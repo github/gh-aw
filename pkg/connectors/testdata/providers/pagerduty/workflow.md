@@ -4,7 +4,7 @@ engine: copilot
 permissions:
   contents: read
 imports:
-  - uses: "@builtin:connectors/pagerduty.md"
+  - uses: ".github/workflows/connectors/pagerduty.md"
     with:
       incidents: [PINC001]
       services: [PSVC001]

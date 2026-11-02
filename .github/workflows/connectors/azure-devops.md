@@ -1,6 +1,14 @@
 ---
 connectors:
   azure-devops:
+    experimental: true
+    docs:
+      - https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server?view=azure-devops
+      - https://learn.microsoft.com/en-us/azure/devops/integrate/get-started/authentication/entra-oauth?view=azure-devops
+      - https://learn.microsoft.com/en-us/rest/api/azure/devops/wit/work-items/create?view=azure-devops-rest-7.1
+      - https://learn.microsoft.com/en-us/rest/api/azure/devops/wit/work-items/update?view=azure-devops-rest-7.1
+      - https://learn.microsoft.com/en-us/rest/api/azure/devops/wit/comments/add-work-item-comment?view=azure-devops-rest-7.1
+      - https://learn.microsoft.com/en-us/azure/devops/service-hooks/events?view=azure-devops
     credentials:
       agent-reader:
         header: Authorization
@@ -178,6 +186,8 @@ connectors:
             required: true
             type: string
           text:
+            sanitize: body
+            minLength: 1
             maxLength: 4000
             required: true
             type: string
@@ -231,6 +241,8 @@ connectors:
             required: true
             type: string
           title:
+            sanitize: title
+            minLength: 20
             maxLength: 256
             required: true
             type: string
@@ -330,6 +342,8 @@ connectors:
             required: true
             type: string
           title:
+            sanitize: title
+            minLength: 20
             maxLength: 256
             required: true
             type: string
@@ -408,11 +422,25 @@ import-schema:
 
 <!--
 <connector-documentation id="azure-devops" version="1">
+  <stability>experimental: true. This connector's contract may change.</stability>
+  <runtime-policies>
+    Human text inputs marked sanitize title or body use the shared publisher's
+    built-in sanitizers. Titles require at least 20 Unicode code points after
+    sanitization. Body limits include protected generated attribution and any
+    configured body footer. Fixed authored request literals are trusted content,
+    not agent-controlled text inputs.
+    Consumer safe-output options support max from 1 to 100, default 1, and staged
+    booleans or expressions. Global or compiler-forced staging always wins.
+    Staged operations do not resolve writer credentials or send provider requests.
+    Automatic retries require an explicit bounded operation retry policy; no policy
+    means one attempt. Repeating writes requires declared idempotency and a
+    repeat-safe PUT, PATCH or DELETE; POST creates and appends cannot retry.
+  </runtime-policies>
   <purpose>
     Experimental Azure DevOps Services connector: organization project metadata
     through hosted read-only MCP, and five separately selected bounded REST
     mutations outside the agent credential boundary. This ordinary Markdown
-    declaration is embedded in the compiler; consumers need no provider checkout.
+    declaration is an editable local file or a reviewed pinned remote import.
     Normal workflow setup supplies the bundled Node host for reads and effects;
     no connector-specific source checkout, Go build, or CLI install is needed.
     Importing registers capabilities but enables none. Azure DevOps Server and
@@ -498,7 +526,7 @@ import-schema:
       target and both items' project membership before approving bindings.
     </resources>
     <selection>
-      Import @builtin:connectors/azure-devops.md with uses/with. Select
+      Import .github/workflows/connectors/azure-devops.md with uses/with. Select
       tools.azure-devops: [azure-devops] for the metadata reader. Independently
       select each safe-outputs.azure-devops-operation below with null or an empty
       object. Omit a selection to disable it; no implicit context or credential
@@ -622,7 +650,8 @@ import-schema:
     shared/mcp/azure-devops.md import are not aliases. Description/body, state,
     tags, area/iteration paths, custom fields, artifact links, arbitrary link
     types/targets, attachment upload/chaining, and temporary-ID chaining have no
-    drop-in replacement. No per-effect budget/staging or work-queue effects.
+    drop-in replacement. Per-effect max and staged controls are supported;
+    work-queue effects remain unsupported.
     Broader behavior needs reviewed declarations and any missing generic support,
     not hidden legacy runtime fallback.
   </limitations>
@@ -643,7 +672,7 @@ engine: copilot
 permissions:
   contents: read
 imports:
-  - uses: "@builtin:connectors/azure-devops.md"
+  - uses: ".github/workflows/connectors/azure-devops.md"
     with:
       organization: fabrikam
       collection: 11111111-1111-4111-8111-111111111111

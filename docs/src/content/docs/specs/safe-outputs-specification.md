@@ -3146,7 +3146,7 @@ This section provides complete definitions for all remaining safe output types. 
 
 The former `linear_create_issue`, `linear_add_comment`, and
 `linear_update_issue` handlers are removed. Linear operations are declarations
-in the compiler-embedded Markdown connector and run through the shared
+in an imported, editable Markdown connector and run through the shared
 connector runtime. See [Connectors](/gh-aw/reference/connectors/#linear) for the
 authoritative credential, resource, typed-input, staging, and migration contract.
 

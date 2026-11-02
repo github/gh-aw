@@ -32,6 +32,7 @@ func parseDatadogConsumer(t *testing.T, source string) (*Compiler, *WorkflowData
 	require.NoError(t, os.WriteFile(path, []byte(source), 0600))
 	compiler := NewCompiler(WithNoEmit(true), WithVersion("v0.0.0-1-gabcdef0"))
 	compiler.gitRoot = root
+	installConnectorTestSources(t, root)
 	compiler.SetActionMode(ActionModeDev)
 	data, err := compiler.ParseWorkflowFile(path)
 	return compiler, data, path, err
@@ -54,7 +55,7 @@ func datadogPlans(t *testing.T) (*connectors.Plan, *connectors.Plan) {
 	return freeze(config.Agent), freeze(config.SafeOutputs)
 }
 
-func TestDatadogConnectorEmbeddedCompilation(t *testing.T) {
+func TestDatadogConnectorLocalImportCompilation(t *testing.T) {
 	source := strings.Replace(datadogFixture(t, "workflow.md"), "  staged: true\n", "", 1)
 	compiler, data, path, err := parseDatadogConsumer(t, source)
 	require.NoError(t, err)
@@ -90,8 +91,8 @@ func TestDatadogConnectorEmbeddedCompilation(t *testing.T) {
 	require.NotContains(t, output, ".gh-aw-connector-runtime")
 	require.NotContains(t, output, "Build trusted connector runtime")
 	require.NotContains(t, output, "connector_7_datadog")
-	_, err = os.Stat(filepath.Join(compiler.gitRoot, ".github", "aw", "connectors"))
-	require.True(t, os.IsNotExist(err), "embedded import must not read provider declarations from the consumer checkout")
+	_, err = os.Stat(filepath.Join(compiler.gitRoot, ".github", "workflows", "connectors"))
+	require.NoError(t, err, "normal imports read editable declarations")
 }
 
 func TestDatadogConnectorIndependentSelections(t *testing.T) {
@@ -181,7 +182,7 @@ func TestDatadogConnectorSitesAndSecretNames(t *testing.T) {
 }
 
 func TestDatadogConnectorXMLDocumentation(t *testing.T) {
-	data, err := os.ReadFile("../../.github/aw/connectors/datadog.md")
+	data, err := os.ReadFile("../../.github/workflows/connectors/datadog.md")
 	require.NoError(t, err)
 	body := strings.SplitN(string(data), "\n---\n", 2)
 	require.Len(t, body, 2)

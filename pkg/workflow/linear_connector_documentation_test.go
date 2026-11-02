@@ -51,7 +51,7 @@ type linearDocumentedExample struct {
 
 func loadLinearDocumentation(t *testing.T) linearDocumentation {
 	t.Helper()
-	source, err := os.ReadFile("../../.github/aw/connectors/linear.md")
+	source, err := os.ReadFile("../../.github/workflows/connectors/linear.md")
 	require.NoError(t, err)
 	parsed, err := parser.ExtractFrontmatterFromContent(string(source))
 	require.NoError(t, err)
@@ -106,8 +106,8 @@ func checkLinearDocumentedCredentials(t *testing.T, frontmatter map[string]any, 
 func TestLinearConnectorDocumentationContract(t *testing.T) {
 	documentation := loadLinearDocumentation(t)
 	require.Equal(t, []linearDocumentedCredential{
-		{ID: "reader", Secret: "LINEAR_READ_API_KEY", Phase: "agent", Scheme: "raw"},
-		{ID: "writer", Secret: "LINEAR_WRITE_API_KEY", Phase: "safe-output", Scheme: "raw"},
+		{ID: "reader", Secret: "LINEAR_API_KEY", Phase: "agent", Scheme: "raw"},
+		{ID: "writer", Secret: "LINEAR_API_KEY", Phase: "safe-output", Scheme: "raw"},
 		{ID: "mcp-reader", Secret: "LINEAR_READ_MCP_TOKEN", Phase: "agent", Scheme: "bearer"},
 	}, documentation.Credentials)
 	require.Len(t, documentation.Tools, 3)
@@ -139,13 +139,14 @@ func compileLinearDocumentationExample(t *testing.T, example linearDocumentedExa
 	require.NoError(t, os.WriteFile(path, []byte(source), 0600))
 	compiler := NewCompiler(WithNoEmit(true), WithVersion("v0.0.0-1-gabcdef0"))
 	compiler.gitRoot = root
+	installConnectorTestSources(t, root)
 	compiler.SetActionMode(ActionModeDev)
 	data, err := compiler.ParseWorkflowFile(path)
 	require.NoError(t, err, "the documentation must compile as a real importing consumer")
 	compiled, err := compiler.CompileToYAML(data, path)
 	require.NoError(t, err)
-	_, err = os.Stat(filepath.Join(root, ".github", "aw", "connectors"))
-	require.True(t, os.IsNotExist(err), "examples must use embedded declarations without consumer connector files")
+	_, err = os.Stat(filepath.Join(root, ".github", "workflows", "connectors"))
+	require.NoError(t, err, "examples use editable local declarations")
 	require.Nil(t, data.Connectors["linear"].Context)
 	return data, compiled
 }
@@ -177,10 +178,10 @@ func TestLinearConnectorDocumentationConsumers(t *testing.T) {
 				require.Nil(t, config.Agent)
 				require.Equal(t, []string{"LINEAR_TEAM_ID", "LINEAR_WRITE_API_KEY"}, config.SafeOutputs.Secrets())
 				require.Equal(t, []string{"create-issue-in-project"}, config.SafeOutputs.SafeOutputNames())
-				_, err := config.SafeOutputs.PrepareSafeOutputIntent("create-issue-in-project", map[string]any{"title": "Title", "body": "Body"})
+				_, err := config.SafeOutputs.PrepareSafeOutputIntent("create-issue-in-project", map[string]any{"title": "A reviewed connector title", "body": "Body"})
 				require.NoError(t, err, "trusted creation can stage without resolving secrets or running preflight")
 				_, err = config.SafeOutputs.PrepareSafeOutputIntent("create-issue-in-project", map[string]any{
-					"title": "Title", "body": "Body", "team-id": "33333333-3333-4333-8333-333333333333",
+					"title": "A reviewed connector title", "body": "Body", "team-id": "33333333-3333-4333-8333-333333333333",
 				})
 				require.Error(t, err, "an example must not allow the agent to rebind a trusted destination")
 			default:
@@ -248,7 +249,7 @@ func checkLinearDocumentedIntent(t *testing.T, plan *connectors.Plan, operation 
 func linearDocumentedArguments(t *testing.T, inputs map[string]connectors.Input) map[string]any {
 	t.Helper()
 	values := map[string]string{
-		"title": "Title", "body": "Body",
+		"title": "A reviewed connector title", "body": "Body",
 		"issue-id":   "22222222-2222-4222-8222-222222222222",
 		"team-id":    "33333333-3333-4333-8333-333333333333",
 		"project-id": "44444444-4444-4444-8444-444444444444",

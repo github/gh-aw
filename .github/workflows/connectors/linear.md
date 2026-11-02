@@ -1,6 +1,14 @@
 ---
 connectors:
   linear:
+    experimental: true
+    docs:
+      - https://linear.app/developers/graphql
+      - https://linear.app/docs/api-and-webhooks
+      - https://linear.app/docs/mcp
+      - https://linear.app/developers/oauth-2-0-authentication
+      - https://linear.app/developers/webhooks
+      - https://raw.githubusercontent.com/linear/linear/master/packages/sdk/src/schema.graphql
     credentials:
       mcp-reader:
         header: Authorization
@@ -99,6 +107,8 @@ connectors:
         credential: writer
         inputs:
           body:
+            sanitize: body
+            minLength: 1
             maxLength: 65000
             pattern: \S
             required: true
@@ -137,6 +147,8 @@ connectors:
         credential: writer
         inputs:
           body:
+            sanitize: body
+            minLength: 1
             maxLength: 65000
             pattern: \S
             required: true
@@ -152,6 +164,8 @@ connectors:
             required: true
             type: string
           title:
+            sanitize: title
+            minLength: 20
             maxLength: 128
             pattern: \S
             required: true
@@ -192,6 +206,8 @@ connectors:
         credential: writer
         inputs:
           body:
+            sanitize: body
+            minLength: 1
             maxLength: 65000
             pattern: \S
             required: true
@@ -207,6 +223,8 @@ connectors:
             required: true
             type: string
           title:
+            sanitize: title
+            minLength: 20
             maxLength: 128
             pattern: \S
             required: true
@@ -302,6 +320,8 @@ connectors:
         credential: writer
         inputs:
           body:
+            sanitize: body
+            minLength: 1
             maxLength: 65000
             pattern: \S
             required: true
@@ -312,6 +332,8 @@ connectors:
             required: true
             type: string
           title:
+            sanitize: title
+            minLength: 20
             maxLength: 128
             pattern: \S
             required: true
@@ -494,17 +516,31 @@ import-schema:
     default: LINEAR_READ_MCP_TOKEN
     type: string
   reader-secret:
-    default: LINEAR_READ_API_KEY
+    default: LINEAR_API_KEY
     type: string
   writer-secret:
-    default: LINEAR_WRITE_API_KEY
+    default: LINEAR_API_KEY
     type: string
 ---
 
 <!--
 <connector-documentation id="linear" version="1">
+  <stability>experimental: true. This connector's contract may change.</stability>
+  <runtime-policies>
+    Human text inputs marked sanitize title or body use the shared publisher's
+    built-in sanitizers. Titles require at least 20 Unicode code points after
+    sanitization. Body limits include protected generated attribution and any
+    configured body footer. Fixed authored request literals are trusted content,
+    not agent-controlled text inputs.
+    Consumer safe-output options support max from 1 to 100, default 1, and staged
+    booleans or expressions. Global or compiler-forced staging always wins.
+    Staged operations do not resolve writer credentials or send provider requests.
+    Automatic retries require an explicit bounded operation retry policy; no policy
+    means one attempt. Repeating writes requires declared idempotency and a
+    repeat-safe PUT, PATCH or DELETE; POST creates and appends cannot retry.
+  </runtime-policies>
   <purpose>
-    Import this embedded declaration as @builtin:connectors/linear.md to read
+    Import this editable declaration as .github/workflows/connectors/linear.md to read
     approved Linear issues and stage typed issue mutations. Importing alone
     enables no capability and grants no resource access. This experimental
     connector uses fixed GraphQL documents, not arbitrary REST requests.
@@ -517,12 +553,12 @@ import-schema:
       required by its selected operations; never grant Admin for these tools.
       Provider permissions and team access are independent of connector grants.
     </acquisition>
-    <credential id="reader" secret="LINEAR_READ_API_KEY" phase="agent" scheme="raw">
+    <credential id="reader" secret="LINEAR_API_KEY" phase="agent" scheme="raw">
       Enable Read for get-issue, resolve-team, and resolve-project.
       GraphQL receives Authorization containing the personal API key verbatim,
       with no Bearer prefix.
     </credential>
-    <credential id="writer" secret="LINEAR_WRITE_API_KEY" phase="safe-output" scheme="raw">
+    <credential id="writer" secret="LINEAR_API_KEY" phase="safe-output" scheme="raw">
       Use Create comments for a comment-only key, Create issues for creation,
       or Write for the full mutation surface including issue updates.
       The trusted create-issue-in-project preflight also requires Read on its
@@ -541,6 +577,9 @@ import-schema:
       or infer MCP compatibility from a successful GraphQL request.
     </credential>
     <storage>
+      GraphQL reader and writer routes default to the conventional LINEAR_API_KEY
+      secret for convenience. For distinct least-privilege identities, override
+      reader-secret and writer-secret with separate names as shown in the examples.
       Store secret values in GitHub repository or appropriately granted
       organization Actions secrets using Settings, Secrets and variables,
       Actions. Environment secrets additionally require the consuming job to
@@ -585,8 +624,8 @@ import-schema:
       Exact 12-character lowercase hexadecimal project slugId values, for
       example abcdef123456, not full project URLs, names, or model UUIDs.
     </resource>
-    <input name="reader-secret" default="LINEAR_READ_API_KEY">Actions secret name.</input>
-    <input name="writer-secret" default="LINEAR_WRITE_API_KEY">Actions secret name.</input>
+    <input name="reader-secret" default="LINEAR_API_KEY">Actions secret name; override for a distinct read identity.</input>
+    <input name="writer-secret" default="LINEAR_API_KEY">Actions secret name; override for a distinct write identity.</input>
     <input name="mcp-reader-secret" default="LINEAR_READ_MCP_TOKEN">Actions secret name.</input>
     <input name="create-team-secret" default="LINEAR_TEAM_ID">
       Actions secret name containing the author-approved lowercase team UUID,
@@ -659,8 +698,9 @@ import-schema:
   <safe-outputs selection-field="safe-outputs">
     <validation>
       Select each linear-prefixed output as null or an empty mapping. All listed
-      arguments are required strings. Titles contain non-whitespace and at most
-      128 characters; bodies contain non-whitespace and at most 65000 characters.
+      arguments are required strings. Sanitized titles contain non-whitespace and
+      20 to 128 Unicode characters; bodies contain non-whitespace and at most
+      65000 characters including generated footers.
       Issue, project and team IDs are lowercase hyphenated UUIDs, not ENG-123.
       These are conservative connector limits, not the complete Linear API.
       body maps to description for issue mutations and body for comments.
@@ -697,7 +737,8 @@ import-schema:
       resolving write/team secrets, running the trusted preflight, or sending
       mutations. Staging is not provider validation or a live test. Agent read
       tools still make authorized reads when selected; staging does not disable
-      arbitrary authored scripts. There is no per-operation staged option.
+      arbitrary authored scripts. Per-operation max and staged options are supported;
+      global staging cannot be overridden by per-operation false.
       Connector-only effects do not request GitHub issue write permission or
       automatically create a GitHub issue for incomplete work.
     </execution>
@@ -742,7 +783,7 @@ permissions:
   contents: read
   copilot-requests: write
 imports:
-  - uses: "@builtin:connectors/linear.md"
+  - uses: ".github/workflows/connectors/linear.md"
     with:
       reader-secret: LINEAR_READ_API_KEY
       mcp-reader-secret: LINEAR_READ_MCP_TOKEN
@@ -778,7 +819,7 @@ permissions:
   contents: read
   copilot-requests: write
 imports:
-  - uses: "@builtin:connectors/linear.md"
+  - uses: ".github/workflows/connectors/linear.md"
     with:
       writer-secret: LINEAR_WRITE_API_KEY
       create-team-secret: LINEAR_TEAM_ID
@@ -807,7 +848,7 @@ safe-outputs:
 </connector-documentation>
 -->
 
-Import `@builtin:connectors/linear.md` and explicitly select read tools and
+Import `.github/workflows/connectors/linear.md` and explicitly select read tools and
 hyphen-prefixed safe outputs. Supply exact resource allowlists through `with`;
 the defaults grant no resources. Personal API keys use raw Authorization;
 hosted MCP requires a separate bearer credential. Event envelopes contain

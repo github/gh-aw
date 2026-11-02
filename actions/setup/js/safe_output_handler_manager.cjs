@@ -245,10 +245,11 @@ const THREAT_WARNING_ABORT_TYPES = new Set([
 /**
  * Resolve threat warning policy for a safe output type.
  * @param {string} messageType
+ * @param {Map<string, Function>} messageHandlers
  * @returns {{policy: "reviewable" | "convertible" | "abort" | "none", mappedType?: string}}
  */
-function getThreatWarningPolicy(messageType) {
-  if (THREAT_WARNING_ABORT_TYPES.has(messageType)) {
+function getThreatWarningPolicy(messageType, messageHandlers) {
+  if (THREAT_WARNING_ABORT_TYPES.has(messageType) || handlerThreatWarningAbortTypes.get(messageHandlers)?.has(messageType)) {
     return { policy: "abort" };
   }
   const mappedType = THREAT_WARNING_CONVERTIBLE_TYPES.get(messageType);
@@ -346,6 +347,12 @@ const PR_REVIEW_HANDLER_TYPES = new Set(["create_pull_request_review_comment", "
  */
 const handlerLoadErrorsByHandlerMap = new WeakMap();
 
+/** @type {WeakMap<Map<string, Function>, Set<string>>} Compiler-owned warning policies, never message payloads. */
+const handlerThreatWarningAbortTypes = new WeakMap();
+
+/** @type {WeakMap<Map<string, Function>, Map<string, {max: number, attempted: number}>>} Trusted connector proposal budgets, scoped to a handler factory. */
+const connectorBudgetsByHandlerMap = new WeakMap();
+
 /**
  * Wrap a handler so project-safe-output execution can temporarily bind global.github
  * to the handler-specific authenticated client.
@@ -426,6 +433,16 @@ function bindHandlerToFactoryScope(handler) {
 async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMentionAliases, activationCommentLinks = []) {
   config = normalizeSafeOutputConfig(config);
   const messageHandlers = new Map();
+  handlerThreatWarningAbortTypes.set(messageHandlers, new Set(Object.keys(config).filter(type => config[type]?.threat_warning_policy === "abort")));
+  const connectorBudgets = new Map();
+  for (const [type, options] of Object.entries(config)) {
+    if (options?.connector_operation !== true) continue;
+    if (!Number.isSafeInteger(options.max) || options.max < 1 || options.max > 100) {
+      throw new Error(`Invalid trusted connector budget for "${type}": max must be an integer from 1 to 100`);
+    }
+    connectorBudgets.set(type, { max: options.max, attempted: 0 });
+  }
+  connectorBudgetsByHandlerMap.set(messageHandlers, connectorBudgets);
 
   /** @type {Map<string, string>} */
   const handlerLoadErrors = new Map();
@@ -1108,7 +1125,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
     }
 
     if (detectionConclusion === "warning") {
-      const threatPolicy = getThreatWarningPolicy(messageType);
+      const threatPolicy = getThreatWarningPolicy(messageType, messageHandlers);
       if (threatPolicy.policy === "abort") {
         const errorCode = "threat_detected_abort_policy";
         const error = `Threat-detection warn policy aborted "${messageType}" (Requirement ${WTD3_REQUIREMENT_ID}): non-reviewable outputs must not be applied when detection conclusion is warning.`;
@@ -1208,6 +1225,22 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
     }
 
     try {
+      const budget = connectorBudgetsByHandlerMap.get(messageHandlers)?.get(messageType);
+      if (budget) {
+        if (budget.attempted >= budget.max) {
+          results.push({
+            type: messageType,
+            messageIndex: i,
+            success: false,
+            errorCode: "connector_budget_exceeded",
+            error: `Connector operation "${messageType}" exceeded its max of ${budget.max} attempted invocation(s)`,
+          });
+          continue;
+        }
+        // Reserve synchronously before invoking the credentialed handler. Failed
+        // proposals consume budget too; HTTP retries stay inside that invocation.
+        budget.attempted++;
+      }
       core.info(`Processing message ${i + 1}/${messages.length}: ${messageType}`);
 
       // Convert Map to plain object for handler

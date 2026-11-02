@@ -13,7 +13,7 @@ import (
 )
 
 const azureDevOpsConsumerImport = `imports:
-  - uses: "@builtin:connectors/azure-devops.md"
+  - uses: ".github/workflows/connectors/azure-devops.md"
     with:
       organization: contoso
       project: 33333333-3333-4333-8333-333333333333
@@ -33,12 +33,13 @@ func parseAzureDevOpsConsumer(t *testing.T, selection string) (*Compiler, *Workf
 	require.NoError(t, os.WriteFile(path, []byte(awConnectorHeader+azureDevOpsConsumerImport+selection+"---\nUse only explicitly approved capabilities.\n"), 0600))
 	compiler := NewCompiler(WithNoEmit(true), WithSkipValidation(true))
 	compiler.gitRoot = root
+	installConnectorTestSources(t, root)
 	compiler.SetActionMode(ActionModeDev)
 	compiler.version = "v0.0.0-1-g683ddf9617"
 	data, err := compiler.ParseWorkflowFile(path)
 	require.NoError(t, err)
-	_, err = os.Stat(filepath.Join(root, ".github", "aw"))
-	require.True(t, os.IsNotExist(err), "the compiler must not require or materialize provider files")
+	_, err = os.Stat(filepath.Join(root, ".github", "workflows", "connectors"))
+	require.NoError(t, err, "the compiler reads normal provider imports")
 	return compiler, data, path
 }
 
@@ -104,6 +105,7 @@ func TestAzureDevOpsConnectorRejectsLegacyAndUnsupportedCapabilities(t *testing.
 			require.NoError(t, os.WriteFile(path, []byte(awConnectorHeader+azureDevOpsConsumerImport+selection+"---\nNo fallback.\n"), 0600))
 			compiler := NewCompiler(WithNoEmit(true))
 			compiler.gitRoot = root
+			installConnectorTestSources(t, root)
 			_, err := compiler.ParseWorkflowFile(path)
 			require.Error(t, err)
 		})
@@ -122,6 +124,7 @@ func TestAzureDevOpsConnectorRejectsLegacyAndUnsupportedCapabilities(t *testing.
 			require.NoError(t, os.WriteFile(path, []byte(header+azureDevOpsConsumerImport+"---\nDo not activate.\n"), 0600))
 			compiler := NewCompiler(WithNoEmit(true))
 			compiler.gitRoot = root
+			installConnectorTestSources(t, root)
 			_, err := compiler.ParseWorkflowFile(path)
 			require.Error(t, err)
 			if !strings.Contains(trigger, "gateway-dispatch") {

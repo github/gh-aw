@@ -279,7 +279,7 @@ func TestAzureDevOpsConnectorMutationFailuresAreNotRetried(t *testing.T) {
 				})},
 			}
 			args := azureDevOpsConsumerArgs()
-			args["title"] = "approved update"
+			args["title"] = "Approved work item title update"
 			_, err := plan.Execute(t.Context(), runtime, "safe-output", "update-work-item", args)
 			require.Error(t, err)
 			assert.Equal(t, 1, calls, "a rejected or ambiguous write must not retry or follow redirects")
@@ -341,9 +341,9 @@ func TestAzureDevOpsConnectorInputBounds(t *testing.T) {
 			switch test.operation {
 			case "create-work-item":
 				delete(args, "work-item")
-				args["title"] = "bounded"
+				args["title"] = "A bounded work item title"
 			case "update-work-item":
-				args["title"] = "bounded"
+				args["title"] = "A bounded work item title"
 			case "comment-on-work-item":
 				args["text"] = "bounded"
 			case "assign-work-item":

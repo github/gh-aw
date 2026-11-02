@@ -3,6 +3,7 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/connectors"
@@ -12,13 +13,15 @@ import (
 // ConnectorDeclaration extends AW frontmatter; versioned runtime documents are
 // compiler internals, not additional files an author needs to maintain.
 type ConnectorDeclaration struct {
-	Endpoints   map[string]string               `json:"endpoints"`
-	Credentials map[string]ConnectorCredential  `json:"credentials"`
-	Resources   map[string][]string             `json:"resources,omitempty"`
-	Triggers    map[string]connectors.Trigger   `json:"triggers,omitempty"`
-	Tools       map[string]connectors.ReadTool  `json:"tools,omitempty"`
-	MCPServers  map[string]connectors.HTTPMCP   `json:"mcp-servers,omitempty"`
-	SafeOutputs map[string]connectors.Operation `json:"safe-outputs,omitempty"`
+	Experimental bool                            `json:"experimental,omitempty"`
+	Docs         []string                        `json:"docs,omitempty"`
+	Endpoints    map[string]string               `json:"endpoints"`
+	Credentials  map[string]ConnectorCredential  `json:"credentials"`
+	Resources    map[string][]string             `json:"resources,omitempty"`
+	Triggers     map[string]connectors.Trigger   `json:"triggers,omitempty"`
+	Tools        map[string]connectors.ReadTool  `json:"tools,omitempty"`
+	MCPServers   map[string]connectors.HTTPMCP   `json:"mcp-servers,omitempty"`
+	SafeOutputs  map[string]connectors.Operation `json:"safe-outputs,omitempty"`
 }
 
 type ConnectorCredential struct {
@@ -58,6 +61,9 @@ func normalizeConnectorDeclaration(alias string, value any) (map[string]any, boo
 }
 
 func (declaration ConnectorDeclaration) registration(alias string) (map[string]any, error) {
+	if err := validateConnectorDocumentationURLs(alias, declaration.Docs); err != nil {
+		return nil, err
+	}
 	spec := connectors.ConnectorSpec{
 		APIVersion: connectors.APIVersion, Kind: "ConnectorSpec", ID: "aw.github.com/" + alias,
 		Endpoints: declaration.Endpoints, Credentials: map[string]connectors.Credential{},
@@ -99,13 +105,12 @@ func (declaration ConnectorDeclaration) registration(alias string) (map[string]a
 			credentials[name] = connectors.SecretRef{Secret: credential.Secret}
 		}
 	}
-	resources := map[string][]string{}
-	for name, values := range declaration.Resources {
-		if len(values) > 0 {
-			resources[name] = values
-		}
+	resources := nonemptyConnectorResources(declaration.Resources)
+	fields := map[string]any{"experimental": declaration.Experimental, "spec": spec, "credentials": credentials, "resources": resources, "github-apps": apps, "oidc-tokens": oidc}
+	if declaration.Docs != nil {
+		fields["docs"] = declaration.Docs
 	}
-	data, err := json.Marshal(map[string]any{"spec": spec, "credentials": credentials, "resources": resources, "github-apps": apps, "oidc-tokens": oidc})
+	data, err := json.Marshal(fields)
 	if err != nil {
 		return nil, err
 	}
@@ -114,4 +119,24 @@ func (declaration ConnectorDeclaration) registration(alias string) (map[string]a
 		return nil, err
 	}
 	return registration, nil
+}
+
+func validateConnectorDocumentationURLs(alias string, references []string) error {
+	for _, reference := range references {
+		docURL, err := url.ParseRequestURI(reference)
+		if err != nil || docURL.Scheme != "https" || docURL.Hostname() == "" || docURL.User != nil || strings.ContainsAny(reference, " \t\r\n") || strings.Contains(reference, "${") {
+			return fmt.Errorf("connectors.%s.docs: each reference must be a literal HTTPS documentation URL without credentials", alias)
+		}
+	}
+	return nil
+}
+
+func nonemptyConnectorResources(resources map[string][]string) map[string][]string {
+	result := map[string][]string{}
+	for name, values := range resources {
+		if len(values) > 0 {
+			result[name] = values
+		}
+	}
+	return result
 }

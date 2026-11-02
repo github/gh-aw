@@ -36,10 +36,11 @@ func parseGitLabConsumer(t *testing.T, source string) (*Compiler, *WorkflowData,
 	require.NoError(t, os.WriteFile(path, []byte(source), 0600))
 	compiler := NewCompiler(WithNoEmit(true), WithVersion("v0.0.0-1-gabcdef0"))
 	compiler.gitRoot = root
+	installConnectorTestSources(t, root)
 	compiler.SetActionMode(ActionModeDev)
 	data, err := compiler.ParseWorkflowFile(path)
-	_, statErr := os.Stat(filepath.Join(root, ".github", "aw"))
-	require.True(t, os.IsNotExist(statErr), "consumer must require only the compiler-embedded declaration")
+	_, statErr := os.Stat(filepath.Join(root, ".github", "workflows", "connectors"))
+	require.NoError(t, statErr, "consumer uses the normal local declaration")
 	return compiler, data, path, err
 }
 
@@ -139,7 +140,7 @@ func TestGitLabConnectorNativeConsumerRejections(t *testing.T) {
 
 func TestGitLabConnectorEmptyGrantsAndDocumentedExamples(t *testing.T) {
 	for _, selection := range []string{"", "tools:\n  gitlab: [get-merge-request]\n", "safe-outputs:\n  gitlab-add-merge-request-note:\n"} {
-		source := "---\non: workflow_dispatch\nengine: copilot\npermissions:\n  contents: read\nimports: ['@builtin:connectors/gitlab.md']\n" + selection + "---\nNo implicit grants.\n"
+		source := "---\non: workflow_dispatch\nengine: copilot\npermissions:\n  contents: read\nimports: ['.github/workflows/connectors/gitlab.md']\n" + selection + "---\nNo implicit grants.\n"
 		_, data, _, err := parseGitLabConsumer(t, source)
 		if selection == "" {
 			require.NoError(t, err)
@@ -149,7 +150,7 @@ func TestGitLabConnectorEmptyGrantsAndDocumentedExamples(t *testing.T) {
 		}
 
 	}
-	source, err := os.ReadFile("../../.github/aw/connectors/gitlab.md")
+	source, err := os.ReadFile("../../.github/workflows/connectors/gitlab.md")
 	require.NoError(t, err)
 	_, body, ok := strings.Cut(string(source), "<!--\n")
 	require.True(t, ok)

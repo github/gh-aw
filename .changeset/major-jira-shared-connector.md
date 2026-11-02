@@ -4,16 +4,17 @@
 
 Replace the native Jira, Linear, and Azure DevOps tools, safe-output handlers,
 and gateway issue triggers with the shared declarative connector runtime.
-Provider Markdown declarations are
-embedded in the compiler and available through ordinary quoted
-`@builtin:connectors/<provider>.md` imports.
+Provider Markdown declarations are editable files under
+`.github/workflows/connectors/<provider>.md`, consumed through ordinary local or
+pinned `owner/repo/path@ref` imports. No provider definitions are compiled in.
 
 Jira workflows must import the declaration, explicitly grant cloud IDs, issue
 keys, projects, and exact queries as needed, and select read profiles and write
 effects independently. Store separate encoded Basic credentials for personal MCP
 reads and REST writes, or use the declared service-account read credential.
-Legacy `auth`/`allowed`, automatic email/token environment injection, and
-per-effect `max`/`staged` options are rejected.
+Legacy `auth`/`allowed` and automatic email/token environment injection are
+rejected. Connector safe-output selections support per-operation `max` budgets
+and `staged` previews in addition to workflow-wide staging.
 
 The connector preserves issue creation, issue updates, ADF comments, and additive
 labels. Updates currently require both summary and description. Explicit
@@ -29,9 +30,10 @@ Linear consumers must replace native toolsets and safe outputs with explicit
 connector imports and selections. Trusted resource preflights preserve the
 smoke workflow's secret-derived team and project-slug destination without
 granting those inputs to the agent. Broad native MCP toolsets, friendly-name
-chaining, and per-operation legacy options are not implicit compatibility paths.
+chaining, and legacy destination options are not implicit compatibility paths.
+Per-operation `max` and `staged` remain explicit supported controls.
 
-Azure DevOps consumers must use the embedded connector and separate read/write
+Azure DevOps consumers must import the connector and use separate read/write
 Entra credentials; automatic PAT/system-token wiring is removed. Hosted MCP
 currently exposes project metadata, while the declared mutations remain bounded
 to title changes, comments, assignment, and fixed related links. Other legacy

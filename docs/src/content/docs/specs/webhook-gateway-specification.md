@@ -845,6 +845,6 @@ The compiler implements hash-bound `getToken` calls and fail-closed client conti
 
 ## References
 
-The [GitHub webhook trigger reference](/gh-aw/reference/webhook-triggers/) defines the detailed GitHub filter catalog and dispatch authorization. The [provider issue reference](/gh-aw/reference/provider-issue-triggers/) explains migration from the removed native integrations to embedded connectors.
+The [GitHub webhook trigger reference](/gh-aw/reference/webhook-triggers/) defines the detailed GitHub filter catalog and dispatch authorization. The [provider issue reference](/gh-aw/reference/provider-issue-triggers/) explains migration from the removed native integrations to imported connector declarations.
 
 See the [GitHub repository dispatch API](https://docs.github.com/en/rest/repos/repos#create-a-repository-dispatch-event), [App installation-token generation](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app), [GitHub actor contexts](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#github-context), [GitHub webhook payloads](https://docs.github.com/en/webhooks/webhook-events-and-payloads), [Jira webhooks](https://developer.atlassian.com/cloud/jira/platform/webhooks/), [Linear webhooks](https://linear.app/developers/webhooks).

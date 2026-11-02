@@ -1,6 +1,14 @@
 ---
 connectors:
   sentry:
+    experimental: true
+    docs:
+      - https://docs.sentry.io/api/auth/
+      - https://docs.sentry.io/api/permissions/
+      - https://docs.sentry.io/api/events/retrieve-an-issue/
+      - https://docs.sentry.io/api/events/update-an-issue/
+      - https://docs.sentry.io/integrations/integration-platform/webhooks/
+      - https://mcp.sentry.dev/
     credentials:
       hosted-reader:
         header: Authorization
@@ -203,6 +211,20 @@ import-schema:
 
 <!--
 <connector-documentation id="sentry" version="1">
+  <stability>experimental: true. This connector's contract may change.</stability>
+  <runtime-policies>
+    Human text inputs marked sanitize title or body use the shared publisher's
+    built-in sanitizers. Titles require at least 20 Unicode code points after
+    sanitization. Body limits include protected generated attribution and any
+    configured body footer. Fixed authored request literals are trusted content,
+    not agent-controlled text inputs.
+    Consumer safe-output options support max from 1 to 100, default 1, and staged
+    booleans or expressions. Global or compiler-forced staging always wins.
+    Staged operations do not resolve writer credentials or send provider requests.
+    Automatic retries require an explicit bounded operation retry policy; no policy
+    means one attempt. Repeating writes requires declared idempotency and a
+    repeat-safe PUT, PATCH or DELETE; POST creates and appends cannot retry.
+  </runtime-policies>
   <purpose>
     Read bounded error-issue metadata and optionally request resolution of one
     approved Sentry issue. Importing this ordinary AW Markdown declaration grants
@@ -276,9 +298,9 @@ import-schema:
     The shipped import does not accept resource or endpoint overrides.
   </resources>
   <imports>
-    Use @builtin:connectors/sentry.md for the compiler-bundled declaration without
-    a checkout file. Local .github/aw/connectors/sentry.md or immutable
-    owner/repo/path@ref imports support reviewed declaration changes.
+    Use an editable local .github/workflows/connectors/sentry.md or an immutable
+    owner/repo/path@ref import. There is no compiler-bundled declaration;
+    normal imports support reviewed downstream changes.
     <parameter name="reader-secret" type="string" default="SENTRY_READ_TOKEN" />
     <parameter name="hosted-reader-secret" type="string" default="SENTRY_MCP_OAUTH_TOKEN" />
     <parameter name="writer-secret" type="string" default="SENTRY_STATUS_TOKEN" />
@@ -383,7 +405,7 @@ permissions:
   contents: read
   copilot-requests: write
 imports:
-  - uses: "@builtin:connectors/sentry.md"
+  - uses: ".github/workflows/connectors/sentry.md"
 safe-outputs:
   staged: true
   sentry-resolve-issue:

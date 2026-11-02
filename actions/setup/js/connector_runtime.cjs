@@ -38,10 +38,18 @@ const operationFields = [
   "trustedInputs",
   "preflight",
   "responseContains",
+  "retry",
 ];
 const numberTokens = new WeakMap();
 
 class ConnectorError extends Error {}
+class ConnectorHTTPError extends ConnectorError {
+  constructor(status, retryAfter = "") {
+    super("Connector HTTP request returned a non-success status; no retry performed");
+    this.status = status;
+    this.retryAfter = retryAfter;
+  }
+}
 function fail(message) {
   throw new ConnectorError(message);
 }
@@ -214,16 +222,19 @@ function origin(value, full = false) {
 function validateInputs(inputs) {
   assert(inputs === undefined || inputs === null || object(inputs));
   for (const [key, input] of entries(inputs)) {
-    fields(input, ["type", "required", "enum", "maxLength", "minimum", "maximum", "pattern"], ["type"]);
+    fields(input, ["type", "required", "enum", "maxLength", "minLength", "sanitize", "minimum", "maximum", "pattern"], ["type"]);
     assert(fixedPattern(argumentPattern, key) && ["string", "integer", "number", "boolean"].includes(input.type));
     assert(input.required === undefined || typeof input.required === "boolean");
     if (input.type === "string") {
       assert(Number.isInteger(input.maxLength) && input.maxLength >= 1 && input.maxLength <= 65536);
+      assert(input.minLength === undefined || (Number.isInteger(input.minLength) && input.minLength >= 0 && input.minLength <= input.maxLength));
+      assert(input.sanitize === undefined || ["title", "body"].includes(input.sanitize));
+      assert(input.sanitize !== "title" || input.maxLength >= 20);
       assert(input.enum === undefined || (Array.isArray(input.enum) && input.enum.every(item => typeof item === "string")));
       assert(input.pattern === undefined || boundedString(input.pattern, 1024));
       assert(input.minimum === undefined && input.maximum === undefined);
     } else {
-      assert(!input.maxLength && !input.enum?.length && !input.pattern);
+      assert(!input.maxLength && !input.minLength && !input.sanitize && !input.enum?.length && !input.pattern);
       assert(["number", "integer"].includes(input.type) || (input.minimum === undefined && input.maximum === undefined));
     }
     for (const key of ["minimum", "maximum"]) assert(input[key] === undefined || (typeof input[key] === "number" && Number.isFinite(input[key])));
@@ -314,6 +325,15 @@ function validateOperation(spec, op, phase, readTool = false) {
   validateInputs(op.inputs);
   for (const key of ["resources", "project", "createdResources", "trustedInputs", "responseContains"]) assert(op[key] === undefined || object(op[key]));
   validateRequest(op.request, op.inputs, phase);
+  if (op.retry !== undefined) {
+    fields(op.retry, ["maxAttempts", "backoffMs", "retryOn", "idempotent"], ["maxAttempts", "backoffMs", "retryOn"]);
+    assert(Number.isInteger(op.retry.maxAttempts) && op.retry.maxAttempts >= 1 && op.retry.maxAttempts <= 4);
+    assert(Number.isInteger(op.retry.backoffMs) && op.retry.backoffMs >= 1 && op.retry.backoffMs <= 1000);
+    assert(Array.isArray(op.retry.retryOn) && op.retry.retryOn.length >= 1 && op.retry.retryOn.length <= 5);
+    assert(new Set(op.retry.retryOn).size === op.retry.retryOn.length && op.retry.retryOn.every(status => [429, 500, 502, 503, 504].includes(status)));
+    assert(op.retry.idempotent === undefined || typeof op.retry.idempotent === "boolean");
+    assert(phase !== "safe-output" || op.retry.maxAttempts === 1 || (op.retry.idempotent === true && ["PUT", "PATCH", "DELETE"].includes(op.request.method)), "Connector write retries require an explicitly idempotent PUT, PATCH or DELETE");
+  }
   for (const [input, resource] of entries(op.resources)) {
     assert(op.inputs?.[input]?.required && op.inputs[input].type === "string" && fixedPattern(namePattern, resource));
   }
@@ -514,7 +534,8 @@ function restrictPhase(plan, phase) {
 }
 async function validateArgument(input, value) {
   if (input.type === "string") {
-    assert(typeof value === "string" && Array.from(value).length <= input.maxLength, "Connector argument must be a bounded Unicode string");
+    const minimum = Math.max(input.minLength || 0, input.sanitize === "title" ? 20 : 0);
+    assert(typeof value === "string" && Array.from(value).length <= input.maxLength && Array.from(value).length >= minimum, "Connector argument must be a bounded Unicode string");
     assert(!input.enum?.length || input.enum.includes(value), "Connector argument is outside its declared enum");
     if (input.pattern) {
       let matched = false;
@@ -792,8 +813,8 @@ function sseResult(text, id, final = false) {
   }
   return undefined;
 }
-/** @param {any} fetchImpl @param {string} url @param {any} init @param {number} maximum @param {number|undefined} [rpcId] */
-async function boundedHTTP(fetchImpl, url, init, maximum, rpcId = undefined) {
+/** @param {any} fetchImpl @param {string} url @param {any} init @param {number} maximum @param {number|undefined} [rpcId] @param {number} [timeout] */
+async function boundedHTTP(fetchImpl, url, init, maximum, rpcId = undefined, timeout = REQUEST_TIMEOUT) {
   const controller = new AbortController();
   let timer;
   let reader;
@@ -801,7 +822,7 @@ async function boundedHTTP(fetchImpl, url, init, maximum, rpcId = undefined) {
     timer = setTimeout(() => {
       controller.abort();
       reject(new ConnectorError("Connector HTTP request timed out; outcome may be unknown, no retry performed"));
-    }, REQUEST_TIMEOUT);
+    }, timeout);
   });
   const operation = async () => {
     let response;
@@ -818,7 +839,8 @@ async function boundedHTTP(fetchImpl, url, init, maximum, rpcId = undefined) {
       return fail("Connector HTTP request failed; outcome may be unknown, no retry performed");
     }
     assert(!response.redirected && (!response.url || response.url === url), "Connector redirects and endpoint changes are prohibited");
-    assert(Number.isInteger(response.status) && response.status >= 200 && response.status < 300, "Connector HTTP request returned a non-success status; no retry performed");
+    assert(Number.isInteger(response.status), "Connector HTTP response has an invalid status");
+    if (response.status < 200 || response.status >= 300) throw new ConnectorHTTPError(response.status, response.headers.get("retry-after") || "");
     const length = response.headers.get("content-length");
     assert(!length || (/^[0-9]+$/u.test(length) && Number(length) <= maximum), "Connector response exceeds its byte bound");
     const mediaType = (response.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
@@ -858,9 +880,33 @@ async function boundedHTTP(fetchImpl, url, init, maximum, rpcId = undefined) {
 async function runOperation(plan, op, capability, name, args, allowed, env, fetchImpl) {
   const request = buildRequest(plan, op, args);
   authenticate(plan, op.credential, capability === "mcp" ? "agent" : capability === "preflight" ? "safe-output" : capability, request.init.headers, env);
-  const { text, response } = await boundedHTTP(fetchImpl, request.url, request.init, op.maxResponseBytes);
-  const data = await validateResponse(op, text, args, allowed);
-  return { connector: plan.spec.id, capability: capability + "/" + name, untrusted: true, statusCode: response.status, data };
+  const attempts = op.retry?.maxAttempts || 1;
+  const deadline = Date.now() + REQUEST_TIMEOUT;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    assert(deadline > Date.now(), "Connector retries exceeded the bounded execution window");
+    let result;
+    try {
+      result = await boundedHTTP(fetchImpl, request.url, request.init, op.maxResponseBytes, undefined, deadline - Date.now());
+    } catch (error) {
+      if (!(error instanceof ConnectorHTTPError) || !op.retry?.retryOn.includes(error.status)) throw error;
+      assert(attempt + 1 < attempts, `Connector HTTP status ${error.status} after ${attempt + 1} attempt(s)`);
+      let delay = op.retry.backoffMs * 2 ** attempt;
+      if (error.retryAfter) {
+        const header = error.retryAfter.trim();
+        const numeric = /^[0-9]+$/u.test(header);
+        const seconds = Number(header);
+        if (numeric) assert(Number.isSafeInteger(seconds) && seconds <= REQUEST_TIMEOUT / 1000, "Connector retry delay exceeds the bounded execution window");
+        const suggested = numeric ? seconds * 1000 : Date.parse(header) - Date.now();
+        if (Number.isFinite(suggested)) delay = Math.max(delay, suggested);
+      }
+      assert(delay < deadline - Date.now(), "Connector retry delay exceeds the bounded execution window");
+      await new Promise(resolve => setTimeout(resolve, delay));
+      continue;
+    }
+    const data = await validateResponse(op, result.text, args, allowed);
+    return { connector: plan.spec.id, capability: capability + "/" + name, untrusted: true, statusCode: result.response.status, data };
+  }
+  throw new ConnectorError("Connector retry attempts exhausted");
 }
 
 function bindingHost(env) {
@@ -1088,7 +1134,8 @@ function inputSchema(inputs) {
   const properties = Object.create(null);
   const required = [];
   for (const [name, input] of entries(inputs)) {
-    const { required: mandatory, ...property } = input;
+    const { required: mandatory, sanitize, ...property } = input;
+    if (sanitize === "title") property.minLength = Math.max(property.minLength || 0, 20);
     properties[name] = property;
     if (mandatory) required.push(name);
   }

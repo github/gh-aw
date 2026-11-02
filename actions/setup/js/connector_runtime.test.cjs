@@ -55,6 +55,69 @@ const execute = (doc, args = { record: "approved" }, options = {}, capability = 
 
 afterEach(() => vi.restoreAllMocks());
 
+describe("declared bounded retries", () => {
+  const retry = { maxAttempts: 3, backoffMs: 1, retryOn: [429, 503] };
+
+  it("retries explicit transient statuses and preserves the exact request", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({}, 503))
+      .mockResolvedValueOnce(jsonResponse({}, 429))
+      .mockResolvedValueOnce(jsonResponse({ id: "approved" }));
+    await execute(document("agent", { retry }), undefined, { fetchImpl }, "mcp");
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    for (const [url, options] of fetchImpl.mock.calls) {
+      expect(url).toBe("https://api.example.com/records/approved");
+      expect(options.headers.Authorization).toBe("Bearer test-token-not-a-real-credential");
+      expect(options.redirect).toBe("manual");
+    }
+  });
+
+  it.each([401, 403, 404])("never retries authorization or non-transient HTTP %s", async status => {
+    const fetchImpl = vi.fn(async () => jsonResponse({}, status));
+    await expect(execute(document("agent", { retry }), undefined, { fetchImpl }, "mcp")).rejects.toThrow();
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry transport errors or excessive Retry-After delays", async () => {
+    for (const fetchImpl of [
+      vi.fn(async () => {
+        throw new Error("transport failure");
+      }),
+      vi.fn(async () => jsonResponse({}, 429, { "retry-after": "3600" })),
+    ]) {
+      await expect(execute(document("agent", { retry }), undefined, { fetchImpl }, "mcp")).rejects.toThrow();
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("rejects automatic create retries even with an idempotency assertion", () => {
+    expect(() => decodePlan(encode(document("safe-output", { retry: { ...retry, idempotent: true } })))).toThrow(/idempotent/);
+  });
+
+  it("requires explicit idempotency for retrying PUT effects", async () => {
+    const doc = document("safe-output", { retry: { ...retry, idempotent: true }, request: { endpoint: "api", method: "PUT", path: "/records/{record}", pathInputs: { record: "record" } } });
+    const fetchImpl = vi.fn().mockResolvedValueOnce(jsonResponse({}, 503)).mockResolvedValueOnce(jsonResponse());
+    await execute(doc, undefined, { fetchImpl });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    delete doc.spec.safeOutputs.operation.retry.idempotent;
+    expect(() => decodePlan(encode(doc))).toThrow(/idempotent/);
+  });
+});
+
+describe("minimum title length", () => {
+  it.each(["a", "💬"])("counts %s by Unicode code points and rejects titles shorter than 20", async character => {
+    const doc = document("safe-output", {
+      inputs: { record: { type: "string", required: true, maxLength: 80 }, title: { type: "string", required: true, sanitize: "title", maxLength: 128 } },
+      request: { endpoint: "api", method: "POST", path: "/records/{record}", pathInputs: { record: "record" }, body: { title: { input: "title" } } },
+    });
+    const fetchImpl = vi.fn();
+    await expect(execute(doc, { record: "approved", title: character.repeat(19) }, { staged: true, fetchImpl })).rejects.toThrow(/bounded Unicode/);
+    await expect(execute(doc, { record: "approved", title: character.repeat(20) }, { staged: true, fetchImpl })).resolves.toMatchObject({ staged: true });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+});
+
 describe("compiler-frozen connector snapshots", () => {
   it("verifies raw Go value slices, including map order and HTML escaping", () => {
     const doc = document();

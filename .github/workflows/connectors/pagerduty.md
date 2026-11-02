@@ -1,6 +1,14 @@
 ---
 connectors:
   pagerduty:
+    experimental: true
+    docs:
+      - https://docs.pagerduty.com/developer/authentication
+      - https://docs.pagerduty.com/account-admin/api-access-keys
+      - https://docs.pagerduty.com/developer/api/reference/rest/incidents/get-incident
+      - https://docs.pagerduty.com/developer/api/reference/rest/incidents/create-incident-note
+      - https://raw.githubusercontent.com/PagerDuty/api-schema/main/reference/REST/openapiv3.json
+      - https://docs.pagerduty.com/developer/verifying-webhook-signatures
     credentials:
       reader:
         header: Authorization
@@ -34,6 +42,8 @@ connectors:
             maxLength: 32
             pattern: ^[A-Z][A-Z0-9]{6,31}$
           content:
+            sanitize: body
+            minLength: 1
             type: string
             required: true
             maxLength: 2000
@@ -158,6 +168,20 @@ import-schema:
 
 <!--
 <connector-documentation id="pagerduty" version="1">
+  <stability>experimental: true. This connector's contract may change.</stability>
+  <runtime-policies>
+    Human text inputs marked sanitize title or body use the shared publisher's
+    built-in sanitizers. Titles require at least 20 Unicode code points after
+    sanitization. Body limits include protected generated attribution and any
+    configured body footer. Fixed authored request literals are trusted content,
+    not agent-controlled text inputs.
+    Consumer safe-output options support max from 1 to 100, default 1, and staged
+    booleans or expressions. Global or compiler-forced staging always wins.
+    Staged operations do not resolve writer credentials or send provider requests.
+    Automatic retries require an explicit bounded operation retry policy; no policy
+    means one attempt. Repeating writes requires declared idempotency and a
+    repeat-safe PUT, PATCH or DELETE; POST creates and appends cannot retry.
+  </runtime-policies>
   <purpose>
     Correlate a GitHub Actions investigation with one explicitly approved
     PagerDuty incident, service, and team. Read minimal incident metadata and
@@ -225,7 +249,7 @@ import-schema:
     </events-api>
   </credentials>
   <imports>
-    Import @builtin:connectors/pagerduty.md from a conventional workflow under
+    Import .github/workflows/connectors/pagerduty.md from a conventional workflow under
     .github/workflows. No connector definition files, YAML specifications, local
     provider copies, or enrollment are needed in the consuming repository.
     incidents, services, and teams are arrays of exact PagerDuty resource IDs,
@@ -345,7 +369,7 @@ permissions:
   contents: read
   copilot-requests: write
 imports:
-  - uses: "@builtin:connectors/pagerduty.md"
+  - uses: ".github/workflows/connectors/pagerduty.md"
     with:
       incidents: [PINC001]
       services: [PSVC001]

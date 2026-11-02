@@ -40,8 +40,8 @@ See **[GitHub Tools Reference](/gh-aw/reference/github-tools/)** for complete co
 
 ### Linear Tools (`linear:`)
 
-Linear is supplied by the compiler-embedded Markdown connector, not a built-in
-toolset. Import `@builtin:connectors/linear.md`, configure exact resource grants,
+Linear is configured through an imported Markdown connector, not a built-in
+toolset. Import `.github/workflows/connectors/linear.md`, configure exact resource grants,
 and select `tools.linear: [get-issue]` or the reviewed hosted MCP registration.
 Personal GraphQL API keys and hosted MCP bearer tokens are separate credentials.
 See [Connectors](/gh-aw/reference/connectors/#linear) for the single configuration
@@ -49,7 +49,7 @@ reference and migration limitations.
 
 ### Jira connector
 
-Import `"@builtin:connectors/jira.md"` and select `tools.jira: [personal]` or
+Import `".github/workflows/connectors/jira.md"` and select `tools.jira: [personal]` or
 `[service-account]` with explicit cloud, issue, and query grants. The former
 `auth`/`allowed` built-in configuration is no longer supported. See the
 [Jira connector reference](/gh-aw/reference/connectors/#jira) for inputs,

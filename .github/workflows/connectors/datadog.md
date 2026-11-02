@@ -1,6 +1,14 @@
 ---
 connectors:
   datadog:
+    experimental: true
+    docs:
+      - https://docs.datadoghq.com/extend/authorization/
+      - https://docs.datadoghq.com/extend/authorization/oauth2_in_datadog/
+      - https://docs.datadoghq.com/api/latest/monitors/get-a-monitors-details/
+      - https://docs.datadoghq.com/api/latest/incidents/get-the-details-of-an-incident/
+      - https://docs.datadoghq.com/api/latest/incidents/update-an-existing-incident/
+      - https://docs.datadoghq.com/api/latest/scopes/
     credentials:
       monitor-reader:
         header: Authorization
@@ -103,6 +111,8 @@ connectors:
             maxLength: 36
             pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
           title:
+            sanitize: title
+            minLength: 20
             type: string
             required: true
             maxLength: 128
@@ -176,6 +186,20 @@ import-schema:
 
 <!--
 <connector-documentation id="datadog" version="1">
+  <stability>experimental: true. This connector's contract may change.</stability>
+  <runtime-policies>
+    Human text inputs marked sanitize title or body use the shared publisher's
+    built-in sanitizers. Titles require at least 20 Unicode code points after
+    sanitization. Body limits include protected generated attribution and any
+    configured body footer. Fixed authored request literals are trusted content,
+    not agent-controlled text inputs.
+    Consumer safe-output options support max from 1 to 100, default 1, and staged
+    booleans or expressions. Global or compiler-forced staging always wins.
+    Staged operations do not resolve writer credentials or send provider requests.
+    Automatic retries require an explicit bounded operation retry policy; no policy
+    means one attempt. Repeating writes requires declared idempotency and a
+    repeat-safe PUT, PATCH or DELETE; POST creates and appends cannot retry.
+  </runtime-policies>
   <purpose>
     Correlate a GitHub Actions investigation with explicitly approved Datadog
     monitor and incident metadata. Optionally propose a title-only incident
@@ -237,7 +261,7 @@ import-schema:
     </mode>
   </authentication>
   <configuration>
-    Import @builtin:connectors/datadog.md from the compiler distribution.
+    Import .github/workflows/connectors/datadog.md from the compiler distribution.
     Local or reviewed pinned imports are alternatives; no provider YAML file
     or Datadog SDK is required in the consumer repository. Importing alone
     selects no capabilities and resolves no credentials.
@@ -291,7 +315,7 @@ import-schema:
     <effect>
       Select safe-outputs.datadog-rename-incident with null or an empty mapping.
       The generated datadog_rename_incident effect accepts only incident-id and
-      title. Title must contain non-whitespace text and be at most 128 Unicode
+      title. Sanitized title must contain non-whitespace text and 20 to 128 Unicode
       characters. PATCH /api/v2/incidents/{incident-id} sends only a data
       object with type incidents, the same id, and attributes.title.
       It does not set state, severity, impact, notification handles,
@@ -302,7 +326,7 @@ import-schema:
       Whole-workflow safe-outputs.staged: true validates and prepares the
       request without resolving writer credentials or contacting Datadog.
       Remove staging only after reviewing the workflow, target and title.
-      There is no per-operation retry, automatic rollback or concurrency
+      No retry policy is enabled by default. There is no automatic rollback or concurrency
       precondition; a non-staged rename can overwrite a concurrent title.
     </effect>
     <mcp>
@@ -353,7 +377,7 @@ engine: copilot
 permissions:
   contents: read
 imports:
-  - uses: "@builtin:connectors/datadog.md"
+  - uses: ".github/workflows/connectors/datadog.md"
     with:
       api-origin: https://api.datadoghq.com
       monitors: ["12345678"]

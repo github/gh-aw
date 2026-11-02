@@ -32,7 +32,7 @@ func serviceNowImportCompiler(t *testing.T, with, selection string) (*Compiler, 
 	root := t.TempDir()
 	path := filepath.Join(root, ".github", "workflows", "servicenow.md")
 	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0700))
-	source := awConnectorHeader + "imports:\n  - uses: \"@builtin:connectors/servicenow.md\"\n"
+	source := awConnectorHeader + "imports:\n  - uses: \".github/workflows/connectors/servicenow.md\"\n"
 	if with != "" {
 		source += "    with:\n" + with
 	}
@@ -40,13 +40,14 @@ func serviceNowImportCompiler(t *testing.T, with, selection string) (*Compiler, 
 	require.NoError(t, os.WriteFile(path, []byte(source), 0600))
 	compiler := NewCompiler(WithNoEmit(true), WithSkipValidation(true))
 	compiler.gitRoot = root
+	installConnectorTestSources(t, root)
 	compiler.SetActionMode(ActionModeDev)
 	compiler.version = "v0.0.0-1-gdc0f368c6c"
 	return compiler, path
 }
 
 func TestServiceNowMarkdownDocumentation(t *testing.T) {
-	source, err := os.ReadFile("../../.github/aw/connectors/servicenow.md")
+	source, err := os.ReadFile("../../.github/workflows/connectors/servicenow.md")
 	require.NoError(t, err)
 	parts := strings.SplitN(string(source), "---\n", 3)
 	require.Len(t, parts, 3)
@@ -58,7 +59,7 @@ func TestServiceNowMarkdownDocumentation(t *testing.T) {
 	require.True(t, found)
 	assert.NotContains(t, comment, "--", "HTML comments cannot contain internal double hyphens, even in CDATA")
 	assert.NotContains(t, comment, "connector_10_", "document the direct provider tool names")
-	assert.Empty(t, scanImportedConnectorMarkdown(string(source), "/repo/.github/aw/connectors/servicenow.md"),
+	assert.Empty(t, scanImportedConnectorMarkdown(string(source), "/repo/.github/workflows/connectors/servicenow.md"),
 		"the self-contained XML comment must be accepted by the actual local-import scanner")
 
 	var doc struct {
@@ -126,7 +127,7 @@ func TestServiceNowMarkdownDocumentation(t *testing.T) {
 	assert.Equal(t, true, effects["staged"])
 
 	root := t.TempDir()
-	dir := filepath.Join(root, ".github", "aw", "connectors")
+	dir := filepath.Join(root, ".github", "workflows", "connectors")
 	require.NoError(t, os.MkdirAll(dir, 0700))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "servicenow.md"), source, 0600))
 	path := filepath.Join(root, ".github", "workflows", "servicenow-review.md")
@@ -135,6 +136,7 @@ func TestServiceNowMarkdownDocumentation(t *testing.T) {
 	require.NoError(t, os.WriteFile(path, []byte(content), 0600))
 	compiler := NewCompiler(WithNoEmit(true), WithSkipValidation(true))
 	compiler.gitRoot = root
+	installConnectorTestSources(t, root)
 	compiler.SetActionMode(ActionModeDev)
 	compiler.version = "v0.0.0-1-gdc0f368c6c"
 	data, err := compiler.ParseWorkflowFile(path)
@@ -215,8 +217,8 @@ func TestServiceNowMarkdownIndependentSelections(t *testing.T) {
 			output, err := compiler.CompileToYAML(data, path)
 			require.NoError(t, err)
 			assertServiceNowMarkdownCredentials(t, output, test.read, test.write)
-			_, err = os.Stat(filepath.Join(compiler.gitRoot, ".github", "aw"))
-			assert.True(t, os.IsNotExist(err), "embedded imports require no checkout declaration")
+			_, err = os.Stat(filepath.Join(compiler.gitRoot, ".github", "workflows", "connectors"))
+			assert.NoError(t, err, "normal imports use editable checkout declarations")
 		})
 	}
 	for _, test := range []struct{ grant, selection string }{
@@ -267,7 +269,7 @@ func TestServiceNowMarkdownRejectsUnsupportedAuthority(t *testing.T) {
 		{"unknown-tool", serviceNowImportGrants, "tools:\n  servicenow: [get-record]\n"},
 		{"write-as-read", serviceNowImportGrants, "tools:\n  servicenow: [append-incident-work-note]\n"},
 		{"context", serviceNowImportGrants, "context:\n  servicenow:\n    incident-metadata: {record: " + serviceNowImportIncident + "}\n"},
-		{"effect-options", serviceNowImportGrants, "safe-outputs:\n  servicenow-append-incident-work-note: {staged: true}\n"},
+		{"unknown-effect-option", serviceNowImportGrants, "safe-outputs:\n  servicenow-append-incident-work-note: {unknown: true}\n"},
 		{"general-update", serviceNowImportGrants, "safe-outputs:\n  servicenow-update-record:\n"},
 	} {
 		t.Run(test.name, func(t *testing.T) {

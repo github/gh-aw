@@ -4,7 +4,7 @@ engine: copilot
 permissions:
   contents: read
 imports:
-  - uses: "@builtin:connectors/datadog.md"
+  - uses: ".github/workflows/connectors/datadog.md"
     with:
       api-origin: https://api.datadoghq.com
       monitors: ["12345678"]

@@ -1,7 +1,7 @@
 ---
 engine: copilot
 imports:
-  - uses: "@builtin:connectors/jira.md"
+  - uses: ".github/workflows/connectors/jira.md"
     with:
       site: https://example.atlassian.net
       cloud-ids: [00000000-0000-4000-8000-000000000001]

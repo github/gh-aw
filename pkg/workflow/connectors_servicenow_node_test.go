@@ -58,8 +58,11 @@ func TestServiceNowBundledNodeRuntime(t *testing.T) {
 	require.NoError(t, err)
 	command := exec.CommandContext(t.Context(), node, "-e", serviceNowNodeDriver, filepath.Join(assets, "connector_runtime.cjs"))
 	command.Stdin = strings.NewReader(string(input))
-	output, err := command.CombinedOutput()
-	require.NoError(t, err, "%s", output)
+	command.Env = []string{}
+	var diagnostics strings.Builder
+	command.Stderr = &diagnostics
+	output, err := command.Output()
+	require.NoError(t, err, "%s\n%s", output, diagnostics.String())
 	require.JSONEq(t, `{"tables":2,"generatedStagedEffects":2}`, string(output))
 }
 
@@ -68,6 +71,8 @@ const assert = require("node:assert/strict");
 const { join } = require("node:path");
 const input = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
 const { executeConnector } = require(process.argv[1]);
+const { decodePlan } = require(join(input.setup, "connector_runtime.cjs"));
+const { formatConnectorArguments } = require(join(input.setup, "connector_content.cjs"));
 const note = "Synthetic review\n" + "$" + "{{ secrets.NOT_A_SECRET }} $(not-code)";
 const secretFree = new Proxy({}, { get() { throw new Error("credential access forbidden"); } });
 const jsonData = value => JSON.parse(JSON.stringify(value));
@@ -178,7 +183,9 @@ async function main() {
     };
     const generated = new Function("item", "require", "process", "temporaryIdMap", input.scripts[operation]);
     const staged = generated({ type: "servicenow_" + operation.replaceAll("-", "_"), ...args }, adaptedRequire, stagedProcess, new Map());
-    assert.deepEqual(staged, input.expected[operation], "the generated effect must invoke the copied Node assets and preserve the Go intent");
+    const expected = input.expected[operation];
+    expected.request.arguments = formatConnectorArguments(decodePlan(input.effects), operation, args);
+    assert.deepEqual(staged, expected, "the generated effect must stage formatted wire arguments, not the raw Go compatibility intent");
   }
   process.stdout.write(JSON.stringify({ tables: 2, generatedStagedEffects: 2 }));
 }

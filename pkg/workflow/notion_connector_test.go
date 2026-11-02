@@ -29,7 +29,7 @@ type notionDocumentation struct {
 
 func notionConsumerExample(t *testing.T) string {
 	t.Helper()
-	source, err := os.ReadFile("../../.github/aw/connectors/notion.md")
+	source, err := os.ReadFile("../../.github/workflows/connectors/notion.md")
 	require.NoError(t, err)
 	parts := strings.SplitN(string(source), "---", 3)
 	require.Len(t, parts, 3)
@@ -59,6 +59,7 @@ func parseNotionConsumer(t *testing.T, source string) (*Compiler, *WorkflowData,
 	require.NoError(t, os.WriteFile(path, []byte(source), 0600))
 	compiler := NewCompiler(WithNoEmit(true), WithVersion("v0.0.0-1-gabcdef0"))
 	compiler.gitRoot = root
+	installConnectorTestSources(t, root)
 	compiler.SetActionMode(ActionModeDev)
 	data, err := compiler.ParseWorkflowFile(path)
 	return compiler, data, path, err
@@ -89,8 +90,8 @@ func TestNotionConnectorDocumentedConsumer(t *testing.T) {
 	require.NotContains(t, string(effects), "${{ secrets.NOTION_READ_TOKEN }}")
 	require.NotContains(t, string(effects), "${{ secrets.NOTION_COMMENT_WRITE_TOKEN }}", "staged effects must not materialize credentials")
 	require.NotContains(t, output, "connectors invoke context")
-	_, err = os.Stat(filepath.Join(compiler.gitRoot, ".github", "aw", "connectors"))
-	require.ErrorIs(t, err, os.ErrNotExist, "builtin imports must work without consumer-side definitions")
+	_, err = os.Stat(filepath.Join(compiler.gitRoot, ".github", "workflows", "connectors"))
+	require.NoError(t, err, "normal imports use editable consumer-side declarations")
 
 	compiler, data, path, err = parseNotionConsumer(t, strings.Replace(notionConsumerExample(t), "  staged: true\n", "", 1))
 	require.NoError(t, err)

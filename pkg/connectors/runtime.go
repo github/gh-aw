@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"path"
@@ -38,8 +37,9 @@ type Result struct {
 	CreatedResource string          `json:"createdResource,omitempty"`
 }
 
-// Execute revalidates the typed request at the execution boundary. No operation
-// retries, redirects, pagination, or credential fallback are performed.
+// Execute revalidates the typed request at the execution boundary. No
+// redirects, pagination, or credential fallback are performed. Retries require
+// an explicit bounded policy and never replay uncertain transport failures.
 func (p *Plan) Execute(ctx context.Context, runtime Runtime, capability, name string, args map[string]any) (*Result, error) {
 	op, err := p.authorizeOperation(runtime, capability, name, args)
 	if err != nil {
@@ -60,27 +60,15 @@ func (p *Plan) executeOperation(ctx context.Context, runtime Runtime, capability
 		return nil, err
 	}
 	client := boundedClient(runtime.Client)
-	response, err := client.Do(request)
+	data, status, err := connectorHTTP(ctx, client, request, op.MaxResponseBytes, op.Retry)
 	if err != nil {
-		return nil, errors.New("connector HTTP request failed; outcome may be unknown, no retry performed")
-	}
-	defer func() {
-		if err := response.Body.Close(); err != nil {
-			log.Printf("close connector response: %v", err)
-		}
-	}()
-	data, err := io.ReadAll(io.LimitReader(response.Body, int64(op.MaxResponseBytes)+1))
-	if err != nil || len(data) > op.MaxResponseBytes {
-		return nil, errors.New("connector response could not be read within its byte bound")
-	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return nil, fmt.Errorf("connector HTTP status %d; no retry performed", response.StatusCode)
+		return nil, err
 	}
 	data, err = p.validateResponse(op, data, args)
 	if err != nil {
 		return nil, err
 	}
-	return &Result{Connector: p.spec.ID, Capability: path.Join(capability, name), Untrusted: true, StatusCode: response.StatusCode, Data: data}, nil
+	return &Result{Connector: p.spec.ID, Capability: path.Join(capability, name), Untrusted: true, StatusCode: status, Data: data}, nil
 }
 
 func (p *Plan) authorizeOperation(runtime Runtime, capability, name string, args map[string]any) (Operation, error) {

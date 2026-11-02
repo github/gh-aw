@@ -83,13 +83,13 @@ func TestDatadogConnectorGeneratedEffectStagesInBundledNode(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, os.WriteFile(filepath.Join(scripts, file), content, 0600))
 	}
-	input, err := json.Marshal(map[string]any{"script": effect.Script, "item": map[string]any{
+	input, err := json.Marshal(map[string]any{"script": effect.Script, "assets": filepath.Dir(runtime), "item": map[string]any{
 		"type": "datadog_rename_incident", "incident-id": datadogIncidentID, "title": "Staged build evidence",
 	}})
 	require.NoError(t, err)
 	command := exec.CommandContext(t.Context(), node, "-e", `
 const { readFileSync } = require("node:fs");
-const { script, item } = JSON.parse(readFileSync(0, "utf8"));
+const { script, item, assets } = JSON.parse(readFileSync(0, "utf8"));
 const realRequire = require;
 const scopedRequire = name => {
   if (name === "./safe_output_helpers.cjs") return { isStagedMode: () => true };
@@ -99,7 +99,7 @@ const scopedRequire = name => {
       record() { throw new Error("staging must not record a mutation"); }
     })
   };
-  return realRequire(name);
+  return name.startsWith("./") ? realRequire(require("node:path").join(assets, name)) : realRequire(name);
 };
 const result = new Function("require", "item", "temporaryIdMap", script)(scopedRequire, item, {});
 process.stdout.write(JSON.stringify(result));

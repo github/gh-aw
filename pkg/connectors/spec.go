@@ -32,6 +32,8 @@ type Input struct {
 	Required  bool     `json:"required,omitempty"`
 	Enum      []string `json:"enum,omitempty"`
 	MaxLength int      `json:"maxLength,omitempty"`
+	MinLength int      `json:"minLength,omitempty"`
+	Sanitize  string   `json:"sanitize,omitempty"`
 	Minimum   *float64 `json:"minimum,omitempty"`
 	Maximum   *float64 `json:"maximum,omitempty"`
 	Pattern   string   `json:"pattern,omitempty"`
@@ -84,6 +86,15 @@ type Operation struct {
 	TrustedInputs          map[string]TrustedInput `json:"trustedInputs,omitempty"`
 	Preflight              *TrustedPreflight       `json:"preflight,omitempty"`
 	ResponseContains       map[string]string       `json:"responseContains,omitempty"`
+	Retry                  *RetryPolicy            `json:"retry,omitempty"`
+}
+
+// RetryPolicy bounds explicitly declared transient HTTP-status retries.
+type RetryPolicy struct {
+	MaxAttempts int   `json:"maxAttempts"`
+	BackoffMS   int   `json:"backoffMs"`
+	RetryOn     []int `json:"retryOn"`
+	Idempotent  bool  `json:"idempotent,omitempty"`
 }
 
 type TrustedInput struct {

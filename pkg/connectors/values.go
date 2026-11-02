@@ -59,7 +59,11 @@ func validateArgument(input Input, value any) error {
 	switch input.Type {
 	case "string":
 		text, ok := value.(string)
-		if !ok || !utf8.ValidString(text) || utf8.RuneCountInString(text) > input.MaxLength {
+		minimum := input.MinLength
+		if input.Sanitize == "title" && minimum < 20 {
+			minimum = 20
+		}
+		if !ok || !utf8.ValidString(text) || utf8.RuneCountInString(text) > input.MaxLength || utf8.RuneCountInString(text) < minimum {
 			return errors.New("expected a bounded UTF-8 string")
 		}
 		if len(input.Enum) != 0 && !slices.Contains(input.Enum, text) {

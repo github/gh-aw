@@ -144,17 +144,26 @@ func TestZendeskConnectorStagedHostDoesNotReadSecrets(t *testing.T) {
 	require.NoError(t, err)
 	proposalJSON, err := json.Marshal(proposal)
 	require.NoError(t, err)
+	setup, err := filepath.Abs("../../actions/setup/js")
+	require.NoError(t, err)
 	driver := fmt.Sprintf(`
 const assert = require('node:assert/strict');
+const path = require('node:path');
 let calls = 0;
 const proposal = %s;
 const runnerTemp = %q;
+const setup = %q;
+const encoded = %s;
+const { decodePlan } = require(path.join(setup, 'connector_runtime.cjs'));
+const { formatConnectorArguments } = require(path.join(setup, 'connector_content.cjs'));
+const originalArguments = proposal.arguments;
+proposal.arguments = formatConnectorArguments(decodePlan(encoded), 'add-internal-note', originalArguments);
 const adaptedRequire = name => {
   if (name === 'node:child_process') return {spawnSync: (binary, args, options) => {
     calls++;
     assert.equal(binary, process.execPath);
     assert.deepEqual(args, [require('node:path').join(runnerTemp,'gh-aw','actions','connector_runtime.cjs'),'invoke','safe-output','add-internal-note','--stage']);
-    assert.deepEqual(options.env, {GH_AW_CONNECTOR_PLAN: %s});
+    assert.deepEqual(options.env, {GH_AW_CONNECTOR_PLAN: encoded});
     assert.deepEqual(JSON.parse(options.input), proposal.arguments);
     assert.equal(options.shell, undefined);
     assert.equal(options.timeout, 25000);
@@ -166,19 +175,19 @@ const adaptedRequire = name => {
     get env() { throw new Error('staging must not read effect bindings'); },
     record() { throw new Error('staging must not record a delivered write'); }
   })};
-  return require(name);
+  return name.startsWith('./') ? require(path.join(setup, name)) : require(name);
 };
 const env = new Proxy({}, {get: (_, key) => {
   if (key === 'RUNNER_TEMP') return runnerTemp;
   throw new Error('staging must not read provider credentials: ' + key);
 }});
 const result = new Function('item','require','process','temporaryIdMap', %s)(
-  {type:'zendesk_add_internal_note', ...proposal.arguments},
+  {type:'zendesk_add_internal_note', ...originalArguments},
   adaptedRequire, {execPath: process.execPath, env}, new Map()
 );
 assert.deepEqual(result, {staged:true,request:proposal});
 assert.equal(calls, 1);
-`, proposalJSON, runnerTemp, encodedJSON, source)
+`, proposalJSON, runnerTemp, setup, encodedJSON, source)
 	command := exec.CommandContext(t.Context(), node, "-e", driver)
 	command.Env = []string{}
 	output, err := command.CombinedOutput()

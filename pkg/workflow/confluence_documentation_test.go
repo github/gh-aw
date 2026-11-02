@@ -24,7 +24,7 @@ import (
 )
 
 const confluencePublicImport = `imports:
-  - uses: "@builtin:connectors/confluence.md"
+  - uses: ".github/workflows/connectors/confluence.md"
     with:
       clouds: ["11111111-2222-4333-8444-555555555555"]
       spaces: ["123"]
@@ -50,7 +50,7 @@ type confluenceDocumentation struct {
 
 func confluenceDocumentationSource(t *testing.T) (string, confluenceDocumentation) {
 	t.Helper()
-	source, err := os.ReadFile("../../.github/aw/connectors/confluence.md")
+	source, err := os.ReadFile("../../.github/workflows/connectors/confluence.md")
 	require.NoError(t, err)
 	document, err := parser.ExtractFrontmatterFromContent(string(source))
 	require.NoError(t, err)
@@ -79,16 +79,17 @@ func confluencePublicConsumer(t *testing.T, source string, local bool) (*Compile
 	path := filepath.Join(root, ".github", "workflows", "confluence.md")
 	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0700))
 	if local {
-		declaration, err := os.ReadFile("../../.github/aw/connectors/confluence.md")
+		declaration, err := os.ReadFile("../../.github/workflows/connectors/confluence.md")
 		require.NoError(t, err)
-		target := filepath.Join(root, ".github", "aw", "connectors", "confluence.md")
+		target := filepath.Join(root, ".github", "workflows", "connectors", "confluence.md")
 		require.NoError(t, os.MkdirAll(filepath.Dir(target), 0700))
 		require.NoError(t, os.WriteFile(target, declaration, 0600))
-		source = strings.ReplaceAll(source, "@builtin:connectors/confluence.md", ".github/aw/connectors/confluence.md")
+		source = strings.ReplaceAll(source, ".github/workflows/connectors/confluence.md", ".github/workflows/connectors/confluence.md")
 	}
 	require.NoError(t, os.WriteFile(path, []byte(source), 0600))
 	compiler := NewCompiler(WithVersion("v0.0.0-1-gabcdef0"))
 	compiler.gitRoot = root
+	installConnectorTestSources(t, root)
 	compiler.SetActionMode(ActionModeDev)
 	compiler.SetStrictMode(true)
 	return compiler, path
@@ -203,7 +204,7 @@ func TestConfluencePublicResourceGrants(t *testing.T) {
 	}
 	_, _, _, err := confluencePublicWorkflow(t, strings.Replace(confluencePublicImport, `pages: ["456"]`, `pages: ["*"]`, 1), read)
 	require.ErrorContains(t, err, "exact allowlist")
-	_, data, _, err := confluencePublicWorkflow(t, "imports: ['@builtin:connectors/confluence.md']\n", "")
+	_, data, _, err := confluencePublicWorkflow(t, "imports: ['.github/workflows/connectors/confluence.md']\n", "")
 	require.NoError(t, err)
 	require.Empty(t, data.Connectors)
 	comment := "safe-outputs:\n  confluence-add-review-comment:\n"
@@ -219,7 +220,7 @@ func TestConfluencePublicUnsupportedSurfaces(t *testing.T) {
 		"tools:\n  confluence: [create-runbook]\n",
 		"tools:\n  confluence: [hosted-mcp]\n",
 		"safe-outputs:\n  confluence-update-page:\n",
-		"safe-outputs:\n  confluence-add-review-comment: {staged: true}\n",
+		"safe-outputs:\n  confluence-add-review-comment: {unknown: true}\n",
 		"context:\n  confluence: {}\n",
 	} {
 		_, _, _, err := confluencePublicWorkflow(t, confluencePublicImport, selection)

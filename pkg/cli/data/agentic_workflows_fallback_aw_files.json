@@ -11,6 +11,7 @@
   "cli-commands.md",
   "compat.md",
   "configure-agentic-engine.md",
+  "connectors.md",
   "context.md",
   "create-agentic-workflow-trigger-details.md",
   "create-agentic-workflow.md",

@@ -3,13 +3,13 @@ name: Test Connectors
 on:
   pull_request:
     paths:
-      - '.github/aw/connectors/**'
+      - '.github/workflows/connectors/**'
       - '.github/workflows/test-connectors.yml'
       - 'actions/setup/setup.sh'
       - 'actions/setup/js/connector*'
       - 'actions/setup/js/setup_sh_file_lists.test.cjs'
-      - 'resources.go'
       - 'pkg/connectors/**'
+      - 'pkg/cli/*connector*'
       - 'pkg/workflow/*connector*'
       - 'pkg/workflow/*node*_test.go'
       - 'pkg/workflow/*documentation*_test.go'
@@ -19,13 +19,13 @@ on:
       - 'go.sum'
   push:
     paths:
-      - '.github/aw/connectors/**'
+      - '.github/workflows/connectors/**'
       - '.github/workflows/test-connectors.yml'
       - 'actions/setup/setup.sh'
       - 'actions/setup/js/connector*'
       - 'actions/setup/js/setup_sh_file_lists.test.cjs'
-      - 'resources.go'
       - 'pkg/connectors/**'
+      - 'pkg/cli/*connector*'
       - 'pkg/workflow/*connector*'
       - 'pkg/workflow/*node*_test.go'
       - 'pkg/workflow/*documentation*_test.go'

@@ -6,7 +6,7 @@ permissions:
   actions: read
 engine: copilot
 imports:
-  - uses: "@builtin:connectors/jira.md"
+  - uses: ".github/workflows/connectors/jira.md"
     with:
       site: https://example.atlassian.net
       issues: [APP-1]

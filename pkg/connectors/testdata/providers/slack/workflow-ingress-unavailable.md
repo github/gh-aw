@@ -1,6 +1,6 @@
 ---
 imports:
-  - .github/aw/connectors/slack.md
+  - .github/workflows/connectors/slack.md
 "on":
   slack-threaded-app-mention: null
 permissions:

@@ -1,7 +1,7 @@
 ---
 engine: copilot
 imports:
-  - uses: .github/aw/connectors/teams.md
+  - uses: .github/workflows/connectors/teams.md
     with:
       tenants: [33333333-3333-4333-8333-333333333333]
       subscriptions: [22222222-2222-4222-8222-222222222222]

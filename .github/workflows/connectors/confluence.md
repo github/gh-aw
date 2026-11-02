@@ -1,6 +1,13 @@
 ---
 connectors:
   confluence:
+    experimental: true
+    docs:
+      - https://developer.atlassian.com/cloud/confluence/oauth-2-3lo-apps/
+      - https://developer.atlassian.com/cloud/confluence/rest/v2/api-group-page/
+      - https://developer.atlassian.com/cloud/confluence/rest/v2/api-group-comment/
+      - https://developer.atlassian.com/platform/forge/events-reference/confluence/
+      - https://developer.atlassian.com/platform/forge/remote/essentials/
     credentials:
       comment-writer:
         header: Authorization
@@ -260,6 +267,20 @@ import-schema:
 
 <!--
 <connector-documentation id="confluence" version="1">
+  <stability>experimental: true. This connector's contract may change.</stability>
+  <runtime-policies>
+    Human text inputs marked sanitize title or body use the shared publisher's
+    built-in sanitizers. Titles require at least 20 Unicode code points after
+    sanitization. Body limits include protected generated attribution and any
+    configured body footer. Fixed authored request literals are trusted content,
+    not agent-controlled text inputs.
+    Consumer safe-output options support max from 1 to 100, default 1, and staged
+    booleans or expressions. Global or compiler-forced staging always wins.
+    Staged operations do not resolve writer credentials or send provider requests.
+    Automatic retries require an explicit bounded operation retry policy; no policy
+    means one attempt. Repeating writes requires declared idempotency and a
+    repeat-safe PUT, PATCH or DELETE; POST creates and appends cannot retry.
+  </runtime-policies>
   <purpose>
     Read one approved current Confluence Cloud page through REST API v2 and
     optionally request a fixed runbook creation or review footer comment.
@@ -343,10 +364,10 @@ import-schema:
     </discovery>
   </endpoints>
   <imports>
-    <import path="@builtin:connectors/confluence.md">
-      Uses the declaration embedded in the installed compiler; no checkout copy is
-      required. A reviewed local .github/aw/connectors/confluence.md or pinned
-      owner/repo/path@ref import can customize the declaration through normal AW imports.
+    <import path=".github/workflows/connectors/confluence.md">
+      Uses a reviewed editable local .github/workflows/connectors/confluence.md or
+      a pinned owner/repo/path@ref import. The compiler does not embed provider
+      declarations or substitute a hidden fallback.
       Importing alone selects no capability.
     </import>
     <input name="clouds" type="array of strings" default="empty">Exact approved cloud UUIDs.</input>
@@ -463,8 +484,8 @@ import-schema:
       an ambiguous response can mean a write occurred. Inspect the provider before
       submitting another intent: there is no idempotency/reconciliation guarantee.
       The response size cap is 65,536 bytes including JSON overhead, not a content
-      length allowance or a write-count budget. No per-effect max or staged option
-      exists. Workflow-wide safe-outputs.staged: true validates/prepares intents
+      length allowance or a write-count budget. Per-effect max/staged options are
+      supported. Workflow-wide safe-outputs.staged: true validates/prepares intents
       without resolving write credentials or contacting the provider. Agent reads
       still require their own credential and can contact the provider.
     </limits>
@@ -496,7 +517,7 @@ engine: copilot
 permissions:
   contents: read
 imports:
-  - uses: "@builtin:connectors/confluence.md"
+  - uses: ".github/workflows/connectors/confluence.md"
     with:
       clouds: ["11111111-2222-4333-8444-555555555555"]
       spaces: ["123"]

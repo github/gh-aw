@@ -1,7 +1,7 @@
 ---
 engine: copilot
 imports:
-  - uses: "@builtin:connectors/jira.md"
+  - uses: ".github/workflows/connectors/jira.md"
     with:
       projects: [APP]
       issue-ids: ["10001"]

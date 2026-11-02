@@ -95,6 +95,11 @@ func TestConnectorIndependentFrontmatter(t *testing.T) {
 				require.NotNil(t, data.SafeOutputs)
 				assert.Contains(t, data.SafeOutputs.Scripts, "tracker-add-comment")
 				script := data.SafeOutputs.Scripts["tracker-add-comment"]
+				generated, err := generateSafeOutputsConfig(data)
+				require.NoError(t, err)
+				var handlerConfig map[string]any
+				require.NoError(t, json.Unmarshal([]byte(generated), &handlerConfig))
+				assert.Equal(t, "abort", handlerConfig["tracker_add_comment"].(map[string]any)["threat_warning_policy"])
 				tool := generateCustomScriptToolDefinition("tracker-add-comment", script)
 				schema, ok := tool["inputSchema"].(map[string]any)
 				require.True(t, ok)
@@ -133,7 +138,7 @@ func TestConnectorCompilationStaysStaged(t *testing.T) {
 			data, err := c.ParseWorkflowString(connectorWorkflow("    safe-outputs: [add-comment]\n"), filepath.Join(root, "proof.md"))
 			require.NoError(t, err)
 			script := data.SafeOutputs.Scripts["tracker-add-comment"]
-			assert.Contains(t, script.Script, "const staged = true || isStagedMode();")
+			assert.Contains(t, script.Script, "const staged = true || isStagedMode(typeof config === 'undefined' ? undefined : config);")
 			assert.Contains(t, script.Script, "staged ? '--stage' : '--allow-writes'")
 			if mode == "dry-run" {
 				_, err := c.CompileToYAML(data, filepath.Join(root, "proof.md"))
@@ -169,6 +174,12 @@ const adaptedRequire = name => {
   }};
   if (name === './safe_output_helpers.cjs') return {isStagedMode: () => %t};
   if (name === './connector_effect_bindings.cjs') return {connectorEffectBindings: () => ({env: {BINDING: 'trusted'}, record: () => {}})};
+  if (name === './connector_runtime.cjs') return {decodePlan: encoded => ({encoded})};
+  if (name === './connector_content.cjs') return {formatConnectorArguments: (plan, operation, args) => {
+    assert.equal(plan.encoded, 'frozen');
+    assert.equal(operation, 'add-comment');
+    return args;
+  }};
   return require(name);
 };
 const result = new Function('item', 'require', 'process', 'temporaryIdMap', %s)(

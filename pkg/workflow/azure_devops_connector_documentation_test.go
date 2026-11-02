@@ -70,7 +70,7 @@ type azureDevOpsDocumentation struct {
 
 func loadAzureDevOpsDocumentation(t *testing.T) (azureDevOpsDocumentation, map[string]any) {
 	t.Helper()
-	content, err := os.ReadFile("../../.github/aw/connectors/azure-devops.md")
+	content, err := os.ReadFile("../../.github/workflows/connectors/azure-devops.md")
 	require.NoError(t, err)
 	parts := strings.SplitN(string(content), "---", 3)
 	require.Len(t, parts, 3)
@@ -147,6 +147,7 @@ func TestAzureDevOpsConnectorDocumentationExample(t *testing.T) {
 	require.NoError(t, os.WriteFile(path, []byte(content), 0600))
 	compiler := NewCompiler()
 	compiler.gitRoot = root
+	installConnectorTestSources(t, root)
 	compiler.SetActionMode(ActionModeRelease)
 	compiler.SetActionTag("72c8a3ff80e4a7549a83bb82c8ff5a97b879e92d")
 	compiler.SetStrictMode(true)
@@ -181,6 +182,6 @@ func TestAzureDevOpsConnectorDocumentationExample(t *testing.T) {
 		require.NotEmpty(t, effect.Inputs)
 		require.NotEmpty(t, strings.TrimSpace(effect.Text))
 	}
-	_, err = os.Stat(filepath.Join(root, ".github", "aw"))
-	require.True(t, os.IsNotExist(err), "embedded consumer must not need a local provider file")
+	_, err = os.Stat(filepath.Join(root, ".github", "workflows", "connectors"))
+	require.NoError(t, err, "normal imports read the local provider file")
 }

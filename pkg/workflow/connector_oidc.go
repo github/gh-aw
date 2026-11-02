@@ -59,7 +59,7 @@ func connectorMintCondition(c *Compiler, data *WorkflowData, phase string) (stri
 }
 
 func (c *Compiler) connectorOIDCSteps(data *WorkflowData, phase string) []string {
-	condition, mint := connectorMintCondition(c, data, phase)
+	_, mint := connectorMintCondition(c, data, phase)
 	if !mint {
 		return nil
 	}
@@ -79,6 +79,10 @@ func (c *Compiler) connectorOIDCSteps(data *WorkflowData, phase string) []string
 			if oidc.phase != phase || !slices.Contains(plan.Secrets(), secret) {
 				continue
 			}
+			condition, staged, enabled := connectorCredentialMintCondition(c, data, config, secret, phase)
+			if !enabled {
+				continue
+			}
 			steps = append(steps,
 				fmt.Sprintf("      - name: Mint connector GitHub OIDC token %s/%s\n", alias, name),
 				"        id: "+connectorAppStepID(secret)+"\n")
@@ -90,7 +94,7 @@ func (c *Compiler) connectorOIDCSteps(data *WorkflowData, phase string) []string
 				"        env:\n",
 				formatYAMLEnv("          ", "GH_AW_CONNECTOR_OIDC_AUDIENCE", oidc.Audience))
 			if condition != "" {
-				steps = append(steps, formatYAMLEnv("          ", "GH_AW_CONNECTOR_STAGED", data.SafeOutputs.Staged.String()))
+				steps = append(steps, formatYAMLEnv("          ", "GH_AW_CONNECTOR_STAGED", staged))
 			}
 			steps = append(steps,
 				"        with:\n",

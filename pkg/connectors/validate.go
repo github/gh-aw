@@ -131,6 +131,9 @@ func (s *ConnectorSpec) validateOperation(name string, op Operation, phase strin
 	if op.MaxResponseBytes < 1 || op.MaxResponseBytes > 1024*1024 {
 		return fmt.Errorf("operation %q maxResponseBytes must be between 1 and 1048576", name)
 	}
+	if err := validateRetryPolicy(op.Retry, op.Request, phase); err != nil {
+		return fmt.Errorf("operation %q: %w", name, err)
+	}
 	method := op.Request.Method
 	if method != "GET" && method != "POST" && method != "PUT" && method != "PATCH" && method != "DELETE" {
 		return fmt.Errorf("operation %q has unsupported method", name)
@@ -188,7 +191,16 @@ func validateInputs(inputs map[string]Input) error {
 		if input.Type == "string" && (input.MaxLength < 1 || input.MaxLength > 65536) {
 			return fmt.Errorf("string input %q requires maxLength between 1 and 65536", key)
 		}
-		if input.Type != "string" && (input.MaxLength != 0 || len(input.Enum) != 0) {
+		if input.MinLength < 0 || input.MinLength > input.MaxLength {
+			return fmt.Errorf("input %q minLength must be between 0 and maxLength", key)
+		}
+		if input.Sanitize != "" && input.Sanitize != "title" && input.Sanitize != "body" {
+			return fmt.Errorf("input %q sanitize must be title or body", key)
+		}
+		if input.Sanitize == "title" && input.MaxLength < 20 {
+			return fmt.Errorf("title input %q maxLength must allow at least 20 characters", key)
+		}
+		if input.Type != "string" && (input.MaxLength != 0 || input.MinLength != 0 || input.Sanitize != "" || len(input.Enum) != 0) {
 			return fmt.Errorf("input %q string constraints require type string", key)
 		}
 		if input.Type != "number" && input.Type != "integer" && (input.Minimum != nil || input.Maximum != nil) {

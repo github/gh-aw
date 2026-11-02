@@ -187,14 +187,31 @@ func consumeQualifiedConnectorSection(frontmatter, config map[string]any, sectio
 	}
 	remaining := maps.Clone(values)
 	var names []string
+	operationOptions := map[string]any{}
 	for _, key := range sliceutil.SortedKeys(values) {
 		operation, qualified := strings.CutPrefix(key, alias+"-")
 		if !qualified {
 			continue
 		}
-		options, object := values[key].(map[string]any)
-		if values[key] != nil && (!object || len(options) != 0) {
-			return fmt.Errorf("%s.%s accepts null or {}; connector behavior is declared in its spec", section, key)
+		if section == "safe-outputs" {
+			options, err := parseConnectorOperationOptions(values[key])
+			if err != nil {
+				return fmt.Errorf("%s.%s: %w", section, key, err)
+			}
+			normalized := map[string]any{"max": options.Max}
+			if options.Staged != nil {
+				if isExpression(options.Staged.String()) {
+					normalized["staged"] = options.Staged.String()
+				} else {
+					normalized["staged"] = templatableBoolIsTrue(options.Staged)
+				}
+			}
+			operationOptions[operation] = normalized
+		} else {
+			options, object := values[key].(map[string]any)
+			if values[key] != nil && (!object || len(options) != 0) {
+				return fmt.Errorf("%s.%s accepts null or {}; connector behavior is declared in its spec", section, key)
+			}
 		}
 		names = append(names, operation)
 		delete(remaining, key)
@@ -203,6 +220,9 @@ func consumeQualifiedConnectorSection(frontmatter, config map[string]any, sectio
 		return nil
 	}
 	config[section] = names
+	if len(operationOptions) > 0 {
+		config["safe-output-options"] = operationOptions
+	}
 	if len(remaining) == 0 {
 		delete(frontmatter, section)
 	} else {

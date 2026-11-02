@@ -48,7 +48,7 @@ func TestJiraCreatedResourceChain(t *testing.T) {
 			return base64.StdEncoding.EncodeToString([]byte("fixture:token")), nil
 		}}
 	host := connectors.CreatedResourceHost{Run: "trusted-execution", Key: []byte(strings.Repeat("k", 32))}
-	create := map[string]any{"project": "APP", "issue-type": "Task", "summary": "Haiku", "temporary_id": "aw_created"}
+	create := map[string]any{"project": "APP", "issue-type": "Task", "summary": "Original haiku for connector review", "temporary_id": "aw_created"}
 	result, err := plan.ExecuteCreatedSafeOutput(t.Context(), runtime, host, "create-issue", create)
 	require.NoError(t, err)
 	require.NotEmpty(t, result.CreatedResource)
@@ -57,7 +57,7 @@ func TestJiraCreatedResourceChain(t *testing.T) {
 		name string
 		args map[string]any
 	}{
-		{"update-issue", map[string]any{"issue": "#aw_created", "summary": "Haiku", "description": "Revised haiku"}},
+		{"update-issue", map[string]any{"issue": "#aw_created", "summary": "Original haiku for connector review", "description": "Revised haiku"}},
 		{"add-comment", map[string]any{"issue": "aw_created", "text": "Run URL"}},
 		{"add-label", map[string]any{"issue": "#aw_created", "label": "gh-aw-smoke-test"}},
 	} {

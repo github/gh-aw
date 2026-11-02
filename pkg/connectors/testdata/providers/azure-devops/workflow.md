@@ -1,6 +1,6 @@
 ---
 imports:
-  - .github/aw/connectors/azure-devops.md
+  - .github/workflows/connectors/azure-devops.md
 "on": workflow_dispatch
 permissions:
   contents: read

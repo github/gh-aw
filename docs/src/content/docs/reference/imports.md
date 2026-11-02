@@ -425,8 +425,8 @@ network:
 Consumers import it with `imports: [shared/mcp/tavily.md]`.
 
 For Azure CLI authentication inside the sandbox, use `shared/azure-auth.md`
-with the Azure MCP import. Azure DevOps instead uses the embedded
-`"@builtin:connectors/azure-devops.md"` import; see
+with the Azure MCP import. Azure DevOps instead uses the imported
+`".github/workflows/connectors/azure-devops.md"` import; see
 [Connectors](/gh-aw/reference/connectors/#azure-devops). Importing it alone grants
 no tools or safe outputs and does not acquire an Entra token.
 

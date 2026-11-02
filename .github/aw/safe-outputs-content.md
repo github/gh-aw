@@ -4,27 +4,27 @@ description: Safe-output reference for issue, discussion, comment, and pull requ
 
 # Safe Outputs: GitHub Content
 
-- **[Experimental]** Jira uses the compiler-embedded
-  `@builtin:connectors/jira.md` import and shared connector runtime. Bind the
+- **[Experimental]** Jira uses a normal local or pinned remote
+  `.github/workflows/connectors/jira.md` import and shared connector runtime. Bind the
   reviewed site, project, and issue grants through `with`, then select
   `jira-create-issue`, `jira-update-issue`, `jira-add-comment`, or `jira-add-label`.
   Tools use the `jira_` prefix; unqualified GitHub effects are unchanged.
   Supply a separate encoded REST Basic credential; native email/token injection
-  and per-effect `max`/`staged` options no longer apply. Explicit temporary IDs
+  is removed. Per-operation `max` and `staged` are supported. Explicit temporary IDs
   support same-run follow-ups through trusted created-resource receipts, never
   by treating an agent-supplied issue key as authority. See the single
   [Connectors reference](../../docs/src/content/docs/reference/connectors.md#jira)
   for exact inputs, credential routes, staging, and migration limitations.
 
-- **[Experimental]** Linear uses the compiler-embedded
-  `@builtin:connectors/linear.md` import and shared connector runtime. Select
+- **[Experimental]** Linear uses a normal local or pinned remote
+  `.github/workflows/connectors/linear.md` import and shared connector runtime. Select
   `linear-create-issue`, `linear-update-issue`, or `linear-add-comment` only
   after declaring approved resource arrays through `with`. Use separate read
-  and write credentials. The old built-in options and implicit ID resolution
-  are removed; the single reference is
+  and write credentials. Legacy destination options and implicit ID resolution
+  are removed; per-operation `max` and `staged` are supported. The reference is
   [Connectors](https://github.github.com/gh-aw/reference/connectors/#linear).
 
-- Azure DevOps operations use the embedded `"@builtin:connectors/azure-devops.md"` import and independently selected `azure-devops-*` safe outputs. The removed `ado-*` handlers, automatic PAT credentials, temporary IDs, and attachments are unsupported. See [Connectors](https://github.github.com/gh-aw/reference/connectors/#azure-devops) for exact capabilities and migration limits.
+- Azure DevOps operations use the normal `".github/workflows/connectors/azure-devops.md"` import and independently selected `azure-devops-*` safe outputs. The removed `ado-*` handlers, automatic PAT credentials, temporary IDs, and attachments are unsupported. See [Connectors](https://github.github.com/gh-aw/reference/connectors/#azure-devops) for exact capabilities and migration limits.
 
 - `create-issue:` - Safe GitHub issue creation (bugs, features)
 

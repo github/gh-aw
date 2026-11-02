@@ -134,7 +134,7 @@ func TestTeamsMarkdownWorkflowMatchesLegacySelections(t *testing.T) {
 		t.Fatal("documented workflow must have one Teams import")
 	}
 	imported, ok := imports[0].(map[string]any)
-	if !ok || imported["uses"] != ".github/aw/connectors/teams.md" {
+	if !ok || imported["uses"] != ".github/workflows/connectors/teams.md" {
 		t.Fatal("documented workflow must import the self-contained Teams Markdown")
 	}
 	grants, ok := imported["with"].(map[string]any)

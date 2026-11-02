@@ -6,7 +6,7 @@ permissions:
   actions: read
 engine: copilot
 imports:
-  - uses: "@builtin:connectors/linear.md"
+  - uses: ".github/workflows/connectors/linear.md"
     with:
       issues: [22222222-2222-4222-8222-222222222222]
 safe-outputs:

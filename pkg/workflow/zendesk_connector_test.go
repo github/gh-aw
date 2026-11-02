@@ -43,6 +43,7 @@ func parseZendeskWorkflow(t *testing.T, source string) (*Compiler, *WorkflowData
 	require.NoError(t, os.WriteFile(path, []byte(source), 0600))
 	compiler := NewCompiler(WithNoEmit(true))
 	compiler.gitRoot = root
+	installConnectorTestSources(t, root)
 	compiler.SetActionMode(ActionModeDev)
 	compiler.version = "v0.0.0-1-gabcdef0"
 	data, err := compiler.ParseWorkflowFile(path)
@@ -114,7 +115,7 @@ func zendeskNoteArgs() map[string]any {
 }
 
 func TestZendeskConnectorDocumentation(t *testing.T) {
-	source, err := os.ReadFile("../../.github/aw/connectors/zendesk.md")
+	source, err := os.ReadFile("../../.github/workflows/connectors/zendesk.md")
 	require.NoError(t, err)
 	_, body, found := strings.Cut(strings.TrimPrefix(string(source), "---\n"), "\n---\n")
 	require.True(t, found)
@@ -187,8 +188,8 @@ func TestZendeskConnectorIndependentSelections(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			compiler, data, path, err := parseZendeskWorkflow(t, zendeskSource(t, test.selection))
 			require.NoError(t, err)
-			_, err = os.Stat(filepath.Join(compiler.gitRoot, ".github", "aw"))
-			require.True(t, os.IsNotExist(err), "builtin import must not materialize checkout files")
+			_, err = os.Stat(filepath.Join(compiler.gitRoot, ".github", "workflows", "connectors"))
+			require.NoError(t, err, "normal imports read editable checkout files")
 			if !test.read && !test.write {
 				require.Empty(t, data.Connectors)
 				return

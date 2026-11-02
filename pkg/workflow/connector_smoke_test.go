@@ -33,7 +33,7 @@ func connectorSmokePlan(t *testing.T, target connectorSmokeTarget) *connectors.P
 			"on": "workflow_dispatch", "engine": "copilot",
 			"permissions": map[string]string{"contents": "read"},
 			"imports": []any{map[string]any{
-				"uses": "@builtin:connectors/azure-devops.md",
+				"uses": ".github/workflows/connectors/azure-devops.md",
 				"with": map[string]string{"organization": target.organization},
 			}},
 			"tools": map[string][]string{"azure-devops": {"azure-devops"}},
@@ -49,15 +49,15 @@ func connectorSmokePlan(t *testing.T, target connectorSmokeTarget) *connectors.P
 		require.NotEmpty(t, target.scope, "scope_id must be the approved Linear organization UUID")
 		require.NotEmpty(t, target.team, "LINEAR_TEAM_ID is required")
 		imported = map[string]any{
-			"uses": "@builtin:connectors/linear.md",
-			"with": map[string]any{"issues": []string{target.resource}, "organizations": []string{target.scope}, "teams": []string{target.team}},
+			"uses": ".github/workflows/connectors/linear.md",
+			"with": map[string]any{"reader-secret": "LINEAR_READ_API_KEY", "issues": []string{target.resource}, "organizations": []string{target.scope}, "teams": []string{target.team}},
 		}
 		tool = "get-issue"
 	case "jira":
 		require.NotEmpty(t, target.resource, "resource_id must be an approved Jira issue key")
 		require.NotEmpty(t, target.scope, "scope_id must be the approved Jira cloud ID")
 		imported = map[string]any{
-			"uses": "@builtin:connectors/jira.md",
+			"uses": ".github/workflows/connectors/jira.md",
 			"with": map[string]any{
 				"issues": []string{target.resource}, "cloud-ids": []string{target.scope},
 				"queries": []string{"key = " + target.resource},
@@ -86,6 +86,7 @@ func connectorSmokeParsePlan(t *testing.T, root, provider string, content []byte
 	require.NoError(t, os.WriteFile(path, []byte("---\n"+string(content)+"---\nRead approved references only.\n"), 0600))
 	compiler := NewCompiler(WithNoEmit(true))
 	compiler.gitRoot = root
+	installConnectorTestSources(t, root)
 	data, err := compiler.ParseWorkflowFile(path)
 	require.NoError(t, err)
 	selected := data.Connectors[provider]

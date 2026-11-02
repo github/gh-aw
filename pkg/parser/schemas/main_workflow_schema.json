@@ -14414,6 +14414,8 @@
       ],
       "additionalProperties": false,
       "properties": {
+        "experimental": { "type": "boolean", "default": false },
+        "docs": { "$ref": "#/$defs/connectorDocumentationURLs" },
         "definition": { "type": "string", "minLength": 1 },
         "spec": {
           "type": "object",
@@ -14436,6 +14438,12 @@
         "on": { "$ref": "#/$defs/connectorCapabilities" },
         "tools": { "$ref": "#/$defs/connectorCapabilities" },
         "safe-outputs": { "$ref": "#/$defs/connectorCapabilities" },
+        "safe-output-options": {
+          "description": "Compiler-normalized per-operation selection options.",
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/connectorName" },
+          "additionalProperties": { "$ref": "#/$defs/connectorOperationOptions" }
+        },
         "context": {
           "type": "object",
           "minProperties": 1,
@@ -14444,12 +14452,27 @@
         }
       }
     },
+    "connectorOperationOptions": {
+      "description": "Workflow-owned delivery controls for a selected connector operation. Global staging cannot be disabled here.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max": { "type": "integer", "minimum": 1, "maximum": 100, "default": 1 },
+        "staged": { "$ref": "#/$defs/templatable_boolean" }
+      }
+    },
     "connectorDeclaration": {
       "description": "A reusable connector declared in ordinary AW Markdown. Capability maps define APIs; only the consuming workflow selects them.",
       "type": "object",
       "required": ["endpoints", "credentials"],
       "additionalProperties": false,
       "properties": {
+        "experimental": {
+          "type": "boolean",
+          "default": false,
+          "description": "Marks this connector as experimental. Selecting its capabilities emits a compile-time warning; this metadata does not change grants or runtime protections."
+        },
+        "docs": { "$ref": "#/$defs/connectorDocumentationURLs" },
         "endpoints": { "type": "object", "minProperties": 1, "additionalProperties": { "type": "string" } },
         "credentials": {
           "type": "object",
@@ -14495,6 +14518,12 @@
         "repositories": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" } },
         "permissions": { "type": "object", "additionalProperties": { "enum": ["read", "write", "none"] } }
       }
+    },
+    "connectorDocumentationURLs": {
+      "description": "Official documentation URLs used to author the connector. References only: never fetched automatically or treated as endpoint or resource grants.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "format": "uri", "pattern": "^https://" }
     },
     "connectorGitHubOIDC": {
       "type": "object",

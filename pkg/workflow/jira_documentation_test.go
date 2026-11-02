@@ -25,7 +25,7 @@ type jiraDocumentationExample struct {
 
 func jiraDocumentationExamples(t *testing.T) []jiraDocumentationExample {
 	t.Helper()
-	source, err := os.ReadFile("../../.github/aw/connectors/jira.md")
+	source, err := os.ReadFile("../../.github/workflows/connectors/jira.md")
 	require.NoError(t, err)
 	_, body, found := strings.Cut(strings.TrimPrefix(string(source), "---\n"), "\n---\n")
 	require.True(t, found)
@@ -71,17 +71,18 @@ func parseJiraDocumentationConsumer(t *testing.T, example jiraDocumentationExamp
 	require.Equal(t, filepath.Join(root, ".github", "workflows"), filepath.Dir(path))
 	source := "---\n" + example.YAML + "---\n" + example.Prompt
 	if local {
-		declaration, err := os.ReadFile("../../.github/aw/connectors/jira.md")
+		declaration, err := os.ReadFile("../../.github/workflows/connectors/jira.md")
 		require.NoError(t, err)
-		target := filepath.Join(root, ".github", "aw", "connectors", "jira.md")
+		target := filepath.Join(root, ".github", "workflows", "connectors", "jira.md")
 		require.NoError(t, os.MkdirAll(filepath.Dir(target), 0700))
 		require.NoError(t, os.WriteFile(target, declaration, 0600))
-		source = strings.Replace(source, "@builtin:connectors/jira.md", "../aw/connectors/jira.md", 1)
+		source = strings.Replace(source, ".github/workflows/connectors/jira.md", "connectors/jira.md", 1)
 	}
 	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0700))
 	require.NoError(t, os.WriteFile(path, []byte(source), 0600))
 	c := NewCompiler(WithNoEmit(true), WithSkipValidation(false))
 	c.gitRoot = root
+	installConnectorTestSources(t, root)
 	c.SetActionMode(ActionModeDev)
 	c.version = "v0.0.0-1-g683ddf9617"
 	data, err := c.ParseWorkflowFile(path)
@@ -131,8 +132,8 @@ func TestJiraDocumentationStagedChainAndExactGrants(t *testing.T) {
 			operation string
 			args      map[string]any
 		}{
-			{"create-issue", map[string]any{"project": "APP", "issue-type": "Task", "summary": "Review follow-up", "description": "Review approved evidence.", "temporary_id": "aw_created"}},
-			{"update-issue", map[string]any{"issue": "#aw_created", "summary": "Reviewed follow-up", "description": "Evidence reviewed; proposed changes only."}},
+			{"create-issue", map[string]any{"project": "APP", "issue-type": "Task", "summary": "Review follow-up for approved issue", "description": "Review approved evidence.", "temporary_id": "aw_created"}},
+			{"update-issue", map[string]any{"issue": "#aw_created", "summary": "Reviewed follow-up for approved issue", "description": "Evidence reviewed; proposed changes only."}},
 			{"add-comment", map[string]any{"issue": "#aw_created", "text": "Review prepared."}},
 			{"add-label", map[string]any{"issue": "#aw_created", "label": "reviewed"}},
 		} {

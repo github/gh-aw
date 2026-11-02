@@ -188,6 +188,13 @@ func inputSchema(inputs map[string]Input) map[string]any {
 		}
 		if input.Type == "string" {
 			property["maxLength"] = input.MaxLength
+			if input.MinLength > 0 || input.Sanitize == "title" {
+				minimum := input.MinLength
+				if input.Sanitize == "title" && minimum < 20 {
+					minimum = 20
+				}
+				property["minLength"] = minimum
+			}
 		}
 		if len(input.Enum) != 0 {
 			property["enum"] = input.Enum

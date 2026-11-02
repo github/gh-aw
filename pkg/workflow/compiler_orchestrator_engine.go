@@ -321,7 +321,11 @@ func scanImportedMarkdownFiles(importedFiles []string, markdownDir string, impor
 			fmt.Fprintf(os.Stderr, "WARNING: Skipping security scan for unreadable import '%s' (resolved path: %s): %v\n", importedFile, fullPath, readErr)
 			continue
 		}
-		if findings := scanImportedConnectorMarkdown(string(importContent), fullPath); len(findings) > 0 {
+		scanPath := fullPath
+		if parser.IsWorkflowSpec(importFilePath) {
+			scanPath = importFilePath
+		}
+		if findings := scanImportedConnectorMarkdown(string(importContent), scanPath); len(findings) > 0 {
 			orchestratorEngineLog.Printf("Security scan failed for imported file: %s (%d findings)", importedFile, len(findings))
 			return fmt.Errorf("imported workflow '%s' failed security scan: %s", importedFile, FormatSecurityFindings(findings, importedFile))
 		}

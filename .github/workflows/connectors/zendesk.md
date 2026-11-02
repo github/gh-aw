@@ -1,6 +1,13 @@
 ---
 connectors:
   zendesk:
+    experimental: true
+    docs:
+      - https://developer.zendesk.com/api-reference/introduction/security-and-auth/
+      - https://developer.zendesk.com/api-reference/ticketing/oauth/oauth_tokens/
+      - https://developer.zendesk.com/api-reference/ticketing/tickets/tickets/
+      - https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_comments/
+      - https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_audits/
     credentials:
       reader:
         header: Authorization
@@ -87,6 +94,8 @@ connectors:
             maxLength: 15
             pattern: ^[1-9][0-9]{0,14}$
           text:
+            sanitize: body
+            minLength: 1
             type: string
             required: true
             maxLength: 4000
@@ -157,6 +166,20 @@ import-schema:
 ---
 <!--
 <connector-documentation id="zendesk" version="1">
+  <stability>experimental: true. This connector's contract may change.</stability>
+  <runtime-policies>
+    Human text inputs marked sanitize title or body use the shared publisher's
+    built-in sanitizers. Titles require at least 20 Unicode code points after
+    sanitization. Body limits include protected generated attribution and any
+    configured body footer. Fixed authored request literals are trusted content,
+    not agent-controlled text inputs.
+    Consumer safe-output options support max from 1 to 100, default 1, and staged
+    booleans or expressions. Global or compiler-forced staging always wins.
+    Staged operations do not resolve writer credentials or send provider requests.
+    Automatic retries require an explicit bounded operation retry policy; no policy
+    means one attempt. Repeating writes requires declared idempotency and a
+    repeat-safe PUT, PATCH or DELETE; POST creates and appends cannot retry.
+  </runtime-policies>
   <purpose>
     Correlate one approved Zendesk Support ticket with GitHub Actions triage.
     Read projected ticket metadata and optionally propose a private internal
@@ -220,7 +243,7 @@ import-schema:
     </compatibility>
   </authentication>
   <configuration>
-    <import path="@builtin:connectors/zendesk.md">
+    <import path=".github/workflows/connectors/zendesk.md">
       Required subdomain is the approved lowercase Zendesk hostname label,
       at most 63 characters, using letters, digits and internal hyphens.
       Required ticket is one positive decimal string with no leading zero,
@@ -341,7 +364,7 @@ engine: copilot
 permissions:
   contents: read
 imports:
-  - uses: "@builtin:connectors/zendesk.md"
+  - uses: ".github/workflows/connectors/zendesk.md"
     with:
       subdomain: example
       ticket: "35436"

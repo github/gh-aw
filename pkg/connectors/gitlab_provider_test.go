@@ -11,7 +11,7 @@ import (
 )
 
 func TestGitLabProviderDeclarationAndDocumentation(t *testing.T) {
-	source, err := os.ReadFile("../../.github/aw/connectors/gitlab.md")
+	source, err := os.ReadFile("../../.github/workflows/connectors/gitlab.md")
 	require.NoError(t, err)
 	parts := strings.SplitN(string(source), "---", 3)
 	require.Len(t, parts, 3)
@@ -19,7 +19,7 @@ func TestGitLabProviderDeclarationAndDocumentation(t *testing.T) {
 	require.NoError(t, Decode([]byte(parts[1]), &document))
 	require.ElementsMatch(t, []string{"connectors", "import-schema"}, gitLabKeys(document))
 	declaration := document["connectors"].(map[string]any)["gitlab"].(map[string]any)
-	require.ElementsMatch(t, []string{"endpoints", "credentials", "resources", "triggers", "tools", "safe-outputs"}, gitLabKeys(declaration))
+	require.ElementsMatch(t, []string{"experimental", "docs", "endpoints", "credentials", "resources", "triggers", "tools", "safe-outputs"}, gitLabKeys(declaration))
 	require.ElementsMatch(t, []string{"get-merge-request", "get-pipeline"}, gitLabKeys(declaration["tools"].(map[string]any)))
 	require.ElementsMatch(t, []string{"add-merge-request-note"}, gitLabKeys(declaration["safe-outputs"].(map[string]any)))
 	schema := document["import-schema"].(map[string]any)
@@ -71,7 +71,7 @@ func gitLabKeys(values map[string]any) []string {
 }
 
 func TestGitLabProviderNativeEventEvidenceDoesNotEnrollIngress(t *testing.T) {
-	source, err := os.ReadFile("../../.github/aw/connectors/gitlab.md")
+	source, err := os.ReadFile("../../.github/workflows/connectors/gitlab.md")
 	require.NoError(t, err)
 	var document map[string]any
 	require.NoError(t, Decode([]byte(strings.SplitN(string(source), "---", 3)[1]), &document))

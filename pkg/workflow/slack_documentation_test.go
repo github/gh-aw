@@ -58,7 +58,7 @@ type slackDocumentedOperation struct {
 
 func slackDocumentationSource(t *testing.T) (string, slackDocumentation) {
 	t.Helper()
-	source, err := os.ReadFile("../../.github/aw/connectors/slack.md")
+	source, err := os.ReadFile("../../.github/workflows/connectors/slack.md")
 	require.NoError(t, err)
 	_, body, found := strings.Cut(strings.TrimPrefix(string(source), "---\n"), "\n---\n")
 	require.True(t, found)
@@ -150,14 +150,15 @@ func slackDocumentationCompiler(t *testing.T, content, relativePath string) (*Co
 	path := filepath.Join(root, relativePath)
 	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0700))
 	require.NoError(t, os.WriteFile(path, []byte(content), 0600))
-	if strings.Contains(content, "uses: .github/aw/connectors/slack.md") {
+	if strings.Contains(content, "uses: .github/workflows/connectors/slack.md") {
 		source, _ := slackDocumentationSource(t)
-		local := filepath.Join(root, ".github/aw/connectors/slack.md")
+		local := filepath.Join(root, ".github/workflows/connectors/slack.md")
 		require.NoError(t, os.MkdirAll(filepath.Dir(local), 0700))
 		require.NoError(t, os.WriteFile(local, []byte(source), 0600))
 	}
 	compiler := NewCompiler(WithNoEmit(true))
 	compiler.gitRoot = root
+	installConnectorTestSources(t, root)
 	compiler.SetActionMode(ActionModeDev)
 	compiler.version = "v0.0.0-1-gdc0f368c6c"
 	data, err := compiler.ParseWorkflowFile(path)
@@ -170,7 +171,7 @@ func TestSlackDocumentationConsumerCompilation(t *testing.T) {
 		t.Run(map[bool]string{false: "embedded", true: "local"}[local], func(t *testing.T) {
 			content := sample
 			if local {
-				content = strings.ReplaceAll(content, `"@builtin:connectors/slack.md"`, ".github/aw/connectors/slack.md")
+				content = strings.ReplaceAll(content, `".github/workflows/connectors/slack.md"`, ".github/workflows/connectors/slack.md")
 			}
 			compiler, data, path, err := slackDocumentationCompiler(t, content, relativePath)
 			require.NoError(t, err)
@@ -249,7 +250,7 @@ func TestSlackDocumentationRejectedSelections(t *testing.T) {
 		{"write-as-read", "slack: [read-thread]", "slack: [reply-in-thread]"},
 		{"unknown-tool", "slack: [read-thread]", "slack: [search]"},
 		{"unknown-effect", "slack-reply-in-thread: {}", "slack-post-message: {}"},
-		{"per-effect-options", "slack-reply-in-thread: {}", "slack-reply-in-thread: {staged: false}"},
+		{"unknown-effect-option", "slack-reply-in-thread: {}", "slack-reply-in-thread: {unknown: false}"},
 		{"resource-input", "reader-secret: SLACK_READ_TOKEN", "channels: [COTHER]"},
 		{"public-context", "tools:\n", "context:\n  slack:\n    thread-context: {}\ntools:\n"},
 	} {

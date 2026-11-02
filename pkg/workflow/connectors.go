@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 
 	"github.com/github/gh-aw/pkg/connectors"
 	"github.com/github/gh-aw/pkg/sliceutil"
@@ -13,30 +14,36 @@ import (
 var connectorNamePattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,62}$`)
 
 type ConnectorRegistration struct {
-	Definition  string                          `json:"definition,omitempty"`
-	Spec        *connectors.ConnectorSpec       `json:"spec,omitempty"`
-	Connection  string                          `json:"connection"`
-	Credentials map[string]connectors.SecretRef `json:"credentials,omitempty"`
-	Resources   map[string][]string             `json:"resources,omitempty"`
-	GitHubApps  map[string]*ConnectorGitHubApp  `json:"github-apps,omitempty"`
-	OIDCTokens  map[string]*ConnectorGitHubOIDC `json:"oidc-tokens,omitempty"`
-	On          []string                        `json:"on,omitempty"`
-	Tools       []string                        `json:"tools,omitempty"`
-	Context     map[string]map[string]any       `json:"context,omitempty"`
-	SafeOutputs []string                        `json:"safe-outputs,omitempty"`
+	Experimental      bool                                 `json:"experimental,omitempty"`
+	Docs              []string                             `json:"docs,omitempty"`
+	Definition        string                               `json:"definition,omitempty"`
+	Spec              *connectors.ConnectorSpec            `json:"spec,omitempty"`
+	Connection        string                               `json:"connection"`
+	Credentials       map[string]connectors.SecretRef      `json:"credentials,omitempty"`
+	Resources         map[string][]string                  `json:"resources,omitempty"`
+	GitHubApps        map[string]*ConnectorGitHubApp       `json:"github-apps,omitempty"`
+	OIDCTokens        map[string]*ConnectorGitHubOIDC      `json:"oidc-tokens,omitempty"`
+	On                []string                             `json:"on,omitempty"`
+	Tools             []string                             `json:"tools,omitempty"`
+	Context           map[string]map[string]any            `json:"context,omitempty"`
+	SafeOutputs       []string                             `json:"safe-outputs,omitempty"`
+	SafeOutputOptions map[string]ConnectorOperationOptions `json:"safe-output-options,omitempty"`
 }
 
 // WorkflowConnector is the compiler-resolved service, not an all-or-nothing
 // integration. Each runtime receives only its selected phase snapshot.
 type WorkflowConnector struct {
-	Plan        *connectors.Plan
-	Agent       *connectors.Plan
-	Context     *connectors.Plan
-	SafeOutputs *connectors.Plan
-	ContextArgs map[string]map[string]any
-	Alias       string
-	GitHubApps  map[string]*ConnectorGitHubApp
-	OIDCTokens  map[string]*ConnectorGitHubOIDC
+	Experimental      bool
+	Docs              []string
+	Plan              *connectors.Plan
+	Agent             *connectors.Plan
+	Context           *connectors.Plan
+	SafeOutputs       *connectors.Plan
+	SafeOutputOptions map[string]ConnectorOperationOptions
+	ContextArgs       map[string]map[string]any
+	Alias             string
+	GitHubApps        map[string]*ConnectorGitHubApp
+	OIDCTokens        map[string]*ConnectorGitHubOIDC
 }
 
 func validateConnectorNames(names []string) error {
@@ -164,6 +171,14 @@ func (c *Compiler) resolveWorkflowConnectors(frontmatter map[string]any) (map[st
 		resolved[alias] = config
 		config.Alias, config.GitHubApps = alias, registration.GitHubApps
 		config.OIDCTokens = registration.OIDCTokens
+		config.Experimental = registration.Experimental
+		config.Docs = registration.Docs
+		config.SafeOutputOptions = registration.SafeOutputOptions
+		for operation, options := range config.SafeOutputOptions {
+			if !slices.Contains(registration.SafeOutputs, operation) || options.Max < 1 || options.Max > connectorMaximumMax {
+				return nil, fmt.Errorf("connectors.%s.safe-output-options.%s requires a selected operation and max from 1 to %d", alias, operation, connectorMaximumMax)
+			}
+		}
 	}
 	return resolved, nil
 }

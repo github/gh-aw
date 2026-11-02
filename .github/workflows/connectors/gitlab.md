@@ -1,6 +1,15 @@
 ---
 connectors:
   gitlab:
+    experimental: true
+    docs:
+      - https://docs.gitlab.com/api/rest/authentication/
+      - https://docs.gitlab.com/user/project/settings/project_access_tokens/
+      - https://docs.gitlab.com/security/tokens/access_token_scopes/
+      - https://docs.gitlab.com/api/merge_requests/#get-single-merge-request
+      - https://docs.gitlab.com/api/pipelines/#get-a-single-pipeline
+      - https://docs.gitlab.com/api/notes/#create-a-merge-request-note
+      - https://docs.gitlab.com/user/project/integrations/webhook_events/
     endpoints:
       api: ${{ github.aw.import-inputs.api-origin }}
     credentials:
@@ -156,10 +165,12 @@ connectors:
             maxLength: 15
             pattern: ^[1-9][0-9]{0,14}$
           body:
+            sanitize: body
+            minLength: 1
             type: string
             required: true
             maxLength: 2000
-            pattern: ^[A-Za-z0-9][A-Za-z0-9 .,!?_:;()]*$
+            pattern: ^[A-Za-z0-9][^\r\n]*(?:\r?\n[ \t]*(?:[^/ \t\r\n][^\r\n]*)?)*$
         resources:
           project: projects
           merge-request: merge-requests
@@ -220,6 +231,20 @@ import-schema:
 ---
 <!--
 <connector-documentation id="gitlab" version="1">
+  <stability>experimental: true. This connector's contract may change.</stability>
+  <runtime-policies>
+    Human text inputs marked sanitize title or body use the shared publisher's
+    built-in sanitizers. Titles require at least 20 Unicode code points after
+    sanitization. Body limits include protected generated attribution and any
+    configured body footer. Fixed authored request literals are trusted content,
+    not agent-controlled text inputs.
+    Consumer safe-output options support max from 1 to 100, default 1, and staged
+    booleans or expressions. Global or compiler-forced staging always wins.
+    Staged operations do not resolve writer credentials or send provider requests.
+    Automatic retries require an explicit bounded operation retry policy; no policy
+    means one attempt. Repeating writes requires declared idempotency and a
+    repeat-safe PUT, PATCH or DELETE; POST creates and appends cannot retry.
+  </runtime-policies>
   <purpose>
     Coordinate GitHub Actions with an explicitly approved GitLab project, merge
     request, and pipeline using REST v4. Importing registers capabilities only:
@@ -315,14 +340,13 @@ import-schema:
       repository files, or secret-bearing configuration are fetched.
     </read>
     <effect selection="safe-outputs.gitlab-add-merge-request-note" tool="gitlab_add_merge_request_note" method="POST" path="/api/v4/projects/{project}/merge_requests/{merge-request}/notes">
-      Inputs: project, merge-request, and body. Body is 1 to 2000 ASCII
-      characters, begins with a letter or digit, and otherwise permits only
-      letters, digits, spaces, and these punctuation characters: . , ! ? _ : ; ( )
-      The exact pattern is ^[A-Za-z0-9][A-Za-z0-9 .,!?_:;()]*$.
-      Slashes, line breaks, carriage returns, tabs, mentions, markup, explicit
-      Markdown link syntax, emoji-only reactions, and GitLab quick actions are
-      rejected, not cleaned. GitLab may still auto-link plain domain-like text.
-      GitLab executes quick actions in notes, so arbitrary Markdown is unsafe.
+      Inputs: project, merge-request, and body. Body is at most 2000 Unicode
+      characters after built-in sanitization and generated footer sizing.
+      The first character must be a letter or digit. Later lines may contain
+      Markdown attribution and URLs, but a slash after optional leading spaces
+      or tabs is rejected to prevent GitLab quick actions. Ordinary inline
+      slashes in URLs do not become commands. The generated footer is trusted
+      host content; agent text is sanitized before the final pattern check.
       This creates a top-level MR note, not a diff discussion or internal note.
       JSON body contains only body; internal, created_at, and merge head SHA
       cannot be supplied. Returns note, project, and merge-request identifiers
@@ -397,7 +421,7 @@ engine: copilot
 permissions:
   contents: read
 imports:
-  - uses: "@builtin:connectors/gitlab.md"
+  - uses: ".github/workflows/connectors/gitlab.md"
     with:
       api-origin: https://gitlab.com
       projects: ["42"]
@@ -419,7 +443,7 @@ engine: copilot
 permissions:
   contents: read
 imports:
-  - uses: "@builtin:connectors/gitlab.md"
+  - uses: ".github/workflows/connectors/gitlab.md"
     with:
       api-origin: https://gitlab.com
       projects: ["42"]

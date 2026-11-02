@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -85,19 +86,16 @@ func (c *Compiler) expandConnectorSafeOutputs(frontmatter map[string]any, alias 
 		if _, exists := env[name]; exists {
 			return fmt.Errorf("safe-outputs.env.%s conflicts with a connector credential", name)
 		}
-		staged := false
-		switch value := safeOutputs["staged"].(type) {
-		case bool:
-			staged = value
-		case string:
-			staged = value == "true"
+		liveCondition, enabled, err := connectorCredentialLiveCondition(config, secret, connectorStagedValue(safeOutputs["staged"]), c.dryRun || c.trialMode || c.forceStaged)
+		if err != nil {
+			return err
 		}
-		if c.dryRun || c.trialMode || c.forceStaged || staged {
+		if !enabled {
 			continue
 		}
 		env[name] = connectorSecretExpression(config, secret)
-		if value, ok := safeOutputs["staged"].(string); ok && isExpression(value) {
-			env[name] = "${{ format('{0}', " + stripExpressionWrapper(value) + ") != 'true' && (" +
+		if liveCondition != "" {
+			env[name] = "${{ " + liveCondition + " && (" +
 				stripExpressionWrapper(connectorSecretExpression(config, secret)) + ") || '' }}"
 		}
 	}
@@ -141,6 +139,40 @@ func attachConnectorInputSchemas(data *WorkflowData) error {
 				return err
 			}
 			data.SafeOutputs.Scripts[name].connectorInputSchema = schema
+			options := config.operationOptions(operation)
+			data.SafeOutputs.Scripts[name].Max = options.Max
+			data.SafeOutputs.Scripts[name].connectorOptions = &options
+			contentConfig := map[string]any{}
+			if data.SafeOutputs.Footer != nil {
+				contentConfig["footer"] = *data.SafeOutputs.Footer
+			}
+			if data.SafeOutputs.BodyFooter != "" {
+				contentConfig["body_footer"] = data.SafeOutputs.BodyFooter
+			}
+			encodedConfig, err := json.Marshal(contentConfig)
+			if err != nil {
+				return fmt.Errorf("encode connector content configuration: %w", err)
+			}
+			data.SafeOutputs.Scripts[name].Script = "const connectorContentDefaults = JSON.parse(Buffer.from(" +
+				strconv.Quote(base64.StdEncoding.EncodeToString(encodedConfig)) + ", 'base64').toString('utf8'));\n" +
+				data.SafeOutputs.Scripts[name].Script
+		}
+		// Imports may contribute the final global staged value after expansion.
+		// Narrow existing compiler-owned env entries again after that merge.
+		for _, secret := range config.SafeOutputs.Secrets() {
+			name := connectorCredentialEnvPrefix(alias) + secret
+			if _, exists := data.SafeOutputs.Env[name]; !exists {
+				continue
+			}
+			live, enabled, err := connectorCredentialLiveCondition(config, secret, data.SafeOutputs.Staged, false)
+			if err != nil {
+				return err
+			}
+			if !enabled {
+				delete(data.SafeOutputs.Env, name)
+			} else if live != "" {
+				data.SafeOutputs.Env[name] = "${{ " + live + " && (" + stripExpressionWrapper(connectorSecretExpression(config, secret)) + ") || '' }}"
+			}
 		}
 	}
 	if data.SafeOutputs != nil && data.SafeOutputs.ReportIncomplete != nil && data.SafeOutputs.ReportIncomplete.Implicit {
@@ -179,10 +211,14 @@ func connectorSafeOutputScript(encoded, operation, prefix string, secrets []stri
 	script.WriteString("const { join } = require('node:path');\n")
 	script.WriteString("const { isStagedMode } = require('./safe_output_helpers.cjs');\n")
 	script.WriteString("const { connectorEffectBindings } = require('./connector_effect_bindings.cjs');\n")
-	fmt.Fprintf(&script, "const staged = %t || isStagedMode();\n", staged) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
-	script.WriteString("const args = { ...item }; delete args.type;\n")
+	script.WriteString("const { decodePlan } = require('./connector_runtime.cjs');\n")
+	script.WriteString("const { formatConnectorArguments } = require('./connector_content.cjs');\n")
+	fmt.Fprintf(&script, "const staged = %t || isStagedMode(typeof config === 'undefined' ? undefined : config);\n", staged) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
+	script.WriteString("const input = { ...item }; delete input.type;\n")
 	fmt.Fprintf(&script, "const env = { GH_AW_CONNECTOR_PLAN: %q };\n", encoded) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
-	script.WriteString("const bindings = connectorEffectBindings(temporaryIdMap, env.GH_AW_CONNECTOR_PLAN);\n")
+	script.WriteString("const contentConfig = { ...(typeof connectorContentDefaults === 'undefined' ? {} : connectorContentDefaults), ...(typeof config === 'undefined' ? {} : config) };\n")
+	fmt.Fprintf(&script, "const args = formatConnectorArguments(decodePlan(env.GH_AW_CONNECTOR_PLAN), %q, input, { config: contentConfig });\n", operation) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
+	script.WriteString("const bindings = staged ? null : connectorEffectBindings(temporaryIdMap, env.GH_AW_CONNECTOR_PLAN);\n")
 	script.WriteString("if (!staged) Object.assign(env, bindings.env);\n")
 	for _, secret := range secrets {
 		fmt.Fprintf(&script, "if (!staged) env[%q] = process.env[%q];\n", "GH_AW_CONNECTOR_SECRET_"+secret, prefix+secret) //nolint:fprintferrorunchecked // strings.Builder cannot fail.

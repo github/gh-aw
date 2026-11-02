@@ -1,6 +1,15 @@
 ---
 connectors:
   notion:
+    experimental: true
+    docs:
+      - https://developers.notion.com/reference/versioning
+      - https://developers.notion.com/guides/get-started/authorization
+      - https://developers.notion.com/reference/capabilities
+      - https://developers.notion.com/reference/retrieve-a-page
+      - https://developers.notion.com/reference/create-a-comment
+      - https://developers.notion.com/reference/comment-object
+      - https://developers.notion.com/reference/request-limits
     credentials:
       reader:
         header: Authorization
@@ -74,6 +83,8 @@ connectors:
             maxLength: 36
             pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
           text:
+            sanitize: body
+            minLength: 1
             type: string
             required: true
             maxLength: 2000
@@ -141,6 +152,20 @@ import-schema:
 
 <!--
 <connector-documentation id="notion" version="1">
+  <stability>experimental: true. This connector's contract may change.</stability>
+  <runtime-policies>
+    Human text inputs marked sanitize title or body use the shared publisher's
+    built-in sanitizers. Titles require at least 20 Unicode code points after
+    sanitization. Body limits include protected generated attribution and any
+    configured body footer. Fixed authored request literals are trusted content,
+    not agent-controlled text inputs.
+    Consumer safe-output options support max from 1 to 100, default 1, and staged
+    booleans or expressions. Global or compiler-forced staging always wins.
+    Staged operations do not resolve writer credentials or send provider requests.
+    Automatic retries require an explicit bounded operation retry policy; no policy
+    means one attempt. Repeating writes requires declared idempotency and a
+    repeat-safe PUT, PATCH or DELETE; POST creates and appends cannot retry.
+  </runtime-policies>
   <purpose>
     Connect GitHub Actions release and knowledge-reference workflows to narrowly
     approved Notion pages. Read one page's identity, human-facing URL and edit
@@ -210,7 +235,7 @@ import-schema:
       API version. The version is not a consumer or agent input.
     </endpoint>
     <imports>
-      Import @builtin:connectors/notion.md using ordinary workflow imports.
+      Import .github/workflows/connectors/notion.md using ordinary workflow imports.
       with.pages is an array of exact canonical page UUID strings, defaults to
       an empty array and must be nonempty for either selected operation.
       with.reader-secret is a secret name, default NOTION_READ_TOKEN.
@@ -314,7 +339,7 @@ permissions:
 network:
   allowed: [defaults, api.notion.com]
 imports:
-  - uses: "@builtin:connectors/notion.md"
+  - uses: ".github/workflows/connectors/notion.md"
     with:
       pages: [11111111-2222-4333-8444-555555555555]
 tools:

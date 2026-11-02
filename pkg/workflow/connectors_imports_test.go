@@ -94,7 +94,7 @@ func TestConnectorImportRejectsInvalidAuthority(t *testing.T) {
 		{"trigger-string", strings.Replace(connectorImportHeader, "on: workflow_dispatch", "on: tracker-issue-created", 1), "", "ingress is not operational"},
 		{"trigger-list", strings.Replace(connectorImportHeader, "on: workflow_dispatch", "on: [workflow_dispatch, tracker-issue-created]", 1), "", "ingress is not operational"},
 		{"trigger-duplicate", strings.Replace(connectorImportHeader, "on: workflow_dispatch", "on: [tracker-issue-created, tracker-issue-created]", 1), "", "duplicate trigger"},
-		{"effect-options", connectorImportHeader, "safe-outputs:\n  tracker-add-comment: {token: injected}\n", "accepts null or {}"},
+		{"effect-options", connectorImportHeader, "safe-outputs:\n  tracker-add-comment: {token: injected}\n", "unknown connector operation option"},
 		{"nested-effects", connectorImportHeader, "safe-outputs:\n  tracker: [add-comment]\n", ""},
 		{"unknown-effect", connectorImportHeader, "safe-outputs:\n  tracker-missing:\n", "unknown safe-output"},
 		{"dot-effect", connectorImportHeader, "safe-outputs:\n  tracker.add-comment:\n", ""},
@@ -213,9 +213,9 @@ func TestConnectorImportAllProviderWrappers(t *testing.T) {
 	for _, provider := range []string{"linear", "jira", "azure-devops", "slack", "teams", "confluence", "sentry", "servicenow"} {
 		t.Run(provider, func(t *testing.T) {
 			root := t.TempDir()
-			dir := filepath.Join(root, ".github/aw/connectors")
+			dir := filepath.Join(root, ".github/workflows/connectors")
 			require.NoError(t, os.MkdirAll(dir, 0700))
-			wrapper, err := os.ReadFile(filepath.Join("../../.github/aw/connectors", provider+".md"))
+			wrapper, err := os.ReadFile(filepath.Join("../../.github/workflows/connectors", provider+".md"))
 			require.NoError(t, err)
 			require.NoError(t, os.WriteFile(filepath.Join(dir, provider+".md"), wrapper, 0600))
 			fixtureDir := filepath.Join("../connectors/testdata/providers", provider)
@@ -242,6 +242,7 @@ func TestConnectorImportAllProviderWrappers(t *testing.T) {
 				t.Run(source.name, func(t *testing.T) {
 					c := NewCompiler(WithNoEmit(true), WithSkipValidation(true))
 					c.gitRoot = root
+					installConnectorTestSources(t, root)
 					c.SetActionMode(ActionModeDev)
 					c.version = "v0.0.0-1-g683ddf9617"
 					path := filepath.Join(workflows, source.name+".md")
@@ -266,7 +267,7 @@ func TestConnectorDocumentationMatchesDeclarations(t *testing.T) {
 	t.Parallel()
 	doc, err := os.ReadFile("../../docs/src/content/docs/reference/connectors.md")
 	require.NoError(t, err)
-	files, err := filepath.Glob("../../.github/aw/connectors/*.md")
+	files, err := filepath.Glob("../../.github/workflows/connectors/*.md")
 	require.NoError(t, err)
 	for _, file := range files {
 		provider := strings.TrimSuffix(filepath.Base(file), ".md")
@@ -280,7 +281,7 @@ func TestConnectorDocumentationMatchesDeclarations(t *testing.T) {
 			require.NoError(t, err)
 			declarations, ok := frontmatter.Frontmatter["connectors"].(map[string]any)
 			require.True(t, ok)
-			_, section, found := strings.Cut(string(doc), "Declaration: `.github/aw/connectors/"+provider+".md`.")
+			_, section, found := strings.Cut(string(doc), "Declaration: `.github/workflows/connectors/"+provider+".md`.")
 			section, _, _ = strings.Cut(section, "\n## ")
 			machineDocumentation := false
 			for _, match := range htmlCommentPattern.FindAllStringSubmatch(string(data), -1) {
@@ -335,7 +336,7 @@ func TestConnectorDocumentationMatchesDeclarations(t *testing.T) {
 func TestConnectorAuthoringUsesOnlyMarkdown(t *testing.T) {
 	t.Parallel()
 	for _, extension := range []string{"yaml", "yml"} {
-		files, err := filepath.Glob("../../.github/aw/connectors/*." + extension)
+		files, err := filepath.Glob("../../.github/workflows/connectors/*." + extension)
 		require.NoError(t, err)
 		assert.Empty(t, files, "author connectors in AW Markdown; keep versioned runtime documents under testdata")
 	}

@@ -1,6 +1,13 @@
 ---
 connectors:
   servicenow:
+    experimental: true
+    docs:
+      - https://www.servicenow.com/docs/r/api-reference/rest-apis/c_TableAPI.html
+      - https://www.servicenow.com/docs/r/platform-security/authentication/t_CreateEndpointforExternalClients.html
+      - https://www.servicenow.com/docs/r/platform-security/authentication/client-credentials-grant-workflow.html
+      - https://www.servicenow.com/docs/r/platform-security/authentication/configure-rest-api-auth-scope.html
+      - https://www.servicenow.com/docs/r/yokohama/platform-administration/c_JournalFields.html
     credentials:
       reader:
         header: Authorization
@@ -59,6 +66,8 @@ connectors:
         credential: writer
         inputs:
           note:
+            sanitize: body
+            minLength: 1
             maxLength: 4000
             pattern: (?s)^.*\S.*$
             required: true
@@ -101,6 +110,8 @@ connectors:
         credential: writer
         inputs:
           note:
+            sanitize: body
+            minLength: 1
             maxLength: 4000
             pattern: (?s)^.*\S.*$
             required: true
@@ -258,6 +269,20 @@ import-schema:
 
 <!--
 <connector-documentation id="servicenow" version="1">
+  <stability>experimental: true. This connector's contract may change.</stability>
+  <runtime-policies>
+    Human text inputs marked sanitize title or body use the shared publisher's
+    built-in sanitizers. Titles require at least 20 Unicode code points after
+    sanitization. Body limits include protected generated attribution and any
+    configured body footer. Fixed authored request literals are trusted content,
+    not agent-controlled text inputs.
+    Consumer safe-output options support max from 1 to 100, default 1, and staged
+    booleans or expressions. Global or compiler-forced staging always wins.
+    Staged operations do not resolve writer credentials or send provider requests.
+    Automatic retries require an explicit bounded operation retry policy; no policy
+    means one attempt. Repeating writes requires declared idempotency and a
+    repeat-safe PUT, PATCH or DELETE; POST creates and appends cannot retry.
+  </runtime-policies>
   <purpose>
     Read minimal metadata for explicitly approved ServiceNow incident and
     requested-item records, and stage narrowly scoped internal work-note appends.
@@ -327,9 +352,9 @@ import-schema:
   </administration>
   <configuration>
     <import>
-      Import @builtin:connectors/servicenow.md for the compiler-embedded version.
-      A reviewed local .github/aw/connectors/servicenow.md or pinned remote
-      Markdown import can instead customize the declaration. No separate
+      Import a reviewed editable local .github/workflows/connectors/servicenow.md or
+      a pinned remote Markdown declaration through normal AW imports. The compiler
+      does not embed provider definitions. No separate
       ConnectorSpec, connection file, or context configuration is required.
     </import>
     <parameters>
@@ -406,9 +431,9 @@ import-schema:
       equal the request record, and belong to that table's grants. Only sys-id
       is projected. There is no create, state transition, general update,
       sc_request operation, attachment operation, or journal-history read.
-      There is no per-operation max or staged option: use whole-workflow
+      Use per-operation max/staged options or whole-workflow
       safe-outputs.staged: true to validate intents without resolving write
-      credentials or making mutations. Multiple separately submitted intents
+      credentials or making mutations. Multiple separately submitted intents, when the budget permits,
       can append multiple entries; this is not an idempotency guarantee.
     </safe-effects>
   </capabilities>
@@ -450,7 +475,7 @@ import-schema:
       .github/workflows/servicenow-review.md, surrounded by the usual three-dash
       delimiter lines, then append the prompt below. The delimiters are omitted
       here to keep this XML comment valid. The local import uses this reviewed
-      file; use @builtin:connectors/servicenow.md only with a compiler containing
+      file; use .github/workflows/connectors/servicenow.md only with a compiler containing
       this declaration. Keep staged true for the initial review: reads are real,
       but effects send no PATCH. Staging is not provider permission verification.
       Remove either read or write selection to disable that surface independently.
@@ -465,7 +490,7 @@ permissions:
   contents: read
   copilot-requests: write
 imports:
-  - uses: .github/aw/connectors/servicenow.md
+  - uses: .github/workflows/connectors/servicenow.md
     with:
       instance: https://example.service-now.com
       incidents: ["0123456789abcdef0123456789abcdef"]

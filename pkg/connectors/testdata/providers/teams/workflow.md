@@ -1,6 +1,6 @@
 ---
 imports:
-  - uses: .github/aw/connectors/teams.md
+  - uses: .github/workflows/connectors/teams.md
     with:
       teams: [11111111-1111-4111-8111-111111111111]
       channels: ["19:approved-channel@thread.tacv2"]

@@ -1,6 +1,6 @@
 ---
 imports:
-  - .github/aw/connectors/azure-devops.md
+  - .github/workflows/connectors/azure-devops.md
 "on":
   azure-devops-work-item-created: null
 permissions:

@@ -14,10 +14,11 @@ func TestConnectorDocumentationCommentScanning(t *testing.T) {
 		"<!--\n<connector-documentation id=\"tracker\" version=\"1\"><usage>Read https://example.test/docs and store Basic credentials as base64.</usage>" +
 		"<example><frontmatter><![CDATA[on: workflow_dispatch]]></frontmatter><body>Read approved records.</body></example>" +
 		"</connector-documentation>\n-->\n"
-	path := "/repo/.github/aw/connectors/tracker.md"
+	path := "/repo/.github/workflows/connectors/tracker.md"
 	require.NotEmpty(t, ScanMarkdownSecurity(content), "ordinary hidden comments remain rejected by default")
 	require.Empty(t, scanImportedConnectorMarkdown(content, path))
 	require.NotEmpty(t, scanImportedConnectorMarkdown(content, "/repo/.github/workflows/shared.md"))
+	require.NotEmpty(t, scanImportedConnectorMarkdown(content, "/repo/.github/aw/connectors/tracker.md"), "the old location must not retain a documentation exception")
 	for _, invalid := range []string{
 		strings.Replace(content, `id="tracker"`, `id="other"`, 1),
 		strings.Replace(content, `version="1"`, `version="2"`, 1),

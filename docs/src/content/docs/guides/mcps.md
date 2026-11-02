@@ -217,7 +217,7 @@ Pre-configured MCP server specifications are available in [`.github/workflows/sh
 | **Jupyter** | `shared/mcp/jupyter.md` | Execute code, manage notebooks, visualize data |
 | **AgentDB** | `shared/mcp/agentdb.md` | Semantic and hybrid retrieval over agent-collected corpora (e.g. discussions, issues), backed by a runtime store at `AGENTDB_PATH` |
 | **Azure Auth (OIDC bridge)** | `shared/azure-auth.md` | Re-authenticate Azure CLI inside the agent sandbox using GitHub OIDC |
-| **Azure DevOps connector** *(experimental)* | `"@builtin:connectors/azure-devops.md"` | Explicit project-metadata reads; see [Connectors](/gh-aw/reference/connectors/#azure-devops) |
+| **Azure DevOps connector** *(experimental)* | `".github/workflows/connectors/azure-devops.md"` | Explicit project-metadata reads; see [Connectors](/gh-aw/reference/connectors/#azure-devops) |
 | **Azure MCP** | `shared/mcp/azure.md` | Azure MCP server in read-only mode with an explicit tool allowlist |
 | **Others** | `shared/mcp/*.md` | AST-Grep, Azure, Brave Search, Context7, DataDog, DeepWiki, Fabric RTI, MarkItDown, Microsoft Docs, Notion, Sentry, Serena, Server Memory, Slack, Tavily |
 
@@ -258,7 +258,7 @@ mcp-servers:
 
 `shared/azure-auth.md` sets `AZURE_CONFIG_DIR=/tmp/gh-aw/agent/.azure` and runs `az login` in a pre-agent step so `DefaultAzureCredential` can resolve `AzureCliCredential` inside the sandbox.
 
-Azure DevOps uses the separate [embedded connector](/gh-aw/reference/connectors/#azure-devops).
+Azure DevOps uses the separate [declarative connector](/gh-aw/reference/connectors/#azure-devops).
 Azure CLI authentication does not provision its Entra MCP credential. The old
 `shared/mcp/azure-devops.md` wildcard configuration is removed.
 

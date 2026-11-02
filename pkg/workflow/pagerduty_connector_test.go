@@ -17,7 +17,7 @@ import (
 const pagerdutyFixtureDirectory = "../connectors/testdata/providers/pagerduty"
 
 const pagerdutyConnectorImport = `imports:
-  - uses: "@builtin:connectors/pagerduty.md"
+  - uses: ".github/workflows/connectors/pagerduty.md"
     with:
       incidents: [PINC001]
       services: [PSVC001]
@@ -40,12 +40,13 @@ func parsePagerDutySource(t *testing.T, source string) (*Compiler, *WorkflowData
 	require.NoError(t, os.WriteFile(path, []byte(source), 0600))
 	compiler := NewCompiler(WithNoEmit(true), WithVersion("v0.0.0-1-gabcdef0"))
 	compiler.gitRoot = root
+	installConnectorTestSources(t, root)
 	compiler.SetActionMode(ActionModeDev)
 	data, err := compiler.ParseWorkflowFile(path)
 	return compiler, data, path, err
 }
 
-func TestPagerDutyConnectorEmbeddedConsumer(t *testing.T) {
+func TestPagerDutyConnectorLocalImportConsumer(t *testing.T) {
 	source, err := os.ReadFile(filepath.Join(pagerdutyFixtureDirectory, "workflow.md"))
 	require.NoError(t, err)
 	compiler, data, path, err := parsePagerDutySource(t, string(source))
@@ -79,8 +80,8 @@ func TestPagerDutyConnectorEmbeddedConsumer(t *testing.T) {
 	require.NotContains(t, output, "connector_9_pagerduty")
 	require.NotContains(t, output, `node "${RUNNER_TEMP}/gh-aw/actions/connector_runtime.cjs" invoke context`)
 	require.NotContains(t, output, "go build")
-	_, err = os.Stat(filepath.Join(compiler.gitRoot, ".github", "aw", "connectors"))
-	require.ErrorIs(t, err, os.ErrNotExist, "embedded imports must not require consumer connector files")
+	_, err = os.Stat(filepath.Join(compiler.gitRoot, ".github", "workflows", "connectors"))
+	require.NoError(t, err, "normal imports use editable connector files")
 }
 
 func TestPagerDutyConnectorIndependentSelections(t *testing.T) {
@@ -138,15 +139,15 @@ func TestPagerDutyConnectorRejectsUnboundedAuthority(t *testing.T) {
 			}
 		})
 	}
-	_, _, _, err := parsePagerDutyWorkflow(t, "imports: ['@builtin:connectors/pagerduty.md']\n", read)
+	_, _, _, err := parsePagerDutyWorkflow(t, "imports: ['.github/workflows/connectors/pagerduty.md']\n", read)
 	require.Error(t, err)
-	_, _, _, err = parsePagerDutyWorkflow(t, "imports: ['@builtin:connectors/pagerduty.md']\n", "")
+	_, _, _, err = parsePagerDutyWorkflow(t, "imports: ['.github/workflows/connectors/pagerduty.md']\n", "")
 	require.NoError(t, err, "unselected registration must grant no resources")
 }
 
 func TestPagerDutyConnectorNoteAuthorityIsIndependent(t *testing.T) {
 	const imports = `imports:
-  - uses: "@builtin:connectors/pagerduty.md"
+  - uses: ".github/workflows/connectors/pagerduty.md"
     with:
       incidents: [PINC001]
       writer-secret: CUSTOM_PAGERDUTY_WRITER
@@ -194,7 +195,7 @@ func TestPagerDutyConnectorSelectionRejections(t *testing.T) {
 }
 
 func TestPagerDutyConnectorXMLDocumentation(t *testing.T) {
-	data, err := os.ReadFile("../../.github/aw/connectors/pagerduty.md")
+	data, err := os.ReadFile("../../.github/workflows/connectors/pagerduty.md")
 	require.NoError(t, err)
 	parts := strings.SplitN(string(data), "---", 3)
 	require.Len(t, parts, 3)

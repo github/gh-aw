@@ -1,7 +1,7 @@
 ---
 engine: copilot
 imports:
-  - .github/aw/connectors/sentry.md
+  - .github/workflows/connectors/sentry.md
 "on":
   sentry-error-created: null
 permissions:

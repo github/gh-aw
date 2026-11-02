@@ -11,6 +11,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/sliceutil"
 	"github.com/goccy/go-yaml"
 )
 
@@ -596,6 +597,15 @@ func (c *Compiler) emitExperimentalFeatureWarningsTo(workflowData *WorkflowData,
 		{enabled: workflowData.RepoMemoryConfig != nil && slices.ContainsFunc(workflowData.RepoMemoryConfig.Memories, func(memory RepoMemoryEntry) bool { return memory.Ledger != nil }), message: "Using experimental feature: repo-memory ledger"},
 		{enabled: hasContinualExperiment(workflowData.ExperimentConfigs), message: "Using experimental feature: continual experiments"},
 		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.Steer, message: "Using experimental feature: safe-outputs steer"},
+	}
+	for _, alias := range sliceutil.SortedKeys(workflowData.Connectors) {
+		warnings = append(warnings, struct {
+			enabled bool
+			message string
+		}{
+			enabled: workflowData.Connectors[alias].Experimental,
+			message: "Using experimental feature: connectors." + alias,
+		})
 	}
 	for _, warning := range warnings {
 		if warning.enabled {

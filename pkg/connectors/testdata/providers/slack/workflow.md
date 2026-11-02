@@ -1,6 +1,6 @@
 ---
 imports:
-  - .github/aw/connectors/slack.md
+  - .github/workflows/connectors/slack.md
 "on": workflow_dispatch
 permissions:
   contents: read

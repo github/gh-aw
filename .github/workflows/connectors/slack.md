@@ -1,6 +1,14 @@
 ---
 connectors:
   slack:
+    experimental: true
+    docs:
+      - https://docs.slack.dev/reference/methods/conversations.replies/
+      - https://docs.slack.dev/apis/web-api/pagination/
+      - https://docs.slack.dev/reference/methods/chat.postMessage/
+      - https://docs.slack.dev/authentication/installing-with-oauth/
+      - https://docs.slack.dev/authentication/verifying-requests-from-slack/
+      - https://docs.slack.dev/ai/slack-mcp-server/
     credentials:
       reader:
         header: Authorization
@@ -64,6 +72,8 @@ connectors:
             required: true
             type: string
           text:
+            sanitize: body
+            minLength: 1
             maxLength: 4000
             required: true
             type: string
@@ -176,6 +186,20 @@ import-schema:
 
 <!--
 <connector-documentation id="slack" version="1">
+  <stability>experimental: true. This connector's contract may change.</stability>
+  <runtime-policies>
+    Human text inputs marked sanitize title or body use the shared publisher's
+    built-in sanitizers. Titles require at least 20 Unicode code points after
+    sanitization. Body limits include protected generated attribution and any
+    configured body footer. Fixed authored request literals are trusted content,
+    not agent-controlled text inputs.
+    Consumer safe-output options support max from 1 to 100, default 1, and staged
+    booleans or expressions. Global or compiler-forced staging always wins.
+    Staged operations do not resolve writer credentials or send provider requests.
+    Automatic retries require an explicit bounded operation retry policy; no policy
+    means one attempt. Repeating writes requires declared idempotency and a
+    repeat-safe PUT, PATCH or DELETE; POST creates and appends cannot retry.
+  </runtime-policies>
   <purpose>
     Read one approved Slack thread through a constrained REST-backed MCP adapter
     and request a plain-text reply through a separate safe-output phase. Importing
@@ -245,9 +269,9 @@ import-schema:
   <configuration>
     <endpoint id="api" origin="https://slack.com"/>
     <imports>
-      Use @builtin:connectors/slack.md for the compiler-embedded declaration, or
-      .github/aw/connectors/slack.md for a reviewed local copy. A pinned remote
-      Markdown import is also supported by ordinary AW imports. The only import
+      Use .github/workflows/connectors/slack.md for a reviewed editable local copy.
+      A pinned remote Markdown import uses the same ordinary AW import contract;
+      no declaration is built into the compiler. The only import
       inputs are reader-secret, default SLACK_READ_TOKEN, and writer-secret,
       default SLACK_WRITE_TOKEN; both are string secret names. Resources and the
       endpoint are not import inputs. Replace specimen grants only in a reviewed
@@ -270,7 +294,8 @@ import-schema:
       with safe-outputs.slack-reply-in-thread: null or an empty mapping. Omit either
       selection to disable that phase. Effect arguments use the generated
       slack_reply_in_thread tool, never a length-prefixed connector tool name.
-      Per-effect options such as max, token or staged are unsupported; use
+      Per-effect max and staged are supported; credential values such as token
+      are not operation options. Use
       workflow-wide safe-outputs.staged: true to stage effects.
     </selections>
   </configuration>
@@ -410,7 +435,7 @@ permissions:
   contents: read
   copilot-requests: write
 imports:
-  - uses: "@builtin:connectors/slack.md"
+  - uses: ".github/workflows/connectors/slack.md"
     with:
       reader-secret: SLACK_READ_TOKEN
       writer-secret: SLACK_WRITE_TOKEN

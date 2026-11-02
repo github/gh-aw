@@ -115,7 +115,7 @@ func connectorSecretExpression(config *WorkflowConnector, secret string) string 
 }
 
 func (c *Compiler) connectorGitHubAppSteps(data *WorkflowData, phase string) []string {
-	condition, mintEnabled := connectorMintCondition(c, data, phase)
+	_, mintEnabled := connectorMintCondition(c, data, phase)
 	if !mintEnabled {
 		return nil
 	}
@@ -140,13 +140,17 @@ func (c *Compiler) connectorGitHubAppSteps(data *WorkflowData, phase string) []s
 			if app.phase != phase {
 				continue
 			}
+			condition, staged, enabled := connectorCredentialMintCondition(c, data, config, secret, phase)
+			if !enabled {
+				continue
+			}
 			mint := c.buildGitHubAppTokenMintStepWithMeta(&app.GitHubAppConfig,
 				&Permissions{}, "${{ github.event.repository.name }}", "",
 				fmt.Sprintf("Mint connector GitHub App token %s/%s", alias, name), connectorAppStepID(secret))
 			if condition != "" {
 				mint = slices.Insert(mint, 2, condition)
 				mint = appendStepEnvAssignments(mint, []stepEnvAssignment{{
-					Name: "GH_AW_CONNECTOR_STAGED", Value: data.SafeOutputs.Staged.String(),
+					Name: "GH_AW_CONNECTOR_STAGED", Value: staged,
 				}})
 			}
 			steps = append(steps, mint...)

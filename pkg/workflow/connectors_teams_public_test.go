@@ -22,7 +22,7 @@ import (
 
 func teamsPublicDocumentation(t *testing.T) (string, string) {
 	t.Helper()
-	content, err := os.ReadFile("../../.github/aw/connectors/teams.md")
+	content, err := os.ReadFile("../../.github/workflows/connectors/teams.md")
 	require.NoError(t, err)
 	doc, err := parser.ExtractFrontmatterFromContent(string(content))
 	require.NoError(t, err)
@@ -65,16 +65,17 @@ func teamsPublicCompiler(t *testing.T, source string, local bool) (*Compiler, *W
 	path := filepath.Join(root, ".github/workflows/teams-review.md")
 	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0700))
 	if local {
-		content, err := os.ReadFile("../../.github/aw/connectors/teams.md")
+		content, err := os.ReadFile("../../.github/workflows/connectors/teams.md")
 		require.NoError(t, err)
-		target := filepath.Join(root, ".github/aw/connectors/teams.md")
+		target := filepath.Join(root, ".github/workflows/connectors/teams.md")
 		require.NoError(t, os.MkdirAll(filepath.Dir(target), 0700))
 		require.NoError(t, os.WriteFile(target, content, 0600))
-		source = strings.ReplaceAll(source, "@builtin:connectors/teams.md", ".github/aw/connectors/teams.md")
+		source = strings.ReplaceAll(source, ".github/workflows/connectors/teams.md", ".github/workflows/connectors/teams.md")
 	}
 	require.NoError(t, os.WriteFile(path, []byte(source), 0600))
 	compiler := NewCompiler(WithVersion("v0.0.0-1-gabcdef0"))
 	compiler.gitRoot = root
+	installConnectorTestSources(t, root)
 	compiler.SetActionMode(ActionModeDev)
 	data, err := compiler.ParseWorkflowFile(path)
 	return compiler, data, path, err
@@ -136,8 +137,8 @@ func TestTeamsConnectorPublicDocumentationSample(t *testing.T) {
 				require.Contains(t, script.Script, "'actions', 'connector_runtime.cjs'")
 			}
 			if !local {
-				_, err = os.Stat(filepath.Join(compiler.gitRoot, ".github/aw/connectors"))
-				require.ErrorIs(t, err, os.ErrNotExist, "embedded imports must work without checkout connector files")
+				_, err = os.Stat(filepath.Join(compiler.gitRoot, ".github/workflows/connectors"))
+				require.NoError(t, err, "normal imports use editable connector files")
 			}
 		})
 	}
@@ -190,7 +191,7 @@ func TestTeamsConnectorPublicRejections(t *testing.T) {
 	for _, test := range []struct{ name, old, replacement, diagnostic string }{
 		{"context", "tools:\n", "context:\n  teams: {}\ntools:\n", "context.teams is unsupported"},
 		{"write-as-read", "get-channel-message, list-channel-replies", "reply-to-activity", "must name exactly one"},
-		{"output-options", "teams-reply-to-activity:", "teams-reply-to-activity: {staged: true}", "accepts null or {}"},
+		{"unknown-output-option", "teams-reply-to-activity:", "teams-reply-to-activity: {unknown: true}", "unknown connector operation option"},
 		{"empty-read-grant", "teams: [11111111-1111-4111-8111-111111111111]", "teams: []", "resource allowlist"},
 		{"empty-write-grant", `activities: ["1730000001000"]`, "activities: []", "resource allowlist"},
 		{"wildcard", `threads: ["1730000000000"]`, `threads: ["*"]`, "exact allowlist"},
@@ -209,7 +210,7 @@ func TestTeamsConnectorPublicRejections(t *testing.T) {
 		require.ErrorIs(t, err, connectors.ErrIngressUnavailable)
 	})
 	t.Run("registration-grants-nothing", func(t *testing.T) {
-		_, _, _, err := teamsPublicCompiler(t, awConnectorHeader+"imports: ['@builtin:connectors/teams.md']\ntools:\n  teams: [get-channel-message]\n---\nRead.\n", false)
+		_, _, _, err := teamsPublicCompiler(t, awConnectorHeader+"imports: ['.github/workflows/connectors/teams.md']\ntools:\n  teams: [get-channel-message]\n---\nRead.\n", false)
 		require.ErrorContains(t, err, "resource allowlist")
 	})
 }

@@ -19,8 +19,10 @@ import (
 )
 
 const linearConnectorImport = `imports:
-  - uses: "@builtin:connectors/linear.md"
+  - uses: ".github/workflows/connectors/linear.md"
     with:
+      reader-secret: LINEAR_READ_API_KEY
+      writer-secret: LINEAR_WRITE_API_KEY
       issues: [22222222-2222-4222-8222-222222222222]
       organizations: [11111111-1111-4111-8111-111111111111]
       teams: [33333333-3333-4333-8333-333333333333]
@@ -28,6 +30,19 @@ const linearConnectorImport = `imports:
       team-keys: [ENG]
       project-slugs: [abcdef123456]
 `
+
+func TestLinearConventionalSecretDefaultsAndOverrides(t *testing.T) {
+	imports := strings.ReplaceAll(linearConnectorImport, "      reader-secret: LINEAR_READ_API_KEY\n", "")
+	imports = strings.ReplaceAll(imports, "      writer-secret: LINEAR_WRITE_API_KEY\n", "")
+	_, data, _, err := parseLinearConnectorWorkflow(t, imports, "tools:\n  linear: [get-issue]\nsafe-outputs:\n  staged: true\n  linear-add-comment:\n")
+	require.NoError(t, err)
+	require.Equal(t, []string{"LINEAR_API_KEY"}, data.Connectors["linear"].Agent.Secrets())
+	require.Equal(t, []string{"LINEAR_API_KEY"}, data.Connectors["linear"].SafeOutputs.Secrets())
+	_, overridden, _, err := parseLinearConnectorWorkflow(t, linearConnectorImport, "tools:\n  linear: [get-issue]\nsafe-outputs:\n  linear-add-comment:\n")
+	require.NoError(t, err)
+	require.Equal(t, []string{"LINEAR_READ_API_KEY"}, overridden.Connectors["linear"].Agent.Secrets())
+	require.Equal(t, []string{"LINEAR_WRITE_API_KEY"}, overridden.Connectors["linear"].SafeOutputs.Secrets())
+}
 
 func parseLinearConnectorWorkflow(t *testing.T, imports, selection string) (*Compiler, *WorkflowData, string, error) {
 	t.Helper()
@@ -39,6 +54,7 @@ func parseLinearConnectorWorkflow(t *testing.T, imports, selection string) (*Com
 	require.NoError(t, os.WriteFile(path, []byte(source), 0600))
 	compiler := NewCompiler(WithNoEmit(true), WithVersion("v0.0.0-1-gabcdef0"))
 	compiler.gitRoot = root
+	installConnectorTestSources(t, root)
 	compiler.SetActionMode(ActionModeDev)
 	data, err := compiler.ParseWorkflowFile(path)
 	return compiler, data, path, err
@@ -86,8 +102,8 @@ func TestLinearConnectorWorkflowCompilation(t *testing.T) {
 	require.NotContains(t, output, "Checkout trusted connector runtime")
 	require.NotContains(t, output, "Build trusted connector runtime")
 	require.NotContains(t, output, "gh extension install")
-	_, err = os.Stat(filepath.Join(compiler.gitRoot, ".github", "aw", "connectors"))
-	require.True(t, os.IsNotExist(err), "compilation must not require consumer connector files")
+	_, err = os.Stat(filepath.Join(compiler.gitRoot, ".github", "workflows", "connectors"))
+	require.NoError(t, err, "compilation reads editable connector files")
 }
 
 func TestLinearConnectorWorkflowIndependentSelections(t *testing.T) {
@@ -136,8 +152,8 @@ func TestLinearConnectorWorkflowRejections(t *testing.T) {
 		{"native-tool-not-registration", "tools:\n  linear: [get_issue]\n", ""},
 		{"read-as-effect", "safe-outputs:\n  linear-get-issue:\n", "unknown safe-output"},
 		{"context", "context:\n  linear: {}\n", "context.linear is unsupported"},
-		{"legacy-token", "safe-outputs:\n  linear-token: '${{ secrets.LINEAR_API_KEY }}'\n", "accepts null or {}"},
-		{"legacy-target", "safe-outputs:\n  linear-add-comment: {target: ENG-123}\n", "accepts null or {}"},
+		{"legacy-token", "safe-outputs:\n  linear-token: '${{ secrets.LINEAR_API_KEY }}'\n", "connector operation option"},
+		{"legacy-target", "safe-outputs:\n  linear-add-comment: {target: ENG-123}\n", "unknown connector operation option"},
 		{"legacy-toolsets", "tools:\n  linear: {toolsets: issues}\n", ""},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -173,18 +189,18 @@ func TestLinearConnectorWorkflowRejections(t *testing.T) {
 func TestLinearConnectorResourceInputs(t *testing.T) {
 	const read = "tools:\n  linear: [get-issue]\n"
 	for _, imports := range []string{
-		"imports: ['@builtin:connectors/linear.md']\n",
+		"imports: ['.github/workflows/connectors/linear.md']\n",
 		strings.Replace(linearConnectorImport, "      teams: [33333333-3333-4333-8333-333333333333]\n", "", 1),
 		strings.Replace(linearConnectorImport, "      issues: [22222222-2222-4222-8222-222222222222]\n", "      issues: ['*']\n", 1),
 	} {
 		_, _, _, err := parseLinearConnectorWorkflow(t, imports, read)
 		require.Error(t, err, "selected reads require exact issue, organization and team authority")
 	}
-	_, data, _, err := parseLinearConnectorWorkflow(t, "imports: ['@builtin:connectors/linear.md']\n", "")
+	_, data, _, err := parseLinearConnectorWorkflow(t, "imports: ['.github/workflows/connectors/linear.md']\n", "")
 	require.NoError(t, err)
 	require.Empty(t, data.Connectors)
 	_, data, _, err = parseLinearConnectorWorkflow(t, `imports:
-  - uses: "@builtin:connectors/linear.md"
+  - uses: ".github/workflows/connectors/linear.md"
     with:
       writer-secret: CUSTOM_LINEAR_WRITER
       issues: [22222222-2222-4222-8222-222222222222]
@@ -240,5 +256,5 @@ func TestLinearConnectorCompiledMutationBoundaries(t *testing.T) {
 	require.Equal(t, 1, calls)
 	require.Equal(t, 1, secrets)
 	_, err = parser.ExtractMCPConfigurations(map[string]any{"tools": map[string]any{"linear": nil}}, "")
-	require.ErrorContains(t, err, "import @builtin:connectors/linear.md")
+	require.ErrorContains(t, err, "import .github/workflows/connectors/linear.md")
 }

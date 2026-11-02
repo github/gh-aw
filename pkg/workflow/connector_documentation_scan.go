@@ -13,7 +13,7 @@ import (
 func scanImportedConnectorMarkdown(content, path string) []SecurityFinding {
 	findings := ScanMarkdownSecurity(content)
 	canonical := "/" + strings.TrimPrefix(filepath.ToSlash(path), "/")
-	if !strings.Contains(canonical, "/.github/aw/connectors/") || !strings.HasSuffix(canonical, ".md") {
+	if !strings.Contains(canonical, "/.github/workflows/connectors/") || !strings.HasSuffix(canonical, ".md") {
 		return findings
 	}
 	document, err := parser.ExtractFrontmatterFromContent(content)

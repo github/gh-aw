@@ -18,7 +18,7 @@ import (
 )
 
 const linearTrustedCreationImport = `imports:
-  - uses: "@builtin:connectors/linear.md"
+  - uses: ".github/workflows/connectors/linear.md"
     with:
       writer-secret: LINEAR_API_KEY
       create-team-secret: LINEAR_TEAM_ID
@@ -37,6 +37,7 @@ func TestLinearSmokeWorkflowPreservesTrustedDestination(t *testing.T) {
 	require.NotContains(t, string(source), "abcdef123456")
 	compiler := NewCompiler(WithNoEmit(true), WithVersion("v0.0.0-1-gabcdef0"))
 	compiler.gitRoot = root
+	installConnectorTestSources(t, root)
 	compiler.SetActionMode(ActionModeDev)
 	compiler.SetWorkflowIdentifier("smoke-issues.md")
 	data, err := compiler.ParseWorkflowFile(path)
@@ -184,7 +185,7 @@ func TestLinearTrustedCreationPreflight(t *testing.T) {
 				return &http.Response{StatusCode: status, Header: header, Body: io.NopCloser(strings.NewReader(string(encoded))), Request: request}, nil
 			})}
 			host := connectors.CreatedResourceHost{Run: "linear-bound-create", Key: []byte(strings.Repeat("x", 32))}
-			result, err := plan.ExecuteCreatedSafeOutput(t.Context(), runtime, host, "create-issue-in-project", map[string]any{"title": "Title", "body": "untrusted $(not-code)"})
+			result, err := plan.ExecuteCreatedSafeOutput(t.Context(), runtime, host, "create-issue-in-project", map[string]any{"title": "A reviewed connector title", "body": "untrusted $(not-code)"})
 			if scenario == "success" {
 				require.NoError(t, err)
 				require.NotNil(t, result)
@@ -206,7 +207,7 @@ func TestLinearTrustedCreationPreflight(t *testing.T) {
 
 func TestLinearTrustedCreationRejectsAgentAuthorityAndStagesWithoutSecrets(t *testing.T) {
 	plan := linearTrustedCreationPlan(t)
-	args := map[string]any{"title": "Title", "body": "body"}
+	args := map[string]any{"title": "A reviewed connector title", "body": "body"}
 	_, err := plan.PrepareSafeOutputIntent("create-issue-in-project", args)
 	require.NoError(t, err, "staging must not require the team secret or a read preflight")
 	calls := 0
@@ -218,7 +219,7 @@ func TestLinearTrustedCreationRejectsAgentAuthorityAndStagesWithoutSecrets(t *te
 		},
 	}
 	for _, name := range []string{"team-id", "project-id", "endpoint", "query"} {
-		injected := map[string]any{"title": "Title", "body": "body", name: "untrusted"}
+		injected := map[string]any{"title": "A reviewed connector title", "body": "body", name: "untrusted"}
 		host := connectors.CreatedResourceHost{Run: "linear-bound-create", Key: []byte(strings.Repeat("x", 32))}
 		_, err := plan.ExecuteCreatedSafeOutput(t.Context(), runtime, host, "create-issue-in-project", injected)
 		require.Error(t, err)

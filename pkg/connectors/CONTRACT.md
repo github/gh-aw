@@ -2,7 +2,7 @@
 
 Declare connectors directly under `connectors.<id>` in ordinary AW Markdown.
 There is no required connection, definition, binding, or versioned authoring file.
-Provider declarations belong in `.github/aw/connectors/<provider>.md`.
+Provider declarations belong in `.github/workflows/connectors/<provider>.md`.
 `ConnectorDeclaration` in `pkg/workflow/connector_declaration.go` extends the
 existing frontmatter; it reuses this package's typed, bounded operation primitives.
 
@@ -10,7 +10,7 @@ Consumers reuse normal `imports` / `uses` / `with` syntax:
 
 ```yaml
 imports:
-  - uses: .github/aw/connectors/linear.md
+  - uses: .github/workflows/connectors/linear.md
     with:
       reader-secret: APPROVED_LINEAR_READ_KEY
 on: workflow_dispatch

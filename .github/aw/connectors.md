@@ -11,15 +11,26 @@ integration in GitHub Agentic Workflows. Use `gh aw` to compile workflows;
 ## Find the contract first
 
 Read the selected provider's Markdown declaration under
-[connectors/](connectors/) and its `connector-documentation` XML comment.
+[workflow connector declarations](../workflows/connectors/) and its
+`connector-documentation` XML comment.
 That comment describes credential provisioning, exact import inputs, resource
 grants, capabilities, privacy limits, and complete consumer examples. Read only
 the relevant provider, not every integration.
 
-Bundled providers are `linear`, `jira`, `azure-devops`, `slack`, `teams`,
+Example declarations in this repository include `linear`, `jira`, `azure-devops`, `slack`, `teams`,
 `confluence`, `sentry`, `servicenow`, `gitlab`, `pagerduty`, `datadog`, `zendesk`,
 and `notion`. The [human reference](../../docs/src/content/docs/reference/connectors.md)
 contains credential-route details and migration limits.
+
+Every included declaration currently sets `experimental: true`. Selecting a
+capability from an experimental connector emits a compile-time warning.
+Declarations accept boolean `true` or `false`; omission defaults to `false`.
+This is stability metadata, not permission to weaken security checks.
+
+Read the declaration's `docs` array for the official documentation used to author
+its API contract. Keep those literal HTTPS references synchronized with the
+provider XML sources. They are provenance metadata, not automatic fetches,
+runtime endpoints, network permissions, or resource grants.
 
 Do not infer a provider API, OAuth scope, MCP tool schema, or authorization grant
 from a product name. Use the reviewed declaration and its cited provider
@@ -41,7 +52,7 @@ permissions:
 network:
   allowed: [defaults, api.notion.com]
 imports:
-  - uses: "@builtin:connectors/notion.md"
+  - uses: ".github/workflows/connectors/notion.md"
     with:
       pages: [11111111-2222-4333-8444-555555555555]
 tools:
@@ -65,17 +76,19 @@ secret values. `copilot-requests: write` authorizes inference, not provider writ
 
 | Surface | Agent rule |
 | --- | --- |
-| Imports | Prefer `"@builtin:connectors/<provider>.md"` for compiler-shipped declarations. Local `.github/aw/connectors/<provider>.md` and reviewed pinned remote imports use the same `uses`/`with` contract. |
+| Imports | Use an editable local `.github/workflows/connectors/<provider>.md` or a reviewed `owner/repo/path@ref` URL import. There are no compiler-builtin connector definitions or fallback providers. |
 | Resources | Supply exact approved IDs. Importing alone selects nothing; never widen grants to make a call succeed. Independent lists do not establish parent, tenant, or tuple membership. |
 | Reads | Select declared `tools.<id>` capabilities only. A REST-backed tool does not imply a hosted provider MCP registration. |
-| Writes | Select `safe-outputs.<id>-<operation>` with null or `{}`. Call the generated safe-output tool, never a provider write API from the agent. |
+| Writes | Select `safe-outputs.<id>-<operation>` with null, `{}`, or workflow-owned `max`/`staged` options. `max` is an integer from 1 to 100, default 1, enforced before handler execution; failures count but HTTP retries within an invocation do not. Call the generated safe-output tool, never a provider write API from the agent. |
 | Names | Selectors use hyphens; generated effect tools use underscores, such as `notion_add_comment`. Discover actual read-tool names and argument schemas; do not invent a `connector_N_` prefix. |
 | Context | No public configurable connector `context` exists. Retrieve content through selected reads; event references are not hydrated resource bodies. |
 | Triggers | Declaration definitions use `triggers`; workflow events use root `on`. Custom connector ingress is unavailable and fails closed. Use manual dispatch until a trusted receiver is implemented and approved. |
 
-`staged: true` suppresses connector mutations, write-credential resolution,
+Global or per-operation `staged: true` suppresses connector mutations, write-credential resolution,
 preflights, and creation receipts. It does not suppress selected reads or
-arbitrary workflow scripts. Removing staging is a deployment decision, not a
+arbitrary workflow scripts. A per-operation `false` cannot disable global or
+compiler-forced staging. Boolean expressions gate minting and credential delivery.
+Removing staging is a deployment decision, not a
 documentation fix.
 
 ## Preserve credential and authority boundaries
@@ -100,12 +113,45 @@ For author-owned targets, use declared `trustedInputs` and bounded `preflight`
 operations rather than agent-controlled destination overrides. Temporary IDs
 authorize follow-ups only through validated execution-local creation receipts.
 Staged proposals and agent-supplied IDs do not create authority.
+Connector mutations are non-reviewable outputs and are blocked when threat
+detection concludes warning; agent-supplied policy fields cannot override this.
 
 ## Author or extend a declaration
+
+For local development, use `gh aw connector <id> setup` for phase-specific
+secret-name and provisioning guidance, then `gh aw connector <id> test` with
+an explicit phase, capability, typed arguments, and approved import bindings.
+Default secret names come from `import-schema`; Linear GraphQL defaults to
+`LINEAR_API_KEY`. Override names through workflow `with` or CLI `--input`.
+Setup never reads or writes values. Reads use environment credentials and fail
+with actionable missing-variable instructions; Actions secrets are not local
+environment variables automatically.
+
+Safe-output tests never write. Supply the matching trusted `--node-runtime`
+when checking annotated title/body publication so the test covers sanitization
+and generated footers, not only raw transport shape. Use `--file` for an editable
+local declaration or normal-import wrapper. Never turn a conformance check into
+a provider mutation, receiver deployment, or automatic login.
 
 Use ordinary Markdown with `connectors.<id>` and an `import-schema`; no separate
 public spec, connection, or binding YAML is required. Reuse an existing provider
 declaration and the shared runtime before adding custom code.
+
+Declare stability and sources alongside endpoints and credentials:
+
+```yaml
+connectors:
+  notion:
+    experimental: true
+    docs:
+      - https://developers.notion.com/reference/retrieve-a-page
+      - https://developers.notion.com/reference/create-a-comment
+    # The complete declaration also defines endpoints, credentials, and capabilities.
+```
+
+Use official provider references actually consulted when generating the
+declaration, not search-result URLs or unsourced guesses. `docs` accepts an array
+of unique HTTPS URLs without embedded credentials or template expressions.
 
 Declare fixed HTTPS endpoints, phase-specific credentials, exact resource
 collections, typed bounded inputs, fixed request shapes, and minimal response
@@ -114,11 +160,40 @@ not only that a returned ID occurs somewhere in an allowlist. Use
 `responseResourceInputs` when correlating a canonical numeric response ID with
 a resource-constrained string input.
 
+Mark human text arguments explicitly with `sanitize: title` or `sanitize: body`.
+Titles require at least 20 Unicode code points after sanitization. Use
+`minLength: 1` for body inputs whose actor content must remain nonempty before
+generated attribution. Do not mark resource IDs, labels, status values, or
+URLs as body content. Existing sanitizers and protected generated footers run
+in the shared trusted publisher before staging or delivery; raw transport
+compatibility APIs do not silently perform this publication step.
+
 String `maxLength` counts Unicode code points. Encoded plans, argument documents,
 and HTTP responses have separate byte limits. Specify literal reviewed request
 metadata through `request.headers`; never use it to bypass credential routing.
-Do not add retries for ambiguous writes, automatic pagination, event-URL fetches,
-or unsupported provider functionality.
+Declare automatic retries explicitly on an operation:
+
+```yaml
+retry:
+  maxAttempts: 3
+  backoffMs: 200
+  retryOn: [429, 500, 502, 503, 504]
+```
+
+Attempts include the first request and are bounded to 1 through 4. Initial
+backoff is 1 through 1000 milliseconds, doubles between attempts, and respects
+`Retry-After` within the total 20-second request window. Only declared transient
+HTTP statuses are retried; authorization failures, response-evidence failures,
+redirects, and uncertain transport failures are not.
+
+Write retries additionally require `idempotent: true` and a repeat-safe PUT,
+PATCH, or DELETE contract. POST creates and append operations cannot retry.
+An HTTP method alone does not prove idempotency: the declaration author must
+verify that repeating the exact request cannot duplicate effects. Hosted HTTP
+MCP transport does not inherit REST operation retry settings.
+
+Do not add automatic pagination, event-URL fetches, or unsupported provider
+functionality.
 
 The compiler freezes selected plans and uses the Node runtime shipped by
 `actions/setup`. Do not add a per-provider checkout, build, CLI installation,
@@ -157,11 +232,13 @@ structure rather than assuming a tag pair.
 
 Compile the consuming `.github/workflows/<name>.md` with
 `gh aw compile <name> --strict --no-emit`. Compilation does not dispatch a run.
-Validate local and embedded imports, extract and compile the XML examples, and
+Validate local and normal remote URL imports, extract and compile the XML examples, and
 exercise credential-free staging, exact grants, response evidence, failure
 paths, Unicode bounds, and the actual bundled Node runtime with offline mocks.
 Follow the repository developer instructions for build, formatting, and
 publication gates when changing code.
+Local declarations are read at compilation, so downstream edits need no compiler
+rebuild or generated provider bundle.
 
 Before any live test, follow [debug-agentic-workflow.md](debug-agentic-workflow.md)
 and its security-review and execution gates. Documentation, compilation, mocked

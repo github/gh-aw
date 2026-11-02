@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/parser"
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,7 +25,7 @@ type providerDocumentationElement struct {
 }
 
 func TestProviderDocumentationXMLConsumers(t *testing.T) {
-	files, err := filepath.Glob("../../.github/aw/connectors/*.md")
+	files, err := filepath.Glob("../../.github/workflows/connectors/*.md")
 	require.NoError(t, err)
 	require.NotEmpty(t, files)
 	for _, file := range files {
@@ -31,6 +33,20 @@ func TestProviderDocumentationXMLConsumers(t *testing.T) {
 		t.Run(provider, func(t *testing.T) {
 			source, err := os.ReadFile(file)
 			require.NoError(t, err)
+			var declaration struct {
+				Connectors map[string]struct {
+					Experimental bool     `yaml:"experimental"`
+					Docs         []string `yaml:"docs"`
+				} `yaml:"connectors"`
+			}
+			frontmatter, _, found := strings.Cut(strings.TrimPrefix(string(source), "---\n"), "\n---\n")
+			require.True(t, found)
+			require.NoError(t, yaml.Unmarshal([]byte(frontmatter), &declaration))
+			require.True(t, declaration.Connectors[provider].Experimental, "all bundled connectors are experimental")
+			require.NotEmpty(t, declaration.Connectors[provider].Docs, "cite official documentation used to author the connector")
+			for _, reference := range declaration.Connectors[provider].Docs {
+				require.Contains(t, string(source), `"`+reference+`"`, "each docs reference must also occur in the self-contained XML sources")
+			}
 			_, body, found := strings.Cut(strings.TrimPrefix(string(source), "---\n"), "\n---\n")
 			require.True(t, found)
 			body = strings.TrimSpace(body)
@@ -82,20 +98,21 @@ func TestProviderDocumentationXMLConsumers(t *testing.T) {
 			require.Equal(t, len(samples)+bodyCDATA, strings.Count(document, "<![CDATA["))
 			for index, sample := range samples {
 				t.Run(fmt.Sprintf("consumer-%d", index+1), func(t *testing.T) {
-					for _, embedded := range []bool{false, true} {
-						t.Run(fmt.Sprintf("embedded-%t", embedded), func(t *testing.T) {
+					for _, remote := range []bool{false, true} {
+						t.Run(fmt.Sprintf("remote-%t", remote), func(t *testing.T) {
 							dir := t.TempDir()
 							path := filepath.Join(dir, ".github", "workflows", provider+"-review.md")
 							require.NoError(t, os.MkdirAll(filepath.Dir(path), 0700))
 							frontmatter := sample[0]
-							localImport := ".github/aw/connectors/" + provider + ".md"
-							builtinImport := "@builtin:connectors/" + provider + ".md"
-							if embedded {
-								frontmatter = strings.ReplaceAll(frontmatter, "uses: "+localImport, `uses: "`+builtinImport+`"`)
-								frontmatter = strings.ReplaceAll(frontmatter, localImport, builtinImport)
+							localImport := ".github/workflows/connectors/" + provider + ".md"
+							if remote {
+								const revision = "1111111111111111111111111111111111111111"
+								cache := parser.NewImportCache(dir)
+								_, err := cache.Set("github", "gh-aw", localImport, revision, source)
+								require.NoError(t, err)
+								frontmatter = strings.ReplaceAll(frontmatter, localImport, "github/gh-aw/"+localImport+"@"+revision)
 							} else {
-								frontmatter = strings.ReplaceAll(frontmatter, builtinImport, localImport)
-								declaration := filepath.Join(dir, ".github", "aw", "connectors", provider+".md")
+								declaration := filepath.Join(dir, ".github", "workflows", "connectors", provider+".md")
 								require.NoError(t, os.MkdirAll(filepath.Dir(declaration), 0700))
 								require.NoError(t, os.WriteFile(declaration, source, 0600))
 							}
@@ -111,6 +128,10 @@ func TestProviderDocumentationXMLConsumers(t *testing.T) {
 							require.Contains(t, string(output), "connector_runtime.cjs")
 							require.NotContains(t, string(output), "go build")
 							require.NotContains(t, string(output), "gh extension install")
+							if remote {
+								_, err := os.Stat(filepath.Join(dir, ".github", "workflows", "connectors"))
+								require.True(t, os.IsNotExist(err), "URL imports must not materialize local declarations")
+							}
 						})
 					}
 				})

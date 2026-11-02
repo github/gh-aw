@@ -2489,13 +2489,15 @@ func TestSafeOutputsImportLinearConnectorCredential(t *testing.T) {
 	compiler := NewCompiler(WithVersion("1.0.0"))
 
 	tmpDir := t.TempDir()
+	compiler.gitRoot = tmpDir
+	installConnectorTestSources(t, tmpDir)
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
 	err := os.MkdirAll(workflowsDir, 0755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	sharedWorkflow := `---
 imports:
-  - uses: "@builtin:connectors/linear.md"
+  - uses: ".github/workflows/connectors/linear.md"
     with:
       writer-secret: IMPORT_LINEAR_TOKEN
       issues: [22222222-2222-4222-8222-222222222222]
@@ -2533,7 +2535,7 @@ This workflow uses only the imported Linear safe-outputs configuration.
 	require.NoError(t, err, "Failed to change directory")
 	defer func() { _ = os.Chdir(oldDir) }()
 
-	workflowData, err := compiler.ParseWorkflowFile("main.md")
+	workflowData, err := compiler.ParseWorkflowFile(mainFile)
 	require.NoError(t, err, "Failed to parse workflow")
 	require.NotNil(t, workflowData.SafeOutputs, "SafeOutputs should not be nil")
 
@@ -2551,13 +2553,15 @@ func TestSafeOutputsImportLinearConnectorDoesNotEnableGitHubIssueReporting(t *te
 	compiler := NewCompiler(WithVersion("1.0.0"))
 
 	tmpDir := t.TempDir()
+	compiler.gitRoot = tmpDir
+	installConnectorTestSources(t, tmpDir)
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
 	err := os.MkdirAll(workflowsDir, 0755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	sharedWorkflow := `---
 imports:
-  - uses: "@builtin:connectors/linear.md"
+  - uses: ".github/workflows/connectors/linear.md"
     with:
       teams: [33333333-3333-4333-8333-333333333333]
       projects: [44444444-4444-4444-8444-444444444444]
@@ -2597,7 +2601,7 @@ safe-outputs:
 	require.NoError(t, err, "Failed to change directory")
 	defer func() { _ = os.Chdir(oldDir) }()
 
-	workflowData, err := compiler.ParseWorkflowFile("main.md")
+	workflowData, err := compiler.ParseWorkflowFile(mainFile)
 	require.NoError(t, err, "Failed to parse workflow")
 	require.NotNil(t, workflowData.SafeOutputs, "SafeOutputs should not be nil")
 

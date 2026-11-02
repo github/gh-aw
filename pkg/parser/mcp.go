@@ -32,11 +32,23 @@ func IsSimpleSecretExpression(value string) bool {
 		return false
 	}
 	path, ok := actionslanguageservice.Reference(expression)
-	if !ok || len(path) != 2 || path[0] != "secrets" || path[1] == "" {
+	if !ok || len(path) != 2 {
+		return false
+	}
+	var namespace, secret string
+	for index, component := range path {
+		switch index {
+		case 0:
+			namespace = component
+		case 1:
+			secret = component
+		}
+	}
+	if namespace != "secrets" || secret == "" {
 		return false
 	}
 	// Keep the credential allowlist independent of expression syntax.
-	for i, ch := range path[1] {
+	for i, ch := range secret {
 		if ch != '_' && (ch < 'A' || ch > 'Z') && (i == 0 || ch < '0' || ch > '9') {
 			return false
 		}
@@ -227,10 +239,8 @@ func safeOutputToolName(toolType string) (string, bool) {
 }
 
 func findOrCreateSafeOutputsConfig(configs *[]RegistryMCPServerConfig) *RegistryMCPServerConfig {
-	for i := range *configs {
-		if (*configs)[i].Name == constants.SafeOutputsMCPServerID.String() {
-			return &(*configs)[i]
-		}
+	if config := findSafeOutputsConfig(*configs); config != nil {
+		return config
 	}
 	newConfig := RegistryMCPServerConfig{
 		BaseMCPServerConfig: types.BaseMCPServerConfig{
@@ -241,7 +251,16 @@ func findOrCreateSafeOutputsConfig(configs *[]RegistryMCPServerConfig) *Registry
 		Name: constants.SafeOutputsMCPServerID.String(),
 	}
 	*configs = append(*configs, newConfig)
-	return &(*configs)[len(*configs)-1]
+	return findSafeOutputsConfig(*configs)
+}
+
+func findSafeOutputsConfig(configs []RegistryMCPServerConfig) *RegistryMCPServerConfig {
+	for index, config := range configs {
+		if config.Name == constants.SafeOutputsMCPServerID.String() {
+			return &configs[index]
+		}
+	}
+	return nil
 }
 
 func parseCustomMCPServerConfigs(mcpServers map[string]any, serverFilter string) ([]RegistryMCPServerConfig, error) {
@@ -280,7 +299,7 @@ func extractBuiltinMCPTools(frontmatter map[string]any, serverFilter string, con
 			return errors.New("tools.serena is removed")
 		}
 		if toolName == "linear" {
-			return errors.New("tools.linear requires an imported connector; import @builtin:connectors/linear.md and explicitly select its read capabilities")
+			return errors.New("tools.linear requires an imported connector; import .github/workflows/connectors/linear.md and explicitly select its read capabilities")
 		}
 		if toolName == "github" {
 			config, err := processBuiltinMCPTool(toolName, toolValue, serverFilter)

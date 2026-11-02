@@ -1,6 +1,14 @@
 ---
 connectors:
   teams:
+    experimental: true
+    docs:
+      - https://learn.microsoft.com/en-us/graph/api/chatmessage-get?view=graph-rest-1.0
+      - https://learn.microsoft.com/en-us/graph/api/chatmessage-list-replies?view=graph-rest-1.0
+      - https://learn.microsoft.com/en-us/microsoftteams/platform/graph-api/rsc/resource-specific-consent
+      - https://learn.microsoft.com/en-us/azure/bot-service/rest-api/bot-framework-rest-connector-authentication?view=azure-bot-service-4.0
+      - https://learn.microsoft.com/en-us/microsoftteams/platform/bots/how-to/conversations/send-proactive-messages
+      - https://learn.microsoft.com/en-us/graph/teams-changenotifications-chatmessage
     credentials:
       bot-writer:
         header: Authorization
@@ -59,6 +67,8 @@ connectors:
             required: true
             type: string
           text:
+            sanitize: body
+            minLength: 1
             maxLength: 4000
             pattern: \S
             required: true
@@ -99,6 +109,8 @@ connectors:
             required: true
             type: string
           text:
+            sanitize: body
+            minLength: 1
             maxLength: 4000
             pattern: \S
             required: true
@@ -282,6 +294,20 @@ import-schema:
 
 <!--
 <connector-documentation id="teams" version="1">
+  <stability>experimental: true. This connector's contract may change.</stability>
+  <runtime-policies>
+    Human text inputs marked sanitize title or body use the shared publisher's
+    built-in sanitizers. Titles require at least 20 Unicode code points after
+    sanitization. Body limits include protected generated attribution and any
+    configured body footer. Fixed authored request literals are trusted content,
+    not agent-controlled text inputs.
+    Consumer safe-output options support max from 1 to 100, default 1, and staged
+    booleans or expressions. Global or compiler-forced staging always wins.
+    Staged operations do not resolve writer credentials or send provider requests.
+    Automatic retries require an explicit bounded operation retry policy; no policy
+    means one attempt. Repeating writes requires declared idempotency and a
+    repeat-safe PUT, PATCH or DELETE; POST creates and appends cannot retry.
+  </runtime-policies>
   <purpose>
     Read approved standard-channel root messages and one reply page through
     Microsoft Graph. Request text or a fixed review-card reply through a
@@ -363,9 +389,9 @@ import-schema:
   </credentials>
   <configuration>
     <imports>
-      Import @builtin:connectors/teams.md for the compiler-embedded declaration;
-      a reviewed local .github/aw/connectors/teams.md or immutable pinned remote
-      AW import can supply an explicitly reviewed variant. No separate spec or
+      Import a reviewed local .github/workflows/connectors/teams.md or an immutable
+      pinned remote AW import. Declarations remain editable source files, not
+      compiler-builtin definitions. No separate spec or
       connection file is required. Imports alone select no capabilities.
       Select reads with an explicit tools.teams list and each mutation
       independently with its teams-prefixed safe-output key. Safe-output
@@ -508,9 +534,8 @@ import-schema:
     pagination, and never retry; 401, 403, 429, malformed/oversized responses,
     and missing required evidence fail rather than broadening permissions or
     using another token. An ambiguous bot write must not be blindly repeated.
-    There are no per-operation max/staged options: safe-output selections are
-    null or empty mappings, not arbitrary configuration. Staged mode is
-    workflow-wide and does not prove installation, consent, delivery, service
+    Safe-output selections accept null, empty mappings, or max/staged options.
+    Global and per-operation staging do not prove installation, consent, delivery, service
     URL compatibility, or token validity. Private/shared channels, chats,
     sovereign endpoints, Graph migration posting, interactive cards, and live
     ingress are outside this profile. Ordinary Graph app-only channel posting
@@ -534,7 +559,7 @@ engine: copilot
 permissions:
   contents: read
 imports:
-  - uses: "@builtin:connectors/teams.md"
+  - uses: ".github/workflows/connectors/teams.md"
     with:
       reader-secret: TEAMS_GRAPH_READ_ACCESS_TOKEN
       bot-writer-secret: TEAMS_BOT_ACCESS_TOKEN
@@ -576,7 +601,7 @@ Writes are staged; do not call provider write APIs directly.
 </connector-documentation>
 -->
 
-Import `@builtin:connectors/teams.md` and supply exact resource grants through
+Import `.github/workflows/connectors/teams.md` and supply exact resource grants through
 `with`; defaults grant nothing. Select Graph reads and Bot Connector safe outputs
 independently. Keep their credentials and identifiers separate. Native ingress
 is unavailable; use manual dispatch. The XML comment above is the self-contained

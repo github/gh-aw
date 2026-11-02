@@ -34,17 +34,18 @@ func sentryPublicConsumer(t *testing.T, content string) (*Compiler, *WorkflowDat
 	require.NoError(t, os.WriteFile(path, []byte(content), 0600))
 	compiler := NewCompiler(WithNoEmit(true), WithSkipValidation(true))
 	compiler.gitRoot = root
+	installConnectorTestSources(t, root)
 	compiler.SetActionMode(ActionModeDev)
 	compiler.version = "v0.0.0-1-g683ddf9617"
 	data, err := compiler.ParseWorkflowFile(path)
-	_, statErr := os.Stat(filepath.Join(root, ".github", "aw"))
-	require.True(t, os.IsNotExist(statErr), "bundled consumers must not materialize declarations")
+	_, statErr := os.Stat(filepath.Join(root, ".github", "workflows", "connectors"))
+	require.NoError(t, statErr, "normal imports use the local declaration")
 	return compiler, data, path, err
 }
 
 func sentryPublicSource(selection string) string {
 	return awConnectorHeader + `imports:
-  - uses: "@builtin:connectors/sentry.md"
+  - uses: ".github/workflows/connectors/sentry.md"
     with:
       reader-secret: APPROVED_SENTRY_READER
       hosted-reader-secret: APPROVED_SENTRY_MCP
@@ -53,7 +54,7 @@ func sentryPublicSource(selection string) string {
 }
 
 func TestSentryPublicDocumentationConsumer(t *testing.T) {
-	source, err := os.ReadFile("../../.github/aw/connectors/sentry.md")
+	source, err := os.ReadFile("../../.github/workflows/connectors/sentry.md")
 	require.NoError(t, err)
 	parts := strings.SplitN(string(source), "\n---\n", 2)
 	require.Len(t, parts, 2)

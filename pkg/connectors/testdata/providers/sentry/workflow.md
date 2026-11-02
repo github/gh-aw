@@ -1,7 +1,7 @@
 ---
 engine: copilot
 imports:
-  - uses: "@builtin:connectors/sentry.md"
+  - uses: ".github/workflows/connectors/sentry.md"
 "on": workflow_dispatch
 permissions:
   contents: read

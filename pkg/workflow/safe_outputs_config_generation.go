@@ -247,6 +247,36 @@ func addSafeScriptsConfig(safeOutputsConfig map[string]any, scripts map[string]*
 		}
 		safeOutputsConfig[normalizedName] = safeScriptConfigMap
 	}
+	addConnectorThreatWarningPolicies(safeOutputsConfig, scripts)
+}
+
+func addConnectorThreatWarningPolicies(config map[string]any, scripts map[string]*SafeScriptConfig) {
+	for name, script := range scripts {
+		if script.connectorInputSchema == nil {
+			continue
+		}
+		normalizedName := stringutil.NormalizeSafeOutputIdentifier(name)
+		handler, ok := config[normalizedName].(map[string]any)
+		if !ok {
+			handler = map[string]any{}
+		}
+		handler["threat_warning_policy"] = "abort"
+		if script.connectorOptions != nil {
+			handler["connector_operation"] = true
+			handler["max"] = script.connectorOptions.Max
+			if script.connectorOptions.Staged != nil {
+				staged := script.connectorOptions.Staged
+				if isExpression(staged.String()) {
+					// Only interpolate a canonical boolean into the JSON config.
+					// An arbitrary expression result must not inject policy fields.
+					handler["staged"] = "${{ format('{0}', " + stripExpressionWrapper(staged.String()) + ") == 'true' }}"
+				} else {
+					handler["staged"] = templatableBoolIsTrue(staged)
+				}
+			}
+		}
+		config[normalizedName] = handler
+	}
 }
 
 // buildSafeOutputInputsConfig converts safe-job/safe-script input definitions into

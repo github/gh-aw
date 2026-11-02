@@ -3,7 +3,7 @@ title: Connectors
 description: Credentials, triggers, MCPs, safe outputs, and context for declarative third-party integrations.
 ---
 
-Connectors are ordinary AW Markdown files under `.github/aw/connectors/`.
+Connectors are ordinary AW Markdown files under `.github/workflows/connectors/`.
 They declare endpoints, credential secret names, exact resource grants, and
 capabilities under `connectors.<id>`; no separate YAML definition or connection
 file is required. Review the specimen hosts and resource IDs before use.
@@ -11,12 +11,18 @@ file is required. Review the specimen hosts and resource IDs before use.
 For agent-oriented authoring instructions, use
 [`.github/aw/connectors.md`](https://github.com/github/gh-aw/blob/main/.github/aw/connectors.md).
 
-The compiler embeds these declarations. Import `"@builtin:connectors/<provider>.md"`
-to use the declaration shipped with that compiler, without copying files into the
-consumer repository. Local `.github/aw/connectors/` imports and pinned remote
-imports remain available for reviewed endpoint and resource customizations.
-Embedded imports use the same `uses`/`with` inputs and validation as other imports;
-they never fall back to a checkout file or implicitly enable capabilities.
+Declarations are editable source files, not built into the compiler. Import a
+reviewed copy from `.github/workflows/connectors/<provider>.md`, or use the
+existing remote import syntax:
+
+```yaml
+imports:
+  - uses: github/gh-aw/.github/workflows/connectors/linear.md@main
+```
+
+Pin a reviewed commit SHA instead of `main` for reproducible deployments.
+The same `uses`/`with` inputs and validation apply to local and remote imports;
+there is no hidden provider catalog or fallback declaration.
 
 > [!IMPORTANT]
 > These declarations are experimental. Custom connector triggers currently fail
@@ -37,7 +43,7 @@ engine: copilot
 permissions:
   contents: read
 imports:
-  - uses: "@builtin:connectors/linear.md"
+  - uses: ".github/workflows/connectors/linear.md"
     with:
       issues: [22222222-2222-4222-8222-222222222222]
       organizations: [11111111-1111-4111-8111-111111111111]
@@ -54,15 +60,14 @@ Request a comment only when useful; never call a write API directly.
 
 `with` overrides secret **names**, not values, through ordinary `import-schema`
 inputs. Linear also accepts exact resource arrays through `with`; replace the
-specimen UUIDs above with approved resources. The `@builtin:connectors/linear.md`
-import is embedded in the compiler and requires no connector file in the
-consumer checkout. Local declarations and pinned cross-repository
-`owner/repo/path@ref` imports remain available.
+specimen UUIDs above with approved resources. The local import reads the
+consumer's editable file. A pinned cross-repository `owner/repo/path@ref` import
+instead uses the normal remote import resolver and cache.
 Importing grants nothing: omit `tools` or `safe-outputs` to disable that phase.
 Root triggers and safe outputs use `<id>-<capability>`; unqualified GitHub
 safe outputs retain their existing meaning.
 
-Every bundled declaration contains one self-contained
+Every included declaration contains one self-contained
 `connector-documentation` XML comment in its Markdown body, including credential
 provisioning, resource inputs, capability limits, and complete consumer examples.
 The YAML and prompt elements form a workflow when wrapped in normal Markdown
@@ -71,6 +76,8 @@ or authenticated event enrollment.
 
 | Declaration field | Meaning |
 | --- | --- |
+| `experimental` | Boolean stability marker; defaults to `false`. Selecting capabilities from an experimental connector emits a compile-time warning. All included connectors currently set `true`. |
+| `docs` | Array of unique literal HTTPS URLs for official documentation used to author the connector. Provenance only; never fetched automatically or treated as authority. |
 | `endpoints` | Named, fixed HTTPS origins. |
 | `credentials` | Header, authentication scheme, scopes, phase, and a token, GitHub App, or GitHub OIDC route. |
 | `resources` | Exact approved resource-ID allowlists; no wildcards. Independent lists do not establish tenant, parent, or tuple membership. |
@@ -78,6 +85,29 @@ or authenticated event enrollment.
 | `tools` | Bounded REST/GraphQL reads exposed through the shared MCP adapter. |
 | `mcp-servers` | Read-only HTTP MCP registrations with exact remote tool allowlists. |
 | `safe-outputs` | Typed mutations executed outside the agent credential boundary. |
+
+### Operation budgets and staging
+
+Each root connector safe-output selection accepts null, `{}`, or these options:
+
+```yaml
+safe-outputs:
+  tracker-add-comment:
+    max: 3
+    staged: true
+```
+
+| Option | Contract |
+| --- | --- |
+| `max` | Integer from 1 to 100. Defaults to **1**, retaining the conservative native Linear budget rather than inheriting arbitrary custom-script behavior. Counts attempted invocations of this operation, including failures, in the trusted dispatcher before handler credential or network work. HTTP retries within an approved invocation do not consume additional proposal budget. |
+| `staged` | Boolean or GitHub Actions expression. Defaults to `false`; global staging and compiler-forced staging always take precedence over a per-operation `false`. |
+
+These are trusted workflow options, not agent tool arguments. Unknown options
+and invalid types fail compilation. Staging produces the would-be request without
+writer credential resolution, provider requests, preflights, or creation receipts.
+Credentials and mint steps used only by statically staged operations are omitted.
+Mixed operations retain only credentials needed by live operations; expression
+staging gates credential delivery and minting at runtime.
 
 Store credentials in repository or environment **Settings > Secrets and
 variables > Actions**, or use `gh secret set NAME` without putting values in
@@ -158,15 +188,80 @@ All retrieved content is untrusted data, not instructions. There is no automatic
 hydration, arbitrary pagination, or attachment fetching. The per-connector context
 rows below describe the current read surface, not additional configuration.
 
+## Local setup and conformance
+
+`gh aw connector <id> setup` discovers
+`.github/workflows/connectors/<id>.md` and prints credential names, scopes,
+provisioning references, and configuration instructions without reading or
+writing secret values:
+
+```bash
+gh aw connector linear setup
+gh aw connector linear setup --input 'reader-secret="LINEAR_DEV_READ_KEY"'
+```
+
+Declared secret names have defaults. Linear GraphQL uses `LINEAR_API_KEY`;
+`with` in workflows and `--input` in these commands override names, never values.
+Supply the selected read credential through the environment for local tests;
+Actions secrets are not automatically available to local processes. Missing
+credentials cause a nonzero result with instructions naming the required
+variables. Secrets and successful provider response content are not printed.
+
+```bash
+gh aw connector linear test --phase agent --capability get-issue \
+  --input 'issues=["22222222-2222-4222-8222-222222222222"]' \
+  --input 'organizations=["11111111-1111-4111-8111-111111111111"]' \
+  --input 'teams=["33333333-3333-4333-8333-333333333333"]' \
+  --args '{"issue-id":"22222222-2222-4222-8222-222222222222"}'
+```
+
+Use approved IDs, not the specimens above. Tests validate frozen plans,
+arguments, exact grants, and provider response evidence. Reads contact the
+declared provider; safe-output tests are always credential-free staged checks,
+never live mutations. Use a matching trusted local Node runtime to include
+shared title/body sanitization and generated footer conformance:
+
+```bash
+gh aw connector linear test --phase safe-output --capability add-comment \
+  --input 'issues=["22222222-2222-4222-8222-222222222222"]' \
+  --args '{"issue-id":"22222222-2222-4222-8222-222222222222","body":"Local connector review prepared."}' \
+  --node-runtime actions/setup/js/connector_runtime.cjs
+```
+
+`--file` selects an explicit repository-owned declaration or normal-import
+wrapper, and `--root` selects its repository. A wrapper can use ordinary remote
+imports. Files and nested imports are reread, so downstream edits are testable
+without rebuilding the compiler. There is no compiled-in provider fallback.
+The low-level plural `gh aw connectors` commands remain available for trusted
+raw-plan compatibility and transport inspection.
+
+## Content safety
+
+Human text inputs declare `sanitize: title` or `sanitize: body`. The shared
+publisher uses the existing title/body sanitizers before staging or delivery,
+then validates the final arguments against the frozen contract. Titles require
+at least 20 Unicode code points after sanitization; short titles are rejected,
+not padded. Body sizing preserves trusted generated attribution and configured
+body footers within `maxLength`, trimming only agent content. A footer that
+cannot fit fails explicitly.
+
+Identifiers, labels, statuses, and URLs are not inferred to be content fields.
+Fixed authored request literals remain trusted declaration content. Optional
+absent text arguments are not invented. Pure Go/raw Node transport APIs do not
+perform publication formatting; local publication conformance uses the shared
+Node publisher explicitly.
+
 ## Linear
 
-Declaration: `.github/aw/connectors/linear.md`.
+Declaration: `.github/workflows/connectors/linear.md`.
 
 ### Secrets
 
 Create separate personal API keys in Linear **Settings > Security & access**,
 restricted to the required read or write permissions and teams. Store the raw
-keys as `LINEAR_READ_API_KEY` and `LINEAR_WRITE_API_KEY`; GraphQL personal keys
+key as `LINEAR_API_KEY`, the default secret name for both GraphQL routes.
+Override `reader-secret` and `writer-secret` through `with` to use distinct
+keys such as `LINEAR_READ_API_KEY` and `LINEAR_WRITE_API_KEY`. GraphQL personal keys
 use raw Authorization rather than a bearer prefix. For hosted MCP, separately provision
 an authorized bearer token through Linear's supported OAuth or direct-key route and store it as
 `LINEAR_READ_MCP_TOKEN`. Personal-key GraphQL access does not prove hosted MCP
@@ -182,7 +277,7 @@ and [MCP setup](https://linear.app/docs/mcp).
 
 ### Migration from built-in Linear
 
-Import `@builtin:connectors/linear.md`, supply approved resource arrays through
+Import `.github/workflows/connectors/linear.md`, supply approved resource arrays through
 `with`, and independently select capabilities. Resource inputs are `issues`,
 `organizations`, `teams`, `projects`, `team-keys`, and `project-slugs`; each
 defaults to an empty allowlist. Selection fails closed when any required grant
@@ -190,16 +285,18 @@ is missing. Secret-name overrides are `reader-secret`, `mcp-reader-secret`, and
 `writer-secret`.
 
 The former `tools.linear: {token, toolsets, allowed, required}` shorthand,
-`safe-outputs.linear-token`, output options such as `target`, `team-id`, `max`,
-and `staged`, and `on.gateway-dispatch.linear-issue` are no longer supported.
-Connector safe-output selections accept only null or `{}`. Their generated tools
+`safe-outputs.linear-token`, output target options such as `target` and `team-id`,
+and `on.gateway-dispatch.linear-issue` are no longer supported.
+Connector safe-output selections accept null, `{}`, or the per-operation
+`max`/`staged` options above. Their generated tools
 are `linear_create_issue`, `linear_update_issue`, and
 `linear_add_comment`. Targets are typed UUID arguments constrained by
 the trusted resource arrays, never arbitrary URLs or credential inputs.
 
 Create requires approved team and project UUIDs plus title/body; update requires
 an approved issue UUID and both title/body; comment requires issue UUID and body.
-Titles are bounded to 128 characters and bodies to 65,000. The shared runtime
+Sanitized titles contain 20 to 128 Unicode characters; bodies are bounded to
+65,000 characters including generated footers. The shared runtime
 validates inputs and provider responses without retries. Whole-workflow
 dry-run/staged mode prepares requests without resolving write credentials or
 sending mutations. Connector-only writes do not implicitly enable GitHub issue
@@ -208,8 +305,8 @@ reporting, request GitHub write permissions, or mint a GitHub App token.
 There is no automatic conversion of team names, issue shorthand, or old
 environment-variable defaults; use separately selected bounded `resolve-team`
 and `resolve-project` reads and approve the resulting model UUIDs. Broad hosted
-MCP toolsets, optional project creation, single-field updates, and per-operation
-budget/staging options are contract gaps, not silently retained legacy paths.
+MCP toolsets, optional project creation, and single-field updates remain contract
+gaps, not silently retained legacy paths.
 No custom authenticated ingress or configurable context is installed.
 
 For an author-owned team UUID secret and a project URL slug, select
@@ -226,9 +323,9 @@ Dry-run/staged mode does not resolve these secrets or perform the preflight.
 
 ## Jira
 
-Declaration: `.github/aw/connectors/jira.md`.
+Declaration: `.github/workflows/connectors/jira.md`.
 
-Import `"@builtin:connectors/jira.md"` with `site` set to the approved HTTPS
+Import `".github/workflows/connectors/jira.md"` with `site` set to the approved HTTPS
 site origin for writes. `cloud-ids`, `issues`, `projects`, `queries`, and
 `issue-ids` are exact string-array grants, empty by default. Importing alone
 grants nothing. Each MCP profile requires `cloud-ids`, `issues`, and `queries`
@@ -244,7 +341,7 @@ engine: copilot
 permissions:
   contents: read
 imports:
-  - uses: "@builtin:connectors/jira.md"
+  - uses: ".github/workflows/connectors/jira.md"
     with:
       site: https://example.atlassian.net
       issues: [APP-1]
@@ -303,20 +400,20 @@ assignment and the other seven former read methods are unavailable.
 Use a reviewed declaration for additional
 capabilities rather than removing resource constraints.
 
-Effect selection accepts only null or `{}`. Use workflow-wide
-`safe-outputs.staged: true` or compiler dry-run mode for credential-free
-preparation; per-effect legacy `max`/`staged` options are rejected. No mutation
+Effect selection accepts null, `{}`, or per-operation `max`/`staged` options.
+Workflow-wide `safe-outputs.staged: true` and compiler dry-run mode also provide
+credential-free preparation and cannot be disabled by an operation. No mutation
 is retried after an ambiguous failure. Declaration acceptance and MCP
 initialization alone do not establish live tool-call compatibility.
 
 ## Azure DevOps
 
-Embedded import: `"@builtin:connectors/azure-devops.md"`.
-Declaration: `.github/aw/connectors/azure-devops.md`.
+Local import: `".github/workflows/connectors/azure-devops.md"`.
+Declaration: `.github/workflows/connectors/azure-devops.md`.
 
-The compiler embeds this Markdown declaration. A consuming repository needs only
-its workflow, not a local connector file. Override the reviewed specimen bindings
-with trusted literal `with` inputs; imports register capabilities but grant none:
+Use a reviewed local copy or a pinned remote import of this Markdown declaration.
+Override specimen bindings with trusted literal `with` inputs; imports register
+capabilities but grant none:
 
 ```aw wrap
 ---
@@ -325,7 +422,7 @@ engine: copilot
 permissions:
   contents: read
 imports:
-  - uses: "@builtin:connectors/azure-devops.md"
+  - uses: ".github/workflows/connectors/azure-devops.md"
     with:
       organization: fabrikam
       project: 22222222-2222-4222-8222-222222222222
@@ -391,7 +488,7 @@ explicit read-only smoke-test opt-in are required.
 
 ## Slack
 
-Declaration: `.github/aw/connectors/slack.md`.
+Declaration: `.github/workflows/connectors/slack.md`.
 
 ### Secrets
 
@@ -417,7 +514,7 @@ HTTP 200 with `ok: false` is a failure. An ambiguous write is not retried.
 
 ## Microsoft Teams
 
-Declaration: `.github/aw/connectors/teams.md`.
+Declaration: `.github/workflows/connectors/teams.md`.
 
 ### Secrets
 
@@ -451,7 +548,7 @@ service URLs, private channels, or shared channels.
 
 ## Confluence
 
-Declaration: `.github/aw/connectors/confluence.md`.
+Declaration: `.github/workflows/connectors/confluence.md`.
 
 ### Secrets
 
@@ -476,7 +573,7 @@ relationship. Comment writes do not perform a space-membership preflight.
 
 ## Sentry
 
-Declaration: `.github/aw/connectors/sentry.md`.
+Declaration: `.github/workflows/connectors/sentry.md`.
 
 ### Secrets
 
@@ -502,7 +599,7 @@ Pin the organization's region and exact API host; never follow event URLs with c
 
 ## ServiceNow
 
-Declaration: `.github/aw/connectors/servicenow.md`.
+Declaration: `.github/workflows/connectors/servicenow.md`.
 
 ### Secrets
 
@@ -525,7 +622,7 @@ See [ServiceNow REST authentication](https://developer.servicenow.com/dev.do#!/r
 A record receipt does not prove a durable journal entry; review ACLs and business
 rules, and do not retry an ambiguous append.
 
-## Additional embedded connectors
+## Additional connector declarations
 
 These declarations use the same import and phase-selection contract. Their XML
 documentation contains the full credential-acquisition instructions, exact input
@@ -533,11 +630,11 @@ names, resource grants, limits, and staged manual-dispatch examples.
 
 | Declaration | Read capabilities | Safe output | Credential and scope boundary |
 | --- | --- | --- | --- |
-| `@builtin:connectors/gitlab.md` | `get-merge-request`, `get-pipeline` | `gitlab-add-merge-request-note` | Separate read and note-writing tokens; exact project, merge-request IID, and pipeline grants. No authenticated webhook receiver is installed. |
-| `@builtin:connectors/pagerduty.md` | `get-incident` | `pagerduty-add-note` | Separate full `Token token=...` REST authorization values and an approved `From` identity. Read checks bind incident/service/team; note authority is the exact incident ID, not an atomic membership check. Events v2 routing keys are not REST credentials. |
-| `@builtin:connectors/datadog.md` | `get-monitor`, `get-incident` | `datadog-rename-incident` | Separate OAuth bearer tokens for `monitors_read`, `incident_read`, and `incident_write`; exact site and resource grants. API/application-key pairs are not approximated by a bearer token. Only the incident title changes. |
-| `@builtin:connectors/zendesk.md` | `get-ticket` | `zendesk-add-internal-note` | Separate OAuth read/write tokens for one approved tenant and ticket. Private-note audit evidence can fail after a possible write; no retry or durable-readback guarantee. |
-| `@builtin:connectors/notion.md` | `get-page` | `notion-add-comment` | Separate internal bearer connections with explicit page sharing; exact canonical page UUID grants and fixed `Notion-Version: 2026-03-11`. Metadata and plain-text comments only; no page-body/database hydration, hosted OAuth MCP, or native trigger. |
+| `.github/workflows/connectors/gitlab.md` | `get-merge-request`, `get-pipeline` | `gitlab-add-merge-request-note` | Separate read and note-writing tokens; exact project, merge-request IID, and pipeline grants. No authenticated webhook receiver is installed. |
+| `.github/workflows/connectors/pagerduty.md` | `get-incident` | `pagerduty-add-note` | Separate full `Token token=...` REST authorization values and an approved `From` identity. Read checks bind incident/service/team; note authority is the exact incident ID, not an atomic membership check. Events v2 routing keys are not REST credentials. |
+| `.github/workflows/connectors/datadog.md` | `get-monitor`, `get-incident` | `datadog-rename-incident` | Separate OAuth bearer tokens for `monitors_read`, `incident_read`, and `incident_write`; exact site and resource grants. API/application-key pairs are not approximated by a bearer token. Only the incident title changes. |
+| `.github/workflows/connectors/zendesk.md` | `get-ticket` | `zendesk-add-internal-note` | Separate OAuth read/write tokens for one approved tenant and ticket. Private-note audit evidence can fail after a possible write; no retry or durable-readback guarantee. |
+| `.github/workflows/connectors/notion.md` | `get-page` | `notion-add-comment` | Separate internal bearer connections with explicit page sharing; exact canonical page UUID grants and fixed `Notion-Version: 2026-03-11`. Metadata and plain-text comments only; no page-body/database hydration, hosted OAuth MCP, or native trigger. |
 
 Hosted MCP, token acquisition/refresh, and ingress are not implied by any REST
 read capability. No new provider has been established as live-operational by
@@ -563,7 +660,47 @@ checkout, Go build, or CLI installation is needed.
 Agent reads use constrained MCP adapters. Write credentials exist only in the
 safe-output phase; staging validates intents without resolving them or making
 requests. Work-queue connector effects remain unsupported. The runtime refuses
-redirects, bounds responses, and does not automatically retry writes.
+redirects and bounds responses. Operations do not retry unless they declare a
+bounded `retry` policy; ambiguous transport failures are never retried.
+Connector effects are classified as non-reviewable mutations: threat-detection
+warnings cancel them before their handlers execute, independently of provider
+names or aliases.
+
+Use workflow-wide staging to prepare connector intents without write credentials
+or requests:
+
+```yaml
+safe-outputs:
+  staged: true
+  notion-add-comment:
+```
+
+Staging does not disable selected reads or arbitrary authored scripts. It does
+not create authenticated receipts or authorize later mutation.
+
+### Automatic retries
+
+REST/GraphQL operation declarations accept:
+
+```yaml
+retry:
+  maxAttempts: 3
+  backoffMs: 200
+  retryOn: [429, 500, 502, 503, 504]
+```
+
+`maxAttempts` includes the first request and ranges from 1 to 4. `backoffMs`
+ranges from 1 to 1000 and doubles between attempts. `retryOn` is an explicit,
+unique subset of the five statuses above. Retries respect `Retry-After` and
+the total 20-second execution window. Missing policy means one attempt.
+Redirects, authorization failures, malformed or out-of-scope successful
+responses, and uncertain transport failures never trigger a retry.
+
+Safe-output retries additionally require `idempotent: true` and a PUT, PATCH,
+or DELETE operation whose repeated exact request is safe. POST creates and
+append operations are rejected with retries enabled. The author must establish
+provider-level idempotency; an HTTP method is not proof. Hosted HTTP MCP calls
+do not use this REST/GraphQL operation setting.
 
 Versioned specs/connections and context-phase fixtures under `testdata` are
 legacy runtime compatibility tests, not the public authoring interface.

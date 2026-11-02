@@ -1,6 +1,14 @@
 ---
 connectors:
   jira:
+    experimental: true
+    docs:
+      - https://support.atlassian.com/atlassian-ai-gateway/docs/configure-authentication-via-api-token/
+      - https://support.atlassian.com/atlassian-ai-gateway/docs/supported-tools/
+      - https://developer.atlassian.com/cloud/jira/platform/basic-auth-for-rest-apis/
+      - https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/
+      - https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-comments/
+      - https://developer.atlassian.com/cloud/jira/platform/webhooks/
     credentials:
       mcp-personal:
         header: Authorization
@@ -189,6 +197,8 @@ connectors:
             required: true
             type: string
           text:
+            sanitize: body
+            minLength: 1
             maxLength: 32767
             pattern: \S
             required: true
@@ -258,6 +268,8 @@ connectors:
             pattern: ^#?aw_[A-Za-z0-9_]{3,12}$
             type: string
           description:
+            sanitize: body
+            minLength: 1
             maxLength: 32767
             pattern: \S
             type: string
@@ -272,6 +284,8 @@ connectors:
             required: true
             type: string
           summary:
+            sanitize: title
+            minLength: 20
             maxLength: 255
             pattern: \S
             required: true
@@ -317,6 +331,8 @@ connectors:
         credential: rest-writer
         inputs:
           description:
+            sanitize: body
+            minLength: 1
             maxLength: 32767
             pattern: \S
             required: true
@@ -327,6 +343,8 @@ connectors:
             required: true
             type: string
           summary:
+            sanitize: title
+            minLength: 20
             maxLength: 255
             pattern: \S
             required: true
@@ -380,10 +398,24 @@ import-schema:
 
 <!--
 <connector-documentation id="jira" version="1">
+  <stability>experimental: true. This connector's contract may change.</stability>
+  <runtime-policies>
+    Human text inputs marked sanitize title or body use the shared publisher's
+    built-in sanitizers. Titles require at least 20 Unicode code points after
+    sanitization. Body limits include protected generated attribution and any
+    configured body footer. Fixed authored request literals are trusted content,
+    not agent-controlled text inputs.
+    Consumer safe-output options support max from 1 to 100, default 1, and staged
+    booleans or expressions. Global or compiler-forced staging always wins.
+    Staged operations do not resolve writer credentials or send provider requests.
+    Automatic retries require an explicit bounded operation retry policy; no policy
+    means one attempt. Repeating writes requires declared idempotency and a
+    repeat-safe PUT, PATCH or DELETE; POST creates and appends cannot retry.
+  </runtime-policies>
   <purpose>
     Jira Cloud integration for bounded hosted MCP reads and separately authorized REST API v3
     issue creation, update, comment, and additive label writes. Import the ordinary Markdown
-    declaration with @builtin:connectors/jira.md; importing alone enables no capability.
+    declaration with .github/workflows/connectors/jira.md; importing alone enables no capability.
     Explicit tools.jira selections and root jira-prefixed safe-output selections are independent.
     Generated write tools are jira_create_issue, jira_update_issue, jira_add_comment, and jira_add_label.
   </purpose>
@@ -453,7 +485,7 @@ import-schema:
       mcp-service-account-secret, and rest-writer-secret, with defaults listed above.
       Select one read profile with tools: {jira: [personal]} or tools: {jira: [service-account]}.
       Select writes as jira-create-issue, jira-update-issue, jira-add-comment, or jira-add-label
-      under root safe-outputs, with null or empty-object values. No per-operation options apply.
+      under root safe-outputs, with null, empty-object, or max/staged option values.
     </inputs>
   </configuration>
   <triggers operational="false">
@@ -499,14 +531,14 @@ import-schema:
   <safe-outputs max-response-bytes="16384">
     <operation selection="jira-create-issue" tool="jira_create_issue" method="POST" path="/rest/api/3/issue">
       Required inputs: approved project key (string, at most 80 characters), issue-type exactly
-      Task, and nonblank summary (at most 255 characters). Optional nonblank description is at
+      Task, and nonblank summary (20 to 255 Unicode characters). Optional nonblank description is at
       most 32767 characters. Optional temporary_id matches ^#?aw_[A-Za-z0-9_]{3,12}$ and is at most
       80 characters. Task must exist on the project's create screen; projects requiring unsupported
       mandatory fields cannot use this operation. Projects and issue types are not auto-resolved.
       Projects the response strings id, key, self to issue-id, issue-key, url, and requires all three.
     </operation>
     <operation selection="jira-update-issue" tool="jira_update_issue" method="PUT" path="/rest/api/3/issue/{issue}">
-      Required inputs: issue, nonblank summary (at most 255 characters), and nonblank description
+      Required inputs: issue, nonblank summary (20 to 255 Unicode characters), and nonblank description
       (at most 32767 characters). Both fields are replaced; single-field update and clearing either
       field are unavailable. A successful response may be empty (HTTP 204).
     </operation>
@@ -529,7 +561,7 @@ import-schema:
       Writes execute outside the agent credential boundary. Provider response content, including
       projected URLs, remains untrusted. Staging prepares intents without resolving write secrets,
       sending writes, or issuing creation receipts. Root safe-outputs.staged applies to the whole
-      workflow; per-operation staged and max options are unsupported. Staging does not suppress
+      workflow; per-operation staged and max options are also supported. Staging does not suppress
       selected MCP reads or make arbitrary user scripts safe.
     </semantics>
     <created-resources>
@@ -578,7 +610,7 @@ permissions:
   contents: read
   copilot-requests: write
 imports:
-  - uses: "@builtin:connectors/jira.md"
+  - uses: ".github/workflows/connectors/jira.md"
     with:
       site: https://example.atlassian.net
       cloud-ids: [00000000-0000-4000-8000-000000000001]
@@ -604,9 +636,9 @@ Read APP-1 using personal__getJiraIssue with the approved cloudId and issueIdOrK
 If search is needed, use personal__searchJiraIssuesUsingJql with that cloudId,
 jql "issue = APP-1", and maxResults 1.
 Demonstrate this staged chain without calling provider write APIs directly:
-1. jira_create_issue: project APP, issue-type Task, summary "Review follow-up",
+1. jira_create_issue: project APP, issue-type Task, summary "Review follow-up for approved issue",
    description "Review approved evidence.", temporary_id aw_created.
-2. jira_update_issue: issue "#aw_created", summary "Reviewed follow-up",
+2. jira_update_issue: issue "#aw_created", summary "Reviewed follow-up for approved issue",
    description "Evidence reviewed; proposed changes only.".
 3. jira_add_comment: issue "#aw_created", text "Review prepared.".
 4. jira_add_label: issue "#aw_created", label "reviewed".

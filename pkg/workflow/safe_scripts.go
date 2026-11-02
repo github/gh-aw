@@ -23,6 +23,7 @@ type SafeScriptConfig struct {
 	MemoryDefinition     string                      `yaml:"-"`
 	Max                  int                         `yaml:"-"`
 	connectorInputSchema map[string]any
+	connectorOptions     *ConnectorOperationOptions
 }
 
 // parseSafeScriptsConfig parses safe-scripts configuration from a scripts map.

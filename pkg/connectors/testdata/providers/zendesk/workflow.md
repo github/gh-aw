@@ -4,7 +4,7 @@ engine: copilot
 permissions:
   contents: read
 imports:
-  - uses: "@builtin:connectors/zendesk.md"
+  - uses: ".github/workflows/connectors/zendesk.md"
     with:
       subdomain: example
       ticket: "35436"
