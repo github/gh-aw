@@ -54,19 +54,33 @@ func validatePayload(op Operation, phase string) error {
 			return errors.New("project requires named fields with JSON Pointer values")
 		}
 	}
+	return validateResponseConstraints(op)
+}
+
+func validateResponseConstraints(op Operation) error {
+	if err := validatePrimitiveTypes(op.ResponseTypes); err != nil {
+		return err
+	}
+	for pointer, input := range op.ResponseInputs {
+		field, ok := op.Inputs[input]
+		if !validPointer(pointer) || !ok || !field.Required {
+			return errors.New("responseInputs requires JSON Pointers referencing declared required inputs")
+		}
+	}
+	return nil
+}
+
+func validatePrimitiveTypes(types map[string]string) error {
+	for pointer, kind := range types {
+		if !validPointer(pointer) || (kind != "string" && kind != "number" && kind != "integer" && kind != "boolean") {
+			return errors.New("responseTypes requires JSON Pointers and primitive string/number/integer/boolean types")
+		}
+	}
 	return nil
 }
 
 func validateValue(value Value, inputs map[string]Input) error {
-	if (value.Input == "") == (value.Literal == nil) {
-		return errors.New("value requires exactly one input or non-null literal")
-	}
-	if value.Input != "" {
-		if _, ok := inputs[value.Input]; !ok {
-			return fmt.Errorf("value references unknown input %q", value.Input)
-		}
-	}
-	return nil
+	return validateValueDepth(value, inputs, 0)
 }
 
 func (s *ConnectorSpec) validateHTTPMCP() error {

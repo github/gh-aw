@@ -151,9 +151,9 @@ func validateSelection(spec ConnectorSpec, binding Binding, connection Connectio
 				if len(connection.Resources[resource]) == 0 {
 					return fmt.Errorf("selected capability %q has no connection resource allowlist %q", name, resource)
 				}
-				if err := requireResources(op.ResponseResources, connection.Resources); err != nil {
-					return err
-				}
+			}
+			if err := requireResources(op.ResponseResources, connection.Resources); err != nil {
+				return err
 			}
 		}
 		total += len(names)

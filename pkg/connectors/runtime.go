@@ -68,7 +68,7 @@ func (p *Plan) Execute(ctx context.Context, runtime Runtime, capability, name st
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return nil, fmt.Errorf("connector HTTP status %d; no retry performed", response.StatusCode)
 	}
-	data, err = p.validateResponse(op, data)
+	data, err = p.validateResponse(op, data, args)
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +167,11 @@ func (p *Plan) buildRequest(ctx context.Context, op Operation, args map[string]a
 	}
 	if op.Request.GraphQL == "" {
 		query := u.Query()
-		for key, value := range resolveValues(op.Request.Query, args) {
+		values, err := resolveValues(op.Request.Query, args)
+		if err != nil {
+			return nil, err
+		}
+		for key, value := range values {
 			query.Set(key, fmt.Sprint(value))
 		}
 		u.RawQuery = query.Encode()
@@ -183,16 +187,28 @@ func (p *Plan) buildRequest(ctx context.Context, op Operation, args map[string]a
 	return request, nil
 }
 
-func resolveValues(values map[string]Value, args map[string]any) map[string]any {
+func resolveValues(values map[string]Value, args map[string]any) (map[string]any, error) {
 	result := map[string]any{}
+	size := 2
 	for key, value := range values {
-		if value.Input == "" {
-			result[key] = value.Literal
-		} else if input, ok := args[value.Input]; ok {
-			result[key] = input
+		resolved, present, err := resolveValue(value, args)
+		if err != nil {
+			return nil, err
 		}
+		if !present {
+			continue
+		}
+		encoded, err := json.Marshal(resolved)
+		if err != nil {
+			return nil, fmt.Errorf("encode structured connector value: %w", err)
+		}
+		size += len(encoded) + len(key)*6 + 4
+		if size > MaxDocumentBytes {
+			return nil, errors.New("structured object exceeds the JSON byte bound")
+		}
+		result[key] = resolved
 	}
-	return result
+	return result, nil
 }
 
 func requestBody(request Request, args map[string]any) ([]byte, string, error) {
@@ -200,19 +216,30 @@ func requestBody(request Request, args map[string]any) ([]byte, string, error) {
 	contentType := "application/json"
 	switch {
 	case request.GraphQL != "":
-		body = map[string]any{"query": request.GraphQL, "variables": resolveValues(request.Query, args)}
+		variables, err := resolveValues(request.Query, args)
+		if err != nil {
+			return nil, "", err
+		}
+		body = map[string]any{"query": request.GraphQL, "variables": variables}
 	case len(request.Patch) != 0:
 		patches := make([]map[string]any, 0, len(request.Patch))
 		for _, patch := range request.Patch {
-			value, ok := resolveValues(map[string]Value{"value": patch.Value}, args)["value"]
-			if !ok {
+			value, present, err := resolveValue(patch.Value, args)
+			if err != nil {
+				return nil, "", err
+			}
+			if !present {
 				return nil, "", errors.New("JSON Patch value is missing")
 			}
 			patches = append(patches, map[string]any{"op": patch.Op, "path": patch.Path, "value": value})
 		}
 		body, contentType = patches, "application/json-patch+json"
 	case len(request.Body) != 0:
-		body = resolveValues(request.Body, args)
+		resolved, err := resolveValues(request.Body, args)
+		if err != nil {
+			return nil, "", err
+		}
+		body = resolved
 	default:
 		return nil, contentType, nil
 	}
