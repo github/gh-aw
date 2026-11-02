@@ -191,18 +191,6 @@ func GenerateNpmInstallSteps(packageName, version, stepName, cacheKeyPrefix stri
 	return GenerateNpmInstallStepsWithScope(packageName, version, stepName, cacheKeyPrefix, scopeOptions)
 }
 
-// BuildStandardNpmEngineInstallStepsNoCooldown creates standard npm installation
-// steps for engines while forcing the default npm release-age cooldown off.
-func BuildStandardNpmEngineInstallStepsNoCooldown(
-	packageName string,
-	defaultVersion string,
-	stepName string,
-	cacheKeyPrefix string,
-	workflowData *WorkflowData,
-) []GitHubActionStep {
-	return buildStandardNpmEngineInstallSteps(packageName, defaultVersion, stepName, cacheKeyPrefix, workflowData, false)
-}
-
 // BuildStandardNpmEngineInstallSteps honors engine.cooldown, defaulting to three days.
 func BuildStandardNpmEngineInstallSteps(packageName, defaultVersion, stepName, cacheKeyPrefix string, workflowData *WorkflowData) []GitHubActionStep {
 	return buildStandardNpmEngineInstallSteps(packageName, defaultVersion, stepName, cacheKeyPrefix, workflowData, true)

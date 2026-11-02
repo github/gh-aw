@@ -11,7 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/github/gh-aw/pkg/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -94,25 +93,6 @@ func TestApplyEngineHarnessRetryEnv(t *testing.T) {
 
 		assert.Equal(t, "90000", env["GH_AW_HARNESS_WATCHDOG_TIMEOUT_MS"])
 	})
-}
-
-func TestBuildStandardNpmEngineInstallStepsNoCooldown(t *testing.T) {
-	steps := BuildStandardNpmEngineInstallStepsNoCooldown(
-		"@github/copilot",
-		string(constants.DefaultCopilotVersion),
-		"Install GitHub Copilot CLI",
-		"copilot",
-		&WorkflowData{},
-	)
-
-	var content strings.Builder
-	for _, step := range steps {
-		content.WriteString(strings.Join(step, "\n"))
-		content.WriteString("\n")
-	}
-	if strings.Contains(content.String(), "NPM_CONFIG_MIN_RELEASE_AGE") {
-		t.Fatalf("expected npm cooldown env to be omitted when no-cooldown helper is used")
-	}
 }
 
 func TestShellEscapeArgWithFullyQuotedAgentPath(t *testing.T) {
