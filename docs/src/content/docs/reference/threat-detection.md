@@ -384,10 +384,10 @@ safe-outputs:
 | `trust` | Source and capabilities |
 |---|---|
 | `author` | Locally assembled system/user prompt or repository-local author file; imports and compiler-selected non-secret expression bindings are supported |
-| `untrusted` | External HTTPS content; static text without expressions, directives, or inline agent/skill definitions |
+| `untrusted` | External content in older artifacts; current prompt assembly does not fetch remote imports |
 | Missing | Older artifact with unknown trust; do not infer author capabilities |
 
-The runtime assigns labels from provenance, not imported text. A node's label does not apply to its interpolated values or descendants: an `author` node can contain an `untrusted` HTTPS child. Cached nodes retain their own label and pre-expansion `rawContent`, even when `children` is empty because expansion already occurred. Labels are inspection metadata, not permission grants or proof that static text is free of prompt injection.
+The runtime assigns labels from provenance, not imported text. Current trees contain only local author sources, including nested and cached imports; remote targets fail before fetching or tree insertion. A node's label does not establish the safety of its interpolated values. Cached nodes retain their own label and pre-expansion `rawContent`, even when `children` is empty because expansion already occurred. Labels are inspection metadata, not permission grants or proof against prompt injection. Content retrieved later by the agent inside the AWF sandbox is not a prompt-assembly import node.
 
 `prompt-template.txt` records the assembled template before interpolation-stage processing. The main author source is part of that assembled prompt rather than a separate runtime-import child. Keep the template and import tree alongside the final prompt when analyzing provenance.
 

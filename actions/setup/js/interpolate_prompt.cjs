@@ -22,8 +22,8 @@ const { createLiteralValues, readLiteralState, restoreInlineMetadata, writeLiter
 /**
  * @typedef {Object} ImportTreeNode
  * @property {string} macro - The original {{#runtime-import ...}} macro text
- * @property {string} src - The resolved local file path or static HTTPS URL
- * @property {"author"|"untrusted"} trust - Author-capable local source or untrusted static external content
+ * @property {string} src - The resolved local file path
+ * @property {"author"} trust - Author-capable local source, not a guarantee about interpolated values
  * @property {boolean} optional - Whether the import was optional ({{#runtime-import?}})
  * @property {number|null} startLine - Start line for partial imports, or null
  * @property {number|null} endLine - End line for partial imports, or null
@@ -136,7 +136,7 @@ async function main({ deferredBindings = {}, authorExpressions = {} } = {}) {
       content = system + splitMarker + user;
     }
 
-    // Step 1: Process local file or static public HTTPS runtime imports
+    // Step 1: Process local file runtime imports without network access
     core.info("\n========================================");
     core.info("[main] STEP 1: Runtime Imports");
     core.info("========================================");
@@ -153,7 +153,7 @@ async function main({ deferredBindings = {}, authorExpressions = {} } = {}) {
 
     if (hasRuntimeImports) {
       const importMatches = content.match(/{{#runtime-import\??[ \t]+[^\}]+}}/g) || [];
-      core.info(`Processing ${importMatches.length} runtime import macro(s) (local files or static public HTTPS)`);
+      core.info(`Processing ${importMatches.length} runtime import macro(s) (local files only)`);
 
       const beforeImports = content.length;
       content = await processRuntimeImports(content, workspaceDir, new Set(), new Map(), [], importTree.children, new Map(), new Set(), protectExpression, authorExpressions);

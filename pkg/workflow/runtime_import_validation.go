@@ -18,7 +18,6 @@ package workflow
 
 import (
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -161,18 +160,10 @@ func validateRuntimeImportFiles(markdownContent string, workspaceDir string) ([]
 }
 
 func validateRuntimeImportFileReference(filePath, workspaceDir string, seen map[string]struct{}, result *runtimeImportValidationResult) {
-	if strings.HasPrefix(strings.ToLower(filePath), "https:") {
-		parsed, err := url.Parse(filePath)
-		if err != nil || !strings.HasPrefix(strings.ToLower(filePath), "https://") || parsed.Hostname() == "" || parsed.User != nil || strings.Contains(filePath, "${{") || strings.Contains(filePath, "${GH_AW_") || strings.Contains(filePath, "__GH_AW_") || strings.ContainsAny(filePath, "\\ \t\r\n") {
-			result.validationErrors = append(result.validationErrors, "Runtime import URL requires a literal, unauthenticated HTTPS URL")
-		}
-		// Public destination and expression-free response checks run on the runner.
-		return
-	}
 	repoRootPath := strings.TrimLeft(filePath, "/")
 	isRepoRootPath := strings.HasPrefix(filePath, "/") && (strings.HasPrefix(repoRootPath, constants.GithubDir) || strings.HasPrefix(repoRootPath, ".github\\") || strings.HasPrefix(repoRootPath, ".agents/") || strings.HasPrefix(repoRootPath, ".agents\\"))
 	if runtimeImportNonLocalPattern.MatchString(filePath) && !isRepoRootPath {
-		result.validationErrors = append(result.validationErrors, "Runtime imports require local files or literal public HTTPS URLs")
+		result.validationErrors = append(result.validationErrors, "Runtime imports require local files; ask the agent to fetch external content inside the AWF sandbox")
 		return
 	}
 	absolutePath, relativePath, baseFolder, ok := resolveRuntimeImportValidationPath(filePath, workspaceDir)
@@ -247,6 +238,6 @@ func newRuntimeImportValidationError(validationErrors []string) error {
 		"runtime-import",
 		fmt.Sprintf("%d files with errors", len(validationErrors)),
 		"runtime-import validation failed:\n\n"+strings.Join(validationErrors, "\n\n"),
-		"Use local files or literal public HTTPS URLs for runtime imports. Local fragments may use only allowed expressions; remote content must not contain expressions or template directives. See runtime import documentation for details.",
+		"Use local files within .github or explicit .agents/ paths for runtime imports, with compiler-selected non-secret author bindings. Ask the agent to fetch external content inside the AWF sandbox instead. See runtime import documentation for details.",
 	)
 }

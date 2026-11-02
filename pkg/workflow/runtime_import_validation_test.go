@@ -102,9 +102,9 @@ Body actor: ${{ github.actor }}`), 0644))
 			expectError: false, // Should skip validation for non-existent files
 		},
 		{
-			name:        "literal HTTPS URL checked at runtime",
+			name:        "literal HTTPS URL rejected",
 			markdown:    "{{#runtime-import https://example.com/remote.md}}",
-			expectError: false,
+			expectError: true,
 		},
 		{
 			name:        "nested invalid runtime import",

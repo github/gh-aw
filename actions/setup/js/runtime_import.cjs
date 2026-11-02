@@ -7,9 +7,7 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_API, ERR_CONFIG, ERR_PARSE, ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
-const { displayImportUrl, importUrlErrorMessage, validateImportUrl, readPublicImportUrl } = require("./runtime_import_url.cjs");
 const { isTruthy } = require("./is_truthy.cjs");
-const { hasTemplateDirectives } = require("./template_branch.cjs");
 const { closeUnterminatedSkillMarkers } = require("./extract_inline_skills.cjs");
 const { closeUnterminatedSubAgentMarkers } = require("./extract_inline_sub_agents.cjs");
 const { bindAuthorExpressions } = require("./author_prompt.cjs");
@@ -695,74 +693,6 @@ function hasGitHubActionsMacros(content) {
 }
 
 /**
- * @param {string} url
- * @returns {Promise<string>}
- */
-async function fetchUrlContent(url) {
-  const validatedUrl = validateImportUrl(url);
-  core.info(`Fetching content from URL: ${displayImportUrl(validatedUrl)}`);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(new Error("Timed out after 30000ms")), 30_000);
-  try {
-    const content = await readPublicImportUrl(validatedUrl, controller.signal);
-    assertStaticRemoteImport(content);
-    return content;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-/**
- * Remote text has no expression, template, or inline definition capabilities,
- * even inside comments, frontmatter, or lines outside the selected range.
- * @param {string} content
- */
-function assertStaticRemoteImport(content) {
-  if (/\$\{\{|(?:\$\{|__)GH_AW_/.test(content) || hasTemplateDirectives(content)) {
-    throw new Error(`${ERR_VALIDATION}: URL runtime imports must not contain expressions or template directives`);
-  }
-  // Both extractors accept tabs and explicit "end" markers. Reject their
-  // prefixes as well as complete definitions, before any inline extraction.
-  if (/^##[ \t]+(?:end[ \t]+)?(?:agent|skill):/im.test(content)) {
-    throw new Error(`${ERR_VALIDATION}: URL runtime imports must not contain inline agent or skill markers`);
-  }
-}
-
-/**
- * @param {string} url
- * @param {boolean} optional
- * @param {number} [startLine]
- * @param {number} [endLine]
- * @returns {Promise<string>}
- */
-async function processUrlImport(url, optional, startLine, endLine) {
-  validateImportUrl(url);
-  let content;
-  try {
-    content = await fetchUrlContent(url);
-  } catch (error) {
-    if (error instanceof Error && error.message.startsWith(ERR_VALIDATION)) throw error;
-    if (!optional) throw error;
-    core.warning(`Optional runtime import URL failed: ${displayImportUrl(url)}: ${importUrlErrorMessage(error)}`);
-    return "";
-  }
-  if (startLine !== undefined || endLine !== undefined) {
-    const lines = content.split("\n");
-    const start = startLine ?? 1;
-    const end = endLine ?? lines.length;
-    if (start < 1 || start > lines.length || end < 1 || end > lines.length || start > end) {
-      throw new Error(`${ERR_VALIDATION}: Invalid line range ${start}-${end} for URL ${displayImportUrl(url)} (total lines: ${lines.length})`);
-    }
-    content = lines.slice(start - 1, end).join("\n");
-  }
-  content = content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "");
-  content = removeXMLComments(content);
-  content = neutralizeSystemTags(content);
-  assertStaticRemoteImport(content);
-  return content;
-}
-
-/**
  * Wraps bare GitHub expressions in template conditionals with ${{ }}
  * Transforms {{#if expression}} to {{#if ${{ expression }} }} if expression looks like a GitHub Actions expression
  * @param {string} content - The markdown content
@@ -885,14 +815,10 @@ function generatePlaceholderName(expr) {
  */
 function assertSupportedRuntimeImport(target) {
   const trimmed = target.trim();
-  if (/^https:/i.test(trimmed)) {
-    validateImportUrl(trimmed);
-    return;
-  }
   // Repo-root .github/.agents paths retain their existing multiple-slash syntax.
   const repoRootPath = /^\/+\.(?:github|agents)[/\\]/.test(trimmed);
   if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed) || (/^[/\\]{2}/.test(trimmed) && !repoRootPath)) {
-    throw new Error(`${ERR_VALIDATION}: Runtime imports require local files or literal public HTTPS URLs`);
+    throw new Error(`${ERR_VALIDATION}: Runtime imports require local files; ask the agent to fetch external content inside the AWF sandbox`);
   }
 }
 
@@ -1009,8 +935,8 @@ function assertRuntimeImportRealPathWithinBase(normalizedPath, normalizedBaseFol
 }
 
 /**
- * Reads a local author file or expression-free public HTTPS content.
- * @param {string} filepathOrUrl - The local file path or literal public HTTPS URL to import
+ * Reads a local author file without network access.
+ * @param {string} filepathOrUrl - The local file path to import
  * @param {boolean} optional - Whether the import is optional (true for {{#runtime-import? filepath}})
  * @param {string} workspaceDir - The GITHUB_WORKSPACE directory path
  * @param {number} [startLine] - Optional start line (1-indexed, inclusive)
@@ -1022,9 +948,6 @@ function assertRuntimeImportRealPathWithinBase(normalizedPath, normalizedBaseFol
  */
 async function processRuntimeImport(filepathOrUrl, optional, workspaceDir, startLine, endLine, protectValue = value => value, authorExpressions = {}) {
   assertSupportedRuntimeImport(filepathOrUrl);
-  if (/^https:/i.test(filepathOrUrl)) {
-    return processUrlImport(filepathOrUrl, optional, startLine, endLine);
-  }
   const { filepath, normalizedPath, normalizedBaseFolder } = resolveRuntimeImportFilePath(filepathOrUrl, workspaceDir);
 
   // Check if file exists
@@ -1138,10 +1061,6 @@ async function processRuntimeImport(filepathOrUrl, optional, workspaceDir, start
 function resolveRuntimeImportKey(filepathOrUrl, workspaceDir, startLine, endLine) {
   const rangeSuffix = startLine !== undefined && endLine !== undefined ? `:${startLine}-${endLine}` : "";
 
-  if (/^https:/i.test(filepathOrUrl)) {
-    validateImportUrl(filepathOrUrl);
-    return `${filepathOrUrl}${rangeSuffix}`;
-  }
   const { normalizedPath } = resolveRuntimeImportFilePath(filepathOrUrl, workspaceDir);
 
   return `${normalizedPath}${rangeSuffix}`;
@@ -1150,8 +1069,8 @@ function resolveRuntimeImportKey(filepathOrUrl, workspaceDir, startLine, endLine
 /**
  * @typedef {Object} ImportTreeNode
  * @property {string} macro - The original {{#runtime-import ...}} macro text
- * @property {string} src - The resolved local file path or static HTTPS URL
- * @property {"author"|"untrusted"} trust - Author-capable local source or untrusted static external content
+ * @property {string} src - The resolved local file path
+ * @property {"author"} trust - Author-capable local source, not a guarantee about interpolated values
  * @property {boolean} optional - Whether the import was optional ({{#runtime-import?}})
  * @property {number|null} startLine - Start line for partial imports, or null
  * @property {number|null} endLine - End line for partial imports, or null
@@ -1264,14 +1183,13 @@ async function processRuntimeImports(
   for (const matchData of matches) {
     const { fullMatch, filepathOrUrl, optional, startLine, endLine, filepathWithRange } = matchData;
     assertSupportedRuntimeImport(filepathOrUrl);
-    const remote = /^https:/i.test(filepathOrUrl);
-    const displayPath = remote ? displayImportUrl(filepathOrUrl) : filepathWithRange;
+    const displayPath = filepathWithRange;
     let importKey;
     try {
       importKey = resolveRuntimeImportKey(filepathOrUrl, workspaceDir, startLine, endLine);
     } catch (error) {
       const errorMessage = getErrorMessage(error);
-      throw new Error(`${ERR_API}: Failed to process runtime import for ${displayPath}: ${importUrlErrorMessage(errorMessage)}`);
+      throw new Error(`${ERR_API}: Failed to process runtime import for ${displayPath}: ${errorMessage}`);
     }
 
     // Skip imports already resolved in the parent/sibling context.
@@ -1291,7 +1209,6 @@ async function processRuntimeImports(
       // Reuse cached content
       const cachedContent = importCache.get(filepathWithRange);
       if (cachedContent !== undefined) {
-        if (remote) assertStaticRemoteImport(cachedContent);
         processedContent = processedContent.replace(fullMatch, () => cachedContent);
         core.info(`Reusing cached content for ${displayPath}`);
         if (parentTreeChildren !== null) {
@@ -1301,7 +1218,7 @@ async function processRuntimeImports(
           parentTreeChildren.push({
             macro: fullMatch,
             src: filepathOrUrl,
-            trust: remote ? "untrusted" : "author",
+            trust: "author",
             optional,
             startLine: startLine ?? null,
             endLine: endLine ?? null,
@@ -1316,7 +1233,7 @@ async function processRuntimeImports(
 
     // Check for circular dependencies
     if (importStack.includes(filepathWithRange)) {
-      const cycle = [...importStack, filepathWithRange].map(value => (/^https:/i.test(value) ? displayImportUrl(value) : value)).join(" -> ");
+      const cycle = [...importStack, filepathWithRange].join(" -> ");
       throw new Error(`${ERR_PARSE}: Circular dependency detected: ${cycle}`);
     }
 
@@ -1340,7 +1257,7 @@ async function processRuntimeImports(
         parentTreeChildren.push({
           macro: fullMatch,
           src: filepathOrUrl,
-          trust: remote ? "untrusted" : "author",
+          trust: "author",
           optional,
           startLine: startLine ?? null,
           endLine: endLine ?? null,
@@ -1379,7 +1296,7 @@ async function processRuntimeImports(
       resolvedInThisCall.add(importKey);
     } catch (error) {
       const errorMessage = getErrorMessage(error);
-      throw new Error(`${ERR_API}: Failed to process runtime import for ${displayPath}: ${importUrlErrorMessage(errorMessage)}`);
+      throw new Error(`${ERR_API}: Failed to process runtime import for ${displayPath}: ${errorMessage}`);
     } finally {
       // Remove from import stack
       importStack.pop();
@@ -1390,7 +1307,6 @@ async function processRuntimeImports(
 }
 
 module.exports = {
-  fetchUrlContent,
   processRuntimeImports,
   processRuntimeImport,
   resolveRuntimeImportFilePath,

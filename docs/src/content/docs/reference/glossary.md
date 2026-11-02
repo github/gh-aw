@@ -963,7 +963,7 @@ A typed parameter contract declared in a shared workflow file that enables calle
 
 ### Runtime Import (`{{#runtime-import}}`)
 
-A body-level directive that includes local author files or static public HTTPS content at a specific point in the workflow markdown. Unlike the `imports:` frontmatter field, it does not merge workflow configuration. Local files within `.github` or explicit `.agents/` paths share compiler-selected non-secret author bindings and support nested imports. External HTTPS content cannot contain expressions, directives, or inline agent/skill markers. Use `{{#runtime-import? target}}` for optional imports; optional syntax does not bypass security checks. See [Runtime Imports](/gh-aw/reference/templating/#runtime-imports).
+A body-level directive that includes local author files at a specific point in the workflow markdown. Unlike the `imports:` frontmatter field, it does not merge workflow configuration. Local files within `.github` or explicit `.agents/` paths share compiler-selected non-secret author bindings and support nested imports. Runtime imports perform no network fetching; external content must be retrieved by the agent inside the AWF sandbox. Use `{{#runtime-import? target}}` for optional local files; optional syntax does not permit remote targets. See [Runtime Imports](/gh-aw/reference/templating/#runtime-imports).
 
 ### Emoji (`emoji:`)
 
