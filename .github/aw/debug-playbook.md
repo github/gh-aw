@@ -196,11 +196,11 @@ Check current PR head/base/checks/reviews/guards; diagnosis isn't merge authoriz
 | --- | --- | --- |
 | `source_branch_invalid`, `target_base_branch_invalid`, `branch_not_allowed` | Syntax/patterns; actual head/base. | Fix authorized target/config. |
 | `target_branch_protected`, `target_branch_default`, `target_branch_has_no_open_pr` | Protection/default restrictions; required PR. | Use permitted PR path; retain protections. |
-| `pr_is_draft` | Draft state. | Author-authorized readiness only. |
+| `pr_is_draft`, `pr_not_open` | Draft/open. | Authorized readiness. |
 | `merge_conflicts`, `not_mergeable` | Live mergeability/conflicts; unknown != conflict. | Resolve on reviewed head; bounded wait for known state. |
 | `missing_required_labels`, `title_prefix_mismatch` | Required labels/title. | Authorized correction; retain handler guards. |
 | `required_checks_missing`, `required_checks_failing` | Check identity/SHA/completion/result. | Fix current-head checks; no bypass. |
-| `pending_reviewers`, `blocking_review_state`, `unresolved_review_threads` | Pending/blocked reviews; open threads. | Address feedback; retain reviewer authority/policy. |
+| `pending_reviewers`, `required_approval_missing`, `blocking_review_state`, `unresolved_review_threads` | Review/approval. | Address feedback; retain policy. |
 | `merge_not_completed`, `merge_operation_error` | API response; live state. | Reconcile before retry; possibly merged. |
 
 ## Parser and ledger diagnostics
