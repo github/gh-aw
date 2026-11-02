@@ -1,6 +1,6 @@
 {
-  "run_date": "2026-11-02T00:39:50.279+00:00",
-  "run_id": "41368131357",
+  "run_date": "2026-11-02T06:34:49.545382+00:00",
+  "run_id": "41400366770",
   "source": "pr-triage",
   "eligible_total": 0,
   "cooldown_skipped": [],
@@ -11,5 +11,5 @@
   "action_counts": {},
   "batches": [],
   "selected_candidates": [],
-  "notes": "No open pull requests in this repository snapshot were authored by app/github-copilot; current open PRs are attributed to pelikhan, Copilot, or dependabot and are excluded by policy."
+  "notes": "No open pull requests in this repository snapshot were authored by app/github-copilot; reported open PRs are from other users/bots and are excluded by policy."
 }
