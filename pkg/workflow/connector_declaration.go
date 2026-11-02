@@ -67,9 +67,11 @@ func (declaration ConnectorDeclaration) registration(alias string) (map[string]a
 			credentials[name] = connectors.SecretRef{Secret: credential.Secret}
 		}
 	}
-	resources := declaration.Resources
-	if resources == nil {
-		resources = map[string][]string{}
+	resources := map[string][]string{}
+	for name, values := range declaration.Resources {
+		if len(values) > 0 {
+			resources[name] = values
+		}
 	}
 	data, err := json.Marshal(map[string]any{"spec": spec, "credentials": credentials, "resources": resources})
 	if err != nil {
