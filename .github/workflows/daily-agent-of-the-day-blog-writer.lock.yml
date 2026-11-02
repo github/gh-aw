@@ -315,60 +315,19 @@ jobs:
         run: bash "${RUNNER_TEMP}/gh-aw/actions/log_runtime_features_summary.sh"
       - name: Create prompt with built-in context
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
-          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
-          GH_AW_SAFE_OUTPUTS: ${{ runner.temp }}/gh-aw/safeoutputs/outputs.jsonl
-          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"repo_memory_prompt.md\"},{\"file\":\"safe_outputs_cli_only_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"file\":\"safe_outputs_create_pull_request.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"safe_outputs_steering_issue.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"},{\"file\":\"github_mcp_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0006\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0007\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0008\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0009\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0010\"}],\"system_item_count\":17}"
-          GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
-          GH_AW_EXPR_77C1A4D2: ${{ github.event.comment.id || fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').comment_id }}
-          GH_AW_EXPR_7C248226: ${{ github.event.issue.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'issue' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
-          GH_AW_EXPR_C19C384F: ${{ github.event.discussion.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'discussion' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
-          GH_AW_GITHUB_ACTOR: ${{ github.actor }}
-          GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
-          GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
-          GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
-          GH_AW_NEEDS_ACTIVATION_OUTPUTS_STEERING_ISSUE_NUMBER: ${{ (steps.create-steering-issue.outputs.issue_number) }}
-          GH_AW_PROMPT_CONTENT_0000: "<system>\n"
-          GH_AW_PROMPT_CONTENT_0001: "<safe-output-tools>\nTools: create_pull_request, upload_asset(max:3), report_missing_tool, report_missing_data, noop(max:2)\n"
-          GH_AW_PROMPT_CONTENT_0002: "<issue-steering>\nThe steering issue for this run is #__GH_AW_NEEDS_ACTIVATION_OUTPUTS_STEERING_ISSUE_NUMBER__.\n\n"
-          GH_AW_PROMPT_CONTENT_0003: "\nupload_asset: provide a file path; returns a URL; assets are published after the workflow completes (safeoutputs).\n"
-          GH_AW_PROMPT_CONTENT_0004: "</safe-output-tools>\n"
-          GH_AW_PROMPT_CONTENT_0005: "<github-context>\nThe following GitHub context information is available for this workflow:\n{{#if github.actor}}\n- **actor**: __GH_AW_GITHUB_ACTOR__\n{{/if}}\n{{#if github.repository}}\n- **repository**: __GH_AW_GITHUB_REPOSITORY__\n{{/if}}\n{{#if github.workspace}}\n- **workspace**: __GH_AW_GITHUB_WORKSPACE__\n{{/if}}\n{{#if github.event.issue.number || (github.aw.context.item_type == 'issue' && github.aw.context.item_number)}}\n- **issue-number**: #__GH_AW_EXPR_7C248226__\n{{/if}}\n{{#if github.event.discussion.number || (github.aw.context.item_type == 'discussion' && github.aw.context.item_number)}}\n- **discussion-number**: #__GH_AW_EXPR_C19C384F__\n{{/if}}\n{{#if github.event.pull_request.number || (github.aw.context.item_type == 'pull_request' && github.aw.context.item_number)}}\n- **pull-request-number**: #__GH_AW_EXPR_76DF9333__\n{{/if}}\n{{#if github.event.comment.id || github.aw.context.comment_id}}\n- **comment-id**: __GH_AW_EXPR_77C1A4D2__\n{{/if}}\n{{#if github.run_id}}\n- **workflow-run-id**: __GH_AW_GITHUB_RUN_ID__\n{{/if}}\n</github-context>\n\n"
-          GH_AW_PROMPT_CONTENT_0006: "</system>\n"
-          GH_AW_PROMPT_CONTENT_0007: "{{#runtime-import .github/workflows/shared/github-guard-policy.md}}\n"
-          GH_AW_PROMPT_CONTENT_0008: "{{#runtime-import .github/workflows/shared/otlp.md}}\n"
-          GH_AW_PROMPT_CONTENT_0009: "{{#runtime-import .github/workflows/shared/reporting.md}}\n"
-          GH_AW_PROMPT_CONTENT_0010: "{{#runtime-import .github/workflows/daily-agent-of-the-day-blog-writer.md}}\n"
         with:
+          github-token: no-authentication
           script: |
-            const { setupGlobals } = require(process.env.GH_AW_ACTIONS_DIR + '/setup_globals.cjs');
-            setupGlobals(core, github, context, exec, io, getOctokit);
+            const promptEnvironment = new Set(["GH_AW_ACTIONS_DIR","GH_AW_EXPR_76DF9333","GH_AW_EXPR_77C1A4D2","GH_AW_EXPR_7C248226","GH_AW_EXPR_C19C384F","GH_AW_GITHUB_ACTOR","GH_AW_GITHUB_REPOSITORY","GH_AW_GITHUB_RUN_ID","GH_AW_GITHUB_WORKSPACE","GH_AW_NEEDS_ACTIVATION_OUTPUTS_STEERING_ISSUE_NUMBER","GH_AW_PROMPT","GH_AW_PROMPT_CONFIG","GH_AW_PROMPT_CONTENT_0000","GH_AW_PROMPT_CONTENT_0001","GH_AW_PROMPT_CONTENT_0002","GH_AW_PROMPT_CONTENT_0003","GH_AW_PROMPT_CONTENT_0004","GH_AW_PROMPT_CONTENT_0005","GH_AW_PROMPT_CONTENT_0006","GH_AW_PROMPT_CONTENT_0007","GH_AW_PROMPT_CONTENT_0008","GH_AW_PROMPT_CONTENT_0009","GH_AW_SAFE_OUTPUTS","GITHUB_ACTION","GITHUB_ACTOR","GITHUB_API_URL","GITHUB_EVENT_NAME","GITHUB_EVENT_PATH","GITHUB_GRAPHQL_URL","GITHUB_JOB","GITHUB_OUTPUT","GITHUB_REF","GITHUB_REPOSITORY","GITHUB_RUN_ATTEMPT","GITHUB_RUN_ID","GITHUB_RUN_NUMBER","GITHUB_SERVER_URL","GITHUB_SHA","GITHUB_STEP_SUMMARY","GITHUB_WORKFLOW","GITHUB_WORKSPACE","PATH","RUNNER_ARCH","RUNNER_OS","RUNNER_TEMP"]);
+            for (const name of Object.keys(process.env)) {
+              if (!promptEnvironment.has(name)) delete process.env[name];
+            }
+            global.core = core;
+            global.context = context;
             const { main } = require(process.env.GH_AW_ACTIONS_DIR + '/create_prompt.cjs');
             await main(core);
-      - name: Interpolate variables and render templates
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
-          GH_AW_ENGINE_ID: "copilot"
-          GH_AW_SUB_AGENT_DIR: ".github/agents"
-          GH_AW_SUB_AGENT_EXT: ".agent.md"
-          GH_AW_SKILL_DIR: ".github/skills"
-          GH_AW_SKILL_EXT: "/SKILL.md"
-          GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
-          GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
-        with:
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'interpolate_prompt.cjs'));
-            await main();
-      - name: Substitute placeholders
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
           GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
           GH_AW_EXPR_77C1A4D2: ${{ github.event.comment.id || fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').comment_id }}
           GH_AW_EXPR_7C248226: ${{ github.event.issue.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'issue' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
@@ -377,23 +336,109 @@ jobs:
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
-          GH_AW_MCP_CLI_SERVERS_LIST: "- `agenticworkflows` — run `agenticworkflows --help` to see available tools\n- `github` — run `github --help` to see available tools\n- `safeoutputs` — run `safeoutputs --help` to see available tools"
-          GH_AW_MEMORY_BRANCH_NAME: "master"
-          GH_AW_MEMORY_CONSTRAINTS: "\n\n**Constraints:**\n- **Max File Size**: 102400 bytes (0.10 MB) per file\n- **Max File Count**: 100 files per commit\n- **Max Patch Size**: 10240 bytes (10 KB) total per push (max: 1024 KB)\n"
-          GH_AW_MEMORY_DESCRIPTION: " Tracks persona/style rotation and recently featured workflows to keep daily entries varied"
-          GH_AW_MEMORY_DIR: "/tmp/gh-aw/repo-memory/default/"
-          GH_AW_MEMORY_TARGET_REPO: " of the current repository"
           GH_AW_NEEDS_ACTIVATION_OUTPUTS_STEERING_ISSUE_NUMBER: ${{ (steps.create-steering-issue.outputs.issue_number) }}
-          GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED: ${{ needs.pre_activation.outputs.activated }}
-          GH_AW_WIKI_NOTE: "\n\n> **GitHub Wiki**: This memory is backed by the GitHub Wiki for this repository. Files use GitHub Wiki Markdown syntax. Follow GitHub Wiki conventions when creating or editing pages (e.g., use standard Markdown headers, use `[[Page Name]]` syntax for internal wiki links, name page files with spaces replaced by hyphens or use the wiki page title as the filename)."
-        with:
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
+          GH_AW_OTLP_ALL_HEADERS: ""
+          GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"repo_memory_prompt.md\"},{\"file\":\"safe_outputs_cli_only_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"file\":\"safe_outputs_create_pull_request.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"safe_outputs_steering_issue.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"},{\"file\":\"github_mcp_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0006\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0007\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0008\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0009\"},{\"author_file\":\".github/workflows/daily-agent-of-the-day-blog-writer.md\"}],\"system_item_count\":17,\"author_expressions\":{\"github.repository\":\"GH_AW_GITHUB_REPOSITORY\",\"github.run_id\":\"GH_AW_GITHUB_RUN_ID\"}}"
+          GH_AW_PROMPT_CONTENT_0000: |
+            <system>
+          GH_AW_PROMPT_CONTENT_0001: |
+            <safe-output-tools>
+            Tools: create_pull_request, upload_asset(max:3), report_missing_tool, report_missing_data, noop(max:2)
+          GH_AW_PROMPT_CONTENT_0002: |+
+            <issue-steering>
+            The steering issue for this run is #__GH_AW_NEEDS_ACTIVATION_OUTPUTS_STEERING_ISSUE_NUMBER__.
 
-            const substitutePlaceholders = require(path.join(actionsDir, 'substitute_placeholders.cjs'));
+          GH_AW_PROMPT_CONTENT_0003: |
+
+            upload_asset: provide a file path; returns a URL; assets are published after the workflow completes (safeoutputs).
+          GH_AW_PROMPT_CONTENT_0004: |
+            </safe-output-tools>
+          GH_AW_PROMPT_CONTENT_0005: |+
+            <github-context>
+            The following GitHub context information is available for this workflow:
+            {{#if github.actor}}
+            - **actor**: __GH_AW_GITHUB_ACTOR__
+            {{/if}}
+            {{#if github.repository}}
+            - **repository**: __GH_AW_GITHUB_REPOSITORY__
+            {{/if}}
+            {{#if github.workspace}}
+            - **workspace**: __GH_AW_GITHUB_WORKSPACE__
+            {{/if}}
+            {{#if github.event.issue.number || (github.aw.context.item_type == 'issue' && github.aw.context.item_number)}}
+            - **issue-number**: #__GH_AW_EXPR_7C248226__
+            {{/if}}
+            {{#if github.event.discussion.number || (github.aw.context.item_type == 'discussion' && github.aw.context.item_number)}}
+            - **discussion-number**: #__GH_AW_EXPR_C19C384F__
+            {{/if}}
+            {{#if github.event.pull_request.number || (github.aw.context.item_type == 'pull_request' && github.aw.context.item_number)}}
+            - **pull-request-number**: #__GH_AW_EXPR_76DF9333__
+            {{/if}}
+            {{#if github.event.comment.id || github.aw.context.comment_id}}
+            - **comment-id**: __GH_AW_EXPR_77C1A4D2__
+            {{/if}}
+            {{#if github.run_id}}
+            - **workflow-run-id**: __GH_AW_GITHUB_RUN_ID__
+            {{/if}}
+            </github-context>
+
+          GH_AW_PROMPT_CONTENT_0006: |
+            </system>
+          GH_AW_PROMPT_CONTENT_0007: |
+            {{#runtime-import .github/workflows/shared/github-guard-policy.md}}
+          GH_AW_PROMPT_CONTENT_0008: |
+            {{#runtime-import .github/workflows/shared/otlp.md}}
+          GH_AW_PROMPT_CONTENT_0009: |
+            {{#runtime-import .github/workflows/shared/reporting.md}}
+          GH_AW_SAFE_OUTPUTS: ${{ runner.temp }}/gh-aw/safeoutputs/outputs.jsonl
+          OTEL_EXPORTER_OTLP_ENDPOINT: ""
+          OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_RESOURCE_ATTRIBUTES: ""
+          OTEL_SERVICE_NAME: ""
+      - name: Interpolate variables and render templates
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          github-token: no-authentication
+          script: |
+            const promptEnvironment = new Set(["GH_AW_ACTIONS_DIR","GH_AW_ENGINE_ID","GH_AW_GITHUB_REPOSITORY","GH_AW_GITHUB_RUN_ID","GH_AW_PROMPT","GH_AW_SKILL_DIR","GH_AW_SKILL_EXT","GH_AW_SUB_AGENT_DIR","GH_AW_SUB_AGENT_EXT","GITHUB_ACTION","GITHUB_ACTOR","GITHUB_API_URL","GITHUB_EVENT_NAME","GITHUB_EVENT_PATH","GITHUB_GRAPHQL_URL","GITHUB_JOB","GITHUB_OUTPUT","GITHUB_REF","GITHUB_REPOSITORY","GITHUB_RUN_ATTEMPT","GITHUB_RUN_ID","GITHUB_RUN_NUMBER","GITHUB_SERVER_URL","GITHUB_SHA","GITHUB_STEP_SUMMARY","GITHUB_WORKFLOW","GITHUB_WORKSPACE","PATH","RUNNER_ARCH","RUNNER_OS","RUNNER_TEMP"]);
+            for (const name of Object.keys(process.env)) {
+              if (!promptEnvironment.has(name)) delete process.env[name];
+            }
+            global.core = core;
+            global.context = context;
+            const { main } = require(process.env.GH_AW_ACTIONS_DIR + '/interpolate_prompt.cjs');
+            await main({ authorExpressions: {"github.repository":"GH_AW_GITHUB_REPOSITORY","github.run_id":"GH_AW_GITHUB_RUN_ID"} });
+        env:
+          GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
+          GH_AW_ENGINE_ID: copilot
+          GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
+          GH_AW_OTLP_ALL_HEADERS: ""
+          GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          GH_AW_SKILL_DIR: .github/skills
+          GH_AW_SKILL_EXT: /SKILL.md
+          GH_AW_SUB_AGENT_DIR: .github/agents
+          GH_AW_SUB_AGENT_EXT: .agent.md
+          OTEL_EXPORTER_OTLP_ENDPOINT: ""
+          OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_RESOURCE_ATTRIBUTES: ""
+          OTEL_SERVICE_NAME: ""
+      - name: Substitute placeholders
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          github-token: no-authentication
+          script: |
+            const promptEnvironment = new Set(["GH_AW_ACTIONS_DIR","GH_AW_EXPR_76DF9333","GH_AW_EXPR_77C1A4D2","GH_AW_EXPR_7C248226","GH_AW_EXPR_C19C384F","GH_AW_GITHUB_ACTOR","GH_AW_GITHUB_REPOSITORY","GH_AW_GITHUB_RUN_ID","GH_AW_GITHUB_WORKSPACE","GH_AW_MCP_CLI_SERVERS_LIST","GH_AW_MEMORY_BRANCH_NAME","GH_AW_MEMORY_CONSTRAINTS","GH_AW_MEMORY_DESCRIPTION","GH_AW_MEMORY_DIR","GH_AW_MEMORY_TARGET_REPO","GH_AW_NEEDS_ACTIVATION_OUTPUTS_STEERING_ISSUE_NUMBER","GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED","GH_AW_PROMPT","GH_AW_WIKI_NOTE","GITHUB_ACTION","GITHUB_ACTOR","GITHUB_API_URL","GITHUB_EVENT_NAME","GITHUB_EVENT_PATH","GITHUB_GRAPHQL_URL","GITHUB_JOB","GITHUB_OUTPUT","GITHUB_REF","GITHUB_REPOSITORY","GITHUB_RUN_ATTEMPT","GITHUB_RUN_ID","GITHUB_RUN_NUMBER","GITHUB_SERVER_URL","GITHUB_SHA","GITHUB_STEP_SUMMARY","GITHUB_WORKFLOW","GITHUB_WORKSPACE","PATH","RUNNER_ARCH","RUNNER_OS","RUNNER_TEMP"]);
+            for (const name of Object.keys(process.env)) {
+              if (!promptEnvironment.has(name)) delete process.env[name];
+            }
+            global.core = core;
+            global.context = context;
+
+            const substitutePlaceholders = require(process.env.GH_AW_ACTIONS_DIR + '/substitute_placeholders.cjs');
 
             // Call the substitution function
             return await substitutePlaceholders({
@@ -418,16 +463,66 @@ jobs:
                 GH_AW_WIKI_NOTE: process.env.GH_AW_WIKI_NOTE
               }
             });
-      - name: Validate prompt placeholders
         env:
+          GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
+          GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
+          GH_AW_EXPR_77C1A4D2: ${{ github.event.comment.id || fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').comment_id }}
+          GH_AW_EXPR_7C248226: ${{ github.event.issue.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'issue' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
+          GH_AW_EXPR_C19C384F: ${{ github.event.discussion.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'discussion' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
+          GH_AW_GITHUB_ACTOR: ${{ github.actor }}
+          GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
+          GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
+          GH_AW_MCP_CLI_SERVERS_LIST: |-
+            - `agenticworkflows` — run `agenticworkflows --help` to see available tools
+            - `github` — run `github --help` to see available tools
+            - `safeoutputs` — run `safeoutputs --help` to see available tools
+          GH_AW_MEMORY_BRANCH_NAME: master
+          GH_AW_MEMORY_CONSTRAINTS: |
+
+
+            **Constraints:**
+            - **Max File Size**: 102400 bytes (0.10 MB) per file
+            - **Max File Count**: 100 files per commit
+            - **Max Patch Size**: 10240 bytes (10 KB) total per push (max: 1024 KB)
+          GH_AW_MEMORY_DESCRIPTION: " Tracks persona/style rotation and recently featured workflows to keep daily entries varied"
+          GH_AW_MEMORY_DIR: /tmp/gh-aw/repo-memory/default/
+          GH_AW_MEMORY_TARGET_REPO: " of the current repository"
+          GH_AW_NEEDS_ACTIVATION_OUTPUTS_STEERING_ISSUE_NUMBER: ${{ (steps.create-steering-issue.outputs.issue_number) }}
+          GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED: ${{ needs.pre_activation.outputs.activated }}
+          GH_AW_OTLP_ALL_HEADERS: ""
+          GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          GH_AW_WIKI_NOTE: |-
+
+
+            > **GitHub Wiki**: This memory is backed by the GitHub Wiki for this repository. Files use GitHub Wiki Markdown syntax. Follow GitHub Wiki conventions when creating or editing pages (e.g., use standard Markdown headers, use `[[Page Name]]` syntax for internal wiki links, name page files with spaces replaced by hyphens or use the wiki page title as the filename).
+          OTEL_EXPORTER_OTLP_ENDPOINT: ""
+          OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_RESOURCE_ATTRIBUTES: ""
+          OTEL_SERVICE_NAME: ""
+      - name: Validate prompt placeholders
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/validate_prompt_placeholders.sh"
-      - name: Print prompt
         env:
+          GH_AW_OTLP_ALL_HEADERS: ""
+          GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          OTEL_EXPORTER_OTLP_ENDPOINT: ""
+          OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_RESOURCE_ATTRIBUTES: ""
+          OTEL_SERVICE_NAME: ""
+      - name: Print prompt
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/print_prompt_summary.sh"
+        env:
+          GH_AW_OTLP_ALL_HEADERS: ""
+          GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          OTEL_EXPORTER_OTLP_ENDPOINT: ""
+          OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_RESOURCE_ATTRIBUTES: ""
+          OTEL_SERVICE_NAME: ""
       - name: Inventory installed skills
         if: success() || failure()
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0

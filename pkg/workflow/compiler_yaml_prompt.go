@@ -44,7 +44,8 @@ func splitContentIntoChunks(content string) []string {
 	return chunks
 }
 
-func (c *Compiler) generatePrompt(yaml *strings.Builder, data *WorkflowData, preActivationJobCreated bool, beforeActivationJobs []string) {
+func (c *Compiler) generatePrompt(output *strings.Builder, data *WorkflowData, preActivationJobCreated bool, beforeActivationJobs []string) error {
+	yaml := &strings.Builder{}
 	compilerYamlPromptLog.Printf("Generating prompt for workflow: %s (markdown size: %d bytes)", data.Name, len(data.MarkdownContent))
 
 	builtinSections := c.collectPromptSections(data)
@@ -96,6 +97,7 @@ func (c *Compiler) generatePrompt(yaml *strings.Builder, data *WorkflowData, pre
 		writePromptBashStep(yaml, "Validate prompt placeholders", "validate_prompt_placeholders.sh")
 	}
 	writePromptBashStep(yaml, "Print prompt", "print_prompt_summary.sh")
+	return writeCredentialFreePromptSteps(output, yaml.String(), data)
 }
 
 // enrichExpressionMappings extracts expressions from the main workflow markdown
@@ -104,7 +106,7 @@ func (c *Compiler) enrichExpressionMappings(data *WorkflowData, expressionMappin
 	if !c.inlinePrompt && !data.InlinedImports && data.MainWorkflowMarkdown != "" {
 		compilerYamlPromptLog.Printf("Extracting expressions from main workflow markdown (%d bytes)", len(data.MainWorkflowMarkdown))
 		mainExtractor := NewExpressionExtractor()
-		mainExprMappings, err := mainExtractor.ExtractExpressions(data.MainWorkflowMarkdown)
+		mainExprMappings, err := mainExtractor.ExtractExpressions(wrapExpressionsInTemplateConditionals(data.MainWorkflowMarkdown))
 		if err == nil && len(mainExprMappings) > 0 {
 			compilerYamlPromptLog.Printf("Extracted %d expressions from main workflow markdown", len(mainExprMappings))
 			expressionMappings = append(expressionMappings, mainExprMappings...)
@@ -112,7 +114,7 @@ func (c *Compiler) enrichExpressionMappings(data *WorkflowData, expressionMappin
 	}
 	if runtimeImportMarkdown := c.collectRuntimeImportMarkdownForCompilerAnalysis(data); runtimeImportMarkdown != "" {
 		runtimeImportExtractor := NewExpressionExtractor()
-		runtimeImportExprMappings, err := runtimeImportExtractor.ExtractExpressions(runtimeImportMarkdown)
+		runtimeImportExprMappings, err := runtimeImportExtractor.ExtractExpressions(wrapExpressionsInTemplateConditionals(runtimeImportMarkdown))
 		if err == nil && len(runtimeImportExprMappings) > 0 {
 			compilerYamlPromptLog.Printf("Extracted %d expressions from runtime-import markdown", len(runtimeImportExprMappings))
 			expressionMappings = append(expressionMappings, runtimeImportExprMappings...)
@@ -130,6 +132,7 @@ func (c *Compiler) enrichExpressionMappings(data *WorkflowData, expressionMappin
 // In inline mode it embeds the markdown directly; otherwise it emits a runtime-import macro.
 // Any expression mappings extracted from inline markdown are appended to expressionMappings.
 func (c *Compiler) buildMainWorkflowPromptChunks(data *WorkflowData, userPromptChunks []string, expressionMappings []*ExpressionMapping) ([]string, []*ExpressionMapping) {
+	data.MainWorkflowPromptPath = ""
 	if c.inlinePrompt || data.InlinedImports {
 		if data.MainWorkflowMarkdown != "" {
 			compilerYamlPromptLog.Printf("Inlining main workflow markdown (%d bytes)", len(data.MainWorkflowMarkdown))
@@ -160,6 +163,7 @@ func (c *Compiler) buildMainWorkflowPromptChunks(data *WorkflowData, userPromptC
 		workflowFilePath = filepath.Base(c.markdownPath)
 	}
 	runtimeImportMacro := fmt.Sprintf("{{#runtime-import %s}}", workflowFilePath)
+	data.MainWorkflowPromptPath = workflowFilePath
 	compilerYamlPromptLog.Printf("Using runtime-import for main workflow markdown: %s", workflowFilePath)
 	return append(userPromptChunks, runtimeImportMacro), expressionMappings
 }
@@ -416,6 +420,9 @@ func collectRuntimeImportMarkdownContent(markdownContent, workspaceRoot string, 
 }
 
 func readRuntimeImportMarkdownForAnalysis(ref runtimeImportReference, workspaceRoot string, seen map[string]struct{}) (string, bool, bool) {
+	if strings.HasPrefix(strings.ToLower(ref.importPath), "https:") {
+		return "", false, false
+	}
 	for _, candidate := range runtimeImportAnalysisCandidatePaths(ref.importPath, workspaceRoot) {
 		seenKey := fmt.Sprintf("%s:%d-%d", candidate, ref.startLine, ref.endLine)
 		if _, alreadySeen := seen[seenKey]; alreadySeen {
@@ -437,7 +444,8 @@ func readRuntimeImportMarkdownForAnalysis(ref runtimeImportReference, workspaceR
 		if extractErr != nil {
 			importedBody = content
 		}
-		if err := validateExpressionSafety(importedBody); err != nil {
+		importedBody = removeXMLComments(importedBody)
+		if err := validateRuntimeImportExpressionSafety(importedBody); err != nil {
 			return "", false, true
 		}
 		return importedBody, true, false

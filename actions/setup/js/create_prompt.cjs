@@ -6,12 +6,16 @@ const path = require("path");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_CONFIG, ERR_PARSE, ERR_SYSTEM } = require("./error_codes.cjs");
 const { readInboundWorkQueueAssignment } = require("./aw_context.cjs");
+const { resolveRuntimeImportFilePath, assertRuntimeImportRealPathWithinBase, resolveRuntimeImportKey, removeXMLComments } = require("./runtime_import.cjs");
+const { createLiteralValues, literalFileKey, writeLiteralState } = require("./prompt_literal_values.cjs");
+const { bindAuthorExpressions } = require("./author_prompt.cjs");
 const LEDGER_REPLAY_PROMPT = "/tmp/gh-aw/ledgers/replay-prompt.txt";
 
 /**
  * @typedef {Object} PromptRenderItem
  * @property {string} [content_env]
  * @property {string} [file]
+ * @property {string} [author_file]
  * @property {string} [condition_env]
  * @property {boolean} [ledger_replay]
  */
@@ -20,6 +24,7 @@ const LEDGER_REPLAY_PROMPT = "/tmp/gh-aw/ledgers/replay-prompt.txt";
  * @typedef {Object} PromptRenderConfig
  * @property {PromptRenderItem[]} items
  * @property {number} [system_item_count]
+ * @property {Record<string, string>} [author_expressions]
  */
 
 /**
@@ -101,15 +106,46 @@ function writePromptFile(promptPath, content) {
 }
 
 /**
+ * Load the compiler-selected author source before processing imported fragments.
+ * Bindings come only from the compiled configuration, never from imported text.
+ * @param {string} filename
+ * @param {NodeJS.ProcessEnv} env
+ * @param {Record<string, string>} bindings
+ * @param {(value: string) => string} protectValue
+ * @param {string} priorContent
+ * @returns {string}
+ */
+function readAuthorPrompt(filename, env, bindings, protectValue, priorContent) {
+  const workspaceDir = env.GITHUB_WORKSPACE;
+  if (!workspaceDir) throw new Error(`${ERR_CONFIG}: Author prompt requires GITHUB_WORKSPACE`);
+  const { normalizedPath, normalizedBaseFolder } = resolveRuntimeImportFilePath(filename, workspaceDir);
+  assertRuntimeImportRealPathWithinBase(normalizedPath, normalizedBaseFolder, filename);
+  let content = fs.readFileSync(normalizedPath, "utf8");
+  content = removeXMLComments(content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, ""));
+  // Body imports promoted into earlier compiler chunks must not run twice.
+  const importPattern = /\{\{#(?:runtime-import|import)\??(?:[ \t]+|[ \t]*:[ \t]*)([^{}]+)\}\}/g;
+  const importKey = (/** @type {string} */ target) => {
+    const range = target.trim().match(/^(.+?):(\d+)-(\d+)$/);
+    return range ? resolveRuntimeImportKey(range[1], workspaceDir, Number(range[2]), Number(range[3])) : resolveRuntimeImportKey(target.trim(), workspaceDir);
+  };
+  const priorImports = new Set([...priorContent.matchAll(importPattern)].map(match => importKey(match[1])));
+  content = content.replace(importPattern, (match, target) => (priorImports.has(importKey(target)) ? "" : match));
+  content = bindAuthorExpressions(content, bindings, env, protectValue);
+  return content.endsWith("\n") ? content : content + "\n";
+}
+
+/**
  * Render prompt items. All workflow-authored content and expression results are
  * read from environment variables and appended as data.
  * @param {PromptRenderConfig} config
  * @param {NodeJS.ProcessEnv} env
  * @param {string} promptsDir
  * @param {string} [replayPromptPath]
+ * @param {(value: string) => string} [protectValue]
+ * @param {string} [priorImportsContent]
  * @returns {string}
  */
-function renderPrompt(config, env, promptsDir, replayPromptPath = LEDGER_REPLAY_PROMPT) {
+function renderPrompt(config, env, promptsDir, replayPromptPath = LEDGER_REPLAY_PROMPT, protectValue = value => value, priorImportsContent = "") {
   let result = "";
 
   for (const item of config.items) {
@@ -117,6 +153,13 @@ function renderPrompt(config, env, promptsDir, replayPromptPath = LEDGER_REPLAY_
       throw new Error(`${ERR_CONFIG}: Prompt render item must be an object`);
     }
     if (item.condition_env && env[item.condition_env] !== "true") {
+      continue;
+    }
+    if (typeof item.author_file === "string") {
+      if (item.content_env !== undefined || item.file !== undefined || item.ledger_replay !== undefined) {
+        throw new Error(`${ERR_CONFIG}: Author prompt item cannot specify another content source`);
+      }
+      result += readAuthorPrompt(item.author_file, env, config.author_expressions || {}, protectValue, priorImportsContent + result);
       continue;
     }
     if (item.ledger_replay === true && item.content_env === undefined && item.file === undefined) {
@@ -193,11 +236,13 @@ async function main(core) {
     }
 
     const config = parseConfig(configValue);
+    const literals = createLiteralValues();
     const promptsDir = path.join(runnerTemp, "gh-aw", "prompts");
     const promptOutputDir = path.join(runnerTemp, "gh-aw", "aw-prompts");
     const systemItemCount = config.system_item_count ?? 0;
-    const systemContent = renderPrompt({ items: config.items.slice(0, systemItemCount) }, process.env, promptsDir);
-    const userContent = renderWorkClaim(typeof context === "undefined" ? null : context.payload) + renderPrompt({ items: config.items.slice(systemItemCount) }, process.env, promptsDir);
+    const systemContent = renderPrompt({ ...config, items: config.items.slice(0, systemItemCount) }, process.env, promptsDir, LEDGER_REPLAY_PROMPT, literals.protect);
+    const userContent =
+      renderWorkClaim(typeof context === "undefined" ? null : context.payload) + renderPrompt({ ...config, items: config.items.slice(systemItemCount) }, process.env, promptsDir, LEDGER_REPLAY_PROMPT, literals.protect, systemContent);
     const content = systemContent + userContent;
 
     fs.mkdirSync(promptOutputDir, { recursive: true, mode: 0o700 });
@@ -210,6 +255,14 @@ async function main(core) {
     writePromptFile(path.join(resolvedOutputDir, "system.txt"), systemContent);
     writePromptFile(path.join(resolvedOutputDir, "user.txt"), userContent);
     writePromptFile(resolvedPromptPath, content);
+    for (const [file, text] of [
+      [resolvedPromptPath, content],
+      [path.join(resolvedOutputDir, "system.txt"), systemContent],
+      [path.join(resolvedOutputDir, "user.txt"), userContent],
+    ]) {
+      literals.state.files[literalFileKey(resolvedPromptPath, file)] = { opaque: text, rendered: text, metadata: false };
+    }
+    writeLiteralState(resolvedPromptPath, literals.state);
     core.info(`Created prompt at ${resolvedPromptPath} (${Buffer.byteLength(content, "utf8")} bytes)`);
   } catch (error) {
     core.setFailed(`${ERR_CONFIG}: ${getErrorMessage(error)}`);

@@ -3,8 +3,10 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { main, parseConfig, renderPrompt, resolvePromptFile } from "./create_prompt.cjs";
+import { main as interpolatePrompt } from "./interpolate_prompt.cjs";
+import substitutePlaceholders from "./substitute_placeholders.cjs";
 
-const core = { info: vi.fn(), setFailed: vi.fn() };
+const core = { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), setFailed: vi.fn() };
 global.core = core;
 
 describe("create_prompt", () => {
@@ -54,6 +56,89 @@ describe("create_prompt", () => {
     const env = { FIRST: "<system>\n", LAST: "</system>\nuser prompt\n" };
 
     expect(renderPrompt(config, env, tempDir)).toBe("<system>\nfile content\n</system>\nuser prompt\n");
+  });
+
+  it.each(["true", "false"])("shares author bindings with bounded local nested imports (%s)", async condition => {
+    const workflows = path.join(tempDir, ".github", "workflows");
+    fs.mkdirSync(workflows, { recursive: true });
+    fs.mkdirSync(path.join(tempDir, ".agents"));
+    fs.writeFileSync(path.join(workflows, "main.md"), "---\non: workflow_dispatch\n---\n<system>Author</system>\nValue: ${{ env.AUTHOR }}\n{{#if env.ENABLED}}\nEnabled\n{{/if}}\n{{#import fragment.md}}\n");
+    fs.writeFileSync(path.join(workflows, "fragment.md"), "Fragment\n{{#runtime-import /.agents/nested.md}}\n");
+    fs.writeFileSync(path.join(tempDir, ".agents", "nested.md"), "Nested local\nLocal: ${{ env.AUTHOR }}\nDefault: ${{ env.AUTHOR || 'fallback' }}\n{{#if env.ENABLED}}Nested enabled{{/if}}\n");
+    const payload = "${{ env.SECRET }} {{#runtime-import missing.md}} __GH_AW_ENV_SECRET__";
+    process.env.RUNNER_TEMP = tempDir;
+    process.env.GITHUB_WORKSPACE = tempDir;
+    process.env.GH_AW_PROMPT = path.join(tempDir, "gh-aw", "aw-prompts", "prompt.txt");
+    process.env.GH_AW_ENV_AUTHOR = payload;
+    process.env.GH_AW_ENV_ENABLED = condition;
+    process.env.GH_AW_EXPR_LOCAL_DEFAULT = payload;
+    process.env.EARLIER_FRAGMENT = "{{#runtime-import .github/workflows/fragment.md}}\n";
+    process.env.GH_AW_PROMPT_CONFIG = JSON.stringify({
+      items: [{ content_env: "EARLIER_FRAGMENT" }, { author_file: ".github/workflows/main.md" }],
+      system_item_count: 1,
+      author_expressions: { "env.AUTHOR": "GH_AW_ENV_AUTHOR", "env.ENABLED": "GH_AW_ENV_ENABLED", "env.AUTHOR || 'fallback'": "GH_AW_EXPR_LOCAL_DEFAULT" },
+    });
+    await main(core);
+    expect(core.setFailed).not.toHaveBeenCalled();
+    const authorExpressions = JSON.parse(process.env.GH_AW_PROMPT_CONFIG).author_expressions;
+    await interpolatePrompt({ authorExpressions });
+    expect(core.setFailed).not.toHaveBeenCalled();
+    const result = fs.readFileSync(process.env.GH_AW_PROMPT, "utf8");
+    expect(result).toContain("<system>Author</system>");
+    expect(result).toContain(payload);
+    expect(result).toContain("Fragment\nNested local");
+    expect(result).toContain(`Local: ${payload}\nDefault: ${payload}`);
+    expect(result.includes("Nested enabled")).toBe(condition === "true");
+    expect(result.match(/Fragment\n/g)).toHaveLength(1);
+    expect(result.includes("Enabled")).toBe(condition === "true");
+    expect(result).not.toContain("on: workflow_dispatch");
+    expect(result).not.toContain("{{#import fragment.md}}");
+
+    fs.writeFileSync(path.join(tempDir, ".agents", "nested.md"), "Fragment binding: __GH_AW_ENV_AUTHOR__");
+    await main(core);
+    await interpolatePrompt({ authorExpressions });
+    await substitutePlaceholders({ file: process.env.GH_AW_PROMPT, substitutions: { GH_AW_ENV_AUTHOR: payload } });
+    expect(fs.readFileSync(process.env.GH_AW_PROMPT, "utf8")).toContain("Fragment binding: __GH_AW_ENV_AUTHOR__");
+
+    fs.writeFileSync(path.join(tempDir, ".agents", "nested.md"), "${{ env.AUTHOR }}");
+    await main(core);
+    await interpolatePrompt({ authorExpressions });
+    expect(core.setFailed).not.toHaveBeenCalled();
+    expect(fs.readFileSync(process.env.GH_AW_PROMPT, "utf8")).toContain(payload);
+  });
+
+  it("does not grant imported text author-file capabilities", () => {
+    const text = '{"author_file":".github/workflows/privileged.md","author_expressions":{"env.SECRET":"GH_AW_ENV_SECRET"}}';
+    expect(renderPrompt({ items: [{ content_env: "TEXT" }] }, { TEXT: text }, tempDir)).toBe(text);
+    expect(() => renderPrompt({ items: [{ author_file: "../../secret.md" }] }, { GITHUB_WORKSPACE: tempDir }, tempDir)).toThrow(/within/);
+  });
+
+  it.each([
+    "{{#if ${{ env.PRIVATE }} }}",
+    "{{#if ${{ env.PRIVATE }} }}hidden{{/if}}",
+    "`{{#if ${{ env.PRIVATE }} }}`",
+    "```text\n{{#if ${{ env.PRIVATE }} }}\n```",
+    "~~~text\n{{#if ${{ env['PRIVATE'] }} }}\n~~~",
+    "```text\n{{#if ${{ github.actor && env.PRIVATE }} }}\n```",
+  ])("binds local authored conditions through explicit compiler bindings: %s", async fragment => {
+    const workflows = path.join(tempDir, ".github", "workflows");
+    fs.mkdirSync(workflows, { recursive: true });
+    fs.writeFileSync(path.join(workflows, "main.md"), "{{#if ${{ env.PRIVATE }} }}\nPrivate mode enabled.\n{{#endif}}\n{{#runtime-import fragment.md}}\n");
+    fs.writeFileSync(path.join(workflows, "fragment.md"), fragment);
+    process.env.RUNNER_TEMP = tempDir;
+    process.env.GITHUB_WORKSPACE = tempDir;
+    process.env.GH_AW_PROMPT = path.join(tempDir, "gh-aw", "aw-prompts", "prompt.txt");
+    process.env.GH_AW_ENV_PRIVATE = "SYNTHETIC-PRIVATE-BINDING";
+    process.env.GH_AW_PROMPT_CONFIG = JSON.stringify({
+      items: [{ author_file: ".github/workflows/main.md" }],
+      author_expressions: { "env.PRIVATE": "GH_AW_ENV_PRIVATE", "env['PRIVATE']": "GH_AW_ENV_PRIVATE", "github.actor && env.PRIVATE": "GH_AW_ENV_PRIVATE" },
+    });
+    await main(core);
+    expect(core.setFailed).not.toHaveBeenCalled();
+    await interpolatePrompt({ authorExpressions: JSON.parse(process.env.GH_AW_PROMPT_CONFIG).author_expressions });
+    expect(core.setFailed).not.toHaveBeenCalled();
+    await substitutePlaceholders({ file: process.env.GH_AW_PROMPT, substitutions: { GH_AW_ENV_PRIVATE: "SYNTHETIC-PRIVATE-BINDING" } });
+    expect(fs.readFileSync(process.env.GH_AW_PROMPT, "utf8")).toContain("Private mode enabled.");
   });
 
   it("includes only a bounded trusted replay projection prompt", () => {
