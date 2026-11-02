@@ -38,25 +38,23 @@ func connectorGatewaySelections(frontmatter map[string]any, registrations map[st
 	if !ok {
 		return nil
 	}
-	raw, exists := gateway["connectors"]
-	if !exists {
-		return nil
+	if _, legacy := gateway["connectors"]; legacy {
+		return errors.New("on.gateway-dispatch.connectors is removed; select imported connectors directly as on.gateway-dispatch.<id>: [trigger]")
 	}
-	if diagnostics := workflowlint.CheckGatewayDispatchLiterals(raw); len(diagnostics) != 0 {
-		return errors.New("on.gateway-dispatch.connectors requires literal connector and trigger names")
+	if diagnostics := workflowlint.CheckGatewayDispatchLiterals(gateway); len(diagnostics) != 0 {
+		return errors.New("on.gateway-dispatch requires literal connector and trigger names")
 	}
-	selected, ok := raw.(map[string]any)
-	if !ok || len(selected) == 0 {
-		return errors.New("on.gateway-dispatch.connectors requires a nonempty connector-to-trigger-list mapping")
-	}
-	for _, alias := range sliceutil.SortedKeys(selected) {
+	for _, alias := range sliceutil.SortedKeys(gateway) {
+		if reservedConnectorGatewayName(alias) {
+			continue
+		}
 		registration, ok := registrations[alias].(map[string]any)
 		if !ok {
 			return fmt.Errorf("gateway connector %q requires an imported declaration", alias)
 		}
-		names, err := webhookStringList(selected[alias])
+		names, err := webhookStringList(gateway[alias])
 		if err != nil || len(names) == 0 {
-			return fmt.Errorf("on.gateway-dispatch.connectors.%s requires a nonempty trigger list", alias)
+			return fmt.Errorf("on.gateway-dispatch.%s requires a nonempty trigger list", alias)
 		}
 		if registration["on"] != nil {
 			return fmt.Errorf("connector %q trigger selection is duplicated", alias)
@@ -64,6 +62,18 @@ func connectorGatewaySelections(frontmatter map[string]any, registrations map[st
 		registration["on"] = names
 	}
 	return nil
+}
+
+func reservedConnectorGatewayName(name string) bool {
+	if isWebhookTrigger(name) {
+		return true
+	}
+	switch name {
+	case "repos", "orgs", "connectors", "security-alerts", "jira-issue", "linear-issue", "azure-devops-issue":
+		return true
+	default:
+		return false
+	}
 }
 
 func normalizeConnectorGatewayOn(frontmatter map[string]any, registrations map[string]any) error {
@@ -74,6 +84,9 @@ func normalizeConnectorGatewayOn(frontmatter map[string]any, registrations map[s
 		}
 		if registration["on"] == nil {
 			continue
+		}
+		if reservedConnectorGatewayName(alias) {
+			return fmt.Errorf("connector %q conflicts with a reserved webhook gateway field; use a different connector id", alias)
 		}
 		names, err := webhookStringList(registration["on"])
 		if err != nil || len(names) == 0 {
@@ -93,8 +106,7 @@ func normalizeConnectorGatewayOn(frontmatter map[string]any, registrations map[s
 		} else {
 			on["gateway-dispatch"] = gateway
 		}
-		selected := connectorMap(gateway, "connectors")
-		selected[alias] = names
+		gateway[alias] = names
 		if err := validateGatewayDispatchExclusive(on); err != nil {
 			return err
 		}

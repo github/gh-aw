@@ -38,7 +38,7 @@ func parseConnectorGateway(t *testing.T, on string, enabled bool) (*Compiler, *W
 
 func TestConnectorGatewayCompilation(t *testing.T) {
 	for _, on := range []string{
-		"on:\n  gateway-dispatch:\n    connectors:\n      tracker: [issue-created]\n",
+		"on:\n  gateway-dispatch:\n    tracker: [issue-created]\n",
 		"on:\n  tracker-issue-created:\n",
 	} {
 		compiler, data, err := parseConnectorGateway(t, on, true)
@@ -66,7 +66,7 @@ func TestConnectorGatewayCompilation(t *testing.T) {
 }
 
 func TestConnectorGatewayStillRequiresTrustedEnrollmentBoundary(t *testing.T) {
-	on := "on:\n  gateway-dispatch:\n    connectors:\n      tracker: [issue-created]\n"
+	on := "on:\n  gateway-dispatch:\n    tracker: [issue-created]\n"
 	_, _, err := parseConnectorGateway(t, on, false)
 	require.ErrorContains(t, err, "gateway-dispatch")
 	for _, invalid := range []string{
@@ -81,8 +81,48 @@ func TestConnectorGatewayStillRequiresTrustedEnrollmentBoundary(t *testing.T) {
 	}
 }
 
+func TestConnectorGatewayFlatSelectionsAndNativeEvents(t *testing.T) {
+	on := "on:\n  gateway-dispatch:\n    tracker: [issue-created]\n    projects-items:\n      project_id: PVT_example\n      types: [edited]\n"
+	_, data, err := parseConnectorGateway(t, on, true)
+	require.NoError(t, err)
+	require.Len(t, data.WebhookSubscriptions, 2)
+	require.Equal(t, "projects_v2_item", data.WebhookSubscriptions[0].Event)
+	require.NotNil(t, data.WebhookSubscriptions[1].Connector)
+}
+
+func TestConnectorGatewayRejectsWrapperAndReservedAliases(t *testing.T) {
+	_, _, err := parseConnectorGateway(t, "on:\n  gateway-dispatch:\n    connectors:\n      tracker: [issue-created]\n", true)
+	require.ErrorContains(t, err, "on.gateway-dispatch.connectors is removed")
+	for _, alias := range []string{"issue", "projects-items", "repos", "orgs", "connectors"} {
+		t.Run(alias, func(t *testing.T) {
+			compiler, root := awConnectorCompiler(t)
+			source := connectorGatewayWorkflow(t, "on:\n  tracker-issue-created:\n")
+			source = strings.Replace(source, "  tracker:\n", "  "+alias+":\n", 1)
+			source = strings.Replace(source, "tracker-issue-created", alias+"-issue-created", 1)
+			_, err := compiler.ParseWorkflowString(source, filepath.Join(root, "reserved.md"))
+			require.ErrorContains(t, err, "reserved webhook gateway field")
+		})
+	}
+}
+
+func TestConnectorGatewayMultipleFlatAliases(t *testing.T) {
+	compiler, root := awConnectorCompiler(t)
+	source := connectorGatewayWorkflow(t, "on:\n  gateway-dispatch:\n    tracker: [issue-created]\n    another: [issue-created]\n")
+	var document map[string]any
+	require.NoError(t, yaml.Unmarshal([]byte(strings.SplitN(source, "---", 3)[1]), &document))
+	registrations := document["connectors"].(map[string]any)
+	registrations["another"] = registrations["tracker"]
+	content, err := yaml.Marshal(document)
+	require.NoError(t, err)
+	compiler.repoConfig, compiler.repoConfigLoaded = &RepoConfig{GatewayDispatch: true}, true
+	data, err := compiler.ParseWorkflowString("---\n"+string(content)+"---\nInspect approved references.\n", filepath.Join(root, "two.md"))
+	require.NoError(t, err)
+	require.Len(t, data.WebhookSubscriptions, 2)
+	require.NotEqual(t, data.WebhookSubscriptions[0].Event, data.WebhookSubscriptions[1].Event)
+}
+
 func TestConnectorGatewayGoToNodeRelay(t *testing.T) {
-	_, data, err := parseConnectorGateway(t, "on:\n  gateway-dispatch:\n    connectors:\n      tracker: [issue-created]\n", true)
+	_, data, err := parseConnectorGateway(t, "on:\n  gateway-dispatch:\n    tracker: [issue-created]\n", true)
 	require.NoError(t, err)
 	payload, err := json.Marshal(data.WebhookSubscriptions)
 	require.NoError(t, err)
@@ -172,7 +212,7 @@ func TestConnectorGatewayImportedProviderSubscriptions(t *testing.T) {
 				triggers = append(triggers, trigger)
 			}
 			consumer, err := yaml.Marshal(map[string]any{
-				"on":     map[string]any{"gateway-dispatch": map[string]any{"connectors": map[string]any{provider: triggers}}},
+				"on":     map[string]any{"gateway-dispatch": map[string]any{provider: triggers}},
 				"engine": "copilot", "permissions": map[string]any{"contents": "read"},
 				"imports": []any{map[string]any{"uses": ".github/workflows/connectors/" + provider + ".md", "with": inputs}},
 			})

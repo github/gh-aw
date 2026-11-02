@@ -82,7 +82,7 @@ secret values. `copilot-requests: write` authorizes inference, not provider writ
 | Writes | Select `safe-outputs.<id>-<operation>` with null, `{}`, or workflow-owned `max`/`staged` options. `max` is an integer from 1 to 100, default 1, enforced before handler execution; failures count but HTTP retries within an invocation do not. Call the generated safe-output tool, never a provider write API from the agent. |
 | Names | Selectors use hyphens; generated effect tools use underscores, such as `notion_add_comment`. Discover actual read-tool names and argument schemas; do not invent a `connector_N_` prefix. |
 | Context | No public configurable connector `context` exists. Retrieve content through selected reads; event references are not hydrated resource bodies. |
-| Triggers | Select `on.gateway-dispatch.connectors.<id>: [trigger]`. Qualified root `<id>-<trigger>` selections lower to the same protected route. Repo opt-in, exact source grants, declared resource origins, App provenance and hash-bound admission are required. Compilation does not deploy or approve a receiver. |
+| Triggers | Select `on.gateway-dispatch.<id>: [trigger]`. Qualified root `<id>-<trigger>` selections lower to the same protected route. Repo opt-in, exact source grants, declared resource origins, App provenance and hash-bound admission are required. Compilation does not deploy or approve a receiver. |
 
 Global or per-operation `staged: true` suppresses connector mutations, write-credential resolution,
 preflights, and creation receipts. It does not suppress selected reads or

@@ -25,7 +25,7 @@ func (c *Compiler) processWebhookTriggers(frontmatter map[string]any, data *Work
 	}
 	nativeOn := any(on)
 	if len(connectorSubscriptions) > 0 {
-		nativeOn, err = withoutConnectorGatewaySelections(on)
+		nativeOn, err = withoutConnectorGatewaySelections(on, data.Connectors)
 		if err != nil {
 			return nil, err
 		}
@@ -56,7 +56,7 @@ func (c *Compiler) processWebhookTriggers(frontmatter map[string]any, data *Work
 	return frontmatter, nil
 }
 
-func withoutConnectorGatewaySelections(on map[string]any) (map[string]any, error) {
+func withoutConnectorGatewaySelections(on map[string]any, connectors map[string]*WorkflowConnector) (map[string]any, error) {
 	if err := validateGatewayDispatchExclusive(on); err != nil {
 		return nil, err
 	}
@@ -66,7 +66,11 @@ func withoutConnectorGatewaySelections(on map[string]any) (map[string]any, error
 	}
 	on = maps.Clone(on)
 	gateway = maps.Clone(gateway)
-	delete(gateway, "connectors")
+	for alias := range connectors {
+		if !reservedConnectorGatewayName(alias) {
+			delete(gateway, alias)
+		}
+	}
 	if len(gateway) == 0 {
 		delete(on, "gateway-dispatch")
 	} else {

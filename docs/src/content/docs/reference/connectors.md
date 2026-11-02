@@ -197,8 +197,7 @@ Select triggers from an imported declaration under the existing gateway route:
 ---
 on:
   gateway-dispatch:
-    connectors:
-      linear: [issue-created, issue-updated]
+    linear: [issue-created, issue-updated]
 permissions:
   contents: read
 engine: copilot
@@ -215,6 +214,8 @@ Use separately selected read tools for details. Event references do not grant wr
 
 The repository must opt in with `{"gateway-dispatch":true}` in
 `.github/workflows/aw.json`. This route is exclusive with all other triggers.
+Connector IDs are direct siblings of existing gateway event fields; they cannot
+shadow reserved names such as `issue`, `projects-items`, `repos`, or `orgs`.
 Qualified root selections such as `on.linear-issue-created` lower to the same
 gateway path; they are not native GitHub Actions listeners.
 

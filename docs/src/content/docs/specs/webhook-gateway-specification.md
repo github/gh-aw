@@ -62,7 +62,7 @@ The following inventory is exhaustive. Other entries in an internal webhook cata
 | `on.gateway-dispatch.label-command` | `label_command` | Selected native GitHub source event with `action: labeled` | Original `label.name` and canonical item HTML URL. The server matches the label exactly and separately authorizes any requested label removal. |
 | GitHub notification triggers below | The corresponding GitHub semantic event | `X-GitHub-Event`, corroborated under the enrolled source profile, and native `action` | Original source resource, event-specific identity, declared filter evidence, and canonical item/comment HTML URL; no original body is forwarded. |
 
-Azure DevOps, Jira, and Linear use the [connector contract](/gh-aw/reference/connectors/). Their former native gateway aliases are removed and MUST be rejected. Imported trigger selections use `on.gateway-dispatch.connectors.<alias>: [trigger-name]`, not a compiler provider catalog.
+Azure DevOps, Jira, and Linear use the [connector contract](/gh-aw/reference/connectors/). Their former native gateway aliases are removed and MUST be rejected. Imported trigger selections use `on.gateway-dispatch.<alias>: [trigger-name]`, not a compiler provider catalog.
 
 ### Imported connector subscriptions
 
