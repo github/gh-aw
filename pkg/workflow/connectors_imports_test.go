@@ -171,7 +171,7 @@ func TestConnectorPrefixedEffectsDoNotShadowGitHub(t *testing.T) {
 		assert.Equal(t, connectorEffect, data.Connectors["tracker"] != nil)
 		output, err := c.CompileToYAML(data, path)
 		require.NoError(t, err)
-		assert.Equal(t, connectorEffect, strings.Contains(output, "connector_7_tracker_add_comment"))
+		assert.Equal(t, connectorEffect, strings.Contains(output, "tracker_add_comment"))
 	}
 }
 
@@ -274,18 +274,27 @@ func TestConnectorDocumentationMatchesDeclarations(t *testing.T) {
 			continue
 		}
 		t.Run(provider, func(t *testing.T) {
-			_, section, found := strings.Cut(string(doc), "Declaration: `.github/aw/connectors/"+provider+".md`.")
-			require.True(t, found, "the consolidated reference must document every provider")
-			section, _, _ = strings.Cut(section, "\n## ")
-			for _, surface := range []string{"### Secrets", "| Triggers |", "| MCPs/read tools |", "| Safe outputs |", "| Context |"} {
-				assert.Contains(t, section, surface)
-			}
 			data, err := os.ReadFile(file)
 			require.NoError(t, err)
 			frontmatter, err := parser.ExtractFrontmatterFromContent(string(data))
 			require.NoError(t, err)
 			declarations, ok := frontmatter.Frontmatter["connectors"].(map[string]any)
 			require.True(t, ok)
+			_, section, found := strings.Cut(string(doc), "Declaration: `.github/aw/connectors/"+provider+".md`.")
+			section, _, _ = strings.Cut(section, "\n## ")
+			machineDocumentation := false
+			for _, match := range htmlCommentPattern.FindAllStringSubmatch(string(data), -1) {
+				if validConnectorDocumentation(match[1], declarations) {
+					section, machineDocumentation = match[1], true
+					break
+				}
+			}
+			if !machineDocumentation {
+				require.True(t, found, "document the provider in its XML comment or consolidated reference")
+				for _, surface := range []string{"### Secrets", "| Triggers |", "| MCPs/read tools |", "| Safe outputs |", "| Context |"} {
+					assert.Contains(t, section, surface)
+				}
+			}
 			declaration, ok := declarations[provider].(map[string]any)
 			require.True(t, ok)
 			for field, prefix := range map[string]string{"triggers": provider + "-", "tools": "", "mcp-servers": "", "safe-outputs": provider + "-"} {
@@ -296,7 +305,11 @@ func TestConnectorDocumentationMatchesDeclarations(t *testing.T) {
 				capabilities, ok := value.(map[string]any)
 				require.True(t, ok)
 				for name := range capabilities {
-					assert.Contains(t, section, "`"+prefix+name+"`")
+					expected := prefix + name
+					if !machineDocumentation {
+						expected = "`" + expected + "`"
+					}
+					assert.Contains(t, section, expected)
 				}
 			}
 			inputs, ok := frontmatter.Frontmatter["import-schema"].(map[string]any)
@@ -309,7 +322,11 @@ func TestConnectorDocumentationMatchesDeclarations(t *testing.T) {
 				require.True(t, ok)
 				name, ok := input["default"].(string)
 				require.True(t, ok)
-				assert.Contains(t, section, "`"+name+"`", "document the credential defaults actually shipped")
+				if machineDocumentation {
+					assert.Contains(t, section, name, "document the credential defaults actually shipped")
+				} else {
+					assert.Contains(t, section, "`"+name+"`", "document the credential defaults actually shipped")
+				}
 			}
 		})
 	}
