@@ -1,0 +1,14 @@
+on: workflow_dispatch
+permissions:
+  contents: read
+connectors:
+  confluence:
+    definition: .github/aw/connectors/confluence.yaml
+    connection: pkg/connectors/testdata/providers/confluence/connection.yaml
+    tools: [get-page]
+    context:
+      runbook:
+        cloud-id: 11111111-2222-4333-8444-555555555555
+        space-id: "123"
+        page-id: "456"
+    safe-outputs: [add-review-comment]
