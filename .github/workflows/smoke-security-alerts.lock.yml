@@ -1383,7 +1383,7 @@ jobs:
       - gateway_provenance
       - push_evals_state
       - safe_outputs
-    if: "${{ needs.gateway_provenance.result == 'success' && needs.gateway_provenance.outputs.verified == 'true' && needs.gateway_admission.result == 'success' && needs.gateway_admission.outputs.verified == 'true' && (always() && (needs.agent.result != 'skipped' || needs.activation.outputs.lockdown_check_failed == 'true' || needs.activation.outputs.oauth_token_check_failed == 'true' || needs.activation.outputs.stale_lock_file_failed == 'true' || needs.activation.outputs.daily_ai_credits_exceeded == 'true' || needs.activation.outputs.daily_ai_credits_guardrail_status == 'structural_error' || needs.activation.outputs.daily_ai_credits_guardrail_status == 'transient_error')) }}"
+    if: "${{ needs.gateway_provenance.result == 'success' && needs.gateway_provenance.outputs.verified == 'true' && needs.gateway_admission.result == 'success' && needs.gateway_admission.outputs.verified == 'true' && (always() && (needs.agent.result != 'skipped' || needs.activation.result == 'failure' || needs.activation.outputs.lockdown_check_failed == 'true' || needs.activation.outputs.oauth_token_check_failed == 'true' || needs.activation.outputs.stale_lock_file_failed == 'true' || needs.activation.outputs.daily_ai_credits_exceeded == 'true' || needs.activation.outputs.daily_ai_credits_guardrail_status == 'structural_error' || needs.activation.outputs.daily_ai_credits_guardrail_status == 'transient_error')) }}"
     runs-on: ubuntu-slim
     # Permissions for the conclusion job (workflow permissions default to none).
     permissions:
@@ -1494,6 +1494,7 @@ jobs:
           GH_AW_ENGINE_MODEL: ${{ needs.agent.outputs.model }}
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
+          GH_AW_ACTIVATION_RESULT: ${{ needs.activation.result }}
           GH_AW_NOOP_REPORT_AS_ISSUE: "true"
           GH_AW_AIC: ${{ needs.agent.outputs.aic }}
           GH_AW_THREAT_DETECTION_AIC: ${{ needs.detection.outputs.aic }}
@@ -1576,6 +1577,7 @@ jobs:
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/smoke-security-alerts.md"
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
+          GH_AW_ACTIVATION_RESULT: ${{ needs.activation.result }}
           GH_AW_WORKFLOW_ID: "smoke-security-alerts"
           GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS: "12"
           GH_AW_ENGINE_ID: "copilot"
