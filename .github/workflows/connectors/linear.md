@@ -1072,9 +1072,21 @@ connectors:
         credential: reader
         tool: get-project
         inputs: &linear-project-inputs
-          organization-id: *linear-read-id
-          team-id: *linear-read-id
-          project-id: *linear-read-id
+          organization-id:
+            type: string
+            required: true
+            maxLength: 36
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          team-id:
+            type: string
+            required: true
+            maxLength: 36
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          project-id:
+            type: string
+            required: true
+            maxLength: 36
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
         resources: &linear-project-resources
           <<: *linear-team-page-resources
           project-id: projects
