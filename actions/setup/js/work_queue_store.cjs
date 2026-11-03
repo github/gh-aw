@@ -14,6 +14,7 @@ const { writeWorkQueueUpdateSummary } = require("./work_queue_summary_renderer.c
 const { queueAuthenticationScope } = require("./work_queue_auth_cache.cjs");
 const { queueGitScope, queueLedgerClient } = require("./work_queue_git_transport.cjs");
 const { expirationView } = require("./work_queue_expiration.cjs");
+const { observeQueueOperation, publicationAttempt, publicationRecovery } = require("./work_queue_telemetry.cjs");
 const {
   appendCommit,
   causalChain,
@@ -118,7 +119,12 @@ async function readRef(githubClient, owner, repo, branch) {
 }
 
 /** @param {QueueReadOptions} options */
-async function readWorkQueueLog({ githubClient, owner, repo, branch = WORK_QUEUE_BRANCH, eventIds, core: coreApi = undefined }) {
+async function readWorkQueueLog(options) {
+  return observeQueueOperation("read", options, () => readWorkQueueLogImpl(options));
+}
+
+/** @param {QueueReadOptions} options */
+async function readWorkQueueLogImpl({ githubClient, owner, repo, branch = WORK_QUEUE_BRANCH, eventIds, core: coreApi = undefined }) {
   log.debug("ledger.read.start");
   validateBranch(branch);
   if (eventIds !== undefined && (!Array.isArray(eventIds) || eventIds.length > 256 || eventIds.some(member => !member || typeof member.work_id !== "string" || typeof member.claim_id !== "string")))
@@ -488,7 +494,11 @@ async function validateCompactionExtension(previous, current, { githubClient, ow
 }
 
 /** Checkpoint validated history against the current Git HEAD and publish by fast-forward CAS. */
-async function compactWorkQueue({ githubClient, owner, repo, context, branch = WORK_QUEUE_BRANCH, maxRetries = DEFAULT_MAX_RETRIES, now = Date.now }) {
+async function compactWorkQueue(options) {
+  return observeQueueOperation("compact", options, () => compactWorkQueueImpl(options));
+}
+
+async function compactWorkQueueImpl({ githubClient, owner, repo, context, branch = WORK_QUEUE_BRANCH, maxRetries = DEFAULT_MAX_RETRIES, now = Date.now }) {
   const actor = actorFromContext(context);
   validateTrustedContext(context, actor);
   if (actor.role !== "administrator" || actor.repository.toLowerCase() !== `${owner}/${repo}`.toLowerCase()) throw queueError("actor_unauthorized", "checkpoint requires an authenticated queue administrator");
@@ -496,6 +506,7 @@ async function compactWorkQueue({ githubClient, owner, repo, context, branch = W
   let lastCandidate;
   let lastBaseSHA;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    publicationAttempt();
     const current = await readWorkQueueLog({ githubClient, owner, repo, branch });
     if (!current.sha) throw queueError("queue_missing", "checkpoint requires an existing queue");
     await validateCompactionExtension(observedPrefix, current.transactions, { githubClient, owner, repo, sha: current.sha, branch }, "queue history was rewritten during checkpoint publication");
@@ -512,6 +523,7 @@ async function compactWorkQueue({ githubClient, owner, repo, context, branch = W
       return { ...current, sha, transactions, state: replayTransactionLog(transactions.map(commit => canonical(commit)).join("\n") + "\n"), publishedNow: true };
     } catch (error) {
       if (!refConflict(error) && !ambiguousWrite(error)) throw error;
+      publicationRecovery(refConflict(error) ? "conflict" : "ambiguous");
       if (attempt === maxRetries) {
         const refreshed = await readWorkQueueLog({ githubClient, owner, repo, branch });
         await validateCompactionExtension(observedPrefix, refreshed.transactions, { githubClient, owner, repo, sha: refreshed.sha, branch }, "queue history was rewritten during checkpoint publication");
@@ -603,7 +615,12 @@ async function prepareEmptyRepository(githubClient, owner, repo, branch) {
  * commitId?: typeof proposedCommitId, sleepFn?: (delay: number) => Promise<void>
  * }} options
  */
-async function publishWorkQueueRequest({
+async function publishWorkQueueRequest(options) {
+  return observeQueueOperation("publish", options, () => publishWorkQueueRequestImpl(options));
+}
+
+/** @param {Parameters<typeof publishWorkQueueRequest>[0]} options */
+async function publishWorkQueueRequestImpl({
   githubClient,
   owner,
   repo,
@@ -639,6 +656,7 @@ async function publishWorkQueueRequest({
   let observedPrefix = [];
   let lastConflict;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    publicationAttempt();
     log.debug("request.publish.attempt", { attempt: attempt + 1 });
     let current = await readWorkQueueLog({ githubClient, owner, repo, branch, core: coreApi });
     validateExtendingPrefix(observedPrefix, current.transactions, "refreshed queue history does not extend the previously validated prefix");
@@ -720,6 +738,7 @@ async function publishWorkQueueRequest({
       log.failure("request.publish.write_failed", error);
       log.debug("request.publish.recovery", { conflict: refConflict(error), ambiguous: ambiguousWrite(error), retry_available: attempt < maxRetries });
       if (!refConflict(error) && !ambiguousWrite(error)) throw new Error("Failed to publish checked work queue request", { cause: error });
+      publicationRecovery(refConflict(error) ? "conflict" : "ambiguous");
       lastConflict = error;
       // A lost response is not permission to choose another request. Refresh
       // before another candidate, and at exhaustion before reporting uncertainty.

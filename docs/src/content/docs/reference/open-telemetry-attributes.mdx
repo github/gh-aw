@@ -311,6 +311,10 @@ These attributes are emitted when experiments are active for a run.
   </tbody>
 </table>
 
+## Work queue attributes
+
+Runtime queue spans use `gh-aw.work_queue.*` for verified queue-state snapshots, backlog age, delivery barriers, logical/native capacity, publication retries, and reconciliation outcomes. See the [queue health attribute inventory](./work-queue/#opentelemetry-queue-health) for field meanings and snapshot freshness rules. These measurements are span attributes, not continuously sampled metrics.
+
 ## Trace files and artifacts
 
 When observability is enabled, trace data is also mirrored to local JSONL files and uploaded in the <code>agent</code> artifact:
