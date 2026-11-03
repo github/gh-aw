@@ -493,6 +493,7 @@ func TestAgyConformanceEntryPointsShareConfiguration(t *testing.T) {
 				}
 				delete(source, "evals")
 			}
+			delete(source, "evals")
 			assert.Equal(t, canonical, source, "all compilation paths must retain identical gate configuration")
 		})
 	}

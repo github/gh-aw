@@ -138,6 +138,17 @@ var KnownBuiltInJobNames = map[string]struct{}{
 	string(UnlockJobName):              {},
 }
 
+// MaintenanceJobDependencies contains generated maintenance jobs and their
+// prerequisite jobs. Maintenance jobs are not built-in customization targets.
+var MaintenanceJobDependencies = map[string]JobName{
+	string(PushRepoMemoryJobName):       AgentJobName,
+	string(UpdateCacheMemoryJobName):    AgentJobName,
+	string(UpdateDriveMemoryJobName):    AgentJobName,
+	string(PushLedgerChangesJobName):    AgentJobName,
+	string(PushEvalsStateJobName):       AgentJobName,
+	string(PushExperimentsStateJobName): ActivationJobName,
+}
+
 // IsCompilerOwnedJobName includes generated maintenance jobs, which are not
 // built-in customization targets. Source-backed checks must distinguish authored
 // jobs from these generated jobs rather than exempting maintenance names alone.
@@ -145,12 +156,8 @@ func IsCompilerOwnedJobName(name string) bool {
 	if _, builtin := KnownBuiltInJobNames[name]; builtin {
 		return true
 	}
-	switch JobName(name) {
-	case PushExperimentsStateJobName, PushEvalsStateJobName, PushRepoMemoryJobName,
-		PushLedgerChangesJobName, UpdateCacheMemoryJobName, UpdateDriveMemoryJobName:
-		return true
-	}
-	return false
+	_, maintenance := MaintenanceJobDependencies[name]
+	return maintenance
 }
 
 // Artifact name constants

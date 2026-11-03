@@ -257,6 +257,8 @@ This guarantee is scoped to the `node` and `python` ecosystems. Engine domain se
 
 To let the agent reach engine domains or the `node`/`python` registries, opt in explicitly with the matching domain set or ecosystem identifier (`copilot`, `node`, `python`, …) in `network.allowed`, or declare the corresponding entry under `runtimes:` for language ecosystems. With `network: {}` or `network: { allowed: [defaults, github] }`, those domains remain blocked.
 
+Runtime selection does not include unrelated telemetry hosts: the `node` ecosystem excludes `telemetry.vercel.com`, and `dotnet` excludes `dc.services.visualstudio.com`. This applies both to ecosystems selected through `runtimes:` and to those listed in `network.allowed`. Recompile existing workflows to apply these updated domain sets to their lock files.
+
 See [`domains.go`](https://github.com/github/gh-aw/blob/main/pkg/workflow/domains.go) for the full lists. `TestEngineDefaultDomainsDoNotOverlapEcosystems` in [`domains_package_registry_test.go`](https://github.com/github/gh-aw/blob/main/pkg/workflow/domains_package_registry_test.go) checks suffix and wildcard overlap against package ecosystems, including Node, Python, Go, Dart, Java, .NET, and Ruby, with only the documented GitHub Packages exception.
 
 ### Firewall Log Level

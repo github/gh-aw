@@ -118,6 +118,36 @@ func TestProcessWorkflowFileWithInfo_RejectsNonConvergingCodemods(t *testing.T) 
 	assert.Equal(t, content, string(unchanged))
 }
 
+func TestRunFixDryRunPreservesNestedWorkflowPath(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "shared", "foo.md")
+	content := `---
+jobs:
+  publish:
+    steps:
+      - uses: actions/create-github-app-token@v3
+---`
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o700))
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+
+	originalStderr := os.Stderr
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	os.Stderr = w
+	t.Cleanup(func() { os.Stderr = originalStderr })
+
+	require.NoError(t, RunFix(FixConfig{
+		WorkflowDir:                dir,
+		SkipInstructionFileUpdates: true,
+	}))
+	require.NoError(t, w.Close())
+	outputBytes, err := io.ReadAll(r)
+	require.NoError(t, err)
+	output := string(outputBytes)
+	assert.Contains(t, output, "gh aw fix shared/foo --write")
+	assert.NotContains(t, output, "gh aw fix foo --write")
+}
+
 func TestProcessWorkflowFileWithInfo_StopsAfterThreePasses(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "workflow.md")
 	content := "---\nstage: 0\n---\nBody\n"
