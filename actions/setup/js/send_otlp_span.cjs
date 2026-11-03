@@ -795,6 +795,9 @@ function selectGraderOutputForJob(jobName, readJSON = readJSONIfExists) {
 function buildEvalTelemetry(evalResults, eventTimeMs, notEvaluated = null) {
   if (notEvaluated) {
     const attributes = [buildAttr("gh-aw.evals.status", notEvaluated.status), buildAttr("gh-aw.evals.reason_code", notEvaluated.reason_code)];
+    if (typeof notEvaluated.model === "string" && notEvaluated.model) {
+      attributes.push(buildAttr("gh-aw.eval.model", notEvaluated.model));
+    }
     return { attributes, events: [{ timeUnixNano: toNanoString(eventTimeMs), name: "eval.status", attributes }] };
   }
   if (!Array.isArray(evalResults)) {

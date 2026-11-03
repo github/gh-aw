@@ -169,7 +169,7 @@ describe("gh-aw OpenTelemetry compatibility contract", () => {
     const originalRead = readFileSyncSpy.getMockImplementation();
     readFileSyncSpy.mockImplementation(filePath => {
       if (filePath === "/tmp/gh-aw/evals_status.json") {
-        return JSON.stringify({ status: "not_evaluated", reason_code: "judge_failed", reason: "sensitive judge failure" });
+        return JSON.stringify({ status: "not_evaluated", reason_code: "judge_failed", reason: "sensitive judge failure", model: "copilot/gpt-6-luna-decisions" });
       }
       return originalRead(filePath);
     });
@@ -178,8 +178,9 @@ describe("gh-aw OpenTelemetry compatibility contract", () => {
 
     for (const payload of [JSON.parse(String(fetchMock.mock.calls[0][1].body)), JSON.parse(String(appendFileSyncSpy.mock.calls[0][1]))]) {
       const span = firstSpan(payload);
-      expect(attrsByKey(span)).toMatchObject({ "gh-aw.evals.status": "not_evaluated", "gh-aw.evals.reason_code": "judge_failed" });
+      expect(attrsByKey(span)).toMatchObject({ "gh-aw.evals.status": "not_evaluated", "gh-aw.evals.reason_code": "judge_failed", "gh-aw.eval.model": "copilot/gpt-6-luna-decisions" });
       expect(span.events.filter(event => event.name === "eval.status")).toHaveLength(1);
+      expect(attrsByKey(span.events.find(event => event.name === "eval.status"))["gh-aw.eval.model"]).toBe("copilot/gpt-6-luna-decisions");
       expect(span.events.some(event => event.name === "eval.result")).toBe(false);
       expect(JSON.stringify(payload)).not.toContain("sensitive");
     }

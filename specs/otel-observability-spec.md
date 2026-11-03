@@ -649,7 +649,9 @@ MUST include `gh-aw.evals.count`, `yes`, `no`, and `unknown` under the
 
 A valid not-evaluated marker MUST instead emit `gh-aw.evals.status =
 not_evaluated` and the bounded `gh-aw.evals.reason_code`, both on the span and
-an `eval.status` event. It MUST NOT fabricate answer records or unknown-answer
+an `eval.status` event. When available, the marker's configured Decisions model
+ID MUST be included as `gh-aw.eval.model` on both the span and status event.
+It MUST NOT fabricate answer records or unknown-answer
 counts. Free-form questions, reasons, and error text MUST NOT be included in
 these result events.
 
