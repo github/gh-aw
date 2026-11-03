@@ -8,8 +8,14 @@ on:
 permissions:
   contents: read
   issues: read
+  copilot-requests: write
 tracker-id: safe-outputs-conformance
-engine: claude
+engine:
+  id: claude
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: balanced
 strict: true
 tools:
   cli-proxy: true
