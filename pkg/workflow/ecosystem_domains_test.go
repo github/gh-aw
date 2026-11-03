@@ -4,8 +4,46 @@ package workflow
 
 import (
 	"slices"
+	"strings"
 	"testing"
 )
+
+func TestEcosystemPriorityCoversAllEcosystems(t *testing.T) {
+	prioritized := make(map[string]struct{}, len(ecosystemPriority))
+	for _, ecosystem := range ecosystemPriority {
+		if _, exists := prioritized[ecosystem]; exists {
+			t.Errorf("ecosystem %q appears more than once in ecosystemPriority", ecosystem)
+		}
+		prioritized[ecosystem] = struct{}{}
+	}
+
+	for ecosystem := range getLoadedDomainSets().Ecosystems {
+		if _, exists := prioritized[ecosystem]; !exists {
+			t.Errorf("ecosystem %q is missing from ecosystemPriority", ecosystem)
+		}
+	}
+	for ecosystem := range compoundEcosystems {
+		if _, exists := prioritized[ecosystem]; !exists {
+			t.Errorf("compound ecosystem %q is missing from ecosystemPriority", ecosystem)
+		}
+	}
+}
+
+func TestRuntimeSelectedEcosystemsExcludeTelemetryDomains(t *testing.T) {
+	for runtime := range runtimeToEcosystem {
+		domains := getDomainsFromRuntimes(map[string]any{runtime: nil})
+		for _, domain := range domains {
+			if strings.Contains(strings.ToLower(domain), "telemetry") {
+				t.Errorf("runtime %q automatically includes telemetry domain %q", runtime, domain)
+			}
+		}
+	}
+
+	dotnetDomains := getDomainsFromRuntimes(map[string]any{"dotnet": nil})
+	if slices.Contains(dotnetDomains, "dc.services.visualstudio.com") {
+		t.Error("dotnet runtime automatically includes dc.services.visualstudio.com")
+	}
+}
 
 func TestEcosystemDomainExpansion(t *testing.T) {
 	t.Run("defaults ecosystem includes basic infrastructure", func(t *testing.T) {
