@@ -16,9 +16,12 @@ const message = (index, dependencies, type = "add_comment") => ({
 
 describe("safe-output runtime dependencies", () => {
   beforeEach(() => {
-    vi.stubEnv("GH_AW_DETECTION_CONCLUSION", "");
+    vi.stubEnv("GH_AW_DETECTION_CONCLUSION", "success");
     vi.stubEnv("GH_AW_DETECTION_REASON", "");
-    vi.stubEnv("GH_AW_RUN_DETECTION", "");
+    vi.stubEnv("GH_AW_RUN_DETECTION", "false");
+    vi.stubEnv("GH_AW_WORK_QUEUE_ENABLED", "false");
+    vi.stubEnv("GH_AW_SAFE_OUTPUTS_STAGED", "false");
+    vi.stubEnv("GH_AW_SAFE_OUTPUT_JOBS", "");
     global.core = { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), error: vi.fn(), setOutput: vi.fn() };
   });
   afterEach(() => {
