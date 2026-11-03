@@ -1841,6 +1841,7 @@ safe-outputs:
 | `mcp_policy_error` | MCP server policy violations |
 | `ai_credits_rate_limit_error` | AI credits rate limit exceeded |
 | `max_ai_credits_exceeded` | Maximum AI credits budget exceeded |
+| `activation_failed` | Activation job failed before the agent started, without a named guardrail failure |
 | `cache_miss_misconfiguration` | Cache configuration errors |
 | `code_push_failures` | Failures pushing code to branches |
 | `assignment_errors` | Failures assigning issues or reviewers |

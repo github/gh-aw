@@ -128,6 +128,7 @@ func (c *Compiler) buildConclusionNoOpStep(data *WorkflowData, mainJobName strin
 	envVars = append(envVars, buildEngineMetadataEnvVars(data.EngineConfig, data.Model)...)
 	envVars = append(envVars, "          GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n")
 	envVars = append(envVars, fmt.Sprintf("          GH_AW_AGENT_CONCLUSION: ${{ needs.%s.result }}\n", mainJobName))
+	envVars = append(envVars, "          GH_AW_ACTIVATION_RESULT: ${{ needs.activation.result }}\n")
 	envVars = append(envVars, buildTemplatableBoolEnvVar("GH_AW_NOOP_REPORT_AS_ISSUE", data.SafeOutputs.NoOp.ReportAsIssue)...)
 	if data.SafeOutputs.NoOp.ReportAsIssue == nil {
 		envVars = append(envVars, "          GH_AW_NOOP_REPORT_AS_ISSUE: \"true\"\n")
@@ -273,6 +274,7 @@ func (c *Compiler) buildAgentFailureCoreVars(data *WorkflowData, mainJobName str
 	envVars = append(envVars, buildWorkflowMetadataEnvVarsWithTrackerID(data.Name, data.Source, data.TrackerID, buildLocalWorkflowSourceURL(c.markdownPath))...)
 	envVars = append(envVars, "          GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n")
 	envVars = append(envVars, fmt.Sprintf("          GH_AW_AGENT_CONCLUSION: ${{ needs.%s.result }}\n", mainJobName))
+	envVars = append(envVars, "          GH_AW_ACTIVATION_RESULT: ${{ needs.activation.result }}\n")
 	envVars = append(envVars, buildDynamicCheckoutFailureEnv(data, mainJobName)...)
 	envVars = append(envVars, fmt.Sprintf("          GH_AW_WORKFLOW_ID: %q\n", data.WorkflowID))
 	envVars = append(envVars, buildModelRoutingOutputEnvVars(data.EngineConfig, mainJobName)...)
@@ -556,6 +558,7 @@ func (c *Compiler) buildConclusionScriptEnvVars(data *WorkflowData, mainJobName 
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_TRACKER_ID: %q\n", data.TrackerID))
 	}
 	envVars = append(envVars, fmt.Sprintf("          GH_AW_AGENT_CONCLUSION: ${{ needs.%s.result }}\n", mainJobName))
+	envVars = append(envVars, "          GH_AW_ACTIVATION_RESULT: ${{ needs.activation.result }}\n")
 	envVars = append(envVars, buildModelRoutingOutputEnvVars(data.EngineConfig, mainJobName)...)
 	if data.SafeOutputs.NoOp != nil {
 		envVars = append(envVars, "          GH_AW_NOOP_COMMENT_BODY: ${{ steps.noop.outputs.noop_comment_body }}\n")
@@ -595,10 +598,11 @@ func (c *Compiler) buildConclusionJobCondition(data *WorkflowData, mainJobName s
 	}
 	// Build the condition for this job:
 	// 1. always() - run even if agent fails
-	// 2. agent was activated (not skipped) OR an activation guardrail failed
+	// 2. agent was activated (not skipped) OR activation failed
 	// 3. IF comment_id exists: add_comment job either doesn't exist OR hasn't created a comment yet
 	alwaysFunc := BuildFunctionCall("always")
 	agentNotSkipped := BuildNotEquals(BuildPropertyAccess(fmt.Sprintf("needs.%s.result", mainJobName)), BuildStringLiteral("skipped"))
+	activationFailed := BuildEquals(BuildPropertyAccess(fmt.Sprintf("needs.%s.result", constants.ActivationJobName)), BuildStringLiteral("failure"))
 	lockdownCheckFailed := BuildEquals(BuildPropertyAccess(fmt.Sprintf("needs.%s.outputs.lockdown_check_failed", constants.ActivationJobName)), BuildStringLiteral("true"))
 	oauthTokenCheckFailed := BuildEquals(BuildPropertyAccess(fmt.Sprintf("needs.%s.outputs.oauth_token_check_failed", constants.ActivationJobName)), BuildStringLiteral("true"))
 	var oauthOrStaleCheckFailed ConditionNode = oauthTokenCheckFailed
@@ -606,7 +610,7 @@ func (c *Compiler) buildConclusionJobCondition(data *WorkflowData, mainJobName s
 		staleLockFileFailed := BuildEquals(BuildPropertyAccess(fmt.Sprintf("needs.%s.outputs.stale_lock_file_failed", constants.ActivationJobName)), BuildStringLiteral("true"))
 		oauthOrStaleCheckFailed = BuildOr(oauthTokenCheckFailed, staleLockFileFailed)
 	}
-	activationGuardrailsFailed := BuildOr(lockdownCheckFailed, oauthOrStaleCheckFailed)
+	activationGuardrailsFailed := BuildOr(activationFailed, BuildOr(lockdownCheckFailed, oauthOrStaleCheckFailed))
 	// Only reference the secret_verification_result output when the activation job
 	// actually declares it. The output is emitted only when the engine or safe outputs
 	// require a secret validation step (see addActivationSecretValidationStep); referencing it
