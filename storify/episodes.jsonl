@@ -80,3 +80,6 @@
 {"date":"2026-11-02","episode":"Publication after agent work","outcome":"stalled","confidence":"high for failed steps; cause unknown","runs":[41384361790,41407484295,41394170937,41402196393,41402208964]}
 {"date":"2026-11-02","episode":"Review-driven safe-output repair","outcome":"active; production effect unverified","confidence":"medium","runs":[41390149166],"prs":[73672]}
 {"date":"2026-11-02","episode":"Runtime checks","outcome":"unresolved","confidence":"medium","runs":[41401497789,41390146259]}
+{"date":"2026-11-03","title":"Claude-on-Copilot smoke recovery","workflows":["Smoke Claude on Copilot","agent-job-health"],"runs":[41530389467,41543214962,41551356584],"prs":[74242],"outcome":"improved in observed smoke runs","confidence":"high"}
+{"date":"2026-11-03","title":"Sous Chef eligibility repair and PR Finisher chain","workflows":["PR Sous Chef","PR Finisher"],"runs":[41530920831,41553632623,41597769276],"prs":[74303],"outcome":"mostly improved, residual failures","confidence":"moderate"}
+{"date":"2026-11-03","title":"Publication and docs build boundaries","workflows":["ESLint Refiner","Smoke Project","Visual Regression Checker"],"runs":[41573215900,41589389911],"outcome":"unresolved","confidence":"moderate"}

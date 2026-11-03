@@ -1,33 +1,28 @@
 {
-  "last_run_date": "2026-11-02",
+  "last_run_date": "2026-11-03",
   "last_window": {
-    "start": "2026-11-01T07:57:15Z",
-    "end": "2026-11-02T07:57:15Z"
+    "start": "2026-11-02T07:52:51Z",
+    "end": "2026-11-03T07:52:51Z"
   },
   "observed_window": {
-    "coverage": "Partial: saved metadata begins 2026-11-01 19:46:59 UTC; detailed failure synthesis covers 2026-11-02 03:37:59 to 07:52:52 UTC; continuation did not complete",
+    "coverage": "Partial: saved runs span 2026-11-02T21:33:49Z to 2026-11-03T07:52:51Z; continuation to earlier period timed out",
     "representative_audits": [
-      41384361790,
-      41402196393,
-      41390149166,
-      41401497789,
-      41402208964,
-      41407484295
+      41530389467,
+      41543214962,
+      41530920831,
+      41553632623,
+      41573215900,
+      41589389911
     ]
   },
   "key_themes": [
-    "Publication-boundary failures recurred in PR Sous Chef, ESLint Miner and Daily Container Image Security Scan",
-    "Human review drove further commits on open PR 73672",
-    "Runtime and publisher failures had distinct boundaries"
+    "Claude-on-Copilot smoke recovered after PR 74242",
+    "Sous Chef success predominated after PR 74303, with residual failures",
+    "Safe-output publication and visual documentation build failures remain"
   ],
   "carry_forward_questions": [
-    "Do the three Process Safe Outputs workflows recover on main?",
-    "Does PR 73672 merge and pass post-merge validation?",
-    "Do asset upload and essential issue publisher failures recur?"
-  ],
-  "representative_runs": [
-    41384361790,
-    41407484295,
-    41390149166
+    "Do Sous Chef late failures persist or resolve?",
+    "Do ESLint Refiner and Smoke Project safe-output processing recover?",
+    "Does Visual Regression Checker documentation build recover on connector PR?"
   ]
 }
