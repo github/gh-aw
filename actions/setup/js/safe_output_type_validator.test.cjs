@@ -337,7 +337,7 @@ describe("safe_output_type_validator", () => {
       expect(validateItem({ type: "add_comment", body: "A completed update.", output_id: "aw_issue1" }, "add_comment", 1).isValid).toBe(false);
     });
 
-    it.each(["upload_asset", "noop"])("rejects dependencies on standalone %s requests during ingestion", async type => {
+    it.each(["upload_asset", "noop", "call_workflow", "push_repo_memory", "report_incomplete", "report_missing_tool"])("rejects dependencies on standalone %s requests during ingestion", async type => {
       const { validateItem } = await import("./safe_output_type_validator.cjs");
       const result = validateItem({ type, "depends-on": "so_AAAAAAAAAAAA" }, type, 1);
       expect(result.isValid).toBe(false);

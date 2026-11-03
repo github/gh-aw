@@ -1516,36 +1516,114 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
     core.info(`\n=== Retrying Deferred Messages ===`);
     core.info(`Found ${deferredMessages.length} deferred message(s) to retry`);
 
-    for (const deferred of deferredMessages) {
-      try {
-        core.info(`Retrying message ${deferred.messageIndex + 1}/${messages.length}: ${deferred.type}`);
+    let pending = [...deferredMessages];
+    for (let round = 0; pending.length > 0 && round <= messages.length; round++) {
+      const roundStartTemporaryIdCount = temporaryIdMap.size;
+      const attempted = new Set(pending.map(deferred => deferred.messageIndex));
+      const stillDeferred = [];
+      for (const deferred of pending) {
+        try {
+          core.info(`Retrying message ${deferred.messageIndex + 1}/${messages.length}: ${deferred.type}`);
 
-        // Convert Map to plain object for handler
-        const resolvedTemporaryIds = Object.fromEntries(temporaryIdMap);
+          // Convert Map to plain object for handler
+          const resolvedTemporaryIds = Object.fromEntries(temporaryIdMap);
 
-        // Record the temp ID map size before processing to detect new IDs
-        const tempIdMapSizeBefore = temporaryIdMap.size;
+          // Record the temp ID map size before processing to detect new IDs
+          const tempIdMapSizeBefore = temporaryIdMap.size;
 
-        // Call the handler again with updated temp ID map
-        await assertClaimAuthorized(deferred.message);
-        const stalePRReason = await getStalePullRequestReason(global.github, global.context);
-        const result = stalePRReason ? { skipped: true, reason: stalePRReason } : recordMergeDecision(deferred.type, await deferred.handler(deferred.message, resolvedTemporaryIds, temporaryIdMap), deferred.messageIndex);
+          // Call the handler again with updated temp ID map
+          await assertClaimAuthorized(deferred.message);
+          const stalePRReason = await getStalePullRequestReason(global.github, global.context);
+          const result = stalePRReason ? { skipped: true, reason: stalePRReason } : recordMergeDecision(deferred.type, await deferred.handler(deferred.message, resolvedTemporaryIds, temporaryIdMap), deferred.messageIndex);
 
-        if (result && result.skipped === true && !result.deferred) {
-          const msg = result.reason || result.warning || result.error || "Handler returned skipped: true";
-          core.info(`⏭ Retry of message ${deferred.messageIndex + 1} (${deferred.type}) skipped — ${msg}`);
-          const resultIndex = results.findIndex(r => r.messageIndex === deferred.messageIndex);
-          if (resultIndex >= 0) {
-            results[resultIndex] = buildSkippedResult(deferred.type, deferred.messageIndex, result);
+          if (result && result.skipped === true && !result.deferred) {
+            const msg = result.reason || result.warning || result.error || "Handler returned skipped: true";
+            core.info(`⏭ Retry of message ${deferred.messageIndex + 1} (${deferred.type}) skipped — ${msg}`);
+            const resultIndex = results.findIndex(r => r.messageIndex === deferred.messageIndex);
+            if (resultIndex >= 0) {
+              results[resultIndex] = buildSkippedResult(deferred.type, deferred.messageIndex, result);
+            }
+            continue;
           }
-          continue;
-        }
 
-        // Check if the handler explicitly returned a failure
-        if (result && result.success === false && !result.deferred) {
-          const errorMsg = result.error || "Handler returned success: false";
+          // Check if the handler explicitly returned a failure
+          if (result && result.success === false && !result.deferred) {
+            const errorMsg = result.error || "Handler returned success: false";
+            core.error(`✗ Retry of message ${deferred.messageIndex + 1} (${deferred.type}) failed: ${errorMsg}`);
+            // Replace the deferred record so terminal retry failures classify as failed.
+            const resultIndex = results.findIndex(r => r.messageIndex === deferred.messageIndex);
+            if (resultIndex >= 0) {
+              results[resultIndex] = {
+                type: deferred.type,
+                messageIndex: deferred.messageIndex,
+                success: false,
+                deferred: false,
+                error: errorMsg,
+                result: deferred.type === "merge_pull_request" ? projectMergeFailure(result) : { ...result, success: false, deferred: false, error: errorMsg },
+              };
+            }
+            continue;
+          }
+
+          // Check if still deferred
+          if (result && result.deferred === true) {
+            core.warning(`⏸ Message ${deferred.messageIndex + 1} (${deferred.type}) still deferred - some temporary IDs remain unresolved`);
+            // Update the existing result entry
+            const resultIndex = results.findIndex(r => r.messageIndex === deferred.messageIndex);
+            if (resultIndex >= 0) {
+              results[resultIndex].result = result;
+            }
+            stillDeferred.push(deferred);
+          } else {
+            core.info(`✓ Message ${deferred.messageIndex + 1} (${deferred.type}) completed on retry`);
+
+            // If handler returned a temp ID mapping, add it to our map
+            // This ensures that sub-issues created during deferred retry have their temporary IDs
+            // registered so parent issues can reference them in synthetic updates
+            if (result && result.temporaryId && result.repo && result.number) {
+              const normalizedTempId = normalizeTemporaryId(result.temporaryId);
+              temporaryIdMap.set(normalizedTempId, {
+                repo: result.repo,
+                number: result.number,
+              });
+              core.info(`Registered temporary ID: ${result.temporaryId} -> ${result.repo}#${result.number}`);
+            }
+
+            // Check if this output was created with unresolved temporary IDs
+            // For create_issue, create_discussion - check if body has unresolved IDs
+            // This enables synthetic updates to resolve references after all items are created
+            if (result && result.number && result.repo) {
+              const contentToCheck = getContentToCheck(deferred.type, deferred.message, result);
+              if (contentToCheck && hasUnresolvedTemporaryIds(contentToCheck, temporaryIdMap, artifactUrlMap)) {
+                core.info(`Output ${result.repo}#${result.number} was created with unresolved temporary IDs - tracking for update`);
+                outputsWithUnresolvedIds.push({
+                  type: deferred.type,
+                  message: deferred.message,
+                  result: result,
+                  originalTempIdMapSize: tempIdMapSizeBefore,
+                });
+              }
+              if (result && result.temporaryId && result.temporaryIdEntry) {
+                const normalizedTempId = normalizeTemporaryId(result.temporaryId);
+                temporaryIdMap.set(normalizedTempId, result.temporaryIdEntry);
+              }
+            }
+
+            // Update the result to success
+            const resultIndex = results.findIndex(r => r.messageIndex === deferred.messageIndex);
+            if (resultIndex >= 0) {
+              results[resultIndex].success = true;
+              results[resultIndex].deferred = false;
+              results[resultIndex].result = result;
+            }
+
+            // Log to manifest after deferred retry success
+            logCreatedItemFromResult(onItemCreated, deferred.type, result);
+          }
+        } catch (error) {
+          const errorMsg = getErrorMessage(error);
           core.error(`✗ Retry of message ${deferred.messageIndex + 1} (${deferred.type}) failed: ${errorMsg}`);
-          // Replace the deferred record so terminal retry failures classify as failed.
+          // Replace the deferred record so terminal retry exceptions classify as failed.
           const resultIndex = results.findIndex(r => r.messageIndex === deferred.messageIndex);
           if (resultIndex >= 0) {
             results[resultIndex] = {
@@ -1554,86 +1632,26 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
               success: false,
               deferred: false,
               error: errorMsg,
-              result: deferred.type === "merge_pull_request" ? projectMergeFailure(result) : { ...result, success: false, deferred: false, error: errorMsg },
+              result: { success: false, deferred: false, error: errorMsg },
             };
           }
-          continue;
+        } finally {
+          await drainWaitingMessages();
         }
-
-        // Check if still deferred
-        if (result && result.deferred === true) {
-          core.warning(`⏸ Message ${deferred.messageIndex + 1} (${deferred.type}) still deferred - some temporary IDs remain unresolved`);
-          // Update the existing result entry
-          const resultIndex = results.findIndex(r => r.messageIndex === deferred.messageIndex);
-          if (resultIndex >= 0) {
-            results[resultIndex].result = result;
-          }
-        } else {
-          core.info(`✓ Message ${deferred.messageIndex + 1} (${deferred.type}) completed on retry`);
-
-          // If handler returned a temp ID mapping, add it to our map
-          // This ensures that sub-issues created during deferred retry have their temporary IDs
-          // registered so parent issues can reference them in synthetic updates
-          if (result && result.temporaryId && result.repo && result.number) {
-            const normalizedTempId = normalizeTemporaryId(result.temporaryId);
-            temporaryIdMap.set(normalizedTempId, {
-              repo: result.repo,
-              number: result.number,
-            });
-            core.info(`Registered temporary ID: ${result.temporaryId} -> ${result.repo}#${result.number}`);
-          }
-
-          // Check if this output was created with unresolved temporary IDs
-          // For create_issue, create_discussion - check if body has unresolved IDs
-          // This enables synthetic updates to resolve references after all items are created
-          if (result && result.number && result.repo) {
-            const contentToCheck = getContentToCheck(deferred.type, deferred.message, result);
-            if (contentToCheck && hasUnresolvedTemporaryIds(contentToCheck, temporaryIdMap, artifactUrlMap)) {
-              core.info(`Output ${result.repo}#${result.number} was created with unresolved temporary IDs - tracking for update`);
-              outputsWithUnresolvedIds.push({
-                type: deferred.type,
-                message: deferred.message,
-                result: result,
-                originalTempIdMapSize: tempIdMapSizeBefore,
-              });
-            }
-            if (result && result.temporaryId && result.temporaryIdEntry) {
-              const normalizedTempId = normalizeTemporaryId(result.temporaryId);
-              temporaryIdMap.set(normalizedTempId, result.temporaryIdEntry);
-            }
-          }
-
-          // Update the result to success
-          const resultIndex = results.findIndex(r => r.messageIndex === deferred.messageIndex);
-          if (resultIndex >= 0) {
-            results[resultIndex].success = true;
-            results[resultIndex].deferred = false;
-            results[resultIndex].result = result;
-          }
-
-          // Log to manifest after deferred retry success
-          logCreatedItemFromResult(onItemCreated, deferred.type, result);
-        }
-      } catch (error) {
-        const errorMsg = getErrorMessage(error);
-        core.error(`✗ Retry of message ${deferred.messageIndex + 1} (${deferred.type}) failed: ${errorMsg}`);
-        // Replace the deferred record so terminal retry exceptions classify as failed.
-        const resultIndex = results.findIndex(r => r.messageIndex === deferred.messageIndex);
-        if (resultIndex >= 0) {
-          results[resultIndex] = {
-            type: deferred.type,
-            messageIndex: deferred.messageIndex,
-            success: false,
-            deferred: false,
-            error: errorMsg,
-            result: { success: false, deferred: false, error: errorMsg },
-          };
-        }
-      } finally {
-        // Release newly ready producers before the next legacy temporary-ID
-        // retry; it may need an ID created by a previously waiting output.
-        await drainWaitingMessages();
       }
+
+      const waitingIndexes = new Set(stillDeferred.map(deferred => deferred.messageIndex));
+      let newlyDeferred = false;
+      for (const deferred of deferredMessages) {
+        const result = results.find(item => item.messageIndex === deferred.messageIndex);
+        if (result?.deferred && !attempted.has(deferred.messageIndex) && !waitingIndexes.has(deferred.messageIndex)) {
+          stillDeferred.push(deferred);
+          waitingIndexes.add(deferred.messageIndex);
+          newlyDeferred = true;
+        }
+      }
+      if (temporaryIdMap.size === roundStartTemporaryIdCount && !newlyDeferred) break;
+      pending = stillDeferred;
     }
   }
 

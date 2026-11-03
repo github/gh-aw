@@ -5,7 +5,22 @@ const { randomUUID } = require("node:crypto");
 
 const OUTPUT_ID_PATTERN = "^so_[A-Za-z0-9_-]{12}$";
 const outputIdRegex = new RegExp(OUTPUT_ID_PATTERN);
-const DELEGATED_TYPES = new Set(["upload_asset", "noop"]);
+const DEPENDENCY_UNSUPPORTED_TYPES = new Set(["upload_asset", "noop", "call_workflow", "push_repo_memory", "report_incomplete", "report_missing_tool", "report_missing_data"]);
+const DELEGATED_EFFECT_TYPES = new Set([...DEPENDENCY_UNSUPPORTED_TYPES, "upload_code_coverage"]);
+
+/**
+ * @param {string|undefined} type
+ */
+function isDependencyUnsupportedType(type) {
+  return typeof type === "string" && DEPENDENCY_UNSUPPORTED_TYPES.has(type.replace(/-/g, "_").toLowerCase());
+}
+
+/**
+ * @param {string|undefined} type
+ */
+function isDependencyDelegatedType(type) {
+  return typeof type === "string" && DELEGATED_EFFECT_TYPES.has(type.replace(/-/g, "_").toLowerCase());
+}
 
 /**
  * Validate metadata again when reading the untrusted JSONL artifact.
@@ -32,7 +47,7 @@ function validateSubmissionMetadata(input) {
 function addDependencySchema(tool) {
   tool.inputSchema ||= { type: "object" };
   tool.inputSchema.properties ||= {};
-  tool.inputSchema.properties["depends-on"] = {
+  const dependencySchema = {
     description: "One output_id, or a nonempty array of output_id values returned by earlier safe-output calls. Execute only after every prerequisite succeeds; otherwise this output fails. These are not temporary resource IDs.",
     "x-synonyms": ["depends_on"],
     oneOf: [
@@ -40,6 +55,16 @@ function addDependencySchema(tool) {
       { type: "array", minItems: 1, uniqueItems: true, items: { type: "string", pattern: OUTPUT_ID_PATTERN } },
     ],
   };
+  const properties = tool.inputSchema.properties;
+  for (const reservedName of ["depends_on", "output_id"]) {
+    if (Object.hasOwn(properties, reservedName)) {
+      throw new TypeError(`Safe-output tool '${tool.name}' declares reserved input '${reservedName}'.`);
+    }
+  }
+  if (Object.hasOwn(properties, "depends-on") && JSON.stringify(properties["depends-on"]) !== JSON.stringify(dependencySchema)) {
+    throw new TypeError(`Safe-output tool '${tool.name}' declares reserved input 'depends-on'.`);
+  }
+  properties["depends-on"] = dependencySchema;
 }
 
 /**
@@ -93,7 +118,7 @@ function createSubmissionTracker() {
   function append(entry, write) {
     const submission = submissions.getStore();
     const dependency = submission?.dependency ?? entry["depends-on"] ?? entry.depends_on;
-    if (dependency !== undefined && DELEGATED_TYPES.has(entry.type)) {
+    if (dependency !== undefined && isDependencyUnsupportedType(entry.type)) {
       throw new Error(`depends-on is not supported for ${entry.type}, which executes outside the safe-output handler manager.`);
     }
     const outputId = `so_${Buffer.from(randomUUID().replace(/-/g, ""), "hex").toString("base64url").slice(0, 12)}`;
@@ -107,4 +132,4 @@ function createSubmissionTracker() {
   return { wrap, append };
 }
 
-module.exports = { addDependencySchema, createSubmissionTracker, validateSubmissionMetadata };
+module.exports = { addDependencySchema, createSubmissionTracker, isDependencyDelegatedType, isDependencyUnsupportedType, validateSubmissionMetadata };

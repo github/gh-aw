@@ -516,6 +516,16 @@ describe("collect_ndjson_output.cjs", () => {
       expect(output.items.some(item => item.type === "deploy")).toBe(false);
       expect(output.errors.join("\n")).toContain("depends-on");
     }),
+    it.each(["report_incomplete", "report_missing_tool", "report_missing_data"])("rejects dependencies for out-of-band %s during ingestion", async type => {
+      const testFile = "/tmp/gh-aw/test-ndjson-output.txt";
+      fs.writeFileSync(testFile, JSON.stringify({ type, "depends-on": "so_BBBBBBBBBBBB" }));
+      process.env.GH_AW_SAFE_OUTPUTS = testFile;
+      fs.writeFileSync("/tmp/gh-aw/safeoutputs/config.json", JSON.stringify({ [type]: { max: 1 } }));
+      await eval(`(async () => { ${collectScript}; await main(); })()`);
+      const output = JSON.parse(fs.readFileSync("/tmp/gh-aw/agent_output.json", "utf8"));
+      expect(output.items.some(item => item["depends-on"] === "so_BBBBBBBBBBBB")).toBe(false);
+      expect(output.errors.join("\n")).toContain("depends-on is not supported");
+    }),
     it("should preserve Slack mrkdwn links in custom safe-job string inputs", async () => {
       const testFile = "/tmp/gh-aw/test-ndjson-output.txt";
       const slackText = "Tracking issue: <https://github.com/octo-org/octo-repo/issues/123|Build failure — Build github/gh-aw#456>";

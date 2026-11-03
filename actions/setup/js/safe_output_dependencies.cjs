@@ -2,6 +2,7 @@
 
 const { classifySafeOutputResult, pickOutcomeField } = require("./safe_outputs_status.cjs");
 const { getCreatedTemporaryId, extractTemporaryIdReferences } = require("./temporary_id.cjs");
+const { isDependencyDelegatedType } = require("./safe_output_submission.cjs");
 
 const OUTPUT_ID_PATTERN = /^so_[A-Za-z0-9_-]{12}$/;
 
@@ -89,12 +90,27 @@ function buildSafeOutputDependencyPlan(messages) {
   }
   const cyclic = order.length !== messages.length;
   const visited = new Set(order);
-  messages.forEach((message, index) => {
-    if (!visited.has(index)) {
-      // Preserve the legacy cycle fallback only for messages without explicit edges.
-      if (message["depends-on"] !== undefined || message.depends_on !== undefined) invalid.set(index, "Cyclic safe-output dependency");
-      order.push(index);
+  if (cyclic) {
+    function hasPath(start, target) {
+      const pending = [start];
+      const reached = new Set();
+      while (pending.length > 0) {
+        const current = pending.pop();
+        if (current === target) return true;
+        if (reached.has(current)) continue;
+        reached.add(current);
+        pending.push(...ordering[current]);
+      }
+      return false;
     }
+    prerequisites.forEach((dependencies, index) => {
+      if ([...dependencies].some(prerequisite => hasPath(prerequisite, index))) {
+        invalid.set(index, "Cyclic safe-output dependency");
+      }
+    });
+  }
+  messages.forEach((_, index) => {
+    if (!visited.has(index)) order.push(index);
   });
   return { order, prerequisites, invalid, cyclic };
 }
@@ -106,6 +122,7 @@ function buildSafeOutputDependencyPlan(messages) {
  * @param {any} record
  */
 function isConfirmedDependencySuccess(record) {
+  if (isDependencyDelegatedType(record?.type)) return false;
   if (process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true") return false;
   if (!record || record.success !== true || classifySafeOutputResult(record) !== "success") return false;
   if (pickOutcomeField(record, "staged") || pickOutcomeField(record, "queued") || pickOutcomeField(record, "buffered") || pickOutcomeField(record, "deferred_manifest")) return false;

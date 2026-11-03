@@ -19,7 +19,7 @@ const { isBlankOptionalField, normalizeBlankOptionalFields } = require("./option
 const { normalizeSafeOutputName, normalizeSafeOutputConfig } = require("./safe_output_names.cjs");
 const { parseReportMarkdown } = require("./report_markdown.cjs");
 const { renderReport } = require("./report_ast.cjs");
-const { validateSubmissionMetadata } = require("./safe_output_submission.cjs");
+const { isDependencyUnsupportedType, validateSubmissionMetadata } = require("./safe_output_submission.cjs");
 
 /**
  * Default max body length for GitHub content
@@ -781,7 +781,7 @@ function validateItem(item, itemType, lineNum, options) {
   const metadataError = validateSubmissionMetadata(item);
   if (metadataError) return { isValid: false, error: `Line ${lineNum}: ${metadataError}` };
   itemType = normalizeSafeOutputName(itemType);
-  if ((item["depends-on"] !== undefined || item.depends_on !== undefined) && ["upload_asset", "noop"].includes(itemType)) {
+  if ((item["depends-on"] !== undefined || item.depends_on !== undefined) && isDependencyUnsupportedType(itemType)) {
     return { isValid: false, error: `Line ${lineNum}: depends-on is not supported for ${itemType}, which executes outside the safe-output handler manager.` };
   }
   const validationConfig = loadValidationConfig();

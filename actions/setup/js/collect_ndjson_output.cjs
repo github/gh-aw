@@ -12,7 +12,7 @@ const { parseIntTemplatable } = require("./templatable.cjs");
 const { isProbingNoopMessage } = require("./intent_probe.cjs");
 const { buildEmptyOutputOutcome, collectOutcomeSession, hasFailedFinalResult } = require("./empty_output_outcome.cjs");
 const { normalizeSafeOutputName, normalizeSafeOutputConfig } = require("./safe_output_names.cjs");
-const { validateSubmissionMetadata } = require("./safe_output_submission.cjs");
+const { isDependencyUnsupportedType, validateSubmissionMetadata } = require("./safe_output_submission.cjs");
 
 const MENTION_AWARE_OUTPUT_TYPES = new Set(["add_comment", "close_discussion", "create_discussion", "create_issue", "create_pull_request", "create_pull_request_review_comment", "reply_to_pull_request_review_comment"]);
 
@@ -292,6 +292,10 @@ async function main() {
         if (!expectedOutputTypes[itemType]) {
           core.warning(`[INGESTION] Line ${i + 1}: Type '${itemType}' not found in expected types: ${JSON.stringify(Object.keys(expectedOutputTypes))}`);
           rejectItem(`Line ${i + 1}: Unexpected output type '${itemType}'. Expected one of: ${Object.keys(expectedOutputTypes).join(", ")}`);
+          continue;
+        }
+        if ((item["depends-on"] !== undefined || item.depends_on !== undefined) && isDependencyUnsupportedType(itemType)) {
+          rejectItem(`Line ${i + 1}: depends-on is not supported for ${itemType}, which executes outside the safe-output handler manager.`);
           continue;
         }
         if (!queueScope && itemType === "noop" && isProbingNoopMessage(item.message)) {

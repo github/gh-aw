@@ -38,7 +38,7 @@ const { normalizeBlankOptionalFields } = require("./optional_field_normalizer.cj
 const { clearValidationMarker, formatJSONFiles, runCustomMemoryValidation, writeValidationMarker } = require("./memory_custom_validation.cjs");
 const { compileFileGlobPatterns, isMemoryFileEligible } = require("./memory_file_eligibility.cjs");
 const { normalizeRuntimeMessage, readClaimScopeContext, withClaimExecution, currentClaimHandle, claimArtifactPath } = require("./work_queue_claim_scope.cjs");
-const { createSubmissionTracker } = require("./safe_output_submission.cjs");
+const { createSubmissionTracker, isDependencyUnsupportedType } = require("./safe_output_submission.cjs");
 
 function createEligibleMemoryValidationView(memoryDir, isEligibleFile) {
   let validationDir;
@@ -3063,7 +3063,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
       content: [
         {
           type: "text",
-          text: JSON.stringify({ result: "success" }),
+          text: JSON.stringify({ result: "success", delegated: true }),
         },
       ],
     };
@@ -3496,9 +3496,9 @@ function createHandlers(server, appendSafeOutput, config = {}) {
         ? (...args) =>
             submissions.wrap(
               scopedHandler(Reflect.apply(handler, undefined, args), name === "defaultHandler" ? args[0] : "ledger_append"),
-              name !== "defaultHandler" || (!["upload_asset", "noop"].includes(args[0]) && getSafeOutputsToolConfig(config, args[0]).supports_dependencies !== false)
+              name !== "defaultHandler" || (!isDependencyUnsupportedType(args[0]) && getSafeOutputsToolConfig(config, args[0]).supports_dependencies !== false)
             )
-        : submissions.wrap(scopedHandler(handler, name === "ledgerAgentAppendHandler" ? "ledger_append" : undefined), name !== "uploadAssetHandler"),
+        : submissions.wrap(scopedHandler(handler, name === "ledgerAgentAppendHandler" ? "ledger_append" : undefined), !["uploadAssetHandler", "pushRepoMemoryHandler"].includes(name)),
     ])
   );
 }

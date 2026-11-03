@@ -4,6 +4,8 @@ import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { processMessages, sortMessageIndicesByTemporaryIdDependencies } from "./safe_output_handler_manager.cjs";
 import { buildSafeOutputDependencyPlan, isConfirmedDependencySuccess } from "./safe_output_dependencies.cjs";
 import { main as createActionHandler } from "./safe_output_action_handler.cjs";
+import { main as createCallWorkflowHandler } from "./call_workflow.cjs";
+import { createHandlers } from "./safe_outputs_handlers.cjs";
 import { buildSafeOutputOutcomes, projectSafeOutputData } from "./safe_output_outcomes.cjs";
 import { createSessionValidator } from "./scripts/validate_session.cjs";
 
@@ -133,6 +135,21 @@ describe("safe-output runtime dependencies", () => {
     expect(result.results.find(item => item.output_id === id(2))).toMatchObject({ success: false, errorCode: "safe_output_dependency_invalid" });
   });
 
+  it("does not mark an explicit dependency downstream of a legacy cycle as cyclic", async () => {
+    const create = vi.fn(async () => ({ success: true, repo: "owner/repo", number: 42 }));
+    const comment = vi.fn(async () => ({ success: true }));
+    const result = await processMessages(
+      new Map([
+        ["create_issue", create],
+        ["add_comment", comment],
+      ]),
+      [{ ...message(1, undefined, "create_issue"), temporary_id: "aw_first", blocked_by: ["aw_second"] }, { ...message(2, undefined, "create_issue"), temporary_id: "aw_second", blocked_by: ["aw_first"] }, message(3, id(1))]
+    );
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(comment).toHaveBeenCalledOnce();
+    expect(result.results.find(item => item.output_id === id(3))).toMatchObject({ success: true });
+  });
+
   it("waits for actual deferred retry success before running a dependent chain", async () => {
     const calls = [];
     let attempts = 0;
@@ -238,6 +255,36 @@ describe("safe-output runtime dependencies", () => {
     expect(result.results.every(item => item.success)).toBe(true);
   });
 
+  it("revisits deferred consumers when waiting dependencies create new IDs", async () => {
+    const calls = [];
+    const link = vi.fn(async (msg, temporaryIds) => {
+      if (msg.output_id === id(1)) {
+        calls.push("link-P");
+        return temporaryIds.aw_parent ? { success: true } : { deferred: true };
+      }
+      calls.push("link-Q");
+      return temporaryIds.aw_child ? { success: true } : { deferred: true };
+    });
+    const create = vi.fn(async msg => {
+      if (msg.output_id === id(3)) {
+        calls.push("create-P");
+        return { success: true, repo: "owner/repo", number: 1, temporaryId: "aw_parent" };
+      }
+      calls.push("create-Q");
+      return { success: true, repo: "owner/repo", number: 2, temporaryId: "aw_child" };
+    });
+    const result = await processMessages(
+      new Map([
+        ["link_sub_issue", link],
+        ["create_issue", create],
+      ]),
+      [message(1, undefined, "link_sub_issue"), message(2, id(4), "link_sub_issue"), message(3, id(2), "create_issue"), message(4, undefined, "create_issue")]
+    );
+    expect(calls).toEqual(["link-P", "create-Q", "link-Q", "create-P", "link-P"]);
+    expect(result.results.every(item => item.success)).toBe(true);
+    expect(create).toHaveBeenCalledTimes(2);
+  });
+
   it.each(["throw", "failure", "deferred", "staged", "skipped"])("blocks waiting dependents after a retry ends in %s", async outcome => {
     let attempts = 0;
     const handler = vi.fn(async () => {
@@ -282,6 +329,30 @@ describe("safe-output runtime dependencies", () => {
     expect(result.results.find(item => item.output_id === id(1))).toMatchObject({ success: true, result: { delegated: true } });
     expect(comment).not.toHaveBeenCalled();
     expect(result.results.find(item => item.output_id === id(2))).toMatchObject({ success: false, errorCode: "safe_output_dependency_failed" });
+  });
+
+  it("does not treat real workflow and coverage exports as completed prerequisites", async () => {
+    global.context = { repo: { owner: "owner", repo: "repo" }, payload: {} };
+    const callWorkflow = await createCallWorkflowHandler({ workflows: ["worker"] });
+    const append = vi.fn();
+    const handlers = createHandlers({ debug: vi.fn() }, append, {});
+    const uploadCoverage = args => JSON.parse(handlers.uploadCodeCoverageHandler(args).content[0].text);
+    const noop = args => JSON.parse(handlers.defaultHandler("noop")(args).content[0].text);
+    const comment = vi.fn(async () => ({ success: true }));
+    expect(isConfirmedDependencySuccess({ type: "upload_asset", claim_handle: "claim-1", success: true, result: { success: true } })).toBe(false);
+    const result = await processMessages(
+      new Map([
+        ["call_workflow", callWorkflow],
+        ["upload_code_coverage", uploadCoverage],
+        ["noop", noop],
+        ["add_comment", comment],
+      ]),
+      [{ ...message(1, undefined, "call_workflow"), workflow_name: "worker", inputs: {} }, message(2, id(1)), message(3, undefined, "upload_code_coverage"), message(4, id(3)), message(5, undefined, "noop"), message(6, id(5))]
+    );
+    expect(result.results.find(item => item.output_id === id(1))).toMatchObject({ success: true, result: { delegated: true } });
+    expect(result.results.find(item => item.output_id === id(3))).toMatchObject({ success: true, result: { delegated: true } });
+    expect(comment).not.toHaveBeenCalled();
+    expect(result.results.filter(item => item.errorCode === "safe_output_dependency_failed")).toHaveLength(3);
   });
 
   it("never confirms prerequisites in global staged mode, even when legacy handlers omit staged", async () => {

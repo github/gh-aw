@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createSubmissionTracker } from "./safe_output_submission.cjs";
+import { addDependencySchema, createSubmissionTracker } from "./safe_output_submission.cjs";
 import { createHandlers } from "./safe_outputs_handlers.cjs";
 import { validateItem } from "./safe_output_type_validator.cjs";
 import { processMessages } from "./safe_output_handler_manager.cjs";
@@ -11,6 +11,18 @@ const success = () => ({ content: [{ type: "text", text: JSON.stringify({ result
 const payload = response => JSON.parse(response.content[0].text);
 
 describe("safe-output submission tracker", () => {
+  it("injects the dependency schema idempotently and rejects reserved input names", () => {
+    const tool = { name: "custom", inputSchema: { type: "object", properties: { body: { type: "string" } } } };
+    addDependencySchema(tool);
+    const dependencySchema = tool.inputSchema.properties["depends-on"];
+    addDependencySchema(tool);
+    expect(tool.inputSchema.properties["depends-on"]).toEqual(dependencySchema);
+
+    for (const reservedName of ["depends-on", "depends_on", "output_id"]) {
+      expect(() => addDependencySchema({ name: "conflicting", inputSchema: { properties: { [reservedName]: { type: "string" } } } })).toThrow(/reserved input/);
+    }
+  });
+
   it("returns exactly the IDs queued by distinct calls", () => {
     const tracker = createSubmissionTracker();
     const queued = [];
@@ -204,6 +216,29 @@ describe("safe-output submission handler integration", () => {
     const accepted = payload(handler({ body: "Actual findings" }));
     expect(accepted).toEqual({ result: "success", output_id: expect.stringMatching(outputIdPattern) });
     expect(append).toHaveBeenCalledExactlyOnceWith({ type: "publish_report", body: "Actual findings", output_id: accepted.output_id });
+  });
+
+  it.each(["call_workflow", "push_repo_memory", "report_incomplete", "report_missing_tool", "report_missing_data"])("rejects dependencies for standalone %s handlers before execution", type => {
+    const handler = handlers.defaultHandler(type);
+    const response = handler({ "depends-on": firstDependency });
+    expect(response.isError).toBe(true);
+    expect(payload(response)).toMatchObject({ result: "error", error: expect.stringContaining("depends-on is not supported") });
+    expect(append).not.toHaveBeenCalled();
+  });
+
+  it("rejects dependencies for push_repo_memory before staging memory files", () => {
+    const response = handlers.pushRepoMemoryHandler({ "depends-on": firstDependency });
+    expect(response.isError).toBe(true);
+    expect(payload(response)).toMatchObject({ result: "error", error: expect.stringContaining("depends-on is not supported") });
+    expect(append).not.toHaveBeenCalled();
+  });
+
+  it("rejects dependencies for real noop and upload_asset handlers before processing", () => {
+    const noop = handlers.defaultHandler("noop")({ "depends-on": firstDependency });
+    const asset = handlers.uploadAssetHandler({ path: "/tmp/image.png", "depends-on": firstDependency });
+    expect(noop.isError).toBe(true);
+    expect(asset.isError).toBe(true);
+    expect(append).not.toHaveBeenCalled();
   });
 
   it("returns matching text, structured-content and queued IDs", () => {
