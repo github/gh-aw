@@ -128,7 +128,6 @@ func (c *Compiler) buildConclusionNoOpStep(data *WorkflowData, mainJobName strin
 	envVars = append(envVars, buildEngineMetadataEnvVars(data.EngineConfig, data.Model)...)
 	envVars = append(envVars, "          GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n")
 	envVars = append(envVars, fmt.Sprintf("          GH_AW_AGENT_CONCLUSION: ${{ needs.%s.result }}\n", mainJobName))
-	envVars = append(envVars, "          GH_AW_ACTIVATION_RESULT: ${{ needs.activation.result }}\n")
 	envVars = append(envVars, buildTemplatableBoolEnvVar("GH_AW_NOOP_REPORT_AS_ISSUE", data.SafeOutputs.NoOp.ReportAsIssue)...)
 	if data.SafeOutputs.NoOp.ReportAsIssue == nil {
 		envVars = append(envVars, "          GH_AW_NOOP_REPORT_AS_ISSUE: \"true\"\n")
@@ -558,7 +557,6 @@ func (c *Compiler) buildConclusionScriptEnvVars(data *WorkflowData, mainJobName 
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_TRACKER_ID: %q\n", data.TrackerID))
 	}
 	envVars = append(envVars, fmt.Sprintf("          GH_AW_AGENT_CONCLUSION: ${{ needs.%s.result }}\n", mainJobName))
-	envVars = append(envVars, "          GH_AW_ACTIVATION_RESULT: ${{ needs.activation.result }}\n")
 	envVars = append(envVars, buildModelRoutingOutputEnvVars(data.EngineConfig, mainJobName)...)
 	if data.SafeOutputs.NoOp != nil {
 		envVars = append(envVars, "          GH_AW_NOOP_COMMENT_BODY: ${{ steps.noop.outputs.noop_comment_body }}\n")

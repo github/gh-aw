@@ -314,11 +314,9 @@ func TestConclusionHandlerReceivesActivationResult(t *testing.T) {
 	}
 
 	expected := "GH_AW_ACTIVATION_RESULT: ${{ needs.activation.result }}"
-	assert.Contains(t, strings.Join(compiler.buildConclusionNoOpStep(data, string(constants.AgentJobName)), ""), expected)
 	coreVars, _, err := compiler.buildAgentFailureCoreVars(data, string(constants.AgentJobName))
 	require.NoError(t, err)
 	assert.Contains(t, strings.Join(coreVars, ""), expected)
-	assert.Contains(t, strings.Join(compiler.buildConclusionScriptEnvVars(data, string(constants.AgentJobName), nil, ""), ""), expected)
 }
 
 func TestDefaultCheckoutUsesTriggerRef(t *testing.T) {
