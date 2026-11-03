@@ -104,7 +104,7 @@ func handleUnresolvedActionPin(actionRepo, version, originalRepo, originalVersio
 		return "", fmt.Errorf("unable to resolve action pin mapping for %s@%s to %s@%s", originalRepo, originalVersion, actionRepo, version)
 	}
 
-	actionPinsLog.Printf("Leaving action %s@%s unpinned (non-enforcing mode)", actionRepo, version)
+	actionPinsLog.Printf("Leaving action %s@%s unpinned (unresolved action refs allowed: EnforcePinned=%t, AllowActionRefs=%t)", actionRepo, version, ctx.EnforcePinned, ctx.AllowActionRefs)
 	warningMsg := fmt.Sprintf("Unable to pin action %s@%s", actionRepo, version)
 	if ctx.Resolver != nil {
 		warningMsg += ": resolution failed"
