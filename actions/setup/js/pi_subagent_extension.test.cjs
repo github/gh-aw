@@ -58,6 +58,14 @@ describe("Pi managed delegation", () => {
     expect(registerTool).not.toHaveBeenCalled();
   });
 
+  it.each([null, [], { agent: "unknown", task: "Read." }, { agent: "reader", task: "   " }])("rejects malformed or undeclared invocation parameters: %j", async params => {
+    fs.writeFileSync(path.join(dir, "subagents.json"), JSON.stringify([agent]));
+    const registerTool = vi.fn();
+    extension({ registerTool });
+    const tool = registerTool.mock.calls[0][0];
+    await expect(tool.execute("id", params, undefined, undefined, { cwd: dir })).rejects.toThrow("Choose a declared Pi sub-agent");
+  });
+
   it("passes the selected model and all parent infrastructure and restrictions", () => {
     const args = subagentArgs(agent, "/trusted/system.txt");
     expect(args).toEqual(

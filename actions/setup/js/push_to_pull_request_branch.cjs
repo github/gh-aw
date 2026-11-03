@@ -2,6 +2,8 @@
 /// <reference types="@actions/github-script" />
 
 const { createReportIssue, buildIssueReport } = require("./issue_report.cjs");
+const { extractExpirationDate } = require("./ephemerals.cjs");
+const { appendReportExecutionProvenance } = require("./execution_provenance.cjs");
 const { getWorkflowCompilationNotice, isWorkflowYamlFile } = require("./workflow_file_exclusions.cjs");
 const { getStalePullRequestReason, StalePullRequestError } = require("./pr_lifecycle.cjs");
 
@@ -1071,6 +1073,13 @@ async function main(config = {}) {
         branch_name: branchName,
         apply_instructions: applyInstructions,
       });
+      const expirationDate = extractExpirationDate(pullRequest.body || "") || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      issueBody.push({
+        type: "quote",
+        agentTainted: false,
+        children: [{ type: "expiration", expiresAt: expirationDate.toISOString(), agentTainted: false }],
+      });
+      const issueReport = appendReportExecutionProvenance(buildIssueReport(issueTitle, issueBody), process.env.GH_AW_WORKFLOW_NAME || "Workflow", runUrl);
 
       try {
         const { data: issue } = await withRetry(
@@ -1082,9 +1091,9 @@ async function main(config = {}) {
                 owner: repoParts.owner,
                 repo: repoParts.repo,
                 title: issueTitle,
-                labels: ["agentic-workflows"],
+                labels: ["agentic-workflows", "pull-request-fallback"],
               },
-              buildIssueReport(issueTitle, issueBody)
+              issueReport
             );
           },
           RATE_LIMIT_RETRY_CONFIG,

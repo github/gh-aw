@@ -111,6 +111,27 @@ if echo "$BINARY_VERSION" | grep -q "dev"; then
 fi
 echo "PASS: Binary version does not contain 'dev'"
 
+# Test 4: Build Windows 386 binary for release
+echo ""
+echo "Test 4: Verify Windows 386 is included in release builds"
+if ! grep -Eq '^[[:space:]]+windows-386$' "$PROJECT_ROOT/scripts/build-release.sh"; then
+  echo "FAIL: Windows 386 is not included in the release platform list"
+  exit 1
+fi
+
+CGO_ENABLED=0 GOOS=windows GOARCH=386 go build \
+  -trimpath \
+  -ldflags="-s -w -X main.version=${TEST_VERSION} -X main.isRelease=true" \
+  -o "$TEST_DIR/windows-386.exe" \
+  ./cmd/gh-aw
+
+if [ ! -f "$TEST_DIR/windows-386.exe" ]; then
+  echo "FAIL: Windows 386 binary was not created"
+  exit 1
+fi
+
+echo "PASS: Windows 386 release binary built"
+
 # Clean up dist directory
 rm -rf dist
 

@@ -141,8 +141,8 @@ const HANDLER_MAP = {
 const STANDALONE_STEP_TYPES = new Set(["upload_asset", "noop"]);
 
 /**
- * Code-push safe output types that must succeed before remaining outputs are processed.
- * If any of these fail, the remaining non-code-push messages are cancelled with a clear reason.
+ * Code-push safe output types whose failures are tracked for later comment annotations
+ * and conclusion reporting. Remaining messages are still processed after a failure.
  */
 const CODE_PUSH_TYPES = new Set(["push_to_pull_request_branch", "create_pull_request"]);
 
@@ -1079,9 +1079,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
   /** @type {Array<{type: string, message: any, messageIndex: number, handler: Function}>} */
   const deferredMessages = [];
 
-  // Track code-push failures for fail-fast behaviour.
-  // If a code-push type (push_to_pull_request_branch / create_pull_request) fails,
-  // all subsequent non-code-push messages are cancelled with a clear reason.
+  // Track code-push failures for later comment annotations and conclusion reporting.
   /** @type {Array<{type: string, error: string}>} */
   const codePushFailures = [];
 
@@ -1364,9 +1362,8 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
       const result = recordMergeDecision(messageType, await messageHandler(effectiveMessage, resolvedTemporaryIds, temporaryIdMap), i);
 
       // Check if the handler explicitly returned a skipped result (e.g. policy filters,
-      // no-op warnings, or if_no_changes: warn/ignore). Skipped results should NOT
-      // trigger fail-fast cancellation of subsequent messages, and any summary-safe
-      // diagnostics supplied by the handler must be preserved.
+      // no-op warnings, or if_no_changes: warn/ignore). Subsequent messages are still
+      // processed, and any summary-safe diagnostics supplied by the handler are preserved.
       if (result && result.skipped === true && !result.deferred) {
         const msg = result.reason || result.warning || result.error || "Handler returned skipped: true";
         core.info(`⏭ Message ${i + 1} (${messageType}) skipped — ${msg}`);
@@ -1388,7 +1385,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
           error: errorMsg,
           ...(messageType === "merge_pull_request" ? { result: projectMergeFailure(result) } : {}),
         });
-        // Track code-push failures for fail-fast behaviour
+        // Track code-push failures for later comment annotations and conclusion reporting.
         if (CODE_PUSH_TYPES.has(messageType)) {
           codePushFailures.push({ type: messageType, error: errorMsg });
           core.warning(`⚠️ Code push operation '${messageType}' failed — continuing with remaining safe outputs (add_comment messages will include a failure note)`);
@@ -1532,7 +1529,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
         success: false,
         error: getErrorMessage(error),
       });
-      // Track code-push failures for fail-fast behaviour
+      // Track code-push failures for later comment annotations and conclusion reporting.
       if (CODE_PUSH_TYPES.has(messageType)) {
         codePushFailures.push({ type: messageType, error: getErrorMessage(error) });
         core.warning(`⚠️ Code push operation '${messageType}' failed — continuing with remaining safe outputs (add_comment messages will include a failure note)`);
@@ -2384,7 +2381,7 @@ async function main(options = {}) {
       core.info(`Reported assignment failures: ${reportOnlyFailureCount}`);
     }
     if (cancelledCount > 0) {
-      core.info(`Cancelled (code push failed): ${cancelledCount}`);
+      core.info(`Cancelled: ${cancelledCount}`);
     }
     if (deferredCount > 0) {
       core.info(`Deferred: ${deferredCount}`);
@@ -2428,7 +2425,7 @@ async function main(options = {}) {
       core.warning(`${reportOnlyFailureCount} non-fatal safe output(s) failed but were reported without failing safe_outputs: ${reportOnlyTypes.join(", ")}`);
     }
     if (cancelledCount > 0) {
-      core.warning(`${cancelledCount} message(s) were cancelled because a code push operation failed`);
+      core.warning(`${cancelledCount} message(s) were cancelled`);
     }
     if (skippedNoHandlerResults.length > 0) {
       core.warning(`${skippedNoHandlerResults.length} message(s) were skipped because no handler was loaded. Check your workflow's safe-outputs configuration.`);

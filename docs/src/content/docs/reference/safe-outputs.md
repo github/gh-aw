@@ -162,6 +162,33 @@ Create custom post-processing jobs registered as Model Context Protocol (MCP) to
 
 Custom implementations should include a generated-by footer and workflow metadata on published content. Direct API calls do not add these automatically; without them, provenance searches and workflow-output tracking cannot identify the content. Use the [stable issue-creation API](/gh-aw/reference/custom-safe-outputs/#issue-creation-api) for GitHub issues.
 
+Do not read internal safe-output files from `post-steps`. Their paths and format are implementation details, and the compiler rejects direct reads:
+
+```yaml wrap
+post-steps:
+  - name: Read safe output
+    run: jq '.items[]' /tmp/gh-aw/safeoutputs/output.json
+```
+
+Use a built-in `safe-outputs` handler for supported operations, or move custom processing into a `safe-outputs.jobs` job. Custom jobs receive agent output through `$GH_AW_AGENT_OUTPUT`:
+
+```yaml wrap
+safe-outputs:
+  jobs:
+    process-report:
+      description: "Process the generated report"
+      runs-on: ubuntu-latest
+      output: "Report processed"
+      inputs:
+        report:
+          description: "Report content"
+          required: true
+          type: string
+      steps:
+        - name: Process agent output
+          run: jq '.items[]' "$GH_AW_AGENT_OUTPUT"
+```
+
 ### GitHub Action Wrappers (`actions:`)
 
 Mount any public GitHub Action as a once-callable MCP tool. The compiler pins the action reference to a SHA at compile time and derives the tool's input schema from the action's `action.yml`. See [GitHub Action Wrappers](/gh-aw/reference/custom-safe-outputs/#github-action-wrappers-safe-outputsactions).
@@ -1727,6 +1754,7 @@ safe-outputs:
 | `mcp_policy_error` | MCP server policy violations |
 | `ai_credits_rate_limit_error` | AI credits rate limit exceeded |
 | `max_ai_credits_exceeded` | Maximum AI credits budget exceeded |
+| `activation_failed` | Activation job failed before the agent started, without a named guardrail failure |
 | `cache_miss_misconfiguration` | Cache configuration errors |
 | `code_push_failures` | Failures pushing code to branches |
 | `assignment_errors` | Failures assigning issues or reviewers |

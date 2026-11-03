@@ -208,12 +208,6 @@ func TransformExecutableShellContent(content string, transform func(string) stri
 	return transformShellRegions(content, regions, transform, false), nil
 }
 
-// removeHeredocContent removes only quoted heredoc bodies. Unquoted bodies
-// undergo command substitution and must remain visible to injection checks.
-func removeHeredocContent(content string) string {
-	return transformShellContent(content, func(s string) string { return s }, true, false)
-}
-
 func executableShellContent(content string) string {
 	if !strings.Contains(content, "<<") {
 		return stripShellLineComments(content)
@@ -284,32 +278,6 @@ func isShellCommentStart(content string, index int) bool {
 	}
 	prev := content[index-1]
 	return prev == ' ' || prev == '\t' || prev == '\n' || prev == '\r' || prev == ';'
-}
-
-// replaceOutsideQuotedHeredocs replaces all occurrences of old with new in s,
-// skipping content inside quoted heredoc blocks (e.g. << 'EOF' ... EOF).
-//
-// Quoted heredocs suppress variable expansion in the shell, so a replacement
-// like "$GH_AW_VAR" would be written literally to the output file rather than
-// being expanded.  Unquoted heredoc content and regular script lines are
-// processed normally.
-//
-// Unproven heredoc boundaries leave the script unchanged for validation.
-// Shell comments are preserved even when there are no quoted heredocs.
-func replaceOutsideQuotedHeredocs(s, old, new string) string {
-	if !strings.Contains(s, "<<") {
-		return replaceOutsideShellLineComments(s, old, new)
-	}
-	return transformShellContent(s,
-		func(segment string) string { return strings.ReplaceAll(segment, old, new) }, false, true)
-}
-
-// replaceOutsideShellLineComments replaces old with new in shell script content
-// while preserving text inside bash-style # line comments.
-func replaceOutsideShellLineComments(content, old, new string) string {
-	return transformOutsideShellLineComments(content, func(segment string) string {
-		return strings.ReplaceAll(segment, old, new)
-	})
 }
 
 func transformOutsideShellLineComments(content string, transform func(string) string) string {
