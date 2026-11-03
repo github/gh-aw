@@ -12,12 +12,17 @@ permissions:
   issues: read
   pull-requests: read
   actions: read
+  copilot-requests: write
 
 sandbox:
   agent:
     id: awf
 engine:
   id: claude
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: balanced
   mcp:
     tool-timeout: 10m
 safe-outputs:
