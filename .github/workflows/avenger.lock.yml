@@ -90,13 +90,10 @@ env:
   GH_AW_HARNESS_MAX_RETRIES: "4"
   GOTOOLCHAIN: auto
   OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.GH_AW_OTEL_SENTRY_ENDPOINT }}
-  OTEL_EXPORTER_OTLP_PROTOCOL: ${{ vars.OTEL_EXPORTER_OTLP_PROTOCOL }}
   OTEL_SERVICE_NAME: gh-aw.avenger
   OTEL_RESOURCE_ATTRIBUTES: 'gh-aw.workflow.name=Avenger,gh-aw.repository=${{ github.repository }},gh-aw.run.id=${{ github.run_id }},github.run_id=${{ github.run_id }},gh-aw.engine.id=copilot'
   OTEL_EXPORTER_OTLP_HEADERS: x-sentry-auth=${{ secrets.GH_AW_OTEL_SENTRY_AUTHORIZATION }}
   GH_AW_OTLP_ALL_HEADERS: x-sentry-auth=${{ secrets.GH_AW_OTEL_SENTRY_AUTHORIZATION }},Authorization=${{ secrets.GH_AW_OTEL_GRAFANA_AUTHORIZATION }}
-  GH_AW_OTLP_LOGS_ENABLED: ${{ vars.GH_AW_OTLP_LOGS_ENABLED }}
-  GH_AW_OTLP_LOGS_MAX_BYTES: ${{ vars.GH_AW_OTLP_LOGS_MAX_BYTES }}
   GH_AW_OTLP_ENDPOINTS: '[{"url":"${{ secrets.GH_AW_OTEL_SENTRY_ENDPOINT }}","headers":"x-sentry-auth=${{ secrets.GH_AW_OTEL_SENTRY_AUTHORIZATION }}"},{"url":"${{ secrets.GH_AW_OTEL_GRAFANA_ENDPOINT }}","headers":"Authorization=${{ secrets.GH_AW_OTEL_GRAFANA_AUTHORIZATION }}"}]'
 
 jobs:
@@ -351,8 +348,6 @@ jobs:
           GH_AW_NEEDS_CHECK_CI_STATUS_OUTPUTS_CI_STATUS: ${{ needs.check_ci_status.outputs.ci_status }}
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
-          GH_AW_OTLP_LOGS_ENABLED: ""
-          GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"safe_outputs_cli_only_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"file\":\"safe_outputs_create_pull_request.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"safe_outputs_steering_issue.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"file\":\"github_mcp_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0006\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0007\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0008\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0009\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0010\"},{\"author_file\":\".github/workflows/avenger.md\"}],\"system_item_count\":15,\"author_expressions\":{\"github.repository\":\"GH_AW_GITHUB_REPOSITORY\",\"github.run_number\":\"GH_AW_GITHUB_RUN_NUMBER\",\"needs.check_ci_status.outputs.ci_run_id\":\"GH_AW_NEEDS_CHECK_CI_STATUS_OUTPUTS_CI_RUN_ID\",\"needs.check_ci_status.outputs.ci_status\":\"GH_AW_NEEDS_CHECK_CI_STATUS_OUTPUTS_CI_STATUS\"}}"
           GH_AW_PROMPT_CONTENT_0000: |
@@ -411,7 +406,6 @@ jobs:
           GOTOOLCHAIN: ""
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
-          OTEL_EXPORTER_OTLP_PROTOCOL: ""
           OTEL_RESOURCE_ATTRIBUTES: ""
           OTEL_SERVICE_NAME: ""
       - name: Interpolate variables and render templates
@@ -437,8 +431,6 @@ jobs:
           GH_AW_NEEDS_CHECK_CI_STATUS_OUTPUTS_CI_STATUS: ${{ needs.check_ci_status.outputs.ci_status }}
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
-          GH_AW_OTLP_LOGS_ENABLED: ""
-          GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           GH_AW_SKILL_DIR: .github/skills
           GH_AW_SKILL_EXT: /SKILL.md
@@ -447,7 +439,6 @@ jobs:
           GOTOOLCHAIN: ""
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
-          OTEL_EXPORTER_OTLP_PROTOCOL: ""
           OTEL_RESOURCE_ATTRIBUTES: ""
           OTEL_SERVICE_NAME: ""
       - name: Substitute placeholders
@@ -503,13 +494,10 @@ jobs:
           GH_AW_NEEDS_CHECK_CI_STATUS_OUTPUTS_CI_STATUS: ${{ needs.check_ci_status.outputs.ci_status }}
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
-          GH_AW_OTLP_LOGS_ENABLED: ""
-          GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           GOTOOLCHAIN: ""
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
-          OTEL_EXPORTER_OTLP_PROTOCOL: ""
           OTEL_RESOURCE_ATTRIBUTES: ""
           OTEL_SERVICE_NAME: ""
       - name: Validate prompt placeholders
@@ -519,13 +507,10 @@ jobs:
           GH_AW_HARNESS_MAX_RETRIES: ""
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
-          GH_AW_OTLP_LOGS_ENABLED: ""
-          GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           GOTOOLCHAIN: ""
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
-          OTEL_EXPORTER_OTLP_PROTOCOL: ""
           OTEL_RESOURCE_ATTRIBUTES: ""
           OTEL_SERVICE_NAME: ""
       - name: Print prompt
@@ -535,13 +520,10 @@ jobs:
           GH_AW_HARNESS_MAX_RETRIES: ""
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
-          GH_AW_OTLP_LOGS_ENABLED: ""
-          GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           GOTOOLCHAIN: ""
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
-          OTEL_EXPORTER_OTLP_PROTOCOL: ""
           OTEL_RESOURCE_ATTRIBUTES: ""
           OTEL_SERVICE_NAME: ""
       - name: Inventory installed skills
