@@ -15,7 +15,12 @@ const message = (index, dependencies, type = "add_comment") => ({
 });
 
 describe("safe-output runtime dependencies", () => {
+  let originalGithub;
+  let originalContext;
+
   beforeEach(() => {
+    originalGithub = global.github;
+    originalContext = global.context;
     vi.stubEnv("GH_AW_DETECTION_CONCLUSION", "success");
     vi.stubEnv("GH_AW_DETECTION_REASON", "");
     vi.stubEnv("GH_AW_RUN_DETECTION", "false");
@@ -23,10 +28,16 @@ describe("safe-output runtime dependencies", () => {
     vi.stubEnv("GH_AW_SAFE_OUTPUTS_STAGED", "false");
     vi.stubEnv("GH_AW_SAFE_OUTPUT_JOBS", "");
     global.core = { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), error: vi.fn(), setOutput: vi.fn() };
+    global.github = {};
+    global.context = { payload: {} };
   });
   afterEach(() => {
     vi.unstubAllEnvs();
     delete global.core;
+    if (originalGithub === undefined) delete global.github;
+    else global.github = originalGithub;
+    if (originalContext === undefined) delete global.context;
+    else global.context = originalContext;
     delete process.env.GH_AW_SAFE_OUTPUT_JOBS;
   });
 
