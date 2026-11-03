@@ -481,7 +481,6 @@ func TestAgyConformanceEntryPointsShareConfiguration(t *testing.T) {
 						"question": "Does the agent emit exactly one final native safeoutputs noop with message Conformance probes completed after the probes?",
 					},
 				}, source["evals"], "the smoke entry point must retain its native conformance evals")
-				delete(source, "evals")
 				expectedTriggers["slash_command"] = map[string]any{
 					"name":     "smoke-agy",
 					"strategy": "centralized",
