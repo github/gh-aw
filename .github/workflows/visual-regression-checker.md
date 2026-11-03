@@ -51,6 +51,15 @@ steps:
     with:
       persist-credentials: false
 
+  - name: Checkout agentics workflows
+    uses: actions/checkout@v7.0.1
+    with:
+      repository: githubnext/agentics
+      ref: main
+      path: .agentics
+      persist-credentials: false
+      sparse-checkout: workflows
+
   - name: Setup Node.js
     uses: actions/setup-node@v7.1.0
     with:
@@ -66,10 +75,14 @@ steps:
   - name: Build documentation
     working-directory: ./docs
     timeout-minutes: 5
+    env:
+      AGENTICS_WORKFLOWS_DIR: ${{ github.workspace }}/.agentics/workflows
     run: npm run build
 
   - name: Start docs server
     working-directory: ./docs
+    env:
+      AGENTICS_WORKFLOWS_DIR: ${{ github.workspace }}/.agentics/workflows
     run: |
       nohup npm run dev -- --host 0.0.0.0 --port 4321 > /tmp/gh-aw/agent/preview.log 2>&1 &
       PID=$!
