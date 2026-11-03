@@ -174,6 +174,7 @@ Nonempty `safeoutputs.jsonl` != publication.
 | `ERR_NOT_FOUND`, `TARGET_NOT_FOUND` | Target/repository; visibility. | Correct target/access; 404 may conceal inaccessible resources. |
 | `ERR_PARSE` | JSON/NDJSON framing/schema/producer. | Fix producer/format; retain private evidence. |
 | `ERR_SYSTEM`, `E099` | First file/git/process failure. | Fix I/O/runtime/checkout; wrapper is not cause. |
+| `no_new_commits`, `missing_pr_head`, `shallow_history` | Commits/refs/history. | Verify no-op; prepare PR refs/full history before agent. |
 | `E009`, `CONFIG_HASH_MISMATCH` | Source vs lock hash. | Recompile/publish source+lock together; no manual hash edit. |
 | `E010`, `RATE_LIMIT_EXCEEDED` | Retry budget; reset headers. | Stop exhausted retries; respect reset/backoff; reduce API work. |
 | `POLICY_FILE_PROTECTION_DENIED` | Allowed/protected files and attempted patch. | Respect intentional skip; constrain change, don't disable protection. |

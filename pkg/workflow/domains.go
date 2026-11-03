@@ -423,6 +423,14 @@ var ecosystemPriority = []string{
 	"terraform",
 	"zig",
 	"default-safe-outputs", // compound: defaults + dev-tools + github + local
+	"bazel",
+	"gh-aw",
+	"julia",
+	"lua",
+	"ocaml",
+	"powershell",
+	"r",
+	"threat-detection",
 }
 
 // GetDomainEcosystem returns the ecosystem identifier for a given domain, or empty string if not found.
