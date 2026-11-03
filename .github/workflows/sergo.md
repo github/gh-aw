@@ -5,6 +5,7 @@ on:
   workflow_dispatch: null
 permissions:
   contents: read
+  copilot-requests: write
   discussions: read
   issues: read
   pull-requests: read
@@ -34,7 +35,12 @@ safe-outputs:
     max: 3
 description: Daily Go code quality analysis using Serena MCP language service protocol expert
 emoji: 🤖
-engine: claude
+engine:
+  id: claude
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: balanced
 name: "Sergo - Serena Go Expert"
 strict: true
 timeout-minutes: 45
