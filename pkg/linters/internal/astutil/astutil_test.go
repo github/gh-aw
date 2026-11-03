@@ -1231,7 +1231,7 @@ func f(pattern string) {
 	_ = regexp.MustCompile(pattern)
 	_ = regexp.MustCompilePOSIX(pattern)
 	_ = other.Contains(pattern, pattern)
-	_ = (regexp.Compile)(pattern)
+	_, _ = (regexp.Compile)(pattern)
 }
 `
 	pass, file := typecheckSnippet(t, src)
