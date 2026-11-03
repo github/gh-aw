@@ -261,6 +261,15 @@ safe-outputs:
     max-ai-credits: 750
 ```
 
+### Token Broker (`token-broker:`)
+
+An experimental frontmatter field that exchanges the job's OIDC identity for short-lived credentials from an organization-operated broker instead of using existing secrets. The `copilot-request` and `copilot-task` modes can be selected independently. Brokered request authentication is supported in threat-detection and evals jobs, and the broker endpoint comes from the `GH_AW_TOKEN_BROKER_URL` Actions variable or secret at runtime. A missing configuration or failed exchange blocks the affected operation rather than falling back to other credentials. See [Token Broker](/gh-aw/reference/frontmatter/#token-broker-token-broker) and the [Token Broker Specification](/gh-aw/specs/token-broker-specification/).
+
+```aw wrap
+token-broker:
+  copilot-task: true
+```
+
 ### Staged Mode
 
 A preview mode where workflows simulate actions without making changes. The AI generates output showing what would happen, but no GitHub API write operations are performed. Use for testing before production runs. See [Staged Mode](/gh-aw/reference/staged-mode/) for details.
