@@ -209,6 +209,11 @@ Ensure proper audience validation and trust policies are configured.`
 			c.emitTipOnce(markdownPath, tipMsg)
 		}
 	}
+	if shouldWarnClaudeCopilotRequestsPermission(workflowData, workflowPermissions) {
+		warnMsg := `Claude engine with model-provider: github uses the COPILOT_GITHUB_TOKEN secret because this workflow does not grant permissions: { copilot-requests: write }. Personal access tokens may be rejected by the Copilot model catalog (401 from /models), which leaves Claude-on-Copilot without models. Set permissions: { copilot-requests: write } to use ${{ github.token }} instead — see https://github.github.com/gh-aw/reference/billing/ for details. To keep using COPILOT_GITHUB_TOKEN and silence this warning, set permissions.copilot-requests: none.`
+		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", warnMsg))
+		c.IncrementWarningCount()
+	}
 
 	return workflowPermissions, nil
 }
@@ -255,6 +260,25 @@ func shouldEmitCopilotRequestsEnableTip(workflowData *WorkflowData, workflowPerm
 		return false
 	}
 	if workflowData.EngineConfig == nil || workflowData.EngineConfig.ID != "copilot" {
+		return false
+	}
+	if level, exists := workflowPermissions.GetExplicit(PermissionCopilotRequests); exists && level == PermissionNone {
+		return false
+	}
+	return !workflowPermissions.HasCopilotRequestsWrite()
+}
+
+// shouldWarnClaudeCopilotRequestsPermission reports whether a Claude workflow that
+// resolves to the GitHub/Copilot provider falls back to the COPILOT_GITHUB_TOKEN
+// secret because permissions.copilot-requests: write is not granted.
+func shouldWarnClaudeCopilotRequestsPermission(workflowData *WorkflowData, workflowPermissions *Permissions) bool {
+	if workflowData == nil || workflowPermissions == nil {
+		return false
+	}
+	if ResolveEngineID(workflowData) != "claude" || tokenBrokerRequestEnabled(workflowData) {
+		return false
+	}
+	if NewClaudeEngine().ResolveLLMProvider(workflowData) != LLMProviderGitHub {
 		return false
 	}
 	if level, exists := workflowPermissions.GetExplicit(PermissionCopilotRequests); exists && level == PermissionNone {
