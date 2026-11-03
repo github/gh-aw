@@ -67,7 +67,7 @@ func checkHTTPCall(pass *analysis.Pass, cursor inspector.Cursor, generatedFiles 
 	if nolint.HasDirectiveForLinter(pos, noLintIndex, "httpnoctx") {
 		return
 	}
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok {
 		return
 	}
