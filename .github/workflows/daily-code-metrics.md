@@ -17,7 +17,6 @@ tracker-id: daily-code-metrics
 engine:
   id: copilot
   copilot-sdk: true
-model: copilot/auto
 sandbox:
   agent:
     id: awf
