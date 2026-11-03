@@ -204,6 +204,43 @@ func TestCombineTokenExpressions(t *testing.T) {
 }
 
 func TestResolvePRCheckoutToken(t *testing.T) {
+	t.Run("uses global GitHub App token for create-pull-request checkout", func(t *testing.T) {
+		safeOutputs := &SafeOutputsConfig{
+			GitHubApp: &GitHubAppConfig{
+				AppID:      "${{ vars.APP_ID }}",
+				PrivateKey: "${{ secrets.APP_KEY }}",
+			},
+			CreatePullRequests: &CreatePullRequestsConfig{},
+		}
+
+		token, isCustom := resolvePRCheckoutToken(safeOutputs, NewCheckoutManager(nil))
+		if token != "${{ steps.safe-outputs-app-token.outputs.token }}" {
+			t.Fatalf("expected global app token, got %q", token)
+		}
+		if !isCustom {
+			t.Fatalf("expected isCustom=true")
+		}
+	})
+
+	t.Run("ignore-if-missing global GitHub App falls back to safe-output token", func(t *testing.T) {
+		safeOutputs := &SafeOutputsConfig{
+			GitHubApp: &GitHubAppConfig{
+				AppID:           "${{ vars.APP_ID }}",
+				PrivateKey:      "${{ secrets.APP_KEY }}",
+				IgnoreIfMissing: true,
+			},
+			PushToPullRequestBranch: &PushToPullRequestBranchConfig{},
+		}
+
+		token, isCustom := resolvePRCheckoutToken(safeOutputs, NewCheckoutManager(nil))
+		if token != "${{ steps.safe-outputs-app-token.outputs.token || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}" {
+			t.Fatalf("expected app token with safe-output fallback, got %q", token)
+		}
+		if !isCustom {
+			t.Fatalf("expected isCustom=true")
+		}
+	})
+
 	t.Run("uses checkout safe-output app token when target-repo matches", func(t *testing.T) {
 		safeOutputs := &SafeOutputsConfig{
 			CreatePullRequests: &CreatePullRequestsConfig{

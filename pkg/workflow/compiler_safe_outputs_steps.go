@@ -67,7 +67,7 @@ func prepareSharedPRCheckout(data *WorkflowData) (*CheckoutManager, string) {
 	// same token is reused below for the "Configure Git credentials" step so both the
 	// persisted checkout credential and the push remote agree on a single token.
 	prCheckoutToken, _ := resolvePRCheckoutToken(data.SafeOutputs, checkoutMgr)
-	checkoutMgr.SetPushToken(resolveStaticCheckoutToken(data.SafeOutputs, checkoutMgr))
+	checkoutMgr.SetPushToken(prCheckoutToken)
 	// Runtime checkouts are not revisited by GenerateConfigureGitCredentialsSteps.
 	// Resolve the shared PR auth without selecting another entry's scoped write app;
 	// dynamicCheckoutToken applies each runtime entry's own auth first.

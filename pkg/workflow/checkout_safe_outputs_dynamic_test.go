@@ -99,7 +99,7 @@ func TestSafeOutputDynamicCheckoutKeepsHostingAndStaticAuth(t *testing.T) {
 	}
 	steps := strings.Join(NewCompiler().buildSharedPRCheckoutSteps(data), "")
 	require.Contains(t, steps, "token: ${{ secrets.HOST_TOKEN }}")
-	require.Equal(t, 2, strings.Count(steps, "token: ${{ secrets.HOST_TOKEN }}"), "hosting and static checkouts keep existing token priority")
+	require.Equal(t, 1, strings.Count(steps, "token: ${{ secrets.HOST_TOKEN }}"), "the default checkout keeps its explicit token while PR git operations use the global app")
 	require.Equal(t, 3, strings.Count(steps, "GH_AW_DYNAMIC_TOKEN: ${{ steps.safe-outputs-app-token.outputs.token }}"))
 }
 
