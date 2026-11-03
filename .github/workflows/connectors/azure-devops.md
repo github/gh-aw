@@ -2457,10 +2457,19 @@ import-schema:
       All checks are suppressed during staging and share the operation endpoint
       and credential. Policy reads and the following mutation are not atomic.
     </author-policies>
-    <static-create-example><![CDATA[
+    <static-create-example>
+      <frontmatter><![CDATA[
+on: workflow_dispatch
+engine: copilot
+permissions:
+  contents: read
 imports:
   - uses: .github/workflows/connectors/azure-devops.md
     with:
+      organization: fabrikam
+      project: 22222222-2222-4222-8222-222222222222
+      project-name: Fabrikam
+      work-item-types: [Task]
       create-additional-patch:
         - op: add
           path: /fields/Custom.CostCenter
@@ -2484,7 +2493,19 @@ imports:
               rel: ArtifactLink
               url: vstfs:///Git/Ref/22222222-2222-4222-8222-222222222222%2F44444444-4444-4444-8444-444444444444%2FGBmain
               attributes: {name: Branch}
-    ]]></static-create-example>
+safe-outputs:
+  staged: true
+  azure-devops-create-work-item-with-description:
+]]></frontmatter>
+      <body><![CDATA[
+Stage one azure_devops_create_work_item_with_description proposal for
+organization fabrikam and project 22222222-2222-4222-8222-222222222222,
+work-item-type Task, title "Investigate the reviewed deployment failure",
+and body "The approved deployment investigation needs a tracked follow-up."
+The author owns the additional fields and branch relation. Do not supply
+patch entries or claim the staged work item was created.
+]]></body>
+    </static-create-example>
     <creation-followups>
       Select the producer and consumers independently. update-work-item,
       comment-on-work-item, assign-work-item, the six sparse set/replace
@@ -2786,8 +2807,17 @@ authorizes a same-run follow-up.
     <source href="https://learn.microsoft.com/en-us/rest/api/azure/devops/wit/work-items/update?view=azure-devops-rest-7.1"/>
     <source href="https://learn.microsoft.com/en-us/rest/api/azure/devops/wit/work-items/get-work-item?view=azure-devops-rest-7.1"/>
     <source href="https://learn.microsoft.com/en-us/rest/api/azure/devops/wit/comments/add-work-item-comment?view=azure-devops-rest-7.1"/>
+    <source href="https://learn.microsoft.com/en-us/rest/api/azure/devops/wit/attachments/create?view=azure-devops-rest-7.1"/>
+    <source href="https://learn.microsoft.com/en-us/rest/api/azure/devops/wit/wiql/query-by-id?view=azure-devops-rest-7.1"/>
     <source href="https://learn.microsoft.com/en-us/rest/api/azure/devops/git/repositories/get-repository?view=azure-devops-rest-7.1"/>
     <source href="https://learn.microsoft.com/en-us/rest/api/azure/devops/git/refs/list?view=azure-devops-rest-7.1"/>
+    <source href="https://learn.microsoft.com/en-us/rest/api/azure/devops/git/items/get?view=azure-devops-rest-7.1"/>
+    <source href="https://learn.microsoft.com/en-us/rest/api/azure/devops/git/pull-requests/get-pull-requests?view=azure-devops-rest-7.1"/>
+    <source href="https://learn.microsoft.com/en-us/rest/api/azure/devops/git/pull-requests/get-pull-request?view=azure-devops-rest-7.1"/>
+    <source href="https://learn.microsoft.com/en-us/rest/api/azure/devops/build/definitions/list?view=azure-devops-rest-7.1"/>
+    <source href="https://learn.microsoft.com/en-us/rest/api/azure/devops/build/definitions/get?view=azure-devops-rest-7.1"/>
+    <source href="https://learn.microsoft.com/en-us/rest/api/azure/devops/build/builds/list?view=azure-devops-rest-7.1"/>
+    <source href="https://learn.microsoft.com/en-us/rest/api/azure/devops/build/builds/get?view=azure-devops-rest-7.1"/>
     <source href="https://learn.microsoft.com/en-us/azure/devops/service-hooks/events?view=azure-devops"/>
     <source href="https://learn.microsoft.com/en-us/azure/devops/service-hooks/create-subscription?view=azure-devops"/>
     <source href="https://learn.microsoft.com/en-us/azure/devops/service-hooks/services/webhooks?view=azure-devops"/>
