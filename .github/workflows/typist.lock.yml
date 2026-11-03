@@ -88,6 +88,8 @@ env:
   OTEL_RESOURCE_ATTRIBUTES: 'gh-aw.workflow.name=Typist%20-%20Go%20Type%20Analysis,gh-aw.repository=${{ github.repository }},gh-aw.run.id=${{ github.run_id }},github.run_id=${{ github.run_id }},gh-aw.engine.id=claude'
   OTEL_EXPORTER_OTLP_HEADERS: x-sentry-auth=${{ secrets.GH_AW_OTEL_SENTRY_AUTHORIZATION }}
   GH_AW_OTLP_ALL_HEADERS: x-sentry-auth=${{ secrets.GH_AW_OTEL_SENTRY_AUTHORIZATION }},Authorization=${{ secrets.GH_AW_OTEL_GRAFANA_AUTHORIZATION }}
+  GH_AW_OTLP_LOGS_ENABLED: ${{ vars.GH_AW_OTLP_LOGS_ENABLED }}
+  GH_AW_OTLP_LOGS_MAX_BYTES: ${{ vars.GH_AW_OTLP_LOGS_MAX_BYTES }}
   GH_AW_OTLP_ENDPOINTS: '[{"url":"${{ secrets.GH_AW_OTEL_SENTRY_ENDPOINT }}","headers":"x-sentry-auth=${{ secrets.GH_AW_OTEL_SENTRY_AUTHORIZATION }}"},{"url":"${{ secrets.GH_AW_OTEL_GRAFANA_ENDPOINT }}","headers":"Authorization=${{ secrets.GH_AW_OTEL_GRAFANA_AUTHORIZATION }}"}]'
 
 jobs:
@@ -348,6 +350,8 @@ jobs:
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_OTLP_LOGS_ENABLED: ""
+          GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"safe_outputs_cli_only_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"github_mcp_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0006\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0007\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0008\"},{\"author_file\":\".github/workflows/typist.md\"}],\"system_item_count\":12,\"author_expressions\":{\"experiments.tone_style\":\"GH_AW_EXPERIMENTS_TONE_STYLE\",\"experiments.tone_style == 'conversational'\":\"GH_AW_EXPR_32904950\",\"experiments.tone_style == 'formal'\":\"GH_AW_EXPR_468E2A7C\",\"github.repository\":\"GH_AW_GITHUB_REPOSITORY\",\"github.workspace\":\"GH_AW_GITHUB_WORKSPACE\"}}"
           GH_AW_PROMPT_CONTENT_0000: |
@@ -426,6 +430,8 @@ jobs:
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_OTLP_LOGS_ENABLED: ""
+          GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           GH_AW_SKILL_DIR: .claude/skills
           GH_AW_SKILL_EXT: .md
@@ -485,6 +491,8 @@ jobs:
             - `serena` — run `serena --help` to see available tools
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_OTLP_LOGS_ENABLED: ""
+          GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
@@ -496,6 +504,8 @@ jobs:
         env:
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_OTLP_LOGS_ENABLED: ""
+          GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
@@ -507,6 +517,8 @@ jobs:
         env:
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_OTLP_LOGS_ENABLED: ""
+          GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""

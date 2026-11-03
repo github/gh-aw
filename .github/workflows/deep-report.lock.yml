@@ -99,6 +99,8 @@ env:
   OTEL_RESOURCE_ATTRIBUTES: 'gh-aw.workflow.name=Deep%20Report,gh-aw.repository=${{ github.repository }},gh-aw.run.id=${{ github.run_id }},github.run_id=${{ github.run_id }},gh-aw.engine.id=claude'
   OTEL_EXPORTER_OTLP_HEADERS: x-sentry-auth=${{ secrets.GH_AW_OTEL_SENTRY_AUTHORIZATION }}
   GH_AW_OTLP_ALL_HEADERS: x-sentry-auth=${{ secrets.GH_AW_OTEL_SENTRY_AUTHORIZATION }},Authorization=${{ secrets.GH_AW_OTEL_GRAFANA_AUTHORIZATION }}
+  GH_AW_OTLP_LOGS_ENABLED: ${{ vars.GH_AW_OTLP_LOGS_ENABLED }}
+  GH_AW_OTLP_LOGS_MAX_BYTES: ${{ vars.GH_AW_OTLP_LOGS_MAX_BYTES }}
   GH_AW_OTLP_ENDPOINTS: '[{"url":"${{ secrets.GH_AW_OTEL_SENTRY_ENDPOINT }}","headers":"x-sentry-auth=${{ secrets.GH_AW_OTEL_SENTRY_AUTHORIZATION }}"},{"url":"${{ secrets.GH_AW_OTEL_GRAFANA_ENDPOINT }}","headers":"Authorization=${{ secrets.GH_AW_OTEL_GRAFANA_AUTHORIZATION }}"}]'
 
 jobs:
@@ -368,6 +370,8 @@ jobs:
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_OTLP_LOGS_ENABLED: ""
+          GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"cache_memory_prompt.md\"},{\"file\":\"safe_outputs_cli_only_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"github_mcp_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0006\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0007\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0008\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0009\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0010\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0011\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0012\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0013\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0014\"},{\"author_file\":\".github/workflows/deep-report.md\"}],\"system_item_count\":13,\"author_expressions\":{\"experiments.output_format\":\"GH_AW_EXPERIMENTS_OUTPUT_FORMAT\",\"experiments.output_format == 'annotated_brief'\":\"GH_AW_EXPR_6BD53142\",\"experiments.output_format == 'executive_brief'\":\"GH_AW_EXPR_504E2CD2\",\"experiments.output_format == 'ste'\":\"GH_AW_EXPR_C30EB268\"}}"
           GH_AW_PROMPT_CONTENT_0000: |
@@ -455,6 +459,8 @@ jobs:
           GH_AW_EXPR_C30EB268: ${{ steps.pick-experiment.outputs.output_format == 'ste' }}
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_OTLP_LOGS_ENABLED: ""
+          GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           GH_AW_SKILL_DIR: .claude/skills
           GH_AW_SKILL_EXT: .md
@@ -525,6 +531,8 @@ jobs:
             - `work-queue` — run `work-queue --help` to see available tools
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_OTLP_LOGS_ENABLED: ""
+          GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
@@ -536,6 +544,8 @@ jobs:
         env:
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_OTLP_LOGS_ENABLED: ""
+          GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
@@ -547,6 +557,8 @@ jobs:
         env:
           GH_AW_OTLP_ALL_HEADERS: ""
           GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_OTLP_LOGS_ENABLED: ""
+          GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
