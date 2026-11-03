@@ -41,7 +41,7 @@
     "@playwright/test": "^1.64.1",
     "@types/primer__octicons": "^19.21.0",
     "http-server": "^14.1.1",
-    "postcss": "8.5.31",
+    "postcss": "8.5.32",
     "satori": "^0.63.2",
     "starlight-github-alerts": "^0.5.0"
   },
