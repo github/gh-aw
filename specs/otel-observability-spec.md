@@ -711,6 +711,44 @@ Log bodies and attributes MUST NOT contain OTLP headers, tokens, credentials, co
 
 Log messages SHOULD use stable templates, with variable data placed in structured attributes after redaction.
 
+### 12.5 Opt-in Compact Unified Session Logs
+
+The compiler MUST inject `GH_AW_OTLP_LOGS_ENABLED` and
+`GH_AW_OTLP_LOGS_MAX_BYTES` from their same-named GitHub Actions variables.
+Session-log export MUST remain disabled unless the enable value is exactly
+`true`. An unset byte limit MUST default to 65536; a configured limit MUST be a
+positive safe integer. Invalid configuration MUST warn without exporting.
+
+The conclusion job MUST export only the persisted, publication-redacted compact
+unified session, with at most 128 events and 16 KiB of projected JSONL.
+Export MUST additionally omit repository, workflow/run/session/agent identity,
+refs, SHAs, memory identity, branches and filesystem paths. Current secret and
+exporter-header masks MUST be applied. Operational metadata and trace
+correlation MAY remain; this profile does not guarantee irreversible anonymity.
+Full session artifacts MUST remain unchanged.
+
+Each retained event MUST be an OTLP structured log body under instrumentation
+scope `gh-aw.session`, with `gh-aw.session.event_type` as a log attribute.
+Valid current trace/span IDs SHOULD be included. Export MUST use the existing
+endpoint list and isolated per-endpoint headers, posting to `/v1/logs` instead
+of `/v1/traces`. A trailing signal path MUST be replaced, not duplicated.
+
+The serialized UTF-8 JSON request MUST NOT exceed `GH_AW_OTLP_LOGS_MAX_BYTES`
+per endpoint. Whole low-priority records MUST be omitted to meet the limit,
+using the same retention ranking as the compact serializer: format/workflow
+metadata, final outcomes and promoted failures, guardrail/grader results,
+retry diagnostics, per-step usage, then successful memory updates.
+Equal-priority records MUST prefer earlier evidence, and retained records MUST
+remain in source order. The source serializer MUST consider late essential
+records within its scan budget even after compact output limits are reached.
+Resource attributes MUST report compact version, included/omitted event counts,
+oversized source lines, scan truncation and overall truncation, including
+size-induced omissions. When size or scan limits discard evidence, the exporter
+MUST issue a GitHub Actions warning explicitly identifying the export as partial.
+If no record fits, the exporter MUST warn and skip the
+request. Export failures MUST NOT fail the workflow, and unchanged credentials
+MUST NOT be retried after authorization failures.
+
 ---
 
 ## 13. Outcome Evaluation
