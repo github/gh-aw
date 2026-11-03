@@ -122,6 +122,30 @@ func TestGenerateUnifiedPromptCreationStep_StaticValuesAsData(t *testing.T) {
 	}
 }
 
+func TestGenerateUnifiedPromptCreationStep_QuotesExpressionEnvVars(t *testing.T) {
+	const expression = `${{ github.event.issue.title || 'value: "quoted" # comment' }}`
+	compiler := &Compiler{}
+	data := &WorkflowData{ParsedTools: NewTools(map[string]any{})}
+	section := PromptSection{
+		Content: "Prompt content",
+		EnvVars: map[string]string{"GH_AW_TEST": expression},
+	}
+
+	var creation strings.Builder
+	compiler.generateUnifiedPromptCreationStep(&creation, []PromptSection{section}, nil, nil, data)
+
+	var workflow struct {
+		Jobs map[string]struct {
+			Steps []struct {
+				Env map[string]string `yaml:"env"`
+			} `yaml:"steps"`
+		} `yaml:"jobs"`
+	}
+	require.NoError(t, yaml.Unmarshal([]byte("jobs:\n  test:\n    steps:\n"+creation.String()), &workflow))
+	require.Len(t, workflow.Jobs["test"].Steps, 1)
+	assert.Equal(t, expression, workflow.Jobs["test"].Steps[0].Env["GH_AW_TEST"])
+}
+
 func TestGenerateUnifiedPromptCreationStep_SplitsSystemAndUserItems(t *testing.T) {
 	compiler := &Compiler{}
 	data := &WorkflowData{ParsedTools: NewTools(map[string]any{})}
