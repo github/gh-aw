@@ -5,6 +5,7 @@ on:
   workflow_dispatch: null
 permissions:
   contents: read
+  copilot-requests: write
   issues: read
   pull-requests: read
 env:
@@ -147,7 +148,12 @@ steps:
   working-directory: ./actions/setup/js
 description: Analyzes and enhances Go logging practices across the codebase for improved debugging and observability
 emoji: 📝
-engine: claude
+engine:
+  id: claude
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: balanced
 name: Go Logger Enhancement
 timeout-minutes: 30
 tools:
