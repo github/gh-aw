@@ -207,6 +207,14 @@ import-schema:
     does not install a Datadog integration or send Actions telemetry.
   </purpose>
   <authentication>
+    <availability>
+      Datadog OAuth clients are restricted to approved Technology Partners building
+      official integrations. Standalone clients are not supported; unpublished
+      clients are limited to their partner developer organization. An ordinary
+      repository owner cannot assume self-service client creation is available.
+      See https://docs.datadoghq.com/extend/integrations/api_integration/.
+      Ordinary API/application keys do not satisfy this bearer-token route.
+    </availability>
     <mode name="oauth-bearer" supported="true">
       Each selected operation uses Authorization: Bearer followed by an existing
       Datadog OAuth access token, stored without the Bearer prefix. The documented
@@ -261,10 +269,10 @@ import-schema:
     </mode>
   </authentication>
   <configuration>
-    Import .github/workflows/connectors/datadog.md from the compiler distribution.
-    Local or reviewed pinned imports are alternatives; no provider YAML file
-    or Datadog SDK is required in the consumer repository. Importing alone
-    selects no capabilities and resolves no credentials.
+    Use a reviewed local copy at .github/workflows/connectors/datadog.md or a
+    reviewed pinned remote import. There is no compiled-in provider definition
+    or automatic installation. No separate provider YAML file or Datadog SDK is
+    required. Importing alone selects no capabilities and resolves no credentials.
     <sites>
       api-origin is a trusted choice input, default https://api.datadoghq.com
       for US1. Other allowed origins are https://api.us3.datadoghq.com (US3),

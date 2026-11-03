@@ -344,8 +344,10 @@ import-schema:
     receivers. Future ingress must validate Sentry-Hook-Resource and verify
     Sentry-Hook-Signature against the exact raw body with HMAC-SHA256 using the
     integration Client Secret, plus a reviewed replay policy. Importing does not
-    subscribe webhooks or enroll a source. Every custom trigger selection currently
-    fails compilation closed; use workflow_dispatch.
+    subscribe webhooks or enroll a source. Protected gateway subscription
+    compilation is supported, but live ingress needs separately approved receiver
+    support, source enrollment and canonical URL mapping. Use workflow_dispatch
+    until those external requirements are implemented and approved.
   </triggers>
   <reads>
     <read id="get-issue" selection="tools.sentry: [get-issue]" tool="get_issue_details" credential="reader" max-response-bytes="65536">

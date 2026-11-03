@@ -13,6 +13,7 @@ imports:
 tools:
   pagerduty: [get-incident]
 safe-outputs:
+  staged: true
   pagerduty-add-note:
 ---
 

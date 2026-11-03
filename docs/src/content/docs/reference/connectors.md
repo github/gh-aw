@@ -95,6 +95,44 @@ and other mutations remain opt-in, not additional advertised tools for these
 selections. Missing or unsupported provider functionality is preferable to a
 generic arbitrary-call proxy.
 
+### Golden workflows
+
+Each integration includes a manually triggered common-scenario workflow under
+`.github/workflows/<provider>-golden.md`. These are complete consumers, not extra
+MCP tools. They keep the provider surface to one or two targeted reads and cap
+the proposed effect at one. Confluence additionally selects two read-only
+GitHub methods for duplicate detection.
+
+| Integration | Common scenario | Source |
+| --- | --- | --- |
+| Linear | Bug intake triage using the issue and complete bounded discussion | [linear-golden.md](https://github.com/github/gh-aw/blob/main/.github/workflows/linear-golden.md) |
+| Jira | First-response issue triage with evidence, focused questions and a next step | [jira-golden.md](https://github.com/github/gh-aw/blob/main/.github/workflows/jira-golden.md) |
+| Azure DevOps | Work-item description to an actionable engineering handoff | [azure-devops-golden.md](https://github.com/github/gh-aw/blob/main/.github/workflows/azure-devops-golden.md) |
+| Slack | Short-thread decisions, action items and open questions | [slack-golden.md](https://github.com/github/gh-aw/blob/main/.github/workflows/slack-golden.md) |
+| Teams | Approved root-message action items to a GitHub follow-up | [teams-golden.md](https://github.com/github/gh-aw/blob/main/.github/workflows/teams-golden.md) |
+| Confluence | Deployment/rollback runbook readiness review with a deduplicated follow-up | [confluence-golden.md](https://github.com/github/gh-aw/blob/main/.github/workflows/confluence-golden.md) |
+| Sentry | Known-error diagnostic evidence to an engineering investigation | [sentry-golden.md](https://github.com/github/gh-aw/blob/main/.github/workflows/sentry-golden.md) |
+| ServiceNow | On-call incident shift handoff combining operator facts and record metadata | [servicenow-golden.md](https://github.com/github/gh-aw/blob/main/.github/workflows/servicenow-golden.md) |
+| GitLab | Open/draft merge-request intake and human-review handoff | [gitlab-golden.md](https://github.com/github/gh-aw/blob/main/.github/workflows/gitlab-golden.md) |
+| PagerDuty | Active-incident handoff with observed facts and suggested responder checks | [pagerduty-golden.md](https://github.com/github/gh-aw/blob/main/.github/workflows/pagerduty-golden.md) |
+| Datadog | Alert/Warn monitor metadata to a GitHub investigation issue | [datadog-golden.md](https://github.com/github/gh-aw/blob/main/.github/workflows/datadog-golden.md) |
+| Zendesk | Unresolved-ticket metadata to a private engineering-ownership handoff | [zendesk-golden.md](https://github.com/github/gh-aw/blob/main/.github/workflows/zendesk-golden.md) |
+| Notion | Older page-edit metadata to a human reference-maintenance request | [notion-golden.md](https://github.com/github/gh-aw/blob/main/.github/workflows/notion-golden.md) |
+
+All effects are staged by default; reads still require authorized provider
+credentials and inference access. Copy the reviewed connector declaration
+alongside its consumer, replace specimen resource bindings consistently, and
+review new-secret/action notices before deployment. Slack and Sentry require
+editing their declaration-owned specimen pins. Datadog's current OAuth route
+requires an approved partner client and external token renewal; ordinary
+API/application-key pairs are not interchangeable with that route.
+
+A compiled golden is offline configuration evidence, not live API or model
+quality proof. Each prompt distinguishes reported facts from hypotheses, stops
+on insufficient evidence and avoids pretending metadata is a document or
+conversation body. No example installs a receiver, expands grants from returned
+IDs or claims a staged effect was delivered.
+
 Every included declaration contains one self-contained
 `connector-documentation` XML comment in its Markdown body, including credential
 provisioning, resource inputs, capability limits, and complete consumer examples.
@@ -435,8 +473,9 @@ arguments and lists `unresolvedInputs`; it performs no lookups or credential
 resolution and does not claim verified canonical targets. Separately selected
 `resolve-team` and `resolve-project` reads remain available and grant no authority.
 Old environment-variable defaults are not restored. Broad hosted
-MCP toolsets, optional project creation, and single-field updates remain contract
-gaps, not silently retained legacy paths.
+MCP toolsets remain intentionally unavailable. Use the explicit team-only creator
+for projectless creation and sparse selectors for single-field updates rather
+than assuming the removed native options are aliases.
 No custom authenticated ingress or configurable context is installed.
 
 For an author-owned team UUID secret and a project URL slug, select
@@ -458,8 +497,9 @@ Declaration: `.github/workflows/connectors/jira.md`.
 Import `".github/workflows/connectors/jira.md"` with `site` set to the approved HTTPS
 site origin for writes. `cloud-ids`, `issues`, `projects`, `queries`, and
 `issue-ids` are exact string-array grants, empty by default. Importing alone
-grants nothing. Each MCP profile requires `cloud-ids`, `issues`, and `queries`
-because it registers both read methods. Issue mutations require `issues`
+grants nothing. A full MCP profile requires `cloud-ids`, `issues`, and `queries`;
+`tools.jira: {personal: [getJiraIssue]}` or the equivalent service-account subset
+needs only the cloud/issue grants and does not advertise search. Issue mutations require `issues`
 unless a selected creator establishes an authenticated temporary reference;
 creation requires `projects`. `site` defaults to `https://example.atlassian.net`
 only as a specimen, not tenant discovery.
@@ -476,6 +516,7 @@ imports:
       site: https://example.atlassian.net
       issues: [APP-1]
 safe-outputs:
+  staged: true
   jira-add-comment:
 ---
 
@@ -487,9 +528,12 @@ Request a factual comment only for the approved issue.
 For hosted MCP, an Atlassian administrator can create a scoped service-account
 API key: store it as `JIRA_MCP_SERVICE_ACCOUNT_KEY`. Alternatively, create a
 personal API token and store `base64(email:api_token)` as
-`JIRA_MCP_PERSONAL_BASIC_AUTH`. Both read profiles require
-`read:jira:agent-interface` and `search:jira:agent-interface`, and organization
-policy must permit token authentication. Follow [Atlassian MCP token setup](https://support.atlassian.com/atlassian-ai-gateway/docs/configure-authentication-via-api-token/).
+`JIRA_MCP_PERSONAL_BASIC_AUTH`. Both profile declarations list
+`read:jira:agent-interface` and `search:jira:agent-interface` as credential
+metadata; this neither grants permissions nor enables an unselected method.
+Review the selected method's scope/permission-group requirements, issue
+visibility and IP policy. Organization policy must permit token authentication.
+Follow [Atlassian MCP token setup](https://support.atlassian.com/atlassian-ai-gateway/docs/configure-authentication-via-api-token/).
 Successful MCP initialization is not authorization: organization policy can
 still deny API-token tool calls. An organization administrator must grant that
 access; the connector does not switch credentials or authentication schemes.
@@ -500,7 +544,9 @@ selected issue operations, then store `base64(email:api_token)` as
 `JIRA_REST_BASIC_AUTH`. Existing `JIRA_USER_EMAIL` and `JIRA_API_TOKEN` values
 must be combined and encoded by the trusted host; neither alone is the encoded
 secret. See [Jira Basic authentication](https://developer.atlassian.com/cloud/jira/platform/basic-auth-for-rest-apis/).
-The specimen pins a site origin; scoped-token gateway URLs require a reviewed
+The seven direct REST discovery readers use a separate
+`JIRA_REST_READ_BASIC_AUTH` credential, not an automatic fallback after MCP
+denial. The specimen pins a site origin; scoped-token gateway URLs require a reviewed
 endpoint **and path** change, not just substituting a hostname.
 
 | Surface | Current declaration |
@@ -508,7 +554,7 @@ endpoint **and path** change, not just substituting a hostname.
 | Triggers | Native created/updated/deleted plus resolution-based closed/reopened and unambiguous label changes. Signed admin verification and replay support remain external. |
 | MCPs/read tools | The two hosted issue/JQL methods remain independently selected. Seven fixed REST readers restore project/type/field/transition/account/link discovery with explicit grants and bounds. REST reads use their own declared credential, not an automatic fallback from a denied MCP profile. |
 | Safe outputs | Existing create/update/comment/label operations plus sparse summary/description updates and exact approved issue types. ADF encoding, additive labels and authenticated same-run chaining remain supported. |
-| Context | Selected bounded reads only. Validate tenant/project authority independently; returned keys/accounts are data, not grants. No automatic hydration or raw-event fallback. |
+| Read evidence | Selected bounded reads only. Hosted results are untrusted remote content, not locally projected issue/tenant identity evidence. Validate cloud/site/project authority independently; search results are not filtered by the issue-key grant. No automatic hydration or raw-event fallback. |
 
 ### Migration limits
 
@@ -559,12 +605,14 @@ imports:
       project-name: Fabrikam
       work-item: "123"
 tools:
-  azure-devops: [azure-devops]
+  azure-devops: [get-work-item-description]
 safe-outputs:
+  staged: true
   azure-devops-comment-on-work-item:
 ---
 
-Inspect project metadata only. Request a comment only on the approved work item.
+Read the approved work item's actual description. Stage a useful handoff only
+when the returned evidence supports it; never claim it was posted.
 ```
 
 Inputs `collection`, `related-work-item`, and `assignee` bind the gateway-source
@@ -579,9 +627,13 @@ operation; they must match its exact approved resource lists.
 Authorize an identity in the approved Azure DevOps organization/project and
 obtain [Microsoft Entra access tokens](https://learn.microsoft.com/en-us/azure/devops/integrate/get-started/authentication/entra?view=azure-devops)
 for the selected Azure DevOps services. Store the read MCP token as
-`AZURE_DEVOPS_MCP_ENTRA_TOKEN` and a separately authorized write token as
-`AZURE_DEVOPS_WRITE_TOKEN`. The declaration lists `vso.project` for reads and
-`vso.work_write` for writes; actual identity and project permissions still apply.
+`AZURE_DEVOPS_MCP_ENTRA_TOKEN` only for the hosted project-listing profile.
+The REST description reader instead uses `AZURE_DEVOPS_READ_TOKEN`; separately
+authorized writes use `AZURE_DEVOPS_WRITE_TOKEN`. REST tokens target Azure DevOps
+resource `499b84ac-1321-427f-aa17-267ca6975798`, with trusted acquisition commonly
+requesting `https://app.vssps.visualstudio.com/.default`. Do not assume the hosted
+MCP flow uses that audience. Declared `vso.*` scopes are requirements, not
+permission grants; actual identity/project/resource access still applies.
 The [remote MCP server](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server?view=azure-devops)
 uses Entra authentication: do not substitute a REST PAT or client secret as a
 bearer access token. Token renewal is not implemented by the declaration.
@@ -592,6 +644,13 @@ bearer access token. Token renewal is not implemented by the declaration.
 | MCPs/read tools | Hosted MCP still exposes only organization-visible project metadata. Independently selected fixed REST readers provide approved work-item content; additional repository/pipeline selections use their own declared read identities and grants. No wildcard remote registration is restored. |
 | Safe outputs | Original narrow effects remain available. Rich creators, sparse/clear mutations, authored static custom fields, reviewed Branch ArtifactLinks, receipt-aware typed relations, and staged binary upload/attachment effects are independently selected. |
 | Context | Bounded selected reads only. IDs remain references, not grants; snapshot/delta variants and configured terminal states determine lifecycle evidence. |
+
+Work-item and pinned source-file readers return actual content. PR/build metadata
+is not a diff, log, artifact or root-cause investigation. Returned list/query
+items still need independent exact grants; one unapproved result rejects the
+page. Build continuation headers are not returned by the JSON-only adapter.
+The golden starts with one known item's description and one staged comment,
+without requiring a hosted MCP token.
 
 ### Migration limits
 
@@ -651,6 +710,16 @@ receiver, not either Web API token.
 
 HTTP 200 with `ok: false` is a failure. An ambiguous write is not retried.
 
+The declaration pins synthetic workspace/app/channel/thread resources and
+matching enums; public `with` inputs override secret names only. Review and
+replace those pins together before real use. `read-thread` returns actual
+message text, blocks and file references, not attachment bytes. It requests
+`limit=15`, requires no remaining page/cursor, and caps the response at 65,536
+bytes; fifteen is a request size, not a separately enforced response item cap.
+Use it for short approved threads, not complete long-thread summarization or
+an arbitrary mention bot. The golden keeps its decisions/action-items brief in
+the same thread and stages nothing on incomplete evidence.
+
 ## Microsoft Teams
 
 Declaration: `.github/workflows/connectors/teams.md`.
@@ -685,6 +754,12 @@ conversation reference whose authenticated service URL matches the declared
 `https://smba.trafficmanager.net/teams/`; this is not a global fallback for other
 service URLs, private channels, or shared channels.
 
+The root-message read returns actual content but rejects bot/system-only or empty
+messages. The reply reader requests `$top=20`; its byte cap does not establish a
+local reply-count/type limit or per-item parent binding. Label that page partial.
+The golden uses just the root reader and a staged GitHub action-item handoff,
+so no Bot writer/token or conversation enrollment is required.
+
 ## Confluence
 
 Declaration: `.github/workflows/connectors/confluence.md`.
@@ -709,6 +784,15 @@ OAuth acquisition and renewal are external to the connector.
 
 Independent cloud, space, and page allowlists do not prove their membership
 relationship. Comment writes do not perform a space-membership preflight.
+
+`get-page` returns real storage-format body and version evidence, within a
+65,536-byte JSON response; it does not hydrate macros, linked pages or attachments.
+The two provider writes contain a fixed title/paragraph, not an agent's generated
+runbook or review findings. The golden therefore reviews the body and proposes a
+deduplicated GitHub follow-up instead of pretending the placeholder comment
+publishes its results. Read the declaration's `<authentication>` guidance as
+well as setup output: OAuth audience, consent, cloud discovery, ACLs and external
+renewal are prerequisites, not generic token-storage instructions.
 
 ## Sentry
 
@@ -736,6 +820,17 @@ not a REST access token.
 
 Pin the organization's region and exact API host; never follow event URLs with credentials.
 
+Only secret names are import inputs: organization/project/issue resources,
+the hosted URL and organization enum are specimen pins in the declaration.
+Replace them consistently and prefer singleton targets. REST response checks
+establish allowlist membership, not exact request equality if that list is
+widened. Hosted diagnostics may include stacks, exception values and personal
+data without local resource-identity projection or PII scrubbing; approve their
+disclosure before selecting the profile. The golden uses that single diagnostic
+method for a staged investigation handoff and does not select resolution.
+Gateway subscription compilation is supported, but no Sentry receiver or live
+signature verification is installed by the declaration.
+
 ## ServiceNow
 
 Declaration: `.github/workflows/connectors/servicenow.md`.
@@ -758,28 +853,183 @@ See [ServiceNow REST authentication](https://developer.servicenow.com/dev.do#!/r
 | Safe outputs | `servicenow-append-incident-work-note`, `servicenow-append-requested-item-work-note`. Notes are bounded to 4,000 characters; no state transitions, general record updates, or `sc_request` support. |
 | Context | Exact `incident` or `sc_req_item` records by 32-hex `sys_id`; only `sys_id`, `number`, `state`, and `sys_mod_count`, with an 8,192-byte response cap. No descriptions, journal history, attachments, or automatic display-number lookup. |
 
-A record receipt does not prove a durable journal entry; review ACLs and business
-rules, and do not retry an ambiguous append.
+A record receipt does not prove a durable journal entry. Field ACL filtering can
+return HTTP 200 and a matching `sys_id` without persisting `work_notes`; review
+ACLs/business rules and independently verify journal persistence before treating
+a live note as delivered. Do not retry an ambiguous append. The golden combines
+an operator's non-sensitive shift briefing with number/raw-state/revision
+metadata; it does not invent an incident description, diagnosis or lifecycle
+interpretation.
 
-## Additional connector declarations
+## GitLab
 
-These declarations use the same import and phase-selection contract. Their XML
-documentation contains the full credential-acquisition instructions, exact input
-names, resource grants, limits, and staged manual-dispatch examples.
+Declaration: `.github/workflows/connectors/gitlab.md`.
 
-| Declaration | Read capabilities | Safe output | Credential and scope boundary |
-| --- | --- | --- | --- |
-| `.github/workflows/connectors/gitlab.md` | `get-merge-request`, `get-pipeline` | `gitlab-add-merge-request-note` | Separate read and note-writing tokens; exact project, merge-request IID, and pipeline grants. No authenticated webhook receiver is installed. |
-| `.github/workflows/connectors/pagerduty.md` | `get-incident` | `pagerduty-add-note` | Separate full `Token token=...` REST authorization values and an approved `From` identity. Read checks bind incident/service/team; note authority is the exact incident ID, not an atomic membership check. Events v2 routing keys are not REST credentials. |
-| `.github/workflows/connectors/datadog.md` | `get-monitor`, `get-incident` | `datadog-rename-incident` | Separate OAuth bearer tokens for `monitors_read`, `incident_read`, and `incident_write`; exact site and resource grants. API/application-key pairs are not approximated by a bearer token. Only the incident title changes. |
-| `.github/workflows/connectors/zendesk.md` | `get-ticket` | `zendesk-add-internal-note` | Separate OAuth read/write tokens for one approved tenant and ticket. Private-note audit evidence can fail after a possible write; no retry or durable-readback guarantee. |
-| `.github/workflows/connectors/notion.md` | `get-page` | `notion-add-comment` | Separate internal bearer connections with explicit page sharing; exact canonical page UUID grants and fixed `Notion-Version: 2026-03-11`. Metadata and plain-text comments only; no page-body/database hydration, hosted OAuth MCP, or native trigger. |
+Supply one reviewed HTTPS `api-origin` and exact project/MR/pipeline grants.
+Project IDs, project-local MR **IIDs**, and pipeline **IDs** are positive decimal
+strings, not interchangeable identifiers. The default origin is `https://gitlab.com`;
+subpath installations are unsupported.
 
-Hosted MCP, token acquisition/refresh, and ingress are not implied by any REST
-read capability. No new provider has been established as live-operational by
-offline mocked tests.
+Use separate `PRIVATE-TOKEN` credentials: `GITLAB_READ_TOKEN` with `read_api`
+and `GITLAB_NOTE_TOKEN` with `api` for a separately authorized note writer.
+Project tokens have creation-role/tier requirements; personal tokens are an
+alternative but do not override project access. Acquisition/rotation is external.
+See [GitLab REST authentication](https://docs.gitlab.com/api/rest/authentication/)
+and [project access tokens](https://docs.gitlab.com/user/project/settings/project_access_tokens/).
+
+| Surface | Current declaration |
+| --- | --- |
+| Reads | `get-merge-request` returns ID/project/IID/title/state/draft; `get-pipeline` returns ID/project/status/SHA/ref/source. No MR description, diff, approvals, jobs, logs or artifacts. |
+| Safe output | `gitlab-add-merge-request-note`: one bounded top-level note, not a review, merge or lifecycle operation. |
+| Evidence | Exact request/response project and child identities are checked. Independent grants do not prove an MR/pipeline association; a shared project or SHA-looking value is insufficient. |
+| Triggers | Declared MR-opened/pipeline-updated subscriptions compile through the protected gateway; signed receiver enrollment and canonical URL mapping remain external. |
+
+Notes start with an ASCII letter/digit; slash-prefixed later lines are rejected
+because GitLab quick actions can execute before normalization. The 2,000-code-point
+bound includes generated attribution. Do not retry an ambiguous POST. The golden
+classifies an open MR's draft flag and stages an author/reviewer handoff without
+claiming code quality, passing CI or merge readiness.
+
+## PagerDuty
+
+Declaration: `.github/workflows/connectors/pagerduty.md`.
+
+Approve exact incident, service and team IDs. Store the **complete**
+`Token token=<REST_API_KEY>` Authorization value in separate
+`PAGERDUTY_READ_AUTHORIZATION` and `PAGERDUTY_WRITE_AUTHORIZATION` secrets;
+a bare key, bearer token or Events-v2 routing key is not this route's credential.
+Live notes also require a fixed, authorized account user's `from-email`.
+The invalid specimen From is suitable for compilation, not live delivery.
+See [REST authentication](https://docs.pagerduty.com/developer/authentication)
+and [API access keys](https://docs.pagerduty.com/account-admin/api-access-keys).
+
+| Surface | Current declaration |
+| --- | --- |
+| Read | `get-incident` returns incident/service IDs, title, status and urgency. No alerts, timeline, assignments, existing notes, logs or root cause. |
+| Safe output | `pagerduty-add-note`, bounded to 2,000 code points including publication overhead; no acknowledgment, resolution or paging. |
+| Evidence | Read checks exact incident/service and requested-team membership. The note's incident authority is independent, not an atomic service/team/status recheck. |
+| Triggers | None declared; manual or ordinary GitHub invocation is required. No receiver, subscription or Events-v2 emitter is installed. |
+
+The golden prepares a known active-incident handoff with observed facts and
+suggested responder checks explicitly labeled unperformed. Copy the local
+declaration or use a reviewed pinned import; a relative import does not install
+the provider file. Staging requires the actual YAML flag, not merely the word
+"stage" in a prompt. Ambiguous note delivery requires independent inspection.
+
+## Datadog
+
+Declaration: `.github/workflows/connectors/datadog.md`.
+
+The current route requires an approved Datadog OAuth client and externally
+renewed bearer tokens: `DATADOG_MONITOR_READ_OAUTH_TOKEN` (`monitors_read`),
+`DATADOG_INCIDENT_READ_OAUTH_TOKEN` (`incident_read`) and
+`DATADOG_INCIDENT_WRITE_OAUTH_TOKEN` (`incident_write`) as selected.
+[Datadog restricts OAuth clients to approved Technology Partners](https://docs.datadoghq.com/extend/integrations/api_integration/);
+standalone client registration is not generally available, and unpublished
+clients are restricted to their partner developer organization.
+[Access tokens expire after one hour](https://docs.datadoghq.com/extend/authorization/oauth2_endpoints/).
+This is not a self-service API/application-key integration: the normal
+`DD-API-KEY` plus `DD-APPLICATION-KEY` pair is unsupported, not representable by
+renaming a bearer secret.
+
+| Surface | Current declaration |
+| --- | --- |
+| Reads | `get-monitor` exposes ID/name/type/overall state; `get-incident` exposes ID/title. No telemetry, incident lifecycle, per-group state or monitor/incident correlation. |
+| Safe output | `datadog-rename-incident`: title-only PATCH, with exact ID/title evidence and a 20–128-character sanitized title. |
+| Scope | Exact monitor/incident grants and one supported commercial `api-origin`; match the authorizing site and network domain. No cross-site fallback. |
+| Triggers | None declared; importing does not configure alert webhooks or a receiver. |
+
+The golden turns an Alert/Warn monitor snapshot into a staged GitHub
+investigation handoff, not a root-cause claim or a concurrent incident rename.
+OAuth approval/renewal remains a real deployment gate even when mocks and
+compilation pass.
+
+## Zendesk
+
+Declaration: `.github/workflows/connectors/zendesk.md`.
+
+Bind one `subdomain` and positive decimal ticket string through `with`.
+Provision separate OAuth credentials `ZENDESK_READ_OAUTH_TOKEN` (`tickets:read`)
+and `ZENDESK_WRITE_OAUTH_TOKEN` (`tickets:write`) for a verified Support agent
+with the required role and ticket visibility. API-token Basic authentication is
+not interchangeable. Token acquisition, expiry and refresh remain external.
+See [Zendesk authentication](https://developer.zendesk.com/api-reference/introduction/security-and-auth/)
+and [OAuth grants](https://developer.zendesk.com/api-reference/ticketing/oauth/grant_type_tokens/).
+
+| Surface | Current declaration |
+| --- | --- |
+| Read | `get-ticket` exposes ticket ID/status/subject/updated time, not description, conversation, priority, requester or attachments. |
+| Safe output | `zendesk-add-internal-note`, fixed `public:false`, with nonblank brace-free text and a 4,000-code-point formatted bound. No status/assignee/public-note operation. |
+| Evidence | Exact tenant/ticket and numeric response identity are checked. Private Comment confirmation currently assumes `audit.events[0]` and exact body equality. |
+| Triggers | None declared; no ticket discovery, webhook subscription or authenticated ingress is installed. |
+
+**Live note verification has a known compatibility risk.** The trusted publisher
+adds attribution including an HTML marker, while
+[Zendesk normalizes comment bodies](https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_comments/#bodies).
+A note can therefore be written and fail exact-echo verification; event-zero
+ordering is also unverified. Do not weaken assertions, trust any 2xx, or retry
+blindly. The golden deliberately selects a staged GitHub ownership handoff from
+metadata, not this writer or a customer-conversation diagnosis.
+
+## Notion
+
+Declaration: `.github/workflows/connectors/notion.md`.
+
+Create internal connections with the minimum capabilities and share each
+approved page with them using **Add connections**. Reader
+`NOTION_READ_TOKEN` needs Read content; a separately authorized
+`NOTION_COMMENT_WRITE_TOKEN` needs Insert comments. Capabilities and page
+sharing are independent; sharing a parent does not widen exact connector grants.
+See [authorization](https://developers.notion.com/guides/get-started/authorization)
+and [capabilities](https://developers.notion.com/reference/capabilities).
+
+| Surface | Current declaration |
+| --- | --- |
+| Read | `get-page` advertises `get_page` and exposes only page ID, URL and last-edited time, not title/body/blocks or databases. |
+| Safe output | `notion-add-comment`, one plain-text rich-text item bounded to 2,000 code points including attribution; Markdown markers are text, not rich rendering. |
+| Evidence | Exact lowercase canonical page UUID grants and request/response identity checks; returned IDs do not authorize new targets. Requests pin `Notion-Version: 2026-03-11`. |
+| Triggers | None declared; no page sharing, token exchange, webhook enrollment or automatic hydration is performed. |
+
+The golden compares edit metadata with an operator's UTC cutoff and stages a
+specific human maintenance request. An old edit timestamp does not prove a
+content defect, and a recent edit does not establish a review. There is no
+comment-history read or cross-run deduplication. Use this consumer rather than
+the disabled legacy `shared/mcp/notion.md` surface; legacy issue-summary examples
+are not proof of working declarative integration.
 
 ## Validation and runtime boundaries
+
+### Compiler scenario suite
+
+The golden consumers are executable compiler fixtures for every included
+integration, not copies of a separate built-in catalog.
+`connector_golden_workflow_test.go` checks their exact advertised reader names,
+reader-secret references, provider-versus-GitHub effect choice, one-proposal
+budget and staged writer omission. `connector_scenario_compile_test.go` exercises
+local and cached pinned imports, independent read-only/effect-only selections,
+authoring-document exclusion, imports that select nothing, and rejection of unknown capabilities, missing exact grants and
+writer-phase credentials on readers. Numeric-looking resource IDs remain strings
+in these fixtures.
+
+`connector_upstream_boundaries_test.go` checks each deployed host's transitive
+shared CJS dependencies and the actual connector artifact-upload ordering:
+built-in/custom redactors and the initial recovery validator must succeed before
+staging publication; final agent archives additionally require final recovery
+validation. Failure, cancellation or a skipped validator must not permit upload.
+
+Run the focused suite with:
+
+```bash
+go test ./pkg/workflow \
+  -run '^TestConnector(GoldenWorkflows|Scenario|ArtifactUploadRequiresCompletedRedaction|DeployedCJSDependencies)' \
+  -count=1
+```
+
+Provider-specific Go/Node transport, response, formatting and staging tests remain
+separate. Neither suite establishes real provider authentication, deployed
+ingress, live mutation delivery or the quality of an agent-generated handoff.
+
+### Runtime enforcement
 
 Compile a consuming workflow with `gh aw compile my-workflow --strict --no-emit`.
 Compilation makes no provider requests. It freezes selected definitions,

@@ -249,9 +249,10 @@ import-schema:
     </events-api>
   </credentials>
   <imports>
-    Import .github/workflows/connectors/pagerduty.md from a conventional workflow under
-    .github/workflows. No connector definition files, YAML specifications, local
-    provider copies, or enrollment are needed in the consuming repository.
+    Import a reviewed local copy at .github/workflows/connectors/pagerduty.md from
+    a conventional workflow, or use a reviewed pinned remote import. A relative
+    import requires that Markdown file to exist; there is no built-in provider
+    catalog or automatic installation. No separate YAML specification or SDK is needed.
     incidents, services, and teams are arrays of exact PagerDuty resource IDs,
     defaulting to empty arrays and therefore granting nothing. Selected reads
     require all three grants; selected notes require an incident grant.

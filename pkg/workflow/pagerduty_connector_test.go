@@ -49,39 +49,54 @@ func parsePagerDutySource(t *testing.T, source string) (*Compiler, *WorkflowData
 func TestPagerDutyConnectorLocalImportConsumer(t *testing.T) {
 	source, err := os.ReadFile(filepath.Join(pagerdutyFixtureDirectory, "workflow.md"))
 	require.NoError(t, err)
-	compiler, data, path, err := parsePagerDutySource(t, string(source))
-	require.NoError(t, err)
-	config := data.Connectors["pagerduty"]
-	require.NotNil(t, config)
-	require.Nil(t, config.Context)
-	require.Equal(t, []string{"PAGERDUTY_READ_AUTHORIZATION"}, config.Agent.Secrets())
-	require.Equal(t, []string{"PAGERDUTY_WRITE_AUTHORIZATION"}, config.SafeOutputs.Secrets())
-	require.Equal(t, []string{"pagerduty_get_incident"}, config.Agent.ToolNames())
-	require.Equal(t, []string{"add-note"}, config.SafeOutputs.SafeOutputNames())
-	require.Contains(t, data.Tools, "pagerduty")
-	require.NotContains(t, data.Tools, "connector-pagerduty")
-	require.Contains(t, data.SafeOutputs.Scripts["pagerduty-add-note"].Script, "process.execPath")
-	require.Contains(t, data.SafeOutputs.Scripts["pagerduty-add-note"].Script, "connector_runtime.cjs")
-	output, err := compiler.CompileToYAML(data, path)
-	require.NoError(t, err)
-	var document struct {
-		Jobs map[string]any `yaml:"jobs"`
+	for _, staged := range []bool{true, false} {
+		name := "staged-fixture"
+		consumer := string(source)
+		if !staged {
+			name = "explicit-live-configuration"
+			consumer = strings.Replace(consumer, "  staged: true\n", "  staged: false\n", 1)
+		}
+		t.Run(name, func(t *testing.T) {
+			compiler, data, path, err := parsePagerDutySource(t, consumer)
+			require.NoError(t, err)
+			require.Equal(t, staged, templatableBoolIsTrue(data.SafeOutputs.Staged))
+			config := data.Connectors["pagerduty"]
+			require.NotNil(t, config)
+			require.Nil(t, config.Context)
+			require.Equal(t, []string{"PAGERDUTY_READ_AUTHORIZATION"}, config.Agent.Secrets())
+			require.Equal(t, []string{"PAGERDUTY_WRITE_AUTHORIZATION"}, config.SafeOutputs.Secrets())
+			require.Equal(t, []string{"pagerduty_get_incident"}, config.Agent.ToolNames())
+			require.Equal(t, []string{"add-note"}, config.SafeOutputs.SafeOutputNames())
+			require.Contains(t, data.Tools, "pagerduty")
+			require.NotContains(t, data.Tools, "connector-pagerduty")
+			require.Contains(t, data.SafeOutputs.Scripts["pagerduty-add-note"].Script, "process.execPath")
+			require.Contains(t, data.SafeOutputs.Scripts["pagerduty-add-note"].Script, "connector_runtime.cjs")
+			output, err := compiler.CompileToYAML(data, path)
+			require.NoError(t, err)
+			var document struct {
+				Jobs map[string]any `yaml:"jobs"`
+			}
+			require.NoError(t, yaml.Unmarshal([]byte(output), &document))
+			agent, err := json.Marshal(document.Jobs["agent"])
+			require.NoError(t, err)
+			effects, err := json.Marshal(document.Jobs["safe_outputs"])
+			require.NoError(t, err)
+			require.Contains(t, string(agent), "${{ secrets.PAGERDUTY_READ_AUTHORIZATION }}")
+			require.NotContains(t, string(agent), "${{ secrets.PAGERDUTY_WRITE_AUTHORIZATION }}")
+			if staged {
+				require.NotContains(t, string(effects), "${{ secrets.PAGERDUTY_WRITE_AUTHORIZATION }}")
+			} else {
+				require.Contains(t, string(effects), "${{ secrets.PAGERDUTY_WRITE_AUTHORIZATION }}")
+			}
+			require.NotContains(t, string(effects), "${{ secrets.PAGERDUTY_READ_AUTHORIZATION }}")
+			require.Contains(t, string(effects), "pagerduty_add_note")
+			require.NotContains(t, output, "connector_9_pagerduty")
+			require.NotContains(t, output, `node "${RUNNER_TEMP}/gh-aw/actions/connector_runtime.cjs" invoke context`)
+			require.NotContains(t, output, "go build")
+			_, err = os.Stat(filepath.Join(compiler.gitRoot, ".github", "workflows", "connectors"))
+			require.NoError(t, err, "normal imports use editable connector files")
+		})
 	}
-	require.NoError(t, yaml.Unmarshal([]byte(output), &document))
-	agent, err := json.Marshal(document.Jobs["agent"])
-	require.NoError(t, err)
-	effects, err := json.Marshal(document.Jobs["safe_outputs"])
-	require.NoError(t, err)
-	require.Contains(t, string(agent), "${{ secrets.PAGERDUTY_READ_AUTHORIZATION }}")
-	require.NotContains(t, string(agent), "${{ secrets.PAGERDUTY_WRITE_AUTHORIZATION }}")
-	require.Contains(t, string(effects), "${{ secrets.PAGERDUTY_WRITE_AUTHORIZATION }}")
-	require.NotContains(t, string(effects), "${{ secrets.PAGERDUTY_READ_AUTHORIZATION }}")
-	require.Contains(t, string(effects), "pagerduty_add_note")
-	require.NotContains(t, output, "connector_9_pagerduty")
-	require.NotContains(t, output, `node "${RUNNER_TEMP}/gh-aw/actions/connector_runtime.cjs" invoke context`)
-	require.NotContains(t, output, "go build")
-	_, err = os.Stat(filepath.Join(compiler.gitRoot, ".github", "workflows", "connectors"))
-	require.NoError(t, err, "normal imports use editable connector files")
 }
 
 func TestPagerDutyConnectorIndependentSelections(t *testing.T) {
