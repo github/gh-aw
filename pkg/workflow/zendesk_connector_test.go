@@ -16,7 +16,6 @@ import (
 
 	"github.com/github/gh-aw/pkg/connectors"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 )
 
 const zendeskFixtureDir = "../connectors/testdata/providers/zendesk/"
@@ -37,17 +36,7 @@ func zendeskSource(t *testing.T, selection string) string {
 
 func parseZendeskWorkflow(t *testing.T, source string) (*Compiler, *WorkflowData, string, error) {
 	t.Helper()
-	root := t.TempDir()
-	path := filepath.Join(root, ".github", "workflows", "zendesk.md")
-	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0700))
-	require.NoError(t, os.WriteFile(path, []byte(source), 0600))
-	compiler := NewCompiler(WithNoEmit(true))
-	compiler.gitRoot = root
-	installConnectorTestSources(t, root)
-	compiler.SetActionMode(ActionModeDev)
-	compiler.version = "v0.0.0-1-gabcdef0"
-	data, err := compiler.ParseWorkflowFile(path)
-	return compiler, data, path, err
+	return parseConnectorConsumer(t, "zendesk.md", source)
 }
 
 func zendeskPlan(t *testing.T, phase string) *connectors.Plan {
@@ -205,12 +194,8 @@ func TestZendeskConnectorIndependentSelections(t *testing.T) {
 			require.NotContains(t, output, "Build trusted connector runtime")
 			require.NotContains(t, output, "connector_7_zendesk_")
 			require.NotContains(t, data.Tools, "connector-zendesk")
-			var workflow map[string]any
-			require.NoError(t, yaml.Unmarshal([]byte(output), &workflow))
-			jobs := workflow["jobs"].(map[string]any)
-			agent, err := json.Marshal(jobs["agent"])
-			require.NoError(t, err)
-			require.NotContains(t, string(agent), "${{ secrets.ZENDESK_WRITE_OAUTH_TOKEN }}")
+			agent, effects := connectorPhaseJobJSON(t, output)
+			require.NotContains(t, agent, "${{ secrets.ZENDESK_WRITE_OAUTH_TOKEN }}")
 			if test.read {
 				tool, ok := data.Tools["zendesk"].(map[string]any)
 				require.True(t, ok)
@@ -218,7 +203,7 @@ func TestZendeskConnectorIndependentSelections(t *testing.T) {
 				require.Equal(t, []string{"${RUNNER_TEMP}/gh-aw/actions/connector_runtime.cjs", "serve"}, tool["entrypointArgs"])
 				require.Equal(t, []string{"ZENDESK_READ_OAUTH_TOKEN"}, config.Agent.Secrets())
 				require.Equal(t, []string{"get_ticket"}, config.Agent.ToolNames())
-				require.Contains(t, string(agent), "${{ secrets.ZENDESK_READ_OAUTH_TOKEN }}")
+				require.Contains(t, agent, "${{ secrets.ZENDESK_READ_OAUTH_TOKEN }}")
 				encoded, err := config.Agent.Encode()
 				require.NoError(t, err)
 				raw, err := base64.StdEncoding.DecodeString(encoded)
@@ -234,10 +219,8 @@ func TestZendeskConnectorIndependentSelections(t *testing.T) {
 				require.Contains(t, output, "process.execPath")
 				require.Equal(t, []string{"ZENDESK_WRITE_OAUTH_TOKEN"}, config.SafeOutputs.Secrets())
 				require.Equal(t, []string{"add-internal-note"}, config.SafeOutputs.SafeOutputNames())
-				effects, err := json.Marshal(jobs["safe_outputs"])
-				require.NoError(t, err)
-				require.Contains(t, string(effects), "${{ secrets.ZENDESK_WRITE_OAUTH_TOKEN }}")
-				require.NotContains(t, string(effects), "${{ secrets.ZENDESK_READ_OAUTH_TOKEN }}")
+				require.Contains(t, effects, "${{ secrets.ZENDESK_WRITE_OAUTH_TOKEN }}")
+				require.NotContains(t, effects, "${{ secrets.ZENDESK_READ_OAUTH_TOKEN }}")
 			} else {
 				require.NotContains(t, output, "${{ secrets.ZENDESK_WRITE_OAUTH_TOKEN }}")
 			}

@@ -3,7 +3,6 @@
 package workflow
 
 import (
-	"encoding/json"
 	"encoding/xml"
 	"os"
 	"path/filepath"
@@ -11,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"go.yaml.in/yaml/v3"
 )
 
 const gitLabFixture = "../connectors/testdata/providers/gitlab/"
@@ -29,16 +27,8 @@ func gitLabConsumerSource(t *testing.T, selection string) string {
 
 func parseGitLabConsumer(t *testing.T, source string) (*Compiler, *WorkflowData, string, error) {
 	t.Helper()
-	root := t.TempDir()
-	path := filepath.Join(root, ".github", "workflows", "gitlab.md")
-	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0700))
-	require.NoError(t, os.WriteFile(path, []byte(source), 0600))
-	compiler := NewCompiler(WithNoEmit(true), WithVersion("v0.0.0-1-gabcdef0"))
-	compiler.gitRoot = root
-	installConnectorTestSources(t, root)
-	compiler.SetActionMode(ActionModeDev)
-	data, err := compiler.ParseWorkflowFile(path)
-	_, statErr := os.Stat(filepath.Join(root, ".github", "workflows", "connectors"))
+	compiler, data, path, err := parseConnectorConsumer(t, "gitlab.md", source)
+	_, statErr := os.Stat(filepath.Join(compiler.gitRoot, ".github", "workflows", "connectors"))
 	require.NoError(t, statErr, "consumer uses the normal local declaration")
 	return compiler, data, path, err
 }
@@ -79,17 +69,11 @@ func TestGitLabConnectorIndependentNativeSelections(t *testing.T) {
 			}
 			output, err := compiler.CompileToYAML(data, path)
 			require.NoError(t, err)
-			var document map[string]any
-			require.NoError(t, yaml.Unmarshal([]byte(output), &document))
-			jobs := document["jobs"].(map[string]any)
-			agent, err := json.Marshal(jobs["agent"])
-			require.NoError(t, err)
-			effects, err := json.Marshal(jobs["safe_outputs"])
-			require.NoError(t, err)
-			require.Equal(t, test.read, strings.Contains(string(agent), "${{ secrets.APPROVED_GITLAB_READER }}"))
-			require.NotContains(t, string(agent), "${{ secrets.APPROVED_GITLAB_WRITER }}")
-			require.Equal(t, test.write, strings.Contains(string(effects), "${{ secrets.APPROVED_GITLAB_WRITER }}"))
-			require.NotContains(t, string(effects), "${{ secrets.APPROVED_GITLAB_READER }}")
+			agent, effects := connectorPhaseJobJSON(t, output)
+			require.Equal(t, test.read, strings.Contains(agent, "${{ secrets.APPROVED_GITLAB_READER }}"))
+			require.NotContains(t, agent, "${{ secrets.APPROVED_GITLAB_WRITER }}")
+			require.Equal(t, test.write, strings.Contains(effects, "${{ secrets.APPROVED_GITLAB_WRITER }}"))
+			require.NotContains(t, effects, "${{ secrets.APPROVED_GITLAB_READER }}")
 			require.NotContains(t, output, "${{ secrets.GITLAB_READ_TOKEN }}")
 			require.NotContains(t, output, "${{ secrets.GITLAB_NOTE_TOKEN }}")
 		})

@@ -3,7 +3,6 @@
 package workflow
 
 import (
-	"encoding/json"
 	"encoding/xml"
 	"os"
 	"path/filepath"
@@ -12,7 +11,6 @@ import (
 
 	"github.com/github/gh-aw/pkg/connectors"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 )
 
 const notionPageID = "11111111-2222-4333-8444-555555555555"
@@ -53,16 +51,7 @@ func notionConsumerExample(t *testing.T) string {
 
 func parseNotionConsumer(t *testing.T, source string) (*Compiler, *WorkflowData, string, error) {
 	t.Helper()
-	root := t.TempDir()
-	path := filepath.Join(root, ".github", "workflows", "notion.md")
-	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0700))
-	require.NoError(t, os.WriteFile(path, []byte(source), 0600))
-	compiler := NewCompiler(WithNoEmit(true), WithVersion("v0.0.0-1-gabcdef0"))
-	compiler.gitRoot = root
-	installConnectorTestSources(t, root)
-	compiler.SetActionMode(ActionModeDev)
-	data, err := compiler.ParseWorkflowFile(path)
-	return compiler, data, path, err
+	return parseConnectorConsumer(t, "notion.md", source)
 }
 
 func TestNotionConnectorDocumentedConsumer(t *testing.T) {
@@ -78,17 +67,11 @@ func TestNotionConnectorDocumentedConsumer(t *testing.T) {
 	require.True(t, templatableBoolIsTrue(data.SafeOutputs.Staged))
 	output, err := compiler.CompileToYAML(data, path)
 	require.NoError(t, err)
-	var document map[string]any
-	require.NoError(t, yaml.Unmarshal([]byte(output), &document))
-	jobs := document["jobs"].(map[string]any)
-	agent, err := json.Marshal(jobs["agent"])
-	require.NoError(t, err)
-	effects, err := json.Marshal(jobs["safe_outputs"])
-	require.NoError(t, err)
-	require.Contains(t, string(agent), "${{ secrets.NOTION_READ_TOKEN }}")
-	require.NotContains(t, string(agent), "${{ secrets.NOTION_COMMENT_WRITE_TOKEN }}")
-	require.NotContains(t, string(effects), "${{ secrets.NOTION_READ_TOKEN }}")
-	require.NotContains(t, string(effects), "${{ secrets.NOTION_COMMENT_WRITE_TOKEN }}", "staged effects must not materialize credentials")
+	agent, effects := connectorPhaseJobJSON(t, output)
+	require.Contains(t, agent, "${{ secrets.NOTION_READ_TOKEN }}")
+	require.NotContains(t, agent, "${{ secrets.NOTION_COMMENT_WRITE_TOKEN }}")
+	require.NotContains(t, effects, "${{ secrets.NOTION_READ_TOKEN }}")
+	require.NotContains(t, effects, "${{ secrets.NOTION_COMMENT_WRITE_TOKEN }}", "staged effects must not materialize credentials")
 	require.NotContains(t, output, "connectors invoke context")
 	_, err = os.Stat(filepath.Join(compiler.gitRoot, ".github", "workflows", "connectors"))
 	require.NoError(t, err, "normal imports use editable consumer-side declarations")
@@ -97,15 +80,10 @@ func TestNotionConnectorDocumentedConsumer(t *testing.T) {
 	require.NoError(t, err)
 	output, err = compiler.CompileToYAML(data, path)
 	require.NoError(t, err)
-	require.NoError(t, yaml.Unmarshal([]byte(output), &document))
-	jobs = document["jobs"].(map[string]any)
-	agent, err = json.Marshal(jobs["agent"])
-	require.NoError(t, err)
-	effects, err = json.Marshal(jobs["safe_outputs"])
-	require.NoError(t, err)
-	require.NotContains(t, string(agent), "${{ secrets.NOTION_COMMENT_WRITE_TOKEN }}")
-	require.Contains(t, string(effects), "${{ secrets.NOTION_COMMENT_WRITE_TOKEN }}")
-	require.NotContains(t, string(effects), "${{ secrets.NOTION_READ_TOKEN }}")
+	agent, effects = connectorPhaseJobJSON(t, output)
+	require.NotContains(t, agent, "${{ secrets.NOTION_COMMENT_WRITE_TOKEN }}")
+	require.Contains(t, effects, "${{ secrets.NOTION_COMMENT_WRITE_TOKEN }}")
+	require.NotContains(t, effects, "${{ secrets.NOTION_READ_TOKEN }}")
 	require.Contains(t, data.Tools, "notion")
 	require.NotContains(t, data.Tools, "connector-notion")
 	require.Contains(t, output, "notion_add_comment")

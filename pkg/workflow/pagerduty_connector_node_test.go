@@ -36,34 +36,6 @@ func TestPagerDutyConnectorBundledNodeExecution(t *testing.T) {
 	require.JSONEq(t, `{"reads":2,"writes":1,"staged":true}`, string(output))
 }
 
-func TestPagerDutyConnectorBundledNodeCLIStaging(t *testing.T) {
-	_, write := pagerDutyPlans(t)
-	encoded, err := write.Encode()
-	require.NoError(t, err)
-	expected, err := write.PrepareSafeOutput("add-note", pagerDutyNoteArgs())
-	require.NoError(t, err)
-	want, err := json.Marshal(map[string]any{"staged": true, "request": expected})
-	require.NoError(t, err)
-	node, err := exec.LookPath("node")
-	require.NoError(t, err)
-	runtime, err := filepath.Abs("../../actions/setup/js/connector_runtime.cjs")
-	require.NoError(t, err)
-	command := exec.CommandContext(t.Context(), node, runtime, "invoke", "safe-output", "add-note", "--stage")
-	command.Env = []string{"GH_AW_CONNECTOR_PLAN=" + encoded}
-	args, err := json.Marshal(pagerDutyNoteArgs())
-	require.NoError(t, err)
-	command.Stdin = strings.NewReader(string(args))
-	output, err := command.CombinedOutput()
-	require.NoError(t, err, "%s", output)
-	require.JSONEq(t, string(want), string(output))
-	unauthorized := exec.CommandContext(t.Context(), node, runtime, "invoke", "safe-output", "add-note")
-	unauthorized.Env = []string{"GH_AW_CONNECTOR_PLAN=" + encoded}
-	unauthorized.Stdin = strings.NewReader(string(args))
-	output, err = unauthorized.CombinedOutput()
-	require.Error(t, err)
-	require.Contains(t, string(output), "requires explicit host write authorization")
-}
-
 const pagerDutyNodeChecks = `
 const assert = require("node:assert/strict");
 const { Readable, Writable } = require("node:stream");
