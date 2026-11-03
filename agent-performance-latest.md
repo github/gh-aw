@@ -85,3 +85,6 @@ metrics/latest.json now dated 2026-10-29 but collection_status=partial; workflow
 
 ## Run 2026-10-31T12:42Z
 metrics/latest.json now dated 2026-10-31 but collection_status=partial: run counters are zero placeholders, safe-output/engagement null (coverage 2.1h). Ranking still not possible; no discussion/issue filed.
+
+## Run 2026-11-03T12:45Z
+latest.json (2026-11-03, complete 24h): 593 executed / 438 ok (73.9%), 465 safe-output items, PR merge 88.9% (16/18). Weakest: pr-sous-chef 39% (60/98 failed), ai-moderator 12/24 failed (avg 4812s), smoke-copilot-aoai-apikey 0/3, 44 workflows with a single failed run. Pocock reviewer 20/24 ok but 1.96M tokens. Discussion posted.
