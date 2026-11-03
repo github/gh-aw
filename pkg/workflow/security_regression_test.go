@@ -584,7 +584,7 @@ network: defaults
 
 # Defaults Test
 Test network defaults.`,
-			expectedDomains: []string{"www.googleapis.com"},
+			expectedDomains: []string{"json-schema.org"},
 			description:     "Default domains should be applied without enabling engine domains",
 		},
 	}
