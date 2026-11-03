@@ -13,16 +13,18 @@ import (
 
 func TestCacheMemoryPromptMissingDataContract(t *testing.T) {
 	for _, template := range []string{cacheMemoryPromptFile, cacheMemoryPromptMultiFile} {
-		t.Run(template, func(t *testing.T) {
-			content, err := os.ReadFile(filepath.Join("prompts", template))
-			require.NoError(t, err)
-			prompt := string(content)
-			assert.Contains(t, prompt, "If the workflow defines initialization, a full analysis, or another fallback for absent state, follow that path and do **not** call `report_missing_data`")
-			assert.Contains(t, prompt, "If the workflow requires cached input and provides no fallback, call `report_missing_data`")
-			assert.Contains(t, prompt, "`data_type: \"cache_memory\"` and `reason: \"cache_memory_miss\"`")
-			assert.Contains(t, prompt, "report unusable required data with `report_missing_data` unless the workflow explicitly defines recovery")
-			assert.NotContains(t, prompt, "If you look for data in the cache and do not find any, call")
-		})
+		for _, directory := range []string{"prompts", filepath.Join("..", "..", "actions", "setup", "md")} {
+			t.Run(filepath.Join(directory, template), func(t *testing.T) {
+				content, err := os.ReadFile(filepath.Join(directory, template))
+				require.NoError(t, err)
+				prompt := string(content)
+				assert.Contains(t, prompt, "If the workflow defines initialization, a full analysis, or another fallback for absent state, follow that path and do **not** call `report_missing_data`")
+				assert.Contains(t, prompt, "If the workflow requires cached input and provides no fallback, call `report_missing_data`")
+				assert.Contains(t, prompt, "`data_type: \"cache_memory\"` and `reason: \"cache_memory_miss\"`")
+				assert.Contains(t, prompt, "report unusable required data with `report_missing_data` unless the workflow explicitly defines recovery")
+				assert.NotContains(t, prompt, "If you look for data in the cache and do not find any, call")
+			})
+		}
 	}
 }
 
