@@ -14,7 +14,13 @@ permissions:
   pull-requests: read
   discussions: read
   security-events: read
-engine: claude
+  copilot-requests: write
+engine:
+  id: claude
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
 strict: true
 tools:
   cli-proxy: true
