@@ -42,6 +42,8 @@ The `report-incomplete` safe-output is enabled by default and is distinct from `
 
   Custom implementations should add a generated-by footer and workflow provenance annotations to published content; direct API calls omit them and lose provenance-based tracking. For GitHub issues, run the setup action, initialize `actions/setup/js/index.cjs` with `setupGlobals`, and call `createIssue`. See the [public issue-creation API](https://github.github.com/gh-aw/reference/custom-safe-outputs/#issue-creation-api).
 
+  Never read internal safe-output files (e.g., `/tmp/gh-aw/safeoutputs/output.json`) from `post-steps:`; paths and format are implementation details and the compiler rejects direct reads. Use a built-in handler or move processing into a `safe-outputs.jobs` job that reads `$GH_AW_AGENT_OUTPUT`.
+
   Additional per-job properties:
   - `needs:` (string or array) - sequence this job relative to other compiled jobs; valid targets are `agent`, `safe_outputs`, `detection`, `upload_assets`, `unlock`, or another job name (dashes normalized to underscores). Persists across recompiles, unlike hand-patching the lock file.
   - `artifacts:` (array of strings) - filesystem paths/globs under `/tmp/gh-aw/` that this job's `inputs` reference so the compiler includes them in the unified agent artifact upload (paths the agent wrote at runtime are otherwise dropped). Directory entries must end with `/`; only secret-redaction-covered extensions (`.txt`, `.json`, `.log`, `.md`, `.mdx`, `.yml`, `.jsonl`, `.patch`) are persisted, and `..` or hidden-file segments are rejected at compile time.
@@ -336,3 +338,7 @@ The safe-outputs job emits named step outputs for the first successful result of
 | `create-pull-request` | `created_pr_number`, `created_pr_url` |
 | `add-comment` | `comment_id`, `comment_url` |
 | `push-to-pull-request-branch` | `push_commit_sha`, `push_commit_url` |
+
+### Code-Push Failure Handling
+
+If `create-pull-request` or `push-to-pull-request-branch` fails, remaining safe outputs still run; later `add_comment` outputs get a failure note, and the conclusion job reports details. No setting cancels selected outputs on code-push failure. To gate dependent work, use a custom safe-output job with `needs: safe_outputs` and `if: needs.safe_outputs.outputs.code_push_failure_count == '0'`.

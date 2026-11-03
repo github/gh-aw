@@ -121,7 +121,7 @@ func validateOnNeedsTargets(data *WorkflowData) error {
 	customJobs := make(map[string]struct {
 	}, len(data.Jobs))
 	for jobName := range data.Jobs {
-		if isReservedOnNeedsTarget(jobName) {
+		if isReservedOnNeedsTarget(jobName, data.Jobs) {
 			continue
 		}
 		customJobs[jobName] = struct {
@@ -129,7 +129,7 @@ func validateOnNeedsTargets(data *WorkflowData) error {
 	}
 
 	for _, need := range data.OnNeeds {
-		if isReservedOnNeedsTarget(need) {
+		if isReservedOnNeedsTarget(need, data.Jobs) {
 			return fmt.Errorf(
 				"on.needs: built-in job %q is not allowed. Expected one of the workflow's custom jobs. Example: on.needs: [secrets_fetcher]",
 				need,
@@ -189,7 +189,7 @@ func (c *Compiler) validateOnGitHubAppNeedsExpressions(data *WorkflowData) error
 			continue
 		}
 
-		if isReservedOnNeedsTarget(jobName) {
+		if isReservedOnNeedsTarget(jobName, data.Jobs) {
 			return fmt.Errorf("on.github-app.%s: built-in job %q is not allowed in needs expressions", fieldName, jobName)
 		}
 		if _, exists := data.Jobs[jobName]; !exists {
@@ -274,7 +274,7 @@ func validateOnNeedsDependencyChain(
 	defer delete(visiting, current)
 
 	for _, dep := range parseNeedsField(jobConfig["needs"]) {
-		if isReservedOnNeedsTarget(dep) {
+		if isReservedOnNeedsTarget(dep, allJobs) {
 			return fmt.Errorf(
 				"on.needs: job %q depends on built-in job %q. Dependencies for on.needs jobs must be custom jobs that run before activation",
 				current,
@@ -322,7 +322,9 @@ func extractNeedsJobFromOutputExpression(value string) (string, bool) {
 	return match[1], true
 }
 
-func isReservedOnNeedsTarget(jobName string) bool {
+// isReservedOnNeedsTarget treats generated maintenance job names as reserved
+// only when the workflow does not author a custom job with that name.
+func isReservedOnNeedsTarget(jobName string, authoredJobs map[string]any) bool {
 	switch jobName {
 	case string(constants.AgentJobName),
 		string(constants.ActivationJobName),
@@ -332,11 +334,13 @@ func isReservedOnNeedsTarget(jobName string) bool {
 		string(constants.SafeOutputsJobName),
 		"safe-outputs",
 		string(constants.DetectionJobName),
-		string(constants.UnlockJobName),
-		"push_repo_memory",
-		"update_cache_memory":
+		string(constants.UnlockJobName):
 		return true
 	default:
-		return false
+		if _, authored := authoredJobs[jobName]; authored {
+			return false
+		}
+		_, maintenance := constants.MaintenanceJobDependencies[jobName]
+		return maintenance
 	}
 }
