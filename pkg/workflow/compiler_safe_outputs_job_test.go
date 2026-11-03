@@ -2077,3 +2077,71 @@ func TestClaimDiagnosticRetentionPreservesRepositoryOverrides(t *testing.T) {
 		})
 	}
 }
+
+func TestSafeOutputsPRCheckoutGlobalAppTokenScoping(t *testing.T) {
+	app := &GitHubAppConfig{AppID: "${{ vars.APP_ID }}", PrivateKey: "${{ secrets.APP_PRIVATE_KEY }}"}
+	const appToken = "token: ${{ steps.safe-outputs-app-token.outputs.token }}"
+
+	t.Run("ignore-if-missing keeps fallback expression", func(t *testing.T) {
+		ignoring := *app
+		ignoring.IgnoreIfMissing = true
+		data := &WorkflowData{SafeOutputs: &SafeOutputsConfig{GitHubApp: &ignoring, CreatePullRequests: &CreatePullRequestsConfig{}}}
+		steps := strings.Join(NewCompiler().buildSharedPRCheckoutSteps(data), "")
+		assert.Contains(t, steps, "token: ${{ steps.safe-outputs-app-token.outputs.token || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}")
+	})
+
+	t.Run("per-handler app keeps static default checkout token", func(t *testing.T) {
+		data := &WorkflowData{SafeOutputs: &SafeOutputsConfig{
+			GitHubApp:          app,
+			CreateIssues:       &CreateIssuesConfig{},
+			CreatePullRequests: &CreatePullRequestsConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{GitHubApp: app}},
+		}}
+		steps := strings.Join(NewCompiler().buildSharedPRCheckoutSteps(data), "")
+		assert.NotContains(t, steps, appToken)
+	})
+
+	t.Run("additional checkouts keep static credentials", func(t *testing.T) {
+		data := &WorkflowData{
+			SafeOutputs: &SafeOutputsConfig{GitHubApp: app, CreatePullRequests: &CreatePullRequestsConfig{}},
+			CheckoutConfigs: []*CheckoutConfig{
+				{Repository: "org/static", Path: "./static"},
+			},
+		}
+		steps := strings.Join(NewCompiler().buildSharedPRCheckoutSteps(data), "")
+		assert.Equal(t, 1, strings.Count(steps, appToken), "only the default checkout persists the App token")
+	})
+
+	t.Run("target repo in another org keeps static default checkout token", func(t *testing.T) {
+		data := &WorkflowData{SafeOutputs: &SafeOutputsConfig{
+			GitHubApp:          app,
+			CreatePullRequests: &CreatePullRequestsConfig{TargetRepoSlug: "OrgB/target"},
+		}}
+		steps := strings.Join(NewCompiler().buildSharedPRCheckoutSteps(data), "")
+		assert.NotContains(t, steps, appToken)
+	})
+}
+
+func TestWorkQueueSafeOutputsPRCheckoutFollowsAppToken(t *testing.T) {
+	compiler := NewCompiler()
+	compiler.jobManager = NewJobManager()
+	data := &WorkflowData{
+		Name: "Test Workflow",
+		SafeOutputs: &SafeOutputsConfig{
+			GitHubApp:          &GitHubAppConfig{AppID: "${{ vars.APP_ID }}", PrivateKey: "${{ secrets.APP_PRIVATE_KEY }}"},
+			CreatePullRequests: &CreatePullRequestsConfig{},
+		},
+		Tools: map[string]any{"work-queue": map[string]any{"worker": true}},
+	}
+	job, _, err := compiler.buildConsolidatedSafeOutputsJob(data, string(constants.AgentJobName), "test.md")
+	require.NoError(t, err)
+	require.NotNil(t, job)
+	steps := strings.Join(job.Steps, "")
+	reconcile := strings.Index(steps, "id: work_queue_claim_reconciliation")
+	mint := strings.Index(steps, "id: safe-outputs-app-token")
+	checkout := strings.Index(steps, "name: Checkout repository")
+	require.NotEqual(t, -1, reconcile)
+	require.NotEqual(t, -1, mint)
+	require.NotEqual(t, -1, checkout)
+	assert.Less(t, reconcile, mint)
+	assert.Less(t, mint, checkout)
+}

@@ -491,7 +491,7 @@ checkout:
 
 ## Cross-Organization safe_outputs Authentication (`safe-outputs-github-app`)
 
-By default, the safe_outputs job uses `GITHUB_TOKEN` to check out repositories — `safe-outputs.github-app` and `safe-outputs.github-token` are **not** used for checkout and only govern PR/push API operations. This design prevents cross-org token confusion when the safe-outputs app is scoped to a target organization that differs from the workflow repository's organization.
+By default, the safe_outputs job uses `GITHUB_TOKEN` to check out repositories. The only exception is the default workspace checkout when the global `safe-outputs.github-app` serves `create-pull-request` or `push-to-pull-request-branch` for the workflow repository (no `target-repo`/`head-repo`, no per-handler app or token): it persists the minted App token so pushes run as the App and trigger workflows. Additional checkouts, per-handler apps and cross-repository targets never inherit the global App token for checkout, which prevents cross-org token confusion when the app is scoped to a different organization.
 
 For workflows that target a different organization, use `safe-outputs-github-app` on the relevant checkout entry to supply a checkout token for the safe_outputs job:
 
