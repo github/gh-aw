@@ -13,8 +13,6 @@ import (
 	"github.com/github/gh-aw/pkg/sliceutil"
 )
 
-const connectorContextPath = "/tmp/gh-aw/connector-context.jsonl"
-
 func connectorMap(parent map[string]any, key string) map[string]any {
 	value, ok := parent[key].(map[string]any)
 	if !ok {
@@ -235,49 +233,28 @@ func connectorSafeOutputScript(encoded, operation, prefix string, secrets []stri
 }
 
 func (c *Compiler) generateAgentConnectorSteps(yaml *strings.Builder, data *WorkflowData) error {
+	if err := validateConnectorContextInputs(data); err != nil {
+		return err
+	}
 	yaml.WriteString(strings.Join(c.connectorGitHubAppSteps(data, "agent"), ""))
-	return generateConnectorContextSteps(yaml, data)
+	return nil
 }
 
-func generateConnectorContextSteps(yaml *strings.Builder, data *WorkflowData) error {
-	hasContext := false
-	for _, config := range data.Connectors {
-		hasContext = hasContext || config.Context != nil
-	}
-	if !hasContext {
-		return nil
-	}
-	yaml.WriteString("      - name: Initialize untrusted connector context\n")
-	yaml.WriteString("        run: install -m 600 /dev/null " + connectorContextPath + "\n")
+// Preserve validation of legacy context selections without fetching their data.
+func validateConnectorContextInputs(data *WorkflowData) error {
 	for _, alias := range sliceutil.SortedKeys(data.Connectors) {
 		config := data.Connectors[alias]
 		if config.Context == nil {
 			continue
-		}
-		env, err := connectorEnv(config.Context, config)
-		if err != nil {
-			return err
 		}
 		for _, name := range sliceutil.SortedKeys(config.ContextArgs) {
 			args, err := json.Marshal(config.ContextArgs[name])
 			if err != nil {
 				return err
 			}
-			// Arguments, including expression-looking text, are encoded data.
-			// They are never evaluated as Actions expressions or shell input.
 			if strings.Contains(string(args), "${{") {
 				return errors.New("connector context inputs must be literal values, not Actions expressions")
 			}
-			fmt.Fprintf(yaml, "      - name: Fetch connector context %s/%s\n", alias, name) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
-			yaml.WriteString("        env:\n")
-			for _, key := range sliceutil.SortedKeys(env) {
-				fmt.Fprintf(yaml, "          %s: %q\n", key, env[key]) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
-			}
-			fmt.Fprintf(yaml, "          GH_AW_CONNECTOR_INPUTS: %q\n", string(args)) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
-			fmt.Fprintf(yaml, "          GH_AW_CONNECTOR_OPERATION: %q\n", name)      //nolint:fprintferrorunchecked // strings.Builder cannot fail.
-			yaml.WriteString("        run: |\n")
-			yaml.WriteString("          set -euo pipefail\n")
-			yaml.WriteString("          printf '%s' \"$GH_AW_CONNECTOR_INPUTS\" | node \"${RUNNER_TEMP}/gh-aw/actions/connector_runtime.cjs\" invoke context \"$GH_AW_CONNECTOR_OPERATION\" >> " + connectorContextPath + "\n")
 		}
 	}
 	return nil

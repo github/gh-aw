@@ -259,7 +259,11 @@ func validateConnectorSamples(config *SafeOutputsConfig) error {
 		if err != nil {
 			return fmt.Errorf("safe-outputs.%s.samples: compile tool schema: %w", name, err)
 		}
-		entry := toolSchemaEntry{raw: script.connectorInputSchema, compiled: schema}
+		var raw map[string]any
+		if err := json.Unmarshal(data, &raw); err != nil {
+			return fmt.Errorf("safe-outputs.%s.samples: decode tool schema: %w", name, err)
+		}
+		entry := toolSchemaEntry{raw: raw, compiled: schema}
 		if err := validateSamplesAgainstSchema(name, script.connectorOptions.Samples, entry, nil); err != nil {
 			return err
 		}

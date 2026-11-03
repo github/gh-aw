@@ -218,6 +218,10 @@ Built-in samples replay first, followed by connector tools sorted by name;
 samples within each tool retain their authored order. Enabled connector outputs
 without samples receive the existing replay coverage warning.
 
+Runtime expressions in argument values are transported separately from replay
+control data and bound as strings after parsing. Their values cannot select a
+different tool, create arguments, or introduce patch sidecars.
+
 Samples are example arguments, never instructions or authority. They cannot
 expand grants, bypass sanitization, supply trusted inputs or credentials,
 or increase proposal budgets. More samples than `max` can be authored but excess

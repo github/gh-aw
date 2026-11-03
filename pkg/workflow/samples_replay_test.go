@@ -550,9 +550,8 @@ emit a valid empty-array GH_AW_SAMPLES under --use-samples.
 
 // TestUseSamplesPreservesRuntimeExpressionsInLockFile verifies that a sample
 // value containing a `${{ ... }}` GitHub Actions expression compiles cleanly
-// AND lands verbatim in the GH_AW_SAMPLES env value of the lock file, so that
-// GitHub Actions substitutes the real value on the runner before
-// apply_samples.cjs reads it.
+// AND is transported separately from replay control data, so GitHub Actions
+// substitutes the value before apply_samples.cjs binds the authored argument.
 //
 // Regression for https://github.com/github/gh-aw/issues/37532.
 func TestUseSamplesPreservesRuntimeExpressionsInLockFile(t *testing.T) {
@@ -601,9 +600,8 @@ Runtime-templated sample for workflow_dispatch-driven testing.
 	lock := string(b)
 
 	samplesJSON := extractGHAWSamplesJSON(t, lock)
-	assert.Contains(t, samplesJSON, "${{ github.event.inputs.issue_number }}", "GH_AW_SAMPLES should preserve live runtime expression for substitution")
-	// The marshalled payload must still be valid JSON (the expression sits
-	// inside a JSON string, so no escaping concerns at compile time).
+	assert.NotContains(t, samplesJSON, "${{", "GH_AW_SAMPLES must not interpolate runtime values into JSON")
+	assert.Contains(t, lock, `GH_AW_SAMPLE_VALUE_0: "${{ github.event.inputs.issue_number }}"`)
 	var parsed []any
 	err = json.Unmarshal([]byte(samplesJSON), &parsed)
 	require.NoError(t, err, "GH_AW_SAMPLES should remain valid JSON at compile time")
@@ -885,9 +883,8 @@ Replace-label workflow replayed deterministically from samples.
 	if !strings.Contains(samplesJSON, `"tool":"replace_label"`) {
 		t.Fatalf("GH_AW_SAMPLES should contain a replace_label entry; got %s", samplesJSON)
 	}
-	if !strings.Contains(samplesJSON, "${{ github.event.issue.number }}") {
-		t.Fatalf("GH_AW_SAMPLES should preserve the runtime expression; got %s", samplesJSON)
-	}
+	assert.NotContains(t, samplesJSON, "${{", "runtime expressions must be outside replay JSON")
+	assert.Contains(t, lock, `GH_AW_SAMPLE_VALUE_0: "${{ github.event.issue.number }}"`)
 }
 
 // TestSafeOutputsMissingSamples verifies the diagnostic helper that backs the

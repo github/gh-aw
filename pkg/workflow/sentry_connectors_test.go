@@ -52,7 +52,9 @@ func TestSentryUnifiedWorkflowCompilation(t *testing.T) {
 			}
 			require.Equal(t, []string{"SENTRY_CONTEXT_TOKEN"}, config.Context.Secrets())
 			require.Equal(t, []string{"SENTRY_STATUS_TOKEN"}, config.SafeOutputs.Secrets())
-			require.Contains(t, output, `node "${RUNNER_TEMP}/gh-aw/actions/connector_runtime.cjs" invoke context`)
+			require.NotContains(t, output, `node "${RUNNER_TEMP}/gh-aw/actions/connector_runtime.cjs" invoke context`)
+			require.NotContains(t, output, "${{ secrets.SENTRY_CONTEXT_TOKEN }}")
+			require.NotContains(t, output, connectorContextPath)
 			require.Contains(t, output, "sentry_resolve_issue")
 			agent, err := json.Marshal(config.Agent)
 			require.NoError(t, err)

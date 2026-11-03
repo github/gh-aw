@@ -12,9 +12,6 @@ on:
     dependabot-alerts:
       types: [dismissed]
       severity: critical
-    jira-issue:
-      project: APP
-      types: [opened, closed]
 permissions:
   contents: read
 engine: copilot

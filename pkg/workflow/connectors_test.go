@@ -17,6 +17,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const connectorContextPath = "/tmp/gh-aw/connector-context.jsonl"
+
 func connectorCompiler(t *testing.T) (*Compiler, string) {
 	t.Helper()
 	root := t.TempDir()
@@ -251,13 +253,13 @@ func TestConnectorCompilesIntoRuntimeBoundaries(t *testing.T) {
 	require.NoError(t, err)
 	safe, err := json.Marshal(jobs["safe_outputs"])
 	require.NoError(t, err)
-	assert.Contains(t, output, `node "${RUNNER_TEMP}/gh-aw/actions/connector_runtime.cjs" invoke context`)
-	assert.Contains(t, string(agent), "CONNECTOR_CONTEXT_TOKEN")
+	assert.NotContains(t, output, `node "${RUNNER_TEMP}/gh-aw/actions/connector_runtime.cjs" invoke context`)
+	assert.NotContains(t, string(agent), "CONNECTOR_CONTEXT_TOKEN")
 	assert.Contains(t, string(agent), "CONNECTOR_READ_TOKEN")
 	assert.NotContains(t, string(agent), "${{ secrets.CONNECTOR_WRITE_TOKEN }}")
 	assert.Contains(t, string(safe), "${{ secrets.CONNECTOR_WRITE_TOKEN }}")
 	assert.NotContains(t, string(safe), "${{ secrets.CONNECTOR_CONTEXT_TOKEN }}")
-	assert.Contains(t, output, connectorContextPath)
+	assert.NotContains(t, output, connectorContextPath)
 	assert.Contains(t, output, "untrusted third-party data")
 	assert.Contains(t, output, "tracker_add_comment")
 	assert.Contains(t, string(agent), "connector_runtime.cjs")
@@ -266,6 +268,74 @@ func TestConnectorCompilesIntoRuntimeBoundaries(t *testing.T) {
 	assert.NotContains(t, output, "Build trusted connector runtime")
 	assert.NotContains(t, output, "gh extension install")
 	assert.NotContains(t, output, "api.example.com/issues/{issue}")
+}
+
+func TestConnectorAgentJobDoesNotFetchContext(t *testing.T) {
+	for _, selection := range []struct {
+		name, fields string
+	}{
+		{"context-only", ""},
+		{"with-reader", "    tools: [get-issue]\n"},
+		{"with-effects", "    safe-outputs: [add-comment]\n"},
+		{"combined", "    tools: [get-issue]\n    safe-outputs: [add-comment]\n"},
+	} {
+		t.Run(selection.name, func(t *testing.T) {
+			c, root := connectorCompiler(t)
+			path := filepath.Join(root, "proof.md")
+			data, err := c.ParseWorkflowString(connectorWorkflow(selection.fields+"    context:\n      issue-details: {issue: ISSUE-1}\n"), path)
+			require.NoError(t, err)
+			require.NotNil(t, data.Connectors["tracker"].Context)
+			output, err := c.CompileToYAML(data, path)
+			require.NoError(t, err)
+
+			var workflow struct {
+				Jobs map[string]struct {
+					Steps []struct {
+						Name string         `yaml:"name"`
+						Run  string         `yaml:"run"`
+						Env  map[string]any `yaml:"env"`
+					} `yaml:"steps"`
+				} `yaml:"jobs"`
+			}
+			require.NoError(t, yaml.Unmarshal([]byte(output), &workflow))
+			agent, ok := workflow.Jobs["agent"]
+			require.True(t, ok)
+			require.NotEmpty(t, agent.Steps)
+			assert.NotContains(t, output, connectorContextPath)
+			assert.NotContains(t, output, "${{ secrets.CONNECTOR_CONTEXT_TOKEN }}")
+			for _, step := range agent.Steps {
+				assert.NotContains(t, step.Name, "connector context")
+				assert.NotContains(t, step.Run, "invoke context")
+				assert.NotContains(t, step.Env, "GH_AW_CONNECTOR_INPUTS")
+				assert.NotContains(t, step.Env, "GH_AW_CONNECTOR_OPERATION")
+			}
+		})
+	}
+}
+
+func TestConnectorLegacyContextInputValidation(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		value any
+	}{
+		{"expression", "${{ github.event.issue.title }}"},
+		{"unencodable", func() {}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			c, root := connectorCompiler(t)
+			path := filepath.Join(root, "proof.md")
+			data, err := c.ParseWorkflowString(connectorWorkflow("    context:\n      issue-details: {issue: ISSUE-1}\n"), path)
+			require.NoError(t, err)
+			data.Connectors["tracker"].ContextArgs["issue-details"]["issue"] = test.value
+			_, err = c.CompileToYAML(data, path)
+			require.Error(t, err)
+			if test.name == "expression" {
+				assert.ErrorContains(t, err, "connector context inputs must be literal values")
+			} else {
+				assert.ErrorContains(t, err, "unsupported type")
+			}
+		})
+	}
 }
 
 func TestConnectorFileAndStringCompilationAgree(t *testing.T) {

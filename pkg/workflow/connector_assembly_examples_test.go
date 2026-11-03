@@ -95,13 +95,12 @@ func TestConnectorAssemblyExampleCompilation(t *testing.T) {
 			safe, err := json.Marshal(document.Jobs["safe_outputs"])
 			require.NoError(t, err)
 			reads := name == "tools-only" || name == "combined"
-			prepares := name == "context-only" || name == "combined"
 			writes := name == "effects-only" || name == "combined"
 			require.Equal(t, reads, strings.Contains(string(agent), "${{ secrets.ASSEMBLY_READ_TOKEN }}"))
-			require.Equal(t, prepares, strings.Contains(string(agent), "${{ secrets.ASSEMBLY_CONTEXT_TOKEN }}"))
+			require.NotContains(t, string(agent), "${{ secrets.ASSEMBLY_CONTEXT_TOKEN }}")
 			require.NotContains(t, string(agent), "${{ secrets.ASSEMBLY_WRITE_TOKEN }}")
-			require.Equal(t, prepares, strings.Contains(string(lock), `node "${RUNNER_TEMP}/gh-aw/actions/connector_runtime.cjs" invoke context`))
-			require.Equal(t, prepares, strings.Contains(string(agent), "/tmp/gh-aw/connector-context.jsonl"))
+			require.NotContains(t, string(lock), `node "${RUNNER_TEMP}/gh-aw/actions/connector_runtime.cjs" invoke context`)
+			require.NotContains(t, string(agent), connectorContextPath)
 			require.Equal(t, writes, strings.Contains(string(safe), "${{ secrets.ASSEMBLY_WRITE_TOKEN }}"))
 			require.NotContains(t, string(safe), "${{ secrets.ASSEMBLY_READ_TOKEN }}")
 			require.NotContains(t, string(safe), "${{ secrets.ASSEMBLY_CONTEXT_TOKEN }}")

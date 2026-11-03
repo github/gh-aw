@@ -58,12 +58,12 @@ func TestSlackConnectorWorkflowCompilation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, expected := range []string{`node "${RUNNER_TEMP}/gh-aw/actions/connector_runtime.cjs" invoke context`, "SLACK_CONTEXT_TOKEN", "SLACK_READ_TOKEN", "SLACK_WRITE_TOKEN", "slack_reply_in_thread", "untrusted third-party data"} {
+	for _, expected := range []string{"SLACK_READ_TOKEN", "SLACK_WRITE_TOKEN", "slack_reply_in_thread", "untrusted third-party data"} {
 		if !strings.Contains(output, expected) {
 			t.Fatalf("compiled workflow missing %q", expected)
 		}
 	}
-	for _, forbidden := range []string{"Checkout trusted connector runtime", "Build trusted connector runtime", "gh extension install"} {
+	for _, forbidden := range []string{"Checkout trusted connector runtime", "Build trusted connector runtime", "gh extension install", "invoke context", "SLACK_CONTEXT_TOKEN", connectorContextPath} {
 		if strings.Contains(output, forbidden) {
 			t.Fatalf("bundled connector runtime must not require %q", forbidden)
 		}

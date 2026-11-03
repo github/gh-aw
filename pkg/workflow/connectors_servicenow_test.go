@@ -65,12 +65,12 @@ func TestServiceNowWorkflowCompilation(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			assertServiceNowCompiledJobs(t, output, test.tools, test.context, test.write)
+			assertServiceNowCompiledJobs(t, output, test.tools, test.write)
 		})
 	}
 }
 
-func assertServiceNowCompiledJobs(t *testing.T, output string, tools, context, write bool) {
+func assertServiceNowCompiledJobs(t *testing.T, output string, tools, write bool) {
 	t.Helper()
 	var document map[string]any
 	if err := yaml.Unmarshal([]byte(output), &document); err != nil {
@@ -91,7 +91,7 @@ func assertServiceNowCompiledJobs(t *testing.T, output string, tools, context, w
 	if strings.Contains(string(agent), "${{ secrets.SERVICENOW_WRITE_TOKEN }}") {
 		t.Fatal("agent job must not receive the write token")
 	}
-	for secret, selected := range map[string]bool{"SERVICENOW_READ_TOKEN": tools, "SERVICENOW_CONTEXT_TOKEN": context} {
+	for secret, selected := range map[string]bool{"SERVICENOW_READ_TOKEN": tools, "SERVICENOW_CONTEXT_TOKEN": false} {
 		if strings.Contains(string(agent), "${{ secrets."+secret+" }}") != selected {
 			t.Fatalf("agent credential selection does not match %s capability", secret)
 		}
@@ -102,10 +102,10 @@ func assertServiceNowCompiledJobs(t *testing.T, output string, tools, context, w
 	if strings.Contains(string(effects), "${{ secrets.SERVICENOW_WRITE_TOKEN }}") != write {
 		t.Fatal("effect credential selection does not match declared capability")
 	}
-	if strings.Contains(output, `node "${RUNNER_TEMP}/gh-aw/actions/connector_runtime.cjs" invoke context`) != context {
-		t.Fatal("context hydration must be emitted only when selected")
+	if strings.Contains(output, `node "${RUNNER_TEMP}/gh-aw/actions/connector_runtime.cjs" invoke context`) {
+		t.Fatal("legacy context selections must not emit automatic context hydration")
 	}
-	for _, removed := range []string{"Checkout trusted connector runtime", "Build trusted connector runtime", "connector_10_servicenow_"} {
+	for _, removed := range []string{"Checkout trusted connector runtime", "Build trusted connector runtime", "connector_10_servicenow_", connectorContextPath} {
 		if strings.Contains(output, removed) {
 			t.Fatalf("compiled workflow retains removed connector host behavior: %s", removed)
 		}

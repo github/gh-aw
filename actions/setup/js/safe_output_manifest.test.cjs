@@ -532,6 +532,42 @@ describe("safe_output_manifest", () => {
       expect(extractCreatedItemFromResult(type, result)).toMatchObject(expected);
     });
 
+    it.each(["linear", "jira", "aw.github.com/linear", "custom-tracker"])("should preserve trusted %s connector identity from the runtime result", connector => {
+      const item = extractCreatedItemFromResult("connector_add_comment", {
+        connector,
+        capability: "safe-output/add-comment",
+        untrusted: true,
+        statusCode: 200,
+        data: { provider: "github", connector: "untrusted-response" },
+      });
+      expect(item).toEqual({ type: "connector_add_comment", provider: connector });
+      const log = createManifestLogger(testManifestFile);
+      log(item);
+      expect(JSON.parse(fs.readFileSync(testManifestFile, "utf8")).provider).toBe(connector);
+    });
+
+    it.each([
+      [{ provider: "explicit-provider", metadata: { provider: "metadata-provider" } }, "explicit-provider"],
+      [{ metadata: { provider: "metadata-provider" } }, "metadata-provider"],
+    ])("should prefer explicit provider fields over connector identity: %j", (fields, provider) => {
+      const item = extractCreatedItemFromResult("connector_add_comment", {
+        success: true,
+        connector: "linear",
+        target: "ENG-123",
+        ...fields,
+      });
+      expect(item).toMatchObject({ status: "success", provider, target: { provider, identifier: "ENG-123" } });
+    });
+
+    it.each([undefined, null, "", false, 123, {}])("should keep the GitHub fallback without a valid connector identity: %j", connector => {
+      const item = extractCreatedItemFromResult("jira_create_issue", { success: true, connector });
+      expect(item).toMatchObject({ status: "success", provider: "github" });
+    });
+
+    it.each(["linear", "jira", "custom-tracker"])("should not record staged %s connector results as applied writes", connector => {
+      expect(extractCreatedItemFromResult("connector_add_comment", { success: true, staged: true, connector, url: "https://example.com/item" })).toBeNull();
+    });
+
     it("should preserve an explicitly reported external provider without inferring it from a tool prefix", () => {
       const item = extractCreatedItemFromResult("azure_devops_comment_on_work_item", {
         success: true,

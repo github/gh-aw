@@ -12,7 +12,7 @@
 // Tests intentionally use the simplest safe-output tool (`create_issue`) so we
 // do not need to set up a git working tree for patch sidecars.
 
-import { describe, it, expect, beforeAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 import { spawnSync } from "child_process";
 import { createRequire } from "module";
 import fs from "fs";
@@ -46,6 +46,69 @@ function initRepo(dir, defaultBranch) {
   git(["add", "."], dir);
   git(["commit", "-q", "-m", "seed"], dir);
 }
+
+describe("apply_samples.cjs runtime value bindings", () => {
+  const { loadSamples } = require("./apply_samples.cjs");
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("binds nested values and authored sidecars once without interpreting runtime text", () => {
+    const text = 'prefix "quotes"\n${{ event.title }} / ${GH_AW_SAMPLE_VALUE_1}';
+    const samples = [
+      {
+        tool: "create_pull_request",
+        arguments: { title: "literal", nested: [{ text: "prefix ${{ inputs.title }} / ${{ inputs.other }}" }], literal: "${GH_AW_SAMPLE_VALUE_0}" },
+        sidecars: { patch: "${{ inputs.patch }}" },
+      },
+    ];
+    vi.stubEnv("GH_AW_SAMPLES", JSON.stringify(samples));
+    vi.stubEnv(
+      "GH_AW_SAMPLE_BINDINGS",
+      JSON.stringify([
+        { entry: 0, path: ["arguments", "nested", "0", "text"], env: "GH_AW_SAMPLE_VALUE_0" },
+        { entry: 0, path: ["sidecars", "patch"], env: "GH_AW_SAMPLE_VALUE_1" },
+      ])
+    );
+    vi.stubEnv("GH_AW_SAMPLE_VALUE_0", text);
+    vi.stubEnv("GH_AW_SAMPLE_VALUE_1", "authored patch\n");
+    expect(loadSamples()).toEqual([
+      {
+        tool: "create_pull_request",
+        arguments: { title: "literal", nested: [{ text }], literal: "${GH_AW_SAMPLE_VALUE_0}" },
+        sidecars: { patch: "authored patch\n" },
+      },
+    ]);
+  });
+
+  for (const binding of [
+    { entry: 0, path: ["tool"], env: "GH_AW_SAMPLE_VALUE_0" },
+    { entry: 0, path: ["arguments"], env: "GH_AW_SAMPLE_VALUE_0" },
+    { entry: 0, path: ["arguments", "nested"], env: "GH_AW_SAMPLE_VALUE_0" },
+    { entry: 0, path: ["sidecars", "patch"], env: "GH_AW_SAMPLE_VALUE_0" },
+    { entry: 0, path: ["arguments", "__proto__", "tool"], env: "GH_AW_SAMPLE_VALUE_0" },
+    { entry: 1, path: ["arguments", "text"], env: "GH_AW_SAMPLE_VALUE_0" },
+    { entry: 0, path: ["arguments", "text"], env: "GITHUB_TOKEN" },
+  ]) {
+    it(`rejects invalid binding ${JSON.stringify(binding)}`, () => {
+      vi.stubEnv("GH_AW_SAMPLES", JSON.stringify([{ tool: "create_issue", arguments: { text: "original", nested: {} } }]));
+      vi.stubEnv("GH_AW_SAMPLE_BINDINGS", JSON.stringify([binding]));
+      vi.stubEnv("GH_AW_SAMPLE_VALUE_0", '{"tool":"create_pull_request","sidecars":{"patch":"injected"}}');
+      expect(() => loadSamples()).toThrow();
+    });
+  }
+
+  it("fails closed when the separately transported value is missing", () => {
+    vi.stubEnv("GH_AW_SAMPLES", JSON.stringify([{ tool: "create_issue", arguments: { text: "${{ inputs.text }}" } }]));
+    vi.stubEnv("GH_AW_SAMPLE_BINDINGS", JSON.stringify([{ entry: 0, path: ["arguments", "text"], env: "GH_AW_SAMPLE_VALUE_0" }]));
+    vi.stubEnv("GH_AW_SAMPLE_VALUE_0", undefined);
+    expect(() => loadSamples()).toThrow("missing runtime sample value GH_AW_SAMPLE_VALUE_0");
+  });
+
+  it("reports malformed runtime binding metadata before replaying samples", () => {
+    vi.stubEnv("GH_AW_SAMPLES", JSON.stringify([{ tool: "create_issue", arguments: { text: "original" } }]));
+    vi.stubEnv("GH_AW_SAMPLE_BINDINGS", "[invalid");
+    expect(() => loadSamples()).toThrow("failed to parse GH_AW_SAMPLE_BINDINGS as JSON");
+  });
+});
 
 describe("apply_samples.cjs", () => {
   let tempDir;

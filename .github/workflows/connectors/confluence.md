@@ -33,7 +33,7 @@ connectors:
     endpoints:
       api: https://api.atlassian.com
     triggers:
-      page-created:
+      page-created: &confluence-page-trigger
         resourceOrigins:
           - https://api.atlassian.com
         match:
@@ -56,27 +56,13 @@ connectors:
           /content/version/number: integer
         verificationProfile: atlassian.com/forge-invocation-token
       page-updated:
-        resourceOrigins:
-          - https://api.atlassian.com
+        <<: *confluence-page-trigger
         match:
           /content/status: current
           /content/type: page
           /eventType: avi:confluence:updated:page
         nativeEvents:
           - avi:confluence:updated:page
-        normalize:
-          space: /content/space/id
-          subject: /content/id
-          version: /content/version/number
-        resources:
-          /content/id: pages
-          /content/space/id: spaces
-        types:
-          /content/id: string
-          /content/space/id: integer
-          /content/title: string
-          /content/version/number: integer
-        verificationProfile: atlassian.com/forge-invocation-token
     resources:
       clouds: ${{ github.aw.import-inputs.clouds }}
       pages: ${{ github.aw.import-inputs.pages }}

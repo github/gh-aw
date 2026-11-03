@@ -53,7 +53,7 @@ connectors:
         credential: mcp-personal
         maxResponseBytes: 65536
         readOnly: true
-        tools:
+        tools: &jira-mcp-tools
           getJiraIssue:
             inputs:
               cloudId:
@@ -91,39 +91,7 @@ connectors:
         credential: mcp-service-account
         maxResponseBytes: 65536
         readOnly: true
-        tools:
-          getJiraIssue:
-            inputs:
-              cloudId:
-                maxLength: 80
-                required: true
-                type: string
-              issueIdOrKey:
-                maxLength: 80
-                pattern: ^[A-Z][A-Z0-9_]*-[1-9][0-9]*$
-                required: true
-                type: string
-            resources:
-              cloudId: cloud-ids
-              issueIdOrKey: issues
-          searchJiraIssuesUsingJql:
-            inputs:
-              cloudId:
-                maxLength: 80
-                required: true
-                type: string
-              jql:
-                maxLength: 1000
-                required: true
-                type: string
-              maxResults:
-                maximum: 25
-                minimum: 1
-                required: true
-                type: integer
-            resources:
-              cloudId: cloud-ids
-              jql: queries
+        tools: *jira-mcp-tools
         url: https://mcp.atlassian.com/v2/mcp
     triggers:
       issue-created:
