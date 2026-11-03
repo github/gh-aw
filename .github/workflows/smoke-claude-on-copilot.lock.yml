@@ -78,6 +78,8 @@ env:
   OTEL_SERVICE_NAME: gh-aw.smoke-claude-on-copilot
   OTEL_RESOURCE_ATTRIBUTES: 'gh-aw.workflow.name=Smoke%20Claude%20on%20Copilot,gh-aw.repository=${{ github.repository }},gh-aw.run.id=${{ github.run_id }},github.run_id=${{ github.run_id }},gh-aw.engine.id=claude'
   OTEL_EXPORTER_OTLP_HEADERS: ${{ secrets.GH_AW_DEFAULT_OTLP_HEADERS }}
+  GH_AW_OTLP_LOGS_ENABLED: ${{ vars.GH_AW_OTLP_LOGS_ENABLED }}
+  GH_AW_OTLP_LOGS_MAX_BYTES: ${{ vars.GH_AW_OTLP_LOGS_MAX_BYTES }}
   GH_AW_OTLP_ENDPOINTS: '[{"url":"${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}","headers":"${{ secrets.GH_AW_DEFAULT_OTLP_HEADERS }}"}]'
   GH_AW_OTLP_IF_MISSING: ignore
 
@@ -349,6 +351,8 @@ jobs:
           GH_AW_INCLUDE_PR_CONTEXT: ${{ (github.event_name == 'issue_comment' && github.event.issue.pull_request != null) || github.event_name == 'pull_request_review_comment' || github.event_name == 'pull_request_review' }}
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
+          GH_AW_OTLP_LOGS_ENABLED: ""
+          GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"safe_outputs_mcp_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"cli_proxy_with_safeoutputs_prompt.md\"},{\"file\":\"pr_context_prompt.md\",\"condition_env\":\"GH_AW_INCLUDE_PR_CONTEXT\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"},{\"author_file\":\".github/workflows/smoke-claude-on-copilot.md\"}],\"system_item_count\":13}"
           GH_AW_PROMPT_CONTENT_0000: |
@@ -414,6 +418,8 @@ jobs:
           GH_AW_ENGINE_ID: claude
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
+          GH_AW_OTLP_LOGS_ENABLED: ""
+          GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           GH_AW_SKILL_DIR: .claude/skills
           GH_AW_SKILL_EXT: .md
@@ -471,6 +477,8 @@ jobs:
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_MATCHED_COMMAND: ${{ needs.pre_activation.outputs.matched_command }}
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
+          GH_AW_OTLP_LOGS_ENABLED: ""
+          GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
@@ -482,6 +490,8 @@ jobs:
         env:
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
+          GH_AW_OTLP_LOGS_ENABLED: ""
+          GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
@@ -493,6 +503,8 @@ jobs:
         env:
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
+          GH_AW_OTLP_LOGS_ENABLED: ""
+          GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
