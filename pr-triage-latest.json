@@ -1,15 +1,41 @@
 {
-  "run_date": "2026-11-03T00:37:36.446187+00:00",
-  "run_id": "41553804219",
+  "run_id": "41589545500",
+  "run_date": "2026-11-03T06:25:46.159000+00:00",
   "source": "pr-triage",
-  "eligible_total": 0,
+  "eligible_total": 1,
+  "open_copilot_prs": 1,
   "cooldown_skipped": [],
-  "open_copilot_prs": 0,
-  "category_counts": {},
-  "risk_counts": {},
-  "priority_counts": {},
-  "action_counts": {},
+  "category_counts": {
+    "chore": 1
+  },
+  "risk_counts": {
+    "high": 1
+  },
+  "priority_counts": {
+    "high": 1
+  },
+  "action_counts": {
+    "fast_track": 1
+  },
   "batches": [],
-  "selected_candidates": [],
-  "notes": "No open pull requests in this repository snapshot were authored by app/github-copilot; reported open PRs are from other users/bots and are excluded by policy."
+  "selected_candidates": [
+    {
+      "number": 74389,
+      "title": "Bump gh-aw-firewall to v0.29.6 and gh-aw-mcpg to v0.5.2",
+      "category": "chore",
+      "risk": "high",
+      "priority": "high",
+      "action": "fast_track",
+      "score": 80,
+      "breakdown": {
+        "impact": 35,
+        "urgency": 25,
+        "quality": 20
+      },
+      "ci": "passing",
+      "status": "draft",
+      "updated_at": "2026-11-03T04:47:27Z"
+    }
+  ],
+  "notes": "Only one open PR from app/github-copilot was older than the 1-hour cooldown and eligible for triage. The request is a dependency/security bump with regenerated artifacts and a successful CI run, so it is high-value and ready for expedited human review."
 }
