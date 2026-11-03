@@ -355,6 +355,12 @@ describe("safe-output runtime dependencies", () => {
     expect(result.results.filter(item => item.errorCode === "safe_output_dependency_failed")).toHaveLength(3);
   });
 
+  it("does not treat dispatch outcomes as confirmed prerequisites", () => {
+    for (const type of ["dispatch_workflow", "dispatch-repository"]) {
+      expect(isConfirmedDependencySuccess({ type, claim_handle: "claim-1", success: true, result: { success: true } })).toBe(false);
+    }
+  });
+
   it("never confirms prerequisites in global staged mode, even when legacy handlers omit staged", async () => {
     vi.stubEnv("GH_AW_SAFE_OUTPUTS_STAGED", "true");
     const handler = vi.fn(async () => ({ success: true }));

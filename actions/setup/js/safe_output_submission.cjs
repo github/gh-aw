@@ -6,7 +6,7 @@ const { randomUUID } = require("node:crypto");
 const OUTPUT_ID_PATTERN = "^so_[A-Za-z0-9_-]{12}$";
 const outputIdRegex = new RegExp(OUTPUT_ID_PATTERN);
 const DEPENDENCY_UNSUPPORTED_TYPES = new Set(["upload_asset", "noop", "call_workflow", "push_repo_memory", "report_incomplete", "report_missing_tool", "report_missing_data"]);
-const DELEGATED_EFFECT_TYPES = new Set([...DEPENDENCY_UNSUPPORTED_TYPES, "upload_code_coverage"]);
+const DELEGATED_EFFECT_TYPES = new Set([...DEPENDENCY_UNSUPPORTED_TYPES, "upload_code_coverage", "dispatch_workflow", "dispatch_repository"]);
 
 /**
  * @param {string|undefined} type
