@@ -165,11 +165,14 @@ describe("gh-aw OpenTelemetry compatibility contract", () => {
 
   it("exports not-evaluated eval status without fabricating UNKNOWN answers", async () => {
     process.env.INPUT_JOB_NAME = "evals";
-    const existsSpy = vi.spyOn(fs, "existsSync").mockImplementation(filePath => filePath === "/tmp/gh-aw/evals_status.json");
+    const existsSpy = vi.spyOn(fs, "existsSync").mockImplementation(filePath => filePath === "/tmp/gh-aw/evals_status.json" || filePath === "/tmp/gh-aw/evals.jsonl");
     const originalRead = readFileSyncSpy.getMockImplementation();
     readFileSyncSpy.mockImplementation(filePath => {
       if (filePath === "/tmp/gh-aw/evals_status.json") {
         return JSON.stringify({ status: "not_evaluated", reason_code: "judge_failed", reason: "sensitive judge failure", model: "copilot/gpt-6-luna-decisions" });
+      }
+      if (filePath === "/tmp/gh-aw/evals.jsonl") {
+        return JSON.stringify({ id: "eval-1", answer: "YES" }) + "\n";
       }
       return originalRead(filePath);
     });

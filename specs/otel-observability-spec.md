@@ -1000,6 +1000,10 @@ context is added to outcome spans or links.
 
 ## 19. Change Log
 
+### Unreleased
+
+- **Added**: A normative requirement (§10.8) that completed BinEval records MUST produce `eval.result` events on `gh-aw.evals.conclusion`; when a not-evaluated status marker is present it takes precedence and answers are not emitted.
+
 ### Version 0.5.0 (Working Draft, August 27, 2026)
 
 - **Added**: §5.8 Default Fallback — the compiler falls back to `${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}` / `${{ secrets.GH_AW_DEFAULT_OTLP_HEADERS }}` when no `observability.otlp` endpoint is configured in frontmatter or an import, forcing `if-missing: ignore` so an unset default is a silent no-op.
