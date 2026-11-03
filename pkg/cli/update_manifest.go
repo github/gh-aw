@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -17,6 +18,7 @@ import (
 )
 
 var updateManifestLog = logger.New("cli:update_manifest")
+var errManifestWorkflowConflictSkipped = errors.New("manifest-managed workflow update skipped because of conflicts")
 
 type manifestManagedWorkflowUpdate struct {
 	wf             *workflowWithSource
@@ -80,6 +82,7 @@ func updateManifestWorkflowGroup(ctx context.Context, source string, grouped []*
 	var successes []string
 	var failures []updateFailure
 	var groupedSuccesses []string
+	var skippedConflict bool
 
 	repoSpec, _, err := parseManifestSourceSpec(source)
 	if err != nil {
@@ -173,7 +176,10 @@ func updateManifestWorkflowGroup(ctx context.Context, source string, grouped []*
 			latestRef:      latestRef,
 			manifestSource: manifestSource,
 		}
-		if err := updateManifestManagedWorkflow(ctx, update, opts); err != nil {
+		if err := updateManifestManagedWorkflow(ctx, update, opts); errors.Is(err, errManifestWorkflowConflictSkipped) {
+			skippedConflict = true
+			continue
+		} else if err != nil {
 			failures = append(failures, updateFailure{Name: wf.Name, Error: err.Error()})
 			continue
 		}
@@ -197,6 +203,11 @@ func updateManifestWorkflowGroup(ctx context.Context, source string, grouped []*
 			continue
 		}
 		groupedSuccesses = append(groupedSuccesses, name)
+	}
+
+	if skippedConflict {
+		successes = append(successes, groupedSuccesses...)
+		return successes, failures
 	}
 
 	if err := syncManifestManagedResources(ctx, repoSpec, latestPkg, latestRef, opts); err != nil {
@@ -590,7 +601,7 @@ func updateManifestManagedWorkflow(ctx context.Context, update manifestManagedWo
 	}
 	if hasConflicts && !opts.NoCompile {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not update %s from %s to %s due to CONFLICTS - leaving the existing workflow unchanged; please review and resolve manually", update.wf.Name, shortRef(update.currentRef), shortRef(update.latestRef))))
-		return nil
+		return errManifestWorkflowConflictSkipped
 	}
 
 	if err := fetchManifestManagedDependencies(ctx, newContent, update.repo, update.latestPath, update.latestRef, filepath.Dir(update.wf.Path), opts.Verbose); err != nil {
