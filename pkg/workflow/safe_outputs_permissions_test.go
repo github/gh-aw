@@ -735,6 +735,59 @@ func TestComputePermissionsForSafeOutputsDispatchRepositoryAppSplit(t *testing.T
 	assert.Equal(t, PermissionWrite, perms.permissions[PermissionContents])
 }
 
+func TestComputePermissionsForSafeOutputsDispatchRepositoryGitHubTokenSplit(t *testing.T) {
+	safeOutputs := &SafeOutputsConfig{
+		DispatchRepository: &DispatchRepositoryConfig{
+			Tools: map[string]*DispatchRepositoryToolConfig{
+				"with-token": {
+					Workflow:    "ci.yml",
+					EventType:   "ci_trigger",
+					Repository:  "github/gh-aw",
+					GitHubToken: "${{ secrets.DISPATCH_PAT }}",
+				},
+			},
+		},
+	}
+
+	// A per-tool github-token override means the handler authenticates with its own
+	// credential at runtime (dispatch_repository.cjs), so it must not also contribute
+	// contents: write to the global safe-outputs App mint.
+	appPermissions := computeDispatchRepositoryPermissions(safeOutputs, true)
+	assert.Nil(t, appPermissions)
+
+	jobPermissions := computeDispatchRepositoryPermissions(safeOutputs, false)
+	require.NotNil(t, jobPermissions)
+	assert.Equal(t, PermissionWrite, jobPermissions.permissions[PermissionContents])
+}
+
+func TestComputePermissionsForSafeOutputsDispatchRepositoryMixedGitHubTokenConfig(t *testing.T) {
+	safeOutputs := &SafeOutputsConfig{
+		DispatchRepository: &DispatchRepositoryConfig{
+			Tools: map[string]*DispatchRepositoryToolConfig{
+				"with-token": {
+					Workflow:    "ci.yml",
+					EventType:   "ci_trigger",
+					Repository:  "github/gh-aw",
+					GitHubToken: "${{ secrets.DISPATCH_PAT }}",
+				},
+				"without-token": {
+					Workflow:   "ci.yml",
+					EventType:  "ci_trigger",
+					Repository: "github/gh-aw",
+				},
+			},
+		},
+	}
+
+	appPermissions := computeDispatchRepositoryPermissions(safeOutputs, true)
+	require.NotNil(t, appPermissions)
+	assert.Equal(t, PermissionWrite, appPermissions.permissions[PermissionContents])
+
+	jobPermissions := computeDispatchRepositoryPermissions(safeOutputs, false)
+	require.NotNil(t, jobPermissions)
+	assert.Equal(t, PermissionWrite, jobPermissions.permissions[PermissionContents])
+}
+
 func TestComputePermissionsForSafeOutputsExcludesParsedPerHandlerApps(t *testing.T) {
 	compiler := NewCompiler(WithVersion("1.0.0"))
 	tmpDir := t.TempDir()
