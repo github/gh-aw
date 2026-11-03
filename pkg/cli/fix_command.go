@@ -149,7 +149,7 @@ func runFixCommandWithResults(workflowIDs []string, write bool, verbose bool, wo
 		}
 	} else {
 		// Process all workflows in the workflow directory
-		files, err = getMarkdownWorkflowFiles(workflowDir)
+		files, err = getMarkdownWorkflowFilesRecursively(workflowDir)
 		if err != nil {
 			return err
 		}

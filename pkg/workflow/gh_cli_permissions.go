@@ -351,6 +351,196 @@ func inferPermissionsFromShellScripts(scripts []string) (map[PermissionScope]Per
 	return perms, nil
 }
 
+// InferGitHubAppTokenPermissionsFromShellScripts returns permission-* inputs
+// for scripts that contain only GitHub CLI read operations whose scopes are
+// explicitly known. It declines to infer permissions for write, unknown, or
+// unrecognized API operations so callers can require manual review.
+func InferGitHubAppTokenPermissionsFromShellScripts(scripts []string) (map[string]string, bool) {
+	if len(scripts) == 0 {
+		return nil, false
+	}
+	ghCLIPermissions, err := getCompiledGHCLIPermissions()
+	if err != nil {
+		return nil, false
+	}
+	for _, script := range scripts {
+		if !containsOnlyExplicitGHCommands(script, ghCLIPermissions) ||
+			!isExplicitlyReadOnlyGHScript(script, ghCLIPermissions) {
+			return nil, false
+		}
+	}
+
+	inferred, err := inferPermissionsFromShellScripts(scripts)
+	if err != nil || len(inferred) == 0 {
+		return nil, false
+	}
+	fields := convertPermissionsToAppTokenFields(NewPermissionsFromMap(inferred))
+	if len(fields) == 0 {
+		return nil, false
+	}
+	return fields, true
+}
+
+func containsOnlyExplicitGHCommands(script string, permissions compiledGHCLIPermissions) bool {
+	matched := false
+	for line := range strings.SplitSeq(script, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if strings.ContainsAny(line, "|;&<>`#$()\\") {
+			return false
+		}
+		fields := strings.Fields(line)
+		first, ok := ghCLICaptureGroup(fields, 0)
+		if !ok || !strings.EqualFold(first, "gh") {
+			return false
+		}
+		second, ok := ghCLICaptureGroup(fields, 1)
+		if !ok {
+			return false
+		}
+		if strings.EqualFold(second, "api") {
+			if len(ghAPICmdRE.FindAllStringSubmatch(line, -1)) != 1 {
+				return false
+			}
+			matched = true
+			continue
+		}
+
+		third, ok := ghCLICaptureGroup(fields, 2)
+		if !ok {
+			return false
+		}
+		commands := permissions.subcommandRE.FindAllStringSubmatch(line, -1)
+		command, ok := singleGHCLIRegexMatch(commands)
+		if !ok {
+			return false
+		}
+		group, ok := ghCLICaptureGroup(command, 1)
+		if !ok || !strings.EqualFold(group, second) {
+			return false
+		}
+		action, ok := ghCLICaptureGroup(command, 2)
+		if !ok || !strings.EqualFold(action, third) {
+			return false
+		}
+		matched = true
+	}
+	return matched
+}
+
+func isExplicitlyReadOnlyGHScript(script string, permissions compiledGHCLIPermissions) bool {
+	subcommandMatched, valid := explicitlyReadOnlyGHSubcommands(script, permissions)
+	if !valid {
+		return false
+	}
+	apiMatched, valid := explicitlyReadOnlyGHAPI(script, permissions)
+	return valid && (subcommandMatched || apiMatched)
+}
+
+func explicitlyReadOnlyGHSubcommands(script string, permissions compiledGHCLIPermissions) (bool, bool) {
+	matched := false
+	for _, command := range permissions.subcommandRE.FindAllStringSubmatch(script, -1) {
+		group, ok := ghCLICaptureGroup(command, 1)
+		if !ok {
+			return false, false
+		}
+		action, ok := ghCLICaptureGroup(command, 2)
+		if !ok {
+			return false, false
+		}
+		key := strings.ToLower(group) + " " + strings.ToLower(action)
+		if _, ok := permissions.readCommands[key]; ok {
+			matched = true
+			continue
+		}
+		if _, ok := permissions.appReadCommands[key]; ok {
+			matched = true
+			continue
+		}
+		return false, false
+	}
+	return matched, true
+}
+
+func explicitlyReadOnlyGHAPI(script string, permissions compiledGHCLIPermissions) (bool, bool) {
+	matched := false
+	for _, command := range ghAPICmdRE.FindAllStringSubmatch(script, -1) {
+		args, ok := ghCLICaptureGroup(command, 1)
+		if !ok {
+			return false, false
+		}
+		if !isReadOnlyGHAPIRequest(args) {
+			return false, false
+		}
+
+		endpoint := parseGHAPIEndpoint(args)
+		if endpoint == "" {
+			return false, false
+		}
+		endpointMatched := false
+		for _, apiPermission := range permissions.apiPathPatterns {
+			if apiPermission.re.MatchString(endpoint) {
+				endpointMatched = true
+				break
+			}
+		}
+		if !endpointMatched {
+			return false, false
+		}
+		matched = true
+	}
+	return matched, true
+}
+
+func isReadOnlyGHAPIRequest(args string) bool {
+	tokens := splitShellTokens(strings.TrimSpace(args))
+	for i, token := range tokens {
+		switch {
+		case token == "-X" || token == "--method":
+			method, ok := ghCLICaptureGroup(tokens, i+1)
+			if !ok || !strings.EqualFold(method, "GET") {
+				return false
+			}
+		case strings.HasPrefix(token, "--method="):
+			if !strings.EqualFold(strings.TrimPrefix(token, "--method="), "GET") {
+				return false
+			}
+		case strings.HasPrefix(token, "-X") && len(token) > 2:
+			if !strings.EqualFold(strings.TrimPrefix(token, "-X"), "GET") {
+				return false
+			}
+		case token == "--input" || token == "-f" || token == "-F" ||
+			token == "--field" || token == "--raw-field" ||
+			strings.HasPrefix(token, "--input=") ||
+			strings.HasPrefix(token, "--field=") ||
+			strings.HasPrefix(token, "--raw-field=") ||
+			(strings.HasPrefix(token, "-f") && token != "-f") ||
+			(strings.HasPrefix(token, "-F") && token != "-F"):
+			return false
+		}
+	}
+	return true
+}
+
+func ghCLICaptureGroup(match []string, index int) (string, bool) {
+	if index < 0 || index >= len(match) {
+		return "", false
+	}
+	return match[index], true
+}
+
+func singleGHCLIRegexMatch(matches [][]string) ([]string, bool) {
+	if len(matches) != 1 {
+		return nil, false
+	}
+	for _, match := range matches {
+		return match, true
+	}
+	return nil, false
+}
+
 // detectWriteCommandsInShellScripts returns all write gh CLI commands found in the
 // given scripts, formatted as "gh <group> <action>" (e.g. "gh pr create").
 // The slice contains no duplicates and is sorted deterministically in discovery order.

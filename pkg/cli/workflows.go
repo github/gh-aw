@@ -317,6 +317,37 @@ func getMarkdownWorkflowFiles(workflowDir string) ([]string, error) {
 	return mdFiles, nil
 }
 
+// getMarkdownWorkflowFilesRecursively discovers workflow Markdown files in the
+// directory tree. Fix uses this so nested workflow files receive the same codemods.
+func getMarkdownWorkflowFilesRecursively(workflowDir string) ([]string, error) {
+	workflowsDir := workflowDir
+	if workflowsDir == "" {
+		workflowsDir = getWorkflowsDir()
+	}
+
+	if _, err := os.Stat(workflowsDir); os.IsNotExist(err) {
+		return nil, fmt.Errorf("no %s directory found", workflowsDir)
+	}
+
+	var mdFiles []string
+	err := filepath.WalkDir(workflowsDir, func(path string, _ os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if !strings.EqualFold(filepath.Ext(path), ".md") || !isWorkflowFile(path) {
+			return nil
+		}
+		mdFiles = append(mdFiles, path)
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to find workflow files: %w", err)
+	}
+
+	workflowsLog.Printf("Found %d markdown workflow file(s) in %s recursively", len(mdFiles), workflowsDir)
+	return mdFiles, nil
+}
+
 // filterMarkdownFilesWithFrontmatter keeps only markdown files that begin with frontmatter.
 func filterMarkdownFilesWithFrontmatter(mdFiles []string) ([]string, error) {
 	workflowFiles := make([]string, 0, len(mdFiles))
