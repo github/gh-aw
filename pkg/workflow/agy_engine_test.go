@@ -329,6 +329,10 @@ func TestAgyProductionConformancePermissionsAreBoundedAndScoped(t *testing.T) {
 			if entry.trigger == "workflow_call" {
 				assert.Contains(t, callee.Concurrency["group"], "${{ github.run_id }}")
 			}
+			if entry.id == "smoke-agy" {
+				assert.Contains(t, callee.Jobs, "evals")
+				assert.Contains(t, callee.Jobs, "push_evals_state")
+			}
 			for name, config := range callee.Jobs {
 				allowedPermissions := map[string]string{"actions": "read", "contents": "read"}
 				if name == string(constants.ConclusionAdmissionJobName) {
@@ -342,6 +346,10 @@ func TestAgyProductionConformancePermissionsAreBoundedAndScoped(t *testing.T) {
 					allowedPermissions = map[string]string{
 						"actions": "read", "contents": "read", "issues": "read", "pull-requests": "read",
 					}
+				}
+				if entry.id == "smoke-agy" && name == "push_evals_state" {
+					allowedPermissions = map[string]string{"contents": "write"}
+					assert.Equal(t, allowedPermissions, config.Permissions, "only the eval state publisher may persist smoke eval results")
 				}
 				if entry.id == "engine-conformance-agy" {
 					switch name {
@@ -453,6 +461,21 @@ func TestAgyConformanceEntryPointsShareConfiguration(t *testing.T) {
 			readConformanceFrontmatter(t, "../../.github/workflows/"+entry.id+".md", &source)
 			expectedTriggers := map[string]any{entry.trigger: nil}
 			if entry.id == "smoke-agy" {
+				assert.Equal(t, []any{
+					map[string]any{
+						"id":       "native_challenge_transport",
+						"question": "Does the output show native MCP invocation of agy-native native_challenge with the fixture fileNonce rather than a CLI or HTTP substitute?",
+					},
+					map[string]any{
+						"id":       "native_infrastructure_transport",
+						"question": "Does the output show native MCP invocation of mcpscripts native_infrastructure_challenge with the same fixture fileNonce?",
+					},
+					map[string]any{
+						"id":       "native_completion",
+						"question": "Does the agent emit exactly one final native safeoutputs noop with message Conformance probes completed after the probes?",
+					},
+				}, source["evals"], "the smoke entry point must retain its native conformance evals")
+				delete(source, "evals")
 				expectedTriggers["slash_command"] = map[string]any{
 					"name":     "smoke-agy",
 					"strategy": "centralized",
