@@ -169,7 +169,7 @@ export function classify(pr, detail, comments, runs, now = Date.now()) {
   const humanComments = comments.filter(comment => trusted(comment) && !automationPattern.test(login(comment)) && !isSousChefComment(comment));
   const activity = Math.max(
     epoch(pr.createdAt),
-    ...detail.commits.nodes.map(node => epoch(node.commit.committedDate)),
+    epoch(pr.headCommittedAt),
     ...feedback.map(item => epoch(item.feedback_at)),
     ...humanComments.map(commentTime),
     ...detail.reviews.nodes.filter(review => trustedReviewer(review)).map(review => epoch(review.submittedAt))
@@ -304,28 +304,54 @@ export async function fetchActiveRuns(repo, api = gh, branch) {
 
 async function inspect(repo, pr, runs, api = gh, now = Date.now()) {
   const [owner, name] = repo.split("/");
-  const response = await api([
-    "api",
-    "graphql",
-    "-f",
-    `query=query($owner:String!,$name:String!,$number:Int!){
-      repository(owner:$owner,name:$name){pullRequest(number:$number){
-        commits(last:1){nodes{commit{committedDate}}}
-        reviewThreads(first:100){pageInfo{hasNextPage} nodes{id isResolved path line originalLine
-          comments(first:100){pageInfo{hasNextPage} nodes{author{login} authorAssociation body createdAt updatedAt url}}}}
-        reviews(last:100){pageInfo{hasPreviousPage} nodes{databaseId author{login} authorAssociation state submittedAt}}
-      }}}`,
-    "-f",
-    `owner=${owner}`,
-    "-f",
-    `name=${name}`,
-    "-F",
-    `number=${pr.number}`,
-  ]);
-  if (response.errors?.length) throw new Error(`PR #${pr.number}: ${JSON.stringify(response.errors)}`);
+  // The proxy reconstructs the first connection when reviews are filtered.
+  // Keep reviews separate so they cannot replace thread or commit nodes.
+  const detail = {};
+  for (const [field, selection] of [
+    ["reviewThreads", "reviewThreads(first:100){pageInfo{hasNextPage} nodes{id isResolved path line originalLine comments(first:100){pageInfo{hasNextPage} nodes{author{login} authorAssociation body createdAt updatedAt url}}}}"],
+    ["reviews", "reviews(last:100){pageInfo{hasPreviousPage} nodes{databaseId author{login} authorAssociation state submittedAt}}"],
+  ]) {
+    const response = await api([
+      "api",
+      "graphql",
+      "-f",
+      `query=query($owner:String!,$name:String!,$number:Int!){
+        repository(owner:$owner,name:$name){pullRequest(number:$number){
+          number author{login} authorAssociation
+          ${selection}
+        }}}`,
+      "-f",
+      `owner=${owner}`,
+      "-f",
+      `name=${name}`,
+      "-F",
+      `number=${pr.number}`,
+    ]);
+    if (response?.errors?.length) throw new Error(`PR #${pr.number}: ${JSON.stringify(response.errors)}`);
+    const candidate = response?.data?.repository?.pullRequest;
+    const connection = candidate?.[field];
+    const pageFlag = field === "reviews" ? "hasPreviousPage" : "hasNextPage";
+    if (
+      candidate?.number !== pr.number ||
+      !Array.isArray(connection?.nodes) ||
+      typeof connection.pageInfo?.[pageFlag] !== "boolean" ||
+      !connection.nodes.every(node =>
+        field === "reviews"
+          ? node && typeof node.state === "string" && Number.isSafeInteger(node.databaseId) && node.databaseId > 0
+          : typeof node?.id === "string" &&
+            typeof node.isResolved === "boolean" &&
+            Array.isArray(node.comments?.nodes) &&
+            typeof node.comments.pageInfo?.hasNextPage === "boolean" &&
+            node.comments.nodes.every(comment => comment && typeof comment.body === "string" && Number.isFinite(Date.parse(comment.createdAt)))
+      )
+    ) {
+      throw new Error(`PR #${pr.number}: could not refresh ${field}; missing or malformed GitHub response (possibly proxy-filtered)`);
+    }
+    detail[field] = connection;
+  }
   // Issue comments do not support sort/direction: paginate, then sort locally.
   const comments = (await api(["api", `repos/${repo}/issues/${pr.number}/comments?per_page=100`, "--paginate", "--slurp"])).flat();
-  return classify(pr, response.data.repository.pullRequest, comments, runs, now);
+  return classify(pr, detail, comments, runs, now);
 }
 
 const prFields = "number,updatedAt,author,isDraft,state,labels";
@@ -342,6 +368,7 @@ export async function fetchCandidate(repo, number, api = gh, now) {
       repository(owner:$owner,name:$name){pullRequest(number:$number){
         number title url state isDraft headRefOid headRefName baseRefName
         createdAt updatedAt changedFiles mergeStateStatus author{login} authorAssociation
+        headRef{target{oid ... on Commit{committedDate}}}
         labels(first:100){pageInfo{hasNextPage} nodes{name}}
       }}}`,
     "-f",
@@ -372,6 +399,10 @@ export async function fetchCandidate(repo, number, api = gh, now) {
     mergeStateStatus: candidate.mergeStateStatus === "DIRTY" ? "CONFLICTING" : candidate.mergeStateStatus,
   };
   if (now !== undefined && metadataSkip(metadata, now)) return metadata;
+  if (candidate.headRef?.target?.oid !== candidate.headRefOid || !Number.isFinite(Date.parse(candidate.headRef?.target?.committedDate))) {
+    throw new Error(`PR #${number}: could not refresh head commit activity`);
+  }
+  metadata.headCommittedAt = candidate.headRef.target.committedDate;
   const checkRuns = (await api(["api", `repos/${repo}/commits/${candidate.headRefOid}/check-runs?per_page=100&filter=latest`, "--paginate", "--slurp"])).flatMap(page => page.check_runs);
   const statuses = (await api(["api", `repos/${repo}/commits/${candidate.headRefOid}/status?per_page=100`, "--paginate", "--slurp"])).flatMap(page => page.statuses);
   return {
