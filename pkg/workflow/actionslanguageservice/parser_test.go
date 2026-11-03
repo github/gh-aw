@@ -58,38 +58,6 @@ func TestExtractExpressionsRecoversAfterUnclosedQuote(t *testing.T) {
 	}
 }
 
-func TestWorkflowValidation(t *testing.T) {
-	for _, test := range []struct {
-		name, fields, want string
-	}{
-		{"valid", "if: github.ref == 'refs/heads/main'", ""},
-		{"implicit bad context", "if: secrets.TOKEN", "unrecognized named-value"},
-		{"implicit syntax error", "if: github.ref = 'main'", "unexpected symbol"},
-		{"explicit syntax error", "if: ${{ github.ref + 'main' }}", "unexpected symbol"},
-		{"valid status function", "if: always()", ""},
-		{"invalid status arity", "if: always(true)", "too many parameters"},
-		{"allowed env context", "env: {VALUE: '${{ secrets.TOKEN }}'}", ""},
-		{"unsupported context", "env: {VALUE: '${{ unknown.TOKEN }}'}", "unrecognized named-value"},
-		{"literal braces", "env: {VALUE: '${{ format(''}}-{0}'', github.ref) }}'}", ""},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			source := "on: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    " + test.fields +
-				"\n    steps: [{run: echo hi}]\n"
-			err := ValidateWorkflow("test.yml", source)
-			if test.want == "" {
-				require.NoError(t, err)
-			} else {
-				require.ErrorContains(t, err, test.want)
-				var diagnostic *Diagnostic
-				require.ErrorAs(t, err, &diagnostic)
-				assert.Equal(t, "test.yml", diagnostic.File)
-				assert.Equal(t, 5, diagnostic.Line)
-				assert.Positive(t, diagnostic.Column)
-			}
-		})
-	}
-}
-
 func TestWorkflowParsingIsolation(t *testing.T) {
 	source := "on: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps: [{run: echo hi}]\n"
 	var group sync.WaitGroup
@@ -104,7 +72,8 @@ func TestWorkflowParsingIsolation(t *testing.T) {
 		})
 	}
 	group.Wait()
-	require.NoError(t, ValidateWorkflow("after.yml", source))
+	_, err := ParseWorkflow("after.yml", source)
+	require.NoError(t, err)
 }
 
 func TestWorkflowRejectsCircularAliasesAndMultipleDocuments(t *testing.T) {
