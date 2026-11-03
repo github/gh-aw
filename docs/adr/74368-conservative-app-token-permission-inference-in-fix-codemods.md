@@ -1,6 +1,6 @@
 # ADR-74368: Conservative GitHub App Token Permission Inference and Recursive Workflow Discovery in `gh aw fix`
 
-**Date**: 2026-07-14
+**Date**: 2026-11-03
 **Status**: Draft
 **Deciders**: [TODO: verify] pelikhan, Copilot coding agent
 
