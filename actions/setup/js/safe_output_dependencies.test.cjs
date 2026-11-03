@@ -1,0 +1,328 @@
+// @ts-check
+
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
+import { processMessages, sortMessageIndicesByTemporaryIdDependencies } from "./safe_output_handler_manager.cjs";
+import { buildSafeOutputDependencyPlan, isConfirmedDependencySuccess } from "./safe_output_dependencies.cjs";
+import { main as createActionHandler } from "./safe_output_action_handler.cjs";
+import { buildSafeOutputOutcomes, projectSafeOutputData } from "./safe_output_outcomes.cjs";
+import { createSessionValidator } from "./scripts/validate_session.cjs";
+
+const id = index => `so_00000000-0000-4000-8000-${String(index).padStart(12, "0")}`;
+const message = (index, dependencies, type = "add_comment") => ({
+  type,
+  output_id: id(index),
+  ...(dependencies !== undefined ? { "depends-on": dependencies } : {}),
+});
+
+describe("safe-output runtime dependencies", () => {
+  beforeEach(() => {
+    global.core = { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), error: vi.fn(), setOutput: vi.fn() };
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    delete global.core;
+    delete process.env.GH_AW_SAFE_OUTPUT_JOBS;
+  });
+
+  it("orders multiple prerequisites and aliases while leaving independent outputs alone", async () => {
+    const calls = [];
+    const handler = vi.fn(async msg => {
+      calls.push(msg.output_id);
+      return { success: true };
+    });
+    const messages = [message(3, [id(1), id(2)]), message(4), message(2), { ...message(1), depends_on: id(2) }];
+    const result = await processMessages(new Map([["add_comment", handler]]), messages);
+    expect(calls).toEqual([id(4), id(2), id(1), id(3)]);
+    expect(result.results.every(item => item.success)).toBe(true);
+    expect(result.results.map(item => item.output_id)).toEqual(calls);
+  });
+
+  it("combines explicit and temporary-ID ordering", () => {
+    const messages = [{ ...message(1, undefined, "create_issue"), temporary_id: "aw_first", blocked_by: ["aw_second"] }, message(3, id(1)), { ...message(2, undefined, "create_issue"), temporary_id: "aw_second" }];
+    expect(sortMessageIndicesByTemporaryIdDependencies(messages)).toEqual([2, 0, 1]);
+  });
+
+  it("requires every prerequisite, not just one successful member", async () => {
+    const handler = vi.fn(async msg => ({ success: msg.output_id !== id(2) }));
+    const result = await processMessages(new Map([["add_comment", handler]]), [message(3, [id(1), id(2)]), message(1), message(2), message(4)]);
+    expect(handler.mock.calls.map(([msg]) => msg.output_id)).toEqual([id(1), id(2), id(4)]);
+    expect(result.results.find(item => item.output_id === id(3))).toMatchObject({ success: false, errorCode: "safe_output_dependency_failed" });
+  });
+
+  it.each([
+    [
+      "throws",
+      () => {
+        throw new Error("failed");
+      },
+    ],
+    ["returned failure", () => ({ success: false })],
+    ["fanout failure", () => [{ success: true }, { success: false }]],
+    ["empty fanout", () => []],
+    ["no result", () => undefined],
+    ["skipped", () => ({ success: true, skipped: true })],
+    ["deferred", () => ({ deferred: true })],
+    ["cancelled", () => ({ success: true, cancelled: true })],
+    ["staged", () => ({ success: true, staged: true })],
+    ["delegated", () => ({ success: true, delegated: true })],
+    ["queued", () => ({ success: true, queued: true })],
+    ["buffered", () => ({ success: true, buffered: true })],
+    ["deferred review publication", () => ({ success: true, deferred_manifest: true })],
+    ["warning", () => ({ success: true, warning: "Not applied" })],
+    ["unconfirmed error", () => ({ error: "Not applied" })],
+  ])("blocks transitive dependents of %s without affecting independent outputs", async (name, outcome) => {
+    const handler = vi.fn(async msg => (msg.output_id === id(1) ? outcome() : { success: true }));
+    const result = await processMessages(new Map([["add_comment", handler]]), [message(3, id(2)), message(2, id(1)), message(1), message(4)]);
+    expect(handler.mock.calls.map(([msg]) => msg.output_id)).toEqual(name === "deferred" ? [id(1), id(4), id(1)] : [id(1), id(4)]);
+    for (const index of [0, 1]) {
+      expect(result.results.find(item => item.messageIndex === index)).toMatchObject({ success: false, errorCode: "safe_output_dependency_failed" });
+    }
+    expect(result.results.find(item => item.output_id === id(4))).toMatchObject({ success: true });
+  });
+
+  it.each([
+    ["missing", [message(1, id(99))]],
+    ["self", [message(1, id(1))]],
+    ["cycle", [message(1, id(2)), message(2, id(1))]],
+    ["duplicate", [message(1), message(1), message(2, id(1))]],
+    ["malformed ID", [message(1, "aw_not_an_output")]],
+    ["malformed output ID", [{ ...message(1), output_id: "aw_not_an_output" }]],
+    ["empty list", [message(1, [])]],
+    ["duplicate prerequisite", [message(1, [id(2), id(2)]), message(2)]],
+    ["null", [message(1, null)]],
+    ["non-string", [message(1, [id(2), 3]), message(2)]],
+    ["conflicting aliases", [{ ...message(1, id(2)), depends_on: id(3) }, message(2), message(3)]],
+    ["both aliases", [{ ...message(1, id(2)), depends_on: id(2) }, message(2)]],
+  ])("fails closed for %s", async (_name, messages) => {
+    const handler = vi.fn(async () => ({ success: true }));
+    const result = await processMessages(new Map([["add_comment", handler]]), [...messages, message(100)]);
+    for (const record of result.results.filter(item => buildSafeOutputDependencyPlan(messages).invalid.has(item.messageIndex))) {
+      expect(record).toMatchObject({ success: false, errorCode: "safe_output_dependency_invalid" });
+    }
+    const invalid = buildSafeOutputDependencyPlan(messages).invalid;
+    expect(invalid.size).toBeGreaterThan(0);
+    expect(handler).toHaveBeenCalledTimes(messages.length - invalid.size + 1);
+    expect(result.results.find(item => item.output_id === id(100))).toMatchObject({ success: true });
+  });
+
+  it("detects cycles spanning explicit and legacy temporary-ID edges", async () => {
+    const messages = [
+      { ...message(1, undefined, "create_issue"), temporary_id: "aw_first", blocked_by: ["aw_second"] },
+      { ...message(2, id(1), "create_issue"), temporary_id: "aw_second" },
+    ];
+    const handler = vi.fn(async () => ({ success: true }));
+    const result = await processMessages(new Map([["create_issue", handler]]), messages);
+    expect(handler.mock.calls.map(([msg]) => msg.output_id)).toEqual([id(1)]);
+    expect(result.results.find(item => item.output_id === id(2))).toMatchObject({ success: false, errorCode: "safe_output_dependency_invalid" });
+  });
+
+  it("waits for actual deferred retry success before running a dependent chain", async () => {
+    const calls = [];
+    let attempts = 0;
+    const handler = vi.fn(async msg => {
+      calls.push(msg.output_id);
+      if (msg.output_id === id(1) && attempts++ === 0) return { deferred: true };
+      return { success: true };
+    });
+    const result = await processMessages(new Map([["add_comment", handler]]), [message(3, id(2)), message(2, id(1)), message(1), message(4)]);
+    expect(calls).toEqual([id(1), id(4), id(1), id(2), id(3)]);
+    expect(result.results.every(item => item.success)).toBe(true);
+  });
+
+  it("retries a waiting dependent that itself defers, before releasing its dependent", async () => {
+    const calls = [];
+    const attempts = new Map();
+    const handler = vi.fn(async msg => {
+      calls.push(msg.output_id);
+      const count = attempts.get(msg.output_id) || 0;
+      attempts.set(msg.output_id, count + 1);
+      return count === 0 && msg.output_id !== id(3) ? { deferred: true } : { success: true };
+    });
+    const result = await processMessages(new Map([["add_comment", handler]]), [message(3, id(2)), message(2, id(1)), message(1)]);
+    expect(calls).toEqual([id(1), id(1), id(2), id(2), id(3)]);
+    expect(result.results.every(item => item.success)).toBe(true);
+  });
+
+  it("waits for a prerequisite's temporary-ID resolution on retry", async () => {
+    const calls = [];
+    const link = vi.fn(async (_message, temporaryIds) => {
+      calls.push("link");
+      return temporaryIds.aw_parent ? { success: true } : { deferred: true };
+    });
+    const create = vi.fn(async () => {
+      calls.push("create");
+      return { repo: "owner/repo", number: 42, temporaryId: "aw_parent" };
+    });
+    const comment = vi.fn(async () => {
+      calls.push("comment");
+      return { success: true };
+    });
+    const result = await processMessages(
+      new Map([
+        ["link_sub_issue", link],
+        ["create_issue", create],
+        ["add_comment", comment],
+      ]),
+      [message(1, undefined, "link_sub_issue"), message(2, id(1)), { ...message(3, undefined, "create_issue"), temporary_id: "aw_parent" }]
+    );
+    expect(calls).toEqual(["link", "create", "link", "comment"]);
+    expect(result.results.every(item => item.success)).toBe(true);
+    expect(result.temporaryIdMap.aw_parent).toEqual({ repo: "owner/repo", number: 42 });
+  });
+
+  it("preserves temporary-ID deferral and cyclic ordering without explicit dependencies", async () => {
+    const messages = [
+      { type: "create_issue", temporary_id: "aw_first", blocked_by: ["aw_second"] },
+      { type: "create_issue", temporary_id: "aw_second", blocked_by: ["aw_first"] },
+    ];
+    expect(sortMessageIndicesByTemporaryIdDependencies(messages)).toEqual([0, 1]);
+    let attempts = 0;
+    const handler = vi.fn(async () => (++attempts === 1 ? { deferred: true } : { success: true }));
+    const result = await processMessages(new Map([["create_issue", handler]]), messages);
+    expect(handler).toHaveBeenCalledTimes(3);
+    expect(result.results.every(item => item.success)).toBe(true);
+  });
+
+  it("releases waiting temporary-ID producers before retrying their legacy consumers", async () => {
+    const calls = [];
+    let attempts = 0;
+    const handlers = new Map([
+      [
+        "update_issue",
+        async () => {
+          calls.push("update");
+          return attempts++ === 0 ? { deferred: true } : { success: true };
+        },
+      ],
+      [
+        "create_issue",
+        async () => {
+          calls.push("create");
+          return { repo: "owner/repo", number: 42, temporaryId: "aw_parent" };
+        },
+      ],
+      [
+        "link_sub_issue",
+        async (_message, temporaryIds) => {
+          calls.push("link");
+          return temporaryIds.aw_parent ? { success: true } : { deferred: true };
+        },
+      ],
+      [
+        "add_comment",
+        async () => {
+          calls.push("comment");
+          return { success: true };
+        },
+      ],
+    ]);
+    const result = await processMessages(handlers, [message(1, undefined, "update_issue"), { ...message(2, id(1), "create_issue"), temporary_id: "aw_parent" }, message(3, undefined, "link_sub_issue"), message(4, id(3))]);
+    expect(calls).toEqual(["update", "link", "update", "create", "link", "comment"]);
+    expect(result.results.every(item => item.success)).toBe(true);
+  });
+
+  it.each(["throw", "failure", "deferred", "staged", "skipped"])("blocks waiting dependents after a retry ends in %s", async outcome => {
+    let attempts = 0;
+    const handler = vi.fn(async () => {
+      if (attempts++ === 0) return { deferred: true };
+      if (outcome === "throw") throw new Error("retry failed");
+      if (outcome === "failure") return { success: false };
+      return { success: true, [outcome]: true };
+    });
+    const result = await processMessages(new Map([["add_comment", handler]]), [message(2, id(1)), message(1)]);
+    expect(handler).toHaveBeenCalledTimes(2);
+    expect(result.results.find(item => item.output_id === id(2))).toMatchObject({ success: false, errorCode: "safe_output_dependency_failed" });
+  });
+
+  it("does not treat standalone or custom-job delegation as success", async () => {
+    process.env.GH_AW_SAFE_OUTPUT_JOBS = JSON.stringify({ custom_output: {} });
+    const handler = vi.fn(async () => ({ success: true }));
+    const result = await processMessages(new Map([["add_comment", handler]]), [message(1, undefined, "noop"), message(2, id(1)), message(3, undefined, "custom_output"), message(4, id(3))]);
+    expect(handler).not.toHaveBeenCalled();
+    expect(result.results.filter(item => item.errorCode === "safe_output_dependency_failed")).toHaveLength(2);
+    expect(result.results.filter(item => item.delegated)).toHaveLength(2);
+  });
+
+  it("preserves no-dependency legacy messages and successful legacy fanouts", async () => {
+    const handler = vi.fn(async () => [{ commentId: 1 }, { success: true }]);
+    const result = await processMessages(new Map([["add_comment", handler]]), [{ type: "add_comment" }, message(1), message(2, id(1))]);
+    expect(handler).toHaveBeenCalledTimes(3);
+    expect(result.results.every(item => item.success)).toBe(true);
+    expect(result.results[0]).not.toHaveProperty("output_id");
+  });
+
+  it("does not mistake custom-action payload export for confirmed execution", async () => {
+    const action = await createActionHandler({ action_name: "custom_action" });
+    const comment = vi.fn(async () => ({ success: true }));
+    const result = await processMessages(
+      new Map([
+        ["custom_action", action],
+        ["add_comment", comment],
+      ]),
+      [message(1, undefined, "custom_action"), message(2, id(1))]
+    );
+    expect(global.core.setOutput).toHaveBeenCalledWith("action_custom_action_payload", "{}");
+    expect(result.results.find(item => item.output_id === id(1))).toMatchObject({ success: true, result: { delegated: true } });
+    expect(comment).not.toHaveBeenCalled();
+    expect(result.results.find(item => item.output_id === id(2))).toMatchObject({ success: false, errorCode: "safe_output_dependency_failed" });
+  });
+
+  it("never confirms prerequisites in global staged mode, even when legacy handlers omit staged", async () => {
+    vi.stubEnv("GH_AW_SAFE_OUTPUTS_STAGED", "true");
+    const handler = vi.fn(async () => ({ success: true }));
+    const result = await processMessages(new Map([["add_comment", handler]]), [message(1), message(2, id(1)), message(3)]);
+    expect(handler.mock.calls.map(([msg]) => msg.output_id)).toEqual([id(1), id(3)]);
+    expect(result.results.find(item => item.output_id === id(2))).toMatchObject({ success: false, errorCode: "safe_output_dependency_failed" });
+    expect(isConfirmedDependencySuccess({ success: true, result: { success: true } })).toBe(false);
+    expect(isConfirmedDependencySuccess({ success: true, result: [{ success: true }] })).toBe(false);
+  });
+
+  it("rejects nested fanout outcomes even under an optimistic wrapper", () => {
+    expect(isConfirmedDependencySuccess({ success: true, result: [{ success: true }, { success: true, staged: true }] })).toBe(false);
+    expect(isConfirmedDependencySuccess({ success: true, result: [{ success: false }] })).toBe(false);
+  });
+
+  it("fails closed when a post-handler error makes a prerequisite's results ambiguous", async () => {
+    const create = vi.fn(async () => ({ repo: "owner/repo", number: 42 }));
+    const comment = vi.fn(async () => ({ success: true }));
+    const result = await processMessages(
+      new Map([
+        ["create_issue", create],
+        ["add_comment", comment],
+      ]),
+      [message(1, undefined, "create_issue"), message(2, id(1))],
+      () => {
+        throw new Error("manifest unavailable");
+      }
+    );
+    expect(create).toHaveBeenCalledOnce();
+    expect(comment).not.toHaveBeenCalled();
+    expect(result.results.find(item => item.output_id === id(2))).toMatchObject({ success: false, errorCode: "safe_output_dependency_failed" });
+  });
+
+  it("preserves server output IDs and dependency error codes in manifest outcomes", async () => {
+    const handler = vi.fn(async () => ({ success: false }));
+    const result = await processMessages(new Map([["add_comment", handler]]), [message(1), message(2, id(1))]);
+    const outcomes = buildSafeOutputOutcomes(result.results);
+    expect(outcomes).toEqual([expect.objectContaining({ output_id: id(1), status: "failed" }), expect.objectContaining({ output_id: id(2), status: "failed", errorCode: "safe_output_dependency_failed" })]);
+    expect(projectSafeOutputData(outcomes[1])).toMatchObject({ output_id: id(2), errorCode: "safe_output_dependency_failed" });
+    expect(projectSafeOutputData({ output_id: "PRIVATE_CONTENT" })).not.toHaveProperty("output_id");
+    expect(projectSafeOutputData({ output_id: "aw_temporary" })).not.toHaveProperty("output_id");
+    const validator = createSessionValidator("unified");
+    expect(
+      validator.event({
+        type: "safe_output.result",
+        data: projectSafeOutputData(outcomes[1]),
+        provenance: { component: "safe_outputs", phase: "safe_outputs", path: "safe-output-outcomes.jsonl", index: 0 },
+      })
+    ).toBe(true);
+  });
+
+  it("retains one correlation ID across fanout execution outcomes", () => {
+    const outcomes = buildSafeOutputOutcomes([{ output_id: id(1), type: "add_comment", success: true, result: [{ success: true }, { success: false }] }]);
+    expect(outcomes.map(outcome => [outcome.output_id, outcome.status])).toEqual([
+      [id(1), "success"],
+      [id(1), "failed"],
+    ]);
+  });
+});

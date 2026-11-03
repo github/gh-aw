@@ -12,6 +12,7 @@ const { parseIntTemplatable } = require("./templatable.cjs");
 const { isProbingNoopMessage } = require("./intent_probe.cjs");
 const { buildEmptyOutputOutcome, collectOutcomeSession, hasFailedFinalResult } = require("./empty_output_outcome.cjs");
 const { normalizeSafeOutputName, normalizeSafeOutputConfig } = require("./safe_output_names.cjs");
+const { validateSubmissionMetadata } = require("./safe_output_submission.cjs");
 
 const MENTION_AWARE_OUTPUT_TYPES = new Set(["add_comment", "close_discussion", "create_discussion", "create_issue", "create_pull_request", "create_pull_request_review_comment", "reply_to_pull_request_review_comment"]);
 
@@ -135,11 +136,16 @@ async function main() {
     }
     function validateItemWithSafeJobConfig(item, jobConfig, lineNum) {
       const errors = [];
+      const metadataError = validateSubmissionMetadata(item);
+      if (metadataError) errors.push(`Line ${lineNum}: ${metadataError}`);
+      const dependency = item["depends-on"] !== undefined ? item["depends-on"] : item.depends_on;
       const normalizedItem = { type: item.type };
+      if (item.output_id !== undefined) normalizedItem.output_id = item.output_id;
+      if (dependency !== undefined) normalizedItem["depends-on"] = dependency;
       if (!jobConfig || typeof jobConfig !== "object" || !jobConfig.inputs) {
         return {
-          isValid: true,
-          errors: [],
+          isValid: errors.length === 0,
+          errors,
           normalizedItem,
         };
       }
@@ -301,6 +307,10 @@ async function main() {
         core.info(`Line ${i + 1}: type '${itemType}'`);
 
         const typeConfig = expectedOutputTypes[itemType];
+        if ((item["depends-on"] !== undefined || item.depends_on !== undefined) && typeConfig?.supports_dependencies === false) {
+          rejectItem(`Line ${i + 1}: depends-on is not supported for custom safe jobs, which execute outside the safe-output handler manager.`);
+          continue;
+        }
         const normalizeIssueClosingKeywords = typeConfig !== null && typeof typeConfig === "object" && typeConfig.normalize_closing_keywords === true;
         if (itemType === "dispatch_workflow") {
           const hasWorkflowName = typeof item.workflow_name === "string" && item.workflow_name.trim().length > 0;

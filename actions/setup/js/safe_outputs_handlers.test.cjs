@@ -21,6 +21,7 @@ import {
 } from "./intent_probe.cjs";
 
 const LARGE_CONTENT_BODY = "A".repeat(70000);
+const outputId = expect.stringMatching(/^so_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
 const testScratchRoot = path.resolve(`.safe-outputs-handlers-${crypto.randomUUID()}`);
 const originalGitCeiling = process.env.GIT_CEILING_DIRECTORIES;
 
@@ -110,8 +111,8 @@ describe("safe_outputs_handlers", () => {
     expect(configured.ledgerBuiltinHandler("map", "put")({ ledger: "cache", key: "a", value: { status: "ready" }, temp_id: "entry" }).isError).not.toBe(true);
     expect(configured.ledgerBuiltinHandler("map", "put")({ ledger: "other", key: "b", value: 2 }).isError).not.toBe(true);
     expect(mockAppendSafeOutput.mock.calls.map(([entry]) => entry)).toEqual([
-      { type: "ledger_append", ledger: "cache", operation: "put", key: "a", value: { status: "ready" }, temp_id: "entry" },
-      { type: "ledger_append", ledger: "other", operation: "put", key: "b", value: 2 },
+      { type: "ledger_append", ledger: "cache", operation: "put", key: "a", value: { status: "ready" }, temp_id: "entry", output_id: outputId },
+      { type: "ledger_append", ledger: "other", operation: "put", key: "b", value: 2, output_id: outputId },
     ]);
   });
 
@@ -133,9 +134,9 @@ describe("safe_outputs_handlers", () => {
     expect(configured.ledgerAgentAppendHandler({ ledger: "knowledge", operation: "note", ...note }).isError).toBe(true);
     expect(configured.ledgerAgentAppendHandler({ ledger: "history", operation: "append", value: "ok" }).isError).not.toBe(true);
     expect(mockAppendSafeOutput.mock.calls.map(([entry]) => entry)).toEqual([
-      { type: "ledger_append", ledger: "knowledge", temp_id: "first", operation: "note", ...note },
-      { type: "ledger_append", ledger: "knowledge", operation: "vote", note_id: "#first", vote: "up" },
-      { type: "ledger_append", ledger: "history", operation: "append", value: "ok" },
+      { type: "ledger_append", ledger: "knowledge", temp_id: "first", operation: "note", ...note, output_id: outputId },
+      { type: "ledger_append", ledger: "knowledge", operation: "vote", note_id: "#first", vote: "up", output_id: outputId },
+      { type: "ledger_append", ledger: "history", operation: "append", value: "ok", output_id: outputId },
     ]);
   });
 
@@ -174,7 +175,7 @@ describe("safe_outputs_handlers", () => {
     expect(configured.ledgerAgentAppendHandler({ ledger: "unknown", record }).isError).toBe(true);
     expect(mockAppendSafeOutput).not.toHaveBeenCalled();
     expect(configured.ledgerAgentAppendHandler({ record }).isError).not.toBe(true);
-    expect(mockAppendSafeOutput).toHaveBeenCalledExactlyOnceWith({ type: "ledger_append", record });
+    expect(mockAppendSafeOutput).toHaveBeenCalledExactlyOnceWith({ type: "ledger_append", record, output_id: outputId });
 
     const previousRunnerTemp = process.env.RUNNER_TEMP;
     process.env.RUNNER_TEMP = testWorkspaceDir;
@@ -440,12 +441,13 @@ describe("safe_outputs_handlers", () => {
         field1: "value1",
         field2: "value2",
         type: "test-type",
+        output_id: outputId,
       });
       expect(result).toEqual({
         content: [
           {
             type: "text",
-            text: JSON.stringify({ result: "success" }),
+            text: JSON.stringify({ result: "success", output_id: mockAppendSafeOutput.mock.calls[0][0].output_id }),
           },
         ],
       });
@@ -477,8 +479,8 @@ describe("safe_outputs_handlers", () => {
 
       const result = handler(null);
 
-      expect(mockAppendSafeOutput).toHaveBeenCalledWith({ type: "test-type" });
-      expect(result.content[0].text).toBe(JSON.stringify({ result: "success" }));
+      expect(mockAppendSafeOutput).toHaveBeenCalledWith({ type: "test-type", output_id: outputId });
+      expect(JSON.parse(result.content[0].text)).toEqual({ result: "success", output_id: mockAppendSafeOutput.mock.calls[0][0].output_id });
     });
 
     it("should handle undefined args", () => {
@@ -486,8 +488,8 @@ describe("safe_outputs_handlers", () => {
 
       const result = handler(undefined);
 
-      expect(mockAppendSafeOutput).toHaveBeenCalledWith({ type: "test-type" });
-      expect(result.content[0].text).toBe(JSON.stringify({ result: "success" }));
+      expect(mockAppendSafeOutput).toHaveBeenCalledWith({ type: "test-type", output_id: outputId });
+      expect(JSON.parse(result.content[0].text)).toEqual({ result: "success", output_id: mockAppendSafeOutput.mock.calls[0][0].output_id });
     });
 
     it("should enforce data_schema for default handler payloads", () => {
@@ -3975,8 +3977,8 @@ describe("safe_outputs_handlers", () => {
 
       const response = h.defaultHandler("publish_report")({ payload });
 
-      expect(JSON.parse(response.content[0].text)).toEqual({ result: "success" });
-      expect(mockAppendSafeOutput).toHaveBeenCalledExactlyOnceWith({ payload, type: "publish_report" });
+      expect(JSON.parse(response.content[0].text)).toEqual({ result: "success", output_id: outputId });
+      expect(mockAppendSafeOutput).toHaveBeenCalledExactlyOnceWith({ payload, type: "publish_report", output_id: JSON.parse(response.content[0].text).output_id });
     });
 
     it("should reject invalid deduplicate-by-title configuration", () => {
@@ -5094,7 +5096,7 @@ describe("safe_outputs_handlers", () => {
         });
         const result = wildcardHandlers.updateIssueHandler({ issue_number: 42, ...update });
         expect(result.isError).toBeUndefined();
-        expect(mockAppendSafeOutput).toHaveBeenCalledWith({ type: "update_issue", issue_number: 42, ...update });
+        expect(mockAppendSafeOutput).toHaveBeenCalledWith({ type: "update_issue", issue_number: 42, ...update, output_id: outputId });
       }
     );
 

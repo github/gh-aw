@@ -390,6 +390,7 @@ export interface SafeOutputData {
   url?: JsonValue;
   status?: JsonValue;
   errorCode?: JsonValue;
+  output_id?: string;
   messageIndex?: number;
   staged?: boolean;
 }

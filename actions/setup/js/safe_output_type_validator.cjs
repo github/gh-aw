@@ -19,6 +19,7 @@ const { isBlankOptionalField, normalizeBlankOptionalFields } = require("./option
 const { normalizeSafeOutputName, normalizeSafeOutputConfig } = require("./safe_output_names.cjs");
 const { parseReportMarkdown } = require("./report_markdown.cjs");
 const { renderReport } = require("./report_ast.cjs");
+const { validateSubmissionMetadata } = require("./safe_output_submission.cjs");
 
 /**
  * Default max body length for GitHub content
@@ -777,7 +778,12 @@ function executeCustomValidation(item, customValidation, lineNum, itemType) {
  * @returns {{isValid: boolean, normalizedItem?: Object, error?: string}}
  */
 function validateItem(item, itemType, lineNum, options) {
+  const metadataError = validateSubmissionMetadata(item);
+  if (metadataError) return { isValid: false, error: `Line ${lineNum}: ${metadataError}` };
   itemType = normalizeSafeOutputName(itemType);
+  if ((item["depends-on"] !== undefined || item.depends_on !== undefined) && ["upload_asset", "noop"].includes(itemType)) {
+    return { isValid: false, error: `Line ${lineNum}: depends-on is not supported for ${itemType}, which executes outside the safe-output handler manager.` };
+  }
   const validationConfig = loadValidationConfig();
   const typeConfig = validationConfig[itemType];
 
@@ -795,6 +801,9 @@ function validateItem(item, itemType, lineNum, options) {
   // agent-controlled, so forwarding undeclared fields would let consumers act
   // on values that were never validated.
   const normalizedItem = { type: item.type };
+  if (item.output_id !== undefined) normalizedItem.output_id = item.output_id;
+  const dependency = item["depends-on"] !== undefined ? item["depends-on"] : item.depends_on;
+  if (dependency !== undefined) normalizedItem["depends-on"] = dependency;
   const errors = [];
 
   // Run custom validation first if defined

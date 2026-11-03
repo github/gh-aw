@@ -18,7 +18,7 @@ const { currentClaimHandle, claimIdentity, assertClaimIdentity } = require("./wo
  * forwarding them to external action `with:` inputs.
  * @type {Set<string>}
  */
-const INTERNAL_MESSAGE_FIELDS = new Set(["type"]);
+const INTERNAL_MESSAGE_FIELDS = new Set(["type", "output_id", "depends-on", "depends_on"]);
 const CLAIM_MESSAGE_FIELDS = new Set(["claim_handle", "claim_id", "work_id"]);
 
 /**

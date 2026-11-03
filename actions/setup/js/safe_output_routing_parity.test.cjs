@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import { execFileSync } from "node:child_process";
 
 const require = createRequire(import.meta.url);
+const outputId = expect.stringMatching(/^so_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
 const root = fs.mkdtempSync(path.join(process.cwd(), ".safe-output-routing-parity-"));
 // Redirect the manager's fixed artifact destinations without changing runtime defaults.
 const constants = require("./constants.cjs");
@@ -196,9 +197,10 @@ describe("disabled safe-output behavioral parity", () => {
       },
     });
     const result = handlers.ledgerAgentAppendHandler({ ledger: "history", operation: "append", value: "Entry" });
-    expect(result).toMatchObject({ content: [{ type: "text", text: JSON.stringify({ result: "success" }) }] });
+    const response = JSON.parse(result.content[0].text);
+    expect(response).toEqual({ result: "success", output_id: outputId });
     expect(handlers.ledgerAgentAppendHandler({ ledger: "knowledge", operation: "note", note: "Use dedicated notes tools" }).isError).toBe(true);
-    expect(append).toHaveBeenCalledExactlyOnceWith({ type: "ledger_append", ledger: "history", operation: "append", value: "Entry" });
+    expect(append).toHaveBeenCalledExactlyOnceWith({ type: "ledger_append", ledger: "history", operation: "append", value: "Entry", output_id: response.output_id });
   });
 });
 
@@ -588,7 +590,7 @@ describe("real immutable Claim routing", () => {
       approve({ claim_handle: member.handle, run_id: "99" });
       expect(() => approve({ claim_handle: member.handle, run_id: "100" })).toThrow(/limit reached/);
     }
-    expect(append.mock.calls.map(([entry]) => entry)).toEqual(fixture.assignment.claims.map(member => ({ type: "approve_workflow_run", claim_handle: member.handle, run_id: "99" })));
+    expect(append.mock.calls.map(([entry]) => entry)).toEqual(fixture.assignment.claims.map(member => ({ type: "approve_workflow_run", claim_handle: member.handle, run_id: "99", output_id: outputId })));
     expect(() => approve({ run_id: "99" })).toThrow(/multi-Claim/);
     expect(() => handlers.defaultHandler("noop")({ claim_handle: fixture.assignment.claims[0].handle, run_id: "99" })).toThrow(/trusted authority/);
     handlers.createPullRequestReviewCommentHandler({ claim_handle: fixture.assignment.claims[0].handle, body: "First Claim review", path: "file.js", line: 1 });

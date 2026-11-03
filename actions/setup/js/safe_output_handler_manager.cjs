@@ -15,6 +15,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { getStalePullRequestReason } = require("./pr_lifecycle.cjs");
 const { ERR_CONFIG, ERR_PARSE, ERR_SYSTEM, ERR_VALIDATION, SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
 const { classifySafeOutputResult, computeSafeOutputsStatus, isFailedProcessingResult } = require("./safe_outputs_status.cjs");
+const { buildSafeOutputDependencyPlan, checkSafeOutputDependencies } = require("./safe_output_dependencies.cjs");
 const { finalizeBufferedReviewOutcomes } = require("./safe_output_outcomes.cjs");
 const { hasUnresolvedTemporaryIds, replaceTemporaryIdReferences, replaceArtifactUrlReferences, normalizeTemporaryId, extractTemporaryIdReferences, getCreatedTemporaryId } = require("./temporary_id.cjs");
 const { generateMissingInfoSections } = require("./missing_info_formatter.cjs");
@@ -967,63 +968,11 @@ function projectMergeFailure(result) {
  * @returns {Array<number>} original message indices in processing order
  */
 function sortMessageIndicesByTemporaryIdDependencies(messages) {
-  const producers = new Map();
-  messages.forEach((message, index) => {
-    const temporaryId = getCreatedTemporaryId(message);
-    if (temporaryId && !producers.has(temporaryId)) {
-      producers.set(temporaryId, index);
-    }
-  });
-
-  /** @type {Array<Array<number>>} */
-  const dependents = messages.map(() => []);
-  const inDegree = messages.map(() => 0);
-  messages.forEach((message, index) => {
-    const dependencies = message.type === "create_issue" ? extractTemporaryIdReferences({ blocked_by: message.blocked_by }) : new Set();
-    for (const temporaryId of dependencies) {
-      const producerIndex = producers.get(temporaryId);
-      if (producerIndex !== undefined && producerIndex !== index) {
-        dependents[producerIndex].push(index);
-        inDegree[index]++;
-      }
-    }
-  });
-
-  /** @type {Array<number>} */
-  const ready = [];
-  /** @param {number} index */
-  const pushReady = index => {
-    // Keep the ready queue ordered by original message index so independent
-    // messages keep their original relative order (stable topological sort).
-    let position = ready.length;
-    while (position > 0 && ready[position - 1] > index) position--;
-    ready.splice(position, 0, index);
-  };
-  inDegree.forEach((degree, index) => {
-    if (degree === 0) pushReady(index);
-  });
-  /** @type {Array<number>} */
-  const sorted = [];
-  while (ready.length > 0) {
-    const index = ready.shift();
-    if (index === undefined) break;
-    sorted.push(index);
-    for (const dependentIndex of dependents[index]) {
-      inDegree[dependentIndex]--;
-      if (inDegree[dependentIndex] === 0) {
-        pushReady(dependentIndex);
-      }
-    }
-  }
-
-  if (sorted.length !== messages.length) {
+  const plan = buildSafeOutputDependencyPlan(messages);
+  if (plan.cyclic) {
     core.warning("Temporary ID dependency cycle detected; preserving original order for cyclic safe outputs");
-    const sortedIndices = new Set(sorted);
-    for (let index = 0; index < messages.length; index++) {
-      if (!sortedIndices.has(index)) sorted.push(index);
-    }
   }
-  return sorted;
+  return plan.order;
 }
 
 /**
@@ -1058,7 +1007,10 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
       return { ...message, _claimScopeError: getErrorMessage(error) };
     }
   });
-  const processingOrder = sortMessageIndicesByTemporaryIdDependencies(messages);
+  const dependencyPlan = buildSafeOutputDependencyPlan(messages);
+  if (dependencyPlan.cyclic) core.warning("Safe-output dependency cycle detected; preserving legacy temporary-ID ordering only for messages without depends-on");
+  const processingOrder = dependencyPlan.order;
+  const waitingMessages = [];
   const results = [];
   const detectionConclusion = getEffectiveDetectionConclusion(process.env.GH_AW_DETECTION_CONCLUSION, process.env.GH_AW_DETECTION_REASON);
   const detectionConclusionMissing = String(process.env.GH_AW_RUN_DETECTION || "").trim() === "true" && detectionConclusion === "";
@@ -1112,11 +1064,19 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
 
   core.info(`Processing ${messages.length} message(s) in order of appearance...`);
 
-  // Process messages in dependency order while reporting original message indices
-  for (let position = 0; position < processingOrder.length; position++) {
-    const i = processingOrder[position];
+  /** @param {number} i @param {boolean} allowWaiting */
+  async function processMessage(i, allowWaiting) {
     let message = messages[i];
     const messageType = message.type;
+    const dependency = checkSafeOutputDependencies(dependencyPlan, i, results, allowWaiting);
+    if (dependency.state === "waiting") {
+      waitingMessages.push(i);
+      return;
+    }
+    if (dependency.state === "failed") {
+      results.push({ type: messageType, messageIndex: i, success: false, errorCode: dependency.errorCode, error: dependency.error });
+      return;
+    }
     try {
       if (currentClaimHandle() && message._claimScopeError) throw new Error(message._claimScopeError);
       message = await assertClaimAuthorized(message);
@@ -1130,12 +1090,12 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
           ? { cancelled: error.state === "cancelled", skipped: true, reason: error.state === "result" ? "Durable Result settled; effects not replayed" : "Claim cancelled; outputs suppressed", errorCode: error.code }
           : { errorCode: message._claimScopeErrorCode || error.code || "claim_scope_invalid", error: getErrorMessage(error) }),
       });
-      continue;
+      return;
     }
 
     if (!messageType) {
       core.warning(`Skipping message ${i + 1} without type`);
-      continue;
+      return;
     }
 
     if (detectionConclusion === "failure" || detectionConclusionMissing) {
@@ -1157,7 +1117,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
         errorCode,
         error,
       });
-      continue;
+      return;
     }
 
     if (detectionConclusion === "warning") {
@@ -1175,7 +1135,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
           errorCode,
           error,
         });
-        continue;
+        return;
       }
       if (threatPolicy.policy === "convertible") {
         // Conversion execution is implemented in the handler for the convertible type.
@@ -1195,7 +1155,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
       if (STANDALONE_STEP_TYPES.has(messageType)) {
         if (currentClaimHandle() && messageType === "noop") {
           results.push({ type: messageType, messageIndex: i, claim_handle: currentClaimHandle(), success: true, result: { effect: "none" } });
-          continue;
+          return;
         }
         // Silently skip - this is handled by a dedicated step
         core.debug(`Message ${i + 1} (${messageType}) will be handled by standalone step`);
@@ -1207,7 +1167,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
           delegated: true,
           reason: "Handled by standalone step",
         });
-        continue;
+        return;
       }
 
       // Check if this message type is handled by a custom safe output job
@@ -1242,7 +1202,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
           delegated: true,
           reason: "Handled by custom safe output job",
         });
-        continue;
+        return;
       }
 
       // Unknown message type - warn the user
@@ -1257,7 +1217,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
         success: false,
         error: loadError ? `No handler loaded for type '${messageType}': ${loadError}` : `No handler loaded for type '${messageType}'`,
       });
-      continue;
+      return;
     }
 
     try {
@@ -1352,7 +1312,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
       if (stalePRReason) {
         core.info(stalePRReason);
         results.push(buildSkippedResult(messageType, i, { skipped: true, reason: stalePRReason }));
-        continue;
+        return;
       }
       const result = recordMergeDecision(messageType, await messageHandler(effectiveMessage, resolvedTemporaryIds, temporaryIdMap), i);
 
@@ -1367,7 +1327,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
         if (CODE_PUSH_TYPES.has(messageType) && !codePushSkip) {
           codePushSkip = { type: messageType, error: msg, skipped: true };
         }
-        continue;
+        return;
       }
 
       // Check if the handler explicitly returned a failure
@@ -1386,7 +1346,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
           codePushFailures.push({ type: messageType, error: errorMsg });
           core.warning(`⚠️ Code push operation '${messageType}' failed — continuing with remaining safe outputs (add_comment messages will include a failure note)`);
         }
-        continue;
+        return;
       }
 
       // Check if the operation was deferred due to unresolved temporary IDs
@@ -1405,7 +1365,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
           deferred: true,
           result,
         });
-        continue;
+        return;
       }
 
       // If handler returned a temp ID mapping, add it to our map
@@ -1533,12 +1493,29 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
     }
   }
 
+  // Keep the legacy first pass/retry boundary: a dependent waits for its
+  // prerequisite's real retry result, not its provisional deferred record.
+  for (const i of processingOrder) await processMessage(i, true);
+
+  async function drainWaitingMessages() {
+    for (let position = 0; position < waitingMessages.length;) {
+      const i = waitingMessages[position];
+      if (checkSafeOutputDependencies(dependencyPlan, i, results, true).state === "waiting") {
+        position++;
+        continue;
+      }
+      waitingMessages.splice(position, 1);
+      await processMessage(i, false);
+    }
+  }
+
   // Retry deferred messages now that more temporary IDs may have been resolved
   // This retry loop mirrors the main processing loop but operates on messages that were
   // deferred during the first pass (e.g., link_sub_issue waiting for parent/sub creation).
   // IMPORTANT: Like the main loop, this must register temporary IDs and track outputs
   // with unresolved IDs to enable full synthetic update resolution.
-  if (deferredMessages.length > 0) {
+  async function retryDeferredMessages() {
+    if (deferredMessages.length === 0) return;
     core.info(`\n=== Retrying Deferred Messages ===`);
     core.info(`Found ${deferredMessages.length} deferred message(s) to retry`);
 
@@ -1655,8 +1632,22 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
             result: { success: false, deferred: false, error: errorMsg },
           };
         }
+      } finally {
+        // Release newly ready producers before the next legacy temporary-ID
+        // retry; it may need an ID created by a previously waiting output.
+        await drainWaitingMessages();
       }
     }
+  }
+
+  await retryDeferredMessages();
+  for (const i of waitingMessages) {
+    await processMessage(i, false);
+  }
+
+  for (const result of results) {
+    const outputId = messages[result.messageIndex]?.output_id;
+    if (outputId !== undefined) result.output_id = outputId;
   }
 
   // Return outputs with unresolved IDs for synthetic update processing
@@ -2257,7 +2248,13 @@ async function main(options = {}) {
 
     if (messageHandlers.size === 0) {
       const delegatedTypes = new Set([...STANDALONE_STEP_TYPES, ...loadCustomSafeOutputJobTypes()]);
-      outcomeResults = allMessages.map((message, messageIndex) => ({ type: message.type, messageIndex, skipped: true, delegated: delegatedTypes.has(message.type) }));
+      outcomeResults = allMessages.map((message, messageIndex) => ({
+        type: message.type,
+        messageIndex,
+        ...(message.output_id !== undefined ? { output_id: message.output_id } : {}),
+        skipped: true,
+        delegated: delegatedTypes.has(message.type),
+      }));
       core.info("No handlers loaded - nothing to process");
       // Ensure manifest file exists even when no handlers are loaded (skip in staged mode)
       if (!isStaged) ensureManifestExists();

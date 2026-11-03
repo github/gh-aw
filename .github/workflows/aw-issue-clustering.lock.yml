@@ -743,7 +743,7 @@ jobs:
         env:
           GH_AW_FILE_ROOT: "${{ runner.temp }}/gh-aw"
           GH_AW_FILE_CONFIG: "{\"files\":[{\"path\":\"safeoutputs/config.json\",\"content_env\":\"GH_AW_SAFE_OUTPUTS_CONFIG\"}]}"
-          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"publish-essential-issues\":{\"description\":\"Validate one complete clustering plan, clean up sources resolved by completed summaries, reconcile at most ten owned issues, and refresh the ranked discussion\",\"inputs\":{\"plan_path\":{\"default\":null,\"description\":\"Set to agent/aw-issue-clustering/plan.json after writing and validating the complete plan artifact\",\"required\":true,\"type\":\"string\"}},\"max\":1},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"publish-essential-issues\":{\"description\":\"Validate one complete clustering plan, clean up sources resolved by completed summaries, reconcile at most ten owned issues, and refresh the ranked discussion\",\"inputs\":{\"plan_path\":{\"default\":null,\"description\":\"Set to agent/aw-issue-clustering/plan.json after writing and validating the complete plan artifact\",\"required\":true,\"type\":\"string\"}},\"max\":1,\"supports_dependencies\":false},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
         with:
           script: |
             const path = require('path');

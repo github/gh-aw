@@ -12,6 +12,15 @@ import generateSafeOutputsTools from "./generate_safe_outputs_tools.cjs";
 
 const scriptPath = path.join(__dirname, "generate_safe_outputs_tools.cjs");
 const { main: generateTools } = generateSafeOutputsTools;
+const outputIdPattern = "^so_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$";
+const dependencySchema = {
+  description: expect.any(String),
+  "x-synonyms": ["depends_on"],
+  oneOf: [
+    { type: "string", pattern: outputIdPattern },
+    { type: "array", minItems: 1, uniqueItems: true, items: { type: "string", pattern: outputIdPattern } },
+  ],
+};
 
 describe("generate_safe_outputs_tools", () => {
   /** @type {string} */
@@ -168,6 +177,12 @@ describe("generate_safe_outputs_tools", () => {
     });
     expect(tools.map(tool => tool.name)).toEqual(["create_issue", "custom_job"]);
     for (const tool of tools) {
+      expect(tool.inputSchema.properties["depends-on"]).toEqual(dependencySchema);
+      expect(tool.inputSchema.required || []).not.toContain("depends-on");
+      expect(tool.inputSchema.properties).not.toHaveProperty("output_id");
+      expect(normalizeSafeOutputToolArguments(tool.name, { depends_on: "so_11111111-1111-4111-8111-111111111111" }, undefined, tool.inputSchema)).toEqual({
+        "depends-on": "so_11111111-1111-4111-8111-111111111111",
+      });
       for (const claim_handle of ["", " ", "\t", null]) {
         const normalized = normalizeSafeOutputToolArguments(tool.name, { claim_handle }, undefined, tool.inputSchema);
         expect(normalized).toHaveProperty("claim_handle", claim_handle);
@@ -192,7 +207,13 @@ describe("generate_safe_outputs_tools", () => {
     fs.writeFileSync(toolsMetaPath, JSON.stringify({ work_queue_scoped: false }));
     runScript();
     const [tool] = JSON.parse(fs.readFileSync(outputPath, "utf8"));
-    expect(tool.inputSchema).toEqual(sampleSourceTools[0].inputSchema);
+    expect(tool.inputSchema).toEqual({
+      ...sampleSourceTools[0].inputSchema,
+      properties: { ...sampleSourceTools[0].inputSchema.properties, "depends-on": dependencySchema },
+    });
+    expect(tool.inputSchema.properties).not.toHaveProperty("claim_handle");
+    expect(tool.inputSchema.properties).not.toHaveProperty("claim_id");
+    expect(tool.inputSchema.required).not.toContain("depends-on");
   });
 
   it("generates an Anthropic-compatible update_issue schema with update-field guidance", () => {
@@ -252,7 +273,8 @@ describe("generate_safe_outputs_tools", () => {
     const [tool] = JSON.parse(fs.readFileSync(outputPath, "utf8"));
     expect(tool.inputSchema.required).toEqual(["record"]);
     expect(tool.inputSchema.properties.ledger.enum).toEqual(["reviews"]);
-    expect(Object.keys(tool.inputSchema.properties)).toEqual(["ledger", "temp_id", "record"]);
+    expect(Object.keys(tool.inputSchema.properties)).toEqual(["ledger", "temp_id", "record", "depends-on"]);
+    expect(tool.inputSchema.properties["depends-on"]).toEqual(dependencySchema);
     expect(tool.inputSchema.properties.record).toMatchObject(schema);
     expect(validateValueAgainstSchema({ ledger: "reviews", operation: "append", value: { run_id: "42" } }, tool.inputSchema)).toBeTruthy();
     expect(validateValueAgainstSchema({ record: { run_id: 42 } }, tool.inputSchema)).toBeTruthy();
@@ -277,7 +299,8 @@ describe("generate_safe_outputs_tools", () => {
     const [tool] = JSON.parse(fs.readFileSync(outputPath, "utf8"));
     expect(tool.inputSchema.required).toEqual(["ledger", "record"]);
     expect(tool.inputSchema.properties.ledger.enum).toEqual(["reviews"]);
-    expect(Object.keys(tool.inputSchema.properties)).toEqual(["ledger", "temp_id", "record"]);
+    expect(Object.keys(tool.inputSchema.properties)).toEqual(["ledger", "temp_id", "record", "depends-on"]);
+    expect(tool.inputSchema.properties["depends-on"]).toEqual(dependencySchema);
     expect(tool.inputSchema.properties.record).toMatchObject(schema);
     expect(validateValueAgainstSchema({ ledger: "reviews", record: { run_id: "42" } }, tool.inputSchema)).toBeNull();
     expect(validateValueAgainstSchema({ ledger: "cache", record: { run_id: "42" } }, tool.inputSchema)).toBeTruthy();
@@ -295,7 +318,8 @@ describe("generate_safe_outputs_tools", () => {
     runScript();
     const [tool] = JSON.parse(fs.readFileSync(outputPath, "utf8"));
     expect(tool.inputSchema.required).toEqual(["record"]);
-    expect(Object.keys(tool.inputSchema.properties)).toEqual(["ledger", "temp_id", "record"]);
+    expect(Object.keys(tool.inputSchema.properties)).toEqual(["ledger", "temp_id", "record", "depends-on"]);
+    expect(tool.inputSchema.properties["depends-on"]).toEqual(dependencySchema);
     expect(tool.inputSchema.properties.record).toEqual(sourceRecordSchema);
     expect(validateValueAgainstSchema({ record: { run_id: "42" } }, tool.inputSchema)).toBeNull();
     expect(validateValueAgainstSchema({}, tool.inputSchema)).toBeTruthy();

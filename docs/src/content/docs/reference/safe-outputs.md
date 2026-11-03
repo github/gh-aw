@@ -57,6 +57,37 @@ be a valid JSON object. Raw Markdown is not valid input for that bare form,
 and `{"body": .}` is not valid JSON. Use only tools and shell operations
 available in the workflow's runtime.
 
+## Output Dependencies
+
+Each recorded safe-output call returns a unique `output_id`, such as
+`so_4a1f2c30-1b2c-4d5e-8f90-123456789abc`. This identifies the queued operation,
+not a created issue or pull request. It is distinct from `temporary_id` (`aw_…`),
+which remains the mechanism for referencing newly created resources.
+
+Subsequent calls accept `depends-on` as one `output_id` or a nonempty array of
+distinct identifiers. All prerequisites must complete successfully before the
+dependent operation runs. For example, after a call returns the identifier above:
+
+```json
+{
+  "item_number": 123,
+  "body": "The prerequisite update completed.",
+  "depends-on": "so_4a1f2c30-1b2c-4d5e-8f90-123456789abc"
+}
+```
+
+The identifier acknowledges recording, not execution success. If a prerequisite
+fails, its dependents fail without executing, including transitive dependents.
+Skipped, cancelled, staged, deferred, or delegated results do not establish
+success. Missing, ambiguous, or cyclic dependencies also fail closed. Independent
+outputs retain their existing behavior and policy checks.
+
+Dependencies apply within a single safe-output processing pass (and within the
+same Claim in queue workflows). Custom safe jobs, `upload_asset`, and `noop`
+execute outside that pipeline and cannot be dependent operations or establish a
+successful prerequisite. Dependencies do not provide rollback for operations
+that have already succeeded.
+
 ## Available Safe Output Types
 
 The tables below summarize the built-in safe output handlers. `noop`, `report-missing-tool`, and `report-missing-data` are always available, and `create-issue` is auto-injected only when no non-system safe outputs are configured and it is not explicitly disabled.
