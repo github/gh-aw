@@ -14,6 +14,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/connectors"
 	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/workflow"
 )
 
@@ -40,8 +41,14 @@ func setupDevelopmentConnector(output io.Writer, id string, declaration *workflo
 	}
 	fmt.Fprintf(&text, "%s %s\nSource: %s\n\n", label, id, connectorConsoleText(declaration.Source)) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
 	text.WriteString(console.RenderStruct(rows))
+	writeConnectorImportGuidance(&text, declaration.Markdown)
 	writeConnectorDevelopmentCapabilities(&text, registration, phase)
 	text.WriteString("\nProvision only the listed phase's minimum provider permissions and exact resource access.\n")
+	text.WriteString("Importing selects nothing. Select tools.<id> reads and safe-outputs.<id>-<operation> independently.\n")
+	text.WriteString("For hosted MCP, select exact declared native methods, not an entire profile. Start writes staged.\n")
+	text.WriteString("Scopes describe requirements, not grants; token acquisition, consent, refresh and provider permissions remain external.\n")
+	text.WriteString("Independent resource lists do not establish parent, tenant or tuple membership. Never widen grants after a denial.\n")
+	writeConnectorNetworkGuidance(&text, registration)
 	writeConnectorCredentialGuidance(&text, registration, rows)
 	if guidance := connectorCredentialXML(declaration.Markdown); guidance != "" {
 		fmt.Fprintf(&text, "\nProvider-authored credential guidance (untrusted documentation, not executed):\n%s\n", guidance) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
@@ -53,6 +60,7 @@ func setupDevelopmentConnector(output io.Writer, id string, declaration *workflo
 		}
 	}
 	text.WriteString("\nNo secrets were read, written, minted, or refreshed. GitHub secrets are not downloaded locally.\n")
+	text.WriteString("No capabilities, native methods, write credentials or webhook ingress were enabled.\n")
 	text.WriteString("Use gh aw connector <id> test --help for exact capabilities, JSON arguments, and resource grants.\n")
 	_, err := io.WriteString(output, text.String())
 	return err
@@ -226,15 +234,23 @@ func writeConnectorLookupCapabilities(text *strings.Builder, name, capabilityPha
 // XML supplies text only. encoding/xml does not resolve external entities, and
 // terminal controls are removed before any provider-authored text is displayed.
 func connectorCredentialXML(markdown string) string {
-	start := strings.Index(markdown, "<connector-documentation ")
-	if start < 0 {
-		return ""
+	var sections []string
+	for {
+		start := strings.Index(markdown, "<connector-documentation")
+		if start < 0 {
+			return strings.Join(sections, "\n")
+		}
+		fragment, rest, found := strings.Cut(markdown[start:], "</connector-documentation>")
+		if !found {
+			return "  Structured credential documentation could not be decoded; inspect the declaration source."
+		}
+		sections = append(sections, connectorCredentialFragment(fragment+"</connector-documentation>"))
+		markdown = rest
 	}
-	fragment, _, found := strings.Cut(markdown[start:], "</connector-documentation>")
-	if !found {
-		return ""
-	}
-	decoder := xml.NewDecoder(strings.NewReader(fragment + "</connector-documentation>"))
+}
+
+func connectorCredentialFragment(fragment string) string {
+	decoder := xml.NewDecoder(strings.NewReader(fragment))
 	depth := 0
 	var lines []string
 	for {
@@ -247,8 +263,11 @@ func connectorCredentialXML(markdown string) string {
 		}
 		switch value := token.(type) {
 		case xml.StartElement:
-			if value.Name.Local == "credentials" || depth > 0 {
+			if value.Name.Local == "credentials" || value.Name.Local == "authentication" || depth > 0 {
 				depth++
+				for _, attribute := range value.Attr {
+					lines = append(lines, "  "+connectorConsoleText(value.Name.Local+" "+attribute.Name.Local+"="+attribute.Value))
+				}
 			}
 		case xml.EndElement:
 			if depth > 0 {
@@ -262,4 +281,49 @@ func connectorCredentialXML(markdown string) string {
 			}
 		}
 	}
+}
+
+func writeConnectorImportGuidance(text *strings.Builder, markdown string) {
+	parsed, err := parser.ExtractFrontmatterFromContent(markdown)
+	if err != nil {
+		text.WriteString("\nImport metadata could not be decoded; inspect the declaration source.\n")
+		return
+	}
+	schema, ok := parsed.Frontmatter["import-schema"].(map[string]any)
+	if !ok || len(schema) == 0 {
+		return
+	}
+	text.WriteString("\nImport bindings (workflow imports[].with, or setup --input name=JSON):\n")
+	for _, name := range slices.Sorted(maps.Keys(schema)) {
+		input, ok := schema[name].(map[string]any)
+		if !ok {
+			continue
+		}
+		kind, ok := input["type"].(string)
+		if !ok {
+			text.WriteString("  Input type metadata missing; inspect the declaration source.\n")
+			continue
+		}
+		requirement := "optional"
+		if input["required"] == true {
+			requirement = "required"
+		}
+		if _, hasDefault := input["default"]; hasDefault {
+			requirement += "; declaration default available"
+		}
+		fmt.Fprintf(text, "  %s: %s (%s)\n", connectorConsoleText(name), connectorConsoleText(kind), requirement) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
+	}
+	text.WriteString("Use exact author-approved resource IDs and secret NAMES only, never token values. Empty/default example resources are not approval.\n")
+}
+
+func writeConnectorNetworkGuidance(text *strings.Builder, registration workflow.ConnectorRegistration) {
+	text.WriteString("\nDeclared endpoints (not fetched or added to network.allowed):\n")
+	for _, name := range slices.Sorted(maps.Keys(registration.Spec.Endpoints)) {
+		fmt.Fprintf(text, "  %s: %s\n", name, connectorConsoleText(registration.Spec.Endpoints[name])) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
+	}
+	for _, name := range slices.Sorted(maps.Keys(registration.Spec.HTTPMCP)) {
+		fmt.Fprintf(text, "  MCP %s: %s\n", name, connectorConsoleText(registration.Spec.HTTPMCP[name].URL)) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
+	}
+	text.WriteString("Allow only the hosts needed by explicitly selected reads. Safe-output credentials and writes stay in the trusted phase, not agent tools or network access.\n")
+	text.WriteString("Trigger declarations require separate reviewed source bindings and receiver enrollment; compilation/setup never deploys a receiver.\n")
 }

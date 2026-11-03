@@ -29,6 +29,8 @@ This command:
 - Removes old prompt files from .github/prompts/ if they exist
 - Configures VSCode settings (.vscode/settings.json)
 - Generates/updates .github/workflows/agentics-maintenance.yml if any workflows use the expires field for discussions or issues
+- Discovers local connector declarations/imports and consumer golden examples for offline setup guidance
+- Does not install connectors, select their tools/native methods, configure credentials, widen grants/network or enable webhook ingress
 
 With --engine copilot:
 - Creates the custom agent at .github/agents/agentic-workflows.md

@@ -55,3 +55,15 @@ After loading the matching workflow prompt or skill, follow it directly:
 When the task involves OTEL, OTLP, traces, observability backends, or telemetry-driven analysis, also read and follow `skills/otel-queries/SKILL.md` after loading the matching workflow prompt or skill.
 
 When creating, updating, diagnosing or upgrading a workflow that uses `tools.work-queue`, also load `.github/aw/work-queue.md` after the primary prompt. Load deployment docs, operator reference or specification only when that task needs them.
+
+For repository initialization or configuration involving third-party integrations,
+use `.github/aw/connectors.md` and the selected editable declaration's
+`import-schema` and `connector-documentation` metadata. Discover local declarations,
+normal local/pinned imports and matching `*-golden.md` consumers; do not invent a
+built-in provider catalog. Use `gh aw connector <id> setup --file PATH` for
+phase-specific credential names/scopes and acquisition/renewal guidance.
+Bind exact approved resources through `with`; secret NAMES only, never values.
+Select reads/native methods and staged safe outputs independently. Importing must
+not enable capabilities, write credentials, broad grants or live webhook ingress.
+Derive network hosts from the selected contract, not provider-name guesses.
+Token acquisition/refresh, consent and real provider permissions remain external.
