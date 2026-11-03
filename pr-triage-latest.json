@@ -1,62 +1,98 @@
 {
-  "run_id": "41634881310",
-  "run_date": "2026-11-03T12:23:18.254000+00:00",
+  "run_id": "41692210270",
+  "run_date": "2026-11-03T18:25:34.050812+00:00",
   "source": "pr-triage",
-  "eligible_total": 8,
-  "open_copilot_prs": 8,
+  "eligible_total": 6,
+  "open_copilot_prs": 6,
   "cooldown_skipped": [],
   "category_counts": {
-    "bug": 6,
-    "chore": 1,
-    "feature": 1
+    "bug": 3,
+    "docs": 1,
+    "feature": 1,
+    "test": 1
   },
   "risk_counts": {
-    "high": 5,
-    "medium": 3
+    "low": 1,
+    "medium": 2,
+    "high": 3
   },
   "priority_counts": {
-    "high": 4,
-    "medium": 4
+    "low": 1,
+    "medium": 2,
+    "high": 3
   },
   "action_counts": {
-    "fast_track": 3,
-    "batch_review": 5
+    "fast_track": 2,
+    "batch_review": 3,
+    "defer": 1
   },
   "batches": [
     {
-      "id": "agent-runtime",
-      "count": 7,
+      "id": "workflow-safety",
+      "count": 4,
       "prs": [
-        74376,
-        74368,
-        74366,
-        74365,
-        74364,
-        74361,
-        74359
-      ]
-    },
-    {
-      "id": "dependency-bump",
-      "count": 1,
-      "prs": [
-        74389
+        74562,
+        74561,
+        74560,
+        74554
       ]
     }
   ],
   "selected_candidates": [
     {
-      "number": 74389,
-      "title": "Bump gh-aw-firewall to v0.29.6 and gh-aw-mcpg to v0.5.2",
-      "category": "chore",
+      "number": 74560,
+      "title": "Quote prompt-step environment values as YAML scalars",
+      "category": "bug",
       "risk": "high",
       "priority": "high",
       "action": "fast_track",
-      "score": 80,
+      "score": 74,
       "breakdown": {
         "impact": 35,
-        "urgency": 25,
-        "quality": 20
+        "urgency": 22,
+        "quality": 17
+      }
+    },
+    {
+      "number": 74561,
+      "title": "Remove the conflicting `-l` shorthand from `project new`",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 56,
+      "breakdown": {
+        "impact": 26,
+        "urgency": 17,
+        "quality": 13
+      }
+    },
+    {
+      "number": 74562,
+      "title": "Strengthen console rendering tests and formatter boundary coverage",
+      "category": "test",
+      "risk": "low",
+      "priority": "low",
+      "action": "defer",
+      "score": 27,
+      "breakdown": {
+        "impact": 11,
+        "urgency": 6,
+        "quality": 10
+      }
+    },
+    {
+      "number": 74554,
+      "title": "Refresh SPDD specification evidence and coverage",
+      "category": "docs",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 48,
+      "breakdown": {
+        "impact": 20,
+        "urgency": 15,
+        "quality": 13
       }
     },
     {
@@ -66,67 +102,11 @@
       "risk": "high",
       "priority": "high",
       "action": "fast_track",
-      "score": 72,
+      "score": 78,
       "breakdown": {
-        "impact": 32,
-        "urgency": 22,
+        "impact": 36,
+        "urgency": 24,
         "quality": 18
-      }
-    },
-    {
-      "number": 74368,
-      "title": "Complete fix codemods for nested workflows and App-token permissions",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 65,
-      "breakdown": {
-        "impact": 30,
-        "urgency": 18,
-        "quality": 17
-      }
-    },
-    {
-      "number": 74366,
-      "title": "Fix false dependency cycles for custom jobs after repo-memory push",
-      "category": "bug",
-      "risk": "high",
-      "priority": "high",
-      "action": "batch_review",
-      "score": 70,
-      "breakdown": {
-        "impact": 32,
-        "urgency": 22,
-        "quality": 16
-      }
-    },
-    {
-      "number": 74365,
-      "title": "Report failures when activation stops before agent startup",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 62,
-      "breakdown": {
-        "impact": 28,
-        "urgency": 20,
-        "quality": 14
-      }
-    },
-    {
-      "number": 74364,
-      "title": "Restrict implicit network defaults to documented infrastructure",
-      "category": "bug",
-      "risk": "high",
-      "priority": "high",
-      "action": "fast_track",
-      "score": 75,
-      "breakdown": {
-        "impact": 35,
-        "urgency": 25,
-        "quality": 15
       }
     },
     {
@@ -136,27 +116,13 @@
       "risk": "high",
       "priority": "medium",
       "action": "batch_review",
-      "score": 68,
-      "breakdown": {
-        "impact": 32,
-        "urgency": 21,
-        "quality": 15
-      }
-    },
-    {
-      "number": 74359,
-      "title": "Prevent repeat-update conflicts in source-managed workflows",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 63,
+      "score": 65,
       "breakdown": {
         "impact": 30,
-        "urgency": 17,
-        "quality": 16
+        "urgency": 20,
+        "quality": 15
       }
     }
   ],
-  "notes": "Eight eligible open Copilot PRs remained after the 1-hour cooldown. The highest-value items are the dependency/security bump and several workflow-contract/security fixes; the remaining cluster focuses on compiler/runtime safety and safe-output reliability."
+  "notes": "Only six eligible Copilot PRs remained after the 1-hour cooldown. The highest-value items are the workflow-safe-output change and the YAML-escaping fix; the remaining batch covers CLI validation, documentation/spec refresh, and a test-quality improvement."
 }
