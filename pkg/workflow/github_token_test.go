@@ -241,6 +241,30 @@ func TestResolvePRCheckoutToken(t *testing.T) {
 		}
 	})
 
+	t.Run("optional global App preserves custom and default token fallbacks", func(t *testing.T) {
+		for _, ignoreMissing := range []bool{false, true} {
+			safeOutputs := &SafeOutputsConfig{
+				GitHubToken: "${{ secrets.SO_TOKEN }}",
+				GitHubApp: &GitHubAppConfig{
+					AppID:           "${{ vars.APP_ID }}",
+					PrivateKey:      "${{ secrets.APP_KEY }}",
+					IgnoreIfMissing: ignoreMissing,
+				},
+			}
+			if ignoreMissing {
+				safeOutputs.CreatePullRequests = &CreatePullRequestsConfig{}
+			}
+			token, isCustom := resolvePRCheckoutToken(safeOutputs, NewCheckoutManager(nil))
+			expected := "${{ steps.safe-outputs-app-token.outputs.token || secrets.SO_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}"
+			if token != expected {
+				t.Fatalf("ignore-if-missing=%v: expected complete fallback chain, got %q", ignoreMissing, token)
+			}
+			if !isCustom {
+				t.Fatalf("expected isCustom=true")
+			}
+		}
+	})
+
 	t.Run("uses checkout safe-output app token when target-repo matches", func(t *testing.T) {
 		safeOutputs := &SafeOutputsConfig{
 			CreatePullRequests: &CreatePullRequestsConfig{
