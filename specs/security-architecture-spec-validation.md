@@ -13,9 +13,9 @@
 
 The v1.1.8 floating-head opt-in adds current-head/non-approval selection with immutable fetch and actual-HEAD verification. Its parser/schema and compiler wiring tests are `TestCheckoutPullRequestFloatingHead`, `TestMainWorkflowSchema_PullRequestFloatingHead`, `TestPRCheckoutFloatingHeadEnvironment`, and `TestCompilePRFloatingHead`; the `explicit floating-head checkout` runtime suite covers moved heads, missing event evidence, fetch-time races, actual-HEAD mismatch, and retained authorization/context failures. This extension has not received targeted formal revalidation. The event-specific mappings below describe the default (`pull-request-floating-head: false`) policy.
 
-⚠️ **VALIDATION STATUS**: The last full validation was completed on 2026-07-15; the last targeted formal RS-05a revalidation remains v1.1.1 / 2026-10-09. On 2026-11-03, the six-job structure was checked against `.github/workflows/security-review.lock.yml` (see §1). This targeted check is not a full revalidation. It confirms the job chain but also shows that write permissions are workflow-specific: `activation`, `safe_outputs`, and `conclusion` have repository write scopes, while the `agent` job includes `copilot-requests: write`. The v1.1.2 review-checkout update, v1.1.3, v1.1.5, and v1.1.6 branch-event updates, and v1.1.7 immutable-revision update have runtime evidence but have not received targeted formal revalidation (see §7b); v1.1.4 concerns transport security, not branch events. These validations do not replace the full revalidation required by `security-architecture-spec.md` §11.
+⚠️ **VALIDATION STATUS**: The last full validation was completed on 2026-07-15; the last targeted formal RS-05a revalidation remains v1.1.1 / 2026-10-09. On 2026-11-03, the ten-job structure was checked against `.github/workflows/security-review.lock.yml` (see §1). This targeted check is not a full revalidation. It confirms the job chain but also shows that write permissions are workflow-specific: `activation`, `safe_outputs`, `conclusion`, and `push_evals_state` have repository write scopes, while the `agent` job includes `copilot-requests: write`. The v1.1.2 review-checkout update, v1.1.3, v1.1.5, and v1.1.6 branch-event updates, and v1.1.7 immutable-revision update have runtime evidence but have not received targeted formal revalidation (see §7b); v1.1.4 concerns transport security, not branch events. These validations do not replace the full revalidation required by `security-architecture-spec.md` §11.
 
-The following claims were verified during the historical full validation; the current targeted pass refreshes the six-job structure and selected SG/input-sanitization evidence. It does not complete a full revalidation or reverify PM-08:
+The following claims were verified during the historical full validation; the current targeted pass refreshes the ten-job structure and selected SG/input-sanitization evidence. It does not complete a full revalidation or reverify PM-08:
 - ✅ Job architecture (activation, agent, safe_outputs)
 - ✅ **Input sanitization** (markdown safety, URL filtering, HTML tag filtering, ANSI removal)
 - ✅ Permission management (historically verified; current job scopes are workflow-specific)
@@ -37,16 +37,20 @@ The following claims were verified during the historical full validation; the cu
 
 ### Current Compiled Job Structure (2026-11-03)
 
-Evidence was checked in `.github/workflows/security-review.lock.yml`. The generated file contains all six named jobs; their YAML declaration order is not execution order.
+Evidence was checked in `.github/workflows/security-review.lock.yml`. The generated file declares ten top-level jobs; their YAML declaration order is not execution order.
 
 | Job | Current evidence | Observed structure and permissions |
 |---|---|---|
 | `pre_activation` | `security-review.lock.yml:2884-2949` | Checks command position and membership; grants `contents: read` and `pull-requests: read`. |
-| `activation` | `security-review.lock.yml:93-107`, `:298-310` | Depends on `pre_activation`; checks the lock timestamp. It also has `issues: write` and `pull-requests: write`. |
+| `admission` | `security-review.lock.yml:583-600` | Depends on `pre_activation`; grants `contents: read` and `id-token: write`. |
+| `activation` | `security-review.lock.yml:93-107`, `:298-310` | Depends on `admission` and `pre_activation` (its `if:` checks `needs.admission.result`); checks the lock timestamp. It also has `issues: write` and `pull-requests: write`. |
 | `agent` | `security-review.lock.yml:635-650` | Depends on `activation`; repository content and issue/PR permissions are read, with `copilot-requests: write`. |
 | `detection` | `security-review.lock.yml:2330-2350` | Depends on `activation` and `agent`; runs before safe outputs and has `contents: read`, `copilot-requests: write`. |
+| `evals` | `security-review.lock.yml:2708-2724` | Depends on `activation`, `agent`, and `detection`; grants `contents: read` and `copilot-requests: write`. |
+| `push_evals_state` | `security-review.lock.yml:2951-2960` | Depends on `activation` and `evals`; grants `contents: write`, a repository-content writer. |
 | `safe_outputs` | `security-review.lock.yml:3038-3051`, `:3142-3144` | Depends on `activation`, `agent`, and `detection`; processes outputs with `checks`, `issues`, and `pull-requests` write permissions. |
 | `conclusion` | `security-review.lock.yml:1862-1887` | Runs after the workflow jobs using `always()`; has `checks`, `issues`, and `pull-requests` write permissions for reporting/cleanup. |
+| `conclusion_admission` | `security-review.lock.yml:2279-2290` | Depends on `conclusion`; grants `contents: read` and `id-token: write`. |
 
 This evidence supersedes the former reference to the absent `security-guard.lock.yml` for job topology. It does not establish that all workflows use identical job permissions or that every security requirement in this report has been revalidated.
 
@@ -58,9 +62,9 @@ This evidence supersedes the former reference to the absent `security-guard.lock
 > 2. **Agent Job**: Executes AI agent with read-only permissions
 > 3. **Safe Output Jobs**: Perform validated GitHub API operations with write permissions
 
-**Implementation Validation** (`.github/workflows/security-review.lock.yml`, checked 2026-11-03): See the current six-job evidence table above. The observed dependency chain includes `pre_activation`, `activation`, `agent`, `detection`, `safe_outputs`, and `conclusion`. Repository write permissions are not exclusive to `safe_outputs`: the representative workflow also grants write scopes to `activation` and `conclusion`; the agent has `copilot-requests: write` but no repository-content write permission.
+**Implementation Validation** (`.github/workflows/security-review.lock.yml`, checked 2026-11-03): See the current ten-job evidence table above. Repository write permissions are not exclusive to `safe_outputs`: the representative workflow also grants write scopes to `activation`, `conclusion`, and `push_evals_state` (`contents: write`), and `id-token: write` to `admission` and `conclusion_admission`; the agent has `copilot-requests: write` but no repository-content write permission.
 
-**Status**: ⚠️ **PARTIALLY VERIFIED** — The six-job structure and representative permission scopes are current for this lock file only. Workflow-wide permission isolation remains subject to full revalidation.
+**Status**: ⚠️ **PARTIALLY VERIFIED** — The ten-job structure and representative permission scopes are current for this lock file only. Workflow-wide permission isolation remains subject to full revalidation.
 
 ---
 
@@ -142,7 +146,7 @@ sanitized = applyTruncation(content, maxLength);  // 0.5MB / 65k lines
 > **PM-01**: A conforming implementation MUST set read-only permissions as the default
 > **PM-02**: Unspecified permissions MUST default to `none`
 
-**Implementation Validation** (`.github/workflows/security-review.lock.yml`, checked 2026-11-03): The workflow-level default is `permissions: {}`. The six-job table in §1 records the job-level scopes. This representative workflow grants repository write scopes to `activation`, `safe_outputs`, and `conclusion`; the agent has `copilot-requests: write` but no repository-content write permission.
+**Implementation Validation** (`.github/workflows/security-review.lock.yml`, checked 2026-11-03): The workflow-level default is `permissions: {}`. The ten-job table in §1 records the job-level scopes. This representative workflow grants repository write scopes to `activation`, `safe_outputs`, `conclusion`, and `push_evals_state` (`contents: write`); the agent has `copilot-requests: write` but no repository-content write permission.
 
 **Status**: ⚠️ **PARTIALLY VERIFIED** — The lock confirms default-deny permissions and distinguishes agent repository access from safe-output writes, but it does not support a blanket claim that all write permissions are isolated to `safe_outputs`.
 
@@ -157,7 +161,7 @@ sanitized = applyTruncation(content, maxLength);  // 0.5MB / 65k lines
 
 **Implementation Validation** (`.github/workflows/security-review.lock.yml`, checked 2026-11-03): The `head.repo.id == github.repository_id` comparison appears in step-level conditions at lines 252 and 326. These conditions do not establish a job-wide fork block for every trigger path.
 
-**Status**: ⚠️ **UNVERIFIED** — The current lock evidence is insufficient to verify the complete PM-08 claim. The evidence gap is recorded in [#74553](https://github.com/github/gh-aw/issues/74553); do not rely on the former job-level assertion.
+**Status**: ⚠️ **UNVERIFIED** — The current lock evidence is insufficient to verify the complete PM-08 claim. The evidence gap needs a dedicated PM-08 follow-up issue, to be created and linked here; [#74553](https://github.com/github/gh-aw/issues/74553) is the maintenance checklist, not the PM-08 tracker. Do not close the PM-08 tracker without revalidation. Do not rely on the former job-level assertion.
 
 ---
 
@@ -451,22 +455,22 @@ concurrency:
   queue: max
 ```
 
-**Implementation Validation** (`.github/workflows/security-compliance.lock.yml`, lines 83-85):
+**Implementation Validation** (`.github/workflows/security-compliance.lock.yml`, lines 83-85, checked 2026-11-03):
 
 ```yaml
 concurrency:
-  group: "gh-aw-${{ github.workflow }}-${{ github.event.issue.number }}"
-  # cancel-in-progress omitted (defaults to false, sequential queueing)
+  group: "gh-aw-${{ github.workflow }}-${{ github.event.issue.number || github.run_id }}"
+  queue: max
 ```
 
-**Current observation**: This representative lock groups by workflow and issue/PR/run ID and uses `queue: max`; it does not set `cancel-in-progress`. The former cancellation-pattern statements are not established by this check.
+**Current observation**: Both locks use an issue number (and, for security-review, PR number) with a `github.run_id` fallback and `queue: max`, so runs without an issue number get distinct groups rather than a shared issue-less group; neither sets `cancel-in-progress` at the workflow level. The former cancellation-pattern statements are not established by this check.
 
 **Concurrency Patterns**:
 
 | Workflow | Current group pattern | Queue setting | Evidence |
 |----------|----------------------|--------------|----------|
 | Security Review Agent | Workflow plus issue/PR/run ID | `queue: max` | `.github/workflows/security-review.lock.yml:78-80` (2026-11-03) |
-| Security Compliance | Workflow plus issue number | Default queue behavior | `.github/workflows/security-compliance.lock.yml:83-85` |
+| Security Compliance | Workflow plus issue number, falling back to run ID | `queue: max` | `.github/workflows/security-compliance.lock.yml:83-85` |
 
 **Status**: ✅ **VERIFIED** — Context-aware concurrency grouping is present in the cited locks. Cancellation behavior is workflow-specific and was not established by the current check.
 
@@ -483,7 +487,7 @@ The evidence date in each row distinguishes the 2026-11-03 lock check from older
 | **5.2** | Job Architecture (OI-01) | ✅ Verified for representative lock | `.github/workflows/security-review.lock.yml:93,635,1862,2330,2884,3038` (2026-11-03) |
 | **5.4** | Output Validation (OI-06) | ✅ Verified for representative lock | `.github/workflows/security-review.lock.yml:3038-3051,3142-3144` (2026-11-03) |
 | **7.2** | Permission Defaults (PM-01, PM-02) | ⚠️ Partially verified; scopes are workflow-specific | `.github/workflows/security-review.lock.yml:103-107,642-650,1879-1883,2338-2340,3047-3050` (2026-11-03) |
-| **7.5** | Fork Protection (PM-08) | ❌ **UNVERIFIED** — current evidence is limited to step conditions; job-wide enforcement is not established | `.github/workflows/security-review.lock.yml:252,326` (2026-11-03); tracked by [#74553](https://github.com/github/gh-aw/issues/74553) |
+| **7.5** | Fork Protection (PM-08) | ❌ **UNVERIFIED** — current evidence is limited to step conditions; job-wide enforcement is not established | `.github/workflows/security-review.lock.yml:252,326` (2026-11-03); tracked by a dedicated PM-08 follow-up issue (to be linked) |
 | **7.6** | Role-Based Access (PM-10, PM-11) | ✅ Verified in representative lock | `.github/workflows/security-review.lock.yml:2884-2949` (2026-11-03) |
 | **9.1** | Threat Detection (TD-01) | ✅ Verified for job placement and dependency | `.github/workflows/security-review.lock.yml:2330-2350,3038-3045` (2026-11-03) |
 | **10.6** | Action Pinning (CS-10) | ✅ Verified for external action references | `.github/workflows/security-review.lock.yml` (96 external SHA-pinned references; 2026-11-03) |
@@ -658,7 +662,7 @@ pre_activation:
 
 ## Conclusion
 
-The 2026-11-03 targeted pass confirms the six-job topology in the representative lock and selected formal/sanitization tests. It does not complete the full revalidation: PM-08 remains UNVERIFIED for this lock, and permission scopes are workflow-specific.
+The 2026-11-03 targeted pass confirms the ten-job topology in the representative lock and selected formal/sanitization tests. It does not complete the full revalidation: PM-08 remains UNVERIFIED for this lock, and permission scopes are workflow-specific.
 
 The specification provides an accurate formalization of the security architecture that can be used for:
 - Security audits and reviews
@@ -673,6 +677,6 @@ The specification provides an accurate formalization of the security architectur
 
 ### 2026-11-03
 
-- Refreshed the six-job evidence against `.github/workflows/security-review.lock.yml`.
+- Refreshed the ten-job evidence against `.github/workflows/security-review.lock.yml`.
 - Corrected permission-scope statements and marked PM-08 UNVERIFIED where current evidence is insufficient.
 - Preserved the historical full-validation grade and the outstanding RS-05a formal revalidation qualification.

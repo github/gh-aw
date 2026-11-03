@@ -655,7 +655,7 @@ Future supported policies may include:
 
 The active policy must be recorded in decision provenance.
 
-### Open Questions and Proposed Resolutions
+### Multiple-Root Open Questions and Proposed Resolutions
 
 These proposals are non-normative until accepted by the governance policy owner.
 
@@ -761,7 +761,7 @@ organization constraints
 
 A lower-precedence rule may not weaken a higher-precedence constraint.
 
-### Open Questions and Proposed Resolutions
+### Policy Precedence Open Questions and Proposed Resolutions
 
 These proposals are non-normative until accepted by the governance policy owner.
 
@@ -1350,20 +1350,6 @@ Potential extensions:
 5. Suggested attribution requiring confirmation
 6. External production or customer evidence
 
-### Phase File-Level Plan
-
-Each phase below names the implementation targets and expected outputs. Compliance fixture changes stay synchronized with `specs/intent-attribution-compliance/README.md`.
-
-| Phase | Target files | Expected output |
-|---|---|---|
-| 1. Current foundation | `pkg/intent/resolver.go`, `pkg/intent/policy.go`, `pkg/cli/outcome_eval.go`, `pkg/cli/outcome_eval_enrich.go`; `specs/intent-attribution-compliance/README.md`, `explicit-intent-wins.yaml` | Preserve compatibility mapping and weighted outcome reporting while documenting the baseline fixture contract. |
-| 2. Honest attribution model | `pkg/intent/resolver.go`, `pkg/intent/resolver_test.go`, `pkg/intent/intent_formal_test.go`; `specs/intent-attribution-compliance/README.md`, `ambiguous-root-closing-issues.yaml`, `unlinked-pr-fail-closed.yaml` | Emit explicit attribution states, source, root identity, nullable unknown weight, and conformance fixtures for ambiguous/unlinked cases. |
-| 3. Prove attribution value | `pkg/cli/outcome_eval.go`, `pkg/cli/outcome_eval_enrich.go`, `pkg/cli/outcome_eval_enrich_test.go`, `pkg/intent/spec_test.go`; `specs/intent-attribution-compliance/README.md`, new `coverage-reporting.yaml` | Report coverage beside mapped-only weighted acceptance and unique-root counts, with reviewable samples. |
-| 4. Prove attribution trustworthiness | `pkg/intent/resolver.go`, `pkg/intent/resolver_test.go`, `pkg/intent/intent_formal_test.go`; `specs/intent-attribution-compliance/README.md`, `ambiguous-root-closing-issues.yaml`, `unlinked-pr-fail-closed.yaml` | Prove deterministic resolution, fail-closed ambiguity, source precedence, and auditable fallback provenance. |
-| 5. Minimal intent-aware governance | `pkg/intent/policy.go`, `pkg/intent/governance.go`, `pkg/intent/governance_formal_test.go`; `specs/intent-attribution-compliance/README.md`, new `policy-precedence.yaml` | Compile minimal policies and verify unknown/ambiguous intent remains `propose_only` with no write scope. |
-| 6. Broader governance and execution evidence | `pkg/intent/governance.go`, `pkg/intent/governance_formal_test.go`, `pkg/intent/compliance_fixtures_formal_test.go`, new `pkg/cli/intent_governance.go`; `specs/intent-attribution-compliance/README.md`, new `policy-enforcement.yaml` | Enforce tool/write-scope/check/approval decisions and record provenance and execution evidence. |
-| 7. Broader intent relationships | `pkg/intent/resolver.go`, `pkg/intent/resolver_test.go`, `pkg/intent/intent_formal_test.go`; `specs/intent-attribution-compliance/README.md`, new `relationships.yaml` | Add explicitly supported parent, project, milestone, cross-repository, or confirmed-suggestion relationships without weakening ambiguity handling. |
-
 ## Testing
 
 ### Attribution tests
@@ -1479,4 +1465,3 @@ It is a deterministic control layer for agentic GitHub work.
 ### 2026-11-03
 
 - Added numbered multiple-root and policy-precedence questions with non-normative proposed resolutions.
-- Added file-level targets and expected outputs for all seven implementation phases.

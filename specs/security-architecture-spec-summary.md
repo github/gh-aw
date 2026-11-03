@@ -280,9 +280,21 @@ Six key best practices with "Don't" and "Do" examples.
 
 The normative requirements remain in [`security-architecture-spec.md`](security-architecture-spec.md), Sections 4–12. This summary describes their architecture and evidence; it does not replace those requirements.
 
+### Entities
+
+The architecture's principal entities are the compiled workflow jobs (`pre_activation`, `admission`, `activation`, `agent`, `detection`, `evals`, `push_evals_state`, `safe_outputs`, `conclusion`, `conclusion_admission`), the sanitized input, structured agent output, and the permission scopes granted to each job.
+
+### Approach
+
+Workflows are compiled to GitHub Actions with least-privilege job separation: the agent job runs read-only, threat detection gates safe outputs, and validated write operations occur in dedicated jobs. Enforcement mechanisms are listed under Safeguards.
+
+### Structure
+
+The full specification's Sections 4–12 define the security layers, and the [validation report](security-architecture-spec-validation.md#current-compiled-job-structure-2026-11-03) maps them to the compiled job structure.
+
 ### Evidence
 
-The [validation report](security-architecture-spec-validation.md) records the historical full validation and the current targeted lock check. The 2026-11-03 check confirms the six-job topology in `.github/workflows/security-review.lock.yml`; it is not a full revalidation.
+The [validation report](security-architecture-spec-validation.md) records the historical full validation and the current targeted lock check. The 2026-11-03 check confirms the ten-job topology in `.github/workflows/security-review.lock.yml`; it is not a full revalidation.
 
 ### Assumptions
 
@@ -301,7 +313,7 @@ Compiled lock files are the evidence for generated job structure and permissions
 
 ### Operations
 
-The representative workflow orders its security jobs as `pre_activation` → `activation` → `agent` → `detection` → `safe_outputs`, followed by `conclusion`. The conclusion job is terminal reporting/cleanup, not a required security layer. See the current job table in the [validation report](security-architecture-spec-validation.md#current-compiled-job-structure-2026-11-03).
+The representative workflow orders its jobs as `pre_activation` → `admission` → `activation` → `agent` → `detection` → `evals` → `push_evals_state`, with `safe_outputs` also following `detection`, and `conclusion` → `conclusion_admission` terminal. The conclusion job is terminal reporting/cleanup, not a required security layer. See the current job table in the [validation report](security-architecture-spec-validation.md#current-compiled-job-structure-2026-11-03).
 
 ### Norms
 
@@ -309,7 +321,7 @@ The full specification defines normative MUST/SHOULD requirements. Summary statu
 
 ### Summary
 
-This canvas summarizes requirements, evidence, assumptions, safeguards, operational order, and normative status. The latest targeted check leaves PM-08 fork protection UNVERIFIED for the representative lock and does not assign a new overall validation grade.
+This canvas covers requirements, entities, approach, structure, operations, norms, and safeguards, with evidence, assumptions, and this summary as additional subsections. The latest targeted check leaves PM-08 fork protection UNVERIFIED for the representative lock and does not assign a new overall validation grade.
 
 ## Target Audience
 
@@ -369,7 +381,7 @@ The historical validation established the following minimum `.lock.yml` behavior
 - Runtime repository/fork validation, timestamp validation, and action pinning remain present in compiled output
 - Concurrency controls and threat-detection job placement are validated against current lock-file generation
 
-The **2026-11-03 targeted check** confirms the six-job structure in `.github/workflows/security-review.lock.yml`, but also records workflow-specific write permissions and an UNVERIFIED PM-08 claim. It does not update the historical full-validation grade.
+The **2026-11-03 targeted check** confirms the ten-job structure in `.github/workflows/security-review.lock.yml`, but also records workflow-specific write permissions and an UNVERIFIED PM-08 claim. It does not update the historical full-validation grade.
 
 ## Next Steps
 
@@ -412,7 +424,7 @@ The **2026-11-03 targeted check** confirms the six-job structure in `.github/wor
 | Sync PM-11 formal coverage into behavioral coverage map | ✅ Done (2026-07-15) | Added `TestFormalPM11_PreActivationContainsMembershipStep` to the behavioral coverage map and generated suite notes; formal suite now tracks 16 tests in `pkg/workflow/security_architecture_sg_formal_test.go` |
 | Sync §12 CS/RS coverage update from daily SPDD queue | ✅ Done (2026-07-28) | Added formal coverage map/test-suite entries for T-CS-001/002 and T-RS-003..008; synced to `specs/security-architecture-spec-validation.md` §12 matrix |
 | Add RS-05a for workflow_dispatch + aw_context PR checkout | ✅ Done (2026-08-01) | Security threat review cleared; added RS-05a to §11.3 (repository scope, actor trust, parse resilience, ref isolation); validation §7a added with 9-test unit evidence; §12 matrix updated; spec bumped to v1.0.1 |
-| Recheck compiled six-job structure | ✅ Targeted check (2026-11-03) | `.github/workflows/security-review.lock.yml` confirms the six jobs; full revalidation remains pending and PM-08 is UNVERIFIED in the validation report |
+| Recheck compiled ten-job structure | ✅ Targeted check (2026-11-03) | `.github/workflows/security-review.lock.yml` confirms the ten jobs; full revalidation remains pending and PM-08 is UNVERIFIED in the validation report |
 
 ## Change Log
 

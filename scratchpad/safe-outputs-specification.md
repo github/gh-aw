@@ -5,9 +5,9 @@ sidebar:
   order: 100
 ---
 
-> ⚠️ **DEPRECATED — v1.1.1 (Stale)**
+> ⚠️ **DEPRECATED — v1.1.0 (Stale)**
 >
-> This scratchpad file (v1.1.1) is significantly outdated relative to the canonical specification.
+> This scratchpad file (v1.1.0) is significantly outdated relative to the canonical specification.
 > **Do not use this document for implementation reference.**
 >
 > **Canonical version**: [Safe Outputs MCP Gateway Specification v1.28.3](/gh-aw/specs/safe-outputs-specification/)
@@ -1290,42 +1290,23 @@ The system does NOT protect against:
 
 ## Sync Notes
 
-This mapping is retained for historical traceability only; the canonical specification linked in the archival notice remains authoritative.
-
 | Specification area | Implementation mapping |
 |---|---|
 | §3.4 Layer 3 validation guardrails | `pkg/workflow/safe_outputs_validation.go`, `pkg/workflow/safe_outputs_validation_config.go` |
 | §3.5 Layer 4 execution handlers | `pkg/workflow/safe_output_handlers.go`, `pkg/workflow/safe_outputs_actions.go` |
-| §4.1 Threat model | `pkg/workflow/threat_detection_job.go`, `pkg/workflow/compiler_safe_outputs_job.go` |
-| §4.2.1 Permission isolation | `pkg/workflow/safe_outputs_permissions.go`, `pkg/workflow/compiler_safe_outputs_job.go`, `pkg/workflow/safe_outputs_permissions_test.go` |
-| §4.2.2 Read-only agent enforcement | `pkg/workflow/compiler_jobs.go`, `pkg/workflow/security_architecture_sg_formal_test.go` |
-| §4.2.3 Structured output validation | `pkg/workflow/safe_outputs_validation.go`, `pkg/workflow/safe_outputs_validation_config.go`, `pkg/workflow/safe_outputs_test.go` |
-| §4.3.1 Input validation and §4.3.2 label sanitization | `pkg/workflow/safe_outputs_validation.go`, `pkg/workflow/safe_outputs_allowed_labels_validation.go` |
-| §4.3.3 Rate limiting | `pkg/workflow/safe_outputs_max_validation.go` (configured operation caps); `actions/setup/js/rate_limit_helpers.cjs`, `actions/setup/js/error_helpers.cjs` (API rate-limit handling); no mapped per-repository aggregate limit |
-| §4.3.4 Audit logging | `pkg/workflow/compiler_safe_outputs_steps.go`, `actions/setup/js/safe_output_manifest.cjs`, `actions/setup/js/safe_output_execution_metadata.cjs` |
-| §4.4 Staged mode | `pkg/workflow/safe_outputs_permissions.go`, `pkg/workflow/compiler_safe_outputs_job.go`, `pkg/workflow/compiler_safe_outputs_config_staged_test.go`, `pkg/workflow/staged_test.go` |
-| §5.1 Missing Tool | `pkg/workflow/missing_issue_reporting.go`, `pkg/workflow/safe_outputs_handler_registry_diagnostics.go`, `pkg/workflow/missing_tool_test.go` |
-| §5.2 Missing Data | `pkg/workflow/missing_issue_reporting.go`, `pkg/workflow/safe_outputs_handler_registry_diagnostics.go`, `pkg/workflow/missing_data_test.go` |
-| §5.3 No-Op | `pkg/workflow/noop.go`, `pkg/workflow/noop_test.go`, `pkg/workflow/noop_in_conclusion_test.go` |
-| §5.4 Builtin Tools Summary | `pkg/workflow/missing_issue_reporting.go`, `pkg/workflow/noop.go`, `pkg/workflow/safe_output_handlers.go`, `pkg/workflow/safe_outputs_handler_registry_test.go` |
-| §2.4 Norms | Review the §3–§5 mappings above whenever a normative requirement changes. |
+| §2.4 Norms | Review the Layer 3 and Layer 4 mappings above whenever a normative requirement changes. |
 
 ## Sync Follow-ups
 
-When changing any mapped behavior:
+When changing Layer 3 or Layer 4 behavior:
 
-1. Verify the mapped `pkg/workflow/` implementation and focused tests reflect the requirement.
-2. Update the canonical specification's conformance requirements when implementation behavior changes.
-3. Keep this archive's mapping synchronized when it remains useful, and record intentional deviations in the canonical specification.
+1. Verify the mapped `pkg/workflow/` implementation and its focused tests reflect the updated requirement.
+2. Update this specification's conformance requirements when the implementation changes behavior.
+3. Record any intentional implementation deviation and its rationale as required by §2.4.
 
 ---
 
 ## Change Log
-
-### Version 1.1.1 (Archival Sync Note, 2026-11-03)
-
-- Extended the historical Sync Notes mapping to cover the Security Model (§4) and Builtin System Tools (§5).
-- Clarified that the canonical specification remains authoritative.
 
 ### Version 1.1.0 (Recommendation)
 
