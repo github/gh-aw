@@ -64,7 +64,7 @@ function projectSafeOutputData(source) {
   for (const key of ["number", "messageIndex"]) {
     if (Number.isSafeInteger(source[key]) && source[key] >= 0) data[key] = source[key];
   }
-  if (typeof source.output_id === "string" && /^so_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(source.output_id)) data.output_id = source.output_id;
+  if (typeof source.output_id === "string" && /^so_[A-Za-z0-9_-]{22}$/.test(source.output_id)) data.output_id = source.output_id;
   if (source.identifier === null) data.identifier = null;
   if (OUTCOME_STATUSES.has(source.status)) data.status = source.status;
   if (typeof source.staged === "boolean") data.staged = source.staged;

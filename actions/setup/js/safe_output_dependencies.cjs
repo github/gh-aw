@@ -3,7 +3,7 @@
 const { classifySafeOutputResult, pickOutcomeField } = require("./safe_outputs_status.cjs");
 const { getCreatedTemporaryId, extractTemporaryIdReferences } = require("./temporary_id.cjs");
 
-const OUTPUT_ID_PATTERN = /^so_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const OUTPUT_ID_PATTERN = /^so_[A-Za-z0-9_-]{22}$/;
 
 /**
  * Build one stable graph for explicit output dependencies and legacy temporary IDs.

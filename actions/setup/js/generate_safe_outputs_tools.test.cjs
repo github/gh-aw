@@ -12,7 +12,7 @@ import generateSafeOutputsTools from "./generate_safe_outputs_tools.cjs";
 
 const scriptPath = path.join(__dirname, "generate_safe_outputs_tools.cjs");
 const { main: generateTools } = generateSafeOutputsTools;
-const outputIdPattern = "^so_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$";
+const outputIdPattern = "^so_[A-Za-z0-9_-]{22}$";
 const dependencySchema = {
   description: expect.any(String),
   "x-synonyms": ["depends_on"],
@@ -180,8 +180,8 @@ describe("generate_safe_outputs_tools", () => {
       expect(tool.inputSchema.properties["depends-on"]).toEqual(dependencySchema);
       expect(tool.inputSchema.required || []).not.toContain("depends-on");
       expect(tool.inputSchema.properties).not.toHaveProperty("output_id");
-      expect(normalizeSafeOutputToolArguments(tool.name, { depends_on: "so_11111111-1111-4111-8111-111111111111" }, undefined, tool.inputSchema)).toEqual({
-        "depends-on": "so_11111111-1111-4111-8111-111111111111",
+      expect(normalizeSafeOutputToolArguments(tool.name, { depends_on: "so_AAAAAAAAAAAAAAAAAAAAAA" }, undefined, tool.inputSchema)).toEqual({
+        "depends-on": "so_AAAAAAAAAAAAAAAAAAAAAA",
       });
       for (const claim_handle of ["", " ", "\t", null]) {
         const normalized = normalizeSafeOutputToolArguments(tool.name, { claim_handle }, undefined, tool.inputSchema);

@@ -21,7 +21,7 @@ import {
 } from "./intent_probe.cjs";
 
 const LARGE_CONTENT_BODY = "A".repeat(70000);
-const outputId = expect.stringMatching(/^so_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+const outputId = expect.stringMatching(/^so_[A-Za-z0-9_-]{22}$/);
 const testScratchRoot = path.resolve(`.safe-outputs-handlers-${crypto.randomUUID()}`);
 const originalGitCeiling = process.env.GIT_CEILING_DIRECTORIES;
 

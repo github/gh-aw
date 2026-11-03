@@ -5,7 +5,7 @@ import safeOutputsMCPServerHTTP from "./safe_outputs_mcp_server_http.cjs";
 import { normalizeSafeOutputToolArguments } from "./safe_outputs_mcp_arguments.cjs";
 
 const { createMCPServer } = safeOutputsMCPServerHTTP;
-const outputId = expect.stringMatching(/^so_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+const outputId = expect.stringMatching(/^so_[A-Za-z0-9_-]{22}$/);
 
 describe("safe_outputs_mcp wrapped tool arguments", () => {
   let tempDir;
@@ -48,7 +48,7 @@ describe("safe_outputs_mcp wrapped tool arguments", () => {
     expect(debug).toHaveBeenCalledWith(expect.stringContaining(JSON.stringify(payloadKeys)));
   });
 
-  it.each([null, "so_4a1f2c30-1b2c-4d5e-8f90-123456789abd"])("rejects simultaneous dependency aliases before normalization can discard one: %j", async alias => {
+  it.each([null, "so_BBBBBBBBBBBBBBBBBBBBBB"])("rejects simultaneous dependency aliases before normalization can discard one: %j", async alias => {
     const configPath = path.join(tempDir, "config.json");
     const toolsPath = path.join(tempDir, "tools.json");
     const outputPath = path.join(tempDir, "output.jsonl");
@@ -63,14 +63,14 @@ describe("safe_outputs_mcp wrapped tool arguments", () => {
       jsonrpc: "2.0",
       id: 1,
       method: "tools/call",
-      params: { name: "add_comment", arguments: { body: "A useful comment", "depends-on": "so_4a1f2c30-1b2c-4d5e-8f90-123456789abc", depends_on: alias } },
+      params: { name: "add_comment", arguments: { body: "A useful comment", "depends-on": "so_AAAAAAAAAAAAAAAAAAAAAA", depends_on: alias } },
     });
     expect(response.error || response.result?.isError).toBeTruthy();
     expect(fs.existsSync(outputPath)).toBe(false);
   });
 
   it("preserves outer dependencies when recovering wrapped arguments", () => {
-    const dependency = "so_4a1f2c30-1b2c-4d5e-8f90-123456789abc";
+    const dependency = "so_AAAAAAAAAAAAAAAAAAAAAA";
     expect(normalizeSafeOutputToolArguments("add_comment", { add_comment: { body: "A useful comment" }, "depends-on": dependency })).toEqual({ body: "A useful comment", "depends-on": dependency });
     expect(() => normalizeSafeOutputToolArguments("add_comment", { add_comment: { body: "A useful comment", "depends-on": dependency }, depends_on: dependency })).toThrow("Provide depends-on only once");
   });

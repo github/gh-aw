@@ -318,8 +318,8 @@ describe("safe_output_type_validator", () => {
   describe("validateItem", () => {
     it.each(["depends-on", "depends_on"])("preserves validated dependency metadata from %s", async key => {
       const { validateItem } = await import("./safe_output_type_validator.cjs");
-      const outputId = "so_4a1f2c30-1b2c-4d5e-8f90-123456789abc";
-      const prerequisite = "so_4a1f2c30-1b2c-4d5e-8f90-123456789abd";
+      const outputId = "so_AAAAAAAAAAAAAAAAAAAAAA";
+      const prerequisite = "so_BBBBBBBBBBBBBBBBBBBBBB";
       const result = validateItem({ type: "add_comment", body: "A completed update.", output_id: outputId, [key]: [prerequisite], undeclared: "discard" }, "add_comment", 1);
       expect(result.isValid).toBe(true);
       expect(result.normalizedItem).toEqual({ type: "add_comment", body: "A completed update.", output_id: outputId, "depends-on": [prerequisite] });
@@ -339,7 +339,7 @@ describe("safe_output_type_validator", () => {
 
     it.each(["upload_asset", "noop"])("rejects dependencies on standalone %s requests during ingestion", async type => {
       const { validateItem } = await import("./safe_output_type_validator.cjs");
-      const result = validateItem({ type, "depends-on": "so_4a1f2c30-1b2c-4d5e-8f90-123456789abc" }, type, 1);
+      const result = validateItem({ type, "depends-on": "so_AAAAAAAAAAAAAAAAAAAAAA" }, type, 1);
       expect(result.isValid).toBe(false);
       expect(result.error).toContain("outside the safe-output handler manager");
     });

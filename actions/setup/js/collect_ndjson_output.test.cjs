@@ -495,8 +495,8 @@ describe("collect_ndjson_output.cjs", () => {
         expect(parsedOutput.errors).toHaveLength(0));
     }),
     it.each(["depends-on", "depends_on"])("preserves %s metadata for inline custom outputs", async key => {
-      const outputId = "so_4a1f2c30-1b2c-4d5e-8f90-123456789abc";
-      const prerequisite = "so_4a1f2c30-1b2c-4d5e-8f90-123456789abd";
+      const outputId = "so_AAAAAAAAAAAAAAAAAAAAAA";
+      const prerequisite = "so_BBBBBBBBBBBBBBBBBBBBBB";
       const testFile = "/tmp/gh-aw/test-ndjson-output.txt";
       fs.writeFileSync(testFile, JSON.stringify({ type: "publish_report", text: "Report", output_id: outputId, [key]: prerequisite }));
       process.env.GH_AW_SAFE_OUTPUTS = testFile;
@@ -506,7 +506,7 @@ describe("collect_ndjson_output.cjs", () => {
       expect(output.errors).toHaveLength(0);
       expect(output.items).toEqual([{ type: "publish_report", text: "Report", output_id: outputId, "depends-on": prerequisite }]);
     }),
-    it.each([null, "aw_issue1", "so_4a1f2c30-1b2c-4d5e-8f90-123456789abd"])("rejects malformed or unsupported custom job dependencies: %j", async dependency => {
+    it.each([null, "aw_issue1", "so_BBBBBBBBBBBBBBBBBBBBBB"])("rejects malformed or unsupported custom job dependencies: %j", async dependency => {
       const testFile = "/tmp/gh-aw/test-ndjson-output.txt";
       fs.writeFileSync(testFile, JSON.stringify({ type: "deploy", "depends-on": dependency }));
       process.env.GH_AW_SAFE_OUTPUTS = testFile;
