@@ -85,6 +85,10 @@ async function run() {
 
   await sendOtlpSpan.sendJobConclusionSpan(spanName, { startMs });
 
+  if (getActionInput("JOB_NAME") === "conclusion") {
+    await require("./send_otlp_session_logs.cjs").sendSessionLogs();
+  }
+
   if (endpoints) {
     core.info("[otlp] conclusion span export attempted");
   }
