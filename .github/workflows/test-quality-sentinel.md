@@ -220,7 +220,7 @@ features:
   gh-aw-detection: true
 evals:
   - id: review_decision_consistent
-    question: Did the agent post a Test Quality Score with an APPROVE or REQUEST_CHANGES decision that matches the tests and guideline violations it flagged, or call noop when no test files changed?
+    question: Did the agent either post a Test Quality Score with an APPROVE or REQUEST_CHANGES decision that matches the tests and guideline violations it flagged, or call noop with a scope reason the workflow's act-vs-noop rubric allows (pre-fetch unavailable, no changed or only unsupported-language test files, or no behavioral test change and no hard violation)?
 
 ---
 
