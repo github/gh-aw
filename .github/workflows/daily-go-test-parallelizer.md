@@ -16,7 +16,7 @@ engine:
   model-provider: github
   model-routing:
     goal: cost
-    mode: balanced
+    mode: economy
 strict: true
 timeout-minutes: 30
 network:
