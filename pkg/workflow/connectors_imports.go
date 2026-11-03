@@ -207,6 +207,9 @@ func consumeQualifiedConnectorSection(frontmatter, config map[string]any, sectio
 				return fmt.Errorf("%s.%s: %w", section, key, err)
 			}
 			normalized := map[string]any{"max": options.Max}
+			if len(options.Samples) > 0 {
+				normalized["samples"] = options.Samples
+			}
 			if options.Staged != nil {
 				if isExpression(options.Staged.String()) {
 					normalized["staged"] = options.Staged.String()

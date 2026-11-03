@@ -14505,12 +14505,19 @@
       }
     },
     "connectorOperationOptions": {
-      "description": "Workflow-owned delivery controls for a selected connector operation. Global staging cannot be disabled here.",
+      "description": "Workflow-owned delivery controls and deterministic replay samples for a selected connector operation. Global staging cannot be disabled here.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "max": { "type": "integer", "minimum": 1, "maximum": 100, "default": 1 },
-        "staged": { "$ref": "#/$defs/templatable_boolean" }
+        "staged": { "$ref": "#/$defs/templatable_boolean" },
+        "samples": {
+          "description": "Internal hidden feature. Sample MCP tool arguments for the existing --use-samples or features.samples replay mode. Payloads must conform to the generated connector tool inputSchema; they do not grant resources or override delivery controls.",
+          "oneOf": [
+            { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+            { "type": "object", "additionalProperties": true }
+          ]
+        }
       }
     },
     "connectorDeclaration": {
