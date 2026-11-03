@@ -40,6 +40,7 @@ strict: true
 timeout-minutes: 45
 tools:
   bash:
+  - mkdir -p /tmp/gh-aw/repo-memory/default/serena
   - gofmt -w *
   - go test *
   - cat go.mod
@@ -88,7 +89,8 @@ Each day: scan Serena tools, detect tool changes, select a 50/50 cached+new stra
 ## Execution Plan
 
 1) Initialize Serena memory and tool cache.
-- Ensure `/tmp/gh-aw/repo-memory/default/serena` exists.
+- Run `mkdir -p /tmp/gh-aw/repo-memory/default/serena` as a standalone command.
+- Discover the CLI schemas with standalone `serena --help` and `safeoutputs --help` commands. Do not combine initialization or discovery commands; each has its own restricted Bash permission.
 - Discover Serena tools and compare with `/tmp/gh-aw/repo-memory/default/sergo-tools-list.json`.
 - Treat missing cache files as expected first-run behavior.
 - Save updated tool snapshot to `/tmp/gh-aw/repo-memory/default/sergo-tools-list.json`.
