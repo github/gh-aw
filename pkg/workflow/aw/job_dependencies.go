@@ -37,6 +37,11 @@ func AuthoredJobDependencies(jobs map[string]any) JobDependencyGraph {
 			graph[id] = []string{string(constants.AgentJobName)}
 		}
 	}
+	for id, dependency := range constants.MaintenanceJobDependencies {
+		if _, authored := jobs[id]; !authored {
+			graph[id] = []string{string(dependency)}
+		}
+	}
 	for id, value := range jobs {
 		fields, ok := value.(map[string]any)
 		if !ok {

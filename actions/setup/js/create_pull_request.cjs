@@ -1667,9 +1667,12 @@ async function main(config = {}) {
             ...(dependsOnPullRequests.length ? { depends_on: dependsOnPullRequests } : {}),
           },
         });
-      /** @param {import("./report_ast.cjs").ReportBlock[]} children */
-      const fallbackFrame = children =>
-        buildIssueBodyReport(title, children, { repo: repoParts, footer: includeFooter, bodyFooter: config.body_footer, expiresHours, closeOlderKey, allowedMentions: allowedMentionAliases, runUrl, itemType: "pull_request" });
+      /**
+       * @param {import("./report_ast.cjs").ReportBlock[]} children
+       * @param {Partial<import("./issue_body.cjs").IssueBodyOptions>} [options]
+       */
+      const fallbackFrame = (children, options = {}) =>
+        buildIssueBodyReport(title, children, { repo: repoParts, footer: includeFooter, bodyFooter: config.body_footer, expiresHours, closeOlderKey, allowedMentions: allowedMentionAliases, runUrl, itemType: "pull_request", ...options });
 
       // Generate footer using messages template system (respects custom messages.footer config)
       // When footer is disabled, only add XML markers (no visible footer content)
@@ -2525,7 +2528,18 @@ async function main(config = {}) {
 
         try {
           transport.assertUnchanged();
-          const { data: issue, issueRepoParts } = await createFallbackIssue(githubClient, repoParts, title, fallbackFrame(fallbackBody), mergeFallbackIssueLabels(effectiveFallbackLabels), configAssignees, transport.assertUnchanged);
+          const expiresAt = new Date(Date.now() + (expiresHours > 0 ? expiresHours : 7 * 24) * 60 * 60 * 1000).toISOString();
+          /** @param {import("./report_ast.cjs").ReportBlock[]} children */
+          const protectedFallbackFrame = children => fallbackFrame([...children, { type: "quote", agentTainted: false, children: [{ type: "expiration", expiresAt, agentTainted: false }] }], { expiresHours: 0, itemType: "issue" });
+          const { data: issue, issueRepoParts } = await createFallbackIssue(
+            githubClient,
+            repoParts,
+            title,
+            protectedFallbackFrame(fallbackBody),
+            mergeFallbackIssueLabels([...effectiveFallbackLabels, "pull-request-fallback"]),
+            configAssignees,
+            transport.assertUnchanged
+          );
 
           core.info(`Created protected-file-protection review issue #${issue.number}: ${issue.html_url}`);
 
@@ -2545,7 +2559,7 @@ async function main(config = {}) {
                     owner: issueRepoParts.owner,
                     repo: issueRepoParts.repo,
                     issue_number: issue.number,
-                    body: renderSizedReport(fallbackFrame(fallbackBodyWithCloseKeyword)).body,
+                    body: renderSizedReport(protectedFallbackFrame(fallbackBodyWithCloseKeyword)).body,
                   }),
                 RATE_LIMIT_RETRY_CONFIG,
                 `update protected-file-protection fallback issue #${issue.number} with auto-close link`

@@ -3,7 +3,6 @@ package workflow
 import (
 	"fmt"
 
-	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/setutil"
 )
@@ -32,7 +31,7 @@ func validateSafeOutputsNeedsField(data *WorkflowData, fieldName string, needs [
 	customJobs := make(map[string]struct {
 	}, len(data.Jobs))
 	for jobName := range data.Jobs {
-		if isReservedSafeOutputsNeedsTarget(jobName) {
+		if isReservedOnNeedsTarget(jobName, data.Jobs) {
 			continue
 		}
 		customJobs[jobName] = struct {
@@ -41,7 +40,7 @@ func validateSafeOutputsNeedsField(data *WorkflowData, fieldName string, needs [
 	safeOutputsNeedsValidationLog.Printf("Found %d custom job(s) available as needs targets", len(customJobs))
 
 	for _, need := range needs {
-		if isReservedSafeOutputsNeedsTarget(need) {
+		if isReservedOnNeedsTarget(need, data.Jobs) {
 			safeOutputsNeedsValidationLog.Printf("Validation failed: %q is a reserved job name", need)
 			return fmt.Errorf(
 				"safe-outputs.%s: built-in job %q is not allowed. Expected one of the workflow's custom jobs. Example: safe-outputs.%s: [secrets_fetcher]",
@@ -63,23 +62,4 @@ func validateSafeOutputsNeedsField(data *WorkflowData, fieldName string, needs [
 
 	safeOutputsNeedsValidationLog.Printf("Validated %d safe-outputs.%s dependency target(s)", len(needs), fieldName)
 	return nil
-}
-
-func isReservedSafeOutputsNeedsTarget(jobName string) bool {
-	switch jobName {
-	case string(constants.AgentJobName),
-		string(constants.ActivationJobName),
-		string(constants.PreActivationJobName),
-		"pre-activation",
-		string(constants.ConclusionJobName),
-		string(constants.SafeOutputsJobName),
-		"safe-outputs",
-		string(constants.DetectionJobName),
-		string(constants.UnlockJobName),
-		"push_repo_memory",
-		"update_cache_memory":
-		return true
-	default:
-		return false
-	}
 }

@@ -1,6 +1,9 @@
 package cli
 
 import (
+	"path/filepath"
+	"strings"
+
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/workflow"
 )
@@ -53,6 +56,10 @@ func applyCopilotWebToolRemoval(content string, frontmatter map[string]any, file
 	if enabled, ok := value.(bool); ok && !enabled {
 		return content, false, nil
 	}
+	if _, hasEngine := frontmatter["engine"]; !hasEngine && isNestedWorkflowFragment(filePath) {
+		copilotWebFetchCodemodLog.Printf("Unable to determine effective engine for nested fragment; preserving tools.%s", tool)
+		return content, false, nil
+	}
 
 	compiler := workflow.NewCompiler()
 	var engineConfig *workflow.EngineConfig
@@ -78,4 +85,17 @@ func applyCopilotWebToolRemoval(content string, frontmatter map[string]any, file
 		copilotWebFetchCodemodLog.Printf("Removed unsupported tools.%s for Copilot", tool)
 	}
 	return updated, applied, err
+}
+
+func isNestedWorkflowFragment(filePath string) bool {
+	if filePath == "" {
+		return false
+	}
+	parts := strings.Split(filepath.ToSlash(filepath.Clean(filePath)), "/")
+	for i, part := range parts {
+		if part == "workflows" {
+			return i < len(parts)-2
+		}
+	}
+	return false
 }

@@ -79,7 +79,6 @@
       "nugetregistryv2prod.blob.core.windows.net",
       "azuresearch-usnc.nuget.org",
       "azuresearch-ussc.nuget.org",
-      "dc.services.visualstudio.com",
       "dot.net",
       "ci.dot.net",
       "www.microsoft.com",
@@ -213,8 +212,7 @@
       "googleapis.deno.dev",
       "googlechromelabs.github.io",
       "storage.googleapis.com",
-      "cdn.jsdelivr.net",
-      "telemetry.vercel.com"
+      "cdn.jsdelivr.net"
     ],
     "node-cdns": ["cdn.jsdelivr.net", "data.jsdelivr.com", "code.jquery.com", "cdn.sheetjs.com"],
     "ocaml": ["opam.ocaml.org", "ocaml.org", "erratique.ch"],

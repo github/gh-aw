@@ -229,6 +229,15 @@ This is a synthetic issue body for testing, not a real report.
 
 ---
 
+## Template: activation_failed.md
+
+> [!WARNING]
+> **Activation job failed before the agent started.** The activation job failed without a recognized guardrail report.
+
+Review the [workflow run](https://example.test/synthetic/repository/actions/runs/1000), including **Set up job** and checkout steps, to find the cause.
+
+---
+
 ## Template: agent_failure_comment.md
 
 Agent job [1000](https://example.test/synthetic/repository/actions/runs/1000) failed.
@@ -266,6 +275,8 @@ Synthetic lockdown_check_failed_context.
 Synthetic oauth_token_check_failed_context.
 
 Synthetic stale_lock_file_failed_context.
+
+Synthetic activation_failed_context.
 
 Synthetic daily_ai_credits_exceeded_context.
 
@@ -362,6 +373,8 @@ Synthetic lockdown_check_failed_context.
 Synthetic oauth_token_check_failed_context.
 
 Synthetic stale_lock_file_failed_context.
+
+Synthetic activation_failed_context.
 
 Synthetic daily_ai_credits_exceeded_context.
 

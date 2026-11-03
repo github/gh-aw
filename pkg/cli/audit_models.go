@@ -6,7 +6,11 @@ import (
 	"os"
 	"slices"
 	"strings"
+
+	"github.com/github/gh-aw/pkg/logger"
 )
+
+var auditModelsLog = logger.New("cli:audit_models")
 
 // AuditModelCatalog contains only model metadata, never endpoint URLs or credentials.
 type AuditModelCatalog struct {
@@ -29,17 +33,20 @@ type AuditCatalogModel struct {
 }
 
 func buildAuditModelCatalog(runDir string) *AuditModelCatalog {
+	auditModelsLog.Printf("Building audit model catalog from run directory: %s", runDir)
 	report := &AuditModelCatalog{
 		Source:    "sandbox/firewall/awf-reflect.json",
 		Endpoints: []AuditModelCatalogEndpoint{},
 	}
 	data, err := readModelAvailabilityReflection(runDir)
 	if err != nil {
+		auditModelsLog.Printf("Model availability reflection unavailable in %s: %v", runDir, err)
 		report.Warnings = []string{"Same-run model catalog is unavailable or unsafe; model absence cannot be confirmed."}
 		return report
 	}
 	var inventory auditModelInventory
 	if err := json.Unmarshal(data, &inventory); err != nil {
+		auditModelsLog.Printf("Model availability reflection in %s is invalid JSON: %v", runDir, err)
 		report.Warnings = []string{"Same-run model catalog is invalid; model absence cannot be confirmed."}
 		return report
 	}
@@ -84,6 +91,7 @@ func buildAuditModelCatalog(runDir string) *AuditModelCatalog {
 		}
 		report.Endpoints = append(report.Endpoints, entry)
 	}
+	auditModelsLog.Printf("Built audit model catalog: %d endpoint(s), %d warning(s)", len(report.Endpoints), len(report.Warnings))
 	return report
 }
 

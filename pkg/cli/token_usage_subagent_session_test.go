@@ -409,6 +409,23 @@ func TestPiLegacySubagentEventsCorrelateByAgent(t *testing.T) {
 	require.Zero(t, agents[0].IncompleteCount)
 }
 
+func TestPiLegacyToolExecutionCorrelatesByAgent(t *testing.T) {
+	content := subagentSessionHeader +
+		subagentSessionRecord(`{"type":"session.init","data":{"sourceEngine":"pi","sessionId":"parent"}}`) +
+		subagentSessionRecord(`{"type":"pi.subagent_dispatch","data":{"agent":"reader"}}`) +
+		subagentSessionRecord(`{"type":"tool.execution_start","data":{"toolName":"subagent","toolCallId":"tool-1","input":{"agent":"reader"}}}`) +
+		subagentSessionRecord(`{"type":"tool.execution_complete","data":{"toolCallId":"tool-1","success":true}}`)
+
+	requests, _, agents, found, err := parseSessionSubagentModelsDetailed(strings.NewReader(content), true)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Len(t, requests, 1)
+	require.Equal(t, 1, requests[0].CompletedCount)
+	require.Zero(t, requests[0].IncompleteCount)
+	require.Len(t, agents, 1)
+	require.Equal(t, 1, agents[0].CompletedCount)
+}
+
 func TestCopilotSubagentUsageRetainsIncompleteOutcome(t *testing.T) {
 	content := subagentSessionHeader +
 		subagentSessionRecord(`{"type":"session.init","data":{"sourceEngine":"copilot","sessionId":"parent"}}`) +
