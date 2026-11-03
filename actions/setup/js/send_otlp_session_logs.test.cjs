@@ -46,6 +46,10 @@ describe("compact unified session OTLP logs", () => {
   const payload = (index = 0) => JSON.parse(fetchMock.mock.calls[index][1].body);
   const records = () => payload().resourceLogs[0].scopeLogs[0].logRecords;
 
+  it("exports only the session log sender", () => {
+    expect(Object.keys(require("./send_otlp_session_logs.cjs"))).toEqual(["sendSessionLogs"]);
+  });
+
   it.each(["", "false", "TRUE", "1", "invalid"])("fails closed for opt-in value %j without reading the session", async value => {
     vi.stubEnv("GH_AW_OTLP_LOGS_ENABLED", value);
     await sendSessionLogs({ sessionPath: "/nonexistent/session" });
@@ -96,6 +100,29 @@ describe("compact unified session OTLP logs", () => {
     await sendSessionLogs({ sessionPath });
     expect(fetchMock.mock.calls[0][1].body).not.toContain("private-model");
     expect(fetchMock.mock.calls[0][1].body).not.toContain("private-credential");
+  });
+
+  it("drops unauthorized sensitive keys but preserves unconfigured secret-like metadata", async () => {
+    const model = "token=nonsecret-metadata";
+    write([
+      {
+        type: "workflow.info",
+        data: {
+          model,
+          api_key: "PRIVATE_API_KEY",
+          authorization: "PRIVATE_AUTHORIZATION",
+          password: "PRIVATE_PASSWORD",
+          extra: { credential: "PRIVATE_NESTED_CREDENTIAL" },
+        },
+      },
+      { type: "firewall.token_usage", data: { model, usage: { inputTokens: 10, outputTokens: 3, secret: "PRIVATE_USAGE_SECRET" } } },
+    ]);
+    await sendSessionLogs({ sessionPath });
+    expect(fetchMock.mock.calls[0][1].body).not.toContain("PRIVATE");
+    expect(records().map(record => decode(record.body))).toEqual([
+      { type: "workflow.info", data: { model } },
+      { type: "firewall.token_usage", data: { model, usage: { inputTokens: 10, outputTokens: 3 } } },
+    ]);
   });
 
   it.each(["", "not-json", JSON.stringify([{ url: "https://collector.example" }]), JSON.stringify([{ url: "https://collector.example", headers: "Authorization=Bearer" }])])(
@@ -157,7 +184,7 @@ describe("compact unified session OTLP logs", () => {
   it("removes grader run identity but keeps grader ids and counts", async () => {
     write([
       { type: "session.format", data: { version: 1 } },
-      { type: "grader.result", data: { id: "quality", passed: true, run: { id: "12345", attempt: 2, graderCount: 3, passed: 3, failed: 0, errors: 0 } } },
+      { type: "grader.result", data: { id: "quality", passed: true, run: { id: "PRIVATE_GRADER_RUN_ID", attempt: 2, graderCount: 3, passed: 3, failed: 0, errors: 0 } } },
     ]);
     await sendSessionLogs({ sessionPath });
     const grader = records()
@@ -165,6 +192,30 @@ describe("compact unified session OTLP logs", () => {
       .find(event => event.type === "grader.result");
     expect(grader.data.id).toBe("quality");
     expect(grader.data.run).toEqual({ graderCount: 3, passed: 3, failed: 0, errors: 0 });
+    expect(fetchMock.mock.calls[0][1].body).not.toContain("PRIVATE_GRADER_RUN_ID");
+    expect(grader.data.run).not.toHaveProperty("attempt");
+  });
+
+  it("skips an oversized higher-priority record without evicting a smaller failure", async () => {
+    const header = { type: "session.format", data: { version: 1 } };
+    const failure = { type: "execution.result", data: { outcome: "failure", exitCode: 1 } };
+    write([header, failure]);
+    await sendSessionLogs({ sessionPath });
+    // Account for the truncation/count metadata that the three-record source will produce.
+    const boundedPayload = payload();
+    for (const attr of boundedPayload.resourceLogs[0].resource.attributes) {
+      if (attr.key === "gh-aw.session.omitted_events") attr.value.intValue = 1;
+      if (attr.key === "gh-aw.session.truncated") attr.value.boolValue = true;
+    }
+    const maxBytes = Buffer.byteLength(JSON.stringify(boundedPayload));
+    fetchMock.mockClear();
+    write([header, failure, { type: "workflow.info", data: { model: "模型".repeat(40) } }]);
+    vi.stubEnv("GH_AW_OTLP_LOGS_MAX_BYTES", String(maxBytes));
+    await sendSessionLogs({ sessionPath });
+    expect(records().map(record => decode(record.body))).toEqual([header, failure]);
+    expect(Buffer.byteLength(fetchMock.mock.calls[0][1].body)).toBe(maxBytes);
+    expect(payload().resourceLogs[0].resource.attributes).toContainEqual({ key: "gh-aw.session.omitted_events", value: { intValue: 1 } });
+    expect(partialWarning).toHaveBeenCalledExactlyOnceWith(expect.stringMatching(/^::warning::\[otlp\] Session export is partial: retained 2 compact events; 1 inspected records omitted\./));
   });
 
   it("does not warn about a partial export when only routine privacy filtering applies", async () => {
@@ -190,7 +241,11 @@ describe("compact unified session OTLP logs", () => {
     expect(warning).toHaveBeenCalledWith(expect.stringContaining("No compact session records fit"));
   });
 
-  it.each(["missing", "malformed", "symlink"])("warns without exporting %s artifacts or private diagnostics", async kind => {
+  it.each([
+    ["missing", "Error ENOENT"],
+    ["malformed", "Error ERR_VALIDATION"],
+    ["symlink", "Error ELOOP"],
+  ])("warns without exporting %s artifacts or private diagnostics", async (kind, diagnostic) => {
     if (kind === "missing") fs.unlinkSync(sessionPath);
     if (kind === "malformed") fs.writeFileSync(sessionPath, "PRIVATE_INVALID_JSON");
     if (kind === "symlink") {
@@ -200,7 +255,23 @@ describe("compact unified session OTLP logs", () => {
     await sendSessionLogs({ sessionPath });
     expect(fetchMock).not.toHaveBeenCalled();
     expect(warning).toHaveBeenCalledOnce();
-    expect(warning.mock.calls.flat().join(" ")).not.toContain("PRIVATE");
+    const message = warning.mock.calls.flat().join(" ");
+    expect(message).toContain(`(${diagnostic})`);
+    for (const privateValue of ["PRIVATE", directory, sessionPath, "private-credential", "collector.example"]) expect(message).not.toContain(privateValue);
+  });
+
+  it("reports unexpected failures without exposing their message or custom error name", async () => {
+    const error = new TypeError(`PRIVATE_SERIALIZER ${sessionPath} private-credential https://collector.example/otlp`);
+    error.name = "PRIVATE_ERROR_NAME";
+    error.code = "PRIVATE_ERROR_CODE";
+    vi.spyOn(fs, "readSync").mockImplementation(() => {
+      throw error;
+    });
+    await sendSessionLogs({ sessionPath });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(warning).toHaveBeenCalledExactlyOnceWith(expect.stringContaining("(TypeError)"));
+    const message = warning.mock.calls.flat().join(" ");
+    for (const privateValue of ["PRIVATE", sessionPath, "private-credential", "collector.example"]) expect(message).not.toContain(privateValue);
   });
 
   it("omits invalid trace context instead of fabricating identifiers", async () => {

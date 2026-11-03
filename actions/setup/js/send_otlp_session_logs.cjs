@@ -6,6 +6,8 @@ const { readCompactUnifiedSession, sessionEventPriority } = require("./compact_u
 const { serializeSessionArtifact } = require("./session_artifact.cjs");
 const { iterateJsonl } = require("./jsonl_helpers.cjs");
 const { getOTLPSecretValues } = require("./otlp_header_helpers.cjs");
+const { getErrorMessage } = require("./error_helpers.cjs");
+const { ERR_VALIDATION } = require("./error_codes.cjs");
 const otlp = require("./send_otlp_span.cjs");
 const DEFAULT_MAX_SESSION_LOG_BYTES = 64 * 1024;
 
@@ -68,7 +70,8 @@ async function sendSessionLogs({ sessionPath = "/tmp/gh-aw/usage/aw_session.json
     const compact = readCompactUnifiedSession(sessionPath);
     const events = [...iterateJsonl(compact.session, { strict: true })];
     // Apply current exporter-secret masks as well as the publication masks already
-    // applied to the source artifact. No exception includes source record content.
+    // applied to the source artifact. Log bodies use the compact field allowlist,
+    // not the span attribute-key heuristic or guesses about secret-looking values.
     const exporterMasks = [...getOTLPSecretValues(), ...endpoints.map(endpoint => endpoint.url)];
     const redacted = serializeSessionArtifact(events, exporterMasks);
     const observedTimeUnixNano = otlp.toNanoString(Date.now());
@@ -125,9 +128,10 @@ async function sendSessionLogs({ sessionPath = "/tmp/gh-aw/usage/aw_session.json
     }
     await otlp.sendOTLPToAllEndpoints(endpoints, payload, { signal: "logs", skipJSONL: true });
   } catch (err) {
-    // Only the error class and code are reported; messages can embed private paths or content.
-    const kind = err instanceof Error ? err.name : typeof err;
-    const code = err && typeof err === "object" && "code" in err && typeof err.code === "string" && /^[A-Z0-9_]{1,40}$/.test(err.code) ? ` ${err.code}` : "";
+    // Only known error classes/codes are reported; messages and custom names can embed private data.
+    const kind = [SyntaxError, TypeError, RangeError, ReferenceError, URIError, EvalError, AggregateError, Error].find(errorClass => err instanceof errorClass)?.name || typeof err;
+    const errorCode = err && typeof err === "object" && "code" in err ? err.code : getErrorMessage(err).startsWith(`${ERR_VALIDATION}:`) ? ERR_VALIDATION : "";
+    const code = typeof errorCode === "string" && new Set([ERR_VALIDATION, "ENOENT", "ELOOP", "EACCES", "EPERM", "ENOTDIR", "EISDIR", "EIO", "EBADF"]).has(errorCode) ? ` ${errorCode}` : "";
     console.warn(`[otlp] Failed to export compact session logs (${kind}${code}); check that a valid unified session artifact was published`);
   }
 }

@@ -223,11 +223,25 @@ describe("compact unified session projection", () => {
     ["grader.result", { run: { errors: 1 } }],
     ["guardrail.admission", { status: "denied" }],
     ["guardrail.daily_aic", { exceeded: true }],
+    ["guardrail.daily_aic", { status: "structural_error" }],
+    ["guardrail.daily_aic", { status: "transient_error" }],
     ["memory.push", { jobResult: "failure" }],
     ["harness.attempt", { exitCode: 1 }],
     ["workflow.job_result", { result: "timed_out" }],
   ])("promotes failure evidence for %s", (type, data) => {
     expect(sessionEventPriority({ type, data })).toBe(2);
+  });
+
+  it.each(["structural_error", "transient_error"])("retains a late daily-AIC %s ahead of successful guardrails and graders", status => {
+    const successes = Array.from({ length: MAX_COMPACT_SESSION_EVENTS }, (_, index) =>
+      index % 2 === 0 ? { type: "guardrail.daily_aic", data: { status: "under_budget", exceeded: false } } : { type: "grader.result", data: { id: String(index), passed: true } }
+    );
+    const failure = { type: "guardrail.daily_aic", data: { status, exceeded: false } };
+    const result = compactUnifiedSession([...successes, failure]);
+    expect(parse(result)).toEqual([...successes.slice(0, -1), failure]);
+    expect(result.includedEvents).toBe(MAX_COMPACT_SESSION_EVENTS);
+    expect(result.omittedEvents).toBe(1);
+    expect(result.truncated).toBe(true);
   });
 
   it("evicts early low-priority records for late outcomes without reordering or mutating input", () => {
@@ -262,6 +276,26 @@ describe("compact unified session projection", () => {
     expect(Buffer.byteLength(result.session)).toBeLessThanOrEqual(MAX_COMPACT_SESSION_BYTES);
     expect(parse(result).slice(-2)).toEqual(events.slice(-2));
     expect(result.truncated).toBe(true);
+  });
+
+  it("preserves lower-priority evidence when a candidate cannot fit beside earlier equal-priority records", () => {
+    const usage = { type: "usage.report", data: { model: "x".repeat(256), provider: "x".repeat(256) } };
+    const memory = { type: "memory.push", data: { memoryId: "abc" } };
+    const candidate = { type: "usage.report", data: { ...usage.data, purpose: "xxx" } };
+    expect([usage, memory, candidate].map(item => Buffer.byteLength(JSON.stringify(item) + "\n"))).toEqual([570, 49, 586]);
+    const events = [...Array(28).fill(usage), memory];
+    const original = structuredClone(events);
+    const baseline = compactUnifiedSession(events);
+    expect(baseline.includedEvents).toBe(29);
+    expect(baseline.truncated).toBe(false);
+    const result = compactUnifiedSession([...events, candidate]);
+    expect(result.session).toBe(baseline.session);
+    expect(parse(result)).toEqual(events);
+    expect(result.includedEvents).toBe(29);
+    expect(result.omittedEvents).toBe(1);
+    expect(result.truncated).toBe(true);
+    expect(events).toEqual(original);
+    expect(compactUnifiedSession([...events, candidate])).toEqual(result);
   });
 
   it.each(["🦊", '"', "\\", "\u0000"])("bounds UTF-8 JSONL bytes after serialization with %j", character => {
