@@ -1895,7 +1895,9 @@ The projection uses `type: "result"` only at the legacy telemetry boundary. Addi
 The Actions and console renderers share the same compatibility projection and
 accounting selection. The Actions view places statistics in a collapsed
 `<details>` section titled `Agent session`, followed by the detailed fenced trace
-in a separate collapsed `Trace details` section. The console view renders the same
+in a separate collapsed `Trace details` section. Both sections are top-level;
+the log parser does not add an outer `Agentic Conversation` disclosure around
+the agent session. The console view renders the same
 observations as plain text. Neither view publishes user prompts or dumps unknown
 extension payloads.
 

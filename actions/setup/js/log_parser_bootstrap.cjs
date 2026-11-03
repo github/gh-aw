@@ -2,7 +2,7 @@
 /// <reference types="@actions/github-script" />
 
 const { iterateJsonl } = require("./jsonl_helpers.cjs");
-const { generatePlainTextSummary, generateCopilotCliStyleSummary, wrapAgentLogInSection, formatSafeOutputsPreview } = require("./log_parser_shared.cjs");
+const { generatePlainTextSummary, generateCopilotCliStyleSummary, wrapAgentLogInSection, formatSafeOutputsPreview, isCopilotEventLogEntries } = require("./log_parser_shared.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_API, ERR_CONFIG, ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
 const { redactStepSummaryContent, redactSecrets } = require("./redact_secrets.cjs");
@@ -535,12 +535,13 @@ async function runLogParser(options) {
           parserName,
         });
 
-        const wrappedAgentLog = isUnifiedSessionTrace(publicationEntries)
-          ? copilotCliStyleMarkdown
-          : wrapAgentLogInSection(copilotCliStyleMarkdown, {
-              parserName,
-              open: true,
-            });
+        const wrappedAgentLog =
+          isUnifiedSessionTrace(publicationEntries) || isCopilotEventLogEntries(publicationEntries)
+            ? copilotCliStyleMarkdown
+            : wrapAgentLogInSection(copilotCliStyleMarkdown, {
+                parserName,
+                open: true,
+              });
 
         // Add safe outputs preview to step summary
         let fullMarkdown = wrappedAgentLog;

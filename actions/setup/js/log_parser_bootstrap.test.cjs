@@ -242,6 +242,52 @@ describe("log_parser_bootstrap.cjs", () => {
             fs.unlinkSync(logFile),
             fs.rmdirSync(tmpDir));
         }),
+        it.each([
+          ["Copilot", false],
+          ["Copilot", true],
+          ["Claude", false],
+          ["Claude", true],
+          ["Codex", false],
+          ["Codex", true],
+        ])("publishes %s Agent session without an outer disclosure with safe outputs enabled: %s", async (parserName, safeOutputs) => {
+          const tmpDir = fs.mkdtempSync(path.join(__dirname, "test-"));
+          try {
+            const logFile = path.join(tmpDir, "test.log");
+            fs.writeFileSync(logFile, "Test log content");
+            process.env.GH_AW_AGENT_OUTPUT = logFile;
+            delete process.env.GH_AW_SAFE_OUTPUTS;
+            if (safeOutputs) {
+              const outputsFile = path.join(tmpDir, "safe-outputs.jsonl");
+              fs.writeFileSync(outputsFile, JSON.stringify({ type: "create_issue", title: "Test issue", body: "Test body" }) + "\n");
+              process.env.GH_AW_SAFE_OUTPUTS = outputsFile;
+            }
+            const logEntries = [
+              { type: "session.start", data: { sessionId: "test-session", selectedModel: "test-model" } },
+              { type: "assistant.message", data: { content: "Agent response" } },
+              { type: "session.result", data: { status: "success", num_turns: 1 } },
+            ];
+            await runLogParser({ parseLog: () => ({ markdown: "Parsed log", logEntries }), parserName, artifactDir: tmpDir });
+
+            expect(mockCore.setFailed).not.toHaveBeenCalled();
+            expect(mockCore.summary.addRaw).toHaveBeenCalledOnce();
+            const markdown = mockCore.summary.addRaw.mock.calls[0][0];
+            expect(markdown).toMatch(/^<details>\n<summary>Agent session<\/summary>/);
+            expect(markdown.match(/<summary>Agent session<\/summary>/g)).toHaveLength(1);
+            expect(markdown).not.toContain("<summary>Agentic Conversation</summary>");
+            expect(markdown).toContain("Agent response");
+            let depth = 0;
+            for (const match of markdown.matchAll(/<details(?: open)?>|<\/details>|<summary>(Agent session|Trace details|Safe Outputs)<\/summary>/g)) {
+              if (match[0].startsWith("<details")) depth++;
+              else if (match[0] === "</details>") depth--;
+              else expect(depth).toBe(1);
+              expect(depth).toBeGreaterThanOrEqual(0);
+            }
+            expect(depth).toBe(0);
+            if (safeOutputs) expect(markdown).toContain("<summary>Safe Outputs</summary>");
+          } finally {
+            fs.rmSync(tmpDir, { recursive: true, force: true });
+          }
+        }),
         it("should handle parser returning object with markdown", () => {
           const tmpDir = fs.mkdtempSync(path.join(__dirname, "test-")),
             logFile = path.join(tmpDir, "test.log");
