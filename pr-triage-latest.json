@@ -1,23 +1,49 @@
 {
-  "run_id": "41589545500",
-  "run_date": "2026-11-03T06:25:46.159000+00:00",
+  "run_id": "41634881310",
+  "run_date": "2026-11-03T12:23:18.254000+00:00",
   "source": "pr-triage",
-  "eligible_total": 1,
-  "open_copilot_prs": 1,
+  "eligible_total": 8,
+  "open_copilot_prs": 8,
   "cooldown_skipped": [],
   "category_counts": {
-    "chore": 1
+    "bug": 6,
+    "chore": 1,
+    "feature": 1
   },
   "risk_counts": {
-    "high": 1
+    "high": 5,
+    "medium": 3
   },
   "priority_counts": {
-    "high": 1
+    "high": 4,
+    "medium": 4
   },
   "action_counts": {
-    "fast_track": 1
+    "fast_track": 3,
+    "batch_review": 5
   },
-  "batches": [],
+  "batches": [
+    {
+      "id": "agent-runtime",
+      "count": 7,
+      "prs": [
+        74376,
+        74368,
+        74366,
+        74365,
+        74364,
+        74361,
+        74359
+      ]
+    },
+    {
+      "id": "dependency-bump",
+      "count": 1,
+      "prs": [
+        74389
+      ]
+    }
+  ],
   "selected_candidates": [
     {
       "number": 74389,
@@ -31,11 +57,106 @@
         "impact": 35,
         "urgency": 25,
         "quality": 20
-      },
-      "ci": "passing",
-      "status": "draft",
-      "updated_at": "2026-11-03T04:47:27Z"
+      }
+    },
+    {
+      "number": 74376,
+      "title": "Add safe-output identifiers and dependency failure propagation",
+      "category": "feature",
+      "risk": "high",
+      "priority": "high",
+      "action": "fast_track",
+      "score": 72,
+      "breakdown": {
+        "impact": 32,
+        "urgency": 22,
+        "quality": 18
+      }
+    },
+    {
+      "number": 74368,
+      "title": "Complete fix codemods for nested workflows and App-token permissions",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 65,
+      "breakdown": {
+        "impact": 30,
+        "urgency": 18,
+        "quality": 17
+      }
+    },
+    {
+      "number": 74366,
+      "title": "Fix false dependency cycles for custom jobs after repo-memory push",
+      "category": "bug",
+      "risk": "high",
+      "priority": "high",
+      "action": "batch_review",
+      "score": 70,
+      "breakdown": {
+        "impact": 32,
+        "urgency": 22,
+        "quality": 16
+      }
+    },
+    {
+      "number": 74365,
+      "title": "Report failures when activation stops before agent startup",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 62,
+      "breakdown": {
+        "impact": 28,
+        "urgency": 20,
+        "quality": 14
+      }
+    },
+    {
+      "number": 74364,
+      "title": "Restrict implicit network defaults to documented infrastructure",
+      "category": "bug",
+      "risk": "high",
+      "priority": "high",
+      "action": "fast_track",
+      "score": 75,
+      "breakdown": {
+        "impact": 35,
+        "urgency": 25,
+        "quality": 15
+      }
+    },
+    {
+      "number": 74361,
+      "title": "Persist the resolved App token for safe-output PR pushes",
+      "category": "bug",
+      "risk": "high",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 68,
+      "breakdown": {
+        "impact": 32,
+        "urgency": 21,
+        "quality": 15
+      }
+    },
+    {
+      "number": 74359,
+      "title": "Prevent repeat-update conflicts in source-managed workflows",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 63,
+      "breakdown": {
+        "impact": 30,
+        "urgency": 17,
+        "quality": 16
+      }
     }
   ],
-  "notes": "Only one open PR from app/github-copilot was older than the 1-hour cooldown and eligible for triage. The request is a dependency/security bump with regenerated artifacts and a successful CI run, so it is high-value and ready for expedited human review."
+  "notes": "Eight eligible open Copilot PRs remained after the 1-hour cooldown. The highest-value items are the dependency/security bump and several workflow-contract/security fixes; the remaining cluster focuses on compiler/runtime safety and safe-output reliability."
 }
