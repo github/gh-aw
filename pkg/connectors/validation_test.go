@@ -115,6 +115,18 @@ func TestLowerConfinesAndFreezes(t *testing.T) {
 
 func TestConnectorSchemas(t *testing.T) {
 	plan := fixturePlan(t, "https://api.example.com")
+	trigger := plan.spec.Triggers["issue-created"]
+	trigger.When = &EventPredicate{Any: []EventPredicate{
+		{Path: "/event", Op: "equals", Value: "issue.created"},
+		{Path: "/changes", Op: "any-item", Items: &EventPredicate{Path: "/field", Op: "equals", Value: "status"}},
+	}}
+	trigger.Variants = []EventVariant{{
+		When:      EventPredicate{Path: "/event", Op: "equals", Value: "issue.created"},
+		Normalize: trigger.Normalize,
+		Resources: map[string]string{"/issue/id": "issues"},
+		Types:     trigger.Types,
+	}}
+	plan.spec.Triggers["issue-created"] = trigger
 	for kind, document := range map[string]any{"ConnectorSpec": plan.spec, "ConnectorConnection": plan.connection, "ConnectorBinding": plan.binding} {
 		t.Run(kind, func(t *testing.T) {
 			encoded, err := Schema(kind)
@@ -139,6 +151,20 @@ func TestConnectorSchemas(t *testing.T) {
 			}
 			if err := resolved.Validate(value); err != nil {
 				t.Fatal(err)
+			}
+			if kind == "ConnectorSpec" {
+				triggers := value["triggers"].(map[string]any)
+				trigger := triggers["issue-created"].(map[string]any)
+				for _, invalid := range []any{nil, "not a predicate", []any{}} {
+					trigger["when"] = invalid
+					if err := resolved.Validate(value); err == nil {
+						t.Fatalf("structural schema accepted invalid predicate %v", invalid)
+					}
+				}
+				delete(trigger, "when")
+				if err := resolved.Validate(value); err != nil {
+					t.Fatal("optional predicate omission rejected", err)
+				}
 			}
 			value["unknown"] = true
 			if err := resolved.Validate(value); err == nil {
