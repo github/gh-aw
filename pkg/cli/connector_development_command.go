@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/gitutil"
 	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/spf13/cobra"
 )
@@ -38,6 +39,10 @@ its import-schema bindings and nested imports are processed by the normal compil
 An invalid local or explicit --file is never ignored.
 Declarations and their imports must be trusted, just as when compiling a workflow.
 Documentation references are displayed only, never fetched.
+Setup includes credentials/authentication metadata from normal wrapper imports,
+typed binding names, declared endpoints, and matching local golden consumers.
+Endpoint guidance does not widen network access. Setup does not install connectors,
+select capabilities/native methods, provision write credentials or activate ingress.
 
 Import bindings use repeated --input name=JSON (quote JSON strings). Exact grants use
 repeated --grant resource=JSON-array; each supplied resource replaces, never appends
@@ -132,7 +137,20 @@ func runDevelopmentConnector(cmd *cobra.Command, args []string, options *connect
 		if options.phase != "" && options.phase != "agent" && options.phase != "context" && options.phase != "safe-output" {
 			return errors.New("--phase must be agent, context, or safe-output")
 		}
-		return setupDevelopmentConnector(cmd.OutOrStdout(), id, declaration, options.phase)
+		root := options.root
+		if root == "" {
+			root, err = gitutil.FindGitRoot()
+			if err != nil {
+				root = "."
+			}
+		}
+		if err := loadConnectorSetupDocumentation(root, id, declaration, inputs); err != nil {
+			return err
+		}
+		if err := setupDevelopmentConnector(cmd.OutOrStdout(), id, declaration, options.phase); err != nil {
+			return err
+		}
+		return writeConnectorSetupExamples(cmd.OutOrStdout(), root, id)
 	}
 	return testDevelopmentConnector(cmd.Context(), cmd.OutOrStdout(), declaration, options, os.Getenv, nil)
 }

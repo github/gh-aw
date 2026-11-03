@@ -29,11 +29,18 @@ validated before writing. Workflows managed by a source: declaration can be edit
 locally; by default, future updates will merge in those local changes (use --no-merge to override).
 
 Edits that change nothing leave the workflow untouched. When frontmatter does change it is
-re-serialized, so YAML comments, key ordering, and quoting styles are not preserved.`,
+re-serialized, so YAML comments, key ordering, and quoting styles are not preserved.
+
+Connector imports use the same local/pinned imports and typed with bindings as other
+shared workflows. Pass a YAML import object to --add-import for exact resource IDs
+and secret names, never secret values. Importing does not select capabilities:
+select narrow tools.<id> reads/native methods and staged safe-outputs separately.
+Inspect the declaration with gh aw connector <id> setup before editing.`,
 		Example: `  gh aw edit repo-assist "max-turns: 20"
   gh aw edit repo-assist --schedule "every 6h"
   gh aw edit repo-assist --set model=small --unset engine.model
   gh aw edit repo-assist --add-import shared/common.md
+  gh aw edit repo-assist --add-import '{uses: connectors/example.md, with: {items: [approved-id], reader-secret: EXAMPLE_READ_TOKEN}}'
   gh aw edit repo-assist --add-skill shared/review`,
 		Args: cobra.RangeArgs(1, 2),
 		RunE: runEditCommand,
@@ -42,8 +49,8 @@ re-serialized, so YAML comments, key ordering, and quoting styles are not preser
 	cmd.Flags().StringArray("unset", nil, "Remove a frontmatter path")
 	cmd.Flags().StringArray("add", nil, "Append a value to a list (path=value)")
 	cmd.Flags().StringArray("remove", nil, "Remove a value from a list (path=value)")
-	cmd.Flags().StringArray("add-import", nil, "Append a workflow import path")
-	cmd.Flags().StringArray("remove-import", nil, "Remove a workflow import path")
+	cmd.Flags().StringArray("add-import", nil, "Append a workflow import path or YAML object with uses/with bindings")
+	cmd.Flags().StringArray("remove-import", nil, "Remove an exact workflow import path or YAML object")
 	cmd.Flags().StringArray("add-skill", nil, "Append a workflow skill")
 	cmd.Flags().StringArray("remove-skill", nil, "Remove a workflow skill")
 	cmd.Flags().String("schedule", "", "Set a schedule using a fuzzy schedule or cron expression; use off to remove it")
@@ -194,11 +201,14 @@ func editChangesFromCommand(cmd *cobra.Command, args []string) ([]editChange, er
 	for _, path := range editFlagStrings(cmd, "unset") {
 		changes = append(changes, editChange{kind: "unset", path: path})
 	}
-	for _, importPath := range editFlagStrings(cmd, "add-import") {
-		changes = append(changes, editChange{kind: "add", path: "imports", value: importPath})
-	}
-	for _, importPath := range editFlagStrings(cmd, "remove-import") {
-		changes = append(changes, editChange{kind: "remove", path: "imports", value: importPath})
+	for _, kind := range []string{"add", "remove"} {
+		for _, importPath := range editFlagStrings(cmd, kind+"-import") {
+			value, err := parseEditImport(importPath)
+			if err != nil {
+				return nil, err
+			}
+			changes = append(changes, editChange{kind: kind, path: "imports", value: value})
+		}
 	}
 	for _, skill := range editFlagStrings(cmd, "add-skill") {
 		changes = append(changes, editChange{kind: "add", path: "skills", value: skill})
@@ -214,6 +224,22 @@ func editChangesFromCommand(cmd *cobra.Command, args []string) ([]editChange, er
 		changes = append(changes, change)
 	}
 	return changes, nil
+}
+
+func parseEditImport(value string) (any, error) {
+	if !strings.HasPrefix(strings.TrimSpace(value), "{") {
+		return value, nil
+	}
+	var imported map[string]any
+	if err := yaml.Unmarshal([]byte(value), &imported); err != nil {
+		return nil, errors.New("invalid import object; use '{uses: connectors/example.md, with: {items: [approved-id]}}' with secret names only")
+	}
+	if err := parser.ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
+		"on": "workflow_dispatch", "imports": []any{imported},
+	}, ""); err != nil {
+		return nil, errors.New("invalid import object; expected a normal imports entry with uses/with or path/inputs")
+	}
+	return imported, nil
 }
 
 func scheduleChange(schedule string) (editChange, error) {
