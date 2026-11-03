@@ -562,7 +562,11 @@ func updateManifestManagedWorkflow(ctx context.Context, update manifestManagedWo
 		}
 	}
 
-	finalContent, err = UpdateFieldInFrontmatter(finalContent, "source", update.manifestSource)
+	if hasConflicts {
+		finalContent, err = updateTopLevelFieldInFrontmatterRaw(finalContent, "source", update.manifestSource)
+	} else {
+		finalContent, err = UpdateFieldInFrontmatter(finalContent, "source", update.manifestSource)
+	}
 	if err != nil {
 		return fmt.Errorf("unable to update source frontmatter: %w", err)
 	}

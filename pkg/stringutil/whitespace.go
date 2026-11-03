@@ -14,7 +14,7 @@ func NormalizeWhitespace(content string) string {
 	// Split into lines and trim trailing whitespace from each line
 	lines := strings.Split(content, "\n")
 	for i, line := range lines {
-		lines[i] = strings.TrimRight(line, " \t")
+		lines[i] = strings.TrimRight(line, " \t\r")
 	}
 
 	// Join back and ensure exactly one trailing newline if content is not empty

@@ -61,6 +61,11 @@ func TestNormalizeWhitespace(t *testing.T) {
 			content:  "hello\nworld\n",
 			expected: "hello\nworld\n",
 		},
+		{
+			name:     "windows line endings",
+			content:  "hello\r\nworld\r\n",
+			expected: "hello\nworld\n",
+		},
 	}
 
 	for _, tt := range tests {

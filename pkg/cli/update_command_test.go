@@ -424,6 +424,64 @@ on: push
 	}
 }
 
+func TestMergeWorkflowContent_NormalizesRewrittenImports(t *testing.T) {
+	base := `---
+imports:
+  - owner/repo/workflows/my-aw.md@v0.5.3
+---
+
+# Workflow
+`
+	current := `---
+imports:
+- owner/repo/workflows/my-aw.md@v0.5.3
+source: owner/repo@v0.5.3
+---
+
+# Workflow
+`
+	newContent := `---
+imports:
+  - owner/repo/workflows/my-aw.md@v0.5.4
+---
+
+# Workflow
+`
+
+	merged, hasConflicts, err := MergeWorkflowContent(
+		base,
+		current,
+		newContent,
+		"owner/repo/workflows/my-aw.md@v0.5.3",
+		"v0.5.4",
+		"",
+		false,
+	)
+	require.NoError(t, err)
+	require.False(t, hasConflicts, "format-only differences from prior import rewriting must not conflict:\n%s", merged)
+	assert.Contains(t, merged, "owner/repo/workflows/my-aw.md@v0.5.4")
+	assert.NotContains(t, merged, "<<<<<<<")
+}
+
+func TestMergeWorkflowContent_NormalizesWindowsLineEndings(t *testing.T) {
+	base := "---\non: push\n---\n\n# Workflow\n\nUpstream base.\n"
+	current := strings.ReplaceAll(base, "\n", "\r\n")
+	newContent := strings.Replace(base, "Upstream base.", "Updated upstream.", 1)
+
+	merged, hasConflicts, err := MergeWorkflowContent(
+		base,
+		current,
+		newContent,
+		"owner/repo/workflows/workflow.md@v1.0.0",
+		"v1.1.0",
+		"",
+		false,
+	)
+	require.NoError(t, err)
+	require.False(t, hasConflicts, "CRLF differences must not conflict with upstream changes:\n%s", merged)
+	assert.Contains(t, merged, "Updated upstream.")
+}
+
 // TestUpdateSourceFieldInContent tests the source field update function
 func TestUpdateSourceFieldInContent(t *testing.T) {
 	content := `---
