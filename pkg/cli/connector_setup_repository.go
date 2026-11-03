@@ -16,7 +16,10 @@ import (
 	"github.com/github/gh-aw/pkg/parser"
 )
 
-const repositoryConnectorDirectory = constants.WorkflowsDirSlash + "connectors/"
+const (
+	repositoryConnectorDirectory        = constants.WorkflowsDirSlash + "connectors/"
+	repositoryConnectorFixtureDirectory = "pkg/cli/workflows"
+)
 
 type repositoryConnectorDocument struct {
 	path      string
@@ -81,39 +84,44 @@ func repositoryConnectorDocuments(root string) (documents []repositoryConnectorD
 		return nil, fmt.Errorf("open connector discovery root: %w", err)
 	}
 	defer func() { resultErr = errors.Join(resultErr, dir.Close()) }()
-	err = fs.WalkDir(dir.FS(), constants.WorkflowsDir, func(path string, entry fs.DirEntry, walkErr error) error {
-		if errors.Is(walkErr, fs.ErrNotExist) && path == constants.WorkflowsDir {
+	for _, directory := range []string{constants.WorkflowsDir, repositoryConnectorFixtureDirectory} {
+		err = fs.WalkDir(dir.FS(), directory, func(path string, entry fs.DirEntry, walkErr error) error {
+			if errors.Is(walkErr, fs.ErrNotExist) && path == directory {
+				return nil
+			}
+			if walkErr != nil {
+				return walkErr
+			}
+			if entry.IsDir() || !entry.Type().IsRegular() || !strings.HasSuffix(path, ".md") {
+				return nil
+			}
+			if directory == repositoryConnectorFixtureDirectory && !strings.HasSuffix(path, "-golden.md") {
+				return nil
+			}
+			content, err := readConnectorSetupFile(dir, path)
+			if err != nil {
+				return err
+			}
+			parsed, err := parser.ExtractFrontmatterFromContent(string(content))
+			if err != nil {
+				return fmt.Errorf("cannot inspect connector setup metadata in %s; correct its frontmatter", connectorConsoleText(path))
+			}
+			declarations, ok := parsed.Frontmatter["connectors"].(map[string]any)
+			if !ok && parsed.Frontmatter["connectors"] != nil {
+				return fmt.Errorf("cannot inspect %s: connectors must be an object", connectorConsoleText(path))
+			}
+			_, workflow := parsed.Frontmatter["on"]
+			documents = append(documents, repositoryConnectorDocument{
+				path: path, ids: slices.Sorted(maps.Keys(declarations)),
+				imports:   repositoryConnectorImportPaths(parsed.Frontmatter["imports"]),
+				connector: len(declarations) > 0 || strings.HasPrefix(path, repositoryConnectorDirectory),
+				workflow:  workflow,
+			})
 			return nil
-		}
-		if walkErr != nil {
-			return walkErr
-		}
-		if entry.IsDir() || !entry.Type().IsRegular() || !strings.HasSuffix(path, ".md") {
-			return nil
-		}
-		content, err := readConnectorSetupFile(dir, path)
-		if err != nil {
-			return err
-		}
-		parsed, err := parser.ExtractFrontmatterFromContent(string(content))
-		if err != nil {
-			return fmt.Errorf("cannot inspect connector setup metadata in %s; correct its frontmatter", connectorConsoleText(path))
-		}
-		declarations, ok := parsed.Frontmatter["connectors"].(map[string]any)
-		if !ok && parsed.Frontmatter["connectors"] != nil {
-			return fmt.Errorf("cannot inspect %s: connectors must be an object", connectorConsoleText(path))
-		}
-		_, workflow := parsed.Frontmatter["on"]
-		documents = append(documents, repositoryConnectorDocument{
-			path: path, ids: slices.Sorted(maps.Keys(declarations)),
-			imports:   repositoryConnectorImportPaths(parsed.Frontmatter["imports"]),
-			connector: len(declarations) > 0 || strings.HasPrefix(path, repositoryConnectorDirectory),
-			workflow:  workflow,
 		})
-		return nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("discover repository connectors: %w", err)
+		if err != nil {
+			return nil, fmt.Errorf("discover repository connectors: %w", err)
+		}
 	}
 	return documents, nil
 }

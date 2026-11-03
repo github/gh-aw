@@ -240,7 +240,7 @@ func TestConnectorScenarioRejectsInvalidConfiguration(t *testing.T) {
 
 func prepareConnectorScenario(t *testing.T, scenario connectorCompilerScenario, pinned bool, mutate func(map[string]any, map[string]any)) (*Compiler, string) {
 	t.Helper()
-	consumerBytes, err := os.ReadFile(filepath.Join("../../.github/workflows", scenario.provider+"-golden.md"))
+	consumerBytes, err := os.ReadFile(filepath.Join("../..", connectorGoldenWorkflowDirectory, scenario.provider+"-golden.md"))
 	require.NoError(t, err)
 	declarationPath := ".github/workflows/connectors/" + scenario.provider + ".md"
 	declarationBytes, err := os.ReadFile(filepath.Join("../..", declarationPath))
@@ -284,7 +284,10 @@ func prepareConnectorScenario(t *testing.T, scenario connectorCompilerScenario, 
 		require.NoError(t, os.MkdirAll(filepath.Dir(local), 0700))
 		require.NoError(t, os.WriteFile(local, []byte(declarationSource), 0600))
 	}
-	require.NoError(t, os.WriteFile(path, []byte(connectorScenarioMarkdown(t, consumer.Frontmatter, consumerBody)), 0600))
+	if pinned || mutate != nil {
+		consumerBytes = []byte(connectorScenarioMarkdown(t, consumer.Frontmatter, consumerBody))
+	}
+	require.NoError(t, os.WriteFile(path, consumerBytes, 0600))
 	compiler := NewCompiler(WithVersion("v0.0.0"))
 	compiler.gitRoot = root
 	compiler.SetActionMode(ActionModeDev)

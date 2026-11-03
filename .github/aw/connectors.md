@@ -39,8 +39,8 @@ an arbitrary API.
 
 ## Start with a golden workflow
 
-Each included integration has a common-scenario consumer at
-`.github/workflows/<provider>-golden.md`. The
+Each included integration has a common-scenario consumer fixture at
+`pkg/cli/workflows/<provider>-golden.md`. The
 [golden workflow catalog](../../docs/src/content/docs/reference/connectors.md#golden-workflows)
 maps providers to their scenarios. Prefer that focused consumer over exposing
 every capability in the declaration.
@@ -50,8 +50,13 @@ reads and one staged effect. Some produce a GitHub handoff rather than using a
 placeholder provider write. Read their setup and evidence limits before adapting
 them: metadata is not body content, staging does not suppress reads, and no
 example provisions provider credentials or installs webhook ingress. Keep the
-reviewed declaration alongside the consumer, replace all matching specimen pins,
-and compile both before any separately authorized execution.
+reviewed declaration at `.github/workflows/connectors/<provider>.md`, replace all
+matching specimen pins, and compile before any separately authorized execution.
+Goldens are not installed Actions workflows and have no checked-in generated locks.
+`make compile-cli-workflows` copies the unmodified consumers and declarations into
+an isolated `.github/workflows/` layout, preserving local import confinement,
+then compiles them with validation and `--no-emit`.
+Adopting one for deployment requires explicitly copying it to `.github/workflows/`.
 
 ## Choose an integration by its actual evidence
 
@@ -81,7 +86,8 @@ widening grants.
 ## Repository setup
 
 `gh aw init`, `gh aw new` and `gh aw secrets bootstrap` discover local
-declarations, wrappers and importing consumers, including golden workflows.
+declarations, wrappers and importing consumers, including local golden fixtures
+under `pkg/cli/workflows/`.
 Discovery is offline and does not display binding values or select provider
 tools, network permissions, resource grants or ingress.
 

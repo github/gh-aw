@@ -61,22 +61,50 @@ imports:
 
 func TestConnectorSetupDiscoveryBoundsAndNoFallback(t *testing.T) {
 	t.Parallel()
+	for _, directory := range []string{repositoryConnectorDirectory, repositoryConnectorFixtureDirectory} {
+		t.Run(directory, func(t *testing.T) {
+			root := t.TempDir()
+			var output bytes.Buffer
+			require.NoError(t, writeRepositoryConnectorGuidance(&output, root))
+			require.Empty(t, output.String())
+			outside := writeConnectorSetupFixture(t, t.TempDir(), "outside.md", developmentConnectorFixture)
+			dir := filepath.Join(root, directory)
+			require.NoError(t, os.MkdirAll(dir, 0700))
+			require.NoError(t, os.Symlink(outside, filepath.Join(dir, "outside-golden.md")))
+			require.NoError(t, os.Symlink(filepath.Dir(outside), filepath.Join(dir, "outside-directory")))
+			require.NoError(t, writeRepositoryConnectorGuidance(&output, root))
+			require.Empty(t, output.String(), "discovery must not follow symlink sources or directories")
+			path := writeConnectorSetupFixture(t, root, filepath.Join(directory, "bad-golden.md"), "---\nconnectors: [unclosed\n---\n")
+			err := writeRepositoryConnectorGuidance(&output, root)
+			require.ErrorContains(t, err, "correct its frontmatter")
+			require.Empty(t, output.String(), "incomplete discovery must not produce a success-shaped inventory")
+			require.NoError(t, os.WriteFile(path, bytes.Repeat([]byte("x"), connectors.MaxDocumentBytes+1), 0600))
+			require.ErrorContains(t, writeRepositoryConnectorGuidance(&output, root), "exceeds 256 KiB")
+		})
+	}
+}
+
+func TestConnectorSetupFixtureDiscovery(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
+	writeDevelopmentConnector(t, root, developmentConnectorFixture)
+	path := "pkg/cli/workflows/demo-golden.md"
+	writeConnectorSetupFixture(t, root, path, "---\non: workflow_dispatch\nimports: [.github/workflows/connectors/demo.md]\n---\n")
+	writeConnectorSetupFixture(t, root, "pkg/cli/workflows/unrelated-golden.md", "---\non: workflow_dispatch\n---\n")
+	writeConnectorSetupFixture(t, root, "pkg/cli/workflows/invalid-test.md", "---\non: [unclosed\n---\n")
+	writeConnectorSetupFixture(t, root, "unrelated/demo-golden.md", "---\non: workflow_dispatch\nimports: [.github/workflows/connectors/demo.md]\n---\n")
 	var output bytes.Buffer
 	require.NoError(t, writeRepositoryConnectorGuidance(&output, root))
-	require.Empty(t, output.String())
-	outside := writeConnectorSetupFixture(t, t.TempDir(), "outside.md", developmentConnectorFixture)
-	dir := filepath.Join(root, ".github", "workflows", "connectors")
-	require.NoError(t, os.MkdirAll(dir, 0700))
-	require.NoError(t, os.Symlink(outside, filepath.Join(dir, "outside.md")))
-	require.NoError(t, writeRepositoryConnectorGuidance(&output, root))
-	require.Empty(t, output.String(), "discovery must not follow symlink declarations")
-	path := writeConnectorSetupFixture(t, root, ".github/workflows/connectors/bad.md", "---\nconnectors: [unclosed\n---\n")
-	err := writeRepositoryConnectorGuidance(&output, root)
-	require.ErrorContains(t, err, "correct its frontmatter")
-	require.Empty(t, output.String(), "incomplete discovery must not produce a success-shaped inventory")
-	require.NoError(t, os.WriteFile(path, bytes.Repeat([]byte("x"), connectors.MaxDocumentBytes+1), 0600))
-	require.ErrorContains(t, writeRepositoryConnectorGuidance(&output, root), "exceeds 256 KiB")
+	require.Contains(t, output.String(), path+" (golden example; replace specimen bindings)")
+	require.NotContains(t, output.String(), "unrelated-golden.md")
+	require.NotContains(t, output.String(), "invalid-test.md")
+	require.NotContains(t, output.String(), "unrelated/demo-golden.md")
+	setup, err := executeDevelopmentCommand("demo", "setup", "--root", root)
+	require.NoError(t, err)
+	require.Contains(t, setup, path)
+	require.NotContains(t, setup, "unrelated-golden.md")
+	require.NoFileExists(t, filepath.Join(root, ".github/workflows/demo-golden.md"))
+	require.NoFileExists(t, filepath.Join(root, "pkg/cli/workflows/demo-golden.lock.yml"))
 }
 
 func TestConnectorSetupAuthenticationAndBindings(t *testing.T) {
@@ -126,7 +154,7 @@ func TestConnectorSetupCanonicalGoldens(t *testing.T) {
 		"servicenow", "gitlab", "pagerduty", "datadog", "zendesk", "notion",
 	} {
 		t.Run(provider, func(t *testing.T) {
-			path := ".github/workflows/" + provider + "-golden.md"
+			path := repositoryConnectorFixtureDirectory + "/" + provider + "-golden.md"
 			source, err := os.ReadFile(filepath.Join(root, path))
 			require.NoError(t, err)
 			parsed, err := parser.ExtractFrontmatterFromContent(string(source))
