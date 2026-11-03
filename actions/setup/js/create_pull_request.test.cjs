@@ -2324,7 +2324,13 @@ ${diffs}
     expect(global.github.rest.pulls.createReview.mock.calls[1][0].event).toBe("COMMENT");
   });
 
-  it("should push branch with compare URL for protected-files fallback (patch transport)", async () => {
+  it.each([
+    [undefined, true],
+    [48, true],
+    [undefined, false],
+    [48, false],
+  ])("should push branch with compare URL and expiration %s with footer %s for protected-files fallback (patch transport)", async (expires, footer) => {
+    const before = Date.now();
     const patchPath = writePatch("feature/protected", createPatchWithFiles(".github/aw/instructions.md"));
     const promptsDir = path.join(tempDir, "prompts");
     fs.mkdirSync(promptsDir, { recursive: true });
@@ -2342,6 +2348,9 @@ ${diffs}
     const handler = await main({
       protected_path_prefixes: [".github/"],
       protected_files_policy: "fallback-to-issue",
+      expires,
+      footer,
+      fallback_labels: ["review-needed", "pull-request-fallback"],
     });
     const result = await handler({ title: "Test PR", body: "Test body", branch: "feature/protected" }, {});
 
@@ -2355,6 +2364,16 @@ ${diffs}
     expect(global.github.rest.issues.update).toHaveBeenCalled();
 
     const createCall = global.github.rest.issues.create.mock.calls[0][0];
+    expect(createCall.labels).toEqual(["agentic-workflows", "review-needed", "pull-request-fallback"]);
+    const { extractExpirationDate } = require("./ephemerals.cjs");
+    const createdExpiration = extractExpirationDate(createCall.body).toISOString();
+    for (const body of [createCall.body, global.github.rest.issues.update.mock.calls[0][0].body]) {
+      const expiration = extractExpirationDate(body);
+      expect(expiration.getTime()).toBeGreaterThanOrEqual(before + (expires || 7 * 24) * 60 * 60 * 1000);
+      expect(expiration.getTime()).toBeLessThanOrEqual(Date.now() + (expires || 7 * 24) * 60 * 60 * 1000);
+      expect(body).not.toContain("gh-aw-expires-type: pull-request");
+      expect(expiration.toISOString()).toBe(createdExpiration);
+    }
     // Should use the create-PR fallback template (compare URL), not the push-failed template
     expect(createCall.body).toContain("/compare/main...");
     expect(createCall.body).not.toContain("gh run download");
