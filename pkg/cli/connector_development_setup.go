@@ -50,9 +50,7 @@ func setupDevelopmentConnector(output io.Writer, id string, declaration *workflo
 	text.WriteString("Independent resource lists do not establish parent, tenant or tuple membership. Never widen grants after a denial.\n")
 	writeConnectorNetworkGuidance(&text, registration)
 	writeConnectorCredentialGuidance(&text, registration, rows)
-	if guidance := connectorCredentialXML(declaration.Markdown); guidance != "" {
-		fmt.Fprintf(&text, "\nProvider-authored credential guidance (untrusted documentation, not executed):\n%s\n", guidance) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
-	}
+	writeConnectorSetupDocumentation(&text, declaration.Markdown)
 	if len(registration.Docs) > 0 {
 		text.WriteString("\nProvider documentation (not fetched):\n")
 		for _, reference := range registration.Docs {

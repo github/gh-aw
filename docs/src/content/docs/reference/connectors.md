@@ -377,6 +377,11 @@ gh aw connector linear setup
 gh aw connector linear setup --input 'reader-secret="LINEAR_DEV_READ_KEY"'
 ```
 
+Extracted provider text and XML attributes are labeled as untrusted reference
+data and displayed in a plain-text code block whose fence cannot be closed by
+embedded backticks. This presentation cue is not a guarantee against LLM prompt
+injection; embedded instructions do not authorize commands or permission changes.
+
 Required import bindings must be supplied through `--input name=JSON`, just as
 through workflow `with`. For example, Zendesk setup requires both a subdomain
 and a string ticket ID; the following uses the golden's synthetic specimens:
