@@ -56,7 +56,7 @@ func analyzeTrimLeftRight(pass *analysis.Pass, n ast.Node, generatedFiles filech
 		return
 	}
 
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok {
 		return
 	}
