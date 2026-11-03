@@ -169,9 +169,9 @@ safe-outputs:
     repositories: ["*"]
 ```
 
-### Jira Tools (`jira:`)
+### Jira Connector (`jira:`)
 
-A built-in tool that connects agentic workflows to Atlassian's official remote Rovo MCP endpoint (`https://mcp.atlassian.com/v1/mcp` by default) for read-only Jira access from non-interactive GitHub Actions workloads. Browser OAuth, device login, and user-consent flows are not supported. Authentication uses either a service account API key (HTTP bearer) or an Atlassian account email and API token (HTTP Basic), configured under `tools.jira.auth`. The required `allowed` list restricts the workflow to a fixed set of nine read-only operations (e.g., `getJiraIssue`, `searchJiraIssuesUsingJql`, `lookupJiraAccountId`); `allowed: ["*"]` expands to that same fixed list at compile time and never grants the full, unrestricted MCP tool set. See [Tools Reference](/gh-aw/reference/tools/#jira-tools-jira).
+An editable Markdown declaration imported with exact approved Jira resources and independently selected read tools and safe outputs. Read access uses Atlassian's hosted MCP service with the declaration's phase-specific credentials; importing alone grants no capabilities or provider permissions. See [Jira connector](/gh-aw/reference/connectors/#jira).
 
 ## Security and Outputs
 

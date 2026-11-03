@@ -5,6 +5,8 @@ import { loadHandlers, processMessages } from "./safe_output_handler_manager.cjs
 describe("trusted connector operation budgets", () => {
   beforeEach(() => {
     vi.stubGlobal("core", { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), error: vi.fn() });
+    vi.stubGlobal("context", { repo: { owner: "fixture", repo: "fixture" }, payload: { pull_request: { number: 1, state: "open" } } });
+    vi.stubGlobal("github", { rest: { pulls: { get: vi.fn().mockResolvedValue({ data: { state: "open" } }) } } });
     for (const name of ["GH_AW_SAFE_OUTPUT_JOBS", "GH_AW_SAFE_OUTPUT_SCRIPTS", "GH_AW_SAFE_OUTPUT_ACTIONS", "GH_AW_DETECTION_CONCLUSION", "GH_AW_DETECTION_REASON", "GH_AW_RUN_DETECTION"]) {
       vi.stubEnv(name, "");
     }
