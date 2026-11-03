@@ -105,6 +105,14 @@ For each CLI/MCP server and threat-detect:
   - Update the version with the `v` prefix used by GitHub release tags
 **Optimization**: Fetch all versions in parallel using multiple npm view or WebFetch calls in a single turn.
 
+### 3-Day CLI Cooldown
+
+Before updating any CLI, MCP server, or threat-detect version, verify the publication time of that exact stable version:
+- For NPM packages, use `npm view <package> time --json` and read the timestamp for the candidate version.
+- For GitHub releases, use the release's `published_at` timestamp.
+- Compute the age in UTC. If the candidate is less than 72 hours old, skip the update for that tool in this run; do not include it in the PR.
+- If the publication time cannot be verified, do not update that tool and report the blocker with `report_incomplete`.
+
 ### Research & Analysis
 For each update, analyze intermediate versions:
 - Categorize changes: Breaking, Features, Fixes, Security, Performance
@@ -172,7 +180,7 @@ For each CLI tool update, install (`npm install -g <package>@<version>`), run `-
 
 **Follow the Report Structure Pattern defined in `shared/reporting.md`.**
 
-For each updated CLI, include: version old → new, release timeline, changes categorized as Breaking/Features/Fixes/Security/Performance, impact assessment, changelog links, and any CLI/subcommand changes discovered via help output.
+For each updated CLI, include: version old → new, release date and age confirming the cooldown passed, release timeline, changes categorized as Breaking/Features/Fixes/Security/Performance, impact assessment, changelog links, and any CLI/subcommand changes discovered via help output.
 
 **Important**: Use h3 (###) or lower for all headers. Wrap full changelogs in `<details>` tags. Use plain URLs (no backticks) and convert `#1234` PR references to full external URLs like `https://github.com/owner/repo/pull/1234`.
 
