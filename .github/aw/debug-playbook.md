@@ -184,6 +184,7 @@ Nonempty `safeoutputs.jsonl` != publication.
 | `DAILY_AIC_QUOTA_STOP`, `quota_reserve`, `quota_exhausted`, `rate_limited` | Response quota; retry-not-before. | Stop/defer within bounds; missing accounting != zero usage. |
 | `AIC_USAGE_UNKNOWN` | Missing usage/accounting. | Fix collection/access; remaining budget stays unknown. |
 | `permission_denied` | Business response; operation authority. | Fix authorized credentials/permissions, not quota. |
+| `missing_pr_head`, `shallow_history`, `no_new_commits` | Check refs/history/commits. | Fetch refs; use checkout.fetch-depth:0; no commits = no-op. |
 
 ## Merge guard codes
 
