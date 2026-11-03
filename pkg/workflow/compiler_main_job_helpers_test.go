@@ -3,8 +3,12 @@
 package workflow
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -138,6 +142,54 @@ func TestBuildMainJobDependencies(t *testing.T) {
 		assert.Equal(t, depends, data.AgentJobNeeds)
 	})
 
+	t.Run("maintenance-dependent jobs are excluded even when referenced", func(t *testing.T) {
+		for job, dependency := range constants.MaintenanceJobDependencies {
+			if dependency != constants.AgentJobName {
+				continue
+			}
+			t.Run(job, func(t *testing.T) {
+				c := NewCompiler()
+				data := &WorkflowData{
+					Jobs: map[string]any{
+						"publish": map[string]any{"needs": []any{job}},
+					},
+					MarkdownContent: "${{ needs.publish.outputs.id }}",
+					CustomSteps:     "run: echo ${{ needs.publish.result }}",
+					EngineConfig: &EngineConfig{
+						Env: map[string]string{"PUBLISH": "${{ needs.publish.result }}"},
+					},
+				}
+				depends, _ := c.buildMainJobDependencies(data, true)
+				assert.Equal(t, []string{"activation"}, depends)
+				assert.Equal(t, depends, data.AgentJobNeeds)
+			})
+		}
+	})
+
+	t.Run("authored maintenance names remain agent prerequisites", func(t *testing.T) {
+		for job := range constants.MaintenanceJobDependencies {
+			t.Run(job, func(t *testing.T) {
+				c := NewCompiler()
+				data := &WorkflowData{Jobs: map[string]any{
+					job:       map[string]any{"runs-on": "ubuntu-latest"},
+					"publish": map[string]any{"needs": []any{job}},
+				}}
+				depends, _ := c.buildMainJobDependencies(data, true)
+				assert.Contains(t, depends, job)
+				assert.Contains(t, depends, "publish")
+			})
+		}
+	})
+
+	t.Run("experiment persistence does not imply an agent dependency", func(t *testing.T) {
+		c := NewCompiler()
+		data := &WorkflowData{Jobs: map[string]any{
+			"publish": map[string]any{"needs": []any{"push_experiments_state"}},
+		}}
+		depends, _ := c.buildMainJobDependencies(data, true)
+		assert.Contains(t, depends, "publish")
+	})
+
 	t.Run("builtin job names are never added to depends", func(t *testing.T) {
 		c := NewCompiler()
 		data := &WorkflowData{
@@ -178,6 +230,58 @@ func TestBuildMainJobDependencies(t *testing.T) {
 		_, engineEnvContent := c.buildMainJobDependencies(data, false)
 		assert.Contains(t, engineEnvContent, "needs.activation.outputs.model")
 	})
+}
+
+func TestCompileCustomJobAfterRepoMemory(t *testing.T) {
+	for _, needs := range []string{"push_repo_memory", "agent, push_repo_memory"} {
+		t.Run(needs, func(t *testing.T) {
+			workflow := fmt.Sprintf(`---
+on:
+  workflow_dispatch:
+engine: copilot
+permissions:
+  contents: read
+tools:
+  repo-memory:
+    branch-name: memory/demo
+jobs:
+  publish:
+    needs: [%s]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "publish what the agent saved"
+---
+Write a note to repo memory.
+`, needs)
+			dir := t.TempDir()
+			path := filepath.Join(dir, "demo.md")
+			require.NoError(t, os.WriteFile(path, []byte(workflow), 0644))
+			require.NoError(t, NewCompiler().CompileWorkflow(path))
+
+			content, err := os.ReadFile(filepath.Join(dir, "demo.lock.yml"))
+			require.NoError(t, err)
+			var lock struct {
+				Jobs map[string]struct {
+					Needs any `yaml:"needs"`
+				} `yaml:"jobs"`
+			}
+			require.NoError(t, yaml.Unmarshal(content, &lock))
+			require.Contains(t, lock.Jobs, "agent")
+			require.Contains(t, lock.Jobs, "publish")
+			require.Contains(t, lock.Jobs, "push_repo_memory")
+			assert.NotContains(t, lock.Jobs["agent"].Needs, "publish")
+			assert.Contains(t, lock.Jobs["push_repo_memory"].Needs, "agent")
+			expected := []any{"push_repo_memory"}
+			if needs != "push_repo_memory" {
+				expected = []any{"agent", "push_repo_memory"}
+			}
+			publishNeeds := lock.Jobs["publish"].Needs
+			if single, ok := publishNeeds.(string); ok {
+				publishNeeds = []any{single}
+			}
+			assert.Equal(t, expected, publishNeeds)
+		})
+	}
 }
 
 func TestGetJobsDependingOnAgent(t *testing.T) {
