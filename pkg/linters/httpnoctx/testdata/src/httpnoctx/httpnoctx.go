@@ -49,6 +49,11 @@ func BadPkgPostForm(rawURL string, data url.Values) (*http.Response, error) {
 	return http.PostForm(rawURL, data) // want `http\.PostForm does not accept a context`
 }
 
+// BadParenPkgGet calls a parenthesized http.Get without context.
+func BadParenPkgGet(rawURL string) (*http.Response, error) {
+	return (http.Get)(rawURL) // want `http\.Get does not accept a context`
+}
+
 // GoodClientDo uses http.NewRequestWithContext + client.Do — not flagged.
 func GoodClientDo(ctx context.Context, client *http.Client, rawURL string) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)

@@ -34,7 +34,7 @@ jobs:
     permissions:
       actions: read
       checks: read
-      contents: read
+      contents: write
       copilot-requests: write
       discussions: write
       id-token: write

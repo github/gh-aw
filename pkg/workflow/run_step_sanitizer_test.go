@@ -548,7 +548,7 @@ func TestSanitizeRunStepExpressions_SanitizedRunHasNoInlineExpressions(t *testin
 			require.True(t, changed, "expected change for script containing expressions")
 			// Only check the non-heredoc portion; heredoc content is intentionally left.
 			sanitizedRun := result["run"].(string)
-			assert.NotContains(t, removeHeredocContent(sanitizedRun), "${{",
+			assert.NotContains(t, executableShellContent(sanitizedRun), "${{",
 				"non-heredoc portion of sanitized run field must not contain any ${{ }} markers")
 		})
 	}
@@ -811,58 +811,4 @@ func TestSanitizeRunStepExpressions_ExpressionInQuotedHeredocNotReplaced(t *test
 		"expression inside quoted heredoc must be preserved verbatim")
 
 	assert.Len(t, warnings, 1)
-}
-
-// TestReplaceOutsideQuotedHeredocs_NoHeredoc verifies that without heredocs the
-// function behaves identically to strings.ReplaceAll.
-func TestReplaceOutsideQuotedHeredocs_NoHeredoc(t *testing.T) {
-	s := `echo "${{ github.event.issue.title }}" && echo "${{ github.event.issue.title }}"`
-	result := replaceOutsideQuotedHeredocs(s, "${{ github.event.issue.title }}", "$TITLE")
-	assert.Equal(t, `echo "$TITLE" && echo "$TITLE"`, result)
-}
-
-// TestReplaceOutsideQuotedHeredocs_QuotedHeredocPreserved verifies that quoted
-// heredoc content is left unchanged.
-func TestReplaceOutsideQuotedHeredocs_QuotedHeredocPreserved(t *testing.T) {
-	s := strings.Join([]string{
-		`echo "${{ github.event.issue.title }}"`,
-		`cat > /tmp/f << 'EOF'`,
-		`{"t": "${{ github.event.issue.title }}"}`,
-		`EOF`,
-		`echo done`,
-	}, "\n")
-	result := replaceOutsideQuotedHeredocs(s, "${{ github.event.issue.title }}", "$TITLE")
-
-	// Replacement must happen in echo lines.
-	assert.Contains(t, result, `echo "$TITLE"`)
-	// Replacement must NOT happen inside the quoted heredoc.
-	assert.Contains(t, result, `${{ github.event.issue.title }}`)
-	// Closing EOF line and trailing echo must be intact.
-	assert.Contains(t, result, "echo done")
-}
-
-// TestReplaceOutsideQuotedHeredocs_UnquotedHeredocIsReplaced verifies that
-// unquoted heredoc content (where the shell expands variables) is replaced.
-func TestReplaceOutsideQuotedHeredocs_UnquotedHeredocIsReplaced(t *testing.T) {
-	s := strings.Join([]string{
-		`cat > /tmp/f << EOF`,
-		`{"t": "${{ github.event.issue.title }}"}`,
-		`EOF`,
-	}, "\n")
-	result := replaceOutsideQuotedHeredocs(s, "${{ github.event.issue.title }}", "$TITLE")
-
-	// Unquoted heredoc — replacement is safe because the shell expands $TITLE.
-	assert.NotContains(t, result, "${{ github.event.issue.title }}")
-	assert.Contains(t, result, "$TITLE")
-}
-
-func TestReplaceOutsideQuotedHeredocs_DoesNotReplaceInComments(t *testing.T) {
-	s := strings.Join([]string{
-		`# docs: ${{ github.event.issue.title }}`,
-		`echo "${{ github.event.issue.title }}"`,
-	}, "\n")
-	result := replaceOutsideQuotedHeredocs(s, "${{ github.event.issue.title }}", "$TITLE")
-
-	assert.Contains(t, result, `# docs: ${{ github.event.issue.title }}`)
-	assert.Contains(t, result, `echo "$TITLE"`)
 }

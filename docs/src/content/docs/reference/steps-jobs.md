@@ -196,6 +196,8 @@ Use this map to see where compiler-inserted steps land for each job type.
 
 Set `jobs.<job-id>.restore-memory: true` to restore any configured `cache-memory`, `repo-memory`, and `comment-memory` stores before deterministic job steps run. This surface is read-only: gh-aw injects restore/clone/prepare steps, but never emits cache save, repo push, or safe-output write-back steps for custom jobs.
 
+Custom jobs can depend on generated post-agent maintenance jobs when the corresponding feature is enabled. For example, with `tools.repo-memory` configured, `needs: [push_repo_memory]` runs a custom job after the agent and the repo-memory push, without listing `agent` explicitly. Other post-agent maintenance job IDs are `update_cache_memory`, `update_drive_memory`, `push_ledger_changes`, and `push_evals_state`. Experiment persistence (`push_experiments_state`) runs after activation rather than after the agent.
+
 ### Built-in jobs
 
 | Job | Step order |

@@ -120,6 +120,7 @@ func getLaterCodemods() []Codemod {
 		getCheckoutPersistCredentialsFalseCodemod(),       // Add with.persist-credentials: false to actions/checkout steps
 		getPullRequestTargetCheckoutFalseCodemod(),        // Add checkout: false for pull_request_target workflows when safe
 		getDependabotPermissionsCodemod(),                 // Add vulnerability-alerts: read when dependabot toolset is used
+		getGitHubAppTokenPermissionsCodemod(),             // Add minimal known GitHub App token scopes or a none placeholder
 		getGitHubReposToAllowedReposCodemod(),             // Rename deprecated tools.github.repos to tools.github.allowed-repos
 		getToolsetSingularToToolsetsCodemod(),             // Rename mistyped tools.github.toolset to tools.github.toolsets
 		getAllowedReposCurrentToGitHubRepositoryCodemod(), // Migrate legacy tools.github.allowed-repos: current to ${{ github.repository }}

@@ -48,7 +48,7 @@ async function getStatePushError(jobId) {
 /**
  * Stable builtin job IDs whose failures are already reported
  * by the handle_agent_failure step (the agent job) or are framework-internal
- * (conclusion = current job, pre_activation/activation = reported via agent failure issue flags,
+ * (conclusion = current job, pre_activation/activation = reported via agent failure issues,
  * safe-outputs/safe_outputs and detection = handled by dedicated conclusion reporting).
  */
 const BUILTIN_REPORTED_JOB_IDS = new Set(["agent", "conclusion", "activation", "pre_activation", "pre-activation", "safe_outputs", "safe-outputs", "detection"]);

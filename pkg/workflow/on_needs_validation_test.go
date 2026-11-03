@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/stretchr/testify/require"
 )
 
@@ -33,6 +34,30 @@ func TestValidateOnNeedsTargets(t *testing.T) {
 		err := validateOnNeedsTargets(data)
 		require.Error(t, err, "expected on.needs validation error")
 		require.ErrorContains(t, err, `built-in job "activation"`, "error should explain invalid built-in target")
+	})
+
+	t.Run("post-agent maintenance targets rejected", func(t *testing.T) {
+		for job := range constants.MaintenanceJobDependencies {
+			t.Run(job, func(t *testing.T) {
+				data := &WorkflowData{OnNeeds: []string{job}}
+				err := validateOnNeedsTargets(data)
+				require.ErrorContains(t, err, `built-in job "`+job+`"`)
+				require.True(t, constants.IsCompilerOwnedJobName(job))
+				require.NotContains(t, constants.KnownBuiltInJobNames, job)
+			})
+		}
+	})
+
+	t.Run("authored job with maintenance name accepted", func(t *testing.T) {
+		for job := range constants.MaintenanceJobDependencies {
+			t.Run(job, func(t *testing.T) {
+				data := &WorkflowData{
+					Jobs:    map[string]any{job: map[string]any{}},
+					OnNeeds: []string{job},
+				}
+				require.NoError(t, validateOnNeedsTargets(data), "authored job should not be treated as generated")
+			})
+		}
 	})
 
 	t.Run("target depending on activation rejected", func(t *testing.T) {

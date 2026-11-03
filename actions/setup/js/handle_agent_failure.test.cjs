@@ -104,6 +104,7 @@ describe("handle_agent_failure", () => {
     delete process.env.GH_AW_DEFAULT_CHECKOUT_USES_TRIGGER_REF;
     delete process.env.GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS;
     delete process.env.GH_AW_AGENT_CONCLUSION;
+    delete process.env.GH_AW_ACTIVATION_RESULT;
     delete process.env.GH_AW_GROUP_REPORTS;
   });
 
@@ -1835,6 +1836,97 @@ describe("handle_agent_failure", () => {
         expect(body).toContain(message);
         expect(body).toContain("failure_categories: agent_failure");
         expect(global.core.setFailed).not.toHaveBeenCalled();
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it("reports an unnamed activation failure when the agent job was skipped", async () => {
+      syncRuntimePromptTemplates(import.meta.url);
+      const output = path.join(tmpDir, "activation-failure-output.json");
+      fs.writeFileSync(output, JSON.stringify({ items: [] }));
+      vi.stubEnv("GH_AW_AGENT_OUTPUT", output);
+      vi.stubEnv("GH_AW_AGENT_CONCLUSION", "skipped");
+      vi.stubEnv("GH_AW_ACTIVATION_RESULT", "failure");
+      vi.stubEnv("GH_AW_FAILURE_REPORT_AS_ISSUE", "true");
+      vi.stubEnv("GH_AW_FAILURE_CATEGORIES_FILTER", JSON.stringify(["activation_failed"]));
+      fs.writeFileSync(path.join(promptsDir, "agent_failure_issue.md"), fs.readFileSync(new URL("../md/agent_failure_issue.md", import.meta.url), "utf8"));
+
+      const create = vi.fn().mockResolvedValue({ data: { number: 101, html_url: "https://github.com/owner/repo/issues/101", node_id: "I_101" } });
+      global.github = {
+        rest: {
+          search: { issuesAndPullRequests: vi.fn(async () => ({ data: { total_count: 0, items: [] } })) },
+          issues: { create, createComment: vi.fn() },
+          pulls: { get: vi.fn() },
+          actions: { listJobsForWorkflowRun: vi.fn() },
+        },
+        paginate: vi.fn(async () => [{ name: "agent", conclusion: "skipped", steps: [{ name: "Run agent", conclusion: "skipped" }] }]),
+        graphql: vi.fn(),
+      };
+
+      try {
+        await main();
+        expect(create).toHaveBeenCalledOnce();
+        const { title, body } = create.mock.calls[0][0];
+        expect(title).toBe("[aw] Test Workflow: activation failed");
+        expect(body).toContain("failure_categories: activation_failed");
+        expect(body).toContain("Activation job failed before the agent started");
+        expect(body).toContain("[workflow run](https://github.com/owner/repo/actions/runs/123456)");
+        expect(body).toContain("Set up job");
+        expect(body).toContain("checkout steps");
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it("keeps a named activation guardrail failure in its existing category", async () => {
+      syncRuntimePromptTemplates(import.meta.url);
+      const output = path.join(tmpDir, "lockdown-failure-output.json");
+      fs.writeFileSync(output, JSON.stringify({ items: [] }));
+      vi.stubEnv("GH_AW_AGENT_OUTPUT", output);
+      vi.stubEnv("GH_AW_AGENT_CONCLUSION", "skipped");
+      vi.stubEnv("GH_AW_ACTIVATION_RESULT", "failure");
+      vi.stubEnv("GH_AW_LOCKDOWN_CHECK_FAILED", "true");
+      vi.stubEnv("GH_AW_FAILURE_REPORT_AS_ISSUE", "true");
+      fs.writeFileSync(path.join(promptsDir, "agent_failure_issue.md"), fs.readFileSync(new URL("../md/agent_failure_issue.md", import.meta.url), "utf8"));
+
+      const create = vi.fn().mockResolvedValue({ data: { number: 101, html_url: "https://github.com/owner/repo/issues/101", node_id: "I_101" } });
+      global.github = {
+        rest: {
+          search: { issuesAndPullRequests: vi.fn(async () => ({ data: { total_count: 0, items: [] } })) },
+          issues: { create, createComment: vi.fn() },
+          pulls: { get: vi.fn() },
+          actions: { listJobsForWorkflowRun: vi.fn() },
+        },
+        paginate: vi.fn(async () => [{ name: "agent", conclusion: "skipped", steps: [{ name: "Run agent", conclusion: "skipped" }] }]),
+        graphql: vi.fn(),
+      };
+
+      try {
+        await main();
+        expect(create).toHaveBeenCalledOnce();
+        const { title, body } = create.mock.calls[0][0];
+        expect(title).toBe("[aw] Test Workflow: failed lockdown check");
+        expect(body).toContain("failure_categories: lockdown_check_failed");
+        expect(body).not.toContain("activation_failed");
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it("does not report activation failure when activation was skipped", async () => {
+      const output = path.join(tmpDir, "skipped-activation-output.json");
+      fs.writeFileSync(output, JSON.stringify({ items: [] }));
+      vi.stubEnv("GH_AW_AGENT_OUTPUT", output);
+      vi.stubEnv("GH_AW_AGENT_CONCLUSION", "skipped");
+      vi.stubEnv("GH_AW_ACTIVATION_RESULT", "skipped");
+      const create = vi.fn();
+      global.github = { rest: { issues: { create } } };
+
+      try {
+        await main();
+        expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("skipping failure handling"));
+        expect(create).not.toHaveBeenCalled();
       } finally {
         vi.unstubAllEnvs();
       }
