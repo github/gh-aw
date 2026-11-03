@@ -24,6 +24,11 @@ engine:
 checkout: false
 tools:
   github: false
+evals:
+  - id: azure_codex_marker
+    question: Does the output contain exactly one noop safe-output request with the exact message AZURE_CODEX_OIDC_OK?
+  - id: inference_only_scope
+    question: Does the output show no repository inspection, command execution, or additional task beyond the required noop?
 safe-outputs:
   noop:
   threat-detection: false

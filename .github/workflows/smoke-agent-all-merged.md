@@ -33,6 +33,13 @@ network:
   allowed:
     - defaults
     - github
+evals:
+  - id: merged_policy_evidence
+    question: Does the results summary distinguish observed access decisions from the expected merged-only policy rather than claiming untested restrictions passed?
+  - id: probe_coverage
+    question: Does the output report allowed or denied results for all five specified repository, issue, and code-search probes?
+  - id: no_pr_restraint
+    question: When no PR context is available, does the agent report the results through noop instead of requesting a comment on an unrelated item? Return UNKNOWN when PR context is available.
 safe-outputs:
   allowed-domains: [default-safe-outputs]
   add-comment:

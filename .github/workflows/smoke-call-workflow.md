@@ -23,6 +23,11 @@ strict: true
 network:
   allowed:
     - defaults
+evals:
+  - id: worker_selection
+    question: Does the agent request the smoke-workflow-call worker through its smoke_workflow_call safe-output tool rather than substituting noop?
+  - id: worker_input
+    question: Does the worker request pass the exact task-description value smoke test checkout validation?
 safe-outputs:
   allowed-domains: [default-safe-outputs]
   call-workflow:

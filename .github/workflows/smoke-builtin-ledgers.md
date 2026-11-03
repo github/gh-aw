@@ -64,6 +64,15 @@ tools:
     notes:
       type: notes
       compaction: false
+evals:
+  - id: projection_timing
+    question: Does the output distinguish previously projected ledger state from pending same-run writes without claiming those writes are already visible?
+  - id: ledger_write_contracts
+    question: Do the submitted ledger operations follow the specified per-ledger argument shapes, including separate ledger_map_put and table keys derived from value.id for insert or upsert?
+  - id: first_run_restraint
+    question: When the read-only projections are empty on a first run, does the agent avoid reporting that emptiness alone as a failure? Return UNKNOWN when prior state is present.
+  - id: failure_reporting
+    question: When a ledger check fails, does the agent request one issue identifying the failed check without exposing raw ledger contents? Return UNKNOWN when no check fails.
 safe-outputs:
   create-issue:
     max: 1
