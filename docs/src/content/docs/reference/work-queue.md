@@ -319,7 +319,7 @@ Idle refresh is every 10 seconds; search and action review pause it. Failed read
 
 ## OpenTelemetry queue health
 
-Runtime queue operations emit `work_queue.read.run`, `work_queue.publish.run`, `work_queue.dispatch.run`, `work_queue.reconcile_dispatch.run`, `work_queue.reconcile.run`, and `work_queue.compact.run` spans. They reuse the workflow's trace and job parent, [OTLP configuration](../reference/open-telemetry/), exporter fan-out, and sanitized `otel.jsonl` mirror. No additional queue setting is required. Without valid workflow trace context, queue instrumentation is disabled.
+Runtime queue operations emit `work_queue.read.run`, `work_queue.publish.run`, `work_queue.dispatch.run`, `work_queue.reconcile_dispatch.run`, `work_queue.reconcile.run`, and `work_queue.compact.run` spans. They reuse the workflow's trace and job parent, [OTLP configuration](/gh-aw/reference/open-telemetry/), exporter fan-out, and sanitized `otel.jsonl` mirror. No additional queue setting is required. Without valid workflow trace context, queue instrumentation is disabled.
 
 Attributes use the `gh-aw.work_queue.` prefix. `queue.id` is a stable SHA-256 digest of the lowercased target repository coordinates and queue branch, allowing correlation across workflow runs without exporting queue identifiers or task content. Nested ledger reads and publications contribute to one outer operation span rather than separate export requests.
 
