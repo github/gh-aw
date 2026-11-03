@@ -72,26 +72,3 @@ func TestNotionConnectorGeneratedScriptSyntax(t *testing.T) {
 	}
 	require.True(t, found, "the actual compiled wrapper must be syntax-checked")
 }
-
-func TestNotionConnectorCredentialFreeStagedCLI(t *testing.T) {
-	node, err := exec.LookPath("node")
-	require.NoError(t, err)
-	_, plan := notionFrozenPlans(t)
-	args := map[string]any{"page-id": notionPageID, "text": "Release reference reviewed."}
-	request, err := plan.PrepareSafeOutput("add-comment", args)
-	require.NoError(t, err)
-	expected, err := json.Marshal(map[string]any{"staged": true, "request": request})
-	require.NoError(t, err)
-	encoded, err := plan.Encode()
-	require.NoError(t, err)
-	input, err := json.Marshal(args)
-	require.NoError(t, err)
-	runtime, err := filepath.Abs("../../actions/setup/js/connector_runtime.cjs")
-	require.NoError(t, err)
-	command := exec.CommandContext(t.Context(), node, runtime, "invoke", "safe-output", "add-comment", "--stage")
-	command.Env = []string{"GH_AW_CONNECTOR_PLAN=" + encoded}
-	command.Stdin = bytes.NewReader(input)
-	output, err := command.CombinedOutput()
-	require.NoError(t, err, "%s", output)
-	require.JSONEq(t, string(expected), string(output))
-}

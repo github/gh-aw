@@ -3,7 +3,6 @@
 package workflow
 
 import (
-	"encoding/json"
 	"encoding/xml"
 	"os"
 	"path/filepath"
@@ -12,7 +11,6 @@ import (
 
 	"github.com/github/gh-aw/pkg/connectors"
 	"github.com/stretchr/testify/require"
-	"go.yaml.in/yaml/v3"
 )
 
 const datadogIncidentID = "11111111-2222-4333-8444-555555555555"
@@ -26,16 +24,7 @@ func datadogFixture(t *testing.T, name string) string {
 
 func parseDatadogConsumer(t *testing.T, source string) (*Compiler, *WorkflowData, string, error) {
 	t.Helper()
-	root := t.TempDir()
-	path := filepath.Join(root, ".github", "workflows", "datadog-triage.md")
-	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0700))
-	require.NoError(t, os.WriteFile(path, []byte(source), 0600))
-	compiler := NewCompiler(WithNoEmit(true), WithVersion("v0.0.0-1-gabcdef0"))
-	compiler.gitRoot = root
-	installConnectorTestSources(t, root)
-	compiler.SetActionMode(ActionModeDev)
-	data, err := compiler.ParseWorkflowFile(path)
-	return compiler, data, path, err
+	return parseConnectorConsumer(t, "datadog-triage.md", source)
 }
 
 func datadogPlans(t *testing.T) (*connectors.Plan, *connectors.Plan) {
@@ -70,19 +59,13 @@ func TestDatadogConnectorLocalImportCompilation(t *testing.T) {
 	require.Contains(t, data.SafeOutputs.Scripts, "datadog-rename-incident")
 	output, err := compiler.CompileToYAML(data, path)
 	require.NoError(t, err)
-	var document map[string]any
-	require.NoError(t, yaml.Unmarshal([]byte(output), &document))
-	jobs := document["jobs"].(map[string]any)
-	agent, err := json.Marshal(jobs["agent"])
-	require.NoError(t, err)
-	effects, err := json.Marshal(jobs["safe_outputs"])
-	require.NoError(t, err)
+	agent, effects := connectorPhaseJobJSON(t, output)
 	for _, name := range config.Agent.Secrets() {
-		require.Contains(t, string(agent), "${{ secrets."+name+" }}")
-		require.NotContains(t, string(effects), "${{ secrets."+name+" }}")
+		require.Contains(t, agent, "${{ secrets."+name+" }}")
+		require.NotContains(t, effects, "${{ secrets."+name+" }}")
 	}
-	require.NotContains(t, string(agent), "${{ secrets.DATADOG_INCIDENT_WRITE_OAUTH_TOKEN }}")
-	require.Contains(t, string(effects), "${{ secrets.DATADOG_INCIDENT_WRITE_OAUTH_TOKEN }}")
+	require.NotContains(t, agent, "${{ secrets.DATADOG_INCIDENT_WRITE_OAUTH_TOKEN }}")
+	require.Contains(t, effects, "${{ secrets.DATADOG_INCIDENT_WRITE_OAUTH_TOKEN }}")
 	require.NotContains(t, output, "DD-API-KEY")
 	require.NotContains(t, output, "DD-APPLICATION-KEY")
 	require.NotContains(t, output, `node "${RUNNER_TEMP}/gh-aw/actions/connector_runtime.cjs" invoke context`)

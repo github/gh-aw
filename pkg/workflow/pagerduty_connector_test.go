@@ -3,7 +3,6 @@
 package workflow
 
 import (
-	"encoding/json"
 	"encoding/xml"
 	"os"
 	"path/filepath"
@@ -11,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"go.yaml.in/yaml/v3"
 )
 
 const pagerdutyFixtureDirectory = "../connectors/testdata/providers/pagerduty"
@@ -34,16 +32,7 @@ func parsePagerDutyWorkflow(t *testing.T, imports, selection string) (*Compiler,
 
 func parsePagerDutySource(t *testing.T, source string) (*Compiler, *WorkflowData, string, error) {
 	t.Helper()
-	root := t.TempDir()
-	path := filepath.Join(root, ".github", "workflows", "pagerduty.md")
-	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0700))
-	require.NoError(t, os.WriteFile(path, []byte(source), 0600))
-	compiler := NewCompiler(WithNoEmit(true), WithVersion("v0.0.0-1-gabcdef0"))
-	compiler.gitRoot = root
-	installConnectorTestSources(t, root)
-	compiler.SetActionMode(ActionModeDev)
-	data, err := compiler.ParseWorkflowFile(path)
-	return compiler, data, path, err
+	return parseConnectorConsumer(t, "pagerduty.md", source)
 }
 
 func TestPagerDutyConnectorLocalImportConsumer(t *testing.T) {
@@ -73,23 +62,16 @@ func TestPagerDutyConnectorLocalImportConsumer(t *testing.T) {
 			require.Contains(t, data.SafeOutputs.Scripts["pagerduty-add-note"].Script, "connector_runtime.cjs")
 			output, err := compiler.CompileToYAML(data, path)
 			require.NoError(t, err)
-			var document struct {
-				Jobs map[string]any `yaml:"jobs"`
-			}
-			require.NoError(t, yaml.Unmarshal([]byte(output), &document))
-			agent, err := json.Marshal(document.Jobs["agent"])
-			require.NoError(t, err)
-			effects, err := json.Marshal(document.Jobs["safe_outputs"])
-			require.NoError(t, err)
-			require.Contains(t, string(agent), "${{ secrets.PAGERDUTY_READ_AUTHORIZATION }}")
-			require.NotContains(t, string(agent), "${{ secrets.PAGERDUTY_WRITE_AUTHORIZATION }}")
+			agent, effects := connectorPhaseJobJSON(t, output)
+			require.Contains(t, agent, "${{ secrets.PAGERDUTY_READ_AUTHORIZATION }}")
+			require.NotContains(t, agent, "${{ secrets.PAGERDUTY_WRITE_AUTHORIZATION }}")
 			if staged {
-				require.NotContains(t, string(effects), "${{ secrets.PAGERDUTY_WRITE_AUTHORIZATION }}")
+				require.NotContains(t, effects, "${{ secrets.PAGERDUTY_WRITE_AUTHORIZATION }}")
 			} else {
-				require.Contains(t, string(effects), "${{ secrets.PAGERDUTY_WRITE_AUTHORIZATION }}")
+				require.Contains(t, effects, "${{ secrets.PAGERDUTY_WRITE_AUTHORIZATION }}")
 			}
-			require.NotContains(t, string(effects), "${{ secrets.PAGERDUTY_READ_AUTHORIZATION }}")
-			require.Contains(t, string(effects), "pagerduty_add_note")
+			require.NotContains(t, effects, "${{ secrets.PAGERDUTY_READ_AUTHORIZATION }}")
+			require.Contains(t, effects, "pagerduty_add_note")
 			require.NotContains(t, output, "connector_9_pagerduty")
 			require.NotContains(t, output, `node "${RUNNER_TEMP}/gh-aw/actions/connector_runtime.cjs" invoke context`)
 			require.NotContains(t, output, "go build")
