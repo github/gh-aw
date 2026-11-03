@@ -37,6 +37,13 @@ network:
 runtimes:
   go:
     version: "1.27.3"
+evals:
+  - id: native_mcp_prs
+    question: Does the output show exactly two merged PR titles and numbers retrieved through native GitHub MCP rather than a CLI substitute?
+  - id: runtime_configuration_report
+    question: Does the output report the Kiro version and native MCP configuration checks as PASS or FAIL without disclosing configuration contents, headers, keys, or the prompt?
+  - id: evidence_based_report
+    question: Does the requested Kiro issue's overall PASS or FAIL agree with all five required test results rather than overlooking a failed or unavailable check?
 safe-outputs:
   allowed-domains: [default-safe-outputs]
   add-comment:

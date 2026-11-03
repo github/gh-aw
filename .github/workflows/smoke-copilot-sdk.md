@@ -32,6 +32,13 @@ tools:
   bash:
     - "*"
   edit:
+evals:
+  - id: sdk_file_readback
+    question: Does the output show readback of the run-specific Copilot SDK test file containing the phrase smoke test passed?
+  - id: bash_calculation
+    question: Does the output show a bash calculation of 6 times 7 returning 42?
+  - id: evidence_based_report
+    question: Does the requested smoke issue report each required task's status consistently with the observed results rather than marking failed or unverified tasks as passed?
 safe-outputs:
   create-issue:
     expires: 2h

@@ -30,6 +30,13 @@ engine:
   id: agy
   env:
     ENGINE_CONFORMANCE_SENTINEL: conformance-agy
+evals:
+  - id: native_challenge_transport
+    question: Does the output show native MCP invocation of agy-native native_challenge with the fixture fileNonce rather than a CLI or HTTP substitute?
+  - id: native_infrastructure_transport
+    question: Does the output show native MCP invocation of mcpscripts native_infrastructure_challenge with the same fixture fileNonce?
+  - id: native_completion
+    question: Does the agent emit exactly one final native safeoutputs noop with message Conformance probes completed after the probes?
 safe-outputs:
   staged: true
   threat-detection: false

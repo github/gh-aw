@@ -45,6 +45,11 @@ tools:
   bash:
     - "echo *"
     - "date"
+evals:
+  - id: task_echo
+    question: Does the output show execution of echo with Running task followed by this invocation's supplied task description?
+  - id: invocation_identification
+    question: Does the noop message include this invocation's actual task description rather than a hardcoded description from another invocation?
 safe-outputs:
   allowed-domains: [default-safe-outputs]
   noop:

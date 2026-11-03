@@ -42,6 +42,13 @@ tools:
   bash:
     - "*"
   web-fetch:
+evals:
+  - id: native_web_fetch
+    question: Does the output show the web-fetch MCP tool returned content containing GitHub rather than using bash or Playwright for that test?
+  - id: file_readback
+    question: Does the output show shell readback of the run-specific Crush test file with the prescribed smoke-test content?
+  - id: evidence_based_report
+    question: Does the requested Crush issue's overall PASS or FAIL agree with all five required test results, including the build result?
 safe-outputs:
   allowed-domains: [default-safe-outputs]
   add-comment:

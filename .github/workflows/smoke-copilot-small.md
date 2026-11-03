@@ -31,6 +31,13 @@ tools:
   bash:
     - "*"
   edit:
+evals:
+  - id: haiku_file_readback
+    question: Does the output show readback of the run-specific file containing exactly three lines of a software-testing haiku?
+  - id: bash_calculation
+    question: Does the output show a bash calculation of 6 times 7 returning 42?
+  - id: browser_title_comparison
+    question: Does the output show that the JavaScript-rendered page title obtained with Playwright was compared for exact equality with the expected fixture title?
 safe-outputs:
   create-issue:
     expires: 2h
