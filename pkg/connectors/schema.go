@@ -15,8 +15,9 @@ func Schema(kind string) ([]byte, error) {
 	var schema *jsonschema.Schema
 	var err error
 	options := &jsonschema.ForOptions{TypeSchemas: map[reflect.Type]*jsonschema.Schema{
-		reflect.TypeFor[Value]():          {Ref: "#/$defs/value"},
-		reflect.TypeFor[EventPredicate](): {Ref: "#/$defs/eventPredicate"},
+		reflect.TypeFor[Value]():           {Ref: "#/$defs/value"},
+		reflect.TypeFor[EventPredicate]():  {Type: "object", Ref: "#/$defs/eventPredicate"},
+		reflect.TypeFor[*EventPredicate](): {Type: "object", Ref: "#/$defs/eventPredicate"},
 	}}
 	switch kind {
 	case "ConnectorSpec":
