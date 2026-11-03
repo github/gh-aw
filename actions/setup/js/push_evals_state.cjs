@@ -4,14 +4,14 @@
 /**
  * push_evals_state — guards the evals state-branch push.
  *
- * The evals state branch holds answer history only. When the downloaded evals
- * artifact carries the run-level not-evaluated marker (evals_status.json), the
+ * The evals state branch holds answer history only. When the local evals
+ * results carry the run-level not-evaluated marker (evals_status.json), the
  * judge produced no answers, so nothing is pushed: no answer rows, no empty
  * file, and no new state branch. Otherwise the generic state writer
  * (push_experiment_state.cjs) pushes evals.jsonl unchanged.
  *
  * Environment variables:
- *   GH_AW_STATE_DIR - Directory containing the downloaded evals artifact
+ *   GH_AW_STATE_DIR - Directory containing the redacted evals results
  *   (all other variables are consumed by push_experiment_state.cjs)
  */
 

@@ -20,7 +20,7 @@ const GITHUB_API_VERSION = "2022-11-28";
 const FAILED_JOBS_ISSUE_EXPIRES_HOURS = 24 * 7; // 1 week
 const MAX_FAILED_STEP_NUMBER = 10000;
 const MAX_FAILED_STEPS_REPORTED = 10;
-const STATE_PUSH_JOB_IDS = new Set(["push_ledger_changes", "push_repo_memory", "push_evals_state", "push_experiment_state"]);
+const STATE_PUSH_JOB_IDS = new Set(["push_ledger_changes", "push_repo_memory", "evals", "push_evals_state", "push_experiment_state"]);
 
 /**
  * Read error lines from an already-masked plain-text job log, not a workflow-log ZIP archive.

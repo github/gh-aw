@@ -577,14 +577,8 @@ func (c *Compiler) buildMemoryManagementJobs(data *WorkflowData) error {
 		return err
 	}
 
-	// Build push_evals_state job when evals are configured
-	pushEvalsJobName, err := c.buildPushEvalsStateJobWrapper(data)
-	if err != nil {
-		return err
-	}
-
 	// Update conclusion job dependencies
-	if err := c.updateConclusionJobDependencies(pushRepoMemoryJobName, pushLedgerJobName, updateCacheMemoryJobName, pushExperimentsJobName, pushEvalsJobName); err != nil {
+	if err := c.updateConclusionJobDependencies(pushRepoMemoryJobName, pushLedgerJobName, updateCacheMemoryJobName, pushExperimentsJobName); err != nil {
 		return err
 	}
 
@@ -704,32 +698,8 @@ func (c *Compiler) buildPushExperimentsStateJobWrapper(data *WorkflowData) (stri
 	return job.Name, nil
 }
 
-// buildPushEvalsStateJobWrapper builds the push_evals_state job when evals are configured.
-// Returns the job name if created, empty string otherwise.
-func (c *Compiler) buildPushEvalsStateJobWrapper(data *WorkflowData) (string, error) {
-	if data.Evals == nil || !data.Evals.HasEvals() {
-		return "", nil
-	}
-
-	compilerJobsLog.Print("Building push_evals_state job")
-	job, err := c.buildPushEvalsStateJob(data)
-	if err != nil {
-		return "", fmt.Errorf("push_evals_state job could not be built: %w. Check the evals configuration in frontmatter", err)
-	}
-	if job == nil {
-		return "", nil
-	}
-
-	if err := c.jobManager.AddJob(job); err != nil {
-		return "", fmt.Errorf("push_evals_state job could not be added: %w. Check that no other job in the workflow reuses its name", err)
-	}
-
-	compilerJobsLog.Printf("Successfully added push_evals_state job: %s", job.Name)
-	return job.Name, nil
-}
-
 // updateConclusionJobDependencies updates the conclusion job to depend on memory management jobs if they exist.
-func (c *Compiler) updateConclusionJobDependencies(pushRepoMemoryJobName, pushLedgerJobName, updateCacheMemoryJobName, pushExperimentsJobName, pushEvalsJobName string) error {
+func (c *Compiler) updateConclusionJobDependencies(pushRepoMemoryJobName, pushLedgerJobName, updateCacheMemoryJobName, pushExperimentsJobName string) error {
 	conclusionJob, exists := c.jobManager.GetJob("conclusion")
 	if !exists {
 		return nil
@@ -751,11 +721,6 @@ func (c *Compiler) updateConclusionJobDependencies(pushRepoMemoryJobName, pushLe
 	if pushExperimentsJobName != "" {
 		conclusionJob.Needs = append(conclusionJob.Needs, pushExperimentsJobName)
 		compilerJobsLog.Printf("Added push_experiments_state dependency to conclusion job")
-	}
-
-	if pushEvalsJobName != "" {
-		conclusionJob.Needs = append(conclusionJob.Needs, pushEvalsJobName)
-		compilerJobsLog.Printf("Added push_evals_state dependency to conclusion job")
 	}
 
 	return nil

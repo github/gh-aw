@@ -123,7 +123,7 @@ func TestEvalsDecisionsPermissions(t *testing.T) {
 	data.Evals.Model = "openai/gpt-6-luna"
 	_, permissions = compiler.buildEvalsJobPermissions(data)
 	assert.NotContains(t, permissions, "copilot-requests")
-	assert.Contains(t, permissions, "contents: read")
+	assert.Contains(t, permissions, "contents: write")
 	assert.NotContains(t, permissions, "id-token")
 }
 
@@ -141,6 +141,9 @@ func compileClaudeEvalsWorkflow(t *testing.T, engineYAML string) (string, string
 
 func TestEvalsDecisionsCompiledJob(t *testing.T) {
 	agent, evals := compileClaudeEvalsWorkflow(t, "engine:\n  id: claude\n")
+	assert.Contains(t, agent, "contents: read")
+	assert.NotContains(t, agent, "contents: write")
+	assert.Contains(t, evals, "contents: write")
 	assert.Contains(t, agent, "claude_harness.cjs")
 	assert.Contains(t, evals, "Execute BinEval Decisions")
 	assert.Contains(t, evals, "run_evals.cjs")

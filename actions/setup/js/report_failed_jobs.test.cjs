@@ -296,7 +296,7 @@ describe("getFailedNonBuiltinJobs", () => {
     expect(await getFailedNonBuiltinJobs()).toEqual([{ name: "publisher", html_url: process.env.GH_AW_RUN_URL }]);
   });
 
-  it.each(["push_repo_memory", "push_ledger_changes", "push_evals_state"])("includes persistent git error text in the %s failure issue", async jobId => {
+  it.each(["push_repo_memory", "push_ledger_changes", "evals", "push_evals_state"])("includes persistent git error text in the %s failure issue", async jobId => {
     vi.stubEnv("GH_AW_JOB_RESULTS", JSON.stringify({ [jobId]: { result: "failure" } }));
     global.github.rest.actions.listJobsForWorkflowRun.mockResolvedValue({
       data: { jobs: [{ id: 789, name: jobId, conclusion: "failure", html_url: "https://github.com/owner/repo/actions/runs/123/job/789" }] },

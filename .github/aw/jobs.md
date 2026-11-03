@@ -67,12 +67,11 @@ Keep `agent` and `detection` read-only; use safe outputs for writes.
 | `upload_assets` | Release-asset output | `safe_outputs`, `activation` | Inherits safe-output authentication; release permissions only. |
 | `upload_code_scanning_sarif` | Code-scanning output | `safe_outputs` | Inherits safe-output authentication; `security-events: write`. |
 | `unlock` | `lock-for-agent` | `activation`, `agent`, `detection` if present | Workflow-token lock cleanup; do not grant agent writes. |
-| `evals` | `evals` | `agent` | No custom credential; runs alongside safe outputs. |
+| `evals` | `evals` | `agent`, `activation`, `detection` if present | Decisions API evaluation and redacted state persistence; framework-managed `contents: write`; runs alongside safe outputs. Dry-run omits persistence and uses `contents: read`. |
 | `conclusion` | Compiler-generated conclusion | All generated and custom jobs | No custom credential; aggregates results and usage. |
 | `push_repo_memory` | Repository-backed memory | After threat detection | Framework-managed repository credential. |
 | `update_cache_memory` | Cache memory | After threat detection | Framework-managed repository credential. |
 | `push_experiments_state` | Repository-backed experiments | After threat detection | Framework-managed repository credential. |
-| `push_evals_state` | Persisted eval state | After threat detection | Framework-managed repository credential. |
 | `call-<sanitized-worker-name>` | `safe-outputs.call-workflow` worker | — | Configure the called workflow input through the worker's `github-token` or `github-app`. |
 
 ## Maintenance workflow jobs

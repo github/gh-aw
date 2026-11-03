@@ -355,6 +355,10 @@ The `evals` artifact is uploaded by the evals job only when the workflow frontma
 
 - `evals.jsonl` — Per-question BinEval evaluation results (`YES`, `NO`, or `UNKNOWN`) produced by running the declared evaluation questions against the agent output. `UNKNOWN` means the available evidence does not support a `YES` or `NO` answer; it is not a passing result.
 
+The evals job also persists the redacted results to the `evals/<workflow-id>` git
+branch using `contents: write`. It uses the Decisions API, not an agent engine.
+Dry-run compilation omits the persistence steps and keeps `contents: read`.
+
 The conclusion job downloads these results and records each current-run result as
 an `eval.result` event in `aw_session.jsonl` inside the `usage` artifact. The event
 retains the eval ID, answer, model, run ID, experiment assignments when supplied,

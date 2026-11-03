@@ -273,7 +273,7 @@ Test content`
 	assert.Contains(t, conclusionSection, "push_experiments_state", "conclusion job should depend on push_experiments_state")
 }
 
-func TestBuildPushEvalsStateJob_WithEvals(t *testing.T) {
+func TestBuildEvalsJobPersistsState(t *testing.T) {
 	compiler := NewCompiler()
 	compiler.jobManager = NewJobManager()
 
@@ -289,29 +289,43 @@ func TestBuildPushEvalsStateJob_WithEvals(t *testing.T) {
 		},
 	}
 
-	job, err := compiler.buildPushEvalsStateJob(data)
-	require.NoError(t, err, "buildPushEvalsStateJob should not return an error")
-	require.NotNil(t, job, "buildPushEvalsStateJob should return a job when evals are configured")
+	job, err := compiler.buildEvalsJob(data)
+	require.NoError(t, err)
+	require.NotNil(t, job)
 
-	assert.Equal(t, "push_evals_state", job.Name, "job name should be push_evals_state")
+	assert.Equal(t, "evals", job.Name)
 	assert.Contains(t, job.If, "always()", "job condition should use always()")
-	assert.Contains(t, job.If, "skipped", "job condition should run when evals is not skipped")
 	assert.Contains(t, job.Permissions, "contents: write", "job should have contents: write permission")
-	assert.Contains(t, job.Needs, string(constants.EvalsJobName), "job should depend on evals job")
+	assert.NotContains(t, job.Needs, string(constants.EvalsJobName), "evals must not depend on itself")
 	assert.Contains(t, job.Needs, string(constants.ActivationJobName), "job should depend on activation job")
 
 	stepsYAML := strings.Join(job.Steps, "\n")
 	assert.Contains(t, stepsYAML, "evals/myworkflow", "steps should reference sanitized evals branch name")
-	assert.Contains(t, stepsYAML, "pattern: evals", "evals download should tolerate missing artifacts with pattern matching")
-	assert.Contains(t, stepsYAML, "merge-multiple: true", "evals download should preserve direct extraction into the state directory")
-	assert.NotContains(t, stepsYAML, "name: evals", "evals download should not use exact artifact name downloads")
+	assert.NotContains(t, stepsYAML, "Download evals artifact", "results should be read directly instead of downloaded")
+	assert.Contains(t, stepsYAML, "GH_AW_STATE_DIR: /tmp/gh-aw\n")
 	assert.Contains(t, stepsYAML, "GH_AW_STATE_FILES: evals.jsonl", "steps should configure evals filename")
 	assert.NotContains(t, stepsYAML, "GH_AW_STATE_APPEND_FILES", "steps should use the state file itself for append-only history")
 	assert.Contains(t, stepsYAML, "push_evals_state.cjs", "steps should guard the generic state writer with push_evals_state.cjs")
-	assert.NotContains(t, stepsYAML, "evals_status.json", "the not-evaluated marker must not be pushed as answer history")
+	assert.NotContains(t, stepsYAML, "GH_AW_STATE_FILES: evals_status.json", "the not-evaluated marker must not be pushed as answer history")
+	assert.Contains(t, stepsYAML, "GH_TOKEN: ${{ github.token }}")
+	assert.Contains(t, stepsYAML, "persist-credentials: false")
+	assert.Contains(t, stepsYAML, "sparse-checkout: .")
+	assert.Contains(t, stepsYAML, "if: always() && !cancelled() && steps.redact_evals_results.outcome == 'success'")
+	checkout := strings.Index(stepsYAML, "name: Checkout repository\n")
+	configure := strings.Index(stepsYAML, "name: Configure Git credentials")
+	execute := strings.Index(stepsYAML, "name: Execute BinEval Decisions")
+	redact := strings.Index(stepsYAML, "name: Redact secrets in evals results")
+	upload := strings.Index(stepsYAML, "name: Upload evals results")
+	push := strings.Index(stepsYAML, "name: Push evals results to git")
+	require.NotEqual(t, -1, checkout)
+	assert.Greater(t, configure, checkout)
+	assert.Greater(t, execute, configure)
+	assert.Greater(t, redact, execute)
+	assert.Greater(t, upload, redact)
+	assert.Greater(t, push, upload)
 }
 
-func TestBuildPushEvalsStateJob_GHESUsesExactArtifactName(t *testing.T) {
+func TestBuildEvalsJobPersistsStateOnGHES(t *testing.T) {
 	compiler := NewCompiler()
 	compiler.SetGHESCompat(true)
 	compiler.configureGHESCompatibility()
@@ -329,18 +343,18 @@ func TestBuildPushEvalsStateJob_GHESUsesExactArtifactName(t *testing.T) {
 		},
 	}
 
-	job, err := compiler.buildPushEvalsStateJob(data)
+	job, err := compiler.buildEvalsJob(data)
 	require.NoError(t, err)
 	require.NotNil(t, job)
 
 	stepsYAML := strings.Join(job.Steps, "\n")
 	assert.Contains(t, stepsYAML, "actions/download-artifact@a9bc5e6ef2cb54c177f32aa5726adaa15e7e2d59 # v3.1.0")
-	assert.Contains(t, stepsYAML, "name: evals")
-	assert.NotContains(t, stepsYAML, "pattern: evals")
-	assert.NotContains(t, stepsYAML, "merge-multiple: true")
+	assert.NotContains(t, stepsYAML, "Download evals artifact")
+	assert.Contains(t, stepsYAML, "GH_AW_STATE_DIR: /tmp/gh-aw\n")
+	assert.Contains(t, stepsYAML, "GH_AW_STATE_FILES: evals.jsonl")
 }
 
-func TestBuildMemoryManagementJobs_PushEvalsIncludedInConclusion(t *testing.T) {
+func TestCompiledEvalsJobPersistsState(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "push-evals-conclusion-test")
 
 	frontmatter := `---
@@ -369,9 +383,26 @@ Test content`
 
 	yamlStr := string(content)
 
-	assert.True(t, containsInNonCommentLines(yamlStr, "push_evals_state:"), "push_evals_state job should be present")
+	assert.False(t, containsInNonCommentLines(yamlStr, "push_evals_state:"), "there should be no separate persistence job")
+	evalsSection := extractJobSection(yamlStr, "evals")
+	require.NotEmpty(t, evalsSection)
+	assert.Contains(t, evalsSection, "contents: write")
+	assert.Contains(t, evalsSection, "name: Push evals results to git")
+	assert.NotContains(t, evalsSection, "Download evals artifact")
 	conclusionSection := extractJobSection(yamlStr, "conclusion")
 	require.NotEmpty(t, conclusionSection, "conclusion job should be present")
-	assert.Contains(t, conclusionSection, "push_evals_state", "conclusion job should depend on push_evals_state")
+	assert.NotContains(t, conclusionSection, "push_evals_state")
 	assert.Contains(t, conclusionSection, "GH_AW_EVALS_AIC: ${{ needs.evals.outputs.aic }}", "conclusion job should pass evals AIC to footer generation")
+
+	compiler.SetDryRun(true)
+	require.NoError(t, compiler.CompileWorkflow(testFile))
+	content, err = os.ReadFile(filepath.Join(tmpDir, "test-evals.lock.yml"))
+	require.NoError(t, err)
+	evalsSection = extractJobSection(string(content), "evals")
+	require.NotEmpty(t, evalsSection)
+	assert.Contains(t, evalsSection, "Execute BinEval Decisions")
+	assert.Contains(t, evalsSection, "contents: read")
+	assert.NotContains(t, evalsSection, "contents: write")
+	assert.NotContains(t, evalsSection, "push_evals_state")
+	assert.NotContains(t, evalsSection, "Configure Git credentials")
 }

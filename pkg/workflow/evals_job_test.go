@@ -109,8 +109,10 @@ func TestBuildEvalsJobRestoresSetupActionInDevMode(t *testing.T) {
 	steps := strings.Join(job.Steps, "")
 	restoreIndex := strings.Index(steps, "- name: Restore actions folder")
 	uploadIndex := strings.Index(steps, "- name: Upload evals results")
+	pushIndex := strings.Index(steps, "- name: Push evals results to git")
 	assert.NotEqual(t, -1, restoreIndex)
 	assert.Greater(t, restoreIndex, uploadIndex)
+	assert.Greater(t, restoreIndex, pushIndex)
 	assert.Contains(t, steps, "if: always()")
 	assert.Contains(t, steps, "sparse-checkout: |\n            actions/setup")
 }

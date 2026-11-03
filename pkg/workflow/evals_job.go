@@ -10,8 +10,6 @@ import (
 
 var evalsJobLog = logger.New("workflow:evals_job")
 
-const evalsStateDir = "/tmp/gh-aw/evals-state"
-
 func evalsBranchName(workflowID string) string {
 	return WorkflowStateBranchName(constants.EvalsBranchPrefix, workflowID)
 }
@@ -19,7 +17,8 @@ func evalsBranchName(workflowID string) string {
 // buildEvalsJob creates a separate evals job that runs after the agent job (and detection
 // job when enabled), allowing it to run in parallel with safe_outputs.
 // The job downloads the agent artifact to access output files, runs a BinEval
-// multi-question evaluation via the Decisions API, and uploads evals.jsonl as an artifact.
+// multi-question evaluation via the Decisions API, uploads evals.jsonl as an artifact,
+// and persists the redacted results to the evals state branch.
 // Returns nil if evals are not declared in the workflow frontmatter.
 func (c *Compiler) buildEvalsJob(data *WorkflowData) (*Job, error) {
 	if !data.Evals.HasEvals() {
@@ -32,6 +31,9 @@ func (c *Compiler) buildEvalsJob(data *WorkflowData) (*Job, error) {
 
 	// Add the standalone Decisions invocation and result publication steps.
 	steps = append(steps, c.buildEvalsJobSteps(data)...)
+	if !c.dryRun {
+		steps = append(steps, buildPushEvalsStateScript(data)...)
+	}
 
 	if c.actionMode.IsDev() {
 		steps = append(steps, c.generateRestoreActionsSetupStep())
@@ -94,6 +96,17 @@ func (c *Compiler) buildEvalsPreparationSteps(data *WorkflowData) []string {
 		steps = append(steps, c.generateSetupStepForJob("evals", data, setupActionRef, SetupActionDestination, false, evalsTraceID, evalsParentSpanID, "")...)
 	}
 
+	if !c.dryRun {
+		steps = append(steps,
+			"      - name: Checkout repository\n",
+			fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/checkout")),
+			"        with:\n",
+			"          persist-credentials: false\n",
+			"          sparse-checkout: .\n",
+		)
+		steps = append(steps, c.generateGitConfigurationSteps()...)
+	}
+
 	// Download agent output for the shared evaluation evidence.
 	// Use activation-derived prefix since this job always depends on activation.
 	agentArtifactPrefix := artifactPrefixExprForDownstreamJob(data)
@@ -108,6 +121,9 @@ func (c *Compiler) buildEvalsJobPermissions(data *WorkflowData) (*WorkflowData, 
 	brokeredInference := usesTokenBrokerInference(evalsAuthData)
 	copilotRequestsEnabled := evalsAuthData.AI == "copilot" && hasCopilotRequestsWritePermission(data) && !brokeredInference
 	perms := NewPermissionsContentsRead()
+	if !c.dryRun {
+		perms.Set(PermissionContents, PermissionWrite)
+	}
 	if copilotRequestsEnabled {
 		perms.Set(PermissionCopilotRequests, PermissionWrite)
 	}
@@ -120,71 +136,6 @@ func (c *Compiler) buildEvalsJobPermissions(data *WorkflowData) (*WorkflowData, 
 	return evalsAuthData, perms.RenderToYAML()
 }
 
-// buildPushEvalsStateJob creates a job that downloads the evals artifact and commits it to a
-// git branch ("evals/{sanitizedID}") so eval results can be read even when artifacts are absent.
-func (c *Compiler) buildPushEvalsStateJob(data *WorkflowData) (*Job, error) {
-	if data.Evals == nil || !data.Evals.HasEvals() {
-		return nil, nil
-	}
-
-	evalsJobLog.Printf("Building push_evals_state job (branch=%s)", evalsBranchName(data.WorkflowID))
-
-	var steps []string
-
-	setupActionRef := c.resolveActionReference("./actions/setup", data)
-	if setupActionRef != "" || c.actionMode.IsScript() {
-		steps = append(steps, c.generateCheckoutActionsFolder(data)...)
-		traceID := fmt.Sprintf("${{ needs.%s.outputs.setup-trace-id }}", constants.ActivationJobName)
-		parentSpanID := setupParentSpanNeedsExpr(constants.ActivationJobName)
-		steps = append(steps, c.generateSetupStepForJob("push_evals_state", data, setupActionRef, SetupActionDestination, false, traceID, parentSpanID, "")...)
-	}
-
-	steps = append(steps,
-		"      - name: Checkout repository\n",
-		fmt.Sprintf("        uses: %s\n", getActionPin("actions/checkout")),
-		"        with:\n",
-		"          persist-credentials: false\n",
-		"          sparse-checkout: .\n",
-	)
-
-	steps = append(steps, c.generateGitConfigurationSteps()...)
-
-	evalsArtifactName := artifactPrefixExprForDownstreamJob(data) + constants.EvalsArtifactName.String()
-	downloadAction := c.getActionPin("actions/download-artifact")
-	steps = append(steps,
-		"      - name: Download evals artifact\n",
-		fmt.Sprintf("        uses: %s\n", downloadAction),
-		"        continue-on-error: true\n",
-		"        with:\n",
-	)
-	steps = append(steps, downloadArtifactInputLines(evalsArtifactName, downloadAction)...)
-	steps = append(steps, fmt.Sprintf("          path: %s\n", evalsStateDir))
-
-	steps = append(steps, buildPushEvalsStateScript(data)...)
-
-	if c.actionMode.IsDev() {
-		steps = append(steps, c.generateRestoreActionsSetupStep())
-	}
-
-	evalsFinished := BuildNotEquals(
-		BuildPropertyAccess(fmt.Sprintf("needs.%s.result", constants.EvalsJobName)),
-		BuildStringLiteral("skipped"),
-	)
-	notCancelled := &NotNode{Child: BuildFunctionCall("cancelled")}
-	jobCondition := RenderCondition(BuildAnd(BuildAnd(BuildFunctionCall("always"), notCancelled), evalsFinished))
-
-	job := &Job{
-		Name:        pushEvalsStateJobName,
-		RunsOn:      c.formatFrameworkJobRunsOn(data),
-		If:          jobCondition,
-		Permissions: "permissions:\n      contents: write",
-		Needs:       []string{string(constants.EvalsJobName), string(constants.ActivationJobName)},
-		Steps:       steps,
-	}
-
-	return job, nil
-}
-
 // buildPushEvalsStateScript builds the step that pushes evals.jsonl to the evals state
 // branch. push_evals_state.cjs skips not-evaluated input (evals_status.json) before the
 // generic state writer runs, so the branch keeps answer history only.
@@ -192,13 +143,13 @@ func buildPushEvalsStateScript(data *WorkflowData) []string {
 	return []string{
 		"      - name: Push evals results to git\n",
 		"        id: push_evals_state\n",
-		"        if: always()\n",
+		"        if: always() && !cancelled() && steps.redact_evals_results.outcome == 'success'\n",
 		fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)),
 		"        env:\n",
 		"          GH_TOKEN: ${{ github.token }}\n",
 		"          GITHUB_RUN_ID: ${{ github.run_id }}\n",
 		"          GITHUB_SERVER_URL: ${{ github.server_url }}\n",
-		fmt.Sprintf("          GH_AW_STATE_DIR: %s\n", evalsStateDir),
+		"          GH_AW_STATE_DIR: /tmp/gh-aw\n",
 		fmt.Sprintf("          GH_AW_STATE_BRANCH: %s\n", evalsBranchName(data.WorkflowID)),
 		fmt.Sprintf("          GH_AW_STATE_FILES: %s\n", constants.EvalsResultFilename),
 		"          GH_AW_STATE_LABEL: evals results\n",

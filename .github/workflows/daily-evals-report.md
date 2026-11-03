@@ -99,7 +99,7 @@ For each downloaded run directory at `/tmp/gh-aw/aw-mcp/logs/run-<id>/`:
    - Whether evals were declared (check for an `evals` key or the presence of the evals job in the run)
 3. Detect **evals job failures** by scanning job conclusions:
    - runs where the workflow declares evals but `evals.jsonl` is absent (an `evals_status.json` with `status: not_evaluated` means the evals judge did not run or produced no response; report its `reason_code`, and never count it as `UNKNOWN` answers)
-   - runs where job `push_evals_state` exists and has a failed conclusion (`failure`, `timed_out`, or `cancelled`)
+   - runs where job `evals` (or legacy `push_evals_state`) exists and has a failed conclusion (`failure`, `timed_out`, or `cancelled`), including failures to persist results
    - if both conditions happen in the same run, count it once
 
 Cap analysis at **40 runs total**. Apply prioritization before capping: first include all runs that produced `evals.jsonl` (up to 40), then fill any remaining capacity with evals-failure runs. If there are more than 40 runs with evals results, use the most recent 40 and note in the report that analysis was capped. Evals failures are still recorded even if the 40-run cap is reached from results-only runs — count them but do not analyze their artifacts.
@@ -123,7 +123,7 @@ Extract per-run:
 
 For each unique workflow:
 - `runs_with_evals_results` — runs that produced `evals.jsonl`
-- `runs_evals_job_failed` — runs that either declared evals but produced no `evals.jsonl`, or had a failed `push_evals_state` job
+- `runs_evals_job_failed` — runs that either declared evals but produced no `evals.jsonl`, or had a failed `evals` or legacy `push_evals_state` job
 - `evals_job_success_rate` = `runs_with_evals_results / (runs_with_evals_results + runs_evals_job_failed) * 100`
 - `run_pass_rate` = runs where all questions are YES / `runs_with_evals_results * 100`
 - Per-question: `yes_rate` = YES count / `runs_with_evals_results * 100`
@@ -134,7 +134,7 @@ For each unique workflow:
 - `total_workflows_with_evals` — unique workflow count
 - `total_runs_analyzed` — total runs checked
 - `total_evals_results` — runs with `evals.jsonl`
-- `total_evals_failures` — runs with evals job failure conditions (missing results and/or failed `push_evals_state`)
+- `total_evals_failures` — runs with evals job failure conditions (missing results and/or failed `evals` or legacy `push_evals_state`)
 - `overall_evals_job_success_rate` = `total_evals_results / (total_evals_results + total_evals_failures) * 100`
 - `overall_yes_rate` — YES answers / total answers across all runs
 - `most_failing_questions` — top 3 questions (by NO rate) across all workflows
