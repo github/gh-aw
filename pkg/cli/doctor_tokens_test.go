@@ -109,7 +109,7 @@ func TestDoctorTokensRepositoryRegression(t *testing.T) {
 	}
 	names, _, err := discoverDoctorTokens(filepath.Join(root, ".github/workflows/issue-monster.md"), cache)
 	require.NoError(t, err)
-	assert.Equal(t, []string{}, names)
+	assert.Equal(t, []string{"GH_AW_AGENT_TOKEN", "GH_AW_GITHUB_TOKEN"}, names)
 }
 
 func TestDoctorTokenLogEvidence(t *testing.T) {
