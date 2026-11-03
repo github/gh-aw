@@ -12,24 +12,36 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const connectorGoldenWorkflowDirectory = "pkg/cli/workflows"
+
 func TestConnectorGoldenWorkflows(t *testing.T) {
 	declarations, err := filepath.Glob("../../.github/workflows/connectors/*.md")
 	require.NoError(t, err)
 	require.Len(t, declarations, len(connectorCompilerScenarios))
+	var expected []string
+	for _, scenario := range connectorCompilerScenarios {
+		expected = append(expected, filepath.Join("../..", connectorGoldenWorkflowDirectory, scenario.provider+"-golden.md"))
+	}
+	goldens, err := filepath.Glob(filepath.Join("../..", connectorGoldenWorkflowDirectory, "*-golden.md"))
+	require.NoError(t, err)
+	require.ElementsMatch(t, expected, goldens, "every golden fixture must have a compilation scenario")
 	for _, scenario := range connectorCompilerScenarios {
 		provider := scenario.provider
 		t.Run(provider, func(t *testing.T) {
-			path := filepath.Join("../../.github/workflows", provider+"-golden.md")
-			source, err := os.ReadFile(path)
+			sourcePath := filepath.Join("../..", connectorGoldenWorkflowDirectory, provider+"-golden.md")
+			require.NoFileExists(t, filepath.Join("../../.github/workflows", provider+"-golden.md"))
+			require.NoFileExists(t, filepath.Join("../../.github/workflows", provider+"-golden.lock.yml"))
+			source, err := os.ReadFile(sourcePath)
 			require.NoError(t, err)
 			document, err := parser.ExtractFrontmatterFromContent(string(source))
 			require.NoError(t, err)
 			validateGoldenWorkflowSource(t, provider, document.Frontmatter)
-			root, err := filepath.Abs("../..")
+			compiler, path := prepareConnectorScenario(t, scenario, false, nil)
+			fixture, err := os.ReadFile(path)
 			require.NoError(t, err)
-			compiler := NewCompiler(WithVersion("v0.0.0"))
-			compiler.gitRoot = root
-			compiler.SetActionMode(ActionModeDev)
+			require.Equal(t, source, fixture, "compile the unmodified golden source in its deployment layout")
+			compiler.SetNoEmit(true)
+			compiler.SetReadOnly(true)
 			data, err := compiler.ParseWorkflowFile(path)
 			require.NoError(t, err)
 			assertConnectorScenarioAuthority(t, data, scenario)
@@ -43,6 +55,8 @@ func TestConnectorGoldenWorkflows(t *testing.T) {
 			require.Contains(t, output, "connector_runtime.cjs")
 			require.NotContains(t, output, "repository_dispatch:")
 			assertConnectorScenarioEmission(t, compiler, data, scenario, output)
+			require.NoFileExists(t, strings.TrimSuffix(sourcePath, ".md")+".lock.yml", "fixtures have no checked-in generated locks")
+			require.NoFileExists(t, strings.TrimSuffix(path, ".md")+".lock.yml", "fixture compilation must not emit locks")
 		})
 	}
 }

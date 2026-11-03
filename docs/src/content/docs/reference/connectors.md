@@ -97,31 +97,35 @@ generic arbitrary-call proxy.
 
 ### Golden workflows
 
-Each integration includes a manually triggered common-scenario workflow under
-`.github/workflows/<provider>-golden.md`. These are complete consumers, not extra
-MCP tools. They keep the provider surface to one or two targeted reads and cap
+Each integration includes a manually triggered common-scenario fixture under
+`pkg/cli/workflows/<provider>-golden.md`. These are complete consumers, not extra
+MCP tools or installed Actions workflows. Generated locks are not checked in for
+these fixtures. They keep the provider surface to one or two targeted reads and cap
 the proposed effect at one. Confluence additionally selects two read-only
 GitHub methods for duplicate detection.
 
 | Integration | Common scenario | Source |
 | --- | --- | --- |
-| Linear | Bug intake triage using the issue and complete bounded discussion | [linear-golden.md](https://github.com/github/gh-aw/blob/main/.github/workflows/linear-golden.md) |
-| Jira | First-response issue triage with evidence, focused questions and a next step | [jira-golden.md](https://github.com/github/gh-aw/blob/main/.github/workflows/jira-golden.md) |
-| Azure DevOps | Work-item description to an actionable engineering handoff | [azure-devops-golden.md](https://github.com/github/gh-aw/blob/main/.github/workflows/azure-devops-golden.md) |
-| Slack | Short-thread decisions, action items and open questions | [slack-golden.md](https://github.com/github/gh-aw/blob/main/.github/workflows/slack-golden.md) |
-| Teams | Approved root-message action items to a GitHub follow-up | [teams-golden.md](https://github.com/github/gh-aw/blob/main/.github/workflows/teams-golden.md) |
-| Confluence | Deployment/rollback runbook readiness review with a deduplicated follow-up | [confluence-golden.md](https://github.com/github/gh-aw/blob/main/.github/workflows/confluence-golden.md) |
-| Sentry | Known-error diagnostic evidence to an engineering investigation | [sentry-golden.md](https://github.com/github/gh-aw/blob/main/.github/workflows/sentry-golden.md) |
-| ServiceNow | On-call incident shift handoff combining operator facts and record metadata | [servicenow-golden.md](https://github.com/github/gh-aw/blob/main/.github/workflows/servicenow-golden.md) |
-| GitLab | Open/draft merge-request intake and human-review handoff | [gitlab-golden.md](https://github.com/github/gh-aw/blob/main/.github/workflows/gitlab-golden.md) |
-| PagerDuty | Active-incident handoff with observed facts and suggested responder checks | [pagerduty-golden.md](https://github.com/github/gh-aw/blob/main/.github/workflows/pagerduty-golden.md) |
-| Datadog | Alert/Warn monitor metadata to a GitHub investigation issue | [datadog-golden.md](https://github.com/github/gh-aw/blob/main/.github/workflows/datadog-golden.md) |
-| Zendesk | Unresolved-ticket metadata to a private engineering-ownership handoff | [zendesk-golden.md](https://github.com/github/gh-aw/blob/main/.github/workflows/zendesk-golden.md) |
-| Notion | Older page-edit metadata to a human reference-maintenance request | [notion-golden.md](https://github.com/github/gh-aw/blob/main/.github/workflows/notion-golden.md) |
+| Linear | Bug intake triage using the issue and complete bounded discussion | [linear-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/linear-golden.md) |
+| Jira | First-response issue triage with evidence, focused questions and a next step | [jira-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/jira-golden.md) |
+| Azure DevOps | Work-item description to an actionable engineering handoff | [azure-devops-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/azure-devops-golden.md) |
+| Slack | Short-thread decisions, action items and open questions | [slack-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/slack-golden.md) |
+| Teams | Approved root-message action items to a GitHub follow-up | [teams-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/teams-golden.md) |
+| Confluence | Deployment/rollback runbook readiness review with a deduplicated follow-up | [confluence-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/confluence-golden.md) |
+| Sentry | Known-error diagnostic evidence to an engineering investigation | [sentry-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/sentry-golden.md) |
+| ServiceNow | On-call incident shift handoff combining operator facts and record metadata | [servicenow-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/servicenow-golden.md) |
+| GitLab | Open/draft merge-request intake and human-review handoff | [gitlab-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/gitlab-golden.md) |
+| PagerDuty | Active-incident handoff with observed facts and suggested responder checks | [pagerduty-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/pagerduty-golden.md) |
+| Datadog | Alert/Warn monitor metadata to a GitHub investigation issue | [datadog-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/datadog-golden.md) |
+| Zendesk | Unresolved-ticket metadata to a private engineering-ownership handoff | [zendesk-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/zendesk-golden.md) |
+| Notion | Older page-edit metadata to a human reference-maintenance request | [notion-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/notion-golden.md) |
 
 All effects are staged by default; reads still require authorized provider
-credentials and inference access. Copy the reviewed connector declaration
-alongside its consumer, replace specimen resource bindings consistently, and
+credentials and inference access. The fixture harness copies unmodified consumers
+and editable declarations into an isolated `.github/workflows/` layout so local
+imports remain confined to `.github/`. To adopt a fixture, explicitly
+copy its consumer into `.github/workflows/`, keep the reviewed connector declaration
+at its imported path, replace specimen resource bindings consistently, and
 review new-secret/action notices before deployment. Slack and Sentry require
 editing their declaration-owned specimen pins. Datadog's current OAuth route
 requires an approved partner client and external token renewal; ordinary
@@ -1066,7 +1070,9 @@ are not proof of working declarative integration.
 
 The golden consumers are executable compiler fixtures for every included
 integration, not copies of a separate built-in catalog.
-`connector_golden_workflow_test.go` checks their exact advertised reader names,
+`connector_golden_workflow_test.go` compiles every relocated source with the source
+compiler, frontmatter schemas and generated GitHub Actions schema validation
+enabled, without emitting fixture locks. It also checks their exact advertised reader names,
 reader-secret references, provider-versus-GitHub effect choice, one-proposal
 budget and staged writer omission. `connector_scenario_compile_test.go` exercises
 local and cached pinned imports, independent read-only/effect-only selections,
@@ -1087,6 +1093,11 @@ go test ./pkg/workflow \
   -run '^TestConnector(GoldenWorkflows|Scenario|ArtifactUploadRequiresCompletedRedaction|DeployedCJSDependencies)' \
   -count=1
 ```
+
+`make compile-cli-workflows` also compiles all `pkg/cli/workflows/*-golden.md`
+sources in that isolated deployment layout with `--validate --strict --no-emit`,
+independently of companion lock discovery. Setup discovery lists these repository-local fixtures without
+installing them or reading credentials.
 
 Provider-specific Go/Node transport, response, formatting and staging tests remain
 separate. Neither suite establishes real provider authentication, deployed
