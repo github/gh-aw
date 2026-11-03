@@ -10,6 +10,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/stringutil"
+	"github.com/github/gh-aw/pkg/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -205,6 +206,50 @@ func TestClaudeCopilotCompilationIncludesDetectionRouting(t *testing.T) {
 			assert.NotContains(t, detection, "secrets.ANTHROPIC_API_KEY")
 			assert.NotContains(t, string(lock), "Validate COPILOT_GITHUB_TOKEN")
 			assert.NotContains(t, string(lock), "secrets.COPILOT_GITHUB_TOKEN")
+		})
+	}
+}
+
+func TestClaudeCopilotRequestsPermissionWarning(t *testing.T) {
+	const warning = "does not grant permissions: { copilot-requests: write }"
+	for _, test := range []struct {
+		name, engine, permissions string
+		expectWarning             bool
+		expectedToken             string
+	}{
+		{"github provider without permission", "  model-provider: github\n", "  contents: read\n", true, "${{ secrets.COPILOT_GITHUB_TOKEN }}"},
+		{"github provider with permission", "  model-provider: github\n", "  contents: read\n  copilot-requests: write\n", false, "${{ github.token }}"},
+		{"github provider with explicit opt-out", "  model-provider: github\n", "  contents: read\n  copilot-requests: none\n", false, "${{ secrets.COPILOT_GITHUB_TOKEN }}"},
+		{"anthropic provider", "", "  contents: read\n", false, ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			workflowPath := filepath.Join(t.TempDir(), "claude-copilot-permission.md")
+			source := "---\non: workflow_dispatch\nengine:\n  id: claude\n" + test.engine + "model: claude-haiku-4.5\npermissions:\n" + test.permissions +
+				"checkout: false\ntools:\n  github: false\nsafe-outputs:\n  noop:\n  threat-detection: false\n---\nCall noop once."
+			require.NoError(t, os.WriteFile(workflowPath, []byte(source), 0600))
+			compiler := NewCompiler()
+			compiler.SetSkipValidation(true)
+			var compileErr error
+			stderr := testutil.CaptureStderr(t, func() {
+				compileErr = compiler.CompileWorkflow(workflowPath)
+			})
+			require.NoError(t, compileErr)
+			if test.expectWarning {
+				assert.Contains(t, stderr, warning)
+				assert.Positive(t, compiler.GetWarningCount())
+			} else {
+				assert.NotContains(t, stderr, warning)
+			}
+			lock, err := os.ReadFile(stringutil.MarkdownToLockFile(workflowPath))
+			require.NoError(t, err)
+			agent := extractJobSection(string(lock), "agent")
+			if test.expectedToken != "" {
+				assert.Contains(t, agent, "COPILOT_GITHUB_TOKEN: "+test.expectedToken)
+			}
+			assert.NotContains(t, agent, "ANTHROPIC_API_KEY: ${{ secrets.COPILOT_GITHUB_TOKEN }}")
+			assert.NotContains(t, agent, "ANTHROPIC_API_KEY: ${{ github.token }}")
+			assert.NotContains(t, agent, "OPENAI_API_KEY: ${{ secrets.COPILOT_GITHUB_TOKEN }}")
+			assert.NotContains(t, agent, "OPENAI_API_KEY: ${{ github.token }}")
 		})
 	}
 }
