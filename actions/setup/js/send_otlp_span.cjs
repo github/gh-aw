@@ -17,6 +17,7 @@ const { normalizeCodexSession } = require("./codex_session.cjs");
 const { projectSessionResult, observedSessionModel } = require("./agent_session.cjs");
 const { resolveEffectiveModel, resolveModelRoutingSummary } = require("./model_attribution.cjs");
 const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
+const { readEvalsNotEvaluatedStatus } = require("./evals_status.cjs");
 
 function getGhAwPath(relativePath) {
   const root = (process.env.GH_AW_TMP_DIR || "").trim() || "/tmp/gh-aw";
@@ -788,9 +789,17 @@ function selectGraderOutputForJob(jobName, readJSON = readJSONIfExists) {
  *
  * @param {any[]} evalResults
  * @param {number} eventTimeMs
+ * @param {import("./evals_status.cjs").EvalsNotEvaluatedStatus | null} [notEvaluated]
  * @returns {{attributes: Array<{key: string, value: object}>, events: Array<{timeUnixNano: string, name: string, attributes: Array<{key: string, value: object}>}>}}
  */
-function buildEvalTelemetry(evalResults, eventTimeMs) {
+function buildEvalTelemetry(evalResults, eventTimeMs, notEvaluated = null) {
+  if (notEvaluated) {
+    const attributes = [buildAttr("gh-aw.evals.status", notEvaluated.status), buildAttr("gh-aw.evals.reason_code", notEvaluated.reason_code)];
+    if (typeof notEvaluated.model === "string" && notEvaluated.model) {
+      attributes.push(buildAttr("gh-aw.eval.model", notEvaluated.model));
+    }
+    return { attributes, events: [{ timeUnixNano: toNanoString(eventTimeMs), name: "eval.status", attributes }] };
+  }
   if (!Array.isArray(evalResults)) {
     return { attributes: [], events: [] };
   }
@@ -1205,7 +1214,7 @@ function parseOTLPEndpoints() {
  *
  * @param {OTLPEndpointEntry[]} endpoints  - Resolved endpoint list from {@link parseOTLPEndpoints}
  * @param {any} payload                 - Serialisable OTLP JSON object
- * @param {{ maxRetries?: number, baseDelayMs?: number, skipJSONL?: boolean }} [opts]
+ * @param {{ maxRetries?: number, baseDelayMs?: number, skipJSONL?: boolean, signal?: "traces" | "logs" }} [opts]
  * @returns {Promise<void>}
  */
 async function sendOTLPToAllEndpoints(endpoints, payload, opts = {}) {
@@ -1236,10 +1245,10 @@ async function sendOTLPToAllEndpoints(endpoints, payload, opts = {}) {
  *
  * @param {string} endpoint  - OTLP base URL (e.g. https://traces.example.com:4317)
  * @param {any} payload   - Serialisable OTLP JSON object
- * @param {{ maxRetries?: number, baseDelayMs?: number, skipJSONL?: boolean, headersOverride?: string }} [opts]
+ * @param {{ maxRetries?: number, baseDelayMs?: number, skipJSONL?: boolean, headersOverride?: string, signal?: "traces" | "logs" }} [opts]
  * @returns {Promise<void>}
  */
-async function sendOTLPSpan(endpoint, payload, { maxRetries = 2, baseDelayMs = 100, skipJSONL = false, headersOverride = undefined } = {}) {
+async function sendOTLPSpan(endpoint, payload, { maxRetries = 2, baseDelayMs = 100, skipJSONL = false, headersOverride = undefined, signal = "traces" } = {}) {
   // Mirror payload locally so it survives even when the collector is unreachable.
   // Callers that already wrote the JSONL mirror pass skipJSONL: true to avoid a
   // duplicate line.
@@ -1247,7 +1256,8 @@ async function sendOTLPSpan(endpoint, payload, { maxRetries = 2, baseDelayMs = 1
     appendToOTLPJSONL(payload);
   }
 
-  const url = endpoint.replace(/\/$/, "") + "/v1/traces";
+  const base = endpoint.replace(/\/$/, "");
+  const url = signal === "logs" ? base.replace(/\/v1\/(?:traces|logs)$/, "") + "/v1/logs" : base + "/v1/traces";
   // Use headersOverride when explicitly provided (including empty string, which means
   // "this endpoint has no configured headers" in the multi-endpoint fan-out path).
   // Fall back to OTEL_EXPORTER_OTLP_HEADERS only when headersOverride is absent
@@ -2480,7 +2490,7 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   attributes.push(...buildCustomOTLPAttributes());
 
   const graderTelemetry = buildGraderTelemetry(selectGraderOutputForJob(jobName), endMs);
-  const evalTelemetry = jobName === "evals" ? buildEvalTelemetry(readJSONLIfExists("/tmp/gh-aw/evals.jsonl"), endMs) : { attributes: [], events: [] };
+  const evalTelemetry = jobName === "evals" ? buildEvalTelemetry(readJSONLIfExists("/tmp/gh-aw/evals.jsonl"), endMs, readEvalsNotEvaluatedStatus()) : { attributes: [], events: [] };
 
   const resourceAttributes = buildGitHubActionsResourceAttributes({
     repository,
