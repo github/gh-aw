@@ -26,7 +26,7 @@ describe("compact unified session OTLP logs", () => {
     fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
     vi.stubGlobal("fetch", fetchMock);
     warning = vi.spyOn(console, "warn").mockImplementation(() => {});
-    partialWarning = vi.spyOn(global.core, "warning").mockImplementation(() => {});
+    partialWarning = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     for (const name of ["HTTP_PROXY", "http_proxy", "HTTPS_PROXY", "https_proxy", "ALL_PROXY", "all_proxy", "GH_AW_SECRET_NAMES"]) vi.stubEnv(name, "");
     vi.stubEnv("GH_AW_OTLP_LOGS_ENABLED", "true");
     vi.stubEnv("GH_AW_OTLP_LOGS_MAX_BYTES", "");
@@ -113,7 +113,7 @@ describe("compact unified session OTLP logs", () => {
     expect(records()).toHaveLength(128);
     expect(payload().resourceLogs[0].resource.attributes).toContainEqual({ key: "gh-aw.session.truncated", value: { boolValue: true } });
     expect(Buffer.byteLength(fetchMock.mock.calls[0][1].body)).toBeLessThanOrEqual(64 * 1024);
-    expect(partialWarning).toHaveBeenCalledWith(expect.stringContaining("Session export is partial"));
+    expect(partialWarning).toHaveBeenCalledWith(expect.stringMatching(/^::warning::\[otlp\] Session export is partial/));
   });
 
   it("enforces the exact UTF-8 request byte budget with whole records and accurate counts", async () => {
@@ -150,8 +150,21 @@ describe("compact unified session OTLP logs", () => {
     expect(retained.filter(event => event.type !== "usage.report").map(event => event.type)).toEqual(["session.format", "workflow.info", "execution.result", "grader.result"]);
     expect(retained.filter(event => event.type === "usage.report")).toHaveLength(1);
     expect(retained.find(event => event.type === "execution.result").data).toEqual({ outcome: "failure", exitCode: 1 });
-    expect(partialWarning).toHaveBeenCalledOnce();
+    expect(partialWarning.mock.calls.filter(call => String(call[0]).startsWith("::warning::"))).toHaveLength(1);
     expect(payload().resourceLogs[0].resource.attributes).toContainEqual({ key: "gh-aw.session.truncated", value: { boolValue: true } });
+  });
+
+  it("removes grader run identity but keeps grader ids and counts", async () => {
+    write([
+      { type: "session.format", data: { version: 1 } },
+      { type: "grader.result", data: { id: "quality", passed: true, run: { id: "12345", attempt: 2, graderCount: 3, passed: 3, failed: 0, errors: 0 } } },
+    ]);
+    await sendSessionLogs({ sessionPath });
+    const grader = records()
+      .map(record => decode(record.body))
+      .find(event => event.type === "grader.result");
+    expect(grader.data.id).toBe("quality");
+    expect(grader.data.run).toEqual({ graderCount: 3, passed: 3, failed: 0, errors: 0 });
   });
 
   it("does not warn about a partial export when only routine privacy filtering applies", async () => {
@@ -160,7 +173,7 @@ describe("compact unified session OTLP logs", () => {
       { type: "assistant.message", data: { content: "private" } },
     ]);
     await sendSessionLogs({ sessionPath });
-    expect(partialWarning).not.toHaveBeenCalled();
+    expect(partialWarning.mock.calls.filter(call => String(call[0]).startsWith("::warning::"))).toHaveLength(0);
   });
 
   it.each(["0", "-1", "1.5", "NaN", "Infinity", "9007199254740992", "1e4", " "])("fails closed for invalid byte limit %j", async maxBytes => {

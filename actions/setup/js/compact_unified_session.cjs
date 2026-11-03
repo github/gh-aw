@@ -49,7 +49,7 @@ const SESSION_EVENT_PRIORITIES = {
   "firewall.token_usage": 5,
   "memory.push": 6,
 };
-const FAILURE_STATUSES = new Set(["failure", "failed", "fail", "error", "denied", "blocked", "exceeded", "timed_out", "cancelled", "interrupted"]);
+const FAILURE_STATUSES = new Set(["failure", "failed", "fail", "error", "denied", "blocked", "exceeded", "structural_error", "transient_error", "timed_out", "cancelled", "interrupted"]);
 
 /** @param {unknown} event @returns {number} */
 function sessionEventPriority(event) {
@@ -169,14 +169,21 @@ function compactUnifiedSession(events) {
       truncated = true;
       continue;
     }
-    retained.push({ event: projected, line, length });
-    bytes += length;
-    while (retained.length > MAX_COMPACT_SESSION_EVENTS || bytes > MAX_COMPACT_SESSION_BYTES) {
-      const index = leastEssentialSessionEventIndex(retained.map(candidate => candidate.event));
-      bytes -= retained[index].length;
-      retained.splice(index, 1);
+    // Simulate eviction so a candidate that cannot fit never costs lower-priority records already retained.
+    const trial = [...retained, { event: projected, line, length }];
+    let trialBytes = bytes + length;
+    let evictedCandidate = false;
+    while (trial.length > MAX_COMPACT_SESSION_EVENTS || trialBytes > MAX_COMPACT_SESSION_BYTES) {
+      const index = leastEssentialSessionEventIndex(trial.map(candidate => candidate.event));
+      if (index === trial.length - 1) evictedCandidate = true;
+      trialBytes -= trial[index].length;
+      trial.splice(index, 1);
       truncated = true;
+      if (evictedCandidate) break;
     }
+    if (evictedCandidate) continue;
+    retained.splice(0, retained.length, ...trial);
+    bytes = trialBytes;
   }
   const session = retained.map(candidate => candidate.line).join("");
   return { version: COMPACT_UNIFIED_SESSION_VERSION, session, includedEvents: retained.length, omittedEvents: inspectedEvents - retained.length, oversizedLines: 0, scanTruncated: false, truncated };

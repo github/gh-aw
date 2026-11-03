@@ -2,7 +2,7 @@
 "use strict";
 require("./shim.cjs");
 
-const { readCompactUnifiedSession, leastEssentialSessionEventIndex } = require("./compact_unified_session.cjs");
+const { readCompactUnifiedSession, sessionEventPriority } = require("./compact_unified_session.cjs");
 const { serializeSessionArtifact } = require("./session_artifact.cjs");
 const { iterateJsonl } = require("./jsonl_helpers.cjs");
 const { getOTLPSecretValues } = require("./otlp_header_helpers.cjs");
@@ -11,6 +11,17 @@ const DEFAULT_MAX_SESSION_LOG_BYTES = 64 * 1024;
 
 // Keep accounting metadata, not repository, user, session or filesystem identity.
 const IDENTITY_FIELDS = new Set(["repository", "workflowId", "workflowCallId", "runId", "runAttempt", "ref", "sha", "sessionId", "agentId", "memoryId", "branch", "commit", "path"]);
+
+/**
+ * Drop workflow run identity nested in grader records, keeping ordinary grader IDs and counts.
+ * @param {any} event
+ * @returns {any}
+ */
+function removeRunIdentity(event) {
+  if (event?.type !== "grader.result" || !event.data?.run || typeof event.data.run !== "object") return event;
+  const { id, attempt, ...run } = event.data.run;
+  return { ...event, data: { ...event.data, run } };
+}
 
 /**
  * @param {unknown} value
@@ -63,7 +74,7 @@ async function sendSessionLogs({ sessionPath = "/tmp/gh-aw/usage/aw_session.json
     const observedTimeUnixNano = otlp.toNanoString(Date.now());
     const traceId = process.env.GITHUB_AW_OTEL_TRACE_ID || "";
     const spanId = process.env.GITHUB_AW_OTEL_PARENT_SPAN_ID || "";
-    const retainedEvents = [...iterateJsonl(redacted, { strict: true })];
+    const retainedEvents = [...iterateJsonl(redacted, { strict: true })].map(removeRunIdentity);
     const logRecords = retainedEvents.map(event => ({
       observedTimeUnixNano,
       severityNumber: 9,
@@ -78,42 +89,47 @@ async function sendSessionLogs({ sessionPath = "/tmp/gh-aw/usage/aw_session.json
       otlp.buildAttr("gh-aw.session.oversized_lines", compact.oversizedLines),
       otlp.buildAttr("gh-aw.session.scan_truncated", compact.scanTruncated),
     ];
-    const payload = {
+    const buildPayload = (/** @type {number[]} */ indices) => ({
       resourceLogs: [
         {
-          resource: { attributes: resourceAttributes },
-          scopeLogs: [{ scope: { name: "gh-aw.session", version: String(compact.version) }, logRecords }],
+          resource: {
+            attributes: [
+              ...resourceAttributes,
+              otlp.buildAttr("gh-aw.session.included_events", indices.length),
+              otlp.buildAttr("gh-aw.session.omitted_events", compact.omittedEvents + compact.includedEvents - indices.length),
+              otlp.buildAttr("gh-aw.session.truncated", compact.truncated || indices.length < compact.includedEvents),
+            ],
+          },
+          scopeLogs: [{ scope: { name: "gh-aw.session", version: String(compact.version) }, logRecords: indices.map(i => logRecords[i]) }],
         },
       ],
-    };
-    const updateCounts = () => {
-      payload.resourceLogs[0].resource.attributes = [
-        ...resourceAttributes,
-        otlp.buildAttr("gh-aw.session.included_events", logRecords.length),
-        otlp.buildAttr("gh-aw.session.omitted_events", compact.omittedEvents + compact.includedEvents - logRecords.length),
-        otlp.buildAttr("gh-aw.session.truncated", compact.truncated || logRecords.length < compact.includedEvents),
-      ];
-    };
-    updateCounts();
-    while (logRecords.length && Buffer.byteLength(JSON.stringify(payload)) > maxBytes) {
-      const index = leastEssentialSessionEventIndex(retainedEvents);
-      retainedEvents.splice(index, 1);
-      logRecords.splice(index, 1);
-      updateCounts();
+    });
+    // Admit records by priority only when the complete request still fits, then restore source order.
+    /** @type {number[]} */
+    let admitted = [];
+    const byPriority = retainedEvents.map((event, index) => index).sort((a, b) => sessionEventPriority(retainedEvents[a]) - sessionEventPriority(retainedEvents[b]) || a - b);
+    for (const index of byPriority) {
+      const candidate = [...admitted, index].sort((a, b) => a - b);
+      if (Buffer.byteLength(JSON.stringify(buildPayload(candidate))) <= maxBytes) admitted = candidate;
     }
-    if (!logRecords.length) {
+    if (!admitted.length) {
       console.warn("[otlp] No compact session records fit GH_AW_OTLP_LOGS_MAX_BYTES; session logs not exported");
       return;
     }
-    if (compact.truncated || logRecords.length < compact.includedEvents) {
-      core.warning(
-        `[otlp] Session export is partial: retained ${logRecords.length} compact events; ${compact.omittedEvents + compact.includedEvents - logRecords.length} inspected records omitted. Size or source-scan limits were reached; the full session artifact is unchanged.`
+    const payload = buildPayload(admitted);
+    if (compact.truncated || admitted.length < compact.includedEvents) {
+      // The shared standalone shim only writes plain text, so emit the annotation directly.
+      process.stdout.write(
+        `::warning::[otlp] Session export is partial: retained ${admitted.length} compact events; ${compact.omittedEvents + compact.includedEvents - admitted.length} inspected records omitted. Size or source-scan limits were reached; the full session artifact is unchanged.\n`
       );
     }
     await otlp.sendOTLPToAllEndpoints(endpoints, payload, { signal: "logs", skipJSONL: true });
-  } catch {
-    console.warn("[otlp] Failed to export compact session logs; check that a valid unified session artifact was published");
+  } catch (err) {
+    // Only the error class and code are reported; messages can embed private paths or content.
+    const kind = err instanceof Error ? err.name : typeof err;
+    const code = err && typeof err === "object" && "code" in err && typeof err.code === "string" && /^[A-Z0-9_]{1,40}$/.test(err.code) ? ` ${err.code}` : "";
+    console.warn(`[otlp] Failed to export compact session logs (${kind}${code}); check that a valid unified session artifact was published`);
   }
 }
 
-module.exports = { sendSessionLogs, DEFAULT_MAX_SESSION_LOG_BYTES };
+module.exports = { sendSessionLogs };
