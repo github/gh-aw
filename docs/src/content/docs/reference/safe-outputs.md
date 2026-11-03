@@ -261,6 +261,8 @@ This integration does not support transitions, assignment, custom fields, priori
 
 Set `steer: true` to create a run-scoped issue during the activation job, before the agent starts. Users can add comments containing the keyword `steer` while the run is in progress. The injected prompt identifies the exact issue and instructs the agent to read relevant user-authored comments with the GitHub MCP `issue_read` tool.
 
+When the daily AI Credits guardrail blocks agent startup, no steering issue is created. Failure reporting uses its normal existing-issue deduplication instead.
+
 The initial issue body includes the standard generated-by footer and tracking metadata for the workflow, run, tracker ID, and available engine information. Attribution is present before the agent starts and uses the configured `messages.footer` template when provided.
 
 Steering enables the GitHub MCP issues toolset for comment reads and requires top-level `issues: read` permission. The compiler reports an error instead of adding that permission automatically.

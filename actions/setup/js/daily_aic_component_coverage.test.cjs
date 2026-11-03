@@ -90,6 +90,105 @@ it("rejects executed evals with missing accounting despite valid agent usage", a
   expect(f.list).toHaveBeenCalledOnce();
 });
 
+const failedDecisionsStatus = {
+  status: "not_evaluated",
+  reason_code: "judge_failed",
+  reason: "The Decisions evals request finished with outcome failure; no answers were recorded.",
+  engine: "decisions",
+  run_id: "1",
+  run_attempt: "1",
+  execution_outcome: "failure",
+  execution_state: "started",
+};
+
+it("preserves other component usage when an advisory Decisions judge fails in a successful job", async () => {
+  const f = evaluate(
+    {
+      "agent/token_usage.jsonl": '{"aic":51.64972}',
+      "detection/token_usage.jsonl": '{"aic":6.60246}',
+      "evals/evals_status.json": JSON.stringify(failedDecisionsStatus),
+    },
+    [job("agent"), job("detection"), job("evals")]
+  );
+
+  await expect(f.result).resolves.toBeCloseTo(58.25218);
+  expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("provider billing remains unverified"));
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"component":"evals"'));
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"reason":"failed_before_accounting"'));
+});
+
+it.each([
+  ["another run", { run_id: "2" }],
+  ["another attempt", { run_attempt: "2" }],
+  ["missing run identity", { run_id: undefined }],
+  ["missing attempt identity", { run_attempt: undefined }],
+  ["another engine", { engine: "copilot" }],
+  ["cancelled judge", { execution_outcome: "cancelled" }],
+  ["successful judge", { execution_outcome: "success" }],
+  ["unknown judge outcome", { execution_outcome: undefined }],
+  ["unknown execution state", { execution_state: undefined }],
+  ["no assistant response", { reason_code: "no_assistant_response" }],
+  ["not evaluated status missing", { status: undefined }],
+])("does not accept failed-judge evidence with %s", async (_description, overrides) => {
+  const f = evaluate(
+    {
+      "agent/token_usage.jsonl": '{"aic":2}',
+      "evals/evals_status.json": JSON.stringify({ ...failedDecisionsStatus, ...overrides }),
+    },
+    [job("agent"), job("evals")]
+  );
+  await expect(f.result).rejects.toThrow("Missing accounting for executed evals component");
+});
+
+it.each(["", "{invalid"])("does not accept malformed failed-judge evidence (%j)", async status => {
+  const f = evaluate({ "agent/token_usage.jsonl": '{"aic":2}', "evals/evals_status.json": status }, [job("agent"), job("evals")]);
+  await expect(f.result).rejects.toThrow("Missing accounting for executed evals component");
+});
+
+it("does not apply successful-job judge evidence to a cancelled evals job", async () => {
+  const f = evaluate({ "agent/token_usage.jsonl": '{"aic":2}', "evals/evals_status.json": JSON.stringify(failedDecisionsStatus) }, [job("agent"), job("evals", { conclusion: "cancelled" })]);
+  await expect(f.result).rejects.toThrow("Missing accounting for executed evals component");
+});
+
+it("counts recorded evals usage even when the judge subsequently fails", async () => {
+  const f = evaluate(
+    {
+      "agent/token_usage.jsonl": '{"aic":2}',
+      "evals/token_usage.jsonl": '{"aic":3}',
+      "evals/evals_status.json": JSON.stringify(failedDecisionsStatus),
+    },
+    [job("agent"), job("evals")]
+  );
+  await expect(f.result).resolves.toBe(5);
+  expect(global.core.warning).not.toHaveBeenCalled();
+});
+
+it("does not replace invalid nonempty evals usage with a failed-judge fallback", async () => {
+  const f = evaluate(
+    {
+      "agent/token_usage.jsonl": '{"aic":2}',
+      "evals/token_usage.jsonl": "{invalid",
+      "evals/evals_status.json": JSON.stringify(failedDecisionsStatus),
+    },
+    [job("agent"), job("evals")]
+  );
+  await expect(f.result).rejects.toThrow();
+  expect(global.core.warning).not.toHaveBeenCalled();
+});
+
+it("does not replace unreadable evals usage with a failed-judge fallback", async () => {
+  const f = evaluate({}, [job("agent"), job("evals")]);
+  f.client.downloadArtifact.mockImplementation(async (_id, options) => {
+    fs.mkdirSync(path.join(options.path, "agent"), { recursive: true });
+    fs.writeFileSync(path.join(options.path, "agent/token_usage.jsonl"), '{"aic":2}');
+    fs.mkdirSync(path.join(options.path, "evals/token_usage.jsonl"), { recursive: true });
+    fs.writeFileSync(path.join(options.path, "evals/evals_status.json"), JSON.stringify(failedDecisionsStatus));
+    return { downloadPath: options.path };
+  });
+  await expect(f.result).rejects.toThrow("evals/token_usage.jsonl is unreadable");
+  expect(global.core.warning).not.toHaveBeenCalled();
+});
+
 it("counts an empty detection accounting file as zero AIC", async () => {
   const f = evaluate(
     {

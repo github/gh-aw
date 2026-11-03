@@ -83,6 +83,24 @@ beforeEach(() => {
     })),
     downloadArtifact: vi.fn(async (id, options) => {
       for (const component of ["agent", "detection", "evals"]) {
+        if (component === "evals" && componentMode === "failed_decisions") {
+          const root = path.join(options.path, component);
+          fs.mkdirSync(root, { recursive: true });
+          fs.writeFileSync(
+            path.join(root, "evals_status.json"),
+            JSON.stringify({
+              status: "not_evaluated",
+              reason_code: "judge_failed",
+              reason: "The Decisions evals request finished with outcome failure; no answers were recorded.",
+              engine: "decisions",
+              run_id: String(id),
+              run_attempt: "1",
+              execution_outcome: "failure",
+              execution_state: "started",
+            })
+          );
+          continue;
+        }
         if (component === "agent" && (componentMode === "missing" || (componentMode === "mixed" && id === 2))) continue;
         const root = path.join(options.path, component);
         fs.mkdirSync(root, { recursive: true });
@@ -179,6 +197,43 @@ describe("daily AIC specification: basic conformance", () => {
     github.rest.actions.listWorkflowRuns.mockResolvedValue(response({ workflow_runs: [run(1), run(2)] }));
     await check();
     expectDecision("exceeded", 11, 8);
+  });
+
+  it("T-AIC-DG-027 replaces whole-run estimates after a successful wrapper job reports a failed Decisions judge", async () => {
+    componentMode = "failed_decisions";
+    vi.stubEnv("GH_AW_MAX_DAILY_AI_CREDITS", "5000");
+    vi.stubEnv("GH_AW_MAX_AI_CREDITS", "1000");
+    const runs = [run(1), run(2), run(3), run(4), run(5)];
+    github.rest.actions.listWorkflowRuns.mockResolvedValue(response({ workflow_runs: runs }));
+    fs.writeFileSync(
+      path.join(directory, "scan.jsonl"),
+      runs
+        .map(item =>
+          JSON.stringify({
+            version: 2,
+            coverage_version: 3,
+            repository,
+            workflow_id: 7,
+            run_id: item.id,
+            run_attempt: 1,
+            created_at: timestamp,
+            updated_at: timestamp,
+            observed_at: new Date(now).toISOString(),
+            source: "estimated",
+            aic: 1000,
+          })
+        )
+        .join("\n")
+    );
+
+    await check();
+
+    expectDecision("under_budget", 20, 0, 5000);
+    expect(client.listArtifacts).toHaveBeenCalledTimes(5);
+    const observations = fs.readFileSync(path.join(directory, "scan.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
+    expect(observations.map(entry => entry.source)).toEqual(Array(5).fill("recorded"));
+    expect(observations.map(entry => entry.aic)).toEqual([2, 3, 4, 5, 6]);
+    expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("provider billing remains unverified"));
   });
 
   it("T-AIC-DG-021 fails closed when unresolved accounting has no positive maximum", async () => {

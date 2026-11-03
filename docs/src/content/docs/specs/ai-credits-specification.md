@@ -458,6 +458,7 @@ A conforming implementation MUST enforce the following at compile time:
 | T-AIC-DG-024 | Estimated credits are reported separately and equality with the threshold is exceeded | §9.14 |
 | T-AIC-DG-025 | Repo-memory trust, timestamp filtering, duplicate selection, and permissive read behavior match the separate backend contract | §9.15 |
 | T-AIC-DG-026 | A cancelled rerun without a verified producer carries usage only from the unique latest earlier executed job with a verified producer; missing accounting, ambiguous prior jobs, and other outcomes fail closed | §9.11 |
+| T-AIC-DG-027 | Run/attempt-bound advisory Decisions failures use the failed-Evaluations accounting policy, preserve other component usage, and replace whole-run estimates on the next scan | §9.11 |
 
 ### 9.8 Guardrail Bypass Conditions
 
@@ -535,7 +536,7 @@ Within each component, select the first non-empty accounting file in this order:
 | Detection | `detection/token_usage.jsonl`, `detection_usage.jsonl` |
 | Evaluations | `evals/token_usage.jsonl` |
 
-The Evaluations producer collects the runner-visible log exported by AWF as `AWF_TOKEN_USAGE_LOG`, including an empty file, before uploading its accounting artifact. If that file is unavailable, it falls back to non-empty logs in the configured firewall audit and proxy-log directories. Missing accounting MUST NOT create a zero-usage placeholder. An empty collected log does not by itself prove zero usage; the component accounting and zero-accounting fallbacks below still apply.
+The Evaluations producer records usage directly from the Decisions response in `/tmp/gh-aw/evals_token_usage.jsonl` and uploads it with the evals artifact. Conclusion stages this file as `evals/token_usage.jsonl` in the usage artifact. It does not depend on AWF or agent logs. Missing accounting MUST NOT create a zero-usage placeholder. An empty collected log does not by itself prove zero usage; the component accounting and zero-accounting fallbacks below still apply.
 
 The selected source is parsed strictly. A malformed or invalid selected source MUST NOT be rescued by a lower-priority summary. An unreadable higher-priority source MUST NOT be silently skipped in favor of a lower-priority source. Different component values are added once; raw accounting and overlapping engine summaries MUST NOT both contribute.
 
@@ -554,10 +555,11 @@ The following additional component zero-accounting fallbacks are supported. Othe
 | Explicit execution-not-started artifact | No selected accounting and version-1 component execution evidence matching run ID, job attempt, component, and `state: not_started` |
 | Legacy failed Agent before accounting | Verified coverage, no selected accounting, failed conclusion, missing raw file, no execution-evidence file, and no inspected legacy Agent artifact |
 | Failed Evaluations before accounting | Verified coverage, failed conclusion, and no selected accounting |
+| Advisory Decisions failure before accounting | Verified coverage, successful job conclusion, no selected accounting, and `evals/evals_status.json` identifying the same run and selected job attempt with engine `decisions`, status `not_evaluated`, reason `judge_failed`, execution outcome `failure`, and execution state `started` |
 
 Legacy Agent evidence is inspected only when no non-empty Agent accounting candidate exists. The legacy artifact must be unexpired, timestamp-bound to its job, and contain a regular log no larger than 10 MiB. Detection's empty-raw exception is checked before lower-priority candidate selection. The remaining zero fallbacks MUST NOT override a malformed non-empty or higher-priority unreadable source.
 
-These are implemented evidence/compatibility policies, not a proof that a provider never charged a request. In particular, legacy missing-accounting failure heuristics and absent provider-response usage cannot certify external billing.
+These are implemented evidence/compatibility policies, not a proof that a provider never charged a request. In particular, missing-accounting failure heuristics and absent provider-response usage cannot certify external billing. The advisory Decisions fallback applies the existing failed-Evaluations policy to the judge outcome when `continue-on-error` leaves its wrapper job successful. It emits a warning that provider billing remains unverified; it MUST NOT override non-empty or unreadable accounting.
 
 ### 9.12 Conservative Whole-Run Maximum Fallback
 

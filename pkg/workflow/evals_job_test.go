@@ -116,3 +116,28 @@ func TestBuildEvalsJobRestoresSetupActionInDevMode(t *testing.T) {
 	assert.Contains(t, steps, "if: always()")
 	assert.Contains(t, steps, "sparse-checkout: |\n            actions/setup")
 }
+
+func TestBuildEvalsJobPreservesAccountingBeforePersistence(t *testing.T) {
+	for _, dryRun := range []bool{false, true} {
+		compiler := NewCompiler()
+		compiler.SetDryRun(dryRun)
+		job, err := compiler.buildEvalsJob(evalsTestData())
+		require.NoError(t, err)
+		require.NotNil(t, job)
+
+		steps := strings.Join(job.Steps, "")
+		for _, name := range []string{"Upload evals results", "Upload evals accounting after failure"} {
+			start := strings.Index(steps, "      - name: "+name+"\n")
+			require.NotEqual(t, -1, start)
+			step := strings.SplitN(steps[start:], "\n      - ", 2)[0]
+			assert.Contains(t, step, "/tmp/gh-aw/evals_token_usage.jsonl\n")
+			assert.Contains(t, step, evalsExecutionEvidencePath+"\n")
+			if !dryRun {
+				assert.Greater(t, strings.Index(steps, "name: Push evals results to git"), start)
+			}
+		}
+		assert.Contains(t, steps, evalsStatusPath+"\n")
+		assert.Contains(t, steps, "GH_AW_EVALS_EXECUTION_OUTCOME: ${{ steps.evals_decisions_execution.outcome }}")
+		assert.Equal(t, "${{ steps.parse_evals_token_usage.outputs.aic }}", job.Outputs["aic"])
+	}
+}
