@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -95,6 +96,7 @@ func TestEventPredicateBoundsAndValidation(t *testing.T) {
 			require.Error(t, ValidateEventPredicate(rule))
 		})
 	}
+
 	leaf := EventPredicate{Path: "/a", Op: "null"}
 	rule := EventPredicate{All: make([]EventPredicate, 65)}
 	for index := range rule.All {
@@ -111,4 +113,44 @@ func TestEventPredicateBoundsAndValidation(t *testing.T) {
 	matched, known := EvaluateEventPredicate(EventPredicate{Path: "/new", Other: "/old", Op: "set-added"}, document)
 	require.False(t, matched)
 	require.False(t, known)
+}
+
+func TestEventPrefixBudgetConformance(t *testing.T) {
+	members := make([]string, eventArrayLimit)
+	prefixes := make([]string, eventArrayLimit)
+	for index := range eventArrayLimit {
+		members[index] = "a" + strings.Repeat("x", index)
+		prefixes[index] = "no" + strings.Repeat("x", index)
+	}
+	members[eventArrayLimit-1], prefixes[eventArrayLimit-1] = "z", "z"
+	cases := []map[string]any{
+		{
+			"name":    "member-prefix comparison order shares the evaluation budget",
+			"rule":    EventPredicate{Path: "/items", Op: "member-prefix", Values: prefixes},
+			"payload": map[string]any{"items": members}, "matched": false, "known": false,
+		},
+		{
+			"name":    "URL query semicolons are not silently reinterpreted",
+			"rule":    EventPredicate{Path: "/url", Op: "url-id", Other: "/id", Value: "https://example.test/attachments/", Values: []string{"fileName"}},
+			"payload": map[string]any{"id": "a", "url": "https://example.test/attachments/a?fileName=x;other=y"}, "matched": false, "known": false,
+		},
+		{
+			"name":    "URL query encoded semicolon stays literal data",
+			"rule":    EventPredicate{Path: "/url", Op: "url-id", Other: "/id", Value: "https://example.test/attachments/", Values: []string{"fileName"}},
+			"payload": map[string]any{"id": "a", "url": "https://example.test/attachments/a?fileName=x%3Bother%3Dy"}, "matched": true, "known": true,
+		},
+	}
+	slices.Reverse(members)
+	cases = append(cases, map[string]any{
+		"name":    "member input order cannot change budget exhaustion",
+		"rule":    EventPredicate{Path: "/items", Op: "member-prefix", Values: prefixes},
+		"payload": map[string]any{"items": members}, "matched": false, "known": false,
+	}, map[string]any{
+		"name":    "member-prefix match within the budget remains available",
+		"rule":    EventPredicate{Path: "/items", Op: "member-prefix", Values: prefixes},
+		"payload": map[string]any{"items": members[:50]}, "matched": true, "known": true,
+	})
+	data, err := json.Marshal(cases)
+	require.NoError(t, err)
+	checkEventPredicateConformance(t, data)
 }

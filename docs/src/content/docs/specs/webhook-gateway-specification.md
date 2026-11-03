@@ -122,6 +122,13 @@ Known false dominates `all`; known true dominates `any`. Set comparison ignores
 order/duplicates; a declared single-character separator trims string tokens.
 No cached state or guessed status names may substitute for evidence.
 
+Response evidence can also use literal `prefix`, boundary-aware `path-prefix`,
+set `member-prefix`, and exact `url-id` rules. Member-prefix comparisons visit
+distinct members in UTF-8 byte order so the shared evaluation budget is
+deterministic. URL identity rules require the fixed HTTPS prefix plus the
+exact source ID and permit only declared, single-valued query keys; malformed
+escapes and unescaped query semicolons are unknown rather than reinterpreted.
+
 The receiver MUST evaluate `when` against authenticated original evidence.
 Optional `url_identity` and `url_path_prefix` bind the canonical URL path to
 one exact primitive source ID; the origin remains independently approved.

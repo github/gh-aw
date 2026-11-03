@@ -169,7 +169,7 @@ function evaluatePrefix(rule, value, other, result, spend) {
     if (typeof value !== "string" || !other.present || !identity || !/^[A-Za-z0-9._-]{1,256}$/.test(identity)) return result(false, false);
     try {
       const actual = new URL(value);
-      if (actual.username || actual.password || actual.hash || /%(?![0-9a-f]{2})/i.test(actual.search)) return result(false, false);
+      if (actual.username || actual.password || actual.hash || actual.search.includes(";") || /%(?![0-9a-f]{2})/i.test(actual.search)) return result(false, false);
       for (const [key, item] of actual.searchParams) if (!(rule.values || []).includes(key) || actual.searchParams.getAll(key).length !== 1 || Buffer.byteLength(item) > 1024) return result(false);
       return result(value.split("?")[0] === rule.value + encodeURIComponent(identity));
     } catch {
@@ -179,7 +179,7 @@ function evaluatePrefix(rule, value, other, result, spend) {
   if (rule.op === "member-prefix") {
     const members = stringSet(value, rule.separator);
     if (!members) return result(false, false);
-    for (const member of members)
+    for (const member of [...members].sort((left, right) => Buffer.compare(Buffer.from(left), Buffer.from(right))))
       for (const prefix of rule.values || []) {
         if (!spend()) return result(false, false);
         if (member.startsWith(prefix)) return result(true);

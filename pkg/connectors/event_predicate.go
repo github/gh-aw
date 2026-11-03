@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"net/url"
 	"regexp"
@@ -243,7 +244,7 @@ func evaluateEventPrefix(rule EventPredicate, value, other any, found bool, rema
 		if !valid {
 			return false, false
 		}
-		for member := range members {
+		for _, member := range slices.Sorted(maps.Keys(members)) {
 			for _, prefix := range rule.Values {
 				*remaining--
 				if *remaining < 0 {
