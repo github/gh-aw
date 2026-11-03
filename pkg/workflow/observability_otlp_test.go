@@ -342,6 +342,24 @@ func TestGetOTLPGitHubAppTokenConfig(t *testing.T) {
 	assert.Equal(t, "${{ secrets.APP_PRIVATE_KEY }}", got.PrivateKey)
 }
 
+func TestInjectOTLPConfig_Protocol(t *testing.T) {
+	t.Parallel()
+	for _, configuredEnv := range []string{"", "env:\n  OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf"} {
+		t.Run(configuredEnv, func(t *testing.T) {
+			compiler := NewCompiler()
+			data := &WorkflowData{Env: configuredEnv}
+			compiler.injectOTLPConfig(data)
+			assert.Equal(t, 1, strings.Count(data.Env, "OTEL_EXPORTER_OTLP_PROTOCOL:"))
+			if configuredEnv == "" {
+				assert.Contains(t, data.Env, "OTEL_EXPORTER_OTLP_PROTOCOL: ${{ vars.OTEL_EXPORTER_OTLP_PROTOCOL }}")
+			} else {
+				assert.Contains(t, data.Env, "OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf")
+				assert.NotContains(t, data.Env, "vars.OTEL_EXPORTER_OTLP_PROTOCOL")
+			}
+		})
+	}
+}
+
 // TestInjectOTLPConfig verifies that injectOTLPConfig correctly modifies WorkflowData.
 func TestInjectOTLPConfig(t *testing.T) {
 	newCompiler := func() *Compiler { return &Compiler{} }

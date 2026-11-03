@@ -32,15 +32,18 @@ In this enterprise controls reference, OTLP defaults are the scope-sensitive exc
 | `GH_AW_DEFAULT_MODEL_CODEX` | GitHub Actions `vars.*` at runtime | Default fallback model for Codex | `GH_AW_MODEL_AGENT_CODEX` / `GH_AW_MODEL_DETECTION_CODEX` is unset |
 | `GH_AW_DEFAULT_OTLP_ENDPOINT` | GitHub Actions `secrets.*` or `vars.*` at runtime | Default OTLP exporter endpoint | `observability.otlp.endpoint` is not set in frontmatter or any imported workflow |
 | `GH_AW_DEFAULT_OTLP_HEADERS` | GitHub Actions `secrets.*` at runtime | Default OTLP exporter headers for `GH_AW_DEFAULT_OTLP_ENDPOINT` | `observability.otlp.endpoint` is not set in frontmatter or any imported workflow |
+| `OTEL_EXPORTER_OTLP_PROTOCOL` | GitHub Actions `vars.*` at runtime | OTLP/HTTP encoding, `http/json` or `http/protobuf` | Workflow `env` does not explicitly define the variable; JavaScript traces-specific protocol takes precedence |
 | `GH_AW_OTLP_LOGS_ENABLED` | GitHub Actions `vars.*` at runtime | Opt in to compact unified-session OTLP logs (`true`); unset or `false` disables export | The conclusion job has a published unified session and configured OTLP endpoints |
 | `GH_AW_OTLP_LOGS_MAX_BYTES` | GitHub Actions `vars.*` at runtime | Maximum serialized OTLP session-log request size in bytes (default `65536`) | Session-log export is enabled |
 | `GH_AW_REQUIRE_SELF_HOSTED_RUNNERS` | Compiler process environment | Fail compilation unless every generated job selects a self-hosted runner | Set to `true` in a trusted compile environment to enforce self-hosted-only runners |
 
-Use `gh aw env get` and `gh aw env update` to manage `GH_AW_DEFAULT_*`
+Use `gh aw env get` and `gh aw env update` to manage `GH_AW_DEFAULT_*` and `OTEL_EXPORTER_OTLP_PROTOCOL`
 variables in batch. These commands operate on GitHub Actions variables and support repo, org, or enterprise scope, so `default_otlp_endpoint` can still be managed as an enterprise variable. Set OTLP secrets separately with `gh secret set`; those secrets are limited to repository or organization scope. The defaults file uses
 `default_`-prefixed keys such as `default_max_ai_credits`, `default_max_turn_cache_misses`, `default_detection_max_ai_credits`, `default_max_daily_ai_credits`, `default_timeout_minutes`, `default_agent_job_timeout_minutes`, `default_detection_job_timeout_minutes`,
-`default_model_copilot`, `default_otlp_endpoint`, `default_artifact_retention_days`, and `default_utc`. `gh aw env update --scope ent` writes only the `GH_AW_DEFAULT_OTLP_ENDPOINT` variable, not an endpoint secret. To mask the endpoint value, set `GH_AW_DEFAULT_OTLP_ENDPOINT` with
+`default_model_copilot`, `default_otlp_endpoint`, `default_otlp_protocol`, `default_artifact_retention_days`, and `default_utc`. For the endpoint, `gh aw env update --scope ent` writes the `GH_AW_DEFAULT_OTLP_ENDPOINT` variable, not an endpoint secret. To mask the endpoint value, set `GH_AW_DEFAULT_OTLP_ENDPOINT` with
 `gh secret set` at repository or organization scope instead. `GH_AW_DEFAULT_OTLP_HEADERS` is always a secret and must also be set with `gh secret set` at repository or organization scope. If both endpoint values exist, clearing only one leaves the other effective through the fallback expression; clear both the endpoint secret and variable to disable OTLP export.
+
+`default_otlp_protocol` is the defaults-file key for the standard `OTEL_EXPORTER_OTLP_PROTOCOL` Actions variable (not a `GH_AW_DEFAULT_*` variable). It accepts `http/json` or `http/protobuf`; null or omission deletes the variable at the selected scope. Recompile existing workflows to add the runtime variable lookup. Explicit workflow `env` takes precedence. See [OpenTelemetry](/gh-aw/reference/open-telemetry/#protobuf-encoding-and-azure-monitor) for details.
 
 `GH_AW_REQUIRE_SELF_HOSTED_RUNNERS` is a compile-time enforcement setting, not a `GH_AW_DEFAULT_*` default, and is not managed by `gh aw env`. The same policy can be enabled persistently with `require_self_hosted_runners: true` in `.github/workflows/aw.json`, or for a single invocation with `gh aw compile --require-self-hosted-runners`.
 
