@@ -101,6 +101,7 @@ func TestPrepareRuntimeSetupAndCheckoutInfo_UVCacheValidation(t *testing.T) {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), `step "Custom uv setup"`)
 				assert.Contains(t, err.Error(), "enable-cache: false")
+				assert.Contains(t, err.Error(), "shared custom-step templates")
 			} else {
 				require.NoError(t, err)
 			}
