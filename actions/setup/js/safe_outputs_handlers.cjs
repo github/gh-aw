@@ -612,7 +612,19 @@ function createHandlers(server, appendSafeOutput, config = {}) {
    * @returns {Function} Handler function
    */
   const defaultHandler = type => args => {
-    const entry = { ...(args || {}), type };
+    let entry = { ...(args || {}), type };
+    const stagedFiles = getSafeOutputsToolConfig(config, type)?.staged_files;
+    if (stagedFiles) {
+      try {
+        entry = require("./connector_file.cjs").stageConnectorFiles(entry, stagedFiles, {
+          root: path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "safeoutputs", "upload-artifacts"),
+          workspace: process.env.GITHUB_WORKSPACE,
+          rejectPath: validateUploadSourcePath,
+        });
+      } catch (error) {
+        return buildIntentErrorResponse(`Connector file staging failed: ${getErrorMessage(error)}`);
+      }
+    }
     if (entry.data !== undefined) {
       const toolConfig = getSafeOutputsToolConfig(config, type);
       const dataEnabled = toolConfig?.data_enabled === true || (toolConfig?.data_schema && typeof toolConfig.data_schema === "object");
@@ -640,8 +652,13 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     if (wildcardTargetValidationError) {
       return wildcardTargetValidationError;
     }
+    const temporaryField = getSafeOutputsToolConfig(config, type)?.temporary_id_field;
+    if (temporaryField && entry[temporaryField] === undefined) entry[temporaryField] = generateTemporaryId();
     const largeContentResponse = maybeHandleLargeContent(entry);
-    if (largeContentResponse) return largeContentResponse;
+    if (largeContentResponse) {
+      if (temporaryField) largeContentResponse.content.push({ type: "text", text: JSON.stringify({ temporary_id: entry[temporaryField] }) });
+      return largeContentResponse;
+    }
 
     // Normal case - no large content
     appendSafeOutputCounted(entry);
@@ -649,7 +666,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
       content: [
         {
           type: "text",
-          text: JSON.stringify({ result: "success" }),
+          text: JSON.stringify({ result: "success", ...(temporaryField ? { temporary_id: entry[temporaryField] } : {}) }),
         },
       ],
     };

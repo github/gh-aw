@@ -14,7 +14,7 @@ func eventPredicateSchema() (*jsonschema.Schema, error) {
 	    "all":{"type":"array","minItems":1,"maxItems":64,"items":{"$ref":"#/$defs/eventPredicate"}},
 	    "any":{"type":"array","minItems":1,"maxItems":64,"items":{"$ref":"#/$defs/eventPredicate"}},
 	    "path":{"type":"string","pattern":"^/","maxLength":1024},
-	    "op":{"enum":["equals","present","absent","null","timestamp","text","changed","set-added","set-removed","enters","leaves","length","any-item"]},
+	    "op":{"enum":["equals","present","absent","null","timestamp","text","changed","set-added","set-removed","enters","leaves","length","any-item","prefix","path-prefix","member-prefix","url-id"]},
 	    "value":{"type":["string","integer","boolean"]},
 	    "other":{"type":"string","pattern":"^/","maxLength":1024},
 	    "fallback":{"type":"string","pattern":"^/","maxLength":1024},

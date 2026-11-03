@@ -20,8 +20,8 @@ function validEventPredicate(rule) {
     const values = node.values || [];
     if (!Array.isArray(values) || values.length > 100 || !values.every(value => typeof value === "string" && value.length > 0 && Buffer.byteLength(value) <= 1024 && !value.includes("${{"))) return false;
     const op = node.op;
-    if (values.length && !["enters", "leaves"].includes(op)) return false;
-    if (node.separator !== undefined && (!["set-added", "set-removed"].includes(op) || typeof node.separator !== "string" || Array.from(node.separator).length !== 1 || /[\r\n]/.test(node.separator))) return false;
+    if (values.length && !["enters", "leaves", "prefix", "path-prefix", "member-prefix", "url-id"].includes(op)) return false;
+    if (node.separator !== undefined && (!["set-added", "set-removed", "member-prefix"].includes(op) || typeof node.separator !== "string" || Array.from(node.separator).length !== 1 || /[\r\n]/.test(node.separator))) return false;
     if (node.items !== undefined && op !== "any-item") return false;
     const primitive = value => typeof value === "boolean" || (typeof value === "string" && Array.from(value).length <= 1024 && !value.includes("${{")) || (typeof value === "number" && Number.isSafeInteger(value));
     switch (op) {
@@ -40,6 +40,28 @@ function validEventPredicate(rule) {
       case "enters":
       case "leaves":
         return node.other !== undefined && node.value === undefined;
+      case "prefix":
+      case "path-prefix":
+      case "member-prefix":
+        return node.other === undefined && node.value === undefined;
+      case "url-id":
+        try {
+          const parsed = new URL(node.value);
+          return (
+            node.other !== undefined &&
+            typeof node.value === "string" &&
+            Buffer.byteLength(node.value) <= 1024 &&
+            node.value.endsWith("/") &&
+            parsed.protocol === "https:" &&
+            !parsed.username &&
+            !parsed.password &&
+            !parsed.search &&
+            !parsed.hash &&
+            !node.value.includes("${")
+          );
+        } catch {
+          return false;
+        }
       case "length":
         return Number.isInteger(node.value) && node.value >= 0 && node.value <= 100 && node.other === undefined;
       case "any-item":
@@ -100,6 +122,11 @@ function evaluateEventPredicate(rule, document) {
         return result(actual === (node.other ? other.value : node.value), comparable(actual) && comparable(node.other ? other.value : node.value) && (!node.other || other.present));
       case "length":
         return result(Array.isArray(actual) && actual.length === node.value, Array.isArray(actual) && actual.length <= 100);
+      case "prefix":
+      case "path-prefix":
+      case "member-prefix":
+      case "url-id":
+        return evaluatePrefix(node, actual, other, result, () => --remaining >= 0);
       case "any-item": {
         if (!Array.isArray(actual) || actual.length > 100) return result(false, false);
         let unknown = false;
@@ -134,6 +161,43 @@ function evaluateEventPredicate(rule, document) {
   };
   const evaluated = visit(rule, document);
   return remaining < 0 ? result(false, false) : evaluated;
+}
+
+function evaluatePrefix(rule, value, other, result, spend) {
+  if (rule.op === "url-id") {
+    const identity = typeof other.value === "string" ? other.value : typeof other.value === "number" && Number.isSafeInteger(other.value) && other.value >= 0 ? String(other.value) : null;
+    if (typeof value !== "string" || !other.present || !identity || !/^[A-Za-z0-9._-]{1,256}$/.test(identity)) return result(false, false);
+    try {
+      const actual = new URL(value);
+      if (actual.username || actual.password || actual.hash || /%(?![0-9a-f]{2})/i.test(actual.search)) return result(false, false);
+      for (const [key, item] of actual.searchParams) if (!(rule.values || []).includes(key) || actual.searchParams.getAll(key).length !== 1 || Buffer.byteLength(item) > 1024) return result(false);
+      return result(value.split("?")[0] === rule.value + encodeURIComponent(identity));
+    } catch {
+      return result(false, false);
+    }
+  }
+  if (rule.op === "member-prefix") {
+    const members = stringSet(value, rule.separator);
+    if (!members) return result(false, false);
+    for (const member of members)
+      for (const prefix of rule.values || []) {
+        if (!spend()) return result(false, false);
+        if (member.startsWith(prefix)) return result(true);
+      }
+    return result(false);
+  }
+  if (typeof value !== "string" || Buffer.byteLength(value) > 65536) return result(false, false);
+  for (const prefix of rule.values || []) {
+    if (!spend()) return result(false, false);
+    if (rule.op === "path-prefix") {
+      const current = value.trim().toLowerCase();
+      const parent = prefix.trim().replace(/\\+$/, "").toLowerCase();
+      if (current === parent || current.startsWith(parent + "\\")) return result(true);
+    } else if (value.startsWith(prefix)) {
+      return result(true);
+    }
+  }
+  return result(false);
 }
 
 function validTimestamp(value) {

@@ -111,6 +111,10 @@ func (p *Plan) ForPhase(phase string) (*Plan, error) { //nolint:largefunc // Kee
 			addResources(lookup.Resources)
 			addResources(lookup.ResponseResources)
 		}
+		for _, check := range op.Checks {
+			addResources(check.Resources)
+			addResources(check.ResponseResources)
+		}
 	}
 	switch phase {
 	case "agent":
@@ -166,8 +170,20 @@ func (p *Plan) ForPhase(phase string) (*Plan, error) { //nolint:largefunc // Kee
 			spec.SafeOutputs[name] = op
 			addOperation(op)
 		}
+	case "trigger":
+		binding.Triggers = p.binding.Triggers
+		spec.Triggers = map[string]Trigger{}
+		for _, name := range binding.Triggers {
+			trigger := p.spec.Triggers[name]
+			spec.Triggers[name] = trigger
+			addResources(trigger.Resources)
+		}
+		for _, name := range slices.Sorted(maps.Keys(p.spec.Endpoints)) {
+			spec.Endpoints[name] = p.spec.Endpoints[name]
+			break
+		}
 	default:
-		return nil, errors.New("connector phase must be agent, context or safe-output")
+		return nil, errors.New("connector phase must be agent, context, safe-output or trigger")
 	}
 	if err := spec.Validate(); err != nil {
 		return nil, err
@@ -225,6 +241,16 @@ func (p *Plan) SafeOutputNames() []string {
 	return names
 }
 
+func (p *Plan) UsesStagedFile(name string) bool {
+	return slices.Contains(p.binding.SafeOutputs, name) && p.spec.SafeOutputs[name].Request.Binary != nil
+}
+
+func (p *Plan) TriggerNames() []string {
+	names := slices.Clone(p.binding.Triggers)
+	slices.Sort(names)
+	return names
+}
+
 func (p *Plan) Inputs(capability, name string) (map[string]Input, error) {
 	op, ok := selectedOperation(p.spec, capability, name)
 	if !ok {
@@ -259,7 +285,23 @@ func (p *Plan) InputSchema(capability, name string) (map[string]any, error) {
 		}
 	}
 	op, _ := selectedOperation(p.spec, capability, name)
-	return inputSchema(lookupPublicInputs(op, inputs)), nil
+	schema := inputSchema(lookupPublicInputs(op, inputs))
+	if op.Creates != nil {
+		schema["x-gh-aw-temporary-id"] = op.Creates.TemporaryID
+	}
+	if op.Request.Binary != nil {
+		properties, ok := schema["properties"].(map[string]any)
+		if !ok {
+			return nil, errors.New("generated connector file schema requires object properties")
+		}
+		property, ok := properties[op.Request.Binary.Input].(map[string]any)
+		if !ok {
+			return nil, errors.New("generated connector file input is missing its property schema")
+		}
+		property["x-gh-aw-staged-file"] = op.Request.Binary
+		property["description"] = "Existing regular file path under the workspace or trusted staging directory; the recorder stages a bounded content-addressed snapshot before delivery."
+	}
+	return schema, nil
 }
 
 func (p *Plan) ValidateContext(name string, args map[string]any) error {

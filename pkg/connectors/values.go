@@ -115,6 +115,9 @@ func numericValue(value any) (float64, bool) {
 }
 
 func lookupPointer(document any, pointer string) (any, bool) {
+	if pointer == "" {
+		return document, true
+	}
 	if !validPointer(pointer) {
 		return nil, false
 	}

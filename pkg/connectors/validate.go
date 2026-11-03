@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -160,6 +161,9 @@ func (s *ConnectorSpec) validateOperation(name string, op Operation, phase strin
 	if err := validatePayload(op, phase); err != nil {
 		return fmt.Errorf("operation %q: %w", name, err)
 	}
+	if err := validateBinaryOperation(op, phase); err != nil {
+		return fmt.Errorf("operation %q: %w", name, err)
+	}
 	if err := validateRequestHeaders(op.Request); err != nil {
 		return fmt.Errorf("operation %q: %w", name, err)
 	}
@@ -178,6 +182,10 @@ func (s *ConnectorSpec) validateOperation(name string, op Operation, phase strin
 	if !strings.HasPrefix(path, "/") || strings.HasPrefix(path, "//") || strings.ContainsAny(path, "?#\\%") || strings.Contains(path, "..") || strings.Contains(path, "${") {
 		return fmt.Errorf("operation %q requires a fixed absolute path without query, escaping or expressions", name)
 	}
+	return s.validateOperationBindings(name, op, phase, path)
+}
+
+func (s *ConnectorSpec) validateOperationBindings(name string, op Operation, phase, path string) error {
 	if err := validateInputs(op.Inputs); err != nil {
 		return fmt.Errorf("operation %q: %w", name, err)
 	}
@@ -185,6 +193,9 @@ func (s *ConnectorSpec) validateOperation(name string, op Operation, phase strin
 		return fmt.Errorf("operation %q: %w", name, err)
 	}
 	if err := s.validateInputLookups(name, op, phase); err != nil {
+		return fmt.Errorf("operation %q: %w", name, err)
+	}
+	if err := s.validateOperationChecks(name, op, phase); err != nil {
 		return fmt.Errorf("operation %q: %w", name, err)
 	}
 	return validateRequestBindings(name, op, path)
@@ -262,7 +273,7 @@ func validateRequestBindings(name string, op Operation, path string) error {
 			}
 		}
 	}
-	for _, patch := range op.Request.Patch {
+	for _, patch := range append(slices.Clone(op.Request.Patch), op.Request.AdditionalPatch...) {
 		if err := validateValue(patch.Value, op.Inputs); err != nil {
 			return fmt.Errorf("operation %q patch: %w", name, err)
 		}

@@ -31,8 +31,11 @@ func validateRequestHeaders(request Request) error {
 		}
 		if strings.EqualFold(name, "content-type") {
 			expected := "application/json"
-			if len(request.Patch) != 0 {
+			if len(request.Patch)+len(request.AdditionalPatch) != 0 {
 				expected = "application/json-patch+json"
+			}
+			if request.Binary != nil {
+				expected = "application/octet-stream"
 			}
 			if value != expected {
 				return errors.New("request Content-Type must match the JSON body encoding")

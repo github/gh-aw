@@ -261,6 +261,12 @@ func addConnectorThreatWarningPolicies(config map[string]any, scripts map[string
 			handler = map[string]any{}
 		}
 		handler["threat_warning_policy"] = "abort"
+		if field, ok := script.connectorInputSchema["x-gh-aw-temporary-id"].(string); ok {
+			handler["temporary_id_field"] = field
+		}
+		if files := connectorStagedFilePolicies(script.connectorInputSchema); len(files) != 0 {
+			handler["staged_files"] = files
+		}
 		if script.connectorOptions != nil {
 			handler["connector_operation"] = true
 			handler["max"] = script.connectorOptions.Max
@@ -277,6 +283,24 @@ func addConnectorThreatWarningPolicies(config map[string]any, scripts map[string
 		}
 		config[normalizedName] = handler
 	}
+}
+
+func connectorStagedFilePolicies(schema map[string]any) map[string]any {
+	result := map[string]any{}
+	properties, ok := schema["properties"].(map[string]any)
+	if !ok {
+		if schema != nil {
+			safeOutputsConfigLog.Printf("connector staging metadata has no object properties")
+		}
+		return result
+	}
+	for name, raw := range properties {
+		property, ok := raw.(map[string]any)
+		if ok && property["x-gh-aw-staged-file"] != nil {
+			result[name] = property["x-gh-aw-staged-file"]
+		}
+	}
+	return result
 }
 
 // buildSafeOutputInputsConfig converts safe-job/safe-script input definitions into

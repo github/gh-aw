@@ -9,6 +9,17 @@ connectors:
       - https://learn.microsoft.com/en-us/rest/api/azure/devops/wit/work-items/update?view=azure-devops-rest-7.1
       - https://learn.microsoft.com/en-us/rest/api/azure/devops/wit/work-items/get-work-item?view=azure-devops-rest-7.1
       - https://learn.microsoft.com/en-us/rest/api/azure/devops/wit/comments/add-work-item-comment?view=azure-devops-rest-7.1
+      - https://learn.microsoft.com/en-us/rest/api/azure/devops/wit/attachments/create?view=azure-devops-rest-7.1
+      - https://learn.microsoft.com/en-us/rest/api/azure/devops/git/repositories/get-repository?view=azure-devops-rest-7.1
+      - https://learn.microsoft.com/en-us/rest/api/azure/devops/git/refs/list?view=azure-devops-rest-7.1
+      - https://learn.microsoft.com/en-us/rest/api/azure/devops/wit/wiql/query-by-id?view=azure-devops-rest-7.1
+      - https://learn.microsoft.com/en-us/rest/api/azure/devops/git/items/get?view=azure-devops-rest-7.1
+      - https://learn.microsoft.com/en-us/rest/api/azure/devops/git/pull-requests/get-pull-requests?view=azure-devops-rest-7.1
+      - https://learn.microsoft.com/en-us/rest/api/azure/devops/git/pull-requests/get-pull-request?view=azure-devops-rest-7.1
+      - https://learn.microsoft.com/en-us/rest/api/azure/devops/build/definitions/list?view=azure-devops-rest-7.1
+      - https://learn.microsoft.com/en-us/rest/api/azure/devops/build/definitions/get?view=azure-devops-rest-7.1
+      - https://learn.microsoft.com/en-us/rest/api/azure/devops/build/builds/list?view=azure-devops-rest-7.1
+      - https://learn.microsoft.com/en-us/rest/api/azure/devops/build/builds/get?view=azure-devops-rest-7.1
       - https://learn.microsoft.com/en-us/azure/devops/service-hooks/events?view=azure-devops
     credentials:
       agent-reader:
@@ -25,6 +36,18 @@ connectors:
         scopes:
           - vso.work
         secret: ${{ github.aw.import-inputs.rest-reader-secret }}
+      code-reader:
+        header: Authorization
+        phase: agent
+        scheme: bearer
+        scopes: [vso.code]
+        secret: ${{ github.aw.import-inputs.code-reader-secret }}
+      build-reader:
+        header: Authorization
+        phase: agent
+        scheme: bearer
+        scopes: [vso.build]
+        secret: ${{ github.aw.import-inputs.build-reader-secret }}
       writer:
         header: Authorization
         phase: safe-output
@@ -200,6 +223,7 @@ connectors:
           op: set-removed
           separator: ";"
     resources:
+      attachments: ${{ github.aw.import-inputs.attachment-ids }}
       assignees:
         - ${{ github.aw.import-inputs.assignee }}
       collections:
@@ -220,6 +244,19 @@ connectors:
       iteration-paths: ${{ github.aw.import-inputs.iteration-paths }}
       link-types: ${{ github.aw.import-inputs.link-types }}
       link-target-urls: ${{ github.aw.import-inputs.link-target-urls }}
+      repositories:
+        - ${{ github.aw.import-inputs.repository-id }}
+      branches:
+        - ${{ github.aw.import-inputs.branch }}
+      read-work-items: ${{ github.aw.import-inputs.read-work-item-ids }}
+      read-queries: ${{ github.aw.import-inputs.read-query-ids }}
+      read-repositories: ${{ github.aw.import-inputs.read-repository-ids }}
+      read-file-paths: ${{ github.aw.import-inputs.read-file-paths }}
+      read-commits: ${{ github.aw.import-inputs.read-commits }}
+      read-target-refs: ${{ github.aw.import-inputs.read-target-refs }}
+      read-pull-requests: ${{ github.aw.import-inputs.read-pull-request-ids }}
+      read-pipelines: ${{ github.aw.import-inputs.read-pipeline-ids }}
+      read-runs: ${{ github.aw.import-inputs.read-run-ids }}
     tools:
       get-work-item-description:
         credential: rest-reader
@@ -308,9 +345,485 @@ connectors:
           state: /fields/System.State
           body: /fields/Microsoft.VSTS.TCM.ReproSteps
         tool: get_bug_repro_steps
+      get-work-item:
+        credential: rest-reader
+        inputs:
+          organization: *azure-rich-organization
+          project: *azure-rich-project
+          work-item: *azure-rich-item
+        resources:
+          organization: organizations
+          project: projects
+          work-item: read-work-items
+        request:
+          endpoint: api
+          method: GET
+          path: /{organization}/{project}/_apis/wit/workitems/{work-item}
+          pathInputs: *azure-rich-item-path-inputs
+          query:
+            api-version: {literal: "7.1"}
+            fields:
+              literal: System.TeamProject,System.Title,System.State,System.WorkItemType,System.AssignedTo,System.AreaPath,System.IterationPath,System.Tags,System.Description,Microsoft.VSTS.TCM.ReproSteps
+        maxResponseBytes: 262144
+        responseRequired: *azure-rich-item-evidence
+        responseResourceInputs: *azure-rich-item-correlation
+        responseResources:
+          /id: read-work-items
+          /fields/System.TeamProject: project-names
+        responseTypes: {/id: integer, /rev: integer}
+        project:
+          work-item: /id
+          revision: /rev
+          fields: /fields
+        tool: get_work_item
+      run-work-item-query:
+        credential: rest-reader
+        inputs:
+          organization: *azure-rich-organization
+          project: *azure-rich-project
+          query-id: &azure-reader-uuid
+            type: string
+            required: true
+            maxLength: 36
+            pattern: ^[0-9a-f-]{36}$
+          first: &azure-reader-first
+            type: integer
+            required: true
+            minimum: 1
+            maximum: 100
+        resources:
+          organization: organizations
+          project: projects
+          query-id: read-queries
+        request:
+          endpoint: api
+          method: GET
+          path: /{organization}/{project}/_apis/wit/wiql/{query-id}
+          pathInputs:
+            organization: organization
+            project: project
+            query-id: query-id
+          query:
+            api-version: {literal: "7.1"}
+            $top: {input: first}
+        maxResponseBytes: 131072
+        responseChecks: {/queryType: flat}
+        responseLimits: {/workItems: 100, /columns: 32}
+        responseResources: {/workItems/*/id: read-work-items}
+        project:
+          work-items: /workItems
+          as-of: /asOf
+        tool: run_work_item_query
+      get-repository:
+        credential: code-reader
+        inputs: &azure-reader-repository-inputs
+          organization: *azure-rich-organization
+          project: *azure-rich-project
+          repository-id: *azure-reader-uuid
+        resources: &azure-reader-repository-resources
+          organization: organizations
+          project: projects
+          repository-id: read-repositories
+        request:
+          endpoint: api
+          method: GET
+          path: /{organization}/{project}/_apis/git/repositories/{repository-id}
+          pathInputs: &azure-reader-repository-path
+            organization: organization
+            project: project
+            repository-id: repository-id
+          query:
+            api-version: {literal: "7.1"}
+        maxResponseBytes: 65536
+        responseInputs:
+          /id: repository-id
+          /project/id: project
+        responseResources:
+          /id: read-repositories
+          /project/id: projects
+        responseTypes: {/id: string, /name: string}
+        project:
+          repository-id: /id
+          project-id: /project/id
+          name: /name
+        tool: get_repository
+      get-repository-file:
+        credential: code-reader
+        inputs:
+          <<: *azure-reader-repository-inputs
+          path:
+            type: string
+            required: true
+            maxLength: 1024
+            minLength: 2
+            pattern: ^/[^\\\r\n]+$
+          commit:
+            type: string
+            required: true
+            maxLength: 40
+            pattern: ^[0-9a-f]{40}$
+        resources:
+          <<: *azure-reader-repository-resources
+          path: read-file-paths
+          commit: read-commits
+        request:
+          endpoint: api
+          method: GET
+          path: /{organization}/{project}/_apis/git/repositories/{repository-id}/items
+          pathInputs: *azure-reader-repository-path
+          query:
+            api-version: {literal: "7.1"}
+            path: {input: path}
+            versionDescriptor.version: {input: commit}
+            versionDescriptor.versionType: {literal: commit}
+            versionDescriptor.versionOptions: {literal: none}
+            includeContent: {literal: true}
+            includeContentMetadata: {literal: true}
+            resolveLfs: {literal: false}
+            download: {literal: false}
+            $format: {literal: json}
+        maxResponseBytes: 262144
+        responseInputs:
+          /path: path
+          /commitId: commit
+        responseChecks: {/gitObjectType: blob, /contentMetadata/isBinary: false}
+        responseTypes: {/content: string, /objectId: string}
+        project:
+          path: /path
+          commit: /commitId
+          object-id: /objectId
+          content: /content
+          content-metadata: /contentMetadata
+        tool: get_repository_file
+      list-pull-requests:
+        credential: code-reader
+        inputs:
+          <<: *azure-reader-repository-inputs
+          target-ref: &azure-reader-target-ref
+            type: string
+            required: true
+            maxLength: 256
+            pattern: ^refs/heads/[^\r\n\\]+$
+          status:
+            type: string
+            required: true
+            maxLength: 16
+            enum: [active, completed, abandoned, all]
+          first: *azure-reader-first
+          skip:
+            type: integer
+            required: true
+            minimum: 0
+            maximum: 10000
+        resources:
+          <<: *azure-reader-repository-resources
+          target-ref: read-target-refs
+        request:
+          endpoint: api
+          method: GET
+          path: /{organization}/{project}/_apis/git/repositories/{repository-id}/pullrequests
+          pathInputs: *azure-reader-repository-path
+          query:
+            api-version: {literal: "7.1"}
+            searchCriteria.targetRefName: {input: target-ref}
+            searchCriteria.status: {input: status}
+            $top: {input: first}
+            $skip: {input: skip}
+        maxResponseBytes: 262144
+        responseLimits: {/value: 100}
+        responseInputs:
+          /value/*/repository/id: repository-id
+          /value/*/repository/project/id: project
+          /value/*/targetRefName: target-ref
+        responseResources:
+          /value/*/pullRequestId: read-pull-requests
+        project: {pull-requests: /value}
+        tool: list_pull_requests
+      get-pull-request:
+        credential: code-reader
+        inputs:
+          <<: *azure-reader-repository-inputs
+          pull-request-id: *azure-rich-item
+          target-ref: *azure-reader-target-ref
+        resources:
+          <<: *azure-reader-repository-resources
+          pull-request-id: read-pull-requests
+          target-ref: read-target-refs
+        request:
+          endpoint: api
+          method: GET
+          path: /{organization}/{project}/_apis/git/repositories/{repository-id}/pullrequests/{pull-request-id}
+          pathInputs:
+            <<: *azure-reader-repository-path
+            pull-request-id: pull-request-id
+          query:
+            api-version: {literal: "7.1"}
+            includeCommits: {literal: false}
+            includeWorkItemRefs: {literal: false}
+        maxResponseBytes: 262144
+        responseResourceInputs: {/pullRequestId: pull-request-id}
+        responseInputs:
+          /repository/id: repository-id
+          /repository/project/id: project
+          /targetRefName: target-ref
+        responseTypes: {/pullRequestId: integer, /title: string, /status: string}
+        tool: get_pull_request
+      list-pipeline-definitions:
+        credential: build-reader
+        inputs:
+          organization: *azure-rich-organization
+          project: *azure-rich-project
+          first: *azure-reader-first
+          continuation-token: &azure-reader-continuation-token
+            type: string
+            maxLength: 512
+            minLength: 1
+        resources:
+          organization: organizations
+          project: projects
+        request:
+          endpoint: api
+          method: GET
+          path: /{organization}/{project}/_apis/build/definitions
+          pathInputs: &azure-reader-project-path
+            organization: organization
+            project: project
+          query:
+            api-version: {literal: "7.1"}
+            $top: {input: first}
+            continuationToken: {input: continuation-token}
+            includeAllProperties: {literal: false}
+            includeLatestBuilds: {literal: false}
+        maxResponseBytes: 262144
+        responseLimits: {/value: 100}
+        responseInputs: {/value/*/project/id: project}
+        responseResources: {/value/*/id: read-pipelines}
+        project: {pipelines: /value}
+        tool: list_pipeline_definitions
+      get-pipeline-definition:
+        credential: build-reader
+        inputs:
+          <<: *azure-reader-repository-inputs
+          pipeline-id: *azure-rich-item
+        resources:
+          <<: *azure-reader-repository-resources
+          pipeline-id: read-pipelines
+        request:
+          endpoint: api
+          method: GET
+          path: /{organization}/{project}/_apis/build/definitions/{pipeline-id}
+          pathInputs:
+            <<: *azure-reader-project-path
+            pipeline-id: pipeline-id
+          query:
+            api-version: {literal: "7.1"}
+            includeLatestBuilds: {literal: false}
+        maxResponseBytes: 262144
+        responseResourceInputs: {/id: pipeline-id}
+        responseInputs:
+          /project/id: project
+          /repository/id: repository-id
+        responseTypes: {/id: integer, /name: string}
+        project:
+          pipeline-id: /id
+          name: /name
+          revision: /revision
+          path: /path
+          repository: /repository
+          process: /process
+        tool: get_pipeline_definition
+      list-pipeline-runs:
+        credential: build-reader
+        inputs:
+          <<: *azure-reader-repository-inputs
+          source-ref: *azure-reader-target-ref
+          first: *azure-reader-first
+          continuation-token: *azure-reader-continuation-token
+        resources:
+          <<: *azure-reader-repository-resources
+          source-ref: read-target-refs
+        request:
+          endpoint: api
+          method: GET
+          path: /{organization}/{project}/_apis/build/builds
+          pathInputs: *azure-reader-project-path
+          query:
+            api-version: {literal: "7.1"}
+            repositoryId: {input: repository-id}
+            repositoryType: {literal: TfsGit}
+            branchName: {input: source-ref}
+            $top: {input: first}
+            continuationToken: {input: continuation-token}
+        maxResponseBytes: 262144
+        responseLimits: {/value: 100}
+        responseInputs:
+          /value/*/project/id: project
+          /value/*/repository/id: repository-id
+          /value/*/sourceBranch: source-ref
+        responseResources:
+          /value/*/id: read-runs
+          /value/*/definition/id: read-pipelines
+        project: {runs: /value}
+        tool: list_pipeline_runs
+      get-pipeline-run:
+        credential: build-reader
+        inputs:
+          <<: *azure-reader-repository-inputs
+          source-ref: *azure-reader-target-ref
+          pipeline-id: *azure-rich-item
+          run-id: *azure-rich-item
+        resources:
+          <<: *azure-reader-repository-resources
+          source-ref: read-target-refs
+          pipeline-id: read-pipelines
+          run-id: read-runs
+        request:
+          endpoint: api
+          method: GET
+          path: /{organization}/{project}/_apis/build/builds/{run-id}
+          pathInputs:
+            <<: *azure-reader-project-path
+            run-id: run-id
+          query:
+            api-version: {literal: "7.1"}
+        maxResponseBytes: 262144
+        responseResourceInputs:
+          /id: run-id
+          /definition/id: pipeline-id
+        responseInputs:
+          /project/id: project
+          /repository/id: repository-id
+          /sourceBranch: source-ref
+        responseTypes: {/id: integer, /status: string}
+        tool: get_pipeline_run
     safe-outputs:
+      upload-attachment:
+        credential: writer
+        creates:
+          resource: attachments
+          value: /attachment-id
+          scope: project
+          temporaryId: temporary_id
+        inputs:
+          organization: &azure-attachment-organization
+            type: string
+            required: true
+            maxLength: 64
+            pattern: ^[A-Za-z0-9][A-Za-z0-9-]*$
+          project: &azure-attachment-project
+            type: string
+            required: true
+            maxLength: 36
+            pattern: ^[0-9a-f-]{36}$
+          file:
+            type: string
+            required: true
+            maxLength: 1024
+            minLength: 1
+          file-name:
+            type: string
+            required: true
+            maxLength: 255
+            minLength: 1
+            pattern: ^[^/\\\r\n\t]+$
+          temporary_id:
+            type: string
+            maxLength: 80
+            pattern: ^#?aw_[A-Za-z0-9_]{3,12}$
+        resources:
+          organization: organizations
+          project: projects
+        request:
+          endpoint: api
+          method: POST
+          path: /{organization}/{project}/_apis/wit/attachments
+          pathInputs:
+            organization: organization
+            project: project
+          query:
+            api-version: {literal: "7.1"}
+            fileName: {input: file-name}
+          binary:
+            input: file
+            maxBytes: ${{ github.aw.import-inputs.attachment-max-bytes }}
+            extensions: ${{ github.aw.import-inputs.attachment-extensions }}
+            rejectContains: ["##vso["]
+        maxResponseBytes: 16384
+        responseRequired: [/id, /url]
+        responseTypes: {/id: string, /url: string}
+        responseWhen:
+          any:
+            - path: /url
+              other: /id
+              op: url-id
+              value: https://dev.azure.com/${{ github.aw.import-inputs.organization }}/_apis/wit/attachments/
+              values: [fileName]
+            - path: /url
+              other: /id
+              op: url-id
+              value: https://dev.azure.com/${{ github.aw.import-inputs.organization }}/${{ github.aw.import-inputs.project }}/_apis/wit/attachments/
+              values: [fileName]
+        project:
+          attachment-id: /id
+          attachment-url: /url
+      attach-file-to-work-item:
+        credential: writer
+        createdResources:
+          work-item: ${{ github.aw.import-inputs.work-item-creator }}
+          attachment-id: upload-attachment
+        inputs:
+          organization: *azure-attachment-organization
+          project: *azure-attachment-project
+          work-item: *azure-rich-item
+          attachment-id:
+            type: string
+            required: true
+            maxLength: 36
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          comment:
+            type: string
+            required: true
+            sanitize: body
+            minLength: 1
+            maxLength: 1024
+        resources:
+          organization: organizations
+          project: projects
+          work-item: work-items
+          attachment-id: attachments
+        checks: ${{ github.aw.import-inputs.write-checks }}
+        request:
+          endpoint: api
+          method: PATCH
+          path: /{organization}/{project}/_apis/wit/workitems/{work-item}
+          pathInputs:
+            organization: organization
+            project: project
+            work-item: work-item
+          query:
+            api-version: {literal: "7.1"}
+          patch:
+            - op: add
+              path: /relations/-
+              value:
+                object:
+                  rel: {literal: AttachedFile}
+                  url:
+                    input: attachment-id
+                    prefix: https://dev.azure.com/${{ github.aw.import-inputs.organization }}/_apis/wit/attachments/
+                  attributes:
+                    object:
+                      comment: {input: comment}
+        maxResponseBytes: 65536
+        responseRequired: [/id, /fields/System.TeamProject]
+        responseTypes: {/id: integer}
+        responseResourceInputs: {/id: work-item}
+        responseResources:
+          /id: work-items
+          /fields/System.TeamProject: project-names
       assign-work-item:
         credential: writer
+        checks: ${{ github.aw.import-inputs.write-checks }}
         createdResources: &azure-work-item-created-resources
           work-item: ${{ github.aw.import-inputs.work-item-creator }}
         inputs:
@@ -367,6 +880,7 @@ connectors:
           /id: integer
       comment-on-work-item:
         credential: writer
+        checks: ${{ github.aw.import-inputs.write-checks }}
         createdResources: *azure-work-item-created-resources
         inputs:
           organization:
@@ -456,6 +970,7 @@ connectors:
         request:
           endpoint: api
           method: POST
+          additionalPatch: ${{ github.aw.import-inputs.create-additional-patch }}
           patch:
             - op: add
               path: /fields/System.Title
@@ -534,6 +1049,7 @@ connectors:
           /id: integer
       update-work-item:
         credential: writer
+        checks: ${{ github.aw.import-inputs.write-checks }}
         createdResources: *azure-work-item-created-resources
         inputs:
           organization:
@@ -622,6 +1138,7 @@ connectors:
         request:
           endpoint: api
           method: POST
+          additionalPatch: ${{ github.aw.import-inputs.create-additional-patch }}
           path: /{organization}/{project}/_apis/wit/workitems/$${{ github.aw.import-inputs.work-item-type }}
           pathInputs:
             organization: organization
@@ -673,6 +1190,7 @@ connectors:
         request:
           endpoint: api
           method: POST
+          additionalPatch: ${{ github.aw.import-inputs.create-additional-patch }}
           path: /{organization}/{project}/_apis/wit/workitems/$Bug
           pathInputs:
             organization: organization
@@ -703,6 +1221,7 @@ connectors:
           work-item: /id
       set-work-item-description:
         credential: writer
+        checks: ${{ github.aw.import-inputs.write-checks }}
         createdResources: *azure-work-item-created-resources
         inputs:
           organization: *azure-rich-organization
@@ -735,6 +1254,7 @@ connectors:
           work-item: /id
       set-work-item-repro-steps:
         credential: writer
+        checks: ${{ github.aw.import-inputs.write-checks }}
         createdResources: *azure-work-item-created-resources
         inputs:
           organization: *azure-rich-organization
@@ -765,6 +1285,7 @@ connectors:
         project: *azure-rich-item-projection
       set-work-item-state:
         credential: writer
+        checks: ${{ github.aw.import-inputs.write-checks }}
         createdResources: *azure-work-item-created-resources
         inputs:
           organization: *azure-rich-organization
@@ -799,6 +1320,7 @@ connectors:
         project: *azure-rich-item-projection
       replace-work-item-tags:
         credential: writer
+        checks: ${{ github.aw.import-inputs.write-checks }}
         createdResources: *azure-work-item-created-resources
         inputs:
           organization: *azure-rich-organization
@@ -833,6 +1355,7 @@ connectors:
         project: *azure-rich-item-projection
       set-work-item-area-path:
         credential: writer
+        checks: ${{ github.aw.import-inputs.write-checks }}
         createdResources: *azure-work-item-created-resources
         inputs:
           organization: *azure-rich-organization
@@ -868,6 +1391,7 @@ connectors:
         project: *azure-rich-item-projection
       set-work-item-iteration-path:
         credential: writer
+        checks: ${{ github.aw.import-inputs.write-checks }}
         createdResources: *azure-work-item-created-resources
         inputs:
           organization: *azure-rich-organization
@@ -954,6 +1478,7 @@ connectors:
         project: *azure-rich-item-projection
       link-created-work-item:
         credential: writer
+        checks: ${{ github.aw.import-inputs.write-checks }}
         createdResources: *azure-work-item-created-resources
         inputs:
           organization: *azure-rich-organization
@@ -979,7 +1504,325 @@ connectors:
         responseResources: *azure-rich-item-response-resources
         responseTypes: *azure-rich-item-response-types
         project: *azure-rich-item-projection
+      clear-work-item-description:
+        credential: writer
+        checks: ${{ github.aw.import-inputs.write-checks }}
+        createdResources: *azure-work-item-created-resources
+        inputs: &azure-clear-inputs
+          organization: *azure-rich-organization
+          project: *azure-rich-project
+          work-item: *azure-rich-item
+        resources: *azure-rich-item-resources
+        request:
+          endpoint: api
+          method: PATCH
+          path: /{organization}/{project}/_apis/wit/workitems/{work-item}
+          pathInputs: *azure-rich-item-path-inputs
+          query: *azure-rich-api-version
+          patch:
+            - op: add
+              path: /fields/System.Description
+              value: {literal: ""}
+        maxResponseBytes: 131072
+        responseRequired: *azure-rich-item-evidence
+        responseResourceInputs: *azure-rich-item-correlation
+        responseResources: *azure-rich-item-response-resources
+        responseTypes: *azure-rich-item-response-types
+        project: *azure-rich-item-projection
+      clear-work-item-repro-steps:
+        credential: writer
+        checks: ${{ github.aw.import-inputs.write-checks }}
+        createdResources: *azure-work-item-created-resources
+        inputs: *azure-clear-inputs
+        resources: *azure-rich-item-resources
+        request:
+          endpoint: api
+          method: PATCH
+          path: /{organization}/{project}/_apis/wit/workitems/{work-item}
+          pathInputs: *azure-rich-item-path-inputs
+          query: *azure-rich-api-version
+          patch:
+            - op: add
+              path: /fields/Microsoft.VSTS.TCM.ReproSteps
+              value: {literal: ""}
+        maxResponseBytes: 131072
+        responseRequired: *azure-rich-item-evidence
+        responseResourceInputs: *azure-rich-item-correlation
+        responseResources: *azure-rich-item-response-resources
+        responseTypes: *azure-rich-item-response-types
+        project: *azure-rich-item-projection
+      clear-work-item-tags:
+        credential: writer
+        checks: ${{ github.aw.import-inputs.write-checks }}
+        createdResources: *azure-work-item-created-resources
+        inputs: *azure-clear-inputs
+        resources: *azure-rich-item-resources
+        request:
+          endpoint: api
+          method: PATCH
+          path: /{organization}/{project}/_apis/wit/workitems/{work-item}
+          pathInputs: *azure-rich-item-path-inputs
+          query: *azure-rich-api-version
+          patch:
+            - op: replace
+              path: /fields/System.Tags
+              value: {literal: ""}
+        maxResponseBytes: 131072
+        responseRequired: *azure-rich-item-evidence
+        responseResourceInputs: *azure-rich-item-correlation
+        responseResources: *azure-rich-item-response-resources
+        responseTypes: *azure-rich-item-response-types
+        project: *azure-rich-item-projection
+      link-work-item-by-id: &azure-numeric-link
+        credential: writer
+        createdResources:
+          work-item: ${{ github.aw.import-inputs.work-item-creator }}
+          target-work-item: ${{ github.aw.import-inputs.work-item-creator }}
+        inputs: &azure-numeric-link-inputs
+          organization: *azure-rich-organization
+          project: *azure-rich-project
+          work-item: *azure-rich-item
+          target-work-item: *azure-rich-item
+          link-type: &azure-numeric-link-type
+            enum:
+              - System.LinkTypes.Related
+              - System.LinkTypes.Hierarchy-Reverse
+              - System.LinkTypes.Hierarchy-Forward
+              - System.LinkTypes.Dependency-Reverse
+              - System.LinkTypes.Dependency-Forward
+              - System.LinkTypes.Duplicate-Forward
+              - System.LinkTypes.Duplicate-Reverse
+            maxLength: 64
+            required: true
+            type: string
+        resources:
+          organization: organizations
+          project: projects
+          work-item: work-items
+          target-work-item: work-items
+          link-type: link-types
+        checks:
+          - &azure-link-source-check
+            inputs: *azure-clear-inputs
+            resources: *azure-rich-item-resources
+            request:
+              endpoint: api
+              method: GET
+              path: /{organization}/{project}/_apis/wit/workitems/{work-item}
+              pathInputs: *azure-rich-item-path-inputs
+              query:
+                api-version: {literal: "7.1"}
+                fields: {literal: System.TeamProject}
+            maxResponseBytes: 131072
+            responseRequired: *azure-rich-item-evidence
+            responseResourceInputs: *azure-rich-item-correlation
+            responseResources: *azure-rich-item-response-resources
+            responseTypes: *azure-rich-item-response-types
+          - inputs:
+              organization: *azure-rich-organization
+              project: *azure-rich-project
+              target-work-item: *azure-rich-item
+            resources:
+              organization: organizations
+              project: projects
+              target-work-item: work-items
+            request:
+              endpoint: api
+              method: GET
+              path: /{organization}/{project}/_apis/wit/workitems/{target-work-item}
+              pathInputs:
+                organization: organization
+                project: project
+                target-work-item: target-work-item
+              query:
+                api-version: {literal: "7.1"}
+                fields: {literal: System.TeamProject}
+            maxResponseBytes: 131072
+            responseRequired: *azure-rich-item-evidence
+            responseResourceInputs:
+              /id: target-work-item
+            responseResources: *azure-rich-item-response-resources
+            responseTypes: *azure-rich-item-response-types
+        request: &azure-numeric-link-request
+          endpoint: api
+          method: PATCH
+          path: /{organization}/{project}/_apis/wit/workitems/{work-item}
+          pathInputs: *azure-rich-item-path-inputs
+          query: *azure-rich-api-version
+          patch:
+            - op: add
+              path: /relations/-
+              value:
+                object: &azure-numeric-link-value
+                  rel: {input: link-type}
+                  url:
+                    input: target-work-item
+                    prefix: https://dev.azure.com/${{ github.aw.import-inputs.organization }}/${{ github.aw.import-inputs.project }}/_apis/wit/workItems/
+        maxResponseBytes: 131072
+        responseRequired: *azure-rich-item-evidence
+        responseResourceInputs: *azure-rich-item-correlation
+        responseResources: *azure-rich-item-response-resources
+        responseTypes: *azure-rich-item-response-types
+        project: *azure-rich-item-projection
+      link-work-item-by-id-with-comment:
+        <<: *azure-numeric-link
+        inputs:
+          <<: *azure-numeric-link-inputs
+          comment:
+            sanitize: body
+            minLength: 1
+            maxLength: 4000
+            required: true
+            type: string
+        request:
+          <<: *azure-numeric-link-request
+          patch:
+            - op: add
+              path: /relations/-
+              value:
+                object:
+                  <<: *azure-numeric-link-value
+                  attributes:
+                    object:
+                      comment: {input: comment}
+      link-work-item-to-branch:
+        credential: writer
+        createdResources: *azure-work-item-created-resources
+        inputs:
+          <<: *azure-clear-inputs
+          repository-id: &azure-artifact-repository-input
+            enum: ["${{ github.aw.import-inputs.repository-id }}"]
+            maxLength: 36
+            pattern: ^[0-9a-f-]{36}$
+            required: true
+            type: string
+          branch: &azure-artifact-branch-input
+            enum: ["${{ github.aw.import-inputs.branch }}"]
+            maxLength: 200
+            pattern: ^[A-Za-z0-9][A-Za-z0-9_/-]*$
+            required: true
+            type: string
+        resources:
+          <<: *azure-rich-item-resources
+          repository-id: repositories
+          branch: branches
+        checks:
+          - *azure-link-source-check
+          - inputs:
+              organization: *azure-rich-organization
+              project: *azure-rich-project
+              repository-id: *azure-artifact-repository-input
+            resources:
+              organization: organizations
+              project: projects
+              repository-id: repositories
+            request:
+              endpoint: api
+              method: GET
+              path: /{organization}/{project}/_apis/git/repositories/{repository-id}
+              pathInputs:
+                organization: organization
+                project: project
+                repository-id: repository-id
+              query: *azure-rich-api-version
+            maxResponseBytes: 131072
+            responseRequired: [/id, /project/id]
+            responseInputs:
+              /id: repository-id
+              /project/id: project
+            responseResources:
+              /id: repositories
+              /project/id: projects
+          - inputs:
+              organization: *azure-rich-organization
+              project: *azure-rich-project
+              repository-id: *azure-artifact-repository-input
+              branch: *azure-artifact-branch-input
+            resources:
+              organization: organizations
+              project: projects
+              repository-id: repositories
+              branch: branches
+            request:
+              endpoint: api
+              method: GET
+              path: /{organization}/{project}/_apis/git/repositories/{repository-id}/refs
+              pathInputs:
+                organization: organization
+                project: project
+                repository-id: repository-id
+              query:
+                api-version: {literal: "7.1"}
+                filter:
+                  input: branch
+                  prefix: heads/
+                "$top": {literal: "2"}
+            maxResponseBytes: 131072
+            responseRequired: [/count, /value/0/name]
+            responseChecks:
+              /count: 1
+              /value/0/name: refs/heads/${{ github.aw.import-inputs.branch }}
+            responseTypes:
+              /count: integer
+              /value/0/name: string
+        request:
+          endpoint: api
+          method: PATCH
+          path: /{organization}/{project}/_apis/wit/workitems/{work-item}
+          pathInputs: *azure-rich-item-path-inputs
+          query: *azure-rich-api-version
+          patch:
+            - op: add
+              path: /relations/-
+              value:
+                literal:
+                  rel: ArtifactLink
+                  url: vstfs:///Git/Ref/${{ github.aw.import-inputs.project }}%2F${{ github.aw.import-inputs.repository-id }}%2FGB${{ github.aw.import-inputs.branch }}
+                  attributes:
+                    name: Branch
+        maxResponseBytes: 131072
+        responseRequired: *azure-rich-item-evidence
+        responseResourceInputs: *azure-rich-item-correlation
+        responseResources: *azure-rich-item-response-resources
+        responseTypes: *azure-rich-item-response-types
+        project: *azure-rich-item-projection
 import-schema:
+  attachment-max-bytes:
+    type: number
+    default: 5242880
+    description: Maximum staged attachment bytes, from 1 to 10485760; default 5 MiB.
+  attachment-extensions:
+    type: array
+    items:
+      type: string
+    default: []
+    description: Optional exact lowercase file suffixes such as .png; empty allows all supported suffixes.
+  attachment-ids:
+    type: array
+    items:
+      type: string
+    default: []
+    description: Exact existing approved attachment UUIDs; same-execution upload receipts do not expand this persisted grant.
+  create-additional-patch:
+    type: array
+    items:
+      type: object
+    default: []
+    description: Reviewed author-owned fixed-path JSON Patch entries added atomically to each selected creator; no agent patch or arbitrary field path input.
+  write-checks:
+    type: array
+    items:
+      type: object
+    default: []
+    description: Up to four author-owned same-credential bounded GET checks narrowing canonical work-item mutation targets; excludes fixed-source link operations and grants no new resource authority.
+  repository-id:
+    type: string
+    default: 44444444-4444-4444-8444-444444444444
+    description: Exact reviewed Git repository UUID for the optional Branch ArtifactLink operation.
+  branch:
+    type: string
+    default: main
+    description: Exact reviewed existing branch name for the optional Branch ArtifactLink operation, without refs/heads/.
   closed-states:
     type: array
     items:
@@ -1024,6 +1867,59 @@ import-schema:
     default: AZURE_DEVOPS_READ_TOKEN
     type: string
     description: Separate REST-resource Entra reader token secret name, not the hosted MCP token.
+  code-reader-secret:
+    default: AZURE_DEVOPS_CODE_READ_TOKEN
+    type: string
+    description: Separate REST-resource read-only source-code identity secret name; never a hosted MCP or writer token.
+  build-reader-secret:
+    default: AZURE_DEVOPS_BUILD_READ_TOKEN
+    type: string
+    description: Separate REST-resource read-only build identity secret name; never a hosted MCP or writer token.
+  read-work-item-ids:
+    default: []
+    type: array
+    items: {type: string}
+    description: Exact positive decimal work-item IDs for get-work-item and flat saved-query results; independent of writer grants.
+  read-query-ids:
+    default: []
+    type: array
+    items: {type: string}
+    description: Exact reviewed saved flat WIQL query UUIDs; no agent-authored WIQL, query text or query discovery.
+  read-repository-ids:
+    default: []
+    type: array
+    items: {type: string}
+    description: Exact Git repository UUIDs approved for REST reads; independent of the branch-link writer repository.
+  read-file-paths:
+    default: []
+    type: array
+    items: {type: string}
+    description: Exact repository file paths including leading slash; no directory, prefix or recursive grants.
+  read-commits:
+    default: []
+    type: array
+    items: {type: string}
+    description: Exact lowercase 40-hex commit SHAs for file content; no mutable branch resolution or implicit default ref.
+  read-target-refs:
+    default: []
+    type: array
+    items: {type: string}
+    description: Exact refs/heads/ branch names for pull-request targets and build source branches.
+  read-pull-request-ids:
+    default: []
+    type: array
+    items: {type: string}
+    description: Exact positive decimal pull-request IDs, enforced for both single and every listed result.
+  read-pipeline-ids:
+    default: []
+    type: array
+    items: {type: string}
+    description: Exact positive decimal Build definition IDs, enforced for single definitions, listed definitions and single-run parents.
+  read-run-ids:
+    default: []
+    type: array
+    items: {type: string}
+    description: Exact positive decimal Build run IDs, enforced for both single and every listed result.
   work-item-types:
     default: []
     type: array
@@ -1105,8 +2001,9 @@ import-schema:
   </runtime-policies>
   <purpose>
     Experimental Azure DevOps Services connector: organization project metadata
-    through hosted read-only MCP, separately selected REST description/ReproSteps
-    readers, and bounded REST mutations outside the agent credential boundary.
+    through hosted read-only MCP, separately selected bounded REST work-item,
+    saved-query, repository/file, pull-request and Build definition/run readers,
+    and bounded REST mutations outside the agent credential boundary.
     The original five narrow mutations retain their existing request shapes;
     rich creation and sparse updates are additional opt-in operations.
     This ordinary Markdown
@@ -1154,7 +2051,10 @@ import-schema:
       do not replace Azure DevOps authorization. vso.work_write is the documented
       work-item OAuth capability, not a standalone Entra audience or a permission
       granted by listing it here. A client secret or refresh token is not an
-      access token.
+      access token. Selecting link-work-item-to-branch additionally requires
+      this same writer identity to have read access to the exact Git repository
+      and branch (the documented vso.code capability). Its bounded Git reads
+      run only in safe-output, never with an agent credential.
     </credential>
     <credential id="rest-reader" phase="agent" secret="AZURE_DEVOPS_READ_TOKEN" scope="vso.work">
       Provision a separate read-only Entra identity/access token for the same
@@ -1163,6 +2063,24 @@ import-schema:
       approved projects/items. Selecting a body reader delivers only this named
       token to the agent read host; it never exposes or falls back to the writer
       or hosted MCP token. This connector does not exchange or refresh tokens.
+    </credential>
+    <credential id="code-reader" phase="agent" secret="AZURE_DEVOPS_CODE_READ_TOKEN" scope="vso.code">
+      Provision a distinct least-privilege Entra access token for the Azure
+      DevOps REST resource 499b84ac-1321-427f-aa17-267ca6975798, not the hosted MCP
+      audience. Explicitly enroll the identity in the organization and authorize
+      read access only to approved Git repositories. vso.code records the
+      documented REST capability, not an Entra scope exchange or automatic grant.
+      Only selected repository/file/pull-request tools receive this secret.
+      There is no fallback to rest-reader, agent-reader or writer.
+    </credential>
+    <credential id="build-reader" phase="agent" secret="AZURE_DEVOPS_BUILD_READ_TOKEN" scope="vso.build">
+      Provision a separate read-only Entra identity/access token for the same
+      REST resource. Authorize only approved build definitions and runs in the
+      project; do not grant queue, edit, cancel or release permissions. vso.build
+      records the documented capability and does not grant provider permissions.
+      Only selected Build definition/run tools receive this secret; the host
+      never reuses a hosted MCP, code-reader, work-item reader or writer token.
+      The connector does not acquire or refresh either new read token.
     </credential>
     <routes>
       This declaration uses legacy secret-name references, equivalent to the
@@ -1191,7 +2109,21 @@ import-schema:
       <input name="assignee" default="reviewer@example.invalid" resource="assignees">Exact provider-resolvable assignment identity; placeholder only, not a real account.</input>
       <input name="agent-reader-secret" default="AZURE_DEVOPS_MCP_ENTRA_TOKEN">Reader Actions secret name, never its value.</input>
       <input name="writer-secret" default="AZURE_DEVOPS_WRITE_TOKEN">Writer Actions secret name, never its value.</input>
+      <input name="attachment-max-bytes" default="5242880">Maximum staged binary bytes, default 5 MiB, bounded to 1 through 10485760.</input>
+      <input name="attachment-extensions" default="[]">Optional exact lowercase filename suffixes such as .png; empty allows all supported suffixes.</input>
+      <input name="attachment-ids" default="[]" resource="attachments">Exact existing approved attachment UUIDs; upload receipts authorize only their own same-execution attachment, not persisted grant expansion.</input>
       <input name="rest-reader-secret" default="AZURE_DEVOPS_READ_TOKEN">Separate REST reader secret name; not the remote MCP token.</input>
+      <input name="code-reader-secret" default="AZURE_DEVOPS_CODE_READ_TOKEN">Separate source-code REST reader Actions secret name, never its value.</input>
+      <input name="build-reader-secret" default="AZURE_DEVOPS_BUILD_READ_TOKEN">Separate Build REST reader Actions secret name, never its value.</input>
+      <input name="read-work-item-ids" default="[]" resource="read-work-items">Exact decimal IDs for selected-field reads and all saved-query results; independent of writer work-items.</input>
+      <input name="read-query-ids" default="[]" resource="read-queries">Exact reviewed saved flat WIQL query UUIDs.</input>
+      <input name="read-repository-ids" default="[]" resource="read-repositories">Exact Git UUIDs, independent of the writer repository-id.</input>
+      <input name="read-file-paths" default="[]" resource="read-file-paths">Exact slash-prefixed file paths; no prefixes or recursive access.</input>
+      <input name="read-commits" default="[]" resource="read-commits">Exact immutable lowercase 40-hex commit SHAs.</input>
+      <input name="read-target-refs" default="[]" resource="read-target-refs">Exact refs/heads/ names for PR targets and build source branches.</input>
+      <input name="read-pull-request-ids" default="[]" resource="read-pull-requests">Exact decimal IDs required for every PR result, not just its repository.</input>
+      <input name="read-pipeline-ids" default="[]" resource="read-pipelines">Exact decimal Build definition IDs, including single-run parents.</input>
+      <input name="read-run-ids" default="[]" resource="read-runs">Exact decimal Build run IDs, checked for every listed result.</input>
       <input name="work-item-types" default="[]" resource="work-item-types">Array of exact approved rich-create type names; empty grants no creation types.</input>
       <input name="work-item-type" default="Task">Author-fixed type for the description creator. Also grant this exact name in work-item-types.</input>
       <input name="work-item-creator" default="create-work-item">Author-selected same-execution receipt producer: create-work-item, create-work-item-with-description, or create-bug-with-repro-steps. Select that producer and each consumer independently.</input>
@@ -1202,6 +2134,10 @@ import-schema:
       <input name="iteration-paths" default="[]" resource="iteration-paths">Array of exact approved iteration paths, not prefixes.</input>
       <input name="link-types" default="[]" resource="link-types">Array of approved System.LinkTypes reference names within the seven supported relation types.</input>
       <input name="link-target-urls" default="[]" resource="link-target-urls">Array of exact same-organization/project work-item REST URLs approved for the singleton work-item source and each approved link type.</input>
+      <input name="create-additional-patch" default="[]">Reviewed author-owned fixed-path entries added to each selected creator in the same request. Each entry uses the normal op/path/value contract, not raw JSON Patch values. Literal custom fields, classification, assignee, tags and ArtifactLink values are trusted configuration; agents cannot supply patch arrays or field names. Existing patch paths cannot be overridden, including case variants.</input>
+      <input name="write-checks" default="[]">Up to four fixed bounded same-writer GET checks before canonical work-item mutations and explicit clears, excluding fixed-source link operations and the two new link families with built-in checks. Their canonical inputs are a subset of the operation inputs. responseWhen may narrow title, tag or area prefixes without granting additional work items.</input>
+      <input name="repository-id" default="44444444-4444-4444-8444-444444444444" resource="repositories">Exact reviewed repository UUID for link-work-item-to-branch; placeholder only.</input>
+      <input name="branch" default="main" resource="branches">Exact reviewed existing branch name without refs/heads/. Branch operation requires the same fixed value as an agent input and rejects arbitrary repositories or branches.</input>
     </inputs>
     <resources>
       Existing scalar bindings retain their specimen defaults. New grant arrays
@@ -1222,11 +2158,21 @@ import-schema:
       their exact newly created ID for declared followups. The author fixes one
       work-item-creator per import; an agent cannot change producer, project,
       endpoint, or execution. Existing resource grants are never rewritten.
+      link-work-item-by-id and its comment variant independently grant both
+      source and target from work-items or authenticated receipts, then read
+      both IDs with the same writer and verify each exact ID and project before
+      appending the relation. This opt-in approves every source/target/type
+      combination within those exact grants, not any wildcard or discovered ID.
+      Provider process rules reject invalid relations, including self-links.
+      Branch artifacts use author-fixed repository-id and branch, verify source,
+      repository/project identity and exact existing ref before mutation.
     </resources>
     <selection>
       Import .github/workflows/connectors/azure-devops.md with uses/with. Select
       tools.azure-devops: [azure-devops] for the metadata reader, or select
       get-work-item-description and get-bug-repro-steps for the REST body readers.
+      The read-parity section documents ten additional exact REST tool names;
+      select each independently and supply its empty-default read grants.
       Independently
       select each safe-outputs.azure-devops-operation below with null or an empty
       object. Omit a selection to disable it; no implicit context or credential
@@ -1294,6 +2240,33 @@ import-schema:
     </rest>
   </reads>
   <effects max-response-bytes="131072">
+    <effect id="azure-devops-upload-attachment" tool="azure_devops_upload_attachment" inputs="organization, project, file, file-name, optional temporary_id">
+      Uploads a staged regular file as application/octet-stream to the approved
+      project attachments endpoint with API version 7.1. The shared agent recorder
+      copies an existing workspace/staging file to a content-addressed staging
+      name, and the compiler transfers that staging artifact to safe outputs
+      without enabling upload_artifact. The trusted host rechecks digest, byte
+      limit, approved suffixes, regular-file isolation and rejected ##vso[ bytes
+      before credential access. Node guarded file access requires Linux.
+      Staged execution reads no file or credential and sends no provider request.
+      Response id and URL are required. The URL must identify that exact ID under
+      this organization's attachments path, optionally project-scoped and with
+      only one fileName query parameter. Optional temporary_id issues an
+      authenticated execution-local receipt for the canonical attachment UUID,
+      never for an arbitrary returned URL. The writer needs vso.work_write.
+      This uploads only; explicitly select attach-file-to-work-item for linking.
+    </effect>
+    <effect id="azure-devops-attach-file-to-work-item" tool="azure_devops_attach_file_to_work_item" inputs="organization, project, work-item, attachment-id, comment">
+      Appends one AttachedFile relation to the approved work item. The source
+      needs an existing work-items grant or the selected work-item-creator's
+      authenticated receipt; attachment-id needs an exact attachment grant or
+      the selected upload-attachment receipt. The host builds the fixed
+      organization attachment URL from the canonical UUID. Agent-supplied URLs,
+      staged proposals, and raw returned IDs do not create authority. Comment
+      uses shared body sanitization and protected attribution within 1024
+      characters. Exact work-item response ID and approved project name are
+      checked. Author write-checks may further narrow the source.
+    </effect>
     <common>
       Effect arguments are required strings except optional temporary_id on the
       three creators. Organization is at most 64
@@ -1315,7 +2288,7 @@ import-schema:
     </common>
     <effect id="azure-devops-create-work-item" tool="azure_devops_create_work_item" inputs="organization, project, title, optional temporary_id">
       POST /{organization}/{project}/_apis/wit/workitems/$Task with one add at
-      /fields/System.Title. Task is the only type and title the only field.
+      /fields/System.Title by default. Task is the only type.
       Project process rules must permit title-only creation. Requires integer
       /id and exact approved /fields/System.TeamProject; projects work-item from
       /id. Optional temporary_id matching ^#?aw_[A-Za-z0-9_]{3,12}$ requests
@@ -1324,6 +2297,8 @@ import-schema:
       connector, endpoint, project, producer and execution; plain IDs and staged
       proposals create no authority. The ordinary no-temporary_id request
       retains its title-only Task behavior.
+      Explicit create-additional-patch appends reviewed author-owned fields or
+      relations atomically; it is empty by default and never an agent argument.
     </effect>
     <effect id="azure-devops-update-work-item" tool="azure_devops_update_work_item" inputs="organization, project, work-item, title">
       PATCH /{organization}/{project}/_apis/wit/workitems/{work-item} with one
@@ -1359,6 +2334,8 @@ import-schema:
       type whose creation rules accept this fixed field set.
       Supports the same optional execution-local integer receipt. To chain
       followups, bind work-item-creator to create-work-item-with-description.
+      create-additional-patch can add static custom fields, classification,
+      assignee, tags and reviewed artifact relations in this same request.
     </effect>
     <effect id="azure-devops-create-bug-with-repro-steps" tool="azure_devops_create_bug_with_repro_steps" inputs="organization, project, work-item-type, title, body, optional temporary_id">
       POST to fixed $Bug; work-item-type must be Bug and independently granted.
@@ -1368,6 +2345,8 @@ import-schema:
       description-field input or implicit Bug-to-Description substitution.
       To consume this creator's optional receipt, bind work-item-creator to
       create-bug-with-repro-steps.
+      The same create-additional-patch applies; duplicate title, ReproSteps or
+      format paths are rejected rather than overwritten.
     </effect>
     <effect id="azure-devops-set-work-item-description" tool="azure_devops_set_work_item_description" inputs="organization, project, work-item, body">
       Adds only System.Description plus its Markdown format marker. Nonempty
@@ -1419,6 +2398,93 @@ import-schema:
       related-work-item import URL. The original link-work-items operation
       retains its singleton source enum and is not receipt-aware.
     </effect>
+    <effect id="azure-devops-clear-work-item-description" tool="azure_devops_clear_work_item_description" inputs="organization, project, work-item">
+      Adds the literal empty string at /fields/System.Description. There is no
+      body input, generated attribution, body footer or format-field rewrite.
+      Supports exact work-item grants and authenticated creation receipts.
+    </effect>
+    <effect id="azure-devops-clear-work-item-repro-steps" tool="azure_devops_clear_work_item_repro_steps" inputs="organization, project, work-item">
+      Adds the literal empty string at /fields/Microsoft.VSTS.TCM.ReproSteps.
+      Uses the same sparse, footer-free and receipt-aware contract as description
+      clearing; no fallback to another field.
+    </effect>
+    <effect id="azure-devops-clear-work-item-tags" tool="azure_devops_clear_work_item_tags" inputs="organization, project, work-item">
+      Replaces /fields/System.Tags with the literal empty string, never append
+      or a generated footer. Requires explicit operation selection but no
+      nonempty tag-set grant. An absent provider field can fail without retry.
+    </effect>
+    <effect id="azure-devops-link-work-item-by-id" tool="azure_devops_link_work_item_by_id" inputs="organization, project, work-item, target-work-item, link-type">
+      Source and target are independently exact work-items grants or receipts
+      from the selected creator. After receipt resolution, two fixed writer
+      GETs require integer IDs correlated with the respective inputs and the
+      exact approved System.TeamProject before any PATCH. Appends one of the
+      seven independently approved link-types. The target URL is the fixed
+      organization/project REST prefix plus the required resolved decimal ID,
+      never an agent URL or arbitrary template. No comments, relation removal,
+      duplicate detection or automatic retries.
+    </effect>
+    <effect id="azure-devops-link-work-item-by-id-with-comment" tool="azure_devops_link_work_item_by_id_with_comment" inputs="organization, project, work-item, target-work-item, link-type, comment">
+      Same dual-ID grants, receipts, preflights and fixed URL as the unannotated
+      variant, adding only attributes.comment from a required 1-to-4000-character
+      sanitized body input. Select the unannotated operation when no comment is
+      needed; neither operation accepts arbitrary relation attributes.
+    </effect>
+    <effect id="azure-devops-link-work-item-to-branch" tool="azure_devops_link_work_item_to_branch" inputs="organization, project, work-item, repository-id, branch">
+      Three writer GET preflights check the source ID/project, exact repository
+      ID/project and exact refs/heads/branch. Refs uses filter=heads/branch and
+      top=2, requiring count=1 and the exact full ref name, not merely a prefix
+      match. Appends ArtifactLink with name Branch and the fixed reviewed
+      vstfs:///Git/Ref/project%2Frepository%2FGBbranch URL. Repository UUID and
+      branch inputs must equal the import bindings and exact grants. Branches
+      are bounded to 200 ASCII letters, digits, underscores, hyphens and slashes,
+      beginning with an alphanumeric. No repository discovery, default-branch
+      fallback or BUILD_REPOSITORY_NAME fallback. A concurrent ref change after
+      preflight is not guarded by optimistic concurrency.
+    </effect>
+    <author-policies>
+      write-checks is trusted configuration, not an agent input. A check may
+      read System.Title, System.Tags and System.AreaPath for the requested ID,
+      require matching /id and approved /fields/System.TeamProject, and use
+      responseWhen.all with prefix and literal values on /fields/System.Title,
+      path-prefix and literal values on /fields/System.AreaPath, and member-prefix
+      with literal values and separator ";" on /fields/System.Tags.
+      path-prefix matches a case-insensitive exact path or a descendant at a
+      backslash boundary, never a similarly named sibling path.
+      Prefix predicates only narrow existing exact resource grants; they never
+      authorize wildcard or area-derived targets. Assignment remains an exact
+      assignee grant, so identities outside the allowlist are already blocked;
+      no permissive allowed/blocked fallback is inferred.
+      All checks are suppressed during staging and share the operation endpoint
+      and credential. Policy reads and the following mutation are not atomic.
+    </author-policies>
+    <static-create-example><![CDATA[
+imports:
+  - uses: .github/workflows/connectors/azure-devops.md
+    with:
+      create-additional-patch:
+        - op: add
+          path: /fields/Custom.CostCenter
+          value: {literal: CC-42}
+        - op: add
+          path: /fields/System.AreaPath
+          value: {literal: 'Fabrikam\Backend'}
+        - op: add
+          path: /fields/System.IterationPath
+          value: {literal: 'Fabrikam\Sprint 1'}
+        - op: add
+          path: /fields/System.AssignedTo
+          value: {literal: reviewer@example.invalid}
+        - op: add
+          path: /fields/System.Tags
+          value: {literal: 'triaged; backend'}
+        - op: add
+          path: /relations/-
+          value:
+            literal:
+              rel: ArtifactLink
+              url: vstfs:///Git/Ref/22222222-2222-4222-8222-222222222222%2F44444444-4444-4444-8444-444444444444%2FGBmain
+              attributes: {name: Branch}
+    ]]></static-create-example>
     <creation-followups>
       Select the producer and consumers independently. update-work-item,
       comment-on-work-item, assign-work-item, the six sparse set/replace
@@ -1426,8 +2492,9 @@ import-schema:
       receipts. Canonical string ID inputs still require existing exact grants.
       The host rejects unknown, altered, cross-run, wrong-producer or wrong-plan
       receipts; the required response ID must match the resolved numeric target.
-      No hosted reader, fixed-pair link operation, link target, attachment or
-      arbitrary URL gains authority from a receipt.
+      No hosted reader, fixed-pair link operation or arbitrary URL gains
+      authority from a receipt. The two new numeric linking operations explicitly
+      authorize receipt consumers for both IDs.
     </creation-followups>
     <responses>
       Update, assign, and link require integer /id in the approved work-items
@@ -1450,6 +2517,139 @@ import-schema:
       writer credentials, performing preflight, or sending mutations.
     </responses>
   </effects>
+  <read-parity verified="2026-11-02" api-version="7.1">
+    <boundary>
+      These ten opt-in tools are fixed REST adapters, not invented hosted MCP
+      tool names. The removed shared wildcard import described resource families
+      but did not record a historical remote inventory; this is bounded family
+      coverage, not arbitrary wildcard parity. Imports alone select nothing.
+      New read grants default to empty and are independent of all writer grants.
+      Organization and project always use the author's existing exact bindings.
+      Approving multiple repositories, paths and commits approves their Cartesian
+      product; approve only combinations that are safe together. Provider text,
+      URLs and content remain untrusted data and never change endpoint authority.
+    </boundary>
+    <reader id="get-work-item" credential="rest-reader">
+      Fetch the exact independently granted work-item ID, verify its numeric ID
+      and System.TeamProject, and return id, revision and the provider field bag.
+      The fixed fields query requests TeamProject, Title, State, WorkItemType,
+      AssignedTo, AreaPath, IterationPath, Tags, Description and ReproSteps.
+      Unset optional fields remain absent; both body fields are actual content
+      where present, not inferred from metadata. No arbitrary fields selector,
+      relation expansion, comments, attachment download or custom field selector
+      is accepted. Response is bounded to 262144 bytes, not a complete unrestricted
+      work-item export; the provider field bag is not recursively key-filtered.
+    </reader>
+    <reader id="run-work-item-query" credential="rest-reader">
+      Execute only an exact approved saved flat query UUID with explicit first
+      from 1 to 100. Verify queryType flat, at most 32 columns and 100 workItems,
+      and independently approve every returned numeric work-item ID. Returns
+      IDs/URLs and asOf only, not hydrated work-item fields. Saved query contents
+      are author-reviewed provider configuration; agents cannot submit WIQL,
+      arbitrary JSON, team selectors or arbitrary URLs. Tree/link queries fail
+      closed. Query results contain no query-ID echo; the fixed request path,
+      authored saved-query grant and all-result item grants establish the scope.
+    </reader>
+    <reader id="get-repository" credential="code-reader">
+      Verify exact repository and project UUIDs and return repository ID,
+      project ID and name. This is repository metadata, not source content.
+    </reader>
+    <reader id="get-repository-file" credential="code-reader">
+      GET one exact approved repository/path/commit combination with
+      includeContent=true, includeContentMetadata=true, $format=json,
+      versionDescriptor.versionType=commit and versionOptions=none.
+      download=false and resolveLfs=false are fixed. Verify returned path,
+      commitId, gitObjectType blob, contentMetadata.isBinary=false and textual
+      content before returning actual
+      content, object ID and metadata. No mutable branch, directory listing,
+      recursion, LFS resolution, ZIP, raw binary download or agent URL exists.
+      A bounded 262144-byte JSON response may reject a larger or nontext file.
+      GitItem does not echo repository/project; those are bound by the exact
+      fixed request path, not fabricated response fields.
+    </reader>
+    <reader id="list-pull-requests" credential="code-reader">
+      Exact repository and target-ref grants, status enum and explicit first
+      1 to 100 plus skip 0 to 10000. Every returned PR must match requested
+      repository, project and targetRefName and its own independent ID grant.
+      Lists are bounded to 100 entries and 262144 bytes; a mixed unauthorized
+      page is rejected rather than filtered. Azure truncates list descriptions
+      to 400 characters; use get-pull-request for the full available description.
+    </reader>
+    <reader id="get-pull-request" credential="code-reader">
+      Verify exact numeric PR ID, repository/project UUIDs and requested
+      approved target ref; return the bounded provider PR object, including its
+      description when present. includeCommits=false and includeWorkItemRefs=false
+      are fixed. Comments, threads, diffs and commit/file enumeration are not
+      included. Source branch metadata does not grant source repository access.
+    </reader>
+    <reader id="list-pipeline-definitions" credential="build-reader">
+      Use Build definitions REST, also used by the provider's pipelines CLI,
+      not release pipelines or an unverified MCP tool. Explicit first 1 to 100
+      and optional continuation-token, at most 100 results and 262144 bytes.
+      Every returned project must match and every definition ID must be granted.
+      includeAllProperties=false and includeLatestBuilds=false are fixed.
+      Broad project pages containing unapproved definitions fail closed.
+    </reader>
+    <reader id="get-pipeline-definition" credential="build-reader">
+      Verify exact numeric definition ID, project and independently approved
+      repository ID. Return name, revision, path, repository and process metadata.
+      A YAML filename in process metadata is not YAML source content; read that
+      file separately with approved repository/path/commit grants. No variables,
+      queue/start action or release definition reader is exposed.
+    </reader>
+    <reader id="list-pipeline-runs" credential="build-reader">
+      Use Build builds REST scoped to the requested repository and source branch.
+      Every returned definition must belong to the independently approved
+      read-pipeline-ids, including later array entries. All run IDs,
+      repository/project IDs and source branches must be approved and the latter
+      three match the request. Explicit first 1 to 100, optional continuation-token,
+      100-result and 262144-byte limits. Returns bounded Build records, including
+      provider run metadata; no log text or artifacts are downloaded.
+      There is no agent-controlled pipeline filter: pages containing unapproved
+      parents fail closed rather than silently filtering project-wide results.
+    </reader>
+    <reader id="get-pipeline-run" credential="build-reader">
+      Verify exact numeric run ID and requested numeric pipeline parent plus
+      requested repository, project and source branch. Return run ID, pipeline
+      parent, build number, status, source ref and source version in the bounded
+      provider Build object. Optional result/timestamps remain available when
+      the provider supplies them, without requiring completed-run fields on
+      queued or running builds. Parameters and other provider Build metadata
+      may also be present. Log/artifact URLs are metadata only and are never
+      followed; this tool does not retrieve logs, artifacts or expanded YAML.
+    </reader>
+    <pagination>
+      No automatic following of links, continuation headers or cursors; each
+      explicit call performs one request and no retries. Build continuationToken
+      inputs may be supplied by an authorized caller, but this JSON-only adapter
+      does not expose x-ms-continuationtoken response headers. Work-item saved
+      queries expose only the requested bounded first page. Empty list arrays
+      are accepted; every item of nonempty arrays must satisfy all grants.
+    </pagination>
+    <gaps>
+      No historical hosted tool inventory was captured. Hosted tool expansion,
+      arbitrary WIQL, work-item comments/relations/history reads, PR threads/diffs,
+      repository directory/commit enumeration, release pipelines, pipeline start,
+      raw text logs, artifact downloads, binary downloads and unlimited paging
+      remain unsupported. Request.binary is safe-output upload only, never a
+      reader download mechanism. No live provider calls or credentials were used
+      to validate these adapters.
+    </gaps>
+    <evidence format="sha256-of-public-markdown-response" retrieved="2026-11-02">
+      <source operation="get-work-item" sha256="eb1773c10e717ad65db6b2b6d746327ee275b5ecc39afb24e6c93cdfec2d7d0d" href="https://learn.microsoft.com/en-us/rest/api/azure/devops/wit/work-items/get-work-item?view=azure-devops-rest-7.1&amp;accept=text/markdown"/>
+      <source operation="run-work-item-query" sha256="c38ae470b73960e51877d5fa02443f30564f6bcadacd78494a81487c2e48ea0e" href="https://learn.microsoft.com/en-us/rest/api/azure/devops/wit/wiql/query-by-id?view=azure-devops-rest-7.1&amp;accept=text/markdown"/>
+      <source operation="get-repository" sha256="00df2d7f627d09de1ab964fe3793b014e1ed27172a6c59c085579f88c956b07a" href="https://learn.microsoft.com/en-us/rest/api/azure/devops/git/repositories/get-repository?view=azure-devops-rest-7.1&amp;accept=text/markdown"/>
+      <source operation="get-repository-file" sha256="9cfeafeaea080fc449752fb4f31004aca31d356de6c2191e21506ce94dd9fb6d" href="https://learn.microsoft.com/en-us/rest/api/azure/devops/git/items/get?view=azure-devops-rest-7.1&amp;accept=text/markdown"/>
+      <source operation="list-pull-requests" sha256="b06f9ccdcfabbc2b327944491cd9834d6d0f0d2c4115534f9354aadc2398d423" href="https://learn.microsoft.com/en-us/rest/api/azure/devops/git/pull-requests/get-pull-requests?view=azure-devops-rest-7.1&amp;accept=text/markdown"/>
+      <source operation="get-pull-request" sha256="410c2fcae80e0876bf8f8831efc75a7231ad463d84acd4751b71e09947cb0095" href="https://learn.microsoft.com/en-us/rest/api/azure/devops/git/pull-requests/get-pull-request?view=azure-devops-rest-7.1&amp;accept=text/markdown"/>
+      <source operation="list-pipeline-definitions" sha256="7116b2615bae28856c326fd52d3734cfc0f0d0b21a3d5b9166a8917515f6cccc" href="https://learn.microsoft.com/en-us/rest/api/azure/devops/build/definitions/list?view=azure-devops-rest-7.1&amp;accept=text/markdown"/>
+      <source operation="get-pipeline-definition" sha256="f16d13973b53be2ea893da4d93626e2d337d38df0471a9bda6e42458351dccc2" href="https://learn.microsoft.com/en-us/rest/api/azure/devops/build/definitions/get?view=azure-devops-rest-7.1&amp;accept=text/markdown"/>
+      <source operation="list-pipeline-runs" sha256="c03794b545eb06abbb99cdea5ee7f4c6b696071b58d41c08a2d72558ffc899ec" href="https://learn.microsoft.com/en-us/rest/api/azure/devops/build/builds/list?view=azure-devops-rest-7.1&amp;accept=text/markdown"/>
+      <source operation="get-pipeline-run" sha256="4f53236b02dac457b731d280c616d8e2d1dcd7664920b04e52763e137abc48c7" href="https://learn.microsoft.com/en-us/rest/api/azure/devops/build/builds/get?view=azure-devops-rest-7.1&amp;accept=text/markdown"/>
+      <source kind="provider-wire-recording" sha256="e70638473ae808b5a1c3df3834876605f6b527584a7187c55ec57543b705305b" href="https://raw.githubusercontent.com/Azure/azure-devops-cli-extension/ad33bb3719638d4fb89029b4ef961a269a42cb14/azure-devops/azext_devops/tests/latest/integrationtests/recordings/test_build_definition_listShow.yaml"/>
+      <source kind="provider-wire-recording" sha256="8006e60436340e22e30a9b23b0fb8db37606aa9430a4983ac61dbc445e992586" href="https://raw.githubusercontent.com/Azure/azure-devops-cli-extension/ad33bb3719638d4fb89029b4ef961a269a42cb14/azure-devops/azext_devops/tests/latest/integrationtests/recordings/test_build_listQueueShow.yaml"/>
+    </evidence>
+  </read-parity>
   <context>
     There is no public configurable context field or context credential.
     Event references and canonical URLs do not authorize body retrieval or
@@ -1464,13 +2664,14 @@ import-schema:
     Removed ado-* outputs, gateway-dispatch.azure-devops-issue, and the wildcard
     shared/mcp/azure-devops.md import are not aliases. New explicit operations
     replace the old field toggles; the original update-work-item remains
-    title-only. Custom fields, artifact links, arbitrary relation types, fully
-    dynamic multi-source pairs, clearing bodies/tags, attachment upload/chaining,
-    and temporary-ID link targets have no drop-in replacement. Receipt chaining
+    title-only by default. Custom fields require reviewed author-owned static
+    create patches, not agent-selected field paths. Arbitrary relation types and
+    wildcard targets remain unsupported. Receipt chaining
     covers only the declared selected producer/consumer route; a bare numeric
-    create result never establishes follow-up authority. Binary attachments require a
-    reviewed bounded staged-file transport and validated upload/link receipt;
-    JSON strings or arbitrary URLs are not substitutes.
+    create result never establishes follow-up authority. Binary attachments use
+    the shared bounded staged-file transport and separate explicit upload/link
+    effects. Chunked upload and attachment downloads are not exposed; JSON
+    strings or arbitrary URLs are not substitutes for staged bytes.
     Per-effect max and staged controls are supported;
     work-queue effects remain unsupported.
     Broader behavior needs reviewed declarations and any missing generic support,
@@ -1585,6 +2786,8 @@ authorizes a same-run follow-up.
     <source href="https://learn.microsoft.com/en-us/rest/api/azure/devops/wit/work-items/update?view=azure-devops-rest-7.1"/>
     <source href="https://learn.microsoft.com/en-us/rest/api/azure/devops/wit/work-items/get-work-item?view=azure-devops-rest-7.1"/>
     <source href="https://learn.microsoft.com/en-us/rest/api/azure/devops/wit/comments/add-work-item-comment?view=azure-devops-rest-7.1"/>
+    <source href="https://learn.microsoft.com/en-us/rest/api/azure/devops/git/repositories/get-repository?view=azure-devops-rest-7.1"/>
+    <source href="https://learn.microsoft.com/en-us/rest/api/azure/devops/git/refs/list?view=azure-devops-rest-7.1"/>
     <source href="https://learn.microsoft.com/en-us/azure/devops/service-hooks/events?view=azure-devops"/>
     <source href="https://learn.microsoft.com/en-us/azure/devops/service-hooks/create-subscription?view=azure-devops"/>
     <source href="https://learn.microsoft.com/en-us/azure/devops/service-hooks/services/webhooks?view=azure-devops"/>

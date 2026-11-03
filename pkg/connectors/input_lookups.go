@@ -91,7 +91,7 @@ func validateLookupResponseConstraints(op Operation) error {
 		}
 	}
 	for pointer, maximum := range op.ResponseLimits {
-		if !validPointer(pointer) || maximum < 1 || maximum > 100 {
+		if (pointer != "" && !validPointer(pointer)) || maximum < 1 || maximum > 100 {
 			return errors.New("responseLimits requires array pointers and maximum counts from 1 to 100")
 		}
 	}

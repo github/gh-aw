@@ -206,6 +206,28 @@ not only that a returned ID occurs somewhere in an allowlist. Use
 `responseResourceInputs` when correlating a canonical numeric response ID with
 a resource-constrained string input.
 
+Bounded collection reads can use one array wildcard in `responseResources` and
+`responseInputs`; every returned item must satisfy the exact grant/request.
+Use `responseLimits: {"": 25}` for a root JSON array. Empty arrays are valid
+empty reads, not discovered authority. Cursor traversal must remain explicit.
+
+For safe-output policies, `checks` permits at most four fixed same-credential
+reads of canonical operation inputs, after receipt resolution and before the
+write. `responseWhen` can narrow identity, title/tag/area prefixes or reviewed
+URL identity; it cannot grant targets or hydrate missing evidence. Staging
+suppresses checks. `request.additionalPatch` carries reviewed authored fixed
+entries, never an agent patch, and cannot override existing paths.
+
+`request.binary` uses the shared staged-file artifact channel for bounded
+regular-file bytes, not JSON/base64 payloads. The agent recorder stages a
+content-addressed snapshot; the trusted host rechecks digest, byte/suffix policy,
+isolation and rejected bytes before credentials. Node guarded file access
+requires Linux. The declaration fixes the endpoint and the host fixes the root.
+Use explicit upload/attach capabilities and authenticated attachment-ID receipts,
+never a provider-returned arbitrary URL. Default creator proposal aliases are
+allocated by the recorder but establish no authority until successful real
+creation is validated.
+
 Mark human text arguments explicitly with `sanitize: title` or `sanitize: body`.
 Titles require at least 20 Unicode code points after sanitization. Use
 `minLength: 1` for body inputs whose actor content must remain nonempty before

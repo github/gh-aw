@@ -206,7 +206,8 @@ func selectDevelopmentConnector(declaration *workflow.DevelopmentConnector, opti
 		return nil, "", err
 	}
 	if options.phase == "trigger" {
-		return plan, capability, nil
+		plan, err = plan.ForPhase("trigger")
+		return plan, capability, err
 	}
 	plan, err = plan.ForPhase(options.phase)
 	return plan, capability, err

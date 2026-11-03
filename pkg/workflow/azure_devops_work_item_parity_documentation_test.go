@@ -16,7 +16,7 @@ import (
 
 func TestAzureWorkItemParityDocumentation(t *testing.T) {
 	docs, declaration := loadAzureDevOpsDocumentation(t)
-	assert.Len(t, docs.Credentials.Items, 3)
+	assert.Len(t, docs.Credentials.Items, 5)
 	schema := declaration["import-schema"].(map[string]any)
 	assert.NotEmpty(t, docs.Configuration.Inputs)
 	for _, input := range docs.Configuration.Inputs {
