@@ -7,6 +7,7 @@ permissions:
   contents: read
   issues: read
   pull-requests: read
+  copilot-requests: write
 network:
   allowed:
   - defaults
@@ -31,7 +32,10 @@ description: Reviews and cleans up instruction files to ensure clarity, low dupl
 emoji: 🧹
 engine:
   id: claude
-model: claude-sonnet-5
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: balanced
 name: Instructions Janitor
 strict: true
 timeout-minutes: 20
