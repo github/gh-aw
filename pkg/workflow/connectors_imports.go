@@ -102,7 +102,9 @@ func applyImportedConnectorSelections(frontmatter map[string]any, configs map[st
 	}
 	for _, alias := range aliases {
 		for _, section := range []string{"tools", "context"} {
-			consumeImportedConnectorSection(frontmatter, configs[alias], section, alias)
+			if err := consumeImportedConnectorSection(frontmatter, configs[alias], section, alias); err != nil {
+				return err
+			}
 		}
 		for _, section := range []string{"on", "safe-outputs"} {
 			if err := consumeQualifiedConnectorSection(frontmatter, configs[alias], section, alias); err != nil {
@@ -242,12 +244,19 @@ func consumeQualifiedConnectorSection(frontmatter, config map[string]any, sectio
 	return nil
 }
 
-func consumeImportedConnectorSection(frontmatter, config map[string]any, section, alias string) {
+func consumeImportedConnectorSection(frontmatter, config map[string]any, section, alias string) error {
 	values, ok := frontmatter[section].(map[string]any)
 	if !ok {
-		return
+		return nil
 	}
 	if selected, exists := values[alias]; exists {
+		if targeted, ok := selected.(map[string]any); ok && section == "tools" {
+			names, err := narrowConnectorMCPSelection(config, targeted)
+			if err != nil {
+				return fmt.Errorf("tools.%s: %w", alias, err)
+			}
+			selected = names
+		}
 		config[section] = selected
 		values = maps.Clone(values)
 		delete(values, alias)
@@ -257,4 +266,5 @@ func consumeImportedConnectorSection(frontmatter, config map[string]any, section
 			frontmatter[section] = values
 		}
 	}
+	return nil
 }

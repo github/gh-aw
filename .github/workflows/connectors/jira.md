@@ -840,12 +840,18 @@ import-schema:
     <input name="rest-reader-secret" type="string" default="JIRA_REST_READ_BASIC_AUTH">Separate direct-site REST reader Basic credential name, never a secret value.</input>
     <inputs>
       The five original resource arrays default empty, without wildcards. The
-      additional issue-types array defaults to Task only. A selected MCP profile requires
-      nonempty cloud-ids, issues, and queries because it registers both methods. Creation requires
+      additional issue-types array defaults to Task only. A full MCP profile requires
+      nonempty cloud-ids, issues, and queries because it registers both methods.
+      Prefer tools: {jira: {personal: [getJiraIssue]}} for issue-only access:
+      it exposes one native method and needs only cloud-ids and issues, not JQL.
+      The service-account profile supports the same exact method subset.
+      Unknown tools, wildcards, duplicates and empty subsets are rejected.
+      Creation requires
       projects and issue-types. Existing-issue writes require issues, except authenticated same-execution temporary
       references when the creator is also selected. Remaining inputs are mcp-personal-secret,
       mcp-service-account-secret, and rest-writer-secret, with defaults listed above.
-      Select one read profile with tools: {jira: [personal]} or tools: {jira: [service-account]}.
+      List syntax tools: {jira: [personal]} or tools: {jira: [service-account]}
+      remains supported when both issue retrieval and search are needed.
       Select writes as jira-create-issue, jira-update-issue, jira-update-issue-summary,
       jira-update-issue-description, jira-add-comment, or jira-add-label
       under root safe-outputs, with null, empty-object, or max/staged option values.

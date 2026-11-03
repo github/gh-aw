@@ -78,7 +78,7 @@ secret values. `copilot-requests: write` authorizes inference, not provider writ
 | --- | --- |
 | Imports | Use an editable local `.github/workflows/connectors/<provider>.md` or a reviewed `owner/repo/path@ref` URL import. There are no compiler-builtin connector definitions or fallback providers. |
 | Resources | Supply exact approved IDs. Importing alone selects nothing; never widen grants to make a call succeed. Independent lists do not establish parent, tenant, or tuple membership. |
-| Reads | Select declared `tools.<id>` capabilities only. A REST-backed tool does not imply a hosted provider MCP registration. |
+| Reads | Select declared `tools.<id>` capabilities only. For a hosted registration, `tools: {jira: {personal: [getJiraIssue]}}` exposes only those exact already-allowlisted native methods. Prefer this narrow subset over enabling an entire profile. Fixed REST/GraphQL reads keep list syntax. |
 | Writes | Select `safe-outputs.<id>-<operation>` with null, `{}`, or workflow-owned `max`/`staged` options. `max` is an integer from 1 to 100, default 1, enforced before handler execution; failures count but HTTP retries within an invocation do not. Call the generated safe-output tool, never a provider write API from the agent. |
 | Names | Selectors use hyphens; generated effect tools use underscores, such as `notion_add_comment`. Discover actual read-tool names and argument schemas; do not invent a `connector_N_` prefix. |
 | Context | No public configurable connector `context` exists. Retrieve content through selected reads; event references are not hydrated resource bodies. |

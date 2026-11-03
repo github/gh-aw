@@ -68,6 +68,33 @@ Importing grants nothing: omit `tools` or `safe-outputs` to disable that phase.
 Root triggers and safe outputs use `<id>-<capability>`; unqualified GitHub
 safe outputs retain their existing meaning.
 
+### Keep the exposed tool surface small
+
+Importing a declaration exposes no provider tools. Select only the reader and
+effect needed by the workflow; do not enable the catalog merely to approximate
+feature completeness. Unselected capabilities and credential references are
+removed from the agent snapshot.
+
+These read-and-comment selections keep the provider surface small:
+
+| Provider | Read selection | Effect selection | Provider tools |
+| --- | --- | --- | --- |
+| Linear | `tools.linear: [get-issue]` | `linear-add-comment` | One reader and one effect |
+| Jira | `tools.jira: {personal: [getJiraIssue]}` | `jira-add-comment` | One reader and one effect |
+| Azure DevOps | `tools.azure-devops: [get-work-item-description]` | `azure-devops-comment-on-work-item` | One reader and one effect |
+
+Place effect selections under `safe-outputs`. Targeted HTTP MCP mappings select
+only exact native tools already allowed by the declaration; they cannot add
+tools, arguments or authority. The service-account profile supports the same
+mapping. Legacy list selections such as `tools.jira: [personal]` still select
+both profile readers; use an exact subset instead when search is unnecessary.
+Issue-only selection requires no JQL grant. If search is selected, approve a
+narrow exact query such as `issue = APP-1`.
+Counts exclude framework reporting/noop tools. Advanced readers, file transfer
+and other mutations remain opt-in, not additional advertised tools for these
+selections. Missing or unsupported provider functionality is preferable to a
+generic arbitrary-call proxy.
+
 Every included declaration contains one self-contained
 `connector-documentation` XML comment in its Markdown body, including credential
 provisioning, resource inputs, capability limits, and complete consumer examples.
