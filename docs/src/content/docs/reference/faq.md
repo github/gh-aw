@@ -100,23 +100,23 @@ Conventional GitHub Actions workflows define deterministic steps in YAML. Agenti
 
 ### What's the difference between agentic workflows and just running a coding agent in GitHub Actions?
 
-While a standard GitHub Actions workflow can install and run a coding agent directly, GitHub Agentic Workflows provides a structured Markdown format, configurable security defaults, predefined GitHub tools, and a common way to select AI engines.
+A standard Actions workflow can run a coding agent directly. GitHub Agentic Workflows adds a structured Markdown format, configurable security defaults, predefined GitHub tools, and a common way to select AI engines.
 
 ### Is gh-aw a replacement for GitHub Actions, or does it run on top of it?
 
-`gh-aw` runs through GitHub Actions: it compiles a Markdown workflow file into a `.lock.yml` GitHub Actions workflow. Every run is an Actions run with native triggers, runner options, job logs, and spending limits. The generated agent job adds the selected AI engine and configurable controls such as sandboxing, threat detection, and safe outputs. See [How GitHub Agentic Workflows work](/gh-aw/introduction/how-they-work/) for the full process.
+It runs on top of GitHub Actions. `gh aw compile` turns the Markdown into a `.lock.yml` workflow, so every run keeps native triggers, runners, logs, and spending limits. The agent job adds the AI engine plus sandboxing, threat detection, and safe outputs. See [How GitHub Agentic Workflows work](/gh-aw/introduction/how-they-work/).
 
 ### Which AI engine should I use?
 
-GitHub Copilot is the default and supports the `copilot-requests: write` permission or a `COPILOT_GITHUB_TOKEN`. Claude Code supports fine-grained turn control (`max-turns`) and authenticates with `ANTHROPIC_API_KEY` or Anthropic WIF. Codex uses `CODEX_API_KEY` or `OPENAI_API_KEY`; Gemini uses `GEMINI_API_KEY` or Google WIF. Pi selects authentication from its `provider/model` value and has additional proxy requirements. Compare [AI engines for GitHub Agentic Workflows](/gh-aw/reference/engines/) before selecting one.
+GitHub Copilot is the default. Claude Code supports fine-grained turn control (`max-turns`). Codex and Gemini use their provider models, and Pi can route to multiple providers but has additional proxy requirements. Credentials are covered in [Who pays for the use of AI?](#who-pays-for-the-use-of-ai). Compare [AI engines](/gh-aw/reference/engines/) before selecting one.
 
 ### Can I run Claude Code on a schedule in GitHub Actions using gh-aw?
 
-Yes. Set `engine: claude` in workflow frontmatter, configure `ANTHROPIC_API_KEY` or [Anthropic Workload Identity Federation](/gh-aw/reference/auth/#anthropic-workload-identity-federation-wif), and add a schedule trigger such as `on: schedule: daily`. The compiled GitHub Actions workflow runs Claude Code in the configured agent container. See [Using Claude Code with GitHub Agentic Workflows](/gh-aw/engines/claude/).
+Yes. Set `engine: claude` in workflow frontmatter, configure `ANTHROPIC_API_KEY` or [Anthropic Workload Identity Federation](/gh-aw/reference/auth/#anthropic-workload-identity-federation-wif), and add a schedule trigger such as `on: schedule: daily`. See [Using Claude Code with GitHub Agentic Workflows](/gh-aw/engines/claude/).
 
 ### Can agentic workflows write code and create pull requests?
 
-Yes. The recommended `create-pull-request` safe output proposes code changes, documentation updates, or other modifications for human review through a separate, permission-scoped job. Direct write permissions and custom jobs are possible but are separate trust boundaries. If an organization blocks PR creation from GitHub Actions, workflows can still generate diffs or suggestions in issues or comments for manual application.
+Yes. The recommended `create-pull-request` safe output proposes changes for human review through a separate, permission-scoped job. Direct write permissions and custom jobs are separate trust boundaries. If an organization blocks PR creation from GitHub Actions, workflows can still post diffs or suggestions in issues or comments.
 
 ### Can agentic workflows do more than code?
 
@@ -132,13 +132,13 @@ Yes, with a **Personal Access Token (PAT)** that has access to target repositori
 
 ### Can I use agentic workflows in private repositories?
 
-Yes. Private repositories can support proprietary code, a "sidecar" repository with limited access, workflow testing, and organization-internal automation. See [MultiRepoOps — Side Repository](/gh-aw/patterns/multi-repo-ops/#using-a-side-repository) for patterns using private repositories.
+Yes. Private repositories support proprietary code, limited-access sidecar repositories, and internal automation. See [MultiRepoOps — Side Repository](/gh-aw/patterns/multi-repo-ops/#using-a-side-repository).
 
 ### Can I reuse an agentic workflow outside `.github/workflows/`?
 
-Not through `workflow_call`. GitHub Actions requires reusable workflow YAML files to live directly in `.github/workflows/`, with no subdirectories. This applies to compiled `.lock.yml` files too and is a [GitHub Actions limitation](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows#creating-a-reusable-workflow) that gh-aw cannot override. Compiling Markdown in another directory does not make the generated YAML callable from that location.
+Not through `workflow_call`. GitHub Actions requires reusable workflow YAML files to live directly in `.github/workflows/`, with no subdirectories. This [GitHub Actions limitation](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows#creating-a-reusable-workflow) applies to compiled `.lock.yml` files too, and gh-aw cannot override it.
 
-To reuse a centrally maintained implementation without copying it into each calling repository, add `on: workflow_call` to the central workflow's Markdown, compile it, and commit its `.lock.yml` under the central repository's `.github/workflows/`. Callers reference that compiled file at the job level:
+To share a central implementation without copying it, add `on: workflow_call` to its Markdown, compile it, and commit the `.lock.yml` under the central repository's `.github/workflows/`. Callers reference that file at the job level:
 
 ```yaml title=".github/workflows/call-review.yml"
 on: workflow_dispatch
@@ -150,7 +150,7 @@ jobs:
 
 Use a full commit SHA instead of `v1` for an immutable reference. The caller must have access to the reusable workflow and provide the required permissions and engine credentials; `secrets: inherit` is available within the same organization or enterprise.
 
-For a repository organized by action, keep documentation and shared components separately, but retain the callable entry point in `.github/workflows/`. [Imports](/gh-aw/reference/imports/) can separate shared configuration and prompt content from entry-point Markdown; they are not independently callable workflows.
+[Imports](/gh-aw/reference/imports/) can move shared configuration and prompts out of entry-point Markdown, but imported files are not independently callable workflows.
 
 ### Can I edit workflows directly on GitHub.com without recompiling?
 
@@ -267,7 +267,7 @@ See [Self-Hosted Runners](/gh-aw/reference/self-hosted-runners/#action-and-conta
 
 ### If my agent can use a skill, can agentic workflows use it too?
 
-Usually yes. Prefer frontmatter [`skills:`](/gh-aw/reference/frontmatter/#frontmatter-skills-skills) to install skills for workflow runs: use local paths (for example, `skills/name` or `.github/skills/name`) during development and pinned external references for published workflows. Use [imports](/gh-aw/reference/imports/) for workflow-level config and prompts, and [APM (Agent Package Manager)](https://microsoft.github.io/apm/) for reusable package distribution of skills and other agent primitives. See [APM Dependencies](/gh-aw/reference/dependencies/).
+Usually yes. Install skills for workflow runs with frontmatter [`skills:`](/gh-aw/reference/frontmatter/#frontmatter-skills-skills): use local paths (for example, `skills/name` or `.github/skills/name`) during development and pinned external references for published workflows. For reusable package distribution, use [APM (Agent Package Manager)](https://microsoft.github.io/apm/); see [APM Dependencies](/gh-aw/reference/dependencies/).
 
 ### How do I install agent plugins in a workflow?
 
@@ -281,11 +281,7 @@ plugins:
     github-token: ${{ secrets.PRIVATE_PLUGIN_TOKEN }}
 ```
 
-`imports` with package ecosystems such as [Microsoft APM](https://microsoft.github.io/apm/) are still supported for reusable distributions, but `plugins:` remains the direct workflow field for declaring Agent Plugins.
-
-### Can I use Claude plugins with APM?
-
-Yes. When `engine: claude` is set, APM infers the engine target and unpacks only Claude-compatible primitives. See [APM Dependencies](/gh-aw/reference/dependencies/).
+`imports` with package ecosystems such as [Microsoft APM](https://microsoft.github.io/apm/) are still supported for reusable distributions; `plugins:` is the direct field for Agent Plugins. With `engine: claude`, APM unpacks only Claude-compatible primitives. See [APM Dependencies](/gh-aw/reference/dependencies/).
 
 ### Can workflows be broken up into shareable components?
 
@@ -358,15 +354,15 @@ Keep cache keys specific to the OS and `go.sum`, do not share writable keys acro
 
 ### Agentic workflows run in GitHub Actions. Can they access my repository secrets?
 
-Not by default. The generated AI agent job starts with read-only GitHub permissions and does not automatically receive repository secrets. Workflow authors can explicitly pass credentials to engines, tools, MCP servers, custom steps, or custom jobs, so review those paths carefully. Follow [GitHub Actions security guidelines](https://docs.github.com/en/actions/reference/security/secure-use), use least-privilege permissions, inspect the compiled `.lock.yml`, and minimize tools equipped with highly privileged secrets. See the [GitHub Agentic Workflows security architecture](/gh-aw/introduction/architecture/).
+Not by default. The agent job starts with read-only GitHub permissions and receives no repository secrets automatically. Authors can pass credentials explicitly to engines, tools, MCP servers, custom steps, or jobs, so review those paths. Follow [GitHub Actions security guidelines](https://docs.github.com/en/actions/reference/security/secure-use), use least-privilege permissions, and inspect the compiled `.lock.yml`. See the [security architecture](/gh-aw/introduction/architecture/).
 
 ### Agentic workflows run in GitHub Actions. Can they write to the repository?
 
-The generated agent step runs read-only by default. The recommended write path is explicit [safe outputs](/gh-aw/reference/safe-outputs/): limited operations that are sanitized and applied in separate jobs. Workflow authors can instead grant direct `write` permissions or define custom jobs, but those choices create separate trust boundaries and are not constrained by the safe-output list.
+The agent step runs read-only by default. Writes go through [safe outputs](/gh-aw/reference/safe-outputs/), which are sanitized and applied in separate jobs. Direct `write` permissions and custom jobs create separate trust boundaries that the safe-output list does not constrain.
 
 ### What sanitization is done on AI outputs before applying changes?
 
-Configured safe outputs are sanitized before being applied, including secret redaction, URL domain filtering, XML escaping, size limits, control character stripping, GitHub reference escaping, and HTTPS enforcement. Built-in safe-output writes happen in separate jobs with scoped permissions rather than in the agent job. Direct write permissions and custom jobs do not inherit all safe-output protections. See [Text Sanitization](/gh-aw/reference/safe-outputs/#text-sanitization-allowed-domains-allowed-github-references).
+Configured safe outputs are sanitized before being applied, including secret redaction, URL domain filtering, XML escaping, size limits, control character stripping, GitHub reference escaping, and HTTPS enforcement. Direct write permissions and custom jobs do not inherit these protections. See [Text Sanitization](/gh-aw/reference/safe-outputs/#text-sanitization-allowed-domains-allowed-github-references).
 
 ### How do I prevent workflow output from creating backlinks in referenced issues?
 
@@ -389,7 +385,7 @@ The default `gh-aw` agent job uses defense-in-depth with four configurable layer
 3. **Threat detection before writes** — when enabled, [agentic threat detection](/gh-aw/reference/threat-detection/) runs between the agent and safe-output jobs, blocking writes on prompt injection, secret leaks, or malicious patches.
 4. **Network allowlist** — when enabled, the [Agent Workflow Firewall](/gh-aw/reference/sandbox/) blocks outbound traffic except to allowed domains.
 
-Workflow authors can change these defaults, grant direct write permissions, or add custom jobs. For sensitive operations, add a [GitHub Environment protection rule](#can-i-require-external-human-approval-before-safe-outputs-are-applied) so a reviewer must approve before write jobs run. Compilation-time validation and tool allowlisting add further defense; see the [security architecture](/gh-aw/introduction/architecture/).
+Authors can change these defaults. For sensitive operations, add a [GitHub Environment protection rule](#can-i-require-external-human-approval-before-safe-outputs-are-applied) so a reviewer must approve before write jobs run. Compilation-time validation and tool allowlisting add further defense; see the [security architecture](/gh-aw/introduction/architecture/).
 
 ### Can I require external human approval before safe outputs are applied?
 
@@ -434,7 +430,7 @@ The workflow runs on GitHub Actions and invokes the selected [AI engine](/gh-aw/
 
 ### Does the underlying AI engine run in a sandbox?
 
-By default, the [AI engine](/gh-aw/reference/engines/) runs in an agent container inside a GitHub Actions VM with container isolation, Actions resource constraints, limited filesystem mounts, and network egress control through the [Agent Workflow Firewall](/gh-aw/reference/sandbox/). Sandbox and firewall settings are configurable, so explicit opt-outs broaden the agent's access. See [Sandbox Configuration](/gh-aw/reference/sandbox/).
+By default, the AI engine runs in an agent container inside a GitHub Actions VM, with limited filesystem mounts and network egress controlled by the [Agent Workflow Firewall](/gh-aw/reference/sandbox/). Sandbox and firewall settings are configurable; opt-outs broaden the agent's access. See [Sandbox Configuration](/gh-aw/reference/sandbox/).
 
 ### Can an agentic workflow use outbound network requests?
 
@@ -468,7 +464,7 @@ See [Integrity Filtering](/gh-aw/reference/integrity/).
 
 ### Why do slash-command workflows show many "started then skipped" runs on comments?
 
-Expected behavior. A `slash_command` compiles into multiple event listeners (issue/PR bodies, comments, review comments). GitHub dispatches every event, then activation logic checks whether the comment starts with the matching command — non-matches exit early and appear as skipped runs. Narrow the trigger with `events:`, and use [LabelOps](/gh-aw/patterns/label-ops/) for command-style operations that shouldn't activate on every comment:
+Expected behavior. A `slash_command` listens to several events (issue and PR bodies, comments, review comments). Activation logic then checks whether the text starts with the command, so non-matches exit early and appear as skipped runs. Narrow the trigger with `events:`, or use [LabelOps](/gh-aw/patterns/label-ops/) for command-style operations:
 
 ```yaml wrap
 on:
@@ -482,13 +478,13 @@ on:
 
 ### What is a workflow lock file?
 
-The `.lock.yml` file is the compiled GitHub Actions workflow generated from your `.md` by `gh aw compile`. It contains SHA-pinned actions, resolved imports, permissions, and all guardrail hardening, so inspect it to see exactly what will run. Commit both files: the `.md` is the editable source, while the `.lock.yml` is what GitHub Actions runs and must be regenerated after any frontmatter change.
+`gh aw compile` generates the `.lock.yml` from your `.md`. It contains SHA-pinned actions, resolved imports, permissions, and guardrail hardening, so inspect it to see exactly what will run. Commit both files.
 
 ### What is the actions-lock.json file?
 
-The `.github/aw/actions-lock.json` file caches resolved `action@version` → ref mappings. The compiler tries to pin each action to an immutable commit SHA, but resolving a tag to a SHA requires GitHub API access — which can fail under limited-permission tokens (e.g., Copilot Coding Agent). The cache reuses previously resolved refs regardless of the current token's capabilities; without it, compilation is unstable.
+The `.github/aw/actions-lock.json` file caches resolved `action@version` → ref mappings. Pinning a tag to a commit SHA requires GitHub API access, which can fail under limited-permission tokens (e.g., Copilot Coding Agent). The cache keeps compilation stable regardless of token capabilities.
 
-Commit it to version control. Refresh with `gh aw update-actions`, or delete and recompile to force re-resolution. See [Action Pinning](/gh-aw/reference/compilation-process/#action-pinning).
+Commit it to version control. Refresh with `gh aw update-actions`, or delete it and recompile to force re-resolution. See [Action Pinning](/gh-aw/reference/compilation-process/#action-pinning).
 
 ### What is `github/gh-aw-actions`?
 
@@ -496,9 +492,9 @@ The GitHub Actions repository containing all reusable actions that power compile
 
 ### Why is Dependabot opening PRs to update `github/gh-aw-actions`?
 
-Dependabot scans `.lock.yml` files for action references and treats `github/gh-aw-actions` pins as regular dependencies to update. **Do not merge these PRs.** Action pins in compiled workflows should only be updated by running `gh aw compile` or `gh aw update-actions`.
+Dependabot treats `github/gh-aw-actions` pins in `.lock.yml` files as regular dependencies. **Do not merge these PRs.** Update pins only with `gh aw compile` or `gh aw update-actions`.
 
-Suppress these PRs by adding an `ignore` entry in `.github/dependabot.yml`:
+Suppress them with an `ignore` entry in `.github/dependabot.yml`:
 
 ```yaml
 updates:
@@ -512,13 +508,9 @@ See [Dependabot and gh-aw-actions](/gh-aw/reference/compilation-process/#dependa
 
 ### How does `gh aw upgrade` resolve action versions when no GitHub Releases exist?
 
-`gh aw upgrade` (and `gh aw update-actions`) tries the **GitHub Releases API** first via the `gh` CLI; if no releases exist, it falls back to **git tags** via `git ls-remote`. Tags are a valid source for version pinning, so the fallback is safe to ignore. A warning appears only when both sources are empty.
+`gh aw upgrade` (and `gh aw update-actions`) tries the **GitHub Releases API** first; if no releases exist, it falls back to **git tags** via `git ls-remote`. A warning appears only when both sources are empty.
 
-`github/gh-aw-actions` intentionally publishes only tags. The earlier `no releases found` warning has been fixed — the tag fallback now runs automatically.
-
-### Why do I need a token or key?
-
-**GitHub Copilot CLI** can use the recommended `copilot-requests: write` workflow permission with organization billing, or a fine-grained Personal Access Token stored as `COPILOT_GITHUB_TOKEN`. Claude Code, Codex, Gemini, and Pi require their documented provider authentication. See [AI engine authentication](/gh-aw/reference/auth/).
+`github/gh-aw-actions` intentionally publishes only tags, so the tag fallback is the normal path.
 
 ### Can I use `CLAUDE_CODE_OAUTH_TOKEN` with the Claude engine?
 
@@ -550,7 +542,7 @@ gh aw compile --ghes my-workflow.md
 
 ### I'm not using a supported AI Engine (coding agent). What should I do?
 
-Built-in engines are GitHub Copilot, Claude Code, OpenAI Codex, Google Gemini, and Pi. Unsupported engine samples also demonstrate how custom integrations are structured. Contribute support to the [GitHub Agentic Workflows repository](https://github.com/github/gh-aw) or open an issue describing the use case. See [AI engines for GitHub Agentic Workflows](/gh-aw/reference/engines/).
+Built-in engines are listed in [AI engines](/gh-aw/reference/engines/). Unsupported engine samples show how custom integrations are structured. Contribute support to the [GitHub Agentic Workflows repository](https://github.com/github/gh-aw) or open an issue describing the use case.
 
 ### Can I test workflows without affecting my repository?
 
@@ -580,7 +572,7 @@ safe-outputs:
 
 ### Why is my create-pull-request workflow failing with "GitHub Actions is not permitted to create or approve pull requests"?
 
-Some organizations block PR creation by GitHub Actions (**Settings → Actions → General → Workflow permissions**). If you can't enable it, keep the default `fallback-as-issue: true` to open an issue with the branch link instead, assign that issue to `copilot` if you want automated follow-up (`assignees: [copilot]` under `create-issue`), or set `fallback-as-issue: false` to fail outright. See [Pull Request Creation](/gh-aw/reference/safe-outputs/#pull-request-creation-create-pull-request).
+Some organizations block PR creation by GitHub Actions (**Settings → Actions → General → Workflow permissions**). If you can't change that, keep the default `fallback-as-issue: true` to open an issue with the branch link, add `assignees: [copilot]` under `create-issue` for automated follow-up, or set `fallback-as-issue: false` to fail outright. See [Pull Request Creation](/gh-aw/reference/safe-outputs/#pull-request-creation-create-pull-request).
 
 ### Why don't pull requests created by agentic workflows trigger my CI checks?
 
@@ -622,7 +614,7 @@ See [Self-Contained Lock Files](/gh-aw/reference/imports/#self-contained-lock-fi
 
 ### My workflow checkout is very slow because my repository is a large monorepo. How can I speed it up?
 
-Use **sparse checkout** in the `checkout:` field to fetch only the paths your workflow needs — often reducing checkout from minutes to seconds:
+Use **sparse checkout** to fetch only the paths your workflow needs:
 
 ```yaml wrap
 checkout:
@@ -644,7 +636,7 @@ checkout:
       defaults/
 ```
 
-The `sparse-checkout` field accepts newline-separated path patterns compatible with `actions/checkout`. See [GitHub Repository Checkout](/gh-aw/reference/checkout/#configuration-options) for the full list of checkout configuration options.
+The `sparse-checkout` field accepts newline-separated path patterns compatible with `actions/checkout`. See [GitHub Repository Checkout](/gh-aw/reference/checkout/#configuration-options) for all options.
 
 ## Workflow Design
 
@@ -654,7 +646,7 @@ One workflow is simpler to maintain; multiple workflows give better separation o
 
 ### Should I create agentic workflows by hand editing or using AI?
 
-Both work: AI-assisted authoring gives interactive guidance and best practices, while manual editing gives full control for advanced customization.
+Both work: AI-assisted authoring gives guidance, and manual editing gives full control.
 
 GitHub Copilot users can run `gh aw init` and then use `agentic-workflows create` in Copilot Chat on github.com or the GitHub mobile app. Claude Code and other CLI agent users can run `gh aw init --engine claude` to skip Copilot-specific files, then use the `create.md` prompt directly:
 
@@ -693,7 +685,7 @@ See [Safe Outputs (Pull Requests)](/gh-aw/reference/safe-outputs-pull-requests/)
 
 ### Are an AI agent and an agentic workflow the same thing?
 
-No. An **AI agent** is the reasoning component executed by an AI engine. An **agentic workflow** is the Markdown-defined repository automation that configures when and how that agent runs through GitHub Actions, including its tools, permissions, and controlled outputs. Some interfaces may use "agent" as shorthand for a repository workflow, but the concepts are distinct.
+No. An **AI agent** is the reasoning component executed by an AI engine. An **agentic workflow** is the Markdown-defined repository automation that configures when and how that agent runs through GitHub Actions, including its tools, permissions, and controlled outputs.
 
 ### How do I forward agent and detection artifacts to a third-party server after the workflow finishes?
 
@@ -732,7 +724,17 @@ jobs:
 
 ### Who pays for the use of AI?
 
-It depends on the engine: GitHub Copilot CLI bills the organization through `copilot-requests: write` or the account supplying [`COPILOT_GITHUB_TOKEN`](/gh-aw/reference/auth/#copilot_github_token); Claude Code bills the Anthropic account tied to [`ANTHROPIC_API_KEY`](/gh-aw/reference/auth/#anthropic_api_key) or Anthropic WIF; OpenAI Codex bills the OpenAI account tied to `CODEX_API_KEY` or [`OPENAI_API_KEY`](/gh-aw/reference/auth/#openai_api_key); Google Gemini bills the Google account tied to [`GEMINI_API_KEY`](/gh-aw/reference/auth/#gemini_api_key) or Google WIF; and Pi bills the provider selected in the `provider/model` value.
+Each engine bills the account behind its credential:
+
+| Engine | Billed to | Credential |
+|---|---|---|
+| GitHub Copilot | The organization (`copilot-requests: write`) or the account supplying the token | [`COPILOT_GITHUB_TOKEN`](/gh-aw/reference/auth/#copilot_github_token) |
+| Claude Code | Anthropic account | [`ANTHROPIC_API_KEY`](/gh-aw/reference/auth/#anthropic_api_key) or Anthropic WIF |
+| OpenAI Codex | OpenAI account | `CODEX_API_KEY` or [`OPENAI_API_KEY`](/gh-aw/reference/auth/#openai_api_key) |
+| Google Gemini | Google account | [`GEMINI_API_KEY`](/gh-aw/reference/auth/#gemini_api_key) or Google WIF |
+| Pi | Provider in the `provider/model` value | Provider's documented credentials |
+
+See [AI engine authentication](/gh-aw/reference/auth/) for setup.
 
 ### Does gh-aw add any cost beyond what the AI engine charges?
 
@@ -740,11 +742,7 @@ No. gh-aw itself is free and open source. You pay only your AI provider's standa
 
 ### What's the approximate cost per workflow run?
 
-Costs vary by workflow complexity, model, and execution time. Track usage with `gh aw logs`, `gh aw audit <run-id>`, or your AI provider's portal — use separate PAT/API keys per repository for granular tracking. Reduce costs by optimizing prompts, using smaller models, limiting tool calls, reducing run frequency, and caching results.
-
-### Are GitHub Actions minutes charged in addition to AI costs?
-
-Yes — every run consumes Actions minutes (free for public repos, metered for private) alongside AI inference. Set an [org spending limit](https://docs.github.com/en/billing/managing-billing-for-your-products/managing-billing-for-github-actions/managing-your-spending-limit-for-github-actions) to cap Actions spend. AI inference is billed separately (see [Who pays for the use of AI?](#who-pays-for-the-use-of-ai)).
+Costs vary by workflow complexity, model, and execution time. Track usage with `gh aw logs`, `gh aw audit <run-id>`, or your AI provider's portal. Reduce costs by optimizing prompts, using smaller models, limiting tool calls, reducing run frequency, and caching results.
 
 ### How do retries and agent loops affect costs?
 
@@ -760,7 +758,7 @@ For scheduled workflows, run frequency is usually the biggest cost lever.
 
 ### How do I control spend and set budgets?
 
-Spend controls live at the provider level: use GitHub Billing for Actions minutes, provider-side API key or project limits for Claude, Codex, and Gemini, and Copilot plan quota limits for Copilot. For per-repository tracking, use a dedicated API key per repository, `gh aw audit <run-id>` for per-run detail, and `gh aw logs` for aggregate metrics.
+Spend controls live at the provider level: cap Actions minutes (free for public repositories, metered for private) with an [org spending limit](https://docs.github.com/en/billing/managing-billing-for-your-products/managing-billing-for-github-actions/managing-your-spending-limit-for-github-actions), set provider-side API key or project limits for Claude, Codex, and Gemini, and use Copilot plan quota limits for Copilot. For per-repository tracking, use a dedicated API key per repository, `gh aw audit <run-id>` for per-run detail, and `gh aw logs` for aggregate metrics.
 
 ### Can I change the model being used, e.g., use a cheaper or more advanced one?
 
@@ -806,15 +804,11 @@ Use the provider key that matches your engine:
 | `codex` | `openai` |
 | `gemini` | `google` |
 
-These entries are **merged** with the built-in catalog at runtime — they override matching models and fill in gaps for unknown ones, so AIC accounting stays accurate. In shared workflows imported by others, `models.providers` entries merge as unions across all imports.
+Entries merge with the built-in catalog at runtime, overriding matching models and filling gaps, so AIC accounting stays accurate. Imported shared workflows merge `models.providers` entries as unions.
 
 See [Token Optimization — Capping Spend](/gh-aw/reference/cost-management/) for budgeting options alongside custom pricing.
 
 ## Learn More
 
-- [GitHub Agentic Workflows quickstart](/gh-aw/setup/quick-start/) — install `gh-aw` and run a first workflow
-- [Create a GitHub Agentic Workflow](/gh-aw/setup/creating-workflows/) — author Markdown instructions and compile them into GitHub Actions
 - [AI Issue Triage on GitHub](/gh-aw/gallery/ai-issue-triage/) — labeling, deduplication, and clarifying questions
 - [Automated AI Pull Request Review](/gh-aw/gallery/automated-pr-review/) — review diffs and post feedback on new PRs
-- [AI engines for GitHub Agentic Workflows](/gh-aw/reference/engines/) — compare Copilot, Claude Code, Codex, Gemini, and Pi
-- [GitHub Agentic Workflows security architecture](/gh-aw/introduction/architecture/) — understand configurable permissions, isolation, and controlled writes
