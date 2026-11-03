@@ -322,13 +322,35 @@ See the [gateway contract](/gh-aw/specs/webhook-gateway-specification/).
 
 `gh aw connector <id> setup` discovers
 `.github/workflows/connectors/<id>.md` and prints credential names, scopes,
-provisioning references, and configuration instructions without reading or
-writing secret values:
+input types and required/default availability, declared endpoints, provisioning
+references, and `credentials`/`authentication` XML guidance without reading or
+writing secret values. Normal local or cached pinned wrappers retain their
+declaration metadata, and matching local golden consumers are listed:
 
 ```bash
 gh aw connector linear setup
 gh aw connector linear setup --input 'reader-secret="LINEAR_DEV_READ_KEY"'
 ```
+
+Required import bindings must be supplied through `--input name=JSON`, just as
+through workflow `with`. For example, Zendesk setup requires both a subdomain
+and a string ticket ID; the following uses the golden's synthetic specimens:
+
+```bash
+gh aw connector zendesk setup \
+  --input 'subdomain="example"' --input 'ticket="35436"'
+```
+
+`gh aw init`, `gh aw new` and `gh aw secrets bootstrap` discover local
+declarations, wrappers and direct/transitive importing consumers offline,
+including golden workflows. Discovery does not display binding values,
+fetch remote imports or select provider tools, network permissions, grants or
+ingress. `gh aw edit --add-import` and `--remove-import` accept ordinary YAML
+`{uses: ..., with: {...}}` objects without enabling capabilities.
+
+Secrets bootstrap checks engine/system prerequisites only. Its success does
+not mean provider credentials were provisioned or provider access was approved;
+token acquisition, consent, renewal and provider ACLs remain external.
 
 Declared secret names have defaults. Linear GraphQL uses `LINEAR_API_KEY`;
 `with` in workflows and `--input` in these commands override names, never values.

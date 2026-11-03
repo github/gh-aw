@@ -4,9 +4,11 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -112,6 +114,53 @@ func TestConnectorSetupConfluenceAuthenticationMetadata(t *testing.T) {
 		"CONFLUENCE_READ_ACCESS_TOKEN", "CONFLUENCE_PAGE_WRITE_ACCESS_TOKEN",
 	} {
 		require.Contains(t, connectorConsoleText(output), expected)
+	}
+}
+
+func TestConnectorSetupCanonicalGoldens(t *testing.T) {
+	t.Parallel()
+	root, err := filepath.Abs("../..")
+	require.NoError(t, err)
+	for _, provider := range []string{
+		"linear", "jira", "azure-devops", "slack", "teams", "confluence", "sentry",
+		"servicenow", "gitlab", "pagerduty", "datadog", "zendesk", "notion",
+	} {
+		t.Run(provider, func(t *testing.T) {
+			path := ".github/workflows/" + provider + "-golden.md"
+			source, err := os.ReadFile(filepath.Join(root, path))
+			require.NoError(t, err)
+			parsed, err := parser.ExtractFrontmatterFromContent(string(source))
+			require.NoError(t, err)
+			imports, ok := parsed.Frontmatter["imports"].([]any)
+			require.True(t, ok)
+			require.Len(t, imports, 1)
+			entry, ok := imports[0].(map[string]any)
+			require.True(t, ok)
+			require.Equal(t, ".github/workflows/connectors/"+provider+".md", entry["uses"])
+			var bindings map[string]any
+			if raw := entry["with"]; raw != nil {
+				bindings, ok = raw.(map[string]any)
+				require.True(t, ok)
+			}
+			var names []string
+			for name := range bindings {
+				names = append(names, name)
+			}
+			slices.Sort(names)
+			args := []string{provider, "setup", "--root", root}
+			for _, name := range names {
+				value, err := json.Marshal(bindings[name])
+				require.NoError(t, err)
+				args = append(args, "--input", name+"="+string(value))
+			}
+			output, err := executeDevelopmentCommand(args...)
+			require.NoError(t, err)
+			require.Contains(t, output, path)
+			require.Contains(t, output, "Declared capabilities")
+			require.Contains(t, output, "Importing selects nothing")
+			require.Contains(t, output, "No secrets were read, written, minted, or refreshed")
+			require.Contains(t, output, "No capabilities, native methods, write credentials or webhook ingress were enabled")
+		})
 	}
 }
 

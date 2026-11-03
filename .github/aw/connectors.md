@@ -78,6 +78,24 @@ declaration installs a receiver, acquires tokens or turns provider scopes into
 permissions. Stop on authorization denial rather than changing identity or
 widening grants.
 
+## Repository setup
+
+`gh aw init`, `gh aw new` and `gh aw secrets bootstrap` discover local
+declarations, wrappers and importing consumers, including golden workflows.
+Discovery is offline and does not display binding values or select provider
+tools, network permissions, resource grants or ingress.
+
+Use `gh aw connector <id> setup --file PATH` for declared input types,
+required/default availability, endpoints, phase credentials/scopes and
+`credentials`/`authentication` XML guidance. Supply required import bindings
+with `--input name=JSON`; for example, Zendesk requires both `subdomain` and a
+string `ticket`. No secret values are read or provisioned.
+
+`gh aw edit --add-import` and `--remove-import` accept ordinary YAML
+`{uses: ..., with: {...}}` objects. Adding an import still selects nothing.
+Secrets bootstrap checks engine/system prerequisites only: its success does
+not establish provider credentials, consent, refresh, ACLs or live access.
+
 ## Consume a connector
 
 Import a declaration, supply author-approved resource bindings through `with`,
