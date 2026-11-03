@@ -48,6 +48,18 @@ func TestValidateOnNeedsTargets(t *testing.T) {
 		}
 	})
 
+	t.Run("authored job with maintenance name accepted", func(t *testing.T) {
+		for job := range constants.MaintenanceJobDependencies {
+			t.Run(job, func(t *testing.T) {
+				data := &WorkflowData{
+					Jobs:    map[string]any{job: map[string]any{}},
+					OnNeeds: []string{job},
+				}
+				require.NoError(t, validateOnNeedsTargets(data), "authored job should not be treated as generated")
+			})
+		}
+	})
+
 	t.Run("target depending on activation rejected", func(t *testing.T) {
 		data := &WorkflowData{
 			Jobs: map[string]any{
