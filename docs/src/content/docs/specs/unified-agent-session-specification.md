@@ -605,9 +605,23 @@ most **128 records** and **16,384 UTF-8 bytes**, including JSON escaping and one
 after each retained record. Each candidate is projected and serialized before
 budget admission. A record that would exceed either limit MUST be omitted whole;
 the producer MAY retain a later, smaller record that fits, without reordering.
+When the byte/event limits are reached, the serializer MUST preferentially
+discard low-priority records rather than silently retain only an initial prefix.
+The retention order is format header, workflow metadata, final execution/session/job
+outcomes, remaining guardrail/grader results, harness/engine retry diagnostics,
+per-step usage, then successful memory updates. Failure, denial, exceeded-budget,
+cancelled and interrupted evidence MUST be promoted to the final-outcome tier.
+Equal-priority records prefer earlier observations; retained records MUST remain
+in source order. The producer MUST continue considering complete records within
+the bounded source scan, so late essential evidence can evict earlier lower-priority
+records. The candidate buffer MUST remain bounded by the compact limits plus
+one projected candidate; discarded source payloads MUST NOT be retained.
 Input events and full artifact bytes MUST NOT be mutated, rewritten or replaced.
 Repeated equal inputs MUST produce identical compact output and statistics.
 An empty compact stream is valid and does not mean that the full session is empty.
+Transports MUST expose the loss statistics. OTLP export additionally MUST issue
+a visible partial-session warning when output or source-scan limits discard
+evidence; routine privacy filtering alone is not size truncation.
 
 **T-UAS-078 — Bounded file reading and explicit loss.** A file-based producer
 MUST snapshot the nonempty regular file's size, reject a symlink at the file

@@ -1,0 +1,246 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const http = require("node:http");
+const { sendSessionLogs } = require("./send_otlp_session_logs.cjs");
+const nativeFetch = globalThis.fetch;
+const traceId = "0123456789abcdef0123456789abcdef";
+const spanId = "0123456789abcdef";
+const decode = value => {
+  if (value.kvlistValue) return Object.fromEntries(value.kvlistValue.values.map(entry => [entry.key, decode(entry.value)]));
+  if (value.arrayValue) return value.arrayValue.values.map(decode);
+  if (value.intValue !== undefined) return Number(value.intValue);
+  return value.stringValue ?? value.doubleValue ?? value.boolValue ?? null;
+};
+
+describe("compact unified session OTLP logs", () => {
+  let directory;
+  let sessionPath;
+  let fetchMock;
+  let warning;
+  let partialWarning;
+  beforeEach(() => {
+    directory = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-session-logs-"));
+    sessionPath = path.join(directory, "aw_session.jsonl");
+    fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    vi.stubGlobal("fetch", fetchMock);
+    warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+    partialWarning = vi.spyOn(global.core, "warning").mockImplementation(() => {});
+    for (const name of ["HTTP_PROXY", "http_proxy", "HTTPS_PROXY", "https_proxy", "ALL_PROXY", "all_proxy", "GH_AW_SECRET_NAMES"]) vi.stubEnv(name, "");
+    vi.stubEnv("GH_AW_OTLP_LOGS_ENABLED", "true");
+    vi.stubEnv("GH_AW_OTLP_LOGS_MAX_BYTES", "");
+    vi.stubEnv("GH_AW_OTLP_ENDPOINTS", JSON.stringify([{ url: "https://collector.example/otlp", headers: "Authorization=Bearer%20private-credential" }]));
+    vi.stubEnv("GH_AW_OTLP_IF_MISSING", "ignore");
+    vi.stubEnv("GITHUB_AW_OTEL_TRACE_ID", traceId);
+    vi.stubEnv("GITHUB_AW_OTEL_PARENT_SPAN_ID", spanId);
+    fs.writeFileSync(sessionPath, JSON.stringify({ type: "session.format", data: { version: 1 } }) + "\n");
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    fs.rmSync(directory, { recursive: true, force: true });
+  });
+  const write = events => fs.writeFileSync(sessionPath, events.map(JSON.stringify).join("\n") + "\n");
+  const payload = (index = 0) => JSON.parse(fetchMock.mock.calls[index][1].body);
+  const records = () => payload().resourceLogs[0].scopeLogs[0].logRecords;
+
+  it.each(["", "false", "TRUE", "1", "invalid"])("fails closed for opt-in value %j without reading the session", async value => {
+    vi.stubEnv("GH_AW_OTLP_LOGS_ENABLED", value);
+    await sendSessionLogs({ sessionPath: "/nonexistent/session" });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(warning).toHaveBeenCalledTimes(value && value !== "false" ? 1 : 0);
+  });
+
+  it("exports searchable typed records with correlation, not conversation or identifying fields", async () => {
+    write([
+      { type: "session.format", data: { version: 1 } },
+      { type: "workflow.info", data: { engineId: "copilot", repository: "PRIVATE_REPO", workflowId: "PRIVATE_WORKFLOW", ref: "PRIVATE_REF", sha: "PRIVATE_SHA" } },
+      { type: "assistant.message", data: { content: "PRIVATE_CONVERSATION" } },
+      { type: "tool.execution_start", data: { input: "PRIVATE_TOOL" } },
+      { type: "session.result", data: { numTurns: 0, sessionId: "PRIVATE_SESSION", agentId: "PRIVATE_AGENT", usage: { inputTokens: 10, inputTokensIncludeCache: false } }, provenance: { path: "PRIVATE_PATH", component: "agent" } },
+      { type: "memory.push", data: { memoryId: "PRIVATE_MEMORY", branch: "PRIVATE_BRANCH", commit: "PRIVATE_COMMIT", status: "saved" } },
+    ]);
+    await sendSessionLogs({ sessionPath });
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock.mock.calls[0][0]).toBe("https://collector.example/otlp/v1/logs");
+    expect(fetchMock.mock.calls[0][1].headers).toEqual({ "Content-Type": "application/json", Authorization: "Bearer private-credential" });
+    expect(fetchMock.mock.calls[0][1].body).not.toContain("PRIVATE");
+    expect(records()).toHaveLength(4);
+    expect(records()[2]).toMatchObject({ traceId, spanId, severityNumber: 9, observedTimeUnixNano: expect.stringMatching(/^[0-9]+$/) });
+    expect(decode(records()[2].body)).toEqual({ type: "session.result", data: { numTurns: 0, usage: { inputTokens: 10, inputTokensIncludeCache: false } }, provenance: { component: "agent" } });
+    const attributes = Object.fromEntries(payload().resourceLogs[0].resource.attributes.map(entry => [entry.key, decode(entry.value)]));
+    expect(attributes).toMatchObject({ "service.name": "gh-aw", "gh-aw.session.included_events": 4, "gh-aw.session.omitted_events": 2, "gh-aw.session.truncated": false });
+  });
+
+  it("fans out with isolated credentials and normalizes signal-specific URLs", async () => {
+    vi.stubEnv(
+      "GH_AW_OTLP_ENDPOINTS",
+      JSON.stringify([
+        { url: "https://first.example/v1/traces", headers: "Authorization=Bearer%20first" },
+        { url: "https://second.example/v1/logs/", headers: "x-api-key=second" },
+      ])
+    );
+    await sendSessionLogs({ sessionPath });
+    expect(fetchMock.mock.calls.map(call => call[0])).toEqual(["https://first.example/v1/logs", "https://second.example/v1/logs"]);
+    expect(fetchMock.mock.calls[0][1].headers).not.toHaveProperty("x-api-key");
+    expect(fetchMock.mock.calls[1][1].headers).not.toHaveProperty("Authorization");
+    expect(payload(0)).toEqual(payload(1));
+  });
+
+  it("applies current publication and exporter credential masks", async () => {
+    vi.stubEnv("GH_AW_SECRET_NAMES", "CUSTOM");
+    vi.stubEnv("SECRET_CUSTOM", "private-model");
+    write([{ type: "workflow.info", data: { model: "private-model", agentVersion: "private-credential" } }]);
+    await sendSessionLogs({ sessionPath });
+    expect(fetchMock.mock.calls[0][1].body).not.toContain("private-model");
+    expect(fetchMock.mock.calls[0][1].body).not.toContain("private-credential");
+  });
+
+  it.each(["", "not-json", JSON.stringify([{ url: "https://collector.example" }]), JSON.stringify([{ url: "https://collector.example", headers: "Authorization=Bearer" }])])(
+    "does not export with missing endpoint credentials: %s",
+    async endpoints => {
+      vi.stubEnv("GH_AW_OTLP_ENDPOINTS", endpoints);
+      await sendSessionLogs({ sessionPath });
+      expect(fetchMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it("retains compact limits and reports truncation", async () => {
+    write(Array.from({ length: 200 }, () => ({ type: "usage.report", data: { aic: 1 } })));
+    await sendSessionLogs({ sessionPath });
+    expect(records()).toHaveLength(128);
+    expect(payload().resourceLogs[0].resource.attributes).toContainEqual({ key: "gh-aw.session.truncated", value: { boolValue: true } });
+    expect(Buffer.byteLength(fetchMock.mock.calls[0][1].body)).toBeLessThanOrEqual(64 * 1024);
+    expect(partialWarning).toHaveBeenCalledWith(expect.stringContaining("Session export is partial"));
+  });
+
+  it("enforces the exact UTF-8 request byte budget with whole records and accurate counts", async () => {
+    write(Array.from({ length: 20 }, () => ({ type: "usage.report", data: { aic: 1, model: "模型" } })));
+    await sendSessionLogs({ sessionPath });
+    const fullSize = Buffer.byteLength(fetchMock.mock.calls[0][1].body);
+    fetchMock.mockClear();
+    vi.stubEnv("GH_AW_OTLP_LOGS_MAX_BYTES", String(fullSize));
+    await sendSessionLogs({ sessionPath });
+    expect(Buffer.byteLength(fetchMock.mock.calls[0][1].body)).toBe(fullSize);
+    expect(records()).toHaveLength(20);
+    fetchMock.mockClear();
+    vi.stubEnv("GH_AW_OTLP_LOGS_MAX_BYTES", String(fullSize - 1));
+    await sendSessionLogs({ sessionPath });
+    expect(Buffer.byteLength(fetchMock.mock.calls[0][1].body)).toBeLessThanOrEqual(fullSize - 1);
+    expect(records()).toHaveLength(19);
+    const attributes = Object.fromEntries(payload().resourceLogs[0].resource.attributes.map(entry => [entry.key, decode(entry.value)]));
+    expect(attributes).toMatchObject({ "gh-aw.session.included_events": 19, "gh-aw.session.omitted_events": 1, "gh-aw.session.truncated": true });
+    expect(partialWarning).toHaveBeenCalledWith(expect.stringContaining("19 compact events; 1 inspected records omitted"));
+  });
+
+  it("drops low-priority usage, not late outcomes, at the transport byte cap", async () => {
+    write([
+      { type: "session.format", data: { version: 1 } },
+      ...Array.from({ length: 200 }, (_, stepIndex) => ({ type: "usage.report", data: { stepIndex, aic: 1 } })),
+      { type: "workflow.info", data: { engineId: "copilot" } },
+      { type: "execution.result", data: { outcome: "failure", exitCode: 1 } },
+      { type: "grader.result", data: { id: "quality", passed: false } },
+    ]);
+    vi.stubEnv("GH_AW_OTLP_LOGS_MAX_BYTES", "3000");
+    await sendSessionLogs({ sessionPath });
+    const retained = records().map(record => decode(record.body));
+    expect(Buffer.byteLength(fetchMock.mock.calls[0][1].body)).toBeLessThanOrEqual(3000);
+    expect(retained.filter(event => event.type !== "usage.report").map(event => event.type)).toEqual(["session.format", "workflow.info", "execution.result", "grader.result"]);
+    expect(retained.filter(event => event.type === "usage.report")).toHaveLength(1);
+    expect(retained.find(event => event.type === "execution.result").data).toEqual({ outcome: "failure", exitCode: 1 });
+    expect(partialWarning).toHaveBeenCalledOnce();
+    expect(payload().resourceLogs[0].resource.attributes).toContainEqual({ key: "gh-aw.session.truncated", value: { boolValue: true } });
+  });
+
+  it("does not warn about a partial export when only routine privacy filtering applies", async () => {
+    write([
+      { type: "session.format", data: { version: 1 } },
+      { type: "assistant.message", data: { content: "private" } },
+    ]);
+    await sendSessionLogs({ sessionPath });
+    expect(partialWarning).not.toHaveBeenCalled();
+  });
+
+  it.each(["0", "-1", "1.5", "NaN", "Infinity", "9007199254740992", "1e4", " "])("fails closed for invalid byte limit %j", async maxBytes => {
+    vi.stubEnv("GH_AW_OTLP_LOGS_MAX_BYTES", maxBytes);
+    await sendSessionLogs({ sessionPath });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(warning).toHaveBeenCalledWith(expect.stringContaining("must be a positive safe integer"));
+  });
+
+  it("warns without sending when even one record cannot fit the size limit", async () => {
+    vi.stubEnv("GH_AW_OTLP_LOGS_MAX_BYTES", "1");
+    await sendSessionLogs({ sessionPath });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(warning).toHaveBeenCalledWith(expect.stringContaining("No compact session records fit"));
+  });
+
+  it.each(["missing", "malformed", "symlink"])("warns without exporting %s artifacts or private diagnostics", async kind => {
+    if (kind === "missing") fs.unlinkSync(sessionPath);
+    if (kind === "malformed") fs.writeFileSync(sessionPath, "PRIVATE_INVALID_JSON");
+    if (kind === "symlink") {
+      fs.renameSync(sessionPath, path.join(directory, "source"));
+      fs.symlinkSync(path.join(directory, "source"), sessionPath);
+    }
+    await sendSessionLogs({ sessionPath });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(warning).toHaveBeenCalledOnce();
+    expect(warning.mock.calls.flat().join(" ")).not.toContain("PRIVATE");
+  });
+
+  it("omits invalid trace context instead of fabricating identifiers", async () => {
+    vi.stubEnv("GITHUB_AW_OTEL_TRACE_ID", "invalid");
+    await sendSessionLogs({ sessionPath });
+    expect(records()[0]).not.toHaveProperty("traceId");
+    expect(records()[0]).not.toHaveProperty("spanId");
+  });
+
+  it("does not retry authorization failures and still delivers to other vendors", async () => {
+    vi.stubEnv(
+      "GH_AW_OTLP_ENDPOINTS",
+      JSON.stringify([
+        { url: "https://denied.example", headers: "x-api-key=denied" },
+        { url: "https://ok.example", headers: "x-api-key=ok" },
+      ])
+    );
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 403 }).mockResolvedValueOnce({ ok: true, status: 200 });
+    await sendSessionLogs({ sessionPath });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(warning).toHaveBeenCalledWith(expect.stringContaining("authorization failed"));
+  });
+
+  it("retries transient failures using the existing OTLP transport", async () => {
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 503 }).mockResolvedValueOnce({ ok: true, status: 200 });
+    await sendSessionLogs({ sessionPath });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("delivers bounded OTLP JSON to a real local logs collector", async () => {
+    let received;
+    const server = http.createServer((request, response) => {
+      let body = "";
+      request.setEncoding("utf8");
+      request.on("data", chunk => (body += chunk));
+      request.on("end", () => {
+        received = { url: request.url, headers: request.headers, body };
+        response.writeHead(200, { "Content-Type": "application/json" });
+        response.end("{}");
+      });
+    });
+    await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+    try {
+      vi.stubEnv("GH_AW_OTLP_ENDPOINTS", JSON.stringify([{ url: `http://127.0.0.1:${server.address().port}`, headers: "x-api-key=local-test" }]));
+      vi.stubEnv("GH_AW_OTLP_LOGS_MAX_BYTES", "2048");
+      fetchMock.mockImplementation(nativeFetch);
+      await sendSessionLogs({ sessionPath });
+      expect(received.url).toBe("/v1/logs");
+      expect(received.headers["x-api-key"]).toBe("local-test");
+      expect(Buffer.byteLength(received.body)).toBeLessThanOrEqual(2048);
+      expect(JSON.parse(received.body).resourceLogs[0].scopeLogs[0].logRecords).toHaveLength(1);
+    } finally {
+      await new Promise(resolve => server.close(resolve));
+    }
+  });
+});

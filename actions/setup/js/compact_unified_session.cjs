@@ -32,6 +32,58 @@ EVENT_FIELDS["firewall.token_usage"] = EVENT_FIELDS["usage.report"];
 const USAGE_FIELDS = ["totalTokens", "inputTokens", "outputTokens", "reasoningOutputTokens", "cacheReadInputTokens", "cacheCreationInputTokens", "inputTokensIncludeCache"];
 const GRADER_RUN_FIELDS = ["id", "attempt", "graderCount", "passed", "failed", "errors"];
 
+/** @type {Record<string, number>} Lower numbers preserve more essential evidence. */
+const SESSION_EVENT_PRIORITIES = {
+  "session.format": 0,
+  "workflow.info": 1,
+  "execution.result": 2,
+  "session.result": 2,
+  "workflow.job_result": 2,
+  "guardrail.admission": 3,
+  "guardrail.daily_aic": 3,
+  "grader.result": 3,
+  "harness.retry": 4,
+  "harness.attempt": 4,
+  "engine.retry": 4,
+  "usage.report": 5,
+  "firewall.token_usage": 5,
+  "memory.push": 6,
+};
+const FAILURE_STATUSES = new Set(["failure", "failed", "fail", "error", "denied", "blocked", "exceeded", "timed_out", "cancelled", "interrupted"]);
+
+/** @param {unknown} event @returns {number} */
+function sessionEventPriority(event) {
+  if (!isRecord(event) || typeof event.type !== "string") return 7;
+  const priority = Object.hasOwn(SESSION_EVENT_PRIORITIES, event.type) ? SESSION_EVENT_PRIORITIES[event.type] : 7;
+  const data = isRecord(event.data) ? event.data : {};
+  const run = data.run;
+  const failed =
+    ["status", "result", "outcome", "conclusion", "jobResult"].some(key => typeof data[key] === "string" && FAILURE_STATUSES.has(data[key])) ||
+    (typeof data.exitCode === "number" && data.exitCode !== 0) ||
+    data.exceeded === true ||
+    data.passed === false ||
+    (isRecord(run) && ["failed", "errors"].some(key => typeof run[key] === "number" && run[key] > 0));
+  return failed ? Math.min(priority, 2) : priority;
+}
+
+/**
+ * Drop the latest least-essential record, preserving earlier evidence on ties.
+ * @param {readonly unknown[]} events
+ * @returns {number}
+ */
+function leastEssentialSessionEventIndex(events) {
+  let index = -1;
+  let priority = -1;
+  for (let i = 0; i < events.length; i++) {
+    const candidatePriority = sessionEventPriority(events[i]);
+    if (candidatePriority >= priority) {
+      priority = candidatePriority;
+      index = i;
+    }
+  }
+  return index;
+}
+
 /**
  * @typedef {{version: number, session: string, includedEvents: number, omittedEvents: number, oversizedLines: number, scanTruncated: boolean, truncated: boolean}} CompactUnifiedSession
  */
@@ -102,29 +154,32 @@ function projectEvent(event) {
  * @returns {CompactUnifiedSession}
  */
 function compactUnifiedSession(events) {
-  let session = "";
+  /** @type {Array<{event: Record<string, unknown>, line: string, length: number}>} */
+  const retained = [];
   let bytes = 0;
-  let includedEvents = 0;
-  let omittedEvents = 0;
+  let inspectedEvents = 0;
   let truncated = false;
   for (const event of events) {
+    inspectedEvents++;
     const projected = projectEvent(event);
-    if (!projected) {
-      omittedEvents++;
-      continue;
-    }
+    if (!projected) continue;
     const line = JSON.stringify(projected) + "\n";
     const length = Buffer.byteLength(line);
-    if (includedEvents >= MAX_COMPACT_SESSION_EVENTS || bytes + length > MAX_COMPACT_SESSION_BYTES) {
-      omittedEvents++;
+    if (length > MAX_COMPACT_SESSION_BYTES) {
       truncated = true;
       continue;
     }
-    session += line;
+    retained.push({ event: projected, line, length });
     bytes += length;
-    includedEvents++;
+    while (retained.length > MAX_COMPACT_SESSION_EVENTS || bytes > MAX_COMPACT_SESSION_BYTES) {
+      const index = leastEssentialSessionEventIndex(retained.map(candidate => candidate.event));
+      bytes -= retained[index].length;
+      retained.splice(index, 1);
+      truncated = true;
+    }
   }
-  return { version: COMPACT_UNIFIED_SESSION_VERSION, session, includedEvents, omittedEvents, oversizedLines: 0, scanTruncated: false, truncated };
+  const session = retained.map(candidate => candidate.line).join("");
+  return { version: COMPACT_UNIFIED_SESSION_VERSION, session, includedEvents: retained.length, omittedEvents: inspectedEvents - retained.length, oversizedLines: 0, scanTruncated: false, truncated };
 }
 
 /**
@@ -193,4 +248,15 @@ function readCompactUnifiedSession(filePath) {
   }
 }
 
-module.exports = { compactUnifiedSession, readCompactUnifiedSession, COMPACT_UNIFIED_SESSION_VERSION, MAX_COMPACT_SESSION_BYTES, MAX_COMPACT_SESSION_EVENTS, MAX_COMPACT_STRING_BYTES, MAX_SOURCE_LINE_BYTES, MAX_SOURCE_SCAN_BYTES };
+module.exports = {
+  compactUnifiedSession,
+  readCompactUnifiedSession,
+  sessionEventPriority,
+  leastEssentialSessionEventIndex,
+  COMPACT_UNIFIED_SESSION_VERSION,
+  MAX_COMPACT_SESSION_BYTES,
+  MAX_COMPACT_SESSION_EVENTS,
+  MAX_COMPACT_STRING_BYTES,
+  MAX_SOURCE_LINE_BYTES,
+  MAX_SOURCE_SCAN_BYTES,
+};

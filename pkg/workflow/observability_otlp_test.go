@@ -357,6 +357,17 @@ func TestInjectOTLPConfig(t *testing.T) {
 		assert.Contains(t, wd.Env, "OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}")
 		assert.Contains(t, wd.Env, "OTEL_EXPORTER_OTLP_HEADERS: ${{ secrets.GH_AW_DEFAULT_OTLP_HEADERS }}")
 		assert.Contains(t, wd.Env, "GH_AW_OTLP_IF_MISSING: ignore", "unset enterprise defaults must be a no-op")
+		assert.Contains(t, wd.Env, "GH_AW_OTLP_LOGS_ENABLED: ${{ vars.GH_AW_OTLP_LOGS_ENABLED }}")
+		assert.Contains(t, wd.Env, "GH_AW_OTLP_LOGS_MAX_BYTES: ${{ vars.GH_AW_OTLP_LOGS_MAX_BYTES }}")
+	})
+
+	t.Run("preserves explicit session log opt out without duplicate keys", func(t *testing.T) {
+		wd := &WorkflowData{Env: "env:\n  GH_AW_OTLP_LOGS_ENABLED: 'false'\n  GH_AW_OTLP_LOGS_MAX_BYTES: '4096'"}
+		newCompiler().injectOTLPConfig(wd)
+		assert.Equal(t, 1, strings.Count(wd.Env, "GH_AW_OTLP_LOGS_ENABLED:"))
+		assert.Contains(t, wd.Env, "GH_AW_OTLP_LOGS_ENABLED: 'false'")
+		assert.Equal(t, 1, strings.Count(wd.Env, "GH_AW_OTLP_LOGS_MAX_BYTES:"))
+		assert.Contains(t, wd.Env, "GH_AW_OTLP_LOGS_MAX_BYTES: '4096'")
 	})
 
 	t.Run("falls back to enterprise defaults when ParsedFrontmatter is nil", func(t *testing.T) {
