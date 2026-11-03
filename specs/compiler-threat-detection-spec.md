@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.95
+**Version**: 1.0.96
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,6 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw | Compatibility |
 |---|---:|---|
+| `1.0.96` | Unreleased | Specifies resolved global-App token persistence only for the default host PR checkout, preserving per-checkout authentication, static additional checkouts, optional-App fallback, and agent isolation. Requires work-queue reconciliation and App minting before shared PR checkout. Regenerate workflow locks; no new threat identifier, permission grant, or repository-scope expansion. |
 | `1.0.95` | Unreleased | Consolidates AGG-005 resource policy into four trusted repository variables for bytes, objects, timeout, and fetch depths, with derived finite budgets preserving defaults, strict validation, consistent generation/upload/publisher enforcement, and explicit MCP container forwarding. Uploads and agent-written environment files cannot override upload-validation or publisher policy. Deploy matching setup runtime and regenerate workflow locks; no new threat identifier, permission grant, or frontmatter setting. |
 | `1.0.94` | Unreleased | Requires descriptor-pinned raw staging parents, post-redaction recovery-envelope validation before artifact upload, preserved generation/output-limit diagnostics, and usable fallback instructions for immutable object-pack uploads. Retains selected-object packaging, native pack validation, strict tip verification, and publisher authorization. Deploy matching setup runtime and regenerate workflow locks for the upload guard; no new threat identifier, permission grant, or frontmatter setting. |
 | `1.0.93` | Unreleased | Scales AGG-005 recovery by selecting pinned-tip object ranges, using baseline hints only for local exclusions, fetching filtered trusted history with pinned bounded adaptive depth, and hydrating only necessary blobs independently identified in trusted trees before import. Preserves offline generation and publisher authorization. No new frontmatter, permissions, or lock-file schema change. |
@@ -696,6 +697,22 @@ The handoff MUST retain guarded exclusive `0600` file creation and `0700` guard-
 | Host artifact handoff and downstream publication | `pkg/workflow/publish_assets.go`; `actions/setup/js/upload_assets.cjs` | `pkg/workflow/publish_assets_test.go`: generated publication-job input/environment wiring; `actions/setup/js/upload_assets.test.cjs`: guarded consumption, content verification, and failure when every declared asset is missing. |
 
 These regressions are runtime configuration and local filesystem evidence, not proof of Docker user-namespace mapping, arbitrary custom mounts or overrides, clean host state, or live GitHub recovery. Non-Linux skips and unavailable container execution MUST remain explicit coverage gaps. Deploying the fixed setup runtime adopts this policy without recompiling unchanged locks; existing failed runs and artifacts remain unchanged. No `CTR-*` or compiler compliance-test identifier is introduced.
+
+### 7.10 Safe-Output PR Publishing Credentials
+
+The compiler MUST implement [Safe Outputs GP5c](../docs/src/content/docs/specs/safe-outputs-specification.md#gp5c-persisted-pr-checkout-credentials). A retained default `GITHUB_TOKEN` can cause unsigned pushes to run as `github-actions[bot]` rather than the configured App and suppress downstream PR workflows. Conversely, substituting a global App token into every checkout can deny access to unrelated private repositories or use a token lacking `contents` when PR handlers have dedicated credentials.
+
+The default workspace checkout MUST persist the resolved global-App PR token only for the host-target, shared-global-App case, preserving explicit checkout authentication and `ignore-if-missing` fallback. Additional static checkouts MUST NOT inherit this default-only override. Token minting MUST precede consumers; work-queue artifact downloads and claim reconciliation MUST precede global App minting and shared PR checkout.
+
+These are generated-configuration requirements, not new authored-source lint diagnostics. Persistence MUST NOT expand repository scope, add permissions excluded by per-handler credential isolation, change static code-scanning upload credentials, or change agent-job credential handling. The compiler-only `artipacked` exception in Section 7.4 remains provenance-bound; credential availability does not authorize agent-generated code.
+
+| Boundary | Implementation | Regression Evidence |
+|---|---|---|
+| Default host checkout token and repository isolation | `pkg/workflow/compiler_safe_outputs_steps.go`: `prHandlersUseGlobalApp`, `prepareSharedPRCheckout`; `checkout_manager.go`: `SetDefaultPushToken`; `checkout_step_generator.go`: `GenerateDefaultCheckoutStep` | `TestSafeOutputsPRCheckoutGlobalAppTokenScoping`: optional-App fallback, per-handler App isolation, additional static checkouts, and cross-organization target isolation; `TestSafeOutputsPRCheckoutPersistsGlobalGitHubAppToken`: unsigned PR operations, mint-before-checkout, retained App token, and unchanged credential-stripping agent checkout. |
+| Work-queue producer/consumer ordering | `pkg/workflow/compiler_safe_outputs_job.go`: `buildSafeOutputsSetupAndDownloadSteps`, `buildSafeOutputsDownloadSteps`, `calculatePreambleInsertIndex` | `TestWorkQueueSafeOutputsPRCheckoutFollowsAppToken`: reconciliation before minting before checkout. |
+| Runtime checkout credential isolation | `pkg/workflow/compiler_safe_outputs_steps.go`; `github_token.go`: `resolvePRCheckoutToken`, `resolveStaticCheckoutToken` | `TestSafeOutputDynamicCheckoutTokenPriority`, `TestSafeOutputDynamicCheckoutKeepsHostingAndStaticAuth`, `TestSafeOutputDynamicCheckoutDoesNotInheritAnotherEntryApp`. |
+
+Generated-YAML regressions do not prove live App installation access, effective repository permissions, push identity, or downstream workflow execution. Existing locks MUST be recompiled to adopt this compiler change; no new `CTR-*` identifier or lock-file schema is introduced.
 
 ## 8. Compliance Testing
 
