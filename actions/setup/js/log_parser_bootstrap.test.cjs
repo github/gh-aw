@@ -242,14 +242,19 @@ describe("log_parser_bootstrap.cjs", () => {
             fs.unlinkSync(logFile),
             fs.rmdirSync(tmpDir));
         }),
-        it.each([
-          ["Copilot", false],
-          ["Copilot", true],
-          ["Claude", false],
-          ["Claude", true],
-          ["Codex", false],
-          ["Codex", true],
-        ])("publishes %s Agent session without an outer disclosure with safe outputs enabled: %s", async (parserName, safeOutputs) => {
+        it.each(
+          [
+            ["Copilot", false],
+            ["Copilot", true],
+            ["Claude", false],
+            ["Claude", true],
+            ["Codex", false],
+            ["Codex", true],
+          ].flatMap(([parserName, safeOutputs]) => [
+            [parserName, safeOutputs, false],
+            [parserName, safeOutputs, true],
+          ])
+        )("publishes %s unified session with safe outputs enabled: %s and legacy entries: %s", async (parserName, safeOutputs, legacy) => {
           const tmpDir = fs.mkdtempSync(path.join(__dirname, "test-"));
           try {
             const logFile = path.join(tmpDir, "test.log");
@@ -261,22 +266,28 @@ describe("log_parser_bootstrap.cjs", () => {
               fs.writeFileSync(outputsFile, JSON.stringify({ type: "create_issue", title: "Test issue", body: "Test body" }) + "\n");
               process.env.GH_AW_SAFE_OUTPUTS = outputsFile;
             }
-            const logEntries = [
-              { type: "session.start", data: { sessionId: "test-session", selectedModel: "test-model" } },
-              { type: "assistant.message", data: { content: "Agent response" } },
-              { type: "session.result", data: { status: "success", num_turns: 1 } },
-            ];
+            const logEntries = legacy
+              ? [
+                  { type: "system", subtype: "init", model: "test-model" },
+                  { type: "assistant", message: { content: [{ type: "text", text: "Agent response" }] } },
+                  { type: "result", num_turns: 1, is_error: false },
+                ]
+              : [
+                  { type: "session.start", data: { sessionId: "test-session", selectedModel: "test-model" } },
+                  { type: "assistant.message", data: { content: "Agent response" } },
+                  { type: "session.result", data: { status: "success", num_turns: 1 } },
+                ];
             await runLogParser({ parseLog: () => ({ markdown: "Parsed log", logEntries }), parserName, artifactDir: tmpDir });
 
             expect(mockCore.setFailed).not.toHaveBeenCalled();
             expect(mockCore.summary.addRaw).toHaveBeenCalledOnce();
             const markdown = mockCore.summary.addRaw.mock.calls[0][0];
-            expect(markdown).toMatch(/^<details>\n<summary>Agent session<\/summary>/);
-            expect(markdown.match(/<summary>Agent session<\/summary>/g)).toHaveLength(1);
+            expect(markdown).toMatch(/^<details><summary>Unified session<\/summary>/);
+            expect(markdown.match(/<summary>Unified session<\/summary>/g)).toHaveLength(1);
             expect(markdown).not.toContain("<summary>Agentic Conversation</summary>");
             expect(markdown).toContain("Agent response");
             let depth = 0;
-            for (const match of markdown.matchAll(/<details(?: open)?>|<\/details>|<summary>(Agent session|Trace details|Safe Outputs)<\/summary>/g)) {
+            for (const match of markdown.matchAll(/<details(?: open)?>|<\/details>|<summary>(Unified session|Safe Outputs)<\/summary>/g)) {
               if (match[0].startsWith("<details")) depth++;
               else if (match[0] === "</details>") depth--;
               else expect(depth).toBe(1);
@@ -347,12 +358,12 @@ describe("log_parser_bootstrap.cjs", () => {
             ],
           });
           runLogParser({ parseLog: mockParseLog, parserName: "TestParser" });
-          const infoCall = mockCore.info.mock.calls.find(call => call[0].includes("=== TestParser Execution Summary ==="));
+          const infoCall = mockCore.info.mock.calls.find(call => call[0].includes("=== Unified session ==="));
           (expect(infoCall).toBeDefined(), expect(infoCall[0]).toContain("Model: gpt-5"), expect(infoCall[0]).toContain("Turns: 2"));
           const summaryCall = mockCore.summary.addRaw.mock.calls[0];
           (expect(summaryCall).toBeDefined(),
             expect(summaryCall[0]).toContain("```"),
-            expect(summaryCall[0]).toContain("Conversation:"),
+            expect(summaryCall[0]).toContain("<summary>Unified session</summary>"),
             expect(summaryCall[0]).toContain("◆ Hello"),
             expect(summaryCall[0]).toContain("Statistics:"),
             expect(summaryCall[0]).toContain("  Turns: 2"),

@@ -2,20 +2,20 @@
 /// <reference types="@actions/github-script" />
 
 const { iterateJsonl } = require("./jsonl_helpers.cjs");
-const { generatePlainTextSummary, generateCopilotCliStyleSummary, wrapAgentLogInSection, formatSafeOutputsPreview, isCopilotEventLogEntries } = require("./log_parser_shared.cjs");
+const { generatePlainTextSummary, generateCopilotCliStyleSummary, wrapAgentLogInSection, formatSafeOutputsPreview } = require("./log_parser_shared.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_API, ERR_CONFIG, ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
 const { redactStepSummaryContent, redactSecrets } = require("./redact_secrets.cjs");
 const { collectAddMaskedValues, applyAddMaskRedaction } = require("./add_mask_redaction.cjs");
 const { collectArtifactSecretValues } = require("./safe_output_manifest.cjs");
-const { projectSessionResult, isSessionEvent, isTokenCount, observedSessionModel } = require("./agent_session.cjs");
+const { projectSessionResult, isSessionEvent, isTokenCount, observedSessionModel, normalizeAgentSession } = require("./agent_session.cjs");
 const { redactSessionForPublication } = require("./agent_session_render.cjs");
 const { writeSessionArtifact } = require("./session_artifact.cjs");
 const { collectCodexJSONRecords } = require("./codex_log_framing.cjs");
 const { collectAgentExecution, parseAgentExitCode, isAgentExecutionEvent } = require("./agent_execution.cjs");
 const { hasCopilotConversation, hasMalformedJsonl, deduplicateCopilotFallback } = require("./copilot_session.cjs");
-const { isUnifiedSessionTrace } = require("./unified_session_render.cjs");
 const { readProtectedCommandOutput, writeVerifiedExitCode, discardUntrustedSessionArtifacts } = require("./protected_command_output.cjs");
+const { sessionTimestamp } = require("./unified_session_order.cjs");
 const INFERENCE_ACCESS_ERROR_PATTERN = /Access denied by policy settings|invalid access to inference/i;
 const CLAUDE_RATE_LIMIT_PATTERN = /rate_limit_error|429 Too Many Requests|"api_error_status"\s*:\s*429|request rejected \(429\)|rate limit/i;
 const CLAUDE_OVERLOAD_PATTERN = /overloaded_error|"overloaded"/i;
@@ -510,9 +510,19 @@ async function runLogParser(options) {
     }
 
     if (markdown) {
-      // Generate lightweight plain text summary for core.info and Copilot CLI style for step summary
+      // Publish every structured engine log through the unified-session renderer.
       if (logEntries && Array.isArray(logEntries) && logEntries.length > 0) {
-        const publicationEntries = redactSessionForPublication(conversationEntries, redactPublication);
+        const sourcePath = path.isAbsolute(selectedSource) ? path.relative(rootDir, selectedSource) : selectedSource;
+        const publicationEntries = redactSessionForPublication(
+          normalizeAgentSession(conversationEntries).map((event, index) => ({
+            ...event,
+            provenance:
+              event.provenance && typeof event.provenance === "object" && "component" in event.provenance && event.provenance.component
+                ? event.provenance
+                : { component: "agent", phase: "agent", path: sourcePath, index, timestampMs: sessionTimestamp(event), ...(event.provenance ? { native: event.provenance } : {}) },
+          })),
+          redactPublication
+        );
         const model = observedSessionModel(logEntries);
 
         const plainTextSummary = generatePlainTextSummary(publicationEntries, {
@@ -529,22 +539,13 @@ async function runLogParser(options) {
           }
         }
 
-        // Generate Copilot CLI style markdown for step summary
-        const copilotCliStyleMarkdown = generateCopilotCliStyleSummary(publicationEntries, {
+        const agentSessionMarkdown = generateCopilotCliStyleSummary(publicationEntries, {
           model: model === undefined ? undefined : redactPublication(model),
           parserName,
         });
 
-        const wrappedAgentLog =
-          isUnifiedSessionTrace(publicationEntries) || isCopilotEventLogEntries(publicationEntries)
-            ? copilotCliStyleMarkdown
-            : wrapAgentLogInSection(copilotCliStyleMarkdown, {
-                parserName,
-                open: true,
-              });
-
         // Add safe outputs preview to step summary
-        let fullMarkdown = wrappedAgentLog;
+        let fullMarkdown = agentSessionMarkdown;
         if (safeOutputsContent) {
           const safeOutputsMarkdown = formatSafeOutputsPreview(safeOutputsContent, { isPlainText: false });
           if (safeOutputsMarkdown) {
