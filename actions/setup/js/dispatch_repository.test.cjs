@@ -15,7 +15,7 @@ describe("dispatch_repository", () => {
   /** @type {any} */
   let dispatchEventCalls;
 
-  /** @type {{ core: any, github: any, context: any }} */
+  /** @type {{ core: any, github: any, context: any, getOctokit: any, hadGetOctokit: boolean }} */
   let savedGlobals;
 
   beforeEach(() => {
@@ -23,6 +23,8 @@ describe("dispatch_repository", () => {
       core: globals.core,
       github: globals.github,
       context: globals.context,
+      getOctokit: globals.getOctokit,
+      hadGetOctokit: Object.hasOwn(globals, "getOctokit"),
     };
 
     dispatchEventCalls = [];
@@ -62,6 +64,8 @@ describe("dispatch_repository", () => {
     globals.core = savedGlobals.core;
     globals.github = savedGlobals.github;
     globals.context = savedGlobals.context;
+    if (savedGlobals.hadGetOctokit) globals.getOctokit = savedGlobals.getOctokit;
+    else delete globals.getOctokit;
     vi.restoreAllMocks();
   });
 
@@ -162,6 +166,73 @@ describe("dispatch_repository", () => {
       expect(result.event_type).toBe("deploy");
       expect(dispatchEventCalls.length).toBe(1);
       expect(dispatchEventCalls[0].event_type).toBe("deploy");
+    });
+
+    it("should authenticate with the per-tool github-token override instead of the step-level client", async () => {
+      const toolDispatchCalls = [];
+      const toolGithubClient = {
+        rest: {
+          repos: {
+            createDispatchEvent: async params => {
+              toolDispatchCalls.push(params);
+              return { data: {} };
+            },
+          },
+        },
+      };
+      const getOctokit = vi.fn().mockReturnValue(toolGithubClient);
+      globals.getOctokit = getOctokit;
+
+      const handler = await main({
+        tools: {
+          deploy: { event_type: "deploy", repository: "test-owner/other-repo", max: 2, "github-token": "tool-scoped-token" },
+        },
+      });
+
+      const result = await handler({ tool_name: "deploy" }, {});
+
+      expect(result.success).toBe(true);
+      expect(getOctokit).toHaveBeenCalledWith("tool-scoped-token", expect.anything());
+      expect(toolDispatchCalls.length).toBe(1);
+      expect(dispatchEventCalls.length).toBe(0);
+    });
+
+    it("should return a structured error when per-tool client creation fails", async () => {
+      globals.getOctokit = vi.fn(() => {
+        throw new Error("client setup failed");
+      });
+
+      const handler = await main({
+        tools: {
+          deploy: { event_type: "deploy", repository: "test-owner/other-repo", "github-token": "tool-scoped-token" },
+        },
+      });
+
+      const result = await handler({ tool_name: "deploy" }, {});
+
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/E099: Failed to dispatch/);
+      expect(result.error).toContain("client setup failed");
+      expect(dispatchEventCalls).toHaveLength(0);
+    });
+
+    it("should fail closed when a per-tool github-token resolves to an empty value", async () => {
+      const getOctokit = vi.fn();
+      globals.getOctokit = getOctokit;
+
+      const handler = await main({
+        tools: {
+          deploy: { event_type: "deploy", repository: "test-owner/other-repo", "github-token": "" },
+        },
+      });
+
+      const result = await handler({ tool_name: "deploy" }, {});
+
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/E099: Failed to dispatch/);
+      expect(result.error).toContain("resolved to an empty value");
+      expect(getOctokit).not.toHaveBeenCalled();
+      expect(dispatchEventCalls).toHaveLength(0);
     });
 
     it("should include message inputs in client_payload", async () => {
