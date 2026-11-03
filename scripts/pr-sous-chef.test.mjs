@@ -12,6 +12,7 @@ const pr = {
   state: "OPEN",
   author: { login: "Copilot" },
   headRefOid: "abc",
+  headCommittedAt: recent,
   headRefName: "copilot/fix",
   baseRefName: "main",
   createdAt: "2026-10-01T00:00:00Z",
@@ -39,7 +40,6 @@ const waitingRun = {
 
 function detail(threads = []) {
   return {
-    commits: { nodes: [{ commit: { committedDate: recent } }] },
     reviewThreads: { nodes: threads, pageInfo: { hasNextPage: false } },
     reviews: { nodes: [], pageInfo: { hasPreviousPage: false } },
   };
@@ -173,15 +173,13 @@ test("dependency bots are ignored using all known login formats", () => {
 
 test("bot comments cannot revive a completely stale PR", () => {
   const stale = detail();
-  stale.commits.nodes[0].commit.committedDate = "2026-09-01T00:00:00Z";
   const comments = [{ user: { login: "Copilot" }, body: "status", created_at: recent }];
-  assert.equal(classify({ ...pr, createdAt: "2026-09-01T00:00:00Z" }, stale, comments, [], now).skip_reason, "stale");
+  assert.equal(classify({ ...pr, createdAt: "2026-09-01T00:00:00Z", headCommittedAt: "2026-09-01T00:00:00Z" }, stale, comments, [], now).skip_reason, "stale");
 });
 
 test("fresh human feedback revives an older PR", () => {
   const stale = detail([thread()]);
-  stale.commits.nodes[0].commit.committedDate = "2026-09-01T00:00:00Z";
-  assert.ok(classify(pr, stale, [], [], now).state_fingerprint);
+  assert.ok(classify({ ...pr, headCommittedAt: "2026-09-01T00:00:00Z" }, stale, [], [], now).state_fingerprint);
 });
 
 test("an active coding agent blocks even an old run on a previous SHA", () => {
@@ -356,6 +354,7 @@ const graphPr = {
   isDraft: false,
   url: "https://github.com/github/gh-aw/pull/42",
   labels: { nodes: [], pageInfo: { hasNextPage: false } },
+  headRef: { target: { oid: pr.headRefOid, committedDate: recent } },
 };
 
 function metadataResponse(candidate = graphPr) {
@@ -373,7 +372,8 @@ test("targeted refresh uses explicit GraphQL metadata and paginated REST checks"
   assert.equal(candidate.number, 42);
   assert.equal(calls[0][1], "graphql");
   assert.match(calls[0][3], /repository\(owner:\$owner,name:\$name\)\{pullRequest\(number:\$number\)/);
-  assert.doesNotMatch(calls[0][3], /\.\.\.|statusCheckRollup/);
+  assert.doesNotMatch(calls[0][3], /statusCheckRollup|commits\(/);
+  assert.match(calls[0][3], /headRef\{target\{oid \.\.\. on Commit\{committedDate\}\}\}/);
   assert.deepEqual(calls[0].slice(4), ["-f", "owner=github", "-f", "name=gh-aw", "-F", "number=42"]);
   assert.deepEqual(calls.slice(1), [
     ["api", "repos/github/gh-aw/commits/abc/check-runs?per_page=100&filter=latest", "--paginate", "--slurp"],
@@ -381,6 +381,7 @@ test("targeted refresh uses explicit GraphQL metadata and paginated REST checks"
   ]);
   assert.equal(candidate.mergeStateStatus, "CONFLICTING");
   assert.equal(candidate.baseRefName, "main");
+  assert.equal(candidate.headCommittedAt, recent);
   assert.equal(candidate.statusCheckRollup[0].conclusion, "FAILURE");
   assert.equal(candidate.statusCheckRollup[1].state, "PENDING");
 });
@@ -401,6 +402,21 @@ test("targeted refresh fails closed when metadata is incomplete or the PR is abs
     { ...graphPr, labels: { nodes: [], pageInfo: { hasNextPage: true } } },
   ]) {
     await assert.rejects(() => fetchCandidate("github/gh-aw", "42", () => metadataResponse(result)), /could not refresh PR metadata/);
+  }
+});
+
+test("head commit activity must be valid and match the refreshed PR head", async () => {
+  for (const headRef of [null, {}, { target: null }, { target: { oid: "old-head", committedDate: recent } }, { target: { oid: pr.headRefOid } }, { target: { oid: pr.headRefOid, committedDate: "invalid date" } }]) {
+    let calls = 0;
+    await assert.rejects(
+      () =>
+        fetchCandidate("github/gh-aw", "42", () => {
+          calls++;
+          return metadataResponse({ ...graphPr, headRef });
+        }),
+      /PR #42: could not refresh head commit activity/
+    );
+    assert.equal(calls, 1);
   }
 });
 
@@ -528,9 +544,7 @@ test("idle threshold is exactly ten minutes, including updated metadata", () => 
 
 test("fresh commits, reviews, comments, and thread replies restart the idle interval", () => {
   const fresh = "2026-10-03T17:51:00Z";
-  const committed = detail();
-  committed.commits.nodes[0].commit.committedDate = fresh;
-  assert.equal(classify(pr, committed, [], [], now).skip_reason, "not_idle");
+  assert.equal(classify({ ...pr, headCommittedAt: fresh }, detail(), [], [], now).skip_reason, "not_idle");
   const reviewed = detail();
   reviewed.reviews.nodes.push({ author: { login: "reviewer" }, authorAssociation: "MEMBER", submittedAt: fresh });
   assert.equal(classify(pr, reviewed, [], [], now).skip_reason, "not_idle");
@@ -740,12 +754,111 @@ function queueAPI({ listed = [pr], candidate = graphPr, checks = [], statuses = 
       if (args[1].includes("/check-runs?")) return [{ check_runs: checks }];
       if (args[1].includes("/status?")) return [{ statuses }];
       if (args[1].includes("/actions/runs?") || args[1].includes("/actions/workflows/pr-finisher.lock.yml/runs?")) return [{ workflow_runs: args[1].includes("status=action_required") ? approvals : runs }];
-      if (args[1] === "graphql") return { data: { repository: { pullRequest: data } } };
+      if (args[1] === "graphql") {
+        const field = args[3].includes("reviewThreads(") ? "reviewThreads" : "reviews";
+        return { data: { repository: { pullRequest: { number: candidate.number, [field]: data[field] } } } };
+      }
       if (args[1].includes("/comments?")) return [comments];
       assert.fail(`Unexpected API call: ${args.join(" ")}`);
     },
   };
 }
+
+test("refresh isolates filtered reviews from thread connections and head commit activity", async () => {
+  const data = detail([thread()]);
+  const approvedReview = { databaseId: 7, author: { login: "reviewer" }, authorAssociation: "MEMBER", state: "COMMENTED", submittedAt: recent };
+  const deniedReview = { ...approvedReview, databaseId: 8, author: { login: "outsider" }, authorAssociation: "NONE" };
+  data.reviews.nodes = [approvedReview, deniedReview];
+  const { api, calls } = queueAPI({ data });
+  const queue = await fetchQueue(
+    "github/gh-aw",
+    "42",
+    args => {
+      const response = api(args);
+      if (args[1] !== "graphql" || !args[3].includes("reviews(last:")) return response;
+      const filtered = structuredClone(response);
+      // Reproduce the pinned proxy's first-connection replacement after filtering.
+      function replaceNodes(value) {
+        if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+        if ("nodes" in value) {
+          value.nodes = [approvedReview];
+          return true;
+        }
+        return Object.values(value).some(replaceNodes);
+      }
+      assert.equal(replaceNodes(filtered.data), true);
+      return filtered;
+    },
+    now
+  );
+  assert.equal(queue.prs[0].number, 42);
+  assert.deepEqual(
+    queue.prs[0].unresolved_reviews.map(review => review.id),
+    ["PRRT_example"]
+  );
+  const body = formatNudge(queue.prs[0]);
+  assert.match(body, /Fix the regression/);
+  assert.match(body, /Sous-chef state: [a-f0-9]{64}/);
+  const queries = calls.filter(args => args[1] === "graphql").map(args => args[3]);
+  assert.equal(queries.length, 3);
+  assert.ok(queries.every(query => !query.includes("commits(")));
+  assert.ok(queries.every(query => !(query.includes("reviewThreads(") && query.includes("reviews("))));
+  assert.match(queries[1], /number author\{login\} authorAssociation/);
+});
+
+test("malformed or proxy-corrupted review connections fail closed with actionable errors", async () => {
+  const review = { databaseId: 7, state: "COMMENTED" };
+  for (const [field, connection] of [
+    ["reviewThreads", undefined],
+    ["reviewThreads", { nodes: [], pageInfo: {} }],
+    ["reviewThreads", { nodes: [review], pageInfo: { hasNextPage: false } }],
+    ["reviewThreads", { nodes: [null], pageInfo: { hasNextPage: false } }],
+    ["reviewThreads", { nodes: [thread({ comments: { nodes: [], pageInfo: {} } })], pageInfo: { hasNextPage: false } }],
+    ["reviewThreads", { nodes: [thread({ comments: { nodes: [review], pageInfo: { hasNextPage: false } } })], pageInfo: { hasNextPage: false } }],
+    ["reviews", undefined],
+    ["reviews", { nodes: [], pageInfo: {} }],
+    ["reviews", { nodes: [thread()], pageInfo: { hasPreviousPage: false } }],
+    ["reviews", { nodes: [{ state: "CHANGES_REQUESTED", databaseId: "7" }], pageInfo: { hasPreviousPage: false } }],
+  ]) {
+    const data = { ...detail(), [field]: connection };
+    const { api, calls } = queueAPI({ data });
+    await assert.rejects(() => fetchQueue("github/gh-aw", "42", api, now), new RegExp(`PR #42: could not refresh ${field}; missing or malformed GitHub response`));
+    assert.ok(!calls.some(args => args[1].includes("/comments?")), "Do not continue with invalid eligibility evidence");
+  }
+});
+
+test("absent or denied detail responses never produce a successful eligibility queue", async () => {
+  for (const field of ["reviewThreads", "reviews"]) {
+    for (const response of [null, [], {}, { data: null }, { data: { repository: { pullRequest: null } } }, { data: { repository: { pullRequest: { number: 43, [field]: detail()[field] } } } }, { errors: [{ message: "access denied" }] }]) {
+      const { api } = queueAPI();
+      await assert.rejects(() => fetchQueue("github/gh-aw", "42", args => (args[1] === "graphql" && args[3].includes(`${field}(`) ? response : api(args)), now), /could not refresh reviewThreads|could not refresh reviews|access denied/);
+    }
+  }
+});
+
+test("isolated review reads preserve incomplete-page exclusions and cleanup eligibility", async () => {
+  for (const field of ["reviewThreads", "reviews"]) {
+    const data = detail();
+    data[field].pageInfo[field === "reviews" ? "hasPreviousPage" : "hasNextPage"] = true;
+    const { api } = queueAPI({ data });
+    const queue = await fetchQueue("github/gh-aw", "42", api, now);
+    assert.deepEqual(queue.prs, []);
+    assert.deepEqual(queue.skipped, [{ pr_number: 42, skip_reason: "incomplete_reviews" }]);
+  }
+  const data = detail([thread({ isResolved: true })]);
+  data.reviews.nodes = [{ databaseId: 7, author: { login: "github-actions" }, state: "CHANGES_REQUESTED", submittedAt: recent }];
+  const { api } = queueAPI({ candidate: { ...graphPr, mergeStateStatus: "CLEAN" }, data });
+  const queue = await fetchQueue("github/gh-aw", "42", api, now);
+  assert.deepEqual(queue.prs[0].dismiss_reviews, [7]);
+  assert.equal(formatNudge(queue.prs[0]), null);
+});
+
+test("refreshed head commit activity prevents nudging a recently pushed PR", async () => {
+  const { api } = queueAPI({ candidate: { ...graphPr, headRef: { target: { oid: pr.headRefOid, committedDate: "2026-10-03T17:55:00Z" } } } });
+  const queue = await fetchQueue("github/gh-aw", "42", api, now);
+  assert.deepEqual(queue.prs, []);
+  assert.deepEqual(queue.skipped, [{ pr_number: 42, skip_reason: "not_idle" }]);
+});
 
 function retryTestConfig(t) {
   const delays = [];
