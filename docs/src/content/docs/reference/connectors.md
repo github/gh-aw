@@ -176,6 +176,7 @@ safe-outputs:
 | --- | --- |
 | `max` | Integer from 1 to 100. Defaults to **1**, retaining the conservative native Linear budget rather than inheriting arbitrary custom-script behavior. Counts attempted invocations of this operation, including failures, in the trusted dispatcher before handler credential or network work. HTTP retries within an approved invocation do not consume additional proposal budget. |
 | `staged` | Boolean or GitHub Actions expression. Defaults to `false`; global staging and compiler-forced staging always take precedence over a per-operation `false`. |
+| `samples` | Optional object or array of objects, each containing arguments for this operation's generated MCP tool. Uses the existing hidden safe-output deterministic replay contract. |
 
 These are trusted workflow options, not agent tool arguments. Unknown options
 and invalid types fail compilation. Staging produces the would-be request without
@@ -183,6 +184,46 @@ writer credential resolution, provider requests, preflights, or creation receipt
 Credentials and mint steps used only by statically staged operations are omitted.
 Mixed operations retain only credentials needed by live operations; expression
 staging gates credential delivery and minting at runtime.
+
+### Deterministic samples
+
+Samples belong to the consumer's qualified safe-output selection, not the
+connector declaration. Each payload is checked against the generated tool's
+input schema, including required fields, types, enums, patterns, and length
+limits. Unknown fields such as `max`, `staged`, credentials, or resource grants
+are rejected unless they are actual declared tool inputs.
+
+```yaml
+features:
+  samples: true
+safe-outputs:
+  tracker-add-comment:
+    max: 1
+    staged: true
+    samples:
+      - issue: ISSUE-1
+        text: Example comment
+```
+
+This assumes an imported `tracker` connector declaring `add-comment` with
+`issue` and `text` inputs and an approved `ISSUE-1` resource. A single mapping
+(`samples: {issue: ISSUE-1, text: Example comment}`) is equivalent to a
+one-element list; an empty list adds no calls.
+
+Declaring samples alone does not change ordinary agent execution or advertised
+tools. `features.samples: true` or `gh aw compile --use-samples` replaces the
+agent step with the existing replay driver. It calls `tracker_add_comment`
+through the safe-outputs MCP server, then uses ordinary downstream delivery.
+Built-in samples replay first, followed by connector tools sorted by name;
+samples within each tool retain their authored order. Enabled connector outputs
+without samples receive the existing replay coverage warning.
+
+Samples are example arguments, never instructions or authority. They cannot
+expand grants, bypass sanitization, supply trusted inputs or credentials,
+or increase proposal budgets. More samples than `max` can be authored but excess
+attempts fail the trusted dispatcher budget. Runtime resource checks still apply.
+Replay is **not** dry-run: keep `staged: true` for previews; without staging,
+downstream delivery can perform authorized provider writes.
 
 Store credentials in repository or environment **Settings > Secrets and
 variables > Actions**, or use `gh secret set NAME` without putting values in

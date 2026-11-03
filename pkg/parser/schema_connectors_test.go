@@ -83,3 +83,36 @@ func TestAWConnectorDefinitionsAreImportableButNotTriggers(t *testing.T) {
 	delete(frontmatter, "on")
 	require.ErrorContains(t, ValidateIncludedFileFrontmatterWithSchemaAndLocation(frontmatter, "shared.md"), "main workflow")
 }
+
+func TestConnectorSamplesNormalizedSchema(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		name    string
+		samples any
+		valid   bool
+	}{
+		{"object", map[string]any{"text": "Example"}, true},
+		{"array", []any{map[string]any{"text": "Example"}}, true},
+		{"empty", []any{}, true},
+		{"null", nil, false},
+		{"scalar", "Example", false},
+		{"mixed", []any{map[string]any{}, false}, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			config := map[string]any{
+				"definition": "spec.yaml", "connection": "connection.yaml",
+				"safe-outputs": []any{"add-comment"},
+				"safe-output-options": map[string]any{
+					"add-comment": map[string]any{"max": 1, "samples": test.samples},
+				},
+			}
+			frontmatter := map[string]any{"on": "workflow_dispatch", "connectors": map[string]any{"tracker": config}}
+			err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "samples.md")
+			if test.valid {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
+}

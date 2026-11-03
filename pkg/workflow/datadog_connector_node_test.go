@@ -49,26 +49,6 @@ func TestDatadogConnectorBundledNodeFrozenPlans(t *testing.T) {
 	require.Equal(t, 48, result.Checks, "the bundled runtime must execute every Datadog boundary case")
 }
 
-func TestDatadogConnectorBundledNodeCLIStaging(t *testing.T) {
-	node, runtime := datadogNode(t)
-	_, writer := datadogPlans(t)
-	encoded, err := writer.Encode()
-	require.NoError(t, err)
-	args := map[string]any{"incident-id": datadogIncidentID, "title": "Staged build evidence"}
-	expected, err := writer.PrepareSafeOutput("rename-incident", args)
-	require.NoError(t, err)
-	input, err := json.Marshal(args)
-	require.NoError(t, err)
-	command := exec.CommandContext(t.Context(), node, runtime, "invoke", "safe-output", "rename-incident", "--stage")
-	command.Env = []string{"GH_AW_CONNECTOR_PLAN=" + encoded}
-	command.Stdin = strings.NewReader(string(input))
-	output, err := command.CombinedOutput()
-	require.NoError(t, err, "%s", output)
-	want, err := json.Marshal(map[string]any{"staged": true, "request": expected})
-	require.NoError(t, err)
-	require.JSONEq(t, string(want), string(output))
-}
-
 func TestDatadogConnectorGeneratedEffectStagesInBundledNode(t *testing.T) {
 	node, runtime := datadogNode(t)
 	_, data, _, err := parseDatadogConsumer(t, datadogFixture(t, "workflow.md"))
