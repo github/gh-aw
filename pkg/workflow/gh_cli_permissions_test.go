@@ -42,10 +42,13 @@ func TestInferGitHubAppTokenPermissionsFromShellScripts(t *testing.T) {
 		{name: "known read command", script: "gh pr view 123", wantField: "permission-pull-requests", wantInferred: true},
 		{name: "known read API", script: "gh api /repos/owner/repo/issues", wantField: "permission-issues", wantInferred: true},
 		{name: "explicit GET API", script: "gh api --method GET /repos/owner/repo/issues", wantField: "permission-issues", wantInferred: true},
+		{name: "actions secrets API", script: "gh api /repos/owner/repo/actions/secrets", wantField: "permission-secrets", wantInferred: true},
 		{name: "write command", script: "gh pr create --title test", wantInferred: false},
 		{name: "unknown command", script: "gh pr custom", wantInferred: false},
 		{name: "write API", script: "gh api --method POST /repos/owner/repo/issues", wantInferred: false},
 		{name: "combined write API method", script: "gh api -XPOST /repos/owner/repo/issues", wantInferred: false},
+		{name: "quoted destructive method after endpoint", script: `gh api /repos/owner/repo/actions/runs/123 "--method=DELETE"`, wantInferred: false},
+		{name: "unknown actions subpath", script: "gh api /repos/owner/repo/actions/unknown", wantInferred: false},
 		{name: "API body fields", script: "gh api /repos/owner/repo/issues -f title=test", wantInferred: false},
 		{name: "API inline body fields", script: "gh api /repos/owner/repo/issues --field=title=test", wantInferred: false},
 		{name: "no GitHub CLI", script: "echo hello", wantInferred: false},
@@ -65,6 +68,17 @@ func TestInferGitHubAppTokenPermissionsFromShellScripts(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestInferGitHubAppTokenPermissionsIgnoresCommentOnlyCommands(t *testing.T) {
+	t.Parallel()
+
+	fields, inferred := InferGitHubAppTokenPermissionsFromShellScripts([]string{
+		"gh pr view 123\n# gh api /orgs/acme/hooks",
+	})
+	require.True(t, inferred)
+	assert.Equal(t, "read", fields["permission-pull-requests"])
+	assert.NotContains(t, fields, "permission-organization-hooks")
 }
 
 // TestInferPermissionsFromShellScripts_GhPrDiff verifies that `gh pr diff` in a
