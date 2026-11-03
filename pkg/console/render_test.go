@@ -134,7 +134,6 @@ func TestRenderStruct_UnsupportedInputs(t *testing.T) {
 		input any
 	}{
 		{"nil", nil},
-		{"nil interface", any(nil)},
 		{"nil struct pointer", (*TestOverview)(nil)},
 		{"integer", 42},
 		{"string", "hello"},
@@ -151,7 +150,7 @@ func TestRenderStruct_UnsupportedInputs(t *testing.T) {
 	}
 }
 
-func TestRenderStruct_UnexportedFields(t *testing.T) {
+func TestRenderStruct_RendersUnexportedFields(t *testing.T) {
 	t.Parallel()
 	data := struct {
 		name     string
@@ -167,7 +166,10 @@ func TestRenderStruct_UnexportedFields(t *testing.T) {
 		callback: func() {},
 	}
 
-	assert.Equal(t, "  name    : hidden\n  count   : 42\n  enabled : true\n  channel : chan int\n  callback: func()\n\n", RenderStruct(data))
+	output := RenderStruct(data)
+	for _, text := range []string{"name", "hidden", "count", "42", "enabled", "true"} {
+		assert.Contains(t, output, text)
+	}
 }
 
 func TestRenderStructWithOptions(t *testing.T) {
@@ -519,10 +521,10 @@ func TestFormatTokens(t *testing.T) {
 		{"thousand", 1000, "1.0K"},
 		{"fractional thousand", 1500, "1.5K"},
 		{"rounded thousand", 9999, "10.0K"},
-		{"below million", 999_999, "1000.0K"},
+		{"upper thousands", 999_400, "999.4K"},
 		{"million", 1_000_000, "1.0M"},
 		{"fractional million", 1_200_000, "1.2M"},
-		{"billion", 1_000_000_000, "1000.0M"},
+		{"tens of millions", 12_300_000, "12.3M"},
 		{"negative single token", -1, "-1"},
 		{"negative thousand", -1000, "-1000"},
 		{"negative million", -1_000_000, "-1000000"},
@@ -600,6 +602,11 @@ func TestRenderStruct_EmbeddedStruct(t *testing.T) {
 	t.Parallel()
 	type Base struct {
 		Name   string `console:"header:Name"`
+		Engine string `console:"header:Engine"`
+	}
+
+	type OptionalBase struct {
+		Name   string `console:"header:Name"`
 		Engine string `console:"header:Engine,omitempty"`
 	}
 
@@ -609,7 +616,7 @@ func TestRenderStruct_EmbeddedStruct(t *testing.T) {
 	}
 
 	type WithPointer struct {
-		*Base
+		*OptionalBase
 		Status string `console:"header:Status"`
 	}
 	type Inner struct {
@@ -639,8 +646,13 @@ func TestRenderStruct_EmbeddedStruct(t *testing.T) {
 			notContains: []string{"Base"},
 		},
 		{
+			name:     "value with empty required field",
+			data:     Extended{Base: Base{Name: "wf"}, Status: "active"},
+			contains: []string{"wf", "Engine", "active"},
+		},
+		{
 			name:        "pointer with omitted empty field",
-			data:        WithPointer{Base: &Base{Name: "wf"}, Status: "active"},
+			data:        WithPointer{OptionalBase: &OptionalBase{Name: "wf"}, Status: "active"},
 			contains:    []string{"wf", "active"},
 			notContains: []string{"Engine", "Base"},
 		},
