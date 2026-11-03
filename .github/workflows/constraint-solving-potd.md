@@ -10,10 +10,12 @@ timeout-minutes: 30
 permissions:
   models: read
 
-model: claude-haiku-4.5
 engine:
   id: copilot
   bare: true
+  model-routing:
+    goal: cost
+    mode: economy
 
 imports:
   - shared/otlp.md

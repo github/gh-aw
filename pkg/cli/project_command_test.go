@@ -41,7 +41,7 @@ func TestNewProjectNewCommand(t *testing.T) {
 
 	linkFlag := cmd.Flags().Lookup("link")
 	require.NotNil(t, linkFlag, "Should have --link flag")
-	assert.Equal(t, "l", linkFlag.Shorthand, "Link flag should have short form 'l'")
+	assert.Empty(t, linkFlag.Shorthand, "Link flag should not define a shorthand that conflicts with --logical-repo")
 }
 
 func TestProjectConfig(t *testing.T) {

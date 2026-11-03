@@ -645,8 +645,24 @@ func TestGetContainerPin_DefaultMCPGatewayReleaseDigest(t *testing.T) {
 	image := constants.DefaultMCPGatewayContainer + ":" + string(constants.DefaultMCPGatewayVersion)
 	pin, ok := GetContainerPin(image)
 	require.True(t, ok, "Expected embedded container pin for %s", image)
-	assert.Equal(t, "sha256:d3544a4222e7efeeeb38669d8a1af0c72691c55b8f6506b15aa5920f7f31b7bc", pin.Digest)
+	assert.Equal(t, "sha256:38fda60f9478165577af9c69d6f059d5968d191f834eb181119cb3e7e925aef6", pin.Digest)
 	assert.Equal(t, image+"@"+pin.Digest, pin.PinnedImage)
+}
+
+func TestGetContainerPin_DefaultFirewallImagesArePinned(t *testing.T) {
+	t.Parallel()
+	version := strings.TrimPrefix(string(constants.DefaultFirewallVersion), "v")
+	for _, role := range []string{"agent", "api-proxy", "cli-proxy", "enclave-agent", "enclave-mcp-server", "enclave-script", "router", "squid"} {
+		t.Run(role, func(t *testing.T) {
+			t.Parallel()
+			image := constants.DefaultFirewallRegistry + "/" + role + ":" + version
+			pin, ok := GetContainerPin(image)
+			require.True(t, ok, "Expected embedded container pin for %s", image)
+			assert.Equal(t, image, pin.Image)
+			assert.Regexp(t, `^sha256:[0-9a-f]{64}$`, pin.Digest)
+			assert.Equal(t, image+"@"+pin.Digest, pin.PinnedImage)
+		})
+	}
 }
 
 func TestGetContainerPin_DefaultMCPImagesArePinned(t *testing.T) {

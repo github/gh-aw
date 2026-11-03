@@ -317,6 +317,32 @@ Artifact JSON is metadata-only, unlike live replay JSON. Scheduler predictions u
 
 Idle refresh is every 10 seconds; search and action review pause it. Failed reads retain the prior view with an explicit stale/error status. Uncertain publications retain their request ID for `explain --request-id`.
 
+## OpenTelemetry queue health
+
+Runtime queue operations emit `work_queue.read.run`, `work_queue.publish.run`, `work_queue.dispatch.run`, `work_queue.reconcile_dispatch.run`, `work_queue.reconcile.run`, and `work_queue.compact.run` spans. They reuse the workflow's trace and job parent, [OTLP configuration](/gh-aw/reference/open-telemetry/), exporter fan-out, and sanitized `otel.jsonl` mirror. No additional queue setting is required. Without valid workflow trace context, queue instrumentation is disabled.
+
+Attributes use the `gh-aw.work_queue.` prefix. `queue.id` is a stable SHA-256 digest of the lowercased target repository coordinates and queue branch, allowing correlation across workflow runs without exporting queue identifiers or task content. Nested ledger reads and publications contribute to one outer operation span rather than separate export requests.
+
+| Attribute suffix | Meaning |
+| --- | --- |
+| `operation`, `request.kind`, `reason`, `outcome` | Operation, last checked request kind, bounded scheduling decision, and lifecycle outcome when applicable |
+| `snapshot.present`, `observed_at_unix_ms`, `initialized` | Whether verified state was observed, its observation time, and whether Policy is installed |
+| `work.total`, `work.available`, `work.claimed`, `work.completed`, `work.cancelled`, `work.expired` | Queue-wide Work counts; expired unclaimed Work is included in cancelled, not available |
+| `work.retry_delayed`, `work.oldest_available_age_ms` | Available Work in backoff and age of the oldest available Work, including dependency- or capacity-blocked Work |
+| `delivery.pending`, `delivery.failed` | Work delivery barriers plus independent `keep_open` Claim barriers; completion alone is not delivery |
+| `claims.open`, `reservations.active`, `reservations.unbound`, `reservations.uncertain`, `reservations.unresolved` | Logical ownership and unreleased native capacity; cancellation or expiration does not imply reservation release |
+| `capacity.logical_limit`, `capacity.native_limit` | Sums of installed pool limits |
+| `capacity.logical_saturated_pools`, `capacity.native_saturated_pools` | Number of pools at or above their respective limits |
+| `admission_paused`, `grants_paused` | Committed operator controls |
+| `publication.attempts`, `publication.conflict`, `publication.ambiguous`, `publication.commits`, `publication.recovered` | Attempts, CAS conflicts, ambiguous writes, acknowledged new commits, and stable-request recoveries during the operation |
+| `committed.<kind>` | Counts of newly acknowledged Work, Claim, Completion, cancellation, Dispatch, Release, Result, and DeliveryFailure operations; recovered requests do not count as new commits |
+| `reconciliation.checked`, `reconciliation.unresolved` | Reservations checked by a reconciliation batch and those returning unresolved launch or binding-conflict outcomes |
+| `error.type` | Allowlisted error category, never raw provider messages or request bodies |
+
+These are **span attributes**, not continuously sampled OTEL metrics. For a dashboard, group by `queue.id` and select the snapshot with the latest `observed_at_unix_ms`; never sum snapshots across spans or workflow runs. Missing snapshots mean unknown state, not an empty queue. A failed operation may retain the last verified snapshot from before the failure. No operations means no new observations, so alert on stale observations separately.
+
+Monitor growing backlog age, failed delivery barriers, unresolved reservations, saturated pools, and repeated publication conflicts. Span status is ERROR for thrown failures and returned rejected/unresolved/conflicting launches, including unresolved reconciliation batches. An ordinary no-grant decision is not an error. Observability failures do not change publication, Claim accounting, or launch fencing. Queue-specific telemetry excludes Work payloads, result bodies, Work/Claim/dispatch/request IDs, fairness keys, and raw errors; the existing workflow resource attributes still identify the workflow run.
+
 ## Runtime debug logging
 
 | Setting | Scope |

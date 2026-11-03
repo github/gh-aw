@@ -17,6 +17,7 @@ const { normalizeCodexSession } = require("./codex_session.cjs");
 const { projectSessionResult, observedSessionModel } = require("./agent_session.cjs");
 const { resolveEffectiveModel, resolveModelRoutingSummary } = require("./model_attribution.cjs");
 const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
+const { readEvalsNotEvaluatedStatus } = require("./evals_status.cjs");
 
 function getGhAwPath(relativePath) {
   const root = (process.env.GH_AW_TMP_DIR || "").trim() || "/tmp/gh-aw";
@@ -27,7 +28,7 @@ function getGhAwPath(relativePath) {
  * send_otlp_span.cjs
  *
  * Sends a single OTLP (OpenTelemetry Protocol) trace span to the configured
- * HTTP/JSON endpoint.  Used by actions/setup to instrument each job execution
+ * OTLP/HTTP JSON or protobuf endpoint. Used by actions/setup to instrument each job execution
  * with basic telemetry.
  *
  * Design constraints:
@@ -111,7 +112,7 @@ function buildAttr(key, value) {
   }
   if (typeof value === "number") {
     if (Number.isFinite(value)) {
-      if (Number.isInteger(value)) {
+      if (Number.isInteger(value) && Number.isSafeInteger(value)) {
         return { key, value: { intValue: value } };
       }
       return { key, value: { doubleValue: value } };
@@ -788,9 +789,17 @@ function selectGraderOutputForJob(jobName, readJSON = readJSONIfExists) {
  *
  * @param {any[]} evalResults
  * @param {number} eventTimeMs
+ * @param {import("./evals_status.cjs").EvalsNotEvaluatedStatus | null} [notEvaluated]
  * @returns {{attributes: Array<{key: string, value: object}>, events: Array<{timeUnixNano: string, name: string, attributes: Array<{key: string, value: object}>}>}}
  */
-function buildEvalTelemetry(evalResults, eventTimeMs) {
+function buildEvalTelemetry(evalResults, eventTimeMs, notEvaluated = null) {
+  if (notEvaluated) {
+    const attributes = [buildAttr("gh-aw.evals.status", notEvaluated.status), buildAttr("gh-aw.evals.reason_code", notEvaluated.reason_code)];
+    if (typeof notEvaluated.model === "string" && notEvaluated.model) {
+      attributes.push(buildAttr("gh-aw.eval.model", notEvaluated.model));
+    }
+    return { attributes, events: [{ timeUnixNano: toNanoString(eventTimeMs), name: "eval.status", attributes }] };
+  }
   if (!Array.isArray(evalResults)) {
     return { attributes: [], events: [] };
   }
@@ -937,7 +946,7 @@ function hasProxyConfigured(endpoint) {
  *
  * @param {string} url
  * @param {Record<string, string>} headers
- * @param {string} body
+ * @param {string | Buffer} body
  * @returns {{ ok: boolean, status: number, statusText: string }}
  */
 function sendOTLPViaCurl(url, headers, body) {
@@ -1205,7 +1214,7 @@ function parseOTLPEndpoints() {
  *
  * @param {OTLPEndpointEntry[]} endpoints  - Resolved endpoint list from {@link parseOTLPEndpoints}
  * @param {any} payload                 - Serialisable OTLP JSON object
- * @param {{ maxRetries?: number, baseDelayMs?: number, skipJSONL?: boolean }} [opts]
+ * @param {{ maxRetries?: number, baseDelayMs?: number, skipJSONL?: boolean, signal?: "traces" | "logs" }} [opts]
  * @returns {Promise<void>}
  */
 async function sendOTLPToAllEndpoints(endpoints, payload, opts = {}) {
@@ -1223,7 +1232,8 @@ async function sendOTLPToAllEndpoints(endpoints, payload, opts = {}) {
 }
 
 /**
- * POST an OTLP traces payload to `{endpoint}/v1/traces` with automatic retries.
+ * POST an OTLP traces payload with automatic retries. Base endpoints gain
+ * `/v1/traces`; full traces endpoints (including Azure Monitor paths) are retained.
  *
  * Failures are surfaced as `console.warn` messages and never thrown; OTLP
  * export failures must not break the workflow.  Uses exponential back-off
@@ -1233,29 +1243,56 @@ async function sendOTLPToAllEndpoints(endpoints, payload, opts = {}) {
  * Reads `OTEL_EXPORTER_OTLP_HEADERS` from the environment and merges any
  * configured headers into every request, unless `headersOverride` is provided
  * (used for per-endpoint headers in the multi-endpoint case).
+ * `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL` overrides `OTEL_EXPORTER_OTLP_PROTOCOL`;
+ * both accept `http/json` (the compatibility default) or `http/protobuf`.
  *
  * @param {string} endpoint  - OTLP base URL (e.g. https://traces.example.com:4317)
  * @param {any} payload   - Serialisable OTLP JSON object
- * @param {{ maxRetries?: number, baseDelayMs?: number, skipJSONL?: boolean, headersOverride?: string }} [opts]
+ * @param {{ maxRetries?: number, baseDelayMs?: number, skipJSONL?: boolean, headersOverride?: string, signal?: "traces" | "logs" }} [opts]
  * @returns {Promise<void>}
  */
-async function sendOTLPSpan(endpoint, payload, { maxRetries = 2, baseDelayMs = 100, skipJSONL = false, headersOverride = undefined } = {}) {
+async function sendOTLPSpan(endpoint, payload, { maxRetries = 2, baseDelayMs = 100, skipJSONL = false, headersOverride = undefined, signal = "traces" } = {}) {
+  const sanitizedPayload = sanitizeOTLPPayload(payload);
   // Mirror payload locally so it survives even when the collector is unreachable.
   // Callers that already wrote the JSONL mirror pass skipJSONL: true to avoid a
   // duplicate line.
   if (!skipJSONL) {
-    appendToOTLPJSONL(payload);
+    appendToOTLPJSONL(sanitizedPayload);
   }
 
-  const url = endpoint.replace(/\/$/, "") + "/v1/traces";
+  const suffixIndex = endpoint.search(/[?#]/);
+  const base = (suffixIndex < 0 ? endpoint : endpoint.slice(0, suffixIndex)).replace(/\/+$/, "");
+  const suffix = suffixIndex < 0 ? "" : endpoint.slice(suffixIndex);
+  const signalBase = base.replace(/\/v1\/(?:traces|logs)$/, "");
+  const url = (signal === "logs" ? signalBase + "/v1/logs" : base + (base.endsWith("/v1/traces") ? "" : "/v1/traces")) + suffix;
   // Use headersOverride when explicitly provided (including empty string, which means
   // "this endpoint has no configured headers" in the multi-endpoint fan-out path).
   // Fall back to OTEL_EXPORTER_OTLP_HEADERS only when headersOverride is absent
   // (undefined), which is the legacy single-endpoint case.
   const rawHeaders = headersOverride !== undefined ? headersOverride : process.env.OTEL_EXPORTER_OTLP_HEADERS || "";
   const extraHeaders = parseOTLPHeaders(rawHeaders);
-  const headers = { "Content-Type": "application/json", ...extraHeaders };
-  const sanitizedBody = JSON.stringify(sanitizeOTLPPayload(payload));
+  const protocol = process.env.OTEL_EXPORTER_OTLP_TRACES_PROTOCOL || process.env.OTEL_EXPORTER_OTLP_PROTOCOL || "http/json";
+  /** @type {string | Buffer} */
+  let sanitizedBody;
+  try {
+    if (protocol === "http/protobuf") {
+      sanitizedBody = require("./otlp_protobuf.cjs").encodeOTLPTraceRequest(sanitizedPayload);
+    } else if (protocol === "http/json") {
+      sanitizedBody = JSON.stringify(sanitizedPayload);
+    } else {
+      throw new Error("Unsupported OTLP traces protocol; use http/json or http/protobuf");
+    }
+  } catch (err) {
+    const reason = getErrorMessage(err);
+    console.warn(`OTLP export encoding failed: ${reason}`);
+    recordOTLPExportError({ endpoint, reason });
+    return;
+  }
+  // The content type must describe the encoded body, not a caller header.
+  for (const key of Object.keys(extraHeaders)) {
+    if (key.toLowerCase() === "content-type") delete extraHeaders[key];
+  }
+  const headers = { "Content-Type": protocol === "http/protobuf" ? "application/x-protobuf" : "application/json", ...extraHeaders };
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     if (attempt > 0) {
       await new Promise(resolve => setTimeout(resolve, baseDelayMs * 2 ** (attempt - 1)));
@@ -2480,7 +2517,7 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   attributes.push(...buildCustomOTLPAttributes());
 
   const graderTelemetry = buildGraderTelemetry(selectGraderOutputForJob(jobName), endMs);
-  const evalTelemetry = jobName === "evals" ? buildEvalTelemetry(readJSONLIfExists("/tmp/gh-aw/evals.jsonl"), endMs) : { attributes: [], events: [] };
+  const evalTelemetry = jobName === "evals" ? buildEvalTelemetry(readJSONLIfExists("/tmp/gh-aw/evals.jsonl"), endMs, readEvalsNotEvaluatedStatus()) : { attributes: [], events: [] };
 
   const resourceAttributes = buildGitHubActionsResourceAttributes({
     repository,

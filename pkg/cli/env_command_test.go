@@ -86,6 +86,59 @@ func TestDefaultsArtifactRetentionDays(t *testing.T) {
 	}
 }
 
+func TestDefaultsOTLPProtocol(t *testing.T) {
+	t.Parallel()
+	for _, protocol := range []string{"http/json", "http/protobuf"} {
+		t.Run(protocol, func(t *testing.T) {
+			file, err := defaultsParseFile("defaults.yml", []byte("default_otlp_protocol: "+protocol+"\n"))
+			require.NoError(t, err)
+			require.NoError(t, defaultsValidateFile(&file))
+			require.NotNil(t, file.DefaultOTLPProtocol)
+			assert.Equal(t, protocol, *file.DefaultOTLPProtocol)
+			changes := defaultsBuildUpdateChanges(&file)
+			index := slices.IndexFunc(changes, func(change defaultsUpdateChange) bool {
+				return change.envName == "OTEL_EXPORTER_OTLP_PROTOCOL"
+			})
+			require.NotEqual(t, -1, index)
+			assert.Equal(t, "default_otlp_protocol", changes[index].field)
+			assert.Equal(t, protocol, changes[index].value)
+			assert.False(t, changes[index].delete)
+			data, err := yaml.Marshal(&file)
+			require.NoError(t, err)
+			assert.Contains(t, string(data), "default_otlp_protocol: "+protocol)
+		})
+	}
+	for _, protocol := range []string{"", "grpc", "protobuf", "http/protobuf ", "${{ vars.PROTOCOL }}"} {
+		require.ErrorContains(t, defaultsValidateFile(&defaultsFile{DefaultOTLPProtocol: &protocol}), "default_otlp_protocol")
+	}
+	file, err := defaultsParseFile("defaults.yml", []byte("default_otlp_protocol: null\n"))
+	require.NoError(t, err)
+	require.NoError(t, defaultsValidateFile(&file))
+	changes := defaultsBuildUpdateChanges(&file)
+	index := slices.IndexFunc(changes, func(change defaultsUpdateChange) bool {
+		return change.envName == "OTEL_EXPORTER_OTLP_PROTOCOL"
+	})
+	require.NotEqual(t, -1, index)
+	assert.True(t, changes[index].delete)
+}
+
+func TestDefaultsGetOTLPProtocol(t *testing.T) {
+	stubDefaultsExecGH(t, func(args []string) *exec.Cmd {
+		if slices.Contains(args, "repos/github/gh-aw/actions/variables/OTEL_EXPORTER_OTLP_PROTOCOL") {
+			return defaultsGHHelperCommand("http/protobuf", 0)
+		}
+		return defaultsGHHelperCommand("HTTP 404: Not Found", 1)
+	})
+	output := t.TempDir() + "/defaults.yml"
+	require.NoError(t, defaultsGetToFile(defaultsTarget{scope: defaultsScopeRepo, repoOwner: "github", repoName: "gh-aw"}, output))
+	data, err := os.ReadFile(output)
+	require.NoError(t, err)
+	file, err := defaultsParseFile(output, data)
+	require.NoError(t, err)
+	require.NotNil(t, file.DefaultOTLPProtocol)
+	assert.Equal(t, "http/protobuf", *file.DefaultOTLPProtocol)
+}
+
 func TestResolveDefaultsTarget(t *testing.T) {
 	orig := defaultsGetCurrentRepoSlug
 	defaultsGetCurrentRepoSlug = func() (string, error) { return "octo-org/example", nil }

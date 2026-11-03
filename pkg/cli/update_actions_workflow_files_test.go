@@ -6,6 +6,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -72,5 +73,40 @@ func TestUpdateActionsInWorkflowFiles_NeverDowngrades(t *testing.T) {
 
 	if string(got) != originalContent {
 		t.Errorf("workflow file was incorrectly modified (downgrade must not occur):\ngot:  %s\nwant: %s", string(got), originalContent)
+	}
+}
+
+func TestUpdateActionsInWorkflowFiles_SkipsMergeConflicts(t *testing.T) {
+	t.Parallel()
+	deps := newTestActionUpdateDeps()
+	deps.getLatestRelease = func(_ context.Context, repo, currentVersion string, allowMajor, verbose bool) (string, string, error) {
+		if repo == "ruby/setup-ruby" {
+			return "v1.310.0", "newrubysha1234567890123456789012345678901", nil
+		}
+		return currentVersion, "", nil
+	}
+
+	workflowsDir := t.TempDir()
+	originalContent := "steps:\n  - uses: ruby/setup-ruby@v1.309.0\n" +
+		strings.Repeat("<", 7) + " current (local changes)\n" +
+		"  - name: Local change\n" +
+		strings.Repeat("=", 7) + "\n" +
+		"  - name: Upstream change\n" +
+		strings.Repeat(">", 7) + " new (upstream)\n"
+	mdPath := filepath.Join(workflowsDir, "conflicted-workflow.md")
+	if err := os.WriteFile(mdPath, []byte(originalContent), 0o644); err != nil {
+		t.Fatalf("failed to write workflow file: %v", err)
+	}
+
+	if err := updateActionsInWorkflowFiles(context.Background(), deps, updateActionsOptions{workflowsDir: workflowsDir, noCompile: true}); err != nil {
+		t.Fatalf("UpdateActionsInWorkflowFiles() error = %v", err)
+	}
+
+	got, err := os.ReadFile(mdPath)
+	if err != nil {
+		t.Fatalf("failed to read workflow file: %v", err)
+	}
+	if string(got) != originalContent {
+		t.Errorf("conflicted workflow file was modified:\ngot:  %s\nwant: %s", string(got), originalContent)
 	}
 }

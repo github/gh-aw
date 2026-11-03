@@ -342,6 +342,24 @@ func TestGetOTLPGitHubAppTokenConfig(t *testing.T) {
 	assert.Equal(t, "${{ secrets.APP_PRIVATE_KEY }}", got.PrivateKey)
 }
 
+func TestInjectOTLPConfig_Protocol(t *testing.T) {
+	t.Parallel()
+	for _, configuredEnv := range []string{"", "env:\n  OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf"} {
+		t.Run(configuredEnv, func(t *testing.T) {
+			compiler := NewCompiler()
+			data := &WorkflowData{Env: configuredEnv}
+			compiler.injectOTLPConfig(data)
+			assert.Equal(t, 1, strings.Count(data.Env, "OTEL_EXPORTER_OTLP_PROTOCOL:"))
+			if configuredEnv == "" {
+				assert.Contains(t, data.Env, "OTEL_EXPORTER_OTLP_PROTOCOL: ${{ vars.OTEL_EXPORTER_OTLP_PROTOCOL }}")
+			} else {
+				assert.Contains(t, data.Env, "OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf")
+				assert.NotContains(t, data.Env, "vars.OTEL_EXPORTER_OTLP_PROTOCOL")
+			}
+		})
+	}
+}
+
 // TestInjectOTLPConfig verifies that injectOTLPConfig correctly modifies WorkflowData.
 func TestInjectOTLPConfig(t *testing.T) {
 	newCompiler := func() *Compiler { return &Compiler{} }
@@ -357,6 +375,17 @@ func TestInjectOTLPConfig(t *testing.T) {
 		assert.Contains(t, wd.Env, "OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}")
 		assert.Contains(t, wd.Env, "OTEL_EXPORTER_OTLP_HEADERS: ${{ secrets.GH_AW_DEFAULT_OTLP_HEADERS }}")
 		assert.Contains(t, wd.Env, "GH_AW_OTLP_IF_MISSING: ignore", "unset enterprise defaults must be a no-op")
+		assert.Contains(t, wd.Env, "GH_AW_OTLP_LOGS_ENABLED: ${{ vars.GH_AW_OTLP_LOGS_ENABLED }}")
+		assert.Contains(t, wd.Env, "GH_AW_OTLP_LOGS_MAX_BYTES: ${{ vars.GH_AW_OTLP_LOGS_MAX_BYTES }}")
+	})
+
+	t.Run("preserves explicit session log opt out without duplicate keys", func(t *testing.T) {
+		wd := &WorkflowData{Env: "env:\n  GH_AW_OTLP_LOGS_ENABLED: 'false'\n  GH_AW_OTLP_LOGS_MAX_BYTES: '4096'"}
+		newCompiler().injectOTLPConfig(wd)
+		assert.Equal(t, 1, strings.Count(wd.Env, "GH_AW_OTLP_LOGS_ENABLED:"))
+		assert.Contains(t, wd.Env, "GH_AW_OTLP_LOGS_ENABLED: 'false'")
+		assert.Equal(t, 1, strings.Count(wd.Env, "GH_AW_OTLP_LOGS_MAX_BYTES:"))
+		assert.Contains(t, wd.Env, "GH_AW_OTLP_LOGS_MAX_BYTES: '4096'")
 	})
 
 	t.Run("falls back to enterprise defaults when ParsedFrontmatter is nil", func(t *testing.T) {
