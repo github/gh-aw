@@ -365,6 +365,74 @@
     "expected": { "outcome_status": "rejected", "evidence_strength": "strong", "signal": "workflow_failed" }
   },
   { "name": "unsupported discussion", "item": { "type": "create_discussion", "number": 1 }, "responses": {}, "expected": { "outcome_status": "unknown", "evidence_strength": "none", "signal": "unsupported_evaluator" } },
+  { "name": "unsupported update discussion", "item": { "type": "update_discussion", "number": 1 }, "responses": {}, "expected": { "outcome_status": "unknown", "evidence_strength": "none", "signal": "unsupported_evaluator" } },
+  {
+    "name": "generic reply target existence is unknown",
+    "item": { "type": "reply_to_pull_request_review_comment", "number": 1 },
+    "responses": { "issues/1": {} },
+    "expected": { "outcome_status": "unknown", "evidence_strength": "weak", "signal": "target_exists_only" }
+  },
+  {
+    "name": "generic reply API failure is error",
+    "item": { "type": "reply_to_pull_request_review_comment", "number": 1 },
+    "responses": {},
+    "errors": { "issues/1": 503 },
+    "expected": { "outcome_status": "error", "evidence_strength": "weak", "signal": "evaluation_error" }
+  },
+  {
+    "name": "generic code scanning autofix target is unknown",
+    "item": { "type": "autofix_code_scanning_alert", "number": 1 },
+    "responses": { "issues/1": {} },
+    "expected": { "outcome_status": "unknown", "evidence_strength": "weak", "signal": "target_exists_only" }
+  },
+  {
+    "name": "generic code scanning autofix API failure is error",
+    "item": { "type": "autofix_code_scanning_alert", "number": 1 },
+    "responses": {},
+    "errors": { "issues/1": 503 },
+    "expected": { "outcome_status": "error", "evidence_strength": "weak", "signal": "evaluation_error" }
+  },
+  {
+    "name": "generic code scanning alert target is unknown",
+    "item": { "type": "create_code_scanning_alert", "number": 1 },
+    "responses": { "issues/1": {} },
+    "expected": { "outcome_status": "unknown", "evidence_strength": "weak", "signal": "target_exists_only" }
+  },
+  {
+    "name": "generic code scanning alert API failure is error",
+    "item": { "type": "create_code_scanning_alert", "number": 1 },
+    "responses": {},
+    "errors": { "issues/1": 503 },
+    "expected": { "outcome_status": "error", "evidence_strength": "weak", "signal": "evaluation_error" }
+  },
+  {
+    "name": "generic sub-issue link target is unknown",
+    "item": { "type": "link_sub_issue", "number": 1 },
+    "responses": { "issues/1": {} },
+    "expected": { "outcome_status": "unknown", "evidence_strength": "weak", "signal": "target_exists_only" }
+  },
+  {
+    "name": "generic sub-issue link API failure is error",
+    "item": { "type": "link_sub_issue", "number": 1 },
+    "responses": {},
+    "errors": { "issues/1": 503 },
+    "expected": { "outcome_status": "error", "evidence_strength": "weak", "signal": "evaluation_error" }
+  },
+  { "name": "generic release target is unknown", "item": { "type": "update_release", "number": 1 }, "responses": { "issues/1": {} }, "expected": { "outcome_status": "unknown", "evidence_strength": "weak", "signal": "target_exists_only" } },
+  {
+    "name": "generic release API failure is error",
+    "item": { "type": "update_release", "number": 1 },
+    "responses": {},
+    "errors": { "issues/1": 503 },
+    "expected": { "outcome_status": "error", "evidence_strength": "weak", "signal": "evaluation_error" }
+  },
+  {
+    "name": "generic project API failure is error",
+    "item": { "type": "update_project", "number": 1 },
+    "responses": {},
+    "errors": { "issues/1": 503 },
+    "expected": { "outcome_status": "error", "evidence_strength": "weak", "signal": "evaluation_error" }
+  },
   {
     "name": "generic closed target does not imply acceptance",
     "item": { "type": "update_project", "number": 1, "url": "https://github.com/acme/repo/issues/1" },

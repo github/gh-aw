@@ -15,7 +15,7 @@ The v1.1.8 floating-head opt-in adds current-head/non-approval selection with im
 
 ⚠️ **VALIDATION STATUS**: The last full validation was completed on 2026-07-15; the last targeted formal RS-05a revalidation remains v1.1.1 / 2026-10-09. On 2026-11-03, the six-job structure was checked against `.github/workflows/security-review.lock.yml` (see §1). This targeted check is not a full revalidation. It confirms the job chain but also shows that write permissions are workflow-specific: `activation`, `safe_outputs`, and `conclusion` have repository write scopes, while the `agent` job includes `copilot-requests: write`. The v1.1.2 review-checkout update, v1.1.3, v1.1.5, and v1.1.6 branch-event updates, and v1.1.7 immutable-revision update have runtime evidence but have not received targeted formal revalidation (see §7b); v1.1.4 concerns transport security, not branch events. These validations do not replace the full revalidation required by `security-architecture-spec.md` §11.
 
-The following claims were verified during the historical full validation; the current six-job check refreshes only the job-structure evidence. In particular, it does not reverify the PM-08 claim:
+The following claims were verified during the historical full validation; the current targeted pass refreshes the six-job structure and selected SG/input-sanitization evidence. It does not complete a full revalidation or reverify PM-08:
 - ✅ Job architecture (activation, agent, safe_outputs)
 - ✅ **Input sanitization** (markdown safety, URL filtering, HTML tag filtering, ANSI removal)
 - ✅ Permission management (historically verified; current job scopes are workflow-specific)
@@ -478,8 +478,8 @@ The evidence date in each row distinguishes the 2026-11-03 lock check from older
 
 | Section | Requirement | Current status | Evidence location and date |
 |---------|-------------|---------------|----------------------------|
-| **3.2** | Security Guarantees (SG-01 to SG-07) | Historical evidence; not revalidated in this lock check | `pkg/workflow/security_architecture_sg_formal_test.go`; last recorded suite update 2026-07-28 |
-| **4.3** | Input Sanitization (IS-04 to IS-09) | Historical evidence; not revalidated in this lock check | `actions/setup/js/sanitize_content_core.cjs`; historical full validation 2026-07-15 |
+| **3.2** | Security Guarantees (SG-01 to SG-07) | ✅ Selected formal coverage rechecked 2026-11-03 | `pkg/workflow/security_architecture_sg_formal_test.go` (`TestFormalSG01`–`TestFormalSG07`, `TestFormalBasicConformance_AllFourControls`, threat-detection and PM-11 tests) |
+| **4.3** | Input Sanitization (IS-04 to IS-09) | ✅ Rechecked 2026-11-03 | `actions/setup/js/sanitize_content_core.cjs`; `sanitize_content.test.cjs`, `sanitize_label_content.test.cjs`, `sanitize_content_core_parser.test.cjs` (615 tests passed) |
 | **5.2** | Job Architecture (OI-01) | ✅ Verified for representative lock | `.github/workflows/security-review.lock.yml:93,635,1862,2330,2884,3038` (2026-11-03) |
 | **5.4** | Output Validation (OI-06) | ✅ Verified for representative lock | `.github/workflows/security-review.lock.yml:3038-3051,3142-3144` (2026-11-03) |
 | **7.2** | Permission Defaults (PM-01, PM-02) | ⚠️ Partially verified; scopes are workflow-specific | `.github/workflows/security-review.lock.yml:103-107,642-650,1879-1883,2338-2340,3047-3050` (2026-11-03) |
@@ -658,7 +658,7 @@ pre_activation:
 
 ## Conclusion
 
-The 2026-11-03 targeted check confirms the six-job topology in the representative lock and refreshes the evidence paths listed above. It does not complete the full revalidation: PM-08 remains UNVERIFIED for this lock, and permission scopes are workflow-specific.
+The 2026-11-03 targeted pass confirms the six-job topology in the representative lock and selected formal/sanitization tests. It does not complete the full revalidation: PM-08 remains UNVERIFIED for this lock, and permission scopes are workflow-specific.
 
 The specification provides an accurate formalization of the security architecture that can be used for:
 - Security audits and reviews
