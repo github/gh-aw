@@ -639,6 +639,22 @@ Event attributes MUST comply with the same privacy and cardinality rules as span
 
 When full content capture is enabled, content attributes MUST use the schemas required by the applicable GenAI convention, MUST be redacted before export, SHOULD be truncated according to a documented limit, MUST NOT contain credentials, and MUST NOT be copied into metric attributes.
 
+### 10.8 Eval Results
+
+Completed BinEval records MUST produce `eval.result` events on
+`gh-aw.evals.conclusion`, with `gh-aw.eval.id`, normalized `gh-aw.eval.answer`
+(`YES`, `NO`, or `UNKNOWN`), and the model when available. Summary attributes
+MUST include `gh-aw.evals.count`, `yes`, `no`, and `unknown` under the
+`gh-aw.evals.` prefix.
+
+A valid not-evaluated marker MUST instead emit `gh-aw.evals.status =
+not_evaluated` and the bounded `gh-aw.evals.reason_code`, both on the span and
+an `eval.status` event. When available, the marker's configured Decisions model
+ID MUST be included as `gh-aw.eval.model` on both the span and status event.
+It MUST NOT fabricate answer records or unknown-answer
+counts. Free-form questions, reasons, and error text MUST NOT be included in
+these result events.
+
 ---
 
 ## 11. Metrics Contract
@@ -1021,6 +1037,10 @@ context is added to outcome spans or links.
 ---
 
 ## 19. Change Log
+
+### Unreleased
+
+- **Added**: A normative requirement (§10.8) that completed BinEval records MUST produce `eval.result` events on `gh-aw.evals.conclusion`; when a not-evaluated status marker is present it takes precedence and answers are not emitted.
 
 ### Version 0.5.0 (Working Draft, August 27, 2026)
 
