@@ -561,7 +561,7 @@ bearer access token. Token renewal is not implemented by the declaration.
 
 | Surface | Current declaration |
 | --- | --- |
-| Triggers | `azure-devops-work-item-created`, `azure-devops-work-item-updated`, `azure-devops-work-item-deleted`, `azure-devops-work-item-restored`. Service hooks require configured authenticated HTTPS ingress and exact collection/project identity; there is no native HMAC header to invent. |
+| Triggers | Native created/updated/deleted/restored plus evidence-backed closed/reopened/labeled/unlabeled selections. Terminal states require explicit `closed-states`; missing prior values do not establish transitions. Service hooks require configured authenticated HTTPS ingress and exact collection/project identity; there is no native HMAC header to invent. |
 | MCPs/read tools | Hosted MCP still exposes only organization-visible project metadata. Independently selected fixed REST readers provide approved work-item content; additional repository/pipeline selections use their own declared read identities and grants. No wildcard remote registration is restored. |
 | Safe outputs | Original narrow effects remain available. Rich creators, sparse/clear mutations, authored static custom fields, reviewed Branch ArtifactLinks, receipt-aware typed relations, and staged binary upload/attachment effects are independently selected. |
 | Context | Bounded selected reads only. IDs remain references, not grants; snapshot/delta variants and configured terminal states determine lifecycle evidence. |
