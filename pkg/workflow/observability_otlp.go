@@ -955,6 +955,7 @@ func (c *Compiler) injectOTLPConfig(workflowData *WorkflowData) {
 		envKeyLines = append(envKeyLines, line)
 	}
 	addEnvLine("OTEL_EXPORTER_OTLP_ENDPOINT", "  OTEL_EXPORTER_OTLP_ENDPOINT: "+firstEndpoint)
+	addEnvLine(compilerenv.OTLPProtocol, fmt.Sprintf("  %s: ${{ vars.%s }}", compilerenv.OTLPProtocol, compilerenv.OTLPProtocol))
 	addEnvLine("OTEL_SERVICE_NAME", "  OTEL_SERVICE_NAME: "+serviceName)
 	addEnvLine("OTEL_RESOURCE_ATTRIBUTES", "  OTEL_RESOURCE_ATTRIBUTES: '"+escapeYAMLSingleQuoted(otelResourceAttributes(workflowData))+"'")
 	otlpEnvLines := strings.Join(envKeyLines, "\n")

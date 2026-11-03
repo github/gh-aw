@@ -323,6 +323,8 @@ Compatibility variables containing credentials MUST NOT be injected into the env
 
 The JavaScript traces exporter MUST honor a non-empty `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL` before `OTEL_EXPORTER_OTLP_PROTOCOL`. When neither is set, it MUST preserve `http/json` as the compatibility default. `http/protobuf` MUST encode the existing sanitized trace payload as a binary OTLP `ExportTraceServiceRequest` with `Content-Type: application/x-protobuf`, without runtime package dependencies. The selected protocol applies to every endpoint in the JavaScript fan-out. Unsupported protocols or encoding failures MUST produce an exporter diagnostic without a JSON fallback. The local JSONL mirror MUST remain raw OTLP JSON for both protocols.
 
+`gh aw env get/update` MUST expose `default_otlp_protocol`, mapped to the standard `OTEL_EXPORTER_OTLP_PROTOCOL` Actions variable, with `http/json` and `http/protobuf` as the accepted non-null values. Null or omission MUST delete the variable at the selected scope, consistently with other managed defaults. Unless workflow `env` explicitly defines the protocol, the compiler MUST inject `${{ vars.OTEL_EXPORTER_OTLP_PROTOCOL }}` so variable changes resolve at runtime rather than compilation.
+
 The JavaScript exporter MUST preserve complete endpoint paths ending in `/v1/traces`, including Azure Monitor DCE/DCR traces paths and query parameters. Base endpoints MUST gain `/v1/traces` before any query parameters.
 
 ### 6.3 Collector Mode (Optional)

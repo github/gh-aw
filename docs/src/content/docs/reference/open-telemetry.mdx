@@ -58,6 +58,24 @@ observability:
 
 `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL`, when non-empty, takes precedence over `OTEL_EXPORTER_OTLP_PROTOCOL`. Both accept `http/json` or `http/protobuf`; gRPC is not supported by this helper. The selected encoding applies to all configured endpoints. Unsupported protocols and encoding errors produce an exporter diagnostic without retrying or silently falling back to JSON.
 
+To manage the protocol as a repository, organization, or enterprise Actions variable, use `gh aw env get` and `gh aw env update`. The defaults file field `default_otlp_protocol` maps to the standard `OTEL_EXPORTER_OTLP_PROTOCOL` variable:
+
+```bash
+gh aw env get defaults.yml
+```
+
+Set this field in the downloaded file, retaining any other defaults:
+
+```yaml
+default_otlp_protocol: http/protobuf
+```
+
+```bash
+gh aw env update defaults.yml --scope repo
+```
+
+As with other managed fields, setting it to `null` or omitting it deletes the variable at the selected scope. The compiler injects `${{ vars.OTEL_EXPORTER_OTLP_PROTOCOL }}` into workflow `env` unless that key is explicitly defined by the workflow. Recompile existing workflows once to add that lookup; subsequent variable updates take effect without recompilation.
+
 For [Azure Monitor native OTLP ingestion](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/opentelemetry-protocol-ingestion), use the traces endpoint from Application Insights **OTLP Connection Info**, or construct the Data Collection Endpoint / Data Collection Rule path:
 
 ```text wrap
