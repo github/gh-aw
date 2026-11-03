@@ -43,6 +43,10 @@ The MCP gateway intercepts tool calls to GitHub and applies integrity checks to 
 
 Starting with [MCP gateway v0.5.0](https://github.com/github/gh-aw-mcpg/releases/tag/v0.5.0), proxy responses that cannot be filtered item by item, such as artifact downloads, raw content, and redirects, require resource-level authorization even in filter mode. These requests can be denied when the configured allow-only policy does not authorize the resource.
 
+Starting with [MCP gateway v0.5.1](https://github.com/github/gh-aw-mcpg/releases/tag/v0.5.1), Actions job logs, security advisory contents, and file contents fetched at explicit SHAs or non-default refs have baseline `none` integrity. Repository visibility and trusted PR authors do not promote these payloads to `approved`; requests can therefore be denied by `min-integrity: approved`.
+
+[MCP gateway v0.5.2](https://github.com/github/gh-aw-mcpg/releases/tag/v0.5.2) filters nested review-thread comments individually in filter mode, preserving thread and pagination metadata. In strict mode, any denied comment rejects the entire response.
+
 ## Configuration
 
 Set `min-integrity` under `tools.github` in your workflow frontmatter:
