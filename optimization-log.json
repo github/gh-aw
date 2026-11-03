@@ -1,15 +1,5 @@
 [
   {
-    "date": "2026-09-11",
-    "workflow_name": "Instructions Janitor",
-    "workflow_file": "instructions-janitor",
-    "total_aic_analyzed": 1378.6,
-    "runs_audited": 3,
-    "recommendations_count": 3,
-    "subagent_candidates": 1,
-    "estimated_aic_savings_per_run": 180
-  },
-  {
     "date": "2026-09-14",
     "workflow_name": "Issue Monster",
     "total_aic_analyzed": 65.622715,
@@ -295,5 +285,15 @@
     "recommendations_count": 4,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 2.5
+  },
+  {
+    "date": "2026-11-03",
+    "workflow_name": "PR Finisher",
+    "workflow_file": "pr-finisher",
+    "total_aic_analyzed": 297.5,
+    "runs_audited": 11,
+    "recommendations_count": 4,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 10
   }
 ]
