@@ -288,7 +288,15 @@ func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error 
 	// already reflect the current AWF version; stale pins from superseded versions are pruned
 	// and new versions are resolved in a single pass.
 	updateLog.Print("Updating container image digest pins")
-	newContainerPins, err := updateContainerPins(ctx, defaultContainerPinUpdateDeps(), opts.WorkflowsDir, opts.Verbose, containerPinUpdateOptions{refreshExisting: true})
+	newContainerPins := false
+	var err error
+	if conflictedWorkflow, scanErr := findWorkflowWithMergeConflictMarkers(opts.WorkflowsDir); scanErr == nil && conflictedWorkflow != "" {
+		message := fmt.Sprintf("Skipping container pin updates and recompilation because merge conflict markers are present in %s", conflictedWorkflow)
+		updateLog.Print(message)
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(message))
+	} else {
+		newContainerPins, err = updateContainerPins(ctx, defaultContainerPinUpdateDeps(), opts.WorkflowsDir, opts.Verbose, containerPinUpdateOptions{refreshExisting: true})
+	}
 	if err != nil {
 		// Non-fatal: Docker may not be available in all environments.
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not update container pins: %v", err)))

@@ -2,6 +2,7 @@
 "use strict";
 const { SAFE_OUTPUT_E007 } = require("./error_codes.cjs");
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("reconciler");
+const { observeQueueOperation } = require("./work_queue_telemetry.cjs");
 
 const { canonical, digest, integer } = require("./work_queue_codec.cjs");
 const { dispatchPrincipal } = require("./work_queue_policy.cjs");
@@ -111,6 +112,10 @@ function returnedRunHint(state, dispatchId) {
 }
 
 async function reconcileDispatch(options) {
+  return observeQueueOperation("reconcile_dispatch", options, () => reconcileDispatchImpl(options));
+}
+
+async function reconcileDispatchImpl(options) {
   log.debug("dispatch.reconcile.start");
   if (isStagedMode(options) || isStagedMode(options.config)) return { state: "staged_preview", released: false };
   const initial = await loadQueue(options);
@@ -281,6 +286,10 @@ function unresolvedDeliveryResults(assignment, projection) {
 }
 
 async function reconcileQueue(options) {
+  return observeQueueOperation("reconcile", options, () => reconcileQueueImpl(options));
+}
+
+async function reconcileQueueImpl(options) {
   log.debug("queue.reconcile.start");
   if (isStagedMode(options) || isStagedMode(options.config)) return { version: 3, status: "staged_preview", reconciled: 0, results: [] };
   const limit = options.maxReconciliations ?? 16;

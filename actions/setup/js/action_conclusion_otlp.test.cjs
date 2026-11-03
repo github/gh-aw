@@ -19,6 +19,7 @@ global.core = mockCore;
 // Load the real send_otlp_span module and capture the original function
 const sendOtlpModule = req("./send_otlp_span.cjs");
 const originalSendJobConclusionSpan = sendOtlpModule.sendJobConclusionSpan;
+const sessionLogs = req("./send_otlp_session_logs.cjs");
 
 // Load the module under test — it holds a reference to the same sendOtlpModule object
 const { run, buildSpanName, parseJobStartMs } = req("./action_conclusion_otlp.cjs");
@@ -35,6 +36,7 @@ describe("action_conclusion_otlp.cjs", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(sessionLogs, "sendSessionLogs").mockResolvedValue(undefined);
     mockSendJobConclusionSpan.mockResolvedValue(undefined);
     // Patch the shared CJS exports object — run() accesses this at call time
     sendOtlpModule.sendJobConclusionSpan = mockSendJobConclusionSpan;
@@ -57,6 +59,16 @@ describe("action_conclusion_otlp.cjs", () => {
 
   it("should export run as a function", () => {
     expect(typeof run).toBe("function");
+  });
+
+  it("exports session logs only from the conclusion job", async () => {
+    process.env.INPUT_JOB_NAME = "agent";
+    await run();
+    expect(sessionLogs.sendSessionLogs).not.toHaveBeenCalled();
+    process.env.INPUT_JOB_NAME = "conclusion";
+    await run();
+    expect(sessionLogs.sendSessionLogs).toHaveBeenCalledOnce();
+    expect(mockSendJobConclusionSpan.mock.invocationCallOrder[1]).toBeLessThan(sessionLogs.sendSessionLogs.mock.invocationCallOrder[0]);
   });
 
   describe("when GH_AW_OTLP_ENDPOINTS is not set", () => {

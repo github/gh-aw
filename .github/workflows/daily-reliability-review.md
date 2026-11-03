@@ -18,7 +18,6 @@ tracker-id: daily-reliability-review
 engine:
   id: copilot
   copilot-sdk: true
-model: copilot/auto
 strict: true
 network:
   allowed:

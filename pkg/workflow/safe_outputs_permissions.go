@@ -322,7 +322,11 @@ func computeDispatchRepositoryPermissions(safeOutputs *SafeOutputsConfig, exclud
 		if tool == nil || isHandlerStaged(globalStaged, tool.Staged) {
 			continue
 		}
-		if excludePerToolApps && tool.GitHubApp != nil {
+		// A per-tool github-app or github-token override means the runtime handler
+		// authenticates this dispatch with its own credential (see dispatch_repository.cjs,
+		// which calls createAuthenticatedGitHubClient(toolConfig)), so it must not also
+		// contribute contents: write to the global safe-outputs App mint (GP5b rule 1).
+		if excludePerToolApps && (tool.GitHubApp != nil || tool.GitHubToken != "") {
 			continue
 		}
 		if permissions == nil {

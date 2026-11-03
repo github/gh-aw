@@ -93,15 +93,18 @@ func ResolveActionPin(actionRepo, version string, ctx *PinContext) (result strin
 
 func handleUnresolvedActionPin(actionRepo, version, originalRepo, originalVersion string, exactMapped bool, cacheKey string, ctx *PinContext) (string, error) {
 	if ctx.EnforcePinned && !ctx.AllowActionRefs {
+		actionPinsLog.Printf("Pinning enforced and action refs not allowed, failing unresolved pin for %s@%s", actionRepo, version)
 		if ctx.Resolver != nil {
 			return "", fmt.Errorf("unable to pin action %s@%s: resolution failed", actionRepo, version)
 		}
 		return "", fmt.Errorf("unable to pin action %s@%s", actionRepo, version)
 	}
 	if exactMapped {
+		actionPinsLog.Printf("Mapped target %s@%s could not be resolved (mapped from %s@%s)", actionRepo, version, originalRepo, originalVersion)
 		return "", fmt.Errorf("unable to resolve action pin mapping for %s@%s to %s@%s", originalRepo, originalVersion, actionRepo, version)
 	}
 
+	actionPinsLog.Printf("Leaving action %s@%s unpinned (unresolved action refs allowed: EnforcePinned=%t, AllowActionRefs=%t)", actionRepo, version, ctx.EnforcePinned, ctx.AllowActionRefs)
 	warningMsg := fmt.Sprintf("Unable to pin action %s@%s", actionRepo, version)
 	if ctx.Resolver != nil {
 		warningMsg += ": resolution failed"
@@ -113,6 +116,7 @@ func handleUnresolvedActionPin(actionRepo, version, originalRepo, originalVersio
 func validateActionPinMapping(actionRepo, version string, ctx *PinContext) (string, bool, error) {
 	mappingValue, exactMapped := ctx.Mappings[FormatCacheKey(actionRepo, version)]
 	if exactMapped && (ExtractRepo(mappingValue) == "" || ExtractVersion(mappingValue) == "") {
+		actionPinsLog.Printf("Invalid action pin mapping target %q for %s@%s", mappingValue, actionRepo, version)
 		return "", true, fmt.Errorf("invalid action pin mapping for %s@%s: target %q must be in owner/repo@ref format", actionRepo, version, mappingValue)
 	}
 	return mappingValue, exactMapped, nil

@@ -4,10 +4,16 @@ emoji: "🎭"
 description: Explores agentic-workflows custom agent behavior by generating software personas and analyzing responses to common automation tasks
 on: daily
 max-daily-ai-credits: 10000
-engine: claude
+engine:
+  id: claude
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
 permissions:
   contents: read
   actions: read
+  copilot-requests: write
   issues: read
   pull-requests: read
 experiments:

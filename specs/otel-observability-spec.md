@@ -321,6 +321,12 @@ The first normalized endpoint MUST remain the primary endpoint for compatibility
 
 Compatibility variables containing credentials MUST NOT be injected into the environment of the agent command, arbitrary shell steps, generated code, or untrusted tool processes.
 
+The JavaScript traces exporter MUST honor a non-empty `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL` before `OTEL_EXPORTER_OTLP_PROTOCOL`. When neither is set, it MUST preserve `http/json` as the compatibility default. `http/protobuf` MUST encode the existing sanitized trace payload as a binary OTLP `ExportTraceServiceRequest` with `Content-Type: application/x-protobuf`, without runtime package dependencies. The selected protocol applies to every endpoint in the JavaScript fan-out. Unsupported protocols or encoding failures MUST produce an exporter diagnostic without a JSON fallback. The local JSONL mirror MUST remain raw OTLP JSON for both protocols.
+
+`gh aw env get/update` MUST expose `default_otlp_protocol`, mapped to the standard `OTEL_EXPORTER_OTLP_PROTOCOL` Actions variable, with `http/json` and `http/protobuf` as the accepted non-null values. Null or omission MUST delete the variable at the selected scope, consistently with other managed defaults. Unless workflow `env` explicitly defines the protocol, the compiler MUST inject `${{ vars.OTEL_EXPORTER_OTLP_PROTOCOL }}` so variable changes resolve at runtime rather than compilation.
+
+The JavaScript exporter MUST preserve complete endpoint paths ending in `/v1/traces`, including Azure Monitor DCE/DCR traces paths and query parameters. Base endpoints MUST gain `/v1/traces` before any query parameters.
+
 ### 6.3 Collector Mode (Optional)
 
 Collector mode is RECOMMENDED for deployments that want centralized batching, retry, redaction, and credential isolation, but direct export is part of the stable compatibility contract. In Collector mode:
@@ -639,6 +645,22 @@ Event attributes MUST comply with the same privacy and cardinality rules as span
 
 When full content capture is enabled, content attributes MUST use the schemas required by the applicable GenAI convention, MUST be redacted before export, SHOULD be truncated according to a documented limit, MUST NOT contain credentials, and MUST NOT be copied into metric attributes.
 
+### 10.8 Eval Results
+
+Completed BinEval records MUST produce `eval.result` events on
+`gh-aw.evals.conclusion`, with `gh-aw.eval.id`, normalized `gh-aw.eval.answer`
+(`YES`, `NO`, or `UNKNOWN`), and the model when available. Summary attributes
+MUST include `gh-aw.evals.count`, `yes`, `no`, and `unknown` under the
+`gh-aw.evals.` prefix.
+
+A valid not-evaluated marker MUST instead emit `gh-aw.evals.status =
+not_evaluated` and the bounded `gh-aw.evals.reason_code`, both on the span and
+an `eval.status` event. When available, the marker's configured Decisions model
+ID MUST be included as `gh-aw.eval.model` on both the span and status event.
+It MUST NOT fabricate answer records or unknown-answer
+counts. Free-form questions, reasons, and error text MUST NOT be included in
+these result events.
+
 ---
 
 ## 11. Metrics Contract
@@ -710,6 +732,44 @@ A standalone log related to a previous workflow run SHOULD include the source ru
 Log bodies and attributes MUST NOT contain OTLP headers, tokens, credentials, complete prompts or responses without explicit authorization, complete tool arguments or results without explicit authorization, unredacted private source code, or unbounded stack traces or payloads.
 
 Log messages SHOULD use stable templates, with variable data placed in structured attributes after redaction.
+
+### 12.5 Opt-in Compact Unified Session Logs
+
+The compiler MUST inject `GH_AW_OTLP_LOGS_ENABLED` and
+`GH_AW_OTLP_LOGS_MAX_BYTES` from their same-named GitHub Actions variables.
+Session-log export MUST remain disabled unless the enable value is exactly
+`true`. An unset byte limit MUST default to 65536; a configured limit MUST be a
+positive safe integer. Invalid configuration MUST warn without exporting.
+
+The conclusion job MUST export only the persisted, publication-redacted compact
+unified session, with at most 128 events and 16 KiB of projected JSONL.
+Export MUST additionally omit repository, workflow/run/session/agent identity,
+refs, SHAs, memory identity, branches and filesystem paths. Current secret and
+exporter-header masks MUST be applied. Operational metadata and trace
+correlation MAY remain; this profile does not guarantee irreversible anonymity.
+Full session artifacts MUST remain unchanged.
+
+Each retained event MUST be an OTLP structured log body under instrumentation
+scope `gh-aw.session`, with `gh-aw.session.event_type` as a log attribute.
+Valid current trace/span IDs SHOULD be included. Export MUST use the existing
+endpoint list and isolated per-endpoint headers, posting to `/v1/logs` instead
+of `/v1/traces`. A trailing signal path MUST be replaced, not duplicated.
+
+The serialized UTF-8 JSON request MUST NOT exceed `GH_AW_OTLP_LOGS_MAX_BYTES`
+per endpoint. Whole low-priority records MUST be omitted to meet the limit,
+using the same retention ranking as the compact serializer: format/workflow
+metadata, final outcomes and promoted failures, guardrail/grader results,
+retry diagnostics, per-step usage, then successful memory updates.
+Equal-priority records MUST prefer earlier evidence, and retained records MUST
+remain in source order. The source serializer MUST consider late essential
+records within its scan budget even after compact output limits are reached.
+Resource attributes MUST report compact version, included/omitted event counts,
+oversized source lines, scan truncation and overall truncation, including
+size-induced omissions. When size or scan limits discard evidence, the exporter
+MUST issue a GitHub Actions warning explicitly identifying the export as partial.
+If no record fits, the exporter MUST warn and skip the
+request. Export failures MUST NOT fail the workflow, and unchanged credentials
+MUST NOT be retried after authorization failures.
 
 ---
 
@@ -907,7 +967,7 @@ The following test IDs are stubs for Level 1 (Stable Configuration and Export) c
 | **T-OT-001** | Compiler config | Compiler accepts `observability.otlp.endpoint` with a valid HTTPS URL and emits `OTEL_EXPORTER_OTLP_ENDPOINT` in the generated workflow environment. |
 | **T-OT-002** | Compiler config | Compiler rejects `observability.otlp.endpoint` set to a non-HTTPS URL when `if-missing: block` is configured, producing a descriptive validation error. |
 | **T-OT-003** | Endpoint normalization | When multiple endpoints are declared, the compiler preserves them in declaration order and retains the first endpoint in the `OTEL_EXPORTER_OTLP_ENDPOINT` variable for backward compatibility. |
-| **T-OT-004** | OTLP export | The runtime JavaScript helper encodes span payloads as valid OTLP/HTTP protobuf-JSON and POSTs them to the configured endpoint; a successful 200 response is recognized as accepted. |
+| **T-OT-004** | OTLP export | The runtime JavaScript helper defaults to valid OTLP/HTTP JSON and supports binary OTLP/HTTP protobuf selected through the standard protocol environment variables. Both POST to the configured traces endpoint and recognize a successful 200 response as accepted. Protobuf conformance is compared with the official OpenTelemetry SDK in CI. |
 | **T-OT-005** | Trace context | The compiler injects `GITHUB_AW_OTEL_TRACE_ID`, `GITHUB_AW_OTEL_PARENT_SPAN_ID`, and `TRACEPARENT` into the generated workflow environment when OTLP observability is enabled. |
 | **T-OT-006** | Local mirrors | The runtime helper writes each exported span as a raw OTLP/HTTP JSON line with a `resourceSpans` key to `/tmp/gh-aw/otel.jsonl`; the file format MUST NOT be an envelope-only summary. |
 | **T-OT-007** | Compiler config | `observability.otlp.headers` entries are emitted as `OTEL_EXPORTER_OTLP_HEADERS` in `key=value,key=value` format and are masked in diagnostics, job summaries, and artifacts. |
@@ -983,6 +1043,10 @@ context is added to outcome spans or links.
 ---
 
 ## 19. Change Log
+
+### Unreleased
+
+- **Added**: A normative requirement (§10.8) that completed BinEval records MUST produce `eval.result` events on `gh-aw.evals.conclusion`; when a not-evaluated status marker is present it takes precedence and answers are not emitted.
 
 ### Version 0.5.0 (Working Draft, August 27, 2026)
 

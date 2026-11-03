@@ -14,10 +14,12 @@ permissions:
   contents: read
   pull-requests: read
   copilot-requests: write
-model: "${{ needs.activation.outputs.model_size }}"
 engine:
   id: copilot
   max-continuations: 15
+  model-routing:
+    goal: cost
+    mode: economy
 cache:
   key: pr-test-prefetch-${{ github.event.pull_request.head.sha || github.event.issue.number }}
   path: /tmp/gh-aw/agent
@@ -216,25 +218,9 @@ imports:
   - shared/otlp.md
 features:
   gh-aw-detection: true
-experiments:
-  model_size:
-    variants: [claude-haiku-4.5, claude-sonnet-5]
-    description: "Tests whether a smaller model can preserve test-review decision quality at lower cost versus a larger reasoning-capable model."
-    hypothesis: "H0: model-size variant does not improve review usefulness acceptance rate. H1: a larger reasoning-capable model improves review usefulness acceptance rate by >=15 percentage points without materially increasing false-positive change requests."
-    metric: review_usefulness_acceptance_rate
-    secondary_metrics: [ai_credits_total, false_positive_change_request_rate]
-    guardrail_metrics:
-      - name: false_positive_change_request_rate
-        threshold: "<=0.20"
-      - name: run_success_rate
-        threshold: ">=0.90"
-    min_samples: 70
-    weight: [50, 50]
-    start_date: "2026-07-05"
-    issue: 43530
 evals:
-  - id: model_size_goal_met
-    question: Does the agent output show that the objective for experiment model_size was successfully completed?
+  - id: review_decision_consistent
+    question: Did the agent either post a Test Quality Score with an APPROVE or REQUEST_CHANGES decision that matches the tests and guideline violations it flagged, or call noop with a scope reason the workflow's act-vs-noop rubric allows (pre-fetch unavailable, no changed or only unsupported-language test files, or no behavioral test change and no hard violation)?
 
 ---
 
