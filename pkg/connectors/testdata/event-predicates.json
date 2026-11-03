@@ -81,5 +81,38 @@
   { "name": "no timestamp date rollover", "rule": { "path": "/time", "op": "timestamp" }, "payload": { "time": "2026-02-30T12:00:00Z" }, "matched": false, "known": false },
   { "name": "timestamp offset bounded", "rule": { "path": "/time", "op": "timestamp" }, "payload": { "time": "2026-11-02T12:00:00+24:00" }, "matched": false, "known": false },
   { "name": "null equality needs null operator", "rule": { "path": "/old", "op": "equals", "other": "/new" }, "payload": { "old": null, "new": null }, "matched": false, "known": false },
-  { "name": "integer representation comparison", "rule": { "path": "/old", "op": "equals", "value": 1 }, "payload": { "old": 1.0 }, "matched": true, "known": true }
+  { "name": "integer representation comparison", "rule": { "path": "/old", "op": "equals", "value": 1 }, "payload": { "old": 1.0 }, "matched": true, "known": true },
+  { "name": "title prefix", "rule": { "path": "/title", "op": "prefix", "values": ["Agent: "] }, "payload": { "title": "Agent: reviewed issue" }, "matched": true, "known": true },
+  { "name": "title prefix does not infer a grant", "rule": { "path": "/title", "op": "prefix", "values": ["Agent: "] }, "payload": { "title": "Other title" }, "matched": false, "known": true },
+  { "name": "case-insensitive path descendant", "rule": { "path": "/area", "op": "path-prefix", "values": ["Project\\Backend"] }, "payload": { "area": "project\\backend\\service" }, "matched": true, "known": true },
+  { "name": "path prefix enforces component boundary", "rule": { "path": "/area", "op": "path-prefix", "values": ["Project\\Backend"] }, "payload": { "area": "Project\\BackendOther" }, "matched": false, "known": true },
+  { "name": "tag prefix", "rule": { "path": "/tags", "op": "member-prefix", "values": ["agent-"], "separator": ";" }, "payload": { "tags": "triaged; agent-review" }, "matched": true, "known": true },
+  {
+    "name": "attachment URL identity and known query",
+    "rule": { "path": "/url", "op": "url-id", "other": "/id", "value": "https://dev.azure.com/org/_apis/wit/attachments/", "values": ["fileName"] },
+    "payload": { "id": "abc-123", "url": "https://dev.azure.com/org/_apis/wit/attachments/abc-123?fileName=image.png" },
+    "matched": true,
+    "known": true
+  },
+  {
+    "name": "attachment URL rejects different identity",
+    "rule": { "path": "/url", "op": "url-id", "other": "/id", "value": "https://dev.azure.com/org/_apis/wit/attachments/", "values": ["fileName"] },
+    "payload": { "id": "abc-123", "url": "https://dev.azure.com/org/_apis/wit/attachments/other?fileName=image.png" },
+    "matched": false,
+    "known": true
+  },
+  {
+    "name": "attachment URL rejects unknown query",
+    "rule": { "path": "/url", "op": "url-id", "other": "/id", "value": "https://dev.azure.com/org/_apis/wit/attachments/", "values": ["fileName"] },
+    "payload": { "id": "abc-123", "url": "https://dev.azure.com/org/_apis/wit/attachments/abc-123?token=forbidden" },
+    "matched": false,
+    "known": true
+  },
+  {
+    "name": "attachment URL rejects path normalization",
+    "rule": { "path": "/url", "op": "url-id", "other": "/id", "value": "https://dev.azure.com/org/_apis/wit/attachments/", "values": ["fileName"] },
+    "payload": { "id": "abc-123", "url": "https://dev.azure.com/other/../org/_apis/wit/attachments/abc-123" },
+    "matched": false,
+    "known": true
+  }
 ]

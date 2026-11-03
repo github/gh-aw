@@ -62,7 +62,8 @@ func valueSchema() (*jsonschema.Schema, error) {
 	    "literal": {"not": {"type": "null"}},
 	    "object": {"type": "object", "additionalProperties": {"$ref": "#/$defs/value"}},
 	    "array": {"type": "array", "items": {"$ref": "#/$defs/value"}},
-	    "encoding": {"enum": ["jira-adf", "confluence-storage"]}
+	    "encoding": {"enum": ["jira-adf", "confluence-storage"]},
+	    "prefix": {"type":"string","maxLength":1024}
 	  },
 	  "oneOf": [
 	    {"required": ["input"]},
@@ -70,7 +71,7 @@ func valueSchema() (*jsonschema.Schema, error) {
 	    {"required": ["object"]},
 	    {"required": ["array"]}
 	  ],
-	  "dependentRequired": {"encoding": ["input"]}
+	  "dependentRequired": {"encoding": ["input"], "prefix":["input"]}
 	}`
 	var schema jsonschema.Schema
 	if err := json.Unmarshal([]byte(definition), &schema); err != nil {

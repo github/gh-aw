@@ -127,6 +127,7 @@ func invokeConnector(ctx context.Context, input io.Reader, output io.Writer, pha
 		if !allowWrites {
 			return errors.New("connector safe-output execution requires explicit host write authorization")
 		}
+		configureConnectorFileRoot(plan, &runtime, name, getenv)
 		if run := getenv("GH_AW_CONNECTOR_BINDING_RUN"); run != "" {
 			host, hostErr := connectorBindingHost(run, getenv)
 			if hostErr != nil {
@@ -149,6 +150,12 @@ func invokeConnector(ctx context.Context, input io.Reader, output io.Writer, pha
 		return fmt.Errorf("write connector result: %w", err)
 	}
 	return nil
+}
+
+func configureConnectorFileRoot(plan *connectors.Plan, runtime *connectors.Runtime, name string, getenv func(string) string) {
+	if plan.UsesStagedFile(name) {
+		runtime.StagedFilesRoot = getenv("GH_AW_CONNECTOR_FILE_ROOT")
+	}
 }
 
 func connectorBindingHost(run string, getenv func(string) string) (connectors.CreatedResourceHost, error) {

@@ -190,5 +190,16 @@ func generateSafeOutputsArtifactStagingUpload(builder *strings.Builder, data *Wo
 }
 
 func usesSafeOutputsArtifactStaging(config *SafeOutputsConfig) bool {
-	return config != nil && config.UploadArtifact != nil
+	if config == nil {
+		return false
+	}
+	if config.UploadArtifact != nil {
+		return true
+	}
+	for _, script := range config.Scripts {
+		if len(connectorStagedFilePolicies(script.connectorInputSchema)) != 0 {
+			return true
+		}
+	}
+	return false
 }

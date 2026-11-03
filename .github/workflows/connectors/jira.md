@@ -9,7 +9,20 @@ connectors:
       - https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/
       - https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-comments/
       - https://developer.atlassian.com/cloud/jira/platform/webhooks/
+      - https://dac-static.atlassian.com/cloud/jira/platform/swagger-v3.v3.json
+      - https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-link-types/
+      - https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-remote-links/
+      - https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-projects/
+      - https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-user-search/
     credentials:
+      rest-reader:
+        header: Authorization
+        phase: agent
+        scheme: basic
+        scopes:
+          - read:jira-work
+          - read:jira-user
+        secret: ${{ github.aw.import-inputs.rest-reader-secret }}
       mcp-personal:
         header: Authorization
         phase: agent
@@ -243,12 +256,207 @@ connectors:
               - {path: /toString, op: "null"}
               - {path: /issue/fields/labels, root: true, op: length, value: 0}
     resources:
+      account-queries: ${{ github.aw.import-inputs.account-queries }}
       cloud-ids: ${{ github.aw.import-inputs.cloud-ids }}
+      discovery-scopes: ${{ github.aw.import-inputs.discovery-scopes }}
       issue-ids: ${{ github.aw.import-inputs.issue-ids }}
+      issue-type-ids: ${{ github.aw.import-inputs.issue-type-ids }}
       issues: ${{ github.aw.import-inputs.issues }}
       issue-types: ${{ github.aw.import-inputs.issue-types }}
       projects: ${{ github.aw.import-inputs.projects }}
       queries: ${{ github.aw.import-inputs.queries }}
+    tools:
+      get-issue-remote-links:
+        credential: rest-reader
+        tool: get-issue-remote-links
+        inputs:
+          issue:
+            type: string
+            required: true
+            maxLength: 80
+            pattern: ^[A-Z][A-Z0-9_]*-[1-9][0-9]*$
+        resources:
+          issue: issues
+        maxResponseBytes: 65536
+        request:
+          endpoint: site
+          method: GET
+          path: /rest/api/3/issue/{issue}/remotelink
+          pathInputs:
+            issue: issue
+        responseLimits:
+          "": 25
+      lookup-account-id:
+        credential: rest-reader
+        tool: lookup-account-id
+        inputs:
+          query:
+            type: string
+            required: true
+            minLength: 1
+            maxLength: 128
+          start-at:
+            type: integer
+            required: true
+            minimum: 0
+            maximum: 999
+          max-results:
+            type: integer
+            required: true
+            minimum: 1
+            maximum: 25
+        resources:
+          query: account-queries
+        maxResponseBytes: 65536
+        request:
+          endpoint: site
+          method: GET
+          path: /rest/api/3/user/search
+          query:
+            query: {input: query}
+            startAt: {input: start-at}
+            maxResults: {input: max-results}
+        responseLimits:
+          "": 25
+      get-issue-link-types:
+        credential: rest-reader
+        tool: get-issue-link-types
+        inputs:
+          scope:
+            type: string
+            required: true
+            enum: [site-metadata]
+            maxLength: 13
+        resources:
+          scope: discovery-scopes
+        maxResponseBytes: 65536
+        request:
+          endpoint: site
+          method: GET
+          path: /rest/api/3/issueLinkType
+        responseLimits:
+          /issueLinkTypes: 25
+        project:
+          link-types: /issueLinkTypes
+      get-transitions-for-issue:
+        credential: rest-reader
+        tool: get-transitions-for-issue
+        inputs:
+          issue:
+            type: string
+            required: true
+            maxLength: 80
+            pattern: ^[A-Z][A-Z0-9_]*-[1-9][0-9]*$
+        resources:
+          issue: issues
+        maxResponseBytes: 65536
+        request:
+          endpoint: site
+          method: GET
+          path: /rest/api/3/issue/{issue}/transitions
+          pathInputs:
+            issue: issue
+          query:
+            includeUnavailableTransitions: {literal: false}
+            skipRemoteOnlyCondition: {literal: false}
+        responseLimits:
+          /transitions: 25
+        project:
+          transitions: /transitions
+      get-project-issue-types:
+        credential: rest-reader
+        tool: get-project-issue-types
+        inputs: &jira-project-page-inputs
+          project: &jira-read-project
+            type: string
+            required: true
+            maxLength: 80
+            pattern: ^[A-Z][A-Z0-9_]*$
+          start-at: &jira-read-start
+            type: integer
+            required: true
+            minimum: 0
+            maximum: 10000
+          max-results: &jira-read-count
+            type: integer
+            required: true
+            minimum: 1
+            maximum: 25
+        resources:
+          project: projects
+        maxResponseBytes: 65536
+        request:
+          endpoint: site
+          method: GET
+          path: /rest/api/3/issue/createmeta/{project}/issuetypes
+          pathInputs:
+            project: project
+          query: &jira-read-page-query
+            startAt: {input: start-at}
+            maxResults: {input: max-results}
+        responseInputs:
+          /startAt: start-at
+        responseLimits:
+          /issueTypes: 25
+        project:
+          issue-types: /issueTypes
+          start-at: /startAt
+          total: /total
+      get-issue-type-fields:
+        credential: rest-reader
+        tool: get-issue-type-fields
+        inputs:
+          <<: *jira-project-page-inputs
+          issue-type-id:
+            type: string
+            required: true
+            maxLength: 20
+            pattern: ^[1-9][0-9]*$
+        resources:
+          project: projects
+          issue-type-id: issue-type-ids
+        maxResponseBytes: 131072
+        request:
+          endpoint: site
+          method: GET
+          path: /rest/api/3/issue/createmeta/{project}/issuetypes/{type}
+          pathInputs:
+            project: project
+            type: issue-type-id
+          query: *jira-read-page-query
+        responseInputs:
+          /startAt: start-at
+        responseLimits:
+          /fields: 25
+        project:
+          fields: /fields
+          start-at: /startAt
+          total: /total
+      get-visible-projects:
+        credential: rest-reader
+        tool: get-visible-projects
+        inputs: *jira-project-page-inputs
+        resources:
+          project: projects
+        maxResponseBytes: 65536
+        request:
+          endpoint: site
+          method: GET
+          path: /rest/api/3/project/search
+          query:
+            <<: *jira-read-page-query
+            keys: {input: project}
+            action: {literal: browse}
+            orderBy: {literal: key}
+        responseInputs:
+          /startAt: start-at
+          /values/*/key: project
+        responseLimits:
+          /values: 25
+        project:
+          projects: /values
+          start-at: /startAt
+          total: /total
     safe-outputs:
       add-comment:
         createdResources:
@@ -473,6 +681,21 @@ connectors:
         resources:
           issue: issues
 import-schema:
+  account-queries:
+    type: array
+    items: {type: string}
+    default: []
+  discovery-scopes:
+    type: array
+    items: {type: string}
+    default: []
+  issue-type-ids:
+    type: array
+    items: {type: string}
+    default: []
+  rest-reader-secret:
+    type: string
+    default: JIRA_REST_READ_BASIC_AUTH
   site:
     default: https://example.atlassian.net
     type: string
@@ -607,6 +830,14 @@ import-schema:
       screen and the writer must have permission to create it.
     </input>
     <input name="issue-ids" type="array" default="[]">Exact numeric-string issue IDs for declared event constraints, not read-tool issue keys.</input>
+    <input name="discovery-scopes" type="array" default="[]">Explicit site-metadata grant for the unpaginated, bounded issue-link-type catalog.</input>
+    <input name="issue-type-ids" type="array" default="[]">Exact numeric-string type IDs for read-only project/type field discovery; distinct from write type names.</input>
+    <input name="account-queries" type="array" default="[]">
+      Exact approved account-search display-name or email prefixes, independently
+      approved from issue JQL in queries. A search result never grants an account
+      authority for another capability.
+    </input>
+    <input name="rest-reader-secret" type="string" default="JIRA_REST_READ_BASIC_AUTH">Separate direct-site REST reader Basic credential name, never a secret value.</input>
     <inputs>
       The five original resource arrays default empty, without wildcards. The
       additional issue-types array defaults to Task only. A selected MCP profile requires
@@ -652,6 +883,74 @@ import-schema:
     </envelope>
   </triggers>
   <reads>
+    <rest credential="rest-reader" secret-input="rest-reader-secret" default-secret="JIRA_REST_READ_BASIC_AUTH">
+      These independent tools use direct site REST v3, not guessed hosted MCP
+      schemas. Provision a separate unscoped account API token and store
+      base64(account-email:api-token), without the Basic prefix or newline.
+      Browse projects and issue-level security apply. Account lookup also
+      requires Browse users and groups; declared classic OAuth scopes
+      read:jira-work and read:jira-user are metadata, not permission grants.
+      The direct site route does not accept scoped-token gateway credentials.
+      Each fixed GET is capped at 65536 bytes, except issue-type field metadata
+      at 131072 bytes. No fields, expand, JQL, endpoint override, or unknown
+      arguments are accepted; no automatic pagination or link following.
+      Project metadata tools require start-at from 0 to 10000 and max-results from
+      1 to 25, check exact returned startAt, limit the returned array to 25,
+      and return start-at/total for an explicit next call.
+      The approved site origin binds tenant authority. The metadata, remote-link,
+      and transition API responses do not echo the requested parent; no
+      nonexistent parent response fields are claimed as evidence. Their fixed,
+      escaped path binds the separately approved requested issue/project.
+      get-visible-projects additionally checks every returned project key is
+      exactly the requested project, not merely another approved project.
+    </rest>
+    <tool selection="get-issue-remote-links" tool="get-issue-remote-links" method="GET" path="/rest/api/3/issue/{issue}/remotelink">
+      Required issue is an exact approved issue key in issues. Returns the actual
+      RemoteIssueLink objects, including external link data, not downloaded
+      attachment bytes. This API has no pagination: a root-array response limit
+      of 25 rejects larger arrays instead of silently truncating them. A nonarray
+      response is rejected; globalId and other arbitrary filters are not accepted.
+      External object/self URLs remain untrusted references and are never followed.
+    </tool>
+    <tool selection="lookup-account-id" tool="lookup-account-id" method="GET" path="/rest/api/3/user/search">
+      Required query is a nonempty string of at most 128 characters from
+      account-queries, default empty. It is the documented displayName/email
+      prefix search, not JQL or a guessed account ID. Requires explicit integer
+      start-at from 0 to 999 and max-results from 1 to 25; Jira restricts this
+      search to the first thousand matching users. Returns the real bounded
+      User array, including accountId and provider-visible profile metadata;
+      privacy controls can hide emailAddress. No total or cursor is invented.
+      The next offset must be explicitly requested. A root-array limit of 25
+      and the byte limit apply even when a provider ignores maxResults.
+      Empty results are legitimate, not proof of Browse users and groups
+      permission. Search results are data only and confer no further grants.
+    </tool>
+    <tool selection="get-issue-link-types" tool="get-issue-link-types" method="GET" path="/rest/api/3/issueLinkType">
+      Required scope is the literal site-metadata, independently approved in
+      discovery-scopes (default empty). Returns link-type metadata from
+      issueLinkTypes, with a 25-element bound; larger unpaginated catalogs fail.
+    </tool>
+    <tool selection="get-transitions-for-issue" tool="get-transitions-for-issue" method="GET" path="/rest/api/3/issue/{issue}/transitions">
+      Required issue is an exact approved issue key in issues. Returns at most
+      25 transitions. includeUnavailableTransitions and skipRemoteOnlyCondition
+      are fixed false; this is discovery only, never a transition mutation.
+    </tool>
+    <tool selection="get-project-issue-types" tool="get-project-issue-types" method="GET" path="/rest/api/3/issue/createmeta/{project}/issuetypes">
+      Required approved project, start-at and max-results. Returns one page of
+      issueTypes. Project/type membership comes from this fixed create-metadata
+      route; results do not authorize a new type for writes.
+    </tool>
+    <tool selection="get-issue-type-fields" tool="get-issue-type-fields" method="GET" path="/rest/api/3/issue/createmeta/{project}/issuetypes/{type}">
+      Required project, issue-type-id, start-at and max-results. The numeric
+      issue-type-id is independently approved in issue-type-ids, default empty,
+      not confused with issue-types, the write operation's type-name grant.
+      Returns fields including creation requirements; it grants no custom-field writes.
+    </tool>
+    <tool selection="get-visible-projects" tool="get-visible-projects" method="GET" path="/rest/api/3/project/search">
+      Required approved project, start-at and max-results. keys is the single
+      approved project; action is fixed browse, orderBy fixed key. Does not
+      discover unrelated projects or follow nextPage URLs.
+    </tool>
     <mcp profiles="personal service-account" url="https://mcp.atlassian.com/v2/mcp" max-response-bytes="65536">
       Both profiles expose only getJiraIssue and searchJiraIssuesUsingJql through a local enforcing
       adapter. getJiraIssue requires cloudId, a string of at most 80 characters from cloud-ids,
@@ -664,10 +963,42 @@ import-schema:
       No discovery, generic executor, write tool, attachment download, or automatic pagination
       is exposed. Provider readOnly annotations do not confer permission.
     </mcp>
-    <rest>
-      No REST read capability or configurable context exists in this shipped declaration.
-      The REST API endpoints below are safe-output writes, not agent read tools.
-    </rest>
+    <schema-evidence checked="2026-11-02" sha256="30d96390297b247d3e734110a689c9314209021b00badacea12fdf2a34f97ad4">
+      The official OpenAPI source below declares getIssueLinkTypes returning
+      IssueLinkTypes.issueLinkTypes; getTransitions returning
+      Transitions.transitions; getCreateIssueMetaIssueTypes returning
+      PageOfCreateMetaIssueTypes.issueTypes; getCreateIssueMetaIssueTypeId
+      returning PageOfCreateMetaIssueTypeWithField.fields; and searchProjects
+      returning PageBeanProject.values. Both create-metadata operations accept
+      projectIdOrKey, startAt and maxResults; the field operation additionally
+      accepts issueTypeId. searchProjects accepts keys (string array), action,
+      orderBy, startAt and maxResults; one encoded keys value is a single
+      array member under the documented form query encoding.
+      getRemoteIssueLinks, GET issue/{issueIdOrKey}/remotelink, returns an array
+      of RemoteIssueLink when globalId is omitted, or the matching object when
+      globalId is supplied. findUsers, GET user/search, accepts query/startAt/
+      maxResults and returns a root array of User. query matches displayName or
+      emailAddress prefixes and must be an independently author-approved search,
+      never arbitrary JQL. Privacy settings may hide emailAddress.
+    </schema-evidence>
+    <known-tool-coverage>
+      getIssueLinkTypes maps to get-issue-link-types;
+      getTransitionsForJiraIssue to get-transitions-for-issue;
+      getJiraProjectIssueTypesMetadata to get-project-issue-types;
+      getJiraIssueTypeMetaWithFields to get-issue-type-fields;
+      getVisibleJiraProjects to get-visible-projects;
+      getJiraIssueRemoteIssueLinks to get-issue-remote-links;
+      lookupJiraAccountId to lookup-account-id.
+      Existing getJiraIssue and searchJiraIssuesUsingJql remain separately
+      bounded hosted methods; no hosted schema is inferred for the five REST readers.
+      get-visible-projects requires per-element responseInputs enforcement;
+      scalar-only hosts fail closed rather than accepting an unchecked project.
+      The remote-link and account-search readers require RFC6901 root-array
+      response bounds, represented by the empty JSON Pointer. They are actual
+      getRemoteIssueLinks/findUsers reads, not an unbounded response,
+      known-account getUser call, or a guessed hosted MCP tool registration.
+      Importing alone or default grants enable none of these readers.
+    </known-tool-coverage>
   </reads>
   <safe-outputs max-response-bytes="16384">
     <operation selection="jira-create-issue" tool="jira_create_issue" method="POST" path="/rest/api/3/issue">
@@ -741,9 +1072,10 @@ import-schema:
     another resource, query, endpoint, identity, or ingress route.
   </context>
   <limitations>
-    Jira Cloud only; no Jira Server or Data Center compatibility is claimed. No transitions,
-    deletion, custom fields, unapproved issue types, account lookup, attachment fetching, or
-    tenant discovery are exposed. These declarations are experimental. Local fixture and
+    Jira Cloud only; no Jira Server or Data Center compatibility is claimed. No transition
+    mutations, deletion, custom-field writes, unapproved issue types,
+    attachment fetching, or tenant discovery are exposed. Transition/type/field discovery
+    is read-only and independently selected. These declarations are experimental. Local fixture and
     compilation success or HTTP 200 MCP initialization does not establish read authorization.
     A tool-level error saying "You don't have permission to connect via API token. Please ask
     your organization admin for access." identifies an organization MCP API-token policy denial,
@@ -813,6 +1145,11 @@ Report these as staged intents, never as completed Jira mutations.
     <reference href="https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-comments/">Comment body, permissions, and response evidence.</reference>
     <reference href="https://developer.atlassian.com/cloud/jira/platform/webhooks/">Native event names and webhook verification boundaries.</reference>
     <reference href="https://developer.atlassian.com/cloud/jira/software/webhooks/#secure-admin-webhooks">Admin webhook secret and X-Hub-Signature verification.</reference>
+    <reference href="https://dac-static.atlassian.com/cloud/jira/platform/swagger-v3.v3.json">Exact reader operation parameters and response schemas, SHA256 30d96390297b247d3e734110a689c9314209021b00badacea12fdf2a34f97ad4, reviewed 2026-11-02.</reference>
+    <reference href="https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-link-types/">Read-only link-type catalog.</reference>
+    <reference href="https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-remote-links/">Remote-link array and exact globalId lookup semantics.</reference>
+    <reference href="https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-projects/">Project search, exact keys filter, browse permission and pagination.</reference>
+    <reference href="https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-user-search/">Account lookup query semantics, limits and privacy.</reference>
   </references>
 </connector-documentation>
 -->

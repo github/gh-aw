@@ -19,6 +19,7 @@ func (preflight TrustedPreflight) operation(credential string) Operation {
 		ResponseOptionalEmpty: preflight.ResponseOptionalEmpty,
 		Resources:             preflight.Resources, ResponseResources: preflight.ResponseResources,
 		ResponseLimits: preflight.ResponseLimits, ResponseAnyInputs: preflight.ResponseAnyInputs,
+		ResponseResourceInputs: preflight.ResponseResourceInputs, ResponseWhen: preflight.ResponseWhen,
 	}
 }
 

@@ -42,6 +42,8 @@ const operationFields = [
   "responseAnyInputs",
   "lookups",
   "retry",
+  "checks",
+  "responseWhen",
 ];
 const numberTokens = new WeakMap();
 const readFields = [
@@ -53,6 +55,8 @@ const readFields = [
   "responseOptionalEmpty",
   "responseTypes",
   "responseInputs",
+  "responseResourceInputs",
+  "responseWhen",
   "responseContains",
   "responseChecks",
   "responseResources",
@@ -261,13 +265,15 @@ function validateInputs(inputs) {
   }
 }
 function validateValue(value, inputs, depth = 0) {
-  fields(value, ["input", "literal", "object", "array", "encoding"]);
+  fields(value, ["input", "literal", "object", "array", "encoding", "prefix"]);
   assert(depth <= 16);
   assert([!!value.input, value.literal !== undefined && value.literal !== null, value.object !== undefined, value.array !== undefined].filter(Boolean).length === 1);
   if (value.input) {
     assert(own(inputs || {}, value.input));
     assert(!value.encoding || (inputs[value.input].type === "string" && ["jira-adf", "confluence-storage"].includes(value.encoding)));
+    if (value.prefix !== undefined) assert(inputs[value.input].type === "string" && !value.encoding && boundedString(value.prefix, 1024) && !/[\r\n]/u.test(value.prefix) && !value.prefix.includes("${"));
   } else assert(!value.encoding);
+  if (!value.input) assert(value.prefix === undefined);
   if (value.object !== undefined) {
     assert(object(value.object));
     for (const child of Object.values(value.object)) validateValue(child, inputs, depth + 1);
@@ -278,7 +284,9 @@ function validateValue(value, inputs, depth = 0) {
   }
 }
 function validateRequest(request, inputs, phase) {
-  fields(request, ["endpoint", "method", "path", "pathInputs", "query", "body", "graphql", "patch", "headers"], ["endpoint", "method", "path"]);
+  fields(request, ["endpoint", "method", "path", "pathInputs", "query", "body", "graphql", "patch", "headers", "additionalPatch", "binary"], ["endpoint", "method", "path"]);
+  if (request.binary !== undefined) assert(require("./connector_file.cjs").validBinaryPolicy(request.binary, inputs, request, phase));
+  assert(request.additionalPatch === undefined || (Array.isArray(request.additionalPatch) && request.additionalPatch.length <= 32));
   assert(["GET", "POST", "PUT", "PATCH", "DELETE"].includes(request.method));
   validateRequestHeaders(request);
   assert(request.pathInputs === undefined || object(request.pathInputs));
@@ -305,7 +313,11 @@ function validateRequest(request, inputs, phase) {
       assert(!seen.has(lower), "Connector request headers contain a case-insensitive duplicate");
       seen.add(lower);
       assert(!forbidden.has(lower) && !/-(?:key|token|secret)$/u.test(lower), "Connector request metadata cannot set authority or secret-bearing headers");
-      if (lower === "content-type") assert(value === (request.patch?.length ? "application/json-patch+json" : "application/json"), "Connector request Content-Type must match its canonical payload type");
+      if (lower === "content-type")
+        assert(
+          value === (request.binary ? "application/octet-stream" : request.patch?.length || request.additionalPatch?.length ? "application/json-patch+json" : "application/json"),
+          "Connector request Content-Type must match its canonical payload type"
+        );
     }
   }
   assert(!/[{}]/u.test(path), "Connector path contains unresolved placeholders");
@@ -313,7 +325,7 @@ function validateRequest(request, inputs, phase) {
     assert(request.method === "GET" || (request.method === "POST" && typeof request.graphql === "string" && request.graphql.trimStart().startsWith("query ")));
     assert(!request.graphql || !/\b(mutation|subscription)\b/u.test(request.graphql));
   }
-  if (request.method === "GET") assert(!count(request.body) && !request.graphql && !request.patch?.length);
+  if (request.method === "GET") assert(!count(request.body) && !request.graphql && !request.patch?.length && !request.additionalPatch?.length);
   if (request.graphql) assert(typeof request.graphql === "string" && request.method === "POST" && !count(request.body));
   for (const values of [request.query, request.body]) {
     assert(values === undefined || object(values));
@@ -326,13 +338,17 @@ function validateRequest(request, inputs, phase) {
     for (const value of Object.values(request.query || {})) {
       assert(value.object === undefined && value.array === undefined && !value.encoding && (value.literal === undefined || value.literal === null || ["string", "number", "boolean"].includes(typeof value.literal)));
     }
-  if (request.patch !== undefined) {
-    assert(Array.isArray(request.patch));
-    if (request.patch.length) assert(phase === "safe-output" && ["PATCH", "POST"].includes(request.method) && !request.graphql && !count(request.body));
-    for (const patch of request.patch) {
+  if (request.patch !== undefined || request.additionalPatch !== undefined) {
+    assert(request.patch === undefined || Array.isArray(request.patch));
+    const patches = [...(request.patch || []), ...(request.additionalPatch || [])];
+    if (patches.length) assert(phase === "safe-output" && ["PATCH", "POST"].includes(request.method) && !request.graphql && !count(request.body));
+    const seen = new Set();
+    for (const patch of patches) {
       fields(patch, ["op", "path", "value"], ["op", "path", "value"]);
       assert(["add", "replace", "test"].includes(patch.op) && pointerValid(patch.path) && !/[{}$]/u.test(patch.path));
       validateValue(patch.value, inputs);
+      assert(!request.additionalPatch?.length || !seen.has(patch.path.toLowerCase()), "Additional patch cannot override an existing path");
+      seen.add(patch.path.toLowerCase());
     }
   }
 }
@@ -344,6 +360,19 @@ function validateOperation(spec, op, phase, readTool = false) {
   validateInputs(op.inputs);
   for (const key of ["resources", "project", "createdResources", "trustedInputs", "responseContains", "responseLimits", "responseAnyInputs"]) assert(op[key] === undefined || object(op[key]));
   validateRequest(op.request, op.inputs, phase);
+  if (op.request.binary) assert(!count(op.trustedInputs) && !op.preflight && !op.lookups?.length, "Binary operations require canonical or receipt-bound inputs without secret preflights");
+  if (op.responseWhen !== undefined) assert(require("./event_predicate.cjs").validEventPredicate(op.responseWhen));
+  if (op.checks !== undefined) {
+    assert(phase === "safe-output" && Array.isArray(op.checks) && op.checks.length <= 4);
+    for (const check of op.checks) {
+      fields(check, readFields, ["inputs", "request", "maxResponseBytes"]);
+      assert(check.request.endpoint === op.request.endpoint && !count(check.project), "Checks require the operation endpoint without projection");
+      validateRequest(check.request, check.inputs, "context");
+      for (const [input, field] of entries(check.inputs)) assert(field.required && equivalent(field, op.inputs?.[input]), "Check inputs must be canonical required operation inputs");
+      for (const [input, resource] of entries(check.resources)) assert(op.resources?.[input] === resource, "Checks cannot change resource authority");
+      validateOperation(spec, { ...check, credential: op.credential }, phase);
+    }
+  }
   if (op.retry !== undefined) {
     fields(op.retry, ["maxAttempts", "backoffMs", "retryOn", "idempotent"], ["maxAttempts", "backoffMs", "retryOn"]);
     assert(Number.isInteger(op.retry.maxAttempts) && op.retry.maxAttempts >= 1 && op.retry.maxAttempts <= 4);
@@ -372,7 +401,7 @@ function validateOperation(spec, op, phase, readTool = false) {
   for (const [pointer, input] of entries(op.responseContains)) {
     assert(pointerValid(pointer) && pointer.split("/*/").length === 2 && op.inputs?.[input]?.required && op.inputs[input].type === "string");
   }
-  for (const [pointer, maximum] of entries(op.responseLimits)) assert(pointerValid(pointer) && Number.isInteger(maximum) && maximum >= 1 && maximum <= 100);
+  for (const [pointer, maximum] of entries(op.responseLimits)) assert((pointer === "" || pointerValid(pointer)) && Number.isInteger(maximum) && maximum >= 1 && maximum <= 100);
   for (const [input, pointers] of entries(op.responseAnyInputs)) {
     assert(op.inputs?.[input]?.required && op.inputs[input].type === "string" && Array.isArray(pointers) && pointers.length >= 1 && pointers.length <= 4 && pointers.every(pointerValid));
   }
@@ -598,6 +627,7 @@ function restrictPhase(plan, phase) {
       if (group !== "httpMcp") endpoints.add(op.request.endpoint);
       for (const resource of [...Object.values(op.resources || {}), ...Object.values(op.responseResources || {})]) resources.add(resource);
       for (const read of op.lookups || []) for (const resource of [...Object.values(read.resources || {}), ...Object.values(read.responseResources || {})]) resources.add(resource);
+      for (const read of op.checks || []) for (const resource of [...Object.values(read.resources || {}), ...Object.values(read.responseResources || {})]) resources.add(resource);
       if (op.preflight) for (const resource of [...Object.values(op.preflight.resources || {}), ...Object.values(op.preflight.responseResources || {})]) resources.add(resource);
       if (group === "httpMcp") for (const tool of Object.values(op.tools)) for (const resource of Object.values(tool.resources || {})) resources.add(resource);
       for (const producer of Object.values(op.createdResources || {})) assert(binding.safeOutputs?.includes(producer), "Connector snapshot contains an unselected creator");
@@ -678,6 +708,10 @@ function resolveValue(value, args) {
   if (value.input) {
     if (!own(args, value.input)) return undefined;
     resolved = args[value.input];
+    if (value.prefix !== undefined) {
+      assert(typeof resolved === "string", "Prefixed input must be a string");
+      resolved = value.prefix + resolved;
+    }
     if (value.encoding) {
       assert(typeof resolved === "string", "Encoded connector input must be a string");
       const text = resolved.replaceAll("\r\n", "\n");
@@ -732,6 +766,7 @@ function resolveValues(values, args) {
 function escapeComponent(value) {
   return encodeURIComponent(value).replace(/[!'()*]/gu, char => "%" + char.charCodeAt(0).toString(16).toUpperCase());
 }
+/** @returns {{url: string, init: {method: string, headers: Record<string,string>, body?: string|Buffer}}} */
 function buildRequest(plan, op, args) {
   let path = op.request.path;
   for (const [placeholder, input] of entries(op.request.pathInputs)) {
@@ -757,9 +792,9 @@ function buildRequest(plan, op, args) {
         return escapeComponent(key).replaceAll("%20", "+") + "=" + escapeComponent(value).replaceAll("%20", "+");
       })
       .join("&");
-    if (op.request.patch?.length) {
+    if (op.request.patch?.length || op.request.additionalPatch?.length) {
       contentType = "application/json-patch+json";
-      body = op.request.patch.map(patch => {
+      body = [...(op.request.patch || []), ...(op.request.additionalPatch || [])].map(patch => {
         const value = resolveValue(patch.value, args);
         assert(value !== undefined, "Connector JSON Patch value is missing");
         const result = { op: patch.op, path: patch.path, value };
@@ -792,6 +827,7 @@ function authenticate(plan, name, phase, headers, env) {
   setHeader(headers, credential.header, prefix + secret(env, ref.secret));
 }
 function lookup(document, pointer) {
+  if (pointer === "") return document;
   if (!pointerValid(pointer)) return undefined;
   let current = document;
   for (const part of pointer.slice(1).split("/")) {
@@ -817,6 +853,15 @@ function numericToken(document, pointer) {
     .replaceAll("~0", "~");
   return object(parent) || Array.isArray(parent) ? numberTokens.get(parent)?.get(key) : undefined;
 }
+function responsePointers(document, pointer) {
+  const split = pointer.indexOf("/*");
+  if (split < 0) return [pointer];
+  const prefix = pointer.slice(0, split);
+  const suffix = pointer.slice(split + 2);
+  const array = lookup(document, prefix);
+  assert(Array.isArray(array) && array.length <= 100 && !suffix.includes("*") && (!suffix || suffix.startsWith("/")), "Connector resource response array is missing or exceeds its bound");
+  return array.map((_, index) => prefix + "/" + index + suffix);
+}
 function compareResponse(document, pointer, expected, expectedToken) {
   const actual = lookup(document, pointer);
   if (typeof actual === "number" && typeof expected === "number") return (numericToken(document, pointer) || goJSON(actual)) === (expectedToken || goJSON(expected));
@@ -826,14 +871,29 @@ async function validateResponse(op, text, args, allowed) {
   if (!text.length) {
     assert(
       !op.request.graphql &&
-        !["responseChecks", "responseResources", "responseRequired", "responseOptionalEmpty", "responseTypes", "responseInputs", "responseResourceInputs", "responseContains", "responseLimits", "responseAnyInputs", "project"].some(key =>
-          count(op[key])
-        ),
+        ![
+          "responseChecks",
+          "responseResources",
+          "responseRequired",
+          "responseOptionalEmpty",
+          "responseTypes",
+          "responseInputs",
+          "responseResourceInputs",
+          "responseContains",
+          "responseLimits",
+          "responseAnyInputs",
+          "project",
+          "responseWhen",
+        ].some(key => count(op[key])),
       "Connector response is missing required evidence"
     );
     return null;
   }
   const document = parseJSON(text, op.maxResponseBytes).document;
+  if (op.responseWhen !== undefined) {
+    const result = require("./event_predicate.cjs").evaluateEventPredicate(op.responseWhen, document);
+    assert(result.known && result.matched, "Connector response does not satisfy its required source-evidence policy");
+  }
   for (const [pointer, maximum] of entries(op.responseLimits)) {
     const value = lookup(document, pointer);
     assert(Array.isArray(value) && value.length <= maximum, "Connector response array is missing or exceeds its declared result bound");
@@ -853,12 +913,15 @@ async function validateResponse(op, text, args, allowed) {
     assert(value === undefined || value === null || value === "", "Connector response contains nonempty optional evidence");
   }
   for (const [pointer, resource] of entries(op.responseResources)) {
-    const value = lookup(document, pointer);
-    const text = typeof value === "number" ? numericToken(document, pointer) : value;
-    assert((typeof value === "string" || typeof value === "number") && allowed[resource]?.includes(text), "Connector response is outside approved resources");
+    for (const current of responsePointers(document, pointer)) {
+      const value = lookup(document, current);
+      const text = typeof value === "number" ? numericToken(document, current) : value;
+      assert((typeof value === "string" || typeof value === "number") && allowed[resource]?.includes(text), "Connector response is outside approved resources");
+    }
   }
   for (const [pointer, type] of entries(op.responseTypes)) await validateArgument({ type, maxLength: MAX_DOCUMENT }, lookup(document, pointer));
-  for (const [pointer, input] of entries(op.responseInputs)) assert(own(args, input) && compareResponse(document, pointer, args[input], numberTokens.get(args)?.get(input)), "Connector response does not match its request input");
+  for (const [pointer, input] of entries(op.responseInputs))
+    for (const current of responsePointers(document, pointer)) assert(own(args, input) && compareResponse(document, current, args[input], numberTokens.get(args)?.get(input)), "Connector response does not match its request input");
   for (const [input, pointers] of entries(op.responseAnyInputs)) {
     assert(typeof args[input] === "string" && pointers.some(pointer => lookup(document, pointer) === args[input]), "Connector response does not match its requested alias identity");
   }
@@ -973,8 +1036,14 @@ async function boundedHTTP(fetchImpl, url, init, maximum, rpcId = undefined, tim
     if (reader) void reader.cancel().catch(() => {});
   }
 }
-async function runOperation(plan, op, capability, name, args, allowed, env, fetchImpl, deadline = Date.now() + REQUEST_TIMEOUT) {
+/** @param {Buffer|undefined} [binaryBody] */
+async function runOperation(plan, op, capability, name, args, allowed, env, fetchImpl, deadline = Date.now() + REQUEST_TIMEOUT, binaryBody = undefined) {
   const request = buildRequest(plan, op, args);
+  if (op.request.binary) {
+    assert(Buffer.isBuffer(binaryBody), "Binary content was not prepared by the authorized host");
+    request.init.body = binaryBody;
+    request.init.headers["Content-Type"] = "application/octet-stream";
+  }
   authenticate(plan, op.credential, capability === "mcp" ? "agent" : capability === "preflight" ? "safe-output" : capability, request.init.headers, env);
   const attempts = op.retry?.maxAttempts || 1;
   for (let attempt = 0; attempt < attempts; attempt++) {
@@ -1224,9 +1293,16 @@ async function executeConnector(encoded, capability, name, args, options = {}) {
       if (staged) return intent;
       const preparation = await resolveSafeOutput(plan, name, op, normalized, env, fetchImpl);
       const { allowed, host } = preparation;
+      const binaryBody = op.request.binary ? require("./connector_file.cjs").readConnectorFile(op.request.binary, preparation.resolved, options.stagedFilesRoot, options.readStagedFile) : undefined;
       const resolved = await resolveLookups(plan, op, preparation.resolved, allowed, env, fetchImpl, capability);
+      const deadline = Date.now() + REQUEST_TIMEOUT;
+      for (const check of op.checks || []) {
+        const inputs = Object.fromEntries(names(check.inputs).map(input => [input, resolved[input]]));
+        await validateArguments(check.inputs, check.resources, allowed, inputs);
+        await runOperation(plan, { ...check, credential: op.credential }, capability, "check", inputs, allowed, env, fetchImpl, deadline);
+      }
       if (op.creates && own(normalized, op.creates.temporaryId)) assert(host, "Created-resource bindings require authenticated trusted execution state");
-      const result = await runOperation(plan, op, capability, name, resolved, allowed, env, fetchImpl);
+      const result = await runOperation(plan, op, capability, name, resolved, allowed, env, fetchImpl, deadline, binaryBody);
       await createdReceipt(plan, name, op, normalized, resolved, host, result);
       return result;
     }
@@ -1308,7 +1384,13 @@ function operationInputSchema(op) {
       enum: undefined,
     };
   }
-  return inputSchema(inputs);
+  const schema = inputSchema(inputs);
+  if (op.creates) schema["x-gh-aw-temporary-id"] = op.creates.temporaryId;
+  if (op.request.binary) {
+    schema.properties[op.request.binary.input]["x-gh-aw-staged-file"] = op.request.binary;
+    schema.properties[op.request.binary.input].description = "Existing regular file path under the workspace or trusted staging directory; the recorder stages a bounded content-addressed snapshot before delivery.";
+  }
+  return schema;
 }
 async function serve(encoded, input = process.stdin, output = process.stdout, options = {}) {
   const plan = decodePlan(encoded);
@@ -1378,7 +1460,7 @@ async function main(argv) {
     chunks.push(Buffer.from(chunk));
   }
   const args = parseJSON(Buffer.concat(chunks).toString("utf8")).document;
-  const result = await executeConnector(encoded, capability, name, args, { staged });
+  const result = await executeConnector(encoded, capability, name, args, { staged, stagedFilesRoot: process.env.GH_AW_CONNECTOR_FILE_ROOT });
   process.stdout.write(goJSON(result) + "\n");
 }
 

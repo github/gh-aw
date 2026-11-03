@@ -12,7 +12,7 @@ import (
 
 func (p *Plan) validateResponse(op Operation, data []byte, args map[string]any) ([]byte, error) {
 	if len(data) == 0 {
-		if len(op.ResponseChecks)+len(op.ResponseRequired)+len(op.ResponseResources)+len(op.ResponseTypes)+len(op.ResponseInputs)+len(op.ResponseResourceInputs)+len(op.ResponseOptionalEmpty)+len(op.ResponseContains)+len(op.ResponseLimits)+len(op.ResponseAnyInputs)+len(op.Project) != 0 || op.Request.GraphQL != "" {
+		if len(op.ResponseChecks)+len(op.ResponseRequired)+len(op.ResponseResources)+len(op.ResponseTypes)+len(op.ResponseInputs)+len(op.ResponseResourceInputs)+len(op.ResponseOptionalEmpty)+len(op.ResponseContains)+len(op.ResponseLimits)+len(op.ResponseAnyInputs)+len(op.Project) != 0 || op.Request.GraphQL != "" || op.ResponseWhen != nil {
 			return nil, errors.New("connector response is empty; required evidence is missing")
 		}
 		return []byte("null"), nil
@@ -34,6 +34,12 @@ func (p *Plan) validateResponse(op Operation, data []byte, args map[string]any) 
 	}
 	if err := checkResponseEvidence(document, op); err != nil {
 		return nil, err
+	}
+	if op.ResponseWhen != nil {
+		matched, known := EvaluateEventPredicate(*op.ResponseWhen, document)
+		if !known || !matched {
+			return nil, errors.New("connector response does not satisfy its required source-evidence policy")
+		}
 	}
 	if err := checkResponseResources(document, op.ResponseResources, p.connection.Resources); err != nil {
 		return nil, err
@@ -84,12 +90,17 @@ func checkResponseBindings(document any, op Operation, args map[string]any) erro
 		}
 	}
 	for pointer, input := range op.ResponseInputs {
-		actual, present := lookupPointer(document, pointer)
 		expected, supplied := args[input]
-		actualJSON, actualErr := json.Marshal(actual)
 		expectedJSON, expectedErr := json.Marshal(expected)
-		if !present || !supplied || actualErr != nil || expectedErr != nil || !bytes.Equal(actualJSON, expectedJSON) {
+		values, present := responsePointerValues(document, pointer)
+		if !present || !supplied || expectedErr != nil {
 			return fmt.Errorf("connector response does not match request input at %q", pointer)
+		}
+		for _, actual := range values {
+			actualJSON, actualErr := json.Marshal(actual)
+			if actualErr != nil || !bytes.Equal(actualJSON, expectedJSON) {
+				return fmt.Errorf("connector response does not match request input at %q", pointer)
+			}
 		}
 	}
 	for pointer, input := range op.ResponseResourceInputs {
@@ -171,14 +182,44 @@ func checkResponseEvidence(document any, op Operation) error {
 
 func checkResponseResources(document any, constraints map[string]string, resources map[string][]string) error {
 	for pointer, resource := range constraints {
-		value, ok := lookupPointer(document, pointer)
-		text, isScalar := value.(string)
-		if number, isNumber := value.(json.Number); isNumber {
-			text, isScalar = number.String(), true
-		}
-		if !ok || !isScalar || !slices.Contains(resources[resource], text) {
+		values, ok := responsePointerValues(document, pointer)
+		if !ok {
 			return fmt.Errorf("connector evidence at %q is outside approved resources", pointer)
+		}
+		for _, value := range values {
+			text, isScalar := value.(string)
+			if number, isNumber := value.(json.Number); isNumber {
+				text, isScalar = number.String(), true
+			}
+			if !isScalar || !slices.Contains(resources[resource], text) {
+				return fmt.Errorf("connector evidence at %q is outside approved resources", pointer)
+			}
 		}
 	}
 	return nil
+}
+
+func responsePointerValues(document any, pointer string) ([]any, bool) {
+	prefix, suffix, wildcard := strings.Cut(pointer, "/*")
+	if !wildcard {
+		value, ok := lookupPointer(document, pointer)
+		return []any{value}, ok
+	}
+	if strings.Contains(suffix, "*") || (suffix != "" && !strings.HasPrefix(suffix, "/")) {
+		return nil, false
+	}
+	value, present := lookupPointer(document, prefix)
+	array, ok := value.([]any)
+	if !present || !ok || len(array) > 100 {
+		return nil, false
+	}
+	values := make([]any, 0, len(array))
+	for _, entry := range array {
+		value, ok := lookupPointer(entry, suffix)
+		if !ok {
+			return nil, false
+		}
+		values = append(values, value)
+	}
+	return values, true
 }

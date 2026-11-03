@@ -202,9 +202,28 @@ func TestConnectorGatewayImportedProviderSubscriptions(t *testing.T) {
 			var declaration map[string]any
 			require.NoError(t, yaml.Unmarshal([]byte(frontmatter), &declaration))
 			inputs := map[string]any{}
+			connector := declaration["connectors"].(map[string]any)[provider].(map[string]any)
+			resourceBindings := connector["resources"].(map[string]any)
+			required := map[string]bool{}
+			for _, rawTrigger := range metadata.Connectors[provider].Triggers {
+				if resources, ok := rawTrigger.(map[string]any)["resources"].(map[string]any); ok {
+					for _, resource := range resources {
+						binding, err := json.Marshal(resourceBindings[resource.(string)])
+						require.NoError(t, err)
+						required[string(binding)] = true
+					}
+				}
+			}
 			for key, raw := range declaration["import-schema"].(map[string]any) {
 				if definition := raw.(map[string]any); definition["type"] == "array" {
-					inputs[key] = []string{"1"}
+					if key == "closed-states" {
+						inputs[key] = []string{"1"}
+					}
+					for binding := range required {
+						if strings.Contains(binding, "github.aw.import-inputs."+key+" ") {
+							inputs[key] = []string{"1"}
+						}
+					}
 				}
 			}
 			triggers := make([]string, 0, len(metadata.Connectors[provider].Triggers))

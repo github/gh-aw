@@ -47,18 +47,28 @@ type Value struct {
 	Object   map[string]Value `json:"object,omitzero"`
 	Array    []Value          `json:"array,omitzero"`
 	Encoding string           `json:"encoding,omitempty"`
+	Prefix   string           `json:"prefix,omitempty"`
 }
 
 type Request struct {
-	Endpoint   string            `json:"endpoint"`
-	Method     string            `json:"method"`
-	Path       string            `json:"path"`
-	PathInputs map[string]string `json:"pathInputs,omitempty"`
-	Query      map[string]Value  `json:"query,omitempty"`
-	Body       map[string]Value  `json:"body,omitempty"`
-	GraphQL    string            `json:"graphql,omitempty"`
-	Patch      []Patch           `json:"patch,omitempty"`
-	Headers    map[string]string `json:"headers,omitempty"`
+	Endpoint        string            `json:"endpoint"`
+	Method          string            `json:"method"`
+	Path            string            `json:"path"`
+	PathInputs      map[string]string `json:"pathInputs,omitempty"`
+	Query           map[string]Value  `json:"query,omitempty"`
+	Body            map[string]Value  `json:"body,omitempty"`
+	GraphQL         string            `json:"graphql,omitempty"`
+	Patch           []Patch           `json:"patch,omitempty"`
+	AdditionalPatch []Patch           `json:"additionalPatch,omitempty"`
+	Binary          *BinaryRequest    `json:"binary,omitempty"`
+	Headers         map[string]string `json:"headers,omitempty"`
+}
+
+type BinaryRequest struct {
+	Input          string   `json:"input"`
+	MaxBytes       int      `json:"maxBytes"`
+	Extensions     []string `json:"extensions,omitempty"`
+	RejectContains []string `json:"rejectContains,omitempty"`
 }
 
 type Patch struct {
@@ -90,6 +100,8 @@ type Operation struct {
 	ResponseAnyInputs      map[string][]string     `json:"responseAnyInputs,omitempty"`
 	Lookups                []InputLookup           `json:"lookups,omitempty"`
 	Retry                  *RetryPolicy            `json:"retry,omitempty"`
+	Checks                 []TrustedPreflight      `json:"checks,omitempty"`
+	ResponseWhen           *EventPredicate         `json:"responseWhen,omitempty"`
 }
 
 // RetryPolicy bounds explicitly declared transient HTTP-status retries.
@@ -109,20 +121,22 @@ type TrustedInput struct {
 // arguments come exclusively from authored trusted inputs, never agent input.
 // InputLookup reuses its bounded read shape with separate exact alias grants.
 type TrustedPreflight struct {
-	Inputs                map[string]Input    `json:"inputs"`
-	Resources             map[string]string   `json:"resources,omitempty"`
-	Request               Request             `json:"request"`
-	MaxResponseBytes      int                 `json:"maxResponseBytes"`
-	ResponseRequired      []string            `json:"responseRequired,omitempty"`
-	ResponseTypes         map[string]string   `json:"responseTypes,omitempty"`
-	ResponseInputs        map[string]string   `json:"responseInputs,omitempty"`
-	ResponseOptionalEmpty []string            `json:"responseOptionalEmpty,omitempty"`
-	ResponseContains      map[string]string   `json:"responseContains,omitempty"`
-	ResponseChecks        map[string]any      `json:"responseChecks,omitempty"`
-	ResponseResources     map[string]string   `json:"responseResources,omitempty"`
-	ResponseLimits        map[string]int      `json:"responseLimits,omitempty"`
-	ResponseAnyInputs     map[string][]string `json:"responseAnyInputs,omitempty"`
-	Project               map[string]string   `json:"project,omitempty"`
+	Inputs                 map[string]Input    `json:"inputs"`
+	Resources              map[string]string   `json:"resources,omitempty"`
+	Request                Request             `json:"request"`
+	MaxResponseBytes       int                 `json:"maxResponseBytes"`
+	ResponseRequired       []string            `json:"responseRequired,omitempty"`
+	ResponseTypes          map[string]string   `json:"responseTypes,omitempty"`
+	ResponseInputs         map[string]string   `json:"responseInputs,omitempty"`
+	ResponseResourceInputs map[string]string   `json:"responseResourceInputs,omitempty"`
+	ResponseWhen           *EventPredicate     `json:"responseWhen,omitempty"`
+	ResponseOptionalEmpty  []string            `json:"responseOptionalEmpty,omitempty"`
+	ResponseContains       map[string]string   `json:"responseContains,omitempty"`
+	ResponseChecks         map[string]any      `json:"responseChecks,omitempty"`
+	ResponseResources      map[string]string   `json:"responseResources,omitempty"`
+	ResponseLimits         map[string]int      `json:"responseLimits,omitempty"`
+	ResponseAnyInputs      map[string][]string `json:"responseAnyInputs,omitempty"`
+	Project                map[string]string   `json:"project,omitempty"`
 }
 
 // InputLookup replaces one approved alias with an independently granted

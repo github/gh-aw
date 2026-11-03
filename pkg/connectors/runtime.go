@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"path"
@@ -21,11 +22,13 @@ type SecretResolver func(ctx context.Context, phase, secretName string) (string,
 // Runtime is an explicitly trusted host execution boundary. AllowedOrigins
 // comes from the operator, not from an agent or connector connection.
 type Runtime struct {
-	Phase          string
-	AllowedOrigins []string
-	ResolveSecret  SecretResolver
-	Client         *http.Client
-	AllowWrites    bool
+	Phase           string
+	AllowedOrigins  []string
+	ResolveSecret   SecretResolver
+	Client          *http.Client
+	AllowWrites     bool
+	StagedFilesRoot string
+	binaryBody      []byte
 }
 
 type Result struct {
@@ -41,12 +44,23 @@ type Result struct {
 // redirects, pagination, or credential fallback are performed. Retries require
 // an explicit bounded policy and never replay uncertain transport failures.
 func (p *Plan) Execute(ctx context.Context, runtime Runtime, capability, name string, args map[string]any) (*Result, error) {
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
 	op, err := p.authorizeOperation(runtime, capability, name, args)
 	if err != nil {
 		return nil, err
 	}
 	args, err = p.resolveInputLookups(ctx, runtime, op, args)
 	if err != nil {
+		return nil, err
+	}
+	if op.Request.Binary != nil {
+		runtime.binaryBody, err = readConnectorFile(runtime.StagedFilesRoot, op.Request.Binary, args)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if err := p.executeOperationChecks(ctx, runtime, op, args); err != nil {
 		return nil, err
 	}
 	return p.executeOperation(ctx, runtime, capability, name, op, args)
@@ -59,6 +73,19 @@ func (p *Plan) executeOperation(ctx context.Context, runtime Runtime, capability
 	request, err := p.buildRequest(ctx, op, args)
 	if err != nil {
 		return nil, err
+	}
+	if op.Request.Binary != nil {
+		if runtime.Phase != "safe-output" || !runtime.AllowWrites {
+			return nil, errors.New("binary connector requests require the authorized safe-output host")
+		}
+		content := runtime.binaryBody
+		if content == nil {
+			return nil, errors.New("binary connector content was not prepared by the authorized host")
+		}
+		request.Body = io.NopCloser(bytes.NewReader(content))
+		request.GetBody = func() (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader(content)), nil }
+		request.ContentLength = int64(len(content))
+		request.Header.Set("Content-Type", "application/octet-stream")
 	}
 	if err := p.authenticate(ctx, runtime, op.Credential, request); err != nil {
 		return nil, err
@@ -227,9 +254,10 @@ func requestBody(request Request, args map[string]any) ([]byte, string, error) {
 			return nil, "", err
 		}
 		body = map[string]any{"query": request.GraphQL, "variables": variables}
-	case len(request.Patch) != 0:
-		patches := make([]map[string]any, 0, len(request.Patch))
-		for _, patch := range request.Patch {
+	case len(request.Patch)+len(request.AdditionalPatch) != 0:
+		all := append(slices.Clone(request.Patch), request.AdditionalPatch...)
+		patches := make([]map[string]any, 0, len(all))
+		for _, patch := range all {
 			value, present, err := resolveValue(patch.Value, args)
 			if err != nil {
 				return nil, "", err

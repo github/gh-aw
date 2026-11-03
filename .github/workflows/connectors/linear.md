@@ -8,7 +8,9 @@ connectors:
       - https://linear.app/docs/mcp
       - https://linear.app/developers/oauth-2-0-authentication
       - https://linear.app/developers/webhooks
+      - https://linear.app/developers/attachments
       - https://raw.githubusercontent.com/linear/linear/master/packages/sdk/src/schema.graphql
+      - https://raw.githubusercontent.com/linear/linear/253713fef2916ab744defdd71c62acccc8e929a2/packages/sdk/src/schema.graphql
     credentials:
       mcp-reader:
         header: Authorization
@@ -142,12 +144,18 @@ connectors:
     resources:
       issues: ${{ github.aw.import-inputs.issues }}
       issue-references: ${{ github.aw.import-inputs.issue-references }}
+      documents: ${{ github.aw.import-inputs.documents }}
+      initiatives: ${{ github.aw.import-inputs.initiatives }}
+      milestones: ${{ github.aw.import-inputs.milestones }}
       organizations: ${{ github.aw.import-inputs.organizations }}
       project-slugs: ${{ github.aw.import-inputs.project-slugs }}
       projects: ${{ github.aw.import-inputs.projects }}
+      queries: ${{ github.aw.import-inputs.queries }}
+      statuses: ${{ github.aw.import-inputs.statuses }}
       team-keys: ${{ github.aw.import-inputs.team-keys }}
       team-references: ${{ github.aw.import-inputs.team-references }}
       teams: ${{ github.aw.import-inputs.teams }}
+      users: ${{ github.aw.import-inputs.users }}
     safe-outputs:
       add-comment:
         credential: writer
@@ -699,6 +707,800 @@ connectors:
         responseInputs:
           /data/issueCreate/issue/team/id: team-id
     tools:
+      list-issues:
+        credential: reader
+        tool: list-issues
+        inputs: &linear-team-page-inputs
+          organization-id: &linear-read-id
+            type: string
+            required: true
+            maxLength: 36
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          team-id:
+            type: string
+            required: true
+            maxLength: 36
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          first: &linear-page-size
+            type: integer
+            required: true
+            minimum: 1
+            maximum: 25
+          after: &linear-page-cursor
+            type: string
+            maxLength: 2048
+        resources: &linear-team-page-resources
+          organization-id: organizations
+          team-id: teams
+        maxResponseBytes: 131072
+        request:
+          endpoint: api
+          method: POST
+          path: /graphql
+          graphql: |
+            query ConnectorLinearIssues($team: String!, $first: Int!, $after: String) {
+              team(id: $team) {
+                id organization { id }
+                issues(first: $first, after: $after) {
+                  nodes { id identifier title description url }
+                  pageInfo { hasNextPage endCursor }
+                }
+              }
+            }
+          query: &linear-team-page-variables
+            team: {input: team-id}
+            first: {input: first}
+            after: {input: after}
+        responseInputs: &linear-team-response
+          /data/team/id: team-id
+          /data/team/organization/id: organization-id
+        responseLimits:
+          /data/team/issues/nodes: 25
+        project:
+          issues: /data/team/issues
+      search-issues:
+        credential: reader
+        tool: search-issues
+        inputs:
+          <<: *linear-team-page-inputs
+          query:
+            type: string
+            required: true
+            minLength: 1
+            maxLength: 1000
+        resources:
+          <<: *linear-team-page-resources
+          query: queries
+        maxResponseBytes: 131072
+        request:
+          endpoint: api
+          method: POST
+          path: /graphql
+          graphql: |
+            query ConnectorLinearSearch($team: String!, $term: String!, $first: Int!, $after: String) {
+              team(id: $team) { id organization { id } }
+              searchIssues(teamId: $team, term: $term, first: $first, after: $after) {
+                nodes { id identifier title description url team { id } }
+                pageInfo { hasNextPage endCursor }
+              }
+            }
+          query:
+            <<: *linear-team-page-variables
+            term: {input: query}
+        responseInputs:
+          <<: *linear-team-response
+          /data/searchIssues/nodes/*/team/id: team-id
+        responseLimits:
+          /data/searchIssues/nodes: 25
+        project:
+          issues: /data/searchIssues
+      list-comments:
+        credential: reader
+        tool: list-comments
+        inputs:
+          <<: *linear-team-page-inputs
+          issue-id: *linear-read-id
+        resources:
+          <<: *linear-team-page-resources
+          issue-id: issues
+        maxResponseBytes: 131072
+        request:
+          endpoint: api
+          method: POST
+          path: /graphql
+          graphql: |
+            query ConnectorLinearComments($id: String!, $first: Int!, $after: String) {
+              issue(id: $id) {
+                id team { id organization { id } }
+                comments(first: $first, after: $after) {
+                  nodes { id body url }
+                  pageInfo { hasNextPage endCursor }
+                }
+              }
+            }
+          query:
+            id: {input: issue-id}
+            first: {input: first}
+            after: {input: after}
+        responseInputs:
+          /data/issue/id: issue-id
+          /data/issue/team/id: team-id
+          /data/issue/team/organization/id: organization-id
+        responseLimits:
+          /data/issue/comments/nodes: 25
+        project:
+          comments: /data/issue/comments
+      get-issue-status:
+        credential: reader
+        tool: get-issue-status
+        inputs:
+          organization-id: *linear-read-id
+          team-id: *linear-read-id
+          status-id: *linear-read-id
+        resources:
+          <<: *linear-team-page-resources
+          status-id: statuses
+        maxResponseBytes: 16384
+        request:
+          endpoint: api
+          method: POST
+          path: /graphql
+          graphql: |
+            query ConnectorLinearStatus($id: String!) {
+              workflowState(id: $id) { id name type team { id organization { id } } }
+            }
+          query:
+            id: {input: status-id}
+        responseInputs:
+          /data/workflowState/id: status-id
+          /data/workflowState/team/id: team-id
+          /data/workflowState/team/organization/id: organization-id
+        project:
+          status: /data/workflowState
+      list-issue-statuses:
+        credential: reader
+        tool: list-issue-statuses
+        inputs: *linear-team-page-inputs
+        resources: *linear-team-page-resources
+        maxResponseBytes: 65536
+        request:
+          endpoint: api
+          method: POST
+          path: /graphql
+          graphql: |
+            query ConnectorLinearStatuses($team: String!, $first: Int!, $after: String) {
+              team(id: $team) {
+                id organization { id }
+                states(first: $first, after: $after) {
+                  nodes { id name type }
+                  pageInfo { hasNextPage endCursor }
+                }
+              }
+            }
+          query: *linear-team-page-variables
+        responseInputs: *linear-team-response
+        responseLimits:
+          /data/team/states/nodes: 25
+        project:
+          statuses: /data/team/states
+      list-issue-labels:
+        credential: reader
+        tool: list-issue-labels
+        inputs: *linear-team-page-inputs
+        resources: *linear-team-page-resources
+        maxResponseBytes: 65536
+        request:
+          endpoint: api
+          method: POST
+          path: /graphql
+          graphql: |
+            query ConnectorLinearLabels($team: String!, $first: Int!, $after: String) {
+              team(id: $team) {
+                id organization { id }
+                labels(first: $first, after: $after) {
+                  nodes { id name }
+                  pageInfo { hasNextPage endCursor }
+                }
+              }
+            }
+          query: *linear-team-page-variables
+        responseInputs: *linear-team-response
+        responseLimits:
+          /data/team/labels/nodes: 25
+        project:
+          labels: /data/team/labels
+      list-cycles:
+        credential: reader
+        tool: list-cycles
+        inputs: *linear-team-page-inputs
+        resources: *linear-team-page-resources
+        maxResponseBytes: 65536
+        request:
+          endpoint: api
+          method: POST
+          path: /graphql
+          graphql: |
+            query ConnectorLinearCycles($team: String!, $first: Int!, $after: String) {
+              team(id: $team) {
+                id organization { id }
+                cycles(first: $first, after: $after) {
+                  nodes { id number name startsAt endsAt }
+                  pageInfo { hasNextPage endCursor }
+                }
+              }
+            }
+          query: *linear-team-page-variables
+        responseInputs: *linear-team-response
+        responseLimits:
+          /data/team/cycles/nodes: 25
+        project:
+          cycles: /data/team/cycles
+      list-workspace-issue-labels:
+        credential: reader
+        tool: list-workspace-issue-labels
+        inputs: &linear-organization-page-inputs
+          organization-id: *linear-read-id
+          first: *linear-page-size
+          after: *linear-page-cursor
+        resources: &linear-organization-resource
+          organization-id: organizations
+        maxResponseBytes: 65536
+        request:
+          endpoint: api
+          method: POST
+          path: /graphql
+          graphql: |
+            query ConnectorLinearWorkspaceIssueLabels($first: Int!, $after: String) {
+              organization { id }
+              issueLabels(first: $first, after: $after, filter: { team: { null: true } }) {
+                nodes { id name }
+                pageInfo { hasNextPage endCursor }
+              }
+            }
+          query: &linear-page-variables
+            first: {input: first}
+            after: {input: after}
+        responseInputs:
+          /data/organization/id: organization-id
+        responseLimits:
+          /data/issueLabels/nodes: 25
+        project:
+          labels: /data/issueLabels
+      get-team:
+        credential: reader
+        tool: get-team
+        inputs:
+          organization-id: *linear-read-id
+          team-id: *linear-read-id
+        resources: *linear-team-page-resources
+        maxResponseBytes: 16384
+        request:
+          endpoint: api
+          method: POST
+          path: /graphql
+          graphql: |
+            query ConnectorLinearReadTeam($team: String!) {
+              team(id: $team) { id key name description organization { id } }
+            }
+          query:
+            team: {input: team-id}
+        responseInputs: *linear-team-response
+        project:
+          team: /data/team
+      list-teams:
+        credential: reader
+        tool: list-teams
+        inputs: *linear-organization-page-inputs
+        resources: *linear-organization-resource
+        maxResponseBytes: 65536
+        request:
+          endpoint: api
+          method: POST
+          path: /graphql
+          graphql: |
+            query ConnectorLinearTeams($first: Int!, $after: String) {
+              organization { id }
+              teams(first: $first, after: $after) {
+                nodes { id key name organization { id } }
+                pageInfo { hasNextPage endCursor }
+              }
+            }
+          query: *linear-page-variables
+        responseInputs:
+          /data/organization/id: organization-id
+          /data/teams/nodes/*/organization/id: organization-id
+        responseResources:
+          /data/teams/nodes/*/id: teams
+        responseLimits:
+          /data/teams/nodes: 25
+        project:
+          teams: /data/teams
+      get-user:
+        credential: reader
+        tool: get-user
+        inputs:
+          organization-id: *linear-read-id
+          user-id: *linear-read-id
+        resources:
+          <<: *linear-organization-resource
+          user-id: users
+        maxResponseBytes: 16384
+        request:
+          endpoint: api
+          method: POST
+          path: /graphql
+          graphql: |
+            query ConnectorLinearUser($id: String!) {
+              user(id: $id) { id name displayName organization { id } }
+            }
+          query:
+            id: {input: user-id}
+        responseInputs:
+          /data/user/id: user-id
+          /data/user/organization/id: organization-id
+        project:
+          user: /data/user
+      list-users:
+        credential: reader
+        tool: list-users
+        inputs: *linear-organization-page-inputs
+        resources: *linear-organization-resource
+        maxResponseBytes: 65536
+        request:
+          endpoint: api
+          method: POST
+          path: /graphql
+          graphql: |
+            query ConnectorLinearUsers($first: Int!, $after: String) {
+              organization { id }
+              users(first: $first, after: $after) {
+                nodes { id name displayName organization { id } }
+                pageInfo { hasNextPage endCursor }
+              }
+            }
+          query: *linear-page-variables
+        responseInputs:
+          /data/organization/id: organization-id
+          /data/users/nodes/*/organization/id: organization-id
+        responseResources:
+          /data/users/nodes/*/id: users
+        responseLimits:
+          /data/users/nodes: 25
+        project:
+          users: /data/users
+      get-project:
+        credential: reader
+        tool: get-project
+        inputs: &linear-project-inputs
+          organization-id: *linear-read-id
+          team-id: *linear-read-id
+          project-id: *linear-read-id
+        resources: &linear-project-resources
+          <<: *linear-team-page-resources
+          project-id: projects
+        maxResponseBytes: 131072
+        request:
+          endpoint: api
+          method: POST
+          path: /graphql
+          graphql: |
+            query ConnectorLinearReadProject($id: String!) {
+              organization { id }
+              project(id: $id) {
+                id name description content url slugId
+                teams(first: 25) { nodes { id } pageInfo { hasNextPage } }
+              }
+            }
+          query:
+            id: {input: project-id}
+        responseInputs: &linear-project-response
+          /data/organization/id: organization-id
+          /data/project/id: project-id
+        responseChecks: &linear-project-team-page
+          /data/project/teams/pageInfo/hasNextPage: false
+        responseContains: &linear-project-team-membership
+          /data/project/teams/nodes/*/id: team-id
+        responseLimits:
+          /data/project/teams/nodes: 25
+        project:
+          project: /data/project
+      list-projects:
+        credential: reader
+        tool: list-projects
+        inputs: *linear-team-page-inputs
+        resources: *linear-team-page-resources
+        maxResponseBytes: 131072
+        request:
+          endpoint: api
+          method: POST
+          path: /graphql
+          graphql: |
+            query ConnectorLinearProjects($team: String!, $first: Int!, $after: String) {
+              team(id: $team) {
+                id organization { id }
+                projects(first: $first, after: $after) {
+                  nodes { id name description url }
+                  pageInfo { hasNextPage endCursor }
+                }
+              }
+            }
+          query: *linear-team-page-variables
+        responseInputs: *linear-team-response
+        responseLimits:
+          /data/team/projects/nodes: 25
+        project:
+          projects: /data/team/projects
+      list-project-labels:
+        credential: reader
+        tool: list-project-labels
+        inputs: *linear-organization-page-inputs
+        resources: *linear-organization-resource
+        maxResponseBytes: 65536
+        request:
+          endpoint: api
+          method: POST
+          path: /graphql
+          graphql: |
+            query ConnectorLinearProjectLabels($first: Int!, $after: String) {
+              organization { id }
+              projectLabels(first: $first, after: $after) {
+                nodes { id name }
+                pageInfo { hasNextPage endCursor }
+              }
+            }
+          query: *linear-page-variables
+        responseInputs:
+          /data/organization/id: organization-id
+        responseLimits:
+          /data/projectLabels/nodes: 25
+        project:
+          labels: /data/projectLabels
+      get-milestone:
+        credential: reader
+        tool: get-milestone
+        inputs:
+          <<: *linear-project-inputs
+          milestone-id: *linear-read-id
+        resources:
+          <<: *linear-project-resources
+          milestone-id: milestones
+        maxResponseBytes: 65536
+        request:
+          endpoint: api
+          method: POST
+          path: /graphql
+          graphql: |
+            query ConnectorLinearMilestone($id: String!) {
+              organization { id }
+              projectMilestone(id: $id) {
+                id name description targetDate
+                project { id teams(first: 25) { nodes { id } pageInfo { hasNextPage } } }
+              }
+            }
+          query:
+            id: {input: milestone-id}
+        responseInputs:
+          /data/organization/id: organization-id
+          /data/projectMilestone/id: milestone-id
+          /data/projectMilestone/project/id: project-id
+        responseChecks:
+          /data/projectMilestone/project/teams/pageInfo/hasNextPage: false
+        responseContains:
+          /data/projectMilestone/project/teams/nodes/*/id: team-id
+        responseLimits:
+          /data/projectMilestone/project/teams/nodes: 25
+        project:
+          milestone: /data/projectMilestone
+      list-milestones:
+        credential: reader
+        tool: list-milestones
+        inputs: &linear-project-page-inputs
+          <<: *linear-project-inputs
+          first: *linear-page-size
+          after: *linear-page-cursor
+        resources: *linear-project-resources
+        maxResponseBytes: 131072
+        request:
+          endpoint: api
+          method: POST
+          path: /graphql
+          graphql: |
+            query ConnectorLinearMilestones($id: String!, $first: Int!, $after: String) {
+              organization { id }
+              project(id: $id) {
+                id teams(first: 25) { nodes { id } pageInfo { hasNextPage } }
+                projectMilestones(first: $first, after: $after) {
+                  nodes { id name description targetDate }
+                  pageInfo { hasNextPage endCursor }
+                }
+              }
+            }
+          query: &linear-project-page-variables
+            id: {input: project-id}
+            first: {input: first}
+            after: {input: after}
+        responseInputs: *linear-project-response
+        responseChecks: *linear-project-team-page
+        responseContains: *linear-project-team-membership
+        responseLimits:
+          /data/project/teams/nodes: 25
+          /data/project/projectMilestones/nodes: 25
+        project:
+          milestones: /data/project/projectMilestones
+      get-document:
+        credential: reader
+        tool: get-document
+        inputs:
+          <<: *linear-project-inputs
+          document-id: *linear-read-id
+        resources:
+          <<: *linear-project-resources
+          document-id: documents
+        maxResponseBytes: 131072
+        request:
+          endpoint: api
+          method: POST
+          path: /graphql
+          graphql: |
+            query ConnectorLinearDocument($id: String!) {
+              organization { id }
+              document(id: $id) {
+                id title content url
+                project { id teams(first: 25) { nodes { id } pageInfo { hasNextPage } } }
+              }
+            }
+          query:
+            id: {input: document-id}
+        responseInputs:
+          /data/organization/id: organization-id
+          /data/document/id: document-id
+          /data/document/project/id: project-id
+        responseChecks:
+          /data/document/project/teams/pageInfo/hasNextPage: false
+        responseContains:
+          /data/document/project/teams/nodes/*/id: team-id
+        responseLimits:
+          /data/document/project/teams/nodes: 25
+        project:
+          document: /data/document
+      list-documents:
+        credential: reader
+        tool: list-documents
+        inputs: *linear-project-page-inputs
+        resources: *linear-project-resources
+        maxResponseBytes: 131072
+        request:
+          endpoint: api
+          method: POST
+          path: /graphql
+          graphql: |
+            query ConnectorLinearDocuments($id: String!, $first: Int!, $after: String) {
+              organization { id }
+              project(id: $id) {
+                id teams(first: 25) { nodes { id } pageInfo { hasNextPage } }
+                documents(first: $first, after: $after) {
+                  nodes { id title content url }
+                  pageInfo { hasNextPage endCursor }
+                }
+              }
+            }
+          query: *linear-project-page-variables
+        responseInputs: *linear-project-response
+        responseChecks: *linear-project-team-page
+        responseContains: *linear-project-team-membership
+        responseLimits:
+          /data/project/teams/nodes: 25
+          /data/project/documents/nodes: 25
+        project:
+          documents: /data/project/documents
+      get-initiative:
+        credential: reader
+        tool: get-initiative
+        inputs:
+          organization-id: *linear-read-id
+          initiative-id: *linear-read-id
+        resources:
+          <<: *linear-organization-resource
+          initiative-id: initiatives
+        maxResponseBytes: 131072
+        request:
+          endpoint: api
+          method: POST
+          path: /graphql
+          graphql: |
+            query ConnectorLinearInitiative($id: String!) {
+              initiative(id: $id) { id name description content url organization { id } }
+            }
+          query:
+            id: {input: initiative-id}
+        responseInputs:
+          /data/initiative/id: initiative-id
+          /data/initiative/organization/id: organization-id
+        project:
+          initiative: /data/initiative
+      list-initiatives:
+        credential: reader
+        tool: list-initiatives
+        inputs: *linear-organization-page-inputs
+        resources: *linear-organization-resource
+        maxResponseBytes: 131072
+        request:
+          endpoint: api
+          method: POST
+          path: /graphql
+          graphql: |
+            query ConnectorLinearInitiatives($first: Int!, $after: String) {
+              organization { id }
+              initiatives(first: $first, after: $after) {
+                nodes { id name description url organization { id } }
+                pageInfo { hasNextPage endCursor }
+              }
+            }
+          query: *linear-page-variables
+        responseInputs:
+          /data/organization/id: organization-id
+          /data/initiatives/nodes/*/organization/id: organization-id
+        responseResources:
+          /data/initiatives/nodes/*/id: initiatives
+        responseLimits:
+          /data/initiatives/nodes: 25
+        project:
+          initiatives: /data/initiatives
+      get-initiative-document:
+        credential: reader
+        tool: get-initiative-document
+        inputs:
+          organization-id: *linear-read-id
+          initiative-id: *linear-read-id
+          document-id: *linear-read-id
+        resources:
+          <<: *linear-organization-resource
+          initiative-id: initiatives
+          document-id: documents
+        maxResponseBytes: 131072
+        request:
+          endpoint: api
+          method: POST
+          path: /graphql
+          graphql: |
+            query ConnectorLinearInitiativeDocument($id: String!) {
+              document(id: $id) {
+                id title content url initiative { id organization { id } }
+              }
+            }
+          query:
+            id: {input: document-id}
+        responseInputs:
+          /data/document/id: document-id
+          /data/document/initiative/id: initiative-id
+          /data/document/initiative/organization/id: organization-id
+        project:
+          document: /data/document
+      list-initiative-documents:
+        credential: reader
+        tool: list-initiative-documents
+        inputs:
+          <<: *linear-organization-page-inputs
+          initiative-id: *linear-read-id
+        resources:
+          <<: *linear-organization-resource
+          initiative-id: initiatives
+        maxResponseBytes: 131072
+        request:
+          endpoint: api
+          method: POST
+          path: /graphql
+          graphql: |
+            query ConnectorLinearInitiativeDocuments($id: String!, $first: Int!, $after: String) {
+              initiative(id: $id) {
+                id organization { id }
+                documents(first: $first, after: $after) {
+                  nodes { id title content url }
+                  pageInfo { hasNextPage endCursor }
+                }
+              }
+            }
+          query:
+            id: {input: initiative-id}
+            first: {input: first}
+            after: {input: after}
+        responseInputs:
+          /data/initiative/id: initiative-id
+          /data/initiative/organization/id: organization-id
+        responseLimits:
+          /data/initiative/documents/nodes: 25
+        project:
+          documents: /data/initiative/documents
+      get-status-updates:
+        credential: reader
+        tool: get-status-updates
+        inputs: *linear-project-page-inputs
+        resources: *linear-project-resources
+        maxResponseBytes: 131072
+        request:
+          endpoint: api
+          method: POST
+          path: /graphql
+          graphql: |
+            query ConnectorLinearStatusUpdates($id: String!, $first: Int!, $after: String) {
+              organization { id }
+              project(id: $id) {
+                id teams(first: 25) { nodes { id } pageInfo { hasNextPage } }
+                projectUpdates(first: $first, after: $after) {
+                  nodes { id body url }
+                  pageInfo { hasNextPage endCursor }
+                }
+              }
+            }
+          query: *linear-project-page-variables
+        responseInputs: *linear-project-response
+        responseChecks: *linear-project-team-page
+        responseContains: *linear-project-team-membership
+        responseLimits:
+          /data/project/teams/nodes: 25
+          /data/project/projectUpdates/nodes: 25
+        project:
+          updates: /data/project/projectUpdates
+      list-initiative-updates:
+        credential: reader
+        tool: list-initiative-updates
+        inputs:
+          <<: *linear-organization-page-inputs
+          initiative-id: *linear-read-id
+        resources:
+          <<: *linear-organization-resource
+          initiative-id: initiatives
+        maxResponseBytes: 131072
+        request:
+          endpoint: api
+          method: POST
+          path: /graphql
+          graphql: |
+            query ConnectorLinearInitiativeUpdates($id: String!, $first: Int!, $after: String) {
+              initiative(id: $id) {
+                id organization { id }
+                initiativeUpdates(first: $first, after: $after) {
+                  nodes { id body url }
+                  pageInfo { hasNextPage endCursor }
+                }
+              }
+            }
+          query:
+            id: {input: initiative-id}
+            first: {input: first}
+            after: {input: after}
+        responseInputs:
+          /data/initiative/id: initiative-id
+          /data/initiative/organization/id: organization-id
+        responseLimits:
+          /data/initiative/initiativeUpdates/nodes: 25
+        project:
+          updates: /data/initiative/initiativeUpdates
+      list-customers:
+        credential: reader
+        tool: list-customers
+        inputs: *linear-organization-page-inputs
+        resources: *linear-organization-resource
+        maxResponseBytes: 65536
+        request:
+          endpoint: api
+          method: POST
+          path: /graphql
+          graphql: |
+            query ConnectorLinearCustomers($first: Int!, $after: String) {
+              organization { id }
+              customers(first: $first, after: $after) {
+                nodes { id name }
+                pageInfo { hasNextPage endCursor }
+              }
+            }
+          query: *linear-page-variables
+        responseInputs:
+          /data/organization/id: organization-id
+        responseLimits:
+          /data/customers/nodes: 25
+        project:
+          customers: /data/customers
       get-issue:
         credential: reader
         lookups: *linear-issue-lookups
@@ -819,6 +1621,30 @@ connectors:
           /data/teams/nodes/0/id: teams
         tool: resolve-team
 import-schema:
+  documents:
+    type: array
+    items: {type: string}
+    default: []
+  initiatives:
+    type: array
+    items: {type: string}
+    default: []
+  milestones:
+    type: array
+    items: {type: string}
+    default: []
+  queries:
+    type: array
+    items: {type: string}
+    default: []
+  statuses:
+    type: array
+    items: {type: string}
+    default: []
+  users:
+    type: array
+    items: {type: string}
+    default: []
   create-team-secret:
     type: string
     default: LINEAR_TEAM_ID
@@ -918,7 +1744,8 @@ import-schema:
       Provider permissions and team access are independent of connector grants.
     </acquisition>
     <credential id="reader" secret="LINEAR_API_KEY" phase="agent" scheme="raw">
-      Enable Read for get-issue, resolve-team, and resolve-project.
+      Enable Read for the selected fixed GraphQL readers, including get-issue,
+      resolve-team, resolve-project and the bounded discovery/content readers.
       GraphQL receives Authorization containing the personal API key verbatim,
       with no Bearer prefix.
     </credential>
@@ -999,6 +1826,16 @@ import-schema:
       example abcdef123456, not full project URLs, names, or model UUIDs.
     </resource>
     <input name="reader-secret" default="LINEAR_API_KEY">Actions secret name; override for a distinct read identity.</input>
+    <resource name="documents initiatives milestones statuses users" default="[]">
+      Independent exact lowercase UUID grants for get-document,
+      get-initiative-document, get-initiative, get-milestone, get-issue-status
+      and get-user respectively. Workspace list-users and list-initiatives
+      also require every returned ID in the corresponding grant.
+    </resource>
+    <resource name="queries" default="[]">
+      Exact approved nonempty issue-search terms, at most 1000 characters.
+      A term does not grant a team, organization, issue, or arbitrary filter.
+    </resource>
     <input name="writer-secret" default="LINEAR_API_KEY">Actions secret name; override for a distinct write identity.</input>
     <input name="mcp-reader-secret" default="LINEAR_READ_MCP_TOKEN">Actions secret name.</input>
     <input name="create-team-secret" default="LINEAR_TEAM_ID">
@@ -1055,6 +1892,168 @@ import-schema:
     </availability>
   </triggers>
   <read-tools selection-field="tools.linear">
+    <bounded-readers>
+    <bounded-reader-contract>
+      All new GraphQL readers use reader and require organization-id, an
+      author-approved lowercase UUID, with exact returned organization evidence.
+      Team readers additionally require team-id; project readers require both
+      project-id and team-id and prove the requested team's membership in the
+      returned project. That membership query is fixed at first 25 and rejects
+      hasNextPage true rather than claiming incomplete evidence is sufficient.
+      ID lookups separately require approved documents, initiatives, milestones,
+      statuses, or users as appropriate. These six new arrays and queries default
+      empty; no import selects a tool or grants resources.
+      Every collection requires integer first from 1 to 25, accepts optional
+      after of at most 2048 characters, returns hasNextPage and endCursor,
+      and issues exactly one collection request. The caller must explicitly
+      provide a subsequent cursor; no reader follows pages or returned URLs.
+      Every returned collection has a 25-element response limit, in addition
+      to its declared 65536- or 131072-byte response limit.
+      Team/project-nested collections authorize the requested parent's children,
+      not arbitrary workspace data; returned child IDs confer no new authority.
+      Workspace team/user/initiative lists additionally check each result's
+      organization and each result ID against the corresponding independent grant.
+      Empty collections are valid, but missing parent, organization, array,
+      membership, or identity evidence is an error.
+    </bounded-reader-contract>
+    <tool selection="list-issues" arguments="organization-id team-id first after" credential="reader">
+      Team.issues returns id, identifier, title, description and URL for one
+      approved team. The exact returned team and its organization must match.
+    </tool>
+    <tool selection="search-issues" arguments="organization-id team-id query first after" credential="reader">
+      searchIssues uses the documented term and teamId arguments. query must
+      be a nonempty exact author-approved entry in queries, at most 1000
+      characters; it is not GraphQL or an arbitrary filter. Every result's
+      team must equal the requested team, not merely another approved team.
+    </tool>
+    <tool selection="list-comments" arguments="organization-id team-id issue-id first after" credential="reader">
+      Issue.comments returns actual comment id, body and URL. The approved
+      issue, exact requested team, and organization are checked before projection.
+    </tool>
+    <tool selection="get-issue-status" arguments="organization-id team-id status-id" credential="reader">
+      workflowState returns id, name and type with exact status/team/organization
+      correlation. status-id must be independently approved in statuses.
+    </tool>
+    <tool selection="list-issue-statuses" arguments="organization-id team-id first after" credential="reader">
+      Team.states returns id, name and type under the exact returned parent.
+    </tool>
+    <tool selection="list-issue-labels" arguments="organization-id team-id first after" credential="reader">
+      Team.labels returns that team's id/name labels. Workspace-shared labels
+      use the separately selected list-workspace-issue-labels reader.
+    </tool>
+    <tool selection="list-workspace-issue-labels" arguments="organization-id first after" credential="reader">
+      issueLabels uses the fixed documented filter team null true and returns
+      id/name only for workspace-shared labels, not another team's labels.
+    </tool>
+    <tool selection="list-cycles" arguments="organization-id team-id first after" credential="reader">
+      Team.cycles returns id, number, name, startsAt and endsAt for the exact team.
+    </tool>
+    <tool selection="get-team" arguments="organization-id team-id" credential="reader">
+      Team id/key/name/description plus exact organization and requested team.
+    </tool>
+    <tool selection="list-teams" arguments="organization-id first after" credential="reader">
+      teams returns id/key/name, requiring each ID in teams and each exact organization.
+    </tool>
+    <tool selection="get-user" arguments="organization-id user-id" credential="reader">
+      user returns id/name/displayName and exact organization; no email is requested.
+    </tool>
+    <tool selection="list-users" arguments="organization-id first after" credential="reader">
+      users returns id/name/displayName; each ID must be in users and each
+      organization must exactly match. No email or disabled-user expansion.
+    </tool>
+    <tool selection="get-project" arguments="organization-id team-id project-id" credential="reader">
+      project returns actual description/content plus id/name/URL/slugId;
+      the exact requested project and team membership are checked.
+    </tool>
+    <tool selection="list-projects" arguments="organization-id team-id first after" credential="reader">
+      Team.projects returns id/name/description/URL scoped to the exact team.
+    </tool>
+    <tool selection="list-project-labels" arguments="organization-id first after" credential="reader">
+      projectLabels returns one workspace page of label IDs and names.
+    </tool>
+    <tool selection="get-milestone" arguments="organization-id team-id project-id milestone-id" credential="reader">
+      projectMilestone returns id/name/description/targetDate and proves the
+      exact milestone/project relationship and requested team's membership.
+    </tool>
+    <tool selection="list-milestones" arguments="organization-id team-id project-id first after" credential="reader">
+      Project.projectMilestones returns id/name/description/targetDate.
+    </tool>
+    <tool selection="get-document" arguments="organization-id team-id project-id document-id" credential="reader">
+      Document id/title/content/URL, not metadata-only content claims. Requires
+      the exact document/project relationship and requested team's membership.
+      Initiative-owned documents use get-initiative-document instead.
+    </tool>
+    <tool selection="list-documents" arguments="organization-id team-id project-id first after" credential="reader">
+      Project.documents returns document id/title/content/URL.
+    </tool>
+    <tool selection="get-initiative" arguments="organization-id initiative-id" credential="reader">
+      Initiative id/name/description/content/URL with exact organization.
+    </tool>
+    <tool selection="list-initiatives" arguments="organization-id first after" credential="reader">
+      initiatives returns id/name/description/URL, checking each approved ID
+      and exact returned organization.
+    </tool>
+    <tool selection="get-initiative-document" arguments="organization-id initiative-id document-id" credential="reader">
+      Actual Document content, with exact document/initiative/organization checks.
+    </tool>
+    <tool selection="list-initiative-documents" arguments="organization-id initiative-id first after" credential="reader">
+      Initiative.documents returns id/title/content/URL under the exact parent.
+    </tool>
+    <tool selection="get-status-updates" arguments="organization-id team-id project-id first after" credential="reader">
+      Project.projectUpdates returns actual id/body/URL for project status updates.
+    </tool>
+    <tool selection="list-initiative-updates" arguments="organization-id initiative-id first after" credential="reader">
+      Initiative.initiativeUpdates returns actual id/body/URL under its exact parent.
+    </tool>
+    <tool selection="list-customers" arguments="organization-id first after" credential="reader">
+      customers returns id/name under the exact authenticated workspace.
+      Customer domains and external IDs are deliberately not requested.
+    </tool>
+    <schema-evidence checked="2026-11-02" revision="253713fef2916ab744defdd71c62acccc8e929a2" sha256="73fac69ae08c0cf8329bbc85a3728a9e24e6e66116ac2f5d6aebbef922b30daf">
+      The provider-owned SDK SDL declares Query.searchIssues(term: String!,
+      teamId: String, first: Int, after: String): IssueSearchPayload!;
+      Team.issues/comments via Issue/states/labels/cycles/projects use bounded
+      first and after connection arguments. Project.documents/projectMilestones/
+      projectUpdates and Initiative.documents/initiativeUpdates also accept
+      first: Int and after: String. Query.user/issue/workflowState/project/
+      projectMilestone/document/initiative take id: String!, not ID!.
+      Document.content, Project.content, Initiative.content and Comment.body/
+      ProjectUpdate.body/InitiativeUpdate.body are documented content fields.
+      The exact pinned public source is listed below; local tests never
+      contact a provider or introspect a hosted MCP server.
+    </schema-evidence>
+    <known-tool-coverage>
+      list_comments maps to list-comments; list_customers to list-customers;
+      list_cycles to list-cycles; get_document/list_documents to the separately
+      scoped project and initiative document readers; get_initiative/list_initiatives
+      to get-initiative/list-initiatives; get_issue remains get-issue;
+      get_issue_status/list_issue_statuses to the status readers;
+      list_issue_labels to the team and workspace-shared label readers;
+      list_issues to list-issues plus separately approved search-issues;
+      get_milestone/list_milestones to milestone readers;
+      get_project/list_projects/list_project_labels to their project readers;
+      get_status_updates to project and initiative update readers;
+      get_team/list_teams and get_user/list_users to their exact counterparts.
+      This restores bounded equivalents, not old remote tool registrations
+      or every historical optional argument.
+      search-issues, list-teams, list-users and list-initiatives additionally
+      require per-element responseInputs/responseResources enforcement in the
+      shared Go and Node hosts. The bundled offline tests verify every returned
+      identity, mismatched second results, and legitimate empty pages in both
+      hosts. Scalar-only hosts are incompatible and fail closed on the declared
+      wildcard pointers. Offline evidence does not establish provider permissions
+      or hosted MCP availability.
+      extract_images/get_attachment remain unsupported: Attachment.url,
+      metadata and bodyData do not establish image extraction or authenticated
+      attachment bytes. get_diff/get_diff_threads/list_diffs remain unsupported:
+      Query.diff exists, but Diff.files exposes paths/counts/state/omitted, not
+      patch content or review threads; no documented Query.diffs or diff-thread
+      collection was found. search_documentation remains unsupported: the
+      public MCP setup page does not publish its input schema or a corresponding
+      product-documentation search API. Workspace Document content is not a
+      substitute for Linear product documentation or a diff/attachment payload.
+    </known-tool-coverage>
+    </bounded-readers>
     <tool selection="get-issue" argument="issue-id" grants="issues organizations teams" credential="reader" max-response-bytes="131072">
       POST a fixed issue query with an approved lowercase UUID. An approved
       issue-references shorthand first resolves through one fixed query, checks
@@ -1296,7 +2295,9 @@ safe-outputs:
     <source url="https://linear.app/docs/mcp">Hosted endpoint, read-only access, transport, OAuth and direct bearer authentication.</source>
     <source url="https://linear.app/developers/oauth-2-0-authentication">OAuth scopes, bearer tokens, expiry, refresh, and CI client credentials.</source>
     <source url="https://linear.app/developers/webhooks">Issue event actions, HMAC verification, and signed timestamp freshness.</source>
+    <source url="https://linear.app/developers/attachments">Attachments are external-resource links and optional rich metadata, not a documented binary/image-extraction endpoint.</source>
     <source url="https://raw.githubusercontent.com/linear/linear/master/packages/sdk/src/schema.graphql">Published GraphQL fields, filters, argument and mutation input types.</source>
+    <source url="https://raw.githubusercontent.com/linear/linear/253713fef2916ab744defdd71c62acccc8e929a2/packages/sdk/src/schema.graphql">Pinned reader SDL evidence, SHA256 73fac69ae08c0cf8329bbc85a3728a9e24e6e66116ac2f5d6aebbef922b30daf, reviewed 2026-11-02.</source>
   </sources>
 </connector-documentation>
 -->

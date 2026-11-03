@@ -118,7 +118,7 @@ func (c *Compiler) expandConnectorSafeOutputs(frontmatter map[string]any, alias 
 		scripts[name] = map[string]any{
 			"description": fmt.Sprintf("Request %s/%s; validated and executed outside the agent credential boundary.", alias, operation),
 			"inputs":      connectorSafeOutputInputs(inputs),
-			"script":      connectorSafeOutputScript(encoded, operation, prefix, config.SafeOutputs.Secrets(), c.dryRun || c.trialMode || c.forceStaged),
+			"script":      connectorSafeOutputScript(encoded, operation, prefix, config.SafeOutputs.Secrets(), c.dryRun || c.trialMode || c.forceStaged, config.SafeOutputs.UsesStagedFile(operation)),
 		}
 	}
 	return nil
@@ -205,7 +205,7 @@ func connectorSafeOutputInputs(inputs map[string]connectors.Input) map[string]an
 	return result
 }
 
-func connectorSafeOutputScript(encoded, operation, prefix string, secrets []string, staged bool) string {
+func connectorSafeOutputScript(encoded, operation, prefix string, secrets []string, staged, binary bool) string {
 	var script strings.Builder
 	script.WriteString("const { spawnSync } = require('node:child_process');\n")
 	script.WriteString("const { join } = require('node:path');\n")
@@ -217,6 +217,9 @@ func connectorSafeOutputScript(encoded, operation, prefix string, secrets []stri
 	script.WriteString("const input = { ...item }; delete input.type;\n")
 	fmt.Fprintf(&script, "const env = { GH_AW_CONNECTOR_PLAN: %q };\n", encoded) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
 	script.WriteString("const contentConfig = { ...(typeof connectorContentDefaults === 'undefined' ? {} : connectorContentDefaults), ...(typeof config === 'undefined' ? {} : config) };\n")
+	if binary {
+		script.WriteString("if (!staged) env.GH_AW_CONNECTOR_FILE_ROOT = join(process.env.RUNNER_TEMP, 'gh-aw', 'safeoutputs', 'upload-artifacts');\n")
+	}
 	fmt.Fprintf(&script, "const args = formatConnectorArguments(decodePlan(env.GH_AW_CONNECTOR_PLAN), %q, input, { config: contentConfig });\n", operation) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
 	script.WriteString("const bindings = staged ? null : connectorEffectBindings(temporaryIdMap, env.GH_AW_CONNECTOR_PLAN);\n")
 	script.WriteString("if (!staged) Object.assign(env, bindings.env);\n")

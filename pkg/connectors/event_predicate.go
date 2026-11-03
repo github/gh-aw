@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net/url"
 	"regexp"
 	"slices"
 	"strconv"
@@ -18,6 +19,7 @@ const eventArrayLimit = 100
 const eventEvaluationLimit = 64 * eventArrayLimit
 
 var eventTimestampPattern = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,9})?(?:Z|[+-](?:0[0-9]|1[0-9]|2[0-3]):[0-5][0-9])$`)
+var eventURLIdentity = regexp.MustCompile(`^[A-Za-z0-9._-]{1,256}$`)
 
 func ValidateEventPredicate(rule EventPredicate) error {
 	count := 0
@@ -76,6 +78,16 @@ func validateEventPredicateOperator(rule EventPredicate, depth int, count *int) 
 		if rule.Other == "" || rule.Value != nil {
 			return errors.New("event transitions require old/new pointers and explicit terminal values")
 		}
+	case "prefix", "path-prefix", "member-prefix":
+		if rule.Other != "" || rule.Value != nil {
+			return errors.New("prefix policies require explicit literal values rather than another pointer")
+		}
+	case "url-id":
+		prefix, ok := rule.Value.(string)
+		parsed, err := url.Parse(prefix)
+		if !ok || len(prefix) > 1024 || rule.Other == "" || err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" || !strings.HasSuffix(prefix, "/") || strings.Contains(prefix, "${") {
+			return errors.New("URL identity policies require a fixed HTTPS prefix and explicit identity pointer")
+		}
 	case "length":
 		n, ok := rule.Value.(json.Number)
 		if !ok {
@@ -95,7 +107,7 @@ func validateEventPredicateOperator(rule EventPredicate, depth int, count *int) 
 	default:
 		return fmt.Errorf("unsupported event predicate operator %q", rule.Op)
 	}
-	if rule.Items != nil || (len(rule.Values) != 0 && rule.Op != "enters" && rule.Op != "leaves") || (rule.Separator != "" && rule.Op != "set-added" && rule.Op != "set-removed") {
+	if rule.Items != nil || (len(rule.Values) != 0 && !slices.Contains([]string{"enters", "leaves", "prefix", "path-prefix", "member-prefix", "url-id"}, rule.Op)) || (rule.Separator != "" && !slices.Contains([]string{"set-added", "set-removed", "member-prefix"}, rule.Op)) {
 		return errors.New("event predicate has options not supported by its operator")
 	}
 	if rule.Separator != "" && (utf8.RuneCountInString(rule.Separator) != 1 || strings.ContainsAny(rule.Separator, "\r\n")) {
@@ -183,10 +195,10 @@ func evaluateEventPredicate(rule EventPredicate, document, root any, remaining *
 	if rule.Op == "any-item" {
 		return evaluateEventItems(rule, value, root, remaining)
 	}
-	return evaluateEventValue(rule, value, other, found)
+	return evaluateEventValue(rule, value, other, found, remaining)
 }
 
-func evaluateEventValue(rule EventPredicate, value, other any, found bool) (bool, bool) {
+func evaluateEventValue(rule EventPredicate, value, other any, found bool, remaining *int) (bool, bool) {
 	switch rule.Op {
 	case "null":
 		return value == nil, true
@@ -216,8 +228,82 @@ func evaluateEventValue(rule EventPredicate, value, other any, found bool) (bool
 		array, ok := value.([]any)
 		expected := fmt.Sprint(rule.Value)
 		return ok && strconv.Itoa(len(array)) == expected, ok && len(array) <= eventArrayLimit
+	case "prefix", "path-prefix", "member-prefix", "url-id":
+		return evaluateEventPrefix(rule, value, other, found, remaining)
 	}
 	return evaluateEventChange(rule, value, other, found)
+}
+
+func evaluateEventPrefix(rule EventPredicate, value, other any, found bool, remaining *int) (bool, bool) {
+	if rule.Op == "url-id" {
+		return evaluateEventURL(rule, value, other, found)
+	}
+	if rule.Op == "member-prefix" {
+		members, valid := eventStringSet(value, rule.Separator)
+		if !valid {
+			return false, false
+		}
+		for member := range members {
+			for _, prefix := range rule.Values {
+				*remaining--
+				if *remaining < 0 {
+					return false, false
+				}
+				if strings.HasPrefix(member, prefix) {
+					return true, true
+				}
+			}
+		}
+		return false, true
+	}
+
+	text, valid := value.(string)
+	if !valid || len(text) > 65536 {
+		return false, false
+	}
+	for _, prefix := range rule.Values {
+		*remaining--
+		if *remaining < 0 {
+			return false, false
+		}
+		if rule.Op == "path-prefix" {
+			text, prefix = strings.ToLower(strings.TrimSpace(text)), strings.ToLower(strings.TrimRight(strings.TrimSpace(prefix), "\\"))
+			if text == prefix || strings.HasPrefix(text, prefix+"\\") {
+				return true, true
+			}
+		} else if strings.HasPrefix(text, prefix) {
+			return true, true
+		}
+	}
+	return false, true
+}
+func evaluateEventURL(rule EventPredicate, value, other any, found bool) (bool, bool) {
+	text, ok := value.(string)
+	identity, valid := responseResourceIdentity(other)
+	prefix, literal := rule.Value.(string)
+	if !ok || !found || !valid || !literal || !eventURLIdentity.MatchString(identity) {
+		return false, false
+	}
+	actual, err := url.Parse(text)
+	if err != nil || actual.User != nil || actual.Fragment != "" {
+		return false, false
+	}
+	query, err := url.ParseQuery(actual.RawQuery)
+	if err != nil {
+		return false, false
+	}
+	for key, values := range query {
+		if !slices.Contains(rule.Values, key) || len(values) != 1 {
+			return false, true
+		}
+		for _, value := range values {
+			if len(value) > 1024 {
+				return false, true
+			}
+		}
+	}
+	base, _, _ := strings.Cut(text, "?")
+	return base == prefix+url.PathEscape(identity), true
 }
 
 func evaluateEventItems(rule EventPredicate, value, root any, remaining *int) (bool, bool) {

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -15,23 +16,34 @@ var writeGraphQLPattern = regexp.MustCompile(`\b(mutation|subscription)\b`)
 
 func validatePayload(op Operation, phase string) error {
 	request := op.Request
-	if request.Method == http.MethodGet && (len(request.Body) != 0 || request.GraphQL != "" || len(request.Patch) != 0) {
+	patches := append(slices.Clone(request.Patch), request.AdditionalPatch...)
+	if len(request.AdditionalPatch) > 32 {
+		return errors.New("additionalPatch supports at most 32 authored fixed-path entries")
+	}
+	if request.Method == http.MethodGet && (len(request.Body) != 0 || request.GraphQL != "" || len(patches) != 0) {
 		return errors.New("GET requests cannot contain a body, GraphQL document or JSON Patch")
 	}
 	if request.GraphQL != "" && phase != "safe-output" && writeGraphQLPattern.MatchString(request.GraphQL) {
 		return errors.New("read GraphQL documents cannot contain mutation or subscription tokens")
 	}
-	if len(request.Patch) != 0 {
+	if len(patches) != 0 {
 		if phase != "safe-output" || request.GraphQL != "" || len(request.Body) != 0 || (request.Method != http.MethodPatch && request.Method != http.MethodPost) {
 			return errors.New("JSON Patch requires safe-output POST/PATCH without another body")
 		}
-		for _, patch := range request.Patch {
+		seen := map[string]struct{}{}
+		for _, patch := range patches {
 			if patch.Op != "add" && patch.Op != "replace" && patch.Op != "test" {
 				return errors.New("JSON Patch supports only fixed-path add, replace and test operations")
 			}
 			if !validPointer(patch.Path) || strings.ContainsAny(patch.Path, "{}$") {
 				return errors.New("JSON Patch paths must be fixed JSON Pointers")
 			}
+			key := strings.ToLower(patch.Path)
+			_, duplicate := seen[key]
+			if duplicate && len(request.AdditionalPatch) != 0 {
+				return errors.New("additionalPatch cannot override an existing patch path")
+			}
+			seen[key] = struct{}{}
 		}
 	}
 	for pointer := range op.ResponseChecks {
@@ -58,6 +70,11 @@ func validatePayload(op Operation, phase string) error {
 }
 
 func validateResponseConstraints(op Operation) error {
+	if op.ResponseWhen != nil {
+		if err := ValidateEventPredicate(*op.ResponseWhen); err != nil {
+			return err
+		}
+	}
 	if err := validatePrimitiveTypes(op.ResponseTypes); err != nil {
 		return err
 	}

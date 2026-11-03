@@ -342,10 +342,10 @@ and [MCP setup](https://linear.app/docs/mcp).
 
 | Surface | Current declaration |
 | --- | --- |
-| Triggers | `linear-issue-created`, `linear-issue-updated`, `linear-issue-removed` for native Issue create/update/remove. Requires raw-body HMAC and timestamp verification with the webhook signing secret, separate from API keys. No inferred closure or label transitions. |
-| MCPs/read tools | Hosted `read-only` at `https://mcp.linear.app/mcp/readonly`, allowing only `get_issue`. REST/GraphQL selections: `get-issue`, `resolve-team`, `resolve-project`. |
-| Safe outputs | `linear-create-issue`, `linear-create-issue-in-project`, `linear-update-issue`, `linear-add-comment`. Fixed GraphQL operations and approved organization/team/project/issue targets. |
-| Context | Fetch the approved issue with `get-issue`; validate organization and team. Resolution is bounded and rejects ambiguity. No automatic resolution chain or paginated hydration. |
+| Triggers | Native created/updated/removed plus evidence-backed closed/reopened/labeled/unlabeled selections. Raw-body HMAC, timestamp verification and approved receiver support remain separate from API keys. |
+| MCPs/read tools | Hosted `read-only` exposes only `get_issue`. Fixed GraphQL readers cover issue search/lists, comments, statuses/labels, teams/users/projects, cycles, milestones, documents, initiatives, status updates and customer metadata. Exact selectors, schema evidence and limits are in the declaration. |
+| Safe outputs | Existing create/update/comment operations plus projectless creation, title-only/body-only updates and explicit clearing. Destinations require independent exact grants. |
+| Context | Selected readers return bounded untrusted data; returned identifiers never add mutation grants. Pagination requires explicit declared cursor arguments, not automatic traversal. |
 
 ### Migration from built-in Linear
 
@@ -366,14 +366,22 @@ are `linear_create_issue`, `linear_update_issue`, and
 `linear_add_comment`. Canonical targets are typed UUID arguments constrained by
 the trusted resource arrays, never arbitrary URLs or credential inputs.
 
-Create requires approved team and project UUIDs plus title/body; update requires
-an approved issue UUID and both title/body; comment requires issue UUID and body.
+The original create requires team/project/title/body; the team-only creator
+omits the project. Original update replaces both title/body; sparse selectors
+replace one field without reading and rewriting the other. Explicit clearing
+uses fixed authored empty text rather than generated attribution.
 Sanitized titles contain 20 to 128 Unicode characters; bodies are bounded to
 65,000 characters including generated footers. The shared runtime
 validates inputs and provider responses without retries. Whole-workflow
 dry-run/staged mode prepares requests without resolving write credentials or
 sending mutations. Connector-only writes do not implicitly enable GitHub issue
 reporting, request GitHub write permissions, or mint a GitHub App token.
+
+The declaration documents fixture-verified equivalents for 22 of the 28 named
+legacy Linear readers. `extract_images`, `get_attachment`, `get_diff`,
+`get_diff_threads`, `list_diffs`, and `search_documentation` remain unsupported
+until an equivalent content/schema contract is verified. Attachment metadata
+is not attachment/image content; SDK-schema discovery is not live MCP proof.
 
 Approved shorthand targets resolve automatically through declaration-owned
 bounded lookup chains. Add exact `issue-references: [ENG-123]` for issue reads,
@@ -470,10 +478,10 @@ endpoint **and path** change, not just substituting a hostname.
 
 | Surface | Current declaration |
 | --- | --- |
-| Triggers | `jira-issue-created`, `jira-issue-updated`, `jira-issue-deleted`. Signed admin webhooks require the configured raw-body HMAC verifier and replay policy; this is not Connect JWT authentication. No inferred closure/reopening/label events. |
-| MCPs/read tools | `service-account` or `personal` at `https://mcp.atlassian.com/v2/mcp`; only `getJiraIssue` and `searchJiraIssuesUsingJql`. Cloud ID, issue keys, exact JQL, and result counts are constrained. |
-| Safe outputs | `jira-create-issue`, `jira-update-issue`, `jira-add-comment`, `jira-add-label`. ADF text encoding; additive labels. Update requires both summary and description. Explicit trusted temporary-reference chaining is supported when the creator and consumers are selected together. |
-| Context | Fetch approved issue content through the selected MCP profile. Validate tenant/project authority independently; issue keys can change projects. No public REST context recipe or raw-event fallback. |
+| Triggers | Native created/updated/deleted plus resolution-based closed/reopened and unambiguous label changes. Signed admin verification and replay support remain external. |
+| MCPs/read tools | The two hosted issue/JQL methods remain independently selected. Seven fixed REST readers restore project/type/field/transition/account/link discovery with explicit grants and bounds. REST reads use their own declared credential, not an automatic fallback from a denied MCP profile. |
+| Safe outputs | Existing create/update/comment/label operations plus sparse summary/description updates and exact approved issue types. ADF encoding, additive labels and authenticated same-run chaining remain supported. |
+| Context | Selected bounded reads only. Validate tenant/project authority independently; returned keys/accounts are data, not grants. No automatic hydration or raw-event fallback. |
 
 ### Migration limits
 
@@ -486,14 +494,14 @@ Selected effect tools are named `jira_<operation_with_underscores>`.
 Effect arguments are `project`, `issue-type`, `summary`, and optional
 `description` for creation; `issue`, `summary`, and `description` for updates;
 `issue` and `text` for comments; `issue` and `label` for additive labels.
-Only the declared `Task` issue type is enabled. The current connector cannot
-express the old update requirement of *at least one* of summary or description:
-both are required. Creation accepts an optional explicit `temporary_id` such
+Issue types are constrained by `issue-types`, defaulting to `[Task]`.
+Choose a sparse selector for a single-field update; the original update still
+requires both fields. Creation accepts an optional explicit `temporary_id` such
 as `aw_jira_haiku`; selected follow-ups can use `#aw_jira_haiku` only after a
-validated creation in the same execution. Native automatic temporary-ID
-assignment and the other seven former read methods are unavailable.
-Use a reviewed declaration for additional
-capabilities rather than removing resource constraints.
+validated creation in the same execution. The shared recorder allocates a
+proposal alias when omitted; allocation is not a creation receipt or authority.
+The seven former discovery methods have bounded REST equivalents documented
+in the declaration, not unrestricted hosted argument forwarding.
 
 Effect selection accepts null, `{}`, or per-operation `max`/`staged` options.
 Workflow-wide `safe-outputs.staged: true` and compiler dry-run mode also provide
@@ -554,9 +562,9 @@ bearer access token. Token renewal is not implemented by the declaration.
 | Surface | Current declaration |
 | --- | --- |
 | Triggers | `azure-devops-work-item-created`, `azure-devops-work-item-updated`, `azure-devops-work-item-deleted`, `azure-devops-work-item-restored`. Service hooks require configured authenticated HTTPS ingress and exact collection/project identity; there is no native HMAC header to invent. |
-| MCPs/read tools | Select `azure-devops` at `https://mcp.dev.azure.com/{organization}`, with `X-MCP-Readonly: true` and only `core_list_projects`. This lists project metadata visible to the identity in that organization; the write project allowlist does not filter remote MCP results. No work-item body reader is declared. |
-| Safe outputs | `azure-devops-create-work-item`, `azure-devops-update-work-item`, `azure-devops-comment-on-work-item`, `azure-devops-assign-work-item`, `azure-devops-link-work-items`. Fixed JSON Patch fields, assignee allowlists, and a reviewed link target. No attachment upload/chaining. |
-| Context | Project metadata only. A work-item ID is a reference, not work-item content; do not claim description/comment hydration. Snapshot and update event IDs differ, and deletion/restoration do not imply closure/reopening. |
+| MCPs/read tools | Hosted MCP still exposes only organization-visible project metadata. Independently selected fixed REST readers provide approved work-item content; additional repository/pipeline selections use their own declared read identities and grants. No wildcard remote registration is restored. |
+| Safe outputs | Original narrow effects remain available. Rich creators, sparse/clear mutations, authored static custom fields, reviewed Branch ArtifactLinks, receipt-aware typed relations, and staged binary upload/attachment effects are independently selected. |
+| Context | Bounded selected reads only. IDs remain references, not grants; snapshot/delta variants and configured terminal states determine lifecycle evidence. |
 
 ### Migration limits
 
@@ -567,14 +575,23 @@ not automatically consumed. Read MCP and safe-output writes use their own
 explicit Entra token references; selecting only writes never exposes a reader
 credential to the agent.
 
-The current declaration creates fixed Task work items with a title, updates
-titles, posts Markdown `text` comments, assigns an allowlisted identity, and
-adds a fixed Related link. Legacy description/body/state/tag/area/iteration
-updates, custom fields, artifact links, arbitrary link types/targets, attachment
-uploads, temporary-ID chaining, wildcard/area-prefix targeting, and per-output
-legacy options have no drop-in replacement. They fail rather than falling back
-to the removed runtime. Broader operations require separately reviewed
-declarative capabilities and any missing shared-contract support.
+Use explicit selectors instead of legacy field toggles. Rich creators accept
+reviewed `create-additional-patch` entries atomically; duplicate protected paths
+reject. Sparse operations update one field; explicit clears do not append
+footers. Typed relation operations accept exact approved source/target/type
+bindings or authenticated same-run creation receipts and verify IDs/projects
+before mutation. `write-checks` can narrow approved items by title/tag/area
+prefixes; a prefix never grants new targets. Branch linking verifies the
+reviewed repository and branch.
+
+Attachment upload uses bounded staged bytes, not a JSON string or arbitrary
+URL. The agent recorder copies an approved local regular file into the existing
+staging artifact; safe outputs rechecks its digest, size, suffix and rejected
+byte policy before credential access. Node guarded file access requires Linux.
+Explicit upload and attach effects can chain through authenticated attachment
+UUID receipts, including newly created work-item references. Chunked upload is
+not exposed. Workflow/template syntax changes and intentional exact-grant
+restrictions remain migration differences, not aliases for permissive old knobs.
 
 Custom trigger selections use the protected gateway route; a verification-profile
 declaration does not deploy authenticated HTTPS ingress. No live Azure request is established
@@ -799,6 +816,31 @@ do not use this REST/GraphQL operation setting.
 
 Versioned specs/connections and context-phase fixtures under `testdata` are
 legacy runtime compatibility tests, not the public authoring interface.
+
+### Authored checks and request extensions
+
+`checks` contains at most four fixed GET/GraphQL reads on the mutation endpoint
+and credential. Each consumes a subset of the operation's required canonical
+inputs, after receipt resolution, without projecting new arguments or granting
+resources. Typed response bindings and bounded `responseWhen` predicates verify
+identity, membership and author-owned prefix policies before mutation.
+Failed or insufficient evidence aborts; staging performs no checks.
+
+`request.additionalPatch` adds at most 32 authored fixed-path entries atomically.
+Paths cannot override existing entries, including case variants. This is
+trusted declaration configuration, not an agent JSON Patch input.
+`Value.prefix` concatenates a bounded authored literal with one typed string
+input, for fixed relation URLs; it does not fetch or authorize the result.
+
+`request.binary` declares one required staged-file input, a byte limit up to
+10 MiB, optional exact suffixes and rejected literal byte sequences. Binary
+POSTs cannot combine JSON/GraphQL/patch bodies or secret preflights. The trusted
+host supplies the staging root; agent arguments cannot change it.
+
+Response limits accept the empty JSON Pointer for a root array. Resource and
+exact-input response checks support one bounded array wildcard and validate
+every returned value. Missing/malformed evidence fails; empty arrays remain
+legitimate empty reads. These checks do not add returned IDs to grants.
 
 ### Trusted resource bindings
 

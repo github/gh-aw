@@ -29,8 +29,13 @@ func validateValueDepth(value Value, inputs map[string]Input, depth int) error {
 		if value.Encoding != "" && (field.Type != "string" || (value.Encoding != "jira-adf" && value.Encoding != "confluence-storage")) {
 			return errors.New("encoding requires a string input and jira-adf or confluence-storage")
 		}
+		if value.Prefix != "" && (field.Type != "string" || value.Encoding != "" || len(value.Prefix) > 1024 || strings.ContainsAny(value.Prefix, "\r\n") || strings.Contains(value.Prefix, "${")) {
+			return errors.New("value prefix requires a string input and a bounded literal prefix without encoding or expressions")
+		}
 	} else if value.Encoding != "" {
 		return errors.New("encoding is supported only on input references")
+	} else if value.Prefix != "" {
+		return errors.New("prefix is supported only on string input references")
 	}
 	for _, child := range value.Object {
 		if err := validateValueDepth(child, inputs, depth+1); err != nil {
@@ -62,6 +67,13 @@ func resolveValue(value Value, args map[string]any) (any, bool, error) {
 			return nil, false, nil
 		}
 		result = input
+		if value.Prefix != "" {
+			text, isString := input.(string)
+			if !isString {
+				return nil, false, errors.New("prefixed connector input must be a string")
+			}
+			result = value.Prefix + text
+		}
 		if value.Encoding != "" {
 			text, isString := input.(string)
 			if !isString {

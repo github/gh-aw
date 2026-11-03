@@ -51,7 +51,7 @@ func TestConnectorContentGeneratedFactory(t *testing.T) {
 	} {
 		t.Run(mode.name, func(t *testing.T) {
 			source := generateSafeOutputScriptContent("connector-publish", &SafeScriptConfig{
-				Script: connectorSafeOutputScript("frozen", "publish", "PREFIX_", []string{"WRITER"}, mode.compiled),
+				Script: connectorSafeOutputScript("frozen", "publish", "PREFIX_", []string{"WRITER"}, mode.compiled, false),
 			})
 			options, err := json.Marshal(map[string]any{
 				"source": source, "assets": assets, "global": mode.global, "staged": mode.staged,
