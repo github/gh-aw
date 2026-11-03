@@ -10,11 +10,17 @@ on:
 permissions:
   contents: read
   actions: read
+  copilot-requests: write
   issues: read
   pull-requests: read
 
 tracker-id: daily-rendering-scripts-verifier
-engine: claude
+engine:
+  id: claude
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: balanced
 strict: true
 
 graders:
