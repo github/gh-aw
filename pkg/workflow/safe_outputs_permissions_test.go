@@ -760,6 +760,34 @@ func TestComputePermissionsForSafeOutputsDispatchRepositoryGitHubTokenSplit(t *t
 	assert.Equal(t, PermissionWrite, jobPermissions.permissions[PermissionContents])
 }
 
+func TestComputePermissionsForSafeOutputsDispatchRepositoryMixedGitHubTokenConfig(t *testing.T) {
+	safeOutputs := &SafeOutputsConfig{
+		DispatchRepository: &DispatchRepositoryConfig{
+			Tools: map[string]*DispatchRepositoryToolConfig{
+				"with-token": {
+					Workflow:    "ci.yml",
+					EventType:   "ci_trigger",
+					Repository:  "github/gh-aw",
+					GitHubToken: "${{ secrets.DISPATCH_PAT }}",
+				},
+				"without-token": {
+					Workflow:   "ci.yml",
+					EventType:  "ci_trigger",
+					Repository: "github/gh-aw",
+				},
+			},
+		},
+	}
+
+	appPermissions := computeDispatchRepositoryPermissions(safeOutputs, true)
+	require.NotNil(t, appPermissions)
+	assert.Equal(t, PermissionWrite, appPermissions.permissions[PermissionContents])
+
+	jobPermissions := computeDispatchRepositoryPermissions(safeOutputs, false)
+	require.NotNil(t, jobPermissions)
+	assert.Equal(t, PermissionWrite, jobPermissions.permissions[PermissionContents])
+}
+
 func TestComputePermissionsForSafeOutputsExcludesParsedPerHandlerApps(t *testing.T) {
 	compiler := NewCompiler(WithVersion("1.0.0"))
 	tmpDir := t.TempDir()

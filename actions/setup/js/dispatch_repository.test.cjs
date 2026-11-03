@@ -15,7 +15,7 @@ describe("dispatch_repository", () => {
   /** @type {any} */
   let dispatchEventCalls;
 
-  /** @type {{ core: any, github: any, context: any }} */
+  /** @type {{ core: any, github: any, context: any, getOctokit: any, hadGetOctokit: boolean }} */
   let savedGlobals;
 
   beforeEach(() => {
@@ -23,6 +23,8 @@ describe("dispatch_repository", () => {
       core: globals.core,
       github: globals.github,
       context: globals.context,
+      getOctokit: globals.getOctokit,
+      hadGetOctokit: Object.hasOwn(globals, "getOctokit"),
     };
 
     dispatchEventCalls = [];
@@ -62,6 +64,8 @@ describe("dispatch_repository", () => {
     globals.core = savedGlobals.core;
     globals.github = savedGlobals.github;
     globals.context = savedGlobals.context;
+    if (savedGlobals.hadGetOctokit) globals.getOctokit = savedGlobals.getOctokit;
+    else delete globals.getOctokit;
     vi.restoreAllMocks();
   });
 
@@ -191,8 +195,44 @@ describe("dispatch_repository", () => {
       expect(getOctokit).toHaveBeenCalledWith("tool-scoped-token", expect.anything());
       expect(toolDispatchCalls.length).toBe(1);
       expect(dispatchEventCalls.length).toBe(0);
+    });
 
-      delete globals.getOctokit;
+    it("should return a structured error when per-tool client creation fails", async () => {
+      globals.getOctokit = vi.fn(() => {
+        throw new Error("client setup failed");
+      });
+
+      const handler = await main({
+        tools: {
+          deploy: { event_type: "deploy", repository: "test-owner/other-repo", "github-token": "tool-scoped-token" },
+        },
+      });
+
+      const result = await handler({ tool_name: "deploy" }, {});
+
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/E099: Failed to dispatch/);
+      expect(result.error).toContain("client setup failed");
+      expect(dispatchEventCalls).toHaveLength(0);
+    });
+
+    it("should fail closed when a per-tool github-token resolves to an empty value", async () => {
+      const getOctokit = vi.fn();
+      globals.getOctokit = getOctokit;
+
+      const handler = await main({
+        tools: {
+          deploy: { event_type: "deploy", repository: "test-owner/other-repo", "github-token": "" },
+        },
+      });
+
+      const result = await handler({ tool_name: "deploy" }, {});
+
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/E099: Failed to dispatch/);
+      expect(result.error).toContain("resolved to an empty value");
+      expect(getOctokit).not.toHaveBeenCalled();
+      expect(dispatchEventCalls).toHaveLength(0);
     });
 
     it("should include message inputs in client_payload", async () => {

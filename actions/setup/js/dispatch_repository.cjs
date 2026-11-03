@@ -157,13 +157,19 @@ async function main(config = {}) {
       };
     }
 
-    let toolClient = toolClients.get(toolName);
-    if (!toolClient) {
-      toolClient = await createAuthenticatedGitHubClient(toolConfig);
-      toolClients.set(toolName, toolClient);
-    }
-
     try {
+      let toolClient = toolClients.get(toolName);
+      if (!toolClient) {
+        if (Object.hasOwn(toolConfig, "github-token") && !toolConfig["github-token"]) {
+          return {
+            success: false,
+            error: `${SAFE_OUTPUT_E099}: Failed to dispatch repository_dispatch event "${eventType}" to ${targetRepoSlug}: github-token for tool "${toolName}" resolved to an empty value`,
+          };
+        }
+        toolClient = await createAuthenticatedGitHubClient(toolConfig);
+        toolClients.set(toolName, toolClient);
+      }
+
       await toolClient.rest.repos.createDispatchEvent({
         owner: parsedRepo.owner,
         repo: parsedRepo.repo,
