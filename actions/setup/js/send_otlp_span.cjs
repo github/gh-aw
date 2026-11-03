@@ -111,7 +111,7 @@ function buildAttr(key, value) {
   }
   if (typeof value === "number") {
     if (Number.isFinite(value)) {
-      if (Number.isInteger(value)) {
+      if (Number.isInteger(value) && Number.isSafeInteger(value)) {
         return { key, value: { intValue: value } };
       }
       return { key, value: { doubleValue: value } };

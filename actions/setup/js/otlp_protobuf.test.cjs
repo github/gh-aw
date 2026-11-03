@@ -5,7 +5,7 @@ import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const { encodeOTLPTraceRequest } = require("./otlp_protobuf.cjs");
-const { buildOTLPPayload, sanitizeOTLPPayload, sendOTLPSpan, sendOTLPToAllEndpoints, OTEL_JSONL_PATH } = require("./send_otlp_span.cjs");
+const { buildAttr, buildOTLPPayload, sanitizeOTLPPayload, sendOTLPSpan, sendOTLPToAllEndpoints, OTEL_JSONL_PATH } = require("./send_otlp_span.cjs");
 
 function payload() {
   return buildOTLPPayload({
@@ -50,6 +50,25 @@ describe("minimal OTLP protobuf encoder", () => {
     ["spanId", "ab"],
   ])("rejects malformed or inexact %s values", (key, value) => {
     expect(() => encodeOTLPTraceRequest({ resourceSpans: [{ scopeSpans: [{ spans: [{ [key]: value }] }] }] })).toThrow();
+  });
+
+  it("rejects unknown fields instead of silently dropping them", () => {
+    expect(() => encodeOTLPTraceRequest({ resourceSpans: [{ scopeSpans: [{ spans: [{ bogusKey: 1 }] }] }] })).toThrow(/unknown field: bogusKey/);
+  });
+
+  it.each([
+    ["NaN", 0x7ff8000000000000n],
+    ["Infinity", 0x7ff0000000000000n],
+    ["-Infinity", 0xfff0000000000000n],
+  ])("encodes OTLP JSON non-finite double token %s", (token, bits) => {
+    const request = { resourceSpans: [{ resource: { attributes: [{ key: "d", value: { doubleValue: token } }] } }] };
+    expect(encodeOTLPTraceRequest(request).includes(Buffer.from(BigInt.asUintN(64, bits).toString(16).padStart(16, "0"), "hex").reverse())).toBe(true);
+  });
+
+  it("encodes unsafe numeric attributes from buildAttr as doubles", () => {
+    const attr = buildAttr("big", Number.MAX_SAFE_INTEGER + 10_000);
+    expect(attr.value.doubleValue).toBe(Number.MAX_SAFE_INTEGER + 10_000);
+    expect(() => encodeOTLPTraceRequest({ resourceSpans: [{ resource: { attributes: [attr] } }] })).not.toThrow();
   });
 
   it.each(["9223372036854775808", "-9223372036854775809", 1.5, Number.MAX_SAFE_INTEGER + 1])("rejects invalid int64 attributes: %s", value => {

@@ -4154,7 +4154,8 @@ describe("sendJobConclusionSpan", () => {
     const span = body.resourceSpans[0].scopeSpans[0].spans[0];
     const attrs = Object.fromEntries(span.attributes.map(attribute => [attribute.key, attribute.value]));
     expect(attrs["gh-aw.working_set.cumulative_input_tokens"]).toBeDefined();
-    expect(attrs["gh-aw.working_set.cumulative_input_tokens"].intValue).toBe(hugeCumulativeInputTokens);
+    expect(attrs["gh-aw.working_set.cumulative_input_tokens"].doubleValue).toBe(hugeCumulativeInputTokens);
+    expect(attrs["gh-aw.working_set.cumulative_input_tokens"].intValue).toBeUndefined();
     expect(attrs["gh-aw.working_set.rebuild_excess_tokens"]).toBeDefined();
     expect(attrs["gh-aw.working_set.invocations"].intValue).toBe(50000);
   });

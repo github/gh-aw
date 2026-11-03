@@ -91,6 +91,9 @@ function encodeField(field, value) {
       bytes.writeBigUInt64LE(integer(value, 0n, (1n << 64n) - 1n));
       break;
     case "double":
+      if (value === "NaN") value = NaN;
+      else if (value === "Infinity") value = Infinity;
+      else if (value === "-Infinity") value = -Infinity;
       if (typeof value !== "number") throw new TypeError("OTLP protobuf doubleValue must be a number");
       wire = 1;
       bytes = Buffer.alloc(8);
@@ -112,6 +115,10 @@ function encodeMessage(value, fields) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new TypeError("OTLP protobuf message must be an object");
   /** @type {Buffer[]} */
   const chunks = [];
+  const known = new Set(fields.map(field => field.name));
+  for (const key of Object.keys(value)) {
+    if (!known.has(key)) throw new TypeError(`OTLP protobuf message has unknown field: ${key}`);
+  }
   for (const field of fields) {
     const item = value[field.name];
     if (item === undefined || item === null) continue;
