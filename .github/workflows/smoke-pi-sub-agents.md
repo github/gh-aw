@@ -19,6 +19,13 @@ tools:
   bash: false
   cli-proxy: false
   edit: false
+evals:
+  - id: declared_delegations
+    question: Does the output show exactly one sequential subagent invocation for each of haiku-whoami, luna-whoami, and compact-whoami without substitutions?
+  - id: fixed_response_comparison
+    question: Does the staged report compare each actual delegation response with its prescribed exact response rather than answering on the sub-agent's behalf?
+  - id: delegation_failure_gate
+    question: When any delegation is missing, fails, or returns an unexpected response, does the staged report mark overall FAIL? Return UNKNOWN when all three delegations return the expected responses.
 safe-outputs:
   staged: true
   create-issue:

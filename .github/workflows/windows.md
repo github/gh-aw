@@ -39,6 +39,13 @@ tools:
   bash:
     - "*"
 
+evals:
+  - id: topic_haiku
+    question: Does the requested issue contain a three-line 5-7-5 haiku about the supplied topic, defaulting to Windows runners?
+  - id: windows_runner_note
+    question: Does the requested issue include a one-line note confirming the Windows runner context?
+  - id: single_issue_scope
+    question: Does the agent request exactly one issue without performing unrelated actions?
 safe-outputs:
   create-issue:
     title-prefix: "[windows] "

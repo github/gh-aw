@@ -35,6 +35,13 @@ network:
   allowed:
     - defaults
     - github
+evals:
+  - id: public_policy_evidence
+    question: Does the report distinguish observed public-repository access from private or internal repository filtering without assuming the current repository is private?
+  - id: probe_coverage
+    question: Does the output report access results for all five specified repository, issue, and code-search probes?
+  - id: no_pr_restraint
+    question: When no PR context is available, does the agent report results through noop instead of requesting a comment on an unrelated item? Return UNKNOWN when PR context is available.
 safe-outputs:
   allowed-domains: [default-safe-outputs]
   add-comment:

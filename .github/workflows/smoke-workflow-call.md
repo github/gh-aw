@@ -40,6 +40,13 @@ tools:
     - "git branch:*"
     - "git remote:*"
     - "echo:*"
+evals:
+  - id: checkout_evidence
+    question: Does the output show the required git status, branch, remote, and log checks rather than assuming checkout succeeded?
+  - id: checkout_report_accuracy
+    question: Does the requested comment's checkout status agree with the observed git command results?
+  - id: task_binding
+    question: Does the requested comment identify this invocation's supplied task-description rather than another invocation's task?
 safe-outputs:
   allowed-domains: [default-safe-outputs]
   add-comment:

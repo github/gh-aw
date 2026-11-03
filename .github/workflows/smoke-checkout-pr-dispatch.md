@@ -32,6 +32,13 @@ tools:
     - "git branch *"
     - "git remote *"
     - "echo *"
+evals:
+  - id: checkout_evidence
+    question: Does the report ground its checkout status in the observed git status, branch, remote, and log results?
+  - id: pr_branch_check
+    question: For a PR event or dispatch with PR aw_context, does the report correctly mark the branch check failed if the observed branch is main? Return UNKNOWN when no PR context is supplied.
+  - id: dispatch_target
+    question: For a workflow_dispatch run with PR aw_context, does the report identify the item_number from that invocation's aw_context? Return UNKNOWN for other contexts.
 safe-outputs:
   allowed-domains: [default-safe-outputs]
   add-comment:

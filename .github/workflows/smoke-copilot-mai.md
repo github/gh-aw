@@ -40,6 +40,13 @@ tools:
   github:
     mode: gh-proxy
     toolsets: [default]
+evals:
+  - id: commit_summary_grounding
+    question: When commits are returned, is the two-to-four-sentence thematic summary grounded in the retrieved last-24-hour commit messages? Return UNKNOWN when the commit list is empty or retrieval failed.
+  - id: empty_commit_report
+    question: When a successful query returns no commits, does the requested issue state No commits in the last 24h rather than inventing activity? Return UNKNOWN when commits are returned or retrieval failed.
+  - id: retrieval_status
+    question: Does the requested issue's bash test status reflect whether the commit query actually succeeded rather than treating a failed query as an empty successful result?
 safe-outputs:
   create-issue:
     expires: 2h

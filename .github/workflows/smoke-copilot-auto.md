@@ -27,6 +27,13 @@ tools:
   github:
     mode: gh-proxy
     toolsets: [default]
+evals:
+  - id: pr_inspired_haiku
+    question: When PR context is available, does the requested comment contain a three-line 5-7-5 haiku inspired by that PR? Return UNKNOWN when no PR context is available.
+  - id: inspiration_caption
+    question: When PR context is available, does the requested comment include a one-sentence caption connecting the haiku to the PR? Return UNKNOWN when no PR context is available.
+  - id: no_pr_noop
+    question: When no PR context is available, does the agent call noop without requesting a PR comment? Return UNKNOWN when PR context is available.
 safe-outputs:
   add-comment:
     hide-older-comments: true

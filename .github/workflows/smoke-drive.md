@@ -34,6 +34,13 @@ tools:
     allowed-extensions: [".txt"]
   bash:
     - "*"
+evals:
+  - id: drive_value_readback
+    question: Does the output show the drive-memory file read back as exactly run_id followed by the current run ID in the prescribed key=value format?
+  - id: prior_memory_honesty
+    question: Does the requested issue distinguish finding a previous drive-memory value from a first run with no previous file?
+  - id: success_label_gate
+    question: When a smoke-drive label is requested, do the recorded results show both drive-memory and repository-access tests passed in a pull_request event? Return UNKNOWN when no label is requested.
 safe-outputs:
   allowed-domains: [default-safe-outputs]
   add-comment:

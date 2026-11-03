@@ -10,6 +10,13 @@ permissions:
   contents: read
   actions: read
 engine: copilot
+evals:
+  - id: shared_haiku_issues
+    question: Do the Linear and Jira issue requests contain the same original three-line 5-7-5 haiku?
+  - id: jira_followup_binding
+    question: Do all three Jira follow-up requests use the temporary ID returned for the newly requested Jira Task rather than another issue key?
+  - id: external_issue_scope
+    question: Does the agent limit issue creation to one Linear issue in the configured project and one Jira Task in KAN without requesting GitHub issues?
 safe-outputs:
   linear-create-issue:
     team-id: ${{ secrets.LINEAR_TEAM_ID }}
