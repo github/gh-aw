@@ -52,9 +52,12 @@ describe("minimal OTLP protobuf encoder", () => {
     expect(() => encodeOTLPTraceRequest({ resourceSpans: [{ scopeSpans: [{ spans: [{ [key]: value }] }] }] })).toThrow();
   });
 
-  it("rejects unknown fields instead of silently dropping them", () => {
-    expect(() => encodeOTLPTraceRequest({ resourceSpans: [{ scopeSpans: [{ spans: [{ bogusKey: 1 }] }] }] })).toThrow(/unknown field: bogusKey/);
-  });
+  it.each([{ bogusKey: 1 }, { resourceSpans: [{ bogusKey: 1 }] }, { resourceSpans: [{ scopeSpans: [{ spans: [{ bogusKey: 1 }] }] }] }, { resourceSpans: [{ resource: { attributes: [{ key: "nested", value: { bogusKey: 1 } }] } }] }])(
+    "rejects unknown fields instead of silently dropping them: %j",
+    request => {
+      expect(() => encodeOTLPTraceRequest(request)).toThrow(/unknown field: bogusKey/);
+    }
+  );
 
   it.each([
     ["NaN", 0x7ff8000000000000n],
@@ -63,6 +66,11 @@ describe("minimal OTLP protobuf encoder", () => {
   ])("encodes OTLP JSON non-finite double token %s", (token, bits) => {
     const request = { resourceSpans: [{ resource: { attributes: [{ key: "d", value: { doubleValue: token } }] } }] };
     expect(encodeOTLPTraceRequest(request).includes(Buffer.from(BigInt.asUintN(64, bits).toString(16).padStart(16, "0"), "hex").reverse())).toBe(true);
+  });
+
+  it.each(["nan", "infinity", "+Infinity", "1.5", "invalid"])("rejects unsupported double string %s", doubleValue => {
+    const request = { resourceSpans: [{ resource: { attributes: [{ key: "d", value: { doubleValue } }] } }] };
+    expect(() => encodeOTLPTraceRequest(request)).toThrow(/doubleValue must be a number/);
   });
 
   it("encodes unsafe numeric attributes from buildAttr as doubles", () => {

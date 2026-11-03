@@ -790,6 +790,7 @@ describe("sendOTLPSpan", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
     mkdirSpy.mockRestore();
     appendSpy.mockRestore();
     spawnSyncSpy.mockRestore();
@@ -814,6 +815,36 @@ describe("sendOTLPSpan", () => {
     expect(init.method).toBe("POST");
     expect(init.headers["Content-Type"]).toBe("application/json");
     expect(JSON.parse(init.body)).toEqual(payload);
+  });
+
+  it.each([Number.MAX_SAFE_INTEGER + 10_000, Number.MIN_SAFE_INTEGER - 10_000])("exports unsafe numeric attribute %s as protobuf double while preserving exact int64 strings", async value => {
+    for (const key of ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy"]) {
+      vi.stubEnv(key, "");
+    }
+    vi.stubEnv("OTEL_EXPORTER_OTLP_TRACES_PROTOCOL", "http/protobuf");
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    vi.stubGlobal("fetch", mockFetch);
+    const payload = buildOTLPPayload({
+      traceId: "0123456789abcdef0123456789abcdef",
+      spanId: "fedcba9876543210",
+      spanName: "gh-aw.test",
+      serviceName: "gh-aw",
+      startMs: 1700000000000,
+      endMs: 1700000000123,
+      attributes: [buildAttr("large.count", value), { key: "exact.count", value: { intValue: "9007199254740993" } }],
+    });
+
+    await sendOTLPSpan("https://traces.example.com", payload);
+
+    expect(mockFetch).toHaveBeenCalledOnce();
+    const [url, init] = mockFetch.mock.calls[0];
+    expect(url).toBe("https://traces.example.com/v1/traces");
+    expect(init.headers["Content-Type"]).toBe("application/x-protobuf");
+    expect(Buffer.isBuffer(init.body)).toBe(true);
+    const doubleBytes = Buffer.alloc(8);
+    doubleBytes.writeDoubleLE(value);
+    expect(init.body.includes(Buffer.concat([Buffer.from([0x12, 0x09, 0x21]), doubleBytes]))).toBe(true);
+    expect(init.body.includes(Buffer.from("1209188180808080808010", "hex"))).toBe(true);
   });
 
   it("strips trailing slash from endpoint before appending /v1/traces", async () => {

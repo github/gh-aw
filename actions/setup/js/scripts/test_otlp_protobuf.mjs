@@ -96,6 +96,11 @@ test("matches the Node.js SDK for 150 spans across resources and scopes", async 
   }
   assert.equal(allSpans.length, 150);
   const payload = JSON.parse(Buffer.from(JsonTraceSerializer.serializeRequest(allSpans)).toString("utf8"));
+  for (const resourceSpans of payload.resourceSpans) {
+    // The pinned SDK duplicates schemaUrl inside Resource, outside the OTLP schema.
+    assert.equal(resourceSpans.resource.schemaUrl, resourceSpans.schemaUrl);
+    delete resourceSpans.resource.schemaUrl;
+  }
   compare(payload, ProtobufTraceSerializer.serializeRequest(allSpans));
 });
 
@@ -154,6 +159,19 @@ test("matches SDK protocol types for 64-bit boundaries and nested AnyValue", () 
 test("matches the SDK for an empty request", () => {
   compare({ resourceSpans: [] }, ProtobufTraceSerializer.serializeRequest([]));
 });
+
+for (const token of ["NaN", "Infinity", "-Infinity"]) {
+  test(`matches SDK protocol types for OTLP JSON double token ${token}`, () => {
+    const payload = {
+      resourceSpans: [{ resource: { attributes: [{ key: "nonfinite", value: { doubleValue: token } }] } }],
+    };
+    const expected = ExportTraceServiceRequest.fromObject(toProtoJson(payload));
+    compare(payload, ExportTraceServiceRequest.encode(expected).finish());
+    const value = decode(encodeOTLPTraceRequest(payload)).resourceSpans[0].resource.attributes[0].value.doubleValue;
+    assert.ok(Object.is(value, Number(token)));
+    assert.equal(payload.resourceSpans[0].resource.attributes[0].value.doubleValue, token);
+  });
+}
 
 test("decodes actual gh-aw payloads with the SDK without losing timestamps or IDs", () => {
   const payload = buildOTLPPayload({
