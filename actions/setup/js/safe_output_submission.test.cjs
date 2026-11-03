@@ -17,6 +17,7 @@ describe("safe-output submission tracker", () => {
     const dependencySchema = tool.inputSchema.properties["depends-on"];
     addDependencySchema(tool);
     expect(tool.inputSchema.properties["depends-on"]).toEqual(dependencySchema);
+    expect(tool.inputSchema.required || []).not.toContain("depends-on");
 
     for (const reservedName of ["depends-on", "depends_on", "output_id"]) {
       expect(() => addDependencySchema({ name: "conflicting", inputSchema: { properties: { [reservedName]: { type: "string" } } } })).toThrow(/reserved input/);

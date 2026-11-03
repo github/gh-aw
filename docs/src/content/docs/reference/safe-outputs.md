@@ -64,9 +64,11 @@ such as `so_AbCdEf012345`. This identifies the queued operation,
 not a created issue or pull request. It is distinct from `temporary_id` (`aw_…`),
 which remains the mechanism for referencing newly created resources.
 
-Subsequent calls accept `depends-on` as one `output_id` or a nonempty array of
-distinct identifiers. All prerequisites must complete successfully before the
-dependent operation runs. For example, after a call returns the identifier above:
+For handler-managed safe outputs, `depends-on` is available by default and is
+optional; omit it to run an operation independently. When provided, it accepts
+one `output_id` or a nonempty array of distinct identifiers. All prerequisites
+must complete successfully before the dependent operation runs. For example,
+after a call returns the identifier above:
 
 ```json
 {
