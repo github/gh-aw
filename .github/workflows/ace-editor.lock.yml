@@ -1546,7 +1546,6 @@ jobs:
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_WORKFLOW_NAME: "ACE Editor Session"
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
-          GH_AW_ACTIVATION_RESULT: ${{ needs.activation.result }}
           GH_AW_SAFE_OUTPUTS_RESULT: ${{ needs.safe_outputs.result }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
