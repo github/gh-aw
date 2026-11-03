@@ -200,28 +200,24 @@ func parseAgentLogIfRequested(runID int64, runOutputDir string, verbose bool) {
 		}
 		err = parseAgentLog(runOutputDir, engine, verbose)
 	}
-	if err != nil {
-		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse agent log for run %d: %v", runID, err)))
-		}
-		return
-	}
-	logMdPath := filepath.Join(runOutputDir, "log.md")
-	if fileutil.FileExists(logMdPath) {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Parsed log for run %d → %s", runID, logMdPath)))
-	}
+	reportParseOutcome(runID, runOutputDir, "agent log", "log", "log.md", verbose, err)
 }
 
 func parseFirewallLogsIfRequested(runID int64, runOutputDir string, verbose bool) {
-	if err := parseFirewallLogs(runOutputDir, verbose); err != nil {
+	err := parseFirewallLogs(runOutputDir, verbose)
+	reportParseOutcome(runID, runOutputDir, "firewall logs", "firewall logs", "firewall.md", verbose, err)
+}
+
+func reportParseOutcome(runID int64, runOutputDir, warnLabel, successLabel, outputFileName string, verbose bool, err error) {
+	if err != nil {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse firewall logs for run %d: %v", runID, err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse %s for run %d: %v", warnLabel, runID, err)))
 		}
 		return
 	}
-	firewallMdPath := filepath.Join(runOutputDir, "firewall.md")
-	if fileutil.FileExists(firewallMdPath) {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Parsed firewall logs for run %d → %s", runID, firewallMdPath)))
+	outputPath := filepath.Join(runOutputDir, outputFileName)
+	if fileutil.FileExists(outputPath) {
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Parsed %s for run %d → %s", successLabel, runID, outputPath)))
 	}
 }
 

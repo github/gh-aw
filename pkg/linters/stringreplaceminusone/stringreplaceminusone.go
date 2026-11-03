@@ -65,7 +65,7 @@ func run(pass *analysis.Pass) (any, error) {
 
 // isStringsReplaceCall reports whether call is an invocation of strings.Replace.
 func isStringsReplaceCall(pass *analysis.Pass, call *ast.CallExpr) bool {
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok || sel.Sel.Name != "Replace" {
 		return false
 	}
@@ -91,7 +91,7 @@ func buildReplaceAllFix(pass *analysis.Pass, call *ast.CallExpr) []analysis.Sugg
 	if astutil.HasOverlappingComment(pass.Files, call.Pos(), call.End()) {
 		return nil
 	}
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok {
 		return nil
 	}

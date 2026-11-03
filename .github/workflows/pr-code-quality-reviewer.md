@@ -163,68 +163,11 @@ Adjudicate each candidate issue from `grumpy-coder` plus your own second pass us
 
 You may use compact pseudo-language/encoding during private reasoning (examples: `[KEEP:racy-map-write]`, `[HARDEN:nil-deref]`, `[DROP:out-of-diff]`), but never publish those tags in PR comments or review bodies.
 
-After adjudication, freeze the final finding set and choose the overall verdict using Step 5's criteria before publishing anything. Late specialist output must not reopen adjudication or trigger corrective comments or another review.
+After adjudication, freeze the final finding set. Then use the `review-publication` skill to publish the inline comments and one overall review. Late specialist output must not reopen adjudication or trigger corrective publication.
 
-### Step 4: Write Review Comments
+### Step 4: Publish the Review
 
-Publish only the frozen, adjudicated findings from Step 3, before the single overall review in Step 5. Do not start new analysis or collect specialist output during publication.
-
-For each significant issue, create a `create-pull-request-review-comment` with the file path and line number using the `safeoutputs` CLI from bash (do not call the safeoutputs MCP tool directly). Send the JSON arguments on stdin, for example:
-
-```bash
-printf '%s' '{"path":"FILE","line":42,"pull_request_number":123,"body":"COMMENT"}' | safeoutputs create_pull_request_review_comment .
-```
-
-Each comment must contain one visible sentence stating the issue and its impact, then a `<details><summary>💡 …</summary>` block with explanation, fix snippet, and rationale.
-
-Keep publication commands stdout-only: construct JSON inline with `printf '%s'` and pipe it directly to `safeoutputs`. Do not write temporary payload files, use shell redirection or heredocs, or invoke `jq`, `python`, or `node`; they are not authorized by this workflow. JSON-escape content and shell-quote it correctly without shell expansion. Send each safe-output command separately from analysis commands. Invoke the documented pipeline directly; do not prepend availability probes or other commands.
-
-Encode every apostrophe in JSON string values as `\u0027` before shell single-quoting (for example, `The caller's input` becomes `"body":"The caller\u0027s input"`); never use shell double quotes. Escape control characters as `\n`, `\t`, `\r`, or `\u00XX` for other U+0000-U+001F characters; for example, a two-line body becomes `"body":"First line\nSecond line"` (no raw newline).
-
-**Prioritization** (use your 10-comment budget aggressively):
-1. Correctness, concurrency, and security-adjacent bugs (highest priority, up to 6 comments)
-2. Significant maintainability/testability concerns (medium priority, up to 3 comments)
-3. Style/naming only when they materially increase risk (lowest priority, up to 1 comment)
-
-**Tone**: Be blunt, specific, and critical. Explain the "why" behind each concern. Do not add praise unless the code is exceptionally solid and that praise is brief.
-
-**Do not flag**:
-- Issues that linters already catch automatically
-- Personal style preferences without a clear rationale
-- Code that is outside the diff (unchanged lines)
-- Empty compliments, generic "looks good" notes, or friendliness padding
-
-### Step 5: Submit the Overall Review
-
-Submit exactly one overall review, only after Step 3's completion barrier and adjudication and Step 4's inline comments. `submit_pull_request_review` is write-once (`max: 1`); never submit a provisional review or attempt a second review to change the verdict.
-
-Always submit a review before the 15-minute timeout, including when there are zero findings. At about 10 minutes elapsed, stop analysis, explicitly close any unfinished specialist pass as `unavailable`, then adjudicate, freeze the findings/verdict, publish inline comments, and submit once. The deadline is not permission to bypass the completion barrier. Use the `safeoutputs` CLI from bash, not its MCP tool directly:
-
-```bash
-printf '%s' '{"pull_request_number":123,"event":"COMMENT","body":"Review summary"}' | safeoutputs submit_pull_request_review .
-```
-
-If a publication command is denied, distinguish an unavailable CLI from unallowed commands or file writes in the pipeline. Correct the command to the stdout-only `printf` pipeline above without widening permissions. Make at most one corrected publication attempt, then stop probing and emit `report_incomplete` through the available safe-output transport with the concrete blocker, before exhausting the five-denial budget; do not call `noop` or claim the review was published. With this workflow's CLI transport, use:
-
-```bash
-printf '%s' '{"reason":"Review publication blocked: describe the concrete tool denial or CLI error; no review was published."}' | safeoutputs report_incomplete .
-```
-
-If an inline-comment publication fails, stop publishing further comments and follow the same bounded recovery path. If the CLI itself is unavailable and no safe-output transport can run, state explicitly that no terminal safe output was emitted.
-
-Set `event` to:
-- `COMMENT` if there are no actionable blocking issues
-- `REQUEST_CHANGES` if there are issues that must be fixed before merging
-
-Use `REQUEST_CHANGES` when any of the following are true:
-- At least one `critical` or `high` issue is valid.
-- Three or more `medium` issues are valid.
-- Any issue can cause data loss, auth bypass, panic/crash, or broken CI behavior.
-- Sub-agent output is invalid and your second pass still finds at least one clearly actionable correctness/security/performance issue.
-
-Use `COMMENT` when all findings are non-blocking. Keep the overall review body concise and focused on blocking themes. Use h3 (###) or lower for any headers, and structure the body as verdict + one-line summary (always visible) → themes/highlights (in `<details>`).
-
-After a successful submission, publication is closed: do not add corrective inline comments, submit another review, or emit `report_incomplete` merely because late specialist output arrived. Proceed only to Step 6 and finish.
+Publish only the frozen findings and overall verdict using the `review-publication` skill. Do not continue analysis during publication. If publication succeeds, proceed to Step 6; if it is blocked, follow the skill's bounded recovery path.
 
 ### Step 6: Update PR Continuity Memory
 
@@ -265,3 +208,40 @@ Output format (strict):
 - `line` must be an integer line number in the changed hunk.
 - `severity` must be one of: `critical`, `high`, `medium`, `low`.
 - Keep `headline` to one sentence; keep `impact` and `fix` concise and concrete.
+
+## skill: `review-publication`
+---
+description: Publish adjudicated PR review comments and the single overall review through safe outputs.
+---
+
+### Write Review Comments
+
+Publish only the frozen, adjudicated findings, before the single overall review. Do not start new analysis or collect specialist output during publication.
+
+For each significant issue, create a `create-pull-request-review-comment` with the file path and line number using the `safeoutputs` CLI from bash (do not call the safeoutputs MCP tool directly). Send JSON on stdin:
+
+```bash
+printf '%s' '{"path":"FILE","line":42,"pull_request_number":123,"body":"COMMENT"}' | safeoutputs create_pull_request_review_comment .
+```
+
+Each comment must contain one visible sentence stating the issue and impact, then a `<details><summary>💡 …</summary>` block with explanation, fix snippet, and rationale.
+
+Keep publication commands stdout-only: construct JSON inline with `printf '%s'` and pipe it directly to `safeoutputs`. Do not write temporary payload files, use shell redirection or heredocs, or invoke `jq`, `python`, or `node`. JSON-escape content and shell-quote it correctly without shell expansion. Send each safe-output command separately from analysis commands. Do not prepend availability probes or other commands.
+
+Encode every apostrophe in JSON string values as `\u0027` before shell single-quoting; never use shell double quotes. Escape control characters as `\n`, `\t`, `\r`, or `\u00XX`.
+
+Prioritize correctness, concurrency, and security-adjacent bugs, then significant maintainability/testability concerns. Flag style only when it materially increases risk. Do not flag linter-detectable issues, unsupported preferences, unchanged code, or non-actionable praise. Be blunt and specific about impact.
+
+### Submit the Overall Review
+
+Submit exactly one overall review after inline comments. `submit_pull_request_review` is write-once (`max: 1`); never submit a provisional or second review. Always submit before the 15-minute timeout, including when there are zero findings. Around 10 minutes elapsed, close any unfinished specialist pass as `unavailable`, freeze the verdict, publish inline comments, and submit once. Do not bypass the completion barrier.
+
+```bash
+printf '%s' '{"pull_request_number":123,"event":"COMMENT","body":"Review summary"}' | safeoutputs submit_pull_request_review .
+```
+
+Set `event` to `COMMENT` when there are no actionable blocking issues and `REQUEST_CHANGES` otherwise. Use `REQUEST_CHANGES` for any valid critical/high issue, three or more valid medium issues, data loss, auth bypass, panic/crash, broken CI behavior, or invalid sub-agent output with a clearly actionable correctness/security/performance issue still found on the second pass. Keep the body concise: verdict and one-line summary, then themes/highlights in `<details>`, with headers no higher than `###`.
+
+If publication is denied, distinguish an unavailable CLI from an unallowed command or file write. Make at most one corrected `printf` pipeline attempt without widening permissions, then emit `report_incomplete` with the concrete blocker; do not call `noop` or claim publication. If an inline-comment publication fails, stop publishing further comments and follow the same recovery path. If no transport can run, state that no terminal safe output was emitted.
+
+After successful submission, publication is closed: do not add corrective comments, submit another review, or emit `report_incomplete` because of late specialist output.
