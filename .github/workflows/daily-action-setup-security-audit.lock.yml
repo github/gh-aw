@@ -1650,7 +1650,6 @@ jobs:
           GH_AW_MODEL_ROUTING_STATUS: ${{ needs.agent.outputs.model_routing_status }}
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
-          GH_AW_ACTIVATION_RESULT: ${{ needs.activation.result }}
           GH_AW_NOOP_REPORT_AS_ISSUE: "true"
           GH_AW_AIC: ${{ needs.agent.outputs.aic }}
           GH_AW_THREAT_DETECTION_AIC: ${{ needs.detection.outputs.aic }}

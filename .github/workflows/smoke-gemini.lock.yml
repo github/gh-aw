@@ -1904,7 +1904,6 @@ jobs:
           GH_AW_ENGINE_MODEL: ${{ needs.agent.outputs.model }}
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
-          GH_AW_ACTIVATION_RESULT: ${{ needs.activation.result }}
           GH_AW_NOOP_REPORT_AS_ISSUE: "false"
           GH_AW_AIC: ${{ needs.agent.outputs.aic }}
           GH_AW_THREAT_DETECTION_AIC: ${{ needs.detection.outputs.aic }}
@@ -2062,7 +2061,6 @@ jobs:
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_WORKFLOW_NAME: "Smoke Gemini"
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
-          GH_AW_ACTIVATION_RESULT: ${{ needs.activation.result }}
           GH_AW_NOOP_COMMENT_BODY: ${{ steps.noop.outputs.noop_comment_body }}
           GH_AW_SAFE_OUTPUTS_RESULT: ${{ needs.safe_outputs.result }}
           GH_AW_DETECTION_CONCLUSION: ${{ needs.detection.outputs.detection_conclusion }}
