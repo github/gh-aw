@@ -284,7 +284,7 @@ describe("ephemerals", () => {
   describe("addExpirationToFooter", () => {
     it.each(["", "\n", "\n\n", " \t\r\n"])("should place expiration directly after footer text ending in %j with or without metadata", async whitespace => {
       const { addExpirationToFooter } = await import("./ephemerals.cjs");
-      for (const suffix of ["", "\n\n<!-- gh-aw-marker -->\n"]) {
+      for (const suffix of ["", "\n\n<!-- gh-aw-marker -->\n", "\r\n\r\n<!-- gh-aw-marker -->\r\n", "\n\n<!-- gh-aw-marker -->\n\n \t"]) {
         const result = addExpirationToFooter(`\n\n> AI generated${whitespace}${suffix}`, 24);
 
         expect(result).toMatch(/^\n\n> AI generated\n> - \[x\] expires/);

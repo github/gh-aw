@@ -142,7 +142,7 @@ function addExpirationToFooter(footer, expiresHours, entityType) {
   const expirationLine = createExpirationLine(expirationDate);
 
   // Look for XML marker at the end of footer
-  const xmlMarkerMatch = footer.match(/\n\n<!--.*?-->\n?$/s);
+  const xmlMarkerMatch = footer.match(/(?:\r?\n){2}<!--.*?-->\s*$/s);
   if (xmlMarkerMatch) {
     // Insert expiration before XML marker
     const xmlMarker = xmlMarkerMatch[0];
