@@ -61,6 +61,17 @@ func updateActionsInWorkflowFiles(ctx context.Context, deps actionUpdateDeps, op
 	// Per-invocation cooldown cache: key = "repo@tag", avoids redundant date API calls
 	coolDownCache := make(map[string]coolDownCheckResult)
 
+	if conflictedWorkflow, err := findWorkflowWithMergeConflictMarkers(opts.workflowsDir); err != nil {
+		return fmt.Errorf("unable to scan workflows for merge conflicts: %w", err)
+	} else if conflictedWorkflow != "" {
+		message := fmt.Sprintf("Skipping action, skill, and plugin updates because merge conflict markers are present in %s", conflictedWorkflow)
+		updateLog.Print(message)
+		if opts.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(message))
+		}
+		return nil
+	}
+
 	var updatedFiles []string
 
 	err := filepath.WalkDir(opts.workflowsDir, func(path string, d os.DirEntry, walkErr error) error {
@@ -81,7 +92,6 @@ func updateActionsInWorkflowFiles(ctx context.Context, deps actionUpdateDeps, op
 			}
 			return nil
 		}
-
 		updatedActions, newContent, err := updateActionRefsInContentWithDeps(ctx, deps, string(content), cache, coolDownCache, !opts.disableReleaseBump, opts.verbose, opts.coolDown)
 		if err != nil {
 			if opts.verbose {
@@ -89,6 +99,7 @@ func updateActionsInWorkflowFiles(ctx context.Context, deps actionUpdateDeps, op
 			}
 			return nil
 		}
+
 		updatedSkills, newContent, err := updateSkillRefsInContent(ctx, newContent, !opts.disableReleaseBump, opts.verbose, opts.coolDown)
 		if err != nil {
 			if opts.verbose {
@@ -131,4 +142,38 @@ func updateActionsInWorkflowFiles(ctx context.Context, deps actionUpdateDeps, op
 	}
 
 	return nil
+}
+
+func containsMergeConflictMarkers(content string) bool {
+	for _, line := range strings.Split(content, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "<<<<<<<") ||
+			strings.HasPrefix(trimmed, "|||||||") ||
+			strings.HasPrefix(trimmed, ">>>>>>>") {
+			return true
+		}
+	}
+	return false
+}
+
+func findWorkflowWithMergeConflictMarkers(workflowsDir string) (string, error) {
+	var conflictedWorkflow string
+	err := filepath.WalkDir(workflowsDir, func(path string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() || !strings.HasSuffix(d.Name(), ".md") {
+			return nil
+		}
+
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		if containsMergeConflictMarkers(string(content)) && conflictedWorkflow == "" {
+			conflictedWorkflow = path
+		}
+		return nil
+	})
+	return conflictedWorkflow, err
 }
