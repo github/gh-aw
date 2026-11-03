@@ -388,6 +388,13 @@ func (c *Compiler) extractAgentSandboxConfig(agentVal any) *AgentSandboxConfig {
 	}
 
 	// Extract model-fallback (AWF API proxy model fallback enable/disable flag)
+	if value, ok := agentObj["enclave-debug-public"].(bool); ok {
+		agentConfig.EnclaveDebugPublic = &value
+	}
+	if value, ok := agentObj["host-github-token"].(string); ok {
+		agentConfig.HostGitHubToken = value
+	}
+
 	if mfVal, hasMF := agentObj["model-fallback"]; hasMF {
 		switch v := mfVal.(type) {
 		case bool:

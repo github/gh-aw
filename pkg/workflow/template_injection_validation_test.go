@@ -566,7 +566,7 @@ func TestTemplateInjectionHeredocFiltering(t *testing.T) {
 			description: "Multiple heredocs should all be filtered",
 		},
 		{
-			name: "safe - unquoted heredoc delimiter",
+			name: "unsafe - unquoted heredoc delimiter",
 			yaml: `jobs:
   test:
     steps:
@@ -575,8 +575,8 @@ func TestTemplateInjectionHeredocFiltering(t *testing.T) {
           cat > config.json << EOF
           {"issue": "${{ github.event.issue.number }}"}
           EOF`,
-			shouldError: false,
-			description: "Unquoted heredoc delimiters should be recognized",
+			shouldError: true,
+			description: "Unquoted heredoc expressions undergo shell expansion",
 		},
 	}
 
@@ -771,8 +771,8 @@ echo "done"`,
 {"value": "${{ github.event.issue.number }}"}
 EOF`,
 			want:     "cat > file # heredoc removed",
-			hasExpr:  false,
-			describe: "Unquoted EOF heredoc should be removed",
+			hasExpr:  true,
+			describe: "Unquoted EOF heredoc must remain visible",
 		},
 		{
 			name: "JSON delimiter",
@@ -818,8 +818,8 @@ EOF`,
           {"value": "${{ github.event.issue.number }}"}
           EOF`,
 			want:     "          cat > file # heredoc removed",
-			hasExpr:  false,
-			describe: "Indented heredoc should be handled",
+			hasExpr:  true,
+			describe: "Space-indented closing delimiter does not terminate a Bash heredoc",
 		},
 		{
 			name: "prefixed EOF delimiter - safe outputs config",
@@ -856,8 +856,8 @@ GH_AW_WORKFLOW_YAML`,
 {"value": "${{ github.event.issue.number }}"}
 GH_AW_TOOLS_EOF`,
 			want:     "cat > file # heredoc removed",
-			hasExpr:  false,
-			describe: "Unquoted prefixed delimiter should be removed",
+			hasExpr:  true,
+			describe: "Unquoted prefixed delimiter must remain visible",
 		},
 		{
 			name: "multiple prefixed delimiters",
@@ -1511,10 +1511,8 @@ func TestScanRunContentExpressions(t *testing.T) {
 	}
 }
 
-// TestScanRunContentExpressionsHeredoc verifies that expressions inside heredocs
-// are not flagged as disallowed – this ensures that ${{ }} expressions inside
-// unquoted heredocs (e.g. heredoc config blocks) are exempt from template-injection
-// checks by our internal validator.
+// TestScanRunContentExpressionsHeredoc distinguishes literal quoted bodies from
+// expanding unquoted bodies on the raw-YAML fast path.
 func TestScanRunContentExpressionsHeredoc(t *testing.T) {
 	tests := []struct {
 		name              string
@@ -1537,7 +1535,7 @@ func TestScanRunContentExpressionsHeredoc(t *testing.T) {
 			wantHasDisallowed: false,
 		},
 		{
-			name: "unsafe expression inside unquoted heredoc is not flagged",
+			name: "unsafe expression inside unquoted heredoc is flagged",
 			yaml: `jobs:
   test:
     steps:
@@ -1545,8 +1543,8 @@ func TestScanRunContentExpressionsHeredoc(t *testing.T) {
           cat << EOF
           title: ${{ github.event.issue.title }}
           EOF`,
-			wantHasUnsafe:     false,
-			wantHasDisallowed: false,
+			wantHasUnsafe:     true,
+			wantHasDisallowed: true,
 		},
 		{
 			name: "disallowed expression OUTSIDE heredoc is still flagged",
@@ -1607,94 +1605,6 @@ func TestScanRunContentExpressionsHeredoc(t *testing.T) {
 
 			assert.Equal(t, tt.wantHasUnsafe, got.hasUnsafe, "hasUnsafe mismatch")
 			assert.Equal(t, tt.wantHasDisallowed, got.hasDisallowed, "hasDisallowed mismatch")
-		})
-	}
-}
-
-// TestDetectHeredocDelimiter verifies the heredoc delimiter extraction function.
-func TestDetectHeredocDelimiter(t *testing.T) {
-	tests := []struct {
-		name      string
-		line      string
-		wantDelim string
-		wantOK    bool
-	}{
-		{
-			name:      "unquoted delimiter",
-			line:      `cat << EOF | node script.cjs`,
-			wantDelim: "EOF",
-			wantOK:    true,
-		},
-		{
-			name:      "compiler-style delimiter with prefix",
-			line:      `cat << GH_AW_MCP_CONFIG_01641c1bd0fd81fa_EOF | "$GH_AW_NODE" "${RUNNER_TEMP}/actions/start.cjs"`,
-			wantDelim: "GH_AW_MCP_CONFIG_01641c1bd0fd81fa_EOF",
-			wantOK:    true,
-		},
-		{
-			name:      "single-quoted delimiter",
-			line:      `cat << 'EOF'`,
-			wantDelim: "EOF",
-			wantOK:    true,
-		},
-		{
-			name:      "double-quoted delimiter",
-			line:      `cat << "MY_DELIM"`,
-			wantDelim: "MY_DELIM",
-			wantOK:    true,
-		},
-		{
-			name:      "strip-tab variant",
-			line:      `cat <<- EOF`,
-			wantDelim: "EOF",
-			wantOK:    true,
-		},
-		{
-			name:      "no heredoc",
-			line:      `echo hello`,
-			wantDelim: "",
-			wantOK:    false,
-		},
-		{
-			name:      "less-than operator is not a heredoc",
-			line:      `if [ $x < 5 ]; then`,
-			wantDelim: "",
-			wantOK:    false,
-		},
-		{
-			name:      "bash here-string is not a heredoc",
-			line:      `cat <<< "hello world"`,
-			wantDelim: "",
-			wantOK:    false,
-		},
-		{
-			name:      "arithmetic bitshift is not a heredoc",
-			line:      `echo $((1 << 2))`,
-			wantDelim: "",
-			wantOK:    false,
-		},
-		{
-			name:      "arithmetic bitshift no spaces is not a heredoc",
-			line:      `result=$((flags<<4))`,
-			wantDelim: "",
-			wantOK:    false,
-		},
-		{
-			name:      "delimiter starting with dash is not a heredoc",
-			line:      `cat << -EOF`,
-			wantDelim: "",
-			wantOK:    false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			trimmed := strings.TrimLeft(tt.line, " \t")
-			gotDelim, gotOK := detectHeredocDelimiter(trimmed)
-			assert.Equal(t, tt.wantOK, gotOK)
-			if tt.wantOK {
-				assert.Equal(t, tt.wantDelim, gotDelim)
-			}
 		})
 	}
 }

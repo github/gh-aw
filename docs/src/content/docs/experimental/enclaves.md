@@ -29,7 +29,30 @@ Each `repos` entry uses `public`, `trusted`, `internal`, `confidential`, or `sea
 
 The generated gateway upstream uses a fresh masked capability for each workflow run. That capability is passed only to mcpg and AWF and is excluded from the primary agent environment. The gateway allows 120 seconds for the AWF-owned HTTP upstream to become available. It enforces a 4,860-second tool timeout, covering AWF's maximum 4,800-second finite-disclosure timing bucket plus a 60-second transport allowance. Executor timeouts are capped at 4,740 seconds because AWF reserves 60 seconds in the final bucket for processing and cleanup. The gateway timeout is an enforcement bound, not an absolute AWF wall-clock guarantee under pathological host cleanup or scheduler stalls.
 
-This compiler contract depends on the unified enclave implementation from `github/gh-aw-firewall#6992`. Until that change is available in an AWF release, pinning an older AWF version will not provide the enclave server.
+### Docker setup and host repository credentials
+
+The default AWF release is `v0.29.5`. For Docker enclaves, compilation generates authenticated installation and probing of the same-release, runner-UID-scoped storage helper. Only helper provisioning is privileged; AWF remains rootless with network isolation and writable invocation storage mounted `noexec`. Copilot native addons load from the sealed image runtime, not writable storage.
+
+Use `sandbox.agent.host-github-token` for host-side repository staging:
+
+```aw wrap
+sandbox:
+  agent:
+    runtime: docker
+    host-github-token: ${{ secrets.GH_AW_GITHUB_TOKEN }}
+```
+
+The execution step rejects a missing staging credential and binds it as host `GH_TOKEN`, automatically excluded from the primary agent environment. This is separate from the enclave GitHub-tool credential and does not persist secrets through `GITHUB_ENV`. Grant only the repository read access needed for staging. Both agent and detection installers independently authenticate official release attestations and verify the reviewed checksum manifest and its release-tag identity.
+
+### Public Docker diagnostics
+
+Set `sandbox.agent.enclave-debug-public: true` only for static, public-only Docker enclaves using official release images. The default is `false`, explicitly serialized to disable AWF's automatic public capture. Confidential, private, mixed, dynamic, custom-image, and unsupported runtime configurations cannot opt in. AWF additionally verifies repository visibility anonymously before capture.
+
+Public collection currently supports the reviewed AWF `v0.29.5` release; later releases require aligned collector and interpreter pins before they can opt in.
+
+Compilation installs the version-aligned upstream diagnostic collector and a checksum-verified Node executable under protected host paths. It generates `prepare` before execution, `collect` after execution and teardown (including execution failure), and a pinned artifact upload of only the collector's validated runner-readable `upload/` directory. Collection rejection can publish bounded status without partially validated streams; execution failure, collection failure, and absent evidence remain distinct.
+
+Diagnostic artifacts have a fixed one-day retention ceiling, unaffected by repository retention variables. Credential redaction does not redact private repository content: never enable public diagnostics for confidential targets. No collector, interpreter, trusted-root, or retention override is exposed.
 
 ## Cloud Hypervisor enclave runtime
 

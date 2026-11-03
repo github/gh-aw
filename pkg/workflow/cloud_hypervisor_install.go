@@ -3,7 +3,10 @@
 
 package workflow
 
-import "github.com/github/gh-aw/pkg/logger"
+import (
+	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/logger"
+)
 
 var cloudHypervisorInstallLog = logger.New("workflow:cloud_hypervisor_install")
 
@@ -65,5 +68,10 @@ func generateAWFInstallationStepForWorkflow(version string, workflowData *Workfl
 		// This does not change the primary agent's Docker runtime profile.
 		return generateAWFInstallationStep(version, nil)
 	}
-	return generateAWFInstallationStep(version, agentConfig)
+	steps := generateAWFInstallationStep(version, agentConfig)
+	if enclavesEnabled(workflowData) && !hasCloudHypervisorEnclaves(workflowData) && !isCloudHypervisorRuntime(workflowData) &&
+		awfVersionAtLeast(getFirewallConfig(workflowData), constants.AWFDockerEnclaveSetupMinVersion) {
+		steps = append(generateDockerEnclaveStorageHelperInstallStep(version, agentConfig), steps...)
+	}
+	return steps
 }

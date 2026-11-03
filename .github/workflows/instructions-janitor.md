@@ -7,6 +7,7 @@ permissions:
   contents: read
   issues: read
   pull-requests: read
+  copilot-requests: write
 network:
   allowed:
   - defaults
@@ -31,7 +32,10 @@ description: Reviews and cleans up instruction files to ensure clarity, low dupl
 emoji: 🧹
 engine:
   id: claude
-model: claude-sonnet-5
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: balanced
 name: Instructions Janitor
 strict: true
 timeout-minutes: 20
@@ -51,6 +55,11 @@ tools:
     mode: local
     toolsets:
     - default
+evals:
+  - id: edited-files-within-targets
+    question: For a proposed instruction-cleanup PR, do the resulting edited instruction files meet their applicable file-layout line targets? Return UNKNOWN when no PR is proposed.
+  - id: duplication-consolidated
+    question: When a patch addresses duplicated guidance, does it replace repeated rules with references to a single focused canonical location? Return UNKNOWN when no duplication cleanup is proposed.
 ---
 
 # Instructions Janitor

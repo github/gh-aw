@@ -19,6 +19,8 @@ engine:
     COPILOT_MODEL: "qwen2.5:0.5b"
 strict: true
 timeout-minutes: 20
+tools:
+  github: false
 steps:
   - name: Install Ollama
     env:
@@ -41,6 +43,8 @@ steps:
     env:
       OLLAMA_HOST: "0.0.0.0:11434"
       OLLAMA_LOG: "/tmp/gh-aw/ollama-serve.log"
+      # The agent request exceeded 25k tokens; leave room for its response.
+      OLLAMA_CONTEXT_LENGTH: "32768"
       # Ollama 0.31.1's llama.cpp runner crashes during warm-up with AMX
       # weight buffers on hosted Xeon runners. Use standard CPU buffers.
       LLAMA_ARG_REPACK: "0"
@@ -112,6 +116,22 @@ steps:
       echo "--- last 200 lines of ${OLLAMA_LOG} ---"
       tail -n 200 "$OLLAMA_LOG" 2>/dev/null || echo "no server log available"
       exit 1
+  - name: Verify Ollama context window
+    env:
+      OLLAMA_MODEL: "qwen2.5:0.5b"
+      OLLAMA_MIN_CONTEXT: "32768"
+    # runner-guard:ignore RGS-012 -- loopback-only metadata read from the local Ollama service.
+    run: |
+      if ! MODELS="$(curl -fsS --max-time 10 http://localhost:11434/api/ps)"; then
+        echo "::error::Could not read the loaded Ollama model context."
+        exit 1
+      fi
+      if ! jq -e --arg model "$OLLAMA_MODEL" --argjson min_context "$OLLAMA_MIN_CONTEXT" \
+        'any(.models[]?; .name == $model and (.context_length | type) == "number" and .context_length >= $min_context)' \
+        <<< "$MODELS" > /dev/null; then
+        echo "::error::Loaded model '$OLLAMA_MODEL' requires at least $OLLAMA_MIN_CONTEXT context tokens."
+        exit 1
+      fi
   - name: Verify Ollama BYOK readiness
     env:
       OLLAMA_MODEL: "qwen2.5:0.5b"
@@ -173,6 +193,14 @@ post-steps:
       pgrep -a ollama || echo "no ollama process is running"
       echo "--- last 200 lines of ${OLLAMA_LOG} ---"
       tail -n 200 "$OLLAMA_LOG" 2>/dev/null || echo "no server log available"
+      if [ ! -r "$OLLAMA_LOG" ]; then
+        echo "::error::Ollama log is unavailable; input truncation could not be checked."
+        exit 1
+      fi
+      if grep -Fq 'truncating input prompt' "$OLLAMA_LOG"; then
+        echo "::error::Ollama truncated an input prompt; this run cannot confirm the BYOK agent completion contract."
+        exit 1
+      fi
 network:
   allowed:
     - defaults
@@ -227,3 +255,5 @@ Then create an issue with:
 
   <your haiku here>
   ```
+
+Replace the placeholder with your actual haiku. Invoke the configured `create_issue` safe-output tool (or `safeoutputs create_issue` CLI) with the final title and body; printing a proposed issue in your response does not create it or complete this task.

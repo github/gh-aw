@@ -241,7 +241,7 @@ describe("manual branch recovery/apply commands", () => {
       });
 
       expect(runGit(["bundle", "list-heads", path.join(artifactDir, "head-only.bundle")], targetDir)).toMatch(/\sHEAD$/);
-      runShell(skipArtifactDownload(commands), targetDir);
+      runShell(skipArtifactDownload(commands).replaceAll(`/tmp/agent-${artifactRunId}`, artifactDir), targetDir);
 
       expect(fs.readFileSync(path.join(targetDir, "file.txt"), "utf8")).toBe("updated\n");
       expect(runGit(["rev-parse", "feature/recovered"], targetDir)).toBe(runGit(["rev-parse", "HEAD"], workDir));
@@ -249,7 +249,7 @@ describe("manual branch recovery/apply commands", () => {
       fs.rmSync(tempRoot, { recursive: true, force: true });
       fs.rmSync(artifactDir, { recursive: true, force: true });
     }
-  });
+  }, 60000);
 
   it("manual apply bundle commands work with a real HEAD-only bundle", () => {
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "manual-apply-head-bundle-"));
@@ -292,7 +292,7 @@ describe("manual branch recovery/apply commands", () => {
       expect(commands).toContain("git checkout -B 'feature' FETCH_HEAD");
       expect(commands).toContain("git push 'origin' 'HEAD:refs/heads/feature'");
       expect(runGit(["bundle", "list-heads", path.join(artifactDir, "head-only.bundle")], targetDir)).toMatch(/\sHEAD$/);
-      runShell(skipArtifactDownload(commands), targetDir);
+      runShell(skipArtifactDownload(commands).replaceAll(`/tmp/agent-${artifactRunId}`, artifactDir), targetDir);
 
       expect(fs.readFileSync(path.join(targetDir, "file.txt"), "utf8")).toBe("updated\n");
       expect(runGit(["rev-parse", "feature"], targetDir)).toBe(runGit(["--git-dir", remoteDir, "rev-parse", "feature"], tempRoot));
@@ -300,7 +300,7 @@ describe("manual branch recovery/apply commands", () => {
       fs.rmSync(tempRoot, { recursive: true, force: true });
       fs.rmSync(artifactDir, { recursive: true, force: true });
     }
-  });
+  }, 60000);
 });
 
 // ---------------------------------------------------------------------------

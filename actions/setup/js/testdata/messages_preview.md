@@ -65,8 +65,9 @@ Commit pushed: [`0123456`](https://example.test/synthetic/repository/commit/0123
 ## getDetectionWarningMessage: agent_failure
 
 > [!WARNING]
-> threat detection engine error
-> The threat detection engine encountered an error and could not complete analysis. This is a tooling failure, not a security finding.
+> **Threat detection engine error**
+>
+> Threat detection could not complete its analysis due to a tooling error. This is not a security finding.
 > <!-- gh-aw-threat-engine-error -->
 >
 > <details>
@@ -74,7 +75,7 @@ Commit pushed: [`0123456`](https://example.test/synthetic/repository/commit/0123
 >
 > The threat detection engine failed to produce results.
 >
-> Review the [workflow run logs](https://example.test/synthetic/repository/actions/runs/1000) for details.
+> Review the [workflow run logs](https://example.test/synthetic/repository/actions/runs/1000) to troubleshoot the error.
 > </details>
 
 ---
@@ -82,8 +83,9 @@ Commit pushed: [`0123456`](https://example.test/synthetic/repository/commit/0123
 ## getDetectionWarningMessage: parse_error
 
 > [!WARNING]
-> threat detection engine error
-> The threat detection engine encountered an error and could not complete analysis. This is a tooling failure, not a security finding.
+> **Threat detection engine error**
+>
+> Threat detection could not complete its analysis due to a tooling error. This is not a security finding.
 > <!-- gh-aw-threat-engine-error -->
 >
 > <details>
@@ -91,7 +93,7 @@ Commit pushed: [`0123456`](https://example.test/synthetic/repository/commit/0123
 >
 > The threat detection results could not be parsed.
 >
-> Review the [workflow run logs](https://example.test/synthetic/repository/actions/runs/1000) for details.
+> Review the [workflow run logs](https://example.test/synthetic/repository/actions/runs/1000) to troubleshoot the error.
 > </details>
 
 ---
@@ -563,15 +565,15 @@ This issue is updated by the activation-stage version check when another blocked
 
 > [!WARNING]
 > <details>
-> <summary>Cache Configuration Problem: cache miss detected after cache restore succeeded.</summary>
+> <summary>Missing Cache Data: cache miss detected after cache restore succeeded.</summary>
 > 
-> The agent reported a cache miss (`report_missing_data` with `reason: cache_memory_miss`) after the workflow successfully restored cache-memory for this run. This likely indicates the prompt is misconfigured and the agent cannot locate the correct file path within the cache directory.
+> The agent reported a cache miss (`report_missing_data` with `reason: cache_memory_miss`) after the workflow successfully restored cache-memory for this run. A restore match does not guarantee that every required file exists. Check the workflow's required inputs, cache paths, and key consistency before diagnosing a configuration problem.
 > 
 > This warning is shown only when a cache restore matched an existing key. Cache misses can be expected on first runs and on branches where `actions/cache` has no visible entries due to branch scoping.
 > 
-> Review the [cache-memory configuration](https://github.github.com/gh-aw/reference/cache-memory/) and ensure the agent prompt correctly references files inside the cache directory.
+> Review the [cache-memory configuration](https://github.github.com/gh-aw/reference/cache-memory/). If the workflow defines initialization or another fallback for absent state, follow that path without reporting expected absence as missing data. Missing required inputs without a fallback should still be reported.
 > 
-> **File naming convention:** Cache files are stored at `/tmp/gh-aw/cache-memory/` (default) or `/tmp/gh-aw/cache-memory-synthetic_id/` for additional caches. Use descriptive file and directory names with subdirectories for organization.
+> **File naming convention:** Cache files are stored at `/tmp/gh-aw/cache-memory/` (default) or `/tmp/gh-aw/cache-memory-<id>/` for additional caches. Replace `<id>` with the configured cache ID. Use descriptive file and directory names with subdirectories for organization.
 > 
 > </details>
 
@@ -1983,8 +1985,9 @@ When the run succeeds, this issue is closed with a link to the created pull requ
 ## Template: threat_detection_engine_error.md
 
 > [!WARNING]
-> threat detection engine error
-> The threat detection engine encountered an error and could not complete analysis. This is a tooling failure, not a security finding.
+> **Threat detection engine error**
+>
+> Threat detection could not complete its analysis due to a tooling error. This is not a security finding.
 > synthetic_threat_detected_marker
 >
 > <details>
@@ -1992,7 +1995,7 @@ When the run succeeds, this issue is closed with a link to the created pull requ
 >
 > A synthetic threat was detected.
 >
-> Review the [workflow run logs](https://example.test/synthetic/repository/actions/runs/1000) for details.
+> Review the [workflow run logs](https://example.test/synthetic/repository/actions/runs/1000) to troubleshoot the error.
 > </details>
 
 ---

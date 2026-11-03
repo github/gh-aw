@@ -36,15 +36,12 @@ func (c *Compiler) validateExpressions(workflowData *WorkflowData, markdownPath 
 	// Validate expression safety - check that all GitHub Actions expressions are in the allowed list.
 	// In non-strict mode, ${{ toJSON(secrets) }} occurrences were already warned about above;
 	// neutralize them so the allowlist does not re-surface them as errors.
-	if strings.Contains(workflowData.MarkdownContent, "${{") {
-		workflowLog.Printf("Validating expression safety")
-		markdownForAllowlist := workflowData.MarkdownContent
-		if !c.effectiveStrictMode(workflowData.RawFrontmatter) {
-			markdownForAllowlist = neutralizeSecretsSerializationExpressions(markdownForAllowlist)
-		}
-		if err := validateExpressionSafety(markdownForAllowlist); err != nil {
-			return formatCompilerError(markdownPath, "error", err.Error(), err)
-		}
+	markdownForAllowlist := removeXMLComments(workflowData.MarkdownContent)
+	if !c.effectiveStrictMode(workflowData.RawFrontmatter) {
+		markdownForAllowlist = neutralizeSecretsSerializationExpressions(markdownForAllowlist)
+	}
+	if err := validateExpressionSafety(markdownForAllowlist); err != nil {
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
 
 	// Validate expressions in runtime-import files at compile time
@@ -65,6 +62,9 @@ func (c *Compiler) validateExpressions(workflowData *WorkflowData, markdownPath 
 		}
 	}
 
+	if err := validatePromptSecretBindings(workflowData, c.collectRuntimeImportMarkdownForCompilerAnalysis(workflowData)); err != nil {
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
+	}
 	// Warn when the prompt explicitly references /tmp/ or /tmp/gh-aw/ directly instead
 	// of the recommended /tmp/gh-aw/agent/ subtree.
 	c.validatePromptTmpPaths(workflowData, markdownPath)
@@ -273,7 +273,7 @@ func (c *Compiler) validateCoreToolConfiguration(workflowData *WorkflowData, mar
 		{logMessage: "Validating safe-outputs samples entries against MCP tool schemas", validateFn: func() error { return validateSafeOutputsSamples(workflowData.SafeOutputs) }},
 		{logMessage: "Validating safe-outputs urls policy", validateFn: func() error { return validateSafeOutputsURLs(workflowData.SafeOutputs) }},
 		{logMessage: "Validating safe-outputs allowed-domains", validateFn: func() error { return c.validateSafeOutputsAllowedDomains(workflowData.SafeOutputs) }},
-		{logMessage: "Validating safe-outputs merge-pull-request", validateFn: func() error { return validateSafeOutputsMergePullRequest(workflowData.SafeOutputs) }},
+		{logMessage: "Validating safe-outputs merge-pull-request", validateFn: func() error { return validateMergePullRequestPolicies(workflowData.SafeOutputs, workflowData.Name) }},
 		{logMessage: "Validating safe-outputs add-labels permissions", validateFn: func() error { return validateAddLabelsPermissions(workflowData.SafeOutputs) }},
 		{logMessage: "Validating safe-outputs add-labels item schema and samples", validateFn: func() error { return validateAddLabelsItemSchemaAndSamples(workflowData.SafeOutputs) }},
 		{logMessage: "Validating safe-outputs remove-labels permissions", validateFn: func() error { return validateRemoveLabelsPermissions(workflowData.SafeOutputs) }},
@@ -585,11 +585,7 @@ func (c *Compiler) emitExperimentalFeatureWarningsTo(workflowData *WorkflowData,
 		{enabled: slices.ContainsFunc(workflowData.WebhookSubscriptions, func(subscription WebhookSubscription) bool { return subscription.Event == "code_scanning_alert" }), message: "Using experimental feature: on.gateway-dispatch.code-scanning-alert (hosted CAO triggers)"},
 		{enabled: slices.ContainsFunc(workflowData.WebhookSubscriptions, func(subscription WebhookSubscription) bool { return subscription.Event == "dependabot_alert" }), message: "Using experimental feature: on.gateway-dispatch.dependabot-alerts (hosted CAO triggers)"},
 		{enabled: workflowData.RawFrontmatter["graders"] != nil && workflowData.Graders != nil && workflowData.Graders.HasGraders(), message: "Using experimental feature: graders"},
-		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.DispatchRepository != nil, message: "Using experimental feature: dispatch-repository"},
 		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.MergePullRequest != nil, message: "Using experimental feature: merge-pull-request"},
-		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.ApproveWorkflowRun != nil, message: "Using experimental feature: approve-workflow-run"},
-		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.ReplaceLabel != nil, message: "Using experimental feature: replace-label"},
-		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.UploadCodeCoverage != nil, message: "Using experimental feature: upload-code-coverage"},
 		{enabled: len(workflowData.LSP) > 0, message: "Using experimental feature: lsp"},
 		{enabled: hasCloudHypervisorEnclaves(workflowData), message: "Using experimental feature: enclaves cloud-hypervisor runtime"},
 		{enabled: len(workflowData.Plugins) > 0, message: "Using experimental feature: plugins"},

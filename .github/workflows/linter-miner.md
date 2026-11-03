@@ -14,10 +14,12 @@ permissions:
 
 
 tracker-id: linter-miner
-model: copilot/claude-sonnet-5.5
 engine:
   id: copilot
   copilot-sdk: true
+  model-routing:
+    goal: cost
+    mode: economy
 max-tool-denials: 3
 network:
   allowed:

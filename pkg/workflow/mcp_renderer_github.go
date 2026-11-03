@@ -1,7 +1,6 @@
 package workflow
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -248,9 +247,9 @@ func RenderGitHubMCPDockerConfig(yaml *strings.Builder, options GitHubMCPDockerO
 	// Append custom args if present (these are Docker runtime args, go before container image)
 	if len(options.CustomArgs) > 0 {
 		yaml.WriteString("                \"args\": [\n")
-		for _, arg := range options.CustomArgs {
-			quotedArg, _ := json.Marshal(arg) //nolint:jsonmarshalignoredeerror // marshaling a string cannot fail
-			yaml.WriteString("                  " + string(quotedArg) + ",\n")
+		for i, arg := range options.CustomArgs {
+			arg, _ = replaceMCPExpressions(arg, false)
+			yaml.WriteString("                  " + marshalMCPHeredocString(normalizeMCPShellReferences(arg)) + renderMCPComma(i == len(options.CustomArgs)-1) + "\n")
 		}
 		yaml.WriteString("                ],\n")
 	}

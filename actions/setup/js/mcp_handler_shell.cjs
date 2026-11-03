@@ -11,7 +11,7 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 
-const { executeProcess } = require("./mcp_handler_process.cjs");
+const { executeProcess, createToolEnvironment } = require("./mcp_handler_process.cjs");
 
 /**
  * Removes the specified temporary output file, suppressing any errors.
@@ -39,16 +39,17 @@ function cleanupOutputFile(outputFile) {
  * @param {string} toolName - Name of the tool for logging purposes
  * @param {string} scriptPath - Path to the shell script to execute
  * @param {number} [timeoutSeconds=60] - Timeout in seconds for script execution
+ * @param {Record<string, string>} [envBindings] - Tool-local environment references
  * @returns {Function} Async handler function that executes the shell script
  */
-function createShellHandler(server, toolName, scriptPath, timeoutSeconds = 60) {
+function createShellHandler(server, toolName, scriptPath, timeoutSeconds = 60, envBindings = {}) {
   return async args => {
     server.debug(`  [${toolName}] Invoking shell handler: ${scriptPath}`);
     server.debug(`  [${toolName}] Shell handler args: ${JSON.stringify(args)}`);
     server.debug(`  [${toolName}] Timeout: ${timeoutSeconds}s`);
 
     // Create environment variables from args (GitHub Actions convention: INPUT_NAME)
-    const env = { ...process.env };
+    const env = createToolEnvironment(envBindings);
     for (const [key, value] of Object.entries(args || {})) {
       const envKey = `INPUT_${key.toUpperCase().replace(/-/g, "_")}`;
       env[envKey] = String(value);

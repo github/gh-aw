@@ -50,10 +50,10 @@ func TestRuntimeImportExpressionValidation(t *testing.T) {
 			description: "Step output",
 		},
 		{
-			name:        "safe expression env.NODE_VERSION",
+			name:        "unsafe expression env.NODE_VERSION",
 			expression:  "env.NODE_VERSION",
-			expectSafe:  true,
-			description: "Environment variable",
+			expectSafe:  false,
+			description: "Environment variables are unavailable to restricted runtime fragments",
 		},
 		{
 			name:        "safe expression inputs.version",

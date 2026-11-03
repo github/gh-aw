@@ -12,6 +12,7 @@ on:
 permissions:
   contents: read
   pull-requests: read
+  copilot-requests: write
 name: Smoke GitHub Claude
 model: claude-haiku-4.5
 engine:

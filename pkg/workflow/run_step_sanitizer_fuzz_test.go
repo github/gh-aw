@@ -117,13 +117,16 @@ func FuzzSanitizeRunStepExpressions(f *testing.F) {
 			return
 		}
 
-		// After sanitization the non-heredoc portion of the run script must
-		// contain no inline ${{ }} markers.  Expressions inside heredoc blocks
-		// are intentionally left in place because they are written to files
-		// rather than executed by the shell interpreter.
-		sanitizedScan := removeHeredocContent(sanitizedRun)
+		// Quoted bodies remain literal; expanding bodies must be sanitized.
+		sanitizedScan := executableShellContent(sanitizedRun)
 		if strings.Contains(sanitizedScan, "${{") {
-			t.Errorf("non-heredoc portion of sanitized run field still contains ${{ }} marker: %q", sanitizedRun)
+			if len(ExpressionPattern.FindAllString(sanitizedScan, -1)) > 0 {
+				t.Errorf("executable portion of sanitized run field still contains a complete expression: %q", sanitizedRun)
+			}
+			// An incomplete wrapper cannot be extracted, but must fail validation.
+			if err := validateNoGitHubExpressionsInRunScriptsFromParsed(map[string]any{"steps": []any{result}}); err == nil {
+				t.Errorf("remaining malformed expression bypassed validation: %q", sanitizedRun)
+			}
 		}
 
 		// env: block must be present.

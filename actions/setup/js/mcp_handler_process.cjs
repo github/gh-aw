@@ -11,6 +11,32 @@
 const { execFile } = require("child_process");
 
 /**
+ * Preserve only runtime paths/locales, not ambient network/registry/TLS
+ * configuration, GitHub metadata, or runner/server credentials.
+ * Additional handler configuration requires explicit per-tool bindings.
+ * Resolve only this tool's bindings; transport names never reach the child.
+ * @param {Record<string, string>} [bindings]
+ * @returns {NodeJS.ProcessEnv}
+ */
+function createToolEnvironment(bindings = {}) {
+  /** @type {NodeJS.ProcessEnv} */
+  const env = {};
+  const runtimeNames = ["PATH", "HOME", "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL", "LC_CTYPE", "TZ", "GITHUB_WORKSPACE", "RUNNER_TEMP", "GOROOT", "GOPATH", "GOCACHE", "GOMODCACHE"];
+  for (const name of runtimeNames) {
+    if (process.env[name] !== undefined) {
+      env[name] = process.env[name];
+    }
+  }
+  for (const [name, source] of Object.entries(bindings)) {
+    if (typeof source !== "string" || !Object.hasOwn(process.env, source)) {
+      throw new Error(`Missing MCP script environment binding for '${name}'`);
+    }
+    Object.defineProperty(env, name, { value: process.env[source], enumerable: true, writable: true, configurable: true });
+  }
+  return env;
+}
+
+/**
  * Builds an enhanced error message that includes stdout/stderr so the AI agent
  * can see what actually went wrong (not just "Command failed").
  * Preserves exit code, signal, and the original error message so timeout and
@@ -170,6 +196,7 @@ function executeProcess(opts) {
 }
 
 module.exports = {
+  createToolEnvironment,
   buildEnhancedError,
   parseStdoutAsJson,
   wrapMCPContent,

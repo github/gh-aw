@@ -144,11 +144,11 @@ func zeroLengthSliceAssignment(pass *analysis.Pass, stmt ast.Stmt) (types.Object
 		return nil, nil, nil, false
 	}
 
-	call, ok := value.(*ast.CallExpr)
+	call, ok := astutil.UnwrapParenExpr(value).(*ast.CallExpr)
 	if !ok || len(call.Args) != 2 || call.Ellipsis.IsValid() {
 		return nil, nil, nil, false
 	}
-	ident, ok := call.Fun.(*ast.Ident)
+	ident, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.Ident)
 	if !ok || ident.Name != "make" {
 		return nil, nil, nil, false
 	}

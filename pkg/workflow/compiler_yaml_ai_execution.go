@@ -750,6 +750,10 @@ func (c *Compiler) generateAgentRunSteps(yaml *strings.Builder, data *WorkflowDa
 
 	c.generateAgentRateLimitSnapshotStep(yaml, data, "start")
 
+	if err := generateEnclaveDiagnosticsPrepare(yaml, data); err != nil {
+		return nil, "", err
+	}
+
 	// Add AI execution step using the agentic engine
 	compilerYamlLog.Printf("Generating engine execution steps for %s", engine.GetID())
 	c.generateEngineExecutionSteps(yaml, data, engine, logFileFull)

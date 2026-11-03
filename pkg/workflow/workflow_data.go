@@ -74,6 +74,7 @@ type WorkflowData struct {
 	ImportPaths                    []string // Import file paths for runtime-import macro generation (imports without inputs)
 	PromptImports                  []parser.PromptImportEntry
 	MainWorkflowMarkdown           string               // main workflow markdown without imports (for runtime-import)
+	MainWorkflowPromptPath         string               // compiler-selected author source, not a runtime-import fragment
 	DeferredPromptExpressions      []*ExpressionMapping // prompt values resolved after activation in the agent job
 	IncludedFiles                  []string             // list of files included via @include directives (rendered as comment in lock file)
 	ImportInputs                   map[string]any       // input values from imports with inputs (for github.aw.inputs.* substitution)

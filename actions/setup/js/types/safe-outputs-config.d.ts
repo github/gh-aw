@@ -249,6 +249,10 @@ interface PushToPullRequestBranchConfig extends SafeOutputConfig {
  */
 interface MergePullRequestConfig extends SafeOutputConfig {
   "required-labels"?: string[];
+  "required-title-prefix"?: string;
+  "required-checks"?: string[];
+  "required-check-apps"?: Record<string, number>;
+  "required-approvers"?: string[];
   "allowed-labels"?: string[];
   "allowed-branches"?: string[];
   "allowed-files"?: string[];

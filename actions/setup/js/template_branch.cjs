@@ -5,6 +5,8 @@
 
 const { isTruthy } = require("./is_truthy.cjs");
 
+const ELSEIF_BRANCH_REGEX = /[ \t]*\{\{#?else[-_]?if\s+([^}]*)\}\}[ \t]*\n?/;
+
 /**
  * Selects the appropriate branch from a conditional block that may contain
  * {{#elseif}}, {{#else-if}}, {{#else_if}}, {{elseif}}, {{else-if}}, {{else_if}}
@@ -29,7 +31,7 @@ function selectBranch(ifCondition, body, resolveCondition = condition => conditi
   // Split on all elseif variants.  The capturing group ensures that the condition
   // text appears between the content pieces in the resulting array.
   // Supported: {{#elseif}}, {{#else-if}}, {{#else_if}}, {{elseif}}, {{else-if}}, {{else_if}}
-  const parts = body.split(/[ \t]*\{\{#?else[-_]?if\s+([^}]*)\}\}[ \t]*\n?/);
+  const parts = body.split(ELSEIF_BRANCH_REGEX);
 
   // parts alternates: [content0, cond1, content1, cond2, content2, ...]
   /** @type {Array<{condition: string|null, content: string}>} */

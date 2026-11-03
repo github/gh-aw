@@ -209,7 +209,6 @@ func cloudHypervisorEnclaveCopilotRouteConfigured(workflowData *WorkflowData) bo
 		}
 	}
 	applyEngineAndAgentEnv(env, workflowData, enclavesLog)
-	applyMCPScriptsSecretEnv(env, workflowData)
 	if engineID == "" {
 		engineID = "copilot"
 	}

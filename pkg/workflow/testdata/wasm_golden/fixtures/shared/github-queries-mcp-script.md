@@ -21,6 +21,7 @@ mcp-scripts:
         required: false
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_REPOSITORY: ${{ github.repository }}
     run: |
       set -e
       
@@ -114,6 +115,7 @@ mcp-scripts:
         required: false
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_REPOSITORY: ${{ github.repository }}
     run: |
       set -e
       
@@ -209,6 +211,8 @@ mcp-scripts:
         required: false
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_REPOSITORY: ${{ github.repository }}
+      GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
     run: |
       set -e
       

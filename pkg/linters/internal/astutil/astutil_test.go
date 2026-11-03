@@ -425,6 +425,11 @@ func TestCalledOSFunc(t *testing.T) {
 	if fn, ok := CalledOSFunc(pass, call, "Getenv", "LookupEnv"); !ok || fn != osFunc {
 		t.Fatalf("CalledOSFunc() = (%#v, %v), want (%#v, true)", fn, ok, osFunc)
 	}
+	// parenthesized callee: (os.Getenv)(...)
+	parenCall := &ast.CallExpr{Fun: &ast.ParenExpr{X: call.Fun}}
+	if fn, ok := CalledOSFunc(pass, parenCall, "Getenv"); !ok || fn != osFunc {
+		t.Fatalf("CalledOSFunc() parenthesized = (%#v, %v), want (%#v, true)", fn, ok, osFunc)
+	}
 	if _, ok := CalledOSFunc(pass, call, "Setenv"); ok {
 		t.Fatal("CalledOSFunc() = ok=true for non-allowed name, want false")
 	}
@@ -536,6 +541,12 @@ func TestAsStringsMethodCall(t *testing.T) {
 		t.Fatal("AsStringsMethodCall(strings.Index, Count) = ok=true, want false")
 	}
 
+	// (strings.Index)(...) → parenthesized callee still matches
+	parenCall := &ast.CallExpr{Fun: &ast.ParenExpr{X: indexCall.Fun}}
+	if got, ok := AsStringsMethodCall(pass, parenCall, "Index"); !ok || got != parenCall {
+		t.Fatalf("AsStringsMethodCall((strings.Index), Index) = (%v, %v), want (%v, true)", got, ok, parenCall)
+	}
+
 	// other.Index does not match (wrong package)
 	if _, ok := AsStringsMethodCall(pass, makeCall(otherIdent, "Index"), "Index"); ok {
 		t.Fatal("AsStringsMethodCall(other.Index, Index) = ok=true, want false")
@@ -560,6 +571,12 @@ func TestCallQualifierText(t *testing.T) {
 	}
 	if got := CallQualifierText(fset, call); got != "strings" {
 		t.Fatalf("CallQualifierText = %q, want %q", got, "strings")
+	}
+
+	// parenthesized callee: (strings.Index)(...)
+	parenCall := &ast.CallExpr{Fun: &ast.ParenExpr{X: call.Fun}}
+	if got := CallQualifierText(fset, parenCall); got != "strings" {
+		t.Fatalf("CallQualifierText(parenthesized) = %q, want %q", got, "strings")
 	}
 
 	// non-selector call (e.g. dot-import): returns ""
@@ -1214,6 +1231,7 @@ func f(pattern string) {
 	_ = regexp.MustCompile(pattern)
 	_ = regexp.MustCompilePOSIX(pattern)
 	_ = other.Contains(pattern, pattern)
+	_, _ = (regexp.Compile)(pattern)
 }
 `
 	pass, file := typecheckSnippet(t, src)
@@ -1225,8 +1243,8 @@ func f(pattern string) {
 		}
 		return true
 	})
-	if len(calls) != 3 {
-		t.Fatalf("found %d calls, want 3", len(calls))
+	if len(calls) != 4 {
+		t.Fatalf("found %d calls, want 4", len(calls))
 	}
 
 	names := []string{"MustCompile", "Compile"}
@@ -1242,8 +1260,51 @@ func f(pattern string) {
 	if IsRegexpCompileCall(pass, calls[2], "Contains") {
 		t.Error("IsRegexpCompileCall(strings.Contains, Contains) = true, want false")
 	}
+	if !IsRegexpCompileCall(pass, calls[3], names...) {
+		t.Error("IsRegexpCompileCall((regexp.Compile), MustCompile/Compile) = false, want true")
+	}
 	if IsRegexpCompileCall(&analysis.Pass{}, calls[0], names...) {
 		t.Error("IsRegexpCompileCall() with nil TypesInfo = true, want false")
+	}
+}
+
+func TestIsFmtErrorf(t *testing.T) {
+	t.Parallel()
+
+	src := `package p
+
+import (
+	"errors"
+	format "fmt"
+)
+
+func f() {
+	_ = format.Errorf("a")
+	_ = (format.Errorf)("b")
+	_ = errors.New("c")
+}
+`
+	pass, file := typecheckSnippet(t, src)
+
+	var calls []*ast.CallExpr
+	ast.Inspect(file, func(n ast.Node) bool {
+		if call, ok := n.(*ast.CallExpr); ok {
+			calls = append(calls, call)
+		}
+		return true
+	})
+	if len(calls) != 3 {
+		t.Fatalf("found %d calls, want 3", len(calls))
+	}
+
+	if !IsFmtErrorf(pass, calls[0]) {
+		t.Error("IsFmtErrorf(format.Errorf) = false, want true")
+	}
+	if !IsFmtErrorf(pass, calls[1]) {
+		t.Error("IsFmtErrorf((format.Errorf)) = false, want true")
+	}
+	if IsFmtErrorf(pass, calls[2]) {
+		t.Error("IsFmtErrorf(errors.New) = true, want false")
 	}
 }
 

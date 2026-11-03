@@ -58,6 +58,11 @@ timeout-minutes: 25
 imports:
   - shared/otlp.md
   - shared/reporting.md
+evals:
+  - id: correct-failure-rate
+    question: In a proposed audit report, is the stated failure percentage correct for the completed CI runs shown in the output? Return UNKNOWN when no report is proposed or run conclusions are unavailable.
+  - id: evidence-supported-patterns
+    question: When failure patterns are reported, is each supported by the inspected failing-job output? Return UNKNOWN when no failure patterns are reported.
 ---
 
 # Daily Regression Audit

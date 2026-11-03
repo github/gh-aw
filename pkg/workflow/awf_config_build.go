@@ -30,6 +30,12 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 
 	// Resolve firewall config once — used for both the schema URL and the container image tag.
 	firewallConfig := getFirewallConfig(config.WorkflowData)
+	if err := validateHostGitHubTokenConfig(config.WorkflowData); err != nil {
+		return "", err
+	}
+	if err := validateDefaultDockerEnclaveImagePins(config.WorkflowData); err != nil {
+		return "", err
+	}
 	if err := validateModelRouting(config.WorkflowData, config.EngineName); err != nil {
 		return "", err
 	}
@@ -45,6 +51,13 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 	}
 	if config.WorkflowData != nil {
 		awfConfig.Enclaves = buildAWFEnclavesConfig(config.WorkflowData.Enclaves)
+		if err := validateEnclaveDiagnostics(config.WorkflowData); err != nil {
+			return "", err
+		}
+		if len(awfConfig.Enclaves) > 0 && awfVersionAtLeast(firewallConfig, constants.AWFDockerEnclaveSetupMinVersion) {
+			enabled := enclaveDiagnosticsEnabled(config.WorkflowData)
+			awfConfig.EnclaveDebugPublic = &enabled
+		}
 	}
 
 	// ── Runner section ──────────────────────────────────────────────────────

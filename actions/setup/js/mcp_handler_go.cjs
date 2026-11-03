@@ -7,7 +7,7 @@
  * It uses `go run` to execute Go source files with inputs via JSON on stdin.
  */
 
-const { executeProcess } = require("./mcp_handler_process.cjs");
+const { executeProcess, createToolEnvironment } = require("./mcp_handler_process.cjs");
 
 /**
  * Create a Go script handler function that executes a .go file using `go run`.
@@ -20,9 +20,10 @@ const { executeProcess } = require("./mcp_handler_process.cjs");
  * @param {string} toolName - Name of the tool for logging purposes
  * @param {string} scriptPath - Path to the Go script to execute
  * @param {number} [timeoutSeconds=60] - Timeout in seconds for script execution
+ * @param {Record<string, string>} [envBindings] - Tool-local environment references
  * @returns {Function} Async handler function that executes the Go script
  */
-function createGoHandler(server, toolName, scriptPath, timeoutSeconds = 60) {
+function createGoHandler(server, toolName, scriptPath, timeoutSeconds = 60, envBindings = {}) {
   return async args => {
     server.debug(`  [${toolName}] Invoking Go handler: ${scriptPath}`);
     server.debug(`  [${toolName}] Go handler args: ${JSON.stringify(args)}`);
@@ -37,7 +38,7 @@ function createGoHandler(server, toolName, scriptPath, timeoutSeconds = 60) {
       languageLabel: "Go",
       command: "go",
       args: ["run", scriptPath],
-      env: process.env,
+      env: createToolEnvironment(envBindings),
       inputJson,
       timeoutSeconds,
       scriptPath,

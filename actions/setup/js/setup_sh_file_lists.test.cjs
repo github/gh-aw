@@ -218,7 +218,7 @@ describe("setup.sh MCP_SCRIPTS_FILES", () => {
 });
 
 describe("setup.sh SAFE_OUTPUTS_FILES", () => {
-  it("renders Claim-scoped footers from the deployed bundle without source-directory dependencies", () => {
+  it("loads Git generators and renders Claim-scoped footers from the deployed bundle without source-directory dependencies", () => {
     const runnerRoot = resolve(__dirname, `.setup-safeoutputs-bundle-${process.pid}`);
     mkdirSync(runnerRoot);
     try {
@@ -232,6 +232,10 @@ describe("setup.sh SAFE_OUTPUTS_FILES", () => {
           "-e",
           `
             const assert = require("node:assert/strict");
+            assert.equal(typeof require("./generate_git_patch.cjs").generateGitPatch, "function");
+            assert.equal(typeof require("./generate_git_bundle.cjs").generateGitBundle, "function");
+            assert.equal(typeof require("./object_pack_fetch.cjs").fetchRecoveryObjects, "function");
+            assert.equal(require("./object_pack_limits.cjs").getObjectPackLimits({}).maxObjects, 100000);
             const { createServer, registerTool } = require("./mcp_server_core.cjs");
             const { getExcludedFiles, getExcludedWorkflowFiles } = require("./workflow_file_exclusions.cjs");
             assert.deepEqual(getExcludedFiles({ exclude_lock_yml: true }), [".github/workflows/**.lock.yml"]);

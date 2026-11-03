@@ -36,10 +36,16 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { generateEnhancedErrorMessage } = require("./mcp_enhanced_errors.cjs");
 const { createDependencyInstallGate } = require("./mcp_dependencies_manager.cjs");
 const { normalizeSafeOutputName } = require("./safe_output_names.cjs");
+const { levenshteinDistance } = require("./levenshtein_distance.cjs");
 
 const encoder = new TextEncoder();
 const PARAMETER_SIMILARITY_DISTANCE_BONUS = 2;
 const UNKNOWN_PARAMETER_LIST_PREVIEW_MAX = 10;
+// Suggestion limits do not restrict valid registered identifiers. Charge all
+// logical matrix cells, including initialization, and one unit per visited
+// candidate (even when pruned) to one budget per error response.
+const SUGGESTION_IDENTIFIER_MAX_LENGTH = 128;
+const SUGGESTION_MATRIX_CELL_BUDGET = 65536;
 
 /**
  * @typedef {Object} ServerInfo
@@ -413,7 +419,7 @@ function loadToolHandlers(server, tools, basePath) {
         // Lazy-load shell handler module
         const { createShellHandler } = require("./mcp_handler_shell.cjs");
         const timeout = tool.timeout || 60; // Default to 60 seconds if not specified
-        const baseHandler = createShellHandler(server, toolName, resolvedPath, timeout);
+        const baseHandler = createShellHandler(server, toolName, resolvedPath, timeout, tool.env);
         const ensureDependenciesInstalled = createDependencyInstallGate(server, toolName, resolvedPath, tool.dependencies, basePath || process.cwd());
         tool.handler = async args => {
           await ensureDependenciesInstalled();
@@ -444,7 +450,7 @@ function loadToolHandlers(server, tools, basePath) {
         // Lazy-load Python handler module
         const { createPythonHandler } = require("./mcp_handler_python.cjs");
         const timeout = tool.timeout || 60; // Default to 60 seconds if not specified
-        const baseHandler = createPythonHandler(server, toolName, resolvedPath, timeout);
+        const baseHandler = createPythonHandler(server, toolName, resolvedPath, timeout, tool.env);
         const ensureDependenciesInstalled = createDependencyInstallGate(server, toolName, resolvedPath, tool.dependencies, basePath || process.cwd());
         tool.handler = async args => {
           await ensureDependenciesInstalled();
@@ -460,7 +466,7 @@ function loadToolHandlers(server, tools, basePath) {
         // Lazy-load Go handler module
         const { createGoHandler } = require("./mcp_handler_go.cjs");
         const timeout = tool.timeout || 60; // Default to 60 seconds if not specified
-        const baseHandler = createGoHandler(server, toolName, resolvedPath, timeout);
+        const baseHandler = createGoHandler(server, toolName, resolvedPath, timeout, tool.env);
         const ensureDependenciesInstalled = createDependencyInstallGate(server, toolName, resolvedPath, tool.dependencies, basePath || process.cwd());
         tool.handler = async args => {
           await ensureDependenciesInstalled();
@@ -476,7 +482,7 @@ function loadToolHandlers(server, tools, basePath) {
         // Lazy-load JavaScript handler module
         const { createJavaScriptHandler } = require("./mcp_handler_javascript.cjs");
         const timeout = tool.timeout || 60; // Default to 60 seconds if not specified
-        const baseHandler = createJavaScriptHandler(server, toolName, resolvedPath, timeout);
+        const baseHandler = createJavaScriptHandler(server, toolName, resolvedPath, timeout, tool.env);
         const ensureDependenciesInstalled = createDependencyInstallGate(server, toolName, resolvedPath, tool.dependencies, basePath || process.cwd());
         tool.handler = async args => {
           await ensureDependenciesInstalled();
@@ -520,43 +526,6 @@ function registerTool(server, tool) {
 }
 
 /**
- * Calculate Levenshtein distance between two strings
- * @param {string} a - First string
- * @param {string} b - Second string
- * @returns {number} Edit distance
- */
-function levenshteinDistance(a, b) {
-  const matrix = [];
-
-  // Initialize first column
-  for (let i = 0; i <= b.length; i++) {
-    matrix[i] = [i];
-  }
-
-  // Initialize first row
-  for (let j = 0; j <= a.length; j++) {
-    matrix[0][j] = j;
-  }
-
-  // Fill in the rest of the matrix
-  for (let i = 1; i <= b.length; i++) {
-    for (let j = 1; j <= a.length; j++) {
-      if (b.charAt(i - 1) === a.charAt(j - 1)) {
-        matrix[i][j] = matrix[i - 1][j - 1];
-      } else {
-        matrix[i][j] = Math.min(
-          matrix[i - 1][j - 1] + 1, // substitution
-          matrix[i][j - 1] + 1, // insertion
-          matrix[i - 1][j] + 1 // deletion
-        );
-      }
-    }
-  }
-
-  return matrix[b.length][a.length];
-}
-
-/**
  * Find similar tool names from available tools
  * @param {string} requestedTool - The tool name that was requested
  * @param {Object} availableTools - Object of available tools
@@ -564,22 +533,7 @@ function levenshteinDistance(a, b) {
  * @returns {Array<{name: string, distance: number}>} Array of similar tool names with distances
  */
 function findSimilarTools(requestedTool, availableTools, maxSuggestions = 3) {
-  const normalizedRequested = normalizeTool(requestedTool);
-  const suggestions = [];
-
-  // Calculate distance for each available tool
-  for (const toolName of Object.keys(availableTools)) {
-    const distance = levenshteinDistance(normalizedRequested, toolName);
-    suggestions.push({ name: toolName, distance });
-  }
-
-  // Sort by distance (closest first) and take top N
-  suggestions.sort((a, b) => a.distance - b.distance);
-
-  // Only return suggestions that are reasonably similar
-  // (distance <= half the length of the requested tool name + 3)
-  const maxDistance = Math.floor(normalizedRequested.length / 2) + 3;
-  return suggestions.filter(s => s.distance <= maxDistance).slice(0, maxSuggestions);
+  return findSimilarNames(requestedTool, Object.keys(availableTools), 3, maxSuggestions);
 }
 
 /**
@@ -587,20 +541,70 @@ function findSimilarTools(requestedTool, availableTools, maxSuggestions = 3) {
  * @param {string} requestedParameter - The parameter name that was provided
  * @param {string[]} availableParameters - Available parameter names
  * @param {number} maxSuggestions - Maximum number of suggestions to return
+ * @param {{remainingCells: number}} [budget] - Shared work budget for an error response
  * @returns {Array<{name: string, distance: number}>} Similar parameter names
  */
-function findSimilarParameters(requestedParameter, availableParameters, maxSuggestions = 3) {
-  const normalizedRequested = normalizeTool(requestedParameter);
-  const suggestions = availableParameters.map(parameterName => ({
-    name: parameterName,
-    distance: levenshteinDistance(normalizedRequested, normalizeTool(parameterName)),
-  }));
+function findSimilarParameters(requestedParameter, availableParameters, maxSuggestions = 3, budget) {
+  return findSimilarNames(requestedParameter, availableParameters, PARAMETER_SIMILARITY_DISTANCE_BONUS, maxSuggestions, budget);
+}
 
+/**
+ * @param {string} requested
+ * @param {string[]} availableNames
+ * @param {number} distanceBonus
+ * @param {number} maxSuggestions
+ * @param {{remainingCells: number}} [budget]
+ * @returns {Array<{name: string, distance: number}>}
+ */
+function findSimilarNames(requested, availableNames, distanceBonus, maxSuggestions, budget = { remainingCells: SUGGESTION_MATRIX_CELL_BUDGET }) {
+  if (requested.length > SUGGESTION_IDENTIFIER_MAX_LENGTH || budget.remainingCells <= 0) {
+    return [];
+  }
+  const normalizedRequested = normalizeTool(requested);
+  if (normalizedRequested.length > SUGGESTION_IDENTIFIER_MAX_LENGTH) {
+    return [];
+  }
+  const maxDistance = Math.floor(normalizedRequested.length / 2) + distanceBonus;
+  const suggestions = [];
+  for (let i = 0; i < availableNames.length && budget.remainingCells > 0; i++) {
+    budget.remainingCells--;
+    const name = availableNames[i];
+    if (name.length > SUGGESTION_IDENTIFIER_MAX_LENGTH) {
+      continue;
+    }
+    const normalizedName = normalizeTool(name);
+    if (normalizedName.length > SUGGESTION_IDENTIFIER_MAX_LENGTH || Math.abs(normalizedName.length - normalizedRequested.length) > maxDistance) {
+      continue;
+    }
+    const cells = (normalizedRequested.length + 1) * (normalizedName.length + 1);
+    if (cells > budget.remainingCells) {
+      budget.remainingCells = 0;
+      break;
+    }
+    budget.remainingCells -= cells;
+    const distance = levenshteinDistance(normalizedRequested, normalizedName);
+    if (distance <= maxDistance) {
+      suggestions.push({ name, distance });
+    }
+  }
   suggestions.sort((a, b) => a.distance - b.distance);
-  // Parameter names are typically short; use a slightly tighter threshold than tool names
-  // so only clearly related misspellings are suggested.
-  const maxDistance = Math.floor(normalizedRequested.length / 2) + PARAMETER_SIMILARITY_DISTANCE_BONUS;
-  return suggestions.filter(s => s.distance <= maxDistance).slice(0, maxSuggestions);
+  return suggestions.slice(0, maxSuggestions);
+}
+
+/**
+ * @param {string} name
+ * @returns {string} Bounded display name for unknown identifiers
+ */
+function formatUnknownIdentifier(name) {
+  if (name.length > SUGGESTION_IDENTIFIER_MAX_LENGTH) {
+    let end = SUGGESTION_IDENTIFIER_MAX_LENGTH;
+    const lastCodeUnit = name.charCodeAt(end - 1);
+    if (lastCodeUnit >= 0xd800 && lastCodeUnit <= 0xdbff) {
+      end--;
+    }
+    return `${name.slice(0, end)}... (identifier too long for suggestions: maximum ${SUGGESTION_IDENTIFIER_MAX_LENGTH} UTF-16 code units, got ${name.length})`;
+  }
+  return name;
 }
 
 /**
@@ -635,13 +639,15 @@ function validateUnknownParameters(args, inputSchema) {
  */
 function buildUnknownParameterError(unknownParameters, inputSchema) {
   const allowedParameters = inputSchema && inputSchema.properties && typeof inputSchema.properties === "object" ? Object.keys(inputSchema.properties) : [];
+  const budget = { remainingCells: SUGGESTION_MATRIX_CELL_BUDGET };
 
   const unknownDetails = unknownParameters.map(parameterName => {
-    const similar = findSimilarParameters(parameterName, allowedParameters);
+    const similar = findSimilarParameters(parameterName, allowedParameters, 3, budget);
+    const displayName = formatUnknownIdentifier(parameterName);
     if (!similar.length) {
-      return `'${parameterName}'`;
+      return `'${displayName}'`;
     }
-    return `'${parameterName}' (closest: ${similar.map(s => `'${s.name}'`).join(", ")})`;
+    return `'${displayName}' (closest: ${similar.map(s => `'${s.name}'`).join(", ")})`;
   });
 
   const preview = allowedParameters
@@ -762,7 +768,7 @@ async function handleRequest(server, request, defaultHandler) {
       if (!tool) {
         // Find similar tools to suggest
         const similarTools = findSimilarTools(name, server.tools);
-        let errorMessage = `Tool '${name}' not found`;
+        let errorMessage = `Tool '${formatUnknownIdentifier(name)}' not found`;
 
         if (similarTools.length > 0) {
           const suggestions = similarTools.map(s => s.name).join(", ");
@@ -947,7 +953,14 @@ async function handleMessage(server, req, defaultHandler) {
       if (!tool) {
         // Find similar tools to suggest
         const similarTools = findSimilarTools(name, server.tools);
-        let errorMessage = `Tool not found: ${name} (${normalizeTool(name)})`;
+        const displayName = formatUnknownIdentifier(name);
+        let errorMessage = `Tool not found: ${displayName}`;
+        if (name.length <= SUGGESTION_IDENTIFIER_MAX_LENGTH) {
+          const normalizedName = normalizeTool(name);
+          if (normalizedName.length <= SUGGESTION_IDENTIFIER_MAX_LENGTH) {
+            errorMessage += ` (${normalizedName})`;
+          }
+        }
 
         if (similarTools.length > 0) {
           const suggestions = similarTools.map(s => s.name).join(", ");

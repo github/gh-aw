@@ -36,6 +36,22 @@ All commands are run from the root of the project, from a terminal:
 | `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
 | `npm run astro -- --help` | Get help using the Astro CLI                     |
 
+### Install through the 1ES feed
+
+If access to npmjs is blocked, run this from `docs/`:
+
+```sh
+npm ci \
+  --registry=https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/ \
+  --replace-registry-host=npmjs
+```
+
+Astro and Starlight are pinned to feed-supported releases. Keep the checked-in
+lockfile and registry configuration unchanged when installing. Metadata
+availability does not guarantee that the feed can serve a package's tarball.
+After updating dependencies, run `make check-npm-1es` from the repository root
+to verify that the locked versions can be downloaded.
+
 ## Homepage slideshow
 
 On desktop, select the presentation icon in the homepage header to present the

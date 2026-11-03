@@ -27,6 +27,7 @@ func TestBuildActivationJobCreatesSteeringIssue(t *testing.T) {
 
 	steps := strings.Join(job.Steps, "")
 	assert.Contains(t, steps, "id: create-steering-issue")
+	assert.Contains(t, steps, "if: steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_exceeded != 'true'")
 	assert.Contains(t, steps, "create_steering_issue.cjs")
 	assert.Contains(t, job.Permissions, "issues: write")
 	assert.NotContains(t, job.Permissions, "contents: write")
@@ -50,6 +51,24 @@ func TestBuildConclusionJobReusesAndCompletesSteeringIssue(t *testing.T) {
 	assert.Contains(t, steps, "GH_AW_CREATED_PR_NUMBER: ${{ needs.safe_outputs.outputs.created_pr_number }}")
 	assert.Contains(t, job.If, "needs.activation.outputs.steering_issue_number")
 	assert.Contains(t, job.Permissions, "issues: write")
+}
+
+func TestActivationSteeringIssueWithoutDailyGuardrail(t *testing.T) {
+	for _, name := range []string{"disabled", "dry-run"} {
+		t.Run(name, func(t *testing.T) {
+			data := steeringTestData()
+			if name == "disabled" {
+				data.RawFrontmatter = map[string]any{"max-daily-ai-credits": -1}
+			} else {
+				data.DryRun = true
+			}
+			ctx := &activationJobBuildContext{data: data, outputs: make(map[string]string)}
+			NewCompiler().addActivationSteeringIssueStep(ctx)
+			steps := strings.Join(ctx.steps, "")
+			assert.Contains(t, steps, "id: create-steering-issue")
+			assert.NotContains(t, steps, "daily-ai-credits-workflow-guardrail")
+		})
+	}
 }
 
 func TestBuildActivationSteeringIssueAttribution(t *testing.T) {

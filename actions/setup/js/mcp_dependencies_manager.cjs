@@ -4,10 +4,51 @@ const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { createToolEnvironment } = require("./mcp_handler_process.cjs");
 
 const installedDependencyPromises = new Map();
 const perToolInstallPromises = new Map();
 let execFileSyncRunner = execFileSync;
+
+/**
+ * Keep installer network configuration separate from tool bindings. URL
+ * credentials must not leak through otherwise innocuous configuration names.
+ * @returns {NodeJS.ProcessEnv}
+ */
+function createInstallerEnvironment() {
+  const env = createToolEnvironment();
+  const proxyNames = ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"];
+  const registryNames = ["PIP_INDEX_URL", "NPM_CONFIG_REGISTRY", "npm_config_registry"];
+  const pathNames = ["NODE_EXTRA_CA_CERTS", "SSL_CERT_FILE", "SSL_CERT_DIR", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE", "PIP_CERT", "NPM_CONFIG_CAFILE", "npm_config_cafile"];
+  const names = [...proxyNames, ...registryNames, ...pathNames, "NO_PROXY", "no_proxy", "PIP_EXTRA_INDEX_URL", "GOPROXY"];
+  for (const name of names) {
+    const value = process.env[name];
+    if (value === undefined || value === "") continue;
+    let valid = !/[\u0000-\u001f\u007f]/.test(value);
+    const protocols = proxyNames.includes(name) ? ["http:", "https:", "socks5:", "socks5h:"] : ["http:", "https:"];
+    if (proxyNames.includes(name) || registryNames.includes(name) || name === "PIP_EXTRA_INDEX_URL" || name === "GOPROXY") {
+      const urls = name === "GOPROXY" ? value.split(/[,|]/) : name === "PIP_EXTRA_INDEX_URL" ? value.trim().split(/\s+/) : [value];
+      valid =
+        valid &&
+        urls.every(candidate => {
+          if (name === "GOPROXY" && ["direct", "off"].includes(candidate)) return true;
+          try {
+            const url = new URL(candidate);
+            return protocols.includes(url.protocol) && Boolean(url.hostname) && !url.username && !url.password && !/[?#]/.test(candidate) && !/\s/.test(candidate);
+          } catch {
+            return false;
+          }
+        });
+    } else if (name === "NO_PROXY" || name === "no_proxy") {
+      valid = valid && /^[a-zA-Z0-9.*,:/[\] _-]+$/.test(value);
+    }
+    if (!valid) {
+      throw new Error(`Unsafe MCP dependency installer configuration in '${name}': use credential-free configuration without URL userinfo, query strings, or fragments`);
+    }
+    env[name] = value;
+  }
+  return env;
+}
 
 /**
  * Emit dependency-install logs via the provided MCP logger.
@@ -33,6 +74,7 @@ function inferDependencyManager(handlerPath) {
 }
 
 function resolveShellPackageManager() {
+  const env = createInstallerEnvironment();
   const managers = [
     { command: "apt-get", args: ["install", "-y"] },
     { command: "yum", args: ["install", "-y"] },
@@ -41,7 +83,7 @@ function resolveShellPackageManager() {
 
   for (const manager of managers) {
     try {
-      execFileSyncRunner("which", [manager.command], { stdio: "pipe" });
+      execFileSyncRunner("which", [manager.command], { stdio: "pipe", env });
       return manager;
     } catch {
       // Manager not installed — ignored, try next manager.
@@ -60,6 +102,7 @@ function isDeterministicInstallFailure(message) {
 }
 
 function executeInstallWithRetry(logger, toolName, dependency, command, args, cwd) {
+  const env = createInstallerEnvironment();
   const maxRetries = 2;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
@@ -67,7 +110,7 @@ function executeInstallWithRetry(logger, toolName, dependency, command, args, cw
       execFileSyncRunner(command, args, {
         cwd,
         stdio: "pipe",
-        env: process.env,
+        env,
       });
       logWithCore(logger, "info", `  [${toolName}] Installed dependency '${dependency}'`);
       return;
@@ -106,7 +149,7 @@ function installDependency(logger, toolName, dependency, manager, basePath) {
     const goModPath = path.join(basePath, "go.mod");
     if (!fs.existsSync(goModPath)) {
       try {
-        execFileSyncRunner("go", ["mod", "init", "example.com/mcp-scripts"], { cwd: basePath, stdio: "pipe", env: process.env });
+        execFileSyncRunner("go", ["mod", "init", "example.com/mcp-scripts"], { cwd: basePath, stdio: "pipe", env: createInstallerEnvironment() });
       } catch {
         // go.mod may have been created concurrently — failure is ignored.
       }
@@ -176,6 +219,7 @@ function setExecFileSyncRunnerForTests(runner) {
 }
 
 module.exports = {
+  createInstallerEnvironment,
   createDependencyInstallGate,
   inferDependencyManager,
   isTransientInstallFailure,

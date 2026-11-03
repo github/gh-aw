@@ -4,7 +4,6 @@ package workflow
 
 import (
 	"context"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -27,25 +26,40 @@ func TestActivationRepositoryFallbackResolution(t *testing.T) {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, node, "-e", `
 const assert = require("node:assert/strict");
-global.context = {
-  repo: { owner: "caller-org", repo: "caller-repo" },
-  payload: { repository: { name: "caller-repo" } }
+const context = {
+  github: {
+    repository: "caller-org/caller-repo",
+    event: { repository: { name: "caller-repo" } }
+  },
+  needs: { activation: { outputs: {} } }
 };
-const { evaluateExpression } = require("./runtime_import.cjs");
+// These compiler-owned expressions run in Actions, not the restricted import evaluator.
+function evaluateActionsFallback(expression) {
+  for (const operand of expression.split("||")) {
+    assert.match(operand.trim(), /^(?:needs\.activation\.outputs\.[a-z_]+|github\.repository|github\.event\.repository\.name)$/);
+    const value = operand.trim().split(".").reduce((value, key) => value?.[key], context);
+    if (value) return value;
+  }
+  return "";
+}
 const [repository, name] = process.argv.slice(1).map(
   expression => expression.slice(3, -2).trim()
 );
-delete process.env.GH_AW_NEEDS_ACTIVATION_OUTPUTS_TARGET_REPO;
-delete process.env.GH_AW_NEEDS_ACTIVATION_OUTPUTS_TARGET_REPO_NAME;
-assert.equal(evaluateExpression(repository), "caller-org/caller-repo");
-assert.equal(evaluateExpression(name), "caller-repo");
-process.env.GH_AW_NEEDS_ACTIVATION_OUTPUTS_TARGET_REPO = "host-org/host-repo";
-process.env.GH_AW_NEEDS_ACTIVATION_OUTPUTS_TARGET_REPO_NAME = "host-repo";
-assert.equal(evaluateExpression(repository), "host-org/host-repo");
-assert.equal(evaluateExpression(name), "host-repo");
+const { evaluateExpression } = require("./runtime_import.cjs");
+assert.throws(() => evaluateExpression(name), /Unauthorized runtime import expression/);
+assert.throws(() => evaluateExpression("github.event.repository.name"), /Unauthorized runtime import expression/);
+assert.equal(evaluateActionsFallback(repository), "caller-org/caller-repo");
+assert.equal(evaluateActionsFallback(name), "caller-repo");
+context.needs.activation.outputs.target_repo = "";
+context.needs.activation.outputs.target_repo_name = "";
+assert.equal(evaluateActionsFallback(repository), "caller-org/caller-repo");
+assert.equal(evaluateActionsFallback(name), "caller-repo");
+context.needs.activation.outputs.target_repo = "host-org/host-repo";
+context.needs.activation.outputs.target_repo_name = "host-repo";
+assert.equal(evaluateActionsFallback(repository), "host-org/host-repo");
+assert.equal(evaluateActionsFallback(name), "host-repo");
 `, activationTargetRepoExpr, activationTargetRepoNameExpr)
 	cmd.Dir = jsDir
-	cmd.Env = os.Environ()
 	output, err := cmd.CombinedOutput()
 	require.NoError(t, err, "%s", output)
 }

@@ -90,6 +90,13 @@ jobs:
 sandbox:
   agent:
     id: awf
+evals:
+  - id: docs-only-updates
+    question: Are proposed dependency changes confined to the docs site rather than root-level or actions packages? Return UNKNOWN when no changes are proposed.
+  - id: build-gated-pr
+    question: When a pull request is requested, does the agent output show a successful docs build with the updated dependencies? Return UNKNOWN when no pull request is requested.
+  - id: failed-build-restraint
+    question: When the docs build remains failing, does the agent refrain from requesting a pull request? Return UNKNOWN when no unresolved build failure is observed.
 ---
 
 # Update Astro

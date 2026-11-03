@@ -1478,8 +1478,7 @@ function buildMissingDataContext(cacheMemoryEnabled, cacheMemoryRestored, items)
 
   core.info(`Found ${missingDataMessages.length} missing_data message(s)`);
 
-  // Detect cache_miss: if cache-memory restore matched and the agent reported a cache miss,
-  // this indicates the prompt is referencing an incorrect file path within the cache directory.
+  // A restore match does not guarantee that every required file exists.
   const hasCacheMiss = missingDataMessages.some(m => m.reason === "cache_memory_miss");
 
   // When cache-memory is configured and cache_miss is present, avoid repeating the same
@@ -1499,7 +1498,7 @@ function buildMissingDataContext(cacheMemoryEnabled, cacheMemoryRestored, items)
   }
 
   if (shouldShowCacheWarning) {
-    core.info("Cache-miss detected after a successful cache restore — likely a configuration problem");
+    core.info("Cache-miss detected after a successful cache restore; check required input, cache paths, and keys");
     const templatePath = getPromptPath("cache_memory_miss.md");
     context.push(...nodes.fragment(fs.readFileSync(templatePath, "utf8")));
   }
@@ -4554,8 +4553,8 @@ async function main() {
     const hasEngineRateLimit429 = agentConclusion === "failure" && !maxAICreditsExceeded && !aiCreditsRateLimitError && detectEngineRateLimit429Failure();
 
     // Detect cache-miss misconfiguration: the agent reported a missing_data with reason
-    // "cache_memory_miss" after a cache restore matched. This indicates the prompt
-    // is referencing an incorrect path inside the cache directory.
+    // "cache_memory_miss" after a cache restore matched. Check required input,
+    // paths, and keys; a restore match does not guarantee the expected file exists.
     // Check for items regardless of agentOutputResult.success so that cache-miss signals
     // emitted alongside other output are not missed when the agent job also fails.
     let hasCacheMissMisconfiguration = false;
@@ -4566,7 +4565,7 @@ async function main() {
         core.info(`Cache-miss misconfiguration detected: ${cacheMissItems.length} missing_data item(s) with reason "cache_memory_miss" after cache restore matched an existing key`);
       }
     } else if (cacheMemoryEnabled && !cacheMemoryRestored) {
-      core.info("Cache-memory is configured but no cache restore match was found; cache_memory_miss is treated as expected cache miss (actions/cache branch scoping and first-run behavior)");
+      core.info("Cache-memory is configured but no cache restore match was found; optional state can use the workflow's cold-start fallback, while reported missing required data still activates failure handling");
     }
 
     // Only proceed if the agent job actually failed OR timed out OR there are assignment errors OR

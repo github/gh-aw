@@ -123,11 +123,11 @@ func (c *Compiler) collectArtifactPaths(data *WorkflowData, engine CodingAgentEn
 	threatDetectionNeedsPatches := IsDetectionJobEnabled(data.SafeOutputs)
 	if usesPatchesAndCheckouts(data.SafeOutputs) || threatDetectionNeedsPatches {
 		paths = append(paths, constants.TmpAwPatchGlob)
-		// Bundle files are generated when patch-format: bundle is configured and are
-		// required downstream to apply changes while preserving merge topology.
-		// Bundles are binary and cannot be text-scanned directly, but they are built
-		// from the same git commit range as the accompanying .patch file, so the
-		// .patch scanning above already covers the underlying diff content
+		// Ordinary bundles preserve merge topology; incomplete local checkouts can
+		// instead upload a versioned object-pack recovery envelope at the same path.
+		// Binary transports are not text-scanned directly. Ordinary .patch files
+		// cover the commit diff; recovery .patch files preview every packed object,
+		// and the publisher verifies that preview before fetching or importing
 		// (see isKnownUnscannedButAllowedForUpload in step_order_validation.go). The
 		// artifact upload step already sets if-no-files-found: ignore, so including
 		// the bundle glob here is safe even when no bundle files exist.
@@ -221,6 +221,8 @@ func (c *Compiler) generateSummarySteps(yaml *strings.Builder, data *WorkflowDat
 // and step-order validation.
 func (c *Compiler) generatePostAgentCollectionAndUpload(yaml *strings.Builder, data *WorkflowData, engine CodingAgentEngine, artifactPaths []string, logFileFull string, checkoutMgr *CheckoutManager) error { //nolint:largefunc // Existing post-agent orchestration preserves generated step order.
 	compilerYamlLog.Print("Generating post-agent collection and upload steps")
+	generateEnclaveDiagnosticsCollect(yaml, data)
+
 	// Generate engine output cleanup step so workspace files are removed after collection.
 	// The engine-declared output paths are gathered by collectArtifactPaths below.
 	if len(getEngineArtifactPaths(engine)) > 0 {
@@ -303,6 +305,7 @@ func (c *Compiler) generatePostAgentCollectionAndUpload(yaml *strings.Builder, d
 			targetPath: "agent/harness_retry.json",
 		})
 	}
+	generateRecoveryEnvelopeValidationStep(yaml, "validate_final_recovery_envelopes", data, c.getActionPin, recoveryArtifactScanRoots(artifactPaths)...)
 
 	// Generate single unified artifact upload with all collected paths.
 	// In workflow_call context, apply the per-invocation prefix to avoid name clashes.

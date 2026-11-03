@@ -50,6 +50,11 @@ safe-outputs:
 
 features:
   gh-aw-detection: true
+evals:
+  - id: correct-catalog-selection
+    question: For a proposed grader PR, is the selected ID the first eligible Not started entry in tier-first catalog order? Return UNKNOWN when no PR is proposed or eligibility evidence is unavailable.
+  - id: builtin-only-fragment
+    question: For a proposed grader PR, does the new fragment configure only the selected registered built-in grader without executable grader code? Return UNKNOWN when no PR is proposed.
 ---
 
 # Daily Trajectory Grader Implementer

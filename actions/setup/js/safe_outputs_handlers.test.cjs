@@ -9,6 +9,7 @@ import { validateTransactions } from "./push_ledger_changes.cjs";
 import { resolveTransportPaths } from "./resolve_transport_paths.cjs";
 import { getPatchPathForBranchInRepo } from "./git_patch_utils.cjs";
 import { getBundlePathForBranchInRepo } from "./generate_git_bundle.cjs";
+import { simulateLinuxDescriptors } from "./test_linux_descriptors.mjs";
 import {
   looksLikeExploratoryBranch,
   normalizeProbeValue,
@@ -4069,13 +4070,17 @@ describe("safe_outputs_handlers", () => {
 
   describe("pushRepoMemoryHandler", () => {
     let memoryDir;
+    let restoreDescriptors;
 
     beforeEach(() => {
+      restoreDescriptors = simulateLinuxDescriptors(vi);
       const testId = Math.random().toString(36).substring(7);
       memoryDir = path.join(testScratchRoot, `test-repo-memory-${testId}`);
     });
 
     afterEach(() => {
+      restoreDescriptors?.();
+      vi.unstubAllGlobals();
       try {
         if (fs.existsSync(memoryDir)) {
           fs.rmSync(memoryDir, { recursive: true, force: true });

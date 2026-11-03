@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -14,47 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-type testPromptRenderConfig struct {
-	Items []struct {
-		ContentEnvVar   string `json:"content_env"`
-		File            string `json:"file"`
-		ConditionEnvVar string `json:"condition_env"`
-	} `json:"items"`
-}
-
-func promptRenderPlan(t *testing.T, output string) string {
-	t.Helper()
-
-	const configPrefix = "GH_AW_PROMPT_CONFIG: "
-	configStart := strings.Index(output, configPrefix)
-	require.NotEqual(t, -1, configStart, "Prompt render config should be present")
-	configLine := output[configStart+len(configPrefix):]
-	configLine, _, _ = strings.Cut(configLine, "\n")
-	configJSON, err := strconv.Unquote(configLine)
-	require.NoError(t, err)
-
-	var config testPromptRenderConfig
-	require.NoError(t, json.Unmarshal([]byte(configJSON), &config))
-
-	var plan strings.Builder
-	for _, item := range config.Items {
-		if item.File != "" {
-			plan.WriteString(item.File)
-			plan.WriteByte('\n')
-			continue
-		}
-		prefix := item.ContentEnvVar + ": "
-		valueStart := strings.Index(output, prefix)
-		require.NotEqual(t, -1, valueStart, "Prompt content variable %s should be present", item.ContentEnvVar)
-		valueLine := output[valueStart+len(prefix):]
-		valueLine, _, _ = strings.Cut(valueLine, "\n")
-		value, unquoteErr := strconv.Unquote(valueLine)
-		require.NoError(t, unquoteErr)
-		plan.WriteString(value)
-	}
-	return plan.String()
-}
 
 func TestGenerateUnifiedPromptCreationStep_TreatsUserContentAsData(t *testing.T) {
 	compiler := &Compiler{}
@@ -994,12 +952,9 @@ Actor: ${{ github.actor }}`
 	assert.Less(t, tempFolderPos, systemClosePos, "Built-in prompts should be before system tag closes")
 	assert.Less(t, playwrightPos, systemClosePos, "Playwright should be before system tag closes")
 
-	// Verify user prompt is after system tags
-	// With runtime-import, the actual content is in the original workflow file
-	// The lock file should contain the runtime-import macro after system tags
-	runtimeImportPos := strings.Index(plan, "{{#runtime-import")
-	assert.Greater(t, runtimeImportPos, -1, "Should contain runtime-import macro")
-	assert.Less(t, systemClosePos, runtimeImportPos, "Runtime-import macro should come after system tag closes")
+	authorPos := strings.Index(plan, "{{#author-prompt")
+	assert.Greater(t, authorPos, -1, "Should contain author source")
+	assert.Less(t, systemClosePos, authorPos, "Author source should come after system tag closes")
 
 	// Verify expressions are handled
 	assert.Contains(t, lockStr, "GH_AW_GITHUB_REPOSITORY:", "Should have repository env var")
@@ -1040,13 +995,10 @@ Do something simple.`
 	// Should have at least temp folder
 	assert.Contains(t, lockStr, "temp_folder_prompt.md", "Should have temp folder prompt")
 
-	// User prompt should be after system tags
-	// With runtime-import, the actual content is in the original workflow file
-	// The lock file should contain the runtime-import macro after system tags
 	systemClosePos := strings.Index(plan, "</system>")
-	runtimeImportPos := strings.Index(plan, "{{#runtime-import")
-	assert.Greater(t, runtimeImportPos, -1, "Should contain runtime-import macro")
-	assert.Less(t, systemClosePos, runtimeImportPos, "Runtime-import macro should be after system tags")
+	authorPos := strings.Index(plan, "{{#author-prompt")
+	assert.Greater(t, authorPos, -1, "Should contain author source")
+	assert.Less(t, systemClosePos, authorPos, "Author source should be after system tags")
 }
 
 // TestUnifiedPromptCreation_SafeOutputsOnly tests workflow with only safe-outputs

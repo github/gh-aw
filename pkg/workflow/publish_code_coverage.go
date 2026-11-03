@@ -107,7 +107,7 @@ func generateSafeOutputsCodeCoverageStagingUpload(builder *strings.Builder, data
 
 	builder.WriteString("      # Upload safe-outputs upload-code-coverage staging for the upload_code_coverage job\n")
 	builder.WriteString("      - name: Upload upload-code-coverage staging\n")
-	builder.WriteString("        if: always()\n")
+	builder.WriteString("        if: always() && " + secretRedactionSuccessCondition(data) + "\n")
 	fmt.Fprintf(builder, "        uses: %s\n", pinAction("actions/upload-artifact")) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	builder.WriteString("        with:\n")
 	fmt.Fprintf(builder, "          name: %s%s\n", prefix, SafeOutputsUploadCodeCoverageStagingArtifactName) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.

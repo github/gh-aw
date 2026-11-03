@@ -57,6 +57,12 @@ func TestSmokeAndCoverageFailureContracts(t *testing.T) {
 		{
 			name: "daily-workflow-security-model",
 			required: []string{
+				"  - shared/tla-plus.md",
+			},
+		},
+		{
+			name: "shared/tla-plus",
+			required: []string{
 				"https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar",
 				"011267fca25d0752cf18894dd585cd28b96960c112ea8a20b823ea770e7e10cd",
 				`"$tools/tla2tools.jar" | sha256sum --check --strict`,

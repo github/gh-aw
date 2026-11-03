@@ -12,6 +12,7 @@ on:
 permissions:
   contents: read
   pull-requests: read
+  copilot-requests: write
 name: Smoke Claude on Copilot
 model: copilot/haiku
 engine:

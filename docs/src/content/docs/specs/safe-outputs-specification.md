@@ -7,9 +7,9 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.29.14<br>
+**Version**: 1.29.15<br>
 **Status**: Working Draft<br>
-**Publication Date**: 2026-10-31<br>
+**Publication Date**: 2026-11-02<br>
 **Editor**: GitHub Agentic Workflows Team<br>
 **This Version**: [safe-outputs-specification](/gh-aw/specs/safe-outputs-specification/)<br>
 **Latest Published Version**: This document
@@ -122,7 +122,7 @@ This specification does NOT define:
 - AI model selection, prompt engineering, or agent implementation strategies
 - User interface design for workflow authoring or monitoring
 - Container orchestration, deployment topology, or infrastructure provisioning
-- Performance benchmarks or resource consumption limits
+- Performance benchmarks or resource limits unrelated to specified safe-output security boundaries
 
 ### 1.3 Design Principles
 
@@ -631,6 +631,14 @@ When evaluating cross-repository operations, implementations MUST apply these ru
 - Exact fallback slugs allow ASCII alphanumerics, hyphens, and underscores in the owner (including Enterprise Managed User logins), and additionally dots in the repository name
 - Each repository MUST be explicitly listed or match an explicit supported allowlist pattern
 
+**Resolved Issue Relationship Repositories**
+
+For `create_issue.blocked_by` and `link_sub_issue`, the runtime handler policy MUST authorize each effective repository by matching the configured default `target-repo` OR a pattern in that handler's `allowed-repos`. The default target falls back to the workflow repository when not configured. Literal and glob comparisons are case-sensitive; `target-repo: "*"` authorizes any valid repository slug, while `target: "*"` selects an issue and MUST NOT widen repository authorization. Token access alone MUST NOT authorize a repository.
+
+Temporary-ID resolution MUST preserve the referenced repository and MUST NOT bypass this policy. After dependency resolution (Stage 6), handlers MUST revalidate effective repositories before Stage 7 or any auxiliary API lookup, including issue reads and per-item mention resolution. Deferred retries MUST repeat resolution and authorization with the resolved IDs. Staged previews MUST reject resolved disallowed repositories without API access; unresolved staged blocker IDs MAY remain display-only references.
+
+Conformance tests MUST assert zero API calls to disallowed repositories for numeric, qualified, URL, and temporary blocker references, including deferred retries, and for temporary parent/sub-issue pairs resolving to the same disallowed repository. Tests MUST preserve permitted explicit and wildcard policies and fixed/triggering parent selection. The bounded [`IssueRelationshipAuthorization.tla`](https://github.com/github/gh-aw/blob/main/specs/workflow-security/IssueRelationshipAuthorization.tla) model checks this boundary with synthetic negative controls; it does not prove refinement of the runtime handlers.
+
 Internal work-queue Claim adapters use the authenticated worker profile's `effect_scope` as a singleton repository allowlist. Declared adapters MUST specify a fixed literal `target-repo`, validated by `work_queue_claim_adapters.cjs`. Every selected repository, including native adapter runtime fallbacks and independently resolved mutation targets, MUST match the profile allowlist through `assertClaimAuthorized` before effects execute. Repository allowlist rejection carries error code E004 while preserving the queue protocol message `work_queue_effect_scope_denied`. This queue-specific authorization does not replace type-specific or global allowlists for user-facing safe-output handlers.
 
 **Security Properties**
@@ -777,6 +785,8 @@ Implementations MUST execute validation steps in this exact sequence for all saf
 - Check: Resolve references to actual GitHub resource numbers
 - On failure: Reject with E005 (MISSING_PARENT)
 - Output: Fully-resolved operation data
+
+Repository identities obtained in this stage MUST pass the resolved issue relationship policy above before any API access. A pre-resolution repository check does not authorize a different repository supplied by a temporary-ID mapping. Unresolved temporary IDs MAY defer an operation for a later retry rather than fail permanently.
 
 **Stage 7: GitHub API Invocation (EXECUTION)**
 
@@ -2513,6 +2523,13 @@ Fields used for privileged transport metadata, including patch anchoring and upl
         }
       },
       "parent": {"type": ["number", "string"], "description": "Parent issue for sub-issues"},
+      "blocked_by": {
+        "oneOf": [
+          {"type": ["number", "string"]},
+          {"type": "array", "items": {"type": ["number", "string"]}}
+        ],
+        "description": "Issue references that block the new issue: numbers, owner/repo#number, GitHub issue URLs, or temporary IDs"
+      },
       "temporary_id": {
         "type": "string",
         "pattern": "^aw_[A-Za-z0-9]{3,8}$",
@@ -2526,13 +2543,16 @@ Fields used for privileged transport metadata, including patch anchoring and upl
 
 **Operational Semantics**:
 
-1. **Atomicity**: Issue creation is atomic. Failure at any step prevents issue creation.
+1. **Atomicity**: Validation failure prevents issue creation. Dependency attachment after creation is best-effort and MUST NOT report the created issue as uncreated.
 2. **Temporary ID Resolution**: References to `#aw_<id>` in bodies replaced with actual numbers post-creation.
 3. **Parent Linking**: When `parent` specified, tasklist entry added to parent issue.
 4. **Label Validation**: Labels must exist in repository; non-existent labels cause failure.
 5. **Issue Field Validation**: Field names/values must match configured repository issue fields; invalid values return actionable errors.
-6. **Cross-Repository**: When `target-repo` configured, created in that repository (must be in `allowed-repos`).
+6. **Cross-Repository**: The effective issue repository MUST match the default `target-repo` or a pattern in `allowed-repos`.
 7. **Temporary ID collision norm**: A temporary ID (`aw_*`) is workflow-run scoped and MUST map to exactly one created object. Reusing the same temporary ID for a different target object in the same run MUST be rejected as ambiguous (`E005`). Reuse that references the same previously-created object is allowed and MUST resolve deterministically to the first mapping.
+8. **Blocked-By Resolution**: `blocked_by` accepts a single reference or an array. Numeric references (optionally prefixed with `#`) use the new issue's repository; qualified references, GitHub issue URLs, and temporary IDs retain the referenced repository. Duplicate references are removed using a case-folded repository/number key; this deduplication MUST NOT change case-sensitive authorization. Unresolved temporary IDs defer creation, except in staged mode where they are preview-only.
+9. **Blocked-By Authorization**: All resolved blocker repositories MUST pass the handler repository policy before per-item mention lookups, issue creation, blocker reads, or dependency mutation. A disallowed blocker MUST reject the entire item without creating an issue or attaching any dependencies, including when mixed with permitted blockers.
+10. **Blocked-By Attachment**: After issue creation, the handler reads each authorized blocker to obtain its issue ID and uses GitHub's native blocked-by dependency API on the newly created issue. Attachment failures MUST produce warnings and `blocked_by_errors` while retaining the successful creation result.
 
 **Configuration Parameters**:
 
@@ -2553,7 +2573,7 @@ Fields used for privileged transport metadata, including patch anchoring and upl
 
 - Title and body undergo full sanitization
 - Label validation before creation
-- Cross-repo validation against allowed-repos
+- Cross-repo validation of the new issue and every resolved blocker against the default target or allowed repository patterns, before API access
 - Expires implemented via scheduled workflow (not client-side)
 
 **Required Permissions**:
@@ -2570,7 +2590,7 @@ Fields used for privileged transport metadata, including patch anchoring and upl
 **Notes**:
 
 - Both permission modes require the same write scopes
-- GitHub App permissions enable cross-repository operations beyond `allowed-repos` when properly configured
+- GitHub App permissions provide access but MUST NOT bypass the handler repository policy
 
 ---
 
@@ -2840,6 +2860,125 @@ These requirements apply to `create_pull_request` and `push_to_pull_request_bran
 | PTI-006–007 | Registered cleanup and structured diagnostics in `transport_integrity.cjs` | `transport_integrity_git.test.cjs` verifies real Git refs, conflicting-rebase rollback, and malformed-patch aborts; helper tests cover checkout pinning, failed cleanup, cause retention, and safe logging |
 
 All implementation and test paths in this table are under `actions/setup/js/`. The bounded [transport lifecycle model](https://github.com/github/gh-aw/blob/main/specs/workflow-security/SafeOutputTransport.tla) specifies stable consumption, failure, retry, cleanup, and diagnostic invariants; it does not prove filesystem isolation or cryptographic collision resistance.
+
+##### Offline Generation and Deferred Object-Pack Recovery
+
+These requirements apply to agent-side generation for `create_pull_request` and
+`push_to_pull_request_branch` and the separate trusted publisher. They refine
+AGG-001–005 in the [compiler threat specification](https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md).
+Bounded object-pack recovery is distinct from ordinary bundle-prerequisite
+recovery under BGO-002; `allow-full-history-fetch` MUST NOT grant network authority
+to generation or remove object-pack budgets.
+
+**OGR-001 — Local-only generation**: Generation and helper-mediated Git inspection
+MUST deny all transports and lazy downloads with `GIT_ALLOW_PROTOCOL=""` and
+`GIT_NO_LAZY_FETCH=1`, and MUST disable repository-configured executable hooks,
+filters, and helpers. Caller environment, repository configuration, and recovery
+flags MUST NOT weaken this guard. Generation MUST NOT receive publisher
+credentials. Missing data MUST NOT trigger fetch, unshallowing, sparse expansion,
+or configuration mutation in the agent checkout. Successful local generation MUST
+remain the fast path.
+
+**OGR-002 — Raw staged input**: Staged changes MUST be derived from an isolated
+index and descriptor-pinned raw workspace files rather than repository-managed
+filters or `git add` semantics. Traversal MUST reject symlinked/replaced parents
+without consuming bytes outside the pinned workspace. File symlinks MAY be staged
+as link text but MUST NOT be dereferenced; other nonregular inputs MUST be rejected.
+Staged generation MUST NOT queue deferred object-pack recovery.
+
+**OGR-003 — Selected offline packaging**: Eligible non-staged failures MAY return
+`result: "queued"` with `recovery: "object-pack"`; this MUST NOT report publication
+success. Packaging MUST export only locally available objects selected from the
+pinned commit, using a non-thin, delta-free pack. Local baseline refs MAY exclude
+already-reachable objects as size hints only; they MUST NOT authorize publisher
+baselines or remote requests. Unrelated branches, tags, and unreachable history
+SHOULD NOT be exported. Missing agent-created bytes MUST fail explicitly.
+
+**OGR-004 — Complete preview and pre-upload guard**: The ordinary `.patch`
+artifact MUST preview every packed object's bytes, including intermediate history;
+the `.bundle` artifact MAY contain the versioned envelope. Before artifact upload,
+a post-redaction guard MUST independently parse the bounded pack, reconstruct its
+complete preview, and remove any envelope whose paired preview is missing,
+redacted, forged, or mismatched. Removal or scanning failures MUST prevent upload.
+Scan roots MUST stay within the established artifact roots, not inherit
+agent-written environment values or authorize external memory mounts.
+The guard MUST reject traversal through symlinks outside the canonical approved
+roots. Generated validation steps MUST pin additional roots, including an empty
+list when none are configured.
+Experimental drive mounts outside those roots MUST fail validation before upload;
+an unchanged but unredacted preview MUST NOT authorize its binary envelope.
+Before network access or import, the publisher MUST repeat bounded pack and
+complete-preview validation. Agent-supplied checksums alone MUST NOT establish
+preview completeness or authorization.
+
+**OGR-005 — Isolated trusted recovery**: The publisher MUST initialize a clean bare
+repository without copied configuration, hooks, remotes, alternates, or worktree.
+All network operations MUST use its independently authorized HTTPS repository and
+credential and finish before untrusted object import. Ancestry search MUST use a
+finite increasing treeless-fetch schedule, pin the first resolved baseline, and
+deepen only after successful but insufficient history. Required tree snapshots
+MUST derive from independently fetched trusted commits. Missing blobs MAY be
+requested only when their identities were independently read from trusted trees;
+uploaded graph edges MUST NOT authorize requests. Authentication, filtering, and
+other fetch failures MUST fail without retry or unfiltered fallback. Native import
+validation and strict fsck MUST remain enforced; promisor treatment MUST NOT
+excuse missing agent-created bytes. Subsequent regeneration MUST remain offline.
+
+**OGR-006 — Repository-controlled resource budgets**: All object-pack-specific
+object counts, uncompressed/pack/preview/header byte bounds, tree/scan entry
+budgets, hydration bytes, command/network deadlines, subprocess-output buffers,
+fetch batch size, and history-depth schedule MUST be configurable through the
+four documented [repository variables](/gh-aw/reference/checkout/#repository-configured-recovery-limits):
+`GH_AW_OBJECT_PACK_MAX_BYTES`, `GH_AW_OBJECT_PACK_MAX_OBJECTS`,
+`GH_AW_OBJECT_PACK_TIMEOUT_MS`, and `GH_AW_OBJECT_PACK_FETCH_DEPTHS`.
+Subordinate byte/entry/batch/deadline limits MUST use the documented shared ratios
+rather than separate configuration values, preserving existing defaults.
+Unset/empty bindings MUST retain finite defaults. Numeric settings MUST be
+positive decimal integers within runtime representation limits; depths MUST be
+finite and strictly increasing. Invalid settings MUST fail explicitly without
+logging their values or silently falling back. Compiler-generated bindings MUST
+reach generation, gateway and nested MCP containers, upload validation, and
+publishing. Upload-validation steps and publishers MUST independently source
+trusted repository values, not uploaded metadata or agent-written environment
+files. Pack/header/preview bounds MUST be consistent across these stages. Hydration
+is checked after each transfer batch; depth and time budgets MUST NOT be described
+as network-byte bounds. Raising budgets MUST NOT weaken authorization or validation.
+
+**OGR-007 — Baseline and publication preservation**: Full recovery MUST use the
+authorized base and preserve applicable trusted dispatch-SHA baselines.
+Incremental recovery MUST use the triggering PR's exact pre-agent head SHA and
+independently authorize its live head repository, never substituting upload
+metadata or a newer remote head. Reconstructed outputs MUST undergo ordinary
+Claim scoping, exclusions, compilation notices, explicit transport selection,
+file/history protection, size limits, signing, and publication-integrity checks.
+Only private transport snapshots MAY change; original uploads MUST remain immutable.
+
+**OGR-008 — Actionable failures and manual recovery**: Recovery failures MUST
+preserve original checkout-provisioning and structured operation-limit guidance
+without exposing raw subprocess diagnostics, content, credentials, or filesystem
+paths. Fallback instructions MUST treat object-pack envelopes as envelopes, not
+ordinary Git bundles or `git am` input. They MUST identify immutable artifacts,
+verify their identities, reconstruct from publisher-resolved baseline/tip values
+in a clean complete clone, and preserve exclusions.
+
+**Conformance Evidence**:
+
+| Requirements | Implementation / regression evidence |
+|---|---|
+| OGR-001–003 | `git_helpers.cjs`, generation helpers, `object_pack_transport.cjs`; `object_pack_transport.test.cjs`, `safe_outputs_handlers_recovery.test.cjs`, and real-Git generation regressions |
+| OGR-004 | `inspectObjectPack` and `validate_recovery_envelopes.cjs`; forged/secret/omitted-preview, configured-boundary, failed-removal, and compiler upload-ordering regressions |
+| OGR-005, OGR-007 | `object_pack_fetch.cjs`, both PR publishers, and `object_pack_transport_git.test.cjs`; trusted-tree hydration, exact baselines, native validation, immutable transports, and policy-rejection cases |
+| OGR-006 | `object_pack_limits.cjs` and compiler environment/container wiring; parser/default/boundary tests, publisher override rejection, deployed-runtime dependency checks, and `pkg/workflow/object_pack_limits_test.go` |
+| OGR-008 | `create_pull_request_helpers.cjs`, handler recovery regressions, and fallback-command tests |
+
+JavaScript paths are under `actions/setup/js/`. The bounded
+[generation](https://github.com/github/gh-aw/blob/main/specs/workflow-security/SafeOutputGeneration.tla)
+and [object-recovery](https://github.com/github/gh-aw/blob/main/specs/workflow-security/SafeOutputObjectRecovery.tla)
+models check separate finite abstractions. Recovery models trusted limit validity,
+independent publisher boundedness, and configurable finite attempt counts, with
+negative controls for invalid settings and upload-controlled policy. They do not
+prove Git parsing, descriptor traversal, actual byte/time thresholds, container
+environment wiring, or implementation refinement.
 
 ##### Bundle Git Operations and Validation Baselines
 
@@ -3247,7 +3386,7 @@ authoritative credential, resource, typed-input, staging, and migration contract
 
 #### Type: link_sub_issue
 
-**Purpose**: Create parent-child relationships between issues using task list entries.
+**Purpose**: Create native GitHub parent-child relationships between issues.
 
 **Default Max**: 1  
 **Cross-Repository Support**: Yes (restricted)  
@@ -3279,7 +3418,7 @@ authoritative credential, resource, typed-input, staging, and migration contract
 
 **Operational Semantics**:
 
-1. **Task List Insertion**: Adds a task list entry referencing the sub-issue to the parent issue body.
+1. **Native Sub-Issue Linking**: Uses GitHub's native sub-issue relationship API, not task list insertion.
 2. **Bidirectional Navigation**: Creates navigable links from parent to child and child to parent.
 3. **Limit Enforcement**: Enforces maximum sub-issue count (default: 50) per parent issue.
 4. **Validation**: Both parent and sub-issue numbers must exist in the same repository.
@@ -3289,6 +3428,8 @@ authoritative credential, resource, typed-input, staging, and migration contract
 
 - `max`: Operation limit (default: 1)
 - `target`: `"triggering"` (default), `"*"`, or a fixed issue number. Controls the **parent** issue; `sub_issue_number` is always agent-supplied.
+- `target-repo`: Default repository for numeric issue references
+- `allowed-repos`: Additional allowed repository patterns
 - `staged`: Staged mode override
 
 **Security Requirements**:
@@ -3298,6 +3439,8 @@ authoritative credential, resource, typed-input, staging, and migration contract
 - The handler MUST enforce the maximum sub-issue count limit to prevent unbounded growth
 - Cross-repository operations MUST be rejected; only same-repository linking is permitted
 - The effective parent and sub-issue numbers, after applying `target`, MUST be validated as different; implementations MUST NOT rely solely on comparing the raw agent-supplied `parent_issue_number` to `sub_issue_number` before `target` is applied
+- After temporary-ID resolution and parent target selection, the effective parent and sub-issue MUST belong to the same repository, which MUST match the default `target-repo` or a pattern in `allowed-repos`, before any issue read, parent lookup, or link mutation. Two temporary IDs resolving to the same repository do not establish authorization.
+- Unresolved parent IDs MUST defer only when `target: "*"` selects that parent; fixed and triggering targets MUST ignore agent parent IDs, including unresolved or disallowed mappings. Unresolved sub-issue IDs MAY defer, and every retry MUST revalidate the resolved repository.
 
 **Target Authorization**:
 
@@ -3310,6 +3453,8 @@ authoritative credential, resource, typed-input, staging, and migration contract
 **LSI-004**: Only `target: "*"` MAY select the parent issue from the agent-supplied `parent_issue_number`.
 
 **LSI-005**: Schema shaping, prompt instructions, and temporary-ID resolution MUST NOT replace or precede runtime target authorization. Agent-supplied target identifiers, including unresolved temporary IDs, MUST be ignored unless `target` is `"*"`.
+
+**LSI-006**: After applying parent target selection and resolving temporary IDs, the handler MUST authorize the effective same-repository parent/sub-issue pair against the default `target-repo` or `allowed-repos` patterns before any API access. Deferred retries and staged mode MUST preserve this check.
 
 **Required Permissions**:
 
@@ -3624,8 +3769,6 @@ authoritative credential, resource, typed-input, staging, and migration contract
 **Cross-Repository Support**: No
 **Mandatory**: No
 
-**Experimental**: Yes. Compiling a workflow with `approve-workflow-run` emits: `Using experimental feature: approve-workflow-run`.
-
 **MCP Tool Schema**:
 
 ```json
@@ -3705,7 +3848,7 @@ authoritative credential, resource, typed-input, staging, and migration contract
 ```json
 {
   "name": "merge_pull_request",
-  "description": "Merge an existing pull request only after policy checks pass (status checks, approvals, resolved review threads, label/branch constraints, and mergeability gates).",
+  "description": "Experimental: merge into an unprotected, non-default branch with an open upstream PR after workflow-owned policy gates pass. CI and affirmative approval are required only when configured. Execution is bound to the evaluated head SHA.",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -3737,6 +3880,9 @@ authoritative credential, resource, typed-input, staging, and migration contract
 4. **Policy Gates**: Enforces required checks, review decision, unresolved review thread gating, label constraints, and source branch constraints.
 5. **Base Branch Protection**: Refuses merges when the target base branch is protected or is the repository default branch.
 6. **Target Branch Open PR**: When the target base branch is neither protected nor the repository default, refuses merges when that branch does not have an associated open pull request (i.e. no open PR exists with that branch as its head/source branch). This gate enforces the PR-chain model (e.g. `release/1.0 → main`) as a hard invariant; no opt-out is provided. Only intra-repository PR chains are matched — fork-sourced upstream PRs are not considered. If your workflow does not follow this model, use a custom merge step instead.
+7. **Revision Binding**: The merge API MUST receive the evaluated head SHA as `sha`. A mismatch MUST fail without retrying the merge; another request requires fresh evaluation.
+8. **Complete Review Evidence**: Missing PR/thread data, invalid review decisions, missing thread resolution flags, malformed pagination, repeated continuation cursors, or a head revision different from the evaluated SHA MUST block merging. Individual reviews MUST be evaluated even without an approver allowlist; any reviewer's latest effective `CHANGES_REQUESTED` review MUST block merging. A null aggregate review decision MUST NOT override an individual objection and is not affirmative approval.
+9. **Final Revalidation**: Before either execution or a staged preview, re-read PR policy fields, target branch policy, the open upstream PR, reviews, configured approvals, and required checks. Changed policy evidence or non-passing checks MUST block the operation. Only the head SHA is enforced atomically by GitHub; other mutable policy state retains a race window after these reads.
 
 **Configuration Parameters**:
 
@@ -3745,9 +3891,14 @@ authoritative credential, resource, typed-input, staging, and migration contract
 - `required-labels`: Labels that must ALL be present on the pull request
 - `required-title-prefix`: Title prefix the pull request must start with
 - `allowed-branches`: Source branch glob patterns; the PR's branch must match at least one
+- `required-checks`: Exact check-run names, unioned with branch-policy requirements. Each MUST complete with `success` on the evaluated head SHA. Missing, pending, skipped, neutral, failed, or wrong-revision checks block merging. Missing app identities or multiple apps publishing the same required name also block merging; this does not authenticate an expected producer. The compiler rejects overlap with the workflow's resolved agent-controlled `create-check-run` name. Legacy commit-status contexts are not supported. An empty or omitted list adds no workflow-owned CI requirement; if the union is empty, CI is not queried.
+- `required-check-apps`: Optional map from names in `required-checks` to positive GitHub App IDs. For mapped names, every observed non-deployment check run MUST have the configured app ID, including during final revalidation. Unknown names and invalid IDs MUST fail compilation. App identity does not establish which workflow produced a check; CI workflow definitions still require independent protection.
+- `required-approvers`: Human GitHub logins (case-insensitive). When non-empty, at least one allowlisted human MUST have a current `APPROVED` review on the evaluated head SHA. Later decisive review state supersedes earlier approval by validated submission time, not review ID; invalid/missing timestamps or ambiguous same-reviewer ordering block merging. Dismissed approvals and active changes requested block merging. The PR author, bot accounts, and authenticated merge identity cannot authorize. Empty or omitted requires no affirmative approval.
 - `target-repo`: Cross-repository target
 - `allowed-repos`: Cross-repository allowlist
 - `staged`: Staged mode override
+
+**Decision Audit**: The handler manager MUST expose only summary-safe merge failure diagnostics and persist successful, blocked, and staged decisions in `merge-pull-request-decisions.jsonl`, uploaded with the safe-output items artifact. Records MUST retain the untrusted-data marker and redact known secrets. Persisted decision evidence MUST be limited to validated repository, pull request number, head/base revisions, evaluation/revalidation timestamps, and optional producer rejections containing fixed phase/code and positive safe-integer check-run and expected/observed app IDs. Early request rejections MUST include a fixed failure code and retain only valid attempted-target identity when known. Titles, labels, branches, check names, reviewer identities, approval details, raw API errors, and review bodies MUST NOT be persisted. Each record MUST be bounded to 64 KiB. Before uploading, standard tracked-secret redaction and any configured custom masking MUST succeed; tracked inputs are uppercase `secrets.NAME` references collected from preceding generated steps. Persistence failures MUST be surfaced separately and MUST NOT be reported as audit success. An already-completed merge MUST retain its successful operation outcome, merged revision, URL, and internal evidence even if auditing fails; an audit failure MUST NOT trigger a merge retry.
 
 **Target Authorization**:
 
@@ -3767,16 +3918,24 @@ authoritative credential, resource, typed-input, staging, and migration contract
 
 - `contents: write` - Merge operation execution
 - `pull-requests: write` - Pull request metadata and merge operations
+- `checks: read` - Required even when `required-checks` is omitted, because branch-policy requirements are discovered at runtime
 
 *GitHub App*:
 
 - `contents: write` - Merge operation execution
 - `pull-requests: write` - Pull request metadata and merge operations
 - `metadata: read` - Repository metadata (automatically granted)
+- `checks: read` - Required even when `required-checks` is omitted, because branch-policy requirements are discovered at runtime
 
 **Notes**:
 
 - Merge execution is blocked unless all configured gates pass.
+- Policy controls are workflow-owned, not tool-call arguments. Labels, titles, and branch names are filters, not authorization. Protect policy definitions and CI producers; check-name matching does not authenticate a check producer.
+- Approval identities and credentials must remain outside the acting agent's control. Do not grant the acting agent credentials that impersonate allowlisted humans or authority to dismiss their reviews. GitHub's human account type cannot distinguish a person from automation using that person's credentials.
+- Evaluated results include `decision_evidence`: repository/PR, head/base revisions, branch policy, label/branch/title constraints, required/passing/missing/failing checks (including successful check-run IDs and app IDs), review decision/thread count, approval policy and provenance (login, review ID, commit ID), and evaluation/revalidation timestamps when reached. Errors retain partial evidence. No credentials are recorded. Already-merged success does not claim a fresh policy evaluation.
+- Results and `decision_evidence` carry `data_trust: untrusted`. Returned metadata and failure details are data, not instructions or authority; the tool contract makes this boundary explicit without claiming semantic prompt-injection isolation. Exact policy values and approval provenance are retained internally for revalidation, while blocked processing results and audit artifacts use minimized projections.
+- Staged mode uses the same policy evaluation and revalidation without calling the merge API, returning `staged: true` and `merged: false` for an eligible preview. Global staged and trial runs MUST upload merge decision audit artifacts without publishing applied-item manifests.
+- A revert is a compensating change, not rollback of downstream deployments, published artifacts, external effects, or data migrations.
 - Merge to the repository default branch is always refused by this safe output type.
 - Merge is refused when the target base branch does not have an open pull request where that branch is the head (source) branch. This enforces that merges flow only into branches actively tracked by an upstream PR.
 - `pull_request_number` may be a temporary ID that resolves to a pull request number from earlier safe-output operations.
@@ -4645,6 +4804,18 @@ safe-outputs:
 - Staged asset filenames MUST be keyed by a hash of the declared source path, with the original extension preserved where applicable, so distinct source paths with the same basename do not collide.
 - The privileged upload job MUST validate that staged asset paths remain contained within the staged-assets directory and that the expected staged filename matches the declared source path.
 - The privileged upload job MUST compute asset size, SHA-256 digest, target filename, and published URL from staged file contents and trusted runtime context. It MUST NOT trust agent-supplied `size`, `sha`, `path`, `targetFileName`, or URL metadata for privileged decisions.
+
+##### Asset Staging Ownership and Transport
+
+The `upload_asset` MCP handler stages files inside a backend container; the agent job's host-side `Upload Safe Outputs Assets` action reads them to create the `safe-outputs-assets` artifact. The downstream `upload_assets` job downloads that artifact before publishing to the asset branch. A shared mount or a successful MCP tool result MUST NOT be treated as evidence that the host can read the staged bytes or that publication completed.
+
+Unless an explicit container user is configured, gateway startup MUST run the built-in `safeoutputs` backend with the host runner's numeric UID and GID before serializing or publishing its configuration. The backend MUST NOT rely on inheriting the outer gateway container's Docker user. Missing or invalid runner identity MUST fail startup rather than silently fall back to root. This default identity MUST include a writable, container-local `HOME` at `/tmp` unless `HOME` is already configured, so local Git configuration does not require `/root` access or exposure of the host's home directory. Explicit container-user settings and configured `HOME` values MUST remain effective; deployments using these overrides are responsible for compatible host access. Other MCP backends, mounts, credentials, and network policies MUST remain unchanged by this ownership policy.
+
+Guarded staging MUST exclusively create regular files with mode `0600`; private subdirectories created by the guard, including Claim-specific directories, MUST use mode `0700`. The ownership contract MUST keep those files and directories readable and traversable by the host uploader without broadening their modes. Source and destination symlink rejection, hard-link and nonregular-source rejection, descriptor-relative path checks, bounded reads, and content-derived metadata MUST remain enforced. Implementations MUST NOT repair ownership by following agent-controlled links, recursively changing arbitrary trees, or disabling these guards.
+
+Unreadable staging MUST fail the artifact upload rather than report successful publication. An absent producer artifact and the downstream missing-asset errors MUST remain distinguishable from a Git push failure or an artifact-storage quota error. Owner equality and successful upload establish access, not trusted content, detector acceptance, or authorization for additional effects.
+
+Implementation and regression mappings are maintained in the [compiler threat specification's runtime staging boundary](https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md#79-safe-output-staging-ownership-boundary). Linux conformance coverage MUST exercise guarded `0600` asset files and `0700` Claim directories written with the selected backend identity and read by a separate host-uploader process. Configuration-only or non-Linux tests MUST NOT be presented as live container-to-host verification.
 
 ---
 
@@ -5583,10 +5754,11 @@ When threat detection executes in `warn` mode and reports a threat signal for a 
 1. A prominent warning section:
 
    > [!WARNING]
-   > threat detection engine error
-   > The threat detection engine encountered an error and could not complete analysis. This is a tooling failure, not a security finding.
+   > **Threat detection engine error**
+   >
+   > Threat detection could not complete its analysis due to a tooling error. This is not a security finding.
 
-2. A visible warning label string: `threat detection engine error`.
+2. A visible warning label string: `Threat detection engine error`.
 3. An XML comment marker in emitted markdown content: `<!-- gh-aw-threat-engine-error -->`.
 
 **Requirement WTD2 (Convertible Fallback)**: For safe output types classified as **Convertible**, implementations MUST transform the operation into the mapped Reviewable type before execution. For this specification, `push_to_pull_request_branch` (also referred to as `update-pull-request-branch`) MUST fall back to `create_pull_request` with the WTD1 or WTD1a review annotation that matches the detection reason.
@@ -6389,6 +6561,15 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.29.15** (2026-11-02):
+
+- **Added**: OGR-001–008 for local-only generation, descriptor-pinned raw staging, selected object packaging, complete-preview upload/publisher validation, and isolated monorepo-aware recovery.
+- **Specified**: Four consolidated repository variables for bytes, objects, timeout, and fetch depths, with derived resource budgets across generation, gateway/nested containers, upload guards, and publishing, finite defaults, strict validation, and independent trusted publisher policy.
+- **Preserved**: Exact incremental/dispatch baselines, fetch-before-import ordering, immutable uploads, ordinary publication policies, original diagnostics, and object-pack-aware manual instructions.
+- **Extended**: Bounded recovery configuration/attempt invariants and synthetic controls, without claiming native thresholds or implementation refinement.
+- **Specified**: Runner UID/GID and container-local writable HOME defaults for the safeoutputs backend, preserving explicit overrides and private staged-file/Claim-directory modes.
+- **Clarified**: The container-to-host artifact handoff, retained asset guards, producer failures versus downstream publication cascades, and the limits of ownership and regression evidence. Adoption requires the fixed setup runtime, not a workflow lock or permission change.
 
 **Version 1.29.14** (2026-10-31):
 

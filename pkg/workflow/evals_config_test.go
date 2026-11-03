@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -88,11 +89,19 @@ func TestParseEvalsFromFrontmatter_PerQuestionModel(t *testing.T) {
 			map[string]any{"id": "q2", "question": "Is it safe?"},
 		},
 	}
-	cfg, err := c.parseEvalsFromFrontmatter(frontmatter)
-	require.NoError(t, err)
-	require.NotNil(t, cfg)
-	assert.Equal(t, "openai/gpt-4o", cfg.Questions[0].Model, "per-question model should be preserved")
-	assert.Empty(t, cfg.Questions[1].Model, "question without model should have empty Model")
+	_, err := c.parseEvalsFromFrontmatter(frontmatter)
+	require.ErrorContains(t, err, "all questions share one Decisions request")
+	require.ErrorContains(t, err, "Set evals.model")
+}
+
+func TestValidateEvals_DecisionsQuestionLimit(t *testing.T) {
+	cfg := &EvalsConfig{}
+	for i := range 400 {
+		cfg.Questions = append(cfg.Questions, EvalDefinition{ID: strconv.Itoa(i), Question: "Did it succeed?"})
+	}
+	require.NoError(t, validateEvals(cfg))
+	cfg.Questions = append(cfg.Questions, EvalDefinition{ID: "overflow", Question: "Did it succeed?"})
+	require.ErrorContains(t, validateEvals(cfg), "at most 400")
 }
 
 func TestParseEvalsFromFrontmatter_QuestionLevelNonStringModel(t *testing.T) {
@@ -104,7 +113,7 @@ func TestParseEvalsFromFrontmatter_QuestionLevelNonStringModel(t *testing.T) {
 	})
 	require.Error(t, err)
 	require.ErrorContains(t, err, "model")
-	require.ErrorContains(t, err, "string")
+	require.ErrorContains(t, err, "all questions share one Decisions request")
 }
 
 func TestParseEvalsFromFrontmatter_InvalidType(t *testing.T) {

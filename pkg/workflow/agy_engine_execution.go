@@ -79,7 +79,6 @@ func (e *AgyEngine) buildExecutionEnv(workflowData *WorkflowData, firewallEnable
 	applyEngineMaxTurnsEnv(env, workflowData)
 	applyEngineVersionEnv(env, workflowData)
 	applyEngineAndAgentEnv(env, workflowData, agyLog)
-	applyMCPScriptsSecretEnv(env, workflowData)
 	applyModelAliasesEnv(env, workflowData)
 	if workflowData.Model != "" {
 		env[e.GetModelEnvVarName()] = workflowData.Model

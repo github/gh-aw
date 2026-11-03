@@ -889,7 +889,6 @@ async function main(config = {}) {
       };
     }
     const { repo: qualifiedItemRepo, repoParts } = repoResult;
-    const allowedMentionAliases = await resolveMentionsForItem(context, githubClient, core, config.mentions, defaultMentionAliases, defaultTargetRepo, repoResult);
 
     // In staged mode no issues are created, so temporary IDs never resolve; validate the
     // references without deferring so dependent issues still get a staged preview.
@@ -901,6 +900,15 @@ async function main(config = {}) {
     if (blockedBy.error) {
       return { success: false, error: blockedBy.error };
     }
+    for (const blockedIssue of blockedBy.targets) {
+      const blockedRepoResult = resolveAndValidateRepo(blockedIssue, defaultTargetRepo, allowedRepos, "blocked-by dependency");
+      if (!blockedRepoResult.success) {
+        core.warning(`Skipping issue: ${blockedRepoResult.error}`);
+        return { success: false, error: blockedRepoResult.error };
+      }
+      blockedIssue.repo = blockedRepoResult.repo;
+    }
+    const allowedMentionAliases = await resolveMentionsForItem(context, githubClient, core, config.mentions, defaultMentionAliases, defaultTargetRepo, repoResult);
 
     // Get or generate the temporary ID for this issue
     const tempIdResult = getOrGenerateTemporaryId(message, "issue");

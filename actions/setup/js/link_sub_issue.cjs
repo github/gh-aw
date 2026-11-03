@@ -222,6 +222,17 @@ async function main(config = {}) {
       }
     }
 
+    const effectiveRepoResult = resolveAndValidateRepo({ repo: `${owner}/${repo}` }, defaultTargetRepo, allowedRepos, "sub-issue link");
+    if (!effectiveRepoResult.success) {
+      core.warning(`Skipping link_sub_issue: ${effectiveRepoResult.error}`);
+      return {
+        parent_issue_number: parentIssueNumber,
+        sub_issue_number: subIssueNumber,
+        success: false,
+        error: effectiveRepoResult.error,
+      };
+    }
+
     // Fetch parent issue to validate filters
     let parentIssue;
     try {

@@ -95,9 +95,13 @@ func compiledPiArgs(t *testing.T, lock string) string {
 
 // assertPromptContract checks that the runtime-imported source keeps the skill-use hint after
 // inline-skill extraction and materializes exactly the reporting skill.
-func assertPromptContract(t *testing.T, lock, runtimeImportPath, sourcePath string) {
+func assertPromptContract(t *testing.T, lock, runtimeImportPath, sourcePath string, authorSource bool) {
 	t.Helper()
-	assert.Contains(t, lock, "{{#runtime-import "+runtimeImportPath+"}}", "prompt should load the skill source at runtime")
+	directive := "runtime-import"
+	if authorSource {
+		directive = "author-prompt"
+	}
+	assert.Contains(t, promptRenderPlan(t, lock), "{{#"+directive+" "+runtimeImportPath+"}}", "prompt should load the selected skill source at runtime")
 	raw, err := os.ReadFile(sourcePath)
 	require.NoError(t, err)
 	body, err := parser.ExtractMarkdownContent(string(raw))
@@ -224,7 +228,7 @@ Say hello.
 			workflowPath := setupBareInlineSkillRepo(t, "bare-pi-skill", tt.workflow)
 			lock, _ := compileBareInlineSkillWorkflow(t, workflowPath)
 			assertBareRuntimeSkillLoading(t, lock)
-			assertPromptContract(t, lock, tt.runtimeImportPath, filepath.Join(filepath.Dir(workflowPath), tt.sourceFile))
+			assertPromptContract(t, lock, tt.runtimeImportPath, filepath.Join(filepath.Dir(workflowPath), tt.sourceFile), tt.name == "directly declared")
 		})
 	}
 }
@@ -269,7 +273,7 @@ Answer the question "what is 6 × 7?" in one word.
 	assert.Contains(t, args, `--model "aw-gateway/$(cat /tmp/gh-aw/pi-routing-model)"`, "model routing should be unchanged")
 	assert.Contains(t, lock, "GH_AW_MAX_TOOL_DENIALS: 3", "denial budget should be unchanged")
 	assert.Contains(t, lock, "claude-sonnet-5", "routing pool should be unchanged")
-	assertPromptContract(t, lock, ".github/workflows/shared/reporting.md", filepath.Join(filepath.Dir(workflowPath), "shared", "reporting.md"))
+	assertPromptContract(t, lock, ".github/workflows/shared/reporting.md", filepath.Join(filepath.Dir(workflowPath), "shared", "reporting.md"), false)
 }
 
 // TestCompileBarePiDriversLoadWorkflowSkills covers bare pi with the SDK and RPC drivers, which
@@ -310,7 +314,7 @@ Say hello.
 			if driver == "pi_rpc_driver.cjs" {
 				assert.Contains(t, lock, "GH_AW_PI_ARGS:", "the RPC driver should receive the bare arguments")
 			}
-			assertPromptContract(t, lock, ".github/workflows/shared/reporting.md", filepath.Join(filepath.Dir(workflowPath), "shared", "reporting.md"))
+			assertPromptContract(t, lock, ".github/workflows/shared/reporting.md", filepath.Join(filepath.Dir(workflowPath), "shared", "reporting.md"), false)
 		})
 	}
 }
@@ -350,7 +354,7 @@ Say hello.
 				assert.NotContains(t, lock, flag)
 			}
 
-			assertPromptContract(t, lock, ".github/workflows/shared/reporting.md", filepath.Join(filepath.Dir(workflowPath), "shared", "reporting.md"))
+			assertPromptContract(t, lock, ".github/workflows/shared/reporting.md", filepath.Join(filepath.Dir(workflowPath), "shared", "reporting.md"), false)
 		})
 	}
 }

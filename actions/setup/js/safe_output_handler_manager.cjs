@@ -13,7 +13,7 @@ const { loadAgentOutput } = require("./load_agent_output.cjs");
 const { normalizeSafeOutputConfig } = require("./safe_output_names.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { getStalePullRequestReason } = require("./pr_lifecycle.cjs");
-const { ERR_CONFIG, ERR_PARSE, ERR_VALIDATION, SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
+const { ERR_CONFIG, ERR_PARSE, ERR_SYSTEM, ERR_VALIDATION, SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
 const { classifySafeOutputResult, computeSafeOutputsStatus, isFailedProcessingResult } = require("./safe_outputs_status.cjs");
 const { finalizeBufferedReviewOutcomes } = require("./safe_output_outcomes.cjs");
 const { hasUnresolvedTemporaryIds, replaceTemporaryIdReferences, replaceArtifactUrlReferences, normalizeTemporaryId, extractTemporaryIdReferences, getCreatedTemporaryId } = require("./temporary_id.cjs");
@@ -38,6 +38,7 @@ const {
   writeTemporaryIdMapFile,
   writeSafeOutputErrorReport,
   writeSafeOutputOutcomes,
+  writeMergePullRequestDecision,
   SAFE_OUTPUT_ERRORS_FILE_PATH,
   CLAIM_DELIVERY_ERRORS_FILE_NAME,
 } = require("./safe_output_manifest.cjs");
@@ -925,6 +926,29 @@ function buildSkippedResult(type, messageIndex, result) {
   };
 }
 
+/** @param {string} type @param {any} result @param {number} messageIndex */
+function recordMergeDecision(type, result, messageIndex) {
+  if (type !== "merge_pull_request" || !result || result.deferred) return result;
+  try {
+    writeMergePullRequestDecision(result, messageIndex);
+    return { ...result, audit_recorded: true };
+  } catch {
+    const auditError = `${ERR_SYSTEM}: Failed to persist merge pull request decision`;
+    core.warning(auditError);
+    return { ...result, audit_failed: true, audit_error: auditError };
+  }
+}
+
+/** @param {any} result */
+function projectMergeFailure(result) {
+  return {
+    failure_reasons: (result.failure_reasons || []).filter(reason => typeof reason.code === "string" && /^[a-z_]{1,80}$/.test(reason.code)).map(reason => ({ code: reason.code })),
+    ...(result.audit_recorded ? { audit_recorded: true } : {}),
+    ...(result.audit_failed ? { audit_failed: true, audit_error: result.audit_error } : {}),
+    ...(typeof result.staged === "boolean" ? { staged: result.staged } : {}),
+  };
+}
+
 /**
  * Compute the processing order (original message indices) so that temporary-ID
  * producers run before consumers while preserving the original order for
@@ -1060,6 +1084,9 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
   // all subsequent non-code-push messages are cancelled with a clear reason.
   /** @type {Array<{type: string, error: string}>} */
   const codePushFailures = [];
+
+  /** @type {{type: string, error: string, skipped: boolean}|null} */
+  let codePushSkip = null;
 
   // Track when a code-push operation falls back to creating an issue or pull request instead.
   // When set, subsequent add_comment messages will receive a correction note prepended
@@ -1283,11 +1310,10 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
           };
           core.info(`Prepending fallback correction note to add_comment body (fallback ${codePushFallbackInfo.fallbackTargetType}: #${codePushFallbackInfo.number})`);
         }
-        // If a previous code-push operation failed outright (e.g. patch application error),
-        // prepend a failure warning so the status comment accurately reflects that the
-        // code changes were not applied.
-        if (codePushFailures.length > 0) {
-          const failure = codePushFailures[0];
+        // Failed and skipped publications both need a correction, but skips remain
+        // non-fatal and must not inflate the code-push failure count.
+        const failure = codePushFailures[0] || codePushSkip;
+        if (failure) {
           effectiveMessage = {
             ...effectiveMessage,
             [COMMENT_PREAMBLE]: [
@@ -1303,7 +1329,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
                     children: [
                       { type: "text", value: "The ", agentTainted: false },
                       { type: "code", value: failure.type, agentTainted: false },
-                      { type: "text", value: " operation failed: ", agentTainted: false },
+                      { type: "text", value: "skipped" in failure ? " operation was skipped: " : " operation failed: ", agentTainted: false },
                       { type: "text", value: `${failure.error}. The code changes were not applied.`, agentTainted: true },
                     ],
                   },
@@ -1335,7 +1361,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
         results.push(buildSkippedResult(messageType, i, { skipped: true, reason: stalePRReason }));
         continue;
       }
-      const result = await messageHandler(effectiveMessage, resolvedTemporaryIds, temporaryIdMap);
+      const result = recordMergeDecision(messageType, await messageHandler(effectiveMessage, resolvedTemporaryIds, temporaryIdMap), i);
 
       // Check if the handler explicitly returned a skipped result (e.g. policy filters,
       // no-op warnings, or if_no_changes: warn/ignore). Skipped results should NOT
@@ -1345,6 +1371,9 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
         const msg = result.reason || result.warning || result.error || "Handler returned skipped: true";
         core.info(`⏭ Message ${i + 1} (${messageType}) skipped — ${msg}`);
         results.push(buildSkippedResult(messageType, i, result));
+        if (CODE_PUSH_TYPES.has(messageType) && !codePushSkip) {
+          codePushSkip = { type: messageType, error: msg, skipped: true };
+        }
         continue;
       }
 
@@ -1357,6 +1386,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
           messageIndex: i,
           success: false,
           error: errorMsg,
+          ...(messageType === "merge_pull_request" ? { result: projectMergeFailure(result) } : {}),
         });
         // Track code-push failures for fail-fast behaviour
         if (CODE_PUSH_TYPES.has(messageType)) {
@@ -1532,7 +1562,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
         // Call the handler again with updated temp ID map
         await assertClaimAuthorized(deferred.message);
         const stalePRReason = await getStalePullRequestReason(global.github, global.context);
-        const result = stalePRReason ? { skipped: true, reason: stalePRReason } : await deferred.handler(deferred.message, resolvedTemporaryIds, temporaryIdMap);
+        const result = stalePRReason ? { skipped: true, reason: stalePRReason } : recordMergeDecision(deferred.type, await deferred.handler(deferred.message, resolvedTemporaryIds, temporaryIdMap), deferred.messageIndex);
 
         if (result && result.skipped === true && !result.deferred) {
           const msg = result.reason || result.warning || result.error || "Handler returned skipped: true";
@@ -1557,7 +1587,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
               success: false,
               deferred: false,
               error: errorMsg,
-              result: { ...result, success: false, deferred: false, error: errorMsg },
+              result: deferred.type === "merge_pull_request" ? projectMergeFailure(result) : { ...result, success: false, deferred: false, error: errorMsg },
             };
           }
           continue;

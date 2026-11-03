@@ -74,7 +74,7 @@ func GenerateMCPScriptsToolsConfig(mcpScripts *MCPScriptsConfig) string {
 			InputSchema:  generateMCPScriptInputSchema(toolConfig.Inputs),
 			Handler:      handler,
 			Dependencies: dependencies,
-			Env:          generateMCPScriptEnvRefs(toolConfig.Env),
+			Env:          generateMCPScriptEnvRefs(toolName, toolConfig.Env),
 			Timeout:      toolConfig.Timeout,
 		})
 	}
@@ -119,14 +119,18 @@ func generateMCPScriptInputSchema(inputs map[string]*MCPScriptParam) map[string]
 	return schema
 }
 
-func generateMCPScriptEnvRefs(env map[string]string) map[string]string {
+// Hex encoding preserves distinct tool/name pairs without sanitization collisions.
+func mcpScriptEnvBindingName(toolName, envName string) string {
+	return fmt.Sprintf("GH_AW_MCP_SCRIPTS_ENV_%x_%x", toolName, envName)
+}
+
+func generateMCPScriptEnvRefs(toolName string, env map[string]string) map[string]string {
 	if len(env) == 0 {
 		return nil
 	}
 	refs := make(map[string]string)
 	for _, name := range sliceutil.SortedKeys(env) {
-		// Document variable names without storing secret values.
-		refs[name] = name
+		refs[name] = mcpScriptEnvBindingName(toolName, name)
 	}
 	return refs
 }

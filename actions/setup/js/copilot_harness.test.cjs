@@ -2652,6 +2652,17 @@ describe("copilot_harness.cjs", () => {
       expect(resolved.stdin).toEqual(prompt);
     });
 
+    it("streams small prompts containing NUL bytes without changing their contents", () => {
+      const tempDir = makeHarnessTempDir("copilot-nul-prompt-");
+      const promptFile = path.join(tempDir, "prompt.txt");
+      const prompt = Buffer.from("Threat detection input\nbundle bytes: \0\xff\n");
+      fs.writeFileSync(promptFile, prompt);
+
+      const resolved = resolvePromptFileInput(["--prompt", "ignored", "--prompt-file", promptFile, "--allow-all-tools"]);
+      expect(resolved.args).toEqual(["--allow-all-tools"]);
+      expect(resolved.stdin).toEqual(prompt);
+    });
+
     it("removes explicit prompt args when streaming a prompt file through stdin", () => {
       const promptFile = path.join(os.tmpdir(), `copilot-driver-conflict-${Date.now()}.txt`);
       const prompt = Buffer.concat([Buffer.from("generated prompt\n", "utf8"), Buffer.alloc(PROMPT_FILE_INLINE_THRESHOLD_BYTES, 0x79)]);
@@ -2679,12 +2690,12 @@ describe("copilot_harness.cjs", () => {
       expect(resolved.stdin).toBeUndefined();
     });
 
-    it("delivers a large prompt to the child unchanged through stdin", () => {
+    it.each(["large", "NUL-containing"])("delivers a %s prompt to the child unchanged through stdin", kind => {
       const tempDir = makeHarnessTempDir("copilot-large-prompt-");
       const promptPath = path.join(tempDir, "prompt.txt");
       const capturedPath = path.join(tempDir, "captured-prompt.bin");
       const stubPath = path.join(tempDir, "stub.cjs");
-      const prompt = Buffer.concat([Buffer.from("system instructions\n", "utf8"), Buffer.alloc(PROMPT_FILE_INLINE_THRESHOLD_BYTES, 0x41)]);
+      const prompt = kind === "large" ? Buffer.concat([Buffer.from("system instructions\n", "utf8"), Buffer.alloc(PROMPT_FILE_INLINE_THRESHOLD_BYTES, 0x41)]) : Buffer.from("Threat detection input\nbundle bytes: \0\xff\n");
       fs.writeFileSync(promptPath, prompt);
       fs.writeFileSync(
         stubPath,

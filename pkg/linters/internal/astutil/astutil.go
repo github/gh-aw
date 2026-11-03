@@ -264,8 +264,9 @@ func ContextParamName(pass *analysis.Pass, fn *ast.FuncType) (string, bool) {
 }
 
 // IsFmtErrorf reports whether call is a call to fmt.Errorf (including aliases).
+// A parenthesized callee such as (fmt.Errorf)(...) is also recognized.
 func IsFmtErrorf(pass *analysis.Pass, call *ast.CallExpr) bool {
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	sel, ok := UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok {
 		return false
 	}
@@ -295,7 +296,7 @@ func CalledOSFunc(pass *analysis.Pass, call *ast.CallExpr, allowedNames ...strin
 	}
 
 	var obj types.Object
-	switch fun := call.Fun.(type) {
+	switch fun := UnwrapParenExpr(call.Fun).(type) {
 	case *ast.SelectorExpr:
 		obj = pass.TypesInfo.Uses[fun.Sel]
 	case *ast.Ident:
@@ -594,7 +595,7 @@ func AsStringsMethodCall(pass *analysis.Pass, expr ast.Expr, methodName string) 
 	if !ok {
 		return nil, false
 	}
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	sel, ok := UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok || sel.Sel.Name != methodName {
 		return nil, false
 	}
@@ -607,9 +608,10 @@ func AsStringsMethodCall(pass *analysis.Pass, expr ast.Expr, methodName string) 
 // CallQualifierText returns the source text of the package qualifier in a
 // selector call such as pkg.Method(...). For example, for strings.Index(...)
 // it returns "strings" (or the local alias when the import is aliased).
-// Returns "" if call.Fun is not a *ast.SelectorExpr.
+// Returns "" if call.Fun (after unwrapping parentheses) is not a
+// *ast.SelectorExpr.
 func CallQualifierText(fset *token.FileSet, call *ast.CallExpr) string {
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	sel, ok := UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok {
 		return ""
 	}
@@ -951,7 +953,7 @@ func IsInInitFunction(cur inspector.Cursor) bool {
 // via the type checker so aliased imports are handled and local identifiers
 // named "regexp" do not produce false positives.
 func IsRegexpCompileCall(pass *analysis.Pass, call *ast.CallExpr, names ...string) bool {
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	sel, ok := UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok || !slices.Contains(names, sel.Sel.Name) {
 		return false
 	}

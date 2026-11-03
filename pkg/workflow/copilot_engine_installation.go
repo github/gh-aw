@@ -456,10 +456,107 @@ func generateAWFInstallationStep(version string, agentConfig *AgentSandboxConfig
 
 	stepLines := []string{
 		"      - name: Install AWF binary",
+		"        env:",
+		"          GH_TOKEN: ${{ github.token }}",
+		"          GH_HOST: github.com",
 		"        run: " + installCmd,
 	}
 
 	return GitHubActionStep(stepLines)
+}
+
+// Docker enclaves keep the orchestrator rootless and delegate storage operations
+// only to the authenticated, version-matched upstream helper.
+const dockerEnclaveHelperInstallerSHA = "cff7d304f9a3fa7240dda32a101aef1bf2dad828759f8d1ecddea22ea2798cb7"
+
+func generateDockerEnclaveStorageHelperInstallStep(version string, agentConfig *AgentSandboxConfig) GitHubActionStep {
+	if agentConfig != nil && agentConfig.Command != "" {
+		return GitHubActionStep{}
+	}
+	if version == "" {
+		version = string(constants.DefaultFirewallVersion)
+	}
+	version = "v" + strings.TrimPrefix(version, "v")
+	if !versionAtLeast(version, string(constants.DefaultFirewallVersion), string(constants.AWFDockerEnclaveSetupMinVersion)) {
+		return GitHubActionStep{}
+	}
+	step := GitHubActionStep{
+		"      - name: Install authenticated Docker enclave storage helper",
+		"        shell: bash",
+		"        env:",
+		"          GH_TOKEN: ${{ github.token }}",
+		"          GH_HOST: github.com",
+		"          AWF_HELPER_VERSION: " + version,
+	}
+	if agentConfig != nil && agentConfig.ChecksumsSHA256 != "" {
+		step = append(step, "          AWF_HELPER_CHECKSUMS_SHA256: "+agentConfig.ChecksumsSHA256)
+	}
+	step = append(step, "        run: |")
+	step = append(step, dockerEnclaveStorageHelperSetupLines()...)
+	step = append(step, dockerEnclaveStorageHelperReleaseLines()...)
+	step = append(step, dockerEnclaveStorageHelperInstallLines()...)
+	step = append(step, dockerEnclaveStorageHelperProbeLines()...)
+	return step
+}
+
+func dockerEnclaveStorageHelperSetupLines() []string {
+	return []string{
+		`          set -euo pipefail`,
+		`          test "$(/usr/bin/id -u)" -ne 0`,
+		`          test -x /usr/bin/python3`,
+		`          test -x /usr/bin/sudo`,
+		`          test -x /usr/sbin/visudo`,
+		`          source "${RUNNER_TEMP}/gh-aw/actions/release_integrity.sh"`,
+		`          checksums_sha256=$(release_artifact_sha256 github/gh-aw-firewall "$AWF_HELPER_VERSION" checksums.txt "${AWF_HELPER_CHECKSUMS_SHA256:-}")`,
+		`          install_dir="${RUNNER_TEMP}/awf-helper-install-$$-${RANDOM}"`,
+		`          mkdir -m 700 "$install_dir"`,
+		`          installer_dir=""`,
+		`          cleanup() {`,
+		`            rm -f "$install_dir/checksums.txt" "$install_dir/release-identity.txt" "$install_dir/enclave-storage-helper.py"`,
+		`            rmdir "$install_dir"`,
+		`            if [[ -n "$installer_dir" ]]; then /usr/bin/sudo -n /usr/bin/rm -rf -- "$installer_dir"; fi`,
+		`          }`,
+		`          trap cleanup EXIT`,
+	}
+}
+
+func dockerEnclaveStorageHelperReleaseLines() []string {
+	return []string{
+		`          for asset in checksums.txt release-identity.txt; do`,
+		`            curl --proto '=https' --proto-redir '=https' -fsSL --retry 8 --retry-max-time 180 --connect-timeout 15 --max-time 60 \`,
+		`              "https://github.com/github/gh-aw-firewall/releases/download/$AWF_HELPER_VERSION/$asset" \`,
+		`              -o "$install_dir/$asset"`,
+		`          done`,
+		`          verify_release_identity "$install_dir/checksums.txt" "$install_dir/release-identity.txt" \`,
+		`            github/gh-aw-firewall "$AWF_HELPER_VERSION" "$checksums_sha256"`,
+		`          helper_sha256=$(awk '$2 == "enclave-storage-helper.py" { count++; digest = $1 } END { if (count != 1 || digest !~ /^[0-9a-f]{64}$/) exit 1; print digest }' "$install_dir/checksums.txt")`,
+		`          curl --proto '=https' --proto-redir '=https' -fsSL --retry 8 --retry-max-time 180 --connect-timeout 15 --max-time 60 \`,
+		`            "https://github.com/github/gh-aw-firewall/releases/download/$AWF_HELPER_VERSION/enclave-storage-helper.py" \`,
+		`            -o "$install_dir/enclave-storage-helper.py"`,
+		`          verify_release_attestation "$install_dir/enclave-storage-helper.py" github/gh-aw-firewall`,
+		`          verify_release_digest "$install_dir/enclave-storage-helper.py" "$helper_sha256"`,
+	}
+}
+
+func dockerEnclaveStorageHelperInstallLines() []string {
+	return []string{
+		`          installer_dir=$(/usr/bin/sudo -n /usr/bin/mktemp -d /var/lib/awf-helper-install.XXXXXX)`,
+		`          [[ "$installer_dir" == /var/lib/awf-helper-install.* ]]`,
+		`          installer_path="$installer_dir/install_awf_enclave_helper.py"`,
+		`          /usr/bin/sudo -n /usr/bin/install -o root -g root -m 0500 -- "${RUNNER_TEMP}/gh-aw/actions/install_awf_enclave_helper.py" "$installer_path"`,
+		`          installer_sha256=$(/usr/bin/sudo -n /usr/bin/sha256sum "$installer_path")`,
+		`          [[ "${installer_sha256%% *}" == "` + dockerEnclaveHelperInstallerSHA + `" ]]`,
+		`          runner_uid=$(/usr/bin/id -u)`,
+		`          /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C /usr/bin/sudo -n -- /usr/bin/python3 -I "$installer_path" "$install_dir/checksums.txt" "$install_dir/enclave-storage-helper.py" "$checksums_sha256" "$helper_sha256" "${AWF_HELPER_VERSION#v}" "$runner_uid"`,
+	}
+}
+
+func dockerEnclaveStorageHelperProbeLines() []string {
+	return []string{
+		`          /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C /usr/bin/sudo -n -- \`,
+		`            /usr/bin/python3 -I /var/lib/awf/enclave-storage-helper.py probe "${AWF_HELPER_VERSION#v}" \`,
+		`            | /usr/bin/python3 -I -c 'import json, os, sys; p = json.load(sys.stdin); assert p == {"version": sys.argv[1], "uid": os.getuid(), "maxBytes": 4 * 1024**3, "stateRoot": "/var/lib/awf/enclave-storage/" + str(os.getuid()) + "/host-state"}, p' "${AWF_HELPER_VERSION#v}"`,
+	}
 }
 
 // generateDockerComposeInstallStep creates a step that installs the Docker Compose

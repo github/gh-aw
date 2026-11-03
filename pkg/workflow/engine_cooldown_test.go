@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"os"
@@ -26,6 +27,7 @@ func TestEngineCooldownParsingAndValidation(t *testing.T) {
 		}{
 			{"zero", 0, true, 0}, {"positive", 7, true, 7},
 			{"yaml-integer", uint64(5), true, 5}, {"json-integer", float64(3), true, 3},
+			{"json-number", json.Number("3"), true, 3},
 			{"negative", -1, false, 0}, {"boolean", false, false, 0},
 			{"string", "3", false, 0}, {"fraction", 1.5, false, 0},
 			{"null", nil, false, 0}, {"array", []any{3}, false, 0},
@@ -65,6 +67,17 @@ func TestEngineCooldownParsingAndValidation(t *testing.T) {
 		}
 		assert.Equal(t, 3, resolveEngineCooldownDays(&WorkflowData{EngineConfig: config}))
 	}
+}
+
+func TestApplyEngineCooldownFieldRejectsNativeIntOverflow(t *testing.T) {
+	if strconv.IntSize != 32 {
+		t.Skip("native int overflow case only applies to 32-bit platforms")
+	}
+
+	config := &EngineConfig{}
+	applyEngineCooldownField(config, map[string]any{"cooldown": json.Number("2147483648")})
+	require.Error(t, validateEngineCooldown(config, false))
+	assert.Nil(t, config.Cooldown)
 }
 
 func TestEngineCooldownInstalls(t *testing.T) {
@@ -168,7 +181,7 @@ func TestEngineCooldownSecondaryJobInheritance(t *testing.T) {
 	c := NewCompiler()
 	assert.Contains(t, strings.Join(c.buildDetectionEngineExecutionStep(data), ""), "--cooldown-days 7")
 	assert.Contains(t, strings.Join(c.buildInstallDetectionEngineForExternalDetectorStep(data), ""), "--cooldown-days 7")
-	assert.Contains(t, strings.Join(c.buildEvalsEngineSteps(data), ""), "--cooldown-days 7")
+	assert.NotContains(t, strings.Join(c.buildEvalsDecisionSteps(data), ""), "--cooldown-days")
 	cloned := cloneThreatDetectionEngineConfig("copilot", &EngineConfig{ID: "pi", Cooldown: &days})
 	assert.Equal(t, &days, cloned.Cooldown, "age policy is not specific to an engine identity")
 	zero := 0

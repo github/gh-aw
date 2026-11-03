@@ -170,13 +170,13 @@ Test mcp-scripts with secrets
 		t.Error("HTTP MCP servers should not have env_vars in config (not supported for HTTP transport)")
 	}
 
-	// Verify env vars are set in Start MCP Gateway step (this is the correct location for HTTP transport)
-	if !strings.Contains(yamlStr, "API_KEY: ${{ secrets.API_KEY }}") {
-		t.Error("Expected API_KEY secret in Start MCP Gateway env section")
+	// Bindings are scoped to the MCP scripts startup step, not the agent gateway.
+	if !strings.Contains(yamlStr, mcpScriptEnvBindingName("api-call", "API_KEY")+": ${{ secrets.API_KEY }}") {
+		t.Error("Expected tool-specific API_KEY binding in MCP scripts startup")
 	}
 
-	if !strings.Contains(yamlStr, "GH_TOKEN: ${{ github.token }}") {
-		t.Error("Expected GH_TOKEN in Start MCP Gateway env section")
+	if !strings.Contains(yamlStr, mcpScriptEnvBindingName("api-call", "GH_TOKEN")+": ${{ github.token }}") {
+		t.Error("Expected tool-specific GH_TOKEN binding in MCP scripts startup")
 	}
 
 	t.Logf("✓ Codex engine correctly passes secrets through HTTP transport (via job env, not MCP config)")

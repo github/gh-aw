@@ -55,7 +55,7 @@ Visible ending.
     vi.unstubAllGlobals();
   });
 
-  for (const spec of [".github/workflows/connectors/tracker.md", url]) {
+  for (const spec of [".github/workflows/connectors/tracker.md"]) {
     it(`omits authoring documentation from the rendered prompt for ${spec}`, async () => {
       const imported = await processRuntimeImports(`Before\n{{#runtime-import ${spec}}}\nAfter`, workspace);
       const rendered = renderMarkdownTemplate(imported);
@@ -84,4 +84,14 @@ Visible ending.
       expect(fetch).not.toHaveBeenCalled();
     });
   }
+
+  it.each(["runtime-import", "runtime-import?"])("rejects remote documentation before reading cached content with %s", async macro => {
+    for (const range of ["", ":11-14"]) {
+      await expect(processRuntimeImports(`{{#${macro} ${url}${range}}}`, workspace)).rejects.toThrow("Runtime imports require local files");
+    }
+    expect(fetch).not.toHaveBeenCalled();
+    expect(fs.readFileSync).not.toHaveBeenCalled();
+    expect(fs.writeFileSync).not.toHaveBeenCalled();
+    expect(fs.mkdirSync).not.toHaveBeenCalled();
+  });
 });

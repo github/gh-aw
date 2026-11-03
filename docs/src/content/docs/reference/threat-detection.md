@@ -377,6 +377,20 @@ safe-outputs:
 
 **Execution Order:** Download artifacts → Stage detection inputs → Execute pre-steps (`steps:`) → Run AI analysis (if enabled) → Execute post-steps (`post-steps:`) → Upload detection log.
 
+### Prompt Provenance Artifacts
+
+`prompt-import-tree.json` retains `version: 1` and adds `trust` to its root and every import node, including nested and cached imports.
+
+| `trust` | Source and capabilities |
+|---|---|
+| `author` | Locally assembled system/user prompt or repository-local author file; imports and compiler-selected non-secret expression bindings are supported |
+| `untrusted` | External content in older artifacts; current prompt assembly does not fetch remote imports |
+| Missing | Older artifact with unknown trust; do not infer author capabilities |
+
+The runtime assigns labels from provenance, not imported text. Current trees contain only local author sources, including nested and cached imports; remote targets fail before fetching or tree insertion. A node's label does not establish the safety of its interpolated values. Cached nodes retain their own label and pre-expansion `rawContent`, even when `children` is empty because expansion already occurred. Labels are inspection metadata, not permission grants or proof against prompt injection. Content retrieved later by the agent inside the AWF sandbox is not a prompt-assembly import node.
+
+`prompt-template.txt` records the assembled template before interpolation-stage processing. The main author source is part of that assembled prompt rather than a separate runtime-import child. Keep the template and import tree alongside the final prompt when analyzing provenance.
+
 ## Example: LlamaGuard Integration
 
 Use Ollama with LlamaGuard 3 for specialized threat detection running after AI analysis:
@@ -467,7 +481,7 @@ safe-outputs:
 A detected threat has reason `threat_detected`. A detector execution failure (for example a provider outage or retired model) has reason `agent_failure`; an invalid result has reason `parse_error`. The latter two mean the security assessment is incomplete, not that a threat was found or that the output is clean. For all three outcomes, enforcement depends on `safe-outputs.threat-detection.continue-on-error`:
 
 - **Warn mode** (`continue-on-error: true`, the default): the run continues and detection concludes `warning`. Safe outputs get the warn-mode policy from the [safe outputs specification](/gh-aw/specs/safe-outputs-specification/) instead of being applied as if detection passed:
-  - Reviewable outputs (such as `create-issue`, `add-comment`, `create-pull-request`) carry a `[!CAUTION]` block, `agentic threat detected` label string, and `<!-- gh-aw-threat-detected -->` marker for an actual threat; detector failures use a `[!WARNING]` block, `threat detection engine error` label string, and `<!-- gh-aw-threat-engine-error -->` marker.
+  - Reviewable outputs (such as `create-issue`, `add-comment`, `create-pull-request`) carry a `[!CAUTION]` block, `agentic threat detected` label string, and `<!-- gh-aw-threat-detected -->` marker for an actual threat; detector failures use a `[!WARNING]` block, `Threat detection engine error` label string, and `<!-- gh-aw-threat-engine-error -->` marker.
   - `push-to-pull-request-branch` falls back to a review pull request with the same warning.
   - Non-reviewable outputs (such as `merge-pull-request`, `close-issue`, `assign-to-agent`) are not applied and are reported as failures in the step summary.
 - **Strict mode** (`continue-on-error: false`): the detection job fails and safe outputs are not applied.

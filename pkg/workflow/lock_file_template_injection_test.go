@@ -24,7 +24,7 @@ func findGitHubEventRunExpressions(lockContent []byte) ([]string, error) {
 
 	var violations []string
 	for _, runContent := range extractRunBlocks(workflow) {
-		executableContent := stripShellLineComments(removeHeredocContent(runContent))
+		executableContent := executableShellContent(runContent)
 		for _, expression := range InlineExpressionPattern.FindAllString(executableContent, -1) {
 			if strings.Contains(expression, "github.event.") {
 				violations = append(violations, expression)

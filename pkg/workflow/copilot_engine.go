@@ -111,17 +111,6 @@ func (e *CopilotEngine) GetRequiredSecretNames(workflowData *WorkflowData) []str
 		copilotLog.Printf("Added %d HTTP MCP header secrets", len(headerSecrets))
 	}
 
-	// Add mcp-scripts secret names
-	if IsMCPScriptsEnabled(workflowData.MCPScripts) {
-		mcpScriptsSecrets := collectMCPScriptsSecrets(workflowData.MCPScripts)
-		for varName := range mcpScriptsSecrets {
-			secrets = append(secrets, varName)
-		}
-		if len(mcpScriptsSecrets) > 0 {
-			copilotLog.Printf("Added %d mcp-scripts secrets", len(mcpScriptsSecrets))
-		}
-	}
-
 	copilotLog.Printf("Total required secrets: %d", len(secrets))
 	return append(secrets, fallbackProviderSecretNames(workflowData)...)
 }

@@ -6,6 +6,19 @@ description: Guide for adding BinEval-style binary evaluations to agentic workfl
 
 Use `evals:` with `safe-outputs` to judge whether an agent achieved its intended outcome. Each eval is a binary YES/NO question about observable agent output.
 
+The evals job sends all questions and shared agent output in one OpenAI-compatible
+`POST /decisions` request. Each question uses `choice` with `YES`, `NO`, and
+`UNKNOWN` (insufficient evidence or not applicable). The job does not install or
+run an agentic engine or AWF. A trusted JavaScript step calls the provider directly
+with its credential. Response token usage (including cache and reasoning tokens)
+is saved with catalog-derived AIC and USD costs for summaries and daily accounting.
+Missing usage or pricing is reported as unavailable, not zero. AWF per-request
+credit limits and sandbox target overrides do not apply to evals.
+Request failures produce a `not_evaluated` marker, not `UNKNOWN` question results.
+Both providers use `/v1/decisions`. Configure the actual provider model ID:
+`copilot/gpt-6-luna-decisions` for Copilot or `openai/gpt-6-luna` for OpenAI.
+Model IDs are sent without provider-specific name mapping.
+
 ---
 
 ## Basic Syntax
@@ -48,15 +61,20 @@ evals:
       question: Do all existing tests still pass according to the agent output?
     - id: scoped_change
       question: Does the agent output show that only the expected files were modified?
-  model: small         # model for all questions
+  model: copilot/gpt-6-luna-decisions    # Decisions-compatible model for all questions
   runs-on: ubuntu-latest
 ```
 
 **Fields:**
 
-- `questions:` — list of question objects (required in extended form, ≥ 1 entry).
-- `model:` — LLM model for all questions. Use a model alias (`small`, `gpt-4o`) or a full model ID.
+- `questions:` — list of question objects (required in extended form, 1–400 entries).
+- `model:` — Actual Decisions-compatible model ID for the entire batch, default `copilot/gpt-6-luna-decisions`, independent of the main agent model. `GH_AW_DEFAULT_EVALS_MODEL` overrides the default. Use `openai/gpt-6-luna` for the OpenAI provider; unqualified IDs use Copilot. The `evals` alias also resolves to `gpt-6-luna-decisions`.
 - `runs-on:` — optional runner override.
+
+Copilot requests use `COPILOT_GITHUB_TOKEN` or the workflow's
+`copilot-requests: write` permission. OpenAI requests use `CODEX_API_KEY` or
+`OPENAI_API_KEY`. Per-question model overrides are not supported because the
+entire batch shares one request.
 
 ---
 
@@ -94,9 +112,9 @@ evals:
     question: Does the agent output show that only CHANGELOG and version files were modified?
 ```
 
-### 4 — Assign question cost
+### 4 — Select a Decisions model
 
-Prefer `model: small` (the default) for factual checks. Set `model` at the `evals:` level for reasoning-heavy questions:
+Use a model that supports `/decisions`, not a chat-only model. Set `model` once at the `evals:` level:
 
 ```yaml
 evals:
@@ -105,7 +123,7 @@ evals:
       question: Does the agent output confirm that CHANGELOG was updated?
     - id: design_sound
       question: Is the agent's proposed design consistent with established patterns described in the agent output?
-  model: gpt-4o   # nuanced questions; override default small model
+  model: copilot/gpt-6-luna-decisions
 ```
 
 ### PromptPex intent and counter-intent scenarios
@@ -139,5 +157,5 @@ Do not combine mutually exclusive scenarios into one question list. If a questio
 - ❌ **Unobservable questions** — "Did the agent try its best?" cannot be answered from output text.
 - ❌ **Duplicate IDs** — `id` must be unique within a workflow; the compiler rejects duplicates.
 - ❌ **Empty questions** — both `id` and `question` must be non-empty strings.
-- ❌ **Using a frontier model for all questions** — factual checks are cheap on small models; save larger models for reasoning-heavy questions.
+- ❌ **Using a chat-only model** — evals require a model that supports `/decisions`.
 - ❌ **Questions that require external evidence** — questions must be answerable from agent output alone.

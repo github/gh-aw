@@ -48,6 +48,7 @@ mcp-scripts:
         --limit "$LIMIT"
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_REPOSITORY: ${{ github.repository }}
 ---
 <!--
 ## PR Data Fetch Safe Input Tool

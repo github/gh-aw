@@ -158,145 +158,56 @@ func findRunValue(keyPart string) (string, bool) {
 	return strings.TrimSpace(keyPart[loc[1]:]), true
 }
 
-// detectHeredocDelimiter extracts the heredoc closing delimiter from a line that
-// opens a heredoc (contains "<<"). It handles the common forms used in compiler-
-// generated run blocks:
-//
-//   - Unquoted:       cat << DELIM ...    → "DELIM"
-//   - Strip-tab:      cat <<- DELIM ...   → "DELIM"
-//   - Single-quoted:  cat << 'DELIM' ...  → "DELIM"
-//   - Double-quoted:  cat << "DELIM" ...  → "DELIM"
-//
-// Returns ("", false) when no heredoc opening is found on the line, including
-// for bash here-strings (<<<) and arithmetic bitshifts (1 << 2).
-func detectHeredocDelimiter(trimmed string) (string, bool) {
-	_, after, found := strings.Cut(trimmed, "<<")
-	if !found {
-		return "", false
-	}
-	// Reject bash here-strings (<<<): the character immediately after << is another <.
-	if after != "" && after[0] == '<' {
-		return "", false
-	}
-	// Handle <<- (strip-tab variant): the dash must immediately follow << with no
-	// intervening whitespace. Strip exactly one dash; <<-- and similar are not valid
-	// shell and are treated conservatively as non-heredoc.
-	if after != "" && after[0] == '-' {
-		after = after[1:]
-	}
-	rest := strings.TrimSpace(after)
-	if rest == "" {
-		return "", false
-	}
-	// Quoted delimiter: << 'DELIM' or << "DELIM"
-	if rest[0] == '\'' || rest[0] == '"' {
-		quoteChar := rest[0]
-		end := strings.IndexByte(rest[1:], quoteChar)
-		if end >= 0 {
-			delim := rest[1 : end+1]
-			if delim != "" {
-				return delim, true
-			}
-		}
-		return "", false
-	}
-	// Unquoted delimiter: take the first whitespace-delimited token.
-	// Require the delimiter to be a valid shell identifier (letters, digits,
-	// underscores; must start with a letter or underscore) to avoid treating
-	// arithmetic bitshifts (e.g. "1 << 2") as heredoc openings.
-	fields := strings.Fields(rest)
-	if len(fields) == 0 {
-		return "", false
-	}
-	delim := strings.TrimRight(fields[0], "|;&")
-	if !isShellIdentifier(delim) {
-		return "", false
-	}
-	return delim, true
-}
-
-// isShellIdentifier reports whether s is a valid shell identifier (letters,
-// digits, and underscores; must not start with a digit). Heredoc delimiters
-// must match this pattern; non-matching tokens indicate non-heredoc uses of <<
-// such as arithmetic bitshifts.
-func isShellIdentifier(s string) bool {
-	if s == "" {
-		return false
-	}
-	for i, c := range s {
-		switch {
-		case c >= 'A' && c <= 'Z', c >= 'a' && c <= 'z', c == '_':
-			// always valid
-		case c >= '0' && c <= '9':
-			if i == 0 {
-				return false // identifiers must not start with a digit
-			}
-		default:
-			return false
-		}
-	}
-	return true
-}
-
 // walkRunBlockLines scans raw YAML text and visits each inline run value or line inside a
 // multiline run block. It recognizes plain run: keys as well as quoted and flow-style forms
 // so Path B stays aligned with the parsed-YAML validators.
 //
-// Heredoc content is skipped so that expressions embedded inside heredocs (which are written
-// to files and never executed directly by the shell) do not trigger false positives in the
-// caller's expression checks. This matches the behaviour of removeHeredocContent, which
-// validateNoGitHubExpressionsInRunScriptsFromParsed uses on the parsed path.
+// Multiline blocks use the same shell-region filtering as the parsed validators.
+// YAML indentation is removed before parsing shell syntax; shell indentation
+// remains significant for exact heredoc delimiter matching.
 func walkRunBlockLines(yamlContent string, visit func(line string) bool) bool {
 	inRunBlock := false
 	runBlockIndent := 0
-	inHeredoc := false
-	heredocDelimiter := ""
-
+	contentIndent := 0
+	var block strings.Builder
+	flush := func() bool {
+		for line := range strings.SplitSeq(executableShellContent(block.String()), "\n") {
+			if visit(line) {
+				return true
+			}
+		}
+		block.Reset()
+		return false
+	}
 	for line := range strings.SplitSeq(yamlContent, "\n") {
 		trimmed := strings.TrimLeft(line, " \t")
 		if trimmed == "" {
+			if inRunBlock {
+				block.WriteByte('\n')
+			}
 			continue
 		}
 		indent := len(line) - len(trimmed)
-
 		if inRunBlock {
 			if indent <= runBlockIndent {
-				inRunBlock = false
-				inHeredoc = false
-				heredocDelimiter = ""
-				// Fall through: check whether this line starts a new run: block.
-			} else {
-				// If we are inside a heredoc, look for the closing delimiter.
-				if inHeredoc {
-					if strings.TrimSpace(line) == heredocDelimiter {
-						inHeredoc = false
-						heredocDelimiter = ""
-					}
-					continue // always skip heredoc content
-				}
-				// Check whether this line opens a heredoc.
-				if delim, ok := detectHeredocDelimiter(trimmed); ok {
-					inHeredoc = true
-					heredocDelimiter = delim
-					// The opening line itself is not heredoc body; visit it so callers
-					// can see the surrounding shell context, but do not recurse.
-					if visit(line) {
-						return true
-					}
-					continue
-				}
-				if visit(line) {
+				if flush() {
 					return true
 				}
+				inRunBlock = false
+				// Fall through: check whether this line starts a new run: block.
+			} else {
+				if contentIndent == 0 {
+					contentIndent = indent
+				}
+				block.WriteString(line[min(contentIndent, indent):])
+				block.WriteByte('\n')
 				continue
 			}
 		}
-
 		keyPart := trimmed
 		if strings.HasPrefix(keyPart, "-") {
 			keyPart = strings.TrimSpace(keyPart[1:])
 		}
-
 		rest, ok := findRunValue(keyPart)
 		if !ok {
 			continue
@@ -305,15 +216,15 @@ func walkRunBlockLines(yamlContent string, visit func(line string) bool) bool {
 		if rest == "" || rest[0] == '|' || rest[0] == '>' {
 			inRunBlock = true
 			runBlockIndent = indent
+			contentIndent = 0
 			continue
 		}
-
 		if visit(rest) {
 			return true
 		}
 	}
 
-	return false
+	return inRunBlock && flush()
 }
 
 // scanRunContentExpressions performs a single pass over run: blocks to detect both
@@ -364,12 +275,9 @@ func validateNoTemplateInjectionFromParsed(workflow map[string]any) error {
 			continue
 		}
 
-		// Remove non-executable regions from the run block to avoid false positives:
-		//   - heredocs are written to files/stdin, not executed directly
-		//   - bash # comments are ignored by the shell
-		contentWithoutHeredocs := stripShellLineComments(removeHeredocContent(runContent))
+		contentWithoutHeredocs := executableShellContent(runContent)
 
-		// Extract all inline expressions from this run block (excluding heredocs)
+		// Extract inline expressions outside quoted heredoc bodies and comments.
 		expressions := runScriptExpressions(contentWithoutHeredocs)
 
 		// Check each expression for unsafe contexts
@@ -417,8 +325,8 @@ func validateNoGitHubExpressionsInRunScriptsFromParsed(workflow map[string]any) 
 		}
 
 		// Align with template-injection validation by excluding non-executable regions:
-		// heredoc bodies and bash # comments.
-		contentWithoutHeredocs := stripShellLineComments(removeHeredocContent(runContent))
+		// quoted heredoc bodies and bash # comments.
+		contentWithoutHeredocs := executableShellContent(runContent)
 		expressions := runScriptExpressions(contentWithoutHeredocs)
 		for _, expr := range expressions {
 			if _, valid := actionslanguageservice.WrappedExpression(expr); valid && allowedRunScriptExpressionRegex.MatchString(expr) {

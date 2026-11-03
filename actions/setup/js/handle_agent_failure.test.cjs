@@ -1260,7 +1260,7 @@ describe("handle_agent_failure", () => {
       );
       fs.writeFileSync(
         path.join(promptsDir, "threat_detection_engine_error.md"),
-        "> [!WARNING]\n> threat detection engine error\n> The threat detection engine encountered an error and could not complete analysis. This is a tooling failure, not a security finding.\n> {threat_detected_marker}\n>\n> <details>\n> <summary>What happened</summary>\n>\n> {reason_text}\n>\n> Review the [workflow run logs]({run_url}) for details.\n> </details>"
+        "> [!WARNING]\n> **Threat detection engine error**\n>\n> Threat detection could not complete its analysis due to a tooling error. This is not a security finding.\n> {threat_detected_marker}\n>\n> <details>\n> <summary>What happened</summary>\n>\n> {reason_text}\n>\n> Review the [workflow run logs]({run_url}) to troubleshoot the error.\n> </details>"
       );
 
       process.env.RUNNER_TEMP = tmpDir;
@@ -6181,6 +6181,17 @@ describe("handle_agent_failure", () => {
       expect(result).toContain("File naming convention");
     });
 
+    it("renders the runtime cache warning without assuming a restore match proves a path defect", () => {
+      fs.copyFileSync(new URL("../md/cache_memory_miss.md", import.meta.url), path.join(promptsDir, "cache_memory_miss.md"));
+      const result = buildMissingDataContext(true, true, [{ type: "report_missing_data", data_type: "cache_memory", reason: "cache_memory_miss" }]);
+      expect(result).toContain("Missing Cache Data");
+      expect(result).toContain("A restore match does not guarantee that every required file exists");
+      expect(result).toContain("without reporting expected absence as missing data");
+      expect(result).toContain("Missing required inputs without a fallback should still be reported");
+      expect(result).toContain("/tmp/gh-aw/cache-memory-<id>/");
+      expect(result).not.toContain("prompt is misconfigured");
+    });
+
     it("captures reason-only missing_data items (no data_type) and detects cache miss", () => {
       // Agents may emit missing_data with only reason (no data_type) — ensure it is still captured
       fs.writeFileSync(
@@ -8788,6 +8799,40 @@ describe("handle_agent_failure", () => {
       expect(global.core.info).not.toHaveBeenCalledWith(expect.stringContaining('Searching for parent issue: "[aw] Failed runs"'));
       expect(global.core.info).toHaveBeenCalledWith("Agent emitted 1 missing_data message(s) - activating failure handling");
       expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("Skipping failure issue creation: failure categories match exclude filter. Categories: [missing_data]"));
+    });
+
+    it.each([
+      { restored: false, required: false },
+      { restored: false, required: true },
+      { restored: true, required: true },
+    ])("preserves required-input reporting for cache restored=$restored required=$required", async ({ restored, required }) => {
+      const { createIssueMock } = setupGithubMock();
+      vi.stubEnv("GH_AW_CACHE_MEMORY_ENABLED", "true");
+      vi.stubEnv("GH_AW_CACHE_MEMORY_RESTORE_0_MATCHED_KEY", restored ? "memory-default-previous-run" : "");
+      process.env.GH_AW_AGENT_CONCLUSION = "success";
+      process.env.GH_AW_AGENT_OUTPUT = path.join(tmpDir, "agent_output.json");
+      process.env.GH_AW_FAILURE_EXCLUDED_CATEGORIES_FILTER = JSON.stringify(["missing_data", "cache_miss_misconfiguration"]);
+      fs.writeFileSync(
+        process.env.GH_AW_AGENT_OUTPUT,
+        JSON.stringify({
+          items: [
+            ...(required ? [{ type: "report_missing_data", data_type: "cache_memory", reason: "cache_memory_miss", context: "Required input has no fallback" }] : []),
+            { type: "noop", reason: required ? "Required input unavailable" : "Cold-start analysis completed; no new candidates" },
+          ],
+        })
+      );
+      try {
+        await main();
+        const activation = "Agent emitted 1 missing_data message(s) - activating failure handling";
+        if (required) {
+          expect(global.core.info).toHaveBeenCalledWith(activation);
+        } else {
+          expect(global.core.info).not.toHaveBeenCalledWith(activation);
+        }
+        expect(createIssueMock).not.toHaveBeenCalled();
+      } finally {
+        vi.unstubAllEnvs();
+      }
     });
 
     it.each([

@@ -39,6 +39,11 @@ imports:
 
 
   - shared/otlp.md
+evals:
+  - id: directory-size-map
+    question: Does the proposed report show directory size distribution using proportionally scaled ASCII bars?
+  - id: metadata-only-scope
+    question: Does the agent output show that repository statistics exclude .git and package-manager directories?
 ---
 
 # Repository Tree Map Generator

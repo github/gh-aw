@@ -56,6 +56,13 @@ safe-outputs:
   missing-tool:
 timeout-minutes: 20
 strict: true
+evals:
+  - id: evidence-backed-increment
+    question: When an issue is proposed, does it identify a concrete Windows support increment grounded in the current probe or repository evidence? Return UNKNOWN when no issue is proposed.
+  - id: wsl-architecture-preserved
+    question: When a fix is proposed, does it preserve the requirement that the agent runtime stays inside WSL? Return UNKNOWN when no fix is proposed.
+  - id: duplicate-restraint
+    question: When an open issue already tracks the selected problem, does the agent request noop rather than a duplicate issue? Return UNKNOWN when no duplicate is identified.
 ---
 
 # Windows Grower

@@ -20,6 +20,7 @@ See [syntax-agentic.md](syntax-agentic.md) for the full frontmatter field index.
     engine:
       id: copilot                       # Required: coding agent identifier (copilot, claude, codex, gemini, agy, pi)
       version: beta                     # Optional: version of the action (has sensible default); also accepts GitHub Actions expressions: ${{ inputs.engine-version }}
+      cooldown: 7                       # Optional: minimum release age in days for compiler-managed engine installs (integer, default 3). 0 disables it only when strict: false
       model: gpt-5                      # Deprecated alias for the top-level `model`; prefer the top-level field
       model-provider: anthropic         # Optional: inference provider override (github, anthropic, openai). Defaults to the engine's native provider
       fallback-models: ["gpt-5-mini"]   # Optional: ordered alternate models tried after model-specific failures on engines with a built-in retry harness. Not combinable with model-routing, a custom driver, or harness

@@ -112,6 +112,13 @@ steps:
       done
       echo "Dev server is ready"
 
+evals:
+  - id: viewport-coverage
+    question: Does the agent output record screenshot results for each required mobile, tablet, and desktop viewport?
+  - id: findings-reported
+    question: When visual differences or accessibility issues are observed, does the proposed PR comment describe those observations? Return UNKNOWN when neither is observed.
+  - id: clean-run-noop
+    question: When all inspected pages have no visual differences or accessibility issues, does the agent request noop? Return UNKNOWN when that clean-run scenario is not established.
 ---
 
 # Visual Regression Checker

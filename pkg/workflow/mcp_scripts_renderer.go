@@ -21,7 +21,7 @@ func collectMCPScriptsSecrets(mcpScripts *MCPScriptsConfig) map[string]string {
 
 	mcpScriptsRendererLog.Printf("Collecting secrets from %d mcp-scripts tools", len(mcpScripts.Tools))
 
-	// Sort tool names for consistent behavior when same env var appears in multiple tools
+	// Keep each tool's binding distinct even when variable names overlap.
 	toolNames := sliceutil.SortedKeys(mcpScripts.Tools)
 
 	for _, toolName := range toolNames {
@@ -30,7 +30,7 @@ func collectMCPScriptsSecrets(mcpScripts *MCPScriptsConfig) map[string]string {
 		envNames := sliceutil.SortedKeys(toolConfig.Env)
 
 		for _, envName := range envNames {
-			secrets[envName] = toolConfig.Env[envName]
+			secrets[mcpScriptEnvBindingName(toolName, envName)] = toolConfig.Env[envName]
 		}
 	}
 

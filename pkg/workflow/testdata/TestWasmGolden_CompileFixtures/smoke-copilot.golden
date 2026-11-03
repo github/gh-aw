@@ -280,64 +280,19 @@ jobs:
         run: bash "${RUNNER_TEMP}/gh-aw/actions/log_runtime_features_summary.sh"
       - name: Create prompt with built-in context
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
-          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
-          GH_AW_SAFE_OUTPUTS: ${{ runner.temp }}/gh-aw/safeoutputs/outputs.jsonl
-          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"playwright_prompt.md\"},{\"file\":\"playwright_awf_prompt.md\"},{\"file\":\"cache_memory_prompt.md\"},{\"file\":\"safe_outputs_mcp_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"github_mcp_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0006\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0007\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0008\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0009\"}],\"system_item_count\":15}"
-          GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
-          GH_AW_EXPR_77C1A4D2: ${{ github.event.comment.id || fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').comment_id }}
-          GH_AW_EXPR_7C248226: ${{ github.event.issue.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'issue' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
-          GH_AW_EXPR_C19C384F: ${{ github.event.discussion.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'discussion' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
-          GH_AW_GITHUB_ACTOR: ${{ github.actor }}
-          GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
-          GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
-          GH_AW_GITHUB_SERVER_URL: ${{ github.server_url }}
-          GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
-          GH_AW_PROMPT_CONTENT_0000: "<system>\n"
-          GH_AW_PROMPT_CONTENT_0001: "<safe-output-tools>\nTools: add_comment(max:2), create_issue, create_discussion, create_pull_request_review_comment(max:5), submit_pull_request_review, reply_to_pull_request_review_comment(max:5), add_labels, remove_labels, haiku_printer, report_missing_tool, report_missing_data, noop(max:2), send_slack_message\nShared budgets: dispatch-workflow [haiku_printer](max:1 total)\n"
-          GH_AW_PROMPT_CONTENT_0002: "</safe-output-tools>\n"
-          GH_AW_PROMPT_CONTENT_0003: "<github-context>\nThe following GitHub context information is available for this workflow:\n{{#if github.actor}}\n- **actor**: __GH_AW_GITHUB_ACTOR__\n{{/if}}\n{{#if github.repository}}\n- **repository**: __GH_AW_GITHUB_REPOSITORY__\n{{/if}}\n{{#if github.workspace}}\n- **workspace**: __GH_AW_GITHUB_WORKSPACE__\n{{/if}}\n{{#if github.event.issue.number || (github.aw.context.item_type == 'issue' && github.aw.context.item_number)}}\n- **issue-number**: #__GH_AW_EXPR_7C248226__\n{{/if}}\n{{#if github.event.discussion.number || (github.aw.context.item_type == 'discussion' && github.aw.context.item_number)}}\n- **discussion-number**: #__GH_AW_EXPR_C19C384F__\n{{/if}}\n{{#if github.event.pull_request.number || (github.aw.context.item_type == 'pull_request' && github.aw.context.item_number)}}\n- **pull-request-number**: #__GH_AW_EXPR_76DF9333__\n{{/if}}\n{{#if github.event.comment.id || github.aw.context.comment_id}}\n- **comment-id**: __GH_AW_EXPR_77C1A4D2__\n{{/if}}\n{{#if github.run_id}}\n- **workflow-run-id**: __GH_AW_GITHUB_RUN_ID__\n{{/if}}\n</github-context>\n\n"
-          GH_AW_PROMPT_CONTENT_0004: "</system>\n"
-          GH_AW_PROMPT_CONTENT_0005: "{{#runtime-import shared/gh.md}}\n"
-          GH_AW_PROMPT_CONTENT_0006: "{{#runtime-import shared/reporting.md}}\n"
-          GH_AW_PROMPT_CONTENT_0007: "{{#runtime-import shared/github-queries-mcp-script.md}}\n"
-          GH_AW_PROMPT_CONTENT_0008: "## Serena Code Analysis\n\nThe Serena MCP server is configured for **[\"go\"]** analysis in this workspace:\n- **Workspace**: `__GH_AW_GITHUB_WORKSPACE__`\n- **Memory**: `/tmp/gh-aw/cache-memory/serena/`\n\n### Project Activation\n\nBefore analyzing code, activate the Serena project:\n```\nTool: activate_project\nArgs: { \"path\": \"__GH_AW_GITHUB_WORKSPACE__\" }\n```\n\n### Available Capabilities\n\nSerena provides IDE-grade Language Server Protocol (LSP) tools including:\n- **Symbol search**: `find_symbol` — locate functions, types, interfaces by name\n- **Navigation**: `find_referencing_symbols` — find all callers/usages of a symbol\n- **Type info**: `get_symbol_documentation` — hover-level type and doc information\n- **Code editing**: `replace_symbol_body`, `insert_after_symbol` — symbol-level edits\n- **Diagnostics**: `get_diagnostics` — compiler errors and linter warnings\n\n### Analysis Guidelines\n\n1. **Use semantic tools over text search** — prefer Serena's LSP tools over `grep`\n2. **Activate project first** — always call `activate_project` before other tools\n3. **Cross-reference findings** — validate with multiple tools for accuracy\n4. **Focus on the relevant language files** — ignore unrelated file types\n"
-          GH_AW_PROMPT_CONTENT_0009: "# Smoke Test: Copilot Engine Validation\n\n**IMPORTANT: Keep all outputs extremely short and concise. Use single-line responses where possible. No verbose explanations.**\n\n## Hard Limit: `add_comment` Budget\n\n`safe-outputs.add-comment.max` is `2`. Never exceed 2 total `add_comment` calls in this run.\n\n- Call #1 is required for the discussion interaction test (comment on latest discussion).\n- Call #2 depends on trigger:\n  - `pull_request` event: post the brief PR summary comment, and **skip** the fun discussion follow-up comment.\n  - non-`pull_request` event: **skip** the PR summary comment and post the fun discussion follow-up comment.\n\n## Test Requirements\n\n1. **GitHub MCP Testing**: Review the last 2 merged pull requests in __GH_AW_GITHUB_REPOSITORY__\n2. **MCP Scripts GH CLI Testing**: Use the `mcpscripts-gh` tool to query 2 pull requests from __GH_AW_GITHUB_REPOSITORY__ (use args: \"pr list --repo __GH_AW_GITHUB_REPOSITORY__ --limit 2 --json number,title,author\")\n3. **Serena MCP Testing**:\n   - Use the Serena MCP server tool `activate_project` to initialize the workspace at `__GH_AW_GITHUB_WORKSPACE__` and verify it succeeds (do NOT use bash to run go commands - use Serena's MCP tools)\n   - After initialization, use the `find_symbol` tool to search for symbols (find which tool to call) and verify that at least 3 symbols are found in the results\n4. **Playwright Testing**: Use the playwright tools to navigate to <https://github.com> and verify the page title contains \"GitHub\" (do NOT try to install playwright - use the provided MCP tools)\n5. **File Writing Testing**: Create a test file `/tmp/gh-aw/agent/smoke-test-copilot-__GH_AW_GITHUB_RUN_ID__.txt` with content \"Smoke test passed for Copilot at $(date)\" (create the directory if it doesn't exist)\n6. **Bash Tool Testing**: Execute bash commands to verify file creation was successful (use `cat` to read the file back)\n7. **Discussion Interaction Testing**:\n   - Use the `github-discussion-query` mcp-script tool with params: `limit=1, jq=\".[0]\"` to get the latest discussion from __GH_AW_GITHUB_REPOSITORY__\n   - Extract the discussion number from the result (e.g., if the result is `{\"number\": 123, \"title\": \"...\", ...}`, extract 123)\n   - Use the `add_comment` tool with `discussion_number: <extracted_number>` to add a fun, playful comment stating that the smoke test agent was here\n8. **Build gh-aw**: Run `GOCACHE=/tmp/go-cache GOMODCACHE=/tmp/go-mod make build` to verify the agent can successfully build the gh-aw project (both caches must be set to /tmp because the default cache locations are not writable). If the command fails, mark this test as ❌ and report the failure.\n9. **Discussion Creation Testing**: Use the `create_discussion` safe-output tool to create a discussion in the announcements category titled \"copilot was here\" with the label \"ai-generated\"\n10. **Workflow Dispatch Testing**: Use the `dispatch_workflow` safe output tool to trigger the `haiku-printer` workflow with a haiku as the message input. Create an original, creative haiku about software testing or automation.\n11. **PR Review Testing**: Review the diff of the current pull request. Leave 1-2 inline `create_pull_request_review_comment` comments on specific lines, then call `submit_pull_request_review` with a brief body summarizing your review and event `COMMENT`. After submitting the review, use `reply_to_pull_request_review_comment` to reply to one of the inline comments you just created (use the `comment_id` returned by `create_pull_request_review_comment`).\n\n## Output\n\n1. **Create an issue** with a summary of the smoke test run:\n   - Title: \"Smoke Test: Copilot - __GH_AW_GITHUB_RUN_ID__\"\n   - Body should include:\n     - Test results (✅ or ❌ for each test)\n     - Overall status: PASS or FAIL\n     - Run URL: __GH_AW_GITHUB_SERVER_URL__/__GH_AW_GITHUB_REPOSITORY__/actions/runs/__GH_AW_GITHUB_RUN_ID__\n     - Timestamp\n     - Pull request author and assignees\n\n2. **Only if this workflow was triggered by a pull_request event**: Add a **very brief** comment (max 5-10 lines) to the current pull request with:\n   - PR titles only (no descriptions)\n   - ✅ or ❌ for each test result\n   - Overall status: PASS or FAIL\n   - Mention the pull request author and any assignees\n\n3. **Only if this workflow was NOT triggered by a pull_request event**: Use the `add_comment` tool to add a **fun and creative comment** to the latest discussion (using the `discussion_number` you extracted in step 7) - be playful and entertaining in your comment\n\n4. Use the `send_slack_message` tool to send a brief summary message (e.g., \"Smoke test __GH_AW_GITHUB_RUN_ID__: All tests passed! ✅\")\n\nIf all tests pass:\n- Use the `add_labels` safe-output tool to add the label `smoke-copilot` to the pull request\n- Use the `remove_labels` safe-output tool to remove the label `smoke` from the pull request\n\n"
         with:
+          github-token: no-authentication
           script: |
-            const { setupGlobals } = require(process.env.GH_AW_ACTIONS_DIR + '/setup_globals.cjs');
-            setupGlobals(core, github, context, exec, io, getOctokit);
+            const promptEnvironment = new Set(["GH_AW_ACTIONS_DIR","GH_AW_EXPR_76DF9333","GH_AW_EXPR_77C1A4D2","GH_AW_EXPR_7C248226","GH_AW_EXPR_C19C384F","GH_AW_GITHUB_ACTOR","GH_AW_GITHUB_REPOSITORY","GH_AW_GITHUB_RUN_ID","GH_AW_GITHUB_SERVER_URL","GH_AW_GITHUB_WORKSPACE","GH_AW_PROMPT","GH_AW_PROMPT_CONFIG","GH_AW_PROMPT_CONTENT_0000","GH_AW_PROMPT_CONTENT_0001","GH_AW_PROMPT_CONTENT_0002","GH_AW_PROMPT_CONTENT_0003","GH_AW_PROMPT_CONTENT_0004","GH_AW_PROMPT_CONTENT_0005","GH_AW_PROMPT_CONTENT_0006","GH_AW_PROMPT_CONTENT_0007","GH_AW_PROMPT_CONTENT_0008","GH_AW_PROMPT_CONTENT_0009","GH_AW_SAFE_OUTPUTS","GITHUB_ACTION","GITHUB_ACTOR","GITHUB_API_URL","GITHUB_EVENT_NAME","GITHUB_EVENT_PATH","GITHUB_GRAPHQL_URL","GITHUB_JOB","GITHUB_OUTPUT","GITHUB_REF","GITHUB_REPOSITORY","GITHUB_RUN_ATTEMPT","GITHUB_RUN_ID","GITHUB_RUN_NUMBER","GITHUB_SERVER_URL","GITHUB_SHA","GITHUB_STEP_SUMMARY","GITHUB_WORKFLOW","GITHUB_WORKSPACE","PATH","RUNNER_ARCH","RUNNER_OS","RUNNER_TEMP"]);
+            for (const name of Object.keys(process.env)) {
+              if (!promptEnvironment.has(name)) delete process.env[name];
+            }
+            global.core = core;
+            global.context = context;
             const { main } = require(process.env.GH_AW_ACTIONS_DIR + '/create_prompt.cjs');
             await main(core);
-      - name: Interpolate variables and render templates
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
-          GH_AW_ENGINE_ID: "copilot"
-          GH_AW_SUB_AGENT_DIR: ".github/agents"
-          GH_AW_SUB_AGENT_EXT: ".agent.md"
-          GH_AW_SKILL_DIR: ".github/skills"
-          GH_AW_SKILL_EXT: "/SKILL.md"
-          GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
-          GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
-          GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
-          GH_AW_GITHUB_SERVER_URL: ${{ github.server_url }}
-        with:
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'interpolate_prompt.cjs'));
-            await main();
-      - name: Substitute placeholders
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
-          GH_AW_ALLOWED_EXTENSIONS: ""
-          GH_AW_CACHE_DESCRIPTION: ""
-          GH_AW_CACHE_DIR: "/tmp/gh-aw/cache-memory/"
+          GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
           GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
           GH_AW_EXPR_77C1A4D2: ${{ github.event.comment.id || fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').comment_id }}
           GH_AW_EXPR_7C248226: ${{ github.event.issue.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'issue' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
@@ -347,16 +302,192 @@ jobs:
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_SERVER_URL: ${{ github.server_url }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
-          GH_AW_MCP_CLI_SERVERS_LIST: "- `github` — run `github --help` to see available tools\n- `mcpscripts` — run `mcpscripts --help` to see available tools\n- `safeoutputs` — run `safeoutputs --help` to see available tools\n- `serena` — run `serena --help` to see available tools"
-          GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED: ${{ needs.pre_activation.outputs.activated }}
-        with:
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
+          GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_OTLP_IF_MISSING: ""
+          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"playwright_prompt.md\"},{\"file\":\"playwright_awf_prompt.md\"},{\"file\":\"cache_memory_prompt.md\"},{\"file\":\"safe_outputs_mcp_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"github_mcp_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0006\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0007\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0008\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0009\"}],\"system_item_count\":15}"
+          GH_AW_PROMPT_CONTENT_0000: |
+            <system>
+          GH_AW_PROMPT_CONTENT_0001: |
+            <safe-output-tools>
+            Tools: add_comment(max:2), create_issue, create_discussion, create_pull_request_review_comment(max:5), submit_pull_request_review, reply_to_pull_request_review_comment(max:5), add_labels, remove_labels, haiku_printer, report_missing_tool, report_missing_data, noop(max:2), send_slack_message
+            Shared budgets: dispatch-workflow [haiku_printer](max:1 total)
+          GH_AW_PROMPT_CONTENT_0002: |
+            </safe-output-tools>
+          GH_AW_PROMPT_CONTENT_0003: |+
+            <github-context>
+            The following GitHub context information is available for this workflow:
+            {{#if github.actor}}
+            - **actor**: __GH_AW_GITHUB_ACTOR__
+            {{/if}}
+            {{#if github.repository}}
+            - **repository**: __GH_AW_GITHUB_REPOSITORY__
+            {{/if}}
+            {{#if github.workspace}}
+            - **workspace**: __GH_AW_GITHUB_WORKSPACE__
+            {{/if}}
+            {{#if github.event.issue.number || (github.aw.context.item_type == 'issue' && github.aw.context.item_number)}}
+            - **issue-number**: #__GH_AW_EXPR_7C248226__
+            {{/if}}
+            {{#if github.event.discussion.number || (github.aw.context.item_type == 'discussion' && github.aw.context.item_number)}}
+            - **discussion-number**: #__GH_AW_EXPR_C19C384F__
+            {{/if}}
+            {{#if github.event.pull_request.number || (github.aw.context.item_type == 'pull_request' && github.aw.context.item_number)}}
+            - **pull-request-number**: #__GH_AW_EXPR_76DF9333__
+            {{/if}}
+            {{#if github.event.comment.id || github.aw.context.comment_id}}
+            - **comment-id**: __GH_AW_EXPR_77C1A4D2__
+            {{/if}}
+            {{#if github.run_id}}
+            - **workflow-run-id**: __GH_AW_GITHUB_RUN_ID__
+            {{/if}}
+            </github-context>
 
-            const substitutePlaceholders = require(path.join(actionsDir, 'substitute_placeholders.cjs'));
+          GH_AW_PROMPT_CONTENT_0004: |
+            </system>
+          GH_AW_PROMPT_CONTENT_0005: |
+            {{#runtime-import shared/gh.md}}
+          GH_AW_PROMPT_CONTENT_0006: |
+            {{#runtime-import shared/reporting.md}}
+          GH_AW_PROMPT_CONTENT_0007: |
+            {{#runtime-import shared/github-queries-mcp-script.md}}
+          GH_AW_PROMPT_CONTENT_0008: |
+            ## Serena Code Analysis
+
+            The Serena MCP server is configured for **["go"]** analysis in this workspace:
+            - **Workspace**: `__GH_AW_GITHUB_WORKSPACE__`
+            - **Memory**: `/tmp/gh-aw/cache-memory/serena/`
+
+            ### Project Activation
+
+            Before analyzing code, activate the Serena project:
+            ```
+            Tool: activate_project
+            Args: { "path": "__GH_AW_GITHUB_WORKSPACE__" }
+            ```
+
+            ### Available Capabilities
+
+            Serena provides IDE-grade Language Server Protocol (LSP) tools including:
+            - **Symbol search**: `find_symbol` — locate functions, types, interfaces by name
+            - **Navigation**: `find_referencing_symbols` — find all callers/usages of a symbol
+            - **Type info**: `get_symbol_documentation` — hover-level type and doc information
+            - **Code editing**: `replace_symbol_body`, `insert_after_symbol` — symbol-level edits
+            - **Diagnostics**: `get_diagnostics` — compiler errors and linter warnings
+
+            ### Analysis Guidelines
+
+            1. **Use semantic tools over text search** — prefer Serena's LSP tools over `grep`
+            2. **Activate project first** — always call `activate_project` before other tools
+            3. **Cross-reference findings** — validate with multiple tools for accuracy
+            4. **Focus on the relevant language files** — ignore unrelated file types
+          GH_AW_PROMPT_CONTENT_0009: |+
+            # Smoke Test: Copilot Engine Validation
+
+            **IMPORTANT: Keep all outputs extremely short and concise. Use single-line responses where possible. No verbose explanations.**
+
+            ## Hard Limit: `add_comment` Budget
+
+            `safe-outputs.add-comment.max` is `2`. Never exceed 2 total `add_comment` calls in this run.
+
+            - Call #1 is required for the discussion interaction test (comment on latest discussion).
+            - Call #2 depends on trigger:
+              - `pull_request` event: post the brief PR summary comment, and **skip** the fun discussion follow-up comment.
+              - non-`pull_request` event: **skip** the PR summary comment and post the fun discussion follow-up comment.
+
+            ## Test Requirements
+
+            1. **GitHub MCP Testing**: Review the last 2 merged pull requests in __GH_AW_GITHUB_REPOSITORY__
+            2. **MCP Scripts GH CLI Testing**: Use the `mcpscripts-gh` tool to query 2 pull requests from __GH_AW_GITHUB_REPOSITORY__ (use args: "pr list --repo __GH_AW_GITHUB_REPOSITORY__ --limit 2 --json number,title,author")
+            3. **Serena MCP Testing**:
+               - Use the Serena MCP server tool `activate_project` to initialize the workspace at `__GH_AW_GITHUB_WORKSPACE__` and verify it succeeds (do NOT use bash to run go commands - use Serena's MCP tools)
+               - After initialization, use the `find_symbol` tool to search for symbols (find which tool to call) and verify that at least 3 symbols are found in the results
+            4. **Playwright Testing**: Use the playwright tools to navigate to <https://github.com> and verify the page title contains "GitHub" (do NOT try to install playwright - use the provided MCP tools)
+            5. **File Writing Testing**: Create a test file `/tmp/gh-aw/agent/smoke-test-copilot-__GH_AW_GITHUB_RUN_ID__.txt` with content "Smoke test passed for Copilot at $(date)" (create the directory if it doesn't exist)
+            6. **Bash Tool Testing**: Execute bash commands to verify file creation was successful (use `cat` to read the file back)
+            7. **Discussion Interaction Testing**:
+               - Use the `github-discussion-query` mcp-script tool with params: `limit=1, jq=".[0]"` to get the latest discussion from __GH_AW_GITHUB_REPOSITORY__
+               - Extract the discussion number from the result (e.g., if the result is `{"number": 123, "title": "...", ...}`, extract 123)
+               - Use the `add_comment` tool with `discussion_number: <extracted_number>` to add a fun, playful comment stating that the smoke test agent was here
+            8. **Build gh-aw**: Run `GOCACHE=/tmp/go-cache GOMODCACHE=/tmp/go-mod make build` to verify the agent can successfully build the gh-aw project (both caches must be set to /tmp because the default cache locations are not writable). If the command fails, mark this test as ❌ and report the failure.
+            9. **Discussion Creation Testing**: Use the `create_discussion` safe-output tool to create a discussion in the announcements category titled "copilot was here" with the label "ai-generated"
+            10. **Workflow Dispatch Testing**: Use the `dispatch_workflow` safe output tool to trigger the `haiku-printer` workflow with a haiku as the message input. Create an original, creative haiku about software testing or automation.
+            11. **PR Review Testing**: Review the diff of the current pull request. Leave 1-2 inline `create_pull_request_review_comment` comments on specific lines, then call `submit_pull_request_review` with a brief body summarizing your review and event `COMMENT`. After submitting the review, use `reply_to_pull_request_review_comment` to reply to one of the inline comments you just created (use the `comment_id` returned by `create_pull_request_review_comment`).
+
+            ## Output
+
+            1. **Create an issue** with a summary of the smoke test run:
+               - Title: "Smoke Test: Copilot - __GH_AW_GITHUB_RUN_ID__"
+               - Body should include:
+                 - Test results (✅ or ❌ for each test)
+                 - Overall status: PASS or FAIL
+                 - Run URL: __GH_AW_GITHUB_SERVER_URL__/__GH_AW_GITHUB_REPOSITORY__/actions/runs/__GH_AW_GITHUB_RUN_ID__
+                 - Timestamp
+                 - Pull request author and assignees
+
+            2. **Only if this workflow was triggered by a pull_request event**: Add a **very brief** comment (max 5-10 lines) to the current pull request with:
+               - PR titles only (no descriptions)
+               - ✅ or ❌ for each test result
+               - Overall status: PASS or FAIL
+               - Mention the pull request author and any assignees
+
+            3. **Only if this workflow was NOT triggered by a pull_request event**: Use the `add_comment` tool to add a **fun and creative comment** to the latest discussion (using the `discussion_number` you extracted in step 7) - be playful and entertaining in your comment
+
+            4. Use the `send_slack_message` tool to send a brief summary message (e.g., "Smoke test __GH_AW_GITHUB_RUN_ID__: All tests passed! ✅")
+
+            If all tests pass:
+            - Use the `add_labels` safe-output tool to add the label `smoke-copilot` to the pull request
+            - Use the `remove_labels` safe-output tool to remove the label `smoke` from the pull request
+
+          GH_AW_SAFE_OUTPUTS: ${{ runner.temp }}/gh-aw/safeoutputs/outputs.jsonl
+          OTEL_EXPORTER_OTLP_ENDPOINT: ""
+          OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_RESOURCE_ATTRIBUTES: ""
+          OTEL_SERVICE_NAME: ""
+      - name: Interpolate variables and render templates
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          github-token: no-authentication
+          script: |
+            const promptEnvironment = new Set(["GH_AW_ACTIONS_DIR","GH_AW_ENGINE_ID","GH_AW_GITHUB_REPOSITORY","GH_AW_GITHUB_RUN_ID","GH_AW_GITHUB_SERVER_URL","GH_AW_GITHUB_WORKSPACE","GH_AW_PROMPT","GH_AW_SKILL_DIR","GH_AW_SKILL_EXT","GH_AW_SUB_AGENT_DIR","GH_AW_SUB_AGENT_EXT","GITHUB_ACTION","GITHUB_ACTOR","GITHUB_API_URL","GITHUB_EVENT_NAME","GITHUB_EVENT_PATH","GITHUB_GRAPHQL_URL","GITHUB_JOB","GITHUB_OUTPUT","GITHUB_REF","GITHUB_REPOSITORY","GITHUB_RUN_ATTEMPT","GITHUB_RUN_ID","GITHUB_RUN_NUMBER","GITHUB_SERVER_URL","GITHUB_SHA","GITHUB_STEP_SUMMARY","GITHUB_WORKFLOW","GITHUB_WORKSPACE","PATH","RUNNER_ARCH","RUNNER_OS","RUNNER_TEMP"]);
+            for (const name of Object.keys(process.env)) {
+              if (!promptEnvironment.has(name)) delete process.env[name];
+            }
+            global.core = core;
+            global.context = context;
+            const { main } = require(process.env.GH_AW_ACTIONS_DIR + '/interpolate_prompt.cjs');
+            await main({ authorExpressions: {"github.repository":"GH_AW_GITHUB_REPOSITORY","github.run_id":"GH_AW_GITHUB_RUN_ID","github.server_url":"GH_AW_GITHUB_SERVER_URL","github.workspace":"GH_AW_GITHUB_WORKSPACE"} });
+        env:
+          GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
+          GH_AW_ENGINE_ID: copilot
+          GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
+          GH_AW_GITHUB_SERVER_URL: ${{ github.server_url }}
+          GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
+          GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_OTLP_IF_MISSING: ""
+          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          GH_AW_SKILL_DIR: .github/skills
+          GH_AW_SKILL_EXT: /SKILL.md
+          GH_AW_SUB_AGENT_DIR: .github/agents
+          GH_AW_SUB_AGENT_EXT: .agent.md
+          OTEL_EXPORTER_OTLP_ENDPOINT: ""
+          OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_RESOURCE_ATTRIBUTES: ""
+          OTEL_SERVICE_NAME: ""
+      - name: Substitute placeholders
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          github-token: no-authentication
+          script: |
+            const promptEnvironment = new Set(["GH_AW_ACTIONS_DIR","GH_AW_ALLOWED_EXTENSIONS","GH_AW_CACHE_DESCRIPTION","GH_AW_CACHE_DIR","GH_AW_EXPR_76DF9333","GH_AW_EXPR_77C1A4D2","GH_AW_EXPR_7C248226","GH_AW_EXPR_C19C384F","GH_AW_GITHUB_ACTOR","GH_AW_GITHUB_REPOSITORY","GH_AW_GITHUB_RUN_ID","GH_AW_GITHUB_SERVER_URL","GH_AW_GITHUB_WORKSPACE","GH_AW_MCP_CLI_SERVERS_LIST","GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED","GH_AW_PROMPT","GITHUB_ACTION","GITHUB_ACTOR","GITHUB_API_URL","GITHUB_EVENT_NAME","GITHUB_EVENT_PATH","GITHUB_GRAPHQL_URL","GITHUB_JOB","GITHUB_OUTPUT","GITHUB_REF","GITHUB_REPOSITORY","GITHUB_RUN_ATTEMPT","GITHUB_RUN_ID","GITHUB_RUN_NUMBER","GITHUB_SERVER_URL","GITHUB_SHA","GITHUB_STEP_SUMMARY","GITHUB_WORKFLOW","GITHUB_WORKSPACE","PATH","RUNNER_ARCH","RUNNER_OS","RUNNER_TEMP"]);
+            for (const name of Object.keys(process.env)) {
+              if (!promptEnvironment.has(name)) delete process.env[name];
+            }
+            global.core = core;
+            global.context = context;
+
+            const substitutePlaceholders = require(process.env.GH_AW_ACTIONS_DIR + '/substitute_placeholders.cjs');
 
             // Call the substitution function
             return await substitutePlaceholders({
@@ -378,16 +509,55 @@ jobs:
                 GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED: process.env.GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED
               }
             });
-      - name: Validate prompt placeholders
         env:
+          GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
+          GH_AW_ALLOWED_EXTENSIONS: ""
+          GH_AW_CACHE_DESCRIPTION: ""
+          GH_AW_CACHE_DIR: /tmp/gh-aw/cache-memory/
+          GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
+          GH_AW_EXPR_77C1A4D2: ${{ github.event.comment.id || fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').comment_id }}
+          GH_AW_EXPR_7C248226: ${{ github.event.issue.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'issue' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
+          GH_AW_EXPR_C19C384F: ${{ github.event.discussion.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'discussion' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
+          GH_AW_GITHUB_ACTOR: ${{ github.actor }}
+          GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
+          GH_AW_GITHUB_SERVER_URL: ${{ github.server_url }}
+          GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
+          GH_AW_MCP_CLI_SERVERS_LIST: |-
+            - `github` — run `github --help` to see available tools
+            - `mcpscripts` — run `mcpscripts --help` to see available tools
+            - `safeoutputs` — run `safeoutputs --help` to see available tools
+            - `serena` — run `serena --help` to see available tools
+          GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED: ${{ needs.pre_activation.outputs.activated }}
+          GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_OTLP_IF_MISSING: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          OTEL_EXPORTER_OTLP_ENDPOINT: ""
+          OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_RESOURCE_ATTRIBUTES: ""
+          OTEL_SERVICE_NAME: ""
+      - name: Validate prompt placeholders
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/validate_prompt_placeholders.sh"
-      - name: Print prompt
         env:
+          GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_OTLP_IF_MISSING: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          OTEL_EXPORTER_OTLP_ENDPOINT: ""
+          OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_RESOURCE_ATTRIBUTES: ""
+          OTEL_SERVICE_NAME: ""
+      - name: Print prompt
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/print_prompt_summary.sh"
+        env:
+          GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_OTLP_IF_MISSING: ""
+          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          OTEL_EXPORTER_OTLP_ENDPOINT: ""
+          OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_RESOURCE_ATTRIBUTES: ""
+          OTEL_SERVICE_NAME: ""
       - name: Inventory installed skills
         if: success() || failure()
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -456,6 +626,10 @@ jobs:
       GH_AW_ASSETS_BRANCH: ""
       GH_AW_ASSETS_MAX_SIZE_KB: 0
       GH_AW_MCP_LOG_DIR: /tmp/gh-aw/mcp-logs/safeoutputs
+      GH_AW_OBJECT_PACK_FETCH_DEPTHS: ${{ vars.GH_AW_OBJECT_PACK_FETCH_DEPTHS }}
+      GH_AW_OBJECT_PACK_MAX_BYTES: ${{ vars.GH_AW_OBJECT_PACK_MAX_BYTES }}
+      GH_AW_OBJECT_PACK_MAX_OBJECTS: ${{ vars.GH_AW_OBJECT_PACK_MAX_OBJECTS }}
+      GH_AW_OBJECT_PACK_TIMEOUT_MS: ${{ vars.GH_AW_OBJECT_PACK_TIMEOUT_MS }}
       GH_AW_PR_HEAD_BASE_BRANCH: ""
       GH_AW_PR_HEAD_BASE_PR_NUMBER: ""
       GH_AW_PR_HEAD_BASE_REF: ""
@@ -647,6 +821,9 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           GH_AW_COPILOT_MIN_VERSION: 1.0.35
       - name: Install AWF binary
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_HOST: github.com
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" vAWF_VERSION --rootless
       - name: Install Playwright CLI
         run: npm install -g @playwright/cli@0.1.22
@@ -1148,8 +1325,8 @@ jobs:
                 },
                 "handler": "gh.sh",
                 "env": {
-                  "GH_AW_GH_TOKEN": "GH_AW_GH_TOKEN",
-                  "GH_DEBUG": "GH_DEBUG"
+                  "GH_AW_GH_TOKEN": "GH_AW_MCP_SCRIPTS_ENV_6768_47485f41575f47485f544f4b454e",
+                  "GH_DEBUG": "GH_AW_MCP_SCRIPTS_ENV_6768_47485f4445425547"
                 },
                 "timeout": 60
               },
@@ -1175,7 +1352,9 @@ jobs:
                 },
                 "handler": "github-discussion-query.sh",
                 "env": {
-                  "GH_TOKEN": "GH_TOKEN"
+                  "GH_TOKEN": "GH_AW_MCP_SCRIPTS_ENV_6769746875622d64697363757373696f6e2d7175657279_47485f544f4b454e",
+                  "GITHUB_REPOSITORY": "GH_AW_MCP_SCRIPTS_ENV_6769746875622d64697363757373696f6e2d7175657279_4749544855425f5245504f5349544f5259",
+                  "GITHUB_REPOSITORY_OWNER": "GH_AW_MCP_SCRIPTS_ENV_6769746875622d64697363757373696f6e2d7175657279_4749544855425f5245504f5349544f52595f4f574e4552"
                 },
                 "timeout": 60
               },
@@ -1205,7 +1384,8 @@ jobs:
                 },
                 "handler": "github-issue-query.sh",
                 "env": {
-                  "GH_TOKEN": "GH_TOKEN"
+                  "GH_TOKEN": "GH_AW_MCP_SCRIPTS_ENV_6769746875622d69737375652d7175657279_47485f544f4b454e",
+                  "GITHUB_REPOSITORY": "GH_AW_MCP_SCRIPTS_ENV_6769746875622d69737375652d7175657279_4749544855425f5245504f5349544f5259"
                 },
                 "timeout": 60
               },
@@ -1235,7 +1415,8 @@ jobs:
                 },
                 "handler": "github-pr-query.sh",
                 "env": {
-                  "GH_TOKEN": "GH_TOKEN"
+                  "GH_TOKEN": "GH_AW_MCP_SCRIPTS_ENV_6769746875622d70722d7175657279_47485f544f4b454e",
+                  "GITHUB_REPOSITORY": "GH_AW_MCP_SCRIPTS_ENV_6769746875622d70722d7175657279_4749544855425f5245504f5349544f5259"
                 },
                 "timeout": 60
               }
@@ -1611,9 +1792,15 @@ jobs:
           DEBUG: ${{ env.DEBUG || runner.debug == '1' && '*' || '' }}
           GH_AW_MCP_SCRIPTS_PORT: ${{ steps.mcp-scripts-config.outputs.mcp_scripts_port }}
           GH_AW_MCP_SCRIPTS_API_KEY: ${{ steps.mcp-scripts-config.outputs.mcp_scripts_api_key }}
-          GH_AW_GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_DEBUG: 1
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_AW_MCP_SCRIPTS_ENV_6768_47485f41575f47485f544f4b454e: ${{ secrets.GITHUB_TOKEN }}
+          GH_AW_MCP_SCRIPTS_ENV_6768_47485f4445425547: 1
+          GH_AW_MCP_SCRIPTS_ENV_6769746875622d64697363757373696f6e2d7175657279_47485f544f4b454e: ${{ secrets.GITHUB_TOKEN }}
+          GH_AW_MCP_SCRIPTS_ENV_6769746875622d64697363757373696f6e2d7175657279_4749544855425f5245504f5349544f5259: ${{ github.repository }}
+          GH_AW_MCP_SCRIPTS_ENV_6769746875622d64697363757373696f6e2d7175657279_4749544855425f5245504f5349544f52595f4f574e4552: ${{ github.repository_owner }}
+          GH_AW_MCP_SCRIPTS_ENV_6769746875622d69737375652d7175657279_47485f544f4b454e: ${{ secrets.GITHUB_TOKEN }}
+          GH_AW_MCP_SCRIPTS_ENV_6769746875622d69737375652d7175657279_4749544855425f5245504f5349544f5259: ${{ github.repository }}
+          GH_AW_MCP_SCRIPTS_ENV_6769746875622d70722d7175657279_47485f544f4b454e: ${{ secrets.GITHUB_TOKEN }}
+          GH_AW_MCP_SCRIPTS_ENV_6769746875622d70722d7175657279_4749544855425f5245504f5349544f5259: ${{ github.repository }}
         run: |
           # Environment variables are set above to prevent template injection
           export DEBUG
@@ -1626,16 +1813,17 @@ jobs:
         id: start-mcp-gateway
         env:
           DEBUG: ${{ env.DEBUG || runner.debug == '1' && '*' || '' }}
-          GH_AW_GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_AW_MCP_SCRIPTS_API_KEY: ${{ steps.mcp-scripts-start.outputs.api_key }}
           GH_AW_MCP_SCRIPTS_PORT: ${{ steps.mcp-scripts-start.outputs.port }}
+          GH_AW_OBJECT_PACK_FETCH_DEPTHS: ${{ vars.GH_AW_OBJECT_PACK_FETCH_DEPTHS }}
+          GH_AW_OBJECT_PACK_MAX_BYTES: ${{ vars.GH_AW_OBJECT_PACK_MAX_BYTES }}
+          GH_AW_OBJECT_PACK_MAX_OBJECTS: ${{ vars.GH_AW_OBJECT_PACK_MAX_OBJECTS }}
+          GH_AW_OBJECT_PACK_TIMEOUT_MS: ${{ vars.GH_AW_OBJECT_PACK_TIMEOUT_MS }}
           GH_AW_POLICY_ALLOW_CREATE_PULL_REQUEST: ${{ vars.GH_AW_POLICY_ALLOW_CREATE_PULL_REQUEST || 'true' }}
           GH_AW_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}
           GH_AW_SAFE_OUTPUTS_CONFIG_PATH: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS_CONFIG_PATH }}
           GH_AW_SAFE_OUTPUTS_TOOLS_PATH: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS_TOOLS_PATH }}
           GH_AW_SINK_VISIBILITY: ${{ steps.determine-automatic-lockdown.outputs.visibility }}
-          GH_DEBUG: 1
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_MCP_GUARD_MIN_INTEGRITY: ${{ steps.determine-automatic-lockdown.outputs.min_integrity }}
           GITHUB_MCP_GUARD_REPOS: ${{ steps.determine-automatic-lockdown.outputs.repos }}
           GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
@@ -1671,7 +1859,7 @@ jobs:
           MCP_GATEWAY_UID=$(id -u 2>/dev/null || echo '0')
           MCP_GATEWAY_GID=$(id -g 2>/dev/null || echo '0')
           source "${RUNNER_TEMP}/gh-aw/actions/resolve_docker_socket_gid.sh"
-          export MCP_GATEWAY_DOCKER_COMMAND='docker run -i --rm --network bridge -p 127.0.0.1:'"${MCP_GATEWAY_PORT}"':'"${MCP_GATEWAY_PORT}"' --name awmg-mcpg --add-host host.docker.internal:host-gateway --user '"${MCP_GATEWAY_UID}"':'"${MCP_GATEWAY_GID}"' --group-add '"${DOCKER_SOCK_GID}"' -v '"${DOCKER_SOCK_PATH}"':/var/run/docker.sock -e MCP_GATEWAY_PORT -e MCP_GATEWAY_DOMAIN -e MCP_GATEWAY_AGENT_ID -e MCP_GATEWAY_PAYLOAD_DIR -e MCP_GATEWAY_PAYLOAD_SIZE_THRESHOLD -e DOCKER_HOST=unix:///var/run/docker.sock -e DEBUG -e MCP_GATEWAY_LOG_DIR -e GH_AW_MCP_LOG_DIR -e GH_AW_SAFE_OUTPUTS -e GH_AW_SAFE_OUTPUTS_CONFIG_PATH -e GH_AW_SAFE_OUTPUTS_TOOLS_PATH -e GH_AW_TARGET_REPO_SLUG -e GH_AW_PR_HEAD_BASE_BRANCH -e GH_AW_PR_HEAD_BASE_SHA -e GH_AW_PR_HEAD_BASE_REPO -e GH_AW_PR_HEAD_BASE_PR_NUMBER -e GH_AW_PR_HEAD_BASE_REF -e GH_AW_PR_HEAD_REPO -e GH_AW_POLICY_ALLOW_CREATE_PULL_REQUEST -e GH_AW_ASSETS_BRANCH -e GH_AW_ASSETS_MAX_SIZE_KB -e GH_AW_ASSETS_ALLOWED_EXTS -e DEFAULT_BRANCH -e GITHUB_MCP_SERVER_TOKEN -e GITHUB_MCP_GUARD_MIN_INTEGRITY -e GITHUB_MCP_GUARD_REPOS -e GH_AW_SINK_VISIBILITY -e GITHUB_REPOSITORY -e GITHUB_SERVER_URL -e GITHUB_SHA -e GITHUB_WORKSPACE -e GITHUB_TOKEN -e GITHUB_RUN_ID -e GITHUB_RUN_NUMBER -e GITHUB_RUN_ATTEMPT -e GITHUB_JOB -e GITHUB_ACTION -e GITHUB_EVENT_NAME -e GITHUB_EVENT_PATH -e GITHUB_ACTOR -e GITHUB_ACTOR_ID -e GITHUB_TRIGGERING_ACTOR -e GITHUB_WORKFLOW -e GITHUB_WORKFLOW_REF -e GITHUB_WORKFLOW_SHA -e GITHUB_REF -e GITHUB_REF_NAME -e GITHUB_REF_TYPE -e GITHUB_HEAD_REF -e GITHUB_BASE_REF -e RUNNER_TEMP -e RUNNER_TOOL_CACHE -e MCP_GATEWAY_ALLOWED_MOUNT_ROOTS -e GH_AW_MCP_SCRIPTS_PORT -e GH_AW_MCP_SCRIPTS_API_KEY -e GITHUB_AW_OTEL_TRACE_ID -e GITHUB_AW_OTEL_PARENT_SPAN_ID -e OTEL_EXPORTER_OTLP_HEADERS -e GH_AW_GH_TOKEN -e GH_DEBUG -e GH_TOKEN -v /tmp/gh-aw/mcp-payloads:/tmp/gh-aw/mcp-payloads:rw -v /opt:/opt:ro -v /tmp:/tmp:rw -v '"${GITHUB_WORKSPACE}"':'"${GITHUB_WORKSPACE}"':rw -v '"${RUNNER_TEMP}"'/gh-aw/safeoutputs:'"${RUNNER_TEMP}"'/gh-aw/safeoutputs:rw ghcr.io/github/gh-aw-mcpg:MCPG_VERSION'
+          export MCP_GATEWAY_DOCKER_COMMAND='docker run -i --rm --network bridge -p 127.0.0.1:'"${MCP_GATEWAY_PORT}"':'"${MCP_GATEWAY_PORT}"' --name awmg-mcpg --add-host host.docker.internal:host-gateway --user '"${MCP_GATEWAY_UID}"':'"${MCP_GATEWAY_GID}"' --group-add '"${DOCKER_SOCK_GID}"' -v '"${DOCKER_SOCK_PATH}"':/var/run/docker.sock -e MCP_GATEWAY_PORT -e MCP_GATEWAY_DOMAIN -e MCP_GATEWAY_AGENT_ID -e MCP_GATEWAY_PAYLOAD_DIR -e MCP_GATEWAY_PAYLOAD_SIZE_THRESHOLD -e DOCKER_HOST=unix:///var/run/docker.sock -e DEBUG -e MCP_GATEWAY_LOG_DIR -e GH_AW_MCP_LOG_DIR -e GH_AW_SAFE_OUTPUTS -e GH_AW_SAFE_OUTPUTS_CONFIG_PATH -e GH_AW_SAFE_OUTPUTS_TOOLS_PATH -e GH_AW_TARGET_REPO_SLUG -e GH_AW_PR_HEAD_BASE_BRANCH -e GH_AW_PR_HEAD_BASE_SHA -e GH_AW_PR_HEAD_BASE_REPO -e GH_AW_PR_HEAD_BASE_PR_NUMBER -e GH_AW_PR_HEAD_BASE_REF -e GH_AW_PR_HEAD_REPO -e GH_AW_POLICY_ALLOW_CREATE_PULL_REQUEST -e GH_AW_OBJECT_PACK_MAX_BYTES -e GH_AW_OBJECT_PACK_MAX_OBJECTS -e GH_AW_OBJECT_PACK_TIMEOUT_MS -e GH_AW_OBJECT_PACK_FETCH_DEPTHS -e GH_AW_ASSETS_BRANCH -e GH_AW_ASSETS_MAX_SIZE_KB -e GH_AW_ASSETS_ALLOWED_EXTS -e DEFAULT_BRANCH -e GITHUB_MCP_SERVER_TOKEN -e GITHUB_MCP_GUARD_MIN_INTEGRITY -e GITHUB_MCP_GUARD_REPOS -e GH_AW_SINK_VISIBILITY -e GITHUB_REPOSITORY -e GITHUB_SERVER_URL -e GITHUB_SHA -e GITHUB_WORKSPACE -e GITHUB_TOKEN -e GITHUB_RUN_ID -e GITHUB_RUN_NUMBER -e GITHUB_RUN_ATTEMPT -e GITHUB_JOB -e GITHUB_ACTION -e GITHUB_EVENT_NAME -e GITHUB_EVENT_PATH -e GITHUB_ACTOR -e GITHUB_ACTOR_ID -e GITHUB_TRIGGERING_ACTOR -e GITHUB_WORKFLOW -e GITHUB_WORKFLOW_REF -e GITHUB_WORKFLOW_SHA -e GITHUB_REF -e GITHUB_REF_NAME -e GITHUB_REF_TYPE -e GITHUB_HEAD_REF -e GITHUB_BASE_REF -e RUNNER_TEMP -e RUNNER_TOOL_CACHE -e MCP_GATEWAY_ALLOWED_MOUNT_ROOTS -e GH_AW_MCP_SCRIPTS_PORT -e GH_AW_MCP_SCRIPTS_API_KEY -e GITHUB_AW_OTEL_TRACE_ID -e GITHUB_AW_OTEL_PARENT_SPAN_ID -e OTEL_EXPORTER_OTLP_HEADERS -v /tmp/gh-aw/mcp-payloads:/tmp/gh-aw/mcp-payloads:rw -v /opt:/opt:ro -v /tmp:/tmp:rw -v '"${GITHUB_WORKSPACE}"':'"${GITHUB_WORKSPACE}"':rw -v '"${RUNNER_TEMP}"'/gh-aw/safeoutputs:'"${RUNNER_TEMP}"'/gh-aw/safeoutputs:rw ghcr.io/github/gh-aw-mcpg:MCPG_VERSION'
 
           mkdir -p "$HOME/.copilot"
           GH_AW_NODE=$(which node 2>/dev/null || command -v node 2>/dev/null || echo node)
@@ -1761,7 +1949,11 @@ jobs:
                   "GITHUB_SHA": "\${GITHUB_SHA}",
                   "GITHUB_TOKEN": "\${GITHUB_TOKEN}",
                   "GITHUB_WORKSPACE": "\${GITHUB_WORKSPACE}",
-                  "RUNNER_TEMP": "\${RUNNER_TEMP}"
+                  "RUNNER_TEMP": "\${RUNNER_TEMP}",
+                  "GH_AW_OBJECT_PACK_MAX_BYTES": "\${GH_AW_OBJECT_PACK_MAX_BYTES}",
+                  "GH_AW_OBJECT_PACK_MAX_OBJECTS": "\${GH_AW_OBJECT_PACK_MAX_OBJECTS}",
+                  "GH_AW_OBJECT_PACK_TIMEOUT_MS": "\${GH_AW_OBJECT_PACK_TIMEOUT_MS}",
+                  "GH_AW_OBJECT_PACK_FETCH_DEPTHS": "\${GH_AW_OBJECT_PACK_FETCH_DEPTHS}"
                 },
                 "guard-policies": {
                   "write-sink": {
@@ -1946,7 +2138,6 @@ jobs:
           COPILOT_DUMMY_BYOK: dummy-byok-key-for-offline-mode
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           COPILOT_MODEL: ${{ vars.GH_AW_MODEL_AGENT_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'default' }}
-          GH_AW_GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_AW_LLM_PROVIDER: github
           GH_AW_MAX_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_AI_CREDITS || '1000' }}
           GH_AW_MAX_TURNS: ${{ vars.GH_AW_DEFAULT_MAX_TURNS || '' }}
@@ -1955,8 +2146,6 @@ jobs:
           GH_AW_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}
           GH_AW_TIMEOUT_MINUTES: 15
           GH_AW_VERSION: dev
-          GH_DEBUG: 1
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_API_URL: ${{ github.api_url }}
           GITHUB_AW: true
           GITHUB_COPILOT_INTEGRATION_ID: agentic-workflows
@@ -2040,6 +2229,22 @@ jobs:
           SECRET_GH_AW_GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN }}
           SECRET_GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}
           SECRET_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Validate recovery envelopes before upload
+        id: validate_recovery_envelopes
+        if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_OBJECT_PACK_MAX_BYTES: ${{ vars.GH_AW_OBJECT_PACK_MAX_BYTES }}
+          GH_AW_OBJECT_PACK_MAX_OBJECTS: ${{ vars.GH_AW_OBJECT_PACK_MAX_OBJECTS }}
+          GH_AW_OBJECT_PACK_TIMEOUT_MS: ${{ vars.GH_AW_OBJECT_PACK_TIMEOUT_MS }}
+          GH_AW_OBJECT_PACK_FETCH_DEPTHS: ${{ vars.GH_AW_OBJECT_PACK_FETCH_DEPTHS }}
+          GH_AW_RECOVERY_ADDITIONAL_ROOTS: '[]'
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core, additionalRoots: JSON.parse(process.env.GH_AW_RECOVERY_ADDITIONAL_ROOTS) });
       - name: Append agent step summary
         if: always()
         run: bash "${RUNNER_TEMP}/gh-aw/actions/append_agent_step_summary.sh"
@@ -2163,18 +2368,50 @@ jobs:
         env:
           GH_AW_CACHE_DIR: /tmp/gh-aw/cache-memory
         run: bash "${RUNNER_TEMP}/gh-aw/actions/check_cache_memory_git_integrity.sh"
+      - name: Validate recovery envelopes before upload
+        id: validate_recovery_cache_default
+        if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_OBJECT_PACK_MAX_BYTES: ${{ vars.GH_AW_OBJECT_PACK_MAX_BYTES }}
+          GH_AW_OBJECT_PACK_MAX_OBJECTS: ${{ vars.GH_AW_OBJECT_PACK_MAX_OBJECTS }}
+          GH_AW_OBJECT_PACK_TIMEOUT_MS: ${{ vars.GH_AW_OBJECT_PACK_TIMEOUT_MS }}
+          GH_AW_OBJECT_PACK_FETCH_DEPTHS: ${{ vars.GH_AW_OBJECT_PACK_FETCH_DEPTHS }}
+          GH_AW_RECOVERY_ADDITIONAL_ROOTS: '["/tmp/gh-aw/cache-memory"]'
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core, additionalRoots: JSON.parse(process.env.GH_AW_RECOVERY_ADDITIONAL_ROOTS) });
       - name: Upload cache-memory data as artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: always()
+        if: always() && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success' && steps.validate_recovery_cache_default.outcome == 'success'
         with:
           name: cache-memory
           include-hidden-files: true
           path: /tmp/gh-aw/cache-memory
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
+      - name: Validate recovery envelopes before upload
+        id: validate_final_recovery_envelopes
+        if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_OBJECT_PACK_MAX_BYTES: ${{ vars.GH_AW_OBJECT_PACK_MAX_BYTES }}
+          GH_AW_OBJECT_PACK_MAX_OBJECTS: ${{ vars.GH_AW_OBJECT_PACK_MAX_OBJECTS }}
+          GH_AW_OBJECT_PACK_TIMEOUT_MS: ${{ vars.GH_AW_OBJECT_PACK_TIMEOUT_MS }}
+          GH_AW_OBJECT_PACK_FETCH_DEPTHS: ${{ vars.GH_AW_OBJECT_PACK_FETCH_DEPTHS }}
+          GH_AW_RECOVERY_ADDITIONAL_ROOTS: '["/tmp/gh-aw/aw-prompts/prompt.txt","/tmp/gh-aw/agent_execution.json","/tmp/gh-aw/agent_execution_exit_code.txt","/tmp/gh-aw/agent-session.jsonl","/tmp/gh-aw/agent-errors.jsonl","/tmp/gh-aw/aw-prompts/user.txt","/tmp/gh-aw/aw-prompts/system.txt","/tmp/gh-aw/skill_inventory.json","/tmp/gh-aw/sandbox/agent/logs/","/tmp/gh-aw/redacted-urls.log","/tmp/gh-aw/mcp-logs/","/tmp/gh-aw/mcp-scripts/logs/","/tmp/gh-aw/agent_usage.json","/tmp/gh-aw/runtime/aw_info.json","/tmp/gh-aw/agent_usage.jsonl","/tmp/gh-aw/agent/model-endpoint-mismatch.json","/tmp/gh-aw/agent/model-resolution.json","/tmp/gh-aw/agent-stdio.log","/tmp/gh-aw/agent/harness_retry.json","/tmp/gh-aw/pre-agent-audit.txt","/tmp/gh-aw/github_rate_limits.jsonl","/tmp/gh-aw/otel.jsonl","/tmp/gh-aw/otlp-export-errors.jsonl","/tmp/gh-aw/safeoutputs.jsonl","/tmp/gh-aw/agent_output.json","/tmp/gh-aw","/tmp/gh-aw","/tmp/gh-aw/awf-config.json","/tmp/gh-aw/awf-resolved-config.json","/tmp/gh-aw/sandbox/firewall/logs/","/tmp/gh-aw/sandbox/firewall/audit/","/tmp/gh-aw/sandbox/firewall/awf-reflect.json"]'
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core, additionalRoots: JSON.parse(process.env.GH_AW_RECOVERY_ADDITIONAL_ROOTS) });
       # Small dedicated copy of the agent output so safe-output processing
       # survives a failed or timed-out upload of the larger agent artifact
       - name: Upload agent output fallback artifact
-        if: always() && steps.redact_secrets.outcome == 'success'
+        if: always() && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success' && steps.validate_final_recovery_envelopes.outcome == 'success'
         continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -2198,7 +2435,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Upload agent artifacts
-        if: always() && steps.redact_secrets.outcome == 'success'
+        if: always() && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success' && steps.validate_final_recovery_envelopes.outcome == 'success'
         continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -2771,6 +3008,9 @@ jobs:
           mkdir -p /tmp/gh-aw/threat-detection
           touch /tmp/gh-aw/threat-detection/detection.log
       - name: Install AWF binary
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_HOST: github.com
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" vAWF_VERSION --rootless
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -3077,6 +3317,10 @@ jobs:
       GH_AW_ENGINE_ID: "copilot"
       GH_AW_ENGINE_MODEL: ${{ needs.agent.outputs.model }}
       GH_AW_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      GH_AW_OBJECT_PACK_FETCH_DEPTHS: ${{ vars.GH_AW_OBJECT_PACK_FETCH_DEPTHS }}
+      GH_AW_OBJECT_PACK_MAX_BYTES: ${{ vars.GH_AW_OBJECT_PACK_MAX_BYTES }}
+      GH_AW_OBJECT_PACK_MAX_OBJECTS: ${{ vars.GH_AW_OBJECT_PACK_MAX_OBJECTS }}
+      GH_AW_OBJECT_PACK_TIMEOUT_MS: ${{ vars.GH_AW_OBJECT_PACK_TIMEOUT_MS }}
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
       GH_AW_RUN_DETECTION: ${{ needs.detection.outputs.run_detection }}
       GH_AW_SAFE_OUTPUT_MESSAGES: "{\"footer\":\"\\u003e 📰 *BREAKING: Report filed by [{workflow_name}]({run_url})*\",\"appendOnlyComments\":true,\"runStarted\":\"📰 BREAKING: [{workflow_name}]({run_url}) is now investigating this {event_type}. Sources say the story is developing...\",\"runSuccess\":\"📰 VERDICT: [{workflow_name}]({run_url}) has concluded. All systems operational. This is a developing story. 🎤\",\"runFailure\":\"📰 DEVELOPING STORY: [{workflow_name}]({run_url}) reports {status}. Our correspondents are investigating the incident...\"}"
@@ -3212,6 +3456,10 @@ jobs:
       GH_AW_ENGINE_ID: "copilot"
       GH_AW_ENGINE_MODEL: ${{ needs.agent.outputs.model }}
       GH_AW_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      GH_AW_OBJECT_PACK_FETCH_DEPTHS: ${{ vars.GH_AW_OBJECT_PACK_FETCH_DEPTHS }}
+      GH_AW_OBJECT_PACK_MAX_BYTES: ${{ vars.GH_AW_OBJECT_PACK_MAX_BYTES }}
+      GH_AW_OBJECT_PACK_MAX_OBJECTS: ${{ vars.GH_AW_OBJECT_PACK_MAX_OBJECTS }}
+      GH_AW_OBJECT_PACK_TIMEOUT_MS: ${{ vars.GH_AW_OBJECT_PACK_TIMEOUT_MS }}
       GH_AW_RUN_DETECTION: ${{ needs.detection.outputs.run_detection }}
       GH_AW_SAFE_OUTPUT_MESSAGES: "{\"footer\":\"\\u003e 📰 *BREAKING: Report filed by [{workflow_name}]({run_url})*\",\"appendOnlyComments\":true,\"runStarted\":\"📰 BREAKING: [{workflow_name}]({run_url}) is now investigating this {event_type}. Sources say the story is developing...\",\"runSuccess\":\"📰 VERDICT: [{workflow_name}]({run_url}) has concluded. All systems operational. This is a developing story. 🎤\",\"runFailure\":\"📰 DEVELOPING STORY: [{workflow_name}]({run_url}) reports {status}. Our correspondents are investigating the incident...\"}"
       GH_AW_THREAT_DETECTION_AIC: ${{ needs.detection.outputs.aic }}

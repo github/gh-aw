@@ -164,7 +164,7 @@ func TestGetRequiredSecretNames_Copilot(t *testing.T) {
 		assert.Contains(t, secrets, "GITHUB_MCP_SERVER_TOKEN")
 	})
 
-	t.Run("includes mcp-scripts secrets", func(t *testing.T) {
+	t.Run("excludes server-only mcp-scripts secrets", func(t *testing.T) {
 		workflowData := &WorkflowData{
 			Tools:       map[string]any{},
 			ParsedTools: &ToolsConfig{},
@@ -182,9 +182,9 @@ func TestGetRequiredSecretNames_Copilot(t *testing.T) {
 
 		secrets := engine.GetRequiredSecretNames(workflowData)
 
-		// Should include COPILOT_GITHUB_TOKEN and API_TOKEN
 		assert.Contains(t, secrets, "COPILOT_GITHUB_TOKEN")
-		assert.Contains(t, secrets, "API_TOKEN")
+		assert.NotContains(t, secrets, "API_TOKEN")
+		assert.NotContains(t, secrets, mcpScriptEnvBindingName("api", "API_TOKEN"))
 	})
 
 	t.Run("model-provider=openai switches core secret requirements", func(t *testing.T) {

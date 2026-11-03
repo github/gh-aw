@@ -152,6 +152,7 @@ func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, wor
 		// ${VAR} placeholders in the safeoutputs MCP container env block and must be resolvable
 		// by the gateway from process.env at startup time.
 		envVars["GH_AW_SAFE_OUTPUTS_CONFIG_PATH"] = "${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS_CONFIG_PATH }}"
+		addObjectPackLimitEnv(envVars)
 		envVars["GH_AW_SAFE_OUTPUTS_TOOLS_PATH"] = "${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS_TOOLS_PATH }}"
 		if workflowData.TrialMode && workflowData.TrialLogicalRepo != "" {
 			envVars["GH_AW_TARGET_REPO_SLUG"] = workflowData.TrialLogicalRepo
@@ -200,14 +201,23 @@ func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, wor
 		envVars["GH_AW_MCP_SCRIPTS_PORT"] = "${{ steps.mcp-scripts-start.outputs.port }}"
 		envVars["GH_AW_MCP_SCRIPTS_API_KEY"] = "${{ steps.mcp-scripts-start.outputs.api_key }}"
 
-		// Add tool-specific env vars (secrets passthrough)
-		mcpScriptsSecrets := collectMCPScriptsSecrets(workflowData.MCPScripts)
-		maps.Copy(envVars, mcpScriptsSecrets)
 	}
 
 	// Check for agentic-workflows GITHUB_TOKEN
 	if hasAgenticWorkflows {
 		envVars["GITHUB_TOKEN"] = "${{ secrets.GITHUB_TOKEN }}"
+	}
+
+	// The mount allowlist scans built-in tools as well as custom servers.
+	for _, mount := range collectMCPServerConfiguredMounts(tools) {
+		_, bindings := replaceMCPExpressions(mount, false)
+		maps.Copy(envVars, bindings)
+	}
+	if githubTool, ok := tools["github"].(map[string]any); ok {
+		for _, arg := range getGitHubCustomArgs(githubTool) {
+			_, bindings := replaceMCPExpressions(arg, false)
+			maps.Copy(envVars, bindings)
+		}
 	}
 
 	// Check for HTTP MCP servers with secrets in headers (e.g., Tavily)
@@ -232,6 +242,7 @@ func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, wor
 				mcpEnvironmentLog.Printf("Failed to parse MCP config for tool %s: %v", toolName, err)
 				continue
 			}
+			maps.Copy(envVars, collectMCPConfigExpressionBindings(mcpConfig))
 
 			// Extract secrets from headers for HTTP MCP servers
 			if mcpConfig.Type == "http" && len(mcpConfig.Headers) > 0 {

@@ -50,6 +50,7 @@ const { createTokenBrokerGitHubClient, isTokenBrokerEnabled } = require("./token
 const { ensureFullHistoryForBundle, importLocalBundle, offlineGitOptions, getBundlePrerequisites, linearizeRangeAsCommit } = require("./git_helpers.cjs");
 const { parseDiffGitHeader: parseDiffGitHeaderPaths, extractDiffGitHeaderEntries } = require("./patch_path_helpers.cjs");
 const { resolveTransportPaths } = require("./resolve_transport_paths.cjs");
+const { recoverObjectPack, isObjectPack, recoveryToken } = require("./object_pack_transport.cjs");
 const { withTransportIntegrity } = require("./transport_integrity.cjs");
 const { resolveDefaultMentions, resolveMentionsForItem } = require("./resolve_mentions_from_payload.cjs");
 const {
@@ -959,6 +960,8 @@ async function main(config = {}) {
 
     // Determine the bundle file path from the message (set when patch-format: bundle is configured)
     const bundleFilePath = transportPaths.bundlePath;
+    let recoveryPatchOnly = false;
+    const objectPackRecovery = {};
     if (bundleFilePath) {
       core.info(`Bundle file path: ${bundleFilePath}`);
     }
@@ -1166,11 +1169,27 @@ async function main(config = {}) {
         }
       }
 
+      if (bundleFilePath && isObjectPack(transport.read(bundleFilePath))) {
+        const recovered = await recoverObjectPack(transport, transportPaths, {
+          repo: itemRepo,
+          baseBranch,
+          branch: pullRequestItem.branch?.trim(),
+          mode: "full",
+          config,
+          message: pullRequestItem,
+          checkoutSha: itemRepo.toLowerCase() === `${context.repo?.owner}/${context.repo?.repo}`.toLowerCase() ? process.env.GITHUB_SHA : undefined,
+          token: await recoveryToken(githubClient, config["github-token"]),
+          staged: isStaged,
+          manualRecovery: objectPackRecovery,
+        });
+        recoveryPatchOnly = recovered && config.patch_format === "am";
+      }
+
       // Check if patch file exists and has valid content.
       // Always require patch content for policy enforcement, even when bundle transport
       // is used for apply-time commit transport.
       transport.assertUnchanged();
-      const hasBundleFile = !!(bundleFilePath && fs.existsSync(bundleFilePath));
+      const hasBundleFile = !!(!recoveryPatchOnly && bundleFilePath && fs.existsSync(bundleFilePath));
       const applyTransport = hasBundleFile ? "bundle" : "patch";
       core.info(`Apply transport mode: ${applyTransport} (bundle file present: ${hasBundleFile})`);
       if (bundleFilePath && !hasBundleFile) {
@@ -1923,6 +1942,7 @@ async function main(config = {}) {
 
                 const artifactFileName = bundleFilePath ? bundleFilePath.replace("/tmp/gh-aw/", "") : "aw-unknown.bundle";
                 const recoveryInstructions = buildManualBranchRecoveryCommands({
+                  objectPackRecovery,
                   hasBundleFile: true,
                   runId,
                   artifactFileName,
@@ -2289,6 +2309,7 @@ async function main(config = {}) {
 
                 const patchFileName = patchFilePath ? patchFilePath.replace("/tmp/gh-aw/", "") : "aw-unknown.patch";
                 const recoveryInstructions = buildManualBranchRecoveryCommands({
+                  objectPackRecovery,
                   hasBundleFile: false,
                   runId,
                   artifactFileName: patchFileName,
@@ -2472,6 +2493,7 @@ async function main(config = {}) {
           const runId = context.runId;
           const artifactFileName = hasBundleFile ? bundleFilePath.replace("/tmp/gh-aw/", "") : patchFilePath ? patchFilePath.replace("/tmp/gh-aw/", "") : "aw-unknown.patch";
           const applyInstructions = buildManualBranchRecoveryCommands({
+            objectPackRecovery,
             hasBundleFile,
             runId,
             artifactFileName,

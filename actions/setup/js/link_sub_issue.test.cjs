@@ -266,6 +266,54 @@ const mockCore = {
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Resolved sub-issue temporary ID"));
     });
 
+    it.each([{}, { allowed_repos: ["approved-org/*"] }, { staged: true }])("should reject two temporary IDs resolving to the same disallowed repository with config %j", async config => {
+      const { main } = require(path.join(process.cwd(), "link_sub_issue.cjs"));
+      const policyHandler = await main({ target: "*", ...config });
+      const result = await policyHandler({ parent_issue_number: "aw_parent", sub_issue_number: "#aw_child" }, { aw_parent: { repo: "other-org/other-repo", number: 100 }, aw_child: { repo: "other-org/other-repo", number: 50 } });
+      expect(result).toMatchObject({ success: false, error: expect.stringContaining("not in the allowed-repos list") });
+      expect(mockGithub.rest.issues.get).not.toHaveBeenCalled();
+      expect(mockGithub.graphql).not.toHaveBeenCalled();
+    });
+
+    it("should reject a deferred link after IDs resolve to a disallowed repository", async () => {
+      const message = { parent_issue_number: "aw_parent", sub_issue_number: "aw_child" };
+      expect(await handler(message, {})).toMatchObject({ success: false, deferred: true });
+      const result = await handler(message, { aw_parent: { repo: "other-org/other-repo", number: 100 }, aw_child: { repo: "other-org/other-repo", number: 50 } });
+      expect(result).toMatchObject({ success: false, error: expect.stringContaining("not in the allowed-repos list") });
+      expect(mockGithub.rest.issues.get).not.toHaveBeenCalled();
+      expect(mockGithub.graphql).not.toHaveBeenCalled();
+    });
+
+    it.each([{ allowed_repos: ["other-org/other-repo"] }, { allowed_repos: ["other-org/*"] }, { allowed_repos: ["*"] }, { "target-repo": "*" }])("should link permitted temporary IDs with repository policy %j", async config => {
+      const { main } = require(path.join(process.cwd(), "link_sub_issue.cjs"));
+      const policyHandler = await main({ target: "*", ...config });
+      mockGithub.rest.issues.get.mockResolvedValueOnce({ data: { number: 100, title: "Parent", node_id: "I_parent", labels: [] } }).mockResolvedValueOnce({ data: { number: 50, title: "Child", node_id: "I_child", labels: [] } });
+      mockGithub.graphql.mockResolvedValueOnce({ repository: { issue: { parent: null } } }).mockResolvedValueOnce({});
+
+      const result = await policyHandler(
+        { repo: "testowner/testrepo", parent_issue_number: "aw_parent", sub_issue_number: "aw_child" },
+        { aw_parent: { repo: "other-org/other-repo", number: 100 }, aw_child: { repo: "other-org/other-repo", number: 50 } }
+      );
+      expect(result.success).toBe(true);
+      expect(mockGithub.rest.issues.get).toHaveBeenNthCalledWith(1, { owner: "other-org", repo: "other-repo", issue_number: 100 });
+      expect(mockGithub.rest.issues.get).toHaveBeenNthCalledWith(2, { owner: "other-org", repo: "other-repo", issue_number: 50 });
+      expect(mockGithub.graphql).toHaveBeenLastCalledWith(expect.stringContaining("addSubIssue"), { parentId: "I_parent", subIssueId: "I_child" });
+    });
+
+    it.each(["100", "triggering"])("should ignore a disallowed model parent for target %s", async target => {
+      mockContext.eventName = "issues";
+      mockContext.payload.issue = { number: 100 };
+      const { main } = require(path.join(process.cwd(), "link_sub_issue.cjs"));
+      const policyHandler = await main({ target });
+      mockGithub.rest.issues.get.mockResolvedValueOnce({ data: { number: 100, title: "Parent", node_id: "I_parent", labels: [] } }).mockResolvedValueOnce({ data: { number: 50, title: "Child", node_id: "I_child", labels: [] } });
+      mockGithub.graphql.mockResolvedValueOnce({ repository: { issue: { parent: null } } }).mockResolvedValueOnce({});
+
+      const result = await policyHandler({ parent_issue_number: "aw_parent", sub_issue_number: 50 }, { aw_parent: { repo: "other-org/other-repo", number: 999 } });
+      expect(result).toMatchObject({ success: true, parent_issue_number: 100 });
+      expect(mockGithub.rest.issues.get.mock.calls.every(([params]) => params.owner === "testowner" && params.repo === "testrepo")).toBe(true);
+      expect(mockGithub.graphql).toHaveBeenLastCalledWith(expect.stringContaining("addSubIssue"), { parentId: "I_parent", subIssueId: "I_child" });
+    });
+
     it("should fail when parent and sub temporary IDs resolve to different repos", async () => {
       const message = { type: "link_sub_issue", parent_issue_number: "aw_12345678", sub_issue_number: "aw_456789ab" };
 
@@ -282,9 +330,11 @@ const mockCore = {
       expect(mockGithub.graphql).not.toHaveBeenCalled();
     });
 
-    it("should reject a cross-repository sub-issue for a fixed parent target", async () => {
+    it.each(["100", "triggering"])("should reject a cross-repository sub-issue for parent target %s", async target => {
+      mockContext.eventName = "issues";
+      mockContext.payload.issue = { number: 100 };
       const { main } = require(path.join(process.cwd(), "link_sub_issue.cjs"));
-      const fixedTargetHandler = await main({ max: 5, target: "100" });
+      const fixedTargetHandler = await main({ max: 5, target });
       const resolvedIds = {
         aw_456789ab: { repo: "other-org/other-repo", number: 50 },
       };

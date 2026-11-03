@@ -200,8 +200,8 @@ describe("render_evals_summary.cjs", () => {
       const summary = mockCore.summary.addRaw.mock.calls[0][0];
       expect(summary).toContain("<summary>BinEval Results</summary>");
       expect(summary).toContain("**Evals did not run.**");
-      expect(summary).toContain("**Reason** (judge_not_started): The claude evals judge did not start");
-      expect(summary).toContain("**engine**: claude | **model**: evals");
+      expect(summary).toContain("**Reason** (judge_not_started): The Decisions evals judge did not start");
+      expect(summary).toContain("**engine**: decisions | **model**: evals");
       expect(summary).not.toContain("super-secret-value");
       expect(summary).not.toContain("❓ UNKNOWN");
       expect(summary).not.toContain("| ID | Question | Answer |");

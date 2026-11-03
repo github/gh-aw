@@ -49,3 +49,61 @@ func TestExperimentalWarningAccounting(t *testing.T) {
 	}
 
 }
+
+func TestStableSafeOutputsNoExperimentalWarning(t *testing.T) {
+	t.Parallel()
+	for _, batch := range []bool{false, true} {
+		compiler := NewCompiler()
+		compiler.SetBatchMode(batch)
+		data := &WorkflowData{
+			SafeOutputs: &SafeOutputsConfig{
+				DispatchRepository: &DispatchRepositoryConfig{},
+				ApproveWorkflowRun: &ApproveWorkflowRunConfig{},
+				ReplaceLabel:       &ReplaceLabelConfig{},
+				UploadCodeCoverage: &UploadCodeCoverageConfig{},
+			},
+		}
+		var output bytes.Buffer
+		compiler.emitExperimentalFeatureWarningsTo(data, &output)
+		assert.Empty(t, output.String(), "batch mode: %t", batch)
+		assert.Zero(t, compiler.GetWarningCount(), "batch mode: %t", batch)
+		assert.Zero(t, compiler.GetExperimentalWarningCount(), "batch mode: %t", batch)
+		assert.Empty(t, compiler.GetExperimentalFeatureUsage(), "batch mode: %t", batch)
+
+		data.SafeOutputs.Steer = true
+		compiler.emitExperimentalFeatureWarningsTo(data, &output)
+		assert.Equal(t, 1, compiler.GetWarningCount(), "batch mode: %t", batch)
+		assert.Equal(t, 1, compiler.GetExperimentalWarningCount(), "batch mode: %t", batch)
+		const warning = "Using experimental feature: safe-outputs steer"
+		if batch {
+			assert.Empty(t, output.String())
+			assert.Equal(t, map[string]int{warning: 1}, compiler.GetExperimentalFeatureUsage())
+		} else {
+			assert.Contains(t, output.String(), warning)
+			assert.Empty(t, compiler.GetExperimentalFeatureUsage())
+		}
+	}
+}
+
+func TestMergePullRequestExperimentalNoticeClassification(t *testing.T) {
+	t.Parallel()
+	for _, batch := range []bool{false, true} {
+		compiler := NewCompiler()
+		compiler.SetBatchMode(batch)
+		data := &WorkflowData{
+			SafeOutputs: &SafeOutputsConfig{MergePullRequest: &MergePullRequestConfig{}},
+		}
+		var output bytes.Buffer
+		compiler.emitExperimentalFeatureWarningsTo(data, &output)
+		assert.Equal(t, 1, compiler.GetWarningCount(), "batch mode: %t", batch)
+		assert.Equal(t, 1, compiler.GetExperimentalWarningCount(), "batch mode: %t", batch)
+		const warning = "Using experimental feature: merge-pull-request"
+		if batch {
+			assert.Empty(t, output.String())
+			assert.Equal(t, 1, compiler.GetExperimentalFeatureUsage()[warning])
+		} else {
+			assert.Contains(t, output.String(), warning)
+			assert.Empty(t, compiler.GetExperimentalFeatureUsage())
+		}
+	}
+}
