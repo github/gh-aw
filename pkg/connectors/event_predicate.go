@@ -15,6 +15,7 @@ import (
 
 const EventEvaluationVersion = "gh-aw/event-predicates/v1"
 const eventArrayLimit = 100
+const eventEvaluationLimit = 64 * eventArrayLimit
 
 var eventTimestampPattern = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,9})?(?:Z|[+-](?:0[0-9]|1[0-9]|2[0-3]):[0-5][0-9])$`)
 
@@ -133,11 +134,19 @@ func EvaluateEventPredicate(rule EventPredicate, document any) (matched, known b
 	if ValidateEventPredicate(rule) != nil {
 		return false, false
 	}
-	matched, known = evaluateEventPredicate(rule, document, document)
+	remaining := eventEvaluationLimit
+	matched, known = evaluateEventPredicate(rule, document, document, &remaining)
+	if remaining < 0 {
+		return false, false
+	}
 	return matched && known, known
 }
 
-func evaluateEventPredicate(rule EventPredicate, document, root any) (bool, bool) {
+func evaluateEventPredicate(rule EventPredicate, document, root any, remaining *int) (bool, bool) {
+	*remaining--
+	if *remaining < 0 {
+		return false, false
+	}
 	if len(rule.All)+len(rule.Any) != 0 {
 		unknown := false
 		children := rule.All
@@ -146,7 +155,10 @@ func evaluateEventPredicate(rule EventPredicate, document, root any) (bool, bool
 			children = rule.Any
 		}
 		for _, child := range children {
-			match, known := evaluateEventPredicate(child, document, root)
+			match, known := evaluateEventPredicate(child, document, root, remaining)
+			if *remaining < 0 {
+				return false, false
+			}
 			if known && match != all {
 				return !all, true
 			}
@@ -169,7 +181,7 @@ func evaluateEventPredicate(rule EventPredicate, document, root any) (bool, bool
 	}
 	other, found := lookupPointer(root, rule.Other)
 	if rule.Op == "any-item" {
-		return evaluateEventItems(rule, value, root)
+		return evaluateEventItems(rule, value, root, remaining)
 	}
 	return evaluateEventValue(rule, value, other, found)
 }
@@ -208,14 +220,17 @@ func evaluateEventValue(rule EventPredicate, value, other any, found bool) (bool
 	return evaluateEventChange(rule, value, other, found)
 }
 
-func evaluateEventItems(rule EventPredicate, value, root any) (bool, bool) {
+func evaluateEventItems(rule EventPredicate, value, root any, remaining *int) (bool, bool) {
 	array, ok := value.([]any)
 	if !ok || len(array) > eventArrayLimit {
 		return false, false
 	}
 	unknown := false
 	for _, item := range array {
-		match, known := evaluateEventPredicate(*rule.Items, item, root)
+		match, known := evaluateEventPredicate(*rule.Items, item, root, remaining)
+		if *remaining < 0 {
+			return false, false
+		}
 		if known && match {
 			return true, true
 		}

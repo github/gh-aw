@@ -104,7 +104,9 @@ remain external receiver responsibilities. Compilation is not receiver deploymen
 
 The evaluation contract is data-only: at most 64 predicate nodes and depth 6,
 100 array items or membership values, 16 named filters, and four payload
-variants. Equality uses typed primitive values; integer comparisons are bounded
+variants. Each predicate evaluation permits at most 6,400 node visits across
+all nested item rules; exhausting that budget makes the entire evaluation
+unknown and nonmatching. Equality uses typed primitive values; integer comparisons are bounded
 to safe integers. `all`/`any` groups combine presence/absence, explicit null,
 nonblank text, RFC3339 timestamps, changed values, terminal-set entry/exit,
 array/string-set addition/removal, array length, and bounded `any-item` rules.
