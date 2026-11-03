@@ -62,8 +62,13 @@ func TestAWConnectorDefinitionsAreImportableButNotTriggers(t *testing.T) {
 	config := map[string]any{
 		"endpoints":   map[string]any{"api": "https://api.example.com"},
 		"credentials": map[string]any{},
-		"triggers":    map[string]any{"issue-created": map[string]any{}},
-		"tools":       map[string]any{"get-issue": map[string]any{}},
+		"triggers": map[string]any{"issue-created": map[string]any{
+			"verificationProfile": "example.com/hmac",
+			"nativeEvents":        []any{"issue.created"},
+			"match":               map[string]any{"/event": "issue.created"},
+			"normalize":           map[string]any{"subject": "/issue/id"},
+		}},
+		"tools": map[string]any{"get-issue": map[string]any{}},
 		"safe-outputs": map[string]any{
 			"add-comment": map[string]any{},
 		},
