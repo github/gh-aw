@@ -1509,9 +1509,21 @@ connectors:
         checks: ${{ github.aw.import-inputs.write-checks }}
         createdResources: *azure-work-item-created-resources
         inputs: &azure-clear-inputs
-          organization: *azure-rich-organization
-          project: *azure-rich-project
-          work-item: *azure-rich-item
+          organization:
+            maxLength: 64
+            pattern: ^[A-Za-z0-9][A-Za-z0-9-]*$
+            required: true
+            type: string
+          project:
+            maxLength: 36
+            pattern: ^[0-9a-f-]{36}$
+            required: true
+            type: string
+          work-item:
+            maxLength: 16
+            pattern: ^[1-9][0-9]{0,9}$
+            required: true
+            type: string
         resources: *azure-rich-item-resources
         request:
           endpoint: api
