@@ -588,6 +588,10 @@ func updateManifestManagedWorkflow(ctx context.Context, update manifestManagedWo
 			return fmt.Errorf("workflow '%s' has %d security scan issue(s); review the findings and resolve them before updating, or pass --no-security-scanner to skip this check", update.wf.Name, len(findings))
 		}
 	}
+	if hasConflicts && !opts.NoCompile {
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not update %s from %s to %s due to CONFLICTS - leaving the existing workflow unchanged; please review and resolve manually", update.wf.Name, shortRef(update.currentRef), shortRef(update.latestRef))))
+		return nil
+	}
 
 	if err := fetchManifestManagedDependencies(ctx, newContent, update.repo, update.latestPath, update.latestRef, filepath.Dir(update.wf.Path), opts.Verbose); err != nil {
 		return fmt.Errorf("unable to update workflow dependencies: %w", err)

@@ -438,6 +438,47 @@ func TestUpdateManifestManagedWorkflowPreservesFrontmatterConflicts(t *testing.T
 	assert.Contains(t, string(updated), "source: owner/repo@v2.0.0")
 }
 
+func TestUpdateManifestManagedWorkflowLeavesConflictsUntouchedWhenCompiling(t *testing.T) {
+	originalDownload := downloadWorkflowContentFn
+	t.Cleanup(func() { downloadWorkflowContentFn = originalDownload })
+	downloadWorkflowContentFn = func(_ context.Context, repo, path, ref string, _ bool) ([]byte, error) {
+		if repo != "owner/repo" || path != "workflows/conflict.md" {
+			return nil, fmt.Errorf("unexpected workflow download %s/%s@%s", repo, path, ref)
+		}
+		switch ref {
+		case "v1.0.0":
+			return []byte("---\ntools:\n  bash: [\"echo base\"]\n---\n\n# Workflow\n"), nil
+		case "v2.0.0":
+			return []byte("---\ntools:\n  bash: [\"echo upstream\"]\n---\n\n# Workflow\n"), nil
+		default:
+			return nil, fmt.Errorf("unexpected workflow ref %s", ref)
+		}
+	}
+
+	tmpDir := testutil.TempDir(t, "manifest-conflict-preserve-*")
+	workflowPath := filepath.Join(tmpDir, "conflict.md")
+	original := "---\ntools:\n  bash: [\"echo local\"]\nsource: owner/repo@v1.0.0\n---\n\n# Workflow\n"
+	require.NoError(t, os.WriteFile(workflowPath, []byte(original), 0o644))
+
+	err := updateManifestManagedWorkflow(context.Background(), manifestManagedWorkflowUpdate{
+		wf:             &workflowWithSource{Name: "conflict", Path: workflowPath},
+		repo:           "owner/repo",
+		currentPath:    "workflows/conflict.md",
+		latestPath:     "workflows/conflict.md",
+		currentRef:     "v1.0.0",
+		latestRef:      "v2.0.0",
+		manifestSource: "owner/repo@v2.0.0",
+	}, UpdateWorkflowsOptions{
+		DisableSecurityScanner: true,
+	})
+	require.NoError(t, err)
+
+	updated, err := os.ReadFile(workflowPath)
+	require.NoError(t, err)
+	assert.Equal(t, original, string(updated))
+	assert.NotContains(t, string(updated), "<<<<<<<")
+}
+
 func TestUpdateManifestWorkflowGroup_AddsUpdatesRemoves(t *testing.T) {
 	originalResolveLatestRef := resolveLatestRefFn
 	originalDownloadPackage := downloadPackageFileFromGitHubForHost
