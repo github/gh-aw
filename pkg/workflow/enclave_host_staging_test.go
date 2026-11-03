@@ -336,7 +336,11 @@ func TestDockerEnclaveInstallationWrapperReleaseBoundary(t *testing.T) {
 			assert.NotContains(t, GetAWFCommandPrefix(data), "sudo")
 			if tc.helper {
 				assert.Contains(t, setup, "enclave-storage-helper.py probe")
-				assert.Contains(t, setup, "AWF_HELPER_VERSION: "+string(constants.AWFDockerEnclaveSetupMinVersion))
+				expectedVersion := tc.version
+				if expectedVersion == "" {
+					expectedVersion = string(constants.DefaultFirewallVersion)
+				}
+				assert.Contains(t, setup, "AWF_HELPER_VERSION: "+expectedVersion)
 			} else {
 				assert.NotContains(t, setup, "enclave-storage-helper.py")
 			}
