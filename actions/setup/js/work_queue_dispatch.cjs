@@ -5,6 +5,7 @@ const { workExpired } = require("./work_queue_expiration.cjs");
 const { SAFE_OUTPUT_E001 } = require("./error_codes.cjs");
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("dispatch");
 const { queueControlErrorCode, queueControlErrorExplanation } = require("./work_queue_logging.cjs");
+const { observeQueueOperation } = require("./work_queue_telemetry.cjs");
 
 const { canonical, closed, digest, integer, queueError } = require("./work_queue_codec.cjs");
 const { actorFromContext, dispatchPrincipal, policyForAcceptedRequest } = require("./work_queue_policy.cjs");
@@ -245,6 +246,10 @@ async function verifyLaunchedRun(options, expected, policy) {
 }
 
 async function launchAssignment(options, supplied) {
+  return observeQueueOperation("dispatch", options, () => launchAssignmentImpl(options, supplied));
+}
+
+async function launchAssignmentImpl(options, supplied) {
   log.debug("launch.start");
   assertQueueControlRole(options);
   let latest = await loadQueue(options);
