@@ -327,7 +327,7 @@ safe-outputs:
     - "!inference_access_error"
 ```
 
-Common categories include `agent_failure`, `timed_out`, `missing_safe_outputs`, `report_incomplete`, `missing_tool`, `missing_data`, `inference_access_error`, `copilot_org_billing_error`, and `ai_credits_rate_limit_error`. See [Safe Outputs Reference](/gh-aw/reference/safe-outputs/) for the full list.
+Common categories include `agent_failure`, `activation_failed`, `timed_out`, `missing_safe_outputs`, `report_incomplete`, `missing_tool`, `missing_data`, `inference_access_error`, `copilot_org_billing_error`, and `ai_credits_rate_limit_error`. See [Safe Outputs Reference](/gh-aw/reference/safe-outputs/) for the full list.
 
 ### Report Failed Jobs (`report-failed-jobs:`)
 

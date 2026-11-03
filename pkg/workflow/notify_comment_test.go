@@ -11,6 +11,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUsageActivityGenerationIncludesJobResults(t *testing.T) {
@@ -288,6 +289,34 @@ func TestConclusionJobRunsForSkillInstallFailures(t *testing.T) {
 		!strings.Contains(condition, "needs.activation.outputs.skill_install_failure_count != '0'") {
 		t.Errorf("Expected conclusion condition to include skill installation failures, got: %q", condition)
 	}
+}
+
+func TestConclusionJobRunsForActivationFailuresButNotSkippedActivation(t *testing.T) {
+	compiler := NewCompiler()
+	data := &WorkflowData{SafeOutputs: &SafeOutputsConfig{}}
+
+	job, err := compiler.buildConclusionJob(data, string(constants.AgentJobName), nil)
+	require.NoError(t, err)
+	assert.Contains(t, job.If, "needs.activation.result == 'failure'")
+	assert.NotContains(t, job.If, "needs.activation.result != 'skipped'")
+
+	condition := RenderCondition(compiler.buildConclusionJobCondition(data, string(constants.AgentJobName), nil))
+	assert.Contains(t, condition, "needs.agent.result != 'skipped' ||")
+	assert.Contains(t, condition, "needs.activation.result == 'failure'")
+}
+
+func TestConclusionHandlerReceivesActivationResult(t *testing.T) {
+	compiler := NewCompiler()
+	data := &WorkflowData{
+		SafeOutputs: &SafeOutputsConfig{
+			NoOp: &NoOpConfig{},
+		},
+	}
+
+	expected := "GH_AW_ACTIVATION_RESULT: ${{ needs.activation.result }}"
+	coreVars, _, err := compiler.buildAgentFailureCoreVars(data, string(constants.AgentJobName))
+	require.NoError(t, err)
+	assert.Contains(t, strings.Join(coreVars, ""), expected)
 }
 
 func TestDefaultCheckoutUsesTriggerRef(t *testing.T) {
