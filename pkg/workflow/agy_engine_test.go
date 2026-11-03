@@ -335,6 +335,9 @@ func TestAgyProductionConformancePermissionsAreBoundedAndScoped(t *testing.T) {
 			}
 			for name, config := range callee.Jobs {
 				allowedPermissions := map[string]string{"actions": "read", "contents": "read"}
+				if entry.id == "smoke-agy" && name == "push_evals_state" {
+					allowedPermissions = map[string]string{"contents": "write"}
+				}
 				if name == string(constants.ConclusionAdmissionJobName) {
 					allowedPermissions = map[string]string{"contents": "read", "id-token": "write"}
 				}
@@ -498,6 +501,21 @@ func TestAgyConformanceEntryPointsShareConfiguration(t *testing.T) {
 			delete(source, "max-ai-credits")
 			delete(source, "imports")
 			delete(source, "tools")
+			if entry.id == "smoke-agy" {
+				evals, ok := source["evals"].([]any)
+				require.True(t, ok)
+				require.Len(t, evals, 3)
+				for index, expectedID := range []string{
+					"native_challenge_transport",
+					"native_infrastructure_transport",
+					"native_completion",
+				} {
+					eval, ok := evals[index].(map[string]any)
+					require.True(t, ok)
+					assert.Equal(t, expectedID, eval["id"])
+				}
+				delete(source, "evals")
+			}
 			delete(source, "evals")
 			assert.Equal(t, canonical, source, "all compilation paths must retain identical gate configuration")
 		})

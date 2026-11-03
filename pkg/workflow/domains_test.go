@@ -102,11 +102,16 @@ func TestGetDomainEcosystem(t *testing.T) {
 			domain:   "dl.google.com",
 			expected: "java",
 		},
-		// Defaults ecosystem takes priority over chrome for packages.cloud.google.com
+		// Linux package repositories take priority over chrome for packages.cloud.google.com
 		{
-			name:     "defaults ecosystem - packages.cloud.google.com (not chrome)",
+			name:     "linux-distros ecosystem - packages.cloud.google.com (not chrome)",
 			domain:   "packages.cloud.google.com",
-			expected: "defaults",
+			expected: "linux-distros",
+		},
+		{
+			name:     "chrome ecosystem - www.googleapis.com (not defaults)",
+			domain:   "www.googleapis.com",
+			expected: "chrome",
 		},
 
 		// Deno ecosystem

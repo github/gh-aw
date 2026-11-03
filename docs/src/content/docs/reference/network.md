@@ -7,7 +7,7 @@ sidebar:
 
 Control network access for AI engines using the top-level `network` field to specify which domains and services your agentic workflows can access during execution. Supported by all four engines (Copilot, Claude, Codex, Gemini) via the AWF firewall.
 
-If no `network:` permission is specified, it defaults to `network: defaults`, which allows basic infrastructure domains (certificates, JSON schema, Ubuntu, common package mirrors, Microsoft sources).
+If no `network:` permission is specified, it defaults to `network: defaults`, which allows only certificate validation, JSON schema, and stock Ubuntu archive/keyserver hosts. The [complete baseline](#defaults-baseline) lists every allowed host.
 
 > [!TIP]
 > New to network configuration? See the [Network Configuration Guide](/gh-aw/guides/network-configuration/) for practical examples and troubleshooting tips.
@@ -92,13 +92,13 @@ Mix ecosystem identifiers with specific domains for fine-grained control:
 
 | Identifier | Includes |
 |------------|----------|
-| `defaults` | Basic infrastructure (certificates, JSON schema, Ubuntu, package mirrors) |
+| `defaults` | Certificate validation, JSON schema, and stock Ubuntu archive/keyserver hosts ([complete list](#defaults-baseline)) |
 | `github` | GitHub domains (`github.com`, `docs.github.com`, `github.blog`, `*.githubusercontent.com`, and related) |
 | `local` | Loopback addresses (`localhost`, `127.0.0.1`, `::1`) |
 | `dev-tools` | Popular CI/CD and developer tool services (Codecov, Shields.io, Snyk, Renovate, CircleCI, etc.) |
 | `default-safe-outputs` | Compound: `defaults` + `dev-tools` + `github` + `local` — recommended baseline for `safe-outputs.allowed-domains` |
 | `containers` | Docker Hub, GitHub Container Registry, Quay, GCR, MCR |
-| `linux-distros` | Debian, Ubuntu, Alpine, Fedora, and other Linux package repositories |
+| `linux-distros` | Linux distribution and third-party package sources, including Launchpad PPAs, packagecloud, Snap, Google, and Microsoft repositories — explicit opt-in |
 | `playwright` | Playwright browser testing (see [Playwright Reference](/gh-aw/reference/playwright/)) |
 | `chrome` | Headless Chrome/Puppeteer (`*.google.com`, `*.googleapis.com`, `*.gvt1.com`) |
 | `fonts` | Google Fonts (`fonts.googleapis.com`, `fonts.gstatic.com`) |
@@ -140,6 +140,27 @@ Mix ecosystem identifiers with specific domains for fine-grained control:
 | `scala` | Scala packages (`repo.scala-sbt.org`, `jitpack.io`) |
 | `swift` | Swift packages (`swift.org`, `cocoapods.org`) |
 | `zig` | Zig packages (`ziglang.org`) |
+
+### Defaults baseline
+
+`defaults` contains exactly these entries. Each also allows its subdomains:
+
+| Purpose | Hosts |
+|---------|-------|
+| Certificate validation | `crl3.digicert.com`, `crl4.digicert.com`, `ocsp.digicert.com`, `ts-crl.ws.symantec.com`, `ts-ocsp.ws.symantec.com`, `crl.geotrust.com`, `ocsp.geotrust.com`, `crl.thawte.com`, `ocsp.thawte.com`, `crl.verisign.com`, `ocsp.verisign.com`, `crl.globalsign.com`, `ocsp.globalsign.com`, `crls.ssl.com`, `ocsp.ssl.com`, `crl.identrust.com`, `ocsp.identrust.com`, `crl.sectigo.com`, `ocsp.sectigo.com`, `crl.usertrust.com`, `ocsp.usertrust.com`, `s.symcb.com`, `s.symcd.com` |
+| JSON schema | `json-schema.org`, `json.schemastore.org` |
+| Stock Ubuntu archives and keyserver | `archive.ubuntu.com`, `security.ubuntu.com`, `keyserver.ubuntu.com`, `azure.archive.ubuntu.com` |
+
+Third-party package sources (`ppa.launchpad.net`, `packagecloud.io`, `api.snapcraft.io`, `packages.cloud.google.com`, `packages.microsoft.com`) require an explicit `linux-distros` opt-in or individual entries in `network.allowed`. For example:
+
+```yaml
+network:
+  allowed:
+    - defaults
+    - linux-distros
+```
+
+`www.googleapis.com` is not part of `defaults`. Workflows that need it must allow it explicitly or opt into an ecosystem that includes it, such as `chrome`.
 
 ## Engine Domain Sets
 
