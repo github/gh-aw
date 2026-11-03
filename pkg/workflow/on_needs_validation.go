@@ -332,11 +332,10 @@ func isReservedOnNeedsTarget(jobName string) bool {
 		string(constants.SafeOutputsJobName),
 		"safe-outputs",
 		string(constants.DetectionJobName),
-		string(constants.UnlockJobName),
-		"push_repo_memory",
-		"update_cache_memory":
+		string(constants.UnlockJobName):
 		return true
 	default:
-		return false
+		_, maintenance := constants.MaintenanceJobDependencies[jobName]
+		return maintenance
 	}
 }
