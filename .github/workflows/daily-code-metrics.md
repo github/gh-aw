@@ -240,9 +240,9 @@ Weighted average: test coverage (30%), code organization (25%), documentation (2
 
 ### Discussion Format
 
-Use `###` or lower headers and keep the summary and critical actions visible. Put long detail in `<details>` blocks. Structure the report as overview → key metrics/issues → collapsible detail → next actions.
-
 **Title**: `Daily Code Metrics Report - YYYY-MM-DD`
+
+Read `GH_AW_EXPERIMENTS_OUTPUT_FORMAT` and use only its matching template below: `executive_summary`, `ste`, or `full_detail`. If it is unset, use `full_detail`. Ignore the other templates and their conditional tags.
 
 ```markdown
 {{#if experiments.output_format == 'executive_summary' }}

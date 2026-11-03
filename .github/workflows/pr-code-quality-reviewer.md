@@ -201,6 +201,14 @@ Rules:
 - Prioritize correctness, security, race conditions, error handling, and perf regressions; be very critical and risk-focused.
 - Ignore nits unless they materially increase bug risk.
 
+Output format (strict):
+- Return JSONL only, one finding per line.
+- Fields: `path`, `line`, `severity`, `headline`, `impact`, `fix`.
+- `path` must be a repository-relative file path from the diff.
+- `line` must be an integer line number in the changed hunk.
+- `severity` must be one of: `critical`, `high`, `medium`, `low`.
+- Keep `headline` to one sentence; keep `impact` and `fix` concise and concrete.
+
 ## skill: `review-publication`
 ---
 description: Publish adjudicated PR review comments and the single overall review through safe outputs.
@@ -237,11 +245,3 @@ Set `event` to `COMMENT` when there are no actionable blocking issues and `REQUE
 If publication is denied, distinguish an unavailable CLI from an unallowed command or file write. Make at most one corrected `printf` pipeline attempt without widening permissions, then emit `report_incomplete` with the concrete blocker; do not call `noop` or claim publication. If an inline-comment publication fails, stop publishing further comments and follow the same recovery path. If no transport can run, state that no terminal safe output was emitted.
 
 After successful submission, publication is closed: do not add corrective comments, submit another review, or emit `report_incomplete` because of late specialist output.
-
-Output format (strict):
-- Return JSONL only, one finding per line.
-- Fields: `path`, `line`, `severity`, `headline`, `impact`, `fix`.
-- `path` must be a repository-relative file path from the diff.
-- `line` must be an integer line number in the changed hunk.
-- `severity` must be one of: `critical`, `high`, `medium`, `low`.
-- Keep `headline` to one sentence; keep `impact` and `fix` concise and concrete.
