@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/sliceutil"
 	"github.com/github/gh-aw/pkg/stringutil"
 )
 
@@ -141,6 +142,18 @@ func collectSampleEntries(config *SafeOutputsConfig) []SampleEntry {
 				Tool:      toolName,
 				Arguments: args,
 				Sidecars:  sidecars,
+			})
+		}
+	}
+	for _, name := range sliceutil.SortedKeys(config.Scripts) {
+		script := config.Scripts[name]
+		if script == nil || script.connectorOptions == nil {
+			continue
+		}
+		for _, sample := range script.connectorOptions.Samples {
+			entries = append(entries, SampleEntry{
+				Tool:      stringutil.NormalizeSafeOutputIdentifier(name),
+				Arguments: maps.Clone(sample),
 			})
 		}
 	}
@@ -350,6 +363,11 @@ func safeOutputsMissingSamples(config *SafeOutputsConfig) []string {
 			continue
 		}
 		keys = append(keys, toolDisplayKey(handler.Key))
+	}
+	for name, script := range config.Scripts {
+		if script != nil && script.connectorOptions != nil && len(script.connectorOptions.Samples) == 0 {
+			keys = append(keys, name)
+		}
 	}
 	sort.Strings(keys)
 	return keys

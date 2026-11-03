@@ -19,10 +19,11 @@ const (
 	connectorMaximumMax = 100
 )
 
-// ConnectorOperationOptions are workflow-owned delivery controls, never agent inputs.
+// ConnectorOperationOptions holds workflow-owned delivery controls and replay data.
 type ConnectorOperationOptions struct {
-	Max    int              `json:"max"`
-	Staged *TemplatableBool `json:"staged,omitempty"`
+	Max     int              `json:"max"`
+	Staged  *TemplatableBool `json:"staged,omitempty"`
+	Samples []map[string]any `json:"samples,omitempty"`
 }
 
 func parseConnectorOperationOptions(value any) (ConnectorOperationOptions, error) {
@@ -32,7 +33,7 @@ func parseConnectorOperationOptions(value any) (ConnectorOperationOptions, error
 	}
 	fields, ok := value.(map[string]any)
 	if !ok {
-		return options, errors.New("connector operation options must be null or an object containing max and staged")
+		return options, errors.New("connector operation options must be null or an object containing max, staged and samples")
 	}
 	for _, name := range sliceutil.SortedKeys(fields) {
 		switch name {
@@ -57,8 +58,22 @@ func parseConnectorOperationOptions(value any) (ConnectorOperationOptions, error
 				return options, fmt.Errorf("staged must be a boolean or GitHub Actions expression: %w", err)
 			}
 			options.Staged = &staged
+		case "samples":
+			samples := fields[name]
+			switch value := samples.(type) {
+			case map[string]any:
+			case []any:
+				for _, item := range value {
+					if _, ok := item.(map[string]any); !ok {
+						return options, errors.New("samples must be an object or an array of objects")
+					}
+				}
+			default:
+				return options, errors.New("samples must be an object or an array of objects")
+			}
+			options.Samples = parseSamplesValue(samples)
 		default:
-			return options, fmt.Errorf("unknown connector operation option %q; allowed options are max and staged", name)
+			return options, fmt.Errorf("unknown connector operation option %q; allowed options are max, staged and samples", name)
 		}
 	}
 	return options, nil
