@@ -1,6 +1,7 @@
 // @ts-check
 
 const EVENT_EVALUATION_VERSION = "gh-aw/event-predicates/v1";
+const EVENT_EVALUATION_LIMIT = 64 * 100;
 const object = value => value !== null && typeof value === "object" && !Array.isArray(value);
 const pointer = value => typeof value === "string" && Buffer.byteLength(value) <= 1024 && /^\/(?:[^~]|~[01])*$/.test(value);
 const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
@@ -64,13 +65,16 @@ function lookup(document, path) {
 function evaluateEventPredicate(rule, document) {
   if (!validEventPredicate(rule)) return { matched: false, known: false };
   const root = document;
+  let remaining = EVENT_EVALUATION_LIMIT;
   const result = (matched, known = true) => ({ matched: matched && known, known });
   const visit = (node, current) => {
+    if (--remaining < 0) return result(false, false);
     if (node.all || node.any) {
       const all = !!node.all;
       let unknown = false;
       for (const child of node.all || node.any) {
         const value = visit(child, current);
+        if (remaining < 0) return result(false, false);
         if (value.known && value.matched !== all) return result(!all);
         unknown ||= !value.known;
       }
@@ -101,6 +105,7 @@ function evaluateEventPredicate(rule, document) {
         let unknown = false;
         for (const item of actual) {
           const value = visit(node.items, item);
+          if (remaining < 0) return result(false, false);
           if (value.known && value.matched) return result(true);
           unknown ||= !value.known;
         }
@@ -111,8 +116,9 @@ function evaluateEventPredicate(rule, document) {
       case "enters":
       case "leaves": {
         if (!other.present || typeof actual !== "string" || typeof other.value !== "string") return result(false, false);
-        const before = node.values.includes(other.value);
-        const after = node.values.includes(actual);
+        const values = node.values || [];
+        const before = values.includes(other.value);
+        const after = values.includes(actual);
         return result(node.op === "enters" ? !before && after : before && !after);
       }
       case "set-added":
@@ -126,7 +132,8 @@ function evaluateEventPredicate(rule, document) {
     }
     return result(false, false);
   };
-  return visit(rule, document);
+  const evaluated = visit(rule, document);
+  return remaining < 0 ? result(false, false) : evaluated;
 }
 
 function validTimestamp(value) {

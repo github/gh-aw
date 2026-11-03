@@ -14,6 +14,11 @@ import (
 func TestEventPredicateConformance(t *testing.T) {
 	data, err := os.ReadFile("testdata/event-predicates.json")
 	require.NoError(t, err)
+	checkEventPredicateConformance(t, data)
+}
+
+func checkEventPredicateConformance(t *testing.T, data []byte) {
+	t.Helper()
 	var cases []struct {
 		Name    string
 		Rule    EventPredicate
@@ -43,6 +48,34 @@ for (const test of cases) {
 	command.Stdin = strings.NewReader(string(data))
 	output, err := command.CombinedOutput()
 	require.NoError(t, err, "%s", output)
+}
+
+func TestEventPredicateEvaluationBudget(t *testing.T) {
+	rule := EventPredicate{Path: "/match", Root: true, Op: "equals", Value: "yes"}
+	for range 3 {
+		child := rule
+		rule = EventPredicate{Path: "/items", Root: true, Op: "any-item", Items: &child}
+	}
+	payload := map[string]any{"items": make([]any, eventArrayLimit), "match": "no"}
+	cases := []map[string]any{
+		{"name": "nested root arrays exhaust the shared budget", "rule": rule, "payload": payload, "matched": false, "known": false},
+		{"name": "later alternative cannot override exhaustion", "rule": EventPredicate{Any: []EventPredicate{rule, {Path: "/match", Op: "equals", Value: "no"}}}, "payload": payload, "matched": false, "known": false},
+		{"name": "later conjunction cannot override exhaustion", "rule": EventPredicate{All: []EventPredicate{rule, {Path: "/match", Op: "equals", Value: "yes"}}}, "payload": payload, "matched": false, "known": false},
+	}
+	data, err := json.Marshal(cases)
+	require.NoError(t, err)
+	checkEventPredicateConformance(t, data)
+
+	remaining := 1
+	leaf := EventPredicate{Path: "/match", Op: "equals", Value: "no"}
+	matched, known := evaluateEventPredicate(leaf, payload, payload, &remaining)
+	require.True(t, matched)
+	require.True(t, known)
+	require.Zero(t, remaining)
+	matched, known = evaluateEventPredicate(leaf, payload, payload, &remaining)
+	require.False(t, matched)
+	require.False(t, known)
+	require.Equal(t, -1, remaining)
 }
 
 func TestEventPredicateBoundsAndValidation(t *testing.T) {

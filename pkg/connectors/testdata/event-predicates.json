@@ -32,6 +32,8 @@
   { "name": "terminal entry", "rule": { "path": "/new", "other": "/old", "op": "enters", "values": ["Done", "Closed"] }, "payload": { "old": "Active", "new": "Done" }, "matched": true, "known": true },
   { "name": "terminal-to-terminal is not close", "rule": { "path": "/new", "other": "/old", "op": "enters", "values": ["Done", "Closed"] }, "payload": { "old": "Closed", "new": "Done" }, "matched": false, "known": true },
   { "name": "terminal exit", "rule": { "path": "/new", "other": "/old", "op": "leaves", "values": ["Done"] }, "payload": { "old": "Done", "new": "Active" }, "matched": true, "known": true },
+  { "name": "unconfigured terminal entry", "rule": { "path": "/new", "other": "/old", "op": "enters" }, "payload": { "old": "Active", "new": "Done" }, "matched": false, "known": true },
+  { "name": "empty terminal exit", "rule": { "path": "/new", "other": "/old", "op": "leaves", "values": [] }, "payload": { "old": "Done", "new": "Active" }, "matched": false, "known": true },
   { "name": "missing old state", "rule": { "path": "/new", "other": "/old", "op": "enters", "values": ["Done"] }, "payload": { "new": "Done" }, "matched": false, "known": false },
   { "name": "label addition", "rule": { "path": "/new", "other": "/old", "op": "set-added" }, "payload": { "old": ["a"], "new": ["a", "b"] }, "matched": true, "known": true },
   { "name": "set order duplicates irrelevant", "rule": { "path": "/new", "other": "/old", "op": "set-added" }, "payload": { "old": ["a", "b"], "new": ["b", "a", "a"] }, "matched": false, "known": true },
