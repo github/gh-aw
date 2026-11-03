@@ -335,3 +335,6 @@
 
 ## Update — 2026-10-23 (Workflow Health Manager)
 - Removed stale attribution to #70777 (closed, metric unchanged). Re-diagnose: smoke-claude safe_outputs shows OTLP 401 and digest-mismatch; see new tracker.
+
+## Update — 2026-11-03 (Workflow Health Manager)
+- STALE: PR #72940 merged but 1-run failures persist; do not cite it as pending fix.

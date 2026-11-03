@@ -1,4 +1,4 @@
-# Workflow Health — 2026-11-02T04:30Z
-- Metrics partial (24h, 460 runs, 120 wf); 42/118 executed wf had a failed run, mostly 1-run samples (overall success 63.8%). compile output clean.
-- Failures already tracked by per-workflow `[aw] ... failed` issues (e.g. #73926, #73907, #73735, #73862 smoke startup failures on branch copilot/fix-agent-config-folder-permissions, PR #72940). No new issue; no dashboard.
-- Prior tracking: #70975, #71513, #69801.
+# Workflow Health — 2026-11-03T04:30Z
+- Metrics complete (24h). Top-20 failing list is all 1-run samples (0% success); compile output clean.
+- Note: PR #72940 (cited as pending fix for smoke startup failures) is MERGED; failures like ab-testing-advisor (runs 2026-11-01/02) persist, so that attribution is stale. Run logs unreadable from this sandbox; re-diagnose next run. Failures remain tracked by per-workflow `[aw] ... failed` issues.
+- No new issue, no dashboard (no material delta).
