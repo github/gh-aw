@@ -7,7 +7,7 @@ import { main as createActionHandler } from "./safe_output_action_handler.cjs";
 import { buildSafeOutputOutcomes, projectSafeOutputData } from "./safe_output_outcomes.cjs";
 import { createSessionValidator } from "./scripts/validate_session.cjs";
 
-const id = index => `so_${String(index).padStart(22, "0")}`;
+const id = index => `so_${String(index).padStart(12, "0")}`;
 const message = (index, dependencies, type = "add_comment") => ({
   type,
   output_id: id(index),

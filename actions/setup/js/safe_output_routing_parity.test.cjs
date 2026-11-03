@@ -5,7 +5,7 @@ import { createRequire } from "node:module";
 import { execFileSync } from "node:child_process";
 
 const require = createRequire(import.meta.url);
-const outputId = expect.stringMatching(/^so_[A-Za-z0-9_-]{22}$/);
+const outputId = expect.stringMatching(/^so_[A-Za-z0-9_-]{12}$/);
 const root = fs.mkdtempSync(path.join(process.cwd(), ".safe-output-routing-parity-"));
 // Redirect the manager's fixed artifact destinations without changing runtime defaults.
 const constants = require("./constants.cjs");

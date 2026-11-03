@@ -4,9 +4,9 @@ import { createHandlers } from "./safe_outputs_handlers.cjs";
 import { validateItem } from "./safe_output_type_validator.cjs";
 import { processMessages } from "./safe_output_handler_manager.cjs";
 
-const outputIdPattern = /^so_[A-Za-z0-9_-]{22}$/;
-const firstDependency = "so_AAAAAAAAAAAAAAAAAAAAAA";
-const secondDependency = "so_BBBBBBBBBBBBBBBBBBBBBB";
+const outputIdPattern = /^so_[A-Za-z0-9_-]{12}$/;
+const firstDependency = "so_AAAAAAAAAAAA";
+const secondDependency = "so_BBBBBBBBBBBB";
 const success = () => ({ content: [{ type: "text", text: JSON.stringify({ result: "success" }) }] });
 const payload = response => JSON.parse(response.content[0].text);
 

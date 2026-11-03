@@ -60,7 +60,7 @@ available in the workflow's runtime.
 ## Output Dependencies
 
 Each recorded safe-output call returns a unique, compact URL-safe `output_id`,
-such as `so_AbCdEf0123456789_-AbCd`. This identifies the queued operation,
+such as `so_AbCdEf012345`. This identifies the queued operation,
 not a created issue or pull request. It is distinct from `temporary_id` (`aw_…`),
 which remains the mechanism for referencing newly created resources.
 
@@ -72,7 +72,7 @@ dependent operation runs. For example, after a call returns the identifier above
 {
   "item_number": 123,
   "body": "The prerequisite update completed.",
-  "depends-on": "so_AbCdEf0123456789_-AbCd"
+  "depends-on": "so_AbCdEf012345"
 }
 ```
 

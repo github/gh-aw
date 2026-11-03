@@ -3,7 +3,7 @@
 const { AsyncLocalStorage } = require("node:async_hooks");
 const { randomUUID } = require("node:crypto");
 
-const OUTPUT_ID_PATTERN = "^so_[A-Za-z0-9_-]{22}$";
+const OUTPUT_ID_PATTERN = "^so_[A-Za-z0-9_-]{12}$";
 const outputIdRegex = new RegExp(OUTPUT_ID_PATTERN);
 const DELEGATED_TYPES = new Set(["upload_asset", "noop"]);
 
@@ -96,7 +96,7 @@ function createSubmissionTracker() {
     if (dependency !== undefined && DELEGATED_TYPES.has(entry.type)) {
       throw new Error(`depends-on is not supported for ${entry.type}, which executes outside the safe-output handler manager.`);
     }
-    const outputId = `so_${Buffer.from(randomUUID().replace(/-/g, ""), "hex").toString("base64url")}`;
+    const outputId = `so_${Buffer.from(randomUUID().replace(/-/g, ""), "hex").toString("base64url").slice(0, 12)}`;
     const recorded = { ...entry, output_id: outputId };
     delete recorded.depends_on;
     if (dependency !== undefined) recorded["depends-on"] = dependency;

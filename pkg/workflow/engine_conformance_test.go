@@ -207,7 +207,8 @@ async function execute(file_nonce) {
   };
   if (assignment) withClaimExecution({ assignment, claim_handle: assignment.claims[0].handle }, emit);
   else emit();
-  const noop = JSON.parse(fs.readFileSync(process.env.CONFORMANCE_SAFE_OUTPUTS, "utf8"));
+  const { output_id: outputId, ...noop } = JSON.parse(fs.readFileSync(process.env.CONFORMANCE_SAFE_OUTPUTS, "utf8"));
+  require("node:assert/strict").match(outputId, /^so_[A-Za-z0-9_-]{12}$/);
   require("node:assert/strict").deepEqual(noop, {
     type: "noop", message: "Conformance probes completed",
     ...(assignment && { claim_handle: assignment.claims[0].handle }),
