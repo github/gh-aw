@@ -68,10 +68,10 @@
       "version": "v9.0.0",
       "sha": "3a2844b7e9c422d3c10d287c895573f7108da1b3"
     },
-    "actions/setup-dotnet@v6.0.0": {
+    "actions/setup-dotnet@v6.1.0": {
       "repo": "actions/setup-dotnet",
-      "version": "v6.0.0",
-      "sha": "a98b56852c35b8e3190ac28c8c2271da59106c68"
+      "version": "v6.1.0",
+      "sha": "0f4a354dd5547a28c70b7853dbd95d5b67886e73"
     },
     "actions/setup-go@v7.0.0": {
       "repo": "actions/setup-go",

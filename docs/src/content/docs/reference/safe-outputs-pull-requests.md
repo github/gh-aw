@@ -659,6 +659,8 @@ safe-outputs:
 
 **`push-to-pull-request-branch` with `fallback-to-issue`**: instead of pushing to the PR branch, a review issue is created with the target PR link, patch download/apply instructions, and a review warning.
 
+Protected-file fallback issues receive the `pull-request-fallback` label alongside `agentic-workflows`. For updates to an existing PR, the issue inherits the PR's expiration date, or expires after 7 days if the PR has no active expiration. For PR creation, the issue uses the configured PR expiration, defaulting to 7 days.
+
 ```yaml wrap
 safe-outputs:
   create-pull-request:

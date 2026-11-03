@@ -5,6 +5,7 @@ package cli
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/parser"
@@ -76,6 +77,27 @@ func TestCopilotWebSearchRemovalCodemod_ResolvesIncludedEngine(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, applied)
 	assert.Equal(t, unresolved, updated)
+}
+
+func TestCopilotWebFetchRemovalCodemodPreservesNestedFragmentWithoutEngine(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), ".github", "workflows")
+	filePath := filepath.Join(dir, "shared", "fragment.md")
+	content := "---\ntools:\n  web-fetch: true\n---\n"
+	fm, err := parser.ExtractFrontmatterFromContent(content)
+	require.NoError(t, err)
+
+	updated, applied, err := getCopilotWebFetchRemovalCodemod().ApplyWithContext(content, fm.Frontmatter, filePath)
+	require.NoError(t, err)
+	assert.False(t, applied)
+	assert.Equal(t, content, updated)
+
+	withEngine := strings.Replace(content, "---\n", "---\nengine: copilot\n", 1)
+	fm, err = parser.ExtractFrontmatterFromContent(withEngine)
+	require.NoError(t, err)
+	updated, applied, err = getCopilotWebFetchRemovalCodemod().ApplyWithContext(withEngine, fm.Frontmatter, filePath)
+	require.NoError(t, err)
+	assert.True(t, applied)
+	assert.NotContains(t, updated, "web-fetch")
 }
 
 func TestCopilotWebSearchRemovalCodemod_FixesStrictCompilation(t *testing.T) {

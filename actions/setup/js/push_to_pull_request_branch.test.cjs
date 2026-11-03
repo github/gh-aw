@@ -2,6 +2,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { expectExecutionProvenance, useExecutionProvenanceFixture } from "./test_execution_provenance.js";
+
+useExecutionProvenanceFixture();
 
 const { getPatchPathForBranch, getPatchPathForBranchInRepo } = require("./git_patch_utils.cjs");
 const { getBundlePathForBranch, getBundlePathForBranchInRepo } = require("./generate_git_bundle.cjs");
@@ -4051,10 +4054,69 @@ ${diffs}
       expect(result.fallback_used).toBe(true);
 
       const issueBody = mockGithub.rest.issues.create.mock.calls[0][0].body;
+      const { extractExpirationDate } = require("./ephemerals.cjs");
+      const expiration = extractExpirationDate(issueBody);
+      expect(expiration).not.toBeNull();
+      expect(expiration.getTime()).toBeGreaterThan(Date.now() + 7 * 24 * 60 * 60 * 1000 - 10000);
+      expect(expiration.getTime()).toBeLessThanOrEqual(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      expect(issueBody).toContain("[#123](https://github.com/test-owner/test-repo/pull/123)");
+      expect(issueBody).toContain("gh-aw-agentic-workflow:");
+      expectExecutionProvenance(issueBody);
+      expect(mockGithub.rest.issues.create.mock.calls[0][0].labels).toEqual(["agentic-workflows", "pull-request-fallback"]);
       expect(issueBody).toContain("gh run download");
       expect(issueBody).toContain("git am --3way");
       expect(issueBody).not.toContain("refs/bundles/");
     });
+
+    it.each([
+      ["> - [x] expires <!-- gh-aw-expires: 2030-01-20T09:20:00.000Z --> on Jan 20, 2030, 9:20 AM UTC", "2030-01-20T09:20:00.000Z"],
+      ["> - [x] expires <!-- gh-aw-expires: 2020-01-20T09:20:00.000Z --> on Jan 20, 2020, 9:20 AM UTC", "2020-01-20T09:20:00.000Z"],
+      ["> - [x] expires on Jan 20, 2030, 9:20 AM UTC", "2030-01-20T09:20:00.000Z"],
+    ])("should inherit the target PR expiration from %s", async (body, expectedExpiration) => {
+      const branch = "protected-fallback-expiration";
+      createPatchFile(branch, createPatchWithFiles("package.json"));
+      const { data: pullRequest } = await mockGithub.rest.pulls.get();
+      mockGithub.rest.pulls.get.mockResolvedValue({ data: { ...pullRequest, body } });
+      process.env.GITHUB_SERVER_URL = "https://github.example.com";
+
+      const module = await loadModule();
+      const handler = await module.main({
+        protected_files: ["package.json"],
+        protected_files_policy: "fallback-to-issue",
+      });
+      const result = await handler({ branch }, {});
+
+      expect(result.success).toBe(true);
+      const issue = mockGithub.rest.issues.create.mock.calls[0][0];
+      const { extractExpirationDate } = require("./ephemerals.cjs");
+      expect(extractExpirationDate(issue.body).toISOString()).toBe(expectedExpiration);
+      expect(issue.body).toContain("[#123](https://github.example.com/test-owner/test-repo/pull/123)");
+      expect(issue.labels).toContain("pull-request-fallback");
+    });
+
+    it.each([null, "> - [x] expires <!-- gh-aw-expires: invalid --> on invalid UTC", "> - [ ] expires <!-- gh-aw-expires: 2030-01-20T09:20:00.000Z --> on Jan 20, 2030, 9:20 AM UTC"])(
+      "should default to seven days when the PR has no active valid expiration: %s",
+      async body => {
+        const branch = "protected-fallback-default-expiration";
+        createPatchFile(branch, createPatchWithFiles("package.json"));
+        const { data: pullRequest } = await mockGithub.rest.pulls.get();
+        mockGithub.rest.pulls.get.mockResolvedValue({ data: { ...pullRequest, body } });
+        const before = Date.now();
+
+        const module = await loadModule();
+        const handler = await module.main({
+          protected_files: ["package.json"],
+          protected_files_policy: "fallback-to-issue",
+        });
+        const result = await handler({ branch }, {});
+
+        expect(result.success).toBe(true);
+        const { extractExpirationDate } = require("./ephemerals.cjs");
+        const expiration = extractExpirationDate(mockGithub.rest.issues.create.mock.calls[0][0].body);
+        expect(expiration.getTime()).toBeGreaterThanOrEqual(before + 7 * 24 * 60 * 60 * 1000);
+        expect(expiration.getTime()).toBeLessThanOrEqual(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      }
+    );
 
     it("should give bundle-based manual apply instructions for protected-files fallback (bundle transport)", async () => {
       createPatchFile("should-give-bundle-based-manual-apply-instructions", createPatchWithFiles("package.json"));

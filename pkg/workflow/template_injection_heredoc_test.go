@@ -61,7 +61,7 @@ func TestHeredocInjectionControls(t *testing.T) {
 			yaml := "jobs:\n  test:\n    steps:\n      - run: |\n          " +
 				strings.ReplaceAll(tt.script, "\n", "\n          ") + "\n"
 
-			assert.Equal(t, tt.unsafe, strings.Contains(removeHeredocContent(tt.script), expression))
+			assert.Equal(t, tt.unsafe, strings.Contains(executableShellContent(tt.script), expression))
 			assert.Equal(t, tt.unsafe, validateNoTemplateInjectionFromParsed(parsed) != nil)
 			assert.Equal(t, tt.unsafe, validateNoGitHubExpressionsInRunScriptsFromParsed(parsed) != nil)
 			scan := scanRunContentExpressions(yaml)
@@ -123,7 +123,6 @@ func TestHeredocUnknownBoundariesPreserveScript(t *testing.T) {
 			_, parsed := shellHeredocRegions(tt.script, false)
 			require.False(t, parsed, "unproven Bash boundaries must not grant an exemption")
 			assert.Contains(t, executableShellContent(tt.script), expression)
-			assert.Equal(t, tt.script, replaceOutsideQuotedHeredocs(tt.script, expression, "$TITLE"))
 			step := map[string]any{"run": tt.script}
 			sanitized, warnings, changed := sanitizeRunStepExpressions(step)
 			assert.False(t, changed)

@@ -574,6 +574,23 @@ func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_AcceptsDailyAICred
 	}
 }
 
+func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_AcceptsActivationFailedCategory(t *testing.T) {
+	frontmatter := map[string]any{
+		"on": "workflow_dispatch",
+		"safe-outputs": map[string]any{
+			"create-issue": map[string]any{},
+			"report-failure-as-issue": []any{
+				"activation_failed",
+			},
+		},
+	}
+
+	err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "/test/workflow.md")
+	if err != nil {
+		t.Fatalf("ValidateMainWorkflowFrontmatterWithSchemaAndLocation() unexpected error = %v", err)
+	}
+}
+
 func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_AcceptsTerminalSafeOutputCategories(t *testing.T) {
 	for _, category := range []string{"engine_driver_failure", "secret_redaction_failure", "safeoutputs_cli_error", "invalid_safe_outputs", "missing_terminal_safe_output"} {
 		for _, prefix := range []string{"", "!"} {
