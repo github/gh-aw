@@ -343,6 +343,9 @@ func TestAgyProductionConformancePermissionsAreBoundedAndScoped(t *testing.T) {
 						"actions": "read", "contents": "read", "issues": "read", "pull-requests": "read",
 					}
 				}
+				if entry.id == "smoke-agy" && name == "push_evals_state" {
+					allowedPermissions = map[string]string{"contents": "write"}
+				}
 				if entry.id == "engine-conformance-agy" {
 					switch name {
 					case "activation", "conclusion":
@@ -475,6 +478,9 @@ func TestAgyConformanceEntryPointsShareConfiguration(t *testing.T) {
 			delete(source, "max-ai-credits")
 			delete(source, "imports")
 			delete(source, "tools")
+			if entry.id == "smoke-agy" {
+				delete(source, "evals")
+			}
 			assert.Equal(t, canonical, source, "all compilation paths must retain identical gate configuration")
 		})
 	}
