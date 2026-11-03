@@ -12,6 +12,10 @@ func badParenthesizedCutset(s string) string {
 	return strings.TrimLeft(s, ("foo")) // want `strings\.TrimLeft with a multi-character cutset`
 }
 
+func badParenthesizedFunc(s string) string {
+	return (strings.TrimRight)(s, "txt") // want `strings\.TrimRight with a multi-character cutset`
+}
+
 // bad: TrimRight with repeated alphanumeric cutset — likely meant TrimSuffix
 func badTrimRight(s string) string {
 	return strings.TrimRight(s, "barr") // want `strings\.TrimRight with a multi-character cutset`

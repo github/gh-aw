@@ -13,6 +13,10 @@ func badNamedConst(s string) string {
 	return strings.Replace(s, "o", "0", replaceAllConst) // want `use strings\.ReplaceAll instead of strings\.Replace with n=-1`
 }
 
+func badParenFunc(s string) string {
+	return (strings.Replace)(s, "o", "0", -1) // want `use strings\.ReplaceAll instead of strings\.Replace with n=-1`
+}
+
 func goodFirstOnly(s string) string {
 	return strings.Replace(s, "o", "0", 1) // replace only the first occurrence — n=1 is intentional
 }
