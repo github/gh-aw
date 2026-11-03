@@ -33,6 +33,8 @@ In this enterprise controls reference, OTLP defaults are the scope-sensitive exc
 | `GH_AW_DEFAULT_OTLP_ENDPOINT` | GitHub Actions `secrets.*` or `vars.*` at runtime | Default OTLP exporter endpoint | `observability.otlp.endpoint` is not set in frontmatter or any imported workflow |
 | `GH_AW_DEFAULT_OTLP_HEADERS` | GitHub Actions `secrets.*` at runtime | Default OTLP exporter headers for `GH_AW_DEFAULT_OTLP_ENDPOINT` | `observability.otlp.endpoint` is not set in frontmatter or any imported workflow |
 | `OTEL_EXPORTER_OTLP_PROTOCOL` | GitHub Actions `vars.*` at runtime | OTLP/HTTP encoding, `http/json` or `http/protobuf` | Workflow `env` does not explicitly define the variable; JavaScript traces-specific protocol takes precedence |
+| `GH_AW_OTLP_LOGS_ENABLED` | GitHub Actions `vars.*` at runtime | Opt in to compact unified-session OTLP logs (`true`); unset or `false` disables export | The conclusion job has a published unified session and configured OTLP endpoints |
+| `GH_AW_OTLP_LOGS_MAX_BYTES` | GitHub Actions `vars.*` at runtime | Maximum serialized OTLP session-log request size in bytes (default `65536`) | Session-log export is enabled |
 | `GH_AW_REQUIRE_SELF_HOSTED_RUNNERS` | Compiler process environment | Fail compilation unless every generated job selects a self-hosted runner | Set to `true` in a trusted compile environment to enforce self-hosted-only runners |
 
 Use `gh aw env get` and `gh aw env update` to manage `GH_AW_DEFAULT_*` and `OTEL_EXPORTER_OTLP_PROTOCOL`
@@ -82,6 +84,71 @@ When enabled, compilation checks the generated workflow jobs, including framewor
 gh aw env update defaults.yml --scope org --org MY_ORG --visibility all
 gh aw env update defaults.yml --scope ent --enterprise MY_ENT --visibility all
 ```
+
+## Unified Session Logs
+
+`GH_AW_OTLP_LOGS_ENABLED=true` opts in to content-minimized unified-session
+export from the conclusion job, before cleanup. Set it as an organization,
+enterprise, or repository Actions variable. Workflows need to be compiled with
+this support once; subsequent variable changes take effect at runtime.
+Unset or `false` disables export, and invalid values warn without exporting.
+Like other Actions variables, this is cooperative configuration, not a locked
+enterprise policy: repository variables and explicit workflow environment values
+can override it.
+
+`GH_AW_OTLP_LOGS_MAX_BYTES` accepts a positive integer byte limit (default
+`65536`, or 64 KiB). It limits the complete UTF-8 JSON request, including the
+OTLP envelope, for each vendor, not just the session body. Whole low-priority
+records are omitted until the request fits, and the exported included/omitted
+counts and truncation flag reflect those omissions. Invalid limits or limits
+too small for one record warn without exporting. Increasing the limit does not
+raise the compact profile's independent source/event limits.
+
+Both the compact serializer and OTLP envelope use this retention order:
+
+| Priority (highest first) | Records |
+| --- | --- |
+| 1 | Session format and workflow metadata |
+| 2 | Final execution/session/job outcomes, plus failed, denied, exceeded, cancelled, or interrupted evidence from any retained event kind |
+| 3 | Remaining guardrail decisions and grader results |
+| 4 | Harness attempts/retries and engine reconnect diagnostics |
+| 5 | Per-step usage and firewall token-usage observations |
+| 6 | Successful memory updates |
+
+Later essential records can replace earlier low-priority records even after
+the compact byte/event limits are reached. Selection is deterministic:
+equal-priority records prefer earlier observations, and retained records remain
+in source order. Records are dropped whole, not text-truncated or merged;
+unrelated accounting sources are never summed. A GitHub Actions warning
+explicitly identifies a **partial session export** whenever output or source-scan
+limits discard evidence, and exported truncation/count attributes preserve
+that qualification for vendor queries. Routine privacy filtering alone does
+not trigger a size-truncation warning.
+
+Logs use the existing OTLP endpoint list and per-endpoint authentication,
+including the enterprise default endpoint/header pair. No additional credentials
+or agent network access are required. The exporter posts OTLP/HTTP JSON to
+`<endpoint>/v1/logs`, replacing a trailing `/v1/traces` or `/v1/logs` when present.
+The vendor must support OTLP logs as well as traces at that base URL.
+
+Each retained event is a structured log body with `type`, `data`, optional
+`timestamp`, and provenance. Filter on the `gh-aw.session.event_type` log
+attribute or the `gh-aw.session` instrumentation scope. Records carry the
+existing trace/span IDs when valid, so vendors can correlate session metadata
+with traces. Resource attributes report the compact format version, included
+and omitted event counts, oversized source lines, and truncation.
+
+The export reuses the [compact unified-session profile](/gh-aw/specs/unified-agent-session-specification/):
+at most 128 events and 16 KiB of projected JSONL, with bounded source scanning.
+Prompts, conversation, reasoning, tool arguments/results, unknown event types,
+and unbounded nested data are excluded. Export additionally removes repository,
+workflow/run/session/agent identifiers, refs, commit SHAs, memory identifiers,
+branches, and filesystem paths. Current publication-secret and exporter-header
+masks are applied before sending. Operational metadata such as model names,
+job/grader IDs, timestamps, usage, outcomes, and trace correlation remains;
+this is content minimization, not a guarantee of irreversible anonymity.
+The full session artifact is unchanged. Export failures warn and do not change
+workflow results; authorization failures are not retried.
 
 ## Artifact Retention
 

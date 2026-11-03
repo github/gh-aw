@@ -7314,6 +7314,30 @@ describe("buildEvalTelemetry", () => {
   it.each([null, undefined, [], [null, {}, { id: "" }]])("returns empty telemetry without valid results", results => {
     expect(buildEvalTelemetry(results, 1)).toEqual({ attributes: [], events: [] });
   });
+
+  it.each(["judge_not_started", "judge_failed", "no_assistant_response", "execution_evidence_unavailable"])("records %s without inventing eval answers", reasonCode => {
+    const telemetry = buildEvalTelemetry([{ id: "stale", answer: "YES" }], 1, {
+      status: "not_evaluated",
+      reason_code: reasonCode,
+      reason: "Sensitive free-form failure details",
+    });
+    const attributes = [buildAttr("gh-aw.evals.status", "not_evaluated"), buildAttr("gh-aw.evals.reason_code", reasonCode)];
+    expect(telemetry).toEqual({ attributes, events: [{ timeUnixNano: toNanoString(1), name: "eval.status", attributes }] });
+    expect(JSON.stringify(telemetry)).not.toContain("Sensitive");
+    expect(JSON.stringify(telemetry)).not.toContain("gh-aw.eval.answer");
+  });
+
+  it("includes the configured Decisions model for not-evaluated runs", () => {
+    const telemetry = buildEvalTelemetry([], 1, {
+      status: "not_evaluated",
+      reason_code: "judge_failed",
+      reason: "No answers recorded",
+      model: "copilot/gpt-6-luna-decisions",
+    });
+    const model = buildAttr("gh-aw.eval.model", "copilot/gpt-6-luna-decisions");
+    expect(telemetry.attributes).toContainEqual(model);
+    expect(telemetry.events[0].attributes).toContainEqual(model);
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -881,6 +881,12 @@ func buildOTLPHeaderEnvLines(entries []otlpEndpointEntry, existingEnv string) st
 // already present there are skipped to avoid emitting a duplicate YAML mapping key.
 func buildOTLPPayloadEnvLines(workflowData *WorkflowData, entries []otlpEndpointEntry, ifMissingMode string, existingEnv string) string {
 	var lines string
+	if !workflowEnvHasKey(existingEnv, "GH_AW_OTLP_LOGS_ENABLED") {
+		lines += "\n  GH_AW_OTLP_LOGS_ENABLED: ${{ vars.GH_AW_OTLP_LOGS_ENABLED }}"
+	}
+	if !workflowEnvHasKey(existingEnv, "GH_AW_OTLP_LOGS_MAX_BYTES") {
+		lines += "\n  GH_AW_OTLP_LOGS_MAX_BYTES: ${{ vars.GH_AW_OTLP_LOGS_MAX_BYTES }}"
+	}
 	if encoded := encodeOTLPEndpoints(entries); encoded != "" {
 		if workflowEnvHasKey(existingEnv, "GH_AW_OTLP_ENDPOINTS") {
 			otlpLog.Printf("Skipping GH_AW_OTLP_ENDPOINTS injection: already defined by user")
