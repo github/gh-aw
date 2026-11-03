@@ -97,6 +97,14 @@ func hasLocalModifications(sourceContent, localContent, sourceSpec, localWorkflo
 	return hasModifications
 }
 
+func normalizeImportsForMerge(content string, sourceSpec *SourceSpec, localWorkflowDir string, verbose bool) (string, error) {
+	workflow := &WorkflowSpec{
+		RepoSpec:     RepoSpec{RepoSlug: sourceSpec.Repo, Version: sourceSpec.Ref},
+		WorkflowPath: sourceSpec.Path,
+	}
+	return processImportsWithWorkflowSpec(content, workflow, sourceSpec.Ref, localWorkflowDir, verbose)
+}
+
 // MergeWorkflowContent performs a 3-way merge of workflow content using git merge-file
 // It returns the merged content, whether conflicts exist, and any error
 // localWorkflowPath is the filesystem path of the local workflow file being updated;
@@ -139,6 +147,26 @@ func MergeWorkflowContent(base, current, new, oldSourceSpec, newRefOrSourceSpec,
 	newWithoutSource, err := RemoveTopLevelFieldFromFrontmatter(new, "source")
 	if err != nil {
 		return "", false, fmt.Errorf("failed to remove source from new content: %w", err)
+	}
+
+	// Import processing rewrites frontmatter into canonical YAML. Apply that
+	// transformation to all three inputs before merging so a previously updated
+	// local file is compared with the same representation as its upstream base.
+	mergeWorkflowDir := ""
+	if localWorkflowPath != "" {
+		mergeWorkflowDir = filepath.Dir(localWorkflowPath)
+	}
+	baseWithoutSource, err = normalizeImportsForMerge(baseWithoutSource, sourceSpec, mergeWorkflowDir, verbose)
+	if err != nil {
+		return "", false, fmt.Errorf("failed to normalize base imports: %w", err)
+	}
+	currentWithoutSource, err = normalizeImportsForMerge(currentWithoutSource, sourceSpec, mergeWorkflowDir, verbose)
+	if err != nil {
+		return "", false, fmt.Errorf("failed to normalize current imports: %w", err)
+	}
+	newWithoutSource, err = normalizeImportsForMerge(newWithoutSource, parsedNewSourceSpec, mergeWorkflowDir, verbose)
+	if err != nil {
+		return "", false, fmt.Errorf("failed to normalize upstream imports: %w", err)
 	}
 
 	// Normalize whitespace in all three versions to reduce spurious conflicts.
