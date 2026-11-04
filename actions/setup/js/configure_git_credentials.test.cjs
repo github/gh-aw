@@ -21,12 +21,129 @@ function removeDir(dir) {
  * Run configure_git_credentials.sh in an isolated HOME so that the global git
  * config it writes does not affect the developer's real ~/.gitconfig.
  */
-function runScript(env) {
+function runScript(env, cwd) {
   return spawnSync("sh", [SCRIPT_PATH], {
+    cwd,
     encoding: "utf8",
-    env: { ...process.env, ...env },
+    env: { ...process.env, GITHUB_TOKEN: "", GIT_TOKEN: "", GH_AW_GIT_REPOSITORY: undefined, ...env },
   });
 }
+
+describe("configure_git_credentials.sh repository identity", () => {
+  let root;
+  let target;
+  let env;
+
+  function authenticatedURL(token, repo = "target") {
+    return `https://${"x-access-token"}:${token}@github.com/owner/${repo}.git`;
+  }
+
+  function git(...args) {
+    const result = spawnSync("git", args, { cwd: target, encoding: "utf8", env: { ...process.env, ...env } });
+    expect(result.status, result.stderr).toBe(0);
+    return result.stdout.trim();
+  }
+
+  beforeEach(() => {
+    root = createTempDir("cfg-git-identity-");
+    const home = path.join(root, "home");
+    const workspace = path.join(root, "ws");
+    target = path.join(workspace, "target");
+    fs.mkdirSync(home);
+    fs.mkdirSync(target, { recursive: true });
+    // ScriptHandler exports the workflow context into reserved GITHUB_* variables,
+    // even when a step attempted to set GITHUB_REPOSITORY to the target.
+    env = {
+      HOME: home,
+      GITHUB_WORKSPACE: workspace,
+      RUNNER_TEMP: root,
+      GITHUB_REPOSITORY: "owner/workflow",
+      GITHUB_SERVER_URL: "https://github.com",
+      GH_AW_GIT_REPOSITORY: "owner/target",
+      GITHUB_TOKEN: "test-token",
+    };
+    git("init", workspace);
+    git("-C", workspace, "remote", "add", "origin", "https://github.com/owner/workflow.git");
+    git("init", target);
+    git("remote", "add", "origin", "https://github.com/owner/target.git");
+    git("-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "--allow-empty", "-m", "target commit");
+  });
+
+  afterEach(() => removeDir(root));
+
+  it("preserves the external current checkout despite runner-reserved workflow identity", () => {
+    const head = git("rev-parse", "HEAD");
+    const result = runScript(env, target);
+    expect(result.status, result.stderr).toBe(0);
+    expect(git("remote", "get-url", "origin")).toBe(authenticatedURL("test-token"));
+    expect(git("-C", env.GITHUB_WORKSPACE, "remote", "get-url", "origin")).toBe("https://github.com/owner/workflow.git");
+    expect(git("rev-parse", "HEAD")).toBe(head);
+    expect(git("status", "--short")).toBe("");
+    expect(result.stderr).toContain("identity verified before credential configuration");
+    expect(result.stderr).toContain("identity verified after credential configuration");
+    expect(result.stdout + result.stderr).not.toContain("test-token");
+  });
+
+  it.each(["https://github.com/OWNER/Target", "git@github.com:owner/target.git", "ssh://git@github.com/owner/target.git", authenticatedURL("old-token")])("recognizes equivalent repository identity for %s", remote => {
+    git("remote", "set-url", "origin", remote);
+    expect(runScript(env, target).status).toBe(0);
+  });
+
+  it.each([
+    ["wrong repository", authenticatedURL("private-secret", "workflow")],
+    ["wrong server", "https://elsewhere.example/owner/target.git"],
+  ])("rejects %s before changing the remote without disclosing credentials", (_name, remote) => {
+    git("remote", "set-url", "origin", remote);
+    const result = runScript(env, target);
+    expect(result.status).not.toBe(0);
+    expect(git("remote", "get-url", "origin")).toBe(remote);
+    expect(result.stderr).toContain("identity verification failed before credential configuration");
+    expect(result.stdout + result.stderr).not.toMatch(/private-secret|test-token|https:\/\//);
+  });
+
+  it("rejects a mismatched push URL", () => {
+    git("remote", "set-url", "--push", "origin", "https://github.com/owner/workflow.git");
+    const result = runScript(env, target);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("failed before credential configuration");
+  });
+
+  it("rejects multiple fetch URLs if any identify a different repository", () => {
+    git("remote", "set-url", "--add", "origin", "https://github.com/owner/workflow.git");
+    expect(runScript(env, target).status).not.toBe(0);
+  });
+
+  it("rejects a missing origin rather than creating one", () => {
+    git("remote", "remove", "origin");
+    expect(runScript(env, target).status).not.toBe(0);
+    expect(git("remote")).toBe("");
+  });
+
+  it("checks identity even when no authentication token is present", () => {
+    git("remote", "set-url", "origin", "https://github.com/owner/workflow.git");
+    expect(runScript({ ...env, GITHUB_TOKEN: "" }, target).status).not.toBe(0);
+  });
+
+  it("does not fall back to the workflow repository for an empty explicit target", () => {
+    git("remote", "set-url", "origin", "https://github.com/owner/workflow.git");
+    expect(runScript({ ...env, GH_AW_GIT_REPOSITORY: "" }, target).status).not.toBe(0);
+  });
+
+  it("fails after authentication if a URL rewrite changes the effective push identity", () => {
+    git("config", "url.https://github.com/owner/workflow.git.pushInsteadOf", authenticatedURL("test-token"));
+    const result = runScript(env, target);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("identity verified before credential configuration");
+    expect(result.stderr).toContain("identity verification failed after credential configuration");
+    expect(result.stdout + result.stderr).not.toContain("test-token");
+  });
+
+  it("supports legacy compiled workflows and GIT_TOKEN authentication", () => {
+    const result = runScript({ ...env, GH_AW_GIT_REPOSITORY: undefined, GITHUB_REPOSITORY: "owner/target", GITHUB_TOKEN: "", GIT_TOKEN: "legacy-token" }, target);
+    expect(result.status, result.stderr).toBe(0);
+    expect(git("remote", "get-url", "origin")).toContain("legacy-token@github.com/owner/target.git");
+  });
+});
 
 function readSafeDirectories(home) {
   const result = spawnSync("git", ["config", "--global", "--get-all", "safe.directory"], {

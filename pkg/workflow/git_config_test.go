@@ -68,7 +68,7 @@ func TestGitConfigurationStepsHelper(t *testing.T) {
 
 	steps := compiler.generateGitConfigurationSteps()
 
-	// Verify we get expected number of lines (6 lines: name, env, GITHUB_REPOSITORY, GITHUB_SERVER_URL, GITHUB_TOKEN, run)
+	// Verify we get expected number of lines (6 lines: name, env, GH_AW_GIT_REPOSITORY, GITHUB_SERVER_URL, GITHUB_TOKEN, run)
 	if len(steps) != 6 {
 		t.Errorf("Expected 6 lines in git configuration steps, got %d", len(steps))
 	}
@@ -77,7 +77,7 @@ func TestGitConfigurationStepsHelper(t *testing.T) {
 	expectedContents := []string{
 		"Configure Git credentials",
 		"env:",
-		"GITHUB_REPOSITORY:",
+		"GH_AW_GIT_REPOSITORY:",
 		"GITHUB_TOKEN:",
 		"configure_git_credentials.sh",
 	}
@@ -285,8 +285,8 @@ func TestGenerateGitConfigurationStepsForData(t *testing.T) {
 		if strings.Contains(fullContent, "working-directory:") {
 			t.Error("working-directory must not be present when data is nil")
 		}
-		if !strings.Contains(fullContent, "GITHUB_REPOSITORY: ${{ github.repository }}") {
-			t.Error("Expected default GITHUB_REPOSITORY expression")
+		if !strings.Contains(fullContent, "GH_AW_GIT_REPOSITORY: ${{ github.repository }}") {
+			t.Error("Expected default GH_AW_GIT_REPOSITORY expression")
 		}
 	})
 
@@ -298,12 +298,12 @@ func TestGenerateGitConfigurationStepsForData(t *testing.T) {
 		if strings.Contains(fullContent, "working-directory:") {
 			t.Error("working-directory must not be present when there are no checkout configs")
 		}
-		if !strings.Contains(fullContent, "GITHUB_REPOSITORY: ${{ github.repository }}") {
-			t.Error("Expected default GITHUB_REPOSITORY expression")
+		if !strings.Contains(fullContent, "GH_AW_GIT_REPOSITORY: ${{ github.repository }}") {
+			t.Error("Expected default GH_AW_GIT_REPOSITORY expression")
 		}
 	})
 
-	t.Run("current: true at workspace root falls back to standard behavior", func(t *testing.T) {
+	t.Run("current: true at workspace root retains repository identity", func(t *testing.T) {
 		data := &WorkflowData{
 			CheckoutConfigs: []*CheckoutConfig{
 				{Repository: "owner/target", Current: true},
@@ -315,6 +315,21 @@ func TestGenerateGitConfigurationStepsForData(t *testing.T) {
 		// current at root (no path) → no working-directory needed
 		if strings.Contains(fullContent, "working-directory:") {
 			t.Error("working-directory must not be present when current checkout is at workspace root")
+		}
+		if !strings.Contains(fullContent, `GH_AW_GIT_REPOSITORY: "owner/target"`) {
+			t.Errorf("Expected current repository at workspace root, got:\n%s", fullContent)
+		}
+	})
+
+	t.Run("external workspace root without current retains repository identity", func(t *testing.T) {
+		data := &WorkflowData{
+			CheckoutConfigs: []*CheckoutConfig{
+				{Repository: "owner/target"},
+			},
+		}
+		fullContent := strings.Join(compiler.generateGitConfigurationStepsForData(data), "")
+		if !strings.Contains(fullContent, `GH_AW_GIT_REPOSITORY: "owner/target"`) {
+			t.Errorf("Expected external workspace root repository, got:\n%s", fullContent)
 		}
 	})
 
@@ -333,8 +348,11 @@ func TestGenerateGitConfigurationStepsForData(t *testing.T) {
 		if !strings.Contains(fullContent, `working-directory: "target"`) {
 			t.Errorf("Expected working-directory to be 'target', got:\n%s", fullContent)
 		}
-		if !strings.Contains(fullContent, `GITHUB_REPOSITORY: "owner/public-target"`) {
-			t.Errorf("Expected GITHUB_REPOSITORY to be the current checkout's repository, got:\n%s", fullContent)
+		if !strings.Contains(fullContent, `GH_AW_GIT_REPOSITORY: "owner/public-target"`) {
+			t.Errorf("Expected GH_AW_GIT_REPOSITORY to be the current checkout's repository, got:\n%s", fullContent)
+		}
+		if strings.Contains(fullContent, "GITHUB_REPOSITORY:") {
+			t.Error("Must not override the runner-reserved GITHUB_REPOSITORY variable")
 		}
 		if !strings.Contains(fullContent, "configure_git_credentials.sh") {
 			t.Error("Expected configure_git_credentials.sh to be called")
@@ -358,9 +376,9 @@ func TestGenerateGitConfigurationStepsForData(t *testing.T) {
 		if !strings.Contains(fullContent, `working-directory: "subdir"`) {
 			t.Errorf("Expected working-directory to be 'subdir', got:\n%s", fullContent)
 		}
-		// When no custom repo, GITHUB_REPOSITORY should be the workflow expression
-		if !strings.Contains(fullContent, "GITHUB_REPOSITORY: ${{ github.repository }}") {
-			t.Errorf("Expected default GITHUB_REPOSITORY expression when no custom repo set, got:\n%s", fullContent)
+		// When no custom repo, GH_AW_GIT_REPOSITORY should be the workflow expression
+		if !strings.Contains(fullContent, "GH_AW_GIT_REPOSITORY: ${{ github.repository }}") {
+			t.Errorf("Expected default GH_AW_GIT_REPOSITORY expression when no custom repo set, got:\n%s", fullContent)
 		}
 	})
 
@@ -396,6 +414,12 @@ checkout:
   - repository: owner/public-target
     path: ./target
     current: true
+    github-app:
+      client-id: ${{ vars.TARGET_APP_CLIENT_ID }}
+      private-key: ${{ secrets.TARGET_APP_PRIVATE_KEY }}
+      owner: owner
+      repositories:
+        - public-target
 ---
 
 # Test workflow with current checkout in subdirectory
@@ -428,7 +452,13 @@ checkout:
 		t.Errorf("Expected working-directory: \"target\" in Configure Git credentials step.\nLock content:\n%s", lockContent)
 	}
 	// The configured repository should be the current checkout's repo
-	if !strings.Contains(lockContent, `GITHUB_REPOSITORY: "owner/public-target"`) {
-		t.Errorf("Expected GITHUB_REPOSITORY to be 'owner/public-target'.\nLock content:\n%s", lockContent)
+	if !strings.Contains(lockContent, `GH_AW_GIT_REPOSITORY: "owner/public-target"`) {
+		t.Errorf("Expected GH_AW_GIT_REPOSITORY to be 'owner/public-target'.\nLock content:\n%s", lockContent)
+	}
+	if strings.Contains(lockContent, `GITHUB_REPOSITORY: "owner/public-target"`) {
+		t.Error("External checkout identity must not rely on overriding reserved runner variables")
+	}
+	if !strings.Contains(lockContent, "steps.checkout-app-token-1.outputs.token") {
+		t.Error("Expected the external checkout to retain its GitHub App authentication")
 	}
 }

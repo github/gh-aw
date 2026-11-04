@@ -30,17 +30,23 @@ func (c *Compiler) generateGitConfigurationStepsForData(data *WorkflowData) []st
 
 	checkoutMgr := NewCheckoutManager(data.CheckoutConfigs)
 	currentPath := checkoutMgr.GetCurrentCheckoutPath()
+	currentRepo := checkoutMgr.GetCurrentRepository()
 
 	if currentPath == "" {
 		// No current checkout in a subdirectory — use the standard workspace-root behaviour.
-		return c.generateGitConfigurationStepsWithToken(token, "")
+		if currentRepo == "" {
+			rootRepo := checkoutMgr.effectiveRootCheckoutRepository()
+			if rootRepo != "${{ github.repository }}" {
+				currentRepo = rootRepo
+			}
+		}
+		return c.generateGitConfigurationStepsWithToken(token, currentRepo)
 	}
 
 	// current: true checkout is in a subdirectory. Emit the step with a working-directory
 	// so configure_git_credentials.sh runs from that directory. This ensures that
 	// `git remote set-url origin` targets the correct git repository even when the
 	// workspace root no longer contains a .git directory.
-	currentRepo := checkoutMgr.GetCurrentRepository()
 	repoNameValue := "${{ github.repository }}"
 	if currentRepo != "" {
 		repoNameValue = fmt.Sprintf("%q", currentRepo)
@@ -56,7 +62,7 @@ func (c *Compiler) generateGitConfigurationStepsForData(data *WorkflowData) []st
 		"      - name: Configure Git credentials\n",
 		fmt.Sprintf("        working-directory: %q\n", currentPath),
 		"        env:\n",
-		fmt.Sprintf("          GITHUB_REPOSITORY: %s\n", repoNameValue),
+		fmt.Sprintf("          GH_AW_GIT_REPOSITORY: %s\n", repoNameValue),
 		"          GITHUB_SERVER_URL: ${{ github.server_url }}\n",
 		// SECURITY: token moved to env mapping so the shell treats it as data,
 		// not syntax. Prevents shell injection if token value contains metacharacters.
@@ -89,7 +95,7 @@ func (c *Compiler) generateGitConfigurationStepsWithToken(token string, targetRe
 	return []string{
 		"      - name: Configure Git credentials\n",
 		"        env:\n",
-		fmt.Sprintf("          GITHUB_REPOSITORY: %s\n", repoNameValue),
+		fmt.Sprintf("          GH_AW_GIT_REPOSITORY: %s\n", repoNameValue),
 		"          GITHUB_SERVER_URL: ${{ github.server_url }}\n",
 		// SECURITY: token moved to env mapping so the shell treats it as data,
 		// not syntax. Prevents shell injection if token value contains metacharacters.

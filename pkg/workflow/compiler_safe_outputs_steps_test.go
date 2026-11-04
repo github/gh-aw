@@ -36,7 +36,7 @@ func TestBuildSharedPRCheckoutSteps(t *testing.T) {
 				"persist-credentials: true",
 				"name: Configure Git credentials",
 				"configure_git_credentials.sh",
-				"GITHUB_REPOSITORY: ${{ github.repository }}",
+				"GH_AW_GIT_REPOSITORY: ${{ github.repository }}",
 			},
 			checkNotContains: []string{
 				// No checkout-time base ref or trusted-default-branch guard anymore;
@@ -112,6 +112,7 @@ func TestBuildSharedPRCheckoutSteps(t *testing.T) {
 			},
 			checkContains: []string{
 				"repository: org/trial-repo",
+				`GH_AW_GIT_REPOSITORY: "org/trial-repo"`,
 			},
 		},
 		{
@@ -198,7 +199,7 @@ func TestBuildSharedPRCheckoutSteps(t *testing.T) {
 				// Root workflow checkout is still present (the agent default checkout).
 				"name: Checkout repository",
 				// Subdirectory checkout is re-authenticated so the handler can push to it.
-				`git -C "a" remote set-url origin`,
+				`(cd -- "a" && GH_AW_GIT_REPOSITORY="${GH_AW_SUBREPO_0}" bash`,
 			},
 		},
 		{

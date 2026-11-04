@@ -289,15 +289,18 @@ func (cm *CheckoutManager) GenerateGitHubFolderCheckoutStep(repository, ref, tok
 // safe_outputs job, which supplies the push token (resolvePRCheckoutToken) and a gating
 // condition.
 func (cm *CheckoutManager) GenerateConfigureGitCredentialsSteps(gitRemoteToken string, condition ConditionNode) []string {
+	return cm.generateConfigureGitCredentialsStepsForRoot(gitRemoteToken, condition, cm.effectiveRootCheckoutRepository())
+}
+
+func (cm *CheckoutManager) generateConfigureGitCredentialsStepsForRoot(gitRemoteToken string, condition ConditionNode, rootRepo string) []string {
 	conditionStr := RenderCondition(condition)
-	rootRepo := cm.effectiveRootCheckoutRepository()
 	subRepos := cm.credentialSubrepositories()
 	if len(subRepos) == 0 {
 		return []string{
 			"      - name: Configure Git credentials\n",
 			fmt.Sprintf("        if: %s\n", conditionStr),
 			"        env:\n",
-			fmt.Sprintf("          GITHUB_REPOSITORY: %s\n", rootRepo),
+			fmt.Sprintf("          GH_AW_GIT_REPOSITORY: %s\n", rootRepo),
 			"          GITHUB_SERVER_URL: ${{ github.server_url }}\n",
 			fmt.Sprintf("          GIT_TOKEN: %s\n", gitRemoteToken),
 			"        run: bash \"${RUNNER_TEMP}/gh-aw/actions/configure_git_credentials.sh\"\n",

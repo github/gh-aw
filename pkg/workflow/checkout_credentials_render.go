@@ -45,7 +45,7 @@ func (cm *CheckoutManager) credentialSubrepositories() []credentialSubrepository
 func credentialEnvironmentLines(root, token string, repositories []credentialSubrepository) []string {
 	lines := []string{
 		"        env:\n",
-		fmt.Sprintf("          GITHUB_REPOSITORY: %s\n", root),
+		fmt.Sprintf("          GH_AW_GIT_REPOSITORY: %s\n", root),
 		"          GITHUB_SERVER_URL: ${{ github.server_url }}\n",
 		fmt.Sprintf("          GIT_TOKEN: %s\n", token),
 	}
@@ -66,7 +66,6 @@ func credentialCommandLines(repositories []credentialSubrepository) []string {
 	lines := []string{
 		"        run: |\n",
 		"          bash \"${RUNNER_TEMP}/gh-aw/actions/configure_git_credentials.sh\"\n",
-		"          GIT_SERVER_URL_STRIPPED=\"${GITHUB_SERVER_URL#https://}\"\n",
 	}
 	for _, repo := range repositories {
 		gitDir := fmt.Sprintf("%q", repo.path)
@@ -77,7 +76,7 @@ func credentialCommandLines(repositories []credentialSubrepository) []string {
 		}
 		lines = append(lines,
 			fmt.Sprintf("          # Re-authenticate git for %s\n", commentRef),
-			fmt.Sprintf("          git -C %s remote set-url origin \"https://x-access-token:${GIT_TOKEN}@${GIT_SERVER_URL_STRIPPED}/${%s}.git\"\n", gitDir, repo.envVarName),
+			fmt.Sprintf("          (cd -- %s && GH_AW_GIT_REPOSITORY=\"${%s}\" bash \"${RUNNER_TEMP}/gh-aw/actions/configure_git_credentials.sh\")\n", gitDir, repo.envVarName),
 		)
 	}
 	return append(lines, "          echo \"Git configured with standard GitHub Actions identity\"\n")

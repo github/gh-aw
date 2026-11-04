@@ -6,7 +6,7 @@
 # Sets up Git global configuration for use in GitHub Actions workflows and the gh-aw-node
 # container. Always configures git identity and safe.directory trust. Configures the remote
 # URL for authentication when credentials are provided; silently skips auth when any required
-# credential variable (GITHUB_REPOSITORY, GITHUB_SERVER_URL, GITHUB_TOKEN) is absent.
+# credential variable (repository, GITHUB_SERVER_URL, GITHUB_TOKEN) is absent.
 #
 # When a checkout manifest is present, every cross-repository checkout subdirectory it
 # records is also trusted as a safe.directory so that safe-outputs handlers can run git
@@ -20,7 +20,9 @@
 #   GH_AW_CHECKOUT_MANIFEST  - Explicit path to the checkout manifest (overrides default)
 #
 # Optional environment variables for remote authentication:
-#   GITHUB_REPOSITORY    - Repository slug (e.g., "org/repo")
+#   GH_AW_GIT_REPOSITORY - Expected repository slug (e.g., "org/repo"); takes precedence
+#                         over GITHUB_REPOSITORY, which Actions reserves for the workflow repo
+#   GITHUB_REPOSITORY    - Legacy fallback for previously compiled workflows
 #   GITHUB_SERVER_URL    - GitHub server URL (with or without https:// prefix)
 #   GITHUB_TOKEN         - Authentication token; falls back to GIT_TOKEN
 #
@@ -87,13 +89,54 @@ fi
 # Configure remote URL authentication when all required credentials are present.
 # Silently skips when any variable is absent (e.g., inside the safeoutputs container
 # where GITHUB_SERVER_URL is intentionally not exposed).
-REPO="${GITHUB_REPOSITORY:-}"
+REPO="${GH_AW_GIT_REPOSITORY-${GITHUB_REPOSITORY:-}}"
 URL="${GITHUB_SERVER_URL:-}"
 TOKEN="${GITHUB_TOKEN:-${GIT_TOKEN:-}}"
 
+# Check effective fetch and push URLs, including URL rewrites, without printing
+# remotes or raw git errors: either may contain credentials.
+verify_repository_identity() {
+  GH_AW_EXPECTED_REPOSITORY="${REPO}" GH_AW_EXPECTED_SERVER="${URL}" node -e '
+    const { execFileSync } = require("child_process");
+    try {
+      const server = process.env.GH_AW_EXPECTED_SERVER;
+      const base = new URL(server.includes("://") ? server : `https://${server}`);
+      const expected = process.env.GH_AW_EXPECTED_REPOSITORY.toLowerCase();
+      const identity = value => {
+        const scp = /^git@([^:]+):(.+)$/.exec(value);
+        const url = new URL(scp ? `ssh://git@${scp[1]}/${scp[2]}` : value);
+        if (!["https:", "http:", "ssh:"].includes(url.protocol) || url.search || url.hash) return false;
+        const repo = url.pathname.replace(/^\//, "").replace(/\.git\/?$/, "").replace(/\/$/, "");
+        return url.host.toLowerCase() === base.host.toLowerCase() && repo.toLowerCase() === expected;
+      };
+      for (const flags of [[], ["--push"]]) {
+        const urls = execFileSync("git", ["remote", "get-url", ...flags, "--all", "origin"],
+          { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim().split("\n");
+        if (!urls.length || !urls.every(identity)) process.exit(1);
+      }
+    } catch {
+      process.exit(1);
+    }
+  ' 2>/dev/null || {
+    echo "Git checkout identity verification failed ${1} credential configuration; check checkout repository and origin configuration. Remote URLs are omitted to protect credentials." >&2
+    exit 1
+  }
+  echo "Git checkout identity verified ${1} credential configuration" >&2
+}
+
+# Explicit compiler targets are checked even without a token. Legacy callers
+# retain the identity-only, no-checkout behavior when authentication is skipped.
+if [ -n "${URL}" ] && { [ "${GH_AW_GIT_REPOSITORY+x}" = x ] || { [ -n "${REPO}" ] && [ -n "${TOKEN}" ]; }; }; then
+  verify_repository_identity before
+fi
+
 if [ -n "${REPO}" ] && [ -n "${URL}" ] && [ -n "${TOKEN}" ]; then
   URL_STRIPPED="${URL#https://}"
-  git remote set-url origin "https://x-access-token:${TOKEN}@${URL_STRIPPED}/${REPO}.git"
+  if ! git remote set-url origin "https://x-access-token:${TOKEN}@${URL_STRIPPED}/${REPO}.git" 2>/dev/null; then
+    echo "Git remote authentication configuration failed; remote URL omitted to protect credentials." >&2
+    exit 1
+  fi
+  verify_repository_identity after
 fi
 
 echo "Git configured with standard GitHub Actions identity" >&2
