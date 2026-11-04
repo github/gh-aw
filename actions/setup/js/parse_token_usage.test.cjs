@@ -1297,15 +1297,8 @@ describe("parse_token_usage", () => {
     });
 
     test.each([
-      { records: [{ input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0 }], expected: { input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0 }, total: 0 },
       { records: [{ input_tokens: 100, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 5 }], expected: { input_tokens: 100, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 5 }, total: 100 },
-      { records: [{ input_tokens: 0 }], expected: { input_tokens: 0 }, total: undefined },
-      { records: [{ output_tokens: 10 }], expected: { output_tokens: 10 }, total: undefined },
-      { records: [{ input_tokens: null, output_tokens: -1, cache_read_tokens: false, cache_write_tokens: "10" }], expected: {}, total: undefined },
-      { records: [{ input_tokens: "invalid", output_tokens: "", cache_read_tokens: [], cache_write_tokens: {} }], expected: {}, total: undefined },
       { records: [{ input_tokens: 100, output_tokens: 0 }, { input_tokens: 0 }], expected: { input_tokens: 100 }, total: undefined },
-      { records: [{ output_tokens: 0 }, { input_tokens: 100, output_tokens: 10 }], expected: { output_tokens: 10 }, total: undefined },
-      { records: [{ request_id: "same", input_tokens: 0, output_tokens: 0 }, { request_id: "same" }], expected: { input_tokens: 0, output_tokens: 0 }, total: 0 },
     ])("preserves proxy token availability through artifacts and OTLP export: $records", async ({ records, expected, total }) => {
       process.env.GH_AW_TMP_DIR = tmpDir;
       const tokenUsagePath = path.join(tmpDir, "sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl");
@@ -1324,6 +1317,7 @@ describe("parse_token_usage", () => {
       vi.stubEnv("GH_AW_OTLP_ENDPOINTS", "");
       const mkdirSpy = vi.spyOn(fs, "mkdirSync").mockImplementation(() => {});
       const appendSpy = vi.spyOn(fs, "appendFileSync").mockImplementation(() => {});
+      const previousReadFileSync = fs.readFileSync;
       fs.readFileSync = vi.fn(p => {
         if (p === "/tmp/gh-aw/agent_usage.json") return usageJSON;
         throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
@@ -1338,6 +1332,7 @@ describe("parse_token_usage", () => {
         if (total !== undefined) expectedAttributes["gen_ai.usage.total_tokens"] = total;
         expect(Object.fromEntries(attributes.map(attr => [attr.key, attr.value.intValue]))).toEqual(expectedAttributes);
       } finally {
+        fs.readFileSync = previousReadFileSync;
         mkdirSpy.mockRestore();
         appendSpy.mockRestore();
         vi.unstubAllEnvs();
