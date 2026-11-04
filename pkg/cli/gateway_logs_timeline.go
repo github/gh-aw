@@ -291,12 +291,15 @@ func auditEntryToTimelineEvent(entry AuditLogEntry) (UnifiedTimelineEvent, bool)
 func findGatewayJSONLPath(logDir string) string {
 	// Root-level gateway.jsonl (pre-mcp-logs-subdirectory artifact layout)
 	if p := filepath.Join(logDir, "gateway.jsonl"); fileutil.FileExists(p) {
+		gatewayLogsLog.Printf("Using root-level gateway.jsonl: %s", p)
 		return p
 	}
 	// mcp-logs/ subdirectory (standard layout after artifact download)
 	if p := filepath.Join(logDir, "mcp-logs", "gateway.jsonl"); fileutil.FileExists(p) {
+		gatewayLogsLog.Printf("Using mcp-logs gateway.jsonl: %s", p)
 		return p
 	}
+	gatewayLogsLog.Printf("No gateway.jsonl in %s, falling back to rpc-messages.jsonl", logDir)
 	// Fallback: rpc-messages.jsonl
 	return findRPCMessagesPath(logDir)
 }

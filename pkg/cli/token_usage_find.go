@@ -82,6 +82,7 @@ func findAgentUsageFile(runDir string) string {
 	if usageDir := findArtifactDir(runDir, "usage", ""); usageDir != "" {
 		candidate := filepath.Join(usageDir, agentUsageJSONPath)
 		if fileutil.FileExists(candidate) {
+			tokenUsageLog.Printf("Found agent usage file in usage artifact: %s", candidate)
 			return candidate
 		}
 	}
@@ -153,6 +154,7 @@ func findUsageJSONLFilesInDirs(dirs []string) ([]string, []string) {
 	}
 
 	sort.Strings(files)
+	tokenUsageLog.Printf("Found %d usage JSONL file(s) across %d dir(s) (%d warning(s))", len(files), len(dirs), len(warnings))
 	return files, warnings
 }
 
@@ -256,15 +258,18 @@ func discoverAPIProxyEventsLog(runDir string) (*apiProxySteeringLog, error) {
 			}
 			log, err := parseAPIProxySteeringLog(candidate)
 			if err != nil {
+				tokenUsageLog.Printf("Failed to parse API proxy events log %s: %v", candidate, err)
 				if firstErr == nil {
 					firstErr = err
 				}
 				continue
 			}
 			if len(log.eventCounts) > 0 {
+				tokenUsageLog.Printf("Using API proxy events log: %s", candidate)
 				return log, nil
 			}
 		}
 	}
+	tokenUsageLog.Printf("No API proxy events log found in %d root(s) under %s", len(roots), runDir)
 	return nil, firstErr
 }
