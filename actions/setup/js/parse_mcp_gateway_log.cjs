@@ -1,7 +1,7 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
-const { iterateJsonl } = require("./jsonl_helpers.cjs");
+const { iterateJsonl, iterateJsonlEvents } = require("./jsonl_helpers.cjs");
 const fs = require("fs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { displayDirectories } = require("./display_file_helpers.cjs");
@@ -146,7 +146,12 @@ function parseTokenUsageJsonl(jsonlContent) {
     entries: [],
   };
 
-  for (const entry of iterateJsonl(jsonlContent)) {
+  for (const event of iterateJsonlEvents(jsonlContent)) {
+    if (event.type !== "json") {
+      if (event.reason !== "blank") summary.tokenUsage = {};
+      continue;
+    }
+    const entry = event.value;
     try {
       if (!entry || typeof entry !== "object") continue;
       const requestId = typeof entry.request_id === "string" ? entry.request_id.trim() : "";

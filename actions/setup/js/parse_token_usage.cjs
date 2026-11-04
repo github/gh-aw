@@ -1,7 +1,7 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
-const { iterateJsonl, iterateJsonlEvents, iterateLines } = require("./jsonl_helpers.cjs");
+const { iterateJsonl, iterateJsonlEvents } = require("./jsonl_helpers.cjs");
 const fs = require("fs");
 const path = require("path");
 const { getErrorMessage } = require("./error_helpers.cjs");
@@ -365,9 +365,15 @@ function readDedupedTokenUsage(paths) {
       continue;
     }
 
-    for (const line of iterateLines(fileContent)) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
+    for (const event of iterateJsonlEvents(fileContent)) {
+      if (event.type === "invalid" && event.reason === "blank") continue;
+      const trimmed = event.rawLine.trim();
+      // A partial record may contain a request_id already seen in a valid
+      // record. Preserve it so aggregation can mark counters unavailable.
+      if (event.type === "invalid") {
+        dedupedLines.push(trimmed);
+        continue;
+      }
       const dedupeKey = extractTokenUsageDedupeKey(trimmed) || trimmed;
       if (uniqueLineKeys.has(dedupeKey)) continue;
       uniqueLineKeys.add(dedupeKey);

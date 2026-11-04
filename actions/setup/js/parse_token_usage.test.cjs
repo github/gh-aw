@@ -953,7 +953,7 @@ describe("parse_token_usage", () => {
       expect(JSON.parse(originalReadFileSync(path.join(ghAwDir, "agent_usage.json"), "utf8")).ai_credits).toBe(0.29142);
     });
 
-    test.each(["", "not json\n", "{}\n"])("preserves unavailable usage when requested without measured counters: %j", async content => {
+    test.each(["", "not json\n"])("preserves unavailable usage when requested without measured counters: %j", async content => {
       const usagePath = path.join(tmpDir, "detection_usage.json");
       const usageJSONLPath = path.join(tmpDir, "detection_usage.jsonl");
       process.env.GH_AW_AGENT_USAGE_PATH = usagePath;
@@ -972,9 +972,26 @@ describe("parse_token_usage", () => {
       for (const key of ["input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens", "ai_credits"]) {
         expect(usage).not.toHaveProperty(key);
       }
-      if (content !== "{}\n") {
-        expect(JSON.parse(originalReadFileSync(usageJSONLPath, "utf8"))).toEqual({ provider: "unknown" });
-      }
+      expect(JSON.parse(originalReadFileSync(usageJSONLPath, "utf8"))).toEqual({ provider: "unknown" });
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+
+    test("writes normal summary JSON without empty-evidence JSONL for an empty request object", async () => {
+      const usagePath = path.join(tmpDir, "detection_usage.json");
+      const usageJSONLPath = path.join(tmpDir, "detection_usage.jsonl");
+      const tokenUsagePath = path.join(tmpDir, "sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl");
+      process.env.GH_AW_AGENT_USAGE_PATH = usagePath;
+      process.env.GH_AW_AGENT_USAGE_JSONL_PATH = usageJSONLPath;
+      process.env.GH_AW_WRITE_EMPTY_USAGE = "true";
+      process.env.GH_AW_TMP_DIR = tmpDir;
+      fs.mkdirSync(path.dirname(tokenUsagePath), { recursive: true });
+      fs.writeFileSync(tokenUsagePath, "{}\n");
+
+      await main(path.join(tmpDir, "missing-session-state"));
+
+      expect(JSON.parse(originalReadFileSync(usagePath, "utf8"))).toEqual({ ambient_context: 0 });
+      expect(originalExistsSync(usageJSONLPath)).toBe(false);
+      expect(mockCore.info).toHaveBeenCalledWith("Token usage summary appended to step summary");
       expect(mockCore.setFailed).not.toHaveBeenCalled();
     });
 
