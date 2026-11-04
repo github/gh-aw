@@ -530,7 +530,6 @@ test-scripts: build
 	node --test scripts/agy-authentication.test.cjs
 	node --test scripts/check-npm-1es.test.mjs
 	node --test scripts/release-workflows.test.cjs
-	node --test scripts/copilot-workflow-approval.test.cjs
 	bash scripts/extract-workflow-frontmatter-keys_test.sh
 	bash scripts/check-stale-lock-files_test.sh
 	bash scripts/agent-report-progress_test.sh

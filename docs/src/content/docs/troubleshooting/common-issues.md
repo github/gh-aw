@@ -59,8 +59,6 @@ To reduce repeated approvals, a repository administrator can disable **Require a
 > [!WARNING]
 > Automatic runs can give unreviewed Copilot code access to workflow secrets and write permissions. Review the repository's CI and agentic workflow permissions before changing this policy. Keep approval enabled where those privileges require human review.
 
-In the `github/gh-aw` repository, **Copilot Workflow Approval** reports pending commit statuses for approval-gated CGO, CJS, CWI, Doc Build - Deploy, Agentic Commands, and Squad runs on same-repository Copilot PRs. Each status links to the blocked run. The default-branch monitor reconciles open PRs hourly as a fallback for gates that emit no completion event; it does not check out PR code, approve runs, or dispatch workflows. After recovery, it clears the approval notice without replacing the workflow's actual CI result. The monitor takes effect after its workflow reaches the default branch; it does not change the administrator-controlled approval policy.
-
 ## Workflow Compilation Issues
 
 ### Frontmatter Field Not Taking Effect
