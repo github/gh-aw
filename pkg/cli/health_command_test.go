@@ -132,6 +132,7 @@ func TestHealthCommand(t *testing.T) {
 	daysFlag := cmd.Flags().Lookup("days")
 	require.NotNil(t, daysFlag, "Should have --days flag")
 	assert.Equal(t, "7", daysFlag.DefValue, "Default days should be 7")
+	assert.Equal(t, "Maximum evidence horizon in days (allowed values: 7, 30, or 90)", daysFlag.Usage)
 
 	thresholdFlag := cmd.Flags().Lookup("threshold")
 	require.NotNil(t, thresholdFlag, "Should have --threshold flag")

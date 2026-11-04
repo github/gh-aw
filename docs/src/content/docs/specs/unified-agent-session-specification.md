@@ -584,7 +584,8 @@ bytes survive scalar projection. Nulls, arrays, other objects, nonfinite numbers
 oversized strings and unpaired surrogates MUST be omitted, not coerced or
 truncated. At the event level, only `type`, projected `data`, an eligible scalar
 `timestamp`, and projected `provenance` MAY survive. Provenance is restricted to
-eligible scalar `component`, `phase`, `path`, `index`, `attemptId`, and `startupAttemptId`; native metadata and
+eligible scalar `component`, `phase`, `path`, `index`, `attemptId`, and `startupAttemptId`,
+plus finite numeric `timestampMs` from the source-normalized observed clock; native metadata and
 unknown fields MUST NOT survive. Missing values MUST NOT become defaults.
 The validated harness projection additionally retains bounded `failureClasses`
 and attempt lists, and explicit `null` exit or completion fields representing
@@ -622,6 +623,16 @@ An empty compact stream is valid and does not mean that the full session is empt
 Transports MUST expose the loss statistics. OTLP export additionally MUST issue
 a visible partial-session warning when output or source-scan limits discard
 evidence; routine privacy filtering alone is not size truncation.
+
+OTLP log records MUST retain valid source event time in `timeUnixNano`,
+separately from export observation time in `observedTimeUnixNano`. Exact
+timezone-qualified ISO fractions take precedence over the millisecond
+projection; numeric clocks use the source-normalized `provenance.timestampMs`
+when supplied, or the native millisecond timestamp otherwise. Missing, invalid,
+negative or unsigned-64-bit-overflow event times MUST remain unset, never
+replaced with observation time or ordering anchors. The exported
+`gh-aw.session.untimed_events` count describes retained records without an
+exportable event clock, after transport-budget admission.
 
 **T-UAS-078 — Bounded file reading and explicit loss.** A file-based producer
 MUST snapshot the nonempty regular file's size, reject a symlink at the file

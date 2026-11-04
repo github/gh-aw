@@ -5,6 +5,7 @@ const path = require("node:path");
 const http = require("node:http");
 const { sendSessionLogs } = require("./send_otlp_session_logs.cjs");
 const { encodeOTLPLogsRequest } = require("./otlp_protobuf.cjs");
+const { serializeSessionArtifact } = require("./session_artifact.cjs");
 const nativeFetch = globalThis.fetch;
 const traceId = "0123456789abcdef0123456789abcdef";
 const spanId = "0123456789abcdef";
@@ -50,6 +51,87 @@ describe("compact unified session OTLP logs", () => {
 
   it("exports only the session log sender", () => {
     expect(Object.keys(require("./send_otlp_session_logs.cjs"))).toEqual(["sendSessionLogs"]);
+  });
+
+  it.each([
+    { timestamp: "2026-10-20T19:00:00.123456789Z", expected: "1792522800123456789" },
+    { timestamp: "2026-10-20T21:00:00.123456789+02:00", expected: "1792522800123456789" },
+    { timestamp: "2026-10-20T17:00:00.123456789-02:00", expected: "1792522800123456789" },
+    { timestamp: "2554-07-21T23:34:33.709551615Z", expected: "18446744073709551615" },
+    { timestamp: 1700000000123.5, expected: "1700000000123500000" },
+    { timestamp: 0, expected: "0" },
+    { timestamp: 1700000000, provenance: { timestampMs: 1700000000000 }, expected: "1700000000000000000" },
+    { timestamp: "1700000000123000000", provenance: { timestampMs: 1700000000123 }, expected: "1700000000123000000" },
+    { provenance: { timestampMs: 1700000000123 }, expected: "1700000000123000000" },
+    { timestamp: "2026-10-20T19:00:00.123456789Z", provenance: { timestampMs: 1792522800123.4568 }, expected: "1792522800123456789" },
+    { timestamp: "1792522800123456789", provenance: { timestampMs: 1792522800123.4568 }, expected: "1792522800123456789" },
+  ])("exports original event time separately from observation time: $timestamp / $provenance", async ({ timestamp, provenance, expected }) => {
+    vi.spyOn(Date, "now").mockReturnValue(1800000000000);
+    const source = { type: "usage.report", data: { aic: 0 }, ...(timestamp !== undefined ? { timestamp } : {}), ...(provenance ? { provenance } : {}) };
+    write([source]);
+    const original = fs.readFileSync(sessionPath, "utf8");
+    await sendSessionLogs({ sessionPath });
+    expect(records()[0]).toMatchObject({ timeUnixNano: expected, observedTimeUnixNano: "1800000000000000000", traceId, spanId });
+    expect(decode(records()[0].body)).toEqual(source);
+    expect(payload().resourceLogs[0].resource.attributes).toContainEqual({ key: "gh-aw.session.untimed_events", value: { intValue: 0 } });
+    expect(fs.readFileSync(sessionPath, "utf8")).toBe(original);
+  });
+
+  it.each([undefined, null, "", "PRIVATE_INVALID_TIME", "1700000000000", "2026-10-20T19:00:00", -1, 8640000000000000, "9999-12-31T23:59:59Z", "2554-07-21T23:34:33.709551616Z"])(
+    "does not replace missing or invalid event time %j with export time",
+    async timestamp => {
+      vi.spyOn(Date, "now").mockReturnValue(1800000000000);
+      write([{ type: "usage.report", data: { aic: 0 }, timestamp }]);
+      await sendSessionLogs({ sessionPath });
+      expect(records()[0]).not.toHaveProperty("timeUnixNano");
+      expect(records()[0].observedTimeUnixNano).toBe("1800000000000000000");
+      expect(payload().resourceLogs[0].resource.attributes).toContainEqual({ key: "gh-aw.session.untimed_events", value: { intValue: 1 } });
+      expect(warning).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([-1, 8640000000000000, 8640000000000001, 1e300])("does not reinterpret an out-of-range normalized clock %j in native timestamp units", async timestampMs => {
+    write([{ type: "usage.report", timestamp: 1700000000, provenance: { timestampMs }, data: { aic: 0 } }]);
+    await sendSessionLogs({ sessionPath });
+    expect(records()[0]).not.toHaveProperty("timeUnixNano");
+    expect(payload().resourceLogs[0].resource.attributes).toContainEqual({ key: "gh-aw.session.untimed_events", value: { intValue: 1 } });
+  });
+
+  it("does not reinterpret an invalid source-normalized seconds clock as milliseconds", async () => {
+    write([{ type: "usage.report", timestamp: 1e13, provenance: { component: "firewall", path: "audit.jsonl" }, data: { aic: 0 } }]);
+    await sendSessionLogs({ sessionPath });
+    expect(records()[0]).not.toHaveProperty("timeUnixNano");
+    expect(payload().resourceLogs[0].resource.attributes).toContainEqual({ key: "gh-aw.session.untimed_events", value: { intValue: 1 } });
+  });
+
+  it("computes time only after publication masks, without exporting source identities", async () => {
+    const timestamp = "2026-10-20T19:00:00Z";
+    vi.stubEnv("GH_AW_SECRET_NAMES", "CLOCK");
+    vi.stubEnv("SECRET_CLOCK", timestamp);
+    write([{ type: "usage.report", timestamp, provenance: { timestampMs: 1792522800000, path: "PRIVATE", component: "usage" }, data: { aic: 1 } }]);
+    await sendSessionLogs({ sessionPath });
+    expect(fetchMock.mock.calls[0][1].body).not.toContain(timestamp);
+    expect(fetchMock.mock.calls[0][1].body).not.toContain("PRIVATE");
+    expect(records()[0]).not.toHaveProperty("timeUnixNano");
+    expect(decode(records()[0].body).provenance).not.toHaveProperty("timestampMs");
+  });
+
+  it("suppresses merger-produced numeric clocks masked during publication", async () => {
+    const timestamp = "2026-10-20T19:00:00Z";
+    const event = { type: "usage.report", timestamp, provenance: { timestampMs: 1792522800000 }, data: { aic: 1 } };
+    fs.writeFileSync(sessionPath, serializeSessionArtifact([event], [timestamp]));
+    await sendSessionLogs({ sessionPath });
+    expect(fetchMock.mock.calls[0][1].body).not.toContain(timestamp);
+    expect(records()[0]).not.toHaveProperty("timeUnixNano");
+    expect(decode(records()[0].body).provenance).not.toHaveProperty("timestampMs");
+    expect(payload().resourceLogs[0].resource.attributes).toContainEqual({ key: "gh-aw.session.untimed_events", value: { intValue: 1 } });
+  });
+
+  it("does not fall back to a normalized clock derived from an impossible ISO date", async () => {
+    write([{ type: "usage.report", timestamp: "2026-02-29T19:00:00.123456789Z", provenance: { timestampMs: 1772391600123 }, data: { aic: 0 } }]);
+    await sendSessionLogs({ sessionPath });
+    expect(records()[0]).not.toHaveProperty("timeUnixNano");
+    expect(payload().resourceLogs[0].resource.attributes).toContainEqual({ key: "gh-aw.session.untimed_events", value: { intValue: 1 } });
   });
 
   it.each(["", "false", "TRUE", "1", "invalid"])("fails closed for opt-in value %j without reading the session", async value => {
@@ -166,6 +248,29 @@ describe("compact unified session OTLP logs", () => {
     expect(partialWarning).toHaveBeenCalledWith(expect.stringMatching(/^::warning::\[otlp\] Session export is partial/));
   });
 
+  it("retains oversized-line and source-scan quality without guessing omitted population", async () => {
+    const { MAX_SOURCE_LINE_BYTES, MAX_SOURCE_SCAN_BYTES } = require("./compact_unified_session.cjs");
+    fs.writeFileSync(sessionPath, '{"type":"session.format","data":{"version":1}}\n' + " ".repeat(MAX_SOURCE_LINE_BYTES + 1) + "\n");
+    const fd = fs.openSync(sessionPath, "r+");
+    try {
+      fs.ftruncateSync(fd, MAX_SOURCE_SCAN_BYTES + 1);
+    } finally {
+      fs.closeSync(fd);
+    }
+    await sendSessionLogs({ sessionPath });
+    expect(records()).toHaveLength(1);
+    const attributes = Object.fromEntries(payload().resourceLogs[0].resource.attributes.map(entry => [entry.key, decode(entry.value)]));
+    expect(attributes).toMatchObject({
+      "gh-aw.session.included_events": 1,
+      "gh-aw.session.omitted_events": 1,
+      "gh-aw.session.oversized_lines": 1,
+      "gh-aw.session.scan_truncated": true,
+      "gh-aw.session.truncated": true,
+      "gh-aw.session.untimed_events": 1,
+    });
+    expect(partialWarning).toHaveBeenCalledWith(expect.stringContaining("Session export is partial"));
+  });
+
   it("enforces the exact UTF-8 request byte budget with whole records and accurate counts", async () => {
     write(Array.from({ length: 20 }, () => ({ type: "usage.report", data: { aic: 1, model: "模型" } })));
     await sendSessionLogs({ sessionPath });
@@ -181,8 +286,28 @@ describe("compact unified session OTLP logs", () => {
     expect(Buffer.byteLength(fetchMock.mock.calls[0][1].body)).toBeLessThanOrEqual(fullSize - 1);
     expect(records()).toHaveLength(19);
     const attributes = Object.fromEntries(payload().resourceLogs[0].resource.attributes.map(entry => [entry.key, decode(entry.value)]));
-    expect(attributes).toMatchObject({ "gh-aw.session.included_events": 19, "gh-aw.session.omitted_events": 1, "gh-aw.session.truncated": true });
+    expect(attributes).toMatchObject({ "gh-aw.session.included_events": 19, "gh-aw.session.omitted_events": 1, "gh-aw.session.truncated": true, "gh-aw.session.untimed_events": 19 });
     expect(partialWarning).toHaveBeenCalledWith(expect.stringContaining("19 compact events; 1 inspected records omitted"));
+  });
+
+  it.each([true, false])("counts only admitted untimed records when the priority record is timed: %j", async timed => {
+    const priority = { type: "session.result", data: { numTurns: 0 }, ...(timed ? { timestamp: "2026-10-20T19:00:00Z" } : {}) };
+    write([priority]);
+    await sendSessionLogs({ sessionPath });
+    const singleRecordSize = Buffer.byteLength(fetchMock.mock.calls[0][1].body);
+    fetchMock.mockClear();
+    vi.stubEnv("GH_AW_OTLP_LOGS_MAX_BYTES", String(singleRecordSize));
+    write([{ type: "usage.report", data: { aic: 1 }, ...(!timed ? { timestamp: "2026-10-20T19:00:00Z" } : {}) }, priority]);
+    await sendSessionLogs({ sessionPath });
+    expect(records()).toHaveLength(1);
+    expect(decode(records()[0].body).type).toBe("session.result");
+    const attributes = Object.fromEntries(payload().resourceLogs[0].resource.attributes.map(entry => [entry.key, decode(entry.value)]));
+    expect(attributes).toMatchObject({
+      "gh-aw.session.included_events": 1,
+      "gh-aw.session.omitted_events": 1,
+      "gh-aw.session.untimed_events": timed ? 0 : 1,
+    });
+    expect(Buffer.byteLength(fetchMock.mock.calls[0][1].body)).toBeLessThanOrEqual(singleRecordSize);
   });
 
   it("drops low-priority usage, not late outcomes, at the transport byte cap", async () => {
@@ -337,11 +462,17 @@ describe("compact unified session OTLP logs", () => {
     });
     await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
     try {
+      write([
+        { type: "session.result", timestamp: "2026-10-20T19:00:00.123456789Z", data: { numTurns: 0 } },
+        { type: "session.format", data: { version: 1 } },
+      ]);
       vi.stubEnv("GH_AW_OTLP_ENDPOINTS", JSON.stringify([{ url: `http://127.0.0.1:${server.address().port}`, headers: "x-api-key=local-test" }]));
       vi.stubEnv("GH_AW_OTLP_LOGS_MAX_BYTES", "2048");
       vi.spyOn(Date, "now").mockReturnValue(1700000000000);
       await sendSessionLogs({ sessionPath });
       const jsonPayload = payload();
+      expect(jsonPayload.resourceLogs[0].scopeLogs[0].logRecords[0]).toMatchObject({ timeUnixNano: "1792522800123456789", observedTimeUnixNano: "1700000000000000000", traceId, spanId });
+      expect(jsonPayload.resourceLogs[0].resource.attributes).toContainEqual({ key: "gh-aw.session.untimed_events", value: { intValue: 1 } });
       fetchMock.mockClear();
       vi.stubEnv("OTEL_EXPORTER_OTLP_PROTOCOL", protocol);
       fetchMock.mockImplementation(nativeFetch);

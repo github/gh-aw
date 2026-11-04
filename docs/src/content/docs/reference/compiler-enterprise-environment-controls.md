@@ -144,6 +144,32 @@ existing trace/span IDs when valid, so vendors can correlate session metadata
 with traces. Resource attributes report the compact format version, included
 and omitted event counts, oversized source lines, and truncation.
 
+`timeUnixNano` contains the original event time when valid; timezone-qualified
+ISO timestamps retain up to nanosecond precision. Numeric timestamps reuse the
+source-normalized `provenance.timestampMs` clock when present, otherwise the
+native millisecond timestamp. `observedTimeUnixNano` records export observation
+time independently. Missing, invalid, negative or out-of-range event times leave
+`timeUnixNano` unset; they are not replaced with export time. The body retains
+the projected original timestamp and available normalized clock.
+
+Use the following resource attributes to qualify vendor queries:
+
+| Attribute | Meaning |
+| --- | --- |
+| `gh-aw.session.compact.version` | Compact profile version, currently `1`. |
+| `gh-aw.session.included_events` | Records retained in this request. |
+| `gh-aw.session.omitted_events` | Inspected records omitted by privacy/vocabulary filtering or compact/transport budgets; not a count of the unscanned population. |
+| `gh-aw.session.oversized_lines` | Completed source lines discarded for exceeding the line limit. |
+| `gh-aw.session.scan_truncated` | Source scanning stopped at its byte limit. |
+| `gh-aw.session.truncated` | Output, line-size or scan limits discarded evidence; `false` does not certify full-session completeness. |
+| `gh-aw.session.untimed_events` | Retained records without an exportable event timestamp. |
+
+These attributes describe a request and repeat on its log rows. Do not sum them
+per row or across mirrored endpoints. A truncated or scan-limited export is
+partial evidence, not proof of no further activity. Event-time queries must
+qualify untimed records separately rather than silently treating export time as
+execution time. Uncorrelated records cannot establish run-level coverage.
+
 The export reuses the [compact unified-session profile](/gh-aw/specs/unified-agent-session-specification/):
 at most 128 events and 16 KiB of projected JSONL, with bounded source scanning.
 Prompts, conversation, reasoning, tool arguments/results, unknown event types,
