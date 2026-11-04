@@ -451,6 +451,8 @@ safe-outputs:
 
 When `push-to-pull-request-branch` is configured, git commands (`checkout`, `branch`, `switch`, `add`, `rm`, `commit`, `merge`) are automatically enabled.
 
+Every `push_to_pull_request_branch` tool call requires a `message` containing a concise summary of the pushed changes. This argument has no default and is not inferred from git, even when the changes are already committed locally. Existing local commits retain their own commit messages.
+
 An explicit `target` accepts a positive PR number as an integer (`123`), a numeric string (`"123"`), or a hash-prefixed string (`"#123"`). With `target: "*"`, the same forms are accepted in the safe output message's `pull_request_number` field. Quote hash-prefixed values in YAML so they are not treated as comments.
 
 `create_pull_request` stages a patch/bundle for processing after the agent finishes; its tool response does not return a PR number. A `push_to_pull_request_branch` call cannot target a PR created earlier in the same agent run, even with a `temporary_id`, because the branch is not yet available remotely. Push follow-up commits in a later run after the PR exists.
