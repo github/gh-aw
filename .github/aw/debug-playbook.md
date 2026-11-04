@@ -154,10 +154,10 @@ Nonempty `safeoutputs.jsonl` != publication.
 | --- | --- | --- |
 | `agent_startup_failure` | First setup/engine error. | Fix startup; missing output need not be agent choice. |
 | `engine_driver_failure`, `driver_crash` | Driver exit/signal; final native error. | Fix driver first; nonzero exit alone != outage. |
-| `secret_redaction_failure` | Redaction status; sanitized diagnostic. | Repair redaction before publication; never expose raw logs/disable masking. |
-| `safeoutputs_cli_error` | Arguments, registration, denial. | Fix supported invocation/allowlist; no unauthorized `gh` writes. |
-| `invalid_safe_outputs` | Record errors; generated schema. | Fix emitted type/fields; retain validation. |
-| `missing_terminal_safe_output` | Expected terminal tool, denied calls, last session event. | Fix publication/prompt completion contract; silence is not an intentional noop. |
+| `secret_redaction_failure` | Redaction status; sanitized diagnostic. | Repair redaction before publication; never expose raw logs. |
+| `safeoutputs_cli_error` | Invocation/registration/denial. | Fix supported invocation; no unauthorized writes. |
+| `invalid_safe_outputs`, `safe_output_dependency_failed`, `safe_output_dependency_invalid` | Output/schema; dependency graph/results. | Fix output/dependencies; validate. |
+| `missing_terminal_safe_output` | Terminal tool, denied calls, last event. | Fix publication/completion contract; silence is not an intentional noop. |
 | `request_rejection`, `prompt_exhaustion`, `unknown` | Native error, budget, missing evidence. | Resolve cause; retain unknown without evidence. |
 | `ERR_VALIDATION`, `E001` | Fields/types, target IDs, schema. | Fix producer; no silent coercion. |
 | `E002`, `MAX_COUNT_REACHED` | Operation cap; accepted records. | Reduce count; never replay applied mutations. |
