@@ -65,6 +65,7 @@ function isSousChefComment(comment) {
 function isNudge(comment) {
   const body = comment.body ?? "";
   if (/The code changes were not applied\.|a fallback review issue was created instead due to protected file changes:|Direct push to the original pull request branch was not possible/.test(body)) return false;
+  if (/^Sous-chef requested-state: [a-f0-9]{64}$/m.test(body) && !statePattern.test(body)) return false;
   return isSousChefComment(comment) && (body.includes("@copilot") || statePattern.test(body));
 }
 
@@ -473,7 +474,7 @@ export function formatNudge(pr) {
     "",
     ...tasks.map((task, index) => `${index + 1}. ${task}`),
     "",
-    "Once you start work, post this work summary as a PR comment, including the Sous-chef head, work, and state lines below, to record that the assignment is running. Apply the necessary fixes on this PR's existing branch, reply to each listed review thread and resolve it when addressed. Ignore feedback already answered or resolved; stop when only human review or CI remains. Do not merge or trigger CI.",
+    "Once you start work, post this work summary as a PR comment without the leading Copilot mention, including the Sous-chef head, work, and state lines below, to record that the assignment is running. Apply the necessary fixes on this PR's existing branch, reply to each listed review thread and resolve it when addressed. Ignore feedback already answered or resolved; stop when only human review or CI remains. Do not merge or trigger CI.",
     "",
     `Sous-chef head: ${pr.headRefOid}`,
     `Sous-chef work: ${workTokens(pr).join(" ")}`,
@@ -483,7 +484,7 @@ export function formatNudge(pr) {
 
 export function formatAssignmentRequest(pr) {
   const body = formatNudge(pr);
-  return body?.replace(/^Sous-chef (head|work|state):/gm, "Sous-chef requested-$1:") ?? null;
+  return body ? `[@copilot](https://github.com/copilot)\n\n${body.replace(/^Sous-chef (head|work|state):/gm, "Sous-chef requested-$1:")}` : null;
 }
 
 export async function checkRateLimit(api = gh) {

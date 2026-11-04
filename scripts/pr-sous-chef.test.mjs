@@ -134,18 +134,22 @@ test("started coding agents can record assignment markers without member associa
 
 test("pending assignment comments do not suppress retries until a coding agent starts", () => {
   const first = classify(failingPr, detail(), [], [], now);
-  const body = formatAssignmentRequest(first).replace(/<!--[\s\S]*?--!?>/g, "");
+  const request = formatAssignmentRequest(first);
+  assert.ok(request.startsWith("[@copilot](https://github.com/copilot)\n\n"));
+  const body = request.replace(/<!--[\s\S]*?--!?>/g, "");
   assert.match(body, /Sous-chef requested-head: abc/);
   assert.match(body, /Sous-chef requested-work: [a-f0-9]{64}/);
   assert.ok(body.endsWith(`Sous-chef requested-state: ${first.state_fingerprint}`));
   assert.doesNotMatch(body, /Sous-chef (head|work|state):/);
   const pending = { ...nudge(first.state_fingerprint), body };
   assert.ok(classify(failingPr, detail(), [pending], [], now).nudge_needed);
+  assert.ok(classify(failingPr, detail(), [{ ...pending, body: request }], [], now).nudge_needed);
   const acknowledged = {
     ...pending,
     user: { login: "copilot-swe-agent[bot]" },
-    body: body.replace(/^Sous-chef requested-(head|work|state):/gm, "Sous-chef $1:"),
+    body: body.replace("[@copilot](https://github.com/copilot)\n\n", "").replace(/^Sous-chef requested-(head|work|state):/gm, "Sous-chef $1:"),
   };
+  assert.doesNotMatch(acknowledged.body, /@copilot/);
   assert.equal(classify(failingPr, detail(), [pending, acknowledged], [], now).skip_reason, "unchanged");
   assert.equal(formatAssignmentRequest({ ...first, nudge_needed: false }), null);
 });
@@ -1183,6 +1187,8 @@ test("workflow polls every five minutes but never starts an agent for low budget
   assert.match(workflow, /sparse-checkout: \|\n\s+scripts\n\s+actions\/setup\/js\n\s+\.github\/scripts/);
   assert.match(workflow, /assign-to-agent:\n\s+name: copilot\n\s+allowed: \[copilot\]\n\s+target: "\*"\n\s+max: 4\n\s+github-token: \$\{\{ secrets\.AWI_MAINTENANCE_TOKEN \}\}/);
   assert.match(workflow, /post its `nudges\[0\]\.body` exactly via `add_comment` on `nudges\[0\]\.pr_number`/);
+  assert.match(workflow, /The comment must start with `\[@copilot\]\(https:\/\/github\.com\/copilot\)`/);
+  assert.match(workflow, /leading Copilot mention, replacing/);
   assert.match(workflow, /as `pull_number` and `copilot` as `agent`/);
   assert.match(workflow, /custom-instructions: \|\n\s+Work on this PR's existing branch/);
   assert.match(workflow, /"Sous-chef requested-state:" with "Sous-chef head:", "Sous-chef work:", and\n\s+"Sous-chef state:"/);
