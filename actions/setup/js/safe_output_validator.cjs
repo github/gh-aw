@@ -93,16 +93,23 @@ function validateLabels(labels, allowedLabels = undefined, maxCount = 3, blocked
     return { valid: false, error: "labels must be an array" };
   }
 
-  // Sanitize labels before applying security-sensitive filters
+  // Sanitize and truncate labels before applying security-sensitive filters
   let validLabels = labels
     .filter(label => label != null && label !== false && label !== 0)
-    .map(label => sanitizeLabelContent(String(label).trim()))
-    .filter(label => label);
+    .map(label => {
+      const raw = String(label).trim();
+      const sanitized = sanitizeLabelContent(raw);
+      return {
+        raw,
+        value: sanitized.length > 64 ? sanitized.substring(0, 64) : sanitized,
+      };
+    })
+    .filter(label => label.value);
 
   // Check for removal attempts (labels starting with '-')
   for (const label of validLabels) {
-    if (label.startsWith("-")) {
-      return { valid: false, error: `Label removal is not permitted. Found line starting with '-': ${label}` };
+    if (label.value.startsWith("-")) {
+      return { valid: false, error: `Label removal is not permitted. Found line starting with '-': ${label.value}` };
     }
   }
 
@@ -110,9 +117,9 @@ function validateLabels(labels, allowedLabels = undefined, maxCount = 3, blocked
   if (blockedPatterns && blockedPatterns.length > 0) {
     const blockedLabels = [];
     validLabels = validLabels.filter(label => {
-      const isBlocked = blockedPatterns.some(pattern => matchesSimpleGlob(label, pattern));
+      const isBlocked = blockedPatterns.some(pattern => matchesSimpleGlob(label.raw, pattern) || matchesSimpleGlob(label.value, pattern));
       if (isBlocked) {
-        blockedLabels.push(label);
+        blockedLabels.push(label.value);
       }
       return !isBlocked;
     });
@@ -123,11 +130,11 @@ function validateLabels(labels, allowedLabels = undefined, maxCount = 3, blocked
 
   // Filter labels based on allowed list if provided
   if (allowedLabels && allowedLabels.length > 0) {
-    validLabels = validLabels.filter(label => allowedLabels.some(pattern => matchesSimpleGlob(label, pattern)));
+    validLabels = validLabels.filter(label => allowedLabels.some(pattern => matchesSimpleGlob(label.raw, pattern) || matchesSimpleGlob(label.value, pattern)));
   }
 
-  // Deduplicate and truncate labels
-  const uniqueLabels = validLabels.map(label => (label.length > 64 ? label.substring(0, 64) : label)).filter((label, index, arr) => arr.indexOf(label) === index);
+  // Deduplicate labels
+  const uniqueLabels = validLabels.map(label => label.value).filter((label, index, arr) => arr.indexOf(label) === index);
 
   // Apply max count limit
   if (uniqueLabels.length > maxCount) {

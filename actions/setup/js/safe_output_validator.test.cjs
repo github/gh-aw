@@ -283,15 +283,30 @@ describe("safe_output_validator.cjs", () => {
       expect(result.value).not.toContain("stale");
     });
 
-    it("should block labels containing zero-width characters that sanitize to a blocked label", () => {
-      const result = validator.validateLabels(["bug", "block\u200Bed"], undefined, 10, ["blocked"]);
+    it.each(["block\u200Bed", "ｂｌｏｃｋｅｄ"])("should block normalized labels that match a blocked pattern: %s", label => {
+      const result = validator.validateLabels(["bug", label], undefined, 10, ["blocked"]);
 
       expect(result.valid).toBe(true);
       expect(result.value).toEqual(["bug"]);
     });
 
-    it("should block fullwidth labels that sanitize to a blocked label", () => {
-      const result = validator.validateLabels(["bug", "ｂｌｏｃｋｅｄ"], undefined, 10, ["blocked"]);
+    it("should match blocked patterns against the raw label before sanitization", () => {
+      const result = validator.validateLabels(["bug", "@copilot"], undefined, 10, ["@copilot"]);
+
+      expect(result.valid).toBe(true);
+      expect(result.value).toEqual(["bug"]);
+    });
+
+    it("should match allowed patterns against the raw label before sanitization", () => {
+      const result = validator.validateLabels(["@bot"], ["@bot"], 10);
+
+      expect(result.valid).toBe(true);
+      expect(result.value).toEqual(["`@bot`"]);
+    });
+
+    it("should block labels that match a blocked pattern after sanitization and truncation", () => {
+      const label = "🐛".repeat(27) + " @blocked!";
+      const result = validator.validateLabels(["bug", label], undefined, 10, ["*blocked"]);
 
       expect(result.valid).toBe(true);
       expect(result.value).toEqual(["bug"]);
