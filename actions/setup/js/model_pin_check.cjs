@@ -20,7 +20,7 @@
  *   - `provider not in the Copilot catalogue`: the pin targets another provider (an
  *     explicit non-Copilot prefix, the engine's own provider such as Anthropic or
  *     OpenAI, or Copilot BYOK via `engine.env.COPILOT_PROVIDER_BASE_URL`).
- *   - `sentinel`: `inherited` (a sub-agent that uses its parent's model; the parent's
+ *   - `sentinel`: `inherited` or `inherit` (a sub-agent that uses its parent's model; the parent's
  *     pin is checked in its own row) or `auto` on an engine or field where `auto` is
  *     the gateway's own model selection rather than a gh-aw alias (every engine except
  *     Copilot, and `safe-outputs.assign-to-agent.model`).
@@ -692,7 +692,7 @@ function classifyPin(pin, reflectData) {
   const values = pin.kind === "alias-definition" ? [pin.model, ...(pin.aliasEntries || [])] : [pin.model];
   if (values.some(value => value.includes("${{"))) return { ...result, reason: REASON_EXPRESSION };
   const name = pin.kind === "model" ? bareModelName(pin.model) : "";
-  if (name === "inherited") return { ...result, reason: REASON_INHERITED };
+  if (name === "inherited" || name === "inherit") return { ...result, reason: REASON_INHERITED };
   if (pin.inactiveReason) return { ...result, reason: pin.inactiveReason };
   if (pin.provider === "byok") return { ...result, reason: REASON_BYOK };
   const prefix = pin.kind === "model" ? modelPrefixProvider(pin.model) : "";

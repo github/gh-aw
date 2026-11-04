@@ -136,6 +136,12 @@ describe("model_pin_check collection and rules", () => {
         "model: inherited",
         "---",
         "Help.",
+        "",
+        "## agent: `claude-sub`",
+        "---",
+        "model: inherit",
+        "---",
+        "Help.",
       ].join("\n"),
       ".github/workflows/shared/models.md": "---\nmodels:\n  providers:\n    copilot:\n      models: {}\n  team-fast:\n    - copilot/claude-haiku-4.5\n---\n",
       ".github/agents/helper.md": "---\nname: helper\nmodel: copilot/claude-opus-4.8\n---\nHelper.\n",
@@ -154,6 +160,7 @@ describe("model_pin_check collection and rules", () => {
     );
     expect(report.pins.some(result => result.field.includes("providers"))).toBe(false);
     expect(pin(report, "## agent: 'nano' model").reason).toMatch(/^sentinel `inherited`/);
+    expect(pin(report, "## agent: 'claude-sub' model")).toMatchObject({ status: "not_checked", reason: expect.stringMatching(/^sentinel `inherited`/) });
   });
 
   it("resolves nested imports like the compiler (shared/ paths from the workflow directory)", () => {
