@@ -216,3 +216,70 @@ func TestUnquotedHeredocSanitizerPreventsCommandSubstitution(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, payload+"\n", string(output), "environment-variable expansion must preserve the payload as data")
 }
+
+func TestQuotedHeredocEnvExpressionRejectedInBothValidationPaths(t *testing.T) {
+	const expression = "${{ env.BODY }}"
+	script := "cat <<'EOF'\n" + expression + "\nEOF"
+	workflow := map[string]any{"steps": []any{map[string]any{
+		"env": map[string]any{"BODY": "${{ steps.fetch.outputs.result }}"},
+		"run": script,
+	}}}
+
+	err := validateNoTemplateInjectionFromParsed(workflow)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "quoted heredoc")
+	assert.Contains(t, err.Error(), "unquoted heredoc (<<EOF) or printf")
+
+	err = validateNoGitHubExpressionsInRunScriptsFromParsed(workflow)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unquoted heredoc (<<EOF) or printf")
+
+	yaml := `jobs:
+  test:
+    steps:
+      - id: fetch
+        run: echo result
+      - env:
+          BODY: ${{ steps.fetch.outputs.result }}
+        run: |
+          cat <<'EOF'
+            ${{ env.BODY }}
+          EOF
+`
+	scan := scanRunContentExpressions(yaml)
+	assert.True(t, scan.hasUnsafe)
+	assert.True(t, scan.hasDisallowed)
+
+	compiler := NewCompiler(WithNoEmit(true))
+	for _, parsed := range []map[string]any{workflow, nil} {
+		require.Error(t, compiler.validateTemplateInjection(yaml, "test.lock.yml", "test.md", parsed))
+	}
+}
+
+func TestQuotedHeredocGuardrailDiagnostic(t *testing.T) {
+	for _, expression := range []string{"${{ secrets.NPM_TOKEN }}", "${{ github.sha }}"} {
+		t.Run(expression, func(t *testing.T) {
+			workflow := map[string]any{"steps": []any{map[string]any{
+				"run": "cat <<'EOF'\n" + expression + "\nEOF",
+			}}}
+			err := validateNoGitHubExpressionsInRunScriptsFromParsed(workflow)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "Quoted heredoc contents are still interpolated by GitHub Actions before Bash")
+			assert.Contains(t, err.Error(), "printf '%s\\n' \"$VALUE\"")
+		})
+	}
+}
+
+func TestQuotedHeredocEnvExpressionWithUnprovenBoundaryRejected(t *testing.T) {
+	const script = "cat <<'EOF'\n${{ env.BODY }}\nEOF\nif"
+	workflow := map[string]any{"steps": []any{map[string]any{"run": script}}}
+
+	err := validateNoTemplateInjectionFromParsed(workflow)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unproven heredoc boundary")
+
+	yaml := "steps:\n  - run: |\n      " + strings.ReplaceAll(script, "\n", "\n      ") + "\n"
+	scan := scanRunContentExpressions(yaml)
+	assert.True(t, scan.hasUnsafe)
+	assert.True(t, scan.hasDisallowed)
+}

@@ -349,6 +349,15 @@ type TemplateInjectionViolation struct {
 	Context    string // Expression context (e.g., "github.event", "steps.*.outputs")
 }
 
+func writeQuotedHeredocMigrationGuidance(builder *strings.Builder, violations []TemplateInjectionViolation) {
+	for _, violation := range violations {
+		if strings.HasPrefix(violation.Context, "quoted heredoc") || violation.Context == "unproven heredoc boundary" {
+			builder.WriteString("Quoted heredoc contents are still interpolated by GitHub Actions before Bash. Bind dynamic values in the step's env: block, then use an unquoted heredoc (<<EOF) or printf '%s\\n' \"$VALUE\" instead.\n\n")
+			return
+		}
+	}
+}
+
 // extractRunSnippet extracts a relevant snippet from the run block containing the expression
 func extractRunSnippet(runContent string, expression string) string {
 	lines := strings.SplitSeq(runContent, "\n")
@@ -411,6 +420,8 @@ func formatTemplateInjectionError(violations []TemplateInjectionViolation) error
 		builder.WriteString("\n")
 	}
 
+	writeQuotedHeredocMigrationGuidance(&builder, violations)
+
 	builder.WriteString("Security Risk:\n")
 	builder.WriteString("  When expressions are used directly in shell commands, an attacker can inject\n")
 	builder.WriteString("  malicious code through user-controlled inputs (issue titles, PR descriptions,\n")
@@ -452,6 +463,8 @@ func formatRunScriptExpressionGuardrailError(violations []TemplateInjectionViola
 	if len(violations) > maxExamples {
 		fmt.Fprintf(&builder, "  ... and %d more\n", len(violations)-maxExamples)
 	}
+
+	writeQuotedHeredocMigrationGuidance(&builder, violations)
 
 	builder.WriteString("\nSafe pattern:\n")
 	builder.WriteString("  env:\n")

@@ -93,6 +93,59 @@ func runScriptExpressions(source string) []string {
 	return expressions
 }
 
+func runScriptHeredocExpressionSnippets(source string) (map[string]string, bool) {
+	regions, parsed := shellHeredocRegions(source, false)
+	if !parsed {
+		return nil, false
+	}
+	snippets := make(map[string]string)
+	for _, region := range regions {
+		if !region.quoted || region.start < 0 || region.end < region.start || region.end > len(source) {
+			continue
+		}
+		body := source[region.start:region.end]
+		for _, expression := range runScriptExpressions(body) {
+			if _, exists := snippets[expression]; !exists {
+				snippets[expression] = extractRunSnippet(body, expression)
+			}
+		}
+	}
+	return snippets, true
+}
+
+func isRunScriptEnvExpression(source string) bool {
+	expression, ok := actionslanguageservice.WrappedExpression(source)
+	if !ok {
+		return false
+	}
+	found := false
+	actionslanguageservice.Walk(expression, func(node *actionslanguageservice.Expression) bool {
+		path := runScriptAccessPath(node)
+		first, ok := runScriptAccessPathSegment(path, 0)
+		if ok && strings.EqualFold(first, "env") {
+			found = true
+			return false
+		}
+		return !found
+	})
+	return found
+}
+
+func unsafeRunScriptExpressionContextInScript(expression string, quotedHeredocSnippets map[string]string, boundariesProven bool) string {
+	if context := unsafeRunScriptExpressionContext(expression); context != "" {
+		return context
+	}
+	if isRunScriptEnvExpression(expression) {
+		if !boundariesProven {
+			return "unproven heredoc boundary"
+		}
+		if _, quoted := quotedHeredocSnippets[expression]; quoted {
+			return "quoted heredoc environment"
+		}
+	}
+	return ""
+}
+
 // Unknown computed selectors are wildcards for this deny policy, not trusted
 // static references. In particular, steps[vars.step].outputs.* is user data.
 func runScriptAccessPath(expression *actionslanguageservice.Expression) []string {
@@ -189,25 +242,21 @@ func startRunBlock(indent int, inRunBlock *bool, runBlockIndent, contentIndent *
 	*contentIndent = 0
 }
 
-// walkRunBlockLines scans raw YAML text and visits each inline run value or line inside a
-// multiline run block. It recognizes plain run: keys as well as quoted and flow-style forms
-// so Path B stays aligned with the parsed-YAML validators.
+// walkRunBlocks scans raw YAML text and visits each inline run value or complete
+// multiline run block. It recognizes plain run: keys as well as quoted and flow-style
+// forms so Path B stays aligned with the parsed-YAML validators.
 //
 // YAML indentation is removed before expressions are scanned. Shell comments and
 // heredoc bodies are included because GitHub evaluates expressions before Bash.
-func walkRunBlockLines(yamlContent string, visit func(line string) bool) bool {
+func walkRunBlocks(yamlContent string, visit func(runContent string) bool) bool {
 	inRunBlock := false
 	runBlockIndent := 0
 	contentIndent := 0
 	var block strings.Builder
 	flush := func() bool {
-		for line := range strings.SplitSeq(block.String(), "\n") {
-			if visit(line) {
-				return true
-			}
-		}
+		content := block.String()
 		block.Reset()
-		return false
+		return content != "" && visit(content)
 	}
 	for line := range strings.SplitSeq(yamlContent, "\n") {
 		trimmed := strings.TrimLeft(line, " \t")
@@ -263,17 +312,18 @@ func scanRunContentExpressions(yamlContent string) runContentExpressionScan {
 	}
 
 	var scan runContentExpressionScan
-	walkRunBlockLines(yamlContent, func(line string) bool {
-		if !mayContainInlineExpression(line) {
+	walkRunBlocks(yamlContent, func(runContent string) bool {
+		if !mayContainInlineExpression(runContent) {
 			return false
 		}
 
-		for _, expr := range runScriptExpressions(line) {
-			context := unsafeRunScriptExpressionContext(expr)
+		quotedHeredocSnippets, boundariesProven := runScriptHeredocExpressionSnippets(runContent)
+		for _, expr := range runScriptExpressions(runContent) {
+			context := unsafeRunScriptExpressionContextInScript(expr, quotedHeredocSnippets, boundariesProven)
 			if !scan.hasUnsafe && context != "" {
 				scan.hasUnsafe = true
 			}
-			if !scan.hasDisallowed && (context == "invalid expression" || !allowedRunScriptExpressionRegex.MatchString(expr)) {
+			if !scan.hasDisallowed && (context != "" || !allowedRunScriptExpressionRegex.MatchString(expr)) {
 				scan.hasDisallowed = true
 			}
 			if scan.hasUnsafe && scan.hasDisallowed {
@@ -303,12 +353,16 @@ func validateNoTemplateInjectionFromParsed(workflow map[string]any) error {
 		}
 
 		expressions := runScriptExpressions(runContent)
+		quotedHeredocSnippets, boundariesProven := runScriptHeredocExpressionSnippets(runContent)
 
 		// Check each expression for unsafe contexts
 		for _, expr := range expressions {
-			if context := unsafeRunScriptExpressionContext(expr); context != "" {
+			if context := unsafeRunScriptExpressionContextInScript(expr, quotedHeredocSnippets, boundariesProven); context != "" {
 				// Found an unsafe pattern - extract a snippet for context
 				snippet := extractRunSnippet(runContent, expr)
+				if quotedSnippet, quoted := quotedHeredocSnippets[expr]; quoted {
+					snippet = quotedSnippet
+				}
 				violations = append(violations, TemplateInjectionViolation{
 					Expression: expr,
 					Snippet:    snippet,
@@ -349,15 +403,32 @@ func validateNoGitHubExpressionsInRunScriptsFromParsed(workflow map[string]any) 
 		}
 
 		expressions := runScriptExpressions(runContent)
+		quotedHeredocSnippets, boundariesProven := runScriptHeredocExpressionSnippets(runContent)
 		for _, expr := range expressions {
-			if _, valid := actionslanguageservice.WrappedExpression(expr); valid && allowedRunScriptExpressionRegex.MatchString(expr) {
+			_, hasQuotedSnippet := quotedHeredocSnippets[expr]
+			quotedEnv := isRunScriptEnvExpression(expr) &&
+				(!boundariesProven || hasQuotedSnippet)
+			if _, valid := actionslanguageservice.WrappedExpression(expr); valid &&
+				allowedRunScriptExpressionRegex.MatchString(expr) && !quotedEnv {
 				continue
 			}
 			snippet := extractRunSnippet(runContent, expr)
+			context := detectExpressionContext(expr)
+			if quotedEnv {
+				context = "quoted heredoc environment"
+				if quotedSnippet, quoted := quotedHeredocSnippets[expr]; quoted {
+					snippet = quotedSnippet
+				}
+			} else if quotedSnippet, quoted := quotedHeredocSnippets[expr]; quoted {
+				snippet = quotedSnippet
+				context = "quoted heredoc"
+			} else if !boundariesProven && isRunScriptEnvExpression(expr) {
+				context = "unproven heredoc boundary"
+			}
 			violations = append(violations, TemplateInjectionViolation{
 				Expression: expr,
 				Snippet:    snippet,
-				Context:    detectExpressionContext(expr),
+				Context:    context,
 			})
 		}
 	}
