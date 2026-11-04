@@ -15,9 +15,9 @@ import (
 func TestHeredocInjectionControls(t *testing.T) {
 	const expression = "${{ github.event.issue.title }}"
 	tests := []struct {
-		name   string
-		script string
-		unsafe bool
+		name    string
+		script  string
+		rewrite bool
 	}{
 		{"unquoted", "cat <<EOF\n" + expression + "\nEOF", true},
 		{"unquoted custom", "cat <<custom-marker\n" + expression + "\ncustom-marker", true},
@@ -25,34 +25,34 @@ func TestHeredocInjectionControls(t *testing.T) {
 		{"unquoted tab stripping", "cat <<-EOF\n\t" + expression + "\n\tEOF", true},
 		{"body hash is not a comment", "cat <<EOF\n# " + expression + "\nEOF", true},
 		{"body quotes are not shell quotes", "cat <<EOF\n' # " + expression + "\nEOF", true},
-		{"single quoted", "cat <<'EOF'\n" + expression + "\nEOF", true},
-		{"double quoted custom", "cat <<\"custom-marker\"\n" + expression + "\ncustom-marker", true},
-		{"partially quoted", "cat <<E'OF'\n" + expression + "\nEOF", true},
-		{"prefix quoted", "cat <<'E'OF\n" + expression + "\nEOF", true},
-		{"ANSI quoted without escapes", "cat <<$'EOF'\n" + expression + "\nEOF", true},
-		{"single quoted literal backslash", "cat <<'E\\OF'\n" + expression + "\nE\\OF", true},
+		{"single quoted", "cat <<'EOF'\n" + expression + "\nEOF", false},
+		{"double quoted custom", "cat <<\"custom-marker\"\n" + expression + "\ncustom-marker", false},
+		{"partially quoted", "cat <<E'OF'\n" + expression + "\nEOF", false},
+		{"prefix quoted", "cat <<'E'OF\n" + expression + "\nEOF", false},
+		{"ANSI quoted without escapes", "cat <<$'EOF'\n" + expression + "\nEOF", false},
+		{"single quoted literal backslash", "cat <<'E\\OF'\n" + expression + "\nE\\OF", false},
 		{"continued unquoted delimiter", "cat <<EO\\\nF\n" + expression + "\nEOF", true},
-		{"escaped delimiter", "cat <<\\EOF\n" + expression + "\nEOF", true},
+		{"escaped delimiter", "cat <<\\EOF\n" + expression + "\nEOF", false},
 		{"escaped delimiter followed by command", "cat <<\\EOF\nliteral\\\nEOF\necho " + expression, true},
-		{"quoted tab stripping", "cat <<-'custom-marker'\n\t" + expression + "\n\tcustom-marker", true},
-		{"mismatched suffix", "cat <<'FIRST_EOF'\n" + expression + "\nSECOND_EOF", true},
-		{"trailing delimiter spaces", "cat <<'EOF'\n" + expression + "\nEOF ", true},
-		{"leading delimiter spaces", "cat <<'EOF'\n" + expression + "\n EOF", true},
-		{"tabs without strip operator", "cat <<'EOF'\n" + expression + "\n\tEOF", true},
-		{"spaces with strip operator", "cat <<-'EOF'\n" + expression + "\n EOF", true},
-		{"unterminated", "cat <<'EOF'\n" + expression, true},
+		{"quoted tab stripping", "cat <<-'custom-marker'\n\t" + expression + "\n\tcustom-marker", false},
+		{"mismatched suffix", "cat <<'FIRST_EOF'\n" + expression + "\nSECOND_EOF", false},
+		{"trailing delimiter spaces", "cat <<'EOF'\n" + expression + "\nEOF ", false},
+		{"leading delimiter spaces", "cat <<'EOF'\n" + expression + "\n EOF", false},
+		{"tabs without strip operator", "cat <<'EOF'\n" + expression + "\n\tEOF", false},
+		{"spaces with strip operator", "cat <<-'EOF'\n" + expression + "\n EOF", false},
+		{"unterminated", "cat <<'EOF'\n" + expression, false},
 		{"opener in string", "echo \"<<'EOF'\"\necho " + expression + "\nEOF", true},
 		{"opener in comment", "# cat <<'EOF'\necho " + expression + "\nEOF", true},
 		{"here string", "cat <<<\"<<'EOF'\"\necho " + expression + "\nEOF", true},
 		{"arithmetic shift", "echo $((1 << 2))\necho " + expression, true},
 		{"opening command retained", "cat <<'EOF'; echo " + expression + "\nliteral\nEOF", true},
 		{"after exact close", "cat <<'FIRST_EOF'\nliteral\nFIRST_EOF\necho " + expression + "\nSECOND_EOF", true},
-		{"same suffix inside body", "cat <<'FIRST_EOF'\nSECOND_EOF\n" + expression + "\nFIRST_EOF", true},
+		{"same suffix inside body", "cat <<'FIRST_EOF'\nSECOND_EOF\n" + expression + "\nFIRST_EOF", false},
 		{"multiple redirects", "cat <<'FIRST' <<SECOND\nliteral\nFIRST\n# " + expression + "\nSECOND", true},
-		{"quoted body after unquoted body", "cat <<FIRST <<'SECOND'\nliteral\nFIRST\n" + expression + "\nSECOND", true},
-		{"nested command substitution", "value=$(cat <<'EOF'\n" + expression + "\nEOF\n)", true},
+		{"quoted body after unquoted body", "cat <<FIRST <<'SECOND'\nliteral\nFIRST\n" + expression + "\nSECOND", false},
+		{"nested command substitution", "value=$(cat <<'EOF'\n" + expression + "\nEOF\n)", false},
 		{"outer double quote hash", "echo \"$(cat <<'EOF'\nliteral\nEOF\n) # " + expression + "\"", true},
-		{"quoted inner body in expanding outer body", "cat <<OUTER\n$(cat <<'INNER'\n" + expression + "\nINNER\n)\nOUTER", true},
+		{"quoted inner body in expanding outer body", "cat <<OUTER\n$(cat <<'INNER'\n" + expression + "\nINNER\n)\nOUTER", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -61,34 +61,30 @@ func TestHeredocInjectionControls(t *testing.T) {
 			yaml := "jobs:\n  test:\n    steps:\n      - run: |\n          " +
 				strings.ReplaceAll(tt.script, "\n", "\n          ") + "\n"
 
-			assert.Equal(t, tt.unsafe, validateNoTemplateInjectionFromParsed(parsed) != nil)
-			assert.Equal(t, tt.unsafe, validateNoGitHubExpressionsInRunScriptsFromParsed(parsed) != nil)
+			assert.Contains(t, tt.script, expression)
+			require.Error(t, validateNoTemplateInjectionFromParsed(parsed))
+			require.Error(t, validateNoGitHubExpressionsInRunScriptsFromParsed(parsed))
 			scan := scanRunContentExpressions(yaml)
-			assert.Equal(t, tt.unsafe, scan.hasUnsafe, "raw YAML unsafe scan")
-			assert.Equal(t, tt.unsafe, scan.hasDisallowed, "raw YAML expression guardrail")
+			assert.True(t, scan.hasUnsafe, "raw YAML unsafe scan")
+			assert.True(t, scan.hasDisallowed, "raw YAML expression guardrail")
 
 			sanitized, warnings, changed := sanitizeRunStepExpressions(step)
 			_, parsedShell := shellHeredocRegions(tt.script, false)
-			expectedChanged := tt.unsafe && parsedShell && strings.Contains(executableShellContent(tt.script), expression)
-			assert.Equal(t, expectedChanged, changed)
+			assert.Equal(t, tt.rewrite && parsedShell, changed)
 			assert.Equal(t, tt.script, step["run"], "input must not be mutated")
-			if tt.unsafe && parsedShell {
-				if changed {
-					require.Len(t, warnings, 1)
-					assert.Equal(t, expression, sanitized["env"].(map[string]any)["GH_AW_GITHUB_EVENT_ISSUE_TITLE"])
-					assert.NotContains(t, executableShellContent(sanitized["run"].(string)), expression)
-					require.NoError(t, validateNoTemplateInjectionFromParsed(map[string]any{"steps": []any{sanitized}}))
-				} else {
-					assert.Empty(t, warnings)
-					assert.Equal(t, tt.script, sanitized["run"], "quoted body must remain literal")
+			if tt.rewrite && parsedShell {
+				require.Len(t, warnings, 1)
+				assert.Equal(t, expression, sanitized["env"].(map[string]any)["GH_AW_GITHUB_EVENT_ISSUE_TITLE"])
+				assert.NotContains(t, shellExpansionContent(sanitized["run"].(string)), expression)
+				if strings.Contains(sanitized["run"].(string), expression) {
 					require.Error(t, validateNoTemplateInjectionFromParsed(map[string]any{"steps": []any{sanitized}}))
+				} else {
+					require.NoError(t, validateNoTemplateInjectionFromParsed(map[string]any{"steps": []any{sanitized}}))
 				}
 			} else {
 				assert.Empty(t, warnings)
 				assert.Equal(t, tt.script, sanitized["run"], "quoted body must remain literal")
-				if tt.unsafe {
-					assert.Error(t, validateNoTemplateInjectionFromParsed(parsed))
-				}
+				require.Error(t, validateNoTemplateInjectionFromParsed(map[string]any{"steps": []any{sanitized}}))
 			}
 		})
 	}
@@ -129,7 +125,7 @@ func TestHeredocUnknownBoundariesPreserveScript(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			_, parsed := shellHeredocRegions(tt.script, false)
 			require.False(t, parsed, "unproven Bash boundaries must not grant an exemption")
-			assert.Contains(t, executableShellContent(tt.script), expression)
+			assert.Contains(t, tt.script, expression)
 			step := map[string]any{"run": tt.script}
 			sanitized, warnings, changed := sanitizeRunStepExpressions(step)
 			assert.False(t, changed)
@@ -161,7 +157,7 @@ func TestHeredocCommentsPreserveFullScriptContext(t *testing.T) {
 	sanitized, _, changed := sanitizeRunStepExpressions(map[string]any{"run": script})
 	require.True(t, changed)
 	assert.Equal(t, "# $GH_AW_GITHUB_EVENT_ISSUE_TITLE\necho \"$(cat <<'EOF'\nliteral\nEOF\n) # $GH_AW_GITHUB_EVENT_ISSUE_TITLE\"\n# $GH_AW_GITHUB_EVENT_ISSUE_TITLE", sanitized["run"])
-	assert.NotContains(t, executableShellContent(sanitized["run"].(string)), expression)
+	assert.NotContains(t, shellExpansionContent(sanitized["run"].(string)), expression)
 	require.NoError(t, validateNoGitHubExpressionsInRunScriptsFromParsed(map[string]any{"steps": []any{sanitized}}))
 }
 
@@ -228,11 +224,11 @@ func TestQuotedHeredocEnvExpressionRejectedInBothValidationPaths(t *testing.T) {
 	err := validateNoTemplateInjectionFromParsed(workflow)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "quoted heredoc")
-	assert.Contains(t, err.Error(), "unquoted heredoc (<<EOF) or printf")
+	assert.Contains(t, err.Error(), "unquoted heredoc or printf")
 
 	err = validateNoGitHubExpressionsInRunScriptsFromParsed(workflow)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unquoted heredoc (<<EOF) or printf")
+	assert.Contains(t, err.Error(), "unquoted heredoc or printf")
 
 	yaml := `jobs:
   test:

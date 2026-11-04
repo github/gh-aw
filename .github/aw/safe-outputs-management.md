@@ -304,6 +304,8 @@ description: Safe-output reference for update, label, milestone, project, releas
 
   Cross-repository pushes are supported via `target-repo` (and `head-repo`/`head-github-token` for fork-backed PRs) plus an `allowed-repos` allowlist. To trigger CI on pushed commits, use `github-token-for-extra-empty-commit` or set the magic secret `GH_AW_CI_TRIGGER_TOKEN`. Set `github-token-for-extra-empty-commit: none` to skip the extra empty commit and keep `GH_AW_CI_TRIGGER_TOKEN` out of the compiled lock file and manifest entirely.
 
+  **Shared checkout credential**: same-repository `create-pull-request` and `push-to-pull-request-branch` persist one git credential (precedence: `create-pull-request.github-token`, `push-to-pull-request-branch.github-token`, `safe-outputs.github-app` minted token, `safe-outputs.github-token`, default). Give both handlers the same token, ideally once at `safe-outputs.github-token` or `safe-outputs.github-app`.
+
   **File Restrictions**: Same as `create-pull-request`: **always specify `allowed-files`** scoped to specific file extensions or paths to limit the agent's reach. `excluded-files` strips files before all checks, and `protected-files` controls handling of sensitive files. Object form supported: `protected-files: { policy: fallback-to-issue, exclude: [AGENTS.md] }`.
 
   `push-to-pull-request-branch` now uses the same `request-review` default as `create-pull-request`. Protected-file changes are still surfaced in the PR as a `REQUEST_CHANGES` review, while `blocked` remains available when a workflow requires a hard failure. `CHANGELOG.md` is excluded from the PR handlers' default protected-file set so routine release updates do not require an explicit exception; other shared handlers continue to protect it.

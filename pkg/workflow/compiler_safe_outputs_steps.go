@@ -302,12 +302,6 @@ func (c *Compiler) buildDispatchRepositoryAppTokenSteps(data *WorkflowData) []st
 	return steps
 }
 
-// buildSafeOutputItemsManifestUploadStep builds the step that uploads the safe output
-// items manifest and temporary ID map as a separate artifact.
-func buildSafeOutputItemsManifestUploadStep(prefix string, pinAction func(string) string, claimArtifacts bool, data *WorkflowData) []string {
-	return buildSafeOutputManifestUploadStep(prefix, pinAction, claimArtifacts, data, true)
-}
-
 func buildSafeOutputManifestUploadStep(prefix string, pinAction func(string) string, claimArtifacts bool, data *WorkflowData, includeItems bool) []string {
 	includeMergeDecisions := data != nil && data.SafeOutputs != nil && data.SafeOutputs.MergePullRequest != nil
 	condition := "always()"

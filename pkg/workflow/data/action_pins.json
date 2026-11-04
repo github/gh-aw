@@ -143,10 +143,10 @@
       "version": "v1.24.1",
       "sha": "54075bcc5e249e4758d363f27d099f55d843f124"
     },
-    "github/codeql-action/upload-sarif@v4.39.1": {
+    "github/codeql-action/upload-sarif@v4.39.2": {
       "repo": "github/codeql-action/upload-sarif",
-      "version": "v4.39.1",
-      "sha": "9b3254085494b55a0f7c4c2b3d2d52cc712ce370"
+      "version": "v4.39.2",
+      "sha": "1fc58d04a4d4374f921bdac573c3811c240f9c26"
     },
     "github/stale-repos@v9.1.1": {
       "repo": "github/stale-repos",
@@ -1044,11 +1044,6 @@
       "image": "ghcr.io/github/gh-aw-firewall/squid:0.29.6",
       "digest": "sha256:fe60c5816f7d91058090a794f62dd8af516f25e7a7497030d38b3f3fac2665d7",
       "pinned_image": "ghcr.io/github/gh-aw-firewall/squid:0.29.6@sha256:fe60c5816f7d91058090a794f62dd8af516f25e7a7497030d38b3f3fac2665d7"
-    },
-    "ghcr.io/github/gh-aw-mcpg:v0.5.0": {
-      "image": "ghcr.io/github/gh-aw-mcpg:v0.5.0",
-      "digest": "sha256:d3544a4222e7efeeeb38669d8a1af0c72691c55b8f6506b15aa5920f7f31b7bc",
-      "pinned_image": "ghcr.io/github/gh-aw-mcpg:v0.5.0@sha256:d3544a4222e7efeeeb38669d8a1af0c72691c55b8f6506b15aa5920f7f31b7bc"
     },
     "ghcr.io/github/gh-aw-mcpg:v0.5.2": {
       "image": "ghcr.io/github/gh-aw-mcpg:v0.5.2",

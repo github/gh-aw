@@ -1910,9 +1910,9 @@ func TestCreateCodeScanningAlertUploadJobWorkflowCallDependsOnActivation(t *test
 // TestBuildSafeOutputItemsManifestUploadStep verifies that the upload step includes
 // the manifest and temporary ID map but excludes process stdout/stderr logs.
 func TestBuildSafeOutputItemsManifestUploadStep(t *testing.T) {
-	steps := buildSafeOutputItemsManifestUploadStep("", func(action string) string {
+	steps := buildSafeOutputManifestUploadStep("", func(action string) string {
 		return action + "@test-pin"
-	}, false, &WorkflowData{})
+	}, false, &WorkflowData{}, true)
 
 	content := strings.Join(steps, "")
 
@@ -1928,7 +1928,7 @@ func TestBuildSafeOutputItemsManifestUploadStep(t *testing.T) {
 func TestBuildMergePullRequestDecisionUploadStep(t *testing.T) {
 	for _, claims := range []bool{false, true} {
 		data := &WorkflowData{SafeOutputs: &SafeOutputsConfig{MergePullRequest: &MergePullRequestConfig{}}}
-		steps := buildSafeOutputItemsManifestUploadStep("", func(action string) string { return action + "@test-pin" }, claims, data)
+		steps := buildSafeOutputManifestUploadStep("", func(action string) string { return action + "@test-pin" }, claims, data, true)
 		content := strings.Join(steps, "")
 		assert.Contains(t, content, "if: always()")
 		assert.Contains(t, content, "/tmp/gh-aw/merge-pull-request-decisions.jsonl")
@@ -2064,9 +2064,9 @@ func TestClaimDiagnosticRetentionPreservesRepositoryOverrides(t *testing.T) {
 		{name: "repository", config: &RepoConfig{ArtifactRetentionDays: new(TemplatableInt32("14"))}, want: 14},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			steps := buildSafeOutputItemsManifestUploadStep("", func(action string) string {
+			steps := buildSafeOutputManifestUploadStep("", func(action string) string {
 				return action + "@v4"
-			}, true, &WorkflowData{})
+			}, true, &WorkflowData{}, true)
 			output, err := applyArtifactRetention("jobs:\n  test:\n    steps:\n"+strings.Join(steps, ""), test.config)
 			require.NoError(t, err)
 			uploads := retentionTestSteps(t, output)

@@ -432,6 +432,19 @@ Triage new issues.
 			require.NoError(t, os.WriteFile(path, []byte(artifactSource), 0o600))
 			require.NoError(t, compiler.CompileWorkflow(path), "rendering copies must preserve generated references")
 
+			lockPath := filepath.Join(dir, "triage.lock.yml")
+			require.NoError(t, os.Remove(lockPath))
+			compiler.SetNoEmit(true)
+			for _, dryRun := range []bool{false, true} {
+				compiler.SetDryRun(dryRun)
+				require.NoError(t, compiler.CompileWorkflow(path), "no-emit and dry-run compilation must preserve generated references")
+				require.Positive(t, compiler.GetWarningCount(), "generated fallbacks must still produce warnings")
+				_, err := os.Stat(lockPath)
+				require.True(t, os.IsNotExist(err), "no-emit compilation must not write a lock file")
+			}
+			compiler.SetDryRun(false)
+			compiler.SetNoEmit(false)
+
 			if mode == ActionModeAction {
 				runtimeSource := strings.Replace(source, "tools:\n", "tools:\n  agentic-workflows: true\n", 1)
 				runtimeSource = strings.Replace(runtimeSource, "permissions:\n", "permissions:\n  actions: read\n", 1)

@@ -2,20 +2,24 @@
 title: Guard Policies Integration Specification
 description: Formal specification for the guard policies framework in the MCP Gateway
 version: 0.1.0
-status: Draft
+status: Implemented (compiler-side)
 sidebar:
   order: 1450
 ---
 
-# Guard Policies Integration Proposal
+# Guard Policies Integration Specification
 
 ## Executive Summary
 
-This document proposes an extensible guard policies framework for the MCP Gateway, starting with GitHub-specific policies. Guard policies enable fine-grained access control at the MCP gateway level, restricting which repositories and operations AI agents can access through MCP servers.
+This document specifies the implemented compiler-side guard-policy integration for the MCP Gateway, starting with GitHub-specific policies. The compiler validates GitHub policy fields and derives gateway and safe-output configuration; runtime enforcement is provided by the external MCP Gateway and is not implemented in this repository.
 
 **Version**: 0.1.0  
-**Status**: Draft  
+**Status**: Implemented (compiler-side; runtime enforcement is external)
 **Date**: 2026-06-21
+
+## Requirements
+
+The compiler accepts and validates GitHub guard-policy configuration, derives the corresponding gateway and safe-output policy, and preserves lockdown precedence. The normative requirements are in [Conformance](#conformance); request-time enforcement remains the responsibility of the external MCP Gateway runtime.
 
 ## Requirements Notation
 
@@ -242,6 +246,10 @@ The design supports future MCP servers (Jira, WorkIQ) through:
        issue-types: ["Bug", "Story"]
    ```
 
+## Structure
+
+Workflow frontmatter is parsed into `GitHubToolConfig`, validated in `pkg/workflow/tools_validation_github.go`, and translated by `pkg/workflow/mcp_github_config.go` into gateway and safe-output configuration. The generated configuration is consumed by the MCP Gateway; request-time enforcement is outside this repository.
+
 ## Implementation Details
 
 ### Files Modified
@@ -373,27 +381,17 @@ tools:
 
 ## Next Steps
 
-1. **Write Tests**:
-   - Unit tests for parsing functions
-   - Unit tests for validation functions
-   - Integration tests for end-to-end workflow compilation
+The original proposal tasks are tracked below with their implementation status and owning source or evidence.
 
-2. **Update Documentation**:
-   - Add guard policies section to MCP gateway documentation
-   - Add examples to GitHub MCP server documentation
-   - Update frontmatter configuration reference
-
-### Documentation Tasks
-
-- [x] `docs/src/content/docs/reference/mcp-gateway.md` — document how GitHub guard policies map into gateway `guard-policies` and how `lockdown: true` overrides them. **Done when** the page shows the compiled gateway shape and warns that guard-policy fields are ignored under lockdown. (PR: [#48686](https://github.com/github/gh-aw/issues/48686))
-- [x] `docs/src/content/docs/reference/github-tools.md` — add frontmatter examples for `allowed-repos`, `min-integrity`, `blocked-users`, `trusted-users`, and `approval-labels`. **Done when** the page includes at least one valid multi-field example and notes the deprecated `repos` alias. (PR: [#48686](https://github.com/github/gh-aw/issues/48686))
-- [x] `docs/src/content/docs/reference/frontmatter-full.md` — add schema-level reference entries for the GitHub guard-policy fields. **Done when** each field has a documented type, default/requirement note, and at least one cross-reference to the GitHub/MCP gateway docs. (PR: [#48686](https://github.com/github/gh-aw/issues/48686))
-
-3. **Runtime Implementation** (Separate from this PR):
-   - MCP Gateway enforcement of guard policies
-   - Repository pattern matching logic
-   - Integrity level verification
-   - Access control logging
+| Work item | Status | Owner or evidence |
+|---|---|---|
+| Parse and validate GitHub guard-policy fields | Complete | `pkg/workflow/tools_parser.go`, `pkg/workflow/tools_validation_github.go`, `pkg/workflow/tools_validation_test.go` |
+| Compile guard policies and derive the safe-output write-sink | Complete | `pkg/workflow/mcp_github_config.go`, `pkg/workflow/guard_policy_compilation_integration_test.go`, `pkg/workflow/safeoutputs_guard_policy_test.go` |
+| Report configured guard policies during strict compilation | Complete | `pkg/cli/compile_guard_policy_report.go`, `pkg/cli/compile_guard_policy_report_test.go` |
+| Document gateway shape and lockdown precedence | Complete | `docs/src/content/docs/reference/mcp-gateway.md` |
+| Document GitHub frontmatter examples | Complete | `docs/src/content/docs/reference/github-tools.md` |
+| Document guard-policy schema fields | Complete | `docs/src/content/docs/reference/frontmatter-full.md` |
+| Enforce repository, integrity, and audit policies at runtime | External dependency; not implemented in this repository | MCP Gateway runtime, maintained outside `pkg/workflow/` |
 
 ## Benefits
 
@@ -566,7 +564,7 @@ When no guard-policy fields are present on `tools.github`, the derived safe-outp
 
 This section maps normative sections of this specification to the implementation files that realise each requirement. Use this mapping to identify which files must be reviewed or updated when specification sections change.
 
-**Last verified**: 2026-07-03
+**Last verified**: 2026-11-04
 
 ### Guard Policy Validation
 
@@ -578,6 +576,7 @@ This section maps normative sections of this specification to the implementation
 | GP-04 empty array rejection | Empty `allowed-repos` array detection and error | `pkg/workflow/tools_validation_github.go` (`validateGitHubGuardPolicy`) |
 | GP-11 cross-field consistency | Any explicit `allowed-repos` value without `min-integrity` MUST fail validation, including `allowed-repos: "all"` | `pkg/workflow/tools_validation_github.go` (`validateGitHubGuardPolicy`), `pkg/workflow/tools_validation_test.go` (`missing min-integrity field`, `allowed-repos non-all without min-integrity fails`) |
 | GP-10 lockdown precedence | Lockdown + guard-policy conflict detection and warning | `pkg/workflow/tools_validation_github.go` (`validateGitHubGuardPolicy`, `emitGitHubLockdownGuardPolicyWarning`) |
+| Strict-compilation report | Per-workflow summary of allowed repositories, integrity, user and label policies, and lockdown precedence | `pkg/cli/compile_guard_policy_report.go`, `pkg/cli/compile_guard_policy_report_test.go` |
 
 ### Safe-Outputs Guard Policy Derivation
 
@@ -604,6 +603,8 @@ The deprecated `repos` field (YAML key: `repos`) is handled alongside `allowed-r
 ## Sync Follow-ups
 
 This section lists the files that **MUST** be reviewed and updated whenever a normative section of this specification changes. Reviewers **SHALL** confirm each target is consistent with the updated spec before merging.
+
+The 2026-11-04 review found no stale local implementation follow-ups. The only external dependency is MCP Gateway runtime enforcement, which remains outside this repository.
 
 ### After Restructuring Approach and Operations Headers
 
@@ -640,3 +641,10 @@ When the extensibility model for future MCP servers (Jira, WorkIQ) changes:
 2. **`pkg/workflow/schemas/mcp-gateway-config.schema.json`** AND **`docs/public/schemas/mcp-gateway-config.schema.json`** — Add server-specific guard-policy schema objects as new `definitions` entries (the schema is JSON Schema draft-07 and uses `definitions`, not `$defs`) and reference them from the relevant server config schemas. Update both copies.
 
 3. Document the new policy type in this specification under a new `### Entity:` subsection in [§Entities](#entities).
+
+## Change Log
+
+### 2026-11-04
+
+- Updated the document status to reflect implemented compiler-side validation, configuration generation, and reporting while retaining the external runtime-enforcement boundary.
+- Replaced proposal-era next steps with a status and ownership table; refreshed implementation sync evidence.

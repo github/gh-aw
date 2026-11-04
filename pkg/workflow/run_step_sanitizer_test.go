@@ -539,7 +539,7 @@ func TestSanitizeRunStepExpressions_SanitizedRunHasNoInlineExpressions(t *testin
 			require.True(t, changed, "expected change for script containing expressions")
 			// Only check the non-heredoc portion; heredoc content is intentionally left.
 			sanitizedRun := result["run"].(string)
-			assert.NotContains(t, executableShellContent(sanitizedRun), "${{",
+			assert.NotContains(t, shellExpansionContent(sanitizedRun), "${{",
 				"non-heredoc portion of sanitized run field must not contain any ${{ }} markers")
 		})
 	}

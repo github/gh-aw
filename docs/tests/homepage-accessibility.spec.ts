@@ -12,10 +12,12 @@ test("mobile menu supports the hamburger button selector", async ({ page }) => {
   await expect(page.locator("#site-menu")).toBeVisible();
 });
 
-test("homepage exposes one primary heading and labels decorative logos", async ({ page }) => {
+test("homepage exposes one primary heading, secondary hero headings, and labels decorative logos", async ({ page }) => {
   await page.goto("/gh-aw/");
 
   await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
+  await expect(page.locator("#hero [data-variant] h1")).toHaveCount(0);
+  await expect(page.locator("#hero [data-variant] h2")).toHaveCount(3);
 
   const logos = page.locator(".theme-logo, .site-footer-logo");
   await expect(logos).toHaveCount(3);

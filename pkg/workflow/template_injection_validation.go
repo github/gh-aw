@@ -387,10 +387,8 @@ func validateNoTemplateInjectionFromParsed(workflow map[string]any) error {
 // validateNoGitHubExpressionsInRunScriptsFromParsed checks a pre-parsed workflow map
 // for any GitHub Actions expression usage in run: scripts.
 //
-// This is a compiler regression guardrail: run: scripts in compiled lock files should
-// never contain ${{ ... }} directly because the compiler must rewrite expressions into
-// env: variables. It runs after validateNoTemplateInjectionFromParsed as a broader
-// catch-all for any remaining expression contexts.
+// This raw-content guardrail rejects prohibited expressions left in run: scripts,
+// including comments and quoted heredocs that the sanitizer preserves.
 func validateNoGitHubExpressionsInRunScriptsFromParsed(workflow map[string]any) error {
 	runBlocks := extractRunBlocks(workflow)
 	templateInjectionValidationLog.Printf("Found %d run blocks to scan for raw expressions", len(runBlocks))
@@ -435,7 +433,7 @@ func validateNoGitHubExpressionsInRunScriptsFromParsed(workflow map[string]any) 
 
 	if len(violations) > 0 {
 		templateInjectionValidationLog.Printf("Run-script expression guardrail failed: %d violation(s) found", len(violations))
-		return formatRunScriptExpressionGuardrailError(violations)
+		return formatRunScriptExpressionValidationError(violations)
 	}
 
 	return nil

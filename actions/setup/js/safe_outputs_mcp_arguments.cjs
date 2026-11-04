@@ -25,9 +25,17 @@ function normalizeSafeOutputToolArguments(toolName, args, logger, inputSchema) {
     if (nestedArgs && typeof nestedArgs === "object" && !Array.isArray(nestedArgs)) {
       const outerKeys = Object.keys(normalizedArgs);
       logger?.debug?.(`Recovered wrapped safe-output tool arguments for '${normalizedToolName}' by unwrapping key '${candidateKey}' from payload keys ${JSON.stringify(outerKeys)}`);
-      normalizedArgs = nestedArgs;
+      const outerDependencies = Object.fromEntries(["depends-on", "depends_on"].filter(key => Object.hasOwn(normalizedArgs, key)).map(key => [key, normalizedArgs[key]]));
+      if (Object.keys(outerDependencies).length && (Object.hasOwn(nestedArgs, "depends-on") || Object.hasOwn(nestedArgs, "depends_on"))) {
+        throw Object.assign(new Error("Provide depends-on only once, not both inside and outside wrapped tool arguments."), { code: -32602 });
+      }
+      normalizedArgs = { ...nestedArgs, ...outerDependencies };
       break;
     }
+  }
+
+  if (Object.hasOwn(normalizedArgs, "depends-on") && Object.hasOwn(normalizedArgs, "depends_on")) {
+    throw Object.assign(new Error("Provide depends-on only once, not together with depends_on."), { code: -32602 });
   }
 
   if (!inputSchema || !inputSchema.properties || typeof inputSchema.properties !== "object" || Array.isArray(inputSchema.properties)) {

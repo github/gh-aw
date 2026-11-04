@@ -497,7 +497,7 @@ func TestTemplateInjectionHeredocFiltering(t *testing.T) {
 		description string
 	}{
 		{
-			name: "unsafe - expression in quoted heredoc with EOF delimiter",
+			name: "unsafe - expression in quoted heredoc",
 			yaml: `jobs:
   test:
     steps:
@@ -507,10 +507,10 @@ func TestTemplateInjectionHeredocFiltering(t *testing.T) {
           {"issue": "${{ github.event.issue.number }}"}
           EOF`,
 			shouldError: true,
-			description: "Expressions in heredocs are evaluated before Bash and must be rejected",
+			description: "Actions expressions are substituted before the shell processes quoted heredocs",
 		},
 		{
-			name: "unsafe - expression in quoted heredoc with JSON delimiter",
+			name: "unsafe - expression in quoted JSON heredoc",
 			yaml: `jobs:
   test:
     steps:
@@ -520,10 +520,10 @@ func TestTemplateInjectionHeredocFiltering(t *testing.T) {
           {"title": "${{ github.event.issue.title }}"}
           JSON`,
 			shouldError: true,
-			description: "Expressions in heredocs are evaluated before Bash and must be rejected",
+			description: "Expressions in quoted heredocs must be detected",
 		},
 		{
-			name: "unsafe - expression in quoted heredoc with YAML delimiter",
+			name: "unsafe - expression in quoted YAML heredoc",
 			yaml: `jobs:
   test:
     steps:
@@ -533,7 +533,7 @@ func TestTemplateInjectionHeredocFiltering(t *testing.T) {
           title: ${{ github.event.issue.title }}
           YAML`,
 			shouldError: true,
-			description: "Expressions in heredocs are evaluated before Bash and must be rejected",
+			description: "Expressions in quoted heredocs must be detected",
 		},
 		{
 			name: "unsafe - expression outside heredoc",
@@ -563,7 +563,7 @@ func TestTemplateInjectionHeredocFiltering(t *testing.T) {
           {"title": "${{ github.event.issue.title }}"}
           EOF`,
 			shouldError: true,
-			description: "Expressions in any heredoc are evaluated before Bash and must be rejected",
+			description: "Expressions in all heredocs must be detected",
 		},
 		{
 			name: "unsafe - unquoted heredoc delimiter",
@@ -1442,7 +1442,7 @@ func TestScanRunContentExpressionsHeredoc(t *testing.T) {
 			wantHasDisallowed: false,
 		},
 		{
-			name: "quoted heredoc delimiter (single-quoted) still scans content",
+			name: "quoted heredoc expression is detected",
 			yaml: `jobs:
   test:
     steps:

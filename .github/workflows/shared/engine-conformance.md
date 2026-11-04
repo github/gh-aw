@@ -180,7 +180,9 @@ post-steps:
       check("staged-safe-output", () => {
         const file = process.env.CONFORMANCE_SAFE_OUTPUTS;
         assert.ok(file, "Safe-output evidence path is required");
-        assert.deepEqual(read(path.dirname(file), path.basename(file)), {
+        const { output_id: outputId, ...safeOutput } = read(path.dirname(file), path.basename(file));
+        assert.match(outputId, /^so_[A-Za-z0-9_-]{12}$/);
+        assert.deepEqual(safeOutput, {
           type: "noop", message: "Conformance probes completed",
           ...(expected.claimHandle !== undefined && { claim_handle: expected.claimHandle }),
         });

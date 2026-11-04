@@ -58,6 +58,7 @@ describe("call_workflow handler factory", () => {
     const result = await handler(message);
 
     expect(result.success).toBe(true);
+    expect(result.delegated).toBe(true);
     expect(result.workflow_name).toBe("spring-boot-bugfix");
     expect(core.setOutput).toHaveBeenCalledWith("call_workflow_name", "spring-boot-bugfix");
     const payload = parsePayloadOutput();

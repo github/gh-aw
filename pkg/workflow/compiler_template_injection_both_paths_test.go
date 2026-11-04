@@ -176,14 +176,16 @@ jobs:
 	t.Run("Path A - schema enabled - run expression regression detected", func(t *testing.T) {
 		err := compiler.validateTemplateInjection(regressionYAML, lockFile, markdownPath, parseYAML(t, regressionYAML))
 		require.Error(t, err, "should detect raw GitHub Actions expression in run script")
-		require.ErrorContains(t, err, "compiler regression detected")
+		require.ErrorContains(t, err, "authored run: content")
+		require.ErrorContains(t, err, "unquoted heredoc")
 		require.ErrorContains(t, err, "github.token")
 	})
 
 	t.Run("Path B - schema disabled - run expression regression detected", func(t *testing.T) {
 		err := compiler.validateTemplateInjection(regressionYAML, lockFile, markdownPath, nil)
 		require.Error(t, err, "should detect raw GitHub Actions expression in run script")
-		require.ErrorContains(t, err, "compiler regression detected")
+		require.ErrorContains(t, err, "authored run: content")
+		require.ErrorContains(t, err, "unquoted heredoc")
 		require.ErrorContains(t, err, "github.token")
 	})
 
@@ -200,31 +202,43 @@ jobs:
 	t.Run("Path B - schema disabled - flow-style regression detected alongside allowed expression", func(t *testing.T) {
 		err := compiler.validateTemplateInjection(flowStyleRegressionYAML, lockFile, markdownPath, nil)
 		require.Error(t, err, "flow-style run expressions should still be detected in the fallback path")
-		require.ErrorContains(t, err, "compiler regression detected")
+		require.ErrorContains(t, err, "authored run: content")
 		require.ErrorContains(t, err, "github.actor")
 	})
 
 	t.Run("Path A - schema enabled - heredoc expression rejected", func(t *testing.T) {
 		err := compiler.validateTemplateInjection(heredocExpressionYAML, lockFile, markdownPath, parseYAML(t, heredocExpressionYAML))
-		require.Error(t, err, "expressions inside heredoc content must be rejected")
+		require.Error(t, err, "expressions inside heredoc content must be flagged")
+		require.ErrorContains(t, err, "CTR-006")
+		require.ErrorContains(t, err, "Actions interpolates expressions before Bash")
+		require.ErrorContains(t, err, "unquoted heredoc")
 		require.ErrorContains(t, err, "github.event")
 	})
 
 	t.Run("Path B - schema disabled - heredoc expression rejected", func(t *testing.T) {
 		err := compiler.validateTemplateInjection(heredocExpressionYAML, lockFile, markdownPath, nil)
-		require.Error(t, err, "expressions inside heredoc content must be rejected")
+		require.Error(t, err, "expressions inside heredoc content must be flagged")
+		require.ErrorContains(t, err, "CTR-006")
+		require.ErrorContains(t, err, "Actions interpolates expressions before Bash")
+		require.ErrorContains(t, err, "unquoted heredoc")
 		require.ErrorContains(t, err, "github.event")
 	})
 
 	t.Run("Path A - schema enabled - comment expression rejected", func(t *testing.T) {
 		err := compiler.validateTemplateInjection(commentExpressionYAML, lockFile, markdownPath, parseYAML(t, commentExpressionYAML))
-		require.Error(t, err, "expressions inside bash comments must be rejected")
+		require.Error(t, err, "expressions inside bash comments must be flagged")
+		require.ErrorContains(t, err, "CTR-006")
+		require.ErrorContains(t, err, "Actions interpolates expressions before Bash")
+		require.ErrorContains(t, err, "Remove expressions from comments")
 		require.ErrorContains(t, err, "github.event")
 	})
 
 	t.Run("Path B - schema disabled - comment expression rejected", func(t *testing.T) {
 		err := compiler.validateTemplateInjection(commentExpressionYAML, lockFile, markdownPath, nil)
-		require.Error(t, err, "expressions inside bash comments must be rejected")
+		require.Error(t, err, "expressions inside bash comments must be flagged")
+		require.ErrorContains(t, err, "CTR-006")
+		require.ErrorContains(t, err, "Actions interpolates expressions before Bash")
+		require.ErrorContains(t, err, "Remove expressions from comments")
 		require.ErrorContains(t, err, "github.event")
 	})
 

@@ -36,7 +36,7 @@ func parseMemoryAllowedExtensions(configMap map[string]any) ([]string, error) {
 			continue
 		}
 		if !isValidFileExtension(extension) {
-			return nil, fmt.Errorf("invalid allowed-extension %q: must start with '.' followed by alphanumeric characters only (e.g. .json)", extension)
+			return nil, fmt.Errorf("invalid allowed-extension %q: must start with '.' followed by alphanumeric characters only (e.g. .json). Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", extension)
 		}
 		parsed = append(parsed, extension)
 	}
@@ -83,13 +83,13 @@ func parseMemoryValidationConfig(configMap map[string]any, fieldPath string) (*M
 		config := &MemoryValidationConfig{}
 		for key := range value {
 			if key != "script" && key != "timeout-minutes" && key != "json-schemas" {
-				return nil, fmt.Errorf("%s has unknown property %q (only script, timeout-minutes, and json-schemas are supported)", fieldPath, key)
+				return nil, fmt.Errorf("%s has unknown property %q (only script, timeout-minutes, and json-schemas are supported). Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", fieldPath, key)
 			}
 		}
 		if scriptValue, exists := value["script"]; exists {
 			script, ok := scriptValue.(string)
 			if !ok || script == "" {
-				return nil, fmt.Errorf("%s.script must be a non-empty string", fieldPath)
+				return nil, fmt.Errorf("%s.script must be a non-empty string. Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", fieldPath)
 			}
 			config.Script = script
 		}
@@ -153,7 +153,7 @@ func normalizeMemoryValidationConfig(config *MemoryValidationConfig, fieldPath s
 		return nil, nil
 	}
 	if config.Script == "" && len(config.JSONSchemas) == 0 {
-		return nil, fmt.Errorf("%s must configure script or a non-empty json-schemas list", fieldPath)
+		return nil, fmt.Errorf("%s must configure script or a non-empty json-schemas list. Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", fieldPath)
 	}
 	if config.TimeoutMinutes == 0 {
 		memoryValidationLog.Printf("Applying default timeout of %d minute(s) at %s", defaultMemoryValidationTimeoutMinutes, fieldPath)
@@ -202,7 +202,7 @@ func memoryValidationSchemasBase64(config *MemoryValidationConfig) string {
 func parseMemoryJSONSchemas(raw any, fieldPath string) ([]MemoryJSONSchemaConfig, error) {
 	entries, ok := raw.([]any)
 	if !ok || len(entries) == 0 {
-		return nil, fmt.Errorf("%s must be a non-empty list of file and schema declarations with optional format", fieldPath)
+		return nil, fmt.Errorf("%s must be a non-empty list of file and schema declarations with optional format. Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", fieldPath)
 	}
 	schemas := make([]MemoryJSONSchemaConfig, 0, len(entries))
 	seenFiles := make(map[string]struct{}, len(entries))
@@ -210,21 +210,21 @@ func parseMemoryJSONSchemas(raw any, fieldPath string) ([]MemoryJSONSchemaConfig
 		entryPath := fmt.Sprintf("%s[%d]", fieldPath, index)
 		entry, ok := rawEntry.(map[string]any)
 		if !ok {
-			return nil, fmt.Errorf("%s must be an object", entryPath)
+			return nil, fmt.Errorf("%s must be an object. Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", entryPath)
 		}
 		for key := range entry {
 			if key != "file" && key != "format" && key != "schema" {
-				return nil, fmt.Errorf("%s has unknown property %q (only file, format, and schema are supported)", entryPath, key)
+				return nil, fmt.Errorf("%s has unknown property %q (only file, format, and schema are supported). Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", entryPath, key)
 			}
 		}
 		var file string
 		if rawFile, exists := entry["file"]; exists {
 			file, ok = rawFile.(string)
 			if !ok || !validMemorySchemaFilePath(file) {
-				return nil, fmt.Errorf("%s.file must be a non-empty relative file path or glob without traversal", entryPath)
+				return nil, fmt.Errorf("%s.file must be a non-empty relative file path or glob without traversal. Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", entryPath)
 			}
 		} else if _, exists := entry["format"]; exists {
-			return nil, fmt.Errorf("%s.format cannot be set when file is omitted; the format is inferred for each JSON or JSONL file", entryPath)
+			return nil, fmt.Errorf("%s.format cannot be set when file is omitted; the format is inferred for each JSON or JSONL file. Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", entryPath)
 		}
 		if _, exists := seenFiles[file]; exists {
 			return nil, fmt.Errorf("%s contains duplicate file target %q", fieldPath, file)
@@ -234,12 +234,12 @@ func parseMemoryJSONSchemas(raw any, fieldPath string) ([]MemoryJSONSchemaConfig
 		if rawFormat, exists := entry["format"]; exists {
 			format, ok = rawFormat.(string)
 			if !ok || (format != "json" && format != "jsonl") {
-				return nil, fmt.Errorf("%s.format must be either json or jsonl", entryPath)
+				return nil, fmt.Errorf("%s.format must be either json or jsonl. Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", entryPath)
 			}
 		}
 		schema, ok := entry["schema"].(map[string]any)
 		if !ok {
-			return nil, fmt.Errorf("%s.schema must be an object", entryPath)
+			return nil, fmt.Errorf("%s.schema must be an object. Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", entryPath)
 		}
 		if err := validateMemoryJSONSchema(schema, entryPath+".schema", 0); err != nil {
 			return nil, err
@@ -277,14 +277,14 @@ func validateMemoryJSONSchema(schema map[string]any, fieldPath string, depth int
 		return fmt.Errorf("%s exceeds the maximum schema nesting depth of 32", fieldPath)
 	}
 	if _, hasOneOf := schema["oneOf"]; hasOneOf && len(schema) != 1 {
-		return fmt.Errorf("%s cannot combine oneOf or anyOf with sibling constraints", fieldPath)
+		return fmt.Errorf("%s cannot combine oneOf or anyOf with sibling constraints. Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", fieldPath)
 	}
 	if _, hasAnyOf := schema["anyOf"]; hasAnyOf && len(schema) != 1 {
-		return fmt.Errorf("%s cannot combine oneOf or anyOf with sibling constraints", fieldPath)
+		return fmt.Errorf("%s cannot combine oneOf or anyOf with sibling constraints. Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", fieldPath)
 	}
 	for key, value := range schema {
 		if _, ok := supportedMemorySchemaKeywords[key]; !ok {
-			return fmt.Errorf("%s uses unsupported schema keyword %q", fieldPath, key)
+			return fmt.Errorf("%s uses unsupported schema keyword %q. Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", fieldPath, key)
 		}
 		if err := validateMemoryJSONSchemaKeyword(key, value, fieldPath, depth); err != nil {
 			return err
@@ -310,7 +310,7 @@ func validateMemoryJSONSchemaKeyword(key string, value any, fieldPath string, de
 	case "items":
 		child, ok := value.(map[string]any)
 		if !ok {
-			return fmt.Errorf("%s.items must be an object schema", fieldPath)
+			return fmt.Errorf("%s.items must be an object schema. Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", fieldPath)
 		}
 		return validateMemoryJSONSchema(child, fieldPath+".items", depth+1)
 	case "oneOf", "anyOf":
@@ -325,15 +325,15 @@ func validateMemorySchemaTypes(value any, fieldPath string) error {
 		types = []any{value}
 	}
 	if len(types) == 0 {
-		return fmt.Errorf("%s.type must be a supported type or a non-empty list of types", fieldPath)
+		return fmt.Errorf("%s.type must be a supported type or a non-empty list of types. Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", fieldPath)
 	}
 	for _, rawType := range types {
 		typeName, ok := rawType.(string)
 		if !ok {
-			return fmt.Errorf("%s.type must contain only supported type names", fieldPath)
+			return fmt.Errorf("%s.type must contain only supported type names. Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", fieldPath)
 		}
 		if _, ok := supportedMemorySchemaTypes[typeName]; !ok {
-			return fmt.Errorf("%s.type contains unsupported type %q", fieldPath, typeName)
+			return fmt.Errorf("%s.type contains unsupported type %q. Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", fieldPath, typeName)
 		}
 	}
 	return nil
@@ -342,36 +342,36 @@ func validateMemorySchemaTypes(value any, fieldPath string) error {
 func validateMemorySchemaEnum(value any, fieldPath string) error {
 	values, ok := value.([]any)
 	if !ok || len(values) == 0 {
-		return fmt.Errorf("%s.enum must be a non-empty list of primitive JSON values", fieldPath)
+		return fmt.Errorf("%s.enum must be a non-empty list of primitive JSON values. Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", fieldPath)
 	}
 	for _, item := range values {
 		switch typed := item.(type) {
 		case nil, string, bool:
 		case int:
 			if int64(typed) > 1<<53-1 || int64(typed) < -(1<<53-1) {
-				return fmt.Errorf("%s.enum integer values must be exactly representable", fieldPath)
+				return fmt.Errorf("%s.enum integer values must be exactly representable. Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", fieldPath)
 			}
 		case int64:
 			if typed > 1<<53-1 || typed < -(1<<53-1) {
-				return fmt.Errorf("%s.enum integer values must be exactly representable", fieldPath)
+				return fmt.Errorf("%s.enum integer values must be exactly representable. Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", fieldPath)
 			}
 		case uint:
 			if uint64(typed) > 1<<53-1 {
-				return fmt.Errorf("%s.enum integer values must be exactly representable", fieldPath)
+				return fmt.Errorf("%s.enum integer values must be exactly representable. Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", fieldPath)
 			}
 		case uint64:
 			if typed > 1<<53-1 {
-				return fmt.Errorf("%s.enum integer values must be exactly representable", fieldPath)
+				return fmt.Errorf("%s.enum integer values must be exactly representable. Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", fieldPath)
 			}
 		case float64:
 			if math.IsNaN(typed) || math.IsInf(typed, 0) {
-				return fmt.Errorf("%s.enum values must be finite JSON primitives", fieldPath)
+				return fmt.Errorf("%s.enum values must be finite JSON primitives. Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", fieldPath)
 			}
 			if math.Trunc(typed) == typed && math.Abs(typed) > 1<<53-1 {
-				return fmt.Errorf("%s.enum integer values must be exactly representable", fieldPath)
+				return fmt.Errorf("%s.enum integer values must be exactly representable. Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", fieldPath)
 			}
 		default:
-			return fmt.Errorf("%s.enum must contain only primitive JSON values", fieldPath)
+			return fmt.Errorf("%s.enum must contain only primitive JSON values. Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", fieldPath)
 		}
 	}
 	return nil
@@ -380,11 +380,11 @@ func validateMemorySchemaEnum(value any, fieldPath string) error {
 func validateMemorySchemaRequired(value any, fieldPath string) error {
 	fields, ok := value.([]any)
 	if !ok {
-		return fmt.Errorf("%s.required must be a list of strings", fieldPath)
+		return fmt.Errorf("%s.required must be a list of strings. Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", fieldPath)
 	}
 	for _, field := range fields {
 		if _, ok := field.(string); !ok {
-			return fmt.Errorf("%s.required must contain only strings", fieldPath)
+			return fmt.Errorf("%s.required must contain only strings. Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", fieldPath)
 		}
 	}
 	return nil
@@ -393,12 +393,12 @@ func validateMemorySchemaRequired(value any, fieldPath string) error {
 func validateMemorySchemaProperties(value any, fieldPath string, depth int) error {
 	properties, ok := value.(map[string]any)
 	if !ok {
-		return fmt.Errorf("%s.properties must be an object", fieldPath)
+		return fmt.Errorf("%s.properties must be an object. Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", fieldPath)
 	}
 	for name, child := range properties {
 		childSchema, ok := child.(map[string]any)
 		if !ok {
-			return fmt.Errorf("%s.properties.%s must be an object schema", fieldPath, name)
+			return fmt.Errorf("%s.properties.%s must be an object schema. Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", fieldPath, name)
 		}
 		if err := validateMemoryJSONSchema(childSchema, fieldPath+".properties."+name, depth+1); err != nil {
 			return err
@@ -410,12 +410,12 @@ func validateMemorySchemaProperties(value any, fieldPath string, depth int) erro
 func validateMemorySchemaAlternatives(value any, key, fieldPath string, depth int) error {
 	options, ok := value.([]any)
 	if !ok || len(options) == 0 {
-		return fmt.Errorf("%s.%s must be a non-empty list of schemas", fieldPath, key)
+		return fmt.Errorf("%s.%s must be a non-empty list of schemas. Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", fieldPath, key)
 	}
 	for index, child := range options {
 		childSchema, ok := child.(map[string]any)
 		if !ok {
-			return fmt.Errorf("%s.%s[%d] must be an object schema", fieldPath, key, index)
+			return fmt.Errorf("%s.%s[%d] must be an object schema. Example: json-schemas: [{file: \"data.json\", schema: {type: object}}]", fieldPath, key, index)
 		}
 		if err := validateMemoryJSONSchema(childSchema, fmt.Sprintf("%s.%s[%d]", fieldPath, key, index), depth+1); err != nil {
 			return err

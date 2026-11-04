@@ -767,7 +767,7 @@ jobs:
         env:
           GH_AW_FILE_ROOT: "${{ runner.temp }}/gh-aw"
           GH_AW_FILE_CONFIG: "{\"files\":[{\"path\":\"safeoutputs/config.json\",\"content_env\":\"GH_AW_SAFE_OUTPUTS_CONFIG\"}]}"
-          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{},\"test_environment\":{\"description\":\"A test job with choice input\",\"inputs\":{\"environment\":{\"default\":null,\"description\":\"Target environment\",\"options\":[\"staging\",\"production\"],\"required\":true,\"type\":\"choice\"},\"test_type\":{\"default\":null,\"description\":\"Type of test to run\",\"options\":[\"smoke\",\"integration\",\"e2e\"],\"required\":true,\"type\":\"choice\"}},\"output\":\"Environment test completed successfully\"}}"
+          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{},\"test_environment\":{\"description\":\"A test job with choice input\",\"inputs\":{\"environment\":{\"default\":null,\"description\":\"Target environment\",\"options\":[\"staging\",\"production\"],\"required\":true,\"type\":\"choice\"},\"test_type\":{\"default\":null,\"description\":\"Type of test to run\",\"options\":[\"smoke\",\"integration\",\"e2e\"],\"required\":true,\"type\":\"choice\"}},\"output\":\"Environment test completed successfully\",\"supports_dependencies\":false}}"
         with:
           script: |
             const path = require('path');
