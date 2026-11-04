@@ -179,7 +179,7 @@ This subsection identifies the normative behavior that conforming AWF config sou
 
 **CR-05**: When drift is detected, the detecting agent or workflow SHOULD open a corrective pull request with specific field paths and suggested remediation.
 
-**CR-06**: Drift categorized as "missing in gh-aw" or "spec mismatch" MUST be remediated (merged or explicitly waived with rationale) within **5 business days** of detection. For this requirement, business days are Monday-Friday in UTC, excluding weekends. If this SLA is missed, maintainers MUST open (or update) an escalation tracking issue within 1 business day. The escalation issue MUST include an owner, unblock plan, and revised ETA.
+**CR-06**: Drift categorized as "missing in gh-aw" or "spec mismatch" MUST be remediated (merged or explicitly waived with rationale) within **5 business days** of detection. For this requirement, business days are Monday-Friday in UTC, excluding weekends. If this SLA is missed, maintainers MUST open (or update) an escalation tracking issue within 1 business day. The escalation issue MUST include an owner, unblock plan, and revised ETA (T-DR-007; owner assignment and acknowledgement are covered by T-DR-011).
 
 **CR-06a (Escalation Owner Assignment)**: When opening or updating an escalation tracking issue under CR-06, the assignee **SHOULD** be determined as follows: (a) the maintainer who merged the last change to the drifted property's corresponding implementation file in `pkg/workflow/` or `actions/setup/` is the **default escalation owner** (implementation guidance: this can be determined via `git log` on the relevant file, or through PR merge history); (b) if no such maintainer is identifiable (e.g., the property has never been implemented), the escalation owner **SHOULD** default to the on-call maintainer for the `github/gh-aw` repository at the time of escalation; (c) the assigned owner **MUST** be recorded in the `Owner` field of the escalation issue template and **MUST** acknowledge the assignment by commenting on the issue within 1 business day of assignment. The escalation issue **MUST NOT** be left unassigned. The formal conformance fixture is [T-DR-011](awf-config-sources-compliance/README.md#driftrecord-conformance-tests), implemented in `pkg/workflow/awf_config_safeguards_formal_test.go`; production issue assignment and comment-based acknowledgement enforcement are not yet automated. Until a dedicated production tracker exists, that enforcement is explicitly out of scope for T-DR-011 because the current fixture only validates the normative owner-selection and acknowledgement-window contract, not GitHub issue mutation side effects.
 
@@ -234,6 +234,12 @@ Drift detection MUST be triggered when:
    - Suggested corrective action (add coverage, open PR, update spec).
 
 6. **Open a corrective PR** when any drift of category "missing in gh-aw" or "spec mismatch" is found. The PR description MUST include the drift report and reference this procedure.
+
+7. **Run local conformance checks** from the repository root:
+   ```bash
+   go test ./pkg/workflow -run 'TestDriftRecord|TestAWFConfigSafeguard' -count=1
+   ```
+   These tests verify the local `DriftRecord`, corrective-PR, SLA-escalation, and unavailable-source safeguards. They do not fetch or compare the upstream schema; Steps 2–4 remain the schema-inventory and implementation comparison.
 
 ### 7.3 Example Drift Check (CLI)
 
@@ -299,7 +305,7 @@ To satisfy CR-06 tracking obligations, drift escalation records SHOULD use:
 - Waiver rationale (if any): <text>
 ```
 
-The scheduled schema consistency workflow SHOULD open or update one such issue when drift remains unresolved beyond 5 business days.
+The 5-business-day remediation window and 1-business-day escalation deadline are normative under CR-06. Maintainers MUST open or update the escalation issue within that deadline when the drift remains unresolved; the scheduled schema consistency workflow SHOULD detect the missed SLA and prepare the issue with the required owner, unblock plan, and revised ETA.
 
 ### 7.5 DriftRecord Entity Schema
 
@@ -332,3 +338,10 @@ Every invocation (scheduled, manual, or ad hoc) **MUST** attempt to refresh the 
 2. The workflow **SHOULD** emit a warning that canonical source retrieval failed, including the failing source path(s) and timestamp. (T-DR-SAFE-002; see the [fixture index](awf-config-sources-compliance/README.md#safeguards-conformance-tests))
 3. The workflow **MUST** skip destructive validation actions (for example failing required checks, auto-opening corrective PRs, or auto-creating drift issues from stale snapshots) when canonical data cannot be refreshed, and mark the run as degraded instead of silently passing. (T-DR-SAFE-003; see the [fixture index](awf-config-sources-compliance/README.md#safeguards-conformance-tests))
 4. The workflow **SHOULD** open or update a tracking issue when canonical source unavailability persists from one daily scheduled cron invocation through the next. Manual reruns and ad hoc invocations still perform the refresh and freshness checks above, but do not advance this consecutive-scheduled-run threshold. This persistence threshold applies only to unavailable-source reporting; the daily cadence in §7.4 applies to the full drift check. (T-DR-SAFE-004; see the [fixture index](awf-config-sources-compliance/README.md#safeguards-conformance-tests))
+
+## Change Log
+
+### 2026-11-04
+
+- Added the exact local conformance-test command and distinguished it from the upstream schema comparison procedure.
+- Aligned SLA escalation timing and required issue fields with CR-06 and compliance tests T-DR-007/T-DR-011.

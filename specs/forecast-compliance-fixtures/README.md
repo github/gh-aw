@@ -1,7 +1,6 @@
 # Forecast Compliance Fixtures
 
-This directory contains fixture files for bootstrapping the Section 12 compliance tests of the
-[Forecast Specification](../../docs/src/content/docs/specs/forecast-specification.md).
+This directory contains fixture files for the [Forecast Specification's §12 Compliance Testing](../../docs/src/content/docs/specs/forecast-specification.md#12-compliance-testing).
 
 Forecast is a run-level AIC projection command. Episode analysis and yield were removed in
 [#34750](https://github.com/github/gh-aw/pull/34750); the former episode requirements and tests
@@ -128,3 +127,17 @@ To add a fixture covering a specific compliance scenario:
 | `run_summary_partial_aic.json` | In-progress run with a non-zero token usage snapshot | [T-FC-024](../../docs/src/content/docs/specs/forecast-specification.md#1213-data-sampling-tests) |
 
 Sync note: `T-FC-022`, `T-FC-024`, `T-FC-035`, and `T-AIC-006` still point to the canonical forecast specification anchors for §12.1.3 Data Sampling Tests and §12.1.4 Monte Carlo Engine Tests. Their fixture assertions are covered by `TestMonteCarloFixtureVariantsAreAvailable` in `pkg/cli/forecast_montecarlo_test.go`, alongside the `TestForecast*` command-path coverage in `pkg/cli/forecast_test.go`. `TestFormal_ForecastSpecSyncNoteAnchorsExist` in `pkg/cli/forecast_compliance_fixtures_formal_test.go` mechanically fails if either anchor heading moves or is renamed in `forecast-specification.md`, so this note no longer needs manual re-dating.
+
+## Norms
+
+Fixture filenames use `run_summary_<scenario>.json` with a concise, descriptive scenario name. Keep each fixture deterministic and limited to the fields needed by its test. Every fixture's test ID and behavioral claim must link to the governing [Forecast Specification §12](../../docs/src/content/docs/specs/forecast-specification.md#12-compliance-testing), using the subsection anchor when one is defined.
+
+## Safeguards
+
+Fixtures must contain synthetic, non-identifying values only. Never include credentials, tokens, personal information, production run data, or copied live workflow logs. Use fabricated run identifiers and repository/workflow names when a test requires them.
+
+## Change Log
+
+### 2026-11-04
+
+- Added fixture naming and data-safety norms and linked the fixture index directly to the governing forecast compliance section.
