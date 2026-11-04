@@ -162,9 +162,13 @@ func TestRuntimeImportAnalysisBindsAuthorEnv(t *testing.T) {
 	compiler.markdownPath = filepath.Join(workflowsDir, "test.md")
 	data := &WorkflowData{MarkdownContent: "{{#runtime-import fragment.md}}"}
 	assert.Contains(t, compiler.collectRuntimeImportMarkdownForCompilerAnalysis(data), "env.MY_VAR")
-	assert.NotEmpty(t, compiler.enrichExpressionMappings(data, nil, nil))
+	mappings, err := compiler.enrichExpressionMappings(data, nil, nil)
+	require.NoError(t, err)
+	assert.NotEmpty(t, mappings)
 	require.NoError(t, os.WriteFile(filepath.Join(root, ".github", "fragment.md"), []byte("Visible\n<!-- ${{ env.MY_VAR }} -->"), 0o600))
 	assert.Contains(t, compiler.collectRuntimeImportMarkdownForCompilerAnalysis(data), "Visible")
 	assert.NotContains(t, compiler.collectRuntimeImportMarkdownForCompilerAnalysis(data), "env.MY_VAR")
-	assert.Empty(t, compiler.enrichExpressionMappings(data, nil, nil))
+	mappings, err = compiler.enrichExpressionMappings(data, nil, nil)
+	require.NoError(t, err)
+	assert.Empty(t, mappings)
 }

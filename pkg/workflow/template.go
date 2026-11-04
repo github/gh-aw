@@ -10,6 +10,7 @@ import (
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/setutil"
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 )
 
 var templateLog = logger.New("workflow:template")
@@ -22,12 +23,7 @@ var inlineSubAgentPattern = regexp.MustCompile("(?m)^##[ \t]+agent:[ \t]+`[a-z][
 func wrapExpressionsInTemplateConditionals(markdown string) string {
 	templateLog.Print("Wrapping expressions in template conditionals")
 
-	// wrapTagExpr applies the wrapping logic to a single extracted expression and
-	// returns the full reconstructed tag. re must be the same regex that produced
-	// match (so FindStringSubmatch reliably extracts capture group 1 = the expression).
-	// prefix is the canonical opening tag text without the expression
-	// (e.g. "{{#if " or "{{#elseif "), used to rebuild the output tag.
-	wrapTagExpr := func(re conditionalPattern, match, prefix string) string {
+	wrapTagExpr := func(re conditionalPattern, match, prefix string, codeExample bool) string {
 		submatches := re.FindStringSubmatch(match)
 		if len(submatches) < 2 {
 			return match
@@ -58,6 +54,11 @@ func wrapExpressionsInTemplateConditionals(markdown string) string {
 			templateLog.Print("Placeholder reference detected, skipping wrap")
 			return match
 		}
+		if codeExample {
+			if _, err := actionslanguageservice.ParseSyntax(applyContentTransformers(expr, defaultContentTransformers)); err != nil {
+				return match
+			}
+		}
 
 		templateLog.Printf("Wrapping expression: %s", expr)
 		return prefix + "${{ " + expr + " }} }}"
@@ -66,13 +67,13 @@ func wrapExpressionsInTemplateConditionals(markdown string) string {
 	// Process {{#if ...}} tags
 	ifPattern := conditionalPattern{TemplateIfPattern}
 	elseIfPattern := conditionalPattern{TemplateElseIfPattern}
-	result := ifPattern.ReplaceAllStringFunc(markdown, func(match string) string {
-		return wrapTagExpr(ifPattern, match, "{{#if ")
+	result := replaceConditionalTags(markdown, ifPattern, func(match string, codeExample bool) string {
+		return wrapTagExpr(ifPattern, match, "{{#if ", codeExample)
 	})
 
 	// Process all elseif variant tags — normalise to canonical {{#elseif ...}} form after wrapping
-	result = elseIfPattern.ReplaceAllStringFunc(result, func(match string) string {
-		wrapped := wrapTagExpr(elseIfPattern, match, "{{#elseif ")
+	result = replaceConditionalTags(result, elseIfPattern, func(match string, codeExample bool) string {
+		wrapped := wrapTagExpr(elseIfPattern, match, "{{#elseif ", codeExample)
 		// If the original tag used a non-canonical form (else-if / else_if / without #),
 		// the prefix replacement above already normalises it to {{#elseif ...}}.
 		return wrapped

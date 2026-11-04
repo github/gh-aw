@@ -16,6 +16,14 @@ if (!interpolateVariablesMatch) throw new Error("Could not extract interpolateVa
 const interpolateVariables = eval(`(${interpolateVariablesMatch[0]})`),
   { renderMarkdownTemplate } = require("./render_template.cjs");
 describe("interpolate_prompt", () => {
+  it("resolves both compiler placeholder forms in one pass", () => {
+    const payload = "__GH_AW_EXPR_OTHER__ ${GH_AW_EXPR_OTHER}";
+    const result = interpolateVariables("First: __GH_AW_EXPR_VALUE__\nSecond: ${GH_AW_EXPR_VALUE}\nOther: __GH_AW_EXPR_OTHER__", {
+      GH_AW_EXPR_VALUE: payload,
+      GH_AW_EXPR_OTHER: "evaluated",
+    });
+    expect(result).toBe(`First: ${payload}\nSecond: ${payload}\nOther: evaluated`);
+  });
   (describe("interpolateVariables", () => {
     (it("should interpolate single variable", () => {
       const result = interpolateVariables("Repository: ${GH_AW_EXPR_TEST123}", { GH_AW_EXPR_TEST123: "github/test-repo" });

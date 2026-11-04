@@ -4,7 +4,25 @@ package workflow
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
+
+func TestWrapLiteralConditionalExamples(t *testing.T) {
+	const example = "{{#if experiments.<name> == '<variant>'}}example{{/if}}"
+	for _, code := range []string{
+		"`" + example + "`",
+		"``" + example + " with ` inside``",
+		"```markdown\n" + example + "\n```",
+		"~~~~markdown\n```\n" + example + "\n~~~~",
+	} {
+		assert.Equal(t, code, wrapExpressionsInTemplateConditionals(code))
+	}
+	assert.Contains(t, wrapExpressionsInTemplateConditionals(example), "${{ experiments.<name>")
+	assert.Equal(t, "`unclosed "+example, maskTemplateCodeRegions("`unclosed "+example))
+	assert.Contains(t, wrapExpressionsInTemplateConditionals("```\n${{ github.run_id }}\n{{#if env.VALUE}}value{{/if}}\n```"), "${{ env.VALUE }}")
+	assert.Contains(t, wrapExpressionsInTemplateConditionals("```\n${{ secrets.TOKEN }}\n```"), "${{ secrets.TOKEN }}")
+}
 
 func TestWrapExpressionsInTemplateConditionals(t *testing.T) {
 	tests := []struct {
