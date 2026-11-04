@@ -952,7 +952,22 @@ function hasProxyConfigured(endpoint) {
  */
 function sendOTLPViaCurl(url, headers, body) {
   /** @type {string[]} */
-  const args = ["--silent", "--show-error", "--location", "--max-filesize", String(MAX_OTLP_RESPONSE_BYTES), "--write-out", "\n%{http_code}\n%{content_type}", "--request", "POST", "--data-binary", "@-"];
+  const args = [
+    "--silent",
+    "--show-error",
+    "--location",
+    "--suppress-connect-headers",
+    "--dump-header",
+    "/dev/fd/3",
+    "--max-filesize",
+    String(MAX_OTLP_RESPONSE_BYTES),
+    "--write-out",
+    "\n%{http_code}\n%{content_type}",
+    "--request",
+    "POST",
+    "--data-binary",
+    "@-",
+  ];
 
   for (const [key, value] of Object.entries(headers)) {
     args.push("--header", `${key}: ${value}`);
@@ -961,6 +976,7 @@ function sendOTLPViaCurl(url, headers, body) {
 
   const result = childProcess.spawnSync("curl", args, {
     input: body,
+    stdio: ["pipe", "pipe", "pipe", "pipe"],
     maxBuffer: MAX_OTLP_RESPONSE_BYTES + 4096,
     timeout: 15_000,
   });
@@ -973,16 +989,22 @@ function sendOTLPViaCurl(url, headers, body) {
   const output = Buffer.from(result.stdout || "");
   const typeIndex = output.lastIndexOf("\n");
   const statusIndex = output.lastIndexOf("\n", typeIndex - 1);
-  const status = Number.parseInt(output.subarray(statusIndex + 1, typeIndex < 0 ? undefined : typeIndex).toString(), 10);
+  // Headers arrive before the body, on a separate bounded pipe. On ENOBUFS the
+  // stdout trailer may be absent (or arbitrary body bytes resembling a status).
+  // CONNECT headers are suppressed; incomplete final headers must not reuse a
+  // preceding redirect's or informational response's status.
+  const headerOutput = (result.output?.[3] || "").toString();
+  const headerBlocks = headerOutput.split(/\r?\n\r?\n/);
+  const finalHeader = headerBlocks.pop() === "" ? headerBlocks.pop() || "" : "";
+  const headerStatus = /^HTTP\/(?:1\.[01]|2|3) ([1-5]\d{2})(?:[ \t][^\r\n]*)?(?:\r?\n|$)/.exec(finalHeader);
+  const trailerStatus = output.subarray(statusIndex + 1, typeIndex < 0 ? undefined : typeIndex).toString();
+  const status = headerStatus ? Number(headerStatus[1]) : !bufferOverflow && /^[1-5]\d{2}$/.test(trailerStatus) ? Number(trailerStatus) : 0;
   const diagnostics = {
     responseBody: statusIndex < 0 ? Buffer.alloc(0) : output.subarray(0, statusIndex),
     contentType: typeIndex < 0 ? "" : output.subarray(typeIndex + 1).toString(),
-    diagnosticsUnavailable: result.status !== 0,
+    diagnosticsUnavailable: Boolean(bufferOverflow) || result.status !== 0,
   };
-  // An oversized proxy response may have already accepted records. Never
-  // resend it merely because curl could not capture its diagnostics.
-  if (bufferOverflow) return { ok: true, status: 0, statusText: "", ...diagnostics, diagnosticsUnavailable: true };
-  if (Number.isInteger(status)) {
+  if (status > 0) {
     return {
       ok: status >= 200 && status < 300,
       status,

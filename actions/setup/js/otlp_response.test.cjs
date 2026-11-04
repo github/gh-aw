@@ -6,6 +6,7 @@ import childProcess from "child_process";
 const require = createRequire(import.meta.url);
 const { MAX_OTLP_RESPONSE_BYTES, readOTLPResponse, inspectOTLPResponse } = require("./otlp_response.cjs");
 const { sendOTLPSpan, sendOTLPToAllEndpoints } = require("./send_otlp_span.cjs");
+// Preload the lazy encoder before the readFileSync mock prevents Node from loading it.
 require("./otlp_protobuf.cjs");
 const privateMessage = "Bearer secret-token user@example.com https://user:password@collector.invalid/?key=private\n::error::private";
 const inspectJSON = (body, signal = "traces") => inspectOTLPResponse(Buffer.from(JSON.stringify(body)), "application/json", "http/json", signal);
@@ -70,7 +71,17 @@ describe("OTLP response diagnostics", () => {
     expect(result.reason).not.toContain("private");
   });
 
-  it.each(["0a", "0a0208", "0a0208010a00", "0a03080100", "0a020a00", "0a0b08ffffffffffffffffff01", "0a020c00", "0a031201ff", "00"])("handles malformed protobuf %s without leaking data", hex => {
+  it.each(["traces", "logs"])("withholds invalid UTF-8 protobuf %s messages without obscuring acceptance", signal => {
+    const warning = inspectOTLPResponse(Buffer.from("0a031201ff", "hex"), "application/x-protobuf", "http/protobuf", signal);
+    expect(warning.error).toBe(false);
+    expect(warning.reason).toContain("collector warning (message withheld)");
+    const rejection = inspectOTLPResponse(Buffer.from("0a0508021201ff", "hex"), "application/x-protobuf", "http/protobuf", signal);
+    expect(rejection.error).toBe(true);
+    expect(rejection.reason).toContain(signal === "logs" ? "rejected_log_records=2" : "rejected_spans=2");
+    for (const result of [warning, rejection]) expect(result.reason).not.toContain("acceptance unknown");
+  });
+
+  it.each(["0a", "0a0208", "0a0208010a00", "0a03080100", "0a020a00", "0a0b08ffffffffffffffffff01", "0a020c00", "00"])("handles malformed protobuf %s without leaking data", hex => {
     expect(inspectOTLPResponse(Buffer.from(hex, "hex"), "application/x-protobuf", "http/protobuf", "logs").reason).toContain("acceptance unknown");
   });
 
@@ -226,7 +237,12 @@ describe("OTLP delivery diagnostics across transports", () => {
         status: kind === "proxy-truncated" ? 63 : 0,
         stdout: Buffer.from(`${kind === "proxy-truncated" ? "" : privateMessage}\n200\n${kind === "proxy-unsupported" ? "text/html" : "application/json"}`),
         stderr: Buffer.from(privateMessage),
-        ...(kind === "proxy-buffer-overflow" ? { error: Object.assign(new Error(privateMessage), { code: "ENOBUFS" }) } : {}),
+        ...(kind === "proxy-buffer-overflow"
+          ? {
+              error: Object.assign(new Error(privateMessage), { code: "ENOBUFS" }),
+              output: [null, null, null, Buffer.from("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n")],
+            }
+          : {}),
       });
     }
     await sendOTLPSpan("https://collector.invalid", {}, { skipJSONL: true, baseDelayMs: 1 });

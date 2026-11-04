@@ -86,7 +86,6 @@ function decodePartialSuccess(bytes) {
           rejected = item;
         } else {
           if (type !== 2 || !Buffer.isBuffer(item)) throw new Error("Invalid collector message");
-          new TextDecoder("utf-8", { fatal: true }).decode(item);
           warning = item.length > 0;
         }
       });
