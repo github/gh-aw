@@ -81,6 +81,7 @@ run-name: "Daily Compiler Threat Spec Optimizer"
 
 env:
   OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.GH_AW_OTEL_SENTRY_ENDPOINT }}
+  OTEL_EXPORTER_OTLP_PROTOCOL: ${{ vars.OTEL_EXPORTER_OTLP_PROTOCOL }}
   OTEL_SERVICE_NAME: gh-aw.daily-compiler-threat-spec-optimizer
   OTEL_RESOURCE_ATTRIBUTES: 'gh-aw.workflow.name=Daily%20Compiler%20Threat%20Spec%20Optimizer,gh-aw.repository=${{ github.repository }},gh-aw.run.id=${{ github.run_id }},github.run_id=${{ github.run_id }},gh-aw.engine.id=copilot'
   OTEL_EXPORTER_OTLP_HEADERS: x-sentry-auth=${{ secrets.GH_AW_OTEL_SENTRY_AUTHORIZATION }}
@@ -387,6 +388,7 @@ jobs:
           GH_AW_SAFE_OUTPUTS: ${{ runner.temp }}/gh-aw/safeoutputs/outputs.jsonl
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_EXPORTER_OTLP_PROTOCOL: ""
           OTEL_RESOURCE_ATTRIBUTES: ""
           OTEL_SERVICE_NAME: ""
       - name: Interpolate variables and render templates
@@ -416,6 +418,7 @@ jobs:
           GH_AW_SUB_AGENT_EXT: .agent.md
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_EXPORTER_OTLP_PROTOCOL: ""
           OTEL_RESOURCE_ATTRIBUTES: ""
           OTEL_SERVICE_NAME: ""
       - name: Substitute placeholders
@@ -469,6 +472,7 @@ jobs:
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_EXPORTER_OTLP_PROTOCOL: ""
           OTEL_RESOURCE_ATTRIBUTES: ""
           OTEL_SERVICE_NAME: ""
       - name: Validate prompt placeholders
@@ -482,6 +486,7 @@ jobs:
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_EXPORTER_OTLP_PROTOCOL: ""
           OTEL_RESOURCE_ATTRIBUTES: ""
           OTEL_SERVICE_NAME: ""
       - name: Print prompt
@@ -495,6 +500,7 @@ jobs:
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_EXPORTER_OTLP_PROTOCOL: ""
           OTEL_RESOURCE_ATTRIBUTES: ""
           OTEL_SERVICE_NAME: ""
       - name: Inventory installed skills
