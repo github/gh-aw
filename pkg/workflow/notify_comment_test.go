@@ -2211,6 +2211,18 @@ func TestConclusionGitHubAppTokenUsesConclusionPermissions(t *testing.T) {
 			}
 
 			steps := strings.Join(job.Steps, "")
+			for _, stepID := range []string{"handle_agent_failure", "report_failed_jobs"} {
+				if stepID == "report_failed_jobs" && tt.reportFailedJobs != nil && tt.reportFailedJobs.String() == "false" {
+					continue
+				}
+				step := strings.SplitN(steps, "id: "+stepID+"\n", 2)
+				if len(step) != 2 {
+					t.Fatalf("missing conclusion step %s", stepID)
+				}
+				stepContent := strings.SplitN(step[1], "\n      - name:", 2)[0]
+				assert.Contains(t, stepContent, "if: always()", "%s must run after token minting fails", stepID)
+				assert.Contains(t, stepContent, "github-token: ${{ steps.safe-outputs-app-token.outputs.token || github.token }}", "%s must have a runtime token fallback", stepID)
+			}
 			if !strings.Contains(steps, "permission-actions: read") {
 				t.Errorf("conclusion App token should include 'permission-actions: read', got:\n%s", steps)
 			}
