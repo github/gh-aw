@@ -145,64 +145,25 @@ func sameModelRoutingRoute(left, right *AuditComparisonRoute) bool {
 		left.EffectiveEndpoint == right.EffectiveEndpoint && left.SelectedEndpoint == right.SelectedEndpoint
 }
 
-func loadAuditComparisonSnapshotFromArtifacts(run WorkflowRun, logsPath string, verbose bool) (auditComparisonSnapshot, error) {
-	auditComparisonLog.Printf("Loading baseline snapshot from artifacts: run_id=%d, logs_path=%s", run.DatabaseID, logsPath)
-	metrics, err := extractLogMetrics(logsPath, verbose, run.WorkflowPath)
-	if err != nil {
-		auditComparisonLog.Printf("Baseline metrics extraction failed for run %d: %v", run.DatabaseID, err)
-		return auditComparisonSnapshot{}, fmt.Errorf("failed to extract baseline metrics: %w", err)
-	}
-
-	firewallAnalysis, err := analyzeFirewallLogs(logsPath, verbose)
-	if err != nil {
-		auditComparisonLog.Printf("Baseline firewall analysis failed for run %d: %v", run.DatabaseID, err)
-		return auditComparisonSnapshot{}, fmt.Errorf("failed to analyze baseline firewall logs: %w", err)
-	}
-
-	mcpExpName, mcpExpVariant, _ := firstExperimentAssignment(extractExperimentData(logsPath))
-	mcpFailures, err := extractMCPFailuresFromRun(logsPath, run, verbose, mcpExpName, mcpExpVariant)
-	if err != nil {
-		auditComparisonLog.Printf("Baseline MCP failure extraction failed for run %d: %v", run.DatabaseID, err)
-		return auditComparisonSnapshot{}, fmt.Errorf("failed to extract baseline MCP failures: %w", err)
-	}
-
-	blockedRequests := 0
-	if firewallAnalysis != nil {
-		blockedRequests = firewallAnalysis.BlockedRequests
-	}
-
-	return auditComparisonSnapshot{
-		Turns:           metrics.Turns,
-		Posture:         deriveAuditPosture(extractCreatedItemsFromManifest(logsPath)),
-		BlockedRequests: blockedRequests,
-		MCPFailures:     collectMCPFailureServers(mcpFailures),
-		ModelRouting:    modelRoutingComparisonRoute(analyzeModelRouting(logsPath)),
-	}, nil
-}
-
 func buildAuditComparisonCandidateFromSummary(summary *RunSummary, logsPath string) auditComparisonCandidate {
-	createdItems := resolveCreatedItems(logsPath, summary.SafeOutputs)
-	posture := deriveAuditPosture(createdItems)
 	routing := summary.ModelRouting
 	if routing == nil {
 		// Older cached summaries do not contain model-routing data.
 		routing = analyzeModelRouting(logsPath)
 	}
 
-	blockedRequests := 0
-	if summary.FirewallAnalysis != nil {
-		blockedRequests = summary.FirewallAnalysis.BlockedRequests
+	processedRun := ProcessedRun{
+		Run:              summary.Run,
+		FirewallAnalysis: summary.FirewallAnalysis,
+		MCPFailures:      summary.MCPFailures,
+		ModelRouting:     routing,
+		SafeOutputs:      summary.SafeOutputs,
 	}
+	processedRun.Run.Turns = summary.Metrics.Turns
 
 	return auditComparisonCandidate{
-		Run: summary.Run,
-		Snapshot: auditComparisonSnapshot{
-			Turns:           summary.Metrics.Turns,
-			Posture:         posture,
-			BlockedRequests: blockedRequests,
-			MCPFailures:     collectMCPFailureServers(summary.MCPFailures),
-			ModelRouting:    modelRoutingComparisonRoute(routing),
-		},
+		Run:                 summary.Run,
+		Snapshot:            buildAuditComparisonSnapshot(processedRun, resolveCreatedItems(logsPath, summary.SafeOutputs)),
 		TaskDomain:          summary.TaskDomain,
 		BehaviorFingerprint: summary.BehaviorFingerprint,
 	}
@@ -224,30 +185,34 @@ func loadAuditComparisonCandidate(run WorkflowRun, logsPath string, verbose bool
 		return candidate, nil
 	}
 
-	snapshot, err := loadAuditComparisonSnapshotFromArtifacts(run, logsPath, verbose)
+	auditComparisonLog.Printf("Loading baseline snapshot from artifacts: run_id=%d, logs_path=%s", run.DatabaseID, logsPath)
+	processedRun := ProcessedRun{Run: run}
+	metrics, err := extractLogMetrics(logsPath, verbose, run.WorkflowPath)
 	if err != nil {
-		return auditComparisonCandidate{}, err
+		auditComparisonLog.Printf("Baseline metrics extraction failed for run %d: %v", run.DatabaseID, err)
+		return auditComparisonCandidate{}, fmt.Errorf("failed to extract baseline metrics: %w", err)
+	}
+	processedRun.Run.TokenUsage = metrics.TokenUsage
+	processedRun.Run.Turns = metrics.Turns
+
+	processedRun.FirewallAnalysis, err = analyzeFirewallLogs(logsPath, verbose)
+	if err != nil {
+		auditComparisonLog.Printf("Baseline firewall analysis failed for run %d: %v", run.DatabaseID, err)
+		return auditComparisonCandidate{}, fmt.Errorf("failed to analyze baseline firewall logs: %w", err)
 	}
 
-	processedRun := ProcessedRun{Run: run}
-	metrics, metricsErr := extractLogMetrics(logsPath, verbose, run.WorkflowPath)
-	if metricsErr == nil {
-		processedRun.Run.TokenUsage = metrics.TokenUsage
-		processedRun.Run.Turns = metrics.Turns
-	}
-	if firewallAnalysis, firewallErr := analyzeFirewallLogs(logsPath, verbose); firewallErr == nil {
-		processedRun.FirewallAnalysis = firewallAnalysis
-	}
 	expName, expVariant, _ := firstExperimentAssignment(extractExperimentData(logsPath))
-	if mcpFailures, mcpErr := extractMCPFailuresFromRun(logsPath, run, verbose, expName, expVariant); mcpErr == nil {
-		processedRun.MCPFailures = mcpFailures
+	processedRun.MCPFailures, err = extractMCPFailuresFromRun(logsPath, run, verbose, expName, expVariant)
+	if err != nil {
+		auditComparisonLog.Printf("Baseline MCP failure extraction failed for run %d: %v", run.DatabaseID, err)
+		return auditComparisonCandidate{}, fmt.Errorf("failed to extract baseline MCP failures: %w", err)
 	}
-	awContext, _, _, taskDomain, behaviorFingerprint, _ := deriveRunAgenticAnalysis(processedRun, metrics)
-	processedRun.AwContext = awContext
+	processedRun.ModelRouting = analyzeModelRouting(logsPath)
+	_, _, _, taskDomain, behaviorFingerprint, _ := deriveRunAgenticAnalysis(processedRun, metrics)
 
 	return auditComparisonCandidate{
 		Run:                 run,
-		Snapshot:            snapshot,
+		Snapshot:            buildAuditComparisonSnapshot(processedRun, resolveCreatedItems(logsPath, processedRun.SafeOutputs)),
 		TaskDomain:          taskDomain,
 		BehaviorFingerprint: behaviorFingerprint,
 		Selection:           "latest_success",
