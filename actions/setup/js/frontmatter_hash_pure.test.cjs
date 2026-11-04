@@ -23,6 +23,59 @@ const {
 } = require("./frontmatter_hash_pure.cjs");
 
 describe("frontmatter_hash_pure (text-based)", () => {
+  describe("import read failures", () => {
+    const workflowPath = ".github/workflows/test.md";
+    const cases = [
+      { name: "frontmatter imports", computeHash: computeFrontmatterHash, content: "---\nengine: copilot\nimports:\n  - shared/test.md\n---\nBody" },
+      { name: "body imports", computeHash: computeBodyHash, content: "---\nengine: copilot\nimports:\n  - shared/test.md\n---\nBody" },
+      { name: "runtime imports", computeHash: computeFrontmatterHash, content: "---\nengine: copilot\n---\n{{#runtime-import shared/test.md}}" },
+    ];
+
+    describe.each(cases)("$name", ({ computeHash, content }) => {
+      function readerWithError(error) {
+        return createGitHubFileReader(
+          {
+            rest: {
+              repos: {
+                getContent: vi.fn(async ({ path: filePath }) => {
+                  if (filePath === workflowPath) return { data: { content } };
+                  throw error;
+                }),
+              },
+            },
+          },
+          "owner",
+          "repo",
+          "main"
+        );
+      }
+
+      it.each([{ status: 500, message: "Internal Server Error" }, { status: 403, message: "Secondary rate limit" }, { message: "Request timed out" }])("should propagate unreadable imports: $message", async error => {
+        await expect(computeHash(workflowPath, { fileReader: readerWithError(error), readerMode: "github-api" })).rejects.toThrow(error.message);
+      });
+
+      it("should skip genuinely absent API imports", async () => {
+        const hash = await computeHash(workflowPath, {
+          fileReader: readerWithError({ status: 404, message: "Not Found" }),
+          readerMode: "github-api",
+        });
+        const expected = await computeHash(workflowPath, {
+          fileReader: async filePath => {
+            if (filePath === workflowPath) return content;
+            throw Object.assign(new Error("not found"), { code: "ENOENT" });
+          },
+          readerMode: "github-api",
+        });
+        expect(hash).toBe(expected);
+      });
+
+      it("should skip genuinely absent local imports", async () => {
+        const fileReader = async filePath => (filePath === workflowPath ? content : defaultFileReader(filePath));
+        await expect(computeHash(workflowPath, { fileReader, readerMode: "github-api" })).resolves.toMatch(/^[a-f0-9]{64}$/);
+      });
+    });
+  });
+
   describe("shared interpolation hash vectors", () => {
     it.each(interpolationVectors)("$name", async ({ markdown, relevant, all }) => {
       expect(extractRelevantTemplateExpressions(markdown)).toEqual(relevant);
@@ -331,7 +384,7 @@ Cycle hash coverage.
         ["/repo/.github/workflows/shared/b.md", "B $" + "{{ needs.b.outputs.value }}\n{{#runtime-import shared/a.md}}\n"],
       ]);
       const fileReader = async filePath => {
-        if (!files.has(filePath)) throw new Error(`missing ${filePath}`);
+        if (!files.has(filePath)) throw Object.assign(new Error(`missing ${filePath}`), { code: "ENOENT" });
         return files.get(filePath);
       };
 

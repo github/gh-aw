@@ -210,6 +210,8 @@ async function main() {
     return { match, storedHash: storedBodyHash, recomputedHash: recomputedBodyHash, hashKind: "body" };
   }
 
+  let hashReadFailure = "";
+
   async function compareFrontmatterHashesFromLocalFiles() {
     const workspace = process.env.GITHUB_WORKSPACE;
     if (!workspace) {
@@ -273,7 +275,8 @@ async function main() {
 
       return { match, storedHash, recomputedHash, hashKind: "frontmatter" };
     } catch (error) {
-      core.info(`Could not compute frontmatter hash from local files: ${getErrorMessage(error)}`);
+      hashReadFailure = getErrorMessage(error);
+      core.info(`Could not compute frontmatter hash from local files: ${hashReadFailure}`);
       return null;
     }
   }
@@ -335,6 +338,7 @@ async function main() {
       return { result: { match, storedHash, recomputedHash, hashKind: "frontmatter" }, crossRepoAuthFailure: null };
     } catch (error) {
       const errorMessage = getErrorMessage(error);
+      hashReadFailure = errorMessage;
       core.info(`Could not compute frontmatter hash via API: ${errorMessage}`);
       // Fall back to local filesystem when API is unavailable
       // (e.g., cross-org reusable workflow where caller token lacks source repo access)
@@ -398,7 +402,7 @@ async function main() {
 
   if (!hashComparison) {
     // Could not compute hash - run verbose pass for debugging then fail
-    core.warning("Could not compare frontmatter hashes - assuming lock file is outdated");
+    core.warning(hashReadFailure ? `Could not compare frontmatter hashes: ${hashReadFailure}` : "Could not compare frontmatter hashes - assuming lock file is outdated");
     await recomputeHashWithDebugLogging();
 
     let warningMessage;
@@ -409,6 +413,9 @@ async function main() {
       // not to re-run `gh aw compile` (which would not resolve the issue).
       warningMessage = `Lock file '${lockFilePath}' could not be verified: GITHUB_TOKEN cannot access the callee repo '${crossRepoAuthFailure.repo}' (HTTP ${crossRepoAuthFailure.status}). Configure GH_AW_GITHUB_TOKEN with read access to '${crossRepoAuthFailure.repo}'.`;
       actionRequiredText = `**Root cause:** \`GITHUB_TOKEN\` is scoped to the caller repo and cannot read from the private callee repo \`${crossRepoAuthFailure.repo}\`.\n\n**Action Required:** Configure \`GH_AW_GITHUB_TOKEN\` with \`contents: read\` access to \`${crossRepoAuthFailure.repo}\`.\n\n`;
+    } else if (hashReadFailure) {
+      warningMessage = `Lock file '${lockFilePath}' could not be verified: ${hashReadFailure}`;
+      actionRequiredText = "**Action Required:** Check source file access and retry the workflow.\n\n";
     } else {
       warningMessage = `Lock file '${lockFilePath}' is outdated or unverifiable! Could not verify frontmatter hash for '${workflowMdPath}'. Run 'gh aw compile' to regenerate the lock file.`;
       actionRequiredText = "**Action Required:** Run `gh aw compile` to regenerate the lock file.\n\n";

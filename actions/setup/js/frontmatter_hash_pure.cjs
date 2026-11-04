@@ -31,6 +31,18 @@ async function defaultFileReader(filePath) {
 }
 
 /**
+ * @param {any} error - Reader error, possibly wrapped with a cause
+ * @returns {boolean} Whether the file is genuinely absent
+ */
+function isFileNotFound(error) {
+  if (!error) return false;
+  const status = error.status || error.response?.status;
+  if (status !== undefined) return status === HTTP_STATUS_NOT_FOUND;
+  if (error.code !== undefined) return error.code === "ENOENT";
+  return error.cause ? isFileNotFound(error.cause) : false;
+}
+
+/**
  * Parses a boolean flag from frontmatter text using simple text scanning.
  * Matches lines of the form "key: true" or "key: false" at the top level.
  * Returns false when the key is absent or the value is not "true".
@@ -232,7 +244,7 @@ async function processImportsTextBased(frontmatterText, baseDir, visited = new S
       importedFiles.push(...nestedResult.importedFiles);
       importedFrontmatterTexts.push(...nestedResult.importedFrontmatterTexts);
     } catch (err) {
-      // Skip files that can't be read
+      if (!isFileNotFound(err)) throw err;
       continue;
     }
   }
@@ -488,6 +500,7 @@ async function readRuntimeImportBodyForHash(ref, baseDir, seen, fileReader, read
       const { markdown } = extractFrontmatterAndBody(content);
       return markdown;
     } catch (err) {
+      if (!isFileNotFound(err)) throw err;
       continue;
     }
   }
@@ -664,6 +677,7 @@ async function collectImportedBodies(frontmatterText, baseDir, visited = new Set
       const nestedBodies = await collectImportedBodies(importFrontmatterText, importBaseDir, visited, fileReader);
       importedBodyTexts.push(...nestedBodies);
     } catch (err) {
+      if (!isFileNotFound(err)) throw err;
       continue;
     }
   }
@@ -965,7 +979,8 @@ function createGitHubFileReader(github, owner, repo, ref) {
       }
 
       const errorMessage = getErrorMessage(error);
-      throw new Error(`${ERR_SYSTEM}: Failed to read file ${filePath} from GitHub: ${errorMessage}`);
+      const statusMessage = status !== undefined ? ` (HTTP ${status})` : "";
+      throw new Error(`${ERR_SYSTEM}: Failed to read file ${filePath} from GitHub${statusMessage}: ${errorMessage}`, { cause: error });
     }
   }
 
