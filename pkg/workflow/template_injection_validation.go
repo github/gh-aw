@@ -162,16 +162,16 @@ func findRunValue(keyPart string) (string, bool) {
 // multiline run block. It recognizes plain run: keys as well as quoted and flow-style forms
 // so Path B stays aligned with the parsed-YAML validators.
 //
-// Multiline blocks use the same shell-region filtering as the parsed validators.
-// YAML indentation is removed before parsing shell syntax; shell indentation
-// remains significant for exact heredoc delimiter matching.
+// Multiline blocks preserve raw shell content because Actions expressions are
+// substituted before Bash interprets quotes, comments, or heredoc boundaries.
+// YAML indentation is removed while collecting the run block.
 func walkRunBlockLines(yamlContent string, visit func(line string) bool) bool {
 	inRunBlock := false
 	runBlockIndent := 0
 	contentIndent := 0
 	var block strings.Builder
 	flush := func() bool {
-		for line := range strings.SplitSeq(executableShellContent(block.String()), "\n") {
+		for line := range strings.SplitSeq(block.String(), "\n") {
 			if visit(line) {
 				return true
 			}
@@ -275,16 +275,13 @@ func validateNoTemplateInjectionFromParsed(workflow map[string]any) error {
 			continue
 		}
 
-		contentWithoutHeredocs := executableShellContent(runContent)
-
-		// Extract inline expressions outside quoted heredoc bodies and comments.
-		expressions := runScriptExpressions(contentWithoutHeredocs)
+		expressions := runScriptExpressions(runContent)
 
 		// Check each expression for unsafe contexts
 		for _, expr := range expressions {
 			if context := unsafeRunScriptExpressionContext(expr); context != "" {
 				// Found an unsafe pattern - extract a snippet for context
-				snippet := extractRunSnippet(contentWithoutHeredocs, expr)
+				snippet := extractRunSnippet(runContent, expr)
 				violations = append(violations, TemplateInjectionViolation{
 					Expression: expr,
 					Snippet:    snippet,
@@ -309,10 +306,8 @@ func validateNoTemplateInjectionFromParsed(workflow map[string]any) error {
 // validateNoGitHubExpressionsInRunScriptsFromParsed checks a pre-parsed workflow map
 // for any GitHub Actions expression usage in run: scripts.
 //
-// This is a compiler regression guardrail: run: scripts in compiled lock files should
-// never contain ${{ ... }} directly because the compiler must rewrite expressions into
-// env: variables. It runs after validateNoTemplateInjectionFromParsed as a broader
-// catch-all for any remaining expression contexts.
+// This raw-content guardrail rejects prohibited expressions left in run: scripts,
+// including comments and quoted heredocs that the sanitizer preserves.
 func validateNoGitHubExpressionsInRunScriptsFromParsed(workflow map[string]any) error {
 	runBlocks := extractRunBlocks(workflow)
 	templateInjectionValidationLog.Printf("Found %d run blocks to scan for raw expressions", len(runBlocks))
@@ -324,15 +319,12 @@ func validateNoGitHubExpressionsInRunScriptsFromParsed(workflow map[string]any) 
 			continue
 		}
 
-		// Align with template-injection validation by excluding non-executable regions:
-		// quoted heredoc bodies and bash # comments.
-		contentWithoutHeredocs := executableShellContent(runContent)
-		expressions := runScriptExpressions(contentWithoutHeredocs)
+		expressions := runScriptExpressions(runContent)
 		for _, expr := range expressions {
 			if _, valid := actionslanguageservice.WrappedExpression(expr); valid && allowedRunScriptExpressionRegex.MatchString(expr) {
 				continue
 			}
-			snippet := extractRunSnippet(contentWithoutHeredocs, expr)
+			snippet := extractRunSnippet(runContent, expr)
 			violations = append(violations, TemplateInjectionViolation{
 				Expression: expr,
 				Snippet:    snippet,
@@ -343,7 +335,7 @@ func validateNoGitHubExpressionsInRunScriptsFromParsed(workflow map[string]any) 
 
 	if len(violations) > 0 {
 		templateInjectionValidationLog.Printf("Run-script expression guardrail failed: %d violation(s) found", len(violations))
-		return formatRunScriptExpressionGuardrailError(violations)
+		return formatRunScriptExpressionValidationError(violations)
 	}
 
 	return nil

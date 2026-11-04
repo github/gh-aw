@@ -15,9 +15,9 @@ import (
 func TestHeredocInjectionControls(t *testing.T) {
 	const expression = "${{ github.event.issue.title }}"
 	tests := []struct {
-		name   string
-		script string
-		unsafe bool
+		name    string
+		script  string
+		rewrite bool
 	}{
 		{"unquoted", "cat <<EOF\n" + expression + "\nEOF", true},
 		{"unquoted custom", "cat <<custom-marker\n" + expression + "\ncustom-marker", true},
@@ -40,7 +40,7 @@ func TestHeredocInjectionControls(t *testing.T) {
 		{"leading delimiter spaces", "cat <<'EOF'\n" + expression + "\n EOF", true},
 		{"tabs without strip operator", "cat <<'EOF'\n" + expression + "\n\tEOF", true},
 		{"spaces with strip operator", "cat <<-'EOF'\n" + expression + "\n EOF", true},
-		{"unterminated", "cat <<'EOF'\n" + expression, true},
+		{"unterminated", "cat <<'EOF'\n" + expression, false},
 		{"opener in string", "echo \"<<'EOF'\"\necho " + expression + "\nEOF", true},
 		{"opener in comment", "# cat <<'EOF'\necho " + expression + "\nEOF", true},
 		{"here string", "cat <<<\"<<'EOF'\"\necho " + expression + "\nEOF", true},
@@ -61,28 +61,25 @@ func TestHeredocInjectionControls(t *testing.T) {
 			yaml := "jobs:\n  test:\n    steps:\n      - run: |\n          " +
 				strings.ReplaceAll(tt.script, "\n", "\n          ") + "\n"
 
-			assert.Equal(t, tt.unsafe, strings.Contains(executableShellContent(tt.script), expression))
-			assert.Equal(t, tt.unsafe, validateNoTemplateInjectionFromParsed(parsed) != nil)
-			assert.Equal(t, tt.unsafe, validateNoGitHubExpressionsInRunScriptsFromParsed(parsed) != nil)
+			assert.Contains(t, tt.script, expression)
+			require.Error(t, validateNoTemplateInjectionFromParsed(parsed))
+			require.Error(t, validateNoGitHubExpressionsInRunScriptsFromParsed(parsed))
 			scan := scanRunContentExpressions(yaml)
-			assert.Equal(t, tt.unsafe, scan.hasUnsafe, "raw YAML unsafe scan")
-			assert.Equal(t, tt.unsafe, scan.hasDisallowed, "raw YAML expression guardrail")
+			assert.True(t, scan.hasUnsafe, "raw YAML unsafe scan")
+			assert.True(t, scan.hasDisallowed, "raw YAML expression guardrail")
 
 			sanitized, warnings, changed := sanitizeRunStepExpressions(step)
 			_, parsedShell := shellHeredocRegions(tt.script, false)
-			assert.Equal(t, tt.unsafe && parsedShell, changed)
+			assert.Equal(t, tt.rewrite && parsedShell, changed)
 			assert.Equal(t, tt.script, step["run"], "input must not be mutated")
-			if tt.unsafe && parsedShell {
+			if tt.rewrite && parsedShell {
 				require.Len(t, warnings, 1)
 				assert.Equal(t, expression, sanitized["env"].(map[string]any)["GH_AW_GITHUB_EVENT_ISSUE_TITLE"])
-				assert.NotContains(t, executableShellContent(sanitized["run"].(string)), expression)
+				assert.NotContains(t, shellExpansionContent(sanitized["run"].(string)), expression)
 				assert.NoError(t, validateNoTemplateInjectionFromParsed(map[string]any{"steps": []any{sanitized}}))
 			} else {
 				assert.Empty(t, warnings)
 				assert.Equal(t, tt.script, sanitized["run"], "quoted body must remain literal")
-				if tt.unsafe {
-					assert.Error(t, validateNoTemplateInjectionFromParsed(parsed))
-				}
 			}
 		})
 	}
@@ -122,7 +119,7 @@ func TestHeredocUnknownBoundariesPreserveScript(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			_, parsed := shellHeredocRegions(tt.script, false)
 			require.False(t, parsed, "unproven Bash boundaries must not grant an exemption")
-			assert.Contains(t, executableShellContent(tt.script), expression)
+			assert.Contains(t, tt.script, expression)
 			step := map[string]any{"run": tt.script}
 			sanitized, warnings, changed := sanitizeRunStepExpressions(step)
 			assert.False(t, changed)
@@ -153,7 +150,7 @@ func TestHeredocCommentsPreserveFullScriptContext(t *testing.T) {
 	sanitized, _, changed := sanitizeRunStepExpressions(map[string]any{"run": script})
 	require.True(t, changed)
 	assert.Equal(t, "# "+expression+"\necho \"$(cat <<'EOF'\nliteral\nEOF\n) # $GH_AW_GITHUB_EVENT_ISSUE_TITLE\"\n# "+expression, sanitized["run"])
-	assert.NotContains(t, executableShellContent(sanitized["run"].(string)), expression)
+	assert.NotContains(t, shellExpansionContent(sanitized["run"].(string)), expression)
 }
 
 func TestHeredocParserFailureDoesNotLogScript(t *testing.T) {
