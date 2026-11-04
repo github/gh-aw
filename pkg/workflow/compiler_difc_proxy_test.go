@@ -513,8 +513,25 @@ Test that DIFC proxy is injected by default when min-integrity is set with custo
 	data, err := compiler.ParseWorkflowString(workflow, "test-workflow.md")
 	require.NoError(t, err, "parsing should succeed")
 
+	image := constants.DefaultMCPGatewayContainer + ":" + effectiveMCPGatewayVersion(data)
+	digest := "sha256:" + strings.Repeat("a", 64)
+	pinnedImage := image + "@" + digest
+	data.ActionCache = &ActionCache{ContainerPins: make(map[string]ContainerPin)}
+	data.ActionCache.SetContainerPin(image, digest, pinnedImage)
+
 	result, err := compiler.CompileToYAML(data, "test-workflow.md")
 	require.NoError(t, err, "compilation should succeed")
+
+	assert.Contains(t, result, "DIFC_PROXY_IMAGE: '"+pinnedImage+"'")
+	gatewayCommand := ""
+	for line := range strings.SplitSeq(result, "\n") {
+		if strings.Contains(line, "export MCP_GATEWAY_DOCKER_COMMAND=") {
+			gatewayCommand = line
+			break
+		}
+	}
+	require.NotEmpty(t, gatewayCommand)
+	assert.Contains(t, gatewayCommand, " "+pinnedImage)
 
 	// Verify proxy start step is present
 	assert.Contains(t, result, "Start DIFC Proxy",
@@ -1098,9 +1115,14 @@ func TestGitHubMCPAppTokenFailsClosedForGhProxy(t *testing.T) {
 // image reference from the gateway config, falling back to the default version when
 // no version is specified.
 func TestResolveProxyContainerImage(t *testing.T) {
+	defaultImage := constants.DefaultMCPGatewayContainer + ":" + string(constants.DefaultMCPGatewayVersion)
+	defaultPin, ok := getEmbeddedContainerPin(defaultImage)
+	require.True(t, ok)
+
 	tests := []struct {
 		name     string
 		config   *MCPGatewayRuntimeConfig
+		data     *WorkflowData
 		expected string
 	}{
 		{
@@ -1109,7 +1131,19 @@ func TestResolveProxyContainerImage(t *testing.T) {
 				Container: constants.DefaultMCPGatewayContainer,
 				Version:   "",
 			},
-			expected: constants.DefaultMCPGatewayContainer + ":" + string(constants.DefaultMCPGatewayVersion),
+			expected: defaultPin.PinnedImage,
+		},
+		{
+			name: "uses effective workflow version when version is empty",
+			config: &MCPGatewayRuntimeConfig{
+				Container: constants.DefaultMCPGatewayContainer,
+			},
+			data: &WorkflowData{
+				SandboxConfig: &SandboxConfig{
+					MCP: &MCPGatewayRuntimeConfig{Version: "v1.2.3"},
+				},
+			},
+			expected: constants.DefaultMCPGatewayContainer + ":v1.2.3",
 		},
 		{
 			name: "uses explicit version when set",
@@ -1139,8 +1173,57 @@ func TestResolveProxyContainerImage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := resolveProxyContainerImage(tt.config)
+			got := resolveProxyContainerImage(tt.config, tt.data)
 			assert.Equal(t, tt.expected, got, "resolveProxyContainerImage(%+v)", tt.config)
+		})
+	}
+}
+
+func TestProxyContainerImagePins(t *testing.T) {
+	image := constants.DefaultMCPGatewayContainer + ":v1.2.3"
+	digest := "sha256:" + strings.Repeat("a", 64)
+	pinnedImage := image + "@" + digest
+	mappedImage := "ghcr.io/myorg/proxy:v1@" + digest
+
+	for _, tt := range []struct {
+		name     string
+		pinned   bool
+		mapped   bool
+		expected string
+	}{
+		{name: "without pin", expected: image},
+		{name: "cached pin", pinned: true, expected: pinnedImage},
+		{name: "repository mapping", mapped: true, expected: mappedImage},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			data := &WorkflowData{
+				Tools: map[string]any{
+					"github": map[string]any{"min-integrity": "approved"},
+				},
+				SandboxConfig: &SandboxConfig{
+					MCP: &MCPGatewayRuntimeConfig{
+						Container: constants.DefaultMCPGatewayContainer,
+						Version:   "v1.2.3",
+					},
+				},
+				ActionCache: &ActionCache{ContainerPins: make(map[string]ContainerPin)},
+			}
+			if tt.pinned {
+				data.ActionCache.SetContainerPin(image, digest, pinnedImage)
+			}
+			if tt.mapped {
+				data.ContainerPinMappings = map[string]string{image: mappedImage}
+			}
+
+			c := &Compiler{}
+			assert.Contains(t, c.buildStartDIFCProxyStepYAML(data), "DIFC_PROXY_IMAGE: '"+tt.expected+"'")
+			assert.Contains(t, c.buildStartCliProxyStepYAML(data), "CLI_PROXY_IMAGE: '"+tt.expected+"'")
+			gatewayCommand := buildMCPGatewayContainerCommand(buildMCPGatewayContainerCommandOptions{
+				engine:        NewCopilotEngine(),
+				workflowData:  data,
+				gatewayConfig: data.SandboxConfig.MCP,
+			})
+			assert.Contains(t, gatewayCommand, " "+tt.expected)
 		})
 	}
 }

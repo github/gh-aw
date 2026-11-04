@@ -229,7 +229,7 @@ func stripShellLineComments(content string) string {
 	escaped := false
 
 	for i := 0; i < len(content); i++ {
-		ch := content[i]
+		ch := content[i] //nolint:uncheckedsliceindex // i is bounded by the loop condition.
 
 		// Preserve newlines and reset escape state across lines.
 		if ch == '\n' {
@@ -263,7 +263,7 @@ func stripShellLineComments(content string) string {
 		}
 
 		if ch == '#' && !inSingleQuote && !inDoubleQuote && isShellCommentStart(content, i) {
-			for i+1 < len(content) && content[i+1] != '\n' {
+			for i+1 < len(content) && content[i+1] != '\n' { //nolint:uncheckedsliceindex // i+1 is bounded by the loop condition.
 				i++
 			}
 			continue
@@ -279,7 +279,10 @@ func isShellCommentStart(content string, index int) bool {
 	if index == 0 {
 		return true
 	}
-	prev := content[index-1]
+	if index < 0 || index >= len(content) {
+		return false
+	}
+	prev := content[index-1] //nolint:uncheckedsliceindex // index is checked above.
 	return prev == ' ' || prev == '\t' || prev == '\n' || prev == '\r' || prev == ';'
 }
 
@@ -293,7 +296,7 @@ func transformOutsideShellLineComments(content string, transform func(string) st
 	segmentStart := 0
 
 	for i := 0; i < len(content); {
-		ch := content[i]
+		ch := content[i] //nolint:uncheckedsliceindex // i is bounded by the loop condition.
 
 		if ch == '\n' {
 			escaped = false
@@ -329,7 +332,7 @@ func transformOutsideShellLineComments(content string, transform func(string) st
 			result.WriteString(transform(content[segmentStart:i]))
 
 			commentEnd := i
-			for commentEnd < len(content) && content[commentEnd] != '\n' {
+			for commentEnd < len(content) && content[commentEnd] != '\n' { //nolint:uncheckedsliceindex // commentEnd is bounded by the loop condition.
 				commentEnd++
 			}
 			result.WriteString(content[i:commentEnd])
@@ -350,6 +353,15 @@ type TemplateInjectionViolation struct {
 	Expression string // The unsafe expression (e.g., "${{ github.event.issue.title }}")
 	Snippet    string // Code snippet showing the violation context
 	Context    string // Expression context (e.g., "github.event", "steps.*.outputs")
+}
+
+func writeQuotedHeredocMigrationGuidance(builder *strings.Builder, violations []TemplateInjectionViolation) {
+	for _, violation := range violations {
+		if strings.HasPrefix(violation.Context, "quoted heredoc") || violation.Context == "unproven heredoc boundary" {
+			builder.WriteString("Quoted heredoc contents are still interpolated by GitHub Actions before Bash. Bind dynamic values in the step's env: block, then use an unquoted heredoc or printf '%s\\n' \"$VALUE\" instead.\n\n")
+			return
+		}
+	}
 }
 
 // extractRunSnippet extracts a relevant snippet from the run block containing the expression
@@ -416,6 +428,8 @@ func formatTemplateInjectionError(violations []TemplateInjectionViolation) error
 		builder.WriteString("\n")
 	}
 
+	writeQuotedHeredocMigrationGuidance(&builder, violations)
+
 	builder.WriteString("Security Risk:\n")
 	builder.WriteString("  Direct interpolation into executable shell syntax can let attacker-controlled text alter commands.\n")
 	builder.WriteString("  Comments and quoted heredocs do not prevent Actions substitution; remove comment expressions and\n")
@@ -460,6 +474,8 @@ func formatRunScriptExpressionValidationError(violations []TemplateInjectionViol
 	if len(violations) > maxExamples {
 		builder.WriteString("  ... and " + strconv.Itoa(len(violations)-maxExamples) + " more\n")
 	}
+
+	writeQuotedHeredocMigrationGuidance(&builder, violations)
 
 	builder.WriteString("\nSafe pattern:\n")
 	builder.WriteString("  env:\n")
