@@ -14,6 +14,8 @@
 
 We will enforce two archive-wide limits during ZIP log extraction: at most 10,000 entries (`maxZipEntryCount`) and at most 1 GiB of total uncompressed output (`maxZipTotalSize`). Enforcement happens in two layers. First, a pre-extraction validation pass rejects the archive based on entry count and the sum of declared sizes before any file is written. Second, a runtime byte budget is passed to each entry's `io.LimitReader`, so inaccurate size metadata cannot bypass the total limit. The limits live in a parameterized `unzipFileWithLimits` function, and `unzipFile` calls it with the default constants. This keeps the production API unchanged and lets tests use small limits.
 
+Preflight also caps unique directories, including implicit parent directories, at 10,000 (`maxZipDirectoryCount`). This bounds inode consumption even when many empty files have deeply nested paths.
+
 ### Alternatives Considered
 
 #### Alternative 1: Runtime byte counting only (no pre-validation pass)
@@ -43,7 +45,7 @@ Exposing the limits as user configuration would help users with very large legit
 
 #### Neutral
 - `extractZipFile` keeps its signature as a wrapper. Internal helpers now return bytes written (`uint64`) along with the error.
-- The error text for an oversized entry at runtime changed to "exceeded total uncompressed size limit", even when the per-entry cap was the limit that applied.
+- Runtime size-limit errors report the byte bound without attributing it to either the per-entry or archive-wide cap.
 
 ---
 

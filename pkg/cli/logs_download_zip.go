@@ -23,6 +23,7 @@ var logsDownloadZipLog = logger.New("cli:logs_download_zip")
 const maxZipEntrySize = 1 * 1024 * 1024 * 1024 // 1GB
 const maxZipTotalSize = 1 * 1024 * 1024 * 1024 // 1GB
 const maxZipEntryCount = 10000
+const maxZipDirectoryCount = 10000
 
 // unzipFile extracts a zip file to a destination directory
 func unzipFile(zipPath, destDir string, verbose bool) error {
@@ -48,6 +49,7 @@ func unzipFileWithLimits(zipPath, destDir string, verbose bool, maxEntryCount in
 	}
 
 	var declaredSize uint64
+	directories := make(map[string]struct{})
 	for _, f := range r.File {
 		if f.UncompressedSize64 > maxZipEntrySize {
 			return fmt.Errorf("file too large in zip (>1GB): %s (%d bytes)", f.Name, f.UncompressedSize64)
@@ -56,6 +58,25 @@ func unzipFileWithLimits(zipPath, destDir string, verbose bool, maxEntryCount in
 			return fmt.Errorf("zip archive exceeds total uncompressed size limit (%d bytes)", maxTotalSize)
 		}
 		declaredSize += f.UncompressedSize64
+
+		dir := filepath.Clean(f.Name)
+		if !f.FileInfo().IsDir() {
+			dir = filepath.Dir(dir)
+		}
+		for dir != "." && dir != string(os.PathSeparator) {
+			if _, exists := directories[dir]; exists {
+				break
+			}
+			directories[dir] = struct{}{}
+			if len(directories) > maxZipDirectoryCount {
+				return fmt.Errorf("zip archive requires too many directories (max %d)", maxZipDirectoryCount)
+			}
+			parent := filepath.Dir(dir)
+			if parent == dir {
+				break
+			}
+			dir = parent
+		}
 	}
 
 	// Extract each file in the zip
@@ -161,7 +182,7 @@ func extractZipFileContents(f *zip.File, filePath string, maxSize uint64) (writt
 	// written == maxSize+1 means the reader was not exhausted, i.e. the
 	// actual content is larger than the allowed size.
 	if uint64(written) > maxSize {
-		extractErr = fmt.Errorf("file extraction exceeded total uncompressed size limit: %s", f.Name)
+		extractErr = fmt.Errorf("file extraction exceeded size limit (%d bytes): %s", maxSize, f.Name)
 		return writtenBytes, extractErr
 	}
 

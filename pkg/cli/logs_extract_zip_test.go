@@ -5,8 +5,10 @@ package cli
 import (
 	"archive/zip"
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -321,4 +323,85 @@ func TestUnzipFileWithLimits(t *testing.T) {
 			assert.Empty(t, entries, "archive validation should happen before extracting any entries")
 		})
 	}
+
+	t.Run("exact total and entry count", func(t *testing.T) {
+		destDir := t.TempDir()
+		require.NoError(t, unzipFileWithLimits(zipPath, destDir, false, 2, uint64(len("first")+len("second"))))
+		for name, content := range map[string]string{"first.txt": "first", "second.txt": "second"} {
+			extracted, err := os.ReadFile(filepath.Join(destDir, name))
+			require.NoError(t, err)
+			assert.Equal(t, content, string(extracted))
+		}
+	})
+}
+
+func TestUnzipFileDirectoryLimit(t *testing.T) {
+	t.Parallel()
+
+	for _, directoryEntry := range []bool{false, true} {
+		t.Run(fmt.Sprintf("directory entries %t", directoryEntry), func(t *testing.T) {
+			zipPath := filepath.Join(t.TempDir(), "directories.zip")
+			archive, err := os.Create(zipPath)
+			require.NoError(t, err)
+			writer := zip.NewWriter(archive)
+			for i := 0; i <= maxZipDirectoryCount/100; i++ {
+				name := fmt.Sprintf("%d/", i) + strings.Repeat("d/", 99)
+				if !directoryEntry {
+					name += "empty.txt"
+				}
+				_, err := writer.Create(name)
+				require.NoError(t, err)
+			}
+			require.NoError(t, writer.Close())
+			require.NoError(t, archive.Close())
+
+			destDir := t.TempDir()
+			require.ErrorContains(t, unzipFile(zipPath, destDir, false), "zip archive requires too many directories")
+			entries, err := os.ReadDir(destDir)
+			require.NoError(t, err)
+			assert.Empty(t, entries, "directory validation must happen before extraction")
+		})
+	}
+}
+
+func TestExtractZipFileWithLimit(t *testing.T) {
+	t.Parallel()
+
+	buf := new(bytes.Buffer)
+	writer := zip.NewWriter(buf)
+	entry, err := writer.Create("nested/test.txt")
+	require.NoError(t, err)
+	_, err = entry.Write([]byte("hello"))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+	reader, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+	require.NoError(t, err)
+
+	for _, budget := range []uint64{0, 3, 4, 5, 6} {
+		t.Run(fmt.Sprintf("budget %d", budget), func(t *testing.T) {
+			destDir := t.TempDir()
+			written, err := extractZipFileWithLimit(reader.File[0], destDir, false, budget)
+			if budget < 5 {
+				require.ErrorContains(t, err, fmt.Sprintf("exceeded size limit (%d bytes)", budget))
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, min(uint64(5), budget+1), written)
+			content, err := os.ReadFile(filepath.Join(destDir, "nested", "test.txt"))
+			require.NoError(t, err)
+			assert.Equal(t, "hello"[:int(written)], string(content))
+		})
+	}
+
+	t.Run("per-entry metadata limit", func(t *testing.T) {
+		file := *reader.File[0]
+		file.UncompressedSize64 = maxZipEntrySize + 1
+		destDir := t.TempDir()
+		written, err := extractZipFileWithLimit(&file, destDir, false, maxZipTotalSize)
+		require.ErrorContains(t, err, "file too large in zip")
+		assert.Zero(t, written)
+		entries, err := os.ReadDir(destDir)
+		require.NoError(t, err)
+		assert.Empty(t, entries)
+	})
 }
