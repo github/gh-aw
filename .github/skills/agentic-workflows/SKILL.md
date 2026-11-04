@@ -86,6 +86,7 @@ If GitHub API, `gh api`, or GitHub MCP downloads return HTTP 403 (including a to
 - `.github/aw/multi-agent-research.md`
 - `.github/aw/network.md`
 - `.github/aw/optimize-agentic-workflow.md`
+- `.github/aw/otel.md`
 - `.github/aw/patterns.md`
 - `.github/aw/playwright.md`
 - `.github/aw/pr-reviewer.md`
