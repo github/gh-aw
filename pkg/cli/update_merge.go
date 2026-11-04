@@ -6,11 +6,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/stringutil"
 )
 
@@ -105,6 +107,39 @@ func normalizeImportsForMerge(content string, sourceSpec *SourceSpec, localWorkf
 	return processImportsWithWorkflowSpec(content, workflow, sourceSpec.Ref, localWorkflowDir, verbose)
 }
 
+// canonicalizeImportsForMerge retains the old merge representation when a
+// formatting-only difference in previously rewritten imports causes a conflict.
+func canonicalizeImportsForMerge(content string) (string, error) {
+	result, err := parser.ExtractFrontmatterFromContent(content)
+	if err != nil {
+		return content, nil
+	}
+	return reconstructWorkflowFileFromMap(result.Frontmatter, result.Markdown)
+}
+
+func isLegacyImportFormattingOnly(base, current, upstream string) bool {
+	for _, input := range []string{base, current, upstream} {
+		parsed, err := parser.ExtractFrontmatterFromContent(input)
+		if err != nil {
+			return false
+		}
+		if _, ok := parsed.Frontmatter["imports"]; !ok {
+			return false
+		}
+		for _, line := range parsed.FrontmatterLines {
+			if strings.HasPrefix(strings.TrimSpace(line), "#") {
+				return false
+			}
+		}
+	}
+	canonicalBase, err := canonicalizeImportsForMerge(base)
+	if err != nil {
+		return false
+	}
+	canonicalCurrent, err := canonicalizeImportsForMerge(current)
+	return err == nil && canonicalBase == canonicalCurrent
+}
+
 // MergeWorkflowContent performs a 3-way merge of workflow content using git merge-file
 // It returns the merged content, whether conflicts exist, and any error
 // localWorkflowPath is the filesystem path of the local workflow file being updated;
@@ -149,9 +184,7 @@ func MergeWorkflowContent(base, current, new, oldSourceSpec, newRefOrSourceSpec,
 		return "", false, fmt.Errorf("failed to remove source from new content: %w", err)
 	}
 
-	// Import processing rewrites frontmatter into canonical YAML. Apply that
-	// transformation to all three inputs before merging so a previously updated
-	// local file is compared with the same representation as its upstream base.
+	// Rewrite imports that need resolution in all three inputs before merging.
 	mergeWorkflowDir := ""
 	if localWorkflowPath != "" {
 		mergeWorkflowDir = filepath.Dir(localWorkflowPath)
@@ -231,6 +264,15 @@ func MergeWorkflowContent(base, current, new, oldSourceSpec, newRefOrSourceSpec,
 				// Conflicts found (exit codes 1-127 indicate conflicts)
 				// Exit codes >= 128 typically indicate system errors
 				hasConflicts = true
+				// Old updates canonicalized imports even when paths were unchanged.
+				// If base and current differ only in that representation, take
+				// the upstream version without discarding any local edits.
+				if isLegacyImportFormattingOnly(baseNormalized, currentNormalized, newNormalized) {
+					if writeErr := os.WriteFile(currentFile, []byte(newNormalized), constants.FilePermPublic); writeErr != nil {
+						return "", false, writeErr
+					}
+					hasConflicts = false
+				}
 				updateMergeLog.Printf("Merge conflicts detected: exit_code=%d", exitCode)
 				if verbose {
 					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Merge conflicts detected (exit code: %d)", exitCode)))

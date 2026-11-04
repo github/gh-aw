@@ -57,6 +57,7 @@ func processImportsWithWorkflowSpec(content string, workflow *WorkflowSpec, comm
 		return content, nil // No imports field, return original content
 	}
 
+	importChanged := false
 	// resolveOneImportPath converts a single raw import path to workflowspec format.
 	// Paths that already use the workflowspec format (contain "@") are left unchanged.
 	// When localWorkflowDir is set, relative paths whose files exist locally are also
@@ -80,6 +81,9 @@ func processImportsWithWorkflowSpec(content string, workflow *WorkflowSpec, comm
 		importsLog.Printf("Resolved import path: %s -> %s (workflow: %s)", importPath, resolvedPath, workflow.WorkflowPath)
 		workflowSpec := buildWorkflowSpecRef(workflow.RepoSlug, resolvedPath, commitSHA, workflow.Version)
 		importsLog.Printf("Converted import: %s -> %s", importPath, workflowSpec)
+		if workflowSpec != importPath {
+			importChanged = true
+		}
 		return workflowSpec
 	}
 
@@ -143,6 +147,10 @@ func processImportsWithWorkflowSpec(content string, workflow *WorkflowSpec, comm
 		}
 	default:
 		importsLog.Print("Invalid imports field type, skipping")
+		return content, nil
+	}
+
+	if !importChanged {
 		return content, nil
 	}
 

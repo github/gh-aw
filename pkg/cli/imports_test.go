@@ -905,6 +905,40 @@ imports:
 	}
 }
 
+func TestProcessImportsWithWorkflowSpec_UnchangedImportsPreserveFormatting(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "shared"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "shared/local.md"), []byte("# Local\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	workflow := &WorkflowSpec{
+		RepoSpec:     RepoSpec{RepoSlug: "owner/repo"},
+		WorkflowPath: ".github/workflows/test.md",
+	}
+	for _, tt := range []struct {
+		name    string
+		imports string
+	}{
+		{"local list", "  - shared/local.md\n  - owner/repo/shared/remote.md@abc123\n"},
+		{"object form", "  aw:\n    - uses: shared/local.md\n      with:\n        role: reviewer\n"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			content := "---\n# Keep this setup note\nname: Example\nimports:\n" + tt.imports +
+				"description: |\n  Keep this block's indentation.\n# Optional import:\n#   - shared/optional.md\n---\n\n# Body\n"
+			got, err := processImportsWithWorkflowSpec(content, workflow, "abc123", dir, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != content {
+				t.Errorf("unchanged imports must preserve the workflow byte-for-byte:\nwant:\n%s\ngot:\n%s", content, got)
+			}
+		})
+	}
+}
+
 // TestProcessImportsWithWorkflowSpec_RewritesWhenLocalMissing verifies that imports
 // for files that do NOT exist locally are still rewritten to cross-repo refs.
 func TestProcessImportsWithWorkflowSpec_RewritesWhenLocalMissing(t *testing.T) {

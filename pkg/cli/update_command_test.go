@@ -463,6 +463,26 @@ imports:
 	assert.NotContains(t, merged, "<<<<<<<")
 }
 
+func TestMergeWorkflowContent_PreservesCommentsWithLocalImport(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "shared"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "shared/local.md"), []byte("# Local\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	base := "---\n# Setup note\nname: Example\n# imports:\n#   - shared/optional.md\n---\n\n# Original\n"
+	current := "---\n# Setup note\nname: Example\n# imports:\n#   - shared/optional.md\nimports:\n  - shared/local.md\nsource: owner/repo/workflows/example.md@v1\n---\n\n# Original\n"
+	upstream := strings.Replace(base, "# Original", "# Updated", 1)
+
+	merged, hasConflicts, err := MergeWorkflowContent(base, current, upstream,
+		"owner/repo/workflows/example.md@v1", "v2", filepath.Join(dir, "example.md"), false)
+	require.NoError(t, err)
+	require.False(t, hasConflicts, "local import and upstream body change must not conflict:\n%s", merged)
+	assert.Contains(t, merged, "# Setup note\nname: Example\n# imports:\n#   - shared/optional.md\nimports:\n  - shared/local.md")
+	assert.Contains(t, merged, "# Updated")
+}
+
 func TestMergeWorkflowContent_NormalizesWindowsLineEndings(t *testing.T) {
 	base := "---\non: push\n---\n\n# Workflow\n\nUpstream base.\n"
 	current := strings.ReplaceAll(base, "\n", "\r\n")
