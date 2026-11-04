@@ -613,6 +613,16 @@ environment: production
 
 The activation job inherits this environment, including its deployment protection rules. If [`on.manual-approval`](/gh-aw/reference/triggers/#manual-approval-gates-manual-approval) is configured, its environment takes precedence for the activation job.
 
+The object form accepts `name`, optional `url`, and optional `deployment` (a boolean or GitHub Actions expression, such as `${{ github.ref_name == 'main' }}`). For environments that only gate secrets, set `deployment: false` to retain environment secrets and protection rules—including branch policies, required reviewers, and wait timers—without creating deployment records:
+
+```aw wrap
+environment:
+  name: protected-secrets
+  deployment: false
+```
+
+Omitting `deployment` preserves GitHub Actions' default deployment behavior. The CLI `--environment` override replaces the entire environment block with a literal name, including any `deployment` setting.
+
 See [GitHub Actions environment docs](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment).
 
 ### Container Configuration (`container:`)

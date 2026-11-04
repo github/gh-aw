@@ -2046,7 +2046,17 @@ safe-outputs:
     private-key: ${{ secrets.WORKFLOW_APP_PRIVATE_KEY }}
 ```
 
-Accepts a plain string or an object with `name` and optional `url`, consistent with the top-level `environment:` syntax.
+Accepts a plain string or an object with `name`, optional `url`, and optional `deployment`, consistent with the top-level `environment:` syntax. `deployment` accepts a boolean or GitHub Actions expression, such as `${{ github.ref_name == 'main' }}`; omitting it preserves the default deployment behavior.
+
+For environments that only gate write credentials, `deployment: false` keeps environment secrets and protection rules (including branch policies, required reviewers, and wait timers) without creating deployment records:
+
+```aw wrap
+safe-outputs:
+  environment:
+    name: protected-write-secrets
+    deployment: false
+  add-comment:
+```
 
 ### Safe Outputs Dependencies (`needs:`)
 
