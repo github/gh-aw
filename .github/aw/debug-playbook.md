@@ -20,7 +20,7 @@ gh aw audit "$RUN_URL" --no-baseline --timeout 2m \
   --output "$EVIDENCE" --json
 ```
 
-Read completeness/`overview`/`key_findings`/`recommendations`/`errors`.
+Read completeness/findings/recommendations/errors.
 Timeout: incomplete JSON report; fetch evidence.
 Read only the linked `playbook_url`/code row; [cluster fleets](analyzing-runs.md).
 Keep codes/severity; advisory/pending/skipped/policy-denied need not be bugs.
@@ -157,6 +157,7 @@ Nonempty `safeoutputs.jsonl` != publication.
 | `secret_redaction_failure` | Redaction status; sanitized diagnostic. | Repair redaction before publication; never expose raw logs/disable masking. |
 | `safeoutputs_cli_error` | Arguments, registration, denial. | Fix supported invocation/allowlist; no unauthorized `gh` writes. |
 | `invalid_safe_outputs` | Record errors; generated schema. | Fix emitted type/fields; retain validation. |
+| `safe_output_dependency_failed`, `safe_output_dependency_invalid` | Dependency graph/result. | Fix IDs/results; fail closed. |
 | `missing_terminal_safe_output` | Expected terminal tool, denied calls, last session event. | Fix publication/prompt completion contract; silence is not an intentional noop. |
 | `request_rejection`, `prompt_exhaustion`, `unknown` | Native error, budget, missing evidence. | Resolve cause; retain unknown without evidence. |
 | `ERR_VALIDATION`, `E001` | Fields/types, target IDs, schema. | Fix producer; no silent coercion. |
@@ -248,15 +249,15 @@ or bypass profiles/effect scopes.
 | `publication_conflict`, `publication_invalid`, `publication_unresolved` | Git tip, CAS, published commit. | Reread/reconcile before retry; publication may have succeeded. |
 | `checkpoint_invalid`, `credential_generation_reused` | Checkpoint proof/ancestry; unique credential generation. | Recover verified checkpoint/authorized new generation; no stale authority. |
 | `dispatch_invalid`, `dispatch_missing`, `launch_started`, `launch_unresolved` | Reservation, receipt, possibly started child. | Reconcile immutable identity; no duplicate launch. |
-| `claim_delivery_unverified`, `delivery_failed`, `verification_unresolved`, `delivery_conflict`, `delivery_barrier_conflict`, `delivery_contract_required`, `delivery_evidence_required`, `evidence_invalid`, `evidence_required`, `terminal_evidence_required`, `nonlaunch_evidence_required` | Claim state/effects; independent receipts; barrier/contract. | Reconcile before retry; never force terminal state. |
+| `claim_delivery_unverified`, `delivery_failed`, `verification_unresolved`, `delivery_conflict`, `delivery_barrier_conflict`, `delivery_contract_required`, `delivery_evidence_required`, `evidence_invalid`, `evidence_required`, `terminal_evidence_required`, `nonlaunch_evidence_required` | Claim state/effects; receipts; barrier/contract. | Reconcile before retry; never force terminal state. |
 | `result_invalid`, `completion_conflict`, `cancellation_conflict`, `ownership_terminal`, `work_terminal`, `work_missing` | Work/ownership state; finish/result intent. | Respect terminal transitions; reconcile duplicate/conflicting completion/cancellation. |
 | `retry_invalid`, `retry_exhausted`, `release_invalid`, `release_open_claims`, `remediation_invalid` | Retry/release policy, attempts, open claims. | Stop exhausted retries; reconcile claims; authorized recovery only. |
-| `ERR_WORK_QUEUE_RECONCILIATION`, `observation_invalid`, `observation_conflict`, `reconciliation_invalid`, `reconciliation_pending`, `inspection_invalid`, `resource_unverified` | Reason, run/Claim binding, provenance/freshness. | Bounded trusted reconciliation; unverified stays blocked; never force release. |
-| `resource_invalid`, `resource_limit`, `assignment_limit`, `evidence_limit`, `graph_limit`, `work_queue_graph_limit`, `ledger_limit`, `observation_limit`, `operation_limit`, `payload_limit`, `pending_limit`, `projection_limit`, `reconciliation_limit` | Named limit; actual count. | Bound/batch/compact through supported operations; retain limits. |
+| `ERR_WORK_QUEUE_RECONCILIATION`, `observation_invalid`, `observation_conflict`, `reconciliation_invalid`, `reconciliation_pending`, `inspection_invalid`, `resource_unverified` | Reason, binding, provenance/freshness. | Reconcile trusted evidence; never force release. |
+| `resource_invalid`, `resource_limit`, `assignment_limit`, `evidence_limit`, `graph_limit`, `work_queue_graph_limit`, `ledger_limit`, `observation_limit`, `operation_limit`, `payload_limit`, `pending_limit`, `projection_limit`, `reconciliation_limit` | Named limit; actual count. | Bound/batch supported operations; retain limits. |
 | `issue_binding_invalid`, `issue_binding_conflict` | Queue-issue binding; ownership. | Correct authorized binding; never adopt another work item's issue. |
-| `projection_invalid`, `projection_journal_invalid`, `projection_journal_conflict`, `projection_scope_changed`, `projection_write_ambiguous` | Journal, native acknowledgement, target, CAS. | Reconcile receipts; never duplicate uncertain writes, drop uncertain locks or rewrite history. |
+| `projection_invalid`, `projection_journal_invalid`, `projection_journal_conflict`, `projection_scope_changed`, `projection_write_ambiguous` | Journal, acknowledgement, target, CAS. | Reconcile receipts; never duplicate uncertain writes or rewrite history. |
 | `projection_target_unavailable`, `projection_unavailable` | Actual failure; safe status/request ID. | Diagnose cause; preserve mirrors and locks. |
-| `projection_receipt_pending`, `projection_comment_pending`, `projection_label_pending`, `projection_coordination_pending`, `projection_pagination_pending`, `projection_rate_pending` | Checkpoint, pacing, existing mirrors/receipts. | Reconcile exact request; never recreate mirrors or mistake pending for terminal failure. |
+| `projection_receipt_pending`, `projection_comment_pending`, `projection_label_pending`, `projection_coordination_pending`, `projection_pagination_pending`, `projection_rate_pending` | Checkpoint, pacing, mirrors/receipts. | Reconcile exact request; don't recreate mirrors or mistake pending for terminal failure. |
 
 ## Unmapped codes
 
