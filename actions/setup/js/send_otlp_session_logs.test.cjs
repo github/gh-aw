@@ -88,7 +88,7 @@ describe("compact unified session OTLP logs", () => {
     }
   );
 
-  it.each([-1, 8640000000000000])("does not reinterpret an out-of-range normalized clock %j in native timestamp units", async timestampMs => {
+  it.each([-1, 8640000000000000, 8640000000000001])("does not reinterpret an out-of-range normalized clock %j in native timestamp units", async timestampMs => {
     write([{ type: "usage.report", timestamp: 1700000000, provenance: { timestampMs }, data: { aic: 0 } }]);
     await sendSessionLogs({ sessionPath });
     expect(records()[0]).not.toHaveProperty("timeUnixNano");
