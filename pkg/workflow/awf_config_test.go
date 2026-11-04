@@ -828,7 +828,7 @@ func TestBuildAWFConfigJSON(t *testing.T) {
 		jsonStr, err := BuildAWFConfigJSON(config)
 		require.NoError(t, err)
 		assert.NotContains(t, jsonStr, `"enableTokenSteering"`, "apiProxy should omit enableTokenSteering when max-ai-credits is negative")
-		assert.NotContains(t, jsonStr, `"maxAiCredits"`, "apiProxy should omit maxAiCredits when negative (disabled)")
+		assert.Contains(t, jsonStr, `"maxAiCredits":-1`, "apiProxy should explicitly disable the budget")
 	})
 
 	t.Run("token steering is skipped for unsupported AWF versions", func(t *testing.T) {
@@ -2389,7 +2389,7 @@ func TestBuildAWFCommand_ResolvesMaxAICreditsFromEnv(t *testing.T) {
 
 			command := BuildAWFCommand(config)
 			assert.Contains(t, command, fmt.Sprintf(`GH_AW_MAX_AI_CREDITS="${GH_AW_MAX_AI_CREDITS:-%d}"`, tt.defaultBudget))
-			assert.Contains(t, command, `if [[ ! "$GH_AW_MAX_AI_CREDITS" =~ ^[0-9]+$ ]]; then`)
+			assert.Contains(t, command, `if [[ "$GH_AW_MAX_AI_CREDITS" != "-1" && ! "$GH_AW_MAX_AI_CREDITS" =~ ^[0-9]+$ ]]; then`)
 			assert.Contains(t, command, fmt.Sprintf(`GH_AW_MAX_AI_CREDITS="%d"`, tt.defaultBudget))
 			assert.Contains(t, command, `\"maxAiCredits\":${GH_AW_MAX_AI_CREDITS}`)
 			assert.NotContains(t, command, "vars.GH_AW_DEFAULT_MAX_AI_CREDITS")

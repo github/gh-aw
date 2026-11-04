@@ -137,15 +137,11 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 	}
 
 	// Token steering is enabled by default. Setting max-ai-credits to a negative
-	// value (-1) omits that budget from the AWF config and disables token steering.
+	// value (-1) explicitly disables the AWF budget and token steering.
 	// When maxAICredits is 0 (runtime default), token steering stays enabled here.
 	enableTokenSteering := maxAICredits >= 0
 	if config.WorkflowData != nil && config.WorkflowData.SandboxConfig != nil && config.WorkflowData.SandboxConfig.Agent != nil && config.WorkflowData.SandboxConfig.Agent.TokenSteering != nil {
 		enableTokenSteering = *config.WorkflowData.SandboxConfig.Agent.TokenSteering
-	}
-	if maxAICredits < 0 {
-		// Negative signals "disabled" — omit the budget from the AWF config.
-		maxAICredits = 0
 	}
 	var tokenSteeringEnabled *bool
 	if awfSupportsTokenSteering(firewallConfig) && (enableTokenSteering || (config.WorkflowData != nil && config.WorkflowData.SandboxConfig != nil && config.WorkflowData.SandboxConfig.Agent != nil && config.WorkflowData.SandboxConfig.Agent.TokenSteering != nil)) {

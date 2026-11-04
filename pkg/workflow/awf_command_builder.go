@@ -377,7 +377,7 @@ fi
 `
 	}
 	return fmt.Sprintf(`%s
-if [[ ! "$%s" =~ ^[0-9]+$ ]]; then
+if [[ "$%s" != "-1" && ! "$%s" =~ ^[0-9]+$ ]]; then
   %s="%s"
 fi
 %s
@@ -391,7 +391,7 @@ if [[ "${GH_AW_ADMISSION_RESULT:-}" == "admitted" && -n "${GH_AW_ADMISSION_MAX_A
 else
   echo "No component admission allowance; retaining existing budget policy (value withheld)."
 fi
-unset GH_AW_ADMISSION_RESULT GH_AW_ADMISSION_MAX_AI_CREDITS`, assignment, awfMaxAICreditsVarName, awfMaxAICreditsVarName, defaultMaxAICredits, requirePrimary), awfConfigJSON
+unset GH_AW_ADMISSION_RESULT GH_AW_ADMISSION_MAX_AI_CREDITS`, assignment, awfMaxAICreditsVarName, awfMaxAICreditsVarName, awfMaxAICreditsVarName, defaultMaxAICredits, requirePrimary), awfConfigJSON
 }
 
 func buildAWFConfigPrintfArg(awfConfigJSON string, hasMaxAICreditsExport bool) string {

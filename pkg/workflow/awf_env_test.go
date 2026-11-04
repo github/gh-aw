@@ -3,6 +3,10 @@
 package workflow
 
 import (
+	"encoding/json"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -67,6 +71,60 @@ func TestApplyDefaultMaxAICreditsEnvToMap(t *testing.T) {
 		_, exists := env[awfMaxAICreditsVarName]
 		assert.False(t, exists)
 	})
+}
+
+func TestMaxAICreditsRuntimeConfig(t *testing.T) {
+	for _, component := range []struct {
+		name       string
+		detection  bool
+		evals      bool
+		defaultCap int64
+	}{
+		{name: "agent", defaultCap: constants.DefaultMaxAICredits},
+		{name: "detection", detection: true, defaultCap: constants.DefaultDetectionMaxAICredits},
+		{name: "evals", evals: true, defaultCap: constants.DefaultDetectionMaxAICredits},
+	} {
+		for _, tc := range []struct {
+			name, runtime, expected string
+			local                   int64
+		}{
+			{name: "explicit unlimited", local: -1, runtime: "222", expected: "-1"},
+			{name: "runtime unlimited", runtime: "-1", expected: "-1"},
+			{name: "runtime positive", runtime: "500", expected: "500"},
+			{name: "unset", expected: strconv.FormatInt(component.defaultCap, 10)},
+			{name: "invalid negative", runtime: "-2", expected: strconv.FormatInt(component.defaultCap, 10)},
+			{name: "shell payload", runtime: "$(echo unsafe)", expected: strconv.FormatInt(component.defaultCap, 10)},
+		} {
+			t.Run(component.name+"/"+tc.name, func(t *testing.T) {
+				config := AWFCommandConfig{
+					EngineName: "copilot",
+					WorkflowData: &WorkflowData{
+						EngineConfig:      &EngineConfig{ID: "copilot", MaxAICredits: tc.local},
+						IsDetectionRun:    component.detection,
+						IsEvalsRun:        component.evals,
+						ValidateAWFConfig: true,
+					},
+				}
+				configJSON, err := BuildAWFConfigJSON(config)
+				require.NoError(t, err)
+				script, configJSON := buildMaxAICreditsExport(config, configJSON)
+				resultFile := filepath.Join(t.TempDir(), "config.json")
+				cmd := exec.Command("bash", "-c", script+"\nprintf '%s' "+buildAWFConfigPrintfArg(configJSON, true)+" > \"$BUDGET_RESULT\"")
+				cmd.Env = append(os.Environ(),
+					"GH_AW_MAX_AI_CREDITS="+tc.runtime,
+					"GH_AW_ADMISSION_RESULT=",
+					"GH_AW_ADMISSION_MAX_AI_CREDITS=",
+					"BUDGET_RESULT="+resultFile)
+				output, err := cmd.CombinedOutput()
+				require.NoError(t, err, "%s", output)
+				result, err := os.ReadFile(resultFile)
+				require.NoError(t, err)
+				var parsed AWFConfigFile
+				require.NoError(t, json.Unmarshal(result, &parsed))
+				assert.Equal(t, tc.expected, strconv.FormatInt(parsed.APIProxy.MaxAICredits, 10))
+			})
+		}
+	}
 }
 
 // TestComputeAWFExcludeEnvVarNames verifies that engine.env vars whose values contain

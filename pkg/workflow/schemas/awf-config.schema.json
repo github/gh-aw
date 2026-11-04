@@ -158,8 +158,15 @@
         },
         "maxAiCredits": {
           "type": "number",
-          "exclusiveMinimum": 0,
-          "description": "Maximum cumulative AI credits allowed for a run. When reached, the API proxy rejects subsequent requests with HTTP 403 and error type 'ai_credits_limit_exceeded'. AWF also enforces a non-overridable hard cap of 10,000 AI credits; values above 10,000 are effectively clamped."
+          "anyOf": [
+            {
+              "enum": [-1, 0]
+            },
+            {
+              "exclusiveMinimum": 0
+            }
+          ],
+          "description": "Maximum cumulative accounted AI credits allowed for a run. Set to -1 or 0 to disable the configured budget (the hard cap still applies). When reached, the API proxy rejects subsequent requests with HTTP 403 and error type 'ai_credits_limit_exceeded'. With apiProxy.enableTokenSteering, advisory notices are queued at 80%, 90%, 95%, and 99% of the effective limit. AWF also enforces a non-overridable hard cap of 10,000 accounted AI credits; values above 10,000 are effectively clamped. Models without resolvable pricing are allowed with a warning and unpriced usage is excluded from totals, so actual spending may exceed these limits."
         },
         "defaultAiCreditsPricing": {
           "type": "object",
