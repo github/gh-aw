@@ -112,9 +112,7 @@ safe-outputs:
     protected-files:
       policy: fallback-to-issue
       exclude:
-        - /.github/workflows/*.md
-        - /.github/workflows/shared/hippo-memory.md
-        - /.github/workflows/shared/tla-plus.md
+        - /.github/workflows/shared/*.md
     fallback-as-pull-request: false
   reply-to-pull-request-review-comment:
     target: ${{ needs.preflight.outputs.pr_number }}
