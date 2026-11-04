@@ -97,6 +97,13 @@ describe("compact unified session OTLP logs", () => {
     expect(payload().resourceLogs[0].resource.attributes).toContainEqual({ key: "gh-aw.session.untimed_events", value: { intValue: 1 } });
   });
 
+  it("does not reinterpret an invalid source-normalized seconds clock as milliseconds", async () => {
+    write([{ type: "usage.report", timestamp: 1e13, provenance: { component: "firewall", path: "audit.jsonl" }, data: { aic: 0 } }]);
+    await sendSessionLogs({ sessionPath });
+    expect(records()[0]).not.toHaveProperty("timeUnixNano");
+    expect(payload().resourceLogs[0].resource.attributes).toContainEqual({ key: "gh-aw.session.untimed_events", value: { intValue: 1 } });
+  });
+
   it("computes time only after publication masks, without exporting source identities", async () => {
     const timestamp = "2026-10-20T19:00:00Z";
     vi.stubEnv("GH_AW_SECRET_NAMES", "CLOCK");

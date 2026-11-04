@@ -38,7 +38,8 @@ function eventTimeUnixNano(event) {
   const hasNormalizedClock = typeof event.provenance?.timestampMs === "number";
   const exactNs = hasNormalizedClock && typeof timestamp === "string" ? sessionTimestampNs(event, "nanoseconds") : undefined;
   const normalizedTime = hasNormalizedClock ? sessionTimestampNs({ timestamp: event.provenance.timestampMs }) : undefined;
-  const time = isoTime ?? exactNs ?? (typeof timestamp === "string" ? undefined : hasNormalizedClock ? normalizedTime : sessionTimestampNs(event));
+  const nativeTime = typeof timestamp !== "string" && event.provenance === undefined ? sessionTimestampNs(event) : undefined;
+  const time = isoTime ?? exactNs ?? (typeof timestamp === "string" ? undefined : hasNormalizedClock ? normalizedTime : nativeTime);
   return time !== undefined && time >= 0n && time <= 18446744073709551615n ? time.toString() : undefined;
 }
 
