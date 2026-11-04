@@ -93,22 +93,26 @@ function validateLabels(labels, allowedLabels = undefined, maxCount = 3, blocked
     return { valid: false, error: "labels must be an array" };
   }
 
+  // Sanitize labels before applying security-sensitive filters
+  let validLabels = labels
+    .filter(label => label != null && label !== false && label !== 0)
+    .map(label => sanitizeLabelContent(String(label).trim()))
+    .filter(label => label);
+
   // Check for removal attempts (labels starting with '-')
-  for (const label of labels) {
-    if (label && typeof label === "string" && label.startsWith("-")) {
+  for (const label of validLabels) {
+    if (label.startsWith("-")) {
       return { valid: false, error: `Label removal is not permitted. Found line starting with '-': ${label}` };
     }
   }
 
   // Filter out blocked labels first (security boundary)
-  let validLabels = labels;
   if (blockedPatterns && blockedPatterns.length > 0) {
     const blockedLabels = [];
-    validLabels = labels.filter(label => {
-      const labelStr = String(label).trim();
-      const isBlocked = blockedPatterns.some(pattern => matchesSimpleGlob(labelStr, pattern));
+    validLabels = validLabels.filter(label => {
+      const isBlocked = blockedPatterns.some(pattern => matchesSimpleGlob(label, pattern));
       if (isBlocked) {
-        blockedLabels.push(labelStr);
+        blockedLabels.push(label);
       }
       return !isBlocked;
     });
@@ -119,21 +123,11 @@ function validateLabels(labels, allowedLabels = undefined, maxCount = 3, blocked
 
   // Filter labels based on allowed list if provided
   if (allowedLabels && allowedLabels.length > 0) {
-    validLabels = validLabels.filter(label => {
-      const labelStr = String(label).trim();
-      return allowedLabels.some(pattern => matchesSimpleGlob(labelStr, pattern));
-    });
+    validLabels = validLabels.filter(label => allowedLabels.some(pattern => matchesSimpleGlob(label, pattern)));
   }
 
-  // Sanitize and deduplicate labels
-  const uniqueLabels = validLabels
-    .filter(label => label != null && label !== false && label !== 0)
-    .map(label => String(label).trim())
-    .filter(label => label)
-    .map(label => sanitizeLabelContent(label))
-    .filter(label => label)
-    .map(label => (label.length > 64 ? label.substring(0, 64) : label))
-    .filter((label, index, arr) => arr.indexOf(label) === index);
+  // Deduplicate and truncate labels
+  const uniqueLabels = validLabels.map(label => (label.length > 64 ? label.substring(0, 64) : label)).filter((label, index, arr) => arr.indexOf(label) === index);
 
   // Apply max count limit
   if (uniqueLabels.length > maxCount) {

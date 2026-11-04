@@ -283,6 +283,20 @@ describe("safe_output_validator.cjs", () => {
       expect(result.value).not.toContain("stale");
     });
 
+    it("should block labels containing zero-width characters that sanitize to a blocked label", () => {
+      const result = validator.validateLabels(["bug", "block\u200Bed"], undefined, 10, ["blocked"]);
+
+      expect(result.valid).toBe(true);
+      expect(result.value).toEqual(["bug"]);
+    });
+
+    it("should block fullwidth labels that sanitize to a blocked label", () => {
+      const result = validator.validateLabels(["bug", "ｂｌｏｃｋｅｄ"], undefined, 10, ["blocked"]);
+
+      expect(result.valid).toBe(true);
+      expect(result.value).toEqual(["bug"]);
+    });
+
     it("should handle empty blocked patterns", () => {
       const result = validator.validateLabels(["bug", "~stale"], undefined, 10, []);
 
