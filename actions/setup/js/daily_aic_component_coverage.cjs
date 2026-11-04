@@ -21,7 +21,7 @@ const COMPONENT_DISPLAY_NAMES = { evaluations: "evals" };
 function componentKey(job) {
   for (const candidate of [job.job_id, job.name]) {
     if (typeof candidate !== "string") continue;
-    const lower = candidate.split(" / ").pop().toLowerCase();
+    const lower = (candidate.split(" / ").pop() ?? "").toLowerCase();
     const key = COMPONENT_DISPLAY_NAMES[lower] ?? lower;
     if (Object.hasOwn(COMPONENT_FILES, key)) return key;
   }
