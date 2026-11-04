@@ -16,6 +16,9 @@ permissions:
 engine:
   id: codex
   model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
 features:
   gh-aw-detection: true
 timeout-minutes: 10
@@ -32,7 +35,6 @@ safe-outputs:
     max: 1
     replace-older-comments: true
   noop:
-model: copilot/gpt-5.6-terra
 evals:
   - id: question-per-protected-file
     question: When protected-file changes are observed, does the proposed comment ask at least one explicit confirmation question for each changed protected file? Return UNKNOWN when neither protected file changed.
