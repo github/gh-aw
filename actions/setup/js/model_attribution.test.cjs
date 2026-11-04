@@ -17,6 +17,41 @@ function writeJSONL(filePath, records) {
 }
 
 describe("observed model attribution", () => {
+  it.each([
+    ["gemini-3.8-flash", "auto (powered by Gemini 3.8 Flash)"],
+    ["gpt-6.1-sol", "auto (powered by GPT 6.1 Sol)"],
+    ["", "auto"],
+    ["auto", "auto"],
+    ["bad model<script>", "auto"],
+  ])("labels auto using validated observed model %s", (model, label) => {
+    const root = createRoot();
+    const infoPath = path.join(root, "aw_info.json");
+    try {
+      fs.writeFileSync(infoPath, JSON.stringify({ requested_model: "auto", model_selection: { status: model ? "observed" : "unavailable", effective_model: model } }));
+      expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "auto" })).toBe(label);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("lists distinct agent models without including classifier, detection, or untrusted events", () => {
+    const root = createRoot();
+    const infoPath = path.join(root, "aw_info.json");
+    try {
+      writeJSONL(path.join(root, "usage/aw_session.jsonl"), [
+        ...["gemini-3.8-flash", "gemini-3.8-flash", "claude-sonnet-5", "auto", "<script>"].map(model => ({ type: "firewall.token_usage", data: { model, purpose: "agent" }, provenance: { component: "firewall", phase: "agent" } })),
+        { type: "firewall.token_usage", data: { model: "classifier", purpose: "routing_classification" }, provenance: { component: "firewall", phase: "agent" } },
+        { type: "firewall.token_usage", data: { model: "detector" }, provenance: { component: "firewall", phase: "detection" } },
+        { type: "firewall.token_usage", data: { model: "forged" }, provenance: { component: "agent", phase: "agent" } },
+      ]);
+      expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "auto" })).toBe("auto (powered by Gemini 3.8 Flash, Claude Sonnet 5)");
+      expect(getEffectiveModelLabel(infoPath, "detection", { GH_AW_ENGINE_MODEL: "auto" })).toBe("auto");
+      expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "gpt-5.4" })).toBe("gpt54");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it.each(["observed", "substituted"])("normalizes requested query parameters for %s selections", status => {
     const root = createRoot();
     const infoPath = path.join(root, "aw_info.json");

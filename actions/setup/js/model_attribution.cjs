@@ -318,7 +318,21 @@ function getEffectiveModelLabel(infoPath = `${process.env.GH_AW_TMP_DIR || "/tmp
   const attribution = resolveEffectiveModel(infoPath, phase, env);
   const { reduceModelNameToIdentifier } = require("./model_aliases.cjs");
   const shortModel = reduceModelNameToIdentifier(attribution.model);
-  if (!attribution.routing) return shortModel;
+  if (!attribution.routing) {
+    const requested = attribution.requestedModel || requestedModelIdentifier(env.GH_AW_INFO_MODEL || env.GH_AW_ENGINE_MODEL);
+    if (requested.toLowerCase() !== "auto") return shortModel;
+    const models = new Set();
+    if (phase === "agent") {
+      const sessionPath = require("path").join(require("path").dirname(infoPath), "usage/aw_session.jsonl");
+      for (const event of readModelRoutingSession(sessionPath)) {
+        if (event.type !== "firewall.token_usage" || (event.data?.purpose && event.data.purpose !== "agent")) continue;
+        const model = validateModelIdentifier(event.data?.model);
+        if (model && model.toLowerCase() !== "auto") models.add(model);
+      }
+    }
+    if (!models.size && attribution.model && attribution.model.toLowerCase() !== "auto") models.add(attribution.model);
+    return models.size ? `auto (powered by ${[...models].map(formatAttributionModelName).join(", ")})` : "auto";
+  }
   if (attribution.routing.status === "selected") {
     const routedModel = reduceModelNameToIdentifier(attribution.routing.wire_model);
     const routed = `routed: ${routedModel}${attribution.effort ? ` ${attribution.effort}` : ""}`;
@@ -327,6 +341,15 @@ function getEffectiveModelLabel(infoPath = `${process.env.GH_AW_TMP_DIR || "/tmp
   }
   const failureCode = validateModelIdentifier(attribution.routing.failure_code);
   return `routing ${attribution.routing.status}${failureCode ? ` (${failureCode})` : ""}`;
+}
+
+// Keep the full model version and tier readable rather than compressing them into an alias.
+function formatAttributionModelName(model) {
+  return model
+    .replace(/^.*\//, "")
+    .split(/[-_]/)
+    .map(part => (/^(gpt|o\d+)$/i.test(part) ? part.toUpperCase() : /^\d/.test(part) ? part : part.charAt(0).toUpperCase() + part.slice(1)))
+    .join(" ");
 }
 
 function recordFallbackModelFromUsage(content, env = process.env, infoPath = `${env.GH_AW_TMP_DIR || "/tmp/gh-aw"}/aw_info.json`, logger = console.warn) {
