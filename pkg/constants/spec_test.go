@@ -50,6 +50,7 @@ func TestSpec_Constants_FeatureFlags(t *testing.T) {
 		{name: "group concurrency queue", got: constants.GroupConcurrencyQueueFeatureFlag, want: "group-concurrency-queue"},
 		{name: "disable sandbox agent", got: constants.DangerouslyDisableSandboxAgentFeatureFlag, want: "dangerously-disable-sandbox-agent"},
 		{name: "allow roles read and pull request target", got: constants.DangerouslyAllowRolesReadAndPullRequestTargetFeatureFlag, want: "dangerously-allow-roles-read-and-pull-request-target"},
+		{name: "allow all pull request target forks", got: constants.DangerouslyAllowPullRequestTargetForksAllFeatureFlag, want: "dangerously-allow-pull-request-target-forks-all"},
 		{name: "gh-aw detection", got: constants.GHAWDetectionFeatureFlag, want: "gh-aw-detection"},
 	}
 	for _, tt := range tests {

@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,10 +22,10 @@ func TestPullRequestTargetBoundedForkAdmission(t *testing.T) {
 		allows bool
 	}{
 		{"omitted", "", true},
-		{"wildcard string", "'*'", true},
-		{"wildcard list", "['*']", true},
-		{"mixed wildcard", "[trusted/repo, '*']", true},
-		{"wildcard first", "['*', trusted/repo]", true},
+		{"wildcard string", "'*'", false},
+		{"wildcard list", "['*']", false},
+		{"mixed wildcard", "[trusted/repo, '*']", false},
+		{"wildcard first", "['*', trusted/repo]", false},
 		{"empty list", "[]", true},
 		{"exact string", "trusted/repo", true},
 		{"owner string", "'trusted/*'", true},
@@ -62,8 +64,12 @@ Review the contribution.
 				require.NoError(t, os.WriteFile(file, []byte(source), 0600))
 				err := NewCompiler().CompileWorkflow(file)
 				if strict && !tt.allows {
-					require.ErrorContains(t, err, "requires supported fork patterns")
-					assert.Contains(t, err.Error(), "acknowledge-risk do not bypass")
+					if strings.Contains(tt.forks, "'*'") {
+						require.ErrorContains(t, err, "Strict mode requires")
+					} else {
+						require.ErrorContains(t, err, "requires supported fork patterns")
+					}
+					assert.Contains(t, err.Error(), "acknowledge-risk")
 					assert.NoFileExists(t, filepath.Join(filepath.Dir(file), "workflow.lock.yml"))
 				} else {
 					require.NoError(t, err)
@@ -134,6 +140,10 @@ func TestPullRequestTargetWildcardWarning(t *testing.T) {
 	for _, forks := range []any{"*", []any{"*"}, []any{"trusted/repo", "*"}, []any{"*", "trusted/*"}} {
 		for _, strict := range []bool{false, true} {
 			compiler := NewCompiler()
+			features := map[string]any{}
+			if strict {
+				features[string(constants.DangerouslyAllowPullRequestTargetForksAllFeatureFlag)] = true
+			}
 			frontmatter := map[string]any{
 				"strict": strict,
 				"on": map[string]any{
@@ -146,6 +156,7 @@ func TestPullRequestTargetWildcardWarning(t *testing.T) {
 			data := &WorkflowData{
 				On:                         "on:\n  pull_request_target:\n    types: [labeled]",
 				RawFrontmatter:             frontmatter,
+				Features:                   features,
 				CheckoutExplicitlyDisabled: true,
 				Roles:                      []string{"admin", "maintainer", "write"},
 			}
@@ -156,9 +167,11 @@ func TestPullRequestTargetWildcardWarning(t *testing.T) {
 				assert.Equal(t, 1, compiler.GetWarningCount(), "forks: %#v", forks)
 				assert.Contains(t, output, "Prefer restricting forks")
 				assert.Contains(t, output, "acknowledge-risk does not suppress")
+				assert.Contains(t, output, "dangerously-allow-pull-request-target-forks-all")
 			} else {
-				assert.Zero(t, compiler.GetWarningCount())
-				assert.Empty(t, output)
+				assert.Equal(t, 1, compiler.GetWarningCount(), "forks: %#v", forks)
+				assert.Contains(t, output, "Prefer restricting forks")
+				assert.Contains(t, output, "acknowledge-risk does not suppress")
 			}
 			compiler.ResetWarningCount()
 			data.CheckoutExplicitlyDisabled = false
@@ -177,5 +190,38 @@ func TestPullRequestTargetWildcardWarning(t *testing.T) {
 				require.NoError(t, err)
 			}
 		}
+	}
+}
+
+func TestPullRequestTargetWildcardStrictModeRequiresFeatureOptIn(t *testing.T) {
+	for _, featureValue := range []string{"false", "true"} {
+		t.Run(featureValue, func(t *testing.T) {
+			source := fmt.Sprintf(`---
+strict: true
+on:
+  pull_request_target:
+    forks: ["*"]
+    acknowledge-risk: true
+checkout: false
+features:
+  dangerously-allow-pull-request-target-forks-all: %s
+tools:
+  github: false
+---
+Review the contribution.
+`, featureValue)
+			file := filepath.Join(testutil.TempDir(t, "prt-forks-feature-opt-in"), "workflow.md")
+			require.NoError(t, os.WriteFile(file, []byte(source), 0600))
+			compiler := NewCompiler()
+			compiler.SetNoEmit(true)
+			err := compiler.CompileWorkflow(file)
+			if featureValue == "true" {
+				require.NoError(t, err)
+				assert.Equal(t, 1, compiler.GetWarningCount())
+			} else {
+				require.ErrorContains(t, err, "Strict mode requires")
+				assert.Zero(t, compiler.GetWarningCount())
+			}
+		})
 	}
 }

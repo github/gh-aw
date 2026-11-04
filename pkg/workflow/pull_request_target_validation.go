@@ -20,8 +20,8 @@
 //  3. With on.roles containing all or read: reject in strict mode and warn in
 //     non-strict mode, regardless of checkout or trigger risk acknowledgment.
 //
-//  4. In strict mode, warn about unrestricted fork admission and recommend
-//     bounded patterns regardless of checkout or trigger risk acknowledgment.
+//  4. In strict mode, reject unrestricted fork admission unless explicitly
+//     allowed by a dangerous feature flag; always warn when it is allowed.
 //
 // # References
 //
@@ -148,12 +148,26 @@ func (c *Compiler) validatePullRequestTargetTrigger(workflowData *WorkflowData, 
 		}
 	}
 
-	if effectiveStrictMode && unrestrictedForks {
+	allowUnrestrictedForks := dangerouslyAllowsPullRequestTargetForksAll(workflowData)
+	if effectiveStrictMode && unrestrictedForks && !allowUnrestrictedForks {
+		return formatCompilerError(markdownPath, "error",
+			"pull_request_target.forks contains '*' and allows PRs from any fork.\n"+
+				"Strict mode requires exact owner/repo entries or deliberately trusted owner/* patterns.\n"+
+				"Omit forks (or use forks: []) for same-repository PRs only.\n"+
+				"To allow unrestricted fork admission anyway, set features.dangerously-allow-pull-request-target-forks-all: true.\n"+
+				"Trusted event actors can still act on attacker-controlled PR content, even with checkout disabled.\n"+
+				"acknowledge-risk does not bypass this restriction; actor authorization and checkout restrictions remain enforced.", nil)
+	}
+
+	if unrestrictedForks {
 		message := "pull_request_target.forks contains '*' and allows PRs from any fork.\n" +
 			"Prefer restricting forks to exact owner/repo entries or deliberately trusted owner/* patterns.\n" +
 			"Omit forks (or use forks: []) for same-repository PRs only.\n" +
 			"Trusted event actors can still act on attacker-controlled PR content, even with checkout disabled.\n" +
 			"acknowledge-risk does not suppress this warning; actor authorization and checkout restrictions remain enforced."
+		if allowUnrestrictedForks {
+			message += "\nThe dangerous feature flag features.dangerously-allow-pull-request-target-forks-all is enabled."
+		}
 		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", message))
 		c.IncrementWarningCount()
 	}
@@ -257,6 +271,15 @@ func dangerouslyAllowsRolesReadAndPullRequestTarget(workflowData *WorkflowData) 
 	value, found := getFeatureValueCaseInsensitive(
 		workflowData.Features,
 		string(constants.DangerouslyAllowRolesReadAndPullRequestTargetFeatureFlag),
+	)
+	enabled, isBoolean := value.(bool)
+	return found && isBoolean && enabled
+}
+
+func dangerouslyAllowsPullRequestTargetForksAll(workflowData *WorkflowData) bool {
+	value, found := getFeatureValueCaseInsensitive(
+		workflowData.Features,
+		string(constants.DangerouslyAllowPullRequestTargetForksAllFeatureFlag),
 	)
 	enabled, isBoolean := value.(bool)
 	return found && isBoolean && enabled
