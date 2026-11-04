@@ -1195,7 +1195,7 @@ func TestDetectionAndEvalsSidecarOutputUnchanged(t *testing.T) {
           GITHUB_GRAPHQL_URL: ${{ env.GITHUB_GRAPHQL_URL }}
           GITHUB_COPILOT_BASE_URL: ${{ env.GITHUB_COPILOT_BASE_URL }}
           CLI_PROXY_POLICY: '{"allow-only":{"repos":"${{ steps.determine-automatic-lockdown.outputs.repos }}","min-integrity":"${{ steps.determine-automatic-lockdown.outputs.min_integrity }}"}}'
-          CLI_PROXY_IMAGE: '` + resolveProxyContainerImage(tt.data.SandboxConfig.MCP) + `'
+          CLI_PROXY_IMAGE: '` + resolveProxyContainerImage(tt.data.SandboxConfig.MCP, tt.data) + `'
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/start_cli_proxy.sh"
 `
