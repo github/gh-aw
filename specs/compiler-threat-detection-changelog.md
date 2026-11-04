@@ -101,6 +101,10 @@ The unreleased 1.0.81 merge-policy mapping also covers ambiguous check producers
 
 ## Mapping Audits
 
+### Mapping Audit (2026-11-04)
+
+Rechecked the Section 2 implementation snapshot against the current compiler, validator, AST-lint, runtime-boundary, and test files. The mapping remains current; the Section 5.1.1 CTR-032 requirement to test destination API filtering and inspect persisted bodies is still an explicit open test obligation. No implementation behavior or compiler compatibility changed.
+
 ### Mapping Audit (2026-10-27)
 
 #### Immutable PR Revision Isolation
