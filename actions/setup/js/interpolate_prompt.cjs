@@ -47,12 +47,13 @@ function interpolateVariables(content, variables) {
 
   for (const [varName, value] of Object.entries(variables)) {
     const escapedVarName = varName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const pattern = new RegExp(`\\$\\{${escapedVarName}\\}`, "g");
+    const pattern = new RegExp(`\\$\\{${escapedVarName}\\}|__${escapedVarName}__`, "g");
     const matches = (content.match(pattern) || []).length;
 
     if (matches > 0) {
       core.debug(`[interpolateVariables] Replacing variable (${matches} occurrence(s))`);
       replacements.set(`\${${varName}}`, value);
+      replacements.set(`__${varName}__`, value);
       totalReplacements += matches;
     } else {
       core.debug("[interpolateVariables] Unused variable");

@@ -95,13 +95,15 @@ describe("parsed prompt condition operands", () => {
     expect(await render(`{{#if __GH_AW_EXPR_FIRST__}}\nFirst\n{{${marker} __GH_AW_EXPR_SECOND__}}\nSecond\n{{#else}}\nFallback\n{{/if}}`)).toBe("Second\n");
   });
 
-  it("uses the same evaluated placeholder in repeated conditions and final substitution", async () => {
-    process.env.GH_AW_EXPR_CONTEXT = "42";
+  it.each(["42", "__GH_AW_EXPR_OTHER__"])("uses the same evaluated value %j in repeated conditions and body placeholders before final substitution", async value => {
+    process.env.GH_AW_EXPR_CONTEXT = value;
+    process.env.GH_AW_EXPR_OTHER = "false";
     const template = "{{#if __GH_AW_EXPR_CONTEXT__}}\nIssue: #__GH_AW_EXPR_CONTEXT__\n{{/if}}\n{{#if __GH_AW_EXPR_CONTEXT__}}\nAgain: #__GH_AW_EXPR_CONTEXT__\n{{/if}}";
-    expect(await render(template)).toBe("Issue: #__GH_AW_EXPR_CONTEXT__\nAgain: #__GH_AW_EXPR_CONTEXT__\n");
+    const expected = `Issue: #${value}\nAgain: #${value}\n`;
+    expect(await render(template)).toBe(expected);
     const substitutePlaceholders = require("./substitute_placeholders.cjs");
-    await substitutePlaceholders({ file: promptPath, substitutions: { GH_AW_EXPR_CONTEXT: process.env.GH_AW_EXPR_CONTEXT } });
-    expect(fs.readFileSync(promptPath, "utf8")).toBe("Issue: #42\nAgain: #42\n");
+    await substitutePlaceholders({ file: promptPath, substitutions: { GH_AW_EXPR_CONTEXT: value, GH_AW_EXPR_OTHER: process.env.GH_AW_EXPR_OTHER } });
+    expect(fs.readFileSync(promptPath, "utf8")).toBe(expected);
   });
 
   it("does not recursively substitute placeholder-like text in evaluated condition values", async () => {
