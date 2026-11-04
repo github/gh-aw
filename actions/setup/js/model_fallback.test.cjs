@@ -28,6 +28,7 @@ describe("Claude model IDs", () => {
     ["copilot/claude-opus-5.5", "github", "claude-opus-5.5"],
     ["claude-sonnet-5", "github", "claude-sonnet-5"],
     ["claude-opus-99-12", "github", "claude-opus-99.12"],
+    ["claude-sonnet-4-20250514", "github", "claude-sonnet-4-20250514"],
     ["claude-opus-5-5?effort=high", "github", "claude-opus-5.5?effort=high"],
     ["claude-opus-5-5-20261104", "github", "claude-opus-5-5-20261104"],
     ["anthropic/custom-model", "github", "anthropic/custom-model"],

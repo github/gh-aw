@@ -126,7 +126,7 @@ function normalizeClaudeModel(model, provider, env, options = {}) {
   const resolved = resolveClaudeAutoModel(match ? match[1] : model.trim(), provider, options);
   if (!copilotProvider) return resolved;
   const { base } = splitModelIdentifier(resolved);
-  const mapped = CLAUDE_COPILOT_MODEL_OVERRIDES.get(base) || base.replace(/^(claude-[a-z]+-\d+)-(\d+)$/, "$1.$2");
+  const mapped = CLAUDE_COPILOT_MODEL_OVERRIDES.get(base) || base.replace(/^(claude-[a-z]+-\d+)-(\d{1,2})$/, "$1.$2");
   return mapped + resolved.slice(base.length);
 }
 

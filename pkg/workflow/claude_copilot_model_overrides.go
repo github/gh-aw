@@ -62,8 +62,9 @@ func claudeArgsHaveSettings(args []string) bool {
 func claudeArgsSettingsValue(args []string) (string, bool) {
 	value, found := "", false
 	for i, arg := range args {
-		if arg == "--settings" && i+1 < len(args) {
-			value, found = args[i+1], true
+		next := i + 1
+		if arg == "--settings" && next >= 0 && next < len(args) {
+			value, found = args[next], true
 		} else if after, ok := strings.CutPrefix(arg, "--settings="); ok {
 			value, found = after, true
 		}
