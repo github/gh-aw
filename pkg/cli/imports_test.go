@@ -939,6 +939,34 @@ func TestProcessImportsWithWorkflowSpec_UnchangedImportsPreserveFormatting(t *te
 	}
 }
 
+func TestProcessImportsWithWorkflowSpec_RewritePreservesUnrelatedFrontmatter(t *testing.T) {
+	content := `---
+# Keep this setup note
+description: |
+  Preserve this block's indentation.
+name: Example
+imports:
+  - shared/team-config.md
+engine: copilot
+---
+
+# Body
+`
+	workflow := &WorkflowSpec{
+		RepoSpec:     RepoSpec{RepoSlug: "owner/repo", Version: "v1"},
+		WorkflowPath: ".github/workflows/example.md",
+	}
+
+	got, err := processImportsWithWorkflowSpec(content, workflow, "v1", t.TempDir(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := strings.Replace(content, "  - shared/team-config.md", "- owner/repo/.github/workflows/shared/team-config.md@v1", 1)
+	if got != want {
+		t.Errorf("rewriting an import must preserve unrelated frontmatter formatting:\nwant:\n%s\ngot:\n%s", want, got)
+	}
+}
+
 // TestProcessImportsWithWorkflowSpec_RewritesWhenLocalMissing verifies that imports
 // for files that do NOT exist locally are still rewritten to cross-repo refs.
 func TestProcessImportsWithWorkflowSpec_RewritesWhenLocalMissing(t *testing.T) {

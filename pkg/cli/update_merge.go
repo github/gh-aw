@@ -107,37 +107,74 @@ func normalizeImportsForMerge(content string, sourceSpec *SourceSpec, localWorkf
 	return processImportsWithWorkflowSpec(content, workflow, sourceSpec.Ref, localWorkflowDir, verbose)
 }
 
-// canonicalizeImportsForMerge retains the old merge representation when a
-// formatting-only difference in previously rewritten imports causes a conflict.
-func canonicalizeImportsForMerge(content string) (string, error) {
-	result, err := parser.ExtractFrontmatterFromContent(content)
-	if err != nil {
-		return content, nil
+func normalizeImportFormattingForMerge(content string, parsed *parser.FrontmatterResult) (string, bool, bool) {
+	imports, exists := parsed.Frontmatter["imports"]
+	if !exists {
+		return content, false, true
 	}
-	return reconstructWorkflowFileFromMap(result.Frontmatter, result.Markdown)
+
+	importLine, exists := parsed.FieldLines["imports"]
+	if !exists {
+		return content, false, false
+	}
+	start := importLine - parsed.FrontmatterStart
+	end := len(parsed.FrontmatterLines)
+	for _, line := range parsed.FieldLines {
+		if line > importLine && line-parsed.FrontmatterStart < end {
+			end = line - parsed.FrontmatterStart
+		}
+	}
+	if start < 0 || start >= end || end > len(parsed.FrontmatterLines) {
+		return content, false, false
+	}
+	for _, line := range parsed.FrontmatterLines[start:end] {
+		if strings.Contains(line, "#") {
+			return content, false, false
+		}
+	}
+
+	normalized, err := replaceImportsFieldInContent(content, parsed, imports)
+	if err != nil {
+		return content, false, false
+	}
+	return normalized, normalized != content, true
 }
 
-func isLegacyImportFormattingOnly(base, current, upstream string) bool {
-	for _, input := range []string{base, current, upstream} {
-		parsed, err := parser.ExtractFrontmatterFromContent(input)
-		if err != nil {
-			return false
-		}
-		if _, ok := parsed.Frontmatter["imports"]; !ok {
-			return false
-		}
-		for _, line := range parsed.FrontmatterLines {
-			if strings.HasPrefix(strings.TrimSpace(line), "#") {
-				return false
-			}
-		}
-	}
-	canonicalBase, err := canonicalizeImportsForMerge(base)
+func normalizeLegacyImportsForMerge(base, current, upstream string) (string, string, string, bool) {
+	baseParsed, err := parser.ExtractFrontmatterFromContent(base)
 	if err != nil {
-		return false
+		return base, current, upstream, false
 	}
-	canonicalCurrent, err := canonicalizeImportsForMerge(current)
-	return err == nil && canonicalBase == canonicalCurrent
+	currentParsed, err := parser.ExtractFrontmatterFromContent(current)
+	if err != nil {
+		return base, current, upstream, false
+	}
+	upstreamParsed, err := parser.ExtractFrontmatterFromContent(upstream)
+	if err != nil {
+		return base, current, upstream, false
+	}
+	baseImports, baseHasImports := baseParsed.Frontmatter["imports"]
+	currentImports, currentHasImports := currentParsed.Frontmatter["imports"]
+	if !baseHasImports || !currentHasImports {
+		return base, current, upstream, false
+	}
+	baseImportsYAML, err := serializeImportsField(baseImports)
+	if err != nil {
+		return base, current, upstream, false
+	}
+	currentImportsYAML, err := serializeImportsField(currentImports)
+	if err != nil || strings.Join(baseImportsYAML, "\n") != strings.Join(currentImportsYAML, "\n") {
+		return base, current, upstream, false
+	}
+
+	normalizedBase, baseChanged, baseOK := normalizeImportFormattingForMerge(base, baseParsed)
+	normalizedCurrent, currentChanged, currentOK := normalizeImportFormattingForMerge(current, currentParsed)
+	normalizedUpstream, upstreamChanged, upstreamOK := normalizeImportFormattingForMerge(upstream, upstreamParsed)
+	if !baseOK || !currentOK || !upstreamOK {
+		return base, current, upstream, false
+	}
+	return normalizedBase, normalizedCurrent, normalizedUpstream,
+		baseChanged || currentChanged || upstreamChanged
 }
 
 // MergeWorkflowContent performs a 3-way merge of workflow content using git merge-file
@@ -240,50 +277,61 @@ func MergeWorkflowContent(base, current, new, oldSourceSpec, newRefOrSourceSpec,
 		return "", false, fmt.Errorf("failed to write new file: %w", err)
 	}
 
-	// Execute git merge-file
-	// Format: git merge-file <current> <base> <new>
-	cmd := exec.Command("git", "merge-file",
-		"-L", "current (local changes)",
-		"-L", "base (original)",
-		"-L", "new (upstream)",
-		"--diff3", // Use diff3 style conflict markers for better context
-		currentFile, baseFile, newFile)
-
-	output, err := cmd.CombinedOutput()
-
-	// git merge-file returns:
-	// - 0 if merge was successful without conflicts
-	// - >0 if conflicts were found (appears to return number of conflicts, but file is still updated)
-	// The exit code can be >1 for multiple conflicts, not just errors
-	hasConflicts := false
-	if err != nil {
+	runMergeFile := func() ([]byte, error) {
+		cmd := exec.Command("git", "merge-file",
+			"-L", "current (local changes)",
+			"-L", "base (original)",
+			"-L", "new (upstream)",
+			"--diff3",
+			currentFile, baseFile, newFile)
+		return cmd.CombinedOutput()
+	}
+	classifyMergeFileResult := func(output []byte, err error) (bool, int, error) {
+		if err == nil {
+			return false, 0, nil
+		}
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
 			exitCode := exitErr.ExitCode()
 			if exitCode > 0 && exitCode < 128 {
-				// Conflicts found (exit codes 1-127 indicate conflicts)
-				// Exit codes >= 128 typically indicate system errors
-				hasConflicts = true
-				// Old updates canonicalized imports even when paths were unchanged.
-				// If base and current differ only in that representation, take
-				// the upstream version without discarding any local edits.
-				if isLegacyImportFormattingOnly(baseNormalized, currentNormalized, newNormalized) {
-					if writeErr := os.WriteFile(currentFile, []byte(newNormalized), constants.FilePermPublic); writeErr != nil {
-						return "", false, writeErr
-					}
-					hasConflicts = false
-				}
-				updateMergeLog.Printf("Merge conflicts detected: exit_code=%d", exitCode)
-				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Merge conflicts detected (exit code: %d)", exitCode)))
-				}
-			} else {
-				// Real error (exit code >= 128)
-				updateMergeLog.Printf("Git merge-file failed: exit_code=%d", exitCode)
-				return "", false, fmt.Errorf("git merge-file failed: %w\nOutput: %s", err, output)
+				return true, exitCode, nil
 			}
-		} else {
-			return "", false, fmt.Errorf("failed to execute git merge-file: %w", err)
+			return false, exitCode, fmt.Errorf("git merge-file failed: %w\nOutput: %s", err, output)
+		}
+		return false, 0, fmt.Errorf("failed to execute git merge-file: %w", err)
+	}
+
+	output, err := runMergeFile()
+	hasConflicts, conflictExitCode, err := classifyMergeFileResult(output, err)
+	if err != nil {
+		return "", false, err
+	}
+	if hasConflicts {
+		// Earlier updates re-marshaled frontmatter when rewriting imports. Retry
+		// with only the imports block normalized, preserving comments and other edits.
+		normalizedBase, normalizedCurrent, normalizedUpstream, changed := normalizeLegacyImportsForMerge(
+			baseNormalized, currentNormalized, newNormalized)
+		if changed {
+			if err := os.WriteFile(baseFile, []byte(normalizedBase), constants.FilePermPublic); err != nil {
+				return "", false, fmt.Errorf("failed to write normalized base file: %w", err)
+			}
+			if err := os.WriteFile(currentFile, []byte(normalizedCurrent), constants.FilePermPublic); err != nil {
+				return "", false, fmt.Errorf("failed to write normalized current file: %w", err)
+			}
+			if err := os.WriteFile(newFile, []byte(normalizedUpstream), constants.FilePermPublic); err != nil {
+				return "", false, fmt.Errorf("failed to write normalized upstream file: %w", err)
+			}
+			output, err = runMergeFile()
+			hasConflicts, conflictExitCode, err = classifyMergeFileResult(output, err)
+			if err != nil {
+				return "", false, err
+			}
+		}
+		if hasConflicts {
+			updateMergeLog.Printf("Merge conflicts detected: exit_code=%d", conflictExitCode)
+			if verbose {
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Merge conflicts detected (exit code: %d)", conflictExitCode)))
+			}
 		}
 	}
 

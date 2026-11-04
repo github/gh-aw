@@ -439,6 +439,8 @@ source: owner/repo@v0.5.3
 ---
 
 # Workflow
+
+Local paragraph.
 `
 	newContent := `---
 imports:
@@ -460,7 +462,82 @@ imports:
 	require.NoError(t, err)
 	require.False(t, hasConflicts, "format-only differences from prior import rewriting must not conflict:\n%s", merged)
 	assert.Contains(t, merged, "owner/repo/workflows/my-aw.md@v0.5.4")
+	assert.Contains(t, merged, "Local paragraph.")
 	assert.NotContains(t, merged, "<<<<<<<")
+}
+
+func TestMergeWorkflowContent_LegacyImportFormattingPreservesInlineCommentConflict(t *testing.T) {
+	base := `---
+name: Example
+imports:
+  - owner/repo/shared/local.md@v1
+---
+
+# Original
+`
+	current := `---
+name: Example # my local note
+imports:
+- owner/repo/shared/local.md@v1
+source: owner/repo/workflows/example.md@v1
+---
+
+# Original
+`
+	upstream := `---
+name: Example v2
+imports:
+  - owner/repo/shared/local.md@v2
+---
+
+# Original
+`
+
+	merged, hasConflicts, err := MergeWorkflowContent(base, current, upstream,
+		"owner/repo/workflows/example.md@v1", "v2", "", false)
+	require.NoError(t, err)
+	require.True(t, hasConflicts, "overlapping local inline comment and upstream edit must conflict:\n%s", merged)
+	assert.Contains(t, merged, "# my local note")
+}
+
+func TestMergeWorkflowContent_LegacyImportFormattingAllowsUpstreamCommentsAndImportRemoval(t *testing.T) {
+	base := `---
+# Setup note
+name: Example
+imports:
+  - owner/repo/shared/local.md@v1
+---
+
+# Original
+`
+	current := `---
+name: Example
+imports:
+- owner/repo/shared/local.md@v1
+source: owner/repo/workflows/example.md@v1
+---
+
+# Original
+
+Local paragraph.
+`
+	upstream := `---
+# Setup note
+name: Example
+# Upstream note
+---
+
+# Original
+`
+
+	merged, hasConflicts, err := MergeWorkflowContent(base, current, upstream,
+		"owner/repo/workflows/example.md@v1", "v2", "", false)
+	require.NoError(t, err)
+	require.False(t, hasConflicts, "formatting-only local import difference must not block upstream comments or import removal:\n%s", merged)
+	assert.Contains(t, merged, "# Upstream note")
+	assert.Contains(t, merged, "# Original")
+	assert.Contains(t, merged, "Local paragraph.")
+	assert.NotContains(t, merged, "imports:")
 }
 
 func TestMergeWorkflowContent_PreservesCommentsWithLocalImport(t *testing.T) {
