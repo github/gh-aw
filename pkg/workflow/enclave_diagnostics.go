@@ -12,7 +12,7 @@ const (
 	enclaveDiagnosticsRoot         = "/var/lib/awf-enclave-smoke-export"
 	enclaveDiagnosticsUploadAction = "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9"
 	enclaveDiagnosticsRunKey       = "${{ github.run_id }}-${{ github.run_attempt }}"
-	enclaveDiagnosticsInstallerSHA = "adb59bd042bfe11a432b2c6577f3919988ff30dcc04ab9bc2f6264422eb4b021"
+	enclaveDiagnosticsInstallerSHA = "10e3b5bf925852cba6e2ab9b899e1bfbafb57acb17f8155567f5f539f49f6520"
 )
 
 func enclaveDiagnosticsEnabled(data *WorkflowData) bool {

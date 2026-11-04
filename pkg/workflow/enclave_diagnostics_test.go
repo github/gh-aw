@@ -301,7 +301,7 @@ func TestEnclaveDiagnosticsTrustedBootstrap(t *testing.T) {
 const fs = require("node:fs");
 const path = require("node:path");
 const assert = require("node:assert/strict");
-const { readRegular, protectedDirectory } = require(process.argv[1]);
+const { readRegular } = require(process.argv[1]);
 const target = process.argv[2];
 assert.equal(readRegular(target, 8).toString(), "verified");
 assert.throws(() => readRegular(target, 7), /file-size/);
@@ -310,8 +310,6 @@ assert.throws(() => readRegular(target, 8), /unsafe-file/);
 fs.unlinkSync(target + "-hard");
 fs.symlinkSync(target, target + "-link");
 assert.throws(() => readRegular(target + "-link", 8));
-fs.chmodSync(path.dirname(target), 0o777);
-assert.throws(() => protectedDirectory(path.dirname(target)), /unsafe-directory/);
 `
 	output, err := exec.Command("node", "-e", harness, installerPath, target).CombinedOutput()
 	require.NoError(t, err, string(output))

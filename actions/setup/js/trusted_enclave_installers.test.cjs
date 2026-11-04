@@ -63,15 +63,17 @@ describe.each([helperFile, diagnosticsFile])("%s regular file checks", file => {
     expect(() => load(file, { "node:fs": filesystem }).readRegular("input", 8)).toThrow();
     expect(closeSync).toHaveBeenCalledWith(12);
   });
+});
 
-  it("requires both real and effective root before reading any installer input", () => {
-    for (const ids of [{ getuid: () => 1001 }, { geteuid: () => 1001 }, { getuid: undefined }, { geteuid: undefined }]) {
-      const openSync = vi.fn();
-      const installer = load(file, { "node:fs": { ...fs, openSync } }, ids);
-      const main = installer.installAWFEnclaveHelper ?? installer.installEnclaveDiagnosticsTrusted;
-      expect(() => main(Array(6).fill("untrusted"))).toThrow();
-      expect(openSync).not.toHaveBeenCalled();
-    }
+describe.each([
+  [helperFile, "installAWFEnclaveHelper", ["manifest", "helper", "a".repeat(64), "b".repeat(64), "0.29.5", "1001"], "Invalid helper installer invocation"],
+  [diagnosticsFile, "installEnclaveDiagnosticsTrusted", ["node", "collector"], "bootstrap-must-run-root"],
+])("%s root requirement", (file, name, args, message) => {
+  it.each([{ getuid: () => 1001 }, { geteuid: () => 1001 }, { getuid: undefined }, { geteuid: undefined }])("rejects non-root identity %# before reading any input", ids => {
+    const openSync = vi.fn();
+    const installer = load(file, { "node:fs": { ...fs, openSync } }, ids);
+    expect(() => installer[name](args)).toThrow(message);
+    expect(openSync).not.toHaveBeenCalled();
   });
 });
 
@@ -207,11 +209,22 @@ describe("trusted diagnostics installation", () => {
     expect(mkdirSync).not.toHaveBeenCalled();
   });
 
-  it("rejects unsafe protected directories", () => {
-    const directory = temporaryDirectory();
-    fs.chmodSync(directory, 0o777);
-    const { protectedDirectory } = load(diagnosticsFile);
-    expect(() => protectedDirectory(directory)).toThrow("unsafe-directory");
+  it.each([
+    [0o777, true],
+    [0o775, true],
+    [0o757, true],
+    [0o755, false],
+  ])("checks writable bits on root-owned protected directories (mode %o)", (mode, rejected) => {
+    const lstatSync = () => ({ isDirectory: () => true, uid: 0, mode });
+    const { protectedDirectory } = load(diagnosticsFile, { "node:fs": { ...fs, lstatSync } });
+    if (rejected) expect(() => protectedDirectory("/protected")).toThrow("unsafe-directory");
+    else expect(() => protectedDirectory("/protected")).not.toThrow();
+  });
+
+  it("rejects non-root-owned protected directories", () => {
+    const lstatSync = () => ({ isDirectory: () => true, uid: 1001, mode: 0o755 });
+    const { protectedDirectory } = load(diagnosticsFile, { "node:fs": { ...fs, lstatSync } });
+    expect(() => protectedDirectory("/protected")).toThrow("unsafe-directory");
   });
 
   it("verifies already-installed ownership, mode and contents without replacing them", () => {
@@ -229,10 +242,27 @@ describe("trusted diagnostics installation", () => {
   });
 
   it("creates new files exclusively with their exact installed mode", () => {
-    const target = path.join(temporaryDirectory(), "new-node");
+    const directory = temporaryDirectory();
+    const target = path.join(directory, "new-node");
     const { installVerified } = load(diagnosticsFile);
     installVerified(target, Buffer.from("verified"), 0o500);
     expect(fs.readFileSync(target).toString()).toBe("verified");
     expect(fs.statSync(target).mode & 0o7777).toBe(0o500);
+    expect(fs.readdirSync(directory)).toEqual(["new-node"]);
+  });
+
+  it("removes staging and leaves no destination when a write fails", () => {
+    const directory = temporaryDirectory();
+    const target = path.join(directory, "new-node");
+    const { installVerified } = load(diagnosticsFile, {
+      "node:fs": {
+        ...fs,
+        writeFileSync: () => {
+          throw new Error("disk full");
+        },
+      },
+    });
+    expect(() => installVerified(target, Buffer.from("verified"), 0o500)).toThrow("disk full");
+    expect(fs.readdirSync(directory)).toEqual([]);
   });
 });

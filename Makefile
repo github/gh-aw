@@ -45,7 +45,7 @@ build: lint-setup-no-python sync-action-pins sync-action-scripts sync-compat syn
 
 # Build for all platforms
 .PHONY: build-all
-build-all: lint-setup-no-python build-linux build-darwin build-windows build-android
+build-all: build-linux build-darwin build-windows build-android
 
 .PHONY: build-linux
 build-linux: lint-setup-no-python

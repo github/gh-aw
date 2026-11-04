@@ -1,5 +1,5 @@
 const fs = require("node:fs");
-const { createHash } = require("node:crypto");
+const { createHash, randomBytes } = require("node:crypto");
 
 function reject(category) {
   throw new Error(`Trusted enclave collector rejected: ${category}`);
@@ -42,12 +42,23 @@ function installVerified(path, data, mode) {
     if (!readRegular(path, data.length).equals(data)) reject("installed-checksum");
     return;
   }
-  const fd = fs.openSync(path, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_NOFOLLOW, mode);
+  const staging = `${path}.pending-${randomBytes(16).toString("hex")}`;
   try {
-    fs.writeFileSync(fd, data);
-    fs.fchmodSync(fd, mode);
+    const fd = fs.openSync(staging, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_NOFOLLOW, mode);
+    try {
+      fs.writeFileSync(fd, data);
+      fs.fchmodSync(fd, mode);
+      fs.fsyncSync(fd);
+    } finally {
+      fs.closeSync(fd);
+    }
+    fs.renameSync(staging, path);
   } finally {
-    fs.closeSync(fd);
+    try {
+      fs.unlinkSync(staging);
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
   }
 }
 
@@ -66,7 +77,12 @@ function installEnclaveDiagnosticsTrusted(args) {
   for (const directory of ["/", "/var", "/var/lib"]) protectedDirectory(directory);
   try {
     fs.mkdirSync(root, { mode: 0o711 });
-    fs.chmodSync(root, 0o711);
+    const fd = fs.openSync(root, fs.constants.O_RDONLY | fs.constants.O_DIRECTORY | fs.constants.O_NOFOLLOW);
+    try {
+      fs.fchmodSync(fd, 0o711);
+    } finally {
+      fs.closeSync(fd);
+    }
   } catch (error) {
     if (error.code !== "EEXIST") throw error;
   }
