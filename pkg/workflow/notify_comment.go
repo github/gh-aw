@@ -182,7 +182,7 @@ func computeConclusionJobPermissions(data *WorkflowData) *Permissions {
 			conclusionPerms.Set(PermissionContents, PermissionWrite)
 			conclusionPerms.Set(PermissionIssues, PermissionWrite)
 		}
-		if IsDetectionJobEnabled(data.SafeOutputs) && data.SafeOutputs.ThreatDetection.IsReportAsIssueEnabled() {
+		if conclusionDetectionMayCreateIssue(data) {
 			conclusionPerms.Set(PermissionIssues, PermissionWrite)
 		}
 		if hasOTLPGitHubOIDCAuth(data.ParsedFrontmatter, data.RawFrontmatter) {
@@ -255,6 +255,10 @@ func issueReportingCreateIssueEnabled(config *IssueReportingConfig) bool {
 	return config != nil && (config.CreateIssue == nil || !strings.EqualFold(strings.TrimSpace(*config.CreateIssue), "false"))
 }
 
+func conclusionDetectionMayCreateIssue(data *WorkflowData) bool {
+	return IsDetectionJobEnabled(data.SafeOutputs) && data.SafeOutputs.ThreatDetection.IsReportAsIssueEnabled()
+}
+
 // conclusionMayCreateIssue returns true if at least one conclusion-job mechanism can create or
 // update an issue: report-failed-jobs, agent-failure reporting (report-failure-as-issue), noop
 // reporting (noop.report-as-issue), detection runs, or missing-tool issue reporting. This mirrors the resolved
@@ -273,7 +277,7 @@ func conclusionMayCreateIssue(data *WorkflowData) bool {
 	if conclusionMissingToolCreateIssueEnabled(data) {
 		return true
 	}
-	if IsDetectionJobEnabled(data.SafeOutputs) && data.SafeOutputs.ThreatDetection.IsReportAsIssueEnabled() {
+	if conclusionDetectionMayCreateIssue(data) {
 		return true
 	}
 	return false
