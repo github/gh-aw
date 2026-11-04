@@ -82,6 +82,15 @@ const (
 	//	features:
 	//	  dangerously-allow-roles-read-and-pull-request-target: true
 	DangerouslyAllowRolesReadAndPullRequestTargetFeatureFlag FeatureFlag = "dangerously-allow-roles-read-and-pull-request-target"
+	// DangerouslyAllowPullRequestTargetForksAllFeatureFlag permits unrestricted
+	// pull_request_target fork admission in strict mode. The wildcard diagnostic
+	// remains visible even when this flag is enabled.
+	//
+	// Workflow frontmatter usage:
+	//
+	//	features:
+	//	  dangerously-allow-pull-request-target-forks-all: true
+	DangerouslyAllowPullRequestTargetForksAllFeatureFlag FeatureFlag = "dangerously-allow-pull-request-target-forks-all"
 	// GHAWDetectionFeatureFlag controls the external threat-detect binary detection path.
 	// The external detector is enabled by default. Set this flag to false to use
 	// the legacy inline engine execution path.
