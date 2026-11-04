@@ -1,14 +1,5 @@
 [
   {
-    "date": "2026-09-14",
-    "workflow_name": "Issue Monster",
-    "total_aic_analyzed": 65.622715,
-    "runs_audited": 51,
-    "recommendations_count": 3,
-    "subagent_candidates": 0,
-    "estimated_aic_savings_per_run": 100
-  },
-  {
     "date": "2026-09-15",
     "workflow_name": "Deep Report",
     "total_aic_analyzed": 1052.21,
@@ -295,5 +286,15 @@
     "recommendations_count": 4,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 10
+  },
+  {
+    "date": "2026-11-04",
+    "workflow_name": "PR Sous Chef",
+    "workflow_file": "pr-sous-chef",
+    "total_aic_analyzed": 72.62,
+    "runs_audited": 13,
+    "recommendations_count": 4,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 3.5
   }
 ]
