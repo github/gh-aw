@@ -12,7 +12,11 @@
 
 ### Decision
 
-We will treat `source:` as a record of what the user *intends to track*, not of the exact commit that was installed. `buildSourceStringWithCommitSHA` will write the ref the user gave (a tag, major ref, branch, or SHA) exactly as given. It will use the resolved commit SHA only when no ref was given. The same rule applies to both per-file workflow sources and repository-manifest sources. To protect that intent, `fetchWorkflowDependencies` passes a copy of the `WorkflowSpec` to `fetchAllRemoteDependencies`, so dependency resolution cannot change the requested ref. The main reason is that `update` must follow the user's chosen release channel. Exact installed-commit pinning is already handled elsewhere: the lock file and `.github/aw/imports/` pin by SHA.
+`source:` records what the user intends to track, not the exact commit installed. `buildSourceStringWithCommitSHA` writes the explicit tag, major ref, branch, or SHA, falling back to the resolved commit only when no ref was given. This applies to both per-file workflow sources and repository-manifest sources.
+
+The optional `source-sha:` field retains the installed commit as the immutable three-way merge base. Package ownership records retain the tracking source and resolved commit separately. The updater excludes managed source metadata from content comparisons and advances the installed revision after merging. Existing files without revision metadata retain the previous ref-based fallback.
+
+Dependency fetching uses a copy of `WorkflowSpec` pinned to the fetched workflow commit, preserving both source intent and installation consistency. Release resolution propagates cooldown blocking so manifest updates cannot synchronize resources from a moved fallback tag when no eligible upgrade exists.
 
 ### Alternatives Considered
 
@@ -24,10 +28,6 @@ Keep writing the commit SHA and change `update` to map the SHA back to a tag, fo
 
 The issue's implementation plan suggested keeping `workflow.Version` only when it is a release tag (`isSemanticVersionTag`) or a major ref like `v1`, and using the SHA otherwise. That is a narrower change. However, it would still turn branch installs (for example `@release/stable`) into SHA pins. Those pins would then follow the default branch on update instead of the requested branch, which is the same class of bug. The PR keeps every explicit ref.
 
-#### Alternative 3: Record both the ref and the SHA in frontmatter
-
-Write the requested ref to `source:` and add another field (or a lock-file metadata entry) for the resolved SHA, for auditing. The issue lists this as optional. It was not done in this PR. The lock file and import cache already pin by SHA, so a second frontmatter field would add more format surface for little gain. [TODO: verify whether audit metadata is still wanted]
-
 ### Consequences
 
 #### Positive
@@ -36,7 +36,7 @@ Write the requested ref to `source:` and add another field (or a lock-file metad
 - Per-file and manifest sources follow the same ref-selection rule. This removes a separate code path that behaved differently.
 
 #### Negative
-- `source:` no longer records the exact commit installed when a mutable ref (a tag that can be moved, or a branch) was given. Users who want reproducibility must rely on the lock file and import cache SHAs, or install with an explicit SHA.
+- Tracking intent and installed revision now occupy separate fields. The installed SHA must advance with successful updates and remain unchanged when an update is skipped or rolled back.
 - This changes behavior for existing users. Newly added workflows that used a branch ref (for example `@main`) now record `@main` instead of a SHA, so `update` will follow that branch. Users who expected SHA pinning from a branch install will see different update targets.
 - Copying the `WorkflowSpec` for dependency fetching relies on a convention, not a type guarantee. Future code that changes the shared spec could bring the bug back.
 

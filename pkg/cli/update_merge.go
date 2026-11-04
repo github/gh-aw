@@ -78,10 +78,10 @@ func hasLocalModifications(sourceContent, localContent, sourceSpec, localWorkflo
 	// is source field position, which in turn triggers merge mode and can produce
 	// spurious merge conflict markers.
 	sourceResolvedNormalized := stringutil.NormalizeWhitespace(sourceResolved)
-	if withoutSource, removeErr := RemoveTopLevelFieldFromFrontmatter(sourceResolvedNormalized, "source"); removeErr == nil {
+	if withoutSource, removeErr := removeSourceMetadata(sourceResolvedNormalized); removeErr == nil {
 		sourceResolvedNormalized = withoutSource
 	}
-	if withoutSource, removeErr := RemoveTopLevelFieldFromFrontmatter(localNormalized, "source"); removeErr == nil {
+	if withoutSource, removeErr := removeSourceMetadata(localNormalized); removeErr == nil {
 		localNormalized = withoutSource
 	}
 
@@ -95,6 +95,17 @@ func hasLocalModifications(sourceContent, localContent, sourceSpec, localWorkflo
 	}
 
 	return hasModifications
+}
+
+func removeSourceMetadata(content string) (string, error) {
+	for _, field := range []string{"source", "source-sha"} {
+		var err error
+		content, err = RemoveTopLevelFieldFromFrontmatter(content, field)
+		if err != nil {
+			return "", err
+		}
+	}
+	return content, nil
 }
 
 func normalizeImportsForMerge(content string, sourceSpec *SourceSpec, localWorkflowDir string, verbose bool) (string, error) {
@@ -136,15 +147,15 @@ func MergeWorkflowContent(base, current, new, oldSourceSpec, newRefOrSourceSpec,
 
 	// The source field is managed by the updater, not user content. Exclude it from the
 	// textual merge so changing only its ref cannot overlap local frontmatter additions.
-	baseWithoutSource, err := RemoveTopLevelFieldFromFrontmatter(base, "source")
+	baseWithoutSource, err := removeSourceMetadata(base)
 	if err != nil {
 		return "", false, fmt.Errorf("failed to remove source from base content: %w", err)
 	}
-	currentWithoutSource, err := RemoveTopLevelFieldFromFrontmatter(current, "source")
+	currentWithoutSource, err := removeSourceMetadata(current)
 	if err != nil {
 		return "", false, fmt.Errorf("failed to remove source from current content: %w", err)
 	}
-	newWithoutSource, err := RemoveTopLevelFieldFromFrontmatter(new, "source")
+	newWithoutSource, err := removeSourceMetadata(new)
 	if err != nil {
 		return "", false, fmt.Errorf("failed to remove source from new content: %w", err)
 	}

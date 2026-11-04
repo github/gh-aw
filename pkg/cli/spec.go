@@ -39,6 +39,8 @@ type WorkflowSpec struct {
 	// FromRepositoryManifest is true when this workflow was selected from an aw.yml
 	// repository package manifest (root or nested package path).
 	FromRepositoryManifest bool
+	// VersionInferred distinguishes package defaults from explicitly requested refs.
+	VersionInferred bool
 	// RawURL is set only for generic HTTP(S) URL specs whose host is not a recognized
 	// GitHub host.  When non-empty, WorkflowPath, RepoSlug, Version, and Host are all
 	// empty; the spec is resolved by fetching the URL and dispatching on Content-Type.
@@ -486,7 +488,7 @@ func buildSourceStringWithCommitSHA(workflow *WorkflowSpec, commitSHA string) st
 	}
 
 	ref := workflow.Version
-	if ref == "" {
+	if ref == "" || workflow.VersionInferred {
 		ref = commitSHA
 	}
 
