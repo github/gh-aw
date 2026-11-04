@@ -134,6 +134,42 @@ func TestConnectorImportWithoutParameters(t *testing.T) {
 	require.NotNil(t, data.Connectors["tracker"].Agent)
 }
 
+func TestConnectorImportErrorPreservesEngineDiagnostic(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		name, engine, message string
+	}{
+		{"invalid-engine", "copiilot", "Did you mean: copilot?"},
+		{"valid-engine", "copilot", "import file not found"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			for _, trigger := range []string{"workflow_dispatch", "tracker-issue-created"} {
+				t.Run(trigger, func(t *testing.T) {
+					for _, fromFile := range []bool{false, true} {
+						c, root := connectorCompiler(t)
+						content := strings.Replace(connectorImportHeader, "engine: copilot", "engine: "+test.engine, 1)
+						content = strings.Replace(content, "on: workflow_dispatch", "on: "+trigger, 1) + "---\nInvestigate.\n"
+						path := filepath.Join(root, "proof.md")
+						var err error
+						if fromFile {
+							require.NoError(t, os.WriteFile(path, []byte(content), 0600))
+							_, err = c.ParseWorkflowFile(path)
+						} else {
+							_, err = c.ParseWorkflowString(content, path)
+						}
+						require.ErrorContains(t, err, test.message)
+						assert.Contains(t, err.Error(), path)
+						if test.engine != "copilot" {
+							assert.Contains(t, err.Error(), "invalid engine")
+							assert.NotContains(t, err.Error(), "import file not found")
+						}
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestConnectorSelfContainedMarkdownExample(t *testing.T) {
 	c, root := connectorCompiler(t)
 	wrapper, err := os.ReadFile("testdata/connector-imports/connector.md")

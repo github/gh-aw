@@ -12,6 +12,17 @@ import (
 	"github.com/github/gh-aw/pkg/sliceutil"
 )
 
+func (c *Compiler) normalizeWorkflowConnectors(result *parser.FrontmatterResult, path, content string, validateEngineOnError bool) error {
+	err := c.normalizeImportedConnectors(result.Frontmatter, path, content)
+	// Connector discovery must not let a broken import hide a main workflow's engine typo.
+	if err != nil && validateEngineOnError {
+		if engineErr := c.validateEngineBeforeSchema(path, []byte(content), result, result.Frontmatter); engineErr != nil {
+			return engineErr
+		}
+	}
+	return err
+}
+
 // Resolve registrations through the existing import pipeline before native schema
 // validation. The normal engine import pass reuses the same confined import cache.
 func (c *Compiler) normalizeImportedConnectors(frontmatter map[string]any, path, content string) error {

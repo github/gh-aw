@@ -103,7 +103,9 @@ func (c *Compiler) parseFrontmatterSection(markdownPath string) (*frontmatterPar
 		orchestratorFrontmatterLog.Printf("Schedule preprocessing failed: %v", err)
 		return nil, err
 	}
-	if err := c.normalizeImportedConnectors(result.Frontmatter, cleanPath, contentString); err != nil {
+	onValue, hasOnField := result.Frontmatter["on"]
+	isMain := parser.HasConnectorTriggers(result.Frontmatter) || (hasOnField && !parser.IsImportSafeSharedWorkflowOn(onValue))
+	if err := c.normalizeWorkflowConnectors(result, cleanPath, contentString, isMain && result.Markdown != ""); err != nil {
 		return nil, err
 	}
 
