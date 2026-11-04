@@ -10,7 +10,7 @@ Do not dispatch workflows or execute artifacts. Keep secrets/prompts/configurati
 
 ## Start here
 
-Preserve `RUN_URL`, including its fragment; derive `REPO` (`HOST/OWNER/REPO`)/`RUN_ID`. Qualify bare IDs.
+Preserve `RUN_URL`, including its fragment; derive `REPO` (`HOST/OWNER/REPO`)/`RUN_ID`.
 
 ```bash
 : "${RUN_URL:?Set URL}"
@@ -23,7 +23,7 @@ gh aw audit "$RUN_URL" --no-baseline --timeout 2m \
 Read completeness/`overview`/`key_findings`/`recommendations`/`errors`.
 Timeout: incomplete JSON report; fetch evidence.
 Read only the linked `playbook_url`/code row; [cluster fleets](analyzing-runs.md).
-Keep codes/severity; advisory/pending/skipped/policy-denied need not be bugs.
+Keep codes/severity; advisory/pending/skipped need not be bugs.
 Unknown: [unmapped codes](#unmapped-codes).
 
 ## Audit findings
@@ -100,7 +100,7 @@ Refresh downloads artifacts.
 
 ### Verify exact same-run inventory
 
-Read same-run `$EVIDENCE/run-$RUN_ID/sandbox/firewall/awf-reflect.json` (or audit-reported path).
+Read same-run `$EVIDENCE/run-$RUN_ID/sandbox/firewall/awf-reflect.json`.
 
 ```bash
 : "${MODEL:?Set exact model}" "${PROVIDER:?Set provider}"
@@ -156,7 +156,7 @@ Nonempty `safeoutputs.jsonl` != publication.
 | `engine_driver_failure`, `driver_crash` | Driver exit/signal; final native error. | Fix driver first; nonzero exit alone != outage. |
 | `secret_redaction_failure` | Redaction status; sanitized diagnostic. | Repair redaction before publication; never expose raw logs/disable masking. |
 | `safeoutputs_cli_error` | Arguments, registration, denial. | Fix supported invocation/allowlist; no unauthorized `gh` writes. |
-| `invalid_safe_outputs` | Record errors; generated schema. | Fix emitted type/fields; retain validation. |
+| `invalid_safe_outputs`, `safe_output_dependency_invalid`, `safe_output_dependency_failed` | Record errors; generated schema. | Fix emitted type/fields; retain validation. |
 | `missing_terminal_safe_output` | Expected terminal tool, denied calls, last session event. | Fix publication/prompt completion contract; silence is not an intentional noop. |
 | `request_rejection`, `prompt_exhaustion`, `unknown` | Native error, budget, missing evidence. | Resolve cause; retain unknown without evidence. |
 | `ERR_VALIDATION`, `E001` | Fields/types, target IDs, schema. | Fix producer; no silent coercion. |
