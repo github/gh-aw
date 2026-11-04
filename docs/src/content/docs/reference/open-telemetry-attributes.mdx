@@ -113,8 +113,8 @@ These attributes appear on built-in workflow setup, agent, and conclusion spans 
     <tr><td><code>gh-aw.agent.conclusion</code></td><td>Normalized agent conclusion.</td></tr>
     <tr><td><code>gh-aw.detection.conclusion</code></td><td>Detection subsystem conclusion when present.</td></tr>
     <tr><td><code>gh-aw.detection.reason</code></td><td>Detection subsystem reason when present.</td></tr>
-    <tr><td><code>gh-aw.otlp.export_errors</code></td><td>Count of OTLP export errors seen during the run.</td></tr>
-    <tr><td><code>gh-aw.otlp.export_error_details</code></td><td>Serialized OTLP export error details when present.</td></tr>
+    <tr><td><code>gh-aw.otlp.export_errors</code></td><td>Count of OTLP export errors seen during the run, including partial rejection and unknown acceptance due to invalid response diagnostics. Counts export errors, not rejected records; warning-only partial success is excluded.</td></tr>
+    <tr><td><code>gh-aw.otlp.export_error_details</code></td><td>Serialized sanitized OTLP export error details when present, including signal-specific partial-rejection counts. Collector response messages are withheld.</td></tr>
     <tr><td><code>gh-aw.error.count</code></td><td>Count of output errors on the conclusion span.</td></tr>
     <tr><td><code>gh-aw.error.messages</code></td><td>Joined error messages when present.</td></tr>
     <tr><td><code>gh-aw.output.item_count</code></td><td>Count of output items produced by the run.</td></tr>

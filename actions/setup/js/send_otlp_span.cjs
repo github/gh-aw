@@ -18,6 +18,7 @@ const { projectSessionResult, observedSessionModel } = require("./agent_session.
 const { resolveEffectiveModel, resolveModelRoutingSummary } = require("./model_attribution.cjs");
 const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
 const { readEvalsNotEvaluatedStatus } = require("./evals_status.cjs");
+const { MAX_OTLP_RESPONSE_BYTES, readOTLPResponse, inspectOTLPResponse, unavailableOTLPResponse } = require("./otlp_response.cjs");
 
 function getGhAwPath(relativePath) {
   const root = (process.env.GH_AW_TMP_DIR || "").trim() || "/tmp/gh-aw";
@@ -947,11 +948,29 @@ function hasProxyConfigured(endpoint) {
  * @param {string} url
  * @param {Record<string, string>} headers
  * @param {string | Buffer} body
- * @returns {{ ok: boolean, status: number, statusText: string }}
+ * @returns {{ ok: boolean, status: number, statusText: string, responseBody: Buffer, contentType: string, diagnosticsUnavailable: boolean }}
  */
 function sendOTLPViaCurl(url, headers, body) {
   /** @type {string[]} */
-  const args = ["--silent", "--show-error", "--location", "--output", "/dev/null", "--write-out", "%{http_code}", "--request", "POST", "--data-binary", "@-"];
+  const args = [
+    "--silent",
+    "--show-error",
+    "--location",
+    "--suppress-connect-headers",
+    "--dump-header",
+    "-",
+    // Let curl finish and emit its status before the subprocess deadline.
+    "--max-time",
+    "10",
+    "--max-filesize",
+    String(MAX_OTLP_RESPONSE_BYTES),
+    "--write-out",
+    "\n%{http_code}\n%{content_type}",
+    "--request",
+    "POST",
+    "--data-binary",
+    "@-",
+  ];
 
   for (const [key, value] of Object.entries(headers)) {
     args.push("--header", `${key}: ${value}`);
@@ -959,29 +978,60 @@ function sendOTLPViaCurl(url, headers, body) {
   args.push(url);
 
   const result = childProcess.spawnSync("curl", args, {
-    encoding: "utf8",
     input: body,
-    maxBuffer: 1024 * 1024,
+    stdio: ["pipe", "pipe", "pipe"],
+    maxBuffer: MAX_OTLP_RESPONSE_BYTES + 4096,
     timeout: 15_000,
   });
 
-  if (result.error) {
+  const interrupted = result.error && "code" in result.error && (result.error.code === "ENOBUFS" || result.error.code === "ETIMEDOUT");
+  if (result.error && !interrupted) {
     throw result.error;
   }
 
-  const status = Number.parseInt((result.stdout || "").trim(), 10);
-  if (Number.isInteger(status)) {
+  const output = Buffer.from(result.stdout || "");
+  // curl writes headers to stdout before each body. Unlike /dev/fd paths, "-"
+  // works with Node's socket-backed stdio on Linux as well as macOS.
+  // Stop at the final response's body: body bytes must never supply a status.
+  let bodyOffset = 0;
+  let headerStatus = 0;
+  while (output.subarray(bodyOffset, bodyOffset + 5).toString() === "HTTP/") {
+    const remaining = output.subarray(bodyOffset).toString("latin1");
+    const header = /^HTTP\/(?:1\.[01]|2|3) ([1-5]\d{2})(?:[ \t][^\r\n]*)?\r?\n(?:[^\r\n]+\r?\n)*\r?\n/.exec(remaining);
+    headerStatus = 0;
+    if (!header) break;
+    bodyOffset += header[0].length;
+    headerStatus = Number(header[1]);
+    if (headerStatus >= 200 && (headerStatus < 300 || headerStatus >= 400)) break;
+    if (headerStatus >= 300 && !/\r?\nlocation:/i.test(header[0])) break;
+    // Informational responses require a final response. curl suppresses
+    // redirect bodies when following Location, leaving the next header here.
+    if (headerStatus < 200) headerStatus = 0;
+  }
+  const responseOutput = output.subarray(bodyOffset);
+  const typeIndex = responseOutput.lastIndexOf("\n");
+  const statusIndex = responseOutput.lastIndexOf("\n", typeIndex - 1);
+  const trailerStatus = responseOutput.subarray(statusIndex + 1, typeIndex < 0 ? undefined : typeIndex).toString();
+  const status = headerStatus || (!interrupted && /^[1-5]\d{2}$/.test(trailerStatus) ? Number(trailerStatus) : 0);
+  const diagnostics = {
+    responseBody: statusIndex < 0 ? Buffer.alloc(0) : responseOutput.subarray(0, statusIndex),
+    contentType: typeIndex < 0 ? "" : responseOutput.subarray(typeIndex + 1).toString(),
+    diagnosticsUnavailable: Boolean(interrupted) || result.status !== 0,
+  };
+  if (status > 0) {
     return {
       ok: status >= 200 && status < 300,
       status,
-      statusText: result.status === 0 ? "OK" : (result.stderr || "curl failed").trim() || "curl failed",
+      statusText: result.status === 0 ? "OK" : (result.stderr || "curl failed").toString().trim() || "curl failed",
+      ...diagnostics,
     };
   }
 
   return {
     ok: false,
     status: 0,
-    statusText: (result.stderr || "curl failed").trim() || "curl failed",
+    statusText: (result.stderr || "curl failed").toString().trim() || "curl failed",
+    ...diagnostics,
   };
 }
 
@@ -1309,6 +1359,19 @@ async function sendOTLPSpan(endpoint, payload, { maxRetries = 2, baseDelayMs = 1
             signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
           });
       if (response.ok) {
+        let diagnostic;
+        try {
+          const bytes = "responseBody" in response ? response.responseBody : await readOTLPResponse(response.body);
+          const contentType = "contentType" in response ? response.contentType : response.headers?.get("content-type") || "";
+          if ("diagnosticsUnavailable" in response && response.diagnosticsUnavailable) throw new Error("Response unavailable");
+          diagnostic = inspectOTLPResponse(bytes, contentType, protocol, signal);
+        } catch {
+          diagnostic = unavailableOTLPResponse(signal);
+        }
+        if (diagnostic.reason) {
+          console.warn(diagnostic.reason);
+          if (diagnostic.error) recordOTLPExportError({ endpoint, status: response.status, reason: diagnostic.reason });
+        }
         return;
       }
       const reason = getOTLPExportFailureReason(response);
