@@ -94,7 +94,11 @@ func sanitizeRunStepExpressions(step map[string]any) (map[string]any, []string, 
 		return step, nil, false
 	}
 
-	scanContent := executableShellContent(runVal)
+	// Actions expands ${{ }} before the shell runs, so comments offer no
+	// protection: a value containing a newline escapes the comment. Only
+	// quoted heredoc bodies are left in place (rewriting them would emit the
+	// literal variable name); validation is responsible for those.
+	scanContent := transformShellContent(runVal, func(s string) string { return s }, true, false)
 	if !hasExpressionMarker(scanContent) {
 		return step, nil, false
 	}
@@ -231,7 +235,11 @@ func sanitizeRunStepExpressions(step map[string]any) (map[string]any, []string, 
 func replaceSanitizedRunStepExpression(run string, expression sanitizedExpression, shellValue any) string {
 	shell, shellIsString := shellValue.(string)
 	powershell := shellIsString && (strings.EqualFold(shell, "pwsh") || strings.EqualFold(shell, "powershell"))
-	updated, err := TransformExecutableShellContent(run, func(segment string) string {
+	regions, parsed := shellHeredocRegions(run, false)
+	if !parsed {
+		return run
+	}
+	return transformShellRegions(run, regions, func(segment string) string {
 		var result strings.Builder
 		for {
 			before, after, found := strings.Cut(segment, expression.Original)
@@ -250,11 +258,7 @@ func replaceSanitizedRunStepExpression(run string, expression sanitizedExpressio
 			segment = after
 		}
 		return result.String()
-	})
-	if err != nil {
-		return run
-	}
-	return updated
+	}, false)
 }
 
 // sanitizeCustomStepsYAML parses a raw "steps: ..." YAML string (as produced by
