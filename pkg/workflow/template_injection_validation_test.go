@@ -497,7 +497,7 @@ func TestTemplateInjectionHeredocFiltering(t *testing.T) {
 		description string
 	}{
 		{
-			name: "safe - heredoc with EOF delimiter",
+			name: "unsafe - expression in quoted heredoc with EOF delimiter",
 			yaml: `jobs:
   test:
     steps:
@@ -506,11 +506,11 @@ func TestTemplateInjectionHeredocFiltering(t *testing.T) {
           cat > config.json << 'EOF'
           {"issue": "${{ github.event.issue.number }}"}
           EOF`,
-			shouldError: false,
-			description: "Expressions in heredocs are safe - written to files, not executed",
+			shouldError: true,
+			description: "Expressions in heredocs are evaluated before Bash and must be rejected",
 		},
 		{
-			name: "safe - heredoc with JSON delimiter",
+			name: "unsafe - expression in quoted heredoc with JSON delimiter",
 			yaml: `jobs:
   test:
     steps:
@@ -519,11 +519,11 @@ func TestTemplateInjectionHeredocFiltering(t *testing.T) {
           cat > data.json << 'JSON'
           {"title": "${{ github.event.issue.title }}"}
           JSON`,
-			shouldError: false,
-			description: "JSON heredoc delimiter should be recognized",
+			shouldError: true,
+			description: "Expressions in heredocs are evaluated before Bash and must be rejected",
 		},
 		{
-			name: "safe - heredoc with YAML delimiter",
+			name: "unsafe - expression in quoted heredoc with YAML delimiter",
 			yaml: `jobs:
   test:
     steps:
@@ -532,8 +532,8 @@ func TestTemplateInjectionHeredocFiltering(t *testing.T) {
           cat > config.yaml << 'YAML'
           title: ${{ github.event.issue.title }}
           YAML`,
-			shouldError: false,
-			description: "YAML heredoc delimiter should be recognized",
+			shouldError: true,
+			description: "Expressions in heredocs are evaluated before Bash and must be rejected",
 		},
 		{
 			name: "unsafe - expression outside heredoc",
@@ -550,7 +550,7 @@ func TestTemplateInjectionHeredocFiltering(t *testing.T) {
 			description: "Expressions outside heredoc should still be detected",
 		},
 		{
-			name: "safe - multiple heredocs in same run block",
+			name: "unsafe - expressions in multiple quoted heredocs",
 			yaml: `jobs:
   test:
     steps:
@@ -562,8 +562,8 @@ func TestTemplateInjectionHeredocFiltering(t *testing.T) {
           cat > config2.json << 'EOF'
           {"title": "${{ github.event.issue.title }}"}
           EOF`,
-			shouldError: false,
-			description: "Multiple heredocs should all be filtered",
+			shouldError: true,
+			description: "Expressions in any heredoc are evaluated before Bash and must be rejected",
 		},
 		{
 			name: "unsafe - unquoted heredoc delimiter",
@@ -1367,8 +1367,8 @@ func TestScanRunContentExpressions(t *testing.T) {
 	}
 }
 
-// TestScanRunContentExpressionsHeredoc distinguishes literal quoted bodies from
-// expanding unquoted bodies on the raw-YAML fast path.
+// TestScanRunContentExpressionsHeredoc checks that expressions in any heredoc body
+// are detected on the raw-YAML fast path because Actions evaluates them before Bash.
 func TestScanRunContentExpressionsHeredoc(t *testing.T) {
 	tests := []struct {
 		name              string
@@ -1442,7 +1442,7 @@ func TestScanRunContentExpressionsHeredoc(t *testing.T) {
 			wantHasDisallowed: false,
 		},
 		{
-			name: "quoted heredoc delimiter (single-quoted) skips content",
+			name: "quoted heredoc delimiter (single-quoted) still scans content",
 			yaml: `jobs:
   test:
     steps:
@@ -1450,8 +1450,8 @@ func TestScanRunContentExpressionsHeredoc(t *testing.T) {
           cat << 'EOF'
           literal: ${{ github.event.issue.title }}
           EOF`,
-			wantHasUnsafe:     false,
-			wantHasDisallowed: false,
+			wantHasUnsafe:     true,
+			wantHasDisallowed: true,
 		},
 	}
 

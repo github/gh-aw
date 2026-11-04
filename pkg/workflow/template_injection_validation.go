@@ -162,16 +162,15 @@ func findRunValue(keyPart string) (string, bool) {
 // multiline run block. It recognizes plain run: keys as well as quoted and flow-style forms
 // so Path B stays aligned with the parsed-YAML validators.
 //
-// Multiline blocks use the same shell-region filtering as the parsed validators.
-// YAML indentation is removed before parsing shell syntax; shell indentation
-// remains significant for exact heredoc delimiter matching.
+// YAML indentation is removed before expressions are scanned. Shell comments and
+// heredoc bodies are included because GitHub evaluates expressions before Bash.
 func walkRunBlockLines(yamlContent string, visit func(line string) bool) bool {
 	inRunBlock := false
 	runBlockIndent := 0
 	contentIndent := 0
 	var block strings.Builder
 	flush := func() bool {
-		for line := range strings.SplitSeq(executableShellContent(block.String()), "\n") {
+		for line := range strings.SplitSeq(block.String(), "\n") {
 			if visit(line) {
 				return true
 			}
@@ -275,16 +274,13 @@ func validateNoTemplateInjectionFromParsed(workflow map[string]any) error {
 			continue
 		}
 
-		contentWithoutHeredocs := executableShellContent(runContent)
-
-		// Extract inline expressions outside quoted heredoc bodies and comments.
-		expressions := runScriptExpressions(contentWithoutHeredocs)
+		expressions := runScriptExpressions(runContent)
 
 		// Check each expression for unsafe contexts
 		for _, expr := range expressions {
 			if context := unsafeRunScriptExpressionContext(expr); context != "" {
 				// Found an unsafe pattern - extract a snippet for context
-				snippet := extractRunSnippet(contentWithoutHeredocs, expr)
+				snippet := extractRunSnippet(runContent, expr)
 				violations = append(violations, TemplateInjectionViolation{
 					Expression: expr,
 					Snippet:    snippet,
@@ -324,15 +320,12 @@ func validateNoGitHubExpressionsInRunScriptsFromParsed(workflow map[string]any) 
 			continue
 		}
 
-		// Align with template-injection validation by excluding non-executable regions:
-		// quoted heredoc bodies and bash # comments.
-		contentWithoutHeredocs := executableShellContent(runContent)
-		expressions := runScriptExpressions(contentWithoutHeredocs)
+		expressions := runScriptExpressions(runContent)
 		for _, expr := range expressions {
 			if _, valid := actionslanguageservice.WrappedExpression(expr); valid && allowedRunScriptExpressionRegex.MatchString(expr) {
 				continue
 			}
-			snippet := extractRunSnippet(contentWithoutHeredocs, expr)
+			snippet := extractRunSnippet(runContent, expr)
 			violations = append(violations, TemplateInjectionViolation{
 				Expression: expr,
 				Snippet:    snippet,
