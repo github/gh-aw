@@ -1,28 +1,30 @@
 {
-  "last_run_date": "2026-11-03",
+  "last_run_date": "2026-11-04",
   "last_window": {
-    "start": "2026-11-02T07:52:51Z",
-    "end": "2026-11-03T07:52:51Z"
+    "start": "2026-11-03T07:56:08Z",
+    "end": "2026-11-04T07:56:08Z"
   },
   "observed_window": {
-    "coverage": "Partial: saved runs span 2026-11-02T21:33:49Z to 2026-11-03T07:52:51Z; continuation to earlier period timed out",
+    "coverage": "Partial: cached runs begin 2026-11-03T22:16:59Z; continuation to 07:56 UTC failed with GitHub API rate limit",
     "representative_audits": [
-      41530389467,
-      41543214962,
-      41530920831,
-      41553632623,
-      41573215900,
-      41589389911
+      41756205044,
+      41755176166,
+      41757056245,
+      41781694094,
+      41790720670,
+      41779387214,
+      41778039952
     ]
   },
   "key_themes": [
-    "Claude-on-Copilot smoke recovered after PR 74242",
-    "Sous Chef success predominated after PR 74303, with residual failures",
-    "Safe-output publication and visual documentation build failures remain"
+    "PR #74560 Finisher agent-step failures after Sous Chef dispatch",
+    "PR #74752 and #74785 five-reviewer fanout succeeded",
+    "Scheduled security checks failed at distinct gates"
   ],
   "carry_forward_questions": [
-    "Do Sous Chef late failures persist or resolve?",
-    "Do ESLint Refiner and Smoke Project safe-output processing recover?",
-    "Does Visual Regression Checker documentation build recover on connector PR?"
+    "Does PR #74560 Finisher recover, and what caused its repeated agent exits?",
+    "Did PR review feedback affect #74752 or #74785 implementation?",
+    "Do the image scan and TLA+ runtime gates recover?",
+    "What occurred in the missing 07:56-22:16 UTC interval?"
   ]
 }
