@@ -15,7 +15,7 @@ import (
 // TestRuntimeImportExpansionWithGitHubFalse verifies the primary regression scenario:
 // a workflow with tools.github: false, no expressions, and no {{#if}} blocks must still
 // receive the "Interpolate variables and render templates" step so that the
-// {{#runtime-import}} self-import macro emitted by the compiler is resolved at runtime.
+// author prompt and its runtime imports are resolved at runtime.
 func TestRuntimeImportExpansionWithGitHubFalse(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "runtime-import-expansion-github-false")
 	workflowDir := filepath.Join(tmpDir, ".github", "workflows")
@@ -55,14 +55,13 @@ Do some important work.
 	}
 	lockContent := string(lockBytes)
 
-	// The compiler always emits a self-import runtime-import macro in normal mode.
-	if !strings.Contains(lockContent, "{{#runtime-import") {
-		t.Error("lock file must contain a {{#runtime-import}} macro")
+	if !strings.Contains(promptRenderPlan(t, lockContent), "{{#author-prompt .github/workflows/test-workflow.md}}") {
+		t.Error("prompt render config must load the main workflow as an author file")
 	}
 
-	// The interpolation step must be present to resolve that macro at runtime.
+	// The interpolation step must be present even without GitHub tools or expressions.
 	if !strings.Contains(lockContent, "Interpolate variables and render templates") {
-		t.Error("lock file must contain 'Interpolate variables and render templates' step so that {{#runtime-import}} is resolved")
+		t.Error("lock file must contain 'Interpolate variables and render templates' step")
 	}
 	if !strings.Contains(lockContent, "interpolate_prompt.cjs") {
 		t.Error("lock file must reference interpolate_prompt.cjs in the interpolation step")
@@ -120,9 +119,9 @@ Core task description.
 	}
 	lockContent := string(lockBytes)
 
-	// The optional macro must be preserved in the lock file.
-	if !strings.Contains(lockContent, "{{#runtime-import") {
-		t.Error("lock file must contain a {{#runtime-import}} macro (either the self-import or the optional user macro)")
+	// Body macros are loaded from the author file rather than embedded in the lock file.
+	if !strings.Contains(promptRenderPlan(t, lockContent), "{{#author-prompt .github/workflows/optional-import.md}}") {
+		t.Error("prompt render config must load the author file containing the optional runtime import")
 	}
 
 	// The interpolation step must be present so the optional macro is expanded at runtime.

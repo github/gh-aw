@@ -342,7 +342,7 @@ func customSetupUVCacheWarnings(customSteps string) []string {
 			stepDescription = fmt.Sprintf("step %q", name)
 		}
 		warnings = append(warnings, fmt.Sprintf(
-			"custom setup-uv %s does not explicitly disable Actions caching; set `with.enable-cache: false` to disable caching",
+			"custom setup-uv %s does not explicitly disable Actions caching; set `with.enable-cache: false` to disable caching. For shared custom-step templates, make the change in the template.",
 			stepDescription,
 		))
 	}

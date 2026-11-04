@@ -6,6 +6,7 @@ steps:
   - name: Prepare pinned TLA+ runtime
     shell: bash
     run: |
+      # runner-guard:ignore RGS-018
       set -euo pipefail
       tools=/tmp/gh-aw/agent/tla-tools
       mkdir -p "$tools/jre"

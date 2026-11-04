@@ -111,3 +111,8 @@ func GoodNoLint(ctx context.Context, d time.Duration) {
 	_ = ctx
 	time.Sleep(d) //nolint:timesleepnocontext
 }
+
+// Bad: parenthesized time.Sleep callee inside a context-receiving function.
+func BadParenSleep(ctx context.Context, d time.Duration) {
+	(time.Sleep)(d) // want `use select with ctx\.Done\(\) instead of time\.Sleep to allow context cancellation`
+}

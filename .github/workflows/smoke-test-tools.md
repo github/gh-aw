@@ -41,6 +41,13 @@ network:
 tools:
   bash:
     - "*"
+evals:
+  - id: runtime_check_coverage
+    question: Does the output report an observed availability result for each of bash, sh, git, jq, yq, curl, gh, node, python3, go, java, and dotnet?
+  - id: availability_accounting
+    question: Does the reported X/12 count agree with the individual tool-check results?
+  - id: missing_tool_failure
+    question: When any required tool check fails, does the report mark overall status FAIL rather than PASS? Return UNKNOWN when all required tools are available.
 safe-outputs:
     allowed-domains: [default-safe-outputs]
     add-comment:

@@ -28,9 +28,11 @@ func applyActionPinPrefix(repo, pinnedRef string, ctx *PinContext) string {
 	}
 	resolvedRepo, suffix, ok := strings.Cut(pinnedRef, "@")
 	if !ok || resolvedRepo != repo {
+		actionPinsLog.Printf("Resolved ref %q does not reference repo=%s, skipping prefix mapping", pinnedRef, repo)
 		return pinnedRef
 	}
 	mappedRepo := ctx.PrefixMappings[longest] + strings.TrimPrefix(repo, longest)
+	actionPinsLog.Printf("Applying prefix mapping %q: %s → %s", longest, repo, mappedRepo)
 	ctx.emitOnce("prefix:"+repo, fmt.Sprintf("Action pin mapping applied: %s → %s", repo, mappedRepo), console.FormatInfoMessage)
 	return mappedRepo + "@" + suffix
 }
@@ -90,6 +92,7 @@ func ApplyContainerPinMapping(image string, ctx *PinContext) string {
 	}
 
 	if !containerDigestPinPattern.MatchString(mapped) {
+		actionPinsLog.Printf("Invalid container pin mapping value %q for image=%s (not digest-pinned); skipping", mapped, image)
 		ctx.emitOnce("container-invalid:"+image,
 			fmt.Sprintf("container_pins: invalid replacement value %q for key %q (must use @sha256:<64 lowercase hex characters>); mapping skipped", mapped, image),
 			console.FormatWarningMessage)

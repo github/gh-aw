@@ -37,6 +37,13 @@ network:
 runtimes:
   go:
     version: "1.27.3"
+evals:
+  - id: native_mcp_prs
+    question: Does the output show exactly two merged PR titles and numbers retrieved through native GitHub MCP rather than a CLI substitute?
+  - id: file_readback
+    question: Does the output show shell readback of the run-specific Cursor test file with the prescribed smoke-test content?
+  - id: evidence_based_report
+    question: Does the requested Cursor issue's overall PASS or FAIL agree with every required test result, including the build result?
 safe-outputs:
   allowed-domains: [default-safe-outputs]
   add-comment:

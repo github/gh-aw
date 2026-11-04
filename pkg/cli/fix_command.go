@@ -149,7 +149,7 @@ func runFixCommandWithResults(workflowIDs []string, write bool, verbose bool, wo
 		}
 	} else {
 		// Process all workflows in the workflow directory
-		files, err = getMarkdownWorkflowFiles(workflowDir)
+		files, err = getMarkdownWorkflowFilesRecursively(workflowDir)
 		if err != nil {
 			return err
 		}
@@ -197,8 +197,12 @@ func runFixCommandWithResults(workflowIDs []string, write bool, verbose bool, wo
 		if fixed {
 			totalFixed++
 			if !write {
+				relativePath, relErr := filepath.Rel(workflowDir, file)
+				if relErr != nil {
+					relativePath = filepath.Base(file)
+				}
 				workflowsNeedingFixes = append(workflowsNeedingFixes, workflowFixInfo{
-					File:  filepath.Base(file),
+					File:  relativePath,
 					Fixes: appliedFixes,
 				})
 			}
@@ -279,7 +283,7 @@ func runFixCommandWithResults(workflowIDs []string, write bool, verbose bool, wo
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Or fix them individually:"))
 			fmt.Fprintln(os.Stderr, "")
 			for _, wf := range workflowsNeedingFixes {
-				fmt.Fprintf(os.Stderr, "  gh aw fix %s --write\n", strings.TrimSuffix(wf.File, ".md"))
+				fmt.Fprintf(os.Stderr, "  gh aw fix %s --write\n", strings.TrimSuffix(filepath.ToSlash(wf.File), ".md"))
 			}
 		} else if totalGuidedErrors == 0 && totalProcessingErrors == 0 {
 			fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("No workflow fixes needed"))

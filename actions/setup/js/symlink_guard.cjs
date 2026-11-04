@@ -179,4 +179,4 @@ function writeGuardedFile(filename, content) {
   });
 }
 
-module.exports = { lstatGuard, normalizeGuardedPath, readGuardedFile, writeGuardedFile };
+module.exports = { lstatGuard, normalizeGuardedPath, withGuardedDirectory, readGuardedFile, writeGuardedFile };

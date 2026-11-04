@@ -17,7 +17,6 @@ tracker-id: daily-code-metrics
 engine:
   id: copilot
   copilot-sdk: true
-model: copilot/auto
 sandbox:
   agent:
     id: awf
@@ -111,29 +110,7 @@ Analyze codebase daily: compute size, quality, health metrics. Track 7/30-day tr
 
 **Context**: Fresh clone (no git history). Fetch with `git fetch --unshallow` for churn metrics. Memory: `/tmp/gh-aw/repo-memory/default/`
 
-## Metrics to Collect
-
-All metrics use standardized names from scratchpad/metrics-glossary.md:
-
-**Size**: LOC by language (`lines_of_code_total`), by directory (cmd, pkg, docs, workflows), file counts/distribution
-
-**LOC Calculation (deterministic scoping — CRITICAL for day-over-day comparability)**:
-  - Always compute LOC with `cloc --vcs=git --json --quiet .` (never bare `cloc .`). The `--vcs=git` flag makes cloc enumerate files via `git ls-files`, so the scan is limited to git-tracked files only and automatically excludes `.gitignore`d paths (e.g. `node_modules/`, `dist/`, `build/`) regardless of what untracked/build artifacts happen to exist in the working tree that day. This is what makes the count reproducible run-to-run.
-  - Record the exact command used (`cloc_command`) and the number of files scanned (`cloc_file_count`, from `.SUM.nFiles` in the cloc JSON) alongside `lines_of_code_total` — see Data Storage below.
-  - Before reporting, compare today's `cloc_file_count` to the most recent history entry. If the file count changes by more than 20% without a corresponding explanation (e.g. a large merged PR), do not silently treat the new number as a "baseline" — flag it explicitly in the report as a **possible file-scoping change** and show both the old and new file counts so readers can judge plausibility.
-
-**Quality**: Large files (>500 LOC), avg file size, function count, comment lines, comment ratio
-
-**Tests**: Test files/LOC (`test_lines_of_code`), test-to-source ratio (`test_to_source_ratio`)
-
-**Churn (7d)**: Files modified, commits, lines added/deleted, most active files (requires `git fetch --unshallow`)
-  - **IMPORTANT**: Exclude generated files (`*.lock.yml`, `actions-lock.json`) from churn calculations to avoid noise
-  - Calculate separate churn metrics: source code churn vs generated file churn
-  - Use source code churn (excluding `*.lock.yml` and `actions-lock.json`) for quality score calculation
-
-**Workflows**: Count direct `.github/workflows/*.md` files as `total_workflows` and direct `.github/workflows/*.lock.yml` files as `lockfile_count`; exclude nested `shared/` Markdown. Before reporting either count, compare their basename sets. Report a discrepancy and the mismatched names rather than treating unequal sets as the same fleet.
-
-**Docs**: Files in `docs/`, total doc LOC, code-to-docs ratio
+Before collecting metrics or drafting the discussion, use the `daily-metrics-and-report` skill for metric definitions, calculations, and the variant-specific report format.
 
 ## Data Storage
 
@@ -227,20 +204,44 @@ For each metric: current value, 7-day % change, 30-day % change, trend indicator
   - If the command or file count diverges, report it explicitly as a **scoping change**, not a trend, and show old vs. new file counts.
   - If the command and file count both match (or the file-count delta is small) but the metric still swung sharply, report it as a **genuine change requiring investigation** and cite the specific commits/PRs responsible.
 
-## Report Format
+## Guidelines
 
-Use detailed template with embedded visualization charts:
+- Comprehensive but efficient (complete in 15min)
+- Calculate trends accurately, flag >10% changes
+- Use repo memory for persistent history (90-day retention)
+- Handle missing data gracefully
+- Visual indicators for quick scanning
+- Generate variant-appropriate required visualization charts (6 for `full_detail`, 2 for `executive_summary`)
+- Upload charts as assets for permanent URLs
+- Embed charts in discussion report with analysis
+- Store metrics to repo memory, create discussion report with visualizations
 
-**Report Structure Guidelines**
+## skill: `daily-metrics-and-report`
+---
+description: Metric definitions, calculation rules, quality scoring, and discussion format for daily code metrics.
+---
 
-- Use `###` (or lower) headers only.
-- Keep summary and critical actions visible; move long detail into `<details>` blocks.
-- Structure reports as: overview → key metrics/issues → collapsible detail → next actions.
+### Metrics to Collect
 
-### Discussion Structure
+Use standardized names from scratchpad/metrics-glossary.md:
 
-- **Title**: `Daily Code Metrics Report - YYYY-MM-DD`
-- **Body template**:
+- **Size**: LOC by language (`lines_of_code_total`), by directory (cmd, pkg, docs, workflows), file counts/distribution.
+- **LOC scope**: Always run `cloc --vcs=git --json --quiet .`, never bare `cloc .`. Record the exact `cloc_command` and `.SUM.nFiles` as `cloc_file_count`. If this count changes by more than 20% without explanation, flag a possible file-scoping change and show both counts.
+- **Quality**: Large files (>500 LOC), average file size, function count, comment lines, and comment ratio.
+- **Tests**: Test files/LOC (`test_lines_of_code`) and test-to-source ratio (`test_to_source_ratio`).
+- **Churn (7d)**: Modified files, commits, added/deleted lines, and most active files (requires `git fetch --unshallow`). Separate source and generated-file churn; exclude `*.lock.yml` and `actions-lock.json` from source churn and the quality score.
+- **Workflows**: Count direct `.github/workflows/*.md` as `total_workflows` and direct `*.lock.yml` as `lockfile_count`; exclude nested `shared/` Markdown. Compare basename sets and report any mismatch.
+- **Docs**: Files in `docs/`, total doc LOC, and code-to-docs ratio.
+
+### Quality Score
+
+Weighted average: test coverage (30%), code organization (25%), documentation (20%), source churn stability (15%), comment density (10%). For churn stability, calculate source-only churn with `git log --since="7 days ago" --numstat --pretty=format: -- . ':!*.lock.yml' ':!**/actions-lock.json'`, normalize it to 0–15 points, and track generated-file churn separately.
+
+### Discussion Format
+
+**Title**: `Daily Code Metrics Report - YYYY-MM-DD`
+
+Read `GH_AW_EXPERIMENTS_OUTPUT_FORMAT` and use only its matching template below: `executive_summary`, `ste`, or `full_detail`. If it is unset, use `full_detail`. Ignore the other templates and their conditional tags.
 
 ```markdown
 {{#if experiments.output_format == 'executive_summary' }}
@@ -263,12 +264,7 @@ Use detailed template with embedded visualization charts:
 
 *For full metric tables, switch to `full_detail` variant.*
 {{#elseif experiments.output_format == 'ste' }}
-Write every sentence below using Simplified Technical English (STE) rules:
-- Use short sentences. Limit each sentence to 20 words or fewer.
-- Write one fact per sentence.
-- Use active voice and present tense.
-- Use simple, familiar words. Do not use jargon.
-- Spell out each acronym on first use.
+Use Simplified Technical English: sentences of at most 20 words, one fact per sentence, active voice, familiar words, and acronyms spelled out on first use.
 
 ### Summary
 
@@ -291,7 +287,7 @@ Write every sentence below using Simplified Technical English (STE) rules:
 
 **X items found** — [brief description]
 
-Brief 2-3 paragraph executive summary highlighting key findings, quality score, notable trends, and any concerns requiring attention.
+Briefly summarize key findings, quality score, notable trends, and concerns requiring attention.
 
 ### 📊 Visualizations
 
@@ -300,36 +296,8 @@ Embed all 6 charts (LOC by Language, Top Directories, Quality Score, Test Covera
 <details>
 <summary><b>View Full Details</b></summary>
 
-One compact table per category (Size, Quality, Tests, Churn-source, Churn-generated, Workflows/Docs). Follow with a Quality Score breakdown (Test Coverage 30%, Code Organization 25%, Documentation 20%, Churn Stability 15%, Comment Density 10%) and 3–5 actionable recommendations.
+Include one compact table per category (Size, Quality, Tests, Churn-source, Churn-generated, Workflows/Docs), a weighted Quality Score breakdown, and 3–5 actionable recommendations.
 
 </details>
 {{/if}}
 ```
-
-## Quality Score
-
-Weighted average: Test coverage (30%), Code organization (25%), Documentation (20%), Churn stability (15%), Comment density (10%)
-
-### Churn Stability Component (15% of Quality Score)
-
-**CRITICAL**: Use **source code churn only** (exclude `*.lock.yml` and `actions-lock.json` files) when calculating churn stability for the quality score.
-
-**Calculation**:
-1. Calculate source code churn: `git log --since="7 days ago" --numstat --pretty=format: -- . ':!*.lock.yml' ':!**/actions-lock.json'`
-2. Compute churn score based on files modified and net change (lower churn = higher stability)
-3. Normalize to 0-15 points scale
-4. Track generated file churn separately for informational purposes only
-
-This ensures the quality score reflects actionable source code volatility, not noise from generated files.
-
-## Guidelines
-
-- Comprehensive but efficient (complete in 15min)
-- Calculate trends accurately, flag >10% changes
-- Use repo memory for persistent history (90-day retention)
-- Handle missing data gracefully
-- Visual indicators for quick scanning
-- Generate variant-appropriate required visualization charts (6 for `full_detail`, 2 for `executive_summary`)
-- Upload charts as assets for permanent URLs
-- Embed charts in discussion report with analysis
-- Store metrics to repo memory, create discussion report with visualizations

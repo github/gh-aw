@@ -1197,6 +1197,63 @@ func TestGitHubAppWithPushToPRBranch(t *testing.T) {
 	assert.Contains(t, stepsContent, "id: safe-outputs-app-token")
 }
 
+func TestSafeOutputsPRCheckoutPersistsGlobalGitHubAppToken(t *testing.T) {
+	signedCommits := false
+	app := &GitHubAppConfig{
+		AppID:      "${{ vars.APP_ID }}",
+		PrivateKey: "${{ secrets.APP_PRIVATE_KEY }}",
+	}
+	tests := []struct {
+		name        string
+		safeOutputs *SafeOutputsConfig
+	}{
+		{
+			name: "push-to-pull-request-branch",
+			safeOutputs: &SafeOutputsConfig{
+				GitHubApp: app,
+				PushToPullRequestBranch: &PushToPullRequestBranchConfig{
+					SignedCommits: &signedCommits,
+				},
+			},
+		},
+		{
+			name: "create-pull-request",
+			safeOutputs: &SafeOutputsConfig{
+				GitHubApp: app,
+				CreatePullRequests: &CreatePullRequestsConfig{
+					SignedCommits: &signedCommits,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			compiler := NewCompiler()
+			compiler.jobManager = NewJobManager()
+			data := &WorkflowData{Name: "Test Workflow", SafeOutputs: tt.safeOutputs}
+
+			job, _, err := compiler.buildConsolidatedSafeOutputsJob(data, string(constants.AgentJobName), "test.md")
+			require.NoError(t, err)
+			require.NotNil(t, job)
+			stepsContent := strings.Join(job.Steps, "")
+
+			tokenMintIndex := strings.Index(stepsContent, "id: safe-outputs-app-token")
+			checkoutIndex := strings.Index(stepsContent, "name: Checkout repository")
+			require.NotEqual(t, -1, tokenMintIndex, "safe-outputs app token must be minted")
+			require.NotEqual(t, -1, checkoutIndex, "safe_outputs must include the default checkout")
+			assert.Less(t, tokenMintIndex, checkoutIndex, "App token minting must precede checkout")
+			assert.Contains(t, stepsContent, "token: ${{ steps.safe-outputs-app-token.outputs.token }}")
+			assert.Contains(t, stepsContent, "persist-credentials: true")
+
+			var agentSteps strings.Builder
+			compiler.generateAppTokenAndDefaultCheckoutSteps(&agentSteps, data, NewCheckoutManager(nil), true)
+			assert.Contains(t, agentSteps.String(), "persist-credentials: false")
+			assert.NotContains(t, agentSteps.String(), "steps.safe-outputs-app-token.outputs.token")
+		})
+	}
+}
+
 func TestBuildSafeOutputJobPreStepsRunBeforeGitHubAppToken(t *testing.T) {
 	compiler := NewCompiler()
 
@@ -1594,6 +1651,7 @@ func TestCreateCodeScanningAlertUploadJob(t *testing.T) {
 		expectTokenInSteps     string // expected token expression in upload job steps
 		expectAppTokenMintStep bool   // expect a GitHub App token minting step in upload job
 		safeOutputsGitHubToken string
+		safeOutputsGitHubApp   *GitHubAppConfig
 	}{
 		{
 			name: "default config creates separate upload job with static token computed directly",
@@ -1621,6 +1679,15 @@ func TestCreateCodeScanningAlertUploadJob(t *testing.T) {
 			expectUploadJob:        true,
 			expectTokenInSteps:     "${{ secrets.SO_TOKEN }}",
 			safeOutputsGitHubToken: "${{ secrets.SO_TOKEN }}",
+		},
+		{
+			name: "safe-outputs GitHub App does not leak step token into upload job",
+			config: &CreateCodeScanningAlertsConfig{
+				BaseSafeOutputConfig: BaseSafeOutputConfig{},
+			},
+			expectUploadJob:      true,
+			expectTokenInSteps:   "${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}",
+			safeOutputsGitHubApp: &GitHubAppConfig{AppID: "${{ vars.APP_ID }}", PrivateKey: "${{ secrets.APP_PRIVATE_KEY }}"},
 		},
 		{
 			name: "checkout with github-app mints a fresh app token in the upload job",
@@ -1673,6 +1740,7 @@ func TestCreateCodeScanningAlertUploadJob(t *testing.T) {
 				SafeOutputs: &SafeOutputsConfig{
 					CreateCodeScanningAlerts: tt.config,
 					GitHubToken:              tt.safeOutputsGitHubToken,
+					GitHubApp:                tt.safeOutputsGitHubApp,
 				},
 				CheckoutConfigs: tt.checkoutConfigs,
 			}
@@ -1842,9 +1910,9 @@ func TestCreateCodeScanningAlertUploadJobWorkflowCallDependsOnActivation(t *test
 // TestBuildSafeOutputItemsManifestUploadStep verifies that the upload step includes
 // the manifest and temporary ID map but excludes process stdout/stderr logs.
 func TestBuildSafeOutputItemsManifestUploadStep(t *testing.T) {
-	steps := buildSafeOutputItemsManifestUploadStep("", func(action string) string {
+	steps := buildSafeOutputManifestUploadStep("", func(action string) string {
 		return action + "@test-pin"
-	}, false, &WorkflowData{})
+	}, false, &WorkflowData{}, true)
 
 	content := strings.Join(steps, "")
 
@@ -1854,6 +1922,89 @@ func TestBuildSafeOutputItemsManifestUploadStep(t *testing.T) {
 	assert.Contains(t, content, "/tmp/gh-aw/safe-output-outcomes.jsonl")
 	assert.NotContains(t, content, "process-safe-outputs.stdout.log")
 	assert.NotContains(t, content, "process-safe-outputs.stderr.log")
+	assert.NotContains(t, content, "merge-pull-request-decisions.jsonl")
+}
+
+func TestBuildMergePullRequestDecisionUploadStep(t *testing.T) {
+	for _, claims := range []bool{false, true} {
+		data := &WorkflowData{SafeOutputs: &SafeOutputsConfig{MergePullRequest: &MergePullRequestConfig{}}}
+		steps := buildSafeOutputManifestUploadStep("", func(action string) string { return action + "@test-pin" }, claims, data, true)
+		content := strings.Join(steps, "")
+		assert.Contains(t, content, "if: always()")
+		assert.Contains(t, content, "/tmp/gh-aw/merge-pull-request-decisions.jsonl")
+		assert.Equal(t, claims, strings.Contains(content, "/tmp/gh-aw/claims/*/merge-pull-request-decisions.jsonl"))
+	}
+}
+
+func TestMergePullRequestDecisionUploadsRequireRedactionInAllModes(t *testing.T) {
+	for _, worker := range []bool{false, true} {
+		for _, mode := range []string{"applied", "handler-staged", "global-staged", "trial"} {
+			t.Run(mode+map[bool]string{false: "-ordinary", true: "-worker"}[worker], func(t *testing.T) {
+				compiler := NewCompiler()
+				compiler.trialMode = mode == "trial"
+				compiler.jobManager = NewJobManager()
+				data := &WorkflowData{
+					Name: "Merge audit",
+					SafeOutputs: &SafeOutputsConfig{
+						MergePullRequest: &MergePullRequestConfig{RequiredTitlePrefix: "${{ secrets.MERGE_PREFIX }}"},
+						GitHubToken:      "${{ secrets.MERGE_TOKEN }}",
+					},
+					Tools: map[string]any{},
+					SecretMasking: &SecretMaskingConfig{Steps: []map[string]any{
+						{"id": "mask_custom", "run": "echo masking"},
+					}},
+				}
+				staged := TemplatableBool("true")
+				if mode == "handler-staged" {
+					data.SafeOutputs.MergePullRequest.Staged = &staged
+				}
+				if mode == "global-staged" {
+					data.SafeOutputs.Staged = &staged
+				}
+				if worker {
+					data.Tools["work-queue"] = map[string]any{"worker": true}
+				}
+				job, _, err := compiler.buildConsolidatedSafeOutputsJob(data, string(constants.AgentJobName), "merge-audit.md")
+				require.NoError(t, err)
+				require.NotNil(t, job)
+				content := strings.Join(job.Steps, "")
+				var document []map[string]any
+				require.NoError(t, yaml.Unmarshal([]byte(content), &document))
+				var upload, redaction map[string]any
+				for _, step := range document {
+					if step["name"] == "Upload Safe Outputs Items" {
+						require.Nil(t, upload, "audit and item manifests must share one artifact")
+						upload = step
+					}
+					if step["id"] == "redact_secrets" {
+						require.Nil(t, redaction)
+						redaction = step
+					}
+				}
+				require.NotNil(t, upload)
+				require.NotNil(t, redaction)
+				assert.Equal(t, "always() && steps.redact_secrets.outcome == 'success' && steps.mask_custom.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success'", upload["if"])
+				assert.Equal(t, "${{ secrets.MERGE_TOKEN }}", redaction["env"].(map[string]any)["SECRET_MERGE_TOKEN"])
+				assert.Contains(t, redaction["env"].(map[string]any)["GH_AW_SECRET_NAMES"], "MERGE_TOKEN")
+				assert.Equal(t, "${{ secrets.MERGE_PREFIX }}", redaction["env"].(map[string]any)["SECRET_MERGE_PREFIX"])
+				assert.Contains(t, redaction["env"].(map[string]any)["GH_AW_SECRET_NAMES"], "MERGE_PREFIX")
+				with := upload["with"].(map[string]any)
+				assert.Contains(t, with["name"], constants.SafeOutputItemsArtifactName)
+				paths := with["path"].(string)
+				assert.Contains(t, paths, "/tmp/gh-aw/merge-pull-request-decisions.jsonl")
+				assert.Equal(t, worker, strings.Contains(paths, "/tmp/gh-aw/claims/*/merge-pull-request-decisions.jsonl"))
+				suppressItems := mode == "global-staged" || mode == "trial"
+				assert.Equal(t, !suppressItems, strings.Contains(paths, "/tmp/gh-aw/safe-output-items.jsonl"))
+				if suppressItems {
+					assert.NotContains(t, paths, "safe-output-outcomes.jsonl")
+					assert.NotContains(t, paths, "temporary-id-map.json")
+					assert.NotContains(t, paths, "safe-output-errors.json")
+					assert.NotContains(t, paths, "claim-delivery-errors.json")
+				}
+				assert.Less(t, strings.Index(content, "id: redact_secrets"), strings.Index(content, "name: Upload Safe Outputs Items"))
+			})
+		}
+	}
 }
 
 func TestSafeOutputClaimArtifactsRequireWorkerAndSuccessfulRedaction(t *testing.T) {
@@ -1913,9 +2064,9 @@ func TestClaimDiagnosticRetentionPreservesRepositoryOverrides(t *testing.T) {
 		{name: "repository", config: &RepoConfig{ArtifactRetentionDays: new(TemplatableInt32("14"))}, want: 14},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			steps := buildSafeOutputItemsManifestUploadStep("", func(action string) string {
+			steps := buildSafeOutputManifestUploadStep("", func(action string) string {
 				return action + "@v4"
-			}, true, &WorkflowData{})
+			}, true, &WorkflowData{}, true)
 			output, err := applyArtifactRetention("jobs:\n  test:\n    steps:\n"+strings.Join(steps, ""), test.config)
 			require.NoError(t, err)
 			uploads := retentionTestSteps(t, output)
@@ -1925,4 +2076,72 @@ func TestClaimDiagnosticRetentionPreservesRepositoryOverrides(t *testing.T) {
 			assert.Contains(t, output, "/tmp/gh-aw/claims/*/claim-delivery-errors.json")
 		})
 	}
+}
+
+func TestSafeOutputsPRCheckoutGlobalAppTokenScoping(t *testing.T) {
+	app := &GitHubAppConfig{AppID: "${{ vars.APP_ID }}", PrivateKey: "${{ secrets.APP_PRIVATE_KEY }}"}
+	const appToken = "token: ${{ steps.safe-outputs-app-token.outputs.token }}"
+
+	t.Run("ignore-if-missing keeps fallback expression", func(t *testing.T) {
+		ignoring := *app
+		ignoring.IgnoreIfMissing = true
+		data := &WorkflowData{SafeOutputs: &SafeOutputsConfig{GitHubApp: &ignoring, CreatePullRequests: &CreatePullRequestsConfig{}}}
+		steps := strings.Join(NewCompiler().buildSharedPRCheckoutSteps(data), "")
+		assert.Contains(t, steps, "token: ${{ steps.safe-outputs-app-token.outputs.token || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}")
+	})
+
+	t.Run("per-handler app keeps static default checkout token", func(t *testing.T) {
+		data := &WorkflowData{SafeOutputs: &SafeOutputsConfig{
+			GitHubApp:          app,
+			CreateIssues:       &CreateIssuesConfig{},
+			CreatePullRequests: &CreatePullRequestsConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{GitHubApp: app}},
+		}}
+		steps := strings.Join(NewCompiler().buildSharedPRCheckoutSteps(data), "")
+		assert.NotContains(t, steps, appToken)
+	})
+
+	t.Run("additional checkouts keep static credentials", func(t *testing.T) {
+		data := &WorkflowData{
+			SafeOutputs: &SafeOutputsConfig{GitHubApp: app, CreatePullRequests: &CreatePullRequestsConfig{}},
+			CheckoutConfigs: []*CheckoutConfig{
+				{Repository: "org/static", Path: "./static"},
+			},
+		}
+		steps := strings.Join(NewCompiler().buildSharedPRCheckoutSteps(data), "")
+		assert.Equal(t, 1, strings.Count(steps, appToken), "only the default checkout persists the App token")
+	})
+
+	t.Run("target repo in another org keeps static default checkout token", func(t *testing.T) {
+		data := &WorkflowData{SafeOutputs: &SafeOutputsConfig{
+			GitHubApp:          app,
+			CreatePullRequests: &CreatePullRequestsConfig{TargetRepoSlug: "OrgB/target"},
+		}}
+		steps := strings.Join(NewCompiler().buildSharedPRCheckoutSteps(data), "")
+		assert.NotContains(t, steps, appToken)
+	})
+}
+
+func TestWorkQueueSafeOutputsPRCheckoutFollowsAppToken(t *testing.T) {
+	compiler := NewCompiler()
+	compiler.jobManager = NewJobManager()
+	data := &WorkflowData{
+		Name: "Test Workflow",
+		SafeOutputs: &SafeOutputsConfig{
+			GitHubApp:          &GitHubAppConfig{AppID: "${{ vars.APP_ID }}", PrivateKey: "${{ secrets.APP_PRIVATE_KEY }}"},
+			CreatePullRequests: &CreatePullRequestsConfig{},
+		},
+		Tools: map[string]any{"work-queue": map[string]any{"worker": true}},
+	}
+	job, _, err := compiler.buildConsolidatedSafeOutputsJob(data, string(constants.AgentJobName), "test.md")
+	require.NoError(t, err)
+	require.NotNil(t, job)
+	steps := strings.Join(job.Steps, "")
+	reconcile := strings.Index(steps, "id: work_queue_claim_reconciliation")
+	mint := strings.Index(steps, "id: safe-outputs-app-token")
+	checkout := strings.Index(steps, "name: Checkout repository")
+	require.NotEqual(t, -1, reconcile)
+	require.NotEqual(t, -1, mint)
+	require.NotEqual(t, -1, checkout)
+	assert.Less(t, reconcile, mint)
+	assert.Less(t, mint, checkout)
 }

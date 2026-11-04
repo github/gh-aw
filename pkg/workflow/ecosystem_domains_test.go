@@ -4,8 +4,91 @@ package workflow
 
 import (
 	"slices"
+	"strings"
 	"testing"
 )
+
+func TestDefaultsExcludeThirdPartySources(t *testing.T) {
+	thirdPartySources := []string{
+		"ppa.launchpad.net",
+		"packagecloud.io",
+		"api.snapcraft.io",
+		"packages.cloud.google.com",
+		"packages.microsoft.com",
+	}
+	optedIn := GetAllowedDomains(&NetworkPermissions{Allowed: []string{"defaults", "linux-distros"}})
+	for _, domain := range thirdPartySources {
+		if !slices.Contains(optedIn, domain) {
+			t.Errorf("Expected third-party source %q with linux-distros opt-in", domain)
+		}
+		if ecosystem := GetDomainEcosystem(domain); ecosystem != "linux-distros" {
+			t.Errorf("Expected %q to classify as linux-distros, got %q", domain, ecosystem)
+		}
+	}
+
+	for _, tc := range []struct {
+		name    string
+		network *NetworkPermissions
+	}{
+		{name: "implicit"},
+		{name: "explicit", network: &NetworkPermissions{Allowed: []string{"defaults"}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			domains := GetAllowedDomains(tc.network)
+			for _, domain := range append(thirdPartySources, "www.googleapis.com") {
+				if slices.Contains(domains, domain) {
+					t.Errorf("Default baseline must not include %q", domain)
+				}
+			}
+			for _, domain := range []string{
+				"crl3.digicert.com", "json-schema.org", "json.schemastore.org",
+				"archive.ubuntu.com", "security.ubuntu.com",
+				"keyserver.ubuntu.com", "azure.archive.ubuntu.com",
+			} {
+				if !slices.Contains(domains, domain) {
+					t.Errorf("Default baseline must retain %q", domain)
+				}
+			}
+		})
+	}
+}
+
+func TestEcosystemPriorityCoversAllEcosystems(t *testing.T) {
+	prioritized := make(map[string]struct{}, len(ecosystemPriority))
+	for _, ecosystem := range ecosystemPriority {
+		if _, exists := prioritized[ecosystem]; exists {
+			t.Errorf("ecosystem %q appears more than once in ecosystemPriority", ecosystem)
+		}
+		prioritized[ecosystem] = struct{}{}
+	}
+
+	for ecosystem := range getLoadedDomainSets().Ecosystems {
+		if _, exists := prioritized[ecosystem]; !exists {
+			t.Errorf("ecosystem %q is missing from ecosystemPriority", ecosystem)
+		}
+	}
+	for ecosystem := range compoundEcosystems {
+		if _, exists := prioritized[ecosystem]; !exists {
+			t.Errorf("compound ecosystem %q is missing from ecosystemPriority", ecosystem)
+		}
+	}
+}
+
+func TestRuntimeSelectedEcosystemsExcludeTelemetryDomains(t *testing.T) {
+	for runtime := range runtimeToEcosystem {
+		domains := getDomainsFromRuntimes(map[string]any{runtime: nil})
+		for _, domain := range domains {
+			if strings.Contains(strings.ToLower(domain), "telemetry") {
+				t.Errorf("runtime %q automatically includes telemetry domain %q", runtime, domain)
+			}
+		}
+	}
+
+	dotnetDomains := getDomainsFromRuntimes(map[string]any{"dotnet": nil})
+	if slices.Contains(dotnetDomains, "dc.services.visualstudio.com") {
+		t.Error("dotnet runtime automatically includes dc.services.visualstudio.com")
+	}
+}
 
 func TestEcosystemDomainExpansion(t *testing.T) {
 	t.Run("defaults ecosystem includes basic infrastructure", func(t *testing.T) {
@@ -16,11 +99,9 @@ func TestEcosystemDomainExpansion(t *testing.T) {
 
 		// Check that basic infrastructure domains are included
 		expectedDomains := []string{
-			"crl3.digicert.com",      // Certificates
-			"json-schema.org",        // JSON Schema
-			"archive.ubuntu.com",     // Ubuntu
-			"packagecloud.io",        // Common Package Mirrors
-			"packages.microsoft.com", // Microsoft Sources
+			"crl3.digicert.com",  // Certificates
+			"json-schema.org",    // JSON Schema
+			"archive.ubuntu.com", // Ubuntu
 		}
 
 		for _, expectedDomain := range expectedDomains {

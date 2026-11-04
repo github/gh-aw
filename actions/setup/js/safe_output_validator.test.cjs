@@ -283,6 +283,35 @@ describe("safe_output_validator.cjs", () => {
       expect(result.value).not.toContain("stale");
     });
 
+    it.each(["block\u200Bed", "ｂｌｏｃｋｅｄ"])("should block normalized labels that match a blocked pattern: %s", label => {
+      const result = validator.validateLabels(["bug", label], undefined, 10, ["blocked"]);
+
+      expect(result.valid).toBe(true);
+      expect(result.value).toEqual(["bug"]);
+    });
+
+    it("should match blocked patterns against the raw label before sanitization", () => {
+      const result = validator.validateLabels(["bug", "@copilot"], undefined, 10, ["@copilot"]);
+
+      expect(result.valid).toBe(true);
+      expect(result.value).toEqual(["bug"]);
+    });
+
+    it("should match allowed patterns against the raw label before sanitization", () => {
+      const result = validator.validateLabels(["@bot"], ["@bot"], 10);
+
+      expect(result.valid).toBe(true);
+      expect(result.value).toEqual(["`@bot`"]);
+    });
+
+    it("should block labels that match a blocked pattern after sanitization and truncation", () => {
+      const label = "🐛".repeat(27) + " @blocked!";
+      const result = validator.validateLabels(["bug", label], undefined, 10, ["*blocked"]);
+
+      expect(result.valid).toBe(true);
+      expect(result.value).toEqual(["bug"]);
+    });
+
     it("should handle empty blocked patterns", () => {
       const result = validator.validateLabels(["bug", "~stale"], undefined, 10, []);
 

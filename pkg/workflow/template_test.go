@@ -32,11 +32,11 @@ func TestGenerateInterpolationAndTemplateStep_DeduplicatesEnvVars(t *testing.T) 
 	result := yaml.String()
 
 	// MY_VAR should appear exactly once
-	count := strings.Count(result, "GH_AW_VARS_MY_VAR: ${{ vars.MY_VAR }}")
+	count := strings.Count(result, `GH_AW_VARS_MY_VAR: "${{ vars.MY_VAR }}"`)
 	assert.Equal(t, 1, count, "duplicate env var GH_AW_VARS_MY_VAR should appear exactly once")
 
 	// OTHER_VAR should be present
-	assert.Contains(t, result, "GH_AW_VARS_OTHER_VAR: ${{ vars.OTHER_VAR }}", "OTHER_VAR should be present")
+	assert.Contains(t, result, `GH_AW_VARS_OTHER_VAR: "${{ vars.OTHER_VAR }}"`, "OTHER_VAR should be present")
 }
 
 // TestGenerateInterpolationAndTemplateStep_SkipPath tests that the step is not generated

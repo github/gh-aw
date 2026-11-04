@@ -21,6 +21,9 @@ async function main(config = {}) {
     const messageType = message === null ? "null" : Array.isArray(message) ? "array" : typeof message;
     if (messageType !== "object") throw new TypeError(`Invalid ledger append message: expected an object, received ${messageType}`);
     const { type, ...request } = message;
+    delete request.output_id;
+    delete request["depends-on"];
+    delete request.depends_on;
     if (type !== undefined && type !== "ledger_append") {
       const receivedType = type === null ? "null" : Array.isArray(type) ? "array" : typeof type;
       throw new TypeError(`Invalid ledger append message type: expected "ledger_append", received ${receivedType}`);

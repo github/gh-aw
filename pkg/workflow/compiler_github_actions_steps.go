@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"fmt"
 	"path"
 	"strings"
@@ -66,6 +67,33 @@ func generatePlaceholderSubstitutionStepForFile(yaml *strings.Builder, expressio
 type inlineArtifactSubstitutionTarget struct {
 	Directory string
 	Extension string
+}
+
+func promptAuthorExpressions(mappings []*ExpressionMapping) map[string]string {
+	bindings := make(map[string]string)
+	for _, mapping := range mappings {
+		if mapping.Original == "" {
+			continue
+		}
+		binding := mapping.EnvVar
+		if mapping.IsLiteral {
+			binding = "__" + binding + "__"
+		}
+		bindings[stripExpressionWrapper(mapping.Original)] = binding
+	}
+	return bindings
+}
+
+func promptInterpolationOptions(mappings []*ExpressionMapping) string {
+	var options []string
+	if bindings := promptDeferredBindingsJSON(mappings); bindings != "{}" {
+		options = append(options, "deferredBindings: "+bindings)
+	}
+	if bindings := promptAuthorExpressions(mappings); len(bindings) > 0 {
+		encoded, _ := json.Marshal(bindings) //nolint:jsonmarshalignoredeerror // Marshaling string bindings cannot fail.
+		options = append(options, "authorExpressions: "+string(encoded))
+	}
+	return strings.Join(options, ", ")
 }
 
 // Only compiler-authored late bindings remain substitutable after interpolation.

@@ -70,6 +70,34 @@ test("normalizes the safe-output type discriminator before validating built-in a
   }
 });
 
+test("strips safe-output dependency metadata before ledger transaction validation", async () => {
+  const runnerTemp = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-append-output-id-"));
+  const previousRunnerTemp = process.env.RUNNER_TEMP;
+  process.env.RUNNER_TEMP = runnerTemp;
+  try {
+    const handler = await main({ ledgers: [{ name: "events", type: "log" }] });
+    await handler({
+      type: "ledger_append",
+      ledger: "events",
+      operation: "append",
+      value: "published",
+      output_id: "so_AAAAAAAAAAAA",
+      "depends-on": "so_BBBBBBBBBBBB",
+    });
+    handler.finalize();
+
+    const artifact = JSON.parse(fs.readFileSync(transactionPath(), "utf8"));
+    const append = artifact.ledgers.events.appends[0];
+    assert.deepEqual({ operation: append.record.operation, value: append.record.value }, { operation: "append", value: "published" });
+    assert.equal(Object.hasOwn(append, "output_id"), false);
+    assert.equal(Object.hasOwn(append, "depends-on"), false);
+  } finally {
+    if (previousRunnerTemp === undefined) delete process.env.RUNNER_TEMP;
+    else process.env.RUNNER_TEMP = previousRunnerTemp;
+    fs.rmSync(runnerTemp, { recursive: true, force: true });
+  }
+});
+
 test("rejects invalid append envelopes with input kinds but without payload contents", async () => {
   const handler = await main({ ledgers: [{ name: "events", type: "log" }] });
   for (const [message, receivedType] of [

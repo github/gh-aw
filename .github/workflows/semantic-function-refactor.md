@@ -11,12 +11,16 @@ max-turns: 50
 
 permissions:
   contents: read
+  copilot-requests: write
   issues: read
   pull-requests: read
 
-model: claude-sonnet-5
 engine:
   id: claude
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
 imports:
   - shared/otlp.md
   - shared/reporting.md
@@ -55,6 +59,13 @@ steps:
 timeout-minutes: 20
 strict: true
 
+evals:
+  - id: sampled-scope-honesty
+    question: Does the agent output describe its conclusions as limited to the prepared function slice rather than claiming repository-wide coverage?
+  - id: concrete-refactoring-evidence
+    question: When a refactoring issue is proposed, does it cite observed code from the supplied function packet that supports the recommendation? Return UNKNOWN when no issue is proposed.
+  - id: no-finding-preserves-issues
+    question: When no replacement issue is requested, does the agent refrain from requesting closure of existing refactoring issues? Return UNKNOWN when a replacement issue is requested.
 ---
 
 # Semantic Function Refactoring: Read-Only Analysis

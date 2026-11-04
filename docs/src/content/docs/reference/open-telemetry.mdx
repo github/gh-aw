@@ -42,6 +42,62 @@ If a credential was exposed in an earlier run, revoke or rotate it and remove th
 
 HTTP 401 and 403 export failures are not retried with unchanged credentials. Check the affected collector's configured authorization header and telemetry-write permissions. Transient delivery failures retain bounded retries; a rejected endpoint does not block other configured endpoints or the local telemetry mirror, and export failure does not fail the functional workflow.
 
+### Protobuf encoding and Azure Monitor
+
+The gh-aw JavaScript exporter defaults to OTLP/HTTP JSON (`http/json`) for traces and opt-in [compact session logs](/gh-aw/reference/compiler-enterprise-environment-controls/#unified-session-logs). Set the standard protocol environment variable to use binary OTLP/HTTP protobuf instead:
+
+```yaml wrap
+env:
+  OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+observability:
+  otlp:
+    endpoint: ${{ secrets.AZURE_MONITOR_OTLP_ENDPOINT }}
+    headers:
+      Authorization: ${{ secrets.AZURE_MONITOR_OTLP_AUTHORIZATION }}
+```
+
+`OTEL_EXPORTER_OTLP_TRACES_PROTOCOL` and `OTEL_EXPORTER_OTLP_LOGS_PROTOCOL`, when non-empty, take precedence over `OTEL_EXPORTER_OTLP_PROTOCOL` for their respective signals. A traces override does not affect logs, and a logs override does not affect traces. Set these overrides in workflow `env` when the signals need different encodings. All accept `http/json` or `http/protobuf`; gRPC is not supported by this helper. The selected encoding applies to all configured endpoints for that signal. Unsupported protocols and encoding errors produce an exporter diagnostic without retrying or silently falling back to JSON.
+
+To manage the protocol as a repository, organization, or enterprise Actions variable, use `gh aw env get` and `gh aw env update`. The defaults file field `default_otlp_protocol` maps to the standard `OTEL_EXPORTER_OTLP_PROTOCOL` variable:
+
+```bash
+gh aw env get defaults.yml
+```
+
+Set this field in the downloaded file, retaining any other defaults:
+
+```yaml
+default_otlp_protocol: http/protobuf
+```
+
+```bash
+gh aw env update defaults.yml --scope repo
+```
+
+As with other managed fields, setting it to `null` or omitting it deletes the variable at the selected scope. The compiler injects `${{ vars.OTEL_EXPORTER_OTLP_PROTOCOL }}` into workflow `env` unless that key is explicitly defined by the workflow. Recompile existing workflows once to add that lookup; subsequent variable updates take effect without recompilation.
+
+For [Azure Monitor native OTLP ingestion](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/opentelemetry-protocol-ingestion), use the traces endpoint from Application Insights **OTLP Connection Info**, or construct the Data Collection Endpoint / Data Collection Rule path:
+
+```text wrap
+https://<logs-dce-domain>/datacollectionRules/<dcr-immutable-id>/streams/Microsoft-OTLP-Traces/otlp/v1/traces
+```
+
+The exporter retains a complete `/v1/traces` path, including query parameters. For base endpoints, it appends `/v1/traces`. Set `AZURE_MONITOR_OTLP_AUTHORIZATION` to the complete `Bearer <access-token>` header value for a Microsoft Entra identity authorized to write to the DCR (typically **Monitoring Metrics Publisher**). Provision and refresh that token outside this helper; protobuf encoding does not provide Azure authentication or make an Application Insights connection string an OTLP endpoint.
+
+When compact session logs are enabled, the exporter selects the independent `Microsoft-OTLP-Logs` stream for the same DCE and DCR, preserving query parameters:
+
+```text wrap
+https://<logs-dce-domain>/datacollectionRules/<dcr-immutable-id>/streams/Microsoft-OTLP-Logs/otlp/v1/logs
+```
+
+The DCR must accept the logs stream as well as the traces stream. A complete logs endpoint is retained; generic collector endpoints use `/v1/logs` without Azure stream rewriting.
+
+Protobuf requests use `Content-Type: application/x-protobuf` with binary-safe direct and proxy transports. Traces encode `ExportTraceServiceRequest`; logs encode `ExportLogsServiceRequest`, including structured bodies and trace/span correlation. The encoder uses only Node.js built-ins, and the sanitized local `otel.jsonl` trace mirror remains raw OTLP JSON regardless of wire encoding. These settings configure gh-aw JavaScript telemetry; external engines and the MCP gateway retain their own exporter capabilities.
+
+Successful HTTP responses are inspected for OTLP `partialSuccess` in JSON or protobuf, for both traces and logs. JSON responses ignore unknown fields and treat `null` members as unset, following OTLP/ProtoJSON compatibility rules. Rejected spans or log records produce a warning with the signal-specific rejection count and increment `gh-aw.otlp.export_errors`; sanitized details appear in `gh-aw.otlp.export_error_details`. Warning-only partial success (zero rejected records with a collector message) warns without incrementing the error count. Collector messages are withheld because they may contain private data or credentials.
+
+Response diagnostics are limited to 64 KiB. Malformed, unsupported, oversized, or unreadable successful responses record an exporter error with acceptance marked unknown. The proxy-aware curl transport has a 10-second request timeout within a 15-second subprocess deadline; a body timeout after known HTTP success reports unknown acceptance without retrying. Empty responses and valid full-success responses remain successful. None of these successful HTTP responses are retried: resending records the collector already accepted could create duplicates. Export diagnostics remain nonfatal and do not prevent delivery to other configured endpoints.
+
 ### Organization-wide defaults
 
 When a workflow does not configure `observability.otlp` (in its own frontmatter or through an import), the compiler falls back to a default OTLP configuration read from the GitHub Actions environment:

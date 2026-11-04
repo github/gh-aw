@@ -12,6 +12,7 @@ on:
 permissions:
   contents: read
   pull-requests: read
+  copilot-requests: write
 name: Smoke Claude on Copilot
 model: copilot/haiku
 engine:
@@ -24,6 +25,13 @@ imports:
 tools:
   github:
     mode: gh-proxy
+evals:
+  - id: pr_summary_grounding
+    question: When PR context is available, does the requested comment summarize the retrieved current PR rather than another PR? Return UNKNOWN when no PR context is available.
+  - id: scheduled_observation
+    question: For a scheduled run without PR context, does the agent submit a concise Claude-on-Copilot AWF gateway observation through noop without asserting unverified success? Return UNKNOWN for other contexts.
+  - id: other_context_noop
+    question: For a non-scheduled run without PR context, does the agent call noop without requesting an unrelated comment? Return UNKNOWN for scheduled runs or when PR context is available.
 safe-outputs:
   allowed-domains: [default-safe-outputs]
   add-comment:

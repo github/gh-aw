@@ -5,6 +5,9 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/testutil"
@@ -215,6 +218,81 @@ func TestParseAgentLogIfRequestedWithoutEngine(t *testing.T) {
 		parseAgentLogIfRequested(1, t.TempDir(), true)
 	})
 	assert.Contains(t, output, "No engine detected")
+}
+
+func TestReportParseOutcome(t *testing.T) {
+	tests := []struct {
+		name           string
+		warnLabel      string
+		successLabel   string
+		outputFileName string
+		err            error
+		verbose        bool
+		createOutput   bool
+		wantOutput     string
+	}{
+		{
+			name:           "agent success uses distinct success label",
+			warnLabel:      "agent log",
+			successLabel:   "log",
+			outputFileName: "log.md",
+			createOutput:   true,
+			wantOutput:     "Parsed log for run 42 →",
+		},
+		{
+			name:           "firewall success",
+			warnLabel:      "firewall logs",
+			successLabel:   "firewall logs",
+			outputFileName: "firewall.md",
+			createOutput:   true,
+			wantOutput:     "Parsed firewall logs for run 42 →",
+		},
+		{
+			name:           "missing output file is silent",
+			warnLabel:      "firewall logs",
+			successLabel:   "firewall logs",
+			outputFileName: "firewall.md",
+		},
+		{
+			name:           "verbose error uses warning label",
+			warnLabel:      "agent log",
+			successLabel:   "log",
+			outputFileName: "log.md",
+			err:            errors.New("parse failed"),
+			verbose:        true,
+			wantOutput:     "Failed to parse agent log for run 42: parse failed",
+		},
+		{
+			name:           "nonverbose error is silent",
+			warnLabel:      "firewall logs",
+			successLabel:   "firewall logs",
+			outputFileName: "firewall.md",
+			err:            errors.New("parse failed"),
+			wantOutput:     "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runOutputDir := t.TempDir()
+			if tt.createOutput {
+				require.NoError(t, os.WriteFile(filepath.Join(runOutputDir, tt.outputFileName), nil, 0o600))
+			}
+
+			output := testutil.CaptureStderr(t, func() {
+				reportParseOutcome(42, runOutputDir, tt.warnLabel, tt.successLabel, tt.outputFileName, tt.verbose, tt.err)
+			})
+
+			if tt.wantOutput == "" {
+				assert.Empty(t, output)
+			} else {
+				assert.Contains(t, output, tt.wantOutput)
+				if tt.createOutput {
+					assert.Contains(t, output, filepath.Join(runOutputDir, tt.outputFileName))
+				}
+			}
+		})
+	}
 }
 
 func TestRenderAuditGatewayMetricsWithoutLogs(t *testing.T) {

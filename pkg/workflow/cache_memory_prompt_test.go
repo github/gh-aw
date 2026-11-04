@@ -14,7 +14,7 @@ import (
 func TestCacheMemoryPromptMissingDataContract(t *testing.T) {
 	for _, template := range []string{cacheMemoryPromptFile, cacheMemoryPromptMultiFile} {
 		t.Run(template, func(t *testing.T) {
-			content, err := os.ReadFile(filepath.Join("prompts", template))
+			content, err := os.ReadFile(filepath.Join("..", "..", "actions", "setup", "md", template))
 			require.NoError(t, err)
 			prompt := string(content)
 			assert.Contains(t, prompt, "If the workflow defines initialization, a full analysis, or another fallback for absent state, follow that path and do **not** call `report_missing_data`")

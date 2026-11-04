@@ -29,6 +29,13 @@ imports:
   - shared/reporting.md
 network:
   allowed: []
+evals:
+  - id: readme_file_tool
+    question: Does the output quote README.md's first line from a successful read_file result rather than a shell command or a guess?
+  - id: file_write_readback
+    question: Does the output show write_file completing before read_file verifies the exact line Pydantic AI smoke file write passed in the prescribed generated_reports file?
+  - id: file_failure_handling
+    question: When either file tool fails, does the agent report the concrete error through report_incomplete after submitting the summary rather than claiming success? Return UNKNOWN when both file tools succeed.
 safe-outputs:
   allowed-domains: [default-safe-outputs]
   add-comment:

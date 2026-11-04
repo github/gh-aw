@@ -131,6 +131,7 @@ sandbox:
 					}
 					require.Equal(t, 1, redactionCount, "upload guards must reference exactly one built-in redaction step")
 					redactionIDs := append([]string{"redact_secrets"}, tc.hookIDs...)
+					redactionIDs = append(redactionIDs, "validate_recovery_envelopes", "validate_final_recovery_envelopes")
 					outcomes := map[string]string{}
 					var expectedCondition strings.Builder
 					expectedCondition.WriteString("always()")
@@ -200,6 +201,9 @@ func TestCustomSecretMaskingWorkQueueUploadGates(t *testing.T) {
 	compiler.stepOrderTracker = NewStepOrderTracker()
 	adapter := strings.Join(compiler.finishWorkQueuePreparedAdapterSteps(data, "test", 0, nil), "")
 	assert.Contains(t, adapter, "steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success' && steps.custom_mask.outcome == 'success'")
-	manifest := strings.Join(buildSafeOutputItemsManifestUploadStep("", compiler.getActionPin, true, data), "")
+	assert.Contains(t, adapter, "id: validate_recovery_envelopes\n")
+	assert.Contains(t, adapter, "steps.validate_recovery_envelopes.outcome == 'success'")
+	manifest := strings.Join(buildSafeOutputManifestUploadStep("", compiler.getActionPin, true, data, true), "")
 	assert.Contains(t, manifest, "if: always() && steps.redact_secrets.outcome == 'success' && steps.custom_mask.outcome == 'success'")
+	assert.Contains(t, manifest, "steps.validate_recovery_envelopes.outcome == 'success'")
 }

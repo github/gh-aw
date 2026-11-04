@@ -395,11 +395,19 @@ describe("parse_claude_log.cjs", () => {
 
       const markdownCall = mockCore.summary.addRaw.mock.calls[0];
       expect(markdownCall[0]).toContain("```");
-      expect(markdownCall[0]).toContain("Conversation:");
+      expect(markdownCall[0]).toContain("<details><summary>Unified session</summary>");
+      expect(markdownCall[0]).toContain("<details><summary>Session overview</summary>");
+      expect(markdownCall[0]).toContain("### Conversation");
+      expect(markdownCall[0]).toContain("<details><summary>Full timeline</summary>");
+      expect(markdownCall[0]).toContain("session.init");
+      expect(markdownCall[0]).toContain("session.result");
       expect(markdownCall[0]).toContain("Statistics:");
+      expect(markdownCall[0]).toContain("Turns: 1");
+      expect(markdownCall[0]).toContain("Tokens: 75 total (50 in / 25 out)");
+      expect(markdownCall[0]).toContain("Cost: $0.0010");
       expect(mockCore.info).toHaveBeenCalled();
 
-      const infoCall = mockCore.info.mock.calls.find(call => call[0].includes("=== Claude Execution Summary ==="));
+      const infoCall = mockCore.info.mock.calls.find(call => call[0].includes("Records: 2 (agent=2)"));
       expect(infoCall).toBeDefined();
       expect(infoCall[0]).toContain("Model: claude-sonnet-4-20250514");
     });

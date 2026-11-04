@@ -49,6 +49,44 @@ type updateActionsOptions struct {
 	approve            bool
 }
 
+// updateActionsInWorkflowFile updates action, skill and plugin references in one
+// workflow file and reports whether the file was rewritten.
+func updateActionsInWorkflowFile(ctx context.Context, deps actionUpdateDeps, opts updateActionsOptions, path string, cache map[string]latestReleaseResult, coolDownCache map[string]coolDownCheckResult) (bool, error) {
+	warn := func(format string, args ...any) {
+		if opts.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf(format, args...)))
+		}
+	}
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		warn("Failed to read %s: %v", path, err)
+		return false, nil
+	}
+	updatedActions, newContent, err := updateActionRefsInContentWithDeps(ctx, deps, string(content), cache, coolDownCache, !opts.disableReleaseBump, opts.verbose, opts.coolDown)
+	if err != nil {
+		warn("Failed to update action refs in %s: %v", path, err)
+		return false, nil
+	}
+	updatedSkills, newContent, err := updateSkillRefsInContent(ctx, newContent, !opts.disableReleaseBump, opts.verbose, opts.coolDown)
+	if err != nil {
+		warn("Failed to update skill refs in %s: %v", path, err)
+		return false, nil
+	}
+	updatedPlugins, newContent, err := updatePluginRefsInContent(ctx, newContent, !opts.disableReleaseBump, opts.verbose, opts.coolDown)
+	if err != nil {
+		warn("Failed to update plugin refs in %s: %v", path, err)
+		return false, nil
+	}
+	if !updatedActions && !updatedSkills && !updatedPlugins {
+		return false, nil
+	}
+	if err := os.WriteFile(path, []byte(newContent), constants.FilePermPublic); err != nil {
+		return false, fmt.Errorf("unable to write updated workflow %s: %w", path, err)
+	}
+	return true, nil
+}
+
 func updateActionsInWorkflowFiles(ctx context.Context, deps actionUpdateDeps, opts updateActionsOptions) error {
 	if opts.workflowsDir == "" {
 		opts.workflowsDir = getWorkflowsDir()
@@ -60,6 +98,17 @@ func updateActionsInWorkflowFiles(ctx context.Context, deps actionUpdateDeps, op
 	cache := make(map[string]latestReleaseResult)
 	// Per-invocation cooldown cache: key = "repo@tag", avoids redundant date API calls
 	coolDownCache := make(map[string]coolDownCheckResult)
+
+	if conflictedWorkflow, err := findWorkflowWithMergeConflictMarkers(opts.workflowsDir); err != nil {
+		return fmt.Errorf("unable to scan workflows for merge conflicts: %w", err)
+	} else if conflictedWorkflow != "" {
+		message := "Skipping action, skill, and plugin updates because merge conflict markers are present in " + conflictedWorkflow
+		updateLog.Print(message)
+		if opts.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(message))
+		}
+		return nil
+	}
 
 	var updatedFiles []string
 
@@ -74,44 +123,9 @@ func updateActionsInWorkflowFiles(ctx context.Context, deps actionUpdateDeps, op
 			return nil
 		}
 
-		content, err := os.ReadFile(path)
-		if err != nil {
-			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to read %s: %v", path, err)))
-			}
-			return nil
+		if updated, err := updateActionsInWorkflowFile(ctx, deps, opts, path, cache, coolDownCache); err != nil || !updated {
+			return err
 		}
-
-		updatedActions, newContent, err := updateActionRefsInContentWithDeps(ctx, deps, string(content), cache, coolDownCache, !opts.disableReleaseBump, opts.verbose, opts.coolDown)
-		if err != nil {
-			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to update action refs in %s: %v", path, err)))
-			}
-			return nil
-		}
-		updatedSkills, newContent, err := updateSkillRefsInContent(ctx, newContent, !opts.disableReleaseBump, opts.verbose, opts.coolDown)
-		if err != nil {
-			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to update skill refs in %s: %v", path, err)))
-			}
-			return nil
-		}
-		updatedPlugins, newContent, err := updatePluginRefsInContent(ctx, newContent, !opts.disableReleaseBump, opts.verbose, opts.coolDown)
-		if err != nil {
-			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to update plugin refs in %s: %v", path, err)))
-			}
-			return nil
-		}
-
-		if !updatedActions && !updatedSkills && !updatedPlugins {
-			return nil
-		}
-
-		if err := os.WriteFile(path, []byte(newContent), constants.FilePermPublic); err != nil {
-			return fmt.Errorf("unable to write updated workflow %s: %w", path, err)
-		}
-
 		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Updated action/skill/plugin references in "+d.Name()))
 		updatedFiles = append(updatedFiles, path)
 		return nil
@@ -131,4 +145,38 @@ func updateActionsInWorkflowFiles(ctx context.Context, deps actionUpdateDeps, op
 	}
 
 	return nil
+}
+
+func containsMergeConflictMarkers(content string) bool {
+	for line := range strings.SplitSeq(content, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "<<<<<<<") ||
+			strings.HasPrefix(trimmed, "|||||||") ||
+			strings.HasPrefix(trimmed, ">>>>>>>") {
+			return true
+		}
+	}
+	return false
+}
+
+func findWorkflowWithMergeConflictMarkers(workflowsDir string) (string, error) {
+	var conflictedWorkflow string
+	err := filepath.WalkDir(workflowsDir, func(path string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() || !strings.HasSuffix(d.Name(), ".md") {
+			return nil
+		}
+
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		if containsMergeConflictMarkers(string(content)) && conflictedWorkflow == "" {
+			conflictedWorkflow = path
+		}
+		return nil
+	})
+	return conflictedWorkflow, err
 }

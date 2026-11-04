@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"path"
 	"strings"
 
@@ -43,6 +44,7 @@ func (c *Compiler) generateUnifiedArtifactUpload(yaml *strings.Builder, paths []
 
 	yaml.WriteString("      - name: Upload agent artifacts\n")
 	condition := "always() && " + secretRedactionSuccessCondition(data)
+	condition += " && steps.validate_final_recovery_envelopes.outcome == 'success'"
 	if protectedSessionCapture {
 		condition += " && steps.parse_agent_logs.outcome == 'success'"
 	}
@@ -70,6 +72,43 @@ func (c *Compiler) generateTrackedSecretRedactionStep(yaml *strings.Builder, yam
 		"      - name: Redact secrets in logs\n",
 		"      - name: Redact secrets in logs\n        id: redact_secrets\n",
 		1))
+	generateRecoveryEnvelopeValidationStep(yaml, "validate_recovery_envelopes", data, c.getActionPin)
+}
+
+func generateRecoveryEnvelopeValidationStep(yaml *strings.Builder, id string, data *WorkflowData, pinAction func(string) string, additionalRoots ...string) {
+	yaml.WriteString("      - name: Validate recovery envelopes before upload\n")
+	yaml.WriteString("        id: " + id + "\n")
+	yaml.WriteString("        if: always() && " + secretMaskingSuccessCondition(data) + "\n")
+	yaml.WriteString("        uses: " + pinAction("actions/github-script") + "\n")
+	yaml.WriteString("        env:\n")
+	for _, name := range objectPackLimitEnvNames {
+		yaml.WriteString("          " + name + ": ${{ vars." + name + " }}\n")
+	}
+	if additionalRoots == nil {
+		additionalRoots = []string{}
+	}
+	encoded, _ := json.Marshal(additionalRoots) //nolint:jsonmarshalignoredeerror // A slice of strings is always JSON-serializable.
+	// Pin even an empty list: inherited GITHUB_ENV values must not authorize roots.
+	yaml.WriteString("          GH_AW_RECOVERY_ADDITIONAL_ROOTS: '" + strings.ReplaceAll(string(encoded), "'", "''") + "'\n")
+	yaml.WriteString("        with:\n")
+	yaml.WriteString("          script: |\n")
+	yaml.WriteString("            const { main } = require('${{ runner.temp }}/gh-aw/actions/validate_recovery_envelopes.cjs');\n")
+	yaml.WriteString("            main({ core, additionalRoots: JSON.parse(process.env.GH_AW_RECOVERY_ADDITIONAL_ROOTS) });\n")
+}
+
+// Scan the directory before any glob, including compiler-approved environment paths.
+func recoveryArtifactScanRoots(paths []string) []string {
+	var roots []string
+	for _, artifactPath := range paths {
+		if strings.HasPrefix(artifactPath, "!") {
+			continue
+		}
+		if wildcard := strings.IndexAny(artifactPath, "*?["); wildcard >= 0 {
+			artifactPath = path.Dir(artifactPath[:wildcard])
+		}
+		roots = append(roots, artifactPath)
+	}
+	return roots
 }
 
 // generateAgentOutputFallbackUpload generates a small, dedicated artifact upload containing
@@ -114,6 +153,7 @@ func (c *Compiler) generateAgentOutputFallbackUpload(yaml *strings.Builder, data
 	yaml.WriteString("      # survives a failed or timed-out upload of the larger agent artifact\n")
 	yaml.WriteString("      - name: Upload agent output fallback artifact\n")
 	condition := "always() && " + secretRedactionSuccessCondition(data)
+	condition += " && steps.validate_final_recovery_envelopes.outcome == 'success'"
 	if protectedSessionCapture {
 		condition += " && steps.parse_agent_logs.outcome == 'success'"
 	}

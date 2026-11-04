@@ -18,7 +18,7 @@ This document describes the type patterns used throughout the GitHub Agentic Wor
 
 ## Semantic Type Aliases
 
-Semantic type aliases provide meaningful names for primitive types, improving code clarity and preventing mistakes through type safety.
+Semantic type aliases provide descriptive names for primitive types and let the compiler reject some value mix-ups.
 
 ### Pattern: Semantic Type Alias
 
@@ -36,7 +36,7 @@ type Version string
 **Benefits**:
 - Self-documenting code - the type name explains the purpose
 - Type safety - prevents mixing different concepts that share the same underlying type
-- Clear intent - signals to readers what the value represents
+- Explicit intent - signals to readers what the value represents
 - Supports refactoring - can change underlying implementation without affecting API
 
 ### Examples in Codebase
@@ -70,7 +70,7 @@ const ExpressionBreakThreshold LineLength = 100
 
 **Usage**:
 ```go
-// Clear intent - these are lengths, not arbitrary integers
+// Documents intent - these are lengths, not arbitrary integers
 if len(expression) > int(constants.MaxExpressionLineLength) {
     // Break into multiple lines
 }
@@ -146,7 +146,7 @@ func (w WorkflowID) IsValid() bool {
 func GetWorkflow(id WorkflowID) (*Workflow, error) { ... }
 func CompileWorkflow(id WorkflowID) error { ... }
 
-// Clear intent - this is a workflow identifier, not a file path
+// Documents intent - this is a workflow identifier, not a file path
 workflowID := WorkflowID("ci-doctor")
 if workflowID.IsValid() {
     err := CompileWorkflow(workflowID)
@@ -230,7 +230,7 @@ const SafeInputsFeatureFlag = "safe-inputs"
 
 **Purpose**: Type-safe tool configuration using semantic types and typed slices
 
-Tool configurations demonstrate the pattern of combining semantic types with typed slices to provide compile-time type safety while maintaining clean APIs.
+Tool configurations demonstrate the pattern of combining semantic types with typed slices to provide compile-time type safety while keeping the API surface consistent.
 
 **Semantic Types for Tool Names**:
 
@@ -291,7 +291,7 @@ type GitHubToolConfig struct {
 - **Self-documenting**: Type names make intent clear (e.g., `GitHubToolName` vs `string`)
 - **Conversion helpers**: `ToStringSlice()` methods enable interoperability with legacy code
 - **Compile-time validation**: Mismatched types caught at compile time, not runtime
-- **IDE support**: Better autocomplete and navigation for tool names
+- **IDE support**: Autocomplete and navigation for tool names
 
 **Migration Pattern - Before/After**:
 
@@ -316,8 +316,8 @@ func processTools(config map[string]any) {
 
 // ✅ AFTER - Using semantic types and typed slices
 type GitHubToolConfig struct {
-    Allowed GitHubAllowedTools  // Clear what this contains
-    Toolset GitHubToolsets      // Clear what this contains
+    Allowed GitHubAllowedTools  // Element type is GitHubToolName
+    Toolset GitHubToolsets      // Element type is GitHubToolset
 }
 
 func processTools(config *GitHubToolConfig) {
@@ -395,7 +395,7 @@ func processConfig(config *GitHubToolConfig) {
 - The primitive type is already clear from context
 - It's a one-off usage without reuse
 - The type would be overly specific (prefer composition)
-- It adds ceremony without clarity
+- It adds declarations without making the meaning more specific
 
 ### Best Practices for Type Aliases
 

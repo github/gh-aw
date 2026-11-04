@@ -458,6 +458,7 @@ A conforming implementation MUST enforce the following at compile time:
 | T-AIC-DG-024 | Estimated credits are reported separately and equality with the threshold is exceeded | §9.14 |
 | T-AIC-DG-025 | Repo-memory trust, timestamp filtering, duplicate selection, and permissive read behavior match the separate backend contract | §9.15 |
 | T-AIC-DG-026 | A cancelled rerun without a verified producer carries usage only from the unique latest earlier executed job with a verified producer; missing accounting, ambiguous prior jobs, and other outcomes fail closed | §9.11 |
+| T-AIC-DG-027 | Run/attempt-bound advisory Decisions failures use the failed-Evaluations accounting policy, preserve other component usage, and replace whole-run estimates on the next scan | §9.11 |
 
 ### 9.8 Guardrail Bypass Conditions
 
@@ -554,10 +555,11 @@ The following additional component zero-accounting fallbacks are supported. Othe
 | Explicit execution-not-started artifact | No selected accounting and version-1 component execution evidence matching run ID, job attempt, component, and `state: not_started` |
 | Legacy failed Agent before accounting | Verified coverage, no selected accounting, failed conclusion, missing raw file, no execution-evidence file, and no inspected legacy Agent artifact |
 | Failed Evaluations before accounting | Verified coverage, failed conclusion, and no selected accounting |
+| Advisory Decisions failure before accounting | Verified coverage, successful job conclusion, no selected accounting, and `evals/evals_status.json` identifying the same run and selected job attempt with engine `decisions`, status `not_evaluated`, reason `judge_failed`, execution outcome `failure`, and execution state `started` |
 
 Legacy Agent evidence is inspected only when no non-empty Agent accounting candidate exists. The legacy artifact must be unexpired, timestamp-bound to its job, and contain a regular log no larger than 10 MiB. Detection's empty-raw exception is checked before lower-priority candidate selection. The remaining zero fallbacks MUST NOT override a malformed non-empty or higher-priority unreadable source.
 
-These are implemented evidence/compatibility policies, not a proof that a provider never charged a request. In particular, legacy missing-accounting failure heuristics and absent provider-response usage cannot certify external billing.
+These are implemented evidence/compatibility policies, not a proof that a provider never charged a request. In particular, missing-accounting failure heuristics and absent provider-response usage cannot certify external billing. The advisory Decisions fallback applies the existing failed-Evaluations policy to the judge outcome when `continue-on-error` leaves its wrapper job successful. It emits a warning that provider billing remains unverified; it MUST NOT override non-empty or unreadable accounting.
 
 ### 9.12 Conservative Whole-Run Maximum Fallback
 

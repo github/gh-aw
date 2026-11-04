@@ -22,7 +22,9 @@ import (
 // optional alternative to a direct tool call.
 func TestPiSafeOutputsPromptStatesCLIIsOnlyTransportIntegration(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "pi-safeoutputs-cli-only")
-	workflowPath := filepath.Join(tmpDir, "pi-safeoutputs.md")
+	workflowDir := filepath.Join(tmpDir, ".github", "workflows")
+	require.NoError(t, os.MkdirAll(workflowDir, 0o700))
+	workflowPath := filepath.Join(workflowDir, "pi-safeoutputs.md")
 	workflowContent := `---
 on: issues
 name: Pi Safe Outputs
@@ -41,7 +43,7 @@ Fix the bug and open a pull request.
 	compiler := NewCompiler()
 	require.NoError(t, compiler.CompileWorkflow(workflowPath))
 
-	lockPath := filepath.Join(tmpDir, "pi-safeoutputs.lock.yml")
+	lockPath := filepath.Join(workflowDir, "pi-safeoutputs.lock.yml")
 	compiledBytes, err := os.ReadFile(lockPath)
 	require.NoError(t, err)
 	compiled := string(compiledBytes)
@@ -73,6 +75,7 @@ Fix the bug and open a pull request.
 		}
 	}
 	require.NotNil(t, promptEnv, "compiled workflow should include the prompt creation step")
+	promptEnv["GITHUB_WORKSPACE"] = tmpDir
 	env, err := json.Marshal(promptEnv)
 	require.NoError(t, err)
 	cmd := exec.Command("node", "-e", `
@@ -86,7 +89,8 @@ process.stdout.write(renderPrompt(parseConfig(env.GH_AW_PROMPT_CONFIG), env, './
 	output, err := cmd.CombinedOutput()
 	require.NoError(t, err, "%s", output)
 	prompt := string(output)
-	assert.Contains(t, prompt, "command -v safeoutputs")
+	assert.Contains(t, prompt, "`safeoutputs --help`, by itself")
+	assert.NotContains(t, prompt, "command -v safeoutputs")
 	assert.Contains(t, prompt, "single-quoted")
 	assert.Contains(t, prompt, "Stdin is also supported")
 	assert.Contains(t, prompt, `safeoutputs add_comment '{"item_number":42,"body":"### Result\n\nIt\u0027s ready.`)

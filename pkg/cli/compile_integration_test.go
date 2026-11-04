@@ -287,6 +287,95 @@ Please check the repository for any open issues and create a summary.
 	t.Logf("Successfully compiled workflow to %s", lockFilePath)
 }
 
+func TestCompileSafeOutputsGitHubAppPersistedPRCheckoutTokenIntegration(t *testing.T) {
+	setup := setupIntegrationTest(t)
+	defer setup.cleanup()
+
+	testWorkflow := `---
+name: Safe Outputs PR App Token
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+engine: copilot
+safe-outputs:
+  github-app:
+    app-id: ${{ vars.APP_ID }}
+    private-key: ${{ secrets.APP_PRIVATE_KEY }}
+  create-pull-request:
+    max: 1
+---
+
+Compile a safe-output workflow that can create a pull request.
+`
+	testWorkflowPath := filepath.Join(setup.workflowsDir, "safe-outputs-app-pr-checkout.md")
+	if err := os.WriteFile(testWorkflowPath, []byte(testWorkflow), 0600); err != nil {
+		t.Fatalf("Failed to write test workflow file: %v", err)
+	}
+
+	cmd := exec.Command(setup.binaryPath, "compile", testWorkflowPath)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("CLI compile command failed: %v\nOutput: %s", err, string(output))
+	}
+
+	lockFilePath := filepath.Join(setup.workflowsDir, "safe-outputs-app-pr-checkout.lock.yml")
+	lockContent, err := os.ReadFile(lockFilePath)
+	if err != nil {
+		t.Fatalf("Failed to read lock file: %v", err)
+	}
+	lockContentStr := string(lockContent)
+	safeOutputsJob := extractYAMLJobSection(lockContentStr, "safe_outputs")
+	if safeOutputsJob == "" {
+		t.Fatalf("Could not find safe_outputs job in lock file\nLock file content:\n%s", lockContentStr)
+	}
+	agentJob := extractYAMLJobSection(lockContentStr, "agent")
+	if agentJob == "" {
+		t.Fatalf("Could not find agent job in lock file\nLock file content:\n%s", lockContentStr)
+	}
+
+	const checkoutMarker = "      - name: Checkout repository (gh-aw default)"
+	checkoutStep := func(job string) string {
+		start := strings.Index(job, checkoutMarker)
+		if start == -1 {
+			return ""
+		}
+		rest := job[start:]
+		if next := strings.Index(rest[len(checkoutMarker):], "\n      - name: "); next != -1 {
+			return rest[:len(checkoutMarker)+next]
+		}
+		return rest
+	}
+
+	safeOutputCheckout := checkoutStep(safeOutputsJob)
+	if safeOutputCheckout == "" {
+		t.Fatalf("Could not find default checkout in safe_outputs job\nJob:\n%s", safeOutputsJob)
+	}
+	if !strings.Contains(safeOutputCheckout, "token: ${{ steps.safe-outputs-app-token.outputs.token }}") {
+		t.Errorf("safe_outputs checkout should use the global GitHub App token\nCheckout:\n%s", safeOutputCheckout)
+	}
+	if !strings.Contains(safeOutputCheckout, "persist-credentials: true") {
+		t.Errorf("safe_outputs checkout should persist credentials for PR pushes\nCheckout:\n%s", safeOutputCheckout)
+	}
+
+	appTokenIndex := strings.Index(safeOutputsJob, "id: safe-outputs-app-token")
+	checkoutIndex := strings.Index(safeOutputsJob, checkoutMarker)
+	if appTokenIndex == -1 || checkoutIndex == -1 || appTokenIndex >= checkoutIndex {
+		t.Errorf("safe_outputs should mint the App token before checkout (mint=%d, checkout=%d)", appTokenIndex, checkoutIndex)
+	}
+
+	agentCheckout := checkoutStep(agentJob)
+	if agentCheckout == "" {
+		t.Fatalf("Could not find default checkout in agent job\nJob:\n%s", agentJob)
+	}
+	if strings.Contains(agentCheckout, "steps.safe-outputs-app-token") {
+		t.Errorf("agent checkout should not use the safe-outputs App token\nCheckout:\n%s", agentCheckout)
+	}
+	if !strings.Contains(agentCheckout, "persist-credentials: false") {
+		t.Errorf("agent checkout should retain its existing credential behavior\nCheckout:\n%s", agentCheckout)
+	}
+}
+
 func TestCompileGHESArtifactPinsIntegration(t *testing.T) {
 	setup := setupIntegrationTest(t)
 	defer setup.cleanup()

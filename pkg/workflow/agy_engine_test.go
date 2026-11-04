@@ -329,10 +329,20 @@ func TestAgyProductionConformancePermissionsAreBoundedAndScoped(t *testing.T) {
 			if entry.trigger == "workflow_call" {
 				assert.Contains(t, callee.Concurrency["group"], "${{ github.run_id }}")
 			}
+			if entry.id == "smoke-agy" {
+				assert.Contains(t, callee.Jobs, "evals")
+				assert.Contains(t, callee.Jobs, "push_evals_state")
+			}
 			for name, config := range callee.Jobs {
 				allowedPermissions := map[string]string{"actions": "read", "contents": "read"}
+				if entry.id == "smoke-agy" && name == "push_evals_state" {
+					allowedPermissions = map[string]string{"contents": "write"}
+				}
 				if name == string(constants.ConclusionAdmissionJobName) {
 					allowedPermissions = map[string]string{"contents": "read", "id-token": "write"}
+				}
+				if entry.id == "smoke-agy" && name == "push_evals_state" {
+					allowedPermissions = map[string]string{"contents": "write"}
 				}
 				if entry.id == "agy-conformance-reusable" && name == "safe_outputs" {
 					allowedPermissions["pull-requests"] = "read"
@@ -342,6 +352,10 @@ func TestAgyProductionConformancePermissionsAreBoundedAndScoped(t *testing.T) {
 					allowedPermissions = map[string]string{
 						"actions": "read", "contents": "read", "issues": "read", "pull-requests": "read",
 					}
+				}
+				if entry.id == "smoke-agy" && name == "push_evals_state" {
+					allowedPermissions = map[string]string{"contents": "write"}
+					assert.Equal(t, allowedPermissions, config.Permissions, "only the eval state publisher may persist smoke eval results")
 				}
 				if entry.id == "engine-conformance-agy" {
 					switch name {
@@ -453,6 +467,20 @@ func TestAgyConformanceEntryPointsShareConfiguration(t *testing.T) {
 			readConformanceFrontmatter(t, "../../.github/workflows/"+entry.id+".md", &source)
 			expectedTriggers := map[string]any{entry.trigger: nil}
 			if entry.id == "smoke-agy" {
+				assert.Equal(t, []any{
+					map[string]any{
+						"id":       "native_challenge_transport",
+						"question": "Does the output show native MCP invocation of agy-native native_challenge with the fixture fileNonce rather than a CLI or HTTP substitute?",
+					},
+					map[string]any{
+						"id":       "native_infrastructure_transport",
+						"question": "Does the output show native MCP invocation of mcpscripts native_infrastructure_challenge with the same fixture fileNonce?",
+					},
+					map[string]any{
+						"id":       "native_completion",
+						"question": "Does the agent emit exactly one final native safeoutputs noop with message Conformance probes completed after the probes?",
+					},
+				}, source["evals"], "the smoke entry point must retain its native conformance evals")
 				expectedTriggers["slash_command"] = map[string]any{
 					"name":     "smoke-agy",
 					"strategy": "centralized",
@@ -475,6 +503,22 @@ func TestAgyConformanceEntryPointsShareConfiguration(t *testing.T) {
 			delete(source, "max-ai-credits")
 			delete(source, "imports")
 			delete(source, "tools")
+			if entry.id == "smoke-agy" {
+				evals, ok := source["evals"].([]any)
+				require.True(t, ok)
+				require.Len(t, evals, 3)
+				for index, expectedID := range []string{
+					"native_challenge_transport",
+					"native_infrastructure_transport",
+					"native_completion",
+				} {
+					eval, ok := evals[index].(map[string]any)
+					require.True(t, ok)
+					assert.Equal(t, expectedID, eval["id"])
+				}
+				delete(source, "evals")
+			}
+			delete(source, "evals")
 			assert.Equal(t, canonical, source, "all compilation paths must retain identical gate configuration")
 		})
 	}

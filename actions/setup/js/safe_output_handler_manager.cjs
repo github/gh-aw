@@ -13,8 +13,9 @@ const { loadAgentOutput } = require("./load_agent_output.cjs");
 const { normalizeSafeOutputConfig } = require("./safe_output_names.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { getStalePullRequestReason } = require("./pr_lifecycle.cjs");
-const { ERR_CONFIG, ERR_PARSE, ERR_VALIDATION, SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
+const { ERR_CONFIG, ERR_PARSE, ERR_SYSTEM, ERR_VALIDATION, SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
 const { classifySafeOutputResult, computeSafeOutputsStatus, isFailedProcessingResult } = require("./safe_outputs_status.cjs");
+const { buildSafeOutputDependencyPlan, checkSafeOutputDependencies } = require("./safe_output_dependencies.cjs");
 const { finalizeBufferedReviewOutcomes } = require("./safe_output_outcomes.cjs");
 const { hasUnresolvedTemporaryIds, replaceTemporaryIdReferences, replaceArtifactUrlReferences, normalizeTemporaryId, extractTemporaryIdReferences, getCreatedTemporaryId } = require("./temporary_id.cjs");
 const { generateMissingInfoSections } = require("./missing_info_formatter.cjs");
@@ -38,6 +39,7 @@ const {
   writeTemporaryIdMapFile,
   writeSafeOutputErrorReport,
   writeSafeOutputOutcomes,
+  writeMergePullRequestDecision,
   SAFE_OUTPUT_ERRORS_FILE_PATH,
   CLAIM_DELIVERY_ERRORS_FILE_NAME,
 } = require("./safe_output_manifest.cjs");
@@ -153,8 +155,8 @@ const HANDLER_MAP = {
 const STANDALONE_STEP_TYPES = new Set(["upload_asset", "noop"]);
 
 /**
- * Code-push safe output types that must succeed before remaining outputs are processed.
- * If any of these fail, the remaining non-code-push messages are cancelled with a clear reason.
+ * Code-push safe output types whose failures are tracked for later comment annotations
+ * and conclusion reporting. Remaining messages are still processed after a failure.
  */
 const CODE_PUSH_TYPES = new Set(["push_to_pull_request_branch", "create_pull_request"]);
 
@@ -934,6 +936,29 @@ function buildSkippedResult(type, messageIndex, result) {
   };
 }
 
+/** @param {string} type @param {any} result @param {number} messageIndex */
+function recordMergeDecision(type, result, messageIndex) {
+  if (type !== "merge_pull_request" || !result || result.deferred) return result;
+  try {
+    writeMergePullRequestDecision(result, messageIndex);
+    return { ...result, audit_recorded: true };
+  } catch {
+    const auditError = `${ERR_SYSTEM}: Failed to persist merge pull request decision`;
+    core.warning(auditError);
+    return { ...result, audit_failed: true, audit_error: auditError };
+  }
+}
+
+/** @param {any} result */
+function projectMergeFailure(result) {
+  return {
+    failure_reasons: (result.failure_reasons || []).filter(reason => typeof reason.code === "string" && /^[a-z_]{1,80}$/.test(reason.code)).map(reason => ({ code: reason.code })),
+    ...(result.audit_recorded ? { audit_recorded: true } : {}),
+    ...(result.audit_failed ? { audit_failed: true, audit_error: result.audit_error } : {}),
+    ...(typeof result.staged === "boolean" ? { staged: result.staged } : {}),
+  };
+}
+
 /**
  * Compute the processing order (original message indices) so that temporary-ID
  * producers run before consumers while preserving the original order for
@@ -943,63 +968,11 @@ function buildSkippedResult(type, messageIndex, result) {
  * @returns {Array<number>} original message indices in processing order
  */
 function sortMessageIndicesByTemporaryIdDependencies(messages) {
-  const producers = new Map();
-  messages.forEach((message, index) => {
-    const temporaryId = getCreatedTemporaryId(message);
-    if (temporaryId && !producers.has(temporaryId)) {
-      producers.set(temporaryId, index);
-    }
-  });
-
-  /** @type {Array<Array<number>>} */
-  const dependents = messages.map(() => []);
-  const inDegree = messages.map(() => 0);
-  messages.forEach((message, index) => {
-    const dependencies = message.type === "create_issue" ? extractTemporaryIdReferences({ blocked_by: message.blocked_by }) : new Set();
-    for (const temporaryId of dependencies) {
-      const producerIndex = producers.get(temporaryId);
-      if (producerIndex !== undefined && producerIndex !== index) {
-        dependents[producerIndex].push(index);
-        inDegree[index]++;
-      }
-    }
-  });
-
-  /** @type {Array<number>} */
-  const ready = [];
-  /** @param {number} index */
-  const pushReady = index => {
-    // Keep the ready queue ordered by original message index so independent
-    // messages keep their original relative order (stable topological sort).
-    let position = ready.length;
-    while (position > 0 && ready[position - 1] > index) position--;
-    ready.splice(position, 0, index);
-  };
-  inDegree.forEach((degree, index) => {
-    if (degree === 0) pushReady(index);
-  });
-  /** @type {Array<number>} */
-  const sorted = [];
-  while (ready.length > 0) {
-    const index = ready.shift();
-    if (index === undefined) break;
-    sorted.push(index);
-    for (const dependentIndex of dependents[index]) {
-      inDegree[dependentIndex]--;
-      if (inDegree[dependentIndex] === 0) {
-        pushReady(dependentIndex);
-      }
-    }
-  }
-
-  if (sorted.length !== messages.length) {
+  const plan = buildSafeOutputDependencyPlan(messages);
+  if (plan.cyclic) {
     core.warning("Temporary ID dependency cycle detected; preserving original order for cyclic safe outputs");
-    const sortedIndices = new Set(sorted);
-    for (let index = 0; index < messages.length; index++) {
-      if (!sortedIndices.has(index)) sorted.push(index);
-    }
   }
-  return sorted;
+  return plan.order;
 }
 
 /**
@@ -1034,7 +1007,10 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
       return { ...message, _claimScopeError: getErrorMessage(error) };
     }
   });
-  const processingOrder = sortMessageIndicesByTemporaryIdDependencies(messages);
+  const dependencyPlan = buildSafeOutputDependencyPlan(messages);
+  if (dependencyPlan.cyclic) core.warning("Safe-output dependency cycle detected; preserving legacy temporary-ID ordering only for messages without depends-on");
+  const processingOrder = dependencyPlan.order;
+  const waitingMessages = [];
   const results = [];
   const detectionConclusion = getEffectiveDetectionConclusion(process.env.GH_AW_DETECTION_CONCLUSION, process.env.GH_AW_DETECTION_REASON);
   const detectionConclusionMissing = String(process.env.GH_AW_RUN_DETECTION || "").trim() === "true" && detectionConclusion === "";
@@ -1064,11 +1040,12 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
   /** @type {Array<{type: string, message: any, messageIndex: number, handler: Function}>} */
   const deferredMessages = [];
 
-  // Track code-push failures for fail-fast behaviour.
-  // If a code-push type (push_to_pull_request_branch / create_pull_request) fails,
-  // all subsequent non-code-push messages are cancelled with a clear reason.
+  // Track code-push failures for later comment annotations and conclusion reporting.
   /** @type {Array<{type: string, error: string}>} */
   const codePushFailures = [];
+
+  /** @type {{type: string, error: string, skipped: boolean}|null} */
+  let codePushSkip = null;
 
   // Track when a code-push operation falls back to creating an issue or pull request instead.
   // When set, subsequent add_comment messages will receive a correction note prepended
@@ -1085,11 +1062,19 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
 
   core.info(`Processing ${messages.length} message(s) in order of appearance...`);
 
-  // Process messages in dependency order while reporting original message indices
-  for (let position = 0; position < processingOrder.length; position++) {
-    const i = processingOrder[position];
+  /** @param {number} i @param {boolean} allowWaiting */
+  async function processMessage(i, allowWaiting) {
     let message = messages[i];
     const messageType = message.type;
+    const dependency = checkSafeOutputDependencies(dependencyPlan, i, results, allowWaiting);
+    if (dependency.state === "waiting") {
+      waitingMessages.push(i);
+      return;
+    }
+    if (dependency.state === "failed") {
+      results.push({ type: messageType, messageIndex: i, success: false, errorCode: dependency.errorCode, error: dependency.error });
+      return;
+    }
     try {
       if (currentClaimHandle() && message._claimScopeError) throw new Error(message._claimScopeError);
       message = await assertClaimAuthorized(message);
@@ -1103,12 +1088,12 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
           ? { cancelled: error.state === "cancelled", skipped: true, reason: error.state === "result" ? "Durable Result settled; effects not replayed" : "Claim cancelled; outputs suppressed", errorCode: error.code }
           : { errorCode: message._claimScopeErrorCode || error.code || "claim_scope_invalid", error: getErrorMessage(error) }),
       });
-      continue;
+      return;
     }
 
     if (!messageType) {
       core.warning(`Skipping message ${i + 1} without type`);
-      continue;
+      return;
     }
 
     if (detectionConclusion === "failure" || detectionConclusionMissing) {
@@ -1130,7 +1115,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
         errorCode,
         error,
       });
-      continue;
+      return;
     }
 
     if (detectionConclusion === "warning") {
@@ -1148,7 +1133,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
           errorCode,
           error,
         });
-        continue;
+        return;
       }
       if (threatPolicy.policy === "convertible") {
         // Conversion execution is implemented in the handler for the convertible type.
@@ -1168,7 +1153,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
       if (STANDALONE_STEP_TYPES.has(messageType)) {
         if (currentClaimHandle() && messageType === "noop") {
           results.push({ type: messageType, messageIndex: i, claim_handle: currentClaimHandle(), success: true, result: { effect: "none" } });
-          continue;
+          return;
         }
         // Silently skip - this is handled by a dedicated step
         core.debug(`Message ${i + 1} (${messageType}) will be handled by standalone step`);
@@ -1180,7 +1165,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
           delegated: true,
           reason: "Handled by standalone step",
         });
-        continue;
+        return;
       }
 
       // Check if this message type is handled by a custom safe output job
@@ -1215,7 +1200,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
           delegated: true,
           reason: "Handled by custom safe output job",
         });
-        continue;
+        return;
       }
 
       // Unknown message type - warn the user
@@ -1230,7 +1215,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
         success: false,
         error: loadError ? `No handler loaded for type '${messageType}': ${loadError}` : `No handler loaded for type '${messageType}'`,
       });
-      continue;
+      return;
     }
 
     try {
@@ -1276,11 +1261,10 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
           };
           core.info(`Prepending fallback correction note to add_comment body (fallback ${codePushFallbackInfo.fallbackTargetType}: #${codePushFallbackInfo.number})`);
         }
-        // If a previous code-push operation failed outright (e.g. patch application error),
-        // prepend a failure warning so the status comment accurately reflects that the
-        // code changes were not applied.
-        if (codePushFailures.length > 0) {
-          const failure = codePushFailures[0];
+        // Failed and skipped publications both need a correction, but skips remain
+        // non-fatal and must not inflate the code-push failure count.
+        const failure = codePushFailures[0] || codePushSkip;
+        if (failure) {
           effectiveMessage = {
             ...effectiveMessage,
             [COMMENT_PREAMBLE]: [
@@ -1296,7 +1280,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
                     children: [
                       { type: "text", value: "The ", agentTainted: false },
                       { type: "code", value: failure.type, agentTainted: false },
-                      { type: "text", value: " operation failed: ", agentTainted: false },
+                      { type: "text", value: "skipped" in failure ? " operation was skipped: " : " operation failed: ", agentTainted: false },
                       { type: "text", value: `${failure.error}. The code changes were not applied.`, agentTainted: true },
                     ],
                   },
@@ -1326,19 +1310,21 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
       if (stalePRReason) {
         core.info(stalePRReason);
         results.push(buildSkippedResult(messageType, i, { skipped: true, reason: stalePRReason }));
-        continue;
+        return;
       }
-      const result = await messageHandler(effectiveMessage, resolvedTemporaryIds, temporaryIdMap);
+      const result = recordMergeDecision(messageType, await messageHandler(effectiveMessage, resolvedTemporaryIds, temporaryIdMap), i);
 
       // Check if the handler explicitly returned a skipped result (e.g. policy filters,
-      // no-op warnings, or if_no_changes: warn/ignore). Skipped results should NOT
-      // trigger fail-fast cancellation of subsequent messages, and any summary-safe
-      // diagnostics supplied by the handler must be preserved.
+      // no-op warnings, or if_no_changes: warn/ignore). Subsequent messages are still
+      // processed, and any summary-safe diagnostics supplied by the handler are preserved.
       if (result && result.skipped === true && !result.deferred) {
         const msg = result.reason || result.warning || result.error || "Handler returned skipped: true";
         core.info(`⏭ Message ${i + 1} (${messageType}) skipped — ${msg}`);
         results.push(buildSkippedResult(messageType, i, result));
-        continue;
+        if (CODE_PUSH_TYPES.has(messageType) && !codePushSkip) {
+          codePushSkip = { type: messageType, error: msg, skipped: true };
+        }
+        return;
       }
 
       // Check if the handler explicitly returned a failure
@@ -1350,13 +1336,14 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
           messageIndex: i,
           success: false,
           error: errorMsg,
+          ...(messageType === "merge_pull_request" ? { result: projectMergeFailure(result) } : {}),
         });
-        // Track code-push failures for fail-fast behaviour
+        // Track code-push failures for later comment annotations and conclusion reporting.
         if (CODE_PUSH_TYPES.has(messageType)) {
           codePushFailures.push({ type: messageType, error: errorMsg });
           core.warning(`⚠️ Code push operation '${messageType}' failed — continuing with remaining safe outputs (add_comment messages will include a failure note)`);
         }
-        continue;
+        return;
       }
 
       // Check if the operation was deferred due to unresolved temporary IDs
@@ -1375,7 +1362,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
           deferred: true,
           result,
         });
-        continue;
+        return;
       }
 
       // If handler returned a temp ID mapping, add it to our map
@@ -1495,11 +1482,27 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
         success: false,
         error: getErrorMessage(error),
       });
-      // Track code-push failures for fail-fast behaviour
+      // Track code-push failures for later comment annotations and conclusion reporting.
       if (CODE_PUSH_TYPES.has(messageType)) {
         codePushFailures.push({ type: messageType, error: getErrorMessage(error) });
         core.warning(`⚠️ Code push operation '${messageType}' failed — continuing with remaining safe outputs (add_comment messages will include a failure note)`);
       }
+    }
+  }
+
+  // Keep the legacy first pass/retry boundary: a dependent waits for its
+  // prerequisite's real retry result, not its provisional deferred record.
+  for (const i of processingOrder) await processMessage(i, true);
+
+  async function drainWaitingMessages() {
+    for (let position = 0; position < waitingMessages.length;) {
+      const i = waitingMessages[position];
+      if (checkSafeOutputDependencies(dependencyPlan, i, results, true).state === "waiting") {
+        position++;
+        continue;
+      }
+      waitingMessages.splice(position, 1);
+      await processMessage(i, false);
     }
   }
 
@@ -1508,40 +1511,119 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
   // deferred during the first pass (e.g., link_sub_issue waiting for parent/sub creation).
   // IMPORTANT: Like the main loop, this must register temporary IDs and track outputs
   // with unresolved IDs to enable full synthetic update resolution.
-  if (deferredMessages.length > 0) {
+  async function retryDeferredMessages() {
+    if (deferredMessages.length === 0) return;
     core.info(`\n=== Retrying Deferred Messages ===`);
     core.info(`Found ${deferredMessages.length} deferred message(s) to retry`);
 
-    for (const deferred of deferredMessages) {
-      try {
-        core.info(`Retrying message ${deferred.messageIndex + 1}/${messages.length}: ${deferred.type}`);
+    let pending = [...deferredMessages];
+    for (let round = 0; pending.length > 0 && round <= messages.length; round++) {
+      const roundStartTemporaryIdCount = temporaryIdMap.size;
+      const attempted = new Set(pending.map(deferred => deferred.messageIndex));
+      const stillDeferred = [];
+      for (const deferred of pending) {
+        try {
+          core.info(`Retrying message ${deferred.messageIndex + 1}/${messages.length}: ${deferred.type}`);
 
-        // Convert Map to plain object for handler
-        const resolvedTemporaryIds = Object.fromEntries(temporaryIdMap);
+          // Convert Map to plain object for handler
+          const resolvedTemporaryIds = Object.fromEntries(temporaryIdMap);
 
-        // Record the temp ID map size before processing to detect new IDs
-        const tempIdMapSizeBefore = temporaryIdMap.size;
+          // Record the temp ID map size before processing to detect new IDs
+          const tempIdMapSizeBefore = temporaryIdMap.size;
 
-        // Call the handler again with updated temp ID map
-        await assertClaimAuthorized(deferred.message);
-        const stalePRReason = await getStalePullRequestReason(global.github, global.context);
-        const result = stalePRReason ? { skipped: true, reason: stalePRReason } : await deferred.handler(deferred.message, resolvedTemporaryIds, temporaryIdMap);
+          // Call the handler again with updated temp ID map
+          await assertClaimAuthorized(deferred.message);
+          const stalePRReason = await getStalePullRequestReason(global.github, global.context);
+          const result = stalePRReason ? { skipped: true, reason: stalePRReason } : recordMergeDecision(deferred.type, await deferred.handler(deferred.message, resolvedTemporaryIds, temporaryIdMap), deferred.messageIndex);
 
-        if (result && result.skipped === true && !result.deferred) {
-          const msg = result.reason || result.warning || result.error || "Handler returned skipped: true";
-          core.info(`⏭ Retry of message ${deferred.messageIndex + 1} (${deferred.type}) skipped — ${msg}`);
-          const resultIndex = results.findIndex(r => r.messageIndex === deferred.messageIndex);
-          if (resultIndex >= 0) {
-            results[resultIndex] = buildSkippedResult(deferred.type, deferred.messageIndex, result);
+          if (result && result.skipped === true && !result.deferred) {
+            const msg = result.reason || result.warning || result.error || "Handler returned skipped: true";
+            core.info(`⏭ Retry of message ${deferred.messageIndex + 1} (${deferred.type}) skipped — ${msg}`);
+            const resultIndex = results.findIndex(r => r.messageIndex === deferred.messageIndex);
+            if (resultIndex >= 0) {
+              results[resultIndex] = buildSkippedResult(deferred.type, deferred.messageIndex, result);
+            }
+            continue;
           }
-          continue;
-        }
 
-        // Check if the handler explicitly returned a failure
-        if (result && result.success === false && !result.deferred) {
-          const errorMsg = result.error || "Handler returned success: false";
+          // Check if the handler explicitly returned a failure
+          if (result && result.success === false && !result.deferred) {
+            const errorMsg = result.error || "Handler returned success: false";
+            core.error(`✗ Retry of message ${deferred.messageIndex + 1} (${deferred.type}) failed: ${errorMsg}`);
+            // Replace the deferred record so terminal retry failures classify as failed.
+            const resultIndex = results.findIndex(r => r.messageIndex === deferred.messageIndex);
+            if (resultIndex >= 0) {
+              results[resultIndex] = {
+                type: deferred.type,
+                messageIndex: deferred.messageIndex,
+                success: false,
+                deferred: false,
+                error: errorMsg,
+                result: deferred.type === "merge_pull_request" ? projectMergeFailure(result) : { ...result, success: false, deferred: false, error: errorMsg },
+              };
+            }
+            continue;
+          }
+
+          // Check if still deferred
+          if (result && result.deferred === true) {
+            core.warning(`⏸ Message ${deferred.messageIndex + 1} (${deferred.type}) still deferred - some temporary IDs remain unresolved`);
+            // Update the existing result entry
+            const resultIndex = results.findIndex(r => r.messageIndex === deferred.messageIndex);
+            if (resultIndex >= 0) {
+              results[resultIndex].result = result;
+            }
+            stillDeferred.push(deferred);
+          } else {
+            core.info(`✓ Message ${deferred.messageIndex + 1} (${deferred.type}) completed on retry`);
+
+            // If handler returned a temp ID mapping, add it to our map
+            // This ensures that sub-issues created during deferred retry have their temporary IDs
+            // registered so parent issues can reference them in synthetic updates
+            if (result && result.temporaryId && result.repo && result.number) {
+              const normalizedTempId = normalizeTemporaryId(result.temporaryId);
+              temporaryIdMap.set(normalizedTempId, {
+                repo: result.repo,
+                number: result.number,
+              });
+              core.info(`Registered temporary ID: ${result.temporaryId} -> ${result.repo}#${result.number}`);
+            }
+
+            // Check if this output was created with unresolved temporary IDs
+            // For create_issue, create_discussion - check if body has unresolved IDs
+            // This enables synthetic updates to resolve references after all items are created
+            if (result && result.number && result.repo) {
+              const contentToCheck = getContentToCheck(deferred.type, deferred.message, result);
+              if (contentToCheck && hasUnresolvedTemporaryIds(contentToCheck, temporaryIdMap, artifactUrlMap)) {
+                core.info(`Output ${result.repo}#${result.number} was created with unresolved temporary IDs - tracking for update`);
+                outputsWithUnresolvedIds.push({
+                  type: deferred.type,
+                  message: deferred.message,
+                  result: result,
+                  originalTempIdMapSize: tempIdMapSizeBefore,
+                });
+              }
+              if (result && result.temporaryId && result.temporaryIdEntry) {
+                const normalizedTempId = normalizeTemporaryId(result.temporaryId);
+                temporaryIdMap.set(normalizedTempId, result.temporaryIdEntry);
+              }
+            }
+
+            // Update the result to success
+            const resultIndex = results.findIndex(r => r.messageIndex === deferred.messageIndex);
+            if (resultIndex >= 0) {
+              results[resultIndex].success = true;
+              results[resultIndex].deferred = false;
+              results[resultIndex].result = result;
+            }
+
+            // Log to manifest after deferred retry success
+            logCreatedItemFromResult(onItemCreated, deferred.type, result);
+          }
+        } catch (error) {
+          const errorMsg = getErrorMessage(error);
           core.error(`✗ Retry of message ${deferred.messageIndex + 1} (${deferred.type}) failed: ${errorMsg}`);
-          // Replace the deferred record so terminal retry failures classify as failed.
+          // Replace the deferred record so terminal retry exceptions classify as failed.
           const resultIndex = results.findIndex(r => r.messageIndex === deferred.messageIndex);
           if (resultIndex >= 0) {
             results[resultIndex] = {
@@ -1550,83 +1632,37 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
               success: false,
               deferred: false,
               error: errorMsg,
-              result: { ...result, success: false, deferred: false, error: errorMsg },
+              result: { success: false, deferred: false, error: errorMsg },
             };
           }
-          continue;
-        }
-
-        // Check if still deferred
-        if (result && result.deferred === true) {
-          core.warning(`⏸ Message ${deferred.messageIndex + 1} (${deferred.type}) still deferred - some temporary IDs remain unresolved`);
-          // Update the existing result entry
-          const resultIndex = results.findIndex(r => r.messageIndex === deferred.messageIndex);
-          if (resultIndex >= 0) {
-            results[resultIndex].result = result;
-          }
-        } else {
-          core.info(`✓ Message ${deferred.messageIndex + 1} (${deferred.type}) completed on retry`);
-
-          // If handler returned a temp ID mapping, add it to our map
-          // This ensures that sub-issues created during deferred retry have their temporary IDs
-          // registered so parent issues can reference them in synthetic updates
-          if (result && result.temporaryId && result.repo && result.number) {
-            const normalizedTempId = normalizeTemporaryId(result.temporaryId);
-            temporaryIdMap.set(normalizedTempId, {
-              repo: result.repo,
-              number: result.number,
-            });
-            core.info(`Registered temporary ID: ${result.temporaryId} -> ${result.repo}#${result.number}`);
-          }
-
-          // Check if this output was created with unresolved temporary IDs
-          // For create_issue, create_discussion - check if body has unresolved IDs
-          // This enables synthetic updates to resolve references after all items are created
-          if (result && result.number && result.repo) {
-            const contentToCheck = getContentToCheck(deferred.type, deferred.message, result);
-            if (contentToCheck && hasUnresolvedTemporaryIds(contentToCheck, temporaryIdMap, artifactUrlMap)) {
-              core.info(`Output ${result.repo}#${result.number} was created with unresolved temporary IDs - tracking for update`);
-              outputsWithUnresolvedIds.push({
-                type: deferred.type,
-                message: deferred.message,
-                result: result,
-                originalTempIdMapSize: tempIdMapSizeBefore,
-              });
-            }
-            if (result && result.temporaryId && result.temporaryIdEntry) {
-              const normalizedTempId = normalizeTemporaryId(result.temporaryId);
-              temporaryIdMap.set(normalizedTempId, result.temporaryIdEntry);
-            }
-          }
-
-          // Update the result to success
-          const resultIndex = results.findIndex(r => r.messageIndex === deferred.messageIndex);
-          if (resultIndex >= 0) {
-            results[resultIndex].success = true;
-            results[resultIndex].deferred = false;
-            results[resultIndex].result = result;
-          }
-
-          // Log to manifest after deferred retry success
-          logCreatedItemFromResult(onItemCreated, deferred.type, result);
-        }
-      } catch (error) {
-        const errorMsg = getErrorMessage(error);
-        core.error(`✗ Retry of message ${deferred.messageIndex + 1} (${deferred.type}) failed: ${errorMsg}`);
-        // Replace the deferred record so terminal retry exceptions classify as failed.
-        const resultIndex = results.findIndex(r => r.messageIndex === deferred.messageIndex);
-        if (resultIndex >= 0) {
-          results[resultIndex] = {
-            type: deferred.type,
-            messageIndex: deferred.messageIndex,
-            success: false,
-            deferred: false,
-            error: errorMsg,
-            result: { success: false, deferred: false, error: errorMsg },
-          };
+        } finally {
+          await drainWaitingMessages();
         }
       }
+
+      const waitingIndexes = new Set(stillDeferred.map(deferred => deferred.messageIndex));
+      let newlyDeferred = false;
+      for (const deferred of deferredMessages) {
+        const result = results.find(item => item.messageIndex === deferred.messageIndex);
+        if (result?.deferred && !attempted.has(deferred.messageIndex) && !waitingIndexes.has(deferred.messageIndex)) {
+          stillDeferred.push(deferred);
+          waitingIndexes.add(deferred.messageIndex);
+          newlyDeferred = true;
+        }
+      }
+      if (temporaryIdMap.size === roundStartTemporaryIdCount && !newlyDeferred) break;
+      pending = stillDeferred;
     }
+  }
+
+  await retryDeferredMessages();
+  for (const i of waitingMessages) {
+    await processMessage(i, false);
+  }
+
+  for (const result of results) {
+    const outputId = messages[result.messageIndex]?.output_id;
+    if (outputId !== undefined) result.output_id = outputId;
   }
 
   // Return outputs with unresolved IDs for synthetic update processing
@@ -2227,7 +2263,13 @@ async function main(options = {}) {
 
     if (messageHandlers.size === 0) {
       const delegatedTypes = new Set([...STANDALONE_STEP_TYPES, ...loadCustomSafeOutputJobTypes()]);
-      outcomeResults = allMessages.map((message, messageIndex) => ({ type: message.type, messageIndex, skipped: true, delegated: delegatedTypes.has(message.type) }));
+      outcomeResults = allMessages.map((message, messageIndex) => ({
+        type: message.type,
+        messageIndex,
+        ...(message.output_id !== undefined ? { output_id: message.output_id } : {}),
+        skipped: true,
+        delegated: delegatedTypes.has(message.type),
+      }));
       core.info("No handlers loaded - nothing to process");
       // Ensure manifest file exists even when no handlers are loaded (skip in staged mode)
       if (!isStaged) ensureManifestExists();
@@ -2347,7 +2389,7 @@ async function main(options = {}) {
       core.info(`Reported assignment failures: ${reportOnlyFailureCount}`);
     }
     if (cancelledCount > 0) {
-      core.info(`Cancelled (code push failed): ${cancelledCount}`);
+      core.info(`Cancelled: ${cancelledCount}`);
     }
     if (deferredCount > 0) {
       core.info(`Deferred: ${deferredCount}`);
@@ -2391,7 +2433,7 @@ async function main(options = {}) {
       core.warning(`${reportOnlyFailureCount} non-fatal safe output(s) failed but were reported without failing safe_outputs: ${reportOnlyTypes.join(", ")}`);
     }
     if (cancelledCount > 0) {
-      core.warning(`${cancelledCount} message(s) were cancelled because a code push operation failed`);
+      core.warning(`${cancelledCount} message(s) were cancelled`);
     }
     if (skippedNoHandlerResults.length > 0) {
       core.warning(`${skippedNoHandlerResults.length} message(s) were skipped because no handler was loaded. Check your workflow's safe-outputs configuration.`);

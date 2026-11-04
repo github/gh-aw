@@ -24,7 +24,21 @@ const maxFuzzyMatchSuggestions = 7
 // validateExpressionSafety checks that all GitHub Actions expressions in the markdown content
 // are in the allowed list and returns an error if any unauthorized expressions are found
 func validateExpressionSafety(markdownContent string) error {
+	return validateMarkdownExpressionSafety(markdownContent, true)
+}
+
+// Local imported files are author sources and use the main prompt's allowlist.
+func validateRuntimeImportExpressionSafety(markdownContent string) error {
+	return validateExpressionSafety(removeXMLComments(markdownContent))
+}
+
+func validateMarkdownExpressionSafety(markdownContent string, allowEnv bool) error {
 	expressionValidationLog.Print("Validating expression safety in markdown content")
+
+	var envMatcher expressionMatcher
+	if allowEnv {
+		envMatcher = EnvPattern
+	}
 
 	matches, err := actionslanguageservice.ExtractExpressions(markdownContent)
 	if err != nil {
@@ -50,7 +64,7 @@ func validateExpressionSafety(markdownContent string) error {
 			WorkflowCallInputsRe:    WorkflowCallInputsPattern,
 			AwInputsRe:              AWInputsPattern,
 			AwImportInputsRe:        AWImportInputsPattern,
-			EnvRe:                   EnvPattern,
+			EnvRe:                   envMatcher,
 			UnauthorizedExpressions: &unauthorizedExpressions,
 		}); err != nil {
 			return err
@@ -58,14 +72,14 @@ func validateExpressionSafety(markdownContent string) error {
 	}
 
 	if len(unauthorizedExpressions) > 0 {
-		return unauthorizedExpressionsError(unauthorizedExpressions)
+		return unauthorizedExpressionsError(unauthorizedExpressions, allowEnv)
 	}
 
 	expressionValidationLog.Print("Expression safety validation passed")
 	return nil
 }
 
-func unauthorizedExpressionsError(unauthorizedExpressions []string) error {
+func unauthorizedExpressionsError(unauthorizedExpressions []string, allowEnv bool) error {
 	expressionValidationLog.Printf("Expression safety validation failed: %d unauthorized expressions found", len(unauthorizedExpressions))
 	var unauthorizedList strings.Builder
 	unauthorizedList.WriteString("\n")
@@ -97,7 +111,9 @@ func unauthorizedExpressionsError(unauthorizedExpressions []string) error {
 	allowedList.WriteString("  - github.aw.inputs.* (shared workflow inputs)\n")
 	allowedList.WriteString("  - github.aw.import-inputs.* (import-schema inputs)\n")
 	allowedList.WriteString("  - inputs.* (workflow_call)\n")
-	allowedList.WriteString("  - env.*\n")
+	if allowEnv {
+		allowedList.WriteString("  - env.*\n")
+	}
 
 	return NewValidationError(
 		"expressions",
@@ -169,7 +185,11 @@ func isGatewayEventsExpression(expression string) bool {
 		tree = tree.Child(0)
 	}
 	path, ok := actionslanguageservice.Reference(tree)
-	if !ok || len(path) < 2 || path[0] != "gateway" || path[1] != "events" {
+	if !ok || len(path) < 2 {
+		return false
+	}
+	//nolint:uncheckedsliceindex // The preceding guard requires both path components.
+	if path[0] != "gateway" || path[1] != "events" {
 		return false
 	}
 	for _, property := range path[2:] {

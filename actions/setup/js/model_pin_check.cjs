@@ -20,7 +20,7 @@
  *   - `provider not in the Copilot catalogue`: the pin targets another provider (an
  *     explicit non-Copilot prefix, the engine's own provider such as Anthropic or
  *     OpenAI, or Copilot BYOK via `engine.env.COPILOT_PROVIDER_BASE_URL`).
- *   - `sentinel`: `inherited` (a sub-agent that uses its parent's model; the parent's
+ *   - `sentinel`: `inherited` or Claude sub-agents' `inherit` (uses the parent's model; the parent's
  *     pin is checked in its own row) or `auto` on an engine or field where `auto` is
  *     the gateway's own model selection rather than a gh-aw alias (every engine except
  *     Copilot, and `safe-outputs.assign-to-agent.model`).
@@ -51,7 +51,7 @@ const REASON_EXPRESSION = "expression";
 const REASON_PROVIDER = "provider not in the Copilot catalogue";
 const REASON_BYOK = "provider not in the Copilot catalogue (BYOK via COPILOT_PROVIDER_BASE_URL)";
 const REASON_DETECTION_DISABLED = "threat detection disabled by the main workflow";
-const REASON_INHERITED = "sentinel `inherited`: the sub-agent uses its parent's model, which is checked in its own row";
+const REASON_INHERITED = "the sub-agent uses its parent's model, which is checked in its own row";
 const REASON_AUTO = "sentinel `auto`: the gateway selects the model";
 
 const STATUS_LABELS = Object.freeze({ unresolvable: "unresolvable", alias: "alias resolves", exact: "exact", not_checked: "not checked" });
@@ -67,6 +67,7 @@ const STATUS_ORDER = ["unresolvable", "alias", "exact", "not_checked"];
  *   provider: string,
  *   engine: string,
  *   autoSentinel: boolean,
+ *   inheritSentinel?: boolean,
  *   inactiveReason?: string,
  *   aliasEntries?: string[],
  *   aliasMap: Record<string, string[]>,
@@ -519,7 +520,7 @@ function collectWorkflowPins(workflowFile, options) {
    * @param {LoadedFile} file
    * @param {string} field
    * @param {unknown} value
-   * @param {{ engine: EngineInfo, provider: string, autoSentinel?: boolean, inactiveReason?: string }} scope
+   * @param {{ engine: EngineInfo, provider: string, autoSentinel?: boolean, inheritSentinel?: boolean, inactiveReason?: string }} scope
    */
   const addPin = (file, field, value, scope) => {
     const model = stringValue(value);
@@ -533,11 +534,13 @@ function collectWorkflowPins(workflowFile, options) {
       provider: scope.provider,
       engine: scope.engine.id || "copilot",
       autoSentinel: scope.autoSentinel ?? scope.engine.id !== "copilot",
+      inheritSentinel: scope.inheritSentinel ?? false,
       ...(scope.inactiveReason ? { inactiveReason: scope.inactiveReason } : {}),
       aliasMap,
     });
   };
   const mainScope = { engine, provider: mainProvider };
+  const subAgentScope = { ...mainScope, inheritSentinel: engine.id === "claude" };
   const detectionScope = { engine: detectionEngine, provider: detectionProvider, ...(detectionDisabled ? { inactiveReason: REASON_DETECTION_DISABLED } : {}) };
   const copilotScope = { engine: { id: "copilot", explicitProvider: "", byok: false, definitionProvider: "" }, provider: "copilot" };
 
@@ -567,7 +570,7 @@ function collectWorkflowPins(workflowFile, options) {
   for (const file of files) {
     const fm = file.frontmatter;
     if (file.agentFile) {
-      addPin(file, "model (imported agent file)", fm.model, mainScope);
+      addPin(file, "model (imported agent file)", fm.model, subAgentScope);
       continue;
     }
     addPin(file, "model", fm.model, mainScope);
@@ -613,7 +616,7 @@ function collectWorkflowPins(workflowFile, options) {
     }
     for (const agent of agents) {
       const parsed = parseMarkdownFrontmatter(agent.content);
-      if (parsed.frontmatter) addPin(file, `## agent: '${agent.name}' model`, parsed.frontmatter.model, mainScope);
+      if (parsed.frontmatter) addPin(file, `## agent: '${agent.name}' model`, parsed.frontmatter.model, subAgentScope);
     }
   }
 
@@ -692,7 +695,7 @@ function classifyPin(pin, reflectData) {
   const values = pin.kind === "alias-definition" ? [pin.model, ...(pin.aliasEntries || [])] : [pin.model];
   if (values.some(value => value.includes("${{"))) return { ...result, reason: REASON_EXPRESSION };
   const name = pin.kind === "model" ? bareModelName(pin.model) : "";
-  if (name === "inherited") return { ...result, reason: REASON_INHERITED };
+  if (name === "inherited" || (name === "inherit" && pin.inheritSentinel)) return { ...result, reason: `sentinel \`${name}\`: ${REASON_INHERITED}` };
   if (pin.inactiveReason) return { ...result, reason: pin.inactiveReason };
   if (pin.provider === "byok") return { ...result, reason: REASON_BYOK };
   const prefix = pin.kind === "model" ? modelPrefixProvider(pin.model) : "";

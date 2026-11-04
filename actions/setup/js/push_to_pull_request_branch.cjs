@@ -2,6 +2,8 @@
 /// <reference types="@actions/github-script" />
 
 const { createReportIssue, buildIssueReport } = require("./issue_report.cjs");
+const { extractExpirationDate } = require("./ephemerals.cjs");
+const { appendReportExecutionProvenance } = require("./execution_provenance.cjs");
 const { getWorkflowCompilationNotice, isWorkflowYamlFile } = require("./workflow_file_exclusions.cjs");
 const { getStalePullRequestReason, StalePullRequestError } = require("./pr_lifecycle.cjs");
 
@@ -32,6 +34,7 @@ const { findRepoCheckout } = require("./find_repo_checkout.cjs");
 const { getThreatWarningPresentation, getEffectiveDetectionConclusion } = require("./threat_detection_warning.cjs");
 const { attachExecutionState } = require("./safe_output_execution_metadata.cjs");
 const { resolveTransportPaths } = require("./resolve_transport_paths.cjs");
+const { recoverObjectPack, isObjectPack, recoveryToken, traceObjectPack } = require("./object_pack_transport.cjs");
 const { buildManualBranchApplyCommands, buildFallbackIssueBlocks, withTransientPushRetry } = require("./create_pull_request_helpers.cjs");
 
 /**
@@ -564,7 +567,7 @@ async function main(config = {}) {
    */
   return withTransportIntegrity(async function handlePushToPullRequestBranch(message, resolvedTemporaryIds, transport) {
     const exec = transport.guardExec(globalThis.exec);
-    const compilationNotice = getWorkflowCompilationNotice(message, config);
+    let compilationNotice = getWorkflowCompilationNotice(message, config);
     if (compilationNotice) core.warning(compilationNotice);
     // Check max count
     if (maxCount > 0 && processedCount >= maxCount) {
@@ -587,6 +590,44 @@ async function main(config = {}) {
     const transportPaths = resolveTransportPaths(message, itemRepo);
     transport.captureOptional(transportPaths.patchPath);
     transport.captureOptional(transportPaths.bundlePath);
+    const objectPackRecovery = {};
+    if (transportPaths.bundlePath && isObjectPack(transport.read(transportPaths.bundlePath))) {
+      const triggeringPR = context.payload?.pull_request;
+      const aw = parseAwContext(context.payload?.inputs?.aw_context);
+      const explicitPull = message.pull_request_number ?? message.pullRequestNumber ?? message.target ?? message.pr_number ?? message.pull_number ?? message.item_number ?? message.pr;
+      const recoveryPull =
+        target === "triggering" ? parsePositiveInteger(triggeringPR?.number || context.payload?.issue?.number || (aw?.item_type === "pull_request" ? aw.item_number : null)) : parsePositiveInteger(target === "*" ? explicitPull : target);
+      const boundTarget = !!recoveryPull && triggeringPR?.number === recoveryPull && triggeringPR?.base?.repo?.full_name?.toLowerCase() === itemRepo.toLowerCase();
+      traceObjectPack("target-resolution", { eligible: boundTarget, incremental: true });
+      if (!boundTarget) {
+        throw new Error("Object-pack recovery requires a trusted triggering-PR baseline. Provision checkout data for dynamic PR updates.");
+      }
+      const { data: recoveryPR } = await githubClient.rest.pulls.get({ owner: repoParts.owner, repo: repoParts.repo, pull_number: recoveryPull });
+      const expectedHeadRepo = configuredHeadRepo || itemRepo;
+      const authorizedHead = recoveryPR.state === "open" && recoveryPR.head?.repo?.full_name?.toLowerCase() === expectedHeadRepo.toLowerCase() && triggeringPR.head?.repo?.full_name?.toLowerCase() === expectedHeadRepo.toLowerCase();
+      traceObjectPack("head-authorization", { eligible: authorizedHead });
+      if (!authorizedHead) {
+        throw new Error("Object-pack recovery is not authorized for this PR head repository");
+      }
+      const recovered = await recoverObjectPack(transport, transportPaths, {
+        repo: expectedHeadRepo,
+        branch: recoveryPR.head.ref,
+        mode: "incremental",
+        baseline: triggeringPR.head.sha,
+        config,
+        message,
+        token: configuredHeadRepo
+          ? headGitHubToken || (expectedHeadRepo.toLowerCase() === itemRepo.toLowerCase() ? await recoveryToken(githubClient, config["github-token"]) : undefined)
+          : await recoveryToken(githubClient, config["github-token"]),
+        staged: isStaged,
+        manualRecovery: objectPackRecovery,
+      });
+      if (recovered && config.patch_format === "am") transportPaths.bundlePath = undefined;
+      if (!compilationNotice) {
+        compilationNotice = getWorkflowCompilationNotice(message, config);
+        if (compilationNotice) core.warning(compilationNotice);
+      }
+    }
     const patchFilePath = transportPaths.patchPath;
     core.info(`Patch file path: ${patchFilePath || "(not set)"}`);
 
@@ -1011,6 +1052,7 @@ async function main(config = {}) {
       const runId = context.runId;
       const artifactFileName = hasBundleFile ? bundleFilePath.replace("/tmp/gh-aw/", "") : patchFilePath ? patchFilePath.replace("/tmp/gh-aw/", "") : "aw-unknown.patch";
       const applyInstructions = buildManualBranchApplyCommands({
+        objectPackRecovery,
         hasBundleFile,
         runId,
         artifactFileName,
@@ -1031,6 +1073,13 @@ async function main(config = {}) {
         branch_name: branchName,
         apply_instructions: applyInstructions,
       });
+      const expirationDate = extractExpirationDate(pullRequest.body || "") || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      issueBody.push({
+        type: "quote",
+        agentTainted: false,
+        children: [{ type: "expiration", expiresAt: expirationDate.toISOString(), agentTainted: false }],
+      });
+      const issueReport = appendReportExecutionProvenance(buildIssueReport(issueTitle, issueBody), process.env.GH_AW_WORKFLOW_NAME || "Workflow", runUrl);
 
       try {
         const { data: issue } = await withRetry(
@@ -1042,9 +1091,9 @@ async function main(config = {}) {
                 owner: repoParts.owner,
                 repo: repoParts.repo,
                 title: issueTitle,
-                labels: ["agentic-workflows"],
+                labels: ["agentic-workflows", "pull-request-fallback"],
               },
-              buildIssueReport(issueTitle, issueBody)
+              issueReport
             );
           },
           RATE_LIMIT_RETRY_CONFIG,

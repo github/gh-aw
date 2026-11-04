@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -14,47 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-type testPromptRenderConfig struct {
-	Items []struct {
-		ContentEnvVar   string `json:"content_env"`
-		File            string `json:"file"`
-		ConditionEnvVar string `json:"condition_env"`
-	} `json:"items"`
-}
-
-func promptRenderPlan(t *testing.T, output string) string {
-	t.Helper()
-
-	const configPrefix = "GH_AW_PROMPT_CONFIG: "
-	configStart := strings.Index(output, configPrefix)
-	require.NotEqual(t, -1, configStart, "Prompt render config should be present")
-	configLine := output[configStart+len(configPrefix):]
-	configLine, _, _ = strings.Cut(configLine, "\n")
-	configJSON, err := strconv.Unquote(configLine)
-	require.NoError(t, err)
-
-	var config testPromptRenderConfig
-	require.NoError(t, json.Unmarshal([]byte(configJSON), &config))
-
-	var plan strings.Builder
-	for _, item := range config.Items {
-		if item.File != "" {
-			plan.WriteString(item.File)
-			plan.WriteByte('\n')
-			continue
-		}
-		prefix := item.ContentEnvVar + ": "
-		valueStart := strings.Index(output, prefix)
-		require.NotEqual(t, -1, valueStart, "Prompt content variable %s should be present", item.ContentEnvVar)
-		valueLine := output[valueStart+len(prefix):]
-		valueLine, _, _ = strings.Cut(valueLine, "\n")
-		value, unquoteErr := strconv.Unquote(valueLine)
-		require.NoError(t, unquoteErr)
-		plan.WriteString(value)
-	}
-	return plan.String()
-}
 
 func TestGenerateUnifiedPromptCreationStep_TreatsUserContentAsData(t *testing.T) {
 	compiler := &Compiler{}
@@ -162,6 +120,67 @@ func TestGenerateUnifiedPromptCreationStep_StaticValuesAsData(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGenerateUnifiedPromptCreationStep_QuotesExpressionEnvVars(t *testing.T) {
+	expressions := map[string]string{
+		"GH_AW_TEST":      `${{ github.event.issue.title || 'value: "quoted" # comment' }}`,
+		"GH_AW_MULTILINE": "${{ github.event.issue.title || '\"first line\nsecond line' }}",
+	}
+	compiler := &Compiler{}
+	data := &WorkflowData{ParsedTools: NewTools(map[string]any{})}
+	section := PromptSection{
+		Content: "Prompt content",
+		EnvVars: expressions,
+	}
+
+	var creation strings.Builder
+	mappings := compiler.generateUnifiedPromptCreationStep(&creation, []PromptSection{section}, nil, nil, data)
+	compiler.generateInterpolationAndTemplateStep(&creation, mappings, data, false)
+
+	var workflow struct {
+		Jobs map[string]struct {
+			Steps []struct {
+				Env map[string]string `yaml:"env"`
+			} `yaml:"steps"`
+		} `yaml:"jobs"`
+	}
+	require.NoError(t, yaml.Unmarshal([]byte("jobs:\n  test:\n    steps:\n"+creation.String()), &workflow))
+	require.Len(t, workflow.Jobs["test"].Steps, 2)
+	for _, step := range workflow.Jobs["test"].Steps {
+		for key, expression := range expressions {
+			assert.Equal(t, expression, step.Env[key])
+		}
+	}
+}
+
+func TestGenerateUnifiedPromptCreationStep_QuotesLiteralEnvVarsOnce(t *testing.T) {
+	const literal = "quote: \"value\"\nnext\\line"
+	compiler := &Compiler{}
+	data := &WorkflowData{ParsedTools: NewTools(map[string]any{})}
+	section := PromptSection{
+		Content: "Prompt content",
+		EnvVars: map[string]string{"GH_AW_LITERAL": literal},
+	}
+
+	var creation strings.Builder
+	mappings := compiler.generateUnifiedPromptCreationStep(&creation, []PromptSection{section}, nil, nil, data)
+	require.Len(t, mappings, 1)
+	assert.True(t, mappings[0].IsLiteral)
+	assert.Equal(t, literal, mappings[0].environmentValue())
+	compiler.generateInterpolationAndTemplateStep(&creation, mappings, data, false)
+
+	var workflow struct {
+		Jobs map[string]struct {
+			Steps []struct {
+				Env map[string]string `yaml:"env"`
+			} `yaml:"steps"`
+		} `yaml:"jobs"`
+	}
+	require.NoError(t, yaml.Unmarshal([]byte("jobs:\n  test:\n    steps:\n"+creation.String()), &workflow))
+	require.Len(t, workflow.Jobs["test"].Steps, 2)
+	assert.NotContains(t, workflow.Jobs["test"].Steps[0].Env, "GH_AW_LITERAL")
+	assert.Equal(t, literal, workflow.Jobs["test"].Steps[1].Env["GH_AW_LITERAL"])
 }
 
 func TestGenerateUnifiedPromptCreationStep_SplitsSystemAndUserItems(t *testing.T) {
@@ -751,16 +770,21 @@ func TestGenerateUnifiedPromptCreationStep_PRContextConditional(t *testing.T) {
 	builtinSections := compiler.collectPromptSections(data)
 	userPromptChunks := []string{"# User Task"}
 
-	var yaml strings.Builder
-	compiler.generateUnifiedPromptCreationStep(&yaml, builtinSections, userPromptChunks, nil, data)
+	var creation strings.Builder
+	compiler.generateUnifiedPromptCreationStep(&creation, builtinSections, userPromptChunks, nil, data)
 
-	output := yaml.String()
+	output := creation.String()
 	plan := promptRenderPlan(t, output)
 
 	// Verify PR context is included with conditional
 	assert.Contains(t, output, "pr_context_prompt.md", "Should have PR context prompt file reference")
 	assert.Contains(t, output, `\"condition_env\":\"GH_AW_INCLUDE_PR_CONTEXT\"`, "Should reference a condition environment variable")
-	assert.Contains(t, output, "GH_AW_INCLUDE_PR_CONTEXT: ${{", "Should evaluate the condition as environment data")
+	var steps []struct {
+		Env map[string]string `yaml:"env"`
+	}
+	require.NoError(t, yaml.Unmarshal([]byte(output), &steps))
+	require.Len(t, steps, 1)
+	assert.Equal(t, "${{ (github.event_name == 'issue_comment' && github.event.issue.pull_request != null) || github.event_name == 'pull_request_review_comment' || github.event_name == 'pull_request_review' }}", steps[0].Env["GH_AW_INCLUDE_PR_CONTEXT"], "Should evaluate the condition as environment data")
 	assert.NotContains(t, output, "if [", "Should not use shell conditions")
 
 	// Verify it's within system tags
@@ -994,12 +1018,9 @@ Actor: ${{ github.actor }}`
 	assert.Less(t, tempFolderPos, systemClosePos, "Built-in prompts should be before system tag closes")
 	assert.Less(t, playwrightPos, systemClosePos, "Playwright should be before system tag closes")
 
-	// Verify user prompt is after system tags
-	// With runtime-import, the actual content is in the original workflow file
-	// The lock file should contain the runtime-import macro after system tags
-	runtimeImportPos := strings.Index(plan, "{{#runtime-import")
-	assert.Greater(t, runtimeImportPos, -1, "Should contain runtime-import macro")
-	assert.Less(t, systemClosePos, runtimeImportPos, "Runtime-import macro should come after system tag closes")
+	authorPos := strings.Index(plan, "{{#author-prompt")
+	assert.Greater(t, authorPos, -1, "Should contain author source")
+	assert.Less(t, systemClosePos, authorPos, "Author source should come after system tag closes")
 
 	// Verify expressions are handled
 	assert.Contains(t, lockStr, "GH_AW_GITHUB_REPOSITORY:", "Should have repository env var")
@@ -1040,13 +1061,10 @@ Do something simple.`
 	// Should have at least temp folder
 	assert.Contains(t, lockStr, "temp_folder_prompt.md", "Should have temp folder prompt")
 
-	// User prompt should be after system tags
-	// With runtime-import, the actual content is in the original workflow file
-	// The lock file should contain the runtime-import macro after system tags
 	systemClosePos := strings.Index(plan, "</system>")
-	runtimeImportPos := strings.Index(plan, "{{#runtime-import")
-	assert.Greater(t, runtimeImportPos, -1, "Should contain runtime-import macro")
-	assert.Less(t, systemClosePos, runtimeImportPos, "Runtime-import macro should be after system tags")
+	authorPos := strings.Index(plan, "{{#author-prompt")
+	assert.Greater(t, authorPos, -1, "Should contain author source")
+	assert.Less(t, systemClosePos, authorPos, "Author source should be after system tags")
 }
 
 // TestUnifiedPromptCreation_SafeOutputsOnly tests workflow with only safe-outputs

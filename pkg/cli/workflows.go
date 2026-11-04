@@ -292,6 +292,16 @@ func filterWorkflowFiles(files []string) []string {
 
 // getMarkdownWorkflowFiles discovers markdown workflow files in the specified directory
 func getMarkdownWorkflowFiles(workflowDir string) ([]string, error) {
+	return getMarkdownWorkflowFilesWithRecursion(workflowDir, false)
+}
+
+// getMarkdownWorkflowFilesRecursively discovers workflow Markdown files in the
+// directory tree. Fix uses this so nested workflow files receive the same codemods.
+func getMarkdownWorkflowFilesRecursively(workflowDir string) ([]string, error) {
+	return getMarkdownWorkflowFilesWithRecursion(workflowDir, true)
+}
+
+func getMarkdownWorkflowFilesWithRecursion(workflowDir string, recursive bool) ([]string, error) {
 	// Use provided directory or default
 	workflowsDir := workflowDir
 	if workflowsDir == "" {
@@ -304,16 +314,36 @@ func getMarkdownWorkflowFiles(workflowDir string) ([]string, error) {
 		return nil, fmt.Errorf("no %s directory found", workflowsDir)
 	}
 
-	// Find all markdown files in workflow directory
-	mdFiles, err := filepath.Glob(filepath.Join(workflowsDir, "*.md"))
-	if err != nil {
-		return nil, fmt.Errorf("failed to find workflow files: %w", err)
+	var mdFiles []string
+	if recursive {
+		err := filepath.WalkDir(workflowsDir, func(path string, _ os.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if strings.EqualFold(filepath.Ext(path), ".md") {
+				mdFiles = append(mdFiles, path)
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to find workflow files: %w", err)
+		}
+	} else {
+		var err error
+		mdFiles, err = filepath.Glob(filepath.Join(workflowsDir, "*.md"))
+		if err != nil {
+			return nil, fmt.Errorf("failed to find workflow files: %w", err)
+		}
 	}
 
 	// Filter out README.md files
 	mdFiles = filterWorkflowFiles(mdFiles)
 
-	workflowsLog.Printf("Found %d markdown workflow file(s) in %s", len(mdFiles), workflowsDir)
+	if recursive {
+		workflowsLog.Printf("Found %d markdown workflow file(s) in %s recursively", len(mdFiles), workflowsDir)
+	} else {
+		workflowsLog.Printf("Found %d markdown workflow file(s) in %s", len(mdFiles), workflowsDir)
+	}
 	return mdFiles, nil
 }
 
@@ -433,16 +463,16 @@ func fastParseTitleFromReader(r io.Reader) (string, error) { //nolint:largefunc 
 }
 
 func isFrontmatterDelimiter(line []byte) bool {
-	return len(line) == 3 && line[0] == '-' && line[1] == '-' && line[2] == '-'
+	return bytes.Equal(line, []byte("---"))
 }
 
 func extractHeadingTitle(line []byte) (string, bool) {
 	switch {
-	case len(line) >= 2 && line[0] == '#' && line[1] == ' ':
+	case bytes.HasPrefix(line, []byte("# ")):
 		return string(bytes.TrimSpace(line[2:])), true
-	case len(line) >= 3 && line[0] == '#' && line[1] == '#' && line[2] == ' ':
+	case bytes.HasPrefix(line, []byte("## ")):
 		return string(bytes.TrimSpace(line[3:])), true
-	case len(line) >= 4 && line[0] == '#' && line[1] == '#' && line[2] == '#' && line[3] == ' ':
+	case bytes.HasPrefix(line, []byte("### ")):
 		return string(bytes.TrimSpace(line[4:])), true
 	default:
 		return "", false

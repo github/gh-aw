@@ -58,6 +58,11 @@ safe-outputs:
 timeout-minutes: 15
 strict: true
 
+evals:
+  - id: resource-query-answer
+    question: When resources are successfully converted, does the proposed response address the supplied query using their content? Return UNKNOWN when no resources can be converted.
+  - id: conversion-limitations-disclosed
+    question: When resource conversion fails, does the response disclose the resulting limitation rather than inventing resource content? Return UNKNOWN when no conversion fails.
 ---
 
 # Resource Summarizer Agent

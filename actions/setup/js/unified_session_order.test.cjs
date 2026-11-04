@@ -154,6 +154,7 @@ describe("Unified trace ordering", () => {
     expect(sessionTimestampNs({ timestamp: "1790899200123456789" }, "nanoseconds")).toBe(1790899200123456789n);
     expect(sessionTimestampNs({ timestamp: "2026-10-02T00:00:00.123456789+00:00" })).toBe(1790899200123456789n);
     expect(sessionTimestampNs({ timestamp: -1.25 })).toBe(-1250000n);
+    expect(sessionTimestampNs({ timestamp: "2026-02-29T19:00:00.123456789Z" })).toBeUndefined();
     expect(sessionTimestamp({ timestamp: "0" }, "nanoseconds")).toBe(0);
     for (const timestamp of ["", "-1", "1.5", "NaN", "8640000000000000000001", 1790899200000000000]) {
       expect(sessionTimestamp({ timestamp }, "nanoseconds")).toBeUndefined();

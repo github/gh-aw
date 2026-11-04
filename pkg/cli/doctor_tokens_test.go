@@ -101,12 +101,15 @@ func TestDoctorTokensRepositoryRegression(t *testing.T) {
 	cache.SetReadOnly(true)
 	for _, tt := range []struct{ workflow, secret string }{
 		{"pr-sous-chef", "AWI_MAINTENANCE_TOKEN"},
-		{"issue-monster", "GH_AW_AGENT_TOKEN"},
+		{"eslint-monster", "GH_AW_AGENT_TOKEN"},
 	} {
 		names, _, err := discoverDoctorTokens(filepath.Join(root, ".github/workflows", tt.workflow+".md"), cache)
 		require.NoError(t, err)
 		assert.Contains(t, names, tt.secret)
 	}
+	names, _, err := discoverDoctorTokens(filepath.Join(root, ".github/workflows/issue-monster.md"), cache)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"GH_AW_AGENT_TOKEN", "GH_AW_GITHUB_TOKEN"}, names)
 }
 
 func TestDoctorTokenLogEvidence(t *testing.T) {

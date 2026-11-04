@@ -29,7 +29,7 @@ The codebase follows several consistent patterns that should be emulated:
 - `create_pr_review_comment.go` - PR review comment creation
 
 **Why it works**:
-- Clear separation of concerns
+- Separation of concerns
 - Enables quick location of specific functionality
 - Prevents files from becoming too large
 - Facilitates parallel development
@@ -56,7 +56,7 @@ The codebase follows several consistent patterns that should be emulated:
 - Engine-specific logic is isolated
 - Shared code is centralized in `engine_helpers.go`
 - Allows addition of new engines without affecting existing ones
-- Clear boundaries reduce merge conflicts
+- Separate file boundaries reduce merge conflicts
 
 **When to use**:
 - Implementing new AI engines
@@ -75,7 +75,7 @@ The codebase follows several consistent patterns that should be emulated:
 
 **Why it works**:
 - All related functionality in one place
-- Provides clear view of the complete feature
+- Shows the complete feature in one place
 - Reduces navigation between files
 - Promotes cohesive design
 
@@ -100,7 +100,7 @@ The codebase follows several consistent patterns that should be emulated:
 
 **Why it works**:
 - Tests are co-located with implementation
-- Clear test purpose from filename
+- Test purpose is stated in the filename
 - Supports test coverage requirements
 - Separates integration from unit tests
 
@@ -139,7 +139,7 @@ tests.go                   # All tests
 **Good**:
 - `create_pull_request_reviewers_test.go` - Clear what's being tested
 - `engine_error_patterns_infinite_loop_test.go` - Specific scenario
-- `copilot_mcp_http_integration_test.go` - Clear scope and type
+- `copilot_mcp_http_integration_test.go` - Scope and type are stated in the name
 
 **Avoid**:
 - `utils.go` - Too vague
@@ -478,4 +478,4 @@ If you discover new patterns or anti-patterns:
 4. Update decision trees if needed
 5. Submit a pull request with your improvements
 
-Remember: **Good organization emerges from consistent patterns, not rigid rules.**
+Remember: **Maintainable organization comes from consistent patterns applied with judgment, not rigid rules.**

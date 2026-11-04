@@ -4,6 +4,8 @@ const fs = require("fs");
 const path = require("path");
 const { sumAICFromUsageJSONLFiles } = require("./daily_aic_workflow_helpers.cjs");
 const { API_READ_OPERATIONS } = require("./daily_aic_api_budget.cjs");
+const { EVALS_STATUS_FILENAME } = require("./evals_constants.cjs");
+const { EVALS_REASON_CODES, readEvalsNotEvaluatedStatus } = require("./evals_status.cjs");
 
 // These are the compiler-owned jobs and collect_usage_artifact_files.sh paths.
 // Raw firewall accounting is preferred to the overlapping engine summary.
@@ -117,6 +119,18 @@ function provesExecutionNotStarted(directory, name, runId, runAttempt) {
   } catch {
     return false;
   }
+}
+
+function hasFailedDecisionsEvals(directory, runId, runAttempt) {
+  const status = readEvalsNotEvaluatedStatus(path.join(directory, "evals", EVALS_STATUS_FILENAME));
+  return (
+    status?.engine === "decisions" &&
+    status.reason_code === EVALS_REASON_CODES.JUDGE_FAILED &&
+    status.execution_outcome === "failure" &&
+    status.execution_state === "started" &&
+    status.run_id === String(runId) &&
+    status.run_attempt === String(runAttempt)
+  );
 }
 
 function inspectAccountingFile(directory, file) {
@@ -263,7 +277,10 @@ function sumCoveredComponents(directory, components, artifactCreatedAt, artifact
         });
         continue;
       }
-      if (name === "evals" && job.conclusion === "failure") {
+      // Decisions is advisory: continue-on-error can leave the job successful
+      // even though the run-bound judge outcome records a failed request.
+      if (name === "evals" && (job.conclusion === "failure" || (job.conclusion === "success" && hasFailedDecisionsEvals(directory, runId, job.run_attempt)))) {
+        core.warning(`[daily-workflow-aic] Counting failed evals without response usage as zero under the failed-evaluation accounting policy for run ${runId}, attempt ${job.run_attempt}; provider billing remains unverified.`);
         logComponentAIC(runId, name, job, 0, "failed_before_accounting", {
           source: candidateStates[0].file,
         });

@@ -7,6 +7,7 @@ on:
 permissions:
   actions: read
   contents: read
+  copilot-requests: write
   issues: read
   pull-requests: read
 
@@ -32,7 +33,12 @@ safe-outputs:
     title-prefix: "[docs] "
 description: Consolidates and organizes developer documentation from multiple sources into a unified, searchable knowledge base
 emoji: 📝
-engine: claude
+engine:
+  id: claude
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: balanced
 name: Developer Documentation Consolidator
 strict: true
 timeout-minutes: 30

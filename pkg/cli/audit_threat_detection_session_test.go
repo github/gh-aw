@@ -87,8 +87,7 @@ func TestUnifiedDetectionResultOverridesLegacyEvidence(t *testing.T) {
 	result, found := readDetectionUsageResult(runDir)
 	require.True(t, found)
 	assert.Equal(t, detectionUsageResult{JobResult: "skipped", Conclusion: "skipped"}, result)
-	_, found = findThreatDetectionVerdict(runDir)
-	assert.False(t, found)
+	assert.False(t, readThreatDetectionEvidence(runDir).HasVerdict)
 	assert.Empty(t, generateThreatDetectionFindings(ProcessedRun{Run: WorkflowRun{LogsPath: runDir}}))
 }
 
@@ -219,9 +218,9 @@ func TestUnifiedDetectionResultFallsBackToLegacyArtifacts(t *testing.T) {
 	runDir := writeUnifiedDetectionTestSession(t, strings.Replace(unifiedDetectionTestHeader, `"version":1`, `"version":2`, 1))
 	require.NoError(t, os.WriteFile(filepath.Join(runDir, "detection_result.json"),
 		[]byte(`{"prompt_injection":false,"secret_leak":true,"malicious_patch":false}`), 0o600))
-	verdict, found := findThreatDetectionVerdict(runDir)
-	require.True(t, found)
-	assert.True(t, verdict.SecretLeak)
+	evidence := readThreatDetectionEvidence(runDir)
+	require.True(t, evidence.HasVerdict)
+	assert.True(t, evidence.Verdict.SecretLeak)
 }
 
 func TestReadThreatDetectionLiveArtifacts(t *testing.T) {
@@ -250,9 +249,9 @@ func TestReadThreatDetectionLiveArtifacts(t *testing.T) {
 			session, err := os.ReadFile(filepath.Join(runDir, "usage", "aw_session.jsonl"))
 			require.NoError(t, err)
 			isolatedDir := writeUnifiedDetectionTestSession(t, string(session))
-			isolatedVerdict, isolatedFound := findThreatDetectionVerdict(isolatedDir)
-			require.Equal(t, hasVerdict, isolatedFound)
-			assert.Equal(t, verdict, isolatedVerdict)
+			isolated := readThreatDetectionEvidence(isolatedDir)
+			require.Equal(t, hasVerdict, isolated.HasVerdict)
+			assert.Equal(t, verdict, isolated.Verdict)
 			t.Logf("Verified live detection result and unified-only verdict from %s", filepath.Base(runDir))
 		})
 	}

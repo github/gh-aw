@@ -7,13 +7,19 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  copilot-requests: write
   issues: read
   pull-requests: read
 
 sandbox:
   agent:
     id: awf
-engine: claude
+engine:
+  id: claude
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
 strict: true
 tools:
   cli-proxy: true

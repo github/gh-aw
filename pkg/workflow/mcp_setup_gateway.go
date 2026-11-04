@@ -142,7 +142,11 @@ func writeMCPGatewayStepEnvWithCustomGatewayEnvNames(yaml *strings.Builder, mcpE
 		if isReservedMCPGatewayEnvVar(envVarName) {
 			continue
 		}
-		fmt.Fprintf(yaml, "          %s: %s\n", envVarName, mcpEnvVars[envVarName])
+		if strings.HasPrefix(envVarName, mcpExpressionEnvPrefix) {
+			writeYAMLEnv(yaml, "          ", envVarName, mcpEnvVars[envVarName])
+		} else {
+			fmt.Fprintf(yaml, "          %s: %s\n", envVarName, mcpEnvVars[envVarName])
+		}
 	}
 	// Write safe-outputs input env vars (sorted); these must also be present in the
 	// runner step environment so the docker -e flag can forward them to the container.
@@ -299,7 +303,7 @@ func writeMCPGatewayExports(yaml *strings.Builder, opts writeMCPGatewayExportsOp
 	yaml.WriteString("          export MCP_GATEWAY_PAYLOAD_SIZE_THRESHOLD=\"" + strconv.Itoa(payloadSizeThreshold) + "\"\n")
 	// Allow read-write access to the host paths our built-in MCP servers mount
 	// (workspace, safe-outputs runtime dir, temp dir); see buildMCPGatewayAllowedMountRoots.
-	yaml.WriteString("          export MCP_GATEWAY_ALLOWED_MOUNT_ROOTS=\"" + buildMCPGatewayAllowedMountRoots(tools, gatewayConfig) + "\"\n")
+	yaml.WriteString("          export MCP_GATEWAY_ALLOWED_MOUNT_ROOTS=\"" + escapeMCPMountRootsShell(buildMCPGatewayAllowedMountRoots(tools, gatewayConfig)) + "\"\n")
 	// These values are populated only for pull request checkouts, but the safe-outputs
 	// server config always references them. Export empty defaults so Docker forwards
 	// defined values and strict gateway config expansion also works for other triggers.
@@ -552,6 +556,9 @@ func appendMCPGatewayBaseEnvFlags(containerCmd *strings.Builder, payloadPathPref
 		containerCmd.WriteString(" -e " + envVar)
 	}
 	containerCmd.WriteString(" -e " + compilerenv.PolicyAllowCreatePullRequest)
+	for _, name := range objectPackLimitEnvNames {
+		containerCmd.WriteString(" -e " + name)
+	}
 	containerCmd.WriteString(" -e GH_AW_ASSETS_BRANCH")
 	containerCmd.WriteString(" -e GH_AW_ASSETS_MAX_SIZE_KB")
 	containerCmd.WriteString(" -e GH_AW_ASSETS_ALLOWED_EXTS")
@@ -639,6 +646,9 @@ func buildMCPGatewayAllowedMountRoots(tools map[string]any, gatewayConfig *MCPGa
 	}
 
 	for _, mount := range collectMCPServerConfiguredMounts(tools) {
+		// Reuse the config's step environment bindings rather than interpolating
+		// authored Actions expressions into the allowlist export's shell source.
+		mount, _ = replaceMCPExpressions(mount, false)
 		addMount(mount)
 	}
 
@@ -661,7 +671,7 @@ func buildMCPGatewayAllowedMountRoots(tools map[string]any, gatewayConfig *MCPGa
 // so we normalize it here too, or the allowlist would gain a spurious entry
 // that never matches the real mounted path.
 func parseMCPGatewayAllowlistMount(mount string) (string, string, bool) {
-	mount = strings.ReplaceAll(mount, `\$`, "$")
+	mount = strings.ReplaceAll(mount, `\${`, "${")
 	parts := strings.SplitN(mount, ":", 3)
 	if len(parts) < 2 || parts[0] == "" {
 		return "", "", false
@@ -671,6 +681,26 @@ func parseMCPGatewayAllowlistMount(mount string) (string, string, bool) {
 		mode = "ro"
 	}
 	return parts[0], mode, true
+}
+
+// Only simple environment references may expand in this double-quoted export.
+// In particular, authored computations and quotes must remain mount path data.
+func escapeMCPMountRootsShell(roots string) string {
+	escape := strings.NewReplacer(`\`, `\\`, `"`, `\"`, "$", `\$`, "`", "\\`")
+	var result strings.Builder
+	remaining := roots
+	for _, reference := range mcpShellReferencePattern.FindAllString(roots, -1) {
+		literal, rest, _ := strings.Cut(remaining, reference)
+		result.WriteString(escape.Replace(normalizeMCPHeredocEscapes(literal)))
+		if strings.HasPrefix(reference, `\$`) {
+			result.WriteString(escape.Replace(reference[1:]))
+		} else {
+			result.WriteString(reference)
+		}
+		remaining = rest
+	}
+	result.WriteString(escape.Replace(normalizeMCPHeredocEscapes(remaining)))
+	return result.String()
 }
 
 // collectMCPServerConfiguredMounts scans every configured MCP server (built-in
@@ -836,6 +866,9 @@ func buildAddedGatewayEnvVarSet(workflowData *WorkflowData, customGatewayEnvName
 		"GITHUB_REF", "GITHUB_REF_NAME", "GITHUB_REF_TYPE", "GITHUB_HEAD_REF", "GITHUB_BASE_REF",
 	}
 	for _, envVar := range standardEnvVars {
+		addedEnvVars[envVar] = struct{}{}
+	}
+	for _, envVar := range objectPackLimitEnvNames {
 		addedEnvVars[envVar] = struct{}{}
 	}
 	for _, envVar := range optionalPRHeadEnvVars {

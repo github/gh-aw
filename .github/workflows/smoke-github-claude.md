@@ -12,6 +12,7 @@ on:
 permissions:
   contents: read
   pull-requests: read
+  copilot-requests: write
 name: Smoke GitHub Claude
 model: claude-haiku-4.5
 engine:
@@ -27,6 +28,13 @@ imports:
 tools:
   github:
     mode: gh-proxy
+evals:
+  - id: pr_summary_grounding
+    question: When PR context is available, does the requested summary accurately describe the current PR using its retrieved details? Return UNKNOWN when no PR context is available.
+  - id: pr_summary_fields
+    question: When PR context is available, does the compact comment include the PR title, author, and file count? Return UNKNOWN when no PR context is available.
+  - id: no_pr_noop
+    question: When no PR context is available, does the agent call noop without requesting a PR comment? Return UNKNOWN when PR context is available.
 safe-outputs:
   allowed-domains: [default-safe-outputs]
   add-comment:

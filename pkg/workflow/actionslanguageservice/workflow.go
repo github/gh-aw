@@ -22,16 +22,6 @@ type condition struct {
 	context []string
 }
 
-// ValidateWorkflow adds implicit if-condition parsing to the template reader.
-// Dependency resolution and policy checks belong to the compiler's Actions AST.
-func ValidateWorkflow(name, content string) error {
-	workflow, err := ParseWorkflow(name, content)
-	if err != nil {
-		return err
-	}
-	return validateConditions(name, workflow)
-}
-
 func validateConditions(name string, workflow *Workflow) error {
 	for _, condition := range workflow.conditions {
 		source := scalarText(condition.node)

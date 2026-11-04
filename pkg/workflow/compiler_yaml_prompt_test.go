@@ -65,7 +65,8 @@ func TestPromptImportRereadsRetainResolvedBase(t *testing.T) {
 				} else {
 					data.ImportPaths = []string{importPath}
 				}
-				chunks, _ := c.processPromptImportEntries(data)
+				chunks, _, err := c.processPromptImportEntries(data)
+				require.NoError(t, err)
 				require.Contains(t, strings.Join(chunks, "\n"), "safe content")
 				if layout == "fallback" || layout == "leaf" {
 					require.NoError(t, os.Remove(link))
@@ -74,7 +75,8 @@ func TestPromptImportRereadsRetainResolvedBase(t *testing.T) {
 					require.NoError(t, os.Rename(link, link+"-original"))
 					require.NoError(t, os.Symlink(outside, link))
 				}
-				chunks, _ = c.processPromptImportEntries(data)
+				chunks, _, err = c.processPromptImportEntries(data)
+				require.NoError(t, err)
 				require.NotContains(t, strings.Join(chunks, "\n"), "external secret")
 				require.Equal(t, []string{"{{#runtime-import " + importPath + "}}"}, chunks)
 				require.Empty(t, c.collectRuntimeImportMarkdownForCompilerAnalysis(data))
@@ -154,7 +156,8 @@ func TestProcessOrderedPromptImports(t *testing.T) {
 				c.markdownPath = tt.markdownPath
 			}
 
-			chunks, _ := c.processOrderedPromptImports(data)
+			chunks, _, err := c.processOrderedPromptImports(data)
+			require.NoError(t, err)
 
 			if tt.wantChunkCount > 0 && len(chunks) != tt.wantChunkCount {
 				t.Errorf("processOrderedPromptImports() got %d chunks, want %d; chunks: %v", len(chunks), tt.wantChunkCount, chunks)
@@ -210,7 +213,8 @@ func TestProcessOrderedPromptImportsFileReadFallback(t *testing.T) {
 		InlinedImports: true,
 	}
 
-	chunks, _ := c.processOrderedPromptImports(data)
+	chunks, _, err := c.processOrderedPromptImports(data)
+	require.NoError(t, err)
 	if len(chunks) != 1 {
 		t.Fatalf("expected 1 chunk, got %d", len(chunks))
 	}
@@ -270,7 +274,8 @@ func TestProcessLegacyPromptImports(t *testing.T) {
 				InlinedImports:   tt.inlinedImports,
 			}
 
-			chunks, _ := c.processLegacyPromptImports(data)
+			chunks, _, err := c.processLegacyPromptImports(data)
+			require.NoError(t, err)
 
 			for _, sub := range tt.wantChunkContain {
 				found := false
@@ -324,7 +329,8 @@ func TestProcessLegacyPromptImportsInlinedFromDisk(t *testing.T) {
 		InlinedImports: true,
 	}
 
-	chunks, _ := c.processLegacyPromptImports(data)
+	chunks, _, err := c.processLegacyPromptImports(data)
+	require.NoError(t, err)
 	if len(chunks) == 0 {
 		t.Fatal("expected at least one chunk after inlining from disk")
 	}
@@ -351,7 +357,8 @@ func TestProcessLegacyPromptImportsInlinedFallback(t *testing.T) {
 		InlinedImports: true,
 	}
 
-	chunks, _ := c.processLegacyPromptImports(data)
+	chunks, _, err := c.processLegacyPromptImports(data)
+	require.NoError(t, err)
 	if len(chunks) != 1 {
 		t.Fatalf("expected 1 chunk (runtime-import fallback), got %d", len(chunks))
 	}
@@ -436,7 +443,8 @@ func TestEnrichExpressionMappings(t *testing.T) {
 				Experiments:          tt.experiments,
 			}
 
-			result := c.enrichExpressionMappings(data, tt.initialMappings, tt.beforeActivationJobs)
+			result, err := c.enrichExpressionMappings(data, tt.initialMappings, tt.beforeActivationJobs)
+			require.NoError(t, err)
 
 			if len(result) != tt.wantMappingCount {
 				t.Errorf("enrichExpressionMappings() got %d mappings, want %d", len(result), tt.wantMappingCount)
@@ -533,7 +541,8 @@ func TestBuildMainWorkflowPromptChunks(t *testing.T) {
 				MainWorkflowMarkdown: tt.mainWorkflowMarkdown,
 			}
 
-			chunks, _ := c.buildMainWorkflowPromptChunks(data, nil, nil)
+			chunks, _, err := c.buildMainWorkflowPromptChunks(data, nil, nil)
+			require.NoError(t, err)
 
 			if tt.wantChunkCount > 0 && len(chunks) != tt.wantChunkCount {
 				t.Errorf("buildMainWorkflowPromptChunks() got %d chunks, want %d", len(chunks), tt.wantChunkCount)
@@ -576,7 +585,8 @@ func TestBuildMainWorkflowPromptChunksExpressionExtraction(t *testing.T) {
 		MainWorkflowMarkdown: "Issue number: ${{ github.event.issue.number }}",
 	}
 
-	_, mappings := c.buildMainWorkflowPromptChunks(data, nil, nil)
+	_, mappings, err := c.buildMainWorkflowPromptChunks(data, nil, nil)
+	require.NoError(t, err)
 	if len(mappings) == 0 {
 		t.Error("buildMainWorkflowPromptChunks() expected expression mappings to be extracted in inline mode")
 	}
@@ -592,7 +602,8 @@ func TestProcessPromptImportEntriesDispatch(t *testing.T) {
 				{ImportPath: ".github/workflows/shared.md"},
 			},
 		}
-		chunks, _ := c.processPromptImportEntries(data)
+		chunks, _, err := c.processPromptImportEntries(data)
+		require.NoError(t, err)
 		if len(chunks) == 0 {
 			t.Error("processPromptImportEntries() expected chunks from ordered path")
 		}
@@ -606,7 +617,8 @@ func TestProcessPromptImportEntriesDispatch(t *testing.T) {
 		data := &WorkflowData{
 			ImportPaths: []string{".github/workflows/shared.md"},
 		}
-		chunks, _ := c.processPromptImportEntries(data)
+		chunks, _, err := c.processPromptImportEntries(data)
+		require.NoError(t, err)
 		if len(chunks) == 0 {
 			t.Error("processPromptImportEntries() expected chunks from legacy path")
 		}
@@ -907,7 +919,8 @@ func TestExtractPromptChunksFromMarkdown(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			chunks, mappings := extractPromptChunksFromMarkdown(tt.body)
+			chunks, mappings, err := extractPromptChunksFromMarkdown(tt.body)
+			require.NoError(t, err)
 			if len(chunks) != tt.wantChunks {
 				t.Errorf("extractPromptChunksFromMarkdown() got %d chunks, want %d", len(chunks), tt.wantChunks)
 			}

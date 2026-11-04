@@ -7,6 +7,7 @@ permissions:
   contents: read
   issues: read
   pull-requests: read
+  copilot-requests: write
 imports:
 - shared/reporting.md
 - uses: shared/daily-audit-base.md
@@ -17,7 +18,12 @@ imports:
 - shared/otlp.md
 description: Analyzes Go type usage patterns and identifies opportunities for better type safety and code improvements
 emoji: ✍️
-engine: claude
+engine:
+  id: claude
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
 name: "Typist - Go Type Analysis"
 strict: true
 experiments:

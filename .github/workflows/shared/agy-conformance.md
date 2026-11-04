@@ -3,9 +3,9 @@ max-turn-cache-misses: 12
 mcp-servers:
   agy-native:
     type: http
-    url: "http://host.docker.internal:${{ steps.mcp-scripts-start.outputs.port }}"
+    url: "http://host.docker.internal:$GH_AW_MCP_SCRIPTS_PORT"
     headers:
-      Authorization: "${{ steps.mcp-scripts-start.outputs.api_key }}"
+      Authorization: '\${GH_AW_MCP_SCRIPTS_API_KEY}'
     allowed:
       - native_challenge
 mcp-scripts:

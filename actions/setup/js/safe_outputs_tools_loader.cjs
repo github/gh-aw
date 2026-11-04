@@ -4,6 +4,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_SYSTEM, ERR_SAFE_OUTPUT_TOOL_COPY_FAILED } = require("./error_codes.cjs");
 const { validateTargetRepo, parseAllowedRepos, getDefaultTargetRepo } = require("./repo_helpers.cjs");
 const { normalizeSafeOutputName, normalizeSafeOutputConfig } = require("./safe_output_names.cjs");
+const { addDependencySchema, createSubmissionTracker } = require("./safe_output_submission.cjs");
 
 const fs = require("fs");
 
@@ -211,6 +212,7 @@ function attachHandlers(tools, handlers, logger) {
   };
 
   tools.forEach(tool => {
+    addDependencySchema(tool);
     tool.name = normalizeSafeOutputName(tool.name);
     const handler = handlerMap[normalizeConfiguredToolName(tool.name)];
     if (handler) {
@@ -230,12 +232,13 @@ function attachHandlers(tools, handlers, logger) {
       // Create a custom handler that wraps args in inputs and adds workflow_name
       const workflowName = tool._workflow_name.trim();
       tool.handler = args => {
-        const { ref, ...inputs } = args ?? {};
+        const { ref, "depends-on": dependency, ...inputs } = args ?? {};
         // Wrap workflow inputs in inputs and pass dispatch ref as top-level field
         return handlers.defaultHandler("dispatch_workflow")({
           ...(ref && { ref }),
           ...(args !== undefined && { inputs }),
           workflow_name: workflowName,
+          ...(dependency !== undefined && { "depends-on": dependency }),
         });
       };
     }
@@ -244,9 +247,11 @@ function attachHandlers(tools, handlers, logger) {
     if (tool._dispatch_repository_tool) {
       const toolKey = tool._dispatch_repository_tool;
       tool.handler = args => {
+        const { "depends-on": dependency, ...inputs } = args ?? {};
         return handlers.defaultHandler("dispatch_repository")({
-          inputs: args,
+          inputs,
           tool_name: toolKey,
+          ...(dependency !== undefined && { "depends-on": dependency }),
         });
       };
     }
@@ -256,10 +261,12 @@ function attachHandlers(tools, handlers, logger) {
       // Create a custom handler that wraps args in inputs and adds workflow_name
       const workflowName = tool._call_workflow_name.trim();
       tool.handler = args => {
+        const { "depends-on": dependency, ...inputs } = args ?? {};
         // Wrap args in inputs property to match call_workflow schema
         return handlers.defaultHandler("call_workflow")({
-          inputs: args,
+          inputs,
           workflow_name: workflowName,
+          ...(dependency !== undefined && { "depends-on": dependency }),
         });
       };
     }
@@ -407,6 +414,7 @@ function registerPredefinedTools(server, tools, config, registerTool, normalizeT
  * @param {Function} normalizeTool - Function to normalize tool names
  */
 function registerDynamicTools(server, tools, config, outputFile, registerTool, normalizeTool) {
+  const submissions = createSubmissionTracker();
   Object.keys(config).forEach(configKey => {
     const normalizedKey = normalizeSafeOutputName(normalizeTool(configKey));
 
@@ -446,7 +454,7 @@ function registerDynamicTools(server, tools, config, outputFile, registerTool, n
         // CRITICAL: Use JSON.stringify WITHOUT formatting parameters for JSONL format
         // Each entry must be on a single line, followed by a newline character
         try {
-          fs.appendFileSync(outputFile, `${JSON.stringify(entry)}\n`);
+          submissions.append(entry, recorded => fs.appendFileSync(outputFile, `${JSON.stringify(recorded)}\n`));
         } catch (err) {
           throw new Error(`${ERR_SYSTEM}: Failed to append to file ${outputFile}: ${getErrorMessage(err)}`, { cause: err });
         }
@@ -493,6 +501,7 @@ function registerDynamicTools(server, tools, config, outputFile, registerTool, n
       });
     }
 
+    dynamicTool.handler = submissions.wrap(dynamicTool.handler, false);
     registerTool(server, dynamicTool);
   });
 }

@@ -82,6 +82,12 @@ describe("safe_output_action_handler", () => {
   });
 
   describe("handler — INTERNAL_MESSAGE_FIELDS filtering", () => {
+    it("does not forward dependency protocol metadata as action inputs", async () => {
+      const handler = await main({ action_name: "my_action" });
+      await handler({ type: "my_action", output_id: "so_operation", "depends-on": ["so_first"], depends_on: "so_first", title: "hello" }, {}, new Map());
+      expect(JSON.parse(global.core.setOutput.mock.calls[0][1])).toEqual({ title: "hello" });
+    });
+
     it("should strip 'type' from the exported payload", async () => {
       const handler = await main({ action_name: "my_action" });
       await handler({ type: "my_action", title: "hello" }, {}, new Map());

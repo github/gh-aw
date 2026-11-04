@@ -26,8 +26,11 @@ func TestExpressionMappingEnvironmentValue(t *testing.T) {
 	}
 	for _, content := range []string{"__GH_AW_DEFERRED_1234__", "", "true", "quote: \"value\"\nnext\\line"} {
 		mapping := &ExpressionMapping{EnvVar: "VALUE", Content: content, IsLiteral: true}
+		assert.Equal(t, content, mapping.environmentValue())
+		var emitted strings.Builder
+		writeYAMLEnv(&emitted, "", mapping.EnvVar, mapping.environmentValue())
 		var environment map[string]any
-		require.NoError(t, yaml.Unmarshal([]byte("VALUE: "+mapping.environmentValue()), &environment))
+		require.NoError(t, yaml.Unmarshal([]byte(emitted.String()), &environment))
 		assert.Equal(t, content, environment["VALUE"])
 		var substitution strings.Builder
 		generatePlaceholderEnvironment(&substitution, []*ExpressionMapping{mapping}, "")

@@ -261,6 +261,15 @@ safe-outputs:
     max-ai-credits: 750
 ```
 
+### Token Broker (`token-broker:`)
+
+An experimental frontmatter field that exchanges the job's OIDC identity for short-lived credentials from an organization-operated broker instead of using existing secrets. The `copilot-request` and `copilot-task` modes can be selected independently. Brokered request authentication is supported in threat-detection and evals jobs, and the broker endpoint comes from the `GH_AW_TOKEN_BROKER_URL` Actions variable or secret at runtime. A missing configuration or failed exchange blocks the affected operation rather than falling back to other credentials. See [Token Broker](/gh-aw/reference/frontmatter/#token-broker-token-broker) and the [Token Broker Specification](/gh-aw/specs/token-broker-specification/).
+
+```aw wrap
+token-broker:
+  copilot-task: true
+```
+
 ### Staged Mode
 
 A preview mode where workflows simulate actions without making changes. The AI generates output showing what would happen, but no GitHub API write operations are performed. Use for testing before production runs. See [Staged Mode](/gh-aw/reference/staged-mode/) for details.
@@ -327,7 +336,7 @@ safe-outputs:
     - "!inference_access_error"
 ```
 
-Common categories include `agent_failure`, `timed_out`, `missing_safe_outputs`, `report_incomplete`, `missing_tool`, `missing_data`, `inference_access_error`, `copilot_org_billing_error`, and `ai_credits_rate_limit_error`. See [Safe Outputs Reference](/gh-aw/reference/safe-outputs/) for the full list.
+Common categories include `agent_failure`, `activation_failed`, `timed_out`, `missing_safe_outputs`, `report_incomplete`, `missing_tool`, `missing_data`, `inference_access_error`, `copilot_org_billing_error`, and `ai_credits_rate_limit_error`. See [Safe Outputs Reference](/gh-aw/reference/safe-outputs/) for the full list.
 
 ### Report Failed Jobs (`report-failed-jobs:`)
 
@@ -963,7 +972,7 @@ A typed parameter contract declared in a shared workflow file that enables calle
 
 ### Runtime Import (`{{#runtime-import}}`)
 
-A body-level directive that injects the text content of another file at a specific point in the workflow markdown. Unlike the `imports:` frontmatter field (which merges configuration), `{{#runtime-import filepath}}` splices raw markdown text — useful for sharing reusable prompt snippets, tone instructions, or reference material. Use `{{#runtime-import? filepath}}` for an optional include that silently skips a missing file. Paths are resolved within the `.github` folder with or without the `.github/` prefix. See [Runtime Imports](/gh-aw/reference/templating/#runtime-imports).
+A body-level directive that includes local author files at a specific point in the workflow markdown. Unlike the `imports:` frontmatter field, it does not merge workflow configuration. Local files within `.github` or explicit `.agents/` paths share compiler-selected non-secret author bindings and support nested imports. Runtime imports perform no network fetching; external content must be retrieved by the agent inside the AWF sandbox. Use `{{#runtime-import? target}}` for optional local files; optional syntax does not permit remote targets. See [Runtime Imports](/gh-aw/reference/templating/#runtime-imports).
 
 ### Emoji (`emoji:`)
 
@@ -1125,6 +1134,14 @@ A frontmatter option that appends custom key/value pairs to the standard gh-aw a
 ### OTLP Authorization Header Guard
 
 A compiler-enforced rule for `observability.otlp` headers requiring the bare secret expression for `Authorization` values rather than a scheme prefix such as `Bearer`. For Sentry endpoints, gh-aw automatically rewrites `Authorization` to `x-sentry-auth`, so no prefix is needed. Prevents scheme-only header values (a stray auth scheme with no token) from being sent to the OTLP backend. See [OpenTelemetry](/gh-aw/reference/open-telemetry/).
+
+### OTLP Protobuf Encoding (`OTEL_EXPORTER_OTLP_PROTOCOL`)
+
+An opt-in wire encoding for the gh-aw JavaScript OTLP exporter. The exporter defaults to OTLP/HTTP JSON (`http/json`); setting `OTEL_EXPORTER_OTLP_PROTOCOL` to `http/protobuf` sends binary protobuf for traces and compact session logs, using a dependency-free encoder built on Node.js built-ins. `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL` and `OTEL_EXPORTER_OTLP_LOGS_PROTOCOL` override the encoding per signal. gRPC is not supported, and the local `otel.jsonl` trace mirror remains raw OTLP JSON. Required for Azure Monitor OTLP ingestion. See [OpenTelemetry](/gh-aw/reference/open-telemetry/#protobuf-encoding-and-azure-monitor).
+
+### OTLP Partial Success
+
+An OTLP export response that reports some spans or log records as rejected even though the HTTP request succeeded. The exporter inspects `partialSuccess` in JSON and protobuf responses for traces and logs, warns with a signal-specific rejection count, and increments `gh-aw.otlp.export_errors`. Accepted records are not retried, and collector messages are withheld because they may contain private data. See [OpenTelemetry](/gh-aw/reference/open-telemetry/).
 
 ### Custom Span (`logSpan`)
 

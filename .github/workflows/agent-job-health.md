@@ -11,6 +11,7 @@ permissions:
   pull-requests: read
   discussions: read
   actions: read
+  copilot-requests: write
 tracker-id: agent-job-health
 
 

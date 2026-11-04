@@ -392,16 +392,16 @@ func validateEnclaveEntry(index int, enclave *EnclaveConfig, seenTypes map[strin
 		return fmt.Errorf("enclaves[%d].agent.github and enclaves[%d].agent.tools.github cannot both be set. Use only one enclave GitHub configuration shape. Example:\n\nenclaves:\n  - agent:\n      model: gpt-5\n      tools:\n        github:\n          allowed: [list_issues]\n    repos:\n      - repo: org/my-repo\n        sensitivity: confidential", index, index)
 	}
 	if enclaveType == "agent" && enclave.Agent.GitHub != nil && enclave.Agent.GitHub.CLI != "" && enclave.Agent.GitHub.CLI != enclaveGitHubIssuesProfile {
-		return fmt.Errorf("enclaves[%d].agent.github.cli must be %q", index, enclaveGitHubIssuesProfile)
+		return fmt.Errorf("enclaves[%d].agent.github.cli must be %q. Example: enclaves: [{repos: [\"owner/repo\"]}] or enclaves: [{dynamic: {allowed-owners: [\"owner\"]}}]", index, enclaveGitHubIssuesProfile)
 	}
 	if enclaveType == "script" && enclave.Dynamic != nil {
-		return fmt.Errorf("enclaves[%d].dynamic is only supported for agent entries; script enclaves must declare static repos", index)
+		return fmt.Errorf("enclaves[%d].dynamic is only supported for agent entries; script enclaves must declare static repos. Example: enclaves: [{repos: [\"owner/repo\"]}] or enclaves: [{dynamic: {allowed-owners: [\"owner\"]}}]", index)
 	}
 	if len(enclave.Repos) > 0 && enclave.Dynamic != nil {
-		return fmt.Errorf("enclaves[%d] must declare either static repos or dynamic, not both", index)
+		return fmt.Errorf("enclaves[%d] must declare either static repos or dynamic, not both. Example: enclaves: [{repos: [\"owner/repo\"]}] or enclaves: [{dynamic: {allowed-owners: [\"owner\"]}}]", index)
 	}
 	if len(enclave.Repos) == 0 && enclave.Dynamic == nil {
-		return fmt.Errorf("enclaves[%d] must declare either non-empty static repos or a dynamic repository policy", index)
+		return fmt.Errorf("enclaves[%d] must declare either non-empty static repos or a dynamic repository policy. Example: enclaves: [{repos: [\"owner/repo\"]}] or enclaves: [{dynamic: {allowed-owners: [\"owner\"]}}]", index)
 	}
 	nonPublicRepositories := 0
 	var err error
@@ -432,38 +432,38 @@ func validateDynamicEnclavePolicy(index int, enclave *EnclaveConfig) error {
 		return nil
 	}
 	if len(policy.AllowedOwners) == 0 && len(policy.AllowedRepositories) == 0 {
-		return fmt.Errorf("enclaves[%d].dynamic must declare allowed-owners or allowed-repositories", index)
+		return fmt.Errorf("enclaves[%d].dynamic must declare allowed-owners or allowed-repositories. Example: enclaves: [{repos: [\"owner/repo\"]}] or enclaves: [{dynamic: {allowed-owners: [\"owner\"]}}]", index)
 	}
 	for ownerIndex, owner := range policy.AllowedOwners {
 		if !enclaveDynamicOwnerPattern.MatchString(owner) {
-			return fmt.Errorf("enclaves[%d].dynamic.allowed-owners[%d] must be a canonical lowercase ASCII owner matching ^[a-z0-9](?:[a-z0-9-]{0,38})$", index, ownerIndex)
+			return fmt.Errorf("enclaves[%d].dynamic.allowed-owners[%d] must be a canonical lowercase ASCII owner matching ^[a-z0-9](?:[a-z0-9-]{0,38})$. Example: enclaves: [{repos: [\"owner/repo\"]}] or enclaves: [{dynamic: {allowed-owners: [\"owner\"]}}]", index, ownerIndex)
 		}
 	}
 	for repoIndex, repo := range policy.AllowedRepositories {
 		if !isCanonicalDynamicRepositorySelector(repo) {
-			return fmt.Errorf("enclaves[%d].dynamic.allowed-repositories[%d] must use canonical dynamic selector form ^[a-z0-9](?:[a-z0-9-]{0,38})/(?!\\.\\.?$)(?!.*\\.\\.)[a-z0-9._-]{1,100}$", index, repoIndex)
+			return fmt.Errorf("enclaves[%d].dynamic.allowed-repositories[%d] must use canonical dynamic selector form ^[a-z0-9](?:[a-z0-9-]{0,38})/(?!\\.\\.?$)(?!.*\\.\\.)[a-z0-9._-]{1,100}$. Example: enclaves: [{repos: [\"owner/repo\"]}] or enclaves: [{dynamic: {allowed-owners: [\"owner\"]}}]", index, repoIndex)
 		}
 	}
 	switch policy.Sensitivity {
 	case "public", "trusted", "internal", "confidential", "sealed":
 	default:
-		return fmt.Errorf("enclaves[%d].dynamic.sensitivity must be public, trusted, internal, confidential, or sealed", index)
+		return fmt.Errorf("enclaves[%d].dynamic.sensitivity must be public, trusted, internal, confidential, or sealed. Example: enclaves: [{repos: [\"owner/repo\"]}] or enclaves: [{dynamic: {allowed-owners: [\"owner\"]}}]", index)
 	}
 	if policy.GitHubPolicy != enclaveDynamicGitHubPolicy {
-		return fmt.Errorf("enclaves[%d].dynamic.github-policy must be %q", index, enclaveDynamicGitHubPolicy)
+		return fmt.Errorf("enclaves[%d].dynamic.github-policy must be %q. Example: enclaves: [{repos: [\"owner/repo\"]}] or enclaves: [{dynamic: {allowed-owners: [\"owner\"]}}]", index, enclaveDynamicGitHubPolicy)
 	}
 	if policy.MaxRepositories <= 0 {
-		return fmt.Errorf("enclaves[%d].dynamic.max-repositories must be a positive finite integer", index)
+		return fmt.Errorf("enclaves[%d].dynamic.max-repositories must be a positive finite integer. Example: enclaves: [{repos: [\"owner/repo\"]}] or enclaves: [{dynamic: {allowed-owners: [\"owner\"]}}]", index)
 	}
 	if policy.Quotas == nil || policy.Quotas.MaxInvocations <= 0 || policy.Quotas.MaxOutputBytes <= 0 || policy.Quotas.MaxExecutionSeconds <= 0 {
-		return fmt.Errorf("enclaves[%d].dynamic.quotas must declare positive max-invocations, max-output-bytes, and max-execution-seconds", index)
+		return fmt.Errorf("enclaves[%d].dynamic.quotas must declare positive max-invocations, max-output-bytes, and max-execution-seconds. Example: enclaves: [{repos: [\"owner/repo\"]}] or enclaves: [{dynamic: {allowed-owners: [\"owner\"]}}]", index)
 	}
 	if len(policy.AuditLabels) == 0 {
-		return fmt.Errorf("enclaves[%d].dynamic.audit-labels must contain at least one audit label", index)
+		return fmt.Errorf("enclaves[%d].dynamic.audit-labels must contain at least one audit label. Example: enclaves: [{repos: [\"owner/repo\"]}] or enclaves: [{dynamic: {allowed-owners: [\"owner\"]}}]", index)
 	}
 	for labelIndex, label := range policy.AuditLabels {
 		if !enclaveAuditLabelPattern.MatchString(label) {
-			return fmt.Errorf("enclaves[%d].dynamic.audit-labels[%d] must match [A-Za-z0-9][A-Za-z0-9_.:-]{0,127}", index, labelIndex)
+			return fmt.Errorf("enclaves[%d].dynamic.audit-labels[%d] must match [A-Za-z0-9][A-Za-z0-9_.:-]{0,127}. Example: enclaves: [{repos: [\"owner/repo\"]}] or enclaves: [{dynamic: {allowed-owners: [\"owner\"]}}]", index, labelIndex)
 		}
 	}
 	if err := validateDynamicEnclaveBounds(index, enclave, policy); err != nil {
@@ -471,10 +471,10 @@ func validateDynamicEnclavePolicy(index int, enclave *EnclaveConfig) error {
 	}
 	if github := enclaveGitHubToolsConfig(enclave); github != nil {
 		if len(github.AllowedRepos) > 0 || github.MinIntegrity != "" {
-			return fmt.Errorf("enclaves[%d].agent.tools.github cannot set allowed-repos or min-integrity with dynamic repository policy", index)
+			return fmt.Errorf("enclaves[%d].agent.tools.github cannot set allowed-repos or min-integrity with dynamic repository policy. Example: enclaves: [{repos: [\"owner/repo\"]}] or enclaves: [{dynamic: {allowed-owners: [\"owner\"]}}]", index)
 		}
 		if len(github.Allowed) > 0 && !sameStringSet(github.Allowed, enclaveAgentGitHubDefaultTools) {
-			return fmt.Errorf("enclaves[%d].agent.tools.github.allowed must match %s when dynamic.github-policy is %q", index, strings.Join(enclaveAgentGitHubDefaultTools, ", "), enclaveDynamicGitHubPolicy)
+			return fmt.Errorf("enclaves[%d].agent.tools.github.allowed must match %s when dynamic.github-policy is %q. Example: enclaves: [{repos: [\"owner/repo\"]}] or enclaves: [{dynamic: {allowed-owners: [\"owner\"]}}]", index, strings.Join(enclaveAgentGitHubDefaultTools, ", "), enclaveDynamicGitHubPolicy)
 		}
 	}
 	return nil
@@ -491,16 +491,16 @@ func validateDynamicEnclaveBounds(index int, enclave *EnclaveConfig, policy *Dyn
 	// min(expires-at, job-start + enclave.timeout) when the workflow runs.
 	cpuLimit, err := strconv.ParseFloat(enclave.CPULimit, 64)
 	if err != nil || cpuLimit <= 0 {
-		return fmt.Errorf("enclaves[%d].cpu-limit must be a positive finite value", index)
+		return fmt.Errorf("enclaves[%d].cpu-limit must be a positive finite value. Example: enclaves: [{repos: [\"owner/repo\"]}] or enclaves: [{dynamic: {allowed-owners: [\"owner\"]}}]", index)
 	}
 	if enclave.Timeout <= 0 || enclave.MemoryLimit == "" || enclave.PIDsLimit <= 0 || enclave.TmpfsLimit == "" || enclave.MaxOutputBytes <= 0 || enclave.MaxInvocations <= 0 {
-		return fmt.Errorf("enclaves[%d] dynamic agent entries must declare finite timeout, memory-limit, cpu-limit, pids-limit, tmpfs-limit, max-output-bytes, and max-invocations", index)
+		return fmt.Errorf("enclaves[%d] dynamic agent entries must declare finite timeout, memory-limit, cpu-limit, pids-limit, tmpfs-limit, max-output-bytes, and max-invocations. Example: enclaves: [{repos: [\"owner/repo\"]}] or enclaves: [{dynamic: {allowed-owners: [\"owner\"]}}]", index)
 	}
 	if enclave.Timeout > maxDynamicEnclaveTimeoutSeconds {
-		return fmt.Errorf("enclaves[%d].timeout must be at most %d seconds for dynamic enclaves, got %d", index, maxDynamicEnclaveTimeoutSeconds, enclave.Timeout)
+		return fmt.Errorf("enclaves[%d].timeout must be at most %d seconds for dynamic enclaves, got %d. Example: enclaves: [{repos: [\"owner/repo\"]}] or enclaves: [{dynamic: {allowed-owners: [\"owner\"]}}]", index, maxDynamicEnclaveTimeoutSeconds, enclave.Timeout)
 	}
 	if enclave.Agent.MaxTaskBytes <= 0 || enclave.Agent.MaxModelRequests <= 0 || enclave.Agent.MaxModelTokens <= 0 {
-		return fmt.Errorf("enclaves[%d].agent dynamic entries must declare finite max-task-bytes, max-model-requests, and max-model-tokens", index)
+		return fmt.Errorf("enclaves[%d].agent dynamic entries must declare finite max-task-bytes, max-model-requests, and max-model-tokens. Example: enclaves: [{repos: [\"owner/repo\"]}] or enclaves: [{dynamic: {allowed-owners: [\"owner\"]}}]", index)
 	}
 	return nil
 }

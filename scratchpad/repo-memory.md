@@ -64,7 +64,7 @@ Repo-memory provides persistent, git-backed storage for AI agents across workflo
 
 ## File Path Conventions
 
-All paths in the repo-memory system follow strict naming conventions to ensure consistency across layers.
+All paths in the repo-memory system follow the naming conventions below so that all layers use the same paths.
 
 ### Primary Path Patterns
 
@@ -653,7 +653,7 @@ file-glob:
 2. **Incremental Sync**
    - Only upload changed files (rsync-style)
    - Track file hashes between runs
-   - Benefit: Faster uploads for large memories
+   - Benefit: Uploads only changed files, reducing transfer size for large memories
 
 3. **Multi-Repository Memory**
    - Support memory shared across multiple repositories

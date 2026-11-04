@@ -203,8 +203,10 @@ describe("Unified session bootstrap telemetry conformance", () => {
     ];
     const original = structuredClone(events);
     await parse(events);
-    const consoleText = global.core.info.mock.calls.map(call => call[0]).find(text => text.includes("Execution Summary"));
+    const consoleText = global.core.info.mock.calls.map(call => call[0]).find(text => text.includes("Records: 3 (agent=3)"));
+    expect(consoleText).toBeDefined();
     const markdown = global.core.summary.addRaw.mock.calls[0][0];
+    expect(markdown).toContain("<details><summary>Unified session</summary>");
     for (const output of [consoleText, markdown]) {
       expect(output).not.toContain(token.slice(0, 40));
       expect(output).not.toContain(masked.slice(0, 40));

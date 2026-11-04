@@ -43,13 +43,16 @@ description: Safe-output reference for update, label, milestone, project, releas
       required-labels: [ready-to-merge]   # Optional: ALL listed labels must be present on the PR
       required-title-prefix: "[bot] "     # Optional: only merge PRs with this title prefix
       allowed-branches: ["feature/*"]    # Optional: glob patterns for allowed source branch names
+      required-checks: ["ci/test"]       # Optional: exact check-run names that must succeed on the evaluated head SHA
+      required-check-apps: { ci/test: 15368 }  # Optional: expected GitHub App ID per required check name
+      required-approvers: [maintainer]   # Optional: at least one listed human must APPROVE the evaluated head
       target: "triggering"                # Optional: "triggering" (default, current PR) or "*" (any PR with pull_request_number)
       target-repo: "owner/repo"           # Optional: cross-repository
       allowed-repos: [owner/other]        # Optional: additional repos the agent can merge in
       max: 1                              # Optional: max merges (default: 1)
   ```
 
-  **⚠️ Experimental**: Compilation emits a warning when this feature is used. The merge is blocked unless all configured gates pass.
+  **⚠️ Experimental**: Compilation emits a warning when this feature is used. The merge is blocked unless all configured gates pass. Merges to the default branch are refused. Any latest `CHANGES_REQUESTED` review blocks; without `required-approvers`, no affirmative human approval is required. PR authors, bots, and the merge identity cannot approve. `required-checks` must not name this workflow's own `create-check-run` check. Labels, titles, and branches are filters, not authorization; keep approver credentials and CI definitions outside the agent's control. See [merge-pull-request](https://github.github.com/gh-aw/reference/safe-outputs-pull-requests/#merge-pull-request-merge-pull-request).
 
 - `close-pull-request:` - Safe pull request closing with filtering
 
@@ -300,6 +303,8 @@ description: Safe-output reference for update, label, milestone, project, releas
   ```
 
   Cross-repository pushes are supported via `target-repo` (and `head-repo`/`head-github-token` for fork-backed PRs) plus an `allowed-repos` allowlist. To trigger CI on pushed commits, use `github-token-for-extra-empty-commit` or set the magic secret `GH_AW_CI_TRIGGER_TOKEN`. Set `github-token-for-extra-empty-commit: none` to skip the extra empty commit and keep `GH_AW_CI_TRIGGER_TOKEN` out of the compiled lock file and manifest entirely.
+
+  **Shared checkout credential**: same-repository `create-pull-request` and `push-to-pull-request-branch` persist one git credential (precedence: `create-pull-request.github-token`, `push-to-pull-request-branch.github-token`, `safe-outputs.github-app` minted token, `safe-outputs.github-token`, default). Give both handlers the same token, ideally once at `safe-outputs.github-token` or `safe-outputs.github-app`.
 
   **File Restrictions**: Same as `create-pull-request`: **always specify `allowed-files`** scoped to specific file extensions or paths to limit the agent's reach. `excluded-files` strips files before all checks, and `protected-files` controls handling of sensitive files. Object form supported: `protected-files: { policy: fallback-to-issue, exclude: [AGENTS.md] }`.
 

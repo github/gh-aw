@@ -12,11 +12,17 @@ timeout-minutes: 30
 
 permissions:
   contents: read
+  copilot-requests: write
   issues: read
   pull-requests: read
 
 tracker-id: daily-astrostylelite-markdown-spellcheck
-engine: claude
+engine:
+  id: claude
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
 strict: true
 
 if: needs.spellcheck.outputs.has_findings == 'true'

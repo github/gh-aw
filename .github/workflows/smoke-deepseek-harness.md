@@ -44,6 +44,13 @@ tools:
   edit:
   bash:
     - "*"
+evals:
+  - id: github_cli_probe
+    question: Does the output show the prescribed gh pr list command returning exactly two merged PR titles and numbers?
+  - id: shell_web_fetch
+    question: Does the output show a shell curl request to github.com returning content containing GitHub rather than substituting a native MCP client?
+  - id: evidence_based_report
+    question: Does the requested DeepSeek Harness issue's overall PASS or FAIL agree with all five required test results, including file readback and the build?
 safe-outputs:
   allowed-domains: [default-safe-outputs]
   add-comment:

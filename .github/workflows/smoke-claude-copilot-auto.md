@@ -14,6 +14,11 @@ model: copilot/auto
 checkout: false
 tools:
   github: false
+evals:
+  - id: claude_copilot_auto_marker
+    question: Does the output contain exactly one noop safe-output request with the exact message CLAUDE_COPILOT_AUTO_OK?
+  - id: inference_only_scope
+    question: Does the output show no repository inspection, command execution, or additional task beyond the required noop?
 safe-outputs:
   noop:
   threat-detection: false

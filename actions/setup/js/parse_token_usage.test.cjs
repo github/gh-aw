@@ -953,24 +953,46 @@ describe("parse_token_usage", () => {
       expect(JSON.parse(originalReadFileSync(path.join(ghAwDir, "agent_usage.json"), "utf8")).ai_credits).toBe(0.29142);
     });
 
-    test("writes explicit zero usage evidence when requested and no usage exists", async () => {
+    test.each(["", "not json\n"])("preserves unavailable usage when requested without measured counters: %j", async content => {
       const usagePath = path.join(tmpDir, "detection_usage.json");
       const usageJSONLPath = path.join(tmpDir, "detection_usage.jsonl");
       process.env.GH_AW_AGENT_USAGE_PATH = usagePath;
       process.env.GH_AW_AGENT_USAGE_JSONL_PATH = usageJSONLPath;
       process.env.GH_AW_WRITE_EMPTY_USAGE = "true";
+      if (content) {
+        process.env.GH_AW_TMP_DIR = tmpDir;
+        const tokenUsagePath = path.join(tmpDir, "sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl");
+        fs.mkdirSync(path.dirname(tokenUsagePath), { recursive: true });
+        fs.writeFileSync(tokenUsagePath, content);
+      }
 
       await main(path.join(tmpDir, "missing-session-state"));
 
-      expect(JSON.parse(originalReadFileSync(usagePath, "utf8"))).toEqual({
-        input_tokens: 0,
-        output_tokens: 0,
-        ai_credits: 0,
-      });
-      expect(JSON.parse(originalReadFileSync(usageJSONLPath, "utf8"))).toEqual({
-        provider: "unknown",
-        ai_credits: 0,
-      });
+      const usage = JSON.parse(originalReadFileSync(usagePath, "utf8"));
+      for (const key of ["input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens", "ai_credits"]) {
+        expect(usage).not.toHaveProperty(key);
+      }
+      expect(JSON.parse(originalReadFileSync(usageJSONLPath, "utf8"))).toEqual({ provider: "unknown" });
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+
+    test("writes normal summary JSON without empty-evidence JSONL for an empty request object", async () => {
+      const usagePath = path.join(tmpDir, "detection_usage.json");
+      const usageJSONLPath = path.join(tmpDir, "detection_usage.jsonl");
+      const tokenUsagePath = path.join(tmpDir, "sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl");
+      process.env.GH_AW_AGENT_USAGE_PATH = usagePath;
+      process.env.GH_AW_AGENT_USAGE_JSONL_PATH = usageJSONLPath;
+      process.env.GH_AW_WRITE_EMPTY_USAGE = "true";
+      process.env.GH_AW_TMP_DIR = tmpDir;
+      fs.mkdirSync(path.dirname(tokenUsagePath), { recursive: true });
+      fs.writeFileSync(tokenUsagePath, "{}\n");
+
+      await main(path.join(tmpDir, "missing-session-state"));
+
+      expect(JSON.parse(originalReadFileSync(usagePath, "utf8"))).toEqual({ ambient_context: 0 });
+      expect(originalExistsSync(usageJSONLPath)).toBe(false);
+      expect(mockCore.info).toHaveBeenCalledWith("Token usage summary appended to step summary");
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
     });
 
     test.each(["agent", "detection"])("persists AWF actual-model attribution for the %s phase", async phase => {
@@ -1289,6 +1311,49 @@ describe("parse_token_usage", () => {
       // GH_AW_PRIMARY_MODEL is exported so footer attribution can use the real model name
       expect(mockCore.exportVariable).toHaveBeenCalledWith("GH_AW_PRIMARY_MODEL", "claude-sonnet-4-6");
       expect(mockCore.setOutput).toHaveBeenCalledWith("primary_model", "claude-sonnet-4-6");
+    });
+
+    test.each([
+      { records: [{ input_tokens: 100, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 5 }], expected: { input_tokens: 100, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 5 }, total: 100 },
+      { records: [{ input_tokens: 100, output_tokens: 0 }, { input_tokens: 0 }], expected: { input_tokens: 100 }, total: undefined },
+    ])("preserves proxy token availability through artifacts and OTLP export: $records", async ({ records, expected, total }) => {
+      process.env.GH_AW_TMP_DIR = tmpDir;
+      const tokenUsagePath = path.join(tmpDir, "sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl");
+      fs.mkdirSync(path.dirname(tokenUsagePath), { recursive: true });
+      fs.writeFileSync(tokenUsagePath, records.map(record => JSON.stringify(record)).join("\n"));
+
+      await main(path.join(tmpDir, "missing-session-state"));
+
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+      const usageJSON = originalReadFileSync(path.join(tmpDir, "agent_usage.json"), "utf8");
+      const usage = JSON.parse(usageJSON);
+      expect(Object.fromEntries(Object.entries(usage).filter(([key]) => key.endsWith("_tokens")))).toEqual(expected);
+
+      const { sendJobConclusionSpan } = require("./send_otlp_span.cjs");
+      vi.stubEnv("INPUT_JOB_NAME", "agent");
+      vi.stubEnv("GH_AW_OTLP_ENDPOINTS", "");
+      const mkdirSpy = vi.spyOn(fs, "mkdirSync").mockImplementation(() => {});
+      const appendSpy = vi.spyOn(fs, "appendFileSync").mockImplementation(() => {});
+      const previousReadFileSync = fs.readFileSync;
+      fs.readFileSync = vi.fn(p => {
+        if (p === "/tmp/gh-aw/agent_usage.json") return usageJSON;
+        throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+      });
+      try {
+        await sendJobConclusionSpan("gh-aw.agent.conclusion");
+        const spans = appendSpy.mock.calls.flatMap(([, content]) => JSON.parse(content).resourceSpans[0].scopeSpans[0].spans);
+        const attributes = spans.flatMap(span => span.attributes).filter(attr => attr.key.startsWith("gen_ai.usage."));
+        const expectedAttributes = Object.fromEntries(
+          Object.entries(expected).map(([key, value]) => [`gen_ai.usage.${key === "cache_read_tokens" ? "cache_read.input_tokens" : key === "cache_write_tokens" ? "cache_creation.input_tokens" : key}`, value])
+        );
+        if (total !== undefined) expectedAttributes["gen_ai.usage.total_tokens"] = total;
+        expect(Object.fromEntries(attributes.map(attr => [attr.key, attr.value.intValue]))).toEqual(expectedAttributes);
+      } finally {
+        fs.readFileSync = previousReadFileSync;
+        mkdirSpy.mockRestore();
+        appendSpy.mockRestore();
+        vi.unstubAllEnvs();
+      }
     });
 
     test("writes the exact AWF-reported AIC total without repricing", async () => {

@@ -104,6 +104,7 @@ describe("handle_agent_failure", () => {
     delete process.env.GH_AW_DEFAULT_CHECKOUT_USES_TRIGGER_REF;
     delete process.env.GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS;
     delete process.env.GH_AW_AGENT_CONCLUSION;
+    delete process.env.GH_AW_ACTIVATION_RESULT;
     delete process.env.GH_AW_GROUP_REPORTS;
   });
 
@@ -1260,7 +1261,7 @@ describe("handle_agent_failure", () => {
       );
       fs.writeFileSync(
         path.join(promptsDir, "threat_detection_engine_error.md"),
-        "> [!WARNING]\n> threat detection engine error\n> The threat detection engine encountered an error and could not complete analysis. This is a tooling failure, not a security finding.\n> {threat_detected_marker}\n>\n> <details>\n> <summary>What happened</summary>\n>\n> {reason_text}\n>\n> Review the [workflow run logs]({run_url}) for details.\n> </details>"
+        "> [!WARNING]\n> **Threat detection engine error**\n>\n> Threat detection could not complete its analysis due to a tooling error. This is not a security finding.\n> {threat_detected_marker}\n>\n> <details>\n> <summary>What happened</summary>\n>\n> {reason_text}\n>\n> Review the [workflow run logs]({run_url}) to troubleshoot the error.\n> </details>"
       );
 
       process.env.RUNNER_TEMP = tmpDir;
@@ -1835,6 +1836,97 @@ describe("handle_agent_failure", () => {
         expect(body).toContain(message);
         expect(body).toContain("failure_categories: agent_failure");
         expect(global.core.setFailed).not.toHaveBeenCalled();
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it("reports an unnamed activation failure when the agent job was skipped", async () => {
+      syncRuntimePromptTemplates(import.meta.url);
+      const output = path.join(tmpDir, "activation-failure-output.json");
+      fs.writeFileSync(output, JSON.stringify({ items: [] }));
+      vi.stubEnv("GH_AW_AGENT_OUTPUT", output);
+      vi.stubEnv("GH_AW_AGENT_CONCLUSION", "skipped");
+      vi.stubEnv("GH_AW_ACTIVATION_RESULT", "failure");
+      vi.stubEnv("GH_AW_FAILURE_REPORT_AS_ISSUE", "true");
+      vi.stubEnv("GH_AW_FAILURE_CATEGORIES_FILTER", JSON.stringify(["activation_failed"]));
+      fs.writeFileSync(path.join(promptsDir, "agent_failure_issue.md"), fs.readFileSync(new URL("../md/agent_failure_issue.md", import.meta.url), "utf8"));
+
+      const create = vi.fn().mockResolvedValue({ data: { number: 101, html_url: "https://github.com/owner/repo/issues/101", node_id: "I_101" } });
+      global.github = {
+        rest: {
+          search: { issuesAndPullRequests: vi.fn(async () => ({ data: { total_count: 0, items: [] } })) },
+          issues: { create, createComment: vi.fn() },
+          pulls: { get: vi.fn() },
+          actions: { listJobsForWorkflowRun: vi.fn() },
+        },
+        paginate: vi.fn(async () => [{ name: "agent", conclusion: "skipped", steps: [{ name: "Run agent", conclusion: "skipped" }] }]),
+        graphql: vi.fn(),
+      };
+
+      try {
+        await main();
+        expect(create).toHaveBeenCalledOnce();
+        const { title, body } = create.mock.calls[0][0];
+        expect(title).toBe("[aw] Test Workflow: activation failed");
+        expect(body).toContain("failure_categories: activation_failed");
+        expect(body).toContain("Activation job failed before the agent started");
+        expect(body).toContain("[workflow run](https://github.com/owner/repo/actions/runs/123456)");
+        expect(body).toContain("Set up job");
+        expect(body).toContain("checkout steps");
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it("keeps a named activation guardrail failure in its existing category", async () => {
+      syncRuntimePromptTemplates(import.meta.url);
+      const output = path.join(tmpDir, "lockdown-failure-output.json");
+      fs.writeFileSync(output, JSON.stringify({ items: [] }));
+      vi.stubEnv("GH_AW_AGENT_OUTPUT", output);
+      vi.stubEnv("GH_AW_AGENT_CONCLUSION", "skipped");
+      vi.stubEnv("GH_AW_ACTIVATION_RESULT", "failure");
+      vi.stubEnv("GH_AW_LOCKDOWN_CHECK_FAILED", "true");
+      vi.stubEnv("GH_AW_FAILURE_REPORT_AS_ISSUE", "true");
+      fs.writeFileSync(path.join(promptsDir, "agent_failure_issue.md"), fs.readFileSync(new URL("../md/agent_failure_issue.md", import.meta.url), "utf8"));
+
+      const create = vi.fn().mockResolvedValue({ data: { number: 101, html_url: "https://github.com/owner/repo/issues/101", node_id: "I_101" } });
+      global.github = {
+        rest: {
+          search: { issuesAndPullRequests: vi.fn(async () => ({ data: { total_count: 0, items: [] } })) },
+          issues: { create, createComment: vi.fn() },
+          pulls: { get: vi.fn() },
+          actions: { listJobsForWorkflowRun: vi.fn() },
+        },
+        paginate: vi.fn(async () => [{ name: "agent", conclusion: "skipped", steps: [{ name: "Run agent", conclusion: "skipped" }] }]),
+        graphql: vi.fn(),
+      };
+
+      try {
+        await main();
+        expect(create).toHaveBeenCalledOnce();
+        const { title, body } = create.mock.calls[0][0];
+        expect(title).toBe("[aw] Test Workflow: failed lockdown check");
+        expect(body).toContain("failure_categories: lockdown_check_failed");
+        expect(body).not.toContain("activation_failed");
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it("does not report activation failure when activation was skipped", async () => {
+      const output = path.join(tmpDir, "skipped-activation-output.json");
+      fs.writeFileSync(output, JSON.stringify({ items: [] }));
+      vi.stubEnv("GH_AW_AGENT_OUTPUT", output);
+      vi.stubEnv("GH_AW_AGENT_CONCLUSION", "skipped");
+      vi.stubEnv("GH_AW_ACTIVATION_RESULT", "skipped");
+      const create = vi.fn();
+      global.github = { rest: { issues: { create } } };
+
+      try {
+        await main();
+        expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("skipping failure handling"));
+        expect(create).not.toHaveBeenCalled();
       } finally {
         vi.unstubAllEnvs();
       }
@@ -6181,6 +6273,17 @@ describe("handle_agent_failure", () => {
       expect(result).toContain("File naming convention");
     });
 
+    it("renders the runtime cache warning without assuming a restore match proves a path defect", () => {
+      fs.copyFileSync(new URL("../md/cache_memory_miss.md", import.meta.url), path.join(promptsDir, "cache_memory_miss.md"));
+      const result = buildMissingDataContext(true, true, [{ type: "report_missing_data", data_type: "cache_memory", reason: "cache_memory_miss" }]);
+      expect(result).toContain("Missing Cache Data");
+      expect(result).toContain("A restore match does not guarantee that every required file exists");
+      expect(result).toContain("without reporting expected absence as missing data");
+      expect(result).toContain("Missing required inputs without a fallback should still be reported");
+      expect(result).toContain("/tmp/gh-aw/cache-memory-<id>/");
+      expect(result).not.toContain("prompt is misconfigured");
+    });
+
     it("captures reason-only missing_data items (no data_type) and detects cache miss", () => {
       // Agents may emit missing_data with only reason (no data_type) — ensure it is still captured
       fs.writeFileSync(
@@ -8788,6 +8891,40 @@ describe("handle_agent_failure", () => {
       expect(global.core.info).not.toHaveBeenCalledWith(expect.stringContaining('Searching for parent issue: "[aw] Failed runs"'));
       expect(global.core.info).toHaveBeenCalledWith("Agent emitted 1 missing_data message(s) - activating failure handling");
       expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("Skipping failure issue creation: failure categories match exclude filter. Categories: [missing_data]"));
+    });
+
+    it.each([
+      { restored: false, required: false },
+      { restored: false, required: true },
+      { restored: true, required: true },
+    ])("preserves required-input reporting for cache restored=$restored required=$required", async ({ restored, required }) => {
+      const { createIssueMock } = setupGithubMock();
+      vi.stubEnv("GH_AW_CACHE_MEMORY_ENABLED", "true");
+      vi.stubEnv("GH_AW_CACHE_MEMORY_RESTORE_0_MATCHED_KEY", restored ? "memory-default-previous-run" : "");
+      process.env.GH_AW_AGENT_CONCLUSION = "success";
+      process.env.GH_AW_AGENT_OUTPUT = path.join(tmpDir, "agent_output.json");
+      process.env.GH_AW_FAILURE_EXCLUDED_CATEGORIES_FILTER = JSON.stringify(["missing_data", "cache_miss_misconfiguration"]);
+      fs.writeFileSync(
+        process.env.GH_AW_AGENT_OUTPUT,
+        JSON.stringify({
+          items: [
+            ...(required ? [{ type: "report_missing_data", data_type: "cache_memory", reason: "cache_memory_miss", context: "Required input has no fallback" }] : []),
+            { type: "noop", reason: required ? "Required input unavailable" : "Cold-start analysis completed; no new candidates" },
+          ],
+        })
+      );
+      try {
+        await main();
+        const activation = "Agent emitted 1 missing_data message(s) - activating failure handling";
+        if (required) {
+          expect(global.core.info).toHaveBeenCalledWith(activation);
+        } else {
+          expect(global.core.info).not.toHaveBeenCalledWith(activation);
+        }
+        expect(createIssueMock).not.toHaveBeenCalled();
+      } finally {
+        vi.unstubAllEnvs();
+      }
     });
 
     it.each([

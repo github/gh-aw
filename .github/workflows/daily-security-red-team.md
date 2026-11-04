@@ -574,7 +574,7 @@ echo "✅ Full comprehensive scan complete"
 
 #### Phase 4b: Iterative Re-Evaluation (variant: iterative only)
 
-{{#if experiments.reasoning_depth iterative}}
+{{#if experiments.reasoning_depth == 'iterative'}}
 Before proceeding to Phase 5, perform a **second-pass validation** of every finding collected so far:
 
 1. For each finding in `FINDINGS[]`, re-read the exact file and line cited.

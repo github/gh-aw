@@ -162,4 +162,31 @@ describe("gh-aw OpenTelemetry compatibility contract", () => {
     }
     expect(exportedPayloads.map(firstSpan).filter(span => Object.hasOwn(attrsByKey(span), "gh-aw.aic"))).toHaveLength(1);
   });
+
+  it("exports not-evaluated eval status without fabricating UNKNOWN answers", async () => {
+    process.env.INPUT_JOB_NAME = "evals";
+    const existsSpy = vi.spyOn(fs, "existsSync").mockImplementation(filePath => filePath === "/tmp/gh-aw/evals_status.json" || filePath === "/tmp/gh-aw/evals.jsonl");
+    const originalRead = readFileSyncSpy.getMockImplementation();
+    readFileSyncSpy.mockImplementation(filePath => {
+      if (filePath === "/tmp/gh-aw/evals_status.json") {
+        return JSON.stringify({ status: "not_evaluated", reason_code: "judge_failed", reason: "sensitive judge failure", model: "copilot/gpt-6-luna-decisions" });
+      }
+      if (filePath === "/tmp/gh-aw/evals.jsonl") {
+        return JSON.stringify({ id: "eval-1", answer: "YES" }) + "\n";
+      }
+      return originalRead(filePath);
+    });
+
+    await sendJobConclusionSpan("gh-aw.evals.conclusion");
+
+    for (const payload of [JSON.parse(String(fetchMock.mock.calls[0][1].body)), JSON.parse(String(appendFileSyncSpy.mock.calls[0][1]))]) {
+      const span = firstSpan(payload);
+      expect(attrsByKey(span)).toMatchObject({ "gh-aw.evals.status": "not_evaluated", "gh-aw.evals.reason_code": "judge_failed", "gh-aw.eval.model": "copilot/gpt-6-luna-decisions" });
+      expect(span.events.filter(event => event.name === "eval.status")).toHaveLength(1);
+      expect(attrsByKey(span.events.find(event => event.name === "eval.status"))["gh-aw.eval.model"]).toBe("copilot/gpt-6-luna-decisions");
+      expect(span.events.some(event => event.name === "eval.result")).toBe(false);
+      expect(JSON.stringify(payload)).not.toContain("sensitive");
+    }
+    existsSpy.mockRestore();
+  });
 });

@@ -57,6 +57,41 @@ be a valid JSON object. Raw Markdown is not valid input for that bare form,
 and `{"body": .}` is not valid JSON. Use only tools and shell operations
 available in the workflow's runtime.
 
+## Output Dependencies
+
+Each recorded safe-output call returns a unique, compact URL-safe `output_id`,
+such as `so_AbCdEf012345`. This identifies the queued operation,
+not a created issue or pull request. It is distinct from `temporary_id` (`aw_…`),
+which remains the mechanism for referencing newly created resources.
+
+For handler-managed safe outputs, `depends-on` is available by default and is
+optional; omit it to run an operation independently. When provided, it accepts
+one `output_id` or a nonempty array of distinct identifiers. All prerequisites
+must complete successfully before the dependent operation runs. For example,
+after a call returns the identifier above:
+
+```json
+{
+  "item_number": 123,
+  "body": "The prerequisite update completed.",
+  "depends-on": "so_AbCdEf012345"
+}
+```
+
+The identifier acknowledges recording, not execution success. If a prerequisite
+fails, its dependents fail without executing, including transitive dependents.
+Skipped, cancelled, staged, deferred, or delegated results do not establish
+success. Missing, ambiguous, or cyclic dependencies also fail closed. Independent
+outputs retain their existing behavior and policy checks.
+
+Dependencies apply within a single safe-output processing pass (and within the
+same Claim in queue workflows). Custom safe jobs, `call_workflow`,
+`push_repo_memory`, `upload_asset`, `noop`, and out-of-band diagnostics
+(`report_incomplete`, `report_missing_tool`, `report_missing_data`) reject
+`depends-on`. The effects of `upload_code_coverage` run in a later job, so
+staging it cannot establish a successful prerequisite. Dependencies do not
+provide rollback for operations that have already succeeded.
+
 ## Available Safe Output Types
 
 The tables below summarize the built-in safe output handlers. `noop`, `report-missing-tool`, and `report-missing-data` are always available, and `create-issue` is auto-injected only when no non-system safe outputs are configured and it is not explicitly disabled.
@@ -201,6 +236,33 @@ Create custom post-processing jobs registered as Model Context Protocol (MCP) to
 
 Custom implementations should include a generated-by footer and workflow metadata on published content. Direct API calls do not add these automatically; without them, provenance searches and workflow-output tracking cannot identify the content. Use the [stable issue-creation API](/gh-aw/reference/custom-safe-outputs/#issue-creation-api) for GitHub issues.
 
+Do not read internal safe-output files from `post-steps`. Their paths and format are implementation details, and the compiler rejects direct reads:
+
+```yaml wrap
+post-steps:
+  - name: Read safe output
+    run: jq '.items[]' /tmp/gh-aw/safeoutputs/output.json
+```
+
+Use a built-in `safe-outputs` handler for supported operations, or move custom processing into a `safe-outputs.jobs` job. Custom jobs receive agent output through `$GH_AW_AGENT_OUTPUT`:
+
+```yaml wrap
+safe-outputs:
+  jobs:
+    process-report:
+      description: "Process the generated report"
+      runs-on: ubuntu-latest
+      output: "Report processed"
+      inputs:
+        report:
+          description: "Report content"
+          required: true
+          type: string
+      steps:
+        - name: Process agent output
+          run: jq '.items[]' "$GH_AW_AGENT_OUTPUT"
+```
+
 ### GitHub Action Wrappers (`actions:`)
 
 Mount any public GitHub Action as a once-callable MCP tool. The compiler pins the action reference to a SHA at compile time and derives the tool's input schema from the action's `action.yml`. See [GitHub Action Wrappers](/gh-aw/reference/custom-safe-outputs/#github-action-wrappers-safe-outputsactions).
@@ -260,6 +322,8 @@ This integration does not support transitions, assignment, custom fields, priori
 :::
 
 Set `steer: true` to create a run-scoped issue during the activation job, before the agent starts. Users can add comments containing the keyword `steer` while the run is in progress. The injected prompt identifies the exact issue and instructs the agent to read relevant user-authored comments with the GitHub MCP `issue_read` tool.
+
+When the daily AI Credits guardrail blocks agent startup, no steering issue is created. Failure reporting uses its normal existing-issue deduplication instead.
 
 The initial issue body includes the standard generated-by footer and tracking metadata for the workflow, run, tracker ID, and available engine information. Attribution is present before the agent starts and uses the configured `messages.footer` template when provided.
 
@@ -1839,6 +1903,7 @@ safe-outputs:
 | `mcp_policy_error` | MCP server policy violations |
 | `ai_credits_rate_limit_error` | AI credits rate limit exceeded |
 | `max_ai_credits_exceeded` | Maximum AI credits budget exceeded |
+| `activation_failed` | Activation job failed before the agent started, without a named guardrail failure |
 | `cache_miss_misconfiguration` | Cache configuration errors |
 | `code_push_failures` | Failures pushing code to branches |
 | `assignment_errors` | Failures assigning issues or reviewers |

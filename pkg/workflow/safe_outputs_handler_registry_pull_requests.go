@@ -80,7 +80,7 @@ var pullRequestHandlerRegistry = map[string]handlerBuilder{
 			return nil
 		}
 		c := cfg.MergePullRequest
-		return newHandlerConfigBuilder().
+		handler := newHandlerConfigBuilder().
 			AddTemplatableInt("max", c.Max).
 			AddIfNotEmpty("target", c.Target).
 			AddStringSlice("required_checks", c.RequiredChecks).
@@ -91,6 +91,10 @@ var pullRequestHandlerRegistry = map[string]handlerBuilder{
 			AddIfNotEmpty("github-token", resolveHandlerGitHubToken(c.GitHubApp, "merge-pull-request", c.GitHubToken)).
 			AddTemplatableBool("staged", templatableBoolPtrToStringPtr(c.Staged)).
 			Build()
+		if len(c.RequiredCheckApps) > 0 {
+			handler["required_check_apps"] = c.RequiredCheckApps
+		}
+		return handler
 	},
 	"close_pull_request": func(cfg *SafeOutputsConfig) map[string]any {
 		if cfg.ClosePullRequests == nil {

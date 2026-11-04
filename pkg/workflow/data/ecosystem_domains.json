@@ -35,14 +35,8 @@
       "json.schemastore.org",
       "archive.ubuntu.com",
       "security.ubuntu.com",
-      "ppa.launchpad.net",
       "keyserver.ubuntu.com",
-      "azure.archive.ubuntu.com",
-      "api.snapcraft.io",
-      "packagecloud.io",
-      "packages.cloud.google.com",
-      "packages.microsoft.com",
-      "www.googleapis.com"
+      "azure.archive.ubuntu.com"
     ],
     "deno": ["deno.land", "jsr.io", "googleapis.deno.dev", "fresh.deno.dev"],
     "dev-tools": [
@@ -79,7 +73,6 @@
       "nugetregistryv2prod.blob.core.windows.net",
       "azuresearch-usnc.nuget.org",
       "azuresearch-ussc.nuget.org",
-      "dc.services.visualstudio.com",
       "dot.net",
       "ci.dot.net",
       "www.microsoft.com",
@@ -169,6 +162,11 @@
     "latex": ["ctan.org", "mirror.ctan.org", "mirrors.ctan.org", "tug.org", "www.tug.org", "ftp.tug.org", "latex-project.org", "www.latex-project.org", "miktex.org", "packages.miktex.org"],
     "lean": ["elan.lean-lang.org", "lean-lang.org", "leanprover.github.io", "reservoir.lean-lang.org", "static.lean-lang.org"],
     "linux-distros": [
+      "ppa.launchpad.net",
+      "packagecloud.io",
+      "api.snapcraft.io",
+      "packages.cloud.google.com",
+      "packages.microsoft.com",
       "deb.debian.org",
       "security.debian.org",
       "keyring.debian.org",
@@ -213,8 +211,7 @@
       "googleapis.deno.dev",
       "googlechromelabs.github.io",
       "storage.googleapis.com",
-      "cdn.jsdelivr.net",
-      "telemetry.vercel.com"
+      "cdn.jsdelivr.net"
     ],
     "node-cdns": ["cdn.jsdelivr.net", "data.jsdelivr.com", "code.jquery.com", "cdn.sheetjs.com"],
     "ocaml": ["opam.ocaml.org", "ocaml.org", "erratique.ch"],

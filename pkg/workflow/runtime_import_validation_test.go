@@ -102,9 +102,9 @@ Body actor: ${{ github.actor }}`), 0644))
 			expectError: false, // Should skip validation for non-existent files
 		},
 		{
-			name:        "URL import (should skip)",
+			name:        "literal HTTPS URL rejected",
 			markdown:    "{{#runtime-import https://example.com/remote.md}}",
-			expectError: false,
+			expectError: true,
 		},
 		{
 			name:        "nested invalid runtime import",
@@ -284,7 +284,7 @@ Please process the issue.
 
 	// Should fail due to invalid expression in runtime-import file
 	require.Error(t, err, "Compilation should fail due to invalid expression in runtime-import file")
-	require.ErrorContains(t, err, "runtime-import files contain expression errors", "Error should mention runtime-import files")
+	require.ErrorContains(t, err, "runtime-import validation failed", "Error should mention runtime-import files")
 	require.ErrorContains(t, err, "secrets.GITHUB_TOKEN", "Error should mention the specific invalid expression")
 }
 

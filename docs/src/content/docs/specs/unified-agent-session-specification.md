@@ -584,7 +584,8 @@ bytes survive scalar projection. Nulls, arrays, other objects, nonfinite numbers
 oversized strings and unpaired surrogates MUST be omitted, not coerced or
 truncated. At the event level, only `type`, projected `data`, an eligible scalar
 `timestamp`, and projected `provenance` MAY survive. Provenance is restricted to
-eligible scalar `component`, `phase`, `path`, `index`, `attemptId`, and `startupAttemptId`; native metadata and
+eligible scalar `component`, `phase`, `path`, `index`, `attemptId`, and `startupAttemptId`,
+plus finite numeric `timestampMs` from the source-normalized observed clock; native metadata and
 unknown fields MUST NOT survive. Missing values MUST NOT become defaults.
 The validated harness projection additionally retains bounded `failureClasses`
 and attempt lists, and explicit `null` exit or completion fields representing
@@ -605,9 +606,33 @@ most **128 records** and **16,384 UTF-8 bytes**, including JSON escaping and one
 after each retained record. Each candidate is projected and serialized before
 budget admission. A record that would exceed either limit MUST be omitted whole;
 the producer MAY retain a later, smaller record that fits, without reordering.
+When the byte/event limits are reached, the serializer MUST preferentially
+discard low-priority records rather than silently retain only an initial prefix.
+The retention order is format header, workflow metadata, final execution/session/job
+outcomes, remaining guardrail/grader results, harness/engine retry diagnostics,
+per-step usage, then successful memory updates. Failure, denial, exceeded-budget,
+cancelled and interrupted evidence MUST be promoted to the final-outcome tier.
+Equal-priority records prefer earlier observations; retained records MUST remain
+in source order. The producer MUST continue considering complete records within
+the bounded source scan, so late essential evidence can evict earlier lower-priority
+records. The candidate buffer MUST remain bounded by the compact limits plus
+one projected candidate; discarded source payloads MUST NOT be retained.
 Input events and full artifact bytes MUST NOT be mutated, rewritten or replaced.
 Repeated equal inputs MUST produce identical compact output and statistics.
 An empty compact stream is valid and does not mean that the full session is empty.
+Transports MUST expose the loss statistics. OTLP export additionally MUST issue
+a visible partial-session warning when output or source-scan limits discard
+evidence; routine privacy filtering alone is not size truncation.
+
+OTLP log records MUST retain valid source event time in `timeUnixNano`,
+separately from export observation time in `observedTimeUnixNano`. Exact
+timezone-qualified ISO fractions take precedence over the millisecond
+projection; numeric clocks use the source-normalized `provenance.timestampMs`
+when supplied, or the native millisecond timestamp otherwise. Missing, invalid,
+negative or unsigned-64-bit-overflow event times MUST remain unset, never
+replaced with observation time or ordering anchors. The exported
+`gh-aw.session.untimed_events` count describes retained records without an
+exportable event clock, after transport-budget admission.
 
 **T-UAS-078 — Bounded file reading and explicit loss.** A file-based producer
 MUST snapshot the nonempty regular file's size, reject a symlink at the file
@@ -1986,6 +2011,10 @@ model, and accounting remain separate from the parent. A subagent lifecycle
 envelope's target `agentId` does not identify the emitting caller. Readers must
 not invent parent tool IDs to distinguish these scopes; a view containing only
 one nested scope can select that scope's initialization and accounting explicitly.
+
+The log parser publishes all structured engine logs through this unified-session
+view, normalizing legacy records and attaching source provenance when absent.
+Rendering does not depend on the engine name.
 
 Actions publishes this view once in a top-level `Unified session` disclosure,
 using a fenced CLI-style transcript like the Claude conversation summary rather

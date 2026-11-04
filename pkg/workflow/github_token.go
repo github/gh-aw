@@ -190,9 +190,13 @@ func resolvePRCheckoutToken(safeOutputs *SafeOutputsConfig, checkoutMgr *Checkou
 		// enabled handler consuming the global app), keep a fallback so the expression
 		// still resolves to a usable token instead of an empty string.
 		if safeOutputs.GitHubApp.shouldIgnoreMissingKey() || !safeOutputsGlobalAppTokenMinted(safeOutputs) {
+			fallback := resolveSafeOutputGitHubToken("")
+			if safeOutputs.GitHubToken != "" {
+				fallback = combineTokenExpressions(safeOutputs.GitHubToken, fallback)
+			}
 			return combineTokenExpressions(
 				"${{ steps.safe-outputs-app-token.outputs.token }}",
-				resolveSafeOutputGitHubToken(safeOutputs.GitHubToken),
+				fallback,
 			), true
 		}
 		//nolint:gosec // G101: False positive - this is a GitHub Actions expression template placeholder, not a hardcoded credential

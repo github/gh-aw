@@ -83,6 +83,22 @@ func goodRangesOverTarget() {
 	_ = s
 }
 
+func badParenMake(items []string) {
+	s := (make([]string, 0)) // want `make\(\[\]string, 0\) before this range loop can use capacity len\(items\)`
+	for _, item := range items {
+		s = append(s, item)
+	}
+	_ = s
+}
+
+func badParenMakeCallee(items []string) {
+	s := (make)([]string, 0) // want `make\(\[\]string, 0\) before this range loop can use capacity len\(items\)`
+	for _, item := range items {
+		s = append(s, item)
+	}
+	_ = s
+}
+
 func suppressed(items []string) {
 	//nolint:slicemakezerolength
 	s := make([]string, 0)

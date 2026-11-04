@@ -44,6 +44,11 @@ imports:
   - shared/reporting.md
 features:
   gh-aw-detection: true
+evals:
+  - id: eligible-cleanup
+    question: For a proposed cleanup PR, does every resolved TODO or FIXME come from a source comment eligible under the workflow's selection rules? Return UNKNOWN when no PR is proposed.
+  - id: empty-discovery-restraint
+    question: When successful discovery finds no eligible TODO or FIXME comments, does the agent leave repository files unchanged? Return UNKNOWN when that empty-discovery scenario is not established.
 ---
 
 # Daily Code Debt Cleanup — Aider

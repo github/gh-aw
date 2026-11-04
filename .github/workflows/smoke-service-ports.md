@@ -43,6 +43,13 @@ network:
 tools:
   bash:
     - "*"
+evals:
+  - id: redis_ping
+    question: Does the output show a PONG response from the Redis service at host.docker.internal port 6379?
+  - id: redis_roundtrip
+    question: Does the output show that GET smoke_test returned the exact service-ports-ok value written by SET?
+  - id: redis_info
+    question: Does the output show Redis server information retrieved from the host service rather than merely claiming connectivity?
 safe-outputs:
     allowed-domains: [default-safe-outputs]
     add-comment:

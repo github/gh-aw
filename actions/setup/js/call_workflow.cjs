@@ -116,6 +116,7 @@ async function main(config = {}) {
 
       return {
         success: true,
+        delegated: true,
         workflow_name: workflowName,
         payload: payloadJson,
       };

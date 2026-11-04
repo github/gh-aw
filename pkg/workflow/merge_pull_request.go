@@ -20,6 +20,7 @@ type MergePullRequestConfig struct {
 	AllowedBranches               []string         `yaml:"allowed-branches,omitempty"`      // Glob patterns for source branch names; PR branch must match one
 	RequiredTitlePrefix           string           `yaml:"required-title-prefix,omitempty"` // Title prefix the PR must have
 	RequiredChecks                []string         `yaml:"required-checks,omitempty"`       // Exact check-run names required on the evaluated head
+	RequiredCheckApps             map[string]int64 `yaml:"required-check-apps,omitempty"`   // Expected GitHub App IDs by required check name
 	RequiredApprovers             []string         `yaml:"required-approvers,omitempty"`    // At least one independent human from this allowlist must approve the head
 }
 
@@ -43,6 +44,27 @@ func (c *Compiler) parseMergePullRequestConfig(outputMap map[string]any) *MergeP
 		cfg.AllowedBranches = ParseStringArrayFromConfig(configMap, "allowed-branches", mergePullRequestLog)
 		cfg.RequiredTitlePrefix = extractStringFromMap(configMap, "required-title-prefix", mergePullRequestLog)
 		cfg.RequiredChecks = ParseStringArrayFromConfig(configMap, "required-checks", mergePullRequestLog)
+		if apps, ok := configMap["required-check-apps"].(map[string]any); ok {
+			cfg.RequiredCheckApps = make(map[string]int64, len(apps))
+			for name, value := range apps {
+				var id int64
+				switch v := value.(type) {
+				case int:
+					id = int64(v)
+				case int64:
+					id = v
+				case uint64:
+					if v <= 9007199254740991 {
+						id = int64(v)
+					}
+				case float64:
+					if v > 0 && v <= 9007199254740991 && v == float64(int64(v)) {
+						id = int64(v)
+					}
+				}
+				cfg.RequiredCheckApps[name] = id
+			}
+		}
 		cfg.RequiredApprovers = ParseStringArrayFromConfig(configMap, "required-approvers", mergePullRequestLog)
 		c.parseBaseSafeOutputConfig(configMap, &cfg.BaseSafeOutputConfig, 1)
 		mergePullRequestLog.Printf("Parsed merge-pull-request config: requiredLabels=%v, allowedBranches=%v, requiredTitlePrefix=%q", cfg.RequiredLabels, cfg.AllowedBranches, cfg.RequiredTitlePrefix)
@@ -63,6 +85,14 @@ func validateMergePullRequestPolicies(config *SafeOutputsConfig, workflowName st
 		return nil
 	}
 	cfg := config.MergePullRequest
+	for name, appID := range cfg.RequiredCheckApps {
+		if !slices.Contains(cfg.RequiredChecks, name) {
+			return fmt.Errorf("safe-outputs.merge-pull-request.required-check-apps contains check %q not listed in required-checks. Add the check to required-checks", name)
+		}
+		if appID <= 0 || appID > 9007199254740991 {
+			return fmt.Errorf("safe-outputs.merge-pull-request.required-check-apps[%q] must be a positive GitHub App ID no greater than 9007199254740991", name)
+		}
+	}
 	for field, values := range map[string][]string{
 		"required-checks":    cfg.RequiredChecks,
 		"required-approvers": cfg.RequiredApprovers,

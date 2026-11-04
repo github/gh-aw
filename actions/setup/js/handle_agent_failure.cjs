@@ -350,6 +350,7 @@ function buildFailureMatchCategories(options) {
   if (options.hasLockdownCheckFailed) categories.push("lockdown_check_failed");
   if (options.hasOAuthTokenCheckFailed) categories.push("oauth_token_check_failed");
   if (options.hasStaleLockFileFailed) categories.push("stale_lock_file_failed");
+  if (options.hasActivationFailure) categories.push("activation_failed");
   if (options.hasDailyAICExceeded) categories.push("daily_ai_credits_exceeded");
   if (options.hasDailyAICGuardrailError) categories.push("daily_ai_credits_unknown");
   if (options.isAWFFirewallStartupFailed) categories.push("awf_firewall_startup_failed");
@@ -460,6 +461,7 @@ function buildModelEndpointMismatchContext(mismatch, detectionJobResult = proces
  * @param {boolean} options.hasLockdownCheckFailed
  * @param {boolean} options.hasOAuthTokenCheckFailed
  * @param {boolean} options.hasStaleLockFileFailed
+ * @param {boolean} [options.hasActivationFailure]
  * @param {boolean} options.hasDailyAICExceeded
  * @param {boolean} options.hasDailyAICGuardrailError
  * @param {boolean} options.aiCreditsRateLimitError
@@ -512,6 +514,7 @@ function buildFailureIssueSummary(options) {
   if (options.hasLockdownCheckFailed) return "failed lockdown check";
   if (options.hasOAuthTokenCheckFailed) return "has OAuth token misconfiguration";
   if (options.hasStaleLockFileFailed) return "has stale lock file";
+  if (options.hasActivationFailure) return "activation failed";
   if (options.shellExpansionGuardRejected) return "hit shell expansion guard rejection";
   if (options.copilotOrgBillingError) return "hit Copilot organization billing error";
   if (options.copilotAgentNotFound) {
@@ -1478,8 +1481,7 @@ function buildMissingDataContext(cacheMemoryEnabled, cacheMemoryRestored, items)
 
   core.info(`Found ${missingDataMessages.length} missing_data message(s)`);
 
-  // Detect cache_miss: if cache-memory restore matched and the agent reported a cache miss,
-  // this indicates the prompt is referencing an incorrect file path within the cache directory.
+  // A restore match does not guarantee that every required file exists.
   const hasCacheMiss = missingDataMessages.some(m => m.reason === "cache_memory_miss");
 
   // When cache-memory is configured and cache_miss is present, avoid repeating the same
@@ -1499,7 +1501,7 @@ function buildMissingDataContext(cacheMemoryEnabled, cacheMemoryRestored, items)
   }
 
   if (shouldShowCacheWarning) {
-    core.info("Cache-miss detected after a successful cache restore — likely a configuration problem");
+    core.info("Cache-miss detected after a successful cache restore; check required input, cache paths, and keys");
     const templatePath = getPromptPath("cache_memory_miss.md");
     context.push(...nodes.fragment(fs.readFileSync(templatePath, "utf8")));
   }
@@ -2835,6 +2837,27 @@ function buildStaleLockFileFailedContext(hasStaleLockFileFailed) {
     throw new Error(`Failed to read file ${templatePath}: ${getErrorMessage(err)}`, { cause: err });
   }
   return nodes.fragment(template);
+}
+
+/**
+ * Build a context string when the activation job failed without a named guardrail failure.
+ * @param {boolean} hasActivationFailure - Whether activation failed before the agent started
+ * @param {string} runUrl - The workflow run URL for reference
+ * @returns {ReportBlock[]}
+ */
+function buildActivationFailedContext(hasActivationFailure, runUrl) {
+  if (!hasActivationFailure) {
+    return [];
+  }
+
+  const templatePath = getPromptPath("activation_failed.md");
+  let template;
+  try {
+    template = fs.readFileSync(templatePath, "utf8");
+  } catch (err) {
+    throw new Error(`Failed to read file ${templatePath}: ${getErrorMessage(err)}`, { cause: err });
+  }
+  return nodes.fragment(template, { run_url: runUrl });
 }
 
 /**
@@ -4225,11 +4248,13 @@ async function main() {
     const workflowName = process.env.GH_AW_WORKFLOW_NAME || "unknown";
     const workflowID = process.env.GH_AW_WORKFLOW_ID || "unknown";
     const agentConclusion = process.env.GH_AW_AGENT_CONCLUSION || "";
+    const activationResult = process.env.GH_AW_ACTIVATION_RESULT || "";
     const runUrl = process.env.GH_AW_RUN_URL || "";
     const workflowSource = process.env.GH_AW_WORKFLOW_SOURCE || "";
     const workflowSourceURL = process.env.GH_AW_WORKFLOW_SOURCE_URL || "";
     const secretVerificationResult = process.env.GH_AW_SECRET_VERIFICATION_RESULT || "";
     const engineSecretFailureMessage = process.env.GH_AW_ENGINE_SECRET_FAILURE_MESSAGE || "";
+    const hasSecretVerificationFailed = secretVerificationResult === "failed";
     const assignmentErrors = process.env.GH_AW_ASSIGNMENT_ERRORS || "";
     const assignmentErrorCount = process.env.GH_AW_ASSIGNMENT_ERROR_COUNT || "0";
     const assignCopilotErrors = process.env.GH_AW_ASSIGN_COPILOT_ERRORS || "";
@@ -4416,6 +4441,16 @@ async function main() {
 
     // Check if any frontmatter skill installs failed (regardless of agent job status)
     const hasSkillInstallFailures = parseInt(skillInstallFailureCount, 10) > 0;
+    const hasActivationFailure =
+      activationResult === "failure" &&
+      !hasAppTokenMintingFailed &&
+      !hasLockdownCheckFailed &&
+      !hasOAuthTokenCheckFailed &&
+      !hasStaleLockFileFailed &&
+      !hasSecretVerificationFailed &&
+      !hasDailyAICExceeded &&
+      !dailyAICGuardrailErrorIsFailure &&
+      !hasSkillInstallFailures;
     const checkoutError = process.env.GH_AW_CHECKOUT_ERROR || "";
     const hasCheckoutFailure = checkoutError !== "";
 
@@ -4554,8 +4589,8 @@ async function main() {
     const hasEngineRateLimit429 = agentConclusion === "failure" && !maxAICreditsExceeded && !aiCreditsRateLimitError && detectEngineRateLimit429Failure();
 
     // Detect cache-miss misconfiguration: the agent reported a missing_data with reason
-    // "cache_memory_miss" after a cache restore matched. This indicates the prompt
-    // is referencing an incorrect path inside the cache directory.
+    // "cache_memory_miss" after a cache restore matched. Check required input,
+    // paths, and keys; a restore match does not guarantee the expected file exists.
     // Check for items regardless of agentOutputResult.success so that cache-miss signals
     // emitted alongside other output are not missed when the agent job also fails.
     let hasCacheMissMisconfiguration = false;
@@ -4566,7 +4601,7 @@ async function main() {
         core.info(`Cache-miss misconfiguration detected: ${cacheMissItems.length} missing_data item(s) with reason "cache_memory_miss" after cache restore matched an existing key`);
       }
     } else if (cacheMemoryEnabled && !cacheMemoryRestored) {
-      core.info("Cache-memory is configured but no cache restore match was found; cache_memory_miss is treated as expected cache miss (actions/cache branch scoping and first-run behavior)");
+      core.info("Cache-memory is configured but no cache restore match was found; optional state can use the workflow's cold-start fallback, while reported missing required data still activates failure handling");
     }
 
     // Only proceed if the agent job actually failed OR timed out OR there are assignment errors OR
@@ -4577,7 +4612,6 @@ async function main() {
     // OR the agent reported missing tools or missing data (treated as agent failures by default)
     // OR the secret validation step failed (engine secret missing)
     // BUT skip if we only have noop outputs (that's a successful no-action scenario)
-    const hasSecretVerificationFailed = secretVerificationResult === "failed";
     if (
       agentConclusion !== "failure" &&
       !isTimedOut &&
@@ -4596,6 +4630,7 @@ async function main() {
       !hasStaleLockFileFailed &&
       !hasDailyAICExceeded &&
       !dailyAICGuardrailErrorIsFailure &&
+      !hasActivationFailure &&
       !hasReportIncomplete &&
       !hasCacheMissMisconfiguration &&
       !aiCreditsRateLimitError &&
@@ -4606,7 +4641,7 @@ async function main() {
       !modelEndpointMismatchError
     ) {
       core.info(
-        `Agent job did not fail and no assignment/discussion/code-push/push-repo-memory/app-token/lockdown/oauth-token-check/stale-lock-file/daily-workflow-aic/daily-workflow-aic-accounting/ai-credits/max-ai-credits-exceeded/report-incomplete/cache-miss/missing-tool/missing-data/tool-denials-exceeded/secret-verification errors and has safe outputs (conclusion: ${agentConclusion}), skipping failure handling`
+        `Agent job did not fail and no assignment/discussion/code-push/push-repo-memory/app-token/lockdown/oauth-token-check/stale-lock-file/activation/daily-workflow-aic/daily-workflow-aic-accounting/ai-credits/max-ai-credits-exceeded/report-incomplete/cache-miss/missing-tool/missing-data/tool-denials-exceeded/secret-verification errors and has safe outputs (conclusion: ${agentConclusion}), skipping failure handling`
       );
       return;
     }
@@ -4762,6 +4797,7 @@ async function main() {
       hasLockdownCheckFailed,
       hasOAuthTokenCheckFailed,
       hasStaleLockFileFailed,
+      hasActivationFailure,
       hasDailyAICExceeded,
       hasDailyAICGuardrailError: dailyAICGuardrailErrorIsFailure,
       aiCreditsRateLimitError,
@@ -4813,6 +4849,7 @@ async function main() {
       hasLockdownCheckFailed,
       hasOAuthTokenCheckFailed,
       hasStaleLockFileFailed,
+      hasActivationFailure,
       hasDailyAICExceeded,
       hasDailyAICGuardrailError: dailyAICGuardrailErrorIsFailure,
       isAWFFirewallStartupFailed: detectAWFFirewallStartupFailureFromLog(),
@@ -5013,6 +5050,7 @@ async function main() {
 
         // Build stale lock file failure context
         const staleLockFileFailedContext = buildStaleLockFileFailedContext(hasStaleLockFileFailed);
+        const activationFailedContext = buildActivationFailedContext(hasActivationFailure, runUrl);
         const dailyAICExceededContext = buildDailyAICExceededContext(hasDailyAICExceeded, dailyAICTotal, dailyAICThreshold, dailyAICEstimated);
         const dailyAICGuardrailErrorContext = buildDailyAICGuardrailErrorContext(hasDailyAICGuardrailError, dailyAICGuardrailStatus, dailyAICGuardrailError, dailyAICContinueOnError);
 
@@ -5071,6 +5109,7 @@ async function main() {
           lockdown_check_failed_context: lockdownCheckFailedContext,
           oauth_token_check_failed_context: oauthTokenCheckFailedContext,
           stale_lock_file_failed_context: staleLockFileFailedContext,
+          activation_failed_context: activationFailedContext,
           daily_ai_credits_exceeded_context: dailyAICExceededContext,
           daily_ai_credits_guardrail_error_context: dailyAICGuardrailErrorContext,
         };
@@ -5249,6 +5288,7 @@ async function main() {
 
         // Build stale lock file failure context
         const staleLockFileFailedContext = buildStaleLockFileFailedContext(hasStaleLockFileFailed);
+        const activationFailedContext = buildActivationFailedContext(hasActivationFailure, runUrl);
         const dailyAICExceededContext = buildDailyAICExceededContext(hasDailyAICExceeded, dailyAICTotal, dailyAICThreshold, dailyAICEstimated);
         const dailyAICGuardrailErrorContext = buildDailyAICGuardrailErrorContext(hasDailyAICGuardrailError, dailyAICGuardrailStatus, dailyAICGuardrailError, dailyAICContinueOnError);
 
@@ -5313,6 +5353,7 @@ async function main() {
           lockdown_check_failed_context: lockdownCheckFailedContext,
           oauth_token_check_failed_context: oauthTokenCheckFailedContext,
           stale_lock_file_failed_context: staleLockFileFailedContext,
+          activation_failed_context: activationFailedContext,
           daily_ai_credits_exceeded_context: dailyAICExceededContext,
           daily_ai_credits_guardrail_error_context: dailyAICGuardrailErrorContext,
           optimize_token_consumption_context: optimizeTokenConsumptionContext,

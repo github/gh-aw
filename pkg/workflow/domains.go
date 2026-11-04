@@ -315,7 +315,7 @@ func getDomainsFromRuntimes(runtimes map[string]any) []string {
 // The returned list is sorted and deduplicated.
 //
 // # Supported ecosystem identifiers:
-//   - "defaults": basic infrastructure (certs, JSON schema, Ubuntu, package mirrors)
+//   - "defaults": certificate validation, JSON schema, and stock Ubuntu archive/keyserver hosts
 //   - "chrome": headless Chrome/Puppeteer browser testing (*.google.com, *.googleapis.com, *.gvt1.com)
 //   - "clojure": Clojure/Clojars
 //   - "containers": container registries (Docker, GHCR, etc.)
@@ -332,7 +332,7 @@ func getDomainsFromRuntimes(runtimes map[string]any) []string {
 //   - "java": Java/Maven/Gradle
 //   - "kotlin": Kotlin/JetBrains
 //   - "lean": Lean 4/Lake/Reservoir
-//   - "linux-distros": Linux distribution package repositories
+//   - "linux-distros": Linux distribution and third-party package repositories (opt-in)
 //   - "node": Node.js/NPM/Yarn
 //   - "perl": Perl/CPAN
 //   - "php": PHP/Composer
@@ -404,12 +404,12 @@ var ecosystemPriority = []string{
 	"github-actions",
 	"go",
 	"haskell",
-	"java", // before "chrome" — maven.google.com and dl.google.com are Java domains, not chrome domains
+	"java",          // before "chrome" — maven.google.com and dl.google.com are Java domains, not chrome domains
+	"linux-distros", // before "chrome" — packages.cloud.google.com is a package repository
 	"chrome",
 	"kotlin",
 	"latex",
 	"lean",
-	"linux-distros",
 	"local",
 	"node",
 	"perl",
@@ -423,6 +423,14 @@ var ecosystemPriority = []string{
 	"terraform",
 	"zig",
 	"default-safe-outputs", // compound: defaults + dev-tools + github + local
+	"bazel",
+	"gh-aw",
+	"julia",
+	"lua",
+	"ocaml",
+	"powershell",
+	"r",
+	"threat-detection",
 }
 
 // GetDomainEcosystem returns the ecosystem identifier for a given domain, or empty string if not found.
