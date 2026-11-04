@@ -1,15 +1,16 @@
 {
-  "run_id": "41785195095",
-  "run_date": "2026-11-04T06:26:17.370+00:00",
+  "run_id": "41828448219",
+  "run_date": "2026-11-04T12:25:42.198492+00:00",
   "source": "pr-triage",
   "eligible_total": 1,
-  "open_copilot_prs": 1,
+  "open_copilot_prs": 7,
   "cooldown_skipped": [
-    74752,
-    74741,
-    74740,
-    74742,
-    74751
+    74795,
+    74794,
+    74793,
+    74790,
+    74789,
+    74788
   ],
   "category_counts": {
     "feature": 1
@@ -40,5 +41,5 @@
       }
     }
   ],
-  "notes": "Only one eligible Copilot PR remained after the 1-hour cooldown; it is a high-value safe-output reliability improvement and should be fast-tracked."
+  "notes": "Only one eligible Copilot PR remained after the 1-hour cooldown; it is a high-impact safe-output reliability feature and should be fast-tracked."
 }
