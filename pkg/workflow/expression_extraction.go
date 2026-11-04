@@ -26,7 +26,7 @@ type ExpressionMapping struct {
 
 func (m *ExpressionMapping) environmentValue() string {
 	if m.IsLiteral {
-		return fmt.Sprintf("%q", m.Content)
+		return m.Content
 	}
 	return fmt.Sprintf("${{ %s }}", m.Content)
 }
