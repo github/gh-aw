@@ -176,7 +176,9 @@ func fetchWorkflowDependencies(ctx context.Context, workflowSpec *WorkflowSpec, 
 	}
 	if !isLocalWorkflowPath(workflowSpec.WorkflowPath) {
 		addLog.Printf("Fetching remote dependencies for %s", workflowSpec.WorkflowPath)
-		return fetchAllRemoteDependencies(ctx, string(sourceContent), workflowSpec, githubWorkflowsDir, opts.Verbose, opts.Force, tracker)
+		// Dependency fetching may fill in a default ref; preserve the requested source ref.
+		dependencySpec := *workflowSpec
+		return fetchAllRemoteDependencies(ctx, string(sourceContent), &dependencySpec, githubWorkflowsDir, opts.Verbose, opts.Force, tracker)
 	}
 	if sourceInfo == nil || !sourceInfo.IsLocal {
 		return nil

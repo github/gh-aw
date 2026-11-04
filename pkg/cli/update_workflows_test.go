@@ -17,6 +17,33 @@ func mockWorkflowUpdateDeps(mockFn func(context.Context, string) ([]byte, error)
 	return deps
 }
 
+func TestResolveLatestRef_AddedReleaseTracksCompatibleReleases(t *testing.T) {
+	t.Parallel()
+
+	spec, err := parseWorkflowSpec("owner/repo/workflows/triage.md@v1.2.0")
+	require.NoError(t, err)
+	source := buildSourceStringWithCommitSHA(spec, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	sourceSpec, err := parseSourceSpec(source)
+	require.NoError(t, err)
+
+	deps := mockWorkflowUpdateDeps(func(_ context.Context, repo string) ([]byte, error) {
+		assert.Equal(t, "owner/repo", repo)
+		return []byte("v2.0.0\nv1.4.0\nv1.3.0\nv1.2.0"), nil
+	})
+	deps.getRepoDefaultBranch = func(context.Context, string) (string, error) {
+		t.Fatal("a workflow added at a release tag must not track the default branch")
+		return "", nil
+	}
+	deps.getLatestBranchCommit = func(context.Context, string, string) (latestBranchCommitInfo, error) {
+		t.Fatal("a workflow added at a release tag must not resolve a branch commit")
+		return latestBranchCommitInfo{}, nil
+	}
+
+	result, err := resolveLatestRefWithDeps(context.Background(), deps, sourceSpec.Repo, sourceSpec.Ref, false, false, 0)
+	require.NoError(t, err)
+	assert.Equal(t, "v1.4.0", result.Ref)
+}
+
 // TestResolveLatestRelease_PrereleaseTagsSkipped verifies that prerelease tags are
 // not selected as the upgrade target even when they have a higher base version than
 // the latest stable release. Per semver rules, v1.1.0-beta.1 > v1.0.0, so without

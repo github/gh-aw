@@ -478,18 +478,19 @@ func parseSourceSpec(source string) (*SourceSpec, error) {
 	return spec, nil
 }
 
-// buildSourceStringWithCommitSHA builds the source string with the actual commit SHA
-// This is used when adding workflows to include the precise commit that was installed
+// buildSourceStringWithCommitSHA preserves the requested ref for future updates,
+// falling back to the resolved commit SHA when no ref was specified.
 func buildSourceStringWithCommitSHA(workflow *WorkflowSpec, commitSHA string) string {
 	if workflow.RepoSlug == "" || workflow.WorkflowPath == "" {
 		return ""
 	}
 
+	ref := workflow.Version
+	if ref == "" {
+		ref = commitSHA
+	}
+
 	if workflow.FromRepositoryManifest {
-		ref := workflow.Version
-		if commitSHA != "" {
-			ref = commitSHA
-		}
 		if ref == "" {
 			return repositoryPackageIdentifier(workflow.RepoSlug, workflow.PackagePath)
 		}
@@ -499,13 +500,10 @@ func buildSourceStringWithCommitSHA(workflow *WorkflowSpec, commitSHA string) st
 	// For local workflows, remove the "./" prefix from the WorkflowPath
 	workflowPath := strings.TrimPrefix(workflow.WorkflowPath, "./")
 
-	// Format: owner/repo/path@commitSHA
+	// Format: owner/repo/path@ref
 	source := workflow.RepoSlug + "/" + workflowPath
-	if commitSHA != "" {
-		source += "@" + commitSHA
-	} else if workflow.Version != "" {
-		// Fallback to the version if no commit SHA is available
-		source += "@" + workflow.Version
+	if ref != "" {
+		source += "@" + ref
 	}
 
 	return source
