@@ -34,6 +34,7 @@ const { ERR_CONFIG, ERR_PARSE, ERR_SAFE_OUTPUT_TOOL_COPY_FAILED, ERR_SYSTEM } = 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { normalizeSafeOutputName } = require("./safe_output_names.cjs");
 const { buildAddLabelsObjectOnlyFieldDesc } = require("./add_labels_schema.cjs");
+const { addDependencySchema } = require("./safe_output_submission.cjs");
 const normalizeToolName = name => normalizeSafeOutputName(String(name).replace(/-/g, "_").toLowerCase());
 const ADD_COMMENT_DEFAULT_DISCUSSIONS_NOTE =
   "NOTE: By default, this tool does not require discussions:write permission. Set 'discussions: true' in the workflow's safe-outputs.add-comment configuration to enable discussion comments and request this permission.";
@@ -504,6 +505,7 @@ async function main() {
   // Append dynamic tools (custom jobs, dispatch_workflow, call_workflow)
   const dynamicTools = Array.isArray(toolsMeta.dynamic_tools) ? toolsMeta.dynamic_tools : [];
   const allFilteredTools = [...filteredTools, ...dynamicTools];
+  for (const tool of allFilteredTools) addDependencySchema(tool);
   if (toolsMeta.work_queue_scoped === true) {
     for (const tool of allFilteredTools) {
       tool.inputSchema.properties ||= {};

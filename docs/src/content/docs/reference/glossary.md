@@ -1126,6 +1126,14 @@ A frontmatter option that appends custom key/value pairs to the standard gh-aw a
 
 A compiler-enforced rule for `observability.otlp` headers requiring the bare secret expression for `Authorization` values rather than a scheme prefix such as `Bearer`. For Sentry endpoints, gh-aw automatically rewrites `Authorization` to `x-sentry-auth`, so no prefix is needed. Prevents scheme-only header values (a stray auth scheme with no token) from being sent to the OTLP backend. See [OpenTelemetry](/gh-aw/reference/open-telemetry/).
 
+### OTLP Protobuf Encoding (`OTEL_EXPORTER_OTLP_PROTOCOL`)
+
+An opt-in wire encoding for the gh-aw JavaScript OTLP exporter. The exporter defaults to OTLP/HTTP JSON (`http/json`); setting `OTEL_EXPORTER_OTLP_PROTOCOL` to `http/protobuf` sends binary protobuf for traces and compact session logs, using a dependency-free encoder built on Node.js built-ins. `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL` and `OTEL_EXPORTER_OTLP_LOGS_PROTOCOL` override the encoding per signal. gRPC is not supported, and the local `otel.jsonl` trace mirror remains raw OTLP JSON. Required for Azure Monitor OTLP ingestion. See [OpenTelemetry](/gh-aw/reference/open-telemetry/#protobuf-encoding-and-azure-monitor).
+
+### OTLP Partial Success
+
+An OTLP export response that reports some spans or log records as rejected even though the HTTP request succeeded. The exporter inspects `partialSuccess` in JSON and protobuf responses for traces and logs, warns with a signal-specific rejection count, and increments `gh-aw.otlp.export_errors`. Accepted records are not retried, and collector messages are withheld because they may contain private data. See [OpenTelemetry](/gh-aw/reference/open-telemetry/).
+
 ### Custom Span (`logSpan`)
 
 A telemetry API provided by the `otlp.cjs` helper that lets shared workflow imports emit their own OTLP spans alongside built-in gh-aw telemetry. Call `otlp.logSpan(toolName, attributes, options)` inside a `github-script` step to attach domain-specific measurements to the same distributed trace as the workflow run. The function is non-fatal and never throws — export failures are surfaced as warnings. See [OpenTelemetry](/gh-aw/reference/open-telemetry/#custom-spans-from-shared-imports).

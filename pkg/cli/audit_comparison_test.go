@@ -3,12 +3,77 @@
 package cli
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestBuildAuditComparisonCandidateFromSummaryUsesSharedSnapshot(t *testing.T) {
+	t.Parallel()
+	summary := &RunSummary{
+		RunAnalysis: RunAnalysis{
+			Run:     WorkflowRun{Turns: 2},
+			Metrics: LogMetrics{Turns: 7},
+			FirewallAnalysis: &FirewallAnalysis{
+				AnalysisBase: AnalysisBase{BlockedRequests: 3},
+			},
+			MCPFailures: []MCPFailureReport{{ServerName: "github"}},
+			ModelRouting: &ModelRoutingSummary{
+				SelectedModel:  "gpt-5.6-luna",
+				SelectedEffort: "high",
+			},
+			SafeOutputs: []CreatedItemReport{{Type: "create_issue"}},
+		},
+	}
+
+	candidate := buildAuditComparisonCandidateFromSummary(summary, t.TempDir())
+
+	assert.Equal(t, 7, candidate.Snapshot.Turns)
+	assert.Equal(t, "write_capable", candidate.Snapshot.Posture)
+	assert.Equal(t, 3, candidate.Snapshot.BlockedRequests)
+	assert.Equal(t, []string{"github"}, candidate.Snapshot.MCPFailures)
+	require.NotNil(t, candidate.Snapshot.ModelRouting)
+	assert.Equal(t, "gpt-5.6-luna", candidate.Snapshot.ModelRouting.Model)
+	assert.Equal(t, "high", candidate.Snapshot.ModelRouting.Effort)
+}
+
+func TestLoadAuditComparisonCandidateFromArtifacts(t *testing.T) {
+	t.Parallel()
+	logsPath := t.TempDir()
+	routingDir := filepath.Join(logsPath, "sandbox", "firewall", "logs", "api-proxy-logs")
+	require.NoError(t, os.MkdirAll(routingDir, 0o700))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(routingDir, "model-routing.jsonl"),
+		[]byte("{\"_schema\":\"model-routing/v0.28.37\",\"stage\":\"selection\",\"selected_model\":\"gpt-5.6-luna\",\"selected_effort\":\"high\"}\n"),
+		0o600,
+	))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(logsPath, safeOutputItemsManifestFilename),
+		[]byte("{\"type\":\"create_issue\"}\n"),
+		0o600,
+	))
+
+	candidate, err := loadAuditComparisonCandidate(WorkflowRun{DatabaseID: 42}, logsPath, false)
+	require.NoError(t, err)
+	assert.Equal(t, "write_capable", candidate.Snapshot.Posture)
+	assert.Equal(t, 0, candidate.Snapshot.Turns)
+	require.NotNil(t, candidate.Snapshot.ModelRouting)
+	assert.Equal(t, "gpt-5.6-luna", candidate.Snapshot.ModelRouting.Model)
+	assert.Equal(t, "high", candidate.Snapshot.ModelRouting.Effort)
+}
+
+func TestLoadAuditComparisonCandidateFromArtifactsFailsOnFirewallError(t *testing.T) {
+	t.Parallel()
+	logsPath := filepath.Join(t.TempDir(), "not-a-directory")
+	require.NoError(t, os.WriteFile(logsPath, nil, 0o600))
+
+	_, err := loadAuditComparisonCandidate(WorkflowRun{DatabaseID: 42}, logsPath, false)
+	require.ErrorContains(t, err, "failed to analyze baseline firewall logs")
+}
 
 func TestBuildAuditComparison_NoBaseline(t *testing.T) {
 	t.Parallel()

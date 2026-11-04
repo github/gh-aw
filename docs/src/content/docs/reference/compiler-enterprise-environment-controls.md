@@ -127,9 +127,15 @@ not trigger a size-truncation warning.
 
 Logs use the existing OTLP endpoint list and per-endpoint authentication,
 including the enterprise default endpoint/header pair. No additional credentials
-or agent network access are required. The exporter posts OTLP/HTTP JSON to
+or agent network access are required. The exporter posts OTLP/HTTP JSON or protobuf to
 `<endpoint>/v1/logs`, replacing a trailing `/v1/traces` or `/v1/logs` when present.
-The vendor must support OTLP logs as well as traces at that base URL.
+`OTEL_EXPORTER_OTLP_LOGS_PROTOCOL` overrides `OTEL_EXPORTER_OTLP_PROTOCOL` for
+logs (`http/json` by default); `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL` does not
+affect logs. The byte limit is measured against the complete JSON representation
+before encoding. For Azure Monitor traces endpoints, the logs URL also selects
+the independent `Microsoft-OTLP-Logs` stream, retaining the DCE, DCR, and query
+parameters. The vendor must support OTLP logs as well as traces at that base URL.
+See [protobuf encoding and Azure Monitor](/gh-aw/reference/open-telemetry/#protobuf-encoding-and-azure-monitor).
 
 Each retained event is a structured log body with `type`, `data`, optional
 `timestamp`, and provenance. Filter on the `gh-aw.session.event_type` log
@@ -137,6 +143,32 @@ attribute or the `gh-aw.session` instrumentation scope. Records carry the
 existing trace/span IDs when valid, so vendors can correlate session metadata
 with traces. Resource attributes report the compact format version, included
 and omitted event counts, oversized source lines, and truncation.
+
+`timeUnixNano` contains the original event time when valid; timezone-qualified
+ISO timestamps retain up to nanosecond precision. Numeric timestamps reuse the
+source-normalized `provenance.timestampMs` clock when present, otherwise the
+native millisecond timestamp. `observedTimeUnixNano` records export observation
+time independently. Missing, invalid, negative or out-of-range event times leave
+`timeUnixNano` unset; they are not replaced with export time. The body retains
+the projected original timestamp and available normalized clock.
+
+Use the following resource attributes to qualify vendor queries:
+
+| Attribute | Meaning |
+| --- | --- |
+| `gh-aw.session.compact.version` | Compact profile version, currently `1`. |
+| `gh-aw.session.included_events` | Records retained in this request. |
+| `gh-aw.session.omitted_events` | Inspected records omitted by privacy/vocabulary filtering or compact/transport budgets; not a count of the unscanned population. |
+| `gh-aw.session.oversized_lines` | Completed source lines discarded for exceeding the line limit. |
+| `gh-aw.session.scan_truncated` | Source scanning stopped at its byte limit. |
+| `gh-aw.session.truncated` | Output, line-size or scan limits discarded evidence; `false` does not certify full-session completeness. |
+| `gh-aw.session.untimed_events` | Retained records without an exportable event timestamp. |
+
+These attributes describe a request and repeat on its log rows. Do not sum them
+per row or across mirrored endpoints. A truncated or scan-limited export is
+partial evidence, not proof of no further activity. Event-time queries must
+qualify untimed records separately rather than silently treating export time as
+execution time. Uncorrelated records cannot establish run-level coverage.
 
 The export reuses the [compact unified-session profile](/gh-aw/specs/unified-agent-session-specification/):
 at most 128 events and 16 KiB of projected JSONL, with bounded source scanning.

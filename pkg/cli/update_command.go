@@ -291,7 +291,7 @@ func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error 
 	newContainerPins := false
 	var err error
 	if conflictedWorkflow, scanErr := findWorkflowWithMergeConflictMarkers(opts.WorkflowsDir); scanErr == nil && conflictedWorkflow != "" {
-		message := fmt.Sprintf("Skipping container pin updates and recompilation because merge conflict markers are present in %s", conflictedWorkflow)
+		message := "Skipping container pin updates and recompilation because merge conflict markers are present in " + conflictedWorkflow
 		updateLog.Print(message)
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(message))
 	} else {

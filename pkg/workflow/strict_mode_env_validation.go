@@ -33,6 +33,7 @@ func (c *Compiler) validateEnvSecrets(frontmatter map[string]any) error {
 func (c *Compiler) validateEarlyEnvSecrets(frontmatter map[string]any) error {
 	_, config, _ := c.ExtractEngineConfig(frontmatter)
 	if config != nil && len(config.FallbackModels) > 0 {
+		strictModeValidationLog.Printf("Fallback models configured (%d); deferring engine.env secret validation until imports are merged", len(config.FallbackModels))
 		// Provider aliases are not available until imports have been merged.
 		return c.validateEnvSecretsSection(frontmatter, "env", nil)
 	}
@@ -55,6 +56,7 @@ func (c *Compiler) validateEnvSecretsWithModels(frontmatter map[string]any, mode
 			allowedEnvVarKeys := c.getEngineBaseEnvVarKeys(engineSetting)
 			if engineConfig != nil && len(engineConfig.FallbackModels) > 0 {
 				data := &WorkflowData{EngineConfig: engineConfig, Model: model, ModelMappings: models}
+				strictModeValidationLog.Printf("Adding fallback provider secret keys to engine.env allowlist for engine=%s", engineSetting)
 				for _, name := range fallbackProviderSecretNames(data) {
 					allowedEnvVarKeys[name] = struct{}{}
 				}

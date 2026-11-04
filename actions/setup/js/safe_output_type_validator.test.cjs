@@ -316,6 +316,34 @@ describe("safe_output_type_validator", () => {
   });
 
   describe("validateItem", () => {
+    it.each(["depends-on", "depends_on"])("preserves validated dependency metadata from %s", async key => {
+      const { validateItem } = await import("./safe_output_type_validator.cjs");
+      const outputId = "so_AAAAAAAAAAAA";
+      const prerequisite = "so_BBBBBBBBBBBB";
+      const result = validateItem({ type: "add_comment", body: "A completed update.", output_id: outputId, [key]: [prerequisite], undeclared: "discard" }, "add_comment", 1);
+      expect(result.isValid).toBe(true);
+      expect(result.normalizedItem).toEqual({ type: "add_comment", body: "A completed update.", output_id: outputId, "depends-on": [prerequisite] });
+    });
+
+    it.each([null, "", [], ["aw_resource"], ["so_invalid"], { id: "invalid" }])("rejects malformed dependencies rather than silently dropping them: %j", async dependency => {
+      const { validateItem } = await import("./safe_output_type_validator.cjs");
+      const result = validateItem({ type: "add_comment", body: "A completed update.", "depends-on": dependency }, "add_comment", 1);
+      expect(result.isValid).toBe(false);
+      expect(result.error).toContain("depends-on");
+    });
+
+    it("rejects resource temporary IDs as operation IDs", async () => {
+      const { validateItem } = await import("./safe_output_type_validator.cjs");
+      expect(validateItem({ type: "add_comment", body: "A completed update.", output_id: "aw_issue1" }, "add_comment", 1).isValid).toBe(false);
+    });
+
+    it.each(["upload_asset", "noop", "call_workflow", "push_repo_memory", "report_incomplete", "report_missing_tool"])("rejects dependencies on standalone %s requests during ingestion", async type => {
+      const { validateItem } = await import("./safe_output_type_validator.cjs");
+      const result = validateItem({ type, "depends-on": "so_AAAAAAAAAAAA" }, type, 1);
+      expect(result.isValid).toBe(false);
+      expect(result.error).toContain("outside the safe-output handler manager");
+    });
+
     it.each(["aw_discuss", "#aw_Discuss"])("preserves discussion temporary ID %s during ingestion", async temporaryId => {
       const { validateItem } = await import("./safe_output_type_validator.cjs");
       const item = { type: "create_discussion", title: "Report", body: "Discussion report with enough detail to satisfy the minimum body length.", temporary_id: temporaryId };

@@ -417,7 +417,8 @@ func TestInlinedSubagentExperimentCompilerToRuntime(t *testing.T) {
 		if ordered {
 			data.PromptImports = []parser.PromptImportEntry{{ImportPath: importPath}}
 		}
-		chunks, mappings := compiler.processPromptImportEntries(data)
+		chunks, mappings, err := compiler.processPromptImportEntries(data)
+		require.NoError(t, err)
 		prompt := strings.Join(chunks, "\n")
 		require.Contains(t, prompt, "model: __GH_AW_EXPERIMENTS_SUBAGENT_MODEL__")
 		require.Len(t, mappings, 1)

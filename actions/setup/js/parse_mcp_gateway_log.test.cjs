@@ -2161,6 +2161,60 @@ Some content here.`;
   });
 
   describe("parseTokenUsageJsonl", () => {
+    test.each(["{truncated", '{"input_tokens":100,', "not-json"])("withholds every counter for malformed evidence: %s", malformed => {
+      const record = JSON.stringify({ model: "gpt-4o", input_tokens: 100, output_tokens: 5, cache_read_tokens: 0, cache_write_tokens: 0 });
+      for (const content of [`${record}\n${malformed}`, `${malformed}\n${record}`, `${record}\n${malformed}\n${record}`]) {
+        const summary = parseTokenUsageJsonl(content);
+        const validOnly = parseTokenUsageJsonl(content.replace(malformed, ""));
+        expect(summary.tokenUsage).toEqual({});
+        expect(summary).toEqual({ ...validOnly, tokenUsage: {} });
+      }
+    });
+
+    test("preserves measured zero counters across blank lines", () => {
+      const summary = parseTokenUsageJsonl('\n \t\n{"input_tokens":0,"output_tokens":0,"cache_read_tokens":0,"cache_write_tokens":0}\n\n');
+      expect(summary.tokenUsage).toEqual({ input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0 });
+    });
+
+    test.each([false, true])("preserves malformed evidence through request deduplication (malformed first: %s)", malformedFirst => {
+      const { readDedupedTokenUsage } = require("./parse_token_usage.cjs");
+      const valid = '{"request_id":"same","input_tokens":100,"output_tokens":5,"cache_read_tokens":0,"cache_write_tokens":0}';
+      const malformed = '{"request_id":"same","input_tokens":';
+      const contents = malformedFirst ? [malformed, valid] : [valid, malformed];
+      const readSpy = vi.spyOn(fs, "readFileSync").mockImplementation(file => contents[Number(file)]);
+      let content;
+      try {
+        content = readDedupedTokenUsage(["0", "1"]);
+      } finally {
+        readSpy.mockRestore();
+      }
+      expect(content).toContain(malformed);
+      const summary = parseTokenUsageJsonl(content);
+      expect(summary.totalRequests).toBe(1);
+      expect(summary.totalInputTokens).toBe(100);
+      expect(summary.tokenUsage).toEqual({});
+    });
+
+    test("keeps complete token aggregates separate from partial display totals", () => {
+      const summary = parseTokenUsageJsonl(
+        [
+          { input_tokens: 100, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 5 },
+          { input_tokens: 0, output_tokens: null, cache_read_tokens: 0 },
+        ]
+          .map(entry => JSON.stringify(entry))
+          .join("\n")
+      );
+      expect(summary.tokenUsage).toEqual({ input_tokens: 100, cache_read_tokens: 0 });
+      expect(summary.totalInputTokens).toBe(100);
+      expect(summary.totalOutputTokens).toBe(0);
+      expect(summary.totalCacheWriteTokens).toBe(5);
+    });
+
+    test("does not export an overflowing aggregate or synthesize missing categories", () => {
+      const summary = parseTokenUsageJsonl('{"input_tokens":1e308,"output_tokens":0,"cache_read_tokens":1e309}\n{"input_tokens":1e308,"output_tokens":0}');
+      expect(summary.tokenUsage).toEqual({ output_tokens: 0 });
+    });
+
     test.each([
       [{}, false],
       [{ input_tokens_include_cache: true }, false],

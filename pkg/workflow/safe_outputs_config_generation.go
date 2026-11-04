@@ -208,7 +208,7 @@ func addSafeJobsConfig(safeOutputsConfig map[string]any, jobs map[string]*SafeJo
 	safeOutputsConfigLog.Printf("Processing %d safe job configurations", len(jobs))
 	for jobName, jobConfig := range jobs {
 		safeOutputsConfigLog.Printf("Generating config for safe job: %s", jobName)
-		safeJobConfig := map[string]any{}
+		safeJobConfig := map[string]any{"supports_dependencies": false}
 		if jobConfig.Description != "" {
 			safeJobConfig["description"] = jobConfig.Description
 		}

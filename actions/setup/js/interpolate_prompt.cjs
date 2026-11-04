@@ -34,7 +34,7 @@ const { createLiteralValues, readLiteralState, restoreInlineMetadata, writeLiter
 
 /**
  * Interpolates variables in the prompt content
- * @param {string} content - The prompt content with ${GH_AW_EXPR_*} placeholders
+ * @param {string} content - The prompt content with compiler-selected placeholders
  * @param {Record<string, string>} variables - Map of variable names to their values
  * @returns {string} - The interpolated content
  */
@@ -45,15 +45,15 @@ function interpolateVariables(content, variables) {
   const replacements = new Map();
   let totalReplacements = 0;
 
-  // Replace each ${VAR_NAME} with its corresponding value
   for (const [varName, value] of Object.entries(variables)) {
     const escapedVarName = varName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const pattern = new RegExp(`\\$\\{${escapedVarName}\\}`, "g");
+    const pattern = new RegExp(`\\$\\{${escapedVarName}\\}|__${escapedVarName}__`, "g");
     const matches = (content.match(pattern) || []).length;
 
     if (matches > 0) {
       core.debug(`[interpolateVariables] Replacing variable (${matches} occurrence(s))`);
       replacements.set(`\${${varName}}`, value);
+      replacements.set(`__${varName}__`, value);
       totalReplacements += matches;
     } else {
       core.debug("[interpolateVariables] Unused variable");
@@ -230,6 +230,14 @@ async function main({ deferredBindings = {}, authorExpressions = {} } = {}) {
         variables[key] = deferredBindings[key] === value ? value : protectValue(value || "");
       }
     }
+    for (const binding of Object.values(authorExpressions)) {
+      if (/^__GH_AW_[A-Z0-9_]+__$/.test(binding)) continue;
+      if (!Object.prototype.hasOwnProperty.call(process.env, binding)) {
+        throw new Error(`${ERR_CONFIG}: Author expression environment variable is missing: ${binding}`);
+      }
+      const value = process.env[binding] || "";
+      variables[binding] = deferredBindings[binding] === value ? value : protectValue(value);
+    }
 
     const varCount = Object.keys(variables).length;
     if (varCount > 0) {
@@ -296,7 +304,9 @@ async function main({ deferredBindings = {}, authorExpressions = {} } = {}) {
       core.info(`Processing ${conditionalMatches.length} conditional template block(s)`);
 
       const beforeRendering = content.length;
-      content = renderMarkdownTemplate(content, restoreValues);
+      const resolveCondition = (/** @type {string} */ condition) =>
+        restoreValues(condition.replace(/__(GH_AW_[A-Z0-9_]+)__/g, (placeholder, key) => (Object.prototype.hasOwnProperty.call(process.env, key) ? protectValue(process.env[key] || "") : placeholder)));
+      content = renderMarkdownTemplate(content, resolveCondition);
       const afterRendering = content.length;
 
       core.info(`Template rendered successfully`);

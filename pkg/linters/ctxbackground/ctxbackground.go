@@ -5,7 +5,6 @@ package ctxbackground
 
 import (
 	"go/ast"
-	"go/types"
 
 	"golang.org/x/tools/go/analysis"
 
@@ -80,22 +79,13 @@ func run(pass *analysis.Pass) (any, error) {
 	return nil, nil
 }
 
+// isContextBackgroundCall reports whether call is a call to
+// context.Background. A parenthesized callee such as
+// (context.Background)() is also recognized.
 func isContextBackgroundCall(pass *analysis.Pass, call *ast.CallExpr) bool {
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok || sel.Sel.Name != "Background" {
 		return false
 	}
-	ident, ok := sel.X.(*ast.Ident)
-	if !ok || pass.TypesInfo == nil {
-		return false
-	}
-	obj := pass.TypesInfo.ObjectOf(ident)
-	if obj == nil {
-		return false
-	}
-	pkgName, ok := obj.(*types.PkgName)
-	if !ok {
-		return false
-	}
-	return pkgName.Imported().Path() == "context"
+	return astutil.IsPkgSelector(pass, sel, "context")
 }

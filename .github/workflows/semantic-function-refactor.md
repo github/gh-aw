@@ -11,12 +11,16 @@ max-turns: 50
 
 permissions:
   contents: read
+  copilot-requests: write
   issues: read
   pull-requests: read
 
-model: claude-sonnet-5
 engine:
   id: claude
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
 imports:
   - shared/otlp.md
   - shared/reporting.md

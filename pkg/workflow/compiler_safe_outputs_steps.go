@@ -49,6 +49,22 @@ func preparePRCheckoutLintBlock(steps []string, runsOn string) string {
 	return normalizeBlankLines(finalized)
 }
 
+const globalSafeOutputsAppTokenExpr = "steps.safe-outputs-app-token.outputs.token"
+
+// prHandlersUseGlobalApp reports whether the PR handlers push to the host repository
+// with the global safe-outputs App token (no per-handler App/token and no other target repo).
+func prHandlersUseGlobalApp(safeOutputs *SafeOutputsConfig) bool {
+	if safeOutputs == nil || safeOutputs.GitHubApp == nil || resolvePRCheckoutTargetRepo(safeOutputs) != "" {
+		return false
+	}
+	for _, field := range []string{"CreatePullRequests", "PushToPullRequestBranch"} {
+		if getHandlerGitHubApp(safeOutputs, field) != nil || getHandlerGitHubToken(safeOutputs, field) != "" {
+			return false
+		}
+	}
+	return safeOutputsGlobalAppTokenMinted(safeOutputs)
+}
+
 func prepareSharedPRCheckout(data *WorkflowData) (*CheckoutManager, string) {
 	// Build the same CheckoutManager the agent job builds from the workflow's checkout: config.
 	checkoutMgr := NewCheckoutManager(data.CheckoutConfigs)
@@ -67,7 +83,13 @@ func prepareSharedPRCheckout(data *WorkflowData) (*CheckoutManager, string) {
 	// same token is reused below for the "Configure Git credentials" step so both the
 	// persisted checkout credential and the push remote agree on a single token.
 	prCheckoutToken, _ := resolvePRCheckoutToken(data.SafeOutputs, checkoutMgr)
+	// Additional checkouts keep their existing static/per-checkout credentials; only the
+	// default workspace checkout adopts the minted App token, and only when the host
+	// repository is the PR target and the PR handlers rely on the global App.
 	checkoutMgr.SetPushToken(resolveStaticCheckoutToken(data.SafeOutputs, checkoutMgr))
+	if prHandlersUseGlobalApp(data.SafeOutputs) && strings.Contains(prCheckoutToken, globalSafeOutputsAppTokenExpr) {
+		checkoutMgr.SetDefaultPushToken(prCheckoutToken)
+	}
 	// Runtime checkouts are not revisited by GenerateConfigureGitCredentialsSteps.
 	// Resolve the shared PR auth without selecting another entry's scoped write app;
 	// dynamicCheckoutToken applies each runtime entry's own auth first.
@@ -278,12 +300,6 @@ func (c *Compiler) buildDispatchRepositoryAppTokenSteps(data *WorkflowData) []st
 	}
 
 	return steps
-}
-
-// buildSafeOutputItemsManifestUploadStep builds the step that uploads the safe output
-// items manifest and temporary ID map as a separate artifact.
-func buildSafeOutputItemsManifestUploadStep(prefix string, pinAction func(string) string, claimArtifacts bool, data *WorkflowData) []string {
-	return buildSafeOutputManifestUploadStep(prefix, pinAction, claimArtifacts, data, true)
 }
 
 func buildSafeOutputManifestUploadStep(prefix string, pinAction func(string) string, claimArtifacts bool, data *WorkflowData, includeItems bool) []string {

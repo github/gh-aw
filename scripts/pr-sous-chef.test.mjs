@@ -115,7 +115,7 @@ test("visible fingerprint survives HTML marker removal and arbitrary comment ord
 
 test("dispatch state comments deduplicate without assigning or mentioning Copilot", () => {
   const first = classify(failingPr, detail(), [], [], now);
-  const body = formatNudge(first).replace(/<!--.*?-->/g, "");
+  const body = formatNudge(first).replace(/<!--[\s\S]*?--!?>/g, "");
   assert.doesNotMatch(body, /@copilot|assign.to.agent/i);
   assert.equal(classify(failingPr, detail(), [{ ...nudge(first.state_fingerprint), body }], [], now).skip_reason, "unchanged");
   assert.equal(classify(failingPr, detail(), [{ ...nudge(first.state_fingerprint), body, user: { login: "outsider" } }], [], now).skip_reason, undefined);

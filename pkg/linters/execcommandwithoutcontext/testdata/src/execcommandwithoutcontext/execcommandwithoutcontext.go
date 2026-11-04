@@ -129,3 +129,8 @@ func BadGoWithCtx(ctx context.Context) {
 func register(fn func()) {
 	fn()
 }
+
+// Bad: parenthesized exec.Command callee inside a context-receiving function.
+func BadParenCommand(ctx context.Context, name string) {
+	_ = (exec.Command)(name) // want `use exec\.CommandContext\(ctx, \.\.\.\) instead of exec\.Command to propagate context cancellation`
+}

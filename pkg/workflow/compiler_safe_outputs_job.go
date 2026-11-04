@@ -210,6 +210,10 @@ func (c *Compiler) buildSafeOutputsSetupAndDownloadSteps(data *WorkflowData, age
 		return nil, err
 	}
 	steps = append(steps, controls...)
+	if isWorkQueueEnabled(data) && usesPatchesAndCheckouts(data.SafeOutputs) {
+		consolidatedSafeOutputsJobLog.Print("Adding shared checkout step for PR operations after claim reconciliation")
+		steps = append(steps, c.buildSharedPRCheckoutSteps(data)...)
+	}
 
 	// Configure GH_HOST for GHES/GHEC compatibility.
 	// The safe-outputs job runs as an independent GitHub Actions job and does not
@@ -281,8 +285,11 @@ func (c *Compiler) buildSafeOutputsDownloadSteps(data *WorkflowData, agentArtifa
 			SetupEnvStep: false,
 			StepName:     "Download patch artifact",
 		}, c.getActionPin)...)
-		consolidatedSafeOutputsJobLog.Print("Adding shared checkout step for PR operations")
-		steps = append(steps, c.buildSharedPRCheckoutSteps(data)...)
+		// Work-queue jobs add the checkout after claim reconciliation and App token minting.
+		if !isWorkQueueEnabled(data) {
+			consolidatedSafeOutputsJobLog.Print("Adding shared checkout step for PR operations")
+			steps = append(steps, c.buildSharedPRCheckoutSteps(data)...)
+		}
 	}
 	return steps
 }

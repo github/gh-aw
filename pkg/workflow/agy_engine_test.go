@@ -341,6 +341,9 @@ func TestAgyProductionConformancePermissionsAreBoundedAndScoped(t *testing.T) {
 				if name == string(constants.ConclusionAdmissionJobName) {
 					allowedPermissions = map[string]string{"contents": "read", "id-token": "write"}
 				}
+				if entry.id == "smoke-agy" && name == "push_evals_state" {
+					allowedPermissions = map[string]string{"contents": "write"}
+				}
 				if entry.id == "agy-conformance-reusable" && name == "safe_outputs" {
 					allowedPermissions["pull-requests"] = "read"
 					assert.Equal(t, map[string]string{"pull-requests": "read"}, config.Permissions)

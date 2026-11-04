@@ -1171,6 +1171,7 @@
         "url": { "$ref": "#/definitions/JsonValue" },
         "status": { "$ref": "#/definitions/JsonValue" },
         "errorCode": { "$ref": "#/definitions/JsonValue" },
+        "output_id": { "type": "string" },
         "messageIndex": { "type": "number" },
         "staged": { "type": "boolean" }
       },
@@ -1187,6 +1188,7 @@
         "url": { "$ref": "#/definitions/JsonValue" },
         "status": { "$ref": "#/definitions/JsonValue" },
         "errorCode": { "$ref": "#/definitions/JsonValue" },
+        "output_id": { "type": "string" },
         "messageIndex": { "type": "number" },
         "staged": { "type": "boolean" },
         "errors": { "type": "array", "items": { "$ref": "#/definitions/SafeOutputData" } }

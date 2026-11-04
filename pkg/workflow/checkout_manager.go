@@ -214,6 +214,8 @@ type CheckoutManager struct {
 	// http.extraheader injection is required. Empty means "fall back to the
 	// actions/checkout default token".
 	pushToken string
+	// defaultPushToken, when set, overrides pushToken for the default workspace checkout only.
+	defaultPushToken string
 	// dynamicPushToken may reference same-job app-token outputs. Runtime checkouts
 	// retain it directly instead of relying on the static git-credential setup step.
 	dynamicPushToken string
@@ -299,6 +301,13 @@ func (cm *CheckoutManager) SetKeepCredentialsForPush(keep bool) {
 func (cm *CheckoutManager) SetPushToken(token string) {
 	checkoutManagerLog.Printf("Setting pushToken: present=%t", token != "")
 	cm.pushToken = token
+}
+
+// SetDefaultPushToken overrides the persisted credential of the default workspace
+// checkout without changing the credential of additional checkouts.
+func (cm *CheckoutManager) SetDefaultPushToken(token string) {
+	checkoutManagerLog.Printf("Setting defaultPushToken: present=%t", token != "")
+	cm.defaultPushToken = token
 }
 
 // SetDynamicPushToken overrides the fallback push credential for runtime checkouts

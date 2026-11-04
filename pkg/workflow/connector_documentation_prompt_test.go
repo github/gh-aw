@@ -102,7 +102,8 @@ Visible approved instruction.
 					if mode.legacy {
 						data.PromptImports = nil
 					}
-					chunks, mappings := compiler.processPromptImportEntries(data)
+					chunks, mappings, err := compiler.processPromptImportEntries(data)
+					require.NoError(t, err)
 					require.Empty(t, mappings, "omitted documentation must not create expression bindings")
 					if mode.payload != "" {
 						require.NotEmpty(t, result.MergedMarkdown, "visible input substitution exercises compile-time inlining")

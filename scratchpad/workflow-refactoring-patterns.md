@@ -1,10 +1,10 @@
 # Workflow Refactoring Patterns
 
-This document describes the patterns and practices used for refactoring large agentic workflows into smaller, maintainable modules.
+This document describes the patterns and practices used for refactoring large agentic workflows into smaller modules that each cover one concern.
 
 ## Overview
 
-The workflow complexity reduction initiative addresses workflows that have grown to excessive size (600+ lines), making them difficult to maintain, debug, and test. This document captures the refactoring patterns used to modularize these workflows.
+The workflow complexity reduction initiative addresses workflows that have grown beyond 600 lines, making them difficult to maintain, debug, and test. This document captures the refactoring patterns used to modularize these workflows.
 
 ## Refactoring Principles
 
@@ -39,7 +39,7 @@ imports:
 ## Size Guidelines
 
 - **Target**: 400-500 lines maximum per workflow
-- **Ideal**: 200-300 lines for most workflows
+- **Typical**: 200-300 lines for most workflows
 - **Hard limit**: 600 lines (refactor above this)
 
 ## Refactoring Pattern Examples
@@ -125,7 +125,7 @@ imports:
 
 Pattern for modules that fetch and prepare data:
 
-```markdown
+````markdown
 ---
 # Module name and description
 #
@@ -159,7 +159,7 @@ Usage examples:
 ```bash
 # How to use the collected data
 ```
-```
+````
 
 ### Analysis Strategies Modules
 
@@ -234,21 +234,21 @@ When refactoring a large workflow:
 - [ ] Extract visualization logic to shared module (if applicable)
 - [ ] Update main workflow to use imports
 - [ ] Verify workflow compiles successfully
-- [ ] Check that line count is < 500 (ideally 200-400)
+- [ ] Check that line count is < 500 (recommended range 200-400)
 - [ ] Test workflow functionality
-- [ ] Document extracted modules with clear usage examples
+- [ ] Document extracted modules with usage examples
 
 ## Benefits
 
 ### Maintainability
-- Focused modules are easier to understand
+- Each module covers one concern, which narrows what a reader must follow
 - Changes to shared logic propagate to all workflows
-- Clear separation of concerns
+- Separation of concerns between modules
 
 ### Testability
 - Smaller modules reduce test scope
 - Shared modules can be tested independently
-- Reduced cognitive load for reviewers
+- Smaller review scope for each change
 
 ### Reusability
 - Shared modules serve multiple workflows
@@ -264,7 +264,7 @@ When refactoring a large workflow:
 
 ### Pattern: Data Fetch + Analysis + Visualization
 
-```
+```text
 Main Workflow (300 lines)
 ├── Import: data-fetch.md (150 lines)
 ├── Import: analysis-strategies.md (200 lines)
@@ -274,7 +274,7 @@ Main Workflow (300 lines)
 
 ### Pattern: Build + Analyze + Propose Changes
 
-```
+```text
 Main Workflow (280 lines)
 ├── Import: build-and-test.md (180 lines)
 ├── Import: optimization-strategies.md (190 lines)
@@ -295,16 +295,16 @@ Main Workflow (280 lines)
    - **Bad example**: Both `data-analysis-a.md` and `data-analysis-b.md` have identical data fetch code
    - **Good example**: Extract common data fetch to `data-fetch.md`, both modules import it
 
-❌ **Don't make modules too generic**: Modules should be focused and purposeful, not catch-all utilities.
+❌ **Don't make modules too generic**: Each module should cover one topic rather than act as a catch-all utility.
    - **Bad example**: `shared/utilities.md` with 500 lines of unrelated functions
    - **Good example**: `shared/python-dataviz.md` focused on data visualization setup
 
 ## Success Metrics
 
 A successful refactoring achieves:
-- ✅ Main workflow < 500 lines (ideally 200-400)
+- ✅ Main workflow < 500 lines (recommended range 200-400)
 - ✅ No more than 3 distinct concerns per workflow
-- ✅ Reusable shared modules with clear purpose
+- ✅ Reusable shared modules with a stated purpose
 - ✅ Workflow compiles without errors
 - ✅ Functionality preserved (verified by testing)
 

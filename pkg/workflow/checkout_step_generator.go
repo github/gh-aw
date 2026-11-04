@@ -346,8 +346,12 @@ func (cm *CheckoutManager) GenerateDefaultCheckoutStep(
 	// push token so the credential retained in .git/config matches the token the
 	// safe-output handlers use to fetch/push (avoiding both a wrong-token push and the
 	// duplicate Authorization header that a separate per-command extraheader would add).
-	if !trialMode && !tokenEmitted && cm.keepCredentialsForPush && cm.pushToken != "" {
-		fmt.Fprintf(&sb, "          token: %s\n", cm.pushToken)
+	defaultToken := cm.pushToken
+	if cm.defaultPushToken != "" {
+		defaultToken = cm.defaultPushToken
+	}
+	if !trialMode && !tokenEmitted && cm.keepCredentialsForPush && defaultToken != "" {
+		fmt.Fprintf(&sb, "          token: %s\n", defaultToken)
 	}
 
 	steps := []string{sb.String()}

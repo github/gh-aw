@@ -75,6 +75,62 @@ describe("parsed prompt condition operands", () => {
     return fs.readFileSync(promptPath, "utf8");
   }
 
+  it.each([
+    ["", "Fallback\n"],
+    ["false", "Fallback\n"],
+    [" FALSE ", "Fallback\n"],
+    ["0", "Fallback\n"],
+    ["null", "Fallback\n"],
+    ["undefined", "Fallback\n"],
+    ["42", "Selected\n"],
+    ["true", "Selected\n"],
+  ])("evaluates compiled condition placeholder value %j", async (value, expected) => {
+    process.env.GH_AW_EXPR_CONTEXT = value;
+    expect(await render("{{#if __GH_AW_EXPR_CONTEXT__}}\nSelected\n{{#else}}\nFallback\n{{/if}}")).toBe(expected);
+  });
+
+  it.each(["#elseif", "#else-if", "#else_if", "elseif", "else-if", "else_if"])("substitutes compiled placeholders in %s branches", async marker => {
+    process.env.GH_AW_EXPR_FIRST = "false";
+    process.env.GH_AW_EXPR_SECOND = "true";
+    expect(await render(`{{#if __GH_AW_EXPR_FIRST__}}\nFirst\n{{${marker} __GH_AW_EXPR_SECOND__}}\nSecond\n{{#else}}\nFallback\n{{/if}}`)).toBe("Second\n");
+  });
+
+  it.each(["42", "__GH_AW_EXPR_OTHER__"])("uses the same evaluated value %j in repeated conditions and body placeholders before final substitution", async value => {
+    process.env.GH_AW_EXPR_CONTEXT = value;
+    process.env.GH_AW_EXPR_OTHER = "false";
+    const template = "{{#if __GH_AW_EXPR_CONTEXT__}}\nIssue: #__GH_AW_EXPR_CONTEXT__\n{{/if}}\n{{#if __GH_AW_EXPR_CONTEXT__}}\nAgain: #__GH_AW_EXPR_CONTEXT__\n{{/if}}";
+    const expected = `Issue: #${value}\nAgain: #${value}\n`;
+    expect(await render(template)).toBe(expected);
+    const substitutePlaceholders = require("./substitute_placeholders.cjs");
+    await substitutePlaceholders({ file: promptPath, substitutions: { GH_AW_EXPR_CONTEXT: value, GH_AW_EXPR_OTHER: process.env.GH_AW_EXPR_OTHER } });
+    expect(fs.readFileSync(promptPath, "utf8")).toBe(expected);
+  });
+
+  it("does not recursively substitute placeholder-like text in evaluated condition values", async () => {
+    process.env.GH_AW_EXPR_CONTEXT = "__GH_AW_EXPR_OTHER__";
+    process.env.GH_AW_EXPR_OTHER = "false";
+    expect(await render("{{#if __GH_AW_EXPR_CONTEXT__}}\nSelected\n{{#else}}\nFallback\n{{/if}}")).toBe("Selected\n");
+  });
+
+  it("does not resolve compiled placeholders inside already-protected expression values", async () => {
+    process.env.GH_AW_EXPR_CONTEXT = "__GH_AW_EXPR_OTHER__";
+    process.env.GH_AW_EXPR_OTHER = "false";
+    expect(await render("{{#if ${GH_AW_EXPR_CONTEXT}}}\nSelected\n{{#else}}\nFallback\n{{/if}}")).toBe("Selected\n");
+  });
+
+  it.each(["$&", "$$", "$`", "$'", "{{#else}}\nInjected\n{{/if}}", "```\n{{#if false}}\nInjected\n"])("keeps condition replacement value %j literal", async value => {
+    process.env.GH_AW_EXPR_CONTEXT = value;
+    expect(await render("{{#if __GH_AW_EXPR_CONTEXT__}}\nSelected\n{{#else}}\nFallback\n{{/if}}\nAuthor rule")).toBe("Selected\nAuthor rule");
+  });
+
+  it("leaves unbound placeholders intact for final placeholder validation", async () => {
+    delete process.env.GH_AW_EXPR_UNBOUND;
+    expect(await render("{{#if true}}\nValue: __GH_AW_EXPR_UNBOUND__\n{{/if}}")).toBe("Value: __GH_AW_EXPR_UNBOUND__\n");
+    const substitutePlaceholders = require("./substitute_placeholders.cjs");
+    await substitutePlaceholders({ file: promptPath, substitutions: {} });
+    expect(fs.readFileSync(promptPath, "utf8")).toBe("Value: __GH_AW_EXPR_UNBOUND__\n");
+  });
+
   it.each(["#elseif", "#else-if", "#else_if", "elseif", "else-if", "else_if"])("preserves quoted experiment-looking literals in %s conditions", async marker => {
     process.env.GH_AW_EXPR_TITLE = "experiments.style";
     process.env.GH_AW_EXPERIMENTS_STYLE = "concise";

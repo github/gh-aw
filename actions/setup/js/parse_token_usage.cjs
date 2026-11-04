@@ -1,7 +1,7 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
-const { iterateJsonl, iterateJsonlEvents, iterateLines } = require("./jsonl_helpers.cjs");
+const { iterateJsonl, iterateJsonlEvents } = require("./jsonl_helpers.cjs");
 const fs = require("fs");
 const path = require("path");
 const { getErrorMessage } = require("./error_helpers.cjs");
@@ -299,9 +299,9 @@ function writeEmptyUsageEvidence() {
   const usageJSONLPath = getUsageOutputPath("GH_AW_AGENT_USAGE_JSONL_PATH", getGhAwPath("agent_usage.jsonl"));
   fs.mkdirSync(path.dirname(usagePath), { recursive: true });
   fs.mkdirSync(path.dirname(usageJSONLPath), { recursive: true });
-  fs.writeFileSync(usagePath, '{"input_tokens":0,"output_tokens":0,"ai_credits":0}\n');
-  fs.writeFileSync(usageJSONLPath, '{"provider":"unknown","ai_credits":0}\n');
-  core.info("Recorded explicit zero token usage evidence");
+  fs.writeFileSync(usagePath, "{}\n");
+  fs.writeFileSync(usageJSONLPath, '{"provider":"unknown"}\n');
+  core.info("Recorded unavailable token usage evidence");
 }
 
 /**
@@ -365,9 +365,15 @@ function readDedupedTokenUsage(paths) {
       continue;
     }
 
-    for (const line of iterateLines(fileContent)) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
+    for (const event of iterateJsonlEvents(fileContent)) {
+      if (event.type === "invalid" && event.reason === "blank") continue;
+      const trimmed = event.rawLine.trim();
+      // A partial record may contain a request_id already seen in a valid
+      // record. Preserve it so aggregation can mark counters unavailable.
+      if (event.type === "invalid") {
+        dedupedLines.push(trimmed);
+        continue;
+      }
       const dedupeKey = extractTokenUsageDedupeKey(trimmed) || trimmed;
       if (uniqueLineKeys.has(dedupeKey)) continue;
       uniqueLineKeys.add(dedupeKey);
@@ -635,10 +641,7 @@ async function main(copilotSessionStateDir = getGhAwPath("sandbox/agent/logs/cop
     if (process.env.GH_AW_PHASE !== "detection") primaryModel = effectiveAttribution.model || primaryModel;
 
     const agentUsage = {
-      input_tokens: summary.totalInputTokens,
-      output_tokens: summary.totalOutputTokens,
-      cache_read_tokens: summary.totalCacheReadTokens,
-      cache_write_tokens: summary.totalCacheWriteTokens,
+      ...summary.tokenUsage,
       ambient_context: Math.round(summary.ambientContextTokens || 0),
       ...(summary.aiCreditsAvailable ? { ai_credits: summary.aiCreditsSource === "awf_reported" ? Number(summary.totalAIC.toFixed(6)) : Number(summary.totalAIC.toFixed(3)) } : {}),
       ...(primaryModel ? { primary_model: primaryModel } : {}),

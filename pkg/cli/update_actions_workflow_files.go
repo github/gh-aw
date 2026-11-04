@@ -102,7 +102,7 @@ func updateActionsInWorkflowFiles(ctx context.Context, deps actionUpdateDeps, op
 	if conflictedWorkflow, err := findWorkflowWithMergeConflictMarkers(opts.workflowsDir); err != nil {
 		return fmt.Errorf("unable to scan workflows for merge conflicts: %w", err)
 	} else if conflictedWorkflow != "" {
-		message := fmt.Sprintf("Skipping action, skill, and plugin updates because merge conflict markers are present in %s", conflictedWorkflow)
+		message := "Skipping action, skill, and plugin updates because merge conflict markers are present in " + conflictedWorkflow
 		updateLog.Print(message)
 		if opts.verbose {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(message))
@@ -148,7 +148,7 @@ func updateActionsInWorkflowFiles(ctx context.Context, deps actionUpdateDeps, op
 }
 
 func containsMergeConflictMarkers(content string) bool {
-	for _, line := range strings.Split(content, "\n") {
+	for line := range strings.SplitSeq(content, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "<<<<<<<") ||
 			strings.HasPrefix(trimmed, "|||||||") ||

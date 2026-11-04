@@ -513,9 +513,7 @@ func scatterAroundTime(targetHour, targetMinute int, workflowIdentifier string) 
 	hash := stableHash(workflowIdentifier, windowSize)
 	offset := hash - (windowSize / 2)
 	scatteredMinutes := wrapMinutes(targetMinutes + offset)
-	hour := scatteredMinutes / 60
-	minute := avoidPeakMinutes(hour, avoidHourBoundary(scatteredMinutes%60))
-	return hour, minute
+	return finalizeScatteredMinutes(scatteredMinutes)
 }
 
 func scatterBetweenTime(startHour, startMinute, endHour, endMinute int, workflowIdentifier string) (int, int) {
@@ -527,6 +525,10 @@ func scatterBetweenTime(startHour, startMinute, endHour, endMinute int, workflow
 	if scatteredMinutes >= 24*60 {
 		scatteredMinutes -= 24 * 60
 	}
+	return finalizeScatteredMinutes(scatteredMinutes)
+}
+
+func finalizeScatteredMinutes(scatteredMinutes int) (int, int) {
 	hour := scatteredMinutes / 60
 	minute := avoidPeakMinutes(hour, avoidHourBoundary(scatteredMinutes%60))
 	return hour, minute

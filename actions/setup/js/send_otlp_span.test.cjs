@@ -6134,7 +6134,7 @@ describe("sendJobConclusionSpan", () => {
       expect(keys).not.toContain("gen_ai.usage.total_tokens");
     });
 
-    it("omits a gen_ai token attribute when its value is zero", async () => {
+    it("preserves zero token attributes alongside positive counts", async () => {
       const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK" });
       vi.stubGlobal("fetch", mockFetch);
 
@@ -6155,11 +6155,43 @@ describe("sendJobConclusionSpan", () => {
       const attrs = Object.fromEntries(agentSpan.attributes.map(a => [a.key, a.value.intValue ?? a.value.stringValue]));
       expect(attrs["gen_ai.usage.input_tokens"]).toBe(1000);
       expect(attrs["gen_ai.usage.cache_read.input_tokens"]).toBe(500);
-      // total_tokens = input(1000) + output(0) = 1000 (non-zero so it IS emitted)
       expect(attrs["gen_ai.usage.total_tokens"]).toBe(1000);
-      const keys = agentSpan.attributes.map(a => a.key);
-      expect(keys).not.toContain("gen_ai.usage.output_tokens");
-      expect(keys).not.toContain("gen_ai.usage.cache_creation.input_tokens");
+      expect(attrs["gen_ai.usage.output_tokens"]).toBe(0);
+      expect(attrs["gen_ai.usage.cache_creation.input_tokens"]).toBe(0);
+    });
+
+    describe.each(["file", "runtime result"])("token availability from %s", source => {
+      it.each([
+        { usage: { input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0 }, expected: { input_tokens: 0, output_tokens: 0, "cache_read.input_tokens": 0, "cache_creation.input_tokens": 0, total_tokens: 0 } },
+        {
+          usage: { input_tokens: "0", output_tokens: "20", cache_read_input_tokens: "0", cache_creation_input_tokens: "5" },
+          expected: { input_tokens: 0, output_tokens: 20, "cache_read.input_tokens": 0, "cache_creation.input_tokens": 5, total_tokens: 20 },
+        },
+        { usage: { input_tokens: 100 }, expected: { input_tokens: 100 } },
+        { usage: { output_tokens: 0 }, expected: { output_tokens: 0 } },
+        { usage: { cache_read_tokens: 0, cache_write_tokens: 4 }, expected: { "cache_read.input_tokens": 0, "cache_creation.input_tokens": 4 } },
+        { usage: { input_tokens: null, output_tokens: 0, cache_read_tokens: false, cache_write_tokens: -1 }, expected: { output_tokens: 0 } },
+        { usage: { input_tokens: "NaN", output_tokens: "Infinity", cache_read_tokens: "", cache_write_tokens: " " }, expected: {} },
+        { usage: { input_tokens: [], output_tokens: {}, cache_read_tokens: true, cache_write_tokens: "-1" }, expected: {} },
+        { usage: { input_tokens: 1e308, output_tokens: 1e308 }, expected: { input_tokens: 1e308, output_tokens: 1e308 } },
+        { usage: {}, expected: {} },
+        { usage: null, expected: {} },
+        { usage: [], expected: {} },
+        { usage: undefined, expected: {} },
+      ])("exports only available counters for $usage", async ({ usage, expected }) => {
+        readFileSpy.mockImplementation(filePath => {
+          if (source === "file" && filePath === "/tmp/gh-aw/agent_usage.json") return JSON.stringify(usage ?? null);
+          if (source === "runtime result" && filePath === "/tmp/gh-aw/agent-stdio.log") return JSON.stringify({ type: "result", usage }) + "\n";
+          throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+        });
+
+        await sendJobConclusionSpan("gh-aw.agent.conclusion", { startMs: 1_700_000_000_000 });
+
+        const spans = appendSpy.mock.calls.flatMap(([, content]) => JSON.parse(content).resourceSpans[0].scopeSpans[0].spans);
+        const usageAttributes = spans.flatMap(span => span.attributes).filter(attr => attr.key.startsWith("gen_ai.usage."));
+        expect(Object.fromEntries(usageAttributes.map(attr => [attr.key.replace("gen_ai.usage.", ""), attr.value.intValue ?? attr.value.doubleValue]))).toEqual(expected);
+        expect(usageAttributes).toHaveLength(Object.keys(expected).length);
+      });
     });
 
     it("omits gen_ai token breakdown attributes when agent_usage.json contains invalid JSON", async () => {
@@ -6323,6 +6355,44 @@ describe("sendJobConclusionSpan", () => {
       expect(keys).not.toContain("gen_ai.usage.output_tokens");
       expect(keys).not.toContain("gen_ai.usage.cache_read.input_tokens");
       expect(keys).not.toContain("gen_ai.usage.cache_creation.input_tokens");
+    });
+
+    it.each([
+      { job: "agent", dedicated: true, owner: "gh-aw.agent.agent" },
+      { job: "agent", dedicated: false, owner: "gh-aw.agent.conclusion" },
+      { job: "copilot", dedicated: false, owner: "gh-aw.copilot.conclusion" },
+      { job: "detection", dedicated: false, owner: "gh-aw.detection.conclusion" },
+      { job: "detection", dedicated: false, skipped: true, owner: undefined },
+      { job: "conclusion", dedicated: false, owner: undefined },
+      { job: "safe_outputs", dedicated: false, owner: undefined },
+      { job: "", dedicated: false, owner: undefined },
+    ])("keeps measured zero accounting exclusive to $owner (job=$job, skipped=$skipped)", async ({ job, dedicated, skipped, owner }) => {
+      process.env.INPUT_JOB_NAME = job;
+      process.env.GH_AW_INFO_ENGINE_ID = "copilot";
+      process.env.GH_AW_DETECTION_CONCLUSION = skipped ? "skipped" : "success";
+      if (!dedicated) {
+        statSpy.mockImplementation(() => {
+          throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+        });
+      }
+      const usage = { input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0 };
+      readFileSpy.mockImplementation(filePath => {
+        if (filePath === "/tmp/gh-aw/threat-detection/detection_usage.json") return JSON.stringify(usage);
+        if (filePath === "/tmp/gh-aw/agent_usage.json") return JSON.stringify(job === "detection" ? { input_tokens: 100, output_tokens: 50 } : usage);
+        if (filePath === "/tmp/gh-aw/agent-stdio.log") return '{"type":"result","usage":{"input_tokens":100,"output_tokens":50}}\n';
+        throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+      });
+
+      await sendJobConclusionSpan(`gh-aw.${job || "job"}.conclusion`, dedicated ? { startMs: 1_700_000_000_000 } : {});
+
+      const spans = appendSpy.mock.calls.flatMap(([, content]) => JSON.parse(content).resourceSpans[0].scopeSpans[0].spans);
+      const owners = spans.filter(span => span.attributes.some(attr => attr.key.startsWith("gen_ai.usage.")));
+      expect(owners.map(span => span.name)).toEqual(owner ? [owner] : []);
+      if (owner) {
+        const attrs = owners[0].attributes.filter(attr => attr.key.startsWith("gen_ai.usage."));
+        expect(attrs).toHaveLength(5);
+        expect(attrs.every(attr => attr.value.intValue === 0)).toBe(true);
+      }
     });
 
     it("includes gen_ai token breakdown on agent conclusion span when no agent sub-span is emitted", async () => {

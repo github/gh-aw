@@ -269,7 +269,8 @@ Review.
 	require.NoError(t, err)
 	var proposal map[string]any
 	require.NoError(t, json.Unmarshal([]byte(strings.TrimSpace(string(recorded))), &proposal))
-	assert.Equal(t, map[string]any{"type": "tracker_add_comment", "issue": "ISSUE-1", "text": "Offline replay"}, proposal)
+	require.Regexp(t, `^so_[A-Za-z0-9_-]{12}$`, proposal["output_id"])
+	assert.Equal(t, map[string]any{"type": "tracker_add_comment", "issue": "ISSUE-1", "text": "Offline replay", "output_id": proposal["output_id"]}, proposal)
 }
 
 func TestConnectorSamplesRuntimeValuesCannotInjectReplayControl(t *testing.T) {
@@ -356,6 +357,8 @@ func TestConnectorSamplesRuntimeValuesCannotInjectReplayControl(t *testing.T) {
 				require.NoError(t, err)
 				var proposal map[string]any
 				require.NoError(t, json.Unmarshal([]byte(strings.TrimSpace(string(recorded))), &proposal))
+				require.Regexp(t, `^so_[A-Za-z0-9_-]{12}$`, proposal["output_id"])
+				expected["output_id"] = proposal["output_id"]
 				assert.Equal(t, expected, proposal, "runtime text must remain one argument on the authored tool")
 				assert.NoFileExists(t, filepath.Join(root, "injected.txt"))
 				assert.Equal(t, head, runGit("rev-parse", "HEAD"), "sample must not apply or commit an injected patch")

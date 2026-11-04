@@ -7,7 +7,6 @@ package timesleepnocontext
 import (
 	"fmt"
 	"go/ast"
-	"go/types"
 
 	"golang.org/x/tools/go/analysis"
 
@@ -78,23 +77,12 @@ func run(pass *analysis.Pass) (any, error) {
 	return nil, nil
 }
 
-// isTimeSleepCall reports whether call is a call to time.Sleep.
+// isTimeSleepCall reports whether call is a call to time.Sleep. A
+// parenthesized callee such as (time.Sleep)(d) is also recognized.
 func isTimeSleepCall(pass *analysis.Pass, call *ast.CallExpr) bool {
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok || sel.Sel.Name != "Sleep" {
 		return false
 	}
-	ident, ok := sel.X.(*ast.Ident)
-	if !ok {
-		return false
-	}
-	obj := pass.TypesInfo.ObjectOf(ident)
-	if obj == nil {
-		return false
-	}
-	pkgName, ok := obj.(*types.PkgName)
-	if !ok {
-		return false
-	}
-	return pkgName.Imported().Path() == "time"
+	return astutil.IsPkgSelector(pass, sel, "time")
 }

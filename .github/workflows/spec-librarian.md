@@ -54,23 +54,7 @@ name: Package Specification Librarian
 strict: true
 timeout-minutes: 25
 tools:
-  bash:
-  - find pkg -name "README.md" -type f
-  - find pkg -maxdepth 1 -type d
-  - find pkg/* -maxdepth 0 -type d
-  - cat pkg/*/README.md
-  - wc -l pkg/*/README.md
-  - head -n * pkg/*/*.go
-  - cat pkg/*/*.go
-  - wc -l pkg/*/*.go
-  - grep -rn "func [A-Z]" pkg --include="*.go"
-  - grep -rn "type [A-Z]" pkg --include="*.go"
-  - grep -rn "const [A-Z]" pkg --include="*.go"
-  - grep -rn "import " pkg --include="*.go"
-  - grep -rn "package " pkg --include="*.go"
-  - "git log --oneline --since=\"30 days ago\" -- pkg/*"
-  - "git log --oneline --since=\"7 days ago\" -- pkg/*/README.md"
-  - "git log -1 --format=%H -- pkg/*"
+  bash: ["*"]
   cli-proxy: true
   edit: null
   github:

@@ -121,7 +121,7 @@ When writing GitHub Actions workflows:
      echo "Title: $UNTRUSTED_VALUE"
    ```
 
-4. **Safe context variables (always safe to use):**
+4. **Context variables without user-authored text:**
    - `${{ github.actor }}`
    - `${{ github.repository }}`
    - `${{ github.run_id }}`
