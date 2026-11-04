@@ -135,6 +135,13 @@ describe("compact unified session projection", () => {
     expect(compactUnifiedSession(events).session).not.toContain("PRIVATE");
   });
 
+  it("preserves only finite source-normalized provenance clocks", () => {
+    const clocks = [0, 1700000000123.5, NaN, Infinity, "PRIVATE", { content: "PRIVATE" }];
+    const inputs = clocks.map(timestampMs => ({ ...event("usage.report", { aic: 1 }), provenance: { timestampMs } }));
+    expect(parse(compactUnifiedSession(inputs)).map(item => item.provenance.timestampMs)).toEqual([0, 1700000000123.5, undefined, undefined, undefined, undefined]);
+    expect(compactUnifiedSession(inputs).session).not.toContain("PRIVATE");
+  });
+
   it("preserves bounded native reconnect counters without creating harness events", () => {
     const events = [
       event("engine.retry", { attempt: 2, maxRetries: 5, backoffMs: 1000, output: "PRIVATE", errors: ["PRIVATE"] }),
