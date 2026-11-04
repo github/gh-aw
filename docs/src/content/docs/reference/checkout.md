@@ -13,6 +13,43 @@ Before the agent job, activation separately checks out workflow configuration to
 
 Use `checkout:` when you need to check out additional branches, check out multiple repositories, or to disable checkout entirely for workflows that don't need to access code or can access code dynamically through the GitHub Tools.
 
+## Checkout and Host Step Order
+
+The relevant agent-job order is:
+
+1. Repository checkout, using `checkout.ref` when configured.
+2. Imported `steps:` (including shared toolchain setup).
+3. The workflow's own `steps:`.
+4. Automatic "Checkout PR branch", when enabled for the event.
+5. `pre-agent-steps:`.
+6. The sandboxed engine.
+
+> [!WARNING]
+> Imported and custom steps execute on the host, outside the sandbox. Setting `checkout.ref` to a planner-selected PR branch can make a setup command such as `./scripts/setup.sh` execute untrusted branch code with the job's available credentials. The compiler warns when a ref expression references `needs.*`, `github.event.*`, or `inputs.*` and imported or custom `steps:` are present, except for the repository's default-branch expression. The absence of a warning does not establish that a ref is trusted.
+
+For a planner-chosen branch, keep setup on the default branch and switch in the workflow's own `steps:` after imported setup finishes:
+
+```aw wrap
+on:
+  workflow_dispatch:
+  needs: [plan]
+imports:
+  - ./shared/toolchain.md
+checkout:
+  ref: ${{ github.event.repository.default_branch }}
+  fetch: ["${{ needs.plan.outputs.branch }}"]
+  pull-request: false
+steps:
+  - name: Switch to planner-selected branch
+    env:
+      BRANCH: ${{ needs.plan.outputs.branch }}
+    run: |
+      git check-ref-format --branch "$BRANCH"
+      git checkout -B "$BRANCH" --track "origin/$BRANCH"
+```
+
+This example assumes a custom `plan` job exposes a `branch` output naming a branch in the current repository. `on.needs` makes that output available before activation. `fetch:` retrieves that branch while checkout credentials are available; the later switch is local-only. Passing the branch through `env` avoids shell interpolation of expression values. `pull-request: false` prevents automatic PR checkout from replacing the selected branch. Do not execute branch-owned scripts in later host steps, including `pre-agent-steps:`.
+
 ## PR Revision Binding
 
 By default, the compiler-generated "Checkout PR branch" step fetches a specific commit SHA from the current repository's `origin`, then verifies the checked-out `HEAD` before reporting success or recording a patch baseline. It does not resolve a moving `refs/pull/N/head` during fetch.
