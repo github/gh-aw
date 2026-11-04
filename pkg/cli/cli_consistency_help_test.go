@@ -104,6 +104,22 @@ func TestCLIDocsReflectStatusAuditExperimentsAndGradersCommands(t *testing.T) {
 	assert.Contains(t, text, "| `-h`, `--help` | Show help (`gh aw help [command]` for command-specific help) |\n| `-v`, `--verbose` | Enable verbose output showing detailed information |\n| `--banner` | Display ASCII logo banner with purple GitHub color theme |", "global options table rows should remain contiguous")
 }
 
+func TestCLIDocsDocumentTimeoutFlagFormats(t *testing.T) {
+	t.Parallel()
+	_, currentFile, _, ok := runtime.Caller(0)
+	require.True(t, ok, "should resolve current test file path")
+
+	docsPath := filepath.Join(filepath.Dir(currentFile), "..", "..", "docs", "src", "content", "docs", "setup", "cli.md")
+	content, err := os.ReadFile(docsPath)
+	require.NoError(t, err, "should read CLI setup docs")
+
+	text := string(content)
+	assert.Contains(t, text, "| `audit`, `health` | Go duration | `--timeout 5m` | `audit`: no additional deadline; `health`: disables its collection deadline |")
+	assert.Contains(t, text, "| `logs`, `forecast` | Integer minutes | `--timeout 5` | No timeout |")
+	assert.Contains(t, text, "| `trial` | Integer minutes | `--timeout 10` | No timeout (default: 30 minutes) |")
+	assert.Equal(t, 2, strings.Count(text, "`--repos`, `--interactive/-i`, `--dry-run`"))
+}
+
 func TestSubcommandListingsUseHyphenBullets(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

@@ -26,7 +26,7 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.12.1
 	go.uber.org/goleak v1.3.0
-	go.yaml.in/yaml/v3 v3.0.5
+	go.yaml.in/yaml/v3 v3.0.6
 	// Only golang.org/x/crypto/nacl/box is used. The unmaintained
 	// golang.org/x/crypto/openpgp subpackage (advisory GO-2026-5932, no fix
 	// available) must never be imported; enforced by the depguard rule in

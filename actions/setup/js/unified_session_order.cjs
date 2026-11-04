@@ -25,6 +25,17 @@ function sessionTimestampNs(record, unit = "milliseconds") {
   if (typeof value !== "string") return undefined;
   const match = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d+))?(Z|[+-]\d{2}:\d{2})$/i.exec(value);
   if (!match) return undefined;
+  const calendar = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})$/.exec(match[1]);
+  if (!calendar) return undefined;
+  const year = Number(calendar[1]);
+  const month = Number(calendar[2]);
+  const day = Number(calendar[3]);
+  const hour = Number(calendar[4]);
+  const minute = Number(calendar[5]);
+  const second = Number(calendar[6]);
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (month < 1 || month > 12 || day < 1 || day > daysInMonth[month - 1] || hour > 23 || minute > 59 || second > 59) return undefined;
   const ms = Date.parse(`${match[1]}${match[3]}`);
   return Number.isFinite(ms) ? BigInt(ms) * 1000000n + BigInt((match[2] ?? "").padEnd(9, "0").slice(0, 9)) : undefined;
 }

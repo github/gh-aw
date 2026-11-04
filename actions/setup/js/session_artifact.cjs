@@ -24,17 +24,23 @@ function removeFailedSessionArtifacts(files, originalError) {
  * @returns {string}
  */
 function serializeSessionArtifact(events, maskedValues = [], options = {}) {
-  const redacted = redactManifestValue(events, collectArtifactSecretValues());
+  const secretValues = collectArtifactSecretValues();
+  const redacted = redactManifestValue(events, secretValues);
   if (!Array.isArray(redacted)) throw new Error(`${ERR_VALIDATION}: Expected a session event array`);
-  const serialized = redacted.map(event =>
-    JSON.stringify(event, (_key, value) => {
+  const maskedSourceClocks = redacted.map((event, index) => {
+    const sourceTimestamp = events[index]?.timestamp;
+    return typeof sourceTimestamp === "string" && (redacted[index]?.timestamp !== sourceTimestamp || redactMaskedValues(sourceTimestamp, maskedValues) !== sourceTimestamp);
+  });
+  const serialized = redacted.map((event, index) => {
+    const serializableEvent = maskedSourceClocks[index] && event?.provenance && typeof event.provenance === "object" ? { ...event, provenance: { ...event.provenance, timestampMs: undefined } } : event;
+    return JSON.stringify(serializableEvent, (_key, value) => {
       if (typeof value === "string") return redactMaskedValues(value, maskedValues);
       if (options.rejectStructuralRedaction && value && typeof value === "object" && !Array.isArray(value)) {
         return Object.fromEntries(Object.entries(value).map(([key, nested]) => [redactMaskedValues(key, maskedValues), nested]));
       }
       return value;
-    })
-  );
+    });
+  });
   if (options.rejectStructuralRedaction) {
     try {
       events.forEach((event, index) => {

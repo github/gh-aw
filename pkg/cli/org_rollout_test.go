@@ -48,6 +48,19 @@ func TestOrgRolloutFlags(t *testing.T) {
 	}
 }
 
+func TestOrgRolloutInteractiveShortFlag(t *testing.T) {
+	for _, newCommand := range []func(func(string) error) *cobra.Command{NewUpdateCommand, NewUpgradeCommand} {
+		cmd := newCommand(func(string) error { return nil })
+		interactiveFlag := cmd.Flags().Lookup("interactive")
+		require.NotNil(t, interactiveFlag)
+		assert.Equal(t, "i", interactiveFlag.Shorthand)
+		require.NoError(t, cmd.ParseFlags([]string{"-i"}))
+		interactive, err := cmd.Flags().GetBool("interactive")
+		require.NoError(t, err)
+		assert.True(t, interactive)
+	}
+}
+
 func TestOrgRolloutWorkerArguments(t *testing.T) {
 	cmd := NewUpdateCommand(func(string) error { return nil })
 	require.NoError(t, cmd.ParseFlags([]string{"triage", "--org=acme", "--pr", "--dry-run", "--concurrency=4",
