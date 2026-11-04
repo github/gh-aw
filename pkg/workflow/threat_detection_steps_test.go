@@ -338,6 +338,15 @@ func TestBuildUploadDetectionLogStep(t *testing.T) {
 	}
 }
 
+func TestBuildUploadDetectionArtifactStep(t *testing.T) {
+	steps := strings.Join(NewCompiler().buildUploadDetectionArtifactStep(&WorkflowData{}), "")
+
+	assert.Contains(t, steps, "            /tmp/gh-aw/threat-detection/detection_harness_retry.json\n")
+	assert.Contains(t, steps, "        if: "+detectionArtifactsRedactedCondition+"\n")
+	assert.Contains(t, steps, "          if-no-files-found: ignore\n")
+	assert.NotContains(t, steps, "/tmp/gh-aw/threat-detection/detection.log")
+}
+
 func TestThreatDetectionStepsIncludeUpload(t *testing.T) {
 	compiler := NewCompiler()
 
