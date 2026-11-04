@@ -150,7 +150,7 @@ async function checkBranchPushable(githubClient, owner, repo, branchName, checkB
       const protectionStatus = protectionError && typeof protectionError === "object" && "status" in protectionError ? protectionError.status : undefined;
       if (protectionStatus === 404) {
         // 404 means the branch does not exist – safe to proceed
-        core.info(`Branch "${branchName}" has no protection rules`);
+        core.info(`Branch "${branchName}" not found; proceeding to push`);
       } else if (protectionStatus === 403) {
         // 403 means the token lacks permission to read branch protection rules.
         // The GitHub platform will still enforce branch protection at push time,

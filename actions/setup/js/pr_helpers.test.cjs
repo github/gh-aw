@@ -409,6 +409,7 @@ describe("checkBranchPushable", () => {
     const client = makeClient("main", 404);
     const result = await checkBranchPushable(client, "owner", "repo", "feature", true);
     expect(result).toBeNull();
+    expect(mockCore.info).toHaveBeenCalledWith('Branch "feature" not found; proceeding to push');
   });
 
   it("blocks push when branch is the default branch", async () => {
