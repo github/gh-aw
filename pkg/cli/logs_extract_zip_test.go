@@ -270,3 +270,55 @@ func TestExtractZipFileErrorHandling(t *testing.T) {
 		// This prevents silent data loss that could occur if Close() errors were ignored.
 	})
 }
+
+func TestUnzipFileWithLimits(t *testing.T) {
+	t.Parallel()
+
+	zipPath := filepath.Join(t.TempDir(), "multi-entry.zip")
+	zipFile, err := os.Create(zipPath)
+	require.NoError(t, err)
+
+	zipWriter := zip.NewWriter(zipFile)
+	for name, content := range map[string]string{
+		"first.txt":  "first",
+		"second.txt": "second",
+	} {
+		writer, err := zipWriter.Create(name)
+		require.NoError(t, err)
+		_, err = writer.Write([]byte(content))
+		require.NoError(t, err)
+	}
+	require.NoError(t, zipWriter.Close())
+	require.NoError(t, zipFile.Close())
+
+	tests := []struct {
+		name          string
+		maxEntryCount int
+		maxTotalSize  uint64
+		wantError     string
+	}{
+		{
+			name:          "entry count",
+			maxEntryCount: 1,
+			maxTotalSize:  maxZipTotalSize,
+			wantError:     "zip archive contains too many entries",
+		},
+		{
+			name:          "total uncompressed size",
+			maxEntryCount: 2,
+			maxTotalSize:  uint64(len("first") + len("second") - 1),
+			wantError:     "zip archive exceeds total uncompressed size limit",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			destDir := t.TempDir()
+			err := unzipFileWithLimits(zipPath, destDir, false, tt.maxEntryCount, tt.maxTotalSize)
+			require.ErrorContains(t, err, tt.wantError)
+
+			entries, err := os.ReadDir(destDir)
+			require.NoError(t, err)
+			assert.Empty(t, entries, "archive validation should happen before extracting any entries")
+		})
+	}
+}
