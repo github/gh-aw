@@ -1228,9 +1228,7 @@ jobs:
           GH_AW_MCP_CONFIG_132cbc4653e22064_EOF
 
           # Sync converter output to writable CODEX_HOME for Codex
-          mkdir -p "${CODEX_HOME}"
-          if [ "${RUNNER_TEMP}/gh-aw/mcp-config/config.toml" != "${CODEX_HOME}/config.toml" ]; then cp "${RUNNER_TEMP}/gh-aw/mcp-config/config.toml" "${CODEX_HOME}/config.toml"; fi
-          chmod 600 "${CODEX_HOME}/config.toml"
+          "$(command -v node)" "${RUNNER_TEMP}/gh-aw/actions/convert_gateway_config_codex.cjs" --copy-config
       - name: Mount MCP servers as CLIs
         id: mount-mcp-clis
         continue-on-error: true
