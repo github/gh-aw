@@ -17,6 +17,9 @@ func (e *BehaviorDefinedEngine) GetDurableExecutionPlan(data *WorkflowData, logF
 	if durable.Execution == nil || durable.Execution.CommandName == "" {
 		return nil, fmt.Errorf("engine %q behaviors.durable requires execution.command-name and session files", e.GetID())
 	}
+	if durable.Execution.ProtectedSessionCapture != e.protectedSessionCaptureEnabled() {
+		return nil, fmt.Errorf("engine %q behaviors.durable.execution.protected-session-capture must match behaviors.execution.protected-session-capture so capture and publication use the same source", e.GetID())
+	}
 	if data.EngineConfig.Command != "" || data.EngineConfig.Driver != "" || data.EngineConfig.HarnessScript != "" {
 		return nil, fmt.Errorf("engine %q durable execution cannot be overridden by command, driver or harness", e.GetID())
 	}
@@ -36,14 +39,8 @@ func (e *BehaviorDefinedEngine) GetDurableExecutionPlan(data *WorkflowData, logF
 	if err != nil {
 		return nil, err
 	}
-	files := make([]string, 0, len(durable.Files))
-	for _, file := range durable.Files {
-		if file == "$GH_AW_DURABLE_CHECKPOINT" {
-			file = env["GH_AW_DURABLE_CHECKPOINT"]
-		}
-		files = append(files, file)
-	}
-	if err := validateDurableFiles(files); err != nil {
+	files, err := resolveDurableFilePaths(durable.Files, env["GH_AW_DURABLE_CHECKPOINT"])
+	if err != nil {
 		return nil, fmt.Errorf("engine %q behaviors.durable.files: %w", e.GetID(), err)
 	}
 	plan := &DurableExecutionPlan{Files: files, ExecutionSteps: engine.GetExecutionSteps(data, logFile)}
@@ -68,4 +65,15 @@ func (e *BehaviorDefinedEngine) GetDurableExecutionPlan(data *WorkflowData, logF
 		plan.InstallationSteps = append(plan.InstallationSteps, depEngine.GetInstallationSteps(&depData)...)
 	}
 	return plan, nil
+}
+
+func resolveDurableFilePaths(declared []string, checkpoint string) ([]string, error) {
+	files := make([]string, 0, len(declared))
+	for _, file := range declared {
+		if file == "$GH_AW_DURABLE_CHECKPOINT" {
+			file = checkpoint
+		}
+		files = append(files, file)
+	}
+	return files, validateDurableFiles(files)
 }

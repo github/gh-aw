@@ -197,6 +197,26 @@ func TestBehaviorDefinedDurableSessionFilesWithoutLibrary(t *testing.T) {
 	}
 }
 
+func TestBehaviorDefinedDurableRejectsCaptureModeChanges(t *testing.T) {
+	for _, protected := range []bool{false, true} {
+		t.Run(strconv.FormatBool(protected), func(t *testing.T) {
+			definition := &EngineDefinition{ID: "capture-agent", Behaviors: &EngineBehaviorDefinition{
+				Execution: &EngineExecutionDefinition{CommandName: "capture-agent", ProtectedSessionCapture: protected},
+				LogParser: `function parseLog() { return { logEntries: [] }; }`,
+				Durable: &EngineDurableDefinition{
+					Files:     []string{"/tmp/gh-aw/agent/example/sessions"},
+					Execution: &EngineExecutionDefinition{CommandName: "capture-agent", ProtectedSessionCapture: !protected},
+				},
+			}}
+			engine, err := NewBehaviorDefinedEngine(definition)
+			require.NoError(t, err)
+			data := &WorkflowData{WorkflowID: "custom", EngineConfig: &EngineConfig{ID: definition.ID, Durable: &DurableConfig{RetentionDays: 7}}}
+			_, err = engine.GetDurableExecutionPlan(data, constants.AgentStdioLogPath)
+			require.ErrorContains(t, err, "protected-session-capture")
+		})
+	}
+}
+
 func TestCompileDurableImportedSessionEngine(t *testing.T) {
 	dir := t.TempDir()
 	definition := filepath.Join(dir, "session-engine.md")

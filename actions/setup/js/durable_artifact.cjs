@@ -28,6 +28,27 @@ async function selectCheckpoint({ github, context, core }) {
   if (rawContext && !inbound) throw new Error("Durable continuation requires a valid aw_context object");
   const explicitParent = String(inbound?.run_id || "") !== String(current.id) && inbound?.run_id ? inbound.run_id : inbound?.parent_run_id || undefined;
   if (explicitParent !== undefined && !/^[1-9]\d*$/.test(String(explicitParent))) throw new Error("aw_context parent run ID must be a positive integer");
+  async function restoreFrom(run) {
+    const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, { owner, repo, run_id: run.id, per_page: 100 });
+    const artifact = artifacts
+      .filter(item => {
+        const runPrefix = `${prefix}${run.id}-`;
+        if (!item.name.startsWith(runPrefix) || item.expired) return false;
+        const attempt = item.name.slice(runPrefix.length);
+        if (!/^[1-9]\d*$/.test(attempt) || (run.id === current.id && Number(attempt) >= Number(process.env.GITHUB_RUN_ATTEMPT || "1"))) return false;
+        const expiresAt = new Date(item.expires_at).getTime();
+        if (!Number.isFinite(expiresAt)) throw new Error("Durable checkpoint artifact has an invalid expiration date");
+        return expiresAt > Date.now();
+      })
+      .sort((a, b) => b.id - a.id)[0];
+    if (!artifact) return false;
+    core.setOutput("artifact-id", String(artifact.id));
+    core.setOutput("run-id", String(run.id));
+    core.setOutput("parent-run-id", String(run.id));
+    core.info(`Restoring durable checkpoint from run ${run.id}`);
+    return true;
+  }
+  if (Number(process.env.GITHUB_RUN_ATTEMPT || "1") > 1 && (await restoreFrom(current))) return;
   let parent;
   if (explicitParent) {
     ({ data: parent } = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: String(explicitParent) }));
@@ -58,24 +79,7 @@ async function selectCheckpoint({ github, context, core }) {
     ) {
       throw new Error("Durable parent must be a completed run of the same workflow and branch in this repository");
     }
-    const run = parent;
-    const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, { owner, repo, run_id: run.id, per_page: 100 });
-    const artifact = artifacts
-      .filter(
-        item =>
-          item.name.startsWith(prefix) &&
-          !item.expired &&
-          new Date(item.expires_at).getTime() > Date.now() &&
-          (run.id !== current.id || Number(item.name.slice(prefix.length).split("-").at(-1)) < Number(process.env.GITHUB_RUN_ATTEMPT || "1"))
-      )
-      .sort((a, b) => b.id - a.id)[0];
-    if (artifact) {
-      core.setOutput("artifact-id", String(artifact.id));
-      core.setOutput("run-id", String(run.id));
-      core.setOutput("parent-run-id", String(run.id));
-      core.info(`Restoring durable checkpoint from run ${run.id}`);
-      return;
-    }
+    if (await restoreFrom(parent)) return;
     if (explicitParent) throw new Error("The explicit durable parent run has no unexpired checkpoint artifact");
   }
   core.info("The last successful same-branch workflow run has no unexpired durable checkpoint; starting a new session");

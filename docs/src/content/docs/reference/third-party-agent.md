@@ -114,6 +114,8 @@ uses the existing installation fields: `package-manager: npm`, a valid
 dependencies are installed and verified in addition to the ordinary engine
 installation. The durable execution and harness replace the ordinary ones;
 workflow-level command, driver, and harness overrides are rejected.
+Durable and ordinary execution must use the same `protected-session-capture`
+setting so capture verification and publication remain consistent.
 
 The harness also receives `GH_AW_DURABLE_STORAGE=artifact`,
 `GH_AW_DURABLE_DIR`, and `GH_AW_DURABLE_CHECKPOINT`. Persist only session state,

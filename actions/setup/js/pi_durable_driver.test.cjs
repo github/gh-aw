@@ -157,6 +157,9 @@ describe("official Pi durable offline integration", () => {
     assert.equal(after.state.requestId, before.state.requestId);
     assert.equal(after.state.pending, false);
     assert.equal(resumed.requests(), 1);
+    process.env.GITHUB_RUN_ATTEMPT = "2";
+    await main({ ...options, ...resumed });
+    assert.equal(resumed.requests(), 1, "retrying the run that completed a resumed submission must not submit another prompt");
   });
 
   test("an interrupted mutating tool is not blindly executed again", async () => {
@@ -221,6 +224,18 @@ describe("official Pi durable offline integration", () => {
     const state = JSON.parse(fs.readFileSync(process.env.GH_AW_PI_DURABLE_CHECKPOINT, "utf8")).state;
     assert.equal(state.calls, 2);
     assert.equal(state.denials, 2);
+  });
+
+  test("retrying a policy-aborted run preserves failure instead of reporting success", async () => {
+    const options = fixture();
+    process.env.GH_AW_MAX_TOOL_CALLS = "1";
+    process.env.GH_AW_PI_TOOL_POLICY = '{"bash":false}';
+    const engine = await scripted(async index => [{ type: "toolCall", id: `denied-${index}`, name: "bash", arguments: { command: "touch forbidden" } }]);
+    await assert.rejects(main({ ...options, ...engine }), /tool budget exhausted/);
+    const requests = engine.requests();
+    process.env.GITHUB_RUN_ATTEMPT = "2";
+    await assert.rejects(main({ ...options, ...engine }), /tool budget exhausted/);
+    assert.equal(engine.requests(), requests);
   });
 
   test("rejects secret-bearing persistence, incompatible checkpoints, traversal, missing sidecars and unsupported storage", async () => {

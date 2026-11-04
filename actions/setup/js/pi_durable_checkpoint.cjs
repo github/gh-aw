@@ -59,6 +59,7 @@ function createCheckpoint(checkpoint, directory, scope, storage) {
     if (!state || typeof state.pending !== "boolean" || typeof state.requestId !== "string" || !Number.isSafeInteger(state.calls) || state.calls < 0 || !Number.isSafeInteger(state.denials) || state.denials < 0) {
       throw new Error("Invalid Pi durable checkpoint state");
     }
+    if (state.failure != null && !["policy", "unanswered"].includes(state.failure)) throw new Error("Invalid Pi durable checkpoint failure state");
     fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
     for (const name of fs.readdirSync(directory)) {
       if (!FILE.test(name)) throw new Error("Unexpected file in Pi durable working directory");

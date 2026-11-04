@@ -133,7 +133,11 @@ async function main(options = {}) {
     if (!Number.isFinite(timeoutMinutes) || timeoutMinutes <= 0) throw new Error("Invalid workflow timeout for Pi durable");
     timer = setTimeout(() => stop("deadline"), options.timeoutMs ?? Math.max(1000, timeoutMinutes * 60000 - closeMs - 30000));
     const runId = process.env.GITHUB_RUN_ID || "local";
-    if (!checkpoint.state.pending && checkpoint.state.runId === runId) return;
+    if (!checkpoint.state.pending && checkpoint.state.runId === runId) {
+      if (checkpoint.state.failure === "policy") throw new Error("Pi durable workflow tool budget exhausted");
+      if (checkpoint.state.failure === "unanswered") throw new Error("Pi durable submission ended unanswered");
+      return;
+    }
     if (!checkpoint.state.pending) {
       checkpoint.state.requestId = `gh-aw:${runId}:${process.env.GITHUB_RUN_ATTEMPT || "1"}`;
       checkpoint.state.runId = runId;
@@ -141,6 +145,7 @@ async function main(options = {}) {
       checkpoint.state.submissionId = null;
       checkpoint.state.calls = 0;
       checkpoint.state.denials = 0;
+      checkpoint.state.failure = null;
       checkpoint.save();
     }
     let submission = checkpoint.state.submissionId === null ? undefined : await harness.submission(checkpoint.state.submissionId, context);
@@ -153,6 +158,8 @@ async function main(options = {}) {
     if (stopped && stopReason === "policy") {
       await bounded(root.abort(context), closeMs, "Pi durable policy abort exceeded its shutdown deadline");
       checkpoint.state.pending = false;
+      checkpoint.state.runId = runId;
+      checkpoint.state.failure = "policy";
       checkpoint.save();
       throw new Error("Pi durable workflow tool budget exhausted");
     }
@@ -162,6 +169,8 @@ async function main(options = {}) {
     }
     if (stopped || !settled) throw new Error("Pi durable interrupted; the pending submission will resume from the artifact");
     checkpoint.state.pending = false;
+    checkpoint.state.runId = runId;
+    checkpoint.state.failure = settled.status === "done" ? null : "unanswered";
     checkpoint.state.usage = await harness.usage(context);
     checkpoint.save();
     if (settled.status !== "done") throw new Error(`Pi durable submission ended unanswered (${settled.reason || "unknown"})`);

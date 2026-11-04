@@ -27,7 +27,7 @@ function fixture() {
       },
     },
     paginate: vi.fn(async () => {
-      const name = core.setOutput.mock.calls.find(([key]) => key === "artifact-name")[1].replace(/200-1$/, "100-1");
+      const name = core.setOutput.mock.calls.find(([key]) => key === "artifact-name")[1].replace(/200-\d+$/, "100-1");
       return [{ id: 999, name, expired: false, expires_at: "2999-01-01T00:00:00Z" }];
     }),
   };
@@ -53,6 +53,29 @@ describe("durable artifact lineage", () => {
     await selectCheckpoint(options);
     expect(options.github.rest.actions.listWorkflowRuns).not.toHaveBeenCalled();
     expect(options.github.rest.actions.getWorkflowRun).toHaveBeenLastCalledWith(expect.objectContaining({ run_id: "100" }));
+    expect(options.core.setOutput).toHaveBeenCalledWith("run-id", "100");
+  });
+
+  it("restores the latest published earlier attempt before reusing the inbound parent", async () => {
+    const options = fixture();
+    vi.stubEnv("GITHUB_RUN_ATTEMPT", "3");
+    options.context.payload = { inputs: { aw_context: '{"run_id":"100"}' } };
+    options.github.paginate.mockImplementation(async (_method, { run_id }) => {
+      const name = options.core.setOutput.mock.calls.find(([key]) => key === "artifact-name")[1];
+      return String(run_id) === "200" ? [1, 2, 3].map(attempt => ({ id: 900 + attempt, name: name.replace(/200-3$/, `200-${attempt}`), expired: false, expires_at: "2999-01-01T00:00:00Z" })) : [];
+    });
+    await selectCheckpoint(options);
+    expect(options.core.setOutput).toHaveBeenCalledWith("artifact-id", "902");
+    expect(options.core.setOutput).toHaveBeenCalledWith("run-id", "200");
+    expect(options.github.rest.actions.listWorkflowRuns).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the selected parent when an earlier attempt published no checkpoint", async () => {
+    const options = fixture();
+    vi.stubEnv("GITHUB_RUN_ATTEMPT", "2");
+    const parentArtifacts = options.github.paginate.getMockImplementation();
+    options.github.paginate.mockImplementation(async (method, args) => (String(args.run_id) === "200" ? [] : parentArtifacts(method, args)));
+    await selectCheckpoint(options);
     expect(options.core.setOutput).toHaveBeenCalledWith("run-id", "100");
   });
 

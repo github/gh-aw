@@ -89,6 +89,8 @@ workflow and branch; it may have failed or been cancelled if it published a
 checkpoint. Missing or expired explicit-parent checkpoints fail rather than
 silently switching lineage. Without an explicit parent, a missing or expired
 artifact on the last successful run starts a fresh session.
+When retrying a run, an unexpired checkpoint published by an earlier attempt of
+that same run takes precedence over the original parent.
 
 Pending submissions resume their original task rather than admitting the new
 run's prompt. After a submission completes, a later run admits a new prompt into
