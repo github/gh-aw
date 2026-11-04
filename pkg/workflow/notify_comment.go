@@ -182,6 +182,9 @@ func computeConclusionJobPermissions(data *WorkflowData) *Permissions {
 			conclusionPerms.Set(PermissionContents, PermissionWrite)
 			conclusionPerms.Set(PermissionIssues, PermissionWrite)
 		}
+		if IsDetectionJobEnabled(data.SafeOutputs) && data.SafeOutputs.ThreatDetection.IsReportAsIssueEnabled() {
+			conclusionPerms.Set(PermissionIssues, PermissionWrite)
+		}
 		if hasOTLPGitHubOIDCAuth(data.ParsedFrontmatter, data.RawFrontmatter) {
 			conclusionPerms.Set(PermissionIdToken, PermissionWrite)
 		}
@@ -206,7 +209,7 @@ func computeConclusionJobPermissions(data *WorkflowData) *Permissions {
 	// Only request issues: write when at least one conclusion-job mechanism can actually
 	// create/update an issue and that path is not already covered by
 	// ComputePermissionsForSafeOutputs (report-failed-jobs, agent-failure reporting,
-	// noop reporting, or missing-tool issue reporting). This keeps the permission grant
+	// noop, detection, or missing-tool issue reporting). This keeps the permission grant
 	// derived from the resolved configuration instead of being emitted unconditionally.
 	if conclusionMayCreateIssue(data) {
 		if level, ok := conclusionPerms.Get(PermissionIssues); !ok || level != PermissionWrite {
@@ -254,7 +257,7 @@ func issueReportingCreateIssueEnabled(config *IssueReportingConfig) bool {
 
 // conclusionMayCreateIssue returns true if at least one conclusion-job mechanism can create or
 // update an issue: report-failed-jobs, agent-failure reporting (report-failure-as-issue), noop
-// reporting (noop.report-as-issue), or missing-tool issue reporting. This mirrors the resolved
+// reporting (noop.report-as-issue), detection runs, or missing-tool issue reporting. This mirrors the resolved
 // configuration so that disabling every issue-creating path removes issues: write from the
 // compiled conclusion job's permissions.
 func conclusionMayCreateIssue(data *WorkflowData) bool {
@@ -268,6 +271,9 @@ func conclusionMayCreateIssue(data *WorkflowData) bool {
 		return true
 	}
 	if conclusionMissingToolCreateIssueEnabled(data) {
+		return true
+	}
+	if IsDetectionJobEnabled(data.SafeOutputs) && data.SafeOutputs.ThreatDetection.IsReportAsIssueEnabled() {
 		return true
 	}
 	return false

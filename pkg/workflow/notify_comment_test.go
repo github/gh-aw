@@ -2061,7 +2061,7 @@ func TestConclusionJobIssuesWritePermissionDerivedFromConfig(t *testing.T) {
 		assert.NotContains(t, strings.Join(job.Steps, ""), "GH_AW_JOB_DURATIONS:")
 	})
 
-	t.Run("no issues: write when default threat detection is enabled but issue-writing paths are disabled", func(t *testing.T) {
+	t.Run("no issues: write when threat detection is enabled but issue reporting is disabled", func(t *testing.T) {
 		compiler := NewCompiler()
 		falseReportFailedJobs := TemplatableBool("false")
 		workflowData := &WorkflowData{
@@ -2073,7 +2073,7 @@ func TestConclusionJobIssuesWritePermissionDerivedFromConfig(t *testing.T) {
 				MissingTool: &MissingToolConfig{
 					CreateIssue: &falseVal,
 				},
-				ThreatDetection: &ThreatDetectionConfig{},
+				ThreatDetection: &ThreatDetectionConfig{ReportAsIssue: new(false)},
 			},
 		}
 		job, err := compiler.buildConclusionJob(workflowData, string(constants.AgentJobName), []string{})
@@ -2174,6 +2174,11 @@ func TestConclusionGitHubAppTokenUsesConclusionPermissions(t *testing.T) {
 		name                 string
 		reportFailedJobs     *TemplatableBool
 		reportFailureAsIssue *TemplatableBool
+		threatDetection      *ThreatDetectionConfig
+		reportIncomplete     *IssueReportingConfig
+		noop                 *NoOpConfig
+		missingTool          *IssueReportingConfig
+		worker               bool
 		wantIssuesWrite      bool
 	}{
 		{
@@ -2185,6 +2190,80 @@ func TestConclusionGitHubAppTokenUsesConclusionPermissions(t *testing.T) {
 			reportFailedJobs:     templatableBoolPtr("false"),
 			reportFailureAsIssue: templatableBoolPtr("false"),
 		},
+		{
+			name:             "failure reporting only",
+			reportFailedJobs: templatableBoolPtr("false"),
+			wantIssuesWrite:  true,
+		},
+		{
+			name:                 "failed jobs reporting only",
+			reportFailureAsIssue: templatableBoolPtr("false"),
+			wantIssuesWrite:      true,
+		},
+		{
+			name:                 "detection reporting only",
+			reportFailedJobs:     templatableBoolPtr("false"),
+			reportFailureAsIssue: templatableBoolPtr("false"),
+			threatDetection:      &ThreatDetectionConfig{},
+			wantIssuesWrite:      true,
+		},
+		{
+			name:                 "detection issue reporting disabled",
+			reportFailedJobs:     templatableBoolPtr("false"),
+			reportFailureAsIssue: templatableBoolPtr("false"),
+			threatDetection:      &ThreatDetectionConfig{ReportAsIssue: new(false)},
+		},
+		{
+			name:                 "detection not runnable",
+			reportFailedJobs:     templatableBoolPtr("false"),
+			reportFailureAsIssue: templatableBoolPtr("false"),
+			threatDetection:      &ThreatDetectionConfig{EngineDisabled: true},
+		},
+		{
+			name:                 "incomplete reporting only",
+			reportFailedJobs:     templatableBoolPtr("false"),
+			reportFailureAsIssue: templatableBoolPtr("false"),
+			reportIncomplete:     &IssueReportingConfig{},
+			wantIssuesWrite:      true,
+		},
+		{
+			name:                 "incomplete issue reporting disabled",
+			reportFailedJobs:     templatableBoolPtr("false"),
+			reportFailureAsIssue: templatableBoolPtr("false"),
+			reportIncomplete:     &IssueReportingConfig{CreateIssue: new("false")},
+		},
+		{
+			name:                 "incomplete issue reporting expression",
+			reportFailedJobs:     templatableBoolPtr("false"),
+			reportFailureAsIssue: templatableBoolPtr("false"),
+			reportIncomplete:     &IssueReportingConfig{CreateIssue: new("${{ inputs.report }}")},
+			wantIssuesWrite:      true,
+		},
+		{
+			name:                 "noop reporting only",
+			reportFailedJobs:     templatableBoolPtr("false"),
+			reportFailureAsIssue: templatableBoolPtr("false"),
+			noop:                 &NoOpConfig{},
+			wantIssuesWrite:      true,
+		},
+		{
+			name:                 "missing tool reporting only",
+			reportFailedJobs:     templatableBoolPtr("false"),
+			reportFailureAsIssue: templatableBoolPtr("false"),
+			missingTool:          &IssueReportingConfig{},
+			wantIssuesWrite:      true,
+		},
+		{
+			name:            "worker detection reporting",
+			worker:          true,
+			threatDetection: &ThreatDetectionConfig{},
+			wantIssuesWrite: true,
+		},
+		{
+			name:            "worker detection issue reporting disabled",
+			worker:          true,
+			threatDetection: &ThreatDetectionConfig{ReportAsIssue: new(false)},
+		},
 	}
 
 	for _, tt := range tests {
@@ -2195,11 +2274,18 @@ func TestConclusionGitHubAppTokenUsesConclusionPermissions(t *testing.T) {
 					CreatePullRequestReviewComments: &CreatePullRequestReviewCommentsConfig{},
 					ReportFailedJobs:                tt.reportFailedJobs,
 					ReportFailureAsIssue:            tt.reportFailureAsIssue,
+					ThreatDetection:                 tt.threatDetection,
+					ReportIncomplete:                tt.reportIncomplete,
+					NoOp:                            tt.noop,
+					MissingTool:                     tt.missingTool,
 					GitHubApp: &GitHubAppConfig{
 						AppID:      "${{ vars.APP_ID }}",
 						PrivateKey: "${{ secrets.APP_PRIVATE_KEY }}",
 					},
 				},
+			}
+			if tt.worker {
+				workflowData.Tools = map[string]any{"work-queue": map[string]any{"worker": true}}
 			}
 
 			job, err := NewCompiler().buildConclusionJob(workflowData, string(constants.AgentJobName), nil)
@@ -2211,6 +2297,11 @@ func TestConclusionGitHubAppTokenUsesConclusionPermissions(t *testing.T) {
 			}
 
 			steps := strings.Join(job.Steps, "")
+			assert.Equal(t, tt.wantIssuesWrite, strings.Contains(job.Permissions, "issues: write"))
+			_, safeOutputIssues := ComputePermissionsForSafeOutputs(workflowData.SafeOutputs).Get(PermissionIssues)
+			if tt.reportIncomplete == nil {
+				assert.False(t, safeOutputIssues, "conclusion reports must not broaden safe-output execution permissions")
+			}
 			if !strings.Contains(steps, "permission-actions: read") {
 				t.Errorf("conclusion App token should include 'permission-actions: read', got:\n%s", steps)
 			}
