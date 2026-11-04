@@ -959,6 +959,9 @@ function sendOTLPViaCurl(url, headers, body) {
     "--suppress-connect-headers",
     "--dump-header",
     "-",
+    // Let curl finish and emit its status before the subprocess deadline.
+    "--max-time",
+    "10",
     "--max-filesize",
     String(MAX_OTLP_RESPONSE_BYTES),
     "--write-out",
@@ -981,8 +984,8 @@ function sendOTLPViaCurl(url, headers, body) {
     timeout: 15_000,
   });
 
-  const bufferOverflow = result.error && "code" in result.error && result.error.code === "ENOBUFS";
-  if (result.error && !bufferOverflow) {
+  const interrupted = result.error && "code" in result.error && (result.error.code === "ENOBUFS" || result.error.code === "ETIMEDOUT");
+  if (result.error && !interrupted) {
     throw result.error;
   }
 
@@ -1009,11 +1012,11 @@ function sendOTLPViaCurl(url, headers, body) {
   const typeIndex = responseOutput.lastIndexOf("\n");
   const statusIndex = responseOutput.lastIndexOf("\n", typeIndex - 1);
   const trailerStatus = responseOutput.subarray(statusIndex + 1, typeIndex < 0 ? undefined : typeIndex).toString();
-  const status = headerStatus || (!bufferOverflow && /^[1-5]\d{2}$/.test(trailerStatus) ? Number(trailerStatus) : 0);
+  const status = headerStatus || (!interrupted && /^[1-5]\d{2}$/.test(trailerStatus) ? Number(trailerStatus) : 0);
   const diagnostics = {
     responseBody: statusIndex < 0 ? Buffer.alloc(0) : responseOutput.subarray(0, statusIndex),
     contentType: typeIndex < 0 ? "" : responseOutput.subarray(typeIndex + 1).toString(),
-    diagnosticsUnavailable: Boolean(bufferOverflow) || result.status !== 0,
+    diagnosticsUnavailable: Boolean(interrupted) || result.status !== 0,
   };
   if (status > 0) {
     return {

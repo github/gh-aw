@@ -33,6 +33,29 @@ describe("OTLP response diagnostics", () => {
   });
 
   it.each([
+    ["traces", "rejectedSpans", "rejected_spans", "rejectedLogRecords"],
+    ["logs", "rejectedLogRecords", "rejected_log_records", "rejectedSpans"],
+  ])("ignores unknown JSON fields and defaults null %s members", (signal, camelCount, snakeCount, otherCount) => {
+    for (const [partialKey, countKey, messageKey] of [
+      ["partialSuccess", camelCount, "errorMessage"],
+      ["partial_success", snakeCount, "error_message"],
+    ]) {
+      for (const partial of [null, {}, { [countKey]: null, [messageKey]: null }, { futureField: privateMessage, [otherCount]: "9" }]) {
+        expect(inspectJSON({ [partialKey]: partial, futureField: privateMessage }, signal)).toEqual({ reason: "", error: false });
+      }
+      const rejection = inspectJSON({ futureField: privateMessage, [partialKey]: { [countKey]: "9223372036854775807", [messageKey]: null, futureField: privateMessage } }, signal);
+      expect(rejection.error).toBe(true);
+      expect(rejection.reason).toContain(`${snakeCount}=9223372036854775807`);
+      expect(rejection.reason).not.toContain("private");
+      const warning = inspectJSON({ [partialKey]: { [countKey]: null, [messageKey]: privateMessage, futureField: true } }, signal);
+      expect(warning.error).toBe(false);
+      expect(warning.reason).toContain("collector warning (message withheld)");
+      expect(warning.reason).not.toContain("private");
+    }
+    expect(inspectJSON({ futureField: privateMessage }, signal)).toEqual({ reason: "", error: false });
+  });
+
+  it.each([
     ["traces", "rejectedSpans", "rejected_spans"],
     ["logs", "rejectedLogRecords", "rejected_log_records"],
   ])("reports exact %s rejection counts without disclosing messages", (signal, key, label) => {
@@ -55,13 +78,10 @@ describe("OTLP response diagnostics", () => {
   it.each([
     null,
     [],
-    { error: privateMessage },
-    { partialSuccess: null },
     { partialSuccess: [] },
-    { partialSuccess: { rejectedLogRecords: "1" } },
-    ...[-1, 0.1, null, true, "not-a-count", "9223372036854775808", Number.MAX_SAFE_INTEGER + 1].map(rejectedSpans => ({ partialSuccess: { rejectedSpans } })),
+    { partialSuccess: false },
+    ...[-1, 0.1, true, "not-a-count", "9223372036854775808", Number.MAX_SAFE_INTEGER + 1].map(rejectedSpans => ({ partialSuccess: { rejectedSpans } })),
     { partialSuccess: { errorMessage: 123 } },
-    { partialSuccess: { errorMessage: null } },
     { partialSuccess: { rejectedSpans: "1", rejected_spans: "0" } },
     { partialSuccess: {}, partial_success: {} },
   ])("does not claim full acceptance of invalid JSON diagnostics: %j", body => {
@@ -69,6 +89,23 @@ describe("OTLP response diagnostics", () => {
     expect(result.error).toBe(true);
     expect(result.reason).toContain("acceptance unknown");
     expect(result.reason).not.toContain("private");
+  });
+
+  it.each([
+    ["traces", "rejectedSpans", "rejected_spans"],
+    ["logs", "rejectedLogRecords", "rejected_log_records"],
+  ])("still validates known %s members alongside unknown fields", (signal, camelCount, snakeCount) => {
+    for (const [partialKey, countKey, messageKey] of [
+      ["partialSuccess", camelCount, "errorMessage"],
+      ["partial_success", snakeCount, "error_message"],
+    ]) {
+      for (const fields of [...[-1, "-1", 0.1, true, {}, [], "9223372036854775808", Number.MAX_SAFE_INTEGER + 1].map(count => ({ [countKey]: count })), { [messageKey]: false }]) {
+        const result = inspectJSON({ futureField: privateMessage, [partialKey]: { ...fields, futureField: privateMessage } }, signal);
+        expect(result.error).toBe(true);
+        expect(result.reason).toContain("acceptance unknown");
+        expect(result.reason).not.toContain("private");
+      }
+    }
   });
 
   it.each(["traces", "logs"])("withholds invalid UTF-8 protobuf %s messages without obscuring acceptance", signal => {
@@ -193,6 +230,31 @@ describe("OTLP delivery diagnostics across transports", () => {
     expect(warn).not.toHaveBeenCalled();
     expect(write).not.toHaveBeenCalled();
   });
+
+  it.each(["direct", "proxy"].flatMap(transport => ["traces", "logs"].flatMap(signal => ["full", "warning", "rejection"].map(kind => [transport, signal, kind]))))(
+    "preserves %s %s JSON null and unknown-field %s semantics",
+    async (transport, signal, kind) => {
+      vi.stubEnv("OTEL_EXPORTER_OTLP_PROTOCOL", "http/json");
+      const countKey = signal === "logs" ? "rejected_log_records" : "rejected_spans";
+      const body = JSON.stringify({
+        futureField: privateMessage,
+        partial_success: { [countKey]: kind === "rejection" ? "9223372036854775807" : null, error_message: kind === "warning" ? privateMessage : null, futureField: privateMessage },
+      });
+      const fetch = vi.fn().mockResolvedValue(new Response(body, { headers: { "content-type": "application/json" } }));
+      vi.stubGlobal("fetch", fetch);
+      if (transport === "proxy") {
+        vi.stubEnv("HTTPS_PROXY", "http://proxy.invalid");
+        spawn.mockReturnValue({ status: 0, stdout: Buffer.from(`${body}\n200\napplication/json`) });
+      }
+      await expect(sendOTLPSpan("https://collector.invalid", {}, { signal, skipJSONL: true })).resolves.toBeUndefined();
+      expect(transport === "proxy" ? spawn : fetch).toHaveBeenCalledOnce();
+      expect(write).toHaveBeenCalledTimes(kind === "rejection" ? 1 : 0);
+      expect(warn).toHaveBeenCalledTimes(kind === "full" ? 0 : 1);
+      if (kind === "warning") expect(warn.mock.calls[0][0]).toContain("collector warning (message withheld)");
+      if (kind === "rejection") expect(append).toHaveBeenCalledWith(expect.stringContaining("otlp-export-errors.jsonl"), expect.stringContaining(`${countKey}=9223372036854775807`));
+      expect(JSON.stringify([...warn.mock.calls, ...append.mock.calls])).not.toContain("private");
+    }
+  );
 
   it.each(["traces", "logs"].flatMap(signal => ["http/json", "http/protobuf"].flatMap(protocol => ["full", "empty", "warning"].map(kind => [signal, protocol, kind]))))(
     "preserves proxy %s %s %s success semantics",

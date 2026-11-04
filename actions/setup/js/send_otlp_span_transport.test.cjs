@@ -65,6 +65,20 @@ describe("bounded curl response status", () => {
     expect(JSON.stringify(warn.mock.calls)).not.toContain("acceptance unknown");
   });
 
+  it.each([0, 200, 401, 403, 503])("preserves known HTTP %s status if the subprocess deadline is reached", async status => {
+    spawn.mockReturnValue({
+      status: null,
+      error: Object.assign(new Error("spawnSync curl ETIMEDOUT"), { code: "ETIMEDOUT" }),
+      stdout: Buffer.from(status ? `HTTP/1.1 ${status} Response\r\n\r\n{}\n200\napplication/json` : "untrusted body\n200\napplication/json"),
+      stderr: Buffer.alloc(0),
+    });
+    await expect(sendOTLPSpan("https://collector.invalid", {}, { skipJSONL: true, baseDelayMs: 1 })).resolves.toBeUndefined();
+    expect(spawn).toHaveBeenCalledTimes(status === 0 || status === 503 ? 3 : 1);
+    if (status) expect(append.mock.calls[0][1]).toContain(`"status":${status}`);
+    else expect(append.mock.calls[0][1]).not.toContain('"status"');
+    expect(JSON.stringify(warn.mock.calls)).toContain(status === 200 ? "acceptance unknown" : status === 401 || status === 403 ? "authorization failed" : "retrying");
+  });
+
   it.each(["", "HTTP/1.1 200 OK\r\nContent-Type: application/json", "HTTP/1.1 100 Continue\r\n\r\n", "HTTP/1.1 302 Found\r\nLocation: /next\r\n\r\nHTTP/1.1 200", "HTTP/1.1 302 Found\r\nLocation: /next\r\n\r\nHTTP/1.1 503"])(
     "never treats unknown or incomplete final status as success: %j",
     async headers => {
@@ -175,6 +189,99 @@ describe("bounded curl response status", () => {
       }
       expect(append.mock.calls[0][1]).toContain(`"status":${status}`);
       expect(JSON.stringify(warn.mock.calls)).toContain(status === 200 ? "acceptance unknown" : status === 503 ? "retrying" : "authorization failed");
+    } finally {
+      await server.terminate();
+    }
+  });
+
+  it.each(["traces", "logs"].flatMap(signal => ["http/json", "http/protobuf"].flatMap(protocol => [0, 200, 401, 403, 503].map(status => [signal, protocol, status]))))(
+    "bounds real curl %s %s stalled HTTP %s responses without retrying known acceptance",
+    async (signal, protocol, status) => {
+      vi.stubEnv("OTEL_EXPORTER_OTLP_PROTOCOL", protocol);
+      const server = new Worker(
+        `
+        const { parentPort } = require("worker_threads");
+        const http = require("http");
+        const server = http.createServer((req, res) => {
+          req.resume();
+          req.on("end", () => {
+            if (${status}) {
+              res.writeHead(${status}, { "Content-Type": "application/json" });
+              res.write("{}");
+            }
+          });
+        });
+        server.listen(0, "127.0.0.1", () => parentPort.postMessage(server.address().port));
+        `,
+        { eval: true }
+      );
+      try {
+        const port = await new Promise((resolve, reject) => {
+          server.once("message", resolve);
+          server.once("error", reject);
+        });
+        const results = [];
+        spawn.mockImplementation((command, args, options) => {
+          const index = args.indexOf("--max-time");
+          expect(index).toBeGreaterThan(-1);
+          expect(Number(args[index + 1]) * 1000).toBeLessThan(options.timeout);
+          // Shorten the actual curl deadline, not the production configuration.
+          const boundedArgs = [...args];
+          boundedArgs[index + 1] = "0.1";
+          const result = realSpawnSync(command, ["--noproxy", "*", ...boundedArgs], options);
+          results.push(result);
+          return result;
+        });
+        await expect(sendOTLPSpan(`http://127.0.0.1:${port}`, {}, { signal, skipJSONL: true, baseDelayMs: 1 })).resolves.toBeUndefined();
+        expect(results).toHaveLength(status === 0 || status === 503 ? 3 : 1);
+        for (const result of results) {
+          expect(result.error).toBeUndefined();
+          expect(result.status).toBe(28);
+        }
+        expect(append).toHaveBeenCalledOnce();
+        if (status) expect(append.mock.calls[0][1]).toContain(`"status":${status}`);
+        else expect(append.mock.calls[0][1]).not.toContain('"status"');
+        expect(JSON.stringify(warn.mock.calls)).toContain(status === 200 ? "acceptance unknown" : status === 401 || status === 403 ? "authorization failed" : "retrying");
+        if (status === 200) expect(warn.mock.calls[0][0]).toContain(`OTLP ${signal} response diagnostics unavailable`);
+      } finally {
+        await server.terminate();
+      }
+    }
+  );
+
+  it.each([200, 401, 403, 503])("retains real curl HTTP %s with a 64 KiB body and long Content-Type", async status => {
+    const server = new Worker(
+      `
+      const { parentPort } = require("worker_threads");
+      const http = require("http");
+      const server = http.createServer((req, res) => {
+        req.resume();
+        req.on("end", () => {
+          res.writeHead(${status}, { "Content-Type": "application/json; private=" + "s".repeat(8192) });
+          res.end(" ".repeat(${MAX_OTLP_RESPONSE_BYTES}));
+        });
+      });
+      server.listen(0, "127.0.0.1", () => parentPort.postMessage(server.address().port));
+      `,
+      { eval: true }
+    );
+    try {
+      const port = await new Promise((resolve, reject) => {
+        server.once("message", resolve);
+        server.once("error", reject);
+      });
+      const results = [];
+      spawn.mockImplementation((command, args, options) => {
+        const result = realSpawnSync(command, ["--noproxy", "*", ...args], options);
+        results.push(result);
+        return result;
+      });
+      await expect(sendOTLPSpan(`http://127.0.0.1:${port}`, {}, { skipJSONL: true, baseDelayMs: 1 })).resolves.toBeUndefined();
+      expect(results).toHaveLength(status === 503 ? 3 : 1);
+      for (const result of results) expect(result.error?.code).toBe("ENOBUFS");
+      expect(append.mock.calls[0][1]).toContain(`"status":${status}`);
+      expect(JSON.stringify(warn.mock.calls)).toContain(status === 200 ? "acceptance unknown" : status === 503 ? "retrying" : "authorization failed");
+      expect(JSON.stringify(warn.mock.calls)).not.toContain("private=");
     } finally {
       await server.terminate();
     }

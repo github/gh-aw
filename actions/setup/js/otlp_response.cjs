@@ -112,21 +112,16 @@ function parseJSONResponse(bytes, signal) {
   if (!response || typeof response !== "object" || Array.isArray(response)) throw new Error("Invalid response");
   if ("partialSuccess" in response && "partial_success" in response) throw new Error("Duplicate partial success");
   const partial = "partialSuccess" in response ? response.partialSuccess : response.partial_success;
-  if (partial === undefined) {
-    if (Object.keys(response).length) throw new Error("Unsupported response");
-    return { rejected: 0n, warning: false };
-  }
-  if (!partial || typeof partial !== "object" || Array.isArray(partial)) throw new Error("Invalid partial success");
+  if (partial === undefined || partial === null) return { rejected: 0n, warning: false };
+  if (typeof partial !== "object" || Array.isArray(partial)) throw new Error("Invalid partial success");
   const countKey = signal === "logs" ? "rejectedLogRecords" : "rejectedSpans";
   const snakeKey = signal === "logs" ? "rejected_log_records" : "rejected_spans";
-  const allowed = new Set([countKey, snakeKey, "errorMessage", "error_message"]);
-  if (Object.keys(partial).some(key => !allowed.has(key))) throw new Error("Unsupported partial success");
   if ((countKey in partial && snakeKey in partial) || ("errorMessage" in partial && "error_message" in partial)) throw new Error("Duplicate partial success field");
-  const count = countKey in partial ? partial[countKey] : snakeKey in partial ? partial[snakeKey] : 0;
+  const count = (countKey in partial ? partial[countKey] : partial[snakeKey]) ?? 0;
   if ((typeof count !== "number" || !Number.isSafeInteger(count)) && (typeof count !== "string" || !/^\d{1,19}$/.test(count))) throw new Error("Invalid rejection count");
   const rejected = BigInt(count);
   if (rejected < 0n || rejected > MAX_INT64) throw new Error("Invalid rejection count");
-  const message = "errorMessage" in partial ? partial.errorMessage : "error_message" in partial ? partial.error_message : "";
+  const message = ("errorMessage" in partial ? partial.errorMessage : partial.error_message) ?? "";
   if (typeof message !== "string") throw new Error("Invalid collector message");
   return { rejected, warning: message.length > 0 };
 }
