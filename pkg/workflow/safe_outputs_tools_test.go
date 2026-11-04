@@ -424,6 +424,23 @@ func TestSafeOutputsToolsJSONInSync(t *testing.T) {
 		"pkg/workflow/js/safe_outputs_tools.json and actions/setup/js/safe_outputs_tools.json must define identical tool objects in the same order; update both files together")
 }
 
+func TestPushToPullRequestBranchMessageGuidance(t *testing.T) {
+	var tools []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(safeOutputsToolsJSONContent), &tools))
+	for _, tool := range tools {
+		if tool["name"] != "push_to_pull_request_branch" {
+			continue
+		}
+		schema := tool["inputSchema"].(map[string]any)
+		require.Contains(t, schema["required"], "message")
+		properties := schema["properties"].(map[string]any)
+		message := properties["message"].(map[string]any)
+		require.NotContains(t, message, "default")
+		return
+	}
+	t.Fatal("push_to_pull_request_branch tool not found")
+}
+
 func TestLedgerAppendToolGuidance(t *testing.T) {
 	var tools []map[string]any
 	require.NoError(t, json.Unmarshal([]byte(safeOutputsToolsJSONContent), &tools))
