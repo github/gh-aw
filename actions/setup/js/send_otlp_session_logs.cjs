@@ -5,6 +5,7 @@ require("./shim.cjs");
 const { readCompactUnifiedSession, sessionEventPriority } = require("./compact_unified_session.cjs");
 const { serializeSessionArtifact } = require("./session_artifact.cjs");
 const { iterateJsonl } = require("./jsonl_helpers.cjs");
+const { sessionTimestampNs } = require("./unified_session_order.cjs");
 const { getOTLPSecretValues } = require("./otlp_header_helpers.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
@@ -23,6 +24,23 @@ function removeRunIdentity(event) {
   if (event?.type !== "grader.result" || !event.data?.run || typeof event.data.run !== "object") return event;
   const { id, attempt, ...run } = event.data.run;
   return { ...event, data: { ...event.data, run } };
+}
+
+/**
+ * Prefer exact ISO fractions, otherwise reuse the source-normalized clock.
+ * Ordering anchors and export time must never become event timestamps.
+ * @param {any} event
+ * @returns {string | undefined}
+ */
+function eventTimeUnixNano(event) {
+  const timestamp = event.timestamp;
+  const isoTime = typeof timestamp === "string" ? sessionTimestampNs(event) : undefined;
+  const hasNormalizedClock = typeof event.provenance?.timestampMs === "number";
+  const exactNs = hasNormalizedClock && typeof timestamp === "string" ? sessionTimestampNs(event, "nanoseconds") : undefined;
+  const normalizedTime = hasNormalizedClock ? sessionTimestampNs({ timestamp: event.provenance.timestampMs }) : undefined;
+  const nativeTime = typeof timestamp !== "string" && event.provenance === undefined ? sessionTimestampNs(event) : undefined;
+  const time = isoTime ?? exactNs ?? (typeof timestamp === "string" ? undefined : hasNormalizedClock ? normalizedTime : nativeTime);
+  return time !== undefined && time >= 0n && time <= 18446744073709551615n ? time.toString() : undefined;
 }
 
 /**
@@ -78,14 +96,18 @@ async function sendSessionLogs({ sessionPath = "/tmp/gh-aw/usage/aw_session.json
     const traceId = process.env.GITHUB_AW_OTEL_TRACE_ID || "";
     const spanId = process.env.GITHUB_AW_OTEL_PARENT_SPAN_ID || "";
     const retainedEvents = [...iterateJsonl(redacted, { strict: true })].map(removeRunIdentity);
-    const logRecords = retainedEvents.map(event => ({
-      observedTimeUnixNano,
-      severityNumber: 9,
-      severityText: "INFO",
-      ...(otlp.isValidTraceId(traceId) ? { traceId, ...(otlp.isValidSpanId(spanId) ? { spanId } : {}) } : {}),
-      body: anyValue(event),
-      attributes: [otlp.buildAttr("gh-aw.session.event_type", event.type)],
-    }));
+    const logRecords = retainedEvents.map(event => {
+      const timeUnixNano = eventTimeUnixNano(event);
+      return {
+        ...(timeUnixNano !== undefined ? { timeUnixNano } : {}),
+        observedTimeUnixNano,
+        severityNumber: 9,
+        severityText: "INFO",
+        ...(otlp.isValidTraceId(traceId) ? { traceId, ...(otlp.isValidSpanId(spanId) ? { spanId } : {}) } : {}),
+        body: anyValue(event),
+        attributes: [otlp.buildAttr("gh-aw.session.event_type", event.type)],
+      };
+    });
     const resourceAttributes = [
       otlp.buildAttr("service.name", "gh-aw"),
       otlp.buildAttr("gh-aw.session.compact.version", compact.version),
@@ -101,6 +123,7 @@ async function sendSessionLogs({ sessionPath = "/tmp/gh-aw/usage/aw_session.json
               otlp.buildAttr("gh-aw.session.included_events", indices.length),
               otlp.buildAttr("gh-aw.session.omitted_events", compact.omittedEvents + compact.includedEvents - indices.length),
               otlp.buildAttr("gh-aw.session.truncated", compact.truncated || indices.length < compact.includedEvents),
+              otlp.buildAttr("gh-aw.session.untimed_events", indices.filter(i => logRecords[i].timeUnixNano === undefined).length),
             ],
           },
           scopeLogs: [{ scope: { name: "gh-aw.session", version: String(compact.version) }, logRecords: indices.map(i => logRecords[i]) }],
