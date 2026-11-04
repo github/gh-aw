@@ -530,6 +530,7 @@ async function runLogParser(options) {
     if (markdown) {
       // Publish every structured engine log through the unified-session renderer.
       if (logEntries && Array.isArray(logEntries) && logEntries.length > 0) {
+        // The candidate loop sets selectedSource before parsing the result that supplies logEntries.
         const sourcePath = path.isAbsolute(selectedSource) ? path.relative(rootDir, selectedSource) : selectedSource;
         const publicationEntries = redactSessionForPublication(
           normalizeAgentSession(conversationEntries).map((event, index) => withAgentProvenance(event, sourcePath, index)),
