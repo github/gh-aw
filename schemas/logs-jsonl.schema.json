@@ -10145,6 +10145,104 @@
                     "detection_engine_retries"
                   ],
                   "additionalProperties": false
+                },
+                "protected_files": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "workflow": {
+                      "type": "string"
+                    },
+                    "workflow_path": {
+                      "type": "string"
+                    },
+                    "repository": {
+                      "type": "string"
+                    },
+                    "files": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "detections": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "run_id": {
+                            "type": "integer"
+                          },
+                          "operation": {
+                            "type": "string"
+                          },
+                          "action": {
+                            "type": "string"
+                          },
+                          "source": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "files": {
+                            "type": [
+                              "null",
+                              "array"
+                            ],
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "fallback_used": {
+                            "type": "boolean"
+                          },
+                          "target_pull_request_number": {
+                            "type": "integer"
+                          },
+                          "url": {
+                            "type": "string"
+                          },
+                          "evidence_path": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "run_id",
+                          "operation",
+                          "action",
+                          "files"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "unavailable_runs": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "integer"
+                      }
+                    },
+                    "partial": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "workflow",
+                    "files",
+                    "detections"
+                  ],
+                  "additionalProperties": false
                 }
               },
               "required": [
