@@ -171,7 +171,7 @@ func walkRunBlockLines(yamlContent string, visit func(line string) bool) bool {
 	contentIndent := 0
 	var block strings.Builder
 	flush := func() bool {
-		for line := range strings.SplitSeq(executableShellContent(block.String()), "\n") {
+		for line := range strings.SplitSeq(block.String(), "\n") {
 			if visit(line) {
 				return true
 			}
@@ -275,14 +275,13 @@ func validateNoTemplateInjectionFromParsed(workflow map[string]any) error {
 			continue
 		}
 
-		rawRunContent := executableShellContent(runContent)
-		expressions := runScriptExpressions(rawRunContent)
+		expressions := runScriptExpressions(runContent)
 
 		// Check each expression for unsafe contexts
 		for _, expr := range expressions {
 			if context := unsafeRunScriptExpressionContext(expr); context != "" {
 				// Found an unsafe pattern - extract a snippet for context
-				snippet := extractRunSnippet(rawRunContent, expr)
+				snippet := extractRunSnippet(runContent, expr)
 				violations = append(violations, TemplateInjectionViolation{
 					Expression: expr,
 					Snippet:    snippet,
@@ -307,10 +306,8 @@ func validateNoTemplateInjectionFromParsed(workflow map[string]any) error {
 // validateNoGitHubExpressionsInRunScriptsFromParsed checks a pre-parsed workflow map
 // for any GitHub Actions expression usage in run: scripts.
 //
-// This is a compiler regression guardrail: run: scripts in compiled lock files should
-// never contain ${{ ... }} directly because the compiler must rewrite expressions into
-// env: variables. It runs after validateNoTemplateInjectionFromParsed as a broader
-// catch-all for any remaining expression contexts.
+// This raw-content guardrail rejects prohibited expressions left in run: scripts,
+// including comments and quoted heredocs that the sanitizer preserves.
 func validateNoGitHubExpressionsInRunScriptsFromParsed(workflow map[string]any) error {
 	runBlocks := extractRunBlocks(workflow)
 	templateInjectionValidationLog.Printf("Found %d run blocks to scan for raw expressions", len(runBlocks))
@@ -322,13 +319,12 @@ func validateNoGitHubExpressionsInRunScriptsFromParsed(workflow map[string]any) 
 			continue
 		}
 
-		rawRunContent := executableShellContent(runContent)
-		expressions := runScriptExpressions(rawRunContent)
+		expressions := runScriptExpressions(runContent)
 		for _, expr := range expressions {
 			if _, valid := actionslanguageservice.WrappedExpression(expr); valid && allowedRunScriptExpressionRegex.MatchString(expr) {
 				continue
 			}
-			snippet := extractRunSnippet(rawRunContent, expr)
+			snippet := extractRunSnippet(runContent, expr)
 			violations = append(violations, TemplateInjectionViolation{
 				Expression: expr,
 				Snippet:    snippet,
@@ -339,7 +335,7 @@ func validateNoGitHubExpressionsInRunScriptsFromParsed(workflow map[string]any) 
 
 	if len(violations) > 0 {
 		templateInjectionValidationLog.Printf("Run-script expression guardrail failed: %d violation(s) found", len(violations))
-		return formatRunScriptExpressionGuardrailError(violations)
+		return formatRunScriptExpressionValidationError(violations)
 	}
 
 	return nil

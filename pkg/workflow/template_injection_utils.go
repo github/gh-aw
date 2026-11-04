@@ -3,8 +3,8 @@ package workflow
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/stringutil"
@@ -218,10 +218,6 @@ func shellExpansionContent(content string) string {
 	return transformShellContent(content, func(s string) string { return s }, true, true)
 }
 
-func executableShellContent(content string) string {
-	return content
-}
-
 // stripShellLineComments removes bash-style # line comments while preserving text
 // inside single/double quotes and escaped # characters.
 func stripShellLineComments(content string) string {
@@ -392,8 +388,10 @@ func detectExpressionContext(expression string) string {
 func formatTemplateInjectionError(violations []TemplateInjectionViolation) error {
 	var builder strings.Builder
 
-	builder.WriteString("template injection vulnerabilities detected in compiled workflow\n\n")
-	builder.WriteString("The following expressions are used directly in shell commands, which enables template injection attacks:\n\n")
+	builder.WriteString("unsafe Actions expressions found in authored run: content\n")
+	builder.WriteString("GitHub Actions interpolates expressions before Bash parses shell syntax, including comments and heredoc delimiters.\n")
+	builder.WriteString("Remove expressions from comments. For heredoc values, move the expression to a step env: entry and use an unquoted heredoc so Bash can expand the shell variable.\n\n")
+	builder.WriteString("Actions expands these expressions before shell execution; attacker-controlled values can become shell input in executable contexts:\n\n")
 
 	// Group violations by context for clearer reporting
 	contextGroups := make(map[string][]TemplateInjectionViolation)
@@ -403,25 +401,25 @@ func formatTemplateInjectionError(violations []TemplateInjectionViolation) error
 
 	// Report violations grouped by context
 	for context, contextViolations := range contextGroups {
-		fmt.Fprintf(&builder, "  %s context (%d occurrence(s)):\n", context, len(contextViolations))
+		builder.WriteString("  " + context + " context (" + strconv.Itoa(len(contextViolations)) + " occurrence(s)):\n")
 
 		// Show up to 3 examples per context to keep error message manageable
 		maxExamples := 3
 		for i, v := range contextViolations {
 			if i >= maxExamples {
-				fmt.Fprintf(&builder, "    ... and %d more\n", len(contextViolations)-maxExamples)
+				builder.WriteString("    ... and " + strconv.Itoa(len(contextViolations)-maxExamples) + " more\n")
 				break
 			}
-			fmt.Fprintf(&builder, "    - %s\n", v.Expression)
-			fmt.Fprintf(&builder, "      in: %s\n", v.Snippet)
+			builder.WriteString("    - " + v.Expression + "\n")
+			builder.WriteString("      in: " + v.Snippet + "\n")
 		}
 		builder.WriteString("\n")
 	}
 
 	builder.WriteString("Security Risk:\n")
-	builder.WriteString("  When expressions are used directly in shell commands, an attacker can inject\n")
-	builder.WriteString("  malicious code through user-controlled inputs (issue titles, PR descriptions,\n")
-	builder.WriteString("  comments, etc.) to execute arbitrary commands, steal secrets, or modify the repository.\n\n")
+	builder.WriteString("  Direct interpolation into executable shell syntax can let attacker-controlled text alter commands.\n")
+	builder.WriteString("  Comments and quoted heredocs do not prevent Actions substitution; remove comment expressions and\n")
+	builder.WriteString("  pass heredoc values through environment data.\n\n")
 
 	builder.WriteString("Safe Pattern - Use environment variables instead:\n")
 	builder.WriteString("  env:\n")
@@ -441,30 +439,33 @@ func formatTemplateInjectionError(violations []TemplateInjectionViolation) error
 	return errors.New(builder.String())
 }
 
-// formatRunScriptExpressionGuardrailError formats a compiler-regression error for any
-// GitHub Actions expressions that remain in run: shell scripts of compiled workflows.
-func formatRunScriptExpressionGuardrailError(violations []TemplateInjectionViolation) error {
+// formatRunScriptExpressionValidationError explains why Actions expressions are
+// prohibited in raw run: content, including shell comments and quoted heredocs.
+func formatRunScriptExpressionValidationError(violations []TemplateInjectionViolation) error {
 	var builder strings.Builder
 
-	builder.WriteString("compiler regression detected: GitHub Actions expressions found in run: shell scripts of compiled workflow\n\n")
-	builder.WriteString("The compiler must rewrite expressions in run: blocks to env variables.\n")
-	builder.WriteString("Use env: assignments and shell variable references instead of inline ${{ ... }} in run: scripts.\n\n")
+	builder.WriteString("GitHub Actions expressions are not allowed in authored run: content, including shell comments and quoted heredocs.\n")
+	builder.WriteString("Actions interpolates ${{ ... }} before Bash parses shell syntax.\n\n")
+	builder.WriteString("Remove expressions from comments. For heredoc values, move the expression to a step env: entry and use an unquoted heredoc so Bash can expand the shell variable.\n\n")
 	builder.WriteString("Examples found:\n")
 
 	maxExamples := min(5, len(violations))
-	for i := range maxExamples {
-		fmt.Fprintf(&builder, "  - %s\n", violations[i].Expression)
-		fmt.Fprintf(&builder, "    in: %s\n", violations[i].Snippet)
+	for i, violation := range violations {
+		if i >= maxExamples {
+			break
+		}
+		builder.WriteString("  - " + violation.Expression + "\n")
+		builder.WriteString("    in: " + violation.Snippet + "\n")
 	}
 	if len(violations) > maxExamples {
-		fmt.Fprintf(&builder, "  ... and %d more\n", len(violations)-maxExamples)
+		builder.WriteString("  ... and " + strconv.Itoa(len(violations)-maxExamples) + " more\n")
 	}
 
 	builder.WriteString("\nSafe pattern:\n")
 	builder.WriteString("  env:\n")
-	builder.WriteString("    EXPR_VALUE: ${{ github.token }}\n")
+	builder.WriteString("    EXPR_VALUE: ${{ github.event.issue.title }}\n")
 	builder.WriteString("  run: |\n")
-	builder.WriteString("    echo \"$EXPR_VALUE\"\n")
+	builder.WriteString("    printf '%s\\n' \"$EXPR_VALUE\"\n")
 
 	return errors.New(builder.String())
 }

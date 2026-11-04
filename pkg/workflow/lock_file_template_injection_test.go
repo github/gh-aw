@@ -14,8 +14,8 @@ import (
 )
 
 // findGitHubEventRunExpressions parses a compiled workflow and returns github.event
-// expressions that reach an executable run: block. Expressions assigned to env: are
-// deliberately excluded because the shell receives their values as data.
+// expressions in raw run: values. Expressions assigned to env: are deliberately
+// excluded because the shell receives their values as data.
 func findGitHubEventRunExpressions(lockContent []byte) ([]string, error) {
 	var workflow map[string]any
 	if err := yaml.Unmarshal(lockContent, &workflow); err != nil {
@@ -24,8 +24,7 @@ func findGitHubEventRunExpressions(lockContent []byte) ([]string, error) {
 
 	var violations []string
 	for _, runContent := range extractRunBlocks(workflow) {
-		executableContent := executableShellContent(runContent)
-		for _, expression := range InlineExpressionPattern.FindAllString(executableContent, -1) {
+		for _, expression := range InlineExpressionPattern.FindAllString(runContent, -1) {
 			if strings.Contains(expression, "github.event.") {
 				violations = append(violations, expression)
 			}
@@ -35,7 +34,7 @@ func findGitHubEventRunExpressions(lockContent []byte) ([]string, error) {
 }
 
 // TestCompiledLockFiles_NoGitHubEventExpressionsInRunScripts is a deterministic
-// template-injection guard. It parses each compiled workflow and inspects only run:
+// template-injection guard. It parses each compiled workflow and inspects raw run:
 // values, avoiding false positives from github.event expressions in env: assignments.
 func TestCompiledLockFiles_NoGitHubEventExpressionsInRunScripts(t *testing.T) {
 	lockFiles, err := filepath.Glob(filepath.Join(workflowsDir, "*.lock.yml"))
