@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import { parseGeminiLog } from "./parse_gemini_log.cjs";
 import { selectSessionResult, projectSessionResult } from "./agent_session.cjs";
 import { generatePlainTextSummary, generateCopilotCliStyleSummary } from "./log_parser_shared.cjs";
+import { sessionTimestamp } from "./unified_session_order.cjs";
 
 const localRequire = createRequire(import.meta.url);
 const bootstrapSource = fs.readFileSync(new URL("./log_parser_bootstrap.cjs", import.meta.url), "utf8");
@@ -131,7 +132,19 @@ describe("Gemini diagnostic history is not terminal failure", () => {
     expect(core.error).not.toHaveBeenCalled();
     expect(core.warning).not.toHaveBeenCalled();
     expect(core.summary.write).toHaveBeenCalledOnce();
-    expect(core.summary.addRaw.mock.calls[0][0]).toContain(generateCopilotCliStyleSummary(parsed.logEntries, { parserName: "Gemini" }));
+    const publicationEntries = parsed.logEntries.map((event, index) => ({
+      ...event,
+      provenance: { component: "agent", phase: "agent", path: inputPath, index, timestampMs: sessionTimestamp(event) },
+    }));
+    const summary = core.summary.addRaw.mock.calls[0][0];
+    expect(summary).toBe(generateCopilotCliStyleSummary(publicationEntries, { parserName: "Gemini" }));
+    expect(summary).toContain("<details><summary>Unified session</summary>");
+    expect(summary).toContain("<details><summary>Full timeline</summary>");
+    expect(summary.includes("  Errors:")).toBe(errors.length > 0);
+    expect(summary.includes(providerError.message)).toBe(records.some(record => record.type === "error"));
+    expect(summary).not.toMatch(/session (?:failed|succeeded)|(?:failed|succeeded) session|terminal (?:failure|success)/i);
+    if (!terminal) expect(summary).not.toMatch(/Duration:|Tokens:|Token Usage:|Total:/);
+    expect(core.info).toHaveBeenCalledWith(generatePlainTextSummary(publicationEntries, { parserName: "Gemini" }));
     expect(writeSessionArtifact).toHaveBeenCalledOnce();
     const execution = { type: "agent.execution", data: { categories: [], errorCodes: [], errorTypes: [] } };
     expect(writeSessionArtifact.mock.calls[0][1]).toEqual([...parsed.logEntries, ...(errors.length ? [execution] : [])]);
