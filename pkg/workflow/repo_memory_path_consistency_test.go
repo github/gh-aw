@@ -110,7 +110,7 @@ func TestRepoMemoryPathConsistencyAcrossLayers(t *testing.T) {
 
 			// Test 3: Validate clone steps
 			var cloneStepsBuilder strings.Builder
-			generateRepoMemorySteps(&cloneStepsBuilder, data)
+			NewCompiler().generateRepoMemorySteps(&cloneStepsBuilder, data, "agent")
 			cloneStepsOutput := cloneStepsBuilder.String()
 
 			assert.Contains(t, cloneStepsOutput,
@@ -417,7 +417,7 @@ func TestRepoMemoryMultipleMemoriesPathConsistency(t *testing.T) {
 
 	// Test clone steps
 	var cloneBuilder strings.Builder
-	generateRepoMemorySteps(&cloneBuilder, data)
+	NewCompiler().generateRepoMemorySteps(&cloneBuilder, data, "agent")
 	cloneOutput := cloneBuilder.String()
 
 	assert.Contains(t, cloneOutput, "Clone repo-memory branch (session)",
@@ -472,7 +472,7 @@ func TestRepoMemoryPathComponentIsolation(t *testing.T) {
 	generateRepoMemoryArtifactUpload(&uploadBuilder, data, getActionPin)
 
 	var cloneBuilder strings.Builder
-	generateRepoMemorySteps(&cloneBuilder, data)
+	NewCompiler().generateRepoMemorySteps(&cloneBuilder, data, "agent")
 
 	compiler := NewCompiler()
 	pushJob, err := compiler.buildPushRepoMemoryJob(data, false)

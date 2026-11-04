@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -10,6 +11,16 @@ import (
 
 type appTokenStepKey struct {
 	jobName, id, clientID, privateKey string
+}
+
+func validateRepoMemoryAppConfig(app *GitHubAppConfig) error {
+	if app != nil && !app.IgnoreIfMissing && !app.hasRequiredCredentials() {
+		return errors.New("tools.repo-memory.github-app requires client-id (or app-id) and private-key; configure both credentials or set ignore-if-missing: true")
+	}
+	if app != nil && len(app.Permissions) > 0 {
+		return errors.New("tools.repo-memory.github-app does not support permissions; repo-memory requests only contents permission")
+	}
+	return nil
 }
 
 func (c *Compiler) hasGeneratedWildcardAppTokenStep(jobName string, step, with map[string]any, seen map[appTokenStepKey]bool) bool {

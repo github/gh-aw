@@ -89,6 +89,30 @@ tools:
 
 `branch-prefix` changes the default `memory` prefix and must be 4-32 alphanumeric, hyphen, or underscore characters; it cannot be `copilot`. `allowed-extensions` limits which file types can be stored, `format-json: true` pretty-prints `.json` files before commit, `validation.json-schemas` declares mandatory per-file JSON/JSONL validation, `validation.script` runs an optional custom JavaScript domain validator, and `max-patch-size` caps the total diff size for one push (default 10KB, max 1MB) to prevent oversized updates.
 
+## GitHub App authentication
+
+`github-app` is optional in the object form and in each array entry. Without it, memory operations use `github.token`. Configure an installed GitHub App to write memory branches protected by rulesets:
+
+```aw wrap
+tools:
+  repo-memory:
+    github-app:
+      client-id: ${{ vars.MEMORY_APP_CLIENT_ID }}
+      private-key: ${{ secrets.MEMORY_APP_PRIVATE_KEY }}
+```
+
+The app must have **Contents: read and write** permission and be installed on the memory repository. Push tokens request only `contents: write`. `client-id` (or legacy `app-id`) and `private-key` are required. Optional `owner` and `repositories` override the installation owner and repository scope; by default, both are derived from `target-repo`, or the current repository when no target is configured. Each array entry mints its own token. Additional app permissions cannot be requested.
+
+For an explicit `target-repo`, restore steps mint a separate Contents-read token from the same app, allowing private cross-repository clones. Restores without `target-repo` continue using `github.token`. Tokens are revoked by the token action's cleanup step.
+
+`ignore-if-missing: true` skips minting when either credential is missing and falls back to `github.token`. This fallback cannot bypass an app-only ruleset or access another private repository. The push job needs only `contents: read` when all entries use apps without this fallback; otherwise it retains `contents: write`.
+
+### Protect memory branches with a ruleset
+
+Create an active branch ruleset targeting `memory/**` (or the configured branch prefix). Enable **Restrict updates** and **Restrict creations**. Add the installed memory app to the bypass list with **Always allow**; optionally add an administrator team for recovery. The built-in GitHub Actions token is not the app bypass actor.
+
+Keep the app's private key available only to trusted workflows and environments. A branch ruleset controls writers, not the content an authorized workflow accepts.
+
 ## Structured Ledger
 
 :::caution[Experimental]

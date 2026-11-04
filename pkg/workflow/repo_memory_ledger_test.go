@@ -125,7 +125,7 @@ func TestRepoMemoryLedgerGeneratedMCPAndPrompt(t *testing.T) {
 	assert.NotContains(t, setup.String(), "npm ci")
 
 	var restore strings.Builder
-	generateRepoMemorySteps(&restore, data)
+	NewCompiler().generateRepoMemorySteps(&restore, data, "agent")
 	assert.NotContains(t, restore.String(), "Checkout trusted ledger schema")
 
 	var rendered strings.Builder
