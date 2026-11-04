@@ -132,7 +132,7 @@ jobs:
           node --test actions/setup/js/scripts/test_otlp_protobuf.mjs
 
   js-tests:
-    name: JS Tests (shard ${{ matrix.shard }}/4)
+    name: JS Tests (shard ${{ matrix.shard }}/8)
     needs: [checkout-cache]
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -140,7 +140,7 @@ jobs:
       contents: read
     strategy:
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     concurrency:
       group: ci-${{ github.ref }}-js-tests-${{ matrix.shard }}
       cancel-in-progress: true
@@ -180,7 +180,7 @@ jobs:
           cp actions/setup/md/*.md ${{ runner.temp }}/gh-aw/prompts/
       - name: Run tests
         # Keep no-file-parallelism so Vitest sharding has deterministic test scheduling per shard.
-        run: cd actions/setup/js && npm run test:js -- --no-file-parallelism --shard=${{ matrix.shard }}/4
+        run: cd actions/setup/js && npm run test:js -- --no-file-parallelism --shard=${{ matrix.shard }}/8
 
   impacted-js-tests:
     needs: [checkout-cache]
