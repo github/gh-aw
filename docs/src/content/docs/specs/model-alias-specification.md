@@ -570,7 +570,8 @@ AWF ships the following builtin aliases. Workflow frontmatter definitions (and i
 | Alias | Resolves to (in order) |
 |-------|------------------------|
 | `small` | `mini` |
-| `mini` | `haiku`, `gpt-5-mini`, `gpt-5-nano`, `gemini-flash-lite` |
+| `mini` | `haiku`, `gpt-5-mini`, `gpt-5-nano`, `gemini-flash-lite`, `copilot/gpt-*-luna`, `openai/gpt-*-luna` |
+| `detection` | `small`, `small-agent`, `agent` |
 | `large` | `sonnet`, `gpt-5`, `gemini-pro` |
 | `auto` | `copilot/auto`, `large` |
 | `any` | `copilot/*`, `anthropic/*`, `openai/*`, `google/*`, `gemini/*` |
@@ -581,6 +582,10 @@ AWF ships the following builtin aliases. Workflow frontmatter definitions (and i
 | `gemini` | `agent`, `gemini-pro`, `gemini-flash`, `any` |
 
 Meta-aliases reference other aliases and are resolved recursively. They allow workflow authors to express capability tiers (`mini`, `large`) without committing to a specific vendor.
+
+`mini` keeps its existing preference order and only falls back to Luna-tier models (`gpt-*-luna`) when no Haiku, GPT-5 Mini/Nano, or Gemini Flash Lite model is available; the Luna patterns end at `luna`, so suffixed variants such as `gpt-5.6-luna-utility` do not match. When several Luna generations are available, the highest version wins (for example `gpt-6-luna` over `gpt-5.6-luna`).
+
+`detection` prefers small models and falls back to `small-agent`, then `agent`, so threat detection selects an available larger model rather than failing when the catalog has no small model.
 
 ### 9.3 Absence of Default Policy
 

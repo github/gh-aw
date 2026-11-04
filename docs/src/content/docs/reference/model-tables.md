@@ -78,9 +78,9 @@ Meta-aliases reference other aliases by name. They are resolved recursively unti
 |------------|------------|
 | `opusplan` | `opus?effort=high` |
 | `small` | `mini` |
-| `detection` | `small` |
+| `detection` | `small` → `small-agent` → `agent` |
 | `evals` | `small` |
-| `mini` | `haiku` → `gpt-5-mini` → `gpt-5-nano` → `gemini-flash-lite` |
+| `mini` | `haiku` → `gpt-5-mini` → `gpt-5-nano` → `gemini-flash-lite` → `copilot/gpt-*-luna` → `openai/gpt-*-luna` |
 | `large` | `sonnet` → `gpt-6` → `gpt-5-pro` → `gpt-5` → `gemini-pro` |
 | `agent` | `sonnet-6x` → `gpt-6` → `gpt-5.4` → `gpt-5.5` → `gpt-5.6` → `gpt-5.3` → `gemini-pro` → `any` |
 | `small-agent` | `haiku` → `gpt-5-mini` → `gemini-flash` |

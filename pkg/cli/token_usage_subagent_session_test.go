@@ -657,6 +657,6 @@ func TestPiUnifiedFixtureAttributesInterleavedRequestsFromFirewallEvents(t *test
 	require.Equal(t, 2, requestsByAgent["z-reader"])
 	require.Equal(t, 1, requestsByAgent["main"])
 	require.NotNil(t, mainAgent)
-	require.Equal(t, []string{"gpt-5.6-luna"}, mainAgent.ServedModels)
+	require.Equal(t, []string{"gpt-5.6-sol"}, mainAgent.ServedModels)
 	require.Empty(t, summary.Warnings)
 }
