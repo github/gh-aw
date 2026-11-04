@@ -92,8 +92,42 @@
       "avg_comments": 0.82,
       "success_rate": 0.9412,
       "note": "true UTC calendar-day window (2026-10-31T00:00:00Z..2026-11-01T00:00:00Z); creation cohort from 30-day pre-fetched dataset, author app/copilot-swe-agent only; agent_prs_total=17, all resolved (0 open); agent_prs_merged_from_created=16, closed_prs=1 (#73536, substantive body, no WIP placeholder); agent_success_rate=94.1%, up sharply from 10-30's 62.5% (+31.6pp, +50.6% relative, significant - largely resolution of PRs that were still open at 10-30 collection time); avg_duration created->merged over 16 merged PRs=155.43min, down vs 10-30 (287.43->155.43, -45.9%, significant improvement in speed); agent_prs_merged (event-scoped, mergedAt in window)=15 from local 30-day dataset (one PR, #73556, created late in-window but merged just after window_end, excluded); cross-checked against live paginated GitHub search (is:merged, author:app/copilot-swe-agent, merged in window) which returned only 13 due to search-index lag (#73541 and #73534 confirmed merged via dataset/get_comments calls but missing from live search at collection time, same lag pattern as 10-26/10-27/10-29) - treat live search as lower bound, local dataset count (15) used instead; cross-checked against all-author merged_prs in window (~26-27 via live search, one page-2 result integrity-filtered) - 15<=26 consistent; avg_comments=0.82 is unique human comments per PR via pull_request_read get_comments (filtered out github-actions[bot] and the Copilot agent's own replies) across all 17 cohort PRs, all human engagement from one maintainer (pelikhan) giving short follow-up directives - get_review_comments was blocked by an integrity-policy filter on 3 of 5 directly-checked PRs (#73556, #73541, #73534), so review-thread comments are not included and this figure is not directly comparable to total-issue-comment-count days (10-26, 10-30)"
+    },
+    {
+      "date": "2026-11-01",
+      "agent_prs_total": 12,
+      "agent_prs_merged": 14,
+      "agent_prs_merged_from_created": 11,
+      "closed_prs": 1,
+      "open_prs": 0,
+      "avg_agent_duration_minutes": 235.5,
+      "success_rate": 0.9167,
+      "note": "gap-fill; true UTC calendar-day window (2026-11-01T00:00:00Z..2026-11-02T00:00:00Z); creation cohort from 30-day pre-fetched dataset, author app/copilot-swe-agent only; agent_prs_total=12, all resolved (0 open); agent_prs_merged_from_created=11, closed_prs=1 (not a WIP placeholder); agent_success_rate=91.7%, up vs 10-31 (94.1%->91.7%, -2.4pp, not significant); avg_duration created->merged over 11 merged PRs=235.5min, up vs 10-31 (155.43->235.5, +51.5%, significant); agent_prs_merged (event-scoped)=14, independently verified via live paginated GitHub search (is:merged, author:app/copilot-swe-agent, merged: date range), cross-checked against 69 all-author merged PRs is not applicable here (separate query used for this date, 14 consistent with cohort size); avg_comments not collected for this backfilled day (budget prioritized for 11-03 full analysis)"
+    },
+    {
+      "date": "2026-11-02",
+      "agent_prs_total": 17,
+      "agent_prs_merged": 10,
+      "agent_prs_merged_from_created": 16,
+      "closed_prs": 1,
+      "open_prs": 0,
+      "avg_agent_duration_minutes": 143.3,
+      "success_rate": 0.9412,
+      "note": "gap-fill; true UTC calendar-day window (2026-11-02T00:00:00Z..2026-11-03T00:00:00Z); creation cohort from 30-day pre-fetched dataset, author app/copilot-swe-agent only; agent_prs_total=17, all resolved (0 open); agent_prs_merged_from_created=16, closed_prs=1 (not a WIP placeholder); agent_success_rate=94.1%, up vs 11-01 (91.7%->94.1%, +2.4pp, not significant); avg_duration created->merged over 16 merged PRs=143.3min, down vs 11-01 (235.5->143.3, -39.2%, significant improvement in speed); agent_prs_merged (event-scoped)=10, independently verified via live paginated GitHub search (is:merged, author:app/copilot-swe-agent, merged: date range); avg_comments not collected for this backfilled day"
+    },
+    {
+      "date": "2026-11-03",
+      "agent_prs_total": 37,
+      "agent_prs_merged": 36,
+      "agent_prs_merged_from_created": 35,
+      "closed_prs": 1,
+      "open_prs": 1,
+      "avg_agent_duration_minutes": 315.2,
+      "avg_comments": 1.7,
+      "success_rate": 0.9459,
+      "note": "primary analysis window (2026-11-03T00:00:00Z..2026-11-04T00:00:00Z); creation cohort from 30-day pre-fetched dataset, author app/copilot-swe-agent only; agent_prs_total=37, 1 still open at collection time (#74376, feature work created 03:37:09Z, open ~38.7h, not stalled/WIP - substantive scope); agent_prs_merged_from_created=35, closed_prs=1 (#74356, not a WIP placeholder - closed because a security scan found zero remediation-worthy findings); agent_success_rate=94.6%, roughly stable vs 11-02 (94.1%->94.6%, +0.5pp, not significant); avg_duration created->merged over 35 merged PRs=315.2min, up sharply vs 11-02 (143.3->315.2, +120%, significant); volume up sharply vs 11-02 (17->37, +117.6%, significant); agent_prs_merged (event-scoped)=36, independently verified via live paginated GitHub search (is:merged, author:app/copilot-swe-agent, merged: date range, total_count=36), cross-checked against 69 all-author merged PRs in window (36<=69, consistent); avg_comments=1.70 (63 unique human comments / 37 PRs via per-PR pull_request_read get_comments+get_review_comments, bots/Apps excluded) - get_review_comments was blocked by an integrity-policy filter on 4 of 37 PRs (#74367, #74363, #74358, #74354), so those 4 counts are a lower bound; nearly all human commentary came from two maintainers (pelikhan, lpcox) plus one reviewer (SivaKesava1) on workflow-routing PRs"
     }
   ],
-  "last_updated": "2026-10-31",
+  "last_updated": "2026-11-03",
   "note": "prior long-form history (2026-07-06..2026-08-26) lives at copilot-agent-metrics/history.json in this branch but that nested path is NOT matched by the configured repo-memory file-glob (flat *.json only) so it can no longer be updated by this workflow; this root-level history.json is now the live file going forward"
 }
