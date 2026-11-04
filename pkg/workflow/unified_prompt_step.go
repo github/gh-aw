@@ -472,7 +472,7 @@ func (c *Compiler) generateUnifiedPromptCreationStep(yaml *strings.Builder, buil
 	// Add all environment variables in sorted order for consistency
 	envKeys := sliceutil.SortedKeys(allEnvVars)
 	for _, key := range envKeys {
-		yaml.WriteString("          " + key + ": " + allEnvVars[key] + "\n")
+		writeYAMLEnv(yaml, "          ", key, allEnvVars[key])
 	}
 	for _, key := range sliceutil.SortedKeys(renderContent) {
 		writeYAMLEnv(yaml, "          ", key, renderContent[key])

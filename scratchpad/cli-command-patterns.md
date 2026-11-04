@@ -485,7 +485,7 @@ if verbose {
 
 Every command must have corresponding test files:
 
-```
+```text
 command_name_command.go
 command_name_command_test.go         # Unit tests
 command_name_integration_test.go     # Integration tests (optional)
@@ -597,7 +597,7 @@ func TestAudit2(t *testing.T) { ... }
 - Under 80 characters
 - Action-oriented (start with verb)
 - No period at the end
-- Clear and concise
+- Names the command and its purpose in one line
 
 ```go
 // ✅ CORRECT
@@ -645,9 +645,9 @@ Examples:
 
 ### Example Guidelines
 
-Provide at least 3 practical examples:
+Provide at least 3 examples covering basic, common-option, and advanced usage:
 
-1. **Basic usage**: Simplest form of the command
+1. **Basic usage**: Minimal form of the command with required arguments only
 2. **Common options**: With frequently used flags
 3. **Advanced usage**: Complex scenarios
 

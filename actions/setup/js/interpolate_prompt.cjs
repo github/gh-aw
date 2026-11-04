@@ -47,13 +47,12 @@ function interpolateVariables(content, variables) {
 
   for (const [varName, value] of Object.entries(variables)) {
     const escapedVarName = varName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const pattern = new RegExp(`\\$\\{${escapedVarName}\\}|__${escapedVarName}__`, "g");
+    const pattern = new RegExp(`\\$\\{${escapedVarName}\\}`, "g");
     const matches = (content.match(pattern) || []).length;
 
     if (matches > 0) {
       core.debug(`[interpolateVariables] Replacing variable (${matches} occurrence(s))`);
       replacements.set(`\${${varName}}`, value);
-      replacements.set(`__${varName}__`, value);
       totalReplacements += matches;
     } else {
       core.debug("[interpolateVariables] Unused variable");
@@ -304,7 +303,9 @@ async function main({ deferredBindings = {}, authorExpressions = {} } = {}) {
       core.info(`Processing ${conditionalMatches.length} conditional template block(s)`);
 
       const beforeRendering = content.length;
-      content = renderMarkdownTemplate(content, restoreValues);
+      const resolveCondition = (/** @type {string} */ condition) =>
+        restoreValues(condition.replace(/__(GH_AW_[A-Z0-9_]+)__/g, (placeholder, key) => (Object.prototype.hasOwnProperty.call(process.env, key) ? protectValue(process.env[key] || "") : placeholder)));
+      content = renderMarkdownTemplate(content, resolveCondition);
       const afterRendering = content.length;
 
       core.info(`Template rendered successfully`);

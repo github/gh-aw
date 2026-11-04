@@ -242,6 +242,63 @@ describe("log_parser_bootstrap.cjs", () => {
             fs.unlinkSync(logFile),
             fs.rmdirSync(tmpDir));
         }),
+        it.each(
+          [
+            ["Copilot", false],
+            ["Copilot", true],
+            ["Claude", false],
+            ["Claude", true],
+            ["Codex", false],
+            ["Codex", true],
+          ].flatMap(([parserName, safeOutputs]) => [
+            [parserName, safeOutputs, false],
+            [parserName, safeOutputs, true],
+          ])
+        )("publishes %s unified session with safe outputs enabled: %s and legacy entries: %s", async (parserName, safeOutputs, legacy) => {
+          const tmpDir = fs.mkdtempSync(path.join(__dirname, "test-"));
+          try {
+            const logFile = path.join(tmpDir, "test.log");
+            fs.writeFileSync(logFile, "Test log content");
+            process.env.GH_AW_AGENT_OUTPUT = logFile;
+            delete process.env.GH_AW_SAFE_OUTPUTS;
+            if (safeOutputs) {
+              const outputsFile = path.join(tmpDir, "safe-outputs.jsonl");
+              fs.writeFileSync(outputsFile, JSON.stringify({ type: "create_issue", title: "Test issue", body: "Test body" }) + "\n");
+              process.env.GH_AW_SAFE_OUTPUTS = outputsFile;
+            }
+            const logEntries = legacy
+              ? [
+                  { type: "system", subtype: "init", model: "test-model" },
+                  { type: "assistant", message: { content: [{ type: "text", text: "Agent response" }] } },
+                  { type: "result", num_turns: 1, is_error: false },
+                ]
+              : [
+                  { type: "session.start", data: { sessionId: "test-session", selectedModel: "test-model" } },
+                  { type: "assistant.message", data: { content: "Agent response" } },
+                  { type: "session.result", data: { status: "success", num_turns: 1 } },
+                ];
+            await runLogParser({ parseLog: () => ({ markdown: "Parsed log", logEntries }), parserName, artifactDir: tmpDir });
+
+            expect(mockCore.setFailed).not.toHaveBeenCalled();
+            expect(mockCore.summary.addRaw).toHaveBeenCalledOnce();
+            const markdown = mockCore.summary.addRaw.mock.calls[0][0];
+            expect(markdown).toMatch(/^<details><summary>Unified session<\/summary>/);
+            expect(markdown.match(/<summary>Unified session<\/summary>/g)).toHaveLength(1);
+            expect(markdown).not.toContain("<summary>Agentic Conversation</summary>");
+            expect(markdown).toContain("Agent response");
+            let depth = 0;
+            for (const match of markdown.matchAll(/<details(?: open)?>|<\/details>|<summary>(Unified session|Safe Outputs)<\/summary>/g)) {
+              if (match[0].startsWith("<details")) depth++;
+              else if (match[0] === "</details>") depth--;
+              else expect(depth).toBe(1);
+              expect(depth).toBeGreaterThanOrEqual(0);
+            }
+            expect(depth).toBe(0);
+            if (safeOutputs) expect(markdown).toContain("<summary>Safe Outputs</summary>");
+          } finally {
+            fs.rmSync(tmpDir, { recursive: true, force: true });
+          }
+        }),
         it("should handle parser returning object with markdown", () => {
           const tmpDir = fs.mkdtempSync(path.join(__dirname, "test-")),
             logFile = path.join(tmpDir, "test.log");
@@ -301,12 +358,12 @@ describe("log_parser_bootstrap.cjs", () => {
             ],
           });
           runLogParser({ parseLog: mockParseLog, parserName: "TestParser" });
-          const infoCall = mockCore.info.mock.calls.find(call => call[0].includes("=== TestParser Execution Summary ==="));
+          const infoCall = mockCore.info.mock.calls.find(call => call[0].includes("=== Unified session ==="));
           (expect(infoCall).toBeDefined(), expect(infoCall[0]).toContain("Model: gpt-5"), expect(infoCall[0]).toContain("Turns: 2"));
           const summaryCall = mockCore.summary.addRaw.mock.calls[0];
           (expect(summaryCall).toBeDefined(),
             expect(summaryCall[0]).toContain("```"),
-            expect(summaryCall[0]).toContain("Conversation:"),
+            expect(summaryCall[0]).toContain("<summary>Unified session</summary>"),
             expect(summaryCall[0]).toContain("◆ Hello"),
             expect(summaryCall[0]).toContain("Statistics:"),
             expect(summaryCall[0]).toContain("  Turns: 2"),
@@ -825,6 +882,90 @@ describe("log_parser_bootstrap.cjs", () => {
           }
         }));
     }));
+
+  describe("agent source provenance", () => {
+    let root;
+    beforeEach(() => {
+      root = fs.mkdtempSync(path.join(__dirname, "test-agent-provenance-"));
+      delete process.env.GH_AW_SAFE_OUTPUTS;
+    });
+    afterEach(() => {
+      fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    async function publish(events, retained) {
+      const logPath = retained ? path.join(root, "logs") : path.join(root, "direct.log");
+      if (retained) fs.mkdirSync(logPath);
+      fs.writeFileSync(retained ? path.join(logPath, "events.jsonl") : logPath, events.map(event => JSON.stringify(event)).join("\n"));
+      process.env.GH_AW_AGENT_OUTPUT = logPath;
+      await runLogParser({
+        parseLog: content => ({ markdown: "Parsed log", logEntries: content.split("\n").map(JSON.parse) }),
+        parserName: retained ? "Copilot" : "Claude",
+        supportsDirectories: retained,
+        rootDir: root,
+      });
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+      return fs.readFileSync(path.join(root, "agent-session.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
+    }
+
+    it.each([false, true])("publishes elapsed times for timestamped events (retained: %s)", async retained => {
+      const events = [
+        { type: "assistant.message", timestamp: 0, data: { content: "Starting work" }, provenance: { vendor: "first" } },
+        { type: "assistant.message", timestamp: "1970-01-01T00:00:01.250Z", data: { content: "Finished work" }, provenance: { vendor: "last" } },
+      ];
+      const original = structuredClone(events);
+      const persisted = await publish(events, retained);
+      for (const output of [mockCore.summary.addRaw.mock.calls[0][0], mockCore.info.mock.calls.map(([text]) => text).join("\n")]) {
+        expect(output).toContain("assistant.message +0s");
+        expect(output).toContain("assistant.message +1.25s");
+        expect(output).not.toContain("assistant.message [untimed]");
+      }
+      if (retained) {
+        for (const [index, event] of persisted.filter(event => event.type === "assistant.message").entries()) {
+          expect(event.provenance).toEqual({ component: "agent", phase: "agent", path: "events.jsonl", index, timestampMs: index === 0 ? 0 : 1250, native: events[index].provenance });
+          expect(event.timestamp).toBe(events[index].timestamp);
+        }
+      }
+      expect(events).toEqual(original);
+    });
+
+    it("publishes elapsed times for timestamped direct legacy events", async () => {
+      await publish(
+        [
+          { type: "assistant", message: { timestamp: 0, content: [{ type: "text", text: "Starting work" }] } },
+          { type: "assistant", timestamp: 1250, message: { content: [{ type: "text", text: "Finished work" }] } },
+        ],
+        false
+      );
+      for (const output of [mockCore.summary.addRaw.mock.calls[0][0], mockCore.info.mock.calls.map(([text]) => text).join("\n")]) {
+        expect(output).toContain("assistant.message +0s");
+        expect(output).toContain("assistant.message +1.25s");
+      }
+    });
+
+    it.each([false, true])("fills missing provenance while preserving known timestamps and source scopes (retained: %s)", async retained => {
+      const source = { component: "agent", phase: "activation", path: "known/events.jsonl", native: { vendor: "known" } };
+      const events = [
+        { type: "assistant.message", timestamp: 9000, data: { content: "Starting work" }, provenance: { ...source, index: 0, timestampMs: 0 } },
+        { type: "assistant.message", timestamp: 9500, data: { content: "Finished work" }, provenance: { ...source, index: 42, timestampMs: 1250 } },
+        { type: "assistant.message", timestamp: 1500, data: { content: "Observed later" }, provenance: { component: "agent", phase: undefined, path: undefined, index: undefined, timestampMs: undefined } },
+      ];
+      const persisted = await publish(events, retained);
+      for (const output of [mockCore.summary.addRaw.mock.calls[0][0], mockCore.info.mock.calls.map(([text]) => text).join("\n")]) {
+        expect(output).toContain("activation/known/events.jsonl");
+        expect(output).toContain("assistant.message +0s");
+        expect(output).toContain("assistant.message +1.25s");
+        expect(output).toContain("assistant.message +0.25s");
+        expect(output).not.toContain("undefined/");
+      }
+      if (retained) {
+        const messages = persisted.filter(event => event.type === "assistant.message");
+        expect(messages[0].provenance).toEqual(events[0].provenance);
+        expect(messages[1].provenance).toEqual(events[1].provenance);
+        expect(messages[2].provenance).toEqual({ component: "agent", phase: "agent", path: "events.jsonl", index: 2, timestampMs: 1500 });
+      }
+    });
+  });
 
   describe("Copilot session source fallback", () => {
     let root;

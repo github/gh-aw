@@ -4,7 +4,7 @@ title: Intent Attribution & Agent Governance Specification
 version: 2.0.0
 status: Partially Implemented
 date: 2026-06-09
-last_updated: 2026-06-12
+last_updated: 2026-11-03
 replaces: objective-mapping-portfolio-reporting.md
 ---
 
@@ -655,6 +655,14 @@ Future supported policies may include:
 
 The active policy must be recorded in decision provenance.
 
+### Multiple-Root Open Questions and Proposed Resolutions
+
+These proposals are non-normative until accepted by the governance policy owner.
+
+1. **How are duplicate root references distinguished from multiple roots?** Proposed resolution: deduplicate by stable GitHub node ID when available; if identity is missing, keep the candidates distinct and fail closed as `ambiguous`.
+2. **Can explicit intent metadata resolve multiple closing issues?** Proposed resolution: a schema-valid explicit intent may resolve them only when it names one canonical root and its provenance is retained; otherwise return `ambiguous`.
+3. **Are the listed future policies active alternatives?** Proposed resolution: no. Explicit-primary, highest-priority, all-root, and fractional policies remain unsupported until separately specified with deterministic provenance and conformance fixtures.
+
 ## Risk classification
 
 Risk should be explicit where possible.
@@ -752,6 +760,14 @@ organization constraints
 ```
 
 A lower-precedence rule may not weaken a higher-precedence constraint.
+
+### Policy Precedence Open Questions and Proposed Resolutions
+
+These proposals are non-normative until accepted by the governance policy owner.
+
+4. **Are organization and repository policies constraints or replaceable defaults?** Proposed resolution: treat them as hard constraints; lower-precedence layers may narrow authority but cannot relax them.
+5. **How are conflicting rules at the same precedence handled?** Proposed resolution: merge deterministically using the more restrictive value for authority-bearing fields; choose the lower autonomy and narrowest write scope, union required checks and denied tools, intersect allowed tools, require approval if any rule requires it, permit auto-merge only if all rules permit it, and use the lower attempt limit.
+6. **What resolves ties between same-level rules?** Proposed resolution: reject conflicting policy compilation as ambiguous and apply the safest default rather than relying on declaration order or agent choice.
 
 Example:
 
@@ -1443,3 +1459,9 @@ This system is not a business-impact calculator.
 It is a deterministic control layer for agentic GitHub work.
 
 > **Intent determines authority. Execution produces evidence.**
+
+## Change Log
+
+### 2026-11-03
+
+- Added numbered multiple-root and policy-precedence questions with non-normative proposed resolutions.
