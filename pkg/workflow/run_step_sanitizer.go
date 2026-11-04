@@ -94,7 +94,7 @@ func sanitizeRunStepExpressions(step map[string]any) (map[string]any, []string, 
 		return step, nil, false
 	}
 
-	scanContent := executableShellContent(runVal)
+	scanContent := shellExpansionContent(runVal)
 	if !hasExpressionMarker(scanContent) {
 		return step, nil, false
 	}

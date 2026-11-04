@@ -118,7 +118,7 @@ jobs:
       - name: Heredoc expression is file content
         run: |
           cat > config.txt << 'EOF'
-          token=${{ github.token }}
+          token=${{ github.event.issue.title }}
           EOF
 `
 
@@ -132,7 +132,7 @@ jobs:
       - name: Comment expression
         run: |
           set -euo pipefail
-          # docs: ${{ secrets.* }}
+          # docs: ${{ github.event.issue.title }}
           echo "ok"
 `
 
@@ -204,24 +204,28 @@ jobs:
 		require.ErrorContains(t, err, "github.actor")
 	})
 
-	t.Run("Path A - schema enabled - heredoc expression passes", func(t *testing.T) {
+	t.Run("Path A - schema enabled - heredoc expression rejected", func(t *testing.T) {
 		err := compiler.validateTemplateInjection(heredocExpressionYAML, lockFile, markdownPath, parseYAML(t, heredocExpressionYAML))
-		assert.NoError(t, err, "expressions inside heredoc content should not be flagged")
+		require.Error(t, err, "expressions inside heredoc content must be flagged")
+		require.ErrorContains(t, err, "CTR-006")
 	})
 
-	t.Run("Path B - schema disabled - heredoc expression passes", func(t *testing.T) {
+	t.Run("Path B - schema disabled - heredoc expression rejected", func(t *testing.T) {
 		err := compiler.validateTemplateInjection(heredocExpressionYAML, lockFile, markdownPath, nil)
-		assert.NoError(t, err, "expressions inside heredoc content should not be flagged")
+		require.Error(t, err, "expressions inside heredoc content must be flagged")
+		require.ErrorContains(t, err, "CTR-006")
 	})
 
-	t.Run("Path A - schema enabled - comment expression passes", func(t *testing.T) {
+	t.Run("Path A - schema enabled - comment expression rejected", func(t *testing.T) {
 		err := compiler.validateTemplateInjection(commentExpressionYAML, lockFile, markdownPath, parseYAML(t, commentExpressionYAML))
-		assert.NoError(t, err, "expressions inside bash comments should not be flagged")
+		require.Error(t, err, "expressions inside bash comments must be flagged")
+		require.ErrorContains(t, err, "CTR-006")
 	})
 
-	t.Run("Path B - schema disabled - comment expression passes", func(t *testing.T) {
+	t.Run("Path B - schema disabled - comment expression rejected", func(t *testing.T) {
 		err := compiler.validateTemplateInjection(commentExpressionYAML, lockFile, markdownPath, nil)
-		assert.NoError(t, err, "expressions inside bash comments should not be flagged")
+		require.Error(t, err, "expressions inside bash comments must be flagged")
+		require.ErrorContains(t, err, "CTR-006")
 	})
 
 	t.Run("both paths agree on unsafe YAML", func(t *testing.T) {

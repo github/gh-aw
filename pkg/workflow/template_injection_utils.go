@@ -208,11 +208,18 @@ func TransformExecutableShellContent(content string, transform func(string) stri
 	return transformShellRegions(content, regions, transform, false), nil
 }
 
-func executableShellContent(content string) string {
+// shellExpansionContent excludes regions where Bash does not perform parameter
+// expansion. It is for sanitizer decisions only; Actions expressions are
+// substituted before Bash interprets these regions.
+func shellExpansionContent(content string) string {
 	if !strings.Contains(content, "<<") {
 		return stripShellLineComments(content)
 	}
 	return transformShellContent(content, func(s string) string { return s }, true, true)
+}
+
+func executableShellContent(content string) string {
+	return content
 }
 
 // stripShellLineComments removes bash-style # line comments while preserving text

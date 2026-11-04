@@ -83,7 +83,7 @@ jobs:
 			expected: []string{"${{ github.event.issue.title }}"},
 		},
 		{
-			name: "comments and heredocs are ignored",
+			name: "comments and heredocs are scanned",
 			yaml: `
 jobs:
   test:
@@ -94,6 +94,7 @@ jobs:
           title=${{ github.event.issue.title }}
           EOF
 `,
+			expected: []string{"${{ github.event.issue.title }}", "${{ github.event.issue.title }}"},
 		},
 	}
 
