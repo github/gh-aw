@@ -300,7 +300,7 @@ jobs:
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
-          GH_AW_NEEDS_DEFENDER_SCAN_OUTPUTS_FINDINGS_COUNT: "\"__GH_AW_DEFERRED_4E80DA485E8867DC__\""
+          GH_AW_NEEDS_DEFENDER_SCAN_OUTPUTS_FINDINGS_COUNT: __GH_AW_DEFERRED_4E80DA485E8867DC__
           GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_OTLP_IF_MISSING: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
