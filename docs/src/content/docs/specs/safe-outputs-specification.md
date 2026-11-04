@@ -7,9 +7,9 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.29.15<br>
+**Version**: 1.29.16<br>
 **Status**: Working Draft<br>
-**Publication Date**: 2026-11-02<br>
+**Publication Date**: 2026-11-03<br>
 **Editor**: GitHub Agentic Workflows Team<br>
 **This Version**: [safe-outputs-specification](/gh-aw/specs/safe-outputs-specification/)<br>
 **Latest Published Version**: This document
@@ -1573,6 +1573,18 @@ In this example, `add-comment` and `dispatch-workflow` MUST use separate install
 For example, `dispatch-workflow` configured with `github-token: ${{ secrets.DISPATCH_TOKEN }}` and `workflows: [fixer]` MUST retain `actions: write` in job permissions but MUST NOT add `actions: write` to any global App mint solely for that handler. Without the handler token, the App mint MUST retain the dispatch permission.
 
 **Conformance**: Tests MUST verify the generated global App mints and job permissions with and without a handler token, including dispatch-repository tools. Tests MUST also cover mixed configurations where another handler keeps the global App mint enabled while credential-overridden handlers perform finalization, autofix, or cleanup.
+
+#### GP5c: Persisted PR Checkout Credentials
+
+The trusted `safe_outputs` job MUST retain credentials for PR fetch/push operations with `persist-credentials: true`. When PR handlers use the global App for the host repository, the default workspace checkout MUST persist the resolved PR token, including `${{ steps.safe-outputs-app-token.outputs.token }}`, unless explicit checkout authentication takes precedence. Unsigned Git pushes MUST NOT silently use the checkout's default `GITHUB_TOKEN` instead of that selected App token.
+
+The global-App override MUST apply only when no PR handler has its own App or token, no distinct PR target/head repository is selected, and the global App mint is emitted. A global App serving only other handlers MUST NOT replace the default checkout credential: its permissions can exclude `contents`. Additional static checkouts MUST retain their existing static/per-entry credentials rather than inherit the default workspace's App-token override. Runtime repository-list checkouts retain the separate credential rules in [Section 9.6.1](#961-runtime-repository-list-checkouts).
+
+Token minting MUST precede any checkout that references its output. Work-queue jobs MUST order artifact downloads, claim reconciliation, global App minting, then shared PR checkout. With `ignore-if-missing`, the persisted expression MUST preserve the configured safe-output token fallback, then `secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN`.
+
+Persistence MUST NOT widen App repository scope or permission aggregation under GP5–GP5b, override explicit per-checkout authentication, change static code-scanning upload token selection, or expose these privileged credentials to the agent job or safe-outputs MCP server. Retained credentials authorize trusted publication, not agent-generated code.
+
+**Conformance**: Generated-step tests MUST cover the host App token, missing-key fallback, mixed global/per-handler Apps, additional static checkouts, a distinct cross-organization target, and work-queue reconciliation/mint/checkout ordering. These tests establish compiler wiring, not live installation access or downstream workflow execution. Existing locks require recompilation to adopt the changed token selection and ordering.
 
 #### GP6: data
 
@@ -6621,6 +6633,11 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.29.16** (2026-11-03):
+
+- **Specified**: GP5c for resolved global-App token persistence on the default host PR checkout, preserving explicit checkout credentials, optional-App fallback, static additional checkouts, and agent-job isolation.
+- **Required**: Work-queue reconciliation and App minting before shared PR checkout, without expanding App permissions or repository scope. Existing locks require recompilation.
 
 **Version 1.29.15** (2026-11-02):
 

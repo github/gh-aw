@@ -34,7 +34,7 @@ func TestSafeOutputDynamicCheckoutTokenPriority(t *testing.T) {
 	}{
 		{name: "global app", globalApp: app, want: globalAppToken, agentWant: defaultToken},
 		{name: "global app overrides global PAT", globalApp: app, globalToken: "${{ secrets.GLOBAL_PAT }}", want: globalAppToken, agentWant: defaultToken},
-		{name: "optional global app falls back to PAT", globalApp: optionalApp, globalToken: "${{ secrets.GLOBAL_PAT }}", want: "${{ steps.safe-outputs-app-token.outputs.token || secrets.GLOBAL_PAT }}", agentWant: defaultToken},
+		{name: "optional global app falls back to PAT", globalApp: optionalApp, globalToken: "${{ secrets.GLOBAL_PAT }}", want: "${{ steps.safe-outputs-app-token.outputs.token || secrets.GLOBAL_PAT || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}", agentWant: defaultToken},
 		{name: "optional global app falls back to defaults", globalApp: optionalApp, want: "${{ steps.safe-outputs-app-token.outputs.token || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}", agentWant: defaultToken},
 		{name: "create PAT overrides global app", globalApp: app, createToken: "${{ secrets.CREATE_PAT }}", pushToken: "${{ secrets.PUSH_PAT }}", want: "${{ secrets.CREATE_PAT }}", agentWant: defaultToken},
 		{name: "push PAT overrides global app", globalApp: app, pushToken: "${{ secrets.PUSH_PAT }}", want: "${{ secrets.PUSH_PAT }}", agentWant: defaultToken},
