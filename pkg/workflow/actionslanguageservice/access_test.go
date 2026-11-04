@@ -58,6 +58,39 @@ func TestReferenceWalkingAndRewriting(t *testing.T) {
 	}
 }
 
+func TestReferenceGroupedLiteralIndex(t *testing.T) {
+	for _, source := range []string{
+		"secrets[('RESTRICTED')]",
+		"(secrets)[((('RESTRICTED')))]",
+	} {
+		t.Run(source, func(t *testing.T) {
+			tree, err := ParseSyntax(source)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := []string{"secrets", "RESTRICTED"}
+			if got, ok := Reference(tree); !ok || !reflect.DeepEqual(got, want) {
+				t.Fatalf("reference = %#v, %v; want %#v", got, ok, want)
+			}
+		})
+	}
+	for _, source := range []string{
+		"secrets[(inputs.name)]",
+		"secrets[('RESTRICTED' || inputs.name)]",
+		"secrets[(format('{0}', 'RESTRICTED'))]",
+	} {
+		t.Run(source, func(t *testing.T) {
+			tree, err := ParseSyntax(source)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got, ok := Reference(tree); ok {
+				t.Fatalf("computed index incorrectly treated as static: %#v", got)
+			}
+		})
+	}
+}
+
 func TestScannerPatterns(t *testing.T) {
 	source := "before ${{ format('}}{0}', inputs.name) }}\nafter ${{ secrets['TOKEN'] }} ${{ missing"
 	pattern := Pattern{}

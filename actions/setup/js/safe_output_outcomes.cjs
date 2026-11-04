@@ -72,7 +72,9 @@ function projectSafeOutputData(source) {
   const metadata = source.metadata && typeof source.metadata === "object" && !Array.isArray(source.metadata) ? source.metadata : undefined;
   const protection = source.file_protection ?? metadata?.file_protection;
   if (protection && typeof protection === "object" && !Array.isArray(protection) && ["deny", "fallback"].includes(protection.action) && Array.isArray(protection.files)) {
-    const files = protection.files.filter(file => typeof file === "string" && file.length > 0 && file.length <= 4096 && !/[\u0000-\u001f\u007f\\:]/.test(file) && file.split("/").every(part => part !== "" && part !== "." && part !== ".."));
+    const files = protection.files.filter(
+      file => typeof file === "string" && file.length > 0 && Buffer.byteLength(file, "utf8") <= 4096 && !/[\u0000-\u001f\u007f-\u009f\\:]/.test(file) && file.split("/").every(part => part !== "" && part !== "." && part !== "..")
+    );
     if (files.length > 0) {
       data.file_protection = {
         action: protection.action,

@@ -275,7 +275,7 @@ func (c *Compiler) generateLogParsing(yaml *strings.Builder, data *WorkflowData,
 }
 
 func generateProtectedSessionCaptureEnv(yaml *strings.Builder, data *WorkflowData) {
-	secretReferences := CollectSecretReferences(data.Env + yaml.String())
+	secretReferences := CollectSecretReferences(data.Env, yaml.String())
 	yaml.WriteString("          GH_AW_PROTECTED_SESSION_CAPTURE: 1\n")
 	if len(secretReferences) > 0 {
 		yaml.WriteString("          GH_AW_SECRET_NAMES: '" + strings.Join(secretReferences, ",") + "'\n")

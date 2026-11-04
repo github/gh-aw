@@ -54,10 +54,8 @@ func loadCachedAuditData(runOutputDir string, run WorkflowRun, source auditCache
 	if auditData.Retries == nil {
 		auditData.Retries = readAuditRetrySummary(runOutputDir)
 	}
-	if auditData.ProtectedFiles == nil {
-		run.LogsPath = runOutputDir
-		auditData.ProtectedFiles = readAuditProtectedFiles(run)
-	}
+	run.LogsPath = runOutputDir
+	auditData.ProtectedFiles = resolveAuditProtectedFiles(run, auditData.ProtectedFiles)
 	return auditData, true
 }
 
@@ -116,9 +114,7 @@ func writeLogsAuditFile(processedRun ProcessedRun, processedRuns []ProcessedRun,
 	if auditData.Retries == nil {
 		auditData.Retries = readAuditRetrySummary(runOutputDir)
 	}
-	if auditData.ProtectedFiles == nil {
-		auditData.ProtectedFiles = readAuditProtectedFiles(processedRun.Run)
-	}
+	auditData.ProtectedFiles = resolveAuditProtectedFiles(processedRun.Run, auditData.ProtectedFiles)
 	hydratedProcessedRuns := hydrateProcessedRunsWithCachedAudit(processedRuns)
 	auditData.Comparison = buildAuditComparisonForProcessedRuns(hydrateProcessedRunWithCachedAudit(processedRun), hydratedProcessedRuns)
 	if err := writeAuditData(runOutputDir, auditData); err != nil {

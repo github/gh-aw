@@ -251,6 +251,10 @@ func renderLogsArtifactHint(w io.Writer, message string) {
 func processedRunsToCrossRunInputs(processedRuns []ProcessedRun) []crossRunInput {
 	inputs := make([]crossRunInput, 0, len(processedRuns))
 	for _, pr := range processedRuns {
+		var protectedFiles *AuditProtectedFiles
+		if pr.cachedAudit != nil && pr.cachedAudit.SchemaVersion == auditSchemaVersion {
+			protectedFiles = pr.cachedAudit.ProtectedFiles
+		}
 		inputs = append(inputs, crossRunInput{
 			RunID:               pr.Run.DatabaseID,
 			WorkflowName:        pr.Run.WorkflowName,
@@ -265,7 +269,7 @@ func processedRunsToCrossRunInputs(processedRuns []ProcessedRun) []crossRunInput
 			BehaviorFingerprint: pr.BehaviorFingerprint,
 			GradersCluster:      deriveGradersClusterValue(pr.Run.LogsPath),
 			EvalsCluster:        deriveEvalsClusterValue(pr.Run.LogsPath),
-			ProtectedFiles:      readAuditProtectedFiles(pr.Run),
+			ProtectedFiles:      resolveAuditProtectedFiles(pr.Run, protectedFiles),
 		})
 	}
 	return inputs

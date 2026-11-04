@@ -138,7 +138,8 @@ func firstNonEmptyAuditValue(values ...string) string {
 }
 
 func loadGroupedAuditData(outputDir string, runID int64) (AuditData, bool) {
-	auditFile := filepath.Join(resolveAuditOutputDir(outputDir, runID), auditFileName)
+	runOutputDir := resolveAuditOutputDir(outputDir, runID)
+	auditFile := filepath.Join(runOutputDir, auditFileName)
 	data, err := os.ReadFile(auditFile)
 	if err != nil {
 		return AuditData{}, false
@@ -147,6 +148,13 @@ func loadGroupedAuditData(outputDir string, runID int64) (AuditData, bool) {
 	if err := json.Unmarshal(data, &auditData); err != nil {
 		return AuditData{}, false
 	}
+	run := WorkflowRun{DatabaseID: runID, WorkflowName: auditData.Overview.WorkflowName}
+	if summary, ok := loadRunSummary(runOutputDir, false); ok {
+		run = summary.Run
+	}
+	run.DatabaseID = runID
+	run.LogsPath = runOutputDir
+	auditData.ProtectedFiles = resolveAuditProtectedFiles(run, auditData.ProtectedFiles)
 	return auditData, true
 }
 

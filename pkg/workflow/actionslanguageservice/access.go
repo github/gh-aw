@@ -36,6 +36,9 @@ func Reference(expression *Expression) ([]string, bool) {
 			return nil, false
 		}
 		index := expression.Child(1)
+		for index.Kind == "group" {
+			index = index.Child(0)
+		}
 		if index.Kind == "star" {
 			return append(path, "*"), true
 		}

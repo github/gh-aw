@@ -75,6 +75,50 @@ func TestLoadCachedAuditDataDropsHistoricalOutcomeSnapshot(t *testing.T) {
 	assert.Nil(t, cached.OutcomeSummary)
 }
 
+func TestCachedAuditProtectedFilesRefreshesAvailableSession(t *testing.T) {
+	for _, partial := range []bool{false, true} {
+		t.Run(map[bool]string{false: "unavailable", true: "partial"}[partial], func(t *testing.T) {
+			root := t.TempDir()
+			runDir := resolveAuditOutputDir(root, 42)
+			run := WorkflowRun{DatabaseID: 42, LogsPath: runDir, WorkflowName: "test"}
+			protection := readAuditProtectedFiles(run)
+			protection.Partial = partial
+			cached := AuditData{
+				SchemaVersion:  auditSchemaVersion,
+				CacheSource:    auditCacheSourceLogs,
+				Overview:       buildAuditOverview(run, nil),
+				ProtectedFiles: protection,
+			}
+			require.NoError(t, writeAuditData(runDir, cached))
+			session := protectionSessionHeader + protectionSessionRecord(t, "safe_output.outcome", "safe_output", "safe_outputs", "success", true, false)
+			require.NoError(t, os.WriteFile(filepath.Join(runDir, "aw_session.jsonl"), []byte(session), 0o600))
+
+			loaded, ok := loadCachedAuditData(runDir, run, auditCacheSourceLogs)
+			require.True(t, ok)
+			require.Len(t, loaded.ProtectedFiles.Detections, 1)
+			assert.Empty(t, loaded.ProtectedFiles.UnavailableRuns)
+			assert.False(t, loaded.ProtectedFiles.Partial)
+
+			processed := ProcessedRun{Run: run, cachedAudit: &cached}
+			inputs := processedRunsToCrossRunInputs([]ProcessedRun{processed})
+			require.Len(t, inputs, 1)
+			assert.Equal(t, loaded.ProtectedFiles, inputs[0].ProtectedFiles)
+
+			grouped, ok := loadGroupedAuditData(root, run.DatabaseID)
+			require.True(t, ok)
+			assert.Equal(t, loaded.ProtectedFiles, grouped.ProtectedFiles)
+
+			writeLogsAuditFiles([]ProcessedRun{processed}, false)
+			data, err := os.ReadFile(auditPath(runDir))
+			require.NoError(t, err)
+			var written AuditData
+			require.NoError(t, json.Unmarshal(data, &written))
+			assert.Equal(t, loaded.ProtectedFiles, written.ProtectedFiles)
+			assert.Equal(t, []int64{42}, cached.ProtectedFiles.UnavailableRuns, "refresh must not mutate shared replay data")
+		})
+	}
+}
+
 func TestLoadCachedAuditDataRejectsOlderSchema(t *testing.T) {
 	t.Parallel()
 

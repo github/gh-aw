@@ -234,6 +234,59 @@ func TestRecordGroupedAuditRunAppendsActionableFindings(t *testing.T) {
 	assert.Equal(t, AuditFindingWorkflowFailed, report.Entries[0].Code)
 }
 
+func TestRecordGroupedAuditRunBackfillsProtectedFiles(t *testing.T) {
+	for _, withSession := range []bool{false, true} {
+		t.Run(strconv.FormatBool(withSession), func(t *testing.T) {
+			root := t.TempDir()
+			const runID int64 = 605
+			writeCachedAuditRunFixture(t, root, runID, nil)
+			runDir := resolveAuditOutputDir(root, runID)
+			original, err := os.ReadFile(auditPath(runDir))
+			require.NoError(t, err)
+			var legacy AuditData
+			require.NoError(t, json.Unmarshal(original, &legacy))
+			require.Nil(t, legacy.ProtectedFiles)
+			require.Equal(t, 12, legacy.SchemaVersion)
+			if withSession {
+				session := protectionSessionHeader + protectionSessionRecord(t, "safe_output.outcome", "safe_output", "safe_outputs", "success", true, false)
+				require.NoError(t, os.WriteFile(filepath.Join(runDir, "aw_session.jsonl"), []byte(session), 0o600))
+			}
+
+			var report GroupedAuditReport
+			recordGroupedAuditRun(root, runID, &report)
+
+			require.Len(t, report.ProtectedFiles, 1)
+			if withSession {
+				require.Len(t, report.ProtectedFiles[0].Detections, 1)
+				assert.True(t, report.ProtectedFiles[0].Detections[0].FallbackUsed)
+				assert.Equal(t, []string{".github/***.json", ".github/workflows/test.md"}, report.ProtectedFiles[0].Files)
+				assert.Empty(t, report.ProtectedFiles[0].UnavailableRuns)
+			} else {
+				assert.Equal(t, []int64{runID}, report.ProtectedFiles[0].UnavailableRuns)
+			}
+			unchanged, err := os.ReadFile(auditPath(runDir))
+			require.NoError(t, err)
+			assert.Equal(t, original, unchanged, "grouping must backfill locally without rewriting the cache")
+		})
+	}
+}
+
+func TestAuditProtectedFilesMarkdownWarnsForPartialEvidence(t *testing.T) {
+	protection := &AuditProtectedFiles{
+		Workflow: "test", Files: []string{"CODEOWNERS"},
+		Detections: []AuditProtectedFileDetection{{RunID: 42}}, Partial: true,
+	}
+	grouped := captureAuditGroupStdout(t, func() {
+		renderGroupedAuditReportMarkdown(GroupedAuditReport{RunsAnalyzed: 1, ProtectedFiles: []*AuditProtectedFiles{protection}})
+	})
+	var crossRun bytes.Buffer
+	renderCrossRunReportMarkdownToWriter(&crossRun, &CrossRunAuditReport{RunsAnalyzed: 1, ProtectedFiles: []*AuditProtectedFiles{protection}})
+	for _, output := range []string{grouped, crossRun.String()} {
+		assert.Contains(t, output, "Protected-file audit evidence is incomplete")
+		assert.Contains(t, output, "CODEOWNERS")
+	}
+}
+
 // writeCachedAuditRunFixture writes a cached run_summary.json and matching audit.json
 // for runID under outputDir so that AuditWorkflowRun takes the offline cache path and
 // runs without any network access.

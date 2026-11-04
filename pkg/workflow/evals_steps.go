@@ -3,6 +3,7 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -242,7 +243,7 @@ func (c *Compiler) collectEvalsSecretReferences(data *WorkflowData) []string {
 	if data.Evals == nil {
 		return nil
 	}
-	return CollectSecretReferences(marshalEvalsQuestions(data.Evals.Questions) + "\n" + c.resolveEvalsExecutionModel(data))
+	return CollectSecretReferences(marshalEvalsQuestions(data.Evals.Questions), strconv.Quote(c.resolveEvalsExecutionModel(data)))
 }
 
 func marshalEvalsQuestions(questions []EvalDefinition) string {

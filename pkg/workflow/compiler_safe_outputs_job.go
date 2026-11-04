@@ -5,6 +5,7 @@ import (
 	"maps"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -997,6 +998,7 @@ func (c *Compiler) appendFinalSafeOutputSteps(data *WorkflowData, steps []string
 func (c *Compiler) safeOutputRedactionContext(data *WorkflowData, steps []string) string {
 	var context strings.Builder
 	context.WriteString(data.Env)
+	context.WriteString("\n---\n")
 	context.WriteString(strings.Join(steps, ""))
 	for jobName, jobConfig := range data.Jobs {
 		target := normalizeBuiltinJobAlias(jobName)
@@ -1011,9 +1013,10 @@ func (c *Compiler) safeOutputRedactionContext(data *WorkflowData, steps []string
 	}
 	if c.jobManager != nil {
 		if agent, exists := c.jobManager.GetJob(string(constants.AgentJobName)); exists {
+			context.WriteString("\n---\n")
 			context.WriteString(strings.Join(agent.Steps, ""))
 			for _, value := range agent.Env {
-				context.WriteString(value)
+				appendRedactionReferenceStrings(&context, value)
 			}
 		}
 	}
@@ -1023,7 +1026,11 @@ func (c *Compiler) safeOutputRedactionContext(data *WorkflowData, steps []string
 func appendRedactionReferenceStrings(context *strings.Builder, value any) {
 	switch typed := value.(type) {
 	case string:
-		context.WriteString(typed)
+		// Pending step definitions and job env values are already decoded, unlike
+		// the rendered YAML above. Quote each as its own document to preserve both
+		// Actions string literals and YAML-sensitive prefixes without reinterpreting.
+		context.WriteString("\n---\n")
+		context.WriteString(strconv.Quote(typed))
 		context.WriteByte('\n')
 	case map[string]any:
 		for _, child := range typed {

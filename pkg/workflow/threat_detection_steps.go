@@ -125,7 +125,7 @@ func (c *Compiler) buildDetectionJobSteps(data *WorkflowData, precedingSteps ...
 	// Only forward secrets actually available to this job, including inherited
 	// workflow env and setup steps, never unrelated agent or safe-output inputs.
 	accountingSteps := c.buildDetectionTokenUsageSummaryStep(data)
-	secretContext := data.Env + "\n" + strings.Join(precedingSteps, "") + strings.Join(steps, "") + strings.Join(accountingSteps, "") + strings.Join(publicationSteps, "")
+	secretContext := data.Env + "\n---\n" + strings.Join(precedingSteps, "") + strings.Join(steps, "") + strings.Join(accountingSteps, "") + strings.Join(publicationSteps, "")
 	// Accounting renders log-derived fields, so sanitize its inputs first. Its new
 	// result files then need their own redaction pass before publication.
 	steps = append(steps, c.buildDetectionSecretRedactionStep(data, secretContext, "redact_detection_logs")...)

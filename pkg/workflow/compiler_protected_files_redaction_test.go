@@ -16,37 +16,59 @@ import (
 )
 
 func TestProtectedFileDiagnosticsCaptureLateJobStepSecrets(t *testing.T) {
+	references := []struct {
+		name       string
+		expression string
+	}{
+		{"dotted", "${{ secrets.LATE_STEP_SECRET }}"},
+		{"lowercase dotted", "${{ secrets.late_step_secret }}"},
+		{"mixed case context", "${{ SeCrEtS.Late_Step_Secret }}"},
+		{"bracket", "${{ secrets['LATE_STEP_SECRET'] }}"},
+		{"lowercase bracket", "${{ secrets['late_step_secret'] }}"},
+		{"spaced bracket", "${{ secrets [ 'Late_Step_Secret' ] }}"},
+		{"grouped", "${{ (secrets['late_step_secret']) }}"},
+		{"grouped index", "${{ secrets[('late_step_secret')] }}"},
+		{"fallback", "${{ secrets.late_step_secret || secrets['LATE_STEP_SECRET'] }}"},
+		{"YAML quoted fallback", "'[${{ secrets.LATE_STEP_SECRET || ''fallback'' }}]'"},
+		{"YAML quoted bracket", "'[${{ secrets[''late_step_secret''] }}]'"},
+		{"YAML quoted expression literal", "'${{ ''secrets.FAKE_KEY'' }} ${{ secrets.LATE_STEP_SECRET }}'"},
+	}
 	for _, job := range []string{"agent", "safe_outputs"} {
 		for _, field := range []string{"setup-steps", "pre-steps"} {
-			t.Run(job+"/"+field, func(t *testing.T) {
-				source := fmt.Sprintf("---\non: workflow_dispatch\nengine: copilot\npermissions: {contents: read}\nsafe-outputs:\n  push-to-pull-request-branch:\n  threat-detection: false\njobs:\n  %s:\n    %s:\n      - name: Late credential binding\n        run: echo configured\n        env:\n          TOOL_CREDENTIAL: ${{ secrets.LATE_STEP_SECRET }}\n---\nPublic prompt.\n", job, field)
-				document, err := aw.Parse(source)
-				require.NoError(t, err)
-				compiler := NewCompiler(WithNoEmit(true))
-				data, err := compiler.ParseWorkflowDocument(document, filepath.Join(t.TempDir(), "protected.md"))
-				require.NoError(t, err)
-				content, err := compiler.CompileToYAML(data, "protected.md")
-				require.NoError(t, err)
-				var workflow struct {
-					Jobs map[string]struct {
-						Steps []struct {
-							ID  string            `yaml:"id"`
-							Env map[string]string `yaml:"env"`
-						} `yaml:"steps"`
-					} `yaml:"jobs"`
-				}
-				require.NoError(t, yaml.Unmarshal([]byte(content), &workflow))
-				found := 0
-				for _, step := range workflow.Jobs["safe_outputs"].Steps {
-					if step.ID != "process_safe_outputs" && step.ID != "redact_secrets" {
-						continue
+			for _, reference := range references {
+				t.Run(job+"/"+field+"/"+reference.name, func(t *testing.T) {
+					source := fmt.Sprintf("---\non: workflow_dispatch\nengine: copilot\npermissions: {contents: read}\nsafe-outputs:\n  push-to-pull-request-branch:\n  threat-detection: false\njobs:\n  %s:\n    %s:\n      - name: Late credential binding\n        run: echo configured\n        env:\n          TOOL_CREDENTIAL: %s\n---\nPublic prompt.\n", job, field, reference.expression)
+					document, err := aw.Parse(source)
+					require.NoError(t, err)
+					compiler := NewCompiler(WithNoEmit(true))
+					data, err := compiler.ParseWorkflowDocument(document, filepath.Join(t.TempDir(), "protected.md"))
+					require.NoError(t, err)
+					content, err := compiler.CompileToYAML(data, "protected.md")
+					require.NoError(t, err)
+					var workflow struct {
+						Jobs map[string]struct {
+							Steps []struct {
+								ID  string            `yaml:"id"`
+								Env map[string]string `yaml:"env"`
+							} `yaml:"steps"`
+						} `yaml:"jobs"`
 					}
-					found++
-					assert.Contains(t, step.Env["GH_AW_SECRET_NAMES"], "LATE_STEP_SECRET")
-					assert.Equal(t, "${{ secrets.LATE_STEP_SECRET }}", step.Env["SECRET_LATE_STEP_SECRET"])
-				}
-				assert.Equal(t, 2, found, "both producer and final redaction must receive the late-only secret")
-			})
+					require.NoError(t, yaml.Unmarshal([]byte(content), &workflow))
+					found := 0
+					for _, step := range workflow.Jobs["safe_outputs"].Steps {
+						if step.ID != "process_safe_outputs" && step.ID != "redact_secrets" {
+							continue
+						}
+						found++
+						assert.Contains(t, step.Env["GH_AW_SECRET_NAMES"], "LATE_STEP_SECRET")
+						assert.Equal(t, 1, strings.Count(step.Env["GH_AW_SECRET_NAMES"], "LATE_STEP_SECRET"))
+						assert.Equal(t, "${{ secrets.LATE_STEP_SECRET }}", step.Env["SECRET_LATE_STEP_SECRET"])
+						assert.NotContains(t, step.Env, "SECRET_late_step_secret")
+						assert.NotContains(t, step.Env, "SECRET_FAKE_KEY")
+					}
+					assert.Equal(t, 2, found, "both producer and final redaction must receive the late-only secret")
+				})
+			}
 		}
 	}
 }
@@ -54,14 +76,16 @@ func TestProtectedFileDiagnosticsCaptureLateJobStepSecrets(t *testing.T) {
 func TestProtectedFileDiagnosticsRequireProductionRedactionBindings(t *testing.T) {
 	compiler := NewCompiler()
 	compiler.jobManager = NewJobManager()
+	agentStep := appendEnvVarLine([]string{"      - name: Agent step", "        env:"},
+		"EXTRA", "[${{ secrets.AGENT_STEP_SECRET || 'fallback' }}]")
 	require.NoError(t, compiler.jobManager.AddJob(&Job{
 		Name:  string(constants.AgentJobName),
-		Env:   map[string]string{"OPAQUE": "${{ secrets.AGENT_OPAQUE_SECRET }}"},
-		Steps: []string{"      - name: Agent step\n        env:\n          EXTRA: ${{ secrets.AGENT_STEP_SECRET }}\n"},
+		Env:   map[string]string{"OPAQUE": "[${{ secrets[('agent_opaque_secret')] || 'fallback' }}]"},
+		Steps: []string{strings.Join(agentStep, "\n") + "\n"},
 	}))
 	data := &WorkflowData{
 		Name: "Protected filename diagnostics",
-		Env:  "env:\n  PRIVATE: ${{ secrets.GLOBAL_OPAQUE_SECRET }}\n",
+		Env:  "env:\n  PRIVATE: '[${{ secrets.GLOBAL_OPAQUE_SECRET || ''fallback'' }}]'\n",
 		SafeOutputs: &SafeOutputsConfig{
 			PushToPullRequestBranch: &PushToPullRequestBranchConfig{},
 			GitHubToken:             "${{ secrets.PUBLICATION_TOKEN }}",
@@ -90,7 +114,7 @@ func TestProtectedFileDiagnosticsRequireProductionRedactionBindings(t *testing.T
 func TestProtectedFileDiagnosticsUploadsFailClosedWithoutQueueOrMerge(t *testing.T) {
 	compiler := NewCompiler()
 	data := &WorkflowData{
-		Env:         "env:\n  PRIVATE: ${{ secrets.GLOBAL_OPAQUE_SECRET }}\n",
+		Env:         "env:\n  PRIVATE: '[${{ secrets[(''global_opaque_secret'')] || ''fallback'' }}]'\n",
 		SafeOutputs: &SafeOutputsConfig{PushToPullRequestBranch: &PushToPullRequestBranchConfig{}},
 	}
 	content := strings.Join(compiler.appendFinalSafeOutputSteps(data, []string{"      - name: Process Safe Outputs\n"}, ""), "")
@@ -113,4 +137,42 @@ func TestProtectedFileDiagnosticsUploadsFailClosedWithoutQueueOrMerge(t *testing
 	assert.NotContains(t, content, "/claims/")
 	assert.Contains(t, upload["with"].(map[string]any)["path"], "safe-output-outcomes.jsonl")
 	assert.Less(t, strings.Index(content, "id: redact_secrets"), strings.Index(content, "name: Upload Safe Outputs Items"))
+}
+
+func TestProtectedFileDiagnosticsSecretReviewInventory(t *testing.T) {
+	for _, value := range []string{
+		"'[${{ secrets.RESTRICTED || ''fallback'' }}]'",
+		"${{ secrets[('restricted')] }}",
+	} {
+		t.Run(value, func(t *testing.T) {
+			source := "---\non: workflow_dispatch\nengine: copilot\npermissions: {contents: read}\n" +
+				"jobs:\n  inventory_only:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo configured\n        env:\n          TOKEN: " + value +
+				"\n---\nPublic prompt.\n"
+			document, err := aw.Parse(source)
+			require.NoError(t, err)
+			path := filepath.Join(t.TempDir(), "review.md")
+			compiler := NewCompiler(WithNoEmit(true))
+			data, err := compiler.ParseWorkflowDocument(document, path)
+			require.NoError(t, err)
+			content, secrets, _, err := compiler.generateYAML(data, path)
+			require.NoError(t, err)
+			assert.NotContains(t, content, "SECRET_RESTRICTED:", "inventory must discover the original binding, not a redactor's synthetic reference")
+			assert.Contains(t, secrets, "RESTRICTED", "the generated body inventory must include the credential")
+			err = EnforceSafeUpdate(SafeUpdateOptions{
+				Manifest:    &GHAWManifest{Version: currentGHAWManifestVersion},
+				SecretNames: secrets,
+			})
+			require.ErrorContains(t, err, "RESTRICTED")
+
+			compiler = NewCompiler(WithNoEmit(true))
+			data, err = compiler.ParseWorkflowDocument(document, path)
+			require.NoError(t, err)
+			compiler.SetPriorManifests(map[string]*GHAWManifest{
+				strings.TrimSuffix(path, ".md") + ".lock.yml": {Version: currentGHAWManifestVersion},
+			})
+			require.NoError(t, compiler.CompileWorkflowData(data, path))
+			assert.Contains(t, strings.Join(compiler.GetSafeUpdateWarnings(), "\n"), "RESTRICTED",
+				"the compile lifecycle must surface the newly discovered secret for review")
+		})
+	}
 }

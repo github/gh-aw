@@ -41,6 +41,101 @@ type AuditProtectedFileDetection struct {
 	EvidencePath            string   `json:"evidence_path,omitempty"`
 }
 
+// resolveAuditProtectedFiles preserves replayed evidence while retrying incomplete
+// diagnostics when a local unified session becomes available.
+func resolveAuditProtectedFiles(run WorkflowRun, cached *AuditProtectedFiles) *AuditProtectedFiles {
+	if cached == nil {
+		return readAuditProtectedFiles(run)
+	}
+	if (!cached.Partial && len(cached.UnavailableRuns) == 0) || run.LogsPath == "" {
+		return cached
+	}
+	sessionPath, err := findUnifiedSessionPath(run.LogsPath)
+	if err != nil || sessionPath == "" {
+		return cached
+	}
+	return mergeAuditProtectedFileEvidence(cached, readAuditProtectedFiles(run))
+}
+
+func mergeAuditProtectedFileEvidence(cached, refreshed *AuditProtectedFiles) *AuditProtectedFiles {
+	merged := *cached
+	if merged.Workflow == "" {
+		merged.Workflow = refreshed.Workflow
+	}
+	if merged.WorkflowPath == "" {
+		merged.WorkflowPath = refreshed.WorkflowPath
+	}
+	if merged.Repository == "" {
+		merged.Repository = refreshed.Repository
+	}
+	merged.Files = append(slices.Clone(cached.Files), refreshed.Files...)
+	slices.Sort(merged.Files)
+	merged.Files = slices.Compact(merged.Files)
+	merged.Detections = []AuditProtectedFileDetection{}
+	seen := map[auditProtectedFileDetectionIdentity]struct{}{}
+	refreshedKeys := map[auditProtectedFileDetectionIdentity]struct{}{}
+	recordedRuns := map[int64]struct{}{}
+	for _, detection := range refreshed.Detections {
+		refreshedKeys[auditProtectedFileDetectionKey(detection)] = struct{}{}
+	}
+	// A complete parse supersedes prior partial coverage only if it includes
+	// every previously recorded decision and path.
+	supersedes := !refreshed.Partial
+	for _, detection := range cached.Detections {
+		_, exists := refreshedKeys[auditProtectedFileDetectionKey(detection)]
+		supersedes = supersedes && exists
+	}
+	for _, file := range cached.Files {
+		supersedes = supersedes && slices.Contains(refreshed.Files, file)
+	}
+	for _, detections := range [][]AuditProtectedFileDetection{cached.Detections, refreshed.Detections} {
+		for _, detection := range detections {
+			key := auditProtectedFileDetectionKey(detection)
+			if _, exists := seen[key]; !exists {
+				seen[key] = struct{}{}
+				merged.Detections = append(merged.Detections, detection)
+			}
+			recordedRuns[detection.RunID] = struct{}{}
+		}
+	}
+	merged.Partial = refreshed.Partial || (cached.Partial && !supersedes)
+	merged.UnavailableRuns = nil
+	for _, runs := range [][]int64{cached.UnavailableRuns, refreshed.UnavailableRuns} {
+		for _, runID := range runs {
+			if _, recorded := recordedRuns[runID]; !recorded {
+				merged.UnavailableRuns = append(merged.UnavailableRuns, runID)
+			}
+		}
+	}
+	slices.Sort(merged.UnavailableRuns)
+	merged.UnavailableRuns = slices.Compact(merged.UnavailableRuns)
+	return &merged
+}
+
+type auditProtectedFileDetectionIdentity struct {
+	RunID                   int64
+	Operation               string
+	Action                  string
+	Source                  string
+	Status                  string
+	Files                   string
+	FallbackUsed            bool
+	TargetPullRequestNumber int64
+	URL                     string
+}
+
+func auditProtectedFileDetectionKey(detection AuditProtectedFileDetection) auditProtectedFileDetectionIdentity {
+	detection.Files = slices.Clone(detection.Files)
+	slices.Sort(detection.Files)
+	detection.Files = slices.Compact(detection.Files)
+	return auditProtectedFileDetectionIdentity{
+		RunID: detection.RunID, Operation: detection.Operation, Action: detection.Action,
+		Source: detection.Source, Status: detection.Status, Files: fmt.Sprintf("%q", detection.Files),
+		FallbackUsed: detection.FallbackUsed, TargetPullRequestNumber: detection.TargetPullRequestNumber,
+		URL: detection.URL,
+	}
+}
+
 func readAuditProtectedFiles(run WorkflowRun) *AuditProtectedFiles {
 	workflow := run.WorkflowName
 	if run.WorkflowPath != "" {
@@ -269,6 +364,9 @@ func renderAuditProtectedFiles(w io.Writer, reports []*AuditProtectedFiles, mark
 		}
 		if len(report.UnavailableRuns) > 0 {
 			writeModelRoutingReportLine(w, "Protection paths not recorded for run(s): %s; absence is not proof that no files were blocked.\n", formatRunIDList(report.UnavailableRuns))
+		}
+		if report.Partial {
+			writeModelRoutingReportLine(w, "Protected-file audit evidence is incomplete; additional protection decisions may not be shown.\n")
 		}
 		if markdown {
 			writeModelRoutingReportLine(w, "\n")

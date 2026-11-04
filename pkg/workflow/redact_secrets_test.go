@@ -57,11 +57,97 @@ func TestCollectSecretReferences(t *testing.T) {
 			expected: []string{},
 		},
 		{
-			name: "Mixed case - only uppercase secrets",
+			name: "Mixed case secrets",
 			yaml: `env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   api_key: ${{ secrets.api_key }}`,
-			expected: []string{"GITHUB_TOKEN"},
+			expected: []string{"API_KEY", "GITHUB_TOKEN"},
+		},
+		{
+			name: "Literal bracket references and case insensitive identity",
+			yaml: `env:
+  FIRST: ${{ secrets['OPAQUE_SECRET'] }}
+  SECOND: ${{ SeCrEtS['opaque_secret'] }}
+  THIRD: ${{ SECRETS.Opaque_Secret }}
+  FOURTH: ${{ secrets [ 'Other_Secret' ] }}`,
+			expected: []string{"OPAQUE_SECRET", "OTHER_SECRET"},
+		},
+		{
+			name: "Whitespace grouping functions and fallback",
+			yaml: `env:
+  VALUE: ${{ format('{0}{1}', (secrets . api_key), secrets['fallback_key'] || secrets._private_key2) }}`,
+			expected: []string{"API_KEY", "FALLBACK_KEY", "_PRIVATE_KEY2"},
+		},
+		{
+			name: "Reference like text is not a secret",
+			yaml: `env:
+  TEXT: secrets.NOT_A_REFERENCE
+  VALUE: ${{ format('secrets.FAKE_KEY {0}', secrets.REAL_KEY) }}
+  LITERAL: ${{ 'secrets[''ALSO_FAKE'']' }}
+  NESTED: ${{ inputs.secrets.NOT_A_SECRET }}`,
+			expected: []string{"REAL_KEY"},
+		},
+		{
+			name: "Invalid names cannot inject emitted YAML or expressions",
+			yaml: `env:
+  DASH: ${{ secrets['BAD-NAME'] }}
+  DIGIT: ${{ secrets['1BAD'] }}
+  SPACE: ${{ secrets['BAD NAME'] }}
+  QUOTE: ${{ secrets['BAD''NAME'] }}
+  INJECTION: ${{ secrets['BAD }} ${{ secrets.INJECTED'] }}
+  UNICODE: ${{ secrets['évil'] }}
+  EMPTY: ${{ secrets[''] }}`,
+			expected: []string{},
+		},
+		{
+			name: "Computed references only expose static secret dependencies",
+			yaml: `env:
+  DYNAMIC: ${{ secrets[inputs.key] }}
+  STATIC: ${{ secrets[secrets.selector] }}`,
+			expected: []string{"SELECTOR"},
+		},
+		{
+			name: "YAML single quoted scalar",
+			yaml: `env:
+  TOKEN: '[${{ secrets.RESTRICTED || ''fallback'' }}]'`,
+			expected: []string{"RESTRICTED"},
+		},
+		{
+			name: "YAML escaped literal bracket reference",
+			yaml: `env:
+  TOKEN: '[${{ secrets[''restricted''] }}]'`,
+			expected: []string{"RESTRICTED"},
+		},
+		{
+			name: "YAML double quoted scalar",
+			yaml: `env:
+  TOKEN: "[${{ secrets.RESTRICTED || 'a\"b' }}]"`,
+			expected: []string{"RESTRICTED"},
+		},
+		{
+			name:     "JSON escaped scalar",
+			yaml:     `{"TOKEN":"[${{ secrets.RESTRICTED || 'a\"b' }}]"}`,
+			expected: []string{"RESTRICTED"},
+		},
+		{
+			name: "YAML folded expression",
+			yaml: `env:
+  TOKEN: >-
+    ${{ secrets.RESTRICTED ||
+        'fallback' }}`,
+			expected: []string{"RESTRICTED"},
+		},
+		{
+			name: "YAML decoded expression literal is not a reference",
+			yaml: `env:
+  TOKEN: '${{ ''secrets.NOT_REAL'' }}'`,
+			expected: []string{},
+		},
+		{
+			name: "Grouped literal bracket index",
+			yaml: `env:
+  TOKEN: ${{ secrets[((('restricted')))] }}`,
+			expected: []string{"RESTRICTED"},
 		},
 	}
 
@@ -80,6 +166,49 @@ func TestCollectSecretReferences(t *testing.T) {
 				if result[i] != expected {
 					t.Errorf("Expected secret[%d] = %s, got %s", i, expected, result[i])
 				}
+			}
+		})
+	}
+}
+
+func TestCollectSecretReferencesFragments(t *testing.T) {
+	got := CollectSecretReferences(
+		"env:\n  FIRST: '[${{ secrets.RESTRICTED || ''fallback'' }}]'\n",
+		"      - name: Configure\n        env:\n          SECOND: ${{ secrets[('OTHER')] }}\n",
+		"      - name: Incomplete\n        env:\n          THIRD: ${{ secrets.FRAGMENT }}\n        with: [",
+	)
+	want := []string{"FRAGMENT", "OTHER", "RESTRICTED"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("references = %v; want %v", got, want)
+	}
+}
+
+func TestSecretRedactionSerializedEnvBindings(t *testing.T) {
+	for _, value := range []string{
+		"[${{ secrets.RESTRICTED || 'fallback' }}]",
+		"[${{ secrets[('restricted')] }}]",
+	} {
+		t.Run(value, func(t *testing.T) {
+			source := strings.Join(appendEnvVarLine([]string{"      - name: Configure", "        env:"}, "TOKEN", value), "\n") + "\n"
+			var redaction strings.Builder
+			NewCompiler().generateSecretRedactionStep(&redaction, source, &WorkflowData{})
+			steps := parseGeneratedSteps(t, redaction.String())
+			if len(steps) != 1 {
+				t.Fatalf("Expected exactly one redaction step, got %d", len(steps))
+			}
+			env, ok := steps[0]["env"].(map[string]any)
+			if !ok || env["GH_AW_SECRET_NAMES"] != "RESTRICTED" || env["SECRET_RESTRICTED"] != "${{ secrets.RESTRICTED }}" {
+				t.Fatalf("Missing canonical redaction bindings: %#v", env)
+			}
+
+			var capture strings.Builder
+			capture.WriteString(source)
+			capture.WriteString("      - name: Capture\n        env:\n")
+			generateProtectedSessionCaptureEnv(&capture, &WorkflowData{
+				Env: "env:\n  OTHER: '[${{ secrets.OTHER || ''fallback'' }}]'\n",
+			})
+			if !strings.Contains(capture.String(), "GH_AW_SECRET_NAMES: 'OTHER,RESTRICTED'") {
+				t.Fatalf("Missing capture redaction bindings:\n%s", capture.String())
 			}
 		})
 	}

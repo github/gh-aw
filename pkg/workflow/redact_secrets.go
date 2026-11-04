@@ -1,19 +1,18 @@
 package workflow
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"maps"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/sliceutil"
+	yaml "go.yaml.in/yaml/v3"
 )
 
 var secretMaskingLog = logger.New("workflow:secret_masking")
-
-// secretsPrefix is the literal string used to locate secret references.
-// Pattern (informational): `secrets\.([A-Z][A-Z0-9_]*)`
-const secretsPrefix = "secrets."
 
 // actionReferencePattern is replaced by a fast string scan in CollectActionReferences.
 // Pattern (informational): `(?m)^\s+(?:-\s+)?uses:\s+(\S+)(?:\s+#\s*(.+?))?$`
@@ -27,42 +26,44 @@ func escapeSingleQuoteBackslash(s string) string {
 	return s
 }
 
-// CollectSecretReferences extracts all secret references from the workflow YAML
-// This scans for patterns like ${{ secrets.SECRET_NAME }} or secrets.SECRET_NAME
-func CollectSecretReferences(yamlContent string) []string {
-	secretMaskingLog.Printf("Scanning workflow YAML (%d bytes) for secret references", len(yamlContent))
-	secretsMap := make(map[string]struct {
-	})
-
-	// Walk through the content looking for every occurrence of "secrets."
-	// followed by an uppercase identifier [A-Z][A-Z0-9_]*.
-	rest := yamlContent
-	for {
-		idx := strings.Index(rest, secretsPrefix)
-		if idx == -1 {
-			break
+// CollectSecretReferences decodes YAML/JSON documents and scans their scalar values
+// for named secret references. Pass independently generated fragments separately.
+// Incomplete YAML fragments are still scanned as expression text, without guessing
+// at escaping. Decoded values should use ExtractSecretsFromValue instead.
+// Names are validated ASCII identifiers, canonicalized for case-insensitive secret
+// identity and safe emission as both environment keys and dotted references.
+func CollectSecretReferences(yamlContents ...string) []string {
+	secretsMap := make(map[string]struct{})
+	collectValue := func(value string) {
+		for name := range ExtractSecretsFromValue(value) {
+			secretsMap[strings.ToUpper(name)] = struct{}{}
 		}
-		// Advance past "secrets."
-		rest = rest[idx+len(secretsPrefix):]
-
-		// First character of the name must be an uppercase letter
-		if rest == "" || rest[0] < 'A' || rest[0] > 'Z' {
-			continue
+	}
+	var collectNode func(*yaml.Node)
+	collectNode = func(node *yaml.Node) {
+		if node.Kind == yaml.ScalarNode {
+			collectValue(node.Value)
 		}
-
-		// Consume [A-Z0-9_]* for the rest of the name
-		end := 1
-		for end < len(rest) {
-			c := rest[end]
-			if (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' {
-				end++
-			} else {
+		for _, child := range node.Content {
+			collectNode(child)
+		}
+	}
+	for _, content := range yamlContents {
+		secretMaskingLog.Printf("Scanning workflow YAML (%d bytes) for secret references", len(content))
+		decoder := yaml.NewDecoder(strings.NewReader(content))
+		for {
+			var document yaml.Node
+			err := decoder.Decode(&document)
+			if errors.Is(err, io.EOF) {
 				break
 			}
+			if err != nil {
+				secretMaskingLog.Printf("Scanning incomplete YAML fragment as expression text: %v", err)
+				collectValue(content)
+				break
+			}
+			collectNode(&document)
 		}
-		secretsMap[rest[:end]] = struct {
-		}{}
-		rest = rest[end:]
 	}
 
 	// Convert map to sorted slice for consistent ordering
@@ -79,8 +80,7 @@ func CollectSecretReferences(yamlContent string) []string {
 // Each entry includes the inline tag comment when present (e.g., "actions/checkout@sha # v4").
 func CollectActionReferences(yamlContent string) []string {
 	secretMaskingLog.Printf("Scanning workflow YAML (%d bytes) for action references", len(yamlContent))
-	actionsMap := make(map[string]struct {
-	})
+	actionsMap := make(map[string]struct{})
 
 	for line := range strings.SplitSeq(yamlContent, "\n") {
 		// Quick check: line must contain "uses:" to avoid scanning every character
@@ -91,7 +91,7 @@ func CollectActionReferences(yamlContent string) []string {
 
 		// Must start with whitespace — rejects bare top-level keys ("uses: action")
 		// or top-level list items like "- uses: action".
-		if line == "" || (line[0] != ' ' && line[0] != '\t') {
+		if !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t") {
 			continue
 		}
 
@@ -132,8 +132,7 @@ func CollectActionReferences(yamlContent string) []string {
 		if comment != "" {
 			entry = ref + " # " + comment
 		}
-		actionsMap[entry] = struct {
-		}{}
+		actionsMap[entry] = struct{}{}
 	}
 
 	actions := sliceutil.SortedKeys(actionsMap)
@@ -153,7 +152,7 @@ func (c *Compiler) generateSecretRedactionStep(yaml *strings.Builder, yamlConten
 	secretMaskingLog.Printf("Generating redaction step for %d secret(s)", len(secretReferences))
 	yaml.WriteString("      - name: Redact secrets in logs\n")
 	yaml.WriteString("        if: always()\n")
-	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data))
+	yaml.WriteString("        uses: " + getCachedActionPin("actions/github-script", data) + "\n")
 	yaml.WriteString("        with:\n")
 	yaml.WriteString("          script: |\n")
 
@@ -175,11 +174,11 @@ func (c *Compiler) generateSecretRedactionStep(yaml *strings.Builder, yamlConten
 
 		// Pass the list of secret names as a comma-separated string
 		// Escape each secret reference to prevent injection when embedding in YAML
-		escapedRefs := make([]string, len(secretReferences))
-		for i, ref := range secretReferences {
-			escapedRefs[i] = escapeSingleQuoteBackslash(ref)
+		escapedRefs := make([]string, 0, len(secretReferences))
+		for _, ref := range secretReferences {
+			escapedRefs = append(escapedRefs, escapeSingleQuoteBackslash(ref))
 		}
-		fmt.Fprintf(yaml, "          GH_AW_SECRET_NAMES: '%s'\n", strings.Join(escapedRefs, ","))
+		yaml.WriteString("          GH_AW_SECRET_NAMES: '" + strings.Join(escapedRefs, ",") + "'\n")
 
 		// Pass the actual secret values as environment variables so they can be redacted
 		// Each secret will be available as an environment variable
@@ -188,7 +187,7 @@ func (c *Compiler) generateSecretRedactionStep(yaml *strings.Builder, yamlConten
 			escapedSecretName := escapeSingleQuoteBackslash(secretName)
 			// Use original secretName in GitHub Actions expression since it's already validated
 			// to only contain safe characters (uppercase letters, numbers, underscores)
-			fmt.Fprintf(yaml, "          SECRET_%s: ${{ secrets.%s }}\n", escapedSecretName, secretName)
+			yaml.WriteString("          SECRET_" + escapedSecretName + ": ${{ secrets." + secretName + " }}\n")
 		}
 	}
 

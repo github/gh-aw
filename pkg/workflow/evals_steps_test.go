@@ -113,6 +113,13 @@ func TestEvalsDecisionsSecretRedaction(t *testing.T) {
 	assert.Contains(t, redaction, "SECRET_EVAL_PROMPT: ${{ secrets.EVAL_PROMPT }}")
 }
 
+func TestEvalsDecisionsSecretRedactionSerializedValues(t *testing.T) {
+	data := evalsTestData()
+	data.Evals.Model = "${{ secrets[('eval_model')] }}"
+	data.Evals.Questions[0].Question = `Does it use ${{ secrets.EVAL_PROMPT || 'a"b' }}?`
+	assert.Equal(t, []string{"EVAL_MODEL", "EVAL_PROMPT"}, NewCompiler().collectEvalsSecretReferences(data))
+}
+
 func TestEvalsDecisionsPermissions(t *testing.T) {
 	data := evalsTestData()
 	data.Permissions = "permissions:\n  contents: read\n  copilot-requests: write"

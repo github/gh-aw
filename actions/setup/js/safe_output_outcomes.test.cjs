@@ -257,6 +257,39 @@ describe("safe-output application outcomes", () => {
     expect(JSON.stringify(data)).not.toContain("PRIVATE");
   });
 
+  it("rejects all C0 and C1 control characters without dropping valid protection paths", () => {
+    const controls = Array.from({ length: 0xa0 }, (_, code) => code).filter(code => code <= 0x1f || code >= 0x7f);
+    const validFiles = [".github/after.yml", ".github/with\u0020space.yml", ".github/with\u007esymbol.yml", ".github/with\u00a0space.yml"];
+    const [outcome] = buildSafeOutputOutcomes([
+      {
+        type: "push_to_pull_request_branch",
+        success: false,
+        result: {
+          metadata: {
+            file_protection: {
+              action: "deny",
+              source: "protected",
+              files: [...controls.map(code => `.github/with${String.fromCharCode(code)}control.yml`), ...validFiles],
+            },
+          },
+        },
+      },
+    ]);
+    expect(outcome.file_protection).toEqual({ action: "deny", source: "protected", files: validFiles });
+    expect(projectSafeOutputData(outcome).file_protection).toEqual(outcome.file_protection);
+  });
+
+  it.each(["a", "é", "界", "😀"])("bounds protection paths in UTF-8 bytes for %s", character => {
+    for (const byteLength of [4095, 4096, 4097]) {
+      const characterBytes = Buffer.byteLength(character, "utf8");
+      const file = character.repeat(Math.floor(byteLength / characterBytes)) + "x".repeat(byteLength % characterBytes);
+      expect(Buffer.byteLength(file, "utf8")).toBe(byteLength);
+      const data = projectSafeOutputData({ file_protection: { action: "deny", files: [file, "after.yml"] } });
+      expect(data.file_protection).toEqual({ action: "deny", files: byteLength <= 4096 ? [file, "after.yml"].sort() : ["after.yml"] });
+      expect(projectSafeOutputData(data)).toEqual(data);
+    }
+  });
+
   it.each([null, "PRIVATE", [], { action: "PRIVATE", files: ["package.json"] }, { action: "deny", files: "PRIVATE" }])("omits malformed protection diagnostics %j", fileProtection => {
     expect(projectSafeOutputData({ type: "push_to_pull_request_branch", metadata: { file_protection: fileProtection, target_pull_request_number: -1, fallback_used: "PRIVATE" } })).toEqual({
       type: "push_to_pull_request_branch",
