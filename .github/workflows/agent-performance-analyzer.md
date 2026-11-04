@@ -79,7 +79,7 @@ evals:
 
 {{#runtime-import? .github/shared-instructions.md}}
 
-{{#if (eq experiments.prompt_compression "caveman")}}
+{{#if experiments.prompt_compression == 'caveman'}}
 # Agent Performance Analyzer - Meta-Orchestrator
 
 Analyze agent performance across repo. Be objective, data-driven, and actionable.

@@ -64,6 +64,8 @@ Content to include if expression is truthy
 
 The compiler automatically wraps expressions with `${{ }}` for GitHub Actions evaluation. For example, `{{#if github.event.issue.number}}` becomes `{{#if ${{ github.event.issue.number }} }}`.
 
+Comparisons require an operator, for example `{{#if experiments.reasoning_depth == 'iterative'}}`. Invalid expressions or active conditions in the main workflow or local runtime imports fail compilation; they do not disable substitution of other prompt expressions. Syntactically invalid implicit conditions inside code regions are treated as literal examples; valid conditions and explicit GitHub Actions expressions still receive bindings.
+
 **Falsy values:** `false`, `0`, `null`, `undefined`, `""` (empty string)
 **Truthy values:** Everything else
 
