@@ -5,6 +5,7 @@ const path = require("node:path");
 const http = require("node:http");
 const { sendSessionLogs } = require("./send_otlp_session_logs.cjs");
 const { encodeOTLPLogsRequest } = require("./otlp_protobuf.cjs");
+const { serializeSessionArtifact } = require("./session_artifact.cjs");
 const nativeFetch = globalThis.fetch;
 const traceId = "0123456789abcdef0123456789abcdef";
 const spanId = "0123456789abcdef";
@@ -63,6 +64,7 @@ describe("compact unified session OTLP logs", () => {
     { timestamp: "1700000000123000000", provenance: { timestampMs: 1700000000123 }, expected: "1700000000123000000" },
     { provenance: { timestampMs: 1700000000123 }, expected: "1700000000123000000" },
     { timestamp: "2026-10-20T19:00:00.123456789Z", provenance: { timestampMs: 1792522800123.4568 }, expected: "1792522800123456789" },
+    { timestamp: "1792522800123456789", provenance: { timestampMs: 1792522800123.4568 }, expected: "1792522800123456789" },
   ])("exports original event time separately from observation time: $timestamp / $provenance", async ({ timestamp, provenance, expected }) => {
     vi.spyOn(Date, "now").mockReturnValue(1800000000000);
     const source = { type: "usage.report", data: { aic: 0 }, ...(timestamp !== undefined ? { timestamp } : {}), ...(provenance ? { provenance } : {}) };
@@ -88,7 +90,7 @@ describe("compact unified session OTLP logs", () => {
     }
   );
 
-  it.each([-1, 8640000000000000, 8640000000000001])("does not reinterpret an out-of-range normalized clock %j in native timestamp units", async timestampMs => {
+  it.each([-1, 8640000000000000, 8640000000000001, 1e300])("does not reinterpret an out-of-range normalized clock %j in native timestamp units", async timestampMs => {
     write([{ type: "usage.report", timestamp: 1700000000, provenance: { timestampMs }, data: { aic: 0 } }]);
     await sendSessionLogs({ sessionPath });
     expect(records()[0]).not.toHaveProperty("timeUnixNano");
@@ -99,11 +101,30 @@ describe("compact unified session OTLP logs", () => {
     const timestamp = "2026-10-20T19:00:00Z";
     vi.stubEnv("GH_AW_SECRET_NAMES", "CLOCK");
     vi.stubEnv("SECRET_CLOCK", timestamp);
-    write([{ type: "usage.report", timestamp, provenance: { path: "PRIVATE", component: "usage" }, data: { aic: 1 } }]);
+    write([{ type: "usage.report", timestamp, provenance: { timestampMs: 1792522800000, path: "PRIVATE", component: "usage" }, data: { aic: 1 } }]);
     await sendSessionLogs({ sessionPath });
     expect(fetchMock.mock.calls[0][1].body).not.toContain(timestamp);
     expect(fetchMock.mock.calls[0][1].body).not.toContain("PRIVATE");
     expect(records()[0]).not.toHaveProperty("timeUnixNano");
+    expect(decode(records()[0].body).provenance).not.toHaveProperty("timestampMs");
+  });
+
+  it("suppresses merger-produced numeric clocks masked during publication", async () => {
+    const timestamp = "2026-10-20T19:00:00Z";
+    const event = { type: "usage.report", timestamp, provenance: { timestampMs: 1792522800000 }, data: { aic: 1 } };
+    fs.writeFileSync(sessionPath, serializeSessionArtifact([event], [timestamp]));
+    await sendSessionLogs({ sessionPath });
+    expect(fetchMock.mock.calls[0][1].body).not.toContain(timestamp);
+    expect(records()[0]).not.toHaveProperty("timeUnixNano");
+    expect(decode(records()[0].body).provenance).not.toHaveProperty("timestampMs");
+    expect(payload().resourceLogs[0].resource.attributes).toContainEqual({ key: "gh-aw.session.untimed_events", value: { intValue: 1 } });
+  });
+
+  it("does not fall back to a normalized clock derived from an impossible ISO date", async () => {
+    write([{ type: "usage.report", timestamp: "2026-02-29T19:00:00.123456789Z", provenance: { timestampMs: 1772391600123 }, data: { aic: 0 } }]);
+    await sendSessionLogs({ sessionPath });
+    expect(records()[0]).not.toHaveProperty("timeUnixNano");
+    expect(payload().resourceLogs[0].resource.attributes).toContainEqual({ key: "gh-aw.session.untimed_events", value: { intValue: 1 } });
   });
 
   it.each(["", "false", "TRUE", "1", "invalid"])("fails closed for opt-in value %j without reading the session", async value => {

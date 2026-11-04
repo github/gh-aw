@@ -33,8 +33,12 @@ function removeRunIdentity(event) {
  * @returns {string | undefined}
  */
 function eventTimeUnixNano(event) {
-  const isoTime = typeof event.timestamp === "string" ? sessionTimestampNs(event) : undefined;
-  const time = isoTime ?? (typeof event.provenance?.timestampMs === "number" ? sessionTimestampNs({ timestamp: event.provenance.timestampMs }) : sessionTimestampNs(event));
+  const timestamp = event.timestamp;
+  const isoTime = typeof timestamp === "string" ? sessionTimestampNs(event) : undefined;
+  const hasNormalizedClock = typeof event.provenance?.timestampMs === "number";
+  const exactNs = hasNormalizedClock && typeof timestamp === "string" ? sessionTimestampNs(event, "nanoseconds") : undefined;
+  const normalizedTime = hasNormalizedClock ? sessionTimestampNs({ timestamp: event.provenance.timestampMs }) : undefined;
+  const time = isoTime ?? exactNs ?? (typeof timestamp === "string" ? undefined : hasNormalizedClock ? normalizedTime : sessionTimestampNs(event));
   return time !== undefined && time >= 0n && time <= 18446744073709551615n ? time.toString() : undefined;
 }
 
