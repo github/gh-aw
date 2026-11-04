@@ -1675,3 +1675,20 @@ conclusion each run is low value.
   probing to a disposable sandbox repo with explicit re-authorization for
   real writes, or disable/archive the workflow -- rather than continuing to
   re-litigate the same blocker daily.
+
+## Run 2026-11-04: HALTED (74th consecutive run) -- ESCALATION ISSUE FILED
+
+- Re-derived the policy conflict from this run's own safe-outputs text (not just
+  memory). Next cells idx216-219 = tiny-shallow-single-xlarge-{clean-single,
+  clean-multi,clean-merge_msg,ahead-single}; idx216 alone = ~4 MB random-base64
+  draft PR on github/gh-aw purely to observe acceptance -> forbidden probing.
+- Steering #74686: 0 comments, no override.
+- NEW: prior 73 runs were noop-only and nothing reached maintainers (no open issue
+  tracked the halt; #51690/#51934/#52433 were bulk-closed 2026-10-04 in 2 s, no
+  comments). Filed ONE real diagnostic create_issue (not a probe):
+  "[git-sim] Sweep halted 74 runs: real probe PRs conflict with safe-outputs policy"
+  (run 41749209375). Body: blocker + policy quotes + mechanical constraints
+  (PR quota=1/run; push can't chain to same-run create) + coverage 216/3600.
+- FUTURE RUNS: do NOT re-file. Look up that issue (gh issue list --search
+  "Sweep halted in:title") and act only on a maintainer response there or a
+  `steer` comment; otherwise noop. next_index stays 216.
