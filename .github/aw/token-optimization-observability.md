@@ -18,10 +18,11 @@ Add workflow-level OpenTelemetry export so each run emits token and phase data t
 observability:
   otlp:
     endpoint: ${{ secrets.GH_AW_OTEL_ENDPOINT }}
-    headers: ${{ secrets.GH_AW_OTEL_HEADERS }}
+    headers:
+      Authorization: ${{ secrets.GH_AW_OTEL_AUTHORIZATION }}
 ```
 
-Setup, agent, and conclusion spans carry token usage attributes. See [Frontmatter syntax](syntax-agentic.md#agentic-workflow-specific-fields).
+Setup, agent, and conclusion spans carry token usage attributes. For protobuf encoding or opt-in session logs, see [Frontmatter syntax](syntax-agentic.md#agentic-workflow-specific-fields).
 
 When a `github-script` step needs a custom span, load the helper from the portable runner temporary directory:
 

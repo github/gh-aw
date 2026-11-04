@@ -46,7 +46,7 @@ Keywords expanding to curated domain lists:
 
 | Identifier | Runtime / Tool | Key Domains Enabled |
 |---|---|---|
-| `defaults` | Basic infrastructure | Certificate authorities, Ubuntu package verification, JSON schema |
+| `defaults` | Basic infrastructure (implicit when `network:` is omitted) | Certificate CRL/OCSP hosts, JSON schema, stock Ubuntu archive/keyserver only — no GitHub, engine, or package-registry hosts |
 | `github` | GitHub domains | `*.githubusercontent.com`, `codeload.github.com`, `docs.github.com` |
 | `github-actions` | GitHub Actions artifacts | Azure Blob storage for action caches and artifacts |
 | `node` | npm / yarn / pnpm | `registry.npmjs.org`, `npmjs.com`, `yarnpkg.com` |
@@ -63,7 +63,7 @@ Keywords expanding to curated domain lists:
 | `perl` | CPAN | `cpan.org`, `metacpan.org` |
 | `containers` | Docker / GHCR | `ghcr.io`, `registry.hub.docker.com`, `*.docker.io` |
 | `playwright` | Playwright browsers | `playwright.download.prss.microsoft.com`, `cdn.playwright.dev` |
-| `linux-distros` | apt / yum / apk | `deb.debian.org`, `security.debian.org`, Ubuntu/Alpine mirrors |
+| `linux-distros` | apt / yum / apk | Debian, Fedora, CentOS, Alpine, Arch, openSUSE mirrors, and third-party apt sources (`ppa.launchpad.net`, `packagecloud.io`, `api.snapcraft.io`, `packages.microsoft.com`, `packages.cloud.google.com`) |
 | `terraform` | HashiCorp | `releases.hashicorp.com`, `registry.terraform.io` |
 | `local` | Loopback addresses | `127.0.0.1`, `::1`, `localhost` |
 | `bazel` | Bazel build | `releases.bazel.build`, `bcr.bazel.build` |

@@ -180,7 +180,7 @@ Do not default every recurring or PR-reactive workflow to the same strategy. Bas
 See [workflow-constraints.md](workflow-constraints.md) for the read-only security posture. Specific to workflow creation:
 
 - Do not grant `issues: write`, `pull-requests: write`, or `contents: write` to the agent job.
-- When targeting the Copilot coding agent, recommend `permissions: { copilot-requests: write }` so Copilot can authenticate with `${{ github.token }}`.
+- For Copilot inference, recommend `permissions: { copilot-requests: write }` (scope and caveats: [syntax-core.md](syntax-core.md)).
 - If the user asks for direct writes, explain why the safe-output pattern is required.
 
 ### 4. Select tools

@@ -75,7 +75,7 @@ When `runs-on` is any value other than GitHub-hosted labels (`ubuntu-latest`, `u
 - Set `runs-on` explicitly (not inherited from imports); accepts string, array, or runner-group object. Framework jobs (activation, safe-outputs, unlock, etc.) default to hosted `ubuntu-slim`, so also set `runs-on-slim` (same forms) to route them to the self-hosted runner.
 - Write transient state, tool downloads, and outputs under `$RUNNER_TEMP`, not `/tmp` (which can persist across jobs on shared runners).
 - Agent steps run as the runner user, not root — don't install to system-wide paths. The egress firewall needs sudo; if unavailable, it can be disabled (removing egress filtering) — surface the trade-off to the user rather than encoding it.
-- Declare every outbound domain in `network.allowed` (keep `defaults` for core GitHub/Copilot/registry endpoints). Non-allow-listed domains are blocked when the firewall is enabled.
+- Declare every outbound domain in `network.allowed`; `defaults` covers only certificate, JSON-schema, and stock Ubuntu hosts, so add `github`, language ecosystems, or engine sets explicitly (see [network.md](network.md)). Non-allow-listed domains are blocked when the firewall is enabled.
 - Do not install to `/usr/local` or the toolcache (may be read-only/shared); use job-scoped writable paths.
 - Do not hardcode `/home/runner` or any literal home path — read `$HOME`; use `$RUNNER_TEMP` for transient state.
 - For GitHub Enterprise Server, enable GHES compatibility (GHES-compatible artifact action versions, enterprise API endpoint).
