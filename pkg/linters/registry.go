@@ -61,6 +61,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/seenmapbool"
 	"github.com/github/gh-aw/pkg/linters/slicemakezerolength"
 	"github.com/github/gh-aw/pkg/linters/sortslice"
+	splitindexzeroprefercut "github.com/github/gh-aw/pkg/linters/split-index-zero-prefer-cut"
 	"github.com/github/gh-aw/pkg/linters/sprintfbool"
 	"github.com/github/gh-aw/pkg/linters/sprintferrdot"
 	"github.com/github/gh-aw/pkg/linters/sprintferrorsnew"
@@ -172,6 +173,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	jsonmarshalignoredeerror.Analyzer,
 	lenstringzero.Analyzer,
 	lenstringsplit.Analyzer,
+	splitindexzeroprefercut.Analyzer,
 	timeafterleak.Analyzer,
 	timesleepnocontext.Analyzer,
 	timenowsub.Analyzer,

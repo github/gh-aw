@@ -64,6 +64,7 @@ This package currently provides custom Go analyzers in the following subpackages
 - `seenmapbool` — reports `map[string]bool` used as a set (values always `true`) that should use `map[string]struct{}` instead.
 - `slicemakezerolength` — reports zero-length slice allocations before known-size range loops that append exactly one element per iteration, where the range length provides a capacity hint.
 - `sortslice` — reports `sort.Slice` / `sort.SliceStable` calls that should use `slices.SortFunc` / `slices.SortStableFunc`.
+- `split-index-zero-prefer-cut` — reports `strings.Split(s, sep)[0]` expressions with a non-empty separator that allocate all substrings when `strings.Cut` would return the first part.
 - `sprintferrdot` — reports redundant `.Error()` calls on error values passed to `fmt` format functions where the fmt package calls `.Error()` automatically.
 - `sprintferrorsnew` — reports `errors.New(fmt.Sprintf(...))` calls that should use `fmt.Errorf` instead.
 - `sprintfbool` — reports `fmt.Sprintf("%t", b)` calls where `b` is a single bool value and suggests using `strconv.FormatBool(b)` instead.
@@ -150,7 +151,7 @@ returning a channel does not transfer ownership.
 
 Micro-optimizations flagged by allocation/perf linters (e.g. `stringsconcatloop`, `appendoneelement`,
 `appendbytestring`, `bytesbufferstring`, `bytescomparestring`, `lenstringsplit`, `mapclearloop`,
-`readerstringconv`, `reflectdeepequalusage`, `seenmapbool`, `slicemakezerolength`, `sortslice`, `stringbytesroundtrip`, `stringsjoinone`, `tolowerequalfold`, and
+`readerstringconv`, `reflectdeepequalusage`, `seenmapbool`, `slicemakezerolength`, `sortslice`, `split-index-zero-prefer-cut`, `stringbytesroundtrip`, `stringsjoinone`, `tolowerequalfold`, and
 `writebytestring`) only matter on hot paths: applying them to code that tests never execute adds
 churn without a measurable benefit. These linters consult the shared
 `pkg/linters/internal/coverage` package, which loads a Go coverage profile (produced by
@@ -209,6 +210,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `jsonmarshalignoredeerror` | Custom `go/analysis` analyzer that flags `json.Marshal`/`json.Unmarshal` calls where the error return is discarded |
 | `largefunc` | Custom `go/analysis` analyzer that flags large functions with actionable diagnostics |
 | `lenstringsplit` | Custom `go/analysis` analyzer that flags `len(strings.Split(s, sep))` with a non-empty separator that should use `strings.Count(s, sep)+1` |
+| `split-index-zero-prefer-cut` | Custom `go/analysis` analyzer that flags `strings.Split(s, sep)[0]` with a non-empty separator that should use `strings.Cut` |
 | `lenstringzero` | Custom `go/analysis` analyzer that flags `len(s) == 0` / `len(s) != 0` on string values that should use `s == ""` / `s != ""` |
 | `logfatallibrary` | Custom `go/analysis` analyzer that flags `log.Fatal`, `log.Fatalf`, and `log.Fatalln` calls in library packages where they implicitly call `os.Exit` and bypass deferred cleanup |
 | `mapclearloop` | Custom `go/analysis` analyzer that flags range-over-map loops that delete every entry and can be replaced with `clear(m)` |
@@ -364,6 +366,7 @@ _ = typeassertionnil.Analyzer
 - `github.com/github/gh-aw/pkg/linters/jsonmarshalignoredeerror` — json-marshal-ignored-error analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/largefunc` — large-func analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/lenstringsplit` — len-strings-split analyzer subpackage
+- `github.com/github/gh-aw/pkg/linters/split-index-zero-prefer-cut` — split-index-zero-prefer-cut analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/lenstringzero` — len-string-zero analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/logfatallibrary` — log-fatal-library analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/mapclearloop` — map-clear-loop analyzer subpackage

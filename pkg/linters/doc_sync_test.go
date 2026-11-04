@@ -53,6 +53,7 @@ var notYetEnforced = map[string]string{
 	"unchecked_deferredclose":     "existing deferred Close() findings need remediation before CI enforcement",
 	"uncheckedsliceindex":         "existing production violations need remediation before enforcement; nolint suppression already works",
 	"walkdirignoredeerror":        "existing discarded WalkDir errors in audit_threat_detection.go and model_routing.go need remediation before CI enforcement",
+	"splitindexzeroprefercut":     "new analyzer needs an enforcement-readiness audit (known finding in pkg/cli/edit_command.go) before CI enables it",
 }
 
 // TestDocGo_CountMatchesBullets validates that the "All N active analyzers:"
@@ -285,6 +286,8 @@ func docSlugToAnalyzerName(slug string) string {
 	switch slug {
 	case "panic-in-library-code":
 		return "panicinlibrarycode"
+	case "split-index-zero-prefer-cut":
+		return "splitindexzeroprefercut"
 	default:
 		return slug
 	}
