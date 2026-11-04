@@ -296,7 +296,9 @@ async function main({ deferredBindings = {}, authorExpressions = {} } = {}) {
       core.info(`Processing ${conditionalMatches.length} conditional template block(s)`);
 
       const beforeRendering = content.length;
-      content = renderMarkdownTemplate(content, restoreValues);
+      const resolveCondition = (/** @type {string} */ condition) =>
+        restoreValues(condition.replace(/__(GH_AW_[A-Z0-9_]+)__/g, (placeholder, key) => (Object.prototype.hasOwnProperty.call(process.env, key) ? protectValue(process.env[key] || "") : placeholder)));
+      content = renderMarkdownTemplate(content, resolveCondition);
       const afterRendering = content.length;
 
       core.info(`Template rendered successfully`);
