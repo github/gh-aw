@@ -2161,6 +2161,26 @@ Some content here.`;
   });
 
   describe("parseTokenUsageJsonl", () => {
+    test("keeps complete token aggregates separate from partial display totals", () => {
+      const summary = parseTokenUsageJsonl(
+        [
+          { input_tokens: 100, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 5 },
+          { input_tokens: 0, output_tokens: null, cache_read_tokens: 0 },
+        ]
+          .map(entry => JSON.stringify(entry))
+          .join("\n")
+      );
+      expect(summary.tokenUsage).toEqual({ input_tokens: 100, cache_read_tokens: 0 });
+      expect(summary.totalInputTokens).toBe(100);
+      expect(summary.totalOutputTokens).toBe(0);
+      expect(summary.totalCacheWriteTokens).toBe(5);
+    });
+
+    test("does not export an overflowing aggregate or synthesize missing categories", () => {
+      const summary = parseTokenUsageJsonl('{"input_tokens":1e308,"output_tokens":0,"cache_read_tokens":1e309}\n{"input_tokens":1e308,"output_tokens":0}');
+      expect(summary.tokenUsage).toEqual({ output_tokens: 0 });
+    });
+
     test.each([
       [{}, false],
       [{ input_tokens_include_cache: true }, false],

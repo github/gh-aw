@@ -2624,25 +2624,28 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   if (typeof aiCredits === "number") {
     usageAttrs.push(buildDoubleAttr("gh-aw.aic", aiCredits));
   }
-  if (typeof agentUsage.input_tokens === "number" && agentUsage.input_tokens > 0) {
+  if (typeof agentUsage.input_tokens === "number") {
     usageAttrs.push(buildAttr("gen_ai.usage.input_tokens", agentUsage.input_tokens));
   }
-  if (typeof agentUsage.output_tokens === "number" && agentUsage.output_tokens > 0) {
+  if (typeof agentUsage.output_tokens === "number") {
     usageAttrs.push(buildAttr("gen_ai.usage.output_tokens", agentUsage.output_tokens));
   }
-  if (typeof agentUsage.cache_read_tokens === "number" && agentUsage.cache_read_tokens > 0) {
+  if (typeof agentUsage.cache_read_tokens === "number") {
     usageAttrs.push(buildAttr("gen_ai.usage.cache_read.input_tokens", agentUsage.cache_read_tokens));
   }
-  if (typeof agentUsage.cache_write_tokens === "number" && agentUsage.cache_write_tokens > 0) {
+  if (typeof agentUsage.cache_write_tokens === "number") {
     usageAttrs.push(buildAttr("gen_ai.usage.cache_creation.input_tokens", agentUsage.cache_write_tokens));
   }
   // Emit gen_ai.usage.total_tokens as the sum of input and output so OTel GenAI
   // semantic-convention aggregations (e.g. sum(gen_ai.usage.total_tokens)) work
   // without per-backend normalization. Cache tokens are excluded from the total
   // to match the OpenTelemetry GenAI spec definition of "total tokens consumed".
-  const totalTokens = (typeof agentUsage.input_tokens === "number" ? agentUsage.input_tokens : 0) + (typeof agentUsage.output_tokens === "number" ? agentUsage.output_tokens : 0);
-  if (totalTokens > 0) {
-    usageAttrs.push(buildAttr("gen_ai.usage.total_tokens", totalTokens));
+  // A partial count is not a total; measured zero is distinct from unavailable.
+  if (typeof agentUsage.input_tokens === "number" && typeof agentUsage.output_tokens === "number") {
+    const totalTokens = agentUsage.input_tokens + agentUsage.output_tokens;
+    if (Number.isFinite(totalTokens)) {
+      usageAttrs.push(buildAttr("gen_ai.usage.total_tokens", totalTokens));
+    }
   }
 
   const endpoints = parseOTLPEndpoints();
