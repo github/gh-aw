@@ -18,6 +18,7 @@ const { projectSessionResult, observedSessionModel } = require("./agent_session.
 const { resolveEffectiveModel, resolveModelRoutingSummary } = require("./model_attribution.cjs");
 const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
 const { readEvalsNotEvaluatedStatus } = require("./evals_status.cjs");
+const { MAX_OTLP_RESPONSE_BYTES, readOTLPResponse, inspectOTLPResponse, unavailableOTLPResponse } = require("./otlp_response.cjs");
 
 function getGhAwPath(relativePath) {
   const root = (process.env.GH_AW_TMP_DIR || "").trim() || "/tmp/gh-aw";
@@ -947,11 +948,11 @@ function hasProxyConfigured(endpoint) {
  * @param {string} url
  * @param {Record<string, string>} headers
  * @param {string | Buffer} body
- * @returns {{ ok: boolean, status: number, statusText: string }}
+ * @returns {{ ok: boolean, status: number, statusText: string, responseBody: Buffer, contentType: string, diagnosticsUnavailable: boolean }}
  */
 function sendOTLPViaCurl(url, headers, body) {
   /** @type {string[]} */
-  const args = ["--silent", "--show-error", "--location", "--output", "/dev/null", "--write-out", "%{http_code}", "--request", "POST", "--data-binary", "@-"];
+  const args = ["--silent", "--show-error", "--location", "--max-filesize", String(MAX_OTLP_RESPONSE_BYTES), "--write-out", "\n%{http_code}\n%{content_type}", "--request", "POST", "--data-binary", "@-"];
 
   for (const [key, value] of Object.entries(headers)) {
     args.push("--header", `${key}: ${value}`);
@@ -959,29 +960,42 @@ function sendOTLPViaCurl(url, headers, body) {
   args.push(url);
 
   const result = childProcess.spawnSync("curl", args, {
-    encoding: "utf8",
     input: body,
-    maxBuffer: 1024 * 1024,
+    maxBuffer: MAX_OTLP_RESPONSE_BYTES + 4096,
     timeout: 15_000,
   });
 
-  if (result.error) {
+  const bufferOverflow = result.error && "code" in result.error && result.error.code === "ENOBUFS";
+  if (result.error && !bufferOverflow) {
     throw result.error;
   }
 
-  const status = Number.parseInt((result.stdout || "").trim(), 10);
+  const output = Buffer.from(result.stdout || "");
+  const typeIndex = output.lastIndexOf("\n");
+  const statusIndex = output.lastIndexOf("\n", typeIndex - 1);
+  const status = Number.parseInt(output.subarray(statusIndex + 1, typeIndex < 0 ? undefined : typeIndex).toString(), 10);
+  const diagnostics = {
+    responseBody: statusIndex < 0 ? Buffer.alloc(0) : output.subarray(0, statusIndex),
+    contentType: typeIndex < 0 ? "" : output.subarray(typeIndex + 1).toString(),
+    diagnosticsUnavailable: result.status !== 0,
+  };
+  // An oversized proxy response may have already accepted records. Never
+  // resend it merely because curl could not capture its diagnostics.
+  if (bufferOverflow) return { ok: true, status: 0, statusText: "", ...diagnostics, diagnosticsUnavailable: true };
   if (Number.isInteger(status)) {
     return {
       ok: status >= 200 && status < 300,
       status,
-      statusText: result.status === 0 ? "OK" : (result.stderr || "curl failed").trim() || "curl failed",
+      statusText: result.status === 0 ? "OK" : (result.stderr || "curl failed").toString().trim() || "curl failed",
+      ...diagnostics,
     };
   }
 
   return {
     ok: false,
     status: 0,
-    statusText: (result.stderr || "curl failed").trim() || "curl failed",
+    statusText: (result.stderr || "curl failed").toString().trim() || "curl failed",
+    ...diagnostics,
   };
 }
 
@@ -1309,6 +1323,19 @@ async function sendOTLPSpan(endpoint, payload, { maxRetries = 2, baseDelayMs = 1
             signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
           });
       if (response.ok) {
+        let diagnostic;
+        try {
+          const bytes = "responseBody" in response ? response.responseBody : await readOTLPResponse(response.body);
+          const contentType = "contentType" in response ? response.contentType : response.headers?.get("content-type") || "";
+          if ("diagnosticsUnavailable" in response && response.diagnosticsUnavailable) throw new Error("Response unavailable");
+          diagnostic = inspectOTLPResponse(bytes, contentType, protocol, signal);
+        } catch {
+          diagnostic = unavailableOTLPResponse(signal);
+        }
+        if (diagnostic.reason) {
+          console.warn(diagnostic.reason);
+          if (diagnostic.error) recordOTLPExportError({ endpoint, status: response.status, reason: diagnostic.reason });
+        }
         return;
       }
       const reason = getOTLPExportFailureReason(response);
