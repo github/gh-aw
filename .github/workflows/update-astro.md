@@ -72,7 +72,7 @@ jobs:
         working-directory: ./docs
         run: |
           ncu_output="$(mktemp)"
-          npx --yes npm-check-updates --jsonUpgraded >"$ncu_output" 2>/dev/null || true
+          npx --yes npm-check-updates --jsonUpgraded --cooldown 3 >"$ncu_output" 2>/dev/null || true
 
           if [ -s "$ncu_output" ] && [ "$(tr -d '[:space:]' <"$ncu_output")" != "{}" ]; then
             echo "has_updates=true" >> "$GITHUB_OUTPUT"
@@ -114,10 +114,10 @@ You are an automated dependency updater for the `docs/` Astro site. Your job is 
 
 ### 1. Update Dependencies
 
-Navigate to the docs folder and run npm-check-updates to update all packages to their latest versions:
+Navigate to the docs folder and run npm-check-updates to update all packages to the latest versions that have been published for at least three days. Apply the cooldown to every dependency update so recently published versions are skipped:
 
 ```bash
-cd docs && npx --yes npm-check-updates --upgrade
+cd docs && npx --yes npm-check-updates --upgrade --cooldown 3
 ```
 
 This updates `package.json` with the latest versions. Then install the updated dependencies:
