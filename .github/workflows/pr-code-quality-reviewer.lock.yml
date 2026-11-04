@@ -783,11 +783,11 @@ jobs:
           name: activation
           path: /tmp/gh-aw
       - name: Write comment-memory configuration
+        env:
+          GH_AW_EARLY_COMMENT_MEMORY_CONFIG: "{\"comment_memory\":{\"max\":1,\"memory_id\":\"pr-code-quality-reviewer\"}}"
         run: |
           mkdir -p "${RUNNER_TEMP}/gh-aw/safeoutputs"
-          cat > "${RUNNER_TEMP}/gh-aw/safeoutputs/config.json" << 'GH_AW_COMMENT_MEMORY_CONFIG_bd68be2e7d1bda6c_EOF'
-          {"comment_memory":{"max":1,"memory_id":"pr-code-quality-reviewer"}}
-          GH_AW_COMMENT_MEMORY_CONFIG_bd68be2e7d1bda6c_EOF
+          printf '%s\n' "$GH_AW_EARLY_COMMENT_MEMORY_CONFIG" > "${RUNNER_TEMP}/gh-aw/safeoutputs/config.json"
       - name: Prepare comment memory files
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
