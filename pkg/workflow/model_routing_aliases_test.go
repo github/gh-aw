@@ -122,7 +122,6 @@ var copilotSmallPatterns = []string{
 	"github-copilot/gpt-5*mini*",
 	"github-copilot/gpt-5*nano*",
 	"github-copilot/gemini-*flash*lite*",
-	"github-copilot/gpt-*-luna",
 }
 
 func TestRoutingAllowedModelsExpandsCopilotAliases(t *testing.T) {
@@ -183,7 +182,7 @@ func TestRoutingAllowedModelsScopesAliasesAcrossEngines(t *testing.T) {
 		{name: "copilot", engine: "copilot", models: "[small, sonnet]", want: append(append([]string{}, copilotSmallPatterns...), "github-copilot/*sonnet*")},
 		{name: "pi", engine: "pi", models: "[small, sonnet]", want: append(append([]string{}, copilotSmallPatterns...), "github-copilot/*sonnet*")},
 		{name: "claude keeps Claude models", engine: "claude", provider: "github", models: "[small, sonnet]", want: []string{"github-copilot/claude-*haiku*", "github-copilot/claude-*sonnet*"}},
-		{name: "codex keeps GPT models", engine: "codex", provider: "github", models: "[small, gpt-5.6-luna]", want: []string{"github-copilot/gpt-5*mini*", "github-copilot/gpt-5*nano*", "github-copilot/gpt-*-luna", "github-copilot/gpt-5.6-luna"}},
+		{name: "codex keeps GPT models", engine: "codex", provider: "github", models: "[small, gpt-5.6-luna]", want: []string{"github-copilot/gpt-5*mini*", "github-copilot/gpt-5*nano*", "github-copilot/gpt-5.6-luna"}},
 		{name: "codex rejects Sonnet", engine: "codex", provider: "github", models: "[sonnet]", wantError: `alias "sonnet" has no models compatible with Codex's Responses API`},
 		{name: "claude family validation still applies to exact ids", engine: "claude", provider: "github", models: "[small, gpt-5.6-luna]", wantError: "native Messages API"},
 	} {
@@ -199,13 +198,13 @@ func TestRoutingAllowedModelsScopesAliasesAcrossEngines(t *testing.T) {
 }
 
 func TestRoutingAllowedModelsReportsFullyBlockedAlias(t *testing.T) {
-	blockSmall := "models:\n  blocked: [\"*haiku*\", \"gpt-5*\", \"gemini-*\", \"gpt-*-luna\"]\n"
+	blockSmall := "models:\n  blocked: [\"*haiku*\", \"gpt-5*\", \"gemini-*\"]\n"
 	compiled := compileRoutedAliasWorkflow(t, "copilot", "", "[small]", blockSmall)
 	require.ErrorContains(t, compiled.err, "all engine.model-routing.allowed-models are excluded by models.allowed or models.blocked policy")
 	require.ErrorContains(t, compiled.err, "excluded: small")
 
 	t.Run("other candidates remain", func(t *testing.T) {
-		data := routedPolicyWorkflowData("copilot", "", nil, []string{"*haiku*", "gpt-5*", "gemini-*", "gpt-*-luna"}, []string{"small", "claude-sonnet-5"})
+		data := routedPolicyWorkflowData("copilot", "", nil, []string{"*haiku*", "gpt-5*", "gemini-*"}, []string{"small", "claude-sonnet-5"})
 		candidates, excluded, err := intersectModelRoutingPolicy(mustRoutingGroups(t, data, "copilot"), nil, data.ModelPolicyBlocked, false)
 		require.NoError(t, err)
 		require.Equal(t, []string{"github-copilot/claude-sonnet-5"}, candidates)
@@ -247,14 +246,14 @@ func TestRoutingAllowedModelsIntersectsExpandedPolicy(t *testing.T) {
 			name:        "wildcard allow rule covering alias patterns keeps them",
 			models:      "[small]",
 			policy:      "models:\n  allowed: [\"gpt-5*\"]\n",
-			want:        []string{"github-copilot/*haiku*", "github-copilot/gpt-5*mini*", "github-copilot/gpt-5*nano*", "github-copilot/gpt-*-luna"},
+			want:        []string{"github-copilot/*haiku*", "github-copilot/gpt-5*mini*", "github-copilot/gpt-5*nano*"},
 			wantAllowed: []any{"gpt-5*"},
 		},
 		{
 			name:           "partial block keeps the alias pattern for AWF to filter",
 			models:         "[small, sonnet]",
 			policy:         "models:\n  blocked: [claude-haiku-4.5, \"gpt-5*nano*\"]\n",
-			want:           []string{"github-copilot/*haiku*", "github-copilot/gpt-5*mini*", "github-copilot/gemini-*flash*lite*", "github-copilot/gpt-*-luna", "github-copilot/*sonnet*"},
+			want:           []string{"github-copilot/*haiku*", "github-copilot/gpt-5*mini*", "github-copilot/gemini-*flash*lite*", "github-copilot/*sonnet*"},
 			wantDisallowed: []any{"claude-haiku-4.5", "gpt-5*nano*"},
 		},
 		{
@@ -308,7 +307,7 @@ func TestRoutingAllowedModelsRejectsUnknownName(t *testing.T) {
 func TestRoutingModelConfigRecordsAuthoredAndExpandedCandidates(t *testing.T) {
 	compiled := compileRoutedAliasWorkflow(t, "copilot", "", "[gpt-5.6-luna, small, sonnet]", "models:\n  blocked: [\"gpt-5*nano*\", \"gemini-*\"]\n")
 	emitted := compiled.candidates(t)
-	require.Equal(t, []string{"github-copilot/gpt-5.6-luna", "github-copilot/*haiku*", "github-copilot/gpt-5*mini*", "github-copilot/gpt-*-luna", "github-copilot/*sonnet*"}, emitted)
+	require.Equal(t, []string{"github-copilot/gpt-5.6-luna", "github-copilot/*haiku*", "github-copilot/gpt-5*mini*", "github-copilot/*sonnet*"}, emitted)
 
 	var compiledConfig map[string]any
 	require.NoError(t, json.Unmarshal([]byte(compiled.infoEnv["GH_AW_INFO_MODEL_CONFIG"]), &compiledConfig))
@@ -461,8 +460,8 @@ func TestRoutingAllowedModelsPolicyProviderAliasesAndCase(t *testing.T) {
 	}{
 		{name: "github/ allow rule", models: "[small]", policy: "models:\n  allowed: [github/gpt-5.4-mini]\n", want: []string{"github-copilot/gpt-5.4-mini"}},
 		{name: "mixed-case provider allow rule", models: "[small]", policy: "models:\n  allowed: [GitHub-Copilot/claude-haiku-4.5]\n", want: []string{"github-copilot/claude-haiku-4.5"}},
-		{name: "github/ block rule", models: "[small, sonnet]", policy: "models:\n  blocked: [\"github/*haiku*\"]\n", want: []string{"github-copilot/gpt-5*mini*", "github-copilot/gpt-5*nano*", "github-copilot/gemini-*flash*lite*", "github-copilot/gpt-*-luna", "github-copilot/*sonnet*"}},
-		{name: "mixed-case allow rule", models: "[small]", policy: "models:\n  allowed: [\"GPT-5*\"]\n", want: []string{"github-copilot/*haiku*", "github-copilot/gpt-5*mini*", "github-copilot/gpt-5*nano*", "github-copilot/gpt-*-luna"}},
+		{name: "github/ block rule", models: "[small, sonnet]", policy: "models:\n  blocked: [\"github/*haiku*\"]\n", want: []string{"github-copilot/gpt-5*mini*", "github-copilot/gpt-5*nano*", "github-copilot/gemini-*flash*lite*", "github-copilot/*sonnet*"}},
+		{name: "mixed-case allow rule", models: "[small]", policy: "models:\n  allowed: [\"GPT-5*\"]\n", want: []string{"github-copilot/*haiku*", "github-copilot/gpt-5*mini*", "github-copilot/gpt-5*nano*"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			compiled := compileRoutedAliasWorkflow(t, "copilot", "", tc.models, tc.policy)

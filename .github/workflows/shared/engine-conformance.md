@@ -17,7 +17,7 @@ safe-outputs:
   activation-comments: false
   report-failure-as-issue: false
   report-failed-jobs: false
-  missing-tool:
+  report-missing-tool:
     create-issue: false
   noop:
     report-as-issue: false

@@ -444,6 +444,14 @@ describe("built-in detection alias selection", () => {
     expect(await resolveDetection(["gpt-5.6-luna-utility", "gpt-6-luna-decisions", "claude-sonnet-5"])).toBe("claude-sonnet-5");
   });
 
+  it("falls back to the small-agent tier when no small or Luna model is available", async () => {
+    expect(await resolveDetection(["gemini-3.8-flash", "claude-sonnet-5", "gpt-5.6-sol"])).toBe("gemini-3.8-flash");
+  });
+
+  it("selects Luna when Haiku, GPT-5 Mini/Nano and Gemini Flash Lite are absent", async () => {
+    expect(await resolveDetection(["gpt-5.6-luna", "gemini-3.8-flash", "claude-sonnet-5"])).toBe("gpt-5.6-luna");
+  });
+
   it("keeps an explicit GH_AW_MODEL_DETECTION_COPILOT override", async () => {
     expect(await resolveDetection(CLI_CLI_CATALOG, { GH_AW_MODEL_DETECTION_COPILOT: "gpt-5.3-codex" })).toBe("gpt-5.3-codex");
   });

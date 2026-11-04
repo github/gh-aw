@@ -4,7 +4,9 @@ tools:
     key: agentdb-${{ env.GH_AW_WORKFLOW_ID_SANITIZED }}
 steps:
   - name: Ensure AgentDB cache path
-    run: mkdir -p "/tmp/gh-aw/cache-memory/agentdb-${{ env.GH_AW_WORKFLOW_ID_SANITIZED }}"
+    run: mkdir -p "/tmp/gh-aw/cache-memory/agentdb-$GH_AW_ENV_GH_AW_WORKFLOW_ID_SANITIZED"
+    env:
+      GH_AW_ENV_GH_AW_WORKFLOW_ID_SANITIZED: ${{ env.GH_AW_WORKFLOW_ID_SANITIZED }}
 mcp-servers:
   agentdb:
     command: "npx"

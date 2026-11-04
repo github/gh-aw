@@ -49,7 +49,7 @@ safe-outputs:
     reviewers: copilot
     draft: false
   push-to-pull-request-branch:
-  missing-tool:
+  report-missing-tool:
 steps:
   - name: Setup Node.js
     uses: actions/setup-node@v7.1.0

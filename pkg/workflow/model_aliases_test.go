@@ -83,7 +83,7 @@ func TestBuiltinModelAliases(t *testing.T) {
 	assert.Equal(t, []string{"copilot/*grok*", "openai/*grok*"}, aliases["grok"], "grok should map to copilot and openai grok patterns")
 
 	// Meta-aliases reference other alias names (resolved recursively by AWF).
-	assert.Equal(t, []string{"haiku", "gpt-5-mini", "gpt-5-nano", "gemini-flash-lite", "copilot/gpt-*-luna", "openai/gpt-*-luna"}, aliases["mini"], "mini should prefer haiku, gpt-5-mini, gpt-5-nano, and gemini-flash-lite before falling back to Luna-tier models")
+	assert.Equal(t, []string{"haiku", "gpt-5-mini", "gpt-5-nano", "gemini-flash-lite"}, aliases["mini"], "mini should reference haiku, gpt-5-mini, gpt-5-nano, and gemini-flash-lite")
 	assert.Equal(t, []string{"haiku", "gpt-5-mini", "gemini-flash-lite", "mini"}, aliases["summarization"], "summarization should reference fast/lightweight models")
 	assert.Equal(t, []string{"copilot/gpt-6*", "openai/gpt-6*"}, aliases["gpt-6"], "gpt-6 should map to copilot/openai gpt-6 family")
 	assert.Equal(t, []string{"sonnet", "gpt-6", "gpt-5-pro", "gpt-5", "gemini-pro"}, aliases["large"], "large should list sonnet-range pricing models including gpt-6")
@@ -94,7 +94,7 @@ func TestBuiltinModelAliases(t *testing.T) {
 	assert.Equal(t, []string{"copilot/*", "anthropic/*", "openai/*", "google/*", "gemini/*"}, aliases["any"], "any should provide a provider-wide catch-all fallback chain")
 	assert.Equal(t, []string{"sonnet-6x", "gpt-6", "gpt-5.4", "gpt-5.5", "gpt-5.6", "gpt-5.3", "gemini-pro", "any"}, aliases["agent"], "agent should default to the configured high-capability fallback chain before any-model fallback")
 	assert.Equal(t, []string{"haiku", "gpt-5-mini", "gemini-flash"}, aliases["small-agent"], "small-agent should default to the small/fast model fallback chain")
-	assert.Equal(t, []string{"small", "small-agent", "agent"}, aliases["detection"], "detection should prefer small models and fall back to small-agent then agent")
+	assert.Equal(t, []string{"small", "copilot/gpt-*-luna", "openai/gpt-*-luna", "small-agent", "agent"}, aliases["detection"], "detection should prefer small models, then Luna-tier models, then small-agent and agent")
 	assert.Equal(t, []string{"copilot/gpt-6-luna-decisions"}, aliases["evals"], "evals should use a Decisions-compatible model")
 	assert.Equal(t, []string{"agent"}, aliases["copilot"], "copilot should define per-engine default fallback chain")
 	assert.Equal(t, []string{"agent"}, aliases["claude"], "claude should define per-engine default fallback chain")

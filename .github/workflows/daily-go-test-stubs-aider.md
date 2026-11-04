@@ -36,7 +36,7 @@ safe-outputs:
     title-prefix: "[aider] "
     labels: [automation, testing]
     draft: false
-  missing-tool:
+  report-missing-tool:
 timeout-minutes: 30
 imports:
   - shared/aider.md

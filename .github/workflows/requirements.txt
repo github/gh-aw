@@ -1,3 +1,7 @@
+/tmp/gh-aw/python/venv/bin/python
+/tmp/gh-aw/token-audit/site-packages
+\"$VENV/bin/python3\"
 markitdown-mcp
 numpy
 scikit-learn
+yamllint==1.38.0

@@ -39,7 +39,7 @@ safe-outputs:
     max: 1
     close-older-issues: true
     close-older-key: daily-spec-coverage-kiro
-  missing-tool:
+  report-missing-tool:
 timeout-minutes: 20
 imports:
   - shared/otlp.md

@@ -120,7 +120,7 @@ func TestModelRoutingNativeAllowedModelsAndAliases(t *testing.T) {
 		{name: "exact native OpenAI id", engine: "codex", models: "[gpt-5.4]", want: []string{"gpt-5.4"}},
 		{name: "matching OpenAI qualification is normalized", engine: "codex", models: "[openai/gpt-5.4]", want: []string{"gpt-5.4"}},
 		{name: "Codex rejects Anthropic qualification", engine: "codex", models: "[anthropic/claude-sonnet-5]", wantError: `provider "anthropic" differs from the native "openai" provider`},
-		{name: "Codex small alias stays in the GPT family", engine: "codex", models: "[small]", want: []string{"gpt-5*mini*", "gpt-5*nano*", "gpt-*-luna"}},
+		{name: "Codex small alias stays in the GPT family", engine: "codex", models: "[small]", want: []string{"gpt-5*mini*", "gpt-5*nano*"}},
 		{name: "OpenAI exact id wins over alias of the same name", engine: "codex", models: "[gpt-5-mini]", want: []string{"gpt-5-mini"}},
 		{name: "Codex rejects Sonnet alias", engine: "codex", models: "[sonnet]", wantError: `alias "sonnet" has no models compatible with Codex's Responses API`},
 		{name: "Claude family validation applies to exact ids", engine: "claude", models: "[gpt-5.4]", wantError: "native Messages API"},

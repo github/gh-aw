@@ -53,7 +53,7 @@ safe-outputs:
     max: 1
     close-older-issues: true
     close-older-key: daily-regression-audit-kiro
-  missing-tool:
+  report-missing-tool:
 timeout-minutes: 25
 imports:
   - shared/otlp.md
