@@ -200,6 +200,69 @@ func TestCustomJobDetectionStatusOnlyMustBeLeaf(t *testing.T) {
 	assert.True(t, found, "expected dependent custom jobs to invalidate status-only opt-in")
 }
 
+func TestCustomJobDetectionStatusOnlyCompiledPreAgentOutputs(t *testing.T) {
+	for _, tt := range []struct {
+		name, agentNeeds, producerNeeds string
+		allowed, generated              bool
+	}{
+		{"pre-agent", "[activation, eligibility]", "[]", true, false},
+		{"before activation", "activation", "[]", true, false},
+		{"parallel", "activation", "[]", false, false},
+		{"post-agent", "activation", "agent", false, false},
+		{"post-detection", "activation", "detection", false, false},
+		{"generated pre-agent", "[activation, eligibility]", "[]", false, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			source := "jobs:\n" +
+				"  eligibility:\n    needs: " + tt.producerNeeds + "\n    runs-on: ubuntu-latest\n    steps: [{run: echo metadata}]\n" +
+				"  report:\n    needs: [eligibility, agent, detection]\n    detection-gate: status-only\n    if: always()\n" +
+				"    runs-on: ubuntu-latest\n    steps:\n      - env:\n          PR: ${{ needs.eligibility.outputs.pr_number }}\n        run: echo \"$PR\"\n"
+			authored := source
+			if tt.generated {
+				authored = "jobs:\n  report:\n" + strings.SplitN(source, "  report:\n", 2)[1]
+			}
+			document, err := aw.Parse("---\nsafe-outputs:\n  create-issue:\n" + authored + "---\nPrompt\n")
+			require.NoError(t, err)
+			activationNeeds := ""
+			if tt.name == "before activation" {
+				activationNeeds = "    needs: eligibility\n"
+			}
+			compiled := "jobs:\n" +
+				"  activation:\n" + activationNeeds + "    runs-on: ubuntu-latest\n    steps: [{run: echo activation}]\n" +
+				"  agent:\n    needs: " + tt.agentNeeds + "\n    runs-on: ubuntu-latest\n    steps: [{run: echo agent}]\n" +
+				"  detection:\n    needs: agent\n    runs-on: ubuntu-latest\n    steps: [{run: echo detection}]\n" +
+				strings.TrimPrefix(source, "jobs:\n")
+			workflow, err := actions.Parse([]byte(strings.ReplaceAll(compiled, "    detection-gate: status-only\n", "")))
+			require.NoError(t, err)
+			runner, err := Default().Select("custom-job-detection")
+			require.NoError(t, err)
+			diagnostics, err := runner.Run(context.Background(), Input{Document: document, Workflow: workflow})
+			require.NoError(t, err)
+			if tt.allowed {
+				assert.Empty(t, diagnostics)
+				return
+			}
+			assert.Condition(t, func() bool {
+				for _, diagnostic := range diagnostics {
+					if diagnostic.Path == "jobs.report.steps[0].env.PR" && strings.Contains(diagnostic.Message, "needs.eligibility.outputs") {
+						return true
+					}
+				}
+				return false
+			})
+		})
+	}
+}
+
+func TestCustomJobDetectionAllowedOutputsRequiresSource(t *testing.T) {
+	workflow, err := actions.Parse([]byte("jobs:\n  metadata:\n    runs-on: ubuntu-latest\n    steps: [{run: echo metadata}]\n  agent:\n    needs: metadata\n    runs-on: ubuntu-latest\n    steps: [{run: echo agent}]\n"))
+	require.NoError(t, err)
+	input := Input{Workflow: workflow}
+	jobs, graph, err := customJobDetectionJobs(context.Background(), input)
+	require.NoError(t, err)
+	assert.NotContains(t, customJobDetectionAllowedOutputs(input, jobs, graph), "metadata")
+}
+
 func TestCustomJobDetectionActions(t *testing.T) {
 	for _, tt := range []struct {
 		name, jobs, path string

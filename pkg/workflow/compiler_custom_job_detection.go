@@ -23,7 +23,9 @@ func (c *Compiler) guardCustomJobDetection(data *WorkflowData) error {
 	allJobs := c.jobManager.GetAllJobs()
 	allowedOutputJobs := make(map[string]struct{})
 	for id, job := range allJobs {
-		if constants.IsCompilerOwnedJobName(id) && graph.DependsOn(id, detection) && aw.HasSuccessfulDetectionCondition(job.If) {
+		_, authored := data.Jobs[id]
+		if (authored && graph.IsPreAgentCustomJob(id)) ||
+			(constants.IsCompilerOwnedJobName(id) && graph.DependsOn(id, detection) && aw.HasSuccessfulDetectionCondition(job.If)) {
 			allowedOutputJobs[id] = struct{}{}
 		}
 	}

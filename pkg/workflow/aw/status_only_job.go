@@ -172,7 +172,7 @@ func inspectStatusOnlyExpression(expression, path string, allowed map[string]str
 	}
 	slices.Sort(references)
 	for _, reference := range references {
-		addViolation(path, fmt.Sprintf("status-only jobs cannot read %s; only outputs of detection-gated compiler-owned jobs are permitted", reference))
+		addViolation(path, fmt.Sprintf("status-only jobs cannot read %s; only outputs of pre-agent custom jobs or detection-gated compiler-owned jobs are permitted", reference))
 	}
 }
 

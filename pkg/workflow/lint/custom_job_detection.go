@@ -35,7 +35,7 @@ func checkCustomJobDetection(ctx context.Context, input Input) ([]Diagnostic, er
 	if err != nil {
 		return nil, err
 	}
-	allowedOutputJobs := customJobDetectionAllowedOutputs(input, graph)
+	allowedOutputJobs := customJobDetectionAllowedOutputs(input, jobs, graph)
 	var diagnostics []Diagnostic
 	for _, id := range sliceutil.SortedKeys(jobs) {
 		if err := ctx.Err(); err != nil {
@@ -101,9 +101,23 @@ func customJobDetectionStatusOnlyDiagnostics(id string, fields map[string]any, j
 	return diagnostics
 }
 
-func customJobDetectionAllowedOutputs(input Input, graph aw.JobDependencyGraph) map[string]struct{} {
+func customJobDetectionAllowedOutputs(input Input, jobs map[string]any, graph aw.JobDependencyGraph) map[string]struct{} {
 	allowed := make(map[string]struct{})
 	if input.Workflow == nil {
+		// The compiler makes custom jobs without post-agent dependencies agent
+		// ancestors. With compiled Actions, use only the actual lowered graph.
+		graph = maps.Clone(graph)
+		agent, detection := string(constants.AgentJobName), string(constants.DetectionJobName)
+		for id := range jobs {
+			if !constants.IsCompilerOwnedJobName(id) && !graph.DependsOn(id, agent) && !graph.DependsOn(id, detection) {
+				graph[agent] = append(graph[agent], id)
+			}
+		}
+		for id := range jobs {
+			if graph.IsPreAgentCustomJob(id) {
+				allowed[id] = struct{}{}
+			}
+		}
 		allowed[string(constants.SafeOutputsJobName)] = struct{}{}
 		return allowed
 	}
@@ -117,9 +131,11 @@ func customJobDetectionAllowedOutputs(input Input, graph aw.JobDependencyGraph) 
 				continue
 			}
 		}
-		if constants.IsCompilerOwnedJobName(id) &&
-			graph.DependsOn(id, string(constants.DetectionJobName)) &&
-			aw.HasSuccessfulDetectionCondition(condition) {
+		_, authored := jobs[id]
+		if (input.Document != nil && authored && graph.IsPreAgentCustomJob(id)) ||
+			(constants.IsCompilerOwnedJobName(id) &&
+				graph.DependsOn(id, string(constants.DetectionJobName)) &&
+				aw.HasSuccessfulDetectionCondition(condition)) {
 			allowed[id] = struct{}{}
 		}
 	}
