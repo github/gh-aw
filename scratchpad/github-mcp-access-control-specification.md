@@ -1067,6 +1067,32 @@ Invalid value '{value}' for min-integrity.
 Valid integrity levels are: none, unapproved, approved, merged.
 ```
 
+### 4.8 Entities Index
+
+The index covers every top-level field named in Sections 4.1–4.4. Go entities refer to the current compiler model in `pkg/workflow/`.
+
+| Configuration field | Go entity or implementation status |
+|---|---|
+| `mode` | `GitHubToolConfig.Mode` (`GitHubMCPMode`) |
+| `toolsets` | `GitHubToolConfig.Toolset` (`GitHubToolsets`; singular Go field) |
+| `tools` | No `tools` field in `GitHubToolConfig`; the compiler model uses `GitHubToolConfig.Allowed` (`GitHubAllowedTools`, YAML key `allowed`) |
+| `read-only` | `GitHubToolConfig.ReadOnly` |
+| `github-token` | `GitHubToolConfig.GitHubToken` |
+| `version` | `GitHubToolConfig.Version` |
+| `args` | `GitHubToolConfig.Args` |
+| `lockdown` | `GitHubToolConfig.Lockdown` |
+| `github-app` | `GitHubToolConfig.GitHubApp` (`GitHubAppConfig`) |
+| `allowed-repos` | `GitHubToolConfig.AllowedRepos` (`GitHubReposScope`) |
+| `repos` (deprecated alias) | `GitHubToolConfig.Repos` (`GitHubReposScope`); `parseGitHubTool()` normalizes it into `AllowedRepos` |
+| `roles` | No `tools.github.roles` field in `GitHubToolConfig`; `WorkflowData.Roles` represents top-level workflow trigger roles and is not equivalent to this field |
+| `private-repos` | No corresponding field in `GitHubToolConfig` or `pkg/workflow/` gateway model |
+| `min-integrity` | `GitHubToolConfig.MinIntegrity` (`GitHubIntegrityLevel`) |
+| `blocked-users` | `GitHubToolConfig.BlockedUsers` (`[]string`); expression input is tracked separately in `BlockedUsersExpr` |
+| `trusted-users` | `GitHubToolConfig.TrustedUsers` (`[]string`); expression input is tracked separately in `TrustedUsersExpr` |
+| `approval-labels` | `GitHubToolConfig.ApprovalLabels` (`[]string`); expression input is tracked separately in `ApprovalLabelsExpr` |
+
+`GitHubToolConfig`, `GitHubReposScope`, and `GitHubIntegrityLevel` are declared in `pkg/workflow/tools_types.go`; field normalization is in `pkg/workflow/tools_parser.go`. Entries with no direct Go field are recorded as gaps rather than inferred from similarly named fields.
+
 ---
 
 ## 5. Repository Scoping
@@ -2744,24 +2770,24 @@ function queryWithBackoff(request):
 
 ## Sync Notes
 
-This section maps all seven §4.4 access control extension fields to their implementation files, enabling traceability between specification and code.
+This section records the current mapping of Section 4 configuration fields to the compiler model, including fields for which no corresponding local Go entity exists.
 
-| §4.4 Field | Description | Implementation File(s) |
+**Last verified**: 2026-11-04
+
+| Field | Current implementation mapping | Status |
 |---|---|---|
-| §4.4.1 `repos` | Repository scope — wildcard and exact patterns | `pkg/workflow/tools_types.go` (`GitHubReposScope`), `pkg/workflow/tools_parser.go` (`parseGitHubTool()`), `pkg/workflow/tools_validation_github.go` (`validateReposScope()`, `validateRepoPattern()`) |
-| §4.4.2 `roles` | Role-based filtering (`read`, `write`, `admin`, `maintain`, `triage`) | `pkg/workflow/tools_types.go` (`GitHubRoles`), `pkg/workflow/tools_validation_github.go` |
-| §4.4.3 `private-repos` | Private repository visibility control | `pkg/workflow/tools_types.go` (`GitHubToolConfig.PrivateRepos`), `pkg/workflow/tools_parser.go` |
-| §4.4.4 `min-integrity` | Minimum content integrity level (`none`/`unapproved`/`approved`/`merged`) | `pkg/workflow/tools_types.go` (`GitHubIntegrityLevel`), `pkg/workflow/tools_validation_github.go` (`validateGitHubGuardPolicy()`), `pkg/workflow/tools_validation_github_integrity_reactions.go` |
-| §4.4.5 `blocked-users` | Unconditional block list for specific GitHub usernames | `pkg/workflow/tools_types.go` (`GitHubToolConfig.BlockedUsers`), `pkg/workflow/tools_validation_github.go` (`validateGitHubGuardPolicy()`) |
-| §4.4.6 `trusted-users` | Trusted users promoted above `author_association` baseline | `pkg/workflow/tools_types.go` (`GitHubToolConfig.TrustedUsers`), `pkg/workflow/tools_validation_github.go` |
-| §4.4.7 `approval-labels` | Labels that promote item integrity to `approved` | `pkg/workflow/tools_types.go` (`GitHubToolConfig.ApprovalLabels`), `pkg/workflow/tools_validation_github.go` (`validateGitHubGuardPolicy()`) |
+| `mode`, `toolsets`, `read-only`, `github-token`, `version`, `args`, `lockdown`, `github-app` | Corresponding `GitHubToolConfig` fields and parser cases | Present in `pkg/workflow/tools_types.go` and `pkg/workflow/tools_parser.go` |
+| `tools` | Compiler field is `GitHubToolConfig.Allowed` (`allowed`), not `tools` | Naming difference; see Section 4.8 |
+| `allowed-repos`, `repos` | `GitHubToolConfig.AllowedRepos` / `Repos`; parsing and validation in `tools_parser.go` and `tools_validation_github.go` | Present; `repos` is deprecated |
+| `min-integrity`, `blocked-users`, `trusted-users`, `approval-labels` | Corresponding `GitHubToolConfig` fields, parsed in `tools_parser.go` and validated in `tools_validation_github.go` | Present |
+| `roles`, `private-repos` | No matching GitHub MCP fields in the current `pkg/workflow/` model | Specification-to-implementation gap; do not equate top-level `WorkflowData.Roles` with `tools.github.roles` |
 
 Sync procedure:
-1. Update this specification when changing any of the above files (`tools_types.go`, `tools_parser.go`, `tools_validation_github.go`, `tools_validation_github_integrity_reactions.go`).
-2. Update the §4.4 field definitions and §11 compliance test references in the same change.
-3. Re-run validation tests: `go test ./pkg/workflow/ -run TestValidateGitHub`.
+1. Update this index and the §4 field definitions when any listed parser, model, or validation path changes.
+2. Resolve the `tools`, `roles`, and `private-repos` mismatches before claiming those keys are supported by the local compiler.
+3. Update the §11 compliance references and run `go test ./pkg/workflow/ -run 'TestValidateGitHub|TestFormal' -count=1`.
 
-### Divergence Audit (2026-06-21)
+### Historical Divergence Audit (2026-06-21; superseded by the 2026-11-04 index)
 
 Cross-reference of `scratchpad/github-mcp-access-control-specification.md` and `scratchpad/guard-policies-specification.md` against `pkg/workflow/tools_validation_github.go` and `pkg/workflow/mcp_github_config.go`:
 
@@ -2780,6 +2806,15 @@ Cross-reference of `scratchpad/github-mcp-access-control-specification.md` and `
 ## Sync Follow-ups
 
 This section lists the files that **MUST** be reviewed and updated whenever a normative section of this specification changes, especially §8.5 (combined evaluation order), §4.4 (field definitions), and §11 (compliance tests).
+
+The 2026-11-04 review closed stale local follow-ups. Changes to §8.5 still require external gateway confirmation because the production evaluator is not in this repository; changes to §4.4 retain the forward-looking update procedure below.
+
+### Follow-up Status (2026-11-04)
+
+| Follow-up | Status |
+|---|---|
+| §8.5 evaluation order | Local model and fixture rechecked; carry forward external production-gateway confirmation for any future order change. |
+| §4.4 field changes | No current local edit pending; retain the listed schema, type, parser, validation, and compliance updates for future changes. |
 
 ### After Changing §8.5 Combined Evaluation Order
 
@@ -2836,6 +2871,9 @@ When a new access-control field is added (e.g., `trusted-users`, `approval-label
 ### Version 1.1.0 (Draft)
 
 **Integrity-Level Management Extensions** - March 2026
+
+- **Updated**: Added the Section 4.8 Entities Index for all configuration fields and recorded fields without a matching local Go entity as implementation gaps.
+- **Updated**: Reconciled Sync Notes and Sync Follow-ups with `pkg/workflow/` and compliance evidence on 2026-11-04; retained the external gateway evaluation-order dependency.
 
 - **Added**: `min-integrity` configuration field — sets the minimum content trust level required for the agent to act on a GitHub item; valid values are `none`, `unapproved`, `approved`, `merged`
 - **Added**: `blocked-users` configuration field — list of GitHub usernames whose content is unconditionally blocked, representing an integrity level below `none` that cannot be overridden by labels

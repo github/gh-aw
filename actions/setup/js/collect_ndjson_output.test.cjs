@@ -494,6 +494,38 @@ describe("collect_ndjson_output.cjs", () => {
         expect(parsedOutput.items[0].inputs).toEqual({ sentinel: "hello-sentinel" }),
         expect(parsedOutput.errors).toHaveLength(0));
     }),
+    it.each(["depends-on", "depends_on"])("preserves %s metadata for inline custom outputs", async key => {
+      const outputId = "so_AAAAAAAAAAAA";
+      const prerequisite = "so_BBBBBBBBBBBB";
+      const testFile = "/tmp/gh-aw/test-ndjson-output.txt";
+      fs.writeFileSync(testFile, JSON.stringify({ type: "publish_report", text: "Report", output_id: outputId, [key]: prerequisite }));
+      process.env.GH_AW_SAFE_OUTPUTS = testFile;
+      fs.writeFileSync("/tmp/gh-aw/safeoutputs/config.json", JSON.stringify({ publish_report: { inputs: { text: { type: "string" } } } }));
+      await eval(`(async () => { ${collectScript}; await main(); })()`);
+      const output = JSON.parse(fs.readFileSync("/tmp/gh-aw/agent_output.json", "utf8"));
+      expect(output.errors).toHaveLength(0);
+      expect(output.items).toEqual([{ type: "publish_report", text: "Report", output_id: outputId, "depends-on": prerequisite }]);
+    }),
+    it.each([null, "aw_issue1", "so_BBBBBBBBBBBB"])("rejects malformed or unsupported custom job dependencies: %j", async dependency => {
+      const testFile = "/tmp/gh-aw/test-ndjson-output.txt";
+      fs.writeFileSync(testFile, JSON.stringify({ type: "deploy", "depends-on": dependency }));
+      process.env.GH_AW_SAFE_OUTPUTS = testFile;
+      fs.writeFileSync("/tmp/gh-aw/safeoutputs/config.json", JSON.stringify({ deploy: { supports_dependencies: false } }));
+      await eval(`(async () => { ${collectScript}; await main(); })()`);
+      const output = JSON.parse(fs.readFileSync("/tmp/gh-aw/agent_output.json", "utf8"));
+      expect(output.items.some(item => item.type === "deploy")).toBe(false);
+      expect(output.errors.join("\n")).toContain("depends-on");
+    }),
+    it.each(["report_incomplete", "report_missing_tool", "report_missing_data"])("rejects dependencies for out-of-band %s during ingestion", async type => {
+      const testFile = "/tmp/gh-aw/test-ndjson-output.txt";
+      fs.writeFileSync(testFile, JSON.stringify({ type, "depends-on": "so_BBBBBBBBBBBB" }));
+      process.env.GH_AW_SAFE_OUTPUTS = testFile;
+      fs.writeFileSync("/tmp/gh-aw/safeoutputs/config.json", JSON.stringify({ [type]: { max: 1 } }));
+      await eval(`(async () => { ${collectScript}; await main(); })()`);
+      const output = JSON.parse(fs.readFileSync("/tmp/gh-aw/agent_output.json", "utf8"));
+      expect(output.items.some(item => item["depends-on"] === "so_BBBBBBBBBBBB")).toBe(false);
+      expect(output.errors.join("\n")).toContain("depends-on is not supported");
+    }),
     it("should preserve Slack mrkdwn links in custom safe-job string inputs", async () => {
       const testFile = "/tmp/gh-aw/test-ndjson-output.txt";
       const slackText = "Tracking issue: <https://github.com/octo-org/octo-repo/issues/123|Build failure — Build github/gh-aw#456>";

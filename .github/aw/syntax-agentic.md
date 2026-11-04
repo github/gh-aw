@@ -54,7 +54,7 @@ description: Agentic workflow specific frontmatter fields for GitHub Agentic Wor
 - **`features:`** - Feature flags for experimental or optional features (object)
   - Each flag is a key-value pair; boolean flags (`true`/`false`) or string values are accepted
   - Known feature flags:
-    - `copilot-requests: true` - Use GitHub Actions token for Copilot authentication instead of `COPILOT_GITHUB_TOKEN` secret
+    - `copilot-requests: true` - **Deprecated**; use `permissions: { copilot-requests: write }`. `gh aw fix` migrates it.
     - `disable-xpia-prompt: true` - Disable the built-in cross-prompt injection attack (XPIA) system prompt
     - `action-tag: "v0"` - Pin compiled action references to a specific version of the `gh-aw-actions` repository. Accepts version tags (e.g., `"v0"`, `"v1"`, `"v1.0.0"`) or a full 40-character commit SHA. When set, overrides the compiler's default action mode and resolves all action references from the external `github/gh-aw-actions` repository at the specified tag.
     - `action-mode: "script"` - Control how the compiler generates action references: `"dev"` (local paths, default), `"release"` (SHA-pinned remote), `"action"` (gh-aw-actions repo), `"script"` (direct shell calls). Can also be overridden via `--action-mode` CLI flag.
@@ -158,24 +158,29 @@ description: Agentic workflow specific frontmatter fields for GitHub Agentic Wor
 
 - **`observability:`** - Workflow observability and telemetry configuration (object)
   - **`otlp:`** - Export OpenTelemetry spans to any OTLP-compatible backend (Honeycomb, Grafana Tempo, Sentry, etc.) (object)
-    - `endpoint:` - OTLP collector endpoint URL. When a static URL is provided, its hostname is added to the AWF firewall allowlist automatically. Supports GitHub Actions expressions.
+    - `endpoint:` - OTLP collector URL string, a `{url, headers}` object, or an array of them for concurrent multi-endpoint export. Static hostnames are added to the AWF firewall allowlist automatically. Supports GitHub Actions expressions.
     - `github-app:` - Optional runtime auth configuration.
       - Preferred: provide GitHub App credentials (`app-id`/`client-id` + `private-key`) to mint a token with `actions/create-github-app-token` before `actions/setup`.
       - OIDC mode is used when `github-app` is configured without credentials (`app-id`/`client-id` + `private-key`).
       - OIDC mode requires `permissions.id-token: write` on the workflow/job.
     - `workload-identity:` - Exchange a GitHub Actions OIDC token for a cloud access token before OTLP export. Only `provider: google` is currently supported; requires `audience:` (Google Workload Identity Provider resource name) and accepts optional `service-account:` to impersonate after STS token exchange.
-    - `headers:` - Comma-separated `key=value` HTTP headers included in every OTLP export request (e.g. `Authorization=Bearer <token>`). Injected as `OTEL_EXPORTER_OTLP_HEADERS`. Supports GitHub Actions expressions.
+    - `headers:` - Map of HTTP header names to values (e.g. `Authorization: ${{ secrets.OTLP_AUTH }}`) for the string `endpoint:` form; object/array endpoints carry their own `headers:`. Injected as `OTEL_EXPORTER_OTLP_HEADERS`. The comma-separated `key=value` string form is deprecated.
+    - `if-missing:` - `error` (default), `warn`, or `ignore` when endpoint/header values resolve empty at runtime (affects MCP gateway OTLP setup only).
+    - `attributes:` - Optional map of custom span attributes; values are static strings or `{{ <span-attribute> }}` templates. Exported to backends and masked in runner logs.
     - `resource-attributes:` - Optional map of additional OTEL resource attributes appended to gh-aw/GitHub defaults. Values may be static strings or GitHub Actions expressions. Do not use `secrets.*` or `vars.*` here because resource attributes are exported to external observability backends and are not treated as secret values.
+  - Runtime controls (Actions variables, not frontmatter; recompile once to add the lookup): `OTEL_EXPORTER_OTLP_PROTOCOL` selects `http/json` (default) or `http/protobuf` (gRPC unsupported; per-signal `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL`/`OTEL_EXPORTER_OTLP_LOGS_PROTOCOL` override it); `GH_AW_OTLP_LOGS_ENABLED=true` opts in to compact unified-session OTLP logs posted to `<endpoint>/v1/logs`, capped by `GH_AW_OTLP_LOGS_MAX_BYTES` (default `65536`). Manage the protocol with `gh aw env` key `default_otlp_protocol`.
   - Example:
 
     ```yaml
     observability:
       otlp:
-        endpoint: ${{ secrets.GH_AW_OTEL_ENDPOINT }}
+        endpoint:
+          - url: ${{ secrets.GH_AW_OTEL_ENDPOINT }}
+            headers:
+              Authorization: ${{ secrets.GH_AW_OTEL_AUTHORIZATION }}
         github-app:
           app-id: ${{ vars.APP_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
-        headers: ${{ secrets.GH_AW_OTEL_HEADERS }}
     ```
 
     Every job emits setup and conclusion spans with rich attributes (`gh-aw.job.name`, `gh-aw.workflow.name`, `gh-aw.engine.id`, token usage). All jobs in a run share one trace ID. Dispatched child workflows inherit the parent's trace context via `aw_context`.

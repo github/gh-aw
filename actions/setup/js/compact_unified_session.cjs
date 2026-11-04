@@ -131,6 +131,7 @@ function projectEvent(event) {
   const projected = { type: event.type, data, ...projectScalars(event, ["timestamp"]) };
   if (isRecord(event.provenance)) {
     const provenance = projectScalars(event.provenance, ["component", "phase", "path", "index"]);
+    if (typeof event.provenance.timestampMs === "number" && Number.isFinite(event.provenance.timestampMs)) provenance.timestampMs = event.provenance.timestampMs;
     for (const field of ["attemptId", "startupAttemptId"]) {
       const id = event.provenance[field];
       if (typeof id !== "string") continue;

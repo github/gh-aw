@@ -64,6 +64,7 @@ function projectSafeOutputData(source) {
   for (const key of ["number", "messageIndex"]) {
     if (Number.isSafeInteger(source[key]) && source[key] >= 0) data[key] = source[key];
   }
+  if (typeof source.output_id === "string" && /^so_[A-Za-z0-9_-]{12}$/.test(source.output_id)) data.output_id = source.output_id;
   if (source.identifier === null) data.identifier = null;
   if (OUTCOME_STATUSES.has(source.status)) data.status = source.status;
   if (typeof source.staged === "boolean") data.staged = source.staged;
@@ -93,6 +94,8 @@ function buildSafeOutputOutcomes(results, staged = false) {
         ...projectSafeOutputData({
           type: record.type,
           messageIndex: record.messageIndex,
+          output_id: record.output_id,
+          errorCode: record.errorCode,
           status: isStaged && status === "success" ? "staged" : status,
           staged: isStaged,
           url,

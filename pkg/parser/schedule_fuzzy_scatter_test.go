@@ -85,6 +85,29 @@ func TestScatterScheduleDeterministic(t *testing.T) {
 	}
 }
 
+func TestFinalizeScatteredMinutes(t *testing.T) {
+	tests := []struct {
+		name            string
+		scatteredMinute int
+		wantHour        int
+		wantMinute      int
+	}{
+		{name: "unchanged minute", scatteredMinute: 12*60 + 22, wantHour: 12, wantMinute: 22},
+		{name: "hour boundary", scatteredMinute: 7*60 + 2, wantHour: 7, wantMinute: 7},
+		{name: "EU peak minute", scatteredMinute: 7*60 + 30, wantHour: 7, wantMinute: 34},
+		{name: "US peak minute", scatteredMinute: 15*60 + 15, wantHour: 15, wantMinute: 19},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotHour, gotMinute := finalizeScatteredMinutes(tt.scatteredMinute)
+			if gotHour != tt.wantHour || gotMinute != tt.wantMinute {
+				t.Errorf("finalizeScatteredMinutes(%d) = (%d, %d), want (%d, %d)", tt.scatteredMinute, gotHour, gotMinute, tt.wantHour, tt.wantMinute)
+			}
+		})
+	}
+}
+
 func TestScatterScheduleHourly(t *testing.T) {
 	tests := []struct {
 		name               string

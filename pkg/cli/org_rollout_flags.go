@@ -33,7 +33,7 @@ func orgRolloutFromContext(ctx context.Context) *orgRolloutOptions {
 
 func addOrgRolloutFlags(cmd *cobra.Command) {
 	cmd.Flags().String("enterprise", "", "Target all accessible organizations in an enterprise (requires enterprise organization visibility)")
-	cmd.Flags().Bool("interactive", false, "Select repositories and watch live PR progress in a TUI (requires --org or --enterprise)")
+	cmd.Flags().BoolP("interactive", "i", false, "Select repositories and watch live PR progress in a TUI (requires --org or --enterprise)")
 	cmd.Flags().Bool("dry-run", false, "Preview an org or enterprise rollout without creating or closing PRs or issues")
 	cmd.Flags().Int("concurrency", 3, "Maximum concurrent repository workers (1-10); starts are paced to protect API limits")
 	cmd.Flags().Bool("replace-existing", false, "Replace existing rollout PRs, closing them only after a replacement is created")
