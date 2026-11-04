@@ -157,6 +157,31 @@ function readCopilotSessions(directory, parseLog) {
 }
 
 /**
+ * Fill source defaults without replacing an existing scope or native metadata.
+ * @param {any} event
+ * @param {string} sourcePath
+ * @param {number} index
+ * @returns {any}
+ */
+function withAgentProvenance(event, sourcePath, index) {
+  const provenance = event.provenance;
+  const hasSourceScope = provenance && typeof provenance === "object" && "component" in provenance && provenance.component;
+  const source = hasSourceScope ? provenance : {};
+  return {
+    ...event,
+    provenance: {
+      ...source,
+      component: source.component ?? "agent",
+      phase: source.phase ?? "agent",
+      path: source.path ?? sourcePath,
+      index: source.index ?? index,
+      timestampMs: provenance?.timestampMs ?? sessionTimestamp(event),
+      ...(!hasSourceScope && provenance ? { native: provenance } : {}),
+    },
+  };
+}
+
+/**
  * Bootstrap helper for log parser entry points.
  * Handles common logic for environment variable lookup, file existence checks,
  * content reading (file or directory), and summary emission.
@@ -385,16 +410,9 @@ async function runLogParser(options) {
     const conversationEntries = retainedSessions.length
       ? [
           ...retainedSessions.flatMap(session =>
-            [...session.events, ...(hasMalformedJsonl(session.content) ? [{ type: "session.collection_warning", data: { path: session.source, code: "malformed_jsonl" } }] : [])].map((event, index) => ({
-              ...event,
-              provenance: {
-                component: "agent",
-                phase: "agent",
-                path: session.source,
-                index,
-                ...(event.provenance ? { native: event.provenance } : {}),
-              },
-            }))
+            [...session.events, ...(hasMalformedJsonl(session.content) ? [{ type: "session.collection_warning", data: { path: session.source, code: "malformed_jsonl" } }] : [])].map((event, index) =>
+              withAgentProvenance(event, session.source, index)
+            )
           ),
           ...(selectedSource === finalSession?.source ? [] : supplementalEvents),
         ]
@@ -514,13 +532,7 @@ async function runLogParser(options) {
       if (logEntries && Array.isArray(logEntries) && logEntries.length > 0) {
         const sourcePath = path.isAbsolute(selectedSource) ? path.relative(rootDir, selectedSource) : selectedSource;
         const publicationEntries = redactSessionForPublication(
-          normalizeAgentSession(conversationEntries).map((event, index) => ({
-            ...event,
-            provenance:
-              event.provenance && typeof event.provenance === "object" && "component" in event.provenance && event.provenance.component
-                ? event.provenance
-                : { component: "agent", phase: "agent", path: sourcePath, index, timestampMs: sessionTimestamp(event), ...(event.provenance ? { native: event.provenance } : {}) },
-          })),
+          normalizeAgentSession(conversationEntries).map((event, index) => withAgentProvenance(event, sourcePath, index)),
           redactPublication
         );
         const model = observedSessionModel(logEntries);
