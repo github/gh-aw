@@ -96,10 +96,6 @@ func hasNonEmptyStringArgument(pass *analysis.Pass, expr ast.Expr) bool {
 }
 
 func isConstantInt(pass *analysis.Pass, expr ast.Expr, want int64) bool {
-	tv, ok := pass.TypesInfo.Types[expr]
-	if !ok || tv.Value == nil || tv.Value.Kind() != constant.Int {
-		return false
-	}
-	value, ok := constant.Int64Val(tv.Value)
+	value, ok := astutil.ConstIntValue(pass, expr)
 	return ok && value == want
 }

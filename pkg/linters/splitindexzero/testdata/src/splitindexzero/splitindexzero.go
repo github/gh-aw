@@ -33,6 +33,10 @@ func splitNWithDifferentLimit(value string) string {
 	return s.SplitN(value, ",", 3)[0]
 }
 
+func splitNWithOneLimit(value string) string {
+	return s.SplitN(value, ",", 1)[0]
+}
+
 func laterElement(value string) string {
 	return s.Split(value, ",")[1]
 }
