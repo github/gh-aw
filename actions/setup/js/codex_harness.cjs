@@ -686,18 +686,48 @@ function reflectHasMatchingProviderEndpoint(reflectData, provider) {
   return endpoints.some(ep => matchingProviders.has(normalizeReflectProviderName(ep.provider)));
 }
 
-function isSafeCodexConfigPath(codexConfigPath) {
+function resolveSafeCodexConfigPath(codexConfigPath, managedRoot = TMP_GH_AW_PATH) {
   try {
-    const root = fs.realpathSync(TMP_GH_AW_PATH);
-    const resolvedPath = path.resolve(codexConfigPath);
-    const relativePath = path.relative(root, resolvedPath);
-    const resolvedDirectory = fs.realpathSync(path.dirname(resolvedPath));
-    const relativeDirectory = path.relative(root, resolvedDirectory);
+    if (!path.isAbsolute(codexConfigPath) || path.resolve(codexConfigPath) !== codexConfigPath) return "";
+    const lexicalRoot = path.resolve(managedRoot);
+    const relativePath = path.relative(lexicalRoot, codexConfigPath);
     const isWithinRoot = relative => relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
-    return path.basename(resolvedPath) === "config.toml" && isWithinRoot(relativePath) && isWithinRoot(relativeDirectory) && fs.lstatSync(resolvedPath).isFile();
+    if (path.basename(codexConfigPath) !== "config.toml" || !isWithinRoot(relativePath)) return "";
+
+    const root = fs.realpathSync(lexicalRoot);
+    const expectedRoot = path.join(fs.realpathSync(path.dirname(lexicalRoot)), path.basename(lexicalRoot));
+    if (root !== expectedRoot) return "";
+    const resolvedPath = path.resolve(codexConfigPath);
+    let resolvedDirectory;
+    try {
+      resolvedDirectory = fs.realpathSync(path.dirname(resolvedPath));
+    } catch (error) {
+      if (/** @type {NodeJS.ErrnoException} */ error.code === "ENOENT") return resolvedPath;
+      return "";
+    }
+    const relativeDirectory = path.relative(root, resolvedDirectory);
+    if (!isWithinRoot(relativeDirectory)) return "";
+    const canonicalPath = path.join(resolvedDirectory, path.basename(resolvedPath));
+    let stat;
+    try {
+      stat = fs.lstatSync(canonicalPath);
+    } catch (error) {
+      if (/** @type {NodeJS.ErrnoException} */ error.code === "ENOENT") return canonicalPath;
+      return "";
+    }
+    return stat.isFile() && !stat.isSymbolicLink() ? canonicalPath : "";
   } catch {
-    return false;
+    return "";
   }
+}
+
+function resolveRuntimeCodexConfigPath(codexConfigPath) {
+  const managedPath = resolveSafeCodexConfigPath(codexConfigPath);
+  if (managedPath) return managedPath;
+  if (isDetectionPhase(process.env.GH_AW_PHASE) && process.env.RUNNER_TEMP) {
+    return resolveSafeCodexConfigPath(codexConfigPath, path.join(process.env.RUNNER_TEMP, "gh-aw", "threat-detection"));
+  }
+  return "";
 }
 
 /**
@@ -712,10 +742,12 @@ function isSafeCodexConfigPath(codexConfigPath) {
  */
 function validateCodexOpenAIBaseURLFromReflect(options) {
   const readFileSync = (options && options.readFileSync) || fs.readFileSync;
-  const codexConfigPath = options && options.codexConfigPath;
+  const requestedConfigPath = options && options.codexConfigPath;
+  const codexConfigPath = requestedConfigPath ? resolveRuntimeCodexConfigPath(requestedConfigPath) : "";
   const reflectPath = options && options.reflectPath;
   const provider = normalizeReflectProviderName(options?.provider || "openai", "openai");
-  if (!codexConfigPath || !reflectPath) return { ok: true };
+  if (!requestedConfigPath || !reflectPath) return { ok: true };
+  if (!codexConfigPath) return { ok: false, reason: "Codex config path is outside a managed temporary directory" };
 
   let tomlContent;
   let reflectContent;
@@ -762,11 +794,13 @@ function validateCodexOpenAIBaseURLFromReflect(options) {
  */
 function configureCodexProviderFromReflect(options) {
   const env = { ...process.env };
-  const codexConfigPath = options && options.codexConfigPath;
+  const requestedConfigPath = options && options.codexConfigPath;
+  let codexConfigPath = requestedConfigPath || "";
   const reflectPath = (options && options.reflectPath) || AWF_REFLECT_OUTPUT_PATH;
   const provider = normalizeReflectProviderName(options?.provider || process.env.GH_AW_LLM_PROVIDER, "openai");
   if (!reflectPath) return { env, configured: false };
-  if (codexConfigPath && !isSafeCodexConfigPath(codexConfigPath)) {
+  if (codexConfigPath) codexConfigPath = resolveRuntimeCodexConfigPath(codexConfigPath);
+  if (requestedConfigPath && !codexConfigPath) {
     log("warning: refusing to update Codex config outside the managed temporary directory");
     return { env, configured: false };
   }
@@ -1415,6 +1449,7 @@ if (typeof module !== "undefined" && module.exports) {
     emitMissingToolPermissionIssue,
     buildCodexChildEnv,
     resolveCodexConfiguredModel,
+    resolveSafeCodexConfigPath,
     hasCodexAzureOIDCProxy,
     extractPortFromURL,
     extractOpenAIProxyBaseURLFromToml,

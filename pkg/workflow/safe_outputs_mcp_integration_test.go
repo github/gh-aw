@@ -218,8 +218,8 @@ Test safe outputs workflow with Codex engine.
 	if !strings.Contains(yamlStr, "convert_gateway_config_codex.cjs") {
 		t.Error("Expected Codex gateway-to-native configuration converter")
 	}
-	if !strings.Contains(yamlStr, `cp "${RUNNER_TEMP}/gh-aw/mcp-config/config.toml" "${CODEX_HOME}/config.toml"`) {
-		t.Error("Expected generated Codex config to be copied to CODEX_HOME")
+	if !strings.Contains(yamlStr, `convert_gateway_config_codex.cjs" --copy-config`) {
+		t.Error("Expected generated Codex config to be copied securely to CODEX_HOME")
 	}
 
 	pinnedGhAwNodeImage := resolveMCPGatewayContainerImage(constants.DefaultGhAwNodeImage, nil)

@@ -379,10 +379,11 @@ describe("extractCommandNamesFromPipeline", () => {
     const cmd = `set -euo pipefail
 WORK_DIR='/tmp/work'
 mkdir -p "$WORK_DIR"
+FILES='file1.txt file2.txt'
 git log -1 --format='%H' -- file.txt | sed 's|^|file.txt |'
 printf '%s\n' '---FILES---'
 if [ -f "$WORK_DIR/result.json" ]; then cat "$WORK_DIR/result.json"; fi
-wc -l file.txt`;
+for f in $FILES; do wc -l "$WORK_DIR/$f"; done`;
     expect(extractCommandNamesFromPipeline(cmd)).toEqual(["set", "mkdir", "git", "sed", "printf", "cat", "wc"]);
   });
 
