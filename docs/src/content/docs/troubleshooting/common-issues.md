@@ -48,6 +48,19 @@ The CLI validates three permission layers in Repository Settings → Actions →
 > [!NOTE]
 > Organization policies override repository settings. Contact admins if settings are grayed out.
 
+### Copilot Pull Request Workflows Require Approval
+
+**Symptom:** Runs on a Copilot branch conclude with `action_required` without starting any jobs. This is an approval gate, not a test failure.
+
+**Solution:** Review the proposed changes, especially workflow changes, then select **Approve and run workflows** in the pull request's merge box. Changing a job's `if:` condition, adding `trusted-users`, or granting token permissions cannot bypass this pre-execution gate.
+
+To reduce repeated approvals, a repository administrator can disable **Require approval for workflow runs** under **Settings → Copilot → Cloud agent → Policies**. This is a repository setting, not gh-aw frontmatter or an actor allowlist. See [configuring automatic workflow runs](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/cloud-agent/configuring-agent-settings#allowing-github-actions-workflows-to-run-automatically-when-copilot-pushes).
+
+> [!WARNING]
+> Automatic runs can give unreviewed Copilot code access to workflow secrets and write permissions. Review the repository's CI and agentic workflow permissions before changing this policy. Keep approval enabled where those privileges require human review.
+
+In the `github/gh-aw` repository, **Copilot Workflow Approval** reports pending commit statuses for approval-gated CGO, CJS, CWI, Doc Build - Deploy, Agentic Commands, and Squad runs on same-repository Copilot PRs. Each status links to the blocked run. The default-branch monitor reconciles open PRs hourly as a fallback for gates that emit no completion event; it does not check out PR code, approve runs, or dispatch workflows. After recovery, it clears the approval notice without replacing the workflow's actual CI result. The monitor takes effect after its workflow reaches the default branch; it does not change the administrator-controlled approval policy.
+
 ## Workflow Compilation Issues
 
 ### Frontmatter Field Not Taking Effect

@@ -1,0 +1,83 @@
+name: Copilot Workflow Approval
+
+on:
+  workflow_run:
+    workflows: [CGO, CJS, CWI, Doc Build - Deploy, Agentic Commands, Squad]
+    types: [completed]
+  # Reconcile runs that were gated before a workflow_run event could be emitted.
+  schedule:
+    - cron: '17 * * * *'
+
+permissions: {}
+
+concurrency:
+  group: copilot-workflow-approval
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      pull-requests: read
+      statuses: write
+    steps:
+      # No checkout: privileged reporting must never execute pull request code.
+      - name: Report workflow approval gates
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const workflows = new Set(['CGO', 'CJS', 'CWI', 'Doc Build - Deploy', 'Agentic Commands', 'Squad']);
+            const bots = new Set(['Copilot', 'copilot[bot]']);
+            const repository = `${context.repo.owner}/${context.repo.repo}`;
+            const trigger = context.payload.workflow_run;
+            if (trigger && (trigger.head_repository?.full_name !== repository ||
+                !trigger.head_branch?.startsWith('copilot/'))) return;
+
+            const pulls = await github.paginate(github.rest.pulls.list, {
+              ...context.repo,
+              state: 'open',
+              ...(trigger ? { head: `${context.repo.owner}:${trigger.head_branch}` } : {}),
+              per_page: 100,
+            });
+            for (const pr of pulls) {
+              if (pr.user?.type !== 'Bot' || !bots.has(pr.user.login) ||
+                  pr.head.repo?.full_name !== repository ||
+                  !pr.head.ref.startsWith('copilot/')) continue;
+              const runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {
+                ...context.repo,
+                branch: pr.head.ref,
+                head_sha: pr.head.sha,
+                per_page: 100,
+              });
+              const latest = new Map();
+              for (const run of runs) {
+                if (!workflows.has(run.name) || run.head_sha !== pr.head.sha ||
+                    run.head_repository?.full_name !== repository) continue;
+                const key = `${run.workflow_id}/${run.event}`;
+                const previous = latest.get(key);
+                if (!previous || run.id > previous.id) latest.set(key, run);
+              }
+              const { data: combined } = await github.rest.repos.getCombinedStatusForRef({
+                ...context.repo, ref: pr.head.sha, per_page: 100,
+              });
+              for (const [key, run] of latest) {
+                const statusContext = `Copilot workflow approval / ${key}`;
+                const previous = combined.statuses.find(status => status.context === statusContext);
+                const blocked = run.conclusion === 'action_required';
+                if (!blocked && previous?.state !== 'pending') continue;
+                const state = blocked ? 'pending' : 'success';
+                const description = blocked
+                  ? `${run.name}: approval required; review the PR, then Approve and run workflows.`
+                  : `${run.name}: approval gate cleared; workflow result is reported separately.`;
+                const target_url = `${context.serverUrl}/${repository}/actions/runs/${run.id}`;
+                if (previous?.state === state && previous.target_url === target_url &&
+                    previous.description === description.slice(0, 140)) continue;
+                await github.rest.repos.createCommitStatus({
+                  ...context.repo, sha: pr.head.sha, context: statusContext,
+                  state, description: description.slice(0, 140), target_url,
+                });
+                core.info(`PR #${pr.number}: ${run.name} approval status ${state}`);
+              }
+            }
