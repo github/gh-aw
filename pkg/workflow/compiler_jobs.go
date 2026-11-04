@@ -418,6 +418,7 @@ func (c *Compiler) finalizeBuiltJobs(data *WorkflowData) error {
 
 	c.ensureOTLPOIDCJobPermissions(data)
 	c.ensureDriveMemoryJobPermissions(data)
+	c.ensureDurableArtifactJobPermissions(data)
 	c.annotateGeneratedJobs(data)
 	if err := c.finalizeConclusionJobInventory(); err != nil {
 		return err
@@ -428,6 +429,22 @@ func (c *Compiler) finalizeBuiltJobs(data *WorkflowData) error {
 	}
 
 	return nil
+}
+
+func (c *Compiler) ensureDurableArtifactJobPermissions(data *WorkflowData) {
+	if data.EngineConfig == nil || data.EngineConfig.Durable == nil {
+		return
+	}
+	for _, job := range c.jobManager.GetAllJobs() {
+		for _, step := range job.Steps {
+			if strings.Contains(step, "id: durable_checkpoint") {
+				perms := NewPermissionsParser(job.Permissions).ToPermissions()
+				perms.Set(PermissionActions, PermissionRead)
+				job.Permissions = perms.RenderToYAML()
+				break
+			}
+		}
+	}
 }
 
 // ensureOTLPOIDCJobPermissions grants id-token: write to every job that contains the

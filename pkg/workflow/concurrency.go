@@ -14,6 +14,9 @@ var concurrencyLog = logger.New("workflow:concurrency")
 // based on its trigger types and characteristics.
 func GenerateConcurrencyConfig(workflowData *WorkflowData, isCommandTrigger bool) string {
 	concurrencyLog.Printf("Generating concurrency config: isCommandTrigger=%v", isCommandTrigger)
+	if workflowData.EngineConfig != nil && workflowData.EngineConfig.Durable != nil {
+		return fmt.Sprintf("concurrency:\n  group: \"gh-aw-durable-%s\"\n  cancel-in-progress: false", durableWorkflowID(workflowData))
+	}
 
 	// Don't override if already set
 	if workflowData.Concurrency != "" {

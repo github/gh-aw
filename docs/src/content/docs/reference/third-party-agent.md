@@ -68,6 +68,65 @@ Start from a sample with a matching transport rather than copying installation o
 
 See [imports](/gh-aw/reference/imports/) for resolution and pinning rules.
 
+### Durable execution
+
+A workflow can opt into artifact-backed continuation using `engine.durable:
+{ retention-days: 7 }` alongside its custom `engine.id`. Compilation fails unless
+the definition declares `behaviors.durable`. Engines that implement the Go
+interface provide `GetDurableExecutionPlan` with the files to persist and the
+continuation execution steps.
+
+An engine does not need a native durable library. It can declare its session
+folder and provide a harness that continues the restored session:
+
+```aw wrap
+engine:
+  id: example-engine
+  behaviors:
+    durable:
+      files:
+        - /tmp/gh-aw/agent/example/sessions
+      execution:
+        command-name: example-engine
+        step-name: Continue example-engine session
+      harness-script: |
+        const resumed = process.env.GH_AW_DURABLE_RESUMED === "true";
+        // Invoke this engine's resume command when resumed, or start a new session.
+```
+
+Merge this fragment into the publisher's existing definition. Configure the
+agent to write its sessions to the declared directory. The harness must use its
+engine-specific continuation API or CLI flags when `GH_AW_DURABLE_RESUMED` is
+`true`; the parent run is available as `GH_AW_DURABLE_PARENT_RUN_ID`. No extra
+durable dependencies are needed for session-file continuation. This restores
+conversation state, not the native library's durable task or replay guarantees.
+
+`behaviors.durable.files` is required. Paths must be explicit, non-overlapping
+files or directories under `/tmp/gh-aw/agent/`, without globs or symlinks. gh-aw
+recursively snapshots only these paths and restores them before the harness
+runs. A native implementation can declare `$GH_AW_DURABLE_CHECKPOINT` to persist
+the compiler-managed checkpoint file instead.
+
+The `execution` object is required; `installation` and `harness-script` are
+optional. When a native implementation needs extra dependencies, each dependency
+uses the existing installation fields: `package-manager: npm`, a valid
+`package-name`, an exact literal `version`, and a `verify-command`. Durable
+dependencies are installed and verified in addition to the ordinary engine
+installation. The durable execution and harness replace the ordinary ones;
+workflow-level command, driver, and harness overrides are rejected.
+
+The harness also receives `GH_AW_DURABLE_STORAGE=artifact`,
+`GH_AW_DURABLE_DIR`, and `GH_AW_DURABLE_CHECKPOINT`. Persist only session state,
+never credentials or runtime authentication. gh-aw restores and publishes the artifact and applies
+the configured retention period. The engine is responsible for checkpoint
+compatibility, replay safety, fresh credential binding, telemetry, and unified
+session events. See [Pi durable runs](/gh-aw/reference/engines/pi/#durable-runs)
+for parent selection, retention, and continuation limitations.
+
+Artifact files include an integrity-checked UTF-8 projection so host secret
+redaction also examines binary session state. If redaction changes a snapshot,
+publication fails instead of uploading credentials or a corrupted session.
+
 ### Protected session capture
 
 `engine.behaviors.execution.protected-session-capture` is a boolean, defaulting to `false`. It belongs to the shared declarative engine definition, not the workflow root or built-in `engine.harness`. Merge this fragment into a definition that already has its installation, isolated recorder, and verifying `behaviors.log-parser`:
