@@ -2562,6 +2562,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
       ["agent modification of a protected file", protectedPatch, 16, "package.json", "protected files", false],
       ["oversized unchanged-side binary resolution", "", 2048, "", "Changed content size", true],
       ["reverted protected-file change", "small patch\n", 16, "merge-agent.txt", "bundle modifies protected files", false, "package.json"],
+      ["reverted opaque-secret protected-file change", "small patch\n", 16, "merge-agent.txt", "bundle modifies protected files", false, ".github/opaque-secret.json"],
       ["reverted protected-file change after trusted-base fallback", "small patch\n", 16, "merge-agent.txt", "bundle modifies protected files", false, "package.json", false, true],
       ["agent-created octopus merge", "small patch\n", 16, "merge-agent.txt", "octopus merge", false, "", true],
       ["agent-created octopus merge after trusted-base fallback", "small patch\n", 16, "merge-agent.txt", "octopus merge", false, "", true, true],
@@ -2574,6 +2575,10 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
     it.each(cases)(
       "validates with advanced base %s and merged-base opt-in %s: %s",
       async (baseAdvanced, allowMergedBaseBaseline, _name, agentPatch, contentSize, changedFile, expectedError, binaryConflict, historyFile = "", octopusMerge = false, mergeTreeFailure = false, historyPatch = agentPatch) => {
+        if (historyFile.includes("opaque-secret")) {
+          vi.stubEnv("GH_AW_SECRET_NAMES", "PROTECTED_PATH");
+          vi.stubEnv("SECRET_PROTECTED_PATH", "opaque-secret");
+        }
         const branch = "merge-size-validation";
         const trustedBase = "b".repeat(40);
         const trustedTip = baseAdvanced ? "d".repeat(40) : trustedBase;
@@ -2614,6 +2619,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
             signed_commits: false,
             allow_merged_base_baseline: allowMergedBaseBaseline,
             protected_files: ["package.json"],
+            protected_path_prefixes: [".github/"],
           });
           const result = await handler({ branch, diff_size: 0 }, {});
           if (expectedError) {
@@ -2655,6 +2661,10 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
             expect(mockExec.getExecOutput).toHaveBeenCalledWith("git", ["diff", "--name-only", "--no-renames", "-z", `${baseAdvanced ? "remote-head" : validationTree}..refs/bundles/push-feature-branch`], expect.any(Object));
           }
           if (expectedError === "bundle modifies protected files") {
+            if (historyFile.includes("opaque-secret")) {
+              expect(JSON.stringify(result.metadata)).not.toContain("opaque-secret");
+              expect(result.metadata.file_protection.files).toHaveLength(1);
+            }
             const historyExclusions = mergeTreeFailure || baseAdvanced ? ["remote-head"] : ["remote-head", trustedBase];
             expect(mockExec.getExecOutput).toHaveBeenCalledWith(
               "git",
@@ -3977,6 +3987,20 @@ ${diffs}
       expect(result.reasonCode).toBe("POLICY_FILE_PROTECTION_DENIED");
       expect(result.error).toContain("protected files");
       expect(result.error).toContain("package.json");
+      expect(result.metadata.file_protection).toEqual({ action: "deny", source: "protected", files: ["package.json"] });
+    });
+
+    it("redacts configured secrets in protected filenames before returning diagnostics", async () => {
+      vi.stubEnv("GH_AW_SECRET_NAMES", "PROTECTED_PATH");
+      vi.stubEnv("SECRET_PROTECTED_PATH", "opaque-secret");
+      createPatchFile("redacted-protection", createPatchWithFiles(".github/opaque-secret.json"));
+      const module = await loadModule();
+      const handler = await module.main({ protected_path_prefixes: [".github/"], protected_files_policy: "blocked" });
+      const result = await handler({ branch: "redacted-protection" }, {});
+      expect(result.success).toBe(false);
+      expect(result.metadata.file_protection.files).toHaveLength(1);
+      expect(JSON.stringify(result.metadata)).not.toContain("opaque-secret");
+      expect(result.metadata.file_protection.files[0]).toContain(".github/");
     });
 
     it("should allow a protected file when both allowed-files matches and protected-files: allowed is set", async () => {
@@ -4016,7 +4040,7 @@ ${diffs}
           return { exitCode: 0, stdout: "local-head-before\n", stderr: "" };
         }
         if (cmd === "git" && Array.isArray(args) && args[0] === "diff" && args[1] === "--name-only" && args[2] === "--no-renames") {
-          return { exitCode: 0, stdout: ".github/CODEOWNERS\n", stderr: "" };
+          return { exitCode: 0, stdout: ".github/CODEOWNERS\0", stderr: "" };
         }
         return { exitCode: 0, stdout: "", stderr: "" };
       });
@@ -4032,6 +4056,11 @@ ${diffs}
         expect(result.success).toBe(true);
         expect(result.fallback_used).toBe(true);
         expect(result.issue_number).toBe(456);
+        expect(result.metadata).toEqual({
+          file_protection: { action: "fallback", files: [".github/CODEOWNERS"] },
+          target_pull_request_number: 123,
+          fallback_used: true,
+        });
         expect(mockExec.exec).toHaveBeenCalledWith("git", ["reset", "--hard", "local-head-before"], expect.any(Object));
         expect(mockGithub.rest.issues.create).toHaveBeenCalledTimes(1);
         expect(pushSignedSpy).not.toHaveBeenCalled();
@@ -4054,6 +4083,11 @@ ${diffs}
       expect(result.fallback_used).toBe(true);
 
       const issueBody = mockGithub.rest.issues.create.mock.calls[0][0].body;
+      expect(result.metadata).toEqual({
+        file_protection: { action: "fallback", files: ["package.json"] },
+        target_pull_request_number: 123,
+        fallback_used: true,
+      });
       const { extractExpirationDate } = require("./ephemerals.cjs");
       const expiration = extractExpirationDate(issueBody);
       expect(expiration).not.toBeNull();
@@ -4132,6 +4166,7 @@ ${diffs}
 
       expect(result.success).toBe(true);
       expect(result.fallback_used).toBe(true);
+      expect(result.metadata.file_protection).toEqual({ action: "fallback", files: ["package.json"] });
 
       const issueBody = mockGithub.rest.issues.create.mock.calls[0][0].body;
       expect(issueBody).toContain("gh run download");
@@ -4140,6 +4175,24 @@ ${diffs}
       expect(issueBody).toContain("refs/bundles/manual-apply");
       expect(issueBody).toContain("git reset --hard refs/bundles/manual-apply");
       expect(issueBody).not.toContain("git am --3way");
+    });
+
+    it("retains detected files when creating the protected-files fallback issue fails", async () => {
+      const branch = "protected-fallback-issue-failure";
+      createPatchFile(branch, createPatchWithFiles("package.json"));
+      mockGithub.rest.issues.create.mockRejectedValue(Object.assign(new Error("Forbidden"), { status: 403 }));
+
+      const module = await loadModule();
+      const handler = await module.main({ protected_files: ["package.json"], protected_files_policy: "fallback-to-issue" });
+      const result = await handler({ branch }, {});
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("failed to create review issue");
+      expect(result.metadata).toEqual({
+        file_protection: { action: "fallback", files: ["package.json"] },
+        target_pull_request_number: 123,
+      });
+      expect(result.fallback_used).toBeUndefined();
     });
 
     it("should use configured fork remote in protected-files manual apply instructions", async () => {

@@ -77,6 +77,7 @@ run-name: "Workflow Craft Agent"
 
 env:
   OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.GH_AW_OTEL_SENTRY_ENDPOINT }}
+  OTEL_EXPORTER_OTLP_PROTOCOL: ${{ vars.OTEL_EXPORTER_OTLP_PROTOCOL }}
   OTEL_SERVICE_NAME: gh-aw.craft
   OTEL_RESOURCE_ATTRIBUTES: 'gh-aw.workflow.name=Workflow%20Craft%20Agent,gh-aw.repository=${{ github.repository }},gh-aw.run.id=${{ github.run_id }},github.run_id=${{ github.run_id }},gh-aw.engine.id=copilot'
   OTEL_EXPORTER_OTLP_HEADERS: x-sentry-auth=${{ secrets.GH_AW_OTEL_SENTRY_AUTHORIZATION }}
@@ -406,6 +407,7 @@ jobs:
           GH_AW_STEPS_SANITIZED_OUTPUTS_TEXT: ${{ steps.sanitized.outputs.text }}
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_EXPORTER_OTLP_PROTOCOL: ""
           OTEL_RESOURCE_ATTRIBUTES: ""
           OTEL_SERVICE_NAME: ""
       - name: Interpolate variables and render templates
@@ -438,6 +440,7 @@ jobs:
           GH_AW_SUB_AGENT_EXT: .agent.md
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_EXPORTER_OTLP_PROTOCOL: ""
           OTEL_RESOURCE_ATTRIBUTES: ""
           OTEL_SERVICE_NAME: ""
       - name: Substitute placeholders
@@ -497,6 +500,7 @@ jobs:
           GH_AW_STEPS_SANITIZED_OUTPUTS_TEXT: ${{ steps.sanitized.outputs.text }}
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_EXPORTER_OTLP_PROTOCOL: ""
           OTEL_RESOURCE_ATTRIBUTES: ""
           OTEL_SERVICE_NAME: ""
       - name: Validate prompt placeholders
@@ -510,6 +514,7 @@ jobs:
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_EXPORTER_OTLP_PROTOCOL: ""
           OTEL_RESOURCE_ATTRIBUTES: ""
           OTEL_SERVICE_NAME: ""
       - name: Print prompt
@@ -523,6 +528,7 @@ jobs:
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_EXPORTER_OTLP_PROTOCOL: ""
           OTEL_RESOURCE_ATTRIBUTES: ""
           OTEL_SERVICE_NAME: ""
       - name: Inventory installed skills
@@ -2848,6 +2854,15 @@ jobs:
           GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"max\":1},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"push_to_pull_request_branch\":{\"if_no_changes\":\"warn\",\"max_patch_size\":4096,\"protect_top_level_dot_folders\":true,\"protected_files\":[\"package.json\",\"bun.lockb\",\"bunfig.toml\",\"deno.json\",\"deno.jsonc\",\"deno.lock\",\"global.json\",\"NuGet.Config\",\"Directory.Packages.props\",\"mix.exs\",\"mix.lock\",\"go.mod\",\"go.sum\",\"stack.yaml\",\"stack.yaml.lock\",\"pom.xml\",\"build.gradle\",\"build.gradle.kts\",\"settings.gradle\",\"settings.gradle.kts\",\"gradle.properties\",\"package-lock.json\",\"yarn.lock\",\"pnpm-lock.yaml\",\"npm-shrinkwrap.json\",\"requirements.txt\",\"Pipfile\",\"Pipfile.lock\",\"pyproject.toml\",\"setup.py\",\"setup.cfg\",\"Gemfile\",\"Gemfile.lock\",\"uv.lock\",\"CODEOWNERS\",\"DESIGN.md\",\"README.md\",\"CONTRIBUTING.md\",\"SECURITY.md\",\"CODE_OF_CONDUCT.md\",\"AGENTS.md\"],\"protected_files_path_exclude\":[\".changeset/*.md\"],\"protected_files_policy\":\"request-review\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
           GH_AW_CI_TRIGGER_TOKEN: ${{ secrets.GH_AW_CI_TRIGGER_TOKEN }}
           GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
+          GH_AW_SECRET_NAMES: 'GH_AW_CI_TRIGGER_TOKEN,GH_AW_GITHUB_MCP_SERVER_TOKEN,GH_AW_GITHUB_TOKEN,GH_AW_OTEL_GRAFANA_AUTHORIZATION,GH_AW_OTEL_GRAFANA_ENDPOINT,GH_AW_OTEL_SENTRY_AUTHORIZATION,GH_AW_OTEL_SENTRY_ENDPOINT,GITHUB_TOKEN'
+          SECRET_GH_AW_CI_TRIGGER_TOKEN: ${{ secrets.GH_AW_CI_TRIGGER_TOKEN }}
+          SECRET_GH_AW_GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN }}
+          SECRET_GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}
+          SECRET_GH_AW_OTEL_GRAFANA_AUTHORIZATION: ${{ secrets.GH_AW_OTEL_GRAFANA_AUTHORIZATION }}
+          SECRET_GH_AW_OTEL_GRAFANA_ENDPOINT: ${{ secrets.GH_AW_OTEL_GRAFANA_ENDPOINT }}
+          SECRET_GH_AW_OTEL_SENTRY_AUTHORIZATION: ${{ secrets.GH_AW_OTEL_SENTRY_AUTHORIZATION }}
+          SECRET_GH_AW_OTEL_SENTRY_ENDPOINT: ${{ secrets.GH_AW_OTEL_SENTRY_ENDPOINT }}
+          SECRET_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -2857,8 +2872,46 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit, process.env.GH_AW_GITHUB_TOKEN_SOURCE);
             const { main } = require(path.join(actionsDir, 'process_safe_outputs.cjs'));
             await main();
-      - name: Upload Safe Outputs Items
+      - name: Redact secrets in logs
+        id: redact_secrets
         if: always()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'redact_secrets.cjs'));
+            await main();
+        env:
+          GH_AW_SECRET_NAMES: 'GH_AW_CI_TRIGGER_TOKEN,GH_AW_GITHUB_MCP_SERVER_TOKEN,GH_AW_GITHUB_TOKEN,GH_AW_OTEL_GRAFANA_AUTHORIZATION,GH_AW_OTEL_GRAFANA_ENDPOINT,GH_AW_OTEL_SENTRY_AUTHORIZATION,GH_AW_OTEL_SENTRY_ENDPOINT,GITHUB_TOKEN'
+          SECRET_GH_AW_CI_TRIGGER_TOKEN: ${{ secrets.GH_AW_CI_TRIGGER_TOKEN }}
+          SECRET_GH_AW_GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN }}
+          SECRET_GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}
+          SECRET_GH_AW_OTEL_GRAFANA_AUTHORIZATION: ${{ secrets.GH_AW_OTEL_GRAFANA_AUTHORIZATION }}
+          SECRET_GH_AW_OTEL_GRAFANA_ENDPOINT: ${{ secrets.GH_AW_OTEL_GRAFANA_ENDPOINT }}
+          SECRET_GH_AW_OTEL_SENTRY_AUTHORIZATION: ${{ secrets.GH_AW_OTEL_SENTRY_AUTHORIZATION }}
+          SECRET_GH_AW_OTEL_SENTRY_ENDPOINT: ${{ secrets.GH_AW_OTEL_SENTRY_ENDPOINT }}
+          SECRET_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Validate recovery envelopes before upload
+        id: validate_recovery_envelopes
+        if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_OBJECT_PACK_MAX_BYTES: ${{ vars.GH_AW_OBJECT_PACK_MAX_BYTES }}
+          GH_AW_OBJECT_PACK_MAX_OBJECTS: ${{ vars.GH_AW_OBJECT_PACK_MAX_OBJECTS }}
+          GH_AW_OBJECT_PACK_TIMEOUT_MS: ${{ vars.GH_AW_OBJECT_PACK_TIMEOUT_MS }}
+          GH_AW_OBJECT_PACK_FETCH_DEPTHS: ${{ vars.GH_AW_OBJECT_PACK_FETCH_DEPTHS }}
+          GH_AW_RECOVERY_ADDITIONAL_ROOTS: '[]'
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core, additionalRoots: JSON.parse(process.env.GH_AW_RECOVERY_ADDITIONAL_ROOTS) });
+      - name: Upload Safe Outputs Items
+        if: always() && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: safe-outputs-items

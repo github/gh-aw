@@ -86,6 +86,7 @@ run-name: "Poem Bot - A Creative Agentic Workflow"
 
 env:
   OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.GH_AW_OTEL_SENTRY_ENDPOINT }}
+  OTEL_EXPORTER_OTLP_PROTOCOL: ${{ vars.OTEL_EXPORTER_OTLP_PROTOCOL }}
   OTEL_SERVICE_NAME: gh-aw.poem-bot
   OTEL_RESOURCE_ATTRIBUTES: 'gh-aw.workflow.name=Poem%20Bot%20-%20A%20Creative%20Agentic%20Workflow,gh-aw.repository=${{ github.repository }},gh-aw.run.id=${{ github.run_id }},github.run_id=${{ github.run_id }},gh-aw.engine.id=codex'
   OTEL_EXPORTER_OTLP_HEADERS: x-sentry-auth=${{ secrets.GH_AW_OTEL_SENTRY_AUTHORIZATION }}
@@ -422,6 +423,7 @@ jobs:
           GH_AW_STEPS_SANITIZED_OUTPUTS_TEXT: ${{ steps.sanitized.outputs.text }}
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_EXPORTER_OTLP_PROTOCOL: ""
           OTEL_RESOURCE_ATTRIBUTES: ""
           OTEL_SERVICE_NAME: ""
       - name: Interpolate variables and render templates
@@ -455,6 +457,7 @@ jobs:
           GH_AW_SUB_AGENT_EXT: .md
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_EXPORTER_OTLP_PROTOCOL: ""
           OTEL_RESOURCE_ATTRIBUTES: ""
           OTEL_SERVICE_NAME: ""
       - name: Substitute placeholders
@@ -520,6 +523,7 @@ jobs:
           GH_AW_STEPS_SANITIZED_OUTPUTS_TEXT: ${{ steps.sanitized.outputs.text }}
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_EXPORTER_OTLP_PROTOCOL: ""
           OTEL_RESOURCE_ATTRIBUTES: ""
           OTEL_SERVICE_NAME: ""
       - name: Validate prompt placeholders
@@ -533,6 +537,7 @@ jobs:
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_EXPORTER_OTLP_PROTOCOL: ""
           OTEL_RESOURCE_ATTRIBUTES: ""
           OTEL_SERVICE_NAME: ""
       - name: Print prompt
@@ -546,6 +551,7 @@ jobs:
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_EXPORTER_OTLP_PROTOCOL: ""
           OTEL_RESOURCE_ATTRIBUTES: ""
           OTEL_SERVICE_NAME: ""
       - name: Inventory installed skills
@@ -3233,6 +3239,16 @@ jobs:
           GH_AW_SAFE_OUTPUTS_STAGED: "true"
           GH_AW_AGENT_SESSION_TOKEN: ${{ secrets.GH_AW_AGENT_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
+          GH_AW_SECRET_NAMES: 'COPILOT_GITHUB_TOKEN,GH_AW_AGENT_TOKEN,GH_AW_GITHUB_MCP_SERVER_TOKEN,GH_AW_GITHUB_TOKEN,GH_AW_OTEL_GRAFANA_AUTHORIZATION,GH_AW_OTEL_GRAFANA_ENDPOINT,GH_AW_OTEL_SENTRY_AUTHORIZATION,GH_AW_OTEL_SENTRY_ENDPOINT,GITHUB_TOKEN'
+          SECRET_COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          SECRET_GH_AW_AGENT_TOKEN: ${{ secrets.GH_AW_AGENT_TOKEN }}
+          SECRET_GH_AW_GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN }}
+          SECRET_GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}
+          SECRET_GH_AW_OTEL_GRAFANA_AUTHORIZATION: ${{ secrets.GH_AW_OTEL_GRAFANA_AUTHORIZATION }}
+          SECRET_GH_AW_OTEL_GRAFANA_ENDPOINT: ${{ secrets.GH_AW_OTEL_GRAFANA_ENDPOINT }}
+          SECRET_GH_AW_OTEL_SENTRY_AUTHORIZATION: ${{ secrets.GH_AW_OTEL_SENTRY_AUTHORIZATION }}
+          SECRET_GH_AW_OTEL_SENTRY_ENDPOINT: ${{ secrets.GH_AW_OTEL_SENTRY_ENDPOINT }}
+          SECRET_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

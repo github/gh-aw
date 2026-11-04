@@ -265,6 +265,7 @@ func processedRunsToCrossRunInputs(processedRuns []ProcessedRun) []crossRunInput
 			BehaviorFingerprint: pr.BehaviorFingerprint,
 			GradersCluster:      deriveGradersClusterValue(pr.Run.LogsPath),
 			EvalsCluster:        deriveEvalsClusterValue(pr.Run.LogsPath),
+			ProtectedFiles:      readAuditProtectedFiles(pr.Run),
 		})
 	}
 	return inputs

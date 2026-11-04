@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { buildSafeOutputOutcomes, canonicalSafeOutputUrl, projectSafeOutputData, finalizeBufferedReviewOutcomes } from "./safe_output_outcomes.cjs";
-import { writeSafeOutputOutcomes, extractCreatedItemFromResult } from "./safe_output_manifest.cjs";
+import { writeSafeOutputOutcomes, extractCreatedItemFromResult, createManifestLogger } from "./safe_output_manifest.cjs";
 import { main as actionHandlerFactory } from "./safe_output_action_handler.cjs";
 import { computeSafeOutputsStatus } from "./safe_outputs_status.cjs";
 import { main as handlerManagerMain, processMessages, rollbackReviewResultsForPR, skipReviewResultsForPR } from "./safe_output_handler_manager.cjs";
@@ -214,6 +214,119 @@ describe("safe-output application outcomes", () => {
       status: "success",
       url: "https://github.com/org/repo/issues/1",
     });
+  });
+
+  it("projects only bounded repository-relative protection paths and categorical diagnostics", () => {
+    const data = projectSafeOutputData({
+      type: "push_to_pull_request_branch",
+      status: "success",
+      metadata: {
+        file_protection: {
+          action: "fallback",
+          source: "protected",
+          files: [
+            ".github/workflows/finisher.md",
+            ".github/workflows/finisher.md",
+            "docs/with space.md",
+            "/PRIVATE_HOME/file",
+            "../PRIVATE_PARENT",
+            "folder/../PRIVATE_PARENT",
+            "folder//PRIVATE_PATH",
+            "https://PRIVATE_URL",
+            "C:\\PRIVATE_HOME",
+            "PRIVATE\nCONTENT",
+            "x".repeat(4097),
+            null,
+            { content: "PRIVATE" },
+          ],
+          content: "PRIVATE",
+        },
+        fallback_used: true,
+        target_pull_request_number: 123,
+        body: "PRIVATE",
+      },
+    });
+    expect(data).toEqual({
+      type: "push_to_pull_request_branch",
+      status: "success",
+      file_protection: { action: "fallback", source: "protected", files: [".github/workflows/finisher.md", "docs/with space.md"] },
+      fallback_used: true,
+      target_pull_request_number: 123,
+    });
+    expect(projectSafeOutputData(data)).toEqual(data);
+    expect(JSON.stringify(data)).not.toContain("PRIVATE");
+  });
+
+  it.each([null, "PRIVATE", [], { action: "PRIVATE", files: ["package.json"] }, { action: "deny", files: "PRIVATE" }])("omits malformed protection diagnostics %j", fileProtection => {
+    expect(projectSafeOutputData({ type: "push_to_pull_request_branch", metadata: { file_protection: fileProtection, target_pull_request_number: -1, fallback_used: "PRIVATE" } })).toEqual({
+      type: "push_to_pull_request_branch",
+    });
+  });
+
+  it.each([
+    [{ success: false }, "failed"],
+    [{ success: false, skipped: true }, "skipped"],
+    [{ success: true, staged: true }, "staged"],
+  ])("keeps detected protection without claiming a published fallback for %s", (result, status) => {
+    const [outcome] = buildSafeOutputOutcomes([
+      {
+        type: "push_to_pull_request_branch",
+        ...result,
+        result: { metadata: { file_protection: { action: "deny", source: "protected", files: ["package.json"] }, fallback_used: true } },
+      },
+    ]);
+    expect(outcome).toMatchObject({ status, file_protection: { action: "deny", source: "protected", files: ["package.json"] } });
+    expect(outcome).not.toHaveProperty("fallback_used");
+  });
+
+  it("persists fallback files and target PR through manifests and the unified session without exposing secrets", () => {
+    const root = fs.mkdtempSync(path.join(process.cwd(), ".safe-output-outcomes-test-"));
+    vi.stubGlobal("core", { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), error: vi.fn() });
+    vi.stubEnv("GH_AW_SECRET_NAMES", "TEST");
+    vi.stubEnv("SECRET_TEST", "opaque-secret");
+    try {
+      const result = {
+        success: true,
+        fallback_used: true,
+        issue_number: 456,
+        issue_url: "https://github.com/org/repo/issues/456",
+        metadata: {
+          file_protection: { action: "fallback", files: [".github/workflows/finisher.md", ".github/opaque-secret.json", `.github/ghp_${"A".repeat(36)}.json`] },
+          fallback_used: true,
+          target_pull_request_number: 123,
+          body: "PRIVATE_BODY",
+        },
+      };
+      const item = extractCreatedItemFromResult("push_to_pull_request_branch", result);
+      createManifestLogger(path.join(root, "safe-output-items.jsonl"))(item);
+      writeSafeOutputOutcomes([{ type: "push_to_pull_request_branch", messageIndex: 0, success: true, result }], false, path.join(root, "safe-output-outcomes.jsonl"));
+      for (const artifact of ["safe-output-items.jsonl", "safe-output-outcomes.jsonl"]) {
+        const recorded = fs.readFileSync(path.join(root, artifact), "utf8");
+        expect(recorded).not.toContain("opaque-secret");
+        expect(recorded).not.toContain(`ghp_${"A".repeat(36)}`);
+      }
+      const events = writeUnifiedSession({ rootDir: root, graders: [] });
+      const diagnostics = events.filter(event => ["safe_output.result", "safe_output.outcome"].includes(event.type));
+      expect(diagnostics).toHaveLength(2);
+      for (const event of diagnostics) {
+        expect(event.data).toMatchObject({
+          type: "push_to_pull_request_branch",
+          status: "success",
+          url: result.issue_url,
+          fallback_used: true,
+          target_pull_request_number: 123,
+          file_protection: { action: "fallback", files: expect.arrayContaining([".github/workflows/finisher.md"]) },
+        });
+        expect(event.provenance).toMatchObject({ component: "safe_output", phase: "safe_outputs" });
+      }
+      const persisted = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8");
+      expect(persisted).not.toContain("opaque-secret");
+      expect(persisted).not.toContain(`ghp_${"A".repeat(36)}`);
+      expect(persisted).not.toContain("PRIVATE_BODY");
+      expect(validateSession(persisted)).toBe(events.length);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it("records custom action payload exports as delegated, never applied", async () => {

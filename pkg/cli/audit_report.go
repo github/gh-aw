@@ -80,6 +80,7 @@ type AuditData struct {
 	EvidenceSearch             *AuditEvidenceSearch     `json:"evidence_search,omitempty"`
 	ModelCatalog               *AuditModelCatalog       `json:"model_catalog,omitempty"`
 	Retries                    *AuditRetrySummary       `json:"retries,omitempty"`
+	ProtectedFiles             *AuditProtectedFiles     `json:"protected_files,omitempty"`
 }
 
 // AuditFinding represents a key insight discovered during audit
@@ -572,6 +573,7 @@ func assembleAuditData(inputs auditDataInputs) AuditData {
 	return AuditData{
 		SchemaVersion:           auditSchemaVersion,
 		Retries:                 readAuditRetrySummary(run.LogsPath),
+		ProtectedFiles:          readAuditProtectedFiles(run),
 		Overview:                inputs.overview,
 		TaskDomain:              inputs.taskDomain,
 		BehaviorFingerprint:     inputs.behaviorFingerprint,

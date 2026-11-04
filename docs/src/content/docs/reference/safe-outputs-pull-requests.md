@@ -659,6 +659,8 @@ safe-outputs:
 
 **`push-to-pull-request-branch` with `fallback-to-issue`**: instead of pushing to the PR branch, a review issue is created with the target PR link, patch download/apply instructions, and a review warning.
 
+For `push-to-pull-request-branch`, the unified session records detected paths in `data.file_protection.files` on `safe_output.result` and `safe_output.outcome` events. `file_protection.action` distinguishes `deny` from `fallback`; denials also identify the check in `file_protection.source`. A published fallback issue records `fallback_used: true`, its URL, and `target_pull_request_number`. Its `status: success` means the issue was created, not that changes were pushed. Failed fallback publication retains the detected paths without claiming a published issue. Agent-controlled filenames are redacted for configured secrets and built-in credential patterns before handler diagnostics and artifact/session persistence; audit preserves that redaction. These diagnostics preserve the configured protections and omit patch contents.
+
 Protected-file fallback issues receive the `pull-request-fallback` label alongside `agentic-workflows`. For updates to an existing PR, the issue inherits the PR's expiration date, or expires after 7 days if the PR has no active expiration. For PR creation, the issue uses the configured PR expiration, defaulting to 7 days.
 
 ```yaml wrap

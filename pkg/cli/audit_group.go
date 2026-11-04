@@ -18,9 +18,10 @@ import (
 
 // GroupedAuditReport represents audit findings grouped by run and stable finding code.
 type GroupedAuditReport struct {
-	RunsAnalyzed int                 `json:"runs_analyzed"`
-	SkippedRuns  []int64             `json:"skipped_runs,omitempty"`
-	Entries      []GroupedAuditEntry `json:"entries"`
+	RunsAnalyzed   int                    `json:"runs_analyzed"`
+	SkippedRuns    []int64                `json:"skipped_runs,omitempty"`
+	Entries        []GroupedAuditEntry    `json:"entries"`
+	ProtectedFiles []*AuditProtectedFiles `json:"protected_files,omitempty"`
 }
 
 // GroupedAuditEntry summarizes all findings for one [run, audit code] pair.
@@ -80,6 +81,7 @@ func recordGroupedAuditRun(outputDir string, runID int64, report *GroupedAuditRe
 	}
 	findings := filterActionableFindings(auditData.KeyFindings)
 	report.Entries = append(report.Entries, groupAuditFindingsForRun(runID, findings)...)
+	report.ProtectedFiles = mergeAuditProtectedFiles(append(report.ProtectedFiles, auditData.ProtectedFiles))
 }
 
 type groupedAuditRunRequest struct {
@@ -193,6 +195,7 @@ func renderGroupedAuditReport(report GroupedAuditReport, opts auditCommandOption
 }
 
 func renderGroupedAuditReportPretty(report GroupedAuditReport) {
+	renderAuditProtectedFiles(os.Stderr, report.ProtectedFiles, false)
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Grouped audit findings across %d run(s)", report.RunsAnalyzed)))
 	if len(report.SkippedRuns) > 0 {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Skipped run(s): "+formatRunIDList(report.SkippedRuns)))
@@ -208,6 +211,7 @@ func renderGroupedAuditReportPretty(report GroupedAuditReport) {
 }
 
 func renderGroupedAuditReportMarkdown(report GroupedAuditReport) {
+	renderAuditProtectedFiles(os.Stdout, report.ProtectedFiles, true)
 	fmt.Fprintf(os.Stdout, "### Grouped Audit Findings\n\n")
 	fmt.Fprintf(os.Stdout, "Runs analyzed: %d\n\n", report.RunsAnalyzed)
 	if len(report.SkippedRuns) > 0 {

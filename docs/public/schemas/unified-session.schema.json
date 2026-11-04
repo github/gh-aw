@@ -1172,7 +1172,15 @@
         "status": { "$ref": "#/definitions/JsonValue" },
         "errorCode": { "$ref": "#/definitions/JsonValue" },
         "messageIndex": { "type": "number" },
-        "staged": { "type": "boolean" }
+        "staged": { "type": "boolean" },
+        "file_protection": {
+          "type": "object",
+          "properties": { "action": { "type": "string", "enum": ["deny", "fallback"] }, "files": { "type": "array", "items": { "type": "string" } }, "source": { "type": "string", "enum": ["allowlist", "protected", "post-apply"] } },
+          "required": ["action", "files"],
+          "additionalProperties": false
+        },
+        "fallback_used": { "type": "boolean" },
+        "target_pull_request_number": { "type": "number" }
       },
       "additionalProperties": false
     },
@@ -1189,6 +1197,14 @@
         "errorCode": { "$ref": "#/definitions/JsonValue" },
         "messageIndex": { "type": "number" },
         "staged": { "type": "boolean" },
+        "file_protection": {
+          "type": "object",
+          "properties": { "action": { "type": "string", "enum": ["deny", "fallback"] }, "files": { "type": "array", "items": { "type": "string" } }, "source": { "type": "string", "enum": ["allowlist", "protected", "post-apply"] } },
+          "required": ["action", "files"],
+          "additionalProperties": false
+        },
+        "fallback_used": { "type": "boolean" },
+        "target_pull_request_number": { "type": "number" },
         "errors": { "type": "array", "items": { "$ref": "#/definitions/SafeOutputData" } }
       },
       "additionalProperties": false

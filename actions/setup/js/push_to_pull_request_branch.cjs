@@ -33,6 +33,7 @@ const { extractPatchBaseCommit } = require("./commit_sha_helpers.cjs");
 const { findRepoCheckout } = require("./find_repo_checkout.cjs");
 const { getThreatWarningPresentation, getEffectiveDetectionConclusion } = require("./threat_detection_warning.cjs");
 const { attachExecutionState } = require("./safe_output_execution_metadata.cjs");
+const { collectArtifactSecretValues, redactManifestValue } = require("./safe_output_manifest.cjs");
 const { resolveTransportPaths } = require("./resolve_transport_paths.cjs");
 const { recoverObjectPack, isObjectPack, recoveryToken, traceObjectPack } = require("./object_pack_transport.cjs");
 const { buildManualBranchApplyCommands, buildFallbackIssueBlocks, withTransientPushRetry } = require("./create_pull_request_helpers.cjs");
@@ -47,6 +48,28 @@ const MAX_BUNDLE_PARENT_COMPARISONS = 4;
 const MAX_BUNDLE_HISTORY_COMMITS = 100;
 const BUNDLE_VALIDATION_TIMEOUT_MS = 5000;
 const BUNDLE_VALIDATION_MAX_OUTPUT = 1024 * 1024;
+
+/**
+ * @param {{action: "deny" | "fallback", files: string[], source?: string}} protection
+ * @returns {{file_protection: {action: string, files: string[], source?: string}}}
+ */
+function fileProtectionMetadata(protection) {
+  const secretValues = collectArtifactSecretValues();
+  const files = protection.files.map(file => {
+    const redacted = redactManifestValue(file, secretValues);
+    if (typeof redacted !== "string") {
+      throw new Error(`${ERR_SYSTEM}: Protected filename redaction must return a string`);
+    }
+    return redacted;
+  });
+  return {
+    file_protection: {
+      action: protection.action,
+      files: [...new Set(files)].sort(),
+      ...(protection.source ? { source: protection.source } : {}),
+    },
+  };
+}
 
 /**
  * @param {Record<string, unknown>} options
@@ -691,7 +714,7 @@ async function main(config = {}) {
     let protectedFilesForFallback = [];
     /**
      * @param {string} patchContent
-     * @returns {{ error: { success: boolean, error: string, skipped?: boolean, reasonCode?: string } | null, fallbackFiles: string[] }}
+     * @returns {{ error: { success: boolean, error: string, skipped?: boolean, reasonCode?: string, metadata?: ReturnType<typeof fileProtectionMetadata> } | null, fallbackFiles: string[] }}
      */
     function validatePatch(patchContent) {
       const fallbackFiles = [];
@@ -745,7 +768,7 @@ async function main(config = {}) {
               ? `Cannot push to pull request branch: patch modifies files outside the allowed-files list (${filesStr}). Add the files to the allowed-files configuration field or remove them from the patch.`
               : `Cannot push to pull request branch: patch modifies protected files (${filesStr}). Add them to the allowed-files configuration field or set protected-files: fallback-to-issue to create a review issue instead.`;
           core.warning(msg);
-          return { error: { success: false, skipped: true, reasonCode: POLICY_FILE_PROTECTION_DENIED_REASON_CODE, error: msg }, fallbackFiles };
+          return { error: { success: false, skipped: true, reasonCode: POLICY_FILE_PROTECTION_DENIED_REASON_CODE, error: msg, metadata: fileProtectionMetadata(protection) }, fallbackFiles };
         }
         if (protection.action === "fallback") {
           fallbackFiles.push(...protection.files);
@@ -1047,6 +1070,10 @@ async function main(config = {}) {
     }
 
     const createProtectedFilesFallbackIssue = async files => {
+      const protectionMetadata = {
+        ...fileProtectionMetadata({ action: "fallback", files }),
+        target_pull_request_number: pullNumber,
+      };
       transport.assertUnchanged();
       const runUrl = buildWorkflowRunUrl(context, context.repo);
       const runId = context.runId;
@@ -1107,6 +1134,7 @@ async function main(config = {}) {
             fallback_used: true,
             issue_number: issue.number,
             issue_url: issue.html_url,
+            metadata: { ...protectionMetadata, fallback_used: true },
           },
           branchStateBefore,
           branchStateBefore
@@ -1114,7 +1142,7 @@ async function main(config = {}) {
       } catch (issueError) {
         const error = `Manifest file protection: failed to create review issue. Error: ${getErrorMessage(issueError)}`;
         core.error(error);
-        return { success: false, error };
+        return { success: false, error, metadata: protectionMetadata };
       }
     };
 
@@ -1347,7 +1375,7 @@ async function main(config = {}) {
                     ? `Cannot push to pull request branch: bundle modifies files outside the allowed-files list (${filesStr}). Add the files to the allowed-files configuration field or remove them from the bundle.`
                     : `Cannot push to pull request branch: bundle modifies protected files (${filesStr}). Add them to the allowed-files configuration field or set protected-files: fallback-to-issue to create a review issue instead.`;
                 core.warning(msg);
-                return { success: false, skipped: true, reasonCode: POLICY_FILE_PROTECTION_DENIED_REASON_CODE, error: msg };
+                return { success: false, skipped: true, reasonCode: POLICY_FILE_PROTECTION_DENIED_REASON_CODE, error: msg, metadata: fileProtectionMetadata(bundleProtection) };
               }
               if (bundleProtection.action === "fallback") {
                 core.warning(`Protected file protection triggered (fallback-to-issue): ${bundleProtection.files.join(", ")}. Will create review issue instead of pushing.`);
@@ -1515,7 +1543,7 @@ async function main(config = {}) {
             core.error(msg);
             // Reset to pre-apply state
             await exec.exec("git", ["reset", "--hard", rangeBaseRef], baseGitOpts);
-            return { success: false, error: msg };
+            return { success: false, error: msg, metadata: fileProtectionMetadata(postApplyProtection) };
           }
           if (postApplyProtection.action === "fallback") {
             core.warning(`Post-apply: Protected file protection triggered (fallback-to-issue): ${postApplyProtection.files.join(", ")}`);

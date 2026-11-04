@@ -45,6 +45,7 @@ type CrossRunAuditReport struct {
 	Edges                []EpisodeEdge               `json:"edges,omitempty"`
 	Outcomes             []OutcomesData              `json:"outcomes,omitempty"`
 	EpisodeOutcomes      *EpisodeOutcomesData        `json:"episode_outcomes,omitempty"`
+	ProtectedFiles       []*AuditProtectedFiles      `json:"protected_files,omitempty"`
 }
 
 // CrossRunSummary provides top-level statistics across all analyzed runs.
@@ -208,6 +209,7 @@ type crossRunInput struct {
 	BehaviorFingerprint *BehaviorFingerprint
 	GradersCluster      string
 	EvalsCluster        string
+	ProtectedFiles      *AuditProtectedFiles
 }
 
 // buildCrossRunAuditReport aggregates data from multiple runs into a CrossRunAuditReport.
@@ -230,6 +232,11 @@ func buildCrossRunAuditReport(inputs []crossRunInput) *CrossRunAuditReport {
 
 	report.Drain3Insights = buildDrain3InsightsFromCrossRunInputs(inputs)
 	report.ClusterAnalysis = buildClusterAnalysis(inputs)
+	protectionReports := make([]*AuditProtectedFiles, 0, len(inputs))
+	for _, input := range inputs {
+		protectionReports = append(protectionReports, input.ProtectedFiles)
+	}
+	report.ProtectedFiles = mergeAuditProtectedFiles(protectionReports)
 	return report
 }
 

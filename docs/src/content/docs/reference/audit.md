@@ -35,6 +35,31 @@ Top-level fields in `--json` output are stable; nested sub-fields may be extende
 
 By default a single-run audit renders a Comparison section against an earlier run of the same workflow. Use `--no-baseline` when that baseline is unrepresentative or to avoid the extra downloads. A `--no-baseline` result is never written to the audit cache, so it cannot suppress the Comparison section of a later default audit.
 
+### Protected files
+
+Single-run audit JSON includes `protected_files` with recorded blocked paths,
+protection action and source, operation status, target PR, fallback publication
+status, and run/source references. Grouped audits (`--group`) and cross-run
+reports aggregate these diagnostics by repository and workflow path rather than
+PR-specific display titles. Console and Markdown output list the paths.
+
+Only executed `safe_output.result` and `safe_output.outcome` records from the
+safe-output phase contribute. Mirrored records are deduplicated; an agent's
+requested operation is not evidence of a push or fallback issue. A successful
+fallback means an issue was published, not that changes were pushed.
+
+Protected filenames are untrusted, agent-controlled data. The producer and
+artifact/session writers redact configured secrets and built-in credential
+patterns before persistence. Branch-push safe-output producers receive the
+referenced secrets from the global, agent, and safe-output environments; a
+required final redaction pass gates artifact upload on success. Audit reads
+that redacted session rather than
+recovering filenames from raw logs or issue bodies. Redaction can merge distinct
+filenames into one masked path. `unavailable_runs` identifies runs without
+recorded protection paths, including historical sessions; `partial` indicates
+incomplete or invalid evidence. Missing paths do not prove that no files were
+blocked.
+
 ### Retry history
 
 When unified-session retry evidence is available, `--json` includes a `retries`

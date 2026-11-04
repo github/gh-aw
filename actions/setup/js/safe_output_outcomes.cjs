@@ -69,6 +69,22 @@ function projectSafeOutputData(source) {
   if (typeof source.staged === "boolean") data.staged = source.staged;
   const url = canonicalSafeOutputUrl(source.url);
   if (url) data.url = url;
+  const metadata = source.metadata && typeof source.metadata === "object" && !Array.isArray(source.metadata) ? source.metadata : undefined;
+  const protection = source.file_protection ?? metadata?.file_protection;
+  if (protection && typeof protection === "object" && !Array.isArray(protection) && ["deny", "fallback"].includes(protection.action) && Array.isArray(protection.files)) {
+    const files = protection.files.filter(file => typeof file === "string" && file.length > 0 && file.length <= 4096 && !/[\u0000-\u001f\u007f\\:]/.test(file) && file.split("/").every(part => part !== "" && part !== "." && part !== ".."));
+    if (files.length > 0) {
+      data.file_protection = {
+        action: protection.action,
+        files: [...new Set(files)].sort(),
+        ...(["allowlist", "protected", "post-apply"].includes(protection.source) ? { source: protection.source } : {}),
+      };
+    }
+  }
+  const fallbackUsed = source.fallback_used ?? metadata?.fallback_used;
+  if (typeof fallbackUsed === "boolean" && source.staged !== true && ["success", "warning"].includes(source.status)) data.fallback_used = fallbackUsed;
+  const targetPullRequest = source.target_pull_request_number ?? metadata?.target_pull_request_number;
+  if (Number.isSafeInteger(targetPullRequest) && targetPullRequest > 0) data.target_pull_request_number = targetPullRequest;
   return data;
 }
 
@@ -96,6 +112,7 @@ function buildSafeOutputOutcomes(results, staged = false) {
           status: isStaged && status === "success" ? "staged" : status,
           staged: isStaged,
           url,
+          metadata: result?.metadata,
         }),
       };
     });

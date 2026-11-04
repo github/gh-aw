@@ -392,6 +392,13 @@ export interface SafeOutputData {
   errorCode?: JsonValue;
   messageIndex?: number;
   staged?: boolean;
+  file_protection?: {
+    action: "deny" | "fallback";
+    files: string[];
+    source?: "allowlist" | "protected" | "post-apply";
+  };
+  fallback_used?: boolean;
+  target_pull_request_number?: number;
 }
 
 export interface SafeOutputErrorData extends SafeOutputData {

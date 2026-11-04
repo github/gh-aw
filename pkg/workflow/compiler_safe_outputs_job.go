@@ -976,9 +976,9 @@ func (c *Compiler) appendFinalSafeOutputSteps(data *WorkflowData, steps []string
 	hasMergeDecisions := data.SafeOutputs.MergePullRequest != nil
 	if !isStaged || hasMergeDecisions {
 		claimArtifacts := isWorkQueueWorker(data)
-		if claimArtifacts || hasMergeDecisions {
+		if safeOutputManifestRequiresRedaction(data, claimArtifacts) {
 			var redaction strings.Builder
-			c.generateTrackedSecretRedactionStep(&redaction, strings.Join(steps, ""), data)
+			c.generateTrackedSecretRedactionStep(&redaction, c.safeOutputRedactionContext(data, steps), data)
 			steps = append(steps, redaction.String())
 		}
 		steps = append(steps, buildSafeOutputManifestUploadStep(agentArtifactPrefix, c.getActionPin, claimArtifacts, data, !isStaged)...)
@@ -992,6 +992,52 @@ func (c *Compiler) appendFinalSafeOutputSteps(data *WorkflowData, steps []string
 		steps = append(steps, c.generateScriptModeCleanupStep())
 	}
 	return steps
+}
+
+func (c *Compiler) safeOutputRedactionContext(data *WorkflowData, steps []string) string {
+	var context strings.Builder
+	context.WriteString(data.Env)
+	context.WriteString(strings.Join(steps, ""))
+	for jobName, jobConfig := range data.Jobs {
+		target := normalizeBuiltinJobAlias(jobName)
+		if target != string(constants.AgentJobName) && target != string(constants.SafeOutputsJobName) {
+			continue
+		}
+		if config, ok := jobConfig.(map[string]any); ok {
+			// These validated definitions are inserted after safe-output jobs are built.
+			appendRedactionReferenceStrings(&context, config["setup-steps"])
+			appendRedactionReferenceStrings(&context, config["pre-steps"])
+		}
+	}
+	if c.jobManager != nil {
+		if agent, exists := c.jobManager.GetJob(string(constants.AgentJobName)); exists {
+			context.WriteString(strings.Join(agent.Steps, ""))
+			for _, value := range agent.Env {
+				context.WriteString(value)
+			}
+		}
+	}
+	return context.String()
+}
+
+func appendRedactionReferenceStrings(context *strings.Builder, value any) {
+	switch typed := value.(type) {
+	case string:
+		context.WriteString(typed)
+		context.WriteByte('\n')
+	case map[string]any:
+		for _, child := range typed {
+			appendRedactionReferenceStrings(context, child)
+		}
+	case map[string]string:
+		for _, child := range typed {
+			appendRedactionReferenceStrings(context, child)
+		}
+	case []any:
+		for _, child := range typed {
+			appendRedactionReferenceStrings(context, child)
+		}
+	}
 }
 
 // buildSafeOutputsJobCondition constructs the "if" expression for the safe_outputs job.

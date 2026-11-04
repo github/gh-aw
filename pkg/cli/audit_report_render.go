@@ -529,6 +529,7 @@ func renderConsoleWarnings(warnings []ValidationIssue) {
 }
 
 func renderConsoleOperationalSections(data AuditData) {
+	renderAuditProtectedFiles(os.Stderr, []*AuditProtectedFiles{data.ProtectedFiles}, false)
 	renderConsoleWorkQueue(data.WorkQueue)
 	renderConsoleSkillActivations(data.SkillActivations)
 	renderConsoleGatewaySteeringEvents(data.GatewaySteeringEvents)
