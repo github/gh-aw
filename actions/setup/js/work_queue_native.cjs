@@ -149,9 +149,10 @@ async function dispatchTag(githubClient, destination) {
   const sha = immutableRef(destination.ref);
   const ref = `refs/tags/gh-aw/work-queue/${sha}`;
   const parameters = { owner, repo, ref: ref.slice("refs/".length), headers: { "X-GitHub-Api-Version": API_VERSION }, request: { retries: 0, retryCount: 0, timeout: 15000 } };
+  const readTag = () => readNativeMetadata(request => githubClient.rest.git.getRef({ ...parameters, request }), "dispatch.tag.read");
   let response;
   try {
-    response = await githubClient.rest.git.getRef(parameters);
+    response = await readTag();
   } catch (error) {
     const failure = error && typeof error === "object" ? /** @type {{status?: unknown}} */ error : undefined;
     if (failure?.status !== 404) throw error;
@@ -163,7 +164,7 @@ async function dispatchTag(githubClient, destination) {
       if (failure?.status !== 422 || failure.response?.status !== 422 || failure.response.data?.message !== "Reference already exists") throw creationError;
       log.failure("dispatch.tag.create_conflict", creationError, true);
     }
-    response = await githubClient.rest.git.getRef(parameters);
+    response = await readTag();
   }
   if (response.status !== 200 || response.data?.ref !== ref || response.data?.object?.type !== "commit" || response.data.object.sha !== sha) throw new Error("work_queue_dispatch_tag_mismatch");
   log.diagnostic("dispatch.tag.verified", { verified: true });
