@@ -24,9 +24,9 @@ safe-outputs:
   report-failed-jobs: false
   noop:
     report-as-issue: false
-  report-missing-tool:
+  missing-tool:
     create-issue: false
-  report-missing-data:
+  missing-data:
     create-issue: false
   report-incomplete:
     create-issue: false

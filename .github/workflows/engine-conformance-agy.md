@@ -33,7 +33,7 @@ safe-outputs:
   timeout-minutes: 2
   noop:
     report-as-issue: false
-  report-missing-tool:
+  missing-tool:
     create-issue: false
 imports:
   - shared/agy-conformance.md

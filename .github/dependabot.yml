@@ -1,44 +1,44 @@
-updates:
-- directory: /
-  ignore:
-  - dependency-name: "github/gh-aw-actions/*" # Managed by gh aw compile. Version-locked to the gh-aw compiler; do not bump.
-  package-ecosystem: github-actions
-  schedule:
-    interval: weekly
-- directory: /
-  package-ecosystem: gomod
-  schedule:
-    interval: weekly
-- directory: /docs
-  package-ecosystem: npm
-  schedule:
-    interval: weekly
-- directory: /actions/setup/js
-  package-ecosystem: npm
-  schedule:
-    interval: weekly
-- directory: /.github/workflows
-  package-ecosystem: npm
-  schedule:
-    interval: weekly
-- directory: /.github/workflows
-  package-ecosystem: pip
-  schedule:
-    interval: weekly
-- directory: /.github/workflows
-  package-ecosystem: gomod
-  schedule:
-    interval: weekly
-- directory: /
-  package-ecosystem: docker
-  schedule:
-    interval: weekly
-- directory: /actions/setup/js
-  package-ecosystem: docker
-  schedule:
-    interval: weekly
-- directory: /.devcontainer
-  package-ecosystem: docker
-  schedule:
-    interval: weekly
 version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /docs
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /actions/setup/js
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /.github/workflows
+    schedule:
+      interval: weekly
+  - package-ecosystem: pip
+    directory: /.github/workflows
+    schedule:
+      interval: weekly
+  - package-ecosystem: gomod
+    directory: /.github/workflows
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /actions/setup/js
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /.devcontainer
+    schedule:
+      interval: weekly

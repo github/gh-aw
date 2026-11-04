@@ -110,7 +110,7 @@ safe-outputs:
     expires: 2d
     title-prefix: "[ca] "
     protected-files: fallback-to-issue
-  report-missing-tool:
+  missing-tool:
 timeout-minutes: 45
 imports:
   - ../agents/ci-cleaner.agent.md

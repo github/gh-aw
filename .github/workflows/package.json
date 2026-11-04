@@ -3,21 +3,8 @@
   "private": true,
   "license": "MIT",
   "dependencies": {
-    "@anthropic-ai/claude-code": "2.1.312",
-    "@charmland/crush": "0.98.1",
-    "@deepseek-ai/dsh": "0.2.0-rc.2",
-    "@earendil-works/pi-coding-agent": "1.4.0",
-    "@factory/cli": "0.248.0",
-    "@github/copilot": "1.0.103",
-    "@github/copilot-sdk": "1.0.16",
-    "@google/gemini-cli": "0.64.0",
-    "@nanonets/graft": "0.8.0",
-    "@openai/codex": "0.165.0",
-    "@opencode/cli": "2.0.26",
     "@sentry/mcp-server": "0.37.0",
     "@your-org/otel-query-mcp": "latest",
-    "agentdb": "3.0.0-alpha.20",
-    "ast-grep-mcp": "0.0.2",
-    "mcp": "latest"
+    "agentdb": "alpha"
   }
 }

@@ -42,7 +42,7 @@ safe-outputs:
     max: 1
     close-older-issues: true
     close-older-key: daily-pr-review-cursor
-  report-missing-tool:
+  missing-tool:
 timeout-minutes: 20
 imports:
   - shared/otlp.md

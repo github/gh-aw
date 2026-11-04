@@ -135,7 +135,7 @@ safe-outputs:
     retention-days: 30
 
   # Missing tool reporting
-  report-missing-tool:
+  missing-tool:
 
   # No-op for explicit completion messages
   noop:

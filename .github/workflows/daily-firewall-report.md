@@ -9,6 +9,7 @@ features:
   gh-aw-detection: true
 on:
   workflow_dispatch:
+
 max-daily-ai-credits: 10000
 permissions:
   contents: read
@@ -29,7 +30,7 @@ safe-outputs:
     category: "audits"
     title-prefix: "Daily Firewall Report"
     close-older-discussions: true
-    expires: 14d
+    expires: 14
 tools:
   work-queue:
     worker: true

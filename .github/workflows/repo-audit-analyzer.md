@@ -27,7 +27,7 @@ tools:
     - id: repo-audits
       key: repo-audits-${{ github.workflow }}
 safe-outputs:
-  report-missing-tool:
+  missing-tool:
     create-issue: true
     labels: [cookie]
 timeout-minutes: 45

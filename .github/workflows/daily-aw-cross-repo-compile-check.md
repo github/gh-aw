@@ -31,7 +31,7 @@ tools:
 safe-outputs:
   mentions: false
   allowed-github-references: []
-  report-missing-tool:
+  missing-tool:
     create-issue: true
   create-issue:
     title-prefix: "[aw-compat] "

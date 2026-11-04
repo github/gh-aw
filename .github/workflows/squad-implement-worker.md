@@ -93,7 +93,7 @@ safe-outputs:
       - "tests/**"
       - "tools/**"
       - "web/**"
-    protected-files: request-review
+    protected-files: request_review
     max-patch-files: 500
     expires: 14d
   add-comment:

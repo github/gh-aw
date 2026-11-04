@@ -28,7 +28,7 @@ safe-outputs:
     labels: [squad:plan]
     group: true
     max: 12
-    expires: 1d
+    expires: 1
     close-older-issues: true
     close-older-key: squad-game-planner
 pre-agent-steps:
