@@ -192,14 +192,21 @@ it("counts an empty detection accounting file as zero AIC", async () => {
   expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"source":"detection/token_usage.jsonl"'));
 });
 
-it("counts compiler-generated Agent, Detection and Evaluations jobs using their lowercase accounting paths", async () => {
+it.each([
+  ["", ["agent", "detection", "evals"]],
+  ["caller / ", ["agent", "detection", "evals"]],
+  ["outer / caller / ", ["agent", "detection", "evals"]],
+  ["", ["Agent", "Detection", "Evaluations"]],
+  ["caller / ", ["Agent", "Detection", "Evaluations"]],
+  ["outer / caller / ", ["Agent", "Detection", "Evaluations"]],
+])("counts %j-prefixed %j jobs using their lowercase accounting paths", async (prefix, names) => {
   const f = evaluate(
     {
       "agent/token_usage.jsonl": '{"aic":18.02604}',
       "detection/token_usage.jsonl": '{"aic":30.08748}',
       "evals/token_usage.jsonl": '{"aic":1}',
     },
-    [job("Agent"), job("Detection"), job("Evaluations")]
+    names.map(name => job(`${prefix}${name}`))
   );
   await expect(f.result).resolves.toBeCloseTo(49.11352);
   expect(f.client.listArtifacts).toHaveBeenCalledOnce();
