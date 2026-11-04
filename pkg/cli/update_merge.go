@@ -6,11 +6,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/stringutil"
 )
 
@@ -105,6 +107,65 @@ func normalizeImportsForMerge(content string, sourceSpec *SourceSpec, localWorkf
 	return processImportsWithWorkflowSpec(content, workflow, sourceSpec.Ref, localWorkflowDir, verbose)
 }
 
+// normalizeLegacyImportMergeBase recognizes frontmatter serialized by older updates,
+// independently of local Markdown edits. Only the base is adjusted, so upstream
+// comments and field order are still available to the textual merge.
+func normalizeLegacyImportMergeBase(base, current string) string {
+	parsed, err := parser.ExtractFrontmatterFromContent(base)
+	if err != nil {
+		return base
+	}
+	if _, hasImports := parsed.Frontmatter["imports"]; !hasImports {
+		return base
+	}
+	local, err := parser.ExtractFrontmatterFromContent(current)
+	if err != nil {
+		return base
+	}
+	canonical, err := reconstructWorkflowFileFromMap(parsed.Frontmatter, parsed.Markdown)
+	if err != nil {
+		return base
+	}
+	comparable, err := parser.ReconstructWorkflowFile(strings.Join(local.FrontmatterLines, "\n"), parsed.Markdown)
+	if err != nil || canonical != comparable {
+		return base
+	}
+	return strings.Replace(base, strings.Join(parsed.FrontmatterLines, "\n"), strings.Join(local.FrontmatterLines, "\n"), 1)
+}
+
+// Preserve historical merge behavior for already serialized, comment-free installs
+// with local frontmatter edits. Authored formatting never enters this fallback.
+func normalizeLegacyImportMergeInputs(base, current, upstream string) (string, string, string) {
+	canonicalCurrent, err := canonicalImportMergeContent(current)
+	if err != nil || stringutil.NormalizeWhitespace(canonicalCurrent) != current {
+		return base, current, upstream
+	}
+	canonicalBase, err := canonicalImportMergeContent(base)
+	if err != nil {
+		return base, current, upstream
+	}
+	canonicalUpstream, err := canonicalImportMergeContent(upstream)
+	if err != nil {
+		return base, current, upstream
+	}
+	return stringutil.NormalizeWhitespace(canonicalBase), current, stringutil.NormalizeWhitespace(canonicalUpstream)
+}
+
+func canonicalImportMergeContent(content string) (string, error) {
+	parsed, err := parser.ExtractFrontmatterFromContent(content)
+	if err != nil {
+		return "", err
+	}
+	if _, hasImports := parsed.Frontmatter["imports"]; !hasImports {
+		return "", errors.New("no imports to normalize")
+	}
+	canonical, err := reconstructWorkflowFileFromMap(parsed.Frontmatter, parsed.Markdown)
+	if err != nil {
+		return "", err
+	}
+	return RemoveTopLevelFieldFromFrontmatter(canonical, "source")
+}
+
 // MergeWorkflowContent performs a 3-way merge of workflow content using git merge-file
 // It returns the merged content, whether conflicts exist, and any error
 // localWorkflowPath is the filesystem path of the local workflow file being updated;
@@ -149,9 +210,8 @@ func MergeWorkflowContent(base, current, new, oldSourceSpec, newRefOrSourceSpec,
 		return "", false, fmt.Errorf("failed to remove source from new content: %w", err)
 	}
 
-	// Import processing rewrites frontmatter into canonical YAML. Apply that
-	// transformation to all three inputs before merging so a previously updated
-	// local file is compared with the same representation as its upstream base.
+	// Resolve import paths consistently in all three inputs before merging,
+	// while preserving their authored frontmatter formatting.
 	mergeWorkflowDir := ""
 	if localWorkflowPath != "" {
 		mergeWorkflowDir = filepath.Dir(localWorkflowPath)
@@ -183,6 +243,15 @@ func MergeWorkflowContent(base, current, new, oldSourceSpec, newRefOrSourceSpec,
 			return "", false, fmt.Errorf("failed to update source in current content: %w", updateErr)
 		}
 		return updatedCurrent, false, nil
+	}
+
+	if baseNormalized != currentNormalized {
+		legacyBase := normalizeLegacyImportMergeBase(baseNormalized, currentNormalized)
+		if legacyBase != baseNormalized {
+			baseNormalized = legacyBase
+		} else {
+			baseNormalized, currentNormalized, newNormalized = normalizeLegacyImportMergeInputs(baseNormalized, currentNormalized, newNormalized)
+		}
 	}
 
 	// Create temporary directory for merge files

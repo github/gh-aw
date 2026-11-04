@@ -6,6 +6,9 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/console"
@@ -14,6 +17,7 @@ import (
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/setutil"
 	"github.com/github/gh-aw/pkg/workflow"
+	"go.yaml.in/yaml/v3"
 )
 
 var importsLog = logger.New("cli:imports")
@@ -62,6 +66,7 @@ func processImportsWithWorkflowSpec(content string, workflow *WorkflowSpec, comm
 	// When localWorkflowDir is set, relative paths whose files exist locally are also
 	// preserved as-is so that consumers who have copied shared files into their own repo
 	// are not forced onto cross-repo references after every `gh aw update`.
+	replacements := make(map[string]string)
 	resolveOneImportPath := func(importPath string) string {
 		if isWorkflowSpecFormat(importPath) {
 			importsLog.Printf("Import already in workflowspec format: %s", importPath)
@@ -80,6 +85,9 @@ func processImportsWithWorkflowSpec(content string, workflow *WorkflowSpec, comm
 		importsLog.Printf("Resolved import path: %s -> %s (workflow: %s)", importPath, resolvedPath, workflow.WorkflowPath)
 		workflowSpec := buildWorkflowSpecRef(workflow.RepoSlug, resolvedPath, commitSHA, workflow.Version)
 		importsLog.Printf("Converted import: %s -> %s", importPath, workflowSpec)
+		if workflowSpec != importPath {
+			replacements[importPath] = workflowSpec
+		}
 		return workflowSpec
 	}
 
@@ -146,8 +154,113 @@ func processImportsWithWorkflowSpec(content string, workflow *WorkflowSpec, comm
 		return content, nil
 	}
 
-	// Use helper function to reconstruct workflow file with proper field ordering
+	if len(replacements) == 0 {
+		return content, nil
+	}
+	if updated, ok := rewriteImportPathScalars(content, result, replacements); ok {
+		if parsed, parseErr := parser.ExtractFrontmatterFromContent(updated); parseErr == nil &&
+			reflect.DeepEqual(parsed.Frontmatter, result.Frontmatter) { //nolint:reflectdeepequalusage // YAML fields contain nested, heterogeneous maps and slices.
+			return updated, nil
+		}
+	}
+
+	// Fall back to serialization for YAML shapes that cannot be edited in place.
 	return reconstructWorkflowFileFromMap(result.Frontmatter, result.Markdown)
+}
+
+// rewriteImportPathScalars edits only single-line import values, leaving comments,
+// quoting, key order, and all content outside those values untouched.
+func rewriteImportPathScalars(content string, result *parser.FrontmatterResult, replacements map[string]string) (string, bool) {
+	var doc yaml.Node
+	if err := yaml.Unmarshal([]byte(strings.Join(result.FrontmatterLines, "\n")), &doc); err != nil || len(doc.Content) != 1 {
+		return "", false
+	}
+	var imports *yaml.Node
+	for _, root := range doc.Content {
+		imports = importMappingValue(root, "imports")
+	}
+	if imports != nil && imports.Kind == yaml.MappingNode {
+		imports = importMappingValue(imports, "aw")
+	}
+	if imports == nil || imports.Kind != yaml.SequenceNode {
+		return "", false
+	}
+
+	lines := strings.Split(content, "\n")
+	// Work backwards so multiple values on the same flow-style line keep their columns.
+	for _, node := range slices.Backward(imports.Content) {
+		if node.Kind == yaml.MappingNode {
+			path := importMappingValue(node, "path")
+			if path == nil || path.Tag != "!!str" {
+				path = importMappingValue(node, "uses")
+			}
+			if path == nil {
+				continue
+			}
+			node = path
+		}
+		if node.Kind == yaml.AliasNode {
+			return "", false
+		}
+		replacement, changed := replacements[node.Value]
+		if !changed {
+			continue
+		}
+		oldText, newText, ok := importPathScalarText(node, replacement)
+		if !ok {
+			return "", false
+		}
+		lineIndex := node.Line + result.FrontmatterStart - 2
+		if lineIndex < 0 || lineIndex >= len(lines) {
+			return "", false
+		}
+		runes := []rune(lines[lineIndex])
+		if node.Column < 1 || node.Column > len(runes)+1 {
+			return "", false
+		}
+		prefix, suffix := string(runes[:node.Column-1]), string(runes[node.Column-1:])
+		if !strings.HasPrefix(suffix, oldText) {
+			return "", false
+		}
+		lines[lineIndex] = prefix + newText + strings.TrimPrefix(suffix, oldText)
+	}
+	return strings.Join(lines, "\n"), true
+}
+
+func importMappingValue(node *yaml.Node, key string) *yaml.Node {
+	if node.Kind != yaml.MappingNode {
+		return nil
+	}
+	var name string
+	for i, child := range node.Content {
+		if i%2 == 0 {
+			name = child.Value
+		} else if name == key {
+			return child
+		}
+	}
+	return nil
+}
+
+func importPathScalarText(node *yaml.Node, replacement string) (string, string, bool) {
+	if node.Kind != yaml.ScalarNode || node.Tag != "!!str" || node.Anchor != "" {
+		return "", "", false
+	}
+	switch node.Style {
+	case 0:
+		encoded, err := yaml.Marshal(replacement)
+		if err != nil {
+			return "", "", false
+		}
+		return node.Value, strings.TrimSuffix(string(encoded), "\n"), true
+	case yaml.SingleQuotedStyle:
+		return "'" + strings.ReplaceAll(node.Value, "'", "''") + "'",
+			"'" + strings.ReplaceAll(replacement, "'", "''") + "'", true
+	case yaml.DoubleQuotedStyle:
+		return strconv.Quote(node.Value), strconv.Quote(replacement), true
+	default:
+		return "", "", false
+	}
 }
 
 // reconstructWorkflowFileFromMap reconstructs a workflow file from frontmatter map and markdown
