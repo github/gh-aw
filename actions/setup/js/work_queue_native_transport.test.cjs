@@ -133,6 +133,32 @@ describe("native Octokit queue dispatch tag transport", () => {
     expect(f.post).not.toHaveBeenCalled();
   });
 
+  it("shares the three-read budget across missing-tag lookup and read-back", async () => {
+    const deadlines = fakeDeadlines();
+    const aborts = [];
+    const f = tagFixture(options => stalledBody(options, aborts), { create: true, failures: 3 });
+    const rejected = expect(dispatchTag(f.githubClient, destination)).rejects.toMatchObject({ code: "ETIMEDOUT" });
+    await vi.runAllTimersAsync();
+    await rejected;
+    expect(f.fetch).toHaveBeenCalledTimes(3);
+    expect(deadlines).toHaveBeenCalledTimes(3);
+    expect(aborts).toHaveLength(2);
+    expect(f.createRef).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not log the expected missing-tag 404 as a failure", async () => {
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    const f = tagFixture(() => new Response("{}", { status: 502 }), { create: true, failures: 0 });
+    try {
+      await expect(dispatchTag(f.githubClient, destination)).resolves.toBe(tag);
+      const output = stderr.mock.calls.map(call => call[0]).join("");
+      expect(output).not.toContain("dispatch.tag.read.failed");
+      expect(f.createRef).toHaveBeenCalledTimes(1);
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
   it("recovers a swallowed tag body timeout using a fresh 15-second deadline", async () => {
     const deadlines = fakeDeadlines();
     const aborts = [];
