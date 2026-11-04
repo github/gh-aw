@@ -388,7 +388,7 @@ func detectExpressionContext(expression string) string {
 func formatTemplateInjectionError(violations []TemplateInjectionViolation) error {
 	var builder strings.Builder
 
-	builder.WriteString("unsafe Actions expressions found in authored run: content\n")
+	builder.WriteString("template injection: unsafe Actions expressions found in authored run: content\n")
 	builder.WriteString("GitHub Actions interpolates expressions before Bash parses shell syntax, including comments and heredoc delimiters.\n")
 	builder.WriteString("Remove expressions from comments. For heredoc values, move the expression to a step env: entry and use an unquoted heredoc so Bash can expand the shell variable.\n\n")
 	builder.WriteString("Actions expands these expressions before shell execution; attacker-controlled values can become shell input in executable contexts:\n\n")
@@ -444,7 +444,7 @@ func formatTemplateInjectionError(violations []TemplateInjectionViolation) error
 func formatRunScriptExpressionValidationError(violations []TemplateInjectionViolation) error {
 	var builder strings.Builder
 
-	builder.WriteString("GitHub Actions expressions are not allowed in authored run: content, including shell comments and quoted heredocs.\n")
+	builder.WriteString("template injection: GitHub Actions expressions are not allowed in authored run: content, including shell comments and quoted heredocs.\n")
 	builder.WriteString("Actions interpolates ${{ ... }} before Bash parses shell syntax.\n\n")
 	builder.WriteString("Remove expressions from comments. For heredoc values, move the expression to a step env: entry and use an unquoted heredoc so Bash can expand the shell variable.\n\n")
 	builder.WriteString("Examples found:\n")
