@@ -1692,3 +1692,22 @@ conclusion each run is low value.
 - FUTURE RUNS: do NOT re-file. Look up that issue (gh issue list --search
   "Sweep halted in:title") and act only on a maintainer response there or a
   `steer` comment; otherwise noop. next_index stays 216.
+
+## Run 2026-11-04 (b): HALTED (re-check same day, escalation issue not re-filed)
+
+- Re-invoked same day as the 74th-run escalation. Looked up the escalation issue
+  by search (`gh issue list --search "git-sim Sweep halted"`) since the numeric
+  "issue_url":"filed" placeholder and run-id in state.json are not issue numbers.
+  Found #74693, state OPEN, 0 comments -- no maintainer response yet.
+- Checked steering issue #74739: 0 comments, no `steer` override.
+- Policy conflict is unchanged: real create_pull_request/push_to_pull_request_branch
+  calls against the live github/gh-aw repo filled with synthetic sim/stuff/history
+  filler remain the outer safe-outputs policy's forbidden probing/placeholder
+  pattern. Did not re-derive from scratch; relied on the already-filed #74693.
+- Did NOT re-file the escalation issue (would be duplicate spam with no new
+  information). No config-simulator sub-agents spawned. No cells tested/advanced
+  (next_index stays 216). Only action: `noop`.
+- For future runs: search for the escalation issue by title keyword search
+  (`gh issue list --repo github/gh-aw --search "git-sim Sweep halted"`) rather
+  than trusting the `issue_url` field in state.json, which stores the literal
+  string "filed" and a run_id, not a usable issue number/URL.
