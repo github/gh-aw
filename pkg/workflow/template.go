@@ -142,7 +142,7 @@ func (c *Compiler) generateInterpolationAndTemplateStep(yaml *strings.Builder, e
 		}
 		seen[mapping.EnvVar] = struct{}{}
 
-		yaml.WriteString("          " + mapping.EnvVar + ": " + mapping.environmentValue() + "\n")
+		writeYAMLEnv(yaml, "          ", mapping.EnvVar, mapping.environmentValue())
 	}
 
 	yaml.WriteString("        with:\n")

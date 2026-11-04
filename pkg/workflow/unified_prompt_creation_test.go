@@ -122,6 +122,67 @@ func TestGenerateUnifiedPromptCreationStep_StaticValuesAsData(t *testing.T) {
 	}
 }
 
+func TestGenerateUnifiedPromptCreationStep_QuotesExpressionEnvVars(t *testing.T) {
+	expressions := map[string]string{
+		"GH_AW_TEST":      `${{ github.event.issue.title || 'value: "quoted" # comment' }}`,
+		"GH_AW_MULTILINE": "${{ github.event.issue.title || '\"first line\nsecond line' }}",
+	}
+	compiler := &Compiler{}
+	data := &WorkflowData{ParsedTools: NewTools(map[string]any{})}
+	section := PromptSection{
+		Content: "Prompt content",
+		EnvVars: expressions,
+	}
+
+	var creation strings.Builder
+	mappings := compiler.generateUnifiedPromptCreationStep(&creation, []PromptSection{section}, nil, nil, data)
+	compiler.generateInterpolationAndTemplateStep(&creation, mappings, data, false)
+
+	var workflow struct {
+		Jobs map[string]struct {
+			Steps []struct {
+				Env map[string]string `yaml:"env"`
+			} `yaml:"steps"`
+		} `yaml:"jobs"`
+	}
+	require.NoError(t, yaml.Unmarshal([]byte("jobs:\n  test:\n    steps:\n"+creation.String()), &workflow))
+	require.Len(t, workflow.Jobs["test"].Steps, 2)
+	for _, step := range workflow.Jobs["test"].Steps {
+		for key, expression := range expressions {
+			assert.Equal(t, expression, step.Env[key])
+		}
+	}
+}
+
+func TestGenerateUnifiedPromptCreationStep_QuotesLiteralEnvVarsOnce(t *testing.T) {
+	const literal = "quote: \"value\"\nnext\\line"
+	compiler := &Compiler{}
+	data := &WorkflowData{ParsedTools: NewTools(map[string]any{})}
+	section := PromptSection{
+		Content: "Prompt content",
+		EnvVars: map[string]string{"GH_AW_LITERAL": literal},
+	}
+
+	var creation strings.Builder
+	mappings := compiler.generateUnifiedPromptCreationStep(&creation, []PromptSection{section}, nil, nil, data)
+	require.Len(t, mappings, 1)
+	assert.True(t, mappings[0].IsLiteral)
+	assert.Equal(t, literal, mappings[0].environmentValue())
+	compiler.generateInterpolationAndTemplateStep(&creation, mappings, data, false)
+
+	var workflow struct {
+		Jobs map[string]struct {
+			Steps []struct {
+				Env map[string]string `yaml:"env"`
+			} `yaml:"steps"`
+		} `yaml:"jobs"`
+	}
+	require.NoError(t, yaml.Unmarshal([]byte("jobs:\n  test:\n    steps:\n"+creation.String()), &workflow))
+	require.Len(t, workflow.Jobs["test"].Steps, 2)
+	assert.NotContains(t, workflow.Jobs["test"].Steps[0].Env, "GH_AW_LITERAL")
+	assert.Equal(t, literal, workflow.Jobs["test"].Steps[1].Env["GH_AW_LITERAL"])
+}
+
 func TestGenerateUnifiedPromptCreationStep_SplitsSystemAndUserItems(t *testing.T) {
 	compiler := &Compiler{}
 	data := &WorkflowData{ParsedTools: NewTools(map[string]any{})}
@@ -709,16 +770,21 @@ func TestGenerateUnifiedPromptCreationStep_PRContextConditional(t *testing.T) {
 	builtinSections := compiler.collectPromptSections(data)
 	userPromptChunks := []string{"# User Task"}
 
-	var yaml strings.Builder
-	compiler.generateUnifiedPromptCreationStep(&yaml, builtinSections, userPromptChunks, nil, data)
+	var creation strings.Builder
+	compiler.generateUnifiedPromptCreationStep(&creation, builtinSections, userPromptChunks, nil, data)
 
-	output := yaml.String()
+	output := creation.String()
 	plan := promptRenderPlan(t, output)
 
 	// Verify PR context is included with conditional
 	assert.Contains(t, output, "pr_context_prompt.md", "Should have PR context prompt file reference")
 	assert.Contains(t, output, `\"condition_env\":\"GH_AW_INCLUDE_PR_CONTEXT\"`, "Should reference a condition environment variable")
-	assert.Contains(t, output, "GH_AW_INCLUDE_PR_CONTEXT: ${{", "Should evaluate the condition as environment data")
+	var steps []struct {
+		Env map[string]string `yaml:"env"`
+	}
+	require.NoError(t, yaml.Unmarshal([]byte(output), &steps))
+	require.Len(t, steps, 1)
+	assert.Equal(t, "${{ (github.event_name == 'issue_comment' && github.event.issue.pull_request != null) || github.event_name == 'pull_request_review_comment' || github.event_name == 'pull_request_review' }}", steps[0].Env["GH_AW_INCLUDE_PR_CONTEXT"], "Should evaluate the condition as environment data")
 	assert.NotContains(t, output, "if [", "Should not use shell conditions")
 
 	// Verify it's within system tags
