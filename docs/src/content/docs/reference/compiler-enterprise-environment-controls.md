@@ -127,9 +127,15 @@ not trigger a size-truncation warning.
 
 Logs use the existing OTLP endpoint list and per-endpoint authentication,
 including the enterprise default endpoint/header pair. No additional credentials
-or agent network access are required. The exporter posts OTLP/HTTP JSON to
+or agent network access are required. The exporter posts OTLP/HTTP JSON or protobuf to
 `<endpoint>/v1/logs`, replacing a trailing `/v1/traces` or `/v1/logs` when present.
-The vendor must support OTLP logs as well as traces at that base URL.
+`OTEL_EXPORTER_OTLP_LOGS_PROTOCOL` overrides `OTEL_EXPORTER_OTLP_PROTOCOL` for
+logs (`http/json` by default); `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL` does not
+affect logs. The byte limit is measured against the complete JSON representation
+before encoding. For Azure Monitor traces endpoints, the logs URL also selects
+the independent `Microsoft-OTLP-Logs` stream, retaining the DCE, DCR, and query
+parameters. The vendor must support OTLP logs as well as traces at that base URL.
+See [protobuf encoding and Azure Monitor](/gh-aw/reference/open-telemetry/#protobuf-encoding-and-azure-monitor).
 
 Each retained event is a structured log body with `type`, `data`, optional
 `timestamp`, and provenance. Filter on the `gh-aw.session.event_type` log

@@ -4,6 +4,7 @@ const os = require("node:os");
 const path = require("node:path");
 const http = require("node:http");
 const { sendSessionLogs } = require("./send_otlp_session_logs.cjs");
+const { encodeOTLPLogsRequest } = require("./otlp_protobuf.cjs");
 const nativeFetch = globalThis.fetch;
 const traceId = "0123456789abcdef0123456789abcdef";
 const spanId = "0123456789abcdef";
@@ -27,7 +28,8 @@ describe("compact unified session OTLP logs", () => {
     vi.stubGlobal("fetch", fetchMock);
     warning = vi.spyOn(console, "warn").mockImplementation(() => {});
     partialWarning = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-    for (const name of ["HTTP_PROXY", "http_proxy", "HTTPS_PROXY", "https_proxy", "ALL_PROXY", "all_proxy", "GH_AW_SECRET_NAMES"]) vi.stubEnv(name, "");
+    for (const name of ["HTTP_PROXY", "http_proxy", "HTTPS_PROXY", "https_proxy", "ALL_PROXY", "all_proxy", "GH_AW_SECRET_NAMES", "OTEL_EXPORTER_OTLP_PROTOCOL", "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL", "OTEL_EXPORTER_OTLP_LOGS_PROTOCOL"])
+      vi.stubEnv(name, "");
     vi.stubEnv("GH_AW_OTLP_LOGS_ENABLED", "true");
     vi.stubEnv("GH_AW_OTLP_LOGS_MAX_BYTES", "");
     vi.stubEnv("GH_AW_OTLP_ENDPOINTS", JSON.stringify([{ url: "https://collector.example/otlp", headers: "Authorization=Bearer%20private-credential" }]));
@@ -91,6 +93,27 @@ describe("compact unified session OTLP logs", () => {
     expect(fetchMock.mock.calls[0][1].headers).not.toHaveProperty("x-api-key");
     expect(fetchMock.mock.calls[1][1].headers).not.toHaveProperty("Authorization");
     expect(payload(0)).toEqual(payload(1));
+  });
+
+  it.each(["OTEL_EXPORTER_OTLP_PROTOCOL", "OTEL_EXPORTER_OTLP_LOGS_PROTOCOL"])("exports the compact session as protobuf through %s", async protocolVariable => {
+    vi.spyOn(Date, "now").mockReturnValue(1700000000000);
+    write([
+      { type: "session.format", data: { version: 1 } },
+      { type: "assistant.message", data: { content: "PRIVATE_CONVERSATION" } },
+      { type: "session.result", data: { numTurns: 2, sessionId: "PRIVATE_SESSION", usage: { inputTokens: 10, inputTokensIncludeCache: false } } },
+    ]);
+    await sendSessionLogs({ sessionPath });
+    const expected = encodeOTLPLogsRequest(payload());
+    fetchMock.mockClear();
+    vi.stubEnv(protocolVariable, "http/protobuf");
+    await sendSessionLogs({ sessionPath });
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toBe("https://collector.example/otlp/v1/logs");
+    expect(options.headers["Content-Type"]).toBe("application/x-protobuf");
+    expect(options.body).toEqual(expected);
+    expect(options.body.includes(Buffer.from("PRIVATE"))).toBe(false);
+    expect(warning).not.toHaveBeenCalled();
   });
 
   it("applies current publication and exporter credential masks", async () => {
@@ -301,14 +324,13 @@ describe("compact unified session OTLP logs", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("delivers bounded OTLP JSON to a real local logs collector", async () => {
+  it.each(["http/json", "http/protobuf"])("delivers bounded OTLP %s to a real local logs collector", async protocol => {
     let received;
     const server = http.createServer((request, response) => {
-      let body = "";
-      request.setEncoding("utf8");
-      request.on("data", chunk => (body += chunk));
+      const chunks = [];
+      request.on("data", chunk => chunks.push(chunk));
       request.on("end", () => {
-        received = { url: request.url, headers: request.headers, body };
+        received = { url: request.url, headers: request.headers, body: Buffer.concat(chunks) };
         response.writeHead(200, { "Content-Type": "application/json" });
         response.end("{}");
       });
@@ -317,12 +339,18 @@ describe("compact unified session OTLP logs", () => {
     try {
       vi.stubEnv("GH_AW_OTLP_ENDPOINTS", JSON.stringify([{ url: `http://127.0.0.1:${server.address().port}`, headers: "x-api-key=local-test" }]));
       vi.stubEnv("GH_AW_OTLP_LOGS_MAX_BYTES", "2048");
+      vi.spyOn(Date, "now").mockReturnValue(1700000000000);
+      await sendSessionLogs({ sessionPath });
+      const jsonPayload = payload();
+      fetchMock.mockClear();
+      vi.stubEnv("OTEL_EXPORTER_OTLP_PROTOCOL", protocol);
       fetchMock.mockImplementation(nativeFetch);
       await sendSessionLogs({ sessionPath });
       expect(received.url).toBe("/v1/logs");
       expect(received.headers["x-api-key"]).toBe("local-test");
+      expect(received.headers["content-type"]).toBe(protocol === "http/protobuf" ? "application/x-protobuf" : "application/json");
       expect(Buffer.byteLength(received.body)).toBeLessThanOrEqual(2048);
-      expect(JSON.parse(received.body).resourceLogs[0].scopeLogs[0].logRecords).toHaveLength(1);
+      expect(received.body).toEqual(protocol === "http/protobuf" ? encodeOTLPLogsRequest(jsonPayload) : Buffer.from(JSON.stringify(jsonPayload)));
     } finally {
       await new Promise(resolve => server.close(resolve));
     }

@@ -2,7 +2,7 @@
 "use strict";
 
 /**
- * Minimal OTLP ExportTraceServiceRequest encoder. Field numbers and wire types
+ * Minimal OTLP trace and logs request encoders. Field numbers and wire types
  * follow opentelemetry-proto; no generated code or runtime dependencies.
  *
  * @typedef {"string" | "bool" | "int64" | "uint32" | "fixed32" | "fixed64" | "double" | "traceId" | "spanId" | "bytes" | "message"} WireType
@@ -147,6 +147,25 @@ anyValue.push(
 );
 /** @type {Field} */
 const attributes = { id: 1, name: "attributes", type: "message", repeated: true, fields: keyValue };
+/** @type {Field} */
+const resource = {
+  id: 1,
+  name: "resource",
+  type: "message",
+  fields: [attributes, { id: 2, name: "droppedAttributesCount", type: "uint32" }],
+};
+/** @type {Field} */
+const scope = {
+  id: 1,
+  name: "scope",
+  type: "message",
+  fields: [
+    { id: 1, name: "name", type: "string" },
+    { id: 2, name: "version", type: "string" },
+    { ...attributes, id: 3 },
+    { id: 4, name: "droppedAttributesCount", type: "uint32" },
+  ],
+};
 /** @type {Field[]} */
 const span = [
   { id: 1, name: "traceId", type: "traceId" },
@@ -206,32 +225,48 @@ const request = [
     type: "message",
     repeated: true,
     fields: [
-      {
-        id: 1,
-        name: "resource",
-        type: "message",
-        fields: [attributes, { id: 2, name: "droppedAttributesCount", type: "uint32" }],
-      },
+      resource,
       {
         id: 2,
         name: "scopeSpans",
         type: "message",
         repeated: true,
-        fields: [
-          {
-            id: 1,
-            name: "scope",
-            type: "message",
-            fields: [
-              { id: 1, name: "name", type: "string" },
-              { id: 2, name: "version", type: "string" },
-              { ...attributes, id: 3 },
-              { id: 4, name: "droppedAttributesCount", type: "uint32" },
-            ],
-          },
-          { id: 2, name: "spans", type: "message", repeated: true, fields: span },
-          { id: 3, name: "schemaUrl", type: "string" },
-        ],
+        fields: [scope, { id: 2, name: "spans", type: "message", repeated: true, fields: span }, { id: 3, name: "schemaUrl", type: "string" }],
+      },
+      { id: 3, name: "schemaUrl", type: "string" },
+    ],
+  },
+];
+
+/** @type {Field[]} */
+const logRecord = [
+  { id: 1, name: "timeUnixNano", type: "fixed64" },
+  { id: 2, name: "severityNumber", type: "uint32" },
+  { id: 3, name: "severityText", type: "string" },
+  { id: 5, name: "body", type: "message", fields: anyValue },
+  { ...attributes, id: 6 },
+  { id: 7, name: "droppedAttributesCount", type: "uint32" },
+  { id: 8, name: "flags", type: "fixed32" },
+  { id: 9, name: "traceId", type: "traceId" },
+  { id: 10, name: "spanId", type: "spanId" },
+  { id: 11, name: "observedTimeUnixNano", type: "fixed64" },
+  { id: 12, name: "eventName", type: "string" },
+];
+/** @type {Field[]} */
+const logsRequest = [
+  {
+    id: 1,
+    name: "resourceLogs",
+    type: "message",
+    repeated: true,
+    fields: [
+      resource,
+      {
+        id: 2,
+        name: "scopeLogs",
+        type: "message",
+        repeated: true,
+        fields: [scope, { id: 2, name: "logRecords", type: "message", repeated: true, fields: logRecord }, { id: 3, name: "schemaUrl", type: "string" }],
       },
       { id: 3, name: "schemaUrl", type: "string" },
     ],
@@ -248,4 +283,13 @@ function encodeOTLPTraceRequest(payload) {
   return encodeMessage(payload, request);
 }
 
-module.exports = { encodeOTLPTraceRequest };
+/**
+ * Encode an ExportLogsServiceRequest using the same AnyValue wire types as traces.
+ * @param {any} payload
+ * @returns {Buffer}
+ */
+function encodeOTLPLogsRequest(payload) {
+  return encodeMessage(payload, logsRequest);
+}
+
+module.exports = { encodeOTLPTraceRequest, encodeOTLPLogsRequest };

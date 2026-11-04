@@ -1232,8 +1232,8 @@ async function sendOTLPToAllEndpoints(endpoints, payload, opts = {}) {
 }
 
 /**
- * POST an OTLP traces payload with automatic retries. Base endpoints gain
- * `/v1/traces`; full traces endpoints (including Azure Monitor paths) are retained.
+ * POST an OTLP traces or logs payload with automatic retries. Base endpoints gain
+ * the signal path; Azure Monitor logs use their own stream, not the traces stream.
  *
  * Failures are surfaced as `console.warn` messages and never thrown; OTLP
  * export failures must not break the workflow.  Uses exponential back-off
@@ -1243,7 +1243,8 @@ async function sendOTLPToAllEndpoints(endpoints, payload, opts = {}) {
  * Reads `OTEL_EXPORTER_OTLP_HEADERS` from the environment and merges any
  * configured headers into every request, unless `headersOverride` is provided
  * (used for per-endpoint headers in the multi-endpoint case).
- * `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL` overrides `OTEL_EXPORTER_OTLP_PROTOCOL`;
+ * `OTEL_EXPORTER_OTLP_{TRACES,LOGS}_PROTOCOL` overrides `OTEL_EXPORTER_OTLP_PROTOCOL`
+ * for the matching signal;
  * both accept `http/json` (the compatibility default) or `http/protobuf`.
  *
  * @param {string} endpoint  - OTLP base URL (e.g. https://traces.example.com:4317)
@@ -1263,7 +1264,7 @@ async function sendOTLPSpan(endpoint, payload, { maxRetries = 2, baseDelayMs = 1
   const suffixIndex = endpoint.search(/[?#]/);
   const base = (suffixIndex < 0 ? endpoint : endpoint.slice(0, suffixIndex)).replace(/\/+$/, "");
   const suffix = suffixIndex < 0 ? "" : endpoint.slice(suffixIndex);
-  const signalBase = base.replace(/\/v1\/(?:traces|logs)$/, "");
+  const signalBase = base.replace(/\/v1\/(?:traces|logs)$/, "").replace(/\/streams\/Microsoft-OTLP-Traces\/otlp$/, "/streams/Microsoft-OTLP-Logs/otlp");
   const url = (signal === "logs" ? signalBase + "/v1/logs" : base + (base.endsWith("/v1/traces") ? "" : "/v1/traces")) + suffix;
   // Use headersOverride when explicitly provided (including empty string, which means
   // "this endpoint has no configured headers" in the multi-endpoint fan-out path).
@@ -1271,16 +1272,17 @@ async function sendOTLPSpan(endpoint, payload, { maxRetries = 2, baseDelayMs = 1
   // (undefined), which is the legacy single-endpoint case.
   const rawHeaders = headersOverride !== undefined ? headersOverride : process.env.OTEL_EXPORTER_OTLP_HEADERS || "";
   const extraHeaders = parseOTLPHeaders(rawHeaders);
-  const protocol = process.env.OTEL_EXPORTER_OTLP_TRACES_PROTOCOL || process.env.OTEL_EXPORTER_OTLP_PROTOCOL || "http/json";
+  const protocol = process.env[signal === "logs" ? "OTEL_EXPORTER_OTLP_LOGS_PROTOCOL" : "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL"] || process.env.OTEL_EXPORTER_OTLP_PROTOCOL || "http/json";
   /** @type {string | Buffer} */
   let sanitizedBody;
   try {
     if (protocol === "http/protobuf") {
-      sanitizedBody = require("./otlp_protobuf.cjs").encodeOTLPTraceRequest(sanitizedPayload);
+      const { encodeOTLPTraceRequest, encodeOTLPLogsRequest } = require("./otlp_protobuf.cjs");
+      sanitizedBody = signal === "logs" ? encodeOTLPLogsRequest(sanitizedPayload) : encodeOTLPTraceRequest(sanitizedPayload);
     } else if (protocol === "http/json") {
       sanitizedBody = JSON.stringify(sanitizedPayload);
     } else {
-      throw new Error("Unsupported OTLP traces protocol; use http/json or http/protobuf");
+      throw new Error(`Unsupported OTLP ${signal} protocol; use http/json or http/protobuf`);
     }
   } catch (err) {
     const reason = getErrorMessage(err);
