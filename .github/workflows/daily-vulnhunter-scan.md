@@ -9,10 +9,14 @@ on:
 permissions:
   actions: read
   contents: read
+  copilot-requests: write
   issues: read
-model: claude-sonnet-5
 engine:
   id: claude
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: balanced
 jobs:
   vulnhunter_bundle:
     runs-on: ubuntu-latest

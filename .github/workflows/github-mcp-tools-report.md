@@ -7,13 +7,19 @@ on:
 permissions:
   contents: read
   actions: read
+  copilot-requests: write
   discussions: read
   issues: read
   pull-requests: read
   security-events: read
 
 
-engine: claude
+engine:
+  id: claude
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
 tools:
   cli-proxy: true
   github:
