@@ -203,7 +203,7 @@ func TestCustomSecretMaskingWorkQueueUploadGates(t *testing.T) {
 	assert.Contains(t, adapter, "steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success' && steps.custom_mask.outcome == 'success'")
 	assert.Contains(t, adapter, "id: validate_recovery_envelopes\n")
 	assert.Contains(t, adapter, "steps.validate_recovery_envelopes.outcome == 'success'")
-	manifest := strings.Join(buildSafeOutputItemsManifestUploadStep("", compiler.getActionPin, true, data), "")
+	manifest := strings.Join(buildSafeOutputManifestUploadStep("", compiler.getActionPin, true, data, true), "")
 	assert.Contains(t, manifest, "if: always() && steps.redact_secrets.outcome == 'success' && steps.custom_mask.outcome == 'success'")
 	assert.Contains(t, manifest, "steps.validate_recovery_envelopes.outcome == 'success'")
 }
