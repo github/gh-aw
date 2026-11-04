@@ -2064,7 +2064,7 @@
                       }
                     }
                   ],
-                  "description": "Filter fork pull requests by repository pattern (string or list). Omission and an empty list both allow only same-repository PRs. Exact owner/repo entries or trusted owner/* patterns admit matching forks; '*' allows all forks. Strict mode rejects any '*' entry unless features.dangerously-allow-pull-request-target-forks-all is true; non-strict mode warns. The warning remains when the flag is enabled. Strict mode rejects expressions and unsupported pattern forms. Same-repository PRs remain allowed. Actor authorization and checkout restrictions remain mandatory; acknowledge-risk neither bypasses them nor suppresses the fork warning. This does not change GitHub's base-repository permissions or secret availability for pull_request_target."
+                  "description": "Filter fork pull requests by repository pattern (string or list). Omission and an empty list both allow only same-repository PRs. Exact owner/repo entries or trusted owner/* patterns admit matching forks; '*' allows all forks. Strict mode rejects any '*' entry unless the main workflow's top-level features.dangerously-allow-pull-request-target-forks-all is true; imported features do not enable this opt-in. Non-strict mode warns. The warning remains when the flag is enabled. Strict mode rejects expressions and unsupported pattern forms. Same-repository PRs remain allowed. Actor authorization and checkout restrictions remain mandatory; acknowledge-risk neither bypasses them nor suppresses the fork warning. This does not change GitHub's base-repository permissions or secret availability for pull_request_target."
                 },
                 "acknowledge-risk": {
                   "type": "boolean",
@@ -3420,7 +3420,7 @@
         "dangerously-allow-pull-request-target-forks-all": {
           "type": "boolean",
           "default": false,
-          "description": "Allow forks: '*' under pull_request_target in strict mode. The unrestricted fork admission warning remains visible.",
+          "description": "Allow forks: '*' under pull_request_target in strict mode when declared in the main workflow's top-level features. Imported features do not enable this opt-in. The unrestricted fork admission warning remains visible.",
           "examples": [true, false]
         }
       },

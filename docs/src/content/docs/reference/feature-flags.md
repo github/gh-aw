@@ -61,7 +61,7 @@ Debug workflow using script mode for custom actions.
 
 ## Unrestricted `pull_request_target` Forks
 
-Strict mode rejects `on.pull_request_target.forks: ["*"]` because it admits every fork. To explicitly permit this in strict mode, set:
+Strict mode rejects `on.pull_request_target.forks: ["*"]` because it admits every fork. To explicitly permit this in strict mode, set the flag in the main workflow's top-level frontmatter (an imported feature does not enable the opt-in):
 
 ```yaml wrap
 features:

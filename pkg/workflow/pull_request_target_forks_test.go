@@ -145,7 +145,8 @@ func TestPullRequestTargetWildcardWarning(t *testing.T) {
 				features[string(constants.DangerouslyAllowPullRequestTargetForksAllFeatureFlag)] = true
 			}
 			frontmatter := map[string]any{
-				"strict": strict,
+				"strict":   strict,
+				"features": features,
 				"on": map[string]any{
 					"pull_request_target": map[string]any{
 						"forks":            forks,
@@ -224,4 +225,35 @@ Review the contribution.
 			}
 		})
 	}
+}
+
+func TestImportedOptInDoesNotBypassStrictForkGuard(t *testing.T) {
+	dir := testutil.TempDir(t, "prt-forks-imported-opt-in")
+	sharedFile := filepath.Join(dir, "shared.md")
+	require.NoError(t, os.WriteFile(sharedFile, []byte(`---
+features:
+  dangerously-allow-pull-request-target-forks-all: true
+---
+Shared configuration.
+`), 0600))
+
+	mainFile := filepath.Join(dir, "workflow.md")
+	require.NoError(t, os.WriteFile(mainFile, []byte(`---
+strict: true
+imports:
+  - shared.md
+on:
+  pull_request_target:
+    forks: ["*"]
+    acknowledge-risk: true
+checkout: false
+tools:
+  github: false
+---
+Review the contribution.
+`), 0600))
+
+	err := NewCompiler().CompileWorkflow(mainFile)
+	require.ErrorContains(t, err, "Strict mode requires")
+	assert.NoFileExists(t, filepath.Join(dir, "workflow.lock.yml"))
 }

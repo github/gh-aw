@@ -112,7 +112,10 @@ func (c *Compiler) validatePullRequestTargetTrigger(workflowData *WorkflowData, 
 		if effectiveStrictMode {
 			return formatCompilerError(markdownPath, "error", message, nil)
 		}
-		if !dangerouslyAllowsRolesReadAndPullRequestTarget(workflowData) {
+		if !dangerouslyAllowsFeatureFlag(
+			workflowData.Features,
+			constants.DangerouslyAllowRolesReadAndPullRequestTargetFeatureFlag,
+		) {
 			message += "\nTo suppress this warning in non-strict mode only, set " +
 				"features.dangerously-allow-roles-read-and-pull-request-target: true."
 			fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", message))
@@ -148,7 +151,14 @@ func (c *Compiler) validatePullRequestTargetTrigger(workflowData *WorkflowData, 
 		}
 	}
 
-	allowUnrestrictedForks := dangerouslyAllowsPullRequestTargetForksAll(workflowData)
+	var features map[string]any
+	if topLevelFeatures, ok := workflowData.RawFrontmatter["features"].(map[string]any); ok {
+		features = topLevelFeatures
+	}
+	allowUnrestrictedForks := dangerouslyAllowsFeatureFlag(
+		features,
+		constants.DangerouslyAllowPullRequestTargetForksAllFeatureFlag,
+	)
 	if effectiveStrictMode && unrestrictedForks && !allowUnrestrictedForks {
 		return formatCompilerError(markdownPath, "error",
 			"pull_request_target.forks contains '*' and allows PRs from any fork.\n"+
@@ -267,20 +277,8 @@ func hasSupportedPullRequestTargetForks(frontmatter map[string]any) bool {
 	}
 }
 
-func dangerouslyAllowsRolesReadAndPullRequestTarget(workflowData *WorkflowData) bool {
-	value, found := getFeatureValueCaseInsensitive(
-		workflowData.Features,
-		string(constants.DangerouslyAllowRolesReadAndPullRequestTargetFeatureFlag),
-	)
-	enabled, isBoolean := value.(bool)
-	return found && isBoolean && enabled
-}
-
-func dangerouslyAllowsPullRequestTargetForksAll(workflowData *WorkflowData) bool {
-	value, found := getFeatureValueCaseInsensitive(
-		workflowData.Features,
-		string(constants.DangerouslyAllowPullRequestTargetForksAllFeatureFlag),
-	)
+func dangerouslyAllowsFeatureFlag(features map[string]any, flag constants.FeatureFlag) bool {
+	value, found := getFeatureValueCaseInsensitive(features, string(flag))
 	enabled, isBoolean := value.(bool)
 	return found && isBoolean && enabled
 }
