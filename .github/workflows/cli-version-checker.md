@@ -64,42 +64,54 @@ Monitor and update agentic CLI tools: Claude Code, GitHub Copilot CLI, OpenAI Co
 
 **EFFICIENCY FIRST**: Before starting:
 1. Check cache-memory at `/tmp/gh-aw/cache-memory/` for previous version checks and help outputs
-2. If cached versions exist and are recent (< 24h), verify if updates are needed before proceeding
+2. If cached versions exist and are recent (< 24h), re-evaluate their publication timestamps against this run's cooldown cutoff before deciding whether updates are needed; cached "latest" values never bypass the cooldown
 3. If no CLI version, Docker image version, or Docker image digest changes are detected, call `noop` as the terminal safe output and exit successfully
 
 **CRITICAL**: If version or digest changes are detected, implement and validate them and create a pull request using `create_pull_request`, including minor updates. Report concrete blockers with `report_incomplete`.
 
 For each CLI/MCP server and threat-detect:
-1. Fetch latest version from NPM registry or GitHub releases (use npm view commands for package metadata)
+1. Resolve the newest stable version eligible under the global 3-day release cooldown below (use npm view commands for package metadata)
 2. Compare with the current version constant in `./pkg/constants/`
 3. If newer version exists, research changes and prepare update
 
+### Global 3-Day Release Cooldown
+
+Apply this policy to **all release resolution**: every CLI, MCP server, threat-detect, and Docker image, including cached candidates and fallback sources.
+
+1. Capture one UTC check time for the run and compute `cutoff = check_time - 259200 seconds` (72 hours).
+2. Only select stable releases with a valid publication timestamp **at or before the cutoff**. A release exactly 72 hours old is eligible; one 71 hours 59 minutes old is not. Never use creation/modification time as a substitute for publication time.
+3. If the newest release is too recent, search older stable releases and select the newest eligible version instead. Paginate GitHub release lists as needed; exclude drafts and prereleases. Never downgrade an existing pin.
+4. For npm, fetch `npm view <package> versions time --json`, compare stable semantic versions, and check the selected version's `time[version]`. Do not resolve from the unfiltered `version` or `dist-tags.latest` value, or use the package-wide `created`/`modified` timestamps.
+5. For GitHub releases, use the releases list API (`/repos/OWNER/REPO/releases?per_page=100`) and each candidate's `published_at`, not `/releases/latest`. Preserve each project's tag convention.
+6. If a candidate's publication timestamp is missing, invalid, or in the future, do not select it. Report unavailable metadata with `report_incomplete`; do not guess an age or treat a failed lookup as "up to date".
+7. Record the selected version, publication timestamp, check time, and cooldown decision in cache-memory and the pull request. When all newer releases are cooling down and no other eligible changes exist, save the deferred candidates and call `noop`.
+
 ### Version Sources
-- **Claude Code**: Use `npm view @anthropic-ai/claude-code version` (faster than web-fetch)
+- **Claude Code**: Use `npm view @anthropic-ai/claude-code versions time --json` and apply the global cooldown
   - No public GitHub repository
-- **Copilot CLI**: Use `npm view @github/copilot version`
+- **Copilot CLI**: Use `npm view @github/copilot versions time --json` and apply the global cooldown
   - Repository: https://github.com/github/copilot-cli
   - **CRITICAL**: Always attempt to fetch and deeply analyze Copilot repository content
   - Release Notes: https://github.com/github/copilot-cli/releases
   - Changelog: https://github.com/github/copilot-cli/blob/main/CHANGELOG.md (or similar)
   - README: https://github.com/github/copilot-cli/blob/main/README.md
-- **Codex**: Use `npm view @openai/codex version`
+- **Codex**: Use `npm view @openai/codex versions time --json` and apply the global cooldown
   - Repository: https://github.com/openai/codex
   - Release Notes: https://github.com/openai/codex/releases
-- **GitHub MCP Server**: `https://api.github.com/repos/github/github-mcp-server/releases/latest`
+- **GitHub MCP Server**: `https://api.github.com/repos/github/github-mcp-server/releases?per_page=100` (apply the global cooldown)
   - Release Notes: https://github.com/github/github-mcp-server/releases
-- **Playwright CLI**: Use `npm view @playwright/cli version`
+- **Playwright CLI**: Use `npm view @playwright/cli versions time --json` and apply the global cooldown
   - Repository: https://github.com/microsoft/playwright-cli
   - Package: https://www.npmjs.com/package/@playwright/cli
-- **MCP Gateway**: `https://api.github.com/repos/github/gh-aw-mcpg/releases/latest`
+- **MCP Gateway**: `https://api.github.com/repos/github/gh-aw-mcpg/releases?per_page=100` (apply the global cooldown)
   - Repository: https://github.com/github/gh-aw-mcpg
   - Release Notes: https://github.com/github/gh-aw-mcpg/releases
   - Docker Image: `ghcr.io/github/gh-aw-mcpg:v{VERSION}`
   - Used as default sandbox.agent container (see `pkg/constants/constants.go`)
-- **Pi**: Use `npm view @earendil-works/pi-coding-agent version`
+- **Pi**: Use `npm view @earendil-works/pi-coding-agent versions time --json` and apply the global cooldown
   - Package: https://www.npmjs.com/package/@earendil-works/pi-coding-agent
   - Constant: `DefaultPiVersion` in `pkg/constants/version_constants.go`
-- **Threat-detect**: Check `https://api.github.com/repos/github/gh-aw-threat-detection/releases/latest`
+- **Threat-detect**: Check `https://api.github.com/repos/github/gh-aw-threat-detection/releases?per_page=100` (apply the global cooldown)
   - Release notes: https://github.com/github/gh-aw-threat-detection/releases
   - Constant: `DefaultThreatDetectVersion` in `pkg/constants/version_constants.go`
   - Update the version with the `v` prefix used by GitHub release tags
@@ -152,6 +164,7 @@ For each update, analyze intermediate versions:
 - **Threat-detect**: Fetch release notes from https://github.com/github/gh-aw-threat-detection/releases
 **NPM Metadata Fallback**: When GitHub release notes are unavailable, use:
 - `npm view <package> --json` for package metadata
+- Keep the version selected by the global cooldown; fallback metadata is for research, not permission to select an unfiltered latest release
 - Compare CLI help outputs between versions
 - Check for version changelog in package description
 
@@ -161,12 +174,25 @@ Check cache-memory first (`/tmp/gh-aw/cache-memory/`). Only install and run `--h
 For each CLI tool update, install (`npm install -g <package>@<version>`), run `--help` on the main command and key subcommands (Copilot: `config`, `environment`), and compare with the cached output to identify new flags, removed features, or behavior changes.
 
 ### Update Process
-1. Edit the appropriate version constant in `./pkg/constants/` with new CLI version(s)
+1. Edit the appropriate version constant in `./pkg/constants/` with cooldown-eligible CLI version(s). **Copilot CLI is special**: use the paired version/checksum refresh below instead of editing its constants by hand.
 2. Edit `./pkg/cli/docker_images.go` with new Docker image version(s) and digest(s), including digest-only changes where the tag is unchanged
 3. Run `make fmt` after editing any Go files
 4. **REQUIRED**: Run `make recompile` in the **foreground** — do NOT background it with `&` or follow it with `sleep`. Wait for it to finish completely before proceeding. Example: `make recompile && echo "done"`.
 5. Verify changes with `git status`
 6. **REQUIRED**: Validate the updated pins, commit the intended changes locally, and call `create_pull_request` with detailed analysis and the local branch. Compiled workflow locks are excluded from delivery automatically.
+
+### Copilot CLI Version and Checksum Refresh
+
+After selecting a cooldown-eligible Copilot release, run `bash scripts/update-copilot-version.sh VERSION` (for example, `bash scripts/update-copilot-version.sh 1.0.103`). This offline resolver updates `DefaultCopilotVersion` and `DefaultCopilotChecksumsSHA256` together from the reviewed pin table in `actions/setup/sh/release_integrity.sh`. It does not discover releases or enforce the cooldown, so apply the global policy first.
+
+If the release has no reviewed pin, first obtain an independently authenticated SHA256 for its `SHA256SUMS.txt`, then run:
+
+```bash
+bash scripts/update-release-pins.sh github/copilot-cli VERSION SHA256SUMS.txt TRUSTED_MANIFEST_SHA256
+bash scripts/update-copilot-version.sh VERSION
+```
+
+Never derive `TRUSTED_MANIFEST_SHA256` solely from a manifest downloaded alongside the executable, bypass pin validation, or change only the version constant. If independent authentication is unavailable, leave the Copilot pins unchanged, report the blocker with `report_incomplete`, and continue with other eligible updates.
 
 ## Pull Request Format
 
@@ -177,8 +203,8 @@ For each updated CLI, include: version old → new, release timeline, changes ca
 **Important**: Use h3 (###) or lower for all headers. Wrap full changelogs in `<details>` tags. Use plain URLs (no backticks) and convert `#1234` PR references to full external URLs like `https://github.com/owner/repo/pull/1234`.
 
 ## Guidelines
-- Only update stable versions (no pre-releases)
-- Prioritize security updates
+- Only update stable versions (no pre-releases) that pass the global 3-day release cooldown
+- Prioritize security updates among eligible releases; security fixes do not bypass the cooldown
 - Document all intermediate versions
 - **USE NPM COMMANDS**: Use `npm view` instead of web-fetch for package metadata queries
 - **CHECK CACHE FIRST**: Before re-analyzing versions, check cache-memory for recent results
@@ -205,33 +231,28 @@ After checking CLI tools, also check the Docker images defined in `./pkg/cli/doc
 
 ### Docker Image Sources
 
-Fetch the latest release for each image from its GitHub repository:
+Resolve the newest cooldown-eligible stable release for each image from its GitHub repository:
 
 | Constant | Current image | GitHub releases URL |
 |---|---|---|
-| `ActionlintImage` | `rhysd/actionlint:<version>@sha256:<digest>` | `https://api.github.com/repos/rhysd/actionlint/releases/latest` |
-| `SyftImage` | `anchore/syft:<version>@sha256:<digest>` | `https://api.github.com/repos/anchore/syft/releases/latest` |
-| `GrypeImage` | `anchore/grype:<version>@sha256:<digest>` | `https://api.github.com/repos/anchore/grype/releases/latest` |
-| `GrantImage` | `anchore/grant:<version>@sha256:<digest>` | `https://api.github.com/repos/anchore/grant/releases/latest` |
-| `ZizmorImage` | `ghcr.io/zizmorcore/zizmor:<version>@sha256:<digest>` | `https://api.github.com/repos/zizmorcore/zizmor/releases/latest` |
-| `PoutineImage` | `ghcr.io/boostsecurityio/poutine:<version>@sha256:<digest>` | `https://api.github.com/repos/boostsecurityio/poutine/releases/latest` |
-| `RunnerGuardImage` | `ghcr.io/vigilant-llc/runner-guard:<version>@sha256:<digest>` | `https://api.github.com/repos/vigilant-llc/runner-guard/releases/latest` |
-| `YamllintImage` | `pipelinecomponents/yamllint:<version>@sha256:<digest>` | `https://api.github.com/repos/PipelineComponents/yamllint/releases/latest` |
+| `ActionlintImage` | `rhysd/actionlint:<version>@sha256:<digest>` | `https://api.github.com/repos/rhysd/actionlint/releases?per_page=100` |
+| `SyftImage` | `anchore/syft:<version>@sha256:<digest>` | `https://api.github.com/repos/anchore/syft/releases?per_page=100` |
+| `GrypeImage` | `anchore/grype:<version>@sha256:<digest>` | `https://api.github.com/repos/anchore/grype/releases?per_page=100` |
+| `GrantImage` | `anchore/grant:<version>@sha256:<digest>` | `https://api.github.com/repos/anchore/grant/releases?per_page=100` |
+| `ZizmorImage` | `ghcr.io/zizmorcore/zizmor:<version>@sha256:<digest>` | `https://api.github.com/repos/zizmorcore/zizmor/releases?per_page=100` |
+| `PoutineImage` | `ghcr.io/boostsecurityio/poutine:<version>@sha256:<digest>` | `https://api.github.com/repos/boostsecurityio/poutine/releases?per_page=100` |
+| `RunnerGuardImage` | `ghcr.io/vigilant-llc/runner-guard:<version>@sha256:<digest>` | `https://api.github.com/repos/vigilant-llc/runner-guard/releases?per_page=100` |
+| `YamllintImage` | `pipelinecomponents/yamllint:<version>@sha256:<digest>` | `https://api.github.com/repos/PipelineComponents/yamllint/releases?per_page=100` |
 
 **Optimization**: Fetch all GitHub release endpoints in parallel in a single turn.
 
-### 3-Day Cooldown
+### Docker Release Eligibility
 
-Before considering any Docker image version update, check that the release is **at least 3 days old**:
-1. Parse the `published_at` field from the GitHub releases API response.
-2. Compute `(current date) - published_at`. If less than 3 days, **skip** that image — do not update it or include it in the issue.
-3. Only proceed with images whose latest release is ≥ 3 days old.
-
-This avoids picking up immature or quickly-retracted releases. Digest-only updates for an already-pinned version are not subject to the release cooldown.
+Apply the global 3-day release cooldown before resolving any target tag, including an already-pinned version for a digest-only update. If the newest release is cooling down, select an older eligible stable release without downgrading the current pin. A release timestamp establishes the tag's release age, not the age of a republished digest; do not claim otherwise.
 
 ### Fetching the Container SHA
 
-For every Docker image, fetch the registry digest for the target tag. For a newer version, apply the 3-day cooldown first. Also fetch and compare the digest when the version is unchanged so mutable or republished tags are reflected in `docker_images.go`.
+For every Docker image, fetch the registry digest for the cooldown-eligible target tag. Also fetch and compare the digest when the eligible version is unchanged so mutable or republished tags are reflected in `docker_images.go`.
 
 **Docker Hub images** (actionlint, syft, grype, grant, yamllint):
 ```bash
@@ -285,8 +306,8 @@ Compare each fetched digest with the `@sha256:...` value in `./pkg/cli/docker_im
 
 ### Docker Image Update Process
 
-1. Fetch all latest releases in parallel via `api.github.com`.
-2. Apply the 3-day cooldown to version updates — skip a newer release if it is < 3 days old.
+1. Fetch release lists in parallel via `api.github.com`.
+2. Apply the global 3-day release cooldown to every target tag, including digest-only updates; search older stable releases when newer ones are still cooling down.
 3. Fetch the container digest for every selected tag, including unchanged versions (see "Fetching the Container SHA" above).
 4. Compare each fetched digest with `./pkg/cli/docker_images.go` and edit the constant for version changes, digest changes, or missing digests.
 5. Run `make fmt` to format any changed Go files.
@@ -310,7 +331,7 @@ Wrap long changelogs in `<details>` tags. Use plain URLs (no backticks). Convert
 
 Filter stderr and use jq to avoid Unicode token errors from npm output:
 ```bash
-npm view @github/copilot --json 2>/dev/null | jq -r '.version'
+npm view @github/copilot versions time --json | jq '{versions, time}'
 ```
 
 ## Error Handling
