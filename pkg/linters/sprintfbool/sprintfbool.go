@@ -35,9 +35,9 @@ type candidate struct {
 }
 
 // Analyzer is the sprintfbool analysis pass.
-var Analyzer = analyzerutil.New("sprintfbool", `reports fmt.Sprintf("%t", b) calls where b is a single bool value; use strconv.FormatBool(b) instead`, run)
+var Analyzer = analyzerutil.New("sprintfbool", `reports fmt.Sprintf("%t", b) calls where b is a single bool value; use strconv.FormatBool(b) instead`, analyzeSprintfBool)
 
-func run(pass *analysis.Pass) (any, error) {
+func analyzeSprintfBool(pass *analysis.Pass) (any, error) {
 	insp, err := astutil.Inspector(pass)
 	if err != nil {
 		return nil, err
@@ -60,7 +60,7 @@ func run(pass *analysis.Pass) (any, error) {
 		}
 	}
 
-	orphanFmtByFile := computeOrphanFmtStatus(pass, filesByPos, targetCallsByFile, fixableCallsByFile)
+	orphanFmtByFile := computeOrphanedFmtImportStatus(pass, filesByPos, targetCallsByFile, fixableCallsByFile)
 	reportSprintfBoolDiagnostics(pass, candidates, replacements, seenImportFiles, orphanFmtByFile)
 
 	return nil, nil
@@ -111,9 +111,9 @@ func collectSprintfBoolCandidates(pass *analysis.Pass, insp *inspector.Inspector
 	return candidates, targetCallsByFile, filesByPos
 }
 
-// computeOrphanFmtStatus returns a map of file positions where fmt is imported
+// computeOrphanedFmtImportStatus returns a map of file positions where fmt is imported
 // solely for the flagged Sprintf calls (and thus can be removed after the fix).
-func computeOrphanFmtStatus(pass *analysis.Pass, filesByPos map[token.Pos]*ast.File, targetCallsByFile, fixableCallsByFile map[token.Pos]int) map[token.Pos]bool {
+func computeOrphanedFmtImportStatus(pass *analysis.Pass, filesByPos map[token.Pos]*ast.File, targetCallsByFile, fixableCallsByFile map[token.Pos]int) map[token.Pos]bool {
 	orphanFmtByFile := make(map[token.Pos]bool)
 	for filePos, targetCalls := range targetCallsByFile {
 		file := filesByPos[filePos]
@@ -168,7 +168,7 @@ func buildFormatBoolFix(
 	}}
 
 	if file != nil {
-		edits = append(edits, buildImportEdits(pass, file, seenImportFiles, orphanFmtByFile)...)
+		edits = append(edits, buildStrconvFmtImportEdits(pass, file, seenImportFiles, orphanFmtByFile)...)
 	}
 
 	return []analysis.SuggestedFix{{
@@ -177,11 +177,11 @@ func buildFormatBoolFix(
 	}}
 }
 
-// buildImportEdits returns TextEdits that add "strconv" to file and, when the
-// file's "fmt" import becomes unused after the fix, also remove it.
+// buildStrconvFmtImportEdits returns TextEdits that add "strconv" to file and,
+// when the file's "fmt" import becomes unused after the fix, also remove it.
 // seenImportFiles prevents duplicate overlapping edits in files with multiple
 // violations.
-func buildImportEdits(
+func buildStrconvFmtImportEdits(
 	pass *analysis.Pass,
 	file *ast.File,
 	seenImportFiles map[token.Pos]bool,
