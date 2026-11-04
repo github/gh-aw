@@ -1,7 +1,7 @@
 # Developer Instructions
 
-**Version**: 9.29
-**Last Updated**: 2026-10-31
+**Version**: 9.30
+**Last Updated**: 2026-11-04
 **Purpose**: Consolidated development guidelines for GitHub Agentic Workflows
 
 This document consolidates specifications from the scratchpad directory into unified developer instructions. It provides architecture patterns, security guidelines, code organization rules, and testing practices.
@@ -111,7 +111,7 @@ graph LR
 
 The codebase uses a layered package structure with three tiers: entry points, core packages, and utilities.
 
-**Entry Points**: `cmd/gh-aw` (main CLI binary) and `cmd/gh-aw-wasm` (WebAssembly target)
+**Entry Points**: `cmd/gh-aw` (main CLI binary), `cmd/gh-aw-wasm` (WebAssembly target), `cmd/linters` (custom linter binary), and `cmd/gh-aw-security-model` (security conformance runner)
 
 **Core Packages**:
 
@@ -123,7 +123,14 @@ The codebase uses a layered package structure with three tiers: entry points, co
 | `pkg/console` | Terminal UI and styled output rendering |
 | `pkg/agentdrain` | Log drain, clustering, and anomaly detection (DRAIN3 algorithm) |
 | `pkg/actionpins` | GitHub Actions pin resolution — maps version refs to pinned SHAs |
-| `pkg/stats` | Numerical statistics for metric collection |
+| `pkg/atif` | Session JSONL to ATIF trajectory conversion |
+| `pkg/github` | GitHub label and objective mapping |
+| `pkg/githubapi` | GitHub API client options and requests |
+| `pkg/intent` | Intent policy resolution |
+| `pkg/linters` | Custom Go analyzers |
+| `pkg/modelsdev` | Model catalog and provider normalization |
+| `pkg/scanfindings` | Scan finding data model |
+| `pkg/workqueue` | Work queue selection and delivery |
 
 **Shared Definitions**:
 
@@ -132,7 +139,7 @@ The codebase uses a layered package structure with three tiers: entry points, co
 | `pkg/constants` | Application-wide constants (versions, flags, URLs, engine names) |
 | `pkg/types` | Shared type definitions across packages |
 
-**Utility Packages**: `pkg/fileutil`, `pkg/gitutil`, `pkg/jsonutil`, `pkg/logger`, `pkg/stringutil`, `pkg/sliceutil`, `pkg/repoutil`, `pkg/tty`, `pkg/envutil`, `pkg/timeutil`, `pkg/typeutil`, `pkg/semverutil`, `pkg/testutil`, `pkg/styles`
+**Utility Packages**: `pkg/colorwriter`, `pkg/ctxutil`, `pkg/envutil`, `pkg/errorutil`, `pkg/fileutil`, `pkg/gitutil`, `pkg/importinpututil`, `pkg/jsonutil`, `pkg/logger`, `pkg/repoutil`, `pkg/semverutil`, `pkg/setutil`, `pkg/sliceutil`, `pkg/stats`, `pkg/stringutil`, `pkg/styles`, `pkg/syncutil`, `pkg/testutil`, `pkg/timeutil`, `pkg/tty`, `pkg/typeutil`, `pkg/validationerror`, `pkg/workflowcontract`
 
 All core packages depend on `pkg/constants` and `pkg/types` for shared definitions.
 
@@ -208,7 +215,7 @@ Examples:
 - `create_code_scanning_alert.go` (136 lines) - Code scanning alerts
 
 Rationale:
-- Clear separation of concerns
+- Separation of concerns
 - Enables quick location of functionality
 - Prevents files from growing too large
 - Facilitates parallel development
@@ -228,7 +235,7 @@ Rationale:
 - Engine-specific logic isolated
 - Shared code centralized
 - New engines added without affecting existing ones
-- Clear boundaries reduce merge conflicts
+- Separate file boundaries reduce merge conflicts
 
 **3. Engine Interface Architecture**
 
@@ -265,7 +272,7 @@ Examples:
 
 Rationale:
 - Tests co-located with implementation
-- Clear test purpose from filename
+- Test purpose is stated in the filename
 - Supports test coverage requirements
 
 ### Function Count Threshold
@@ -2404,7 +2411,7 @@ Base span attributes (always present): `gh-aw.workflow.name`, `gh-aw.run.id`, `g
 
 ### Semantic Type Aliases
 
-Semantic type aliases provide meaningful names for primitive types, improving code clarity and preventing mistakes through type safety. They are defined in `pkg/constants/constants.go`.
+Semantic type aliases provide descriptive names for primitive types and let the compiler reject some value mix-ups. They are defined in `pkg/constants/constants.go`.
 
 **Pattern**:
 ```go
@@ -2980,6 +2987,7 @@ These files are loaded automatically by compatible AI tools (e.g., GitHub Copilo
 ---
 
 **Document History**:
+- v9.30 (2026-11-04): Maintenance tone scan (continuing the v9.29 rotation) plus one accuracy fix. Ran the tone-analyzer agent file-by-file on 8 of the 44 files v9.29 did not cover (`validation-architecture.md`, `code-organization.md`, `cli-command-patterns.md`, `error-recovery-patterns.md`, `go-type-patterns.md`, `template-injection-prevention.md`, `repo-memory.md`, `workflow-refactoring-patterns.md`) and fixed 38 tone issues across 7 files (`workflow-refactoring-patterns.md` 11, `go-type-patterns.md` 8, `error-recovery-patterns.md` 7, `code-organization.md` 6, `cli-command-patterns.md` 3, `repo-memory.md` 2, `template-injection-prevention.md` 1). Most fixes replace unhedged "clear"/"clean"/"better"/"ideal"/"focused" wording with the concrete property, for example "Clear test purpose from filename"→"Test purpose is stated in the filename" and "// Clear what this contains"→"// Element type is GitHubToolName". `template-injection-prevention.md`: "Safe context variables (always safe to use)"→"Context variables without user-authored text", which drops the absolute "always safe" claim. `validation-architecture.md` had no tone issues. Formatting: fixed a nested-fence rendering defect in `workflow-refactoring-patterns.md`, where the ```` ```markdown ```` module template contained a ```` ```bash ```` block that closed the outer fence early; the outer fence is now four backticks. Also added `text` language tags to the file-layout block in `cli-command-patterns.md` and the 2 ASCII-tree blocks in `workflow-refactoring-patterns.md`. Synced the 4 matching phrases in this file's Code Organization and Go Type Patterns sections. Accuracy fix: the Package Structure table listed 7 core packages and 14 utilities, behind both `pkg/` and the 2026-11-02 `architecture.md`. Added the missing core packages (`atif`, `github`, `githubapi`, `intent`, `linters`, `modelsdev`, `scanfindings`, `workqueue`), the missing utilities (`colorwriter`, `ctxutil`, `errorutil`, `importinpututil`, `setutil`, `syncutil`, `validationerror`, `workflowcontract`), and the `cmd/linters` and `cmd/gh-aw-security-model` entry points. Moved `stats` to the utility list to match `architecture.md`. Deliberately left unaddressed: about 120 bold-label findings ("**Why it works**:", "**Validation Functions**:", and similar). These are the repository-wide convention for inline labels, and converting them to headings would add hundreds of TOC entries, following the v9.25/v9.27/v9.29 precedent of declining low-value stylistic rewrites. Coverage: 36 of the 44 files remaining after v9.29 are still unscanned; the rotation cursor in `/tmp/gh-aw/cache-memory/consolidation/latest.json` lists them.
 - v9.29 (2026-10-31): Maintenance tone scan — ran the tone-analyzer agent file-by-file (not a grep sweep) across 22 of the 66 `scratchpad/` spec files this pass (`README.md`, `serena-tools-quick-reference.md`, `errors.md`, `capitalization.md`, `template-syntax-sanitization.md`, `mods/README.md`, `mods/jsonschema-go.md`, `mods/go-sdk.md`, `adding-new-engines.md`, `architecture.md`, `engine-architecture-review.md`, `mdflow.md`, `smoke-test-22422877284.md`, `changesets.md`, `string-sanitization-normalization.md`, `pr-checkout-logic-explained.md`, `testing.md`, `github-actions-security-best-practices.md`, `safe-output-environment-variables.md`, `guard-policies-specification.md`, `engine-review-summary.md`, `agent-container-testing.md`), prioritizing files not touched by the v9.x grep-based scans. Fixed 7 tone issues across 4 files: `mods/jsonschema-go.md` (1 fix: "The library fully implements the JSON Schema Draft 2020-12 specification"→"implements" line 5 — "fully" is an unsubstantiated overclaim); `mods/go-sdk.md` (3 fixes: "staying stateful remains the right call for now"→"...is retained for now because switching would break that session affinity" line 96, stating the concrete reason instead of an unsubstantiated value judgment; "### Best Practice Alignment"→"### Convention Alignment" line 102, matching the v9.x pattern of replacing "best practice" self-labeling with a neutral term; "it has already prevented a subtle bug class"→"...prevented the timeout default from silently overriding a handler-computed value" line 114, naming the specific bug instead of the vague "subtle bug class"); `template-syntax-sanitization.md` (1 fix: "Clear logging when template patterns are detected"→"Logging when template patterns are detected" line 125, matching the established "Clear X"→"X" pattern); `testing.md` (2 fixes: "Fuzz tests and input validation tests ensure all user inputs are handled safely"→"...check that user inputs are validated before use" line 423, replacing the overpromised guarantee "ensure...safely" with the concrete claim the tests actually verify; "**Self-validating**: ... **Complete**: Covers all aspects..."→"**Self-checking**: ... **Coverage-tracked**: Covers the functionality and interface areas listed in this document" lines 489–490, removing the absolute "ensures"/"all aspects" overclaims and avoiding "comprehensive", which the v6.1/v9.10/v9.12 entries above established as a banned subjective intensifier). Also fixed 2 small example-comment clarity issues in `string-sanitization-normalization.md` (`// Unnecessary!`→`// Redundant: input is already normalized` line 187; `// Wrong tool!`→`// Incorrect function for this purpose` line 197) for consistency with the technical-tone standard even though the tone-analyzer did not flag them as marketing language. Deliberately left unaddressed: the tone-analyzer's per-file JSON also flagged dozens of adjective choices in `engine-architecture-review.md`, `engine-review-summary.md`, `pr-checkout-logic-explained.md`, `mdflow.md`, and `guard-policies-specification.md` (e.g., "Good coverage", "Clean implementation", security-severity labels like "CRITICAL"/"DANGEROUS") — these are either point-in-time review verdicts that would misrepresent the historical record if rephrased after the fact, or legitimate risk-severity callouts rather than marketing language; rewriting them file-by-file would be low-value churn, consistent with the v9.25/v9.27 precedent of declining low-value stylistic rewrites. Found and fixed one genuine (non-tone) defect while reviewing `README.md`: its Architecture Documentation table still listed `campaigns-files.md` with status "📋 File removed" — the file does not exist in this `scratchpad/` checkout, so the table referenced a dead relative link; removed the row and refreshed the file's "Last Updated" date. Bumped this file's header to Version 9.29 / 2026-10-31. Cache-memory at `/tmp/gh-aw/cache-memory/` was accessible this run (unlike every prior run note above) but contained no prior `consolidation/latest.json`; wrote one this run recording a rotation cursor so a future pass can resume tone scanning from the 44 files not covered this time (`validation-architecture.md` through `error-recovery-patterns.md` in the catalog's alphabetical-by-discovery order) instead of re-scanning files already clean. Coverage: 22 of 66 scratchpad spec files scanned via the tone-analyzer agent this pass (partial — batched per-agent-call cost made a full 66-file pass impractical in one run); the remaining 44 files were not re-scanned and should not be assumed clean. No `specs/` files were in scope, consistent with this run's "Specs Directory: scratchpad/" framing.
 - v9.28 (2026-10-17): Maintenance tone scan — re-ran the established strong-marketing scan (`powerful`/`seamless`/`effortless`/`blazing`/`cutting-edge`/`state-of-the-art`/`world-class`/`battle-tested`/`amazing`/`intuitive`/`magical`/`leverage`/`comprehensive`/`extensive`/`robust`/`sophisticated`/`elegant`/`deep dive`/`significantly`/`nice-to-have`/`best of both worlds`/`easy to`/`easily`/`simply`/`out-of-the-box`/`enhance(d)`/`great`/`revolutionary`/`game-changing`/`first-class`/`supercharge`/`deeply`) plus the v9.27-added subjective-adjective terms (`gracefully`, `minimalistic`) across all 67 `scratchpad/` spec files (`dev.md`, `README.md`, and the `smoke-test-22422877284.md` test artifact excluded, consistent with established precedent). 0 new tone issues: the only matches are the previously-accepted legitimate usage unchanged from v9.26 (`EnhanceError()`/`enhanceError()` identifiers in `errors.md`; "deeply nested" factual test-structure descriptions in `testing.md` and `mods/jsonschema-go.md`; the two `no magic` negations in `mdflow.md`/`mdflow-comparison.md`; `pr-checkout-logic-explained.md`'s neutral "differs significantly" comparison; `safe-outputs-specification.md`'s self-critical "significantly outdated" disclaimer) and the newly-checked `gracefully` occurrences across `gosec.md`, `artifact-naming-compatibility.md`, `github-mcp-access-control-specification.md`, `pr-checkout-logic-explained.md`, `go-type-patterns.md`, `agents/hierarchical-agents.md`, `breaking-cli-rules.md`, and `safe-outputs-specification.md`, all of which describe concrete, substantiated fallback/error-handling behavior (each followed by the specific degraded behavior), not unsubstantiated marketing. Cross-checked this file's Related Documentation links against the full `scratchpad/` file listing: all 67 non-excluded files remain linked, 0 new files since v9.27. The formatting scan's widespread bold-style pseudo-heading backlog (`**Field**:` used as structural labels across 50+ files) remains deferred as its own dedicated pass per the v9.27 note — no files were touched for this in this run. This sandbox's git history for `scratchpad/` shows a single synthetic commit (`d3915e4`, "fix: redact CLI proxy startup diagnostics before publication (#69517)") that touches the entire tree with no incremental prior state to diff against, consistent with every prior run's note; "new since last run" was determined by content inspection (grep + Related-Documentation cross-reference) rather than git log. Cache-memory at `/tmp/gh-aw/cache-memory/` contained no prior `consolidation/latest.json` this run (git-internal cache directory only, no consolidation metadata persisted by any earlier run). Coverage: 67 scratchpad spec files scanned (100%), 0 new files, 0 files touched.
 - v9.27 (2026-09-26): Ran the tone-analyzer's "great/easy/powerful/amazing/simple/seamless/intuitive/subjective-adjective" scan across 13 previously-clean `scratchpad/` spec files and fixed 34 tone issues missed by earlier marketing-keyword scans (unhedged "clear"/"helpful"/"complete"/"minimalistic"/"gracefully"/"full" claims, and "Key Insight"-style subjective section labels) across `repo-memory.md`, `guard-policies-specification.md`, `adding-new-engines.md`, `agent-sessions.md`, `labels.md`, `styles-guide.md`, `token-budget-guidelines.md`, `artifact-naming-compatibility.md`, `breaking-cli-rules.md`, `changesets.md`, and `schema-validation.md`; `metrics-glossary.md` and `capitalization.md` had none. Formatting scan flagged widespread bold-style pseudo-headings (`**Field**:`) used as structural labels in `repo-memory.md`, `metrics-glossary.md`, and `token-budget-guidelines.md` (100+ instances) — left as-is since converting them to `####` headings is a large mechanical change better handled as its own dedicated pass; flagged here for a future run. Coverage: 68 spec files (no new files; specs/ left out of scope per this run's "Specs Directory: scratchpad/" framing).
