@@ -104,6 +104,23 @@ Each version maps to the minimum compatible binary. A version change MUST update
 | `1.0.15`–`1.0.21` | `v0.72.1`–`v0.83.6` | Adds CTR-021–023 and editorial/mapping updates. |
 | `1.0.8`–`1.0.14` | `v0.72.1` | Establishes CTR-016, CTR-018–020; earlier versions establish CTR-001–015. |
 
+### Current Implementation Synchronization
+
+The following implementation snapshot complements the detailed mapping in Section 7. Each row was verified against the current source and test paths on 2026-11-04.
+
+| Requirement area | Implementation | Test reference | Verified |
+|---|---|---|---|
+| Active `CTR-*` catalog and test IDs | `pkg/workflow/compiler_threat_detection_compliance_formal_test.go` | `TestFormal_RuleTestIDBijection`, `TestFormal_ActiveRuleCoverageComplete` | 2026-11-04 |
+| CTR-005 custom-job detection gates | `pkg/workflow/compiler_custom_job_detection.go`, `pkg/workflow/aw/job_dependencies.go` | `pkg/workflow/compiler_custom_job_detection_test.go`, `pkg/workflow/aw/job_dependencies_test.go` | 2026-11-04 |
+| CTR-006 heredoc and MCP expression boundaries | `pkg/workflow/template_injection_utils.go`, `pkg/workflow/mcp_expression_transport.go` | `pkg/workflow/template_injection_heredoc_test.go`, `pkg/workflow/mcp_expression_transport_test.go` | 2026-11-04 |
+| CTR-019 cache-memory publication | `pkg/workflow/cache_memory.go`, `pkg/workflow/cache_integrity.go` | `pkg/workflow/cache_memory_threat_detection_test.go`, `pkg/workflow/cache_access_test.go` | 2026-11-04 |
+| Host-side MCP compilation | `pkg/cli/mcp_server.go`, `pkg/cli/compile_pipeline.go` | `pkg/cli/mcp_server_compile_test.go`, `pkg/cli/compile_validation_no_emit_test.go` | 2026-11-04 |
+| Actions/AW AST lint subsets | `pkg/workflow/lint/` | `pkg/workflow/lint/rule_contract_test.go`, `pkg/workflow/lint/repository_workflows_test.go` | 2026-11-04 |
+| Proxy diagnostic privacy | `actions/setup/js/redact_cli_proxy_diagnostics.cjs`, `actions/setup/js/start_mcp_gateway.cjs` | `actions/setup/js/redact_cli_proxy_diagnostics.test.cjs`, `actions/setup/js/start_mcp_gateway.test.cjs` | 2026-11-04 |
+| Local-only runtime imports | `pkg/workflow/runtime_import_validation.go`, `actions/setup/js/runtime_import.cjs` | `pkg/workflow/runtime_import_target_policy_test.go`, `actions/setup/js/runtime_import_target_policy.test.cjs` | 2026-11-04 |
+| Fork admission and checkout expansion | `pkg/workflow/filters.go`, `pkg/workflow/checkout_manager.go` | `pkg/workflow/filters_forks_test.go`, `pkg/workflow/checkout_multi_test.go` | 2026-11-04 |
+| CTR-032 publisher provenance | `pkg/workflow/compiler_safe_outputs_steps.go`, `actions/setup/js/execution_provenance.cjs` | `pkg/workflow/safe_outputs_job_identity_test.go`, `actions/setup/js/execution_provenance.test.cjs` | 2026-11-04 |
+
 ## 3. Threat Model Overview
 
 Generated workflows run with elevated permissions and consume untrusted content (issues, PRs, comments, external tool output). The catalog in Section 5 groups the threats a conforming compiler MUST detect into five classes: unauthorized privilege or scope expansion, unsafe or bypassed sandboxing, injection (template, shell, or subprocess argument), unsafe output and supply-chain routes (including forged execution attribution), and compile-time drift between manifests, mappings, and the rules that reference them. Each class maps to one or more `CTR-*` rules with a stable trigger and compiler action.
@@ -201,6 +218,40 @@ The following boundaries are informative scope clarifications, not additional co
 | Detection outcomes | CTR-005's clean-detection gate for ordinary downstream custom jobs remains unchanged. Built-in safe-output handlers instead follow the configured runtime policy: default `continue-on-error: true` can publish annotated reviewable outputs, convert branch pushes, and abort non-reviewable operations on threats or detector failures; `false` blocks safe outputs on these outcomes. Detector failures or invalid results mean no security verdict. Warning labels and requested changes do not replace configured merge protections. |
 
 Operator procedures and the exact runtime warning behavior are documented in [self-hosted runner isolation](../docs/src/content/docs/reference/self-hosted-runners.md#host-isolation-checklist), [trigger authorization and approval](../docs/src/content/docs/reference/triggers.md), [cross-run artifact trust](../docs/src/content/docs/reference/artifacts.md#cross-run-artifact-trust), and [threat detection error handling](../docs/src/content/docs/reference/threat-detection.md#error-handling). Candidate compiler diagnostics for these surfaces follow Section 5.3; this clarification adds no `CTR-*` identifier or conformance test obligation.
+
+### 3.2 REASONS Summary
+
+#### Requirements
+
+The normative compiler, optimizer, and conformance requirements are in Sections 4–8. This summary does not replace their MUST-level language.
+
+#### Entities
+
+The primary entities are stable `CTR-*` rules, generated workflow jobs and outputs, optimizer findings, implementation mappings, and their `T-CTR-*` conformance tests.
+
+#### Approach
+
+The specification defines security rules first, then maps each rule to compiler behavior, stable diagnostics, and deterministic evidence. Runtime boundaries that compilation cannot establish remain explicitly out of scope.
+
+#### Structure
+
+Section 5 contains the rule catalog and compiler-response requirements; Section 6 defines optimizer behavior; Section 7 maps implementation and evidence; Section 8 defines conformance tests.
+
+#### Operations
+
+`gh aw compile` validates or safely rewrites authored workflows. The daily optimizer reviews coverage and reports either a pull request or an explicit no-op, subject to Section 6 safeguards.
+
+#### Norms
+
+Requirement keywords follow RFC 2119 and RFC 8174. Conformance requires every applicable MUST in Sections 2–8, while a test or bounded model supports only the behavior it actually exercises.
+
+#### Safeguards
+
+The catalog is secure by default, preserves explicit runtime and deployment boundaries, and does not treat successful compilation, a clean lint result, or a bounded model as proof of whole-program safety. See Section 3.1 for uncovered runtime trust boundaries.
+
+#### Summary
+
+Use Sections 5–8 as the normative source and Section 7 as the implementation/evidence index. The current source snapshot and its verification dates are recorded in Section 2.
 
 ## 4. Governance and Responsibilities
 
@@ -427,6 +478,16 @@ When a threat is found, maintainers MUST add its mapping and test if covered, or
 ### 5.4 Deprecation Policy
 
 Removing a rule dependency MUST deprecate—not delete—the catalog and mapping rows in the same change set. The catalog records the version and reason; mapped tests become `[DEPRECATED]`; the mapping implementation cell is cleared; and the changelog records the retirement. `TestFormal_DeprecationPolicy_SpecArtifactsConform` enforces this policy.
+
+### 5.5 Open Questions
+
+The current mappings identify one Section 5 MUST-level test obligation without a direct regression reference:
+
+| Requirement | Unreferenced test obligation | Follow-up |
+|---|---|---|
+| Section 5.1.1, CTR-032 | Tests MUST simulate destination API filtering and inspect the persisted or returned body. Section 7.1 records this destination-filtering coverage as outstanding. | Add publisher API-boundary regressions for issue comments, PR descriptions, and individual review comments/replies; then update the CTR-032 evidence mapping in Section 7.1. |
+
+Other Section 5 requirements have test targets or explicit evidence mappings in Sections 7 and 8. This list records a test-reference gap, not a claim that the current implementation is nonconforming.
 
 ## 6. Daily Optimizer Protocol
 
