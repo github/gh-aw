@@ -1,6 +1,6 @@
 {
-  "run_id": "41692210270",
-  "run_date": "2026-11-03T18:25:34.050812+00:00",
+  "run_id": "41747736809",
+  "run_date": "2026-11-04T00:38:22.618691+00:00",
   "source": "pr-triage",
   "eligible_total": 6,
   "open_copilot_prs": 6,
@@ -124,5 +124,5 @@
       }
     }
   ],
-  "notes": "Only six eligible Copilot PRs remained after the 1-hour cooldown. The highest-value items are the workflow-safe-output change and the YAML-escaping fix; the remaining batch covers CLI validation, documentation/spec refresh, and a test-quality improvement."
+  "notes": "Six eligible Copilot PRs remained after the 1-hour cooldown. The highest-value items are the workflow-safe-output change and the YAML-escaping fix; the remaining batch covers CLI validation, documentation/spec refresh, and a test-quality improvement."
 }
