@@ -1367,8 +1367,8 @@ func TestScanRunContentExpressions(t *testing.T) {
 	}
 }
 
-// TestScanRunContentExpressionsHeredoc distinguishes literal quoted bodies from
-// expanding unquoted bodies on the raw-YAML fast path.
+// TestScanRunContentExpressionsHeredoc checks that expressions in any heredoc body
+// are detected on the raw-YAML fast path because Actions evaluates them before Bash.
 func TestScanRunContentExpressionsHeredoc(t *testing.T) {
 	tests := []struct {
 		name              string
