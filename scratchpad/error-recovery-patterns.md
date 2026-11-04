@@ -17,7 +17,7 @@ This document provides guidance for error handling, common error scenarios, reco
 
 ### Console Formatting Requirements
 
-All user-facing error messages **must** use console formatting helpers from the `pkg/console` package. This ensures consistent styling and proper output routing.
+All user-facing error messages **must** use console formatting helpers from the `pkg/console` package. This keeps styling consistent and routes output to stderr.
 
 **✅ CORRECT - Use console formatting:**
 ```go
@@ -671,7 +671,7 @@ flowchart TD
 4. **Fail fast on validation errors**: Don't retry user input errors
 5. **Log all retry attempts**: Use debug logging to track recovery behavior
 6. **Detect transient errors**: Only retry network, timeout, and rate limit errors
-7. **Provide clear error messages**: Tell users what failed and why after exhausting retries
+7. **Report the failure**: Tell users what failed and why after exhausting retries
 8. **Test recovery paths**: Write tests that simulate transient failures
 
 ### Anti-Patterns to Avoid
@@ -712,7 +712,7 @@ for attempt := 0; attempt < 10; attempt++ {
     }
     return nil
 }
-// Better: Add exponential backoff delay between attempts
+// Preferred: add exponential backoff delay between attempts
 ```
 
 ❌ **Silent retries:**
@@ -1101,7 +1101,7 @@ engine: copilot  # or claude, codex, custom
 
 ## Error Message Templates
 
-This section provides templates for writing clear, actionable error messages. Follow these templates when adding new validation or error handling.
+This section provides templates for error messages that state the problem and the next step. Follow these templates when adding new validation or error handling.
 
 ### Validation Error Template
 
@@ -1175,7 +1175,7 @@ return fmt.Errorf(
 ```
 
 **Key elements:**
-- Clear error description
+- Error description that states the problem
 - Explain why it's a problem (security, correctness, compatibility)
 - Provide step-by-step fix instructions
 
@@ -1471,7 +1471,7 @@ Errors in gh-aw fall into four main categories, each requiring different handlin
 ```
 
 **Handling approach:**
-- Provide clear, actionable error message
+- Provide an error message that states the problem and the next step
 - Include example of correct usage
 - Reference relevant documentation
 - Use `console.FormatErrorMessage()` for output
@@ -1595,7 +1595,7 @@ graph TD
     D -->|Yes| H[System Error]
     D -->|No| E
     
-    F --> I[Clear message + example]
+    F --> I[Message + example]
     G --> J[Explain implications + fix]
     H --> K[Check environment + recovery]
     E --> L[Report issue link]

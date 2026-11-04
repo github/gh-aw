@@ -2001,6 +2001,10 @@ envelope's target `agentId` does not identify the emitting caller. Readers must
 not invent parent tool IDs to distinguish these scopes; a view containing only
 one nested scope can select that scope's initialization and accounting explicitly.
 
+The log parser publishes all structured engine logs through this unified-session
+view, normalizing legacy records and attaching source provenance when absent.
+Rendering does not depend on the engine name.
+
 Actions publishes this view once in a top-level `Unified session` disclosure,
 using a fenced CLI-style transcript like the Claude conversation summary rather
 than a Markdown table. Opening the disclosure shows source-local conversations
