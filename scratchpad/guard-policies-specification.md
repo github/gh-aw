@@ -17,6 +17,10 @@ This document specifies the implemented compiler-side guard-policy integration f
 **Status**: Implemented (compiler-side; runtime enforcement is external)
 **Date**: 2026-06-21
 
+## Requirements
+
+The compiler accepts and validates GitHub guard-policy configuration, derives the corresponding gateway and safe-output policy, and preserves lockdown precedence. The normative requirements are in [Conformance](#conformance); request-time enforcement remains the responsibility of the external MCP Gateway runtime.
+
 ## Requirements Notation
 
 The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHALL**, **SHALL NOT**, **SHOULD**, **SHOULD NOT**, **RECOMMENDED**, **NOT RECOMMENDED**, **MAY**, and **OPTIONAL** in this document are to be interpreted as described in [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119) and [RFC 8174](https://www.rfc-editor.org/rfc/rfc8174).
@@ -241,6 +245,10 @@ The design supports future MCP servers (Jira, WorkIQ) through:
        projects: ["PROJ-*", "SHARED"]
        issue-types: ["Bug", "Story"]
    ```
+
+## Structure
+
+Workflow frontmatter is parsed into `GitHubToolConfig`, validated in `pkg/workflow/tools_validation_github.go`, and translated by `pkg/workflow/mcp_github_config.go` into gateway and safe-output configuration. The generated configuration is consumed by the MCP Gateway; request-time enforcement is outside this repository.
 
 ## Implementation Details
 
