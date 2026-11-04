@@ -31,6 +31,7 @@ mcp-scripts:
         required: true
     run: |
       echo "hippo $INPUT_ARGS"
+      # shellcheck disable=SC2086 # INPUT_ARGS intentionally word-splits into multiple hippo CLI arguments
       hippo $INPUT_ARGS
 
 steps:
