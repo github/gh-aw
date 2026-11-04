@@ -12,6 +12,36 @@ import (
 	"github.com/github/gh-aw/pkg/testutil"
 )
 
+func TestOutputIssueDeduplicateByLabelsValidation(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		option string
+		valid  bool
+	}{
+		{"labels without title filter", "deduplicate-by-labels: [documentation, automated]", true},
+		{"empty labels", "deduplicate-by-labels: []", true},
+		{"expression label", "deduplicate-by-labels: ['${{ github.event.issue.title }}']", false},
+		{"embedded expression", "deduplicate-by-labels: ['prefix-${{ github.event.issue.title }}']", false},
+		{"old option", "deduplicate-by-title-labels: [documentation]", false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := testutil.TempDir(t, "deduplicate-by-labels")
+			path := filepath.Join(dir, "test.md")
+			content := "---\non: push\nengine: copilot\nstrict: false\nsafe-outputs:\n  create-issue:\n    " + tt.option + "\n---\nTest workflow\n"
+			if err := os.WriteFile(path, []byte(content), 0600); err != nil {
+				t.Fatal(err)
+			}
+			err := NewCompiler().CompileWorkflow(path)
+			if tt.valid && err != nil {
+				t.Fatalf("Expected valid configuration, got %v", err)
+			}
+			if !tt.valid && err == nil {
+				t.Fatal("Expected invalid configuration to be rejected")
+			}
+		})
+	}
+}
+
 // assertTokenInProcessSafeOutputsEnv verifies that a given environment variable name
 // appears inside the env block of the process_safe_outputs step. This is more precise
 // than a plain strings.Contains on the full lock file, which can produce false positives
@@ -151,7 +181,7 @@ strict: false
 safe-outputs:
   create-issue:
     deduplicate-by-title: 1
-    deduplicate-by-title-labels: [documentation, automated]
+    deduplicate-by-labels: [documentation, automated]
     title-prefix: "[genai] "
     labels: [copilot, automation]
 ---
@@ -205,8 +235,8 @@ This workflow tests the output configuration parsing.
 	if deduplicateByTitle == nil || string(*deduplicateByTitle) != "1" {
 		t.Errorf("Expected deduplicate-by-title to parse as '1', got %#v", deduplicateByTitle)
 	}
-	if got := workflowData.SafeOutputs.CreateIssues.DeduplicateByTitleLabels; !slices.Equal(got, []string{"documentation", "automated"}) {
-		t.Errorf("Expected title deduplication labels [documentation automated], got %v", got)
+	if got := workflowData.SafeOutputs.CreateIssues.DeduplicateByLabels; !slices.Equal(got, []string{"documentation", "automated"}) {
+		t.Errorf("Expected deduplication labels [documentation automated], got %v", got)
 	}
 }
 
@@ -356,7 +386,7 @@ strict: false
 safe-outputs:
   create-issue:
     deduplicate-by-title: 1
-    deduplicate-by-title-labels: [documentation, automated]
+    deduplicate-by-labels: [documentation, automated]
     title-prefix: "[genai] "
     labels: [copilot]
 ---
@@ -426,8 +456,8 @@ This workflow tests the create-issue job generation.
 	if !strings.Contains(lockContent, `\"deduplicate_by_title\":1`) {
 		t.Error("Expected deduplicate_by_title in handler config")
 	}
-	if !strings.Contains(lockContent, `\"deduplicate_by_title_labels\":[\"documentation\",\"automated\"]`) {
-		t.Error("Expected deduplicate_by_title_labels in handler config")
+	if !strings.Contains(lockContent, `\"deduplicate_by_labels\":[\"documentation\",\"automated\"]`) {
+		t.Error("Expected deduplicate_by_labels in handler config")
 	}
 
 	// Verify job dependencies

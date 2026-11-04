@@ -736,10 +736,10 @@ describe("create_issue", () => {
   });
 
   describe("deduplicate-by-title", () => {
-    it.each([undefined, []])("should preserve unfiltered searches when label filters are %j", async dedupLabels => {
+    it.each([undefined, [], [" ", "\t"]])("should preserve unfiltered searches when label filters are %j", async dedupLabels => {
       const handler = await main({
         deduplicate_by_title: true,
-        deduplicate_by_title_labels: dedupLabels,
+        deduplicate_by_labels: dedupLabels,
         labels: ["documentation", "automated"],
       });
 
@@ -749,7 +749,7 @@ describe("create_issue", () => {
       expect(queries).toEqual(["repo:test-owner/test-repo is:issue is:open", expect.stringMatching(/^repo:test-owner\/test-repo is:issue is:closed closed:>=\d{4}-\d{2}-\d{2}$/)]);
     });
 
-    it.each(["open", "closed"])("should require all filter labels when searching %s issues", async state => {
+    it.each(["open", "closed"])("should append all filter labels to %s searches", async state => {
       mockGithub.rest.search.issuesAndPullRequests.mockImplementation(({ q }) =>
         Promise.resolve({
           data: {
@@ -760,7 +760,7 @@ describe("create_issue", () => {
       );
       const handler = await main({
         deduplicate_by_title: true,
-        deduplicate_by_title_labels: ["documentation", "automated"],
+        deduplicate_by_labels: [" documentation ", "automated", " "],
         "target-repo": "other-owner/other-repo",
       });
 
@@ -779,23 +779,75 @@ describe("create_issue", () => {
     it("should quote label filters without changing labels applied at creation", async () => {
       const handler = await main({
         deduplicate_by_title: true,
-        deduplicate_by_title_labels: ["needs docs", 'docs" OR repo:other/repo', "path\\docs"],
+        deduplicate_by_labels: ["needs docs", 'docs" OR repo:other/repo', "path\\docs"],
         labels: ["automated"],
       });
 
       await handler({ title: "New title" });
 
+      expect(mockGithub.rest.search.issuesAndPullRequests).toHaveBeenCalledTimes(2);
       for (const [request] of mockGithub.rest.search.issuesAndPullRequests.mock.calls) {
         expect(request.q).toContain(' label:"needs docs" label:"docs\\" OR repo:other/repo" label:"path\\\\docs"');
       }
       expect(mockGithub.rest.issues.create).toHaveBeenCalledWith(expect.objectContaining({ labels: ["automated"] }));
     });
 
-    it("should not search when title deduplication is disabled even with label filters", async () => {
-      const handler = await main({
-        deduplicate_by_title: false,
-        deduplicate_by_title_labels: ["documentation"],
+    it.each([undefined, false])("should deduplicate by labels alone when title filtering is %j", async titleFilter => {
+      mockGithub.rest.search.issuesAndPullRequests.mockResolvedValue({
+        data: { total_count: 1, items: [{ title: "Different existing title" }] },
       });
+      const handler = await main({
+        deduplicate_by_title: titleFilter,
+        deduplicate_by_labels: ["documentation"],
+      });
+
+      const result = await handler({ title: "New title" });
+
+      expect(mockGithub.rest.search.issuesAndPullRequests).toHaveBeenCalledTimes(2);
+      expect(result.dropped_duplicate).toBe(true);
+      expect(result.dedup_source).toBe("repo-level");
+      expect(mockGithub.rest.issues.create).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [true, ["documentation", "automated"], "Same title", true],
+      [true, ["documentation"], "Same title", false],
+      [true, ["documentation", "automated"], "Different title", false],
+      [1, ["Documentation", "automated"], "Same titlf", true],
+      [false, ["documentation", "automated"], "Different title", true],
+      [false, ["documentation"], "Different title", false],
+    ])("should combine within-run title %j and labels %j as AND filters for %s", async (titleFilter, firstLabels, secondTitle, dropped) => {
+      const handler = await main({
+        max: 5,
+        deduplicate_by_title: titleFilter,
+        deduplicate_by_labels: ["documentation", "automated"],
+      });
+
+      await handler({ title: "Same title", labels: firstLabels });
+      const result = await handler({ title: secondTitle, labels: ["documentation", "automated"] });
+
+      expect(result.dropped_duplicate === true).toBe(dropped);
+      expect(mockGithub.rest.issues.create).toHaveBeenCalledTimes(dropped ? 1 : 2);
+    });
+
+    it("should require the title to match repository candidates when both filters are enabled", async () => {
+      mockGithub.rest.search.issuesAndPullRequests.mockResolvedValue({
+        data: { total_count: 1, items: [{ title: "Different existing title" }] },
+      });
+      const handler = await main({
+        deduplicate_by_title: true,
+        deduplicate_by_labels: ["documentation"],
+      });
+
+      const result = await handler({ title: "New title" });
+
+      expect(result.dropped_duplicate).not.toBe(true);
+      expect(mockGithub.rest.search.issuesAndPullRequests).toHaveBeenCalledTimes(2);
+      expect(mockGithub.rest.issues.create).toHaveBeenCalledOnce();
+    });
+
+    it.each([undefined, [], [" "]])("should keep deduplication disabled with no title filter and labels %j", async labelFilter => {
+      const handler = await main({ deduplicate_by_labels: labelFilter });
 
       await handler({ title: "New title" });
 

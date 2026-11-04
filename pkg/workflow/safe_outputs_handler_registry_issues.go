@@ -31,7 +31,7 @@ var issueHandlerRegistry = map[string]handlerBuilder{
 			AddBoolPtr("normalize_closing_keywords", c.NormalizeClosingKeywords).
 			AddTemplatableBool("staged", templatableBoolPtrToStringPtr(c.Staged)).
 			AddTemplatableBoolOrInt("deduplicate_by_title", c.DeduplicateByTitle).
-			AddStringSlice("deduplicate_by_title_labels", c.DeduplicateByTitleLabels)
+			AddStringSlice("deduplicate_by_labels", c.DeduplicateByLabels)
 		return builder.Build()
 	},
 	"close_issue": func(cfg *SafeOutputsConfig) map[string]any {
