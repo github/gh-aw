@@ -65,3 +65,8 @@ func DoWorkNoLint(ctx context.Context) {
 }
 
 func handle(f func(context.Context)) { f(nil) }
+
+// flagged: parenthesized context.Background callee
+func DoWorkParen(ctx context.Context) {
+	_ = (context.Background)() // want `use the context.Context parameter instead of context.Background\(\)`
+}

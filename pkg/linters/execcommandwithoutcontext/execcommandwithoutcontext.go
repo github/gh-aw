@@ -7,7 +7,6 @@ package execcommandwithoutcontext
 import (
 	"fmt"
 	"go/ast"
-	"go/types"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/ast/inspector"
@@ -106,25 +105,14 @@ func checkExecCommandCall(pass *analysis.Pass, cur inspector.Cursor, generatedFi
 }
 
 // execCommandSelector reports the selector expression for calls to
-// exec.Command from os/exec.
+// exec.Command from os/exec. A parenthesized callee such as
+// (exec.Command)(name) is also recognized.
 func execCommandSelector(pass *analysis.Pass, call *ast.CallExpr) (*ast.SelectorExpr, bool) {
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok || sel.Sel.Name != "Command" {
 		return nil, false
 	}
-	ident, ok := sel.X.(*ast.Ident)
-	if !ok {
-		return nil, false
-	}
-	obj := pass.TypesInfo.ObjectOf(ident)
-	if obj == nil {
-		return nil, false
-	}
-	pkgName, ok := obj.(*types.PkgName)
-	if !ok {
-		return nil, false
-	}
-	if pkgName.Imported().Path() != "os/exec" {
+	if !astutil.IsPkgSelector(pass, sel, "os/exec") {
 		return nil, false
 	}
 	return sel, true
