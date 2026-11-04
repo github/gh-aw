@@ -18,9 +18,16 @@ const COMPONENT_FILES = {
 // Generated jobs display as "Agent", "Detection" and "Evaluations".
 const COMPONENT_DISPLAY_NAMES = { evaluations: "evals" };
 
-function componentKey(job) {
+function componentKey(job, jobNames) {
   for (const candidate of [job.job_id, job.name]) {
     if (typeof candidate !== "string") continue;
+    const separator = candidate.lastIndexOf(" / ");
+    if (separator !== -1) {
+      // Caller names are arbitrary. Require the compiler's sibling jobs rather
+      // than treating every reusable workflow with an "agent" job as gh-aw.
+      const prefix = candidate.slice(0, separator + 3);
+      if (!jobNames.has(`${prefix}activation`) || !jobNames.has(`${prefix}conclusion`)) continue;
+    }
     const lower = (candidate.split(" / ").pop() ?? "").toLowerCase();
     const key = COMPONENT_DISPLAY_NAMES[lower] ?? lower;
     if (Object.hasOwn(COMPONENT_FILES, key)) return key;
@@ -31,6 +38,7 @@ function componentKey(job) {
 async function loadBillableJobs({ github, budget }, owner, repo, run) {
   const components = new Map();
   const jobsByComponent = new Map();
+  const allJobs = [];
   let complete = false;
   for (let page = 1; page <= 10; page++) {
     const response = await budget.request(
@@ -48,28 +56,31 @@ async function loadBillableJobs({ github, budget }, owner, repo, run) {
     );
     const jobs = response.data.jobs;
     if (!Array.isArray(jobs)) throw new Error("Incomplete daily AIC job metadata");
-    for (const job of jobs) {
-      const name = componentKey(job);
-      if (!name) continue;
-      if (!Number.isSafeInteger(job.run_attempt) || job.run_attempt < 1 || job.run_attempt > run.run_attempt || job.status !== "completed" || !job.conclusion) {
-        throw new Error("Incomplete daily AIC component attempt metadata");
-      }
-      if (!jobsByComponent.has(name)) jobsByComponent.set(name, []);
-      jobsByComponent.get(name).push(job);
-      const prior = components.get(name);
-      const notStarted = job.conclusion === "skipped" || provesJobExecutionNotStarted(job);
-      const priorNotStarted = prior && (prior.conclusion === "skipped" || provesJobExecutionNotStarted(prior));
-      if (!prior || (priorNotStarted && !notStarted) || (notStarted === priorNotStarted && job.run_attempt > prior.run_attempt)) {
-        components.set(name, job);
-      }
-    }
+    allJobs.push(...jobs);
     if (jobs.length < 100) {
       complete = true;
       break;
     }
   }
+  if (!complete) throw new Error("Cannot prove complete billable-component coverage");
+  const jobNames = new Set(allJobs.flatMap(job => [job.job_id, job.name]));
+  for (const job of allJobs) {
+    const name = componentKey(job, jobNames);
+    if (!name) continue;
+    if (!Number.isSafeInteger(job.run_attempt) || job.run_attempt < 1 || job.run_attempt > run.run_attempt || job.status !== "completed" || !job.conclusion) {
+      throw new Error("Incomplete daily AIC component attempt metadata");
+    }
+    if (!jobsByComponent.has(name)) jobsByComponent.set(name, []);
+    jobsByComponent.get(name).push(job);
+    const prior = components.get(name);
+    const notStarted = job.conclusion === "skipped" || provesJobExecutionNotStarted(job);
+    const priorNotStarted = prior && (prior.conclusion === "skipped" || provesJobExecutionNotStarted(prior));
+    if (!prior || (priorNotStarted && !notStarted) || (notStarted === priorNotStarted && job.run_attempt > prior.run_attempt)) {
+      components.set(name, job);
+    }
+  }
   // A complete empty job list proves the run ended before any billable job existed.
-  if (!complete || (components.size > 0 && !components.has("agent"))) throw new Error("Cannot prove complete billable-component coverage");
+  if (components.size > 0 && !components.has("agent")) throw new Error("Cannot prove complete billable-component coverage");
   const priorJobs = new Map();
   for (const [name, selected] of components) {
     const selectedAttemptJobs = jobsByComponent.get(name).filter(job => job.run_attempt === selected.run_attempt);

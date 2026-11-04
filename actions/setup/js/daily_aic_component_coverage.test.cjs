@@ -8,11 +8,16 @@ const require = createRequire(import.meta.url);
 const { getRunAIC } = require("./check_daily_aic_workflow_guardrail.cjs");
 const { sumAICFromUsageJSONLFiles } = require("./daily_aic_workflow_helpers.cjs");
 const { createAPIBudget } = require("./daily_aic_api_budget.cjs");
+const { loadBillableJobs } = require("./daily_aic_component_coverage.cjs");
 const { captureExecutionEvidenceConfiguration, shouldSkipForNoopSafeOutputs } = require("./harness_retry_runner.cjs");
 const time = "2025-01-01T12:00:00Z";
 const later = "2025-01-01T12:30:00Z";
+const componentName = name => {
+  const last = name.split(" / ").pop().toLowerCase();
+  return last === "evaluations" ? "evals" : last;
+};
 const job = (name, overrides = {}) => ({
-  id: name === "agent" ? 1 : name === "detection" ? 2 : 3,
+  id: componentName(name) === "agent" ? 1 : componentName(name) === "detection" ? 2 : 3,
   name,
   status: "completed",
   conclusion: "success",
@@ -21,6 +26,7 @@ const job = (name, overrides = {}) => ({
   completed_at: time,
   ...overrides,
 });
+const callerJobs = prefix => [job(`${prefix}activation`, { id: 90 }), job(`${prefix}conclusion`, { id: 91 })];
 let directory;
 beforeEach(() => {
   directory = fs.mkdtempSync(path.join(os.tmpdir(), "aic-components-"));
@@ -39,7 +45,7 @@ function evaluate(files, jobs, overrides = {}) {
       artifacts: [
         { id: 10, name: "usage", createdAt: new Date(overrides.artifactTime || later) },
         ...["agent", "detection", "evals"].map(name => {
-          const latest = jobs.filter(item => (item.name.toLowerCase() === "evaluations" ? "evals" : item.name.toLowerCase()) === name && item.conclusion !== "skipped").sort((a, b) => b.run_attempt - a.run_attempt)[0];
+          const latest = jobs.filter(item => componentName(item.name) === name && item.conclusion !== "skipped").sort((a, b) => b.run_attempt - a.run_attempt)[0];
           return { id: latest?.id, name, createdAt: new Date(overrides.producerTime || latest?.completed_at || time) };
         }),
       ],
@@ -192,25 +198,67 @@ it("counts an empty detection accounting file as zero AIC", async () => {
   expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"source":"detection/token_usage.jsonl"'));
 });
 
-it.each([
-  ["", ["agent", "detection", "evals"]],
-  ["caller / ", ["agent", "detection", "evals"]],
-  ["outer / caller / ", ["agent", "detection", "evals"]],
-  ["", ["Agent", "Detection", "Evaluations"]],
-  ["caller / ", ["Agent", "Detection", "Evaluations"]],
-  ["outer / caller / ", ["Agent", "Detection", "Evaluations"]],
-])("counts %j-prefixed %j jobs using their lowercase accounting paths", async (prefix, names) => {
+it.each(
+  [
+    ["", ["agent", "detection", "evals"]],
+    ["caller / ", ["agent", "detection", "evals"]],
+    ["outer / caller / ", ["agent", "detection", "evals"]],
+    ["", ["Agent", "Detection", "Evaluations"]],
+    ["caller / ", ["Agent", "Detection", "Evaluations"]],
+    ["outer / caller / ", ["Agent", "Detection", "Evaluations"]],
+  ].flatMap(([prefix, names]) => [1, 2].map(attempt => [prefix, names, attempt]))
+)("counts %j-prefixed %j jobs using their lowercase accounting paths (attempt %i)", async (prefix, names, attempt) => {
   const f = evaluate(
     {
       "agent/token_usage.jsonl": '{"aic":18.02604}',
       "detection/token_usage.jsonl": '{"aic":30.08748}',
       "evals/token_usage.jsonl": '{"aic":1}',
     },
-    names.map(name => job(`${prefix}${name}`))
+    [...names.map(name => job(`${prefix}${name}`, { run_attempt: attempt })), ...callerJobs(prefix)],
+    { attempt }
   );
   await expect(f.result).resolves.toBeCloseTo(49.11352);
   expect(f.client.listArtifacts).toHaveBeenCalledOnce();
   expect(global.core.info).not.toHaveBeenCalledWith(expect.stringContaining('"reason":"no_billable_jobs"'));
+  for (const [index, component] of ["agent", "detection", "evals"].entries()) {
+    expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining(`"component":"${component}","jobId":${index + 1},"runAttempt":${attempt}`));
+  }
+});
+
+it.each(["caller / ", "outer / caller / "])("rejects a stale producer for %j-prefixed jobs on rerun", async prefix => {
+  const f = evaluate({ "agent/token_usage.jsonl": '{"aic":2}' }, [job(`${prefix}agent`, { run_attempt: 2, started_at: later, completed_at: later }), ...callerJobs(prefix)], { attempt: 2, producerTime: time });
+  await expect(f.result).rejects.toThrow("Cannot verify the agent producer artifact for its job attempt");
+});
+
+it.each(["caller / agent-helper", "caller / my-agent", "outer / caller / agent-helper"])("ignores look-alike component %s even in a compiler caller", async name => {
+  const prefix = name.slice(0, name.lastIndexOf(" / ") + 3);
+  const f = evaluate({ "agent/token_usage.jsonl": '{"aic":99}' }, [job(name), ...callerJobs(prefix)]);
+  await expect(f.result).resolves.toBe(0);
+  expect(f.client.listArtifacts).not.toHaveBeenCalled();
+});
+
+it.each(["security / agent", "other / detection", "outer / other / evals"])("ignores unrelated suffix match %s alongside compiler jobs", async name => {
+  const f = evaluate({ "agent/token_usage.jsonl": '{"aic":2}', "detection/token_usage.jsonl": '{"aic":99}', "evals/token_usage.jsonl": '{"aic":99}' }, [job("Agent"), job(name, { id: 99 })]);
+  await expect(f.result).resolves.toBe(2);
+});
+
+it.each(["activation", "conclusion"])("does not infer compiler ownership from %s alone", async sibling => {
+  const f = evaluate({ "agent/token_usage.jsonl": '{"aic":99}' }, [job("security / agent"), job(`security / ${sibling}`)]);
+  await expect(f.result).resolves.toBe(0);
+});
+
+it("requires compiler siblings under the same caller prefix", async () => {
+  const f = evaluate({ "agent/token_usage.jsonl": '{"aic":99}' }, [job("outer / caller / agent"), job("outer / activation"), job("outer / caller / conclusion")]);
+  await expect(f.result).resolves.toBe(0);
+});
+
+it("recognizes compiler siblings on a later job page", async () => {
+  const agent = job("outer / caller / agent");
+  const pages = [[agent, ...Array.from({ length: 99 }, (_, id) => job("unrelated", { id: id + 100 }))], callerJobs("outer / caller / ")];
+  const listJobsForWorkflowRun = vi.fn(async ({ page }) => ({ data: { jobs: pages[page - 1] } }));
+  const { components } = await loadBillableJobs({ github: { rest: { actions: { listJobsForWorkflowRun } } }, budget: createAPIBudget() }, "example", "project", { id: 1, run_attempt: 1 });
+  expect(components.get("agent")).toBe(agent);
+  expect(listJobsForWorkflowRun).toHaveBeenCalledTimes(2);
 });
 
 it("treats differently cased names for the same component as ambiguous", async () => {
