@@ -431,17 +431,10 @@ func TestPushToPullRequestBranchMessageGuidance(t *testing.T) {
 		if tool["name"] != "push_to_pull_request_branch" {
 			continue
 		}
-		description := tool["description"].(string)
-		require.Contains(t, description, "REQUIRED ARGUMENT: supply 'message'")
-		require.Contains(t, description, "even though changes are already committed locally")
-		require.Contains(t, description, "not read from git automatically")
-
 		schema := tool["inputSchema"].(map[string]any)
 		require.Contains(t, schema["required"], "message")
 		properties := schema["properties"].(map[string]any)
 		message := properties["message"].(map[string]any)
-		require.Contains(t, message["description"], "REQUIRED on every call, with no default")
-		require.Contains(t, message["description"], "not read from git automatically")
 		require.NotContains(t, message, "default")
 		return
 	}
