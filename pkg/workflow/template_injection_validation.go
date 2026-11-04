@@ -118,6 +118,13 @@ func runScriptAccessPath(expression *actionslanguageservice.Expression) []string
 	}
 }
 
+func runScriptAccessPathSegment(path []string, index int) (string, bool) {
+	if index < 0 || index >= len(path) {
+		return "", false
+	}
+	return path[index], true //nolint:uncheckedsliceindex // index is checked against len(path) above.
+}
+
 func unsafeRunScriptExpressionContext(source string) string {
 	expression, ok := actionslanguageservice.WrappedExpression(source)
 	if !ok {
@@ -129,13 +136,23 @@ func unsafeRunScriptExpressionContext(source string) string {
 			return false
 		}
 		path := runScriptAccessPath(node)
+		first, ok := runScriptAccessPathSegment(path, 0)
+		if !ok {
+			return true
+		}
 		switch {
-		case len(path) >= 1 && strings.EqualFold(path[0], "inputs"):
+		case strings.EqualFold(first, "inputs"):
 			context = "workflow inputs"
-		case len(path) >= 2 && strings.EqualFold(path[0], "github") && (strings.EqualFold(path[1], "event") || path[1] == "*"):
-			context = "github.event"
-		case len(path) >= 4 && strings.EqualFold(path[0], "steps") && (strings.EqualFold(path[2], "outputs") || path[2] == "*"):
-			context = "steps.*.outputs"
+		case strings.EqualFold(first, "github"):
+			event, exists := runScriptAccessPathSegment(path, 1)
+			if exists && (strings.EqualFold(event, "event") || event == "*") {
+				context = "github.event"
+			}
+		case strings.EqualFold(first, "steps"):
+			outputs, exists := runScriptAccessPathSegment(path, 2)
+			if len(path) >= 4 && exists && (strings.EqualFold(outputs, "outputs") || outputs == "*") {
+				context = "steps.*.outputs"
+			}
 		}
 		return context == ""
 	})
@@ -152,10 +169,24 @@ func findRunValue(keyPart string) (string, bool) {
 		return "", false
 	}
 	loc := runKeyPattern.FindStringIndex(keyPart)
-	if loc == nil {
+	if len(loc) < 2 {
 		return "", false
 	}
-	return strings.TrimSpace(keyPart[loc[1]:]), true
+	return strings.TrimSpace(keyPart[loc[1]:]), true //nolint:uncheckedsliceindex // FindStringIndex returns a pair; checked above.
+}
+
+func appendRunBlockLine(block *strings.Builder, line string, indent int, contentIndent *int) {
+	if *contentIndent == 0 {
+		*contentIndent = indent
+	}
+	block.WriteString(line[min(*contentIndent, indent):])
+	block.WriteByte('\n')
+}
+
+func startRunBlock(indent int, inRunBlock *bool, runBlockIndent, contentIndent *int) {
+	*inRunBlock = true
+	*runBlockIndent = indent
+	*contentIndent = 0
 }
 
 // walkRunBlockLines scans raw YAML text and visits each inline run value or line inside a
@@ -195,11 +226,7 @@ func walkRunBlockLines(yamlContent string, visit func(line string) bool) bool {
 				inRunBlock = false
 				// Fall through: check whether this line starts a new run: block.
 			} else {
-				if contentIndent == 0 {
-					contentIndent = indent
-				}
-				block.WriteString(line[min(contentIndent, indent):])
-				block.WriteByte('\n')
+				appendRunBlockLine(&block, line, indent, &contentIndent)
 				continue
 			}
 		}
@@ -211,11 +238,12 @@ func walkRunBlockLines(yamlContent string, visit func(line string) bool) bool {
 		if !ok {
 			continue
 		}
-
-		if rest == "" || rest[0] == '|' || rest[0] == '>' {
-			inRunBlock = true
-			runBlockIndent = indent
-			contentIndent = 0
+		if rest == "" {
+			startRunBlock(indent, &inRunBlock, &runBlockIndent, &contentIndent)
+			continue
+		}
+		if rest[0] == '|' || rest[0] == '>' { //nolint:uncheckedsliceindex // rest is non-empty above.
+			startRunBlock(indent, &inRunBlock, &runBlockIndent, &contentIndent)
 			continue
 		}
 		if visit(rest) {

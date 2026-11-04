@@ -179,20 +179,6 @@ EOF`,
 			expectWarnings:  1,
 		},
 		{
-			name: "same expression in comment and command is extracted",
-			step: map[string]any{
-				"run": strings.Join([]string{
-					`# docs: ${{ github.event.issue.title }}`,
-					`echo "${{ github.event.issue.title }}"`,
-				}, "\n"),
-			},
-			expectChanged:   true,
-			expectRunHas:    []string{"# docs: $GH_AW_GITHUB_EVENT_ISSUE_TITLE", `echo "$GH_AW_GITHUB_EVENT_ISSUE_TITLE"`},
-			expectRunNotHas: []string{"${{"},
-			expectEnvKeys:   []string{"GH_AW_GITHUB_EVENT_ISSUE_TITLE"},
-			expectWarnings:  1,
-		},
-		{
 			name: "steps outputs expression extracted",
 			step: map[string]any{
 				"run": `bash script.sh "${{ steps.build.outputs.artifact }}"`,

@@ -105,36 +105,59 @@ func sanitizeRunStepExpressions(step map[string]any) (map[string]any, []string, 
 		return step, nil, false
 	}
 
-	// Find all distinct ${{ ... }} expressions in the expandable portions and comments.
-	matches := ExpressionPattern.FindAllStringSubmatch(scanContent, -1)
-	if len(matches) == 0 {
+	ordered := runStepExpressionsToExtract(scanContent)
+	if len(ordered) == 0 {
 		return step, nil, false
 	}
 
+	newEnv := mergeSanitizedRunStepEnv(step, ordered)
+
+	// Replace every occurrence of each expression in the run: script.
+	// Replacements are limited to non-quoted-heredoc regions: quoted heredocs
+	// (e.g. << 'EOF') suppress shell variable expansion, so replacing
+	// ${{ expr }} with $GH_AW_VAR inside them would write the literal variable
+	// name to the output file instead of the expression value. Expressions
+	// that appear exclusively inside quoted heredocs are never added to `ordered` (see
+	// the scanContent check above), so they are left intact regardless.
+	newRun := runVal
+	for _, s := range ordered {
+		newRun = replaceSanitizedRunStepExpression(newRun, s, step["shell"])
+	}
+
+	// Build the sanitized step as a shallow copy.
+	sanitized := make(map[string]any, len(step))
+	maps.Copy(sanitized, step)
+	sanitized["run"] = newRun
+	sanitized["env"] = newEnv
+
+	return sanitized, sanitizedRunStepDescriptions(step, ordered), true
+}
+
+func runStepExpressionsToExtract(scanContent string) []sanitizedExpression {
+	// Find all distinct ${{ ... }} expressions in the expandable portions and comments.
+	matches := ExpressionPattern.FindAllStringSubmatch(scanContent, -1)
+
 	// Build a deduplicated, ordered list of expressions to extract.
 	extractor := NewExpressionExtractor()
-	seen := make(map[string]struct {
-	})
+	seen := make(map[string]struct{})
 	var ordered []sanitizedExpression
 
 	for _, match := range matches {
-		original := match[0]
+		if len(match) < 2 {
+			continue
+		}
+		original := match[0] //nolint:uncheckedsliceindex // The submatch length is checked above.
 		if setutil.Contains(seen, original) {
 			continue
 		}
-		seen[original] = struct {
-		}{}
-		content := strings.TrimSpace(match[1])
+		seen[original] = struct{}{}
+		content := strings.TrimSpace(match[1]) //nolint:uncheckedsliceindex // The submatch length is checked above.
 		envVar := extractor.generateEnvVarName(content)
 		ordered = append(ordered, sanitizedExpression{
 			Original: original,
 			EnvVar:   envVar,
 			Content:  content,
 		})
-	}
-
-	if len(ordered) == 0 {
-		return step, nil, false
 	}
 
 	// Sort longest expressions first to avoid partial replacements when one
@@ -149,13 +172,19 @@ func sanitizeRunStepExpressions(step map[string]any) (map[string]any, []string, 
 			return 0
 		}
 	})
+	return ordered
+}
 
+func mergeSanitizedRunStepEnv(step map[string]any, ordered []sanitizedExpression) map[string]any {
 	// Merge extracted env vars into a copy of the existing env: map.
 	// Collision handling:
 	//   - If the generated key already exists with the same value → reuse as-is.
 	//   - If it exists with a different value → pick an alternate name by appending
 	//     a numeric suffix (_2, _3, …) so the original user-defined value is preserved.
-	existingEnv, _ := step["env"].(map[string]any)
+	existingEnv, ok := step["env"].(map[string]any)
+	if !ok {
+		existingEnv = nil
+	}
 	newEnv := make(map[string]any, typeutil.SafeAllocationCapacity(len(existingEnv), len(ordered)))
 	maps.Copy(newEnv, existingEnv)
 
@@ -193,27 +222,15 @@ func sanitizeRunStepExpressions(step map[string]any) (map[string]any, []string, 
 		}
 		newEnv[s.EnvVar] = s.Original
 	}
+	return newEnv
+}
 
-	// Replace every occurrence of each expression in the run: script.
-	// Replacements are limited to non-quoted-heredoc regions: quoted heredocs
-	// (e.g. << 'EOF') suppress shell variable expansion, so replacing
-	// ${{ expr }} with $GH_AW_VAR inside them would write the literal variable
-	// name to the output file instead of the expression value.  Expressions
-	// that appear exclusively inside quoted heredocs are never added to `ordered` (see
-	// the scanContent check above), so they are left intact regardless.
-	newRun := runVal
-	for _, s := range ordered {
-		newRun = replaceSanitizedRunStepExpression(newRun, s, step["shell"])
-	}
-
-	// Build the sanitized step as a shallow copy.
-	sanitized := make(map[string]any, len(step))
-	maps.Copy(sanitized, step)
-	sanitized["run"] = newRun
-	sanitized["env"] = newEnv
-
+func sanitizedRunStepDescriptions(step map[string]any, ordered []sanitizedExpression) []string {
 	// Build human-readable descriptions for caller warnings.
-	stepName, _ := step["name"].(string)
+	stepName, ok := step["name"].(string)
+	if !ok {
+		stepName = ""
+	}
 	var descriptions []string
 	for _, s := range ordered {
 		var msg string
@@ -230,8 +247,7 @@ func sanitizeRunStepExpressions(step map[string]any) (map[string]any, []string, 
 		}
 		descriptions = append(descriptions, msg)
 	}
-
-	return sanitized, descriptions, true
+	return descriptions
 }
 
 func replaceSanitizedRunStepExpression(run string, expression sanitizedExpression, shellValue any) string {
