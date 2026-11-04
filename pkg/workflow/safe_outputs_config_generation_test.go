@@ -859,9 +859,11 @@ func TestGenerateSafeOutputsConfigSafeJobMax(t *testing.T) {
 	findingCfg, ok := parsed["emit-finding"].(map[string]any)
 	require.True(t, ok, "emit-finding should be present in config")
 	assert.InDelta(t, float64(25), findingCfg["max"], 0.0001, "max should be 25")
+	assert.Equal(t, false, findingCfg["supports_dependencies"], "separate safe jobs must reject runtime dependencies")
 
 	singleCfg, ok := parsed["single-output"].(map[string]any)
 	require.True(t, ok, "single-output should be present in config")
+	assert.Equal(t, false, singleCfg["supports_dependencies"])
 	_, hasMax := singleCfg["max"]
 	assert.False(t, hasMax, "max should be absent when not configured (lets runtime default to 1)")
 }

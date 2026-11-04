@@ -405,6 +405,7 @@ SAFE_OUTPUTS_FILES=(
   "safe_output_redaction.cjs"
   "safe_outputs_config_redact.cjs"
   "safe_outputs_handlers.cjs"
+  "safe_output_submission.cjs"
   "ledger_append.cjs"
   "ledger_transactions.cjs"
   "ledger_builtin.cjs"
