@@ -1,0 +1,19 @@
+// This panel is mandatory beside every summary. Counts are observed, never inventory.
+let Physical = toscalar(RawSpans | count);
+let InvalidIdentity = toscalar(RawSpans
+    | where not(TraceId matches regex "^[0-9a-f]{32}$") or TraceId == "00000000000000000000000000000000"
+        or not(SpanId matches regex "^[0-9a-f]{16}$") or SpanId == "0000000000000000"
+    | count);
+let Executions = toscalar(SelectedSpans | where Correlated
+    | summarize by RepositoryName, ExecutionRunId, Attempt, WorkflowRef, Hop | count);
+SelectedSpans
+| summarize ObservedSpans = count(), PhysicalCopies = sum(PhysicalCopies),
+    MissingCorrelation = countif(not(Correlated)), ConflictingSpans = countif(ConflictingCopies),
+    SampledSpans = countif(ItemCount > 1),
+    DroppedAttributes = countif(DroppedAttributesCount > 0),
+    DroppedEvents = countif(DroppedEventsCount > 0)
+| extend Dashboard = "observed executions", PackVersion = "1", SelectionValid = SelectionValid,
+    AttemptMode = AttemptMode, RequestedAttempt = RunAttempt, WindowStart = Start, WindowEnd = End,
+    ObservedExecutions = Executions, WindowPhysicalSpans = Physical,
+    WindowInvalidIdentity = InvalidIdentity,
+    Evidence = "observed window only; missing exports, jobs and later attempts unknown"

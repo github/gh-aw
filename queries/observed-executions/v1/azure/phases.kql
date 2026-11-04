@@ -1,0 +1,12 @@
+// Do not sum overlapping job windows, or equate them to final workflow duration.
+SelectedSpans
+| where Name endswith_cs ".setup" or Name endswith_cs ".conclusion" or Name == "gh-aw.agent.agent"
+| extend Phase = case(Name == "gh-aw.agent.agent", "agent-execution",
+    Name endswith_cs ".setup", "setup", "job-window")
+| extend TimingMeasured = isnotnull(TimeGenerated) and isnotnull(EndTime)
+    and EndTime >= TimeGenerated and isfinite(DurationMs) and DurationMs >= 0
+    and not(ConflictingCopies)
+| project RepositoryName, ExecutionRunId, Attempt, WorkflowRef, Hop, Job, TraceId, SpanId, Phase,
+    StartTime = TimeGenerated, EndTime, DurationMs = iff(TimingMeasured, DurationMs, real(null)),
+    TimingState = iff(TimingMeasured, "measured-span", "unknown"), Correlated
+| order by RepositoryName asc, ExecutionRunId asc, Attempt asc, WorkflowRef asc, Job asc, SpanId asc

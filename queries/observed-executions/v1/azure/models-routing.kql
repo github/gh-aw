@@ -1,0 +1,21 @@
+// One accounting owner, not one row per model/tool request or downstream copy.
+// Routing is observed attribution, NOT a counterfactual savings estimate.
+AccountingOwners
+| project RepositoryName, ExecutionRunId, Attempt, WorkflowRef, Hop, Job, TraceId, SpanId, Engine,
+    RequestedModel = coalesce(tostring(Attributes["gh-aw.model.requested"]), tostring(Attributes["gen_ai.request.model"])),
+    EffectiveRequestModel = tostring(Attributes["gen_ai.request.model"]),
+    ResponseModel = tostring(Attributes["gen_ai.response.model"]),
+    Effort = tostring(Attributes["gh-aw.model.effort"]),
+    RoutingStatus = tostring(Attributes["gh-aw.model_routing.status"]),
+    RoutingMode = tostring(Attributes["gh-aw.model_routing.mode"]),
+    RouterVersion = tostring(Attributes["gh-aw.model_routing.router_version"]),
+    FailureCode = tostring(Attributes["gh-aw.model_routing.failure_code"]),
+    Objective = tostring(Attributes["gh-aw.model_routing.objective"]),
+    TaskType = tostring(Attributes["gh-aw.model_routing.task_type"]),
+    Scope = tostring(Attributes["gh-aw.model_routing.scope"]),
+    Complexity = tostring(Attributes["gh-aw.model_routing.complexity"]),
+    Degraded = tobool(Attributes["gh-aw.model_routing.degraded"]),
+    ClassifierAicDiagnosticOnly = Counter(Attributes["gh-aw.model_routing.classifier_aic"]),
+    DeviatedRequests = Counter(Attributes["gh-aw.model_routing.deviated_requests"]),
+    AccountingUsable
+| order by RepositoryName asc, ExecutionRunId asc, Attempt asc, WorkflowRef asc, Job asc, SpanId asc

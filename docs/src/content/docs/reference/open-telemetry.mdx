@@ -138,6 +138,17 @@ observability:
       service-account: ${{ vars.GCP_SA_EMAIL }}
 ```
 
+## Query observed executions
+
+For read-only Azure Monitor queries, the versioned
+[observed executions query pack](https://github.com/github/gh-aw/tree/main/queries/observed-executions/v1)
+provides failure, phase, owned AIC/token, model/routing, grader, and optional compact
+evidence-quality panels. It deduplicates physical spans and selects run attempts
+explicitly. Results describe **observed executions**, not fleet-complete activity
+or authoritative final workflow status. Span summaries do not require logs opt-in.
+The pack includes deterministic reference fixtures and documents unverified Azure
+integration behavior; reference tests do not execute or certify KQL.
+
 ## Read telemetry through MCP
 
 Configure [`mcp-servers`](/gh-aw/reference/frontmatter-full/) when the agent needs to inspect telemetry that already exists in the backend. A typical Sentry read setup looks like this:

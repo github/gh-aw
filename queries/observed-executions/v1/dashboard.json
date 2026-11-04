@@ -1,0 +1,15 @@
+{
+  "title": "observed executions",
+  "version": 1,
+  "provider": "azure-native-otel",
+  "common": "azure/common.kql",
+  "panels": [
+    { "id": "coverage", "title": "Observed execution coverage", "query": "azure/coverage.kql", "required": true },
+    { "id": "failures", "title": "Observed failures and export diagnostics", "query": "azure/failures.kql" },
+    { "id": "phases", "title": "Measured phases and job windows", "query": "azure/phases.kql" },
+    { "id": "usage", "title": "Owned AIC and token subtotals", "query": "azure/usage.kql" },
+    { "id": "models-routing", "title": "Observed model and routing attribution", "query": "azure/models-routing.kql" },
+    { "id": "graders", "title": "Owned grader results", "query": "azure/graders.kql" },
+    { "id": "compact-quality", "title": "Optional compact evidence quality", "query": "azure/compact-quality.kql", "optionalSignal": "logs" }
+  ]
+}

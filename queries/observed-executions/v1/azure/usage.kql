@@ -1,0 +1,17 @@
+// Each subtotal has its own known-owner denominator. Null is not a measured zero.
+AccountingOwners
+| summarize Owners = count(), UnusableOwners = countif(not(AccountingUsable)),
+    AicKnownOwners = countif(isnotnull(Aic)), ObservedAic = sum(Aic),
+    InputKnownOwners = countif(isnotnull(InputTokens)), ObservedInputTokens = sum(InputTokens),
+    OutputKnownOwners = countif(isnotnull(OutputTokens)), ObservedOutputTokens = sum(OutputTokens),
+    TotalKnownOwners = countif(isnotnull(TotalTokens)), ObservedTotalTokens = sum(TotalTokens),
+    CacheReadKnownOwners = countif(isnotnull(CacheReadTokens)), ObservedCacheReadTokens = sum(CacheReadTokens),
+    CacheWriteKnownOwners = countif(isnotnull(CacheWriteTokens)), ObservedCacheWriteTokens = sum(CacheWriteTokens)
+    by RepositoryName, WorkflowRef, Job, Engine
+| extend ObservedAic = iff(AicKnownOwners > 0, ObservedAic, real(null)),
+    ObservedInputTokens = iff(InputKnownOwners > 0, ObservedInputTokens, real(null)),
+    ObservedOutputTokens = iff(OutputKnownOwners > 0, ObservedOutputTokens, real(null)),
+    ObservedTotalTokens = iff(TotalKnownOwners > 0, ObservedTotalTokens, real(null)),
+    ObservedCacheReadTokens = iff(CacheReadKnownOwners > 0, ObservedCacheReadTokens, real(null)),
+    ObservedCacheWriteTokens = iff(CacheWriteKnownOwners > 0, ObservedCacheWriteTokens, real(null))
+| order by RepositoryName asc, WorkflowRef asc, Job asc, Engine asc

@@ -83,6 +83,16 @@ if grep -Eq '^(lint|gofmt):' "$CALL_LOG"; then
 fi
 echo "PASS: non-Go changes tolerate empty Go arrays under nounset"
 
+printf '%s\n' "queries/observed-executions/v1/azure/usage.kql" > "$CHANGED_LIST_FILE"
+run_gate
+if grep -Fxq "make:<test-observed-executions>" "$CALL_LOG"; then
+    echo "Query tests ran in the no-test checkpoint" >&2
+    exit 1
+fi
+run_gate --with-tests
+grep -Fxq "make:<test-observed-executions>" "$CALL_LOG"
+echo "PASS: observed execution query changes run reference tests only at the final checkpoint"
+
 printf '%s\n' "pkg/space name/two.go" "pkg/another/example.go" "pkg/space name/one.go" "pkg/space name/one.go" > "$CHANGED_LIST_FILE"
 run_gate --with-tests
 grep -Fq "Validating 3 changed file(s)" "$OUTPUT"

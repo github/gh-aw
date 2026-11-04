@@ -1,0 +1,29 @@
+// Native OTelEvents.TimeGenerated is the SPAN START, not event.timeUnixNano.
+// No native event-clock column is documented. Never bucket grader results by it.
+let GraderParents = Spans
+    | project TraceId, SpanId, ParentFound = true, IsSelected, RepositoryName, ExecutionRunId,
+        Attempt, WorkflowRef, Hop, Job, ParentName = Name, ParentEndTime = EndTime, Correlated, ConflictingCopies;
+OTelEvents
+| where TimeGenerated >= Start and TimeGenerated < End and Name == "grader.result"
+| extend GraderId = tostring(Attributes["gh-aw.grader.id"]), Source = tostring(Attributes["gh-aw.grader.source"]),
+    Signature = tostring(Attributes)
+| summarize EventCopies = count(), SignatureVariants = make_set(Signature, 2),
+    arg_max(Signature, *) by TraceId, SpanId, GraderId, Source
+| join kind=leftouter GraderParents on TraceId, SpanId
+| where SelectionValid
+| where not(coalesce(ParentFound, false)) or IsSelected
+| where coalesce(ParentFound, false) or isempty(Repository) or tostring(ResourceAttributes["github.repository"]) == Repository
+| extend Ownership = case(not(coalesce(ParentFound, false)), "unknown",
+    ParentName == "gh-aw.conclusion.conclusion" and Job == "conclusion" and Source == "builtin", "owned",
+    ParentName == "gh-aw.graders.conclusion" and Job == "graders" and Source in ("inline", "operational-value"), "owned", "non-owner")
+| where Ownership != "non-owner"
+| project RepositoryName, ExecutionRunId, Attempt, WorkflowRef, Hop, Job, TraceId, SpanId, GraderId, Source,
+    Status = tostring(Attributes["gh-aw.grader.status"]),
+    Value = todouble(Attributes["gh-aw.grader.value"]), Unit = tostring(Attributes["gh-aw.grader.unit"]),
+    Passed = tobool(Attributes["gh-aw.grader.passed"]), Ownership,
+    EventTime = datetime(null), ClockState = "unavailable-native-event-clock",
+    ParentEndTime, EventCopies,
+    PartialEvidence = Ownership != "owned" or not(coalesce(Correlated, false))
+        or coalesce(ConflictingCopies, false) or array_length(SignatureVariants) > 1
+        or coalesce(ItemCount, 1) > 1 or coalesce(DroppedAttributesCount, 0) > 0
+| order by RepositoryName asc, ExecutionRunId asc, Attempt asc, WorkflowRef asc, Job asc, GraderId asc

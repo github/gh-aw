@@ -1,0 +1,41 @@
+// Optional logs panel. Do not join these lossy records into cost or grader totals.
+let LogParents = Spans
+    | project TraceId, SpanId, ParentFound = true, IsSelected, RepositoryName, ExecutionRunId,
+        Attempt, WorkflowRef, Hop, Job, Correlated, Name;
+let LogQuality = materialize(OTelLogs
+| where TimeGenerated >= Start and TimeGenerated < End and ScopeName == "gh-aw.session"
+// The baseline log resource deliberately omits run/repository identity.
+| extend Record = parse_json(Body), Profile = ResourceAttributes
+| extend BodyClock = tostring(Record.timestamp)
+| extend EventTime = iff(BodyClock matches regex @"^\d{4}-\d{2}-\d{2}T", todatetime(BodyClock), datetime(null))
+| summarize PhysicalLogRecords = count(),
+    PhysicalUntimedRecords = countif(isnull(EventTime)),
+    UnparseableBodies = countif(gettype(Record) != "dictionary"),
+    UnknownQualityRecords = countif(isnull(Profile["gh-aw.session.included_events"])
+        or isnull(Profile["gh-aw.session.omitted_events"]) or isnull(Profile["gh-aw.session.oversized_lines"])
+        or isnull(Profile["gh-aw.session.scan_truncated"]) or isnull(Profile["gh-aw.session.truncated"])),
+    Included = max(tolong(Profile["gh-aw.session.included_events"])),
+    Omitted = max(tolong(Profile["gh-aw.session.omitted_events"])),
+    Oversized = max(tolong(Profile["gh-aw.session.oversized_lines"])),
+    ScanTruncated = max(toint(tobool(Profile["gh-aw.session.scan_truncated"]))),
+    Truncated = max(toint(tobool(Profile["gh-aw.session.truncated"]))),
+    // Optional future capability: absence stays unknown on the current baseline.
+    ExporterUntimed = max(tolong(Profile["gh-aw.session.untimed_events"]))
+    by TraceId, SpanId);
+union (LogQuality | join kind=leftouter LogParents on TraceId, SpanId),
+    (LogParents | where IsSelected and Name == "gh-aw.conclusion.setup"
+        | join kind=leftanti LogQuality on TraceId, SpanId)
+| where SelectionValid
+| where not(coalesce(ParentFound, false)) or IsSelected
+// Unmatched logs have no repository identity. Retain them as UNASSIGNED diagnostics.
+| project RepositoryName, ExecutionRunId, Attempt, WorkflowRef, Hop, Job, TraceId, SpanId,
+    PhysicalLogRecords, PhysicalUntimedRecords, UnparseableBodies, UnknownQualityRecords, Included, Omitted, Oversized,
+    ScanTruncated, Truncated, ExporterUntimed,
+    Evidence = case(not(coalesce(Correlated, false)), "unknown-correlation",
+        isnull(PhysicalLogRecords), "not-observed",
+        UnknownQualityRecords > 0, "unknown-quality",
+        Omitted > 0 or Oversized > 0 or ScanTruncated == 1 or Truncated == 1
+            or PhysicalUntimedRecords > 0 or UnparseableBodies > 0 or ExporterUntimed > 0, "partial",
+        "compact-projection"),
+    ClockBasis = "body ISO timestamp only; TimeGenerated is not the event clock"
+| order by RepositoryName asc, ExecutionRunId asc, Attempt asc, WorkflowRef asc, Job asc, SpanId asc

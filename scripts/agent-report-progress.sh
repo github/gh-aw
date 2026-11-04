@@ -88,6 +88,7 @@ action_shell_files=()
 workflow_drift_required=0
 model_alias_validation_required=0
 session_schema_validation_required=0
+observed_query_validation_required=0
 
 for file in "${CHANGED_FILES[@]}"; do
     case "$file" in
@@ -142,6 +143,12 @@ for file in "${CHANGED_FILES[@]}"; do
     case "$file" in
         actions/setup/js/types/*session*|actions/setup/js/scripts/*session*|actions/setup/js/agent_session.cjs|actions/setup/js/agent_execution.cjs|actions/setup/js/unified_session*.cjs|actions/setup/js/package*.json|docs/public/schemas/*session.schema.json)
             session_schema_validation_required=1
+            ;;
+    esac
+
+    case "$file" in
+        queries/observed-executions/*)
+            observed_query_validation_required=1
             ;;
     esac
 done
@@ -351,6 +358,9 @@ if [ "$WITH_TESTS" -eq 1 ]; then
     fi
     if [ "${#eslint_factory_files[@]}" -gt 0 ]; then
         start_job "eslint-factory tests" test_eslint_factory
+    fi
+    if [ "$observed_query_validation_required" -eq 1 ]; then
+        start_job "observed execution query specifications" make --no-print-directory test-observed-executions
     fi
 fi
 

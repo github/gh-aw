@@ -1,0 +1,76 @@
+// Observed executions v1. Prepend this file to ONE panel query.
+// The window selects span starts, not complete runs. Change these literals explicitly.
+let Start = ago(1d);
+let End = now();
+let Repository = ""; // Empty selects all observed repositories.
+let RunId = "";
+let AttemptMode = "all"; // all | exact | latest-observed (within this window)
+let RunAttempt = 1;
+let SelectionValid = Start < End and AttemptMode in ("all", "exact", "latest-observed")
+    and (AttemptMode != "exact" or RunAttempt > 0);
+let Counter = (value:dynamic) {
+    let number = todouble(value);
+    iff(gettype(value) in ("long", "real", "int") and isfinite(number) and number >= 0, number, real(null))
+};
+let RawSpans = materialize(
+    OTelSpans
+    | where TimeGenerated >= Start and TimeGenerated < End
+    | where ScopeName == "gh-aw" and Name startswith_cs "gh-aw."
+    | extend Signature = tostring(pack_array(Name, TimeGenerated, EndTime, DurationMs,
+        ParentSpanId, StatusCode, StatusMessage, Attributes, ResourceAttributes,
+        ItemCount, DroppedAttributesCount, DroppedEventsCount))
+);
+// Invalid/missing physical identity is retained in coverage, never merged into one span.
+let DeduplicatedSpans = materialize(
+    RawSpans
+    | where TraceId matches regex "^[0-9a-f]{32}$" and TraceId != "00000000000000000000000000000000"
+        and SpanId matches regex "^[0-9a-f]{16}$" and SpanId != "0000000000000000"
+    | summarize PhysicalCopies = count(), SignatureVariants = make_set(Signature, 2),
+        arg_max(Signature, *) by TraceId, SpanId
+    | extend ConflictingCopies = array_length(SignatureVariants) > 1
+    | extend RepositoryName = coalesce(tostring(Attributes["gh-aw.repository"]), tostring(ResourceAttributes["github.repository"])),
+        ExecutionRunId = coalesce(tostring(Attributes["gh-aw.run.id"]), tostring(ResourceAttributes["github.run_id"])),
+        Attempt = tolong(coalesce(Attributes["gh-aw.run.attempt"], ResourceAttributes["github.run_attempt"])),
+        WorkflowRef = tostring(ResourceAttributes["github.workflow_ref"]),
+        Hop = coalesce(tostring(Attributes["gh-aw.hop.id"]), tostring(Attributes["gh-aw.workflow_call.id"])),
+        Job = coalesce(tostring(Attributes["gh-aw.job.name"]), tostring(ResourceAttributes["github.job"])),
+        Engine = coalesce(tostring(Attributes["gh-aw.engine.id"]), tostring(ResourceAttributes["gh-aw.engine.id"]))
+    | extend Correlated = isnotempty(RepositoryName) and isnotempty(ExecutionRunId)
+        and isnotnull(Attempt) and Attempt > 0 and isnotempty(WorkflowRef) and isnotempty(Job)
+    | extend InScope = (isempty(Repository) or RepositoryName == Repository)
+        and (isempty(RunId) or ExecutionRunId == RunId)
+);
+// Select attempts at repository/run level BEFORE partitioning jobs/hops.
+let LatestAttempts = DeduplicatedSpans
+    | where isnotempty(RepositoryName) and isnotempty(ExecutionRunId) and Attempt > 0
+    | summarize LatestAttempt = max(Attempt) by RepositoryName, ExecutionRunId;
+let Spans = materialize(
+    DeduplicatedSpans
+    | join kind=leftouter LatestAttempts on RepositoryName, ExecutionRunId
+    | extend IsSelected = SelectionValid and InScope and (AttemptMode == "all"
+        or (AttemptMode == "exact" and Attempt == RunAttempt)
+        or (AttemptMode == "latest-observed" and Attempt == LatestAttempt))
+);
+let SelectedSpans = materialize(Spans | where IsSelected);
+// A dedicated span is linked to its owning conclusion by parent ID, NOT by run/job alone.
+// This also preserves matrix/job instances and reusable workflow hops.
+let DedicatedAgents = materialize(SelectedSpans | where Name == "gh-aw.agent.agent" and Job == "agent");
+let DedicatedParents = DedicatedAgents
+    | project TraceId, SpanId = ParentSpanId
+    | distinct TraceId, SpanId;
+let AccountingOwners = materialize(
+    union DedicatedAgents,
+        (SelectedSpans
+        | where Name == strcat("gh-aw.", Job, ".conclusion")
+            and (Job in ("agent", "detection") or (isnotempty(Engine) and Job == Engine))
+        | join kind=leftanti DedicatedParents on TraceId, SpanId)
+    | extend AccountingUsable = Correlated and not(ConflictingCopies)
+        and coalesce(ItemCount, 1) == 1 and coalesce(DroppedAttributesCount, 0) == 0
+    | extend Aic = iff(AccountingUsable, Counter(Attributes["gh-aw.aic"]), real(null)),
+        InputTokens = iff(AccountingUsable, Counter(Attributes["gen_ai.usage.input_tokens"]), real(null)),
+        OutputTokens = iff(AccountingUsable, Counter(Attributes["gen_ai.usage.output_tokens"]), real(null)),
+        CacheReadTokens = iff(AccountingUsable, Counter(Attributes["gen_ai.usage.cache_read.input_tokens"]), real(null)),
+        CacheWriteTokens = iff(AccountingUsable, Counter(Attributes["gen_ai.usage.cache_creation.input_tokens"]), real(null))
+    // A partial input/output pair is not a total, even if an old copied total exists.
+    | extend TotalTokens = iff(isnotnull(InputTokens) and isnotnull(OutputTokens), InputTokens + OutputTokens, real(null))
+);

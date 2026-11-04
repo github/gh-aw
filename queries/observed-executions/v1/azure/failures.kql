@@ -1,0 +1,11 @@
+SelectedSpans
+| extend ObservedStatus = tostring(Attributes["gh-aw.run.status"]),
+    ExportErrors = Counter(Attributes["gh-aw.otlp.export_errors"])
+| extend ObservedFailure = StatusCode =~ "Error" or ObservedStatus in ("failure", "timeout", "timed_out", "cancelled")
+| where ObservedFailure or ExportErrors > 0
+| project RepositoryName, ExecutionRunId, Attempt, WorkflowRef, Hop, Job, TraceId, SpanId, Name,
+    ObservedFailure, ObservedStatus, StatusCode, StatusMessage,
+    FailureCategories = Attributes["gh-aw.failure.categories"],
+    ExportErrors, ExportDetails = tostring(Attributes["gh-aw.otlp.export_error_details"]),
+    Correlated, ConflictingCopies
+| order by RepositoryName asc, ExecutionRunId asc, Attempt asc, WorkflowRef asc, Job asc, SpanId asc

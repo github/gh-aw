@@ -296,6 +296,10 @@ test-js: build-js
 	cd actions/setup/js && npm run test:js -- --no-file-parallelism
 	cd eslint-factory && npm test
 
+.PHONY: test-observed-executions
+test-observed-executions:
+	node --test queries/observed-executions/*/query-pack.test.cjs
+
 # Test impacted JavaScript unit tests only (excluding integration tests)
 .PHONY: test-impacted-js
 test-impacted-js: build-js
@@ -530,6 +534,7 @@ test-scripts: build
 	node --test scripts/agy-authentication.test.cjs
 	node --test scripts/check-npm-1es.test.mjs
 	node --test scripts/release-workflows.test.cjs
+	$(MAKE) --no-print-directory test-observed-executions
 	bash scripts/extract-workflow-frontmatter-keys_test.sh
 	bash scripts/check-stale-lock-files_test.sh
 	bash scripts/agent-report-progress_test.sh
