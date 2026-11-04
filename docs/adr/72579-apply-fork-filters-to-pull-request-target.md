@@ -10,11 +10,11 @@
 
 gh-aw supports compiler-only `forks:` filters under both PR events and label-name filters (`names:`) under `on.pull_request`; these belong in job conditions, not native GitHub Actions trigger properties. The on-section cleanup state machine (`pkg/workflow/frontmatter_on_section_cleanup.go`) checked for the next event before leaving compiler-only subsections such as `on.permissions`, `on.steps`, or `on.skip-author-associations`, so filters after those fields could leak into lock files and fail Actions schema validation. Separately, `applyPullRequestForkFilter` (`pkg/workflow/filters.go`) read only `on.pull_request`, silently ignoring explicit `pull_request_target.forks` restrictions.
 
-Security review also identified that omitted target fork filters previously admitted arbitrary forks, like `"*"`. Trusted actor authorization is insufficient: a maintainer can label an attacker-controlled PR, and an agent can consume malicious PR content with privileged capabilities even when checkout is disabled. The target event therefore needs the same same-repository default as `pull_request`, and strict mode should warn on explicitly unrestricted admission independently of actor authorization, checkout policy, and risk acknowledgment.
+Security review also identified that omitted target fork filters previously admitted arbitrary forks, like `"*"`. Trusted actor authorization is insufficient: a maintainer can label an attacker-controlled PR, and an agent can consume malicious PR content with privileged capabilities even when checkout is disabled. The target event therefore needs the same same-repository default as `pull_request`, and strict mode should reject explicitly unrestricted admission independently of actor authorization, checkout policy, and risk acknowledgment.
 
 ### Decision
 
-The compiler will apply fork filters to both `pull_request` and `pull_request_target` using event-scoped job conditions (`github.event_name != '<event>' || ...`), while preserving existing conditions and commenting out processed trigger fields. For `pull_request_target`, omission and `forks: []` both admit only same-repository PRs, in strict and non-strict mode, including scalar trigger shorthand. Explicit patterns always admit same-repository PRs. Target workflows may admit forks through exact `owner/repo` entries or deliberately trusted `owner/*` patterns. Explicit `"*"` permits unrestricted admission in both modes; strict mode warns and recommends restricting forks instead of rejecting compilation. Neither `acknowledge-risk` nor trusted/disabled checkout suppresses that warning. Actor authorization and checkout restrictions remain mandatory, and strict mode still rejects expressions and unsupported pattern forms. The same-repository default for configured `pull_request` event objects is unchanged.
+The compiler will apply fork filters to both `pull_request` and `pull_request_target` using event-scoped job conditions (`github.event_name != '<event>' || ...`), while preserving existing conditions and commenting out processed trigger fields. For `pull_request_target`, omission and `forks: []` both admit only same-repository PRs, in strict and non-strict mode, including scalar trigger shorthand. Explicit patterns always admit same-repository PRs. Target workflows may admit forks through exact `owner/repo` entries or deliberately trusted `owner/*` patterns. Explicit `"*"` permits unrestricted admission in non-strict mode with a warning and is rejected in strict mode unless `features.dangerously-allow-pull-request-target-forks-all: true` is set. The warning remains visible with that opt-in. Neither `acknowledge-risk` nor trusted/disabled checkout suppresses the warning. Actor authorization and checkout restrictions remain mandatory, and strict mode still rejects expressions and unsupported pattern forms. The same-repository default for configured `pull_request` event objects is unchanged.
 
 The supported frontmatter schema in `pkg/parser/schemas/main_workflow_schema.json` accepts string and list patterns for both events, but accepts the `forks: {author-association: [...]}` form from [ADR-69374](69374-fork-pr-admission-by-author-association.md) only for `pull_request`; the shared helper's ability to process that object does not make it supported for `pull_request_target`, and this decision does not extend the schema. To produce valid lock files without silently dropping configured admission rules, the cleanup state machine will leave compiler-only subsections before detecting the next event and track `forks` indentation for nested content, including the supported two-space and four-space event layouts.
 
@@ -32,9 +32,9 @@ Requiring `forks: []` would make every strict target workflow state its admissio
 
 A narrower bug fix would remove the leaked keys and leave admission logic alone. It was rejected because removing `forks` from `pull_request_target` without compiling it into a condition would make the silent drop permanent. The author would get a lock file that looks valid but does not enforce the restriction they configured.
 
-#### Alternative 4: Reject unrestricted fork admission in strict mode
+#### Alternative 4: Warn only on unrestricted fork admission in strict mode
 
-Rejecting `"*"` would force bounded admission, but would also prevent existing explicitly unrestricted workflows from compiling. A strict-mode warning preserves that explicit choice while recommending narrower fork trust and retaining actor and checkout safeguards.
+Warn-only handling preserves compatibility but leaves unrestricted admission available without a distinctly dangerous opt-in. Strict mode therefore rejects `"*"` by default and offers a clearly named dangerous feature flag for workflows that intentionally need unrestricted admission. This preserves a migration path while keeping the diagnostic visible.
 
 ### Consequences
 
@@ -42,7 +42,7 @@ Rejecting `"*"` would force bounded admission, but would also prevent existing e
 - Recognizing PR events after compiler-only `on.*` fields prevents `forks`/`names` from leaking into native triggers and failing Actions schema validation.
 - An explicit `forks:` pattern under `pull_request_target` is now enforced as an event-scoped job condition instead of being ignored.
 - Event-scoped guards let workflows that set both PR events use independent fork filters, and existing `if:` and label (`names`) conditions are kept.
-- Strict-mode target workflows warn on explicitly unrestricted fork admission, including with risk acknowledgment or checkout exemptions.
+- Strict-mode target workflows reject unrestricted fork admission by default, including with risk acknowledgment or checkout exemptions; a dangerous feature flag permits it without suppressing the warning.
 
 #### Negative
 - Existing target workflows that omitted `forks` and relied on unrestricted admission must configure the intended fork patterns and recompile. This is documented as a breaking change.

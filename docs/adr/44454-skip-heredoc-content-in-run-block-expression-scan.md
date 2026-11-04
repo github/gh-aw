@@ -1,4 +1,4 @@
-# ADR-44454: Exempt Only Proven Quoted Heredoc Bodies from Run-Block Expression Scanning
+# ADR-44454: Scan Raw Run Content and Preserve Bash-Aware Sanitization
 
 **Date**: 2026-07-09
 **Status**: Draft
@@ -12,15 +12,15 @@ Historically, `CompileSimpleWorkflow` regressed ~3x in execution time (5.67ms â†
 
 ### Decision
 
-The original decision skipped all heredoc bodies using delimiter heuristics. Security alert 1057 exposed an unsafe assumption: Bash executes command substitutions in unquoted bodies, so those bodies cannot be exempt from expression scanning.
+The original decision skipped heredoc bodies using delimiter heuristics, and security alert 1057 exposed an unsafe assumption: Bash executes command substitutions in unquoted bodies. A separate issue is that GitHub Actions interpolates `${{ ... }}` before Bash parses comments, quoting, or heredoc boundaries, so neither comments nor quoted heredocs may be excluded from validation.
 
-Both scanning paths now share the existing Bash parser to identify quoted heredoc bodies after masking Actions expressions without changing byte offsets. Path B removes YAML block indentation before parsing. Only quoted bodies are skipped; unquoted bodies are scanned even on lines beginning with `#`. Complete delimiter matching, quoting, multiple redirections, and `<<-` tab stripping follow Bash syntax. Opening commands remain visible. A parse failure grants no heredoc or comment exemption.
+Both compiler validation paths scan raw `run:` content, including comments and all heredoc bodies. The sanitizer remains Bash-aware and uses the existing parser to identify quoted heredoc bodies after masking Actions expressions without changing byte offsets. Path B removes YAML block indentation before scanning. The sanitizer preserves quoted bodies and comments, and rewrites only proven executable expressions. Complete delimiter matching, quoting, multiple redirections, and `<<-` tab stripping follow Bash syntax. A parse failure grants no sanitizer exemption.
 
-Quoted inner heredocs remain protected inside expanding outer bodies. Comment spans come from the full-script parse so enclosing quote state is preserved. Delimiter quotation excludes unquoted backslash-newline continuations. Quoted-body exemptions also require agreement with the first literal closing delimiter line; parser boundary disagreements are treated as unsupported syntax. Escapes in ANSI-C-quoted or double-quoted delimiter parts are also unsupported because Bash may decode them differently from the parser; ordinary single-quoted literal backslashes remain supported. For malformed or unsupported heredoc syntax, sanitization leaves the script unchanged and validation scans all expressions. Parser failure logs never include script tokens.
+Quoted inner heredocs remain protected from sanitizer rewrites inside expanding outer bodies. Comment spans come from the full-script parse so enclosing quote state is preserved. Delimiter quotation excludes unquoted backslash-newline continuations. Sanitizer exemptions also require agreement with the first literal closing delimiter line; parser boundary disagreements are treated as unsupported syntax. Escapes in ANSI-C-quoted or double-quoted delimiter parts are also unsupported because Bash may decode them differently from the parser; ordinary single-quoted literal backslashes remain supported. For malformed or unsupported heredoc syntax, sanitization leaves the script unchanged while validation still scans all raw expressions. Parser failure logs never include script tokens.
 
-The `steps-run-secrets-to-env` source codemod shares these Bash region decisions instead of applying line-based comment rules inside heredocs. It preserves quoted bodies, migrates hash-prefixed expanding-body expressions, and reports unproven boundaries as guided errors without writing partial workflow changes.
+The `steps-run-secrets-to-env` source codemod shares these Bash region decisions instead of applying line-based comment rules inside heredocs. It preserves quoted bodies and comments, migrates hash-prefixed expanding-body expressions, and reports unproven boundaries as guided errors without writing partial workflow changes. Since validation rejects prohibited expressions in the regions the codemod preserves, those cases require manual migration.
 
-Quoted-body preservation is a shell-expansion compatibility rule, not a guarantee for arbitrary Actions values. Actions interpolation precedes Bash parsing, so an untrusted multiline value can introduce a closing delimiter and executable trailing commands. Environment indirection remains the appropriate transport for untrusted data.
+Quoted-body preservation is a shell-expansion compatibility rule, not a validation exemption or a guarantee for arbitrary Actions values. Actions interpolation precedes Bash parsing, so expressions in comments and quoted heredocs are still rejected, and an untrusted multiline value can introduce a closing delimiter and executable trailing commands. Environment indirection with an unquoted heredoc is the appropriate transport for such values.
 
 Generated MCP JSON no longer relies on exempting expanding heredocs. Expressions are transported through step environment bindings and resolved after JSON parsing. The distinct gateway re-expansion boundary, compile-time diagnostics, and migration constraints are specified in [ADR-28998](28998-auto-extract-shell-injection-expressions-into-env-vars.md#generated-mcp-configuration).
 
@@ -41,17 +41,17 @@ Delimiter suffixes and line-local quote or comment rules cannot establish Bash e
 ### Consequences
 
 #### Positive
-- Path B scan semantics match Path A: both skip only quoted heredoc bodies and detect expressions in expanding unquoted bodies.
+- Both validation paths scan raw content, while sanitizer behavior remains Bash-aware.
 - Shared regression tests cover sanitization, parsed validators, the raw-YAML scan, exact delimiters, quoted/custom delimiters, mismatches, and tab stripping.
-- The source codemod applies the same boundaries, preserving quoted data while migrating executable expressions.
+- The source codemod preserves quoted data and comments while migrating executable expressions; expressions in preserved regions require manual migration.
 
 #### Negative
 - Scripts containing heredoc operators require shell parsing. Unsupported or malformed scripts are scanned conservatively rather than silently exempted.
-- Previously exempt unquoted bodies can now produce extraction warnings or validation errors. The source codemod provides migration where boundaries are proven; unsupported boundaries require manual correction.
-- Proven quoted bodies retain the pre-shell Actions delimiter-injection limitation described above.
+- Validation rejects prohibited expressions in comments and quoted heredocs even though the source codemod preserves those regions; authors must migrate them manually.
+- Values moved to environment bindings should use unquoted heredocs, and arbitrary multiline data retains the pre-shell delimiter-injection limitation described above.
 
 #### Neutral
-- The sanitizer and both validator paths share `executableShellContent`; the former delimiter heuristic has been removed.
+- Raw validation no longer uses a helper named as though it filtered to executable shell content.
 
 ---
 
