@@ -175,6 +175,7 @@ When `experiments:` is set in frontmatter, the selected variant is substituted i
 
 ### Notes
 
-- **Fenced code blocks are preserved** — `{{#if}}` tags inside `` ``` `` blocks appear verbatim.
+- **Malformed conditions fail compilation** — comparisons need an operator (`==`, `!=`, `===`, `!==`); invalid active conditions in the main workflow, imports, or local runtime imports block lock-file generation.
+- **Code regions** — only syntactically invalid implicit conditions inside inline code or fenced blocks stay literal; valid conditions and explicit GitHub Actions expressions there are still bound and validated.
 - **No nested conditionals** — inner tags become literal text.
 - **Tags are stripped before the agent runs** — never visible in the final prompt.
