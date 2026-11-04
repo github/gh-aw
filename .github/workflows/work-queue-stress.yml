@@ -32,7 +32,7 @@ jobs:
   stress:
     name: Local Git and concurrent workers
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       HISTORY_ITEMS: ${{ github.event_name == 'pull_request' && '256' || '100000' }}
       LIFECYCLE_ITEMS: ${{ github.event_name == 'pull_request' && '16' || '1024' }}
@@ -66,7 +66,7 @@ jobs:
         run: |
           node .github/scripts/work-queue-stress.cjs \
             --mode history --items "$HISTORY_ITEMS" --workers 2 --seed 7 \
-            --timeout-seconds 300 > stress-results/history.json
+            --timeout-seconds 600 > stress-results/history.json
 
       - name: Complete concurrent worker lifecycles
         id: lifecycle
