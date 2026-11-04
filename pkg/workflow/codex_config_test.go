@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/goccy/go-yaml"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/assert"
@@ -275,8 +276,10 @@ Complete the task.
 }
 
 func TestCodexGitHubDirectToolCatalogConfiguration(t *testing.T) {
-	dir := t.TempDir()
-	home := filepath.Join(dir, "custom-codex-home")
+	require.NoError(t, os.MkdirAll(constants.TmpGhAwDir, 0o700))
+	home, err := os.MkdirTemp(constants.TmpGhAwDir, "custom-codex-home-")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(home) })
 	cmd := exec.Command("node", "actions/setup/js/convert_gateway_config_codex.cjs", "--direct-tools")
 	cmd.Dir = filepath.Join("..", "..")
 	cmd.Env = append(os.Environ(), "CODEX_HOME="+home)
@@ -314,6 +317,28 @@ func TestCodexGitHubDirectToolCatalogConfiguration(t *testing.T) {
 		if configOnly {
 			assert.Contains(t, rendered, "--config-only")
 		}
+	}
+}
+
+func TestCodexHomeStaysWithinManagedTemporaryDirectory(t *testing.T) {
+	tests := []struct {
+		name string
+		home string
+		want string
+	}{
+		{name: "default", want: constants.TmpMcpConfigDir},
+		{name: "managed path", home: constants.TmpGhAwDir + "/custom", want: constants.TmpGhAwDir + "/custom"},
+		{name: "outside path", home: "/etc", want: constants.TmpMcpConfigDir},
+		{name: "path traversal", home: constants.TmpGhAwDir + "/../../etc", want: constants.TmpMcpConfigDir},
+		{name: "relative path", home: "../codex-home", want: constants.TmpMcpConfigDir},
+		{name: "expression", home: "${{ github.event.issue.title }}", want: constants.TmpMcpConfigDir},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			data := &WorkflowData{EngineConfig: &EngineConfig{Env: map[string]string{"CODEX_HOME": test.home}}}
+			assert.Equal(t, test.want, codexHome(data))
+		})
 	}
 }
 

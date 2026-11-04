@@ -269,7 +269,10 @@ func validateCodexManagedConfig(config *codexNativeConfig, firewallEnabled, gith
 
 func codexHome(workflowData *WorkflowData) string {
 	if home := getEngineEnvOverrides(workflowData)["CODEX_HOME"]; home != "" {
-		return home
+		cleanHome := path.Clean(home)
+		if cleanHome == constants.TmpGhAwDir || strings.HasPrefix(cleanHome, constants.TmpGhAwDir+"/") {
+			return cleanHome
+		}
 	}
 	return constants.TmpMcpConfigDir
 }
