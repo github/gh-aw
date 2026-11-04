@@ -30,7 +30,8 @@ var issueHandlerRegistry = map[string]handlerBuilder{
 			AddIfNotEmpty("github-token", resolveHandlerGitHubToken(c.GitHubApp, "create-issue", c.GitHubToken)).
 			AddBoolPtr("normalize_closing_keywords", c.NormalizeClosingKeywords).
 			AddTemplatableBool("staged", templatableBoolPtrToStringPtr(c.Staged)).
-			AddTemplatableBoolOrInt("deduplicate_by_title", c.DeduplicateByTitle)
+			AddTemplatableBoolOrInt("deduplicate_by_title", c.DeduplicateByTitle).
+			AddStringSlice("deduplicate_by_title_labels", c.DeduplicateByTitleLabels)
 		return builder.Build()
 	},
 	"close_issue": func(cfg *SafeOutputsConfig) map[string]any {

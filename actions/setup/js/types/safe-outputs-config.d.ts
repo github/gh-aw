@@ -16,6 +16,7 @@ interface CreateIssueConfig extends SafeOutputConfig {
   "title-prefix"?: string;
   "body-footer"?: string;
   "deduplicate-by-title"?: boolean | number;
+  "deduplicate-by-title-labels"?: string[];
   labels?: string[];
   "target-repo"?: string;
   "allowed-repos"?: string[];

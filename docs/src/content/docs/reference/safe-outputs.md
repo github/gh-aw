@@ -457,12 +457,15 @@ The `deduplicate-by-title` field drops duplicate issues by comparing titles befo
 
 Deduplication runs at both the MCP tool-call boundary (within-run drops with immediate `duplicate_dropped` feedback to the agent) and at apply time (within-run plus open and recently-closed repository issues). Dropped items are recorded in the safe-output summary with the matched title, edit distance, and source (`mcp-precheck`, `within-run`, or `repo-level`).
 
+The optional `deduplicate-by-title-labels` array restricts repository candidate searches to issues with **all** listed labels (AND). It applies to both open issues and issues closed within the last 30 days, without changing repository boundaries, title matching, or within-run deduplication. Omitted or empty arrays preserve unfiltered searches. The `labels` field only controls labels applied at creation; it does not filter deduplication searches.
+
 ```yaml wrap
 safe-outputs:
   create-issue:
-    title-prefix: "[triage] "
-    labels: [bug]
+    title-prefix: "[docs-consistency-check] "
+    labels: [documentation, automated]
     deduplicate-by-title: 1   # tolerate one-character title differences
+    deduplicate-by-title-labels: [documentation, automated]
 ```
 
 #### Searching for Workflow-Created Items

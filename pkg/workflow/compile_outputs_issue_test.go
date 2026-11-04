@@ -5,6 +5,7 @@ package workflow
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -150,6 +151,7 @@ strict: false
 safe-outputs:
   create-issue:
     deduplicate-by-title: 1
+    deduplicate-by-title-labels: [documentation, automated]
     title-prefix: "[genai] "
     labels: [copilot, automation]
 ---
@@ -202,6 +204,9 @@ This workflow tests the output configuration parsing.
 	deduplicateByTitle := workflowData.SafeOutputs.CreateIssues.DeduplicateByTitle
 	if deduplicateByTitle == nil || string(*deduplicateByTitle) != "1" {
 		t.Errorf("Expected deduplicate-by-title to parse as '1', got %#v", deduplicateByTitle)
+	}
+	if got := workflowData.SafeOutputs.CreateIssues.DeduplicateByTitleLabels; !slices.Equal(got, []string{"documentation", "automated"}) {
+		t.Errorf("Expected title deduplication labels [documentation automated], got %v", got)
 	}
 }
 
@@ -351,6 +356,7 @@ strict: false
 safe-outputs:
   create-issue:
     deduplicate-by-title: 1
+    deduplicate-by-title-labels: [documentation, automated]
     title-prefix: "[genai] "
     labels: [copilot]
 ---
@@ -419,6 +425,9 @@ This workflow tests the create-issue job generation.
 
 	if !strings.Contains(lockContent, `\"deduplicate_by_title\":1`) {
 		t.Error("Expected deduplicate_by_title in handler config")
+	}
+	if !strings.Contains(lockContent, `\"deduplicate_by_title_labels\":[\"documentation\",\"automated\"]`) {
+		t.Error("Expected deduplicate_by_title_labels in handler config")
 	}
 
 	// Verify job dependencies

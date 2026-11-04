@@ -689,13 +689,23 @@ async function searchTitleDedupIssues(githubClient, query) {
  * @param {Object} githubClient
  * @param {string} owner
  * @param {string} repo
+ * @param {string[]} labels
  * @returns {Promise<Array<{title: string}>>}
  */
-async function getRepoTitleDedupCandidates(githubClient, owner, repo) {
+async function getRepoTitleDedupCandidates(githubClient, owner, repo, labels) {
   const sinceDate = new Date(Date.now() - RECENTLY_CLOSED_DEDUP_DAYS * MS_PER_DAY).toISOString().slice(0, 10);
+  const labelQualifiers = labels
+    .map(
+      label =>
+        ` label:"${label
+          .replace(/\\/g, "\\\\")
+          .replace(/"/g, '\\"')
+          .replace(/\r?\n|\r/g, " ")}"`
+    )
+    .join("");
   const [openIssues, recentlyClosedIssues] = await Promise.all([
-    searchTitleDedupIssues(githubClient, `repo:${owner}/${repo} is:issue is:open`),
-    searchTitleDedupIssues(githubClient, `repo:${owner}/${repo} is:issue is:closed closed:>=${sinceDate}`),
+    searchTitleDedupIssues(githubClient, `repo:${owner}/${repo} is:issue is:open${labelQualifiers}`),
+    searchTitleDedupIssues(githubClient, `repo:${owner}/${repo} is:issue is:closed closed:>=${sinceDate}${labelQualifiers}`),
   ]);
 
   if (openIssues.truncated) {
@@ -1082,7 +1092,7 @@ async function main(config = {}) {
         if (!repoTitleDedupCandidatesCache.has(repoCacheKey) && !skipRepoLevelSearch) {
           skipRepoLevelSearch = await shouldSkipRepoTitleDedupSearch(githubClient, repoParts.owner, repoParts.repo);
           if (!skipRepoLevelSearch) {
-            const dedupCandidatesPromise = getRepoTitleDedupCandidates(githubClient, repoParts.owner, repoParts.repo);
+            const dedupCandidatesPromise = getRepoTitleDedupCandidates(githubClient, repoParts.owner, repoParts.repo, config.deduplicate_by_title_labels ?? []);
             dedupCandidatesPromise.catch(() => {
               if (repoTitleDedupCandidatesCache.get(repoCacheKey) === dedupCandidatesPromise) {
                 repoTitleDedupCandidatesCache.delete(repoCacheKey);
