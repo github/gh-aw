@@ -78,7 +78,7 @@ func (c *Compiler) generatePrompt(output *strings.Builder, data *WorkflowData, p
 	hasRuntimeImports := sliceutil.Any(userPromptChunks, func(chunk string) bool {
 		return strings.Contains(chunk, "{{#runtime-import ") || strings.Contains(chunk, "{{#runtime-import? ")
 	})
-	c.generateInterpolationAndTemplateStep(yaml, expressionMappings, data, hasRuntimeImports)
+	c.generateInterpolationAndTemplateStep(yaml, allExpressionMappings, data, hasRuntimeImports)
 
 	if len(allExpressionMappings) > 0 {
 		generatePlaceholderSubstitutionStep(yaml, allExpressionMappings, "      ", data)
