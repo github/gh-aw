@@ -86,6 +86,7 @@ run-name: "Daily Code Debt Cleanup — Aider"
 env:
   GH_AW_AIDER_MAX_REFLECTIONS: "8"
   OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.GH_AW_OTEL_SENTRY_ENDPOINT }}
+  OTEL_EXPORTER_OTLP_PROTOCOL: ${{ vars.OTEL_EXPORTER_OTLP_PROTOCOL }}
   OTEL_SERVICE_NAME: gh-aw.daily-code-debt-aider
   OTEL_RESOURCE_ATTRIBUTES: 'gh-aw.workflow.name=Daily%20Code%20Debt%20Cleanup%20%E2%80%94%20Aider,gh-aw.repository=${{ github.repository }},gh-aw.run.id=${{ github.run_id }},github.run_id=${{ github.run_id }},gh-aw.engine.id=aider'
   OTEL_EXPORTER_OTLP_HEADERS: x-sentry-auth=${{ secrets.GH_AW_OTEL_SENTRY_AUTHORIZATION }}
@@ -388,6 +389,7 @@ jobs:
           GH_AW_SAFE_OUTPUTS: ${{ runner.temp }}/gh-aw/safeoutputs/outputs.jsonl
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_EXPORTER_OTLP_PROTOCOL: ""
           OTEL_RESOURCE_ATTRIBUTES: ""
           OTEL_SERVICE_NAME: ""
       - name: Interpolate variables and render templates
@@ -418,6 +420,7 @@ jobs:
           GH_AW_SUB_AGENT_EXT: .agent.md
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_EXPORTER_OTLP_PROTOCOL: ""
           OTEL_RESOURCE_ATTRIBUTES: ""
           OTEL_SERVICE_NAME: ""
       - name: Substitute placeholders
@@ -470,6 +473,7 @@ jobs:
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_EXPORTER_OTLP_PROTOCOL: ""
           OTEL_RESOURCE_ATTRIBUTES: ""
           OTEL_SERVICE_NAME: ""
       - name: Validate prompt placeholders
@@ -484,6 +488,7 @@ jobs:
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_EXPORTER_OTLP_PROTOCOL: ""
           OTEL_RESOURCE_ATTRIBUTES: ""
           OTEL_SERVICE_NAME: ""
       - name: Print prompt
@@ -498,6 +503,7 @@ jobs:
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_EXPORTER_OTLP_PROTOCOL: ""
           OTEL_RESOURCE_ATTRIBUTES: ""
           OTEL_SERVICE_NAME: ""
       - name: Inventory installed skills
