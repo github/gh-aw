@@ -36,9 +36,8 @@ function overflow(headers) {
     status: null,
     error: Object.assign(new Error("spawnSync curl ENOBUFS"), { code: "ENOBUFS" }),
     // A truncated body is not a trusted status channel, even with a valid suffix.
-    stdout: Buffer.from("arbitrary collector body\n200\napplication/json"),
+    stdout: Buffer.from(headers + "arbitrary collector body\n200\napplication/json"),
     stderr: Buffer.alloc(0),
-    output: [null, null, null, Buffer.from(headers)],
   };
 }
 
@@ -52,8 +51,8 @@ describe("bounded curl response status", () => {
     expect(append.mock.calls[0][1]).toContain('"status":200');
     const args = spawn.mock.calls[0][1];
     expect(args).toContain("--suppress-connect-headers");
-    expect(args.slice(args.indexOf("--dump-header") + 1, args.indexOf("--dump-header") + 2)).toEqual(["/dev/fd/3"]);
-    expect(spawn.mock.calls[0][2].stdio).toEqual(["pipe", "pipe", "pipe", "pipe"]);
+    expect(args.slice(args.indexOf("--dump-header") + 1, args.indexOf("--dump-header") + 2)).toEqual(["-"]);
+    expect(spawn.mock.calls[0][2].stdio).toEqual(["pipe", "pipe", "pipe"]);
     expect(spawn.mock.calls[0][2].maxBuffer).toBeLessThan(2 * MAX_OTLP_RESPONSE_BYTES);
   });
 
@@ -66,7 +65,7 @@ describe("bounded curl response status", () => {
     expect(JSON.stringify(warn.mock.calls)).not.toContain("acceptance unknown");
   });
 
-  it.each(["", "HTTP/1.1 200 OK\r\nContent-Type: application/json", "HTTP/1.1 100 Continue\r\n\r\n", "HTTP/1.1 302 Found\r\nLocation: /next\r\n\r\nHTTP/1.1 200", "HTTP/1.1 200 OK\r\n\r\nHTTP/1.1 503"])(
+  it.each(["", "HTTP/1.1 200 OK\r\nContent-Type: application/json", "HTTP/1.1 100 Continue\r\n\r\n", "HTTP/1.1 302 Found\r\nLocation: /next\r\n\r\nHTTP/1.1 200", "HTTP/1.1 302 Found\r\nLocation: /next\r\n\r\nHTTP/1.1 503"])(
     "never treats unknown or incomplete final status as success: %j",
     async headers => {
       spawn.mockReturnValue(overflow(headers));
@@ -77,12 +76,63 @@ describe("bounded curl response status", () => {
     }
   );
 
+  it.each([200, 401, 403, 503])("does not interpret HTTP-looking body bytes after final HTTP %s headers", async status => {
+    spawn.mockReturnValue(overflow(`HTTP/1.1 ${status} Response\r\n\r\nHTTP/1.1 200 OK\r\n\r\nHTTP/1.1 503`));
+    await sendOTLPSpan("https://collector.invalid", {}, { skipJSONL: true, baseDelayMs: 1 });
+    expect(spawn).toHaveBeenCalledTimes(status === 503 ? 3 : 1);
+    expect(append.mock.calls[0][1]).toContain(`"status":${status}`);
+    expect(JSON.stringify(warn.mock.calls)).toContain(status === 200 ? "acceptance unknown" : status === 503 ? "retrying" : "authorization failed");
+  });
+
   it("uses the final complete response status after informational and redirect headers", async () => {
     spawn.mockReturnValue(overflow("HTTP/1.1 302 Found\r\nLocation: /next\r\n\r\nHTTP/1.1 100 Continue\r\n\r\nHTTP/2 503\r\n\r\n"));
     await sendOTLPSpan("https://collector.invalid", {}, { skipJSONL: true, baseDelayMs: 1 });
     expect(spawn).toHaveBeenCalledTimes(3);
     expect(append.mock.calls[0][1]).toContain('"status":503');
   });
+
+  it.each(["http/json", "http/protobuf"].flatMap(protocol => [false, true].flatMap(redirect => [false, true].map(partial => [protocol, redirect, partial]))))(
+    "parses real curl %s response bodies (redirect: %s, partial rejection: %s)",
+    async (protocol, redirect, partial) => {
+      vi.stubEnv("OTEL_EXPORTER_OTLP_PROTOCOL", protocol);
+      const type = protocol === "http/json" ? "application/json" : "application/x-protobuf";
+      const body = protocol === "http/json" ? Buffer.from(partial ? '{"partialSuccess":{"rejectedSpans":"2"}}' : "{}") : Buffer.from(partial ? [0x0a, 0x02, 0x08, 0x02] : []);
+      const server = new Worker(
+        `
+        const { parentPort } = require("worker_threads");
+        const http = require("http");
+        const server = http.createServer((req, res) => {
+          req.resume();
+          req.on("end", () => {
+            if (${redirect} && req.url !== "/final") {
+              res.writeHead(307, { Location: "/final" }).end("ignored redirect body");
+              return;
+            }
+            res.writeContinue();
+            res.writeHead(200, { "Content-Type": "${type}" });
+            res.end(Buffer.from("${body.toString("base64")}", "base64"));
+          });
+        });
+        server.listen(0, "127.0.0.1", () => parentPort.postMessage(server.address().port));
+        `,
+        { eval: true }
+      );
+      try {
+        const port = await new Promise((resolve, reject) => {
+          server.once("message", resolve);
+          server.once("error", reject);
+        });
+        spawn.mockImplementation((command, args, options) => realSpawnSync(command, ["--noproxy", "*", ...args], options));
+        await sendOTLPSpan(`http://127.0.0.1:${port}`, {}, { skipJSONL: true, baseDelayMs: 1 });
+        expect(spawn).toHaveBeenCalledOnce();
+        expect(warn).toHaveBeenCalledTimes(partial ? 1 : 0);
+        expect(append).toHaveBeenCalledTimes(partial ? 1 : 0);
+        if (partial) expect(append.mock.calls[0][1]).toContain("rejected_spans=2");
+      } finally {
+        await server.terminate();
+      }
+    }
+  );
 
   it.each([200, 401, 403, 503].flatMap(status => [false, true].map(forceOverflow => [status, forceOverflow])))("retains real curl HTTP %s status on a chunked oversized body (force ENOBUFS: %s)", async (status, forceOverflow) => {
     // The server must run outside this thread because spawnSync blocks its loop.
@@ -121,7 +171,7 @@ describe("bounded curl response status", () => {
       for (const result of results) {
         if (forceOverflow) expect(result.error?.code).toBe("ENOBUFS");
         else expect(result.status).toBe(63);
-        expect(result.output[3].toString()).toContain(` ${status} `);
+        expect(result.stdout.toString()).toMatch(new RegExp(`^HTTP/1\\.1 ${status} `));
       }
       expect(append.mock.calls[0][1]).toContain(`"status":${status}`);
       expect(JSON.stringify(warn.mock.calls)).toContain(status === 200 ? "acceptance unknown" : status === 503 ? "retrying" : "authorization failed");

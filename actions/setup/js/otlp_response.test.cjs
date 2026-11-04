@@ -147,7 +147,7 @@ describe("OTLP delivery diagnostics across transports", () => {
       vi.stubGlobal("fetch", fetch);
       if (transport === "proxy") {
         vi.stubEnv("HTTPS_PROXY", "http://proxy.invalid");
-        spawn.mockReturnValue({ status: 0, stdout: Buffer.concat([body, Buffer.from(`\n200\n${type}`)]), stderr: Buffer.alloc(0) });
+        spawn.mockReturnValue({ status: 0, stdout: Buffer.concat([Buffer.from(`HTTP/1.1 200 OK\r\nContent-Type: ${type}\r\n\r\n`), body, Buffer.from(`\n200\n${type}`)]), stderr: Buffer.alloc(0) });
       }
       await expect(sendOTLPSpan("https://collector.invalid", {}, { signal, skipJSONL: true, baseDelayMs: 1 })).resolves.toBeUndefined();
       expect(transport === "proxy" ? spawn : fetch).toHaveBeenCalledOnce();
@@ -202,7 +202,7 @@ describe("OTLP delivery diagnostics across transports", () => {
       const type = protocol === "http/json" ? "application/json" : "application/x-protobuf";
       const body =
         kind === "empty" ? Buffer.alloc(0) : protocol === "http/protobuf" ? protobuf(0, kind === "warning" ? privateMessage : "") : Buffer.from(JSON.stringify({ partialSuccess: kind === "warning" ? { errorMessage: privateMessage } : {} }));
-      spawn.mockReturnValue({ status: 0, stdout: Buffer.concat([body, Buffer.from(`\n200\n${type}`)]) });
+      spawn.mockReturnValue({ status: 0, stdout: Buffer.concat([Buffer.from(`HTTP/1.1 200 OK\r\nContent-Type: ${type}\r\n\r\n`), body, Buffer.from(`\n200\n${type}`)]) });
       await sendOTLPSpan("https://collector.invalid", {}, { signal, skipJSONL: true });
       expect(spawn).toHaveBeenCalledOnce();
       expect(write).not.toHaveBeenCalled();
@@ -235,12 +235,11 @@ describe("OTLP delivery diagnostics across transports", () => {
       vi.stubEnv("HTTPS_PROXY", "http://proxy.invalid");
       spawn.mockReturnValue({
         status: kind === "proxy-truncated" ? 63 : 0,
-        stdout: Buffer.from(`${kind === "proxy-truncated" ? "" : privateMessage}\n200\n${kind === "proxy-unsupported" ? "text/html" : "application/json"}`),
+        stdout: Buffer.from(`HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n${kind === "proxy-truncated" ? "" : privateMessage}\n200\n${kind === "proxy-unsupported" ? "text/html" : "application/json"}`),
         stderr: Buffer.from(privateMessage),
         ...(kind === "proxy-buffer-overflow"
           ? {
               error: Object.assign(new Error(privateMessage), { code: "ENOBUFS" }),
-              output: [null, null, null, Buffer.from("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n")],
             }
           : {}),
       });

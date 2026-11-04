@@ -958,7 +958,7 @@ function sendOTLPViaCurl(url, headers, body) {
     "--location",
     "--suppress-connect-headers",
     "--dump-header",
-    "/dev/fd/3",
+    "-",
     "--max-filesize",
     String(MAX_OTLP_RESPONSE_BYTES),
     "--write-out",
@@ -976,7 +976,7 @@ function sendOTLPViaCurl(url, headers, body) {
 
   const result = childProcess.spawnSync("curl", args, {
     input: body,
-    stdio: ["pipe", "pipe", "pipe", "pipe"],
+    stdio: ["pipe", "pipe", "pipe"],
     maxBuffer: MAX_OTLP_RESPONSE_BYTES + 4096,
     timeout: 15_000,
   });
@@ -987,21 +987,32 @@ function sendOTLPViaCurl(url, headers, body) {
   }
 
   const output = Buffer.from(result.stdout || "");
-  const typeIndex = output.lastIndexOf("\n");
-  const statusIndex = output.lastIndexOf("\n", typeIndex - 1);
-  // Headers arrive before the body, on a separate bounded pipe. On ENOBUFS the
-  // stdout trailer may be absent (or arbitrary body bytes resembling a status).
-  // CONNECT headers are suppressed; incomplete final headers must not reuse a
-  // preceding redirect's or informational response's status.
-  const headerOutput = (result.output?.[3] || "").toString();
-  const headerBlocks = headerOutput.split(/\r?\n\r?\n/);
-  const finalHeader = headerBlocks.pop() === "" ? headerBlocks.pop() || "" : "";
-  const headerStatus = /^HTTP\/(?:1\.[01]|2|3) ([1-5]\d{2})(?:[ \t][^\r\n]*)?(?:\r?\n|$)/.exec(finalHeader);
-  const trailerStatus = output.subarray(statusIndex + 1, typeIndex < 0 ? undefined : typeIndex).toString();
-  const status = headerStatus ? Number(headerStatus[1]) : !bufferOverflow && /^[1-5]\d{2}$/.test(trailerStatus) ? Number(trailerStatus) : 0;
+  // curl writes headers to stdout before each body. Unlike /dev/fd paths, "-"
+  // works with Node's socket-backed stdio on Linux as well as macOS.
+  // Stop at the final response's body: body bytes must never supply a status.
+  let bodyOffset = 0;
+  let headerStatus = 0;
+  while (output.subarray(bodyOffset, bodyOffset + 5).toString() === "HTTP/") {
+    const remaining = output.subarray(bodyOffset).toString("latin1");
+    const header = /^HTTP\/(?:1\.[01]|2|3) ([1-5]\d{2})(?:[ \t][^\r\n]*)?\r?\n(?:[^\r\n]+\r?\n)*\r?\n/.exec(remaining);
+    headerStatus = 0;
+    if (!header) break;
+    bodyOffset += header[0].length;
+    headerStatus = Number(header[1]);
+    if (headerStatus >= 200 && (headerStatus < 300 || headerStatus >= 400)) break;
+    if (headerStatus >= 300 && !/\r?\nlocation:/i.test(header[0])) break;
+    // Informational responses require a final response. curl suppresses
+    // redirect bodies when following Location, leaving the next header here.
+    if (headerStatus < 200) headerStatus = 0;
+  }
+  const responseOutput = output.subarray(bodyOffset);
+  const typeIndex = responseOutput.lastIndexOf("\n");
+  const statusIndex = responseOutput.lastIndexOf("\n", typeIndex - 1);
+  const trailerStatus = responseOutput.subarray(statusIndex + 1, typeIndex < 0 ? undefined : typeIndex).toString();
+  const status = headerStatus || (!bufferOverflow && /^[1-5]\d{2}$/.test(trailerStatus) ? Number(trailerStatus) : 0);
   const diagnostics = {
-    responseBody: statusIndex < 0 ? Buffer.alloc(0) : output.subarray(0, statusIndex),
-    contentType: typeIndex < 0 ? "" : output.subarray(typeIndex + 1).toString(),
+    responseBody: statusIndex < 0 ? Buffer.alloc(0) : responseOutput.subarray(0, statusIndex),
+    contentType: typeIndex < 0 ? "" : responseOutput.subarray(typeIndex + 1).toString(),
     diagnosticsUnavailable: Boolean(bufferOverflow) || result.status !== 0,
   };
   if (status > 0) {
