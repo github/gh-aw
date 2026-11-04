@@ -155,7 +155,7 @@ Nonempty `safeoutputs.jsonl` != publication.
 | `agent_startup_failure` | First setup/engine error. | Fix startup; missing output need not be agent choice. |
 | `engine_driver_failure`, `driver_crash` | Driver exit/signal; final native error. | Fix driver first; nonzero exit alone != outage. |
 | `secret_redaction_failure` | Redaction status; sanitized diagnostic. | Repair redaction before publication; never expose raw logs/disable masking. |
-| `safeoutputs_cli_error` | Arguments, registration, denial. | Fix supported invocation/allowlist; no unauthorized `gh` writes. |
+| `safeoutputs_cli_error`,`safe_output_dependency_failed`,`safe_output_dependency_invalid` |Calls/dependencies|Fix calls/prerequisites; gate|
 | `invalid_safe_outputs` | Record errors; generated schema. | Fix emitted type/fields; retain validation. |
 | `missing_terminal_safe_output` | Expected terminal tool, denied calls, last session event. | Fix publication/prompt completion contract; silence is not an intentional noop. |
 | `request_rejection`, `prompt_exhaustion`, `unknown` | Native error, budget, missing evidence. | Resolve cause; retain unknown without evidence. |
