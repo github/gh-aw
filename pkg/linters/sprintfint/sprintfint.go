@@ -49,7 +49,7 @@ func analyzeSprintfInt(pass *analysis.Pass, n ast.Node, generatedFiles filecheck
 	if nolint.HasDirectiveForLinter(pos, noLintIndex, "sprintfint") {
 		return
 	}
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok || sel.Sel.Name != "Sprintf" {
 		return
 	}
@@ -59,7 +59,7 @@ func analyzeSprintfInt(pass *analysis.Pass, n ast.Node, generatedFiles filecheck
 	if len(call.Args) != 2 {
 		return
 	}
-	formatLit, ok := call.Args[0].(*ast.BasicLit)
+	formatLit, ok := astutil.UnwrapParenExpr(call.Args[0]).(*ast.BasicLit)
 	if !ok || formatLit.Kind != token.STRING || formatLit.Value != `"%d"` {
 		return
 	}
