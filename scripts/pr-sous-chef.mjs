@@ -375,7 +375,6 @@ export async function fetchCandidate(repo, number, api = gh, now) {
       repository(owner:$owner,name:$name){pullRequest(number:$number){
         number title url state isDraft headRefOid headRefName baseRefName
         createdAt updatedAt changedFiles mergeStateStatus author{login} authorAssociation
-        headRef{target{oid ... on Commit{committedDate}}}
         labels(first:100){pageInfo{hasNextPage} nodes{name}}
       }}}`,
     "-f",
@@ -406,10 +405,13 @@ export async function fetchCandidate(repo, number, api = gh, now) {
     mergeStateStatus: candidate.mergeStateStatus === "DIRTY" ? "CONFLICTING" : candidate.mergeStateStatus,
   };
   if (now !== undefined && metadataSkip(metadata, now)) return metadata;
-  if (candidate.headRef?.target?.oid !== candidate.headRefOid || !Number.isFinite(Date.parse(candidate.headRef?.target?.committedDate))) {
+  // Read the exact head SHA without relying on nested GraphQL union fragments
+  // that the CLI proxy may omit from an otherwise successful metadata response.
+  const head = await api(["api", `repos/${repo}/commits/${candidate.headRefOid}`]);
+  if (head?.sha !== candidate.headRefOid || !Number.isFinite(Date.parse(head?.commit?.committer?.date))) {
     throw new Error(`PR #${number}: could not refresh head commit activity`);
   }
-  metadata.headCommittedAt = candidate.headRef.target.committedDate;
+  metadata.headCommittedAt = head.commit.committer.date;
   const checkRuns = (await api(["api", `repos/${repo}/commits/${candidate.headRefOid}/check-runs?per_page=100&filter=latest`, "--paginate", "--slurp"])).flatMap(page => page.check_runs);
   const statuses = (await api(["api", `repos/${repo}/commits/${candidate.headRefOid}/status?per_page=100`, "--paginate", "--slurp"])).flatMap(page => page.statuses);
   return {
