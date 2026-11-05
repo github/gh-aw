@@ -65,7 +65,7 @@ func durableWorkflowID(data *WorkflowData) string {
 	if id == "" {
 		id = data.Name
 	}
-	return stringutil.SanitizeForFilename(id)
+	return strings.ReplaceAll(stringutil.SanitizeForFilename(id), ".", "-")
 }
 
 func durableCheckpointName(data *WorkflowData) string {

@@ -20,8 +20,8 @@ func (e *PiEngine) GetDurableExecutionPlan(data *WorkflowData, logFile string) (
 	if piSessionSettings(data).Enabled {
 		return nil, errors.New("pi durable owns the session; remove engine.config.session")
 	}
-	if isFirewallDisabledBySandboxAgent(data) {
-		return nil, errors.New("pi durable requires the credential-isolated model gateway; enable sandbox.agent")
+	if !isFirewallEnabled(data) {
+		return nil, errors.New("pi durable requires the credential-isolated model gateway; enable sandbox.agent and remove network.firewall: false")
 	}
 	cooldown := resolveEngineCooldownDays(data)
 	var installSteps []GitHubActionStep

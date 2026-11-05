@@ -114,15 +114,66 @@ func TestCompileDurableRejectsUnsupportedEngineOrDriver(t *testing.T) {
 }
 
 func TestDurableWorkflowConcurrency(t *testing.T) {
-	data := &WorkflowData{
-		WorkflowID:   "continuable",
-		On:           "on:\n  issues:\n  workflow_dispatch:\n",
-		EngineConfig: &EngineConfig{ID: "pi", Durable: &DurableConfig{RetentionDays: 7}},
+	for _, test := range []struct {
+		name     string
+		features map[string]any
+		queue    bool
+	}{
+		{name: "default", queue: true},
+		{name: "enabled", features: map[string]any{"group-concurrency-queue": true}, queue: true},
+		{name: "disabled", features: map[string]any{"group-concurrency-queue": false}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			data := &WorkflowData{
+				WorkflowID:   "continuable",
+				On:           "on:\n  issues:\n  workflow_dispatch:\n",
+				EngineConfig: &EngineConfig{ID: "pi", Durable: &DurableConfig{RetentionDays: 7}},
+				Features:     test.features,
+			}
+			concurrency := GenerateConcurrencyConfig(data, false)
+			require.Contains(t, concurrency, `group: "gh-aw-durable-continuable"`)
+			require.Contains(t, concurrency, "cancel-in-progress: false")
+			require.NotContains(t, concurrency, "github.event.issue.number")
+			require.Equal(t, test.queue, strings.Contains(concurrency, "queue: max"))
+		})
 	}
-	concurrency := GenerateConcurrencyConfig(data, false)
-	require.Contains(t, concurrency, `group: "gh-aw-durable-continuable"`)
-	require.Contains(t, concurrency, "cancel-in-progress: false")
-	require.NotContains(t, concurrency, "github.event.issue.number")
+}
+
+func TestDurableWorkflowID(t *testing.T) {
+	for _, test := range []struct {
+		name, workflowID, workflowName, want string
+	}{
+		{name: "dotted ID", workflowID: "workflow.test", want: "workflow-test"},
+		{name: "dotted fallback name", workflowName: "Workflow.Test", want: "Workflow-Test"},
+		{name: "existing separators", workflowID: "workflow_test-1", want: "workflow_test-1"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			data := &WorkflowData{WorkflowID: test.workflowID, Name: test.workflowName}
+			require.Equal(t, test.want, durableWorkflowID(data))
+			require.Regexp(t, `^[a-zA-Z0-9_-]+$`, durableWorkflowID(data))
+			require.Equal(t, "pi-durable-"+test.want+".json", durableCheckpointName(data))
+		})
+	}
+}
+
+func TestCompileDurableDottedWorkflowFilename(t *testing.T) {
+	dir := t.TempDir()
+	source := filepath.Join(dir, "workflow.test.md")
+	require.NoError(t, os.WriteFile(source, []byte(`---
+on: workflow_dispatch
+engine:
+  id: copilot
+  durable: {}
+---
+Continue the workflow task.
+`), 0o600))
+	require.NoError(t, NewCompiler(WithVersion("dev")).CompileWorkflow(source))
+	lock, err := os.ReadFile(filepath.Join(dir, "workflow.test.lock.yml"))
+	require.NoError(t, err)
+	text := string(lock)
+	require.Contains(t, text, `group: "gh-aw-durable-workflow-test"`)
+	require.Contains(t, text, "pi-durable-workflow-test.json")
+	require.NotContains(t, text, "pi-durable-workflow.test.json")
 }
 
 func TestBehaviorDefinedDurablePlan(t *testing.T) {

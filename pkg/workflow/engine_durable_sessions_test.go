@@ -48,6 +48,8 @@ func TestCompileDurableBuiltinEngines(t *testing.T) {
 					require.Contains(t, text, "Collect Copilot durable session files")
 					require.Contains(t, text, "steps.capture_durable_sessions.outcome == 'success'")
 					require.Contains(t, text, "Scope Copilot session logs to current run")
+				} else {
+					require.NotContains(t, text, "steps.capture_durable_sessions")
 				}
 				if engine == "codex" {
 					require.Contains(t, text, "CODEX_HOME: /tmp/gh-aw/agent/durable-sessions/codex")

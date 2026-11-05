@@ -53,8 +53,12 @@ func (c *Compiler) generateDurableFileStep(yaml *strings.Builder, data *Workflow
 }
 
 func (c *Compiler) generateDurableFileStage(yaml *strings.Builder, data *WorkflowData) {
+	condition := "always() && steps.durable_checkpoint.outcome == 'success' && steps.agentic_execution.outcome != 'skipped'"
+	if data.EngineConfig != nil && data.EngineConfig.ID == "copilot" {
+		condition += " && steps.capture_durable_sessions.outcome == 'success'"
+	}
 	c.generateDurableFileStep(yaml, data, "Stage durable session files", "stage_durable_files",
-		"always() && steps.durable_checkpoint.outcome == 'success' && steps.agentic_execution.outcome != 'skipped' && (steps.capture_durable_sessions.outcome == '' || steps.capture_durable_sessions.outcome == 'success')", "stageFiles")
+		condition, "stageFiles")
 }
 
 func (c *Compiler) generateDurableArtifactUpload(yaml *strings.Builder, data *WorkflowData) {

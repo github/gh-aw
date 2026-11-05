@@ -6,6 +6,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { createHash } = require("node:crypto");
 const { stageFiles, restoreFiles, validateFiles } = require("./durable_files.cjs");
+const { processFile } = require("./redact_secrets.cjs");
 const directories = [];
 
 afterEach(() => {
@@ -29,7 +30,7 @@ function fixture() {
 describe("engine-declared durable files", () => {
   it("round trips only declared session files and tells the harness to continue", () => {
     const options = fixture();
-    const binary = Buffer.from([0, 1, 255, 0, 2]);
+    const binary = Buffer.from(Array.from({ length: 256 }, (_, index) => index));
     fs.writeFileSync(path.join(options.sessions, "session.db"), binary);
     stageFiles(options);
     const manifest = JSON.parse(fs.readFileSync(path.join(options.bundle, "manifest.json"), "utf8"));
@@ -79,6 +80,43 @@ describe("engine-declared durable files", () => {
     expect(options.core.setOutput).not.toHaveBeenCalled();
   });
 
+  it("exposes every byte of binary state to host redaction and refuses the redacted bundle", () => {
+    const options = fixture();
+    const secret = "caf\u00e9-runtime-credential";
+    const binary = Buffer.concat([Buffer.from([0xff, 0]), Buffer.from(secret, "latin1"), Buffer.from([0, 0xfe])]);
+    fs.writeFileSync(path.join(options.sessions, "session.db"), binary);
+    stageFiles(options);
+    const file = path.join(options.bundle, createHash("sha256").update("0/session.db").digest("hex") + ".json");
+    const record = JSON.parse(fs.readFileSync(file, "utf8"));
+    expect(record.text).not.toContain(secret);
+    expect(record.byteText).toContain(secret);
+    expect(Buffer.from(record.byteText, "latin1")).toEqual(binary);
+    expect(processFile(file, [], [secret])).toBeGreaterThan(0);
+    options.core.setOutput.mockClear();
+    expect(() => validateFiles(options)).toThrow("damaged or redacted");
+    fs.rmSync(options.sessions, { recursive: true });
+    expect(() => restoreFiles(options)).toThrow("damaged or redacted");
+    expect(fs.existsSync(options.sessions)).toBe(false);
+    expect(options.core.setOutput).not.toHaveBeenCalled();
+  });
+
+  it.each(["session.jsonl", "session.db"])("requires the lossless projection for publication while restoring legacy %s", name => {
+    const options = fixture();
+    const original = name === "session.db" ? Buffer.from([0, 1, 255, 0, 2]) : fs.readFileSync(path.join(options.sessions, name));
+    fs.writeFileSync(path.join(options.sessions, name), original);
+    stageFiles(options);
+    const file = path.join(options.bundle, createHash("sha256").update(`0/${name}`).digest("hex") + ".json");
+    const record = JSON.parse(fs.readFileSync(file, "utf8"));
+    delete record.byteText;
+    fs.writeFileSync(file, JSON.stringify(record));
+    options.core.setOutput.mockClear();
+    expect(() => validateFiles(options)).toThrow("damaged or redacted");
+    expect(options.core.setOutput).not.toHaveBeenCalled();
+    fs.rmSync(options.sessions, { recursive: true });
+    restoreFiles(options);
+    expect(fs.readFileSync(path.join(options.sessions, name))).toEqual(original);
+  });
+
   it("rejects a checkpoint made for a different engine or different file declarations", () => {
     const options = fixture();
     stageFiles(options);
@@ -113,6 +151,26 @@ describe("engine-declared durable files", () => {
     vi.stubEnv("EXAMPLE_API_KEY", "never-persist-this-credential");
     fs.writeFileSync(path.join(options.sessions, "session.jsonl"), '{"key":"never-persist-this-credential"}');
     expect(() => stageFiles(options)).toThrow("credential");
+    expect(options.core.setOutput).not.toHaveBeenCalled();
+  });
+
+  it.each(["utf8", "latin1"])("refuses known %s credentials in binary state", encoding => {
+    const options = fixture();
+    const secret = "caf\u00e9-private-credential";
+    vi.stubEnv("EXAMPLE_API_KEY", secret);
+    fs.writeFileSync(path.join(options.sessions, "session.db"), Buffer.concat([Buffer.from([0xff, 0]), Buffer.from(secret, encoding), Buffer.from([0xfe])]));
+    expect(() => stageFiles(options)).toThrow("credential");
+    expect(options.core.setOutput).not.toHaveBeenCalled();
+  });
+
+  it("blocks publication when host redaction detects ASCII tokens in binary state", () => {
+    const options = fixture();
+    fs.writeFileSync(path.join(options.sessions, "session.db"), Buffer.concat([Buffer.from([0xff, 0]), Buffer.from("ghp_" + "a".repeat(36)), Buffer.from([0xfe])]));
+    stageFiles(options);
+    const file = path.join(options.bundle, createHash("sha256").update("0/session.db").digest("hex") + ".json");
+    expect(processFile(file, [])).toBeGreaterThan(0);
+    options.core.setOutput.mockClear();
+    expect(() => validateFiles(options)).toThrow("damaged or redacted");
     expect(options.core.setOutput).not.toHaveBeenCalled();
   });
 

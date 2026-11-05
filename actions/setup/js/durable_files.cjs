@@ -58,10 +58,13 @@ function stageFiles({ core, root = "/tmp/gh-aw/agent" }) {
   const entries = [];
   function collect(file, relative) {
     const bytes = fs.readFileSync(file);
-    assertNoSecrets(bytes.toString("utf8"));
+    const text = bytes.toString("utf8");
+    const byteText = bytes.toString("latin1");
+    assertNoSecrets(text);
+    assertNoSecrets(byteText);
     const target = path.join(bundle, hash(relative) + ".json");
-    // Keep a checked UTF-8 projection so host redaction also examines binary state.
-    fs.writeFileSync(target, JSON.stringify({ data: bytes.toString("base64"), text: bytes.toString("utf8") }), { mode: 0o600 });
+    // Latin-1 maps every byte losslessly; UTF-8 also exposes Unicode text to host redaction.
+    fs.writeFileSync(target, JSON.stringify({ data: bytes.toString("base64"), text, byteText }), { mode: 0o600 });
     entries.push({ path: relative, hash: hash(bytes) });
   }
   for (const [index, file] of files.entries()) {
@@ -80,7 +83,7 @@ function stageFiles({ core, root = "/tmp/gh-aw/agent" }) {
   core.setOutput("present", "true");
 }
 
-function readBundle(root) {
+function readBundle(root, requireByteText = false) {
   const config = configuration(root);
   noSymlinks(config.bundle, root);
   const manifestFile = path.join(config.bundle, "manifest.json");
@@ -106,7 +109,18 @@ function readBundle(root) {
     if (typeof record.data !== "string" || typeof record.text !== "string") throw new Error("Invalid durable artifact encoding");
     const bytes = Buffer.from(record.data, "base64");
     assertNoSecrets(bytes.toString("utf8"));
-    if (!entry || bytes.toString("base64") !== record.data || bytes.toString("utf8") !== record.text || hash(bytes) !== entry.hash) throw new Error("Durable artifact was damaged or redacted; refusing continuation or publication");
+    assertNoSecrets(bytes.toString("latin1"));
+    // Older version-1 bundles can be restored, but new publication requires both projections.
+    if (
+      !entry ||
+      bytes.toString("base64") !== record.data ||
+      bytes.toString("utf8") !== record.text ||
+      (requireByteText && typeof record.byteText !== "string") ||
+      (record.byteText !== undefined && bytes.toString("latin1") !== record.byteText) ||
+      hash(bytes) !== entry.hash
+    ) {
+      throw new Error("Durable artifact was damaged or redacted; refusing continuation or publication");
+    }
     entry.bytes = bytes;
     count++;
   });
@@ -133,7 +147,7 @@ function restoreFiles({ core, root = "/tmp/gh-aw/agent" }) {
 }
 
 function validateFiles({ core, root = "/tmp/gh-aw/agent" }) {
-  readBundle(root);
+  readBundle(root, true);
   core.setOutput("present", "true");
 }
 
