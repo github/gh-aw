@@ -35,3 +35,4 @@
 2026-11-02: discovery; reviewed turf-agentic-workflows (7), enclave-demo (5), gh-aw-demo (2); no blog; backlog 0.
 2026-11-03: discovery; search returned only already-reviewed repos; no blog; backlog 0.
 2026-11-04: discovery; only already-reviewed repos surfaced; no blog; backlog 0.
+2026-11-05: discovery (repo search; code search rate-limited); nothing new; no blog; backlog 0.
