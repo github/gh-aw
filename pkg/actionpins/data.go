@@ -17,7 +17,7 @@ import (
 var actionPinsLog = logger.New("actionpins:actionpins")
 
 //go:embed data/action_pins.json
-var actionPinsJSON []byte
+var actionPinsJSON string
 
 // actionPinsCache bundles the parsed/derived action pin data behind a single
 // pointer so the package-level variable holding it is never a bare slice or
@@ -41,7 +41,7 @@ func getCachedActionPins() *actionPinsCache {
 	actionPinsOnce.Do(func() {
 		actionPinsLog.Print("Unmarshaling action pins from embedded JSON (first call, will be cached)")
 
-		data := loadActionPinsData(actionPinsJSON)
+		data := loadActionPinsData([]byte(actionPinsJSON))
 
 		pins := slices.Collect(maps.Values(data.Entries))
 
