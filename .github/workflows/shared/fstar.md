@@ -2,10 +2,11 @@
 env:
   FSTAR_BIN: /tmp/gh-aw/agent/fstar-tools/fstar/bin/fstar.exe
   FSTAR_Z3: /tmp/gh-aw/agent/fstar-tools/fstar/lib/fstar/z3-5.3.0/bin/z3
+  FSTAR_SHA256: a716153960545bc26b9d093f55614fedc716a202e4daa1665e5c63e4a2fb04e4
 steps:
   - name: Prepare pinned F* and compatible Z3
     shell: bash
-    run: bash scripts/install-fstar.sh
+    run: bash scripts/install-fstar.sh "$FSTAR_SHA256"
 ---
 
 <!--

@@ -22,13 +22,18 @@ class VerificationTests(unittest.TestCase):
             self.assertIn(path, shared)
             self.assertIn(path, ci)
         for source in [shared, ci]:
-            self.assertIn("bash scripts/install-fstar.sh", source)
+            self.assertIn('bash scripts/install-fstar.sh "$FSTAR_SHA256"', source)
+        for source in [shared, ci]:
+            self.assertIn(
+                "a716153960545bc26b9d093f55614fedc716a202e4daa1665e5c63e4a2fb04e4",
+                source,
+            )
         for pin in [
             "fstar-v2026.10.25-Linux-x86_64.tar.gz",
-            "a716153960545bc26b9d093f55614fedc716a202e4daa1665e5c63e4a2fb04e4",
             'sha256sum --check --strict', "--smt", "--z3version 5.3.0",
         ]:
             self.assertIn(pin, installer)
+        self.assertIn('expected_sha256="${1:-}"', installer)
         tla = (repository / ".github/workflows/shared/tla-plus.md").read_text()
         for line in tla.splitlines():
             if "https://github.com/" in line or len(line.strip().rstrip(" \\")) == 64:

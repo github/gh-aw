@@ -1,6 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
+expected_sha256="${1:-}"
+if [[ ! "$expected_sha256" =~ ^[[:xdigit:]]{64}$ ]]; then
+    echo "Usage: $0 <published F* archive SHA256>" >&2
+    exit 2
+fi
+
 if [[ "$(uname -s)" != Linux || "$(uname -m)" != x86_64 ]]; then
     echo "The pinned F* toolchain requires Linux x86_64 (use ubuntu-24.04)." >&2
     exit 1
@@ -12,9 +18,7 @@ curl --fail --location --silent --show-error \
     --retry 2 --connect-timeout 10 --max-time 240 \
     --output "$tools/fstar.tar.gz" \
     'https://github.com/FStarLang/FStar/releases/download/v2026.10.25/fstar-v2026.10.25-Linux-x86_64.tar.gz'
-printf '%s  %s\n' \
-    a716153960545bc26b9d093f55614fedc716a202e4daa1665e5c63e4a2fb04e4 \
-    "$tools/fstar.tar.gz" | sha256sum --check --strict
+printf '%s  %s\n' "$expected_sha256" "$tools/fstar.tar.gz" | sha256sum --check --strict
 tar -xzf "$tools/fstar.tar.gz" --no-same-owner -C "$tools"
 
 fstar="$tools/fstar/bin/fstar.exe"

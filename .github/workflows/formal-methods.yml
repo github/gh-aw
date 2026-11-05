@@ -29,6 +29,7 @@ jobs:
       PYTHONDONTWRITEBYTECODE: "1"
       FSTAR_BIN: /tmp/gh-aw/agent/fstar-tools/fstar/bin/fstar.exe
       FSTAR_Z3: /tmp/gh-aw/agent/fstar-tools/fstar/lib/fstar/z3-5.3.0/bin/z3
+      FSTAR_SHA256: a716153960545bc26b9d093f55614fedc716a202e4daa1665e5c63e4a2fb04e4
       JAVA_BIN: /tmp/gh-aw/agent/tla-tools/jre/bin/java
       TLA2TOOLS_JAR: /tmp/gh-aw/agent/tla-tools/tla2tools.jar
     steps:
@@ -36,7 +37,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install pinned F* and Z3
-        run: bash scripts/install-fstar.sh
+        run: bash scripts/install-fstar.sh "$FSTAR_SHA256"
       - name: Install pinned TLA+ runtime
         shell: bash
         run: |
