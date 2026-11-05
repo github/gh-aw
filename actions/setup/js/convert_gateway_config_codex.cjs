@@ -26,6 +26,68 @@ const path = require("path");
 const fs = require("fs");
 const { runGatewayConversion, writeSecureOutput } = require("./convert_gateway_config_shared.cjs");
 const { buildConfig, serializeConfig, tomlValue, loadCompiledConfig, mergeConfig, expandConfigEnv, isTable, directToolCatalog } = require("./codex_config.cjs");
+const { TMP_GH_AW_PATH } = require("./constants.cjs");
+
+function isWithinRoot(relativePath) {
+  return relativePath !== ".." && !relativePath.startsWith(`..${path.sep}`) && !path.isAbsolute(relativePath);
+}
+
+function writeCodexHomeFile(home, filename, content) {
+  if (!home || !path.isAbsolute(home) || path.resolve(home) !== home) {
+    throw new Error("CODEX_HOME must be a canonical absolute path");
+  }
+  if (filename !== "config.toml" && filename !== "models.json") {
+    throw new Error("Unsupported Codex home output file");
+  }
+
+  const managedRoot = path.resolve(TMP_GH_AW_PATH);
+  const relativeHome = path.relative(managedRoot, home);
+  if (!isWithinRoot(relativeHome)) {
+    throw new Error("CODEX_HOME must be within the managed temporary directory");
+  }
+
+  fs.mkdirSync(managedRoot, { recursive: true });
+  const realRoot = fs.realpathSync(managedRoot);
+  const expectedRoot = path.join(fs.realpathSync(path.dirname(managedRoot)), path.basename(managedRoot));
+  if (realRoot !== expectedRoot) {
+    throw new Error("Managed temporary directory resolves outside its canonical parent");
+  }
+  let realHome = realRoot;
+  for (const component of relativeHome.split(path.sep).filter(Boolean)) {
+    const next = path.join(realHome, component);
+    try {
+      const stat = fs.lstatSync(next);
+      if (!stat.isDirectory() || stat.isSymbolicLink()) {
+        throw new Error("CODEX_HOME contains a symlink or non-directory component");
+      }
+    } catch (error) {
+      if (/** @type {NodeJS.ErrnoException} */ error.code !== "ENOENT") throw error;
+      fs.mkdirSync(next);
+    }
+    realHome = fs.realpathSync(next);
+    if (!isWithinRoot(path.relative(realRoot, realHome))) {
+      throw new Error("CODEX_HOME resolves outside the managed temporary directory");
+    }
+  }
+
+  const outputPath = path.join(realHome, filename);
+  try {
+    const stat = fs.lstatSync(outputPath);
+    if (!stat.isFile() || stat.isSymbolicLink()) {
+      throw new Error("Codex home output must be a regular, non-symlink file");
+    }
+  } catch (error) {
+    if (/** @type {NodeJS.ErrnoException} */ error.code !== "ENOENT") throw error;
+  }
+  const flags = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC | fs.constants.O_NOFOLLOW;
+  const fd = fs.openSync(outputPath, flags, 0o600);
+  try {
+    fs.writeFileSync(fd, content);
+    fs.fchmodSync(fd, 0o600);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
 
 /**
  * @param {string} name
@@ -53,10 +115,16 @@ function main() {
     // Avoid Node's UTF-8 pipe short-read overflow (nodejs/node#66341).
     const catalog = directToolCatalog(JSON.parse(fs.readFileSync(0).toString("utf8")));
     const output = JSON.stringify(catalog);
-    writeSecureOutput(path.join(home, "models.json"), output);
+    writeCodexHomeFile(home, "models.json", output);
     return output;
   }
   const outputPath = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw/mcp-config/config.toml");
+  if (process.argv.includes("--copy-config")) {
+    const home = process.env.CODEX_HOME;
+    if (!home) throw new Error("CODEX_HOME is required to configure Codex");
+    writeCodexHomeFile(home, "config.toml", fs.readFileSync(outputPath));
+    return "";
+  }
   if (process.argv.includes("--bootstrap")) {
     const compiled = loadCompiledConfig();
     const overrides = expandConfigEnv(compiled.overrides);
@@ -75,7 +143,7 @@ function main() {
     writeSecureOutput(outputPath, output);
     const home = process.env.CODEX_HOME;
     if (!home) throw new Error("CODEX_HOME is required to configure Codex");
-    writeSecureOutput(path.join(home, "config.toml"), output);
+    writeCodexHomeFile(home, "config.toml", output);
     return output;
   }
   return runGatewayConversion({
