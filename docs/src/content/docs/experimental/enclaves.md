@@ -31,7 +31,7 @@ The generated gateway upstream uses a fresh masked capability for each workflow 
 
 ### Docker setup and host repository credentials
 
-The default AWF release is `v0.29.5`. For Docker enclaves, compilation generates authenticated installation and probing of the same-release, runner-UID-scoped storage helper. Only helper provisioning is privileged; AWF remains rootless with network isolation and writable invocation storage mounted `noexec`. Copilot native addons load from the sealed image runtime, not writable storage.
+The default AWF release is `v0.29.7`. For Docker enclaves, compilation generates authenticated installation and probing of the same-release, runner-UID-scoped storage helper. Only helper provisioning is privileged; AWF remains rootless with network isolation and writable invocation storage mounted `noexec`. Copilot native addons load from the sealed image runtime, not writable storage.
 
 Use `sandbox.agent.host-github-token` for host-side repository staging:
 
