@@ -32,7 +32,7 @@ func (c *Compiler) lintCompiledWorkflow(data *WorkflowData, content, sourcePath 
 		generatedActionRefs = nil
 	}
 	diagnostics, err := workflowlint.Default().Run(c.ctx, workflowlint.Input{
-		Workflow: graph, Document: c.lintPolicyDocument(data), SourcePath: sourcePath,
+		Workflow: graph, Document: c.lintPolicyDocument(data), AuthoredJobs: data.Jobs, SourcePath: sourcePath,
 		AllowActionRefs:     c.allowActionRefs,
 		SafeOutputJobs:      safeOutputLintJobs(data),
 		GeneratedActionRefs: generatedActionRefs,

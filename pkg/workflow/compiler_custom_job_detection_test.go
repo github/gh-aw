@@ -48,6 +48,37 @@ func TestCustomJobDetectionStatusOnlyPreAgentOutputs(t *testing.T) {
 	}
 }
 
+func TestCustomJobDetectionStatusOnlyPreAgentOutputAccess(t *testing.T) {
+	source, err := os.ReadFile("testdata/status_only_pre_agent.md")
+	require.NoError(t, err)
+	for _, tt := range []struct {
+		name, source, want string
+	}{
+		{
+			name:   "producer must be a direct dependency",
+			source: strings.Replace(string(source), "needs: [eligibility, agent, detection, safe_outputs]", "needs: [agent, detection, safe_outputs]", 1),
+			want:   "listed in needs",
+		},
+		{
+			name: "pre-agent output cannot be interpolated into run",
+			source: strings.Replace(string(source),
+				`run: printf '%s %s %s\n' "$PR_NUMBER" "$HEAD_SHA" "$FAILED"`,
+				`run: printf '%s %s %s\n' "$PR_NUMBER" "$HEAD_SHA" "$FAILED"; echo '${{ needs.eligibility.outputs.head_sha }}'`, 1),
+			want: "through env",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			document, err := aw.Parse(tt.source)
+			require.NoError(t, err)
+			compiler := NewCompiler(WithNoEmit(true))
+			data, err := compiler.ParseWorkflowDocument(document, filepath.Join(t.TempDir(), "test.md"))
+			require.NoError(t, err)
+			_, err = compiler.CompileToYAML(data, "test.md")
+			require.ErrorContains(t, err, tt.want)
+		})
+	}
+}
+
 func TestCustomJobDetectionStatusOnlyPreAgentTaint(t *testing.T) {
 	source, err := os.ReadFile("testdata/status_only_pre_agent.md")
 	require.NoError(t, err)
