@@ -492,6 +492,7 @@ safe-outputs:
     title-prefix: "[windows-defender] "
     labels: [security, automation]
     deduplicate-by-title: true
+    deduplicate-by-labels: [security, automation]
   create-pull-request:
     title-prefix: "[windows-defender] "
     labels: [security, automation]
