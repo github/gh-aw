@@ -44,6 +44,12 @@ imports:
 
 `uses` is an alias for `path`; `with` is an alias for `inputs`.
 
+Nested local frontmatter imports use the root workflow directory for qualified
+paths such as `shared/graders/recurrence-determinism.md`. Bare names such as
+`common.md` and paths beginning with `./` are relative to the importing file.
+Lock-file frontmatter and body hashes follow the same rules, so changes to nested
+components invalidate the importing workflow's lock.
+
 Conditional frontmatter imports are not supported. If an experiment should vary shared prompt content, keep imports unconditional and gate `{{#runtime-import? ...}}` (optional form) inside your `{{#if experiments.<name> ...}}` block instead. The optional form is not promoted to unconditional lock-file macros, so the content is only injected when the condition is true at runtime.
 
 ### Single-import constraint
