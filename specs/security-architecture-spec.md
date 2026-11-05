@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Agentic Workflows Security Architecture Specification
 
-**Version**: 1.1.8<br>
+**Version**: 1.1.9<br>
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/security-architecture-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -1928,33 +1928,33 @@ more test function names. Cells marked **covered** have at least one dedicated t
 cells marked **gap** lack direct formal test coverage; cells marked **partial** have
 related coverage that does not fully satisfy the checklist item.
 
-Path check revalidated on 2026-08-25: every named test below resolves in
+Path check revalidated on 2026-11-05: every named test below resolves in
 `pkg/workflow/security_architecture_sg_formal_test.go`.
 
 | Checklist Category | Formal Test(s) | Coverage |
 |---|---|---|
-| **G.1** Action pinning | _(none)_ | **gap** — no formal test verifies that compiled `uses:` lines are SHA-pinned; relies on actionlint/poutine in CI |
+| **G.1** Action pinning | `pkg/workflow/lint/integrity_test.go:TestActionPinGeneratedReferences`, `pkg/workflow/action_sha_validation_test.go:TestCompiledWorkflowAppliesActionPinPrefixes` | **partial** — generated pin references and configured pin prefixes are tested; the full Appendix G lock-file action inventory remains enforced by actionlint/poutine rather than this formal suite |
 | **G.2** Permission separation — agent job | `TestFormalSG02_AgentJobHasNoWritePermissions`, `TestFormalSG04_LeastPrivilegeBasePermissions` | covered |
 | **G.2** Permission separation — safe_outputs job | `TestFormalStaged_HandlerRequiresNoWritePerms` | **partial** — verifies that a globally staged handler does not accumulate write grants via `ComputePermissionsForSafeOutputs`, but does not inspect the compiled `safe_outputs` job itself or verify that its `permissions:` block is limited to the configured operations |
-| **G.3** Fork protection | `TestFormalBasicConformance_AllFourControls` | **partial** — verifies `safe_outputs` job presence, permission management, and compilation-time checks; does not inspect the activation job's `if:` expression or assert a repository-ID fork guard |
+| **G.3** Fork protection | `TestFormalBasicConformance_AllFourControls`, `TestFormalAppG2_PullRequestTargetContainsForkValidation`, `TestFormalRS05a_ActorTrustForkRejected`, `TestFormalRS05a_UnverifiableForkStatusRejected` | **partial** — formal and RS-05a tests cover fork authorization, but do not assert every compiled activation-job condition in this checklist |
 | **G.4** Input sanitization | `TestFormalSG01_InputSanitizationInvariant` | **partial** — verifies that a generic `run:` step with a `${{ }}` expression is rewritten and an `env:` block is injected; does not assert either required activation step or that compiled prompts consume `steps.sanitized.outputs.text` |
 | **G.5** Threat detection | `TestFormalSG06_ThreatDetectionAuditArtifact`, `TestFormalThreatDetection_EnabledByDefault`, `TestFormalThreatDetection_ExplicitDisable` | **partial** — detection-job presence and configuration defaults are covered; `permissions: {}` on the detection job and the `needs.detection.outputs.success` gate on `safe_outputs` are not directly asserted |
 | **G.6** RBAC — job topology (PM-10b) | `TestFormalJobTopology_PipelineOrderEnforced` (verifies `pre_activation → activation` needs dependency) | covered |
 | **G.6** RBAC — membership check step (PM-11) | `TestFormalPM11_PreActivationContainsMembershipStep` | covered |
 | **G.7** AWF sandbox | `TestFormalSG05_SandboxIsolationPresence` | **partial** — verifies `isSandboxEnabled()` return value for configuration combinations (AWF type, disabled flag, firewall); does not compile a workflow or assert `install_awf_binary.sh` step presence or execution inside the AWF container |
-| **G.8** Concurrency control | _(none)_ | **gap** — no formal test verifies `concurrency.group` is set or that `cancel-in-progress` matches workflow type |
-| **G.9** Runtime validation — timestamp check | _(none)_ | **gap** — `TestFormalSG07_FailSecureOnSecurityError` tests write-permission rejection at compile time and is unrelated to the G.9 checklist items; neither the activation timestamp step nor conclusion-job behavior is asserted by any test in this file |
+| **G.8** Concurrency control | `TestFormalCC01_ConcurrencyGroupAlwaysConfigured`, `TestFormalCC02_ConcurrencyGroupIncludesWorkflowIdentity`, `TestFormalCC07_ConcurrencyGateIsFirstInSequence`, `TestFormalCC08_GeneratedConcurrencyYAMLShape` | covered for generated concurrency configuration; checklist-specific cancel behavior remains described in the referenced assertions |
+| **G.9** Runtime validation — timestamp check | `TestActivationStepsAddVersionCheckStep`, `TestTaskJobGenerationFix`, `TestActivationJobNoCheckoutStep` | **partial** — tests assert activation timestamp/version-check generation and API-based check placement; conclusion-job behavior is not directly covered |
 
-**Summary of coverage gaps (as of 2026-08-25)**:
+**Summary of coverage gaps (as of 2026-11-05)**:
 
-- **G.1 Action pinning**: Formal test gap. CI tooling (actionlint, poutine) provides runtime coverage; consider adding a dedicated test that parses compiled lock file `uses:` patterns.
+- **G.1 Action pinning**: Partial formal coverage for generated pinning and configured prefixes. CI tooling (actionlint, poutine) checks the compiled action references; retain that independent gate.
 - **G.2 Permission separation — safe_outputs job**: Partial coverage. `TestFormalStaged_HandlerRequiresNoWritePerms` does not inspect the compiled `safe_outputs` job's own `permissions:` block. A dedicated test compiling a safe-outputs workflow and asserting its permission scope would close this gap.
 - **G.3 Fork protection**: Partial coverage. `TestFormalBasicConformance_AllFourControls` does not inspect the activation job's `if:` expression or verify a repository-ID fork guard. A test asserting the exact `if:` condition on the compiled activation job is needed.
 - **G.4 Input sanitization**: Partial coverage. `TestFormalSG01_InputSanitizationInvariant` covers expression rewriting but not the full three-item checklist (activation step presence; `steps.sanitized.outputs.text` consumption in compiled prompts).
 - **G.5 Threat detection**: Partial coverage. Detection-job presence and defaults are covered. Tests asserting `permissions: {}` on the detection job and the `needs.detection.outputs.success` gate on `safe_outputs` are missing.
 - **G.7 AWF sandbox**: Partial coverage. Configuration-logic checks are covered; lock-file-level assertions (`install_awf_binary.sh`, AWF container execution) are missing.
-- **G.8 Concurrency control**: Formal test gap. Concurrency group format is validated only by manual review. Consider a test that compiles a PR-trigger workflow and asserts `concurrency.group` contains the PR number expression.
-- **G.9 Runtime validation — timestamp check**: Formal test gap. No formal test verifies the activation timestamp step or conclusion-job behavior.
+- **G.8 Concurrency control**: Formal tests cover generated group configuration and ordering; the row references the specific functions, while per-trigger cancellation policy remains a separate workflow-level check.
+- **G.9 Runtime validation — timestamp check**: Activation timestamp/version-check generation has test coverage; conclusion-job behavior remains a formal coverage gap.
 
 ---
 
@@ -2098,6 +2098,12 @@ roles: [admin, maintainer]  # Restrict to trusted roles
 ---
 
 ## Change Log
+
+### Version 1.1.9 (Appendix G Test Mapping)
+
+**Published**: November 5, 2026
+
+Revalidated Appendix G.10 test paths, added existing pinning, fork, concurrency, and timestamp checks to the coverage map, and clarified remaining partial-coverage limits.
 
 ### Version 1.1.8 (Explicit Floating-Head Checkout)
 

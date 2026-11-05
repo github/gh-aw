@@ -39,6 +39,9 @@ The package also acts as the authoritative source for the generated workflow con
 | `GetAllEngineSecretNames` | `func GetAllEngineSecretNames() []string` | Returns the deduplicated union of engine primary secrets, alternative secrets, and system secrets. |
 | `GetEngineOption` | `func GetEngineOption(engineValue string) *EngineOption` | Returns the configured engine option for an engine value, or `nil` when none exists. |
 | `GetWorkflowDir` | `func GetWorkflowDir() string` | Returns the workflow directory, honoring `GH_AW_WORKFLOWS_DIR` and normalizing path separators to `/`. |
+| `EngineExecutionStepName` | `func EngineExecutionStepName(name string) string` | Returns `name` unchanged when it follows the engine execution-step naming contract; otherwise adds the required prefix. |
+| `IsCompilerOwnedJobName` | `func IsCompilerOwnedJobName(name string) bool` | Reports whether a job name is owned by the compiler, including generated maintenance jobs. |
+| `IsEngineExecutionStepName` | `func IsEngineExecutionStepName(name string) bool` | Reports whether a name follows the evals or detection engine execution-step naming contract. |
 
 ### Constants
 

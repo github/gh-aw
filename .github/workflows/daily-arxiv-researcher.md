@@ -10,7 +10,10 @@ permissions:
   contents: read
   copilot-requests: write
 
-engine: codex
+engine:
+  id: codex
+  durable:
+    retention-days: 7
 model: openai/gpt-5.6-sol
 
 timeout-minutes: 20

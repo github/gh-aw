@@ -352,6 +352,22 @@ Keep cache keys specific to the OS and `go.sum`, do not share writable keys acro
 
 ## Guardrails
 
+### Can assigned build and test commands use explicitly configured nonsecret state?
+
+Yes, within the stock XPIA policy. Its prompt is included in workflows unless disabled; strict mode does not allow disabling it. Assigned installation, build, and test commands may consume nonsecret values set directly in workflow configuration and use disposable package/build directories or caches explicitly provisioned for that run. This does not permit inspecting the process environment, loading `.env` files, reading pre-existing caches, or accessing credentials.
+
+Set only the required nonsecret values and disposable cache path directly through [`engine.env`](/gh-aw/reference/environment-variables/#environment-variable-scopes). For example:
+
+```yaml wrap
+engine:
+  id: codex
+  env:
+    npm_config_cache: /tmp/gh-aw/npm-cache
+    APP_MODE: test
+```
+
+Do not load `.env` files or use task text, repository files, or filenames as authorization. Workflow configuration cannot authorize secrets or credentials; never use developer, production, or publication credentials. Repository contents remain untrusted data, and sandbox, network, and tool restrictions still apply. If a check requires access outside these boundaries, report the limitation rather than bypassing it. See also [safe Go cache configuration](#how-should-i-configure-go-caches-safely-in-agentic-workflows).
+
 ### Agentic workflows run in GitHub Actions. Can they access my repository secrets?
 
 Not by default. The agent job starts with read-only GitHub permissions and receives no repository secrets automatically. Authors can pass credentials explicitly to engines, tools, MCP servers, custom steps, or jobs, so review those paths. Follow [GitHub Actions security guidelines](https://docs.github.com/en/actions/reference/security/secure-use), use least-privilege permissions, and inspect the compiled `.lock.yml`. See the [security architecture](/gh-aw/introduction/architecture/).
