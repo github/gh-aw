@@ -4,6 +4,11 @@ const { normalizeReflectProviderName, REFLECT_PROVIDER_ALIASES } = require("./aw
 const { buildCatalogFromReflect, selectLatestGlobMatch, splitModelIdentifier } = require("./resolve_model_alias.cjs");
 
 const MODEL_FALLBACK_ENV_VAR = "GH_AW_MODEL_FALLBACK";
+const CLAUDE_COPILOT_MODEL_OVERRIDES = new Map(
+  Object.keys(require("./models.json").providers["github-copilot"].models)
+    .filter(id => id.startsWith("claude-") && id.includes("."))
+    .map(id => [id.replaceAll(".", "-"), id])
+);
 
 function readTrimmedEnv(env, name) {
   return typeof env?.[name] === "string" ? env[name].trim() : "";
@@ -114,11 +119,15 @@ function resolveClaudeAutoModel(model, provider, options = {}) {
  */
 function normalizeClaudeModel(model, provider, env, options = {}) {
   const match = /^copilot\/(.+)$/i.exec(model.trim());
-  if (!match) return resolveClaudeAutoModel(model.trim(), provider, options);
-  if (!REFLECT_PROVIDER_ALIASES.github.has(normalizeReflectProviderName(provider)) && env.GH_AW_LLM_PROVIDER_EXPLICIT !== "1") {
+  const copilotProvider = REFLECT_PROVIDER_ALIASES.github.has(normalizeReflectProviderName(provider));
+  if (match && !copilotProvider && env.GH_AW_LLM_PROVIDER_EXPLICIT !== "1") {
     throw new Error("A copilot/ Claude model requires engine.model-provider: github when the model is selected dynamically; configure the provider and its credentials before running Claude");
   }
-  return resolveClaudeAutoModel(match[1], provider, options);
+  const resolved = resolveClaudeAutoModel(match ? match[1] : model.trim(), provider, options);
+  if (!copilotProvider) return resolved;
+  const { base } = splitModelIdentifier(resolved);
+  const mapped = CLAUDE_COPILOT_MODEL_OVERRIDES.get(base) || base.replace(/^(claude-[a-z]+-\d+)-(\d{1,2})$/, "$1.$2");
+  return mapped + resolved.slice(base.length);
 }
 
 /**

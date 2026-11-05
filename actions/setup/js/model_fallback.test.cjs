@@ -2,7 +2,40 @@ import { describe, it, expect } from "vitest";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { injectModelFlagAfterExec, normalizeCodexModel, normalizeCodexModelArgs, normalizeClaudeModelArgs } = require("./model_fallback.cjs");
+const { injectModelFlagAfterExec, normalizeCodexModel, normalizeCodexModelArgs, normalizeClaudeModel, normalizeClaudeModelArgs } = require("./model_fallback.cjs");
+
+describe("Claude model IDs", () => {
+  const copilotModels = require("./models.json").providers["github-copilot"].models;
+
+  it("uses the same Copilot catalog as the compiler", () => {
+    expect(copilotModels).toEqual(require("../../../pkg/cli/data/models.json").providers["github-copilot"].models);
+  });
+
+  it.each(Object.keys(copilotModels).filter(id => id.startsWith("claude-")))("normalizes the catalog model %s", model => {
+    expect(normalizeClaudeModel(model.replaceAll(".", "-"), "github", {})).toBe(model);
+    expect(normalizeClaudeModel(model, "github", {})).toBe(model);
+  });
+
+  it.each(["github", "copilot", "github-copilot", "github_models", " COPILOT "])("maps Anthropic IDs for provider %s", provider => {
+    expect(normalizeClaudeModel("claude-opus-5-5", provider, {})).toBe("claude-opus-5.5");
+    expect(normalizeClaudeModel("copilot/claude-opus-5-5", provider, {})).toBe("claude-opus-5.5");
+    expect(normalizeClaudeModelArgs(["--model", "claude-opus-5-5"], provider, {})).toEqual(["--model", "claude-opus-5.5"]);
+    expect(normalizeClaudeModelArgs(["--model=claude-opus-5-5"], provider, {})).toEqual(["--model=claude-opus-5.5"]);
+  });
+
+  it.each([
+    ["claude-opus-5-5", "anthropic", "claude-opus-5-5"],
+    ["copilot/claude-opus-5.5", "github", "claude-opus-5.5"],
+    ["claude-sonnet-5", "github", "claude-sonnet-5"],
+    ["claude-opus-99-12", "github", "claude-opus-99.12"],
+    ["claude-sonnet-4-20250514", "github", "claude-sonnet-4-20250514"],
+    ["claude-opus-5-5?effort=high", "github", "claude-opus-5.5?effort=high"],
+    ["claude-opus-5-5-20261104", "github", "claude-opus-5-5-20261104"],
+    ["anthropic/custom-model", "github", "anthropic/custom-model"],
+  ])("normalizes %s only when appropriate for %s", (model, provider, expected) => {
+    expect(normalizeClaudeModel(model, provider, {})).toBe(expected);
+  });
+});
 
 describe("Claude model arguments", () => {
   const autoReflect = {
