@@ -60,6 +60,17 @@ function persistCopilotModelSelection(env = process.env) {
       resolved_model: typeof record?.resolved_model === "string" ? modelID(record.resolved_model) : "",
       effective_model: typeof record?.effective_model === "string" ? modelID(record.effective_model) : "",
     };
+    const observedModels = Array.isArray(record?.observed_models)
+      ? [
+          ...new Set(
+            record.observed_models
+              .filter(model => typeof model === "string")
+              .map(modelID)
+              .filter(Boolean)
+          ),
+        ].slice(0, 32)
+      : [];
+    if (observedModels.length > 1) selection.observed_models = observedModels;
     if (!selection.configured_model || !["observed", "substituted", "unavailable"].includes(selection.status)) throw new Error("Invalid Copilot model selection");
     if (selection.status === "unavailable") {
       selection.resolved_model = "";
@@ -88,6 +99,7 @@ function createCopilotModelObserver({ configuredModel, resolvedModel, sessionId,
   const offsets = new Map();
   /** @type {Map<string, string>} */
   const partial = new Map();
+  const observedModels = new Set();
   let diagnostic = "";
   let observedModel = "";
   const expected = modelID(resolvedModel);
@@ -144,8 +156,21 @@ function createCopilotModelObserver({ configuredModel, resolvedModel, sessionId,
           const model = modelID(event.type === "session.model_change" && event.data?.source === "startup" ? event.data.newModel : event.type === "assistant.message" ? event.data?.model : "");
           if (!model || model === observedModel) continue;
           observedModel = model;
+          if (!observedModels.has(model)) {
+            if (observedModels.size >= 32) observedModels.delete(observedModels.values().next().value);
+            observedModels.add(model);
+          }
           const substituted = expected.toLowerCase() !== "auto" && model.toLowerCase() !== expected.toLowerCase();
-          recordCopilotModelSelection({ status: substituted ? "substituted" : "observed", configured_model: configuredModel, resolved_model: resolvedModel, effective_model: model }, env);
+          recordCopilotModelSelection(
+            {
+              status: substituted ? "substituted" : "observed",
+              configured_model: configuredModel,
+              resolved_model: resolvedModel,
+              effective_model: model,
+              ...(observedModels.size > 1 ? { observed_models: [...observedModels] } : {}),
+            },
+            env
+          );
           if (substituted) {
             diagnostic = modelSubstitutionDiagnostic(expected, model);
             logger(diagnostic);
@@ -200,6 +225,7 @@ function createCopilotSDKModelObserver({ configuredModel, expectedModel, provide
   let sessionId = "";
   let diagnostic = "";
   let recorded = "";
+  const observedModels = new Set();
 
   /** @param {any} event */
   function observe(event) {
@@ -219,7 +245,20 @@ function createCopilotSDKModelObserver({ configuredModel, expectedModel, provide
       const effective = matches ? (unconstrained ? model : expected) : validateModelIdentifier(base) || model;
       if (matches && effective === recorded) return "";
       recorded = effective;
-      recordCopilotModelSelection({ status: matches ? "observed" : "substituted", configured_model: configuredModel, resolved_model: resolvedModel, effective_model: effective }, env);
+      if (!observedModels.has(effective)) {
+        if (observedModels.size >= 32) observedModels.delete(observedModels.values().next().value);
+        observedModels.add(effective);
+      }
+      recordCopilotModelSelection(
+        {
+          status: matches ? "observed" : "substituted",
+          configured_model: configuredModel,
+          resolved_model: resolvedModel,
+          effective_model: effective,
+          ...(observedModels.size > 1 ? { observed_models: [...observedModels] } : {}),
+        },
+        env
+      );
       if (matches) return "";
       diagnostic = modelSubstitutionDiagnostic(expected, effective);
     } catch (error) {

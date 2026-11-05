@@ -309,6 +309,7 @@ function resolveEffectiveModel(infoPath = `${process.env.GH_AW_TMP_DIR || "/tmp/
     model,
     fallbackModel,
     routing,
+    selection,
     requestedModel: requestedModelIdentifier(observed ? info.requested_model || selection.configured_model : routing?.requested_model || (routing ? env.GH_AW_INFO_MODEL || env.GH_AW_ENGINE_MODEL : "")),
     effort: routing?.status === "selected" ? routing.applied_effort || routing.effort : "",
   };
@@ -325,13 +326,22 @@ function getEffectiveModelLabel(infoPath = `${process.env.GH_AW_TMP_DIR || "/tmp
     if (phase === "agent") {
       const sessionPath = require("path").join(require("path").dirname(infoPath), "usage/aw_session.jsonl");
       for (const event of readModelRoutingSession(sessionPath)) {
-        if (event.type !== "firewall.token_usage" || (event.data?.purpose && event.data.purpose !== "agent")) continue;
+        if (event.type !== "firewall.token_usage" || (event.data?.purpose && event.data.purpose !== "agent") || Number(event.data?.status) >= 400) continue;
         const model = validateModelIdentifier(event.data?.model);
         if (model && model.toLowerCase() !== "auto") models.add(model);
       }
+      const observedModels = attribution.selection?.status === "observed" ? attribution.selection.observed_models : null;
+      if (!models.size && Array.isArray(observedModels)) {
+        for (const value of observedModels) {
+          const model = validateModelIdentifier(value);
+          if (model && model.toLowerCase() !== "auto") models.add(model);
+        }
+      }
     }
-    if (!models.size && attribution.model && attribution.model.toLowerCase() !== "auto") models.add(attribution.model);
-    return models.size ? `auto (powered by ${[...models].map(formatAttributionModelName).join(", ")})` : "auto";
+    if (!models.size && !attribution.fallbackModel && attribution.model && attribution.model.toLowerCase() !== "auto") models.add(attribution.model);
+    const names = [...new Set([...models].map(formatAttributionModelName).filter(Boolean))];
+    if (names.length) return `auto (powered by ${names.join(", ")})`;
+    return attribution.fallbackModel && shortModel ? shortModel : "auto";
   }
   if (attribution.routing.status === "selected") {
     const routedModel = reduceModelNameToIdentifier(attribution.routing.wire_model);
