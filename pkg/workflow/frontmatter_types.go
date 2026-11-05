@@ -362,6 +362,7 @@ type FrontmatterConfig struct {
 	// ParseFrontmatterConfig to return nil and break features that depend on it (e.g. OTLP).
 	Engine                      any                          `json:"engine,omitempty"`
 	Source                      string                       `json:"source,omitempty"`
+	SourceSHA                   string                       `json:"source-sha,omitempty"`
 	Redirect                    string                       `json:"redirect,omitempty"`
 	TrackerID                   string                       `json:"tracker-id,omitempty"`
 	ThreatDetectionSuppressions []ThreatDetectionSuppression `json:"threat-detection-suppress,omitempty"`

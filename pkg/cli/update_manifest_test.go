@@ -19,6 +19,57 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestUpdateManifestWorkflowGroup_ReleaseCooldownSkipsPackageSync(t *testing.T) {
+	dir := testutil.TempDir(t, "manifest-release-cooldown-*")
+	require.NoError(t, os.Mkdir(filepath.Join(dir, ".git"), 0o755))
+	t.Chdir(dir)
+	resourcePath := filepath.Join(dir, ".github", "workflows", "action.yml")
+	require.NoError(t, os.MkdirAll(filepath.Dir(resourcePath), 0o755))
+	const resourceContent = "name: installed action\n"
+	require.NoError(t, os.WriteFile(resourcePath, []byte(resourceContent), 0o644))
+
+	originalResolve := resolveLatestRefFn
+	originalDownload := downloadPackageFileFromGitHubForHost
+	t.Cleanup(func() {
+		resolveLatestRefFn = originalResolve
+		downloadPackageFileFromGitHubForHost = originalDownload
+	})
+
+	deps := mockWorkflowUpdateDeps(func(_ context.Context, repo string) ([]byte, error) {
+		assert.Equal(t, "owner/repo", repo)
+		return []byte("v1.2.0\nv1.1.0"), nil
+	})
+	var checkedTags []string
+	deps.checkCoolDown = func(_ context.Context, _, tag string, cd time.Duration) coolDownCheckResult {
+		assert.Equal(t, 7*24*time.Hour, cd)
+		checkedTags = append(checkedTags, tag)
+		return coolDownCheckResult{InCoolDown: true}
+	}
+	resolveLatestRefFn = func(ctx context.Context, repo, currentRef string, allowMajor, verbose bool, coolDown time.Duration) (latestRefResolution, error) {
+		assert.Equal(t, "v1", currentRef)
+		return resolveLatestRefWithDeps(ctx, deps, repo, currentRef, allowMajor, verbose, coolDown)
+	}
+	var downloads []string
+	downloadPackageFileFromGitHubForHost = func(_ context.Context, _, _, path, _, _ string) ([]byte, error) {
+		downloads = append(downloads, path)
+		return nil, fmt.Errorf("unexpected package download during cooldown: %s", path)
+	}
+
+	successes, failures := updateManifestWorkflowGroup(context.Background(), "owner/repo@v1", nil,
+		UpdateWorkflowsOptions{CoolDown: 7 * 24 * time.Hour, Force: true})
+	require.Empty(t, failures)
+	assert.Empty(t, successes)
+	assert.Equal(t, []string{"v1.2.0", "v1.1.0"}, checkedTags)
+	assert.Empty(t, downloads, "blocked releases must not download even the current package manifest")
+	content, err := os.ReadFile(resourcePath)
+	require.NoError(t, err)
+	assert.Equal(t, resourceContent, string(content))
+	entries, err := os.ReadDir(filepath.Dir(resourcePath))
+	require.NoError(t, err)
+	assert.Len(t, entries, 1, "blocked package sync must not install resources")
+	assert.NoFileExists(t, packageOwnershipRecordPath(dir, "owner/repo"))
+}
+
 func TestReconcileManifestManagedAssets_AddsPackageOwnedAssets(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "manifest-assets-*")
 	require.NoError(t, os.Mkdir(filepath.Join(tmpDir, ".git"), 0o755))
