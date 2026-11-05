@@ -56,6 +56,11 @@ Pi resolves [model aliases](/gh-aw/reference/engines/#model-aliases) for the mai
 
 ## Durable runs
 
+> [!WARNING]
+> Pi Durable integration is experimental. Enabling `engine.pi.durable` or
+> `engine.durable` emits a compile-time warning. Configuration and behavior may
+> change without deprecation.
+
 Pi Durable persists harness tasks, submissions, conversation history, tool-call
 budgets, usage and trace propagation in a dedicated GitHub Actions artifact:
 

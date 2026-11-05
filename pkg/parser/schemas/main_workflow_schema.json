@@ -15649,7 +15649,7 @@
     },
     "durable_config": {
       "type": "object",
-      "description": "Persist engine-declared session files in GitHub Actions artifacts. Copilot, Claude, and Codex resume the exact native session; other session-based engines receive a continuation prompt. Pi uses its native durable task runtime. Starts fresh when no prior history exists. No memory tool is required.",
+      "description": "Experimental. Persist engine-declared session files in GitHub Actions artifacts. Using this field emits a compile-time warning. Configuration and behavior may change without deprecation. Copilot, Claude, and Codex resume the exact native session; other session-based engines receive a continuation prompt. Pi uses its native durable task runtime. Starts fresh when no prior history exists. No memory tool is required.",
       "properties": {
         "retention-days": {
           "type": "integer",
@@ -16464,7 +16464,7 @@
               "properties": {
                 "durable": {
                   "type": "object",
-                  "description": "Native durability or session-file continuation. Declares persisted files and the continuation invocation; pinned dependency installation is optional. The harness receives GH_AW_DURABLE_RESUMED and GH_AW_DURABLE_PARENT_RUN_ID.",
+                  "description": "Experimental native durability or session-file continuation. Declares persisted files and the continuation invocation; pinned dependency installation is optional. Enabling engine.durable emits a compile-time warning. The harness receives GH_AW_DURABLE_RESUMED and GH_AW_DURABLE_PARENT_RUN_ID.",
                   "properties": {
                     "files": {
                       "type": "array",

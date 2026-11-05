@@ -70,6 +70,11 @@ See [imports](/gh-aw/reference/imports/) for resolution and pinning rules.
 
 ### Durable execution
 
+> [!WARNING]
+> Durable execution is experimental, including for imported engines. Enabling
+> `engine.durable` emits a compile-time warning. Configuration and behavior may
+> change without deprecation.
+
 A workflow can opt into artifact-backed continuation using `engine.durable:
 { retention-days: 7 }` alongside its custom `engine.id`. Compilation fails unless
 the definition declares `behaviors.durable`. Engines that implement the Go

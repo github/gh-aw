@@ -76,6 +76,11 @@ Engine-specific options such as `agent`, `copilot-sdk`, `driver`, `dynamic-workf
 
 ### Durable runs
 
+> [!WARNING]
+> Durable mode is experimental for all engines, including Pi. Enabling
+> `engine.durable` emits a compile-time warning. Configuration and behavior may
+> change without deprecation.
+
 All built-in engines support artifact-backed continuation:
 
 ```aw
