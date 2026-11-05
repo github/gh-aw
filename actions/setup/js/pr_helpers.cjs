@@ -2,6 +2,8 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 
+const MAX_BRANCH_RULE_PAGES = 50;
+
 /**
  * Detect if a pull request is from a fork repository.
  *
@@ -116,13 +118,14 @@ function buildBranchInstruction(effectiveBaseBranch, resolvedDefaultBranch) {
  */
 async function hasOnlyCopilotReviewRules(githubClient, owner, repo, branch) {
   // Read pages directly: Octokit's paginator can swallow a later-page HTTP 409.
-  for (let page = 1; ; page++) {
+  for (let page = 1; page <= MAX_BRANCH_RULE_PAGES; page++) {
     const { data: rules } = await githubClient.rest.repos.getBranchRules({ owner, repo, branch, per_page: 100, page });
     if (!Array.isArray(rules) || (page === 1 && rules.length === 0) || !rules.every(rule => rule?.type === "copilot_code_review")) {
       return false;
     }
     if (rules.length < 100) return true;
   }
+  return false;
 }
 
 /**
@@ -165,14 +168,15 @@ async function checkBranchPushable(githubClient, owner, repo, branchName, checkB
       const { data: branchData } = await githubClient.rest.repos.getBranch({ owner, repo, branch: branchName });
       isBranchProtected = branchData.protected;
       // The protected flag includes advisory rulesets. Confirm classic protection separately.
-      if (isBranchProtected && branchData.protection?.enabled === false) {
+      if (isBranchProtected && typeof defaultBranch === "string" && defaultBranch.length > 0 && branchName !== defaultBranch && branchData.protection?.enabled === false) {
         try {
           if (await hasOnlyCopilotReviewRules(githubClient, owner, repo, branchName)) {
             try {
               await githubClient.rest.repos.getBranchProtection({ owner, repo, branch: branchName });
             } catch (classicError) {
               const classicStatus = classicError && typeof classicError === "object" && "status" in classicError ? classicError.status : undefined;
-              if (classicStatus !== 404) throw classicError;
+              const classicMessage = classicError && typeof classicError === "object" ? (classicError.response?.data?.message ?? getErrorMessage(classicError)) : getErrorMessage(classicError);
+              if (classicStatus !== 404 || classicMessage !== "Branch not protected") throw classicError;
               core.info(`Branch "${branchName}" only has Copilot code review rules and no classic protection; proceeding to push`);
               isBranchProtected = false;
             }

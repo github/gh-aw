@@ -1045,6 +1045,22 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
       expect(mockExec.getExecOutput).not.toHaveBeenCalled();
     });
 
+    it("should not attempt git operations when repository metadata is unavailable for a protected branch", async () => {
+      mockGithub.rest.repos.get.mockRejectedValue(new Error("API unavailable"));
+      mockGithub.rest.repos.getBranch.mockResolvedValue({ data: { protected: true, protection: { enabled: false } } });
+      mockGithub.rest.repos.getBranchRules = vi.fn().mockResolvedValue({ data: [{ type: "copilot_code_review" }] });
+      createPatchFile("protected-branch-without-repository-metadata");
+
+      const module = await loadModule();
+      const handler = await module.main({});
+      const result = await handler({ branch: "protected-branch-without-repository-metadata" }, {});
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("protection rules");
+      expect(mockExec.exec).not.toHaveBeenCalled();
+      expect(mockExec.getExecOutput).not.toHaveBeenCalled();
+    });
+
     it("should warn and continue when repos.get fails", async () => {
       // repos.get fails - cannot determine default branch, warn and continue
       mockGithub.rest.repos.get.mockRejectedValue(new Error("API unavailable"));
