@@ -354,7 +354,7 @@ runWithCopilotSDK({
       observed_models: ["gemini-3.8-flash", "claude-sonnet-5"],
     });
     persistCopilotModelSelection();
-    expect(getEffectiveModelLabel(infoPath, "agent", process.env)).toBe("auto (powered by Gemini 3.8 Flash, Claude Sonnet 5)");
+    expect(getEffectiveModelLabel(infoPath, "agent", process.env)).toBe("auto (Gemini 3.8 Flash, Claude Sonnet 5)");
   });
 
   it("sdk_subagent_model_events_do_not_change_main_observation", () => {

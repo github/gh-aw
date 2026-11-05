@@ -378,7 +378,7 @@ function getEffectiveModelLabel(infoPath = `${process.env.GH_AW_TMP_DIR || "/tmp
     }
     if (!models.size && !attribution.fallbackModel && attribution.model && attribution.model.toLowerCase() !== "auto") models.add(attribution.model);
     const names = [...new Set([...models].map(formatAttributionModelName).filter(Boolean))];
-    if (names.length) return `auto (powered by ${names.join(", ")})`;
+    if (names.length) return `auto (${names.join(", ")})`;
     return attribution.fallbackModel && shortModel ? shortModel : "auto";
   }
   if (attribution.routing.status === "selected") {

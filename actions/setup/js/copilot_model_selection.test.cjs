@@ -64,7 +64,7 @@ describe("Copilot configured versus observed model", () => {
     append({ type: "assistant.message", data: { model: "claude-sonnet-5" } });
     expect(resumed.check()).toBe("");
     expect(readInfo().model_selection).toMatchObject({ status: "observed", effective_model: "claude-sonnet-5", observed_models: ["gemini-3.8-flash", "claude-sonnet-5"] });
-    expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "auto" })).toBe("auto (powered by Gemini 3.8 Flash, Claude Sonnet 5)");
+    expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "auto" })).toBe("auto (Gemini 3.8 Flash, Claude Sonnet 5)");
   });
 
   it("records an unavailable model without creating workflow metadata in the sandbox", () => {

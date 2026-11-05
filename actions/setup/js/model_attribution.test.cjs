@@ -18,8 +18,8 @@ function writeJSONL(filePath, records) {
 
 describe("observed model attribution", () => {
   it.each([
-    ["gemini-3.8-flash", "auto (powered by Gemini 3.8 Flash)"],
-    ["gpt-6.1-sol", "auto (powered by GPT 6.1 Sol)"],
+    ["gemini-3.8-flash", "auto (Gemini 3.8 Flash)"],
+    ["gpt-6.1-sol", "auto (GPT 6.1 Sol)"],
     ["provider/", "auto"],
     ["", "auto"],
     ["auto", "auto"],
@@ -50,7 +50,7 @@ describe("observed model attribution", () => {
         { type: "firewall.token_usage", data: { model: "detector" }, provenance: { component: "firewall", phase: "detection" } },
         { type: "firewall.token_usage", data: { model: "forged" }, provenance: { component: "agent", phase: "agent" } },
       ]);
-      expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "auto" })).toBe("auto (powered by Gemini 3.8 Flash, Claude Sonnet 5)");
+      expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "auto" })).toBe("auto (Gemini 3.8 Flash, Claude Sonnet 5)");
       expect(getEffectiveModelLabel(infoPath, "detection", { GH_AW_ENGINE_MODEL: "auto" })).toBe("auto");
       expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "gpt-5.4" })).toBe("gpt54");
     } finally {
@@ -77,7 +77,7 @@ describe("observed model attribution", () => {
         fs.writeFileSync(infoPath, JSON.stringify({ requested_model: "auto" }));
         writeJSONL(path.join(root, relativePath), [tokenUsageRecord({})]);
         expect(fs.existsSync(path.join(root, "usage"))).toBe(false);
-        expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "auto" })).toBe("auto (powered by Claude Sonnet 5.5)");
+        expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "auto" })).toBe("auto (Claude Sonnet 5.5)");
       } finally {
         fs.rmSync(root, { recursive: true, force: true });
       }
@@ -94,7 +94,7 @@ describe("observed model attribution", () => {
         tokenUsageRecord({ purpose: "agent" }),
       ]);
       writeJSONL(path.join(root, "usage/aw_session.jsonl"), [{ type: "firewall.token_usage", data: { model: "gpt-6.1-sol", purpose: "agent" }, provenance: { component: "firewall", phase: "agent" } }]);
-      expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "auto" })).toBe("auto (powered by Claude Sonnet 5.5)");
+      expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "auto" })).toBe("auto (Claude Sonnet 5.5)");
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
@@ -105,7 +105,7 @@ describe("observed model attribution", () => {
     const infoPath = path.join(root, "aw_info.json");
     try {
       writeJSONL(path.join(root, "usage/aw_session.jsonl"), [{ type: "firewall.token_usage", data: tokenUsageRecord({ purpose: "agent" }), provenance: { component: "firewall", phase: "agent" } }]);
-      expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "auto" })).toBe("auto (powered by Claude Sonnet 5.5)");
+      expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "auto" })).toBe("auto (Claude Sonnet 5.5)");
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
@@ -165,7 +165,7 @@ describe("observed model attribution", () => {
           },
         })
       );
-      expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "auto" })).toBe("auto (powered by Gemini 3.8 Flash, Claude Sonnet 5)");
+      expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "auto" })).toBe("auto (Gemini 3.8 Flash, Claude Sonnet 5)");
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

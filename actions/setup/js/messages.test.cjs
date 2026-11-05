@@ -204,7 +204,7 @@ describe("messages.cjs", () => {
         );
         const { getFooterMessage } = await import("./messages.cjs");
         const result = getFooterMessage({ workflowName: "Test Workflow", runUrl: "https://github.com/test/repo/actions/runs/123", historyUrl: "https://github.com/search" });
-        expect(result).toContain(" · copilot · auto (powered by Gemini 3.8 Flash, Claude Sonnet 5) · \\~14 AIC · ⌖ \\~1 AIC · ⊞ 9.2K · [◷]");
+        expect(result).toContain(" · copilot · auto (Gemini 3.8 Flash, Claude Sonnet 5) · \\~14 AIC · ⌖ \\~1 AIC · ⊞ 9.2K · [◷]");
       } finally {
         fs.rmSync(root, { recursive: true, force: true });
         for (const [key, value] of environment) {
