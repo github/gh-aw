@@ -108,12 +108,30 @@ function buildBranchInstruction(effectiveBaseBranch, resolvedDefaultBranch) {
 }
 
 /**
+ * @param {import("@actions/github-script").AsyncFunctionArguments["github"]} githubClient
+ * @param {string} owner
+ * @param {string} repo
+ * @param {string} branch
+ * @returns {Promise<boolean>}
+ */
+async function hasOnlyCopilotReviewRules(githubClient, owner, repo, branch) {
+  // Read pages directly: Octokit's paginator can swallow a later-page HTTP 409.
+  for (let page = 1; ; page++) {
+    const { data: rules } = await githubClient.rest.repos.getBranchRules({ owner, repo, branch, per_page: 100, page });
+    if (!Array.isArray(rules) || (page === 1 && rules.length === 0) || !rules.every(rule => rule?.type === "copilot_code_review")) {
+      return false;
+    }
+    if (rules.length < 100) return true;
+  }
+}
+
+/**
  * Check whether a branch is safe to push to.
  *
  * Performs two security checks:
  * 1. Ensures the branch is not the repository's default branch.
  * 2. When `checkBranchProtection` is true, queries the branch API to
- *    verify the branch has no protection rules.
+ *    verify the branch has no protection rules other than Copilot code review.
  *
  * Returns null when the push is safe to proceed, or a string error message that
  * should be surfaced as a hard failure when the push must be blocked.
@@ -146,6 +164,23 @@ async function checkBranchPushable(githubClient, owner, repo, branchName, checkB
     try {
       const { data: branchData } = await githubClient.rest.repos.getBranch({ owner, repo, branch: branchName });
       isBranchProtected = branchData.protected;
+      // The protected flag includes advisory rulesets. Confirm classic protection separately.
+      if (isBranchProtected && branchData.protection?.enabled === false) {
+        try {
+          if (await hasOnlyCopilotReviewRules(githubClient, owner, repo, branchName)) {
+            try {
+              await githubClient.rest.repos.getBranchProtection({ owner, repo, branch: branchName });
+            } catch (classicError) {
+              const classicStatus = classicError && typeof classicError === "object" && "status" in classicError ? classicError.status : undefined;
+              if (classicStatus !== 404) throw classicError;
+              core.info(`Branch "${branchName}" only has Copilot code review rules and no classic protection; proceeding to push`);
+              isBranchProtected = false;
+            }
+          }
+        } catch (rulesError) {
+          return `Cannot verify branch protection rules for "${branchName}": ${getErrorMessage(rulesError)}. Push blocked to prevent accidental writes to protected branches.`;
+        }
+      }
     } catch (protectionError) {
       const protectionStatus = protectionError && typeof protectionError === "object" && "status" in protectionError ? protectionError.status : undefined;
       if (protectionStatus === 404) {

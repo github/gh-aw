@@ -589,7 +589,11 @@ When `fallback-as-pull-request` is enabled (default), non-fast-forward push fail
 
 When `ignore-missing-branch-failure: true` is set, push failures caused by a deleted or missing PR branch return `skipped: true` instead of a hard failure. This is useful when the PR branch may have been deleted before the safe-output job runs (for example, on auto-merged PRs). Without this flag, a missing branch is a terminal error.
 
-When `check-branch-protection: false` is set, the branch protection pre-flight check is skipped. By default (`true`), the handler calls `GET /repos/{owner}/{repo}/branches/{branch}` and checks the `protected` flag before pushing. Branches protected by either classic branch protection or a ruleset are rejected, even when the proposed push would satisfy the ruleset (for example, by using a signed commit). Set `check-branch-protection: false` to opt out of this check. The API call requires only `contents: read`; GitHub App tokens do not need Administration permission. If the API returns 403, the check logs a warning and continues (GitHub still enforces protection at push time).
+When `check-branch-protection: false` is set, the branch protection pre-flight check is skipped. By default (`true`), the handler calls `GET /repos/{owner}/{repo}/branches/{branch}` and checks the `protected` flag before pushing. Branches protected by classic branch protection or restrictive rulesets are rejected, even when the proposed push would satisfy the ruleset (for example, by using a signed commit).
+
+The sole exception is a branch whose metadata explicitly disables classic protection, whose complete list of active rules contains only `copilot_code_review`, and whose classic protection endpoint confirms absence with HTTP 404. Automatic Copilot review does not restrict pushes. Rules are read page by page; unknown or mixed rule types, missing metadata, an empty initial response, or any failed rules query leave the push blocked. Branch and rules reads use `contents: read`. Classic-protection confirmation can require Administration read permission; if the existing token cannot confirm absence, the branch remains blocked without requesting broader credentials. No classic-protection lookup is needed for an unprotected branch.
+
+If the initial branch API returns 403, the check logs a warning and continues (GitHub still enforces protection at push time). The default branch is always rejected, regardless of `check-branch-protection`.
 
 ## Protected Files
 
