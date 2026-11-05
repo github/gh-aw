@@ -58,13 +58,11 @@ function stageFiles({ core, root = "/tmp/gh-aw/agent" }) {
   const entries = [];
   function collect(file, relative) {
     const bytes = fs.readFileSync(file);
-    const text = bytes.toString("utf8");
-    const byteText = bytes.toString("latin1");
-    assertNoSecrets(text);
-    assertNoSecrets(byteText);
+    assertNoSecrets(bytes.toString("utf8"));
+    assertNoSecrets(bytes.toString("latin1"));
     const target = path.join(bundle, hash(relative) + ".json");
-    // Latin-1 maps every byte losslessly; UTF-8 also exposes Unicode text to host redaction.
-    fs.writeFileSync(target, JSON.stringify({ data: bytes.toString("base64"), text, byteText }), { mode: 0o600 });
+    // Keep raw bytes under a host-redaction-scanned suffix; the manifest records their original paths.
+    fs.writeFileSync(target, bytes, { mode: 0o600 });
     entries.push({ path: relative, hash: hash(bytes) });
   }
   for (const [index, file] of files.entries()) {
@@ -79,17 +77,17 @@ function stageFiles({ core, root = "/tmp/gh-aw/agent" }) {
     core.info("The engine did not produce durable session files");
     return;
   }
-  fs.writeFileSync(path.join(bundle, "manifest.json"), JSON.stringify({ version: 1, engine, files, entries }) + "\n", { mode: 0o600 });
+  fs.writeFileSync(path.join(bundle, "manifest.json"), JSON.stringify({ version: 2, engine, files, entries }) + "\n", { mode: 0o600 });
   core.setOutput("present", "true");
 }
 
-function readBundle(root, requireByteText = false) {
+function readBundle(root) {
   const config = configuration(root);
   noSymlinks(config.bundle, root);
   const manifestFile = path.join(config.bundle, "manifest.json");
   if (!fs.lstatSync(manifestFile).isFile()) throw new Error("Durable artifact manifest must be a regular file");
   const manifest = JSON.parse(fs.readFileSync(manifestFile, "utf8"));
-  if (manifest.version !== 1 || manifest.engine !== config.engine || !isDeepStrictEqual(manifest.files, config.files) || !Array.isArray(manifest.entries) || !manifest.entries.length) {
+  if (manifest.version !== 2 || manifest.engine !== config.engine || !isDeepStrictEqual(manifest.files, config.files) || !Array.isArray(manifest.entries) || !manifest.entries.length) {
     throw new Error("Durable artifact is incompatible with the engine's declared files");
   }
   const entries = new Map();
@@ -105,20 +103,10 @@ function readBundle(root, requireByteText = false) {
   walk(config.bundle, (file, relative) => {
     if (relative === "manifest.json") return;
     const entry = blobs.get(relative);
-    const record = JSON.parse(fs.readFileSync(file, "utf8"));
-    if (typeof record.data !== "string" || typeof record.text !== "string") throw new Error("Invalid durable artifact encoding");
-    const bytes = Buffer.from(record.data, "base64");
+    const bytes = fs.readFileSync(file);
     assertNoSecrets(bytes.toString("utf8"));
     assertNoSecrets(bytes.toString("latin1"));
-    // Older version-1 bundles can be restored, but new publication requires both projections.
-    if (
-      !entry ||
-      bytes.toString("base64") !== record.data ||
-      bytes.toString("utf8") !== record.text ||
-      (requireByteText && typeof record.byteText !== "string") ||
-      (record.byteText !== undefined && bytes.toString("latin1") !== record.byteText) ||
-      hash(bytes) !== entry.hash
-    ) {
+    if (!entry || hash(bytes) !== entry.hash) {
       throw new Error("Durable artifact was damaged or redacted; refusing continuation or publication");
     }
     entry.bytes = bytes;
@@ -147,7 +135,7 @@ function restoreFiles({ core, root = "/tmp/gh-aw/agent" }) {
 }
 
 function validateFiles({ core, root = "/tmp/gh-aw/agent" }) {
-  readBundle(root, true);
+  readBundle(root);
   core.setOutput("present", "true");
 }
 

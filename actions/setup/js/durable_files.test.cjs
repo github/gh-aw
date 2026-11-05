@@ -34,7 +34,11 @@ describe("engine-declared durable files", () => {
     fs.writeFileSync(path.join(options.sessions, "session.db"), binary);
     stageFiles(options);
     const manifest = JSON.parse(fs.readFileSync(path.join(options.bundle, "manifest.json"), "utf8"));
+    expect(manifest.version).toBe(2);
     expect(manifest.entries.map(entry => entry.path).sort()).toEqual(["0/session.db", "0/session.jsonl"]);
+    for (const entry of manifest.entries) {
+      expect(fs.readFileSync(path.join(options.bundle, createHash("sha256").update(entry.path).digest("hex") + ".json"))).toEqual(fs.readFileSync(path.join(options.sessions, path.basename(entry.path))));
+    }
     validateFiles(options);
     fs.rmSync(options.sessions, { recursive: true });
     restoreFiles(options);
@@ -71,50 +75,70 @@ describe("engine-declared durable files", () => {
     const options = fixture();
     stageFiles(options);
     const file = path.join(options.bundle, createHash("sha256").update("0/session.jsonl").digest("hex") + ".json");
-    const record = JSON.parse(fs.readFileSync(file, "utf8"));
-    record.text = "***";
-    fs.writeFileSync(file, JSON.stringify(record));
+    expect(processFile(file, ["Continue this task"])).toBeGreaterThan(0);
     expect(() => validateFiles(options)).toThrow("damaged or redacted");
     options.core.setOutput.mockClear();
     expect(() => restoreFiles(options)).toThrow("damaged or redacted");
     expect(options.core.setOutput).not.toHaveBeenCalled();
   });
 
-  it("exposes every byte of binary state to host redaction and refuses the redacted bundle", () => {
+  it.each(["modified", "missing", "extra"])("rejects %s raw files before restoring any state", change => {
+    const options = fixture();
+    stageFiles(options);
+    const file = path.join(options.bundle, createHash("sha256").update("0/session.jsonl").digest("hex") + ".json");
+    if (change === "modified") fs.appendFileSync(file, "\nchanged");
+    else if (change === "missing") fs.unlinkSync(file);
+    else fs.writeFileSync(path.join(options.bundle, "unexpected.json"), "extra state");
+    fs.rmSync(options.sessions, { recursive: true });
+    options.core.setOutput.mockClear();
+    expect(() => validateFiles(options)).toThrow();
+    expect(() => restoreFiles(options)).toThrow();
+    expect(fs.existsSync(options.sessions)).toBe(false);
+    expect(options.core.setOutput).not.toHaveBeenCalled();
+  });
+
+  it("keeps binary state unencoded and refuses the bundle after lossless host redaction", () => {
     const options = fixture();
     const secret = "caf\u00e9-runtime-credential";
     const binary = Buffer.concat([Buffer.from([0xff, 0]), Buffer.from(secret, "latin1"), Buffer.from([0, 0xfe])]);
     fs.writeFileSync(path.join(options.sessions, "session.db"), binary);
     stageFiles(options);
     const file = path.join(options.bundle, createHash("sha256").update("0/session.db").digest("hex") + ".json");
-    const record = JSON.parse(fs.readFileSync(file, "utf8"));
-    expect(record.text).not.toContain(secret);
-    expect(record.byteText).toContain(secret);
-    expect(Buffer.from(record.byteText, "latin1")).toEqual(binary);
+    expect(fs.readFileSync(file)).toEqual(binary);
     expect(processFile(file, [], [secret])).toBeGreaterThan(0);
+    expect(fs.existsSync(file)).toBe(false);
     options.core.setOutput.mockClear();
-    expect(() => validateFiles(options)).toThrow("damaged or redacted");
+    expect(() => validateFiles(options)).toThrow("missing declared session files");
     fs.rmSync(options.sessions, { recursive: true });
-    expect(() => restoreFiles(options)).toThrow("damaged or redacted");
+    expect(() => restoreFiles(options)).toThrow("missing declared session files");
     expect(fs.existsSync(options.sessions)).toBe(false);
     expect(options.core.setOutput).not.toHaveBeenCalled();
   });
 
-  it.each(["session.jsonl", "session.db"])("requires the lossless projection for publication while restoring legacy %s", name => {
+  it("rejects legacy encoded bundles instead of interpreting them as raw session files", () => {
     const options = fixture();
-    const original = name === "session.db" ? Buffer.from([0, 1, 255, 0, 2]) : fs.readFileSync(path.join(options.sessions, name));
-    fs.writeFileSync(path.join(options.sessions, name), original);
     stageFiles(options);
-    const file = path.join(options.bundle, createHash("sha256").update(`0/${name}`).digest("hex") + ".json");
-    const record = JSON.parse(fs.readFileSync(file, "utf8"));
-    delete record.byteText;
-    fs.writeFileSync(file, JSON.stringify(record));
+    const file = path.join(options.bundle, "manifest.json");
+    const manifest = JSON.parse(fs.readFileSync(file, "utf8"));
+    manifest.version = 1;
+    fs.writeFileSync(file, JSON.stringify(manifest));
     options.core.setOutput.mockClear();
-    expect(() => validateFiles(options)).toThrow("damaged or redacted");
+    expect(() => validateFiles(options)).toThrow("incompatible");
     expect(options.core.setOutput).not.toHaveBeenCalled();
     fs.rmSync(options.sessions, { recursive: true });
-    restoreFiles(options);
-    expect(fs.readFileSync(path.join(options.sessions, name))).toEqual(original);
+    expect(() => restoreFiles(options)).toThrow("incompatible");
+    expect(fs.existsSync(options.sessions)).toBe(false);
+  });
+
+  it("leaves unredacted binary bytes unchanged during host redaction", () => {
+    const options = fixture();
+    const binary = Buffer.from(Array.from({ length: 256 }, (_, index) => index));
+    fs.writeFileSync(path.join(options.sessions, "session.db"), binary);
+    stageFiles(options);
+    const file = path.join(options.bundle, createHash("sha256").update("0/session.db").digest("hex") + ".json");
+    expect(processFile(file, [])).toBe(0);
+    expect(fs.readFileSync(file)).toEqual(binary);
+    validateFiles(options);
   });
 
   it("rejects a checkpoint made for a different engine or different file declarations", () => {
@@ -170,7 +194,7 @@ describe("engine-declared durable files", () => {
     const file = path.join(options.bundle, createHash("sha256").update("0/session.db").digest("hex") + ".json");
     expect(processFile(file, [])).toBeGreaterThan(0);
     options.core.setOutput.mockClear();
-    expect(() => validateFiles(options)).toThrow("damaged or redacted");
+    expect(() => validateFiles(options)).toThrow("missing declared session files");
     expect(options.core.setOutput).not.toHaveBeenCalled();
   });
 
