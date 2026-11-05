@@ -35,7 +35,7 @@ func checkCustomJobDetection(ctx context.Context, input Input) ([]Diagnostic, er
 	if err != nil {
 		return nil, err
 	}
-	allowedOutputJobs := customJobDetectionAllowedOutputs(input, graph)
+	allowedOutputJobs, preAgentOutputJobs := customJobDetectionAllowedOutputs(input, jobs, graph)
 	var diagnostics []Diagnostic
 	for _, id := range sliceutil.SortedKeys(jobs) {
 		if err := ctx.Err(); err != nil {
@@ -70,7 +70,7 @@ func checkCustomJobDetection(ctx context.Context, input Input) ([]Diagnostic, er
 		}
 		statusOnly := aw.IsStatusOnlyJob(fields)
 		if statusOnly {
-			diagnostics = append(diagnostics, customJobDetectionStatusOnlyDiagnostics(id, fields, jobs, graph, allowedOutputJobs)...)
+			diagnostics = append(diagnostics, customJobDetectionStatusOnlyDiagnostics(id, fields, jobs, graph, allowedOutputJobs, preAgentOutputJobs)...)
 		}
 		found, err := customJobDetectionDiagnostics(ctx, fields, "jobs."+id, statusOnly)
 		diagnostics = append(diagnostics, found...)
@@ -81,7 +81,7 @@ func checkCustomJobDetection(ctx context.Context, input Input) ([]Diagnostic, er
 	return diagnostics, nil
 }
 
-func customJobDetectionStatusOnlyDiagnostics(id string, fields map[string]any, jobs map[string]any, graph aw.JobDependencyGraph, allowedOutputJobs map[string]struct{}) []Diagnostic {
+func customJobDetectionStatusOnlyDiagnostics(id string, fields map[string]any, jobs map[string]any, graph aw.JobDependencyGraph, allowedOutputJobs, preAgentOutputJobs map[string]struct{}) []Diagnostic {
 	var diagnostics []Diagnostic
 	for _, dependent := range sliceutil.SortedKeys(jobs) {
 		if dependent != id && !constants.IsCompilerOwnedJobName(dependent) && graph.DependsOn(dependent, id) {
@@ -92,7 +92,7 @@ func customJobDetectionStatusOnlyDiagnostics(id string, fields map[string]any, j
 			break
 		}
 	}
-	for _, violation := range aw.ValidateStatusOnlyJob(id, fields, allowedOutputJobs) {
+	for _, violation := range aw.ValidateStatusOnlyJob(id, fields, allowedOutputJobs, preAgentOutputJobs, graph[id]) {
 		diagnostics = append(diagnostics, Diagnostic{
 			Path:    violation.Path,
 			Message: violation.Message,
@@ -101,11 +101,20 @@ func customJobDetectionStatusOnlyDiagnostics(id string, fields map[string]any, j
 	return diagnostics
 }
 
-func customJobDetectionAllowedOutputs(input Input, graph aw.JobDependencyGraph) map[string]struct{} {
+func customJobDetectionAllowedOutputs(input Input, jobs map[string]any, graph aw.JobDependencyGraph) (map[string]struct{}, map[string]struct{}) {
 	allowed := make(map[string]struct{})
+	preAgent := make(map[string]struct{})
 	if input.Workflow == nil {
+		// AW-only lint infers compiler ordering from the authored dependencies.
+		agent, detection := string(constants.AgentJobName), string(constants.DetectionJobName)
+		for id := range jobs {
+			if !constants.IsCompilerOwnedJobName(id) && !graph.DependsOn(id, agent) && !graph.DependsOn(id, detection) {
+				allowed[id] = struct{}{}
+				preAgent[id] = struct{}{}
+			}
+		}
 		allowed[string(constants.SafeOutputsJobName)] = struct{}{}
-		return allowed
+		return allowed, preAgent
 	}
 	for _, job := range input.Workflow.Jobs {
 		id := string(job.ID)
@@ -117,13 +126,17 @@ func customJobDetectionAllowedOutputs(input Input, graph aw.JobDependencyGraph) 
 				continue
 			}
 		}
-		if constants.IsCompilerOwnedJobName(id) &&
+		_, authored := jobs[id]
+		if (input.Document != nil || input.AuthoredJobs != nil) && authored && graph.IsPreAgentCustomJob(id) {
+			allowed[id] = struct{}{}
+			preAgent[id] = struct{}{}
+		} else if constants.IsCompilerOwnedJobName(id) &&
 			graph.DependsOn(id, string(constants.DetectionJobName)) &&
 			aw.HasSuccessfulDetectionCondition(condition) {
 			allowed[id] = struct{}{}
 		}
 	}
-	return allowed
+	return allowed, preAgent
 }
 
 func customJobDetectionJobs(ctx context.Context, input Input) (map[string]any, aw.JobDependencyGraph, error) {
@@ -149,8 +162,8 @@ func customJobDetectionJobs(ctx context.Context, input Input) (map[string]any, a
 func customJobDetectionActions(input Input) (map[string]any, aw.JobDependencyGraph, error) {
 	jobs := make(map[string]any)
 	graph := make(aw.JobDependencyGraph)
-	var authored map[string]any
-	if input.Document != nil {
+	authored := input.AuthoredJobs
+	if authored == nil && input.Document != nil {
 		var err error
 		authored, err = policyMapping(input.Document.Frontmatter["jobs"], "jobs")
 		if err != nil {
@@ -165,14 +178,14 @@ func customJobDetectionActions(input Input) (map[string]any, aw.JobDependencyGra
 			needs = append(needs, string(dependency))
 			graph[id] = append(graph[id], string(dependency))
 		}
-		// With a companion source, only authored top-level jobs are custom.
-		if input.Document != nil {
+		// When provenance is available, only authored jobs are custom.
+		if authored != nil {
 			if _, exists := authored[id]; !exists {
 				continue
 			}
 		}
 		fields := make(map[string]any, len(job.Needs)+1)
-		if input.Document != nil {
+		if authored != nil {
 			if sourceFields, ok := authored[id].(map[string]any); ok {
 				maps.Copy(fields, sourceFields)
 			}

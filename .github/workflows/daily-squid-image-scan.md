@@ -30,6 +30,7 @@ safe-outputs:
     assignees: [pelikhan]
     max: 25
     deduplicate-by-title: true
+    deduplicate-by-labels: [cookie, security]
   update-issue:
     target: "*"
     required-title-prefix: "[container-image-scan] "
