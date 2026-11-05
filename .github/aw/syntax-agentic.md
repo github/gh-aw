@@ -54,7 +54,6 @@ description: Agentic workflow specific frontmatter fields for GitHub Agentic Wor
 - **`features:`** - Feature flags for experimental or optional features (object)
   - Each flag is a key-value pair; boolean flags (`true`/`false`) or string values are accepted
   - Known feature flags:
-    - `copilot-requests: true` - **Deprecated**; use `permissions: { copilot-requests: write }`. `gh aw fix` migrates it.
     - `disable-xpia-prompt: true` - Disable the built-in cross-prompt injection attack (XPIA) system prompt
     - `action-tag: "v0"` - Pin compiled action references to a specific version of the `gh-aw-actions` repository. Accepts version tags (e.g., `"v0"`, `"v1"`, `"v1.0.0"`) or a full 40-character commit SHA. When set, overrides the compiler's default action mode and resolves all action references from the external `github/gh-aw-actions` repository at the specified tag.
     - `action-mode: "script"` - Control how the compiler generates action references: `"dev"` (local paths, default), `"release"` (SHA-pinned remote), `"action"` (gh-aw-actions repo), `"script"` (direct shell calls). Can also be overridden via `--action-mode` CLI flag.

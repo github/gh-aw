@@ -207,7 +207,7 @@ describe("push_to_pull_request_branch.cjs", () => {
           get: vi.fn().mockResolvedValue({
             data: { default_branch: "main" },
           }),
-          getBranchProtection: vi.fn().mockRejectedValue(Object.assign(new Error("Branch not protected"), { status: 404 })),
+          getBranch: vi.fn().mockResolvedValue({ data: { protected: false } }),
         },
         issues: {
           create: vi.fn().mockResolvedValue({
@@ -976,8 +976,8 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
     });
 
     it("should block push to a branch with protection rules", async () => {
-      // Branch has protection rules - getBranchProtection resolves successfully
-      mockGithub.rest.repos.getBranchProtection.mockResolvedValue({ data: {} });
+      // Branch has protection rules
+      mockGithub.rest.repos.getBranch.mockResolvedValue({ data: { protected: true } });
 
       const patchPath = createPatchFile("should-block-push-to-a-branch-with-protection-rules");
       const module = await loadModule();
@@ -992,7 +992,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
     });
 
     it("should allow push when branch is not default and has no protection rules", async () => {
-      // Default mock: repos.get returns "main", getBranchProtection returns 404
+      // Default mock: repos.get returns "main", getBranch returns protected: false
       // PR head is "feature-branch" (not the default)
       const patchPath = createPatchFile("should-allow-push-when-branch-is-not-default-and-has-no-prot");
       mockExec.getExecOutput.mockResolvedValue({ exitCode: 0, stdout: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n", stderr: "" });
@@ -1020,10 +1020,10 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
       expect(result.success).toBe(true);
     });
 
-    it("should warn and continue when getBranchProtection returns 403 (permission denied)", async () => {
-      // getBranchProtection returns 403 (no permission to read protection)
+    it("should warn and continue when getBranch returns 403 (permission denied)", async () => {
+      // getBranch returns 403 (no permission to read the branch)
       // Platform will still enforce protection at push time, so we warn and allow
-      mockGithub.rest.repos.getBranchProtection.mockRejectedValue(Object.assign(new Error("Forbidden"), { status: 403 }));
+      mockGithub.rest.repos.getBranch.mockRejectedValue(Object.assign(new Error("Forbidden"), { status: 403 }));
       const patchPath = createPatchFile("should-warn-and-continue-when-getbranchprotection-returns-40");
       mockExec.getExecOutput.mockResolvedValue({ exitCode: 0, stdout: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n", stderr: "" });
 
@@ -1036,9 +1036,9 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
       expect(result.success).toBe(true);
     });
 
-    it("should block push when getBranchProtection returns an unexpected error (fail closed)", async () => {
-      // getBranchProtection returns 500 - unexpected error, fail closed for security
-      mockGithub.rest.repos.getBranchProtection.mockRejectedValue(Object.assign(new Error("Internal Server Error"), { status: 500 }));
+    it("should block push when getBranch returns an unexpected error (fail closed)", async () => {
+      // getBranch returns 500 - unexpected error, fail closed for security
+      mockGithub.rest.repos.getBranch.mockRejectedValue(Object.assign(new Error("Internal Server Error"), { status: 500 }));
       const patchPath = createPatchFile("should-block-push-when-getbranchprotection-returns-an-unexpe");
 
       const module = await loadModule();
@@ -4383,7 +4383,7 @@ ${diffs}
         },
       });
       mockGithub.rest.repos.get = vi.fn().mockResolvedValue({ data: { default_branch: "main" } });
-      mockGithub.rest.repos.getBranchProtection = vi.fn().mockRejectedValue(Object.assign(new Error("not protected"), { status: 404 }));
+      mockGithub.rest.repos.getBranch = vi.fn().mockResolvedValue({ data: { protected: false } });
 
       mockExec.getExecOutput.mockResolvedValue({ exitCode: 0, stdout: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n", stderr: "" });
 

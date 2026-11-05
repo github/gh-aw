@@ -108,6 +108,15 @@ test("conflicting or behind branches require an intervening comment before anoth
   }
 });
 
+function stripHtmlComments(text) {
+  let previous;
+  do {
+    previous = text;
+    text = text.replace(/<!--[\s\S]*?--!?>/g, "");
+  } while (text !== previous);
+  return text.replace(/<!--/g, "");
+}
+
 test("visible fingerprint survives HTML marker removal and arbitrary comment order", () => {
   const first = classify(failingPr, detail(), [], [], now);
   const reply = {
@@ -126,7 +135,7 @@ test("visible fingerprint survives HTML marker removal and arbitrary comment ord
 
 test("assignment state comments deduplicate without mentioning Copilot", () => {
   const first = classify(failingPr, detail(), [], [], now);
-  const body = formatNudge(first).replace(/<!--[\s\S]*?--!?>/g, "");
+  const body = stripHtmlComments(formatNudge(first));
   assert.doesNotMatch(body, /@copilot|assign.to.agent/i);
   assert.equal(classify(failingPr, detail(), [{ ...nudge(first.state_fingerprint), body }], [], now).skip_reason, "unchanged");
   assert.equal(classify(failingPr, detail(), [{ ...nudge(first.state_fingerprint), body, user: { login: "outsider" } }], [], now).skip_reason, undefined);
@@ -134,7 +143,7 @@ test("assignment state comments deduplicate without mentioning Copilot", () => {
 
 test("started coding agents can record assignment markers without member association", () => {
   const first = classify(failingPr, detail(), [], [], now);
-  const body = formatNudge(first).replace(/<!--[\s\S]*?--!?>/g, "");
+  const body = stripHtmlComments(formatNudge(first));
   for (const login of ["Copilot", "github-copilot[bot]", "copilot-swe-agent[bot]"]) {
     const comment = { ...nudge(first.state_fingerprint), body, user: { login }, author_association: "CONTRIBUTOR" };
     assert.equal(classify(failingPr, detail(), [comment], [], now).skip_reason, "unchanged");
