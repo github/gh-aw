@@ -53,7 +53,7 @@ trap 'rm -f "$OUTPUT"; rm -rf "$FIXTURE_ROOT"' EXIT
     fi
 )
 
-# Exercise REQ-002 with a type whose required sections sit past a fixed line window, then with an incomplete type.
+# Exercise REQ-002 with a long type and an incomplete type followed by a complete sibling.
 (
     cd "$FIXTURE_ROOT"
     spec="docs/src/content/docs/specs/safe-outputs-specification.md"
@@ -74,7 +74,11 @@ trap 'rm -f "$OUTPUT"; rm -rf "$FIXTURE_ROOT"' EXIT
         exit 1
     fi
 
-    printf '\n#### Type: short_type\n\n**MCP Tool Schema**:\n**Operational Semantics**:\n\n### Next Section\n' >>"$spec"
+    {
+        printf '\n#### Type: short_type\n\n**MCP Tool Schema**:\n**Operational Semantics**:\n'
+        printf '\n#### Type: short_type_sibling\n\n**MCP Tool Schema**:\n**Operational Semantics**:\n'
+        printf '**Configuration Parameters**:\n**Security Requirements**:\n**Required Permissions**:\n\n### Next Section\n'
+    } >>"$spec"
     check_type_completeness >"$OUTPUT"
     if ! grep -q "^MEDIUM: REQ-002: Type 'short_type' has only 2/5 required sections" "$OUTPUT" || grep -q '^PASS:' "$OUTPUT"; then
         echo "FAIL: REQ-002 must report incomplete types and must not pass"

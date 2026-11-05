@@ -310,7 +310,7 @@ check_type_completeness() {
 
         # Bound each type at the next heading. A fixed line window truncates long types and also matches
         # sibling types that share the name prefix, such as create_pull_request_review_comment.
-        type_section=$(awk -v name="$type_name" '$0 == "#### Type: " name {found=1; next} found && /^###? / {exit} found' "$spec_file")
+        type_section=$(awk -v name="$type_name" '$0 == "#### Type: " name {found=1; next} found && (/^###? / || /^#### Type: /) {exit} found' "$spec_file")
 
         # Check for required sections
         for section in "MCP Tool Schema" "Operational Semantics" "Configuration Parameters" "Security Requirements" "Required Permissions"; do
