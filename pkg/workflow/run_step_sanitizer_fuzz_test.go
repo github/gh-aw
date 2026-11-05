@@ -118,7 +118,7 @@ func FuzzSanitizeRunStepExpressions(f *testing.F) {
 		}
 
 		// Quoted bodies remain literal; expanding bodies must be sanitized.
-		sanitizedScan := executableShellContent(sanitizedRun)
+		sanitizedScan := shellExpansionContent(sanitizedRun)
 		if strings.Contains(sanitizedScan, "${{") {
 			if len(ExpressionPattern.FindAllString(sanitizedScan, -1)) > 0 {
 				t.Errorf("executable portion of sanitized run field still contains a complete expression: %q", sanitizedRun)

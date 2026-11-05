@@ -1240,7 +1240,9 @@ git checkout --orphan my-custom-branch && git rm -rf . && git commit --allow-emp
 ### Azure DevOps Work Items
 
 Azure DevOps mutations use independently selected `azure-devops-*` capabilities
-from the embedded Markdown connector, not built-in `ado-*` handlers. See
+from an imported Markdown connector, not built-in `ado-*` handlers. Work-item
+resource bindings use exact numeric strings; the removed native `target` option
+and expression-based target coercion are not connector configuration. See
 [Connectors](/gh-aw/reference/connectors/#azure-devops) for configuration,
 credential boundaries, and migration limitations.
 

@@ -59,6 +59,17 @@ Debug workflow using script mode for custom actions.
 
 **Note:** The `action-mode` can also be overridden via the CLI flag `--action-mode` or the environment variable `GH_AW_ACTION_MODE`. The precedence is: CLI flag > feature flag > environment variable > auto-detection.
 
+## Unrestricted `pull_request_target` Forks
+
+Strict mode rejects `on.pull_request_target.forks: ["*"]` because it admits every fork. To explicitly permit this in strict mode, set the flag in the main workflow's top-level frontmatter (an imported feature does not enable the opt-in):
+
+```yaml wrap
+features:
+  dangerously-allow-pull-request-target-forks-all: true
+```
+
+The compiler still warns when unrestricted admission is enabled, including when this feature is set, `acknowledge-risk: true` is used, or checkout is disabled. Fork filtering does not make PR content trustworthy; event-actor authorization and checkout restrictions remain separate controls.
+
 ## Copilot BYOK Mode (Default for `engine: copilot`)
 
 Copilot offline Bring Your Own Key (BYOK) behavior is now the default for `engine: copilot`, bundling four behaviors:
