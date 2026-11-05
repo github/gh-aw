@@ -34,7 +34,7 @@ describe("local work queue stress CI", () => {
   it("uses read-only checkout, pinned actions, bounded execution and failure diagnostics", () => {
     expect(workflow.permissions).toEqual({ contents: "read" });
     expect(workflow.defaults.run.shell).toBe("bash");
-    expect(workflow.jobs.stress["timeout-minutes"]).toBe(20);
+    expect(workflow.jobs.stress["timeout-minutes"]).toBe(30);
     const steps = workflow.jobs.stress.steps;
     const checkout = steps.find(step => step.uses?.startsWith("actions/checkout@"));
     expect(checkout.with["persist-credentials"]).toBe(false);
@@ -55,7 +55,7 @@ describe("local work queue stress CI", () => {
       LIFECYCLE_ITEMS: "${{ github.event_name == 'pull_request' && '16' || '1024' }}",
     });
     const commands = workflow.jobs.stress.steps.filter(step => step.run).map(step => step.run);
-    expect(commands.some(command => command.includes('--mode history --items "$HISTORY_ITEMS" --workers 2') && command.includes("--timeout-seconds 300"))).toBe(true);
+    expect(commands.some(command => command.includes('--mode history --items "$HISTORY_ITEMS" --workers 2') && command.includes("--timeout-seconds 600"))).toBe(true);
     expect(commands.some(command => command.includes('--items "$LIFECYCLE_ITEMS" --workers 4 --queue-items 64') && command.includes("--timeout-seconds 600"))).toBe(true);
     expect(commands.some(command => command.includes("--mode saturation --items 100000 --workers 4") && command.includes("--timeout-seconds 60"))).toBe(true);
     const invariants = workflow.jobs.stress.steps.find(step => step.id === "invariants");
