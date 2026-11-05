@@ -205,16 +205,17 @@ describe("awf_model_routing.cjs", () => {
   });
 
   it("codex_routing_effort_contract_requires_pin_review", () => {
-    // Reviewed pair: Codex 0.165.0 accepts all seven routing-contract efforts unchanged
-    // (openai/codex rust-v0.165.0 codex-rs/protocol/src/openai_models.rs). Both values are
-    // hard-coded on purpose; a pin bump must re-review the Codex entry in mapAWFRoutingEffort.
-    const reviewedCodexVersion = "0.165.0";
+    // Reviewed pair: Codex 0.166.0 preserves all seven AWF routing-contract efforts unchanged
+    // (openai/codex rust-v0.166.0 codex-rs/protocol/src/openai_models.rs). Its additional parser
+    // values remain outside this contract. Both values are hard-coded on purpose; a pin bump must
+    // re-review the Codex entry in mapAWFRoutingEffort.
+    const reviewedCodexVersion = "0.166.0";
     const reviewedCodexEfforts = ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
     const versionConstants = fs.readFileSync(new URL("../../../pkg/constants/version_constants.go", import.meta.url), "utf8");
     const pinned = versionConstants.match(/^const DefaultCodexVersion Version = "([^"]+)"/m)?.[1];
     expect(
       pinned,
-      `Review required: DefaultCodexVersion is ${pinned}, but the Codex routing effort list in mapAWFRoutingEffort was reviewed for ${reviewedCodexVersion}. Check the new Codex ReasoningEffort parser, then update the list and this test together.`
+      `Review required: DefaultCodexVersion is ${pinned}, but the Codex routing effort list in mapAWFRoutingEffort was reviewed for ${reviewedCodexVersion}. Check the Codex ReasoningEffort parser, then update the list and this test together.`
     ).toBe(reviewedCodexVersion);
     expect(reviewedCodexEfforts.filter(effort => mapAWFRoutingEffort("codex", effort).error === null)).toEqual(reviewedCodexEfforts);
     for (const effort of reviewedCodexEfforts) expect(mapAWFRoutingEffort("codex", effort)).toEqual({ effort, error: null });
