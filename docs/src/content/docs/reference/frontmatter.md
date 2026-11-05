@@ -611,7 +611,7 @@ Specifies the environment for deployment protection rules and environment-specif
 environment: production
 ```
 
-The activation job inherits this environment, including its deployment protection rules. If [`on.manual-approval`](/gh-aw/reference/triggers/#manual-approval-gates-manual-approval) is configured, its environment takes precedence for the activation job.
+The activation job inherits this environment, including its deployment protection rules. If [`on.manual-approval`](/gh-aw/reference/triggers/#manual-approval-gates-manual-approval) is configured, its environment name takes precedence for the activation job; settings such as `deployment` and `url` from an object environment are retained.
 
 The object form accepts `name`, optional `url`, and optional `deployment` (a boolean or GitHub Actions expression, such as `${{ github.ref_name == 'main' }}`). For environments that only gate secrets, set `deployment: false` to retain environment secrets and protection rules—including branch policies, required reviewers, and wait timers—without creating deployment records:
 
