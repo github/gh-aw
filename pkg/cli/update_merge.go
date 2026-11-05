@@ -245,6 +245,9 @@ func replaceTopLevelFrontmatterField(content, field string, value any, exists bo
 			end = line - parsed.FrontmatterStart
 		}
 	}
+	if found && (start < 0 || start >= end || end > len(parsed.FrontmatterLines)) {
+		return "", fmt.Errorf("invalid frontmatter field range for %q", field)
+	}
 
 	var replacement []string
 	if exists {
@@ -265,9 +268,6 @@ func replaceTopLevelFrontmatterField(content, field string, value any, exists bo
 		}
 		frontmatter = append(frontmatter, replacement...)
 	} else {
-		if start < 0 || start >= end || end > len(frontmatter) {
-			return "", fmt.Errorf("invalid frontmatter field range for %q", field)
-		}
 		for end > start+1 {
 			line := strings.TrimSpace(frontmatter[end-1])
 			if line != "" && !strings.HasPrefix(line, "#") {
