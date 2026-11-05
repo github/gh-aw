@@ -31,16 +31,21 @@ func TestCompileDurableBuiltinEngines(t *testing.T) {
 				lock, err := os.ReadFile(filepath.Join(dir, "continuable.lock.yml"))
 				require.NoError(t, err)
 				text := string(lock)
-				for _, expected := range []string{"Restore durable session files", "Stage durable session files", "Upload durable checkpoint artifact", "GH_AW_DURABLE_RESUMED", "TRACEPARENT:", "unified_session", "GH_AW_DURABLE_ENGINE:"} {
+				for _, expected := range []string{"Restore durable workflow state", "Stage durable session files", "Upload durable checkpoint artifact", "GH_AW_DURABLE_RESUMED", "TRACEPARENT:", "unified_session", "GH_AW_DURABLE_ENGINE:"} {
 					require.Contains(t, text, expected)
 				}
+				require.Equal(t, 1, strings.Count(text, "- name: Restore durable workflow state"))
+				require.NotContains(t, text, "Select durable checkpoint artifact")
+				require.NotContains(t, text, "Restore durable checkpoint artifact")
+				require.NotContains(t, text, "restore_durable_files")
+				require.NotContains(t, text, "Prepare durable continuation prompt")
+				require.Contains(t, text, "steps.durable_checkpoint.outputs.restored")
 				if engine == "pi" {
 					require.Contains(t, text, "pi_durable_driver.cjs")
 					require.Contains(t, text, "@earendil-works/pi-durable@1.4.0")
 				} else {
 					require.Contains(t, text, durableSessionDirectory(engine))
-					require.Contains(t, text, "Prepare durable continuation prompt")
-					require.Contains(t, text, "durable_session.cjs")
+					require.Contains(t, text, "durable_artifact.cjs")
 					require.NotContains(t, text, "gemini_durable_harness.cjs")
 					require.NotContains(t, text, "Install Pi durable")
 				}

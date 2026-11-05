@@ -6,6 +6,35 @@ const path = require("node:path");
 const { createHash } = require("node:crypto");
 const { assertNoSecrets, SOURCE, VERSION } = require("./pi_durable_checkpoint.cjs");
 const { readInboundAwContext } = require("./aw_context.cjs");
+const { DefaultArtifactClient } = require("./artifact_client.cjs");
+const { restoreFiles } = require("./durable_files.cjs");
+const { preparePrompt } = require("./durable_session.cjs");
+
+/** Select and restore a checkpoint before exposing continuation to the engine. */
+async function restoreCheckpoint({ github, context, core, token, artifactClient = new DefaultArtifactClient(), root = "/tmp/gh-aw/agent", promptFile }) {
+  const outputs = new Map();
+  await selectCheckpoint({
+    github,
+    context,
+    core: {
+      ...core,
+      setOutput(name, value) {
+        outputs.set(name, value);
+        core.setOutput(name, value);
+      },
+    },
+  });
+  if (!outputs.has("artifact-id")) return;
+  await artifactClient.downloadArtifact(Number(outputs.get("artifact-id")), {
+    path: path.join(root, "durable/bundle"),
+    findBy: { token, repositoryOwner: context.repo.owner, repositoryName: context.repo.repo },
+  });
+  restoreFiles({ core: { ...core, setOutput() {} }, root });
+  if (["copilot", "claude", "codex", "gemini", "agy"].includes(process.env.GH_AW_DURABLE_ENGINE || "")) {
+    preparePrompt({ env: { ...process.env, GH_AW_DURABLE_RESUMED: "true" }, promptFile });
+  }
+  core.setOutput("restored", "true");
+}
 
 /**
  * Explicit aw_context lineage wins over the latest successful same-branch run.
@@ -121,4 +150,4 @@ function validateCheckpoint({ core }) {
   core.setOutput("present", "true");
 }
 
-module.exports = { selectCheckpoint, validateCheckpoint };
+module.exports = { selectCheckpoint, restoreCheckpoint, validateCheckpoint };

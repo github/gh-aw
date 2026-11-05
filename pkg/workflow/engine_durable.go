@@ -133,7 +133,7 @@ func durableExecutionEnv(data *WorkflowData) (map[string]string, error) {
 		"GH_AW_DURABLE_STORAGE":       "artifact",
 		"GH_AW_DURABLE_DIR":           durableStateDirectory,
 		"GH_AW_DURABLE_CHECKPOINT":    path.Join(durableStateDirectory, durableCheckpointName(data)),
-		"GH_AW_DURABLE_RESUMED":       "${{ steps.restore_durable_files.outputs.restored == 'true' && 'true' || 'false' }}",
+		"GH_AW_DURABLE_RESUMED":       "${{ steps.durable_checkpoint.outputs.restored == 'true' && 'true' || 'false' }}",
 		"GH_AW_DURABLE_PARENT_RUN_ID": "${{ steps.durable_checkpoint.outputs.parent-run-id }}",
 	}, nil
 }

@@ -3,13 +3,18 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 const fs = require("node:fs");
+const path = require("node:path");
+const os = require("node:os");
 const { createHash } = require("node:crypto");
-const { selectCheckpoint, validateCheckpoint } = require("./durable_artifact.cjs");
+const { selectCheckpoint, restoreCheckpoint, validateCheckpoint } = require("./durable_artifact.cjs");
+const { stageFiles } = require("./durable_files.cjs");
 const { SOURCE, VERSION } = require("./pi_durable_checkpoint.cjs");
+const directories = [];
 
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
+  for (const directory of directories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
 });
 
 function fixture() {
@@ -142,6 +147,84 @@ describe("durable artifact lineage", () => {
     await expect(selectCheckpoint(options)).rejects.toThrow("fork workflow runs");
     expect(options.github.rest.actions.listWorkflowRuns).not.toHaveBeenCalled();
     expect(options.github.paginate).not.toHaveBeenCalled();
+  });
+});
+
+describe("single-step durable restoration", () => {
+  function restoreFixture(engine = "gemini") {
+    const options = fixture();
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "durable-restore-test-"));
+    directories.push(root);
+    const session = path.join(root, "sessions/state.jsonl");
+    fs.mkdirSync(path.dirname(session), { recursive: true });
+    fs.writeFileSync(session, "previous task state");
+    vi.stubEnv("GH_AW_DURABLE_ENGINE", engine);
+    vi.stubEnv("GH_AW_DURABLE_FILES", JSON.stringify([session]));
+    stageFiles({ root, core: { info() {}, setOutput() {} } });
+    const saved = path.join(root, "saved");
+    fs.cpSync(path.join(root, "durable/bundle"), saved, { recursive: true });
+    fs.rmSync(path.join(root, "durable/bundle"), { recursive: true });
+    fs.unlinkSync(session);
+    const promptFile = path.join(root, "prompt.txt");
+    fs.writeFileSync(promptFile, "Current task");
+    const artifactClient = {
+      downloadArtifact: vi.fn(async (_id, { path: destination }) => fs.cpSync(saved, destination, { recursive: true })),
+    };
+    return { ...options, root, session, promptFile, saved, artifactClient, token: "test-download-token" };
+  }
+
+  it("starts fresh without a download, file restore, or prompt rewrite", async () => {
+    const options = restoreFixture();
+    options.github.rest.actions.listWorkflowRuns.mockResolvedValue({ data: { workflow_runs: [] } });
+    await restoreCheckpoint(options);
+    expect(options.artifactClient.downloadArtifact).not.toHaveBeenCalled();
+    expect(fs.existsSync(options.session)).toBe(false);
+    expect(fs.readFileSync(options.promptFile, "utf8")).toBe("Current task");
+    expect(options.core.setOutput).not.toHaveBeenCalledWith("restored", "true");
+  });
+
+  it.each(["copilot", "claude", "codex", "gemini", "agy", "pi", "imported-engine"])("downloads and validates %s state before enabling continuation", async engine => {
+    const options = restoreFixture(engine);
+    await restoreCheckpoint(options);
+    expect(options.artifactClient.downloadArtifact).toHaveBeenCalledWith(999, {
+      path: path.join(options.root, "durable/bundle"),
+      findBy: { token: options.token, repositoryOwner: "owner", repositoryName: "repo" },
+    });
+    expect(fs.readFileSync(options.session, "utf8")).toBe("previous task state");
+    expect(options.core.setOutput).toHaveBeenCalledWith("parent-run-id", "100");
+    expect(options.core.setOutput).toHaveBeenLastCalledWith("restored", "true");
+    const prompt = fs.readFileSync(options.promptFile, "utf8");
+    if (engine === "pi" || engine === "imported-engine") expect(prompt).toBe("Current task");
+    else {
+      expect(prompt).toContain("untrusted historical data");
+      expect(prompt.endsWith("Current task")).toBe(true);
+    }
+  });
+
+  it("fails without restoring files or enabling continuation when download authorization fails", async () => {
+    const options = restoreFixture();
+    options.artifactClient.downloadArtifact.mockRejectedValue(new Error("403 forbidden"));
+    await expect(restoreCheckpoint(options)).rejects.toThrow("403 forbidden");
+    expect(fs.existsSync(options.session)).toBe(false);
+    expect(fs.readFileSync(options.promptFile, "utf8")).toBe("Current task");
+    expect(options.core.setOutput).not.toHaveBeenCalledWith("restored", "true");
+  });
+
+  it("rejects damaged downloaded state before touching the prompt or enabling continuation", async () => {
+    const options = restoreFixture();
+    const blob = fs.readdirSync(options.saved).find(file => file !== "manifest.json");
+    fs.writeFileSync(path.join(options.saved, blob), "corrupt state");
+    await expect(restoreCheckpoint(options)).rejects.toThrow("damaged or redacted");
+    expect(fs.existsSync(options.session)).toBe(false);
+    expect(fs.readFileSync(options.promptFile, "utf8")).toBe("Current task");
+    expect(options.core.setOutput).not.toHaveBeenCalledWith("restored", "true");
+  });
+
+  it("does not enable continuation when preparing the current prompt fails", async () => {
+    const options = restoreFixture();
+    fs.unlinkSync(options.promptFile);
+    await expect(restoreCheckpoint(options)).rejects.toThrow("ENOENT");
+    expect(options.core.setOutput).not.toHaveBeenCalledWith("restored", "true");
   });
 });
 

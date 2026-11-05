@@ -51,8 +51,7 @@ func sessionDurableExecutionPlan(engine CodingAgentEngine, data *WorkflowData, l
 			return nil, errors.New("copilot durable execution cannot override COPILOT_HOME because it collects the native session directory")
 		}
 	}
-	steps := []GitHubActionStep{durableSessionStep(data, "prepare")}
-	steps = append(steps, engine.GetExecutionSteps(data, logFile)...)
+	steps := engine.GetExecutionSteps(data, logFile)
 	if engine.GetID() == "copilot" {
 		steps = append(steps, durableSessionStep(data, "capture-copilot"))
 	}
@@ -104,7 +103,7 @@ func durableSessionStep(data *WorkflowData, operation string) GitHubActionStep {
 		"          GH_AW_DURABLE_ENGINE: " + data.EngineConfig.ID,
 		"          GH_AW_DURABLE_FILES: " + strconv.Quote(string(files)),
 		"          GH_AW_DURABLE_SESSION_DIR: " + durableSessionDirectory(data.EngineConfig.ID),
-		"          GH_AW_DURABLE_RESUMED: ${{ steps.restore_durable_files.outputs.restored == 'true' && 'true' || 'false' }}",
+		"          GH_AW_DURABLE_RESUMED: ${{ steps.durable_checkpoint.outputs.restored == 'true' && 'true' || 'false' }}",
 	}
 	if operation == "capture-copilot" {
 		step = append(step, "        id: capture_durable_sessions")

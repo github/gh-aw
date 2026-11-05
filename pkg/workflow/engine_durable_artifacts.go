@@ -12,26 +12,22 @@ func (c *Compiler) generateDurableArtifactRestore(yaml *strings.Builder, data *W
 	if data.EngineConfig == nil || data.EngineConfig.Durable == nil {
 		return
 	}
-	yaml.WriteString("      - name: Select durable checkpoint artifact\n")
+	files, err := json.Marshal(data.durableExecutionPlan.Files)
+	if err != nil {
+		panic(fmt.Sprintf("BUG: cannot encode durable files: %v", err))
+	}
+	yaml.WriteString("      - name: Restore durable workflow state\n")
 	yaml.WriteString("        id: durable_checkpoint\n")
 	yaml.WriteString("        uses: " + c.getActionPin("actions/github-script") + "\n")
 	yaml.WriteString("        env:\n")
 	yaml.WriteString("          GH_AW_DURABLE_WORKFLOW: " + strconv.Quote(durableWorkflowID(data)) + "\n")
+	yaml.WriteString("          GH_AW_DURABLE_FILES: " + strconv.Quote(string(files)) + "\n")
+	yaml.WriteString("          GH_AW_DURABLE_ENGINE: " + strconv.Quote(data.EngineConfig.ID) + "\n")
+	yaml.WriteString("          GH_AW_DURABLE_TOKEN: ${{ github.token }}\n")
 	yaml.WriteString("        with:\n")
 	yaml.WriteString("          script: |\n")
-	yaml.WriteString("            const { selectCheckpoint } = require('${{ runner.temp }}/gh-aw/actions/durable_artifact.cjs');\n")
-	yaml.WriteString("            await selectCheckpoint({ github, context, core });\n")
-	yaml.WriteString("      - name: Restore durable checkpoint artifact\n")
-	yaml.WriteString("        if: steps.durable_checkpoint.outputs.artifact-id != ''\n")
-	yaml.WriteString("        uses: " + c.getActionPin("actions/download-artifact") + "\n")
-	yaml.WriteString("        with:\n")
-	yaml.WriteString("          artifact-ids: ${{ steps.durable_checkpoint.outputs.artifact-id }}\n")
-	yaml.WriteString("          merge-multiple: true\n")
-	yaml.WriteString("          run-id: ${{ steps.durable_checkpoint.outputs.run-id }}\n")
-	yaml.WriteString("          github-token: ${{ github.token }}\n")
-	yaml.WriteString("          path: " + durableStateDirectory + "/bundle\n")
-	c.generateDurableFileStep(yaml, data, "Restore durable session files", "restore_durable_files",
-		"steps.durable_checkpoint.outputs.artifact-id != ''", "restoreFiles")
+	yaml.WriteString("            const { restoreCheckpoint } = require('${{ runner.temp }}/gh-aw/actions/durable_artifact.cjs');\n")
+	yaml.WriteString("            await restoreCheckpoint({ github, context, core, token: process.env.GH_AW_DURABLE_TOKEN });\n")
 }
 
 func (c *Compiler) generateDurableFileStep(yaml *strings.Builder, data *WorkflowData, name, id, condition, operation string) {
