@@ -23,6 +23,28 @@ func validateRepoMemoryAppConfig(app *GitHubAppConfig) error {
 	return nil
 }
 
+func validateRepoMemoryAppTarget(memory RepoMemoryEntry) error {
+	if memory.GitHubApp == nil || memory.TargetRepo == "" {
+		return nil
+	}
+	if !strings.Contains(memory.TargetRepo, "${{") {
+		if !repoMemoryTargetPattern.MatchString(memory.TargetRepo) {
+			return errors.New("tools.repo-memory.target-repo must use owner/repo format when github-app is configured")
+		}
+		return nil
+	}
+	app := memory.GitHubApp
+	if app.Owner != "" && !repoMemoryTargetPartPattern.MatchString(app.Owner) {
+		return errors.New("tools.repo-memory.github-app.owner must be a literal owner for expression target-repo authorization")
+	}
+	for _, repository := range app.Repositories {
+		if !repoMemoryTargetPartPattern.MatchString(repository) {
+			return errors.New("tools.repo-memory.github-app.repositories must contain literal repository names for expression target-repo authorization")
+		}
+	}
+	return nil
+}
+
 func (c *Compiler) hasGeneratedWildcardAppTokenStep(jobName string, step, with map[string]any, seen map[appTokenStepKey]bool) bool {
 	id, ok := step["id"].(string)
 	if !ok {
@@ -59,8 +81,8 @@ func (c *Compiler) recordGeneratedWildcardAppTokenStep(jobName string, app *GitH
 	c.wildcardAppTokenSteps[appTokenStepKey{jobName: jobName, id: stepID, clientID: app.AppID, privateKey: app.PrivateKey}] = true
 }
 
-func (c *Compiler) buildGitHubAppTokenMintStepForJob(jobName string, app *GitHubAppConfig, permissions *Permissions, fallbackRepoExpr string, ownerSourceRepository string, stepName string, stepID string) []string {
-	steps := c.buildGitHubAppTokenMintStepWithMeta(app, permissions, fallbackRepoExpr, ownerSourceRepository, stepName, stepID)
+func (c *Compiler) buildGitHubAppTokenMintStepForJob(jobName string, app *GitHubAppConfig, permissions *Permissions, fallbackRepoExpr string, ownerSourceRepository string, stepName string, stepID string, conditions ...string) []string {
+	steps := c.buildGitHubAppTokenMintStepWithMeta(app, permissions, fallbackRepoExpr, ownerSourceRepository, stepName, stepID, conditions...)
 	c.recordGeneratedWildcardAppTokenStep(jobName, app, stepID)
 	return steps
 }

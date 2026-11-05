@@ -105,13 +105,21 @@ The app must have **Contents: read and write** permission and be installed on th
 
 For an explicit `target-repo`, restore steps mint a separate Contents-read token from the same app, allowing private cross-repository clones. Restores without `target-repo` continue using `github.token`. Tokens are revoked by the token action's cleanup step.
 
+The repo-memory daily-credit backend also mints Contents-read tokens for its activation and hydration clones. App-authenticated push jobs inherit the workflow's `environment`, making environment-scoped app credentials available.
+
+Literal `target-repo` values authorize that repository. For expression targets, the resolved repository must be the current repository or a literal name in `github-app.repositories` under the literal `github-app.owner` (default: the current owner). Wildcards and expressions cannot define this allowlist. Authorization runs before minting, and tokens are scoped to the selected repository only.
+
 `ignore-if-missing: true` skips minting when either credential is missing and falls back to `github.token`. This fallback cannot bypass an app-only ruleset or access another private repository. The push job needs only `contents: read` when all entries use apps without this fallback; otherwise it retains `contents: write`.
 
 ### Protect memory branches with a ruleset
 
 Create an active branch ruleset targeting `memory/**` (or the configured branch prefix). Enable **Restrict updates** and **Restrict creations**. Add the installed memory app to the bypass list with **Always allow**; optionally add an administrator team for recovery. The built-in GitHub Actions token is not the app bypass actor.
 
+Every workflow and array entry writing to that pattern needs a bypass-listed app. Use a narrower pattern when other memories must continue using `github.token`.
+
 Keep the app's private key available only to trusted workflows and environments. A branch ruleset controls writers, not the content an authorized workflow accepts.
+
+Restored memory is untrusted data, not agent instructions. Select repositories whose memory writers are trusted data producers, and protect their memory branches. App authentication does not establish content integrity; workflows requiring stronger provenance must verify it before exposing restored content.
 
 ## Structured Ledger
 

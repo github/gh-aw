@@ -418,7 +418,7 @@ func appendGitHubAppTokenRepositoryInput(steps []string, app *GitHubAppConfig, f
 	return steps
 }
 
-func (c *Compiler) buildGitHubAppTokenMintStepWithMeta(app *GitHubAppConfig, permissions *Permissions, fallbackRepoExpr string, ownerSourceRepository string, stepName string, stepID string) []string {
+func (c *Compiler) buildGitHubAppTokenMintStepWithMeta(app *GitHubAppConfig, permissions *Permissions, fallbackRepoExpr string, ownerSourceRepository string, stepName string, stepID string, conditions ...string) []string {
 	safeOutputsAppLog.Printf("Building GitHub App token mint step: owner=%s, repos=%d", app.Owner, len(app.Repositories))
 	var steps []string
 
@@ -426,12 +426,21 @@ func (c *Compiler) buildGitHubAppTokenMintStepWithMeta(app *GitHubAppConfig, per
 	steps = append(steps, ownerSteps...)
 	steps = append(steps, fmt.Sprintf("      - name: %s\n", stepName))
 	steps = append(steps, fmt.Sprintf("        id: %s\n", stepID))
+	condition := strings.Join(conditions, " && ")
+	if len(conditions) > 1 {
+		condition = combineGitHubIfExpressions(conditions...)
+	}
 	if app.shouldIgnoreMissingKey() {
 		guard := buildIgnoreIfMissingCondition(app)
 		steps = appendStepEnvAssignments(steps, guard.EnvAssignments)
-		if guard.Condition != "" {
-			steps = append(steps, fmt.Sprintf("        if: %s\n", guard.Condition))
+		if condition == "" {
+			condition = guard.Condition
+		} else if guard.Condition != "" {
+			condition = combineGitHubIfExpressions(condition, "("+stripExpressionWrapper(guard.Condition)+")")
 		}
+	}
+	if condition != "" {
+		steps = append(steps, fmt.Sprintf("        if: %s\n", condition))
 	}
 	steps = append(steps, fmt.Sprintf("        uses: %s\n", getActionPin("actions/create-github-app-token")))
 	steps = append(steps, "        with:\n")
