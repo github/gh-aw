@@ -33,6 +33,7 @@ Load these topic files only when relevant:
 - [linter-workflows.md](linter-workflows.md) for mining, refining, or applying custom linter rules
 - [agent-runtime-instructions.md](agent-runtime-instructions.md) when choosing or debugging Docker, Cloud Hypervisor, ARC DinD, or self-hosted runners
 - [skills.md](skills.md) when the user asks for specific skills or agent plugins
+- [formal-methods.md](formal-methods.md) for executable F* contracts, TLA+ protocol checks, Z3 constraints, or proof repair
 - [operational-value-designer](../skills/operational-value-designer/SKILL.md) when deriving or configuring graders over the in-memory unified session
 
 ## Graders

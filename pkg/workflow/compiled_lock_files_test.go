@@ -61,10 +61,31 @@ func TestSmokeAndCoverageFailureContracts(t *testing.T) {
 			},
 		},
 		{
+			name: "shared/fstar",
+			required: []string{
+				"FSTAR_BIN: /tmp/gh-aw/agent/fstar-tools/fstar/bin/fstar.exe",
+				"FSTAR_Z3: /tmp/gh-aw/agent/fstar-tools/fstar/lib/fstar/z3-5.3.0/bin/z3",
+				"run: bash scripts/install-fstar.sh",
+				"{{#import .github/aw/formal-methods.md}}",
+			},
+		},
+		{
+			name: "formal-proof-repair",
+			required: []string{
+				"  - shared/fstar.md",
+				"  - shared/tla-plus.md",
+				"proof-copilot/plugins/proof-copilot/skills/fstarverifier@c833a8cccf76fbffeaea0db18c65b4edd2ade0af",
+				"Reverify the candidate repair (feedback, not an independent gate)",
+				"github: false",
+				"create-issue: false",
+				"report-as-issue: false",
+			},
+		},
+		{
 			name: "shared/tla-plus",
 			required: []string{
 				"https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar",
-				"011267fca25d0752cf18894dd585cd28b96960c112ea8a20b823ea770e7e10cd",
+				"e20447644bfabd29d6bd0fc2c0eb1473fb301c1a0e4dfe1961938ce5a191edbf",
 				`"$tools/tla2tools.jar" | sha256sum --check --strict`,
 			},
 			rejected: []string{"d15655eeaff4b3f7b3d65c46b838bc0f35d131b2ef4b1e473689b62c98d4726f"},

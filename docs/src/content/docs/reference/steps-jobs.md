@@ -107,6 +107,33 @@ Useful for artifact uploads, summaries, cleanup, or triggering downstream workfl
 Post-steps must not create issues directly, read safe-output files, or expose secrets through a step-level `env` section. Avoid uploading the entire `/tmp/gh-aw/` directory, which can contain protected safe-output files.
 Use [`safe-outputs.create-issue`](/gh-aw/reference/safe-outputs/) to publish agent-generated issues instead.
 
+### Formal verification with F*, TLA+, and Z3
+
+Use F* for refinement types, functional contracts, and proof-oriented
+implementation; TLA+ for concurrent protocols and temporal lifecycle properties;
+and Z3 for SMT constraints (including F*'s proof backend). They can check
+complementary properties of one system.
+
+Import `shared/fstar.md` to install a checksum-pinned F*/Z3 toolchain before
+agent execution on Linux x64. Import `shared/tla-plus.md` as well for TLC.
+The imports configure tool paths under `/tmp/gh-aw/agent`; they do not grant
+shell permissions, networking, or safe outputs. Custom jobs must install their
+own tools because they do not inherit agent setup hooks.
+
+Follow the [formal-methods agent guidance](https://github.com/github/gh-aw/blob/main/.github/aw/formal-methods.md)
+for installation, Proof Copilot skills/MCP support, and the
+Specify → Implement → Verify → Diagnose → Repair → Reverify loop.
+The [runnable counter examples](https://github.com/github/gh-aw/tree/main/specs/formal-methods)
+include a rejected F* proof, a repair with its contract preserved, and a
+complementary TLA+ model with a negative control.
+The [agentic proof-repair example](https://github.com/github/gh-aw/blob/main/.github/workflows/formal-proof-repair.md)
+combines deterministic setup checks, agent repair, and post-execution feedback.
+
+Keep acceptance verification independent of agent-modifiable scripts and
+specifications. Post-steps over the agent's mutable workspace are feedback, not
+an independent acceptance gate. An F* model does not verify a corresponding
+production implementation without an explicit, reviewed correspondence argument.
+
 ## Custom Jobs (`jobs:`)
 
 Define custom jobs that run before agentic execution. The agentic execution job waits for all custom jobs to complete. Custom jobs can share data with the agent through artifacts or job outputs.

@@ -23,7 +23,7 @@ steps:
         --output "$tools/tla2tools.jar" \
         'https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar'
       printf '%s  %s\n' \
-        011267fca25d0752cf18894dd585cd28b96960c112ea8a20b823ea770e7e10cd \
+        e20447644bfabd29d6bd0fc2c0eb1473fb301c1a0e4dfe1961938ce5a191edbf \
         "$tools/tla2tools.jar" | sha256sum --check --strict
       "$tools/jre/bin/java" -version
 ---

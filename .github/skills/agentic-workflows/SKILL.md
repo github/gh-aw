@@ -143,6 +143,7 @@ After loading the matching workflow prompt or skill, follow it directly:
 - Advanced cost controls without native settings (custom AIC allowances by server size or shared organization budget policies): read `docs/src/content/docs/reference/cost-management.md#configure-advanced-cost-controls-with-admission` ([published guidance](https://github.github.com/gh-aw/reference/cost-management/#configure-advanced-cost-controls-with-admission)). Explain the external authority requirement and cooperative limits; do not invent frontmatter fields or promise hard caps, reservations, or mid-run cancellation.
 - Design long-running multi-agent research workflows: `.github/aw/multi-agent-research.md`
 - Add skills or agent plugins requested by the user (`skills:` / `plugins:` frontmatter, never on-the-fly installs): `.github/aw/skills.md`
+- Formal verification, proof repair, refinement contracts, or protocol invariants: `.github/aw/formal-methods.md` (F*, TLA+/TLC, Z3, and Proof Copilot; run real verifiers rather than treating notation as proof)
 
 When the task involves OTEL, OTLP, traces, observability backends, or telemetry-driven analysis, also read and follow `skills/otel-queries/SKILL.md` after loading the matching workflow prompt or skill.
 

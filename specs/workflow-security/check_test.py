@@ -199,7 +199,7 @@ class TransportRunnerTest(unittest.TestCase):
 
 class RuntimePinTest(unittest.TestCase):
     def test_release_pin_matches_workflow_and_documentation(self):
-        expected = "011267fca25d0752cf18894dd585cd28b96960c112ea8a20b823ea770e7e10cd"
+        expected = "e20447644bfabd29d6bd0fc2c0eb1473fb301c1a0e4dfe1961938ce5a191edbf"
         self.assertEqual(check.JAR_SHA256, expected)
         workflow = (check.ROOT.parents[1] / ".github/workflows/daily-workflow-security-model.md").read_text()
         self.assertIn("  - shared/tla-plus.md", workflow)

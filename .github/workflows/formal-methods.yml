@@ -1,0 +1,72 @@
+name: Formal methods examples
+
+on:
+  pull_request:
+    paths:
+      - specs/formal-methods/**
+      - scripts/install-fstar.sh
+      - .github/workflows/formal-methods.yml
+      - .github/workflows/formal-proof-repair.*
+      - .github/workflows/shared/fstar.md
+      - .github/aw/formal-methods.md
+  push:
+    branches: [main]
+    paths:
+      - specs/formal-methods/**
+      - scripts/install-fstar.sh
+      - .github/workflows/formal-methods.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Independent F* and TLC verification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      FSTAR_BIN: /tmp/gh-aw/agent/fstar-tools/fstar/bin/fstar.exe
+      FSTAR_Z3: /tmp/gh-aw/agent/fstar-tools/fstar/lib/fstar/z3-5.3.0/bin/z3
+      JAVA_BIN: /tmp/gh-aw/agent/tla-tools/jre/bin/java
+      TLA2TOOLS_JAR: /tmp/gh-aw/agent/tla-tools/tla2tools.jar
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned F* and Z3
+        run: bash scripts/install-fstar.sh
+      - name: Install pinned TLA+ runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          tools=/tmp/gh-aw/agent/tla-tools
+          mkdir -p "$tools/jre"
+          curl --fail --location --silent --show-error \
+            --retry 2 --connect-timeout 10 --max-time 120 \
+            --output "$tools/jre.tar.gz" \
+            'https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jre_x64_linux_hotspot_21.0.12.1_1.tar.gz'
+          printf '%s  %s\n' \
+            2413149700df0f7d440500a84a8f764c535f21e5a5e87d38328b64eec2c5b500 \
+            "$tools/jre.tar.gz" | sha256sum --check --strict
+          tar -xzf "$tools/jre.tar.gz" --strip-components=1 -C "$tools/jre"
+          curl --fail --location --silent --show-error \
+            --retry 2 --connect-timeout 10 --max-time 120 \
+            --output "$tools/tla2tools.jar" \
+            'https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar'
+          printf '%s  %s\n' \
+            e20447644bfabd29d6bd0fc2c0eb1473fb301c1a0e4dfe1961938ce5a191edbf \
+            "$tools/tla2tools.jar" | sha256sum --check --strict
+      - name: Test proof-bypass and failure detection
+        run: python3 -m unittest discover -s specs/formal-methods -p '*_test.py'
+      - name: Verify contracts, repair, temporal properties, and negative controls
+        run: python3 specs/formal-methods/check.py --tla --results "$RUNNER_TEMP/formal-evidence"
+      - name: Preserve verification evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: formal-evidence
+          path: ${{ runner.temp }}/formal-evidence
+          if-no-files-found: warn
+          retention-days: 7

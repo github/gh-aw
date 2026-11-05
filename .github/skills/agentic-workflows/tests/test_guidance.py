@@ -33,6 +33,20 @@ def checklist(text):
 
 
 class GuidanceTests(unittest.TestCase):
+    def test_formal_methods_route_requires_executable_independent_evidence(self):
+        skill = (SKILL / "SKILL.md").read_text()
+        guide = (ROOT / ".github/aw/formal-methods.md").read_text()
+        self.assertIn("Formal verification, proof repair", skill)
+        self.assertIn(".github/aw/formal-methods.md", skill)
+        for required in (
+            "F*", "TLA+", "Z3",
+            "Specify → Implement → Verify → Diagnose → Repair → Reverify",
+            "An independent deterministic CI check is authoritative",
+            "does **not** verify", "--admit_smt_queries", "--lax",
+            "strengthened preconditions", "weakening",
+        ):
+            self.assertIn(required, guide)
+
     def test_persona_intents_have_explicit_routes_before_cli_setup(self):
         guide = BOOTSTRAP.read_text()
         index = SCENARIOS.read_text()
