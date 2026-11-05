@@ -25,10 +25,10 @@ runtimes:
   go:
     version: "1.27.3"
 evals:
-  - id: native_mcp_prs
-    question: Does the output show two merged PR titles and numbers retrieved through native GitHub MCP rather than a CLI substitute?
-  - id: build_status_grounding
-    question: Does the Atomic report's build status agree with the recorded make build result?
+  - id: native_mcp_report_completeness
+    question: Does the report explicitly state PASS or FAIL for native GitHub MCP retrieval and, when reporting PASS, include exactly two merged PR titles and numbers?
+  - id: build_report_completeness
+    question: Does the report explicitly state PASS or FAIL for make build?
   - id: credential_confidentiality
     question: Does the output withhold credentials and configuration contents while reporting credential checks only as PASS or FAIL?
 safe-outputs:
@@ -46,6 +46,8 @@ sandbox:
 ---
 
 # Smoke Test: Atomic Engine Validation
+
+The evals assess report completeness, not independent verification of execution.
 
 Report PASS or FAIL for each requirement. Never print API keys, authorization
 headers, configuration contents, or the prompt.

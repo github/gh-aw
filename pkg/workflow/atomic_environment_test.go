@@ -36,7 +36,7 @@ const fs = require("fs"), path = require("path"), { spawnSync } = require("child
 const prompt = fs.readFileSync(0, "utf8");
 const file = path.join(process.cwd(), "readback.txt");
 fs.writeFileSync(file, "readback verified");
-const shell = spawnSync("bash", ["-c", "printf 'build verified'"], { encoding: "utf8" });
+const shell = spawnSync("bash", ["-c", 'test "$ENGINE_CONFORMANCE_SENTINEL" = conformance-atomic && test -z "$ARBITRARY_REPOSITORY_SECRET" && printf "build verified"'], { encoding: "utf8" });
 if (shell.error) throw shell.error;
 if (shell.status !== 0) process.exit(shell.status || 1);
 console.log(JSON.stringify({
@@ -58,6 +58,7 @@ console.log(JSON.stringify({
 		"ALL_PROXY": "http://squid:3128", "http_proxy": "http://squid:3128",
 		"https_proxy": "http://squid:3128", "all_proxy": "http://squid:3128",
 		"NO_PROXY": "localhost,api-proxy", "no_proxy": "localhost,api-proxy",
+		"ENGINE_CONFORMANCE_SENTINEL": "conformance-atomic",
 	}
 	for name, value := range retained {
 		cmd.Env = append(cmd.Env, name+"="+value)
@@ -116,6 +117,59 @@ console.log(JSON.stringify({
 	assert.Equal(t, "0", captured.Env["ATOMIC_TELEMETRY"])
 	_, err = os.Stat(captured.Env["ATOMIC_CODING_AGENT_DIR"])
 	assert.True(t, os.IsNotExist(err), "private configuration must be removed")
+}
+
+func TestAtomicHarnessEnvironmentConformanceSentinel(t *testing.T) {
+	for _, tt := range []struct {
+		name, value string
+		set, reject bool
+	}{
+		{name: "absent"},
+		{name: "empty", set: true},
+		{name: "accepted", value: "conformance-atomic", set: true},
+		{name: "other engine", value: "conformance-copilot", set: true, reject: true},
+		{name: "arbitrary value", value: "sentinel-secret", set: true, reject: true},
+		{name: "whitespace", value: " conformance-atomic", set: true, reject: true},
+		{name: "newline", value: "conformance-atomic\n", set: true, reject: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd, dir := atomicEnvironmentFixture(t, "node", "-e", `
+const fs = require("fs"), { spawnSync } = require("child_process");
+fs.writeFileSync("spawned", "yes");
+const shell = spawnSync("bash", ["-c", 'printf "%s" "$ENGINE_CONFORMANCE_SENTINEL"'], { encoding: "utf8" });
+if (shell.error) throw shell.error;
+if (shell.status !== 0) process.exit(shell.status || 1);
+console.log(JSON.stringify({ child: process.env.ENGINE_CONFORMANCE_SENTINEL, shell: shell.stdout }));
+`, "--")
+			cmd.Env = append(cmd.Env, "HOME="+dir, "TMPDIR="+dir)
+			if tt.set {
+				cmd.Env = append(cmd.Env, "ENGINE_CONFORMANCE_SENTINEL="+tt.value)
+			}
+			var stderr strings.Builder
+			cmd.Stderr = &stderr
+			output, err := cmd.Output()
+			if tt.reject {
+				require.Error(t, err)
+				assert.Contains(t, stderr.String(), "ENGINE_CONFORMANCE_SENTINEL must be conformance-atomic when set")
+				assert.NotContains(t, stderr.String(), "sentinel-secret", "rejected values must not be logged")
+				_, err = os.Stat(filepath.Join(dir, "spawned"))
+				assert.True(t, os.IsNotExist(err), "invalid sentinel must fail before spawning")
+				entries, err := os.ReadDir(filepath.Join(dir, "agent"))
+				require.NoError(t, err)
+				assert.Empty(t, entries, "private configuration must be removed on rejection")
+				return
+			}
+			require.NoError(t, err, "%s", stderr.String())
+			var captured map[string]string
+			require.NoError(t, json.Unmarshal(output, &captured))
+			assert.Equal(t, tt.value, captured["shell"])
+			if tt.value == "" {
+				assert.NotContains(t, captured, "child")
+			} else {
+				assert.Equal(t, tt.value, captured["child"])
+			}
+		})
+	}
 }
 
 func TestAtomicHarnessEnvironmentRejectsUnsafeProxy(t *testing.T) {

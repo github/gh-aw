@@ -150,6 +150,13 @@ engine:
             ATOMIC_OFFLINE: "1",
             ATOMIC_TELEMETRY: "0",
           };
+          const conformanceSentinel = process.env.ENGINE_CONFORMANCE_SENTINEL;
+          if (conformanceSentinel) {
+            if (conformanceSentinel !== "conformance-atomic") {
+              throw new Error("ENGINE_CONFORMANCE_SENTINEL must be conformance-atomic when set");
+            }
+            env.ENGINE_CONFORMANCE_SENTINEL = "conformance-atomic";
+          }
           for (const name of [
             "PATH", "HOME", "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL", "LC_CTYPE",
             "TZ", "TERM", "NO_COLOR", "CI", "HOSTALIASES",
@@ -221,6 +228,8 @@ The child environment uses an explicit runtime allowlist: executable paths,
 home and temporary directories, locale and terminal settings, workspace paths,
 engine version, MCP and safe-output file bindings, tool timeout, host aliases,
 and proxy routing. Proxy URLs must be credential-free HTTP(S) addresses.
+The reserved `ENGINE_CONFORMANCE_SENTINEL` binding is forwarded only when its
+value is exactly `conformance-atomic`; other non-empty values fail before launch.
 Arbitrary workflow variables, repository and cloud secrets, future credential
 variables, and execution hooks such as `NODE_OPTIONS` are not inherited.
 MCP authentication remains in the private configuration, not the environment.

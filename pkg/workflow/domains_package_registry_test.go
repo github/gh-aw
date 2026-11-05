@@ -217,7 +217,7 @@ func TestBehaviorDefinedEngineDefaultsDoNotOverlapEcosystems(t *testing.T) {
 		}
 	}
 	require.NotEmpty(t, defaults, "shared behavior-defined engines must be checked")
-	require.Equal(t, 8, checkedBehaviorDefinedEngines, "all behavior-defined engines with network policies must be checked")
+	require.Equal(t, 9, checkedBehaviorDefinedEngines, "all behavior-defined engines with network policies must be checked")
 	assert.Empty(t, engineDefaultEcosystemOverlaps(getLoadedDomainSets().Ecosystems, defaults),
 		"behavior-defined engine defaults and provider domains require the same package ecosystem opt-in as static engines")
 }

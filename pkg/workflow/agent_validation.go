@@ -348,11 +348,19 @@ func (c *Compiler) validateBashCommandAllowlistSupport(tools map[string]any, eng
 		agentValidationLog.Printf("Engine %s fully disables bash instead of enforcing an allowlist", engine.GetID())
 		return nil
 	}
+	if hasBashFullyDisabled(tools) {
+		return fmt.Errorf("engine '%s' cannot disable bash: tools.bash: false and tools.bash: [] cannot be enforced. "+
+			"Remove the tools.bash restriction or switch to an engine that supports disabling bash (copilot, claude, gemini, or codex)", engine.GetID())
+	}
 	agentValidationLog.Printf("Engine %s does not support bash command allowlist, emitting error", engine.GetID())
+	disableAdvice := ""
+	if capabilities.BashDisable {
+		disableAdvice = "'bash: false' to fully disable bash, "
+	}
 	return fmt.Errorf("engine '%s' does not support bash command allow-listing: tools.bash with specific commands is silently ignored at runtime for this engine. "+
-		"Use 'bash: [\"*\"]' to allow all commands, 'bash: false' to fully disable bash, or remove the tools.bash entry. "+
+		"Use 'bash: [\"*\"]' to allow all commands, %sor remove the tools.bash entry. "+
 		"To restrict bash commands to a specific allowlist, switch to an engine that supports this feature (copilot, claude, or gemini)",
-		engine.GetID())
+		engine.GetID(), disableAdvice)
 }
 
 // HasBashExplicitRestriction reports true when the tools map contains a bash configuration

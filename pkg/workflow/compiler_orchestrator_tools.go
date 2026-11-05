@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -261,12 +262,13 @@ func (c *Compiler) resolveToolsConfiguration(
 	if err != nil {
 		return nil, err
 	}
+	// Validate authored restrictions before capability normalization can discard them.
+	if err := c.validateEngineToolRequirements(result.Frontmatter, agenticEngine, tools); err != nil {
+		return nil, err
+	}
 	tools = c.adjustToolsForEngineCapabilities(result.Frontmatter, agenticEngine, tools)
 	tools, err = enforceMCPProxyTools(agenticEngine, tools)
 	if err != nil {
-		return nil, err
-	}
-	if err := c.validateEngineToolRequirements(result.Frontmatter, agenticEngine, tools); err != nil {
 		return nil, err
 	}
 	return &mergedToolsData{
@@ -403,6 +405,10 @@ func (c *Compiler) adjustToolsForEngineCapabilities(frontmatter map[string]any, 
 	}
 	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Using experimental %s support (engine: %s)", agenticEngine.GetDisplayName(), agenticEngine.GetID())))
 	c.IncrementExperimentalWarningCount()
+	// Atomic's gateway enforces MCP policies independently of its fixed native tools.
+	if agenticEngine.GetID() == "atomic" {
+		return tools
+	}
 	if _, hasTools := frontmatter["tools"]; hasTools {
 		message := fmt.Sprintf("'tools' section ignored when using engine: %s (%s doesn't support MCP tool allow-listing)", agenticEngine.GetID(), agenticEngine.GetDisplayName())
 		if _, hasQueue := tools["work-queue"]; hasQueue {
@@ -414,6 +420,9 @@ func (c *Compiler) adjustToolsForEngineCapabilities(frontmatter map[string]any, 
 	// Queue assignment and CLI transport are framework controls, not native
 	// engine tool allow-list entries. Preserve them for dispatch-only workers.
 	fallback := map[string]any{"github": map[string]any{}}
+	if github, ok := tools["github"]; ok {
+		fallback["github"] = github
+	}
 	if queue, ok := tools["work-queue"]; ok {
 		fallback["work-queue"] = queue
 	}
@@ -424,6 +433,11 @@ func (c *Compiler) adjustToolsForEngineCapabilities(frontmatter map[string]any, 
 }
 
 func (c *Compiler) validateEngineToolRequirements(frontmatter map[string]any, agenticEngine CodingAgentEngine, tools map[string]any) error {
+	if agenticEngine.GetID() == "atomic" {
+		if disabled, ok := tools["edit"].(bool); ok && !disabled {
+			return errors.New("experimental atomic cannot enforce tools.edit: false; its native tool profile enables file editing inside the outer sandbox")
+		}
+	}
 	if agenticEngine.GetID() == string(constants.AgyEngine) {
 		for _, name := range []string{"edit", "web-fetch", "web-search"} {
 			if disabled, ok := tools[name].(bool); ok && !disabled {

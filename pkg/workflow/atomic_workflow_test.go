@@ -389,6 +389,19 @@ func TestAtomicSmokeContract(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(source), "shared/atomic.md")
 	assert.NotContains(t, string(source), "schedule:")
+	var smoke struct {
+		Evals []struct {
+			ID       string `yaml:"id"`
+			Question string `yaml:"question"`
+		} `yaml:"evals"`
+	}
+	readConformanceFrontmatter(t, "../../.github/workflows/smoke-atomic.md", &smoke)
+	require.Len(t, smoke.Evals, 3)
+	assert.Equal(t, "native_mcp_report_completeness", smoke.Evals[0].ID)
+	assert.Equal(t, "Does the report explicitly state PASS or FAIL for native GitHub MCP retrieval and, when reporting PASS, include exactly two merged PR titles and numbers?", smoke.Evals[0].Question)
+	assert.Equal(t, "build_report_completeness", smoke.Evals[1].ID)
+	assert.Equal(t, "Does the report explicitly state PASS or FAIL for make build?", smoke.Evals[1].Question)
+	assert.Contains(t, string(source), "The evals assess report completeness, not independent verification of execution.")
 	lock, err := os.ReadFile("../../.github/workflows/smoke-atomic.lock.yml")
 	require.NoError(t, err)
 	for _, expected := range []string{
@@ -397,6 +410,7 @@ func TestAtomicSmokeContract(t *testing.T) {
 		"ATOMIC_MODEL: copilot/gpt-5.3-codex",
 		"atomic_mcp_config_adapter.cjs", "--exclude-env OPENAI_API_KEY",
 		"proxy.golang.org", `"GITHUB_READ_ONLY": "1"`,
+		smoke.Evals[0].Question, smoke.Evals[1].Question,
 	} {
 		assert.Contains(t, string(lock), expected)
 	}
