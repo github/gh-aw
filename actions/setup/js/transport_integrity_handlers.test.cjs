@@ -64,7 +64,7 @@ describe.each(["create_pull_request", "push_to_pull_request_branch"])("%s transp
     global.github = {
       rest: {
         pulls: { get: vi.fn().mockResolvedValue({ data: pr }), create: vi.fn(), list: vi.fn().mockResolvedValue({ data: [] }) },
-        repos: { get: vi.fn().mockResolvedValue({ data: { default_branch: "main" } }), getBranchProtection: vi.fn().mockRejectedValue({ status: 404 }) },
+        repos: { get: vi.fn().mockResolvedValue({ data: { default_branch: "main" } }), getBranch: vi.fn().mockResolvedValue({ data: { protected: false } }) },
         issues: { create: vi.fn(), addLabels: vi.fn(), addAssignees: vi.fn() },
         git: { getRef: vi.fn().mockRejectedValue({ status: 404 }), deleteRef: vi.fn(), createRef: vi.fn() },
       },

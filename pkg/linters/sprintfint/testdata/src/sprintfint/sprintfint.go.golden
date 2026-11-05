@@ -19,6 +19,12 @@ func badLiteral() string {
 	return strconv.Itoa(42) // want `use strconv\.Itoa\(x\) instead of fmt\.Sprintf\("%d", x\)`
 }
 
+// badParenthesized demonstrates the flagged pattern with a parenthesized
+// callee and format literal.
+func badParenthesized(n int) string {
+	return strconv.Itoa(n) // want `use strconv\.Itoa\(x\) instead of fmt\.Sprintf\("%d", x\)`
+}
+
 // goodStrconvItoa is already using the preferred form — no diagnostic expected.
 func goodStrconvItoa(n int) string {
 	return strconv.Itoa(n)
