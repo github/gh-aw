@@ -44,6 +44,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/httprespbodyclose"
 	"github.com/github/gh-aw/pkg/linters/httpstatuscode"
 	"github.com/github/gh-aw/pkg/linters/ioutildeprecated"
+	jsonunmarshalbytesconversion "github.com/github/gh-aw/pkg/linters/json-unmarshal-bytes-conversion"
 	"github.com/github/gh-aw/pkg/linters/jsonmarshalignoredeerror"
 	"github.com/github/gh-aw/pkg/linters/largefunc"
 	"github.com/github/gh-aw/pkg/linters/lenstringsplit"
@@ -208,6 +209,7 @@ func documentedAnalyzers() []docAnalyzer {
 		{"typeassertionnil", typeassertionnil.Analyzer},
 		{"typeassertionokdiscarded", typeassertionokdiscarded.Analyzer},
 		{"unchecked_deferredclose", unchecked_deferredclose.Analyzer},
+		{"jsonunmarshalbytesconversion", jsonunmarshalbytesconversion.Analyzer},
 		{"uncheckedsliceindex", uncheckedsliceindex.Analyzer},
 		{"uncheckedtypeassertion", uncheckedtypeassertion.Analyzer},
 		{"uncheckedflushreturn", uncheckedflushreturn.Analyzer},

@@ -36,6 +36,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/httprespbodyclose"
 	"github.com/github/gh-aw/pkg/linters/httpstatuscode"
 	"github.com/github/gh-aw/pkg/linters/ioutildeprecated"
+	jsonunmarshalbytesconversion "github.com/github/gh-aw/pkg/linters/json-unmarshal-bytes-conversion"
 	"github.com/github/gh-aw/pkg/linters/jsonmarshalignoredeerror"
 	"github.com/github/gh-aw/pkg/linters/largefunc"
 	"github.com/github/gh-aw/pkg/linters/lenstringsplit"
@@ -181,6 +182,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	trimleftright.Analyzer,
 	typeassertionnil.Analyzer,
 	typeassertionokdiscarded.Analyzer,
+	jsonunmarshalbytesconversion.Analyzer,
 	uncheckedsliceindex.Analyzer,
 	unchecked_deferredclose.Analyzer,
 	uncheckedtypeassertion.Analyzer,
