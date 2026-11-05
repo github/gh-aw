@@ -435,9 +435,6 @@ var safeOutputHandlers = []safeOutputHandlerDescriptor{
 			if safeOutputs.PushToPullRequestBranch.AllowWorkflows {
 				permissions.Set(PermissionWorkflows, PermissionWrite)
 			}
-			if getCheckBranchProtection(safeOutputs.PushToPullRequestBranch) {
-				permissions.Set(PermissionAdministration, PermissionRead)
-			}
 			return permissions
 		},
 	},

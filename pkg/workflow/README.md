@@ -626,6 +626,22 @@ Detects dangerous patterns in externally-sourced markdown files (e.g., from `gh 
 | `ExtractGHAWManifestFromLockFile` | `func(string) (*GHAWManifest, error)` | Extracts the manifest from a lock file |
 | `EnforceSafeUpdate` | `func(*GHAWManifest, []string, []string) error` | Validates that a lock file update passes manifest checks |
 
+### Additional API Functions
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `ComputeGitHubAppManifestWebhookPermissions` | `func(onValue any) map[string]string` | Derives the GitHub App permissions required to receive the selected workflow webhook events. |
+| `GenerateWorkQueueEventWorkflow` | `func(ctx context.Context, workflowDataList []*WorkflowData, workflowDir string, repoConfig *RepoConfig, noLogo ...bool) error` | Generates trusted Issue lifecycle handlers for work queue events. |
+| `GitHubCLIHost` | `func() string` | Returns the host used by `gh` helpers; an empty result allows `go-gh` to resolve the host. |
+| `InferGitHubAppTokenPermissionsFromShellScripts` | `func(scripts []string) (map[string]string, bool)` | Infers GitHub App token permissions for scripts containing only GitHub CLI read operations. |
+| `ParseWebhookSubscriptions` | `func(on any, workflowID string) ([]WebhookSubscription, error)` | Validates and normalizes webhook triggers without fetching or hydrating payload fields. |
+| `TransformExecutableShellContent` | `func(content string, transform func(string) string) (string, error)` | Applies a transformation to executable shell content while preserving recognized heredoc and comment boundaries. |
+| `ValidatePostStepsSafeOutputs` | `func(steps []any) error` | Checks user-provided post-steps for disallowed safe-output access. |
+| `WebhookCatalog` | `func() (map[string]WebhookEvent, error)` | Returns an independent copy of the embedded webhook event catalog. |
+| `WebhookDispatchEventType` | `func(workflowID string) string` | Returns the repository-dispatch event type scoped to one workflow. |
+| `WithLint` | `func(enabled bool) CompilerOption` | Enables or disables built-in AST linting independently of compiler validation. |
+| `WorkQueueIssueMirroringEnabled` | `func(workflowDataList []*WorkflowData) bool` | Reports whether any compiled workflow enables work queue Issue mirroring. |
+
 ## Usage Examples
 
 ### Compile a workflow file
