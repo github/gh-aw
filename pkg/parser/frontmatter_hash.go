@@ -296,7 +296,7 @@ func extractFrontmatterAndBodyText(content string) (string, string, error) {
 	lines := strings.Split(content, "\n")
 
 	// Check if content starts with frontmatter delimiter
-	if len(lines) == 0 || strings.TrimSpace(lines[0]) != "---" {
+	if len(lines) == 0 || strings.TrimSpace(lines[0]) != "---" { //nolint:uncheckedsliceindex // Short-circuiting proves the first line exists.
 		// No frontmatter
 		return "", content, nil
 	}
@@ -304,7 +304,7 @@ func extractFrontmatterAndBodyText(content string) (string, string, error) {
 	// Find end of frontmatter
 	endIndex := -1
 	for i := 1; i < len(lines); i++ {
-		if strings.TrimSpace(lines[i]) == "---" {
+		if strings.TrimSpace(lines[i]) == "---" { //nolint:uncheckedsliceindex // The loop starts at 1 and requires i < len(lines).
 			endIndex = i
 			break
 		}
@@ -623,15 +623,15 @@ func extractRuntimeImportReferences(markdownBody string) []runtimeImportReferenc
 		if len(match) < 2 {
 			continue
 		}
-		target := strings.TrimSpace(match[1])
+		target := strings.TrimSpace(match[1]) //nolint:uncheckedsliceindex // The submatch count is checked above.
 		if target == "" {
 			continue
 		}
 		ref := runtimeImportReference{path: target}
 		if rangeMatch := runtimeImportLineRangeRe.FindStringSubmatch(target); len(rangeMatch) == 4 {
-			ref.path = strings.TrimSpace(rangeMatch[1])
-			fmt.Sscanf(rangeMatch[2], "%d", &ref.startLine)
-			fmt.Sscanf(rangeMatch[3], "%d", &ref.endLine)
+			ref.path = strings.TrimSpace(rangeMatch[1])     //nolint:uncheckedsliceindex // The regex submatch count is exactly four.
+			fmt.Sscanf(rangeMatch[2], "%d", &ref.startLine) //nolint:uncheckedsliceindex // The regex submatch count is exactly four.
+			fmt.Sscanf(rangeMatch[3], "%d", &ref.endLine)   //nolint:uncheckedsliceindex // The regex submatch count is exactly four.
 		}
 		if strings.HasPrefix(ref.path, "http://") || strings.HasPrefix(ref.path, "https://") {
 			continue
@@ -806,7 +806,7 @@ func ComputeBodyHashFromParsedContent(markdownBody, frontmatterText, baseDir str
 	if len(importedBodies) > 0 {
 		normalizedBodies := make([]string, len(importedBodies))
 		for i, b := range importedBodies {
-			normalizedBodies[i] = normalizeFrontmatterText(b)
+			normalizedBodies[i] = normalizeFrontmatterText(b) //nolint:uncheckedsliceindex // The output has the same length as the ranged input.
 		}
 		sort.Strings(normalizedBodies)
 		allParts = append(allParts, normalizedBodies...)
@@ -857,10 +857,10 @@ func computeFrontmatterHashTextBasedWithReader(frontmatterText, markdown, baseDi
 	normalizedFrontmatterText := normalizeFrontmatterText(frontmatterText)
 	normalizedImportedTexts := make([]string, len(importedFrontmatterTexts))
 	for i, text := range importedFrontmatterTexts {
-		normalizedImportedTexts[i] = normalizeFrontmatterText(text)
+		normalizedImportedTexts[i] = normalizeFrontmatterText(text) //nolint:uncheckedsliceindex // The output has the same length as the ranged input.
 	}
 
-	if err := validateFrontmatterHashInputSize(normalizedFrontmatterText, normalizedImportedTexts); err != nil {
+	if err := addAPMHashDocuments(canonical, frontmatterText, normalizedFrontmatterText, normalizedImportedTexts, baseDir, fileReader); err != nil {
 		return "", err
 	}
 

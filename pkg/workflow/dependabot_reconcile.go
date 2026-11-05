@@ -12,95 +12,21 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/setutil"
 	"github.com/goccy/go-yaml"
 )
-
-// loadOrInitDependabotConfig reads and parses an existing dependabot.yml at path, or returns a
-// freshly initialized DependabotConfig if the file does not exist or cannot be parsed.
-func loadOrInitDependabotConfig(path string) (DependabotConfig, error) {
-	var config DependabotConfig
-
-	// Check if dependabot.yml already exists
-	if _, err := os.Stat(path); err == nil {
-		// File exists - read and merge configuration
-		dependabotLog.Print("Existing dependabot.yml found, merging configuration")
-		existingData, err := os.ReadFile(path)
-		if err != nil {
-			return config, fmt.Errorf("failed to read existing dependabot.yml: %w", err)
-		}
-
-		if err := yaml.Unmarshal(existingData, &config); err != nil {
-			// If we can't parse it, start fresh
-			dependabotLog.Print("Could not parse existing dependabot.yml, creating new one")
-			config = DependabotConfig{Version: 2}
-		}
-	} else {
-		// New dependabot.yml
-		dependabotLog.Print("Creating new dependabot.yml")
-		config = DependabotConfig{Version: 2}
-	}
-
-	return config, nil
-}
-
-// addMissingDependabotEcosystems appends update entries for ecosystems that don't already
-// have a .github/workflows entry in the given config.
-func addMissingDependabotEcosystems(config *DependabotConfig, ecosystems map[string]struct{}) {
-	for ecosystem := range ecosystems {
-		exists := false
-		for _, update := range config.Updates {
-			if update.PackageEcosystem == ecosystem && update.Directory == "/.github/workflows" {
-				exists = true
-				break
-			}
-		}
-
-		if !exists {
-			entry := DependabotUpdateEntry{
-				PackageEcosystem: ecosystem,
-				Directory:        "/.github/workflows",
-			}
-			entry.Schedule.Interval = "weekly"
-			config.Updates = append(config.Updates, entry)
-		}
-	}
-}
 
 // generateDependabotConfig creates or updates .github/dependabot.yml
 func (c *Compiler) generateDependabotConfig(path string, ecosystems map[string]struct {
 }, forceOverwrite bool) error {
 	dependabotLog.Printf("Generating dependabot.yml at %s", path)
 
-	config, err := loadOrInitDependabotConfig(path)
-	if err != nil {
-		return err
+	directories := make(map[string][]string, len(ecosystems))
+	for ecosystem := range ecosystems {
+		directories[ecosystem] = []string{"/.github/workflows"}
 	}
-	addMissingDependabotEcosystems(&config, ecosystems)
-
-	// Write dependabot.yml
-	yamlData, err := yaml.Marshal(&config)
-	if err != nil {
-		return fmt.Errorf("failed to marshal dependabot.yml: %w", err)
-	}
-
-	if err := os.WriteFile(path, yamlData, constants.FilePermPublic); err != nil {
-		return fmt.Errorf("failed to write dependabot.yml: %w", err)
-	}
-
-	dependabotLog.Print("Successfully wrote dependabot.yml")
-	if c.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Updated .github/dependabot.yml"))
-	}
-
-	// Track the created file
-	if c.fileTracker != nil {
-		c.fileTracker.TrackCreated(path)
-	}
-
-	return nil
+	return c.generateDependabotConfigForDirectories(path, directories)
 }
 
 // ReconcileManagedDependabotIgnores updates existing github-actions entries in .github/dependabot.yml
@@ -130,7 +56,7 @@ func (c *Compiler) ReconcileManagedDependabotIgnores(path string) error {
 		return nil
 	}
 
-	managedPatterns := []string{c.effectiveActionsRepo() + "/*"}
+	managedPatterns := []string{strings.Join([]string{c.effectiveActionsRepo(), "*"}, "/")}
 	changed := false
 	originalStr := string(original)
 	managedPatternsWithComment := managedPatternsWithInlineComment(originalStr, managedPatterns)
@@ -179,8 +105,8 @@ func reconcileGithubActionsIgnoreEntry(updateAny any, managedPatterns []string, 
 		return reconcileGithubActionsIgnoreResult{}
 	}
 
-	ecosystem, _ := updateMap["package-ecosystem"].(string)
-	if ecosystem != "github-actions" {
+	ecosystem, ok := updateMap["package-ecosystem"].(string)
+	if !ok || ecosystem != "github-actions" {
 		return reconcileGithubActionsIgnoreResult{}
 	}
 
@@ -204,8 +130,8 @@ func reconcileGithubActionsIgnoreEntry(updateAny any, managedPatterns []string, 
 	reconciledIgnoreEntries := make([]any, 0, len(ignoreEntries))
 	for _, ignoreEntryAny := range ignoreEntries {
 		ignoreEntryMap, ok := dependabotToStringAnyMap(ignoreEntryAny)
-		dependencyName, _ := ignoreEntryMap["dependency-name"].(string)
-		if !ok || dependencyName == "" {
+		dependencyName, isString := ignoreEntryMap["dependency-name"].(string)
+		if !ok || !isString || dependencyName == "" {
 			reconciledIgnoreEntries = append(reconciledIgnoreEntries, ignoreEntryAny)
 			continue
 		}
@@ -263,7 +189,7 @@ func dependabotToAnySlice(value any) ([]any, bool) {
 	length := rv.Len()
 	out := make([]any, length)
 	for i := range length {
-		out[i] = rv.Index(i).Interface()
+		out[i] = rv.Index(i).Interface() //nolint:uncheckedsliceindex // The output and ranged indices both have length rv.Len().
 	}
 	return out, true
 }
@@ -348,8 +274,8 @@ func normalizeDependabotIgnoreEntries(content []byte, managedPatterns []string) 
 			continue
 		}
 
-		prefix := parts[0] + "dependency-name: "
-		rawDependencyName := strings.TrimSpace(parts[1])
+		prefix := parts[0] + "dependency-name: "         //nolint:uncheckedsliceindex // The split was verified to produce exactly two parts.
+		rawDependencyName := strings.TrimSpace(parts[1]) //nolint:uncheckedsliceindex // The split was verified to produce exactly two parts.
 		quote := `"`
 		// Assume quote characters are balanced when present. If the scalar starts
 		// with a quote but does not end with the same quote, skip normalization.

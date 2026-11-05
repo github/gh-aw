@@ -258,6 +258,11 @@
         ["ci", "testing"]
       ]
     },
+    "apm": {
+      "type": "string",
+      "pattern": "^(?:[A-Za-z0-9_.-]+/)*apm\\.yml$",
+      "description": "Path to an OpenAPM manifest, relative to this workflow. Native compilation consumes direct GitHub skills from the adjacent apm.lock.yaml, without installing Microsoft APM. Paths must remain inside the repository; for a root manifest use ../../apm.yml."
+    },
     "skills": {
       "type": "array",
       "description": "Optional list of skill references to install during activation. Supports remote repository-wide installs (`owner/repo@<sha>`), remote path-scoped installs (`owner/repo/skill/path@<sha>`), and local path references (e.g. `skills/rig` or `.github/skills/my-skill`). Remote static references may use a full 40-character lowercase commit SHA, or a branch/tag name (resolved to a SHA at compile time). Omitting the ref (`owner/repo@`) opts out of pinning and triggers a compile-time warning. Local paths are installed with --from-local at runtime and are rewritten to a remote repospec by `gh aw add`. GitHub Actions expressions (`${{ ... }}`) are also accepted and are evaluated at runtime. Entries may also be objects to configure per-skill authentication via github-token or github-app.",

@@ -68,6 +68,7 @@ type WorkflowData struct {
 	ImportedFiles                  []string         // list of files imported via imports field (rendered as comment in lock file)
 	Skills                         []string         // skill specs from frontmatter (owner/repo@sha or owner/repo/skill/path@sha)
 	SkillReferences                []SkillReference
+	APMManifestPath                string // Repository-relative consumed apm.yml path for Dependabot configuration
 	Plugins                        []string
 	PluginReferences               []PluginReference
 	ImportedMarkdown               string   // Only imports WITH inputs (for compile-time substitution)

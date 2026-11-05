@@ -45,10 +45,29 @@ updates:
 
 All ecosystems update `.github/dependabot.yml` with weekly update schedules. Existing configurations are preserved; only missing ecosystems are added.
 
+## APM version updates
+
+Workflows using [`apm:` manifest-backed skills](/gh-aw/reference/dependencies/#native-manifest-backed-skills) cause `gh aw compile --dependabot` to add weekly `package-ecosystem: apm` entries for the consumed manifest directories. The compiler preserves existing schedules, registries, groups, cooldowns, ignore rules, and comments; an existing `directories:` entry covering the path is reused. Invalid configuration is reported without overwriting it.
+
+```yaml
+version: 2
+updates:
+  - package-ecosystem: apm
+    directory: /
+    schedule:
+      interval: weekly
+```
+
+Unlike generated npm/pip/Go inventories, `apm.yml` and `apm.lock.yaml` are authored dependency sources: the compiler never overwrites them. Dependabot updates supported Git references in the manifest and regenerates an existing lockfile. Branch pins such as `#main` update only the lockfile. Dependabot does not create missing locks and does not provide APM security updates.
+
+After an APM Dependabot update, recompile the affected workflow and commit its `.lock.yml` with the manifest/lock changes. Do not translate those updates back into Markdown package lists. The compiled native skill pins and stale-check hash both depend on the committed APM documents.
+
+Private Git repository access must be configured for Dependabot independently of the credentials used by workflow skill installation. The shared APM component's inline `packages:` list is not scanned by Dependabot's APM ecosystem.
+
 ## Handling Dependabot PRs
 
 > [!WARNING]
-> **Never merge Dependabot PRs that only modify manifest files.** These changes are overwritten on next compilation.
+> **Never merge Dependabot PRs that only modify compiler-generated npm, pip, or Go manifest files.** These changes are overwritten on next compilation. This warning does not apply to authored APM manifests and lockfiles.
 
 **Correct workflow**: Update source `.md` files, then recompile to regenerate manifests.
 

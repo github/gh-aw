@@ -292,6 +292,10 @@ tools:
 
 See [Tools](/gh-aw/reference/tools/) for complete documentation on built-in tools, GitHub toolsets, and MCP server configuration.
 
+### APM manifest (`apm:`)
+
+Consumes direct GitHub skills from a committed `apm.yml` and adjacent `apm.lock.yaml` without installing Microsoft APM. The path is relative to the workflow and confined to the repository; `apm: ../../apm.yml` selects a root manifest. Missing or stale locks and unsupported package features fail compilation. See [Native manifest-backed skills](/gh-aw/reference/dependencies/#native-manifest-backed-skills) for the supported contract.
+
 ### Frontmatter Skills (`skills:`)
 
 Installs Copilot skills in the activation job before the agent runs.

@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://microsoft.github.io/apm/specs/schemas/manifest-v0.1.48.schema.json",
+  "title": "OpenAPM Manifest (apm.yml) v0.1, schema revision 0.1.48",
+  "description": "Structural JSON Schema (Draft 2020-12) for the existing OpenAPM v0.1 dependency and MCP contract. Where this schema and the prose of OpenAPM v0.1 disagree, the prose is authoritative.",
+  "type": "object",
+  "required": ["name", "version"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1 },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$"
+    },
+    "description": { "type": "string" },
+    "author": { "type": "string" },
+    "license": { "type": "string" },
+    "default_host": { "type": "string", "minLength": 1 },
+    "target": {
+      "description": "Legacy-compatible target restriction spelling; null means omitted. Mutually exclusive with targets. See req-tg-008.",
+      "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }, { "type": "null" }]
+    },
+    "targets": {
+      "description": "Canonical target restriction set or all sentinel; mutually exclusive with target. See req-tg-008.",
+      "oneOf": [
+        { "type": "string", "minLength": 1, "pattern": "^(all|[a-z][a-z0-9-]*)$" },
+        { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1, "pattern": "^(all|[a-z][a-z0-9-]*)$" } }
+      ]
+    },
+    "type": { "type": "string", "enum": ["instructions", "skill", "hybrid", "prompts"] },
+    "scripts": { "type": "object", "additionalProperties": { "type": "string" } },
+    "includes": {
+      "oneOf": [{ "const": "auto" }, { "type": "array", "items": { "type": "string" } }]
+    },
+    "registries": {
+      "type": "object",
+      "additionalProperties": {
+        "oneOf": [
+          { "type": "string" },
+          {
+            "type": "object",
+            "required": ["url"],
+            "properties": {
+              "url": { "type": "string", "pattern": "^https?://" },
+              "insecure": { "type": "boolean" },
+              "aliases": { "type": "array", "items": { "type": "string" } }
+            },
+            "patternProperties": { "^x-[a-z][a-z0-9-]*$": {} },
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "dependencies": { "$ref": "#/$defs/depsBlock" },
+    "devDependencies": { "$ref": "#/$defs/depsBlock" },
+    "compilation": { "type": "object" },
+    "policy": {
+      "type": "object",
+      "properties": {
+        "hash": { "type": "string" },
+        "hash_algorithm": { "enum": ["sha256", "sha384", "sha512"] }
+      }
+    },
+    "marketplace": { "type": "object" }
+  },
+  "patternProperties": { "^x-[a-z][a-z0-9-]*$": {} },
+  "$comment": "Mutual exclusivity: target and targets MUST NOT both appear (req-tg-008).",
+  "not": { "required": ["target", "targets"] },
+  "additionalProperties": true,
+  "$defs": {
+    "depsBlock": {
+      "type": "object",
+      "properties": {
+        "apm": { "type": "array", "items": { "$ref": "#/$defs/depEntry" } },
+        "mcp": { "type": "array", "items": { "$ref": "#/$defs/mcpEntry" } },
+        "conflict_resolution": {
+          "enum": ["intersection-pick"],
+          "$comment": "v0.1 admits only `intersection-pick` (the default tri-modal policy clause per sec.7.2). The token `nest` is reserved for v0.2; consumers MUST refuse v0.1 manifests declaring `nest` per req-rs-013."
+        }
+      },
+      "patternProperties": { "^x-[a-z][a-z0-9-]*$": {} },
+      "additionalProperties": true
+    },
+    "depEntry": {
+      "oneOf": [
+        { "type": "string", "minLength": 1 },
+        {
+          "type": "object",
+          "properties": {
+            "git": { "type": "string", "pattern": "\\S" },
+            "id": { "type": "string", "pattern": "\\S" },
+            "registry": { "type": "string", "pattern": "\\S" },
+            "version": { "type": "string", "pattern": "\\S" },
+            "ref": { "type": "string", "pattern": "\\S" },
+            "prerelease": { "type": "boolean" },
+            "path": { "type": "string", "pattern": "\\S" },
+            "alias": {
+              "type": "string",
+              "pattern": "^\\s*(?!\\.{1,2}\\s*(?![\\s\\S]))[a-zA-Z0-9._-]+\\s*(?![\\s\\S])",
+              "description": "Alias input is trimmed and validated per req-mf-025; source paths are independent."
+            },
+            "skills": { "type": "array", "items": { "type": "string" } }
+          },
+          "patternProperties": { "^x-[a-z][a-z0-9-]*$": {} },
+          "additionalProperties": true,
+          "oneOf": [
+            {
+              "required": ["git"],
+              "not": { "anyOf": [{ "required": ["id"] }, { "required": ["registry"] }] }
+            },
+            {
+              "required": ["id", "version"],
+              "not": { "required": ["git"] }
+            },
+            {
+              "required": ["path"],
+              "not": { "anyOf": [{ "required": ["git"] }, { "required": ["id"] }, { "required": ["registry"] }] }
+            }
+          ]
+        }
+      ]
+    },
+    "mcpEntry": {
+      "oneOf": [
+        { "type": "string", "minLength": 1 },
+        {
+          "type": "object",
+          "required": ["name"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "registry": { "type": ["boolean", "string"] },
+            "transport": { "enum": ["stdio", "http", "sse", "streamable-http"] },
+            "type": { "enum": ["stdio", "http", "sse", "streamable-http"] },
+            "command": { "type": "string", "minLength": 1 },
+            "url": { "type": "string", "pattern": "^[Hh][Tt][Tt][Pp][Ss]?:" },
+            "cwd": { "type": "string" },
+            "args": { "type": ["array", "object"] },
+            "env": { "type": "object", "additionalProperties": { "type": "string" } },
+            "headers": { "type": "object", "additionalProperties": { "type": "string" } },
+            "tools": { "type": "array", "items": { "type": "string" } },
+            "version": { "type": "string" },
+            "package": { "enum": ["npm", "pypi", "oci"] }
+          },
+          "additionalProperties": true,
+          "allOf": [
+            {
+              "if": { "required": ["registry"], "properties": { "registry": { "const": false } } },
+              "then": {
+                "required": ["transport"],
+                "allOf": [
+                  {
+                    "if": { "required": ["transport"], "properties": { "transport": { "const": "stdio" } } },
+                    "then": {
+                      "required": ["command"],
+                      "if": { "not": { "required": ["args"] } },
+                      "then": { "properties": { "command": { "pattern": "^\\S+(?![\\s\\S])" } } }
+                    }
+                  },
+                  {
+                    "if": { "required": ["transport"], "properties": { "transport": { "enum": ["http", "sse", "streamable-http"] } } },
+                    "then": { "required": ["url"] }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

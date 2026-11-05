@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://microsoft.github.io/apm/specs/schemas/lockfile-v0.1.schema.json",
+  "title": "OpenAPM Lockfile (apm.lock.yaml) v0.1",
+  "description": "Normative JSON Schema (Draft 2020-12) for the OpenAPM v0.1 lockfile. Where this schema and the prose of OpenAPM v0.1 disagree, the prose is authoritative.",
+  "type": "object",
+  "required": ["lockfile_version", "dependencies"],
+  "properties": {
+    "lockfile_version": { "enum": ["1", "2"] },
+    "generated_at": { "type": "string" },
+    "apm_version": { "type": "string" },
+    "dependencies": { "type": "array", "items": { "$ref": "#/$defs/entry" } },
+    "mcp_servers": { "type": "array" },
+    "mcp_configs": { "type": "object" },
+    "local_deployed_files": { "type": "array", "items": { "type": "string" } },
+    "local_deployed_file_hashes": {
+      "type": "object",
+      "additionalProperties": {
+        "$comment": "Bare-hex form retained for v0.1 reader-tolerance per req-lk-016; v0.2 will require the sha256: envelope exclusively.",
+        "type": "string",
+        "pattern": "^(sha256:[0-9a-f]{64}|sha384:[0-9a-f]{96}|sha512:[0-9a-f]{128}|[0-9a-f]{64})$"
+      }
+    },
+    "attestations": { "type": "object", "description": "Reserved for v0.2 (publisher provenance). Readers MUST preserve byte-equivalent on round-trip." }
+  },
+  "patternProperties": { "^x-[a-z][a-z0-9-]*$": {} },
+  "additionalProperties": true,
+  "$defs": {
+    "hashEnvelope": {
+      "type": "string",
+      "pattern": "^(sha256:[0-9a-f]{64}|sha384:[0-9a-f]{96}|sha512:[0-9a-f]{128}|[0-9a-f]{64})$"
+    },
+    "entry": {
+      "type": "object",
+      "properties": {
+        "repo_url": { "type": "string", "minLength": 1 },
+        "materialization_repo_url": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Source-cased repository identifier for materialization; non-identity metadata per req-lk-022.",
+          "$comment": "MUST map to the same canonical identity as repo_url under req-rs-016."
+        },
+        "host": { "type": "string" },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "registry_prefix": { "type": "string" },
+        "resolved_ref": { "type": "string" },
+        "resolved_commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "tree_sha256": { "$ref": "#/$defs/hashEnvelope" },
+        "version": { "type": "string" },
+        "virtual_path": { "type": "string" },
+        "is_virtual": { "type": "boolean" },
+        "depth": { "type": "integer", "minimum": 0 },
+        "resolved_by": { "type": "string" },
+        "package_type": { "type": "string" },
+        "skill_subset": { "type": "array", "items": { "type": "string" } },
+        "deployed_files": { "type": "array", "items": { "type": "string" } },
+        "deployed_file_hashes": { "type": "object", "additionalProperties": { "$ref": "#/$defs/hashEnvelope" } },
+        "source": { "enum": ["local", "registry"] },
+        "resolved_url": { "type": "string" },
+        "resolved_hash": { "$ref": "#/$defs/hashEnvelope" },
+        "local_path": { "type": "string" },
+        "content_hash": { "$ref": "#/$defs/hashEnvelope" },
+        "is_dev": { "type": "boolean" },
+        "constraint": { "type": "string" },
+        "resolved_tag": { "type": "string" },
+        "resolved_at": { "type": "string" },
+        "name": { "type": "string" },
+        "declared_license": { "type": "string" },
+        "attestations": { "type": "object" }
+      },
+      "patternProperties": { "^x-[a-z][a-z0-9-]*$": {} },
+      "additionalProperties": true
+    }
+  }
+}

@@ -219,6 +219,9 @@ func (c *Compiler) validateToolConfiguration(workflowData *WorkflowData, markdow
 		return err
 	}
 	c.emitGeneralToolWarnings(workflowData, markdownPath)
+	if err := c.resolveAPMManifestSkills(workflowData, markdownPath); err != nil {
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
+	}
 	c.resolveFrontmatterSkillRefs(workflowData, markdownPath)
 	if err := c.validatePlugins(workflowData); err != nil {
 		return err

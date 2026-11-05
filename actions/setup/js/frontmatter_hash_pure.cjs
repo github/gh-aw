@@ -119,7 +119,9 @@ async function computeFrontmatterHash(workflowPath, options = {}) {
   // Add the main frontmatter text as-is (trimmed and normalized)
   const normalizedFrontmatter = normalizeFrontmatterText(frontmatterText);
   const normalizedImportedFrontmatterTexts = importedFrontmatterTexts.map(t => normalizeFrontmatterText(t));
-  validateNormalizedFrontmatterHashInputSize(normalizedFrontmatter, normalizedImportedFrontmatterTexts);
+  const apmDocuments = await readAPMHashDocuments(frontmatterText, baseDir, fileReader);
+  validateNormalizedFrontmatterHashInputSize(normalizedFrontmatter, [...normalizedImportedFrontmatterTexts, ...apmDocuments]);
+  if (apmDocuments.length > 0) canonical["apm-documents"] = apmDocuments;
   canonical["frontmatter-text"] = normalizedFrontmatter;
 
   log(`Normalized frontmatter-text:\n${normalizedFrontmatter}`);
@@ -402,6 +404,25 @@ function scanTemplateExpressions(source) {
     offset = end + 2;
   }
   return expressions;
+}
+
+/**
+ * @param {string} frontmatterText
+ * @param {string} baseDir
+ * @param {Function} fileReader
+ * @returns {Promise<string[]>}
+ */
+async function readAPMHashDocuments(frontmatterText, baseDir, fileReader) {
+  const match = frontmatterText.match(/^(?:apm|"apm"|'apm'):[ \t]*(?:"([A-Za-z0-9_./-]+)"|'([A-Za-z0-9_./-]+)'|([A-Za-z0-9_./-]+))[ \t]*(?:#.*)?$/m);
+  if (!match) return [];
+  const manifest = match[1] || match[2] || match[3];
+  const manifestPath = path.join(baseDir, manifest);
+  const documents = [];
+  for (const file of [manifestPath, path.join(path.dirname(manifestPath), "apm.lock.yaml")]) {
+    const content = await fileReader(file);
+    documents.push(normalizeFrontmatterText(content));
+  }
+  return documents;
 }
 
 /**

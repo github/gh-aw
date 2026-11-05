@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 
 	"github.com/github/gh-aw/pkg/console"
@@ -86,8 +87,17 @@ func (c *Compiler) GenerateDependabotManifests(ctx context.Context, workflowData
 		ecosystems["gomod"] = struct{}{}
 	}
 
+	directories := make(map[string][]string)
+	for ecosystem := range ecosystems {
+		directories[ecosystem] = []string{"/.github/workflows"}
+	}
+	for _, data := range workflowDataList {
+		if data.APMManifestPath != "" {
+			directories["apm"] = append(directories["apm"], path.Join("/", filepath.ToSlash(filepath.Dir(data.APMManifestPath))))
+		}
+	}
 	// If no dependencies found at all, skip
-	if len(ecosystems) == 0 {
+	if len(directories) == 0 {
 		dependabotLog.Print("No dependencies found, skipping manifest generation")
 		if c.verbose {
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No dependencies detected in workflows, skipping Dependabot manifest generation"))
@@ -97,7 +107,7 @@ func (c *Compiler) GenerateDependabotManifests(ctx context.Context, workflowData
 
 	// Generate dependabot.yml with all detected ecosystems
 	dependabotPath := filepath.Join(filepath.Dir(workflowDir), "dependabot.yml")
-	if err := c.generateDependabotConfig(dependabotPath, ecosystems, forceOverwrite); err != nil {
+	if err := c.generateDependabotConfigForDirectories(dependabotPath, directories); err != nil {
 		if err := c.handleManifestGenerationError("dependabot.yml", err); err != nil {
 			return err
 		}
