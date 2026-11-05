@@ -1,4 +1,4 @@
-# ADR-74992: Outcome-Backed Experiment Metrics with a Fixed, Configurable Maturity Window
+# ADR-74992: Outcome-Backed Experiment Metrics with a Learned Maturity Window
 
 **Date**: 2026-11-05
 **Status**: Draft
@@ -14,15 +14,15 @@
 
 We will add two outcome-backed metric references, `outcome:accepted` and `outcome:zero_touch`. They are valid in `metric`, `secondary_metrics`, and `guardrail_metrics`. The `experiments analyze` CLI computes them on demand by running the existing deterministic outcome evaluators over each assigned run in the assignment history. Each mature run contributes one observation to the existing observation-set and statistics pipeline. The value is accepted (or zero-touch) outputs divided by resolved outputs. Resolved outputs are accepted, rejected, and stale-pending outputs; stale-pending outputs count toward the denominator but never the numerator.
 
-Run maturity uses a **fixed, per-experiment `outcome_window`**. It is a positive Go duration that defaults to `72h`, and the compiler validates it. The issue proposed a window learned per workflow with Kaplan–Meier (`outcome_window: auto`); we did not implement it. Runs younger than the window are reported as `immature` and do not count toward `min_samples`. The analyzer never treats incomplete evidence as a negative outcome:
+Run maturity uses a **per-workflow `outcome_window`**. It defaults to `auto`, which estimates the pooled 95th-percentile time to decision across variants using Kaplan–Meier estimation. Still-open outputs are right-censored at their current age. The estimated window is clamped to 24 hours–30 days and falls back to `72h` until at least 20 outputs have known decision times. An explicit positive Go duration overrides learning. Runs younger than the effective window are reported as `immature` and do not count toward `min_samples`. The analyzer never treats incomplete evidence as a negative outcome:
 - Unknown or errored outcomes and accepted PRs with incomplete zero-touch evidence are excluded as `unavailable`. To support this, a new `ZeroTouchEvidenceComplete` field on `OutcomeReport` separates "a human touched the PR" from "the evidence is incomplete".
 - Runs with no outcome-bearing outputs are excluded as `no_op`, so a variant cannot win by doing less.
 
 ### Alternatives Considered
 
-#### Alternative 1: Learn the maturity window per workflow (Kaplan–Meier, `outcome_window: auto`)
+#### Alternative 1: Use a fixed 72-hour default
 
-Issue #74988 proposed estimating time to decision from the experiment's own pooled outputs. Pending outputs would be treated as censored, and the window would be set at the 95th percentile, clamped to 24 h–30 days, with a 72 h cold-start fallback. This adapts to slow-review repositories and avoids delaying analysis for fast workflows. It was not chosen in this PR. It adds a survival estimator, a minimum-sample fallback, and an analysis-time window that changes as data arrives, so results are harder to reproduce between analyze runs. A fixed 72 h default already covers 99.9% of the measured gh-aw PRs, and slower workflows can set an explicit duration. [TODO: verify whether learned windows are deferred to a follow-up or rejected.]
+One fixed 72-hour default is simple and covered 99.9% of the measured gh-aw PRs, but the per-workflow p95 ranged from 2.2 h to 48.7 h. That delays analysis for fast workflows and can score slow-but-good outputs as pending. Explicit durations remain available when a repository needs stable policy, while the learned default adapts to observed decision latency.
 
 #### Alternative 2: Measure outcomes with graders or a scheduled background collector
 
@@ -41,8 +41,8 @@ Each safe output could be treated as an independent observation. This gives more
 - The change reuses the existing observation-set type, R-STAT-004 test selection, and outcome evaluators, and it needs no new scheduled infrastructure.
 
 #### Negative
-- A single fixed default (72 h) does not fit every workflow. For slow-review repositories, slow-but-good PRs will be scored as stale-pending zeros unless authors raise `outcome_window` by hand. For fast workflows, analysis is delayed longer than needed.
-- `experiments analyze` now makes GitHub API calls for every mature assigned run. This increases analysis latency, rate-limit exposure, and dependence on network availability at analyze time.
+- Learned windows can change as new outcomes arrive, so analyses may use different maturity cutoffs over time. Explicit durations provide a stable alternative.
+- `experiments analyze` now makes GitHub API calls for assigned runs, including recent runs used as censored observations. This increases analysis latency, rate-limit exposure, and dependence on network availability at analyze time.
 - Outcome values are re-evaluated each time analyze runs, so a run's observation can change between runs (for example, a stale-pending PR that is merged later). Analyze results are therefore not strictly reproducible.
 - Ratios from runs that create several outputs produce fractional values, which force Welch's t-test instead of the two-proportion test and reduce statistical power for those experiments.
 

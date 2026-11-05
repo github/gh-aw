@@ -3544,8 +3544,8 @@
               "outcome_window": {
                 "type": "string",
                 "minLength": 1,
-                "default": "72h",
-                "description": "Positive Go duration before a run is mature enough for outcome-backed metrics (e.g. '72h' or '1h30m'). Defaults to 72h."
+                "default": "auto",
+                "description": "Use 'auto' to learn the maturity window from outcome decision times, or specify a positive Go duration (e.g. '72h' or '1h30m'). Defaults to auto."
               },
               "weight": {
                 "type": "array",

@@ -519,10 +519,10 @@ func validateExperimentMetricReferences(configs map[string]*ExperimentConfig, ev
 		if cfg == nil {
 			continue
 		}
-		if cfg.OutcomeWindow != "" {
+		if cfg.OutcomeWindow != "" && cfg.OutcomeWindow != "auto" {
 			window, err := time.ParseDuration(cfg.OutcomeWindow)
 			if err != nil || window <= 0 {
-				return fmt.Errorf("experiments.%s.outcome_window: invalid duration %q. Expected a positive Go duration. Example: outcome_window: 72h", experimentName, cfg.OutcomeWindow)
+				return fmt.Errorf("experiments.%s.outcome_window: invalid value %q. Expected \"auto\" or a positive Go duration. Example: outcome_window: 72h", experimentName, cfg.OutcomeWindow)
 			}
 		}
 		if cfg.Continual != nil {

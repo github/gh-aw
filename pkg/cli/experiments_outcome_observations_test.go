@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -59,7 +60,7 @@ func TestOutcomeMetricRunValue(t *testing.T) {
 		{name: "zero touch", kind: "zero_touch", items: []OutcomeReport{merged}, value: 1, measured: true},
 		{name: "human touch is zero", kind: "zero_touch", items: []OutcomeReport{touched}, measured: true},
 		{name: "incomplete is excluded", kind: "zero_touch", items: []OutcomeReport{incomplete}, coverage: OutcomeMetricCoverage{Unavailable: 1}},
-		{name: "non PR acceptance has unknown zero touch evidence", kind: "zero_touch", items: []OutcomeReport{nonPR}, coverage: OutcomeMetricCoverage{Unavailable: 1}},
+		{name: "non PR acceptance contributes zero to zero touch", kind: "zero_touch", items: []OutcomeReport{nonPR}, measured: true},
 		{name: "rejected needs no touch evidence", kind: "zero_touch", items: []OutcomeReport{rejected}, measured: true},
 		{name: "pending needs no touch evidence", kind: "zero_touch", items: []OutcomeReport{pending}, measured: true, coverage: OutcomeMetricCoverage{StalePending: 1}},
 		{name: "incomplete does not affect acceptance", kind: "accepted", items: []OutcomeReport{incomplete}, value: 1, measured: true},
@@ -106,7 +107,7 @@ func TestOutcomeMetricMaturityAndAssignmentJoin(t *testing.T) {
 	refs := map[string]string{"prompt": "accepted"}
 	windows := map[string]time.Duration{"prompt": defaultExperimentOutcomeWindow}
 	source := &fixtureOutcomeRunSource{}
-	data := loadOutcomeRunData(context.Background(), runs, windows, now, source)
+	data := loadOutcomeRunData(context.Background(), runs, windows, nil, now, source)
 	assert.Equal(t, []string{"mature"}, source.calls, "only assigned, mature runs are collected and shared across metrics")
 	set := buildOutcomeMetricObservationSets(experiments, runs, refs, windows, now, data)["prompt"]
 	require.Len(t, set.ByVariant["control"], 1)
@@ -119,7 +120,7 @@ func TestOutcomeMetricMaturityAndAssignmentJoin(t *testing.T) {
 
 	windows["prompt"] = 70 * time.Hour
 	source = &fixtureOutcomeRunSource{}
-	_ = loadOutcomeRunData(context.Background(), runs, windows, now, source)
+	_ = loadOutcomeRunData(context.Background(), runs, windows, nil, now, source)
 	assert.ElementsMatch(t, []string{"mature", "young"}, source.calls)
 }
 
@@ -168,10 +169,10 @@ func TestOutcomeMetricPerExperimentWindowsShareCollection(t *testing.T) {
 		"short": {Metric: "outcome:accepted", OutcomeWindow: "24h"},
 		"long":  {Metric: "outcome:zero_touch", OutcomeWindow: "72h"},
 	}
-	refs, _, windows, err := resolveOutcomeMetricReferences(configs)
+	refs, _, windows, automatic, err := resolveOutcomeMetricReferences(configs)
 	require.NoError(t, err)
 	source := &fixtureOutcomeRunSource{}
-	data := loadOutcomeRunData(context.Background(), runs, windows, now, source)
+	data := loadOutcomeRunData(context.Background(), runs, windows, automatic, now, source)
 	assert.Equal(t, []string{"shared"}, source.calls)
 	experiments := []ExperimentVariantStats{
 		{Name: "short", Variants: map[string]int{"control": 2}, Total: 2},
@@ -183,10 +184,10 @@ func TestOutcomeMetricPerExperimentWindowsShareCollection(t *testing.T) {
 	assert.Equal(t, 1, sets["long"].Coverage["candidate"].Immature)
 
 	configs["long"].OutcomeWindow = "36h"
-	refs, _, windows, err = resolveOutcomeMetricReferences(configs)
+	refs, _, windows, automatic, err = resolveOutcomeMetricReferences(configs)
 	require.NoError(t, err)
 	source = &fixtureOutcomeRunSource{}
-	data = loadOutcomeRunData(context.Background(), runs, windows, now, source)
+	data = loadOutcomeRunData(context.Background(), runs, windows, automatic, now, source)
 	assert.Equal(t, []string{"shared"}, source.calls, "both mature experiments share one collection")
 	sets = buildOutcomeMetricObservationSets(experiments, runs, refs, windows, now, data)
 	assert.Len(t, sets["short"].ByVariant["control"], 1)
@@ -198,28 +199,105 @@ func TestResolveOutcomeMetricReferences(t *testing.T) {
 	configs := map[string]*workflow.ExperimentConfig{
 		"prompt": {Metric: "outcome:accepted", GuardrailMetrics: []workflow.GuardrailMetric{{Name: "outcome:zero_touch", Threshold: ">=0.5"}}},
 	}
-	primary, guardrails, windows, err := resolveOutcomeMetricReferences(configs)
+	primary, guardrails, windows, automatic, err := resolveOutcomeMetricReferences(configs)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]string{"prompt": "accepted"}, primary)
 	assert.Equal(t, "zero_touch", guardrails["prompt"]["outcome:zero_touch"])
 	assert.Equal(t, 72*time.Hour, windows["prompt"])
+	assert.Contains(t, automatic, "prompt")
 	configs["prompt"].OutcomeWindow = "24h"
-	_, _, windows, err = resolveOutcomeMetricReferences(configs)
+	_, _, windows, automatic, err = resolveOutcomeMetricReferences(configs)
 	require.NoError(t, err)
 	assert.Equal(t, 24*time.Hour, windows["prompt"])
+	assert.Empty(t, automatic)
+	configs["prompt"].OutcomeWindow = "auto"
+	_, _, windows, automatic, err = resolveOutcomeMetricReferences(configs)
+	require.NoError(t, err)
+	assert.Equal(t, 72*time.Hour, windows["prompt"])
+	assert.Contains(t, automatic, "prompt")
 	for _, duration := range []string{"-1h", "0s", "bad"} {
 		configs["prompt"].OutcomeWindow = duration
-		_, _, _, err = resolveOutcomeMetricReferences(configs)
+		_, _, _, _, err = resolveOutcomeMetricReferences(configs)
 		require.ErrorContains(t, err, "outcome_window")
 	}
 	configs["prompt"].OutcomeWindow = ""
 	configs["prompt"].Metric = "outcome:merged"
-	_, _, _, err = resolveOutcomeMetricReferences(configs)
+	_, _, _, _, err = resolveOutcomeMetricReferences(configs)
 	require.ErrorContains(t, err, "Expected outcome:accepted or outcome:zero_touch")
 	configs["prompt"].Metric = "grader:score"
 	configs["prompt"].GuardrailMetrics[0].Name = "outcome:typo"
-	_, _, _, err = resolveOutcomeMetricReferences(configs)
+	_, _, _, _, err = resolveOutcomeMetricReferences(configs)
 	require.ErrorContains(t, err, "outcome:typo")
+}
+
+func TestEstimateOutcomeWindow(t *testing.T) {
+	now := time.Date(2026, 11, 5, 0, 0, 0, 0, time.UTC)
+	makeFixture := func(decisions []float64, pending []time.Duration) ([]ExperimentRunRecord, map[string]outcomeRunData) {
+		runs := make([]ExperimentRunRecord, 0, len(decisions)+len(pending))
+		data := make(map[string]outcomeRunData, len(decisions)+len(pending))
+		for i, hours := range decisions {
+			id := fmt.Sprintf("decision-%d", i)
+			runs = append(runs, ExperimentRunRecord{RunID: id, Assignments: map[string]string{"quality": []string{"control", "candidate"}[i%2]}})
+			data[id] = outcomeRunData{Report: OutcomesData{Items: []OutcomeReport{{OutcomeEvaluation: OutcomeEvaluation{OutcomeStatus: OutcomeStatusAccepted}, TimeToOutcomeHours: hours}}}}
+		}
+		for i, age := range pending {
+			id := fmt.Sprintf("pending-%d", i)
+			runs = append(runs, ExperimentRunRecord{RunID: id, Assignments: map[string]string{"quality": "control"}})
+			data[id] = outcomeRunData{Report: OutcomesData{Items: []OutcomeReport{{
+				OutcomeEvaluation: OutcomeEvaluation{OutcomeStatus: OutcomeStatusPending},
+				CreatedAt:         now.Add(-age).Format(time.RFC3339),
+			}}}}
+		}
+		return runs, data
+	}
+
+	t.Run("fallback below twenty decisions", func(t *testing.T) {
+		decisions := make([]float64, minExperimentOutcomeDecisions-1)
+		for i := range decisions {
+			decisions[i] = 48
+		}
+		runs, data := makeFixture(decisions, nil)
+		assert.Equal(t, defaultExperimentOutcomeWindow, estimateOutcomeWindow(runs, map[string]struct{}{"quality": {}}, data, now))
+	})
+
+	t.Run("p95 includes censored pending outputs", func(t *testing.T) {
+		decisions := make([]float64, minExperimentOutcomeDecisions)
+		for i := range decisions {
+			decisions[i] = 60
+			if i < minExperimentOutcomeDecisions-1 {
+				decisions[i] = 48
+			}
+		}
+		runs, data := makeFixture(decisions, []time.Duration{49 * time.Hour})
+		assert.Equal(t, 60*time.Hour, estimateOutcomeWindow(runs, map[string]struct{}{"quality": {}}, data, now))
+	})
+
+	t.Run("p95 is clamped", func(t *testing.T) {
+		decisions := make([]float64, minExperimentOutcomeDecisions)
+		for i := range decisions {
+			decisions[i] = float64((maxExperimentOutcomeWindow + 24*time.Hour).Hours())
+		}
+		runs, data := makeFixture(decisions, nil)
+		assert.Equal(t, maxExperimentOutcomeWindow, estimateOutcomeWindow(runs, map[string]struct{}{"quality": {}}, data, now))
+	})
+
+	t.Run("minimum p95 is clamped", func(t *testing.T) {
+		decisions := make([]float64, minExperimentOutcomeDecisions)
+		for i := range decisions {
+			decisions[i] = 6
+		}
+		runs, data := makeFixture(decisions, nil)
+		assert.Equal(t, minExperimentOutcomeWindow, estimateOutcomeWindow(runs, map[string]struct{}{"quality": {}}, data, now))
+	})
+
+	t.Run("maximum when p95 is not reached", func(t *testing.T) {
+		decisions := make([]float64, minExperimentOutcomeDecisions)
+		for i := range decisions {
+			decisions[i] = 24 * 31
+		}
+		runs, data := makeFixture(decisions, nil)
+		assert.Equal(t, maxExperimentOutcomeWindow, estimateOutcomeWindow(runs, map[string]struct{}{"quality": {}}, data, now))
+	})
 }
 
 func TestOutcomeMetricAnalysisCoverageAndDefaults(t *testing.T) {
@@ -325,7 +403,7 @@ func TestLoadOutcomeObservationSetsUsesLiveCollector(t *testing.T) {
 	assert.Contains(t, string(commands), "--name called-safe-outputs-items")
 	assert.Contains(t, string(commands), "--name called-agent-output-fallback")
 	assert.Contains(t, string(commands), "repos/acme/repo/pulls/42")
-	assert.NotContains(t, string(commands), "runs/102")
+	assert.Contains(t, string(commands), "runs/102", "automatic windows need recent outputs as censored observations")
 	assert.Equal(t, 1, strings.Count(string(commands), "api repos/acme/repo/actions/runs/101 --jq"), "primary and guardrail share one live collection")
 }
 

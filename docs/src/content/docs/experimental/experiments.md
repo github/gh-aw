@@ -308,7 +308,7 @@ experiments:
   prompt_v2:
     variants: [control, candidate]
     metric: outcome:accepted
-    outcome_window: 72h
+    outcome_window: auto
     guardrail_metrics:
       - name: outcome:zero_touch
         threshold: ">=0.8"
@@ -319,8 +319,12 @@ Follow the **${{ experiments.prompt_v2 }}** instructions.
 ```
 
 `gh aw experiments analyze <workflow>` evaluates outcomes on demand; no scheduled
-collector is needed. `outcome_window` is a positive Go duration (default `72h`).
-Only runs at least that old contribute observations. Each run contributes one
+collector is needed. `outcome_window` defaults to `auto`: analysis estimates the
+pooled 95th-percentile decision time across variants with Kaplan–Meier censoring
+for still-open outputs, clamps the window to 24 hours–30 days, and uses `72h`
+until 20 outputs have known decision times. Set a positive Go duration such as
+`72h` to override the learned window. Only runs at least the effective window contribute
+observations. Each run contributes one
 value: accepted outputs divided by resolved outputs, or zero-touch outputs
 divided by resolved outputs. Resolved outputs are accepted, rejected, or still
 pending after the window. Stale pending outputs score zero.

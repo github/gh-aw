@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -66,7 +67,7 @@ func TestValidateExperimentOutcomeMetricReferences(t *testing.T) {
 }
 
 func TestExperimentOutcomeWindow(t *testing.T) {
-	for _, window := range []string{"", "72h", "1h30m", "0.5h", "1ns", "0", "0h", "-1h", "3d", "invalid", " 72h ", "999999999999999999999h"} {
+	for _, window := range []string{"", "auto", "72h", "1h30m", "0.5h", "1ns", "0", "0h", "-1h", "3d", "invalid", " 72h ", "999999999999999999999h"} {
 		t.Run(window, func(t *testing.T) {
 			raw := map[string]any{"variants": []any{"control", "candidate"}, "metric": "outcome:accepted"}
 			if window != "" {
@@ -77,17 +78,17 @@ func TestExperimentOutcomeWindow(t *testing.T) {
 			assert.Equal(t, window, cfg.OutcomeWindow)
 			err := validateExperimentMetricReferences(map[string]*ExperimentConfig{"quality": cfg}, nil, nil)
 			switch window {
-			case "", "72h", "1h30m", "0.5h", "1ns":
+			case "", "auto", "72h", "1h30m", "0.5h", "1ns":
 				require.NoError(t, err)
 				spec := buildExperimentSpecJSON(nil, map[string]*ExperimentConfig{"quality": cfg}, []string{"quality"})
 				if window == "" {
-					assert.NotContains(t, spec, "outcome_window", "omission preserves the analysis default of 72h")
+					assert.NotContains(t, spec, "outcome_window", "omission preserves the analysis default of auto")
 				} else {
 					assert.Contains(t, spec, fmt.Sprintf(`"outcome_window":%q`, window))
 				}
 			default:
 				require.ErrorContains(t, err, "experiments.quality.outcome_window:")
-				require.ErrorContains(t, err, "Expected a positive Go duration. Example: outcome_window: 72h")
+				require.ErrorContains(t, err, `Expected "auto" or a positive Go duration. Example: outcome_window: 72h`)
 			}
 		})
 	}
@@ -100,12 +101,13 @@ func TestParseWorkflowExperimentOutcomes(t *testing.T) {
 		wantErr string
 	}{
 		{"valid", "metric: outcome:accepted\n    secondary_metrics: [outcome:zero_touch]\n    guardrail_metrics:\n      - name: outcome:accepted\n        threshold: '>=0.9'\n    outcome_window: 48h", ""},
+		{"automatic window", "metric: outcome:accepted\n    outcome_window: auto", ""},
 		{"invalid primary", "metric: outcome:merged", `unknown outcome metric "outcome:merged"`},
 		{"invalid secondary", "secondary_metrics: [outcome:merged]", `secondary_metrics: unknown outcome metric "outcome:merged"`},
 		{"invalid guardrail", "guardrail_metrics:\n      - name: outcome:merged\n        threshold: '>=0.9'", `guardrail_metrics: unknown outcome metric "outcome:merged"`},
-		{"invalid window", "outcome_window: 3d", "Expected a positive Go duration"},
-		{"zero window", "outcome_window: 0h", "Expected a positive Go duration"},
-		{"negative window", "outcome_window: -1h", "Expected a positive Go duration"},
+		{"invalid window", "outcome_window: 3d", `Expected "auto" or a positive Go duration`},
+		{"zero window", "outcome_window: 0h", `Expected "auto" or a positive Go duration`},
+		{"negative window", "outcome_window: -1h", `Expected "auto" or a positive Go duration`},
 		{"empty window", "outcome_window: ''", "outcome_window"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -120,8 +122,15 @@ func TestParseWorkflowExperimentOutcomes(t *testing.T) {
 			require.NoError(t, err)
 			cfg := data.ExperimentConfigs["quality"]
 			require.NotNil(t, cfg)
-			assert.Equal(t, "outcome:accepted", cfg.Metric)
-			assert.Equal(t, "48h", cfg.OutcomeWindow)
+			if strings.Contains(tt.fields, "metric: outcome:accepted") {
+				assert.Equal(t, "outcome:accepted", cfg.Metric)
+			}
+			if strings.Contains(tt.fields, "outcome_window: 48h") {
+				assert.Equal(t, "48h", cfg.OutcomeWindow)
+			}
+			if strings.Contains(tt.fields, "outcome_window: auto") {
+				assert.Equal(t, "auto", cfg.OutcomeWindow)
+			}
 		})
 	}
 }

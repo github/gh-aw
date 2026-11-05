@@ -13,6 +13,7 @@ func TestExperimentOutcomeSchema(t *testing.T) {
 		valid  bool
 	}{
 		{"default window", nil, true},
+		{"automatic window", "auto", true},
 		{"explicit window", "72h", true},
 		{"compound duration", "1h30m", true},
 		{"empty window", "", false},
