@@ -88,14 +88,6 @@ func getPushFallbackAsPullRequest(config *PushToPullRequestBranchConfig) bool {
 	return *config.FallbackAsPullRequest
 }
 
-// getCheckBranchProtection returns the effective check-branch-protection setting (defaults to true).
-func getCheckBranchProtection(config *PushToPullRequestBranchConfig) bool {
-	if config == nil || config.CheckBranchProtection == nil {
-		return true // Default: check is enabled
-	}
-	return *config.CheckBranchProtection
-}
-
 // ComputePermissionsForSafeOutputs computes the minimal required permissions
 // based on the configured safe-outputs. This function is used by both the
 // consolidated safe outputs job and the conclusion job to ensure they only
