@@ -261,7 +261,7 @@ or profile/effect-scope bypass.
 | Codes or signature | Check | Remedy |
 | --- | --- | --- |
 | HTTP `401`, `403`, `404`, `429`, `5xx` | Operation, response, proxy guard, policy. | Distinguish auth/SSO, hidden resource, quota, outage; status alone insufficient. |
-| JSON-RPC `-32700`, `-32600`, `-32601`, `-32602`, `-32603`, `isError` | Protocol vs tool failure. | Fix parse/request/method/params/client/schema/server; tool errors need not be protocol errors. |
+| JSON-RPC `-32700`, `-32600`, `-32601`, `-32602`, `-32603`, `isError`, `tool_error` | Protocol vs tool failure. | Fix parse/request/method/params/client/schema/server; tool errors need not be protocol errors. |
 | `EACCES`, `ENOENT`, `ETIMEDOUT`, process exit/signal | Operation/path; fatal vs caught. | Fix boundary; caught `/run/awf-config-audit` warning doesn't prove later inference failure. |
 | Unlisted code, compile/schema/scanner error | Identifier/revision; emitter/caller. | Trace cause; add regression/code row; report gaps, never guess. |
 
