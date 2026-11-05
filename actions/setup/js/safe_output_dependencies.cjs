@@ -123,6 +123,7 @@ function buildSafeOutputDependencyPlan(messages) {
  */
 function isConfirmedDependencySuccess(record) {
   if (isDependencyDelegatedType(record?.type)) return false;
+  // @safe-outputs-exempt USE-003: reads the staged flag only to reject unconfirmed success; renders no staged preview
   if (process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true") return false;
   if (!record || record.success !== true || classifySafeOutputResult(record) !== "success") return false;
   if (pickOutcomeField(record, "staged") || pickOutcomeField(record, "queued") || pickOutcomeField(record, "buffered") || pickOutcomeField(record, "deferred_manifest")) return false;

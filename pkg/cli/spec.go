@@ -39,6 +39,8 @@ type WorkflowSpec struct {
 	// FromRepositoryManifest is true when this workflow was selected from an aw.yml
 	// repository package manifest (root or nested package path).
 	FromRepositoryManifest bool
+	// VersionInferred distinguishes package defaults from explicitly requested refs.
+	VersionInferred bool
 	// RawURL is set only for generic HTTP(S) URL specs whose host is not a recognized
 	// GitHub host.  When non-empty, WorkflowPath, RepoSlug, Version, and Host are all
 	// empty; the spec is resolved by fetching the URL and dispatching on Content-Type.
@@ -478,18 +480,19 @@ func parseSourceSpec(source string) (*SourceSpec, error) {
 	return spec, nil
 }
 
-// buildSourceStringWithCommitSHA builds the source string with the actual commit SHA
-// This is used when adding workflows to include the precise commit that was installed
+// buildSourceStringWithCommitSHA preserves the requested ref for future updates,
+// falling back to the resolved commit SHA when no ref was specified.
 func buildSourceStringWithCommitSHA(workflow *WorkflowSpec, commitSHA string) string {
 	if workflow.RepoSlug == "" || workflow.WorkflowPath == "" {
 		return ""
 	}
 
+	ref := workflow.Version
+	if ref == "" || workflow.VersionInferred {
+		ref = commitSHA
+	}
+
 	if workflow.FromRepositoryManifest {
-		ref := workflow.Version
-		if commitSHA != "" {
-			ref = commitSHA
-		}
 		if ref == "" {
 			return repositoryPackageIdentifier(workflow.RepoSlug, workflow.PackagePath)
 		}
@@ -499,13 +502,10 @@ func buildSourceStringWithCommitSHA(workflow *WorkflowSpec, commitSHA string) st
 	// For local workflows, remove the "./" prefix from the WorkflowPath
 	workflowPath := strings.TrimPrefix(workflow.WorkflowPath, "./")
 
-	// Format: owner/repo/path@commitSHA
+	// Format: owner/repo/path@ref
 	source := workflow.RepoSlug + "/" + workflowPath
-	if commitSHA != "" {
-		source += "@" + commitSHA
-	} else if workflow.Version != "" {
-		// Fallback to the version if no commit SHA is available
-		source += "@" + workflow.Version
+	if ref != "" {
+		source += "@" + ref
 	}
 
 	return source

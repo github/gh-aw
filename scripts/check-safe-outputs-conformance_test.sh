@@ -53,6 +53,40 @@ trap 'rm -f "$OUTPUT"; rm -rf "$FIXTURE_ROOT"' EXIT
     fi
 )
 
+# Exercise REQ-002 with a long type and an incomplete type followed by a complete sibling.
+(
+    cd "$FIXTURE_ROOT"
+    spec="docs/src/content/docs/specs/safe-outputs-specification.md"
+    mkdir -p "$(dirname "$spec")"
+    {
+        printf '#### Type: long_type\n\n**MCP Tool Schema**:\n'
+        for _ in $(seq 1 250); do printf 'filler\n'; done
+        printf '**Operational Semantics**:\n**Configuration Parameters**:\n**Security Requirements**:\n**Required Permissions**:\n\n'
+    } >"$spec"
+
+    log_medium() { echo "MEDIUM: $1"; }
+    log_pass() { echo "PASS: $1"; }
+    eval "$(sed -n '/^check_type_completeness() {/,/^}/p' "$SCRIPT_DIR/check-safe-outputs-conformance.sh")"
+    check_type_completeness >"$OUTPUT"
+    if ! grep -q '^PASS: REQ-002: All safe output types have complete documentation' "$OUTPUT" || grep -q '^MEDIUM:' "$OUTPUT"; then
+        echo "FAIL: REQ-002 must count required sections across the whole type block"
+        cat "$OUTPUT"
+        exit 1
+    fi
+
+    {
+        printf '\n#### Type: short_type\n\n**MCP Tool Schema**:\n**Operational Semantics**:\n'
+        printf '\n#### Type: short_type_sibling\n\n**MCP Tool Schema**:\n**Operational Semantics**:\n'
+        printf '**Configuration Parameters**:\n**Security Requirements**:\n**Required Permissions**:\n\n### Next Section\n'
+    } >>"$spec"
+    check_type_completeness >"$OUTPUT"
+    if ! grep -q "^MEDIUM: REQ-002: Type 'short_type' has only 2/5 required sections" "$OUTPUT" || grep -q '^PASS:' "$OUTPUT"; then
+        echo "FAIL: REQ-002 must report incomplete types and must not pass"
+        cat "$OUTPUT"
+        exit 1
+    fi
+)
+
 bash "$SCRIPT_DIR/check-safe-outputs-transport-integrity_test.sh"
 
 (cd "$REPO_ROOT" && bash "$SCRIPT_DIR/check-safe-outputs-conformance.sh" 2>&1 | sed -E $'s/\033\\[[0-9;]*[[:alpha:]]//g' >"$OUTPUT") || true

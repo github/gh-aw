@@ -123,6 +123,77 @@ describe("azure_devops_work_items", () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
+  it.each([
+    { target: 6779224, id: 6779224 },
+    { target: "*", id: 6779224 },
+    { target: "6779224", id: 6779224 },
+    { target: " 6779224 ", id: 6779224 },
+    { target: ["6779224", 6779225], id: 6779224 },
+    { target: ["6779224", 6779225], id: 6779225 },
+  ])("allows work item $id for target $target without an area-path request", async ({ target, id }) => {
+    global.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: vi.fn().mockResolvedValue(JSON.stringify({ id: 1 })),
+    });
+
+    const result = await createAzureDevOpsWorkItemHandler("ado_comment_on_work_item", {
+      target,
+    })({ work_item_id: id, body: "A comment" }, {});
+
+    expect(result).toMatchObject({ success: true, number: id });
+    expect(global.fetch).toHaveBeenCalledOnce();
+    expect(global.fetch.mock.calls[0][1].method).toBe("POST");
+    expect(global.fetch.mock.calls[0][0]).toBe(`https://dev.azure.com/test-org/test-project/_apis/wit/workItems/${id}/comments?api-version=7.1-preview.4`);
+  });
+
+  it.each([{ target: "6779224" }, { target: " 6779224 " }, { target: ["6779224", 6779226] }])("rejects an ID outside target $target without an area-path request", async ({ target }) => {
+    const result = await createAzureDevOpsWorkItemHandler("ado_comment_on_work_item", {
+      target,
+    })({ work_item_id: 6779225, body: "A comment" }, {});
+
+    expect(result).toEqual({
+      success: false,
+      error: "work item #6779225 is not permitted by the target configuration",
+    });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it.each(["OneCRM\\Team", "OneCRM\\Team\\Subteam", "onecrm\\team"])("preserves area-path matching for %s", async areaPath => {
+    global.fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: vi.fn().mockResolvedValue(JSON.stringify({ fields: { "System.AreaPath": areaPath } })),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: vi.fn().mockResolvedValue(JSON.stringify({ id: 1 })),
+      });
+
+    const result = await createAzureDevOpsWorkItemHandler("ado_comment_on_work_item", {
+      target: "OneCRM\\Team",
+    })({ work_item_id: 6779224, body: "A comment" }, {});
+
+    expect(result).toMatchObject({ success: true, number: 6779224 });
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(global.fetch.mock.calls[0][1].method).toBe("GET");
+    expect(global.fetch.mock.calls[0][0]).toBe("https://dev.azure.com/test-org/test-project/_apis/wit/workitems/6779224?api-version=7.0&fields=System.AreaPath");
+  });
+
+  it.each(["", " \t "])("rejects empty target %j without an area-path request", async target => {
+    const result = await createAzureDevOpsWorkItemHandler("ado_comment_on_work_item", {
+      target,
+    })({ work_item_id: 6779224, body: "A comment" }, {});
+
+    expect(result).toEqual({
+      success: false,
+      error: "target must not be empty; expression targets must evaluate to a work-item ID",
+    });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   it("rejects reserved agent identities", async () => {
     const result = await createAzureDevOpsWorkItemHandler("ado_assign_work_item", {
       target: "*",

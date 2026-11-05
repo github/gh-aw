@@ -1356,6 +1356,14 @@ Authentication uses `SYSTEM_ACCESSTOKEN` when present, otherwise `AZURE_DEVOPS_E
 
 `ado_create_work_item` returns a run-scoped `#aw_...` temporary ID. The other work-item tools accept that ID, and same-run IDs bypass their consuming `target` policy because creation was already scoped by trusted configuration. Numeric IDs are checked against `target`, which accepts `"*"`, a single ID, a list of IDs, or an area-path prefix.
 
+To restrict comments to a work item selected at runtime, set `target` from an expression. The value must evaluate to a positive, safe-integer work-item ID; an empty value is rejected.
+
+```aw wrap
+safe-outputs:
+  ado-comment-on-work-item:
+    target: "${{ inputs.work_item_id }}"
+```
+
 For `ado-update-work-item`, each mutable field must be explicitly enabled. Assignment always rejects the reserved `Agency` and `GitHub Copilot` identities. Attachments must be regular workspace files and are checked for traversal, symbolic links, size, extension, and Azure Pipelines command sequences before upload.
 
 ### No-Op Logging (`noop:`)
