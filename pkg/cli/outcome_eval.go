@@ -27,25 +27,26 @@ var objectiveMappingGHAPIGraphQL = ghAPIGraphQL
 // OutcomeReport is the result of evaluating one safe output item.
 type OutcomeReport struct {
 	OutcomeEvaluation
-	ItemID             string   `json:"item_id,omitempty" console:"-"`
-	Type               string   `json:"type" console:"header:Type"`
-	ObjectURL          string   `json:"object_url,omitempty" console:"header:URL,omitempty"`
-	ObjectNumber       int      `json:"object_number,omitempty" console:"header:#,omitempty"`
-	TracedRootURL      string   `json:"traced_root_url,omitempty" console:"-"`
-	AttributionStatus  string   `json:"attribution_status,omitempty" console:"-"`
-	AttributionSource  string   `json:"attribution_source,omitempty" console:"-"`
-	Repo               string   `json:"repo,omitempty" console:"header:Repo,omitempty"`
-	Detail             string   `json:"detail,omitempty" console:"header:Detail,omitempty"`
-	TimeToOutcomeHours float64  `json:"time_to_outcome_hours,omitempty" console:"header:Time,omitempty"`
-	HumanComments      int      `json:"human_comments,omitempty" console:"header:Comments,omitempty"`
-	HumanEdits         int      `json:"human_edits,omitempty" console:"header:Edits,omitempty"`
-	HumanReviews       int      `json:"human_reviews,omitempty" console:"header:Reviews,omitempty"`
-	ZeroTouch          bool     `json:"zero_touch,omitempty" console:"header:Zero-touch,omitempty"`
-	ObjectiveValue     int      `json:"objective_value,omitempty" console:"header:Obj Value,omitempty"`
-	ObjectiveLabels    []string `json:"objective_labels,omitempty" console:"-"`
-	CreatedAt          string   `json:"created_at" console:"-"`
-	CheckedAt          string   `json:"checked_at" console:"-"`
-	EvalError          string   `json:"eval_error,omitempty" console:"-"`
+	ItemID                    string   `json:"item_id,omitempty" console:"-"`
+	Type                      string   `json:"type" console:"header:Type"`
+	ObjectURL                 string   `json:"object_url,omitempty" console:"header:URL,omitempty"`
+	ObjectNumber              int      `json:"object_number,omitempty" console:"header:#,omitempty"`
+	TracedRootURL             string   `json:"traced_root_url,omitempty" console:"-"`
+	AttributionStatus         string   `json:"attribution_status,omitempty" console:"-"`
+	AttributionSource         string   `json:"attribution_source,omitempty" console:"-"`
+	Repo                      string   `json:"repo,omitempty" console:"header:Repo,omitempty"`
+	Detail                    string   `json:"detail,omitempty" console:"header:Detail,omitempty"`
+	TimeToOutcomeHours        float64  `json:"time_to_outcome_hours,omitempty" console:"header:Time,omitempty"`
+	HumanComments             int      `json:"human_comments,omitempty" console:"header:Comments,omitempty"`
+	HumanEdits                int      `json:"human_edits,omitempty" console:"header:Edits,omitempty"`
+	HumanReviews              int      `json:"human_reviews,omitempty" console:"header:Reviews,omitempty"`
+	ZeroTouch                 bool     `json:"zero_touch,omitempty" console:"header:Zero-touch,omitempty"`
+	ZeroTouchEvidenceComplete bool     `json:"zero_touch_evidence_complete" console:"-"`
+	ObjectiveValue            int      `json:"objective_value,omitempty" console:"header:Obj Value,omitempty"`
+	ObjectiveLabels           []string `json:"objective_labels,omitempty" console:"-"`
+	CreatedAt                 string   `json:"created_at" console:"-"`
+	CheckedAt                 string   `json:"checked_at" console:"-"`
+	EvalError                 string   `json:"eval_error,omitempty" console:"-"`
 }
 
 // OutcomeSummary aggregates outcomes across multiple safe output items.

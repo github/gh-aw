@@ -5069,6 +5069,9 @@
                     "zero_touch": {
                       "type": "boolean"
                     },
+                    "zero_touch_evidence_complete": {
+                      "type": "boolean"
+                    },
                     "objective_value": {
                       "type": "integer"
                     },
@@ -5095,6 +5098,7 @@
                     "outcome_status",
                     "evidence_strength",
                     "type",
+                    "zero_touch_evidence_complete",
                     "created_at",
                     "checked_at"
                   ],
@@ -5371,6 +5375,9 @@
                         "zero_touch": {
                           "type": "boolean"
                         },
+                        "zero_touch_evidence_complete": {
+                          "type": "boolean"
+                        },
                         "objective_value": {
                           "type": "integer"
                         },
@@ -5398,6 +5405,7 @@
                         "outcome_status",
                         "evidence_strength",
                         "type",
+                        "zero_touch_evidence_complete",
                         "created_at",
                         "checked_at"
                       ],
@@ -8671,6 +8679,9 @@
                     "zero_touch": {
                       "type": "boolean"
                     },
+                    "zero_touch_evidence_complete": {
+                      "type": "boolean"
+                    },
                     "objective_value": {
                       "type": "integer"
                     },
@@ -8697,6 +8708,7 @@
                     "outcome_status",
                     "evidence_strength",
                     "type",
+                    "zero_touch_evidence_complete",
                     "created_at",
                     "checked_at"
                   ],
@@ -8973,6 +8985,9 @@
                         "zero_touch": {
                           "type": "boolean"
                         },
+                        "zero_touch_evidence_complete": {
+                          "type": "boolean"
+                        },
                         "objective_value": {
                           "type": "integer"
                         },
@@ -9000,6 +9015,7 @@
                         "outcome_status",
                         "evidence_strength",
                         "type",
+                        "zero_touch_evidence_complete",
                         "created_at",
                         "checked_at"
                       ],

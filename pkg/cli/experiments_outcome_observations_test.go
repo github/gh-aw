@@ -1,0 +1,361 @@
+//go:build !integration
+
+package cli
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"os"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/github/gh-aw/pkg/workflow"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func experimentOutcome(status OutcomeStatus, complete, zeroTouch bool) OutcomeReport {
+	return OutcomeReport{
+		Type: "create_pull_request", OutcomeEvaluation: OutcomeEvaluation{OutcomeStatus: status},
+		ZeroTouchEvidenceComplete: complete, ZeroTouch: zeroTouch,
+	}
+}
+
+func TestOutcomeMetricRunValue(t *testing.T) {
+	t.Parallel()
+	merged := experimentOutcome(OutcomeStatusAccepted, true, true)
+	touched := experimentOutcome(OutcomeStatusAccepted, true, false)
+	incomplete := experimentOutcome(OutcomeStatusAccepted, false, false)
+	rejected := experimentOutcome(OutcomeStatusRejected, false, false)
+	pending := experimentOutcome(OutcomeStatusPending, false, false)
+	unknown := experimentOutcome(OutcomeStatusUnknown, false, false)
+	for _, tc := range []struct {
+		name     string
+		kind     string
+		items    []OutcomeReport
+		value    float64
+		measured bool
+		coverage OutcomeMetricCoverage
+	}{
+		{name: "merged", kind: "accepted", items: []OutcomeReport{merged}, value: 1, measured: true},
+		{name: "closed", kind: "accepted", items: []OutcomeReport{rejected}, measured: true},
+		{name: "stale pending", kind: "accepted", items: []OutcomeReport{pending}, measured: true, coverage: OutcomeMetricCoverage{StalePending: 1}},
+		{name: "multiple PRs", kind: "accepted", items: []OutcomeReport{merged, rejected, pending}, value: 1.0 / 3, measured: true, coverage: OutcomeMetricCoverage{StalePending: 1}},
+		{name: "multiple pending count runs", kind: "accepted", items: []OutcomeReport{pending, pending}, measured: true, coverage: OutcomeMetricCoverage{StalePending: 1}},
+		{name: "unknown excluded from denominator", kind: "accepted", items: []OutcomeReport{merged, unknown}, value: 1, measured: true, coverage: OutcomeMetricCoverage{Unavailable: 1}},
+		{name: "unknown only unavailable not noop", kind: "accepted", items: []OutcomeReport{unknown}, coverage: OutcomeMetricCoverage{Unavailable: 1}},
+		{name: "error only unavailable", kind: "accepted", items: []OutcomeReport{experimentOutcome(OutcomeStatusError, false, false)}, coverage: OutcomeMetricCoverage{Unavailable: 1}},
+		{name: "empty noop", kind: "accepted", coverage: OutcomeMetricCoverage{NoOp: 1}},
+		{name: "non outcome statuses noop", kind: "accepted", items: []OutcomeReport{
+			experimentOutcome(OutcomeStatusIgnored, false, false), experimentOutcome(OutcomeStatusSkipped, false, false),
+			experimentOutcome(OutcomeStatusLifecycle, false, false), experimentOutcome(OutcomeStatusLifecycleClose, false, false),
+		}, coverage: OutcomeMetricCoverage{NoOp: 1}},
+		{name: "zero touch", kind: "zero_touch", items: []OutcomeReport{merged}, value: 1, measured: true},
+		{name: "human touch is zero", kind: "zero_touch", items: []OutcomeReport{touched}, measured: true},
+		{name: "incomplete is excluded", kind: "zero_touch", items: []OutcomeReport{incomplete}, coverage: OutcomeMetricCoverage{Unavailable: 1}},
+		{name: "incomplete does not affect acceptance", kind: "accepted", items: []OutcomeReport{incomplete}, value: 1, measured: true},
+		{name: "zero touch all resolved denominator", kind: "zero_touch", items: []OutcomeReport{merged, touched, rejected, pending}, value: .25, measured: true, coverage: OutcomeMetricCoverage{StalePending: 1}},
+		{name: "zero touch partial evidence", kind: "zero_touch", items: []OutcomeReport{merged, incomplete}, value: 1, measured: true, coverage: OutcomeMetricCoverage{Unavailable: 1}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			value, measured, coverage := outcomeMetricRunValue(tc.kind, tc.items)
+			assert.InDelta(t, tc.value, value, 1e-12)
+			assert.Equal(t, tc.measured, measured)
+			assert.Equal(t, tc.coverage, coverage)
+		})
+	}
+}
+
+type fixtureOutcomeRunSource struct {
+	mu    sync.Mutex
+	calls []string
+}
+
+func (s *fixtureOutcomeRunSource) Load(_ context.Context, id string) outcomeRunData {
+	s.mu.Lock()
+	s.calls = append(s.calls, id)
+	s.mu.Unlock()
+	return outcomeRunData{Report: OutcomesData{Items: []OutcomeReport{experimentOutcome(OutcomeStatusAccepted, true, true)}}}
+}
+
+func TestOutcomeMetricMaturityAndAssignmentJoin(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 11, 4, 0, 0, 0, 0, time.UTC)
+	timestamp := func(age time.Duration) string { return now.Add(-age).Format(time.RFC3339) }
+	runs := []ExperimentRunRecord{
+		{RunID: "mature", Timestamp: timestamp(72 * time.Hour), Assignments: map[string]string{"prompt": "control"}},
+		{RunID: "young", Timestamp: timestamp(71 * time.Hour), Assignments: map[string]string{"prompt": "candidate"}},
+		{RunID: "bad timestamp", Timestamp: "bad", Assignments: map[string]string{"prompt": "candidate"}},
+		{RunID: "unassigned", Timestamp: timestamp(100 * time.Hour)},
+		{RunID: "mature", Timestamp: timestamp(72 * time.Hour), Assignments: map[string]string{"prompt": "control"}},
+	}
+	experiments := []ExperimentVariantStats{{Name: "prompt", Variants: map[string]int{"control": 3, "candidate": 2}, Total: 5}}
+	refs := map[string]string{"prompt": "accepted"}
+	windows := map[string]time.Duration{"prompt": defaultExperimentOutcomeWindow}
+	source := &fixtureOutcomeRunSource{}
+	data := loadOutcomeRunData(context.Background(), runs, windows, now, source)
+	assert.Equal(t, []string{"mature"}, source.calls, "only assigned, mature runs are collected and shared across metrics")
+	set := buildOutcomeMetricObservationSets(experiments, runs, refs, windows, now, data)["prompt"]
+	require.Len(t, set.ByVariant["control"], 1)
+	assert.Equal(t, "mature", set.ByVariant["control"][0].RunID)
+	assert.InDelta(t, 1, set.ByVariant["control"][0].Value, 1e-12)
+	assert.Equal(t, &OutcomeMetricCoverage{Unavailable: 1}, set.Coverage["control"], "missing ledger entries are unavailable")
+	assert.Equal(t, &OutcomeMetricCoverage{Immature: 1, Unavailable: 1}, set.Coverage["candidate"])
+	assert.Empty(t, set.ByVariant["candidate"])
+	assert.Equal(t, 1, exclusionsByReason(set.Exclusions["control"])[exclusionDuplicateAssignment].Count)
+
+	windows["prompt"] = 70 * time.Hour
+	source = &fixtureOutcomeRunSource{}
+	_ = loadOutcomeRunData(context.Background(), runs, windows, now, source)
+	assert.ElementsMatch(t, []string{"mature", "young"}, source.calls)
+}
+
+func TestOutcomeMetricCoverageForMatureRuns(t *testing.T) {
+	t.Parallel()
+	now := time.Now()
+	runs := []ExperimentRunRecord{}
+	data := map[string]outcomeRunData{
+		"pending": {Report: OutcomesData{Items: []OutcomeReport{experimentOutcome(OutcomeStatusPending, false, false)}}},
+		"noop":    {Report: OutcomesData{}},
+		"missing": {ExclusionReason: exclusionArtifactUnavailable},
+		"unknown": {Report: OutcomesData{Items: []OutcomeReport{experimentOutcome(OutcomeStatusUnknown, false, false)}}},
+		"error":   {Report: OutcomesData{EvalError: "manifest unavailable"}},
+	}
+	for _, id := range []string{"pending", "noop", "missing", "unknown", "error"} {
+		runs = append(runs, ExperimentRunRecord{
+			RunID: id, Timestamp: now.Add(-80 * time.Hour).Format(time.RFC3339),
+			Assignments: map[string]string{"prompt": "control"},
+		})
+	}
+	experiments := []ExperimentVariantStats{{Name: "prompt", Variants: map[string]int{"control": 5}, Total: 5}}
+	set := buildOutcomeMetricObservationSets(experiments, runs, map[string]string{"prompt": "accepted"}, nil, now, data)["prompt"]
+	require.Len(t, set.ByVariant["control"], 1)
+	assert.Equal(t, "pending", set.ByVariant["control"][0].RunID)
+	assert.Zero(t, set.ByVariant["control"][0].Value)
+	assert.Equal(t, &OutcomeMetricCoverage{StalePending: 1, Unavailable: 3, NoOp: 1}, set.Coverage["control"])
+
+	cfg := &workflow.ExperimentConfig{Metric: "outcome:accepted", Variants: []string{"control", "candidate"}, MinSamples: 2}
+	analysis := computeExperimentAnalysisWithObservationBundle(experiments[0], cfg, nil, nil, set, nil)
+	assert.Equal(t, ExperimentReadinessCollecting, analysis.Readiness)
+	assert.Equal(t, "binary", analysis.MetricType)
+	variants := variantsByName(analysis.Variants)
+	require.NotNil(t, variants["candidate"].OutcomeCoverage)
+	assert.Equal(t, &OutcomeMetricCoverage{}, variants["candidate"].OutcomeCoverage)
+}
+
+func TestResolveOutcomeMetricReferences(t *testing.T) {
+	t.Parallel()
+	configs := map[string]*workflow.ExperimentConfig{
+		"prompt": {Metric: "outcome:accepted", GuardrailMetrics: []workflow.GuardrailMetric{{Name: "outcome:zero_touch", Threshold: ">=0.5"}}},
+	}
+	primary, guardrails, windows, err := resolveOutcomeMetricReferences(configs)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]string{"prompt": "accepted"}, primary)
+	assert.Equal(t, "zero_touch", guardrails["prompt"]["outcome:zero_touch"])
+	assert.Equal(t, 72*time.Hour, windows["prompt"])
+	configs["prompt"].OutcomeWindow = "24h"
+	_, _, windows, err = resolveOutcomeMetricReferences(configs)
+	require.NoError(t, err)
+	assert.Equal(t, 24*time.Hour, windows["prompt"])
+	for _, duration := range []string{"-1h", "0s", "bad"} {
+		configs["prompt"].OutcomeWindow = duration
+		_, _, _, err = resolveOutcomeMetricReferences(configs)
+		require.ErrorContains(t, err, "outcome_window")
+	}
+	configs["prompt"].OutcomeWindow = ""
+	configs["prompt"].Metric = "outcome:merged"
+	_, _, _, err = resolveOutcomeMetricReferences(configs)
+	require.ErrorContains(t, err, "Expected outcome:accepted or outcome:zero_touch")
+	configs["prompt"].Metric = "grader:score"
+	configs["prompt"].GuardrailMetrics[0].Name = "outcome:typo"
+	_, _, _, err = resolveOutcomeMetricReferences(configs)
+	require.ErrorContains(t, err, "outcome:typo")
+}
+
+func TestOutcomeMetricAnalysisCoverageAndDefaults(t *testing.T) {
+	for _, tc := range []struct {
+		name, testType string
+		values         []float64
+	}{
+		{name: "binary numeric", testType: "proportion_test", values: []float64{0, 1}},
+		{name: "fractional multi PR", testType: "t_test", values: []float64{0.5, 1}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			set := &graderMetricObservationSet{
+				MetricID: "outcome:accepted",
+				ByVariant: map[string][]GraderMetricObservation{
+					"control": decisionTestObservations("control", tc.values), "candidate": decisionTestObservations("candidate", tc.values),
+				},
+				Coverage: map[string]*OutcomeMetricCoverage{"control": {Immature: 1, StalePending: 2, Unavailable: 3, NoOp: 4}, "candidate": {}},
+			}
+			cfg := &workflow.ExperimentConfig{
+				Metric: "outcome:accepted", Variants: []string{"control", "candidate"}, MinSamples: 2,
+				GuardrailMetrics: []workflow.GuardrailMetric{{Name: "outcome:zero_touch", Threshold: ">=0"}},
+			}
+			exp := ExperimentVariantStats{Name: "prompt", Variants: map[string]int{"control": 10, "candidate": 10}, Total: 20}
+			analysis := computeExperimentAnalysisWithObservationBundle(exp, cfg, nil, nil, set, map[string]*graderMetricObservationSet{"outcome:zero_touch": set})
+			require.Len(t, analysis.Comparisons, 1)
+			assert.Equal(t, tc.testType, analysis.Comparisons[0].AnalysisType)
+			assert.Empty(t, analysis.Comparisons[0].Error)
+			assert.Equal(t, ExperimentReadinessReady, analysis.Readiness)
+			assert.Equal(t, GuardrailStatusPass, analysis.Guardrails[0].Status)
+			encoded, err := json.Marshal(analysis)
+			require.NoError(t, err)
+			assert.Contains(t, string(encoded), `"outcome_coverage":{"immature":1,"stale_pending":2,"unavailable":3,"no_op":4}`)
+			output := captureExperimentDetailsStderr(t, &ExperimentDetails{Analyses: []ExperimentAnalysis{analysis}})
+			assert.Contains(t, output, "immature=1 stale_pending=2 unavailable=3 no_op=4")
+			assert.Contains(t, output, "outcome:zero_touch / control")
+		})
+	}
+}
+
+func installExperimentOutcomeFixture(t *testing.T, manifest string) string {
+	t.Helper()
+	fixtures := t.TempDir()
+	t.Setenv("GH_AW_TEST_EXPERIMENT_ARTIFACTS", fixtures)
+	t.Setenv("GH_AW_TEST_EXPERIMENT_DOWNLOAD_ERROR", "")
+	t.Setenv("GH_AW_TEST_EXPERIMENT_NAMES", "called-safe-outputs-items\ncalled-agent-output-fallback\n")
+	writeSessionTestFile(t, fixtures, "called-safe-outputs-items/"+safeOutputItemsManifestFilename, manifest)
+	writeSessionTestFile(t, fixtures, "called-agent-output-fallback/gh-aw/safeoutputs.jsonl", "")
+	return installOutcomeAPIFixture(t, `
+printf '%s\n' "$*" >> "$GH_AW_TEST_OUTCOME_CALLS"
+if [ "$1" = "run" ] && [ "$2" = "download" ]; then
+  shift 3
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --name) name="$2"; shift 2 ;;
+      --dir) dir="$2"; shift 2 ;;
+      -R) shift 2 ;;
+      *) exit 1 ;;
+    esac
+  done
+  if [ -n "$GH_AW_TEST_EXPERIMENT_DOWNLOAD_ERROR" ]; then exit 1; fi
+  cp -R "$GH_AW_TEST_EXPERIMENT_ARTIFACTS/$name/." "$dir"
+  exit 0
+fi
+case "$*" in
+  *actions/runs/101/artifacts*) printf '%s' "$GH_AW_TEST_EXPERIMENT_NAMES" ;;
+  *actions/runs/101*) printf '%s' '{"databaseId":101,"status":"completed","conclusion":"success","repository":"acme/repo"}' ;;
+  *repos/acme/repo/pulls/42/reviews*|*repos/acme/repo/pulls/42/commits*|*repos/acme/repo/issues/42/comments*) printf '%s' '[[]]' ;;
+  *repos/acme/repo/pulls/42*) printf '%s' '{"merged":true,"state":"closed","labels":[]}' ;;
+  *graphql*) printf '%s' '{"data":{"repository":{"pullRequest":{"id":"PR42","closingIssuesReferences":{"nodes":[]}}}}}' ;;
+  *) printf 'unexpected command: %s\n' "$*" >&2; exit 1 ;;
+esac
+`)
+}
+
+func TestLoadOutcomeObservationSetsUsesLiveCollector(t *testing.T) {
+	calls := installExperimentOutcomeFixture(t, `{"type":"create_pull_request","number":42,"timestamp":"2026-01-01T00:00:00Z","url":"https://github.com/acme/repo/pull/42"}`+"\n")
+	details := &ExperimentDetails{
+		Experiments: []ExperimentVariantStats{{Name: "prompt", Variants: map[string]int{"control": 1, "candidate": 1}, Total: 2}},
+		Runs: []ExperimentRunRecord{
+			{RunID: "101", Timestamp: time.Now().Add(-80 * time.Hour).Format(time.RFC3339), Assignments: map[string]string{"prompt": "control"}},
+			{RunID: "102", Timestamp: time.Now().Format(time.RFC3339), Assignments: map[string]string{"prompt": "candidate"}},
+		},
+	}
+	frontmatter := experimentFrontmatterResult{ExperimentConfigs: map[string]*workflow.ExperimentConfig{
+		"prompt": {Metric: "outcome:accepted", GuardrailMetrics: []workflow.GuardrailMetric{{Name: "outcome:zero_touch", Threshold: ">=0.5"}}},
+	}}
+	bundle, cleanup, err := loadMetricObservationSetsForAnalysis(details, frontmatter, "acme/repo")
+	require.NoError(t, err)
+	defer cleanup()
+	require.Len(t, bundle.Primary["prompt"].ByVariant["control"], 1)
+	assert.InDelta(t, 1, bundle.Primary["prompt"].ByVariant["control"][0].Value, 1e-12)
+	require.Len(t, bundle.Guardrails["prompt"]["outcome:zero_touch"].ByVariant["control"], 1)
+	assert.InDelta(t, 1, bundle.Guardrails["prompt"]["outcome:zero_touch"].ByVariant["control"][0].Value, 1e-12)
+	assert.Equal(t, 1, bundle.Primary["prompt"].Coverage["candidate"].Immature)
+	commands, err := os.ReadFile(calls)
+	require.NoError(t, err)
+	assert.Contains(t, string(commands), "--name called-safe-outputs-items")
+	assert.Contains(t, string(commands), "--name called-agent-output-fallback")
+	assert.Contains(t, string(commands), "repos/acme/repo/pulls/42")
+	assert.NotContains(t, string(commands), "runs/102")
+	assert.Equal(t, 1, strings.Count(string(commands), "api repos/acme/repo/actions/runs/101 --jq"), "primary and guardrail share one live collection")
+}
+
+func TestOutcomeArtifactUnavailabilityIsNotNoOp(t *testing.T) {
+	for _, tc := range []struct {
+		name, manifest, names string
+		downloadError         bool
+		unavailable           bool
+	}{
+		{name: "explicit noop", manifest: "{\"type\":\"noop\"}\n"},
+		{name: "empty manifest"},
+		{name: "missing data is unavailable", manifest: "{\"type\":\"report_missing_data\"}\n", unavailable: true},
+		{name: "missing manifest", names: "called-agent-output-fallback", unavailable: true},
+		{name: "no artifacts", names: "usage", unavailable: true},
+		{name: "corrupt manifest", manifest: "{", unavailable: true},
+		{name: "failed download", downloadError: true, unavailable: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			installExperimentOutcomeFixture(t, tc.manifest)
+			if tc.names != "" {
+				t.Setenv("GH_AW_TEST_EXPERIMENT_NAMES", tc.names)
+			}
+			if tc.downloadError {
+				t.Setenv("GH_AW_TEST_EXPERIMENT_DOWNLOAD_ERROR", "1")
+			}
+			source := &githubOutcomeRunSource{artifacts: newGitHubGraderRunArtifactSource(t.TempDir(), "acme/repo")}
+			data := source.Load(context.Background(), "101")
+			if tc.unavailable {
+				assert.NotEmpty(t, data.ExclusionReason)
+			} else {
+				assert.Empty(t, data.ExclusionReason)
+				_, measured, coverage := outcomeMetricRunValue("accepted", data.Report.Items)
+				assert.False(t, measured)
+				assert.Equal(t, 1, coverage.NoOp)
+			}
+		})
+	}
+}
+
+func TestZeroTouchEvidenceCompleteness(t *testing.T) {
+	oldGet, oldArray := outcomeEvalPRGHAPIGet, outcomeEvalPRGHAPIGetArray
+	t.Cleanup(func() { outcomeEvalPRGHAPIGet, outcomeEvalPRGHAPIGetArray = oldGet, oldArray })
+	outcomeEvalPRGHAPIGet = func(context.Context, string, string) (map[string]any, error) {
+		return map[string]any{"merged": true, "state": "closed"}, nil
+	}
+	for _, tc := range []struct {
+		name, failedEndpoint, malformedEndpoint string
+		badTimestamp, touched                   bool
+		complete                                bool
+	}{
+		{name: "complete no touch", complete: true},
+		{name: "complete human touch", touched: true, complete: true},
+		{name: "missing comments", failedEndpoint: "issues/1/comments"},
+		{name: "missing reviews", failedEndpoint: "pulls/1/reviews"},
+		{name: "missing commits", failedEndpoint: "pulls/1/commits"},
+		{name: "malformed comments", malformedEndpoint: "issues/1/comments"},
+		{name: "malformed reviews", malformedEndpoint: "pulls/1/reviews"},
+		{name: "malformed commits", malformedEndpoint: "pulls/1/commits"},
+		{name: "missing creation timestamp", badTimestamp: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			outcomeEvalPRGHAPIGetArray = func(_ context.Context, endpoint, _ string) ([]map[string]any, error) {
+				if endpoint == tc.failedEndpoint {
+					return nil, errors.New("unavailable")
+				}
+				if endpoint == tc.malformedEndpoint {
+					return []map[string]any{{}}, nil
+				}
+				if endpoint == "issues/1/comments" {
+					if tc.touched {
+						return []map[string]any{{"user": map[string]any{"login": "alice"}, "created_at": "2026-01-02T00:00:00Z"}}, nil
+					}
+				}
+				return nil, nil
+			}
+			timestamp := "2026-01-01T00:00:00Z"
+			if tc.badTimestamp {
+				timestamp = ""
+			}
+			report := evalCreatePullRequest(context.Background(), CreatedItemReport{Type: "create_pull_request", Number: 1, Timestamp: timestamp}, "acme/repo")
+			assert.Equal(t, tc.complete, report.ZeroTouchEvidenceComplete)
+			assert.Equal(t, tc.complete && !tc.touched, report.ZeroTouch)
+		})
+	}
+}

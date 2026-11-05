@@ -88,6 +88,10 @@ When `graders` are configured, `metric` can reference a grader result using
 `grader:<id>` (for example `grader:tool-success-rate`) or
 `graders.<id>.value`.
 
+Use `outcome:accepted` or `outcome:zero_touch` to measure live GitHub outcomes
+when analyzing results. These references also work in `secondary_metrics` and
+`guardrail_metrics`, without declaring a grader or eval.
+
 `gh aw experiments analyze <workflow>` resolves the referenced eval question and, when
 eval result data is available, shows YES/NO/UNKNOWN totals for that eval-backed metric.
 It also joins per-run eval answers to persisted experiment assignments and analyzes the
@@ -293,6 +297,52 @@ The `🧪 A/B Experiments` section of the audit report shows the variant chosen 
   • caveman = yes (cumulative: no:4, yes:5)
   • style = concise (cumulative: concise:5, detailed:4)
 ```
+
+### Analyze an outcome-backed metric
+
+Measure whether a workflow's safe outputs were accepted after a maturity window:
+
+```aw wrap
+---
+experiments:
+  prompt_v2:
+    variants: [control, candidate]
+    metric: outcome:accepted
+    outcome_window: 72h
+    guardrail_metrics:
+      - name: outcome:zero_touch
+        threshold: ">=0.8"
+    min_samples: 20
+---
+
+Follow the **${{ experiments.prompt_v2 }}** instructions.
+```
+
+`gh aw experiments analyze <workflow>` evaluates outcomes on demand; no scheduled
+collector is needed. `outcome_window` is a positive Go duration (default `72h`).
+Only runs at least that old contribute observations. Each run contributes one
+value: accepted outputs divided by resolved outputs, or zero-touch outputs
+divided by resolved outputs. Resolved outputs are accepted, rejected, or still
+pending after the window. Stale pending outputs score zero.
+
+Zero-touch means a merged PR with no non-bot comments, reviews, or commits after
+creation. Accepted PR outputs without complete zero-touch evidence are excluded
+from that metric rather than scored zero. Unknown or errored outcomes are also
+excluded. Lifecycle, lifecycle-close, ignored, and skipped outputs do not
+contribute; runs with no outcome-bearing outputs are no-ops, not successes.
+Other resolved output types remain in the denominator and score zero for
+`outcome:zero_touch`.
+
+Text and `--json` reports include per-variant run coverage: `immature`,
+`stale_pending`, `unavailable`, and `no_op`. A run with some usable outputs can
+also count as stale pending or unavailable. Only usable
+run observations count toward `min_samples`. When `analysis_type` is omitted,
+the analyzer uses a two-proportion test if every observed run value is 0 or 1,
+otherwise Welch's t-test (for example, when a run creates several PRs).
+Explicit `proportion_test` or `bayesian_ab` analysis requires binary per-run
+values and cannot analyze fractional outcomes.
+Prefer `outcome:zero_touch` when acceptance is already high and reducing human
+intervention is the goal.
 
 ### Analyze a grader-backed metric
 

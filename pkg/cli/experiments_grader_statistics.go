@@ -41,12 +41,12 @@ func graderObservationMetricType(cfg *workflow.ExperimentConfig, set *graderMetr
 	for _, observations := range set.ByVariant {
 		for _, observation := range observations {
 			hasObservation = true
-			if !observation.Binary {
+			if observation.Value != 0 && observation.Value != 1 {
 				return "continuous"
 			}
 		}
 	}
-	if hasObservation {
+	if hasObservation || set.Coverage != nil {
 		return "binary"
 	}
 	return ""

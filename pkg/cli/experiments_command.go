@@ -273,11 +273,10 @@ func reconcileExperimentDetailsWithConfigs(details *ExperimentDetails, configs m
 	}
 }
 
-// loadMetricObservationSetsForAnalysis resolves grader-backed and eval-backed experiment
+// loadMetricObservationSetsForAnalysis resolves grader-, eval-, and outcome-backed experiment
 // metrics and attributes their per-run measurements to variants using the persisted
 // assignment history, returning one merged map of observation sets and a single cleanup
-// closure. An experiment's metric references exactly one of a grader or an eval, so the
-// two resolved maps never collide.
+// closure. Each metric references exactly one source, so the resolved maps never collide.
 type experimentMetricObservationSets struct {
 	Primary    map[string]*graderMetricObservationSet
 	Guardrails map[string]map[string]*graderMetricObservationSet
@@ -306,7 +305,17 @@ func loadMetricObservationSetsForAnalysis(
 		graderGuardrails = make(map[string]map[string]*graderMetricObservationSet, len(evalGuardrails))
 	}
 	mergeGuardrailObservationSets(graderGuardrails, evalGuardrails)
-	return &experimentMetricObservationSets{Primary: graderSets, Guardrails: graderGuardrails}, cleanup, nil
+	outcomeSets, outcomeGuardrails, outcomeCleanup, err := loadOutcomeObservationSetsForAnalysis(details, frontmatter, repoOverride)
+	if err != nil {
+		cleanup()
+		return nil, func() {}, err
+	}
+	maps.Copy(graderSets, outcomeSets)
+	mergeGuardrailObservationSets(graderGuardrails, outcomeGuardrails)
+	return &experimentMetricObservationSets{Primary: graderSets, Guardrails: graderGuardrails}, func() {
+		cleanup()
+		outcomeCleanup()
+	}, nil
 }
 
 func loadGraderObservationSetsForAnalysis(

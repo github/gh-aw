@@ -148,7 +148,8 @@ type VariantAnalysis struct {
 	Observations []GraderMetricObservation `json:"observations,omitempty"`
 
 	// Excluded summarizes assigned runs that did not yield a usable grader measurement.
-	Excluded []ExcludedObservationSummary `json:"excluded,omitempty"`
+	Excluded        []ExcludedObservationSummary `json:"excluded,omitempty"`
+	OutcomeCoverage *OutcomeMetricCoverage       `json:"outcome_coverage,omitempty"`
 }
 
 // GuardrailStatusCode is the stable machine-readable outcome of a guardrail evaluation.
@@ -176,10 +177,11 @@ type GuardrailStatus struct {
 
 // GuardrailVariantStatus reports one variant's aggregate guardrail outcome.
 type GuardrailVariantStatus struct {
-	Variant          string   `json:"variant"`
-	ObservationCount int      `json:"observation_count"`
-	Mean             *float64 `json:"mean,omitempty"`
-	Passed           *bool    `json:"passed,omitempty"`
+	Variant          string                 `json:"variant"`
+	ObservationCount int                    `json:"observation_count"`
+	Mean             *float64               `json:"mean,omitempty"`
+	Passed           *bool                  `json:"passed,omitempty"`
+	OutcomeCoverage  *OutcomeMetricCoverage `json:"outcome_coverage,omitempty"`
 }
 
 // MetricEvalResults summarizes observed YES/NO/UNKNOWN outcomes for an eval-backed metric.
@@ -317,6 +319,7 @@ func applyExperimentGuardrails(
 			variantStatus := GuardrailVariantStatus{
 				Variant:          variant.Name,
 				ObservationCount: len(observations),
+				OutcomeCoverage:  outcomeVariantCoverage(set, variant.Name),
 			}
 			if len(observations) > 0 {
 				mean := meanGraderObservations(observations)
@@ -497,6 +500,7 @@ func buildVariantAnalyses(
 			variant.ObservationCount = len(observations)
 			variant.BelowMinSamples = len(observations) < minSamples
 			variant.Excluded = graderObservations.Exclusions[name]
+			variant.OutcomeCoverage = outcomeVariantCoverage(graderObservations, name)
 			if len(observations) > 0 {
 				mean := meanGraderObservations(observations)
 				variant.Mean = &mean
@@ -657,6 +661,9 @@ func printOneExperimentAnalysis(a ExperimentAnalysis) {
 	printExperimentMetadata(a)
 	printVariantProgress(a)
 	printObservationExclusions(a)
+	for _, variant := range a.Variants {
+		printOutcomeMetricCoverage(variant.Name, variant.OutcomeCoverage)
+	}
 	printBalanceAnalysis(a)
 	printOutcomeComparisons(a.Comparisons)
 	printGuardrails(a.Guardrails)
@@ -807,6 +814,11 @@ func printGuardrails(guardrails []GuardrailStatus) {
 		parts = append(parts, fmt.Sprintf("%s %s (%s)", guardrail.Name, guardrail.Threshold, strings.ToUpper(string(guardrail.Status))))
 	}
 	fmt.Fprintf(os.Stderr, "  Guardrails : %s\n", strings.Join(parts, "  •  "))
+	for _, guardrail := range guardrails {
+		for _, variant := range guardrail.Variants {
+			printOutcomeMetricCoverage(guardrail.Name+" / "+variant.Variant, variant.OutcomeCoverage)
+		}
+	}
 }
 
 func printExperimentRecommendation(a ExperimentAnalysis) {

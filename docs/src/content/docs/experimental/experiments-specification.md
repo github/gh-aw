@@ -227,8 +227,9 @@ The same minimum-two-variants constraint from R-SCHEMA-005 applies.
 |---|---|---|
 | `description` | string | Human-readable explanation of what the experiment tests. |
 | `hypothesis` | string | Null and alternative hypothesis statements. |
-| `metric` | string | Primary metric name to observe (e.g., `aic`), or an eval reference (`eval:<id>` / `evals.<id>`) when using `evals:`, or a grader reference (`grader:<id>` / `graders.<id>`) when using `graders:`. |
-| `secondary_metrics` | string[] | Additional metrics to collect. |
+| `metric` | string | Primary metric name to observe (e.g., `aic`), an eval reference (`eval:<id>` / `evals.<id>`) when using `evals:`, a grader reference (`grader:<id>` / `graders.<id>`) when using `graders:`, or `outcome:accepted` / `outcome:zero_touch`. |
+| `secondary_metrics` | string[] | Additional metric references, including outcome references. |
+| `outcome_window` | positive duration string | Minimum run age for outcome observations, using Go duration syntax. Defaults to `72h`; applies to primary and guardrail outcome metrics. |
 | `guardrail_metrics` | object[] | Thresholds that must not degrade. Each object has `name` (string), `threshold` (string or number), and optional `direction` (`"min"`\|`"max"`) (see §4.4). |
 | `min_samples` | integer ≥ 1 | Minimum runs per variant before analysis is reliable. Defaults to 20. |
 | `weight` | integer[] | Per-variant probability weights (see §5.2). |
@@ -241,8 +242,8 @@ The same minimum-two-variants constraint from R-SCHEMA-005 applies.
 | `notify` | object | Significance-alert destination (see §4.5). |
 
 **R-SCHEMA-009**: The `weight`, `issue`, `min_samples`, `start_date`, `end_date`, `analysis_type`,
-`tags`, and `notify` fields carry no effect on variant assignment outside their documented
-subsections. `description`, `hypothesis`, `metric`, `secondary_metrics`, and `tags` are
+`outcome_window`, `tags`, and `notify` fields carry no effect on variant assignment outside
+their documented subsections. `description`, `hypothesis`, `metric`, `secondary_metrics`, and `tags` are
 purely informative at runtime.
 
 **R-SCHEMA-010**: Implementations **MUST NOT** introduce additional properties in the object
@@ -662,7 +663,40 @@ use the specified test for significance analysis:
 
 **R-STAT-004**: When `analysis_type` is absent, reporting tools **SHOULD** default to the
 two-proportion z-test for binary outcomes (success/failure) and Welch's t-test for continuous
-metrics (e.g., duration).
+metrics (e.g., duration). For outcome-backed metrics, values are binary only when every
+usable per-run value is 0 or 1; fractional run values require Welch's t-test.
+
+#### Outcome-backed observations
+
+`outcome:accepted` and `outcome:zero_touch` **MUST** be accepted in `metric`,
+`secondary_metrics`, and `guardrail_metrics`. Unknown `outcome:` kinds **MUST** be
+rejected with an error identifying the supported kinds and an example.
+
+Outcome evaluation **MUST** run only when the CLI analyzes experiments, using the
+assignment history for variant attribution and the existing deterministic safe-output
+outcome evaluators. No scheduled collector is required.
+
+Runs younger than `outcome_window` (default `72h`) **MUST** be reported as `immature`
+and excluded from `min_samples`. Each mature run contributes at most one observation:
+accepted outputs divided by resolved outputs for `outcome:accepted`, or zero-touch
+outputs divided by resolved outputs for `outcome:zero_touch`. Resolved outputs comprise
+accepted, rejected, and stale pending outcomes. Pending outputs after the window **MUST**
+count in the denominator but not the numerator.
+
+Unknown and errored outcomes **MUST** be excluded as unavailable. Lifecycle,
+lifecycle-close, ignored, and skipped outputs **MUST NOT** contribute. Runs with no
+outcome-bearing outputs **MUST** be excluded as `no_op`, not scored as successes.
+Missing manifests **MUST** be unavailable evidence, not no-ops.
+
+Zero-touch is a subset of accepted outcomes: a merged PR without non-bot comments,
+reviews, or commits after creation. Its supporting evidence **MUST** be complete;
+accepted PR outputs with incomplete evidence **MUST** be excluded from this metric,
+not scored zero. Other resolved output types **MUST** remain in the denominator
+and contribute zero to the numerator.
+
+Reports **MUST** expose per-variant `immature`, `stale_pending`, `unavailable`, and
+`no_op` coverage in text and JSON, including coverage for outcome-backed guardrails.
+Only usable run observations count toward `min_samples`.
 
 ### 11.3 Multiple Comparison Correction
 
