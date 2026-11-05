@@ -54,6 +54,76 @@ The built-in `tools.playwright` integration uses `playwright-cli`; omit its `mod
 
 Pi resolves [model aliases](/gh-aw/reference/engines/#model-aliases) for the main model and for sub-agents with the same rules as Copilot: `model: copilot/opus` runs on the newest live Opus. Exact ids are checked against AWF `/reflect` before Pi starts, and an unlisted id fails with `model_unavailable`, producing the same unavailable-model failure issue as Copilot. When AWF's model discovery is incomplete, exact ids pass through and aliases fail with `catalog_unavailable`; sub-agents no longer fall back to Pi's built-in model list.
 
+## Durable runs
+
+> [!WARNING]
+> Pi Durable integration is experimental. Enabling `engine.pi.durable` or
+> `engine.durable` emits a compile-time warning. Configuration and behavior may
+> change without deprecation.
+
+Pi Durable persists harness tasks, submissions, conversation history, tool-call
+budgets, usage and trace propagation in a dedicated GitHub Actions artifact:
+
+```aw wrap
+on: workflow_dispatch
+engine:
+  pi:
+    durable:
+      retention-days: 7
+```
+
+`durable: {}` enables the default retention of seven days. `retention-days`
+accepts an integer from 1 to 90, subject to repository and organization artifact
+retention policy and gh-aw's global artifact retention overrides. Durable storage
+does not use or require `tools.repo-memory` or `tools.cache-memory`.
+
+The compiler installs and verifies pinned `@earendil-works/pi-durable`, `pi-ai`,
+`chord` and `pi-telemetry` dependencies separately from the ordinary Pi CLI.
+Unsupported engines and custom drivers fail compilation rather than falling back
+to a non-durable invocation. Custom commands, CLI arguments, extensions, native
+session settings and sub-agents cannot be combined with the durable harness.
+The credential-isolated model and MCP gateways remain required.
+
+Before execution, a trusted host step selects the parent run identified by
+inbound `aw_context.run_id` (or `parent_run_id` when the context describes the
+current run). Without an explicit parent, it selects the last successful run of the same workflow on the same
+branch, considering the latest 100 successful matching runs. Artifacts are scoped
+to the repository, workflow and branch. Fork-originated runs and other
+in-progress runs are excluded. An explicit parent must belong to that same
+workflow and branch; it may have failed or been cancelled if it published a
+checkpoint. Missing or expired explicit-parent checkpoints fail rather than
+silently switching lineage. Without an explicit parent, a missing or expired
+artifact on the last successful run starts a fresh session.
+When retrying a run, an unexpired checkpoint published by an earlier attempt of
+that same run takes precedence over the original parent.
+
+Pending submissions resume their original task rather than admitting the new
+run's prompt. After a submission completes, a later run admits a new prompt into
+the persisted conversation. Restoring a completed checkpoint from the same run
+does not resubmit it.
+The harness yields before its execution deadline with a pending checkpoint so a
+successful workflow run can become the next run's parent. Interrupted external
+mutations are not blindly replayed; durable execution does
+not guarantee exactly-once external side effects.
+
+Workflow-level concurrency serializes execution and artifact publication without
+cancelling the previous writer. Explicit concurrency, reusable workflow calls and
+work-queue workers are not supported. The compiler grants `actions: read` only
+to the job that restores state; GitHub credentials are not passed to the harness.
+The host validates checkpoint integrity after secret redaction, then publishes
+the artifact without treating upload failures as successful persistence.
+
+The harness emits Pi streaming events for the existing unified agentic session
+parser and emits native durable spans through gh-aw's OTel exporter, retaining
+trace propagation across checkpoints. Inference and tool policies are rebound
+to the current run instead of restoring credentials from the artifact.
+
+> [!IMPORTANT]
+> Checkpoints preserve harness state, not the checkout or arbitrary workspace
+> edits. A hard job timeout, cancellation, runner loss or artifact upload failure
+> can prevent publication. Start a later run to continue from the last published
+> checkpoint; durable mode does not dispatch continuation runs automatically.
+
 ## Sub-agents
 
 Define [inline sub-agents](/gh-aw/reference/inline-sub-agents/) with a non-empty `description` and instruct the parent to call the `subagent` tool:

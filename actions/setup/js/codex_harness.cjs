@@ -35,6 +35,7 @@
 const { iterateJsonl, JsonlParser } = require("./jsonl_helpers.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const fs = require("fs");
+const { openDurableSession, observeDurableSession } = require("./durable_native_session.cjs");
 const path = require("node:path");
 const { DEFAULT_MCP_CALL_WATCHDOG_MS, MCP_CALL_TRANSPORT_GRACE_MS, TMP_GH_AW_PATH } = require("./constants.cjs");
 const { loadCompiledConfig, mergeConfig } = require("./codex_config.cjs");
@@ -1113,9 +1114,11 @@ async function main() {
   const configuredToolTimeout = Number(codexEnv.GH_AW_TOOL_TIMEOUT);
   const fallbackToolTimeoutMs = Number.isSafeInteger(configuredToolTimeout) && configuredToolTimeout > 0 ? configuredToolTimeout * 1000 + MCP_CALL_TRANSPORT_GRACE_MS : DEFAULT_MCP_CALL_WATCHDOG_MS;
   const serverToolTimeouts = resolveMCPServerToolTimeouts(loadCompiledConfig(), configuredToolTimeout);
+  const durableSession = openDurableSession("codex");
+  let lastThreadId = durableSession?.id || "";
   /** @type {string[] | null} */
-  let resumeArgs = null;
-  let lastThreadId = "";
+  let resumeArgs = lastThreadId ? buildCodexResumeArgs(resolvedArgs, lastThreadId) : null;
+  if (lastThreadId && !resumeArgs) throw new Error("Cannot resume the restored durable Codex session with these arguments");
   const tokenUsagePaths = process.env.GH_AW_CODEX_TOKEN_USAGE_PATH ? [process.env.GH_AW_CODEX_TOKEN_USAGE_PATH] : TOKEN_USAGE_PATHS;
   const resumePrompt = "Continue the interrupted task using the existing session. Preserve previously staged safe outputs; do not emit them again. Complete only unfinished work.";
   log(
@@ -1136,6 +1139,7 @@ async function main() {
     softTimeoutGuard,
     getRetryMode: () => (resumeArgs ? `resume ${lastThreadId}` : "fresh run"),
     runAttempt: async (attempt, observeStrategy) => {
+      if (durableSession?.id && !resumeArgs && attempt > 0) throw new Error("Durable Codex continuation cannot restart a recorded session as a fresh conversation");
       const strategy = selectedHarnessStrategy(resumeArgs || resolvedArgs, "codex");
       observeStrategy(strategy);
       const terminalErrors = [];
@@ -1155,9 +1159,10 @@ async function main() {
         log,
         logArgs: resumeArgs ? [...resumeArgs.slice(0, -1), "<resume prompt via stdin>"] : safeArgs,
         env: codexEnv,
-        stdin: resumeArgs ? resumePrompt : promptInput.stdin,
+        stdin: resumeArgs && attempt > 0 ? resumePrompt : promptInput.stdin,
         maxCollectedOutputBytes: 4 * 1024 * 1024,
         onStdoutLine: line => {
+          observeDurableSession(durableSession, "codex", line);
           const event = mcpWatchdog.observe(line);
           if (!event) return;
           if (event.type === "thread.started" && typeof event.thread_id === "string") lastThreadId = event.thread_id;

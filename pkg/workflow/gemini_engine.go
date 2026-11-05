@@ -400,6 +400,8 @@ touch %s
 		env["GOOGLE_CLOUD_LOCATION"] = location
 	}
 
+	applyDurableExecutionEnv(env, workflowData)
+
 	// Generate the execution step
 	stepLines := []string{
 		"      - name: Execute Gemini CLI",

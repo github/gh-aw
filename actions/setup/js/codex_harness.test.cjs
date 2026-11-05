@@ -1230,7 +1230,7 @@ fs.appendFileSync(process.env.GH_AW_SAFE_OUTPUTS, JSON.stringify(item) + "\\n");
         const configPath = path.join(managedRoot, "codex-home", "config.toml");
         fs.writeFileSync(path.join(configDir, "config.toml"), '[model_providers.openai-proxy]\nbase_url = "http://172.30.0.30:10000"\n');
 
-        expect(resolveSafeCodexConfigPath(configPath, managedRoot)).toBe(path.join(configDir, "config.toml"));
+        expect(resolveSafeCodexConfigPath(configPath, managedRoot)).toBe(fs.realpathSync(path.join(configDir, "config.toml")));
       });
 
       it("rejects noncanonical paths containing symlink traversal", () => {
