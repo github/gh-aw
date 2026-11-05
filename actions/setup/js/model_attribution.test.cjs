@@ -58,6 +58,69 @@ describe("observed model attribution", () => {
     }
   });
 
+  const tokenUsageRecord = overrides => ({
+    _schema: "token-usage/v0.29.6",
+    event: "token_usage",
+    provider: "copilot",
+    model: "claude-sonnet-5.5",
+    path: "/chat/completions",
+    status: 200,
+    ...overrides,
+  });
+
+  it.each(["sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl", "sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl", "sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl"])(
+    "labels auto from the agent artifact token-usage log at %s without a usage directory",
+    relativePath => {
+      const root = createRoot();
+      const infoPath = path.join(root, "aw_info.json");
+      try {
+        fs.writeFileSync(infoPath, JSON.stringify({ requested_model: "auto" }));
+        writeJSONL(path.join(root, relativePath), [tokenUsageRecord({})]);
+        expect(fs.existsSync(path.join(root, "usage"))).toBe(false);
+        expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "auto" })).toBe("auto (powered by Claude Sonnet 5.5)");
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it("ignores routing classification and non-2xx token-usage records", () => {
+    const root = createRoot();
+    const infoPath = path.join(root, "aw_info.json");
+    try {
+      writeJSONL(path.join(root, "sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl"), [
+        tokenUsageRecord({ model: "gpt-5-mini", purpose: "routing_classification" }),
+        tokenUsageRecord({ model: "gemini-3.8-flash", status: 503 }),
+        tokenUsageRecord({ purpose: "agent" }),
+      ]);
+      writeJSONL(path.join(root, "usage/aw_session.jsonl"), [{ type: "firewall.token_usage", data: { model: "gpt-6.1-sol", purpose: "agent" }, provenance: { component: "firewall", phase: "agent" } }]);
+      expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "auto" })).toBe("auto (powered by Claude Sonnet 5.5)");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("falls back to the unified session when the token-usage log is missing", () => {
+    const root = createRoot();
+    const infoPath = path.join(root, "aw_info.json");
+    try {
+      writeJSONL(path.join(root, "usage/aw_session.jsonl"), [{ type: "firewall.token_usage", data: tokenUsageRecord({ purpose: "agent" }), provenance: { component: "firewall", phase: "agent" } }]);
+      expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "auto" })).toBe("auto (powered by Claude Sonnet 5.5)");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("shows plain auto when no model usage files exist", () => {
+    const root = createRoot();
+    const infoPath = path.join(root, "aw_info.json");
+    try {
+      expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "auto" })).toBe("auto");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("preserves fallback-only labels when auto has no observed model evidence", () => {
     const root = createRoot();
     const infoPath = path.join(root, "aw_info.json");

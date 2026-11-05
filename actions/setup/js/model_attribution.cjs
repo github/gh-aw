@@ -9,6 +9,8 @@ const ROUTING_EFFORTS = new Set(["none", "minimal", "low", "medium", "high", "xh
 const ROUTING_TASK_TYPES = new Set(["explain", "plan", "fix", "refactor", "chore", "implement", "unknown"]);
 const ROUTING_SCOPES = new Set(["local", "multi_file", "subsystem", "cross_system", "unknown"]);
 const ROUTING_COMPLEXITIES = new Set(["trivial", "easy", "medium", "hard", "expert", "unknown"]);
+// Same candidates as ai_credits_context.cjs; these files ship in the agent artifact.
+const TOKEN_USAGE_LOG_PATHS = ["sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl", "sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl", "sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl"];
 const MODEL_ROUTING_LOG_PATHS = ["sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl", "sandbox/firewall/audit/api-proxy-logs/model-routing.jsonl", "sandbox/firewall-audit-logs/api-proxy-logs/model-routing.jsonl"];
 
 /** @typedef {{ status: string, mode: string, router_version: string, failure_code?: string, objective: string, task_type: string, scope: string, complexity: string, degraded?: boolean, classifier_aic?: number, deviated_requests?: number }} ModelRoutingSummary */
@@ -158,6 +160,32 @@ function readModelRoutingSession(sessionPath) {
     return [];
   }
   return events;
+}
+
+/**
+ * Reads models from successful agent requests in the AWF token-usage log.
+ * Returns null when no log exists so callers can fall back to the unified session.
+ * @param {string} ghAwDir
+ * @returns {string[] | null}
+ */
+function readAgentTokenUsageModels(ghAwDir) {
+  const fs = require("fs");
+  const path = require("path");
+  const logPath = TOKEN_USAGE_LOG_PATHS.map(relativePath => path.join(ghAwDir, relativePath)).find(candidate => fs.existsSync(candidate));
+  if (!logPath) return null;
+  const models = [];
+  try {
+    for (const record of readJsonlFile(logPath)) {
+      if (typeof record?._schema !== "string" || !record._schema.startsWith("token-usage/")) continue;
+      if (record.purpose && record.purpose !== "agent") continue;
+      const status = Number(record.status);
+      if (!(status >= 200 && status < 300)) continue;
+      models.push(record.model);
+    }
+  } catch {
+    return null;
+  }
+  return models;
 }
 
 function readModelRoutingProxyRecords(ghAwDir) {
@@ -324,10 +352,19 @@ function getEffectiveModelLabel(infoPath = `${process.env.GH_AW_TMP_DIR || "/tmp
     if (requested.toLowerCase() !== "auto") return shortModel;
     const models = new Set();
     if (phase === "agent") {
-      const sessionPath = require("path").join(require("path").dirname(infoPath), "usage/aw_session.jsonl");
-      for (const event of readModelRoutingSession(sessionPath)) {
-        if (event.type !== "firewall.token_usage" || (event.data?.purpose && event.data.purpose !== "agent") || Number(event.data?.status) >= 400) continue;
-        const model = validateModelIdentifier(event.data?.model);
+      // Footers render in safe_outputs and before the conclusion job builds aw_session.jsonl,
+      // so prefer the token-usage log shipped in the agent artifact.
+      const ghAwDir = require("path").dirname(infoPath);
+      let requestModels = readAgentTokenUsageModels(ghAwDir);
+      if (requestModels === null) {
+        requestModels = [];
+        for (const event of readModelRoutingSession(require("path").join(ghAwDir, "usage/aw_session.jsonl"))) {
+          if (event.type !== "firewall.token_usage" || (event.data?.purpose && event.data.purpose !== "agent") || Number(event.data?.status) >= 400) continue;
+          requestModels.push(event.data?.model);
+        }
+      }
+      for (const value of requestModels) {
+        const model = validateModelIdentifier(value);
         if (model && model.toLowerCase() !== "auto") models.add(model);
       }
       const observedModels = attribution.selection?.status === "observed" ? attribution.selection.observed_models : null;
