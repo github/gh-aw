@@ -69,19 +69,38 @@ func TestMergeWorkflowContent_PreservesUpstreamCommentsAfterLegacyFormatting(t *
 	require.Equal(t, strings.TrimSuffix(expected, "\n"), merged)
 }
 
+func TestMergeWorkflowContent_PreservesUpstreamFormattingWhenFrontmatterMatches(t *testing.T) {
+	base := "---\nengine: copilot\nimports:\n  - owner/repo/shared.md@v1\n---\n\n# Workflow\nOriginal instructions.\n\nShared ending.\n"
+	current := strings.Replace(base, "Original instructions.", "Local instructions.", 1)
+	upstream := strings.Replace(base, "imports:\n", "# Added upstream note\nimports:\n", 1)
+	upstream = strings.Replace(upstream, "Shared ending.", "Updated ending.", 1)
+	expected := strings.Replace(upstream, "Original instructions.", "Local instructions.", 1)
+	expected = strings.Replace(expected, "\n---\n\n", "\nsource: owner/repo/workflows/test.md@v2\n---\n\n", 1)
+
+	merged, conflicts, err := MergeWorkflowContent(base, current, upstream,
+		"owner/repo/workflows/test.md@v1", "v2", "", false)
+	require.NoError(t, err)
+	require.False(t, conflicts, "merge should preserve upstream comments:\n%s", merged)
+	require.Equal(t, strings.TrimSuffix(expected, "\n"), merged)
+}
+
 func TestMergeWorkflowContent_LegacyFormattingWithLocalFrontmatterEdit(t *testing.T) {
-	base := "---\nengine: copilot\non:\n  bots: [original]\n  workflow_dispatch:\nimports:\n  - owner/repo/shared.md@v1\n---\n\n# Workflow\n"
+	base := "---\nengine: copilot\nname: original\nimports:\n  - owner/repo/shared.md@v1\n---\n\n# Workflow\n"
 	parsed, err := parser.ExtractFrontmatterFromContent(base)
 	require.NoError(t, err)
 	current, err := reconstructWorkflowFileFromMap(parsed.Frontmatter, parsed.Markdown)
 	require.NoError(t, err)
-	current = strings.Replace(current, "- original", "- local", 1)
+	current = strings.Replace(current, "name: original", "name: local", 1)
 	upstream := strings.Replace(base, "@v1", "@v2", 1)
+	upstream = strings.Replace(upstream, "engine: copilot", "# Upstream note\nimports:\n  - owner/repo/shared.md@v2 # pinned upstream\nengine: \"copilot\"", 1)
+	upstream = strings.Replace(upstream, "imports:\n  - owner/repo/shared.md@v2\n", "", 1)
+	upstream = strings.Replace(upstream, "name: original", "# Keep upstream name metadata\nname: original", 1)
+	expected := strings.Replace(upstream, "name: original", "name: local", 1)
+	expected = strings.Replace(expected, "\n---\n\n", "\nsource: owner/repo/workflows/test.md@v2\n---\n\n", 1)
 
 	merged, conflicts, err := MergeWorkflowContent(base, current, upstream,
 		"owner/repo/workflows/test.md@v1", "v2", "", false)
 	require.NoError(t, err)
 	require.False(t, conflicts, "legacy formatting must not conflict with independent edits:\n%s", merged)
-	require.Contains(t, merged, "- local")
-	require.Contains(t, merged, "owner/repo/shared.md@v2")
+	require.Equal(t, strings.TrimSuffix(expected, "\n"), merged)
 }

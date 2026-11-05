@@ -724,6 +724,8 @@ Enabling this increases supply chain risk because install hooks from dependencie
 
 Tracks workflow origin in format `owner/repo/path@ref`. Automatically populated when using `gh aw add` to install workflows from external repositories. Optional for manually created workflows.
 
+Explicit refs are preserved so updates follow the requested branch or compatible releases. The optional `source-sha` field records the installed 40-character commit SHA separately. `gh aw add` and `gh aw update` manage this field and use it as the base for three-way merges; it does not change the tracking ref.
+
 ```yaml wrap
 source: "githubnext/agentics/workflows/ci-doctor.md@v1.0.0"
 ```

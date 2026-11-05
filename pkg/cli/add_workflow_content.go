@@ -176,7 +176,12 @@ func fetchWorkflowDependencies(ctx context.Context, workflowSpec *WorkflowSpec, 
 	}
 	if !isLocalWorkflowPath(workflowSpec.WorkflowPath) {
 		addLog.Printf("Fetching remote dependencies for %s", workflowSpec.WorkflowPath)
-		return fetchAllRemoteDependencies(ctx, string(sourceContent), workflowSpec, githubWorkflowsDir, opts.Verbose, opts.Force, tracker)
+		// Pin dependencies to the fetched workflow without changing its tracking ref.
+		dependencySpec := *workflowSpec
+		if sourceInfo != nil && sourceInfo.CommitSHA != "" {
+			dependencySpec.Version = sourceInfo.CommitSHA
+		}
+		return fetchAllRemoteDependencies(ctx, string(sourceContent), &dependencySpec, githubWorkflowsDir, opts.Verbose, opts.Force, tracker)
 	}
 	if sourceInfo == nil || !sourceInfo.IsLocal {
 		return nil
@@ -298,6 +303,12 @@ func applySourceAndIncludeModifications(content string, workflowSpec *WorkflowSp
 			}
 		} else {
 			content = updatedContent
+		}
+		if IsCommitSHA(commitSHA) {
+			content, err = UpdateFieldInFrontmatter(content, "source-sha", fmt.Sprintf("%q", commitSHA))
+			if err != nil {
+				return "", fmt.Errorf("failed to record installed source commit: %w", err)
+			}
 		}
 	}
 

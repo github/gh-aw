@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -80,10 +82,10 @@ func hasLocalModifications(sourceContent, localContent, sourceSpec, localWorkflo
 	// is source field position, which in turn triggers merge mode and can produce
 	// spurious merge conflict markers.
 	sourceResolvedNormalized := stringutil.NormalizeWhitespace(sourceResolved)
-	if withoutSource, removeErr := RemoveTopLevelFieldFromFrontmatter(sourceResolvedNormalized, "source"); removeErr == nil {
+	if withoutSource, removeErr := removeSourceMetadata(sourceResolvedNormalized); removeErr == nil {
 		sourceResolvedNormalized = withoutSource
 	}
-	if withoutSource, removeErr := RemoveTopLevelFieldFromFrontmatter(localNormalized, "source"); removeErr == nil {
+	if withoutSource, removeErr := removeSourceMetadata(localNormalized); removeErr == nil {
 		localNormalized = withoutSource
 	}
 
@@ -97,6 +99,17 @@ func hasLocalModifications(sourceContent, localContent, sourceSpec, localWorkflo
 	}
 
 	return hasModifications
+}
+
+func removeSourceMetadata(content string) (string, error) {
+	for _, field := range []string{"source", "source-sha"} {
+		var err error
+		content, err = RemoveTopLevelFieldFromFrontmatter(content, field)
+		if err != nil {
+			return "", err
+		}
+	}
+	return content, nil
 }
 
 func normalizeImportsForMerge(content string, sourceSpec *SourceSpec, localWorkflowDir string, verbose bool) (string, error) {
@@ -133,22 +146,32 @@ func normalizeLegacyImportMergeBase(base, current string) string {
 	return strings.Replace(base, strings.Join(parsed.FrontmatterLines, "\n"), strings.Join(local.FrontmatterLines, "\n"), 1)
 }
 
-// Preserve historical merge behavior for already serialized, comment-free installs
-// with local frontmatter edits. Authored formatting never enters this fallback.
-func normalizeLegacyImportMergeInputs(base, current, upstream string) (string, string, string) {
+// Preserve historical merge behavior for previously serialized installations.
+// Matching base/current frontmatter needs no normalization, even when Markdown changed.
+func normalizeLegacyImportMergeInputs(base, current, upstream string) (string, string, string, bool) {
+	baseParsed, err := parser.ExtractFrontmatterFromContent(base)
+	if err != nil {
+		return base, current, upstream, false
+	}
+	currentParsed, err := parser.ExtractFrontmatterFromContent(current)
+	if err != nil || strings.Join(baseParsed.FrontmatterLines, "\n") == strings.Join(currentParsed.FrontmatterLines, "\n") {
+		return base, current, upstream, false
+	}
 	canonicalCurrent, err := canonicalImportMergeContent(current)
-	if err != nil || stringutil.NormalizeWhitespace(canonicalCurrent) != current {
-		return base, current, upstream
+	canonicalCurrentParsed, canonicalErr := parser.ExtractFrontmatterFromContent(canonicalCurrent)
+	if err != nil || canonicalErr != nil ||
+		strings.Join(canonicalCurrentParsed.FrontmatterLines, "\n") != strings.Join(currentParsed.FrontmatterLines, "\n") {
+		return base, current, upstream, false
 	}
 	canonicalBase, err := canonicalImportMergeContent(base)
 	if err != nil {
-		return base, current, upstream
+		return base, current, upstream, false
 	}
 	canonicalUpstream, err := canonicalImportMergeContent(upstream)
 	if err != nil {
-		return base, current, upstream
+		return base, current, upstream, false
 	}
-	return stringutil.NormalizeWhitespace(canonicalBase), current, stringutil.NormalizeWhitespace(canonicalUpstream)
+	return stringutil.NormalizeWhitespace(canonicalBase), current, stringutil.NormalizeWhitespace(canonicalUpstream), true
 }
 
 func canonicalImportMergeContent(content string) (string, error) {
@@ -163,7 +186,172 @@ func canonicalImportMergeContent(content string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return RemoveTopLevelFieldFromFrontmatter(canonical, "source")
+	return canonical, nil
+}
+
+func restoreUpstreamFrontmatterFormatting(merged, upstream string) (string, error) {
+	mergedParsed, err := parser.ExtractFrontmatterFromContent(merged)
+	if err != nil {
+		return "", err
+	}
+	upstreamParsed, err := parser.ExtractFrontmatterFromContent(upstream)
+	if err != nil {
+		return "", err
+	}
+
+	formatted := upstream
+	fields := make([]string, 0, len(upstreamParsed.Frontmatter)+len(mergedParsed.Frontmatter))
+	for field := range upstreamParsed.Frontmatter {
+		fields = append(fields, field)
+	}
+	for field := range mergedParsed.Frontmatter {
+		if _, exists := upstreamParsed.Frontmatter[field]; !exists {
+			fields = append(fields, field)
+		}
+	}
+	slices.Sort(fields)
+	for _, field := range fields {
+		value, exists := mergedParsed.Frontmatter[field]
+		if !exists {
+			if _, upstreamHasField := upstreamParsed.Frontmatter[field]; !upstreamHasField {
+				continue
+			}
+		} else if upstreamValue, upstreamHasField := upstreamParsed.Frontmatter[field]; upstreamHasField &&
+			reflect.DeepEqual(value, upstreamValue) { //nolint:reflectdeepequalusage // YAML values are heterogeneous nested maps and slices.
+			continue
+		}
+		formatted, err = replaceTopLevelFrontmatterField(formatted, field, value, exists)
+		if err != nil {
+			return "", err
+		}
+	}
+	formattedParsed, err := parser.ExtractFrontmatterFromContent(formatted)
+	if err != nil {
+		return "", err
+	}
+	return parser.ReconstructWorkflowFile(strings.Join(formattedParsed.FrontmatterLines, "\n"), mergedParsed.Markdown)
+}
+
+func replaceTopLevelFrontmatterField(content, field string, value any, exists bool) (string, error) {
+	parsed, err := parser.ExtractFrontmatterFromContent(content)
+	if err != nil {
+		return "", err
+	}
+	startLine, found := parsed.FieldLines[field]
+	start := startLine - parsed.FrontmatterStart
+	end := len(parsed.FrontmatterLines)
+	for _, line := range parsed.FieldLines {
+		if line > startLine && line-parsed.FrontmatterStart < end {
+			end = line - parsed.FrontmatterStart
+		}
+	}
+
+	var replacement []string
+	if exists {
+		serialized, err := reconstructWorkflowFileFromMap(map[string]any{field: value}, "")
+		if err != nil {
+			return "", err
+		}
+		serializedParsed, err := parser.ExtractFrontmatterFromContent(serialized)
+		if err != nil {
+			return "", err
+		}
+		replacement = serializedParsed.FrontmatterLines
+	}
+	frontmatter := append([]string(nil), parsed.FrontmatterLines...)
+	if !found {
+		if !exists {
+			return content, nil
+		}
+		frontmatter = append(frontmatter, replacement...)
+	} else {
+		if start < 0 || start >= end || end > len(frontmatter) {
+			return "", fmt.Errorf("invalid frontmatter field range for %q", field)
+		}
+		for end > start+1 {
+			line := strings.TrimSpace(frontmatter[end-1])
+			if line != "" && !strings.HasPrefix(line, "#") {
+				break
+			}
+			end--
+		}
+		updated := make([]string, 0, len(frontmatter)-(end-start)+len(replacement))
+		updated = append(updated, frontmatter[:start]...)
+		updated = append(updated, replacement...)
+		updated = append(updated, frontmatter[end:]...)
+		frontmatter = updated
+	}
+	return parser.ReconstructWorkflowFile(strings.Join(frontmatter, "\n"), parsed.Markdown)
+}
+
+func normalizeImportFormattingForMerge(content string, parsed *parser.FrontmatterResult) (string, bool, bool) {
+	imports, exists := parsed.Frontmatter["imports"]
+	if !exists {
+		return content, false, true
+	}
+
+	importLine, exists := parsed.FieldLines["imports"]
+	if !exists {
+		return content, false, false
+	}
+	start := importLine - parsed.FrontmatterStart
+	end := len(parsed.FrontmatterLines)
+	for _, line := range parsed.FieldLines {
+		if line > importLine && line-parsed.FrontmatterStart < end {
+			end = line - parsed.FrontmatterStart
+		}
+	}
+	if start < 0 || start >= end || end > len(parsed.FrontmatterLines) {
+		return content, false, false
+	}
+	for _, line := range parsed.FrontmatterLines[start:end] {
+		if strings.Contains(line, "#") {
+			return content, false, false
+		}
+	}
+
+	normalized, err := replaceImportsFieldInContent(content, parsed, imports)
+	if err != nil {
+		return content, false, false
+	}
+	return normalized, normalized != content, true
+}
+
+func normalizeLegacyImportsForMerge(base, current, upstream string) (string, string, string, bool) {
+	baseParsed, err := parser.ExtractFrontmatterFromContent(base)
+	if err != nil {
+		return base, current, upstream, false
+	}
+	currentParsed, err := parser.ExtractFrontmatterFromContent(current)
+	if err != nil {
+		return base, current, upstream, false
+	}
+	upstreamParsed, err := parser.ExtractFrontmatterFromContent(upstream)
+	if err != nil {
+		return base, current, upstream, false
+	}
+	baseImports, baseHasImports := baseParsed.Frontmatter["imports"]
+	currentImports, currentHasImports := currentParsed.Frontmatter["imports"]
+	if !baseHasImports || !currentHasImports {
+		return base, current, upstream, false
+	}
+	baseImportsYAML, err := serializeImportsField(baseImports)
+	if err != nil {
+		return base, current, upstream, false
+	}
+	currentImportsYAML, err := serializeImportsField(currentImports)
+	if err != nil || strings.Join(baseImportsYAML, "\n") != strings.Join(currentImportsYAML, "\n") {
+		return base, current, upstream, false
+	}
+
+	normalizedBase, baseChanged, baseOK := normalizeImportFormattingForMerge(base, baseParsed)
+	normalizedCurrent, currentChanged, currentOK := normalizeImportFormattingForMerge(current, currentParsed)
+	normalizedUpstream, upstreamChanged, upstreamOK := normalizeImportFormattingForMerge(upstream, upstreamParsed)
+	if !baseOK || !currentOK || !upstreamOK {
+		return base, current, upstream, false
+	}
+	return normalizedBase, normalizedCurrent, normalizedUpstream,
+		baseChanged || currentChanged || upstreamChanged
 }
 
 // MergeWorkflowContent performs a 3-way merge of workflow content using git merge-file
@@ -197,15 +385,15 @@ func MergeWorkflowContent(base, current, new, oldSourceSpec, newRefOrSourceSpec,
 
 	// The source field is managed by the updater, not user content. Exclude it from the
 	// textual merge so changing only its ref cannot overlap local frontmatter additions.
-	baseWithoutSource, err := RemoveTopLevelFieldFromFrontmatter(base, "source")
+	baseWithoutSource, err := removeSourceMetadata(base)
 	if err != nil {
 		return "", false, fmt.Errorf("failed to remove source from base content: %w", err)
 	}
-	currentWithoutSource, err := RemoveTopLevelFieldFromFrontmatter(current, "source")
+	currentWithoutSource, err := removeSourceMetadata(current)
 	if err != nil {
 		return "", false, fmt.Errorf("failed to remove source from current content: %w", err)
 	}
-	newWithoutSource, err := RemoveTopLevelFieldFromFrontmatter(new, "source")
+	newWithoutSource, err := removeSourceMetadata(new)
 	if err != nil {
 		return "", false, fmt.Errorf("failed to remove source from new content: %w", err)
 	}
@@ -245,12 +433,19 @@ func MergeWorkflowContent(base, current, new, oldSourceSpec, newRefOrSourceSpec,
 		return updatedCurrent, false, nil
 	}
 
+	legacyUpstream := ""
+	restoreLegacyFrontmatter := false
 	if baseNormalized != currentNormalized {
 		legacyBase := normalizeLegacyImportMergeBase(baseNormalized, currentNormalized)
 		if legacyBase != baseNormalized {
 			baseNormalized = legacyBase
 		} else {
-			baseNormalized, currentNormalized, newNormalized = normalizeLegacyImportMergeInputs(baseNormalized, currentNormalized, newNormalized)
+			legacyUpstream = newNormalized
+			var normalized bool
+			baseNormalized, currentNormalized, newNormalized, normalized = normalizeLegacyImportMergeInputs(baseNormalized, currentNormalized, newNormalized)
+			if normalized {
+				restoreLegacyFrontmatter = true
+			}
 		}
 	}
 
@@ -276,41 +471,61 @@ func MergeWorkflowContent(base, current, new, oldSourceSpec, newRefOrSourceSpec,
 		return "", false, fmt.Errorf("failed to write new file: %w", err)
 	}
 
-	// Execute git merge-file
-	// Format: git merge-file <current> <base> <new>
-	cmd := exec.Command("git", "merge-file",
-		"-L", "current (local changes)",
-		"-L", "base (original)",
-		"-L", "new (upstream)",
-		"--diff3", // Use diff3 style conflict markers for better context
-		currentFile, baseFile, newFile)
-
-	output, err := cmd.CombinedOutput()
-
-	// git merge-file returns:
-	// - 0 if merge was successful without conflicts
-	// - >0 if conflicts were found (appears to return number of conflicts, but file is still updated)
-	// The exit code can be >1 for multiple conflicts, not just errors
-	hasConflicts := false
-	if err != nil {
+	runMergeFile := func() ([]byte, error) {
+		cmd := exec.Command("git", "merge-file",
+			"-L", "current (local changes)",
+			"-L", "base (original)",
+			"-L", "new (upstream)",
+			"--diff3",
+			currentFile, baseFile, newFile)
+		return cmd.CombinedOutput()
+	}
+	classifyMergeFileResult := func(output []byte, err error) (bool, int, error) {
+		if err == nil {
+			return false, 0, nil
+		}
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
 			exitCode := exitErr.ExitCode()
 			if exitCode > 0 && exitCode < 128 {
-				// Conflicts found (exit codes 1-127 indicate conflicts)
-				// Exit codes >= 128 typically indicate system errors
-				hasConflicts = true
-				updateMergeLog.Printf("Merge conflicts detected: exit_code=%d", exitCode)
-				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Merge conflicts detected (exit code: %d)", exitCode)))
-				}
-			} else {
-				// Real error (exit code >= 128)
-				updateMergeLog.Printf("Git merge-file failed: exit_code=%d", exitCode)
-				return "", false, fmt.Errorf("git merge-file failed: %w\nOutput: %s", err, output)
+				return true, exitCode, nil
 			}
-		} else {
-			return "", false, fmt.Errorf("failed to execute git merge-file: %w", err)
+			return false, exitCode, fmt.Errorf("git merge-file failed: %w\nOutput: %s", err, output)
+		}
+		return false, 0, fmt.Errorf("failed to execute git merge-file: %w", err)
+	}
+
+	output, err := runMergeFile()
+	hasConflicts, conflictExitCode, err := classifyMergeFileResult(output, err)
+	if err != nil {
+		return "", false, err
+	}
+	if hasConflicts {
+		// Earlier updates re-marshaled frontmatter when rewriting imports. Retry
+		// with only the imports block normalized, preserving comments and other edits.
+		normalizedBase, normalizedCurrent, normalizedUpstream, changed := normalizeLegacyImportsForMerge(
+			baseNormalized, currentNormalized, newNormalized)
+		if changed {
+			if err := os.WriteFile(baseFile, []byte(normalizedBase), constants.FilePermPublic); err != nil {
+				return "", false, fmt.Errorf("failed to write normalized base file: %w", err)
+			}
+			if err := os.WriteFile(currentFile, []byte(normalizedCurrent), constants.FilePermPublic); err != nil {
+				return "", false, fmt.Errorf("failed to write normalized current file: %w", err)
+			}
+			if err := os.WriteFile(newFile, []byte(normalizedUpstream), constants.FilePermPublic); err != nil {
+				return "", false, fmt.Errorf("failed to write normalized upstream file: %w", err)
+			}
+			output, err = runMergeFile()
+			hasConflicts, conflictExitCode, err = classifyMergeFileResult(output, err)
+			if err != nil {
+				return "", false, err
+			}
+		}
+		if hasConflicts {
+			updateMergeLog.Printf("Merge conflicts detected: exit_code=%d", conflictExitCode)
+			if verbose {
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Merge conflicts detected (exit code: %d)", conflictExitCode)))
+			}
 		}
 	}
 
@@ -323,6 +538,12 @@ func MergeWorkflowContent(base, current, new, oldSourceSpec, newRefOrSourceSpec,
 	}
 
 	mergedStr := string(mergedContent)
+	if restoreLegacyFrontmatter && !hasConflicts {
+		mergedStr, err = restoreUpstreamFrontmatterFormatting(mergedStr, legacyUpstream)
+		if err != nil {
+			return "", false, fmt.Errorf("failed to restore upstream frontmatter formatting: %w", err)
+		}
+	}
 
 	// Process @include directives if present and no conflicts
 	// Skip include processing if there are conflicts to avoid errors

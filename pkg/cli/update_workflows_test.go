@@ -17,6 +17,33 @@ func mockWorkflowUpdateDeps(mockFn func(context.Context, string) ([]byte, error)
 	return deps
 }
 
+func TestResolveLatestRef_AddedReleaseTracksCompatibleReleases(t *testing.T) {
+	t.Parallel()
+
+	spec, err := parseWorkflowSpec("owner/repo/workflows/triage.md@v1.2.0")
+	require.NoError(t, err)
+	source := buildSourceStringWithCommitSHA(spec, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	sourceSpec, err := parseSourceSpec(source)
+	require.NoError(t, err)
+
+	deps := mockWorkflowUpdateDeps(func(_ context.Context, repo string) ([]byte, error) {
+		assert.Equal(t, "owner/repo", repo)
+		return []byte("v2.0.0\nv1.4.0\nv1.3.0\nv1.2.0"), nil
+	})
+	deps.getRepoDefaultBranch = func(context.Context, string) (string, error) {
+		t.Fatal("a workflow added at a release tag must not track the default branch")
+		return "", nil
+	}
+	deps.getLatestBranchCommit = func(context.Context, string, string) (latestBranchCommitInfo, error) {
+		t.Fatal("a workflow added at a release tag must not resolve a branch commit")
+		return latestBranchCommitInfo{}, nil
+	}
+
+	result, err := resolveLatestRefWithDeps(context.Background(), deps, sourceSpec.Repo, sourceSpec.Ref, false, false, 0)
+	require.NoError(t, err)
+	assert.Equal(t, "v1.4.0", result.Ref)
+}
+
 // TestResolveLatestRelease_PrereleaseTagsSkipped verifies that prerelease tags are
 // not selected as the upgrade target even when they have a higher base version than
 // the latest stable release. Per semver rules, v1.1.0-beta.1 > v1.0.0, so without
@@ -136,6 +163,40 @@ func TestResolveLatestRelease_CooldownAllInWindow(t *testing.T) {
 	result, err := resolveLatestReleaseWithDeps(context.Background(), deps, "owner/repo", "v1.0.0", false, false, 7*24*time.Hour)
 	require.NoError(t, err)
 	assert.Equal(t, "v1.0.0", result, "should return currentRef when all upgrade candidates are in cooldown")
+}
+
+func TestResolveLatestRef_MajorTagReleaseCooldown(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name        string
+		fallback    bool
+		wantRef     string
+		wantBlocked bool
+	}{
+		{name: "all candidates blocked", wantRef: "v1", wantBlocked: true},
+		{name: "eligible fallback", fallback: true, wantRef: "v1.1.0"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			deps := mockWorkflowUpdateDeps(func(_ context.Context, repo string) ([]byte, error) {
+				assert.Equal(t, "owner/repo", repo)
+				return []byte("v1.2.0\nv1.1.0"), nil
+			})
+			var checkedTags []string
+			deps.checkCoolDown = func(_ context.Context, repo, tag string, cd time.Duration) coolDownCheckResult {
+				assert.Equal(t, "owner/repo", repo)
+				assert.Equal(t, 7*24*time.Hour, cd)
+				checkedTags = append(checkedTags, tag)
+				return coolDownCheckResult{InCoolDown: !tt.fallback || tag != "v1.1.0"}
+			}
+
+			result, err := resolveLatestRefWithDeps(context.Background(), deps, "owner/repo", "v1", false, false, 7*24*time.Hour)
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantRef, result.Ref)
+			assert.Equal(t, tt.wantBlocked, result.CoolDownBlocked)
+			assert.Equal(t, []string{"v1.2.0", "v1.1.0"}, checkedTags)
+		})
+	}
 }
 
 func TestResolveLatestRef_BranchCommitCooldownReturnsCurrentBranch(t *testing.T) {

@@ -63,6 +63,29 @@ func BadSingleCaseWithDefault(ctx context.Context) {
 	}
 }
 
+// BadParenthesized: parentheses around the callee, the call, or the receive
+// do not change the leak and are still flagged.
+func BadParenthesized(ctx context.Context) {
+	for {
+		select {
+		case <-(time.After)(time.Second): // want `time\.After creates a new timer on each loop iteration that is not garbage collected until it fires; use time\.NewTimer with Reset and Stop instead`
+		case <-ctx.Done():
+			return
+		}
+		select {
+		case <-(time.After(time.Second)): // want `time\.After creates a new timer on each loop iteration that is not garbage collected until it fires; use time\.NewTimer with Reset and Stop instead`
+		case <-ctx.Done():
+			return
+		}
+		select {
+		case t := (<-time.After(time.Second)): // want `time\.After creates a new timer on each loop iteration that is not garbage collected until it fires; use time\.NewTimer with Reset and Stop instead`
+			_ = t
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
 // GoodNoLoop is fine: time.After in a select that is not inside a loop.
 func GoodNoLoop(ctx context.Context) {
 	select {
