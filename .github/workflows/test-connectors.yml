@@ -36,7 +36,7 @@ on:
   workflow_dispatch:
     inputs:
       provider:
-        description: Optional read-only live check; offline tests always run
+        description: Optional live check requiring provider credentials and scopes; offline tests always run
         type: choice
         options: [none, linear, jira, azure-devops]
         default: none
@@ -80,14 +80,14 @@ jobs:
     name: Explicit read-only provider smoke test
     if: >-
       !github.event.repository.fork &&
-      (github.event_name == 'push' ||
-       (github.event_name == 'workflow_dispatch' && inputs.provider != 'none'))
+      github.event_name == 'workflow_dispatch' &&
+      inputs.provider != 'none'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     strategy:
       fail-fast: false
       matrix:
-        provider: ${{ fromJSON(github.event_name == 'workflow_dispatch' && format('["{0}"]', inputs.provider) || '["linear","jira"]') }}
+        provider: ${{ fromJSON(format('["{0}"]', inputs.provider)) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
