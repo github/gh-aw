@@ -74,6 +74,19 @@ function shouldPreserveFrontMatter(filepath) {
 }
 
 /**
+ * Removes connector authoring documentation before imported content is sliced
+ * or inlined. Keep line breaks so partial imports retain their source offsets.
+ * @param {string} content
+ * @returns {string}
+ */
+function removeConnectorDocumentation(content) {
+  if (!content.includes("<!--") || !content.includes("connector-documentation")) {
+    return content;
+  }
+  return content.replace(/<!--\s*<connector-documentation(?:\s|>)[\s\S]*?<\/connector-documentation>\s*-->/g, comment => comment.replace(/[^\r\n]/g, ""));
+}
+
+/**
  * Removes XML comments from content
  * @param {string} content - The content to process
  * @param {boolean} [preserveLines] - Keep source line numbers stable for partial imports
@@ -969,6 +982,8 @@ async function processRuntimeImport(filepathOrUrl, optional, workspaceDir, start
     throw new Error(`${ERR_SYSTEM}: Failed to read file ${normalizedPath}: ${getErrorMessage(err)}`, { cause: err });
   }
 
+  content = removeConnectorDocumentation(content);
+
   // Strip comments before slicing: selecting their interior must not expose hidden instructions.
   if (startLine !== undefined || endLine !== undefined) {
     content = removeXMLComments(content, true);
@@ -1316,6 +1331,7 @@ module.exports = {
   resolveRuntimeImportKey,
   closeUnterminatedInlineMarkers,
   hasFrontMatter,
+  removeConnectorDocumentation,
   removeXMLComments,
   neutralizeSystemTags,
   hasGitHubActionsMacros,
