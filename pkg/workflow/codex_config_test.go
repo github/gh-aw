@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/goccy/go-yaml"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/assert"
@@ -275,8 +276,10 @@ Complete the task.
 }
 
 func TestCodexGitHubDirectToolCatalogConfiguration(t *testing.T) {
-	dir := t.TempDir()
-	home := filepath.Join(dir, "custom-codex-home")
+	require.NoError(t, os.MkdirAll(constants.TmpGhAwDir, 0o700))
+	home, err := os.MkdirTemp(constants.TmpGhAwDir, "custom-codex-home-")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(home) })
 	cmd := exec.Command("node", "actions/setup/js/convert_gateway_config_codex.cjs", "--direct-tools")
 	cmd.Dir = filepath.Join("..", "..")
 	cmd.Env = append(os.Environ(), "CODEX_HOME="+home)
@@ -314,6 +317,34 @@ func TestCodexGitHubDirectToolCatalogConfiguration(t *testing.T) {
 		if configOnly {
 			assert.Contains(t, rendered, "--config-only")
 		}
+	}
+}
+
+func TestCodexHomeStaysWithinManagedTemporaryDirectory(t *testing.T) {
+	tests := []struct {
+		name string
+		home string
+		want string
+	}{
+		{name: "default", want: constants.TmpMcpConfigDir},
+		{name: "managed path", home: constants.TmpGhAwDir + "/custom", want: constants.TmpGhAwDir + "/custom"},
+		{name: "managed nested path", home: constants.TmpGhAwDir + "/repo-memory/state/codex", want: constants.TmpGhAwDir + "/repo-memory/state/codex"},
+		{name: "managed root", home: constants.TmpGhAwDir, want: constants.TmpGhAwDir},
+		{name: "outside path", home: "/etc", want: constants.TmpMcpConfigDir},
+		{name: "path traversal", home: constants.TmpGhAwDir + "/../../etc", want: constants.TmpMcpConfigDir},
+		{name: "noncanonical path", home: constants.TmpGhAwDir + "/custom/../codex", want: constants.TmpMcpConfigDir},
+		{name: "relative path", home: "../codex-home", want: constants.TmpMcpConfigDir},
+		{name: "expression", home: "${{ github.event.issue.title }}", want: constants.TmpMcpConfigDir},
+		{name: "prefixed expression", home: constants.TmpGhAwDir + "/${{ inputs.codex_dir }}", want: constants.TmpMcpConfigDir},
+		{name: "shell substitution", home: constants.TmpGhAwDir + "/$(touch marker)", want: constants.TmpMcpConfigDir},
+		{name: "whitespace", home: constants.TmpGhAwDir + "/codex home", want: constants.TmpMcpConfigDir},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			data := &WorkflowData{EngineConfig: &EngineConfig{Env: map[string]string{"CODEX_HOME": test.home}}}
+			assert.Equal(t, test.want, codexHome(data))
+		})
 	}
 }
 
@@ -356,6 +387,8 @@ func TestCodexNativeConfigCanonicalFiltersAcrossSetupModes(t *testing.T) {
 			require.NoError(t, err)
 			dir := t.TempDir()
 			gatewayPath := filepath.Join(dir, "gateway.json")
+			codexHome := filepath.Join(constants.TmpGhAwDir, filepath.Base(dir), "codex-home")
+			t.Cleanup(func() { _ = os.RemoveAll(filepath.Dir(codexHome)) })
 			require.NoError(t, os.WriteFile(gatewayPath, []byte(`{"mcpServers":{"github":{"headers":{"Authorization":"fixture-token"}}}}`), 0o600))
 			args := []string{"actions/setup/js/convert_gateway_config_codex.cjs"}
 			if mode != "gateway" {
@@ -366,7 +399,7 @@ func TestCodexNativeConfigCanonicalFiltersAcrossSetupModes(t *testing.T) {
 			cmd.Env = append(os.Environ(),
 				"GH_AW_CODEX_CONFIG_JSON="+string(payload),
 				"RUNNER_TEMP="+dir,
-				"CODEX_HOME="+filepath.Join(dir, "codex-home"),
+				"CODEX_HOME="+codexHome,
 				"MCP_GATEWAY_OUTPUT="+gatewayPath,
 				"MCP_GATEWAY_DOMAIN=gateway",
 				"MCP_GATEWAY_PORT=80",
@@ -441,6 +474,22 @@ func TestCodexExplicitProviderMarker(t *testing.T) {
 			assert.Equal(t, "1", env["GH_AW_LLM_PROVIDER_EXPLICIT"])
 		}
 	}
+}
+
+func TestCodexExecutionEnvKeepsValidatedCodexHomeAfterOverrides(t *testing.T) {
+	data := &WorkflowData{
+		EngineConfig: &EngineConfig{
+			ID:  "codex",
+			Env: map[string]string{"CODEX_HOME": "/tmp/outside-codex"},
+		},
+		SandboxConfig: &SandboxConfig{
+			Agent: &AgentSandboxConfig{Env: map[string]string{"CODEX_HOME": constants.TmpGhAwDir + "/agent-codex"}},
+		},
+	}
+
+	env := NewCodexEngine().buildCodexExecutionEnv(data, false, false, "MODEL")
+
+	assert.Equal(t, constants.TmpMcpConfigDir, env["CODEX_HOME"])
 }
 
 func TestCodexNativeConfigValidation(t *testing.T) {

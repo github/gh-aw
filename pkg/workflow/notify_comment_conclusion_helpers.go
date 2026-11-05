@@ -164,13 +164,10 @@ func (c *Compiler) buildConclusionDetectionRunsStep(data *WorkflowData, mainJobN
 	// Add detection runs logging step if threat detection is enabled.
 	// This posts a comment to the "[aw] Detection Runs" tracking issue whenever
 	// the detection job produces a warning or failure conclusion.
-	if !IsDetectionJobEnabled(data.SafeOutputs) {
-		return nil
-	}
 	// Allow opting out of the "[aw] Detection Runs" tracking issue independently of
 	// threat detection itself via safe-outputs.threat-detection.report-as-issue: false.
-	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && !data.SafeOutputs.ThreatDetection.IsReportAsIssueEnabled() {
-		notifyCommentLog.Print("Skipping detection runs logging step: report-as-issue is disabled")
+	if !conclusionDetectionMayCreateIssue(data) {
+		notifyCommentLog.Print("Skipping detection runs logging step: detection is not runnable or report-as-issue is disabled")
 		return nil
 	}
 	envVars := buildWorkflowMetadataEnvVarsWithTrackerID(data.Name, data.Source, data.TrackerID, buildLocalWorkflowSourceURL(c.markdownPath))

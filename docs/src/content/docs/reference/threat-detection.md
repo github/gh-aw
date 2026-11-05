@@ -124,6 +124,27 @@ safe-outputs:
 | `continue-on-error` | boolean | When `true` (default), detected threats and detection engine failures apply the warn-mode policy (annotate reviewable outputs, convert branch pushes, abort non-reviewable outputs) instead of blocking all safe outputs. When `false`, they fail the detection job and safe outputs are not applied. |
 | `report-as-issue` | boolean | When `true` (default), detection warnings/failures create or update the `[aw] Detection Runs` tracking issue. Set to `false` to keep threat detection and its enforcement enabled while skipping the tracking issue; results remain visible in the GitHub Actions run logs. |
 
+### Issue reporting permissions
+
+When detection is runnable and `report-as-issue` is enabled (the default), the
+`conclusion` job and its GitHub App token request `issues: write`. Reusable workflow
+callers must grant this permission throughout the caller chain. When
+`safe-outputs.github-app` is configured, the App must have **Issues: write** access;
+otherwise, token creation can fail. Reusable callers without the required scope
+can fail workflow validation before any job runs.
+
+The existing opt-out disables the tracking issue and its detection-specific
+permission grant without disabling threat detection or enforcement:
+
+```aw wrap
+safe-outputs:
+  threat-detection:
+    report-as-issue: false
+```
+
+Other enabled issue-writing outputs or conclusion reporters can still require
+`issues: write`.
+
 ### Private CA certificates
 
 The detection job inherits `sandbox.agent.ca-cert` for upstream API proxy TLS verification only when the detection and agent engines match. A non-empty `safe-outputs.threat-detection.ca-cert` overrides the inherited path; set it to `false` to opt out, or leave it unset/empty to use the matching-engine inheritance behavior.
