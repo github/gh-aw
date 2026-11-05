@@ -85,10 +85,15 @@ engine:
       const { mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } = require("fs");
       const { join } = require("path");
       const { spawnSync } = require("child_process");
+      const { redactArtifactMaskedValues } = require("./add_mask_redaction.cjs");
       const { fetchAWFReflect, resolveProviderEndpointFromReflect, deriveBaseUrlFromModelsURL, inferWireApiForModel, normalizeReflectProviderName, REFLECT_PROVIDER_ALIASES } = require("./awf_reflect.cjs");
 
       const [command, ...args] = process.argv.slice(2);
-      const log = message => process.stderr.write(`[atomic-harness] ${message}\n`);
+      const sensitiveValues = new Set();
+      const sanitize = output => redactArtifactMaskedValues(
+        output?.toString("utf8") || "", [...sensitiveValues], undefined, () => "[REDACTED]", { textMode: true }
+      );
+      const log = message => process.stderr.write(sanitize(`[atomic-harness] ${message}\n`));
       const main = async () => {
         if (!command) throw new Error("Atomic command is required");
         if (process.env.AWF_REFLECT_ENABLED !== "1") {
@@ -131,6 +136,17 @@ engine:
         const mcp = mcpPath ? JSON.parse(readFileSync(mcpPath, "utf8")) : { mcpServers: {} };
         if (!mcp || !mcp.mcpServers || typeof mcp.mcpServers !== "object" || Array.isArray(mcp.mcpServers)) {
           throw new Error("Atomic MCP configuration must contain an mcpServers object");
+        }
+        for (const server of Object.values(mcp.mcpServers)) {
+          for (const [name, value] of Object.entries(server?.headers || {})) {
+            if (typeof value !== "string" || !value.trim()) continue;
+            sensitiveValues.add(value);
+            sensitiveValues.add(value.trim());
+            if (name.toLowerCase() === "authorization") {
+              const bearer = /^Bearer\s+(.+)$/i.exec(value.trim());
+              if (bearer) sensitiveValues.add(bearer[1].trim());
+            }
+          }
         }
         mkdirSync("/tmp/gh-aw/agent", { recursive: true });
         const agentDir = mkdtempSync("/tmp/gh-aw/agent/atomic-");
@@ -182,8 +198,17 @@ engine:
             cwd: process.env.GH_AW_ENGINE_CWD || process.env.GITHUB_WORKSPACE,
             env,
             input: prompt,
-            stdio: ["pipe", "inherit", "inherit"],
+            stdio: ["pipe", "pipe", "pipe"],
+            maxBuffer: 64 * 1024 * 1024,
           });
+          // A bounded capture failure may leave a credential split at the buffer boundary.
+          if (result.error?.code === "ENOBUFS") {
+            throw new Error("Atomic output exceeded the 64 MiB capture limit; incomplete output withheld");
+          }
+          const stdout = sanitize(result.stdout);
+          const stderr = sanitize(result.stderr);
+          process.stdout.write(stdout);
+          process.stderr.write(stderr);
           if (result.error) throw result.error;
           if (result.status !== 0) {
             log(result.signal ? `Atomic terminated by signal ${result.signal}` : `Atomic exited with code ${result.status ?? "unknown"}`);
@@ -194,7 +219,11 @@ engine:
         }
       };
       main().catch(error => {
-        log(error instanceof Error ? error.message : String(error));
+        try {
+          log(error instanceof Error ? error.message : String(error));
+        } catch {
+          process.stderr.write("[atomic-harness] Atomic output redaction failed; output withheld\n");
+        }
         process.exitCode = 1;
       });
 ---
@@ -241,6 +270,13 @@ and `mcp.json`, removed on exit. Native HTTP MCP retains gateway authorization
 headers, rewrites container-facing URLs, and exposes tools directly without
 Code Mode. CLI-mounted servers are excluded. The gateway credential is visible
 to the agent and is not an upstream provider credential or an agent boundary.
+The harness captures stdout and stderr and masks exact configured MCP header
+values, including bare bearer credentials and JSON-escaped occurrences, before
+emitting logs or launch diagnostics. The private MCP configuration stays intact.
+Capture is bounded to 64 MiB; overflow fails explicitly without publishing
+incomplete output. Logs appear after the process exits rather than streaming.
+This known-value masking does not contain the agent or cover arbitrary encodings,
+partial credentials, other secrets, or files the agent writes.
 
 Startup network checks, telemetry, saved sessions, skills,
 prompt templates, and themes are disabled. `--no-approve` ignores project-local

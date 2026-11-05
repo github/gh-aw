@@ -112,7 +112,7 @@ console.log(JSON.stringify({
 	assert.Equal(t, "build verified", captured.Build)
 	assert.Equal(t, "http", captured.MCP.Servers["fixture"].Type)
 	assert.Equal(t, "direct", captured.MCP.Servers["fixture"].Exposure)
-	assert.Equal(t, "gateway-session", captured.MCP.Servers["fixture"].Headers["Authorization"])
+	assert.Equal(t, "[REDACTED]", captured.MCP.Servers["fixture"].Headers["Authorization"])
 	assert.Equal(t, "1", captured.Env["ATOMIC_OFFLINE"])
 	assert.Equal(t, "0", captured.Env["ATOMIC_TELEMETRY"])
 	_, err = os.Stat(captured.Env["ATOMIC_CODING_AGENT_DIR"])
