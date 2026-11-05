@@ -77,17 +77,6 @@ func (s *githubOutcomeRunSource) Load(ctx context.Context, runIDText string) out
 	if err != nil || report.EvalError != "" {
 		return outcomeRunData{ExclusionReason: exclusionArtifactUnavailable}
 	}
-	if len(report.Items) == 0 {
-		items, _, err := readLogsOutcomeItems(run)
-		if err != nil {
-			return outcomeRunData{ExclusionReason: exclusionArtifactUnavailable}
-		}
-		for _, item := range items {
-			if item.Type != "noop" {
-				return outcomeRunData{ExclusionReason: "unavailable"}
-			}
-		}
-	}
 	return outcomeRunData{Report: report}
 }
 
@@ -124,7 +113,7 @@ func resolveOutcomeMetricReferences(configs map[string]*workflow.ExperimentConfi
 				var err error
 				window, err = time.ParseDuration(cfg.OutcomeWindow)
 				if err != nil || window <= 0 {
-					return nil, nil, nil, fmt.Errorf("experiments.%s.outcome_window: invalid duration %q. Expected a positive duration. Example: outcome_window: 72h", name, cfg.OutcomeWindow)
+					return nil, nil, nil, fmt.Errorf("experiments.%s.outcome_window: invalid duration %q. Expected a positive Go duration. Example: outcome_window: 72h", name, cfg.OutcomeWindow)
 				}
 			}
 			windows[name] = window
@@ -180,7 +169,7 @@ func loadOutcomeObservationSetsForAnalysis(details *ExperimentDetails, frontmatt
 	if err != nil || len(windows) == 0 {
 		return nil, nil, func() {}, err
 	}
-	cacheDir, err := os.MkdirTemp(".", ".gh-aw-experiment-outcomes-")
+	cacheDir, err := os.MkdirTemp("", "gh-aw-experiment-outcomes-")
 	if err != nil {
 		return nil, nil, func() {}, fmt.Errorf("failed to prepare outcome artifact cache: %w", err)
 	}
@@ -281,12 +270,12 @@ func outcomeMetricRunValue(kind string, items []OutcomeReport) (float64, bool, O
 	for _, item := range items {
 		switch item.OutcomeStatus {
 		case OutcomeStatusAccepted:
-			if kind == "zero_touch" && !item.ZeroTouchEvidenceComplete {
+			if kind == "zero_touch" && item.Type == "create_pull_request" && !item.ZeroTouchEvidenceComplete {
 				coverage.Unavailable = 1
 				continue
 			}
 			denominator++
-			if kind == "accepted" || item.ZeroTouch {
+			if kind == "accepted" || item.Type == "create_pull_request" && item.ZeroTouch {
 				numerator++
 			}
 		case OutcomeStatusRejected:

@@ -32,6 +32,9 @@ func TestOutcomeMetricRunValue(t *testing.T) {
 	rejected := experimentOutcome(OutcomeStatusRejected, false, false)
 	pending := experimentOutcome(OutcomeStatusPending, false, false)
 	unknown := experimentOutcome(OutcomeStatusUnknown, false, false)
+	issue := OutcomeReport{Type: "create_issue", OutcomeEvaluation: OutcomeEvaluation{OutcomeStatus: OutcomeStatusAccepted}}
+	nonPR := experimentOutcome(OutcomeStatusAccepted, false, false)
+	nonPR.Type = "create_issue"
 	for _, tc := range []struct {
 		name     string
 		kind     string
@@ -56,9 +59,15 @@ func TestOutcomeMetricRunValue(t *testing.T) {
 		{name: "zero touch", kind: "zero_touch", items: []OutcomeReport{merged}, value: 1, measured: true},
 		{name: "human touch is zero", kind: "zero_touch", items: []OutcomeReport{touched}, measured: true},
 		{name: "incomplete is excluded", kind: "zero_touch", items: []OutcomeReport{incomplete}, coverage: OutcomeMetricCoverage{Unavailable: 1}},
+		{name: "non PR acceptance has unknown zero touch evidence", kind: "zero_touch", items: []OutcomeReport{nonPR}, coverage: OutcomeMetricCoverage{Unavailable: 1}},
+		{name: "rejected needs no touch evidence", kind: "zero_touch", items: []OutcomeReport{rejected}, measured: true},
+		{name: "pending needs no touch evidence", kind: "zero_touch", items: []OutcomeReport{pending}, measured: true, coverage: OutcomeMetricCoverage{StalePending: 1}},
 		{name: "incomplete does not affect acceptance", kind: "accepted", items: []OutcomeReport{incomplete}, value: 1, measured: true},
 		{name: "zero touch all resolved denominator", kind: "zero_touch", items: []OutcomeReport{merged, touched, rejected, pending}, value: .25, measured: true, coverage: OutcomeMetricCoverage{StalePending: 1}},
 		{name: "zero touch partial evidence", kind: "zero_touch", items: []OutcomeReport{merged, incomplete}, value: 1, measured: true, coverage: OutcomeMetricCoverage{Unavailable: 1}},
+		{name: "non PR is resolved but not zero touch", kind: "zero_touch", items: []OutcomeReport{issue}, measured: true},
+		{name: "mixed PR and issue denominator", kind: "zero_touch", items: []OutcomeReport{merged, issue}, value: .5, measured: true},
+		{name: "mixed output acceptance", kind: "accepted", items: []OutcomeReport{merged, issue}, value: 1, measured: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -147,6 +156,43 @@ func TestOutcomeMetricCoverageForMatureRuns(t *testing.T) {
 	assert.Equal(t, &OutcomeMetricCoverage{}, variants["candidate"].OutcomeCoverage)
 }
 
+func TestOutcomeMetricPerExperimentWindowsShareCollection(t *testing.T) {
+	t.Parallel()
+	now := time.Now()
+	run := ExperimentRunRecord{
+		RunID: "shared", Timestamp: now.Add(-48 * time.Hour).Format(time.RFC3339),
+		Assignments: map[string]string{"short": "control", "long": "candidate"},
+	}
+	runs := []ExperimentRunRecord{run, run}
+	configs := map[string]*workflow.ExperimentConfig{
+		"short": {Metric: "outcome:accepted", OutcomeWindow: "24h"},
+		"long":  {Metric: "outcome:zero_touch", OutcomeWindow: "72h"},
+	}
+	refs, _, windows, err := resolveOutcomeMetricReferences(configs)
+	require.NoError(t, err)
+	source := &fixtureOutcomeRunSource{}
+	data := loadOutcomeRunData(context.Background(), runs, windows, now, source)
+	assert.Equal(t, []string{"shared"}, source.calls)
+	experiments := []ExperimentVariantStats{
+		{Name: "short", Variants: map[string]int{"control": 2}, Total: 2},
+		{Name: "long", Variants: map[string]int{"candidate": 2}, Total: 2},
+	}
+	sets := buildOutcomeMetricObservationSets(experiments, runs, refs, windows, now, data)
+	require.Len(t, sets["short"].ByVariant["control"], 1, "duplicate assignments cannot add samples")
+	assert.Empty(t, sets["long"].ByVariant["candidate"], "shared data must not bypass a longer maturity window")
+	assert.Equal(t, 1, sets["long"].Coverage["candidate"].Immature)
+
+	configs["long"].OutcomeWindow = "36h"
+	refs, _, windows, err = resolveOutcomeMetricReferences(configs)
+	require.NoError(t, err)
+	source = &fixtureOutcomeRunSource{}
+	data = loadOutcomeRunData(context.Background(), runs, windows, now, source)
+	assert.Equal(t, []string{"shared"}, source.calls, "both mature experiments share one collection")
+	sets = buildOutcomeMetricObservationSets(experiments, runs, refs, windows, now, data)
+	assert.Len(t, sets["short"].ByVariant["control"], 1)
+	assert.Len(t, sets["long"].ByVariant["candidate"], 1)
+}
+
 func TestResolveOutcomeMetricReferences(t *testing.T) {
 	t.Parallel()
 	configs := map[string]*workflow.ExperimentConfig{
@@ -191,6 +237,12 @@ func TestOutcomeMetricAnalysisCoverageAndDefaults(t *testing.T) {
 					"control": decisionTestObservations("control", tc.values), "candidate": decisionTestObservations("candidate", tc.values),
 				},
 				Coverage: map[string]*OutcomeMetricCoverage{"control": {Immature: 1, StalePending: 2, Unavailable: 3, NoOp: 4}, "candidate": {}},
+			}
+			for variant, observations := range set.ByVariant {
+				for i := range observations {
+					observations[i].Binary = observations[i].Value == 0 || observations[i].Value == 1
+				}
+				set.ByVariant[variant] = observations
 			}
 			cfg := &workflow.ExperimentConfig{
 				Metric: "outcome:accepted", Variants: []string{"control", "candidate"}, MinSamples: 2,
@@ -285,7 +337,7 @@ func TestOutcomeArtifactUnavailabilityIsNotNoOp(t *testing.T) {
 	}{
 		{name: "explicit noop", manifest: "{\"type\":\"noop\"}\n"},
 		{name: "empty manifest"},
-		{name: "missing data is unavailable", manifest: "{\"type\":\"report_missing_data\"}\n", unavailable: true},
+		{name: "missing data has no outcome", manifest: "{\"type\":\"report_missing_data\"}\n"},
 		{name: "missing manifest", names: "called-agent-output-fallback", unavailable: true},
 		{name: "no artifacts", names: "usage", unavailable: true},
 		{name: "corrupt manifest", manifest: "{", unavailable: true},
