@@ -67,11 +67,9 @@ Copy `shared/fstar.md` and `scripts/install-fstar.sh` from this repository into
 the corresponding paths in the consuming repository. Import `shared/fstar.md`
 in workflow frontmatter. Its `steps:` hook runs after checkout and before the
 agent, installing the Linux x64 F* **2026.10.25** binary release and selecting
-its bundled **Z3 5.3.0**. The archive is checked against the
-[published release asset digest](https://github.com/FStarLang/FStar/releases/tag/v2026.10.25).
-When changing the release, resolve the digest for the exact asset and pass it as
-the first argument to `scripts/install-fstar.sh`; do not copy a digest from this
-guide. Installation checks both version strings and verifies a smoke-test function.
+its bundled **Z3 5.3.0**. Resolve the archive's SHA-256 and pass it as the first argument to
+`scripts/install-fstar.sh`. Installation checks both version strings and verifies
+a smoke-test function.
 Use Ubuntu 24.04; unsupported architectures fail rather than skip verification.
 Do not install an arbitrary runner Z3, use `latest`, or pipe an unpinned installer
 into a shell. Update F*, solver selection, checksum, and verification results together.
