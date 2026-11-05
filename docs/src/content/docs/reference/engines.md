@@ -103,6 +103,8 @@ The compiler restores an explicit parent from `aw_context`, or the last successf
 
 Copilot, Claude, and Codex resume the exact recorded native session with the current workflow prompt and freshly configured credentials, models, and tool policy. Gemini and Agy receive a prompt pointing to their restored session files; they decide how to use that history without a forced CLI continuation argument. Restored history is context, not higher-priority instructions.
 
+Enabling `engine.durable` opts into reusing potentially attacker-influenced history across runs. Guidance to treat restored files as untrusted factual data is advisory, not deterministic instruction/data isolation; native session resume also reintroduces prior history. Durable continuation does not eliminate cross-run prompt injection.
+
 The first run starts normally when no prior run or implicit checkpoint exists. No continuation notice or resume argument is added without history. Missing explicit-parent artifacts, corrupt restored sessions, and API authorization failures remain errors rather than silently starting unrelated conversations.
 
 This restores session files, not workspace edits, credentials, or exactly-once tool execution. Pi additionally preserves pending tasks using its native durable library. Existing unified session capture and trace propagation remain enabled; restored Copilot events are excluded from current-run capture and model verification.
@@ -112,6 +114,8 @@ Threat detection uses a separate fresh session and does not inherit the primary 
 Built-in session-based durable mode rejects replacement commands, drivers, and harnesses because their session files may differ. Ordinary CLI arguments remain supported, but native session selectors and flags that disable persistence cannot override compiler-managed continuation. Copilot cannot override `COPILOT_HOME` because durable mode collects its standard native session directory. Pi has [additional restrictions](/gh-aw/reference/engines/pi/#durable-runs). [Imported engines](/gh-aw/reference/third-party-agent/#durable-execution) must declare their own durable files and execution behavior; unsupported definitions still fail compilation.
 
 Checkpoint artifacts are published after secret redaction and integrity validation. Cancellation or hard runner loss can prevent publication; only the last published checkpoint can be restored.
+
+Artifacts contain restorable session content, not just integrity metadata, and may expose sensitive history to anyone with artifact access. Secret scanning and redaction are heuristic: they do not guarantee removal of PII, unknown token formats, or secrets in unsupported encodings. Enable durable mode only when the workflow's session content is suitable for the repository's artifact access and retention policies.
 
 ### Pinning a Specific Engine Version
 
