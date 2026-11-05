@@ -7,7 +7,7 @@ sidebar:
 
 # replace-label Safe-Output Type Specification
 
-**Version**: 1.0.2
+**Version**: 1.0.3
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/replace-label-spec.md  
 **Editors**: GitHub gh-aw Team (GitHub, Inc.)  
@@ -331,15 +331,15 @@ Messages that fail schema validation MUST be rejected with a structured error lo
 
 ### 5.4 Stage 4: Label Validation
 
-**RL-021**: The implementation MUST evaluate `label_to_remove` against `allowed-remove` (if non-empty) and `blocked` (if non-empty). The evaluation order is:
+**RL-021**: The implementation MUST evaluate `label_to_remove` against `blocked` and `allowed-remove` (if non-empty), in this order:
 
-1. If `allowed-remove` is non-empty, `label_to_remove` MUST match at least one pattern. Failure → reject.
-2. If `blocked` is non-empty, `label_to_remove` MUST NOT match any pattern. Match → reject.
+1. If `blocked` is non-empty, `label_to_remove` MUST NOT match any pattern. A match MUST reject the label before any allowlist permit is considered.
+2. If `allowed-remove` is non-empty, `label_to_remove` MUST match at least one pattern. Failure → reject.
 
-**RL-022**: The implementation MUST evaluate `label_to_add` against `allowed-add` (if non-empty) and `blocked` (if non-empty). The evaluation order is:
+**RL-022**: The implementation MUST evaluate `label_to_add` against `blocked` and `allowed-add` (if non-empty), in this order:
 
-1. If `allowed-add` is non-empty, `label_to_add` MUST match at least one pattern. Failure → reject.
-2. If `blocked` is non-empty, `label_to_add` MUST NOT match any pattern. Match → reject.
+1. If `blocked` is non-empty, `label_to_add` MUST NOT match any pattern. A match MUST reject the label before any allowlist permit is considered.
+2. If `allowed-add` is non-empty, `label_to_add` MUST match at least one pattern. Failure → reject.
 
 **RL-023**: Label validation failures MUST be reported as warnings and the message MUST be skipped. The workflow run MUST NOT be marked as failed solely due to a label validation rejection.
 
@@ -434,17 +434,17 @@ In the Octokit client this is `githubClient.rest.issues.setLabels(params)`.
 
 ### 7.1 Error Categories
 
-| Category | Code | Behavior |
-|----------|------|----------|
-| Schema validation failure | `SCHEMA_INVALID` | Skip message with warning; do not fail run |
-| Count gate exceeded | `MAX_EXCEEDED` | Skip message with warning; do not fail run |
-| Target resolution failure | `TARGET_UNRESOLVABLE` | Skip message with warning; do not fail run |
-| Repository not in allowlist | `REPO_NOT_ALLOWED` | Skip message with warning; do not fail run |
-| Label validation failure | `LABEL_BLOCKED` or `LABEL_NOT_ALLOWED` | Skip message with warning; do not fail run |
-| Gate check (required-labels) | `GATE_REQUIRED_LABELS` | Skip message (skipped=true); do not fail run |
-| Gate check (title prefix) | `GATE_TITLE_PREFIX` | Skip message (skipped=true); do not fail run |
-| REST setLabels failure | `SETLABELS_FAILED` | Return hard error; message fails |
-| Rate-limit exhausted after retries | `RATE_LIMIT_EXHAUSTED` | Return hard error; message fails |
+| Category | Code | Owning stage | Behavior |
+|----------|------|---------------|----------|
+| Schema validation failure | `SCHEMA_INVALID` | 5.1 — Schema Validation | Skip message with warning; do not fail run |
+| Count gate exceeded | `MAX_EXCEEDED` | 5.2 — Count Gate Check | Skip message with warning; do not fail run |
+| Target resolution failure | `TARGET_UNRESOLVABLE` | 5.3 — Target Resolution | Skip message with warning; do not fail run |
+| Repository not in allowlist | `REPO_NOT_ALLOWED` | 5.3 — Target Resolution | Skip message with warning; do not fail run |
+| Label validation failure | `LABEL_BLOCKED` or `LABEL_NOT_ALLOWED` | 5.4 — Label Validation | Skip message with warning; do not fail run |
+| Gate check (required-labels) | `GATE_REQUIRED_LABELS` | 5.5 — Gate Checks | Skip message (`skipped=true`); do not fail run |
+| Gate check (title prefix) | `GATE_TITLE_PREFIX` | 5.5 — Gate Checks | Skip message (`skipped=true`); do not fail run |
+| REST setLabels failure | `SETLABELS_FAILED` | 5.8 — REST Label Update | Return hard error; message fails |
+| Rate-limit exhausted after retries | `RATE_LIMIT_EXHAUSTED` | 5.8 — REST Label Update | Return hard error; message fails |
 
 **RL-044**: A conforming implementation MUST NOT mark the workflow run as failed for soft-skip errors (schema invalid, count gate, target unresolvable, repo not allowed, label validation failure, gate check failures). These errors MUST be surfaced as workflow warnings only.
 
@@ -587,6 +587,8 @@ Fixture linkage check (2026-08-01):
 - [x] T-RL-023 covered by `specs/replace-label-compliance/rl-001-glob-semantics.yaml` and `specs/replace-label-compliance/rl-003-blocklist-ordering.yaml`
 - [x] T-RL-024 covered by `specs/replace-label-compliance/rl-003-blocklist-ordering.yaml`
 - [x] T-RL-025 covered by `specs/replace-label-compliance/rl-002-allowlist-enforcement.yaml`
+
+Error-category fixture: `specs/replace-label-compliance/rl-004-error-categories.yaml` records one scenario for each §7.1 category, including its owning stage and result. `TestFormalReplaceLabelErrorCategoryFixture` checks that the fixture remains complete and its stage assignments match this table.
 
 #### 9.2.5 Gate Check Tests
 
@@ -807,6 +809,10 @@ The message is skipped. The workflow run is not marked as failed.
 ---
 
 ## Change Log
+
+### Version 1.0.3 (Revision) — 2026-11-05
+
+- Added owning stages to every §7.1 error category and mapped them to the executable error-category fixture.
 
 ### Version 1.0.2 (Revision) — 2026-09-12
 
