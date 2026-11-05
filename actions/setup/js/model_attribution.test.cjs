@@ -132,6 +132,24 @@ describe("observed model attribution", () => {
     }
   });
 
+  it("keeps the fallback label over native observations without proxy usage evidence", () => {
+    const root = createRoot();
+    const infoPath = path.join(root, "aw_info.json");
+    try {
+      fs.writeFileSync(
+        infoPath,
+        JSON.stringify({
+          requested_model: "auto",
+          fallback_model: "gpt-5.4",
+          model_selection: { status: "observed", effective_model: "gpt-5.6-luna", observed_models: ["copilot/gpt-5.6-luna", "gpt-5.6-luna"] },
+        })
+      );
+      expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "auto" })).toBe("gpt54");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("uses validated native model observations when the session usage file is absent", () => {
     const root = createRoot();
     const infoPath = path.join(root, "aw_info.json");

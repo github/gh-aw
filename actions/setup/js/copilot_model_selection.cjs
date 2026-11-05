@@ -10,6 +10,9 @@ const { normalizeForCopilotCLI, splitModelIdentifier } = require("./resolve_mode
 const { copilotSessionContext } = require("./copilot_session.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 
+// Bounds the per-run model history persisted in the selection log (16 KiB) and aw_info.json.
+const MAX_OBSERVED_MODELS = 32;
+
 // Exit code the SDK driver uses to report a main-session model verification failure (substitution
 // or unverifiable evidence) so the harness stops without retrying, as it does in CLI mode.
 const COPILOT_MODEL_VERIFICATION_EXIT_CODE = 79;
@@ -42,6 +45,32 @@ function recordCopilotModelSelection(selection, env = process.env) {
   }
 }
 
+/**
+ * Models already observed by an earlier attempt in this agent phase, so a retried or resumed
+ * session extends the history instead of overwriting it.
+ * @param {NodeJS.ProcessEnv} env
+ * @returns {string[]}
+ */
+function previouslyObservedModels(env) {
+  const file = path.join(env.GH_AW_TMP_DIR || "/tmp/gh-aw", "sandbox/agent/logs/copilot-model-selection.json");
+  try {
+    if (!fs.existsSync(file)) return [];
+    const record = JSON.parse(fs.readFileSync(file, "utf8"));
+    if (record?.status !== "observed") return [];
+    const models = Array.isArray(record.observed_models) ? record.observed_models : [record.effective_model];
+    return [
+      ...new Set(
+        models
+          .filter(model => typeof model === "string")
+          .map(modelID)
+          .filter(Boolean)
+      ),
+    ].slice(-MAX_OBSERVED_MODELS);
+  } catch {
+    return [];
+  }
+}
+
 // Only the runner post-step updates workflow metadata; the harness writes a log.
 function persistCopilotModelSelection(env = process.env) {
   if (env.GH_AW_PHASE && env.GH_AW_PHASE !== "agent") return;
@@ -68,7 +97,7 @@ function persistCopilotModelSelection(env = process.env) {
               .map(modelID)
               .filter(Boolean)
           ),
-        ].slice(0, 32)
+        ].slice(0, MAX_OBSERVED_MODELS)
       : [];
     if (observedModels.length > 1) selection.observed_models = observedModels;
     if (!selection.configured_model || !["observed", "substituted", "unavailable"].includes(selection.status)) throw new Error("Invalid Copilot model selection");
@@ -99,11 +128,11 @@ function createCopilotModelObserver({ configuredModel, resolvedModel, sessionId,
   const offsets = new Map();
   /** @type {Map<string, string>} */
   const partial = new Map();
-  const observedModels = new Set();
   let diagnostic = "";
   let observedModel = "";
   const expected = modelID(resolvedModel);
   if (!expected || (env.GH_AW_PHASE && env.GH_AW_PHASE !== "agent")) return { check: () => "" };
+  const observedModels = new Set(previouslyObservedModels(env));
   if (!sessionId || !/^[a-z0-9_-]+$/i.test(sessionId)) throw new Error("Copilot model verification requires an exact invocation session ID");
   const ownedSessionId = sessionId;
 
@@ -157,7 +186,8 @@ function createCopilotModelObserver({ configuredModel, resolvedModel, sessionId,
           if (!model || model === observedModel) continue;
           observedModel = model;
           if (!observedModels.has(model)) {
-            if (observedModels.size >= 32) observedModels.delete(observedModels.values().next().value);
+            const oldest = observedModels.values().next().value;
+            if (observedModels.size >= MAX_OBSERVED_MODELS && oldest !== undefined) observedModels.delete(oldest);
             observedModels.add(model);
           }
           const substituted = expected.toLowerCase() !== "auto" && model.toLowerCase() !== expected.toLowerCase();
@@ -246,7 +276,7 @@ function createCopilotSDKModelObserver({ configuredModel, expectedModel, provide
       if (matches && effective === recorded) return "";
       recorded = effective;
       if (!observedModels.has(effective)) {
-        if (observedModels.size >= 32) observedModels.delete(observedModels.values().next().value);
+        if (observedModels.size >= MAX_OBSERVED_MODELS) observedModels.delete(observedModels.values().next().value);
         observedModels.add(effective);
       }
       recordCopilotModelSelection(

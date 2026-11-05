@@ -368,7 +368,8 @@ function getEffectiveModelLabel(infoPath = `${process.env.GH_AW_TMP_DIR || "/tmp
         if (model && model.toLowerCase() !== "auto") models.add(model);
       }
       const observedModels = attribution.selection?.status === "observed" ? attribution.selection.observed_models : null;
-      if (!models.size && Array.isArray(observedModels)) {
+      // Native observations name the model Copilot requested, not a proxy fallback replacement.
+      if (!models.size && !attribution.fallbackModel && Array.isArray(observedModels)) {
         for (const value of observedModels) {
           const model = validateModelIdentifier(value);
           if (model && model.toLowerCase() !== "auto") models.add(model);
