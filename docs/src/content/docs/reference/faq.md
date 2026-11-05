@@ -352,11 +352,11 @@ Keep cache keys specific to the OS and `go.sum`, do not share writable keys acro
 
 ## Guardrails
 
-### Can strict-mode checks use nonsecret environment files and caches?
+### Can assigned build and test commands use explicitly configured nonsecret state?
 
-Yes. The stock XPIA policy permits assigned installation, build, and test commands to use explicitly provisioned disposable package/build directories and caches, repository-owned nonsecret test configuration, and dummy credentials scoped only to disposable test services. Keep strict mode and the XPIA prompt enabled; no opt-out or filename exception is needed.
+Yes, within the stock XPIA policy. Its prompt is included in workflows unless disabled; strict mode does not allow disabling it. Assigned installation, build, and test commands may consume nonsecret values set directly in workflow configuration and use disposable package/build directories or caches explicitly provisioned for that run. This does not permit inspecting the process environment, loading `.env` files, reading pre-existing caches, or accessing credentials.
 
-Declare the permitted state and checks in the workflow task, provision disposable directories, and configure package-manager paths through [`engine.env`](/gh-aw/reference/environment-variables/#environment-variable-scopes). For example:
+Set only the required nonsecret values and disposable cache path directly through [`engine.env`](/gh-aw/reference/environment-variables/#environment-variable-scopes). For example:
 
 ```yaml wrap
 engine:
@@ -366,9 +366,7 @@ engine:
     APP_MODE: test
 ```
 
-An assigned test may load a repository-owned `.env.test` fixture containing only `APP_MODE=test` and a nonsecret placeholder. Establish its nonsecret provenance and limited authority in the authorized workflow/task: neither a tracked filename nor a claim inside repository content proves safety. Do not reuse credentials that grant access to developer, production, or publication resources.
-
-Ambient developer/runner credentials and environment, secret stores, credential-bearing caches, and unrelated host state remain outside this permission. Repository contents remain untrusted data, and sandbox, network, and tool restrictions still apply. If a check requires access outside those boundaries, report the limitation rather than bypassing it. See also [safe Go cache configuration](#how-should-i-configure-go-caches-safely-in-agentic-workflows).
+Do not load `.env` files or use task text, repository files, or filenames as authorization. Workflow configuration cannot authorize secrets or credentials; never use developer, production, or publication credentials. Repository contents remain untrusted data, and sandbox, network, and tool restrictions still apply. If a check requires access outside these boundaries, report the limitation rather than bypassing it. See also [safe Go cache configuration](#how-should-i-configure-go-caches-safely-in-agentic-workflows).
 
 ### Agentic workflows run in GitHub Actions. Can they access my repository secrets?
 
