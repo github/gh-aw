@@ -63,13 +63,12 @@ cannot complete. Never silently increase bounds or claim an unfinished repair.
 
 ## F* tooling and executable examples
 
-Copy `shared/fstar.md` and `scripts/install-fstar.sh` from this repository into
-the corresponding paths in the consuming repository. Import `shared/fstar.md`
-in workflow frontmatter. Its `steps:` hook runs after checkout and before the
-agent, installing the Linux x64 F* **2026.10.25** binary release and selecting
-its bundled **Z3 5.3.0**. Resolve the archive's SHA-256 and pass it as the first argument to
-`scripts/install-fstar.sh`. Installation checks both version strings and verifies
-a smoke-test function.
+Copy `shared/fstar.md` into the consuming repository and import it in workflow
+frontmatter. Its self-contained `steps:` hook installs the Linux x64 F*
+**2026.10.25** binary release and bundled **Z3 5.3.0**. When updating F*, set
+`FSTAR_VERSION` and resolve the matching release asset SHA-256 for
+`FSTAR_SHA256`. Installation checks both version strings and verifies a smoke
+test.
 Use Ubuntu 24.04; unsupported architectures fail rather than skip verification.
 Do not install an arbitrary runner Z3, use `latest`, or pipe an unpinned installer
 into a shell. Update F*, solver selection, checksum, and verification results together.
@@ -115,11 +114,9 @@ lifecycle and its temporal property. F* does not establish scheduling fairness,
 and TLC does not prove arbitrary-input function correctness. There is no
 gh-aw production implementation corresponding to this tutorial counter.
 
-For local checks from the consuming repository root:
+With the pinned tools available, run local checks from the consuming repository root:
 
 ```bash
-export FSTAR_SHA256="<published SHA256 for the exact F* release asset>"
-bash scripts/install-fstar.sh "$FSTAR_SHA256"
 export FSTAR_BIN=/tmp/gh-aw/agent/fstar-tools/fstar/bin/fstar.exe
 export FSTAR_Z3=/tmp/gh-aw/agent/fstar-tools/fstar/lib/fstar/z3-5.3.0/bin/z3
 python3 -m unittest discover -s specs/formal-methods -p '*_test.py'

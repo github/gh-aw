@@ -65,7 +65,9 @@ func TestSmokeAndCoverageFailureContracts(t *testing.T) {
 			required: []string{
 				"FSTAR_BIN: /tmp/gh-aw/agent/fstar-tools/fstar/bin/fstar.exe",
 				"FSTAR_Z3: /tmp/gh-aw/agent/fstar-tools/fstar/lib/fstar/z3-5.3.0/bin/z3",
-				"run: bash scripts/install-fstar.sh",
+				"FSTAR_VERSION: 2026.10.25",
+				"FSTAR_SHA256: a716153960545bc26b9d093f55614fedc716a202e4daa1665e5c63e4a2fb04e4",
+				"sha256sum --check --strict",
 				"{{#import .github/aw/formal-methods.md}}",
 			},
 		},

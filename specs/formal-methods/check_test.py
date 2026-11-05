@@ -14,7 +14,6 @@ class VerificationTests(unittest.TestCase):
         repository = ROOT.parents[1]
         shared = (repository / ".github/workflows/shared/fstar.md").read_text()
         ci = (repository / ".github/workflows/formal-methods.yml").read_text()
-        installer = (repository / "scripts/install-fstar.sh").read_text()
         for path in [
             "/tmp/gh-aw/agent/fstar-tools/fstar/bin/fstar.exe",
             "/tmp/gh-aw/agent/fstar-tools/fstar/lib/fstar/z3-5.3.0/bin/z3",
@@ -22,18 +21,18 @@ class VerificationTests(unittest.TestCase):
             self.assertIn(path, shared)
             self.assertIn(path, ci)
         for source in [shared, ci]:
-            self.assertIn('bash scripts/install-fstar.sh "$FSTAR_SHA256"', source)
-        for source in [shared, ci]:
+            self.assertIn("FSTAR_VERSION: 2026.10.25", source)
             self.assertIn(
-                "a716153960545bc26b9d093f55614fedc716a202e4daa1665e5c63e4a2fb04e4",
+                "FSTAR_SHA256: a716153960545bc26b9d093f55614fedc716a202e4daa1665e5c63e4a2fb04e4",
                 source,
             )
-        for pin in [
-            "fstar-v2026.10.25-Linux-x86_64.tar.gz",
-            'sha256sum --check --strict', "--smt", "--z3version 5.3.0",
-        ]:
-            self.assertIn(pin, installer)
-        self.assertIn('expected_sha256="${1:-}"', installer)
+            for pin in [
+                "fstar-v${FSTAR_VERSION}-Linux-x86_64.tar.gz",
+                "sha256sum --check --strict",
+                "--smt",
+                "--z3version 5.3.0",
+            ]:
+                self.assertIn(pin, source)
         tla = (repository / ".github/workflows/shared/tla-plus.md").read_text()
         for line in tla.splitlines():
             if "https://github.com/" in line or len(line.strip().rstrip(" \\")) == 64:
