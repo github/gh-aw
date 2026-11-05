@@ -16,6 +16,7 @@ schema, gating, set-computation, staged-mode, and error invariants.
 | `rl-001-glob-semantics.yaml` | Glob pattern matching for `allowed-add`, `allowed-remove`, and `blocked` follows gobwas/glob semantics | RL-001, T-RL-020–T-RL-023 |
 | `rl-002-allowlist-enforcement.yaml` | Non-empty allowlists enforce matches while empty allowlists permit any non-blocked label | RL-002, T-RL-021b, T-RL-022b, T-RL-025 |
 | `rl-003-blocklist-ordering.yaml` | Blocklist evaluation occurs before allowlist evaluation (security boundary) | RL-003, T-RL-023–T-RL-024 |
+| `rl-004-error-categories.yaml` | Each §7.1 error category has one owning stage and a defined result | `SCHEMA_INVALID`, `MAX_EXCEEDED`, `TARGET_UNRESOLVABLE`, `REPO_NOT_ALLOWED`, `LABEL_BLOCKED`, `LABEL_NOT_ALLOWED`, `GATE_REQUIRED_LABELS`, `GATE_TITLE_PREFIX`, `SETLABELS_FAILED`, `RATE_LIMIT_EXHAUSTED` |
 | _Direct test (no standalone fixture file)_ | Empty `setLabels` response fails add-presence verification (`TestFormalTransitionEdge_EmptyResponseLabels`) | RL-057, RL-058 |
 | _Direct test (no standalone fixture file)_ | Self-transition is denied unless explicitly listed (`TestFormalTransitionEdge_SelfTransitionRejectedWhenNotListed`) | Transition invariants (Q2, Q4) |
 | _Direct test (no standalone fixture file)_ | Duplicate transition entries are idempotent (`TestFormalTransitionEdge_DuplicateTransitionEntriesIdempotent`) | Transition invariants (Q2) |
@@ -38,6 +39,26 @@ schema, gating, set-computation, staged-mode, and error invariants.
 
 Evaluation order is modeled as: blocked check → allowlist check → gates
 (required-labels/title-prefix) → staged/execute branch.
+
+### Error Category Fixtures
+
+`rl-004-error-categories.yaml` contains one scenario for each §7.1 category. The
+scenario IDs map to the error codes and their owning stage as follows:
+
+| Category | Code(s) | Fixture scenario | Stage |
+|---|---|---|---|
+| Schema validation failure | `SCHEMA_INVALID` | `schema-invalid` | 5.1 |
+| Count gate exceeded | `MAX_EXCEEDED` | `count-gate-exceeded` | 5.2 |
+| Target resolution failure | `TARGET_UNRESOLVABLE` | `target-resolution-failure` | 5.3 |
+| Repository not in allowlist | `REPO_NOT_ALLOWED` | `repository-not-allowed` | 5.3 |
+| Label validation failure | `LABEL_BLOCKED`, `LABEL_NOT_ALLOWED` | `label-validation-failure` | 5.4 |
+| Required-labels gate | `GATE_REQUIRED_LABELS` | `required-labels-gate` | 5.5 |
+| Title-prefix gate | `GATE_TITLE_PREFIX` | `title-prefix-gate` | 5.5 |
+| REST setLabels failure | `SETLABELS_FAILED` | `set-labels-failure` | 5.8 |
+| Rate-limit exhausted | `RATE_LIMIT_EXHAUSTED` | `rate-limit-exhausted` | 5.8 |
+
+`TestFormalReplaceLabelErrorCategoryFixture` checks that all categories and codes
+are present exactly once with the documented stage and result.
 
 ### Safeguards
 

@@ -172,8 +172,11 @@ describe("buildAwContext episode lineage", () => {
     const child = buildHop(200, "child", root);
     const grandchild = buildHop(300, "grandchild", child);
     expect(root.parent_hop_id).toBe("");
+    expect(root.parent_run_id).toBe("");
     expect(child.parent_hop_id).toBe(root.hop_id);
+    expect(child.parent_run_id).toBe("100");
     expect(grandchild.parent_hop_id).toBe(child.hop_id);
+    expect(grandchild.parent_run_id).toBe("200");
     for (const hop of [child, grandchild]) {
       expect(hop.episode_id).toBe(root.episode_id);
       expect(hop.root_run_id).toBe("100");

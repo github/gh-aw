@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 
-const { iterateJsonl, readJsonlFile } = require("./jsonl_helpers.cjs");
+const { iterateJsonl } = require("./jsonl_helpers.cjs");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
@@ -185,9 +185,9 @@ function sdkEventModel(event) {
  * The expected model is the qualified session model (the router's wire model on routed runs);
  * the configured SDK provider mapping reconciles provider-qualified and bare identifiers.
  * A recorded substitution is final: later matching events cannot clear it.
- * @param {{ configuredModel: string, expectedModel: string, providerConfig?: { providers: Array<{ name: string }>, models: Array<{ provider: string, id: string }> } | null, env?: NodeJS.ProcessEnv, sessionDirs?: string[], logger?: (message: string) => void }} options
+ * @param {{ configuredModel: string, expectedModel: string, sessionId?: string, providerConfig?: { providers: Array<{ name: string }>, models: Array<{ provider: string, id: string }> } | null, env?: NodeJS.ProcessEnv, sessionDirs?: string[], logger?: (message: string) => void }} options
  */
-function createCopilotSDKModelObserver({ configuredModel, expectedModel, providerConfig = null, env = process.env, sessionDirs, logger = () => {} }) {
+function createCopilotSDKModelObserver({ configuredModel, expectedModel, sessionId: restoredSessionId, providerConfig = null, env = process.env, sessionDirs, logger = () => {} }) {
   if (!configuredModel || (env.GH_AW_PHASE && env.GH_AW_PHASE !== "agent")) return { observe: () => "", finalize: () => "", setSessionId: () => {} };
   const rows = providerConfig ? providerConfig.models.filter(entry => providerConfig.providers.some(provider => provider.name === entry.provider)) : [];
   /** @param {string} base */
@@ -200,6 +200,14 @@ function createCopilotSDKModelObserver({ configuredModel, expectedModel, provide
   let sessionId = "";
   let diagnostic = "";
   let recorded = "";
+  const initialOffsets = new Map();
+  if (restoredSessionId) {
+    if (!/^[a-z0-9_-]+$/i.test(restoredSessionId)) throw new Error("Copilot model verification requires an exact restored session ID");
+    for (const directory of sessionDirs || copilotSessionStateDirectories(env)) {
+      const file = path.join(directory, restoredSessionId, "events.jsonl");
+      if (fs.existsSync(file)) initialOffsets.set(file, fs.statSync(file).size);
+    }
+  }
 
   /** @param {any} event */
   function observe(event) {
@@ -242,7 +250,10 @@ function createCopilotSDKModelObserver({ configuredModel, expectedModel, provide
       for (const directory of sessionDirs || copilotSessionStateDirectories(env)) {
         const file = path.join(directory, id, "events.jsonl");
         if (!fs.existsSync(file)) continue;
-        for (const event of readJsonlFile(file)) if (observe(event)) return diagnostic;
+        const bytes = fs.readFileSync(file);
+        const offset = initialOffsets.get(file) || 0;
+        if (offset > bytes.length) throw new Error("Restored Copilot transcript was truncated during model verification");
+        for (const event of iterateJsonl(bytes.subarray(offset).toString("utf8"))) if (observe(event)) return diagnostic;
       }
     } catch (error) {
       diagnostic = verificationFailureDiagnostic(error);

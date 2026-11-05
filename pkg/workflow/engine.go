@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"strconv"
 	"strings"
 
@@ -89,7 +90,9 @@ type EngineConfig struct {
 
 	// Extensions is a list of engine-specific plugin names to install before launching the engine.
 	// Currently used by the Pi engine: each entry is passed to `pi install <extension>`.
-	Extensions []string
+	Extensions   []string
+	Durable      *DurableConfig
+	durableError error
 
 	ModelRouting   *CopilotModelRoutingConfig
 	FallbackModels []string
@@ -365,6 +368,12 @@ func extractStringEngineConfig(engineStr string, topLevel engineTopLevelConfig) 
 
 func extractObjectEngineConfig(engineObj map[string]any, topLevel engineTopLevelConfig) (string, *EngineConfig, string) {
 	engineLog.Print("Found engine in object format, parsing configuration")
+	if pi, ok := engineObj["pi"].(map[string]any); ok {
+		options := make(map[string]any, len(pi)+1)
+		maps.Copy(options, pi)
+		options["id"] = "pi"
+		return extractReferencedEngineConfig(options, topLevel)
+	}
 	if runtime, hasRuntime := engineObj["runtime"]; hasRuntime {
 		return extractInlineEngineConfig(runtime, engineObj, topLevel)
 	}
@@ -426,6 +435,7 @@ func parseNonEmptyAuthDefinition(authObj map[string]any) *AuthDefinition {
 }
 
 func applyInlineEngineFields(config *EngineConfig, engineObj map[string]any, topLevel engineTopLevelConfig) {
+	applyEngineDurableField(config, engineObj)
 	applyEngineCooldownField(config, engineObj)
 	applyEngineBareField(config, engineObj)
 	applyEnginePermissionMode(config, engineObj)
@@ -456,6 +466,7 @@ func extractReferencedEngineConfig(engineObj map[string]any, topLevel engineTopL
 }
 
 func applyReferencedEngineFields(config *EngineConfig, engineObj map[string]any, topLevel engineTopLevelConfig) {
+	applyEngineDurableField(config, engineObj)
 	applyEngineCooldownField(config, engineObj)
 	applyEngineProviderFields(config, engineObj)
 	applyEnginePermissionMode(config, engineObj)

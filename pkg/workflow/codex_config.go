@@ -268,6 +268,9 @@ func validateCodexManagedConfig(config *codexNativeConfig, firewallEnabled, gith
 }
 
 func codexHome(workflowData *WorkflowData) string {
+	if workflowData != nil && workflowData.EngineConfig != nil && workflowData.EngineConfig.Durable != nil {
+		return durableSessionDirectory("codex")
+	}
 	if home := getEngineEnvOverrides(workflowData)["CODEX_HOME"]; home != "" {
 		if isSafeCodexHome(home) {
 			return home
