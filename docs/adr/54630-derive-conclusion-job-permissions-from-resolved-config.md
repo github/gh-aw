@@ -31,7 +31,7 @@ Introduce a new `conclusion.permissions.issues` or similar schema key that users
 ### Consequences
 
 #### Positive
-- Reusable workflows that disable all issue-creating safe outputs (`report-failed-jobs: false`, `report-failure-as-issue: false`, `noop.report-as-issue` unset, `missing-tool.create-issue: false`) now compile a `conclusion` job with no `issues: write` or `actions: read`, removing the hard load-time failure for callers with restricted permission ceilings.
+- Reusable workflows that disable all issue-creating paths (`report-failed-jobs: false`, `report-failure-as-issue: false`, `noop.report-as-issue` unset, `missing-tool.create-issue: false`, `threat-detection.report-as-issue: false`, and no other issue-writing safe outputs) compile a `conclusion` job with no `issues: write`, removing the hard load-time failure for callers with restricted issue permission ceilings. The detection opt-out preserves threat detection and enforcement; `actions: read` remains required for session job-duration collection.
 - Permission derivation is now consistent between the `conclusion` job and the `safe_outputs` job, simplifying the mental model for contributors and auditors.
 
 #### Negative
