@@ -6,11 +6,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/stringutil"
 )
 
@@ -116,6 +118,76 @@ func normalizeImportsForMerge(content string, sourceSpec *SourceSpec, localWorkf
 	return processImportsWithWorkflowSpec(content, workflow, sourceSpec.Ref, localWorkflowDir, verbose)
 }
 
+func normalizeImportFormattingForMerge(content string, parsed *parser.FrontmatterResult) (string, bool, bool) {
+	imports, exists := parsed.Frontmatter["imports"]
+	if !exists {
+		return content, false, true
+	}
+
+	importLine, exists := parsed.FieldLines["imports"]
+	if !exists {
+		return content, false, false
+	}
+	start := importLine - parsed.FrontmatterStart
+	end := len(parsed.FrontmatterLines)
+	for _, line := range parsed.FieldLines {
+		if line > importLine && line-parsed.FrontmatterStart < end {
+			end = line - parsed.FrontmatterStart
+		}
+	}
+	if start < 0 || start >= end || end > len(parsed.FrontmatterLines) {
+		return content, false, false
+	}
+	for _, line := range parsed.FrontmatterLines[start:end] {
+		if strings.Contains(line, "#") {
+			return content, false, false
+		}
+	}
+
+	normalized, err := replaceImportsFieldInContent(content, parsed, imports)
+	if err != nil {
+		return content, false, false
+	}
+	return normalized, normalized != content, true
+}
+
+func normalizeLegacyImportsForMerge(base, current, upstream string) (string, string, string, bool) {
+	baseParsed, err := parser.ExtractFrontmatterFromContent(base)
+	if err != nil {
+		return base, current, upstream, false
+	}
+	currentParsed, err := parser.ExtractFrontmatterFromContent(current)
+	if err != nil {
+		return base, current, upstream, false
+	}
+	upstreamParsed, err := parser.ExtractFrontmatterFromContent(upstream)
+	if err != nil {
+		return base, current, upstream, false
+	}
+	baseImports, baseHasImports := baseParsed.Frontmatter["imports"]
+	currentImports, currentHasImports := currentParsed.Frontmatter["imports"]
+	if !baseHasImports || !currentHasImports {
+		return base, current, upstream, false
+	}
+	baseImportsYAML, err := serializeImportsField(baseImports)
+	if err != nil {
+		return base, current, upstream, false
+	}
+	currentImportsYAML, err := serializeImportsField(currentImports)
+	if err != nil || strings.Join(baseImportsYAML, "\n") != strings.Join(currentImportsYAML, "\n") {
+		return base, current, upstream, false
+	}
+
+	normalizedBase, baseChanged, baseOK := normalizeImportFormattingForMerge(base, baseParsed)
+	normalizedCurrent, currentChanged, currentOK := normalizeImportFormattingForMerge(current, currentParsed)
+	normalizedUpstream, upstreamChanged, upstreamOK := normalizeImportFormattingForMerge(upstream, upstreamParsed)
+	if !baseOK || !currentOK || !upstreamOK {
+		return base, current, upstream, false
+	}
+	return normalizedBase, normalizedCurrent, normalizedUpstream,
+		baseChanged || currentChanged || upstreamChanged
+}
+
 // MergeWorkflowContent performs a 3-way merge of workflow content using git merge-file
 // It returns the merged content, whether conflicts exist, and any error
 // localWorkflowPath is the filesystem path of the local workflow file being updated;
@@ -160,9 +232,7 @@ func MergeWorkflowContent(base, current, new, oldSourceSpec, newRefOrSourceSpec,
 		return "", false, fmt.Errorf("failed to remove source from new content: %w", err)
 	}
 
-	// Import processing rewrites frontmatter into canonical YAML. Apply that
-	// transformation to all three inputs before merging so a previously updated
-	// local file is compared with the same representation as its upstream base.
+	// Rewrite imports that need resolution in all three inputs before merging.
 	mergeWorkflowDir := ""
 	if localWorkflowPath != "" {
 		mergeWorkflowDir = filepath.Dir(localWorkflowPath)
@@ -218,41 +288,61 @@ func MergeWorkflowContent(base, current, new, oldSourceSpec, newRefOrSourceSpec,
 		return "", false, fmt.Errorf("failed to write new file: %w", err)
 	}
 
-	// Execute git merge-file
-	// Format: git merge-file <current> <base> <new>
-	cmd := exec.Command("git", "merge-file",
-		"-L", "current (local changes)",
-		"-L", "base (original)",
-		"-L", "new (upstream)",
-		"--diff3", // Use diff3 style conflict markers for better context
-		currentFile, baseFile, newFile)
-
-	output, err := cmd.CombinedOutput()
-
-	// git merge-file returns:
-	// - 0 if merge was successful without conflicts
-	// - >0 if conflicts were found (appears to return number of conflicts, but file is still updated)
-	// The exit code can be >1 for multiple conflicts, not just errors
-	hasConflicts := false
-	if err != nil {
+	runMergeFile := func() ([]byte, error) {
+		cmd := exec.Command("git", "merge-file",
+			"-L", "current (local changes)",
+			"-L", "base (original)",
+			"-L", "new (upstream)",
+			"--diff3",
+			currentFile, baseFile, newFile)
+		return cmd.CombinedOutput()
+	}
+	classifyMergeFileResult := func(output []byte, err error) (bool, int, error) {
+		if err == nil {
+			return false, 0, nil
+		}
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
 			exitCode := exitErr.ExitCode()
 			if exitCode > 0 && exitCode < 128 {
-				// Conflicts found (exit codes 1-127 indicate conflicts)
-				// Exit codes >= 128 typically indicate system errors
-				hasConflicts = true
-				updateMergeLog.Printf("Merge conflicts detected: exit_code=%d", exitCode)
-				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Merge conflicts detected (exit code: %d)", exitCode)))
-				}
-			} else {
-				// Real error (exit code >= 128)
-				updateMergeLog.Printf("Git merge-file failed: exit_code=%d", exitCode)
-				return "", false, fmt.Errorf("git merge-file failed: %w\nOutput: %s", err, output)
+				return true, exitCode, nil
 			}
-		} else {
-			return "", false, fmt.Errorf("failed to execute git merge-file: %w", err)
+			return false, exitCode, fmt.Errorf("git merge-file failed: %w\nOutput: %s", err, output)
+		}
+		return false, 0, fmt.Errorf("failed to execute git merge-file: %w", err)
+	}
+
+	output, err := runMergeFile()
+	hasConflicts, conflictExitCode, err := classifyMergeFileResult(output, err)
+	if err != nil {
+		return "", false, err
+	}
+	if hasConflicts {
+		// Earlier updates re-marshaled frontmatter when rewriting imports. Retry
+		// with only the imports block normalized, preserving comments and other edits.
+		normalizedBase, normalizedCurrent, normalizedUpstream, changed := normalizeLegacyImportsForMerge(
+			baseNormalized, currentNormalized, newNormalized)
+		if changed {
+			if err := os.WriteFile(baseFile, []byte(normalizedBase), constants.FilePermPublic); err != nil {
+				return "", false, fmt.Errorf("failed to write normalized base file: %w", err)
+			}
+			if err := os.WriteFile(currentFile, []byte(normalizedCurrent), constants.FilePermPublic); err != nil {
+				return "", false, fmt.Errorf("failed to write normalized current file: %w", err)
+			}
+			if err := os.WriteFile(newFile, []byte(normalizedUpstream), constants.FilePermPublic); err != nil {
+				return "", false, fmt.Errorf("failed to write normalized upstream file: %w", err)
+			}
+			output, err = runMergeFile()
+			hasConflicts, conflictExitCode, err = classifyMergeFileResult(output, err)
+			if err != nil {
+				return "", false, err
+			}
+		}
+		if hasConflicts {
+			updateMergeLog.Printf("Merge conflicts detected: exit_code=%d", conflictExitCode)
+			if verbose {
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Merge conflicts detected (exit code: %d)", conflictExitCode)))
+			}
 		}
 	}
 
