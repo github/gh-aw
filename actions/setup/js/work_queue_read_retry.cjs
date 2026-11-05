@@ -26,15 +26,29 @@ function isTransientQueueReadError(error) {
   return transient && !(error && typeof error === "object");
 }
 
+function statusFromQueueReadError(error) {
+  try {
+    return error && typeof error === "object" ? Object.getOwnPropertyDescriptor(error, "status")?.value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 // Call only around an idempotent metadata GET, never around validation or writes.
-async function readQueueMetadata(read, log, event, sleepFn = delay => new Promise(resolve => setTimeout(resolve, delay))) {
+/** @param {{attemptBudget?: {remaining: number}, expectedStatus?: number}} [options] */
+async function readQueueMetadata(read, log, event, sleepFn = delay => new Promise(resolve => setTimeout(resolve, delay)), options = {}) {
+  const { attemptBudget, expectedStatus } = options;
+  const maxAttempts = Math.min(3, attemptBudget?.remaining ?? 3);
+  if (maxAttempts < 1) throw new Error("queue metadata retry budget exhausted");
   for (let attempt = 1; ; attempt++) {
+    if (attemptBudget) attemptBudget.remaining--;
     try {
       return await read();
     } catch (error) {
-      const retry = attempt < 3 && isTransientQueueReadError(error);
-      log.failure(`${event}.${retry ? "retry" : "failed"}`, error, true);
-      log.diagnostic?.(`${event}.attempt`, { attempt, max_attempts: 3, retry, delay_ms: retry ? 1000 : 0 });
+      const retry = attempt < maxAttempts && isTransientQueueReadError(error);
+      if (retry || expectedStatus === undefined || statusFromQueueReadError(error) !== expectedStatus) log.failure(`${event}.${retry ? "retry" : "failed"}`, error, true);
+      else log.debug?.(`${event}.expected_absence`, { status: expectedStatus });
+      log.diagnostic?.(`${event}.attempt`, { attempt, max_attempts: maxAttempts, retry, delay_ms: retry ? 1000 : 0 });
       if (!retry) throw error;
       await sleepFn(1000);
     }

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getOctokit } from "@actions/github";
-import { fetchNativeRun, fetchNativeRunAttempt, authenticateIntentPublisher } from "./work_queue_native.cjs";
+import { fetchNativeRun, fetchNativeRunAttempt, authenticateIntentPublisher, dispatchTag, postQueueDispatch } from "./work_queue_native.cjs";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -80,6 +80,98 @@ function stalledBody({ signal }, aborts) {
     { status: 200, headers: { "content-type": "application/json" } }
   );
 }
+
+describe("native Octokit queue dispatch tag transport", () => {
+  const destination = { repository: "owner/repo", ref: "a".repeat(40), workflow: ".github/workflows/worker.lock.yml" };
+  const tag = `refs/tags/gh-aw/work-queue/${destination.ref}`;
+
+  function tagFixture(failure, { create = false, failures = 1 } = {}) {
+    let reads = 0;
+    const fetch = vi.fn(async (url, options) => {
+      expect(new URL(url).pathname).toBe(`/repos/owner/repo/git/ref/${encodeURIComponent(tag.slice(5))}`);
+      expect(options.method).toBe("GET");
+      expect(options.signal).toBeInstanceOf(AbortSignal);
+      expect(options.signal.aborted).toBe(false);
+      if (create && reads++ === 0) return new Response("{}", { status: 404 });
+      if (failures-- > 0) return failure(options);
+      return new Response(JSON.stringify({ ref: tag, object: { type: "commit", sha: destination.ref } }), { status: 200, headers: { "content-type": "application/json" } });
+    });
+    const githubClient = getOctokit("fixture-token", { request: { fetch } });
+    const createRef = vi.spyOn(githubClient.rest.git, "createRef").mockResolvedValue({ status: 201 });
+    const post = vi.spyOn(githubClient.rest.actions, "createWorkflowDispatch").mockResolvedValue({
+      status: 200,
+      data: { workflow_run_id: 42, run_url: "https://api.github.com/repos/owner/repo/actions/runs/42", html_url: "https://github.com/owner/repo/actions/runs/42" },
+    });
+    return { githubClient, fetch, createRef, post };
+  }
+
+  it.each([false, true])("recovers transient tag reads before dispatch (create=%s) without retrying writes", async create => {
+    vi.useFakeTimers();
+    const f = tagFixture(
+      () => {
+        throw new TypeError("fetch failed", { cause: Object.assign(new Error("other side closed"), { code: "UND_ERR_SOCKET" }) });
+      },
+      { create }
+    );
+    const resolved = expect(postQueueDispatch(f.githubClient, destination, {})).resolves.toMatchObject({ run_id: "42" });
+    await vi.runAllTimersAsync();
+    await resolved;
+    expect(f.fetch).toHaveBeenCalledTimes(create ? 3 : 2);
+    expect(new Set(f.fetch.mock.calls.map(([, options]) => options.signal)).size).toBe(f.fetch.mock.calls.length);
+    expect(f.createRef).toHaveBeenCalledTimes(create ? 1 : 0);
+    expect(f.post).toHaveBeenCalledTimes(1);
+  });
+
+  it("bounds exhausted transient tag failures and never creates or dispatches", async () => {
+    vi.useFakeTimers();
+    const f = tagFixture(() => new Response("{}", { status: 502 }), { failures: 3 });
+    const rejected = expect(postQueueDispatch(f.githubClient, destination, {})).rejects.toMatchObject({ code: "work_queue_dispatch_tag_preparation_failed" });
+    await vi.runAllTimersAsync();
+    await rejected;
+    expect(f.fetch).toHaveBeenCalledTimes(3);
+    expect(f.createRef).not.toHaveBeenCalled();
+    expect(f.post).not.toHaveBeenCalled();
+  });
+
+  it("shares the three-read budget across missing-tag lookup and read-back", async () => {
+    const deadlines = fakeDeadlines();
+    const aborts = [];
+    const f = tagFixture(options => stalledBody(options, aborts), { create: true, failures: 3 });
+    const rejected = expect(dispatchTag(f.githubClient, destination)).rejects.toMatchObject({ code: "ETIMEDOUT" });
+    await vi.runAllTimersAsync();
+    await rejected;
+    expect(f.fetch).toHaveBeenCalledTimes(3);
+    expect(deadlines).toHaveBeenCalledTimes(3);
+    expect(aborts).toHaveLength(2);
+    expect(f.createRef).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not log the expected missing-tag 404 as a failure", async () => {
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    const f = tagFixture(() => new Response("{}", { status: 502 }), { create: true, failures: 0 });
+    try {
+      await expect(dispatchTag(f.githubClient, destination)).resolves.toBe(tag);
+      const output = stderr.mock.calls.map(call => call[0]).join("");
+      expect(output).not.toContain("dispatch.tag.read.failed");
+      expect(f.createRef).toHaveBeenCalledTimes(1);
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
+  it("recovers a swallowed tag body timeout using a fresh 15-second deadline", async () => {
+    const deadlines = fakeDeadlines();
+    const aborts = [];
+    const f = tagFixture(options => stalledBody(options, aborts));
+    const resolved = expect(dispatchTag(f.githubClient, destination)).resolves.toBe(tag);
+    await vi.runAllTimersAsync();
+    await resolved;
+    expect(aborts).toHaveLength(1);
+    expect(deadlines).toHaveBeenCalledTimes(2);
+    expect(f.fetch).toHaveBeenCalledTimes(2);
+    expect(f.createRef).not.toHaveBeenCalled();
+  });
+});
 
 describe("native Octokit queue identity metadata transport", () => {
   it.each(["repository", "run", "attempt"])("bounds stalled %s fetches with fresh 15-second deadlines", async endpoint => {

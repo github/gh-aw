@@ -9,6 +9,7 @@ import { tmpdir } from "os";
 
 const req = createRequire(import.meta.url);
 const { toCodexTomlSection, main } = req("./convert_gateway_config_codex.cjs");
+const { TMP_GH_AW_PATH } = req("./constants.cjs");
 
 describe("convert_gateway_config_codex", () => {
   describe("toCodexTomlSection", () => {
@@ -39,6 +40,8 @@ describe("convert_gateway_config_codex", () => {
     let tempDir;
     /** @type {string} */
     let gatewayOutputFile;
+    /** @type {string} */
+    let codexHome;
     /** @type {Record<string, string | undefined>} */
     let savedEnv;
     /** @type {string[]} */
@@ -47,6 +50,8 @@ describe("convert_gateway_config_codex", () => {
     beforeEach(() => {
       tempDir = mkdtempSync(join(tmpdir(), "codex-config-test-"));
       gatewayOutputFile = join(tempDir, "gateway-output.json");
+      fs.mkdirSync(TMP_GH_AW_PATH, { recursive: true });
+      codexHome = mkdtempSync(join(TMP_GH_AW_PATH, "codex-config-home-"));
 
       savedEnv = {
         CODEX_HOME: process.env.CODEX_HOME,
@@ -75,6 +80,7 @@ describe("convert_gateway_config_codex", () => {
         }
       }
       rmSync(tempDir, { recursive: true, force: true });
+      rmSync(codexHome, { recursive: true, force: true });
     });
 
     /**
@@ -88,7 +94,7 @@ describe("convert_gateway_config_codex", () => {
     it("reads the direct-tool catalog as a Buffer before decoding UTF-8", () => {
       const catalog = { models: [{ slug: "fixture-model", tool_mode: "code_mode_only", instructions: "\u00e9".repeat(70000) }] };
       const read = vi.spyOn(fs, "readFileSync").mockReturnValueOnce(Buffer.from(JSON.stringify(catalog)));
-      process.env.CODEX_HOME = join(tempDir, "codex-home");
+      process.env.CODEX_HOME = codexHome;
       process.argv = [...process.argv, "--direct-tools"];
 
       const output = main();
@@ -121,13 +127,46 @@ const timer = setInterval(() => {
           process.execPath,
           new URL("./convert_gateway_config_codex.cjs", import.meta.url).pathname,
         ],
-        { env: { ...process.env, CODEX_HOME: tempDir }, encoding: "utf8", timeout: 10000 }
+        { env: { ...process.env, CODEX_HOME: codexHome }, encoding: "utf8", timeout: 10000 }
       );
 
       expect(result.error).toBeUndefined();
       expect(result.status, result.stderr).toBe(0);
-      const catalog = JSON.parse(fs.readFileSync(join(tempDir, "models.json"), "utf8"));
+      const catalog = JSON.parse(fs.readFileSync(join(codexHome, "models.json"), "utf8"));
       expect(catalog.models).toEqual([{ slug: "fixture-model", tool_mode: "direct", instructions: "x".repeat(400000) }]);
+    });
+
+    it("copies generated config into the managed Codex home", () => {
+      const source = join(tempDir, "gh-aw", "mcp-config", "config.toml");
+      fs.mkdirSync(join(tempDir, "gh-aw", "mcp-config"), { recursive: true });
+      writeFileSync(source, 'model = "fixture-model"\n');
+      process.env.CODEX_HOME = codexHome;
+      process.argv = [...process.argv, "--copy-config"];
+
+      main();
+
+      const copied = join(codexHome, "config.toml");
+      expect(fs.readFileSync(copied, "utf8")).toBe('model = "fixture-model"\n');
+      expect(fs.statSync(copied).mode & 0o777).toBe(0o600);
+    });
+
+    it("refuses to copy generated config through a symlinked Codex home", () => {
+      const source = join(tempDir, "gh-aw", "mcp-config", "config.toml");
+      const outside = mkdtempSync(join(tmpdir(), "codex-config-outside-"));
+      const linkedHome = join(TMP_GH_AW_PATH, `codex-config-link-${process.pid}`);
+      fs.mkdirSync(join(tempDir, "gh-aw", "mcp-config"), { recursive: true });
+      writeFileSync(source, 'model = "fixture-model"\n');
+      fs.symlinkSync(outside, linkedHome, "dir");
+      process.env.CODEX_HOME = linkedHome;
+      process.argv = [...process.argv, "--copy-config"];
+
+      try {
+        expect(() => main()).toThrow(/symlink or non-directory/);
+        expect(fs.existsSync(join(outside, "config.toml"))).toBe(false);
+      } finally {
+        fs.rmSync(linkedHome, { force: true });
+        rmSync(outside, { recursive: true, force: true });
+      }
     });
 
     it("resolves host.docker.internal to 172.30.0.1 in TOML server URLs", () => {

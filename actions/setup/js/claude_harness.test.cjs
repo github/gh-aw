@@ -235,6 +235,40 @@ describe("claude_harness.cjs", () => {
       ],
     };
 
+    it.each(["agent", "detection"])("sends the Copilot ID to Claude in the %s phase, including CLI model overrides", phase => {
+      const stubScript = `
+        const fs = require("fs");
+        fs.appendFileSync(process.env.CLAUDE_HARNESS_STUB_CALLS, JSON.stringify({
+          args: process.argv.slice(2), model: process.env.ANTHROPIC_MODEL
+        }) + "\\n");
+        process.stdout.write(JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "done" }) + "\\n");
+      `;
+      for (const extraArgs of [[], ["--model", "claude-opus-5-5"], ["--model=claude-opus-5-5"]]) {
+        const { result, calls } = runHarnessWithStub({
+          stubScript,
+          reflectData,
+          extraArgs,
+          extraEnv: {
+            GH_AW_PHASE: phase,
+            GH_AW_LLM_PROVIDER: "github",
+            ANTHROPIC_MODEL: "claude-opus-5-5",
+            GH_AW_CLAUDE_SETTINGS: '{"modelOverrides":{"claude-opus-5-5":"claude-opus-5.5"}}',
+            GH_AW_SAFE_OUTPUTS: "",
+            GH_AW_HARNESS_MAX_RETRIES: "0",
+          },
+        });
+        expect(result.status, result.stderr).toBe(0);
+        expect(calls).toHaveLength(1);
+        expect(calls[0].model).toBe("claude-opus-5.5");
+        expect(calls[0].args).toEqual(["--print", ...extraArgs.map(arg => arg.replace("claude-opus-5-5", "claude-opus-5.5")), "--settings", '{"modelOverrides":{"claude-opus-5-5":"claude-opus-5.5"}}']);
+      }
+    });
+
+    it("normalizes a dynamic fallback model before setting ANTHROPIC_MODEL", async () => {
+      const child = await buildClaudeChildEnv(reflectData, { GH_AW_LLM_PROVIDER: "github", GH_AW_MODEL_FALLBACK: "claude-opus-5-5" }, () => {});
+      expect(child.ANTHROPIC_MODEL).toBe("claude-opus-5.5");
+    });
+
     it.each(["auto", "copilot/auto"])("starts the real harness with an unset bootstrap URL and %s resolved in environment and CLI model inputs", model => {
       const reflect = { endpoints: [{ ...reflectData.endpoints[1], models: ["gpt-6.1-sol", "claude-sonnet-5"] }] };
       const stubScript = `

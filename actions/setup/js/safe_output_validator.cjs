@@ -97,10 +97,8 @@ function validateLabels(labels, allowedLabels = undefined, maxCount = 3, blocked
   let validLabels = labels
     .filter(label => label != null && label !== false && label !== 0)
     .map(label => {
-      const raw = String(label).trim();
-      const sanitized = sanitizeLabelContent(raw);
+      const sanitized = sanitizeLabelContent(String(label).trim());
       return {
-        raw,
         value: sanitized.length > 64 ? sanitized.substring(0, 64) : sanitized,
       };
     })
@@ -117,7 +115,7 @@ function validateLabels(labels, allowedLabels = undefined, maxCount = 3, blocked
   if (blockedPatterns && blockedPatterns.length > 0) {
     const blockedLabels = [];
     validLabels = validLabels.filter(label => {
-      const isBlocked = blockedPatterns.some(pattern => matchesSimpleGlob(label.raw, pattern) || matchesSimpleGlob(label.value, pattern));
+      const isBlocked = blockedPatterns.some(pattern => matchesSimpleGlob(label.value, pattern));
       if (isBlocked) {
         blockedLabels.push(label.value);
       }
@@ -130,7 +128,7 @@ function validateLabels(labels, allowedLabels = undefined, maxCount = 3, blocked
 
   // Filter labels based on allowed list if provided
   if (allowedLabels && allowedLabels.length > 0) {
-    validLabels = validLabels.filter(label => allowedLabels.some(pattern => matchesSimpleGlob(label.raw, pattern) || matchesSimpleGlob(label.value, pattern)));
+    validLabels = validLabels.filter(label => allowedLabels.some(pattern => matchesSimpleGlob(label.value, pattern)));
   }
 
   // Deduplicate labels
