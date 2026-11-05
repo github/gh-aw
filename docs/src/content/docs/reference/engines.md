@@ -101,7 +101,7 @@ The compiler restores an explicit parent from `aw_context`, or the last successf
 | Agy | Native conversation databases | Prompt points to restored session files |
 | Pi | Official Pi Durable task journal and checkpoint | Native task continuation; see [Pi durable runs](/gh-aw/reference/engines/pi/#durable-runs) |
 
-Copilot, Claude, and Codex resume the exact recorded native session with the current workflow prompt and freshly configured credentials, models, and tool policy. Gemini and Agy receive a prompt pointing to their restored session files; they decide how to use that history without a forced CLI continuation argument. Restored history is context, not higher-priority instructions.
+Copilot, Claude, and Codex resume the exact recorded native session with the current workflow prompt and freshly configured credentials, models, and tool policy. Gemini and Agy receive restoration metadata without a forced CLI continuation argument. Continuation guidance limits use to metadata unless historical facts are independently verified against trusted sources for the current task. It does not direct the agent to ingest restored text as prompts or instructions.
 
 Enabling `engine.durable` opts into reusing potentially attacker-influenced history across runs. Guidance to treat restored files as untrusted factual data is advisory, not deterministic instruction/data isolation; native session resume also reintroduces prior history. Durable continuation does not eliminate cross-run prompt injection.
 
