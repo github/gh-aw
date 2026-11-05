@@ -464,8 +464,8 @@ const graphPr = {
   isDraft: false,
   url: "https://github.com/github/gh-aw/pull/42",
   labels: { nodes: [], pageInfo: { hasNextPage: false } },
-  headRef: { target: { oid: pr.headRefOid, committedDate: recent } },
 };
+const headCommit = { sha: pr.headRefOid, commit: { committer: { date: recent } } };
 
 function metadataResponse(candidate = graphPr) {
   return { data: { repository: { pullRequest: candidate } } };
@@ -476,6 +476,7 @@ test("targeted refresh uses explicit GraphQL metadata and paginated REST checks"
   const candidate = await fetchCandidate("github/gh-aw", "42", args => {
     calls.push(args);
     if (args[1] === "graphql") return metadataResponse();
+    if (args[1] === "repos/github/gh-aw/commits/abc") return headCommit;
     if (args[1].includes("/check-runs?")) return [{ check_runs: [{ name: "CGO", status: "completed", conclusion: "failure", html_url: "https://github.com/run/1" }] }];
     return [{ statuses: [{ context: "external-ci", state: "pending", target_url: "https://github.com/run/2" }] }];
   });
@@ -483,9 +484,10 @@ test("targeted refresh uses explicit GraphQL metadata and paginated REST checks"
   assert.equal(calls[0][1], "graphql");
   assert.match(calls[0][3], /repository\(owner:\$owner,name:\$name\)\{pullRequest\(number:\$number\)/);
   assert.doesNotMatch(calls[0][3], /statusCheckRollup|commits\(/);
-  assert.match(calls[0][3], /headRef\{target\{oid \.\.\. on Commit\{committedDate\}\}\}/);
+  assert.doesNotMatch(calls[0][3], /headRef\{|committedDate|\.\.\. on Commit/);
   assert.deepEqual(calls[0].slice(4), ["-f", "owner=github", "-f", "name=gh-aw", "-F", "number=42"]);
   assert.deepEqual(calls.slice(1), [
+    ["api", "repos/github/gh-aw/commits/abc"],
     ["api", "repos/github/gh-aw/commits/abc/check-runs?per_page=100&filter=latest", "--paginate", "--slurp"],
     ["api", "repos/github/gh-aw/commits/abc/status?per_page=100", "--paginate", "--slurp"],
   ]);
@@ -516,17 +518,17 @@ test("targeted refresh fails closed when metadata is incomplete or the PR is abs
 });
 
 test("head commit activity must be valid and match the refreshed PR head", async () => {
-  for (const headRef of [null, {}, { target: null }, { target: { oid: "old-head", committedDate: recent } }, { target: { oid: pr.headRefOid } }, { target: { oid: pr.headRefOid, committedDate: "invalid date" } }]) {
+  for (const head of [null, [], {}, { ...headCommit, sha: "old-head" }, { sha: pr.headRefOid }, { sha: pr.headRefOid, commit: null }, { sha: pr.headRefOid, commit: { committer: { date: "invalid date" } } }]) {
     let calls = 0;
     await assert.rejects(
       () =>
-        fetchCandidate("github/gh-aw", "42", () => {
+        fetchCandidate("github/gh-aw", "42", args => {
           calls++;
-          return metadataResponse({ ...graphPr, headRef });
+          return args[1] === "graphql" ? metadataResponse() : head;
         }),
       /PR #42: could not refresh head commit activity/
     );
-    assert.equal(calls, 1);
+    assert.equal(calls, 2);
   }
 });
 
@@ -859,7 +861,7 @@ const budgets = {
 };
 const idleMsForTest = 10 * 60 * 1000;
 
-function queueAPI({ listed = [pr], candidate = graphPr, checks = [], statuses = [], data = detail(), comments = [], runs = [], approvals = [] } = {}) {
+function queueAPI({ listed = [pr], candidate = graphPr, head = headCommit, checks = [], statuses = [], data = detail(), comments = [], runs = [], approvals = [] } = {}) {
   const calls = [];
   return {
     calls,
@@ -870,6 +872,7 @@ function queueAPI({ listed = [pr], candidate = graphPr, checks = [], statuses = 
       if (args[1] === "graphql" && args[3].includes("headRefOid")) return metadataResponse(candidate);
       if (args[1].includes("/check-runs?")) return [{ check_runs: checks }];
       if (args[1].includes("/status?")) return [{ statuses }];
+      if (args[1] === `repos/github/gh-aw/commits/${candidate.headRefOid}`) return head;
       if (args[1].includes("/actions/runs?") || args[1].includes("/actions/workflows/pr-finisher.lock.yml/runs?")) return [{ workflow_runs: args[1].includes("status=action_required") ? approvals : runs }];
       if (args[1] === "graphql") {
         const field = args[3].includes("reviewThreads(") ? "reviewThreads" : "reviews";
@@ -992,10 +995,42 @@ test("isolated review reads preserve incomplete-page exclusions and cleanup elig
 });
 
 test("refreshed head commit activity prevents nudging a recently pushed PR", async () => {
-  const { api } = queueAPI({ candidate: { ...graphPr, headRef: { target: { oid: pr.headRefOid, committedDate: "2026-10-03T17:55:00Z" } } } });
+  const { api } = queueAPI({ head: { ...headCommit, commit: { committer: { date: "2026-10-03T17:55:00Z" } } } });
   const queue = await fetchQueue("github/gh-aw", "42", api, now);
   assert.deepEqual(queue.prs, []);
   assert.deepEqual(queue.skipped, [{ pr_number: 42, skip_reason: "not_idle" }]);
+});
+
+test("scheduled and proxied refreshes read head activity by SHA without a GraphQL headRef target", async () => {
+  for (const number of [undefined, "42"]) {
+    const { api, calls } = queueAPI();
+    const queue = await fetchQueue("github/gh-aw", number, api, now);
+    assert.equal(queue.prs[0].number, 42);
+    assert.ok(queue.prs[0].state_fingerprint);
+    assert.equal(calls.filter(args => args[1] === "repos/github/gh-aw/commits/abc").length, 1);
+    const query = calls.find(args => args[1] === "graphql")[3];
+    assert.doesNotMatch(query, /headRef\{|committedDate|\.\.\. on Commit/);
+  }
+});
+
+test("failed head activity reads never become an eligible queue", async () => {
+  for (const number of [undefined, "42"]) {
+    const { api, calls } = queueAPI();
+    await assert.rejects(
+      () =>
+        fetchQueue(
+          "github/gh-aw",
+          number,
+          args => {
+            if (args[1] === "repos/github/gh-aw/commits/abc") throw new Error("gh: HTTP 403");
+            return api(args);
+          },
+          now
+        ),
+      /HTTP 403/
+    );
+    assert.ok(!calls.some(args => args[1].includes("/check-runs?")));
+  }
 });
 
 function retryTestConfig(t) {
@@ -1176,6 +1211,36 @@ test("exhausted API retries reject the queue instead of returning a partial succ
     /All retry attempts exhausted/
   );
   assert.equal(metadataAttempts, 3);
+});
+
+test("check-runs HTTP 500 exhaustion fails closed after the bounded retries", async t => {
+  const { config, delays } = retryTestConfig(t);
+  const { api, calls } = queueAPI();
+  let attempts = 0;
+  await assert.rejects(
+    () =>
+      fetchQueue(
+        "github/gh-aw",
+        undefined,
+        args =>
+          gh(
+            args,
+            async (_command, commandArgs) => {
+              if (commandArgs[1].includes("/check-runs?")) {
+                attempts++;
+                throw Object.assign(new Error("Command failed"), { code: 1, stderr: "gh: HTTP 500" });
+              }
+              return { stdout: JSON.stringify(api(commandArgs)) };
+            },
+            config
+          ),
+        now
+      ),
+    /All retry attempts exhausted/
+  );
+  assert.equal(attempts, 3);
+  assert.deepEqual(delays, [2000, 4000]);
+  assert.ok(!calls.some(args => args[1].includes("/status?") || args[1].includes("/actions/")));
 });
 
 test("cheap metadata exclusions avoid all detail and active-run reads", async () => {
