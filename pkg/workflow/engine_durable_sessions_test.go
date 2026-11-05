@@ -101,3 +101,23 @@ func TestDurableSessionOwnedArguments(t *testing.T) {
 		})
 	}
 }
+
+func TestDurableThreatDetectionStartsFresh(t *testing.T) {
+	for _, id := range []string{"copilot", "claude", "codex"} {
+		t.Run(id, func(t *testing.T) {
+			data := &WorkflowData{
+				AI: id,
+				EngineConfig: &EngineConfig{
+					ID: id, Durable: &DurableConfig{RetentionDays: 7},
+				},
+				SafeOutputs: &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{}},
+			}
+			detection := buildExternalDetectorWorkflowData(data, id)
+			require.Nil(t, detection.EngineConfig.Durable, "detection must not inherit the primary agent's continuation")
+			text := strings.Join(NewCompiler().buildDetectionEngineExecutionStep(data), "")
+			require.NotContains(t, text, "GH_AW_DURABLE_STORAGE")
+			require.NotContains(t, text, durableSessionDirectory(id))
+			require.NotNil(t, data.EngineConfig.Durable)
+		})
+	}
+}
