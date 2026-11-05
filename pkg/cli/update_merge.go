@@ -268,8 +268,8 @@ func replaceTopLevelFrontmatterField(content, field string, value any, exists bo
 		}
 		frontmatter = append(frontmatter, replacement...)
 	} else {
-		for end > start+1 {
-			line := strings.TrimSpace(frontmatter[end-1])
+		for _, line := range slices.Backward(frontmatter[start+1 : end]) {
+			line = strings.TrimSpace(line)
 			if line != "" && !strings.HasPrefix(line, "#") {
 				break
 			}
