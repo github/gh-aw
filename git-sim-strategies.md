@@ -1711,3 +1711,9 @@ conclusion each run is low value.
   (`gh issue list --repo github/gh-aw --search "git-sim Sweep halted"`) rather
   than trusting the `issue_url` field in state.json, which stores the literal
   string "filed" and a run_id, not a usable issue number/URL.
+
+## Run 2026-11-05: HALTED (escalation #74693 still unanswered)
+
+- #74693 OPEN, 0 comments; steering #75088 0 comments. Workflow source only changed
+  for model routing (#74666), probing design unchanged. No sub-agents, no PR calls,
+  next_index stays 216. Only action: noop. state.json now stores escalation number.
