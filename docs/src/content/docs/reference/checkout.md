@@ -25,30 +25,9 @@ The relevant agent-job order is:
 6. The sandboxed engine.
 
 > [!WARNING]
-> Imported and custom steps execute on the host, outside the sandbox. Setting `checkout.ref` to a planner-selected PR branch can make a setup command such as `./scripts/setup.sh` execute untrusted branch code with the job's available credentials. The compiler warns when a ref expression references `needs.*`, `github.event.*`, or `inputs.*` and imported or custom `steps:` are present, except for the repository's default-branch expression. The absence of a warning does not establish that a ref is trusted.
+> Imported, workflow-owned, and pre-agent steps execute on the host, outside the sandbox. Setting `checkout.ref` to an untrusted branch can make those steps execute branch-controlled code with the job's available credentials. The compiler warns when a ref expression uses `needs.*`, `github.event.*`, `inputs.*`, `github.head_ref`, `github.base_ref`, `github.ref`, or `github.ref_name` while `steps:` or `pre-agent-steps:` are present. It exempts the exact default-branch expression for the current repository and the supported pull-request base SHA/ref expressions for that repository. Unparseable expressions are treated conservatively. Warnings identify the checkout entry and ref; no warning establishes that a ref is trusted.
 
-For a planner-chosen branch, keep setup on the default branch and switch in the workflow's own `steps:` after imported setup finishes:
-
-```aw wrap
-on:
-  workflow_dispatch:
-  needs: [plan]
-imports:
-  - ./shared/toolchain.md
-checkout:
-  ref: ${{ github.event.repository.default_branch }}
-  fetch: ["${{ needs.plan.outputs.branch }}"]
-  pull-request: false
-steps:
-  - name: Switch to planner-selected branch
-    env:
-      BRANCH: ${{ needs.plan.outputs.branch }}
-    run: |
-      git check-ref-format --branch "$BRANCH"
-      git checkout -B "$BRANCH" --track "origin/$BRANCH"
-```
-
-This example assumes a custom `plan` job exposes a `branch` output naming a branch in the current repository. `on.needs` makes that output available before activation. `fetch:` retrieves that branch while checkout credentials are available; the later switch is local-only. Passing the branch through `env` avoids shell interpolation of expression values. `pull-request: false` prevents automatic PR checkout from replacing the selected branch. Do not execute branch-owned scripts in later host steps, including `pre-agent-steps:`.
+Keep the agent workspace on a trusted ref and, when needed, fetch untrusted refs only to inspect their contents as data. Do not switch the host workspace to an untrusted branch or run its scripts: a manual checkout can execute Git hooks and can expose branch-controlled agent configuration. For PR-head work, use compiler-managed automatic PR checkout so the trusted agent configuration is restored; disabling that checkout also disables its paired configuration restore.
 
 ## PR Revision Binding
 

@@ -76,14 +76,7 @@ steps:
 
 Use custom steps to precompute data, filter triggers, or prepare context for AI agents. Steps can also short-circuit the agent by writing a `noop` entry to `$GH_AW_SAFE_OUTPUTS` — the harness detects this at startup and exits cleanly without incurring any AI inference cost. See [Skip the Agent When It Is Not Needed](/gh-aw/reference/cost-management/#skip-the-agent-when-it-is-not-needed) for details.
 
-### Checkout Ref and Step Order
-
-In the agent job, repository checkout (using `checkout.ref`) precedes imported `steps:`, followed by the workflow's own `steps:`, automatic "Checkout PR branch" when enabled, `pre-agent-steps:`, and the sandboxed engine. Other framework setup steps can run between these phases.
-
-> [!WARNING]
-> `steps:` run on the host, not in the sandbox. An expression-valued `checkout.ref`, such as `${{ needs.plan.outputs.branch }}`, can cause imported setup scripts to execute untrusted branch code before the engine starts. The compiler warns about this combination.
-
-For planner-selected branches, set `checkout.ref` to `${{ github.event.repository.default_branch }}` so imported toolchain steps run trusted code, fetch the selected branch with `checkout.fetch`, then switch in the workflow's own `steps:` using `git checkout -B "$BRANCH" --track "origin/$BRANCH"` with `BRANCH` passed through the step's `env`. Disable automatic PR checkout if it would replace that selection. See the [complete checkout example](/gh-aw/reference/checkout/#checkout-and-host-step-order). Subsequent host steps must not execute untrusted branch scripts.
+See [Checkout and Host Step Order](/gh-aw/reference/checkout/#checkout-and-host-step-order) for checkout ordering, untrusted-ref warnings, and safe handling of fetched refs.
 
 ## Custom Pre-Agent Steps (`pre-agent-steps:`)
 
