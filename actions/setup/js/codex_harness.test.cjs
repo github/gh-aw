@@ -27,6 +27,7 @@ const {
   buildMissingToolPermissionIssuePayload,
   buildCodexChildEnv,
   hasCodexAzureOIDCProxy,
+  resolveSafeCodexConfigPath,
   extractPortFromURL,
   extractOpenAIProxyBaseURLFromToml,
   getConfiguredProviderPortFromReflect,
@@ -55,10 +56,18 @@ const {
   getCodexRoutingFailureCode,
   resolveCodexConfiguredModel,
 } = require("./codex_harness.cjs");
+const { TMP_GH_AW_PATH } = require("./constants.cjs");
 const reflectFixtures = require("./fixtures/model_resolution_reflect.cjs");
 const { detectNonRetryableHarnessGuard } = require("./harness_retry_guard.cjs");
 
-const agentTempDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-harness-tests-"));
+let agentTempDir;
+function makeHarnessTempDir(name) {
+  const parent = agentTempDir || TMP_GH_AW_PATH;
+  fs.mkdirSync(parent, { recursive: true });
+  return fs.mkdtempSync(path.join(parent, name));
+}
+
+agentTempDir = makeHarnessTempDir("codex-harness-tests-");
 afterAll(() => fs.rmSync(agentTempDir, { recursive: true, force: true }));
 const preloadPath = path.join(agentTempDir, "isolated-audit.cjs");
 fs.writeFileSync(
@@ -70,11 +79,6 @@ const original=context.parseMaxAICreditsExceededFromAuditLog;
 context.parseMaxAICreditsExceededFromAuditLog=()=>original(path.join(path.dirname(process.env.GH_AW_AGENT_OUTPUT),"sandbox","firewall","audit","log.jsonl"));
 `
 );
-
-function makeHarnessTempDir(name) {
-  fs.mkdirSync(agentTempDir, { recursive: true });
-  return fs.mkdtempSync(path.join(agentTempDir, name));
-}
 
 function spawnSync(command, args, options) {
   const env = { ...options.env, HOME: path.join(agentTempDir, "home"), AWF_REFLECT_ENABLED: options.env.AWF_REFLECT_ENABLED || "0" };
@@ -1177,6 +1181,100 @@ fs.appendFileSync(process.env.GH_AW_SAFE_OUTPUTS, JSON.stringify(item) + "\\n");
           fs.rmSync(tmpDir, { recursive: true, force: true });
         }
       });
+
+      it("does not rewrite a Codex config outside the managed temporary directory", () => {
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-provider-outside-"));
+        const configPath = path.join(tmpDir, "config.toml");
+        const reflectPath = path.join(tmpDir, "reflect.json");
+        const originalConfig = '[model_providers.openai-proxy]\nbase_url = "http://172.30.0.30:10000"\n';
+        fs.writeFileSync(configPath, originalConfig, "utf8");
+        fs.writeFileSync(reflectPath, JSON.stringify({ endpoints: [{ provider: "openai", configured: true, port: 10000 }] }), "utf8");
+        try {
+          const result = configureCodexProviderFromReflect({ codexConfigPath: configPath, reflectPath, provider: "openai" });
+          expect(result.configured).toBe(false);
+          expect(fs.readFileSync(configPath, "utf8")).toBe(originalConfig);
+        } finally {
+          fs.rmSync(tmpDir, { recursive: true, force: true });
+        }
+      });
+
+      it("does not rewrite a Codex config symlinked outside the managed temporary directory", () => {
+        const tmpDir = makeHarnessTempDir("codex-provider-symlink-");
+        const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-provider-target-"));
+        const configPath = path.join(tmpDir, "config.toml");
+        const outsideConfigPath = path.join(outsideDir, "config.toml");
+        const reflectPath = path.join(tmpDir, "reflect.json");
+        const originalConfig = '[model_providers.openai-proxy]\nbase_url = "http://172.30.0.30:10000"\n';
+        fs.writeFileSync(outsideConfigPath, originalConfig, "utf8");
+        fs.symlinkSync(outsideConfigPath, configPath);
+        fs.writeFileSync(reflectPath, JSON.stringify({ endpoints: [{ provider: "openai", configured: true, port: 10000 }] }), "utf8");
+        try {
+          const result = configureCodexProviderFromReflect({ codexConfigPath: configPath, reflectPath, provider: "openai" });
+          expect(result.configured).toBe(false);
+          expect(fs.readFileSync(outsideConfigPath, "utf8")).toBe(originalConfig);
+        } finally {
+          fs.rmSync(tmpDir, { recursive: true, force: true });
+          fs.rmSync(outsideDir, { recursive: true, force: true });
+        }
+      });
+
+      it("uses the canonical config path and supports a symlinked managed root", () => {
+        const tmpDir = makeHarnessTempDir("codex-provider-root-alias-");
+        const realParent = path.join(tmpDir, "real-parent");
+        const aliasParent = path.join(tmpDir, "alias-parent");
+        const managedRoot = path.join(aliasParent, "managed-root");
+        const realRoot = path.join(realParent, "managed-root");
+        const configDir = path.join(realRoot, "codex-home");
+        fs.mkdirSync(configDir, { recursive: true });
+        fs.symlinkSync(realParent, aliasParent, "dir");
+        const configPath = path.join(managedRoot, "codex-home", "config.toml");
+        fs.writeFileSync(path.join(configDir, "config.toml"), '[model_providers.openai-proxy]\nbase_url = "http://172.30.0.30:10000"\n');
+
+        expect(resolveSafeCodexConfigPath(configPath, managedRoot)).toBe(fs.realpathSync(path.join(configDir, "config.toml")));
+      });
+
+      it("rejects noncanonical paths containing symlink traversal", () => {
+        const tmpDir = makeHarnessTempDir("codex-provider-noncanonical-");
+        const home = path.join(tmpDir, "codex-home");
+        const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-provider-link-target-"));
+        fs.mkdirSync(home);
+        fs.mkdirSync(path.join(outsideDir, "child"));
+        fs.symlinkSync(path.join(outsideDir, "child"), path.join(home, "link"));
+        fs.writeFileSync(path.join(home, "config.toml"), "[model_providers.openai-proxy]\n");
+
+        expect(resolveSafeCodexConfigPath(`${home}/link/../config.toml`)).toBe("");
+        fs.rmSync(outsideDir, { recursive: true, force: true });
+      });
+
+      it("allows the staged ARC/DinD threat-detection Codex home", () => {
+        const runnerTemp = makeHarnessTempDir("codex-provider-arc-");
+        const threatRoot = path.join(runnerTemp, "gh-aw", "threat-detection");
+        const home = path.join(threatRoot, "codex-home");
+        const configPath = path.join(home, "config.toml");
+        const reflectPath = path.join(threatRoot, "reflect.json");
+        fs.mkdirSync(home, { recursive: true });
+        fs.writeFileSync(configPath, '[model_providers.openai-proxy]\nbase_url = "http://172.30.0.30:10000"\n');
+
+        const previousPhase = process.env.GH_AW_PHASE;
+        const previousRunnerTemp = process.env.RUNNER_TEMP;
+        process.env.GH_AW_PHASE = "detection";
+        process.env.RUNNER_TEMP = runnerTemp;
+        try {
+          const result = configureCodexProviderFromReflect({
+            codexConfigPath: configPath,
+            reflectPath,
+            provider: "openai",
+            reflectData: { endpoints: [{ provider: "openai", configured: true, port: 10000 }] },
+          });
+          expect(result.configured).toBe(true);
+          expect(fs.readFileSync(configPath, "utf8")).toContain('base_url = "http://api-proxy:10000"');
+        } finally {
+          if (previousPhase === undefined) delete process.env.GH_AW_PHASE;
+          else process.env.GH_AW_PHASE = previousPhase;
+          if (previousRunnerTemp === undefined) delete process.env.RUNNER_TEMP;
+          else process.env.RUNNER_TEMP = previousRunnerTemp;
+        }
+      });
     });
 
     it("extracts openai-proxy base_url from TOML", () => {
@@ -1225,15 +1323,14 @@ env_key = "OPENAI_API_KEY"
           { provider: "anthropic", port: 10001, configured: true },
         ],
       });
-      const files = {
-        "/tmp/codex-config.toml": toml,
-        "/tmp/awf-reflect.json": reflect,
-      };
-      const readFileSync = filePath => files[filePath];
+      const dir = makeHarnessTempDir("codex-provider-validation-");
+      const configPath = path.join(dir, "config.toml");
+      const reflectPath = path.join(dir, "awf-reflect.json");
+      fs.writeFileSync(configPath, toml);
+      fs.writeFileSync(reflectPath, reflect);
       const result = validateCodexOpenAIBaseURLFromReflect({
-        codexConfigPath: "/tmp/codex-config.toml",
-        reflectPath: "/tmp/awf-reflect.json",
-        readFileSync,
+        codexConfigPath: configPath,
+        reflectPath,
       });
       expect(result.ok).toBe(false);
       expect(result.reason).toContain("mismatch");
@@ -1244,58 +1341,56 @@ env_key = "OPENAI_API_KEY"
       const reflect = JSON.stringify({
         endpoints: [{ provider: "openai", port: 10000, configured: true }],
       });
-      const files = {
-        "/tmp/codex-config.toml": toml,
-        "/tmp/awf-reflect.json": reflect,
-      };
-      const readFileSync = filePath => files[filePath];
+      const dir = makeHarnessTempDir("codex-provider-validation-");
+      const configPath = path.join(dir, "config.toml");
+      const reflectPath = path.join(dir, "awf-reflect.json");
+      fs.writeFileSync(configPath, toml);
+      fs.writeFileSync(reflectPath, reflect);
       const result = validateCodexOpenAIBaseURLFromReflect({
-        codexConfigPath: "/tmp/codex-config.toml",
-        reflectPath: "/tmp/awf-reflect.json",
-        readFileSync,
+        codexConfigPath: configPath,
+        reflectPath,
       });
       expect(result.ok).toBe(true);
     });
 
     it("validates against the selected GitHub provider", () => {
-      const files = {
-        "/tmp/codex-config.toml": `[model_providers.openai-proxy]\nbase_url = "http://api-proxy:10002"\n`,
-        "/tmp/awf-reflect.json": JSON.stringify({ endpoints: [{ provider: "copilot", port: 10002, configured: true }] }),
-      };
+      const dir = makeHarnessTempDir("codex-provider-validation-");
+      const configPath = path.join(dir, "config.toml");
+      const reflectPath = path.join(dir, "awf-reflect.json");
+      fs.writeFileSync(configPath, `[model_providers.openai-proxy]\nbase_url = "http://api-proxy:10002"\n`);
+      fs.writeFileSync(reflectPath, JSON.stringify({ endpoints: [{ provider: "copilot", port: 10002, configured: true }] }));
       const result = validateCodexOpenAIBaseURLFromReflect({
-        codexConfigPath: "/tmp/codex-config.toml",
-        reflectPath: "/tmp/awf-reflect.json",
+        codexConfigPath: configPath,
+        reflectPath,
         provider: "github",
-        readFileSync: filePath => files[filePath],
       });
       expect(result.ok).toBe(true);
     });
 
     it("fails strictly when /reflect has configured endpoints but none for the selected provider", () => {
-      const files = {
-        "/tmp/codex-config.toml": `[model_providers.openai-proxy]\nbase_url = "http://172.30.0.30:10000"\n`,
-        "/tmp/awf-reflect.json": JSON.stringify({ endpoints: [{ provider: "anthropic", port: 10001, configured: true }] }),
-      };
+      const dir = makeHarnessTempDir("codex-provider-validation-");
+      const configPath = path.join(dir, "config.toml");
+      const reflectPath = path.join(dir, "awf-reflect.json");
+      fs.writeFileSync(configPath, `[model_providers.openai-proxy]\nbase_url = "http://172.30.0.30:10000"\n`);
+      fs.writeFileSync(reflectPath, JSON.stringify({ endpoints: [{ provider: "anthropic", port: 10001, configured: true }] }));
       const result = validateCodexOpenAIBaseURLFromReflect({
-        codexConfigPath: "/tmp/codex-config.toml",
-        reflectPath: "/tmp/awf-reflect.json",
+        codexConfigPath: configPath,
+        reflectPath,
         provider: "github",
-        readFileSync: filePath => files[filePath],
       });
       expect(result.ok).toBe(false);
       expect(result.reason).toContain("no configured endpoint for provider");
     });
 
     it("passes through when TOML lacks openai-proxy section", () => {
-      const files = {
-        "/tmp/codex-config.toml": `[history]\npersistence = "none"\n`,
-        "/tmp/awf-reflect.json": JSON.stringify({ endpoints: [{ provider: "openai", port: 10000, configured: true }] }),
-      };
-      const readFileSync = filePath => files[filePath];
+      const dir = makeHarnessTempDir("codex-provider-validation-");
+      const configPath = path.join(dir, "config.toml");
+      const reflectPath = path.join(dir, "awf-reflect.json");
+      fs.writeFileSync(configPath, `[history]\npersistence = "none"\n`);
+      fs.writeFileSync(reflectPath, JSON.stringify({ endpoints: [{ provider: "openai", port: 10000, configured: true }] }));
       const result = validateCodexOpenAIBaseURLFromReflect({
-        codexConfigPath: "/tmp/codex-config.toml",
-        reflectPath: "/tmp/awf-reflect.json",
-        readFileSync,
+        codexConfigPath: configPath,
+        reflectPath,
       });
       expect(result.ok).toBe(true);
     });

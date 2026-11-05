@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createRequire } from "node:module";
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
 import { spawnSync } from "node:child_process";
 
 const require = createRequire(import.meta.url);
@@ -11,11 +10,13 @@ const { stageFiles, restoreFiles, validateFiles } = require("./durable_files.cjs
 const { captureCopilotSessions } = require("./durable_session.cjs");
 const { createCopilotSDKModelObserver } = require("./copilot_model_selection.cjs");
 const { runWithCopilotSDK } = require("./copilot_sdk_session.cjs");
+const { TMP_GH_AW_PATH } = require("./constants.cjs");
 const core = { info() {}, setOutput() {} };
 const id = "00000000-0000-4000-8000-000000000001";
 let directory;
 beforeEach(() => {
-  directory = fs.mkdtempSync(path.join(os.tmpdir(), "durable-native-test-"));
+  fs.mkdirSync(TMP_GH_AW_PATH, { recursive: true });
+  directory = fs.mkdtempSync(path.join(TMP_GH_AW_PATH, "durable-native-test-"));
 });
 afterEach(() => {
   vi.unstubAllEnvs();

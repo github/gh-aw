@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"maps"
 	"os"
@@ -57,6 +58,7 @@ func processImportsWithWorkflowSpec(content string, workflow *WorkflowSpec, comm
 		return content, nil // No imports field, return original content
 	}
 
+	importChanged := false
 	// resolveOneImportPath converts a single raw import path to workflowspec format.
 	// Paths that already use the workflowspec format (contain "@") are left unchanged.
 	// When localWorkflowDir is set, relative paths whose files exist locally are also
@@ -80,6 +82,9 @@ func processImportsWithWorkflowSpec(content string, workflow *WorkflowSpec, comm
 		importsLog.Printf("Resolved import path: %s -> %s (workflow: %s)", importPath, resolvedPath, workflow.WorkflowPath)
 		workflowSpec := buildWorkflowSpecRef(workflow.RepoSlug, resolvedPath, commitSHA, workflow.Version)
 		importsLog.Printf("Converted import: %s -> %s", importPath, workflowSpec)
+		if workflowSpec != importPath {
+			importChanged = true
+		}
 		return workflowSpec
 	}
 
@@ -146,8 +151,11 @@ func processImportsWithWorkflowSpec(content string, workflow *WorkflowSpec, comm
 		return content, nil
 	}
 
-	// Use helper function to reconstruct workflow file with proper field ordering
-	return reconstructWorkflowFileFromMap(result.Frontmatter, result.Markdown)
+	if !importChanged {
+		return content, nil
+	}
+
+	return replaceImportsFieldInContent(content, result, result.Frontmatter["imports"])
 }
 
 // reconstructWorkflowFileFromMap reconstructs a workflow file from frontmatter map and markdown
@@ -165,6 +173,50 @@ func reconstructWorkflowFileFromMap(frontmatter map[string]any, markdown string)
 	frontmatterStr = workflow.UnquoteYAMLKey(frontmatterStr, "on")
 
 	return parser.ReconstructWorkflowFile(frontmatterStr, markdown)
+}
+
+func replaceImportsFieldInContent(content string, parsed *parser.FrontmatterResult, imports any) (string, error) {
+	importLine, exists := parsed.FieldLines["imports"]
+	if !exists {
+		return "", errors.New("imports field line not found")
+	}
+	start := importLine - parsed.FrontmatterStart
+	end := len(parsed.FrontmatterLines)
+	for _, line := range parsed.FieldLines {
+		if line > importLine && line-parsed.FrontmatterStart < end {
+			end = line - parsed.FrontmatterStart
+		}
+	}
+	if start < 0 || start >= end || end > len(parsed.FrontmatterLines) {
+		return "", errors.New("invalid imports field range")
+	}
+
+	serializedLines, err := serializeImportsField(imports)
+	if err != nil {
+		return "", err
+	}
+	lineEnding := "\n"
+	if strings.Contains(content, "\r\n") {
+		lineEnding = "\r\n"
+	}
+	fileLines := strings.SplitAfter(content, "\n")
+	start++
+	end++
+	if end > len(fileLines) {
+		return "", errors.New("imports field range exceeds content")
+	}
+	return strings.Join(fileLines[:start], "") +
+		strings.Join(serializedLines, lineEnding) + lineEnding +
+		strings.Join(fileLines[end:], ""), nil
+}
+
+func serializeImportsField(imports any) ([]string, error) {
+	serialized, err := reconstructWorkflowFileFromMap(map[string]any{"imports": imports}, "")
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Split(serialized, "\n")
+	return lines[1 : len(lines)-1], nil
 }
 
 // processIncludesWithWorkflowSpec processes @include directives in content and replaces local file references
