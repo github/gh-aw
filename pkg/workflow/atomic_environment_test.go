@@ -49,7 +49,7 @@ console.log(JSON.stringify({
 		"PATH": os.Getenv("PATH"), "HOME": dir, "TMPDIR": dir, "TMP": dir, "TEMP": dir,
 		"LANG": "C", "LC_ALL": "C", "LC_CTYPE": "C", "TZ": "UTC", "TERM": "dumb",
 		"NO_COLOR": "1", "CI": "true", "HOSTALIASES": filepath.Join(dir, "host-aliases"),
-		"GITHUB_WORKSPACE": dir, "GH_AW_ENGINE_CWD": dir, "GH_AW_ENGINE_VERSION": "0.9.50",
+		"GITHUB_WORKSPACE": dir, "GH_AW_ENGINE_CWD": dir, "GH_AW_ENGINE_VERSION": loadAtomicSample(t).Version,
 		"GH_AW_MCP_CONFIG": filepath.Join(dir, "mcp.json"), "GH_AW_TOOL_TIMEOUT": "30",
 		"GH_AW_SAFE_OUTPUTS":             filepath.Join(dir, "safe-outputs.json"),
 		"GH_AW_SAFE_OUTPUTS_CONFIG_PATH": filepath.Join(dir, "safe-outputs-config.json"),
