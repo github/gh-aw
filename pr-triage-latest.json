@@ -1,6 +1,6 @@
 {
-  "run_id": "41980085946",
-  "run_date": "2026-11-05T06:26:53.156+00:00",
+  "run_id": "42082921670",
+  "run_date": "2026-11-05T18:21:07.765+00:00",
   "source": "pr-triage",
   "eligible_total": 3,
   "open_copilot_prs": 26,
@@ -78,5 +78,5 @@
       }
     }
   ],
-  "notes": "Eligible PRs older than 1 hour and outside cooldown; selected items were labeled and included in batch agent-triage-2026-11-05."
+  "notes": "Eligible PRs older than 1 hour and outside cooldown; selected items are triaged with batch agent-triage-2026-11-05."
 }
