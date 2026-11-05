@@ -3,12 +3,44 @@
 package workflow
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestIssueTriageScheduledSafeOutputTargets(t *testing.T) {
+	t.Chdir(filepath.Join("..", ".."))
+	compiler := NewCompiler(WithVersion("integration"), WithWorkflowIdentifier("issue-triage-agent"), WithNoEmit(true))
+	compiler.SetQuiet(true)
+	data, err := compiler.ParseWorkflowFile(filepath.Join(".github", "workflows", "issue-triage-agent.md"))
+	require.NoError(t, err)
+	require.NotNil(t, data.SafeOutputs)
+	require.NotNil(t, data.SafeOutputs.AddLabels)
+	require.NotNil(t, data.SafeOutputs.AddComments)
+	require.NotNil(t, data.SafeOutputs.AddLabels.PullRequests)
+	require.False(t, *data.SafeOutputs.AddLabels.PullRequests)
+	require.NotNil(t, data.SafeOutputs.AddComments.PullRequests)
+	require.False(t, *data.SafeOutputs.AddComments.PullRequests)
+
+	configJSON, err := generateSafeOutputsConfig(data)
+	require.NoError(t, err)
+	var config map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal([]byte(configJSON), &config))
+	for _, handler := range []string{"add_labels", "add_comment"} {
+		var handlerConfig map[string]any
+		require.NoError(t, json.Unmarshal(config[handler], &handlerConfig))
+		require.Equal(t, "*", handlerConfig["target"], "%s must support explicit issue targets without a triggering issue", handler)
+		require.EqualValues(t, 5, handlerConfig["max"], "%s must support the same bounded triage batch", handler)
+		require.NotContains(t, handlerConfig, "target-repo")
+		require.NotContains(t, handlerConfig, "allowed_repos")
+	}
+	require.ElementsMatch(t,
+		[]string{"bug", "feature", "enhancement", "documentation", "question", "help-wanted", "good-first-issue"},
+		data.SafeOutputs.AddLabels.Allowed)
+}
 
 func TestRepositoryWorkflowsCompileWithoutEmitting(t *testing.T) {
 	// Resolve remote imports from the checked-in repository cache, not pkg/workflow.
