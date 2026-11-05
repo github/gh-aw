@@ -111,9 +111,10 @@ type WorkflowData struct {
 	MarkdownContent                string
 	SubAgentModels                 []parser.SubAgentModel // models declared by inline and imported sub-agents
 	SubAgents                      []parser.InlineSubAgent
-	AI                             string            // "claude" or "codex" (for backwards compatibility)
-	Model                          string            // Top-level LLM model override (from frontmatter model: field or imports)
-	EngineConfig                   *EngineConfig     // Extended engine configuration
+	AI                             string        // "claude" or "codex" (for backwards compatibility)
+	Model                          string        // Top-level LLM model override (from frontmatter model: field or imports)
+	EngineConfig                   *EngineConfig // Extended engine configuration
+	durableExecutionPlan           *DurableExecutionPlan
 	engineDefinition               *EngineDefinition // Per-workflow metadata, retained across batch compiler registry resets
 	AgentFile                      string            // Path to custom agent file (from imports)
 	AgentImportSpec                string            // Original import specification for agent file (e.g., "owner/repo/path@ref")

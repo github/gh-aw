@@ -361,6 +361,18 @@ describe("redact_secrets.cjs", () => {
         expect(mockCore.setFailed).not.toHaveBeenCalled();
       });
 
+      it.each(["utf8", "latin1"])("removes binary artifacts containing %s runtime credentials without rewriting them", encoding => {
+        const { processFile } = require("./redact_secrets.cjs");
+        const file = path.join(tempDir, "binary.json");
+        const secret = "caf\u00e9-runtime-credential";
+        fs.writeFileSync(file, Buffer.concat([Buffer.from([0xff, 0]), Buffer.from(secret, encoding), Buffer.from([0xfe])]));
+
+        expect(processFile(file, [], [secret])).toBeGreaterThan(0);
+
+        expect(fs.existsSync(file)).toBe(false);
+        expect(mockCore.setFailed).not.toHaveBeenCalled();
+      });
+
       it("reports input bytes only after a fail-closed redaction error without payload data", () => {
         const { processFile } = require("./redact_secrets.cjs");
         const file = path.join(tempDir, "safeoutputs.jsonl");

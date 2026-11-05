@@ -8,6 +8,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/stringutil"
+	"github.com/goccy/go-yaml"
 )
 
 // compiler_activation_outputs contains activation outputs, artifact upload wiring, and environment assembly.
@@ -338,7 +339,17 @@ func (c *Compiler) addActivationInfoArtifactUploadStep(ctx *activationJobBuildCo
 func (c *Compiler) buildActivationEnvironment(ctx *activationJobBuildContext) string {
 	if ctx.data.ManualApproval != "" {
 		compilerActivationJobLog.Print("Activation job uses manual-approval environment gate")
-		return "environment: " + stringutil.StripANSI(ctx.data.ManualApproval)
+		manualApproval := stringutil.StripANSI(ctx.data.ManualApproval)
+		var environmentConfig map[string]any
+		if err := yaml.Unmarshal([]byte(ctx.data.Environment), &environmentConfig); err == nil {
+			if environment, ok := environmentConfig["environment"].(map[string]any); ok {
+				environment["name"] = manualApproval
+				if updatedConfig, err := yaml.Marshal(environmentConfig); err == nil {
+					return c.indentYAMLLines(string(updatedConfig), "    ")
+				}
+			}
+		}
+		return "environment: " + manualApproval
 	}
 	return c.indentYAMLLines(ctx.data.Environment, "    ")
 }

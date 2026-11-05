@@ -1,5 +1,3 @@
-//go:build !js && !wasm
-
 // This file provides package and image name validation utilities for agentic workflows.
 //
 // # Name Validation

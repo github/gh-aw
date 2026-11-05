@@ -49,7 +49,7 @@ enclaves:
 
 ## Docker enclave credential staging and diagnostics
 
-- The default AWF release is `v0.29.5`. Compilation generates authenticated installation and probing of a same-release, runner-UID-scoped storage helper for Docker enclaves. Only helper provisioning is privileged; AWF itself stays rootless with network isolation and `noexec` writable invocation storage.
+- The default AWF release is `v0.29.7`. Compilation generates authenticated installation and probing of a same-release, runner-UID-scoped storage helper for Docker enclaves. Only helper provisioning is privileged; AWF itself stays rootless with network isolation and `noexec` writable invocation storage.
 - Set `sandbox.agent.host-github-token` to stage private host-side repository content for Docker enclaves, e.g. `host-github-token: ${{ secrets.GH_AW_GITHUB_TOKEN }}`. Requires `enclaves` and AWF `v0.29.5` or newer. Compilation rejects a missing staging credential and binds it only as host `GH_TOKEN`, excluded from the primary agent environment. This is separate from the enclave's own GitHub-tool credential and is never persisted through `GITHUB_ENV`. Grant only the repository read access needed for staging.
 - Set `sandbox.agent.enclave-debug-public: true` only for static, public-only Docker enclaves using official release images; default is `false`. Confidential, private, mixed, dynamic, custom-image, and unsupported-runtime configurations cannot opt in, and AWF independently verifies repository visibility before capture. Public diagnostic artifacts have a fixed one-day retention ceiling and redaction does not cover private repository content — never enable this for confidential targets.
 
