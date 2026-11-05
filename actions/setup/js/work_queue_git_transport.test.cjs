@@ -7,6 +7,7 @@ import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const { createGitLedgerClient, gitEnvironment, queueLedgerClient, registerQueueLedgerClient } = require("./work_queue_git_transport.cjs");
+const { wrapGithubClient } = require("./work_queue_issue_pacing.cjs");
 const { readWorkQueueLog, publishWorkQueueRequest } = require("./work_queue_store.cjs");
 const { readCheckedQueue, writeCheckedFiles } = require("./work_queue_checked_transport.cjs");
 const { compactTransactions, newRequest, serializeTransactionLog } = require("./work_queue_replay.cjs");
@@ -61,6 +62,37 @@ function fixture() {
 }
 
 describe("Git-only work queue ledger", { timeout: 30000 }, () => {
+  it.each([false, true])("shares production ledger clients with a paced Issue wrapper created before the first read: %s", async wrapFirst => {
+    const client = { auth: async () => ({ type: "token", token: "offline-queue-token" }) };
+    const original = wrapFirst ? undefined : queueLedgerClient(client, "owner", "repo");
+    const { client: wrapped } = wrapGithubClient(client);
+    const fromWrapper = queueLedgerClient(wrapped, "owner", "repo");
+    const fromSource = original || queueLedgerClient(client, "owner", "repo");
+    cleanups.push(() => fromSource.close());
+    if (fromWrapper !== fromSource) cleanups.push(() => fromWrapper.close());
+    expect(fromWrapper).toBe(fromSource);
+    const independent = queueLedgerClient({ auth: client.auth }, "owner", "repo");
+    cleanups.push(() => independent.close());
+    expect(independent).not.toBe(fromSource);
+    for (const [owner, repo, branch] of [
+      ["other", "repo", "work-queue"],
+      ["owner", "other", "work-queue"],
+      ["owner", "repo", "other"],
+    ]) {
+      const scoped = queueLedgerClient(wrapped, owner, repo, branch);
+      cleanups.push(() => scoped.close());
+      expect(scoped).not.toBe(fromSource);
+    }
+    const revoked = new Error("fixture credential revoked");
+    let revokedReads = 0;
+    client.auth = async () => {
+      revokedReads++;
+      throw revoked;
+    };
+    await expect(readWorkQueueLog({ githubClient: wrapped, owner: "owner", repo: "repo" })).rejects.toMatchObject({ code: "repository_unavailable" });
+    expect(revokedReads).toBe(1);
+  });
+
   it("looks up unchanged history locally but fetches a changed remote head", async () => {
     const f = fixture();
     const current = await readWorkQueueLog(f.options);

@@ -7,6 +7,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { queueError } = require("./work_queue_codec.cjs");
 const { buildGitAuthEnv } = require("./git_auth_env.cjs");
+const { createQueueGitObjectReader } = require("./work_queue_git_objects.cjs");
 
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
 /** @type {WeakMap<object, Map<string, ReturnType<typeof createGitLedgerClient>>>} */
@@ -14,7 +15,9 @@ const clients = new WeakMap();
 const overrides = new WeakMap();
 const gitClients = new WeakMap();
 const directories = new Set();
+const objectReaders = new Set();
 process.once("exit", () => {
+  for (const reader of objectReaders) reader.close();
   for (const directory of directories) fs.rmSync(directory, { recursive: true, force: true });
 });
 
@@ -28,6 +31,9 @@ function inheritQueueLedgerClient(source, target) {
     const ledger = overrides.get(source);
     registerQueueLedgerClient(target, ledger === source ? target : ledger);
   }
+  let repositories = clients.get(source);
+  if (!repositories) clients.set(source, (repositories = new Map()));
+  clients.set(target, repositories);
 }
 
 function queueGitScope(client) {
@@ -82,6 +88,9 @@ function createGitLedgerClient({ githubClient, owner, repo, branch, remote }) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-queue-git-"));
   directories.add(directory);
   const baseEnv = gitEnvironment();
+  const gitArgs = ["-c", "credential.helper=", "-c", `core.hooksPath=${os.devNull}`, "-c", "http.followRedirects=false", "-c", "fetch.fsckObjects=true", "--git-dir", directory];
+  const objectReader = createQueueGitObjectReader(gitArgs, baseEnv);
+  objectReaders.add(objectReader);
   /** @type {Map<string, Buffer>} */
   const objects = new Map();
   let cachedBytes = 0;
@@ -94,7 +103,7 @@ function createGitLedgerClient({ githubClient, owner, repo, branch, remote }) {
   /** @param {string[]} args @param {string | Buffer | undefined} [input] */
   function git(args, input = undefined, env = baseEnv) {
     try {
-      return execFileSync("git", ["-c", "credential.helper=", "-c", `core.hooksPath=${os.devNull}`, "-c", "http.followRedirects=false", "-c", "fetch.fsckObjects=true", "--git-dir", directory, ...args], {
+      return execFileSync("git", [...gitArgs, ...args], {
         env,
         input,
         maxBuffer: 81 * 1024 * 1024,
@@ -150,8 +159,7 @@ function createGitLedgerClient({ githubClient, owner, repo, branch, remote }) {
     const cached = objects.get(key);
     if (cached) return cached;
     await fetchObjects();
-    if (git(["cat-file", "-t", oid]).toString("utf8").trim() !== type) throw queueError("ledger_invalid", "queue Git object has the wrong type");
-    const data = git(["cat-file", type, oid]);
+    const data = await objectReader.object(oid, type);
     // Keep the immutable ancestry hot without retaining an unbounded ledger.
     if (data.length <= 4 * 1024 * 1024) {
       while (objects.size && (cachedBytes + data.length > 16 * 1024 * 1024 || objects.size >= 512)) {
@@ -294,6 +302,8 @@ function createGitLedgerClient({ githubClient, owner, repo, branch, remote }) {
       return commit.data.sha;
     },
     close() {
+      objectReader.close();
+      objectReaders.delete(objectReader);
       fs.rmSync(directory, { recursive: true, force: true });
       directories.delete(directory);
     },

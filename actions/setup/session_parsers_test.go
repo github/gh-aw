@@ -57,6 +57,28 @@ func TestSessionParserSourcesLoadNativeCreationVerifier(t *testing.T) {
 	require.NoError(t, err, "%s", output)
 }
 
+func TestSessionParserSourcesLoadQueueGitTransport(t *testing.T) {
+	t.Parallel()
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is required to load embedded JavaScript sources")
+	}
+
+	bundleDir := t.TempDir()
+	require.NoError(t, os.CopyFS(bundleDir, SessionParserSources))
+
+	cmd := exec.Command(node, "-e", `
+		const assert = require("node:assert/strict");
+		const transport = require("./js/work_queue_git_transport.cjs");
+		const objects = require("./js/work_queue_git_objects.cjs");
+		assert.equal(typeof transport.createGitLedgerClient, "function");
+		assert.equal(typeof objects.createQueueGitObjectReader, "function");
+	`)
+	cmd.Dir = bundleDir
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, "%s", output)
+}
+
 func TestSessionParserSourcesLoadLogParserBootstrap(t *testing.T) {
 	t.Parallel()
 	node, err := exec.LookPath("node")
