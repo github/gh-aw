@@ -1007,6 +1007,9 @@ jobs:
               "create_issue": {
                 "defaultMax": 1,
                 "fields": {
+                  "artifacts": {
+                    "type": "array"
+                  },
                   "blocked_by": {},
                   "body": {
                     "required": true,

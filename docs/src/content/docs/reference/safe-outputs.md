@@ -392,6 +392,23 @@ See [Cross-Repository Operations](/gh-aw/reference/cross-repository/) for compre
 }
 ```
 
+#### Issue Artifacts
+
+`create_issue` accepts an optional `artifacts` array. Each item requires a non-empty `name` and `body` (at most 524288 characters), with an optional `type`: `generic` (default), `plan`, `link`, or `embedded_html`. Link bodies contain a URL; HTML bodies contain HTML source for GitHub's artifact preview. Names and content follow safe-output sanitization, with HTML tags preserved as source. Temporary issue references in artifact bodies are resolved, including the newly created issue's temporary ID.
+
+```json
+{
+  "type": "create_issue",
+  "title": "Implement parser caching",
+  "body": "Cache parsed workflows to reduce compilation time.",
+  "artifacts": [
+    { "type": "plan", "name": "Implementation plan", "body": "## Plan\n\nAdd a cache and regression coverage." }
+  ]
+}
+```
+
+Artifacts are attached using the issue's repository and credentials with `issues: write` permission. Staged mode previews artifacts without writing them. Requests with artifacts create a new issue rather than grouping content into a same-day comment; title deduplication still applies. If an attachment fails, the handler reports failure with the created issue's number and URL and the number of artifacts already attached; it does not delete the issue or retry the entire creation. See the [issue artifacts REST API](https://docs.github.com/en/rest/issues/artifacts?apiVersion=2026-03-10).
+
 #### Blocked-By Dependencies
 
 The `create_issue` tool accepts `blocked_by` as an issue reference or an array of references: an issue number (optionally prefixed with `#`), `owner/repo#number`, a GitHub issue URL, or a temporary ID. Numeric references use the new issue's repository. Every resolved blocker repository must match `target-repo` or appear in `allowed-repos`, including configured wildcard patterns, before issue creation or dependency API access. A disallowed blocker rejects the request. Unresolved temporary IDs defer creation and are validated when retried; staged mode previews unresolved IDs but still rejects resolved disallowed repositories.
