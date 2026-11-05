@@ -17,7 +17,7 @@ A repository can pull in a complete workflow from another repository:
 gh aw add acme-org/agentic-workflows/ci-doctor@v1.2.0
 ```
 
-The `source:` field is automatically added to the installed workflow's frontmatter so the origin and version are tracked. Use `gh aw add-wizard` for interactive installation; use `gh aw add` for scripted or CI use.
+The `source:` field is automatically added to the installed workflow's frontmatter so the origin and version are tracked. An explicit tag, branch, or commit SHA is preserved in `source:`; when no ref is supplied, the resolved commit SHA is recorded. Use `gh aw add-wizard` for interactive installation; use `gh aw add` for scripted or CI use.
 
 See [Adding Existing Workflows](/gh-aw/setup/working-with-workflows/#adding-existing-workflows) for installation commands and options.
 
@@ -55,10 +55,10 @@ See [Imports Reference](/gh-aw/reference/imports/#calling-a-parameterized-shared
 
 | Ref type | Behavior |
 | --- | --- |
-| Exact release tag (`@v1.2.0`) | Pins to one immutable release until you change `source:` explicitly. |
+| Exact release tag (`@v1.2.0`) | Installs that release; `gh aw update` selects the latest compatible stable release within the same major version. |
 | Moving release ref (`@v1`) | Follows newer compatible releases in that major line when you run `gh aw update`. |
 | Branch ref (`@develop`) | Tracks the latest commit on a branch for development integration. |
-| SHA pin (`@abc123def`) | Gives strict reproducibility and never moves without an explicit change. |
+| Full commit SHA (40 hexadecimal characters) | Installs that commit; `gh aw update` checks the default branch for a newer commit because the source contains no branch name. |
 
 To pull upstream changes into an already-installed workflow:
 
@@ -67,7 +67,7 @@ gh aw update ci-doctor          # update one workflow
 gh aw update                    # update all tracked workflows
 ```
 
-Updates use a 3-way merge by default to preserve local edits. Use `--no-merge` to replace the local copy with the upstream version without merging. When the recorded `source:` uses a moving major ref such as `@v1`, `gh aw update` stays within that major line unless `--major` is passed.
+Updates use a 3-way merge by default to preserve local edits. Use `--no-merge` to replace the local copy with the upstream version without merging. When the recorded `source:` uses a semantic-version tag such as `@v1.2.0` or `@v1`, `gh aw update` stays within that major line unless `--major` is passed. Update candidates remain subject to the [cooldown policy](/gh-aw/setup/cli/#update).
 
 ### 5. Private and internal sharing controls
 
