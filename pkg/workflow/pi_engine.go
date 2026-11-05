@@ -345,6 +345,7 @@ func (e *PiEngine) GetExecutionSteps(workflowData *WorkflowData, logFile string)
 	piCommand := e.buildPiCommand(workflowData, commandName, piArgs, piModelsJSONSetup, driverConfigured)
 	command := e.buildPiExecutionCommand(workflowData, logFile, piCommand, firewallEnabled, modelConfigured, profile)
 	env := e.buildPiExecutionEnv(workflowData, profile, backend, firewallEnabled, modelConfigured, piModelsJSONSetup != "")
+	applyDurableExecutionEnv(env, workflowData)
 	step := e.buildPiExecutionStep(workflowData, command, env)
 	return []GitHubActionStep{step}
 }

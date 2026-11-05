@@ -228,7 +228,7 @@ EOF
   curl_args_files=("${test_dir}"/curl-args.[0-9]*)
   shopt -u nullglob
   local expected_downloads=2
-  if [ "$release_version" = v0.29.5 ] || [ "$release_version" = v0.29.6 ]; then
+  if [ "$release_version" = v0.29.5 ] || [ "$release_version" = v0.29.6 ] || [ "$release_version" = v0.29.7 ]; then
     expected_downloads=3
     if [ "$(wc -l < "${test_dir}/attestations")" -ne 3 ]; then
       TEST_FAILURE_REASON="expected identity, checksums, and payload attestations"
@@ -322,7 +322,7 @@ else
   fail "modern release binary verification failed" "$TEST_FAILURE_REASON"
 fi
 for node_version in v24.0.0 v18.0.0; do
-  if test_curl_retry_all_errors '--retry-all-errors' true false '--retry-all-errors' "$node_version" Linux v0.29.6; then
+  if test_curl_retry_all_errors '--retry-all-errors' true false '--retry-all-errors' "$node_version" Linux v0.29.7; then
     pass "default release authenticates release identity, checksums, and payload with $node_version"
   else
     fail "default release verification failed" "$TEST_FAILURE_REASON"

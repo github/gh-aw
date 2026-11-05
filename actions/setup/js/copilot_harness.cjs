@@ -2018,6 +2018,7 @@ async function main() {
   let useContinueOnRetry = false;
   /** @type {string | undefined} */
   let nativeModelSessionId;
+  const durableSession = require("./durable_native_session.cjs").openDurableSession("copilot");
   let modelNotSupportedReflectRetryAttempted = false;
   // Once set to true, --continue is never re-enabled for the remainder of this run.
   // This prevents a broken --continue recovery from resurrecting --continue on the next attempt.
@@ -2083,13 +2084,19 @@ async function main() {
         runAttempt: async (attempt, observeStrategy) => {
           // Verified native retries resume the exact UUID; other CLI paths retain --continue.
           let currentArgs = !copilotSDKMode && attempt > 0 && useContinueOnRetry ? [...resolvedArgs, "--continue"] : resolvedArgs;
+          if (!copilotSDKMode && durableSession?.id && attempt > 0 && !useContinueOnRetry) throw new Error("Durable Copilot continuation cannot restart a recorded session as a fresh conversation");
           const verifyModel = !copilotSDKMode && (!process.env.GH_AW_PHASE || process.env.GH_AW_PHASE === "agent") && Boolean(process.env.COPILOT_MODEL);
           let sessionId;
-          if (verifyModel) {
-            const session = prepareCopilotModelSession(resolvedArgs, attempt > 0 && useContinueOnRetry ? nativeModelSessionId : undefined);
+          if (!copilotSDKMode && (verifyModel || durableSession)) {
+            const continuedId = attempt === 0 ? durableSession?.id || undefined : useContinueOnRetry ? nativeModelSessionId : undefined;
+            const session = prepareCopilotModelSession(resolvedArgs, continuedId);
             currentArgs = session.args;
             sessionId = session.sessionId;
             nativeModelSessionId = sessionId;
+            if (durableSession) {
+              durableSession.copilotSession(sessionId);
+              durableSession.save(sessionId);
+            }
           }
 
           // Redact --prompt / -p value from logs to avoid leaking prompt content

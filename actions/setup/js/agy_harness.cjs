@@ -116,10 +116,10 @@ const main = async () => {
         return refreshed.ok ? refreshed.reflectData || null : null;
       },
     });
-    const home = path.join(root, "home");
+    const home = path.join(process.env.GH_AW_DURABLE_SESSION_DIR || root, "home");
     const settings = path.join(home, ".gemini", "antigravity-cli");
     fs.mkdirSync(settings, { recursive: true, mode: 0o700 });
-    fs.writeFileSync(path.join(settings, "settings.json"), JSON.stringify({ modelProvider: "gemini" }), { mode: 0o600, flag: "wx" });
+    fs.writeFileSync(path.join(settings, "settings.json"), JSON.stringify({ modelProvider: "gemini" }), { mode: 0o600 });
     env.HOME = home;
     env.XDG_CONFIG_HOME = path.join(home, ".config");
     env.XDG_CACHE_HOME = path.join(home, ".cache");
