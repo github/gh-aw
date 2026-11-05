@@ -143,18 +143,34 @@ engine:
           });
           writeConfig("settings.json", { quietStartup: true, enableAnalytics: false, enableInstallTelemetry: false });
           writeConfig("mcp.json", mcp);
+          // Inherit runtime bindings, never arbitrary workflow secrets or execution hooks.
           const env = {
-            ...process.env,
             ATOMIC_CODING_AGENT_DIR: agentDir,
             PI_CODING_AGENT_DIR: agentDir,
             ATOMIC_OFFLINE: "1",
             ATOMIC_TELEMETRY: "0",
           };
           for (const name of [
-            "COPILOT_GITHUB_TOKEN", "OPENAI_API_KEY", "CODEX_API_KEY", "ANTHROPIC_API_KEY",
-            "GITHUB_TOKEN", "GH_TOKEN", "GITHUB_ENTERPRISE_TOKEN", "GH_ENTERPRISE_TOKEN",
-            "GH_AW_GITHUB_TOKEN", "GH_AW_AGENT_TOKEN", "PWD",
-          ]) delete env[name];
+            "PATH", "HOME", "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL", "LC_CTYPE",
+            "TZ", "TERM", "NO_COLOR", "CI", "HOSTALIASES",
+            "GITHUB_WORKSPACE", "GH_AW_ENGINE_CWD", "GH_AW_ENGINE_VERSION",
+            "GH_AW_MCP_CONFIG", "GH_AW_TOOL_TIMEOUT", "GH_AW_SAFE_OUTPUTS",
+            "GH_AW_SAFE_OUTPUTS_CONFIG_PATH", "GH_AW_SAFE_OUTPUTS_TOOLS_PATH",
+            "NO_PROXY", "no_proxy",
+          ]) {
+            if (process.env[name] !== undefined) env[name] = process.env[name];
+          }
+          for (const name of ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]) {
+            const value = process.env[name];
+            if (!value) continue;
+            let proxy;
+            try { proxy = new URL(value); } catch { throw new Error(`${name} must be a credential-free HTTP proxy URL`); }
+            if (!["http:", "https:"].includes(proxy.protocol) || proxy.username || proxy.password ||
+                proxy.pathname !== "/" || proxy.search || proxy.hash) {
+              throw new Error(`${name} must be a credential-free HTTP proxy URL`);
+            }
+            env[name] = value;
+          }
           const result = spawnSync(command, [...args, "--provider", "awf-proxy", "--model", model], {
             cwd: process.env.GH_AW_ENGINE_CWD || process.env.GITHUB_WORKSPACE,
             env,
@@ -200,6 +216,15 @@ required; direct-key execution is not supported. The harness discovers the
 selected endpoint through reflection and configures a private `awf-proxy`
 provider with a placeholder key. Anthropic uses Messages; GPT-5 and newer
 models use Responses; other models use Chat Completions.
+
+The child environment uses an explicit runtime allowlist: executable paths,
+home and temporary directories, locale and terminal settings, workspace paths,
+engine version, MCP and safe-output file bindings, tool timeout, host aliases,
+and proxy routing. Proxy URLs must be credential-free HTTP(S) addresses.
+Arbitrary workflow variables, repository and cloud secrets, future credential
+variables, and execution hooks such as `NODE_OPTIONS` are not inherited.
+MCP authentication remains in the private configuration, not the environment.
+This does not remove secrets already exposed to the harness or stored in files.
 
 Prompts arrive verbatim on stdin, never as command arguments. Each run has an
 owner-only temporary agent directory containing `models.json`, `settings.json`,

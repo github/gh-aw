@@ -77,14 +77,12 @@ func atomicHarnessCommand(t *testing.T, dir, command string, args ...string) *ex
 fetchAWFReflect: async () => JSON.parse(process.env.ATOMIC_TEST_REFLECT) };`), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "prompt.txt"), []byte("--help $(not-a-command)\nAtomic fixture prompt"), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "mcp.json"), []byte(`{"autoEnableCodemode":false,"mcpServers":{}}`), 0o600))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "host-aliases"), []byte("api-proxy localhost\n"), 0o600))
 	ctx, cancel := context.WithTimeout(t.Context(), 45*time.Second)
 	t.Cleanup(cancel)
 	cmd := exec.CommandContext(ctx, "node", append([]string{harness, command}, args...)...)
 	cmd.Env = []string{
 		"PATH=" + os.Getenv("PATH"), "GITHUB_WORKSPACE=" + dir, "GH_AW_PROMPT=" + filepath.Join(dir, "prompt.txt"),
 		"GH_AW_MCP_CONFIG=" + filepath.Join(dir, "mcp.json"), "AWF_REFLECT_ENABLED=1",
-		"HOSTALIASES=" + filepath.Join(dir, "host-aliases"),
 		"ATOMIC_MODEL=copilot/fixture-model", "GH_AW_LLM_PROVIDER=github",
 		`ATOMIC_TEST_REFLECT={"ok":true,"reflectData":{"endpoints":[{"provider":"copilot","configured":true,"models_url":"http://api-proxy:10001/prefix/v1/models"}]}}`,
 	}
@@ -117,7 +115,10 @@ console.log(JSON.stringify({
   offline: process.env.ATOMIC_OFFLINE, telemetry: process.env.ATOMIC_TELEMETRY
 }));`), 0o600))
 			cmd := atomicHarnessCommand(t, dir, "node", probe)
+			hostAliases := filepath.Join(dir, "host-aliases")
+			require.NoError(t, os.WriteFile(hostAliases, []byte("api-proxy localhost\n"), 0o600))
 			cmd.Env = append(cmd.Env,
+				"HOSTALIASES="+hostAliases,
 				"ATOMIC_MODEL="+test.model, "GH_AW_LLM_PROVIDER="+test.provider,
 				"OPENAI_API_KEY=sentinel-secret", "COPILOT_GITHUB_TOKEN=sentinel-token",
 				`ATOMIC_TEST_REFLECT={"ok":true,"reflectData":{"endpoints":[{"provider":"`+test.provider+`","configured":true,"models_url":"http://api-proxy:10001/prefix/v1/models"}]}}`)
@@ -247,132 +248,140 @@ func TestAtomicHarnessPublishedCLI(t *testing.T) {
 	if command == "" {
 		t.Skip("set GH_AW_ATOMIC_TEST_CLI to the pinned Atomic binary for offline native MCP and inference validation")
 	}
-	for _, failure := range []bool{false, true} {
-		t.Run(fmt.Sprint("provider failure=", failure), func(t *testing.T) {
-			mcpCalls := make(chan string, 20)
-			requests := make(chan map[string]any, 10)
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.Method != http.MethodPost {
-					w.WriteHeader(http.StatusMethodNotAllowed)
-					return
-				}
-				var request map[string]any
-				if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-					t.Errorf("decode fixture request: %v", err)
-					http.Error(w, "bad fixture request", http.StatusBadRequest)
-					return
-				}
-				if r.URL.Path == "/mcp" {
-					assert.Equal(t, "Bearer fixture-gateway", r.Header.Get("Authorization"))
-					method, _ := request["method"].(string)
-					select {
-					case mcpCalls <- method:
-					default:
-						http.Error(w, "MCP fixture budget exceeded", http.StatusTooManyRequests)
-						return
-					}
-					if strings.HasPrefix(method, "notifications/") {
-						w.WriteHeader(http.StatusAccepted)
-						return
-					}
-					var result any
-					switch method {
-					case "initialize":
-						result = map[string]any{"protocolVersion": "2025-03-26", "capabilities": map[string]any{"tools": map[string]any{}}, "serverInfo": map[string]any{"name": "fixture", "version": "1"}}
-					case "tools/list":
-						result = map[string]any{"tools": []any{map[string]any{"name": "fixture_check", "description": "Check fixture", "inputSchema": map[string]any{"type": "object", "properties": map[string]any{}}}}}
-					case "tools/call":
-						result = map[string]any{"content": []any{map[string]any{"type": "text", "text": "native MCP verified"}}}
-					default:
-						result = map[string]any{}
-					}
-					w.Header().Set("Content-Type", "application/json")
-					assert.NoError(t, json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": request["id"], "result": result}))
-					return
-				}
-				assert.Equal(t, "/v1/chat/completions", r.URL.Path)
+	t.Run("native MCP", func(t *testing.T) {
+		mcpCalls := make(chan string, 20)
+		requests := make(chan map[string]any, 10)
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodPost {
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				return
+			}
+			var request map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+				t.Errorf("decode fixture request: %v", err)
+				http.Error(w, "bad fixture request", http.StatusBadRequest)
+				return
+			}
+			if r.URL.Path == "/mcp" {
+				assert.Equal(t, "Bearer fixture-gateway", r.Header.Get("Authorization"))
+				method, _ := request["method"].(string)
 				select {
-				case requests <- request:
+				case mcpCalls <- method:
 				default:
-					http.Error(w, "inference fixture budget exceeded", http.StatusTooManyRequests)
+					http.Error(w, "MCP fixture budget exceeded", http.StatusTooManyRequests)
 					return
 				}
-				if failure {
-					w.Header().Set("Content-Type", "application/json")
-					w.WriteHeader(http.StatusUnauthorized)
-					_, _ = w.Write([]byte(`{"error":{"message":"offline provider rejection","type":"invalid_request_error"}}`))
+				if strings.HasPrefix(method, "notifications/") {
+					w.WriteHeader(http.StatusAccepted)
 					return
 				}
-				delta := map[string]any{"role": "assistant", "content": "Atomic integration verified"}
-				finish := "stop"
-				messages, err := json.Marshal(request["messages"])
-				if !assert.NoError(t, err) {
-					return
+				var result any
+				switch method {
+				case "initialize":
+					result = map[string]any{"protocolVersion": "2025-03-26", "capabilities": map[string]any{"tools": map[string]any{}}, "serverInfo": map[string]any{"name": "fixture", "version": "1"}}
+				case "tools/list":
+					result = map[string]any{"tools": []any{map[string]any{"name": "fixture_check", "description": "Check fixture", "inputSchema": map[string]any{"type": "object", "properties": map[string]any{}}}}}
+				case "tools/call":
+					result = map[string]any{"content": []any{map[string]any{"type": "text", "text": "native MCP verified"}}}
+				default:
+					result = map[string]any{}
 				}
-				if !strings.Contains(string(messages), `"role":"tool"`) {
-					tools, _ := request["tools"].([]any)
-					for _, tool := range tools {
-						definition, _ := tool.(map[string]any)
-						function, _ := definition["function"].(map[string]any)
-						if function["name"] == "mcp__fixture__fixture_check" {
-							delta = map[string]any{"role": "assistant", "tool_calls": []any{map[string]any{
-								"index": 0, "id": "fixture-call", "type": "function",
-								"function": map[string]any{"name": function["name"], "arguments": "{}"},
-							}}}
-							finish = "tool_calls"
-						}
+				w.Header().Set("Content-Type", "application/json")
+				assert.NoError(t, json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": request["id"], "result": result}))
+				return
+			}
+			assert.Equal(t, "/v1/chat/completions", r.URL.Path)
+			select {
+			case requests <- request:
+			default:
+				http.Error(w, "inference fixture budget exceeded", http.StatusTooManyRequests)
+				return
+			}
+			delta := map[string]any{"role": "assistant", "content": "Atomic integration verified"}
+			finish := "stop"
+			messages, err := json.Marshal(request["messages"])
+			if !assert.NoError(t, err) {
+				return
+			}
+			if !strings.Contains(string(messages), `"role":"tool"`) {
+				tools, _ := request["tools"].([]any)
+				for _, tool := range tools {
+					definition, _ := tool.(map[string]any)
+					function, _ := definition["function"].(map[string]any)
+					if function["name"] == "mcp__fixture__fixture_check" {
+						delta = map[string]any{"role": "assistant", "tool_calls": []any{map[string]any{
+							"index": 0, "id": "fixture-call", "type": "function",
+							"function": map[string]any{"name": function["name"], "arguments": "{}"},
+						}}}
+						finish = "tool_calls"
 					}
 				}
-				w.Header().Set("Content-Type", "text/event-stream")
-				chunk, err := json.Marshal(map[string]any{"id": "fixture", "object": "chat.completion.chunk", "choices": []any{map[string]any{"index": 0, "delta": delta, "finish_reason": finish}}, "usage": map[string]any{"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}})
-				if !assert.NoError(t, err) {
-					return
-				}
-				_, _ = fmt.Fprintf(w, "data: %s\n\ndata: [DONE]\n\n", chunk)
-			}))
-			defer server.Close()
-			dir := t.TempDir()
-			cmd := atomicHarnessCommand(t, dir, command, loadAtomicSample(t).Behaviors.Execution.Args...)
-			cmd.Env = append(cmd.Env,
-				"HTTP_PROXY=http://127.0.0.1:1", "HTTPS_PROXY=http://127.0.0.1:1", "NO_PROXY=127.0.0.1,localhost",
-				`ATOMIC_TEST_REFLECT={"ok":true,"reflectData":{"endpoints":[{"provider":"copilot","configured":true,"models_url":"`+server.URL+`/v1/models"}]}}`)
-			mcp, err := json.Marshal(map[string]any{"autoEnableCodemode": false, "mcpServers": map[string]any{"fixture": map[string]any{
-				"type": "http", "url": server.URL + "/mcp", "exposure": "direct",
-				"headers": map[string]any{"Authorization": "Bearer fixture-gateway"},
-			}}})
+			}
+			w.Header().Set("Content-Type", "text/event-stream")
+			chunk, err := json.Marshal(map[string]any{"id": "fixture", "object": "chat.completion.chunk", "choices": []any{map[string]any{"index": 0, "delta": delta, "finish_reason": finish}}, "usage": map[string]any{"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}})
+			if !assert.NoError(t, err) {
+				return
+			}
+			_, _ = fmt.Fprintf(w, "data: %s\n\ndata: [DONE]\n\n", chunk)
+		}))
+		defer server.Close()
+		dir := t.TempDir()
+		cmd := atomicHarnessCommand(t, dir, command, loadAtomicSample(t).Behaviors.Execution.Args...)
+		cmd.Env = append(cmd.Env,
+			"HTTP_PROXY=http://127.0.0.1:1", "HTTPS_PROXY=http://127.0.0.1:1", "NO_PROXY=127.0.0.1,localhost",
+			`ATOMIC_TEST_REFLECT={"ok":true,"reflectData":{"endpoints":[{"provider":"copilot","configured":true,"models_url":"`+server.URL+`/v1/models"}]}}`)
+		mcp, err := json.Marshal(map[string]any{"autoEnableCodemode": false, "mcpServers": map[string]any{"fixture": map[string]any{
+			"type": "http", "url": server.URL + "/mcp", "exposure": "direct",
+			"headers": map[string]any{"Authorization": "Bearer fixture-gateway"},
+		}}})
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "mcp.json"), mcp, 0o600))
+		output, err := cmd.CombinedOutput()
+		require.NoError(t, err, "%s", output)
+		assert.Contains(t, string(output), "Atomic integration verified")
+		assert.NotContains(t, string(output), "fixture-gateway")
+		require.NotEmpty(t, requests)
+		var transcript strings.Builder
+		for len(requests) > 0 {
+			request := <-requests
+			assert.Equal(t, "fixture-model", request["model"])
+			messages, err := json.Marshal(request["messages"])
 			require.NoError(t, err)
-			require.NoError(t, os.WriteFile(filepath.Join(dir, "mcp.json"), mcp, 0o600))
-			output, err := cmd.CombinedOutput()
-			if failure {
-				require.Error(t, err, "%s", output)
-				assert.Contains(t, string(output), "offline provider rejection")
-			} else {
-				require.NoError(t, err, "%s", output)
-				assert.Contains(t, string(output), "Atomic integration verified")
+			transcript.Write(messages)
+		}
+		assert.Contains(t, transcript.String(), "Atomic fixture prompt")
+		var methods []string
+		for len(mcpCalls) > 0 {
+			methods = append(methods, <-mcpCalls)
+		}
+		assert.Contains(t, methods, "initialize")
+		assert.Contains(t, methods, "tools/list")
+		assert.Contains(t, methods, "tools/call")
+		assert.Contains(t, transcript.String(), "native MCP verified")
+	})
+	t.Run("provider rejection", func(t *testing.T) {
+		requests := make(chan struct{}, 1)
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, http.MethodPost, r.Method)
+			assert.Equal(t, "/v1/chat/completions", r.URL.Path)
+			select {
+			case requests <- struct{}{}:
+			default:
 			}
-			assert.NotContains(t, string(output), "fixture-gateway")
-			require.NotEmpty(t, requests)
-			var transcript strings.Builder
-			for len(requests) > 0 {
-				request := <-requests
-				assert.Equal(t, "fixture-model", request["model"])
-				messages, err := json.Marshal(request["messages"])
-				require.NoError(t, err)
-				transcript.Write(messages)
-			}
-			assert.Contains(t, transcript.String(), "Atomic fixture prompt")
-			var methods []string
-			for len(mcpCalls) > 0 {
-				methods = append(methods, <-mcpCalls)
-			}
-			assert.Contains(t, methods, "initialize")
-			assert.Contains(t, methods, "tools/list")
-			if !failure {
-				assert.Contains(t, methods, "tools/call")
-				assert.Contains(t, transcript.String(), "native MCP verified")
-			}
-		})
-	}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte(`{"error":{"message":"offline provider rejection","type":"invalid_request_error"}}`))
+		}))
+		defer server.Close()
+		cmd := atomicHarnessCommand(t, t.TempDir(), command, loadAtomicSample(t).Behaviors.Execution.Args...)
+		cmd.Env = append(cmd.Env,
+			"HTTP_PROXY=http://127.0.0.1:1", "HTTPS_PROXY=http://127.0.0.1:1", "NO_PROXY=127.0.0.1,localhost",
+			`ATOMIC_TEST_REFLECT={"ok":true,"reflectData":{"endpoints":[{"provider":"copilot","configured":true,"models_url":"`+server.URL+`/v1/models"}]}}`)
+		output, err := cmd.CombinedOutput()
+		require.Error(t, err, "%s", output)
+		assert.Contains(t, string(output), "offline provider rejection")
+		require.NotEmpty(t, requests, "the CLI must reach the rejecting provider")
+	})
 }
 
 func TestAtomicSmokeContract(t *testing.T) {
