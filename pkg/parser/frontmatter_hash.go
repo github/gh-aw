@@ -630,17 +630,15 @@ func extractRuntimeImportReferences(markdownBody string) []runtimeImportReferenc
 		if len(match) < 2 {
 			continue
 		}
-		captures := [2]string(match)
-		target := strings.TrimSpace(captures[1])
+		target := strings.TrimSpace(match[1]) //nolint:uncheckedsliceindex // Capture group length is checked above.
 		if target == "" {
 			continue
 		}
 		ref := runtimeImportReference{path: target}
 		if rangeMatch := runtimeImportLineRangeRe.FindStringSubmatch(target); len(rangeMatch) == 4 {
-			rangeCaptures := [4]string(rangeMatch)
-			ref.path = strings.TrimSpace(rangeCaptures[1])
-			fmt.Sscanf(rangeCaptures[2], "%d", &ref.startLine)
-			fmt.Sscanf(rangeCaptures[3], "%d", &ref.endLine)
+			ref.path = strings.TrimSpace(rangeMatch[1])     //nolint:uncheckedsliceindex // Capture group length is checked above.
+			fmt.Sscanf(rangeMatch[2], "%d", &ref.startLine) //nolint:uncheckedsliceindex // Capture group length is checked above.
+			fmt.Sscanf(rangeMatch[3], "%d", &ref.endLine)   //nolint:uncheckedsliceindex // Capture group length is checked above.
 		}
 		if strings.HasPrefix(ref.path, "http://") || strings.HasPrefix(ref.path, "https://") {
 			continue
