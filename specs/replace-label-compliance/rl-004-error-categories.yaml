@@ -1,0 +1,51 @@
+fixture_id: RL-ERR-004
+description: Every replace-label error category has one owning processing stage and an explicit result.
+spec_refs:
+  - "§5.1–§5.8"
+  - "§7.1"
+scenarios:
+  - scenario_id: schema-invalid
+    category: Schema validation failure
+    codes: [SCHEMA_INVALID]
+    owning_stage: "5.1"
+    result: soft-skip-warning
+  - scenario_id: count-gate-exceeded
+    category: Count gate exceeded
+    codes: [MAX_EXCEEDED]
+    owning_stage: "5.2"
+    result: soft-skip-warning
+  - scenario_id: target-resolution-failure
+    category: Target resolution failure
+    codes: [TARGET_UNRESOLVABLE]
+    owning_stage: "5.3"
+    result: soft-skip-warning
+  - scenario_id: repository-not-allowed
+    category: Repository not in allowlist
+    codes: [REPO_NOT_ALLOWED]
+    owning_stage: "5.3"
+    result: soft-skip-warning
+  - scenario_id: label-validation-failure
+    category: Label validation failure
+    codes: [LABEL_BLOCKED, LABEL_NOT_ALLOWED]
+    owning_stage: "5.4"
+    result: soft-skip-warning
+  - scenario_id: required-labels-gate
+    category: Gate check (required-labels)
+    codes: [GATE_REQUIRED_LABELS]
+    owning_stage: "5.5"
+    result: skipped-without-run-failure
+  - scenario_id: title-prefix-gate
+    category: Gate check (title prefix)
+    codes: [GATE_TITLE_PREFIX]
+    owning_stage: "5.5"
+    result: skipped-without-run-failure
+  - scenario_id: set-labels-failure
+    category: REST setLabels failure
+    codes: [SETLABELS_FAILED]
+    owning_stage: "5.8"
+    result: hard-error
+  - scenario_id: rate-limit-exhausted
+    category: Rate-limit exhausted after retries
+    codes: [RATE_LIMIT_EXHAUSTED]
+    owning_stage: "5.8"
+    result: hard-error

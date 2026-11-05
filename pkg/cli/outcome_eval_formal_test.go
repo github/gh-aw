@@ -743,14 +743,13 @@ func TestFormalDerivedMetricsConsistency(t *testing.T) {
 	})
 }
 
-// TestFormalOTelGracefulDegradation verifies that outcome evaluation always
-// produces a valid, non-discardable result regardless of transport or OTel
-// exporter availability.
+// TestFormalOutcomeSurvivesAPIFailure verifies that an unavailable GitHub API
+// produces a normalized outcome report rather than discarding the evaluation.
 //
 // Formal predicate (F*):
 //
 //	val evaluateOutcome :
-//	  item:CreatedItemReport → transportOK:bool →
+//	  item:CreatedItemReport → apiAvailable:bool →
 //	  Tot OutcomeReport
 //	  (requires True)
 //	  (ensures fun r →
@@ -759,11 +758,11 @@ func TestFormalDerivedMetricsConsistency(t *testing.T) {
 //	    normalizeOutcomeEvaluation(r).OutcomeStatus ≠ "" ∧
 //	    normalizeOutcomeEvaluation(r).EvidenceStrength ≠ "")
 //
-// Specification reference: specs/safe-output-outcome-evaluation.md §Conformance →§OTel Backend Unavailability
-func TestFormalOTelGracefulDegradation(t *testing.T) {
+// Specification reference: specs/safe-output-outcome-evaluation.md §Norms
+func TestFormalOutcomeSurvivesAPIFailure(t *testing.T) {
 	old := closeStickyGHAPIGet
 	t.Cleanup(func() { closeStickyGHAPIGet = old })
-	// Simulate a transport failure (connection refused) that would also prevent OTLP export.
+	// Simulate an unavailable authoritative GitHub API.
 	closeStickyGHAPIGet = func(_ context.Context, endpoint, repo string) (map[string]any, error) {
 		return nil, errors.New("transport error: connection refused")
 	}
@@ -781,18 +780,18 @@ func TestFormalOTelGracefulDegradation(t *testing.T) {
 		t.Run(item.Type, func(t *testing.T) {
 			report := evalCloseSticky(context.Background(), item, "owner/repo")
 
-			// P11: outcome must always be produced — never discarded on transport failure.
+			// P11: outcome must always be produced — never discarded on API failure.
 			assert.NotEmpty(t, report.Type,
-				"P11: report.Type must be set regardless of transport availability")
+				"P11: report.Type must be set regardless of API availability")
 			assert.True(t, validResults[report.OutcomeStatus],
-				"P11: result %q must be a recognized OutcomeStatus even when transport fails", report.OutcomeStatus)
+				"P11: result %q must be a recognized OutcomeStatus even when the API fails", report.OutcomeStatus)
 
-			// The outcome must always be normalizable (audit log entry is always writable).
+			// The outcome must always be normalizable for CLI report serialization.
 			eval := normalizeOutcomeEvaluation(report)
 			assert.NotEmpty(t, string(eval.OutcomeStatus),
-				"P11: OutcomeStatus must be non-empty so the audit log entry can be written")
+				"P11: OutcomeStatus must be non-empty for CLI report serialization")
 			assert.NotEmpty(t, string(eval.EvidenceStrength),
-				"P11: EvidenceStrength must be non-empty so the audit log entry can be written")
+				"P11: EvidenceStrength must be non-empty for CLI report serialization")
 		})
 	}
 }

@@ -25,6 +25,13 @@
     "expected": { "outcome_status": "error", "evidence_strength": "weak", "signal": "evaluation_error" }
   },
   {
+    "name": "close outcome remains reportable when GitHub API is unavailable",
+    "item": { "type": "close_issue", "number": 3 },
+    "responses": {},
+    "errors": { "issues/3": 503 },
+    "expected": { "outcome_status": "error", "evidence_strength": "weak", "signal": "evaluation_error" }
+  },
+  {
     "name": "retained merged PR edit",
     "item": { "type": "update_pull_request", "number": 1, "before_state": { "title": "old" }, "after_state": { "title": "new" } },
     "responses": { "pulls/1": { "title": "new", "merged": true } },
