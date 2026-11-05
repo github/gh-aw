@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -116,6 +118,170 @@ func normalizeImportsForMerge(content string, sourceSpec *SourceSpec, localWorkf
 		WorkflowPath: sourceSpec.Path,
 	}
 	return processImportsWithWorkflowSpec(content, workflow, sourceSpec.Ref, localWorkflowDir, verbose)
+}
+
+// normalizeLegacyImportMergeBase recognizes frontmatter serialized by older updates,
+// independently of local Markdown edits. Only the base is adjusted, so upstream
+// comments and field order are still available to the textual merge.
+func normalizeLegacyImportMergeBase(base, current string) string {
+	parsed, err := parser.ExtractFrontmatterFromContent(base)
+	if err != nil {
+		return base
+	}
+	if _, hasImports := parsed.Frontmatter["imports"]; !hasImports {
+		return base
+	}
+	local, err := parser.ExtractFrontmatterFromContent(current)
+	if err != nil {
+		return base
+	}
+	canonical, err := reconstructWorkflowFileFromMap(parsed.Frontmatter, parsed.Markdown)
+	if err != nil {
+		return base
+	}
+	comparable, err := parser.ReconstructWorkflowFile(strings.Join(local.FrontmatterLines, "\n"), parsed.Markdown)
+	if err != nil || canonical != comparable {
+		return base
+	}
+	return strings.Replace(base, strings.Join(parsed.FrontmatterLines, "\n"), strings.Join(local.FrontmatterLines, "\n"), 1)
+}
+
+// Preserve historical merge behavior for previously serialized installations.
+// Matching base/current frontmatter needs no normalization, even when Markdown changed.
+func normalizeLegacyImportMergeInputs(base, current, upstream string) (string, string, string, bool) {
+	baseParsed, err := parser.ExtractFrontmatterFromContent(base)
+	if err != nil {
+		return base, current, upstream, false
+	}
+	currentParsed, err := parser.ExtractFrontmatterFromContent(current)
+	if err != nil || strings.Join(baseParsed.FrontmatterLines, "\n") == strings.Join(currentParsed.FrontmatterLines, "\n") {
+		return base, current, upstream, false
+	}
+	canonicalCurrent, err := canonicalImportMergeContent(current)
+	canonicalCurrentParsed, canonicalErr := parser.ExtractFrontmatterFromContent(canonicalCurrent)
+	if err != nil || canonicalErr != nil ||
+		strings.Join(canonicalCurrentParsed.FrontmatterLines, "\n") != strings.Join(currentParsed.FrontmatterLines, "\n") {
+		return base, current, upstream, false
+	}
+	canonicalBase, err := canonicalImportMergeContent(base)
+	if err != nil {
+		return base, current, upstream, false
+	}
+	canonicalUpstream, err := canonicalImportMergeContent(upstream)
+	if err != nil {
+		return base, current, upstream, false
+	}
+	return stringutil.NormalizeWhitespace(canonicalBase), current, stringutil.NormalizeWhitespace(canonicalUpstream), true
+}
+
+func canonicalImportMergeContent(content string) (string, error) {
+	parsed, err := parser.ExtractFrontmatterFromContent(content)
+	if err != nil {
+		return "", err
+	}
+	if _, hasImports := parsed.Frontmatter["imports"]; !hasImports {
+		return "", errors.New("no imports to normalize")
+	}
+	canonical, err := reconstructWorkflowFileFromMap(parsed.Frontmatter, parsed.Markdown)
+	if err != nil {
+		return "", err
+	}
+	return canonical, nil
+}
+
+func restoreUpstreamFrontmatterFormatting(merged, upstream string) (string, error) {
+	mergedParsed, err := parser.ExtractFrontmatterFromContent(merged)
+	if err != nil {
+		return "", err
+	}
+	upstreamParsed, err := parser.ExtractFrontmatterFromContent(upstream)
+	if err != nil {
+		return "", err
+	}
+
+	formatted := upstream
+	fields := make([]string, 0, len(upstreamParsed.Frontmatter)+len(mergedParsed.Frontmatter))
+	for field := range upstreamParsed.Frontmatter {
+		fields = append(fields, field)
+	}
+	for field := range mergedParsed.Frontmatter {
+		if _, exists := upstreamParsed.Frontmatter[field]; !exists {
+			fields = append(fields, field)
+		}
+	}
+	slices.Sort(fields)
+	for _, field := range fields {
+		value, exists := mergedParsed.Frontmatter[field]
+		if !exists {
+			if _, upstreamHasField := upstreamParsed.Frontmatter[field]; !upstreamHasField {
+				continue
+			}
+		} else if upstreamValue, upstreamHasField := upstreamParsed.Frontmatter[field]; upstreamHasField &&
+			reflect.DeepEqual(value, upstreamValue) { //nolint:reflectdeepequalusage // YAML values are heterogeneous nested maps and slices.
+			continue
+		}
+		formatted, err = replaceTopLevelFrontmatterField(formatted, field, value, exists)
+		if err != nil {
+			return "", err
+		}
+	}
+	formattedParsed, err := parser.ExtractFrontmatterFromContent(formatted)
+	if err != nil {
+		return "", err
+	}
+	return parser.ReconstructWorkflowFile(strings.Join(formattedParsed.FrontmatterLines, "\n"), mergedParsed.Markdown)
+}
+
+func replaceTopLevelFrontmatterField(content, field string, value any, exists bool) (string, error) {
+	parsed, err := parser.ExtractFrontmatterFromContent(content)
+	if err != nil {
+		return "", err
+	}
+	startLine, found := parsed.FieldLines[field]
+	start := startLine - parsed.FrontmatterStart
+	end := len(parsed.FrontmatterLines)
+	for _, line := range parsed.FieldLines {
+		if line > startLine && line-parsed.FrontmatterStart < end {
+			end = line - parsed.FrontmatterStart
+		}
+	}
+	if found && (start < 0 || start >= end || end > len(parsed.FrontmatterLines)) {
+		return "", fmt.Errorf("invalid frontmatter field range for %q", field)
+	}
+
+	var replacement []string
+	if exists {
+		serialized, err := reconstructWorkflowFileFromMap(map[string]any{field: value}, "")
+		if err != nil {
+			return "", err
+		}
+		serializedParsed, err := parser.ExtractFrontmatterFromContent(serialized)
+		if err != nil {
+			return "", err
+		}
+		replacement = serializedParsed.FrontmatterLines
+	}
+	frontmatter := append([]string(nil), parsed.FrontmatterLines...)
+	if !found {
+		if !exists {
+			return content, nil
+		}
+		frontmatter = append(frontmatter, replacement...)
+	} else {
+		for _, line := range slices.Backward(frontmatter[start+1 : end]) {
+			line = strings.TrimSpace(line)
+			if line != "" && !strings.HasPrefix(line, "#") {
+				break
+			}
+			end--
+		}
+		updated := make([]string, 0, len(frontmatter)-(end-start)+len(replacement))
+		updated = append(updated, frontmatter[:start]...)
+		updated = append(updated, replacement...)
+		updated = append(updated, frontmatter[end:]...)
+		frontmatter = updated
+	}
+	return parser.ReconstructWorkflowFile(strings.Join(frontmatter, "\n"), parsed.Markdown)
 }
 
 func normalizeImportFormattingForMerge(content string, parsed *parser.FrontmatterResult) (string, bool, bool) {
@@ -232,7 +398,8 @@ func MergeWorkflowContent(base, current, new, oldSourceSpec, newRefOrSourceSpec,
 		return "", false, fmt.Errorf("failed to remove source from new content: %w", err)
 	}
 
-	// Rewrite imports that need resolution in all three inputs before merging.
+	// Resolve import paths consistently in all three inputs before merging,
+	// while preserving their authored frontmatter formatting.
 	mergeWorkflowDir := ""
 	if localWorkflowPath != "" {
 		mergeWorkflowDir = filepath.Dir(localWorkflowPath)
@@ -264,6 +431,22 @@ func MergeWorkflowContent(base, current, new, oldSourceSpec, newRefOrSourceSpec,
 			return "", false, fmt.Errorf("failed to update source in current content: %w", updateErr)
 		}
 		return updatedCurrent, false, nil
+	}
+
+	legacyUpstream := ""
+	restoreLegacyFrontmatter := false
+	if baseNormalized != currentNormalized {
+		legacyBase := normalizeLegacyImportMergeBase(baseNormalized, currentNormalized)
+		if legacyBase != baseNormalized {
+			baseNormalized = legacyBase
+		} else {
+			legacyUpstream = newNormalized
+			var normalized bool
+			baseNormalized, currentNormalized, newNormalized, normalized = normalizeLegacyImportMergeInputs(baseNormalized, currentNormalized, newNormalized)
+			if normalized {
+				restoreLegacyFrontmatter = true
+			}
+		}
 	}
 
 	// Create temporary directory for merge files
@@ -355,6 +538,12 @@ func MergeWorkflowContent(base, current, new, oldSourceSpec, newRefOrSourceSpec,
 	}
 
 	mergedStr := string(mergedContent)
+	if restoreLegacyFrontmatter && !hasConflicts {
+		mergedStr, err = restoreUpstreamFrontmatterFormatting(mergedStr, legacyUpstream)
+		if err != nil {
+			return "", false, fmt.Errorf("failed to restore upstream frontmatter formatting: %w", err)
+		}
+	}
 
 	// Process @include directives if present and no conflicts
 	// Skip include processing if there are conflicts to avoid errors
