@@ -3195,6 +3195,18 @@
                   "url": {
                     "type": "string",
                     "description": "The URL to set as the environment URL in the deployment."
+                  },
+                  "deployment": {
+                    "oneOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^\\$\\{\\{.*\\}\\}$"
+                      }
+                    ],
+                    "description": "Set to false to use the environment's secrets and protection rules without creating a GitHub deployment."
                   }
                 },
                 "required": ["name"]
@@ -3809,6 +3821,18 @@
             "url": {
               "type": "string",
               "description": "A deployment URL"
+            },
+            "deployment": {
+              "oneOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^\\$\\{\\{.*\\}\\}$"
+                }
+              ],
+              "description": "Set to false to use the environment's secrets and protection rules without creating a GitHub deployment."
             }
           },
           "required": ["name"],
@@ -13612,6 +13636,18 @@
                 "url": {
                   "type": "string",
                   "description": "A deployment URL"
+                },
+                "deployment": {
+                  "oneOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "^\\$\\{\\{.*\\}\\}$"
+                    }
+                  ],
+                  "description": "Set to false to use the environment's secrets and protection rules without creating a GitHub deployment."
                 }
               },
               "required": ["name"],
