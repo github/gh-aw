@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import fs, { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { activeAgent, approvableRuns, buildQueue, checkRateLimit, classify, fetchActiveRuns, fetchCandidate, fetchQueue, formatNudge, formatSummary, gh } from "./pr-sous-chef.mjs";
+import { activeAgent, approvableRuns, buildQueue, checkRateLimit, classify, fetchActiveRuns, fetchCandidate, fetchQueue, formatAssignmentRequest, formatNudge, formatSummary, gh } from "./pr-sous-chef.mjs";
 
 const now = Date.parse("2026-10-03T18:00:00Z");
 const recent = "2026-10-03T16:00:00Z";
@@ -113,12 +113,45 @@ test("visible fingerprint survives HTML marker removal and arbitrary comment ord
   }
 });
 
-test("dispatch state comments deduplicate without assigning or mentioning Copilot", () => {
+test("assignment state comments deduplicate without mentioning Copilot", () => {
   const first = classify(failingPr, detail(), [], [], now);
   const body = formatNudge(first).replace(/<!--[\s\S]*?--!?>/g, "");
   assert.doesNotMatch(body, /@copilot|assign.to.agent/i);
   assert.equal(classify(failingPr, detail(), [{ ...nudge(first.state_fingerprint), body }], [], now).skip_reason, "unchanged");
   assert.equal(classify(failingPr, detail(), [{ ...nudge(first.state_fingerprint), body, user: { login: "outsider" } }], [], now).skip_reason, undefined);
+});
+
+test("started coding agents can record assignment markers without member association", () => {
+  const first = classify(failingPr, detail(), [], [], now);
+  const body = formatNudge(first).replace(/<!--[\s\S]*?--!?>/g, "");
+  for (const login of ["Copilot", "github-copilot[bot]", "copilot-swe-agent[bot]"]) {
+    const comment = { ...nudge(first.state_fingerprint), body, user: { login }, author_association: "CONTRIBUTOR" };
+    assert.equal(classify(failingPr, detail(), [comment], [], now).skip_reason, "unchanged");
+  }
+  const outsider = { ...nudge(first.state_fingerprint), body, user: { login: "copilot-impostor" } };
+  assert.ok(classify(failingPr, detail(), [outsider], [], now).nudge_needed);
+});
+
+test("pending assignment comments do not suppress retries until a coding agent starts", () => {
+  const first = classify(failingPr, detail(), [], [], now);
+  const request = formatAssignmentRequest(first);
+  assert.ok(request.startsWith("[@copilot](https://github.com/copilot)\n\n"));
+  const body = request.replace(/<!--[\s\S]*?--!?>/g, "");
+  assert.match(body, /Sous-chef requested-head: abc/);
+  assert.match(body, /Sous-chef requested-work: [a-f0-9]{64}/);
+  assert.ok(body.endsWith(`Sous-chef requested-state: ${first.state_fingerprint}`));
+  assert.doesNotMatch(body, /Sous-chef (head|work|state):/);
+  const pending = { ...nudge(first.state_fingerprint), body };
+  assert.ok(classify(failingPr, detail(), [pending], [], now).nudge_needed);
+  assert.ok(classify(failingPr, detail(), [{ ...pending, body: request }], [], now).nudge_needed);
+  const acknowledged = {
+    ...pending,
+    user: { login: "copilot-swe-agent[bot]" },
+    body: body.replace("[@copilot](https://github.com/copilot)\n\n", "").replace(/^Sous-chef requested-(head|work|state):/gm, "Sous-chef $1:"),
+  };
+  assert.doesNotMatch(acknowledged.body, /@copilot/);
+  assert.equal(classify(failingPr, detail(), [pending, acknowledged], [], now).skip_reason, "unchanged");
+  assert.equal(formatAssignmentRequest({ ...first, nudge_needed: false }), null);
 });
 
 test("failed or fallback finisher publications do not suppress a later dispatch", () => {
@@ -607,12 +640,17 @@ test("a precise nudge lists only unanswered feedback and always requests a branc
   unanswered.comments.nodes[0].body = "Handle null input\n\n@copilot please address.";
   const result = classify(pr, detail([answered, unanswered, thread({ isResolved: true, id: "resolved" })]), [], [], now);
   const body = formatNudge(result);
-  assert.match(body, /PR finisher dispatch requested/);
+  assert.match(body, /Copilot assignment requested/);
   assert.match(body, /1\. Update this branch.*`main`.*`make merge-main`/);
   assert.match(body, /2\. Review \(scripts\/example.mjs:12\): Handle null input/);
   assert.match(body, /#discussion_r1/);
   assert.doesNotMatch(body, /Fix the regression/);
   assert.doesNotMatch(body, /@copilot/);
+  assert.doesNotMatch(body, /pr-finisher/);
+  assert.match(body, /Once you start work, post this work summary as a PR comment/);
+  assert.match(body, /including the Sous-chef head, work, and state lines/);
+  assert.match(body, /this PR's existing branch/);
+  assert.match(body, /Do not merge or trigger CI/);
   assert.ok(body.endsWith(`Sous-chef state: ${result.state_fingerprint}`));
 });
 
@@ -1147,9 +1185,15 @@ test("workflow polls every five minutes but never starts an agent for low budget
   assert.match(workflow, /^  skip-if-no-match: .* -label:broccoli"$/m);
   assert.match(workflow, /^if: needs\.prefilter\.outputs\.rate_limit_low == 'false' && \(needs\.prefilter\.outputs\.eligible_count > 0 \|\| needs\.activation\.outputs\.slash_command == 'souschef'\)$/m);
   assert.match(workflow, /sparse-checkout: \|\n\s+scripts\n\s+actions\/setup\/js\n\s+\.github\/scripts/);
-  assert.match(workflow, /dispatch-workflow:\n\s+workflows: \[pr-finisher\]\n\s+target-ref: main\n\s+max: 4/);
+  assert.match(workflow, /assign-to-agent:\n\s+name: copilot\n\s+allowed: \[copilot\]\n\s+target: "\*"\n\s+max: 4\n\s+github-token: \$\{\{ secrets\.AWI_MAINTENANCE_TOKEN \}\}/);
+  assert.match(workflow, /post its `nudges\[0\]\.body` exactly via `add_comment` on `nudges\[0\]\.pr_number`/);
+  assert.match(workflow, /The comment must start with `\[@copilot\]\(https:\/\/github\.com\/copilot\)`/);
+  assert.match(workflow, /leading Copilot mention, replacing/);
+  assert.match(workflow, /as `pull_number` and `copilot` as `agent`/);
+  assert.match(workflow, /custom-instructions: \|\n\s+Work on this PR's existing branch/);
+  assert.match(workflow, /"Sous-chef requested-state:" with "Sous-chef head:", "Sous-chef work:", and\n\s+"Sous-chef state:"/);
   assert.match(workflow, /min-integrity: approved/);
-  assert.doesNotMatch(workflow, /^\s+assign-to-agent:|^\s+mentions:/m);
+  assert.doesNotMatch(workflow, /^\s+dispatch-workflow:|^\s+mentions:/m);
 });
 
 test("targeted refresh detects an active default-branch finisher", async () => {
