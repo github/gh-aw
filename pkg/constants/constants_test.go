@@ -275,6 +275,7 @@ func TestFeatureFlagConstants(t *testing.T) {
 		{"AwfDiagnosticLogsFeatureFlag", AwfDiagnosticLogsFeatureFlag, "awf-diagnostic-logs"},
 		{"GroupConcurrencyQueueFeatureFlag", GroupConcurrencyQueueFeatureFlag, "group-concurrency-queue"},
 		{"DangerouslyAllowRolesReadAndPullRequestTargetFeatureFlag", DangerouslyAllowRolesReadAndPullRequestTargetFeatureFlag, "dangerously-allow-roles-read-and-pull-request-target"},
+		{"DangerouslyAllowPullRequestTargetForksAllFeatureFlag", DangerouslyAllowPullRequestTargetForksAllFeatureFlag, "dangerously-allow-pull-request-target-forks-all"},
 	}
 
 	for _, tt := range tests {

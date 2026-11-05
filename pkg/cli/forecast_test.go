@@ -76,7 +76,7 @@ func TestNewForecastCommand_DaysFlagDocumentsAllowedValues(t *testing.T) {
 
 	daysFlag := cmd.Flags().Lookup("days")
 	require.NotNil(t, daysFlag, "forecast command should register --days")
-	assert.Equal(t, "Historical window in days to sample run history (allowed values: 7, 30)", daysFlag.Usage)
+	assert.Equal(t, "Historical window in days to sample run history (allowed values: 7 or 30)", daysFlag.Usage)
 	assert.NotContains(t, cmd.Long, ").  When runs have been", "Long description should not contain duplicate spacing")
 	assert.NotContains(t, cmd.Long, "used.  The", "Long description should not contain duplicate spacing")
 	assert.NotContains(t, cmd.Long, "interval.  Use this", "Long description should not contain duplicate spacing")

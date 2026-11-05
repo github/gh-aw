@@ -26,6 +26,16 @@ The `gh aw` CLI extension enables developers to create, manage, and execute AI-p
 > [!TIP]
 > New to `gh aw`? Start with the [day-one commands](#day-one-commands). The advanced and enterprise setup is further down the page and can be skipped for most users.
 
+### Timeout flag formats
+
+The `--timeout` flag uses different formats depending on the command:
+
+| Commands | Accepted value | Example | Meaning of `0` |
+|----------|----------------|---------|----------------|
+| `audit`, `health` | Go duration | `--timeout 5m` | `audit`: no additional deadline; `health`: disables its collection deadline |
+| `logs`, `forecast` | Integer minutes | `--timeout 5` | No timeout |
+| `trial` | Integer minutes | `--timeout 10` | No timeout (default: 30 minutes) |
+
 ## Utility and advanced commands
 
 | Command | Description | When to use |
@@ -1090,7 +1100,7 @@ gh aw health issue-monster --days 90  # 90-day metrics for workflow
 
 **Options:** `--days`, `--start-date`, `--end-date`, `--logs-dir`, `--timeout`, `--threshold`, `--repo/-r`, `--json/-j`
 
-The `--days` flag accepts 7, 30, or 90 (default: 7). Other values produce an error.
+The `--days` flag accepts only 7, 30, or 90 (default: 7). Other values produce an error.
 
 `--timeout` bounds evidence collection (default: `2m`; `0` disables the deadline). The shared deadline cancels API quota checks, requests, local Git revision reads, and work-queue ledger reads. Expiry skips further cache reads and returns available evidence with `collection.partial: true`, `reason: "time_budget"`, and a warning, rather than discarding the report. JSON includes `timeout_seconds` when bounded and `elapsed_seconds`, measured after cache enrichment. An in-progress local cache read and report rendering may finish after the deadline. Partial results do not establish fleet health; increase the budget or narrow the workflow/time window to collect more evidence. `DEBUG=cli:health` logs request progress and elapsed times to stderr without logging response bodies.
 
@@ -1248,7 +1258,7 @@ gh aw update --org my-org --pr --auto-merge --yes  # Enable auto-merge per repos
 gh aw update --org my-org --create-issue --yes  # Auto-accept per-repo confirmations (required in CI)
 ```
 
-**Options:** `--dir/-d`, `--no-merge`, `--major`, `--force/-f`, `--engine/-e`, `--no-stop-after`, `--stop-after`, `--no-release-bump`, `--no-security-scanner`, `--approve`, `--create-pull-request` / `--pr`, `--pr-message` (see [pull request descriptions](#pull-request-descriptions)), `--auto-merge` (requires PR creation; see [auto-merge requirements](#pull-request-auto-merge)), `--create-issue`, `--org`, `--enterprise`, `--repos`, `--interactive`, `--dry-run`, `--concurrency`, `--replace-existing`, `--yes/-y`, `--no-compile`, `--no-redirect`, `--cool-down`, `--repo/-r`
+**Options:** `--dir/-d`, `--no-merge`, `--major`, `--force/-f`, `--engine/-e`, `--no-stop-after`, `--stop-after`, `--no-release-bump`, `--no-security-scanner`, `--approve`, `--create-pull-request` / `--pr`, `--pr-message` (see [pull request descriptions](#pull-request-descriptions)), `--auto-merge` (requires PR creation; see [auto-merge requirements](#pull-request-auto-merge)), `--create-issue`, `--org`, `--enterprise`, `--repos`, `--interactive/-i`, `--dry-run`, `--concurrency`, `--replace-existing`, `--yes/-y`, `--no-compile`, `--no-redirect`, `--cool-down`, `--repo/-r`
 
 Org mode (`--org`) previews or creates workflow update pull requests across every repository in an organization. Use `--repos` to limit matches, `--create-issue` to open an issue in each repository with pending updates, and `--yes/-y` to auto-accept per-repository confirmations in CI.
 
@@ -1312,7 +1322,7 @@ gh aw upgrade --audit --json               # Dependency audit in JSON format
 gh aw upgrade --org my-org --create-issue --yes  # Auto-accept per-repo confirmations (required in CI)
 ```
 
-**Options:** `--dir/-d`, `--engine/-e`, `--repo/-r`, `--no-fix`, `--no-actions`, `--no-compile`, `--no-agent`, `--no-mcp`, `--no-skill`, `--disable-codemod`, `--create-pull-request` / `--pr`, `--pr-message` (see [pull request descriptions](#pull-request-descriptions)), `--auto-merge` (requires PR creation; see [auto-merge requirements](#pull-request-auto-merge)), `--create-issue`, `--org`, `--enterprise`, `--repos`, `--interactive`, `--dry-run`, `--concurrency`, `--replace-existing`, `--yes/-y`, `--audit`, `--json/-j`, `--approve`, `--pre-releases`
+**Options:** `--dir/-d`, `--engine/-e`, `--repo/-r`, `--no-fix`, `--no-actions`, `--no-compile`, `--no-agent`, `--no-mcp`, `--no-skill`, `--disable-codemod`, `--create-pull-request` / `--pr`, `--pr-message` (see [pull request descriptions](#pull-request-descriptions)), `--auto-merge` (requires PR creation; see [auto-merge requirements](#pull-request-auto-merge)), `--create-issue`, `--org`, `--enterprise`, `--repos`, `--interactive/-i`, `--dry-run`, `--concurrency`, `--replace-existing`, `--yes/-y`, `--audit`, `--json/-j`, `--approve`, `--pre-releases`
 
 The dispatcher skill is updated by default. The Copilot custom agent and setup-steps workflow are created only when a workflow uses Copilot (including when the engine is omitted), or updated if the respective file already exists. An explicit `--engine` overrides workflow engine detection. Use `--no-agent`, `--no-mcp`, or `--no-skill` to skip the corresponding files, even when they already exist.
 

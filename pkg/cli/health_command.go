@@ -131,7 +131,7 @@ func NewHealthCommand() *cobra.Command {
 }
 
 func addHealthFlags(cmd *cobra.Command) {
-	cmd.Flags().Int("days", 7, "Maximum evidence horizon in days (7, 30, or 90)")
+	cmd.Flags().Int("days", 7, "Maximum evidence horizon in days (allowed values: 7, 30, or 90)")
 	cmd.Flags().String("start-date", "", "Include runs created at or after this UTC date, RFC3339 timestamp, or relative time (e.g. -24h)")
 	cmd.Flags().String("end-date", "", "Include runs created at or before this UTC date, RFC3339 timestamp, or relative time (default: now)")
 	cmd.MarkFlagsMutuallyExclusive("days", "start-date")

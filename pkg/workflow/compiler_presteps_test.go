@@ -370,6 +370,56 @@ This workflow tests that comment-memory files are prepared before custom steps r
 		downloadIdx, configIdx, prepareIdx, customIdx)
 }
 
+func TestCommentMemoryTemplatableMaxCompiles(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "comment-memory-input-test")
+	testContent := `---
+on:
+  workflow_dispatch:
+    inputs:
+      max:
+        description: Maximum comment-memory entries
+        required: false
+        type: number
+permissions:
+  contents: read
+  issues: read
+tools:
+  comment-memory:
+    max: ${{ inputs.max }}
+engine: claude
+strict: false
+---
+
+# Test Comment Memory Input
+`
+	testFile := filepath.Join(tmpDir, "test-comment-memory-input.md")
+	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := NewCompiler().CompileWorkflow(testFile); err != nil {
+		t.Fatalf("Unexpected error compiling workflow with templatable comment-memory max: %v", err)
+	}
+	lockFile := filepath.Join(tmpDir, "test-comment-memory-input.lock.yml")
+	content, err := os.ReadFile(lockFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lockContent := string(content)
+	if !strings.Contains(lockContent, "GH_AW_EARLY_COMMENT_MEMORY_CONFIG:") {
+		t.Fatal("Expected early comment-memory config to be passed through an environment variable")
+	}
+	if !strings.Contains(lockContent, "${{ inputs.max }}") {
+		t.Fatal("Expected the comment-memory max input expression to be preserved")
+	}
+	if !strings.Contains(lockContent, `printf '%s\n' "$GH_AW_EARLY_COMMENT_MEMORY_CONFIG"`) {
+		t.Fatal("Expected the early config to be written with printf")
+	}
+	if strings.Contains(lockContent, "<< 'COMMENT_MEMORY_CONFIG") {
+		t.Fatal("Expected the early config to avoid a quoted heredoc")
+	}
+}
+
 // TestActivationArtifactWithoutCommentMemory verifies that the activation artifact download
 // step is always emitted even when comment-memory is not configured, and that the
 // comment-memory config/prepare steps are not emitted in that case.

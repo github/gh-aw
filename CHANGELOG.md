@@ -17,12 +17,13 @@ and mixed edits continue to require write-or-higher repository permission.
 strict and non-strict mode. Omitting `forks` is equivalent to `forks: []`; no
 explicit empty list is required. To admit forks, configure exact `owner/repo`
 entries or deliberately trusted `owner/*` patterns, then recompile. Explicit
-`"*"` permits unrestricted admission in both modes; strict mode warns and
-recommends restricting forks instead of rejecting compilation. Strict mode still
-rejects expressions and unsupported pattern forms. Actor
-authorization and trusted-checkout restrictions remain mandatory in strict mode;
-`acknowledge-risk`, disabled checkout, and trusted checkout policies do not bypass
-fork-pattern validation or suppress the unrestricted-forks warning.
+`"*"` permits unrestricted admission in both modes, but strict mode rejects it
+unless the main workflow's top-level `features.dangerously-allow-pull-request-target-forks-all: true`
+is set; imported features do not enable this opt-in. Strict mode still rejects
+expressions and unsupported pattern forms. The compiler warns whenever unrestricted
+admission is allowed. Actor authorization and trusted-checkout restrictions remain
+mandatory in strict mode; `acknowledge-risk`, disabled checkout, and trusted checkout
+policies do not bypass fork-pattern validation or suppress the unrestricted-forks warning.
 
 The `gh aw outcomes` command has been removed. Use `gh aw logs --outcomes`
 to evaluate selected runs, or pipe a run ID to
