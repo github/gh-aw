@@ -224,6 +224,15 @@ Inline skills are secondary skill definitions embedded in the same markdown file
 | `EnsureToolsSection` | `func(frontmatter map[string]any) map[string]any` | Ensures `tools` exists and is a map in frontmatter |
 | `QuoteCronExpressions` | `func(yamlContent string) string` | Ensures schedule cron values in YAML are quoted |
 
+#### Additional Exported Functions
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `ActionPinSourceVersions` | `func(content []byte) map[string]string` | Collects inline version labels for SHA-pinned action references in YAML. |
+| `ExtractSubAgentModels` | `func(body string) []SubAgentModel` | Reads model declarations from inline sub-agent frontmatter; malformed frontmatter is handled as an advisory. |
+| `ParseMCPCACertFile` | `func(config map[string]any, serverType, name string) (string, error)` | Validates and returns an optional per-server CA certificate path from MCP configuration. |
+| `ValidateMCPCACertFile` | `func(value string) error` | Validates an author-controlled CA certificate path before it is used by generated shell content. |
+
 ### Constants / Variables
 
 | Name | Type | Description |

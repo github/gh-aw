@@ -5,6 +5,7 @@ type workflowWithSource struct {
 	Name       string
 	Path       string
 	SourceSpec string // e.g., "owner/repo/path@ref"
+	SourceSHA  string // installed commit used as the three-way merge base
 }
 
 // updateFailure represents a failed workflow update

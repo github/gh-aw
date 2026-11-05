@@ -527,7 +527,7 @@ node .github/scripts/work-queue-stress.cjs --mode saturation --items 100000 --wo
 node .github/scripts/work-queue-stress.cjs --mode retained --items 100000 --history-queue-items 10000 --workers 4 --timeout-seconds 600
 node .github/scripts/work-queue-stress.cjs --mode retained --items 100000 --history-queue-items 100000 --workers 4 --timeout-seconds 600
 node .github/scripts/work-queue-stress.cjs --history-items 100000 --workers 4 --timeout-seconds 600
-node .github/scripts/work-queue-stress.cjs --mode history --items 100000 --workers 2 --seed 7 --timeout-seconds 300
+node .github/scripts/work-queue-stress.cjs --mode history --items 100000 --workers 2 --seed 7 --timeout-seconds 600
 
 Lifecycle: independent rotating bounded branches (default 32 Work/branch, configurable
 2..256). Total 100000 is NOT support for 100000 Work on one branch. Branches run

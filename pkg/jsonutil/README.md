@@ -39,6 +39,7 @@ if err != nil {
 ## Design Notes
 
 - Uses `json.Encoder` with `SetEscapeHTML(false)` rather than `json.Marshal` to suppress HTML escaping.
+- `SetEscapeHTML` is a method on the standard-library `json.Encoder`, not an exported function in `jsonutil`.
 - The trailing newline that `json.Encoder.Encode` appends is trimmed with `strings.TrimSuffix` so the result is consistent with `json.Marshal` output.
 - The package has no external dependencies beyond the Go standard library.
 

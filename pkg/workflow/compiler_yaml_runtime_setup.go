@@ -379,21 +379,13 @@ func (c *Compiler) generateCommentMemoryEarlyConfigLines(data *WorkflowData) ([]
 		return nil, false
 	}
 	configJSON := string(jsonBytes)
-	delimiter := GenerateHeredocDelimiterFromContent("COMMENT_MEMORY_CONFIG", configJSON)
-	if err := ValidateHeredocContent(configJSON, delimiter); err != nil {
-		compilerYamlLog.Printf("Warning: comment-memory config contains heredoc delimiter; skipping early config write: %v", err)
-		return nil, false
-	}
 	var lines []string
 	lines = append(lines, "      - name: Write comment-memory configuration\n")
+	lines = append(lines, "        env:\n")
+	lines = append(lines, fmt.Sprintf("          GH_AW_EARLY_COMMENT_MEMORY_CONFIG: %q\n", configJSON))
 	lines = append(lines, "        run: |\n")
 	lines = append(lines, "          mkdir -p \"${RUNNER_TEMP}/gh-aw/safeoutputs\"\n")
-	lines = append(lines, fmt.Sprintf("          cat > \"${RUNNER_TEMP}/gh-aw/safeoutputs/config.json\" << '%s'\n", delimiter)) //nolint:generatedyamlheredoc // Early config rendering runs before the reusable JavaScript step is available.
-	// The 10-space YAML block-scalar indentation is stripped by the YAML parser before the
-	// shell script is executed, so the JSON content lands at column 0 inside the heredoc.
-	// This matches the pattern used by mcp_setup_generator.go for the full config write.
-	lines = append(lines, fmt.Sprintf("          %s\n", configJSON))
-	lines = append(lines, fmt.Sprintf("          %s\n", delimiter))
+	lines = append(lines, "          printf '%s\\n' \"$GH_AW_EARLY_COMMENT_MEMORY_CONFIG\" > \"${RUNNER_TEMP}/gh-aw/safeoutputs/config.json\"\n")
 	return lines, true
 }
 

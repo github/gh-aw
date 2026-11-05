@@ -53,6 +53,35 @@ Other exported types represent typed operation parameters, dependencies and exte
 | `ParseRepositorySettings` | `func ParseRepositorySettings(data []byte) (Settings, error)` | Extracts and parses `work_queue` from repository configuration JSON. |
 | `Canonical` | `func Canonical(data []byte) ([]byte, error)` | Encodes JSON using the queue's integer-only canonical profile. |
 | `NewRequest` | `func NewRequest(id, kind string, actor Actor, parameters any) (Request, error)` | Constructs a request with its canonical fingerprint. |
+| `AuthorizeEffect` | `func AuthorizeEffect(state Projection, actor Actor, target EffectResource) error` | Checks whether a completed worker Claim authorizes the requested effect. |
+| `CanonicalValue` | `func CanonicalValue(value any) ([]byte, error)` | Encodes typed JSON without repairing strings or losing numeric values. |
+| `Compact` | `func Compact(commits []QueueCommit) ([]QueueCommit, error)` | Validates and returns commits in causal order. |
+| `CompactCheckpoint` | `func CompactCheckpoint(commits []QueueCommit, priorGitSHA string, actor Actor, at int64) ([]QueueCommit, error)` | Builds a minimal state checkpoint from validated history, bound to the Git commit containing the prior ledger. |
+| `DefaultPolicy` | `func DefaultPolicy(principal, repository string) Policy` | Creates the default weighted-priority policy for a principal and repository. |
+| `DispatchPrincipal` | `func DispatchPrincipal(dispatch *DispatchState) string` | Returns the principal frozen at dispatch launch from the selected AW credential. |
+| `ExplainBeforeClaim` | `func ExplainBeforeClaim(commits []QueueCommit, claimID string) (ClaimExplanation, error)` | Validates ledger authority and explains the observations and Claims preceding a Claim. |
+| `ExplainRequest` | `func ExplainRequest(commits []QueueCommit, requestID string) (RequestExplanation, error)` | Replays the ledger and explains the commit associated with a request ID. |
+| `ExplainWork` | `func ExplainWork(state Projection, id string, at int64) (WorkExplanation, error)` | Explains a Work item's readiness and current state at the supplied time. |
+| `Fingerprint` | `func Fingerprint(actor Actor, kind string, parameters json.RawMessage) (string, error)` | Computes the canonical fingerprint for a request. |
+| `FuturePolicy` | `func FuturePolicy(state Projection) Policy` | Exposes current routes to trusted admission builders; it does not replace installed policy or affect existing assignments. |
+| `Genesis` | `func Genesis(actor Actor, policy Policy, requestID, epoch string, at int64) (QueueCommit, error)` | Creates the initial policy commit for a ledger. |
+| `IndependentGraphID` | `func IndependentGraphID(payload []byte) (string, error)` | Computes a graph ID from the canonical payload. |
+| `NewChildWork` | `func NewChildWork(state Projection, actor Actor, payload []byte, nodeKey string, at int64) (WorkDefinition, error)` | Constructs child Work after validating actor authority and the parent projection. |
+| `NewNativeDeliveryHost` | `func NewNativeDeliveryHost(options NativeDeliveryHostOptions) *NativeDeliveryHost` | Creates a native delivery host from the supplied options. |
+| `NewWork` | `func NewWork(payload []byte, graphID, nodeKey, pool string, policy Policy, at int64) (WorkDefinition, error)` | Constructs a Work definition from its payload, graph, node, pool, and policy. |
+| `NodeID` | `func NodeID(graphID, nodeKey string) string` | Derives a stable node ID from a graph ID and node key. |
+| `NormalizeClaimHandle` | `func NormalizeClaimHandle(assignment Assignment, selector *string) (string, error)` | Resolves an optional Claim selector to the canonical Claim handle in an assignment. |
+| `NormalizeFinishIntent` | `func NormalizeFinishIntent(assignment Assignment, data []byte) (FinishParameters, error)` | Validates finish-intent JSON while preserving the distinction between absent and null fields. |
+| `ObservationRefreshBudget` | `func ObservationRefreshBudget(state Projection, requested int) (int, error)` | Bounds an observation refresh while reserving a Claim slot and excluding optional recovery reads. |
+| `Op` | `func Op(value any) (Operation, error)` | Encodes a typed operation using the queue's canonical JSON representation. |
+| `ParseAssignment` | `func ParseAssignment(data []byte) (Assignment, error)` | Validates and decodes a worker assignment. |
+| `ProposedCommitID` | `func ProposedCommitID(state Projection, request Request) string` | Derives the proposed commit ID from the current tip and request ID. |
+| `RecoveryHeadroom` | `func RecoveryHeadroom(state Projection) int64` | Reports the outstanding closure reservation in a replayed projection. |
+| `ReplayAt` | `func ReplayAt(commits []QueueCommit, at int64) (Projection, error)` | Replays historical decisions at committed time and adds a disposable current-time view. |
+| `ReplayAtForHost` | `func ReplayAtForHost(commits []QueueCommit, at int64, host string) (Projection, error)` | Adds a disposable current-time view using the selected resource host. |
+| `TraceQueue` | `func TraceQueue(commits []QueueCommit, options TraceOptions, at int64) (TracePage, error)` | Returns bounded ledger provenance without payloads, descriptors, receipts, or request parameters. |
+| `ValidReason` | `func ValidReason(reason string) bool` | Reports whether a reason is a bounded, sanitized queue reason code. |
+| `ValidateAssignment` | `func ValidateAssignment(state Projection, assignment Assignment) error` | Verifies that an assignment matches the dispatch recorded in the projection. |
 
 ### Constants
 

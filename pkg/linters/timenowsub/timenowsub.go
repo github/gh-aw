@@ -39,7 +39,7 @@ func analyzeTimeNowSub(pass *analysis.Pass, n ast.Node, generatedFiles filecheck
 	}
 
 	// Match <expr>.Sub(<arg>) where <expr> is time.Now().
-	sel, ok := outer.Fun.(*ast.SelectorExpr)
+	sel, ok := astutil.UnwrapParenExpr(outer.Fun).(*ast.SelectorExpr)
 	if !ok || sel.Sel.Name != "Sub" {
 		return
 	}
@@ -96,7 +96,7 @@ func timeNowQualifier(pass *analysis.Pass, call *ast.CallExpr) (string, bool) {
 	if len(call.Args) != 0 {
 		return "", false
 	}
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok || sel.Sel.Name != "Now" {
 		return "", false
 	}
