@@ -8,7 +8,8 @@ description: Agentic workflow specific frontmatter fields for GitHub Agentic Wor
 
 - **`description:`** - Human-readable workflow description (string)
 - **`emoji:`** - Optional single emoji used to represent the workflow visually; recommended for quicker recognition in workflow lists and status output (string)
-- **`source:`** - Workflow origin tracking in format `owner/repo/path@ref` (string)
+- **`source:`** - Workflow origin tracking in format `owner/repo/path@ref` (string). Explicit refs are preserved, so updates follow the requested branch or compatible releases.
+- **`source-sha:`** - Installed 40-character source commit SHA, managed by `gh aw add`/`gh aw update` as the three-way merge base; it does not change the tracking ref. Do not hand-edit (string)
 - **`labels:`** - Array of labels to categorize and organize workflows (array)
   - Labels filter workflows in status/list commands
   - Example: `labels: [automation, security, daily]`
@@ -54,7 +55,6 @@ description: Agentic workflow specific frontmatter fields for GitHub Agentic Wor
 - **`features:`** - Feature flags for experimental or optional features (object)
   - Each flag is a key-value pair; boolean flags (`true`/`false`) or string values are accepted
   - Known feature flags:
-    - `copilot-requests: true` - **Deprecated**; use `permissions: { copilot-requests: write }`. `gh aw fix` migrates it.
     - `disable-xpia-prompt: true` - Disable the built-in cross-prompt injection attack (XPIA) system prompt
     - `action-tag: "v0"` - Pin compiled action references to a specific version of the `gh-aw-actions` repository. Accepts version tags (e.g., `"v0"`, `"v1"`, `"v1.0.0"`) or a full 40-character commit SHA. When set, overrides the compiler's default action mode and resolves all action references from the external `github/gh-aw-actions` repository at the specified tag.
     - `action-mode: "script"` - Control how the compiler generates action references: `"dev"` (local paths, default), `"release"` (SHA-pinned remote), `"action"` (gh-aw-actions repo), `"script"` (direct shell calls). Can also be overridden via `--action-mode` CLI flag.
@@ -62,6 +62,7 @@ description: Agentic workflow specific frontmatter fields for GitHub Agentic Wor
     - `cli-proxy: true` - Enable AWF CLI proxy sidecar for secure read-only `gh` CLI access without exposing `GITHUB_TOKEN` (requires AWF v0.26.0+). Prerequisite for `integrity-reactions`; the compiler enables it automatically when `integrity-reactions: true` is set.
     - `integrity-reactions: true` - Enable reaction-based integrity promotion/demotion. Maintainers can use 👍/❤️ reactions to promote content to `approved` and 👎/😕 to demote it to `none`. Compiler automatically enables `cli-proxy`. Requires `tools.github.min-integrity` to be set and MCPG >= v0.2.18. Defaults: endorsement reactions THUMBS_UP/HEART, disapproval reactions THUMBS_DOWN/CONFUSED, endorser-min-integrity: approved, disapproval-integrity: none.
     - `dangerously-disable-sandbox-agent: true` - Required when `sandbox.agent: false` is set. This opt-out is rejected in strict mode.
+    - `dangerously-allow-pull-request-target-forks-all: true` - Lets strict mode accept `on.pull_request_target.forks: ["*"]`; the warning remains. Must be in the main workflow's top-level `features:` (imported features do not count). See [triggers.md](triggers.md).
 
 - **`experiments:`** - A/B testing experiments for balanced variant selection (object)
   - Maps experiment names to variant lists (bare array) or full config objects

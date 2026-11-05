@@ -76,6 +76,8 @@ steps:
 
 Use custom steps to precompute data, filter triggers, or prepare context for AI agents. Steps can also short-circuit the agent by writing a `noop` entry to `$GH_AW_SAFE_OUTPUTS` — the harness detects this at startup and exits cleanly without incurring any AI inference cost. See [Skip the Agent When It Is Not Needed](/gh-aw/reference/cost-management/#skip-the-agent-when-it-is-not-needed) for details.
 
+See [Checkout and Host Step Order](/gh-aw/reference/checkout/#checkout-and-host-step-order) for checkout ordering, untrusted-ref warnings, and safe handling of fetched refs.
+
 ## Custom Pre-Agent Steps (`pre-agent-steps:`)
 
 Add custom steps before MCP gateway startup in the agent job so prerequisite MCP installation/configuration can happen first.
