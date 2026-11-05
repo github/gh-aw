@@ -94,7 +94,7 @@ func TestDurableArtifactEnvironment(t *testing.T) {
 func TestCompileDurableRejectsUnsupportedEngineOrDriver(t *testing.T) {
 	for _, test := range []struct{ engine, tools, want string }{
 		{"  pi:\n    durable: {}\n    driver: custom.cjs", "", "pi durable does not support custom"},
-		{"  id: copilot\n  durable: {}", "", "does not support durable execution"},
+		{"  id: copilot\n  durable: {}\n  driver: custom.cjs", "", "does not support custom"},
 	} {
 		t.Run(test.want+test.engine, func(t *testing.T) {
 			dir := t.TempDir()

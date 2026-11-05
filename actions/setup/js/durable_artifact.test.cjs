@@ -36,6 +36,15 @@ function fixture() {
 }
 
 describe("durable artifact lineage", () => {
+  it("starts the first run fresh without attempting to download nonexistent history", async () => {
+    const options = fixture();
+    options.github.rest.actions.listWorkflowRuns.mockResolvedValue({ data: { workflow_runs: [] } });
+    await selectCheckpoint(options);
+    expect(options.github.paginate).not.toHaveBeenCalled();
+    expect(options.github.rest.actions.listWorkflowRunArtifacts).not.toHaveBeenCalled();
+    expect(options.core.setOutput.mock.calls.some(([key]) => key === "artifact-id")).toBe(false);
+  });
+
   it("uses the last successful run of the same workflow and branch, without event filtering", async () => {
     const options = fixture();
     options.parent.event = "schedule";

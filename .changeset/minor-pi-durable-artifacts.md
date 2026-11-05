@@ -9,3 +9,8 @@ and unified agentic session events. Extend the engine interface and declarative
 engine behaviors with engine-declared persisted files, optional pinned runtime
 dependencies, and continuation execution plans. Engines without a native durable
 library can restore their session folders and resume through their own harness.
+Enable session-file continuation for Copilot CLI and SDK, Claude, Codex, Gemini,
+and Agy. Resume exact native sessions for Copilot, Claude, and Codex; provide a
+restored-file continuation prompt for Gemini and Agy. Start fresh when no history
+exists, and keep historical Copilot activity out of current-run session metrics.
+Retain Pi's specialized durable task runtime.

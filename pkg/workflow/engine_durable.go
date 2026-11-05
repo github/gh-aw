@@ -147,6 +147,7 @@ func applyDurableExecutionEnv(env map[string]string, data *WorkflowData) {
 		panic(fmt.Sprintf("BUG: unvalidated durable configuration: %v", err))
 	}
 	maps.Copy(env, durableEnv)
+	applyDurableSessionEnv(env, data)
 	if data.EngineConfig.ID == string(constants.PiEngine) {
 		env["GH_AW_PI_DURABLE_STORAGE"] = durableEnv["GH_AW_DURABLE_STORAGE"]
 		env["GH_AW_PI_DURABLE_DIR"] = durableEnv["GH_AW_DURABLE_DIR"]

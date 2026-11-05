@@ -15649,7 +15649,7 @@
     },
     "durable_config": {
       "type": "object",
-      "description": "Persist a supported engine's durable task state in GitHub Actions artifacts. No memory tool is required.",
+      "description": "Persist engine-declared session files in GitHub Actions artifacts. Copilot, Claude, and Codex resume the exact native session; other session-based engines receive a continuation prompt. Pi uses its native durable task runtime. Starts fresh when no prior history exists. No memory tool is required.",
       "properties": {
         "retention-days": {
           "type": "integer",

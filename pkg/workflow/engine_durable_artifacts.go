@@ -54,7 +54,7 @@ func (c *Compiler) generateDurableFileStep(yaml *strings.Builder, data *Workflow
 
 func (c *Compiler) generateDurableFileStage(yaml *strings.Builder, data *WorkflowData) {
 	c.generateDurableFileStep(yaml, data, "Stage durable session files", "stage_durable_files",
-		"always() && steps.durable_checkpoint.outcome == 'success' && steps.agentic_execution.outcome != 'skipped'", "stageFiles")
+		"always() && steps.durable_checkpoint.outcome == 'success' && steps.agentic_execution.outcome != 'skipped' && (steps.capture_durable_sessions.outcome == '' || steps.capture_durable_sessions.outcome == 'success')", "stageFiles")
 }
 
 func (c *Compiler) generateDurableArtifactUpload(yaml *strings.Builder, data *WorkflowData) {
