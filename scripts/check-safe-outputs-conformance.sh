@@ -260,7 +260,12 @@ check_staged_mode() {
         # Skip test files and non-safe-output modules
         [[ "$handler" =~ test|_checks\.cjs$ ]] && continue
         [[ "$handler" =~ (apm_unpack|run_apm_unpack|observability|generate_observability) ]] && continue
-        
+
+        # Skip files with a documented USE-003 exemption annotation
+        if grep -q "@safe-outputs-exempt[[:space:]]\\+USE-003" "$handler"; then
+            continue
+        fi
+
         # Only check handlers that explicitly reference the safe outputs staged mode env var
         if grep -q "GH_AW_SAFE_OUTPUTS_STAGED\|logStagedPreviewInfo\|generateStagedPreview" "$handler"; then
             # Check for emoji in preview
