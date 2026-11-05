@@ -39,7 +39,7 @@ The honest reading: on days with nothing worth simplifying, the right outcome is
 
 - Nightly, scoped review keeps cleanup work out of the daily review queue.
 - Splitting a task into a gate, a scout, and language standards keeps each prompt small.
-- Quiet success is still success; check `safe_items` before assuming a run did nothing wrong.
+- Quiet success is still success; check `run.safe_items_count` before assuming a run did nothing wrong.
 
 ## Try it
 
