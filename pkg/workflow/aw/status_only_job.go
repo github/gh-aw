@@ -18,10 +18,12 @@ type StatusOnlyViolation struct {
 }
 
 type statusOnlyJobValidator struct {
-	jobID            string
-	allowedOutputJob map[string]struct{}
-	violations       []StatusOnlyViolation
-	seen             map[string]struct{}
+	jobID             string
+	allowedOutputJob  map[string]struct{}
+	preAgentOutputJob map[string]struct{}
+	directNeeds       map[string]struct{}
+	violations        []StatusOnlyViolation
+	seen              map[string]struct{}
 }
 
 // IsStatusOnlyJob reports whether an authored custom job opted to continue after detection errors.
@@ -41,16 +43,26 @@ func HasSuccessfulDetectionCondition(condition string) bool {
 }
 
 // ValidateStatusOnlyJob checks that a status-only job cannot access agent data.
-func ValidateStatusOnlyJob(jobID string, config map[string]any, allowedOutputJobs map[string]struct{}) []StatusOnlyViolation {
+func ValidateStatusOnlyJob(jobID string, config map[string]any, allowedOutputJobs, preAgentOutputJobs map[string]struct{}, directNeeds []string) []StatusOnlyViolation {
 	allowed := make(map[string]struct{}, len(allowedOutputJobs))
 	for id := range allowedOutputJobs {
 		allowed[strings.ToLower(id)] = struct{}{}
 	}
+	preAgent := make(map[string]struct{}, len(preAgentOutputJobs))
+	for id := range preAgentOutputJobs {
+		preAgent[strings.ToLower(id)] = struct{}{}
+	}
+	needs := make(map[string]struct{}, len(directNeeds))
+	for _, id := range directNeeds {
+		needs[strings.ToLower(id)] = struct{}{}
+	}
 
 	validator := statusOnlyJobValidator{
-		jobID:            jobID,
-		allowedOutputJob: allowed,
-		seen:             make(map[string]struct{}),
+		jobID:             jobID,
+		allowedOutputJob:  allowed,
+		preAgentOutputJob: preAgent,
+		directNeeds:       needs,
+		seen:              make(map[string]struct{}),
 	}
 	validator.inspect(config, "jobs."+jobID, false, false, false)
 	return validator.violations
@@ -127,21 +139,21 @@ func (validator *statusOnlyJobValidator) inspectString(value, path string, inEnv
 
 	matches := statusOnlyExpressionPattern.FindAllString(value, -1)
 	for _, match := range matches {
-		validator.inspectExpression(match, path)
+		validator.inspectExpression(match, path, inEnv)
 	}
 	if strings.Contains(value, "${{") && len(matches) == 0 {
 		validator.addViolation(path, "status-only job contains an expression that cannot be inspected safely")
 	}
 	if inIf && !strings.Contains(value, "${{") && strings.Contains(strings.ToLower(value), "needs") {
-		validator.inspectExpression(value, path)
+		validator.inspectExpression(value, path, inEnv)
 	}
 }
 
-func (validator *statusOnlyJobValidator) inspectExpression(expression, path string) {
-	inspectStatusOnlyExpression(expression, path, validator.allowedOutputJob, validator.addViolation)
+func (validator *statusOnlyJobValidator) inspectExpression(expression, path string, inEnv bool) {
+	inspectStatusOnlyExpression(expression, path, validator.allowedOutputJob, validator.preAgentOutputJob, validator.directNeeds, inEnv, validator.addViolation)
 }
 
-func inspectStatusOnlyExpression(expression, path string, allowed map[string]struct{}, addViolation func(string, string)) {
+func inspectStatusOnlyExpression(expression, path string, allowed, preAgent, directNeeds map[string]struct{}, inEnv bool, addViolation func(string, string)) {
 	_, node, err := ParseActionsExpression(expression)
 	if err != nil {
 		addViolation(path, "status-only job contains an expression that cannot be inspected safely")
@@ -158,6 +170,16 @@ func inspectStatusOnlyExpression(expression, path string, allowed map[string]str
 			return
 		}
 		jobID = strings.ToLower(jobID)
+		if _, isPreAgent := preAgent[jobID]; isPreAgent {
+			if _, isDirectDependency := directNeeds[jobID]; !isDirectDependency {
+				addViolation(path, fmt.Sprintf("status-only jobs can only read outputs from pre-agent custom jobs listed in needs; add %s to needs", jobID))
+				return
+			}
+			if !inEnv {
+				addViolation(path, "status-only jobs must pass pre-agent custom outputs through env instead of interpolating them into executable or other fields")
+				return
+			}
+		}
 		if _, ok := allowed[jobID]; ok {
 			return
 		}
@@ -172,7 +194,7 @@ func inspectStatusOnlyExpression(expression, path string, allowed map[string]str
 	}
 	slices.Sort(references)
 	for _, reference := range references {
-		addViolation(path, fmt.Sprintf("status-only jobs cannot read %s; only outputs of detection-gated compiler-owned jobs are permitted", reference))
+		addViolation(path, fmt.Sprintf("status-only jobs cannot read %s; only outputs of pre-agent custom jobs or detection-gated compiler-owned jobs are permitted", reference))
 	}
 }
 
