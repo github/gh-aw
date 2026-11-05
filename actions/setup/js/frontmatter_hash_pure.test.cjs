@@ -73,6 +73,11 @@ describe("frontmatter_hash_pure (text-based)", () => {
         const fileReader = async filePath => (filePath === workflowPath ? content : defaultFileReader(filePath));
         await expect(computeHash(workflowPath, { fileReader, readerMode: "github-api" })).resolves.toMatch(/^[a-f0-9]{64}$/);
       });
+
+      it("should propagate errors from malformed imported frontmatter", async () => {
+        const fileReader = async filePath => (filePath === workflowPath ? content : "---\nengine: copilot");
+        await expect(computeHash(workflowPath, { fileReader, readerMode: "github-api" })).rejects.toThrow("ERR_PARSE: Frontmatter not properly closed");
+      });
     });
   });
 
@@ -268,6 +273,24 @@ engine: copilot`;
       const relativeHash = await computeFrontmatterHash(".github/workflows/relative-workflow.md", { fileReader });
       const absoluteHash = await computeFrontmatterHash("/repo/.github/workflows/relative-workflow.md", { fileReader });
       expect(relativeHash).toBe(absoluteHash);
+    });
+
+    it("should try later runtime-import candidates after a read failure", async () => {
+      const workflowPath = ".github/workflows/test.md";
+      const firstCandidate = ".github/shared/test.md";
+      const secondCandidate = ".github/workflows/shared/test.md";
+      const reads = [];
+      const fileReader = async filePath => {
+        reads.push(filePath);
+        if (filePath === workflowPath) return "---\nengine: copilot\n---\n{{#runtime-import shared/test.md}}";
+        if (filePath === firstCandidate) throw Object.assign(new Error("Internal Server Error"), { status: 500 });
+        if (filePath === secondCandidate) return "Imported ${{ github.repository }}";
+        throw Object.assign(new Error("Not Found"), { status: 404 });
+      };
+
+      await expect(computeFrontmatterHash(workflowPath, { fileReader, readerMode: "github-api" })).resolves.toMatch(/^[a-f0-9]{64}$/);
+      expect(reads).toContain(firstCandidate);
+      expect(reads).toContain(secondCandidate);
     });
 
     it("should not use local symlink containment when hashing GitHub API content", async () => {

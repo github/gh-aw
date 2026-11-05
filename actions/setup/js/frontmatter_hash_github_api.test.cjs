@@ -61,6 +61,10 @@ describe("frontmatter_hash with GitHub API", () => {
               throw error;
             }
 
+            if (fs.statSync(fullPath).isDirectory()) {
+              return { data: [] };
+            }
+
             const content = fs.readFileSync(fullPath, "utf8");
             const base64Content = Buffer.from(content).toString("base64");
 
@@ -320,6 +324,10 @@ describe("frontmatter_hash with GitHub API", () => {
                 const error = new Error(`Not Found: ${filePath}`);
                 error.status = 404;
                 throw error;
+              }
+
+              if (fs.statSync(fullPath).isDirectory()) {
+                return { data: [] };
               }
 
               const content = fs.readFileSync(fullPath, "utf8");

@@ -211,6 +211,7 @@ async function main() {
   }
 
   let hashReadFailure = "";
+  let localFallbackMissingImport = "";
 
   async function compareFrontmatterHashesFromLocalFiles() {
     const workspace = process.env.GITHUB_WORKSPACE;
@@ -258,7 +259,17 @@ async function main() {
       }
 
       // computeFrontmatterHash uses the local filesystem reader by default
-      const recomputedHash = await computeFrontmatterHash(localMdFilePath);
+      const recomputedHash = await computeFrontmatterHash(localMdFilePath, {
+        onMissingImport: (importPath, error) => {
+          localFallbackMissingImport ||= `${importPath}: ${getErrorMessage(error)}`;
+        },
+      });
+
+      if (hashReadFailure && localFallbackMissingImport) {
+        hashReadFailure = `${hashReadFailure}; local fallback could not read import ${localFallbackMissingImport}`;
+        core.info(`Local filesystem fallback was incomplete: ${localFallbackMissingImport}`);
+        return null;
+      }
 
       const match = storedHash === recomputedHash;
 
@@ -275,8 +286,9 @@ async function main() {
 
       return { match, storedHash, recomputedHash, hashKind: "frontmatter" };
     } catch (error) {
-      hashReadFailure = getErrorMessage(error);
-      core.info(`Could not compute frontmatter hash from local files: ${hashReadFailure}`);
+      const localError = getErrorMessage(error);
+      hashReadFailure = hashReadFailure ? `${hashReadFailure}; local fallback: ${localError}` : localError;
+      core.info(`Could not compute frontmatter hash from local files: ${localError}`);
       return null;
     }
   }
