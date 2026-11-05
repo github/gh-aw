@@ -2,7 +2,6 @@ package workflow
 
 import (
 	"regexp"
-	"strings"
 
 	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 )
@@ -62,16 +61,4 @@ func (p conditionalPattern) FindAllStringIndex(source string, limit int) [][]int
 		matches = append(matches, indexes[:2])
 	}
 	return matches
-}
-
-func (p conditionalPattern) ReplaceAllStringFunc(source string, replace func(string) string) string {
-	var result strings.Builder
-	offset := 0
-	for _, indexes := range p.indexes(source, -1) {
-		result.WriteString(source[offset:indexes[0]])
-		result.WriteString(replace(source[indexes[0]:indexes[1]]))
-		offset = indexes[1]
-	}
-	result.WriteString(source[offset:])
-	return result.String()
 }
