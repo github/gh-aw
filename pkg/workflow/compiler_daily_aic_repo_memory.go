@@ -23,7 +23,7 @@ func (c *Compiler) generateDailyAICRepoMemoryLedgerSteps(data *WorkflowData, has
 	steps = append(steps, buildUsageArtifactInputDownloadSteps(prefix, hasEvals, "", c.getActionPin)...)
 	ledgerDir := dailyAICRepoMemoryDir(entry)
 	hydrationDir := dailyAICLedgerHydrationDir(entry)
-	if entry.GitHubApp != nil {
+	if entry.githubApp(PermissionRead) != nil {
 		steps = append(steps, c.buildRepoMemoryAppTokenMintStep(entry, PermissionRead, pushRepoMemoryJobName, "always()")...)
 	}
 	steps = append(steps, buildDailyAICRepoMemoryHydrationSteps(entry, ledgerDir, hydrationDir)...)
@@ -33,7 +33,7 @@ func (c *Compiler) generateDailyAICRepoMemoryLedgerSteps(data *WorkflowData, has
 
 func buildDailyAICRepoMemoryHydrationSteps(entry RepoMemoryEntry, ledgerDir, hydrationDir string) []string {
 	token := "${{ github.token }}"
-	if entry.GitHubApp != nil {
+	if entry.githubApp(PermissionRead) != nil {
 		token = repoMemoryAppToken(entry, PermissionRead)
 	}
 	condition := "always()"

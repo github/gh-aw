@@ -173,13 +173,15 @@ func TestRepoMemoryGitHubAppCompilation(t *testing.T) {
 
 func TestRepoMemoryGitHubAppTargetValidation(t *testing.T) {
 	for _, target := range []string{"repository", "/repository", "owner/", "owner/repo/extra", "owner/repo name"} {
-		t.Run(target, func(t *testing.T) {
-			_, err := parseRepoMemoryEntry(map[string]any{
-				"target-repo": target,
-				"github-app":  map[string]any{"client-id": "${{ vars.APP_ID }}", "private-key": "${{ secrets.APP_KEY }}"},
-			}, "test", "memory", false)
-			require.ErrorContains(t, err, "tools.repo-memory.target-repo must use owner/repo")
-		})
+		for _, field := range []string{"github-app", "github-app-read", "github-app-write"} {
+			t.Run(target+"/"+field, func(t *testing.T) {
+				_, err := parseRepoMemoryEntry(map[string]any{
+					"target-repo": target,
+					field:         map[string]any{"client-id": "${{ vars.APP_ID }}", "private-key": "${{ secrets.APP_KEY }}"},
+				}, "test", "memory", false)
+				require.ErrorContains(t, err, "tools.repo-memory.target-repo must use owner/repo")
+			})
+		}
 	}
 	for _, target := range []string{"", "owner/repo", "${{ vars.MEMORY_REPO }}", "${{ github.repository }}"} {
 		t.Run(target, func(t *testing.T) {
@@ -194,12 +196,30 @@ func TestRepoMemoryGitHubAppTargetValidation(t *testing.T) {
 
 func TestRepoMemoryGitHubAppDailyLedger(t *testing.T) {
 	for _, target := range []string{"", "other/private-memory", "${{ vars.MEMORY_REPO }}"} {
-		for _, fallback := range []bool{false, true} {
-			t.Run(target+map[bool]string{false: "/app-only", true: "/fallback"}[fallback], func(t *testing.T) {
+		for _, tc := range []struct {
+			name                                  string
+			separate, readFallback, writeFallback bool
+		}{
+			{name: "shared"},
+			{name: "shared fallback", readFallback: true, writeFallback: true},
+			{name: "separate", separate: true},
+			{name: "read fallback", separate: true, readFallback: true},
+			{name: "write fallback", separate: true, writeFallback: true},
+		} {
+			t.Run(target+"/"+tc.name, func(t *testing.T) {
 				memory := newDefaultRepoMemoryEntry("test", "memory")
 				memory.TargetRepo = target
 				memory.GitHubApp = &GitHubAppConfig{
-					AppID: "${{ vars.APP_ID }}", PrivateKey: "${{ secrets.APP_KEY }}", IgnoreIfMissing: fallback,
+					AppID: "${{ vars.APP_ID }}", PrivateKey: "${{ secrets.APP_KEY }}", IgnoreIfMissing: tc.writeFallback,
+				}
+				if tc.separate {
+					memory.GitHubApp = nil
+					memory.GitHubAppRead = &GitHubAppConfig{
+						AppID: "${{ vars.READ_APP_ID }}", PrivateKey: "${{ secrets.READ_APP_KEY }}", IgnoreIfMissing: tc.readFallback,
+					}
+					memory.GitHubAppWrite = &GitHubAppConfig{
+						AppID: "${{ vars.WRITE_APP_ID }}", PrivateKey: "${{ secrets.WRITE_APP_KEY }}", IgnoreIfMissing: tc.writeFallback,
+					}
 				}
 				data := &WorkflowData{
 					RepoMemoryConfig:   &RepoMemoryConfig{Memories: []RepoMemoryEntry{memory}},
@@ -215,12 +235,19 @@ func TestRepoMemoryGitHubAppDailyLedger(t *testing.T) {
 				for _, steps := range []string{activation, push} {
 					assert.Contains(t, steps, "GH_TOKEN: "+repoMemoryAppToken(memory, PermissionRead))
 					assert.Contains(t, steps, "permission-contents: read")
+					if tc.separate {
+						assert.Contains(t, steps, "client-id: ${{ vars.READ_APP_ID }}")
+					}
+				}
+				if tc.separate {
+					assert.NotContains(t, activation, "WRITE_APP")
+					assert.Contains(t, push, "client-id: ${{ vars.WRITE_APP_ID }}")
 				}
 				assert.Less(t, strings.Index(activation, "id: "+readID), strings.Index(activation, "id: daily-aic-repo-memory-clone"))
 				assert.Less(t, strings.Index(push, "id: "+readID), strings.Index(push, "Clone daily AIC repo-memory ledger for hydration"))
 				assert.Less(t, strings.Index(push, "Clone daily AIC repo-memory ledger for hydration"), strings.Index(push, "id: "+writeID))
 				permission := "read"
-				if fallback {
+				if tc.writeFallback {
 					permission = "write"
 				}
 				assert.Contains(t, job.Permissions, "contents: "+permission)
@@ -262,16 +289,154 @@ func TestRepoMemoryGitHubAppParsing(t *testing.T) {
 		{"legacy", map[string]any{"app-id": "app", "private-key": "key"}, false},
 		{"extra-permissions", map[string]any{"client-id": "app", "private-key": "key", "permissions": map[string]any{"issues": "write"}}, true},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
-			entry, err := parseRepoMemoryEntry(map[string]any{"github-app": tc.app}, "test", "memory", false)
-			if tc.fail {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), "tools.repo-memory.github-app")
-			} else {
-				require.NoError(t, err)
-				require.NotNil(t, entry.GitHubApp)
+		for _, field := range []string{"github-app", "github-app-read", "github-app-write"} {
+			t.Run(tc.name+"/"+field, func(t *testing.T) {
+				entry, err := parseRepoMemoryEntry(map[string]any{field: tc.app}, "test", "memory", false)
+				if tc.fail {
+					require.Error(t, err)
+					assert.Contains(t, err.Error(), "tools.repo-memory."+field)
+				} else {
+					require.NoError(t, err)
+					assert.True(t, entry.githubApp(PermissionRead) != nil || entry.githubApp(PermissionWrite) != nil)
+				}
+			})
+		}
+	}
+}
+
+func TestRepoMemoryGitHubAppReadWriteCompilation(t *testing.T) {
+	for _, tc := range []struct {
+		name, shared, read, write   string
+		readFallback, writeFallback bool
+		emptyRead, emptyWrite       bool
+	}{
+		{name: "separate", read: "READ", write: "WRITE"},
+		{name: "read override", shared: "SHARED", read: "READ"},
+		{name: "write override", shared: "SHARED", write: "WRITE"},
+		{name: "read only", read: "READ"},
+		{name: "write only", write: "WRITE"},
+		{name: "read fallback overrides shared", shared: "SHARED", read: "READ", readFallback: true},
+		{name: "write fallback overrides shared", shared: "SHARED", write: "WRITE", writeFallback: true},
+		{name: "missing read credentials", shared: "SHARED", read: "READ", readFallback: true, emptyRead: true},
+		{name: "missing write credentials", shared: "SHARED", write: "WRITE", writeFallback: true, emptyWrite: true},
+	} {
+		for _, target := range []string{"", "other/memory", "${{ vars.MEMORY_REPO }}"} {
+			for _, array := range []bool{false, true} {
+				t.Run(tc.name+"/"+target+map[bool]string{false: "/object", true: "/array"}[array], func(t *testing.T) {
+					config := map[string]any{"target-repo": target}
+					for field, id := range map[string]string{"github-app": tc.shared, "github-app-read": tc.read, "github-app-write": tc.write} {
+						if id != "" {
+							config[field] = map[string]any{
+								"client-id": "${{ vars." + id + "_APP_ID }}", "private-key": "${{ secrets." + id + "_APP_KEY }}",
+								"owner": "other", "repositories": []string{"memory", strings.ToLower(id) + "-only"},
+								"ignore-if-missing": field == "github-app-read" && tc.readFallback || field == "github-app-write" && tc.writeFallback,
+							}
+							if field == "github-app-read" && tc.emptyRead || field == "github-app-write" && tc.emptyWrite {
+								config[field] = map[string]any{"ignore-if-missing": true}
+							}
+						}
+					}
+					var memory any = config
+					if array {
+						config["id"] = "default"
+						memory = []any{config}
+					}
+					source, err := yaml.Marshal(map[string]any{
+						"on": map[string]any{"workflow_dispatch": nil, "admission": true}, "engine": "copilot",
+						"environment": "memory", "permissions": map[string]any{"contents": "read"},
+						"tools": map[string]any{"github": false, "repo-memory": memory},
+					})
+					require.NoError(t, err)
+					dir := t.TempDir()
+					path := filepath.Join(dir, "memory-app.md")
+					require.NoError(t, os.WriteFile(path, []byte("---\n"+string(source)+"---\nMaintain memory.\n"), 0o600))
+					c := NewCompiler(WithLint(true))
+					c.gitRoot = dir
+					c.SetReadOnly(true)
+					require.NoError(t, c.CompileWorkflow(path))
+					content, err := os.ReadFile(filepath.Join(dir, "memory-app.lock.yml"))
+					require.NoError(t, err)
+					var compiled map[string]any
+					require.NoError(t, yaml.Unmarshal(content, &compiled))
+					jobs := compiled["jobs"].(map[string]any)
+					for _, level := range []PermissionLevel{PermissionRead, PermissionWrite} {
+						jobName, appID, fallback := "agent", tc.read, tc.readFallback
+						if level == PermissionWrite {
+							jobName, appID, fallback = "push_repo_memory", tc.write, tc.writeFallback
+						}
+						if appID == "" {
+							appID, fallback = tc.shared, false
+						}
+						job := jobs[jobName].(map[string]any)
+						byID := map[string]map[string]any{}
+						for _, raw := range job["steps"].([]any) {
+							step := raw.(map[string]any)
+							id, _ := step["id"].(string)
+							byID[id] = step
+						}
+						entry := RepoMemoryEntry{ID: "default"}
+						tokenID := repoMemoryAppTokenStepID(entry, level)
+						if appID == "" || level == PermissionRead && target == "" && tc.read == "" {
+							assert.NotContains(t, byID, tokenID)
+						} else {
+							mint := byID[tokenID]
+							require.NotNil(t, mint)
+							with := mint["with"].(map[string]any)
+							empty := level == PermissionRead && tc.emptyRead || level == PermissionWrite && tc.emptyWrite
+							if empty {
+								assert.Equal(t, "${{ '' }}", with["client-id"])
+								assert.Equal(t, "${{ '' }}", with["private-key"])
+							} else {
+								assert.Equal(t, "${{ vars."+appID+"_APP_ID }}", with["client-id"])
+								assert.Equal(t, "${{ secrets."+appID+"_APP_KEY }}", with["private-key"])
+							}
+							assert.Equal(t, string(level), with["permission-contents"])
+							if fallback {
+								assert.Contains(t, mint["if"], "!= ''")
+							}
+							if strings.Contains(target, "${{") {
+								resolver := byID[repoMemoryAppTargetStepID(entry, level)]
+								require.NotNil(t, resolver)
+								allowed := "${{ github.repository }} other/memory other/" + strings.ToLower(appID) + "-only"
+								if empty {
+									allowed = "${{ github.repository }}"
+								}
+								assert.Equal(t, allowed, resolver["env"].(map[string]any)["GH_AW_ALLOWED_REPOSITORIES"])
+							}
+						}
+						if level == PermissionWrite {
+							permission, token := "read", "${{ steps."+tokenID+".outputs.token }}"
+							if appID == "" {
+								permission, token = "write", "${{ github.token }}"
+							} else if fallback {
+								permission, token = "write", "${{ steps."+tokenID+".outputs.token || github.token }}"
+							}
+							assert.Equal(t, permission, job["permissions"].(map[string]any)["contents"])
+							push := byID["push_repo_memory_default"]
+							assert.Equal(t, token, push["env"].(map[string]any)["GH_TOKEN"])
+							if appID != "" {
+								assert.Equal(t, token, push["with"].(map[string]any)["github-token"])
+							}
+							assert.Equal(t, "memory", job["environment"])
+						} else {
+							for _, raw := range job["steps"].([]any) {
+								step := raw.(map[string]any)
+								if _, ok := step["run"].(string); ok && strings.Contains(step["run"].(string), "clone_repo_memory_branch.sh") {
+									token := "${{ github.token }}"
+									if appID != "" && (target != "" || tc.read != "") {
+										token = "${{ steps." + tokenID + ".outputs.token }}"
+										if fallback {
+											token = "${{ steps." + tokenID + ".outputs.token || github.token }}"
+										}
+									}
+									assert.Equal(t, token, step["env"].(map[string]any)["GH_TOKEN"])
+								}
+							}
+						}
+					}
+				})
 			}
-		})
+		}
 	}
 }
 
@@ -404,9 +569,11 @@ func TestRepoMemoryGitHubAppDynamicAllowlistValidation(t *testing.T) {
 	} {
 		app["client-id"] = "${{ vars.APP_ID }}"
 		app["private-key"] = "${{ secrets.APP_KEY }}"
-		_, err := parseRepoMemoryEntry(map[string]any{"target-repo": "${{ inputs.memory_repo }}", "github-app": app}, "test", "memory", false)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "expression target-repo authorization")
+		for _, field := range []string{"github-app", "github-app-read", "github-app-write"} {
+			_, err := parseRepoMemoryEntry(map[string]any{"target-repo": "${{ inputs.memory_repo }}", field: app}, "test", "memory", false)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "expression target-repo authorization")
+		}
 	}
 }
 

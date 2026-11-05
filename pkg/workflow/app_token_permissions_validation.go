@@ -13,18 +13,30 @@ type appTokenStepKey struct {
 	jobName, id, clientID, privateKey string
 }
 
-func validateRepoMemoryAppConfig(app *GitHubAppConfig) error {
-	if app != nil && !app.IgnoreIfMissing && !app.hasRequiredCredentials() {
-		return errors.New("tools.repo-memory.github-app requires client-id (or app-id) and private-key; configure both credentials or set ignore-if-missing: true")
-	}
-	if app != nil && len(app.Permissions) > 0 {
-		return errors.New("tools.repo-memory.github-app does not support permissions; repo-memory requests only contents permission")
+func validateRepoMemoryAppConfig(memory RepoMemoryEntry) error {
+	for _, config := range []struct {
+		field string
+		app   *GitHubAppConfig
+	}{
+		{"github-app", memory.GitHubApp},
+		{"github-app-read", memory.GitHubAppRead},
+		{"github-app-write", memory.GitHubAppWrite},
+	} {
+		if config.app == nil {
+			continue
+		}
+		if !config.app.IgnoreIfMissing && !config.app.hasRequiredCredentials() {
+			return fmt.Errorf("tools.repo-memory.%s requires client-id (or app-id) and private-key; configure both credentials or set ignore-if-missing: true", config.field)
+		}
+		if len(config.app.Permissions) > 0 {
+			return fmt.Errorf("tools.repo-memory.%s does not support permissions; repo-memory requests only contents permission", config.field)
+		}
 	}
 	return nil
 }
 
 func validateRepoMemoryAppTarget(memory RepoMemoryEntry) error {
-	if memory.GitHubApp == nil || memory.TargetRepo == "" {
+	if (memory.githubApp(PermissionRead) == nil && memory.githubApp(PermissionWrite) == nil) || memory.TargetRepo == "" {
 		return nil
 	}
 	if !strings.Contains(memory.TargetRepo, "${{") {
@@ -33,13 +45,17 @@ func validateRepoMemoryAppTarget(memory RepoMemoryEntry) error {
 		}
 		return nil
 	}
-	app := memory.GitHubApp
-	if app.Owner != "" && !repoMemoryTargetPartPattern.MatchString(app.Owner) {
-		return errors.New("tools.repo-memory.github-app.owner must be a literal owner for expression target-repo authorization")
-	}
-	for _, repository := range app.Repositories {
-		if !repoMemoryTargetPartPattern.MatchString(repository) {
-			return errors.New("tools.repo-memory.github-app.repositories must contain literal repository names for expression target-repo authorization")
+	for _, app := range []*GitHubAppConfig{memory.githubApp(PermissionRead), memory.githubApp(PermissionWrite)} {
+		if app == nil {
+			continue
+		}
+		if app.Owner != "" && !repoMemoryTargetPartPattern.MatchString(app.Owner) {
+			return errors.New("tools.repo-memory.github-app.owner must be a literal owner for expression target-repo authorization")
+		}
+		for _, repository := range app.Repositories {
+			if !repoMemoryTargetPartPattern.MatchString(repository) {
+				return errors.New("tools.repo-memory.github-app.repositories must contain literal repository names for expression target-repo authorization")
+			}
 		}
 	}
 	return nil

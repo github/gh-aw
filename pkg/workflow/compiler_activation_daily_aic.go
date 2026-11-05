@@ -241,12 +241,12 @@ func (c *Compiler) buildDailyAICRepoMemoryCloneStep(memory RepoMemoryEntry) []st
 	}
 	memoryDir := dailyAICRepoMemoryDir(memory)
 	token := "${{ github.token }}"
-	if memory.GitHubApp != nil {
+	if memory.githubApp(PermissionRead) != nil {
 		token = repoMemoryAppToken(memory, PermissionRead)
 	}
 	var steps []string
 	condition := admissionDailyAICFallbackIfExpr
-	if memory.GitHubApp != nil {
+	if memory.githubApp(PermissionRead) != nil {
 		steps = append(steps, c.buildRepoMemoryAppTokenMintStep(memory, PermissionRead, string(constants.ActivationJobName), condition)...)
 	}
 	if targetCondition := repoMemoryAppTargetCondition(memory, PermissionRead); targetCondition != "" {

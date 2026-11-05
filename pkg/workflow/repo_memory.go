@@ -54,6 +54,8 @@ type RepoMemoryEntry struct {
 	ID                string                  `yaml:"id"`                           // memory identifier (required for array notation)
 	TargetRepo        string                  `yaml:"target-repo,omitempty"`        // target repository (default: current repo)
 	GitHubApp         *GitHubAppConfig        `yaml:"github-app,omitempty"`         // optional app credentials for memory storage
+	GitHubAppRead     *GitHubAppConfig        `yaml:"github-app-read,omitempty"`    // optional app override for memory reads
+	GitHubAppWrite    *GitHubAppConfig        `yaml:"github-app-write,omitempty"`   // optional app override for memory writes
 	BranchName        string                  `yaml:"branch-name,omitempty"`        // branch name (default: memory/{memory-id})
 	FileGlob          []string                `yaml:"file-glob,omitempty"`          // file glob patterns for allowed files
 	MaxFileSize       int                     `yaml:"max-file-size,omitempty"`      // maximum size per file in bytes (default: 100KB)
@@ -232,7 +234,7 @@ func applyRepoMemoryBranchPrefix(configMap map[string]any, config *RepoMemoryCon
 func parseRepoMemoryEntry(memoryMap map[string]any, workflowID, branchPrefix string, requireID bool) (RepoMemoryEntry, error) {
 	entry := newDefaultRepoMemoryEntry(workflowID, branchPrefix)
 	explicitID, explicitBranchName := applyRepoMemoryIdentityFields(&entry, memoryMap)
-	if err := validateRepoMemoryAppConfig(entry.GitHubApp); err != nil {
+	if err := validateRepoMemoryAppConfig(entry); err != nil {
 		return entry, err
 	}
 	if err := validateRepoMemoryAppTarget(entry); err != nil {
@@ -297,6 +299,12 @@ func applyRepoMemoryIdentityFields(entry *RepoMemoryEntry, memoryMap map[string]
 	}
 	if app, ok := memoryMap["github-app"].(map[string]any); ok {
 		entry.GitHubApp = parseAppConfig(app)
+	}
+	if app, ok := memoryMap["github-app-read"].(map[string]any); ok {
+		entry.GitHubAppRead = parseAppConfig(app)
+	}
+	if app, ok := memoryMap["github-app-write"].(map[string]any); ok {
+		entry.GitHubAppWrite = parseAppConfig(app)
 	}
 	explicitBranchName := false
 	if branchName, ok := memoryMap["branch-name"].(string); ok {
@@ -633,7 +641,7 @@ func (c *Compiler) generateRepoMemorySteps(builder *strings.Builder, data *Workf
 		// Determine the memory directory
 		memoryDir := constants.TmpRepoMemoryDir + memory.ID
 		token := "${{ github.token }}"
-		if memory.GitHubApp != nil && memory.TargetRepo != "" {
+		if memory.githubApp(PermissionRead) != nil && (memory.TargetRepo != "" || memory.GitHubAppRead != nil) {
 			builder.WriteString(strings.Join(c.buildRepoMemoryAppTokenMintStep(memory, PermissionRead, jobName), ""))
 			token = repoMemoryAppToken(memory, PermissionRead)
 		}
@@ -704,18 +712,20 @@ func (c *Compiler) buildPushRepoMemoryJob(data *WorkflowData, threatDetectionEna
 	hasEvals := data.Evals != nil && data.Evals.HasEvals()
 	steps = append(steps, c.generateDailyAICRepoMemoryLedgerSteps(data, hasEvals)...)
 
-	useRequire := setupActionRef != ""
 	contentsPermission := "read"
 	environment := ""
 	for _, memory := range data.RepoMemoryConfig.Memories {
-		if memory.GitHubApp != nil {
+		if memory.githubApp(PermissionRead) != nil || memory.githubApp(PermissionWrite) != nil {
 			environment = c.indentYAMLLines(data.Environment, "    ")
+		}
+		app := memory.githubApp(PermissionWrite)
+		if app != nil {
 			steps = append(steps, c.buildRepoMemoryAppTokenMintStep(memory, PermissionWrite, pushRepoMemoryJobName)...)
 		}
-		if memory.GitHubApp == nil || memory.GitHubApp.IgnoreIfMissing {
+		if app == nil || app.IgnoreIfMissing {
 			contentsPermission = "write"
 		}
-		steps = append(steps, c.buildSinglePushRepoMemoryStep(data, memory, useRequire, hasConsolidatedSafeOutputsJob))
+		steps = append(steps, c.buildSinglePushRepoMemoryStep(data, memory, setupActionRef != "", hasConsolidatedSafeOutputsJob))
 	}
 	if c.actionMode.IsDev() {
 		steps = append(steps, c.generateRestoreActionsSetupStep())
@@ -728,7 +738,6 @@ func (c *Compiler) buildPushRepoMemoryJob(data *WorkflowData, threatDetectionEna
 	if hasEvals {
 		jobNeeds = append(jobNeeds, string(constants.EvalsJobName))
 	}
-	outputs := buildPushRepoMemoryOutputs(data.RepoMemoryConfig.Memories)
 
 	// No job-level concurrency group is set here on purpose. GitHub Actions keeps at
 	// most one running and one pending job per concurrency group: when more than two
@@ -748,8 +757,18 @@ func (c *Compiler) buildPushRepoMemoryJob(data *WorkflowData, threatDetectionEna
 		TimeoutMinutes: pushRepoMemoryTimeoutMinutes,
 		Needs:          jobNeeds,
 		Steps:          steps,
-		Outputs:        outputs,
+		Outputs:        buildPushRepoMemoryOutputs(data.RepoMemoryConfig.Memories),
 	}, nil
+}
+
+func (memory RepoMemoryEntry) githubApp(level PermissionLevel) *GitHubAppConfig {
+	if level == PermissionRead && memory.GitHubAppRead != nil {
+		return memory.GitHubAppRead
+	}
+	if level == PermissionWrite && memory.GitHubAppWrite != nil {
+		return memory.GitHubAppWrite
+	}
+	return memory.GitHubApp
 }
 
 func repoMemoryAppTokenStepID(memory RepoMemoryEntry, level PermissionLevel) string {
@@ -767,7 +786,7 @@ func repoMemoryAppTargetStepID(memory RepoMemoryEntry, level PermissionLevel) st
 }
 
 func repoMemoryAppTargetCondition(memory RepoMemoryEntry, level PermissionLevel) string {
-	if memory.GitHubApp == nil || !strings.Contains(memory.TargetRepo, "${{") {
+	if memory.githubApp(level) == nil || !strings.Contains(memory.TargetRepo, "${{") {
 		return ""
 	}
 	return fmt.Sprintf("steps.%s.outcome == 'success'", repoMemoryAppTargetStepID(memory, level))
@@ -789,14 +808,14 @@ func repoMemoryTargetRepo(memory RepoMemoryEntry, level PermissionLevel) string 
 }
 
 func repoMemoryAppToken(memory RepoMemoryEntry, level PermissionLevel) string {
-	if memory.GitHubApp.IgnoreIfMissing {
+	if memory.githubApp(level).IgnoreIfMissing {
 		return fmt.Sprintf("${{ steps.%s.outputs.token || github.token }}", repoMemoryAppTokenStepID(memory, level))
 	}
 	return fmt.Sprintf("${{ steps.%s.outputs.token }}", repoMemoryAppTokenStepID(memory, level))
 }
 
 func (c *Compiler) buildRepoMemoryAppTokenMintStep(memory RepoMemoryEntry, level PermissionLevel, jobName string, conditions ...string) []string {
-	app := *memory.GitHubApp
+	app := *memory.githubApp(level)
 	// Repo-memory never inherits additional app permissions.
 	app.Permissions = nil
 	if strings.TrimSpace(app.AppID) == "" {
@@ -829,11 +848,12 @@ func (c *Compiler) buildRepoMemoryAppTokenMintStep(memory RepoMemoryEntry, level
 
 func buildRepoMemoryAppTargetStep(memory RepoMemoryEntry, level PermissionLevel, conditions []string) []string {
 	allowedRepos := []string{"${{ github.repository }}"}
-	owner := memory.GitHubApp.Owner
+	app := memory.githubApp(level)
+	owner := app.Owner
 	if owner == "" {
 		owner = "${{ github.repository_owner }}"
 	}
-	for _, repo := range memory.GitHubApp.Repositories {
+	for _, repo := range app.Repositories {
 		allowedRepos = append(allowedRepos, fmt.Sprintf("%s/%s", owner, repo))
 	}
 	steps := []string{
@@ -940,7 +960,7 @@ func (c *Compiler) buildSinglePushRepoMemoryStep(data *WorkflowData, memory Repo
 	if ledgerMemory, ok := dailyAICRepoMemoryEntry(data); ok && ledgerMemory.ID == memory.ID {
 		step.WriteString("          GH_AW_DAILY_AIC_REPO_MEMORY_WRITER: ${{ steps.daily-aic-repo-memory-reset.outcome == 'success' }}\n")
 	}
-	if memory.Wiki || (memory.GitHubApp != nil && memory.TargetRepo != "") {
+	if memory.Wiki || (memory.githubApp(PermissionWrite) != nil && memory.TargetRepo != "") {
 		fmt.Fprintf(&step, "          REPO_MEMORY_ALLOWED_REPOS: %s\n", targetRepo) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	}
 	fmt.Fprintf(&step, "          MAX_FILE_SIZE: %d\n", memory.MaxFileSize)     //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
@@ -957,7 +977,7 @@ func (c *Compiler) buildSinglePushRepoMemoryStep(data *WorkflowData, memory Repo
 	appendMemoryValidationEnvironment(&step, memory.Validation)
 	appendRepoMemoryLedgerLimitsEnv(&step, memory.Ledger)
 	step.WriteString("        with:\n")
-	if memory.GitHubApp != nil {
+	if memory.githubApp(PermissionWrite) != nil {
 		fmt.Fprintf(&step, "          github-token: %s\n", repoMemoryAppToken(memory, PermissionWrite)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	}
 	step.WriteString("          script: |\n")
@@ -990,7 +1010,7 @@ func appendRepoMemoryLedgerLimitsEnv(step *strings.Builder, ledger *RepoMemoryLe
 
 func buildRepoMemoryGitHubEnv(data *WorkflowData, hasConsolidatedSafeOutputsJob bool, memory RepoMemoryEntry) string {
 	token := "${{ github.token }}"
-	if memory.GitHubApp != nil {
+	if memory.githubApp(PermissionWrite) != nil {
 		token = repoMemoryAppToken(memory, PermissionWrite)
 	}
 	env := fmt.Sprintf("          GH_TOKEN: %s\n", token) +

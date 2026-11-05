@@ -6261,6 +6261,14 @@
                 "github-app": {
                   "$ref": "#/$defs/repo_memory_github_app"
                 },
+                "github-app-read": {
+                  "$ref": "#/$defs/repo_memory_github_app",
+                  "description": "GitHub App for memory restores and daily-credit ledger clones. Overrides github-app for reads only."
+                },
+                "github-app-write": {
+                  "$ref": "#/$defs/repo_memory_github_app",
+                  "description": "GitHub App for memory pushes. Overrides github-app for writes only."
+                },
                 "branch-prefix": {
                   "type": "string",
                   "minLength": 4,
@@ -6391,6 +6399,14 @@
                 "properties": {
                   "github-app": {
                     "$ref": "#/$defs/repo_memory_github_app"
+                  },
+                  "github-app-read": {
+                    "$ref": "#/$defs/repo_memory_github_app",
+                    "description": "GitHub App for memory restores and daily-credit ledger clones. Overrides github-app for reads only."
+                  },
+                  "github-app-write": {
+                    "$ref": "#/$defs/repo_memory_github_app",
+                    "description": "GitHub App for memory pushes. Overrides github-app for writes only."
                   },
                   "id": {
                     "type": "string",
