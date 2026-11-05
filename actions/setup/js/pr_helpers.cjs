@@ -112,7 +112,7 @@ function buildBranchInstruction(effectiveBaseBranch, resolvedDefaultBranch) {
  *
  * Performs two security checks:
  * 1. Ensures the branch is not the repository's default branch.
- * 2. When `checkBranchProtection` is true, queries the branch protection API to
+ * 2. When `checkBranchProtection` is true, queries the branch API to
  *    verify the branch has no protection rules.
  *
  * Returns null when the push is safe to proceed, or a string error message that
@@ -122,7 +122,7 @@ function buildBranchInstruction(effectiveBaseBranch, resolvedDefaultBranch) {
  * @param {string} owner - Repository owner
  * @param {string} repo - Repository name
  * @param {string} branchName - Target branch to validate
- * @param {boolean} checkBranchProtection - Whether to call the branch protection API
+ * @param {boolean} checkBranchProtection - Whether to call the branch API to check protection
  * @returns {Promise<string|null>} Error message if push is blocked, null if safe
  */
 async function checkBranchPushable(githubClient, owner, repo, branchName, checkBranchProtection) {
@@ -144,14 +144,13 @@ async function checkBranchPushable(githubClient, owner, repo, branchName, checkB
   if (checkBranchProtection) {
     let isBranchProtected = false;
     try {
-      await githubClient.rest.repos.getBranchProtection({ owner, repo, branch: branchName });
-      // Successful response means branch protection rules exist
-      isBranchProtected = true;
+      const { data: branchData } = await githubClient.rest.repos.getBranch({ owner, repo, branch: branchName });
+      isBranchProtected = branchData.protected;
     } catch (protectionError) {
       const protectionStatus = protectionError && typeof protectionError === "object" && "status" in protectionError ? protectionError.status : undefined;
       if (protectionStatus === 404) {
-        // 404 means no protection rules – safe to proceed
-        core.info(`Branch "${branchName}" has no protection rules`);
+        // 404 means the branch does not exist – safe to proceed
+        core.info(`Branch "${branchName}" not found; proceeding to push`);
       } else if (protectionStatus === 403) {
         // 403 means the token lacks permission to read branch protection rules.
         // The GitHub platform will still enforce branch protection at push time,

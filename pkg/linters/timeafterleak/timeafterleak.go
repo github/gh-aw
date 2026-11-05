@@ -7,7 +7,6 @@ package timeafterleak
 import (
 	"go/ast"
 	"go/token"
-	"go/types"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/ast/inspector"
@@ -67,23 +66,24 @@ func run(pass *analysis.Pass) (any, error) {
 
 // isTimeAfterCall reports whether call is an invocation of time.After.
 func isTimeAfterCall(pass *analysis.Pass, call *ast.CallExpr) bool {
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok || sel.Sel.Name != "After" {
 		return false
 	}
-	ident, ok := sel.X.(*ast.Ident)
-	if !ok {
-		return false
+	return astutil.IsPkgSelector(pass, sel, "time")
+}
+
+// parentSkippingParens returns the nearest ancestor of cur that is not a
+// *ast.ParenExpr, so that <-(time.After(d)) and (<-time.After(d)) are matched
+// the same as <-time.After(d).
+func parentSkippingParens(cur inspector.Cursor) inspector.Cursor {
+	parent := cur.Parent()
+	for {
+		if _, isParen := parent.Node().(*ast.ParenExpr); !isParen {
+			return parent
+		}
+		parent = parent.Parent()
 	}
-	obj := pass.TypesInfo.ObjectOf(ident)
-	if obj == nil {
-		return false
-	}
-	pkgName, ok := obj.(*types.PkgName)
-	if !ok {
-		return false
-	}
-	return pkgName.Imported().Path() == "time"
 }
 
 // isInsideLoopSelectComm reports whether cur is a time.After call used as the
@@ -93,7 +93,7 @@ func isTimeAfterCall(pass *analysis.Pass, call *ast.CallExpr) bool {
 // fire before the loop can continue — no timer accumulation is possible.
 func isInsideLoopSelectComm(cur inspector.Cursor) bool {
 	// The immediate parent of time.After(...) must be a channel-receive UnaryExpr.
-	recvCur := cur.Parent()
+	recvCur := parentSkippingParens(cur)
 	unary, ok := recvCur.Node().(*ast.UnaryExpr)
 	if !ok || unary.Op != token.ARROW {
 		return false
@@ -101,7 +101,7 @@ func isInsideLoopSelectComm(cur inspector.Cursor) bool {
 
 	// The parent of the receive expression must be the Comm statement of a CommClause.
 	// Comm is an ExprStmt (case <-ch:) or AssignStmt (case v := <-ch:).
-	commStmtCur := recvCur.Parent()
+	commStmtCur := parentSkippingParens(recvCur)
 	var commStmt ast.Stmt
 	switch s := commStmtCur.Node().(type) {
 	case *ast.ExprStmt:

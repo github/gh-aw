@@ -396,19 +396,20 @@ describe("checkBranchPushable", () => {
     vi.clearAllMocks();
   });
 
-  const makeClient = (defaultBranch, protectionStatus) => ({
+  const makeClient = (defaultBranch, protectionStatus, isProtected = false) => ({
     rest: {
       repos: {
         get: vi.fn().mockResolvedValue({ data: { default_branch: defaultBranch } }),
-        getBranchProtection: protectionStatus === null ? vi.fn().mockResolvedValue({}) : vi.fn().mockRejectedValue(Object.assign(new Error("error"), { status: protectionStatus })),
+        getBranch: protectionStatus === null ? vi.fn().mockResolvedValue({ data: { protected: isProtected } }) : vi.fn().mockRejectedValue(Object.assign(new Error("error"), { status: protectionStatus })),
       },
     },
   });
 
-  it("returns null when branch is not default and has no protection rules (404)", async () => {
+  it("returns null when branch does not exist (404)", async () => {
     const client = makeClient("main", 404);
     const result = await checkBranchPushable(client, "owner", "repo", "feature", true);
     expect(result).toBeNull();
+    expect(mockCore.info).toHaveBeenCalledWith('Branch "feature" not found; proceeding to push');
   });
 
   it("blocks push when branch is the default branch", async () => {
@@ -418,16 +419,23 @@ describe("checkBranchPushable", () => {
   });
 
   it("blocks push when branch has protection rules", async () => {
-    const client = makeClient("main", null); // null status = successful getBranchProtection response
+    const client = makeClient("main", null, true);
     const result = await checkBranchPushable(client, "owner", "repo", "feature", true);
     expect(result).toContain("protection rules");
+    expect(client.rest.repos.getBranch).toHaveBeenCalledWith({ owner: "owner", repo: "repo", branch: "feature" });
+  });
+
+  it("returns null when branch is not protected", async () => {
+    const client = makeClient("main", null, false);
+    const result = await checkBranchPushable(client, "owner", "repo", "feature", true);
+    expect(result).toBeNull();
   });
 
   it("returns null and skips protection check when checkBranchProtection is false", async () => {
     const client = makeClient("main", null);
     const result = await checkBranchPushable(client, "owner", "repo", "feature", false);
     expect(result).toBeNull();
-    expect(client.rest.repos.getBranchProtection).not.toHaveBeenCalled();
+    expect(client.rest.repos.getBranch).not.toHaveBeenCalled();
   });
 
   it("returns error on unexpected protection check failure (5xx)", async () => {
