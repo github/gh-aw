@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import fs, { readFileSync } from "node:fs";
 import { test } from "node:test";
+import { sanitizeContent } from "../actions/setup/js/sanitize_content.cjs";
 import { activeAgent, approvableRuns, buildQueue, checkRateLimit, classify, fetchActiveRuns, fetchCandidate, fetchQueue, formatAssignmentRequest, formatNudge, formatSummary, gh } from "./pr-sous-chef.mjs";
 
 const now = Date.parse("2026-10-03T18:00:00Z");
@@ -54,6 +55,15 @@ function nudge(state, at = "2026-10-03T16:30:00Z") {
   };
 }
 
+function response() {
+  return {
+    id: 124,
+    user: { login: "Copilot" },
+    created_at: "2026-10-03T17:00:00Z",
+    body: "Work completed; please recheck the blockers",
+  };
+}
+
 function thread(overrides = {}) {
   return {
     id: "PRRT_example",
@@ -83,11 +93,12 @@ test("unchanged implementation work never gets a repeat poke, even after the idl
   assert.equal(classify(failingPr, detail(), comments, [], now + 24 * 60 * 60 * 1000).skip_reason, "unchanged");
 });
 
-test("only genuinely conflicting or behind branches may repeat an idle nudge", () => {
+test("conflicting or behind branches require an intervening comment before another idle nudge", () => {
   for (const mergeStateStatus of ["CONFLICTING", "BEHIND"]) {
     const candidate = { ...pr, mergeStateStatus };
     const first = classify(candidate, detail(), [], [], now);
-    assert.ok(classify(candidate, detail(), [nudge(first.state_fingerprint)], [], now).state_fingerprint);
+    assert.equal(classify(candidate, detail(), [nudge(first.state_fingerprint)], [], now).skip_reason, "last_comment_sous_chef");
+    assert.ok(classify(candidate, detail(), [nudge(first.state_fingerprint), response()], [], now).state_fingerprint);
     assert.equal(classify(candidate, detail(), [nudge(first.state_fingerprint, "2026-10-03T17:55:00Z")], [], now).skip_reason, "not_idle");
   }
   for (const mergeStateStatus of ["BLOCKED", "DIRTY", "UNKNOWN", "CLEAN"]) {
@@ -96,6 +107,15 @@ test("only genuinely conflicting or behind branches may repeat an idle nudge", (
     assert.equal(classify(candidate, detail(), [nudge(first.state_fingerprint)], [], now).skip_reason, "unchanged");
   }
 });
+
+function stripHtmlComments(text) {
+  let previous;
+  do {
+    previous = text;
+    text = text.replace(/<!--[\s\S]*?--!?>/g, "");
+  } while (text !== previous);
+  return text.replace(/<!--/g, "");
+}
 
 test("visible fingerprint survives HTML marker removal and arbitrary comment order", () => {
   const first = classify(failingPr, detail(), [], [], now);
@@ -115,7 +135,7 @@ test("visible fingerprint survives HTML marker removal and arbitrary comment ord
 
 test("assignment state comments deduplicate without mentioning Copilot", () => {
   const first = classify(failingPr, detail(), [], [], now);
-  const body = formatNudge(first).replace(/<!--[\s\S]*?--!?>/g, "");
+  const body = stripHtmlComments(formatNudge(first));
   assert.doesNotMatch(body, /@copilot|assign.to.agent/i);
   assert.equal(classify(failingPr, detail(), [{ ...nudge(first.state_fingerprint), body }], [], now).skip_reason, "unchanged");
   assert.equal(classify(failingPr, detail(), [{ ...nudge(first.state_fingerprint), body, user: { login: "outsider" } }], [], now).skip_reason, undefined);
@@ -123,7 +143,7 @@ test("assignment state comments deduplicate without mentioning Copilot", () => {
 
 test("started coding agents can record assignment markers without member association", () => {
   const first = classify(failingPr, detail(), [], [], now);
-  const body = formatNudge(first).replace(/<!--[\s\S]*?--!?>/g, "");
+  const body = stripHtmlComments(formatNudge(first));
   for (const login of ["Copilot", "github-copilot[bot]", "copilot-swe-agent[bot]"]) {
     const comment = { ...nudge(first.state_fingerprint), body, user: { login }, author_association: "CONTRIBUTOR" };
     assert.equal(classify(failingPr, detail(), [comment], [], now).skip_reason, "unchanged");
@@ -132,25 +152,32 @@ test("started coding agents can record assignment markers without member associa
   assert.ok(classify(failingPr, detail(), [outsider], [], now).nudge_needed);
 });
 
-test("pending assignment comments do not suppress retries until a coding agent starts", () => {
+test("pending assignment comments suppress consecutive requests without recording active work", () => {
   const first = classify(failingPr, detail(), [], [], now);
-  const body = formatAssignmentRequest(first).replace(/<!--[\s\S]*?--!?>/g, "");
+  const request = formatAssignmentRequest(first);
+  assert.ok(request.startsWith("@copilot\n\n"));
+  assert.doesNotMatch(request, /\[@copilot\]\(/);
+  assert.ok(sanitizeContent(request, { allowedAliases: ["copilot"] }).startsWith("@copilot\n\n"));
+  const body = request.replace(/<!--[\s\S]*?--!?>/g, "");
   assert.match(body, /Sous-chef requested-head: abc/);
   assert.match(body, /Sous-chef requested-work: [a-f0-9]{64}/);
   assert.ok(body.endsWith(`Sous-chef requested-state: ${first.state_fingerprint}`));
   assert.doesNotMatch(body, /Sous-chef (head|work|state):/);
   const pending = { ...nudge(first.state_fingerprint), body };
-  assert.ok(classify(failingPr, detail(), [pending], [], now).nudge_needed);
+  assert.equal(classify(failingPr, detail(), [pending], [], now).skip_reason, "last_comment_sous_chef");
+  assert.equal(classify(failingPr, detail(), [{ ...pending, body: request }], [], now).skip_reason, "last_comment_sous_chef");
+  assert.ok(classify(failingPr, detail(), [pending, response()], [], now).nudge_needed);
   const acknowledged = {
     ...pending,
     user: { login: "copilot-swe-agent[bot]" },
-    body: body.replace(/^Sous-chef requested-(head|work|state):/gm, "Sous-chef $1:"),
+    body: body.replace("@copilot\n\n", "").replace(/^Sous-chef requested-(head|work|state):/gm, "Sous-chef $1:"),
   };
+  assert.doesNotMatch(acknowledged.body, /@copilot/);
   assert.equal(classify(failingPr, detail(), [pending, acknowledged], [], now).skip_reason, "unchanged");
   assert.equal(formatAssignmentRequest({ ...first, nudge_needed: false }), null);
 });
 
-test("failed or fallback finisher publications do not suppress a later dispatch", () => {
+test("failed or fallback finisher publications permit a later dispatch after another comment", () => {
   const first = classify(failingPr, detail(), [], [], now);
   for (const note of [
     "> [!WARNING]\n> The `push_to_pull_request_branch` operation failed: denied. The code changes were not applied.",
@@ -158,15 +185,69 @@ test("failed or fallback finisher publications do not suppress a later dispatch"
     "> [!NOTE]\n> Direct push to the original pull request branch was not possible (diverged/non-fast-forward). A fallback pull request was created instead: #1",
   ]) {
     const body = `${note}\n\n${formatNudge(first)}`;
-    assert.ok(classify(failingPr, detail(), [{ ...nudge(first.state_fingerprint), body }], [], now).nudge_needed);
+    const comment = { ...nudge(first.state_fingerprint), body };
+    assert.equal(classify(failingPr, detail(), [comment], [], now).skip_reason, "last_comment_sous_chef");
+    assert.ok(classify(failingPr, detail(), [comment, response()], [], now).nudge_needed);
   }
 });
 
 test("new HEAD and changed blockers can advance again", () => {
   const first = classify(pr, detail(), [], [], now);
-  const comments = [nudge(first.state_fingerprint)];
+  const comments = [nudge(first.state_fingerprint), response()];
   assert.ok(classify({ ...pr, headRefOid: "def" }, detail(), comments, [], now).state_fingerprint);
   assert.ok(classify(pr, detail([thread()]), comments, [], now).state_fingerprint);
+});
+
+test("latest sous-chef comments block new work regardless of provenance format or array order", () => {
+  const first = classify(pr, detail(), [], [], now);
+  for (const body of [
+    formatAssignmentRequest(first),
+    formatAssignmentRequest(first).replace(/<!--[\s\S]*?--!?>/g, ""),
+    formatNudge(first),
+    "Acknowledged\n<!-- gh-aw-workflow-call-id: github/gh-aw/pr-sous-chef -->",
+    "> Generated by [PR Sous Chef](https://github.com/github/gh-aw/actions/runs/1)",
+  ]) {
+    const last = { ...nudge(first.state_fingerprint), body };
+    const earlier = { ...response(), created_at: recent, updated_at: "2026-10-03T17:00:00Z" };
+    for (const comments of [
+      [earlier, last],
+      [last, earlier],
+    ]) {
+      for (const candidate of [pr, { ...failingPr, headRefOid: "new-head" }]) {
+        assert.equal(classify(candidate, detail([thread()]), comments, [], now).skip_reason, "last_comment_sous_chef");
+      }
+    }
+    assert.ok(classify(pr, detail(), [response(), last], [], now).nudge_needed);
+  }
+});
+
+test("latest comment selection handles GraphQL timestamps and creation-time ties", () => {
+  const last = { ...nudge("a".repeat(64)), id: 126, created_at: undefined, createdAt: "2026-10-03T17:00:00Z" };
+  assert.equal(classify(pr, detail(), [last, response()], [], now).skip_reason, "last_comment_sous_chef");
+  assert.ok(classify(pr, detail(), [last, { ...response(), id: 127 }], [], now).nudge_needed);
+});
+
+test("shared bot authors and untrusted provenance do not block new work", () => {
+  for (const comment of [
+    { ...nudge("a".repeat(64)), body: "Unrelated workflow report" },
+    { ...nudge("a".repeat(64)), user: { login: "outsider" } },
+  ]) {
+    assert.ok(classify(pr, detail(), [comment], [], now).nudge_needed);
+  }
+});
+
+test("latest sous-chef comments do not block independent CI approvals or review cleanup", () => {
+  const comments = [nudge("a".repeat(64))];
+  const data = detail();
+  data.reviews.nodes = [{ author: { login: "github-actions" }, state: "CHANGES_REQUESTED", databaseId: 8 }];
+  const result = classify(pr, data, comments, [waitingRun], now);
+  assert.equal(result.nudge_needed, false);
+  assert.equal(formatAssignmentRequest(result), null);
+  assert.deepEqual(result.dismiss_reviews, [8]);
+  assert.deepEqual(
+    result.approve_runs.map(run => run.run_id),
+    [7]
+  );
 });
 
 test("bot replies and old updatedAt churn do not change implementation state", () => {
@@ -189,8 +270,8 @@ test("latest legacy nudge is selected by timestamp, not REST array order", () =>
 
 test("legacy nudges do not suppress newly actionable blockers", () => {
   const legacy = { ...nudge("unused"), body: "<!-- gh-aw-pr-sous-chef-nudge --> @copilot fix" };
-  assert.ok(classify({ ...pr, mergeStateStatus: "CONFLICTING" }, detail(), [legacy], [], now).state_fingerprint);
-  assert.ok(classify({ ...pr, mergeStateStatus: "BEHIND" }, detail(), [legacy], [], now).state_fingerprint);
+  assert.ok(classify({ ...pr, mergeStateStatus: "CONFLICTING" }, detail(), [legacy, response()], [], now).state_fingerprint);
+  assert.ok(classify({ ...pr, mergeStateStatus: "BEHIND" }, detail(), [legacy, response()], [], now).state_fingerprint);
   assert.equal(classify(failingPr, detail(), [legacy], [], now).skip_reason, "unchanged_legacy");
 });
 
@@ -756,7 +837,8 @@ test("answering some feedback does not re-nudge the remaining already-requested 
   first.isResolved = true;
   assert.equal(classify(candidate, data, comments, [], now).skip_reason, "unchanged");
   second.comments.nodes[0].body = "Newly discovered regression";
-  assert.ok(classify(candidate, data, comments, [], now).state_fingerprint);
+  assert.equal(classify(candidate, data, comments, [], now).skip_reason, "last_comment_sous_chef");
+  assert.ok(classify(candidate, data, [...comments, response()], [], now).state_fingerprint);
 });
 
 test("passing checks do not re-nudge unchanged failures on the same head", () => {
@@ -764,7 +846,8 @@ test("passing checks do not re-nudge unchanged failures on the same head", () =>
   const original = classify(candidate, detail(), [], [], now);
   const comments = [{ ...nudge(original.state_fingerprint), body: formatNudge(original) }];
   assert.equal(classify(failingPr, detail(), comments, [], now).skip_reason, "unchanged");
-  assert.ok(classify({ ...failingPr, headRefOid: "new-head" }, detail(), comments, [], now).state_fingerprint);
+  assert.equal(classify({ ...failingPr, headRefOid: "new-head" }, detail(), comments, [], now).skip_reason, "last_comment_sous_chef");
+  assert.ok(classify({ ...failingPr, headRefOid: "new-head" }, detail(), [...comments, response()], [], now).state_fingerprint);
 });
 
 const budgets = {
@@ -797,6 +880,27 @@ function queueAPI({ listed = [pr], candidate = graphPr, checks = [], statuses = 
     },
   };
 }
+
+test("scheduled and targeted queues scan every comment page before allowing another message", async () => {
+  for (const number of [undefined, "42"]) {
+    const { api, calls } = queueAPI();
+    const queue = await fetchQueue(
+      "github/gh-aw",
+      number,
+      args => {
+        if (args[1].includes("/comments?")) {
+          calls.push(args);
+          assert.ok(args.includes("--paginate") && args.includes("--slurp"));
+          return [Array.from({ length: 100 }, (_, id) => ({ ...response(), id, created_at: recent })), [{ ...nudge("unused"), body: "Acknowledged\n<!-- gh-aw-workflow-call-id: github/gh-aw/pr-sous-chef -->" }]];
+        }
+        return api(args);
+      },
+      now
+    );
+    assert.deepEqual(queue.prs, []);
+    assert.deepEqual(queue.skipped, [{ pr_number: 42, skip_reason: "last_comment_sous_chef" }]);
+  }
+});
 
 test("refresh isolates filtered reviews from thread connections and head commit activity", async () => {
   const data = detail([thread()]);
@@ -1183,11 +1287,15 @@ test("workflow polls every five minutes but never starts an agent for low budget
   assert.match(workflow, /sparse-checkout: \|\n\s+scripts\n\s+actions\/setup\/js\n\s+\.github\/scripts/);
   assert.match(workflow, /assign-to-agent:\n\s+name: copilot\n\s+allowed: \[copilot\]\n\s+target: "\*"\n\s+max: 4\n\s+github-token: \$\{\{ secrets\.AWI_MAINTENANCE_TOKEN \}\}/);
   assert.match(workflow, /post its `nudges\[0\]\.body` exactly via `add_comment` on `nudges\[0\]\.pr_number`/);
+  assert.match(workflow, /The comment must start with the literal `@copilot` mention/);
+  assert.match(workflow, /If the latest is from PR Sous Chef, do not add an acknowledgement/);
+  assert.match(workflow, /leading Copilot mention, replacing/);
   assert.match(workflow, /as `pull_number` and `copilot` as `agent`/);
   assert.match(workflow, /custom-instructions: \|\n\s+Work on this PR's existing branch/);
   assert.match(workflow, /"Sous-chef requested-state:" with "Sous-chef head:", "Sous-chef work:", and\n\s+"Sous-chef state:"/);
   assert.match(workflow, /min-integrity: approved/);
-  assert.doesNotMatch(workflow, /^\s+dispatch-workflow:|^\s+mentions:/m);
+  assert.match(workflow, /^  mentions:\n    allowed: \["@copilot"\]$/m);
+  assert.doesNotMatch(workflow, /^\s+dispatch-workflow:/m);
 });
 
 test("targeted refresh detects an active default-branch finisher", async () => {

@@ -700,6 +700,127 @@ engine: copilot
       expect(mockCore.summary.write).toHaveBeenCalled();
     });
 
+    it.each(["frontmatter", "body", "runtime"])("should fall back when a %s import API read returns HTTP 500", async kind => {
+      const { computeFrontmatterHash, computeBodyHash } = require("./frontmatter_hash_pure.cjs");
+      const content = kind === "runtime" ? "---\nengine: copilot\n---\n{{#runtime-import shared/test.md}}" : "---\nengine: copilot\nimports:\n  - shared/test.md\n---\n# Test";
+      fs.mkdirSync(path.join(workflowsDir, "shared"));
+      fs.writeFileSync(path.join(workflowsDir, "test.md"), content);
+      fs.writeFileSync(path.join(workflowsDir, "shared", "test.md"), "---\ntools:\n  bash: true\n---\nImported body");
+      const sourcePath = path.join(workflowsDir, "test.md");
+      const frontmatterHash = await computeFrontmatterHash(sourcePath);
+      const bodyHash = await computeBodyHash(sourcePath);
+      const lockContent = `# gh-aw-metadata: ${JSON.stringify({ frontmatter_hash: frontmatterHash, body_hash: bodyHash })}\n`;
+      fs.writeFileSync(path.join(workflowsDir, "test.lock.yml"), lockContent);
+      process.env.GITHUB_WORKSPACE = tmpDir;
+      process.env.GH_AW_STALE_CHECK_FULL = "true";
+      let importReads = 0;
+      let workflowReads = 0;
+      mockGithub.rest.repos.getContent.mockImplementation(async ({ path: filePath }) => {
+        if (filePath.endsWith(".lock.yml")) return { data: { type: "file", content: Buffer.from(lockContent).toString("base64"), encoding: "base64" } };
+        if (filePath === ".github/workflows/test.md") {
+          workflowReads++;
+          return { data: { content: Buffer.from(content).toString("base64"), encoding: "base64" } };
+        }
+        importReads++;
+        // Let frontmatter hashing complete so the body-hash walker is also exercised.
+        if (kind === "body" && importReads <= 2) return { data: { content: "---\ntools:\n  bash: true\n---\nImported body" } };
+        throw Object.assign(new Error(kind === "body" ? "Body hash walker API failure" : "Internal Server Error"), { status: 500 });
+      });
+
+      await main();
+
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Could not compute frontmatter hash via API: ERR_SYSTEM: Failed to read file"));
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("(HTTP 500)"));
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("local filesystem fallback"));
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("✅ Lock file is up to date"));
+      expect(mockCore.info).not.toHaveBeenCalledWith(expect.stringContaining("Hashes differ"));
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+      if (kind === "body") {
+        expect(workflowReads).toBe(2);
+        expect(importReads).toBe(3);
+        expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Body hash walker API failure"));
+      }
+    });
+
+    it.each([404, 200])("should preserve missing-import and edited-import behavior (HTTP %s)", async status => {
+      const { computeFrontmatterHash } = require("./frontmatter_hash_pure.cjs");
+      const content = "---\nengine: copilot\nimports:\n  - shared/test.md\n---\n# Test";
+      fs.writeFileSync(path.join(workflowsDir, "test.md"), content);
+      const hash = await computeFrontmatterHash(path.join(workflowsDir, "test.md"));
+      mockGithub.rest.repos.getContent.mockImplementation(async ({ path: filePath }) => {
+        let text;
+        if (filePath.endsWith(".lock.yml")) text = `# frontmatter-hash: ${hash}\n`;
+        else if (filePath === ".github/workflows/test.md") text = content;
+        else if (status === 200) text = "---\ntools:\n  bash: true\n---\nChanged import";
+        else throw Object.assign(new Error("Not Found"), { status: 404 });
+        return { data: { type: "file", content: Buffer.from(text).toString("base64"), encoding: "base64" } };
+      });
+
+      await main();
+
+      if (status === 404) {
+        expect(mockCore.setFailed).not.toHaveBeenCalled();
+        expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("✅ Lock file is up to date"));
+      } else {
+        expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("frontmatter hash mismatch"));
+        expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Hashes differ"));
+      }
+    });
+
+    it("should report the import read error when local fallback is unavailable", async () => {
+      const content = "---\nengine: copilot\nimports:\n  - shared/test.md\n---\n# Test";
+      mockGithub.rest.repos.getContent.mockImplementation(async ({ path: filePath }) => {
+        if (filePath.endsWith(".lock.yml")) return { data: { type: "file", content: Buffer.from("# frontmatter-hash: stored\n").toString("base64"), encoding: "base64" } };
+        if (filePath === ".github/workflows/test.md") return { data: { content } };
+        throw Object.assign(new Error("Internal Server Error"), { status: 500 });
+      });
+
+      await main();
+
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("shared/test.md from GitHub (HTTP 500)"));
+      expect(mockCore.setFailed).not.toHaveBeenCalledWith(expect.stringContaining("Run 'gh aw compile'"));
+      expect(mockCore.info).not.toHaveBeenCalledWith(expect.stringContaining("Hashes differ"));
+    });
+
+    it("should treat missing local imports as inconclusive after an API read failure", async () => {
+      const { computeFrontmatterHash } = require("./frontmatter_hash_pure.cjs");
+      const content = "---\nengine: copilot\nimports:\n  - shared/test.md\n---\n# Test";
+      fs.mkdirSync(path.join(workflowsDir, "shared"));
+      fs.writeFileSync(path.join(workflowsDir, "test.md"), content);
+      fs.writeFileSync(path.join(workflowsDir, "shared", "test.md"), "---\ntools:\n  bash: true\n---\nImported body");
+      const hash = await computeFrontmatterHash(path.join(workflowsDir, "test.md"));
+      const lockContent = `# frontmatter-hash: ${hash}\n`;
+      fs.writeFileSync(path.join(workflowsDir, "test.lock.yml"), lockContent);
+      fs.unlinkSync(path.join(workflowsDir, "shared", "test.md"));
+      process.env.GITHUB_WORKSPACE = tmpDir;
+      mockGithub.rest.repos.getContent.mockImplementation(async ({ path: filePath }) => {
+        if (filePath.endsWith(".lock.yml")) return { data: { type: "file", content: Buffer.from(lockContent).toString("base64"), encoding: "base64" } };
+        if (filePath === ".github/workflows/test.md") return { data: { content } };
+        throw Object.assign(new Error("Internal Server Error"), { status: 500 });
+      });
+
+      await main();
+
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("HTTP 500"));
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("local fallback could not read import"));
+      expect(mockCore.setFailed).not.toHaveBeenCalledWith(expect.stringContaining("Run 'gh aw compile'"));
+      expect(mockCore.info).not.toHaveBeenCalledWith(expect.stringContaining("Hashes differ"));
+    });
+
+    it("should report an unreadable local import rather than a hash mismatch", async () => {
+      process.env.GITHUB_WORKSPACE = tmpDir;
+      fs.writeFileSync(path.join(workflowsDir, "test.lock.yml"), "# frontmatter-hash: stored\n");
+      fs.writeFileSync(path.join(workflowsDir, "test.md"), "---\nengine: copilot\nimports:\n  - shared/test.md\n---\n# Test");
+      fs.mkdirSync(path.join(workflowsDir, "shared", "test.md"), { recursive: true });
+      mockGithub.rest.repos.getContent.mockRejectedValue(Object.assign(new Error("Internal Server Error"), { status: 500 }));
+
+      await main();
+
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Failed to read file"));
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("EISDIR"));
+      expect(mockCore.info).not.toHaveBeenCalledWith(expect.stringContaining("Hashes differ"));
+    });
+
     it("should fail when both API and local filesystem are unavailable", async () => {
       // Simulate cross-org API permission error
       mockGithub.rest.repos.getContent.mockRejectedValue(new Error("Resource not accessible by integration"));

@@ -189,6 +189,7 @@ func (c *Compiler) validateToolConfiguration(workflowData *WorkflowData, markdow
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
 	c.warnLegacyBehaviorInstallationCooldown(workflowData, markdownPath)
+	c.warnCheckoutRefWithSteps(workflowData, markdownPath)
 	if workflowData.SafeOutputs != nil && workflowData.SafeOutputs.ThreatDetection != nil {
 		if err := validateEngineCooldown(workflowData.SafeOutputs.ThreatDetection.EngineConfig, strict); err != nil {
 			return formatCompilerError(markdownPath, "error", "safe-outputs.threat-detection: "+err.Error(), err)
