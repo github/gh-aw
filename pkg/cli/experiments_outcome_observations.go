@@ -23,11 +23,19 @@ const maxExperimentOutcomeWindow = 30 * 24 * time.Hour
 
 // OutcomeMetricCoverage counts assigned runs, not outputs. A partially observed
 // run can contribute both a measurement and an unavailable/stale-pending count.
+// Category counts are per-run flags, so multiple outputs in one category count once.
 type OutcomeMetricCoverage struct {
 	Immature     int `json:"immature"`
 	StalePending int `json:"stale_pending"`
 	Unavailable  int `json:"unavailable"`
 	NoOp         int `json:"no_op"`
+}
+
+// OutcomeWindowInfo records the effective maturity window and how it was selected.
+type OutcomeWindowInfo struct {
+	Window     string `json:"window"`
+	Source     string `json:"source"`
+	SampleSize int    `json:"sample_size"`
 }
 
 type outcomeRunData struct {
@@ -114,20 +122,68 @@ func resolveOutcomeMetricReferences(configs map[string]*workflow.ExperimentConfi
 				}
 				guardrails[name][ref] = kind
 			}
-			window := defaultExperimentOutcomeWindow
+			window, err := experimentOutcomeWindow(name, cfg.OutcomeWindow)
+			if err != nil {
+				return nil, nil, nil, nil, err
+			}
 			if cfg.OutcomeWindow == "" || cfg.OutcomeWindow == "auto" {
 				automatic[name] = struct{}{}
-			} else {
-				var err error
-				window, err = time.ParseDuration(cfg.OutcomeWindow)
-				if err != nil || window <= 0 {
-					return nil, nil, nil, nil, fmt.Errorf("experiments.%s.outcome_window: invalid value %q. Expected \"auto\" or a positive Go duration. Example: outcome_window: 72h", name, cfg.OutcomeWindow)
-				}
 			}
 			windows[name] = window
 		}
+		for _, ref := range cfg.SecondaryMetrics {
+			kind, recognized := workflow.ParseExperimentMetricOutcomeReference(ref)
+			if !recognized {
+				continue
+			}
+			if kind == "" {
+				return nil, nil, nil, nil, fmt.Errorf("experiments.%s: unknown outcome metric %q. Expected outcome:accepted or outcome:zero_touch. Example: metric: outcome:accepted", name, ref)
+			}
+			window, err := experimentOutcomeWindow(name, cfg.OutcomeWindow)
+			if err != nil {
+				return nil, nil, nil, nil, err
+			}
+			windows[name] = window
+			if cfg.OutcomeWindow == "" || cfg.OutcomeWindow == "auto" {
+				automatic[name] = struct{}{}
+			}
+		}
 	}
 	return primary, guardrails, windows, automatic, nil
+}
+
+func experimentOutcomeWindow(name, configured string) (time.Duration, error) {
+	if configured == "" || configured == "auto" {
+		return defaultExperimentOutcomeWindow, nil
+	}
+	window, err := time.ParseDuration(configured)
+	if err != nil || window <= 0 {
+		return 0, fmt.Errorf("experiments.%s.outcome_window: invalid value %q. Expected \"auto\" or a positive Go duration. Example: outcome_window: 72h", name, configured)
+	}
+	return window, nil
+}
+
+func resolveOutcomeSecondaryMetricReferences(configs map[string]*workflow.ExperimentConfig) (map[string]map[string]string, error) {
+	refs := make(map[string]map[string]string)
+	for name, cfg := range configs {
+		if cfg == nil {
+			continue
+		}
+		for _, ref := range cfg.SecondaryMetrics {
+			kind, recognized := workflow.ParseExperimentMetricOutcomeReference(ref)
+			if !recognized {
+				continue
+			}
+			if kind == "" {
+				return nil, fmt.Errorf("experiments.%s: unknown outcome metric %q. Expected outcome:accepted or outcome:zero_touch. Example: metric: outcome:accepted", name, ref)
+			}
+			if refs[name] == nil {
+				refs[name] = make(map[string]string)
+			}
+			refs[name][ref] = kind
+		}
+	}
+	return refs, nil
 }
 
 func outcomeRunMaturity(run ExperimentRunRecord, window time.Duration, now time.Time) string {
@@ -173,26 +229,44 @@ func loadOutcomeRunData(ctx context.Context, runs []ExperimentRunRecord, windows
 	return result
 }
 
-func loadOutcomeObservationSetsForAnalysis(details *ExperimentDetails, frontmatter experimentFrontmatterResult, repoOverride string) (map[string]*graderMetricObservationSet, map[string]map[string]*graderMetricObservationSet, func(), error) {
+func loadOutcomeObservationSetsForAnalysis(details *ExperimentDetails, frontmatter experimentFrontmatterResult, repoOverride string) (map[string]*graderMetricObservationSet, map[string]map[string]*graderMetricObservationSet, map[string]map[string]*graderMetricObservationSet, func(), error) {
 	primary, guardrails, windows, automatic, err := resolveOutcomeMetricReferences(frontmatter.ExperimentConfigs)
 	if err != nil || len(windows) == 0 {
-		return nil, nil, func() {}, err
+		return nil, nil, nil, func() {}, err
+	}
+	secondary, err := resolveOutcomeSecondaryMetricReferences(frontmatter.ExperimentConfigs)
+	if err != nil {
+		return nil, nil, nil, func() {}, err
 	}
 	cacheDir, err := os.MkdirTemp("", "gh-aw-experiment-outcomes-")
 	if err != nil {
-		return nil, nil, func() {}, fmt.Errorf("failed to prepare outcome artifact cache: %w", err)
+		return nil, nil, nil, func() {}, fmt.Errorf("failed to prepare outcome artifact cache: %w", err)
 	}
 	cleanup := func() { _ = os.RemoveAll(cacheDir) }
 	now := time.Now()
 	source := &githubOutcomeRunSource{artifacts: newGitHubGraderRunArtifactSource(cacheDir, repoOverride)}
 	data := loadOutcomeRunData(context.Background(), details.Runs, windows, automatic, now, source)
-	if len(automatic) > 0 {
-		learnedWindow := estimateOutcomeWindow(details.Runs, automatic, data, now)
-		for name := range automatic {
-			windows[name] = learnedWindow
+	windowInfo := make(map[string]*OutcomeWindowInfo, len(windows))
+	for name := range automatic {
+		info := estimateOutcomeWindowInfo(details.Runs, map[string]struct{}{name: {}}, data, now)
+		windowInfo[name] = &info
+		windows[name] = info.duration()
+	}
+	for name := range windows {
+		if _, auto := automatic[name]; auto {
+			continue
 		}
+		windowInfo[name] = &OutcomeWindowInfo{Window: windows[name].String(), Source: "configured"}
 	}
 	sets := buildOutcomeMetricObservationSets(details.Experiments, details.Runs, primary, windows, now, data)
+	secondarySets := make(map[string]map[string]*graderMetricObservationSet, len(secondary))
+	for name, metrics := range secondary {
+		secondarySets[name] = make(map[string]*graderMetricObservationSet, len(metrics))
+		for ref, kind := range metrics {
+			metricSets := buildOutcomeMetricObservationSets(details.Experiments, details.Runs, map[string]string{name: kind}, windows, now, data)
+			secondarySets[name][ref] = metricSets[name]
+		}
+	}
 	guardrailSets := make(map[string]map[string]*graderMetricObservationSet)
 	for name, metrics := range guardrails {
 		guardrailSets[name] = make(map[string]*graderMetricObservationSet)
@@ -200,7 +274,20 @@ func loadOutcomeObservationSetsForAnalysis(details *ExperimentDetails, frontmatt
 			guardrailSets[name][ref] = buildOutcomeMetricObservationSets(details.Experiments, details.Runs, map[string]string{name: kind}, windows, now, data)[name]
 		}
 	}
-	return sets, guardrailSets, cleanup, nil
+	for name, set := range sets {
+		set.OutcomeWindow = windowInfo[name]
+	}
+	for name, metrics := range secondarySets {
+		for _, set := range metrics {
+			set.OutcomeWindow = windowInfo[name]
+		}
+	}
+	for name, metrics := range guardrailSets {
+		for _, set := range metrics {
+			set.OutcomeWindow = windowInfo[name]
+		}
+	}
+	return sets, secondarySets, guardrailSets, cleanup, nil
 }
 
 type outcomeWindowObservation struct {
@@ -212,11 +299,25 @@ type outcomeWindowObservation struct {
 // right-censored at their current age. If p95 is not observable, the upper cap
 // is used rather than underestimating the maturity period.
 func estimateOutcomeWindow(runs []ExperimentRunRecord, automatic map[string]struct{}, data map[string]outcomeRunData, now time.Time) time.Duration {
+	return estimateOutcomeWindowInfo(runs, automatic, data, now).duration()
+}
+
+func estimateOutcomeWindowInfo(runs []ExperimentRunRecord, automatic map[string]struct{}, data map[string]outcomeRunData, now time.Time) OutcomeWindowInfo {
 	observations, decided := collectOutcomeWindowObservations(runs, automatic, data, now)
 	if decided < minExperimentOutcomeDecisions {
+		return OutcomeWindowInfo{Window: defaultExperimentOutcomeWindow.String(), Source: "default", SampleSize: len(observations)}
+	}
+	return OutcomeWindowInfo{
+		Window: kaplanMeierOutcomeWindowP95(observations).String(), Source: "learned", SampleSize: len(observations),
+	}
+}
+
+func (i OutcomeWindowInfo) duration() time.Duration {
+	window, err := time.ParseDuration(i.Window)
+	if err != nil || window <= 0 {
 		return defaultExperimentOutcomeWindow
 	}
-	return kaplanMeierOutcomeWindowP95(observations)
+	return window
 }
 
 func collectOutcomeWindowObservations(runs []ExperimentRunRecord, automatic map[string]struct{}, data map[string]outcomeRunData, now time.Time) ([]outcomeWindowObservation, int) {
@@ -401,6 +502,7 @@ func appendOutcomeMetricObservation(run ExperimentRunRecord, name, kind string, 
 	addObservationExclusion(set, variant, reason, run.RunID, 1)
 }
 
+// Coverage flags are per run; each category counts once, regardless of item count.
 func outcomeMetricRunValue(kind string, items []OutcomeReport) (float64, bool, OutcomeMetricCoverage) {
 	var coverage OutcomeMetricCoverage
 	numerator, denominator := 0, 0

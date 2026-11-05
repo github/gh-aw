@@ -91,7 +91,9 @@ type ExperimentAnalysis struct {
 	Guardrails []GuardrailStatus `json:"guardrails,omitempty"`
 
 	// Comparisons contains control-versus-variant outcome analyses for grader observations.
-	Comparisons []MetricComparison `json:"comparisons,omitempty"`
+	Comparisons      []MetricComparison        `json:"comparisons,omitempty"`
+	SecondaryMetrics []SecondaryMetricAnalysis `json:"secondary_metrics,omitempty"`
+	OutcomeWindow    *OutcomeWindowInfo        `json:"outcome_window,omitempty"`
 
 	// MetricDirection is the normalized primary metric direction: max or min.
 	MetricDirection string `json:"metric_direction,omitempty"`
@@ -184,6 +186,22 @@ type GuardrailVariantStatus struct {
 	OutcomeCoverage  *OutcomeMetricCoverage `json:"outcome_coverage,omitempty"`
 }
 
+// SecondaryMetricAnalysis reports outcome-backed secondary metric observations.
+type SecondaryMetricAnalysis struct {
+	Metric      string                           `json:"metric"`
+	MetricType  string                           `json:"metric_type,omitempty"`
+	Variants    []SecondaryMetricVariantAnalysis `json:"variants"`
+	Comparisons []MetricComparison               `json:"comparisons,omitempty"`
+}
+
+// SecondaryMetricVariantAnalysis reports one variant's secondary metric results.
+type SecondaryMetricVariantAnalysis struct {
+	Variant          string                 `json:"variant"`
+	ObservationCount int                    `json:"observation_count"`
+	Mean             *float64               `json:"mean,omitempty"`
+	OutcomeCoverage  *OutcomeMetricCoverage `json:"outcome_coverage,omitempty"`
+}
+
 // MetricEvalResults summarizes observed YES/NO/UNKNOWN outcomes for an eval-backed metric.
 type MetricEvalResults struct {
 	Yes          int    `json:"yes"`
@@ -229,12 +247,57 @@ func computeExperimentAnalysisWithObservationBundle(
 		a.MetricType = graderObservationMetricType(cfg, graderObservations)
 		a.MetricDirection = normalizeMetricDirection(graderObservations.Direction)
 		a.Comparisons = computeGraderMetricComparisons(cfg, graderObservations, variantNames, a.MetricType)
+		a.OutcomeWindow = graderObservations.OutcomeWindow
+	} else {
+		for _, set := range guardrailObservations {
+			if set != nil && set.OutcomeWindow != nil {
+				a.OutcomeWindow = set.OutcomeWindow
+				break
+			}
+		}
 	}
 	applyExperimentBalance(&a, exp.Name, total, cfg, variantCounts, variantNames, expectedPcts)
 	applyExperimentReadiness(&a, graderObservations != nil)
 	applyExperimentGuardrails(&a, guardrailObservations)
 	a.ExperimentDecisionResult = DecideExperiment(a)
 	return a
+}
+
+func computeOutcomeSecondaryMetricAnalyses(
+	cfg *workflow.ExperimentConfig,
+	sets map[string]*graderMetricObservationSet,
+	variants []VariantAnalysis,
+) []SecondaryMetricAnalysis {
+	if cfg == nil || len(sets) == 0 {
+		return nil
+	}
+	variantNames := make([]string, 0, len(variants))
+	for _, variant := range variants {
+		variantNames = append(variantNames, variant.Name)
+	}
+	results := make([]SecondaryMetricAnalysis, 0)
+	for _, metric := range cfg.SecondaryMetrics {
+		set := sets[metric]
+		if set == nil {
+			continue
+		}
+		analysis := SecondaryMetricAnalysis{Metric: metric, MetricType: graderObservationMetricType(cfg, set)}
+		for _, variant := range variants {
+			observations := set.ByVariant[variant.Name]
+			variantAnalysis := SecondaryMetricVariantAnalysis{
+				Variant: variant.Name, ObservationCount: len(observations),
+				OutcomeCoverage: outcomeVariantCoverage(set, variant.Name),
+			}
+			if len(observations) > 0 {
+				mean := meanGraderObservations(observations)
+				variantAnalysis.Mean = &mean
+			}
+			analysis.Variants = append(analysis.Variants, variantAnalysis)
+		}
+		analysis.Comparisons = computeGraderMetricComparisons(cfg, set, variantNames, analysis.MetricType)
+		results = append(results, analysis)
+	}
+	return results
 }
 
 func newExperimentAnalysis(
@@ -664,12 +727,35 @@ func printOneExperimentAnalysis(a ExperimentAnalysis) {
 	for _, variant := range a.Variants {
 		printOutcomeMetricCoverage(variant.Name, variant.OutcomeCoverage)
 	}
+	if a.OutcomeWindow != nil {
+		fmt.Fprintf(os.Stderr, "  Outcome window: %s (%s", a.OutcomeWindow.Window, a.OutcomeWindow.Source)
+		if a.OutcomeWindow.Source != "configured" {
+			fmt.Fprintf(os.Stderr, ", sample: %d outputs", a.OutcomeWindow.SampleSize)
+		}
+		fmt.Fprintln(os.Stderr, ")")
+	}
 	printBalanceAnalysis(a)
 	printOutcomeComparisons(a.Comparisons)
+	printSecondaryMetricAnalyses(a.SecondaryMetrics)
 	printGuardrails(a.Guardrails)
 	fmt.Fprintf(os.Stderr, "  Readiness  : %s\n", a.Readiness)
 	printExperimentRecommendation(a)
 	printExperimentDecision(a.ExperimentDecisionResult)
+}
+
+func printSecondaryMetricAnalyses(metrics []SecondaryMetricAnalysis) {
+	for _, metric := range metrics {
+		fmt.Fprintf(os.Stderr, "  Secondary metric: %s", metric.Metric)
+		if metric.MetricType != "" {
+			fmt.Fprintf(os.Stderr, " (%s)", metric.MetricType)
+		}
+		fmt.Fprintln(os.Stderr)
+		for _, variant := range metric.Variants {
+			fmt.Fprintf(os.Stderr, "    %s: observations=%d\n", variant.Variant, variant.ObservationCount)
+			printOutcomeMetricCoverage(metric.Metric+" / "+variant.Variant, variant.OutcomeCoverage)
+		}
+		printOutcomeComparisons(metric.Comparisons)
+	}
 }
 
 func printExperimentMetadata(a ExperimentAnalysis) {

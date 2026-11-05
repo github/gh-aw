@@ -107,6 +107,10 @@ var outcomeEvaluators = map[string]outcomeEvaluator{
 // EvaluateOutcomes checks the current state of all safe output items from a run.
 // The mapping parameter is required and defines how labels map to objective values.
 func EvaluateOutcomes(ctx context.Context, items []CreatedItemReport, repoOverride string, mapping *github.ObjectiveMapping) []OutcomeReport {
+	return evaluateOutcomes(ctx, items, repoOverride, mapping, outcomeAPIHostForRepo(repoOverride))
+}
+
+func evaluateOutcomes(ctx context.Context, items []CreatedItemReport, repoOverride string, mapping *github.ObjectiveMapping, trustedHost string) []OutcomeReport {
 	ctx = withOutcomeAPICache(ctx)
 	outcomeEvalLog.Printf("Evaluating outcomes: items=%d, repo_override=%q", len(items), repoOverride)
 	if repoOverride == "" {
@@ -115,6 +119,9 @@ func EvaluateOutcomes(ctx context.Context, items []CreatedItemReport, repoOverri
 			repoOverride = slug
 			outcomeEvalLog.Printf("Resolved repo override from current repo slug: %s", repoOverride)
 		}
+	}
+	if trustedHost == "" {
+		trustedHost = outcomeAPIHostForRepo(repoOverride)
 	}
 
 	reports := make([]OutcomeReport, 0, len(items))
@@ -126,12 +133,22 @@ func EvaluateOutcomes(ctx context.Context, items []CreatedItemReport, repoOverri
 			continue
 		}
 		repo := resolveItemRepo(item, repoOverride)
+		itemID := outcomeItemID(item, occurrences)
+		if !sameOutcomeAPIHost(repo, trustedHost) {
+			reports = append(reports, OutcomeReport{
+				ItemID: itemID, Type: item.Type, ObjectURL: item.URL,
+				ObjectNumber: resolveItemNumber(item), Repo: repo,
+				CreatedAt: item.Timestamp, CheckedAt: time.Now().UTC().Format(time.RFC3339Nano),
+				EvalError:         "item repository host does not match workflow run host",
+				OutcomeEvaluation: outcomeEvidence(OutcomeStatusError, EvidenceWeak, "untrusted_host"),
+			})
+			continue
+		}
 		eval, ok := outcomeEvaluators[item.Type]
 		if !ok {
 			outcomeEvalLog.Printf("No evaluator registered for type %q, using generic sticky", item.Type)
 			eval = evalGenericSticky
 		}
-		itemID := outcomeItemID(item, occurrences)
 		report := eval(ctx, item, repo)
 		report.ItemID = itemID
 		report.CreatedAt = item.Timestamp
@@ -145,6 +162,22 @@ func EvaluateOutcomes(ctx context.Context, items []CreatedItemReport, repoOverri
 	}
 	outcomeEvalLog.Printf("Outcome evaluation complete: reports=%d, skipped=%d", len(reports), skipped)
 	return reports
+}
+
+func sameOutcomeAPIHost(targetRepo, runRepo string) bool {
+	_, targetHost := repoutil.NormalizeRepoForAPI(targetRepo)
+	if targetHost == "" {
+		targetHost = lookupEnv("GH_HOST")
+	}
+	return strings.EqualFold(normalizedGitHubAPIHost(targetHost), normalizedGitHubAPIHost(runRepo))
+}
+
+func outcomeAPIHostForRepo(repo string) string {
+	_, host := repoutil.NormalizeRepoForAPI(repo)
+	if host == "" {
+		host = lookupEnv("GH_HOST")
+	}
+	return strings.ToLower(normalizedGitHubAPIHost(host))
 }
 
 func outcomeItemID(item CreatedItemReport, occurrences map[[sha256.Size]byte]int) string {

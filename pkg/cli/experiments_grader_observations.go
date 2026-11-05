@@ -55,10 +55,11 @@ type graderMetricObservationSet struct {
 	MetricID string
 	// Direction is the declared grader direction ("higher_is_better" or "lower_is_better").
 	// Empty (treated as higher_is_better) for eval-backed metrics.
-	Direction  string
-	ByVariant  map[string][]GraderMetricObservation
-	Exclusions map[string][]ExcludedObservationSummary
-	Coverage   map[string]*OutcomeMetricCoverage
+	Direction     string
+	ByVariant     map[string][]GraderMetricObservation
+	Exclusions    map[string][]ExcludedObservationSummary
+	Coverage      map[string]*OutcomeMetricCoverage
+	OutcomeWindow *OutcomeWindowInfo
 }
 
 type graderResultsArtifact struct {

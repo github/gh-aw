@@ -76,3 +76,19 @@ esac
 	assert.Equal(t, outcomeItemID(items[0], make(map[[sha256.Size]byte]int)), report.Items[0].ItemID,
 		"host routing must not alter source action identity")
 }
+
+func TestEvaluateOutcomesRejectsManifestHostsOutsideRunHost(t *testing.T) {
+	calls := installOutcomeAPIFixture(t, `printf '%s\n' "$*" >> "$GH_AW_TEST_OUTCOME_CALLS"; exit 1`)
+	items := []CreatedItemReport{
+		{Type: "create_issue", Repo: "attacker.example.com/acme/repo", Number: 1},
+		{Type: "create_issue", Repo: "acme/repo", URL: "https://attacker.example.com/acme/repo/issues/2"},
+	}
+	reports := EvaluateOutcomes(context.Background(), items, "github.example.com/acme/repo", nil)
+	require.Len(t, reports, 2)
+	for _, report := range reports {
+		assert.Equal(t, OutcomeStatusError, report.OutcomeStatus)
+		assert.Equal(t, "item repository host does not match workflow run host", report.EvalError)
+	}
+	_, err := os.Stat(calls)
+	assert.ErrorIs(t, err, os.ErrNotExist, "untrusted artifact hosts must not trigger API calls")
+}

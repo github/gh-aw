@@ -320,7 +320,8 @@ Follow the **${{ experiments.prompt_v2 }}** instructions.
 
 `gh aw experiments analyze <workflow>` evaluates outcomes on demand; no scheduled
 collector is needed. `outcome_window` defaults to `auto`: analysis estimates the
-pooled 95th-percentile decision time across variants with Kaplan–Meier censoring
+pooled 95th-percentile decision time from this experiment's outputs across variants
+with Kaplan–Meier censoring
 for still-open outputs, clamps the window to 24 hours–30 days, and uses `72h`
 until 20 outputs have known decision times. Set a positive Go duration such as
 `72h` to override the learned window. Only runs at least the effective window contribute
@@ -345,6 +346,9 @@ the analyzer uses a two-proportion test if every observed run value is 0 or 1,
 otherwise Welch's t-test (for example, when a run creates several PRs).
 Explicit `proportion_test` or `bayesian_ab` analysis requires binary per-run
 values and cannot analyze fractional outcomes.
+The report includes the effective window, its source, and the sample size used for
+learning or the cold-start fallback. Outcome-backed secondary metrics include
+per-variant observations, coverage, and statistical comparisons in text and JSON.
 Prefer `outcome:zero_touch` when acceptance is already high and reducing human
 intervention is the goal.
 

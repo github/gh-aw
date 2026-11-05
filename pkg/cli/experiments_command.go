@@ -279,6 +279,7 @@ func reconcileExperimentDetailsWithConfigs(details *ExperimentDetails, configs m
 // closure. Each metric references exactly one source, so the resolved maps never collide.
 type experimentMetricObservationSets struct {
 	Primary    map[string]*graderMetricObservationSet
+	Secondary  map[string]map[string]*graderMetricObservationSet
 	Guardrails map[string]map[string]*graderMetricObservationSet
 }
 
@@ -305,14 +306,14 @@ func loadMetricObservationSetsForAnalysis(
 		graderGuardrails = make(map[string]map[string]*graderMetricObservationSet, len(evalGuardrails))
 	}
 	mergeGuardrailObservationSets(graderGuardrails, evalGuardrails)
-	outcomeSets, outcomeGuardrails, outcomeCleanup, err := loadOutcomeObservationSetsForAnalysis(details, frontmatter, repoOverride)
+	outcomeSets, outcomeSecondary, outcomeGuardrails, outcomeCleanup, err := loadOutcomeObservationSetsForAnalysis(details, frontmatter, repoOverride)
 	if err != nil {
 		cleanup()
 		return nil, func() {}, err
 	}
 	maps.Copy(graderSets, outcomeSets)
 	mergeGuardrailObservationSets(graderGuardrails, outcomeGuardrails)
-	return &experimentMetricObservationSets{Primary: graderSets, Guardrails: graderGuardrails}, func() {
+	return &experimentMetricObservationSets{Primary: graderSets, Secondary: outcomeSecondary, Guardrails: graderGuardrails}, func() {
 		cleanup()
 		outcomeCleanup()
 	}, nil
@@ -398,14 +399,26 @@ func computeExperimentAnalysesWithObservationBundle(
 		if configs != nil {
 			cfg = configs[exp.Name]
 		}
-		analyses = append(analyses, computeExperimentAnalysisWithObservationBundle(
+		analysis := computeExperimentAnalysisWithObservationBundle(
 			exp,
 			cfg,
 			evals,
 			metricEvalResults,
 			observationSets.Primary[exp.Name],
 			observationSets.Guardrails[exp.Name],
-		))
+		)
+		analysis.SecondaryMetrics = computeOutcomeSecondaryMetricAnalyses(
+			cfg, observationSets.Secondary[exp.Name], analysis.Variants,
+		)
+		if analysis.OutcomeWindow == nil {
+			for _, set := range observationSets.Secondary[exp.Name] {
+				if set != nil && set.OutcomeWindow != nil {
+					analysis.OutcomeWindow = set.OutcomeWindow
+					break
+				}
+			}
+		}
+		analyses = append(analyses, analysis)
 	}
 	return analyses
 }

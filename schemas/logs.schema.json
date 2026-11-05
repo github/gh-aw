@@ -5098,7 +5098,6 @@
                     "outcome_status",
                     "evidence_strength",
                     "type",
-                    "zero_touch_evidence_complete",
                     "created_at",
                     "checked_at"
                   ],
@@ -5405,7 +5404,6 @@
                         "outcome_status",
                         "evidence_strength",
                         "type",
-                        "zero_touch_evidence_complete",
                         "created_at",
                         "checked_at"
                       ],
@@ -8708,7 +8706,6 @@
                     "outcome_status",
                     "evidence_strength",
                     "type",
-                    "zero_touch_evidence_complete",
                     "created_at",
                     "checked_at"
                   ],
@@ -9015,7 +9012,6 @@
                         "outcome_status",
                         "evidence_strength",
                         "type",
-                        "zero_touch_evidence_complete",
                         "created_at",
                         "checked_at"
                       ],

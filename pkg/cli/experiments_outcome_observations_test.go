@@ -34,8 +34,6 @@ func TestOutcomeMetricRunValue(t *testing.T) {
 	pending := experimentOutcome(OutcomeStatusPending, false, false)
 	unknown := experimentOutcome(OutcomeStatusUnknown, false, false)
 	issue := OutcomeReport{Type: "create_issue", OutcomeEvaluation: OutcomeEvaluation{OutcomeStatus: OutcomeStatusAccepted}}
-	nonPR := experimentOutcome(OutcomeStatusAccepted, false, false)
-	nonPR.Type = "create_issue"
 	for _, tc := range []struct {
 		name     string
 		kind     string
@@ -60,13 +58,12 @@ func TestOutcomeMetricRunValue(t *testing.T) {
 		{name: "zero touch", kind: "zero_touch", items: []OutcomeReport{merged}, value: 1, measured: true},
 		{name: "human touch is zero", kind: "zero_touch", items: []OutcomeReport{touched}, measured: true},
 		{name: "incomplete is excluded", kind: "zero_touch", items: []OutcomeReport{incomplete}, coverage: OutcomeMetricCoverage{Unavailable: 1}},
-		{name: "non PR acceptance contributes zero to zero touch", kind: "zero_touch", items: []OutcomeReport{nonPR}, measured: true},
+		{name: "non PR acceptance contributes zero to zero touch", kind: "zero_touch", items: []OutcomeReport{issue}, measured: true},
 		{name: "rejected needs no touch evidence", kind: "zero_touch", items: []OutcomeReport{rejected}, measured: true},
 		{name: "pending needs no touch evidence", kind: "zero_touch", items: []OutcomeReport{pending}, measured: true, coverage: OutcomeMetricCoverage{StalePending: 1}},
 		{name: "incomplete does not affect acceptance", kind: "accepted", items: []OutcomeReport{incomplete}, value: 1, measured: true},
 		{name: "zero touch all resolved denominator", kind: "zero_touch", items: []OutcomeReport{merged, touched, rejected, pending}, value: .25, measured: true, coverage: OutcomeMetricCoverage{StalePending: 1}},
 		{name: "zero touch partial evidence", kind: "zero_touch", items: []OutcomeReport{merged, incomplete}, value: 1, measured: true, coverage: OutcomeMetricCoverage{Unavailable: 1}},
-		{name: "non PR is resolved but not zero touch", kind: "zero_touch", items: []OutcomeReport{issue}, measured: true},
 		{name: "mixed PR and issue denominator", kind: "zero_touch", items: []OutcomeReport{merged, issue}, value: .5, measured: true},
 		{name: "mixed output acceptance", kind: "accepted", items: []OutcomeReport{merged, issue}, value: 1, measured: true},
 	} {
@@ -157,6 +154,22 @@ func TestOutcomeMetricCoverageForMatureRuns(t *testing.T) {
 	assert.Equal(t, &OutcomeMetricCoverage{}, variants["candidate"].OutcomeCoverage)
 }
 
+func TestEmptyOutcomeMetricObservationsDoNotInferBinaryType(t *testing.T) {
+	set := &graderMetricObservationSet{
+		ByVariant: map[string][]GraderMetricObservation{"control": {}, "candidate": {}},
+		Coverage:  map[string]*OutcomeMetricCoverage{"control": {Unavailable: 1}, "candidate": {Unavailable: 1}},
+	}
+	cfg := &workflow.ExperimentConfig{
+		Metric: "outcome:accepted", Variants: []string{"control", "candidate"}, MinSamples: 1,
+	}
+	exp := ExperimentVariantStats{
+		Name: "prompt", Variants: map[string]int{"control": 1, "candidate": 1}, Total: 2,
+	}
+	analysis := computeExperimentAnalysisWithObservationBundle(exp, cfg, nil, nil, set, nil)
+	assert.Empty(t, analysis.MetricType)
+	assert.Empty(t, analysis.Comparisons, "no observations must not run statistical tests")
+}
+
 func TestOutcomeMetricPerExperimentWindowsShareCollection(t *testing.T) {
 	t.Parallel()
 	now := time.Now()
@@ -197,7 +210,10 @@ func TestOutcomeMetricPerExperimentWindowsShareCollection(t *testing.T) {
 func TestResolveOutcomeMetricReferences(t *testing.T) {
 	t.Parallel()
 	configs := map[string]*workflow.ExperimentConfig{
-		"prompt": {Metric: "outcome:accepted", GuardrailMetrics: []workflow.GuardrailMetric{{Name: "outcome:zero_touch", Threshold: ">=0.5"}}},
+		"prompt": {
+			Metric: "outcome:accepted", SecondaryMetrics: []string{"outcome:zero_touch"},
+			GuardrailMetrics: []workflow.GuardrailMetric{{Name: "outcome:zero_touch", Threshold: ">=0.5"}},
+		},
 	}
 	primary, guardrails, windows, automatic, err := resolveOutcomeMetricReferences(configs)
 	require.NoError(t, err)
@@ -205,6 +221,11 @@ func TestResolveOutcomeMetricReferences(t *testing.T) {
 	assert.Equal(t, "zero_touch", guardrails["prompt"]["outcome:zero_touch"])
 	assert.Equal(t, 72*time.Hour, windows["prompt"])
 	assert.Contains(t, automatic, "prompt")
+	secondary, err := resolveOutcomeSecondaryMetricReferences(map[string]*workflow.ExperimentConfig{
+		"prompt": {SecondaryMetrics: []string{"outcome:zero_touch"}},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]map[string]string{"prompt": {"outcome:zero_touch": "zero_touch"}}, secondary)
 	configs["prompt"].OutcomeWindow = "24h"
 	_, _, windows, automatic, err = resolveOutcomeMetricReferences(configs)
 	require.NoError(t, err)
@@ -258,6 +279,9 @@ func TestEstimateOutcomeWindow(t *testing.T) {
 		}
 		runs, data := makeFixture(decisions, nil)
 		assert.Equal(t, defaultExperimentOutcomeWindow, estimateOutcomeWindow(runs, map[string]struct{}{"quality": {}}, data, now))
+		info := estimateOutcomeWindowInfo(runs, map[string]struct{}{"quality": {}}, data, now)
+		assert.Equal(t, "default", info.Source)
+		assert.Equal(t, minExperimentOutcomeDecisions-1, info.SampleSize)
 	})
 
 	t.Run("p95 includes censored pending outputs", func(t *testing.T) {
@@ -388,7 +412,10 @@ func TestLoadOutcomeObservationSetsUsesLiveCollector(t *testing.T) {
 		},
 	}
 	frontmatter := experimentFrontmatterResult{ExperimentConfigs: map[string]*workflow.ExperimentConfig{
-		"prompt": {Metric: "outcome:accepted", GuardrailMetrics: []workflow.GuardrailMetric{{Name: "outcome:zero_touch", Threshold: ">=0.5"}}},
+		"prompt": {
+			Metric: "outcome:accepted", SecondaryMetrics: []string{"outcome:zero_touch"},
+			GuardrailMetrics: []workflow.GuardrailMetric{{Name: "outcome:zero_touch", Threshold: ">=0.5"}},
+		},
 	}}
 	bundle, cleanup, err := loadMetricObservationSetsForAnalysis(details, frontmatter, "acme/repo")
 	require.NoError(t, err)
@@ -397,7 +424,18 @@ func TestLoadOutcomeObservationSetsUsesLiveCollector(t *testing.T) {
 	assert.InDelta(t, 1, bundle.Primary["prompt"].ByVariant["control"][0].Value, 1e-12)
 	require.Len(t, bundle.Guardrails["prompt"]["outcome:zero_touch"].ByVariant["control"], 1)
 	assert.InDelta(t, 1, bundle.Guardrails["prompt"]["outcome:zero_touch"].ByVariant["control"][0].Value, 1e-12)
+	require.Len(t, bundle.Secondary["prompt"]["outcome:zero_touch"].ByVariant["control"], 1)
+	assert.Equal(t, "outcome:zero_touch", bundle.Secondary["prompt"]["outcome:zero_touch"].MetricID)
 	assert.Equal(t, 1, bundle.Primary["prompt"].Coverage["candidate"].Immature)
+	assert.Equal(t, "default", bundle.Primary["prompt"].OutcomeWindow.Source)
+	analyses := computeExperimentAnalysesWithObservationBundle(
+		details.Experiments, frontmatter.ExperimentConfigs, nil, nil, bundle,
+	)
+	require.Len(t, analyses, 1)
+	require.Len(t, analyses[0].SecondaryMetrics, 1)
+	assert.Equal(t, "outcome:zero_touch", analyses[0].SecondaryMetrics[0].Metric)
+	assert.Equal(t, 1, analyses[0].SecondaryMetrics[0].Variants[1].ObservationCount)
+	assert.NotNil(t, analyses[0].OutcomeWindow)
 	commands, err := os.ReadFile(calls)
 	require.NoError(t, err)
 	assert.Contains(t, string(commands), "--name called-safe-outputs-items")

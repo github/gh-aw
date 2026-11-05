@@ -229,7 +229,7 @@ The same minimum-two-variants constraint from R-SCHEMA-005 applies.
 | `hypothesis` | string | Null and alternative hypothesis statements. |
 | `metric` | string | Primary metric name to observe (e.g., `aic`), an eval reference (`eval:<id>` / `evals.<id>`) when using `evals:`, a grader reference (`grader:<id>` / `graders.<id>`) when using `graders:`, or `outcome:accepted` / `outcome:zero_touch`. |
 | `secondary_metrics` | string[] | Additional metric references, including outcome references. |
-| `outcome_window` | `"auto"` or positive duration string | Minimum run age for outcome observations. Defaults to `auto`, which learns a pooled per-workflow 95th-percentile decision time using Kaplan–Meier estimation, clamped to 24 hours–30 days. It falls back to `72h` until 20 outputs have known decision times. An explicit positive Go duration overrides learning; applies to primary and guardrail outcome metrics. |
+| `outcome_window` | `"auto"` or positive duration string | Minimum run age for outcome observations. Defaults to `auto`, which learns a pooled per-experiment 95th-percentile decision time using Kaplan–Meier estimation, clamped to 24 hours–30 days. It falls back to `72h` until 20 outputs have known decision times. An explicit positive Go duration overrides learning; applies to primary, secondary, and guardrail outcome metrics. |
 | `guardrail_metrics` | object[] | Thresholds that must not degrade. Each object has `name` (string), `threshold` (string or number), and optional `direction` (`"min"`\|`"max"`) (see §4.4). |
 | `min_samples` | integer ≥ 1 | Minimum runs per variant before analysis is reliable. Defaults to 20. |
 | `weight` | integer[] | Per-variant probability weights (see §5.2). |
@@ -677,11 +677,13 @@ assignment history for variant attribution and the existing deterministic safe-o
 outcome evaluators. No scheduled collector is required.
 
 When `outcome_window` is `auto` or omitted, implementations **MUST** estimate the
-pooled 95th-percentile time to decision from all variants, treating still-open
+pooled 95th-percentile time to decision from the experiment's own outputs across all variants, treating still-open
 outputs as right-censored observations with Kaplan–Meier estimation. The selected
 window **MUST** be clamped to 24 hours–30 days and **MUST** fall back to `72h`
 until at least 20 outputs have known decision times. An explicit positive Go
-duration **MUST** override estimation.
+duration **MUST** override estimation. Reports **MUST** include the effective window,
+its source (`learned`, `default`, or `configured`), and the sample size used when
+learning or falling back.
 
 Runs younger than the effective `outcome_window` **MUST** be reported as `immature`
 and excluded from `min_samples`. Each mature run contributes at most one observation:
@@ -702,7 +704,9 @@ not scored zero. Other resolved output types **MUST** remain in the denominator
 and contribute zero to the numerator.
 
 Reports **MUST** expose per-variant `immature`, `stale_pending`, `unavailable`, and
-`no_op` coverage in text and JSON, including coverage for outcome-backed guardrails.
+`no_op` coverage in text and JSON for outcome-backed primary, secondary, and guardrail
+metrics. Outcome-backed secondary metrics **MUST** include per-variant observations
+and statistical comparisons in text and JSON.
 Only usable run observations count toward `min_samples`.
 
 ### 11.3 Multiple Comparison Correction

@@ -76,7 +76,44 @@ func GenerateNamedOutputSchema(name string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to generate %s schema: %w", name, err)
 	}
 	fixCreatedItemIDSchema(schema)
+	makeOutcomeEvidenceCompletenessOptional(schema)
 	return MarshalOutputSchema(schema)
+}
+
+func makeOutcomeEvidenceCompletenessOptional(schema *jsonschema.Schema) {
+	if schema == nil {
+		return
+	}
+	if _, ok := schema.Properties["zero_touch_evidence_complete"]; ok {
+		required := schema.Required[:0]
+		for _, name := range schema.Required {
+			if name != "zero_touch_evidence_complete" {
+				required = append(required, name)
+			}
+		}
+		schema.Required = required
+	}
+	for _, child := range schema.Properties {
+		makeOutcomeEvidenceCompletenessOptional(child)
+	}
+	if schema.Items != nil {
+		makeOutcomeEvidenceCompletenessOptional(schema.Items)
+	}
+	for _, child := range schema.ItemsArray {
+		makeOutcomeEvidenceCompletenessOptional(child)
+	}
+	if schema.AdditionalProperties != nil {
+		makeOutcomeEvidenceCompletenessOptional(schema.AdditionalProperties)
+	}
+	for _, child := range schema.OneOf {
+		makeOutcomeEvidenceCompletenessOptional(child)
+	}
+	for _, child := range schema.AnyOf {
+		makeOutcomeEvidenceCompletenessOptional(child)
+	}
+	for _, child := range schema.AllOf {
+		makeOutcomeEvidenceCompletenessOptional(child)
+	}
 }
 
 // fixCreatedItemIDSchema walks the generated schema tree and narrows any
