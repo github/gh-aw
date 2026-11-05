@@ -5149,6 +5149,14 @@ safe-outputs:
     # (optional)
     deduplicate-by-title: null
 
+    # Deduplicate against issues with all listed labels. With deduplicate-by-title,
+    # both the title and all labels must match (AND). Applies within-run and against
+    # open/recently-closed repository issues. Omitted or empty lists disable label
+    # filtering. Literal strings only; does not change labels applied at creation.
+    # (optional)
+    deduplicate-by-labels: []
+      # Array of strings
+
     # Target repository in format 'owner/repo' for cross-repository issue creation.
     # Takes precedence over trial target repo settings.
     # (optional)

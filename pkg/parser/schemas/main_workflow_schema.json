@@ -6864,6 +6864,17 @@
                   ],
                   "description": "Title-based deduplication for create-issue. Set to true for exact title matching, or provide a non-negative integer (0\u2013100) to deduplicate by Levenshtein edit distance (e.g., 1 allows one-character differences). Accepts a GitHub Actions expression that resolves to a boolean or integer at runtime. Applies within-run and against open/recently-closed repository issues."
                 },
+                "deduplicate-by-labels": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "not": {
+                      "pattern": "\\$\\{\\{"
+                    }
+                  },
+                  "description": "Deduplicate against issues with all listed labels. When deduplicate-by-title is also enabled, both the title and all labels must match (AND). Applies within-run and against open/recently-closed repository issues. Omitted or empty lists disable label filtering. Labels must be literal strings, not GitHub Actions expressions. Does not change labels applied at creation."
+                },
                 "target-repo": {
                   "type": "string",
                   "description": "Target repository in format 'owner/repo' for cross-repository issue creation. Takes precedence over trial target repo settings."
