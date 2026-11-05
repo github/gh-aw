@@ -83,6 +83,11 @@
       "version": "v6.1.0",
       "sha": "b843ebf9b913146b38da2eaa7aeddf76074ae1ad"
     },
+    "actions/setup-java@v6.2.0": {
+      "repo": "actions/setup-java",
+      "version": "v6.2.0",
+      "sha": "77dd5b2ce225ea11469928ac317850245a74ae78"
+    },
     "actions/setup-node@v7.1.0": {
       "repo": "actions/setup-node",
       "version": "v7.1.0",
@@ -143,10 +148,10 @@
       "version": "v1.24.1",
       "sha": "54075bcc5e249e4758d363f27d099f55d843f124"
     },
-    "github/codeql-action/upload-sarif@v4.39.2": {
+    "github/codeql-action/upload-sarif@v4.39.3": {
       "repo": "github/codeql-action/upload-sarif",
-      "version": "v4.39.2",
-      "sha": "1fc58d04a4d4374f921bdac573c3811c240f9c26"
+      "version": "v4.39.3",
+      "sha": "33d7b85da1a04171e211befe2c739303b9a4c066"
     },
     "github/stale-repos@v9.1.1": {
       "repo": "github/stale-repos",
