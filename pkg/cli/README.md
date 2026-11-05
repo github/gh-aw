@@ -182,6 +182,12 @@ The `cli` package is intentionally large and command-oriented. The tables below 
 | `GetCurrentRepoSlug` | `func GetCurrentRepoSlug() (string, error)` | Returns the current repository slug. |
 | `GetVersion` | `func GetVersion() string` | Returns the CLI version string. |
 | `SetVersionInfo` | `func SetVersionInfo(v string)` | Sets the CLI version string at startup. |
+| `CheckAndPrepareDockerImagesWithDetachedDownloads` | `func(ctx context.Context, opts DockerImagesOptions) error` | Checks requested scanner images and starts bounded downloads where needed. |
+| `DryRunRequiredBoolFlags` | `func() []string` | Lists development-compile checks that cannot be disabled. |
+| `NewSkillCommand` | `func() *cobra.Command` | Constructs the skill command. |
+| `NewWorkCommandWithNativeDeliveryHost` | `func(host *workqueue.NativeDeliveryHost) *cobra.Command` | Constructs the protected native work command using a host-supplied delivery boundary. |
+| `RetrieveEpisodeLogs` | `func(ctx context.Context, opts EpisodeRetrievalOptions) (LogsData, error)` | Collects canonical workflow-run members using compact artifacts and the standard log report builder. |
+| `ValidateDevelopmentCompileFlags` | `func(dev bool, flags map[string]bool) error` | Rejects explicit development-compile opt-outs while allowing omitted defaults. |
 
 ### Constants
 

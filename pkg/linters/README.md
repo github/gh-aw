@@ -6,6 +6,8 @@ The `linters` package namespace contains custom static analysis linters used by 
 
 This package currently provides custom Go analyzers in the following subpackages:
 
+The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Reset`, `Timeout`, and `Unlock`) are methods on the standard-library values being analyzed, not exports from the `linters` package.
+
 - `appendbytestring` — reports `append(b, []byte(s)...)` calls where `b` is `[]byte` and `s` is a string, which can be simplified to `append(b, s...)`.
 - `appendoneelement` — reports `append(s, []T{x}...)` calls where a single-element slice literal is spread and can be simplified to `append(s, x)`.
 - `blankassigncomma` — reports assignment statements where every result is discarded via 2 or more blank identifiers (e.g. `_, _ = f()`), which may indicate unintended result ignoring.
