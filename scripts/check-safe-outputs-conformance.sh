@@ -260,7 +260,12 @@ check_staged_mode() {
         # Skip test files and non-safe-output modules
         [[ "$handler" =~ test|_checks\.cjs$ ]] && continue
         [[ "$handler" =~ (apm_unpack|run_apm_unpack|observability|generate_observability) ]] && continue
-        
+
+        # Skip files with a documented USE-003 exemption annotation
+        if grep -q "@safe-outputs-exempt[[:space:]]\\+USE-003" "$handler"; then
+            continue
+        fi
+
         # Only check handlers that explicitly reference the safe outputs staged mode env var
         if grep -q "GH_AW_SAFE_OUTPUTS_STAGED\|logStagedPreviewInfo\|generateStagedPreview" "$handler"; then
             # Check for emoji in preview
@@ -304,13 +309,16 @@ check_type_completeness() {
     local spec_file="docs/src/content/docs/specs/safe-outputs-specification.md"
     local failed=0
     
-    # Extract type names
-    grep "^#### Type:" "$spec_file" 2>/dev/null | sed 's/^#### Type: //' | head -10 | while read -r type_name; do
+    # Extract type names. Process substitution keeps the loop in this shell so its failures reach the summary.
+    while read -r type_name; do
         sections_found=0
-        
+
+        # Bound each type at the next heading. A fixed line window truncates long types and also matches
+        # sibling types that share the name prefix, such as create_pull_request_review_comment.
+        type_section=$(awk -v name="$type_name" '$0 == "#### Type: " name {found=1; next} found && (/^###? / || /^#### Type: /) {exit} found' "$spec_file")
+
         # Check for required sections
         for section in "MCP Tool Schema" "Operational Semantics" "Configuration Parameters" "Security Requirements" "Required Permissions"; do
-            type_section=$(grep -A 200 "^#### Type: $type_name" "$spec_file" 2>/dev/null || true)
             if grep -q "**$section**" <<< "$type_section"; then
                 ((sections_found += 1))
             fi
@@ -320,8 +328,8 @@ check_type_completeness() {
             log_medium "REQ-002: Type '$type_name' has only $sections_found/5 required sections"
             failed=1
         fi
-    done
-    
+    done < <(grep "^#### Type:" "$spec_file" 2>/dev/null | sed 's/^#### Type: //')
+
     if [ $failed -eq 0 ]; then
         log_pass "REQ-002: All safe output types have complete documentation"
     fi

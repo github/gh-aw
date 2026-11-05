@@ -56,34 +56,6 @@ func conditionFromExpression(source string, expression *actionslanguageservice.E
 	}
 }
 
-// VisitExpressionTree visits opaque operands of a condition tree. Typed builder
-// nodes remain separate from the parser adapter, as required by optimizer callers.
-func VisitExpressionTree(node ConditionNode, visitor func(*ExpressionNode) error) error {
-	switch n := node.(type) {
-	case *ExpressionNode:
-		return visitor(n)
-	case *AndNode:
-		if err := VisitExpressionTree(n.Left, visitor); err != nil {
-			return err
-		}
-		return VisitExpressionTree(n.Right, visitor)
-	case *OrNode:
-		if err := VisitExpressionTree(n.Left, visitor); err != nil {
-			return err
-		}
-		return VisitExpressionTree(n.Right, visitor)
-	case *NotNode:
-		return VisitExpressionTree(n.Child, visitor)
-	case *DisjunctionNode:
-		for _, term := range n.Terms {
-			if err := VisitExpressionTree(term, visitor); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
 func BreakLongExpression(source string) []string {
 	if len(source) <= int(constants.MaxExpressionLineLength) {
 		return []string{source}
