@@ -215,6 +215,20 @@ Human-written content typically has:
 - Natural conversational flow with genuine questions or frustrations
 - Authentic emotional reactions to technical problems
 
+### add-labels Format
+
+Each label in an `add-labels` call must be an object with exactly `name`, `rationale`, and `confidence`. Set `confidence` to the exact string `"HIGH"`.
+
+```json
+{
+  "type": "add_labels",
+  "labels": [
+    {"name": "ai-inspected", "rationale": "The issue is legitimate and on-topic.", "confidence": "HIGH"}
+  ],
+  "item_number": 12345
+}
+```
+
 ## Actions
 
 Based on your analysis:
