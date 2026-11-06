@@ -147,34 +147,45 @@ func TestValidateMainWorkflowFrontmatter_MaxToolCalls(t *testing.T) {
 }
 
 func TestValidateMainWorkflowFrontmatter_MaxIssueArtifacts(t *testing.T) {
-	for _, key := range []string{"max-issue-artifacts", "max-isssue-artifacts"} {
-		t.Run(key, func(t *testing.T) {
-			for _, test := range []struct {
-				name    string
-				value   any
-				wantErr bool
-			}{
-				{"positive", 3, false},
-				{"zero", 0, false},
-				{"negative", -3, false},
-				{"fraction", 1.5, true},
-				{"string", "3", true},
-				{"boolean", false, true},
-				{"expression", "${{ inputs.max }}", true},
-			} {
-				t.Run(test.name, func(t *testing.T) {
-					err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
-						"on": "workflow_dispatch",
-						"safe-outputs": map[string]any{
-							"create-issue": map[string]any{key: test.value},
-						},
-					}, "workflow.md")
-					if (err != nil) != test.wantErr {
-						t.Fatalf("validation error = %v, wantErr %t", err, test.wantErr)
-					}
-				})
+	for _, test := range []struct {
+		name    string
+		value   any
+		wantErr bool
+	}{
+		{"positive", 3, false},
+		{"zero", 0, false},
+		{"negative", -3, false},
+		{"fraction", 1.5, true},
+		{"string", "3", true},
+		{"boolean", false, true},
+		{"expression", "${{ inputs.max }}", true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
+				"on": "workflow_dispatch",
+				"safe-outputs": map[string]any{
+					"create-issue": map[string]any{"max-issue-artifacts": test.value},
+				},
+			}, "workflow.md")
+			if (err != nil) != test.wantErr {
+				t.Fatalf("validation error = %v, wantErr %t", err, test.wantErr)
 			}
 		})
+	}
+}
+
+func TestValidateMainWorkflowFrontmatter_MaxIssueArtifactsRejectsTypo(t *testing.T) {
+	for _, config := range []map[string]any{
+		{"max-isssue-artifacts": 3},
+		{"max-issue-artifacts": 3, "max-isssue-artifacts": 4},
+	} {
+		err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
+			"on":           "workflow_dispatch",
+			"safe-outputs": map[string]any{"create-issue": config},
+		}, "workflow.md")
+		if err == nil {
+			t.Fatal("Expected the misspelled artifact count option to be rejected")
+		}
 	}
 }
 

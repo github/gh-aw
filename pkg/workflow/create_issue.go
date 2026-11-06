@@ -69,12 +69,6 @@ func (c *Compiler) parseCreateIssuesConfig(outputMap map[string]any) *CreateIssu
 			return &CreateIssuesConfig{}
 		},
 		func(configData map[string]any) bool {
-			if alias, exists := configData["max-isssue-artifacts"]; exists {
-				if _, canonicalExists := configData["max-issue-artifacts"]; !canonicalExists {
-					configData["max-issue-artifacts"] = alias
-				}
-				delete(configData, "max-isssue-artifacts")
-			}
 			coerceStringOrArrayFields(configData, []string{"assignees"}, createIssueLog)
 			return true
 		},

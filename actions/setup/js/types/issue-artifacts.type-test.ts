@@ -39,12 +39,15 @@ void numericBody;
 // @ts-expect-error Normalization does not widen the format to an arbitrary string.
 normalized[0].type = "unknown";
 
-const frontmatter: CreateIssueConfig = { type: "create_issue", "max-issue-artifacts": 3, "max-isssue-artifacts": 3, "max-issue-artifact-size": "1mb" };
+const frontmatter: CreateIssueConfig = { type: "create_issue", "max-issue-artifacts": 3, "max-issue-artifact-size": "1mb" };
 frontmatter["max-issue-artifact-size"] = 1048576;
 const compiled: HandlerConfig = { max_issue_artifacts: 3, max_issue_artifact_size: 1048576 };
 void compiled;
 // @ts-expect-error Artifact counts must be numeric.
 frontmatter["max-issue-artifacts"] = "3";
+// @ts-expect-error The misspelled artifact count option is not supported.
+const misspelledConfig: CreateIssueConfig = { type: "create_issue", "max-isssue-artifacts": 3 };
+void misspelledConfig;
 // @ts-expect-error Human-friendly sizes must be compiled to bytes before runtime.
 compiled.max_issue_artifact_size = "1mb";
 

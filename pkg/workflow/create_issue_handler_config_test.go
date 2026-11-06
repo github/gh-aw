@@ -153,8 +153,6 @@ func TestCreateIssueArtifactLimit(t *testing.T) {
 		{"positive", "max-issue-artifacts: 2", 2, 1048576},
 		{"zero", "max-issue-artifacts: 0", 0, 1048576},
 		{"negative", "max-issue-artifacts: -2", -2, 1048576},
-		{"alias", "max-isssue-artifacts: 4", 4, 1048576},
-		{"canonical-precedence", "max-issue-artifacts: 3\n    max-isssue-artifacts: 4", 3, 1048576},
 		{"smaller-size", "max-issue-artifact-size: 1024", 10, 1024},
 		{"larger-size", "max-issue-artifact-size: 2097152", 10, 2097152},
 		{"human-default-size", "max-issue-artifact-size: 1mb", 10, 1048576},
@@ -195,6 +193,26 @@ func TestCreateIssueArtifactLimit(t *testing.T) {
 				t.Errorf("Compiled tool description does not contain the configured artifact size")
 			}
 		})
+	}
+}
+
+func TestCreateIssueArtifactLimitRejectsTypo(t *testing.T) {
+	for _, config := range []string{
+		"max-isssue-artifacts: 3",
+		"max-issue-artifacts: 3\n    max-isssue-artifacts: 4",
+	} {
+		dir := testutil.TempDir(t, "artifact-limit-typo")
+		path := filepath.Join(dir, "invalid-limit.md")
+		source := fmt.Sprintf("---\non: workflow_dispatch\nengine: copilot\nsafe-outputs:\n  create-issue:\n    %s\n---\nCreate an issue.\n", config)
+		if err := os.WriteFile(path, []byte(source), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if err := NewCompiler().CompileWorkflow(path); err == nil || !strings.Contains(err.Error(), "max-isssue-artifacts") {
+			t.Fatalf("Expected an explicit unknown artifact count option error, got %v", err)
+		}
+		if _, err := os.Stat(filepath.Join(dir, "invalid-limit.lock.yml")); !os.IsNotExist(err) {
+			t.Fatal("Invalid configuration must not publish a lock file")
+		}
 	}
 }
 

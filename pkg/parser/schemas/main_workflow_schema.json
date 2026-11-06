@@ -6830,10 +6830,6 @@
                   "default": 10,
                   "description": "Maximum number of artifacts attached per created issue (default: 10). Zero or a negative value disables issue artifacts."
                 },
-                "max-isssue-artifacts": {
-                  "type": "integer",
-                  "description": "Alias for max-issue-artifacts. If both are specified, max-issue-artifacts takes precedence."
-                },
                 "max-issue-artifact-size": {
                   "type": ["integer", "string"],
                   "minimum": 1,
