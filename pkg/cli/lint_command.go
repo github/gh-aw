@@ -67,7 +67,7 @@ All registered AST rules run by default. Use --rules to select AST rules and ski
 	cmd.Flags().Bool("pyflakes", false, "Enable pyflakes integration in actionlint")
 	cmd.Flags().StringSlice("rules", nil, "Select built-in AST rules and skip actionlint (default: all AST rules plus actionlint; empty selects all)")
 	cmd.Flags().Bool("list-rules", false, "List available built-in AST lint rules")
-	cmd.Flags().Bool("json", false, "Emit structured diagnostics (requires --rules)")
+	cmd.Flags().BoolP("json", "j", false, "Emit structured diagnostics (requires --rules)")
 	cmd.Flags().Bool("debug", false, "Include secret-leak analysis coverage warnings for investigation")
 	registerJavaScriptLintFlags(cmd)
 	// The root routes help to stderr. Structured lint reports belong on stdout.
