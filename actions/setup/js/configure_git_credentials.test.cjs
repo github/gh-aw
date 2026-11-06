@@ -121,7 +121,17 @@ describe("configure_git_credentials.sh repository identity", () => {
   it("does not mistake an untrusted checkout for a missing origin", () => {
     const configPath = path.join(target, ".git", "config");
     const configBefore = fs.readFileSync(configPath, "utf8");
-    const result = runScript({ ...env, GIT_TEST_ASSUME_DIFFERENT_OWNER: "1" }, target);
+    // Runner Git configuration may trust every directory, overriding the ownership check.
+    const result = runScript(
+      {
+        ...env,
+        GIT_TEST_ASSUME_DIFFERENT_OWNER: "1",
+        GIT_CONFIG_NOSYSTEM: "1",
+        GIT_CONFIG_GLOBAL: path.join(env.HOME, ".gitconfig"),
+        GIT_CONFIG_COUNT: "0",
+      },
+      target
+    );
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("Git checkout configuration could not be read");
     expect(result.stdout + result.stderr).not.toContain("test-token");
