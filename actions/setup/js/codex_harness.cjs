@@ -156,6 +156,7 @@ function createMCPCallWatchdog(timeoutMs, now = Date.now) {
     observePrefix(prefix) {
       const event = parseJsonPrefix(prefix);
       track(event?.type, event?.item);
+      return event;
     },
     expiredTimeoutMs() {
       const current = now();
@@ -1158,6 +1159,11 @@ async function main() {
       const strategy = selectedHarnessStrategy(resumeArgs || resolvedArgs, "codex");
       observeStrategy(strategy);
       const terminalErrors = [];
+      let nativeStderrRateLimitError = false;
+      const recordTerminalError = line => {
+        terminalErrors.push(line);
+        if (terminalErrors.length > 8) terminalErrors.shift();
+      };
       const mcpWatchdog = createMCPCallWatchdog(item => {
         const server = item.server ?? item.server_name ?? item.serverName;
         return serverToolTimeouts[server] ? serverToolTimeouts[server] * 1000 + MCP_CALL_TRANSPORT_GRACE_MS : fallbackToolTimeoutMs;
@@ -1181,12 +1187,15 @@ async function main() {
           const event = mcpWatchdog.observe(line);
           if (!event) return;
           if (event.type === "thread.started" && typeof event.thread_id === "string") lastThreadId = event.thread_id;
-          if (event.type === "turn.failed" || event.type === "error") {
-            terminalErrors.push(line);
-            if (terminalErrors.length > 8) terminalErrors.shift();
-          }
+          if (event.type === "turn.failed" || event.type === "error") recordTerminalError(line);
         },
-        onStdoutLinePrefix: prefix => mcpWatchdog.observePrefix(prefix),
+        onStdoutLinePrefix: prefix => {
+          const event = mcpWatchdog.observePrefix(prefix);
+          if (event?.type === "turn.failed" || event?.type === "error") recordTerminalError(prefix);
+        },
+        onStderrLine: line => {
+          if (isRateLimitError(line)) nativeStderrRateLimitError = true;
+        },
         runtimeGuard: {
           pollIntervalMs: Math.min(contextRebuildCircuitBreaker.pollIntervalMs, 1000),
           termGraceMs: contextRebuildCircuitBreaker.termGraceMs,
@@ -1238,7 +1247,12 @@ async function main() {
         log(`attempt ${attempt + 1}: runtime guard fired but process exited 0 — normalizing exit code to 1`);
         return { ...result, exitCode: 1, safeOutputsByteOffset, strategy };
       }
-      return { ...result, safeOutputsByteOffset, strategy, nativeTerminalRateLimitError: isRateLimitError(terminalErrors.join("\n")) };
+      return {
+        ...result,
+        safeOutputsByteOffset,
+        strategy,
+        nativeTerminalRateLimitError: nativeStderrRateLimitError || isRateLimitError(terminalErrors.join("\n")),
+      };
     },
     handleFailure: async ({ attempt, result }) => {
       if (result.runtimeGuardFired) {

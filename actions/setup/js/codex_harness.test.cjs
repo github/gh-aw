@@ -893,6 +893,24 @@ process.exit(1);`;
       expect(JSON.stringify(harnessRetry)).toContain("max_runs_exceeded");
     });
 
+    it("does not resume a generic terminal 429 emitted only on stderr", () => {
+      const { result, calls } = runHarnessFixture(`process.stderr.write("429 Too Many Requests\\n");process.exit(1);`, {
+        env: { AWF_REFLECT_ENABLED: "1" },
+        reflectData: { runs },
+      });
+      expect(result.status).toBe(1);
+      expect(calls).toHaveLength(1);
+      expect(result.stderr).toContain("AWF shared invocation budget exhausted (60/60)");
+    });
+
+    it("recognizes a terminal 429 in an oversized stdout event prefix", () => {
+      const script = `process.stdout.write(JSON.stringify({type:"turn.failed",error:{message:"429 Too Many Requests"},padding:"x".repeat(1024*1024)})+"\\n",()=>process.exit(1));`;
+      const { result, calls } = runHarnessFixture(script, { env: { AWF_REFLECT_ENABLED: "1" }, reflectData: { runs } });
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("AWF shared invocation budget exhausted (60/60)");
+      expect(calls).toHaveLength(1);
+    });
+
     it("preserves completed expected safe outputs after the reflected cap", () => {
       const dir = makeHarnessTempDir("codex-reflected-cap-");
       const safeOutputsPath = path.join(dir, "safe-outputs.jsonl");
