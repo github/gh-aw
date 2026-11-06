@@ -14,7 +14,9 @@ permissions:
 engine:
   id: codex
   model-provider: github
-model: copilot/gpt-6-sol
+  model-routing:
+    goal: cost
+    mode: economy
 strict: true
 if: needs.sighthound_scan.outputs.actionable_findings_detected == 'true'
 jobs:

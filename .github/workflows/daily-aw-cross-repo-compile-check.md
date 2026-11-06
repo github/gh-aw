@@ -12,10 +12,15 @@ permissions:
   issues: read
   pull-requests: read
   actions: read
+  copilot-requests: write
 tracker-id: daily-aw-cross-repo-compile-check
 max-turns: 140
 engine:
   id: claude
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
 sandbox:
   agent:
     id: awf
