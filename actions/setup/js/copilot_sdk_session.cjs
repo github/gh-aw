@@ -174,18 +174,21 @@ function parseSubagentModelsJson(value) {
  * @returns {Promise<{exitCode: number, output: string, hasOutput: boolean, durationMs: number}>}
  */
 async function runWithCopilotSDK(options) {
-  /** @type {{ modelObserver: ReturnType<typeof createCopilotSDKModelObserver> | null, sessionId: string }} */
-  const verification = { modelObserver: null, sessionId: "" };
+  /** @type {{ modelObserver: ReturnType<typeof createCopilotSDKModelObserver> | null, sessionId: string, imageDiagnostic: string }} */
+  const verification = { modelObserver: null, sessionId: "", imageDiagnostic: "" };
   const result = await runCopilotSDKSession({ ...options, verification });
   // Native shutdown records arrive while disconnecting, after the session result is known.
   const verificationFailure = verification.modelObserver && verification.sessionId ? verification.modelObserver.finalize(verification.sessionId) : "";
+  if (verification.imageDiagnostic) {
+    return { ...result, exitCode: COPILOT_TOOL_IMAGE_EXIT_CODE, output: result.output.includes(verification.imageDiagnostic) ? result.output : `${result.output}\n${verification.imageDiagnostic}` };
+  }
   if (!verificationFailure || result.exitCode === COPILOT_TOOL_IMAGE_EXIT_CODE) return result;
   // Any verification failure (substitution or unverifiable evidence) is reported with a dedicated exit code so the harness does not retry.
   return { ...result, exitCode: COPILOT_MODEL_VERIFICATION_EXIT_CODE, output: result.output.includes(verificationFailure) ? result.output : `${result.output}\n${verificationFailure}` };
 }
 
 /**
- * @param {Parameters<typeof runWithCopilotSDK>[0] & { verification: { modelObserver: ReturnType<typeof createCopilotSDKModelObserver> | null, sessionId: string } }} options
+ * @param {Parameters<typeof runWithCopilotSDK>[0] & { verification: { modelObserver: ReturnType<typeof createCopilotSDKModelObserver> | null, sessionId: string, imageDiagnostic: string } }} options
  * @returns {Promise<{exitCode: number, output: string, hasOutput: boolean, durationMs: number}>}
  */
 async function runCopilotSDKSession({
@@ -274,6 +277,7 @@ async function runCopilotSDKSession({
   let modelSubstitutionError = null;
   /** @type {Error | null} */
   let unsupportedImageError = null;
+  let sessionClosing = false;
   /**
    * Rejects `denialGuardPromise` once the tool-denial threshold is exceeded and the
    * bounded force-exit interval elapses. Declared here so `recordToolDenial` (defined
@@ -496,8 +500,10 @@ async function runCopilotSDKSession({
     }
 
     session.on(event => {
+      if (stream.writableEnded || stream.destroyed) return;
       if (!unsupportedImageError && (providerConfig || isCopilotBYOK()) && hasUnsupportedCopilotToolImage(event)) {
         unsupportedImageError = new Error(COPILOT_TOOL_IMAGE_DIAGNOSTIC);
+        verification.imageDiagnostic = unsupportedImageError.message;
         writeDriverEvent("session.error", { errorType: "unsupported_capability", code: "copilot_tool_image_unsupported", message: unsupportedImageError.message });
         if (denialGuardReject) denialGuardReject(unsupportedImageError);
         void session.abort().catch(() => {
@@ -516,7 +522,7 @@ async function runCopilotSDKSession({
         }
         if (denialGuardReject) denialGuardReject(modelSubstitutionError);
       }
-      if (stream.writableEnded || stream.destroyed) return;
+      if (sessionClosing) return;
       // Defer shell chunks until redaction can protect credentials spanning chunks.
       // Background output must not extend the post-completion watchdog either.
       if (event.type === "tool.shell_output") return;
@@ -584,7 +590,7 @@ async function runCopilotSDKSession({
       //   tool call was just started, LLM inference is in progress, or no output yet).
       // The watchdog fires only if sendAndWait never resolves on its own after
       // the final tool result is returned — the common SDK post-completion hang.
-      if (!contentFiltered && hasOutput && pendingToolCalls.size === 0 && !inAssistantTurn) {
+      if (!unsupportedImageError && !contentFiltered && hasOutput && pendingToolCalls.size === 0 && !inAssistantTurn) {
         if (postCompletionWatchdog) clearTimeout(postCompletionWatchdog);
         postCompletionWatchdog = setTimeout(() => {
           postCompletionWatchdog = null;
@@ -681,6 +687,7 @@ async function runCopilotSDKSession({
       durationMs,
     };
   } finally {
+    sessionClosing = true;
     if (denialGuardTimer) {
       clearTimeout(denialGuardTimer);
       denialGuardTimer = null;
@@ -689,11 +696,6 @@ async function runCopilotSDKSession({
     if (postCompletionWatchdog) {
       clearTimeout(postCompletionWatchdog);
       postCompletionWatchdog = null;
-    }
-    // Snapshot for null-safe cleanup in this scope.
-    const stream = eventsStream;
-    if (stream) {
-      await new Promise(resolve => stream.end(resolve));
     }
     // Timeout budget for each cleanup operation.  Prevents the driver from
     // hanging indefinitely when the server is unresponsive after sendAndWait
@@ -744,6 +746,11 @@ async function runCopilotSDKSession({
       } catch {
         // best-effort cleanup
       }
+    }
+    // Keep capturing native events delivered during disconnect and shutdown.
+    const stream = eventsStream;
+    if (stream) {
+      await new Promise(resolve => stream.end(resolve));
     }
   }
 }

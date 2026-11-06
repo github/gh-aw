@@ -76,6 +76,17 @@ describe("Copilot BYOK tool image guard", () => {
     expect(observer.check()).toBe(COPILOT_TOOL_IMAGE_DIAGNOSTIC);
   });
 
+  it("discards stale partial records when the invocation log is truncated", () => {
+    fs.writeFileSync(file, "cached session history\n");
+    const observer = createCopilotImageObserver({ sessionId: "session", sessionDirs: [root] });
+    fs.appendFileSync(file, '{"type":"unfinished');
+    expect(observer.check()).toBe("");
+    fs.writeFileSync(file, "");
+    expect(observer.check()).toBe("");
+    fs.appendFileSync(file, JSON.stringify(imageEvent) + "\n");
+    expect(observer.check()).toBe(COPILOT_TOOL_IMAGE_DIAGNOSTIC);
+  });
+
   it("fails closed if session evidence becomes unreadable", () => {
     const observer = createCopilotImageObserver({ sessionId: "session", sessionDirs: [root] });
     fs.mkdirSync(file);
@@ -84,6 +95,103 @@ describe("Copilot BYOK tool image guard", () => {
 
   it("rejects session path traversal", () => {
     expect(() => createCopilotImageObserver({ sessionId: "../other", sessionDirs: [root] })).toThrow("exact invocation session ID");
+  });
+
+  function runCLI(stub, args = [], byok = true) {
+    return spawnSync(process.execPath, [require.resolve("./copilot_harness.cjs"), process.execPath, stub, ...args], {
+      env: {
+        ...process.env,
+        HOME: root,
+        COPILOT_HOME: path.join(root, ".copilot"),
+        GH_AW_TMP_DIR: root,
+        GH_AW_AWF_CONFIG_PATH: path.join(root, "awf-config.json"),
+        COPILOT_API_KEY: byok ? "test-sentinel" : "",
+        COPILOT_SDK_URI: "",
+        COPILOT_PROVIDER_WIRE_API: "",
+        GH_AW_COPILOT_SDK: "0",
+        GH_AW_PHASE: "agent",
+        GH_AW_MODEL_ROUTING: "0",
+        GH_AW_SAFE_OUTPUTS: "",
+        AWF_REFLECT_ENABLED: "0",
+        GH_AW_HARNESS_INITIAL_DELAY_MS: "1",
+        GH_AW_HARNESS_MAX_RETRIES: "1",
+      },
+      encoding: "utf8",
+      timeout: 10000,
+    });
+  }
+
+  it.each(["--resume", "--session-id"])("resumes the exact BYOK invocation on retry and ignores its old image records (%s)", selector => {
+    const stub = path.join(root, "retry-cli.cjs");
+    const attemptsPath = path.join(root, "attempts.json");
+    const sessionId = "12345678-1234-1234-1234-123456789abc";
+    const sessionFile = path.join(root, ".copilot/session-state", sessionId, "events.jsonl");
+    fs.mkdirSync(path.dirname(sessionFile), { recursive: true });
+    fs.writeFileSync(sessionFile, JSON.stringify(imageEvent) + "\n");
+    fs.writeFileSync(
+      stub,
+      `
+      const fs = require("node:fs");
+      const file = ${JSON.stringify(attemptsPath)};
+      const attempts = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : [];
+      attempts.push(process.argv.slice(2));
+      fs.writeFileSync(file, JSON.stringify(attempts));
+      if (attempts.length === 1) {
+        console.log("Partial text output");
+        console.error("Execution failed: CAPIError: 400 Bad Request");
+        process.exit(1);
+      }
+      console.log("Completed");
+      `
+    );
+    const run = runCLI(stub, [selector, sessionId]);
+    expect(run.error, run.stderr).toBeUndefined();
+    expect(run.status, run.stderr).toBe(0);
+    expect(JSON.parse(fs.readFileSync(attemptsPath, "utf8"))).toEqual([
+      [selector, sessionId],
+      [selector, sessionId],
+    ]);
+  });
+
+  it("assigns an exact BYOK session and reuses only that UUID on retry", () => {
+    const stub = path.join(root, "retry-cli.cjs");
+    const attemptsPath = path.join(root, "attempts.json");
+    fs.writeFileSync(
+      stub,
+      `
+      const fs = require("node:fs");
+      const file = ${JSON.stringify(attemptsPath)};
+      const attempts = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : [];
+      attempts.push(process.argv.slice(2));
+      fs.writeFileSync(file, JSON.stringify(attempts));
+      if (attempts.length === 1) {
+        console.log("Partial text output");
+        console.error("Execution failed: CAPIError: 400 Bad Request");
+        process.exit(1);
+      }
+      console.log("Completed");
+      `
+    );
+    const run = runCLI(stub);
+    expect(run.error, run.stderr).toBeUndefined();
+    expect(run.status, run.stderr).toBe(0);
+    const attempts = JSON.parse(fs.readFileSync(attemptsPath, "utf8"));
+    expect(attempts).toHaveLength(2);
+    expect(attempts[0]).toEqual(["--session-id", expect.stringMatching(/^[0-9a-f-]{36}$/)]);
+    expect(attempts[1]).toEqual(["--session-id", attempts[0][1]]);
+  });
+
+  it.each([["--continue"], ["--connect", "localhost:3000"], ["--resume", "friendly-name"], ["--resume", "12345678"]])("rejects ambiguous BYOK session selectors before spawning (%j)", (...args) => {
+    const stub = path.join(root, "cli.cjs");
+    const marker = path.join(root, "spawned");
+    fs.writeFileSync(stub, `require("node:fs").writeFileSync(${JSON.stringify(marker)}, "spawned"); console.log("done");`);
+    const guarded = runCLI(stub, args);
+    expect(guarded.status, guarded.stderr).toBe(1);
+    expect(guarded.stderr).toContain("exact");
+    expect(fs.existsSync(marker)).toBe(false);
+    const native = runCLI(stub, args, false);
+    expect(native.status, native.stderr).toBe(0);
+    expect(fs.existsSync(marker)).toBe(true);
   });
 
   it.each([false, true])("fails a CLI image result without retrying or accepting prior output (long-lived=%s)", longLived => {
@@ -126,23 +234,28 @@ describe("Copilot BYOK tool image guard", () => {
     expect(run.stderr).not.toContain("attempt 2: spawning");
   });
 
-  it.each(["normal", "partial-output", "idle-timeout", "stalled", "subagent", "native", "inline", "byok-env", "abort-fails", "verification-enabled"])("handles SDK image completion (%s)", async mode => {
+  it.each(["normal", "partial-output", "idle-timeout", "stalled", "subagent", "native", "inline", "byok-env", "abort-fails", "verification-enabled", "disconnect", "stop"])("handles SDK image completion (%s)", async mode => {
     const abort = vi.fn().mockResolvedValue(undefined);
     if (mode === "abort-fails") abort.mockRejectedValue(new Error("abort failed"));
     if (mode === "byok-env") vi.stubEnv("COPILOT_API_KEY", "test-sentinel");
     if (mode === "verification-enabled") vi.stubEnv("GH_AW_COPILOT_CONFIGURED_MODEL", "test");
-    const disconnect = vi.fn().mockResolvedValue(undefined);
+    const disconnect = vi.fn(async () => {
+      if (mode === "disconnect") handler(imageEvent);
+    });
     const logger = vi.fn();
     let handler;
     class FakeCopilotClient {
       start = async () => {};
-      stop = async () => {};
+      stop = async () => {
+        if (mode === "stop") handler(imageEvent);
+      };
       createSession = async () => ({
         sessionId: "sdk",
         on: callback => {
           handler = callback;
         },
         sendAndWait: async () => {
+          if (mode === "disconnect" || mode === "stop") return { type: "assistant.message", data: { content: "done" } };
           if (mode === "partial-output") handler({ type: "assistant.message", data: { content: "Starting." } });
           handler(
             mode === "inline" ? { ...imageEvent, data: { ...imageEvent.data, result: { binaryResultsForLlm: [{ type: "image", data: "aW1hZ2U=" }] } } } : { ...imageEvent, ...(mode === "subagent" ? { parentToolCallId: "task" } : {}) }
