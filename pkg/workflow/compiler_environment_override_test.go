@@ -119,7 +119,7 @@ Test environment overrides.
 	require.NoError(t, err)
 	compiled.Jobs = nil
 	require.NoError(t, yaml.Unmarshal(content, &compiled))
-	assert.Equal(t, "production-approval", compiled.Jobs["activation"]["environment"])
+	assert.Equal(t, map[string]any{"name": "production-approval", "url": "https://production.example.com"}, compiled.Jobs["activation"]["environment"])
 	assert.Equal(t, map[string]any{"name": "production", "url": "https://production.example.com"}, compiled.Jobs["agent"]["environment"])
 	assert.Equal(t, "production-writes", compiled.Jobs["safe_outputs"]["environment"])
 	assert.Equal(t, map[string]any{"name": "production-custom", "url": "https://custom.example.com"}, compiled.Jobs["custom"]["environment"])
