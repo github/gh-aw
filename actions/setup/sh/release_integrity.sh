@@ -4,6 +4,66 @@ set +o histexpand
 # Sourced by installers from the trusted setup action, never from the download origin.
 # Review new pins against authenticated release provenance before committing them.
 # Add pins with scripts/update-release-pins.sh using an independently trusted manifest SHA256.
+release_staging_identity() {
+  stat -c '%d:%i:%u' "$1" 2>/dev/null || stat -f '%d:%i:%u' "$1"
+}
+
+cleanup_release_staging() {
+  if [ ! -e "$TEMP_DIR" ] && [ ! -L "$TEMP_DIR" ]; then
+    return 0
+  fi
+  # Keep the ownership evidence in the installer process, not in mutable staging.
+  if [ -L "$TEMP_DIR" ] || [ ! -d "$TEMP_DIR" ] || [ ! -O "$TEMP_DIR" ] ||
+    [ "$(release_staging_identity "$TEMP_DIR")" != "$GH_AW_RELEASE_STAGING_ID" ]; then
+    echo "Warning: refusing to clean replaced installer staging directory: $TEMP_DIR" >&2
+    return 0
+  fi
+  if ! rm -rf -- "$TEMP_DIR"; then
+    echo "Warning: unable to reclaim owned installer staging directory without elevated permissions: $TEMP_DIR" >&2
+  fi
+}
+
+create_release_staging() {
+  local prefix="$1" parent nonce attempt=0
+  if [[ ! "$prefix" =~ ^[a-z][a-z0-9-]*$ ]]; then
+    echo "ERROR: Invalid release staging prefix" >&2
+    return 1
+  fi
+  parent="${RUNNER_TEMP:-$PWD}"
+  if command -v cygpath >/dev/null 2>&1; then
+    parent="$(cygpath -u "$parent")" || return 1
+  fi
+  parent="$(cd "$parent" && pwd -P)" || return 1
+  while [ "$attempt" -lt 5 ]; do
+    attempt=$((attempt + 1))
+    nonce="$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')" || return 1
+    if [[ ! "$nonce" =~ ^[0-9a-f]{32}$ ]]; then
+      echo "ERROR: Could not generate a private release staging name" >&2
+      return 1
+    fi
+    TEMP_DIR="${parent}/${prefix}-install-${nonce}"
+    if (umask 077; mkdir -m 700 -- "$TEMP_DIR") 2>/dev/null; then
+      readonly TEMP_DIR
+      if ! GH_AW_RELEASE_STAGING_ID="$(release_staging_identity "$TEMP_DIR")"; then
+        echo "Warning: could not record ownership; leaving installer staging directory untouched: $TEMP_DIR" >&2
+        return 1
+      fi
+      readonly GH_AW_RELEASE_STAGING_ID
+      trap cleanup_release_staging EXIT
+      trap 'exit 130' INT
+      trap 'exit 143' TERM
+      trap 'exit 129' HUP
+      return 0
+    fi
+    if [ ! -e "$TEMP_DIR" ] && [ ! -L "$TEMP_DIR" ]; then
+      echo "ERROR: Could not allocate release staging under $parent" >&2
+      return 1
+    fi
+  done
+  echo "ERROR: Could not allocate a unique release staging directory under $parent" >&2
+  return 1
+}
+
 # Each entry binds repository, immutable release version, asset name, and SHA256.
 # The optional fourth argument is a literal pin from trusted workflow frontmatter.
 release_artifact_sha256() {

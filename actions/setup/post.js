@@ -120,37 +120,7 @@ function listTmpGhAwFiles(tmpDir, maxDepth, maxFiles) {
     }
   }
 
-  // Clean up AWF chroot directories under /tmp (e.g. /tmp/awf-*-chroot-home
-  // and /tmp/awf-chroot-*). These are created by AWF when running with
-  // --enable-host-access on GitHub-hosted runners. Files inside may be owned
-  // by root (written by Docker containers or privileged AWF processes),
-  // causing EACCES failures if cleanup is attempted without sudo.
-  for (const pattern of ["awf-*-chroot-home", "awf-chroot-*"]) {
-    const awfChrootFindResult = spawnSync("sudo", ["find", "/tmp", "-maxdepth", "1", "-name", pattern, "-type", "d", "-print"], { encoding: "utf8" });
-    if (awfChrootFindResult.status !== 0) {
-      console.log(`Failed to inspect /tmp/${pattern} directories`);
-      continue;
-    }
-
-    const awfChrootDirs = awfChrootFindResult.stdout
-      .split("\n")
-      .map(line => line.trim())
-      .filter(Boolean);
-    if (awfChrootDirs.length === 0) {
-      console.log(`No /tmp/${pattern} directories found`);
-      continue;
-    }
-
-    const awfChrootCleanupResult = spawnSync(
-      "sudo",
-      ["find", "/tmp", "-maxdepth", "1", "-name", pattern, "-type", "d", "-exec", "rm", "-rf", "--", "{}", "+"],
-      { stdio: "inherit" }
-    );
-    if (awfChrootCleanupResult.status === 0) {
-      const awfChrootNoun = awfChrootDirs.length === 1 ? "directory" : "directories";
-      console.log(`Cleaned up ${awfChrootDirs.length} /tmp/${pattern} ${awfChrootNoun}`);
-    } else {
-      console.log(`Failed to clean /tmp/${pattern} directories`);
-    }
-  }
+  // Legacy AWF chroots have no per-invocation ownership record. Other active
+  // runners can share /tmp and the same UID, so never sweep these by name.
+  console.warn("Warning: untracked AWF chroot directories are not reclaimed; shared-runner ownership cannot be established.");
 })();
