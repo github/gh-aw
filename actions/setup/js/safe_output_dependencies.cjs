@@ -126,7 +126,7 @@ function isConfirmedDependencySuccess(record) {
   // @safe-outputs-exempt USE-003: reads the staged flag only to reject unconfirmed success; renders no staged preview
   if (process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true") return false;
   if (!record || record.success !== true || classifySafeOutputResult(record) !== "success") return false;
-  if (pickOutcomeField(record, "staged") || pickOutcomeField(record, "queued") || pickOutcomeField(record, "buffered") || pickOutcomeField(record, "deferred_manifest")) return false;
+  if (pickOutcomeField(record, "staged") || pickOutcomeField(record, "queued") || pickOutcomeField(record, "buffered")) return false;
   const result = record.result;
   if (Array.isArray(result)) {
     return result.length > 0 && result.every(item => item && typeof item === "object" && isConfirmedDependencySuccess({ success: item.success !== false, result: item }));
@@ -154,7 +154,8 @@ function checkSafeOutputDependencies(plan, index, results, allowWaiting) {
       waiting = true;
       continue;
     }
-    return { state: "failed", errorCode: "safe_output_dependency_failed", error: "Safe-output prerequisite did not complete successfully" };
+    const skipReason = pickOutcomeField(record, "skipReason") || (pickOutcomeField(record, "skipped") && pickOutcomeField(record, "reason"));
+    return { state: "failed", errorCode: "safe_output_dependency_failed", error: `Safe-output prerequisite did not complete successfully${skipReason ? `: ${skipReason}` : ""}` };
   }
   return { state: waiting ? "waiting" : "ready" };
 }
