@@ -12,6 +12,7 @@ const {
   buildCodexResumeArgs,
   injectJsonFlag,
   isRateLimitError,
+  exhaustedInvocationBudget,
   isTokenPerMinuteRateLimitError,
   isAuthenticationFailedError,
   isMissingApiKeyError,
@@ -855,6 +856,74 @@ fs.appendFileSync(process.env.GH_AW_SAFE_OUTPUTS, JSON.stringify(item) + "\\n");
       } finally {
         fs.rmdirSync(dir);
       }
+    });
+  });
+
+  describe("shared invocation budget (PureLock run 42217846868)", () => {
+    const runs = { enabled: true, max_runs: 60, invocation_count: 60, remaining_runs: 0 };
+    const failure = `process.stdout.write(JSON.stringify({type:"thread.started",thread_id:"budget-thread"})+"\\n");
+process.stdout.write(JSON.stringify({type:"turn.failed",error:{message:"exceeded retry limit, last status: 429 Too Many Requests"}})+"\\n");
+process.exit(1);`;
+
+    it("requires a complete, consistent exhausted counter", () => {
+      expect(exhaustedInvocationBudget({ runs })).toEqual({ invocationCount: 60, maxRuns: 60 });
+      expect(exhaustedInvocationBudget({ runs: { ...runs, invocation_count: 61 } })).toEqual({ invocationCount: 61, maxRuns: 60 });
+      for (const invalid of [
+        null,
+        {},
+        { runs: null },
+        { runs: { ...runs, enabled: false } },
+        { runs: { ...runs, invocation_count: 59 } },
+        { runs: { ...runs, max_runs: 0 } },
+        { runs: { ...runs, max_runs: "60" } },
+        { runs: { ...runs, invocation_count: 60.5 } },
+        { runs: { ...runs, remaining_runs: 1 } },
+        { runs: { enabled: true, max_runs: 60, invocation_count: 60 } },
+      ]) {
+        expect(exhaustedInvocationBudget(invalid)).toBeNull();
+      }
+    });
+
+    it("does not resume a generic terminal 429 when fresh reflection confirms exhaustion", () => {
+      const { result, calls, harnessRetry } = runHarnessFixture(failure, { env: { AWF_REFLECT_ENABLED: "1" }, reflectData: { runs } });
+      expect(result.status).toBe(1);
+      expect(calls).toHaveLength(1);
+      expect(result.stderr).toContain("AWF shared invocation budget exhausted (60/60)");
+      expect(result.stderr).not.toContain("rate_limit_exceeded (transient)");
+      expect(JSON.stringify(harnessRetry)).toContain("max_runs_exceeded");
+    });
+
+    it("preserves completed expected safe outputs after the reflected cap", () => {
+      const dir = makeHarnessTempDir("codex-reflected-cap-");
+      const safeOutputsPath = path.join(dir, "safe-outputs.jsonl");
+      const script = `require("fs").appendFileSync(process.env.GH_AW_SAFE_OUTPUTS, JSON.stringify({type:"add_comment",body:"Review complete"})+"\\n");\n${failure}`;
+      const { result, calls } = runHarnessFixture(script, { env: { AWF_REFLECT_ENABLED: "1", GH_AW_SAFE_OUTPUTS: safeOutputsPath }, reflectData: { runs } });
+      expect(result.status, result.stderr).toBe(0);
+      expect(calls).toHaveLength(1);
+      expect(result.stderr).toContain("invocation cap saturated but safe-outputs already contain expected output");
+      expect(fs.readFileSync(safeOutputsPath, "utf8")).not.toContain("incomplete");
+    });
+
+    it.each([
+      ["a remaining budget", { runs: { ...runs, invocation_count: 59, remaining_runs: 1 } }, true, "1"],
+      ["missing counter metadata", {}, true, "1"],
+      ["a failed fresh fetch despite a saved exhausted snapshot", { runs }, false, "1"],
+      ["disabled reflection", { runs }, true, "0"],
+    ])("preserves transient retries with %s", (_name, reflectData, reflectOk, enabled) => {
+      const { result, calls } = runHarnessFixture(failure, { env: { AWF_REFLECT_ENABLED: enabled }, reflectData, reflectOk });
+      expect(result.status).toBe(1);
+      expect(calls).toHaveLength(2);
+      expect(result.stderr).toContain("rate_limit_exceeded (transient)");
+    });
+
+    it("does not treat a tool's quoted 429 as a native terminal error", () => {
+      const script = `process.stdout.write(JSON.stringify({type:"thread.started",thread_id:"quote-thread"})+"\\n");
+process.stdout.write(JSON.stringify({type:"item.completed",item:{type:"command_execution",id:"1",aggregated_output:"429 Too Many Requests",exit_code:0}})+"\\n");
+process.exit(1);`;
+      const { result, calls } = runHarnessFixture(script, { env: { AWF_REFLECT_ENABLED: "1" }, reflectData: { runs } });
+      expect(result.status).toBe(1);
+      expect(calls).toHaveLength(2);
+      expect(result.stderr).not.toContain("confirmed by fresh reflection");
     });
   });
 

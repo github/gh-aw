@@ -2,7 +2,7 @@
 private: true
 emoji: "🔐"
 name: PureLock
-description: Daily workflow that locks down up to 3 uncovered pure Go functions per run using parallel test-writer sub-agents
+description: Daily workflow that locks down one uncovered pure Go function per run using a focused test-writer sub-agent
 on:
   schedule: daily
   workflow_dispatch:
@@ -175,7 +175,7 @@ evals:
 
 # PureLock 🔐
 
-Lock down up to **3** pure Go functions per run. The orchestrator selects candidates, fans out to parallel `test-writer` sub-agents for test generation, then merges results into one draft PR.
+Lock down **one** pure Go function per run. The orchestrator selects a candidate, delegates to one `test-writer` sub-agent, then validates the result for one draft PR. The existing 60-invocation budget is shared by the orchestrator and its child; reserve the final 15 invocations for validation, coverage publication, and cache updates.
 
 The `purelock_precompute` job already did every expensive, deterministic step: it merged coverage profiles, type-checked `./pkg/...` with `go/packages`, ran a fixed-point side-effect analysis, and ranked the pure functions where coverage is weakest. Spend your budget writing tests, not exploring the repository.
 
@@ -188,18 +188,18 @@ The `purelock_precompute` job already did every expensive, deterministic step: i
 
 Treat `candidates.json` as the **complete** working set. Do not scan the repository for other functions.
 
-## 1. Select up to 3 functions
+## 1. Select one function
 
 1. Read `/tmp/gh-aw/cache-memory/purelock/state.json` when it exists. Shape:
    `{"processed":[{"key":"pkg/x/y.go:120:FuncName","date":"YYYY-MM-DD","outcome":"pr|noop"}]}`.
-2. Walk `candidates.json` in order (already sorted by score) and pick the first **up to 3** candidates whose `key` (`file:line:name`) is absent from `processed`, or was processed more than 60 days ago.
+2. Walk `candidates.json` in order (already sorted by score) and pick the first candidate whose `key` (`file:line:name`) is absent from `processed`, or was processed more than 60 days ago.
 3. If every candidate was processed recently, call `noop` explaining that the current candidate set is exhausted, and still update cache memory.
 
 For each selected candidate, write its JSON entry to `/tmp/gh-aw/agent/purelock-<name>/input.json` (creating the directory first).
 
-## 2. Generate tests in parallel
+## 2. Generate tests
 
-Invoke the `test-writer` sub-agent **simultaneously** for every selected candidate — start all invocations at once without waiting for any to finish first.
+Invoke exactly one `test-writer` sub-agent for the selected candidate. Do not replace an impure candidate or a failed child with another candidate in this run. Read its persisted result instead of polling repeatedly.
 
 Pass each agent the path to its input file:
 
@@ -278,6 +278,8 @@ model: large
 ---
 
 You are a focused test writer for a single Go function. Your only job is to generate and validate the test suite for the function described in your input file, then write the result.
+
+Use at most 20 tool calls. Batch independent reads and commands, activate Serena only once, and limit reference inspection to the selected function's direct call sites. Persist the final `result.json` as soon as the outcome is known. If the budget is exhausted before validated tests are ready, return `"outcome":"noop"` with the actual reason rather than continuing exploration.
 
 ### Setup
 

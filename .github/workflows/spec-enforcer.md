@@ -402,7 +402,6 @@ All tests are derived from README.md specifications, not from implementation sou
 ## agent: `rotation-state-recoverer`
 ---
 description: Parse merged PR body text to recover package rotation state.
-model: small
 ---
 You receive:
 - `pr_body`: the merged PR body text
@@ -426,7 +425,6 @@ Output JSON only:
 ## agent: `readme-spec-extractor`
 ---
 description: Extract structured API contract from a Go package README.md.
-model: small
 ---
 You are given the full contents of a single Go package README.md.
 
@@ -443,7 +441,6 @@ Do not invent details that the README does not state. Output JSON only.
 ## agent: `test-output-classifier`
 ---
 description: Classify go test/go build failures into a fixed taxonomy.
-model: small
 ---
 You receive raw `go build` and `go test` output for a single package.
 

@@ -278,6 +278,21 @@ function isRateLimitError(output) {
 }
 
 /**
+ * @param {unknown} reflectData
+ * @returns {{ invocationCount: number, maxRuns: number } | null}
+ */
+function exhaustedInvocationBudget(reflectData) {
+  if (!reflectData || typeof reflectData !== "object" || !("runs" in reflectData)) return null;
+  const runs = reflectData.runs;
+  if (!runs || typeof runs !== "object") return null;
+  if (!("enabled" in runs) || runs.enabled !== true || !("max_runs" in runs) || !("invocation_count" in runs) || !("remaining_runs" in runs)) return null;
+  const maxRuns = runs.max_runs;
+  const invocationCount = runs.invocation_count;
+  if (typeof maxRuns !== "number" || !Number.isSafeInteger(maxRuns) || maxRuns <= 0 || typeof invocationCount !== "number" || !Number.isSafeInteger(invocationCount) || invocationCount < maxRuns || runs.remaining_runs !== 0) return null;
+  return { invocationCount, maxRuns };
+}
+
+/**
  * Determines if the collected output indicates OpenAI token-per-minute exhaustion.
  * This limit is workload-dependent and immediate fresh-run retries can consume
  * additional budget without making progress.
@@ -1223,9 +1238,9 @@ async function main() {
         log(`attempt ${attempt + 1}: runtime guard fired but process exited 0 — normalizing exit code to 1`);
         return { ...result, exitCode: 1, safeOutputsByteOffset, strategy };
       }
-      return { ...result, safeOutputsByteOffset, strategy };
+      return { ...result, safeOutputsByteOffset, strategy, nativeTerminalRateLimitError: isRateLimitError(terminalErrors.join("\n")) };
     },
-    handleFailure: ({ attempt, result }) => {
+    handleFailure: async ({ attempt, result }) => {
       if (result.runtimeGuardFired) {
         const details = result.runtimeGuardReason || "Codex runtime guard terminated the run after context rebuild thresholds were exceeded.";
         emitInfrastructureIncomplete(`Codex run stopped by a runtime guard. ${details}`, { logger: log });
@@ -1300,6 +1315,19 @@ async function main() {
       }
 
       const nonRetryableGuard = detectNonRetryableHarnessGuard(result.output);
+      // Codex can omit the proxy error body and expose only a generic terminal 429.
+      if (!nonRetryableGuard.maxRunsExceeded && process.env.AWF_REFLECT_ENABLED === "1" && result.nativeTerminalRateLimitError === true) {
+        const refreshed = await fetchAWFReflect({ logger: log, timeoutMs: 3000, modelsTimeoutMs: 1000 });
+        const budget = refreshed.ok ? exhaustedInvocationBudget(refreshed.reflectData) : null;
+        if (budget) {
+          nonRetryableGuard.maxRunsExceeded = true;
+          result.failureClasses.push("max_runs_exceeded");
+          log(`attempt ${attempt + 1}: AWF shared invocation budget exhausted (${budget.invocationCount}/${budget.maxRuns}) — confirmed by fresh reflection`);
+          if (!safeOutputsPath || !hasExpectedSafeOutputs(safeOutputsPath, { logger: log })) {
+            emitInfrastructureIncomplete(`AWF shared per-run invocation budget exhausted (${budget.invocationCount}/${budget.maxRuns}), including sub-agents. Retrying cannot restore this budget.`, { logger: log });
+          }
+        }
+      }
       if (nonRetryableGuard.apiProxyGuardRejection) {
         const guard = nonRetryableGuard.apiProxyGuardRejection.guard;
         emitInfrastructureIncomplete(`AWF API proxy rejected the request: ${guard}`, { logger: log });
@@ -1438,6 +1466,7 @@ if (typeof module !== "undefined" && module.exports) {
     buildCodexResumeArgs,
     injectJsonFlag,
     isRateLimitError,
+    exhaustedInvocationBudget,
     isTokenPerMinuteRateLimitError,
     isAuthenticationFailedError,
     isMissingApiKeyError,

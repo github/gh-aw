@@ -375,6 +375,25 @@ describe("Codex sub-agent models (daily-arxiv-researcher run 39394965127)", () =
   };
   const bodyOf = content => extractFrontmatterAndBody(content).markdown.trim();
 
+  it.each([
+    ["ab-testing-advisor", ["field-presence-checker", "workflow-characterizer"]],
+    ["spec-enforcer", ["readme-spec-extractor", "rotation-state-recoverer", "test-output-classifier"]],
+  ])("%s helpers inherit the main model without unverifiable child endpoints", async (workflow, names) => {
+    const run = codexLayout();
+    const source = fs.readFileSync(path.join(repoRoot, `.github/workflows/${workflow}.md`), "utf8");
+    const agents = extractInlineSubAgents(extractFrontmatterAndBody(source).markdown).agents;
+    expect(agents.map(agent => agent.name).sort()).toEqual(names);
+    expect(agents.every(agent => frontmatterOf(agent.content).model === undefined)).toBe(true);
+    stageInline(run, "codex", Object.fromEntries(agents.map(agent => [agent.name, agent.content])));
+
+    const outcome = await apply(run, { reflectData: { endpoints: [{ provider: "openai", models: ["gpt-5-mini-2025-08-07"], models_fetch_status: "complete" }] } });
+
+    expect(outcome).toMatchObject({ ok: true, failures: [], resolutions: [] });
+    expect(run.records()).toEqual([]);
+    expect(roleFiles(run)).toEqual(names.map(name => `${name}.toml`));
+    for (const name of names) expect(readRole(run, name)).not.toHaveProperty("model");
+  });
+
   it("codex_declared_small_writes_native_toml_before_spawn", async () => {
     const run = codexLayout();
     // Fixture mutation: the recorded paper-screener with its selector changed to `small`.
