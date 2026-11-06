@@ -19,6 +19,14 @@ Sandboxed CLI sessions derive URL approvals from finalized AWF network rules, in
 
 Copilot resolves [model aliases](/gh-aw/reference/engines/#model-aliases) before launch. Exact IDs pass through unchanged; unavailable IDs fail the first inference request.
 
+### Tool-returned images
+
+Copilot CLI's BYOK request assembly can silently omit asset-backed images returned by `view` or MCP tools, even when the tool reports success and records `binaryResultsForLlm`. Sandboxed gh-aw Copilot inference uses BYOK routing through the AWF API proxy, so a vision-capable model alone does not prevent this limitation. No gh-aw capability setting repairs the missing payload.
+
+The built-in CLI harness and SDK driver fail with `copilot_tool_image_unsupported` when a successful tool result contains an image without inline data. CLI mode checks newly appended session events during execution and once more at exit; SDK mode aborts on the tool-completion event. This guard does not prove that other image payloads reached the provider. Custom harnesses and drivers must implement their own checks.
+
+Track the request-assembly fix in [Copilot CLI issue #4600](https://github.com/github/copilot-cli/issues/4600). A successful image-view message or an image asset in session logs is not evidence that the model saw the pixels. Do not rely on `@path` in a prompt file as a verified workaround.
+
 ### Dynamic workflows
 
 Copilot [dynamic workflows](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/use-dynamic-workflows) are experimental and disabled by default. Current CLI releases require both settings:

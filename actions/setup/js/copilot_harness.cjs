@@ -49,6 +49,8 @@
 
 "use strict";
 
+const { COPILOT_TOOL_IMAGE_EXIT_CODE, isCopilotBYOK, createCopilotImageObserver } = require("./copilot_image_guard.cjs");
+
 const { iterateJsonl } = require("./jsonl_helpers.cjs");
 require("./shim.cjs");
 
@@ -2085,9 +2087,10 @@ async function main() {
           // Verified native retries resume the exact UUID; other CLI paths retain --continue.
           let currentArgs = !copilotSDKMode && attempt > 0 && useContinueOnRetry ? [...resolvedArgs, "--continue"] : resolvedArgs;
           if (!copilotSDKMode && durableSession?.id && attempt > 0 && !useContinueOnRetry) throw new Error("Durable Copilot continuation cannot restart a recorded session as a fresh conversation");
+          const verifyImages = !copilotSDKMode && isCopilotBYOK();
           const verifyModel = !copilotSDKMode && (!process.env.GH_AW_PHASE || process.env.GH_AW_PHASE === "agent") && Boolean(process.env.COPILOT_MODEL);
           let sessionId;
-          if (!copilotSDKMode && (verifyModel || durableSession)) {
+          if (!copilotSDKMode && (verifyModel || verifyImages || durableSession)) {
             const continuedId = attempt === 0 ? durableSession?.id || undefined : useContinueOnRetry ? nativeModelSessionId : undefined;
             const session = prepareCopilotModelSession(resolvedArgs, continuedId);
             currentArgs = session.args;
@@ -2104,6 +2107,7 @@ async function main() {
           observeStrategy(strategy);
           const safeArgs = currentArgs.map((arg, i) => (currentArgs[i - 1] === "--prompt" || currentArgs[i - 1] === "-p" ? "<redacted>" : arg));
           const modelObserver = !verifyModel ? { check: () => "" } : createCopilotModelObserver({ configuredModel: selectionConfiguredModel, resolvedModel: process.env.COPILOT_MODEL || "", sessionId, logger: log });
+          const imageObserver = verifyImages ? createCopilotImageObserver({ sessionId }) : { check: () => "" };
           // Driver mode: run copilot_sdk_driver.cjs as a normal subprocess. The harness has
           // already started the sidecar; the driver only opens an SDK client connection.
           const result = await runProcess({
@@ -2114,7 +2118,12 @@ async function main() {
             logArgs: safeArgs,
             env: childEnv,
             stdin: promptStdin,
-            runtimeGuard: { shouldTerminate: () => ({ terminate: Boolean(modelObserver.check()), reason: "copilot_model_verification" }) },
+            runtimeGuard: {
+              shouldTerminate: () => {
+                if (imageObserver.check()) return { terminate: true, reason: "copilot_tool_image_unsupported" };
+                return { terminate: Boolean(modelObserver.check()), reason: "copilot_model_verification" };
+              },
+            },
             postResultWatchdog: safeOutputsPath
               ? {
                   shouldArm: () => hasTerminalSafeOutput(safeOutputsPath),
@@ -2124,6 +2133,15 @@ async function main() {
           });
           // The SDK driver observes its main session, records any substitution it refused and
           // exits with COPILOT_MODEL_VERIFICATION_EXIT_CODE on any verification failure.
+          const imageDiagnostic = imageObserver.check(true);
+          if (imageDiagnostic || (copilotSDKMode && result.exitCode === COPILOT_TOOL_IMAGE_EXIT_CODE)) {
+            result.exitCode = 1;
+            result.runtimeGuardReason = "copilot_tool_image_unsupported";
+            if (imageDiagnostic) {
+              log(imageDiagnostic);
+              result.output += `\n${imageDiagnostic}`;
+            }
+          }
           const modelSubstitution = copilotSDKMode ? readCopilotModelSubstitution() : modelObserver.check(true);
           if (modelSubstitution || (copilotSDKMode && result.exitCode === COPILOT_MODEL_VERIFICATION_EXIT_CODE)) {
             result.exitCode = 1;
@@ -2140,6 +2158,10 @@ async function main() {
           return { ...result, strategy };
         },
         handleFailure: async ({ attempt, result }) => {
+          if (result.runtimeGuardReason === "copilot_tool_image_unsupported") {
+            result.failureClasses = ["copilot_tool_image_unsupported"];
+            return { action: "stop" };
+          }
           if (result.runtimeGuardReason === "copilot_model_verification") {
             result.failureClasses = ["copilot_model_verification"];
             return { action: "stop" };

@@ -39,6 +39,7 @@ const { copilotSessionContext, getCopilotMessageRefusal } = require("./copilot_s
 const { loadCopilotSDKCustomAgents } = require("./extract_inline_sub_agents.cjs");
 const { qualifyModelForMultiProvider, parseMultiProviderJson } = require("./copilot_sdk_multi_provider.cjs");
 const { COPILOT_MODEL_VERIFICATION_EXIT_CODE, createCopilotSDKModelObserver, copilotSessionStateDirectories } = require("./copilot_model_selection.cjs");
+const { COPILOT_TOOL_IMAGE_EXIT_CODE, COPILOT_TOOL_IMAGE_DIAGNOSTIC, isCopilotBYOK, hasUnsupportedCopilotToolImage } = require("./copilot_image_guard.cjs");
 
 const CAPTURED_EPHEMERAL_EVENTS = new Set([...COPILOT_WORKFLOW_EVENT_TYPES, "assistant.usage", "assistant.message_delta", "assistant.reasoning_delta", "model.call_failure", "model.call_final_result", "model.call_finished"]);
 
@@ -178,7 +179,7 @@ async function runWithCopilotSDK(options) {
   const result = await runCopilotSDKSession({ ...options, verification });
   // Native shutdown records arrive while disconnecting, after the session result is known.
   const verificationFailure = verification.modelObserver && verification.sessionId ? verification.modelObserver.finalize(verification.sessionId) : "";
-  if (!verificationFailure) return result;
+  if (!verificationFailure || result.exitCode === COPILOT_TOOL_IMAGE_EXIT_CODE) return result;
   // Any verification failure (substitution or unverifiable evidence) is reported with a dedicated exit code so the harness does not retry.
   return { ...result, exitCode: COPILOT_MODEL_VERIFICATION_EXIT_CODE, output: result.output.includes(verificationFailure) ? result.output : `${result.output}\n${verificationFailure}` };
 }
@@ -271,6 +272,8 @@ async function runCopilotSDKSession({
   let catastrophicToolDenialsTriggered = false;
   /** @type {Error | null} */
   let modelSubstitutionError = null;
+  /** @type {Error | null} */
+  let unsupportedImageError = null;
   /**
    * Rejects `denialGuardPromise` once the tool-denial threshold is exceeded and the
    * bounded force-exit interval elapses. Declared here so `recordToolDenial` (defined
@@ -493,6 +496,14 @@ async function runCopilotSDKSession({
     }
 
     session.on(event => {
+      if (!unsupportedImageError && (providerConfig || isCopilotBYOK()) && hasUnsupportedCopilotToolImage(event)) {
+        unsupportedImageError = new Error(COPILOT_TOOL_IMAGE_DIAGNOSTIC);
+        writeDriverEvent("session.error", { errorType: "unsupported_capability", code: "copilot_tool_image_unsupported", message: unsupportedImageError.message });
+        if (denialGuardReject) denialGuardReject(unsupportedImageError);
+        void session.abort().catch(() => {
+          log("warning: unable to abort SDK inference after an unsupported tool image; stopping the driver");
+        });
+      }
       // Observe the main-session model before capture so records delivered while disconnecting count too.
       const modelDiagnostic = modelObserver.observe(event);
       if (modelDiagnostic && !modelSubstitutionError) {
@@ -603,6 +614,7 @@ async function runCopilotSDKSession({
     // timeout intervenes. denialGuardPromise never settles unless the guard fires.
     const result = await Promise.race([session.sendAndWait({ prompt }, sendTimeoutMs), denialGuardPromise]);
 
+    if (unsupportedImageError) throw unsupportedImageError;
     if (catastrophicToolDenialsError) {
       throw catastrophicToolDenialsError;
     }
@@ -635,13 +647,13 @@ async function runCopilotSDKSession({
     return { exitCode: 0, output, hasOutput, durationMs };
   } catch (err) {
     const durationMs = Date.now() - startTime;
-    const failure = catastrophicToolDenialsError ?? modelSubstitutionError ?? (contentFiltered ? contentFilterError() : err instanceof Error ? err : new Error(String(err)));
+    const failure = unsupportedImageError ?? catastrophicToolDenialsError ?? modelSubstitutionError ?? (contentFiltered ? contentFilterError() : err instanceof Error ? err : new Error(String(err)));
     log(`error: ${failure.message}`);
 
     // When the post-completion idle watchdog force-disconnected the session, the
     // agent's work is done — the SDK simply failed to resolve sendAndWait after
     // the final tool result was returned.  Treat it as a successful completion.
-    if (postCompletionWatchdogTriggered && !catastrophicToolDenialsError && !modelSubstitutionError && !contentFiltered && hasOutput && pendingToolCalls.size === 0) {
+    if (postCompletionWatchdogTriggered && !unsupportedImageError && !catastrophicToolDenialsError && !modelSubstitutionError && !contentFiltered && hasOutput && pendingToolCalls.size === 0) {
       log(`warning: post-completion watchdog triggered disconnect — treating as completed`);
       log(`session completed: hasOutput=${hasOutput} assistantTurns=${assistantTurnCount} durationMs=${durationMs}`);
       return { exitCode: 0, output, hasOutput, durationMs };
@@ -651,7 +663,7 @@ async function runCopilotSDKSession({
     // output and all tracked tool calls have already completed, the session work is
     // done — the SDK simply failed to emit the idle signal.  Treat it as a successful
     // run so the harness does not classify it as a failure or waste retry attempts.
-    const isIdleTimeout = !catastrophicToolDenialsError && !modelSubstitutionError && !contentFiltered && SDK_IDLE_TIMEOUT_PATTERN.test(failure.message);
+    const isIdleTimeout = !unsupportedImageError && !catastrophicToolDenialsError && !modelSubstitutionError && !contentFiltered && SDK_IDLE_TIMEOUT_PATTERN.test(failure.message);
     if (isIdleTimeout && hasOutput && pendingToolCalls.size === 0) {
       log(`warning: SDK idle-timeout with collected output and no pending tool calls — treating as completed`);
       log(`session completed: hasOutput=${hasOutput} assistantTurns=${assistantTurnCount} durationMs=${durationMs}`);
@@ -663,8 +675,8 @@ async function runCopilotSDKSession({
     // Preserve any output collected before the error so the harness can use it
     // for retry decisions and diagnostics.
     return {
-      exitCode: 1,
-      output: hasOutput ? output : failure.message,
+      exitCode: unsupportedImageError ? COPILOT_TOOL_IMAGE_EXIT_CODE : 1,
+      output: unsupportedImageError && hasOutput ? `${output}\n${failure.message}` : hasOutput ? output : failure.message,
       hasOutput,
       durationMs,
     };
