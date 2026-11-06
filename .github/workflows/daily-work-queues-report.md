@@ -107,6 +107,21 @@ event log.
    changes happened in the 24-hour window from snapshot data alone.
    Summarize counts rather than copying queue payloads or sensitive contents.
 
+Format the issue body as a reader-facing report:
+
+- Use `###` or lower for all report headings; reserve `#` and `##` for the
+  surrounding GitHub page.
+- Structure it as overview → key metrics and issues → collapsible detail →
+  next actions and/or limitations. Keep decision-relevant metrics, the
+  highest-priority issues, and limitations visible before any collapsible
+  section.
+- Put long tables, item lists, raw evidence, and detailed findings in
+  `<details><summary><b>...</b></summary>...</details>` blocks. Keep the queue
+  summary table and a short list of actionable stuck items visible.
+- When referencing workflow runs, use
+  `[§RUN_ID](https://github.com/owner/repo/actions/runs/RUN_ID)`, replacing the
+  placeholders with the actual owner, repository, and run ID.
+
 If a queue cannot be read, report it as unavailable with the reason and still
 report the others. Never treat a failed query as an empty queue. If all queue
 sources are unavailable, call `noop` with the timestamp, window, and failure
