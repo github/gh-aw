@@ -2,11 +2,12 @@
 
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { processMessages, sortMessageIndicesByTemporaryIdDependencies } from "./safe_output_handler_manager.cjs";
-import { buildSafeOutputDependencyPlan, isConfirmedDependencySuccess } from "./safe_output_dependencies.cjs";
+import { buildSafeOutputDependencyPlan, checkSafeOutputDependencies, isConfirmedDependencySuccess } from "./safe_output_dependencies.cjs";
+import { classifySafeOutputResult, computeSafeOutputsStatus } from "./safe_outputs_status.cjs";
 import { main as createActionHandler } from "./safe_output_action_handler.cjs";
 import { main as createCallWorkflowHandler } from "./call_workflow.cjs";
 import { createHandlers } from "./safe_outputs_handlers.cjs";
-import { buildSafeOutputOutcomes, projectSafeOutputData } from "./safe_output_outcomes.cjs";
+import { buildSafeOutputOutcomes, finalizeBufferedReviewOutcomes, projectSafeOutputData } from "./safe_output_outcomes.cjs";
 import { createSessionValidator } from "./scripts/validate_session.cjs";
 
 const id = index => `so_${String(index).padStart(12, "0")}`;
@@ -163,6 +164,47 @@ describe("safe-output runtime dependencies", () => {
     expect(result.results.every(item => item.success)).toBe(true);
   });
 
+  it.each(["submit_pull_request_review", "create_pull_request_review_comment"])("waits for buffered %s submission before running a dependent check and its dependent", async type => {
+    const calls = [];
+    const review = vi.fn(async () => {
+      calls.push("buffer");
+      return { success: true, repo: "owner/repo", pull_request_number: 42, deferred_manifest: true, ...(type === "create_pull_request_review_comment" ? { buffered: true, metadata: { path: "file.js", line: 1, side: "RIGHT" } } : {}) };
+    });
+    const check = vi.fn(async () => {
+      calls.push("check");
+      return { success: true };
+    });
+    const comment = vi.fn(async () => {
+      calls.push("comment");
+      return { success: true };
+    });
+    const finalize = vi.fn(async results => {
+      if (!results.some(result => result.result?.deferred_manifest)) return;
+      calls.push("submit");
+      expect(check).not.toHaveBeenCalled();
+      finalizeBufferedReviewOutcomes(results, "owner/repo", 42, {
+        success: true,
+        review_url: "https://github.com/owner/repo/pull/42#pullrequestreview-1",
+        comment_count: 1,
+        review_comments: [{ metadata: { path: "file.js", line: 1, side: "RIGHT" } }],
+      });
+    });
+    const result = await processMessages(
+      new Map([
+        [type, review],
+        ["create_check_run", check],
+        ["add_comment", comment],
+      ]),
+      [message(1, undefined, type), message(2, id(1), "create_check_run"), message(3, id(2))],
+      null,
+      finalize
+    );
+    expect(calls).toEqual(["buffer", "submit", "check", "comment"]);
+    expect(finalize).toHaveBeenCalled();
+    expect(result.results.every(item => item.success)).toBe(true);
+    expect(result.results[0].result.deferred_manifest).toBe(false);
+  });
+
   it("retries a waiting dependent that itself defers, before releasing its dependent", async () => {
     const calls = [];
     const attempts = new Map();
@@ -175,6 +217,71 @@ describe("safe-output runtime dependencies", () => {
     const result = await processMessages(new Map([["add_comment", handler]]), [message(3, id(2)), message(2, id(1)), message(1)]);
     expect(calls).toEqual([id(1), id(1), id(2), id(2), id(3)]);
     expect(result.results.every(item => item.success)).toBe(true);
+  });
+
+  it("retries deferred dependents after review publication without replaying completed retries", async () => {
+    const calls = [];
+    const attempts = new Map();
+    const handler = vi.fn(async msg => {
+      calls.push(msg.output_id);
+      const count = attempts.get(msg.output_id) || 0;
+      attempts.set(msg.output_id, count + 1);
+      if (msg.output_id === id(2)) return { success: true, deferred_manifest: true };
+      return count === 0 && msg.output_id !== id(4) ? { deferred: true } : { success: true };
+    });
+    const result = await processMessages(new Map([["add_comment", handler]]), [message(1), message(2, id(1)), message(3, id(2)), message(4, id(3))], null, async results => {
+      for (const record of results) {
+        if (record.result?.deferred_manifest) record.result.deferred_manifest = false;
+      }
+    });
+    expect(calls).toEqual([id(1), id(1), id(2), id(3), id(3), id(4)]);
+    expect(result.results.every(item => item.success)).toBe(true);
+  });
+
+  it("finalizes a review buffered by an in-place retry without result-array growth", async () => {
+    const calls = [];
+    let published = false;
+    const handler = vi.fn(async msg => {
+      calls.push(msg.output_id);
+      if (msg.output_id === id(1)) return { success: true, deferred_manifest: true };
+      if (msg.output_id === id(2)) return published ? { success: true, deferred_manifest: true } : { deferred: true };
+      return { success: true };
+    });
+    const finalize = vi.fn(async results => {
+      published = true;
+      for (const record of results) {
+        if (record.result?.deferred_manifest) record.result.deferred_manifest = false;
+      }
+    });
+    const result = await processMessages(new Map([["add_comment", handler]]), [message(1), message(2), message(3, id(2))], null, finalize);
+    expect(calls).toEqual([id(1), id(2), id(2), id(2), id(3)]);
+    expect(finalize).toHaveBeenCalledTimes(2);
+    expect(result.results.every(item => classifySafeOutputResult(item) === "success")).toBe(true);
+  });
+
+  it("does not retry unresolved handlers again when finalization makes no resolution progress", async () => {
+    const handler = vi.fn(async () => ({ deferred: true }));
+    const finalize = vi.fn(async () => {});
+    const result = await processMessages(new Map([["add_comment", handler]]), [message(1)], null, finalize);
+    expect(handler).toHaveBeenCalledTimes(2);
+    expect(result.results[0]).toMatchObject({ deferred: true });
+  });
+
+  it("classifies buffered review publication consistently across consumers", () => {
+    const record = { messageIndex: 0, success: true, result: { deferred_manifest: true } };
+    expect(classifySafeOutputResult(record)).toBe("deferred");
+    expect(computeSafeOutputsStatus([record])).toMatchObject({ itemsApplied: 0, itemsDeferred: 1, status: "deferred" });
+    expect(buildSafeOutputOutcomes([record])[0].status).toBe("deferred");
+  });
+
+  it("fails a skipped review prerequisite immediately with its skip reason", () => {
+    const plan = buildSafeOutputDependencyPlan([message(1), message(2, id(1))]);
+    const record = { messageIndex: 0, success: true, skipped: true, skipReason: "PR is closed", result: { deferred_manifest: true } };
+    expect(checkSafeOutputDependencies(plan, 1, [record], true)).toEqual({
+      state: "failed",
+      errorCode: "safe_output_dependency_failed",
+      error: "Safe-output prerequisite did not complete successfully: PR is closed",
+    });
   });
 
   it("waits for a prerequisite's temporary-ID resolution on retry", async () => {
