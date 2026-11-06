@@ -890,6 +890,23 @@ describe("safe_output_summary", () => {
     expect(summary).toContain("merge-pull-request-decisions.jsonl");
   });
 
+  it("renders fixed actionable caution guidance without copying review text", () => {
+    const summary = generateSafeOutputSummary({
+      type: "merge_pull_request",
+      messageIndex: 1,
+      success: false,
+      result: {
+        audit_recorded: true,
+        failure_reasons: [{ code: "manual_review_caution", message: "private-review-text" }],
+        decision_evidence: { body: "private-pr-body" },
+      },
+    });
+    expect(summary).toContain("`manual_review_caution`");
+    expect(summary).toContain("normal manual process");
+    expect(summary).toContain("Approvals or dismissed reviews do not clear");
+    expect(summary).not.toContain("private-");
+  });
+
   it.each([true, false])("reports an audit failure separately from the merge outcome (success: %s)", success => {
     const summary = generateSafeOutputSummary({
       type: "merge_pull_request",

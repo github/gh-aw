@@ -7,9 +7,9 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.29.16<br>
+**Version**: 1.29.17<br>
 **Status**: Working Draft<br>
-**Publication Date**: 2026-11-03<br>
+**Publication Date**: 2026-11-06<br>
 **Editor**: GitHub Agentic Workflows Team<br>
 **This Version**: [safe-outputs-specification](/gh-aw/specs/safe-outputs-specification/)<br>
 **Latest Published Version**: This document
@@ -2809,6 +2809,7 @@ safe-outputs:
 13. **Signed Commit Delivery**: Branch delivery MUST satisfy the [signed commit delivery requirements](#signed-commit-delivery-requirements), shared with `push_to_pull_request_branch`.
 14. **Transport Integrity**: Patch/bundle application and publication MUST satisfy the shared [transport integrity requirements](#patch-and-bundle-transport-integrity-requirements).
 15. **Bundle Git Operations**: Bundle inspection and prerequisite recovery MUST satisfy [BGO-001–003 and BGO-008](#bundle-git-operations-and-validation-baselines). Optional unsigned push baselines (BGO-004–007) apply only to `push_to_pull_request_branch`.
+16. **Review-First Merge Gate**: Auto-merge MUST satisfy [WTD4](#105-warn-mode-threat-detection-failure-policy) for both detection caution and protected-files `request-review` requirements, regardless of whether `REQUEST_CHANGES` succeeds. A failed required `REQUEST_CHANGES` review, including rejection because the authenticated bot authored the pull request, MUST leave auto-merge disabled and emit guidance requiring an independent reviewer. Implementations MUST NOT downgrade the only blocking review to `COMMENT` and continue into auto-merge.
 
 **Configuration Parameters**:
 
@@ -2820,6 +2821,7 @@ safe-outputs:
 - `allowed-branches`: Allowed source branch patterns for `branch` tool input
 - `allowed-base-branches`: Allowed base-branch override patterns for per-run `base` tool input
 - `draft`: Draft status
+- `auto-merge`: `false` (default), `true` (squash), or `squash`, `merge`, `rebase`. Detection caution, protected-files `request-review`, or a failed required `REQUEST_CHANGES` review overrides enablement; see WTD4.
 - `commit-changes`: Auto-commit workspace
 - `reviewers`: Auto-request reviewers
 - `labels`: Auto-apply labels
@@ -3959,6 +3961,12 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 7. **Revision Binding**: The merge API MUST receive the evaluated head SHA as `sha`. A mismatch MUST fail without retrying the merge; another request requires fresh evaluation.
 8. **Complete Review Evidence**: Missing PR/thread data, invalid review decisions, missing thread resolution flags, malformed pagination, repeated continuation cursors, or a head revision different from the evaluated SHA MUST block merging. Individual reviews MUST be evaluated even without an approver allowlist; any reviewer's latest effective `CHANGES_REQUESTED` review MUST block merging. A null aggregate review decision MUST NOT override an individual objection and is not affirmative approval.
 9. **Final Revalidation**: Before either execution or a staged preview, re-read PR policy fields, target branch policy, the open upstream PR, reviews, configured approvals, and required checks. Changed policy evidence or non-passing checks MUST block the operation. Only the head SHA is enforced atomically by GitHub; other mutable policy state retains a race window after these reads.
+10. **Independent-Review Caution Veto**: Current-run threat warnings or failures, or a missing successful conclusion when detection is required, MUST block merging. Live PR bodies and labels and every individual review body MUST be inspected for threat-detected, detector-engine-error, protected-files-review, and caution notices. Retained notices MUST block both execution and staged success, regardless of affirmative approval, passing checks, or whether a review is advisory, dismissed, or superseded. Missing or malformed relevant evidence MUST fail closed; an API body of `null` represents valid empty content. PR body and review caution evidence MUST be revalidated before execution. Flagged changes require independent review and the repository's normal manual merge process; removing a notice is not evidence that its underlying risk was resolved.
+
+The current handler implements a conservative notice-based veto, not a fresh scan
+of changed files or an immutable history of removed metadata. Ordinary unmarked
+PRs retain the configured approval policy. Caution evidence MUST NOT add raw PR
+or review bodies to returned or persisted decision evidence.
 
 **Configuration Parameters**:
 
@@ -5863,6 +5871,12 @@ When threat detection executes in `warn` mode and reports a threat signal for a 
 
 **Requirement WTD3 (Non-Reviewable Abort)**: For safe output types classified as **Abort**, implementations MUST NOT apply the original safe output. Implementations MUST activate a threat-detected code path, emit an explicit failure summary, and return a machine-readable threat-detected error outcome.
 
+**Requirement WTD4 (Enforceable Pull Request Merge Gate)**: When `create_pull_request` has a nonempty `detectionCaution`, including WTD1a detection engine errors and WTD2 conversions, or protected-files `request-review` requires independent review, implementations MUST NOT enable auto-merge unless trusted, live evidence establishes an enforceable human approval or blocking review policy for the target pull request. The policy MUST prevent merging until an independent human reviews the affected changes and MUST apply to the automation identity without bypass. Missing, inaccessible, or inconclusive policy evidence MUST leave auto-merge disabled.
+
+A caution annotation, threat label, requested reviewer, or successful `REQUEST_CHANGES` API response alone MUST NOT count as evidence of an enforceable policy. If the required review fails because the bot authored the pull request, or for any other reason, implementations MUST fail closed or require an independent reviewer; a `COMMENT` fallback MUST NOT replace the only security gate while allowing auto-merge. The created pull request MAY remain available for manual review, but the handler MUST explicitly report that auto-merge was withheld and that independent review is required.
+
+The current `create_pull_request` handler does not verify repository review-policy enforcement and therefore conservatively withholds auto-merge whenever detection caution or protected-files `request-review` requires independent review, even if a reviewer was requested or `REQUEST_CHANGES` succeeded. It also withholds auto-merge after any required `REQUEST_CHANGES` failure and does not retry that review as `COMMENT`.
+
 **Table WTD-A: Warn-Mode Threat Detection Failure Policy by Safe Output Type**
 
 | Safe output type | Warn-mode failure policy |
@@ -5914,6 +5928,9 @@ When threat detection executes in `warn` mode and reports a threat signal for a 
 - **T-WTD-001**: Reviewable outputs include the threat-appropriate annotation: WTD1 CAUTION block/label/marker for `threat_detected`, or WTD1a WARNING block/label/marker for `agent_failure` and `parse_error`.
 - **T-WTD-002**: `push_to_pull_request_branch` in warn-mode threat failure is converted to `create_pull_request`.
 - **T-WTD-003**: Abort-class outputs are not applied and produce threat-detected error outcomes.
+- **T-WTD-004**: Detection caution prevents auto-merge without verified enforceable policy, including when reviewer requests and `REQUEST_CHANGES` succeed, for every enabled merge strategy and for threat verdicts and detection engine errors.
+- **T-WTD-005**: Own-PR and other required-review failures leave auto-merge disabled, never downgrade the only security gate to `COMMENT` and merge, and emit independent-review guidance. Ordinary pull requests without any independent-review requirement or review failure retain configured auto-merge behavior. Regression evidence: `actions/setup/js/create_pull_request.test.cjs`.
+- **T-WTD-006**: Protected-files `request-review` prevents auto-merge even when `REQUEST_CHANGES` succeeds and emits independent-review guidance; ordinary pull requests without any independent-review requirement retain configured auto-merge behavior.
 
 ### 10.6 Edge Case Behavior
 
@@ -6659,6 +6676,13 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.29.17** (2026-11-06):
+
+- **Required**: WTD4 and `create_pull_request` item 16 withhold auto-merge for detection caution, protected-files independent-review requirements, and required-review failures without verified enforceable approval policy.
+- **Prohibited**: Downgrading the only required `REQUEST_CHANGES` security gate to `COMMENT` while continuing into auto-merge, including when the bot authored the PR.
+- **Added**: T-WTD-004–006 regression requirements and user-facing auto-merge configuration caveats.
+- **Required**: `merge_pull_request` item 10 vetoes retained detection and protected-file review notices, including historical advisory/dismissed reviews, without treating approvals or passing checks as resolution. Complete caution evidence and final revalidation apply to live, staged, and cross-repository merges; audit diagnostics remain minimized.
 
 **Version 1.29.16** (2026-11-03):
 

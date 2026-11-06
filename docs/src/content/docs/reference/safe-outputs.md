@@ -1090,6 +1090,11 @@ Exposes outputs: `status-update-id`, `project-id`, `status`.
 
 Creates PRs with code changes. Includes configurable [Protected Files](/gh-aw/reference/safe-outputs-pull-requests/#protected-files) against supply chain attacks.
 
+Detection caution, protected-files `request-review`, or a failed required
+`REQUEST_CHANGES` review withholds configured auto-merge and requires independent
+review. A successful review request or blocking-review API response alone does
+not prove that repository policy enforces human approval.
+
 See the full reference: [Safe Outputs (Pull Requests) — create-pull-request](/gh-aw/reference/safe-outputs-pull-requests/#pull-request-creation-create-pull-request)
 
 ```yaml wrap
