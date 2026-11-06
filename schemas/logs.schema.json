@@ -5069,6 +5069,9 @@
                     "zero_touch": {
                       "type": "boolean"
                     },
+                    "zero_touch_evidence_complete": {
+                      "type": "boolean"
+                    },
                     "objective_value": {
                       "type": "integer"
                     },
@@ -5369,6 +5372,9 @@
                           "type": "integer"
                         },
                         "zero_touch": {
+                          "type": "boolean"
+                        },
+                        "zero_touch_evidence_complete": {
                           "type": "boolean"
                         },
                         "objective_value": {
@@ -8671,6 +8677,9 @@
                     "zero_touch": {
                       "type": "boolean"
                     },
+                    "zero_touch_evidence_complete": {
+                      "type": "boolean"
+                    },
                     "objective_value": {
                       "type": "integer"
                     },
@@ -8971,6 +8980,9 @@
                           "type": "integer"
                         },
                         "zero_touch": {
+                          "type": "boolean"
+                        },
+                        "zero_touch_evidence_complete": {
                           "type": "boolean"
                         },
                         "objective_value": {

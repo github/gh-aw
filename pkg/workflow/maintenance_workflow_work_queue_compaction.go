@@ -27,14 +27,14 @@ func buildMaintenanceWorkQueueCompactionJobs(opts buildMaintenanceWorkflowYAMLOp
             const { setupGlobals } = require('${{ runner.temp }}/gh-aw/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { maintenance: reconcile } = require('${{ runner.temp }}/gh-aw/actions/reconcile_work_queue_run.cjs');
-            const reconciliation = await reconcile({ projectIssues: true, deferIssueFailure: true });
+            const reconciliation = await reconcile({ projectIssues: true, deferIssueWarning: true });
             const { main: plan } = require('${{ runner.temp }}/gh-aw/actions/work_queue_compaction_plan.cjs');
             const result = await plan();
             if (result.status === 'planned') {
               const { main: apply } = require('${{ runner.temp }}/gh-aw/actions/work_queue_compaction_apply.cjs');
               await apply();
             }
-            if (reconciliation.issue_sync_pending?.length) core.setFailed('Work queue reconciliation and compaction completed; Issue synchronization remains pending. Recover the exact terminal requests with work-queue sync-issues --request-id.');
+            if (reconciliation.issue_sync_pending?.length) core.warning('Work queue reconciliation and compaction completed; Issue synchronization remains pending. Recover the exact terminal requests with work-queue sync-issues --request-id.');
 `)
 	return b.String()
 }
