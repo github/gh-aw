@@ -23,8 +23,12 @@ func TestRuntimeCheckoutRootCredentials(t *testing.T) {
 		trial     bool
 		mismatch  bool
 		missing   bool
+		debug     bool
 	}{
 		{name: "dot", path: ".", rootRepo: "org/external"},
+		{name: "private runtime debug root", path: ".", rootRepo: "org/external", debug: true},
+		{name: "private runtime debug subdirectory", path: "private-path", rootRepo: "org/workflow", debug: true},
+		{name: "private runtime debug failure", path: "private-missing", rootRepo: "org/workflow", debug: true, missing: true},
 		{name: "empty", path: "", rootRepo: "org/external"},
 		{name: "slash dot", path: "./", rootRepo: "org/external"},
 		{name: "normalized parent", path: "nested/..", rootRepo: "org/external"},
@@ -74,6 +78,9 @@ func TestRuntimeCheckoutRootCredentials(t *testing.T) {
 		for _, job := range []string{"agent", "safe outputs"} {
 			t.Run(tc.name+"/"+job, func(t *testing.T) {
 				workspace, env := setupRuntimeCredentialWorkspace(t)
+				if tc.debug {
+					env = append(env, "GH_AW_GIT_CREDENTIALS_DEBUG=true")
+				}
 				path := strings.ReplaceAll(tc.path, "$WORKSPACE", workspace)
 				require.NoError(t, os.MkdirAll(filepath.Join(workspace, "nested"), 0755))
 				createCredentialTestRepo(t, workspace, tc.rootRepo, env)
@@ -144,6 +151,21 @@ func TestRuntimeCheckoutRootCredentials(t *testing.T) {
 					}
 				}
 				require.NotContains(t, string(output), "fake-test-token")
+				if tc.debug {
+					require.Contains(t, string(output), "workflow:git_credentials root_resolution=started")
+					event := "checkout_index=0 root_match=true"
+					if tc.missing {
+						event = "checkout_index=0 directory_resolution=failed"
+					} else if path != "." {
+						event = "checkout_index=0 root_match=false"
+					}
+					require.Contains(t, string(output), event)
+					for _, private := range []string{workspace, "org/external", "org/workflow", "github.com", "private-path", "private-missing"} {
+						require.NotContains(t, string(output), private)
+					}
+				} else {
+					require.NotContains(t, string(output), "workflow:git_credentials")
+				}
 				if !tc.missing && job == "safe outputs" && path != "" && path != "." && path != "./" && path != "nested/.." && path != workspace {
 					subConfig, readErr := os.ReadFile(filepath.Join(workspace, path, ".git", "config"))
 					require.NoError(t, readErr)
@@ -197,6 +219,9 @@ func setupRuntimeCredentialWorkspace(t *testing.T) (string, []string) {
 	for _, value := range os.Environ() {
 		key, _, _ := strings.Cut(value, "=")
 		if strings.HasPrefix(key, "GIT_") || strings.HasPrefix(key, "GH_AW_") || strings.HasPrefix(key, "GITHUB_") || key == "HOME" || key == "RUNNER_TEMP" {
+			continue
+		}
+		if key == "RUNNER_DEBUG" {
 			continue
 		}
 		env = append(env, value)

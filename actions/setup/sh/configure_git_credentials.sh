@@ -19,6 +19,8 @@
 # Optional environment variables:
 #   RUNNER_TEMP              - Runner temp dir; used to locate the checkout manifest
 #   GH_AW_CHECKOUT_MANIFEST  - Explicit path to the checkout manifest (overrides default)
+#   GH_AW_GIT_CREDENTIALS_DEBUG - Set to true for privacy-preserving debug events;
+#                                also enabled by RUNNER_DEBUG=1
 #
 # Optional environment variables for remote authentication:
 #   GH_AW_GIT_REPOSITORY - Expected repository slug (e.g., "org/repo"); takes precedence
@@ -94,14 +96,29 @@ REPO="${GH_AW_GIT_REPOSITORY-${GITHUB_REPOSITORY:-}}"
 URL="${GITHUB_SERVER_URL:-}"
 TOKEN="${GITHUB_TOKEN:-${GIT_TOKEN:-}}"
 
+# Callers supply fixed events only, never repository, path, URL, or token values.
+git_credentials_debug() {
+  if [ "${RUNNER_DEBUG:-}" = "1" ] || [ "${GH_AW_GIT_CREDENTIALS_DEBUG:-}" = "true" ]; then
+    printf 'workflow:git_credentials %s\n' "$1" >&2
+  fi
+}
+
+if [ "${GH_AW_GIT_REPOSITORY+x}" = x ]; then
+  git_credentials_debug "identity_source=explicit"
+else
+  git_credentials_debug "identity_source=legacy"
+fi
+
 # Do not discover a parent checkout when this directory has no checkout of its own.
 # Git worktrees and submodules use a .git file rather than a directory.
 if [ ! -d .git ] && [ ! -f .git ]; then
+  git_credentials_debug "authentication_skipped=no_checkout"
   echo "Git configured with standard GitHub Actions identity" >&2
   exit 0
 fi
 
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git_credentials_debug "checkout_configuration=unreadable"
   echo "Git checkout configuration could not be read; check repository ownership, safe.directory, and Git configuration. Remote URLs are omitted to protect credentials." >&2
   exit 1
 fi
@@ -110,14 +127,17 @@ if ORIGINAL_URLS=$(git config --get-all remote.origin.url 2>/dev/null); then
 else
   CONFIG_STATUS=$?
   if [ "${CONFIG_STATUS}" -ne 1 ]; then
+    git_credentials_debug "origin_configuration=unreadable"
     echo "Git checkout configuration could not be read; remote URL omitted to protect credentials." >&2
     exit 1
   fi
+  git_credentials_debug "authentication_skipped=no_origin"
   echo "Git configured with standard GitHub Actions identity" >&2
   exit 0
 fi
 
 if [ "${GH_AW_GIT_REPOSITORY+x}" = x ] && [ -z "${REPO}" ]; then
+  git_credentials_debug "identity_target=empty"
   echo "Git checkout identity target is empty; set a repository slug." >&2
   exit 1
 fi
@@ -163,8 +183,10 @@ check_repository_identity() {
   EXPECTED_ID=$(printf '%s/%s' "${SERVER_HOST%:443}" "${REPO}" | LC_ALL=C tr '[:upper:]' '[:lower:]')
   for MODE in fetch push; do
     if [ "${MODE}" = push ]; then
+      git_credentials_debug "effective_urls_check=push"
       REMOTE_URLS=$(git remote get-url --push --all origin 2>/dev/null) || return 1
     else
+      git_credentials_debug "effective_urls_check=fetch"
       REMOTE_URLS=$(git remote get-url --all origin 2>/dev/null) || return 1
     fi
     [ -n "${REMOTE_URLS}" ] || return 1
@@ -176,10 +198,17 @@ check_repository_identity() {
 
 # Never print remotes or raw git errors: either may contain credentials.
 verify_repository_identity() {
+  if [ "$1" = before ]; then
+    git_credentials_debug "identity_check=before"
+  else
+    git_credentials_debug "identity_check=after"
+  fi
   if ! check_repository_identity; then
+    git_credentials_debug "identity_result=rejected"
     echo "Git checkout identity verification failed ${1} credential configuration; check checkout repository and origin configuration. Remote URLs are omitted to protect credentials." >&2
     return 1
   fi
+  git_credentials_debug "identity_result=verified"
   echo "Git checkout identity verified ${1} credential configuration" >&2
 }
 
@@ -190,25 +219,35 @@ if [ -n "${URL}" ] && { [ "${GH_AW_GIT_REPOSITORY+x}" = x ] || { [ -n "${REPO}" 
 fi
 
 if [ -n "${REPO}" ] && [ -n "${URL}" ] && [ -n "${TOKEN}" ]; then
+  git_credentials_debug "authentication=installing"
   URL_STRIPPED="${URL#https://}"
   URL_STRIPPED="${URL_STRIPPED%/}"
   ORIGINAL_URL="${ORIGINAL_URLS%%"
 "*}"
   if ! git remote set-url origin "https://x-access-token:${TOKEN}@${URL_STRIPPED}/${REPO}.git" 2>/dev/null; then
+    git_credentials_debug "authentication=write_failed"
     echo "Git remote authentication configuration failed; remote URL omitted to protect credentials." >&2
     exit 1
   fi
   if ! verify_repository_identity after; then
+    git_credentials_debug "rollback=restoring"
     # Restore the raw value, not its potentially rewritten effective value.
     if ! git remote set-url origin "${ORIGINAL_URL}" 2>/dev/null; then
       if git config --unset-all remote.origin.url 2>/dev/null; then
+        git_credentials_debug "rollback=credential_url_removed"
         echo "Git remote restoration failed; authentication URL removed." >&2
       else
+        git_credentials_debug "rollback=cleanup_failed"
         echo "Git remote restoration and authentication URL removal failed; credentials may remain in Git configuration." >&2
       fi
+    else
+      git_credentials_debug "rollback=restored"
     fi
     exit 1
   fi
+  git_credentials_debug "authentication=installed"
+else
+  git_credentials_debug "authentication_skipped=missing_credentials"
 fi
 
 echo "Git configured with standard GitHub Actions identity" >&2

@@ -3,7 +3,11 @@ package workflow
 import (
 	"fmt"
 	"strings"
+
+	"github.com/github/gh-aw/pkg/logger"
 )
+
+var checkoutCredentialsLog = logger.New("workflow:checkout_credentials_render")
 
 type credentialSubrepository struct {
 	repository     string
@@ -55,6 +59,7 @@ func (cm *CheckoutManager) runtimeRootCandidates() []credentialSubrepository {
 		hasRuntimePath = hasRuntimePath || (!entry.key.multi && strings.Contains(entry.key.path, "${{"))
 	}
 	if !hasRuntimePath {
+		checkoutCredentialsLog.Print("Runtime root identity resolution not required")
 		return nil
 	}
 	var candidates []credentialSubrepository
@@ -76,7 +81,12 @@ func (cm *CheckoutManager) runtimeRootCandidates() []credentialSubrepository {
 			pathEnvVarName: fmt.Sprintf("GH_AW_ROOT_PATH_%d", index),
 		})
 	}
+	checkoutCredentialsLog.Printf("Runtime root identity resolution configured: candidates=%d", len(candidates))
 	return candidates
+}
+
+func gitCredentialDebugLine(event string) string {
+	return fmt.Sprintf("          if [ \"${RUNNER_DEBUG:-}\" = \"1\" ] || [ \"${GH_AW_GIT_CREDENTIALS_DEBUG:-}\" = \"true\" ]; then printf 'workflow:git_credentials %s\\n' >&2; fi\n", event)
 }
 
 func runtimeRootEnvironmentLines(candidates []credentialSubrepository) []string {
@@ -95,19 +105,24 @@ func runtimeRootIdentityLines(candidates []credentialSubrepository) []string {
 	if len(candidates) == 0 {
 		return nil
 	}
-	lines := []string{"          GH_AW_ROOT_DIRECTORY=$(pwd -P)\n"}
-	for _, candidate := range candidates {
+	lines := []string{gitCredentialDebugLine("root_resolution=started"), "          GH_AW_ROOT_DIRECTORY=$(pwd -P)\n"}
+	for index, candidate := range candidates {
 		lines = append(lines,
 			fmt.Sprintf("          GH_AW_CHECKOUT_PATH=\"${%s:-.}\"\n", candidate.pathEnvVarName),
 			"          if [ \"$GH_AW_CHECKOUT_PATH\" = \"-\" ]; then GH_AW_CHECKOUT_PATH=\"./-\"; fi\n",
 			"          if ! GH_AW_CHECKOUT_DIRECTORY=$(cd -- \"$GH_AW_CHECKOUT_PATH\" 2>/dev/null && pwd -P); then\n",
+			gitCredentialDebugLine(fmt.Sprintf("checkout_index=%d directory_resolution=failed", index)),
 			"            echo \"Unable to resolve checkout directory for Git identity verification\" >&2\n",
 			"            exit 1\n",
 			"          fi\n",
-			fmt.Sprintf("          if [ \"$GH_AW_CHECKOUT_DIRECTORY\" = \"$GH_AW_ROOT_DIRECTORY\" ]; then GH_AW_GIT_REPOSITORY=\"${%s}\"; fi\n", candidate.envVarName),
+			fmt.Sprintf("          if [ \"$GH_AW_CHECKOUT_DIRECTORY\" = \"$GH_AW_ROOT_DIRECTORY\" ]; then\n            GH_AW_GIT_REPOSITORY=\"${%s}\"\n", candidate.envVarName),
+			gitCredentialDebugLine(fmt.Sprintf("checkout_index=%d root_match=true", index)),
+			"          else\n",
+			gitCredentialDebugLine(fmt.Sprintf("checkout_index=%d root_match=false", index)),
+			"          fi\n",
 		)
 	}
-	return append(lines, "          export GH_AW_GIT_REPOSITORY\n")
+	return append(lines, "          export GH_AW_GIT_REPOSITORY\n", gitCredentialDebugLine("root_resolution=completed"))
 }
 
 func credentialEnvironmentLines(root, token string, repositories []credentialSubrepository) []string {

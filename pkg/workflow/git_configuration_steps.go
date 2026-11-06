@@ -59,9 +59,9 @@ func generateCurrentCheckoutGitConfigurationSteps(checkoutMgr *CheckoutManager, 
 	repoNameValue := "${{ github.repository }}"
 	if currentRepo != "" {
 		repoNameValue = fmt.Sprintf("%q", currentRepo)
-		gitConfigStepsLog.Printf("Generating git config steps for current checkout: path=%s repo=%s", currentPath, currentRepo)
+		gitConfigStepsLog.Print("Generating git config steps for current checkout: explicit_repository=true")
 	} else {
-		gitConfigStepsLog.Printf("Generating git config steps for current checkout: path=%s (workflow repo)", currentPath)
+		gitConfigStepsLog.Print("Generating git config steps for current checkout: explicit_repository=false")
 	}
 
 	steps := []string{
@@ -107,10 +107,10 @@ func (c *Compiler) generateGitConfigurationStepsWithToken(token string, targetRe
 		if targetRepoSlug != repoNameValue {
 			repoNameValue = fmt.Sprintf("%q", targetRepoSlug)
 		}
-		gitConfigStepsLog.Printf("Generating git config steps with target repo: %s", targetRepoSlug)
+		gitConfigStepsLog.Print("Generating git config steps with explicit checkout identity")
 	} else if c.trialMode && c.trialLogicalRepoSlug != "" {
 		repoNameValue = fmt.Sprintf("%q", c.trialLogicalRepoSlug)
-		gitConfigStepsLog.Printf("Generating git config steps in trial mode with logical repo: %s", c.trialLogicalRepoSlug)
+		gitConfigStepsLog.Print("Generating git config steps with trial checkout identity")
 	} else {
 		gitConfigStepsLog.Print("Generating git config steps with default github.repository")
 	}

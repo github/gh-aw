@@ -24,7 +24,7 @@ function runScript(env, cwd) {
   return spawnSync("sh", [SCRIPT_PATH], {
     cwd,
     encoding: "utf8",
-    env: { ...process.env, GITHUB_TOKEN: "", GIT_TOKEN: "", GH_AW_GIT_REPOSITORY: undefined, ...env },
+    env: { ...process.env, GITHUB_TOKEN: "", GIT_TOKEN: "", GH_AW_GIT_REPOSITORY: undefined, GH_AW_GIT_CREDENTIALS_DEBUG: "", RUNNER_DEBUG: "", ...env },
   });
 }
 
@@ -81,6 +81,37 @@ describe("configure_git_credentials.sh repository identity", () => {
     expect(result.stderr).toContain("identity verified before credential configuration");
     expect(result.stderr).toContain("identity verified after credential configuration");
     expect(result.stdout + result.stderr).not.toContain("test-token");
+    expect(result.stderr).not.toContain("workflow:git_credentials");
+  });
+
+  it.each([
+    ["explicit debug", { GH_AW_GIT_CREDENTIALS_DEBUG: "true" }],
+    ["runner debug", { RUNNER_DEBUG: "1" }],
+  ])("emits privacy-preserving events with %s", (_name, debugEnv) => {
+    const result = runScript({ ...env, ...debugEnv }, target);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toContain("workflow:git_credentials");
+    expect(result.stderr).toContain("identity_source=explicit");
+    expect(result.stderr).toContain("effective_urls_check=fetch");
+    expect(result.stderr).toContain("effective_urls_check=push");
+    expect(result.stderr).toContain("authentication=installed");
+    for (const value of ["owner/target", "owner/workflow", "github.com", target, root, "test-token"]) {
+      expect(result.stdout + result.stderr).not.toContain(value);
+    }
+  });
+
+  it.each(["mismatch", "rollback", "no_checkout", "no_origin"])("keeps debug failure and skip events private for %s", scenario => {
+    if (scenario === "mismatch") git("remote", "set-url", "origin", authenticatedURL("private-secret", "workflow"));
+    if (scenario === "rollback") git("config", "url.https://github.com/owner/workflow.git.pushInsteadOf", authenticatedURL("test-token"));
+    if (scenario === "no_checkout") fs.rmSync(path.join(target, ".git"), { recursive: true });
+    if (scenario === "no_origin") git("remote", "remove", "origin");
+    const result = runScript({ ...env, GH_AW_GIT_CREDENTIALS_DEBUG: "true" }, target);
+    expect(result.status).toBe(["no_checkout", "no_origin"].includes(scenario) ? 0 : 1);
+    const event = scenario === "mismatch" ? "identity_result=rejected" : scenario === "rollback" ? "rollback=restored" : `authentication_skipped=${scenario}`;
+    expect(result.stderr).toContain(event);
+    for (const value of ["owner/target", "owner/workflow", "github.com", target, root, "test-token", "private-secret"]) {
+      expect(result.stdout + result.stderr).not.toContain(value);
+    }
   });
 
   it.each(["https://github.com/OWNER/Target", "git@github.com:owner/target.git", "ssh://git@github.com/owner/target.git", authenticatedURL("old-token")])("recognizes equivalent repository identity for %s", remote => {
