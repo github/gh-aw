@@ -134,6 +134,9 @@ func manifestGitReference(value apm.Dependency) (GitReference, error) {
 		if err != nil {
 			return ref, err
 		}
+		if withPath.Ref != "" {
+			return ref, errors.New("path must not contain a ref; use the separate ref field")
+		}
 		ref.Path = withPath.Path
 	}
 	if declared := value.Ref; declared != "" {
@@ -170,6 +173,9 @@ func lockedSkillReference(entry apm.LockedDependency) (GitReference, error) {
 		parsed, err := ParseGitHubReference(strings.Join([]string{ref.Repository, entry.VirtualPath}, "/"))
 		if err != nil {
 			return ref, err
+		}
+		if parsed.Ref != "" {
+			return ref, errors.New("virtual_path must not contain a ref; use resolved_ref")
 		}
 		ref.Path = parsed.Path
 	}

@@ -201,3 +201,11 @@ func TestAPMDependabotInvalidMappingsAndPatternsNotOverwritten(t *testing.T) {
 		assert.Equal(t, content, string(mustReadAPMTestFile(t, filename)))
 	}
 }
+
+func TestAPMDependabotMergedDirectoryCoverage(t *testing.T) {
+	filename := filepath.Join(t.TempDir(), "dependabot.yml")
+	content := []byte("version: 2\nupdates:\n  - &apm\n    package-ecosystem: apm\n    directory: /other\n    schedule: {interval: daily}\n  - <<: *apm\n    directory: /contexts\n")
+	require.NoError(t, os.WriteFile(filename, content, 0644))
+	require.NoError(t, NewCompiler().generateDependabotConfigForDirectories(filename, map[string][]string{"apm": {"/contexts"}}))
+	assert.Equal(t, content, mustReadAPMTestFile(t, filename), "inherited ecosystem fields must count toward directory coverage")
+}

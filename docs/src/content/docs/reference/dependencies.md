@@ -18,7 +18,7 @@ engine: copilot
 apm: ../../apm.yml
 ```
 
-The compiler converts supported dependencies into SHA-pinned native `skills:` installations during activation. Existing explicit skill authentication is preserved when the same exact reference is also declared in `skills:`. Conflicting explicit pins are rejected.
+The compiler converts supported dependencies into SHA-pinned native `skills:` installations during activation. Object-form `path` and lockfile `virtual_path` fields must contain paths only; `#ref` fragments are rejected rather than discarded. Existing explicit skill authentication is preserved when the same exact reference is also declared in `skills:`. Conflicting explicit pins are rejected.
 
 ```yaml title="apm.yml"
 name: code-review

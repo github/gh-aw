@@ -79,3 +79,17 @@ func TestAPMGitHubReferences(t *testing.T) {
 		require.Error(t, err, value)
 	}
 }
+
+func TestAPMSkillPathsDoNotDiscardRefFragments(t *testing.T) {
+	manifest, err := apm.ParseManifest([]byte("name: project\nversion: 1.0.0\ndependencies:\n  apm:\n    - git: owner/repo\n      path: skills/review#ignored\n      ref: main\n"))
+	require.NoError(t, err)
+	lock, err := apm.ParseLockfile([]byte("lockfile_version: '1'\ndependencies:\n  - repo_url: owner/repo\n    virtual_path: skills/review\n    resolved_ref: main\n    resolved_commit: " + testCommit + "\n    depth: 1\n"))
+	require.NoError(t, err)
+	_, err = lockedAPMSkills(manifest, lock)
+	require.ErrorContains(t, err, "path must not contain a ref")
+
+	_, err = lockedSkillReference(apm.LockedDependency{
+		RepoURL: "owner/repo", VirtualPath: "skills/review#ignored", ResolvedCommit: testCommit,
+	})
+	require.ErrorContains(t, err, "virtual_path must not contain a ref")
+}

@@ -119,25 +119,27 @@ func dependabotScalar(value string) *yaml.Node {
 
 func dependabotDirectoryCovered(updates *yaml.Node, ecosystem, directory string) (bool, error) {
 	for _, entry := range updates.Content {
-		if entry.Kind != yaml.MappingNode {
+		var update struct {
+			Ecosystem   string   `yaml:"package-ecosystem"`
+			Directory   string   `yaml:"directory"`
+			Directories []string `yaml:"directories"`
+		}
+		if err := entry.Decode(&update); err != nil {
+			return false, fmt.Errorf("dependabot.yml: invalid update entry: %w", err)
+		}
+		if update.Ecosystem != ecosystem {
 			continue
 		}
-		name := dependabotNodeField(entry, "package-ecosystem")
-		if name == nil || name.Value != ecosystem {
-			continue
-		}
-		if value := dependabotNodeField(entry, "directory"); value != nil && value.Value == directory {
+		if update.Directory == directory {
 			return true, nil
 		}
-		if values := dependabotNodeField(entry, "directories"); values != nil && values.Kind == yaml.SequenceNode {
-			for _, value := range values.Content {
-				matched, err := doublestar.Match(value.Value, directory)
-				if err != nil {
-					return false, fmt.Errorf("dependabot.yml: invalid directories pattern %q: %w", value.Value, err)
-				}
-				if matched {
-					return true, nil
-				}
+		for _, pattern := range update.Directories {
+			matched, err := doublestar.Match(pattern, directory)
+			if err != nil {
+				return false, fmt.Errorf("dependabot.yml: invalid directories pattern %q: %w", pattern, err)
+			}
+			if matched {
+				return true, nil
 			}
 		}
 	}

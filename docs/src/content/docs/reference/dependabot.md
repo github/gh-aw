@@ -47,7 +47,7 @@ All ecosystems update `.github/dependabot.yml` with weekly update schedules. Exi
 
 ## APM version updates
 
-Workflows using [`apm:` manifest-backed skills](/gh-aw/reference/dependencies/#native-manifest-backed-skills) cause `gh aw compile --dependabot` to add weekly `package-ecosystem: apm` entries for the consumed manifest directories. The compiler preserves existing schedules, registries, groups, cooldowns, ignore rules, and comments; an existing `directories:` entry covering the path is reused. Invalid configuration is reported without overwriting it.
+Workflows using [`apm:` manifest-backed skills](/gh-aw/reference/dependencies/#native-manifest-backed-skills) cause `gh aw compile --dependabot` to add weekly `package-ecosystem: apm` entries for the consumed manifest directories. The compiler preserves existing schedules, registries, groups, cooldowns, ignore rules, and comments; existing entries covering the path are reused, including fields inherited through YAML aliases and merge keys. Invalid configuration is reported without overwriting it.
 
 ```yaml
 version: 2
