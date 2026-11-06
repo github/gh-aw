@@ -54,7 +54,12 @@ func TestNativeRootlessThreatDetectionUsesVerifiedBinary(t *testing.T) {
 				"THREAT_DETECT_BINARY="+verified, "PATH="+root+":"+os.Getenv("PATH"))
 			out, err := cmd.CombinedOutput()
 			if state != "verified" {
-				require.Error(t, err, "%s", out)
+				require.ErrorContains(t, err, "exit status 1", "%s", out)
+				if state == "unset" {
+					require.Contains(t, string(out), "Verified detector path must be supplied by the install step")
+				} else {
+					require.Contains(t, string(out), "ERROR: Verified detector must be a regular executable file")
+				}
 				require.NotContains(t, string(out), "verified")
 				return
 			}
