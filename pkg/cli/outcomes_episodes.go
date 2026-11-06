@@ -150,6 +150,7 @@ func episodeOutcomeObservationsEqual(a, b EpisodeOutcomeObservation) bool {
 		a.HumanEdits == b.HumanEdits &&
 		a.HumanReviews == b.HumanReviews &&
 		a.ZeroTouch == b.ZeroTouch &&
+		a.ZeroTouchEvidenceComplete == b.ZeroTouchEvidenceComplete &&
 		a.ObjectiveValue == b.ObjectiveValue &&
 		(a.ObjectiveLabels == nil) == (b.ObjectiveLabels == nil) &&
 		slices.Equal(a.ObjectiveLabels, b.ObjectiveLabels) &&

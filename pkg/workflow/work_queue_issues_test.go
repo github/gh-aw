@@ -139,11 +139,15 @@ func TestWorkQueueIssuesCompilationUsesExistingJobs(t *testing.T) {
 			require.Equal(t, "always()", step["if"])
 			env := step["env"].(map[string]any)
 			require.JSONEq(t, `{"label":"cookie","title_prefix":"[cookie queue]"}`, env["GH_AW_WORK_QUEUE_ISSUES"].(string))
-			require.Contains(t, step["with"].(map[string]any)["script"], "core.setFailed(")
+			script := step["with"].(map[string]any)["script"].(string)
+			require.Contains(t, script, "if (result.pending?.length) core.warning(")
+			require.NotContains(t, script, "core.setFailed(")
+			require.Equal(t, "${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}", step["with"].(map[string]any)["github-token"])
+			require.Contains(t, script, "githubClient: github")
 			seen = true
 		}
 		if step["id"] == "detection_runs" {
-			require.True(t, seen, "the detection tracker follows the potentially failed Issue projection")
+			require.True(t, seen, "the detection tracker follows the warning-only Issue projection")
 			require.Equal(t, "always()", step["if"], "pending mirrors must not skip required detection reporting")
 			detectionSeen = true
 		}

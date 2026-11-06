@@ -46,6 +46,30 @@ func TestParseTokenUsageFile(t *testing.T) {
 		assert.Equal(t, 200, model.OutputTokens, "model output tokens")
 	})
 
+	t.Run("Z.AI Anthropic-compatible usage", func(t *testing.T) {
+		filePath := filepath.Join(testutil.TempDir(t, "token-usage-zai"), "token-usage.jsonl")
+		// Synthetic normalized AWF record using the session totals from gh-aw#75271.
+		content := `{"event":"token_usage","provider":"anthropic","model":"glm-5.3-flash","streaming":true,"input_tokens":38719,"output_tokens":4058,"cache_read_tokens":112640,"cache_write_tokens":0}`
+		require.NoError(t, os.WriteFile(filePath, []byte(content+"\n"), 0o644))
+
+		summary, err := parseTokenUsageFile(filePath)
+		require.NoError(t, err)
+		require.NotNil(t, summary)
+
+		assert.Equal(t, 38719, summary.TotalInputTokens)
+		assert.Equal(t, 4058, summary.TotalOutputTokens)
+		assert.Equal(t, 112640, summary.TotalCacheReadTokens)
+		assert.Zero(t, summary.TotalCacheWriteTokens)
+		assert.Equal(t, 155417, summary.TotalInputTokens+summary.TotalOutputTokens+summary.TotalCacheReadTokens)
+		require.Contains(t, summary.ByModel, "glm-5.3-flash")
+		model := summary.ByModel["glm-5.3-flash"]
+		assert.Equal(t, "anthropic", model.Provider)
+		assert.Equal(t, 38719, model.InputTokens)
+		assert.Equal(t, 4058, model.OutputTokens)
+		assert.Equal(t, 112640, model.CacheReadTokens)
+		assert.Zero(t, model.CacheWriteTokens)
+	})
+
 	t.Run("multiple entries with multiple models", func(t *testing.T) {
 		tmpDir := testutil.TempDir(t, "token-usage")
 		filePath := filepath.Join(tmpDir, "token-usage.jsonl")

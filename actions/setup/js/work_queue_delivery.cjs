@@ -486,7 +486,7 @@ async function verifyBuiltinDeliveryOutput(options) {
   if (["create_discussion", "create_pull_request"].includes(message.type)) return require("./work_queue_native_creation_delivery.cjs").verifyNativeCreationDelivery(options);
   // Updating branches still requires its own pinned commit/tree verifier.
   if (message.type === "update_pull_request") return unverified("delivery.builtin.pinned_verifier_required");
-  const verifiedFields = new Set(["type", "claim_handle", "claim_id", "work_id", "repo", "item_number", "issue_number", "pull_request_number", "temporary_id", ...(BUILTIN_EFFECT_FIELDS[message.type] || [])]);
+  const verifiedFields = new Set(["type", "output_id", "depends-on", "claim_handle", "claim_id", "work_id", "repo", "item_number", "issue_number", "pull_request_number", "temporary_id", ...(BUILTIN_EFFECT_FIELDS[message.type] || [])]);
   if (Object.keys(message).some(field => !verifiedFields.has(field))) return unverified("delivery.builtin.undeclared_fields");
   if (!result || result.staged || !github?.rest || message.data !== undefined || message.duplicate_of !== undefined)
     return unverified("delivery.builtin.readback_unavailable", { result_present: !!result, staged: !!result?.staged, client_present: !!github?.rest, data_present: message.data !== undefined, duplicate: message.duplicate_of !== undefined });

@@ -1843,7 +1843,7 @@ jobs:
             const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
             const { main } = require(path.join(actionsDir, 'work_queue_issues.cjs'));
             const result = await main({ core, githubClient: github, context });
-            if (result.pending?.length) core.setFailed('Work queue is committed; Issue synchronization remains pending. Inspect the exact terminal request before using work-queue sync-issues --request-id.');
+            if (result.pending?.length) core.warning('Work queue is committed; Issue synchronization remains pending. Inspect the exact terminal request before using work-queue sync-issues --request-id.');
       - name: Download activation artifact for work queue summary
         if: always()
         continue-on-error: true

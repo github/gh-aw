@@ -35,6 +35,7 @@ func TestOutcomeJSONLObjectiveRoundtrip(t *testing.T) {
 		report.ObjectNumber = i + 1
 		report.ObjectiveValue = objective.value
 		report.ObjectiveLabels = objective.labels
+		report.ZeroTouchEvidenceComplete = i%2 == 0
 		reports = append(reports, report)
 	}
 	writeOutcomeJSONL(outcomesDir, 42, reports)

@@ -45,7 +45,7 @@ func checkCustomJobDetection(ctx context.Context, input Input) ([]Diagnostic, er
 		if err != nil {
 			return diagnostics, err
 		}
-		if input.Document == nil && constants.IsCompilerOwnedJobName(id) {
+		if input.Document == nil && input.AuthoredJobs == nil && constants.IsCompilerOwnedJobName(id) {
 			continue
 		}
 		if _, builtin := constants.KnownBuiltInJobNames[id]; builtin && fields["uses"] == nil && fields["runs-on"] == nil {
@@ -168,6 +168,9 @@ func customJobDetectionActions(input Input) (map[string]any, aw.JobDependencyGra
 		authored, err = policyMapping(input.Document.Frontmatter["jobs"], "jobs")
 		if err != nil {
 			return nil, nil, err
+		}
+		if authored == nil {
+			authored = make(map[string]any)
 		}
 	}
 	for _, job := range input.Workflow.Jobs {
