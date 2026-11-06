@@ -63,6 +63,7 @@ describe("runtime repository checkout", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllEnvs();
     fs.rmSync(temp, { recursive: true, force: true });
   });
@@ -93,7 +94,11 @@ describe("runtime repository checkout", () => {
     expect(action.runs.steps).toEqual([{ shell: "bash", run: "true" }]);
   });
 
-  it.each(["", "org/a", "org/a\norg/b"])("keeps a token-free no-op composite available for post-job resolution: %s", async repositories => {
+  it.each([
+    ["empty", ""],
+    ["single", "org/a"],
+    ["multi", "org/a\norg/b"],
+  ])("keeps a token-free no-op composite available for post-job resolution: %s batch", async (_name, repositories) => {
     vi.stubEnv("GH_AW_DYNAMIC_REPOSITORIES", repositories);
     const entries = await prepare(runtime);
     expect(await finish()).toEqual(entries);
@@ -103,7 +108,53 @@ describe("runtime repository checkout", () => {
     expect(action.description).toBeTruthy();
     expect(action.runs).toEqual({ using: "composite", steps: [{ shell: "bash", run: "true" }] });
     expect(manifest).not.toMatch(/token|GH_AW_DYNAMIC|\$\{\{/i);
-    expect(execFileSync("bash", ["-c", action.runs.steps[0].run], { encoding: "utf8" })).toBe("");
+  });
+
+  it.each(["writeFileSync", "renameSync"])("preserves the original manifest when replacement fails in %s", async operation => {
+    vi.stubEnv("GH_AW_DYNAMIC_REPOSITORIES", "");
+    await prepare(runtime);
+    const actionDir = path.join(workspace, ".gh-aw/checkouts/0");
+    const manifestPath = path.join(actionDir, "action.yml");
+    const original = fs.readFileSync(manifestPath, "utf8");
+    vi.spyOn(fs, operation).mockImplementation(() => {
+      throw new Error("Injected filesystem failure");
+    });
+    await expect(finish()).rejects.toThrow("Unable to finalize the temporary runtime checkout action");
+    expect(fs.readFileSync(manifestPath, "utf8")).toBe(original);
+    expect(fs.readdirSync(actionDir).sort()).toEqual([".gitignore", "action.yml"]);
+  });
+
+  it("replaces a manifest symlink without modifying its target", async () => {
+    vi.stubEnv("GH_AW_DYNAMIC_REPOSITORIES", "");
+    await prepare(runtime);
+    const manifestPath = path.join(workspace, ".gh-aw/checkouts/0/action.yml");
+    const outside = path.join(temp, "outside.yml");
+    fs.writeFileSync(outside, "unchanged");
+    fs.unlinkSync(manifestPath);
+    fs.symlinkSync(outside, manifestPath);
+    await finish();
+    expect(fs.readFileSync(outside, "utf8")).toBe("unchanged");
+    expect(fs.lstatSync(manifestPath).isSymbolicLink()).toBe(false);
+    expect(JSON.parse(fs.readFileSync(manifestPath, "utf8")).runs).toEqual({ using: "composite", steps: [{ shell: "bash", run: "true" }] });
+  });
+
+  it("keeps runner-owned manifests out of staging, cleanup, and untracked stashes", async () => {
+    const git = args => execFileSync("git", ["-C", workspace, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+    git(["init", "--initial-branch=main"]);
+    git(["-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null", "commit", "--allow-empty", "-m", "Fixture"]);
+    vi.stubEnv("GH_AW_DYNAMIC_REPOSITORIES", "");
+    await prepare(runtime);
+    await finish();
+    const actionDir = path.join(workspace, ".gh-aw/checkouts/0");
+    git(["add", "-A"]);
+    expect(git(["diff", "--cached", "--name-only"])).toBe("");
+    git(["clean", "-fd"]);
+    const untracked = path.join(workspace, "untracked.txt");
+    fs.writeFileSync(untracked, "stash me");
+    git(["stash", "push", "-u"]);
+    expect(fs.existsSync(untracked)).toBe(false);
+    expect(fs.existsSync(path.join(actionDir, ".gitignore"))).toBe(true);
+    expect(JSON.parse(fs.readFileSync(path.join(actionDir, "action.yml"), "utf8")).runs).toEqual({ using: "composite", steps: [{ shell: "bash", run: "true" }] });
   });
 
   it.each(["0", "-1", "1.5", "NaN", "Infinity", "9007199254740992", "", " 2 ", "2e1", "2repos", "${{ inputs.max }}"])("rejects invalid max-repos before authenticated reads: %s", async value => {
