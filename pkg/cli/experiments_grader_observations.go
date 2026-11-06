@@ -51,13 +51,15 @@ type ExcludedObservationSummary struct {
 }
 
 type graderMetricObservationSet struct {
-	// MetricID identifies the grader or eval question backing this observation set.
+	// MetricID identifies the grader, eval question, or outcome backing this observation set.
 	MetricID string
 	// Direction is the declared grader direction ("higher_is_better" or "lower_is_better").
 	// Empty (treated as higher_is_better) for eval-backed metrics.
-	Direction  string
-	ByVariant  map[string][]GraderMetricObservation
-	Exclusions map[string][]ExcludedObservationSummary
+	Direction     string
+	ByVariant     map[string][]GraderMetricObservation
+	Exclusions    map[string][]ExcludedObservationSummary
+	Coverage      map[string]*OutcomeMetricCoverage
+	OutcomeWindow *OutcomeWindowInfo
 }
 
 type graderResultsArtifact struct {

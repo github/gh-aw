@@ -183,7 +183,7 @@ Resource hosts must match `GITHUB_SERVER_URL` (default `github.com`). A backing 
 
 The compiler generates `agentic-workqueue.yml` for Issue events. Closing an exactly bound Issue can cancel unfinished Work after fresh identity and label checks; it cannot revoke completed delivery, stop a worker, or establish Result.
 
-Projection hooks require `contents: write`, `issues: write`, and `actions: read`, with credentials kept outside agent execution. Failed projection does not roll back queue admission or justify rerunning a worker. Ambiguous Issue/comment creation remains pending rather than blindly creating duplicates; automatic recovery of unreceipted creation is not implemented.
+Projection hooks require `contents: write`, `issues: write`, and `actions: read`, with credentials kept outside agent execution. Issue updates and coordination-lock cleanup use the same projector token; custom tokens must grant those permissions for every projected repository. Failed projection emits a warning rather than failing worker conclusion or scheduled maintenance; it does not roll back queue admission or justify rerunning a worker. Claim delivery and Result verification failures remain fatal. Ambiguous Issue/comment creation remains pending rather than blindly creating duplicates; automatic recovery of unreceipted creation is not implemented.
 
 ### Projector grants
 
