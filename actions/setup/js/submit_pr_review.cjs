@@ -108,6 +108,7 @@ async function main(config = {}) {
   }
 
   let processedCount = 0;
+  const reviewTargets = new Set();
 
   /**
    * Message handler that stores review metadata
@@ -210,7 +211,8 @@ async function main(config = {}) {
     const filterResult = await checkRequiredFilter(githubClient, repoParts, prNum, requiredLabels, requiredTitlePrefix, "submit_pr_review");
     if (filterResult) return filterResult;
 
-    if (buffer.hasReviewMetadata()) {
+    const reviewTarget = `${repo}#${prNum}`;
+    if (reviewTargets.has(reviewTarget)) {
       const errMsg = `PR ${repo}#${prNum} already has a pending review submission. Only one submit_pull_request_review per PR per run is allowed; use target: "*" with max: 1 so each PR gets its own invocation.`;
       core.warning(`submit_pull_request_review: ${errMsg}`);
       return { success: false, error: errMsg };
@@ -218,6 +220,7 @@ async function main(config = {}) {
 
     core.info(`Setting review metadata for ${repo}#${prNum}: event=${event}, bodyLength=${body.length}`);
     buffer.setReviewMetadata(body, event);
+    reviewTargets.add(reviewTarget);
 
     if (!buffer.getReviewContext()) {
       await setReviewContextOnBuffer(buffer, prNum, repo, repoParts, message);

@@ -84,13 +84,21 @@ Skipped, cancelled, staged, deferred, or delegated results do not establish
 success. Missing, ambiguous, or cyclic dependencies also fail closed. Independent
 outputs retain their existing behavior and policy checks.
 
+`submit_pull_request_review` and `create_pull_request_review_comment` can be
+prerequisites. Inline comments and the review body are buffered and submitted
+together at the end of message processing, before dependent outputs run.
+Buffering alone does not confirm success: dependents wait for submission and
+run only if their prerequisite was actually published.
+Review comments released by a dependency are submitted in a subsequent batch.
+
 Dependencies apply within a single safe-output processing pass (and within the
 same Claim in queue workflows). Custom safe jobs, `call_workflow`,
 `push_repo_memory`, `upload_asset`, `noop`, and out-of-band diagnostics
 (`report_incomplete`, `report_missing_tool`, `report_missing_data`) reject
-`depends-on`. The effects of `upload_code_coverage` run in a later job, so
-staging it cannot establish a successful prerequisite. Dependencies do not
-provide rollback for operations that have already succeeded.
+`depends-on`. `upload_code_coverage`, `dispatch_workflow`, `dispatch_repository`,
+and custom action outputs delegate effects outside this manager, so they cannot
+establish successful prerequisites. Dependencies do not provide rollback for
+operations that have already succeeded.
 
 ## Available Safe Output Types
 
