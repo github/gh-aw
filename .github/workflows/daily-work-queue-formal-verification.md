@@ -67,7 +67,7 @@ jobs:
       - name: Download pinned TLC
         shell: bash
         run: |
-          bash "$GITHUB_WORKSPACE/actions/setup/sh/install_tla_runtime.sh" "$RUNNER_TEMP/tla-tools" --jar-only
+          bash "$GITHUB_WORKSPACE/.github/scripts/install_tla_runtime.sh" "$RUNNER_TEMP/tla-tools" --jar-only
       - name: Collect formal verification evidence
         id: verification
         continue-on-error: true

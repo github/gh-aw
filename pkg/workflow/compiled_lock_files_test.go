@@ -63,7 +63,7 @@ func TestSmokeAndCoverageFailureContracts(t *testing.T) {
 		{
 			name: "shared/tla-plus",
 			required: []string{
-				`bash "$GITHUB_WORKSPACE/actions/setup/sh/install_tla_runtime.sh" /tmp/gh-aw/agent/tla-tools`,
+				`bash "$GITHUB_WORKSPACE/.github/scripts/install_tla_runtime.sh" /tmp/gh-aw/agent/tla-tools`,
 				"TLC 2.19",
 			},
 			rejected: []string{"releases/download/v1.8.0", "curl", "011267fca25d0752cf18894dd585cd28b96960c112ea8a20b823ea770e7e10cd"},
@@ -71,7 +71,7 @@ func TestSmokeAndCoverageFailureContracts(t *testing.T) {
 		{
 			name: "daily-work-queue-formal-verification",
 			required: []string{
-				`bash "$GITHUB_WORKSPACE/actions/setup/sh/install_tla_runtime.sh" "$RUNNER_TEMP/tla-tools" --jar-only`,
+				`bash "$GITHUB_WORKSPACE/.github/scripts/install_tla_runtime.sh" "$RUNNER_TEMP/tla-tools" --jar-only`,
 				`printf 'TLA2TOOLS_JAR=%s/tla-tools/tla2tools.jar\n'`,
 			},
 			rejected: []string{"curl", "releases/download/"},

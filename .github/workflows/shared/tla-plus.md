@@ -6,7 +6,7 @@ steps:
   - name: Prepare pinned TLA+ runtime
     shell: bash
     run: |
-      bash "$GITHUB_WORKSPACE/actions/setup/sh/install_tla_runtime.sh" /tmp/gh-aw/agent/tla-tools
+      bash "$GITHUB_WORKSPACE/.github/scripts/install_tla_runtime.sh" /tmp/gh-aw/agent/tla-tools
 ---
 
 <!--
@@ -15,7 +15,7 @@ TLA+ Tools v1.7.4 (TLC 2.19) before the agent runs on a Linux x64 runner. The po
 and jar live under /tmp/gh-aw/agent so they are accessible in the sandbox.
 This fragment does not grant tools, network access, or safe outputs.
 Custom jobs do not inherit these agent setup steps.
-The installer and reviewed pins come from the workflow repository checkout,
+The repository-owned installer and reviewed pins come from the workflow repository checkout,
 not a previously released setup action that might lack the installer.
 -->
 

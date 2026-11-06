@@ -5,8 +5,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 sandbox=$(mktemp -d)
 trap 'rm -rf "$sandbox"' EXIT
-mkdir -p "$sandbox/bin" "$sandbox/scripts" "$sandbox/fixtures/jre/bin"
-cp "$SCRIPT_DIR/install_tla_runtime.sh" "$sandbox/scripts/"
+mkdir -p "$sandbox/bin" "$sandbox/.github/scripts" "$sandbox/actions/setup/sh" "$sandbox/fixtures/jre/bin"
+installer="$sandbox/.github/scripts/install_tla_runtime.sh"
+cp "$SCRIPT_DIR/../../actions/setup/sh/release_integrity.sh" "$sandbox/actions/setup/sh/"
 printf 'fixture jar\n' > "$sandbox/fixtures/tla2tools.jar"
 cat > "$sandbox/fixtures/jre/bin/java" <<'JAVA'
 #!/usr/bin/env bash
@@ -31,7 +32,7 @@ fixture_pins() {
   sed \
     -e "s/936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88/$jar_sha/" \
     -e "s/2413149700df0f7d440500a84a8f764c535f21e5a5e87d38328b64eec2c5b500/${1:-$jre_sha}/" \
-    "$SCRIPT_DIR/release_integrity.sh" > "$sandbox/scripts/release_integrity.sh"
+    "$SCRIPT_DIR/install_tla_runtime.sh" > "$installer"
 }
 fixture_pins
 cat > "$sandbox/bin/uname" <<'UNAME'
@@ -82,7 +83,7 @@ run_case() {
   mkdir -p "$(dirname "$destination")"
   : > "$EXECUTION_LOG"
   : > "$DOWNLOAD_LOG"
-  bash "$sandbox/scripts/install_tla_runtime.sh" "$destination" "$@" > "$sandbox/output" 2>&1 || status=$?
+  bash "$installer" "$destination" "$@" > "$sandbox/output" 2>&1 || status=$?
   if [ "$expected" = success ]; then
     [ "$status" -eq 0 ] || { cat "$sandbox/output"; exit 1; }
     cmp "$FIXTURES/tla2tools.jar" "$destination/tla2tools.jar"
@@ -122,8 +123,12 @@ FAKE_ARCH=aarch64 run_case unsupported failure
 run_case invalid-flag failure --unknown
 mkdir "$sandbox/existing"
 printf preserved > "$sandbox/existing/sentinel"
-if bash "$sandbox/scripts/install_tla_runtime.sh" "$sandbox/existing" > "$sandbox/output" 2>&1; then exit 1; fi
+if bash "$installer" "$sandbox/existing" > "$sandbox/output" 2>&1; then exit 1; fi
 [ "$(cat "$sandbox/existing/sentinel")" = preserved ]
-if bash "$sandbox/scripts/install_tla_runtime.sh" / > "$sandbox/output" 2>&1; then exit 1; fi
-if bash "$sandbox/scripts/install_tla_runtime.sh" relative > "$sandbox/output" 2>&1; then exit 1; fi
+if bash "$installer" / > "$sandbox/output" 2>&1; then exit 1; fi
+if bash "$installer" relative > "$sandbox/output" 2>&1; then exit 1; fi
 echo "PASS: existing and invalid destinations"
+
+[ ! -e "$SCRIPT_DIR/../../actions/setup/sh/install_tla_runtime.sh" ]
+[ ! -e "$SCRIPT_DIR/../../actions/setup/sh/install_tla_runtime_test.sh" ]
+echo "PASS: TLA+ installer and tests are repository-owned, not setup action payloads"

@@ -3,10 +3,10 @@ set +o histexpand
 set -euo pipefail
 
 # Usage: bash install_tla_runtime.sh INSTALL_DIR [--jar-only]
-# Pins are reviewed in release_integrity.sh, never discovered from download responses.
+# Repository-owned pins are reviewed against publisher provenance, never download responses.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=actions/setup/sh/release_integrity.sh
-source "$SCRIPT_DIR/release_integrity.sh"
+source "$SCRIPT_DIR/../../actions/setup/sh/release_integrity.sh"
 
 if [ "$#" -lt 1 ] || [ "$#" -gt 2 ] || { [ "$#" -eq 2 ] && [ "$2" != "--jar-only" ]; }; then
   echo "ERROR: Usage: install_tla_runtime.sh INSTALL_DIR [--jar-only]" >&2
@@ -28,8 +28,8 @@ if [ -e "$tools" ] || [ -L "$tools" ]; then
   exit 1
 fi
 
-jar_sha=$(release_artifact_sha256 tlaplus/tlaplus v1.7.4 tla2tools.jar)
-jre_sha=$(release_artifact_sha256 adoptium/temurin21-binaries jdk-21.0.12.1+1 OpenJDK21U-jre_x64_linux_hotspot_21.0.12.1_1.tar.gz)
+jar_sha=936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88
+jre_sha=2413149700df0f7d440500a84a8f764c535f21e5a5e87d38328b64eec2c5b500
 mkdir -p "$(dirname "$tools")"
 staging=$(mktemp -d "${tools}.install.XXXXXX")
 trap 'rm -rf "$staging"' EXIT
