@@ -29,9 +29,10 @@ type replacement struct {
 }
 
 type candidate struct {
-	call *ast.CallExpr
-	arg  ast.Expr
-	file *ast.File
+	call        *ast.CallExpr
+	arg         ast.Expr
+	file        *ast.File
+	replacement replacement
 }
 
 // Analyzer is the sprintfbool analysis pass.
@@ -50,18 +51,19 @@ func analyzeSprintfBool(pass *analysis.Pass) (any, error) {
 	seenImportFiles := make(map[token.Pos]bool)
 	candidates, targetCallsByFile, filesByPos := collectSprintfBoolCandidates(pass, insp, generatedFiles, noLintIndex)
 
-	replacements := make([]replacement, len(candidates))
+	resolvedCandidates := make([]candidate, 0, len(candidates))
 	fixableCallsByFile := make(map[token.Pos]int)
-	for i, c := range candidates {
+	for _, c := range candidates {
 		repl := replacementForCall(pass, c.call, c.arg, c.file)
-		replacements[i] = repl
+		c.replacement = repl
 		if repl.canFix && c.file != nil {
 			fixableCallsByFile[c.file.Pos()]++
 		}
+		resolvedCandidates = append(resolvedCandidates, c)
 	}
 
 	orphanFmtByFile := computeOrphanedFmtImportStatus(pass, filesByPos, targetCallsByFile, fixableCallsByFile)
-	reportSprintfBoolDiagnostics(pass, candidates, replacements, seenImportFiles, orphanFmtByFile)
+	reportSprintfBoolDiagnostics(pass, resolvedCandidates, seenImportFiles, orphanFmtByFile)
 
 	return nil, nil
 }
@@ -92,13 +94,25 @@ func collectSprintfBoolCandidates(pass *analysis.Pass, insp *inspector.Inspector
 		if len(call.Args) != 2 {
 			return
 		}
-		formatLit, ok := astutil.UnwrapParenExpr(call.Args[0]).(*ast.BasicLit)
+		var formatArg ast.Expr
+		var arg ast.Expr
+		for i, callArg := range call.Args {
+			switch i {
+			case 0:
+				formatArg = callArg
+			case 1:
+				arg = callArg
+			}
+		}
+		if formatArg == nil || arg == nil {
+			return
+		}
+		formatLit, ok := astutil.UnwrapParenExpr(formatArg).(*ast.BasicLit)
 		if !ok || formatLit.Kind != token.STRING || formatLit.Value != `"%t"` {
 			return
 		}
-		arg := call.Args[1]
 		argType := pass.TypesInfo.TypeOf(arg)
-		if argType == nil || argType != types.Typ[types.Bool] {
+		if argType == nil || argType != types.Universe.Lookup("bool").Type() {
 			return
 		}
 		file := astutil.FileForPos(pass.Files, call.Pos())
@@ -129,9 +143,9 @@ func computeOrphanedFmtImportStatus(pass *analysis.Pass, filesByPos map[token.Po
 }
 
 // reportSprintfBoolDiagnostics emits one diagnostic per candidate.
-func reportSprintfBoolDiagnostics(pass *analysis.Pass, candidates []candidate, replacements []replacement, seenImportFiles map[token.Pos]bool, orphanFmtByFile map[token.Pos]bool) {
-	for i, c := range candidates {
-		repl := replacements[i]
+func reportSprintfBoolDiagnostics(pass *analysis.Pass, candidates []candidate, seenImportFiles map[token.Pos]bool, orphanFmtByFile map[token.Pos]bool) {
+	for _, c := range candidates {
+		repl := c.replacement
 		argText := repl.argText
 		if argText == "" {
 			argText = astutil.NodeText(pass.Fset, c.arg)

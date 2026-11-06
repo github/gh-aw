@@ -5,6 +5,7 @@ package fprintlnsprintf
 import (
 	"go/ast"
 	"go/token"
+	"strings"
 
 	"golang.org/x/tools/go/analysis"
 
@@ -49,7 +50,17 @@ func run(pass *analysis.Pass) (any, error) {
 
 		// Check if the printed argument is fmt.Sprintf(...), possibly
 		// parenthesized as in fmt.Fprintln(w, (fmt.Sprintf(...))).
-		printedArg, ok := astutil.UnwrapParenExpr(call.Args[1]).(*ast.CallExpr)
+		var printedArgExpr ast.Expr
+		for i, arg := range call.Args {
+			if i == 1 {
+				printedArgExpr = arg
+				break
+			}
+		}
+		if printedArgExpr == nil {
+			return
+		}
+		printedArg, ok := astutil.UnwrapParenExpr(printedArgExpr).(*ast.CallExpr)
 		if !ok {
 			return
 		}
@@ -64,7 +75,7 @@ func run(pass *analysis.Pass) (any, error) {
 			Pos:            call.Pos(),
 			End:            call.End(),
 			Message:        "use fmt.Fprintf instead of fmt.Fprintln(w, fmt.Sprintf(...))",
-			SuggestedFixes: buildFprintfFix(pass, call, call.Args[1], printedArg),
+			SuggestedFixes: buildFprintfFix(pass, call, printedArgExpr, printedArg),
 		})
 	})
 }
@@ -78,18 +89,23 @@ func run(pass *analysis.Pass) (any, error) {
 // when the Sprintf call is parenthesized, in which case the surrounding parens
 // are deleted together with "fmt.Sprintf(" and its closing ")".
 func buildFprintfFix(pass *analysis.Pass, call *ast.CallExpr, printedArg ast.Expr, sprintfCall *ast.CallExpr) []analysis.SuggestedFix {
-	if len(sprintfCall.Args) == 0 {
+	var formatArg ast.Expr
+	for _, arg := range sprintfCall.Args {
+		formatArg = arg
+		break
+	}
+	if formatArg == nil {
 		return nil
 	}
 	if astutil.HasOverlappingComment(pass.Files, call.Pos(), call.End()) {
 		return nil
 	}
-	formatLit, ok := astutil.UnwrapParenExpr(sprintfCall.Args[0]).(*ast.BasicLit)
+	formatLit, ok := astutil.UnwrapParenExpr(formatArg).(*ast.BasicLit)
 	if !ok || formatLit.Kind != token.STRING {
 		return nil
 	}
 	raw := formatLit.Value
-	if len(raw) < 2 || raw[0] != '"' || raw[len(raw)-1] != '"' {
+	if len(raw) < 2 || !strings.HasPrefix(raw, `"`) || !strings.HasSuffix(raw, `"`) {
 		return nil // not a plain double-quoted literal
 	}
 
