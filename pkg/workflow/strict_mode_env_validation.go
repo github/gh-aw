@@ -31,6 +31,10 @@ func (c *Compiler) validateEnvSecrets(frontmatter map[string]any) error {
 }
 
 func (c *Compiler) validateEarlyEnvSecrets(frontmatter map[string]any) error {
+	if frontmatterDeclaresImports(frontmatter) {
+		// Imported engine definitions are not registered until imports have been merged.
+		return c.validateEnvSecretsSection(frontmatter, "env", nil)
+	}
 	_, config, _ := c.ExtractEngineConfig(frontmatter)
 	if config != nil && len(config.FallbackModels) > 0 {
 		strictModeValidationLog.Printf("Fallback models configured (%d); deferring engine.env secret validation until imports are merged", len(config.FallbackModels))
@@ -45,7 +49,10 @@ func (c *Compiler) validateEnvSecretsWithModels(frontmatter map[string]any, mode
 	if err := c.validateEnvSecretsSection(frontmatter, "env", nil); err != nil {
 		return err
 	}
+	return c.validateEngineEnvSecretsWithModels(frontmatter, models)
+}
 
+func (c *Compiler) validateEngineEnvSecretsWithModels(frontmatter map[string]any, models map[string][]string) error {
 	// Check engine.env section when engine is in object format
 	if engineValue, exists := frontmatter["engine"]; exists {
 		if engineObj, ok := engineValue.(map[string]any); ok {

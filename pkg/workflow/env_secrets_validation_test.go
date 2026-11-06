@@ -4,6 +4,8 @@ package workflow
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -11,6 +13,102 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestCompileImportedEngineSupportedEnvVarKeysStrict(t *testing.T) {
+	tests := []struct {
+		name        string
+		key         string
+		topLevelEnv string
+		strict      bool
+		wantSection string
+	}{
+		{name: "declared key", key: "ANTHROPIC_API_KEY", strict: true},
+		{name: "undeclared key", key: "OTHER_API_KEY", strict: true, wantSection: "engine.env"},
+		{name: "top-level secret", key: "ANTHROPIC_API_KEY", topLevelEnv: "env:\n  TOP_SECRET: ${{ secrets.TOP_SECRET }}\n", strict: true, wantSection: "env"},
+		{name: "non-strict top-level warning once", key: "ANTHROPIC_API_KEY", topLevelEnv: "env:\n  TOP_SECRET: ${{ secrets.TOP_SECRET }}\n"},
+		{name: "non-strict engine warning once", key: "OTHER_API_KEY"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			sharedDir := filepath.Join(dir, "shared")
+			require.NoError(t, os.MkdirAll(sharedDir, 0755))
+			require.NoError(t, os.WriteFile(filepath.Join(sharedDir, "engine.md"), []byte(`---
+engine:
+  id: my-engine
+  display-name: My Engine
+  behaviors:
+    secret-strategy: universal-llm-consumer
+    supported-env-var-keys: [ANTHROPIC_API_KEY]
+    execution:
+      command-name: my-engine
+      step-name: Execute My Engine
+---
+`), 0600))
+			path := filepath.Join(dir, "repro.md")
+			content := fmt.Sprintf(`---
+on: workflow_dispatch
+permissions:
+  contents: read
+strict: %t
+imports: [shared/engine.md]
+engine:
+  id: my-engine
+  model: anthropic/claude-sonnet-4
+  env:
+    %s: ${{ secrets.MY_ANTHROPIC_KEY }}
+%s---
+Say hello.
+`, tt.strict, tt.key, tt.topLevelEnv)
+			require.NoError(t, os.WriteFile(path, []byte(content), 0600))
+			stderr := captureStderr(func() {
+				err := NewCompiler().CompileWorkflow(path)
+				if tt.wantSection != "" {
+					require.ErrorContains(t, err, "strict mode: secrets detected in '"+tt.wantSection+"' section")
+					assert.Contains(t, err.Error(), path+":7:1:")
+					return
+				}
+				require.NoError(t, err)
+			})
+			if tt.wantSection != "" {
+				return
+			}
+			lock, err := os.ReadFile(filepath.Join(dir, "repro.lock.yml"))
+			require.NoError(t, err)
+			assert.Contains(t, string(lock), "--exclude-env "+tt.key)
+			assert.Contains(t, string(lock), "${{ secrets.MY_ANTHROPIC_KEY }}")
+			wantTopWarnings, wantEngineWarnings := 0, 0
+			if tt.topLevelEnv != "" {
+				wantTopWarnings = 1
+			}
+			if tt.key == "OTHER_API_KEY" {
+				wantEngineWarnings = 1
+			}
+			assert.Equal(t, wantTopWarnings, strings.Count(stderr, "secrets detected in 'env' section"))
+			assert.Equal(t, wantEngineWarnings, strings.Count(stderr, "secrets detected in 'engine.env' section"))
+		})
+	}
+}
+
+func TestCompileEngineFallbackTopLevelModelEnvSecret(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "fallback.md")
+	require.NoError(t, os.WriteFile(path, []byte(`---
+on: workflow_dispatch
+permissions:
+  contents: read
+strict: true
+model: anthropic/claude-sonnet-4
+engine:
+  id: copilot
+  fallback-models: [secondary]
+  env:
+    ANTHROPIC_API_KEY: ${{ secrets.MY_ANTHROPIC_KEY }}
+---
+Say hello.
+`), 0600))
+	require.NoError(t, NewCompiler().CompileWorkflow(path))
+}
 
 func TestValidateEnvSecrets(t *testing.T) {
 	tests := []struct {
