@@ -151,8 +151,10 @@ fi
 # root ownership. The Copilot CLI (running as the runner user) then fails when
 # trying to create subdirectories. See: https://github.com/github/gh-aw/issues/12066
 echo "Ensuring correct ownership of $COPILOT_DIR..."
-mkdir -p "$COPILOT_DIR"
-maybe_sudo chown -R "$(id -u):$(id -g)" "$COPILOT_DIR"
+if ! { mkdir -p "$COPILOT_DIR" && maybe_sudo chown -R "$(id -u):$(id -g)" "$COPILOT_DIR"; }; then
+  echo "ERROR: Cannot prepare Copilot state at $COPILOT_DIR. Ask a runner administrator to restore ownership of this directory and its contents to $(id -u):$(id -g) and make it writable before retrying. Rootless installation cannot repair state left by a privileged AWF run." >&2
+  exit 1
+fi
 
 # Clean up any stale AWF chroot directories left by previous runs.
 # When AWF ran with `sudo -E awf --enable-host-access`, it created
@@ -162,8 +164,12 @@ maybe_sudo chown -R "$(id -u):$(id -g)" "$COPILOT_DIR"
 # reports as "engine terminated unexpectedly" or fatal EACCES errors.
 # Remove them here before the agent starts so the runner is in a clean state.
 echo "Cleaning up stale AWF chroot directories..."
-maybe_sudo find /tmp -maxdepth 1 -name 'awf-*-chroot-home' -type d -exec rm -rf -- {} + 2>/dev/null || true
-maybe_sudo find /tmp -maxdepth 1 -name 'awf-chroot-*' -type d -exec rm -rf -- {} + 2>/dev/null || true
+if ! maybe_sudo find /tmp -maxdepth 1 -name 'awf-*-chroot-home' -type d -exec rm -rf -- {} + 2>/dev/null; then
+  echo "WARNING: Could not remove stale /tmp/awf-*-chroot-home directories. Ask a runner administrator to remove stale directories from previous runs before using this runner; installation will continue." >&2
+fi
+if ! maybe_sudo find /tmp -maxdepth 1 -name 'awf-chroot-*' -type d -exec rm -rf -- {} + 2>/dev/null; then
+  echo "WARNING: Could not remove stale /tmp/awf-chroot-* directories. Ask a runner administrator to remove stale directories from previous runs before using this runner; installation will continue." >&2
+fi
 
 # Detect architecture
 ARCH="$(uname -m)"

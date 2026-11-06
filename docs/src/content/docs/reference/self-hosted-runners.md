@@ -41,6 +41,8 @@ Self-hosted runners may require `sudo` depending on the selected engine and conf
 
 `engine.command` skips standard Copilot installation only for the primary agent. External Copilot threat detection still installs and uses the standard `copilot` executable; it does not run the primary agent's custom command. A preinstalled executable on `PATH` does not skip either installer or its privilege checks. Copilot may reuse a compatible executable from the trusted Actions toolcache under the existing version/checksum policy.
 
+Rootless installation cannot repair root-owned state from previous privileged AWF runs. If preparing `~/.copilot` fails, installation stops with an ownership-repair diagnostic. Before retrying, a runner administrator must restore ownership of that directory and its contents to the runner's UID and GID and make it writable. Failed cleanup of stale `/tmp/awf-*-chroot-home` or `/tmp/awf-chroot-*` directories emits a warning and does not stop installation; an administrator must remove those stale directories before the runner is reused.
+
 ## Runner HTTP proxy settings
 
 On runners that require an HTTP proxy for outbound access, configure `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` in the runner environment before the CLI proxy and MCP gateway start. Both containers inherit defined values, including the lowercase forms `http_proxy`, `https_proxy`, and `no_proxy`. Explicit MCP gateway environment settings take precedence over inherited values.

@@ -733,15 +733,22 @@ func TestInstallCopilotCLIScriptRootlessModeUsesRealScriptWithToolcacheAndNoSudo
 	installScript := filepath.Join(projectRoot, "actions", "setup", "sh", "install_copilot_cli.sh")
 
 	testCases := []struct {
-		name        string
-		args        []string
-		autoSelect  bool
-		blockedHome bool
+		name                string
+		args                []string
+		autoSelect          bool
+		blockedHome         bool
+		blockedState        bool
+		failedChown         bool
+		staleCleanupFailure bool
 	}{
 		{name: "rootless flag before version", args: []string{"--rootless", "1.2.3"}},
 		{name: "rootless flag after version", args: []string{"1.2.3", "--rootless"}},
 		{name: "native runner without passwordless sudo", args: []string{"1.2.3"}, autoSelect: true},
 		{name: "native runner with unwritable local directory", args: []string{"1.2.3"}, autoSelect: true, blockedHome: true},
+		{name: "native runner with legacy root-owned state", args: []string{"1.2.3"}, autoSelect: true, failedChown: true},
+		{name: "explicit rootless with legacy root-owned state", args: []string{"--rootless", "1.2.3"}, failedChown: true},
+		{name: "native runner with inaccessible state directory", args: []string{"1.2.3"}, autoSelect: true, blockedState: true},
+		{name: "native runner with stale privileged AWF directories", args: []string{"1.2.3"}, autoSelect: true, staleCleanupFailure: true},
 	}
 
 	for _, tc := range testCases {
@@ -752,6 +759,9 @@ func TestInstallCopilotCLIScriptRootlessModeUsesRealScriptWithToolcacheAndNoSudo
 			if tc.blockedHome {
 				require.NoError(t, os.MkdirAll(filepath.Join(homeDir, ".local"), 0o755))
 				require.NoError(t, os.WriteFile(filepath.Join(homeDir, ".local", "bin"), []byte("not a directory"), 0o644))
+			}
+			if tc.blockedState {
+				require.NoError(t, os.WriteFile(filepath.Join(homeDir, ".copilot"), []byte("not a directory"), 0o644))
 			}
 
 			toolcacheBin := filepath.Join(tempDir, "toolcache", "copilot-cli", "1.2.3", "x64", "bin")
@@ -775,6 +785,16 @@ case "$1" in -u) echo 12345 ;; -g) echo 31 ;; *) exit 1 ;; esac
 test "$1" = -R && test "$2" = 12345:31 && test "$3" = "$HOME/.copilot"
 `), 0o755))
 			}
+			if tc.failedChown {
+				require.NoError(t, os.MkdirAll(filepath.Join(homeDir, ".copilot", "legacy"), 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(fakeBinDir, "chown"), []byte("#!/usr/bin/env bash\necho 'chown: Operation not permitted' >&2\nexit 1\n"), 0o755))
+			}
+			if tc.staleCleanupFailure {
+				require.NoError(t, os.WriteFile(filepath.Join(fakeBinDir, "find"), []byte(`#!/usr/bin/env bash
+if [ "${1:-}" = /tmp ]; then exit 1; fi
+exec /usr/bin/find "$@"
+`), 0o755))
+			}
 
 			cmd := exec.Command("bash", append([]string{installScript}, tc.args...)...)
 			systemBin := filepath.Join(tempDir, "usr", "local", "bin")
@@ -793,6 +813,17 @@ test "$1" = -R && test "$2" = 12345:31 && test "$3" = "$HOME/.copilot"
 			)
 
 			output, err := cmd.CombinedOutput()
+			if tc.failedChown || tc.blockedState {
+				require.Error(t, err)
+				assert.Contains(t, string(output), "Cannot prepare Copilot state at "+filepath.Join(homeDir, ".copilot"))
+				assert.Contains(t, string(output), "Ask a runner administrator to restore ownership")
+				assert.Contains(t, string(output), "make it writable before retrying")
+				assert.NotContains(t, string(output), "Using cached GitHub Copilot CLI")
+				assert.NoFileExists(t, filepath.Join(homeDir, ".local", "bin", "copilot"))
+				assert.NoFileExists(t, filepath.Join(systemBin, "copilot"))
+				assert.NoFileExists(t, githubPath)
+				return
+			}
 			if tc.blockedHome {
 				require.Error(t, err)
 				assert.Contains(t, string(output), "could not create a writable install directory")
@@ -800,6 +831,11 @@ test "$1" = -R && test "$2" = 12345:31 && test "$3" = "$HOME/.copilot"
 				return
 			}
 			require.NoError(t, err, "install_copilot_cli.sh should succeed in rootless mode with toolcache and no sudo: %s", output)
+			if tc.staleCleanupFailure {
+				assert.Contains(t, string(output), "WARNING: Could not remove stale /tmp/awf-*-chroot-home directories")
+				assert.Contains(t, string(output), "WARNING: Could not remove stale /tmp/awf-chroot-* directories")
+				assert.Contains(t, string(output), "installation will continue")
+			}
 
 			assert.Contains(t, string(output), "Using cached GitHub Copilot CLI", "script should use cached copilot CLI")
 			assert.Contains(t, string(output), "Wrapper installed at "+filepath.Join(homeDir, ".local", "bin", "copilot"))
