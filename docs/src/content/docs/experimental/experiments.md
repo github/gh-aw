@@ -337,8 +337,10 @@ pending after the window. Stale pending outputs score zero.
 Zero-touch means a merged PR with no non-bot comments, reviews, or commits after
 creation. Accepted PR outputs without complete zero-touch evidence are excluded
 from that metric rather than scored zero. Unknown or errored outcomes are also
-excluded. Lifecycle, lifecycle-close, ignored, and skipped outputs do not
-contribute; runs with no outcome-bearing outputs are no-ops, not successes.
+excluded. Historical records without `zero_touch_evidence_complete` remain valid,
+but do not establish complete zero-touch evidence. Lifecycle, lifecycle-close,
+ignored, and skipped outputs do not contribute; runs with no outcome-bearing
+outputs are no-ops, not successes.
 Other resolved output types remain in the denominator and score zero for
 `outcome:zero_touch`.
 

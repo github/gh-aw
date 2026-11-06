@@ -414,7 +414,8 @@ func kaplanMeierOutcomeWindowP95(observations []outcomeWindowObservation) time.D
 func applyOutcomeWindowKMGroup(duration time.Duration, events, groupSize int, atRisk *int, survival *float64) (time.Duration, bool) {
 	if events > 0 && *atRisk > 0 {
 		*survival *= 1 - float64(events)/float64(*atRisk)
-		if *survival <= 0.05 {
+		// Repeated products can round an exact 5% survival boundary upward.
+		if *survival <= 0.05+1e-12 {
 			return clampExperimentOutcomeWindow(duration), true
 		}
 	}

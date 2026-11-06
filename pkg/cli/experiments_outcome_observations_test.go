@@ -297,6 +297,15 @@ func TestEstimateOutcomeWindow(t *testing.T) {
 		assert.Equal(t, 60*time.Hour, estimateOutcomeWindow(runs, map[string]struct{}{"quality": {}}, data, now))
 	})
 
+	t.Run("p95 includes exact survival boundary", func(t *testing.T) {
+		decisions := make([]float64, minExperimentOutcomeDecisions)
+		for i := range decisions {
+			decisions[i] = float64(24 + i)
+		}
+		runs, data := makeFixture(decisions, nil)
+		assert.Equal(t, 42*time.Hour, estimateOutcomeWindow(runs, map[string]struct{}{"quality": {}}, data, now))
+	})
+
 	t.Run("p95 is clamped", func(t *testing.T) {
 		decisions := make([]float64, minExperimentOutcomeDecisions)
 		for i := range decisions {
@@ -318,9 +327,9 @@ func TestEstimateOutcomeWindow(t *testing.T) {
 	t.Run("maximum when p95 is not reached", func(t *testing.T) {
 		decisions := make([]float64, minExperimentOutcomeDecisions)
 		for i := range decisions {
-			decisions[i] = 24 * 31
+			decisions[i] = 48
 		}
-		runs, data := makeFixture(decisions, nil)
+		runs, data := makeFixture(decisions, []time.Duration{72 * time.Hour, 72 * time.Hour})
 		assert.Equal(t, maxExperimentOutcomeWindow, estimateOutcomeWindow(runs, map[string]struct{}{"quality": {}}, data, now))
 	})
 }

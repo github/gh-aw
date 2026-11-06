@@ -48,7 +48,7 @@ Each safe output could be treated as an independent observation. This gives more
 
 #### Neutral
 - `ExperimentConfig` gains an `outcome_window` field, and the frontmatter schema accepts it. The compiler now also validates `secondary_metrics` references, which it did not do before.
-- `OutcomeReport` JSON now always emits `zero_touch_evidence_complete` (no `omitempty`), which changes the logs and audit JSON schemas.
+- `OutcomeReport` JSON now always emits `zero_touch_evidence_complete` (no `omitempty`). The logs and audit JSON schemas keep the field optional for historical records; absence does not establish complete zero-touch evidence.
 - The experiments specification (R-STAT-004 and a new "Outcome-backed observations" subsection) and the proposer workflow guidance are updated to allow outcome references.
 
 ---
