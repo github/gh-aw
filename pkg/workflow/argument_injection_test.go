@@ -473,7 +473,16 @@ printf "%s\n" "$@" >> "$GH_AW_TEST_PIP_ARGS_FILE"
 
 func TestValidatePythonPackagesWithPip_SkipsInvalidExecutablePath(t *testing.T) {
 	compiler := NewCompiler()
-	argsFile := filepath.Join(t.TempDir(), "pip-args.txt")
+	tempDir := t.TempDir()
+	argsFile := filepath.Join(tempDir, "pip-args.txt")
+	fakePip := filepath.Join(tempDir, "pip")
+	script := `#!/bin/sh
+printf "%s\n" "$@" >> "$GH_AW_TEST_PIP_ARGS_FILE"
+`
+	if err := os.WriteFile(fakePip, []byte(script), 0o755); err != nil {
+		t.Fatalf("failed to write fake pip executable: %v", err)
+	}
+	t.Setenv("PATH", tempDir)
 	t.Setenv("GH_AW_TEST_PIP_ARGS_FILE", argsFile)
 
 	compiler.validatePythonPackagesWithPip([]string{"requests"}, "pip", "pip")

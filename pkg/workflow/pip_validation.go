@@ -226,12 +226,8 @@ func (c *Compiler) validateUvPackages(workflowData *WorkflowData) error {
 		return c.validateUvPackagesWithPip(packages, pipPath)
 	}
 
-	validatedUvPath, err := fileutil.ValidateExecutablePath(uvPath)
-	if err != nil {
-		return NewOperationError("validate", "uv packages", "", err, "Verify that the uv executable is installed and accessible.")
-	}
 	pipValidationLog.Print("Using uv command for validation")
-	return c.validateUvPackagesWithExecutable(packages, validatedUvPath)
+	return c.validateUvPackagesWithExecutable(packages, uvPath)
 }
 
 func (c *Compiler) validateUvPackagesWithExecutable(packages []string, uvPath string) error {
