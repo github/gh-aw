@@ -411,8 +411,57 @@
       "escalations": 0,
       "open_prs": 10,
       "experimental_strategy": null
+    },
+    {
+      "date": "2026-11-06",
+      "run_id": "42176060093",
+      "data_window": "2026-11-06T04:23Z-05:19Z",
+      "sessions_analyzed": 50,
+      "completion_rate": 90.0,
+      "average_duration_minutes": 3.309,
+      "median_duration_minutes": 1.042,
+      "successful": 45,
+      "failure": 1,
+      "cancelled": 0,
+      "action_required": 0,
+      "skipped": 4,
+      "in_progress": 0,
+      "push_clusters": 20,
+      "push_level_completion_pct": 100.0,
+      "push_clusters_all_green": 19,
+      "transcripts_analyzed": 0,
+      "transcript_format": "none (job logs blocked: DIFC policy violation HTTP 403, 2nd day)",
+      "coding_agent_sessions": 2,
+      "coding_agent_sessions_24h": 71,
+      "coding_agent_prs_24h": {
+        "merged": 7,
+        "closed_unmerged": 1,
+        "open": 2,
+        "no_pr": 1
+      },
+      "sous_chef_dispatches_24h": 33,
+      "sous_chef_noop_replies_24h": 15,
+      "sous_chef_noop_reply_pct": 46.9,
+      "sessions_with_loops": 0,
+      "noop_redispatch_loop_prs_24h": 1,
+      "tool_calls": null,
+      "tool_failures": null,
+      "orphan_rate": 0.0,
+      "orphan_rate_pct": 0.0,
+      "escalations": 0,
+      "open_prs": 17,
+      "unique_branches": 5,
+      "experimental_strategy": null,
+      "key_insights": [
+        "90.0% completion (45 success, 4 skipped PR Spec Reviewer, 1 CGO failure) ties all-time high (10-31); 97.8% excl. skipped. 56-min window, 5 Copilot branches, 2 coding-agent runs (1 cloud agent, 1 addressing comment).",
+        "Push-level completion 20/20 clusters (100%), 19/20 all-green. Lone red (CGO build-wasm + impacted-go-tests on #74940 04:27Z) recovered via Sous Chef -> Addressing comment 42165251685 -> CGO green 05:16Z (~41 min).",
+        "NEW souschef_identical_state_redispatch: Sous Chef posted the same assignment 33x on #74985 over 19h with requested-work hash unchanged 32/33; same (head,state) re-dispatched up to 9x. 15 Copilot no-op replies (~75.5 runner-min) each said the request repeats until a maintainer resolves 4 review threads Copilot cannot resolve.",
+        "Prompt source vs outcome (24h): direct human @copilot prompts 0/19 no-op (14 landed a change); Sous Chef 15/32 no-op (46.9%), all on #74985. 5 human prompts were lock-file merge-conflict fixes."
+      ],
+      "human_prompt_noop_pct": 0.0,
+      "human_prompt_change_pct": 73.7
     }
   ],
-  "last_updated": "2026-11-01",
+  "last_updated": "2026-11-06",
   "version": "1.11"
 }
