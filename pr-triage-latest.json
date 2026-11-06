@@ -1,66 +1,98 @@
 {
-  "run_id": "42216927581",
-  "run_date": "2026-11-06T12:32:00Z",
+  "run_id": "42269446638",
+  "run_date": "2026-11-06T18:26:10.214694Z",
   "source": "pr-triage",
-  "eligible_total": 14,
-  "open_copilot_prs": 14,
+  "eligible_total": 15,
+  "open_copilot_prs": 15,
   "cooldown_skipped": 0,
   "category_counts": {
-    "bug": 11,
+    "bug": 13,
     "feature": 1,
-    "test": 1,
     "docs": 1
   },
   "risk_counts": {
-    "high": 8,
-    "medium": 4,
+    "high": 11,
+    "medium": 2,
     "low": 2
   },
   "priority_counts": {
     "high": 5,
-    "medium": 7,
-    "low": 2
+    "medium": 6,
+    "low": 4
   },
   "action_counts": {
     "fast_track": 4,
     "batch_review": 7,
-    "auto_merge": 2,
+    "auto_merge": 3,
     "defer": 1
   },
   "batches": [
     {
-      "id": "agent-triage-2026-11-06-security",
+      "id": "agent-triage-2026-11-06-runtime",
       "prs": [
-        75362,
-        75387,
-        75385,
-        75382,
-        75380,
-        75379,
-        75381,
-        75365,
-        74943,
-        75366
+        75446,
+        75445,
+        75444,
+        75443
       ],
-      "category": "bug+feature",
+      "category": "feature+bug",
       "risk": "high"
     },
     {
-      "id": "agent-triage-2026-11-06-observability",
+      "id": "agent-triage-2026-11-06-security",
       "prs": [
-        75383,
-        75384,
-        75386,
-        75305
+        75382,
+        75381,
+        75379,
+        75366,
+        75365,
+        75362
       ],
-      "category": "bug+docs+test",
-      "risk": "mixed"
+      "category": "bug",
+      "risk": "high"
+    },
+    {
+      "id": "agent-triage-2026-11-06-docs",
+      "prs": [
+        75453,
+        75427
+      ],
+      "category": "docs",
+      "risk": "low"
     }
   ],
   "selected_candidates": [
     {
-      "number": 75362,
-      "title": "Preserve external threat-detection retry diagnostics across jobs",
+      "number": 75453,
+      "title": "Sync SPDD spec guidance, safeguards, and evidence maps",
+      "category": "docs",
+      "risk": "low",
+      "priority": "medium",
+      "action": "auto_merge",
+      "score": 52,
+      "score_breakdown": {
+        "impact": 18,
+        "urgency": 16,
+        "quality": 18
+      }
+    },
+    {
+      "number": 75446,
+      "title": "Support no-sudo Copilot installation in agent and detection jobs",
+      "category": "feature",
+      "risk": "high",
+      "priority": "high",
+      "action": "fast_track",
+      "score": 78,
+      "score_breakdown": {
+        "impact": 40,
+        "urgency": 22,
+        "quality": 16
+      }
+    },
+    {
+      "number": 75445,
+      "title": "Decouple rootless CLI installation from runner topology",
       "category": "bug",
       "risk": "high",
       "priority": "high",
@@ -73,17 +105,59 @@
       }
     },
     {
+      "number": 75444,
+      "title": "[WIP] Fix cleanup and isolation for self-hosted job runtimes",
+      "category": "bug",
+      "risk": "high",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 69,
+      "score_breakdown": {
+        "impact": 35,
+        "urgency": 20,
+        "quality": 14
+      }
+    },
+    {
+      "number": 75443,
+      "title": "Use effective runner identity and owner-only configs for safeoutputs",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 64,
+      "score_breakdown": {
+        "impact": 30,
+        "urgency": 18,
+        "quality": 16
+      }
+    },
+    {
+      "number": 75427,
+      "title": "Align modelsdev README with the implemented API",
+      "category": "docs",
+      "risk": "low",
+      "priority": "low",
+      "action": "auto_merge",
+      "score": 46,
+      "score_breakdown": {
+        "impact": 16,
+        "urgency": 12,
+        "quality": 18
+      }
+    },
+    {
       "number": 75387,
       "title": "Confirm buffered PR reviews before executing dependent safe outputs",
       "category": "bug",
       "risk": "medium",
       "priority": "medium",
       "action": "batch_review",
-      "score": 68,
+      "score": 66,
       "score_breakdown": {
-        "impact": 34,
-        "urgency": 20,
-        "quality": 14
+        "impact": 31,
+        "urgency": 19,
+        "quality": 16
       }
     },
     {
@@ -93,11 +167,11 @@
       "risk": "high",
       "priority": "high",
       "action": "batch_review",
-      "score": 70,
+      "score": 71,
       "score_breakdown": {
         "impact": 36,
         "urgency": 20,
-        "quality": 14
+        "quality": 15
       }
     },
     {
@@ -107,67 +181,11 @@
       "risk": "high",
       "priority": "high",
       "action": "fast_track",
-      "score": 77,
+      "score": 80,
       "score_breakdown": {
-        "impact": 39,
-        "urgency": 22,
-        "quality": 16
-      }
-    },
-    {
-      "number": 75380,
-      "title": "Preserve expanded details blocks in safe-output bodies",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 62,
-      "score_breakdown": {
-        "impact": 30,
-        "urgency": 18,
-        "quality": 14
-      }
-    },
-    {
-      "number": 75383,
-      "title": "Add regression coverage for Z.AI input and cache token totals",
-      "category": "test",
-      "risk": "low",
-      "priority": "medium",
-      "action": "auto_merge",
-      "score": 56,
-      "score_breakdown": {
-        "impact": 20,
-        "urgency": 16,
-        "quality": 20
-      }
-    },
-    {
-      "number": 75384,
-      "title": "Accept submission metadata in work queue delivery verification",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 63,
-      "score_breakdown": {
-        "impact": 31,
-        "urgency": 18,
-        "quality": 14
-      }
-    },
-    {
-      "number": 75379,
-      "title": "Fail explicitly on unsupported Copilot BYOK tool images",
-      "category": "bug",
-      "risk": "high",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 68,
-      "score_breakdown": {
-        "impact": 34,
-        "urgency": 20,
-        "quality": 14
+        "impact": 40,
+        "urgency": 23,
+        "quality": 17
       }
     },
     {
@@ -177,58 +195,72 @@
       "risk": "high",
       "priority": "medium",
       "action": "batch_review",
-      "score": 64,
+      "score": 67,
       "score_breakdown": {
-        "impact": 32,
-        "urgency": 18,
-        "quality": 14
+        "impact": 33,
+        "urgency": 19,
+        "quality": 15
       }
     },
     {
-      "number": 75386,
-      "title": "Document upstream blocker for imported-engine threat detection",
-      "category": "docs",
-      "risk": "low",
-      "priority": "low",
-      "action": "defer",
-      "score": 38,
-      "score_breakdown": {
-        "impact": 16,
-        "urgency": 12,
-        "quality": 10
-      }
-    },
-    {
-      "number": 75365,
-      "title": "Validate pip and uv executables before package checks",
+      "number": 75379,
+      "title": "Fail explicitly on unsupported Copilot BYOK tool images",
       "category": "bug",
       "risk": "high",
       "priority": "medium",
       "action": "batch_review",
-      "score": 66,
+      "score": 69,
       "score_breakdown": {
-        "impact": 33,
-        "urgency": 19,
-        "quality": 14
-      }
-    },
-    {
-      "number": 74943,
-      "title": "Preserve cross-repository checkout identity during credential setup",
-      "category": "bug",
-      "risk": "high",
-      "priority": "high",
-      "action": "fast_track",
-      "score": 72,
-      "score_breakdown": {
-        "impact": 36,
-        "urgency": 21,
+        "impact": 34,
+        "urgency": 20,
         "quality": 15
       }
     },
     {
       "number": 75366,
       "title": "Reject run-step expressions in shell re-evaluation contexts",
+      "category": "bug",
+      "risk": "high",
+      "priority": "high",
+      "action": "batch_review",
+      "score": 72,
+      "score_breakdown": {
+        "impact": 37,
+        "urgency": 21,
+        "quality": 14
+      }
+    },
+    {
+      "number": 75365,
+      "title": "Validate pip and uv executables before package checks",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "auto_merge",
+      "score": 61,
+      "score_breakdown": {
+        "impact": 29,
+        "urgency": 18,
+        "quality": 14
+      }
+    },
+    {
+      "number": 75362,
+      "title": "Preserve external threat-detection retry diagnostics across jobs",
+      "category": "bug",
+      "risk": "high",
+      "priority": "high",
+      "action": "fast_track",
+      "score": 82,
+      "score_breakdown": {
+        "impact": 42,
+        "urgency": 23,
+        "quality": 17
+      }
+    },
+    {
+      "number": 74943,
+      "title": "Preserve cross-repository checkout identity during credential setup",
       "category": "bug",
       "risk": "high",
       "priority": "high",
@@ -239,21 +271,6 @@
         "urgency": 22,
         "quality": 16
       }
-    },
-    {
-      "number": 75305,
-      "title": "Honor literal fallbacks in step-reference lint",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "low",
-      "action": "auto_merge",
-      "score": 60,
-      "score_breakdown": {
-        "impact": 28,
-        "urgency": 16,
-        "quality": 16
-      }
     }
-  ],
-  "notes": "Filtered to the eligible Copilot PR set older than the 1-hour cooldown window. Security and execution-safety fixes dominate the active batch."
+  ]
 }
