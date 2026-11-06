@@ -2809,6 +2809,7 @@ safe-outputs:
 13. **Signed Commit Delivery**: Branch delivery MUST satisfy the [signed commit delivery requirements](#signed-commit-delivery-requirements), shared with `push_to_pull_request_branch`.
 14. **Transport Integrity**: Patch/bundle application and publication MUST satisfy the shared [transport integrity requirements](#patch-and-bundle-transport-integrity-requirements).
 15. **Bundle Git Operations**: Bundle inspection and prerequisite recovery MUST satisfy [BGO-001–003 and BGO-008](#bundle-git-operations-and-validation-baselines). Optional unsigned push baselines (BGO-004–007) apply only to `push_to_pull_request_branch`.
+16. **Review-First Merge Gate**: Auto-merge MUST satisfy [WTD4](#105-warn-mode-threat-detection-failure-policy). A failed required `REQUEST_CHANGES` review, including rejection because the authenticated bot authored the pull request, MUST leave auto-merge disabled and emit guidance requiring an independent reviewer. Implementations MUST NOT downgrade the only blocking review to `COMMENT` and continue into auto-merge.
 
 **Configuration Parameters**:
 
@@ -2820,6 +2821,7 @@ safe-outputs:
 - `allowed-branches`: Allowed source branch patterns for `branch` tool input
 - `allowed-base-branches`: Allowed base-branch override patterns for per-run `base` tool input
 - `draft`: Draft status
+- `auto-merge`: `false` (default), `true` (squash), or `squash`, `merge`, `rebase`. Detection caution or a failed required `REQUEST_CHANGES` review overrides enablement; see WTD4.
 - `commit-changes`: Auto-commit workspace
 - `reviewers`: Auto-request reviewers
 - `labels`: Auto-apply labels
@@ -5837,6 +5839,12 @@ When threat detection executes in `warn` mode and reports a threat signal for a 
 
 **Requirement WTD3 (Non-Reviewable Abort)**: For safe output types classified as **Abort**, implementations MUST NOT apply the original safe output. Implementations MUST activate a threat-detected code path, emit an explicit failure summary, and return a machine-readable threat-detected error outcome.
 
+**Requirement WTD4 (Enforceable Pull Request Merge Gate)**: When `create_pull_request` has a nonempty `detectionCaution`, including WTD1a detection engine errors and WTD2 conversions, implementations MUST NOT enable auto-merge unless trusted, live evidence establishes an enforceable human approval or blocking review policy for the target pull request. The policy MUST prevent merging until an independent human reviews the affected changes and MUST apply to the automation identity without bypass. Missing, inaccessible, or inconclusive policy evidence MUST leave auto-merge disabled.
+
+A caution annotation, threat label, requested reviewer, or successful `REQUEST_CHANGES` API response alone MUST NOT count as evidence of an enforceable policy. If the required review fails because the bot authored the pull request, or for any other reason, implementations MUST fail closed or require an independent reviewer; a `COMMENT` fallback MUST NOT replace the only security gate while allowing auto-merge. The created pull request MAY remain available for manual review, but the handler MUST explicitly report that auto-merge was withheld and that independent review is required.
+
+The current `create_pull_request` handler does not verify repository review-policy enforcement and therefore conservatively withholds auto-merge whenever `detectionCaution` is present, even if a reviewer was requested or `REQUEST_CHANGES` succeeded. It also withholds auto-merge after any required `REQUEST_CHANGES` failure and does not retry that review as `COMMENT`.
+
 **Table WTD-A: Warn-Mode Threat Detection Failure Policy by Safe Output Type**
 
 | Safe output type | Warn-mode failure policy |
@@ -5888,6 +5896,8 @@ When threat detection executes in `warn` mode and reports a threat signal for a 
 - **T-WTD-001**: Reviewable outputs include the threat-appropriate annotation: WTD1 CAUTION block/label/marker for `threat_detected`, or WTD1a WARNING block/label/marker for `agent_failure` and `parse_error`.
 - **T-WTD-002**: `push_to_pull_request_branch` in warn-mode threat failure is converted to `create_pull_request`.
 - **T-WTD-003**: Abort-class outputs are not applied and produce threat-detected error outcomes.
+- **T-WTD-004**: Detection caution prevents auto-merge without verified enforceable policy, including when reviewer requests and `REQUEST_CHANGES` succeed, for every enabled merge strategy and for threat verdicts and detection engine errors.
+- **T-WTD-005**: Own-PR and other required-review failures leave auto-merge disabled, never downgrade the only security gate to `COMMENT` and merge, and emit independent-review guidance. Ordinary pull requests without detection caution or review failure retain configured auto-merge behavior. Regression evidence: `actions/setup/js/create_pull_request.test.cjs`.
 
 ### 10.6 Edge Case Behavior
 

@@ -2724,6 +2724,7 @@ async function main(config = {}) {
             })
           );
         }
+        let requestChangesReviewFailed = false;
         if (requestChangesSections.length > 0) {
           /** @type {import("./report_ast.cjs").ReportBlock[]} */
           const requestChangesChildren = [];
@@ -2736,7 +2737,7 @@ async function main(config = {}) {
             title: "Changes require review",
             children: requestChangesChildren,
           }).body;
-          /** @type {{ owner: string, repo: string, pull_number: number, event: "REQUEST_CHANGES" | "COMMENT", body: string, commit_id?: string }} */
+          /** @type {{ owner: string, repo: string, pull_number: number, event: "REQUEST_CHANGES", body: string, commit_id?: string }} */
           const requestChangesParams = {
             owner: repoParts.owner,
             repo: repoParts.repo,
@@ -2747,30 +2748,20 @@ async function main(config = {}) {
           if (pullRequest.head && pullRequest.head.sha) {
             requestChangesParams.commit_id = pullRequest.head.sha;
           }
-          core.info(`Creating REQUEST_CHANGES review for PR #${pullRequest.number} due to protected files`);
+          core.info(`Creating REQUEST_CHANGES review for PR #${pullRequest.number} due to protected files or detection caution`);
           try {
             await withRetry(() => githubClient.rest.pulls.createReview(requestChangesParams), RATE_LIMIT_RETRY_CONFIG, `create REQUEST_CHANGES review for PR #${pullRequest.number}`);
             core.info(`Created REQUEST_CHANGES review for PR #${pullRequest.number}`);
           } catch (requestChangesError) {
-            const requestChangesErrorMessage = getErrorMessage(requestChangesError);
-            const ownPrMessages = ["Can not request changes on your own pull request"];
-            if (ownPrMessages.some(msg => requestChangesErrorMessage.includes(msg))) {
-              core.warning(`Cannot submit REQUEST_CHANGES on own PR #${pullRequest.number}. Retrying with COMMENT.`);
-              try {
-                const commentReviewParams = { ...requestChangesParams, event: "COMMENT" };
-                await withRetry(() => githubClient.rest.pulls.createReview(commentReviewParams), RATE_LIMIT_RETRY_CONFIG, `create COMMENT review fallback for PR #${pullRequest.number}`);
-                core.info(`Created COMMENT review fallback for PR #${pullRequest.number}`);
-              } catch (commentReviewError) {
-                core.warning(`Failed to create COMMENT review fallback for PR #${pullRequest.number}: ${getErrorMessage(commentReviewError)}`);
-              }
-            } else {
-              core.warning(`Failed to create REQUEST_CHANGES review for PR #${pullRequest.number}: ${requestChangesErrorMessage}`);
-            }
+            requestChangesReviewFailed = true;
+            core.warning(`Failed to create REQUEST_CHANGES review for PR #${pullRequest.number}: ${getErrorMessage(requestChangesError)}. An independent reviewer must review this pull request before merge.`);
           }
         }
 
-        // Enable auto-merge if configured
-        if (autoMerge) {
+        // Neither annotations nor review requests prove that GitHub will enforce human approval.
+        if (autoMerge && (detectionCaution || requestChangesReviewFailed)) {
+          core.warning(`Auto-merge is disabled for PR #${pullRequest.number} because detection caution is present or the required REQUEST_CHANGES review failed. Manual review by an independent reviewer is required before merge.`);
+        } else if (autoMerge) {
           try {
             await githubClient.graphql(
               `mutation($prId: ID!, $mergeMethod: PullRequestMergeMethod) {
