@@ -74,8 +74,8 @@ func analyzeWriteCall(pass *analysis.Pass, n ast.Node, generatedFiles filecheck.
 		return
 	}
 
-	// Match <expr>.Write(<arg>)
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	// Match <expr>.Write(<arg>), including a parenthesized callee (w.Write)(...).
+	sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok || sel.Sel.Name != "Write" {
 		return
 	}

@@ -113,7 +113,7 @@ func analyzeExprStmt(pass *analysis.Pass, exprStmt *ast.ExprStmt, generatedFiles
 // isCloseMethodCall returns true if call is of the form receiver.Close() where
 // Close() returns error as its only return value or as its second return value.
 func isCloseMethodCall(pass *analysis.Pass, call *ast.CallExpr) bool {
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok || sel.Sel.Name != "Close" || len(call.Args) != 0 {
 		return false
 	}
