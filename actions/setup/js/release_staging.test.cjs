@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import fs from "fs";
 import path from "path";
 import os from "os";
@@ -17,7 +17,7 @@ function workspace() {
   return root;
 }
 
-function finishFixtureCleanup(actions) {
+function finishFixtureCleanup(actions, preservePrimaryError = false) {
   const errors = [];
   for (const action of actions) {
     try {
@@ -26,7 +26,14 @@ function finishFixtureCleanup(actions) {
       errors.push(error);
     }
   }
-  if (errors.length) throw new AggregateError(errors, "Failed to clean Docker ownership fixtures");
+  if (errors.length) {
+    const error = new AggregateError(errors, "Failed to clean Docker ownership fixtures");
+    if (preservePrimaryError) {
+      console.warn(error);
+      return;
+    }
+    throw error;
+  }
 }
 
 function environment(root, extra = {}) {
@@ -104,6 +111,31 @@ afterEach(async () => {
 });
 
 describe("invocation-owned release staging", () => {
+  it("does not replace the primary error when fixture cleanup also fails", () => {
+    const primary = new Error("original smoke failure");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    let caught;
+    try {
+      try {
+        throw primary;
+      } finally {
+        finishFixtureCleanup(
+          [
+            () => {
+              throw new Error("cleanup failure");
+            },
+          ],
+          true
+        );
+      }
+    } catch (error) {
+      caught = error;
+    } finally {
+      warn.mockRestore();
+    }
+    expect(caught).toBe(primary);
+  });
+
   it("attempts every fixture cleanup before reporting failures", () => {
     const attempted = [];
     const failure = new Error("first allocation cannot be restored");
@@ -430,6 +462,7 @@ exec "$REAL_STAT" -c "$2" "$3"
       };
       const mount = dir => ["--mount", `type=bind,source=${dir},target=/staging`];
       const common = ["--network", "none", "--user", "0", "--entrypoint", "/bin/sh"];
+      let hasPrimaryError = false;
       try {
         for (const job of jobs) {
           const id = docker(
@@ -475,16 +508,22 @@ exec "$REAL_STAT" -c "$2" "$3"
         expect(jobs.every(job => fs.existsSync(path.join(job.dir, "firewall")))).toBe(true);
         // Exercise partial fixture creation: one allocation has no firewall to restore.
         docker("run", "--rm", "--pull", "never", ...common, ...mount(jobs[0].dir), dockerImage, "-c", "rm -rf /staging/firewall");
+      } catch (error) {
+        hasPrimaryError = true;
+        throw error;
       } finally {
         // Restore permissions only on these test-created bind-mount fixtures.
         // Production cleanup deliberately never escalates to reclaim such files.
-        finishFixtureCleanup([
-          ...containerIDs.map(id => () => docker("rm", "-f", id)),
-          ...jobs.map(job => () => {
-            if (!fs.existsSync(job.dir)) return;
-            docker("run", "--rm", "--pull", "never", ...common, ...mount(job.dir), dockerImage, "-c", "if [ -d /staging/firewall ]; then chmod -R a+rwX /staging/firewall; fi");
-          }),
-        ]);
+        finishFixtureCleanup(
+          [
+            ...containerIDs.map(id => () => docker("rm", "-f", id)),
+            ...jobs.map(job => () => {
+              if (!fs.existsSync(job.dir)) return;
+              docker("run", "--rm", "--pull", "never", ...common, ...mount(job.dir), dockerImage, "-c", "if [ -d /staging/firewall ]; then chmod -R a+rwX /staging/firewall; fi");
+            }),
+          ],
+          hasPrimaryError
+        );
       }
     },
     60000
