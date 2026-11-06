@@ -24,7 +24,7 @@ cleanup_release_staging() {
 }
 
 create_release_staging() {
-  local prefix="$1" parent nonce attempt=0
+  local prefix="$1" parent
   if [[ ! "$prefix" =~ ^[a-z][a-z0-9-]*$ ]]; then
     echo "ERROR: Invalid release staging prefix" >&2
     return 1
@@ -34,34 +34,20 @@ create_release_staging() {
     parent="$(cygpath -u "$parent")" || return 1
   fi
   parent="$(cd "$parent" && pwd -P)" || return 1
-  while [ "$attempt" -lt 5 ]; do
-    attempt=$((attempt + 1))
-    nonce="$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')" || return 1
-    if [[ ! "$nonce" =~ ^[0-9a-f]{32}$ ]]; then
-      echo "ERROR: Could not generate a private release staging name" >&2
-      return 1
-    fi
-    TEMP_DIR="${parent}/${prefix}-install-${nonce}"
-    if (umask 077; mkdir -m 700 -- "$TEMP_DIR") 2>/dev/null; then
-      readonly TEMP_DIR
-      if ! GH_AW_RELEASE_STAGING_ID="$(release_staging_identity "$TEMP_DIR")"; then
-        echo "Warning: could not record ownership; leaving installer staging directory untouched: $TEMP_DIR" >&2
-        return 1
-      fi
-      readonly GH_AW_RELEASE_STAGING_ID
-      trap cleanup_release_staging EXIT
-      trap 'exit 130' INT
-      trap 'exit 143' TERM
-      trap 'exit 129' HUP
-      return 0
-    fi
-    if [ ! -e "$TEMP_DIR" ] && [ ! -L "$TEMP_DIR" ]; then
-      echo "ERROR: Could not allocate release staging under $parent" >&2
-      return 1
-    fi
-  done
-  echo "ERROR: Could not allocate a unique release staging directory under $parent" >&2
-  return 1
+  if ! TEMP_DIR="$(umask 077; mktemp -d "${parent}/${prefix}-install-XXXXXX")"; then
+    echo "ERROR: Could not allocate release staging under $parent" >&2
+    return 1
+  fi
+  readonly TEMP_DIR
+  if ! GH_AW_RELEASE_STAGING_ID="$(release_staging_identity "$TEMP_DIR")"; then
+    echo "Warning: could not record ownership; leaving installer staging directory untouched: $TEMP_DIR" >&2
+    return 1
+  fi
+  readonly GH_AW_RELEASE_STAGING_ID
+  trap cleanup_release_staging EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  trap 'exit 129' HUP
 }
 
 # Each entry binds repository, immutable release version, asset name, and SHA256.

@@ -1,16 +1,8 @@
 // Setup Activation Action - Post Step
-// Sends an OTLP conclusion span for the job, then removes the /tmp/gh-aw/
-// directory created during the main action step.
-// Runs in the post-job phase so that temporary files are erased after the
-// workflow job completes, regardless of success or failure.
-//
-// Files inside /tmp/gh-aw/ may be owned by root (written by Docker containers
-// or privileged scripts), so we use `sudo rm -rf` — GitHub-hosted runners have
-// passwordless sudo.  We fall back to fs.rmSync for self-hosted runners that
-// don't have sudo but do have direct write access.
+// Sends an OTLP conclusion span for the job. Shared legacy runtime paths have
+// no per-invocation ownership record and must not be reclaimed by this step.
 
 const path = require("path");
-const { spawnSync } = require("child_process");
 const fs = require("fs");
 
 function isDebugModeEnabled() {
@@ -80,8 +72,7 @@ function listTmpGhAwFiles(tmpDir, maxDepth, maxFiles) {
   }
 }
 
-// Wrap everything in an async IIFE so that the OTLP span is fully sent before
-// the cleanup deletes /tmp/gh-aw/ (which contains aw_info.json and otel.jsonl).
+// Wait for the OTLP span before completing the post step.
 (async () => {
   // Send a gh-aw.<jobName>.conclusion span to the configured OTLP endpoint, if any.
   // Delegates to action_conclusion_otlp.cjs so that script mode (clean.sh) and
@@ -102,25 +93,7 @@ function listTmpGhAwFiles(tmpDir, maxDepth, maxFiles) {
     listTmpGhAwFiles(tmpDir, maxDebugDepth, maxDebugFiles);
   }
 
-  console.log(`Cleaning up ${tmpDir}...`);
-
-  // Try sudo rm -rf first (handles root-owned files on GitHub-hosted runners)
-  const result = spawnSync("sudo", ["rm", "-rf", tmpDir], { stdio: "inherit" });
-
-  if (result.status === 0) {
-    console.log(`Cleaned up ${tmpDir}`);
-  } else {
-    // Fall back to fs.rmSync for environments without sudo
-    try {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-      console.log(`Cleaned up ${tmpDir}`);
-    } catch (err) {
-      // Log but do not fail — cleanup is best-effort
-      console.error(`Warning: failed to clean up ${tmpDir}: ${err.message}`);
-    }
+  if (fs.existsSync(tmpDir)) {
+    console.warn(`Warning: leaving shared ${tmpDir} untouched; per-invocation ownership cannot be established.`);
   }
-
-  // Legacy AWF chroots have no per-invocation ownership record. Other active
-  // runners can share /tmp and the same UID, so never sweep these by name.
-  console.warn("Warning: untracked AWF chroot directories are not reclaimed; shared-runner ownership cannot be established.");
 })();

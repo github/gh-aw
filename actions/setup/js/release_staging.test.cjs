@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import fs from "fs";
 import path from "path";
 import os from "os";
@@ -7,33 +7,13 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const helper = path.resolve(__dirname, "../sh/release_integrity.sh");
-const dockerImage = process.env.GH_AW_TEST_DOCKER_IMAGE;
 const workspaces = [];
 const children = [];
 
 function workspace() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-release-staging-"));
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-release-staging-")));
   workspaces.push(root);
   return root;
-}
-
-function finishFixtureCleanup(actions, preservePrimaryError = false) {
-  const errors = [];
-  for (const action of actions) {
-    try {
-      action();
-    } catch (error) {
-      errors.push(error);
-    }
-  }
-  if (errors.length) {
-    const error = new AggregateError(errors, "Failed to clean Docker ownership fixtures");
-    if (preservePrimaryError) {
-      console.warn(error);
-      return;
-    }
-    throw error;
-  }
 }
 
 function environment(root, extra = {}) {
@@ -111,50 +91,60 @@ afterEach(async () => {
 });
 
 describe("invocation-owned release staging", () => {
-  it("does not replace the primary error when fixture cleanup also fails", () => {
-    const primary = new Error("original smoke failure");
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    let caught;
-    try {
-      try {
-        throw primary;
-      } finally {
-        finishFixtureCleanup(
-          [
-            () => {
-              throw new Error("cleanup failure");
-            },
-          ],
-          true
-        );
-      }
-    } catch (error) {
-      caught = error;
-    } finally {
-      warn.mockRestore();
+  it("rejects an unusable Copilot directory even when run as root", () => {
+    const root = workspace();
+    const home = path.join(root, "home");
+    const bin = path.join(root, "bin");
+    const log = path.join(root, "forbidden.log");
+    fs.mkdirSync(home);
+    fs.mkdirSync(bin);
+    fs.writeFileSync(path.join(home, ".copilot"), "existing state");
+    for (const command of ["sudo", "chown", "curl"]) {
+      fs.writeFileSync(path.join(bin, command), '#!/bin/sh\necho forbidden >> "$FORBIDDEN_LOG"\nexit 99\n', { mode: 0o755 });
     }
-    expect(caught).toBe(primary);
+    const result = spawnSync("bash", [path.resolve(__dirname, "../sh/install_copilot_cli.sh"), "--rootless", "1.0.103"], {
+      cwd: root,
+      env: environment(root, { HOME: home, PATH: `${bin}:${process.env.PATH}`, FORBIDDEN_LOG: log }),
+      encoding: "utf8",
+    });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("--rootless requires a writable Copilot directory");
+    expect(result.stderr).toContain("existing files will not be reclaimed or re-owned");
+    expect(fs.readFileSync(path.join(home, ".copilot"), "utf8")).toBe("existing state");
+    expect(fs.existsSync(log)).toBe(false);
   });
 
-  it("attempts every fixture cleanup before reporting failures", () => {
-    const attempted = [];
-    const failure = new Error("first allocation cannot be restored");
-    expect(() =>
-      finishFixtureCleanup([
-        () => {
-          attempted.push("first");
-          throw failure;
-        },
-        () => {
-          attempted.push("second");
-        },
-        () => {
-          attempted.push("third");
-        },
-      ])
-    ).toThrow("Failed to clean Docker ownership fixtures");
-    expect(attempted).toEqual(["first", "second", "third"]);
-  });
+  for (const [script, version] of [
+    ["install_awf_binary.sh", "v0.28.70"],
+    ["install_copilot_cli.sh", "1.0.103"],
+  ]) {
+    it(`${script} retains its EXIT cleanup through downstream installation failure`, () => {
+      const root = workspace();
+      const bin = path.join(root, "bin");
+      const allocations = path.join(root, "allocations");
+      fs.mkdirSync(bin);
+      const mktemp = spawnSync("bash", ["-c", "command -v mktemp"], { encoding: "utf8" }).stdout.trim();
+      fs.writeFileSync(path.join(bin, "mktemp"), '#!/bin/sh\ndir=$("$REAL_MKTEMP" "$@") || exit $?\nprintf "%s\\n" "$dir" >> "$ALLOCATIONS"\nprintf "%s\\n" "$dir"\n', { mode: 0o755 });
+      fs.writeFileSync(path.join(bin, "curl"), "#!/bin/sh\nexit 22\n", { mode: 0o755 });
+      const result = spawnSync("bash", [path.resolve(__dirname, "../sh", script), version, "--rootless"], {
+        cwd: root,
+        env: environment(root, {
+          HOME: path.join(root, "home"),
+          RUNNER_TOOL_CACHE: path.join(root, "empty-cache"),
+          PATH: `${bin}:${process.env.PATH}`,
+          REAL_MKTEMP: mktemp,
+          ALLOCATIONS: allocations,
+        }),
+        encoding: "utf8",
+        timeout: 30000,
+      });
+      expect(result.error).toBeUndefined();
+      expect(result.status).not.toBe(0);
+      const dirs = fs.readFileSync(allocations, "utf8").trim().split("\n");
+      expect(dirs.some(dir => /(?:awf|copilot)-install-/.test(dir))).toBe(true);
+      for (const dir of dirs) expect(fs.existsSync(dir)).toBe(false);
+    });
+  }
 
   it("runs simultaneous rootless installers with shared scratch without chown, sudo, or cross-job cleanup", async () => {
     const root = workspace();
@@ -379,12 +369,12 @@ exit 7`,
     expect(fs.existsSync(result.stdout.trim())).toBe(true);
   });
 
-  it("does not adopt or remove a colliding pre-existing allocation", () => {
+  it("reports allocation failure without adopting or removing existing staging", () => {
     const root = workspace();
     const fakeBin = path.join(root, "bin");
     fs.mkdirSync(fakeBin);
-    fs.writeFileSync(path.join(fakeBin, "od"), "#!/bin/sh\nprintf '00000000000000000000000000000000\\n'\n", { mode: 0o755 });
-    const colliding = path.join(root, "awf-install-00000000000000000000000000000000");
+    fs.writeFileSync(path.join(fakeBin, "mktemp"), "#!/bin/sh\nexit 1\n", { mode: 0o755 });
+    const colliding = path.join(root, "awf-install-existing");
     fs.mkdirSync(colliding);
     fs.writeFileSync(path.join(colliding, "artifact"), "other invocation");
     const result = spawnSync("bash", ["-c", 'set -euo pipefail; source "$RELEASE_HELPER"; create_release_staging awf'], {
@@ -393,7 +383,7 @@ exit 7`,
       encoding: "utf8",
     });
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain("Could not allocate a unique release staging directory");
+    expect(result.stderr).toContain("Could not allocate release staging");
     expect(fs.readFileSync(path.join(colliding, "artifact"), "utf8")).toBe("other invocation");
   });
 
@@ -431,101 +421,36 @@ exit 7`,
     await job.finish();
   });
 
-  it("supports BSD stat ownership snapshots without requiring GNU stat", async () => {
+  it("records device, inode, and uid in BSD stat field order", () => {
     const root = workspace();
     const bin = path.join(root, "bin");
     fs.mkdirSync(bin);
-    const stat = spawnSync("bash", ["-c", "command -v stat"], { encoding: "utf8" }).stdout.trim();
+    const fixture = fs.statSync(root);
     fs.writeFileSync(
       path.join(bin, "stat"),
       `#!/bin/sh
 if [ "$1" = "-c" ]; then exit 1; fi
-exec "$REAL_STAT" -c "$2" "$3"
+[ "$1" = "-f" ] && [ "$2" = "%d:%i:%u" ] || exit 2
+printf '%s\\n' '${fixture.dev}:${fixture.ino}:${fixture.uid}'
 `,
       { mode: 0o755 }
     );
-    const job = await allocate(root, { PATH: `${bin}:${process.env.PATH}`, REAL_STAT: stat });
-    expect((await job.finish()).code).toBe(0);
-    expect(fs.existsSync(job.dir)).toBe(false);
+    const result = spawnSync("bash", ["-c", 'source "$RELEASE_HELPER"; release_staging_identity "$RUNNER_TEMP"'], {
+      env: environment(root, { PATH: `${bin}:${process.env.PATH}` }),
+      encoding: "utf8",
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe(`${fixture.dev}:${fixture.ino}:${fixture.uid}`);
   });
 
-  it.skipIf(!dockerImage || !process.getuid || process.getuid() === 0)(
-    "isolates concurrent Docker-written leftovers and warns without sudo on cleanup",
-    async () => {
-      const root = workspace();
-      const jobs = await Promise.all([allocate(root), allocate(root)]);
-      const containerIDs = [];
-      const docker = (...args) => {
-        const result = spawnSync("docker", args, { encoding: "utf8", timeout: 30000 });
-        expect(result.status, result.stderr || String(result.error || "")).toBe(0);
-        return result.stdout.trim();
-      };
-      const mount = dir => ["--mount", `type=bind,source=${dir},target=/staging`];
-      const common = ["--network", "none", "--user", "0", "--entrypoint", "/bin/sh"];
-      let hasPrimaryError = false;
-      try {
-        for (const job of jobs) {
-          const id = docker(
-            "create",
-            "--pull",
-            "never",
-            ...common,
-            ...mount(job.dir),
-            dockerImage,
-            "-c",
-            "set -eu; mkdir -m 700 /staging/firewall; echo owned > /staging/firewall/artifact; touch /staging/ready; while [ ! -e /staging/finish ]; do sleep 0.1; done"
-          );
-          expect(id).toMatch(/^[a-f0-9]{64}$/);
-          containerIDs.push(id);
-        }
-        docker("start", ...containerIDs);
-        const deadline = Date.now() + 10000;
-        while (!jobs.every(job => fs.existsSync(path.join(job.dir, "ready")))) {
-          if (Date.now() > deadline) throw new Error("Docker ownership fixtures did not become ready");
-          await new Promise(resolve => setTimeout(resolve, 50));
-        }
-        expect(docker("inspect", "--format", "{{.State.Running}}", ...containerIDs).split("\n")).toEqual(["true", "true"]);
-        for (const job of jobs) {
-          expect(fs.statSync(path.join(job.dir, "firewall")).uid).toBe(0);
-          expect(fs.statSync(path.join(job.dir, "firewall")).mode & 0o777).toBe(0o700);
-          fs.writeFileSync(path.join(job.dir, "finish"), "");
-        }
-        expect(docker("wait", ...containerIDs).split("\n")).toEqual(["0", "0"]);
-        docker("rm", ...containerIDs);
-        containerIDs.length = 0;
-
-        const failed = await jobs[0].finish(7);
-        expect(failed.code).toBe(7);
-        expect(failed.stderr).toContain("unable to reclaim owned installer staging directory without elevated permissions");
-        expect(fs.existsSync(path.join(jobs[1].dir, "firewall"))).toBe(true);
-        const finished = await jobs[1].finish();
-        expect(finished.code).toBe(0);
-        expect(finished.stderr).toContain("unable to reclaim owned installer staging directory without elevated permissions");
-
-        const retry = await allocate(root, { GITHUB_RUN_ATTEMPT: "2" });
-        expect(jobs.map(job => job.dir)).not.toContain(retry.dir);
-        await retry.finish();
-        expect(jobs.every(job => fs.existsSync(path.join(job.dir, "firewall")))).toBe(true);
-        // Exercise partial fixture creation: one allocation has no firewall to restore.
-        docker("run", "--rm", "--pull", "never", ...common, ...mount(jobs[0].dir), dockerImage, "-c", "rm -rf /staging/firewall");
-      } catch (error) {
-        hasPrimaryError = true;
-        throw error;
-      } finally {
-        // Restore permissions only on these test-created bind-mount fixtures.
-        // Production cleanup deliberately never escalates to reclaim such files.
-        finishFixtureCleanup(
-          [
-            ...containerIDs.map(id => () => docker("rm", "-f", id)),
-            ...jobs.map(job => () => {
-              if (!fs.existsSync(job.dir)) return;
-              docker("run", "--rm", "--pull", "never", ...common, ...mount(job.dir), dockerImage, "-c", "if [ -d /staging/firewall ]; then chmod -R a+rwX /staging/firewall; fi");
-            }),
-          ],
-          hasPrimaryError
-        );
-      }
-    },
-    60000
-  );
+  it.skipIf(process.platform !== "darwin")("verifies the real BSD stat snapshot", () => {
+    const root = workspace();
+    const fixture = fs.statSync(root);
+    const result = spawnSync("bash", ["-c", 'source "$RELEASE_HELPER"; release_staging_identity "$RUNNER_TEMP"'], {
+      env: environment(root),
+      encoding: "utf8",
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe(`${fixture.dev}:${fixture.ino}:${fixture.uid}`);
+  });
 });

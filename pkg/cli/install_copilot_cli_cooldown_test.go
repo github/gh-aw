@@ -32,7 +32,7 @@ func TestInstallCopilotCLIReleaseAgeRequiresJQ(t *testing.T) {
 			binDir := filepath.Join(dir, "bin")
 			prepareCopilotInstallerTestBin(t, binDir)
 			// Restrict PATH to installer prerequisites, deliberately excluding jq.
-			for _, name := range []string{"bash", "dirname", "mkdir", "id", "od", "tr", "stat", "rm", "chown"} {
+			for _, name := range []string{"bash", "dirname", "mkdir", "id", "mktemp", "stat", "rm", "chown"} {
 				path, err := exec.LookPath(name)
 				require.NoError(t, err)
 				require.NoError(t, os.Symlink(path, filepath.Join(binDir, name)))
