@@ -157,6 +157,12 @@ func TestCreateIssueArtifactLimit(t *testing.T) {
 		{"canonical-precedence", "max-issue-artifacts: 3\n    max-isssue-artifacts: 4", 3, 1048576},
 		{"smaller-size", "max-issue-artifact-size: 1024", 10, 1024},
 		{"larger-size", "max-issue-artifact-size: 2097152", 10, 2097152},
+		{"human-default-size", "max-issue-artifact-size: 1mb", 10, 1048576},
+		{"human-small-size", "max-issue-artifact-size: 512kb", 10, 524288},
+		{"human-fractional-size", "max-issue-artifact-size: 1.5mb", 10, 1572864},
+		{"human-spaced-size", "max-issue-artifact-size: ' 2 MiB '", 10, 2097152},
+		{"human-short-unit", "max-issue-artifact-size: 1m", 10, 1048576},
+		{"quoted-byte-count", "max-issue-artifact-size: '1024'", 10, 1024},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := testutil.TempDir(t, "artifact-limit")
@@ -187,6 +193,58 @@ func TestCreateIssueArtifactLimit(t *testing.T) {
 			}
 			if tc.want > 0 && !strings.Contains(string(content), fmt.Sprintf("Maximum artifact body size: %d UTF-8 bytes.", tc.size)) {
 				t.Errorf("Compiled tool description does not contain the configured artifact size")
+			}
+		})
+	}
+}
+
+func TestParseIssueArtifactSize(t *testing.T) {
+	for _, tc := range []struct {
+		size string
+		want int
+	}{
+		{"1mb", 1048576},
+		{"512kb", 524288},
+		{"1.5mb", 1572864},
+		{"0.5KB", 512},
+		{"2 MiB", 2097152},
+		{" 1m ", 1048576},
+		{"1GB", 1073741824},
+		{"1GiB", 1073741824},
+		{"1tb", 1099511627776},
+		{"1B", 1},
+		{"1024", 1024},
+		{"1.0b", 1},
+	} {
+		t.Run(tc.size, func(t *testing.T) {
+			got, err := parseIssueArtifactSize(tc.size)
+			if err != nil || got != tc.want {
+				t.Fatalf("parseIssueArtifactSize(%q) = %d, %v; want %d", tc.size, got, err, tc.want)
+			}
+		})
+	}
+}
+
+func TestCreateIssueArtifactSizeRejectsInvalidHumanSizes(t *testing.T) {
+	for _, size := range []string{
+		"0mb", "-1mb", "0.1kb", "0.9b", "mb", "1xb", "1e3mb", "NaN", "Inf",
+		"9007199254740992b", "99999999999999999999999999999999999999999999999999999999999999999999mb",
+	} {
+		t.Run(size, func(t *testing.T) {
+			if _, err := parseIssueArtifactSize(size); err == nil {
+				t.Fatal("Expected invalid size to be rejected")
+			}
+			dir := testutil.TempDir(t, "invalid-artifact-size")
+			path := filepath.Join(dir, "invalid-size.md")
+			source := fmt.Sprintf("---\non: workflow_dispatch\nengine: copilot\nsafe-outputs:\n  create-issue:\n    max-issue-artifact-size: %q\n---\nCreate an issue.\n", size)
+			if err := os.WriteFile(path, []byte(source), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := NewCompiler().CompileWorkflow(path); err == nil || !strings.Contains(err.Error(), "max-issue-artifact-size") {
+				t.Fatalf("Expected an explicit artifact-size compilation error, got %v", err)
+			}
+			if _, err := os.Stat(filepath.Join(dir, "invalid-size.lock.yml")); !os.IsNotExist(err) {
+				t.Fatal("Invalid size must not publish a lock file")
 			}
 		})
 	}

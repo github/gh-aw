@@ -355,7 +355,7 @@ safe-outputs:
     assignees: [user1, copilot]      # assignees (use 'copilot' for bot)
     max: 5                           # max issues (default: 1)
     max-issue-artifacts: 3            # max artifacts per issue (default: 10; <=0 disables)
-    max-issue-artifact-size: 1048576   # max UTF-8 bytes per artifact body (default: 1 MB)
+    max-issue-artifact-size: 1mb       # max UTF-8 size per artifact body (default: 1 MB)
     expires: 7                       # auto-close after 7 days (or false to disable)
     group: true                      # group as sub-issues under parent
     close-older-issues: true         # close previous issues from same workflow
@@ -400,7 +400,7 @@ See [Cross-Repository Operations](/gh-aw/reference/cross-repository/) for compre
 
 `safe-outputs.create-issue.max-issue-artifacts` limits attachments **per issue**, defaulting to **10**. Zero or any negative integer disables attachments. Requests exceeding the limit are rejected before issue creation, including in staged mode; requests with no artifacts remain valid. `max-isssue-artifacts` is also accepted as an alias; the canonical spelling takes precedence when both are present. The generated tool description includes the configured limit or disabled state.
 
-`safe-outputs.create-issue.max-issue-artifact-size` is a positive integer specifying the maximum **UTF-8 bytes per artifact body**, defaulting to **1048576 (1 MB)**. Raw bodies and sanitized, reference-resolved content must fit the limit; oversized bodies are rejected rather than silently truncated. Each artifact is measured separately, not as a combined upload. The final body is checked again immediately before attachment.
+`safe-outputs.create-issue.max-issue-artifact-size` accepts positive integer bytes or a human-friendly size such as `512kb`, `1mb`, or `1.5mb`, defaulting to **1mb (1048576 bytes)**. Units `B`, `K`/`KB`/`KiB`, `M`/`MB`/`MiB`, `G`/`GB`/`GiB`, and `T`/`TB`/`TiB` are case-insensitive and use multiples of 1024; spaces between the number and unit are accepted. Values must resolve to a positive whole byte count. Raw bodies and sanitized, reference-resolved content must fit the limit; oversized bodies are rejected rather than silently truncated. Each artifact is measured separately, not as a combined upload. The final body is checked again immediately before attachment.
 
 ```json
 {

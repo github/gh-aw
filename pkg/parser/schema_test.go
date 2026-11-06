@@ -190,7 +190,13 @@ func TestValidateMainWorkflowFrontmatter_MaxIssueArtifactSize(t *testing.T) {
 		{"zero", 0, true},
 		{"negative", -1, true},
 		{"fraction", 1.5, true},
-		{"string", "1mb", true},
+		{"human-size", "1mb", false},
+		{"fractional-human-size", "1.5mb", false},
+		{"spaced-human-size", " 512 KiB ", false},
+		{"short-unit", "1m", false},
+		{"quoted-bytes", "1048576", false},
+		{"unknown-unit", "1xb", true},
+		{"missing-number", "mb", true},
 		{"boolean", false, true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
