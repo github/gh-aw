@@ -98,18 +98,34 @@ is distinct from the passing safety checks above.
 
 ## Abstraction boundary
 
-These are **bounded model-checking results**, not an unbounded TLAPS theorem or
-a proof of the implementation. A value denotes a canonical-JSON equality
-class, a table row has a primary key and one non-key field, a counter operation
-has amount one, and a note has a valid citation represented abstractly. IDs
-distinguish transactions but do not model hashes or duplicate-ID retries. One
-artifact contains one operation at a time; the generated traces are shortest
-operation witnesses, **not** exhaustive conformance tests for every reachable
-state. Batch temporary-ID rewriting,
-forward references in a batch, SHA-256 collision resistance, JSON schemas,
-record/shard byte limits, Git authentication, failed network pushes, DAG
-topological ordering, and real SQLite are not modeled. In particular,
-`Compact` preserves modeled history and shard-ID coverage but does not
-represent or verify the physical compaction implementation. Production tests
-cover these separate obligations. Do not interpret the safety results as a
-liveness or distributed-serializability guarantee.
+**Requirements**
+
+- Results MUST be interpreted only as bounded checks of the abstractions and
+  configurations listed above, not as an unbounded theorem or a proof of the
+  implementation.
+- Concrete runtime behavior MUST be assessed separately with implementation
+  tests; the model's shortest operation witnesses are not exhaustive
+  conformance tests for every reachable state.
+- The model does not prove batch temporary-ID rewriting, forward references,
+  SHA-256 collision resistance, JSON schemas, record/shard byte limits, Git
+  authentication, failed network pushes, DAG topological ordering, or real
+  SQLite behavior.
+
+**Safeguards**
+
+- A value MUST be understood as a canonical-JSON equality class; table rows,
+  counters, notes, transaction IDs, and artifacts remain bounded abstractions.
+- Claims about `Compact` MUST be limited to preserving modeled history and
+  shard-ID coverage; physical compaction is not represented or verified.
+- The model MUST NOT be cited as evidence of liveness or
+  distributed-serializability. Production tests cover separate obligations.
+
+## Last synced with implementation (2026-11-06)
+
+- **Go:** None; this repository has no Go ledger package.
+- **TLA+:** `LedgerProtocol.tla`, `LedgerProtocolWitness.tla`, and the `*.cfg`
+  model configurations in this directory.
+- **JavaScript implementation and tests:** `actions/setup/js/ledger_append.cjs`,
+  `ledger_replay.cjs`, `ledger_builtin.cjs`, `ledger_transactions.cjs`,
+  `push_ledger_changes.cjs`, `ledger_compaction.cjs`,
+  `ledger_protocol_model.test.cjs`, and `ledger_protocol_generated.test.cjs`.

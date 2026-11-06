@@ -2,14 +2,22 @@
 
 **Document**: `security-architecture-spec.md`  
 **Architecture baseline**: 1.0.0
+**Current specification revision**: 1.1.9 / November 5, 2026
 **Status**: Candidate Recommendation  
-**Date**: January 29, 2026
+**Date**: November 5, 2026
 **Last full validation**: v1.0.0 / 2026-07-15
 **Current targeted lock check**: 2026-11-03 (partial; see [validation report](security-architecture-spec-validation.md))
 
 ## Overview
 
 The GitHub Agentic Workflows Security Architecture Specification is a formal W3C-style document that defines the security architecture, guarantees, and implementation requirements for gh-aw. This specification enables organizations to replicate the security model in other CI/CD environments.
+
+### Appendix G Test Mapping (v1.1.9 / 2026-11-05)
+
+The full specification's v1.1.9 revision updates Appendix G.10 test-path mappings
+and clarifies partial-coverage limits. It was published November 5, 2026; this
+summary's current specification revision and date match that header and change
+log.
 
 ### Floating-Head Opt-In (v1.1.8 / 2026-10-28)
 
@@ -218,6 +226,63 @@ go test ./pkg/workflow/ -run 'TestFormalSG|TestFormalCS|TestFormalRS|TestFormalB
 ```
 
 ### Formal Requirements
+
+The following links point to the normative requirement entries in the full
+specification. Identifier ranges include every numbered requirement and suffix
+variant shown in that section.
+
+| Formal requirement | Entry in `security-architecture-spec.md` |
+|---|---|
+| SG-01–SG-07 | [§3.2 Security Guarantees](security-architecture-spec.md#32-security-guarantees) |
+| IS-01–IS-03 | [§4.2 Sanitization Requirements](security-architecture-spec.md#42-sanitization-requirements) |
+| IS-04 | [§4.3.1 Mention Neutralization](security-architecture-spec.md#431-mention-neutralization) |
+| IS-05 | [§4.3.2 Bot Trigger Protection](security-architecture-spec.md#432-bot-trigger-protection) |
+| IS-06, IS-06a–IS-06b | [§4.3.3 HTML/XML Tag Filtering](security-architecture-spec.md#433-htmlxml-tag-filtering) |
+| IS-07, IS-07a–IS-07b | [§4.3.4 URL Filtering and Validation](security-architecture-spec.md#434-url-filtering-and-validation) |
+| IS-08 | [§4.3.5 Content Limits](security-architecture-spec.md#435-content-limits) |
+| IS-09, IS-09a | [§4.3.6 Control Character Removal](security-architecture-spec.md#436-control-character-removal) |
+| IS-10 | [§4.4 Sanitization Pipeline](security-architecture-spec.md#44-sanitization-pipeline) |
+| IS-11 | [§4.5 Bypass Prevention](security-architecture-spec.md#45-bypass-prevention) |
+| OI-01–OI-02 | [§5.2 Job Architecture](security-architecture-spec.md#52-job-architecture) |
+| OI-03–OI-05 | [§5.3 Safe Output Configuration](security-architecture-spec.md#53-safe-output-configuration) |
+| OI-06–OI-07 | [§5.4 Output Validation](security-architecture-spec.md#54-output-validation) |
+| OI-08–OI-10 | [§5.5 Token Management](security-architecture-spec.md#55-token-management) |
+| OI-11 | [§5.6 Output Isolation Guarantees](security-architecture-spec.md#56-output-isolation-guarantees) |
+| NI-01–NI-03 | [§6.2 Network Configuration](security-architecture-spec.md#62-network-configuration) |
+| NI-04–NI-05 | [§6.3 Ecosystem Identifiers](security-architecture-spec.md#63-ecosystem-identifiers) |
+| NI-06–NI-08 | [§6.4 Domain Allowlisting](security-architecture-spec.md#64-domain-allowlisting) |
+| NI-09–NI-11 | [§6.5 Domain Blocking](security-architecture-spec.md#65-domain-blocking) |
+| NI-12–NI-13 | [§6.6 Enforcement Mechanisms](security-architecture-spec.md#66-enforcement-mechanisms) |
+| NI-14 | [§6.7 Content Sanitization Integration](security-architecture-spec.md#67-content-sanitization-integration) |
+| PM-01–PM-02 | [§7.2 Permission Defaults](security-architecture-spec.md#72-permission-defaults) |
+| PM-03–PM-04 | [§7.3 Permission Configuration](security-architecture-spec.md#73-permission-configuration) |
+| PM-05–PM-07 | [§7.4 Strict Mode](security-architecture-spec.md#74-strict-mode) |
+| PM-08–PM-09 | [§7.5 Fork Protection](security-architecture-spec.md#75-fork-protection) |
+| PM-10–PM-12, PM-10a, PM-10b, PM-10c, PM-10d | [§7.6 Role-Based Access Control](security-architecture-spec.md#76-role-based-access-control) |
+| PM-13–PM-15 | [§7.7 Token Validation](security-architecture-spec.md#77-token-validation) |
+| SI-01–SI-03 | [§8.2 Coding Agent Sandbox](security-architecture-spec.md#82-coding-agent-sandbox) |
+| SI-04–SI-05 | [§8.3 AWF Sandbox Requirements](security-architecture-spec.md#83-awf-sandbox-requirements) |
+| SI-08–SI-10 | [§8.4 MCP Server Sandbox](security-architecture-spec.md#84-mcp-server-sandbox) |
+| SI-06–SI-07 | [§8.5 Environment Variable Inheritance](security-architecture-spec.md#85-environment-variable-inheritance) and [§8.6 Sandbox Guarantees](security-architecture-spec.md#86-sandbox-guarantees) |
+| TD-01–TD-03 | [§9.2 Threat Detection Requirements](security-architecture-spec.md#92-threat-detection-requirements) |
+| TD-04–TD-05 | [§9.3 Detection Categories](security-architecture-spec.md#93-detection-categories) |
+| TD-06–TD-07 | [§9.4 Detection Methods](security-architecture-spec.md#94-detection-methods) |
+| TD-08–TD-10 | [§9.5 Detection Output](security-architecture-spec.md#95-detection-output) |
+| TD-11–TD-12 | [§9.6 Custom Prompts](security-architecture-spec.md#96-custom-prompts) |
+| TD-13–TD-15 | [§9.7 Engine Configuration](security-architecture-spec.md#97-engine-configuration) |
+| CS-01–CS-03 | [§10.2 Schema Validation](security-architecture-spec.md#102-schema-validation) |
+| CS-04–CS-05 | [§10.3 Expression Safety](security-architecture-spec.md#103-expression-safety) |
+| CS-06–CS-07 | [§10.4 Permission Validation](security-architecture-spec.md#104-permission-validation) |
+| CS-08–CS-09 | [§10.5 Network Validation](security-architecture-spec.md#105-network-validation) |
+| CS-10–CS-11 | [§10.6 Action Pinning](security-architecture-spec.md#106-action-pinning) |
+| CS-12–CS-13 | [§10.7 Deprecated Features](security-architecture-spec.md#107-deprecated-features) |
+| RS-01–RS-03 | [§11.2 Timestamp Validation](security-architecture-spec.md#112-timestamp-validation) |
+| RS-04–RS-05a | [§11.3 Repository Validation](security-architecture-spec.md#113-repository-validation) |
+| RS-06–RS-08 | [§11.4 Role Validation](security-architecture-spec.md#114-role-validation) |
+| RS-09–RS-11 | [§11.5 Token Validation](security-architecture-spec.md#115-token-validation) |
+| RS-12–RS-13 | [§11.6 Network Enforcement](security-architecture-spec.md#116-network-enforcement) |
+| RS-14–RS-15 | [§11.7 Output Validation](security-architecture-spec.md#117-output-validation) |
+| RS-16–RS-22 | [§11.8 Concurrency Control](security-architecture-spec.md#118-concurrency-control) |
 
 ### Test Categories
 
@@ -433,6 +498,10 @@ The **2026-11-03 targeted check** confirms the ten-job structure in `.github/wor
 - Added the seven REASONS headings with explicit safeguards, operational ordering, and normative-status qualifications.
 - Reconciled the implementation and sync status with the historical full validation and the current targeted lock check.
 
+### 2026-11-06
+
+- Synced the current revision marker and added links from every formal requirement group to its entry in the full specification.
+
 ## Versioning
 
 The specification follows **semantic versioning**:
@@ -442,6 +511,7 @@ The specification follows **semantic versioning**:
 - **Patch**: Bug fixes, clarifications, editorial changes
 
 Historical summary revision: **1.0.1** (Candidate Recommendation). The architecture baseline is **1.0.0**; the later RS-05a updates, including v1.1.7, are recorded above.
+The current full specification revision is **1.1.9**, published **November 5, 2026**.
 
 ## Feedback
 
