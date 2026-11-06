@@ -924,6 +924,18 @@ experiments:
 Summarize this issue in a **${{ experiments.prompt_style }}** way.
 ```
 
+### Outcome-Backed Metric
+
+An [experiment](#experiments-experiments) metric, written as `outcome:accepted` or `outcome:zero_touch`, that scores each run by the observed [outcome](#outcome) of its safe outputs instead of a grader result. Live outcome collection is opt-in through `gh aw experiments analyze <workflow> --outcome` because it downloads artifacts and makes additional GitHub API requests. Each run contributes the share of resolved outputs that were accepted (or zero-touch). See [A/B Experiments](/gh-aw/experimental/experiments/).
+
+### Outcome Window
+
+The maturity period (`outcome_window`) that must elapse after a run before its outputs contribute to an [outcome-backed metric](#outcome-backed-metric). The default `auto` estimates the 95th-percentile decision time from the experiment's own outputs, clamps it to 24 hours–30 days, and uses `72h` until 20 outputs have known decision times. A positive Go duration such as `72h` overrides the learned window.
+
+### Zero-Touch
+
+An outcome of a merged pull request that received no non-bot comments, reviews, or commits after creation. Zero-touch is the strictest acceptance level and backs the `outcome:zero_touch` experiment metric. Accepted pull requests without complete zero-touch evidence are excluded from that metric rather than scored zero.
+
 ### Evals (`evals:`)
 
 An experimental frontmatter section that defines binary (YES/NO) evaluation questions to run after safe-outputs and before the conclusion job. Each question has an `id` and a `question` string; the runtime evaluates each with an LLM and records results in an `evals.jsonl` artifact. Supports a shorthand form (plain array of question objects) and an extended form with a top-level `model` override and optional `runs-on` configuration. Use `gh aw audit --evals` or `gh aw logs --evals` to filter results to runs that contain evals output. See [Frontmatter Reference](/gh-aw/reference/frontmatter/).
