@@ -44,6 +44,20 @@ func BadDiscard() {
 	_, _ = io.Copy(ioutil.Discard, nil) // want `ioutil\.Discard is deprecated; use io\.Discard instead`
 }
 
+// A qualified selector receiver is reported exactly once, on ioutil.Discard.
+func BadDiscardMethod() {
+	_, _ = ioutil.Discard.Write([]byte("x")) // want `ioutil\.Discard is deprecated; use io\.Discard instead`
+}
+
+type fieldHolder struct {
+	Discard int
+}
+
+// A field that shares a deprecated name is not reported.
+func GoodFieldNamedDiscard(h fieldHolder) int {
+	return h.Discard
+}
+
 func GoodReadAll() {
 	f, _ := os.Open("file.txt")
 	defer f.Close()
