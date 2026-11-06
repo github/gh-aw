@@ -887,6 +887,24 @@ recomputed state digest, including earlier checkpoints. It MUST NOT depend on
 API pagination, API caches, Issue mirrors or native run queries. This changes
 transport, not the version-3 wire format or the checkpoint trust boundary.
 
+While walking single-parent Git history, an exact newline-terminated canonical
+causal prefix of an already validated log may reuse its transaction validation.
+For Git transport, the canonical prefix's complete Git blob object identity
+may establish that byte equality without reading the same large payload again.
+Every Git parent is still checked, and every checkpoint boundary is still
+reconstructed from a freshly replayed source snapshot; verification need not
+compress and replay a throwaway replacement checkpoint. Noncanonical, changed
+or malformed historical logs require full validation; a matching checkpoint ID
+alone is never sufficient. No mutable
+projection is shared between reads. The synthetic Git-history benchmark includes
+135 Work items, 1,200 retained requests, four checkpoint generations and 128
+ancestry commits, with a
+three-second cold-validation budget excluding fixture construction and without
+hosted network latency. This budget does not extend durable delivery deadlines.
+The optional captured-history benchmark checks the exact immutable head and
+replayed projection through production Git transport, including its cold
+object transfer and integrity checks, with a ten-second local-read ceiling.
+
 Hosted identity, approved worker configuration, native launch/termination and
 effect delivery remain separate evidence boundaries and MAY require APIs.
 Preparing a branchless repository's default branch is likewise a hosting

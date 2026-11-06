@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { performance } from "node:perf_hooks";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
@@ -20,7 +21,7 @@ afterEach(() => {
   for (const cleanup of cleanups.splice(0).reverse()) cleanup();
 });
 
-function fixture() {
+function fixture(options = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "queue-git-test-"));
   cleanups.push(() => fs.rmSync(directory, { recursive: true, force: true }));
   const env = gitEnvironment();
@@ -30,11 +31,12 @@ function fixture() {
       .trim();
   }
   git(["init", "--bare", "--quiet", "--initial-branch=main", "--template="]);
-  const queue = queueFixture({ count: 2, batch: 1 });
+  const queue = queueFixture({ count: 2, batch: 1, ...options });
   let head;
   let serial = 0;
   function store(transactions, { mode = "100644", parents = head ? [head] : [] } = {}) {
-    const blob = git(["hash-object", "-w", "--stdin"], transactions.map(commit => canonical(commit)).join("\n") + "\n");
+    const contents = typeof transactions === "string" ? transactions : transactions.map(commit => canonical(commit)).join("\n") + "\n";
+    const blob = git(["hash-object", "-w", "--stdin"], contents);
     const tree = git(["mktree"], `${mode} blob ${blob}\twork-queue.jsonl\n`);
     head = git(["commit-tree", tree, ...parents.flatMap(parent => ["-p", parent]), "-F", "-"], `Queue fixture ${++serial}`);
     git(["update-ref", "refs/heads/work-queue", head]);
@@ -124,6 +126,81 @@ describe("Git-only work queue ledger", { timeout: 30000 }, () => {
       expect(serializeTransactionLog(current.transactions)).toBe(serializeTransactionLog(second));
       current.state.works.clear();
     }
+    expect(f.calls).toEqual([]);
+  });
+
+  it("validates a synthetic live-sized nested Git history in less than three seconds from cold", async () => {
+    const f = fixture({
+      count: 135,
+      granted: false,
+      workDefaults: { payload: { plan: "Verify the original synthetic work item without resource effects. ".repeat(80), effect_contract: { kind: "none" } } },
+    });
+    const retained = 1200;
+    const epoch = f.queue.state.policy_epoch;
+    let transactions = [...f.queue.transactions];
+    for (let index = 0; index < retained; index++) {
+      const operations = [{ kind: "Control", control: "admission_paused", value: index % 2 === 0, reason: "performance_fixture" }];
+      transactions.push({
+        version: 3,
+        id: `performance-control-${index}`,
+        previous: transactions.at(-1).id,
+        request: newRequest(`performance-request-${index}`, "control", f.queue.administrator, { operations }),
+        actor: f.queue.administrator,
+        policy_epoch: epoch,
+        at: f.queue.at + index + 1,
+        operations,
+      });
+    }
+    f.store(transactions);
+    for (let generation = 0; generation < 4; generation++) {
+      transactions = compactTransactions(transactions, f.head(), f.queue.administrator, f.queue.at + retained + generation);
+      for (let index = 0; index < 32; index++) f.store(transactions);
+    }
+    const bytes = Buffer.byteLength(transactions.map(commit => canonical(commit) + "\n").join(""));
+    expect(bytes).toBeGreaterThan(700 * 1024);
+    const start = performance.now();
+    const cold = await readWorkQueueLog(f.options);
+    const coldMs = performance.now() - start;
+    expect(cold.state.works.size).toBe(135);
+    expect(cold.state.requests.size).toBe(f.queue.state.requests.size + retained + 4);
+    expect(cold.sha).toBe(f.head());
+    expect(coldMs).toBeLessThan(3000);
+    cold.state.works.clear();
+    const warmStart = performance.now();
+    const warm = await readWorkQueueLog(f.options);
+    const warmMs = performance.now() - warmStart;
+    expect(warm.state.works.size).toBe(135);
+    expect(warmMs).toBeLessThan(3000);
+    expect(f.calls).toEqual([]);
+    console.info(
+      JSON.stringify({
+        benchmark: "synthetic-cold-queue-validation",
+        works: 135,
+        retained_requests: retained,
+        checkpoint_generations: 4,
+        ancestry_commits: 128,
+        checkpoint_bytes: bytes,
+        cold_ms: Math.round(coldMs),
+        warm_ms: Math.round(warmMs),
+        budget_ms: 3000,
+      })
+    );
+  });
+
+  it.each(["duplicate-key", "truncated", "invalid-request"])("rejects a %s historical log even when the descendant checkpoint is valid", async defect => {
+    const f = fixture();
+    const checkpoint = compactTransactions(f.queue.transactions, f.head(), f.queue.administrator, f.queue.at);
+    const contents = canonical(checkpoint[0]) + "\n";
+    f.store(checkpoint);
+    if (defect === "duplicate-key") f.store(contents.replace('"version":3', '"version":3,"version":3'));
+    else if (defect === "truncated") f.store(contents.slice(0, -1));
+    else {
+      const invalid = structuredClone(checkpoint[0]);
+      invalid.request.parameters.prior_tip = "different-tip";
+      f.store([invalid]);
+    }
+    f.store(checkpoint);
+    await expect(readWorkQueueLog(f.options)).rejects.toThrow();
     expect(f.calls).toEqual([]);
   });
 
