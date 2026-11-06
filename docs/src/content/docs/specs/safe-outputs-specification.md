@@ -3148,6 +3148,10 @@ This section provides complete definitions for all remaining safe output types. 
 **Cross-Repository Support**: Yes  
 **Mandatory**: No
 
+**MCP Tool Schema**:
+
+None. `comment_memory` MUST NOT be exposed as an agent-callable MCP tool when file-based comment-memory synchronization is active; see **Tool Exposure Model** and **Logical Operation Schema** below for the processor-side operation shape.
+
 **Tool Exposure Model**:
 
 - `comment_memory` is a safe output processor type.
@@ -3969,6 +3973,18 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 - `target-repo`: Cross-repository target
 - `allowed-repos`: Cross-repository allowlist
 - `staged`: Staged mode override
+
+**Security Requirements**:
+
+- Merge policy (labels, title prefix, branches, checks, approvers) MUST be workflow-owned configuration; the agent MUST NOT be able to supply or relax it through tool-call arguments.
+- The merge API call MUST be bound to the evaluated head SHA; a mismatch MUST fail without retrying the merge.
+- Review, thread, and check evidence MUST be complete and well-formed; missing or malformed evidence MUST block merging.
+- Any individual reviewer's latest effective `CHANGES_REQUESTED` review MUST block merging, regardless of the aggregate review decision.
+- The PR author, bot accounts, and the authenticated merge identity MUST NOT satisfy `required-approvers`.
+- Merges into protected branches or the repository default branch MUST be refused, and the base branch MUST have an associated open upstream pull request.
+- Policy state MUST be revalidated immediately before execution or staged preview.
+- Target selection MUST follow MPR-001 through MPR-005, and cross-repository targets MUST be validated against `allowed-repos`.
+- Results and decision audit records MUST be treated as untrusted data and MUST NOT persist secrets or the fields excluded by the Decision Audit requirements.
 
 **Decision Audit**: The handler manager MUST expose only summary-safe merge failure diagnostics and persist successful, blocked, and staged decisions in `merge-pull-request-decisions.jsonl`, uploaded with the safe-output items artifact. Records MUST retain the untrusted-data marker and redact known secrets. Persisted decision evidence MUST be limited to validated repository, pull request number, head/base revisions, evaluation/revalidation timestamps, and optional producer rejections containing fixed phase/code and positive safe-integer check-run and expected/observed app IDs. Early request rejections MUST include a fixed failure code and retain only valid attempted-target identity when known. Titles, labels, branches, check names, reviewer identities, approval details, raw API errors, and review bodies MUST NOT be persisted. Each record MUST be bounded to 64 KiB. Before uploading, standard tracked-secret redaction and any configured custom masking MUST succeed; tracked inputs are uppercase `secrets.NAME` references collected from preceding generated steps. Persistence failures MUST be surfaced separately and MUST NOT be reported as audit success. An already-completed merge MUST retain its successful operation outcome, merged revision, URL, and internal evidence even if auditing fails; an audit failure MUST NOT trigger a merge retry.
 
@@ -5049,6 +5065,16 @@ Implementation and regression mappings are maintained in the [compiler threat sp
 | `staged` | `boolean` | `false` | Enable staged mode for this handler. |
 | `output.title` | `string` | — | Static fallback title when the agent does not provide one. |
 | `output.summary` | `string` | — | Static fallback summary when the agent does not provide one. |
+
+**Security Requirements**:
+
+- The check run name MUST come only from workflow frontmatter configuration; the handler MUST NOT accept a name from the agent.
+- `title`, `summary`, and `text` MUST be sanitized before the Checks API call. `title` MUST be limited to 256 characters; `summary` and `text` MUST each be limited to 65535 characters.
+- Config-level `output.title` and `output.summary` fallbacks MUST be sanitized and bounded identically to agent-supplied values.
+- The check run MUST be created only in the current repository; cross-repository targets are not supported.
+- Pull request targeting MUST follow the standard target rules. Agent-supplied `pull_request_number` (and its aliases) MUST be honored only when `target` is `"*"`.
+- When `target` is configured, the head SHA MUST be fetched from the Pulls API at execution time rather than trusted from the event payload.
+- In staged mode the handler MUST NOT call the Checks API or the Pulls API.
 
 **Required Permissions**:
 
