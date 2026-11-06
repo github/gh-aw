@@ -38,6 +38,9 @@ Use an `ubuntu-24.04` x64 runner for this recipe. Add the following entry to an
 ordinary job's `steps`, or to an agentic workflow's frontmatter `steps`. Install
 before the agent starts, not through the agent's restricted shell. Custom jobs
 need their own installation; they do not inherit agent setup.
+Agentic workflows can instead import `shared/koka.md`, which installs the same
+pinned bundle and sets `KOKA_BIN`; the consuming workflow still declares tools,
+network access, and safe outputs.
 
 ```yaml
 - name: Install Koka 3.2.9 (Linux x64)

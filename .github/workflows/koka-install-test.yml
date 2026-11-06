@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/aw/formal-methods.md'
       - '.github/workflows/koka-install-test.yml'
+      - '.github/workflows/shared/koka.md'
   workflow_dispatch:
 
 permissions:
@@ -36,6 +37,15 @@ jobs:
           section = section.split("\n## Establish the model\n", 1)[0]
           setup, = re.findall(r"```yaml\n(.*?)\n```", section, re.S)
           install = textwrap.dedent(setup.split("  run: |\n", 1)[1])
+          shared = Path(".github/workflows/shared/koka.md").read_text()
+          frontmatter = shared.split("---\n", 2)[1]
+          shared_install = textwrap.dedent(frontmatter.split("    run: |\n", 1)[1])
+          shared_install = "\n".join(
+              line for line in shared_install.splitlines()
+              if not line.startswith("# runner-guard:")
+          )
+          if shared_install.strip() != install.strip():
+              raise ValueError("Shared Koka setup differs from the documented installation")
           temporary = Path(os.environ["RUNNER_TEMP"])
           (temporary / "install-koka.sh").write_text(install + "\n")
           PY
