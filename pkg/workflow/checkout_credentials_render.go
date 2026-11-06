@@ -49,6 +49,67 @@ func (cm *CheckoutManager) credentialSubrepositories() []credentialSubrepository
 	return repositories
 }
 
+func (cm *CheckoutManager) runtimeRootCandidates() []credentialSubrepository {
+	hasRuntimePath := false
+	for _, entry := range cm.ordered {
+		hasRuntimePath = hasRuntimePath || (!entry.key.multi && strings.Contains(entry.key.path, "${{"))
+	}
+	if !hasRuntimePath {
+		return nil
+	}
+	var candidates []credentialSubrepository
+	// Include literal paths too: a later literal root can supersede a runtime root.
+	for _, entry := range cm.ordered {
+		if entry.isDefault() || entry.key.multi {
+			continue
+		}
+		repository := entry.key.repository
+		if entry.key.wiki {
+			repository = wikiRepository(repository)
+		} else if repository == "" {
+			repository = "${{ github.repository }}"
+		}
+		index := len(candidates)
+		candidates = append(candidates, credentialSubrepository{
+			repository: repository, path: entry.key.path,
+			envVarName:     fmt.Sprintf("GH_AW_ROOT_REPO_%d", index),
+			pathEnvVarName: fmt.Sprintf("GH_AW_ROOT_PATH_%d", index),
+		})
+	}
+	return candidates
+}
+
+func runtimeRootEnvironmentLines(candidates []credentialSubrepository) []string {
+	if len(candidates) == 0 {
+		return nil
+	}
+	var env strings.Builder
+	for _, candidate := range candidates {
+		writeYAMLEnv(&env, "          ", candidate.envVarName, candidate.repository)
+		writeYAMLEnv(&env, "          ", candidate.pathEnvVarName, candidate.path)
+	}
+	return []string{env.String()}
+}
+
+func runtimeRootIdentityLines(candidates []credentialSubrepository) []string {
+	if len(candidates) == 0 {
+		return nil
+	}
+	lines := []string{"          GH_AW_ROOT_DIRECTORY=$(pwd -P)\n"}
+	for _, candidate := range candidates {
+		lines = append(lines,
+			fmt.Sprintf("          GH_AW_CHECKOUT_PATH=\"${%s:-.}\"\n", candidate.pathEnvVarName),
+			"          if [ \"$GH_AW_CHECKOUT_PATH\" = \"-\" ]; then GH_AW_CHECKOUT_PATH=\"./-\"; fi\n",
+			"          if ! GH_AW_CHECKOUT_DIRECTORY=$(cd -- \"$GH_AW_CHECKOUT_PATH\" 2>/dev/null && pwd -P); then\n",
+			"            echo \"Unable to resolve checkout directory for Git identity verification\" >&2\n",
+			"            exit 1\n",
+			"          fi\n",
+			fmt.Sprintf("          if [ \"$GH_AW_CHECKOUT_DIRECTORY\" = \"$GH_AW_ROOT_DIRECTORY\" ]; then GH_AW_GIT_REPOSITORY=\"${%s}\"; fi\n", candidate.envVarName),
+		)
+	}
+	return append(lines, "          export GH_AW_GIT_REPOSITORY\n")
+}
+
 func credentialEnvironmentLines(root, token string, repositories []credentialSubrepository) []string {
 	lines := []string{
 		"        env:\n",
@@ -91,4 +152,25 @@ func credentialCommandLines(repositories []credentialSubrepository) []string {
 		)
 	}
 	return append(lines, "          echo \"Git configured with standard GitHub Actions identity\"\n")
+}
+
+func runtimeRootCredentialCommandLines(repositories, candidates []credentialSubrepository) []string {
+	if len(candidates) == 0 {
+		return credentialCommandLines(repositories)
+	}
+	lines := []string{"        run: |\n"}
+	lines = append(lines, runtimeRootIdentityLines(candidates)...)
+	lines = append(lines, "          bash \"${RUNNER_TEMP}/gh-aw/actions/configure_git_credentials.sh\"\n")
+	for _, repo := range repositories {
+		gitDir := fmt.Sprintf("%q", repo.path)
+		if repo.pathEnvVarName != "" {
+			lines = append(lines, fmt.Sprintf("          if [ \"${%s}\" = \"-\" ]; then %s=\"./-\"; fi\n", repo.pathEnvVarName, repo.pathEnvVarName))
+			gitDir = fmt.Sprintf("\"${%s:-.}\"", repo.pathEnvVarName)
+		} else if repo.path == "-" {
+			gitDir = `"./-"`
+		}
+		// Root checkouts have already been authenticated using the last root identity.
+		lines = append(lines, fmt.Sprintf("          (cd -- %s && if [ \"$(pwd -P)\" != \"$GH_AW_ROOT_DIRECTORY\" ]; then GH_AW_GIT_REPOSITORY=\"${%s}\" bash \"${RUNNER_TEMP}/gh-aw/actions/configure_git_credentials.sh\"; fi)\n", gitDir, repo.envVarName))
+	}
+	return lines
 }

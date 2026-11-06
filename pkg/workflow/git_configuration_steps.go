@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/setutil"
@@ -38,9 +39,19 @@ func (c *Compiler) generateGitConfigurationStepsForData(data *WorkflowData) []st
 		if c.trialMode && !checkoutMgr.HasExternalRootCheckout() {
 			rootRepo = c.trialLogicalRepoSlug
 		}
-		return c.generateGitConfigurationStepsWithToken(token, rootRepo)
+		steps := c.generateGitConfigurationStepsWithToken(token, rootRepo)
+		candidates := checkoutMgr.runtimeRootCandidates()
+		if len(candidates) == 0 {
+			return steps
+		}
+		steps = steps[:len(steps)-1]
+		steps = append(steps, runtimeRootEnvironmentLines(candidates)...)
+		return append(steps, runtimeRootCredentialCommandLines(nil, candidates)...)
 	}
+	return generateCurrentCheckoutGitConfigurationSteps(checkoutMgr, token, currentPath, currentRepo)
+}
 
+func generateCurrentCheckoutGitConfigurationSteps(checkoutMgr *CheckoutManager, token, currentPath, currentRepo string) []string {
 	// current: true checkout is in a subdirectory. Emit the step with a working-directory
 	// so configure_git_credentials.sh runs from that directory. This ensures that
 	// `git remote set-url origin` targets the correct git repository even when the
@@ -53,7 +64,7 @@ func (c *Compiler) generateGitConfigurationStepsForData(data *WorkflowData) []st
 		gitConfigStepsLog.Printf("Generating git config steps for current checkout: path=%s (workflow repo)", currentPath)
 	}
 
-	return []string{
+	steps := []string{
 		"      - name: Configure Git credentials\n",
 		fmt.Sprintf("        working-directory: %q\n", currentPath),
 		"        env:\n",
@@ -64,6 +75,22 @@ func (c *Compiler) generateGitConfigurationStepsForData(data *WorkflowData) []st
 		fmt.Sprintf("          GITHUB_TOKEN: %s\n", token),
 		"        run: bash \"${RUNNER_TEMP}/gh-aw/actions/configure_git_credentials.sh\"\n",
 	}
+	if !strings.Contains(currentPath, "${{") {
+		return steps
+	}
+	candidates := checkoutMgr.runtimeRootCandidates()
+	steps = steps[:len(steps)-1]
+	steps = append(steps, runtimeRootEnvironmentLines(candidates)...)
+	steps = append(steps,
+		"        run: |\n",
+		"          GH_AW_WORKSPACE_DIRECTORY=$(cd -- \"$GITHUB_WORKSPACE\" && pwd -P)\n",
+		"          if [ \"$(pwd -P)\" = \"$GH_AW_WORKSPACE_DIRECTORY\" ]; then\n",
+	)
+	steps = append(steps, runtimeRootIdentityLines(candidates)...)
+	return append(steps,
+		"          fi\n",
+		"          bash \"${RUNNER_TEMP}/gh-aw/actions/configure_git_credentials.sh\"\n",
+	)
 }
 
 // generateGitConfigurationStepsWithToken generates git credential setup with a custom token
