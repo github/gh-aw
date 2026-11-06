@@ -334,6 +334,21 @@ func TestModelRoutingCopilotLocksUnchanged(t *testing.T) {
 		}
 	}
 	require.NotZero(t, routed, "no compiled lock has apiProxy.routing")
+
+	for name, provider := range map[string]string{
+		"daily-cli-tools-tester.lock.yml":     "openai",
+		"schema-consistency-checker.lock.yml": "openai",
+		"daily-spending-forecast.lock.yml":    "",
+		"issue-triage-agent.lock.yml":         "",
+	} {
+		t.Run(name, func(t *testing.T) {
+			content, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", name))
+			require.NoError(t, err)
+			match := routedLockRoutingPattern.FindStringSubmatch(string(content))
+			require.NotNil(t, match, "%s lost model routing", name)
+			require.Equal(t, provider, match[2], "%s routing provider", name)
+		})
+	}
 }
 
 // TestNativeRoutingSmokeEvidence checks that the native routed smokes compile to native
