@@ -64,6 +64,13 @@ func validatePipCommandPackageArg(pkgName string) error {
 // validatePythonPackagesWithPip is a generic helper that validates Python packages using pip index.
 // It accepts a package list, package type name for error messaging, and a validated pip executable path.
 func (c *Compiler) validatePythonPackagesWithPip(packages []string, packageType string, pipPath string) {
+	validatedPipPath, err := fileutil.ValidateExecutablePath(pipPath)
+	if err != nil {
+		pipValidationLog.Printf("Invalid pip executable path: %v", err)
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("%s package validation skipped: invalid pip executable path: %v", packageType, err)))
+		return
+	}
+
 	pipValidationLog.Printf("Validating %d %s packages using %s", len(packages), packageType, pipPath)
 
 	for _, pkg := range packages {
@@ -83,9 +90,9 @@ func (c *Compiler) validatePythonPackagesWithPip(packages []string, packageType 
 		// Use pip index to check if package exists on PyPI
 		// Include --pre flag to check for pre-release versions (alpha, beta, rc)
 		// #nosec G204 -- pipPath is resolved from the hardcoded executable names "pip" or "pip3"
-		// via fileutil.ResolveExecutablePath; pkgName is
+		// and validated immediately above; pkgName is
 		// validated above by validatePipPackageName against the strict PyPI PEP 508 allowlist.
-		cmd := exec.Command(pipPath, "index", "versions", pkgName, "--pre")
+		cmd := exec.Command(validatedPipPath, "index", "versions", pkgName, "--pre")
 		output, err := cmd.CombinedOutput()
 
 		if err != nil {
@@ -146,27 +153,12 @@ func stripUvPackageVersion(pkg string) string {
 	return pkg
 }
 
-// validateUvPackages validates that uv packages are available
-func (c *Compiler) validateUvPackages(workflowData *WorkflowData) error {
-	packages := extractUvPackages(workflowData)
-	if len(packages) == 0 {
-		pipValidationLog.Print("No uv packages to validate")
-		return nil
-	}
-
-	pipValidationLog.Printf("Starting uv package validation for %d packages", len(packages))
-
-	// Reject any package names starting with '-' before invoking uv or pip.
-	// These would be interpreted as flags by the CLI tools (argument injection).
+func validateUvPackageNames(packages []string) error {
 	if err := rejectHyphenPrefixPackages(packages, "uv"); err != nil {
 		pipValidationLog.Printf("uv package name validation failed: %v", err)
 		return err
 	}
 
-	// Validate package name syntax (PEP 508) upfront, before resolving or invoking
-	// uv/pip and independent of whether those tools are installed. This ensures
-	// argument-injection attempts (e.g. "pkg;whoami") are rejected even in
-	// environments without uv or pip available.
 	var invalidNameErrors []string
 	for _, pkg := range packages {
 		pkgName := stripUvPackageVersion(pkg)
@@ -182,6 +174,26 @@ func (c *Compiler) validateUvPackages(workflowData *WorkflowData) error {
 			"uv package name(s) do not conform to PyPI naming rules (PEP 508)",
 			"Package names must start and end with a letter or digit, with hyphens, underscores, or dots allowed inside (e.g. \"requests\" or \"my-package\"). Optionally followed by a \"==version\" or \"@version\" specifier.\n\nValidation details:\n"+strings.Join(invalidNameErrors, "\n"),
 		)
+	}
+	return nil
+}
+
+// validateUvPackages validates that uv packages are available
+func (c *Compiler) validateUvPackages(workflowData *WorkflowData) error {
+	packages := extractUvPackages(workflowData)
+	if len(packages) == 0 {
+		pipValidationLog.Print("No uv packages to validate")
+		return nil
+	}
+
+	pipValidationLog.Printf("Starting uv package validation for %d packages", len(packages))
+
+	// Validate package name syntax (PEP 508) upfront, before resolving or invoking
+	// uv/pip and independent of whether those tools are installed. This ensures
+	// argument-injection attempts (e.g. "pkg;whoami") are rejected even in
+	// environments without uv or pip available.
+	if err := validateUvPackageNames(packages); err != nil {
+		return err
 	}
 
 	// Check if uv is available
@@ -214,12 +226,15 @@ func (c *Compiler) validateUvPackages(workflowData *WorkflowData) error {
 		return c.validateUvPackagesWithPip(packages, pipPath)
 	}
 
+	validatedUvPath, err := fileutil.ValidateExecutablePath(uvPath)
+	if err != nil {
+		return NewOperationError("validate", "uv packages", "", err, "Verify that the uv executable is installed and accessible.")
+	}
 	pipValidationLog.Print("Using uv command for validation")
+	return c.validateUvPackagesWithExecutable(packages, validatedUvPath)
+}
 
-	// Validate with uv
-	// Package names were already validated against PyPI naming rules (PEP 508) above,
-	// before this point. validatePipCommandPackageArg below is a final point-of-use
-	// safety gate applied immediately before pkgName is passed to uv pip show.
+func (c *Compiler) validateUvPackagesWithExecutable(packages []string, uvPath string) error {
 	var errors []string
 	for _, pkg := range packages {
 		pkgName := stripUvPackageVersion(pkg)
@@ -234,8 +249,8 @@ func (c *Compiler) validateUvPackages(workflowData *WorkflowData) error {
 
 		// Use uv pip show to check if package exists on PyPI
 		// #nosec G204 -- uvPath is resolved from the hardcoded executable name "uv" via
-		// fileutil.ResolveExecutablePath; pkgName is validated above by validatePipPackageName
-		// against the strict PyPI PEP 508 allowlist.
+		// fileutil.ResolveExecutablePath and validated before calling this method;
+		// pkgName is validated above by validatePipPackageName against the strict PEP 508 allowlist.
 		cmd := exec.Command(uvPath, "pip", "show", pkgName, "--no-cache")
 		_, err := cmd.CombinedOutput()
 
