@@ -1,6 +1,6 @@
 {
-  "run_id": "42137837343",
-  "run_date": "2026-11-06T00:39:17.399347+00:00",
+  "run_id": "42174174890",
+  "run_date": "2026-11-06T06:26:47.497+00:00",
   "source": "pr-triage",
   "eligible_total": 3,
   "open_copilot_prs": 26,
@@ -25,11 +25,7 @@
   "batches": [
     {
       "id": "agent-triage-2026-11-05",
-      "prs": [
-        74937,
-        74940,
-        74992
-      ],
+      "prs": [74937, 74940, 74992],
       "category": "feature+bug",
       "risk": "mixed"
     }
@@ -78,5 +74,5 @@
       }
     }
   ],
-  "notes": "Eligible PRs older than 1 hour and outside cooldown; selected items are triaged with batch agent-triage-2026-11-05."
+  "notes": "Repo-memory snapshot used for this run because live GitHub PR data is unavailable in this sandbox. The prior eligible set was older than the 1-hour cooldown and recommended for triage."
 }
