@@ -481,11 +481,14 @@ func resolveRemoteNestedPath(item importQueueItem, nestedFilePath string) (strin
 }
 
 func determineNestedBaseDir(item importQueueItem, resolvedPath, baseDir string) string {
-	isLocalRelative := !strings.Contains(resolvedPath, "/") || strings.HasPrefix(resolvedPath, "./")
-	if item.remoteOrigin == nil && !IsWorkflowSpec(resolvedPath) && isLocalRelative {
+	if item.remoteOrigin == nil && !IsWorkflowSpec(resolvedPath) && isFileRelativeImportPath(resolvedPath) {
 		return filepath.Dir(item.fullPath)
 	}
 	return baseDir
+}
+
+func isFileRelativeImportPath(importPath string) bool {
+	return !strings.Contains(importPath, "/") || strings.HasPrefix(importPath, "./")
 }
 
 func formatNestedResolveError(nestedImportPath, nestedFilePath string, item importQueueItem, workflowFilePath string, yamlContent string, resolveErr error) error {
