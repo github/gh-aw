@@ -315,12 +315,15 @@ func TestModelRoutingCopilotLocksUnchanged(t *testing.T) {
 	}
 
 	// Every compiled Copilot-routed lock in the repository omits the routing provider;
-	// only the native smokes carry one.
+	// only the native smokes and native-routed workflows carry one.
 	lockFiles, err := filepath.Glob(filepath.Join("..", "..", ".github", "workflows", "*.lock.yml"))
 	require.NoError(t, err)
 	native := map[string]string{
 		"smoke-claude-routed-anthropic.lock.yml": "anthropic",
 		"smoke-codex-routed-openai.lock.yml":     "openai",
+		"designer-drift-audit.lock.yml":          "openai",
+		"daily-documentation-diagram.lock.yml":   "openai",
+		"chaos-pr-bundle-fuzzer.lock.yml":        "openai",
 	}
 	routed := 0
 	for _, lockFile := range lockFiles {

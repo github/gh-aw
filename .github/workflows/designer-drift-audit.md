@@ -123,7 +123,9 @@ network:
 engine:
   id: codex
   model-provider: openai
-model: openai/gpt-6-astra
+  model-routing:
+    goal: cost
+    mode: economy
 ---
 
 # Designer Drift Audit

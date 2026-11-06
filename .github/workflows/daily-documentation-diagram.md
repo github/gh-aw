@@ -42,7 +42,9 @@ safe-outputs:
 engine:
   id: codex
   model-provider: openai
-model: openai/gpt-5.6-sol
+  model-routing:
+    goal: cost
+    mode: economy
 strict: true
 timeout-minutes: 20
 evals:
