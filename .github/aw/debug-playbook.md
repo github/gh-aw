@@ -30,10 +30,10 @@ Unknown: [unmapped codes](#unmapped-codes).
 
 | Codes | Check | Remedy |
 | --- | --- | --- |
-| `workflow_failed` | First failed step; native error. | Route specific cause; conclusion isn't root cause. |
+| `workflow_failed` | First step error. | Fix cause, not conclusion. |
 | `workflow_timeout` | Step/budget/result. | Remove blockers/narrow scope; justify timeout changes. |
-| `multiple_errors` | First error vs cascades. | Fix cause, not repeats. |
-| `mcp_server_failures`, `tools_not_available` | MCP startup, registration, failed calls. | Fix tool/server/config/auth; no blind permission expansion. |
+| `multiple_errors` | Cause vs cascades. | Fix cause. |
+| `mcp_server_failures`, `tools_not_available`, `tool_error` | MCP setup/call failure. | Fix tool/server/config/auth; retain permission scope. |
 | `model_unavailable`, `model_endpoint_unsupported` | Full same-run inventory: absent model/incompatible endpoint. | [Model availability](#model-availability); verify candidate/API, edit pin, recompile. |
 | `model_availability_unknown` | Missing/incomplete/malformed/ambiguous/contradictory reflection. | Inspect discovery/auth; do not declare removal/switch models without evidence. |
 | `model_resolution_failed` | Failed `model.resolution`; missing same-role startup-stop evidence. | Advisory: verify pins; unproven cause. |
@@ -48,12 +48,12 @@ Unknown: [unmapped codes](#unmapped-codes).
 | `agentic_poor_agentic_control`, `agentic_partially_reducible` | Stop rules, tools, reducible stages. | Bound loops; extract deterministic work; preserve outcomes. |
 | `agentic_model_downgrade_available` | Capability/API needs; measured alternatives. | Benchmark; no automatic downgrade. |
 | `agentic_delegated_context_present` | Delegation/context. | Deduplicate; advisory, not always error. |
-| `workflow_succeeded` | Required downstream effect. | Verify missing effect; conclusion alone insufficient. |
+| `workflow_succeeded` | Downstream effect. | Verify effect; conclusion alone insufficient. |
 
 ## Agent, model, and proxy classifications
 
-Inspect `agent-stdio.log`, `agent_execution.json`, native errors/reflection/proxy; [inventory](#model-availability).
-Assistant/tool prose isn't native error.
+Inspect `agent-stdio.log`, `agent_execution.json`, errors/reflection/proxy and [inventory](#model-availability).
+Prose isn't native error.
 
 | Codes | Check | Remedy |
 | --- | --- | --- |
@@ -199,7 +199,8 @@ Check current PR head/base/checks/reviews/guards; diagnosis isn't merge authoriz
 | `merge_conflicts`, `not_mergeable` | Mergeability/conflicts; unknown != conflict. | Resolve reviewed-head conflicts; bound waits. |
 | `missing_required_labels`, `title_prefix_mismatch` | Labels/title. | Correct authorized metadata; retain guards. |
 | `required_checks_missing`, `required_checks_failing`, `required_check_producer_missing`, `required_check_producer_mismatch`, `required_check_producer_ambiguous` | Identity/SHA/completion/result/app IDs. | Require complete, unambiguous current-head configured-producer checks; no bypass. |
-| `pending_reviewers`, `blocking_review_state`, `blocking_individual_review`, `unresolved_review_threads`, `required_approval_missing` | Pending/blocked reviews/vetoes; threads; current-head allowlisted human approval. | Address feedback; retain reviewer authority/independent-human approval. |
+| `pending_reviewers`, `blocking_review_state`, `blocking_individual_review`, `unresolved_review_threads`, `required_approval_missing` | Reviews/vetoes/threads; current-head allowlisted human approval. | Address feedback; retain independent reviewer authority. |
+| `manual_review_caution` | PR/review detection/protected-files/caution notice. | Use independent manual review/merge; approvals/dismissals/labels/green checks cannot clear this guard. |
 | `merge_not_completed`, `merge_operation_error` | API/live state. | Reconcile possibly-merged state before retry. |
 
 ## Parser and ledger diagnostics
@@ -261,12 +262,11 @@ or profile/effect-scope bypass.
 | Codes or signature | Check | Remedy |
 | --- | --- | --- |
 | HTTP `401`, `403`, `404`, `429`, `5xx` | Operation, response, proxy guard, policy. | Distinguish auth/SSO, hidden resource, quota, outage; status alone insufficient. |
-| JSON-RPC `-32700`, `-32600`, `-32601`, `-32602`, `-32603`, `isError` | Protocol vs tool failure. | Fix parse/request/method/params/client/schema/server; tool errors need not be protocol errors. |
+| JSON-RPC `-32700`, `-32600`, `-32601`, `-32602`, `-32603`, `isError` | Protocol vs tool failure. | Fix parse/request/method/params/client/schema/server. |
 | `EACCES`, `ENOENT`, `ETIMEDOUT`, process exit/signal | Operation/path; fatal vs caught. | Fix boundary; caught `/run/awf-config-audit` warning doesn't prove later inference failure. |
 | Unlisted code, compile/schema/scanner error | Identifier/revision; emitter/caller. | Trace cause; add regression/code row; report gaps, never guess. |
 
 No run: inspect file/line; follow [compile-only gates](debug-compilation.md).
 Compilation != inference/execution authority.
 
-Report code/boundary/revision, evidence/uncertainty, remedy/files/execution.
-No blind retries/downgrades/credential-rotation/guard-bypass.
+Report code/boundary/revision, evidence/uncertainty, remedy/files/execution; no blind retries/downgrades/credential-rotation/guard-bypass.
