@@ -21,7 +21,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Extract documented examples
+      - name: Extract documented installation
         shell: bash
         run: |
           set -euo pipefail
@@ -36,15 +36,8 @@ jobs:
           section = section.split("\n## Establish the model\n", 1)[0]
           setup, = re.findall(r"```yaml\n(.*?)\n```", section, re.S)
           install = textwrap.dedent(setup.split("  run: |\n", 1)[1])
-          smoke, unhandled = re.findall(r"```koka\n(.*?)\n```", section, re.S)
-          commands, = re.findall(r"```bash\n(.*?)\n```", section, re.S)
           temporary = Path(os.environ["RUNNER_TEMP"])
-          results = Path("/tmp/gh-aw/agent/koka-results")
-          results.mkdir(parents=True, exist_ok=True)
           (temporary / "install-koka.sh").write_text(install + "\n")
-          (temporary / "check-koka.sh").write_text(commands + "\n")
-          (results / "smoke.kk").write_text(smoke + "\n")
-          (results / "unhandled.kk").write_text(unhandled + "\n")
           PY
 
       - name: Run documented installation
@@ -53,20 +46,46 @@ jobs:
           set -euo pipefail
           bash "$RUNNER_TEMP/install-koka.sh" 2>&1 | tee "$RUNNER_TEMP/koka-install.log"
 
-      - name: Compile and run documented handler
+      - name: Compile and run an effect handler
         shell: bash
         run: |
           set -euo pipefail
           koka --version | tee "$RUNNER_TEMP/koka-version.log"
           grep -F 'Koka 3.2.9' "$RUNNER_TEMP/koka-version.log"
-          bash "$RUNNER_TEMP/check-koka.sh" 2>&1 | tee "$RUNNER_TEMP/koka-smoke.log"
+          results=/tmp/gh-aw/agent/koka-results
+          mkdir -p "$results"
+          cat > "$results/smoke.kk" <<'KOKA'
+          effect fun answer() : int
+
+          fun handled-answer() : int
+            with fun answer() 42
+            answer()
+
+          pub fun main()
+            assert("handler returns 42", handled-answer() == 42)
+            println("koka smoke: ok")
+          KOKA
+          cd "$results"
+          timeout 2m /tmp/gh-aw/agent/koka/bin/koka \
+            --output="$results/smoke" smoke.kk \
+            2>&1 | tee "$RUNNER_TEMP/koka-compile.log"
+          timeout 30s "$results/smoke" 2>&1 | tee "$RUNNER_TEMP/koka-smoke.log"
           grep -Fx 'koka smoke: ok' "$RUNNER_TEMP/koka-smoke.log"
 
-      - name: Reject the documented unhandled effect
+      - name: Reject an unhandled effect
         shell: bash
         run: |
           set -euo pipefail
           results=/tmp/gh-aw/agent/koka-results
+          cat > "$results/unhandled.kk" <<'KOKA'
+          effect fun answer() : int
+
+          fun unhandled-answer() : int
+            answer()
+
+          pub fun main()
+            println(unhandled-answer())
+          KOKA
           cd "$results"
           set +e
           timeout 2m /tmp/gh-aw/agent/koka/bin/koka \
@@ -91,7 +110,7 @@ jobs:
             printf '## Koka installation and effect checks\n\n'
             printf 'Result: **%s**\n\n' "$JOB_STATUS"
             printf 'Runner: Ubuntu 24.04 x64; compiler: Koka 3.2.9.\n\n'
-            printf 'The job executes the installation and smoke examples extracted from `.github/aw/formal-methods.md`.\n'
+            printf 'The job executes the installation extracted from `.github/aw/formal-methods.md` and keeps its smoke fixtures in the workflow.\n'
             printf 'Success requires checksum verification, native C compilation, handler execution, and rejection of an unhandled effect.\n'
           } >> "$GITHUB_STEP_SUMMARY"
 

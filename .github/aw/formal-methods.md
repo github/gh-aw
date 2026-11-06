@@ -89,59 +89,6 @@ Do not reuse the x64 archive or checksum on ARM64, macOS, or Windows. Select the
 matching asset and verify its own digest; this example does not validate those
 platforms.
 
-### Smoke-test the compiler and an effect handler
-
-Save this as `smoke.kk` in a fresh results directory:
-
-```koka
-effect fun answer() : int
-
-fun handled-answer() : int
-  with fun answer() 42
-  answer()
-
-pub fun main()
-  assert("handler returns 42", handled-answer() == 42)
-  println("koka smoke: ok")
-```
-
-Compile and execute separately so an installation check also exercises the
-standard library, C backend, linker, and handler behavior:
-
-```bash
-set -euo pipefail
-KOKA_BIN=/tmp/gh-aw/agent/koka/bin/koka
-results=/tmp/gh-aw/agent/koka-results
-mkdir -p "$results"
-cd "$results"
-timeout 2m "$KOKA_BIN" --output="$results/smoke" smoke.kk
-timeout 30s "$results/smoke"
-```
-
-The expected output is `koka smoke: ok`, with exit status zero for both commands.
-Run from the model directory so Koka can resolve its generated main module and
-local imports; passing an absolute source path from an unrelated directory can
-fail during main-module generation. Keep generated `.koka` files in the results
-directory too.
-For an intentional negative control, save this as `unhandled.kk`; compilation
-must fail because a function declared total cannot leave `answer` unhandled:
-
-```koka
-effect fun answer() : int
-
-fun unhandled-answer() : int
-  answer()
-
-pub fun main()
-  println(unhandled-answer())
-```
-
-Run the same compiler against `unhandled.kk` with a separate output path and
-retain the diagnostic and nonzero status. A timeout or missing dependency is
-not the expected effect-checking failure. The repository's
-`koka-install-test.yml` job executes these examples directly from this guide
-on Ubuntu 24.04 x64; this smoke test is not a proof of a modeled system.
-
 ## Establish the model
 
 - Read the model README, `.tla` module, `.cfg` configuration, and evidence matrix
@@ -182,6 +129,10 @@ exit statuses, and complete logs. Distinguish successful type/effect checking
 from tested behavioral properties; compilation or passing tests alone do not
 prove temporal properties or exhaust all executions. A missing compiler,
 compile error, timeout, or unfinished run is never a pass.
+
+Run Koka from the model directory so it can resolve its generated main module
+and local imports; an absolute source path from an unrelated directory can fail
+during main-module generation.
 
 ## Preserve and report evidence
 
