@@ -29,7 +29,9 @@ timeout-minutes: 60
 engine:
   id: codex
   model-provider: openai
-model: openai/gpt-6-astra
+  model-routing:
+    goal: cost
+    mode: economy
 strict: true
 imports:
   - uses: shared/daily-audit-base.md

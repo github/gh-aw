@@ -9,10 +9,12 @@ permissions:
   discussions: read
   issues: read
   pull-requests: read
-model: openai/gpt-6.1-sol
 engine:
   id: codex
   model-provider: openai
+  model-routing:
+    goal: cost
+    mode: economy
 max-ai-credits: 1500
 tools:
   cli-proxy: true
