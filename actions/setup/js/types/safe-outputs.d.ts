@@ -23,6 +23,27 @@ interface BaseSafeOutputItem {
   integrity?: string;
 }
 
+type IssueArtifactType = "generic" | "link" | "plan" | "embedded_html";
+
+interface IssueArtifactInput {
+  /** Artifact format; defaults to "generic" when omitted. */
+  type?: IssueArtifactType;
+  name: string;
+  body: string;
+}
+
+interface IssueArtifact extends IssueArtifactInput {
+  /** Validated artifact format with the default applied. */
+  type: IssueArtifactType;
+}
+
+interface CreatedIssueArtifact {
+  /** Per-issue artifact number returned by GitHub. */
+  number: number;
+  /** Artifact page URL, when returned by GitHub. */
+  url: string | undefined;
+}
+
 /**
  * JSONL item for creating a GitHub issue
  */
@@ -32,6 +53,8 @@ interface CreateIssueItem extends BaseSafeOutputItem {
   title: string;
   /** Issue body content */
   body: string;
+  /** Optional artifacts to attach after creating the issue. */
+  artifacts?: IssueArtifactInput[];
   /** Optional labels to add to the issue */
   labels?: string[];
   /** Optional issue fields to set after creating the issue */
@@ -567,6 +590,10 @@ interface SafeOutputItems {
 export {
   // JSONL item types
   BaseSafeOutputItem,
+  IssueArtifactType,
+  IssueArtifactInput,
+  IssueArtifact,
+  CreatedIssueArtifact,
   CreateIssueItem,
   CreateDiscussionItem,
   UpdateDiscussionItem,

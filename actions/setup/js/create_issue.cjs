@@ -44,14 +44,19 @@ const TITLE_DEDUP_MIN_SEARCH_RATE_LIMIT_FRACTION = 0.2;
 /**
  * @typedef {NonNullable<Parameters<typeof github.rest.issues.create>[0]>} IssueParameters
  * @typedef {Awaited<ReturnType<typeof github.rest.issues.create>>["data"]} Issue
+ * @typedef {import("./types/safe-outputs").IssueArtifactInput} IssueArtifactInput
+ * @typedef {import("./types/safe-outputs").IssueArtifact} IssueArtifact
+ * @typedef {import("./types/safe-outputs").CreatedIssueArtifact} CreatedIssueArtifact
+ * @typedef {Omit<IssueParameters, "owner" | "repo" | "title" | "body"> & {owner?: string, repo?: string, title: string, body: string, artifacts?: IssueArtifactInput[]}} CreateIssueParameters
+ * @typedef {{staged: false, issue: Issue, artifacts?: CreatedIssueArtifact[]} | {staged: true, preview: IssueParameters & {artifacts?: IssueArtifact[]}}} CreateIssueResult
  */
 
 /**
  * Create an attributed issue from a custom safe-output job.
  * Call setupGlobals before using this API. Title and body must be trusted or
  * sanitized by the custom job; this helper does not enforce agent tool policies.
- * @param {Omit<IssueParameters, "owner" | "repo" | "title" | "body"> & {owner?: string, repo?: string, title: string, body: string, artifacts?: Array<{type?: "generic" | "link" | "plan" | "embedded_html", name: string, body: string}>}} parameters
- * @returns {Promise<{staged: false, issue: Issue, artifacts?: Array<{number: number, url: string | undefined}>} | {staged: true, preview: IssueParameters & {artifacts?: import("./issue_artifacts.cjs").IssueArtifact[]}}>}
+ * @param {CreateIssueParameters} parameters
+ * @returns {Promise<CreateIssueResult>}
  */
 async function createIssue(parameters) {
   if (typeof github === "undefined" || typeof context === "undefined" || typeof core === "undefined") {
@@ -984,6 +989,7 @@ async function main(config = {}) {
       .filter((assignee, index, arr) => arr.indexOf(assignee) === index);
 
     let issueFields;
+    /** @type {IssueArtifact[]} */
     let artifacts;
     let preparedIssueFieldsInput = [];
     try {
@@ -1319,6 +1325,7 @@ async function main(config = {}) {
       temporaryIdMap.set(normalizedTempId, { repo: qualifiedItemRepo, number: issue.number });
       core.info(`Stored temporary ID mapping: ${temporaryId} -> ${qualifiedItemRepo}#${issue.number}`);
 
+      /** @type {CreatedIssueArtifact[]} */
       let createdArtifacts;
       try {
         const resolvedArtifacts = artifacts.map(artifact => ({ ...artifact, body: replaceTemporaryIdReferences(artifact.body, temporaryIdMap, qualifiedItemRepo) }));

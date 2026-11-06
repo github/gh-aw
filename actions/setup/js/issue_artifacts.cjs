@@ -10,7 +10,8 @@ const { sanitizeTitle } = require("./sanitize_title.cjs");
 const DEFAULT_MAX_ISSUE_ARTIFACT_SIZE = 1024 * 1024;
 
 /**
- * @typedef {{type: "generic" | "link" | "plan" | "embedded_html", name: string, body: string}} IssueArtifact
+ * @typedef {import("./types/safe-outputs").IssueArtifact} IssueArtifact
+ * @typedef {import("./types/safe-outputs").CreatedIssueArtifact} CreatedIssueArtifact
  */
 
 /**
@@ -28,7 +29,9 @@ function normalizeIssueArtifacts(value, maxArtifacts = 10, maxSizeBytes = DEFAUL
   if (value.length > Math.max(0, maxArtifacts)) {
     throw new Error(maxArtifacts <= 0 ? `${ERR_VALIDATION}: Issue artifacts are disabled by max-issue-artifacts; omit artifacts` : `${ERR_VALIDATION}: create_issue artifacts exceeds max-issue-artifacts limit of ${maxArtifacts} per issue`);
   }
-  return value.map((artifact, index) => {
+  /** @type {unknown[]} */
+  const artifacts = value;
+  return artifacts.map((artifact, index) => {
     const field = `create_issue artifacts[${index}]`;
     if (!artifact || typeof artifact !== "object" || Array.isArray(artifact)) {
       throw new Error(`${ERR_VALIDATION}: ${field} must be an object`);
@@ -36,19 +39,35 @@ function normalizeIssueArtifacts(value, maxArtifacts = 10, maxSizeBytes = DEFAUL
     if (Object.keys(artifact).some(key => !["type", "name", "body"].includes(key))) {
       throw new Error(`${ERR_VALIDATION}: ${field} accepts only type, name, and body`);
     }
-    const type = artifact.type === undefined ? "generic" : artifact.type;
+    const type = !("type" in artifact) || artifact.type === undefined ? "generic" : artifact.type;
     if (type !== "generic" && type !== "link" && type !== "plan" && type !== "embedded_html") {
       throw new Error(`${ERR_VALIDATION}: ${field}.type must be generic, link, plan, or embedded_html`);
     }
-    if (typeof artifact.name !== "string" || !artifact.name.trim()) {
+    if (!("name" in artifact) || typeof artifact.name !== "string" || !artifact.name.trim()) {
       throw new Error(`${ERR_VALIDATION}: ${field}.name must be a non-empty string`);
     }
-    if (typeof artifact.body !== "string" || !artifact.body.trim()) {
+    if (!("body" in artifact) || typeof artifact.body !== "string" || !artifact.body.trim()) {
       throw new Error(`${ERR_VALIDATION}: ${field}.body must be a non-empty string`);
     }
     validateIssueArtifactBodySize(artifact.body, maxSizeBytes, `${field}.body`);
     return { type, name: artifact.name.trim(), body: artifact.body };
   });
+}
+
+/**
+ * @param {unknown} value
+ * @returns {CreatedIssueArtifact}
+ */
+function normalizeCreatedIssueArtifact(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${ERR_API}: Invalid issue artifact API response; expected an object`);
+  }
+  const number = "number" in value ? value.number : undefined;
+  const url = "html_url" in value ? value.html_url : undefined;
+  if (typeof number !== "number" || !Number.isSafeInteger(number) || number <= 0 || (url !== undefined && typeof url !== "string")) {
+    throw new Error(`${ERR_API}: Invalid issue artifact API response; expected a positive integer number and an optional string html_url`);
+  }
+  return { number, url };
 }
 
 /**
@@ -97,9 +116,10 @@ function sanitizeIssueArtifacts(artifacts, options) {
  * @param {number} issueNumber
  * @param {IssueArtifact[]} artifacts
  * @param {number} [maxSizeBytes=1048576]
- * @returns {Promise<Array<{number: number, url: string | undefined}>>}
+ * @returns {Promise<CreatedIssueArtifact[]>}
  */
 async function createIssueArtifacts(githubClient, owner, repo, issueNumber, artifacts, maxSizeBytes = DEFAULT_MAX_ISSUE_ARTIFACT_SIZE) {
+  /** @type {CreatedIssueArtifact[]} */
   const created = [];
   for (const artifact of artifacts) {
     try {
@@ -116,7 +136,7 @@ async function createIssueArtifacts(githubClient, owner, repo, issueNumber, arti
         RATE_LIMIT_RETRY_CONFIG,
         `create issue artifact on ${owner}/${repo}#${issueNumber}`
       );
-      created.push({ number: data.number, url: data.html_url });
+      created.push(normalizeCreatedIssueArtifact(data));
     } catch (error) {
       throw new Error(`${ERR_API}: Issue ${owner}/${repo}#${issueNumber} was created, but artifact "${artifact.name}" could not be attached (${created.length}/${artifacts.length} attached): ${getErrorMessage(error)}`, { cause: error });
     }

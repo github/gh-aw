@@ -311,6 +311,8 @@ The helper adds the standard generated-by footer, workflow-run and history links
 
 `parameters.artifacts` accepts the [issue artifact array](/gh-aw/reference/safe-outputs/#issue-artifacts), with a maximum of 10 artifacts per issue and 1048576 UTF-8 bytes (1 MB) per artifact body. Artifacts are validated before issue creation and attached afterward using the same client and repository. The custom job must sanitize their names and content. Live results include `artifacts: [{ number, url }]` when attachments were created; staged previews include the artifact requests without writing them. An attachment failure throws an error identifying the already-created issue and how many artifacts were attached. The built-in `create-issue` frontmatter limit does not configure custom jobs.
 
+The helper's JSDoc types are `CreateIssueParameters` and `CreateIssueResult`. Shared artifact types distinguish `IssueArtifactInput` (optional format), normalized `IssueArtifact` (required format), and `CreatedIssueArtifact` (numeric `number` and a `url` that may be undefined). Narrow results on `staged` to access either normalized preview artifacts or created artifact metadata.
+
 This is a posting helper, not the built-in `create-issue` policy handler. The custom job remains responsible for validating and sanitizing agent-controlled content, enforcing job-level output counts and allowed repositories, and supplying a token with appropriate permissions. Trusted custom metadata comments are preserved. The helper does not perform grouping, deduplication, expiration, assignment to agents, or manifest artifact upload.
 
 ### Job Properties

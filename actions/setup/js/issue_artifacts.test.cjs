@@ -91,6 +91,26 @@ describe("create_issue artifacts", () => {
     expect(normalizeIssueArtifacts([{ name: "Notes", body: "x".repeat(1048576) }])[0].body).toHaveLength(1048576);
   });
 
+  it.each([null, [], {}, { number: "1" }, { number: 0 }, { number: 1.5 }, { number: Number.MAX_SAFE_INTEGER + 1 }, { number: 1, html_url: 42 }])("rejects malformed API artifact metadata: %j", async data => {
+    client.request.mockResolvedValue({ data });
+    const handler = await main({});
+    const result = await handler({ ...message, artifacts: [{ name: "Notes", body: "Details" }] }, {});
+    expect(result.success).toBe(false);
+    expect(result.number).toBe(issue.number);
+    expect(result.url).toBe(issue.html_url);
+    expect(result.error).toContain("Invalid issue artifact API response");
+    expect(result.error).toContain("0/1 attached");
+    expect(client.rest.issues.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("accepts API artifact metadata without an optional URL", async () => {
+    client.request.mockResolvedValue({ data: { number: 1 } });
+    const handler = await main({});
+    const result = await handler({ ...message, artifacts: [{ name: "Notes", body: "Details" }] }, {});
+    expect(result.success).toBe(true);
+    expect(result.artifacts).toEqual([{ number: 1, url: undefined }]);
+  });
+
   it("publishes a 1 MB artifact without the previous half-megabyte truncation", async () => {
     const body = "x".repeat(1048576);
     const handler = await main({});
