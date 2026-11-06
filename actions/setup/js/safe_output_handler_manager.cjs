@@ -1517,7 +1517,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
     core.info(`\n=== Retrying Deferred Messages ===`);
     core.info(`Found ${deferredMessages.length} deferred message(s) to retry`);
 
-    let pending = [...deferredMessages];
+    let pending = deferredMessages.filter(deferred => results.some(result => result.messageIndex === deferred.messageIndex && result.deferred));
     for (let round = 0; pending.length > 0 && round <= messages.length; round++) {
       const roundStartTemporaryIdCount = temporaryIdMap.size;
       const attempted = new Set(pending.map(deferred => deferred.messageIndex));
@@ -1657,7 +1657,15 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
   }
 
   await retryDeferredMessages();
-  if (finalizeBufferedOutputs) await finalizeBufferedOutputs(results);
+  if (finalizeBufferedOutputs) {
+    let previousResultCount;
+    do {
+      await finalizeBufferedOutputs(results);
+      previousResultCount = results.length;
+      await drainWaitingMessages();
+      await retryDeferredMessages();
+    } while (results.length > previousResultCount);
+  }
   for (const i of waitingMessages) {
     await processMessage(i, false);
   }
@@ -2294,7 +2302,7 @@ async function main(options = {}) {
     // Finalize buffered PR reviews before releasing their dependent outputs.
     /** @param {Array<any>} results */
     async function finalizeBufferedReviews(results) {
-      const registryEntries = prReviewBufferRegistry.getAllEntries();
+      const registryEntries = prReviewBufferRegistry.drainEntries();
       for (const { repo: reviewRepo, prNumber: reviewPrNum, buffer: reviewBuffer } of registryEntries) {
         if (reviewBuffer.hasBufferedComments() || reviewBuffer.hasReviewMetadata()) {
           core.info(`\n=== Finalizing PR Review for ${reviewRepo}#${reviewPrNum} ===`);

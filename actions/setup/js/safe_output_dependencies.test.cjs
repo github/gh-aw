@@ -178,6 +178,7 @@ describe("safe-output runtime dependencies", () => {
       return { success: true };
     });
     const finalize = vi.fn(async results => {
+      if (!results.some(result => result.result?.deferred_manifest)) return;
       calls.push("submit");
       expect(check).not.toHaveBeenCalled();
       finalizeBufferedReviewOutcomes(results, "owner/repo", 42, {
@@ -198,7 +199,7 @@ describe("safe-output runtime dependencies", () => {
       finalize
     );
     expect(calls).toEqual(["buffer", "submit", "check", "comment"]);
-    expect(finalize).toHaveBeenCalledOnce();
+    expect(finalize).toHaveBeenCalled();
     expect(result.results.every(item => item.success)).toBe(true);
     expect(result.results[0].result.deferred_manifest).toBe(false);
   });
@@ -214,6 +215,25 @@ describe("safe-output runtime dependencies", () => {
     });
     const result = await processMessages(new Map([["add_comment", handler]]), [message(3, id(2)), message(2, id(1)), message(1)]);
     expect(calls).toEqual([id(1), id(1), id(2), id(2), id(3)]);
+    expect(result.results.every(item => item.success)).toBe(true);
+  });
+
+  it("retries deferred dependents after review publication without replaying completed retries", async () => {
+    const calls = [];
+    const attempts = new Map();
+    const handler = vi.fn(async msg => {
+      calls.push(msg.output_id);
+      const count = attempts.get(msg.output_id) || 0;
+      attempts.set(msg.output_id, count + 1);
+      if (msg.output_id === id(2)) return { success: true, deferred_manifest: true };
+      return count === 0 && msg.output_id !== id(4) ? { deferred: true } : { success: true };
+    });
+    const result = await processMessages(new Map([["add_comment", handler]]), [message(1), message(2, id(1)), message(3, id(2)), message(4, id(3))], null, async results => {
+      for (const record of results) {
+        if (record.result?.deferred_manifest) record.result.deferred_manifest = false;
+      }
+    });
+    expect(calls).toEqual([id(1), id(1), id(2), id(3), id(3), id(4)]);
     expect(result.results.every(item => item.success)).toBe(true);
   });
 

@@ -89,6 +89,7 @@ prerequisites. Inline comments and the review body are buffered and submitted
 together at the end of message processing, before dependent outputs run.
 Buffering alone does not confirm success: dependents wait for submission and
 run only if their prerequisite was actually published.
+Review comments released by a dependency are submitted in a subsequent batch.
 
 Dependencies apply within a single safe-output processing pass (and within the
 same Claim in queue workflows). Custom safe jobs, `call_workflow`,

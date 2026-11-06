@@ -82,6 +82,19 @@ describe("createPrReviewBufferRegistry", () => {
     expect(entries.map(e => e.prNumber)).toEqual([3, 1, 2]);
   });
 
+  it("drains each batch once and creates a fresh buffer for the same PR", () => {
+    const registry = createPrReviewBufferRegistry();
+    const buffer = registry.getOrCreate("o/r", 1);
+    buffer.setReviewMetadata("First batch", "APPROVE");
+    expect(registry.drainEntries()).toEqual([{ repo: "o/r", prNumber: 1, buffer }]);
+    expect(registry.drainEntries()).toEqual([]);
+    expect(registry.hasAnyContent()).toBe(false);
+    const next = registry.getOrCreate("o/r", 1);
+    expect(next).not.toBe(buffer);
+    expect(next.hasReviewMetadata()).toBe(false);
+    expect(next.hasBufferedComments()).toBe(false);
+  });
+
   it("hasAnyContent returns false when all buffers are empty", () => {
     const registry = createPrReviewBufferRegistry();
     registry.getOrCreate("o/r", 1);

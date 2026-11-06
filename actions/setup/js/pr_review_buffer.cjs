@@ -946,6 +946,15 @@ function createPrReviewBufferRegistry() {
   }
 
   /**
+   * Consume the current batch so dependent outputs can buffer a fresh review.
+   * @returns {{repo: string, prNumber: number, buffer: Object}[]}
+   */
+  function drainEntries() {
+    bufferMap.clear();
+    return insertionOrder.splice(0);
+  }
+
+  /**
    * Returns true if any buffer has buffered comments or review metadata.
    * @returns {boolean}
    */
@@ -983,6 +992,7 @@ function createPrReviewBufferRegistry() {
   return {
     getOrCreate,
     getAllEntries,
+    drainEntries,
     hasAnyContent,
     setDefaultFooterMode,
     setDefaultFooterContext,
