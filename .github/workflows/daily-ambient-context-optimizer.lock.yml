@@ -834,7 +834,7 @@ jobs:
         env:
           GH_AW_FILE_ROOT: "${{ runner.temp }}/gh-aw"
           GH_AW_FILE_CONFIG: "{\"files\":[{\"path\":\"safeoutputs/config.json\",\"content_env\":\"GH_AW_SAFE_OUTPUTS_CONFIG\"}]}"
-          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_issue\":{\"close_older_issues\":true,\"expires\":168,\"labels\":[\"automation\",\"report\",\"workflow-optimization\",\"analysis\"],\"max\":3,\"title_prefix\":\"[ambient-context] \"},\"create_report_incomplete_issue\":{},\"mentions\":{\"enabled\":false},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_issue\":{\"close_older_issues\":true,\"expires\":168,\"labels\":[\"automation\",\"report\",\"workflow-optimization\",\"analysis\"],\"max\":3,\"max_issue_artifacts\":10,\"title_prefix\":\"[ambient-context] \"},\"create_report_incomplete_issue\":{},\"mentions\":{\"enabled\":false},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
         with:
           script: |
             const path = require('path');
@@ -848,7 +848,7 @@ jobs:
           GH_AW_TOOLS_META_JSON: |
             {
               "description_suffixes": {
-                "create_issue": " CONSTRAINTS: Maximum 3 issue(s) can be created. Title will be prefixed with \"[ambient-context] \". Labels [\"automation\" \"report\" \"workflow-optimization\" \"analysis\"] will be automatically added."
+                "create_issue": " CONSTRAINTS: Maximum 3 issue(s) can be created. Title will be prefixed with \"[ambient-context] \". Labels [\"automation\" \"report\" \"workflow-optimization\" \"analysis\"] will be automatically added. Maximum 10 artifact(s) can be attached per issue."
               },
               "repo_params": {},
               "dynamic_tools": []
@@ -2762,7 +2762,7 @@ jobs:
           GH_AW_ALLOWED_DOMAINS: "*.githubusercontent.com,*.grafana.net,*.sentry.io,archive.ubuntu.com,azure.archive.ubuntu.com,codeload.github.com,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,docs.github.com,github-cloud.githubusercontent.com,github-cloud.s3.amazonaws.com,github.blog,github.com,github.githubassets.com,json-schema.org,json.schemastore.org,keyserver.ubuntu.com,lfs.github.com,objects.githubusercontent.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,patch-diff.githubusercontent.com,patchdiff.githubusercontent.com,raw.githubusercontent.com,s.symcb.com,s.symcd.com,security.ubuntu.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com"
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"close_older_issues\":true,\"expires\":168,\"labels\":[\"automation\",\"report\",\"workflow-optimization\",\"analysis\"],\"max\":3,\"title_prefix\":\"[ambient-context] \"},\"create_report_incomplete_issue\":{},\"mentions\":{\"enabled\":false},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"close_older_issues\":true,\"expires\":168,\"labels\":[\"automation\",\"report\",\"workflow-optimization\",\"analysis\"],\"max\":3,\"max_issue_artifacts\":10,\"title_prefix\":\"[ambient-context] \"},\"create_report_incomplete_issue\":{},\"mentions\":{\"enabled\":false},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
           GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}

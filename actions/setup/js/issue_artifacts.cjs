@@ -15,11 +15,16 @@ const { sanitizeTitle } = require("./sanitize_title.cjs");
 /**
  * Validate all artifacts before creating their issue.
  * @param {unknown} value
+ * @param {number} [maxArtifacts=10] - Per-issue limit; non-positive values disable artifacts.
  * @returns {IssueArtifact[]}
  */
-function normalizeIssueArtifacts(value) {
+function normalizeIssueArtifacts(value, maxArtifacts = 10) {
+  if (!Number.isSafeInteger(maxArtifacts)) throw new Error(`${ERR_VALIDATION}: max-issue-artifacts must be an integer`);
   if (value === undefined) return [];
   if (!Array.isArray(value)) throw new Error(`${ERR_VALIDATION}: create_issue 'artifacts' must be an array`);
+  if (value.length > Math.max(0, maxArtifacts)) {
+    throw new Error(maxArtifacts <= 0 ? `${ERR_VALIDATION}: Issue artifacts are disabled by max-issue-artifacts; omit artifacts` : `${ERR_VALIDATION}: create_issue artifacts exceeds max-issue-artifacts limit of ${maxArtifacts} per issue`);
+  }
   return value.map((artifact, index) => {
     const field = `create_issue artifacts[${index}]`;
     if (!artifact || typeof artifact !== "object" || Array.isArray(artifact)) {

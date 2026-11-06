@@ -720,7 +720,7 @@ jobs:
         env:
           GH_AW_FILE_ROOT: "${{ runner.temp }}/gh-aw"
           GH_AW_FILE_CONFIG: "{\"files\":[{\"path\":\"safeoutputs/config.json\",\"content_env\":\"GH_AW_SAFE_OUTPUTS_CONFIG\"}]}"
-          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_issue\":{\"close_older_issues\":true,\"close_older_key\":\"daily-max-ai-credits-test\",\"expires\":24,\"labels\":[\"automation\",\"testing\"],\"max\":1},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"true\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_issue\":{\"close_older_issues\":true,\"close_older_key\":\"daily-max-ai-credits-test\",\"expires\":24,\"labels\":[\"automation\",\"testing\"],\"max\":1,\"max_issue_artifacts\":10},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"true\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
         with:
           script: |
             const path = require('path');
@@ -734,7 +734,7 @@ jobs:
           GH_AW_TOOLS_META_JSON: |
             {
               "description_suffixes": {
-                "create_issue": " CONSTRAINTS: Maximum 1 issue(s) can be created. Labels [\"automation\" \"testing\"] will be automatically added."
+                "create_issue": " CONSTRAINTS: Maximum 1 issue(s) can be created. Labels [\"automation\" \"testing\"] will be automatically added. Maximum 10 artifact(s) can be attached per issue."
               },
               "repo_params": {},
               "dynamic_tools": []
@@ -2291,7 +2291,7 @@ jobs:
           GH_AW_MENTIONS_GITHUB_TOKEN: ${{ github.token }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"close_older_issues\":true,\"close_older_key\":\"daily-max-ai-credits-test\",\"expires\":24,\"labels\":[\"automation\",\"testing\"],\"max\":1},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"true\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"close_older_issues\":true,\"close_older_key\":\"daily-max-ai-credits-test\",\"expires\":24,\"labels\":[\"automation\",\"testing\"],\"max\":1,\"max_issue_artifacts\":10},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"true\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
           GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}

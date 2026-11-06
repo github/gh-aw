@@ -987,7 +987,7 @@ async function main(config = {}) {
     let artifacts;
     let preparedIssueFieldsInput = [];
     try {
-      artifacts = sanitizeIssueArtifacts(normalizeIssueArtifacts(message.artifacts), { allowedAliases: allowedMentionAliases, maxMentions });
+      artifacts = sanitizeIssueArtifacts(normalizeIssueArtifacts(message.artifacts, config.max_issue_artifacts), { allowedAliases: allowedMentionAliases, maxMentions });
       artifacts = artifacts.map(artifact => ({ ...artifact, body: replaceTemporaryIdReferences(artifact.body, temporaryIdMap, qualifiedItemRepo) }));
       issueFields = normalizeIssueFields(message.fields);
       validateAllowedIssueFields(issueFields, allowedIssueFields);

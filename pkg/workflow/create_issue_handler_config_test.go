@@ -4,6 +4,7 @@ package workflow
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,6 +29,7 @@ safe-outputs:
     max: 1
     labels: [test-label]
     allowed-fields: [Priority, Iteration]
+    max-issue-artifacts: 3
     title-prefix: "[Test] "
     assignees: [user1, user2]
 ---
@@ -99,12 +101,16 @@ Create an issue with title "Test" and body "Test body".
 	if max, ok := createIssueConfig["max"].(float64); !ok || max != 1 {
 		t.Errorf("Expected max=1 in create_issue config, got: %v", createIssueConfig["max"])
 	}
+	if max, ok := createIssueConfig["max_issue_artifacts"].(float64); !ok || max != 3 {
+		t.Errorf("Expected max_issue_artifacts=3, got: %v", createIssueConfig["max_issue_artifacts"])
+	}
 
 	// Verify labels are present
 	labels, ok := createIssueConfig["labels"].([]any)
 	if !ok {
 		t.Fatal("Expected labels array in create_issue config")
 	}
+
 	if len(labels) != 1 || labels[0] != "test-label" {
 		t.Errorf("Expected labels=[test-label] in create_issue config, got: %v", labels)
 	}
@@ -133,6 +139,47 @@ Create an issue with title "Test" and body "Test body".
 	}
 	if assignees[0] != "user1" || assignees[1] != "user2" {
 		t.Errorf("Expected assignees=[user1, user2] in create_issue config, got: %v", assignees)
+	}
+}
+
+func TestCreateIssueArtifactLimit(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		config string
+		want   int
+	}{
+		{"default", "", 10},
+		{"positive", "max-issue-artifacts: 2", 2},
+		{"zero", "max-issue-artifacts: 0", 0},
+		{"negative", "max-issue-artifacts: -2", -2},
+		{"alias", "max-isssue-artifacts: 4", 4},
+		{"canonical-precedence", "max-issue-artifacts: 3\n    max-isssue-artifacts: 4", 3},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := testutil.TempDir(t, "artifact-limit")
+			path := filepath.Join(dir, "limit.md")
+			source := fmt.Sprintf("---\non: workflow_dispatch\nengine: copilot\npermissions:\n  contents: read\nsafe-outputs:\n  create-issue:\n    max: 1\n    %s\n---\nCreate an issue with an artifact.\n", tc.config)
+			if err := os.WriteFile(path, []byte(source), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := NewCompiler().CompileWorkflow(path); err != nil {
+				t.Fatal(err)
+			}
+			content, err := os.ReadFile(filepath.Join(dir, "limit.lock.yml"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(strings.ReplaceAll(string(content), `\"`, `"`), fmt.Sprintf(`"max_issue_artifacts":%d`, tc.want)) {
+				t.Errorf("Compiled handler config does not contain max_issue_artifacts=%d", tc.want)
+			}
+			constraint := "Issue artifacts are disabled; omit artifacts."
+			if tc.want > 0 {
+				constraint = fmt.Sprintf("Maximum %d artifact(s) can be attached per issue.", tc.want)
+			}
+			if !strings.Contains(string(content), constraint) {
+				t.Errorf("Compiled tool description does not contain %q", constraint)
+			}
+		})
 	}
 }
 

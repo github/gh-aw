@@ -146,6 +146,38 @@ func TestValidateMainWorkflowFrontmatter_MaxToolCalls(t *testing.T) {
 	}
 }
 
+func TestValidateMainWorkflowFrontmatter_MaxIssueArtifacts(t *testing.T) {
+	for _, key := range []string{"max-issue-artifacts", "max-isssue-artifacts"} {
+		t.Run(key, func(t *testing.T) {
+			for _, test := range []struct {
+				name    string
+				value   any
+				wantErr bool
+			}{
+				{"positive", 3, false},
+				{"zero", 0, false},
+				{"negative", -3, false},
+				{"fraction", 1.5, true},
+				{"string", "3", true},
+				{"boolean", false, true},
+				{"expression", "${{ inputs.max }}", true},
+			} {
+				t.Run(test.name, func(t *testing.T) {
+					err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
+						"on": "workflow_dispatch",
+						"safe-outputs": map[string]any{
+							"create-issue": map[string]any{key: test.value},
+						},
+					}, "workflow.md")
+					if (err != nil) != test.wantErr {
+						t.Fatalf("validation error = %v, wantErr %t", err, test.wantErr)
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestValidateMainWorkflowFrontmatter_DockerImagePullPolicy(t *testing.T) {
 	for _, tt := range []struct {
 		policy  any

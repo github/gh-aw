@@ -91,6 +91,65 @@ describe("create_issue artifacts", () => {
     expect(normalizeIssueArtifacts([{ name: "Notes", body: "x".repeat(524288) }])[0].body).toHaveLength(524288);
   });
 
+  it("enforces the default cap of 10 before creating an issue", async () => {
+    const artifacts = Array.from({ length: 11 }, () => ({ name: "Notes", body: "Research notes" }));
+    const handler = await main({});
+    const result = await handler({ ...message, artifacts }, {});
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("limit of 10 per issue");
+    expect(client.rest.issues.create).not.toHaveBeenCalled();
+    expect(client.request).not.toHaveBeenCalled();
+  });
+
+  it("allows the exact configured cap separately for each issue", async () => {
+    const handler = await main({ max: 2, max_issue_artifacts: 2 });
+    const artifacts = Array.from({ length: 2 }, () => ({ name: "Notes", body: "Research notes" }));
+    expect((await handler({ ...message, artifacts }, {})).success).toBe(true);
+    expect((await handler({ ...message, title: "Another issue", artifacts }, {})).success).toBe(true);
+    expect(client.rest.issues.create).toHaveBeenCalledTimes(2);
+    expect(client.request).toHaveBeenCalledTimes(4);
+  });
+
+  it.each([false, true])("rejects above the configured cap before writes (staged: %s)", async staged => {
+    const handler = await main({ staged, max_issue_artifacts: 1 });
+    const artifacts = [
+      { name: "First", body: "First notes" },
+      { name: "Second", body: "Second notes" },
+    ];
+    const result = await handler({ ...message, artifacts }, {});
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("limit of 1 per issue");
+    expect(client.rest.issues.create).not.toHaveBeenCalled();
+    expect(client.request).not.toHaveBeenCalled();
+  });
+
+  it.each([0, -1, -20])("disables attachments for max_issue_artifacts=%s but allows ordinary issues", async max_issue_artifacts => {
+    const handler = await main({ max_issue_artifacts });
+    const rejected = await handler({ ...message, artifacts: [{ name: "Notes", body: "Research notes" }] }, {});
+    expect(rejected.success).toBe(false);
+    expect(rejected.error).toContain("Issue artifacts are disabled");
+    expect(client.rest.issues.create).not.toHaveBeenCalled();
+    expect(client.request).not.toHaveBeenCalled();
+    expect((await handler({ ...message, artifacts: [] }, {})).success).toBe(true);
+  });
+
+  it("rejects a malformed configured cap explicitly", async () => {
+    const handler = await main({ max_issue_artifacts: 1.5 });
+    const result = await handler(message, {});
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("must be an integer");
+    expect(client.rest.issues.create).not.toHaveBeenCalled();
+  });
+
+  it.each([0, -1])("rejects disabled attachments in staged mode for cap %s", async max_issue_artifacts => {
+    const handler = await main({ staged: true, max_issue_artifacts });
+    const result = await handler({ ...message, artifacts: [{ name: "Notes", body: "Research notes" }] }, {});
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("Issue artifacts are disabled");
+    expect(client.rest.issues.create).not.toHaveBeenCalled();
+    expect(client.request).not.toHaveBeenCalled();
+  });
+
   it("resolves references to previously created issues in artifact content", async () => {
     const handler = await main({});
     await handler({ ...message, artifacts: [{ name: "Notes", body: "See #aw_other for context" }] }, { aw_other: { repo: "test-owner/test-repo", number: 99 } });
