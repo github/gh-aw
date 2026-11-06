@@ -146,7 +146,7 @@ async function maintenance(options = {}) {
   }
   log.diagnostic("maintenance.projection.complete", { pending: pending.length });
   if (unresolved) throw reconciliationError("work_queue_maintenance_reconciliation_unresolved");
-  if (pending.length && !options.deferIssueFailure) throw reconciliationError("work_queue_issue_synchronization_pending; queue transitions are committed; recover exact requests with work-queue sync-issues --request-id");
+  if (pending.length && !options.deferIssueWarning) configured.core?.warning("Work queue transitions are committed; Issue synchronization remains pending. Recover the exact terminal requests with work-queue sync-issues --request-id.");
   return { ...result, issue_sync_pending: pending };
 }
 
