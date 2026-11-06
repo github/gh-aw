@@ -19,6 +19,7 @@ network:
 imports:
 - shared/reporting.md
 - shared/otlp.md
+- shared/go-node-setup.md
 safe-outputs:
   steer: true
   create-pull-request:
@@ -132,17 +133,6 @@ steps:
     fi
     echo "{\"should_run\": \"$should_run\", \"current_sha\": \"$current_sha\", \"last_sha\": \"$last_sha\", \"manifest\": \"$out_dir/manifest.json\", \"new_files\": \"$new_files\"}" > "$out_dir/preflight.json"
     echo "should_run=$should_run" >> "$GITHUB_OUTPUT"
-- name: Setup Node.js
-  uses: actions/setup-node@v7.1.0
-  with:
-    cache: npm
-    cache-dependency-path: actions/setup/js/package-lock.json
-    node-version: "24"
-- name: Setup Go
-  uses: actions/setup-go@v7.0.0
-  with:
-    cache: true
-    go-version-file: go.mod
 - name: Install npm dependencies
   run: npm ci
   working-directory: ./actions/setup/js

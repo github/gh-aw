@@ -30,6 +30,7 @@
 #     - shared/activation-app.md
 #     - shared/reporting.md
 #     - shared/daily-issue-base.md
+#     - shared/go-node-setup.md
 #     - shared/mcp/serena.md
 #     - shared/mcp/serena-go.md
 #     - shared/go-source-analysis.md
@@ -330,7 +331,7 @@ jobs:
         with:
           github-token: no-authentication
           script: |
-            const promptEnvironment = new Set(["GH_AW_ACTIONS_DIR","GH_AW_EXPERIMENTS_PROMPT_TIGHTENING_V1","GH_AW_EXPR_4696CF0D","GH_AW_EXPR_76DF9333","GH_AW_EXPR_77C1A4D2","GH_AW_EXPR_7C248226","GH_AW_EXPR_C19C384F","GH_AW_GITHUB_ACTOR","GH_AW_GITHUB_REPOSITORY","GH_AW_GITHUB_RUN_ID","GH_AW_GITHUB_WORKSPACE","GH_AW_PROMPT","GH_AW_PROMPT_CONFIG","GH_AW_PROMPT_CONTENT_0000","GH_AW_PROMPT_CONTENT_0001","GH_AW_PROMPT_CONTENT_0002","GH_AW_PROMPT_CONTENT_0003","GH_AW_PROMPT_CONTENT_0004","GH_AW_PROMPT_CONTENT_0005","GH_AW_PROMPT_CONTENT_0006","GH_AW_PROMPT_CONTENT_0007","GH_AW_PROMPT_CONTENT_0008","GH_AW_PROMPT_CONTENT_0009","GH_AW_PROMPT_CONTENT_0010","GH_AW_SAFE_OUTPUTS","GITHUB_ACTION","GITHUB_ACTOR","GITHUB_API_URL","GITHUB_EVENT_NAME","GITHUB_EVENT_PATH","GITHUB_GRAPHQL_URL","GITHUB_JOB","GITHUB_OUTPUT","GITHUB_REF","GITHUB_REPOSITORY","GITHUB_RUN_ATTEMPT","GITHUB_RUN_ID","GITHUB_RUN_NUMBER","GITHUB_SERVER_URL","GITHUB_SHA","GITHUB_STEP_SUMMARY","GITHUB_WORKFLOW","GITHUB_WORKSPACE","PATH","RUNNER_ARCH","RUNNER_OS","RUNNER_TEMP"]);
+            const promptEnvironment = new Set(["GH_AW_ACTIONS_DIR","GH_AW_EXPERIMENTS_PROMPT_TIGHTENING_V1","GH_AW_EXPR_4696CF0D","GH_AW_EXPR_76DF9333","GH_AW_EXPR_77C1A4D2","GH_AW_EXPR_7C248226","GH_AW_EXPR_C19C384F","GH_AW_GITHUB_ACTOR","GH_AW_GITHUB_REPOSITORY","GH_AW_GITHUB_RUN_ID","GH_AW_GITHUB_WORKSPACE","GH_AW_PROMPT","GH_AW_PROMPT_CONFIG","GH_AW_PROMPT_CONTENT_0000","GH_AW_PROMPT_CONTENT_0001","GH_AW_PROMPT_CONTENT_0002","GH_AW_PROMPT_CONTENT_0003","GH_AW_PROMPT_CONTENT_0004","GH_AW_PROMPT_CONTENT_0005","GH_AW_PROMPT_CONTENT_0006","GH_AW_PROMPT_CONTENT_0007","GH_AW_PROMPT_CONTENT_0008","GH_AW_PROMPT_CONTENT_0009","GH_AW_PROMPT_CONTENT_0010","GH_AW_PROMPT_CONTENT_0011","GH_AW_SAFE_OUTPUTS","GITHUB_ACTION","GITHUB_ACTOR","GITHUB_API_URL","GITHUB_EVENT_NAME","GITHUB_EVENT_PATH","GITHUB_GRAPHQL_URL","GITHUB_JOB","GITHUB_OUTPUT","GITHUB_REF","GITHUB_REPOSITORY","GITHUB_RUN_ATTEMPT","GITHUB_RUN_ID","GITHUB_RUN_NUMBER","GITHUB_SERVER_URL","GITHUB_SHA","GITHUB_STEP_SUMMARY","GITHUB_WORKFLOW","GITHUB_WORKSPACE","PATH","RUNNER_ARCH","RUNNER_OS","RUNNER_TEMP"]);
             for (const name of Object.keys(process.env)) {
               if (!promptEnvironment.has(name)) delete process.env[name];
             }
@@ -355,7 +356,7 @@ jobs:
           GH_AW_OTLP_LOGS_ENABLED: ""
           GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
-          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"cache_memory_prompt.md\"},{\"file\":\"safe_outputs_cli_only_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"github_mcp_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0006\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0007\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0008\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0009\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0010\"},{\"author_file\":\".github/workflows/go-fan.md\"}],\"system_item_count\":13,\"author_expressions\":{\"experiments.prompt_tightening_v1\":\"GH_AW_EXPERIMENTS_PROMPT_TIGHTENING_V1\",\"experiments.prompt_tightening_v1 == \\\"candidate\\\"\":\"GH_AW_EXPR_4696CF0D\",\"github.repository\":\"GH_AW_GITHUB_REPOSITORY\",\"github.run_id\":\"GH_AW_GITHUB_RUN_ID\",\"github.workspace\":\"GH_AW_GITHUB_WORKSPACE\"}}"
+          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"cache_memory_prompt.md\"},{\"file\":\"safe_outputs_cli_only_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"github_mcp_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0006\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0007\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0008\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0009\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0010\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0011\"},{\"author_file\":\".github/workflows/go-fan.md\"}],\"system_item_count\":13,\"author_expressions\":{\"experiments.prompt_tightening_v1\":\"GH_AW_EXPERIMENTS_PROMPT_TIGHTENING_V1\",\"experiments.prompt_tightening_v1 == \\\"candidate\\\"\":\"GH_AW_EXPR_4696CF0D\",\"github.repository\":\"GH_AW_GITHUB_REPOSITORY\",\"github.run_id\":\"GH_AW_GITHUB_RUN_ID\",\"github.workspace\":\"GH_AW_GITHUB_WORKSPACE\"}}"
           GH_AW_PROMPT_CONTENT_0000: |
             <system>
           GH_AW_PROMPT_CONTENT_0001: |
@@ -404,6 +405,8 @@ jobs:
           GH_AW_PROMPT_CONTENT_0009: |
             {{#runtime-import .github/workflows/shared/mcp/serena-go.md}}
           GH_AW_PROMPT_CONTENT_0010: |
+            {{#runtime-import .github/workflows/shared/go-node-setup.md}}
+          GH_AW_PROMPT_CONTENT_0011: |
             ## Serena Code Analysis
 
             Serena is enabled for **["go"]** in `__GH_AW_GITHUB_WORKSPACE__`. Start by calling `activate_project` with that workspace path, then prefer Serena semantic tools for symbol lookup, references, docs, diagnostics, and structured edits.
@@ -790,6 +793,18 @@ jobs:
           GH_AW_CACHE_DIR: /tmp/gh-aw/cache-memory
           GH_AW_MIN_INTEGRITY: none
         run: bash "${RUNNER_TEMP}/gh-aw/actions/setup_cache_memory_git.sh"
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          cache: npm
+          cache-dependency-path: actions/setup/js/package-lock.json
+          node-version: "24"
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          cache: true
+          go-version-file: go.mod
+
       - name: Configure Git credentials
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -853,15 +868,6 @@ jobs:
         env:
           GH_AW_SKILL_DIR: ".claude/skills"
         run: bash "${RUNNER_TEMP}/gh-aw/actions/restore_inline_skills.sh"
-      - name: Setup Node.js for Serena
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: "24"
-      - name: Setup Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          cache: true
-          go-version-file: go.mod
       - name: Expose Go to Serena container
         run: "set -euo pipefail\nunset GOROOT\ngo_root=\"$(GOTOOLCHAIN=local go env GOROOT)\"\ncase \"$go_root\" in\n  \"${RUNNER_TOOL_CACHE:?RUNNER_TOOL_CACHE must be set}\"/go/*) ;;\n  *)\n    echo \"Serena Go runtime is outside its read-only runner tool-cache mount; check actions/setup-go and RUNNER_TOOL_CACHE.\" >&2\n    exit 1\n    ;;\nesac\nif [ ! -x \"$go_root/bin/go\" ]; then\n  echo \"Serena Go runtime has no executable bin/go in the mounted toolchain.\" >&2\n  exit 1\nfi\nexport GOROOT=\"$go_root\"\ngopls_bin=\"$RUNNER_TOOL_CACHE/gopls/0.22.0/bin\"\nif ! CGO_ENABLED=0 GOTOOLCHAIN=local GOBIN=\"$gopls_bin\" \"$go_root/bin/go\" install golang.org/x/tools/gopls@v0.22.0; then\n  echo \"Serena Go preflight failed: could not install gopls v0.22.0 with the selected Go toolchain.\" >&2\n  exit 1\nfi\nif ! \"$gopls_bin/gopls\" version; then\n  echo \"Serena Go preflight failed: installed gopls cannot start.\" >&2\n  exit 1\nfi\nprintf 'GOROOT=%s\\n' \"$go_root\" >> \"$GITHUB_ENV\"\nprintf 'GH_AW_SERENA_GO_PATH=%s/bin:%s:%s\\n' \"$go_root\" \"$gopls_bin\" \"$PATH\" >> \"$GITHUB_ENV\"\n\"$go_root/bin/go\" version\n"
       - name: Check Serena Go semantic analysis

@@ -15,20 +15,12 @@
 #     - shared/mcp/serena-go.md
 
 imports:
+  - shared/go-node-setup.md
   - uses: ./serena.md
     with:
       languages: ["go"]
       path: '${{ env.GH_AW_SERENA_GO_PATH }}:\${PATH}'
 pre-agent-steps:
-  - name: Setup Node.js for Serena
-    uses: actions/setup-node@v7.1.0
-    with:
-      node-version: "24"
-  - name: Setup Go
-    uses: actions/setup-go@v7.0.0
-    with:
-      go-version-file: go.mod
-      cache: true
   - name: Expose Go to Serena container
     run: |
       set -euo pipefail
