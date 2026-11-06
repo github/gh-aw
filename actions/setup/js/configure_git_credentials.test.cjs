@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import fs from "fs";
-import os from "os";
 import path from "path";
 import { spawnSync } from "child_process";
 
@@ -8,7 +7,7 @@ import { spawnSync } from "child_process";
 const SCRIPT_PATH = path.join(__dirname, "..", "sh", "configure_git_credentials.sh");
 
 function createTempDir(prefix) {
-  return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  return fs.mkdtempSync(path.join(__dirname, prefix));
 }
 
 function removeDir(dir) {
@@ -113,10 +112,23 @@ describe("configure_git_credentials.sh repository identity", () => {
     expect(runScript(env, target).status).not.toBe(0);
   });
 
-  it("rejects a missing origin rather than creating one", () => {
+  it("skips a missing origin rather than creating one", () => {
     git("remote", "remove", "origin");
-    expect(runScript(env, target).status).not.toBe(0);
+    expect(runScript(env, target).status).toBe(0);
     expect(git("remote")).toBe("");
+  });
+
+  it.each([true, false])("skips a directory without its own checkout with authentication=%s", authenticate => {
+    fs.rmSync(path.join(target, ".git"), { recursive: true });
+    const result = runScript({ ...env, GITHUB_TOKEN: authenticate ? "test-token" : "" }, target);
+    expect(result.status, result.stderr).toBe(0);
+    expect(git("-C", env.GITHUB_WORKSPACE, "remote", "get-url", "origin")).toBe("https://github.com/owner/workflow.git");
+    expect(result.stderr).not.toContain("identity verified");
+  });
+
+  it("skips a workspace without its own checkout", () => {
+    const result = runScript(env, root);
+    expect(result.status, result.stderr).toBe(0);
   });
 
   it("checks identity even when no authentication token is present", () => {
@@ -129,13 +141,139 @@ describe("configure_git_credentials.sh repository identity", () => {
     expect(runScript({ ...env, GH_AW_GIT_REPOSITORY: "" }, target).status).not.toBe(0);
   });
 
+  it("rejects an empty explicit target even when the origin path is empty", () => {
+    git("remote", "set-url", "origin", "https://github.com/");
+    const result = runScript({ ...env, GH_AW_GIT_REPOSITORY: "" }, target);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("identity target is empty");
+    expect(git("config", "--get", "remote.origin.url")).toBe("https://github.com/");
+  });
+
   it("fails after authentication if a URL rewrite changes the effective push identity", () => {
     git("config", "url.https://github.com/owner/workflow.git.pushInsteadOf", authenticatedURL("test-token"));
+    const configBefore = fs.readFileSync(path.join(target, ".git", "config"), "utf8");
     const result = runScript(env, target);
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("identity verified before credential configuration");
     expect(result.stderr).toContain("identity verification failed after credential configuration");
     expect(result.stdout + result.stderr).not.toContain("test-token");
+    expect(git("config", "--get", "remote.origin.url")).toBe("https://github.com/owner/target.git");
+    expect(fs.readFileSync(path.join(target, ".git", "config"), "utf8")).toBe(configBefore);
+  });
+
+  it("preserves all raw fetch URLs when authentication configuration is rejected", () => {
+    const original = "git@github.com:owner/target.git";
+    git("remote", "set-url", "origin", original);
+    git("remote", "set-url", "--add", "origin", "https://github.com/owner/target");
+    const before = git("config", "--get-all", "remote.origin.url");
+    git("config", "url.https://github.com/owner/workflow.git.pushInsteadOf", authenticatedURL("test-token"));
+    const result = runScript(env, target);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("remote authentication configuration failed");
+    expect(git("config", "--get-all", "remote.origin.url")).toBe(before);
+  });
+
+  it.each([true, false])("reports rollback failure with authentication URL removal succeeding=%s", removeSucceeds => {
+    git("config", "url.https://github.com/owner/workflow.git.pushInsteadOf", authenticatedURL("test-token"));
+    const realGit = spawnSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).stdout.trim();
+    const bin = path.join(root, "rollback-bin");
+    fs.mkdirSync(bin);
+    fs.writeFileSync(
+      path.join(bin, "git"),
+      `#!/bin/sh
+if [ "$1" = remote ] && [ "$2" = set-url ] && [ "$3" = origin ] && [ "$4" = https://github.com/owner/target.git ]; then
+  echo "test-token: simulated restoration failure" >&2
+  exit 1
+fi
+if [ "$1" = config ] && [ "$2" = --unset-all ] && [ "$GH_AW_TEST_REMOVE_SUCCEEDS" = false ]; then
+  echo "test-token: simulated removal failure" >&2
+  exit 1
+fi
+exec "$GH_AW_TEST_REAL_GIT" "$@"
+`,
+      { mode: 0o755 }
+    );
+    const result = runScript({ ...env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, GH_AW_TEST_REAL_GIT: realGit, GH_AW_TEST_REMOVE_SUCCEEDS: String(removeSucceeds) }, target);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("failed after credential configuration");
+    expect(result.stdout + result.stderr).not.toContain("test-token");
+    if (removeSucceeds) {
+      expect(result.stderr).toContain("Git remote restoration failed; authentication URL removed.");
+      expect(spawnSync("git", ["config", "--get-all", "remote.origin.url"], { cwd: target, env: { ...process.env, ...env } }).status).toBe(1);
+    } else {
+      expect(result.stderr).toContain("authentication URL removal failed; credentials may remain in Git configuration.");
+      expect(git("config", "--get", "remote.origin.url")).toBe(authenticatedURL("test-token"));
+    }
+  });
+
+  it("rejects a plaintext HTTP rewrite before installing credentials", () => {
+    git("config", "url.http://.insteadOf", "https://");
+    const result = runScript(env, target);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("failed before credential configuration");
+    expect(git("config", "--get", "remote.origin.url")).toBe("https://github.com/owner/target.git");
+  });
+
+  it("rejects a plaintext HTTP rewrite after installing credentials and restores origin", () => {
+    git("config", "url.http://github.com/owner/target.git.pushInsteadOf", authenticatedURL("test-token"));
+    const result = runScript(env, target);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("failed after credential configuration");
+    expect(git("config", "--get", "remote.origin.url")).toBe("https://github.com/owner/target.git");
+  });
+
+  it.each([true, false])("checks identity without Node on PATH with matching origin=%s", matches => {
+    const bin = path.join(root, "bin");
+    fs.mkdirSync(bin);
+    for (const name of ["git", "tr"]) {
+      const executable = spawnSync("sh", ["-c", `command -v ${name}`], { encoding: "utf8" }).stdout.trim();
+      fs.symlinkSync(executable, path.join(bin, name));
+    }
+    if (!matches) git("remote", "set-url", "origin", "https://github.com/owner/workflow.git");
+    const result = spawnSync("/bin/sh", [SCRIPT_PATH], {
+      cwd: target,
+      encoding: "utf8",
+      env: { ...process.env, ...env, PATH: bin },
+    });
+    if (matches) {
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stderr).toContain("identity verified after credential configuration");
+      expect(git("remote", "get-url", "origin")).toBe(authenticatedURL("test-token"));
+    } else {
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain("failed before credential configuration");
+      expect(git("remote", "get-url", "origin")).toBe("https://github.com/owner/workflow.git");
+    }
+  });
+
+  it("supports linked worktrees with a .git file", () => {
+    const worktree = path.join(root, "linked");
+    git("worktree", "add", "--detach", worktree, "HEAD");
+    expect(fs.statSync(path.join(worktree, ".git")).isFile()).toBe(true);
+    const result = runScript(env, worktree);
+    expect(result.status, result.stderr).toBe(0);
+    expect(git("remote", "get-url", "origin")).toBe(authenticatedURL("test-token"));
+  });
+
+  it.each([
+    "http://github.com/owner/target.git",
+    "https://github.com/owner/target.git?query",
+    "https://github.com/owner/target.git#fragment",
+    "https://github.com/owner/%74arget.git",
+    "https://github.com/owner/../owner/target.git",
+    "https://github.com/owner/target.git\nhttps://github.com/owner/workflow.git",
+    "https://github.com\\@elsewhere.example/owner/target.git",
+  ])("rejects unsafe or ambiguous URL %s", remote => {
+    git("remote", "set-url", "origin", remote);
+    const result = runScript(env, target);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("failed before credential configuration");
+    expect(git("config", "--get", "remote.origin.url")).toBe(remote);
+  });
+
+  it.each(["github.com", "https://github.com/", "https://github.com:443"])("supports server spelling %s", server => {
+    const result = runScript({ ...env, GITHUB_SERVER_URL: server }, target);
+    expect(result.status, result.stderr).toBe(0);
   });
 
   it("supports legacy compiled workflows and GIT_TOKEN authentication", () => {

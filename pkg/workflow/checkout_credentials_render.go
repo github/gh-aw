@@ -14,9 +14,16 @@ type credentialSubrepository struct {
 
 func (cm *CheckoutManager) effectiveRootCheckoutRepository() string {
 	root := "${{ github.repository }}"
+	if override := cm.GetDefaultCheckoutOverride(); override != nil && override.key.wiki {
+		root = wikiRepository(override.key.repository)
+	}
 	for _, entry := range cm.ordered {
-		if !entry.key.wiki && entry.key.path == "" && entry.key.repository != "" {
-			root = entry.key.repository
+		if entry.key.path == "" && entry.key.repository != "" {
+			if entry.key.wiki {
+				root = wikiRepository(entry.key.repository)
+			} else {
+				root = entry.key.repository
+			}
 		}
 	}
 	return root
@@ -71,8 +78,12 @@ func credentialCommandLines(repositories []credentialSubrepository) []string {
 		gitDir := fmt.Sprintf("%q", repo.path)
 		commentRef := repo.path
 		if repo.pathEnvVarName != "" {
+			// A runtime "-" must address the literal checkout, not OLDPWD.
+			lines = append(lines, fmt.Sprintf("          if [ \"${%s}\" = \"-\" ]; then %s=\"./-\"; fi\n", repo.pathEnvVarName, repo.pathEnvVarName))
 			gitDir = fmt.Sprintf("\"${%s}\"", repo.pathEnvVarName)
 			commentRef = "${" + repo.pathEnvVarName + "}"
+		} else if repo.path == "-" {
+			gitDir = `"./-"`
 		}
 		lines = append(lines,
 			fmt.Sprintf("          # Re-authenticate git for %s\n", commentRef),

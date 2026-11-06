@@ -746,7 +746,7 @@ func (c *Compiler) buildPushRepoMemorySetupAndCheckoutSteps(data *WorkflowData, 
 	checkoutStep.WriteString("          persist-credentials: false\n")
 	checkoutStep.WriteString("          sparse-checkout: .\n")
 	steps = append(steps, checkoutStep.String())
-	return append(steps, c.generateGitConfigurationSteps()...)
+	return append(steps, c.generateGitConfigurationStepsWithToken("${{ github.token }}", "${{ github.repository }}")...)
 }
 
 // buildPushRepoMemoryDownloadSteps builds download-artifact steps for all memory entries.

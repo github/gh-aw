@@ -280,8 +280,7 @@ func (cm *CheckoutManager) GenerateGitHubFolderCheckoutStep(repository, ref, tok
 }
 
 // GenerateConfigureGitCredentialsSteps emits the "Configure Git credentials" step that
-// installs a push-capable token. The root workspace checkout is always the workflow
-// repository, so its remote is configured for ${{ github.repository }}. Any cross-repo
+// installs a push-capable token for the effective root workspace checkout. Any cross-repo
 // checkout placed into a subdirectory is re-authenticated in place so a later push can
 // reach it. The provided gitRemoteToken is used for all remotes.
 //

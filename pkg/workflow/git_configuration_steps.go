@@ -34,13 +34,11 @@ func (c *Compiler) generateGitConfigurationStepsForData(data *WorkflowData) []st
 
 	if currentPath == "" {
 		// No current checkout in a subdirectory — use the standard workspace-root behaviour.
-		if currentRepo == "" {
-			rootRepo := checkoutMgr.effectiveRootCheckoutRepository()
-			if rootRepo != "${{ github.repository }}" {
-				currentRepo = rootRepo
-			}
+		rootRepo := checkoutMgr.effectiveRootCheckoutRepository()
+		if c.trialMode && c.trialLogicalRepoSlug != "" && !checkoutMgr.HasExternalRootCheckout() {
+			rootRepo = c.trialLogicalRepoSlug
 		}
-		return c.generateGitConfigurationStepsWithToken(token, currentRepo)
+		return c.generateGitConfigurationStepsWithToken(token, rootRepo)
 	}
 
 	// current: true checkout is in a subdirectory. Emit the step with a working-directory
@@ -51,9 +49,6 @@ func (c *Compiler) generateGitConfigurationStepsForData(data *WorkflowData) []st
 	if currentRepo != "" {
 		repoNameValue = fmt.Sprintf("%q", currentRepo)
 		gitConfigStepsLog.Printf("Generating git config steps for current checkout: path=%s repo=%s", currentPath, currentRepo)
-	} else if c.trialMode && c.trialLogicalRepoSlug != "" {
-		repoNameValue = fmt.Sprintf("%q", c.trialLogicalRepoSlug)
-		gitConfigStepsLog.Printf("Generating git config steps in trial mode with logical repo and current path=%s", currentPath)
 	} else {
 		gitConfigStepsLog.Printf("Generating git config steps for current checkout: path=%s (workflow repo)", currentPath)
 	}
@@ -76,14 +71,15 @@ func (c *Compiler) generateGitConfigurationStepsForData(data *WorkflowData) []st
 // Parameters:
 //   - token: GitHub token to use for authentication
 //   - targetRepoSlug: optional target repository (e.g., "org/repo") for cross-repo operations
-//     If empty, uses source repository (github.repository)
-//     If set, configures git remote to point to the target repository
+//     If empty, uses the trial logical repository or source repository (github.repository)
+//     If set, verifies that the checkout matches the target repository
 func (c *Compiler) generateGitConfigurationStepsWithToken(token string, targetRepoSlug string) []string {
-	// Determine which repository to configure git remote for
-	// Priority: targetRepoSlug > trialLogicalRepoSlug > default (source repo)
+	// An explicit checkout identity takes precedence over the trial fallback.
 	repoNameValue := "${{ github.repository }}"
 	if targetRepoSlug != "" {
-		repoNameValue = fmt.Sprintf("%q", targetRepoSlug)
+		if targetRepoSlug != repoNameValue {
+			repoNameValue = fmt.Sprintf("%q", targetRepoSlug)
+		}
 		gitConfigStepsLog.Printf("Generating git config steps with target repo: %s", targetRepoSlug)
 	} else if c.trialMode && c.trialLogicalRepoSlug != "" {
 		repoNameValue = fmt.Sprintf("%q", c.trialLogicalRepoSlug)

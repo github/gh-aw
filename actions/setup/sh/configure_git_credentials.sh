@@ -6,7 +6,8 @@
 # Sets up Git global configuration for use in GitHub Actions workflows and the gh-aw-node
 # container. Always configures git identity and safe.directory trust. Configures the remote
 # URL for authentication when credentials are provided; silently skips auth when any required
-# credential variable (repository, GITHUB_SERVER_URL, GITHUB_TOKEN) is absent.
+# credential variable (repository, GITHUB_SERVER_URL, GITHUB_TOKEN) is absent,
+# or when the current directory has no checkout/origin of its own.
 #
 # When a checkout manifest is present, every cross-repository checkout subdirectory it
 # records is also trusted as a safe.directory so that safe-outputs handlers can run git
@@ -93,50 +94,105 @@ REPO="${GH_AW_GIT_REPOSITORY-${GITHUB_REPOSITORY:-}}"
 URL="${GITHUB_SERVER_URL:-}"
 TOKEN="${GITHUB_TOKEN:-${GIT_TOKEN:-}}"
 
-# Check effective fetch and push URLs, including URL rewrites, without printing
-# remotes or raw git errors: either may contain credentials.
+# Do not discover a parent checkout when this directory has no checkout of its own.
+# Git worktrees and submodules use a .git file rather than a directory.
+if { [ ! -d .git ] && [ ! -f .git ]; } || ! ORIGINAL_URLS=$(git config --get-all remote.origin.url 2>/dev/null); then
+  echo "Git configured with standard GitHub Actions identity" >&2
+  exit 0
+fi
+
+if [ "${GH_AW_GIT_REPOSITORY+x}" = x ] && [ -z "${REPO}" ]; then
+  echo "Git checkout identity target is empty; set a repository slug." >&2
+  exit 1
+fi
+
+# Parse only unambiguous GitHub HTTPS/SSH URLs using the shell and standard
+# utilities. Identity checks must also work in jobs that do not install Node.
+url_matches_repository() {
+  REMOTE_URL="$1"
+  case "${REMOTE_URL}" in
+    *[[:space:][:cntrl:]]*|*\\*|*'?'*|*'#'*) return 1 ;;
+    https://*|ssh://*)
+      REMOTE_PART="${REMOTE_URL#*://}"
+      case "${REMOTE_PART}" in */*) ;; *) return 1 ;; esac
+      REMOTE_HOST="${REMOTE_PART%%/*}"
+      REMOTE_HOST="${REMOTE_HOST##*@}"
+      REMOTE_REPO="${REMOTE_PART#*/}"
+      case "${REMOTE_URL}" in https://*) REMOTE_HOST="${REMOTE_HOST%:443}" ;; esac
+      ;;
+    git@*:*)
+      REMOTE_PART="${REMOTE_URL#git@}"
+      REMOTE_HOST="${REMOTE_PART%%:*}"
+      REMOTE_REPO="${REMOTE_PART#*:}"
+      ;;
+    *) return 1 ;;
+  esac
+  REMOTE_REPO="${REMOTE_REPO%/}"
+  REMOTE_REPO="${REMOTE_REPO%.git}"
+  REMOTE_ID=$(printf '%s/%s' "${REMOTE_HOST}" "${REMOTE_REPO}" | LC_ALL=C tr '[:upper:]' '[:lower:]')
+  [ "${REMOTE_ID}" = "${EXPECTED_ID}" ]
+}
+
+check_repository_identity() {
+  case "${REPO}" in
+    *[!a-zA-Z0-9_./-]*|/*|*/|*/*/*|"" ) return 1 ;;
+    */*) ;;
+    *) return 1 ;;
+  esac
+  SERVER_HOST="${URL#https://}"
+  SERVER_HOST="${SERVER_HOST%/}"
+  case "${SERVER_HOST}" in
+    ""|*[!a-zA-Z0-9.:-]*|:*|*: ) return 1 ;;
+  esac
+  EXPECTED_ID=$(printf '%s/%s' "${SERVER_HOST%:443}" "${REPO}" | LC_ALL=C tr '[:upper:]' '[:lower:]')
+  for MODE in fetch push; do
+    if [ "${MODE}" = push ]; then
+      REMOTE_URLS=$(git remote get-url --push --all origin 2>/dev/null) || return 1
+    else
+      REMOTE_URLS=$(git remote get-url --all origin 2>/dev/null) || return 1
+    fi
+    [ -n "${REMOTE_URLS}" ] || return 1
+    printf '%s\n' "${REMOTE_URLS}" | while IFS= read -r REMOTE_URL; do
+      url_matches_repository "${REMOTE_URL}" || exit 1
+    done || return 1
+  done
+}
+
+# Never print remotes or raw git errors: either may contain credentials.
 verify_repository_identity() {
-  GH_AW_EXPECTED_REPOSITORY="${REPO}" GH_AW_EXPECTED_SERVER="${URL}" node -e '
-    const { execFileSync } = require("child_process");
-    try {
-      const server = process.env.GH_AW_EXPECTED_SERVER;
-      const base = new URL(server.includes("://") ? server : `https://${server}`);
-      const expected = process.env.GH_AW_EXPECTED_REPOSITORY.toLowerCase();
-      const identity = value => {
-        const scp = /^git@([^:]+):(.+)$/.exec(value);
-        const url = new URL(scp ? `ssh://git@${scp[1]}/${scp[2]}` : value);
-        if (!["https:", "http:", "ssh:"].includes(url.protocol) || url.search || url.hash) return false;
-        const repo = url.pathname.replace(/^\//, "").replace(/\.git\/?$/, "").replace(/\/$/, "");
-        return url.host.toLowerCase() === base.host.toLowerCase() && repo.toLowerCase() === expected;
-      };
-      for (const flags of [[], ["--push"]]) {
-        const urls = execFileSync("git", ["remote", "get-url", ...flags, "--all", "origin"],
-          { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim().split("\n");
-        if (!urls.length || !urls.every(identity)) process.exit(1);
-      }
-    } catch {
-      process.exit(1);
-    }
-  ' 2>/dev/null || {
+  if ! check_repository_identity; then
     echo "Git checkout identity verification failed ${1} credential configuration; check checkout repository and origin configuration. Remote URLs are omitted to protect credentials." >&2
-    exit 1
-  }
+    return 1
+  fi
   echo "Git checkout identity verified ${1} credential configuration" >&2
 }
 
 # Explicit compiler targets are checked even without a token. Legacy callers
 # retain the identity-only, no-checkout behavior when authentication is skipped.
 if [ -n "${URL}" ] && { [ "${GH_AW_GIT_REPOSITORY+x}" = x ] || { [ -n "${REPO}" ] && [ -n "${TOKEN}" ]; }; }; then
-  verify_repository_identity before
+  verify_repository_identity before || exit 1
 fi
 
 if [ -n "${REPO}" ] && [ -n "${URL}" ] && [ -n "${TOKEN}" ]; then
   URL_STRIPPED="${URL#https://}"
+  URL_STRIPPED="${URL_STRIPPED%/}"
+  ORIGINAL_URL="${ORIGINAL_URLS%%"
+"*}"
   if ! git remote set-url origin "https://x-access-token:${TOKEN}@${URL_STRIPPED}/${REPO}.git" 2>/dev/null; then
     echo "Git remote authentication configuration failed; remote URL omitted to protect credentials." >&2
     exit 1
   fi
-  verify_repository_identity after
+  if ! verify_repository_identity after; then
+    # Restore the raw value, not its potentially rewritten effective value.
+    if ! git remote set-url origin "${ORIGINAL_URL}" 2>/dev/null; then
+      if git config --unset-all remote.origin.url 2>/dev/null; then
+        echo "Git remote restoration failed; authentication URL removed." >&2
+      else
+        echo "Git remote restoration and authentication URL removal failed; credentials may remain in Git configuration." >&2
+      fi
+    fi
+    exit 1
+  fi
 fi
 
 echo "Git configured with standard GitHub Actions identity" >&2

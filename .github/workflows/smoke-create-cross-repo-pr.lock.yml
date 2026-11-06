@@ -816,7 +816,7 @@ jobs:
           path: /tmp/gh-aw
       - name: Configure Git credentials
         env:
-          GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_AW_GIT_REPOSITORY: ${{ github.repository }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_TOKEN: ${{ github.token }}
         run: bash "${RUNNER_TEMP}/gh-aw/actions/configure_git_credentials.sh"
@@ -1449,7 +1449,7 @@ jobs:
             await main();
       - name: Configure Git credentials
         env:
-          GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_AW_GIT_REPOSITORY: ${{ github.repository }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_TOKEN: ${{ github.token }}
         run: bash "${RUNNER_TEMP}/gh-aw/actions/configure_git_credentials.sh"
@@ -2767,15 +2767,14 @@ jobs:
       - name: Configure Git credentials
         if: (!cancelled()) && needs.agent.result != 'skipped' && contains(needs.agent.outputs.output_types, 'create_pull_request')
         env:
-          GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_AW_GIT_REPOSITORY: ${{ github.repository }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GIT_TOKEN: ${{ secrets.GH_AW_SIDE_REPO_PAT }}
           GH_AW_SUBREPO_0: "github/gh-aw-side-repo"
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/configure_git_credentials.sh"
-          GIT_SERVER_URL_STRIPPED="${GITHUB_SERVER_URL#https://}"
           # Re-authenticate git for gh-aw-side-repo
-          git -C "gh-aw-side-repo" remote set-url origin "https://x-access-token:${GIT_TOKEN}@${GIT_SERVER_URL_STRIPPED}/${GH_AW_SUBREPO_0}.git"
+          (cd -- "gh-aw-side-repo" && GH_AW_GIT_REPOSITORY="${GH_AW_SUBREPO_0}" bash "${RUNNER_TEMP}/gh-aw/actions/configure_git_credentials.sh")
           echo "Git configured with standard GitHub Actions identity"
       - name: Configure GH_HOST for enterprise compatibility
         id: ghes-host-config

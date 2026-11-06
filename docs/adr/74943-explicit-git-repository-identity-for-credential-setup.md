@@ -12,7 +12,7 @@
 
 ### Decision
 
-We will pass the intended repository to credential setup through a new non-reserved variable, `GH_AW_GIT_REPOSITORY`. The compiler will emit it for workspace-root, subdirectory, trial, and safe-output sub-checkouts. When the variable is absent, the script falls back to `GITHUB_REPOSITORY` so older callers keep working. The script will also fail closed: it checks that the effective fetch and push URLs match the expected server and repository both before and after it writes credentials. On a mismatch it exits non-zero without printing URLs or tokens. Safe-output sub-checkouts use the same helper, so every path goes through one validation point.
+We will pass the intended repository to credential setup through a new non-reserved variable, `GH_AW_GIT_REPOSITORY`. The compiler will emit the actual checkout identity for workspace-root, subdirectory, trial, and safe-output sub-checkouts, including the `.wiki` suffix where applicable. When the variable is absent, the script falls back to `GITHUB_REPOSITORY` so older callers keep working; an explicitly empty identity is rejected. The script will also fail closed: it checks that the effective fetch and push URLs match the expected server and repository both before and after it writes credentials, rejecting plaintext HTTP. On a mismatch it exits non-zero without printing URLs or tokens, restoring the original remote configuration if post-authentication verification fails. Workspaces without a checkout or `origin` retain their no-op behavior. Safe-output sub-checkouts use the same helper, so every path goes through one validation point.
 
 ### Alternatives Considered
 
