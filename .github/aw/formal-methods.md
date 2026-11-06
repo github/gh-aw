@@ -14,7 +14,7 @@ a substitute for TLC's model checking.
 
 Workflows that run TLC in the agent sandbox should import
 `shared/tla-plus.md` in their frontmatter. It installs checksum-pinned Temurin
-JRE 21 and TLC 1.8.0 before the workflow's own setup steps. Use `JAVA_BIN` and
+JRE 21 and TLA+ Tools v1.7.4 (TLC 2.19) before the workflow's own setup steps. Use `JAVA_BIN` and
 `TLA2TOOLS_JAR` rather than relying on a runner-installed Java or downloading
 additional tools. The shared setup supports Linux x64 runners.
 
@@ -26,6 +26,31 @@ Custom verification jobs do not inherit the agent's setup steps. Preserve their
 explicit runtime and TLC version pins, including the work-queue checks using
 TLC 1.7.4; importing agent tooling is not a migration of those jobs. Change a
 tool version only with updated checksums and revalidated model results.
+
+Both paths use `actions/setup/sh/install_tla_runtime.sh` and the reviewed
+SHA-256 pins in `release_integrity.sh`. Custom jobs with Java already installed
+call `bash actions/setup/sh/install_tla_runtime.sh "$RUNNER_TEMP/tla-tools" --jar-only`
+and use `$RUNNER_TEMP/tla-tools/tla2tools.jar`. The destination must not exist.
+Downloads are staged, verified before extraction or execution, and published
+only after successful setup; failures remove staging files and fail the step.
+
+Do not pin the apparent `v1.8.0` release: it is a rolling build.
+[Upstream publishing code](https://github.com/tlaplus/tlaplus/blob/c058b21a5013c31281312d3f029bcbb5c98e3748/.github/workflows/main.yml)
+deletes/replaces its assets and force-moves its tag. This caused checksum failures
+on November 6, 2026; refreshing its digest would not provide a stable installation.
+The v1.7.4 SHA-256 matches the pre-existing work-queue pin and the publisher's
+[release notes](https://github.com/tlaplus/tlaplus/releases/tag/v1.7.4) SHA-1
+`bee4a54f3ee3d4afc347c3240ec2d9e93b075104` for asset `184694200`.
+SHA-1 is historical provenance evidence, not the installation integrity check.
+The JRE SHA-256 matches GitHub's publisher asset digest for asset `521122088`.
+GitHub reports these releases as non-immutable, so replacement must still fail
+closed rather than automatically accepting a new checksum.
+
+For updates, independently verify publisher release/asset identity and digest,
+update the central pins and literal installer URLs together, run
+`bash actions/setup/sh/install_tla_runtime_test.sh`, revalidate bounded models,
+and recompile every consumer. Never derive a trusted pin solely from downloaded
+bytes or a checksum fetched beside them; do not change prior verification results.
 
 For Koka, use the repository's existing setup and verification commands when
 available. Otherwise, declare a version-pinned compiler setup in the consuming

@@ -38,7 +38,7 @@ jobs:
         run: |
           set -euo pipefail
           printf 'RESULTS_DIR=%s/work-queue-formal/%s\n' "$RUNNER_TEMP" "$FORMAL_CONFIG" >> "$GITHUB_ENV"
-          printf 'TLA2TOOLS_JAR=%s/tla2tools.jar\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+          printf 'TLA2TOOLS_JAR=%s/tla-tools/tla2tools.jar\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Initialize analysis artifact
         uses: actions/github-script@v9.0.0
         with:
@@ -67,12 +67,7 @@ jobs:
       - name: Download pinned TLC
         shell: bash
         run: |
-          set -euo pipefail
-          # runner-guard:ignore RGS-018 -- version-pinned TLC JAR is downloaded to disk and SHA-256 verified before use.
-          curl --fail --silent --show-error --location --retry 2 --connect-timeout 10 --max-time 120 \
-            https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar \
-            --output "$TLA2TOOLS_JAR"
-          echo "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88  $TLA2TOOLS_JAR" | sha256sum --check
+          bash "$GITHUB_WORKSPACE/actions/setup/sh/install_tla_runtime.sh" "$RUNNER_TEMP/tla-tools" --jar-only
       - name: Collect formal verification evidence
         id: verification
         continue-on-error: true
