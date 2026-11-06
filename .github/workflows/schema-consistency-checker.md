@@ -9,9 +9,10 @@ permissions:
   discussions: read
   issues: read
   pull-requests: read
+  copilot-requests: write
 engine:
   id: codex
-  model-provider: openai
+  model-provider: github
   model-routing:
     goal: cost
     mode: economy

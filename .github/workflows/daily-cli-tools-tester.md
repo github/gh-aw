@@ -12,6 +12,7 @@ permissions:
   issues: read
   pull-requests: read
   actions: read
+  copilot-requests: write
 tools:
   cli-proxy: true
   agentic-workflows:
@@ -28,7 +29,7 @@ safe-outputs:
 timeout-minutes: 60
 engine:
   id: codex
-  model-provider: openai
+  model-provider: github
   model-routing:
     goal: cost
     mode: economy
