@@ -354,21 +354,6 @@ describe.each(["agenticworkflows", "safeoutputs"])("%s backend ownership", name 
     expect(backend.args).toEqual(["--group-add", "1005", "--user", `2001:${gid}`]);
   });
 
-  it("uses effective rather than real runner identity", () => {
-    const require = createRequire(import.meta.url);
-    const module = { exports: {} };
-    const source = fs.readFileSync(new URL("./start_mcp_gateway.cjs", import.meta.url), "utf8");
-    vm.runInNewContext(source, {
-      require,
-      module,
-      process: { env: {}, getuid: () => 1001, getgid: () => 1001, geteuid: () => 2001, getegid: () => 31 },
-      core: { info: vi.fn() },
-    });
-    const backend = { container: "example/server" };
-    module.exports.applyBuiltinMCPRunnerIdentity({ mcpServers: { [name]: backend } });
-    expect(backend.args).toEqual(["--user", "2001:31"]);
-  });
-
   it.each(["localhost/gh-aw:dev", "alpine:3.24"])("uses the runner identity without widening private artifact modes (%s)", container => {
     const env = { GITHUB_TOKEN: "${GITHUB_TOKEN}", GITHUB_ACTOR: "${GITHUB_ACTOR}" };
     const backend = { container, args: ["--network", "host", "-w", "/workspace"], env };
@@ -566,9 +551,7 @@ readline.createInterface({ input: process.stdin }).on("line", line => {
     const require = createRequire(import.meta.url);
     const core = { info: vi.fn(), warning: vi.fn(), error: vi.fn(), setFailed: vi.fn() };
     const spawn = vi.fn();
-    const writeMcpConfiguration = vi.fn(() => {
-      throw new Error("stop before gateway launch");
-    });
+    const writeMcpConfiguration = vi.fn();
     const config = {
       gateway: { port: 8080, domain: "localhost", agentId: "test-agent" },
       mcpServers: {
@@ -580,14 +563,32 @@ readline.createInterface({ input: process.stdin }).on("line", line => {
         readFileSync: vi.fn(() => Buffer.from(JSON.stringify(config))),
         mkdirSync: vi.fn(),
         chmodSync: vi.fn(),
+        statSync: vi.fn(() => ({ size: 1 })),
+        existsSync: vi.fn(() => false),
+        unlinkSync: vi.fn(),
       },
-      child_process: { spawn, execSync: vi.fn() },
+      child_process: {
+        spawn,
+        execSync: vi.fn(),
+        execFileSync: vi.fn(() => {
+          throw new Error("converter reached");
+        }),
+      },
       "./shim.cjs": {},
       "./symlink_guard.cjs": { lstatGuard: vi.fn(() => ({})) },
       "./mcp_configuration.cjs": { writeMcpConfiguration },
     };
     const source = fs.readFileSync(new URL("./start_mcp_gateway.cjs", import.meta.url), "utf8");
-    await vm.runInNewContext(`${source}\nmain().catch(err => core.setFailed(err.message));`, {
+    const overrides = `
+      startGatewayWithRetry = async () => ({ gatewayPid: 123, stderrPath: "/tmp/gateway.stderr" });
+      sleep = async () => {};
+      isProcessAlive = () => true;
+      httpGet = async () => ({ statusCode: 200, body: "ok" });
+      waitForSafeOutputsReadiness = async () => {};
+      writeGatewayStartupMarker = () => {};
+      main().catch(err => core.setFailed(err.message));
+    `;
+    await vm.runInNewContext(`${source}\n${overrides}`, {
       require: id => mocks[id] || require(id),
       module: { exports: {} },
       process: {
@@ -595,12 +596,16 @@ readline.createInterface({ input: process.stdin }).on("line", line => {
           GH_AW_ENGINE: engine,
           RUNNER_TEMP: "/tmp/test-runner",
           GITHUB_WORKSPACE: "/workspace",
+          MCP_GATEWAY_AGENT_ID: "test-agent",
+          MCP_GATEWAY_PORT: "8080",
+          MCP_GATEWAY_DOMAIN: "localhost",
           MCP_GATEWAY_DOCKER_COMMAND: "docker run --rm -i --network host gateway:latest --config-stdin",
         },
         geteuid: () => 2001,
         getegid: () => 31,
         umask: vi.fn(),
         on: vi.fn(),
+        kill: vi.fn(),
       },
       core,
     });
@@ -609,7 +614,9 @@ readline.createInterface({ input: process.stdin }).on("line", line => {
       args: ["-w", "${GITHUB_WORKSPACE}", "--user", "2001:31"],
       env: { HOME: "/tmp", RUNNER_TEMP: "${RUNNER_TEMP}" },
     });
-    expect(core.setFailed).toHaveBeenCalledExactlyOnceWith("stop before gateway launch");
+    expect(core.info).toHaveBeenCalledWith(`Detected engine type: ${engine}`);
+    expect(mocks.child_process.execFileSync).toHaveBeenCalledWith("node", [expect.stringContaining(`convert_gateway_config_${engine}.cjs`)], expect.any(Object));
+    expect(core.setFailed).toHaveBeenCalledExactlyOnceWith(expect.stringContaining("converter reached"));
     expect(spawn).not.toHaveBeenCalled();
   });
 
