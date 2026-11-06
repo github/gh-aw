@@ -196,6 +196,9 @@ func (c *Compiler) generateEngineExecutionSteps(yaml *strings.Builder, data *Wor
 	}
 
 	steps := engine.GetExecutionSteps(data, logFile)
+	if data.durableExecutionPlan != nil {
+		steps = data.durableExecutionPlan.ExecutionSteps
+	}
 	compilerYamlLog.Printf("Generating engine execution steps: engine=%s, steps=%d", engine.GetID(), len(steps))
 
 	for _, step := range steps {
@@ -558,6 +561,20 @@ func (c *Compiler) generateEngineInstallAndPreAgentSteps(yaml *strings.Builder, 
 
 	// Add engine-specific installation steps (includes Node.js setup and secret validation for npm-based engines)
 	installSteps := engine.GetInstallationSteps(data)
+	if data.EngineConfig != nil && data.EngineConfig.Durable != nil {
+		plan, planErr := engine.GetDurableExecutionPlan(data, constants.AgentStdioLogPath)
+		if planErr != nil {
+			return nil, planErr
+		}
+		if plan == nil || len(plan.ExecutionSteps) == 0 {
+			return nil, fmt.Errorf("engine %q returned an incomplete durable execution plan", engine.GetID())
+		}
+		if err := validateDurableFiles(plan.Files); err != nil {
+			return nil, err
+		}
+		data.durableExecutionPlan = plan
+		installSteps = append(installSteps, plan.InstallationSteps...)
+	}
 	compilerYamlLog.Printf("Adding %d engine installation steps for %s", len(installSteps), engine.GetID())
 	for _, step := range installSteps {
 		for _, line := range step {
@@ -710,8 +727,12 @@ func (c *Compiler) generateAgentRunSteps(yaml *strings.Builder, data *WorkflowDa
 	// Collect artifact paths for unified upload at the end
 	var artifactPaths []string
 	artifactPaths = append(artifactPaths, constants.AwPromptsFile)
+	if data.EngineConfig != nil && data.EngineConfig.Durable != nil {
+		artifactPaths = append(artifactPaths, durableOTelJournal)
+	}
 
 	logFileFull := constants.AgentStdioLogPath
+	c.generateDurableArtifactRestore(yaml, data)
 
 	// Clean credentials before executing the agentic engine.
 	// This removes git credentials from .git/config and, when known credential-leaking
@@ -837,7 +858,9 @@ func (c *Compiler) generateAgentRunSteps(yaml *strings.Builder, data *WorkflowDa
 
 	// Add secret redaction step BEFORE any artifact uploads
 	// This ensures all artifacts are scanned for secrets before being uploaded
+	c.generateDurableFileStage(yaml, data)
 	c.generateTrackedSecretRedactionStep(yaml, yaml.String(), data)
+	c.generateDurableArtifactUpload(yaml, data)
 
 	// Append the agent step summary to the real $GITHUB_STEP_SUMMARY after secrets are redacted.
 	// The agent writes its GITHUB_STEP_SUMMARY content to AgentStepSummaryPath (a file inside

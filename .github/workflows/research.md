@@ -16,7 +16,10 @@ permissions:
   issues: read
   pull-requests: read
 
-engine: pi
+engine:
+  id: pi
+  durable:
+    retention-days: 7
 model: copilot/gpt-6-sol
 
 network:

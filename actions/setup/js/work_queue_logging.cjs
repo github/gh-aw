@@ -31,6 +31,15 @@ const GRAPHQL_ALIAS_KINDS = new Map([
 const CONTROL_ERROR_CODES = new Set([
   "checkpoint_invalid",
   "resource_limit",
+  "run_correlation_mismatch",
+  "run_binding_conflict",
+  "run_repository_mismatch",
+  "run_repository_identity_mismatch",
+  "run_event_mismatch",
+  "run_ref_mismatch",
+  "run_workflow_mismatch",
+  "run_principal_mismatch",
+  "rerun_not_authorized",
   "work_queue_dispatch_credential_binding_required",
   "work_queue_dispatch_credential_auth_unavailable",
   "work_queue_dispatch_credential_client_mismatch",
@@ -67,6 +76,17 @@ const CONTROL_ERROR_CODES = new Set([
 /** @param {string} code */
 function queueControlErrorExplanation(code) {
   switch (code) {
+    case "run_correlation_mismatch":
+      return "The native run title does not yet match the original dispatch token. Keep the reservation fenced and verify the same run through trusted reconciliation; never POST the assignment again.";
+    case "run_binding_conflict":
+    case "run_repository_mismatch":
+    case "run_repository_identity_mismatch":
+    case "run_event_mismatch":
+    case "run_ref_mismatch":
+    case "run_workflow_mismatch":
+    case "run_principal_mismatch":
+    case "rerun_not_authorized":
+      return "The native run does not match the original assignment's immutable identity. Inspect its repository, workflow, revision, principal and attempt; do not bypass the binding check or release an uncertain reservation.";
     case "work_queue_dispatch_repository_access_unavailable":
       return "The dispatch client cannot check the target repository. Use the authenticated GitHub client created by the compiled safe-output job.";
     case "work_queue_dispatch_credential_binding_required":

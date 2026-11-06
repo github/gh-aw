@@ -1,9 +1,9 @@
 ---
 title: Safe Output Outcome Evaluation Specification
-version: 1.0.2
+version: 1.0.3
 status: Working Draft
 date: 2026-05-15
-last_updated: 2026-11-03
+last_updated: 2026-11-05
 ---
 
 # Safe Output Outcome Evaluation Specification
@@ -104,6 +104,10 @@ Status meanings:
 - `partial`: the Go CLI implements only part of the specified evidence contract.
 - `not-started`: no dedicated evaluator exists yet; current behavior is generic/no-op only.
 
+### Entities and Structure
+
+Each numbered section evaluates one safe-output entity: the GitHub object or workflow-execution record named immediately below its heading. Its evaluator is the Go function registered for that output type in `pkg/cli/outcome_eval.go`; `evalGenericSticky` is the explicit generic fallback, and `noop`/`missing_tool` are skipped without evaluation. The section entries below identify the entity and evaluator, including unsupported evaluators whose current result is `unknown`.
+
 ### Current Default Acceptance Map
 
 This table summarizes the current runtime behavior in `pkg/cli/outcome_eval*.go`. It is intentionally about what the evaluator accepts today, not just the intended long-term spec semantics.
@@ -162,6 +166,8 @@ coverage qualifications. Per-item cost attribution remains separate work.
 
 ## 1. `create_pull_request`
 
+**Entity:** Pull request. **Evaluator:** `evalCreatePullRequest`.
+
 **Question:** Was the PR merged?
 
 **API:** `GET /repos/{owner}/{repo}/pulls/{number}`
@@ -192,6 +198,8 @@ coverage qualifications. Per-item cost attribution remains separate work.
 ---
 
 ## 2. `create_issue`
+
+**Entity:** Issue. **Evaluator:** `evalCreateIssue`.
 
 **Question:** Was the issue resolved or dismissed?
 
@@ -225,6 +233,8 @@ coverage qualifications. Per-item cost attribution remains separate work.
 
 ## 3. `add_comment`
 
+**Entity:** Issue comment. **Evaluator:** `evalAddComment`.
+
 **Question:** Did anyone respond or react?
 
 **API:** `GET /repos/{owner}/{repo}/issues/comments/{comment_id}`
@@ -253,6 +263,8 @@ coverage qualifications. Per-item cost attribution remains separate work.
 ---
 
 ## 4. `add_labels`
+
+**Entity:** Issue or pull-request label set and the recorded label delta. **Evaluator:** `evalAddLabels`.
 
 **Question:** Did the labels stick?
 
@@ -284,6 +296,8 @@ classification rule.
 
 ## 5. `add_reviewer`
 
+**Entity:** Reviewer request and attributable pull-request review. **Evaluator:** `evalAddReviewer`.
+
 **Question:** Did the reviewer actually review?
 
 **API:** `GET /repos/{owner}/{repo}/pulls/{number}/reviews`
@@ -307,6 +321,8 @@ classification rule.
 
 ## 6. `update_issue`
 
+**Entity:** Issue fields recorded in the before/after snapshots. **Evaluator:** `evalUpdateIssue`.
+
 **Question:** Did the edit stick?
 
 **API:** `GET /repos/{owner}/{repo}/issues/{number}`
@@ -326,6 +342,8 @@ classification rule.
 
 ## 7. `update_pull_request`
 
+**Entity:** Pull-request fields recorded in the before/after snapshots. **Evaluator:** `evalUpdatePullRequest`.
+
 **Question:** Did the edit stick?
 
 Same retained-update logic as `update_issue` but on a PR object, using persisted execution-time snapshots instead of `updated_at`.
@@ -337,6 +355,8 @@ Same retained-update logic as `update_issue` but on a PR object, using persisted
 ---
 
 ## 8. `close_issue`
+
+**Entity:** Issue closure state and visible close actor. **Evaluator:** `evalCloseSticky`.
 
 **Question:** Did it stay closed?
 
@@ -355,6 +375,8 @@ Same retained-update logic as `update_issue` but on a PR object, using persisted
 ---
 
 ## 9. `close_pull_request`
+
+**Entity:** Pull-request closure state and visible close actor. **Evaluator:** `evalCloseSticky`.
 
 **Question:** Did it stay closed?
 
@@ -375,6 +397,8 @@ Same retained-update logic as `update_issue` but on a PR object, using persisted
 
 ## 10. `close_discussion`
 
+**Entity:** GitHub Discussion closure state. **Evaluator:** `evalCloseDiscussion` (currently unsupported).
+
 **Proposed rule only:** current runtimes return `unknown`/`none`/`unsupported_evaluator`. The conditions below are not implemented acceptance rules.
 
 **Question:** Did it stay closed?
@@ -391,6 +415,8 @@ Same retained-update logic as `update_issue` but on a PR object, using persisted
 ---
 
 ## 11. `create_discussion`
+
+**Entity:** GitHub Discussion. **Evaluator:** `evalCreateDiscussion` (currently unsupported).
 
 **Proposed rule only:** current runtimes return `unknown` with no evidence.
 
@@ -416,6 +442,8 @@ Same retained-update logic as `update_issue` but on a PR object, using persisted
 
 ## 12. `update_discussion`
 
+**Entity:** GitHub Discussion fields recorded in the execution evidence. **Evaluator:** `evalUpdateDiscussion` (currently unsupported).
+
 **Question:** Did the edit stick?
 
 Same logic as `update_issue` but via GraphQL on the discussion body.
@@ -423,6 +451,8 @@ Same logic as `update_issue` but via GraphQL on the discussion body.
 ---
 
 ## 13. `create_pull_request_review_comment`
+
+**Entity:** Pull-request review comment. **Evaluator:** `evalReviewComment` (currently unsupported).
 
 **Proposed rule only:** current runtimes return `unknown` with no evidence.
 
@@ -442,6 +472,8 @@ Same logic as `update_issue` but via GraphQL on the discussion body.
 
 ## 14. `submit_pull_request_review`
 
+**Entity:** Submitted pull-request review and its recorded review ID. **Evaluator:** `evalSubmitPullRequestReview`.
+
 **Question:** Was the feedback addressed?
 
 **API:** `GET /repos/{owner}/{repo}/pulls/{number}/commits` (check for commits after review)
@@ -458,6 +490,8 @@ Same logic as `update_issue` but via GraphQL on the discussion body.
 ---
 
 ## 15. `reply_to_pull_request_review_comment`
+
+**Entity:** Reply target for a pull-request review comment. **Evaluator:** `evalGenericSticky` (generic fallback).
 
 **Proposed rule only:** current fallback verifies only target existence and returns weak `unknown`.
 
@@ -477,6 +511,8 @@ Same logic as `update_issue` but via GraphQL on the discussion body.
 
 ## 16. `resolve_pull_request_review_thread`
 
+**Entity:** Pull-request review thread. **Evaluator:** `evalResolveThread` (currently unsupported).
+
 **Proposed rule only:** current runtimes return `unknown` with no evidence.
 
 **Question:** Did it stay resolved?
@@ -493,6 +529,8 @@ Same logic as `update_issue` but via GraphQL on the discussion body.
 ---
 
 ## 17. `push_to_pull_request_branch`
+
+**Entity:** Recorded commits pushed to a pull-request branch. **Evaluator:** `evalPushToPRBranch`.
 
 **Question:** Was the code accepted?
 
@@ -511,6 +549,8 @@ Same logic as `update_issue` but via GraphQL on the discussion body.
 
 ## 18. `mark_pull_request_as_ready_for_review`
 
+**Entity:** Pull-request draft/review state and subsequent review activity. **Evaluator:** `evalMarkReady`.
+
 **Question:** Did someone review it?
 
 **API:** `GET /repos/{owner}/{repo}/pulls/{number}/reviews`
@@ -526,6 +566,8 @@ Same logic as `update_issue` but via GraphQL on the discussion body.
 ---
 
 ## 19. `assign_to_agent`
+
+**Entity:** Assigned issue and attributable agent-authored pull request. **Evaluator:** `evalAssignToAgent`.
 
 **Question:** Did the agent produce a result?
 
@@ -559,6 +601,8 @@ unattributable.
 
 ## 20. `dispatch_workflow`
 
+**Entity:** Dispatched workflow run. **Evaluator:** `evalDispatchWorkflow`.
+
 **Question:** Did the dispatched workflow succeed?
 
 **API:** `GET /repos/{owner}/{repo}/actions/runs/{recorded_run_id}`; no guessed workflow/time-window attribution
@@ -578,6 +622,8 @@ or decimal strings; malformed IDs MUST NOT be partially parsed.
 ---
 
 ## 21. `autofix_code_scanning_alert`
+
+**Entity:** Code-scanning alert. **Evaluator:** `evalGenericSticky` (generic fallback).
 
 **Proposed rule only:** current fallback returns weak `unknown`, not acceptance.
 
@@ -601,6 +647,8 @@ or decimal strings; malformed IDs MUST NOT be partially parsed.
 
 ## 22. `create_code_scanning_alert`
 
+**Entity:** Code-scanning alert. **Evaluator:** `evalGenericSticky` (generic fallback).
+
 **Proposed rule only:** current fallback returns weak `unknown`, not acceptance.
 
 **Question:** Was the alert triaged?
@@ -619,6 +667,8 @@ or decimal strings; malformed IDs MUST NOT be partially parsed.
 
 ## 23. `link_sub_issue`
 
+**Entity:** Parent/child issue relationship. **Evaluator:** `evalGenericSticky` (generic fallback).
+
 **Proposed rule only:** current fallback returns weak `unknown`, not acceptance.
 
 **Question:** Did the link stick?
@@ -635,6 +685,8 @@ or decimal strings; malformed IDs MUST NOT be partially parsed.
 ---
 
 ## 24. `hide_comment`
+
+**Entity:** Hidden issue or pull-request comment. **Evaluator:** `evalHideComment` (currently unsupported).
 
 **Proposed rule only:** current runtimes return `unknown` with no evidence.
 
@@ -653,6 +705,8 @@ or decimal strings; malformed IDs MUST NOT be partially parsed.
 
 ## 25. `assign_milestone`
 
+**Entity:** Issue milestone assignment and recorded milestone number. **Evaluator:** `evalAssignMilestone`.
+
 **Question:** Did the milestone stick?
 
 **API:** `GET /repos/{owner}/{repo}/issues/{number}`
@@ -667,6 +721,8 @@ or decimal strings; malformed IDs MUST NOT be partially parsed.
 ---
 
 ## 26. `update_project`
+
+**Entity:** Project item and recorded field update. **Evaluator:** `evalGenericSticky` (generic fallback).
 
 **Proposed rule only:** current fallback returns weak `unknown`, not acceptance.
 
@@ -685,6 +741,8 @@ or decimal strings; malformed IDs MUST NOT be partially parsed.
 
 ## 27. `update_release`
 
+**Entity:** Release and recorded release update. **Evaluator:** `evalGenericSticky` (generic fallback).
+
 **Proposed rule only:** current fallback returns weak `unknown`, not acceptance.
 
 **Question:** Did the edit stick?
@@ -702,13 +760,19 @@ or decimal strings; malformed IDs MUST NOT be partially parsed.
 
 ## 28. `noop`
 
+**Entity:** No GitHub object; no operation. **Evaluator:** skipped by `EvaluateOutcomes`.
+
 No outcome to evaluate. Skip.
 
 ## 29. `missing_tool`
 
+**Entity:** Missing safe-output tool request; no GitHub object. **Evaluator:** skipped by `EvaluateOutcomes`.
+
 No outcome to evaluate. Skip.
 
 ## 30. `replace_label`
+
+**Entity:** Issue or pull-request label set and the recorded replacement delta. **Evaluator:** `evalReplaceLabel`.
 
 **Question:** Did the label replacement stick? Specifically: is `label_to_add` present on the item and is `label_to_remove` absent?
 
@@ -847,7 +911,7 @@ safe-output type; status and evidence strength are separate attributes.
 
 ### Sync Notes: Specification Section-to-Implementation and Test Mapping
 
-The evaluator implementation and outcome-conformance tests live in `pkg/cli`; `pkg/workflow` owns safe-output configuration and compilation. Compiler tests do not establish outcome-evaluator support. Evaluator and test evidence per operation lives in [Current Default Acceptance Map](#current-default-acceptance-map) and the Conformance Test Table above; the 94-case fixture corpus is `pkg/cli/testdata/outcome_conformance.json`, executed by `pkg/cli/outcome_conformance_test.go`. The executable TLA+ checker projects the same cases; see [verification scope](outcomes/README.md).
+The evaluator implementation and outcome-conformance tests live in `pkg/cli`; `pkg/workflow` owns safe-output configuration and compilation. Compiler tests do not establish outcome-evaluator support. Evaluator and test evidence per operation lives in [Current Default Acceptance Map](#current-default-acceptance-map) and the Conformance Test Table above; the 95-case fixture corpus is `pkg/cli/testdata/outcome_conformance.json`, executed by `pkg/cli/outcome_conformance_test.go`. The executable TLA+ checker projects the same cases; see [verification scope](outcomes/README.md).
 
 | Specification area | Implementation or test path |
 |---|---|
@@ -855,8 +919,8 @@ The evaluator implementation and outcome-conformance tests live in `pkg/cli`; `p
 | `## Derived Metrics` | `pkg/cli/outcome_eval.go`, `pkg/cli/outcome_economics.go` |
 | `### Implementation locations` | The 30 `pkg/workflow` paths in the table below |
 | `## Conformance`, `### Conformance Test Table` | `pkg/cli/outcome_conformance_test.go`, `pkg/cli/testdata/outcome_conformance.json` |
-| `### OTel Backend Unavailability` | No outcome OTel exporter is currently implemented; outcome records are produced by `pkg/cli/outcome_eval.go` |
-| `### Conformance Safeguard Coverage Requirements` | `pkg/cli/outcome_conformance_test.go`, `pkg/cli/testdata/outcome_conformance.json` |
+| `### OTel Backend Unavailability` | `pkg/cli/outcome_eval.go` produces JSON/JSONL without an OTLP exporter; downstream export behavior is specified in `specs/otel-observability-spec.md` §16.6 |
+| `### Conformance Safeguard Coverage Requirements` | `pkg/cli/outcome_conformance_test.go`, `pkg/cli/testdata/outcome_conformance.json`; OTLP endpoint filtering is tested by `actions/setup/js/send_otlp_span.test.cjs` |
 | `## Formal Model` | `outcomes/OutcomeEvaluation.tla`, `outcomes/OutcomeEvaluation.cfg`, `outcomes/check.mjs` |
 | `## Legacy Runtime Safeguard Tests`, `## Runtime Test Suite` | `pkg/cli/outcome_eval_formal_test.go`, `pkg/cli/outcome_conformance_test.go` |
 
@@ -897,11 +961,9 @@ When any mapped configuration, evaluator, or test path changes, update this tabl
 
 ### OTel Backend Unavailability
 
-When the OTLP exporter is unavailable (e.g., endpoint unreachable, network timeout, authentication failure) during outcome evaluation, the following safeguards **MUST** apply:
+The `gh aw logs --outcomes` evaluator has no OTLP exporter: it classifies outcomes and writes JSON/optional JSONL without making telemetry requests. An unavailable OTLP backend therefore cannot affect CLI classification or suppress the CLI output, and this specification does not require an evaluator-owned audit file or retry loop. A downstream exporter MUST preserve the produced outcome records when its own export fails and MUST NOT report failed delivery as successful; exporter ordering, local mirrors, and failure handling are defined in the [OpenTelemetry Observability Specification](otel-observability-spec.md#16-reliability-and-failure-handling).
 
-1. **Graceful degradation**: Outcome evaluation workers **MUST** complete their classification logic (determining `accepted`, `rejected`, `ignored`, etc.) regardless of OTLP exporter availability. The computed outcome **MUST** be persisted to a local audit fallback log (e.g., a NDJSON file at a known path such as `/tmp/gh-aw/outcome-audit.ndjson`) before any attempt to export to OTLP. If the OTLP export fails, the local audit log entry **MUST** still be written and **MUST NOT** be discarded. This ensures the outcome is recoverable even when the telemetry backend is down.
-
-2. **Audit fallback and retry**: When OTLP export fails, the evaluation worker **SHOULD** schedule a retry using an exponential back-off strategy (initial delay: 5 seconds; maximum delay: 5 minutes; maximum attempts: 5). If all retries are exhausted without a successful export, the worker **MUST** record the export failure in the local audit log with a `export_failed: true` flag and the final error reason. A downstream reconciliation process **SHOULD** periodically sweep the local audit log and re-attempt export for any entries marked `export_failed: true`.
+The CLI conformance corpus covers GitHub API failures that affect evaluation, not OTLP transport failures. The fail-closed check for a default OTLP endpoint with missing credentials is exercised by `actions/setup/js/send_otlp_span.test.cjs` in the runtime exporter, outside the CLI outcome evaluator.
 
 ### Conformance Safeguard Coverage Requirements
 
@@ -909,7 +971,7 @@ Conformance suites **MUST** include explicit safeguard coverage classes in addit
 
 1. **Class A (state success/failure):** validates standard accepted/rejected/ignored/pending transitions from authoritative object state.
 2. **Class B (human override/lifecycle):** validates human edits, deletions, reopen events, and lifecycle outcomes where applicable.
-3. **Class C (API degradation):** validates `404`, `5xx`, timeout, and rate-limit behaviors, including retry metadata and non-terminal handling.
+3. **Class C (API degradation):** validates `404`, `5xx`, timeout, and rate-limit behaviors, including non-terminal handling. OTLP export is not part of CLI evaluation.
 
 Every safe-output type **MUST** have at least one Class A test. Types that query GitHub APIs for evaluation **MUST** also include at least one Class C test case.
 
@@ -958,7 +1020,7 @@ current cross-runtime evidence contract.
 | `P8` Update-Snapshot-Comparison | `TestFormalUpdateSnapshotComparison` | current=after→accepted; current=before or diverged→rejected |
 | `P9` CloseSticky-Reopen-Rejection | `TestFormalCloseStickyReopenRejection` | Reopened object→rejected; lifecycle bot closed→lifecycle_close |
 | `P10` Derived-Metrics-Consistency | `TestFormalDerivedMetricsConsistency` | acceptance_rate and waste_rate formulas; division-by-zero safety |
-| `P11` OTel-Graceful-Degradation | `TestFormalOTelGracefulDegradation` | OTLP failure still writes audit log; outcome not discarded |
+| `P11` Evaluation-API-Degradation | `TestFormalOutcomeSurvivesAPIFailure` | GitHub API transport failure produces a normalized evaluation report; it does not claim an OTLP exporter or audit-file write |
 | `P12` Conformance-Class-Coverage | `TestFormalConformanceClassCoverage` | Class A/C test existence invariant structure |
 | `P14` API-Error-Not-Terminal | `TestFormalAPIErrorNotTerminal` | An authoritative PR fetch error produces `error`, never a terminal outcome |
 | `P15` Zero-Touch-Requires-No-Reviews | `TestFormalZeroTouchRequiresNoReviews` | Requires complete evidence and no post-action non-bot comments, submitted reviews, or edits |
@@ -984,10 +1046,16 @@ Each test function:
 Run the full formal suite:
 
 ```sh
-go test ./pkg/cli/ -run 'TestFormalOutcomeDomainInvariant|TestFormalAPIFailurePending|TestFormal404Classification|TestFormalBotActorProvenance|TestFormalPRMergeAcceptance|TestFormalIssueBotCloseLifecycle|TestFormalLabelStickiness|TestFormalUpdateSnapshotComparison|TestFormalCloseStickyReopenRejection|TestFormalDerivedMetricsConsistency|TestFormalOTelGracefulDegradation|TestFormalConformanceClassCoverage|TestFormalAPIErrorNotTerminal|TestFormalZeroTouchRequiresNoReviews' -v
+go test ./pkg/cli/ -run 'TestFormalOutcomeDomainInvariant|TestFormalAPIFailurePending|TestFormal404Classification|TestFormalBotActorProvenance|TestFormalPRMergeAcceptance|TestFormalIssueBotCloseLifecycle|TestFormalLabelStickiness|TestFormalUpdateSnapshotComparison|TestFormalCloseStickyReopenRejection|TestFormalDerivedMetricsConsistency|TestFormalOutcomeSurvivesAPIFailure|TestFormalConformanceClassCoverage|TestFormalAPIErrorNotTerminal|TestFormalZeroTouchRequiresNoReviews' -v
 ```
 
 ## Change Log
+
+### Version 1.0.3 (Working Draft, 2026-11-05)
+
+- Added explicit entity/evaluator identification to all 30 safe-output sections.
+- Corrected the OTLP-unavailable contract to match the CLI boundary: there is no CLI OTLP exporter or evaluator-owned retry/audit-log implementation; cross-referenced the runtime exporter safeguards.
+- Re-verified the implementation-location table against the repository; all listed paths exist.
 
 ### Version 1.0.2 (Working Draft, 2026-11-03)
 

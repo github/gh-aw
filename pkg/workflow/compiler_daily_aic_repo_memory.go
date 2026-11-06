@@ -23,22 +23,33 @@ func (c *Compiler) generateDailyAICRepoMemoryLedgerSteps(data *WorkflowData, has
 	steps = append(steps, buildUsageArtifactInputDownloadSteps(prefix, hasEvals, "", c.getActionPin)...)
 	ledgerDir := dailyAICRepoMemoryDir(entry)
 	hydrationDir := dailyAICLedgerHydrationDir(entry)
+	if entry.githubApp(PermissionRead) != nil {
+		steps = append(steps, c.buildRepoMemoryAppTokenMintStep(entry, PermissionRead, pushRepoMemoryJobName, "always()")...)
+	}
 	steps = append(steps, buildDailyAICRepoMemoryHydrationSteps(entry, ledgerDir, hydrationDir)...)
 	steps = append(steps, buildDailyAICRepoMemoryAppendStep(data, ledgerDir))
 	return steps
 }
 
 func buildDailyAICRepoMemoryHydrationSteps(entry RepoMemoryEntry, ledgerDir, hydrationDir string) []string {
+	token := "${{ github.token }}"
+	if entry.githubApp(PermissionRead) != nil {
+		token = repoMemoryAppToken(entry, PermissionRead)
+	}
+	condition := "always()"
+	if targetCondition := repoMemoryAppTargetCondition(entry, PermissionRead); targetCondition != "" {
+		condition = combineGitHubIfExpressions(condition, targetCondition)
+	}
 	return []string{
 		"      - name: Collect daily AIC repo-memory usage files\n",
 		"        if: always()\n",
 		"        continue-on-error: true\n",
 		fmt.Sprintf("        run: bash \"%s/collect_usage_artifact_files.sh\"\n", SetupActionDestinationShell),
 		"      - name: Clone daily AIC repo-memory ledger for hydration\n",
-		"        if: always()\n",
+		fmt.Sprintf("        if: %s\n", condition),
 		"        continue-on-error: true\n",
 		"        env:\n",
-		"          GH_TOKEN: ${{ github.token }}\n",
+		fmt.Sprintf("          GH_TOKEN: %s\n", token),
 		"          GITHUB_SERVER_URL: ${{ github.server_url }}\n",
 		fmt.Sprintf("          BRANCH_NAME: %s\n", entry.BranchName),
 		fmt.Sprintf("          TARGET_REPO: %s\n", dailyAICRepoMemoryTargetRepo(entry)),

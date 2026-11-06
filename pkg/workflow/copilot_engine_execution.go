@@ -694,6 +694,7 @@ func (e *CopilotEngine) addCopilotFinalStepEnv(env map[string]string, workflowDa
 	// Inject GH_AW_ENGINE_CWD when engine.cwd is configured.
 	applyEngineCwdEnv(env, workflowData)
 	applyEngineAndAgentEnv(env, workflowData, copilotExecLog)
+	applyDurableExecutionEnv(env, workflowData)
 	// Always inject the Copilot integration ID for agentic workflows after all env merges
 	// so user-supplied env does not override this value.
 	env[constants.CopilotCLIIntegrationIDEnvVar] = constants.CopilotCLIIntegrationIDValue

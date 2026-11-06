@@ -355,6 +355,10 @@ Monitor growing backlog age, failed delivery barriers, unresolved reservations, 
 
 Events go to stderr with elapsed timing and sanitized counts, flags, statuses, and error categories, not payloads, identities, or credentials. Blocked controls and exhausted delivery verification also emit always-visible diagnostics.
 
+Git ledger reads reuse one bounded local object stream instead of starting Git for every historical object. Issue projection shares the originating client's ledger and verified ancestry; repository access is still refreshed before cached history is reused. Cold reads still validate every checkpoint boundary.
+
+Native launch diagnostics preserve fixed identity failure codes such as `run_correlation_mismatch`, `run_ref_mismatch`, and `run_principal_mismatch` without printing the run metadata. A correlation mismatch can reflect a pending run title; other identity failures remain non-retryable. Neither permits a second dispatch POST or release of an uncertain reservation.
+
 Routing diagnostics distinguish installed Policy gaps from compiler approval failures:
 
 | Code | Meaning and recovery |

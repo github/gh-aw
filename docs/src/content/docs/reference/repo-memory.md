@@ -89,6 +89,53 @@ tools:
 
 `branch-prefix` changes the default `memory` prefix and must be 4-32 alphanumeric, hyphen, or underscore characters; it cannot be `copilot`. `allowed-extensions` limits which file types can be stored, `format-json: true` pretty-prints `.json` files before commit, `validation.json-schemas` declares mandatory per-file JSON/JSONL validation, `validation.script` runs an optional custom JavaScript domain validator, and `max-patch-size` caps the total diff size for one push (default 10KB, max 1MB) to prevent oversized updates.
 
+## GitHub App authentication
+
+`github-app` is optional in the object form and in each array entry. Without it, memory operations use `github.token`. Configure an installed GitHub App to write memory branches protected by rulesets:
+
+```aw wrap
+tools:
+  repo-memory:
+    github-app:
+      client-id: ${{ vars.MEMORY_APP_CLIENT_ID }}
+      private-key: ${{ secrets.MEMORY_APP_PRIVATE_KEY }}
+```
+
+The app must have **Contents: read and write** permission and be installed on the memory repository. Push tokens request only `contents: write`. `client-id` (or legacy `app-id`) and `private-key` are required. Optional `owner` and `repositories` override the installation owner and repository scope; by default, both are derived from `target-repo`, or the current repository when no target is configured. Each array entry mints its own token. Additional app permissions cannot be requested.
+
+For an explicit `target-repo`, restore steps mint a separate Contents-read token from the same app, allowing private cross-repository clones. Restores without `target-repo` continue using `github.token` unless `github-app-read` is configured. Tokens are revoked by the token action's cleanup step.
+
+Use `github-app-read` and `github-app-write` to select different apps for reads and writes. Both accept the same credential and scope fields as `github-app`, in object and array forms:
+
+```aw wrap
+tools:
+  repo-memory:
+    github-app-read:
+      client-id: ${{ vars.MEMORY_READ_APP_CLIENT_ID }}
+      private-key: ${{ secrets.MEMORY_READ_APP_PRIVATE_KEY }}
+    github-app-write:
+      client-id: ${{ vars.MEMORY_WRITE_APP_CLIENT_ID }}
+      private-key: ${{ secrets.MEMORY_WRITE_APP_PRIVATE_KEY }}
+```
+
+Each override replaces `github-app` only for its operation. An omitted override uses `github-app`, or `github.token` when no shared app is configured. An override with `ignore-if-missing: true` falls back to `github.token`, not to the shared app. The read app needs **Contents: read** and handles restores (including the current repository) and daily-credit ledger clones. The write app needs **Contents: read and write** and handles pushes, including the Git and API reads needed to commit changes. Only the write app needs the ruleset bypass.
+
+The repo-memory daily-credit backend also mints Contents-read tokens for its activation and hydration clones. App-authenticated push jobs inherit the workflow's `environment`, making environment-scoped app credentials available.
+
+Literal `target-repo` values authorize that repository. For expression targets, the resolved repository must be the current repository or a literal name in the selected app's `repositories` under its literal `owner` (default: the current owner). Wildcards and expressions cannot define this allowlist. Read and write apps authorize targets independently before minting, and tokens are scoped to the selected repository only.
+
+`ignore-if-missing: true` skips minting when either credential is missing and falls back to `github.token`. This fallback cannot bypass an app-only ruleset or access another private repository. The push job needs only `contents: read` when all entries use write apps without this fallback; otherwise it retains `contents: write`.
+
+### Protect memory branches with a ruleset
+
+Create an active branch ruleset targeting `memory/**` (or the configured branch prefix). Enable **Restrict updates** and **Restrict creations**. Add the installed memory app to the bypass list with **Always allow**; optionally add an administrator team for recovery. The built-in GitHub Actions token is not the app bypass actor.
+
+Every workflow and array entry writing to that pattern needs a bypass-listed app. Use a narrower pattern when other memories must continue using `github.token`.
+
+Keep the app's private key available only to trusted workflows and environments. A branch ruleset controls writers, not the content an authorized workflow accepts.
+
+Restored memory is untrusted data, not agent instructions. Select repositories whose memory writers are trusted data producers, and protect their memory branches. App authentication does not establish content integrity; workflows requiring stronger provenance must verify it before exposing restored content.
+
 ## Structured Ledger
 
 :::caution[Experimental]

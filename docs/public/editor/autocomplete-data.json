@@ -1,5 +1,138 @@
 {
   "root": {
+    "token-broker": {
+      "type": "object",
+      "desc": "Experimental.",
+      "children": {
+        "copilot-request": {
+          "type": "boolean",
+          "desc": "Use brokered authentication for supported Copilot inference jobs.",
+          "enum": [true, false],
+          "leaf": true
+        },
+        "copilot-task": {
+          "type": "boolean",
+          "desc": "Use brokered authentication for Copilot task creation and issue assignment.",
+          "enum": [true, false],
+          "leaf": true
+        }
+      }
+    },
+    "work-queue-policy": {
+      "type": "object",
+      "desc": "Deprecated legacy version-3 Policy proposal.",
+      "deprecated": true,
+      "x-deprecation-message": "Move scheduling configuration to the repository-level work_queue in .github/workflows/aw.json and retain only AW-approved dispatch targets in the workflow. Installed Policies remain authoritative and historical ledgers remain readable.",
+      "children": {
+        "mode": {
+          "type": "string",
+          "enum": ["weighted-priority", "strict-priority"]
+        },
+        "class-weights": {
+          "type": "array",
+          "array": true
+        },
+        "accounting-weights": {
+          "type": "object"
+        },
+        "outstanding": {
+          "type": "object",
+          "children": {
+            "claims": {
+              "type": "integer",
+              "leaf": true
+            },
+            "dispatches": {
+              "type": "integer",
+              "leaf": true
+            },
+            "per-account-claims": {
+              "type": "integer",
+              "leaf": true
+            }
+          }
+        },
+        "worker-profiles": {
+          "type": "object"
+        },
+        "pools": {
+          "type": "object"
+        },
+        "producers": {
+          "type": "object"
+        },
+        "projectors": {
+          "type": "array",
+          "array": true
+        },
+        "dependencies": {
+          "type": "object",
+          "children": {
+            "repositories": {
+              "type": "array",
+              "array": true
+            },
+            "max-observation-age": {
+              "type": "string",
+              "leaf": true
+            },
+            "read-credentials": {
+              "type": "object",
+              "desc": "Separate read-only repository credentials, never part of a Policy proposal or snapshot."
+            }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "children": {
+            "ledger-bytes": {
+              "type": "integer",
+              "leaf": true
+            },
+            "recovery-bytes": {
+              "type": "integer",
+              "leaf": true
+            },
+            "payload-bytes": {
+              "type": "integer",
+              "leaf": true
+            },
+            "graph-nodes": {
+              "type": "integer",
+              "leaf": true
+            },
+            "predecessors": {
+              "type": "integer",
+              "leaf": true
+            },
+            "pending-nodes": {
+              "type": "integer",
+              "leaf": true
+            },
+            "operations": {
+              "type": "integer",
+              "leaf": true
+            },
+            "assignment-bytes": {
+              "type": "integer",
+              "leaf": true
+            },
+            "result-bytes": {
+              "type": "integer",
+              "leaf": true
+            },
+            "evidence-bytes": {
+              "type": "integer",
+              "leaf": true
+            },
+            "observation-writes": {
+              "type": "integer",
+              "leaf": true
+            }
+          }
+        }
+      }
+    },
     "name": {
       "type": "string",
       "desc": "Workflow name that appears in the GitHub Actions interface.",
@@ -15,6 +148,12 @@
       "desc": "Optional statement of the durable outcome the workflow exists to achieve.",
       "leaf": true
     },
+    "docker-image-pull-policy": {
+      "type": "string",
+      "desc": "Policy for pre-start Docker images in agent and detection jobs.",
+      "enum": ["always", "never"],
+      "leaf": true
+    },
     "emoji": {
       "type": "string",
       "desc": "Optional emoji to represent the workflow visually in listings and UI surfaces.",
@@ -23,6 +162,11 @@
     "source": {
       "type": "string",
       "desc": "Optional source reference indicating where this workflow was added from.",
+      "leaf": true
+    },
+    "source-sha": {
+      "type": "string",
+      "desc": "Installed source commit, managed by gh aw add and update.",
       "leaf": true
     },
     "redirect": {
@@ -93,6 +237,21 @@
       "type": "string|object",
       "desc": "Workflow triggers that define when the agentic workflow should run.",
       "children": {
+        "repos": {},
+        "orgs": {},
+        "projects-items": {},
+        "code-scanning-alert": {},
+        "dependabot-alerts": {},
+        "security-alerts": {},
+        "slash-command": {},
+        "label-command": {},
+        "jira-issue": {},
+        "linear-issue": {},
+        "azure-devops-issue": {},
+        "gateway-dispatch": {
+          "type": "object",
+          "desc": "Experimental exclusive trigger."
+        },
         "slash_command": {
           "type": "null|string|object",
           "desc": "Special slash command trigger for /command workflows (e.g., '/my-bot' in issue comments).",
@@ -359,6 +518,12 @@
         "permissions": {
           "type": "object",
           "desc": "Additional permissions for the pre-activation job."
+        },
+        "admission": {
+          "type": "boolean",
+          "desc": "Enable admission and conclusion_admission jobs for this workflow.",
+          "enum": [true, false],
+          "leaf": true
         },
         "stale-check": {
           "type": "boolean|string",
@@ -644,12 +809,24 @@
           "desc": "Internal hidden feature.",
           "enum": [true, false],
           "leaf": true
+        },
+        "dangerously-allow-roles-read-and-pull-request-target": {
+          "type": "boolean",
+          "desc": "Suppress the non-strict warning when pull_request_target is combined with on.roles containing read or all.",
+          "enum": [true, false],
+          "leaf": true
+        },
+        "dangerously-allow-pull-request-target-forks-all": {
+          "type": "boolean",
+          "desc": "Allow forks: '*' under pull_request_target in strict mode when declared in the main workflow's top-level features.",
+          "enum": [true, false],
+          "leaf": true
         }
       }
     },
     "models": {
       "type": "object",
-      "desc": "Model policy and optional pricing configuration.",
+      "desc": "Model policy, optional pricing configuration, and workflow-defined model aliases.",
       "children": {
         "allowed": {
           "type": "array",
@@ -716,6 +893,11 @@
         "url": {
           "type": "string",
           "desc": "A deployment URL",
+          "leaf": true
+        },
+        "deployment": {
+          "type": "boolean|string",
+          "desc": "Set to false to use the environment's secrets and protection rules without creating a GitHub deployment.",
           "leaf": true
         }
       }
@@ -849,6 +1031,22 @@
               "desc": "AWF version override used to install and run the matching firewall version.",
               "leaf": true
             },
+            "checksums-sha256": {
+              "type": "string",
+              "desc": "Literal SHA256 digest of the AWF release's checksums.txt manifest.",
+              "leaf": true
+            },
+            "enclave-debug-public": {
+              "type": "boolean",
+              "desc": "Opt in to the maintained public Docker enclave diagnostic collector for static public-only default-image fixtures.",
+              "enum": [true, false],
+              "leaf": true
+            },
+            "host-github-token": {
+              "type": "string",
+              "desc": "Secret expression bound to GH_TOKEN only in the AWF execution host step for repository staging.",
+              "leaf": true
+            },
             "platform": {
               "type": "string",
               "desc": "AWF platform.type override.",
@@ -896,6 +1094,11 @@
                 "api-proxy": {
                   "type": "string",
                   "desc": "API proxy sidecar image that holds provider credentials.",
+                  "leaf": true
+                },
+                "router": {
+                  "type": "string",
+                  "desc": "Model router sidecar image used by engine.model-routing.",
                   "leaf": true
                 },
                 "cli-proxy": {
@@ -954,8 +1157,100 @@
             "runtime": {
               "type": "string",
               "desc": "Sandbox runtime profile for the agent container.",
-              "enum": ["docker", "docker-sudo-iptables", "cloud-hypervisor"],
+              "enum": ["docker", "docker-sudo-iptables", "cloud-hypervisor", "nvx"],
               "leaf": true
+            },
+            "nvx": {
+              "type": "object",
+              "desc": "Optional overrides for AWF's fail-closed NVX preview runtime.",
+              "children": {
+                "preview": {
+                  "type": "boolean",
+                  "desc": "NVX preview is always enabled.",
+                  "enum": [true, false],
+                  "leaf": true
+                },
+                "network-isolation": {
+                  "type": "boolean",
+                  "desc": "Strict AWF network isolation is always enabled.",
+                  "enum": [true, false],
+                  "leaf": true
+                },
+                "api-proxy": {
+                  "type": "boolean",
+                  "desc": "API proxy credential isolation is always enabled.",
+                  "enum": [true, false],
+                  "leaf": true
+                },
+                "mount-policy": {
+                  "type": "string",
+                  "enum": ["workspace-only", "workspace-and-tool-cache"],
+                  "leaf": true
+                },
+                "layer-path": {
+                  "type": "string",
+                  "desc": "Workload-specific guest distro layer directory; defaults to runner.temp/nvx/guest-layer and supports GitHub Actions e...",
+                  "leaf": true
+                },
+                "openvmm-path": {
+                  "type": "string",
+                  "desc": "Path to the trusted, attested OpenVMM binary; defaults to runner.temp/nvx/openvmm and supports GitHub Actions express...",
+                  "leaf": true
+                },
+                "kernel-path": {
+                  "type": "string",
+                  "desc": "Path to the trusted, attested guest kernel; defaults to runner.temp/nvx/vmlinux and supports GitHub Actions expressions.",
+                  "leaf": true
+                },
+                "initramfs-path": {
+                  "type": "string",
+                  "desc": "Path to the trusted, attested guest initramfs; defaults to runner.temp/nvx/initramfs.cpio.gz and supports GitHub Acti...",
+                  "leaf": true
+                },
+                "artifact-manifest-path": {
+                  "type": "string",
+                  "desc": "Path to the AWF release artifact manifest; defaults to runner.temp/nvx/nvx-test-x86_64.manifest.json and supports Git...",
+                  "leaf": true
+                },
+                "artifact-manifest-bundle-path": {
+                  "type": "string",
+                  "desc": "Path to the offline Sigstore attestation bundle; defaults to runner.temp/nvx/nvx-test-x86_64.manifest.sigstore.jsonl ...",
+                  "leaf": true
+                },
+                "signer-workflow": {
+                  "type": "string",
+                  "desc": "Expected trusted workflow identity that signed the manifest.",
+                  "enum": [
+                    "github/gh-aw-firewall/.github/workflows/release.yml",
+                    "github/gh-aw-firewall/.github/workflows/nvx-phase-3b-live-kvm.yml",
+                    "github/gh-aw-firewall/.github/workflows/smoke-nvx-copilot.lock.yml",
+                    "github/gh-aw-firewall/.github/workflows/smoke-nvx-build-test.lock.yml"
+                  ],
+                  "leaf": true
+                },
+                "memory-mib": {
+                  "type": "integer",
+                  "leaf": true
+                },
+                "memory-max-bytes": {
+                  "type": "integer",
+                  "leaf": true
+                },
+                "pids-max": {
+                  "type": "integer",
+                  "leaf": true
+                },
+                "scratch-bytes": {
+                  "type": "integer",
+                  "desc": "Optional bounded per-run guest-writable scratch image size in bytes.",
+                  "leaf": true
+                },
+                "container-workdir": {
+                  "type": "string",
+                  "desc": "Optional guest working directory, restricted to /workspace or a descendant.",
+                  "leaf": true
+                }
+              }
             },
             "config": {
               "type": "object",
@@ -1097,6 +1392,11 @@
               "type": "integer",
               "desc": "Keepalive ping interval in seconds for HTTP MCP backends.",
               "leaf": true
+            },
+            "trusted-bots": {
+              "type": "array",
+              "desc": "Additional GitHub bot identities merged with the MCP gateway's built-in trusted identities.",
+              "array": true
             }
           }
         }
@@ -1141,10 +1441,48 @@
           "desc": "Optional version of the AI engine action (e.g., 'beta', 'stable', 20).",
           "leaf": true
         },
+        "checksums-sha256": {
+          "type": "string",
+          "desc": "Copilot CLI only: literal SHA256 digest of the release's SHA256SUMS.txt manifest.",
+          "leaf": true
+        },
+        "cooldown": {
+          "type": "integer",
+          "desc": "Minimum release age in days for compiler-managed engine installs.",
+          "leaf": true
+        },
         "model": {
           "type": "string",
           "desc": "Model for this engine, overriding the top-level model.",
           "leaf": true
+        },
+        "fallback-models": {
+          "type": "array",
+          "desc": "Ordered alternative models after model-specific failures, supported by engines with a built-in retry harness.",
+          "array": true
+        },
+        "model-routing": {
+          "type": "object",
+          "desc": "Experimental per-run model and reasoning-effort selection from the task text for Copilot, Claude, Codex, and pi engin...",
+          "children": {
+            "goal": {
+              "type": "string",
+              "desc": "Routing objective: cost prefers the cheapest model and effort that meet the mode's target; cost-speed prefers the fas...",
+              "enum": ["cost", "cost-speed"],
+              "leaf": true
+            },
+            "mode": {
+              "type": "string",
+              "desc": "Routing quality profile: economy, balanced, and robust set increasing quality bars, generally with increasing cost; a...",
+              "enum": ["economy", "balanced", "robust", "auto"],
+              "leaf": true
+            },
+            "allowed-models": {
+              "type": "array",
+              "desc": "Optional exact model names of the routing provider or gh-aw model aliases (such as small or sonnet) that narrow the r...",
+              "array": true
+            }
+          }
         },
         "context-window": {
           "type": "integer",
@@ -1160,7 +1498,7 @@
         "permission-mode": {
           "type": "string",
           "desc": "Claude permission mode override.",
-          "enum": ["auto", "acceptEdits", "plan", "bypassPermissions"],
+          "enum": ["default", "dontAsk", "auto", "acceptEdits", "plan", "bypassPermissions"],
           "leaf": true
         },
         "max-turns": {
@@ -1330,7 +1668,7 @@
         },
         "config": {
           "type": "string",
-          "desc": "Additional TOML configuration text that will be appended to the generated config.toml in the action (codex engine only)",
+          "desc": "Additional engine configuration text.",
           "leaf": true
         },
         "agent": {
@@ -1350,7 +1688,13 @@
         },
         "bare": {
           "type": "boolean",
-          "desc": "When true, disables automatic loading of context and custom instructions by the AI engine.",
+          "desc": "When true, disables automatic loading of context and custom instructions where supported.",
+          "enum": [true, false],
+          "leaf": true
+        },
+        "dynamic-workflows": {
+          "type": "boolean",
+          "desc": "Whether dynamic workflows are enabled for engines that support them.",
           "enum": [true, false],
           "leaf": true
         },
@@ -1421,7 +1765,12 @@
     },
     "max-tool-denials": {
       "type": "integer|string",
-      "desc": "Copilot SDK safeguard threshold for repeated tool denials before stopping inference.",
+      "desc": "Safeguard threshold for repeated tool denials before stopping inference.",
+      "leaf": true
+    },
+    "max-tool-calls": {
+      "type": "integer|string",
+      "desc": "Maximum aggregate number of tool dispatches for the workflow run, including nested calls.",
       "leaf": true
     },
     "max-ai-credits": {
@@ -1765,11 +2114,18 @@
                 "issues",
                 "pull_requests",
                 "actions",
+                "code_quality",
                 "code_security",
+                "copilot",
+                "copilot_issue_intents",
+                "copilot_spaces",
                 "dependabot",
                 "discussions",
                 "experiments",
                 "gists",
+                "git",
+                "github_support_docs_search",
+                "governance",
                 "labels",
                 "notifications",
                 "orgs",
@@ -2030,6 +2386,71 @@
             }
           }
         },
+        "work-queue": {
+          "type": "boolean|null|object",
+          "desc": "Read the immutable version-3 activation snapshot.",
+          "children": {
+            "require-assignment": {
+              "type": "boolean",
+              "desc": "Fail closed and block safe outputs when no trusted inbound worker assignment is present.",
+              "enum": [true, false],
+              "leaf": true
+            },
+            "worker": {
+              "type": "boolean",
+              "desc": "Declare this workflow as a work-queue worker eligible to receive trusted queue claims.",
+              "enum": [true, false],
+              "leaf": true
+            },
+            "issues": {
+              "type": "boolean|object",
+              "desc": "Mirror only this run's admitted Work and original authenticated Claims to GitHub Issues.",
+              "children": {
+                "label": {
+                  "type": "string",
+                  "desc": "Repository label prefix; GitHub labels are limited to 50 characters, leaving at most 33 bytes for the prefix before t...",
+                  "leaf": true
+                }
+              }
+            },
+            "memory": {
+              "type": "object",
+              "desc": "Declare one schema-validated JSON memory snapshot per Claim.",
+              "children": {
+                "name": {
+                  "type": "string",
+                  "leaf": true
+                },
+                "path": {
+                  "type": "string",
+                  "desc": "Fixed relative JSON file path in the snapshot tree.",
+                  "leaf": true
+                },
+                "target-repo": {
+                  "type": "string",
+                  "desc": "Fixed repository also authorized by the installed immutable Work scope.",
+                  "leaf": true
+                },
+                "base-revision": {
+                  "type": "string",
+                  "leaf": true
+                },
+                "branch-prefix": {
+                  "type": "string",
+                  "leaf": true
+                },
+                "max-bytes": {
+                  "type": "integer",
+                  "leaf": true
+                },
+                "schema": {
+                  "type": "object",
+                  "desc": "Bounded inline typed JSON Schema subset: object properties/required/additionalProperties, array items, scalar enum, n..."
+                }
+              }
+            }
+          }
+        },
         "cache-memory": {
           "type": "boolean|null|object|array",
           "desc": "Cache memory MCP configuration for persistent memory storage",
@@ -2079,6 +2500,11 @@
                   "type": "integer",
                   "desc": "Maximum validator runtime in minutes (default: 1, max: 5)",
                   "leaf": true
+                },
+                "json-schemas": {
+                  "type": "array",
+                  "desc": "Inline schemas enforced for selected memory files or all eligible JSON and JSONL files when file is omitted",
+                  "array": true
                 }
               }
             }
@@ -2133,6 +2559,11 @@
                   "type": "integer",
                   "desc": "Maximum validator runtime in minutes",
                   "leaf": true
+                },
+                "json-schemas": {
+                  "type": "array",
+                  "desc": "Inline schemas enforced for selected memory files or all eligible JSON and JSONL files when file is omitted",
+                  "array": true
                 }
               }
             }
@@ -2149,7 +2580,7 @@
               "leaf": true
             },
             "target": {
-              "type": "string",
+              "type": "string|integer",
               "desc": "Target for comment memory: 'triggering' (default), '*' (current issue/PR), or explicit issue/PR number",
               "leaf": true
             },
@@ -2217,6 +2648,23 @@
           "desc": "REMOVED: Built-in support for Serena has been removed.",
           "deprecated": true,
           "x-deprecation-message": "Built-in support for Serena has been removed. Import shared/mcp/serena.md instead:\n  imports:\n    - uses: shared/mcp/serena.md\n      with:\n        languages: [\"go\", \"typescript\"]"
+        },
+        "ledger": {
+          "type": "object",
+          "desc": "Standalone Git-backed ledger configuration.",
+          "children": {
+            "type": {
+              "type": "string|object",
+              "desc": "Built-in ledger reducer type, or a named object-valued ledger.",
+              "enum": ["log", "set", "map", "table", "counter", "notes"],
+              "leaf": true
+            },
+            "key": {
+              "type": "string|object",
+              "desc": "Table primary-key field, or a named object-valued ledger.",
+              "leaf": true
+            }
+          }
         },
         "repo-memory": {
           "type": "boolean|null|object|array",
@@ -2286,6 +2734,41 @@
               "enum": [true, false],
               "leaf": true
             },
+            "ledger": {
+              "type": "object|null",
+              "desc": "Experimental.",
+              "children": {
+                "schema": {
+                  "type": "string",
+                  "desc": "Repository-relative path to a JSON schema for ledger entries.",
+                  "leaf": true
+                },
+                "max-shards": {
+                  "type": "integer",
+                  "desc": "Maximum number of JSONL ledger shard files to inspect.",
+                  "leaf": true
+                },
+                "max-segment-kb": {
+                  "type": "integer",
+                  "desc": "Maximum size of one JSONL ledger segment in KiB.",
+                  "leaf": true
+                },
+                "max-record-kb": {
+                  "type": "integer",
+                  "desc": "Maximum size of one serialized ledger record in KiB.",
+                  "leaf": true
+                },
+                "max-patch-kb": {
+                  "type": "integer",
+                  "desc": "Maximum patch size appended by one ledger writer in KiB.",
+                  "leaf": true
+                },
+                "compaction": {
+                  "type": "object",
+                  "desc": "Deterministic compaction policy."
+                }
+              }
+            },
             "validation": {
               "type": "object",
               "desc": "Custom domain validation hook for this repo-memory entry",
@@ -2299,6 +2782,11 @@
                   "type": "integer",
                   "desc": "Maximum validator runtime in minutes (default: 1, max: 5)",
                   "leaf": true
+                },
+                "json-schemas": {
+                  "type": "array",
+                  "desc": "Inline schemas enforced for selected memory files or all eligible JSON and JSONL files when file is omitted",
+                  "array": true
                 }
               }
             }
@@ -2655,11 +3143,21 @@
           "array": true
         },
         "missing-tool": {
+          "desc": "Deprecated alias for report-missing-tool.",
+          "deprecated": true,
+          "x-deprecation-message": "The 'missing-tool' safe-output key is deprecated. Use 'report-missing-tool' instead. Run 'gh aw fix' to migrate."
+        },
+        "report-missing-tool": {
           "type": "object|null|boolean",
           "desc": "Enable AI agents to report when required MCP tools are unavailable.",
           "leaf": true
         },
         "missing-data": {
+          "desc": "Deprecated alias for report-missing-data.",
+          "deprecated": true,
+          "x-deprecation-message": "The 'missing-data' safe-output key is deprecated. Use 'report-missing-data' instead. Run 'gh aw fix' to migrate."
+        },
+        "report-missing-data": {
           "type": "object|null|boolean",
           "desc": "Enable AI agents to report when required data or context is missing.",
           "leaf": true
@@ -2681,7 +3179,7 @@
         },
         "upload-code-coverage": {
           "type": "object|null",
-          "desc": "⚠️ Experimental.",
+          "desc": "Enable AI agents to upload a code coverage report (e.g.",
           "leaf": true
         },
         "update-release": {
@@ -2730,6 +3228,10 @@
         "jobs": {
           "type": "object",
           "desc": "Custom safe-output jobs that can be executed based on agentic workflow output."
+        },
+        "claim-adapters": {
+          "type": "object",
+          "desc": "Queue-worker custom delivery adapters."
         },
         "scripts": {
           "type": "object",
@@ -3012,15 +3514,49 @@
       "desc": "Checkout configuration for the agent job.",
       "enum": [false],
       "children": {
+        "multi": {
+          "type": "boolean",
+          "desc": "Explicitly enable runtime repository-list expansion and its allowlist, visibility, path, and secondary-fetch restrict...",
+          "enum": [true, false],
+          "leaf": true
+        },
         "pull-request": {
           "type": "boolean",
           "desc": "Set to false to disable the compiler-generated PR branch checkout and its associated base-config snapshot/restore steps.",
           "enum": [true, false],
           "leaf": true
         },
+        "pull-request-floating-head": {
+          "type": "boolean",
+          "desc": "Explicitly allow the compiler-generated PR checkout to select the current API head instead of the triggering event or...",
+          "enum": [true, false],
+          "leaf": true
+        },
         "repository": {
           "type": "string",
-          "desc": "Repository to checkout in owner/repo format.",
+          "desc": "Repository to checkout in owner/repo format, or a newline-separated list when multi: true is set.",
+          "leaf": true
+        },
+        "repo": {
+          "type": "string",
+          "desc": "Alias for repository.",
+          "leaf": true
+        },
+        "allowed-repos": {
+          "type": "string|array",
+          "desc": "Required allowlist when multi: true enables runtime repository-list expansion; does not enable multi mode by itself.",
+          "leaf": true,
+          "array": true
+        },
+        "allow-private-repos": {
+          "type": "boolean",
+          "desc": "With multi: true, allow private or internal targets only when the hosting workflow repository is private or internal.",
+          "enum": [true, false],
+          "leaf": true
+        },
+        "max-repos": {
+          "type": "integer",
+          "desc": "Maximum number of unique repositories per multi: true checkout entry.",
           "leaf": true
         },
         "ref": {
@@ -3790,7 +4326,7 @@
     },
     "graders": {
       "type": "object",
-      "desc": "⚠️ Experimental."
+      "desc": "Graders over the unified session."
     },
     "evals": {
       "type": "array|object",
@@ -3803,7 +4339,7 @@
         },
         "model": {
           "type": "string",
-          "desc": "Default model to use for all evaluation questions.",
+          "desc": "Decisions-compatible model ID for the entire question batch, sent without provider-specific name mapping.",
           "leaf": true
         },
         "runs-on": {
