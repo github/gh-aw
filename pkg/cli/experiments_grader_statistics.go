@@ -34,22 +34,32 @@ func meanGraderObservations(observations []GraderMetricObservation) float64 {
 }
 
 func graderObservationMetricType(cfg *workflow.ExperimentConfig, set *graderMetricObservationSet) string {
+	if !graderMetricHasObservations(set) {
+		return ""
+	}
 	if cfg != nil && (cfg.AnalysisType == "proportion_test" || cfg.AnalysisType == "bayesian_ab") {
 		return "binary"
 	}
-	hasObservation := false
 	for _, observations := range set.ByVariant {
 		for _, observation := range observations {
-			hasObservation = true
 			if !observation.Binary {
 				return "continuous"
 			}
 		}
 	}
-	if hasObservation {
-		return "binary"
+	return "binary"
+}
+
+func graderMetricHasObservations(set *graderMetricObservationSet) bool {
+	if set == nil {
+		return false
 	}
-	return ""
+	for _, observations := range set.ByVariant {
+		if len(observations) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func computeGraderMetricComparisons(
@@ -58,24 +68,14 @@ func computeGraderMetricComparisons(
 	variantNames []string,
 	metricType string,
 ) []MetricComparison {
-	if len(variantNames) < 2 {
+	if len(variantNames) < 2 || !graderMetricHasObservations(set) {
 		return nil
 	}
 	control := variantNames[0]
 	if cfg != nil && len(cfg.Variants) > 0 && slices.Contains(variantNames, cfg.Variants[0]) {
 		control = cfg.Variants[0]
 	}
-	analysisType := ""
-	if cfg != nil {
-		analysisType = cfg.AnalysisType
-	}
-	if analysisType == "" {
-		if metricType == "binary" {
-			analysisType = "proportion_test"
-		} else {
-			analysisType = "t_test"
-		}
-	}
+	analysisType := graderObservationAnalysisType(cfg, metricType)
 
 	controlValues := graderObservationValues(set.ByVariant[control])
 	comparisons := make([]MetricComparison, 0, len(variantNames)-1)
@@ -119,6 +119,16 @@ func computeGraderMetricComparisons(
 		comparisons = append(comparisons, comparison)
 	}
 	return comparisons
+}
+
+func graderObservationAnalysisType(cfg *workflow.ExperimentConfig, metricType string) string {
+	if cfg != nil && cfg.AnalysisType != "" {
+		return cfg.AnalysisType
+	}
+	if metricType == "binary" {
+		return "proportion_test"
+	}
+	return "t_test"
 }
 
 func setComparisonPValue(comparison *MetricComparison, pValue float64, err error) {

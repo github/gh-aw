@@ -698,6 +698,15 @@ and `writer-secret` override secret names, never values. The agent supplies
 `organization`, project UUID, and string `work-item` IDs to the selected write
 operation; they must match its exact approved resource lists.
 
+Existing work-item arguments use canonical positive decimal strings of at most ten
+digits, such as `"9876"`. Matching numeric strings go directly to the selected
+operation without an area-path lookup. Empty, padded, leading-zero, fractional,
+or exponent-form strings reject before credential access, even if listed in an
+author-owned grant. Numeric arguments are not coerced to strings. This preserves
+the native ADO numeric-target fix without restoring `target: "*"`, expression
+targets, or permissive whitespace normalization. Author-owned `write-checks`
+remain separate narrowing policies, not a source of additional grants.
+
 ### Secrets
 
 Authorize an identity in the approved Azure DevOps organization/project and

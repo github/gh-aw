@@ -7,7 +7,7 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.29.18<br>
+**Version**: 1.29.19<br>
 **Status**: Working Draft<br>
 **Publication Date**: 2026-11-06<br>
 **Editor**: GitHub Agentic Workflows Team<br>
@@ -5611,6 +5611,11 @@ Implementations MUST apply these transformations in order:
   - `on*` attributes in HTML tags (onclick, onerror, etc.)
 - Preserve safe GitHub Flavored Markdown tags:
   - `<details>`, `<summary>`, `<sub>`, `<sup>`, `<kbd>`
+  - `<details>` and `<details open>` are the only accepted details openings; their
+    summaries may appear inline or on the following line. Plain `<details>` MUST
+    remain collapsed, and the boolean `open` attribute on `<details open>` MUST be
+    preserved and rendered. Valued, duplicate, event-handler, and other unsupported
+    details attributes MUST be rejected or escaped.
 
 **S5: Command Injection Prevention**
 

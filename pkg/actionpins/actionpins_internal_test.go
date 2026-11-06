@@ -645,7 +645,7 @@ func TestGetContainerPin_DefaultMCPGatewayReleaseDigest(t *testing.T) {
 	image := constants.DefaultMCPGatewayContainer + ":" + string(constants.DefaultMCPGatewayVersion)
 	pin, ok := GetContainerPin(image)
 	require.True(t, ok, "Expected embedded container pin for %s", image)
-	assert.Equal(t, "sha256:38fda60f9478165577af9c69d6f059d5968d191f834eb181119cb3e7e925aef6", pin.Digest)
+	assert.Equal(t, "sha256:801db64c2456ba2132733b23141fb52ca9d4691765181ee957ee121a21b86c09", pin.Digest)
 	assert.Equal(t, image+"@"+pin.Digest, pin.PinnedImage)
 }
 

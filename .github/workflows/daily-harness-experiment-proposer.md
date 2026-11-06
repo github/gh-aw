@@ -271,15 +271,15 @@ rollback_plan: "<exact steps to revert if PROMOTEd change misbehaves later, e.g.
 
 **Metric priority policy** (in this order — pick the highest-priority option the target workflow can actually support; do not skip straight to the bottom):
 
-1. **A real deterministic task-quality outcome** already produced by the workflow itself — a domain-specific pass/fail signal the workflow's own safe-outputs or downstream process emits (e.g. a labeled/merged PR outcome, a matched ground-truth value, an existing `grader:<id>` this workflow already declares). Prefer this whenever it exists.
+1. **A real deterministic task-quality outcome** already produced by the workflow itself — a domain-specific signal the workflow's own safe-outputs or downstream process emits (e.g. `outcome:accepted`, `outcome:zero_touch`, a matched ground-truth value, an existing `grader:<id>` this workflow already declares). Prefer this whenever it exists. Outcome metrics require `gh aw experiments analyze --outcome` to opt into additional GitHub API requests and are evaluated after the effective `outcome_window` (default `auto`, with a `72h` cold-start fallback); immature and no-op runs do not count toward `min_samples`. Prefer `outcome:zero_touch` for workflows with high acceptance rates when reducing human intervention is the goal.
 2. **A domain-specific pure grader** — configure a registered built-in or a distinct custom JavaScript `script` whose required correctness evidence is already present in the workflow's unified session, then reference it as `grader:<id>`. Use the `operational value designer` skill (`/operational-value-designer`) to assess outcome evidence. Custom JavaScript receives `session`, `config`, and `helpers` in a separate restricted graders job, never in conclusion. Do not add Bash `run:` or `operational-value` evaluators.
 3. **A robust general grader or eval** — one of the default built-in `grader:<id>` values (`tool-success-rate`, `tool-failure-count`, `retries`, `loops`, `trajectory-efficiency`, `execution-step-count`, `execution-duration`, `working-set-rebuild-factor`, `context-growth`, `artifact-production`), or an `eval:<id>` BinEval question declared under `evals:`.
 
 Do **not** mandate `eval:<id>` as the only allowed primary metric — options 1 and 2 above are preferred whenever available; fall back to option 3 only when neither a deterministic task-quality outcome nor a workflow-specific grader is practical.
 
-`primary_metric` may be a **cost/efficiency** signal (e.g. `grader:execution-duration`) **only when** a guardrail entry protects correctness equivalence with a **supported** `grader:<id>` or `eval:<id>` observation source. This keeps a cheap-but-degraded candidate from winning purely on cost.
+`primary_metric` may be a **cost/efficiency** signal (e.g. `grader:execution-duration`) **only when** a guardrail entry protects correctness equivalence with a **supported** `grader:<id>`, `eval:<id>`, `outcome:accepted`, or `outcome:zero_touch` observation source. This keeps a cheap-but-degraded candidate from winning purely on cost.
 
-`guardrails`/`guardrail_metrics` entries **must** reference `grader:<id>` (with that grader declared, even as `graders: {}`, in the target workflow's own frontmatter) or `eval:<id>` (with that question declared under `evals:`) — **never** a bare/native metric name like `run_success_rate`, `ai_credits_total`, or `execution-duration` without the `grader:` prefix. Unsupported guardrail names never resolve to an observation source, so `gh aw experiments analyze` returns `EXTEND`/`guardrail_unsupported` forever and the experiment can never reach `PROMOTE`/`REJECT`. Any measurement instrumentation you add (a grader, an eval, or logging) applies **identically** to both the control and candidate branches — it is observability, never part of the treatment itself, and must sit outside the conditional block that isolates the candidate-only mutation (see the templating example in Phase 4, step 3, below).
+`guardrails`/`guardrail_metrics` entries **must** reference `grader:<id>` (with that grader declared, even as `graders: {}`, in the target workflow's own frontmatter), `eval:<id>` (with that question declared under `evals:`), `outcome:accepted`, or `outcome:zero_touch` (neither requires a grader or eval declaration) — **never** a bare/native metric name like `run_success_rate`, `ai_credits_total`, or `execution-duration` without the `grader:` prefix. Unsupported guardrail names never resolve to an observation source, so `gh aw experiments analyze` returns `EXTEND`/`guardrail_unsupported` forever and the experiment can never reach `PROMOTE`/`REJECT`. Any measurement instrumentation you add (a grader, an eval, or logging) applies **identically** to both the control and candidate branches — it is observability, never part of the treatment itself, and must sit outside the conditional block that isolates the candidate-only mutation (see the templating example in Phase 4, step 3, below).
 
 ## Phase 4 — Apply the Minimal Edit
 
@@ -292,22 +292,22 @@ Edit **only** `workflow_target`'s `.md` file (never its `.lock.yml` by hand — 
        variants: [control, candidate]
        description: "<one sentence, from the hypothesis contract>"
        hypothesis: "H0: <h0>. H1: <h1>."   # omit if the optional hypothesis contract field was not used
-       metric: "<primary_metric from Phase 3, e.g. grader:tool-failure-count or eval:<id>>"
+       metric: "<primary_metric from Phase 3, e.g. outcome:accepted, outcome:zero_touch, grader:tool-failure-count, or eval:<id>>"
        guardrail_metrics:
-         - name: "<grader:<id> or eval:<id> — never a bare/native metric name>"
+         - name: "<grader:<id>, eval:<id>, outcome:accepted, or outcome:zero_touch — never a bare/native metric name>"
            threshold: "<=<value>" # or ">=<value>"
          - name: "<second guardrail from Phase 3, required when metric is a cost/efficiency signal>"
            threshold: "<=<value>" # or ">=<value>"
        min_samples: 20
-       analysis_type: <t_test | mann_whitney | proportion_test | bayesian_ab>
+       analysis_type: <t_test | mann_whitney | proportion_test | bayesian_ab> # omit for outcome-backed metrics
        decision:
          minimum_effect: <primary_metric-units value from Phase 3, absolute (not a percentage)>
          regression_tolerance: <primary_metric-units value, absolute; may equal minimum_effect>
          confidence: 0.95
        tags: ["harness_dimension:<primary_dimension>", "harness_subtype:<subtype>"]
    ```
-   `analysis_type` guidance: use `proportion_test` for `eval:<id>`/YES-NO or pass/fail rate metrics; use `mann_whitney` as the safe default for skewed/small-sample continuous metrics (most grader counts/durations/AIC); use `t_test` only for a well-behaved, roughly normal continuous measure with ample samples; use `bayesian_ab` only when you deliberately want a probability-of-superiority framing instead of a p-value. Express `minimum_effect`/`regression_tolerance` as **absolute primary-metric units**, matching `minimum_effect` from the Phase 3 contract; `confidence: 0.95` is the required value. The `tags` entry records `primary_dimension`/`subtype` so future runs (and Phase 1's equivalent-active-experiment check) can detect duplicate dimension/subtype coverage on this workflow.
-2. The ten fast built-in graders are already enabled by default. For an opt-in built-in, add only data configuration. A distinct custom JavaScript grader may use `session`, `config`, and `helpers.createSessionLookups(session)` in the isolated graders job. All evidence must already exist in the redacted unified session; no file reads, network, environment, or process access. If neither pure compute nor a declared `eval:<id>` can measure correctness, reject the proposal rather than fabricating a metric.
+   `analysis_type` guidance: use `proportion_test` for `eval:<id>`/YES-NO or binary pass/fail metrics; omit it for outcome-backed metrics so analysis selects the two-proportion test for binary per-run values or Welch's t-test for fractional values (for example, several PRs per run); use `mann_whitney` as the safe default for skewed/small-sample continuous metrics (most grader counts/durations/AIC); use `t_test` only for a well-behaved, roughly normal continuous measure with ample samples; use `bayesian_ab` only when you deliberately want a probability-of-superiority framing instead of a p-value. Express `minimum_effect`/`regression_tolerance` as **absolute primary-metric units**, matching `minimum_effect` from the Phase 3 contract; `confidence: 0.95` is the required value. The `tags` entry records `primary_dimension`/`subtype` so future runs (and Phase 1's equivalent-active-experiment check) can detect duplicate dimension/subtype coverage on this workflow.
+2. The ten fast built-in graders are already enabled by default. For an opt-in built-in, add only data configuration. A distinct custom JavaScript grader may use `session`, `config`, and `helpers.createSessionLookups(session)` in the isolated graders job. All grader evidence must already exist in the redacted unified session; no file reads, network, environment, or process access. Outcome metrics instead use CLI-time GitHub evidence. If neither an outcome metric, pure compute, nor a declared `eval:<id>` can measure correctness, reject the proposal rather than fabricating a metric.
 3. Wrap **only** the isolated section that implements the subtype in a template conditional (see `.github/aw/experiments.md`), placing each separator on its own line, e.g.:
    ```
    {{#if experiments.<primary_dimension_subtype>_v1 == 'candidate' }}
@@ -358,10 +358,10 @@ The `mechanism` (why the mutation should move `primary_metric`), `expected_direc
 `primary_dimension` and `subtype` (exactly one of each), and a precise description of the control vs. candidate difference (`control`/`candidate` fields — must be one isolated change).
 
 ### Experiment
-The exact `experiments:` YAML block added (fenced code block), including `variants`, `metric`, `guardrail_metrics`, `min_samples: 20`, `analysis_type`, and `decision` (`minimum_effect`, `regression_tolerance`, `confidence: 0.95`). Include the `graders:` block too if one was added.
+The exact `experiments:` YAML block added (fenced code block), including `variants`, `metric`, `guardrail_metrics`, `min_samples: 20`, `analysis_type` (when explicitly selected), and `decision` (`minimum_effect`, `regression_tolerance`, `confidence: 0.95`). Include the `graders:` block too if one was added.
 
 ### Guardrails
-Table of guardrail metric (`grader:<id>`/`eval:<id>`) → threshold → why it protects against regression, including — when `primary_metric` is a cost/efficiency signal — which guardrail protects correctness equivalence.
+Table of guardrail metric (`grader:<id>`/`eval:<id>`/`outcome:accepted`/`outcome:zero_touch`) → threshold → why it protects against regression, including — when `primary_metric` is a cost/efficiency signal — which guardrail protects correctness equivalence.
 
 ### Expected Economics
 Concrete, evidence-grounded expectations: the target workflow's current run cadence/traffic (cited from `per-workflow-summary.json`), the estimated time to accumulate `min_samples: 20` usable observations per arm, and the expected cost/efficiency delta of the candidate relative to control.
@@ -398,7 +398,7 @@ Append one entry to `/tmp/gh-aw/repo-memory/default/harness-proposals.json` (cre
 - Never edit `shared/*.md`, this proposer's own file, `source:`-managed workflows, or any file outside `.github/workflows/*.md`/`*.lock.yml`.
 - Never set `weight` or use `continual` ramps — allocation must be balanced 50/50 via a plain two-variant `variants:` list.
 - Never propose a mutation that expands permissions, network access, tool scope, or write authority beyond the workflow's current baseline (no authority expansion).
-- Never make `primary_metric` or any `guardrail_metrics`/`guardrails` entry a bare/native metric name (e.g. `run_success_rate`, `ai_credits_total`, `execution-duration` without a prefix) — every metric reference must be `grader:<id>` or `eval:<id>` so it resolves to a real observation source. Prefer, in order: a real deterministic task-quality outcome, then a workflow-specific deterministic grader, then a general built-in grader/eval; cost/efficiency may be primary only when a supported guardrail protects correctness equivalence.
+- Never make `primary_metric` or any `guardrail_metrics`/`guardrails` entry a bare/native metric name (e.g. `run_success_rate`, `ai_credits_total`, `execution-duration` without a prefix) — every metric reference must be `grader:<id>`, `eval:<id>`, `outcome:accepted`, or `outcome:zero_touch` so it resolves to a real observation source. Prefer, in order: a real deterministic task-quality outcome, then a workflow-specific deterministic grader, then a general built-in grader/eval; cost/efficiency may be primary only when a supported guardrail protects correctness equivalence.
 - Never compute, recompute, or reinterpret `EXTEND`/`PROMOTE`/`REJECT`/`INCONCLUSIVE` — treat any decision found in evidence as final and immutable.
 - Never promote, merge, or auto-apply anything. The proposal is always an issue carrying a patch for a human to review and apply.
 - Never select a candidate merely because `failure_count` is high, without a corroborating mechanism; never start a second experiment equivalent to one already active; never propose on a currently-broken workflow, an obvious direct fix, a workflow with no measurable success criterion, or a target whose real bug must be fixed first.

@@ -1012,6 +1012,7 @@ connectors:
             enum:
               - "${{ github.aw.import-inputs.work-item }}"
             maxLength: 10
+            pattern: ^[1-9][0-9]{0,9}$
             required: true
             type: string
         maxResponseBytes: 65536
@@ -1860,7 +1861,7 @@ import-schema:
   work-item:
     default: "123"
     type: string
-    description: Exact approved existing work item ID; no wildcard or temporary ID.
+    description: Exact approved existing work item ID as a canonical positive decimal string of at most ten digits; no whitespace, wildcard, leading zero or temporary ID.
   related-work-item:
     default: "124"
     type: string
@@ -2284,9 +2285,13 @@ import-schema:
       three creators. Organization is at most 64
       characters and matches ^[A-Za-z0-9][A-Za-z0-9-]*$; project is at most 36
       characters and matches ^[0-9a-f-]{36}$; work-item is at most 10 characters
-      and matches ^[1-9][0-9]*$. Exact resource grants also apply. The link
-      operation instead pins these three strings by import-bound enums and the
-      same length caps. Titles and assignee are bounded to 256 Unicode characters;
+      and matches ^[1-9][0-9]{0,9}$. Exact resource grants also apply. The link
+      operation pins these three strings by import-bound enums and the
+      same length caps, and validates its work-item argument with the same
+      canonical decimal pattern. Matching numeric strings need no area-path
+      lookup; empty, padded, leading-zero, fractional and exponent forms fail
+      before credentials, even when listed in an authored grant. There is no
+      implicit trimming, numeric coercion or wildcard target. Titles and assignee are bounded to 256 Unicode characters;
       comment text to 4000, and rich body inputs to 65000. The original five
       operations retain a 65536-byte response limit; new operations use 131072.
       These are connector limits, not claims about all

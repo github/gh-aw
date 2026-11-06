@@ -25,7 +25,7 @@ function setup(fixtureOptions = {}) {
     workflowRef: `${REPOSITORY}/${WORKFLOW}@${REF}`,
     readWorkQueueLog: vi.fn(fixture.readWorkQueueLog),
     publishWorkQueueRequest: vi.fn(fixture.publishWorkQueueRequest),
-    core: { info: vi.fn() },
+    core: { info: vi.fn(), warning: vi.fn() },
     jobNames: { activation: "activation", agent: "agent", conclusion: "conclusion" },
     jobResults: { activation: { result: "success" }, agent: { result: "success" } },
     sleepFn: vi.fn(async () => {}),
@@ -287,10 +287,10 @@ describe("inline trusted worker termination", () => {
 
 describe("scheduled work queue recovery", () => {
   it.each([
-    { pending: false, deferIssueFailure: false },
-    { pending: true, deferIssueFailure: false },
-    { pending: true, deferIssueFailure: true },
-  ])("projects only this maintenance run's committed terminal requests without rollback: %j", async ({ pending, deferIssueFailure }) => {
+    { pending: false, deferIssueWarning: false },
+    { pending: true, deferIssueWarning: false },
+    { pending: true, deferIssueWarning: true },
+  ])("projects only this maintenance run's committed terminal requests without rollback: %j", async ({ pending, deferIssueWarning }) => {
     const { fixture, options, nativeRun } = setup({ count: 1 });
     const member = fixture.assignment.claims[0];
     fixture.append("finish", { dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle, outcome: "completed" }, { ...fixture.workerActor, dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle });
@@ -306,13 +306,12 @@ describe("scheduled work queue recovery", () => {
     const configuration = vi.spyOn(require("./cancel_work_queue_closed_issue.cjs"), "readIssuesConfig").mockResolvedValue({ label: "work", title_prefix: "[work queue]" });
     const projection = vi.spyOn(require("./work_queue_issues.cjs"), "main").mockResolvedValue({ pending: pending ? [{ reason: "unavailable" }] : [] });
     try {
-      if (pending && !deferIssueFailure) {
-        await expect(maintenance({ ...options, projectIssues: true, deferIssueFailure })).rejects.toMatchObject({
-          message: expect.stringMatching(/^ERR_VALIDATION: work_queue_issue_synchronization_pending; queue transitions are committed/),
-          code: "work_queue_issue_synchronization_pending",
-          category: "ERR_WORK_QUEUE_RECONCILIATION",
-        });
-      } else expect(await maintenance({ ...options, projectIssues: true, deferIssueFailure })).toMatchObject({ issue_sync_pending: pending ? [{ reason: "unavailable" }] : [] });
+      expect(await maintenance({ ...options, projectIssues: true, deferIssueWarning })).toMatchObject({ issue_sync_pending: pending ? [{ reason: "unavailable" }] : [] });
+      if (pending && !deferIssueWarning) {
+        expect(options.core.warning).toHaveBeenCalledWith(expect.stringContaining("Issue synchronization remains pending"));
+      } else {
+        expect(options.core.warning).not.toHaveBeenCalled();
+      }
       expect(projection).toHaveBeenCalledOnce();
       const args = projection.mock.calls[0][0];
       expect(args.trustedContext).toMatchObject({ role: "reconciler", workflow: publisher.path, event: "schedule" });
@@ -347,7 +346,7 @@ describe("scheduled work queue recovery", () => {
       })
       .mockResolvedValue({ pending: [{ work_id: workId, reason: "second batch pending" }] });
     try {
-      const result = await maintenance({ ...options, projectIssues: true, deferIssueFailure: true });
+      const result = await maintenance({ ...options, projectIssues: true, deferIssueWarning: true });
       expect(projection).toHaveBeenCalledTimes(2);
       expect(projection.mock.calls.map(([args]) => args.transitionRequestIds.length)).toEqual([16, 1]);
       expect(result.issue_sync_pending).toHaveLength(2);
@@ -426,7 +425,7 @@ describe("scheduled work queue recovery", () => {
       const configuration = vi.spyOn(require("./cancel_work_queue_closed_issue.cjs"), "readIssuesConfig").mockResolvedValue({ label: "work" });
       const projection = vi.spyOn(require("./work_queue_issues.cjs"), "main").mockResolvedValue({ pending: [{ reason: "mirror pending" }] });
       try {
-        await expect(maintenance({ ...options, projectIssues: true, deferIssueFailure: true })).rejects.toThrow("work_queue_maintenance_reconciliation_unresolved");
+        await expect(maintenance({ ...options, projectIssues: true, deferIssueWarning: true })).rejects.toThrow("work_queue_maintenance_reconciliation_unresolved");
         expect(projection).toHaveBeenCalledOnce();
       } finally {
         configuration.mockRestore();
