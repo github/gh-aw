@@ -76,7 +76,7 @@ describe("create_issue artifacts", () => {
       [{ type: "unknown", name: "Notes", body: "Notes" }],
       [{ type: null, name: "Notes", body: "Notes" }],
       [{ name: "Notes", body: "Notes", repo: "outside/repo" }],
-      [{ name: "Notes", body: "x".repeat(524289) }],
+      [{ name: "Notes", body: "x".repeat(1048577) }],
     ].map((artifacts, index) => ({ artifacts, index }))
   )("rejects invalid artifact input before creating an issue (case $index)", async ({ artifacts }) => {
     const handler = await main({});
@@ -88,7 +88,113 @@ describe("create_issue artifacts", () => {
   });
 
   it("accepts the exact artifact body limit", () => {
-    expect(normalizeIssueArtifacts([{ name: "Notes", body: "x".repeat(524288) }])[0].body).toHaveLength(524288);
+    expect(normalizeIssueArtifacts([{ name: "Notes", body: "x".repeat(1048576) }])[0].body).toHaveLength(1048576);
+  });
+
+  it("publishes a 1 MB artifact without the previous half-megabyte truncation", async () => {
+    const body = "x".repeat(1048576);
+    const handler = await main({});
+    const result = await handler({ ...message, artifacts: [{ name: "Notes", body }] }, {});
+    expect(result.success).toBe(true);
+    expect(client.request.mock.calls[0][1].body).toBe(body);
+  });
+
+  it("allows a configured size above the default and exposes no stale schema character cap", async () => {
+    const body = "x".repeat(1048577);
+    const handler = await main({ max_issue_artifact_size: 1048577 });
+    const result = await handler({ ...message, artifacts: [{ name: "Notes", body }] }, {});
+    expect(result.success).toBe(true);
+    expect(client.request.mock.calls[0][1].body).toBe(body);
+    expect(tools.find(tool => tool.name === "create_issue").inputSchema.properties.artifacts.items.properties.body).not.toHaveProperty("maxLength");
+  });
+
+  it("preserves large HTML source and does not apply Markdown line truncation to artifacts", async () => {
+    const handler = await main({});
+    const html = `<p>${"x".repeat(600000)}</p>`;
+    const markdown = "line\n".repeat(70000).trimEnd();
+    const result = await handler(
+      {
+        ...message,
+        artifacts: [
+          { type: "embedded_html", name: "HTML", body: html },
+          { name: "Lines", body: markdown },
+        ],
+      },
+      {}
+    );
+    expect(result.success).toBe(true);
+    expect(client.request.mock.calls[0][1].body).toBe(html);
+    expect(client.request.mock.calls[1][1].body).toBe(markdown);
+  });
+
+  it.each([false, true])("rejects bodies above the configured byte limit before writes (staged: %s)", async staged => {
+    const handler = await main({ staged, max_issue_artifact_size: 4 });
+    const result = await handler({ ...message, artifacts: [{ name: "Notes", body: "12345" }] }, {});
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("5 UTF-8 bytes");
+    expect(result.error).toContain("limit of 4 bytes");
+    expect(client.rest.issues.create).not.toHaveBeenCalled();
+    expect(client.request).not.toHaveBeenCalled();
+  });
+
+  it("counts UTF-8 bytes rather than JavaScript characters", async () => {
+    const handler = await main({ max_issue_artifact_size: 4 });
+    const result = await handler({ ...message, artifacts: [{ name: "Notes", body: "\u00e9\u00e9\u00e9" }] }, {});
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("6 UTF-8 bytes");
+    expect(client.rest.issues.create).not.toHaveBeenCalled();
+    expect(normalizeIssueArtifacts([{ name: "Notes", body: "\u00e9\u00e9" }], 10, 4)[0].body).toBe("\u00e9\u00e9");
+  });
+
+  it("measures each body independently rather than combining artifact sizes", async () => {
+    const handler = await main({ max_issue_artifact_size: 4 });
+    const result = await handler(
+      {
+        ...message,
+        artifacts: [
+          { name: "First", body: "1234" },
+          { name: "Second", body: "5678" },
+        ],
+      },
+      {}
+    );
+    expect(result.success).toBe(true);
+    expect(client.request).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects bodies that expand beyond the limit during sanitization", async () => {
+    const handler = await main({ max_issue_artifact_size: 8 });
+    const result = await handler({ ...message, artifacts: [{ name: "Notes", body: "@outside" }] }, {});
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("10 UTF-8 bytes");
+    expect(client.rest.issues.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects bodies that expand beyond the limit during reference resolution", async () => {
+    const handler = await main({ max_issue_artifact_size: 10 });
+    const result = await handler({ ...message, artifacts: [{ name: "Notes", body: "#aw_other" }] }, { aw_other: { repo: "other/long-repository", number: 99 } });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("max-issue-artifact-size");
+    expect(client.rest.issues.create).not.toHaveBeenCalled();
+  });
+
+  it("rechecks the final body after resolving a new issue's own temporary ID", async () => {
+    client.rest.issues.create.mockResolvedValue({ data: { ...issue, number: 1234567890123456 } });
+    const handler = await main({ max_issue_artifact_size: 9 });
+    const result = await handler({ ...message, artifacts: [{ name: "Notes", body: "#aw_cache" }] }, {});
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("max-issue-artifact-size");
+    expect(result.error).toContain("0/1 attached");
+    expect(client.rest.issues.create).toHaveBeenCalledOnce();
+    expect(client.request).not.toHaveBeenCalled();
+  });
+
+  it.each([0, -1, 1.5, "1024"])("rejects invalid configured sizes explicitly: %s", async max_issue_artifact_size => {
+    const handler = await main({ max_issue_artifact_size });
+    const result = await handler(message, {});
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("max-issue-artifact-size must be a positive integer");
+    expect(client.rest.issues.create).not.toHaveBeenCalled();
   });
 
   it("enforces the default cap of 10 before creating an issue", async () => {

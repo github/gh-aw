@@ -151,7 +151,7 @@
               "body": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 524288,
+                "description": "Artifact content, limited by max-issue-artifact-size in UTF-8 bytes (default: 1048576).",
                 "pattern": ".*\\S.*"
               }
             },

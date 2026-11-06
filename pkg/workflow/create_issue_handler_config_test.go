@@ -147,13 +147,16 @@ func TestCreateIssueArtifactLimit(t *testing.T) {
 		name   string
 		config string
 		want   int
+		size   int
 	}{
-		{"default", "", 10},
-		{"positive", "max-issue-artifacts: 2", 2},
-		{"zero", "max-issue-artifacts: 0", 0},
-		{"negative", "max-issue-artifacts: -2", -2},
-		{"alias", "max-isssue-artifacts: 4", 4},
-		{"canonical-precedence", "max-issue-artifacts: 3\n    max-isssue-artifacts: 4", 3},
+		{"default", "", 10, 1048576},
+		{"positive", "max-issue-artifacts: 2", 2, 1048576},
+		{"zero", "max-issue-artifacts: 0", 0, 1048576},
+		{"negative", "max-issue-artifacts: -2", -2, 1048576},
+		{"alias", "max-isssue-artifacts: 4", 4, 1048576},
+		{"canonical-precedence", "max-issue-artifacts: 3\n    max-isssue-artifacts: 4", 3, 1048576},
+		{"smaller-size", "max-issue-artifact-size: 1024", 10, 1024},
+		{"larger-size", "max-issue-artifact-size: 2097152", 10, 2097152},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := testutil.TempDir(t, "artifact-limit")
@@ -172,12 +175,18 @@ func TestCreateIssueArtifactLimit(t *testing.T) {
 			if !strings.Contains(strings.ReplaceAll(string(content), `\"`, `"`), fmt.Sprintf(`"max_issue_artifacts":%d`, tc.want)) {
 				t.Errorf("Compiled handler config does not contain max_issue_artifacts=%d", tc.want)
 			}
+			if !strings.Contains(strings.ReplaceAll(string(content), `\"`, `"`), fmt.Sprintf(`"max_issue_artifact_size":%d`, tc.size)) {
+				t.Errorf("Compiled handler config does not contain max_issue_artifact_size=%d", tc.size)
+			}
 			constraint := "Issue artifacts are disabled; omit artifacts."
 			if tc.want > 0 {
 				constraint = fmt.Sprintf("Maximum %d artifact(s) can be attached per issue.", tc.want)
 			}
 			if !strings.Contains(string(content), constraint) {
 				t.Errorf("Compiled tool description does not contain %q", constraint)
+			}
+			if tc.want > 0 && !strings.Contains(string(content), fmt.Sprintf("Maximum artifact body size: %d UTF-8 bytes.", tc.size)) {
+				t.Errorf("Compiled tool description does not contain the configured artifact size")
 			}
 		})
 	}

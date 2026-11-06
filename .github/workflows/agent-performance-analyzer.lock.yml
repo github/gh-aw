@@ -925,7 +925,7 @@ jobs:
         env:
           GH_AW_FILE_ROOT: "${{ runner.temp }}/gh-aw"
           GH_AW_FILE_CONFIG: "{\"files\":[{\"path\":\"safeoutputs/config.json\",\"content_env\":\"GH_AW_SAFE_OUTPUTS_CONFIG\"}]}"
-          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"add_comment\":{\"max\":10},\"create_discussion\":{\"category\":\"audits\",\"expires\":24,\"fallback_to_issue\":true,\"max\":1},\"create_issue\":{\"expires\":48,\"group\":true,\"labels\":[\"cookie\"],\"max\":5,\"max_issue_artifacts\":10},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"push_repo_memory\":{\"memories\":[{\"dir\":\"/tmp/gh-aw/repo-memory/default\",\"file_glob\":\"*.json *.md\",\"id\":\"default\",\"max_file_count\":100,\"max_file_size\":102400,\"max_patch_size\":51200}]},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"add_comment\":{\"max\":10},\"create_discussion\":{\"category\":\"audits\",\"expires\":24,\"fallback_to_issue\":true,\"max\":1},\"create_issue\":{\"expires\":48,\"group\":true,\"labels\":[\"cookie\"],\"max\":5,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"push_repo_memory\":{\"memories\":[{\"dir\":\"/tmp/gh-aw/repo-memory/default\",\"file_glob\":\"*.json *.md\",\"id\":\"default\",\"max_file_count\":100,\"max_file_size\":102400,\"max_patch_size\":51200}]},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
         with:
           script: |
             const path = require('path');
@@ -941,7 +941,7 @@ jobs:
               "description_suffixes": {
                 "add_comment": " CONSTRAINTS: Maximum 10 comment(s) can be added. Supports reply_to_id for discussion threading.",
                 "create_discussion": " CONSTRAINTS: Maximum 1 discussion(s) can be created. Discussions will be created in category \"audits\".",
-                "create_issue": " CONSTRAINTS: Maximum 5 issue(s) can be created. Labels [\"cookie\"] will be automatically added. Maximum 10 artifact(s) can be attached per issue."
+                "create_issue": " CONSTRAINTS: Maximum 5 issue(s) can be created. Labels [\"cookie\"] will be automatically added. Maximum 10 artifact(s) can be attached per issue. Maximum artifact body size: 1048576 UTF-8 bytes."
               },
               "repo_params": {},
               "dynamic_tools": []
@@ -3202,7 +3202,7 @@ jobs:
           GH_AW_ALLOWED_DOMAINS: "*.grafana.net,*.sentry.io,archive.ubuntu.com,azure.archive.ubuntu.com,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,json-schema.org,json.schemastore.org,keyserver.ubuntu.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,s.symcb.com,s.symcd.com,security.ubuntu.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com"
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"max\":10},\"create_discussion\":{\"category\":\"audits\",\"expires\":24,\"fallback_to_issue\":true,\"max\":1},\"create_issue\":{\"expires\":48,\"group\":true,\"labels\":[\"cookie\"],\"max\":5,\"max_issue_artifacts\":10},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"max\":10},\"create_discussion\":{\"category\":\"audits\",\"expires\":24,\"fallback_to_issue\":true,\"max\":1},\"create_issue\":{\"expires\":48,\"group\":true,\"labels\":[\"cookie\"],\"max\":5,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
           GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}

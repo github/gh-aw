@@ -987,8 +987,9 @@ async function main(config = {}) {
     let artifacts;
     let preparedIssueFieldsInput = [];
     try {
-      artifacts = sanitizeIssueArtifacts(normalizeIssueArtifacts(message.artifacts, config.max_issue_artifacts), { allowedAliases: allowedMentionAliases, maxMentions });
+      artifacts = sanitizeIssueArtifacts(normalizeIssueArtifacts(message.artifacts, config.max_issue_artifacts, config.max_issue_artifact_size), { allowedAliases: allowedMentionAliases, maxMentions });
       artifacts = artifacts.map(artifact => ({ ...artifact, body: replaceTemporaryIdReferences(artifact.body, temporaryIdMap, qualifiedItemRepo) }));
+      artifacts = normalizeIssueArtifacts(artifacts, config.max_issue_artifacts, config.max_issue_artifact_size);
       issueFields = normalizeIssueFields(message.fields);
       validateAllowedIssueFields(issueFields, allowedIssueFields);
       if (issueFields.length > 0) {
@@ -1321,7 +1322,7 @@ async function main(config = {}) {
       let createdArtifacts;
       try {
         const resolvedArtifacts = artifacts.map(artifact => ({ ...artifact, body: replaceTemporaryIdReferences(artifact.body, temporaryIdMap, qualifiedItemRepo) }));
-        createdArtifacts = await createIssueArtifacts(githubClient, repoParts.owner, repoParts.repo, issue.number, resolvedArtifacts);
+        createdArtifacts = await createIssueArtifacts(githubClient, repoParts.owner, repoParts.repo, issue.number, resolvedArtifacts, config.max_issue_artifact_size);
       } catch (error) {
         const artifactError = getErrorMessage(error);
         core.error(artifactError);

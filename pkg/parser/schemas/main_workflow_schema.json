@@ -6834,6 +6834,12 @@
                   "type": "integer",
                   "description": "Alias for max-issue-artifacts. If both are specified, max-issue-artifacts takes precedence."
                 },
+                "max-issue-artifact-size": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "default": 1048576,
+                  "description": "Maximum UTF-8 size of each issue artifact body in bytes (default: 1048576, or 1 MB). Oversized bodies are rejected, not truncated."
+                },
                 "assignees": {
                   "oneOf": [
                     {

@@ -219,6 +219,7 @@ func createIssueConstraints(config *CreateIssuesConfig) []string {
 		appendAllowedIssueFieldsConstraint(constraints, config.AllowedFields)
 		if limit := config.maxIssueArtifacts(); limit > 0 {
 			*constraints = append(*constraints, fmt.Sprintf("Maximum %d artifact(s) can be attached per issue.", limit))
+			*constraints = append(*constraints, fmt.Sprintf("Maximum artifact body size: %d UTF-8 bytes.", config.maxIssueArtifactSize()))
 		} else {
 			*constraints = append(*constraints, "Issue artifacts are disabled; omit artifacts.")
 		}

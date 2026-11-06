@@ -7,6 +7,7 @@ const { GITHUB_API_VERSION } = require("./constants.cjs");
 const { withRetry, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { sanitizeTitle } = require("./sanitize_title.cjs");
+const DEFAULT_MAX_ISSUE_ARTIFACT_SIZE = 1024 * 1024;
 
 /**
  * @typedef {{type: "generic" | "link" | "plan" | "embedded_html", name: string, body: string}} IssueArtifact
@@ -16,10 +17,12 @@ const { sanitizeTitle } = require("./sanitize_title.cjs");
  * Validate all artifacts before creating their issue.
  * @param {unknown} value
  * @param {number} [maxArtifacts=10] - Per-issue limit; non-positive values disable artifacts.
+ * @param {number} [maxSizeBytes=1048576] - Maximum UTF-8 bytes per artifact body.
  * @returns {IssueArtifact[]}
  */
-function normalizeIssueArtifacts(value, maxArtifacts = 10) {
+function normalizeIssueArtifacts(value, maxArtifacts = 10, maxSizeBytes = DEFAULT_MAX_ISSUE_ARTIFACT_SIZE) {
   if (!Number.isSafeInteger(maxArtifacts)) throw new Error(`${ERR_VALIDATION}: max-issue-artifacts must be an integer`);
+  if (!Number.isSafeInteger(maxSizeBytes) || maxSizeBytes <= 0) throw new Error(`${ERR_VALIDATION}: max-issue-artifact-size must be a positive integer in bytes`);
   if (value === undefined) return [];
   if (!Array.isArray(value)) throw new Error(`${ERR_VALIDATION}: create_issue 'artifacts' must be an array`);
   if (value.length > Math.max(0, maxArtifacts)) {
@@ -40,11 +43,24 @@ function normalizeIssueArtifacts(value, maxArtifacts = 10) {
     if (typeof artifact.name !== "string" || !artifact.name.trim()) {
       throw new Error(`${ERR_VALIDATION}: ${field}.name must be a non-empty string`);
     }
-    if (typeof artifact.body !== "string" || !artifact.body.trim() || artifact.body.length > 524288) {
-      throw new Error(`${ERR_VALIDATION}: ${field}.body must be a non-empty string of at most 524288 characters`);
+    if (typeof artifact.body !== "string" || !artifact.body.trim()) {
+      throw new Error(`${ERR_VALIDATION}: ${field}.body must be a non-empty string`);
     }
+    validateIssueArtifactBodySize(artifact.body, maxSizeBytes, `${field}.body`);
     return { type, name: artifact.name.trim(), body: artifact.body };
   });
+}
+
+/**
+ * @param {string} body
+ * @param {number} maxSizeBytes
+ * @param {string} field
+ */
+function validateIssueArtifactBodySize(body, maxSizeBytes, field) {
+  const size = Buffer.byteLength(body, "utf8");
+  if (size > maxSizeBytes) {
+    throw new Error(`${ERR_VALIDATION}: ${field} is ${size} UTF-8 bytes, exceeding max-issue-artifact-size limit of ${maxSizeBytes} bytes`);
+  }
 }
 
 /**
@@ -55,6 +71,8 @@ function normalizeIssueArtifacts(value, maxArtifacts = 10) {
  * @returns {IssueArtifact[]}
  */
 function sanitizeIssueArtifacts(artifacts, options) {
+  // Size limits reject content before and after sanitization instead of truncating it.
+  const bodyOptions = { ...options, maxLength: Number.MAX_SAFE_INTEGER, maxLines: Number.MAX_SAFE_INTEGER };
   return artifacts.map(artifact => {
     const name = sanitizeTitle(artifact.name);
     let body;
@@ -62,10 +80,10 @@ function sanitizeIssueArtifacts(artifacts, options) {
       const longestRun = Array.from(artifact.body.matchAll(/`+/g)).reduce((longest, match) => Math.max(longest, match[0].length), 0);
       const fence = "`".repeat(Math.max(3, longestRun + 1));
       const source = `${fence}html\n${artifact.body}\n${fence}`;
-      const sanitized = sanitizeContent(source, { ...options, maxLength: source.length * 2, maxLines: source.length + 1 });
+      const sanitized = sanitizeContent(source, bodyOptions);
       body = sanitized.slice(`${fence}html\n`.length, -`\n${fence}`.length);
     } else {
-      body = sanitizeContent(artifact.body, options);
+      body = sanitizeContent(artifact.body, bodyOptions);
     }
     if (!name.trim() || !body.trim()) throw new Error(`${ERR_VALIDATION}: Issue artifact name and body must remain non-empty after sanitization`);
     return { ...artifact, name, body };
@@ -78,12 +96,14 @@ function sanitizeIssueArtifacts(artifacts, options) {
  * @param {string} repo
  * @param {number} issueNumber
  * @param {IssueArtifact[]} artifacts
+ * @param {number} [maxSizeBytes=1048576]
  * @returns {Promise<Array<{number: number, url: string | undefined}>>}
  */
-async function createIssueArtifacts(githubClient, owner, repo, issueNumber, artifacts) {
+async function createIssueArtifacts(githubClient, owner, repo, issueNumber, artifacts, maxSizeBytes = DEFAULT_MAX_ISSUE_ARTIFACT_SIZE) {
   const created = [];
   for (const artifact of artifacts) {
     try {
+      validateIssueArtifactBodySize(artifact.body, maxSizeBytes, `Artifact "${artifact.name}" body`);
       const { data } = await withRetry(
         () =>
           githubClient.request("POST /repos/{owner}/{repo}/issues/{issue_number}/artifacts", {
