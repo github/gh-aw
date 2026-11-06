@@ -58,7 +58,7 @@ Assistant/tool prose isn't native error.
 | Codes | Check | Remedy |
 | --- | --- | --- |
 | `inference_access_error`, `inference_access_denied`, `authentication_failed` | Native 401/403, credential names, permissions/policy, proxy guards. | Fix access/config; budget/policy denial doesn't warrant credential rotation. |
-| `mcp_policy_error` | Blocked MCP server; organization policy. | Use approved tool/authorized policy correction; no bypass. |
+| `mcp_policy_error`, `tool_error` | MCP policy/tool failure; inspect server diagnostic. | Use approved tool/authorized policy correction; no bypass. |
 | `model_not_supported_error`, `model_endpoint_mismatch_error`, `model_endpoint_mismatch` | Model, API, tool protocol, same-run inventory/routes. | Follow [model/engine guide](debug-model-engine-misconfiguration.md); endpoint change != availability. |
 | `http_400_response_error` | Provider diagnostic, endpoint, feature/schema. | Fix unsupported request; 400 alone != model removal. |
 | `unsupported_endpoint`, `invalid_selection`, `uncorroborated_endpoint`, `uncorroborated_selection`, `harness_selection_mismatch`, `provider_mismatch` | Selection vs harness model/API/metadata. | Align selection/API; never invent evidence. |
