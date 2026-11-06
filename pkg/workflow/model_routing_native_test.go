@@ -289,7 +289,7 @@ func TestModelRoutingRejectsUnsupportedProviderTargets(t *testing.T) {
 // routedLockRoutingPattern matches the apiProxy.routing object written to a compiled lock.
 var routedLockRoutingPattern = regexp.MustCompile(`\\"routing\\":\{(\\"provider\\":\\"([a-z]+)\\",)?\\"objective\\"`)
 
-func TestModelRoutingCopilotLocksUnchanged(t *testing.T) {
+func TestModelRoutingLockProviders(t *testing.T) {
 	for _, tc := range []struct {
 		engine   string
 		provider string
@@ -314,8 +314,7 @@ func TestModelRoutingCopilotLocksUnchanged(t *testing.T) {
 		})
 	}
 
-	// Every compiled Copilot-routed lock in the repository omits the routing provider;
-	// only the native smokes and native-routed workflows carry one.
+	// Only allowlisted native-routed locks may specify a routing provider.
 	lockFiles, err := filepath.Glob(filepath.Join("..", "..", ".github", "workflows", "*.lock.yml"))
 	require.NoError(t, err)
 	native := map[string]string{
@@ -325,16 +324,23 @@ func TestModelRoutingCopilotLocksUnchanged(t *testing.T) {
 		"daily-documentation-diagram.lock.yml":   "openai",
 		"chaos-pr-bundle-fuzzer.lock.yml":        "openai",
 	}
-	routed := 0
+	routed := make(map[string]string)
 	for _, lockFile := range lockFiles {
 		content, err := os.ReadFile(lockFile)
 		require.NoError(t, err)
+		name := filepath.Base(lockFile)
 		for _, match := range routedLockRoutingPattern.FindAllStringSubmatch(string(content), -1) {
-			routed++
-			require.Equal(t, native[filepath.Base(lockFile)], match[2], "%s routing provider", filepath.Base(lockFile))
+			if match[2] == "" {
+				continue
+			}
+			expectedProvider, ok := native[name]
+			require.True(t, ok, "%s has model routing but is not allowlisted", name)
+			require.Equal(t, expectedProvider, match[2], "%s routing provider", name)
+			require.Empty(t, routed[name], "%s has multiple apiProxy.routing entries", name)
+			routed[name] = match[2]
 		}
 	}
-	require.NotZero(t, routed, "no compiled lock has apiProxy.routing")
+	require.Equal(t, native, routed, "every allowlisted lock must be compiled with its expected routing provider")
 }
 
 // TestNativeRoutingSmokeEvidence checks that the native routed smokes compile to native

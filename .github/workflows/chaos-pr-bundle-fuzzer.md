@@ -15,7 +15,7 @@ engine:
   model-provider: openai
   model-routing:
     goal: cost
-    mode: economy
+    mode: robust
 strict: true
 tools:
   cli-proxy: true
