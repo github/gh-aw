@@ -528,7 +528,6 @@ func TestSanitizeRunStepExpressions_SanitizedRunHasNoInlineExpressions(t *testin
 		`echo "${{ github.event.issue.title }}"`,
 		`curl -d "${{ github.event.issue.body }}" https://example.com`,
 		`gh api repos/${{ github.repository }}/issues/${{ github.event.issue.number }} -f title="${{ github.event.issue.title }}"`,
-		`bash -c "echo ${{ steps.build.outputs.version }} && echo ${{ inputs.env }}"`,
 	}
 
 	for _, script := range scripts {
@@ -541,6 +540,53 @@ func TestSanitizeRunStepExpressions_SanitizedRunHasNoInlineExpressions(t *testin
 			sanitizedRun := result["run"].(string)
 			assert.NotContains(t, shellExpansionContent(sanitizedRun), "${{",
 				"non-heredoc portion of sanitized run field must not contain any ${{ }} markers")
+		})
+	}
+}
+
+func TestSanitizeRunStepExpressionsRejectsShellCodeEvaluation(t *testing.T) {
+	tests := []struct {
+		name string
+		run  string
+	}{
+		{
+			name: "eval",
+			run:  `eval "echo ${{ github.event.issue.title }}"`,
+		},
+		{
+			name: "bash -c",
+			run:  `bash -c "echo ${{ github.event.issue.title }}"`,
+		},
+		{
+			name: "sh -c",
+			run:  `sh -c "echo ${{ github.event.issue.title }}"`,
+		},
+		{
+			name: "shell via env",
+			run:  `env bash -c "echo ${{ github.event.issue.title }}"`,
+		},
+		{
+			name: "shell via env with options",
+			run:  `env -u UNUSED bash -c "echo ${{ github.event.issue.title }}"`,
+		},
+		{
+			name: "shell via xargs",
+			run:  `xargs sh -c "echo ${{ github.event.issue.title }}"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			step := map[string]any{"run": tt.run}
+			result, warnings, changed := sanitizeRunStepExpressions(step)
+
+			require.False(t, changed)
+			require.Empty(t, warnings)
+			assert.Equal(t, step, result)
+			assert.NotContains(t, result, "env")
+			assert.Error(t, validateNoGitHubExpressionsInRunScriptsFromParsed(map[string]any{
+				"steps": []any{result},
+			}))
 		})
 	}
 }

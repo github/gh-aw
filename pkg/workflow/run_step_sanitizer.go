@@ -47,6 +47,7 @@
 package workflow
 
 import (
+	"bytes"
 	"fmt"
 	"maps"
 	"slices"
@@ -57,6 +58,7 @@ import (
 	"github.com/github/gh-aw/pkg/setutil"
 	"github.com/github/gh-aw/pkg/typeutil"
 	"github.com/goccy/go-yaml"
+	"mvdan.cc/sh/v3/syntax"
 )
 
 var runStepSanitizerLog = logger.New("workflow:run_step_sanitizer")
@@ -110,6 +112,13 @@ func sanitizeRunStepExpressions(step map[string]any) (map[string]any, []string, 
 		return step, nil, false
 	}
 
+	// Environment-variable expansion is not safe when its result is subsequently
+	// parsed as shell code (for example, by eval or bash -c). Leave these expressions
+	// intact so the compiler's raw run-expression validator rejects the step.
+	if runStepUsesShellCodeEvaluation(runVal) {
+		return step, nil, false
+	}
+
 	newEnv := mergeSanitizedRunStepEnv(step, ordered)
 
 	// Replace every occurrence of each expression in the run: script.
@@ -131,6 +140,128 @@ func sanitizeRunStepExpressions(step map[string]any) (map[string]any, []string, 
 	sanitized["env"] = newEnv
 
 	return sanitized, sanitizedRunStepDescriptions(step, ordered), true
+}
+
+func runStepUsesShellCodeEvaluation(run string) bool {
+	masked := maskShellActionsExpressions(run)
+	tree, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(bytes.NewReader(masked), "")
+	if err != nil {
+		return true
+	}
+
+	found := false
+	syntax.Walk(tree, func(node syntax.Node) bool {
+		call, ok := node.(*syntax.CallExpr)
+		if ok && shellCommandReevaluatesCode(call.Args) {
+			found = true
+			return false
+		}
+		return !found
+	})
+	return found
+}
+
+func shellCommandReevaluatesCode(args []*syntax.Word) bool {
+	if len(args) == 0 {
+		return false
+	}
+	command, ok := runStepShellWordLiteral(args[0]) //nolint:uncheckedsliceindex // args length is checked above.
+	if !ok {
+		return false
+	}
+	command = command[strings.LastIndex(command, "/")+1:]
+	if command == "eval" {
+		return true
+	}
+	if shellCommandName(command) {
+		return shellCommandHasCodeFlag(args, 1)
+	}
+	switch command {
+	case "builtin", "command", "env", "exec", "nice", "nohup", "setsid", "sudo", "time", "timeout", "xargs", "busybox":
+		for i := 1; i < len(args); i++ {
+			nested, ok := runStepShellWordLiteral(args[i]) //nolint:uncheckedsliceindex // i is bounded by the loop condition.
+			if !ok {
+				continue
+			}
+			if command == "env" && (nested == "-S" || nested == "--split-string") {
+				return true
+			}
+			nested = nested[strings.LastIndex(nested, "/")+1:]
+			if nested == "eval" || (shellCommandName(nested) && shellCommandHasCodeFlag(args, i+1)) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func shellCommandName(name string) bool {
+	switch name {
+	case "bash", "sh", "dash", "ash", "zsh", "ksh", "mksh", "fish":
+		return true
+	default:
+		return false
+	}
+}
+
+func shellCommandHasCodeFlag(args []*syntax.Word, start int) bool {
+	for _, word := range args[start:] {
+		arg, ok := runStepShellWordLiteral(word)
+		if !ok {
+			continue
+		}
+		if arg == "--command" || strings.HasPrefix(arg, "--command=") {
+			return true
+		}
+		if len(arg) > 1 && strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") &&
+			strings.Contains(arg[1:], "c") {
+			return true
+		}
+	}
+	return false
+}
+
+func runStepShellWordLiteral(word *syntax.Word) (string, bool) {
+	if word == nil {
+		return "", false
+	}
+	var result strings.Builder
+	for _, part := range word.Parts {
+		switch part := part.(type) {
+		case *syntax.Lit:
+			result.WriteString(part.Value)
+		case *syntax.SglQuoted:
+			if part.Dollar {
+				return "", false
+			}
+			result.WriteString(part.Value)
+		case *syntax.DblQuoted:
+			if part.Dollar {
+				return "", false
+			}
+			value, ok := runStepShellWordPartsLiteral(part.Parts)
+			if !ok {
+				return "", false
+			}
+			result.WriteString(value)
+		default:
+			return "", false
+		}
+	}
+	return result.String(), true
+}
+
+func runStepShellWordPartsLiteral(parts []syntax.WordPart) (string, bool) {
+	var result strings.Builder
+	for _, part := range parts {
+		switch part := part.(type) {
+		case *syntax.Lit:
+			result.WriteString(part.Value)
+		default:
+			return "", false
+		}
+	}
+	return result.String(), true
 }
 
 func runStepExpressionsToExtract(scanContent string) []sanitizedExpression {
