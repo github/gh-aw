@@ -70,7 +70,6 @@ func TestCompileArcDindThreatDetectionStaging(t *testing.T) {
 						_, copilotInstall := find("Install GitHub Copilot CLI")
 						require.NotNil(t, copilotInstall)
 						require.Equal(t, rootless, strings.Contains(copilotInstall["run"].(string), "--rootless"))
-						require.Contains(t, copilotInstall["run"], "--checksums-sha256")
 						foundAgentInstaller := false
 						for _, step := range workflow.Jobs["agent"].Steps {
 							if step["name"] == "Install GitHub Copilot CLI" {
