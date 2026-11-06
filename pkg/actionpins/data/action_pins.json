@@ -133,6 +133,11 @@
       "version": "v4.7.0",
       "sha": "81c6f93d4bc991e510b342a00b419b3bb4efc5c6"
     },
+    "docker/login-action@v4.8.0": {
+      "repo": "docker/login-action",
+      "version": "v4.8.0",
+      "sha": "8aa5831fb8d48d8f76594c7ddde61ae58019f550"
+    },
     "docker/metadata-action@v6.2.0": {
       "repo": "docker/metadata-action",
       "version": "v6.2.0",
