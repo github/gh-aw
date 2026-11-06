@@ -1631,7 +1631,7 @@ if (require.main === module) {
  * @param {number | undefined} [uid]
  * @param {number | undefined} [gid]
  */
-function applyBuiltinMCPRunnerIdentity(config, uid = process.getuid?.(), gid = process.getgid?.()) {
+function applyBuiltinMCPRunnerIdentity(config, uid = process.geteuid?.(), gid = process.getegid?.()) {
   const servers = config.mcpServers;
   if (!servers || typeof servers !== "object") return;
   for (const [name, server] of Object.entries(servers)) {
