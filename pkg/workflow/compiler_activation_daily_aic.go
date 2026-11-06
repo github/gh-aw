@@ -118,7 +118,7 @@ func (c *Compiler) buildActivationDailyAICGuardrailStep(data *WorkflowData) []st
 		steps = append(steps, c.buildDailyAICAppTokenMintStep(data.MaxDailyAICreditsGitHubApp)...)
 	}
 	if entry, ok := dailyAICRepoMemoryEntry(data); ok {
-		steps = append(steps, buildDailyAICRepoMemoryCloneStep(entry)...)
+		steps = append(steps, c.buildDailyAICRepoMemoryCloneStep(entry)...)
 	}
 	// Only restore observations from a verified workflow-run artifact. Actions
 	// cache restore-key matches do not establish producer provenance or freshness.
@@ -230,36 +230,41 @@ func dailyAICLedgerHydrationDir(memory RepoMemoryEntry) string {
 // clone/push steps (defaulting to the current repository and appending ".wiki"
 // for wiki-backed memories).
 func dailyAICRepoMemoryTargetRepo(memory RepoMemoryEntry) string {
-	targetRepo := memory.TargetRepo
-	if targetRepo == "" {
-		targetRepo = "${{ github.repository }}"
-	}
-	if memory.Wiki {
-		targetRepo += ".wiki"
-	}
-	return targetRepo
+	return repoMemoryTargetRepo(memory, PermissionRead)
 }
 
-func buildDailyAICRepoMemoryCloneStep(memory RepoMemoryEntry) []string {
+func (c *Compiler) buildDailyAICRepoMemoryCloneStep(memory RepoMemoryEntry) []string {
 	targetRepo := dailyAICRepoMemoryTargetRepo(memory)
 	memoryLabel := "repo-memory"
 	if memory.Wiki {
 		memoryLabel = "wiki-memory"
 	}
 	memoryDir := dailyAICRepoMemoryDir(memory)
-	return []string{
+	token := "${{ github.token }}"
+	if memory.githubApp(PermissionRead) != nil {
+		token = repoMemoryAppToken(memory, PermissionRead)
+	}
+	var steps []string
+	condition := admissionDailyAICFallbackIfExpr
+	if memory.githubApp(PermissionRead) != nil {
+		steps = append(steps, c.buildRepoMemoryAppTokenMintStep(memory, PermissionRead, string(constants.ActivationJobName), condition)...)
+	}
+	if targetCondition := repoMemoryAppTargetCondition(memory, PermissionRead); targetCondition != "" {
+		condition = combineGitHubIfExpressions(condition, targetCondition)
+	}
+	return append(steps, []string{
 		fmt.Sprintf("      - name: Clone daily AIC %s ledger (%s)\n", memoryLabel, memory.ID),
 		"        id: daily-aic-repo-memory-clone\n",
-		fmt.Sprintf("        if: %s\n", admissionDailyAICFallbackIfExpr),
+		fmt.Sprintf("        if: %s\n", condition),
 		"        env:\n",
-		"          GH_TOKEN: ${{ github.token }}\n",
+		fmt.Sprintf("          GH_TOKEN: %s\n", token),
 		"          GITHUB_SERVER_URL: ${{ github.server_url }}\n",
 		fmt.Sprintf("          BRANCH_NAME: %s\n", memory.BranchName),
 		fmt.Sprintf("          TARGET_REPO: %s\n", targetRepo),
 		fmt.Sprintf("          MEMORY_DIR: %s\n", memoryDir),
 		fmt.Sprintf("          CREATE_ORPHAN: %t\n", memory.CreateOrphan),
 		"        run: bash \"${RUNNER_TEMP}/gh-aw/actions/clone_repo_memory_branch.sh\"\n",
-	}
+	}...)
 }
 
 func appendDailyAICContinueOnError(steps []string, data *WorkflowData) []string {
