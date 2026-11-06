@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
@@ -189,6 +190,9 @@ func applyExperimentConfigMetadata(cfg *ExperimentConfig, raw map[string]any) {
 	}
 	if m, ok := raw["metric"].(string); ok {
 		cfg.Metric = m
+	}
+	if window, ok := raw["outcome_window"].(string); ok {
+		cfg.OutcomeWindow = window
 	}
 	if sd, ok := raw["start_date"].(string); ok {
 		cfg.StartDate = sd
@@ -469,8 +473,25 @@ func ParseExperimentMetricGraderReference(metric string) (string, bool) {
 	return "", false
 }
 
-// validateExperimentMetricReferences ensures experiment metrics that reference evals
-// or graders point to declared IDs.
+// ParseExperimentMetricOutcomeReference returns the outcome kind for a supported
+// outcome:<kind> metric. An unrecognized kind retains the prefix match with an empty kind.
+func ParseExperimentMetricOutcomeReference(metric string) (string, bool) {
+	kind, ok := strings.CutPrefix(strings.TrimSpace(metric), "outcome:")
+	if !ok {
+		return "", false
+	}
+	switch strings.TrimSpace(kind) {
+	case "accepted":
+		return "accepted", true
+	case "zero_touch":
+		return "zero_touch", true
+	default:
+		return "", true
+	}
+}
+
+// validateExperimentMetricReferences validates outcome kinds and maturity windows,
+// and ensures metrics that reference evals or graders point to declared IDs.
 func validateExperimentMetricReferences(configs map[string]*ExperimentConfig, evals *EvalsConfig, graders *GradersConfig) error {
 	if len(configs) == 0 {
 		return nil
@@ -498,6 +519,12 @@ func validateExperimentMetricReferences(configs map[string]*ExperimentConfig, ev
 		if cfg == nil {
 			continue
 		}
+		if cfg.OutcomeWindow != "" && cfg.OutcomeWindow != "auto" {
+			window, err := time.ParseDuration(cfg.OutcomeWindow)
+			if err != nil || window <= 0 {
+				return fmt.Errorf("experiments.%s.outcome_window: invalid value %q. Expected \"auto\" or a positive Go duration. Example: outcome_window: 72h", experimentName, cfg.OutcomeWindow)
+			}
+		}
 		if cfg.Continual != nil {
 			if len(cfg.Variants) != 2 {
 				return fmt.Errorf("experiments.%s.continual: exactly two variants are required (control, candidate)", experimentName)
@@ -508,6 +535,11 @@ func validateExperimentMetricReferences(configs map[string]*ExperimentConfig, ev
 		}
 		if err := validateExperimentMetricReference(experimentName, "metric", cfg.Metric, evalIDs, graderIDs); err != nil {
 			return err
+		}
+		for _, metric := range cfg.SecondaryMetrics {
+			if err := validateExperimentMetricReference(experimentName, "secondary_metrics", metric, evalIDs, graderIDs); err != nil {
+				return err
+			}
 		}
 		for _, guardrail := range cfg.GuardrailMetrics {
 			if err := validateExperimentMetricReference(
@@ -525,6 +557,9 @@ func validateExperimentMetricReference(
 	experimentName, field, metric string,
 	evalIDs, graderIDs map[string]struct{},
 ) error {
+	if kind, referencesOutcome := ParseExperimentMetricOutcomeReference(metric); referencesOutcome && kind == "" {
+		return fmt.Errorf("experiments.%s.%s: unknown outcome metric %q. Expected outcome:accepted or outcome:zero_touch. Example: metric: outcome:accepted", experimentName, field, metric)
+	}
 	referencedEvalID, referencesEval := ParseExperimentMetricEvalReference(metric)
 	if referencesEval {
 		if referencedEvalID == "" {

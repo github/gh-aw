@@ -3556,7 +3556,13 @@
               },
               "metric": {
                 "type": "string",
-                "description": "Primary metric to observe (e.g. 'ai_credits_total')."
+                "description": "Primary metric to observe (e.g. 'ai_credits_total', 'outcome:accepted', or 'outcome:zero_touch')."
+              },
+              "outcome_window": {
+                "type": "string",
+                "minLength": 1,
+                "default": "auto",
+                "description": "Use 'auto' to learn the maturity window from outcome decision times, or specify a positive Go duration (e.g. '72h' or '1h30m'). Defaults to auto."
               },
               "weight": {
                 "type": "array",
@@ -3590,7 +3596,7 @@
                 "items": {
                   "type": "string"
                 },
-                "description": "Additional metrics to collect and report alongside the primary metric (e.g. ['duration_ms', 'discussion_word_count'])."
+                "description": "Additional metrics to collect and report alongside the primary metric (e.g. ['duration_ms', 'outcome:accepted', 'outcome:zero_touch'])."
               },
               "guardrail_metrics": {
                 "type": "array",
@@ -3600,7 +3606,7 @@
                   "properties": {
                     "name": {
                       "type": "string",
-                      "description": "Name of the guardrail metric (e.g. 'success_rate', 'empty_output_rate')."
+                      "description": "Name of the guardrail metric (e.g. 'success_rate', 'outcome:accepted', or 'outcome:zero_touch')."
                     },
                     "direction": {
                       "type": "string",

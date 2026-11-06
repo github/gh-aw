@@ -35,6 +35,7 @@ func TestLatestEpisodeOutcomesConflictingFields(t *testing.T) {
 		{"strength", func(item *EpisodeOutcomeObservation) { item.EvidenceStrength = EvidenceWeak }},
 		{"signal", func(item *EpisodeOutcomeObservation) { item.Signal = "target_exists_only" }},
 		{"zero touch", func(item *EpisodeOutcomeObservation) { item.ZeroTouch = true }},
+		{"zero touch evidence", func(item *EpisodeOutcomeObservation) { item.ZeroTouchEvidenceComplete = true }},
 		{"latency", func(item *EpisodeOutcomeObservation) { item.TimeToOutcomeHours = 1 }},
 		{"objective value", func(item *EpisodeOutcomeObservation) { item.ObjectiveValue = 10 }},
 		{"objective labels", func(item *EpisodeOutcomeObservation) { item.ObjectiveLabels = []string{"security"} }},

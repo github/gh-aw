@@ -123,9 +123,8 @@ func enrichPullRequestEffort(ctx context.Context, item CreatedItemReport, report
 		}
 	}
 
-	if report.OutcomeStatus == OutcomeStatusAccepted {
-		_, timestampErr := time.Parse(time.RFC3339, item.Timestamp)
-		report.ZeroTouch = timestampErr == nil && commentsKnown && reviewsKnown && commitsKnown && report.HumanComments == 0 && report.HumanReviews == 0 && report.HumanEdits == 0
-	}
+	_, timestampErr := time.Parse(time.RFC3339, item.Timestamp)
+	report.ZeroTouchEvidenceComplete = timestampErr == nil && commentsKnown && reviewsKnown && commitsKnown
+	report.ZeroTouch = report.OutcomeStatus == OutcomeStatusAccepted && report.ZeroTouchEvidenceComplete && report.HumanComments == 0 && report.HumanReviews == 0 && report.HumanEdits == 0
 
 }
