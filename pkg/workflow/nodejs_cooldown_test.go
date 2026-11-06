@@ -64,8 +64,9 @@ func TestNpmEngineCooldownAtInstallationTime(t *testing.T) {
 		for _, microVM := range []bool{false, true} {
 			t.Run(test.name+map[bool]string{false: "/host", true: "/microVM"}[microVM], func(t *testing.T) {
 				var downloads atomic.Int32
-				var registry *httptest.Server
-				registry = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				registry := httptest.NewUnstartedServer(nil)
+				registryURL := "http://" + registry.Listener.Addr().String()
+				registry.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					switch r.URL.Path {
 					case "/cooldown-test":
 						w.Header().Set("Content-Type", "application/json")
@@ -75,7 +76,7 @@ func TestNpmEngineCooldownAtInstallationTime(t *testing.T) {
 							"versions": map[string]any{"1.2.3": map[string]any{
 								"name": "cooldown-test", "version": "1.2.3",
 								"bin":  map[string]string{"cooldown-test": "cli.js"},
-								"dist": map[string]string{"tarball": registry.URL + "/archive.tgz"},
+								"dist": map[string]string{"tarball": registryURL + "/archive.tgz"},
 							}},
 							"time": map[string]string{"1.2.3": time.Now().Add(-time.Duration(test.ageDays) * 24 * time.Hour).UTC().Format(time.RFC3339)},
 						}
@@ -88,7 +89,8 @@ func TestNpmEngineCooldownAtInstallationTime(t *testing.T) {
 					default:
 						http.NotFound(w, r)
 					}
-				}))
+				})
+				registry.Start()
 				defer registry.Close()
 
 				dir := t.TempDir()
