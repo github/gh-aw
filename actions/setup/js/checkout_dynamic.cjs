@@ -394,10 +394,19 @@ async function finish(options = {}) {
   }
   const actionDir = workspacePath(config.workspace, `.gh-aw/checkouts/${config.index}`);
   try {
+    // The runner reloads this composite for checkout post hooks; retain a token-free no-op.
     fs.unlinkSync(path.join(actionDir, "action.yml"));
-    fs.rmdirSync(actionDir);
+    fs.writeFileSync(
+      path.join(actionDir, "action.yml"),
+      JSON.stringify({
+        name: "Runtime repository checkout",
+        description: "Runtime repository checkout finalized",
+        runs: { using: "composite", steps: [{ shell: "bash", run: "true" }] },
+      }),
+      { flag: "wx" }
+    );
   } catch (error) {
-    throw new Error("Unable to remove the temporary runtime checkout action", { cause: error });
+    throw new Error("Unable to finalize the temporary runtime checkout action", { cause: error });
   }
   return entries;
 }

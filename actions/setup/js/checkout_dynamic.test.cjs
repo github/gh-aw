@@ -93,6 +93,19 @@ describe("runtime repository checkout", () => {
     expect(action.runs.steps).toEqual([{ shell: "bash", run: "true" }]);
   });
 
+  it.each(["", "org/a", "org/a\norg/b"])("keeps a token-free no-op composite available for post-job resolution: %s", async repositories => {
+    vi.stubEnv("GH_AW_DYNAMIC_REPOSITORIES", repositories);
+    const entries = await prepare(runtime);
+    expect(await finish()).toEqual(entries);
+    const manifest = fs.readFileSync(path.join(workspace, ".gh-aw/checkouts/0/action.yml"), "utf8");
+    const action = JSON.parse(manifest);
+    expect(action.name).toBeTruthy();
+    expect(action.description).toBeTruthy();
+    expect(action.runs).toEqual({ using: "composite", steps: [{ shell: "bash", run: "true" }] });
+    expect(manifest).not.toMatch(/token|GH_AW_DYNAMIC|\$\{\{/i);
+    expect(execFileSync("bash", ["-c", action.runs.steps[0].run], { encoding: "utf8" })).toBe("");
+  });
+
   it.each(["0", "-1", "1.5", "NaN", "Infinity", "9007199254740992", "", " 2 ", "2e1", "2repos", "${{ inputs.max }}"])("rejects invalid max-repos before authenticated reads: %s", async value => {
     vi.stubEnv("GH_AW_DYNAMIC_MAX_REPOS", value);
     await expect(prepare(runtime)).rejects.toThrow("checkout.max-repos must be a positive integer");
@@ -364,7 +377,7 @@ describe("runtime repository checkout", () => {
     expect(runGit.mock.calls[0][1].env).toEqual(options.env);
     expect(runGit.mock.calls[0][1].stdio).toEqual(["ignore", "pipe", "pipe"]);
     expect(options.stdio).toEqual(["ignore", "pipe", "pipe"]);
-    expect(fs.existsSync(path.join(workspace, ".gh-aw/checkouts/0"))).toBe(false);
+    expect(fs.existsSync(path.join(workspace, ".gh-aw/checkouts/0/action.yml"))).toBe(true);
     runGit.mockImplementation(() => {
       throw new Error("secret-token");
     });
@@ -513,7 +526,7 @@ describe("runtime repository checkout", () => {
       expect(fs.readFileSync(path.join(dir, "config"), "utf8")).not.toContain("git-credentials-");
     }
     for (const include of includes) expect(fs.existsSync(include)).toBe(false);
-    expect(fs.existsSync(path.join(workspace, ".gh-aw/checkouts/0"))).toBe(false);
+    expect(fs.existsSync(path.join(workspace, ".gh-aw/checkouts/0/action.yml"))).toBe(true);
   }, 30000);
 
   it.each(["exit 7", "exit 0"])("fails closed when explicit cleanup returns '%s' but credentials remain", async cleaner => {
@@ -601,7 +614,7 @@ describe("runtime repository checkout", () => {
     await finish();
     expect(git(target, ["rev-parse", "origin/feature"])).toBe(git(source, ["rev-parse", "feature"]));
     expect(git(target, ["config", "--local", "--list"])).not.toMatch(/promisor|partialclonefilter|extraheader|secret-token/);
-    expect(fs.existsSync(path.join(workspace, ".gh-aw/checkouts/0"))).toBe(false);
+    expect(fs.existsSync(path.join(workspace, ".gh-aw/checkouts/0/action.yml"))).toBe(true);
   }, 30000);
 
   it("never fetches repository-controlled .gitmodules remotes during finalization, even with recursive fetch configured", async () => {
