@@ -91,7 +91,11 @@ func checkDotImportIoutilUsage(pass *analysis.Pass, root inspector.Cursor, gener
 		if !ok {
 			continue
 		}
-		if _, ok := cur.Parent().Node().(*ast.SelectorExpr); ok {
+		// Skip the Sel of a selector (ioutil.X is handled by
+		// checkQualifiedIoutilUsage; x.Discard is a field or method), but keep
+		// the X side so a dot-imported receiver such as Discard.Write(p) is
+		// still reported.
+		if sel, ok := cur.Parent().Node().(*ast.SelectorExpr); ok && sel.Sel == ident {
 			continue
 		}
 		pos := pass.Fset.PositionFor(ident.Pos(), false)

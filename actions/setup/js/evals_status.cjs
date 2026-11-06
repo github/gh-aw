@@ -19,6 +19,7 @@ const EVALS_NOT_EVALUATED = "not_evaluated";
 const EVALS_REASON_CODES = Object.freeze({
   JUDGE_NOT_STARTED: "judge_not_started",
   JUDGE_FAILED: "judge_failed",
+  MODEL_UNAVAILABLE: "model_unavailable",
   NO_ASSISTANT_RESPONSE: "no_assistant_response",
   EXECUTION_EVIDENCE_UNAVAILABLE: "execution_evidence_unavailable",
 });

@@ -314,3 +314,27 @@ tools:
 	assert.False(t, applied)
 	assert.Equal(t, content, updated)
 }
+
+func TestCopilotWebFetchRemovalCodemod_PreservesNestedFragmentWithoutEngine(t *testing.T) {
+	t.Parallel()
+
+	filePath := filepath.Join(t.TempDir(), ".github", "workflows", "shared", "fragment.md")
+	content := "---\ntools:\n  web-fetch: true\n---\n"
+	frontmatter, err := parser.ExtractFrontmatterFromContent(content)
+	require.NoError(t, err)
+
+	codemod := getCopilotWebFetchRemovalCodemod()
+	updated, applied, err := codemod.ApplyWithContext(content, frontmatter.Frontmatter, filePath)
+	require.NoError(t, err)
+	assert.False(t, applied)
+	assert.Equal(t, content, updated)
+
+	contentWithEngine := strings.Replace(content, "---\n", "---\nengine: copilot\n", 1)
+	frontmatter, err = parser.ExtractFrontmatterFromContent(contentWithEngine)
+	require.NoError(t, err)
+
+	updated, applied, err = codemod.ApplyWithContext(contentWithEngine, frontmatter.Frontmatter, filePath)
+	require.NoError(t, err)
+	assert.True(t, applied)
+	assert.NotContains(t, updated, "web-fetch")
+}

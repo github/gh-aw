@@ -10580,7 +10580,12 @@ safe-outputs:
     # Enable auto-merge for the pull request. Accepts true/false, an explicit merge
     # method (squash, merge, rebase), or a GitHub Actions expression resolving to any
     # of those values. When enabled, the PR will be automatically merged once all
-    # required checks pass and required approvals are met. Defaults to false.
+    # required checks pass and required approvals are met. Auto-merge is withheld and
+    # independent review is required when protected-file changes trigger the
+    # request-review policy, detection produces a caution (including detection engine
+    # errors), or a required review fails (including when the bot authored the PR).
+    # Configured reviewers or a successful REQUEST_CHANGES review do not bypass these
+    # gates. Defaults to false.
     # (optional)
     # Accepted formats:
 
@@ -16710,7 +16715,11 @@ safe-outputs:
   # body updates enabled)
   update-pull-request: null
 
-  # Enable AI agents to merge pull requests under configured policy gates.
+  # Enable AI agents to merge pull requests under configured policy gates. Merging
+  # is blocked by detection, protected-file, or other caution notices in the live PR
+  # or review bodies, or by current detection warnings or failures, even when
+  # approvals and checks pass. Independent manual review and manual merge are
+  # required in these cases.
   # (optional)
   # Accepted formats:
 

@@ -15,7 +15,8 @@
 
 const fs = require("fs");
 const path = require("path");
-const { ERR_VALIDATION } = require("./error_codes.cjs");
+const os = require("os");
+const { ERR_CONFIG, ERR_VALIDATION } = require("./error_codes.cjs");
 
 /** @param {string} message */
 function assetValidationError(message) {
@@ -54,6 +55,69 @@ function normalizeGuardedPath(filename) {
     }
   }
   return absolute;
+}
+
+/**
+ * Resolve a safe-output source within the workspace or /tmp without following links.
+ * @param {string} filename
+ * @returns {string}
+ */
+function resolveWorkspaceOrTmpPath(filename) {
+  const absolute = normalizeGuardedPath(filename);
+  const workspace = normalizeGuardedPath(process.env.GITHUB_WORKSPACE || process.cwd());
+  for (const root of [workspace, normalizeGuardedPath("/tmp")]) {
+    const relative = path.relative(root, absolute);
+    if (relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative)) return absolute;
+  }
+  throw new Error(`${ERR_CONFIG}: File path must be within workspace directory (${workspace}) or /tmp directory. Provided path: ${filename} (resolved to: ${absolute})`);
+}
+
+/**
+ * Shared publication denylist for file uploads and issue artifact text sources.
+ * @param {string} canonicalPath
+ * @returns {string|null}
+ */
+function validateUploadSourcePath(canonicalPath) {
+  const parts = canonicalPath.split(path.sep);
+  if (parts.some(p => p === ".git")) {
+    return `path contains sensitive repository metadata (.git): ${canonicalPath}`;
+  }
+  const systemDenied = ["/etc", "/proc", "/sys", "/dev", "/run", "/boot", "/lib", "/lib64", "/usr/lib", "/usr/local/lib"];
+  for (const denied of systemDenied) {
+    const normalDenied = normalizeGuardedPath(denied);
+    if (canonicalPath === normalDenied || canonicalPath.startsWith(normalDenied + path.sep)) {
+      return `path refers to a system directory: ${canonicalPath}`;
+    }
+  }
+  const homeDir = os.homedir();
+  if (homeDir) {
+    const sensitiveNames = [".ssh", ".aws", ".gnupg", ".docker", ".kube", ".azure", ".gcp", ".config", ".netrc", ".npmrc", ".gitconfig", ".gitcredentials", ".git-credentials"];
+    for (const name of sensitiveNames) {
+      const sensitive = path.join(normalizeGuardedPath(homeDir), name);
+      if (canonicalPath === sensitive || canonicalPath.startsWith(sensitive + path.sep)) {
+        return `path refers to a sensitive HOME location: ${canonicalPath}`;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Issue artifact reads must not access general temporary runtime files.
+ * @param {string} filename
+ * @returns {string}
+ */
+function resolveIssueArtifactPath(filename) {
+  const absolute = normalizeGuardedPath(filename);
+  const workspace = normalizeGuardedPath(process.env.GITHUB_WORKSPACE || process.cwd());
+  const agentRoot = normalizeGuardedPath("/tmp/gh-aw/agent");
+  const denied = validateUploadSourcePath(absolute);
+  if (denied) throw assetValidationError(denied);
+  for (const root of [workspace, agentRoot]) {
+    const relative = path.relative(root, absolute);
+    if (relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative)) return absolute;
+  }
+  throw assetValidationError(`File path must be within workspace directory (${workspace}) or /tmp/gh-aw/agent directory. Provided path: ${filename}`);
 }
 
 /**
@@ -179,4 +243,4 @@ function writeGuardedFile(filename, content) {
   });
 }
 
-module.exports = { lstatGuard, normalizeGuardedPath, withGuardedDirectory, readGuardedFile, writeGuardedFile };
+module.exports = { lstatGuard, normalizeGuardedPath, resolveWorkspaceOrTmpPath, resolveIssueArtifactPath, validateUploadSourcePath, withGuardedDirectory, readGuardedFile, writeGuardedFile };

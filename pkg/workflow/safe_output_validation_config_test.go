@@ -85,6 +85,21 @@ func TestNoOpValidationConfig(t *testing.T) {
 	}
 }
 
+func TestCreateIssueArtifactsValidationConfig(t *testing.T) {
+	jsonStr, err := GetValidationConfigJSONWithDataSchema([]string{"create_issue"}, nil, false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var parsed map[string]TypeValidationConfig
+	if err := json.Unmarshal([]byte(jsonStr), &parsed); err != nil {
+		t.Fatal(err)
+	}
+	artifacts, ok := parsed["create_issue"].Fields["artifacts"]
+	if !ok || artifacts.Type != "array" || artifacts.Required || artifacts.ItemSanitize {
+		t.Fatalf("artifacts validation = %+v, want an optional array preserved for handler validation", artifacts)
+	}
+}
+
 func TestApproveWorkflowRunValidationConfig(t *testing.T) {
 	config, ok := ValidationConfig["approve_workflow_run"]
 	if !ok {

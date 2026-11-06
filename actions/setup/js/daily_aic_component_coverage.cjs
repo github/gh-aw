@@ -144,6 +144,22 @@ function hasFailedDecisionsEvals(directory, runId, runAttempt) {
   );
 }
 
+function hasUnavailableDecisionsModel(directory, runId, runAttempt) {
+  const status = readEvalsNotEvaluatedStatus(path.join(directory, "evals", EVALS_STATUS_FILENAME));
+  return (
+    status?.engine === "decisions" &&
+    status.reason_code === EVALS_REASON_CODES.MODEL_UNAVAILABLE &&
+    status.execution_outcome === "success" &&
+    status.execution_state === EVALS_REASON_CODES.MODEL_UNAVAILABLE &&
+    status.run_id === String(runId) &&
+    status.run_attempt === String(runAttempt) &&
+    ["evals.jsonl", path.join("evals", "evals.jsonl")].every(file => {
+      const state = inspectAccountingFile(directory, path.join(directory, file)).state;
+      return state === "missing" || state === "empty";
+    })
+  );
+}
+
 function inspectAccountingFile(directory, file) {
   const relativeFile = path.relative(directory, file);
   if (!fs.existsSync(file)) return { file: relativeFile, state: "missing" };
@@ -284,6 +300,15 @@ function sumCoveredComponents(directory, components, artifactCreatedAt, artifact
       }
       if (name === "agent" && job.conclusion === "failure" && candidateStates[0].state === "missing" && !fs.existsSync(path.join(directory, name, "execution.json")) && !legacyAgentEvidence?.artifactInspected) {
         logComponentAIC(runId, name, job, 0, "failed_before_accounting", {
+          source: candidateStates[0].file,
+        });
+        continue;
+      }
+      // Only a run-bound rejected-model marker without answer records covers a
+      // graceful Decisions skip; arbitrary not-evaluated markers do not.
+      if (name === "evals" && job.conclusion === "success" && hasUnavailableDecisionsModel(directory, runId, job.run_attempt)) {
+        core.warning(`[daily-workflow-aic] Counting unavailable Decisions model without response usage as zero for run ${runId}, attempt ${job.run_attempt}; provider billing remains unverified.`);
+        logComponentAIC(runId, name, job, 0, EVALS_REASON_CODES.MODEL_UNAVAILABLE, {
           source: candidateStates[0].file,
         });
         continue;

@@ -37,6 +37,7 @@ const MERGE_FAILURE_CODES = new Set([
   "pending_reviewers",
   "blocking_individual_review",
   "required_approval_missing",
+  "manual_review_caution",
   "blocking_review_state",
   "unresolved_review_threads",
   "merge_not_completed",

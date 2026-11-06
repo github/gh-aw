@@ -1015,7 +1015,7 @@ jobs:
         env:
           GH_AW_FILE_ROOT: "${{ runner.temp }}/gh-aw"
           GH_AW_FILE_CONFIG: "{\"files\":[{\"path\":\"safeoutputs/config.json\",\"content_env\":\"GH_AW_SAFE_OUTPUTS_CONFIG\"}]}"
-          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"add_comment\":{\"hide_older_comments\":true,\"max\":2},\"add_labels\":{\"allowed\":[\"smoke-codex\"]},\"add_smoked_label\":true,\"comment_memory\":{\"max\":1,\"memory_id\":\"default\"},\"create_issue\":{\"close_older_issues\":true,\"close_older_key\":\"smoke-codex\",\"expires\":2,\"labels\":[\"automation\",\"testing\"],\"max\":1},\"create_report_incomplete_issue\":{},\"hide_comment\":{\"max\":5},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"remove_labels\":{\"allowed\":[\"smoke\"]},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{},\"set_issue_field\":{\"allowed_fields\":[\"*\"],\"max\":1},\"unassign_from_user\":{\"allowed\":[\"githubactionagent\"],\"max\":1}}"
+          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"add_comment\":{\"hide_older_comments\":true,\"max\":2},\"add_labels\":{\"allowed\":[\"smoke-codex\"]},\"add_smoked_label\":true,\"comment_memory\":{\"max\":1,\"memory_id\":\"default\"},\"create_issue\":{\"close_older_issues\":true,\"close_older_key\":\"smoke-codex\",\"expires\":2,\"labels\":[\"automation\",\"testing\"],\"max\":1,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10},\"create_report_incomplete_issue\":{},\"hide_comment\":{\"max\":5},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"remove_labels\":{\"allowed\":[\"smoke\"]},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{},\"set_issue_field\":{\"allowed_fields\":[\"*\"],\"max\":1},\"unassign_from_user\":{\"allowed\":[\"githubactionagent\"],\"max\":1}}"
         with:
           script: |
             const path = require('path');
@@ -1031,7 +1031,7 @@ jobs:
               "description_suffixes": {
                 "add_comment": " CONSTRAINTS: Maximum 2 comment(s) can be added. Supports reply_to_id for discussion threading.",
                 "add_labels": " CONSTRAINTS: Maximum 5 add_labels call(s) allowed. Maximum 10 label(s) per call. Only these labels are allowed: [\"smoke-codex\"].",
-                "create_issue": " CONSTRAINTS: Maximum 1 issue(s) can be created. Labels [\"automation\" \"testing\"] will be automatically added.",
+                "create_issue": " CONSTRAINTS: Maximum 1 issue(s) can be created. Labels [\"automation\" \"testing\"] will be automatically added. Maximum 10 artifact(s) can be attached per issue. Maximum artifact body size: 1048576 UTF-8 bytes.",
                 "remove_labels": " CONSTRAINTS: Only these labels can be removed: [smoke].",
                 "set_issue_field": " CONSTRAINTS: Maximum 1 issue field update(s) can be made. Any issue field is allowed."
               },
@@ -1147,6 +1147,9 @@ jobs:
               "create_issue": {
                 "defaultMax": 1,
                 "fields": {
+                  "artifacts": {
+                    "type": "array"
+                  },
                   "blocked_by": {},
                   "body": {
                     "required": true,
@@ -3155,7 +3158,7 @@ jobs:
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
           GH_AW_SAFE_OUTPUT_ACTIONS: "{\"add_smoked_label\":\"add_smoked_label\"}"
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"hide_older_comments\":true,\"max\":2},\"add_labels\":{\"allowed\":[\"smoke-codex\"]},\"comment_memory\":{\"max\":1,\"memory_id\":\"default\"},\"create_issue\":{\"close_older_issues\":true,\"close_older_key\":\"smoke-codex\",\"expires\":2,\"labels\":[\"automation\",\"testing\"],\"max\":1},\"create_report_incomplete_issue\":{},\"hide_comment\":{\"max\":5},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"remove_labels\":{\"allowed\":[\"smoke\"]},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{},\"set_issue_field\":{\"allowed_fields\":[\"*\"],\"max\":1},\"unassign_from_user\":{\"allowed\":[\"githubactionagent\"],\"max\":1}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"hide_older_comments\":true,\"max\":2},\"add_labels\":{\"allowed\":[\"smoke-codex\"]},\"comment_memory\":{\"max\":1,\"memory_id\":\"default\"},\"create_issue\":{\"close_older_issues\":true,\"close_older_key\":\"smoke-codex\",\"expires\":2,\"labels\":[\"automation\",\"testing\"],\"max\":1,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10},\"create_report_incomplete_issue\":{},\"hide_comment\":{\"max\":5},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"remove_labels\":{\"allowed\":[\"smoke\"]},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{},\"set_issue_field\":{\"allowed_fields\":[\"*\"],\"max\":1},\"unassign_from_user\":{\"allowed\":[\"githubactionagent\"],\"max\":1}}"
           GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}

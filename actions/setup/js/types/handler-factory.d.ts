@@ -6,6 +6,10 @@
  * Contains handler-specific configuration from GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG
  */
 interface HandlerConfig {
+  /** Maximum issue artifacts per issue (default: 10); non-positive values disable artifacts. */
+  max_issue_artifacts?: number;
+  /** Compiled maximum UTF-8 bytes per issue artifact body (default: 1048576). */
+  max_issue_artifact_size?: number;
   /** Maximum number of items this handler should process */
   max?: number;
   /** Strict allowlist of glob patterns for files eligible for push/create. Checked independently of protected-files; both checks must pass. */

@@ -13,6 +13,10 @@ interface SafeOutputConfig {
  * Configuration for creating GitHub issues
  */
 interface CreateIssueConfig extends SafeOutputConfig {
+  /** Maximum artifacts per issue (default: 10); non-positive values disable artifacts. */
+  "max-issue-artifacts"?: number;
+  /** Maximum UTF-8 body size: integer bytes or human-friendly size (default: "1mb"). */
+  "max-issue-artifact-size"?: number | string;
   "title-prefix"?: string;
   "body-footer"?: string;
   "deduplicate-by-title"?: boolean | number;
