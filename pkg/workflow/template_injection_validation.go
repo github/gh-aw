@@ -354,10 +354,15 @@ func validateNoTemplateInjectionFromParsed(workflow map[string]any) error {
 
 		expressions := runScriptExpressions(runContent)
 		quotedHeredocSnippets, boundariesProven := runScriptHeredocExpressionSnippets(runContent)
+		shellCodeEvaluation := runStepUsesShellCodeEvaluation(runContent)
 
 		// Check each expression for unsafe contexts
 		for _, expr := range expressions {
-			if context := unsafeRunScriptExpressionContextInScript(expr, quotedHeredocSnippets, boundariesProven); context != "" {
+			context := unsafeRunScriptExpressionContextInScript(expr, quotedHeredocSnippets, boundariesProven)
+			if context == "" && shellCodeEvaluation {
+				context = "shell code evaluation"
+			}
+			if context != "" {
 				// Found an unsafe pattern - extract a snippet for context
 				snippet := extractRunSnippet(runContent, expr)
 				if quotedSnippet, quoted := quotedHeredocSnippets[expr]; quoted {
@@ -402,17 +407,20 @@ func validateNoGitHubExpressionsInRunScriptsFromParsed(workflow map[string]any) 
 
 		expressions := runScriptExpressions(runContent)
 		quotedHeredocSnippets, boundariesProven := runScriptHeredocExpressionSnippets(runContent)
+		shellCodeEvaluation := runStepUsesShellCodeEvaluation(runContent)
 		for _, expr := range expressions {
 			_, hasQuotedSnippet := quotedHeredocSnippets[expr]
 			quotedEnv := isRunScriptEnvExpression(expr) &&
 				(!boundariesProven || hasQuotedSnippet)
 			if _, valid := actionslanguageservice.WrappedExpression(expr); valid &&
-				allowedRunScriptExpressionRegex.MatchString(expr) && !quotedEnv {
+				allowedRunScriptExpressionRegex.MatchString(expr) && !quotedEnv && !shellCodeEvaluation {
 				continue
 			}
 			snippet := extractRunSnippet(runContent, expr)
 			context := detectExpressionContext(expr)
-			if quotedEnv {
+			if shellCodeEvaluation {
+				context = "shell code evaluation"
+			} else if quotedEnv {
 				context = "quoted heredoc environment"
 				if quotedSnippet, quoted := quotedHeredocSnippets[expr]; quoted {
 					snippet = quotedSnippet

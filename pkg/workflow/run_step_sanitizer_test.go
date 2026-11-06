@@ -573,18 +573,197 @@ func TestSanitizeRunStepExpressionsRejectsShellCodeEvaluation(t *testing.T) {
 			name: "shell via xargs",
 			run:  `xargs sh -c "echo ${{ github.event.issue.title }}"`,
 		},
+		{
+			name: "dynamic shell command",
+			run:  `$SHELL -c "echo ${{ github.event.issue.title }}"`,
+		},
+		{
+			name: "assigned dynamic shell command",
+			run:  `cmd=bash; "$cmd" -c "echo ${{ github.event.issue.title }}"`,
+		},
+		{
+			name: "expression in command position",
+			run:  `${{ inputs.shell }} -c "echo ${{ github.event.issue.title }}"`,
+		},
+		{
+			name: "dynamic shell option",
+			run:  `bash ${{ inputs.shell_option }} script.sh`,
+		},
+		{
+			name: "dynamic env wrapper option",
+			run:  `env ${{ vars.ENV_OPTIONS }} bash -c "echo ${{ github.event.issue.title }}"`,
+		},
+		{
+			name: "shell reading a pipeline",
+			run:  `printf '%s\n' "${{ github.event.issue.title }}" | bash`,
+		},
+		{
+			name: "shell reading stdin",
+			run:  `bash -s <<< "echo ${{ github.event.issue.title }}"`,
+		},
+		{
+			name: "shell using stdin as script",
+			run:  `printf '%s\n' "echo ${{ github.event.issue.title }}" | bash -`,
+		},
+		{
+			name: "shell using stdin device as script",
+			run:  `bash /dev/stdin <<< "echo ${{ github.event.issue.title }}"`,
+		},
+		{
+			name: "shell reading heredoc",
+			run:  "bash <<EOF\necho \"${{ github.event.issue.title }}\"\nEOF",
+		},
+		{
+			name: "attached env split string",
+			run:  `env --split-string="bash -c 'echo ${{ github.event.issue.title }}'"`,
+		},
+		{
+			name: "short attached env split string",
+			run:  `env -S"bash -c 'echo ${{ github.event.issue.title }}'"`,
+		},
+		{
+			name: "escaped evaluator name",
+			run:  `\eval "echo ${{ github.event.issue.title }}"`,
+		},
+		{
+			name: "escaped shell code option",
+			run:  `bash -\c "echo ${{ github.event.issue.title }}"`,
+		},
+		{
+			name: "dollar quoted evaluator name",
+			run:  `$'eval' "echo ${{ github.event.issue.title }}"`,
+		},
+		{
+			name: "python code string",
+			run:  `python -c "print('${{ github.event.issue.title }}')"`,
+		},
+		{
+			name: "python code from stdin",
+			run:  `printf '%s\n' "print('${{ github.event.issue.title }}')" | python -`,
+		},
+		{
+			name: "python stdin device as script",
+			run:  `python /dev/stdin <<< "print('${{ github.event.issue.title }}')"`,
+		},
+		{
+			name: "deno code string",
+			run:  `deno eval "console.log('${{ github.event.issue.title }}')"`,
+		},
+		{
+			name: "deno code from stdin",
+			run:  `printf '%s\n' "console.log('${{ github.event.issue.title }}')" | deno run -`,
+		},
+		{
+			name: "powershell command string",
+			run:  `pwsh -Command "Write-Output '${{ github.event.issue.title }}'"`,
+		},
+		{
+			name: "find exec shell",
+			run:  `find . -exec bash -c "echo ${{ github.event.issue.title }}" \;`,
+		},
+		{
+			name: "container shell",
+			run:  `docker run --rm image bash -c "echo ${{ github.event.issue.title }}"`,
+		},
+		{
+			name: "container entrypoint shell",
+			run:  `docker run --entrypoint=bash image -c "echo ${{ github.event.issue.title }}"`,
+		},
+		{
+			name: "timeout wrapper shell",
+			run:  `timeout 5 bash -c "echo ${{ github.event.issue.title }}"`,
+		},
+		{
+			name: "trap action",
+			run:  `trap "${{ github.event.issue.title }}" EXIT`,
+		},
+		{
+			name: "trap action after option separator",
+			run:  `trap -- "${{ github.event.issue.title }}" EXIT`,
+		},
+		{
+			name: "source process substitution",
+			run:  `source <(printf '%s\n' "${{ github.event.issue.title }}")`,
+		},
+		{
+			name: "dot stdin script",
+			run:  `. /dev/stdin <<< "${{ github.event.issue.title }}"`,
+		},
+		{
+			name: "source redirected file descriptor",
+			run:  `source /dev/fd/3 3<<< "echo ${{ github.event.issue.title }}"`,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			step := map[string]any{"run": tt.run}
+			before := map[string]any{"run": tt.run}
 			result, warnings, changed := sanitizeRunStepExpressions(step)
 
 			require.False(t, changed)
 			require.Empty(t, warnings)
+			assert.Equal(t, before, step)
 			assert.Equal(t, step, result)
-			assert.NotContains(t, result, "env")
-			assert.Error(t, validateNoGitHubExpressionsInRunScriptsFromParsed(map[string]any{
+			_, hasEnv := result["env"]
+			assert.False(t, hasEnv)
+			workflow := map[string]any{
+				"steps": []any{result},
+			}
+			assert.Error(t, validateNoGitHubExpressionsInRunScriptsFromParsed(workflow))
+		})
+	}
+}
+
+func TestRunStepShellEvaluationRejectsAllowlistedExpressions(t *testing.T) {
+	tests := []struct {
+		name string
+		run  string
+	}{
+		{name: "env", run: `eval "${{ env.VALUE }}"`},
+		{name: "vars", run: `bash -c "echo ${{ vars.VALUE }}"`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			step := map[string]any{"run": tt.run}
+			before := map[string]any{"run": tt.run}
+			result, warnings, changed := sanitizeRunStepExpressions(step)
+			require.False(t, changed)
+			require.Empty(t, warnings)
+			assert.Equal(t, before, step)
+			assert.Equal(t, before, result)
+			workflow := map[string]any{"steps": []any{result}}
+			assert.Error(t, validateNoGitHubExpressionsInRunScriptsFromParsed(workflow))
+			assert.Error(t, validateNoTemplateInjectionFromParsed(workflow))
+		})
+	}
+}
+
+func TestSanitizeRunStepExpressionsAllowsDataAndScriptArguments(t *testing.T) {
+	tests := []struct {
+		name string
+		run  string
+	}{
+		{name: "wrapper data argument named eval", run: `env printf '%s\n' eval "${{ inputs.label }}"`},
+		{name: "find exec data argument named eval", run: `find . -exec printf '%s\n' eval "${{ inputs.label }}" \;`},
+		{name: "find dynamic path operand", run: `find "${{ inputs.directory }}" -type f -print`},
+		{name: "script argument resembling shell option", run: `bash script.sh -c "${{ inputs.value }}"`},
+		{name: "ordinary shell script", run: `bash script.sh "${{ inputs.value }}"`},
+		{name: "piped script file", run: `printf '%s\n' "${{ inputs.value }}" | bash script.sh`},
+		{name: "container option data argument", run: `docker run --env="VALUE=${{ inputs.value }}" image printf '%s' "$VALUE"`},
+		{name: "dynamic env assignment", run: `env VALUE="${{ inputs.value }}" printf '%s\n' "$VALUE"`},
+		{name: "source static script", run: `source script.sh; echo "${{ inputs.value }}"`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, _, changed := sanitizeRunStepExpressions(map[string]any{"run": tt.run})
+			require.True(t, changed)
+			run, ok := result["run"].(string)
+			require.True(t, ok)
+			assert.NotContains(t, run, "${{")
+			_, hasEnv := result["env"]
+			assert.True(t, hasEnv)
+			assert.NoError(t, validateNoGitHubExpressionsInRunScriptsFromParsed(map[string]any{
 				"steps": []any{result},
 			}))
 		})

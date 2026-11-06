@@ -57,6 +57,7 @@ import (
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/setutil"
 	"github.com/github/gh-aw/pkg/typeutil"
+	"github.com/github/gh-aw/pkg/workflow/gradershell"
 	"github.com/goccy/go-yaml"
 	"mvdan.cc/sh/v3/syntax"
 )
@@ -149,119 +150,19 @@ func runStepUsesShellCodeEvaluation(run string) bool {
 		return true
 	}
 
-	found := false
-	syntax.Walk(tree, func(node syntax.Node) bool {
-		call, ok := node.(*syntax.CallExpr)
-		if ok && shellCommandReevaluatesCode(call.Args) {
-			found = true
-			return false
+	expressions := ExpressionPattern.FindAllStringSubmatchIndex(run, -1)
+	return gradershell.HasShellCodeEvaluation(tree, func(word *syntax.Word) bool {
+		if _, literal := gradershell.LiteralWord(word); !literal {
+			return true
 		}
-		return !found
+		start, end := int(word.Pos().Offset()), int(word.End().Offset())
+		for _, expression := range expressions {
+			if len(expression) >= 2 && start < expression[1] && expression[0] < end {
+				return true
+			}
+		}
+		return false
 	})
-	return found
-}
-
-func shellCommandReevaluatesCode(args []*syntax.Word) bool {
-	if len(args) == 0 {
-		return false
-	}
-	command, ok := runStepShellWordLiteral(args[0]) //nolint:uncheckedsliceindex // args length is checked above.
-	if !ok {
-		return false
-	}
-	command = command[strings.LastIndex(command, "/")+1:]
-	if command == "eval" {
-		return true
-	}
-	if shellCommandName(command) {
-		return shellCommandHasCodeFlag(args, 1)
-	}
-	switch command {
-	case "builtin", "command", "env", "exec", "nice", "nohup", "setsid", "sudo", "time", "timeout", "xargs", "busybox":
-		for i := 1; i < len(args); i++ {
-			nested, ok := runStepShellWordLiteral(args[i]) //nolint:uncheckedsliceindex // i is bounded by the loop condition.
-			if !ok {
-				continue
-			}
-			if command == "env" && (nested == "-S" || nested == "--split-string") {
-				return true
-			}
-			nested = nested[strings.LastIndex(nested, "/")+1:]
-			if nested == "eval" || (shellCommandName(nested) && shellCommandHasCodeFlag(args, i+1)) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func shellCommandName(name string) bool {
-	switch name {
-	case "bash", "sh", "dash", "ash", "zsh", "ksh", "mksh", "fish":
-		return true
-	default:
-		return false
-	}
-}
-
-func shellCommandHasCodeFlag(args []*syntax.Word, start int) bool {
-	for _, word := range args[start:] {
-		arg, ok := runStepShellWordLiteral(word)
-		if !ok {
-			continue
-		}
-		if arg == "--command" || strings.HasPrefix(arg, "--command=") {
-			return true
-		}
-		if len(arg) > 1 && strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") &&
-			strings.Contains(arg[1:], "c") {
-			return true
-		}
-	}
-	return false
-}
-
-func runStepShellWordLiteral(word *syntax.Word) (string, bool) {
-	if word == nil {
-		return "", false
-	}
-	var result strings.Builder
-	for _, part := range word.Parts {
-		switch part := part.(type) {
-		case *syntax.Lit:
-			result.WriteString(part.Value)
-		case *syntax.SglQuoted:
-			if part.Dollar {
-				return "", false
-			}
-			result.WriteString(part.Value)
-		case *syntax.DblQuoted:
-			if part.Dollar {
-				return "", false
-			}
-			value, ok := runStepShellWordPartsLiteral(part.Parts)
-			if !ok {
-				return "", false
-			}
-			result.WriteString(value)
-		default:
-			return "", false
-		}
-	}
-	return result.String(), true
-}
-
-func runStepShellWordPartsLiteral(parts []syntax.WordPart) (string, bool) {
-	var result strings.Builder
-	for _, part := range parts {
-		switch part := part.(type) {
-		case *syntax.Lit:
-			result.WriteString(part.Value)
-		default:
-			return "", false
-		}
-	}
-	return result.String(), true
 }
 
 func runStepExpressionsToExtract(scanContent string) []sanitizedExpression {

@@ -13,7 +13,7 @@ func (c *shellChecker) command(args []*syntax.Word, offset, depth int) error {
 	}
 	line := int(args[0].Pos().Line()) + offset //nolint:uncheckedsliceindex // The preceding guard rejects empty argument slices.
 	for wrappers := 0; wrappers < 16 && len(args) > 0; wrappers++ {
-		name, static := literalWord(args[0]) //nolint:uncheckedsliceindex // The loop checks the potentially unwrapped slice is nonempty.
+		name, static := LiteralWord(args[0]) //nolint:uncheckedsliceindex // The loop checks the potentially unwrapped slice is nonempty.
 		if !static {
 			c.add(line, uncheckedShell)
 			return nil
@@ -93,7 +93,7 @@ func commandFinding(name string, args []*syntax.Word) string {
 
 func ddWrites(args []*syntax.Word) bool {
 	for _, word := range args {
-		value, static := literalWord(word)
+		value, static := LiteralWord(word)
 		destination, output := strings.CutPrefix(value, "of=")
 		if (!static && !ddInputOperand(word)) || (output && !sinkPath(destination)) {
 			return true
@@ -131,7 +131,7 @@ func ddInputOperand(word *syntax.Word) bool {
 
 func (c *shellChecker) nestedShell(args []*syntax.Word, line, depth int) error {
 	for i := 0; i < len(args); i++ {
-		option, static := literalWord(args[i]) //nolint:uncheckedsliceindex // The loop rechecks the nonnegative cursor after option-operand skips.
+		option, static := LiteralWord(args[i]) //nolint:uncheckedsliceindex // The loop rechecks the nonnegative cursor after option-operand skips.
 		if !static {
 			break
 		}
@@ -146,7 +146,7 @@ func (c *shellChecker) nestedShell(args []*syntax.Word, line, depth int) error {
 		}
 		if strings.HasPrefix(option, "-") && !strings.HasPrefix(option, "--") && strings.Contains(option, "c") {
 			if i+1 < len(args) && depth < 8 {
-				if source, known := literalWord(args[i+1]); known { //nolint:uncheckedsliceindex // The enclosing guard bounds the lookahead; i starts at zero.
+				if source, known := LiteralWord(args[i+1]); known { //nolint:uncheckedsliceindex // The enclosing guard bounds the lookahead; i starts at zero.
 					return c.source(source, line-1, depth+1)
 				}
 			}
@@ -167,7 +167,7 @@ func (c *shellChecker) nestedShell(args []*syntax.Word, line, depth int) error {
 func teeWrites(args []*syntax.Word) bool {
 	options := true
 	for _, word := range args {
-		value, static := literalWord(word)
+		value, static := LiteralWord(word)
 		if options && static {
 			if value == "--" {
 				options = false
@@ -191,7 +191,7 @@ func inPlace(args []*syntax.Word, command string) bool {
 			skip = false
 			continue
 		}
-		value, static := literalWord(word)
+		value, static := LiteralWord(word)
 		if !static {
 			continue
 		}
@@ -224,7 +224,7 @@ func inPlace(args []*syntax.Word, command string) bool {
 
 func outputOption(args []*syntax.Word, short, long string) bool {
 	for index, word := range args {
-		value, static := literalWord(word)
+		value, static := LiteralWord(word)
 		if !static {
 			continue
 		}
@@ -236,7 +236,7 @@ func outputOption(args []*syntax.Word, short, long string) bool {
 			if long == "--remote-name" || index+1 >= len(args) {
 				return true
 			}
-			if operand, static = literalWord(args[index+1]); !static { //nolint:uncheckedsliceindex // The preceding guard bounds the lookahead and range makes index nonnegative.
+			if operand, static = LiteralWord(args[index+1]); !static { //nolint:uncheckedsliceindex // The preceding guard bounds the lookahead and range makes index nonnegative.
 				return true
 			}
 		} else if after, found := strings.CutPrefix(value, long+"="); found {
@@ -260,7 +260,7 @@ func tarWrites(args []*syntax.Word) bool {
 			skip = false
 			continue
 		}
-		value, static := literalWord(word)
+		value, static := LiteralWord(word)
 		if !static {
 			continue
 		}
@@ -294,7 +294,7 @@ func tarWrites(args []*syntax.Word) bool {
 
 func (c *shellChecker) find(args []*syntax.Word, line, offset, depth int) error {
 	for i, word := range args {
-		value, static := literalWord(word)
+		value, static := LiteralWord(word)
 		if !static {
 			continue
 		}
@@ -304,7 +304,7 @@ func (c *shellChecker) find(args []*syntax.Word, line, offset, depth int) error 
 		case "-exec", "-execdir", "-ok", "-okdir":
 			end := i + 1
 			for ; end < len(args); end++ {
-				value, known := literalWord(args[end]) //nolint:uncheckedsliceindex // end starts at nonnegative range index i+1 and is bounded by the loop.
+				value, known := LiteralWord(args[end]) //nolint:uncheckedsliceindex // end starts at nonnegative range index i+1 and is bounded by the loop.
 				if known && (value == ";" || value == "+") {
 					break
 				}
