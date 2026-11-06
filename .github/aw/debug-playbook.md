@@ -33,7 +33,7 @@ Unknown: [unmapped codes](#unmapped-codes).
 | `workflow_failed` | First failed step; native error. | Route specific cause; conclusion isn't root cause. |
 | `workflow_timeout` | Step/budget/result. | Remove blockers/narrow scope; justify timeout changes. |
 | `multiple_errors` | First error vs cascades. | Fix cause, not repeats. |
-| `mcp_server_failures`, `tools_not_available` | MCP startup, registration, failed calls. | Fix tool/server/config/auth; no blind permission expansion. |
+| `mcp_server_failures`, `tools_not_available`, `tool_error` | MCP startup, registration, failed calls/results. | Fix tool/server/config/auth; no blind permission expansion. |
 | `model_unavailable`, `model_endpoint_unsupported` | Full same-run inventory: absent model/incompatible endpoint. | [Model availability](#model-availability); verify candidate/API, edit pin, recompile. |
 | `model_availability_unknown` | Missing/incomplete/malformed/ambiguous/contradictory reflection. | Inspect discovery/auth; do not declare removal/switch models without evidence. |
 | `model_resolution_failed` | Failed `model.resolution`; missing same-role startup-stop evidence. | Advisory: verify pins; unproven cause. |
