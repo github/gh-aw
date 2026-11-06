@@ -12,7 +12,7 @@ Use these helpers to normalize provider aliases and model identifiers for consis
 
 | Function | Signature | Description |
 |----------|-----------|-------------|
-| `NormalizeProvider` | `func(provider string) string` | Normalizes provider aliases such as `github`, `copilot`, and `github_models` to `github-copilot`, and lower-cases other provider identifiers |
+| `NormalizeProvider` | `func(provider string) string` | Normalizes provider aliases such as `github`, `copilot`, and `github_models` to `github-copilot`; other identifiers are trimmed and lower-cased |
 | `NormalizeComparableModelID` | `func(value string) string` | Lower-cases a model identifier, trims surrounding whitespace, and replaces `.` and `_` with `-` so equivalent model IDs compare consistently |
 
 ## Usage Example
@@ -20,8 +20,8 @@ Use these helpers to normalize provider aliases and model identifiers for consis
 ```go
 import "github.com/github/gh-aw/pkg/modelsdev"
 
-provider := modelsdev.NormalizeProvider("github")
-modelID := modelsdev.NormalizeComparableModelID("GPT_4.1")
+provider := modelsdev.NormalizeProvider("github")          // "github-copilot"
+modelID := modelsdev.NormalizeComparableModelID("GPT_4.1") // "gpt-4-1"
 _ = provider
 _ = modelID
 ```
