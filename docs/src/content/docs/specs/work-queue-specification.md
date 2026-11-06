@@ -901,6 +901,11 @@ projection is shared between reads. The synthetic Git-history benchmark includes
 ancestry commits, with a
 three-second cold-validation budget excluding fixture construction and without
 hosted network latency. This budget does not extend durable delivery deadlines.
+An always-on full-history test covers 70 checkpoint generations and 1,470
+ancestry commits with retained Claims and requests. It checks the exact head and
+complete replayed projection through cold production Git transport, and rejects
+a broken oldest-checkpoint Git-parent binding despite valid newer snapshots.
+Both cases have a ten-second local-read ceiling; fixture construction is excluded.
 The optional captured-history benchmark checks the exact immutable head and
 replayed projection through production Git transport, including its cold
 object transfer and integrity checks, with a ten-second local-read ceiling.

@@ -11,7 +11,7 @@ const { createGitLedgerClient, gitEnvironment, queueLedgerClient, registerQueueL
 const { wrapGithubClient } = require("./work_queue_issue_pacing.cjs");
 const { readWorkQueueLog, publishWorkQueueRequest } = require("./work_queue_store.cjs");
 const { readCheckedQueue, writeCheckedFiles } = require("./work_queue_checked_transport.cjs");
-const { compactTransactions, newRequest, serializeTransactionLog } = require("./work_queue_replay.cjs");
+const { compactTransactions, newRequest, replayTransactions, serializeProjection, serializeTransactionLog } = require("./work_queue_replay.cjs");
 const { queueFixture } = require("./work_queue_lifecycle.test_helpers.cjs");
 const { context } = require("./work_queue_test_helpers.cjs");
 const { canonical } = require("./work_queue_codec.cjs");
@@ -42,6 +42,20 @@ function fixture(options = {}) {
     git(["update-ref", "refs/heads/work-queue", head]);
     return head;
   }
+  function storeHistory(transactions, count) {
+    const contents = transactions.map(commit => canonical(commit) + "\n").join("");
+    const input = [`blob\nmark :1\ndata ${Buffer.byteLength(contents)}\n${contents}\n`];
+    for (let index = 0; index < count; index++) {
+      const message = `Queue fixture ${++serial}`;
+      input.push(
+        `commit refs/heads/work-queue\nmark :${index + 2}\ncommitter Queue fixture <queue-fixture@example.invalid> ${queue.at} +0000\ndata ${Buffer.byteLength(message)}\n${message}\nfrom ${index ? `:${index + 1}` : head}\nM 100644 :1 work-queue.jsonl\n\n`
+      );
+    }
+    input.push("done\n");
+    git(["fast-import", "--quiet"], input.join(""));
+    head = git(["rev-parse", "refs/heads/work-queue"]);
+    return head;
+  }
   store(queue.transactions);
   const calls = [];
   const networkCalls = [];
@@ -60,7 +74,41 @@ function fixture(options = {}) {
   const ledger = createGitLedgerClient({ githubClient, owner: "owner", repo: "repo", branch: "work-queue", remote: directory });
   registerQueueLedgerClient(githubClient, ledger);
   cleanups.push(() => ledger.close());
-  return { queue, githubClient, ledger, calls, networkCalls, store, git, options: { githubClient, owner: "owner", repo: "repo" }, head: () => head };
+  return { queue, githubClient, ledger, calls, networkCalls, store, storeHistory, git, options: { githubClient, owner: "owner", repo: "repo" }, head: () => head };
+}
+
+function performanceHistory({ generations = 4, commitsPerCheckpoint = 32, bound = false, corruptOldest = false } = {}) {
+  const f = fixture({
+    count: 135,
+    granted: bound,
+    bound,
+    workDefaults: { payload: { plan: "Verify the original synthetic work item without resource effects. ".repeat(80), effect_contract: { kind: "none" } } },
+  });
+  const retained = 1200;
+  const initial = f.queue.state;
+  let transactions = [...f.queue.transactions];
+  for (let index = 0; index < retained; index++) {
+    const operations = [{ kind: "Control", control: "admission_paused", value: index % 2 === 0, reason: "performance_fixture" }];
+    transactions.push({
+      version: 3,
+      id: `performance-control-${index}`,
+      previous: transactions.at(-1).id,
+      request: newRequest(`performance-request-${index}`, "control", f.queue.administrator, { operations }),
+      actor: f.queue.administrator,
+      policy_epoch: initial.policy_epoch,
+      at: f.queue.at + index + 1,
+      operations,
+    });
+  }
+  f.store(transactions);
+  for (let generation = 0; generation < generations; generation++) {
+    const source = transactions;
+    transactions = compactTransactions(source, f.head(), f.queue.administrator, f.queue.at + retained + generation);
+    // Preserve valid logical snapshots while breaking the oldest checkpoint's Git-parent binding.
+    if (generation === 0 && corruptOldest) f.store(source, { parents: [] });
+    f.storeHistory(transactions, commitsPerCheckpoint);
+  }
+  return { f, transactions, retained, generations, commitsPerCheckpoint, initial };
 }
 
 describe("Git-only work queue ledger", { timeout: 30000 }, () => {
@@ -130,32 +178,7 @@ describe("Git-only work queue ledger", { timeout: 30000 }, () => {
   });
 
   it("validates a synthetic live-sized nested Git history in less than three seconds from cold", async () => {
-    const f = fixture({
-      count: 135,
-      granted: false,
-      workDefaults: { payload: { plan: "Verify the original synthetic work item without resource effects. ".repeat(80), effect_contract: { kind: "none" } } },
-    });
-    const retained = 1200;
-    const epoch = f.queue.state.policy_epoch;
-    let transactions = [...f.queue.transactions];
-    for (let index = 0; index < retained; index++) {
-      const operations = [{ kind: "Control", control: "admission_paused", value: index % 2 === 0, reason: "performance_fixture" }];
-      transactions.push({
-        version: 3,
-        id: `performance-control-${index}`,
-        previous: transactions.at(-1).id,
-        request: newRequest(`performance-request-${index}`, "control", f.queue.administrator, { operations }),
-        actor: f.queue.administrator,
-        policy_epoch: epoch,
-        at: f.queue.at + index + 1,
-        operations,
-      });
-    }
-    f.store(transactions);
-    for (let generation = 0; generation < 4; generation++) {
-      transactions = compactTransactions(transactions, f.head(), f.queue.administrator, f.queue.at + retained + generation);
-      for (let index = 0; index < 32; index++) f.store(transactions);
-    }
+    const { f, transactions, retained } = performanceHistory();
     const bytes = Buffer.byteLength(transactions.map(commit => canonical(commit) + "\n").join(""));
     expect(bytes).toBeGreaterThan(700 * 1024);
     const start = performance.now();
@@ -185,6 +208,45 @@ describe("Git-only work queue ledger", { timeout: 30000 }, () => {
         budget_ms: 3000,
       })
     );
+  });
+
+  it.each([false, true])("verifies the full cold Git history, including its oldest checkpoint (corrupted: %s)", async corruptOldest => {
+    const { f, transactions, retained, generations, commitsPerCheckpoint, initial } = performanceHistory({ generations: 70, commitsPerCheckpoint: 21, bound: true, corruptOldest });
+    expect(Number(f.git(["rev-list", "--count", f.head()]))).toBe(generations * commitsPerCheckpoint + (corruptOldest ? 1 : 2));
+    expect(f.networkCalls).toEqual([]);
+    expect(initial.claims.size).toBeGreaterThan(0);
+    const expected = canonical(serializeProjection(replayTransactions(transactions)));
+    const start = performance.now();
+    let cold;
+    if (corruptOldest) {
+      await expect(readWorkQueueLog(f.options)).rejects.toMatchObject({ code: "checkpoint_invalid" });
+    } else {
+      cold = await readWorkQueueLog(f.options);
+    }
+    const coldMs = performance.now() - start;
+    if (!corruptOldest) {
+      expect(cold.sha).toBe(f.head());
+      expect(canonical(serializeProjection(cold.state))).toBe(expected);
+      expect(cold.transactions).toEqual(transactions);
+      expect(cold.state.requests.size).toBe(initial.requests.size + retained + generations);
+      expect(cold.state.claims.size).toBe(initial.claims.size);
+    }
+    expect(f.networkCalls).toHaveLength(2);
+    expect(f.calls).toEqual([]);
+    console.info(
+      JSON.stringify({
+        benchmark: "full-git-history-verification",
+        works: 135,
+        claims: initial.claims.size,
+        retained_requests: retained,
+        checkpoint_generations: generations,
+        ancestry_commits: generations * commitsPerCheckpoint,
+        corrupt_oldest: corruptOldest,
+        cold_ms: Math.round(coldMs),
+        budget_ms: 10000,
+      })
+    );
+    expect(coldMs).toBeLessThan(10000);
   });
 
   it.each(["duplicate-key", "truncated", "invalid-request"])("rejects a %s historical log even when the descendant checkpoint is valid", async defect => {
