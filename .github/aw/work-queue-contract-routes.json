@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "readers": {
+    "actions/setup/js/work_queue_replay.cjs": "4b004acabd043390a7e558b23fce26937a89e115613f11eb480dae72e67c0614",
+    "actions/setup/js/work_queue_deployment.cjs": "4b62417822eff7c32d942f0b8c3d080e275ccded3ace4287c9f803fab8ca0e60"
+  },
+  "routes": {
+    ".github/workflows/deep-report.lock.yml": {
+      "5ba80ab1b9423f26578a2cb7b0832d7eaa2d9e92b19d7564f0224e5c244187b4": "8673a9aef2a60f972e1157249f866e79505b85e4"
+    }
+  }
+}

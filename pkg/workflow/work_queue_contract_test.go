@@ -17,13 +17,14 @@ func TestDeepReportPreservesAdmittedDailyReportContract(t *testing.T) {
 	contract, err := workQueueLogicalContractFromContentWithCache(path, string(content), parser.NewImportCache(filepath.Dir(path)))
 	require.NoError(t, err)
 	// Pending daily reports retain this immutable admission contract across deployments.
-	require.Equal(t, "5ba80ab1b9423f26578a2cb7b0832d7eaa2d9e92b19d7564f0224e5c244187b4", contract)
+	require.Equal(t, "099f49b1f233e2c5ebfe89e8fb87697affeb622b76156d375591191c6b28872c", contract)
 
-	scoped := strings.Replace(string(content), "    deduplicate-by-labels: [automation, improvement, quick-win, cookie, code-quality, task-mining]\n", "", 1)
+	scoped := strings.Replace(string(content), "    deduplicate-by-title: 28\n",
+		"    deduplicate-by-title: 28\n    deduplicate-by-labels: [automation, improvement, quick-win, cookie, code-quality, task-mining]\n", 1)
 	require.NotEqual(t, string(content), scoped)
 	incompatible, err := workQueueLogicalContractFromContentWithCache(path, scoped, parser.NewImportCache(filepath.Dir(path)))
 	require.NoError(t, err)
-	require.Equal(t, "099f49b1f233e2c5ebfe89e8fb87697affeb622b76156d375591191c6b28872c", incompatible)
+	require.Equal(t, "5ba80ab1b9423f26578a2cb7b0832d7eaa2d9e92b19d7564f0224e5c244187b4", incompatible)
 }
 
 func TestWorkQueueLogicalContractPreservesInputTypes(t *testing.T) {
