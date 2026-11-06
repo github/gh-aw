@@ -11,6 +11,7 @@ const { COPILOT_MODEL_VERIFICATION_EXIT_CODE, createCopilotSDKModelObserver, rea
 const { runWithCopilotSDK } = require("./copilot_sdk_session.cjs");
 const { qualifyModelForMultiProvider } = require("./copilot_sdk_multi_provider.cjs");
 const { detectErrors } = require("./agent_error_patterns.cjs");
+const { getEffectiveModelLabel } = require("./model_attribution.cjs");
 
 // Captured, credential-free model-bearing records from Smoke Copilot SDK Routed run 39529495361
 // (native envelopes and main/sub-agent scope preserved) and the CLI control run 39529502581.
@@ -142,7 +143,13 @@ describe("Copilot SDK main-session model observation", () => {
     // Derived from the 39529495361 fixture: the main session switches to the same id on an unconfigured `copilot` provider.
     const diagnostic = watch.observe({ ...derivedMainModelChange(), data: { ...derivedMainModelChange().data, newModel: "copilot/gpt-5.6-luna" } });
     expect(diagnostic).toContain("Copilot substituted 'copilot/gpt-5.6-luna'");
-    expect(selection()).toEqual({ status: "substituted", configured_model: "gpt-5.6-luna", resolved_model: "gpt-5.6-luna", effective_model: "copilot/gpt-5.6-luna" });
+    expect(selection()).toEqual({
+      status: "substituted",
+      configured_model: "gpt-5.6-luna",
+      resolved_model: "gpt-5.6-luna",
+      effective_model: "copilot/gpt-5.6-luna",
+      observed_models: ["gpt-5.6-luna", "copilot/gpt-5.6-luna"],
+    });
     expect(watch.observe(firstMessage)).toBe(diagnostic);
     expect(selection().status).toBe("substituted");
   });
@@ -263,7 +270,13 @@ runWithCopilotSDK({
     expect(result.stderr).toContain("stopping SDK session: Copilot model verification failed");
     expect(result.stderr).toContain("Copilot substituted 'copilot-completions/claude-haiku-4.5'. Refusing silent model substitution.");
     expect(result.stderr).not.toContain("retry 1/3");
-    expect(selection()).toEqual({ status: "substituted", configured_model: "gpt-5.6-luna", resolved_model: "gpt-5.6-luna", effective_model: "copilot-completions/claude-haiku-4.5" });
+    expect(selection()).toEqual({
+      status: "substituted",
+      configured_model: "gpt-5.6-luna",
+      resolved_model: "gpt-5.6-luna",
+      effective_model: "copilot-completions/claude-haiku-4.5",
+      observed_models: ["gpt-5.6-luna", "copilot-completions/claude-haiku-4.5"],
+    });
     const diagnostic = readCopilotModelSubstitution();
     expect(result.stderr).toContain(diagnostic);
     expect(detectErrors(diagnostic).modelNotSupportedError).toBe(true);
@@ -304,15 +317,44 @@ runWithCopilotSDK({
       },
     });
     expect(result.exitCode).toBe(exitCode);
-    expect(selection()).toEqual({ status, configured_model: "auto", resolved_model: "gpt-5.6-luna", effective_model: mainModel });
+    expect(selection()).toEqual({
+      status,
+      configured_model: "auto",
+      resolved_model: "gpt-5.6-luna",
+      effective_model: mainModel,
+      ...(status === "substituted" ? { observed_models: ["gpt-5.6-luna", "gpt-5.6-sol"] } : {}),
+    });
   });
 
   it("sdk_auto_does_not_report_substitution", () => {
     const watch = createCopilotSDKModelObserver({ configuredModel: "auto", expectedModel: "auto", providerConfig: null, sessionDirs: [] });
     for (const event of mainEvents()) expect(watch.observe(event)).toBe("");
     expect(watch.finalize(SESSION_ID)).toBe("");
-    expect(selection()).toEqual({ status: "observed", configured_model: "auto", resolved_model: "auto", effective_model: "gpt-5.6-luna" });
+    expect(selection()).toEqual({
+      status: "observed",
+      configured_model: "auto",
+      resolved_model: "auto",
+      effective_model: "gpt-5.6-luna",
+      observed_models: ["copilot-responses/gpt-5.6-luna", "gpt-5.6-luna"],
+    });
     expect(readCopilotModelSubstitution()).toBe("");
+  });
+
+  it("preserves multiple native models for auto attribution without firewall usage", () => {
+    const infoPath = path.join(root, "aw_info.json");
+    const watch = createCopilotSDKModelObserver({ configuredModel: "auto", expectedModel: "auto", providerConfig: null, sessionDirs: [] });
+    expect(watch.observe({ type: "assistant.message", data: { model: "gemini-3.8-flash" } })).toBe("");
+    expect(watch.observe({ type: "assistant.message", data: { model: "claude-sonnet-5" } })).toBe("");
+    expect(watch.finalize(SESSION_ID)).toBe("");
+    expect(selection()).toEqual({
+      status: "observed",
+      configured_model: "auto",
+      resolved_model: "auto",
+      effective_model: "claude-sonnet-5",
+      observed_models: ["gemini-3.8-flash", "claude-sonnet-5"],
+    });
+    persistCopilotModelSelection();
+    expect(getEffectiveModelLabel(infoPath, "agent", process.env)).toBe("auto (Gemini 3.8 Flash, Claude Sonnet 5)");
   });
 
   it("sdk_subagent_model_events_do_not_change_main_observation", () => {

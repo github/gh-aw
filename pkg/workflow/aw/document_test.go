@@ -37,6 +37,48 @@ func TestDocumentRoundTrip(t *testing.T) {
 	}
 }
 
+func TestDocumentEnvironmentDeployment(t *testing.T) {
+	source := `---
+environment: &environment
+  name: protected-secrets
+  deployment: false # secrets only
+safe-outputs:
+  environment: *environment
+  steps:
+    - run: echo public
+jobs:
+  build:
+    environment: *environment
+    steps:
+      - run: echo public
+---
+
+# Prompt
+`
+	document, err := Parse(source)
+	require.NoError(t, err)
+	emitted, err := Emit(document)
+	require.NoError(t, err)
+	assert.Equal(t, source, emitted)
+	blocks, err := ExecutionBlocks(context.Background(), document)
+	require.NoError(t, err)
+	require.Len(t, blocks, 3)
+	for _, block := range blocks {
+		assert.Equal(t, map[string]any{"name": "protected-secrets", "deployment": false}, block.Fields["environment"], block.Path)
+	}
+
+	view := document.FrontmatterResult()
+	view.Frontmatter["environment"].(map[string]any)["deployment"] = true
+	assert.Equal(t, false, document.Frontmatter["environment"].(map[string]any)["deployment"], "compiler view must not mutate the AST")
+
+	document.Frontmatter["engine"] = "copilot"
+	emitted, err = Emit(document)
+	require.NoError(t, err)
+	reparsed, err := Parse(emitted)
+	require.NoError(t, err)
+	assert.Equal(t, document.Frontmatter, reparsed.Frontmatter)
+}
+
 func TestDocumentRunsOnRoundTrip(t *testing.T) {
 	tests := []struct {
 		name   string

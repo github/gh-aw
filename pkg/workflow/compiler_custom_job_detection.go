@@ -22,8 +22,13 @@ func (c *Compiler) guardCustomJobDetection(data *WorkflowData) error {
 	}
 	allJobs := c.jobManager.GetAllJobs()
 	allowedOutputJobs := make(map[string]struct{})
+	preAgentOutputJobs := make(map[string]struct{})
 	for id, job := range allJobs {
-		if constants.IsCompilerOwnedJobName(id) && graph.DependsOn(id, detection) && aw.HasSuccessfulDetectionCondition(job.If) {
+		_, authored := data.Jobs[id]
+		if authored && graph.IsPreAgentCustomJob(id) {
+			allowedOutputJobs[id] = struct{}{}
+			preAgentOutputJobs[id] = struct{}{}
+		} else if constants.IsCompilerOwnedJobName(id) && graph.DependsOn(id, detection) && aw.HasSuccessfulDetectionCondition(job.If) {
 			allowedOutputJobs[id] = struct{}{}
 		}
 	}
@@ -55,7 +60,7 @@ func (c *Compiler) guardCustomJobDetection(data *WorkflowData) error {
 					return fmt.Errorf("jobs.%s.detection-gate: status-only jobs cannot have dependent custom job %s; apply the same contract to a leaf job instead", id, dependent)
 				}
 			}
-			violations := aw.ValidateStatusOnlyJob(id, config, allowedOutputJobs)
+			violations := aw.ValidateStatusOnlyJob(id, config, allowedOutputJobs, preAgentOutputJobs, job.Needs)
 			if len(violations) > 0 {
 				return fmt.Errorf("%s: %s", violations[0].Path, violations[0].Message)
 			}

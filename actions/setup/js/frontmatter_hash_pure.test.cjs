@@ -4,6 +4,7 @@ const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
 const interpolationVectors = require("../../../pkg/parser/testdata/frontmatter_hash_interpolation_vectors.json");
+const nestedImportFixture = require("../../../pkg/parser/testdata/nested_import_hash.json");
 const {
   computeFrontmatterHash,
   computeBodyHash,
@@ -23,6 +24,68 @@ const {
 } = require("./frontmatter_hash_pure.cjs");
 
 describe("frontmatter_hash_pure (text-based)", () => {
+  describe("nested import resolution", () => {
+    const { workflow, imports, expressions } = nestedImportFixture;
+    const hash = text => crypto.createHash("sha256").update(text).digest("hex");
+    const expectedFrontmatter = hash(
+      marshalCanonicalJSON({
+        "frontmatter-text": workflow.frontmatter,
+        imports: imports.map(file => file.importPath).sort(),
+        "imported-frontmatters": imports
+          .map(file => file.frontmatter)
+          .sort()
+          .join("\n---\n"),
+        "template-expressions": expressions,
+      })
+    );
+    const expectedBody = hash([workflow.body, ...imports.map(file => file.body).sort()].join("\n---\n"));
+    const content = file => `---\n${file.frontmatter}\n---\n${file.body}`;
+
+    it("should hash qualified and sibling imports through the API without doubled directories", async () => {
+      const baseDir = ".github/workflows";
+      const files = new Map([workflow, ...imports].map(file => [path.join(baseDir, file.path), content(file)]));
+      const getContent = vi.fn(async ({ path: filePath }) => {
+        if (!files.has(filePath)) throw Object.assign(new Error(`Unexpected path: ${filePath}`), { status: 500 });
+        return { data: { content: files.get(filePath) } };
+      });
+      const fileReader = createGitHubFileReader({ rest: { repos: { getContent } } }, "owner", "repo", "main");
+      const workflowPath = path.join(baseDir, workflow.path);
+      const compute = async () => [await computeFrontmatterHash(workflowPath, { fileReader, readerMode: "github-api" }), await computeBodyHash(workflowPath, { fileReader })];
+      expect(await compute()).toEqual([expectedFrontmatter, expectedBody]);
+      for (const file of imports) {
+        const filePath = path.join(baseDir, file.path);
+        files.set(filePath, content({ ...file, frontmatter: `${file.frontmatter}\ndescription: changed` }));
+        const [changedFrontmatter, sameBody] = await compute();
+        expect(changedFrontmatter).not.toBe(expectedFrontmatter);
+        expect(sameBody).toBe(expectedBody);
+        files.set(filePath, content({ ...file, body: `${file.body}\nChanged \${{ vars.NESTED_CHANGE }}` }));
+        const [expressionHash, changedBody] = await compute();
+        expect(expressionHash).not.toBe(expectedFrontmatter);
+        expect(changedBody).not.toBe(expectedBody);
+        files.set(filePath, content(file));
+      }
+      expect(getContent.mock.calls.every(([request]) => !request.path.includes("/shared/shared/"))).toBe(true);
+    });
+
+    it("should produce the same complete hashes for local fallback without missing imports", async () => {
+      const baseDir = fs.mkdtempSync(path.join(require("os").tmpdir(), "nested-import-hash-"));
+      try {
+        for (const file of [workflow, ...imports]) {
+          const filePath = path.join(baseDir, file.path);
+          fs.mkdirSync(path.dirname(filePath), { recursive: true });
+          fs.writeFileSync(filePath, content(file));
+        }
+        const workflowPath = path.join(baseDir, workflow.path);
+        const onMissingImport = vi.fn();
+        expect(await computeFrontmatterHash(workflowPath, { onMissingImport })).toBe(expectedFrontmatter);
+        expect(await computeBodyHash(workflowPath)).toBe(expectedBody);
+        expect(onMissingImport).not.toHaveBeenCalled();
+      } finally {
+        fs.rmSync(baseDir, { recursive: true, force: true });
+      }
+    });
+  });
+
   describe("import read failures", () => {
     const workflowPath = ".github/workflows/test.md";
     const cases = [

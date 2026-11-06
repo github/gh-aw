@@ -55,6 +55,18 @@ describe("Copilot configured versus observed model", () => {
     });
   });
 
+  it("keeps models observed before a retry when the resumed session switches models", () => {
+    const autoObserver = () => createCopilotModelObserver({ configuredModel: "auto", resolvedModel: "auto", sessionId: "session", env });
+    const first = autoObserver();
+    append({ type: "assistant.message", data: { model: "gemini-3.8-flash" } });
+    expect(first.check()).toBe("");
+    const resumed = autoObserver();
+    append({ type: "assistant.message", data: { model: "claude-sonnet-5" } });
+    expect(resumed.check()).toBe("");
+    expect(readInfo().model_selection).toMatchObject({ status: "observed", effective_model: "claude-sonnet-5", observed_models: ["gemini-3.8-flash", "claude-sonnet-5"] });
+    expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "auto" })).toBe("auto (Gemini 3.8 Flash, Claude Sonnet 5)");
+  });
+
   it("records an unavailable model without creating workflow metadata in the sandbox", () => {
     fs.rmSync(infoPath);
     recordCopilotModelSelection({ status: "unavailable", configured_model: "gemini-3.8-flash", resolved_model: "", effective_model: "" }, env);

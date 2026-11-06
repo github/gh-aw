@@ -3870,6 +3870,28 @@ describe("safe_outputs_handlers", () => {
   });
 
   describe("createIssueHandler", () => {
+    it.each([
+      [true, ["documentation", "automated"], "Same title", "duplicate_dropped"],
+      [true, ["automated"], "Same title", "success"],
+      [true, ["documentation", "automated"], "Different title", "success"],
+      [1, ["Documentation", "automated"], "Same titlf", "duplicate_dropped"],
+      [false, ["documentation", "automated"], "Different title", "duplicate_dropped"],
+      [false, ["automated"], "Different title", "success"],
+    ])("should combine MCP title %j and labels %j as AND filters for %s", (titleFilter, firstLabels, secondTitle, expected) => {
+      const h = createHandlers(mockServer, mockAppendSafeOutput, {
+        create_issue: {
+          deduplicate_by_title: titleFilter,
+          deduplicate_by_labels: [" documentation ", "automated", " "],
+          labels: ["automated"],
+        },
+      });
+
+      h.createIssueHandler({ title: "Same title", body: "First body", labels: firstLabels.filter(label => label !== "automated") });
+      const second = h.createIssueHandler({ title: secondTitle, body: "Second body", labels: ["documentation"] });
+
+      expect(JSON.parse(second.content[0].text).result).toBe(expected);
+    });
+
     it("should deduplicate against fallback title derived from first meaningful body line", () => {
       const h = createHandlers(mockServer, mockAppendSafeOutput, {
         create_issue: {

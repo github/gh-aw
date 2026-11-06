@@ -677,10 +677,10 @@ func TestBuildCacheRestoreKeysEmptyForSinglePartKey(t *testing.T) {
 
 // TestGenerateRepoMemoryRestoreLinesNilData verifies nil/empty RepoMemoryConfig returns nil.
 func TestGenerateRepoMemoryRestoreLinesNilData(t *testing.T) {
-	assert.Nil(t, generateRepoMemoryRestoreLines(&WorkflowData{}))
-	assert.Nil(t, generateRepoMemoryRestoreLines(&WorkflowData{
+	assert.Nil(t, NewCompiler().generateRepoMemoryRestoreLines(&WorkflowData{}, "custom"))
+	assert.Nil(t, NewCompiler().generateRepoMemoryRestoreLines(&WorkflowData{
 		RepoMemoryConfig: &RepoMemoryConfig{},
-	}))
+	}, "custom"))
 }
 
 // TestGenerateCommentMemoryRestoreLinesNilData verifies nil/empty SafeOutputs returns nil.

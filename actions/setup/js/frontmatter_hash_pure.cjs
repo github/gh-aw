@@ -206,9 +206,10 @@ function extractFrontmatterAndBody(content) {
  * @param {Set<string>} visited - Set of visited files for cycle detection
  * @param {Function} fileReader - File reader function (async (filePath) => content)
  * @param {(filePath: string, error: Error) => void} [onMissingImport] - Called when an import file is missing
+ * @param {string} [rootDir] - Directory of the root workflow, retained across nested imports
  * @returns {Promise<{importedFiles: string[], importedFrontmatterTexts: string[]}>}
  */
-async function processImportsTextBased(frontmatterText, baseDir, visited = new Set(), fileReader = defaultFileReader, onMissingImport) {
+async function processImportsTextBased(frontmatterText, baseDir, visited = new Set(), fileReader = defaultFileReader, onMissingImport, rootDir = baseDir) {
   const importedFiles = [];
   const importedFrontmatterTexts = [];
 
@@ -224,7 +225,7 @@ async function processImportsTextBased(frontmatterText, baseDir, visited = new S
 
   for (const importPath of sortedImports) {
     // Join import path with base directory (preserves relative paths for GitHub API compatibility)
-    const fullPath = path.join(baseDir, importPath);
+    const fullPath = resolveHashImportPath(importPath, baseDir, rootDir);
 
     // Skip if already visited (cycle detection)
     if (visited.has(fullPath)) continue;
@@ -241,7 +242,7 @@ async function processImportsTextBased(frontmatterText, baseDir, visited = new S
 
       // Recursively process imports in the imported file
       const importBaseDir = path.dirname(fullPath);
-      const nestedResult = await processImportsTextBased(importFrontmatterText, importBaseDir, visited, fileReader, onMissingImport);
+      const nestedResult = await processImportsTextBased(importFrontmatterText, importBaseDir, visited, fileReader, onMissingImport, rootDir);
 
       // Add nested imports
       importedFiles.push(...nestedResult.importedFiles);
@@ -658,9 +659,10 @@ function marshalSorted(data) {
  * @param {string} baseDir - Base directory for resolving imports
  * @param {Set<string>} visited - Set of visited files for cycle detection
  * @param {Function} fileReader - File reader function (async (filePath) => content)
+ * @param {string} [rootDir] - Directory of the root workflow, retained across nested imports
  * @returns {Promise<string[]>} Array of imported body texts
  */
-async function collectImportedBodies(frontmatterText, baseDir, visited = new Set(), fileReader = defaultFileReader) {
+async function collectImportedBodies(frontmatterText, baseDir, visited = new Set(), fileReader = defaultFileReader, rootDir = baseDir) {
   const importedBodyTexts = [];
 
   const imports = extractImportsFromText(frontmatterText);
@@ -671,7 +673,7 @@ async function collectImportedBodies(frontmatterText, baseDir, visited = new Set
   const sortedImports = [...imports].sort();
 
   for (const importPath of sortedImports) {
-    const fullPath = path.join(baseDir, importPath);
+    const fullPath = resolveHashImportPath(importPath, baseDir, rootDir);
 
     if (visited.has(fullPath)) continue;
     visited.add(fullPath);
@@ -683,7 +685,7 @@ async function collectImportedBodies(frontmatterText, baseDir, visited = new Set
       importedBodyTexts.push(importBody);
 
       const importBaseDir = path.dirname(fullPath);
-      const nestedBodies = await collectImportedBodies(importFrontmatterText, importBaseDir, visited, fileReader);
+      const nestedBodies = await collectImportedBodies(importFrontmatterText, importBaseDir, visited, fileReader, rootDir);
       importedBodyTexts.push(...nestedBodies);
     } catch (err) {
       if (!isFileNotFound(err)) throw err;
@@ -692,6 +694,19 @@ async function collectImportedBodies(frontmatterText, baseDir, visited = new Set
   }
 
   return importedBodyTexts;
+}
+
+/**
+ * Mirrors the compiler's nested local import resolution: bare names and ./ paths
+ * are file-relative; qualified paths are relative to the root workflow directory.
+ * @param {string} importPath
+ * @param {string} baseDir
+ * @param {string} rootDir
+ * @returns {string}
+ */
+function resolveHashImportPath(importPath, baseDir, rootDir) {
+  const fileRelative = !importPath.includes("/") || importPath.startsWith("./");
+  return path.join(fileRelative ? baseDir : rootDir, importPath);
 }
 
 /**

@@ -1005,6 +1005,85 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
       expect(result.branch_name).toBe("feature-branch");
     });
 
+    it("should allow a PR branch covered only by Copilot code review without classic protection", async () => {
+      mockGithub.rest.repos.getBranch.mockResolvedValue({
+        data: { protected: true, protection: { enabled: false, required_status_checks: { enforcement_level: "off", contexts: [], checks: [] } } },
+      });
+      mockGithub.rest.repos.getBranchRules = vi.fn().mockResolvedValue({ data: [{ type: "copilot_code_review", parameters: { review_draft_pull_requests: false, review_on_push: false } }] });
+      mockGithub.rest.repos.getBranchProtection = vi.fn().mockRejectedValue(Object.assign(new Error("Not Found"), { status: 404, response: { data: { message: "Branch not protected" } } }));
+      createPatchFile("copilot-review-only-branch");
+      mockExec.getExecOutput.mockResolvedValue({ exitCode: 0, stdout: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n", stderr: "" });
+
+      const module = await loadModule();
+      const handler = await module.main({});
+      const result = await handler({ branch: "copilot-review-only-branch" }, {});
+
+      expect(result.success).toBe(true);
+      expect(result.branch_name).toBe("feature-branch");
+      expect(mockGithub.rest.repos.getBranchRules).toHaveBeenCalledWith({
+        owner: "test-owner",
+        repo: "test-repo",
+        branch: "feature-branch",
+        per_page: 100,
+        page: 1,
+      });
+    });
+
+    it.each([
+      [404, "Not Found"],
+      [403, "Resource not accessible by integration"],
+    ])("should not attempt git operations when classic protection cannot be confirmed absent (%s)", async (status, message) => {
+      mockGithub.rest.repos.getBranch.mockResolvedValue({ data: { protected: true, protection: { enabled: false } } });
+      mockGithub.rest.repos.getBranchRules = vi.fn().mockResolvedValue({ data: [{ type: "copilot_code_review" }] });
+      mockGithub.rest.repos.getBranchProtection = vi.fn().mockRejectedValue(Object.assign(new Error(message), { status, response: { data: { message } } }));
+      createPatchFile(`copilot-review-classic-${status}-branch`);
+
+      const module = await loadModule();
+      const handler = await module.main({});
+      const result = await handler({ branch: `copilot-review-classic-${status}-branch` }, {});
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Cannot verify branch protection rules");
+      if (status === 403) {
+        expect(result.error).toContain("Administration: read");
+        expect(result.error).toContain("GITHUB_TOKEN cannot provide");
+      }
+      expect(mockExec.exec).not.toHaveBeenCalled();
+      expect(mockExec.getExecOutput).not.toHaveBeenCalled();
+    });
+
+    it.each(["restrictive", "unavailable"])("should not attempt git operations when Copilot rules are mixed with %s protection", async scenario => {
+      mockGithub.rest.repos.getBranch.mockResolvedValue({ data: { protected: true, protection: { enabled: false } } });
+      mockGithub.rest.repos.getBranchRules =
+        scenario === "restrictive" ? vi.fn().mockResolvedValue({ data: [{ type: "copilot_code_review" }, { type: "pull_request" }] }) : vi.fn().mockRejectedValue(Object.assign(new Error("Forbidden"), { status: 403 }));
+      createPatchFile(`copilot-review-${scenario}-branch`);
+
+      const module = await loadModule();
+      const handler = await module.main({});
+      const result = await handler({ branch: `copilot-review-${scenario}-branch` }, {});
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("protection rules");
+      expect(mockExec.exec).not.toHaveBeenCalled();
+      expect(mockExec.getExecOutput).not.toHaveBeenCalled();
+    });
+
+    it("should not attempt git operations when repository metadata is unavailable for a protected branch", async () => {
+      mockGithub.rest.repos.get.mockRejectedValue(new Error("API unavailable"));
+      mockGithub.rest.repos.getBranch.mockResolvedValue({ data: { protected: true, protection: { enabled: false } } });
+      mockGithub.rest.repos.getBranchRules = vi.fn().mockResolvedValue({ data: [{ type: "copilot_code_review" }] });
+      createPatchFile("protected-branch-without-repository-metadata");
+
+      const module = await loadModule();
+      const handler = await module.main({});
+      const result = await handler({ branch: "protected-branch-without-repository-metadata" }, {});
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("protection rules");
+      expect(mockExec.exec).not.toHaveBeenCalled();
+      expect(mockExec.getExecOutput).not.toHaveBeenCalled();
+    });
+
     it("should warn and continue when repos.get fails", async () => {
       // repos.get fails - cannot determine default branch, warn and continue
       mockGithub.rest.repos.get.mockRejectedValue(new Error("API unavailable"));
