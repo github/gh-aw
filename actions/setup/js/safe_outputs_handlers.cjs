@@ -813,11 +813,13 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     }
 
     // Generate target filename as sha + extension (lowercased)
-    const targetFileName = currentClaimHandle() ? `claims/${path.basename(claimArtifactPath("", currentClaimHandle()))}/${sha}${fileExt}` : (sha + fileExt).toLowerCase();
+    const claimNamespace = currentClaimHandle() ? path.basename(claimArtifactPath("", currentClaimHandle())) : null;
+    const targetFileName = claimNamespace ? `claims/${claimNamespace}/${sha}${fileExt}` : (sha + fileExt).toLowerCase();
 
     const githubServer = process.env.GITHUB_SERVER_URL || "https://github.com";
     const repo = process.env.GITHUB_REPOSITORY || "owner/repo";
-    const assetBranch = currentClaimHandle() ? `${normalizedBranchName}/claims/${path.basename(claimArtifactPath("", currentClaimHandle()))}` : normalizedBranchName;
+    // Git refs cannot have children beneath an existing legacy asset branch.
+    const assetBranch = claimNamespace ? normalizeBranchName(branchName, `claim-${claimNamespace}`) : normalizedBranchName;
     let url;
     try {
       const serverHostname = new URL(githubServer).hostname;

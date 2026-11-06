@@ -102,6 +102,10 @@ Unassigned dispatchers cannot emit `noop` or `report_incomplete`.
   ([reference](safe-outputs-runtime.md)); each adapter binds one effect-type to
   an independently verified result, never job success alone.
 
+Claim asset uploads suffix the configured asset branch with `-claim-<namespace>`
+and retain `claims/<namespace>/` content paths. They never create child refs
+beneath legacy asset branches, overwrite those branches, or repair old delivery failures.
+
 `<mcp-clis>` takes one JSON argument. `uninitialized` plus null SHA is empty.
 Submit before dispatch.
 Policyless ledgers fail; workers require Policy; `status: "staged"` is no grant.

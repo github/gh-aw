@@ -16,6 +16,7 @@ const patch = require("./git_patch_utils.cjs");
 const scanning = require("./work_queue_code_scanning.cjs");
 const coverage = require("./work_queue_code_coverage.cjs");
 const assets = require("./work_queue_upload_assets.cjs");
+const { createHandlers } = require("./safe_outputs_handlers.cjs");
 const { main: prepareScript } = require("./work_queue_prepare_claim_script.cjs");
 const { pushSignedCommits } = require("./push_signed_commits.cjs");
 
@@ -28,6 +29,8 @@ const environmentKeys = [
   "GITHUB_REPOSITORY",
   "GITHUB_SERVER_URL",
   "GITHUB_API_URL",
+  "GITHUB_WORKSPACE",
+  "GH_AW_ASSETS_BRANCH",
   "RUNNER_TEMP",
   "GH_AW_CLAIM_INPUT",
   "GH_AW_CLAIM_OUTPUT",
@@ -36,6 +39,7 @@ const environmentKeys = [
 const globalKeys = ["core", "github", "exec", "context", "getOctokit"];
 const roots = [];
 let environment;
+let gitConfigEnvironment;
 let globals;
 let restoreAssetDescriptors;
 
@@ -43,7 +47,7 @@ function simulateLinuxAssetDescriptors() {
   if (process.platform !== "darwin") return;
   // Claim asset parity uses real file I/O with bounded Linux descriptor-path
   // simulation on macOS; production access remains Linux-only.
-  const originals = { openSync: fs.openSync, lstatSync: fs.lstatSync };
+  const originals = { openSync: fs.openSync, lstatSync: fs.lstatSync, mkdirSync: fs.mkdirSync };
   const pinned = new Map();
   const resolve = filename => {
     if (typeof filename !== "string") return filename;
@@ -57,6 +61,7 @@ function simulateLinuxAssetDescriptors() {
     return fd;
   };
   fs.lstatSync = (filename, ...args) => originals.lstatSync(resolve(filename), ...args);
+  fs.mkdirSync = (filename, ...args) => originals.mkdirSync(resolve(filename), ...args);
   restoreAssetDescriptors = () => Object.assign(fs, originals);
   vi.stubGlobal("process", new Proxy(process, { get: (target, key) => (key === "platform" ? "linux" : Reflect.get(target, key)) }));
 }
@@ -93,6 +98,7 @@ const digest = value => crypto.createHash("sha256").update(value).digest("hex");
 
 beforeEach(() => {
   environment = Object.fromEntries(environmentKeys.map(key => [key, process.env[key]]));
+  gitConfigEnvironment = Object.fromEntries(Object.entries(process.env).filter(([key]) => key.startsWith("GIT_CONFIG_")));
   globals = Object.fromEntries(globalKeys.map(key => [key, Object.getOwnPropertyDescriptor(global, key)]));
   environmentKeys.forEach(key => delete process.env[key]);
   process.env.GITHUB_SHA = "a".repeat(40);
@@ -106,6 +112,8 @@ afterEach(() => {
   restoreAssetDescriptors = undefined;
   vi.unstubAllGlobals();
   for (const [key, value] of Object.entries(environment)) value === undefined ? delete process.env[key] : (process.env[key] = value);
+  for (const key of Object.keys(process.env)) if (key.startsWith("GIT_CONFIG_")) delete process.env[key];
+  Object.assign(process.env, gitConfigEnvironment);
   for (const [key, descriptor] of Object.entries(globals)) descriptor === undefined ? delete global[key] : Object.defineProperty(global, key, descriptor);
   roots.splice(0).forEach(root => fs.rmSync(root, { recursive: true, force: true }));
 });
@@ -346,68 +354,106 @@ describe.each([1, 2])("native standalone adapters with %i original Claims", coun
     expect(new Set(uploadedLabels).size).toBe(count);
   });
 
-  it.skipIf(process.platform === "win32")("publishes independently namespaced assets and verifies only the original private Claim receipt", async () => {
-    simulateLinuxAssetDescriptors();
-    const original = assignment(count);
-    const root = directory();
-    const refs = new Map();
-    const trees = new Map();
-    const commits = new Map();
-    const blobs = new Map();
-    const results = [];
-    const sha = value => crypto.createHash("sha1").update(JSON.stringify(value)).digest("hex");
-    const github = {
-      rest: {
-        repos: { get: async () => ({ data: { id: 7, full_name: "owner/repo" } }) },
-        git: {
-          getRef: async input => {
-            if (!refs.has(input.ref)) throw Object.assign(new Error("missing ref"), { status: 404 });
-            return { data: { object: { sha: refs.get(input.ref) } } };
+  it.skipIf(process.platform === "win32")(
+    "stages and publishes Claim assets beside an existing legacy ref with matching URLs and private receipts",
+    async () => {
+      simulateLinuxAssetDescriptors();
+      const original = assignment(count);
+      const root = directory();
+      const git = args =>
+        execFileSync("git", ["-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false", ...args], {
+          cwd: root,
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "pipe"],
+          env: { PATH: process.env.PATH, HOME: root, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null", GIT_TERMINAL_PROMPT: "0" },
+        }).trim();
+      git(["init", "--quiet", "--template="]);
+      git(["-c", "user.name=Asset Test", "-c", "user.email=asset-test@example.com", "commit", "--quiet", "--allow-empty", "-m", "Legacy asset branch"]);
+      const legacyHead = git(["rev-parse", "HEAD"]);
+      git(["update-ref", "refs/heads/assets/audit", legacyHead]);
+      expect(() => git(["update-ref", "refs/heads/assets/audit/claims/old", legacyHead])).toThrow(/cannot lock ref/);
+      const refs = new Map([["heads/assets/audit", legacyHead]]);
+      process.env.GITHUB_WORKSPACE = root;
+      process.env.RUNNER_TEMP = root;
+      process.env.GH_AW_ASSETS_BRANCH = "assets/audit";
+      const assetsRoot = path.join(root, "gh-aw", "safeoutputs", "assets");
+      const trees = new Map();
+      const commits = new Map();
+      const blobs = new Map();
+      const results = [];
+      const sha = value => crypto.createHash("sha1").update(JSON.stringify(value)).digest("hex");
+      const github = {
+        rest: {
+          repos: { get: async () => ({ data: { id: 7, full_name: "owner/repo" } }) },
+          git: {
+            getRef: async input => {
+              if (!refs.has(input.ref)) throw Object.assign(new Error("missing ref"), { status: 404 });
+              return { data: { object: { sha: refs.get(input.ref) } } };
+            },
+            createBlob: async input => {
+              const id = sha(input);
+              blobs.set(id, input.content);
+              return { data: { sha: id } };
+            },
+            createTree: async input => {
+              const id = sha(input);
+              trees.set(id, input.tree);
+              return { data: { sha: id } };
+            },
+            createCommit: async input => {
+              const id = sha(input);
+              commits.set(id, { sha: id, tree: { sha: input.tree }, parents: input.parents.map(parent => ({ sha: parent })) });
+              return { data: { sha: id } };
+            },
+            createRef: async input => {
+              // Real Git enforces the legacy ref's file/directory conflict.
+              git(["update-ref", input.ref, legacyHead]);
+              refs.set(input.ref.slice(5), input.sha);
+              return { data: { object: { sha: input.sha } } };
+            },
+            updateRef: async input => {
+              expect(input.force).toBe(false);
+              expect(refs.has(input.ref)).toBe(true);
+              refs.set(input.ref, input.sha);
+              return { data: { object: { sha: input.sha } } };
+            },
+            getCommit: async input => ({ data: commits.get(input.commit_sha) }),
+            getTree: async input => ({ data: { sha: input.tree_sha, truncated: false, tree: trees.get(input.tree_sha) } }),
+            getBlob: async input => ({ data: { sha: input.file_sha, encoding: "base64", content: blobs.get(input.file_sha) } }),
           },
-          createBlob: async input => {
-            const id = sha(input);
-            blobs.set(id, input.content);
-            return { data: { sha: id } };
-          },
-          createTree: async input => {
-            const id = sha(input);
-            trees.set(id, input.tree);
-            return { data: { sha: id } };
-          },
-          createCommit: async input => {
-            const id = sha(input);
-            commits.set(id, { sha: id, tree: { sha: input.tree }, parents: input.parents.map(parent => ({ sha: parent })) });
-            return { data: { sha: id } };
-          },
-          createRef: async input => {
-            refs.set(input.ref.slice(5), input.sha);
-            return { data: { object: { sha: input.sha } } };
-          },
-          getCommit: async input => ({ data: commits.get(input.commit_sha) }),
-          getTree: async input => ({ data: { sha: input.tree_sha, truncated: false, tree: trees.get(input.tree_sha) } }),
-          getBlob: async input => ({ data: { sha: input.file_sha, encoding: "base64", content: blobs.get(input.file_sha) } }),
         },
-      },
-    };
-    for (const member of original.claims) {
-      const reportRoot = scope.claimArtifactPath(root, member.handle, original);
-      fs.mkdirSync(reportRoot, { recursive: true });
-      fs.writeFileSync(path.join(reportRoot, digest("same.png") + ".png"), member.work.input);
-      await scope.withClaimExecution({ assignment: original, claim_handle: member.handle, authorize: allow, effects: [] }, async () => {
-        const handler = await assets.main({ "assets-dir": root, "target-repo": "owner/repo", branch: "assets/audit" }, github);
-        const message = { type: "upload_asset", ...(count > 1 ? { claim_handle: member.handle } : {}), path: "same.png" };
-        const result = await handler(message);
-        results.push(result);
-        expect(result.sha).toBe(digest(member.work.input));
-        expect((await assets.verifyAssetDelivery({ claim: member, result, github, authorize: allow })).verified).toBe(true);
-        expect((await assets.verifyAssetDelivery({ claim: member, result: structuredClone(result), github })).verified).toBe(false);
-        if (results.length > 1) expect((await assets.verifyAssetDelivery({ claim: member, result: results[0], github })).verified).toBe(false);
-      });
-    }
-    expect(refs.size).toBe(count);
-    expect(new Set(results.map(result => result.branch)).size).toBe(count);
-    expect(new Set(results.map(result => result.path)).size).toBe(count);
-  });
+      };
+      for (const member of original.claims) {
+        await scope.withClaimExecution({ assignment: original, claim_handle: member.handle, authorize: allow, effects: [] }, async () => {
+          const entries = [];
+          const producer = createHandlers({}, entry => entries.push(entry));
+          const handler = await assets.main({ "assets-dir": assetsRoot, "target-repo": "owner/repo", branch: "assets/audit" }, github);
+          for (const filename of ["same.png", "second.png"]) {
+            const source = path.join(root, filename);
+            fs.writeFileSync(source, member.work.input + filename);
+            producer.uploadAssetHandler({ path: source, ...(count > 1 ? { claim_handle: member.handle } : {}) });
+            const entry = entries.at(-1);
+            const message = { ...entry, ...(count > 1 ? { claim_handle: member.handle } : {}) };
+            const result = await handler(message);
+            results.push(result);
+            expect(result.sha).toBe(digest(member.work.input + filename));
+            expect(result.url).toBe(entry.url);
+            expect(result.path).toBe(entry.targetFileName);
+            expect(result.branch).toMatch(/^assets\/audit-claim-[a-f0-9]{64}$/);
+            expect((await assets.verifyAssetDelivery({ claim: member, result, github, authorize: allow })).verified).toBe(true);
+            expect((await assets.verifyAssetDelivery({ claim: member, result: structuredClone(result), github })).verified).toBe(false);
+            if (member.handle !== original.claims[0].handle) expect((await assets.verifyAssetDelivery({ claim: member, result: results[0], github })).verified).toBe(false);
+          }
+        });
+      }
+      expect(refs.get("heads/assets/audit")).toBe(legacyHead);
+      expect(git(["rev-parse", "refs/heads/assets/audit"])).toBe(legacyHead);
+      expect(refs.size).toBe(count + 1);
+      expect(new Set(results.map(result => result.branch)).size).toBe(count);
+      expect(new Set(results.map(result => result.path)).size).toBe(count * 2);
+    },
+    30000
+  );
 });
 
 describe("standalone adapter rejection before file or native effect access", () => {

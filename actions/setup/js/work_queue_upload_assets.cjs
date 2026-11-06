@@ -37,7 +37,7 @@ async function main(config = {}, suppliedClient) {
   if (typeof repository !== "string" || !/^[A-Za-z0-9_-]+\/[A-Za-z0-9._-]+$/.test(repository)) throw new Error("Queue asset requires its trusted repository destination");
   const [owner, repo] = repository.split("/");
   const namespace = path.basename(claimArtifactPath("", factoryClaim));
-  const branch = normalizeBranchName(config.branch || `assets/${process.env.GH_AW_WORKFLOW_ID || "work-queue"}`) + `/claims/${namespace}`;
+  const branch = normalizeBranchName(config.branch || `assets/${process.env.GH_AW_WORKFLOW_ID || "work-queue"}`, `claim-${namespace}`);
   const allowed = config["allowed-exts"] || [".png", ".jpg", ".jpeg"];
   const maximum = Number(config["max-size"] || 10240) * 1024;
   const limit = Number(config.max || 10);
