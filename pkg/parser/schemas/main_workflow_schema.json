@@ -6282,6 +6282,17 @@
               "type": "object",
               "description": "Repo-memory configuration object",
               "properties": {
+                "github-app": {
+                  "$ref": "#/$defs/repo_memory_github_app"
+                },
+                "github-app-read": {
+                  "$ref": "#/$defs/repo_memory_github_app",
+                  "description": "GitHub App for memory restores and daily-credit ledger clones. Overrides github-app for reads only."
+                },
+                "github-app-write": {
+                  "$ref": "#/$defs/repo_memory_github_app",
+                  "description": "GitHub App for memory pushes. Overrides github-app for writes only."
+                },
                 "branch-prefix": {
                   "type": "string",
                   "minLength": 4,
@@ -6410,6 +6421,17 @@
               "items": {
                 "type": "object",
                 "properties": {
+                  "github-app": {
+                    "$ref": "#/$defs/repo_memory_github_app"
+                  },
+                  "github-app-read": {
+                    "$ref": "#/$defs/repo_memory_github_app",
+                    "description": "GitHub App for memory restores and daily-credit ledger clones. Overrides github-app for reads only."
+                  },
+                  "github-app-write": {
+                    "$ref": "#/$defs/repo_memory_github_app",
+                    "description": "GitHub App for memory pushes. Overrides github-app for writes only."
+                  },
                   "id": {
                     "type": "string",
                     "description": "Memory identifier (required for array notation, default: 'default')"
@@ -17108,6 +17130,27 @@
       "maxLength": 100,
       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[A-Z][A-Z0-9]{0,15}-[1-9][0-9]*)$",
       "description": "Linear issue model UUID or uppercase shorthand identifier."
+    },
+    "repo_memory_github_app": {
+      "type": "object",
+      "description": "GitHub App credentials for repo-memory. Push tokens request only contents: write; cross-repository clone tokens request only contents: read.",
+      "properties": {
+        "client-id": { "$ref": "#/$defs/github_app/properties/client-id" },
+        "app-id": { "$ref": "#/$defs/github_app/properties/app-id" },
+        "private-key": { "$ref": "#/$defs/github_app/properties/private-key" },
+        "owner": { "$ref": "#/$defs/github_app/properties/owner" },
+        "repositories": { "$ref": "#/$defs/github_app/properties/repositories" },
+        "ignore-if-missing": { "$ref": "#/$defs/github_app/properties/ignore-if-missing" }
+      },
+      "anyOf": [
+        { "required": ["client-id", "private-key"] },
+        { "required": ["app-id", "private-key"] },
+        {
+          "required": ["ignore-if-missing"],
+          "properties": { "ignore-if-missing": { "const": true } }
+        }
+      ],
+      "additionalProperties": false
     },
     "github_app": {
       "type": "object",

@@ -17,6 +17,160 @@ function writeJSONL(filePath, records) {
 }
 
 describe("observed model attribution", () => {
+  it.each([
+    ["gemini-3.8-flash", "auto (Gemini 3.8 Flash)"],
+    ["gpt-6.1-sol", "auto (GPT 6.1 Sol)"],
+    ["provider/", "auto"],
+    ["", "auto"],
+    ["auto", "auto"],
+    ["bad model<script>", "auto"],
+  ])("labels auto using validated observed model %s", (model, label) => {
+    const root = createRoot();
+    const infoPath = path.join(root, "aw_info.json");
+    try {
+      fs.writeFileSync(infoPath, JSON.stringify({ requested_model: "auto", model_selection: { status: model ? "observed" : "unavailable", effective_model: model } }));
+      expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "auto" })).toBe(label);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("lists distinct agent models without including classifier, detection, or untrusted events", () => {
+    const root = createRoot();
+    const infoPath = path.join(root, "aw_info.json");
+    try {
+      writeJSONL(path.join(root, "usage/aw_session.jsonl"), [
+        ...["gemini-3.8-flash", "gemini-3.8-flash", "google/gemini-3.8-flash", "Gemini-3.8-Flash", "claude-sonnet-5", "auto", "<script>"].map(model => ({
+          type: "firewall.token_usage",
+          data: { model, purpose: "agent" },
+          provenance: { component: "firewall", phase: "agent" },
+        })),
+        { type: "firewall.token_usage", data: { model: "failed-candidate", purpose: "agent", status: 503 }, provenance: { component: "firewall", phase: "agent" } },
+        { type: "firewall.token_usage", data: { model: "classifier", purpose: "routing_classification" }, provenance: { component: "firewall", phase: "agent" } },
+        { type: "firewall.token_usage", data: { model: "detector" }, provenance: { component: "firewall", phase: "detection" } },
+        { type: "firewall.token_usage", data: { model: "forged" }, provenance: { component: "agent", phase: "agent" } },
+      ]);
+      expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "auto" })).toBe("auto (Gemini 3.8 Flash, Claude Sonnet 5)");
+      expect(getEffectiveModelLabel(infoPath, "detection", { GH_AW_ENGINE_MODEL: "auto" })).toBe("auto");
+      expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "gpt-5.4" })).toBe("gpt54");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  const tokenUsageRecord = overrides => ({
+    _schema: "token-usage/v0.29.6",
+    event: "token_usage",
+    provider: "copilot",
+    model: "claude-sonnet-5.5",
+    path: "/chat/completions",
+    status: 200,
+    ...overrides,
+  });
+
+  it.each(["sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl", "sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl", "sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl"])(
+    "labels auto from the agent artifact token-usage log at %s without a usage directory",
+    relativePath => {
+      const root = createRoot();
+      const infoPath = path.join(root, "aw_info.json");
+      try {
+        fs.writeFileSync(infoPath, JSON.stringify({ requested_model: "auto" }));
+        writeJSONL(path.join(root, relativePath), [tokenUsageRecord({})]);
+        expect(fs.existsSync(path.join(root, "usage"))).toBe(false);
+        expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "auto" })).toBe("auto (Claude Sonnet 5.5)");
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it("ignores routing classification and non-2xx token-usage records", () => {
+    const root = createRoot();
+    const infoPath = path.join(root, "aw_info.json");
+    try {
+      writeJSONL(path.join(root, "sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl"), [
+        tokenUsageRecord({ model: "gpt-5-mini", purpose: "routing_classification" }),
+        tokenUsageRecord({ model: "gemini-3.8-flash", status: 503 }),
+        tokenUsageRecord({ purpose: "agent" }),
+      ]);
+      writeJSONL(path.join(root, "usage/aw_session.jsonl"), [{ type: "firewall.token_usage", data: { model: "gpt-6.1-sol", purpose: "agent" }, provenance: { component: "firewall", phase: "agent" } }]);
+      expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "auto" })).toBe("auto (Claude Sonnet 5.5)");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("falls back to the unified session when the token-usage log is missing", () => {
+    const root = createRoot();
+    const infoPath = path.join(root, "aw_info.json");
+    try {
+      writeJSONL(path.join(root, "usage/aw_session.jsonl"), [{ type: "firewall.token_usage", data: tokenUsageRecord({ purpose: "agent" }), provenance: { component: "firewall", phase: "agent" } }]);
+      expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "auto" })).toBe("auto (Claude Sonnet 5.5)");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("shows plain auto when no model usage files exist", () => {
+    const root = createRoot();
+    const infoPath = path.join(root, "aw_info.json");
+    try {
+      expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "auto" })).toBe("auto");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("preserves fallback-only labels when auto has no observed model evidence", () => {
+    const root = createRoot();
+    const infoPath = path.join(root, "aw_info.json");
+    try {
+      fs.writeFileSync(infoPath, JSON.stringify({ requested_model: "auto", fallback_model: "gpt-5.4" }));
+      expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "auto" })).toBe("gpt54");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps the fallback label over native observations without proxy usage evidence", () => {
+    const root = createRoot();
+    const infoPath = path.join(root, "aw_info.json");
+    try {
+      fs.writeFileSync(
+        infoPath,
+        JSON.stringify({
+          requested_model: "auto",
+          fallback_model: "gpt-5.4",
+          model_selection: { status: "observed", effective_model: "gpt-5.6-luna", observed_models: ["copilot/gpt-5.6-luna", "gpt-5.6-luna"] },
+        })
+      );
+      expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "auto" })).toBe("gpt54");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("uses validated native model observations when the session usage file is absent", () => {
+    const root = createRoot();
+    const infoPath = path.join(root, "aw_info.json");
+    try {
+      fs.writeFileSync(
+        infoPath,
+        JSON.stringify({
+          requested_model: "auto",
+          model_selection: {
+            status: "observed",
+            effective_model: "claude-sonnet-5",
+            observed_models: ["google/gemini-3.8-flash", "claude-sonnet-5", "bad model<script>", "provider/"],
+          },
+        })
+      );
+      expect(getEffectiveModelLabel(infoPath, "agent", { GH_AW_ENGINE_MODEL: "auto" })).toBe("auto (Gemini 3.8 Flash, Claude Sonnet 5)");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it.each(["observed", "substituted"])("normalizes requested query parameters for %s selections", status => {
     const root = createRoot();
     const infoPath = path.join(root, "aw_info.json");

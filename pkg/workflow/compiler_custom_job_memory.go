@@ -84,7 +84,7 @@ func (c *Compiler) buildRestoreMemorySteps(cfg *restoreMemoryConfig, jobName str
 		memoryLines = append(memoryLines, c.generateDriveMemoryRestoreLines(data)...)
 	}
 	if cfg.RepoMemory {
-		memoryLines = append(memoryLines, generateRepoMemoryRestoreLines(data)...)
+		memoryLines = append(memoryLines, c.generateRepoMemoryRestoreLines(data, jobName)...)
 	}
 
 	if cfg.CommentMemory {
@@ -184,13 +184,13 @@ func generateCacheMemoryRestoreLines(data *WorkflowData) []string {
 // generateRepoMemoryRestoreLines produces read-only repo-memory clone steps for a
 // custom job by reusing the existing generateRepoMemorySteps builder and converting
 // its output to the []string line format expected by job.Steps.
-func generateRepoMemoryRestoreLines(data *WorkflowData) []string {
+func (c *Compiler) generateRepoMemoryRestoreLines(data *WorkflowData, jobName string) []string {
 	if data.RepoMemoryConfig == nil || len(data.RepoMemoryConfig.Memories) == 0 {
 		return nil
 	}
 
 	var b strings.Builder
-	generateRepoMemorySteps(&b, data)
+	c.generateRepoMemorySteps(&b, data, jobName)
 	raw := b.String()
 	if raw == "" {
 		return nil
