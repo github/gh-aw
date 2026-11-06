@@ -396,7 +396,7 @@ See [Cross-Repository Operations](/gh-aw/reference/cross-repository/) for compre
 
 #### Issue Artifacts
 
-`create_issue` accepts an optional `artifacts` array. Each item requires a non-empty `name` and exactly one of `body` (inline content) or `path` (a UTF-8 text file), with an optional `type`: `generic` (default), `plan`, `link`, or `embedded_html`. Link bodies contain a URL; HTML bodies contain HTML source for GitHub's artifact preview. Names and content follow safe-output sanitization, with HTML tags preserved as source. Temporary issue references in artifact bodies are resolved, including the newly created issue's temporary ID.
+`create_issue` accepts an optional `artifacts` array. Each item requires a non-empty `name` and exactly one of `body` (inline content) or `path` (a UTF-8 text file), with an optional `type`: `generic` (default), `plan`, `link`, or `embedded_html`. Link bodies contain a URL; HTML bodies contain HTML source for GitHub's artifact preview. Names and content follow safe-output sanitization. HTML preserves supported safe-output tags, strips dangerous attributes, and converts unsupported tags to visible text. HTML URLs always use `allowed-only` filtering, even inside backticks and when the workflow allows URLs in Markdown code regions. Temporary issue references in artifact bodies are resolved, including the newly created issue's temporary ID.
 
 `safe-outputs.create-issue.max-issue-artifacts` limits attachments **per issue**, defaulting to **10**. Zero or any negative integer disables attachments. Requests exceeding the limit are rejected before issue creation, including in staged mode; requests with no artifacts remain valid. The generated tool description includes the configured limit or disabled state.
 
@@ -413,7 +413,7 @@ See [Cross-Repository Operations](/gh-aw/reference/cross-repository/) for compre
 }
 ```
 
-Artifacts are attached using the issue's repository and credentials with `issues: write` permission. Staged mode previews artifacts without writing them. Requests with artifacts create a new issue rather than grouping content into a same-day comment; title deduplication still applies. If an attachment fails, the handler reports failure with the created issue's number and URL and the number of artifacts already attached; it does not delete the issue or retry the entire creation. See the [issue artifacts REST API](https://docs.github.com/en/rest/issues/artifacts?apiVersion=2026-03-10).
+Artifacts are attached using the issue's repository and credentials with `issues: write` permission. Staged mode previews artifacts without writing them. Requests with artifacts create a new issue rather than grouping content into a same-day comment; title deduplication still applies. If an attachment fails, the handler still attempts normal issue assignment and parent linking, then reports failure with the created issue's number and URL and the number of artifacts already attached; it does not delete the issue or retry the entire creation. See the [issue artifacts REST API](https://docs.github.com/en/rest/issues/artifacts?apiVersion=2026-03-10).
 
 ##### Attaching Files by Path
 
@@ -431,7 +431,7 @@ Pass an absolute `path` to attach a file without loading its content into the ag
 
 The unprivileged safeoutputs MCP backend reads the file and replaces `path` with its complete `body` before recording the request. The privileged issue job receives content only and never opens the agent-supplied path. The source file does not require a separate artifact upload or custom-job file declaration.
 
-Paths must be literal absolute paths within the workspace or `/tmp`; variables and globs are not expanded. Guarded reads on the Linux workflow runtime reject symlinks (including directory links), hard links, non-regular files, invalid UTF-8, empty content, and files exceeding `max-issue-artifact-size`. Unsupported platforms fail closed. A read or validation failure records no issue request. Do not specify both `body` and `path`. Passing a pathname as `body` still attaches that pathname as text.
+Paths must be literal absolute paths within the workspace or `/tmp/gh-aw/agent`; general temporary runtime files are not allowed. The shared file-upload denylist rejects any `.git` path component, system directories, and HOME credential/config locations such as `.ssh`, `.aws`, `.config`, `.npmrc`, and `.git-credentials`, even when they overlap an allowed root. Variables and globs are not expanded. Guarded reads on the Linux workflow runtime reject symlinks (including directory links), hard links, non-regular files, invalid UTF-8, empty content, and files exceeding `max-issue-artifact-size`. Unsupported platforms fail closed. A read or validation failure records no issue request. Do not specify both `body` and `path`. Passing a pathname as `body` still attaches that pathname as text.
 
 For an image, binary file, or downloadable original, use [upload-artifact](#artifact-uploads-upload-artifact) with a literal file path:
 

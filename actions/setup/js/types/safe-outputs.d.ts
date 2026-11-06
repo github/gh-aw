@@ -33,6 +33,7 @@ interface IssueArtifactMetadata {
 
 type IssueArtifactBodyInput = IssueArtifactMetadata & { body: string; path?: never };
 
+/** MCP paths are absolute workspace or /tmp/gh-aw/agent files; sensitive publication sources are denied. */
 type IssueArtifactInput = IssueArtifactBodyInput | (IssueArtifactMetadata & { path: string; body?: never });
 
 interface IssueArtifact extends IssueArtifactMetadata {

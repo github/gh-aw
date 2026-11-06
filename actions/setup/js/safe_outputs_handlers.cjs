@@ -32,7 +32,7 @@ const { sanitizeLabelContent } = require("./sanitize_label_content.cjs");
 const { isProbingNoopMessage, validateCreatePullRequestIntent, validatePushToPullRequestBranchIntent, validateCreateIssueIntent, validateAddCommentIntent } = require("./intent_probe.cjs");
 const { globPatternToRegex } = require("./glob_pattern_helpers.cjs");
 const { resolveInvocationContext } = require("./invocation_context_helpers.cjs");
-const { lstatGuard, normalizeGuardedPath, resolveWorkspaceOrTmpPath, readGuardedFile, writeGuardedFile } = require("./symlink_guard.cjs");
+const { lstatGuard, normalizeGuardedPath, resolveWorkspaceOrTmpPath, validateUploadSourcePath, readGuardedFile, writeGuardedFile } = require("./symlink_guard.cjs");
 const { resolveIssueArtifactPaths } = require("./issue_artifacts.cjs");
 const { validateValueAgainstSchema } = require("./schema-validation.cjs");
 const { resolveDataSchema } = require("./data_schema_normalizer.cjs");
@@ -2665,47 +2665,6 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     } catch {
       return path.resolve(root);
     }
-  }
-
-  /**
-   * Validate that a canonical absolute path does not refer to sensitive system or credential
-   * locations. Returns an error message string, or null if the path is safe.
-   *
-   * Rejected patterns:
-   *  - Any path with a ".git" directory component (prevents .git/config leakage).
-   *  - System directories: /etc, /proc, /sys, /dev, /run, /boot, /lib*, /usr/lib*.
-   *  - HOME credential/config subtrees: .ssh, .aws, .netrc, .npmrc, .gitconfig, .gnupg,
-   *    .config, .docker, .kube, .azure, .gcp.
-   *
-   * @param {string} canonicalPath - Resolved absolute path (output of fs.realpathSync or path.resolve)
-   * @returns {string|null}
-   */
-  function validateUploadSourcePath(canonicalPath) {
-    const parts = canonicalPath.split(path.sep);
-    if (parts.some(p => p === ".git")) {
-      return `path contains sensitive repository metadata (.git): ${canonicalPath}`;
-    }
-
-    const systemDenied = ["/etc", "/proc", "/sys", "/dev", "/run", "/boot", "/lib", "/lib64", "/usr/lib", "/usr/local/lib"];
-    for (const denied of systemDenied) {
-      const normalDenied = path.resolve(denied);
-      if (canonicalPath === normalDenied || canonicalPath.startsWith(normalDenied + path.sep)) {
-        return `path refers to a system directory: ${canonicalPath}`;
-      }
-    }
-
-    const homeDir = os.homedir();
-    if (homeDir) {
-      const sensitiveNames = [".ssh", ".aws", ".gnupg", ".docker", ".kube", ".azure", ".gcp", ".config", ".netrc", ".npmrc", ".gitconfig", ".gitcredentials", ".git-credentials"];
-      for (const name of sensitiveNames) {
-        const sensitive = path.join(path.resolve(homeDir), name);
-        if (canonicalPath === sensitive || canonicalPath.startsWith(sensitive + path.sep)) {
-          return `path refers to a sensitive HOME location: ${canonicalPath}`;
-        }
-      }
-    }
-
-    return null;
   }
 
   /**

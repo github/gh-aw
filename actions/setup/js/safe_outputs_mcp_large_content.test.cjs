@@ -6,7 +6,10 @@ import crypto from "crypto";
 describe("safe_outputs_mcp_server.cjs large content handling", () => {
   let originalEnv, tempOutputDir, tempConfigFile, tempOutputFile;
   it.skipIf(process.platform !== "linux")("reads issue artifact paths through MCP and persists their complete bodies", async () => {
-    const source = path.join(tempOutputDir, "plan.md");
+    const agentRoot = "/tmp/gh-aw/agent";
+    fs.mkdirSync(agentRoot, { recursive: true });
+    const artifactDirectory = fs.mkdtempSync(path.join(agentRoot, "issue-artifact-test-"));
+    const source = path.join(artifactDirectory, "plan.md");
     const body = "## Plan\n\n" + "Cache parsed workflows.\n".repeat(4000);
     fs.writeFileSync(source, body);
     const child = spawn(process.execPath, [path.join(__dirname, "safe_outputs_mcp_server.cjs")], {
@@ -65,6 +68,7 @@ describe("safe_outputs_mcp_server.cjs large content handling", () => {
     } finally {
       child.kill();
       await closed;
+      fs.rmSync(artifactDirectory, { recursive: true, force: true });
     }
   });
   (beforeEach(() => {

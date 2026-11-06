@@ -6,10 +6,11 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { GITHUB_API_VERSION } = require("./constants.cjs");
 const { withRetry, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
+const { convertXmlTags, removeXmlComments, sanitizeUrlProtocols, sanitizeUrlDomains, buildAllowedDomains } = require("./sanitize_content_core.cjs");
 const { sanitizeTitle } = require("./sanitize_title.cjs");
 const path = require("node:path");
 const { isUtf8 } = require("node:buffer");
-const { readGuardedFile, resolveWorkspaceOrTmpPath } = require("./symlink_guard.cjs");
+const { readGuardedFile, resolveIssueArtifactPath } = require("./symlink_guard.cjs");
 const DEFAULT_MAX_ISSUE_ARTIFACT_SIZE = 1024 * 1024;
 
 /**
@@ -63,7 +64,9 @@ function normalizeIssueArtifactInputs(value, maxArtifacts, maxSizeBytes) {
     if (!("name" in artifact) || typeof artifact.name !== "string" || !artifact.name.trim()) {
       throw new Error(`${ERR_VALIDATION}: ${field}.name must be a non-empty string`);
     }
-    if ("body" in artifact === "path" in artifact) {
+    const hasBody = "body" in artifact;
+    const hasPath = "path" in artifact;
+    if (hasBody === hasPath) {
       throw new Error(`${ERR_VALIDATION}: ${field} requires exactly one of body or path`);
     }
     if ("path" in artifact) {
@@ -93,7 +96,7 @@ function resolveIssueArtifactPaths(value, maxArtifacts = 10, maxSizeBytes = DEFA
     if (artifact.path === undefined) return { type: artifact.type ?? "generic", name: artifact.name, body: artifact.body };
     let content;
     try {
-      content = readGuardedFile(resolveWorkspaceOrTmpPath(artifact.path), maxSizeBytes);
+      content = readGuardedFile(resolveIssueArtifactPath(artifact.path), maxSizeBytes);
     } catch (error) {
       throw new Error(`${ERR_VALIDATION}: create_issue artifacts[${index}].path could not be read: ${getErrorMessage(error)}`, { cause: error });
     }
@@ -133,8 +136,7 @@ function validateIssueArtifactBodySize(body, maxSizeBytes, field) {
 }
 
 /**
- * Preserve HTML as source rather than converting its tags to Markdown text.
- * A fence longer than any source backtick run prevents source from escaping it.
+ * Preserve supported HTML tags, without treating rendered HTML as inert Markdown code.
  * @param {IssueArtifact[]} artifacts
  * @param {import("./sanitize_content.cjs").SanitizeOptions} options
  * @returns {IssueArtifact[]}
@@ -144,15 +146,11 @@ function sanitizeIssueArtifacts(artifacts, options) {
   const bodyOptions = { ...options, maxLength: Number.MAX_SAFE_INTEGER, maxLines: Number.MAX_SAFE_INTEGER };
   return artifacts.map(artifact => {
     const name = sanitizeTitle(artifact.name);
-    let body;
+    let body = sanitizeContent(artifact.body, bodyOptions);
     if (artifact.type === "embedded_html") {
-      const longestRun = Array.from(artifact.body.matchAll(/`+/g)).reduce((longest, match) => Math.max(longest, match[0].length), 0);
-      const fence = "`".repeat(Math.max(3, longestRun + 1));
-      const source = `${fence}html\n${artifact.body}\n${fence}`;
-      const sanitized = sanitizeContent(source, bodyOptions);
-      body = sanitized.slice(`${fence}html\n`.length, -`\n${fence}`.length);
-    } else {
-      body = sanitizeContent(artifact.body, bodyOptions);
+      // Backticks in HTML do not create inert regions in an HTML preview.
+      body = convertXmlTags(removeXmlComments(body));
+      body = sanitizeUrlDomains(sanitizeUrlProtocols(body), buildAllowedDomains());
     }
     if (!name.trim() || !body.trim()) throw new Error(`${ERR_VALIDATION}: Issue artifact name and body must remain non-empty after sanitization`);
     return { ...artifact, name, body };

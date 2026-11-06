@@ -159,7 +159,7 @@
                 "type": "string",
                 "minLength": 1,
                 "pattern": "^/",
-                "description": "Absolute literal path to a non-empty UTF-8 text file within the workspace or /tmp (e.g., /tmp/gh-aw/agent/plan.md). The MCP backend reads it into body before recording the request. Variables and globs are not expanded. Links and non-regular files are rejected; max-issue-artifact-size bounds the read (default: 1mb). Do not also provide body."
+                "description": "Absolute literal path to a non-empty UTF-8 text file within the workspace or /tmp/gh-aw/agent (e.g., /tmp/gh-aw/agent/plan.md). Repository .git metadata, system directories, and HOME credential/config paths are denied. The MCP backend reads it into body before recording the request. Variables and globs are not expanded. Links and non-regular files are rejected; max-issue-artifact-size bounds the read (default: 1mb). Do not also provide body."
               }
             },
             "additionalProperties": false

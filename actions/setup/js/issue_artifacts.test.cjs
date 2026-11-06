@@ -24,10 +24,8 @@ describe("create_issue artifacts", () => {
     global.core = { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), error: vi.fn(), setOutput: vi.fn() };
   });
 
-  it("exposes the same artifact schema in runtime and compiler tools", () => {
+  it("exposes the artifact schema in runtime tools", () => {
     const runtime = tools.find(tool => tool.name === "create_issue").inputSchema.properties.artifacts;
-    const compiler = require("../../../pkg/workflow/js/safe_outputs_tools.json").find(tool => tool.name === "create_issue").inputSchema.properties.artifacts;
-    expect(runtime).toEqual(compiler);
     expect(runtime.items.required).toEqual(["name"]);
     expect(runtime.items.oneOf).toEqual([{ required: ["body"] }, { required: ["path"] }]);
     expect(runtime.items.properties.type.enum).toEqual(["generic", "link", "plan", "embedded_html"]);
@@ -346,6 +344,86 @@ describe("create_issue artifacts", () => {
     expect(client.request).toHaveBeenCalledTimes(2);
   });
 
+  it("assigns copilot and links the parent after partial attachment failure", async () => {
+    vi.stubEnv("GH_AW_ASSIGN_COPILOT", "true");
+    client.rest.issues.get = vi.fn().mockResolvedValue({ data: { ...issue, title: message.title, body: "", assignees: [] } });
+    client.request
+      .mockResolvedValue({ status: 204 })
+      .mockResolvedValueOnce({ data: { number: 1 } })
+      .mockRejectedValueOnce(Object.assign(new Error("Forbidden"), { status: 403 }));
+    client.graphql = vi
+      .fn()
+      .mockResolvedValueOnce({ repository: { issue: { id: "I_parent_456" } } })
+      .mockResolvedValueOnce({ repository: { issue: { id: issue.node_id } } })
+      .mockResolvedValueOnce({ addSubIssue: { issue: { id: "I_parent_456" }, subIssue: { id: issue.node_id } } });
+    const handler = await main({ assignees: ["copilot"] });
+    const result = await handler(
+      {
+        ...message,
+        parent: 456,
+        artifacts: [
+          { name: "First", body: "First notes" },
+          { name: "Second", body: "Second notes" },
+          { name: "Third", body: "Third notes" },
+        ],
+      },
+      {}
+    );
+
+    expect(result).toMatchObject({ success: false, repo: "test-owner/test-repo", number: issue.number, url: issue.html_url, temporaryId: message.temporary_id });
+    expect(result.error).toContain('artifact "Second"');
+    expect(result.error).toContain("1/3 attached");
+    expect(result.error).toContain("Forbidden");
+    expect(result).not.toHaveProperty("artifacts");
+    expect(client.rest.issues.create).toHaveBeenCalledOnce();
+    expect(client.request.mock.calls.filter(([route]) => route.endsWith("/artifacts"))).toHaveLength(2);
+    expect(client.request).toHaveBeenCalledWith("POST /repos/{owner}/{repo}/issues/{issue_number}/assignees", expect.objectContaining({ owner: "test-owner", repo: "test-repo", issue_number: issue.number }));
+    expect(client.rest.issues.get.mock.invocationCallOrder[0]).toBeGreaterThan(client.request.mock.invocationCallOrder[1]);
+    expect(client.graphql).toHaveBeenNthCalledWith(3, expect.stringContaining("mutation AddSubIssue"), { parentId: "I_parent_456", subIssueId: issue.node_id });
+    expect(client.rest.issues.createComment).not.toHaveBeenCalled();
+  });
+
+  it("keeps the artifact failure when parent linking needs its comment fallback", async () => {
+    client.request.mockRejectedValueOnce(Object.assign(new Error("Forbidden"), { status: 403 }));
+    client.graphql = vi.fn().mockRejectedValueOnce(new Error("Sub-issue linking unavailable"));
+    client.rest.issues.createComment.mockResolvedValue({ data: {} });
+    const handler = await main({});
+    const result = await handler({ ...message, parent: 456, artifacts: [{ name: "Notes", body: "Details" }] }, {});
+
+    expect(result).toMatchObject({ success: false, repo: "test-owner/test-repo", number: issue.number, url: issue.html_url, temporaryId: message.temporary_id });
+    expect(result.error).toContain("0/1 attached");
+    expect(result.error).toContain("Forbidden");
+    expect(result.error).not.toContain("Sub-issue linking unavailable");
+    expect(client.rest.issues.createComment).toHaveBeenCalledOnce();
+    expect(client.rest.issues.createComment).toHaveBeenCalledWith({
+      owner: "test-owner",
+      repo: "test-repo",
+      issue_number: 456,
+      body: expect.stringContaining("Created related issue: #123"),
+    });
+    expect(client.rest.issues.create).toHaveBeenCalledOnce();
+    expect(client.request).toHaveBeenCalledOnce();
+  });
+
+  it("retains the issue identity and attachment error if a later post-create step throws", async () => {
+    vi.stubEnv("GH_AW_ASSIGN_COPILOT", "true");
+    vi.stubEnv("GH_AW_ASSIGN_TO_AGENT_TOKEN", "agent-token");
+    global.getOctokit = vi.fn().mockImplementation(() => {
+      throw new Error("Assignment client unavailable");
+    });
+    client.request.mockRejectedValueOnce(Object.assign(new Error("Forbidden"), { status: 403 }));
+    const handler = await main({ assignees: ["copilot"] });
+    const result = await handler({ ...message, artifacts: [{ name: "Notes", body: "Details" }] }, {});
+
+    expect(result).toMatchObject({ success: false, repo: "test-owner/test-repo", number: issue.number, url: issue.html_url, temporaryId: message.temporary_id });
+    expect(result.error).toContain("0/1 attached");
+    expect(result.error).toContain("Forbidden");
+    expect(result.error).not.toContain("Assignment client unavailable");
+    expect(global.core.error).toHaveBeenCalledWith(expect.stringContaining("Assignment client unavailable"));
+    expect(client.rest.issues.create).toHaveBeenCalledOnce();
+    expect(client.request).toHaveBeenCalledOnce();
+  });
+
   it("does not write artifacts when issue creation fails", async () => {
     client.rest.issues.create.mockRejectedValue(Object.assign(new Error("Forbidden"), { status: 403 }));
     const handler = await main({});
@@ -375,6 +453,89 @@ describe("create_issue artifacts", () => {
     expect(html).toContain("<p>```</p>");
     expect(html).not.toContain("https://outside.invalid");
     expect(html).not.toContain("````html");
+  });
+
+  describe("rendered HTML artifact safety", () => {
+    it.each(["allowed-only", "allowed-or-code-region"])("filters HTML URLs strictly under workflow policy %s", async policy => {
+      vi.stubEnv("GH_AW_SAFE_OUTPUTS_URLS", policy);
+      const handler = await main({});
+      const result = await handler(
+        {
+          ...message,
+          artifacts: [
+            {
+              type: "embedded_html",
+              name: "Preview",
+              body: '<h1>Preview</h1>\n```\n<img src="https://outside.invalid/beacon" onerror="alert(1)">\n```\n<p>`https://outside.invalid/inline`</p>\n<img src="https://github.com/image.png">',
+            },
+          ],
+        },
+        {}
+      );
+      expect(result.success).toBe(true);
+      const html = client.request.mock.calls[0][1].body;
+      expect(html).toContain("<h1>Preview</h1>");
+      expect(html).toContain('src="https://github.com/image.png"');
+      expect(html).not.toContain("https://outside.invalid");
+      expect(html).not.toContain("onerror");
+    });
+
+    it("neutralizes executable HTML tags, attributes and protocols including backtick regions", async () => {
+      vi.stubEnv("GH_AW_SAFE_OUTPUTS_URLS", "allowed-or-code-region");
+      const handler = await main({});
+      const result = await handler(
+        {
+          ...message,
+          artifacts: [
+            {
+              type: "embedded_html",
+              name: "Preview",
+              body: '<script>alert(1)</script>\n<iframe src="https://outside.invalid"></iframe>\n<form action="https://outside.invalid"><input></form>\n```\n<p onclick="alert(1)" style="background:url(https://outside.invalid)">Content</p>\n<a href="javascript:alert(1)">Link</a>\n<img src="javascript:alert(1)" onload="alert(1)">\n<!-- hidden payload -->\n```',
+            },
+          ],
+        },
+        {}
+      );
+      expect(result.success).toBe(true);
+      const html = client.request.mock.calls[0][1].body;
+      expect(html).toContain("<p>Content</p>");
+      expect(html).not.toMatch(/<(?:script|iframe|form|input|a)\b/i);
+      expect(html).not.toMatch(/onclick|onload|style=|javascript:|https:\/\/outside\.invalid|<!--/i);
+    });
+
+    it("keeps the workflow's code-region URL policy for non-HTML artifacts", async () => {
+      vi.stubEnv("GH_AW_SAFE_OUTPUTS_URLS", "allowed-or-code-region");
+      const handler = await main({});
+      const body = "Example:\n```\nhttps://outside.invalid/example\n```";
+      const result = await handler({ ...message, artifacts: [{ name: "Source", body }] }, {});
+      expect(result.success).toBe(true);
+      expect(client.request.mock.calls[0][1].body).toBe(body);
+      expect(process.env.GH_AW_SAFE_OUTPUTS_URLS).toBe("allowed-or-code-region");
+    });
+
+    it.each(['<img src="//outside.invalid/beacon">', '<img src="https&#58;//outside.invalid/beacon">', '<img src="javascript&#58;alert(1)">'])("filters protocol-relative and encoded HTML URLs: %s", async body => {
+      vi.stubEnv("GH_AW_SAFE_OUTPUTS_URLS", "allowed-or-code-region");
+      const handler = await main({});
+      const result = await handler({ ...message, artifacts: [{ type: "embedded_html", name: "Preview", body }] }, {});
+      expect(result.success).toBe(true);
+      expect(client.request.mock.calls[0][1].body).not.toMatch(/\/\/outside\.invalid|javascript(?:&#58;|:)/);
+    });
+
+    it("preserves safe disclosure structure while removing event handlers", async () => {
+      const handler = await main({});
+      const result = await handler({ ...message, artifacts: [{ type: "embedded_html", name: "Preview", body: '<details ontoggle="alert(1)"><summary>Safe</summary><p>Body</p></details>' }] }, {});
+      expect(result.success).toBe(true);
+      expect(client.request.mock.calls[0][1].body).toBe("<details><summary>Safe</summary><p>Body</p></details>");
+    });
+
+    it("rejects HTML bodies that become empty during sanitization before creating an issue", async () => {
+      const handler = await main({});
+      const result = await handler({ ...message, artifacts: [{ type: "embedded_html", name: "Preview", body: "<!-- hidden payload -->" }] }, {});
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("must remain non-empty after sanitization");
+      expect(client.rest.issues.create).not.toHaveBeenCalled();
+      expect(client.request).not.toHaveBeenCalled();
+    });
   });
 
   it("preserves custom-job artifacts and keeps them out of the issue request", async () => {

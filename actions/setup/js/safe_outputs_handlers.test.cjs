@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from "vitest";
 import crypto from "crypto";
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { execSync } from "child_process";
 import { createHandlers, hasUpdatePullRequestFields } from "./safe_outputs_handlers.cjs";
@@ -197,9 +198,48 @@ describe("safe_outputs_handlers", () => {
     });
 
     it("rejects outside-root paths, traversal, and prefix collisions", () => {
-      for (const source of ["/etc/passwd", path.join(testWorkspaceDir, "..", "outside.md"), `${testWorkspaceDir}-other/plan.md`]) {
+      for (const source of [path.join(testWorkspaceDir, "..", "outside.md"), `${testWorkspaceDir}-other/plan.md`]) {
         expect(() => handlers.createIssueHandler(request([{ name: "Plan", path: source }]))).toThrow("within workspace directory");
       }
+      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+    });
+
+    it.each([".git/config", "nested/.git/credentials"])("rejects repository metadata before reading: %s", filename => {
+      const source = path.join(testWorkspaceDir, filename);
+      fs.mkdirSync(path.dirname(source), { recursive: true });
+      fs.writeFileSync(source, "sensitive metadata");
+      const open = vi.spyOn(fs, "openSync");
+      expect(() => handlers.createIssueHandler(request([{ name: "Plan", path: source }]))).toThrow("sensitive repository metadata");
+      expect(open).not.toHaveBeenCalled();
+      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+    });
+
+    it.each([".ssh/id_rsa", ".aws/credentials", ".config/gh/hosts.yml", ".netrc", ".npmrc", ".git-credentials"])("rejects HOME credentials even when HOME is the workspace: %s", filename => {
+      vi.spyOn(os, "homedir").mockReturnValue(testWorkspaceDir);
+      const open = vi.spyOn(fs, "openSync");
+      expect(() => handlers.createIssueHandler(request([{ name: "Plan", path: path.join(testWorkspaceDir, filename) }]))).toThrow("sensitive HOME location");
+      expect(open).not.toHaveBeenCalled();
+      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+    });
+
+    it.each(["/tmp/gh-aw/mcp-config.json", "/tmp/runtime.log", "/tmp/gh-aw/agent-other/plan.md", "/tmp/gh-aw/agent/../gateway/config.json"])("rejects general temporary files before opening: %s", source => {
+      const open = vi.spyOn(fs, "openSync");
+      expect(() => handlers.createIssueHandler(request([{ name: "Plan", path: source }]))).toThrow("/tmp/gh-aw/agent directory");
+      expect(open).not.toHaveBeenCalled();
+      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+    });
+
+    it("allows absolute paths in the agent working root without permitting sibling roots", () => {
+      const { resolveIssueArtifactPath, normalizeGuardedPath } = require("./symlink_guard.cjs");
+      expect(resolveIssueArtifactPath("/tmp/gh-aw/agent/plan.md")).toBe(normalizeGuardedPath("/tmp/gh-aw/agent/plan.md"));
+      expect(resolveIssueArtifactPath(path.join(testWorkspaceDir, "plan.md"))).toBe(normalizeGuardedPath(path.join(testWorkspaceDir, "plan.md")));
+    });
+
+    it("rejects system files even if the configured workspace overlaps a system directory", () => {
+      vi.stubEnv("GITHUB_WORKSPACE", "/etc");
+      const open = vi.spyOn(fs, "openSync");
+      expect(() => handlers.createIssueHandler(request([{ name: "Plan", path: "/etc/passwd" }]))).toThrow("system directory");
+      expect(open).not.toHaveBeenCalled();
       expect(mockAppendSafeOutput).not.toHaveBeenCalled();
     });
 

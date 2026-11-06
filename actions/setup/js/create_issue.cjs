@@ -1275,6 +1275,7 @@ async function main(config = {}) {
       };
     }
 
+    let artifactFailure;
     try {
       const { data: issue } = await withRetry(() => createReportIssue(githubClient, request), RATE_LIMIT_RETRY_CONFIG, `create_issue in ${qualifiedItemRepo}`);
 
@@ -1340,14 +1341,14 @@ async function main(config = {}) {
       core.info(`Stored temporary ID mapping: ${temporaryId} -> ${qualifiedItemRepo}#${issue.number}`);
 
       /** @type {CreatedIssueArtifact[]} */
-      let createdArtifacts;
+      let createdArtifacts = [];
       try {
         const resolvedArtifacts = artifacts.map(artifact => ({ ...artifact, body: replaceTemporaryIdReferences(artifact.body, temporaryIdMap, qualifiedItemRepo) }));
         createdArtifacts = await createIssueArtifacts(githubClient, repoParts.owner, repoParts.repo, issue.number, resolvedArtifacts, config.max_issue_artifact_size);
       } catch (error) {
         const artifactError = getErrorMessage(error);
         core.error(artifactError);
-        return { success: false, repo: qualifiedItemRepo, number: issue.number, url: issue.html_url, temporaryId, error: artifactError };
+        artifactFailure = { success: false, repo: qualifiedItemRepo, number: issue.number, url: issue.html_url, temporaryId, error: artifactError };
       }
 
       // Assign copilot directly using agent helpers when enabled (similar to assign_to_agent.cjs pattern)
@@ -1497,6 +1498,10 @@ async function main(config = {}) {
         core.info(`Skipping sub-issue linking: parent is in different repository (${effectiveParentRepo})`);
       }
 
+      if (artifactFailure) {
+        return artifactFailure;
+      }
+
       // Return result with temporary ID mapping info
       return {
         success: true,
@@ -1513,6 +1518,10 @@ async function main(config = {}) {
       };
     } catch (error) {
       const errorMessage = getErrorMessage(error);
+      if (artifactFailure) {
+        core.error(`✗ Failed to complete post-create steps for "${title}" in ${qualifiedItemRepo}: ${errorMessage}`);
+        return artifactFailure;
+      }
       if (errorMessage.includes("Issues has been disabled in this repository")) {
         core.info(`⚠ Cannot create issue "${title}" in ${qualifiedItemRepo}: Issues are disabled for this repository`);
         core.info("Consider enabling issues in repository settings if you want to create issues automatically");
