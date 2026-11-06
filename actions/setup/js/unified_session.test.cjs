@@ -1754,10 +1754,17 @@ describe("Unified conclusion session", () => {
       ],
       private_output: "PRIVATE_RETRY_OUTPUT",
     });
-    write("threat-detection/detection_harness_retry.json", {
-      attempts: 1,
-      exit_code: 1,
-      attempt_results: [{ attempt: 1, exit_code: 1, failure_classes: ["runtime_guard"] }],
+    write("threat-detection/execution.json", {
+      version: 1,
+      component: "detection",
+      run_id: 123,
+      run_attempt: 2,
+      state: "started",
+      harness_retry: {
+        attempts: 1,
+        exit_code: 1,
+        attempt_results: [{ attempt: 1, exit_code: 1, failure_classes: ["runtime_guard"] }],
+      },
     });
     const events = writeUnifiedSession({ rootDir: root });
     const retries = events.filter(event => event.type === "harness.retry");
@@ -1777,13 +1784,30 @@ describe("Unified conclusion session", () => {
       {
         type: "harness.retry",
         data: { attempts: 1, exitCode: 1, attemptResults: [{ attempt: 1, exitCode: 1, failureClasses: ["runtime_guard"] }] },
-        provenance: { component: "harness", phase: "detection", path: "threat-detection/detection_harness_retry.json", index: 0 },
+        provenance: { component: "harness", phase: "detection", path: "threat-detection/execution.json", index: 0 },
       },
     ]);
     const persisted = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8");
     expect(persisted).not.toContain("PRIVATE_RETRY_OUTPUT");
     expect(persisted.trim().split("\n").map(JSON.parse)).toEqual(events);
     expect(validateSession(persisted)).toBe(events.length);
+  });
+
+  it("reads legacy detection retry telemetry from its standalone file", () => {
+    write("threat-detection/detection_harness_retry.json", {
+      attempts: 1,
+      exit_code: 1,
+      attempt_results: [{ attempt: 1, exit_code: 1, failure_classes: ["runtime_guard"] }],
+    });
+
+    const retries = collectUnifiedSession({ rootDir: root }).events.filter(event => event.type === "harness.retry");
+    expect(retries).toEqual([
+      {
+        type: "harness.retry",
+        data: { attempts: 1, exitCode: 1, attemptResults: [{ attempt: 1, exitCode: 1, failureClasses: ["runtime_guard"] }] },
+        provenance: { component: "harness", phase: "detection", path: "threat-detection/detection_harness_retry.json", index: 0 },
+      },
+    ]);
   });
 
   it.each([

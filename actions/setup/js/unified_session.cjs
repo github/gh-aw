@@ -298,7 +298,8 @@ function collectUnifiedSession({
         incompleteSources.add(file);
         report(file, "invalid_plugin_installation", line);
       } else if (type) {
-        events.push({ type, data: record, ...Object.fromEntries(["timestamp", "ts", "time", "created_at"].filter(key => record[key] !== undefined).map(key => [key, record[key]])) });
+        const data = component === "execution" && Object.hasOwn(record, "harness_retry") ? Object.fromEntries(Object.entries(record).filter(([key]) => key !== "harness_retry")) : record;
+        events.push({ type, data, ...Object.fromEntries(["timestamp", "ts", "time", "created_at"].filter(key => record[key] !== undefined).map(key => [key, record[key]])) });
       } else if (component === "mcp" || component === "firewall") events.push(normalizeRuntimeEvent(component, record));
       else throw new Error(`${ERR_VALIDATION}: Missing event mapping for ${component}`);
     }
@@ -533,10 +534,16 @@ function collectUnifiedSession({
     ["", "agent"],
     ["threat-detection/", "detection"],
   ]) {
-    const retryFile = choose(prefix ? ["threat-detection/detection_harness_retry.json", "usage/detection/harness_retry.json"] : ["agent/harness_retry.json", "usage/agent/harness_retry.json"]);
+    let retryFile = choose(prefix ? ["threat-detection/detection_harness_retry.json", "usage/detection/harness_retry.json"] : ["agent/harness_retry.json", "usage/agent/harness_retry.json"]);
+    let retryRecord = retryFile ? records(retryFile)[0] : undefined;
+    if (prefix && !retryFile) {
+      retryFile = choose(["threat-detection/execution.json", "usage/detection/execution.json"]);
+      const execution = retryFile ? records(retryFile)[0] : undefined;
+      if (execution && Object.hasOwn(execution, "harness_retry")) retryRecord = execution.harness_retry;
+      else retryFile = undefined;
+    }
     if (retryFile) {
-      const record = records(retryFile)[0];
-      const data = normalizeHarnessRetryRecord(record);
+      const data = normalizeHarnessRetryRecord(retryRecord);
       if (data) {
         /** @type {SessionEvent[]} */
         const retryEvents = [{ type: "harness.retry", data }];

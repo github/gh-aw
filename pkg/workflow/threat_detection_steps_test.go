@@ -325,9 +325,9 @@ func TestBuildUploadDetectionLogStep(t *testing.T) {
 		"uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
 		"name: " + constants.DetectionArtifactName.String(),
 		"            /tmp/gh-aw/threat-detection/detection.log",
+		"            /tmp/gh-aw/threat-detection/execution.json",
 		"            /tmp/gh-aw/threat-detection/detection_usage.json",
 		"            /tmp/gh-aw/threat-detection/detection_usage.jsonl",
-		"            /tmp/gh-aw/threat-detection/detection_harness_retry.json",
 		"if-no-files-found: ignore",
 	}
 
@@ -336,15 +336,19 @@ func TestBuildUploadDetectionLogStep(t *testing.T) {
 			t.Errorf("Expected upload detection log step to contain %q, but it was not found.\nGenerated steps:\n%s", expected, stepsString)
 		}
 	}
+	if strings.Contains(stepsString, "detection_harness_retry.json") {
+		t.Error("Expected upload detection log step to reuse execution.json for retry diagnostics")
+	}
 }
 
 func TestBuildUploadDetectionArtifactStep(t *testing.T) {
 	steps := strings.Join(NewCompiler().buildUploadDetectionArtifactStep(&WorkflowData{}), "")
 
-	assert.Contains(t, steps, "            /tmp/gh-aw/threat-detection/detection_harness_retry.json\n")
+	assert.Contains(t, steps, "            /tmp/gh-aw/threat-detection/execution.json\n")
 	assert.Contains(t, steps, "        if: "+detectionArtifactsRedactedCondition+"\n")
 	assert.Contains(t, steps, "          if-no-files-found: ignore\n")
 	assert.NotContains(t, steps, "/tmp/gh-aw/threat-detection/detection.log")
+	assert.NotContains(t, steps, "detection_harness_retry.json")
 }
 
 func TestThreatDetectionStepsIncludeUpload(t *testing.T) {
@@ -371,6 +375,10 @@ func TestThreatDetectionStepsIncludeUpload(t *testing.T) {
 	// Verify that the upload detection log step is included
 	if !strings.Contains(stepsString, "Upload threat detection log") {
 		t.Error("Expected inline detection steps to include upload detection log step")
+	}
+
+	if !strings.Contains(stepsString, "Merge detection retry telemetry into execution evidence") {
+		t.Error("Expected detection steps to merge retry telemetry into execution evidence")
 	}
 
 	if !strings.Contains(stepsString, "detection") {

@@ -104,6 +104,7 @@ func (c *Compiler) buildDetectionJobSteps(data *WorkflowData, precedingSteps ...
 	}
 
 	steps = append(steps, c.buildCopyDetectionFirewallLogsStep(buildThreatDetectionWorkflowData(data, ""))...)
+	steps = append(steps, c.buildMergeDetectionRetryTelemetryStep()...)
 	if len(data.SafeOutputs.ThreatDetection.PostSteps) > 0 {
 		steps = append(steps, c.buildCustomThreatDetectionSteps(data.SafeOutputs.ThreatDetection.PostSteps)...)
 	}
@@ -559,7 +560,6 @@ func (c *Compiler) buildUploadDetectionLogStep(data *WorkflowData) []string {
 		"            " + detectionExecutionEvidencePath + "\n",
 		"            " + constants.TmpGhAwDir + "/threat-detection/detection_usage.json\n",
 		"            " + constants.TmpGhAwDir + "/threat-detection/detection_usage.jsonl\n",
-		"            " + constants.TmpGhAwDir + "/threat-detection/detection_harness_retry.json\n",
 	}
 	if isFirewallEnabled(data) {
 		threatLog.Print("Including firewall logs in detection log upload artifact")
@@ -570,6 +570,18 @@ func (c *Compiler) buildUploadDetectionLogStep(data *WorkflowData) []string {
 	}
 	steps = append(steps, "          if-no-files-found: ignore\n")
 	return steps
+}
+
+func (c *Compiler) buildMergeDetectionRetryTelemetryStep() []string {
+	return []string{
+		"      - name: Merge detection retry telemetry into execution evidence\n",
+		"        if: " + detectionStepCondition + "\n",
+		"        continue-on-error: true\n",
+		"        run: |\n",
+		"          node \"${RUNNER_TEMP}/gh-aw/actions/setup/js/merge_harness_retry_into_execution.cjs\" \\\n",
+		"            \"/tmp/gh-aw/threat-detection/detection_harness_retry.json\" \\\n",
+		"            \"" + detectionExecutionEvidencePath + "\"\n",
+	}
 }
 
 // No-output runs publish only compiler-generated execution evidence, never
