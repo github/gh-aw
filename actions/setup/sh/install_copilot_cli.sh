@@ -157,9 +157,16 @@ fi
 # `sudo -E awf --enable-chroot ...`, which creates the .copilot directory with
 # root ownership. The Copilot CLI (running as the runner user) then fails when
 # trying to create subdirectories. See: https://github.com/github/gh-aw/issues/12066
-echo "Ensuring correct ownership of $COPILOT_DIR..."
-mkdir -p "$COPILOT_DIR"
-maybe_sudo chown -R "$(id -u):$(id -g)" "$COPILOT_DIR"
+if [ "$ROOTLESS" = "true" ]; then
+  if ! { mkdir -p "$COPILOT_DIR" && [ -w "$COPILOT_DIR" ]; }; then
+    echo "ERROR: --rootless requires a writable Copilot directory at $COPILOT_DIR; existing files will not be reclaimed or re-owned." >&2
+    exit 1
+  fi
+else
+  echo "Ensuring correct ownership of $COPILOT_DIR..."
+  mkdir -p "$COPILOT_DIR"
+  maybe_sudo chown -R "$(id -u):$(id -g)" "$COPILOT_DIR"
+fi
 
 # Detect architecture
 ARCH="$(uname -m)"

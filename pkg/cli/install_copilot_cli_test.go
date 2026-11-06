@@ -741,6 +741,11 @@ func TestInstallCopilotCLIScriptRootlessModeUsesRealScriptWithToolcacheAndNoSudo
 echo "sudo-called: $*" >> "`+sudoLog+`"
 exit 99
 `), 0o755))
+			chownLog := filepath.Join(tempDir, "chown.log")
+			require.NoError(t, os.WriteFile(filepath.Join(fakeBinDir, "chown"), []byte(`#!/usr/bin/env bash
+echo "chown-called: $*" >> "`+chownLog+`"
+exit 99
+`), 0o755))
 
 			cmd := exec.Command("bash", append([]string{installScript}, tc.args...)...)
 			cmd.Env = append(os.Environ(),
@@ -758,6 +763,7 @@ exit 99
 			assert.Contains(t, string(output), "Wrapper installed at "+filepath.Join(homeDir, ".local", "bin", "copilot"))
 			assert.FileExists(t, filepath.Join(homeDir, ".local", "bin", "copilot"))
 			assert.NoFileExists(t, sudoLog, "sudo should not be called in rootless mode")
+			assert.NoFileExists(t, chownLog, "rootless installation must not recursively re-own Copilot configuration")
 		})
 	}
 }
