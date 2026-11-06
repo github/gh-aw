@@ -161,7 +161,7 @@ Direct command execution of stdio servers (e.g., `command: "node server.js"` wit
 
 The gh-aw launcher defaults the built-in `agenticworkflows` and `safeoutputs` backend containers to the runner's effective numeric UID and primary GID, including nonzero GIDs below 1000, with a container-local writable `HOME` at `/tmp`. Identity is applied to the backend arguments sent to mcpg, independently of the parent gateway container, across engine configuration formats. This keeps owner-only (`0600`) config files readable and outputs runner-owned without relaxing file permissions. Generated safeoutputs config, tools, tools metadata, and validation files use `0600`, including when replacing existing files. Explicit container-user settings, configured `HOME` values, and `--group-add` arguments are preserved; supplementary runner groups are not automatically granted to backends. The gateway separately receives the Docker socket group needed to launch child containers; other MCP servers are unchanged.
 
-The v1.0.1 compiler already emitted `--user ${MCP_GATEWAY_UID}:${MCP_GATEWAY_GID}` for the parent gateway, but not for the safeoutputs backend. A report of a missing gateway user flag therefore needs the unmodified generated command and compiler metadata to reconcile it. Missing a backend user flag alone does not establish why container root could not read a runner-owned `0600` file on a particular self-hosted runner; host permissions and Docker user mappings still need separate evidence.
+The v1.0.1 compiler emitted `--user ${MCP_GATEWAY_UID}:${MCP_GATEWAY_GID}` for the parent gateway, but did not apply that identity to the safeoutputs backend.
 
 ### 3.3 Operational Model
 

@@ -453,7 +453,10 @@ describe("safeoutputs asset ownership", () => {
       const name = path.basename(directory);
       const pins = JSON.parse(fs.readFileSync(new URL("../../../.github/aw/actions-lock.json", import.meta.url), "utf8")).containers;
       const nodeImage = pins["ghcr.io/github/gh-aw-node"].pinned_image;
-      const gatewayImage = pins["ghcr.io/github/gh-aw-mcpg:v0.5.4"].pinned_image;
+      const versionConstants = fs.readFileSync(new URL("../../../pkg/constants/version_constants.go", import.meta.url), "utf8");
+      const gatewayVersion = versionConstants.match(/^const DefaultMCPGatewayVersion Version = "([^"]+)"/m)?.[1];
+      expect(gatewayVersion).toBeDefined();
+      const gatewayImage = pins[`ghcr.io/github/gh-aw-mcpg:${gatewayVersion}`].pinned_image;
       const configPath = path.join(directory, "config.json");
       const toolsPath = path.join(directory, "tools.json");
       const outputPath = path.join(directory, "output.json");
