@@ -335,6 +335,37 @@ func TestUnzipFileWithLimits(t *testing.T) {
 	})
 }
 
+func TestUnzipRejectsHighCompressionRatioArchive(t *testing.T) {
+	t.Parallel()
+
+	const uncompressedSize = 2 * 1024 * 1024
+	zipPath := filepath.Join(t.TempDir(), "compression-bomb.zip")
+	zipFile, err := os.Create(zipPath)
+	require.NoError(t, err)
+
+	zipWriter := zip.NewWriter(zipFile)
+	writer, err := zipWriter.Create("repeated.txt")
+	require.NoError(t, err)
+	_, err = writer.Write(bytes.Repeat([]byte("A"), uncompressedSize))
+	require.NoError(t, err)
+	require.NoError(t, zipWriter.Close())
+	require.NoError(t, zipFile.Close())
+
+	archive, err := zip.OpenReader(zipPath)
+	require.NoError(t, err)
+	require.Len(t, archive.File, 1)
+	require.Less(t, archive.File[0].CompressedSize64, uint64(uncompressedSize/100))
+	require.NoError(t, archive.Close())
+
+	destDir := t.TempDir()
+	err = unzipFileWithLimits(zipPath, destDir, false, maxZipEntryCount, uncompressedSize/2)
+	require.ErrorContains(t, err, "zip archive exceeds total uncompressed size limit")
+
+	entries, err := os.ReadDir(destDir)
+	require.NoError(t, err)
+	assert.Empty(t, entries, "archive validation should happen before decompressing entries")
+}
+
 func TestUnzipFileDirectoryLimit(t *testing.T) {
 	t.Parallel()
 
