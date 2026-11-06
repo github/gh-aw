@@ -14,10 +14,13 @@ permissions:
   contents: read
   pull-requests: read
   issues: read
-model: copilot/gpt-5.6-sol
+  copilot-requests: write
 engine:
   id: codex
   model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
 strict: true
 safe-outputs:
   push-to-pull-request-branch:
