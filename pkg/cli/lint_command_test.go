@@ -20,6 +20,7 @@ func TestNewLintCommand(t *testing.T) {
 	assert.Equal(t, "lint", cmd.Name(), "Command name should be 'lint'")
 	require.NotNil(t, cmd.Flags().Lookup("dir"), "lint command should have a --dir flag")
 	assert.Equal(t, "d", cmd.Flags().Lookup("dir").Shorthand, "--dir should have -d shorthand")
+	assert.Equal(t, "j", cmd.Flags().Lookup("json").Shorthand, "--json should have -j shorthand")
 	assert.Equal(t,
 		"Workflow directory (default: $GH_AW_WORKFLOWS_DIR or .github/workflows)",
 		cmd.Flags().Lookup("dir").Usage,

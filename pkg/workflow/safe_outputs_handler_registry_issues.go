@@ -197,9 +197,9 @@ var issueHandlerRegistry = map[string]handlerBuilder{
 			return nil
 		}
 		c := cfg.ReplaceLabel
-		transitions := make([]map[string]string, len(c.AllowedTransitions))
-		for i, t := range c.AllowedTransitions {
-			transitions[i] = map[string]string{"from": t.From, "to": t.To}
+		transitions := make([]map[string]string, 0, len(c.AllowedTransitions))
+		for _, t := range c.AllowedTransitions {
+			transitions = append(transitions, map[string]string{"from": t.From, "to": t.To})
 		}
 		config := newHandlerConfigBuilder().
 			AddTemplatableInt("max", c.Max).

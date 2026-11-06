@@ -35,6 +35,26 @@ describe("privacy-preserving work queue logging", () => {
     expect(stderr).not.toHaveBeenCalled();
   });
 
+  it.each([
+    "run_correlation_mismatch",
+    "run_binding_conflict",
+    "run_repository_mismatch",
+    "run_repository_identity_mismatch",
+    "run_event_mismatch",
+    "run_ref_mismatch",
+    "run_workflow_mismatch",
+    "run_principal_mismatch",
+    "rerun_not_authorized",
+  ])("identifies native binding failure %s without exposing metadata", code => {
+    const error = Object.assign(new Error(code), { request: { body: "private-token-payload" }, native_run: { display_title: "private-task-title" } });
+    expect(queueControlErrorCode(error)).toBe(code);
+    expect(queueControlErrorExplanation(code)).not.toContain("unclassified");
+    createWorkQueueLogger("dispatch").failure("launch.verification.failed", error, true);
+    expect(output()).toContain(`${code}=true`);
+    expect(output()).not.toContain("private-");
+    expect(queueControlErrorCode(new Error(`${code}: private-details`))).toBe("queue_control_authority_or_publication_failed");
+  });
+
   it("explains a delivery contract cardinality failure using only counts", async () => {
     vi.stubEnv("DEBUG", "work-queue:delivery");
     const assignment = {
