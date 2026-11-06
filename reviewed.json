@@ -591,5 +591,41 @@
   "summary": "Tiny demo repo (cart.py, short README).",
   "highlights": [],
   "blogged": false
+ },
+ "sabbasi3-factory-lab/factory": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-11-06",
+  "score": 9,
+  "summary": "Agentic software factory on gh-aw: deterministic controller, tiered PR policy, hash-chained audit log, spend caps, kill switch.",
+  "highlights": [
+   "policies/tiers.yaml risk tiers",
+   "audit branch + independent verifier/",
+   "dashboard/watchdog.mjs",
+   "policies/budgets.yaml"
+  ],
+  "blogged": true
+ },
+ "rpickett578/gh-aw-codex-pilot": {
+  "kind": "other",
+  "reviewed": "2026-11-06",
+  "score": 3,
+  "summary": "Synthetic single-run Codex pilot; minimal README, evidence-style repo.",
+  "highlights": [
+   "README one-liner"
+  ],
+  "blogged": false
+ },
+ "witt3rd/review-council": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-11-06",
+  "score": 8,
+  "summary": "Five reusable gh-aw reviewer workflows called from thin callers, one required status per reviewer.",
+  "highlights": [
+   "AGENTS.md adoption steps",
+   "SHA-pinned callers",
+   "inlined-imports locks",
+   "base-commit law"
+  ],
+  "blogged": false
  }
 }
