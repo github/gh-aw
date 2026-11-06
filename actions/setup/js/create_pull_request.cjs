@@ -2724,8 +2724,8 @@ async function main(config = {}) {
             })
           );
         }
-        let requestChangesReviewFailed = false;
-        if (requestChangesSections.length > 0) {
+        const requiresIndependentReview = requestChangesSections.length > 0;
+        if (requiresIndependentReview) {
           /** @type {import("./report_ast.cjs").ReportBlock[]} */
           const requestChangesChildren = [];
           for (const section of requestChangesSections) {
@@ -2753,14 +2753,13 @@ async function main(config = {}) {
             await withRetry(() => githubClient.rest.pulls.createReview(requestChangesParams), RATE_LIMIT_RETRY_CONFIG, `create REQUEST_CHANGES review for PR #${pullRequest.number}`);
             core.info(`Created REQUEST_CHANGES review for PR #${pullRequest.number}`);
           } catch (requestChangesError) {
-            requestChangesReviewFailed = true;
             core.warning(`Failed to create REQUEST_CHANGES review for PR #${pullRequest.number}: ${getErrorMessage(requestChangesError)}. An independent reviewer must review this pull request before merge.`);
           }
         }
 
         // Neither annotations nor review requests prove that GitHub will enforce human approval.
-        if (autoMerge && (detectionCaution || requestChangesReviewFailed)) {
-          core.warning(`Auto-merge is disabled for PR #${pullRequest.number} because detection caution is present or the required REQUEST_CHANGES review failed. Manual review by an independent reviewer is required before merge.`);
+        if (autoMerge && requiresIndependentReview) {
+          core.warning(`Auto-merge is disabled for PR #${pullRequest.number} because protected files or detection caution require independent review. Manual review by an independent reviewer is required before merge.`);
         } else if (autoMerge) {
           try {
             await githubClient.graphql(

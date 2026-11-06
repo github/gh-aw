@@ -2265,7 +2265,7 @@ ${diffs}
     expect(result.error).toContain("protected files");
   });
 
-  it("should create PR with caution and request-changes review when protected-files is request_review", async () => {
+  it("should disable auto-merge even after a successful protected-files request-changes review", async () => {
     const patchPath = writePatch("should-create-pr-with-caution-and-request-changes-review-whe", createPatchWithFiles(".github/aw/instructions.md"));
 
     const { main } = require("./create_pull_request.cjs");
@@ -2287,7 +2287,9 @@ ${diffs}
     expect(createReviewCall.event).toBe("REQUEST_CHANGES");
     expect(createReviewCall.body).toContain("Protected files were modified");
     expect(createReviewCall.body).toContain(".github/aw/instructions.md");
-    expect(global.github.graphql).toHaveBeenCalledWith(expect.stringContaining("enablePullRequestAutoMerge"), expect.anything());
+    expect(global.github.graphql).not.toHaveBeenCalledWith(expect.stringContaining("enablePullRequestAutoMerge"), expect.anything());
+    expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("Auto-merge is disabled"));
+    expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("Manual review by an independent reviewer is required before merge"));
   });
 
   it("should default to request_review when protected-files policy is unset", async () => {
@@ -4068,22 +4070,21 @@ describe("create_pull_request - threat detection caution", () => {
   });
 
   it.each([
-    ["warning", "threat_detected", true],
-    ["warning", "agent_failure", "merge"],
-    ["warning", "parse_error", "rebase"],
-    ["failure", "agent_failure", true],
-    ["failure", "parse_error", "squash"],
-  ])("should disable auto-merge for detection %s / %s with merge setting %s even after requesting reviewers", async (conclusion, reason, autoMerge) => {
+    ["warning", "threat_detected", "[!CAUTION]"],
+    ["failure", "agent_failure", "[!WARNING]"],
+    ["failure", "parse_error", "[!WARNING]"],
+  ])("should disable auto-merge for detection %s / %s even after requesting reviewers", async (conclusion, reason, alert) => {
     process.env.GH_AW_DETECTION_CONCLUSION = conclusion;
     process.env.GH_AW_DETECTION_REASON = reason;
 
     const { main } = require("./create_pull_request.cjs");
-    const handler = await main({ allow_empty: true, auto_merge: autoMerge, draft: false, reviewers: ["human-reviewer"] });
+    const handler = await main({ allow_empty: true, auto_merge: true, draft: false, reviewers: ["human-reviewer"] });
     const result = await handler({ title: "Test PR", body: "Agent body content" }, {});
 
     expect(result.success).toBe(true);
+    expect(global.github.rest.pulls.create).toHaveBeenCalledWith(expect.objectContaining({ body: expect.stringContaining(alert) }));
     expect(global.github.rest.pulls.requestReviewers).toHaveBeenCalledWith(expect.objectContaining({ reviewers: ["human-reviewer"] }));
-    expect(global.github.rest.pulls.createReview).toHaveBeenCalledWith(expect.objectContaining({ event: "REQUEST_CHANGES" }));
+    expect(global.github.rest.pulls.createReview).toHaveBeenCalledWith(expect.objectContaining({ event: "REQUEST_CHANGES", body: expect.stringContaining(reason) }));
     expect(global.github.graphql).not.toHaveBeenCalledWith(expect.stringContaining("enablePullRequestAutoMerge"), expect.anything());
     expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("Auto-merge is disabled"));
   });
