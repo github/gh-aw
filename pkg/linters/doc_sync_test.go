@@ -25,6 +25,7 @@ var (
 
 var notYetEnforced = map[string]string{
 	"blankassigncomma":            "existing production violations need remediation before enforcement; nolint suppression already works",
+	"blankassignedcleanuperror":   "new analyzer needs an enforcement-readiness audit before CI enables it (known findings in pkg/cli/logs_download_artifacts.go)",
 	"bufferresetbeforereuse":      "new correctness analyzer needs an enforcement-readiness audit before native CI enables it",
 	"bufioscannererunchecked":     "existing scanner loops need Err handling before native CI enables it",
 	"closeerrorunchecked":         "existing production violations need remediation before enforcement; nolint suppression already works",

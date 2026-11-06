@@ -5,6 +5,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/linters/appendbytestring"
 	"github.com/github/gh-aw/pkg/linters/appendoneelement"
+	blankassignedcleanuperror "github.com/github/gh-aw/pkg/linters/blank-assigned-cleanup-error"
 	"github.com/github/gh-aw/pkg/linters/blankassigncomma"
 	"github.com/github/gh-aw/pkg/linters/bufferresetbeforereuse"
 	"github.com/github/gh-aw/pkg/linters/bufioscannererunchecked"
@@ -105,6 +106,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	appendbytestring.Analyzer,
 	appendoneelement.Analyzer,
 	blankassigncomma.Analyzer,
+	blankassignedcleanuperror.Analyzer,
 	bufferresetbeforereuse.Analyzer,
 	bufioscannererunchecked.Analyzer,
 	bytesbufferstring.Analyzer,
