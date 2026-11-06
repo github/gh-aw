@@ -309,11 +309,40 @@ Use a release containing this API, and pin the setup action to a trusted commit 
 
 The helper adds the standard generated-by footer, workflow-run and history links, configured headers and disclosure, detection warnings, and workflow, caller, engine, and tracker annotations. Cross-repository issues still link to the original workflow run. Missing attribution metadata or a body exceeding GitHub's 65,536-character limit **including attribution** fails before creation; content is not silently truncated.
 
-`parameters.artifacts` accepts the [issue artifact array](/gh-aw/reference/safe-outputs/#issue-artifacts), with a maximum of 10 artifacts per issue and 1048576 UTF-8 bytes (1 MB) per artifact body. Artifacts are validated before issue creation and attached afterward using the same client and repository. The custom job must sanitize their names and content. Live results include `artifacts: [{ number, url }]` when attachments were created; staged previews include the artifact requests without writing them. An attachment failure throws an error identifying the already-created issue and how many artifacts were attached. The built-in `create-issue` frontmatter limit does not configure custom jobs.
+`parameters.artifacts` accepts [issue artifacts](/gh-aw/reference/safe-outputs/#issue-artifacts) with inline `body` content, with a maximum of 10 artifacts per issue and 1048576 UTF-8 bytes (1 MB) per artifact body. Unlike the built-in MCP tool, this privileged helper does not accept `path`. Artifacts are validated before issue creation and attached afterward using the same client and repository. The custom job must sanitize their names and content. Live results include `artifacts: [{ number, url }]` when attachments were created; staged previews include the artifact requests without writing them. An attachment failure throws an error identifying the already-created issue and how many artifacts were attached. The built-in `create-issue` frontmatter limit does not configure custom jobs.
 
-The helper's JSDoc types are `CreateIssueParameters` and `CreateIssueResult`. Shared artifact types distinguish `IssueArtifactInput` (optional format), normalized `IssueArtifact` (required format), and `CreatedIssueArtifact` (numeric `number` and a `url` that may be undefined). Narrow results on `staged` to access either normalized preview artifacts or created artifact metadata.
+The helper's JSDoc types are `CreateIssueParameters` and `CreateIssueResult`. Shared artifact types distinguish `IssueArtifactInput` (MCP input with exactly one of `body` or `path`), `IssueArtifactBodyInput` (body-only input for this helper and recorded requests), normalized `IssueArtifact` (required format), and `CreatedIssueArtifact` (numeric `number` and a `url` that may be undefined). Narrow results on `staged` to access either normalized preview artifacts or created artifact metadata.
 
 This is a posting helper, not the built-in `create-issue` policy handler. The custom job remains responsible for validating and sanitizing agent-controlled content, enforcing job-level output counts and allowed repositories, and supplying a token with appropriate permissions. Trusted custom metadata comments are preserved. The helper does not perform grouping, deduplication, expiration, assignment to agents, or manifest artifact upload.
+
+#### Attaching a Text File as an Issue Artifact
+
+For the built-in `create_issue` MCP tool, pass [`artifacts[].path`](/gh-aw/reference/safe-outputs/#attaching-files-by-path); the backend reads the file before recording its content, so no separate file transport is needed. The following alternative applies only to a trusted custom job using `createIssue`, which accepts `body`, not `path`. When the agent writes `/tmp/gh-aw/agent/issue-plan.md`, declare that file in the custom job so it survives the runner boundary:
+
+```yaml
+artifacts:
+  - /tmp/gh-aw/agent/issue-plan.md
+```
+
+The compiler downloads declared files beside the agent output, preserving their path relative to `/tmp/gh-aw/`. After the setup action and `setupGlobals` call from the example above, read the downloaded file using the installed guarded-file helper and pass its sanitized text as `body`:
+
+```javascript
+const path = require("node:path");
+const { readGuardedFile } = require(`${actionsDir}/symlink_guard.cjs`);
+const source = path.join(path.dirname(process.env.GH_AW_AGENT_OUTPUT), "agent", "issue-plan.md");
+const body = sanitizeContent(readGuardedFile(source, 1048576).toString("utf8"), {
+  maxLength: Number.MAX_SAFE_INTEGER,
+  maxLines: Number.MAX_SAFE_INTEGER,
+});
+const result = await createIssue({
+  title: "Implement parser caching",
+  body: "The implementation plan is attached.",
+  artifacts: [{ type: "plan", name: "Implementation plan", body }],
+});
+if (!result.staged) core.info(result.issue.html_url);
+```
+
+The file read rejects oversized or unsafe sources before issue creation. Artifact validation still checks the sanitized UTF-8 body against the helper's 1 MB default. Use a fixed declared path, not an unchecked agent-supplied path. See [depending on agent-job files](#depending-on-agent-job-files) for supported extensions, redaction, and path restrictions. Binary files and downloadable originals use [path-based file uploads](/gh-aw/reference/safe-outputs/#attaching-files-by-path), not issue artifact bodies.
 
 ### Job Properties
 

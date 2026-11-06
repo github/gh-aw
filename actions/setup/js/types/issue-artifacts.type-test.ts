@@ -1,4 +1,4 @@
-import type { CreatedIssueArtifact, CreateIssueItem, IssueArtifact, IssueArtifactInput, IssueArtifactType } from "./safe-outputs";
+import type { CreatedIssueArtifact, CreateIssueItem, IssueArtifact, IssueArtifactBodyInput, IssueArtifactInput, IssueArtifactType } from "./safe-outputs";
 import type { CreateIssueConfig } from "./safe-outputs-config";
 import type { HandlerConfig } from "./handler-factory";
 import type { CreateIssueParameters, CreateIssueResult } from "../create_issue.cjs";
@@ -6,7 +6,7 @@ import { createIssue } from "../create_issue.cjs";
 import { createIssue as createIssueFromIndex } from "../index.cjs";
 import { createIssueArtifacts, normalizeIssueArtifacts, sanitizeIssueArtifacts } from "../issue_artifacts.cjs";
 
-const inputs: IssueArtifactInput[] = [
+const inputs: IssueArtifactBodyInput[] = [
   { name: "Notes", body: "Research notes" },
   { type: "generic", name: "Notes", body: "Research notes" },
   { type: "plan", name: "Plan", body: "Implementation plan" },
@@ -16,6 +16,13 @@ const inputs: IssueArtifactInput[] = [
 const item: CreateIssueItem = { type: "create_issue", title: "Issue", body: "Details", artifacts: inputs };
 const parameters: CreateIssueParameters = { title: item.title, body: item.body, artifacts: item.artifacts };
 void parameters;
+const fileInput: IssueArtifactInput = { type: "plan", name: "Plan", path: "/tmp/gh-aw/agent/plan.md" };
+void fileInput;
+// @ts-expect-error An MCP artifact has exactly one content source.
+const ambiguousInput: IssueArtifactInput = { name: "Plan", body: "Plan", path: "/tmp/plan.md" };
+void ambiguousInput;
+// @ts-expect-error Recorded output must contain content, never a path to be read by a privileged job.
+item.artifacts = [fileInput];
 
 const normalized = normalizeIssueArtifacts(inputs);
 const sanitized = sanitizeIssueArtifacts(normalized, {});
@@ -60,6 +67,8 @@ export async function checkIssueArtifactApiTypes(): Promise<void> {
   await createIssue({ title: "Issue", body: "Details", artifacts: [{ body: "Details" }] });
   // @ts-expect-error Custom jobs require artifact bodies.
   await createIssue({ title: "Issue", body: "Details", artifacts: [{ name: "Notes" }] });
+  // @ts-expect-error Path expansion belongs to the MCP backend, not the privileged helper.
+  await createIssue({ title: "Issue", body: "Details", artifacts: [fileInput] });
 
   const created = await createIssueArtifacts(github, "owner", "repo", 1, normalized);
   const metadata: CreatedIssueArtifact[] = created;

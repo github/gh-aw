@@ -44,10 +44,10 @@ const TITLE_DEDUP_MIN_SEARCH_RATE_LIMIT_FRACTION = 0.2;
 /**
  * @typedef {NonNullable<Parameters<typeof github.rest.issues.create>[0]>} IssueParameters
  * @typedef {Awaited<ReturnType<typeof github.rest.issues.create>>["data"]} Issue
- * @typedef {import("./types/safe-outputs").IssueArtifactInput} IssueArtifactInput
+ * @typedef {import("./types/safe-outputs").IssueArtifactBodyInput} IssueArtifactBodyInput
  * @typedef {import("./types/safe-outputs").IssueArtifact} IssueArtifact
  * @typedef {import("./types/safe-outputs").CreatedIssueArtifact} CreatedIssueArtifact
- * @typedef {Omit<IssueParameters, "owner" | "repo" | "title" | "body"> & {owner?: string, repo?: string, title: string, body: string, artifacts?: IssueArtifactInput[]}} CreateIssueParameters
+ * @typedef {Omit<IssueParameters, "owner" | "repo" | "title" | "body"> & {owner?: string, repo?: string, title: string, body: string, artifacts?: IssueArtifactBodyInput[]}} CreateIssueParameters
  * @typedef {{staged: false, issue: Issue, artifacts?: CreatedIssueArtifact[]} | {staged: true, preview: IssueParameters & {artifacts?: IssueArtifact[]}}} CreateIssueResult
  */
 

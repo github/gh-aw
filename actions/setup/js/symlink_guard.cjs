@@ -15,7 +15,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { ERR_VALIDATION } = require("./error_codes.cjs");
+const { ERR_CONFIG, ERR_VALIDATION } = require("./error_codes.cjs");
 
 /** @param {string} message */
 function assetValidationError(message) {
@@ -54,6 +54,21 @@ function normalizeGuardedPath(filename) {
     }
   }
   return absolute;
+}
+
+/**
+ * Resolve a safe-output source within the workspace or /tmp without following links.
+ * @param {string} filename
+ * @returns {string}
+ */
+function resolveWorkspaceOrTmpPath(filename) {
+  const absolute = normalizeGuardedPath(filename);
+  const workspace = normalizeGuardedPath(process.env.GITHUB_WORKSPACE || process.cwd());
+  for (const root of [workspace, normalizeGuardedPath("/tmp")]) {
+    const relative = path.relative(root, absolute);
+    if (relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative)) return absolute;
+  }
+  throw new Error(`${ERR_CONFIG}: File path must be within workspace directory (${workspace}) or /tmp directory. Provided path: ${filename} (resolved to: ${absolute})`);
 }
 
 /**
@@ -179,4 +194,4 @@ function writeGuardedFile(filename, content) {
   });
 }
 
-module.exports = { lstatGuard, normalizeGuardedPath, withGuardedDirectory, readGuardedFile, writeGuardedFile };
+module.exports = { lstatGuard, normalizeGuardedPath, resolveWorkspaceOrTmpPath, withGuardedDirectory, readGuardedFile, writeGuardedFile };

@@ -25,16 +25,20 @@ interface BaseSafeOutputItem {
 
 type IssueArtifactType = "generic" | "link" | "plan" | "embedded_html";
 
-interface IssueArtifactInput {
+interface IssueArtifactMetadata {
   /** Artifact format; defaults to "generic" when omitted. */
   type?: IssueArtifactType;
   name: string;
-  body: string;
 }
 
-interface IssueArtifact extends IssueArtifactInput {
+type IssueArtifactBodyInput = IssueArtifactMetadata & { body: string; path?: never };
+
+type IssueArtifactInput = IssueArtifactBodyInput | (IssueArtifactMetadata & { path: string; body?: never });
+
+interface IssueArtifact extends IssueArtifactMetadata {
   /** Validated artifact format with the default applied. */
   type: IssueArtifactType;
+  body: string;
 }
 
 interface CreatedIssueArtifact {
@@ -54,7 +58,7 @@ interface CreateIssueItem extends BaseSafeOutputItem {
   /** Issue body content */
   body: string;
   /** Optional artifacts to attach after creating the issue. */
-  artifacts?: IssueArtifactInput[];
+  artifacts?: IssueArtifactBodyInput[];
   /** Optional labels to add to the issue */
   labels?: string[];
   /** Optional issue fields to set after creating the issue */
@@ -592,6 +596,7 @@ export {
   BaseSafeOutputItem,
   IssueArtifactType,
   IssueArtifactInput,
+  IssueArtifactBodyInput,
   IssueArtifact,
   CreatedIssueArtifact,
   CreateIssueItem,

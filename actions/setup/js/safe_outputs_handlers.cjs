@@ -32,7 +32,8 @@ const { sanitizeLabelContent } = require("./sanitize_label_content.cjs");
 const { isProbingNoopMessage, validateCreatePullRequestIntent, validatePushToPullRequestBranchIntent, validateCreateIssueIntent, validateAddCommentIntent } = require("./intent_probe.cjs");
 const { globPatternToRegex } = require("./glob_pattern_helpers.cjs");
 const { resolveInvocationContext } = require("./invocation_context_helpers.cjs");
-const { lstatGuard, normalizeGuardedPath, readGuardedFile, writeGuardedFile } = require("./symlink_guard.cjs");
+const { lstatGuard, normalizeGuardedPath, resolveWorkspaceOrTmpPath, readGuardedFile, writeGuardedFile } = require("./symlink_guard.cjs");
+const { resolveIssueArtifactPaths } = require("./issue_artifacts.cjs");
 const { validateValueAgainstSchema } = require("./schema-validation.cjs");
 const { resolveDataSchema } = require("./data_schema_normalizer.cjs");
 const { normalizeBlankOptionalFields } = require("./optional_field_normalizer.cjs");
@@ -753,20 +754,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     const { path: filePath } = args;
 
     // Validate file path is within allowed directories
-    const absolutePath = normalizeGuardedPath(filePath);
-    const workspaceDir = process.env.GITHUB_WORKSPACE || process.cwd();
-    const tmpDir = "/tmp";
-
-    const isWithin = root => {
-      const relative = path.relative(normalizeGuardedPath(root), absolutePath);
-      return relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
-    };
-    const isInWorkspace = isWithin(workspaceDir);
-    const isInTmp = isWithin(tmpDir);
-
-    if (!isInWorkspace && !isInTmp) {
-      throw new Error(`${ERR_CONFIG}: File path must be within workspace directory (${workspaceDir}) or /tmp directory. ` + `Provided path: ${filePath} (resolved to: ${absolutePath})`);
-    }
+    const absolutePath = resolveWorkspaceOrTmpPath(filePath);
     if (uploadedAssetPaths.has(scopedKey(absolutePath))) {
       throw new Error(`${ERR_VALIDATION}: Duplicate upload_asset source path is not allowed: ${filePath}`);
     }
@@ -2244,6 +2232,10 @@ function createHandlers(server, appendSafeOutput, config = {}) {
       };
     }
     const resolvedRepo = repoResult.repo;
+
+    if (entry.artifacts !== undefined) {
+      entry.artifacts = resolveIssueArtifactPaths(entry.artifacts, createIssueConfig.max_issue_artifacts, createIssueConfig.max_issue_artifact_size);
+    }
 
     let resolvedTitle = entry.title?.trim() || "";
     if (!resolvedTitle) {

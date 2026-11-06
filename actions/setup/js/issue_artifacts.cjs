@@ -7,10 +7,14 @@ const { GITHUB_API_VERSION } = require("./constants.cjs");
 const { withRetry, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { sanitizeTitle } = require("./sanitize_title.cjs");
+const path = require("node:path");
+const { isUtf8 } = require("node:buffer");
+const { readGuardedFile, resolveWorkspaceOrTmpPath } = require("./symlink_guard.cjs");
 const DEFAULT_MAX_ISSUE_ARTIFACT_SIZE = 1024 * 1024;
 
 /**
  * @typedef {import("./types/safe-outputs").IssueArtifact} IssueArtifact
+ * @typedef {import("./types/safe-outputs").IssueArtifactInput} IssueArtifactInput
  * @typedef {import("./types/safe-outputs").CreatedIssueArtifact} CreatedIssueArtifact
  */
 
@@ -22,6 +26,19 @@ const DEFAULT_MAX_ISSUE_ARTIFACT_SIZE = 1024 * 1024;
  * @returns {IssueArtifact[]}
  */
 function normalizeIssueArtifacts(value, maxArtifacts = 10, maxSizeBytes = DEFAULT_MAX_ISSUE_ARTIFACT_SIZE) {
+  return normalizeIssueArtifactInputs(value, maxArtifacts, maxSizeBytes).map((artifact, index) => {
+    if (artifact.path !== undefined) throw new Error(`${ERR_VALIDATION}: create_issue artifacts[${index}].path must be read by the safeoutputs MCP backend before processing`);
+    return { type: artifact.type ?? "generic", name: artifact.name, body: artifact.body };
+  });
+}
+
+/**
+ * @param {unknown} value
+ * @param {number} maxArtifacts
+ * @param {number} maxSizeBytes
+ * @returns {IssueArtifactInput[]}
+ */
+function normalizeIssueArtifactInputs(value, maxArtifacts, maxSizeBytes) {
   if (!Number.isSafeInteger(maxArtifacts)) throw new Error(`${ERR_VALIDATION}: max-issue-artifacts must be an integer`);
   if (!Number.isSafeInteger(maxSizeBytes) || maxSizeBytes <= 0) throw new Error(`${ERR_VALIDATION}: max-issue-artifact-size must be a positive integer in bytes`);
   if (value === undefined) return [];
@@ -36,8 +53,8 @@ function normalizeIssueArtifacts(value, maxArtifacts = 10, maxSizeBytes = DEFAUL
     if (!artifact || typeof artifact !== "object" || Array.isArray(artifact)) {
       throw new Error(`${ERR_VALIDATION}: ${field} must be an object`);
     }
-    if (Object.keys(artifact).some(key => !["type", "name", "body"].includes(key))) {
-      throw new Error(`${ERR_VALIDATION}: ${field} accepts only type, name, and body`);
+    if (Object.keys(artifact).some(key => !["type", "name", "body", "path"].includes(key))) {
+      throw new Error(`${ERR_VALIDATION}: ${field} accepts only type, name, body, and path`);
     }
     const type = !("type" in artifact) || artifact.type === undefined ? "generic" : artifact.type;
     if (type !== "generic" && type !== "link" && type !== "plan" && type !== "embedded_html") {
@@ -46,11 +63,44 @@ function normalizeIssueArtifacts(value, maxArtifacts = 10, maxSizeBytes = DEFAUL
     if (!("name" in artifact) || typeof artifact.name !== "string" || !artifact.name.trim()) {
       throw new Error(`${ERR_VALIDATION}: ${field}.name must be a non-empty string`);
     }
+    if ("body" in artifact === "path" in artifact) {
+      throw new Error(`${ERR_VALIDATION}: ${field} requires exactly one of body or path`);
+    }
+    if ("path" in artifact) {
+      if (typeof artifact.path !== "string" || !artifact.path.trim() || !path.isAbsolute(artifact.path)) {
+        throw new Error(`${ERR_VALIDATION}: ${field}.path must be a non-empty absolute file path`);
+      }
+      return { type, name: artifact.name.trim(), path: artifact.path };
+    }
     if (!("body" in artifact) || typeof artifact.body !== "string" || !artifact.body.trim()) {
       throw new Error(`${ERR_VALIDATION}: ${field}.body must be a non-empty string`);
     }
     validateIssueArtifactBodySize(artifact.body, maxSizeBytes, `${field}.body`);
     return { type, name: artifact.name.trim(), body: artifact.body };
+  });
+}
+
+/**
+ * Read path-based requests in the unprivileged MCP backend; persist content, not paths.
+ * @param {unknown} value
+ * @param {number} [maxArtifacts=10]
+ * @param {number} [maxSizeBytes=1048576]
+ * @returns {IssueArtifact[]}
+ */
+function resolveIssueArtifactPaths(value, maxArtifacts = 10, maxSizeBytes = DEFAULT_MAX_ISSUE_ARTIFACT_SIZE) {
+  const artifacts = normalizeIssueArtifactInputs(value, maxArtifacts, maxSizeBytes);
+  return artifacts.map((artifact, index) => {
+    if (artifact.path === undefined) return { type: artifact.type ?? "generic", name: artifact.name, body: artifact.body };
+    let content;
+    try {
+      content = readGuardedFile(resolveWorkspaceOrTmpPath(artifact.path), maxSizeBytes);
+    } catch (error) {
+      throw new Error(`${ERR_VALIDATION}: create_issue artifacts[${index}].path could not be read: ${getErrorMessage(error)}`, { cause: error });
+    }
+    if (!isUtf8(content) || content.includes(0)) throw new Error(`${ERR_VALIDATION}: create_issue artifacts[${index}].path must contain UTF-8 text without NUL bytes`);
+    const body = content.toString("utf8");
+    if (!body.trim()) throw new Error(`${ERR_VALIDATION}: create_issue artifacts[${index}].path must contain non-empty text`);
+    return { type: artifact.type ?? "generic", name: artifact.name, body };
   });
 }
 
@@ -144,4 +194,4 @@ async function createIssueArtifacts(githubClient, owner, repo, issueNumber, arti
   return created;
 }
 
-module.exports = { normalizeIssueArtifacts, sanitizeIssueArtifacts, createIssueArtifacts };
+module.exports = { normalizeIssueArtifacts, resolveIssueArtifactPaths, sanitizeIssueArtifacts, createIssueArtifacts };

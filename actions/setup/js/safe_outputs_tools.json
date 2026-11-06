@@ -133,10 +133,11 @@
         },
         "artifacts": {
           "type": "array",
-          "description": "Artifacts to attach after issue creation. Each artifact requires a name and body; type defaults to generic. Use plan for implementation plans, link for a URL, or embedded_html for HTML source.",
+          "description": "Artifacts to attach after issue creation. Each artifact requires a name and exactly one of body or path; type defaults to generic. The MCP backend reads path-based UTF-8 content without requiring the agent to load it. Use plan for implementation plans, link for a URL, or embedded_html for HTML source.",
           "items": {
             "type": "object",
-            "required": ["name", "body"],
+            "required": ["name"],
+            "oneOf": [{ "required": ["body"] }, { "required": ["path"] }],
             "properties": {
               "type": {
                 "type": "string",
@@ -153,6 +154,12 @@
                 "minLength": 1,
                 "description": "Artifact content, limited by max-issue-artifact-size in UTF-8 bytes (default: 1048576).",
                 "pattern": ".*\\S.*"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^/",
+                "description": "Absolute literal path to a non-empty UTF-8 text file within the workspace or /tmp (e.g., /tmp/gh-aw/agent/plan.md). The MCP backend reads it into body before recording the request. Variables and globs are not expanded. Links and non-regular files are rejected; max-issue-artifact-size bounds the read (default: 1mb). Do not also provide body."
               }
             },
             "additionalProperties": false

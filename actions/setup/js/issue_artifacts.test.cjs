@@ -28,9 +28,14 @@ describe("create_issue artifacts", () => {
     const runtime = tools.find(tool => tool.name === "create_issue").inputSchema.properties.artifacts;
     const compiler = require("../../../pkg/workflow/js/safe_outputs_tools.json").find(tool => tool.name === "create_issue").inputSchema.properties.artifacts;
     expect(runtime).toEqual(compiler);
-    expect(runtime.items.required).toEqual(["name", "body"]);
+    expect(runtime.items.required).toEqual(["name"]);
+    expect(runtime.items.oneOf).toEqual([{ required: ["body"] }, { required: ["path"] }]);
     expect(runtime.items.properties.type.enum).toEqual(["generic", "link", "plan", "embedded_html"]);
     expect(runtime.items.additionalProperties).toBe(false);
+  });
+
+  it("rejects unresolved file paths at the privileged processing boundary", () => {
+    expect(() => normalizeIssueArtifacts([{ name: "Plan", path: "/tmp/gh-aw/agent/plan.md" }])).toThrow("must be read by the safeoutputs MCP backend before processing");
   });
 
   it("creates artifacts after the issue without forwarding them to the issue API", async () => {

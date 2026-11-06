@@ -5,6 +5,68 @@ import { spawn } from "child_process";
 import crypto from "crypto";
 describe("safe_outputs_mcp_server.cjs large content handling", () => {
   let originalEnv, tempOutputDir, tempConfigFile, tempOutputFile;
+  it.skipIf(process.platform !== "linux")("reads issue artifact paths through MCP and persists their complete bodies", async () => {
+    const source = path.join(tempOutputDir, "plan.md");
+    const body = "## Plan\n\n" + "Cache parsed workflows.\n".repeat(4000);
+    fs.writeFileSync(source, body);
+    const child = spawn(process.execPath, [path.join(__dirname, "safe_outputs_mcp_server.cjs")], {
+      stdio: ["pipe", "pipe", "pipe"],
+      env: { ...process.env, GH_AW_SAFE_OUTPUTS: tempOutputFile, GH_AW_SAFE_OUTPUTS_CONFIG_PATH: tempConfigFile, GH_AW_SAFE_OUTPUTS_TOOLS_PATH: path.join(tempOutputDir, "tools.json") },
+    });
+    child.stderr.resume();
+    const closed = new Promise(resolve => child.once("close", resolve));
+    const call = request =>
+      new Promise((resolve, reject) => {
+        let buffer = "";
+        const cleanup = () => {
+          clearTimeout(timer);
+          child.stdout.removeListener("data", receive);
+          child.removeListener("error", fail);
+        };
+        const fail = error => {
+          cleanup();
+          reject(error);
+        };
+        const receive = chunk => {
+          buffer += chunk.toString();
+          let newline;
+          while ((newline = buffer.indexOf("\n")) >= 0) {
+            const line = buffer.slice(0, newline);
+            buffer = buffer.slice(newline + 1);
+            const response = JSON.parse(line);
+            if (response.id === request.id) {
+              cleanup();
+              resolve(response);
+              return;
+            }
+          }
+        };
+        const timer = setTimeout(() => fail(new Error("MCP artifact request timed out")), 5000);
+        child.stdout.on("data", receive);
+        child.once("error", fail);
+        child.stdin.write(`${JSON.stringify(request)}\n`);
+      });
+    try {
+      await call({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "artifact-test", version: "1.0.0" } } });
+      const response = await call({
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/call",
+        params: { name: "create_issue", arguments: { title: "Implement parser caching", body: "The implementation plan is attached.", artifacts: [{ type: "plan", name: "Plan", path: source }] } },
+      });
+      expect(response.error).toBeUndefined();
+      expect(response.result.isError).not.toBe(true);
+      expect(JSON.parse(response.result.content[0].text)).toMatchObject({ result: "success" });
+      expect(response.result.content[0].text).not.toContain(body);
+      fs.unlinkSync(source);
+      const recorded = JSON.parse(fs.readFileSync(tempOutputFile, "utf8").trim());
+      expect(recorded.artifacts).toEqual([{ type: "plan", name: "Plan", body }]);
+      expect(recorded.artifacts[0]).not.toHaveProperty("path");
+    } finally {
+      child.kill();
+      await closed;
+    }
+  });
   (beforeEach(() => {
     ((originalEnv = { ...process.env }),
       (tempOutputDir = path.join("/tmp", `test_large_content_${Date.now()}`)),
