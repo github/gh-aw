@@ -78,6 +78,22 @@ func (c *Compiler) validateEngineEnvSecretsWithModels(frontmatter map[string]any
 	return nil
 }
 
+func (c *Compiler) validateResolvedEngineEnvSecrets(ctx *workflowBuildContext) error {
+	return c.withEffectiveStrictMode(ctx.frontmatter.Frontmatter, func() error {
+		cfg := ctx.workflowData.EngineConfig
+		if frontmatterDeclaresImports(ctx.frontmatter.Frontmatter) || (cfg != nil && len(cfg.FallbackModels) > 0) {
+			// Top-level env was already checked before imports were merged.
+			if err := c.validateEngineEnvSecretsWithModels(ctx.frontmatter.Frontmatter, ctx.workflowData.ModelMappings); err != nil {
+				return err
+			}
+		}
+		if c.strictMode && cfg != nil && len(ExtractSecretsFromMap(cfg.Env)) > 0 && !awfSupportsExcludeEnv(getFirewallConfig(ctx.workflowData)) {
+			return fmt.Errorf("strict mode: secret configuration in 'engine.env' requires AWF %s or newer to keep secrets out of the agent container. Set sandbox.agent.version to %s or newer", constants.AWFExcludeEnvMinVersion, constants.AWFExcludeEnvMinVersion)
+		}
+		return nil
+	})
+}
+
 // getEngineBaseEnvVarKeys returns the set of env var key names that the named engine
 // supports as defined in the AWF specification. These keys are allowed to carry secrets
 // in engine.env overrides.
@@ -170,7 +186,11 @@ func (c *Compiler) validateEnvSecretsSection(config map[string]any, sectionName 
 		return fmt.Errorf("strict mode: secrets detected in '%s' section will be leaked to the agent container. Found: %s. Use engine-specific secret configuration instead. See: https://github.github.com/gh-aw/reference/engines/", sectionName, strings.Join(secretRefs, ", "))
 	}
 
-	// In non-strict mode, emit a warning
+	c.warnEnvSecrets(sectionName, secretRefs)
+	return nil
+}
+
+func (c *Compiler) warnEnvSecrets(sectionName string, secretRefs []string) {
 	var warningMsg string
 	if sectionName == "engine.env" {
 		// engine.env secrets are excluded from the agent sandbox via awf --exclude-env
@@ -182,6 +202,4 @@ func (c *Compiler) validateEnvSecretsSection(config map[string]any, sectionName 
 	}
 	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(warningMsg))
 	c.IncrementWarningCount()
-
-	return nil
 }
