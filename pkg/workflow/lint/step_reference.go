@@ -178,17 +178,30 @@ func stepReferenceFallbackNodes(node actionlint.ExprNode, ids map[string]struct{
 		if !ok || fallback.Value == "" {
 			return
 		}
-		actionlint.VisitExprNode(logical.Left, func(candidate, _ actionlint.ExprNode, nestedEntering bool) {
-			if !nestedEntering {
-				return
-			}
+		for _, candidate := range stepReferenceFallbackAccessNodes(logical.Left) {
 			id, literal := stepReferenceID(candidate)
 			if _, exists := ids[strings.ToLower(id)]; literal && !exists {
 				fallbacks[candidate] = struct{}{}
 			}
-		})
+		}
 	})
 	return fallbacks
+}
+
+func stepReferenceFallbackAccessNodes(node actionlint.ExprNode) []actionlint.ExprNode {
+	var accesses []actionlint.ExprNode
+	for {
+		switch access := node.(type) {
+		case *actionlint.ObjectDerefNode:
+			accesses = append(accesses, access)
+			node = access.Receiver
+		case *actionlint.IndexAccessNode:
+			accesses = append(accesses, access)
+			node = access.Operand
+		default:
+			return accesses
+		}
+	}
 }
 
 func stepReferenceAgentMetadataPath(jobPath, path string) bool {
