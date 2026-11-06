@@ -323,6 +323,8 @@ async function verifyNativeCreationDelivery(options) {
   }
   const fields = new Set([
     "type",
+    "output_id",
+    "depends-on",
     "claim_handle",
     "claim_id",
     "work_id",
