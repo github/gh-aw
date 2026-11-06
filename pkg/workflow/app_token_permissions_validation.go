@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -10,6 +11,54 @@ import (
 
 type appTokenStepKey struct {
 	jobName, id, clientID, privateKey string
+}
+
+func validateRepoMemoryAppConfig(memory RepoMemoryEntry) error {
+	for _, config := range []struct {
+		field string
+		app   *GitHubAppConfig
+	}{
+		{"github-app", memory.GitHubApp},
+		{"github-app-read", memory.GitHubAppRead},
+		{"github-app-write", memory.GitHubAppWrite},
+	} {
+		if config.app == nil {
+			continue
+		}
+		if !config.app.IgnoreIfMissing && !config.app.hasRequiredCredentials() {
+			return fmt.Errorf("tools.repo-memory.%s requires client-id (or app-id) and private-key; configure both credentials or set ignore-if-missing: true", config.field)
+		}
+		if len(config.app.Permissions) > 0 {
+			return fmt.Errorf("tools.repo-memory.%s does not support permissions; repo-memory requests only contents permission", config.field)
+		}
+	}
+	return nil
+}
+
+func validateRepoMemoryAppTarget(memory RepoMemoryEntry) error {
+	if (memory.githubApp(PermissionRead) == nil && memory.githubApp(PermissionWrite) == nil) || memory.TargetRepo == "" {
+		return nil
+	}
+	if !strings.Contains(memory.TargetRepo, "${{") {
+		if !repoMemoryTargetPattern.MatchString(memory.TargetRepo) {
+			return errors.New("tools.repo-memory.target-repo must use owner/repo format when github-app is configured")
+		}
+		return nil
+	}
+	for _, app := range []*GitHubAppConfig{memory.githubApp(PermissionRead), memory.githubApp(PermissionWrite)} {
+		if app == nil {
+			continue
+		}
+		if app.Owner != "" && !repoMemoryTargetPartPattern.MatchString(app.Owner) {
+			return errors.New("tools.repo-memory.github-app.owner must be a literal owner for expression target-repo authorization")
+		}
+		for _, repository := range app.Repositories {
+			if !repoMemoryTargetPartPattern.MatchString(repository) {
+				return errors.New("tools.repo-memory.github-app.repositories must contain literal repository names for expression target-repo authorization")
+			}
+		}
+	}
+	return nil
 }
 
 func (c *Compiler) hasGeneratedWildcardAppTokenStep(jobName string, step, with map[string]any, seen map[appTokenStepKey]bool) bool {
@@ -48,8 +97,8 @@ func (c *Compiler) recordGeneratedWildcardAppTokenStep(jobName string, app *GitH
 	c.wildcardAppTokenSteps[appTokenStepKey{jobName: jobName, id: stepID, clientID: app.AppID, privateKey: app.PrivateKey}] = true
 }
 
-func (c *Compiler) buildGitHubAppTokenMintStepForJob(jobName string, app *GitHubAppConfig, permissions *Permissions, fallbackRepoExpr string, ownerSourceRepository string, stepName string, stepID string) []string {
-	steps := c.buildGitHubAppTokenMintStepWithMeta(app, permissions, fallbackRepoExpr, ownerSourceRepository, stepName, stepID)
+func (c *Compiler) buildGitHubAppTokenMintStepForJob(jobName string, app *GitHubAppConfig, permissions *Permissions, fallbackRepoExpr string, ownerSourceRepository string, stepName string, stepID string, conditions ...string) []string {
+	steps := c.buildGitHubAppTokenMintStepWithMeta(app, permissions, fallbackRepoExpr, ownerSourceRepository, stepName, stepID, conditions...)
 	c.recordGeneratedWildcardAppTokenStep(jobName, app, stepID)
 	return steps
 }

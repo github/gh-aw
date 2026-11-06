@@ -378,12 +378,17 @@ The `deduplicate-by-title` field drops duplicate issues by comparing titles befo
 
 Deduplication runs at both the MCP tool-call boundary (within-run drops with immediate `duplicate_dropped` feedback to the agent) and at apply time (within-run plus open and recently-closed repository issues). Dropped items are recorded in the safe-output summary with the matched title, edit distance, and source (`mcp-precheck`, `within-run`, or `repo-level`).
 
+The optional `deduplicate-by-labels` array drops duplicates when an existing issue has **all** listed labels. It works independently of `deduplicate-by-title`; when both are configured, both the title and all labels must match (AND). Filters apply within-run and to repository searches for open issues and issues closed within the last 30 days. Omitted, empty, or whitespace-only label filters preserve title-only behavior; without either filter, deduplication is disabled.
+
+Filter labels must be literal strings, not GitHub Actions expressions. Repository filtering uses GitHub's issue-search syntax; matching labels containing double quotes or backslashes is not verified. Prefer labels without those characters. The `labels` field only controls labels applied at creation. Include filter labels in `labels` (or supply them in the tool call) if newly created issues should match future deduplication searches; filter labels are not added automatically.
+
 ```yaml wrap
 safe-outputs:
   create-issue:
-    title-prefix: "[triage] "
-    labels: [bug]
+    title-prefix: "[docs-consistency-check] "
+    labels: [documentation, automated]
     deduplicate-by-title: 1   # tolerate one-character title differences
+    deduplicate-by-labels: [documentation, automated]
 ```
 
 #### Searching for Workflow-Created Items
@@ -1934,7 +1939,17 @@ safe-outputs:
     private-key: ${{ secrets.WORKFLOW_APP_PRIVATE_KEY }}
 ```
 
-Accepts a plain string or an object with `name` and optional `url`, consistent with the top-level `environment:` syntax.
+Accepts a plain string or an object with `name`, optional `url`, and optional `deployment`, consistent with the top-level `environment:` syntax. `deployment` accepts a boolean or GitHub Actions expression, such as `${{ github.ref_name == 'main' }}`; omitting it preserves the default deployment behavior.
+
+For environments that only gate write credentials, `deployment: false` keeps environment secrets and protection rules (including branch policies, required reviewers, and wait timers) without creating deployment records:
+
+```aw wrap
+safe-outputs:
+  environment:
+    name: protected-write-secrets
+    deployment: false
+  add-comment:
+```
 
 ### Safe Outputs Dependencies (`needs:`)
 

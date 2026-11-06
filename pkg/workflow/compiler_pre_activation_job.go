@@ -274,7 +274,7 @@ func (c *Compiler) buildPreActivationMemoryRestoreSteps(data *WorkflowData, step
 	}
 
 	var repoMemorySteps strings.Builder
-	generateRepoMemorySteps(&repoMemorySteps, data)
+	c.generateRepoMemorySteps(&repoMemorySteps, data, string(constants.PreActivationJobName))
 	if repoMemorySteps.Len() > 0 {
 		steps = append(steps, repoMemorySteps.String())
 	}

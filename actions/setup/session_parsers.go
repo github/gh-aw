@@ -48,7 +48,7 @@ import "embed"
 //go:embed js/work_queue_issue_contract.cjs
 //go:embed js/work_queue_binding.cjs js/work_queue_policy.cjs js/work_queue_store.cjs
 //go:embed js/work_queue_auth_cache.cjs
-//go:embed js/work_queue_git_transport.cjs js/git_auth_env.cjs
+//go:embed js/work_queue_git_transport.cjs js/work_queue_git_objects.cjs js/git_auth_env.cjs
 //go:embed js/work_queue_policy_config.cjs
 //go:embed js/work_queue_pool_install.cjs
 //go:embed js/work_queue_checked_transport.cjs

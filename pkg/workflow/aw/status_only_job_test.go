@@ -144,3 +144,44 @@ func TestStatusOnlyExpressionPath(t *testing.T) {
 		})
 	}
 }
+
+func TestStatusOnlyPreAgentOutputAccess(t *testing.T) {
+	const output = "${{ needs.eligibility.outputs.head_sha }}"
+	allowed := map[string]struct{}{"eligibility": {}}
+	preAgent := map[string]struct{}{"eligibility": {}}
+	for _, tt := range []struct {
+		name        string
+		directNeeds []string
+		field       string
+		want        string
+	}{
+		{"env direct dependency", []string{"eligibility"}, "env", ""},
+		{"env missing direct dependency", nil, "env", "listed in needs"},
+		{"run interpolation", []string{"eligibility"}, "run", "through env"},
+		{"script interpolation", []string{"eligibility"}, "script", "through env"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var step map[string]any
+			switch tt.field {
+			case "env":
+				step = map[string]any{
+					"env": map[string]any{"HEAD_SHA": output},
+					"run": "printf '%s' \"$HEAD_SHA\"",
+				}
+			case "run":
+				step = map[string]any{"run": "echo " + output}
+			case "script":
+				step = map[string]any{"with": map[string]any{"script": "console.log(" + output + ")"}}
+			}
+
+			config := map[string]any{"steps": []any{step}}
+			violations := ValidateStatusOnlyJob("status", config, allowed, preAgent, tt.directNeeds)
+			if tt.want == "" {
+				assert.Empty(t, violations)
+				return
+			}
+			assert.NotEmpty(t, violations)
+			assert.Contains(t, violations[0].Message, tt.want)
+		})
+	}
+}

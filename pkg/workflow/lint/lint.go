@@ -50,8 +50,11 @@ type Input struct {
 	// Document optionally supplies authored AW fields, including the prompt.
 	// Either AST may be supplied independently. Workflow is never a projection
 	// of AW frontmatter; when both are supplied it is the compiled graph.
-	Document   *aw.Document
-	JavaScript *taint.JavaScriptOptions
+	Document *aw.Document
+	// AuthoredJobs contains resolved custom job declarations, including imports,
+	// when linting a compiled workflow.
+	AuthoredJobs map[string]any
+	JavaScript   *taint.JavaScriptOptions
 	// AllowActionRefs permits well-formed mutable references as warnings.
 	// Malformed references remain errors regardless of this compiler allowance.
 	AllowActionRefs bool

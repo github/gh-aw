@@ -324,4 +324,5 @@ See [Custom AI engines](/gh-aw/reference/third-party-agent/#shared-imported-engi
 
 ### Unsupported engine samples
 
-See [third-party samples](/gh-aw/reference/third-party-agent/#unsupported-engine-samples).
+See [third-party samples](/gh-aw/reference/third-party-agent/#unsupported-engine-samples),
+including the experimental Atomic declarative engine.

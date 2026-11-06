@@ -27,7 +27,8 @@ const { generateTemporaryId, getOrGenerateTemporaryId } = require("./temporary_i
 const { parseAllowedExtensionsEnv } = require("./allowed_extensions_helpers.cjs");
 const { buildExcludePathspecs, getStagedPatchDiffSizeBytes } = require("./git_patch_utils.cjs");
 const { sanitizeTitle, applyTitlePrefix } = require("./sanitize_title.cjs");
-const { parseDeduplicateByTitle, normalizeTitleForDedup, findDuplicateByTitle } = require("./issue_title_dedup.cjs");
+const { parseDeduplicateByTitle, normalizeTitleForDedup, normalizeDeduplicationLabels, hasDeduplicationLabels, findDuplicateIssue } = require("./issue_title_dedup.cjs");
+const { sanitizeLabelContent } = require("./sanitize_label_content.cjs");
 const { isProbingNoopMessage, validateCreatePullRequestIntent, validatePushToPullRequestBranchIntent, validateCreateIssueIntent, validateAddCommentIntent } = require("./intent_probe.cjs");
 const { globPatternToRegex } = require("./glob_pattern_helpers.cjs");
 const { resolveInvocationContext } = require("./invocation_context_helpers.cjs");
@@ -744,6 +745,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
   };
 
   const createIssueConfig = config.create_issue || {};
+  const deduplicateByLabels = normalizeDeduplicationLabels(createIssueConfig.deduplicate_by_labels);
   let deduplicateByTitle = { enabled: false, maxDistance: 0 };
   try {
     deduplicateByTitle = parseDeduplicateByTitle(createIssueConfig.deduplicate_by_title);
@@ -2272,10 +2274,10 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     }
     resolvedTitle = applyTitlePrefix(sanitizeTitle(resolvedTitle, createIssueTitlePrefix), createIssueTitlePrefix);
 
-    if (deduplicateByTitle.enabled) {
+    if (deduplicateByTitle.enabled || deduplicateByLabels.length > 0) {
       const normalizedTitle = normalizeTitleForDedup(resolvedTitle);
       const seenTitles = seenIssueTitlesByRepo.get(scopedKey(resolvedRepo)) || [];
-      const duplicate = findDuplicateByTitle(normalizedTitle, seenTitles, deduplicateByTitle.maxDistance);
+      const duplicate = findDuplicateIssue(normalizedTitle, seenTitles, deduplicateByTitle);
       if (duplicate) {
         const droppedEntry = {
           ...entry,
@@ -2300,8 +2302,15 @@ function createHandlers(server, appendSafeOutput, config = {}) {
           ],
         };
       }
-      seenTitles.push({ title: resolvedTitle, normalizedTitle });
-      seenIssueTitlesByRepo.set(scopedKey(resolvedRepo), seenTitles);
+      const defaultLabels = Array.isArray(createIssueConfig.labels) ? createIssueConfig.labels : (createIssueConfig.labels || "").split(",");
+      const labels = [...defaultLabels, ...(Array.isArray(entry.labels) ? entry.labels : [])]
+        .filter(Boolean)
+        .map(label => sanitizeLabelContent(String(label).trim()).slice(0, 64))
+        .filter(Boolean);
+      if (hasDeduplicationLabels(labels, deduplicateByLabels)) {
+        seenTitles.push({ title: resolvedTitle, normalizedTitle });
+        seenIssueTitlesByRepo.set(scopedKey(resolvedRepo), seenTitles);
+      }
     }
 
     const largeContentResponse = maybeHandleLargeContent(entry);

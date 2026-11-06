@@ -168,6 +168,11 @@
       "desc": "Optional source reference indicating where this workflow was added from.",
       "leaf": true
     },
+    "source-sha": {
+      "type": "string",
+      "desc": "Installed source commit, managed by gh aw add and update.",
+      "leaf": true
+    },
     "redirect": {
       "type": "string",
       "desc": "Optional workflow location redirect for updates.",
@@ -812,6 +817,12 @@
           "desc": "Suppress the non-strict warning when pull_request_target is combined with on.roles containing read or all.",
           "enum": [true, false],
           "leaf": true
+        },
+        "dangerously-allow-pull-request-target-forks-all": {
+          "type": "boolean",
+          "desc": "Allow forks: '*' under pull_request_target in strict mode when declared in the main workflow's top-level features.",
+          "enum": [true, false],
+          "leaf": true
         }
       }
     },
@@ -884,6 +895,11 @@
         "url": {
           "type": "string",
           "desc": "A deployment URL",
+          "leaf": true
+        },
+        "deployment": {
+          "type": "boolean|string",
+          "desc": "Set to false to use the environment's secrets and protection rules without creating a GitHub deployment.",
           "leaf": true
         }
       }
@@ -1020,6 +1036,17 @@
             "checksums-sha256": {
               "type": "string",
               "desc": "Literal SHA256 digest of the AWF release's checksums.txt manifest.",
+              "leaf": true
+            },
+            "enclave-debug-public": {
+              "type": "boolean",
+              "desc": "Opt in to the maintained public Docker enclave diagnostic collector for static public-only default-image fixtures.",
+              "enum": [true, false],
+              "leaf": true
+            },
+            "host-github-token": {
+              "type": "string",
+              "desc": "Secret expression bound to GH_TOKEN only in the AWF execution host step for repository staging.",
               "leaf": true
             },
             "platform": {
@@ -1717,6 +1744,17 @@
             "java": {
               "type": "string",
               "desc": "Inline Java driver source written to a generated .java file.",
+              "leaf": true
+            }
+          }
+        },
+        "durable": {
+          "type": "object",
+          "desc": "Experimental.",
+          "children": {
+            "retention-days": {
+              "type": "integer",
+              "desc": "Number of days to retain durable checkpoint artifacts, subject to repository and organization artifact retention policy.",
               "leaf": true
             }
           }
@@ -2587,6 +2625,42 @@
           "type": "boolean|null|object|array",
           "desc": "Repo memory configuration for git-based persistent storage",
           "children": {
+            "github-app": {
+              "type": "object",
+              "desc": "GitHub App credentials for repo-memory.",
+              "children": {
+                "client-id": {},
+                "app-id": {},
+                "private-key": {},
+                "owner": {},
+                "repositories": {},
+                "ignore-if-missing": {}
+              }
+            },
+            "github-app-read": {
+              "type": "object",
+              "desc": "GitHub App for memory restores and daily-credit ledger clones.",
+              "children": {
+                "client-id": {},
+                "app-id": {},
+                "private-key": {},
+                "owner": {},
+                "repositories": {},
+                "ignore-if-missing": {}
+              }
+            },
+            "github-app-write": {
+              "type": "object",
+              "desc": "GitHub App for memory pushes.",
+              "children": {
+                "client-id": {},
+                "app-id": {},
+                "private-key": {},
+                "owner": {},
+                "repositories": {},
+                "ignore-if-missing": {}
+              }
+            },
             "branch-prefix": {
               "type": "string",
               "desc": "Branch prefix for memory storage (default: 'memory').",
@@ -3038,7 +3112,7 @@
         },
         "upload-code-coverage": {
           "type": "object|null",
-          "desc": "⚠️ Experimental.",
+          "desc": "Enable AI agents to upload a code coverage report (e.g.",
           "leaf": true
         },
         "update-release": {
@@ -4193,7 +4267,7 @@
         },
         "model": {
           "type": "string",
-          "desc": "Default model to use for all evaluation questions.",
+          "desc": "Decisions-compatible model ID for the entire question batch, sent without provider-specific name mapping.",
           "leaf": true
         },
         "runs-on": {

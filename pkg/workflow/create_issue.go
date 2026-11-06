@@ -18,8 +18,9 @@ type CreateIssuesConfig struct {
 	AllowedFields                 []string              `yaml:"allowed-fields,omitempty"`       // Optional list of allowed issue field names. If omitted or empty, any issue fields are allowed. Use ["*"] to explicitly allow all.
 	Assignees                     []string              `yaml:"assignees,omitempty"`            // List of users/bots to assign the issue to
 	DeduplicateByTitle            *TemplatableBoolOrInt `yaml:"deduplicate-by-title,omitempty"` // When true or 0, deduplicate by exact title match. When set to a positive integer N, also allow fuzzy matches up to edit distance N. When false or omitted, disable title-based deduplication. Accepts GitHub Actions expressions.
-	TargetRepoSlug                string                `yaml:"target-repo,omitempty"`          // Target repository in format "owner/repo" for cross-repository issues
-	AllowedRepos                  []string              `yaml:"allowed-repos,omitempty"`        // List of additional repositories that issues can be created in
+	DeduplicateByLabels           []string              `yaml:"deduplicate-by-labels,omitempty"`
+	TargetRepoSlug                string                `yaml:"target-repo,omitempty"`   // Target repository in format "owner/repo" for cross-repository issues
+	AllowedRepos                  []string              `yaml:"allowed-repos,omitempty"` // List of additional repositories that issues can be created in
 	CloseOlderConfig              `yaml:",inline"`      // Shared close-older settings; Enabled is sourced from close-older-issues.
 	GroupByDay                    *string               `yaml:"group-by-day,omitempty"` // When true, if an open issue was already created today (UTC), post new content as a comment on it instead of creating a duplicate. Works best with close-older-issues: true.
 	Expires                       int                   `yaml:"expires,omitempty"`      // Hours until the issue expires and should be automatically closed

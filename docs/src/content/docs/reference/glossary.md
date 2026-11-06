@@ -1409,6 +1409,8 @@ on:
 
 A deterministic SHA-256 hash of a workflow's frontmatter configuration, including all imported workflow frontmatter collected in breadth-first order. The hash covers security-relevant fields (`engine`, `on`, `permissions`, `tools`, `network`, `safe-outputs`, etc.) while excluding the markdown body. Identical configurations produce identical hashes across the Go and JavaScript compiler implementations, enabling change detection, tamper verification, and reproducibility checks. To also hash the prompt body, use `on.stale-check: "full"` (see [Body Hash](#body-hash)). See [Frontmatter Hash Specification](/gh-aw/specs/frontmatter-hash-specification/).
 
+Activation reads the source, lock file, and imports at the immutable `GITHUB_WORKFLOW_SHA` when `GITHUB_WORKFLOW_REF` identifies the workflow being checked. This avoids depending on a pull request merge ref that may disappear after merge, or a branch or tag that may move while the run is queued. Reusable workflow resolution continues to prefer the callee's SHA from `referenced_workflows`, not the caller's SHA. Hash mismatches and unverifiable contents still fail the check.
+
 ### Custom Routing Signal (`engine_base_url_customized`)
 
 A boolean field in compiled lock file metadata (`# gh-aw-metadata:`) that authoritatively records whether a Copilot engine is running with custom provider/base-URL routing — via BYOK mode, a non-GitHub `engine.model-provider`, or an explicit `engine.api-target` — instead of default GitHub-hosted routing. Uses `omitempty` so default configurations omit the field rather than emit `false`. Replaces fragile downstream inference from compiled step `env:` blocks. See [Lock File Metadata](/gh-aw/reference/compilation-process/).

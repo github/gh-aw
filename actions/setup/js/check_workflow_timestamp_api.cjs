@@ -119,6 +119,14 @@ async function main() {
   const envRefMatchesWorkflow = envRefWithoutAt.endsWith(`/.github/workflows/${workflowFile}`);
 
   if (envRefMatchesWorkflow) {
+    // Pin source, lock and import reads to the workflow's commit: PR merge refs can
+    // disappear after merge, and branch/tag refs can move while a run is queued.
+    // Never pair an explicit ref override with the original workflow's SHA.
+    const workflowSha = process.env.GITHUB_WORKFLOW_SHA;
+    if (workflowEnvRef === process.env.GITHUB_WORKFLOW_REF && workflowSha) {
+      ref = workflowSha;
+      core.info(`Using immutable workflow revision from GITHUB_WORKFLOW_SHA: ${ref}`);
+    }
     core.info("Env workflow ref already identifies this workflow, skipping referenced_workflows API lookup");
   } else if (Number.isFinite(runId)) {
     const [runOwner, runRepo] = currentRepo.split("/");

@@ -3237,6 +3237,18 @@
                   "url": {
                     "type": "string",
                     "description": "The URL to set as the environment URL in the deployment."
+                  },
+                  "deployment": {
+                    "oneOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^\\$\\{\\{.*\\}\\}$"
+                      }
+                    ],
+                    "description": "Set to false to use the environment's secrets and protection rules without creating a GitHub deployment."
                   }
                 },
                 "required": ["name"]
@@ -3851,6 +3863,18 @@
             "url": {
               "type": "string",
               "description": "A deployment URL"
+            },
+            "deployment": {
+              "oneOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^\\$\\{\\{.*\\}\\}$"
+                }
+              ],
+              "description": "Set to false to use the environment's secrets and protection rules without creating a GitHub deployment."
             }
           },
           "required": ["name"],
@@ -6165,6 +6189,17 @@
               "type": "object",
               "description": "Repo-memory configuration object",
               "properties": {
+                "github-app": {
+                  "$ref": "#/$defs/repo_memory_github_app"
+                },
+                "github-app-read": {
+                  "$ref": "#/$defs/repo_memory_github_app",
+                  "description": "GitHub App for memory restores and daily-credit ledger clones. Overrides github-app for reads only."
+                },
+                "github-app-write": {
+                  "$ref": "#/$defs/repo_memory_github_app",
+                  "description": "GitHub App for memory pushes. Overrides github-app for writes only."
+                },
                 "branch-prefix": {
                   "type": "string",
                   "minLength": 4,
@@ -6293,6 +6328,17 @@
               "items": {
                 "type": "object",
                 "properties": {
+                  "github-app": {
+                    "$ref": "#/$defs/repo_memory_github_app"
+                  },
+                  "github-app-read": {
+                    "$ref": "#/$defs/repo_memory_github_app",
+                    "description": "GitHub App for memory restores and daily-credit ledger clones. Overrides github-app for reads only."
+                  },
+                  "github-app-write": {
+                    "$ref": "#/$defs/repo_memory_github_app",
+                    "description": "GitHub App for memory pushes. Overrides github-app for writes only."
+                  },
                   "id": {
                     "type": "string",
                     "description": "Memory identifier (required for array notation, default: 'default')"
@@ -6770,6 +6816,17 @@
                     }
                   ],
                   "description": "Title-based deduplication for create-issue. Set to true for exact title matching, or provide a non-negative integer (0\u2013100) to deduplicate by Levenshtein edit distance (e.g., 1 allows one-character differences). Accepts a GitHub Actions expression that resolves to a boolean or integer at runtime. Applies within-run and against open/recently-closed repository issues."
+                },
+                "deduplicate-by-labels": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "not": {
+                      "pattern": "\\$\\{\\{"
+                    }
+                  },
+                  "description": "Deduplicate against issues with all listed labels. When deduplicate-by-title is also enabled, both the title and all labels must match (AND). Applies within-run and against open/recently-closed repository issues. Omitted or empty lists disable label filtering. Labels must be literal strings, not GitHub Actions expressions. Does not change labels applied at creation."
                 },
                 "target-repo": {
                   "type": "string",
@@ -13229,6 +13286,18 @@
                 "url": {
                   "type": "string",
                   "description": "A deployment URL"
+                },
+                "deployment": {
+                  "oneOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "^\\$\\{\\{.*\\}\\}$"
+                    }
+                  ],
+                  "description": "Set to false to use the environment's secrets and protection rules without creating a GitHub deployment."
                 }
               },
               "required": ["name"],
@@ -16627,6 +16696,27 @@
         "${{ steps.fetch-token.outputs.my-token }}",
         "${{ env.GH_TOKEN }}"
       ]
+    },
+    "repo_memory_github_app": {
+      "type": "object",
+      "description": "GitHub App credentials for repo-memory. Push tokens request only contents: write; cross-repository clone tokens request only contents: read.",
+      "properties": {
+        "client-id": { "$ref": "#/$defs/github_app/properties/client-id" },
+        "app-id": { "$ref": "#/$defs/github_app/properties/app-id" },
+        "private-key": { "$ref": "#/$defs/github_app/properties/private-key" },
+        "owner": { "$ref": "#/$defs/github_app/properties/owner" },
+        "repositories": { "$ref": "#/$defs/github_app/properties/repositories" },
+        "ignore-if-missing": { "$ref": "#/$defs/github_app/properties/ignore-if-missing" }
+      },
+      "anyOf": [
+        { "required": ["client-id", "private-key"] },
+        { "required": ["app-id", "private-key"] },
+        {
+          "required": ["ignore-if-missing"],
+          "properties": { "ignore-if-missing": { "const": true } }
+        }
+      ],
+      "additionalProperties": false
     },
     "github_app": {
       "type": "object",

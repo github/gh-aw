@@ -83,6 +83,27 @@ func TestAdjustToolsForNativeMCPEngineWithoutAllowlistRetainsFallback(t *testing
 	assert.Equal(t, 1, compiler.GetExperimentalWarningCount(), "ignored tool restrictions are not experimental notices")
 }
 
+func TestAdjustToolsForNativeMCPEngineWithoutAllowlistPreservesGitHubPolicy(t *testing.T) {
+	engine, err := NewBehaviorDefinedEngine(newHarnessEngineDefinition())
+	require.NoError(t, err)
+	tools := map[string]any{
+		"github": map[string]any{"min-integrity": "approved", "allowed-repos": []any{"example/private-repo"}},
+		"bash":   []any{"*"},
+	}
+	actual := NewCompiler().adjustToolsForEngineCapabilities(map[string]any{"tools": tools}, engine, tools)
+	assert.Equal(t, tools["github"], actual["github"])
+	assert.NotContains(t, actual, "bash")
+}
+
+func TestResolveNativeMCPEngineValidatesBashBeforeFallback(t *testing.T) {
+	engine, err := NewBehaviorDefinedEngine(newHarnessEngineDefinition())
+	require.NoError(t, err)
+	frontmatter, err := parser.ExtractFrontmatterFromContent("---\non: workflow_dispatch\ntools:\n  bash: [echo]\n---\nRun echo.\n")
+	require.NoError(t, err)
+	_, err = NewCompiler().resolveToolsConfiguration(frontmatter, frontmatter.Markdown, t.TempDir(), &parser.ImportsResult{}, engine, engine.GetID())
+	require.ErrorContains(t, err, "does not support bash command allow-listing")
+}
+
 func TestExperimentalEngineNoticeWithoutIgnoredTools(t *testing.T) {
 	engine, err := NewBehaviorDefinedEngine(newHarnessEngineDefinition())
 	require.NoError(t, err)

@@ -53,6 +53,7 @@ describe("check_workflow_timestamp_api.cjs", () => {
     vi.clearAllMocks();
     delete process.env.GH_AW_WORKFLOW_FILE;
     delete process.env.GITHUB_WORKFLOW_REF;
+    delete process.env.GITHUB_WORKFLOW_SHA;
     delete process.env.GH_AW_CONTEXT_WORKFLOW_REF;
     delete process.env.GITHUB_REPOSITORY;
     delete process.env.GITHUB_WORKSPACE;
@@ -128,6 +129,77 @@ engine: copilot
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Same-repo invocation"));
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("GITHUB_WORKFLOW_REF:"));
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Resolved source repo:"));
+    });
+  });
+
+  describe("immutable workflow revision", () => {
+    const workflowSha = "84af1fd59015b65a792b4d301c365adf72613385";
+    const validHash = "c2a79263dc72f28c76177afda9bf0935481b26da094407a50155a6e0244084e3";
+    const sourcePath = ".github/workflows/test.md";
+    const lockPath = ".github/workflows/test.lock.yml";
+    const sourceContent = "---\nengine: copilot\n---\n# Test Workflow";
+
+    beforeEach(() => {
+      process.env.GH_AW_WORKFLOW_FILE = "test.lock.yml";
+      process.env.GITHUB_WORKFLOW_REF = "test-owner/test-repo/.github/workflows/test.lock.yml@refs/pull/75207/merge";
+      process.env.GH_AW_CONTEXT_WORKFLOW_REF = process.env.GITHUB_WORKFLOW_REF;
+      process.env.GITHUB_WORKFLOW_SHA = workflowSha;
+      process.env.GITHUB_RUN_ID = "42081295034";
+      process.env.GITHUB_EVENT_NAME = "pull_request";
+    });
+
+    it.each(["refs/pull/75207/merge", "refs/heads/main", "refs/tags/v1"])("should verify at the workflow SHA when %s disappears or moves", async ref => {
+      process.env.GITHUB_WORKFLOW_REF = `test-owner/test-repo/.github/workflows/test.lock.yml@${ref}`;
+      process.env.GH_AW_CONTEXT_WORKFLOW_REF = process.env.GITHUB_WORKFLOW_REF;
+      mockGithub.rest.repos.getContent.mockImplementation(async request => {
+        if (request.ref !== workflowSha) {
+          throw Object.assign(new Error(`No commit found for the ref ${request.ref}`), { status: 404 });
+        }
+        const content = request.path === lockPath ? `# frontmatter-hash: ${validHash}\n` : sourceContent;
+        return { data: { type: "file", encoding: "base64", content: Buffer.from(content).toString("base64") } };
+      });
+
+      await main();
+
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Lock file is up to date"));
+      expect(mockGithub.rest.actions.getWorkflowRun).not.toHaveBeenCalled();
+      expect(mockGithub.rest.repos.getContent).toHaveBeenCalledWith(expect.objectContaining({ path: lockPath, ref: workflowSha }));
+      expect(mockGithub.rest.repos.getContent).toHaveBeenCalledWith(expect.objectContaining({ path: sourcePath, ref: workflowSha }));
+      for (const [request] of mockGithub.rest.repos.getContent.mock.calls) {
+        expect(request.ref).toBe(workflowSha);
+        expect(request.ref).not.toBe(mockContext.sha);
+      }
+    });
+
+    it.each(["frontmatter", "body"])("should still reject a %s hash mismatch at the immutable revision", async hashKind => {
+      process.env.GH_AW_STALE_CHECK_FULL = "true";
+      const frontmatterHash = hashKind === "frontmatter" ? "0".repeat(64) : validHash;
+      const lockContent = `# gh-aw-metadata: ${JSON.stringify({ schema_version: "v4", frontmatter_hash: frontmatterHash, body_hash: "0".repeat(64) })}\n`;
+      mockGithub.rest.repos.getContent.mockImplementation(async request => ({
+        data: { type: "file", encoding: "base64", content: Buffer.from(request.path === lockPath ? lockContent : sourceContent).toString("base64") },
+      }));
+
+      await main();
+
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining(`${hashKind} hash mismatch`));
+      expect(mockCore.setOutput).toHaveBeenCalledWith("stale_lock_file_failed", "true");
+      for (const [request] of mockGithub.rest.repos.getContent.mock.calls) {
+        expect(request.ref).toBe(workflowSha);
+      }
+    });
+
+    it("should fail closed when the immutable revision cannot be read", async () => {
+      mockGithub.rest.repos.getContent.mockRejectedValue(Object.assign(new Error("No commit found"), { status: 404 }));
+
+      await main();
+
+      expect(mockCore.setFailed).toHaveBeenCalled();
+      expect(mockCore.setOutput).toHaveBeenCalledWith("stale_lock_file_failed", "true");
+      expect(mockCore.info).not.toHaveBeenCalledWith(expect.stringContaining("Lock file is up to date"));
+      for (const [request] of mockGithub.rest.repos.getContent.mock.calls) {
+        expect(request.ref).toBe(workflowSha);
+      }
     });
   });
 
@@ -1069,6 +1141,7 @@ engine: copilot
       // ends with "/.github/workflows/test.lock.yml", triggering the short-circuit and
       // bypassing the API lookup.
       process.env.GH_AW_CONTEXT_WORKFLOW_REF = "platform-owner/platform-repo/.github/workflows/test.lock.yml@refs/heads/main";
+      process.env.GITHUB_WORKFLOW_SHA = "1111111111111111111111111111111111111111";
     });
 
     it("should use GH_AW_CONTEXT_WORKFLOW_REF override to identify source repo when env ref matches workflow file", async () => {
@@ -1216,6 +1289,7 @@ engine: copilot
       // GH_AW_CONTEXT_WORKFLOW_REF (from ${{ github.workflow_ref }}) resolves to the caller
       process.env.GH_AW_CONTEXT_WORKFLOW_REF = "caller-owner/caller-repo/.github/workflows/caller.yml@refs/heads/main";
       process.env.GITHUB_WORKFLOW_REF = "caller-owner/caller-repo/.github/workflows/caller.yml@refs/heads/main";
+      process.env.GITHUB_WORKFLOW_SHA = "1111111111111111111111111111111111111111";
     });
 
     it("should use referenced_workflows to resolve callee owner/repo/ref", async () => {
