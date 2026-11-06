@@ -125,7 +125,7 @@ async function executeMain() {
     });
   } catch (error) {
     if (!(error instanceof DecisionsModelUnavailableError)) throw error;
-    evidence.state = "model_unavailable";
+    evidence.state = EVALS_REASON_CODES.MODEL_UNAVAILABLE;
     fs.writeFileSync(EVALS_EXECUTION_EVIDENCE_PATH, JSON.stringify(evidence) + "\n");
     writeNotEvaluatedStatus({
       model,
@@ -148,7 +148,7 @@ function classifyJudgeExecution(rawOutcome, evidence) {
   const executionOutcome = ["success", "failure", "cancelled", "skipped"].includes(rawOutcome || "") ? rawOutcome || "" : "";
   const executionState = evidence?.state || "";
   const base = { executionOutcome, executionState };
-  if (executionState === "model_unavailable" && ["", "success", "failure"].includes(executionOutcome)) {
+  if (executionState === EVALS_REASON_CODES.MODEL_UNAVAILABLE && ["", "success", "failure"].includes(executionOutcome)) {
     return {
       ...base,
       reasonCode: EVALS_REASON_CODES.MODEL_UNAVAILABLE,
@@ -177,7 +177,7 @@ function readExecutionEvidence(runID, runAttempt) {
     core.warning(`Cannot read evals execution evidence: ${getErrorMessage(error)}`);
     return null;
   }
-  if (evidence?.component !== "evals" || String(evidence.run_id) !== runID || String(evidence.run_attempt) !== runAttempt || !["started", "not_started", "model_unavailable"].includes(evidence.state)) return null;
+  if (evidence?.component !== "evals" || String(evidence.run_id) !== runID || String(evidence.run_attempt) !== runAttempt || !["started", "not_started", EVALS_REASON_CODES.MODEL_UNAVAILABLE].includes(evidence.state)) return null;
   return { state: evidence.state };
 }
 

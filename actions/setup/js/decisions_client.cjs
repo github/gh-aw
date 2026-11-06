@@ -119,7 +119,8 @@ async function invokeDecisions({ baseURL, apiKey, model, input, questions, timeo
   });
   // Inspect only allowlisted codes; never expose provider bodies or messages.
   if (!response.ok) {
-    if ([400, 404, 422].includes(response.status)) {
+    // A 404 may come from routing infrastructure, even with a model error code.
+    if ([400, 422].includes(response.status)) {
       let body;
       try {
         body = await response.json();

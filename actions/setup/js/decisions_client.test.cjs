@@ -139,7 +139,7 @@ describe("generic Decisions client", () => {
 
   it.each([
     [400, { error: { code: "model_not_supported" } }],
-    [404, { error: { code: "model_not_found" } }],
+    [400, { error: { code: "model_not_found" } }],
     [422, { code: "unsupported_model" }],
     [400, { code: "model_not_available" }],
     [400, { error: { code: "model_unavailable" } }],
@@ -152,7 +152,7 @@ describe("generic Decisions client", () => {
     expect(config.fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it.each([401, 403, 429, 500])("does not classify HTTP %s as model unavailability even with a model error code", async status => {
+  it.each([401, 403, 404, 429, 500])("does not classify HTTP %s as model unavailability even with a model error code", async status => {
     const config = options();
     const json = vi.fn().mockResolvedValue({ error: { code: "model_not_supported" } });
     config.fetchImpl.mockResolvedValue({ ok: false, status, json });
@@ -164,12 +164,12 @@ describe("generic Decisions client", () => {
     const config = options();
     config.fetchImpl.mockResolvedValue({
       ok: false,
-      status: 404,
+      status: 422,
       json: async () => {
         throw new SyntaxError("sensitive non-JSON response");
       },
     });
-    await expect(invokeDecisions(config)).rejects.toThrow("Decisions request failed (HTTP 404)");
+    await expect(invokeDecisions(config)).rejects.toThrow("Decisions request failed (HTTP 422)");
   });
 
   it("does not treat provider messages or arbitrary codes as model availability evidence", async () => {
