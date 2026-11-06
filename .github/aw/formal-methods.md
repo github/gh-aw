@@ -1,8 +1,14 @@
 ---
-description: Instructions for agents using TLA+ and TLC to collect reproducible formal-verification evidence.
+description: Instructions for agents using TLA+/TLC or Koka to collect reproducible formal-methods evidence.
 ---
 
-# Formal methods with TLA+ and TLC
+# Formal methods with TLA+/TLC or Koka
+
+Use TLA+ and TLC for state-space exploration and temporal properties, or
+[Koka](https://koka-lang.github.io/koka/doc/index.html) for typed functional
+models with explicit algebraic effects and effect handlers. Choose the approach
+that fits the property being investigated; Koka's type and effect checks are not
+a substitute for TLC's model checking.
 
 ## Tooling
 
@@ -21,11 +27,17 @@ explicit runtime and TLC version pins, including the work-queue checks using
 TLC 1.7.4; importing agent tooling is not a migration of those jobs. Change a
 tool version only with updated checksums and revalidated model results.
 
+For Koka, use the repository's existing setup and verification commands when
+available. Otherwise, declare a version-pinned compiler setup in the consuming
+workflow and verify downloaded artifacts against trusted checksums. The
+`shared/tla-plus.md` import does not install Koka.
+
 ## Establish the model
 
 - Read the model README, `.tla` module, `.cfg` configuration, and evidence matrix
   before editing or running checks. Prefer the repository's verification wrapper
-  when one exists.
+  when one exists. For Koka, read the `.kk` modules, effect declarations,
+  handlers, and associated tests instead of TLA+/TLC-specific files.
 - State the system boundary, assumptions, finite constants, invariants, fairness
   assumptions, and temporal properties. Distinguish implementation-enforced
   behavior from documentation, abstractions, and unmodeled behavior.
@@ -53,10 +65,20 @@ finite search, a property violation, timeout, parse error, missing tool, and
 unfinished exploration. A tooling failure or partial search is never a pass.
 An exhausted finite model is not a proof of an unbounded implementation.
 
+For Koka, compile the relevant `.kk` modules and run the repository's model tests
+or verification harness under explicit time and memory limits. Record compiler
+versions, source hashes, inferred or declared types and effects, exact commands,
+exit statuses, and complete logs. Distinguish successful type/effect checking
+from tested behavioral properties; compilation or passing tests alone do not
+prove temporal properties or exhaust all executions. A missing compiler,
+compile error, timeout, or unfinished run is never a pass.
+
 ## Preserve and report evidence
 
 - Preserve counterexamples and minimize the action trace without weakening
   invariants, removing fairness, or excluding troublesome states to make TLC pass.
+  For Koka, retain failing inputs and handler traces without weakening effect
+  declarations or assertions to make checks pass.
 - Separate intentional negative controls and reachability witnesses from genuine
   property violations. Determine whether a violation is a model error,
   implementation defect, or architectural gap before reporting it.
