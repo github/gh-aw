@@ -83,7 +83,11 @@ func collectRunOutcomes(ctx context.Context, run ProcessedRun, mapping *github.O
 		return report, nil
 	}
 	repository := logsOutcomeRepository(run.Run)
-	report.Items = EvaluateOutcomes(ctx, items, repository, mapping)
+	trustedHost := outcomeAPIHostForRepo(repository)
+	if runURL, err := parser.ParseRunURLExtended(run.Run.URL); err == nil && runURL.Host != "" {
+		trustedHost = runURL.Host
+	}
+	report.Items = evaluateOutcomes(ctx, items, repository, mapping, trustedHost)
 	if err := ctx.Err(); err != nil {
 		return report, err
 	}

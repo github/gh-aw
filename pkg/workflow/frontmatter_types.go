@@ -185,6 +185,9 @@ type ExperimentConfig struct {
 	// Metric names the primary metric that should be observed (e.g. "aic").
 	Metric string `json:"metric,omitempty"`
 
+	// OutcomeWindow is the maturity duration for outcome-backed metrics; empty or "auto" learns it.
+	OutcomeWindow string `json:"outcome_window,omitempty"`
+
 	// SecondaryMetrics lists additional metrics to track alongside the primary metric.
 	SecondaryMetrics []string `json:"secondary_metrics,omitempty"`
 

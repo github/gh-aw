@@ -421,6 +421,40 @@ describe("parse_token_usage", () => {
       });
     });
 
+    test("preserves Z.AI Anthropic-compatible usage in the detection summary and artifact", async () => {
+      process.env.GH_AW_TMP_DIR = tmpDir;
+      process.env.GH_AW_PHASE = "detection";
+      const tokenUsagePath = path.join(tmpDir, "sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl");
+      fs.mkdirSync(path.dirname(tokenUsagePath), { recursive: true });
+      // Synthetic normalized AWF record using the session totals from gh-aw#75271.
+      const record = {
+        event: "token_usage",
+        provider: "anthropic",
+        model: "glm-5.3-flash",
+        streaming: true,
+        input_tokens: 38719,
+        output_tokens: 4058,
+        cache_read_tokens: 112640,
+        cache_write_tokens: 0,
+      };
+      const content = JSON.stringify(record) + "\n";
+      fs.writeFileSync(tokenUsagePath, content);
+
+      await main(path.join(tmpDir, "missing-session-state"));
+
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+      expect(JSON.parse(originalReadFileSync(path.join(tmpDir, "agent_usage.json"), "utf8"))).toMatchObject({
+        primary_model: "glm-5.3-flash",
+        input_tokens: 38719,
+        output_tokens: 4058,
+        cache_read_tokens: 112640,
+        cache_write_tokens: 0,
+      });
+      const markdown = mockCore.summary.addRaw.mock.calls[0][0];
+      expect(markdown).toMatch(/\|\s*38,719\s*\|\s*4,058\s*\|\s*112,640\s*\|\s*0\s*\|/);
+      expect(originalReadFileSync(tokenUsagePath, "utf8")).toBe(content);
+    });
+
     test.each([
       ["a malformed provider", "claude", "not a provider"],
       ["another native provider", "claude", "openai"],

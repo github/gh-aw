@@ -443,6 +443,75 @@ func TestCustomJobDetectionActions(t *testing.T) {
 	}
 }
 
+func TestCustomJobDetectionCompiledJobProvenance(t *testing.T) {
+	workflow, err := actions.Parse([]byte(`jobs:
+  activation:
+    runs-on: ubuntu-latest
+    steps: [{run: echo activation}]
+  agent:
+    needs: activation
+    runs-on: ubuntu-latest
+    steps: [{run: echo agent}]
+  detection:
+    needs: agent
+    runs-on: ubuntu-latest
+    steps: [{run: echo detection}]
+  conclusion:
+    needs: [agent, detection]
+    if: always()
+    runs-on: ubuntu-latest
+    steps: [{run: echo conclusion}]
+  push_evals_state:
+    needs: agent
+    if: always()
+    runs-on: ubuntu-latest
+    steps: [{run: echo maintenance}]
+`))
+	require.NoError(t, err)
+	runner, err := Default().Select("custom-job-detection")
+	require.NoError(t, err)
+	for _, tt := range []struct {
+		name         string
+		source       string
+		authoredJobs map[string]any
+		wantPath     string
+	}{
+		{name: "Actions only"},
+		{name: "source without jobs", source: "engine: copilot\n"},
+		{name: "source with null jobs", source: "jobs: null\n"},
+		{name: "source with empty jobs", source: "jobs: {}\n"},
+		{
+			name:     "authored maintenance name",
+			source:   "jobs:\n  push_evals_state:\n    needs: agent\n    runs-on: ubuntu-latest\n",
+			wantPath: "jobs.push_evals_state.needs",
+		},
+		{
+			name: "resolved provenance without document",
+			authoredJobs: map[string]any{
+				"push_evals_state": map[string]any{"needs": "agent", "runs-on": "ubuntu-latest"},
+			},
+			wantPath: "jobs.push_evals_state.needs",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			input := Input{Workflow: workflow, AuthoredJobs: tt.authoredJobs}
+			if tt.source != "" {
+				input.Document, err = aw.Parse("---\n" + tt.source + "---\nPrompt\n")
+				require.NoError(t, err)
+			}
+			diagnostics, err := runner.Run(context.Background(), input)
+			require.NoError(t, err)
+			if tt.wantPath == "" {
+				assert.Empty(t, diagnostics)
+				return
+			}
+			require.Len(t, diagnostics, 1)
+			assert.Equal(t, tt.wantPath, diagnostics[0].Path)
+			assert.Equal(t, Error, diagnostics[0].Severity)
+		})
+	}
+}
+
 func TestCustomJobDetectionInvalidInput(t *testing.T) {
 	rule := CustomJobDetectionRule()
 	for _, source := range []string{

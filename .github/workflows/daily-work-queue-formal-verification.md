@@ -68,6 +68,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # runner-guard:ignore RGS-018 -- version-pinned TLC JAR is downloaded to disk and SHA-256 verified before use.
           curl --fail --silent --show-error --location --retry 2 --connect-timeout 10 --max-time 120 \
             https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar \
             --output "$TLA2TOOLS_JAR"
