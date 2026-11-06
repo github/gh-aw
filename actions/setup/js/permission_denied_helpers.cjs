@@ -71,7 +71,7 @@ function extractDeniedCommands(output) {
 
 /**
  * Detect explicit workflow tool-permission denial summaries.
- * @param {string} output
+ * @param {string | undefined} output
  * @returns {boolean}
  */
 function hasWorkflowToolPermissionDenial(output) {
