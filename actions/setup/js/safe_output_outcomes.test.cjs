@@ -287,7 +287,7 @@ describe("safe-output application outcomes", () => {
     expect(JSON.stringify(outcome)).not.toContain("PRIVATE");
   });
 
-  it.each(["success", "chained", "chained-comment", "failed", "skipped", "staged"])("resolves a check depending on a buffered review after %s submission", async scenario => {
+  it.each(["success", "chained", "chained-comment", "chained-comment-failed", "failed", "skipped", "staged"])("resolves a check depending on a buffered review after %s submission", async scenario => {
     const pullRequest = { number: 1, state: "open", head: { sha: "abc123" }, user: { login: "review-author" } };
     const summary = { addRaw: vi.fn().mockReturnThis(), write: vi.fn().mockResolvedValue(undefined) };
     vi.stubGlobal("core", { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), error: vi.fn(), setOutput: vi.fn(), setFailed: vi.fn(), summary });
@@ -295,7 +295,7 @@ describe("safe-output application outcomes", () => {
     const calls = [];
     const createReview = vi.fn(async ({ pull_number }) => {
       calls.push("review");
-      if (scenario === "failed") throw Object.assign(new Error("Review rejected"), { status: 422 });
+      if (scenario === "failed" || (scenario === "chained-comment-failed" && calls.length === 2)) throw Object.assign(new Error("Review rejected"), { status: 422 });
       return { data: { id: pull_number + 4, html_url: `https://github.com/org/repo/pull/${pull_number}#pullrequestreview-${pull_number + 4}` } };
     });
     const createCheck = vi.fn(async () => {
@@ -323,7 +323,7 @@ describe("safe-output application outcomes", () => {
       messages: [
         { type: "submit_pull_request_review", output_id: "so_000000000001", pull_request_number: 1, body: "PRIVATE_REVIEW_BODY", event: "COMMENT" },
         ...(scenario === "chained" ? [{ type: "submit_pull_request_review", output_id: "so_000000000003", "depends-on": "so_000000000001", pull_request_number: 2, body: "PRIVATE_SECOND_REVIEW_BODY", event: "COMMENT" }] : []),
-        ...(scenario === "chained-comment" ? [{ type: "create_pull_request_review_comment", output_id: "so_000000000003", "depends-on": "so_000000000001", path: "file.js", line: 1, body: "PRIVATE_INLINE_COMMENT" }] : []),
+        ...(scenario.startsWith("chained-comment") ? [{ type: "create_pull_request_review_comment", output_id: "so_000000000003", "depends-on": "so_000000000001", path: "file.js", line: 1, body: "PRIVATE_INLINE_COMMENT" }] : []),
         { type: "create_check_run", output_id: "so_000000000002", "depends-on": scenario.startsWith("chained") ? "so_000000000003" : "so_000000000001", conclusion: "success", title: "Review complete", summary: "PRIVATE_CHECK_BODY" },
       ],
     });
@@ -333,7 +333,7 @@ describe("safe-output application outcomes", () => {
       .trim()
       .split("\n")
       .map(line => JSON.parse(line));
-    if (scenario === "success" || scenario.startsWith("chained")) {
+    if (scenario === "success" || scenario === "chained" || scenario === "chained-comment") {
       expect(calls).toEqual(scenario.startsWith("chained") ? ["review", "review", "check"] : ["review", "check"]);
       expect(global.core.setFailed).not.toHaveBeenCalled();
       expect(outcomes.every(outcome => outcome.status === "success")).toBe(true);
@@ -346,6 +346,11 @@ describe("safe-output application outcomes", () => {
       expect(createCheck).not.toHaveBeenCalled();
       expect(global.core.setFailed).toHaveBeenCalled();
       expect(outcomes.find(outcome => outcome.type === "create_check_run").status).toBe("failed");
+      if (scenario === "chained-comment-failed") {
+        expect(calls).toEqual(["review", "review"]);
+        expect(outcomes.find(outcome => outcome.type === "submit_pull_request_review").status).toBe("success");
+        expect(outcomes.find(outcome => outcome.type === "create_pull_request_review_comment").status).toBe("failed");
+      }
     }
     expect(JSON.stringify(outcomes)).not.toContain("PRIVATE");
   });

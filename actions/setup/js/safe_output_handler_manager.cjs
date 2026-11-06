@@ -2300,8 +2300,11 @@ async function main(options = {}) {
     await checkRateLimitHeadroom(github, "safe_outputs_pre_check");
 
     // Finalize buffered PR reviews before releasing their dependent outputs.
+    const finalizedReviewResults = new Set();
     /** @param {Array<any>} results */
     async function finalizeBufferedReviews(results) {
+      const reviewResults = results.filter(record => record.result?.deferred_manifest && !finalizedReviewResults.has(record));
+      for (const record of reviewResults) finalizedReviewResults.add(record);
       const registryEntries = prReviewBufferRegistry.drainEntries();
       for (const { repo: reviewRepo, prNumber: reviewPrNum, buffer: reviewBuffer } of registryEntries) {
         if (reviewBuffer.hasBufferedComments() || reviewBuffer.hasReviewMetadata()) {
@@ -2319,12 +2322,12 @@ async function main(options = {}) {
             const stalePRReason = await getStalePullRequestReason(github, context);
             if (stalePRReason) {
               core.info(stalePRReason);
-              skipReviewResultsForPR(results, reviewRepo, reviewPrNum, stalePRReason);
+              skipReviewResultsForPR(reviewResults, reviewRepo, reviewPrNum, stalePRReason);
               continue;
             }
             const reviewResult = await reviewBuffer.submitReview();
             if (reviewResult.success && !reviewResult.skipped) {
-              finalizeBufferedReviewOutcomes(results, reviewRepo, reviewPrNum, reviewResult);
+              finalizeBufferedReviewOutcomes(reviewResults, reviewRepo, reviewPrNum, reviewResult);
               logCreatedItemFromResult(logCreatedItem, "submit_pull_request_review", reviewResult);
               logCreatedItemFromResult(
                 logCreatedItem,
@@ -2338,7 +2341,7 @@ async function main(options = {}) {
               if (reviewResult.pr_locked) {
                 core.setOutput("pr_locked", "true");
               }
-              skipReviewResultsForPR(results, reviewRepo, reviewPrNum, skipReason);
+              skipReviewResultsForPR(reviewResults, reviewRepo, reviewPrNum, skipReason);
             } else if (!reviewResult.success) {
               reviewFailureError = reviewResult.error || `PR review finalization failed for ${reviewRepo}#${reviewPrNum}`;
               core.error(`✗ Failed to submit PR review for ${reviewRepo}#${reviewPrNum}: ${reviewFailureError}`);
@@ -2349,7 +2352,7 @@ async function main(options = {}) {
           }
 
           if (reviewFailureError !== null) {
-            rollbackReviewResultsForPR(results, reviewRepo, reviewPrNum, reviewFailureError);
+            rollbackReviewResultsForPR(reviewResults, reviewRepo, reviewPrNum, reviewFailureError);
           }
         }
       }
