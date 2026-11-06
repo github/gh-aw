@@ -18,6 +18,19 @@ JSON Schema for validating agentic workflow frontmatter configuration
 
 ```yaml wrap
 ---
+# Experimental. Select independent Copilot capabilities to authenticate through
+# the OIDC token broker. Using this field emits a compile-time warning.
+# Configuration and behavior may change without deprecation.
+# (optional)
+token-broker:
+  # Use brokered authentication for supported Copilot inference jobs.
+  # (optional)
+  copilot-request: true
+
+  # Use brokered authentication for Copilot task creation and issue assignment.
+  # (optional)
+  copilot-task: true
+
 # Workflow name that appears in the GitHub Actions interface. If not specified,
 # defaults to the filename without extension.
 # (optional)
@@ -50,6 +63,11 @@ emoji: "example-value"
 # Rendered as a comment in the generated lock file.
 # (optional)
 source: "example-value"
+
+# Installed source commit, managed by gh aw add and update. Used as the immutable
+# base for three-way merges while source retains the tracking ref.
+# (optional)
+source-sha: "example-value"
 
 # Optional workflow location redirect for updates. Format: workflow spec or GitHub
 # URL (e.g., owner/repo/path@ref or
@@ -169,6 +187,657 @@ on: "example-value"
 
 # Format 2: Complex trigger configuration with event-specific filters and options
 on:
+  # (optional)
+  repos: null
+
+  # (optional)
+  orgs: null
+
+  # (optional)
+  projects-items: null
+
+  # (optional)
+  code-scanning-alert: null
+
+  # (optional)
+  dependabot-alerts: null
+
+  # (optional)
+  security-alerts: null
+
+  # (optional)
+  slash-command: null
+
+  # (optional)
+  label-command: null
+
+  # (optional)
+  jira-issue: null
+
+  # (optional)
+  linear-issue: null
+
+  # (optional)
+  azure-devops-issue: null
+
+  # Experimental exclusive trigger. Every nested key and value must be literal;
+  # GitHub Actions expressions are not supported anywhere in this section. No other
+  # triggers may coexist with gateway-dispatch; non-trigger on settings such as
+  # roles and bots remain supported. Contains independent nested gateway
+  # subscriptions with shared repository and organization selection. Forward only
+  # canonical resource URIs, event types, and declared matching filter literals;
+  # resolve all other data through provider-authenticated access. Requires aw.json
+  # gateway-dispatch: true and does not grant gateway authority.
+  # (optional)
+  gateway-dispatch:
+    # Experimental. GitHub notification subscription filtered by the approved gateway
+    # before minimal canonical URL/type/matching-filter projection. A null trigger or
+    # omitted types selects every catalog action; no original bodies or native Actions
+    # listeners.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: null
+    issue: null
+
+    # Format 2: object
+    issue:
+      # (optional)
+      types: []
+        # Array of strings
+
+      # (optional)
+      filters:
+        {}
+
+    # Experimental. GitHub notification subscription filtered by the approved gateway
+    # before minimal canonical URL/type/matching-filter projection. A null trigger or
+    # omitted types selects every catalog action; no original bodies or native Actions
+    # listeners.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: null
+    pull-request: null
+
+    # Format 2: object
+    pull-request:
+      # (optional)
+      types: []
+        # Array of strings
+
+      # (optional)
+      filters:
+        {}
+
+    # Experimental. GitHub notification subscription filtered by the approved gateway
+    # before minimal canonical URL/type/matching-filter projection. A null trigger or
+    # omitted types selects every catalog action; no original bodies or native Actions
+    # listeners.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: null
+    discussion: null
+
+    # Format 2: object
+    discussion:
+      # (optional)
+      types: []
+        # Array of strings
+
+      # (optional)
+      filters:
+        {}
+
+    # Experimental. GitHub notification subscription filtered by the approved gateway
+    # before minimal canonical URL/type/matching-filter projection. A null trigger or
+    # omitted types selects every catalog action; no original bodies or native Actions
+    # listeners.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: null
+    issue-comment: null
+
+    # Format 2: object
+    issue-comment:
+      # (optional)
+      types: []
+        # Array of strings
+
+      # (optional)
+      filters:
+        {}
+
+    # Experimental. GitHub notification subscription filtered by the approved gateway
+    # before minimal canonical URL/type/matching-filter projection. A null trigger or
+    # omitted types selects every catalog action; no original bodies or native Actions
+    # listeners.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: null
+    pull-request-comment: null
+
+    # Format 2: object
+    pull-request-comment:
+      # (optional)
+      types: []
+        # Array of strings
+
+      # (optional)
+      filters:
+        {}
+
+    # Experimental. GitHub notification subscription filtered by the approved gateway
+    # before minimal canonical URL/type/matching-filter projection. A null trigger or
+    # omitted types selects every catalog action; no original bodies or native Actions
+    # listeners.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: null
+    pull-request-review: null
+
+    # Format 2: object
+    pull-request-review:
+      # (optional)
+      types: []
+        # Array of strings
+
+      # (optional)
+      filters:
+        {}
+
+    # Experimental. GitHub notification subscription filtered by the approved gateway
+    # before minimal canonical URL/type/matching-filter projection. A null trigger or
+    # omitted types selects every catalog action; no original bodies or native Actions
+    # listeners.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: null
+    pull-request-review-comment: null
+
+    # Format 2: object
+    pull-request-review-comment:
+      # (optional)
+      types: []
+        # Array of strings
+
+      # (optional)
+      filters:
+        {}
+
+    # Experimental. GitHub notification subscription filtered by the approved gateway
+    # before minimal canonical URL/type/matching-filter projection. A null trigger or
+    # omitted types selects every catalog action; no original bodies or native Actions
+    # listeners.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: null
+    pull-request-review-thread: null
+
+    # Format 2: object
+    pull-request-review-thread:
+      # (optional)
+      types: []
+        # Array of strings
+
+      # (optional)
+      filters:
+        {}
+
+    # Experimental. GitHub notification subscription filtered by the approved gateway
+    # before minimal canonical URL/type/matching-filter projection. A null trigger or
+    # omitted types selects every catalog action; no original bodies or native Actions
+    # listeners.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: null
+    discussion-comment: null
+
+    # Format 2: object
+    discussion-comment:
+      # (optional)
+      types: []
+        # Array of strings
+
+      # (optional)
+      filters:
+        {}
+
+    # Experimental. GitHub notification subscription filtered by the approved gateway
+    # before minimal canonical URL/type/matching-filter projection. A null trigger or
+    # omitted types selects every catalog action; no original bodies or native Actions
+    # listeners.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: null
+    commit-comment: null
+
+    # Format 2: object
+    commit-comment:
+      # (optional)
+      types: []
+        # Array of strings
+
+      # (optional)
+      filters:
+        {}
+
+    # Experimental. Native slash_command configuration with matching performed by the
+    # approved gateway server, not native Actions listeners.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: Null command configuration - defaults to using the workflow filename
+    # (without .md extension) as the command name
+    slash-command: null
+
+    # Format 2: Command name as a string (shorthand format, e.g., 'customname' for
+    # '/customname' triggers). Command names must not start with '/'. Use '*' to match
+    # any slash command, or append '*' as a suffix to enable wildcard prefix matching
+    # (for example, 'smoke*' matches '/smoke-copilot').
+    slash-command: "example-value"
+
+    # Format 3: Command configuration object with custom command name
+    slash-command:
+      # Name of the slash command that triggers the workflow (e.g., '/help',
+      # '/analyze'). Used for comment-based workflow activation.
+      # (optional)
+      # Accepted formats:
+
+      # Format 1: Single command name for slash commands (e.g., 'helper-bot' for
+      # '/helper-bot' triggers). Command names must not start with '/'. Use '*' to match
+      # any slash command, or append '*' as a suffix to enable wildcard prefix matching.
+      # Defaults to workflow filename without .md extension if not specified.
+      name: "My Workflow"
+
+      # Format 2: Array of command names that trigger this workflow (e.g., ['cmd.add',
+      # 'cmd.remove'] for '/cmd.add' and '/cmd.remove' triggers). Each command name must
+      # not start with '/'.
+      name: []
+        # Array items: Command name without leading slash. Use '*' to match any slash
+        # command, or append '*' as a suffix to enable wildcard prefix matching.
+
+      # Events where the command should be active. Default is all comment-related events
+      # ('*'). Use GitHub Actions event names.
+      # (optional)
+      # Accepted formats:
+
+      # Format 1: Single event name or '*' for all events. Use GitHub Actions event
+      # names: 'issues', 'issue_comment', 'pull_request_comment', 'pull_request',
+      # 'pull_request_review_comment', 'discussion', 'discussion_comment'.
+      events: "*"
+
+      # Format 2: Array of event names where the command should be active (requires at
+      # least one). Use GitHub Actions event names.
+      events: []
+        # Array items: GitHub Actions event name.
+
+      # Slash command trigger compilation strategy. 'inline' (default) compiles direct
+      # comment listeners in this workflow. 'centralized' compiles this workflow as
+      # workflow_dispatch-centric and routes slash events via the generated central
+      # trigger workflow.
+      # (optional)
+      strategy: "inline"
+
+    # Experimental. Native label_command configuration with matching and mandatory
+    # label consumption performed by the approved gateway server. remove_label: false
+    # is unsupported.
+    # (optional)
+    label-command: null
+
+    # Experimental. Shared source repository selectors for all repository-aware
+    # gateway subscriptions; exact owner/repo or owner/* only. Ignored by
+    # non-repository event families. Selectors do not grant access.
+    # (optional)
+    repos: []
+      # Array of strings
+
+    # Experimental. Optional shared source GitHub organization selectors for
+    # repository notifications, Projects, security alerts, and commands.
+    # Case-insensitive organization names or '*' wildcard patterns, matched only over
+    # approved sources. Ignored by external providers; does not grant access.
+    # (optional)
+    orgs: []
+      # Array of strings
+
+    # Experimental. Batched Projects v2 item events under on.gateway-dispatch
+    # requiring a hosted CAO server and aw.json gateway-dispatch: true.
+    # aw_context.items lists unique affected items. Scoped to required project_id node
+    # IDs; optional status-transitions adds CAO-side predicates. Projects (classic) is
+    # not supported.
+    # (optional)
+    projects-items:
+      # Experimental. Required Projects v2 GraphQL node ID or nonempty list of IDs;
+      # sibling of types.
+      # Accepted formats:
+
+      # Format 1: string
+      project_id: "example-value"
+
+      # Format 2: array
+      project_id: []
+        # Array items: string
+
+      # (optional)
+      types: []
+        # Array of strings
+
+      # Experimental. Paired from/to Status changes compiled to CAO-side predicates over
+      # the delivered payload. Each complete pair is an alternative; no runner admission
+      # step is added.
+      # (optional)
+      status-transitions: []
+        # Array items:
+          from: "example-value"
+
+          to: "example-value"
+
+      # (optional)
+      filters:
+        # (optional)
+        project_id: null
+
+    # Experimental. Code scanning alert events from optionally selected repositories.
+    # Independent types, severity, and filters apply only to code_scanning_alert.
+    # Requires a hosted CAO server and aw.json gateway-dispatch: true.
+    # (optional)
+    code-scanning-alert:
+      # Experimental. Source-specific severity string or nonempty list of severities;
+      # sibling of types.
+      # (optional)
+      # Accepted formats:
+
+      # Format 1: string
+      severity: "example-value"
+
+      # Format 2: array
+      severity: []
+        # Array items: string
+
+      # (optional)
+      types: []
+        # Array of strings
+
+      # (optional)
+      filters:
+        # (optional)
+        severity: null
+
+        # (optional)
+        repos: null
+
+    # Experimental. Dependabot alert events from optionally selected repositories.
+    # Independent types, severity, and filters apply only to dependabot_alert.
+    # Requires a hosted CAO server and aw.json gateway-dispatch: true.
+    # (optional)
+    dependabot-alerts:
+      # Experimental. Source-specific severity string or nonempty list of severities;
+      # sibling of types.
+      # (optional)
+      # Accepted formats:
+
+      # Format 1: string
+      severity: "example-value"
+
+      # Format 2: array
+      severity: []
+        # Array items: string
+
+      # (optional)
+      types: []
+        # Array of strings
+
+      # (optional)
+      filters:
+        # (optional)
+        severity: null
+
+        # (optional)
+        repos: null
+
+    # Experimental. Jira Cloud issue lifecycle and label activities normalized from
+    # native issue webhooks. Requires nested on.gateway-dispatch, the repository
+    # gateway-dispatch opt-in, and an approved provider bridge; does not register
+    # webhooks or grant source access.
+    # (optional)
+    jira-issue:
+      # Experimental. GitHub-style normalized activities, not provider-native action
+      # names. Missing transition evidence never matches lifecycle or label activities.
+      # (optional)
+      types: []
+        # Array of strings
+
+      # Experimental. Required Jira project key or nonempty list of keys; sibling of
+      # types.
+      # Accepted formats:
+
+      # Format 1: string
+      project: "example-value"
+
+      # Format 2: array
+      project: []
+        # Array items: string
+
+      # (optional)
+      # Accepted formats:
+
+      # Format 1: string
+      issue_id: "example-value"
+
+      # Format 2: array
+      issue_id: []
+        # Array items: string
+
+      # (optional)
+      # Accepted formats:
+
+      # Format 1: string
+      issue_key: "example-value"
+
+      # Format 2: array
+      issue_key: []
+        # Array items: string
+
+      # (optional)
+      # Accepted formats:
+
+      # Format 1: string
+      labels: "example-value"
+
+      # Format 2: array
+      labels: []
+        # Array items: string
+
+      # (optional)
+      # Accepted formats:
+
+      # Format 1: string
+      status: "example-value"
+
+      # Format 2: array
+      status: []
+        # Array items: string
+
+      # (optional)
+      # Accepted formats:
+
+      # Format 1: string
+      resolution: "example-value"
+
+      # Format 2: array
+      resolution: []
+        # Array items: string
+
+      # (optional)
+      # Accepted formats:
+
+      # Format 1: string
+      sender: "example-value"
+
+      # Format 2: array
+      sender: []
+        # Array items: string
+
+    # Experimental. Linear Issue create/update/remove webhooks with payload-derived
+    # lifecycle and label activities. Requires nested on.gateway-dispatch, the
+    # repository gateway-dispatch opt-in, and an approved provider bridge; does not
+    # register webhooks or grant source access.
+    # (optional)
+    linear-issue:
+      # Experimental. GitHub-style normalized activities, not provider-native action
+      # names. Missing transition evidence never matches lifecycle or label activities.
+      # (optional)
+      types: []
+        # Array of strings
+
+      # Experimental. Required literal Linear organization ID or nonempty list of IDs;
+      # sibling of types.
+      # Accepted formats:
+
+      # Format 1: string
+      organization-id: "example-value"
+
+      # Format 2: array
+      organization-id: []
+        # Array items: string
+
+      # Experimental. Optional literal Linear team model ID or nonempty list of IDs.
+      # Matches delivered data.teamId without API resolution.
+      # (optional)
+      # Accepted formats:
+
+      # Format 1: string
+      team-id: "example-value"
+
+      # Format 2: array
+      team-id: []
+        # Array items: string
+
+      # (optional)
+      # Accepted formats:
+
+      # Format 1: string
+      issue_id: "example-value"
+
+      # Format 2: array
+      issue_id: []
+        # Array items: string
+
+      # (optional)
+      # Accepted formats:
+
+      # Format 1: string
+      labels: "example-value"
+
+      # Format 2: array
+      labels: []
+        # Array items: string
+
+      # (optional)
+      # Accepted formats:
+
+      # Format 1: string
+      sender: "example-value"
+
+      # Format 2: array
+      sender: []
+        # Array items: string
+
+    # Experimental. Azure DevOps work item webhooks with payload-derived lifecycle and
+    # tag activities. Closed/reopened require explicit closed-states. Requires nested
+    # on.gateway-dispatch, the repository gateway-dispatch opt-in, and an approved
+    # provider bridge.
+    # (optional)
+    azure-devops-issue:
+      # Experimental. Required Azure DevOps project ID or nonempty list of IDs; sibling
+      # of types.
+      # Accepted formats:
+
+      # Format 1: string
+      project_id: "example-value"
+
+      # Format 2: array
+      project_id: []
+        # Array items: string
+
+      # (optional)
+      # Accepted formats:
+
+      # Format 1: string
+      collection_id: "example-value"
+
+      # Format 2: array
+      collection_id: []
+        # Array items: string
+
+      # (optional)
+      types: []
+        # Array of strings
+
+      # Literal terminal state name or nonempty list from the project's work item
+      # process. Required for closed/reopened; no state names are assumed.
+      # (optional)
+      # Accepted formats:
+
+      # Format 1: string
+      closed-states: "example-value"
+
+      # Format 2: array
+      closed-states: []
+        # Array items: string
+
+      # (optional)
+      state:
+        # (optional)
+        # Accepted formats:
+
+        # Format 1: string
+        from: "example-value"
+
+        # Format 2: array
+        from: []
+          # Array items: string
+
+        # (optional)
+        # Accepted formats:
+
+        # Format 1: string
+        to: "example-value"
+
+        # Format 2: array
+        to: []
+          # Array items: string
+
+      # (optional)
+      tags:
+        # (optional)
+        # Accepted formats:
+
+        # Format 1: string
+        from: "example-value"
+
+        # Format 2: array
+        from: []
+          # Array items: string
+
+        # (optional)
+        # Accepted formats:
+
+        # Format 1: string
+        to: "example-value"
+
+        # Format 2: array
+        to: []
+          # Array items: string
+
   # Special slash command trigger for /command workflows (e.g., '/my-bot' in issue
   # comments). Creates conditions to match slash commands automatically. Note: Can
   # be combined with issues/pull_request events if those events only use 'labeled'
@@ -798,12 +1467,12 @@ on:
     # trusted owner/* patterns admit matching forks; '*' allows all forks. Strict mode
     # rejects any '*' entry unless the main workflow's top-level
     # features.dangerously-allow-pull-request-target-forks-all is true; imported
-    # features do not enable this opt-in. Non-strict mode warns, and the warning
-    # remains when the flag is enabled. Strict mode rejects expressions and
-    # unsupported pattern forms. Same-repository PRs remain allowed. Actor
-    # authorization and checkout restrictions remain mandatory; acknowledge-risk
-    # neither bypasses them nor suppresses the fork warning. This does not change
-    # GitHub's base-repository permissions or secret availability for pull_request_target.
+    # features do not enable this opt-in. Non-strict mode warns. The warning remains
+    # when the flag is enabled. Strict mode rejects expressions and unsupported
+    # pattern forms. Same-repository PRs remain allowed. Actor authorization and
+    # checkout restrictions remain mandatory; acknowledge-risk neither bypasses them
+    # nor suppresses the fork warning. This does not change GitHub's base-repository
+    # permissions or secret availability for pull_request_target.
     # (optional)
     # Accepted formats:
 
@@ -1077,8 +1746,10 @@ on:
     {}
 
   # Repository access roles required to trigger agentic workflows. Defaults to
-  # ['admin', 'maintainer', 'write'] for security. Use 'all' to allow any
-  # authenticated user (⚠️ security consideration).
+  # ['admin', 'maintainer', 'write'] for security. All on.gateway-dispatch
+  # subscriptions require write access or higher; only admin, maintainer, maintain,
+  # and write are allowed. For other triggers, use 'all' to allow any authenticated
+  # user (⚠️ security consideration).
   # (optional)
   # Accepted formats:
 
@@ -1602,6 +2273,11 @@ on:
     # (optional)
     all: "read"
 
+  # Enable admission and conclusion_admission jobs for this workflow. Also enabled
+  # when aw.json sets admission to true.
+  # (optional)
+  admission: true
+
   # Controls the stale lock file check in the activation job. Set to false to
   # disable the check, true (default) to enable frontmatter hash checking, or "full"
   # to check both frontmatter and body hashes. Use "full" when prompt-body edits
@@ -1982,9 +2658,9 @@ features:
   # (optional)
   dangerously-allow-roles-read-and-pull-request-target: true
 
-  # Allow forks: '*' under pull_request_target in strict mode when declared in
-  # the main workflow's top-level features. Imported features do not enable this
-  # opt-in. The unrestricted fork admission warning remains visible.
+  # Allow forks: '*' under pull_request_target in strict mode when declared in the
+  # main workflow's top-level features. Imported features do not enable this opt-in.
+  # The unrestricted fork admission warning remains visible.
   # (optional)
   dangerously-allow-pull-request-target-forks-all: true
 
@@ -2119,6 +2795,17 @@ environment:
   # A deployment URL
   # (optional)
   url: "example-value"
+
+  # Set to false to use the environment's secrets and protection rules without
+  # creating a GitHub deployment.
+  # (optional)
+  # Accepted formats:
+
+  # Format 1: boolean
+  deployment: true
+
+  # Format 2: string
+  deployment: "example-value"
 
 # Container to run the job steps in
 # (optional)
@@ -2292,6 +2979,26 @@ sandbox:
     # AWF version override used to install and run the matching firewall version.
     # (optional)
     version: "example-value"
+
+    # Literal SHA256 digest of the AWF release's checksums.txt manifest. Requires an
+    # explicit semantic release version. Overrides the trusted setup action's built-in
+    # manifest pin; obtain the digest through an independently trusted channel.
+    # (optional)
+    checksums-sha256: "example-value"
+
+    # Opt in to the maintained public Docker enclave diagnostic collector for static
+    # public-only default-image fixtures. Currently supports the reviewed AWF v0.29.5
+    # release. Capture defaults to disabled; private, dynamic, mixed and
+    # image-override scopes are rejected. Validated artifacts have fixed one-day
+    # retention.
+    # (optional)
+    enclave-debug-public: true
+
+    # Secret expression bound to GH_TOKEN only in the AWF execution host step for
+    # repository staging. Never persisted to GITHUB_ENV or forwarded into the agent
+    # container or MCP gateway. Requires enclaves and AWF v0.29.5 or newer.
+    # (optional)
+    host-github-token: "example-value"
 
     # AWF platform.type override. Declares the GitHub deployment type so AWF can apply
     # deterministic Copilot auth behavior without relying on host heuristics. Omit to
@@ -2648,6 +3355,14 @@ sandbox:
     # (optional)
     keepalive-interval: 1
 
+    # Additional GitHub bot identities merged with the MCP gateway's built-in trusted
+    # identities. Use only ASCII letters, digits, hyphens, or underscores, optionally
+    # followed by [bot]. Cannot remove or override built-in identities. Compiled to
+    # gateway.trustedBots in the gateway JSON configuration.
+    # (optional)
+    trusted-bots: []
+      # Array of strings
+
 # Conditional execution expression
 # (optional)
 if: "example-value"
@@ -2728,6 +3443,18 @@ engine:
   # handling.
   # (optional)
   version: null
+
+  # Copilot CLI only: literal SHA256 digest of the release's SHA256SUMS.txt
+  # manifest. Requires an explicit semantic release version and bypasses the runner
+  # toolcache so the downloaded archives are verified. Overrides the trusted setup
+  # action's built-in manifest pin.
+  # (optional)
+  checksums-sha256: "example-value"
+
+  # Minimum release age in days for compiler-managed engine installs. Zero disables
+  # the cooldown only outside strict mode.
+  # (optional)
+  cooldown: 1
 
   # Model for this engine, overriding the top-level model. Has sensible defaults and
   # can typically be omitted. Supports full model IDs (e.g.,
@@ -3094,6 +3821,11 @@ engine:
 # provider settings directly in the workflow frontmatter, without requiring a
 # named catalog entry
 engine:
+  # Minimum release age in days for compiler-managed engine installs. Zero disables
+  # the cooldown only outside strict mode.
+  # (optional)
+  cooldown: 1
+
   # Runtime adapter reference for the inline engine definition
   runtime:
     # Runtime adapter identifier (e.g. 'codex', 'claude', 'copilot', 'gemini', 'pi')
@@ -5148,6 +5880,14 @@ safe-outputs:
     # Applies within-run and against open/recently-closed repository issues.
     # (optional)
     deduplicate-by-title: null
+
+    # Deduplicate against issues with all listed labels. With deduplicate-by-title,
+    # both the title and all labels must match (AND). Applies within-run and against
+    # open/recently-closed repository issues. Omitted or empty lists disable label
+    # filtering. Literal strings only; does not change labels applied at creation.
+    # (optional)
+    deduplicate-by-labels: []
+      # Array of strings
 
     # Target repository in format 'owner/repo' for cross-repository issue creation.
     # Takes precedence over trial target repo settings.
@@ -8773,12 +9513,14 @@ safe-outputs:
 
     # Protected files prevent workflow run approval when modified by the associated
     # pull request. Use exclude to remove filenames or path prefixes from the default
-    # protected set, or a leading / for an exact repository path.
+    # protected set, or a leading / for a repository-root path glob.
     # (optional)
     protected-files:
       # Basenames (e.g. AGENTS.md) and path prefixes (e.g. .agents/) remove protection
-      # everywhere they match. A leading / excludes only the exact repository path (e.g.
-      # /pyproject.toml), leaving same-named nested files protected.
+      # everywhere they match. A leading / matches a repository-root path glob: * does
+      # not match /, while ** does. Without wildcards, /pyproject.toml excludes only
+      # that root file. Each pattern must contain a letter, digit, underscore, or hyphen
+      # and no whitespace.
       # (optional)
       exclude: []
         # Array of strings
@@ -10032,7 +10774,12 @@ safe-outputs:
     # Enable auto-merge for the pull request. Accepts true/false, an explicit merge
     # method (squash, merge, rebase), or a GitHub Actions expression resolving to any
     # of those values. When enabled, the PR will be automatically merged once all
-    # required checks pass and required approvals are met. Defaults to false.
+    # required checks pass and required approvals are met. Auto-merge is withheld and
+    # independent review is required when protected-file changes trigger the
+    # request-review policy, detection produces a caution (including detection engine
+    # errors), or a required review fails (including when the bot authored the PR).
+    # Configured reviewers or a successful REQUEST_CHANGES review do not bypass these
+    # gates. Defaults to false.
     # (optional)
     # Accepted formats:
 
@@ -10187,10 +10934,11 @@ safe-outputs:
       # 'fallback-to-issue', or 'request-review' at runtime.
       policy: "example-value"
 
-      # List of filenames or path prefixes to remove from the default protected-file
-      # set. Items are matched by basename (e.g. "AGENTS.md") or path prefix (e.g.
-      # ".agents/"). A leading / matches only the exact repository path (e.g.
-      # "/pyproject.toml"), keeping nested files with the same name protected.
+      # List of basenames (e.g. AGENTS.md) or path prefixes (e.g. .agents/) to remove
+      # from the default protected-file set. A leading / matches a repository-root path
+      # glob: * does not match /, while ** does. Without wildcards, /pyproject.toml
+      # excludes only that root file. Each pattern must contain a letter, digit,
+      # underscore, or hyphen and no whitespace.
       # (optional)
       exclude: []
         # Array of strings
@@ -10224,6 +10972,13 @@ safe-outputs:
     # whose previous PR was merged.
     # (optional)
     recreate-ref: true
+
+    # Exclude .lock.yml files under .github/workflows from both patch and bundle
+    # transports to avoid GitHub Actions token workflow-write restrictions. When
+    # workflow YAML changes are omitted, the pull request includes a reminder to rerun
+    # gh aw compile. Other workflow YAML files are not excluded.
+    # (optional)
+    exclude-lock-yml: true
 
     # List of glob patterns for files to exclude from the patch. Each pattern is
     # passed to `git format-patch` as a `:(exclude)<pattern>` magic pathspec, so
@@ -16594,15 +17349,19 @@ safe-outputs:
   # body updates enabled)
   update-pull-request: null
 
-  # Enable AI agents to merge pull requests under configured policy gates.
+  # Enable AI agents to merge pull requests under configured policy gates. Merging
+  # is blocked by detection, protected-file, or other caution notices in the live PR
+  # or review bodies, or by current detection warnings or failures, even when
+  # approvals and checks pass. Independent manual review and manual merge are
+  # required in these cases.
   # (optional)
   # Accepted formats:
 
   # Format 1: Enable pull request merge with default policy configuration
   merge-pull-request: null
 
-  # Format 2: Configuration for controlled pull request merges. The merge is blocked
-  # unless all configured gates pass.
+  # Format 2: Experimental configuration for controlled pull request merges. The
+  # merge is blocked unless all configured gates pass.
   merge-pull-request:
     # Maximum number of pull request merges to perform per run (default: 1). Supports
     # integer or GitHub Actions expression (e.g. '${{ inputs.max }}').
@@ -16621,18 +17380,22 @@ safe-outputs:
     required-labels: []
       # Array of strings
 
-    # Exact check-run names required on the evaluated head SHA.
+    # Exact check-run names that must complete successfully on the evaluated PR head
+    # SHA, in addition to branch-policy checks. Empty or omitted adds no
+    # workflow-owned CI requirement.
     # (optional)
     required-checks: []
       # Array of strings
 
-    # Expected GitHub App IDs for names listed in required-checks.
+    # Expected GitHub App ID for each named check. Keys must also appear in
+    # required-checks. A missing or different producer blocks merging.
     # (optional)
     required-check-apps:
-      ci/test: 15368
+      {}
 
-    # At least one listed independent human must approve the evaluated head.
-    # Effective changes-requested reviews always block, even when this is omitted.
+    # Human GitHub logins. At least one must have a current, non-dismissed approval
+    # for the evaluated head SHA, independent of the PR author and authenticated merge
+    # identity. Empty or omitted requires no affirmative approval.
     # (optional)
     required-approvers: []
       # Array of strings
@@ -17309,10 +18072,11 @@ safe-outputs:
       # runtime.
       policy: "example-value"
 
-      # List of filenames or path prefixes to remove from the default protected-file
-      # set. Items are matched by basename (e.g. "AGENTS.md") or path prefix (e.g.
-      # ".agents/"). A leading / matches only the exact repository path (e.g.
-      # "/pyproject.toml"), keeping nested files with the same name protected.
+      # List of basenames (e.g. AGENTS.md) or path prefixes (e.g. .agents/) to remove
+      # from the default protected-file set. A leading / matches a repository-root path
+      # glob: * does not match /, while ** does. Without wildcards, /pyproject.toml
+      # excludes only that root file. Each pattern must contain a letter, digit,
+      # underscore, or hyphen and no whitespace.
       # (optional)
       exclude: []
         # Array of strings
@@ -17329,6 +18093,14 @@ safe-outputs:
     # (optional)
     allowed-files: []
       # Array of strings
+
+    # Exclude .lock.yml files under .github/workflows from both patch and bundle
+    # transports to avoid GitHub Actions token workflow-write restrictions. When
+    # workflow YAML changes are omitted, the push summary and pull request comment
+    # include a reminder to rerun gh aw compile. Other workflow YAML files are not
+    # excluded.
+    # (optional)
+    exclude-lock-yml: true
 
     # List of glob patterns for files to exclude from the patch. Each pattern is
     # passed to `git format-patch` as a `:(exclude)<pattern>` magic pathspec, so
@@ -20746,9 +21518,9 @@ safe-outputs:
   upload-artifact: null
 
   # Enable AI agents to upload a code coverage report (e.g. a Cobertura XML file) to
-  # GitHub's code coverage API via actions/upload-code-coverage. The agent stages the
-  # report file and calls the tool with file/language/label; a separate job performs
-  # the actual upload with dedicated code-quality: write permissions.
+  # GitHub's code coverage API via actions/upload-code-coverage. The agent stages
+  # the report file and calls the tool with file/language/label; a separate job
+  # performs the actual upload with dedicated code-quality: write permissions.
   # (optional)
   # Accepted formats:
 
@@ -21377,6 +22149,18 @@ safe-outputs:
       # (optional)
       version: null
 
+      # Copilot CLI only: literal SHA256 digest of the release's SHA256SUMS.txt
+      # manifest. Requires an explicit semantic release version and bypasses the runner
+      # toolcache so the downloaded archives are verified. Overrides the trusted setup
+      # action's built-in manifest pin.
+      # (optional)
+      checksums-sha256: "example-value"
+
+      # Minimum release age in days for compiler-managed engine installs. Zero disables
+      # the cooldown only outside strict mode.
+      # (optional)
+      cooldown: 1
+
       # Model for this engine, overriding the top-level model. Has sensible defaults and
       # can typically be omitted. Supports full model IDs (e.g.,
       # 'claude-3-5-sonnet-20241022', 'gpt-4'), which is useful when a nested engine
@@ -21742,6 +22526,11 @@ safe-outputs:
     # provider settings directly in the workflow frontmatter, without requiring a
     # named catalog entry
     engine-config:
+      # Minimum release age in days for compiler-managed engine installs. Zero disables
+      # the cooldown only outside strict mode.
+      # (optional)
+      cooldown: 1
+
       # Runtime adapter reference for the inline engine definition
       runtime:
         # Runtime adapter identifier (e.g. 'codex', 'claude', 'copilot', 'gemini', 'pi')
@@ -22775,10 +23564,10 @@ safe-outputs:
   # those categories trigger issues. If only prefixed (excluded) categories are
   # specified, all categories except those trigger issues. If both are specified,
   # categories must match included AND not match excluded. Common categories:
-  # agent_failure, activation_failed, timed_out, transport_wedge, missing_safe_outputs,
-  # report_incomplete, missing_tool, missing_data, inference_access_error,
-  # model_endpoint_mismatch, mcp_policy_error, ai_credits_rate_limit_error,
-  # max_ai_credits_exceeded, daily_ai_credits_unknown.
+  # agent_failure, activation_failed, timed_out, transport_wedge,
+  # missing_safe_outputs, report_incomplete, missing_tool, missing_data,
+  # inference_access_error, model_endpoint_mismatch, mcp_policy_error,
+  # ai_credits_rate_limit_error, max_ai_credits_exceeded, daily_ai_credits_unknown.
   report-failure-as-issue: []
     # Array items: string
 
@@ -22860,6 +23649,17 @@ safe-outputs:
     # A deployment URL
     # (optional)
     url: "example-value"
+
+    # Set to false to use the environment's secrets and protection rules without
+    # creating a GitHub deployment.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: boolean
+    deployment: true
+
+    # Format 2: string
+    deployment: "example-value"
 
   # Runner specification for all safe-outputs jobs (activation, create-issue,
   # add-comment, etc.). Supports string, array, or runner-group object forms.
@@ -24591,9 +25391,9 @@ evals:
 
   # Decisions-compatible model ID for the entire question batch, sent without
   # provider-specific name mapping. Defaults to copilot/gpt-6-luna-decisions,
-  # subject to GH_AW_DEFAULT_EVALS_MODEL, independently of the agent model.
-  # Use openai/gpt-6-luna for OpenAI credentials; unqualified models use
-  # Copilot. Per-question model overrides are not supported.
+  # subject to GH_AW_DEFAULT_EVALS_MODEL, independently of the agent model. Use
+  # openai/gpt-6-luna for OpenAI credentials; unqualified models use Copilot.
+  # Per-question model overrides are not supported.
   # (optional)
   model: "example-value"
 

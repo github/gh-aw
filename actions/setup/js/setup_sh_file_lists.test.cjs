@@ -214,6 +214,10 @@ describe("setup.sh SAFE_OUTPUTS_FILES", () => {
             assert.equal(typeof require("./generate_git_bundle.cjs").generateGitBundle, "function");
             assert.equal(typeof require("./object_pack_fetch.cjs").fetchRecoveryObjects, "function");
             assert.equal(require("./object_pack_limits.cjs").getObjectPackLimits({}).maxObjects, 100000);
+            const { resolveIssueArtifactPaths } = require("./issue_artifacts.cjs");
+            assert.deepEqual(resolveIssueArtifactPaths([{ name: "Plan", body: "Artifact content" }]), [
+              { type: "generic", name: "Plan", body: "Artifact content" },
+            ]);
             const { createServer, registerTool } = require("./mcp_server_core.cjs");
             const { getExcludedFiles, getExcludedWorkflowFiles } = require("./workflow_file_exclusions.cjs");
             assert.deepEqual(getExcludedFiles({ exclude_lock_yml: true }), [".github/workflows/**.lock.yml"]);

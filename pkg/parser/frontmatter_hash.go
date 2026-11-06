@@ -293,18 +293,18 @@ func extractFrontmatterAndBodyText(content string) (string, string, error) {
 	// same frontmatter text (and therefore the same hash) as equivalent LF files.
 	content = strings.ReplaceAll(content, "\r\n", "\n")
 
-	lines := strings.Split(content, "\n")
-
 	// Check if content starts with frontmatter delimiter
-	if len(lines) == 0 || strings.TrimSpace(lines[0]) != "---" {
+	firstLine, _, _ := strings.Cut(content, "\n")
+	if strings.TrimSpace(firstLine) != "---" {
 		// No frontmatter
 		return "", content, nil
 	}
 
 	// Find end of frontmatter
+	lines := strings.Split(content, "\n")
 	endIndex := -1
-	for i := 1; i < len(lines); i++ {
-		if strings.TrimSpace(lines[i]) == "---" {
+	for i, line := range lines {
+		if i > 0 && strings.TrimSpace(line) == "---" {
 			endIndex = i
 			break
 		}
@@ -457,7 +457,7 @@ func indentationOf(line string) int {
 
 // processImportsTextBased processes imports from frontmatter using text-based parsing
 // Returns: importedFiles (list of import paths), importedFrontmatterTexts (list of frontmatter texts)
-func processImportsTextBased(frontmatterText, baseDir string, visited map[string]struct {
+func processImportsTextBased(frontmatterText, baseDir, rootDir string, visited map[string]struct {
 }, fileReader FileReader) ([]string, []string, error) {
 	var importedFiles []string
 	var importedFrontmatterTexts []string
@@ -476,7 +476,7 @@ func processImportsTextBased(frontmatterText, baseDir string, visited map[string
 
 	for _, importPath := range imports {
 		// Resolve import path relative to base directory
-		fullPath := filepath.Join(baseDir, importPath)
+		fullPath := resolveHashImportPath(importPath, baseDir, rootDir)
 
 		// Skip if already visited (cycle detection)
 		if setutil.Contains(visited, fullPath) {
@@ -506,7 +506,7 @@ func processImportsTextBased(frontmatterText, baseDir string, visited map[string
 
 		// Recursively process imports in the imported file
 		importBaseDir := filepath.Dir(fullPath)
-		nestedFiles, nestedTexts, err := processImportsTextBased(importFrontmatterText, importBaseDir, visited, fileReader)
+		nestedFiles, nestedTexts, err := processImportsTextBased(importFrontmatterText, importBaseDir, rootDir, visited, fileReader)
 		if err != nil {
 			// Continue processing other imports even if one fails
 			continue
@@ -521,9 +521,16 @@ func processImportsTextBased(frontmatterText, baseDir string, visited map[string
 	return importedFiles, importedFrontmatterTexts, nil
 }
 
+func resolveHashImportPath(importPath, baseDir, rootDir string) string {
+	if isFileRelativeImportPath(importPath) {
+		return filepath.Join(baseDir, importPath)
+	}
+	return filepath.Join(rootDir, importPath)
+}
+
 // collectImportedBodies processes imports from frontmatter and returns the body texts of all
 // transitively imported files. Used to include imported file bodies in the body hash.
-func collectImportedBodies(frontmatterText, baseDir string, visited map[string]struct {
+func collectImportedBodies(frontmatterText, baseDir, rootDir string, visited map[string]struct {
 }, fileReader FileReader) ([]string, error) {
 	var importedBodyTexts []string
 
@@ -535,7 +542,7 @@ func collectImportedBodies(frontmatterText, baseDir string, visited map[string]s
 	sort.Strings(imports)
 
 	for _, importPath := range imports {
-		fullPath := filepath.Join(baseDir, importPath)
+		fullPath := resolveHashImportPath(importPath, baseDir, rootDir)
 
 		if setutil.Contains(visited, fullPath) {
 			continue
@@ -556,7 +563,7 @@ func collectImportedBodies(frontmatterText, baseDir string, visited map[string]s
 		importedBodyTexts = append(importedBodyTexts, importBody)
 
 		importBaseDir := filepath.Dir(fullPath)
-		nestedBodies, err := collectImportedBodies(importFrontmatterText, importBaseDir, visited, fileReader)
+		nestedBodies, err := collectImportedBodies(importFrontmatterText, importBaseDir, rootDir, visited, fileReader)
 		if err != nil {
 			continue
 		}
@@ -581,7 +588,7 @@ func collectRuntimeImportTemplateExpressions(frontmatterText, markdownBody, base
 	seen := map[string]struct{}{}
 	expressions := extractRuntimeImportTemplateExpressionsFromMarkdown(markdownBody, baseDir, seen, fileReader)
 
-	importedBodies, err := collectImportedBodies(frontmatterText, baseDir, map[string]struct{}{}, fileReader)
+	importedBodies, err := collectImportedBodies(frontmatterText, baseDir, baseDir, map[string]struct{}{}, fileReader)
 	if err != nil {
 		return expressions
 	}
@@ -623,15 +630,15 @@ func extractRuntimeImportReferences(markdownBody string) []runtimeImportReferenc
 		if len(match) < 2 {
 			continue
 		}
-		target := strings.TrimSpace(match[1])
+		target := strings.TrimSpace(match[1]) //nolint:uncheckedsliceindex // Capture group length is checked above.
 		if target == "" {
 			continue
 		}
 		ref := runtimeImportReference{path: target}
 		if rangeMatch := runtimeImportLineRangeRe.FindStringSubmatch(target); len(rangeMatch) == 4 {
-			ref.path = strings.TrimSpace(rangeMatch[1])
-			fmt.Sscanf(rangeMatch[2], "%d", &ref.startLine)
-			fmt.Sscanf(rangeMatch[3], "%d", &ref.endLine)
+			ref.path = strings.TrimSpace(rangeMatch[1])     //nolint:uncheckedsliceindex // Capture group length is checked above.
+			fmt.Sscanf(rangeMatch[2], "%d", &ref.startLine) //nolint:uncheckedsliceindex // Capture group length is checked above.
+			fmt.Sscanf(rangeMatch[3], "%d", &ref.endLine)   //nolint:uncheckedsliceindex // Capture group length is checked above.
 		}
 		if strings.HasPrefix(ref.path, "http://") || strings.HasPrefix(ref.path, "https://") {
 			continue
@@ -796,7 +803,7 @@ func ComputeBodyHashFromParsedContent(markdownBody, frontmatterText, baseDir str
 
 	visited := make(map[string]struct {
 	})
-	importedBodies, err := collectImportedBodies(frontmatterText, baseDir, visited, fileReader)
+	importedBodies, err := collectImportedBodies(frontmatterText, baseDir, baseDir, visited, fileReader)
 	if err != nil {
 		return "", fmt.Errorf("could not process imports for body hash; ensure imported workflow files exist and are readable, then retry: %w", err)
 	}
@@ -804,10 +811,7 @@ func ComputeBodyHashFromParsedContent(markdownBody, frontmatterText, baseDir str
 	allParts := []string{normalizedBody}
 
 	if len(importedBodies) > 0 {
-		normalizedBodies := make([]string, len(importedBodies))
-		for i, b := range importedBodies {
-			normalizedBodies[i] = normalizeFrontmatterText(b)
-		}
+		normalizedBodies := sliceutil.Map(importedBodies, normalizeFrontmatterText)
 		sort.Strings(normalizedBodies)
 		allParts = append(allParts, normalizedBodies...)
 	}
@@ -846,7 +850,7 @@ func computeFrontmatterHashTextBasedWithReader(frontmatterText, markdown, baseDi
 	// Process imports using text-based parsing with custom file reader
 	visited := make(map[string]struct {
 	})
-	importedFiles, importedFrontmatterTexts, err := processImportsTextBased(frontmatterText, baseDir, visited, fileReader)
+	importedFiles, importedFrontmatterTexts, err := processImportsTextBased(frontmatterText, baseDir, baseDir, visited, fileReader)
 	if err != nil {
 		return "", fmt.Errorf("could not process imports; ensure imported workflow files exist and are readable, then retry: %w", err)
 	}
@@ -855,10 +859,7 @@ func computeFrontmatterHashTextBasedWithReader(frontmatterText, markdown, baseDi
 	canonical := make(map[string]any)
 
 	normalizedFrontmatterText := normalizeFrontmatterText(frontmatterText)
-	normalizedImportedTexts := make([]string, len(importedFrontmatterTexts))
-	for i, text := range importedFrontmatterTexts {
-		normalizedImportedTexts[i] = normalizeFrontmatterText(text)
-	}
+	normalizedImportedTexts := sliceutil.Map(importedFrontmatterTexts, normalizeFrontmatterText)
 
 	if err := validateFrontmatterHashInputSize(normalizedFrontmatterText, normalizedImportedTexts); err != nil {
 		return "", err

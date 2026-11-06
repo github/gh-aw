@@ -3195,6 +3195,18 @@
                   "url": {
                     "type": "string",
                     "description": "The URL to set as the environment URL in the deployment."
+                  },
+                  "deployment": {
+                    "oneOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^\\$\\{\\{.*\\}\\}$"
+                      }
+                    ],
+                    "description": "Set to false to use the environment's secrets and protection rules without creating a GitHub deployment."
                   }
                 },
                 "required": ["name"]
@@ -3815,6 +3827,18 @@
             "url": {
               "type": "string",
               "description": "A deployment URL"
+            },
+            "deployment": {
+              "oneOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^\\$\\{\\{.*\\}\\}$"
+                }
+              ],
+              "description": "Set to false to use the environment's secrets and protection rules without creating a GitHub deployment."
             }
           },
           "required": ["name"],
@@ -6264,6 +6288,17 @@
               "type": "object",
               "description": "Repo-memory configuration object",
               "properties": {
+                "github-app": {
+                  "$ref": "#/$defs/repo_memory_github_app"
+                },
+                "github-app-read": {
+                  "$ref": "#/$defs/repo_memory_github_app",
+                  "description": "GitHub App for memory restores and daily-credit ledger clones. Overrides github-app for reads only."
+                },
+                "github-app-write": {
+                  "$ref": "#/$defs/repo_memory_github_app",
+                  "description": "GitHub App for memory pushes. Overrides github-app for writes only."
+                },
                 "branch-prefix": {
                   "type": "string",
                   "minLength": 4,
@@ -6392,6 +6427,17 @@
               "items": {
                 "type": "object",
                 "properties": {
+                  "github-app": {
+                    "$ref": "#/$defs/repo_memory_github_app"
+                  },
+                  "github-app-read": {
+                    "$ref": "#/$defs/repo_memory_github_app",
+                    "description": "GitHub App for memory restores and daily-credit ledger clones. Overrides github-app for reads only."
+                  },
+                  "github-app-write": {
+                    "$ref": "#/$defs/repo_memory_github_app",
+                    "description": "GitHub App for memory pushes. Overrides github-app for writes only."
+                  },
                   "id": {
                     "type": "string",
                     "description": "Memory identifier (required for array notation, default: 'default')"
@@ -6831,6 +6877,20 @@
                     "type": "string"
                   }
                 },
+                "max-issue-artifacts": {
+                  "type": "integer",
+                  "default": 10,
+                  "description": "Maximum number of artifacts attached per created issue (default: 10). Zero or a negative value disables issue artifacts."
+                },
+                "max-issue-artifact-size": {
+                  "type": ["integer", "string"],
+                  "minimum": 1,
+                  "maximum": 9007199254740991,
+                  "maxLength": 64,
+                  "pattern": "^\\s*[0-9]+(?:\\.[0-9]+)?\\s*(?:[bB]|[kKmMgGtT](?:[iI]?[bB])?)?\\s*$",
+                  "default": 1048576,
+                  "description": "Maximum UTF-8 size of each issue artifact body (default: 1mb = 1048576 bytes). Accepts positive integer bytes or a human-friendly size such as 512kb, 1mb, or 1.5mb. Units B, K/KB/KiB, M/MB/MiB, G/GB/GiB, and T/TB/TiB are case-insensitive and use multiples of 1024. The size must resolve to a positive whole byte count. Oversized bodies are rejected, not truncated."
+                },
                 "assignees": {
                   "oneOf": [
                     {
@@ -6869,6 +6929,17 @@
                     }
                   ],
                   "description": "Title-based deduplication for create-issue. Set to true for exact title matching, or provide a non-negative integer (0\u2013100) to deduplicate by Levenshtein edit distance (e.g., 1 allows one-character differences). Accepts a GitHub Actions expression that resolves to a boolean or integer at runtime. Applies within-run and against open/recently-closed repository issues."
+                },
+                "deduplicate-by-labels": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "not": {
+                      "pattern": "\\$\\{\\{"
+                    }
+                  },
+                  "description": "Deduplicate against issues with all listed labels. When deduplicate-by-title is also enabled, both the title and all labels must match (AND). Applies within-run and against open/recently-closed repository issues. Omitted or empty lists disable label filtering. Labels must be literal strings, not GitHub Actions expressions. Does not change labels applied at creation."
                 },
                 "target-repo": {
                   "type": "string",
@@ -8985,7 +9056,7 @@
                   "description": "Time until the pull request expires and should be automatically closed (only for same-repo PRs without target-repo). Supports integer (days) or relative time format. Minimum duration: 2 hours."
                 },
                 "auto-merge": {
-                  "description": "Enable auto-merge for the pull request. Accepts true/false, an explicit merge method (squash, merge, rebase), or a GitHub Actions expression resolving to any of those values. When enabled, the PR will be automatically merged once all required checks pass and required approvals are met. Defaults to false.",
+                  "description": "Enable auto-merge for the pull request. Accepts true/false, an explicit merge method (squash, merge, rebase), or a GitHub Actions expression resolving to any of those values. When enabled, the PR will be automatically merged once all required checks pass and required approvals are met. Auto-merge is withheld and independent review is required when protected-file changes trigger the request-review policy, detection produces a caution (including detection engine errors), or a required review fails (including when the bot authored the PR). Configured reviewers or a successful REQUEST_CHANGES review do not bypass these gates. Defaults to false.",
                   "default": false,
                   "oneOf": [
                     {
@@ -11253,7 +11324,7 @@
               "additionalProperties": false
             }
           ],
-          "description": "Enable AI agents to merge pull requests under configured policy gates."
+          "description": "Enable AI agents to merge pull requests under configured policy gates. Merging is blocked by detection, protected-file, or other caution notices in the live PR or review bodies, or by current detection warnings or failures, even when approvals and checks pass. Independent manual review and manual merge are required in these cases."
         },
         "push-to-pull-request-branch": {
           "oneOf": [
@@ -13607,6 +13678,18 @@
                 "url": {
                   "type": "string",
                   "description": "A deployment URL"
+                },
+                "deployment": {
+                  "oneOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "^\\$\\{\\{.*\\}\\}$"
+                    }
+                  ],
+                  "description": "Set to false to use the environment's secrets and protection rules without creating a GitHub deployment."
                 }
               },
               "required": ["name"],
@@ -15658,6 +15741,42 @@
       },
       "additionalProperties": false
     },
+    "durable_config": {
+      "type": "object",
+      "description": "Experimental. Persist engine-declared session files in GitHub Actions artifacts. Using this field emits a compile-time warning. Configuration and behavior may change without deprecation. Copilot, Claude, and Codex resume the exact native session; other session-based engines receive a continuation prompt. Pi uses its native durable task runtime. Starts fresh when no prior history exists. No memory tool is required.",
+      "properties": {
+        "retention-days": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 90,
+          "default": 7,
+          "description": "Number of days to retain durable checkpoint artifacts, subject to repository and organization artifact retention policy."
+        }
+      },
+      "additionalProperties": false
+    },
+    "pi_engine_config": {
+      "type": "object",
+      "properties": {
+        "durable": { "$ref": "#/$defs/durable_config" },
+        "model": { "$ref": "#/$defs/engine_config/oneOf/1/properties/model" },
+        "version": { "$ref": "#/$defs/engine_config/oneOf/1/properties/version" },
+        "config": { "$ref": "#/$defs/engine_config/oneOf/1/properties/config" },
+        "env": { "$ref": "#/$defs/engine_config/oneOf/1/properties/env" },
+        "args": { "$ref": "#/$defs/engine_config/oneOf/1/properties/args" },
+        "mcp": { "$ref": "#/$defs/engine_config/oneOf/1/properties/mcp" },
+        "driver": { "$ref": "#/$defs/engine_config/oneOf/1/properties/driver" },
+        "extensions": { "$ref": "#/$defs/engine_config/oneOf/1/properties/extensions" },
+        "command": { "$ref": "#/$defs/engine_config/oneOf/1/properties/command" },
+        "bare": { "$ref": "#/$defs/engine_config/oneOf/1/properties/bare" },
+        "cooldown": { "$ref": "#/$defs/engine_config/oneOf/1/properties/cooldown" },
+        "cwd": { "$ref": "#/$defs/engine_config/oneOf/1/properties/cwd" },
+        "model-routing": { "$ref": "#/$defs/engine_config/oneOf/1/properties/model-routing" },
+        "model-provider": { "$ref": "#/$defs/engine_config/oneOf/1/properties/model-provider" },
+        "max-turns": { "$ref": "#/$defs/engine_config/oneOf/1/properties/max-turns" }
+      },
+      "additionalProperties": false
+    },
     "engine_config": {
       "examples": [
         "claude",
@@ -16123,6 +16242,9 @@
                 }
               ]
             },
+            "durable": {
+              "$ref": "#/$defs/durable_config"
+            },
             "extensions": {
               "type": "array",
               "items": {
@@ -16304,6 +16426,9 @@
               "description": "Whether the engine supports MCP. When false, the compiler automatically enables gh-proxy and cli-proxy and rejects attempts to disable either proxy.",
               "default": true
             },
+            "durable": {
+              "$ref": "#/$defs/durable_config"
+            },
             "runtime-id": {
               "type": "string",
               "description": "Runtime adapter identifier. Maps to the CodingAgentEngine registered in the engine registry. Defaults to id when omitted."
@@ -16431,6 +16556,28 @@
               "type": "object",
               "description": "Declarative custom-engine runtime behavior used to materialize a shared CLI engine from frontmatter.",
               "properties": {
+                "durable": {
+                  "type": "object",
+                  "description": "Experimental native durability or session-file continuation. Declares persisted files and the continuation invocation; pinned dependency installation is optional. Enabling engine.durable emits a compile-time warning. The harness receives GH_AW_DURABLE_RESUMED and GH_AW_DURABLE_PARENT_RUN_ID.",
+                  "properties": {
+                    "files": {
+                      "type": "array",
+                      "minItems": 1,
+                      "uniqueItems": true,
+                      "items": { "type": "string", "minLength": 1 },
+                      "description": "Explicit files or directories under /tmp/gh-aw/agent/ to persist. $GH_AW_DURABLE_CHECKPOINT refers to the compiler-managed native checkpoint file. Globs and overlapping paths are unsupported."
+                    },
+                    "installation": {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": { "$ref": "#/$defs/engine_config/oneOf/3/properties/behaviors/properties/installation" }
+                    },
+                    "execution": { "$ref": "#/$defs/engine_config/oneOf/3/properties/behaviors/properties/execution" },
+                    "harness-script": { "type": "string", "minLength": 1 }
+                  },
+                  "required": ["files", "execution"],
+                  "additionalProperties": false
+                },
                 "secret-strategy": {
                   "type": "string",
                   "description": "Secret resolution mode for the engine (for example 'universal-llm-consumer')."
@@ -16704,6 +16851,15 @@
             }
           },
           "required": ["model"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "Pi engine options, including optional durable execution.",
+          "properties": {
+            "pi": { "$ref": "#/$defs/pi_engine_config" }
+          },
+          "required": ["pi"],
           "additionalProperties": false
         }
       ]
@@ -16994,6 +17150,27 @@
       "maxLength": 100,
       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[A-Z][A-Z0-9]{0,15}-[1-9][0-9]*)$",
       "description": "Linear issue model UUID or uppercase shorthand identifier."
+    },
+    "repo_memory_github_app": {
+      "type": "object",
+      "description": "GitHub App credentials for repo-memory. Push tokens request only contents: write; cross-repository clone tokens request only contents: read.",
+      "properties": {
+        "client-id": { "$ref": "#/$defs/github_app/properties/client-id" },
+        "app-id": { "$ref": "#/$defs/github_app/properties/app-id" },
+        "private-key": { "$ref": "#/$defs/github_app/properties/private-key" },
+        "owner": { "$ref": "#/$defs/github_app/properties/owner" },
+        "repositories": { "$ref": "#/$defs/github_app/properties/repositories" },
+        "ignore-if-missing": { "$ref": "#/$defs/github_app/properties/ignore-if-missing" }
+      },
+      "anyOf": [
+        { "required": ["client-id", "private-key"] },
+        { "required": ["app-id", "private-key"] },
+        {
+          "required": ["ignore-if-missing"],
+          "properties": { "ignore-if-missing": { "const": true } }
+        }
+      ],
+      "additionalProperties": false
     },
     "github_app": {
       "type": "object",

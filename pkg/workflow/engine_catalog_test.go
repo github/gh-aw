@@ -103,14 +103,13 @@ func TestEngineCatalog_BuiltInsPresent(t *testing.T) {
 	}
 }
 
-// TestEngineCatalogMatchesSchema asserts that the engine_config schema has the expected
-// structure: a plain-string variant (for built-ins and named catalog entries), an
-// object-with-id variant, and an inline-definition variant (object-with-runtime).
+// TestEngineCatalogMatchesSchema asserts that the engine_config schema retains its
+// built-in, named, inline-definition, shared-workflow, and Pi configuration variants.
 // A failure here means the schema structure has changed unexpectedly.
 func TestEngineCatalogMatchesSchema(t *testing.T) {
 	variants := engineSchemaOneOfVariants(t)
 
-	require.Len(t, variants, 6, "engine_config oneOf should have exactly 6 variants: string, object-with-id, object-with-runtime, engine-definition, mcp-only, model-only")
+	require.Len(t, variants, 7, "engine_config oneOf should have exactly 7 variants: string, object-with-id, object-with-runtime, engine-definition, mcp-only, model-only, pi-options")
 
 	// Variant 0: plain string (no enum — allows built-ins and custom named catalog entries)
 	assert.Equal(t, "string", variants[0]["type"],
@@ -175,4 +174,19 @@ func TestEngineCatalogMatchesSchema(t *testing.T) {
 		"model-only variant must NOT have an 'id' property")
 	assert.NotContains(t, props5, "runtime",
 		"model-only variant must NOT have a 'runtime' property")
+
+	// Variant 6: Pi-specific options, including durable execution
+	assert.Equal(t, "object", variants[6]["type"],
+		"seventh variant should be type object (Pi options)")
+	props6, ok := variants[6]["properties"].(map[string]any)
+	require.True(t, ok, "seventh variant should have properties")
+	require.Len(t, props6, 1, "Pi options variant should only expose the 'pi' property")
+	piProp, ok := props6["pi"].(map[string]any)
+	require.True(t, ok, "pi property should be a map")
+	assert.Equal(t, "#/$defs/pi_engine_config", piProp["$ref"],
+		"pi property should reference the Pi configuration schema")
+	assert.Equal(t, []any{"pi"}, variants[6]["required"],
+		"Pi options variant must require the 'pi' property")
+	assert.Equal(t, false, variants[6]["additionalProperties"],
+		"Pi options variant must reject unknown properties")
 }

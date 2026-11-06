@@ -666,6 +666,7 @@ func (e *BehaviorDefinedEngine) buildBehaviorDefinedExecutionEnv(exec *EngineExe
 		env["GH_AW_PROTECTED_SESSION_CAPTURE"] = "1"
 		env["GH_AW_PROTECTED_CAPTURE_ID"] = protectedSessionCaptureID
 	}
+	applyDurableExecutionEnv(env, workflowData)
 	return env
 }
 
@@ -1016,6 +1017,20 @@ func deepCopyEngineDefinition(src EngineDefinition) EngineDefinition {
 //nolint:largefunc // Deep copy initializes all fields explicitly.
 func deepCopyEngineBehaviorDefinition(src EngineBehaviorDefinition) EngineBehaviorDefinition {
 	dst := src // value copy covers all scalar fields
+	if src.Durable != nil {
+		durable := *src.Durable
+		durable.Installation = append([]EngineInstallationDefinition(nil), src.Durable.Installation...)
+		durable.Files = append([]string(nil), src.Durable.Files...)
+		for i := range durable.Installation {
+			if cooldown := durable.Installation[i].Cooldown; cooldown != nil {
+				copy := *cooldown
+				durable.Installation[i].Cooldown = &copy
+			}
+		}
+		copy := deepCopyEngineBehaviorDefinition(EngineBehaviorDefinition{Execution: src.Durable.Execution})
+		durable.Execution = copy.Execution
+		dst.Durable = &durable
+	}
 
 	// SupportedEnvVarKeys
 	if src.SupportedEnvVarKeys != nil {

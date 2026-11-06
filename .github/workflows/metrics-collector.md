@@ -563,20 +563,48 @@ The agentic-workflows logs tool provides structured data with workflow names alr
 
 #### Output Format
 
+When producing a reader-facing Markdown collection summary, use this format:
+
+- Use `###` or lower for all report headings; reserve `#` and `##` for the
+  surrounding GitHub page.
+- Structure the summary as overview → key metrics and collection issues →
+  collapsible detail → next actions and/or limitations. Keep decision-relevant
+  metrics and limitations visible before any collapsible section.
+- Put long tables, item lists, raw evidence, and detailed findings in
+  `<details><summary><b>...</b></summary>...</details>` blocks.
+- When referencing workflow runs, use
+  `[§RUN_ID](https://github.com/owner/repo/actions/runs/RUN_ID)`, replacing the
+  placeholders with the actual owner, repository, and run ID.
+- This formatting applies only to summaries in logs or safe-output messages.
+  Continue storing metrics as JSON under `metrics/`; do not create Markdown
+  files, issues, PRs, or comments.
+
 At the end of collection:
 
 1. **Summary Log**:
    ```
-   ✅ Metrics collection completed
-   
-   📊 Collection Summary:
-   - Workflows analyzed: 120
-   - Active workflows: 85
-   - Total safe outputs: 45
-   - Overall success rate: 89.2%
-   - Storage: /tmp/gh-aw/repo-memory/default/metrics/daily/2024-12-24.json
-   
-   ⏱️  Collection took: 45 seconds
+   ### Overview
+   Metrics collection completed for the UTC reporting window.
+
+   ### Key Metrics and Issues
+
+   | Metric | Value |
+   |---|---:|
+   | Workflows analyzed | 120 |
+   | Active workflows | 85 |
+   | Overall success rate | 89.2% |
+
+   Collection status: complete. If partial, state the specific limitations here.
+
+   <details>
+   <summary><b>Detailed metrics</b></summary>
+
+   Long tables, workflow-level item lists, raw evidence, and detailed findings.
+
+   </details>
+
+   ### Next Actions
+   - Downstream meta-orchestrators can analyze the persisted metrics.
    ```
 
 2. **File Operations Log**:

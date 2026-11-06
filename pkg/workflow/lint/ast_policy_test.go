@@ -124,6 +124,38 @@ func TestImageArgumentActionsAST(t *testing.T) {
 	assert.Equal(t, "jobs.test.services.db.image", diagnostics[1].Path)
 }
 
+func TestEnvironmentDeploymentASTLint(t *testing.T) {
+	source := `on: workflow_dispatch
+permissions: {contents: read}
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: protected-secrets
+      deployment: false
+    steps:
+      - run: echo public
+`
+	workflow, err := actions.Parse([]byte(source))
+	require.NoError(t, err)
+	document, err := aw.Parse("---\nenvironment: {name: protected-secrets, deployment: false}\nsafe-outputs:\n  environment: {name: write-secrets, deployment: false}\n" + source + "---\n")
+	require.NoError(t, err)
+	before, err := aw.Emit(document)
+	require.NoError(t, err)
+	for _, input := range []Input{{Workflow: workflow}, {Workflow: workflow, Document: document}} {
+		diagnostics, err := Default().Run(context.Background(), input)
+		require.NoError(t, err)
+		assert.Empty(t, diagnostics)
+	}
+	emitted, err := actions.Emit(workflow)
+	require.NoError(t, err)
+	assert.Equal(t, source, emitted)
+	after, err := aw.Emit(document)
+	require.NoError(t, err)
+	assert.Equal(t, before, after)
+}
+
 func TestAdditionalASTStrictSeverity(t *testing.T) {
 	for _, tt := range []struct{ rule, fields string }{
 		{"tool-scope", "tools: {cache-memory: {scope: repo}}"},

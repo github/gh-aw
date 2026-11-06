@@ -52,6 +52,19 @@ type replaceLabelFixtureFile struct {
 	Scenarios []replaceLabelFixtureScenario `yaml:"scenarios"`
 }
 
+type replaceLabelErrorFixtureFile struct {
+	FixtureID string                             `yaml:"fixture_id"`
+	Scenarios []replaceLabelErrorFixtureScenario `yaml:"scenarios"`
+}
+
+type replaceLabelErrorFixtureScenario struct {
+	ScenarioID string   `yaml:"scenario_id"`
+	Category   string   `yaml:"category"`
+	Codes      []string `yaml:"codes"`
+	Stage      string   `yaml:"owning_stage"`
+	Result     string   `yaml:"result"`
+}
+
 type replaceLabelFixtureScenario struct {
 	ScenarioID string                   `yaml:"scenario_id"`
 	Input      replaceLabelFixtureInput `yaml:"input"`
@@ -717,4 +730,39 @@ func TestFormalFixtureLoaderRejectsEmptyScenarios(t *testing.T) {
 	_, err := parseReplaceLabelFixture([]byte("fixture_id: test\nscenarios: []\n"))
 	require.Error(t, err)
 	require.ErrorContains(t, err, "no scenarios")
+}
+
+func TestFormalReplaceLabelErrorCategoryFixture(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join(formalRepoRoot(t), "specs", "replace-label-compliance", "rl-004-error-categories.yaml"))
+	require.NoError(t, err)
+
+	var fixture replaceLabelErrorFixtureFile
+	require.NoError(t, yamlv3.Unmarshal(data, &fixture))
+	require.Equal(t, "RL-ERR-004", fixture.FixtureID)
+
+	expected := map[string]replaceLabelErrorFixtureScenario{
+		"Schema validation failure":          {Codes: []string{"SCHEMA_INVALID"}, Stage: "5.1", Result: "soft-skip-warning"},
+		"Count gate exceeded":                {Codes: []string{"MAX_EXCEEDED"}, Stage: "5.2", Result: "soft-skip-warning"},
+		"Target resolution failure":          {Codes: []string{"TARGET_UNRESOLVABLE"}, Stage: "5.3", Result: "soft-skip-warning"},
+		"Repository not in allowlist":        {Codes: []string{"REPO_NOT_ALLOWED"}, Stage: "5.3", Result: "soft-skip-warning"},
+		"Label validation failure":           {Codes: []string{"LABEL_BLOCKED", "LABEL_NOT_ALLOWED"}, Stage: "5.4", Result: "soft-skip-warning"},
+		"Gate check (required-labels)":       {Codes: []string{"GATE_REQUIRED_LABELS"}, Stage: "5.5", Result: "skipped-without-run-failure"},
+		"Gate check (title prefix)":          {Codes: []string{"GATE_TITLE_PREFIX"}, Stage: "5.5", Result: "skipped-without-run-failure"},
+		"REST setLabels failure":             {Codes: []string{"SETLABELS_FAILED"}, Stage: "5.8", Result: "hard-error"},
+		"Rate-limit exhausted after retries": {Codes: []string{"RATE_LIMIT_EXHAUSTED"}, Stage: "5.8", Result: "hard-error"},
+	}
+	require.Len(t, fixture.Scenarios, len(expected))
+	seenCodes := make(map[string]bool)
+	for _, scenario := range fixture.Scenarios {
+		want, ok := expected[scenario.Category]
+		require.True(t, ok, "unexpected error category %q", scenario.Category)
+		require.Equal(t, want.Codes, scenario.Codes, scenario.Category)
+		require.Equal(t, want.Stage, scenario.Stage, scenario.Category)
+		require.Equal(t, want.Result, scenario.Result, scenario.Category)
+		require.NotEmpty(t, scenario.ScenarioID)
+		for _, code := range scenario.Codes {
+			require.False(t, seenCodes[code], "duplicate error code %q", code)
+			seenCodes[code] = true
+		}
+	}
 }

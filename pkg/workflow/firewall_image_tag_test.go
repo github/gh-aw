@@ -9,6 +9,21 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 )
 
+func TestDefaultRuntimeImagePins(t *testing.T) {
+	t.Parallel()
+	images := []string{"ghcr.io/github/gh-aw-mcpg:" + string(constants.DefaultMCPGatewayVersion)}
+	for _, role := range []string{"agent", "squid", "api-proxy", "cli-proxy", "router", "enclave-agent", "enclave-script", "enclave-mcp-server"} {
+		images = append(images, constants.DefaultFirewallRegistry+"/"+role+":"+getAWFImageTag(nil))
+	}
+	for _, image := range images {
+		t.Run(image, func(t *testing.T) {
+			if digest := lookupContainerDigest(image, nil); !awfPinnedImagePattern.MatchString(image + "@" + digest) {
+				t.Fatalf("default runtime image %s lacks an immutable digest pin", image)
+			}
+		})
+	}
+}
+
 // TestGetAWFImageTag tests the getAWFImageTag helper function
 func TestGetAWFImageTag(t *testing.T) {
 	t.Run("returns default version without v prefix when firewall config is nil", func(t *testing.T) {

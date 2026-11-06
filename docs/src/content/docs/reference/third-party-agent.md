@@ -40,6 +40,7 @@ These definitions are examples for integration authors, **not supported gh-aw en
 | --- | --- |
 | [OpenCode](https://opencode.ai) | [opencode.md](https://github.com/github/gh-aw/blob/main/.github/workflows/shared/opencode.md) |
 | [Aider](https://aider.chat/docs/) | [aider.md](https://github.com/github/gh-aw/blob/main/.github/workflows/shared/aider.md) |
+| [Atomic](https://github.com/bastani-inc/atomic) | [atomic.md](https://github.com/github/gh-aw/blob/main/.github/workflows/shared/atomic.md) |
 | [Crush](https://github.com/charmbracelet/crush) | [crush.md](https://github.com/github/gh-aw/blob/main/.github/workflows/shared/crush.md) |
 | [Cursor](https://cursor.com/docs/cli) | [cursor.md](https://github.com/github/gh-aw/blob/main/.github/workflows/shared/cursor.md) |
 | [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) | [deepseek-harness.md](https://github.com/github/gh-aw/blob/main/.github/workflows/shared/deepseek-harness.md) |
@@ -52,6 +53,7 @@ These definitions are examples for integration authors, **not supported gh-aw en
 
 | Sample | Runtime and limitations |
 | --- | --- |
+| Atomic | Pins `@bastani/atomic` 0.9.71 with npm lifecycle scripts disabled. Uses AWF-only Copilot, Anthropic, or OpenAI/Codex inference, stdin prompts, private temporary configuration, and native authenticated HTTP MCP with direct tool exposure. The child environment allowlists runtime bindings and credential-free proxy addresses; arbitrary workflow secrets and execution hooks are not inherited. Startup network checks, telemetry, saved sessions, and project-local configuration are disabled; the isolated agent directory excludes user-installed extensions. Gateway MCP policies, including GitHub integrity and repository restrictions, remain enforced. Native bash restrictions and `edit: false` fail compilation. No native gh-aw tool allowlists, iteration limits, Agent Plugins, custom Atomic process workflows, or structured session parsing. |
 | OpenCode | Installs OpenCode 2 from `@opencode/cli`, uses `--standalone`, native MCP with Code Mode disabled, and JSONL events. Copilot requires AWF; direct Anthropic/OpenAI BYOK is supported without it. Repository JSON/JSONC settings are overlaid; updates/sharing are disabled. V2 has no language servers, and V1 plugins require porting. Native npm plugins are not gh-aw Agent Plugins. |
 | DeepSeek Harness | Pins `dsh` v0.2.0-rc.2. Uses headless stdin prompts, a private per-run configuration patch, and CLI-proxy tools rather than native MCP. Copilot requires AWF; direct Anthropic/OpenAI credentials apply only without AWF. Per-command native bash restrictions are rejected. No native reasoning, tool, refusal, or token-accounting observations are inferred from stdout. |
 | Factory Droid | Pins `@factory/cli` 0.248.0 with lifecycle scripts disabled. Uses custom models through the AWF API proxy with placeholder credentials; real provider and Factory keys are excluded from the agent. Supports Copilot, Anthropic, and OpenAI inference, file-based prompts, high autonomy inside the sandbox, and native HTTP MCP. Native MCP retains the gateway session authorization in agent-readable `.factory/mcp.json`; this is not an upstream provider credential or a security boundary against the agent (see [gateway authentication](/gh-aw/reference/mcp-gateway/#71-authorization-header-format)). Removing it prevents authenticated MCP calls. No Factory API key is required. Factory-managed inference, direct-key execution, structured session parsing, gh-aw tool allowlists, max-turn enforcement, and Agent Plugins are unsupported. |
@@ -67,6 +69,72 @@ A definition contains `engine.id`, metadata, and `engine.behaviors`. Its behavio
 Start from a sample with a matching transport rather than copying installation or configuration code into every workflow. Publish the definition with versioned changes and document its credentials, models, tool restrictions, supported platforms, and [unified session](/gh-aw/specs/unified-agent-session-specification/) coverage.
 
 See [imports](/gh-aw/reference/imports/) for resolution and pinning rules.
+
+### Durable execution
+
+> [!WARNING]
+> Durable execution is experimental, including for imported engines. Enabling
+> `engine.durable` emits a compile-time warning. Configuration and behavior may
+> change without deprecation.
+
+A workflow can opt into artifact-backed continuation using `engine.durable:
+{ retention-days: 7 }` alongside its custom `engine.id`. Compilation fails unless
+the definition declares `behaviors.durable`. Engines that implement the Go
+interface provide `GetDurableExecutionPlan` with the files to persist and the
+continuation execution steps.
+
+An engine does not need a native durable library. It can declare its session
+folder and provide a harness that continues the restored session:
+
+```aw wrap
+engine:
+  id: example-engine
+  behaviors:
+    durable:
+      files:
+        - /tmp/gh-aw/agent/example/sessions
+      execution:
+        command-name: example-engine
+        step-name: Continue example-engine session
+      harness-script: |
+        const resumed = process.env.GH_AW_DURABLE_RESUMED === "true";
+        // Invoke this engine's resume command when resumed, or start a new session.
+```
+
+Merge this fragment into the publisher's existing definition. Configure the
+agent to write its sessions to the declared directory. The harness must use its
+engine-specific continuation API or CLI flags when `GH_AW_DURABLE_RESUMED` is
+`true`; the parent run is available as `GH_AW_DURABLE_PARENT_RUN_ID`. No extra
+durable dependencies are needed for session-file continuation. This restores
+conversation state, not the native library's durable task or replay guarantees.
+
+`behaviors.durable.files` is required. Paths must be explicit, non-overlapping
+files or directories under `/tmp/gh-aw/agent/`, without globs or symlinks. gh-aw
+recursively snapshots only these paths and restores them before the harness
+runs. A native implementation can declare `$GH_AW_DURABLE_CHECKPOINT` to persist
+the compiler-managed checkpoint file instead.
+
+The `execution` object is required; `installation` and `harness-script` are
+optional. When a native implementation needs extra dependencies, each dependency
+uses the existing installation fields: `package-manager: npm`, a valid
+`package-name`, an exact literal `version`, and a `verify-command`. Durable
+dependencies are installed and verified in addition to the ordinary engine
+installation. The durable execution and harness replace the ordinary ones;
+workflow-level command, driver, and harness overrides are rejected.
+Durable and ordinary execution must use the same `protected-session-capture`
+setting so capture verification and publication remain consistent.
+
+The harness also receives `GH_AW_DURABLE_STORAGE=artifact`,
+`GH_AW_DURABLE_DIR`, and `GH_AW_DURABLE_CHECKPOINT`. Persist only session state,
+never credentials or runtime authentication. gh-aw restores and publishes the artifact and applies
+the configured retention period. The engine is responsible for checkpoint
+compatibility, replay safety, fresh credential binding, telemetry, and unified
+session events. See [Pi durable runs](/gh-aw/reference/engines/pi/#durable-runs)
+for parent selection, retention, and continuation limitations.
+
+Artifact files include an integrity-checked UTF-8 projection so host secret
+redaction also examines binary session state. If redaction changes a snapshot,
+publication fails instead of uploading credentials or a corrupted session.
 
 ### Protected session capture
 

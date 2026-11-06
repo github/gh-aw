@@ -14,6 +14,7 @@ func BadExprStmtClose() {
 	f, _ := os.Open("file.txt")
 	f.Close()   // want `Close\(\) error is explicitly discarded; resource cleanup failures may be silently ignored`
 	(f.Close()) // want `Close\(\) error is explicitly discarded; resource cleanup failures may be silently ignored`
+	(f.Close)() // want `Close\(\) error is explicitly discarded; resource cleanup failures may be silently ignored`
 }
 
 // BadBlankAssignClose assigns Close() error to blank identifier.
@@ -21,6 +22,7 @@ func BadBlankAssignClose() {
 	f, _ := os.Open("file.txt")
 	_ = f.Close()   // want `Close\(\) error is explicitly discarded; resource cleanup failures may be silently ignored`
 	_ = (f.Close()) // want `Close\(\) error is explicitly discarded; resource cleanup failures may be silently ignored`
+	_ = (f.Close)() // want `Close\(\) error is explicitly discarded; resource cleanup failures may be silently ignored`
 }
 
 // BadMultiReturnIgnore ignores Close() error in multi-return assignment.
@@ -167,6 +169,7 @@ func GoodNonCloserNoError() {
 	nc := &NonCloser{}
 	nc.Close()
 	(nc.Close())
+	(nc.Close)()
 	_ = nc
 }
 

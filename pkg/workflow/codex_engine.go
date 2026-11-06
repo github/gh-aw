@@ -528,6 +528,7 @@ func (e *CodexEngine) buildCodexExecutionEnv(workflowData *WorkflowData, firewal
 	}
 	applyModelRoutingEnv(env, workflowData)
 	applyModelAliasesEnv(env, workflowData)
+	applyDurableExecutionEnv(env, workflowData)
 	return env
 }
 

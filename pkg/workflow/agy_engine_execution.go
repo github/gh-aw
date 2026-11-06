@@ -80,6 +80,7 @@ func (e *AgyEngine) buildExecutionEnv(workflowData *WorkflowData, firewallEnable
 	applyEngineVersionEnv(env, workflowData)
 	applyEngineAndAgentEnv(env, workflowData, agyLog)
 	applyModelAliasesEnv(env, workflowData)
+	applyDurableExecutionEnv(env, workflowData)
 	if workflowData.Model != "" {
 		env[e.GetModelEnvVarName()] = workflowData.Model
 	}

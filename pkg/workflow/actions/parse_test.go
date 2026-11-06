@@ -94,6 +94,38 @@ func TestParseRejectsInvalidNativeYAML(t *testing.T) {
 	}
 }
 
+func TestParseEnvironmentDeployment(t *testing.T) {
+	source := `on: workflow_dispatch
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: protected-secrets
+      url: https://example.com
+      deployment: false # secrets only
+    steps:
+      - run: echo public
+`
+	input, err := Parse([]byte(source))
+	require.NoError(t, err)
+	environment := map[string]any{
+		"name": "protected-secrets", "url": "https://example.com", "deployment": false,
+	}
+	assert.Equal(t, environment, input.Jobs[0].Environment)
+	fields := emittedWorkflow(t, input)
+	assert.Equal(t, environment, fields["jobs"].(map[string]any)["deploy"].(map[string]any)["environment"])
+	emitted, err := Emit(input)
+	require.NoError(t, err)
+	assert.Equal(t, source, emitted)
+
+	input.Jobs[0].Environment.(map[string]any)["deployment"] = "${{ inputs.deploy }}"
+	emitted, err = Emit(input)
+	require.NoError(t, err)
+	reparsed, err := Parse([]byte(emitted))
+	require.NoError(t, err)
+	assert.Equal(t, input.Jobs[0].Environment, reparsed.Jobs[0].Environment)
+}
+
 func TestParseJobCacheModes(t *testing.T) {
 	for _, mode := range []string{"read", "write", "write-only", "none"} {
 		t.Run(mode, func(t *testing.T) {

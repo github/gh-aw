@@ -1,11 +1,12 @@
 import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
+import { deflateRawSync, inflateRawSync } from "node:zlib";
 
 const require = createRequire(import.meta.url);
 const { canonical } = require("./work_queue_codec.cjs");
 const { administrator, genesis, operationCommit, submission } = require("./work_queue_test_helpers.cjs");
-const { compactTransactions, prepareCheckpoint, reconstructCheckpoint, replayTransactions, serializeProjection } = require("./work_queue_replay.cjs");
+const { compactTransactions, prepareCheckpoint, reconstructCheckpoint, replayCheckpointSource, replayTransactions, serializeProjection, serializeTransactionLog } = require("./work_queue_replay.cjs");
 const { legacyCheckpoint, rewriteCheckpoint } = require("./work_queue_checkpoint_regression_helpers.cjs");
 const { acceptedSubmissionParameters } = require("./work_queue_dispatch.cjs");
 
@@ -16,6 +17,27 @@ function expiringLog() {
 }
 
 describe("checkpoint and expiration internal-state regressions", () => {
+  it("rejects noncanonical compressed receipts even when native JSON parsing produces the original snapshot", () => {
+    const log = [genesis()];
+    log.push(submission(log, ["accepted"]));
+    const root = compactTransactions(log, "a".repeat(40), administrator, 100)[0];
+    const text = inflateRawSync(Buffer.from(root.operations[0].state.requests_compressed, "base64")).toString("utf8");
+    for (const changed of [
+      text.replace(/"at":([0-9]+)/, '"at":$1,"at":$1'),
+      text.replace(/"at":([0-9]+)/, (_, at) => `"at":${at},"\\u0061t":${at}`),
+      text.replace(/"at":([0-9]+)/, '"at":$1.0'),
+      text.replace(/"at":([0-9]+)/, '"at":$1e0'),
+      text.replace('"actor":', '"\\u0061ctor":'),
+      ` ${text}`,
+    ]) {
+      assert.notEqual(changed, text);
+      assert.equal(canonical(JSON.parse(changed)), text);
+      const damaged = structuredClone(root);
+      damaged.operations[0].state.requests_compressed = deflateRawSync(Buffer.from(changed, "utf8")).toString("base64");
+      assert.throws(() => replayTransactions([damaged]), /checkpoint_invalid/);
+    }
+  });
+
   it("recovers checkpoints written before full Policy receipt history and retains current-epoch submit recovery", () => {
     const log = [genesis()];
     log.push(submission(log, ["accepted"]));
@@ -26,11 +48,35 @@ describe("checkpoint and expiration internal-state regressions", () => {
     assert.notEqual(legacy[0].operations[0].state_sha256, current[0].operations[0].state_sha256);
     const recovered = reconstructCheckpoint(log, "a".repeat(40), administrator, 100, legacy[0].operations[0].state_sha256);
     assert.equal(canonical(recovered), canonical(legacy));
+    assert.equal(canonical(serializeProjection(replayCheckpointSource(serializeTransactionLog(log), "a".repeat(40), legacy[0]))), canonical(serializeProjection(replayTransactions(log))));
     const state = replayTransactions(recovered);
     const prior = state.requests.get(log[1].request.id);
     const original = { nodes: log[1].request.parameters.nodes.map(({ kind, batch_trust_domain, enqueued, ...node }) => node) };
     const context = { ...prior.actor, authenticated: true, roles: [prior.actor.role], created_at: log[1].at };
     assert.deepEqual(acceptedSubmissionParameters(state, context, original, prior), prior.request.parameters);
+  });
+
+  it("verifies fresh checkpoint source replay without trusting altered history or state digests", () => {
+    const log = [genesis()];
+    log.push(submission(log, ["accepted"]));
+    const prior = "a".repeat(40);
+    const contents = serializeTransactionLog(log);
+    const root = compactTransactions(log, prior, administrator, 100)[0];
+    const replayed = replayCheckpointSource(contents, prior, root);
+    assert.equal(canonical(serializeProjection(replayed)), canonical(serializeProjection(replayTransactions(log))));
+    for (const field of ["prior_git_sha", "prior_tip", "history_sha256", "state_sha256"]) {
+      const changed = structuredClone(root);
+      changed.operations[0][field] = field === "prior_tip" ? "different-tip" : "b".repeat(field === "prior_git_sha" ? 40 : 64);
+      assert.throws(() => replayCheckpointSource(contents, prior, changed), /checkpoint_invalid/);
+    }
+    for (const actor of [
+      { ...administrator, role: "producer" },
+      { ...administrator, repository: "other/repo" },
+    ]) {
+      assert.throws(() => replayCheckpointSource(contents, prior, { ...root, actor }), /checkpoint_invalid/);
+    }
+    const malformed = contents.replace('"version":3', '"version":3,"version":3');
+    assert.throws(() => replayCheckpointSource(malformed, prior, root), /duplicate_key/);
   });
 
   it("refreshes every public view after an isolated as-of expiration pass", () => {

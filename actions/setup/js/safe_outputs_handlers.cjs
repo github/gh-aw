@@ -27,11 +27,13 @@ const { generateTemporaryId, getOrGenerateTemporaryId } = require("./temporary_i
 const { parseAllowedExtensionsEnv } = require("./allowed_extensions_helpers.cjs");
 const { buildExcludePathspecs, getStagedPatchDiffSizeBytes } = require("./git_patch_utils.cjs");
 const { sanitizeTitle, applyTitlePrefix } = require("./sanitize_title.cjs");
-const { parseDeduplicateByTitle, normalizeTitleForDedup, findDuplicateByTitle } = require("./issue_title_dedup.cjs");
+const { parseDeduplicateByTitle, normalizeTitleForDedup, normalizeDeduplicationLabels, hasDeduplicationLabels, findDuplicateIssue } = require("./issue_title_dedup.cjs");
+const { sanitizeLabelContent } = require("./sanitize_label_content.cjs");
 const { isProbingNoopMessage, validateCreatePullRequestIntent, validatePushToPullRequestBranchIntent, validateCreateIssueIntent, validateAddCommentIntent } = require("./intent_probe.cjs");
 const { globPatternToRegex } = require("./glob_pattern_helpers.cjs");
 const { resolveInvocationContext } = require("./invocation_context_helpers.cjs");
-const { lstatGuard, normalizeGuardedPath, readGuardedFile, writeGuardedFile } = require("./symlink_guard.cjs");
+const { lstatGuard, normalizeGuardedPath, resolveWorkspaceOrTmpPath, validateUploadSourcePath, readGuardedFile, writeGuardedFile } = require("./symlink_guard.cjs");
+const { resolveIssueArtifactPaths } = require("./issue_artifacts.cjs");
 const { validateValueAgainstSchema } = require("./schema-validation.cjs");
 const { resolveDataSchema } = require("./data_schema_normalizer.cjs");
 const { normalizeBlankOptionalFields } = require("./optional_field_normalizer.cjs");
@@ -727,6 +729,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
   };
 
   const createIssueConfig = config.create_issue || {};
+  const deduplicateByLabels = normalizeDeduplicationLabels(createIssueConfig.deduplicate_by_labels);
   let deduplicateByTitle = { enabled: false, maxDistance: 0 };
   try {
     deduplicateByTitle = parseDeduplicateByTitle(createIssueConfig.deduplicate_by_title);
@@ -751,20 +754,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     const { path: filePath } = args;
 
     // Validate file path is within allowed directories
-    const absolutePath = normalizeGuardedPath(filePath);
-    const workspaceDir = process.env.GITHUB_WORKSPACE || process.cwd();
-    const tmpDir = "/tmp";
-
-    const isWithin = root => {
-      const relative = path.relative(normalizeGuardedPath(root), absolutePath);
-      return relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
-    };
-    const isInWorkspace = isWithin(workspaceDir);
-    const isInTmp = isWithin(tmpDir);
-
-    if (!isInWorkspace && !isInTmp) {
-      throw new Error(`${ERR_CONFIG}: File path must be within workspace directory (${workspaceDir}) or /tmp directory. ` + `Provided path: ${filePath} (resolved to: ${absolutePath})`);
-    }
+    const absolutePath = resolveWorkspaceOrTmpPath(filePath);
     if (uploadedAssetPaths.has(scopedKey(absolutePath))) {
       throw new Error(`${ERR_VALIDATION}: Duplicate upload_asset source path is not allowed: ${filePath}`);
     }
@@ -2243,6 +2233,10 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     }
     const resolvedRepo = repoResult.repo;
 
+    if (entry.artifacts !== undefined) {
+      entry.artifacts = resolveIssueArtifactPaths(entry.artifacts, createIssueConfig.max_issue_artifacts, createIssueConfig.max_issue_artifact_size);
+    }
+
     let resolvedTitle = entry.title?.trim() || "";
     if (!resolvedTitle) {
       // Use the first non-empty line of the body as the title fallback rather than
@@ -2255,10 +2249,10 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     }
     resolvedTitle = applyTitlePrefix(sanitizeTitle(resolvedTitle, createIssueTitlePrefix), createIssueTitlePrefix);
 
-    if (deduplicateByTitle.enabled) {
+    if (deduplicateByTitle.enabled || deduplicateByLabels.length > 0) {
       const normalizedTitle = normalizeTitleForDedup(resolvedTitle);
       const seenTitles = seenIssueTitlesByRepo.get(scopedKey(resolvedRepo)) || [];
-      const duplicate = findDuplicateByTitle(normalizedTitle, seenTitles, deduplicateByTitle.maxDistance);
+      const duplicate = findDuplicateIssue(normalizedTitle, seenTitles, deduplicateByTitle);
       if (duplicate) {
         const droppedEntry = {
           ...entry,
@@ -2283,8 +2277,15 @@ function createHandlers(server, appendSafeOutput, config = {}) {
           ],
         };
       }
-      seenTitles.push({ title: resolvedTitle, normalizedTitle });
-      seenIssueTitlesByRepo.set(scopedKey(resolvedRepo), seenTitles);
+      const defaultLabels = Array.isArray(createIssueConfig.labels) ? createIssueConfig.labels : (createIssueConfig.labels || "").split(",");
+      const labels = [...defaultLabels, ...(Array.isArray(entry.labels) ? entry.labels : [])]
+        .filter(Boolean)
+        .map(label => sanitizeLabelContent(String(label).trim()).slice(0, 64))
+        .filter(Boolean);
+      if (hasDeduplicationLabels(labels, deduplicateByLabels)) {
+        seenTitles.push({ title: resolvedTitle, normalizedTitle });
+        seenIssueTitlesByRepo.set(scopedKey(resolvedRepo), seenTitles);
+      }
     }
 
     const largeContentResponse = maybeHandleLargeContent(entry);
@@ -2664,47 +2665,6 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     } catch {
       return path.resolve(root);
     }
-  }
-
-  /**
-   * Validate that a canonical absolute path does not refer to sensitive system or credential
-   * locations. Returns an error message string, or null if the path is safe.
-   *
-   * Rejected patterns:
-   *  - Any path with a ".git" directory component (prevents .git/config leakage).
-   *  - System directories: /etc, /proc, /sys, /dev, /run, /boot, /lib*, /usr/lib*.
-   *  - HOME credential/config subtrees: .ssh, .aws, .netrc, .npmrc, .gitconfig, .gnupg,
-   *    .config, .docker, .kube, .azure, .gcp.
-   *
-   * @param {string} canonicalPath - Resolved absolute path (output of fs.realpathSync or path.resolve)
-   * @returns {string|null}
-   */
-  function validateUploadSourcePath(canonicalPath) {
-    const parts = canonicalPath.split(path.sep);
-    if (parts.some(p => p === ".git")) {
-      return `path contains sensitive repository metadata (.git): ${canonicalPath}`;
-    }
-
-    const systemDenied = ["/etc", "/proc", "/sys", "/dev", "/run", "/boot", "/lib", "/lib64", "/usr/lib", "/usr/local/lib"];
-    for (const denied of systemDenied) {
-      const normalDenied = path.resolve(denied);
-      if (canonicalPath === normalDenied || canonicalPath.startsWith(normalDenied + path.sep)) {
-        return `path refers to a system directory: ${canonicalPath}`;
-      }
-    }
-
-    const homeDir = os.homedir();
-    if (homeDir) {
-      const sensitiveNames = [".ssh", ".aws", ".gnupg", ".docker", ".kube", ".azure", ".gcp", ".config", ".netrc", ".npmrc", ".gitconfig", ".gitcredentials", ".git-credentials"];
-      for (const name of sensitiveNames) {
-        const sensitive = path.join(path.resolve(homeDir), name);
-        if (canonicalPath === sensitive || canonicalPath.startsWith(sensitive + path.sep)) {
-          return `path refers to a sensitive HOME location: ${canonicalPath}`;
-        }
-      }
-    }
-
-    return null;
   }
 
   /**

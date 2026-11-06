@@ -246,6 +246,12 @@ type WorkflowExecutor interface {
 	GetPreBundleSteps(workflowData *WorkflowData) []GitHubActionStep
 }
 
+// DurableExecutionProvider declares persisted files and a continuation invocation.
+// Native durable runtimes also provide any additional dependency installation.
+type DurableExecutionProvider interface {
+	GetDurableExecutionPlan(workflowData *WorkflowData, logFile string) (*DurableExecutionPlan, error)
+}
+
 // MCPConfigProvider handles MCP (Model Context Protocol) configuration
 // Engines that support MCP servers should implement this
 type MCPConfigProvider interface {
@@ -403,6 +409,7 @@ type CodingAgentEngine interface {
 	Engine
 	CapabilityProvider
 	WorkflowExecutor
+	DurableExecutionProvider
 	MCPConfigProvider
 	LogParser
 	SecurityProvider
@@ -443,6 +450,10 @@ func (e *BaseEngine) GetGHSkillAgentName() string {
 
 func (e *BaseEngine) GetCapabilities() EngineCapabilities {
 	return e.capabilities
+}
+
+func (e *BaseEngine) GetDurableExecutionPlan(_ *WorkflowData, _ string) (*DurableExecutionPlan, error) {
+	return nil, fmt.Errorf("engine %q does not support durable execution; remove engine.durable or select an engine with durable behavior", e.id)
 }
 
 func (e *BaseEngine) getDedicatedLLMGatewayPort() int {

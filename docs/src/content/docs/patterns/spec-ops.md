@@ -15,6 +15,16 @@ flowchart LR
 
 SpecOps keeps a specification and its implementations aligned: update the spec, review and merge the change, propagate the new requirements to consuming repositories, then refresh compliance tests against the updated version.
 
+## Review Implementation Pull Requests
+
+The repository's [PR Specification Reviewer](https://github.com/github/gh-aw/blob/main/.github/workflows/pr-specification-reviewer.md) reviews non-draft pull requests when relevant implementation or specification files change. Maintainers can also invoke `/review-specs` on a pull request or review comment.
+
+The reviewer compares the pre-change contract with the proposed behavior, prioritizing the compiler threat detection, safe outputs, and security architecture specifications, then discovers other applicable contracts. It requests changes for demonstrated violations or missing required specification/test coverage. For an intentional compatible change with supporting design, implementation, and test evidence, the W3C specification writer prepares replacement text for review comments. Both same-repository and fork PRs receive proposals without file edits or branch writes. Proposals without a valid changed-line anchor appear in the overall review.
+
+Specification proposals preserve normative security guarantees and include version, change-log, compatibility, and conformance documentation where applicable. Ambiguous or breaking policy changes require maintainer decisions rather than automatic specification relaxation. The review is static: it does not execute PR code or claim tests passed. Aligned PRs produce no redundant review, and stale revisions are not reviewed.
+
+A `REQUEST_CHANGES` review surfaces nonconformance; it does not by itself configure merge enforcement. Maintainers must configure the required checks or ruleset separately.
+
 ## Update Specifications
 
 Create a workflow that uses [`w3c-specification-writer`](https://github.com/github/gh-aw/blob/main/.github/agents/w3c-specification-writer.agent.md) to edit the spec, apply RFC 2119 language, update the version and change log, and open a pull request:

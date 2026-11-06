@@ -41,6 +41,7 @@ The engine, inference provider, and enabled tools determine where repository con
 | Per-command bash allowlist | Yes | Yes | No | Yes | Yes | No |
 | Native MCP | Yes | Yes | Yes | Yes | Yes | Production-conformance gated |
 | Agent Plugins (`plugins`) | Yes | Yes | Yes | No | No | No |
+| Artifact-backed `engine.durable` | Session (CLI/SDK) | Session | Session | Session | Native durable tasks | Session |
 
 Codex can disable shell execution but cannot enforce a command allowlist. Agy rejects unsupported tool restrictions rather than ignoring them. See individual references for provider-specific web access, bare-mode behavior, and dynamic workflows.
 
@@ -69,8 +70,52 @@ engine:
 | `command` | Replacement executable; skips the engine installer, not AWF installation. |
 | `api-target` | Endpoint hostname, where supported; see below. |
 | `harness` | Replacement wrapper or retry settings for Copilot, Claude, and Codex. |
+| `durable` | Artifact-backed session continuation with optional `retention-days` (1–90, default `7`). |
 
 Engine-specific options such as `agent`, `copilot-sdk`, `driver`, `dynamic-workflows`, `permission-mode`, `config`, and `extensions` are documented in each engine reference. Agy rejects most overrides.
+
+### Durable runs
+
+> [!WARNING]
+> Durable mode is experimental for all engines, including Pi. Enabling
+> `engine.durable` emits a compile-time warning. Configuration and behavior may
+> change without deprecation.
+
+All built-in engines support artifact-backed continuation:
+
+```aw
+engine:
+  id: copilot
+  durable:
+    retention-days: 7
+```
+
+The compiler restores an explicit parent from `aw_context`, or the last successful run of the same workflow on the same branch. Reruns prefer a checkpoint from an earlier attempt of the same run. Retention remains subject to repository and organization policy. No memory tool is required, and durable mode does not dispatch another run automatically.
+
+| Engine | Persisted state | Continuation |
+| --- | --- | --- |
+| Copilot CLI and SDK | Native session-state files and exact session ID | CLI `--session-id`; SDK `resumeSession` |
+| Claude | Project transcripts, task state, and exact session ID | CLI `--resume <id>` |
+| Codex | Native and archived rollout sessions and exact thread ID | CLI `exec resume <id>` |
+| Gemini | Native temporary session storage and project registry | Prompt points to restored session files |
+| Agy | Native conversation databases | Prompt points to restored session files |
+| Pi | Official Pi Durable task journal and checkpoint | Native task continuation; see [Pi durable runs](/gh-aw/reference/engines/pi/#durable-runs) |
+
+Copilot, Claude, and Codex resume the exact recorded native session with the current workflow prompt and freshly configured credentials, models, and tool policy. Gemini and Agy receive restoration metadata without a forced CLI continuation argument. Continuation guidance limits use to metadata unless historical facts are independently verified against trusted sources for the current task. It does not direct the agent to ingest restored text as prompts or instructions.
+
+Enabling `engine.durable` opts into reusing potentially attacker-influenced history across runs. Guidance to treat restored files as untrusted factual data is advisory, not deterministic instruction/data isolation; native session resume also reintroduces prior history. Durable continuation does not eliminate cross-run prompt injection.
+
+The first run starts normally when no prior run or implicit checkpoint exists. No continuation notice or resume argument is added without history. Missing explicit-parent artifacts, corrupt restored sessions, and API authorization failures remain errors rather than silently starting unrelated conversations.
+
+This restores session files, not workspace edits, credentials, or exactly-once tool execution. Pi additionally preserves pending tasks using its native durable library. Existing unified session capture and trace propagation remain enabled; restored Copilot events are excluded from current-run capture and model verification.
+
+Threat detection uses a separate fresh session and does not inherit the primary agent's durable state.
+
+Built-in session-based durable mode rejects replacement commands, drivers, and harnesses because their session files may differ. Ordinary CLI arguments remain supported, but native session selectors and flags that disable persistence cannot override compiler-managed continuation. Copilot cannot override `COPILOT_HOME` because durable mode collects its standard native session directory. Pi has [additional restrictions](/gh-aw/reference/engines/pi/#durable-runs). [Imported engines](/gh-aw/reference/third-party-agent/#durable-execution) must declare their own durable files and execution behavior; unsupported definitions still fail compilation.
+
+Checkpoint artifacts are published after secret redaction and integrity validation. Cancellation or hard runner loss can prevent publication; only the last published checkpoint can be restored.
+
+Artifacts contain restorable session content, not just integrity metadata, and may expose sensitive history to anyone with artifact access. Secret scanning and redaction are heuristic: they do not guarantee removal of PII, unknown token formats, or secrets in unsupported encodings. Enable durable mode only when the workflow's session content is suitable for the repository's artifact access and retention policies.
 
 ### Pinning a Specific Engine Version
 
@@ -279,4 +324,5 @@ See [Custom AI engines](/gh-aw/reference/third-party-agent/#shared-imported-engi
 
 ### Unsupported engine samples
 
-See [third-party samples](/gh-aw/reference/third-party-agent/#unsupported-engine-samples).
+See [third-party samples](/gh-aw/reference/third-party-agent/#unsupported-engine-samples),
+including the experimental Atomic declarative engine.

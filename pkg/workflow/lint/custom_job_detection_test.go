@@ -200,6 +200,217 @@ func TestCustomJobDetectionStatusOnlyMustBeLeaf(t *testing.T) {
 	assert.True(t, found, "expected dependent custom jobs to invalidate status-only opt-in")
 }
 
+func TestCustomJobDetectionStatusOnlyCompiledPreAgentOutputs(t *testing.T) {
+	for _, tt := range []struct {
+		name, agentNeeds, producerNeeds, reporterNeeds string
+		allowed, generated                             bool
+	}{
+		{"pre-agent", "[activation, eligibility]", "[]", "", true, false},
+		{"before activation", "activation", "[]", "", true, false},
+		{"parallel", "activation", "[]", "", false, false},
+		{"post-agent", "activation", "agent", "", false, false},
+		{"post-detection", "activation", "detection", "", false, false},
+		{"generated pre-agent", "[activation, eligibility]", "[]", "", false, true},
+		{"missing direct dependency", "[activation, eligibility]", "[]", "[agent, detection]", false, false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			reporterNeeds := tt.reporterNeeds
+			if reporterNeeds == "" {
+				reporterNeeds = "[eligibility, agent, detection]"
+			}
+			source := "jobs:\n" +
+				"  eligibility:\n    needs: " + tt.producerNeeds + "\n    runs-on: ubuntu-latest\n    steps: [{run: echo metadata}]\n" +
+				"  report:\n    needs: " + reporterNeeds + "\n    detection-gate: status-only\n    if: always()\n" +
+				"    runs-on: ubuntu-latest\n    steps:\n      - env:\n          PR: ${{ needs.eligibility.outputs.pr_number }}\n        run: echo \"$PR\"\n"
+			authored := source
+			if tt.generated {
+				authored = "jobs:\n  report:\n" + strings.SplitN(source, "  report:\n", 2)[1]
+			}
+			document, err := aw.Parse("---\nsafe-outputs:\n  create-issue:\n" + authored + "---\nPrompt\n")
+			require.NoError(t, err)
+			activationNeeds := ""
+			if tt.name == "before activation" {
+				activationNeeds = "    needs: eligibility\n"
+			}
+			compiled := "jobs:\n" +
+				"  activation:\n" + activationNeeds + "    runs-on: ubuntu-latest\n    steps: [{run: echo activation}]\n" +
+				"  agent:\n    needs: " + tt.agentNeeds + "\n    runs-on: ubuntu-latest\n    steps: [{run: echo agent}]\n" +
+				"  detection:\n    needs: agent\n    runs-on: ubuntu-latest\n    steps: [{run: echo detection}]\n" +
+				strings.TrimPrefix(source, "jobs:\n")
+			workflow, err := actions.Parse([]byte(strings.ReplaceAll(compiled, "    detection-gate: status-only\n", "")))
+			require.NoError(t, err)
+			runner, err := Default().Select("custom-job-detection")
+			require.NoError(t, err)
+			diagnostics, err := runner.Run(context.Background(), Input{Document: document, Workflow: workflow})
+			require.NoError(t, err)
+			if tt.allowed {
+				assert.Empty(t, diagnostics)
+				return
+			}
+			want := "needs.eligibility.outputs"
+			if tt.name == "missing direct dependency" {
+				want = "listed in needs"
+			}
+			assert.Condition(t, func() bool {
+				for _, diagnostic := range diagnostics {
+					if diagnostic.Path == "jobs.report.steps[0].env.PR" && strings.Contains(diagnostic.Message, want) {
+						return true
+					}
+				}
+				return false
+			})
+		})
+	}
+}
+
+func TestCustomJobDetectionStatusOnlyPreAgentNeedsInAWOnlyMode(t *testing.T) {
+	doc, err := aw.Parse(`---
+safe-outputs:
+  threat-detection: true
+jobs:
+  eligibility:
+    runs-on: ubuntu-latest
+  report:
+    needs: [agent, detection]
+    detection-gate: status-only
+    if: always()
+    steps:
+      - env:
+          HEAD_SHA: ${{ needs.eligibility.outputs.head_sha }}
+        run: echo "$HEAD_SHA"
+---
+`)
+	require.NoError(t, err)
+	runner, err := Default().Select("custom-job-detection")
+	require.NoError(t, err)
+	diagnostics, err := runner.Run(context.Background(), Input{Document: doc})
+	require.NoError(t, err)
+	require.Len(t, diagnostics, 1)
+	assert.Contains(t, diagnostics[0].Message, "listed in needs")
+}
+
+func TestCustomJobDetectionStatusOnlyPreAgentOutputsUseEnv(t *testing.T) {
+	doc, err := aw.Parse(`---
+safe-outputs:
+  threat-detection: true
+jobs:
+  eligibility:
+    runs-on: ubuntu-latest
+  report:
+    needs: [eligibility, agent, detection]
+    detection-gate: status-only
+    if: always()
+    steps:
+      - run: echo '${{ needs.eligibility.outputs.head_sha }}'
+---
+`)
+	require.NoError(t, err)
+	runner, err := Default().Select("custom-job-detection")
+	require.NoError(t, err)
+	diagnostics, err := runner.Run(context.Background(), Input{Document: doc})
+	require.NoError(t, err)
+	require.Len(t, diagnostics, 1)
+	assert.Contains(t, diagnostics[0].Message, "through env")
+}
+
+func TestCustomJobDetectionStatusOnlyPreAgentOutputsNotInterpolatedIntoScript(t *testing.T) {
+	doc, err := aw.Parse(`---
+safe-outputs:
+  threat-detection: true
+jobs:
+  eligibility:
+    runs-on: ubuntu-latest
+  report:
+    needs: [eligibility, agent, detection]
+    detection-gate: status-only
+    if: always()
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: console.log('${{ needs.eligibility.outputs.head_sha }}')
+---
+`)
+	require.NoError(t, err)
+	runner, err := Default().Select("custom-job-detection")
+	require.NoError(t, err)
+	diagnostics, err := runner.Run(context.Background(), Input{Document: doc})
+	require.NoError(t, err)
+	require.Len(t, diagnostics, 1)
+	assert.Contains(t, diagnostics[0].Message, "through env")
+}
+
+func TestCustomJobDetectionCompiledImportedPreAgentOutput(t *testing.T) {
+	doc, err := aw.Parse(`---
+safe-outputs:
+  threat-detection: true
+jobs:
+  report:
+    needs: [eligibility, agent, detection]
+    detection-gate: status-only
+    if: always()
+    steps:
+      - env:
+          HEAD_SHA: ${{ needs.eligibility.outputs.head_sha }}
+        run: echo "$HEAD_SHA"
+---
+`)
+	require.NoError(t, err)
+	workflow, err := actions.Parse([]byte(`jobs:
+  eligibility:
+    runs-on: ubuntu-latest
+    steps: [{run: echo eligibility}]
+  agent:
+    needs: eligibility
+    runs-on: ubuntu-latest
+    steps: [{run: echo agent}]
+  detection:
+    needs: agent
+    runs-on: ubuntu-latest
+    steps: [{run: echo detection}]
+  report:
+    needs: [eligibility, agent, detection]
+    if: always()
+    runs-on: ubuntu-latest
+    steps: [{run: echo report}]
+`))
+	require.NoError(t, err)
+	importedJobs := map[string]any{
+		"eligibility": map[string]any{"runs-on": "ubuntu-latest"},
+		"report":      map[string]any{"needs": []any{"eligibility", "agent", "detection"}, "detection-gate": "status-only", "if": "always()"},
+	}
+	runner, err := Default().Select("custom-job-detection")
+	require.NoError(t, err)
+	for _, tt := range []struct {
+		name         string
+		authoredJobs map[string]any
+		want         string
+	}{
+		{"missing imported provenance", nil, "needs.eligibility.outputs"},
+		{"imported producer provenance", importedJobs, ""},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			diagnostics, err := runner.Run(context.Background(), Input{Workflow: workflow, Document: doc, AuthoredJobs: tt.authoredJobs})
+			require.NoError(t, err)
+			if tt.want == "" {
+				assert.Empty(t, diagnostics)
+				return
+			}
+			require.Len(t, diagnostics, 1)
+			assert.Contains(t, diagnostics[0].Message, tt.want)
+		})
+	}
+}
+
+func TestCustomJobDetectionAllowedOutputsRequiresSource(t *testing.T) {
+	workflow, err := actions.Parse([]byte("jobs:\n  metadata:\n    runs-on: ubuntu-latest\n    steps: [{run: echo metadata}]\n  agent:\n    needs: metadata\n    runs-on: ubuntu-latest\n    steps: [{run: echo agent}]\n"))
+	require.NoError(t, err)
+	input := Input{Workflow: workflow}
+	jobs, graph, err := customJobDetectionJobs(context.Background(), input)
+	require.NoError(t, err)
+	allowed, _ := customJobDetectionAllowedOutputs(input, jobs, graph)
+	assert.NotContains(t, allowed, "metadata")
+}
+
 func TestCustomJobDetectionActions(t *testing.T) {
 	for _, tt := range []struct {
 		name, jobs, path string

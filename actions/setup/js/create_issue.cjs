@@ -31,8 +31,9 @@ const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
 const { MAX_LABELS, MAX_ASSIGNEES } = require("./constants.cjs");
 const { findAgent, getIssueDetails, assignAgentToIssue } = require("./assign_agent_helpers.cjs");
 const { createTokenBrokerGitHubClient, isTokenBrokerEnabled } = require("./token_broker_github.cjs");
-const { parseDeduplicateByTitle, normalizeTitleForDedup, findDuplicateByTitle } = require("./issue_title_dedup.cjs");
+const { parseDeduplicateByTitle, normalizeTitleForDedup, normalizeDeduplicationLabels, hasDeduplicationLabels, findDuplicateIssue } = require("./issue_title_dedup.cjs");
 const { resolveDefaultMentions, resolveMentionsForItem } = require("./resolve_mentions_from_payload.cjs");
+const { normalizeIssueArtifacts, sanitizeIssueArtifacts, createIssueArtifacts } = require("./issue_artifacts.cjs");
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const ISSUE_FIELD_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const RECENTLY_CLOSED_DEDUP_DAYS = 30;
@@ -43,14 +44,19 @@ const TITLE_DEDUP_MIN_SEARCH_RATE_LIMIT_FRACTION = 0.2;
 /**
  * @typedef {NonNullable<Parameters<typeof github.rest.issues.create>[0]>} IssueParameters
  * @typedef {Awaited<ReturnType<typeof github.rest.issues.create>>["data"]} Issue
+ * @typedef {import("./types/safe-outputs").IssueArtifactBodyInput} IssueArtifactBodyInput
+ * @typedef {import("./types/safe-outputs").IssueArtifact} IssueArtifact
+ * @typedef {import("./types/safe-outputs").CreatedIssueArtifact} CreatedIssueArtifact
+ * @typedef {Omit<IssueParameters, "owner" | "repo" | "title" | "body"> & {owner?: string, repo?: string, title: string, body: string, artifacts?: IssueArtifactBodyInput[]}} CreateIssueParameters
+ * @typedef {{staged: false, issue: Issue, artifacts?: CreatedIssueArtifact[]} | {staged: true, preview: IssueParameters & {artifacts?: IssueArtifact[]}}} CreateIssueResult
  */
 
 /**
  * Create an attributed issue from a custom safe-output job.
  * Call setupGlobals before using this API. Title and body must be trusted or
  * sanitized by the custom job; this helper does not enforce agent tool policies.
- * @param {Omit<IssueParameters, "owner" | "repo" | "title" | "body"> & {owner?: string, repo?: string, title: string, body: string}} parameters
- * @returns {Promise<{staged: false, issue: Issue} | {staged: true, preview: IssueParameters}>}
+ * @param {CreateIssueParameters} parameters
+ * @returns {Promise<CreateIssueResult>}
  */
 async function createIssue(parameters) {
   if (typeof github === "undefined" || typeof context === "undefined" || typeof core === "undefined") {
@@ -91,18 +97,21 @@ async function createIssue(parameters) {
   if (issueArrayLimitError) {
     throw new Error(`${ERR_VALIDATION}: ${issueArrayLimitError}`);
   }
+  const { artifacts: artifactInput, ...issueParameters } = parameters;
+  const artifacts = normalizeIssueArtifacts(artifactInput);
   const report = buildIssueBodyReport(parameters.title, parameters.body, { repo: { owner, repo } });
   /** @type {IssueParameters & {title: string, body: string}} */
-  const request = renderIssueParameters({ ...parameters, owner, repo }, report);
+  const request = renderIssueParameters({ ...issueParameters, owner, repo }, report);
   if (labels) request.labels = labels;
   if (assignees) request.assignees = assignees;
   if (isStagedMode()) {
     core.info(`Staged: would create issue in ${owner}/${repo} with title: ${request.title}`);
-    return { staged: true, preview: request };
+    return { staged: true, preview: { ...request, ...(artifacts.length > 0 ? { artifacts } : {}) } };
   }
   const { data: issue } = await withRetry(() => createReportIssue(github, request), RATE_LIMIT_RETRY_CONFIG, `create_issue in ${owner}/${repo}`);
   core.info(`Created issue ${owner}/${repo}#${issue.number}: ${issue.html_url}`);
-  return { staged: false, issue };
+  const createdArtifacts = await createIssueArtifacts(github, owner, repo, issue.number, artifacts);
+  return { staged: false, issue, ...(createdArtifacts.length > 0 ? { artifacts: createdArtifacts } : {}) };
 }
 
 /**
@@ -689,13 +698,23 @@ async function searchTitleDedupIssues(githubClient, query) {
  * @param {Object} githubClient
  * @param {string} owner
  * @param {string} repo
+ * @param {string[]} labels
  * @returns {Promise<Array<{title: string}>>}
  */
-async function getRepoTitleDedupCandidates(githubClient, owner, repo) {
+async function getRepoTitleDedupCandidates(githubClient, owner, repo, labels) {
   const sinceDate = new Date(Date.now() - RECENTLY_CLOSED_DEDUP_DAYS * MS_PER_DAY).toISOString().slice(0, 10);
+  const labelQualifiers = labels
+    .map(
+      label =>
+        ` label:"${label
+          .replace(/\\/g, "\\\\")
+          .replace(/"/g, '\\"')
+          .replace(/\r?\n|\r/g, " ")}"`
+    )
+    .join("");
   const [openIssues, recentlyClosedIssues] = await Promise.all([
-    searchTitleDedupIssues(githubClient, `repo:${owner}/${repo} is:issue is:open`),
-    searchTitleDedupIssues(githubClient, `repo:${owner}/${repo} is:issue is:closed closed:>=${sinceDate}`),
+    searchTitleDedupIssues(githubClient, `repo:${owner}/${repo} is:issue is:open${labelQualifiers}`),
+    searchTitleDedupIssues(githubClient, `repo:${owner}/${repo} is:issue is:closed closed:>=${sinceDate}${labelQualifiers}`),
   ]);
 
   if (openIssues.truncated) {
@@ -753,12 +772,14 @@ async function main(config = {}) {
   const groupEnabled = parseBoolTemplatable(config.group, false);
   const closeOlderIssuesEnabled = parseBoolTemplatable(config.close_older_issues, false);
   const groupByDayEnabled = parseBoolTemplatable(config.group_by_day, false);
+  const deduplicateByLabels = normalizeDeduplicationLabels(config.deduplicate_by_labels);
   let deduplicateByTitle;
   try {
     deduplicateByTitle = parseDeduplicateByTitle(config.deduplicate_by_title);
   } catch (error) {
     throw new Error(`${ERR_VALIDATION}: ${getErrorMessage(error)}`, { cause: error });
   }
+  const deduplicationEnabled = deduplicateByTitle.enabled || deduplicateByLabels.length > 0;
   const rawCloseOlderKey = config.close_older_key ? String(config.close_older_key) : "";
   const closeOlderKey = rawCloseOlderKey ? normalizeCloseOlderKey(rawCloseOlderKey) : "";
   if (rawCloseOlderKey && !closeOlderKey) {
@@ -980,8 +1001,13 @@ async function main(config = {}) {
       .filter((assignee, index, arr) => arr.indexOf(assignee) === index);
 
     let issueFields;
+    /** @type {IssueArtifact[]} */
+    let artifacts;
     let preparedIssueFieldsInput = [];
     try {
+      artifacts = sanitizeIssueArtifacts(normalizeIssueArtifacts(message.artifacts, config.max_issue_artifacts, config.max_issue_artifact_size), { allowedAliases: allowedMentionAliases, maxMentions });
+      artifacts = artifacts.map(artifact => ({ ...artifact, body: replaceTemporaryIdReferences(artifact.body, temporaryIdMap, qualifiedItemRepo) }));
+      artifacts = normalizeIssueArtifacts(artifacts, config.max_issue_artifacts, config.max_issue_artifact_size);
       issueFields = normalizeIssueFields(message.fields);
       validateAllowedIssueFields(issueFields, allowedIssueFields);
       if (issueFields.length > 0) {
@@ -1062,9 +1088,9 @@ async function main(config = {}) {
       };
     }
 
-    if (deduplicateByTitle.enabled) {
+    if (deduplicationEnabled) {
       const withinRunCandidates = createdTitlesByRepo.get(qualifiedItemRepo) || [];
-      const withinRunDuplicate = findDuplicateByTitle(normalizedTitle, withinRunCandidates, deduplicateByTitle.maxDistance);
+      const withinRunDuplicate = findDuplicateIssue(normalizedTitle, withinRunCandidates, deduplicateByTitle);
       if (withinRunDuplicate) {
         core.warning(`Dropping duplicate create_issue (within-run) in ${qualifiedItemRepo}: "${title}" (matched "${withinRunDuplicate.title}", distance=${withinRunDuplicate.distance})`);
         return {
@@ -1082,7 +1108,7 @@ async function main(config = {}) {
         if (!repoTitleDedupCandidatesCache.has(repoCacheKey) && !skipRepoLevelSearch) {
           skipRepoLevelSearch = await shouldSkipRepoTitleDedupSearch(githubClient, repoParts.owner, repoParts.repo);
           if (!skipRepoLevelSearch) {
-            const dedupCandidatesPromise = getRepoTitleDedupCandidates(githubClient, repoParts.owner, repoParts.repo);
+            const dedupCandidatesPromise = getRepoTitleDedupCandidates(githubClient, repoParts.owner, repoParts.repo, deduplicateByLabels);
             dedupCandidatesPromise.catch(() => {
               if (repoTitleDedupCandidatesCache.get(repoCacheKey) === dedupCandidatesPromise) {
                 repoTitleDedupCandidatesCache.delete(repoCacheKey);
@@ -1095,9 +1121,11 @@ async function main(config = {}) {
         const repoCandidatesPromise = repoTitleDedupCandidatesCache.get(repoCacheKey);
         if (repoCandidatesPromise) {
           const repoCandidates = await repoCandidatesPromise;
-          const repoDuplicate = findDuplicateByTitle(normalizedTitle, repoCandidates, deduplicateByTitle.maxDistance);
+          const repoDuplicate = findDuplicateIssue(normalizedTitle, repoCandidates, deduplicateByTitle);
           if (repoDuplicate) {
-            recordSeenTitle(qualifiedItemRepo, title, normalizedTitle);
+            if (hasDeduplicationLabels(labels, deduplicateByLabels)) {
+              recordSeenTitle(qualifiedItemRepo, title, normalizedTitle);
+            }
             core.warning(`Dropping duplicate create_issue (repo-level) in ${qualifiedItemRepo}: "${title}" (matched "${repoDuplicate.title}", distance=${repoDuplicate.distance})`);
             return {
               success: true,
@@ -1167,7 +1195,7 @@ async function main(config = {}) {
     // When found, post the new content as a comment on the existing issue instead of
     // creating a duplicate. This groups multiple same-day runs into a single issue.
     // The reserved max-count slot is released when posting as a comment.
-    if (groupByDayEnabled && (closeOlderKey || workflowId)) {
+    if (!isStaged && artifacts.length === 0 && groupByDayEnabled && (closeOlderKey || workflowId)) {
       const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD (UTC)
       try {
         const existingIssues = await searchOlderIssues(
@@ -1226,7 +1254,7 @@ async function main(config = {}) {
       if (stagedBlockedBy.length > 0) {
         logStagedPreviewInfo(`Would mark issue as blocked by: ${stagedBlockedBy.join(", ")}`);
       }
-      if (deduplicateByTitle.enabled) {
+      if (deduplicationEnabled && hasDeduplicationLabels(labels, deduplicateByLabels)) {
         recordSeenTitle(qualifiedItemRepo, title, normalizedTitle);
       }
       // Return success with staged flag and preview info
@@ -1239,6 +1267,7 @@ async function main(config = {}) {
           labels,
           assignees,
           fields: issueFields,
+          ...(artifacts.length > 0 ? { artifacts } : {}),
           bodyLength: body.length,
           temporaryId,
           ...(stagedBlockedBy.length > 0 ? { blockedBy: stagedBlockedBy } : {}),
@@ -1246,12 +1275,13 @@ async function main(config = {}) {
       };
     }
 
+    let artifactFailure;
     try {
       const { data: issue } = await withRetry(() => createReportIssue(githubClient, request), RATE_LIMIT_RETRY_CONFIG, `create_issue in ${qualifiedItemRepo}`);
 
       core.info(`Created issue ${qualifiedItemRepo}#${issue.number}: ${issue.html_url}`);
       createdIssues.push({ ...issue, _repo: qualifiedItemRepo });
-      if (deduplicateByTitle.enabled) {
+      if (deduplicationEnabled && hasDeduplicationLabels(labels, deduplicateByLabels)) {
         recordSeenTitle(qualifiedItemRepo, title, normalizedTitle);
       }
 
@@ -1309,6 +1339,17 @@ async function main(config = {}) {
       const normalizedTempId = normalizeTemporaryId(String(temporaryId));
       temporaryIdMap.set(normalizedTempId, { repo: qualifiedItemRepo, number: issue.number });
       core.info(`Stored temporary ID mapping: ${temporaryId} -> ${qualifiedItemRepo}#${issue.number}`);
+
+      /** @type {CreatedIssueArtifact[]} */
+      let createdArtifacts = [];
+      try {
+        const resolvedArtifacts = artifacts.map(artifact => ({ ...artifact, body: replaceTemporaryIdReferences(artifact.body, temporaryIdMap, qualifiedItemRepo) }));
+        createdArtifacts = await createIssueArtifacts(githubClient, repoParts.owner, repoParts.repo, issue.number, resolvedArtifacts, config.max_issue_artifact_size);
+      } catch (error) {
+        const artifactError = getErrorMessage(error);
+        core.error(artifactError);
+        artifactFailure = { success: false, repo: qualifiedItemRepo, number: issue.number, url: issue.html_url, temporaryId, error: artifactError };
+      }
 
       // Assign copilot directly using agent helpers when enabled (similar to assign_to_agent.cjs pattern)
       if (hasCopilot && assignCopilot) {
@@ -1457,6 +1498,10 @@ async function main(config = {}) {
         core.info(`Skipping sub-issue linking: parent is in different repository (${effectiveParentRepo})`);
       }
 
+      if (artifactFailure) {
+        return artifactFailure;
+      }
+
       // Return result with temporary ID mapping info
       return {
         success: true,
@@ -1467,11 +1512,16 @@ async function main(config = {}) {
         id: issue.id,
         metadata: { node_id: issue.node_id },
         temporaryId: temporaryId,
+        ...(createdArtifacts.length > 0 ? { artifacts: createdArtifacts } : {}),
         ...(blockedByFailures.length > 0 ? { blocked_by_errors: blockedByFailures } : {}),
         _repo: qualifiedItemRepo, // For tracking in the closure
       };
     } catch (error) {
       const errorMessage = getErrorMessage(error);
+      if (artifactFailure) {
+        core.error(`✗ Failed to complete post-create steps for "${title}" in ${qualifiedItemRepo}: ${errorMessage}`);
+        return artifactFailure;
+      }
       if (errorMessage.includes("Issues has been disabled in this repository")) {
         core.info(`⚠ Cannot create issue "${title}" in ${qualifiedItemRepo}: Issues are disabled for this repository`);
         core.info("Consider enabling issues in repository settings if you want to create issues automatically");

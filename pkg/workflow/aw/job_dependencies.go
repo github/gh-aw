@@ -25,6 +25,15 @@ func (graph JobDependencyGraph) DependsOn(job, dependency string) bool {
 	return false
 }
 
+// IsPreAgentCustomJob reports whether the graph proves that a custom job runs
+// strictly before agent, without a dependency on agent or detection data.
+func (graph JobDependencyGraph) IsPreAgentCustomJob(job string) bool {
+	return !constants.IsCompilerOwnedJobName(job) &&
+		graph.DependsOn(string(constants.AgentJobName), job) &&
+		!graph.DependsOn(job, string(constants.AgentJobName)) &&
+		!graph.DependsOn(job, string(constants.DetectionJobName))
+}
+
 // AuthoredJobDependencies includes the compiler-owned post-agent dependencies.
 // Malformed needs are left to schema validation; they never create graph edges.
 func AuthoredJobDependencies(jobs map[string]any) JobDependencyGraph {

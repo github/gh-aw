@@ -62,6 +62,7 @@ safe-outputs:
     title-prefix: "[deep-report] "
     deduplicate-by-title: 28
     labels: [automation, improvement, quick-win, cookie, code-quality, task-mining]
+    deduplicate-by-labels: [automation, improvement, quick-win, cookie, code-quality, task-mining]
     max: 7
     group: true
 

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -341,6 +342,24 @@ func TestBuildActivationJob_Environment(t *testing.T) {
 			assert.Equal(t, tt.want, job.Environment)
 		})
 	}
+}
+
+func TestBuildActivationJob_ManualApprovalPreservesEnvironmentDeployment(t *testing.T) {
+	data := &WorkflowData{
+		Environment:    "environment:\n  name: production\n  url: https://example.com\n  deployment: false",
+		ManualApproval: "approval",
+	}
+
+	job, err := NewCompiler().buildActivationJob(data, false, "", "test.lock.yml")
+	require.NoError(t, err)
+
+	var compiled map[string]any
+	require.NoError(t, yaml.Unmarshal([]byte(job.Environment), &compiled))
+	assert.Equal(t, map[string]any{
+		"name":       "approval",
+		"url":        "https://example.com",
+		"deployment": false,
+	}, compiled["environment"])
 }
 
 // TestBuildActivationJob_OAuthTokenCheckStep verifies that the activation job

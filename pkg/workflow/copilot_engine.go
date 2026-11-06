@@ -193,6 +193,9 @@ func (e *CopilotEngine) GetFirewallLogsCollectionStep(workflowData *WorkflowData
 	// This ensures session files are in /tmp/gh-aw/ where secret redaction can scan them
 	sessionCopyStep := generateCopilotSessionFileCopyStep()
 	steps = append(steps, sessionCopyStep)
+	if workflowData.EngineConfig != nil && workflowData.EngineConfig.Durable != nil {
+		steps = append(steps, durableSessionStep(workflowData, "trim-copilot"))
+	}
 
 	return steps
 }

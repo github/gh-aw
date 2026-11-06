@@ -41,7 +41,7 @@ func TestAWFInstallerAuthenticationIsStepLocal(t *testing.T) {
 
 func TestDockerEnclaveHelperInstallerContract(t *testing.T) {
 	t.Parallel()
-	for _, version := range []string{"", "v0.29.5", "0.29.5", "v0.29.6", "0.29.6"} {
+	for _, version := range []string{"", "v0.29.5", "0.29.5", "v0.29.6", "0.29.6", "v0.29.7", "0.29.7"} {
 		t.Run(version, func(t *testing.T) {
 			pin := strings.Repeat("a", 64)
 			step := generateDockerEnclaveStorageHelperInstallStep(version, &AgentSandboxConfig{ChecksumsSHA256: pin})
@@ -134,7 +134,7 @@ func TestDockerEnclaveHelperInstallerContract(t *testing.T) {
 
 func TestDockerEnclaveInstallerWrapperKeepsOrchestratorRootless(t *testing.T) {
 	t.Parallel()
-	for _, version := range []string{"", "v0.29.4", "v0.29.5", "v0.29.6"} {
+	for _, version := range []string{"", "v0.29.4", "v0.29.5", "v0.29.6", "v0.29.7"} {
 		t.Run(version, func(t *testing.T) {
 			data := enclaveWorkflowData(true, false, 30, 0)
 			data.NetworkPermissions.Firewall.Version = version
