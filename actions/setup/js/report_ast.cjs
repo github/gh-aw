@@ -20,7 +20,7 @@ const { createExpirationLine } = require("./ephemerals.cjs");
  *   {type: "list", ordered: boolean, items: ReportBlock[][]} |
  *   {type: "quote", children: ReportBlock[]} |
  *   {type: "alert", kind: string, children: ReportBlock[]} |
- *   {type: "details", summary: string | ReportInline[], children: ReportBlock[]} |
+ *   {type: "details", open?: boolean, summary: string | ReportInline[], children: ReportBlock[]} |
  *   {type: "table", headers: ReportInline[][], rows: ReportInline[][][]} |
  *   {type: "task", checked: boolean, children: ReportInline[]} |
  *   {type: "separator"} |
@@ -402,7 +402,7 @@ function normalizeBlocks(nodes, depth) {
         if (node.type === "details") {
           const summary = typeof node.summary === "string" ? normalizeReportText(node.summary).replace(/\s+/g, " ").trim() : normalizeInlines(node.summary, depth + 1);
           if (!summary.length) throw new TypeError("Report details must have a summary");
-          result.push({ type: "details", summary, children });
+          result.push({ type: "details", ...(node.open === true ? { open: true } : {}), summary, children });
         } else if (node.type === "alert") result.push({ type: "alert", kind: node.kind, children });
         else result.push({ type: "quote", children });
         break;
@@ -668,7 +668,7 @@ function renderBlocks(nodes, compactExpiration = false) {
         case "alert":
           return (node.type === "alert" ? `[!${node.kind}]\n` : "") + renderBlocks(node.children, node.type === "quote");
         case "details":
-          return `<details>\n<summary>${typeof node.summary === "string" ? escapeSummaryText(node.summary) : renderInlines(node.summary, true)}</summary>\n\n${renderBlocks(node.children)}\n\n</details>`;
+          return `<details${node.open ? " open" : ""}>\n<summary>${typeof node.summary === "string" ? escapeSummaryText(node.summary) : renderInlines(node.summary, true)}</summary>\n\n${renderBlocks(node.children)}\n\n</details>`;
         case "table": {
           const row = cells => `| ${cells.map(cell => renderInlines(cell).replace(/(?<!\\)\|/g, "\\|")).join(" | ")} |`;
           return [row(node.headers), `| ${node.headers.map(() => "---").join(" | ")} |`, ...node.rows.map(row)].join("\n");

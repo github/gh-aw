@@ -398,7 +398,7 @@ function parseReportMarkdown(markdown, { context, inlineSlots, blockSlots, onBlo
   const isFieldLine = line => /^(?:\{\w+\}\s*)+$/.test(line.trim()) && (!inlineSlots || [...line.matchAll(/\{(\w+)\}/g)].some(field => !Object.hasOwn(inlineSlots, field[1])));
   const isBlockStart = line =>
     openingFence(line) ||
-    /^(?:#{1,6}\s|>|<details>(?:\s*$|\s*<summary>)|<\/details>\s*$|[-*+]\s|\d+\.\s|---\s*$)/.test(line) ||
+    /^(?:#{1,6}\s|>|<details(?:\s+open)?>(?:\s*$|\s*<summary>)|<\/details>\s*$|[-*+]\s|\d+\.\s|---\s*$)/.test(line) ||
     isFieldLine(line) ||
     isBlockSlot(line) ||
     (allowMetadata && /^(?:<!--|\[gh-aw-workflow-call-id\]: # ")/.test(line.trim())) ||
@@ -502,13 +502,13 @@ function parseReportMarkdown(markdown, { context, inlineSlots, blockSlots, onBlo
       } else if ((match = /^(#{1,6})\s+(.+)$/.exec(line))) {
         nodes.push(fromSource({ type: "heading", level: Math.max(minimumHeadingLevel, match[1].length), children: inline(match[2]) }));
         index++;
-      } else if ((match = /^<details>\s*<summary>(.*)<\/summary>$/.exec(line.trim()))) {
+      } else if ((match = /^<details(\s+open)?>\s*<summary>(.*)<\/summary>$/.exec(line.trim()))) {
         index++;
-        nodes.push(fromSource({ type: "details", summary: summary(match[1]), children: blocks(true, detailsDepth + 1) }));
-      } else if (line.trim() === "<details>" && /^<summary>.*<\/summary>$/.test(lines[index + 1]?.trim() || "")) {
+        nodes.push(fromSource({ type: "details", ...(match[1] ? { open: true } : {}), summary: summary(match[2]), children: blocks(true, detailsDepth + 1) }));
+      } else if ((match = /^<details(\s+open)?>$/.exec(line.trim())) && /^<summary>.*<\/summary>$/.test(lines[index + 1]?.trim() || "")) {
         const summarySource = lines[index + 1].trim().slice("<summary>".length, -"</summary>".length);
         index += 2;
-        nodes.push(fromSource({ type: "details", summary: summary(summarySource), children: blocks(true, detailsDepth + 1) }));
+        nodes.push(fromSource({ type: "details", ...(match[1] ? { open: true } : {}), summary: summary(summarySource), children: blocks(true, detailsDepth + 1) }));
       } else if (/^>/.test(line)) {
         const quoted = [];
         while (index < lines.length && /^>/.test(lines[index])) quoted.push(lines[index++].replace(/^> ?/, ""));
