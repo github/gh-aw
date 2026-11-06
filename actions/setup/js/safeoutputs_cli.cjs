@@ -18,6 +18,7 @@ const fs = require("fs");
 const { ERR_VALIDATION, ERR_SYSTEM } = require("./error_codes.cjs");
 const { getSetupTimeoutMs } = require("./child_process_timeouts.cjs");
 const { iterateJsonl } = require("./jsonl_helpers.cjs");
+const { buildMissingToolPermissionIssuePayload } = require("./permission_denied_helpers.cjs");
 
 const SAFEOUTPUTS_CLI_TIMEOUT_MS = getSetupTimeoutMs("safeoutputsCli");
 
@@ -114,10 +115,11 @@ function emitMissingToolPermissionIssue(options) {
     return;
   }
   try {
+    const payload = JSON.parse(buildMissingToolPermissionIssuePayload(deniedCommands));
     runSafeOutputs("report_missing_tool", {
-      tool: "tool/permission",
-      reason: "missing tool/permission issue: numerous permission denied errors detected",
-      alternatives: buildMissingToolAlternatives("Verify token scopes, repository permissions, and MCP/tool access configuration.", deniedCommands),
+      tool: payload.tool,
+      reason: payload.reason,
+      alternatives: buildMissingToolAlternatives(payload.alternatives, deniedCommands),
     });
     logger(`report_missing_tool emitted via safeoutputs CLI: ${safeOutputsPath}`);
   } catch (error) {

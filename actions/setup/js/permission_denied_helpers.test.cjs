@@ -40,4 +40,28 @@ describe("permission_denied_helpers.cjs", () => {
       denied_commands: [],
     });
   });
+
+  it("reports workflow tool denials without advising credential escalation", () => {
+    const output = [
+      "[copilot-sdk-driver] [sdk-driver] permission denied by workflow tool permissions: shell(node --test scripts/pr-sous-chef.test.mjs)",
+      "[copilot-sdk-driver] [sdk-driver] tool denial 3/3: permission denied: shell(node --test scripts/pr-sous-chef.test.mjs)",
+    ].join("\n");
+    const payload = JSON.parse(buildMissingToolPermissionIssuePayload(extractDeniedCommands(output)));
+    expect(payload.denied_commands).toEqual(["shell(node --test scripts/pr-sous-chef.test.mjs)"]);
+    expect(payload.alternatives).toContain("commands allowed by the workflow tools configuration");
+    expect(payload.alternatives).toContain("does not establish missing token scopes");
+    expect(payload.alternatives).not.toContain("Verify token scopes");
+  });
+
+  it.each(["read(/workspace/file)", "write(/workspace/file)", "mcp(github.get_file_contents)", "custom-tool(example)"])("recognizes SDK permission summaries: %s", command => {
+    const payload = JSON.parse(buildMissingToolPermissionIssuePayload([command]));
+    expect(payload.alternatives).toContain("workflow tools configuration");
+    expect(payload.denied_commands).toEqual([command]);
+  });
+
+  it("preserves generic permission guidance when no workflow boundary is identified", () => {
+    const payload = JSON.parse(buildMissingToolPermissionIssuePayload(["go version"]));
+    expect(payload.alternatives).toContain("Verify token scopes");
+    expect(payload.denied_commands).toEqual(["go version"]);
+  });
 });

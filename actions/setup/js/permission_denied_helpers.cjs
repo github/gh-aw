@@ -75,11 +75,14 @@ function extractDeniedCommands(output) {
  * @returns {string}
  */
 function buildMissingToolPermissionIssuePayload(deniedCommands) {
+  const workflowToolDenial = deniedCommands?.some(command => /^(?:shell|read|write|mcp|custom-tool)\(/.test(command)) === true;
   return JSON.stringify({
     type: "report_missing_tool",
     tool: "tool/permission",
     reason: "missing tool/permission issue: numerous permission denied errors detected",
-    alternatives: "Verify token scopes, repository permissions, and MCP/tool access configuration.",
+    alternatives: workflowToolDenial
+      ? "Use only commands allowed by the workflow tools configuration; stop unsupported probes before the denial budget is exhausted. A workflow tool denial does not establish missing token scopes or invalid credentials."
+      : "Verify token scopes, repository permissions, and MCP/tool access configuration.",
     denied_commands: deniedCommands && deniedCommands.length > 0 ? deniedCommands : [],
   });
 }
