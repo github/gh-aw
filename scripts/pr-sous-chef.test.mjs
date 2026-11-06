@@ -158,7 +158,7 @@ test("pending assignment comments suppress consecutive requests without recordin
   assert.ok(request.startsWith("@copilot\n\n"));
   assert.doesNotMatch(request, /\[@copilot\]\(/);
   assert.ok(sanitizeContent(request, { allowedAliases: ["copilot"] }).startsWith("@copilot\n\n"));
-  const body = request.replace(/<!--[\s\S]*?--!?>/g, "");
+  const body = stripHtmlComments(request);
   assert.match(body, /Sous-chef requested-head: abc/);
   assert.match(body, /Sous-chef requested-work: [a-f0-9]{64}/);
   assert.ok(body.endsWith(`Sous-chef requested-state: ${first.state_fingerprint}`));
