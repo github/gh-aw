@@ -10,7 +10,13 @@ permissions:
   issues: read
   pull-requests: read
   actions: read
-engine: claude
+  copilot-requests: write
+engine:
+  id: claude
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
 timeout-minutes: 30
 tools:
   github:
