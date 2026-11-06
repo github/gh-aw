@@ -610,8 +610,13 @@ describe("native creation Claim delivery", () => {
     }
   });
 
-  it.each(["create_discussion", "create_pull_request"])("settles %s through the actual manager verifier and publishes a protected Result", async type => {
+  it.each(
+    ["create_discussion", "create_pull_request"].flatMap(type =>
+      [{}, { output_id: "so_xbzi2dhGSY-3" }, { "depends-on": "so_priorOutput1" }, { output_id: "so_xbzi2dhGSY-3", "depends-on": "so_priorOutput1" }].map(metadata => ({ type, metadata }))
+    )
+  )("settles $type with submission metadata $metadata through the actual manager verifier and publishes a protected Result", async ({ type, metadata }) => {
     const f = fixture(type);
+    Object.assign(f.message, metadata);
     await f.execute(async () => {
       await f.capture();
       expect(closeClaimEffectChannel()).toBeDefined();
@@ -622,6 +627,18 @@ describe("native creation Claim delivery", () => {
     const finalized = await f.finalize();
     expect(finalized.claims.h1.state).toBe("result");
     expect(f.queue.state.works.get(f.member.work_id).barrier).toBe("verified");
+  });
+
+  it.each(["create_discussion", "create_pull_request"])("rejects undeclared %s fields even with submission metadata", async type => {
+    const f = fixture(type);
+    Object.assign(f.message, { output_id: "so_xbzi2dhGSY-3", "depends-on": "so_priorOutput1", unexpected_transport_field: "untrusted" });
+    await f.execute(async () => {
+      await f.capture();
+      expect((await f.settle()).verification).toBe("unknown");
+    });
+    expect(f.client.graphql).not.toHaveBeenCalled();
+    expect(f.client.rest.pulls.get).not.toHaveBeenCalled();
+    expect(f.queue.state.works.get(f.member.work_id).barrier).toBe("pending");
   });
 
   it("settles the enriched PR message emitted by the safe-output transport", async () => {
