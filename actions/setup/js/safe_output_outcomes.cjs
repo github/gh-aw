@@ -85,8 +85,7 @@ function buildSafeOutputOutcomes(results, staged = false) {
     const items = fanout ? (record.result.length ? record.result : [undefined]) : [record.result];
     return items.map(result => {
       const item = fanout ? { ...record, result, success: record.success === false ? false : (result?.success ?? record.success), ...(record.result.length ? {} : { skipped: true }) } : record;
-      let status = classifySafeOutputResult(item);
-      if (status === "success" && pickOutcomeField(item, "deferred_manifest")) status = "deferred";
+      const status = classifySafeOutputResult(item);
       const isStaged = staged || pickOutcomeField(item, "staged") === true;
       const url = !isStaged && (status === "success" || status === "warning") ? RESULT_URL_FIELDS.map(field => canonicalSafeOutputUrl(result?.[field])).find(Boolean) : undefined;
       return {
@@ -129,6 +128,7 @@ function finalizeBufferedReviewOutcomes(results, repo, prNumber, review) {
       if (index >= 0) {
         const [comment] = comments.splice(index, 1);
         result.deferred_manifest = false;
+        result.buffered = false;
         result.url = comment.url || review.review_url;
       } else if (completeComments) {
         record.skipped = true;
