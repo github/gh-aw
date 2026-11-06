@@ -11,6 +11,7 @@ permissions:
   pull-requests: read
   actions: read
   copilot-requests: write
+max-ai-credits: 250
 engine:
   id: claude
   model-provider: github
