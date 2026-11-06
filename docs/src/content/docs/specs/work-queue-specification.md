@@ -1456,6 +1456,54 @@ revision's availability without moving the current route. Admission freezes
 `admission_contract` from the approved logical contract when the caller omits
 an explicit contract. Retries retain it and any `execution_ref` pin.
 
+An activating `Deployment` MAY also carry `contract_routes`, an object mapping
+exact admission-contract SHA256 digests to registered immutable revisions, bounded
+to 4,096 entries. Availability-only updates MUST NOT change this map. The map
+replaces prior retained routes atomically; an absent field preserves them for
+legacy deployment records. References MUST already belong to the same installed
+worker profile and match their exact contract. Checkpoints MUST bind the map to
+authenticated deployment receipts and retain it unchanged.
+
+Protected synchronization MUST automatically derive these routes for available or
+claimed unpinned Work whose contract differs from the prospective default contract.
+Select the exact bridge for each required contract approved in the verified
+default revision's `.github/aw/work-queue-contract-routes.json`. Its version-1
+closed manifest maps workflow paths and contract digests to immutable revisions
+and binds both `work_queue_replay.cjs` and `work_queue_deployment.cjs` to reviewed
+SHA256 digests. An arbitrary older matching revision MUST NOT win. Recheck every
+selected retained revision's exact source, compiler stamp, native registration,
+and reader implementation digests
+before publishing activation and availability in one atomic transition. On a CAS
+loss or changed contract requirements, discard the proposal and recompute it.
+
+An availability-only `Deployment` with `register: true` MAY register a bridge
+before activation within that same atomic request. Native verification MUST bind
+it to the exact protected manifest, validate unchanged installed profile authority,
+verify its compiled contract and active registration, and check both readers.
+Absent this explicit flag, historical registration remains forbidden. Before
+publication, verify reader digests for every available default route, runnable
+available Work (including exact pins), and unreleased assignment. Incompatible
+immutable readers block publication; pins and assignments MUST NOT be retargeted.
+Manifest absence preserves legacy synchronization without new routing fields.
+
+Reader requirements MUST retain workflow identity as well as revision. Verify the
+compiled lock actually loads the approved repository readers: a pinned
+same-repository checkout at the execution revision (or its exact trigger SHA),
+at the checkout root, immediately followed by local `./actions/setup`. Reject
+external/release setup, alternate checkout identity/path/ref, or intervening
+script/action loaders. Matching files at an unrelated revision is insufficient
+runtime provenance.
+
+Scheduling MUST use the current default revision for its matching admission
+contract, an explicitly retained route for a different admission contract, or the
+unchanged explicit `execution_ref` pin. Every selected revision MUST remain
+available and exactly match `admission_contract`. Missing routes remain
+`worker_incompatible`; unavailable selected routes remain `worker_unavailable`
+without searching for another historical fallback. Routing MUST NOT mutate Work,
+consume service before a grant, reinterpret frozen assignments, or relax failed
+and pending delivery barriers. Upgrade closed-schema consumers before publishing
+the new optional field.
+
 Only protected producer/dispatcher adapters or authorized operators may derive
 deployment operations; workers, reconcilers, projectors and agent wire intents
 cannot. Protected adapters synchronize their approved targets only before new
@@ -1479,6 +1527,11 @@ worker; permission, rate-limit, service and transport errors MUST propagate
 instead of publishing unavailable defaults. Bounded deployment models assume
 approved code and verified host evidence; contract equality alone does not
 discharge that host premise.
+
+The retained-contract routing extension has native/runtime regression and
+checkpoint-parity coverage. Existing bounded `WorkerEvolution` and
+`WorkerDeploymentBoundary` models do not model this new route map; their earlier
+results are not formal verification of automatic mixed-contract routing.
 
 #### Operational controls are not policy resets
 

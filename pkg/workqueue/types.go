@@ -182,15 +182,17 @@ type WorkerProfile struct {
 
 // Deployment changes execution routes, never the installed scheduling policy.
 type DeploymentOperation struct {
-	Kind             string        `json:"kind"`
-	Pool             string        `json:"pool"`
-	WorkerProfile    string        `json:"worker_profile"`
-	ExpectedRef      string        `json:"expected_ref"`
-	ExpectedContract string        `json:"expected_contract"`
-	Profile          WorkerProfile `json:"profile"`
-	Available        bool          `json:"available"`
-	Activate         *bool         `json:"activate,omitempty"`
-	Reason           string        `json:"reason"`
+	Kind             string             `json:"kind"`
+	Pool             string             `json:"pool"`
+	WorkerProfile    string             `json:"worker_profile"`
+	ExpectedRef      string             `json:"expected_ref"`
+	ExpectedContract string             `json:"expected_contract"`
+	Profile          WorkerProfile      `json:"profile"`
+	Available        bool               `json:"available"`
+	Activate         *bool              `json:"activate,omitempty"`
+	ContractRoutes   *map[string]string `json:"contract_routes,omitempty"`
+	Register         bool               `json:"register,omitempty"`
+	Reason           string             `json:"reason"`
 }
 
 type WorkerRevision struct {
@@ -202,6 +204,7 @@ type WorkerDeployment struct {
 	CurrentRef      string                    `json:"current_ref"`
 	CurrentContract string                    `json:"current_contract"`
 	Revisions       map[string]WorkerRevision `json:"revisions"`
+	ContractRoutes  map[string]string         `json:"contract_routes,omitempty"`
 }
 
 type RetryPolicy struct {

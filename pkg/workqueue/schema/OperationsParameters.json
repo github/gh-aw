@@ -270,6 +270,12 @@
         "available": {
           "type": "boolean"
         },
+        "contract_routes": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Revision"
+          },
+          "type": "object"
+        },
         "expected_contract": {
           "$ref": "#/$defs/Digest"
         },
@@ -287,6 +293,9 @@
         },
         "reason": {
           "$ref": "#/$defs/ReasonCode"
+        },
+        "register": {
+          "type": "boolean"
         },
         "worker_profile": {
           "$ref": "#/$defs/Identity"

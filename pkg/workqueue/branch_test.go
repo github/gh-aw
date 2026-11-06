@@ -52,6 +52,9 @@ type queueAPI struct {
 	settingsStatus       int
 	sources              map[string]string
 	workerRoutes         map[string]string
+	workerRevisions      map[string]string
+	bridgeApproval       string
+	bridgeReaders        map[string]string
 	workerStatuses       map[string]int
 	workerStates         map[string]string
 	defaultRef           string
@@ -222,6 +225,23 @@ func (mock *queueAPI) serve(t *testing.T, w http.ResponseWriter, r *http.Request
 		} else {
 			respond(map[string]any{"type": "file", "path": strings.TrimPrefix(path, "contents/"), "encoding": "base64", "content": base64.StdEncoding.EncodeToString([]byte(content))})
 		}
+	case r.Method == http.MethodGet && path == "contents/"+contractBridgeManifest:
+		if mock.bridgeApproval == "" {
+			fail(404)
+			break
+		}
+		respond(map[string]any{"type": "file", "path": contractBridgeManifest, "encoding": "base64", "content": base64.StdEncoding.EncodeToString([]byte(mock.bridgeApproval))})
+	case r.Method == http.MethodGet && strings.HasPrefix(path, "contents/actions/setup/js/"):
+		readerPath := strings.TrimPrefix(path, "contents/")
+		content, exists := mock.bridgeReaders[readerPath]
+		if !exists {
+			fail(404)
+			break
+		}
+		if override, found := mock.bridgeReaders[readerPath+"\n"+r.URL.Query().Get("ref")]; found {
+			content = override
+		}
+		respond(map[string]any{"type": "file", "path": readerPath, "encoding": "base64", "content": base64.StdEncoding.EncodeToString([]byte(content))})
 	case r.Method == http.MethodGet && strings.HasPrefix(path, "contents/.github/workflows/"):
 		mock.workerReads++
 		mock.workerRef = r.URL.Query().Get("ref")
@@ -243,6 +263,9 @@ func (mock *queueAPI) serve(t *testing.T, w http.ResponseWriter, r *http.Request
 		}
 		content := mock.workerContent
 		if route, exists := mock.workerRoutes[workerPath]; exists {
+			content = route
+		}
+		if route, exists := mock.workerRevisions[workerPath+"\n"+mock.workerRef]; exists {
 			content = route
 		}
 		if content == "" {

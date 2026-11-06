@@ -244,6 +244,8 @@ model DeploymentOperation {
   profile: WorkerProfile;
   available: boolean;
   activate?: boolean;
+  register?: boolean;
+  contract_routes?: Record<Revision>;
   reason: ReasonCode;
 }
 @jsonSchema

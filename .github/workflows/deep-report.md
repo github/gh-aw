@@ -61,6 +61,7 @@ safe-outputs:
     expires: 2d
     title-prefix: "[deep-report] "
     deduplicate-by-title: 28
+    deduplicate-by-labels: [automation, improvement, quick-win, cookie, code-quality, task-mining]
     labels: [automation, improvement, quick-win, cookie, code-quality, task-mining]
     max: 7
     group: true

@@ -62,6 +62,7 @@ import "embed"
 //go:embed js/work_queue_read_retry.cjs
 //go:embed js/work_queue_expiration.cjs
 //go:embed js/work_queue_deployment.cjs js/work_queue_deployment_control.cjs
+//go:embed js/work_queue_contract_bridges.cjs
 //go:embed js/work_queue_git_tree_adapter.cjs js/work_queue_graphql_adapter.cjs js/work_queue_rest_adapter.cjs
 //go:embed js/work_queue_graph.cjs js/work_queue_limits.cjs js/work_queue_scheduler.cjs js/work_queue_yaml.cjs js/work_queue_expiration.cjs
 //go:embed js/work_queue_indexes.cjs

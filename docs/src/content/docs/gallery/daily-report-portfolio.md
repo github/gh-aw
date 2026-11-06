@@ -75,23 +75,38 @@ Use the [queue reference](/gh-aw/reference/work-queue/) for scheduling, cancella
 ### Recover incompatible routes without rewriting Work
 
 Start with read-only `stats`, `explain --pool daily-reports`, and
-`inspect --work-id ID`. `worker_incompatible` means the selected deployed worker's
-logical contract differs from the Work's immutable admission contract; it does not
-mean the worker failed or a new attempt should be launched.
+`inspect --work-id ID`. These reads never install deployments or alter Work.
 
 DeepReport keeps its original title-deduplication contract for admitted reports.
 Adding label-scoped deduplication changes which auxiliary issues can be created,
 so it changes the authority contract even when the labels themselves are unchanged.
-Restore compatible source and regenerate its lock before an operator explicitly
-deploys the reviewed default-branch revision. Before restoring an older contract,
-inspect every unfinished Work for that profile: Work already admitted under the
-newer contract would become incompatible. Settle those newer-contract items under
-their current deployment first, and coordinate admission so no new-contract Work
-is admitted during the transition. A failed delivery is not settlement.
-Source publication alone does not
-update the installed route. Do not edit admission contracts, clear the queue, or
-fall back to an arbitrary historical worker revision. Introduce intentional
-incompatible semantics only with a separate migration for existing Work.
+
+Protected producer/dispatcher processing automatically installs contract-specific
+routes when adopting a verified default revision. The default route serves new
+admissions and compatible Work. For each different contract still needed by
+unpinned available or claimed Work, synchronization selects the reviewed bridge
+approved at the immutable default revision and rechecks its exact source, compiled
+stamp, native registration, and queue-reader digests before publishing. It does not choose an arbitrary
+historical revision. Operators use the same mechanism through `deploy --from-config`.
+
+Both old- and new-contract Work can therefore progress without manually ordering
+them, pausing admission, or rewriting admission contracts. Explicit execution pins
+and existing assignments stay frozen. An unavailable retained route blocks only
+its matching Work; synchronization never searches for an older fallback to bypass
+unavailability. Failed or pending delivery remains blocked regardless of routes.
+Source publication alone does not update the installed route, and observers never
+perform synchronization. Upgrade queue readers before adopting deployment records
+with `contract_routes`; Older closed-schema readers reject those records. The protected
+`.github/aw/work-queue-contract-routes.json` manifest approves exact workflow,
+contract and bridge revisions plus SHA256 digests of both queue readers.
+Synchronization registers bridges and installs the default and retained routes
+atomically across selected targets. All available default routes, runnable pinned
+Work and unreleased assignments must load the approved reader ABI first. Frozen
+old pins or assignments cannot be upgraded in place; migration fails without
+publishing anything until those exact readers are compatible or settle normally.
+Bridge publication itself performs no live queue mutation or effect retry.
+Keep the approved bridge commit reachable when merging; squash or rebase changes
+its identity and must not discard the manifest's exact revision.
 
 ### Recover failed delivery without replaying effects
 

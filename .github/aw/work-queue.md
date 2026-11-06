@@ -51,6 +51,18 @@ Compatible deployments need no drain. Never expose queue-write credentials to
 agents/snapshot MCP. Repository access rules are GitHub's responsibility.
 See [deployment](../../docs/src/content/docs/patterns/workqueue-ops.md#deploy-a-native-queue).
 
+Protected deployment synchronization automatically retains exact contract routes
+for differently admitted available/claimed Work. It selects the exact bridge
+approved at the immutable default ref in `.github/aw/work-queue-contract-routes.json`,
+rechecks its source/stamp/registration and both reader digests,
+and publishes bridge registration, route and availability together. No manual admission pause or ordering
+is needed. Pins and frozen Claims never change; unavailable retained routes pause
+only affected Work without older fallback. Upgrade closed-schema readers before
+adopting `Deployment.contract_routes`. Observer reads never install routes.
+Migration verifies all available defaults, runnable pins and unreleased assignment
+readers before publication. An incompatible immutable pin or active assignment
+blocks the transition; never rewrite it or replay effects.
+
 ## Mirror admitted Work with Issues
 
 `aw.json` `work_queue.issues: true` mirrors admitted Work with purple `work` /

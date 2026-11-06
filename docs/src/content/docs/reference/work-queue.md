@@ -69,6 +69,33 @@ Compatible worker updates affect future execution without draining the queue. Co
 
 Protected producer/dispatcher processing synchronizes approved routes from the verified default-branch revision. Operators use `deploy --from-config`, optionally with `--pool` or `--worker-profile`. To pin Work, use `submit-work --execution-ref IMMUTABLE_SHA` or a submission node's `execution_ref`; changing the pin requires new Work.
 
+Synchronization automatically retains a contract-specific route for each different
+admission contract still needed by available or claimed unpinned Work. It selects
+the exact bridge approved by the immutable default revision's
+`.github/aw/work-queue-contract-routes.json`, verifies its immutable
+source, compiled contract, native registration and approved reader digests, then publishes `contract_routes`
+and availability together. New admissions follow the default revision; old Work
+keeps its exact authority without a manual drain or admission pause. Explicit pins,
+frozen assignments, delivery barriers and fairness debt are unchanged. An
+unavailable retained route pauses affected Work without choosing an older fallback.
+Older closed-schema readers must be upgraded before these deployment records are
+adopted. Available default routes, runnable pins and unreleased assignments are
+checked together before publication; an old immutable reader blocks migration
+rather than being silently retargeted. Bridge registration and route activation
+are one atomic transition.
+Keep approved bridge commits reachable. Preserve their commit identities when
+merging, or maintain a durable reviewed repository ref; a squash or rebase alone
+does not preserve a manifest's immutable bridge revision. An initial all-target
+`deploy --from-config` can upgrade available defaults together; a narrower
+transition is rejected if an unselected available default still uses old readers.
+
+Reader approval is checked against each workflow and revision's actual compiled
+loader, not merely files found at that revision. This migration supports a pinned
+same-repository checkout at the workflow revision followed by local
+`./actions/setup`. External or release-mode setup loaders, alternate checkout
+repositories/refs/paths and intervening script loaders are rejected rather than
+assuming their readers are compatible.
+
 Worker dispatch uses verified tags named `gh-aw/work-queue/<SHA>`. The trusted dispatch credential needs `actions: write` and `contents: write` for tag creation. Tags are never overwritten or deleted by the queue; repository writers must not mutate tags in use. A launch sends at most one dispatch POST: an uncertain response does not authorize another launch.
 
 ## Workflow roles and intent tools

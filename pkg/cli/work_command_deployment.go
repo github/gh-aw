@@ -41,25 +41,35 @@ func workRunDeployCommand(cmd *cobra.Command, _ []string) error {
 	}
 	pool, _ := cmd.Flags().GetString("pool")
 	worker, _ := cmd.Flags().GetString("worker-profile")
-	if existing, ok := state.Requests[requestID]; ok {
-		return workRecoverDeployment(cmd, branch, actor, existing, pool, worker)
+	for attempt := range 3 {
+		if existing, ok := state.Requests[requestID]; ok {
+			return workRecoverDeployment(cmd, branch, actor, existing, pool, worker)
+		}
+		operations, err := branch.DeploymentOperationsFromConfig(cmd.Context(), state, pool, worker)
+		if err != nil {
+			return err
+		}
+		if len(operations) == 0 {
+			return workPrint(cmd, workqueue.Publication{Changed: false}, "Selected worker deployments are already current")
+		}
+		request, err := workqueue.NewRequest(requestID, "deployment", actor, workqueue.OperationsParameters{Operations: operations})
+		if err != nil {
+			return err
+		}
+		published, err := branch.Publish(cmd.Context(), actor, request)
+		if err == nil {
+			return workPrint(cmd, published, fmt.Sprintf("Updated %d worker deployments without changing scheduling policy", len(operations)))
+		}
+		var protocol *workqueue.ProtocolError
+		if !errors.As(err, &protocol) || protocol.Code != "deployment_conflict" || attempt == 2 {
+			return err
+		}
+		state, err = workRead(cmd)
+		if err != nil {
+			return err
+		}
 	}
-	operations, err := branch.DeploymentOperationsFromConfig(cmd.Context(), state, pool, worker)
-	if err != nil {
-		return err
-	}
-	if len(operations) == 0 {
-		return workPrint(cmd, workqueue.Publication{Changed: false}, "Selected worker deployments are already current")
-	}
-	request, err := workqueue.NewRequest(requestID, "deployment", actor, workqueue.OperationsParameters{Operations: operations})
-	if err != nil {
-		return err
-	}
-	published, err := branch.Publish(cmd.Context(), actor, request)
-	if err != nil {
-		return err
-	}
-	return workPrint(cmd, published, fmt.Sprintf("Updated %d worker deployments without changing scheduling policy", len(operations)))
+	return errors.New("deployment_conflict: deployment could not converge after three refreshed proposals")
 }
 
 func workRecoverDeployment(cmd *cobra.Command, branch workqueue.Branch, actor workqueue.Actor, existing workqueue.QueueCommit, pool, worker string) error {

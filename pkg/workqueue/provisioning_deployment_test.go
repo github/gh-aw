@@ -69,6 +69,9 @@ func TestNativeDeploymentFromConfigPausesOnlyAffectedTargets(t *testing.T) {
 				".github/workflows/beta.lock.yml":  stampedWorker(strings.Repeat("b", 64)),
 			}
 			betaRoute := ".github/workflows/beta.lock.yml"
+			mock.workerRevisions = map[string]string{
+				betaRoute + "\n" + strings.Repeat("e", 40): stampedWorker(strings.Repeat("b", 64)),
+			}
 			switch scenario {
 			case "incompatible":
 				mock.workerRoutes[betaRoute] = stampedWorker(strings.Repeat("c", 64))
@@ -86,12 +89,13 @@ func TestNativeDeploymentFromConfigPausesOnlyAffectedTargets(t *testing.T) {
 				t.Fatalf("per-target availability blocked the whole registry: %v", err)
 			}
 			for route, reads := range mock.routeReads {
-				if reads != 1 {
+				expectedReads := 1
+				if reads != expectedReads {
 					t.Fatalf("inherited pool repeated compiled route reads: %s %d", route, reads)
 				}
 			}
 			for _, ref := range mock.configRefs {
-				if ref != strings.Repeat("f", 40) {
+				if ref != strings.Repeat("f", 40) && (scenario != "incompatible" || ref != strings.Repeat("e", 40)) {
 					t.Fatalf("deployment trusted moving or ambient source revision: %s", ref)
 				}
 			}

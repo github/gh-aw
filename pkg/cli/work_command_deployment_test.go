@@ -84,15 +84,17 @@ func TestWorkCommandDeployFromConfig(t *testing.T) {
 					result = map[string]any{"full_name": repository, "default_branch": "main", "permissions": map[string]bool{"push": true, "admin": scenario != "not administrator"}}
 				case r.Method == http.MethodGet && path == "git/ref/heads/main":
 					result = map[string]any{"ref": "refs/heads/main", "object": map[string]string{"sha": defaultRevision}}
+				case r.Method == http.MethodGet && path == "contents/.github/aw/work-queue-contract-routes.json":
+					status, result = http.StatusNotFound, map[string]string{"message": "Not Found"}
 				case r.Method == http.MethodGet && path == "contents/.github/workflows/worker.md":
 					sourceReads++
-					if r.URL.Query().Get("ref") != defaultRevision {
+					if ref := r.URL.Query().Get("ref"); ref != defaultRevision && (scenario != "incompatible" || ref != profile.Ref) {
 						t.Error("deployment source read was not pinned to the default revision")
 					}
 					result = file(".github/workflows/worker.md", "---\ntools:\n  work-queue:\n    worker: true\n---\nWorker")
 				case r.Method == http.MethodGet && path == "contents/.github/workflows/worker.lock.yml":
 					artifactReads++
-					if r.URL.Query().Get("ref") != defaultRevision {
+					if ref := r.URL.Query().Get("ref"); ref != defaultRevision && (scenario != "incompatible" || ref != profile.Ref) {
 						t.Error("deployment artifact read was not pinned to the default revision")
 					}
 					if scenario == "missing artifact" {
@@ -101,7 +103,11 @@ func TestWorkCommandDeployFromConfig(t *testing.T) {
 					}
 					content := "on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\n"
 					if scenario != "missing stamp" {
-						content += "env:\n  GH_AW_WORK_QUEUE_CONTRACT: \"" + contract + "\"\n"
+						artifactContract := contract
+						if r.URL.Query().Get("ref") == profile.Ref {
+							artifactContract = profile.LogicalContract
+						}
+						content += "env:\n  GH_AW_WORK_QUEUE_CONTRACT: \"" + artifactContract + "\"\n"
 					}
 					result = file(".github/workflows/worker.lock.yml", content)
 				case r.Method == http.MethodGet && path == "actions/workflows/worker.lock.yml":

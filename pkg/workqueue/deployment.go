@@ -84,12 +84,26 @@ func (state *Projection) applyDeployment(operation Operation) error {
 	if prior, exists := deployment.Revisions[profile.Ref]; exists && prior.Profile != profile {
 		return queueError("deployment_invalid", "immutable worker revision cannot change its logical contract or authority")
 	}
-	if _, exists := deployment.Revisions[profile.Ref]; !activate && !exists {
+	if update.Register && (activate || update.ContractRoutes != nil) {
+		return queueError("deployment_invalid", "bridge registration requires an availability-only operation")
+	}
+	if _, exists := deployment.Revisions[profile.Ref]; !activate && !exists && !update.Register {
 		return queueError("deployment_invalid", "availability updates require an existing immutable revision")
+	}
+	if update.ContractRoutes != nil {
+		if !activate {
+			return queueError("deployment_invalid", "contract routes require a default-revision activation")
+		}
+		if err := validateContractRoutes(*update.ContractRoutes, deployment.Revisions); err != nil {
+			return err
+		}
 	}
 	deployment.Revisions[profile.Ref] = WorkerRevision{Profile: profile, Available: update.Available}
 	if activate {
 		deployment.CurrentRef, deployment.CurrentContract = profile.Ref, profile.LogicalContract
+		if update.ContractRoutes != nil {
+			deployment.ContractRoutes = maps.Clone(*update.ContractRoutes)
+		}
 	}
 	return nil
 }
@@ -125,6 +139,8 @@ func (state Projection) executionProfile(work *WorkState) (WorkerProfile, string
 	ref := deployment.CurrentRef
 	if work.ExecutionRef != "" {
 		ref = work.ExecutionRef
+	} else if work.AdmissionContract != deployment.CurrentContract && deployment.ContractRoutes[work.AdmissionContract] != "" {
+		ref = deployment.ContractRoutes[work.AdmissionContract]
 	}
 	revision, exists := deployment.Revisions[ref]
 	if !exists || !revision.Available {

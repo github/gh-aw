@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"strings"
 
@@ -55,13 +56,22 @@ func (b Branch) DeploymentOperationsFromConfig(ctx context.Context, state Projec
 		return nil, err
 	}
 	b.Remote = repository
+	approval, err := b.approvedContractBridges(ctx, revision)
+	if err != nil {
+		return nil, err
+	}
 	builder := nativeDeploymentBuilder{
-		branch: b, state: state, routes: map[string]nativeDeploymentRoute{}, operations: []Operation{},
+		branch: b, state: state, routes: map[string]nativeDeploymentRoute{}, operations: []Operation{}, approval: approval,
 	}
 	policy := FuturePolicy(state)
 	for _, target := range selected {
 		current := policy.Pools[target.Pool].Profiles[target.WorkerProfile]
 		if err := builder.updateTarget(ctx, target, current, revision); err != nil {
+			return nil, err
+		}
+	}
+	if approval != nil && len(builder.operations) != 0 {
+		if err := b.verifyProspectiveBridgeReaders(ctx, state, approval, builder.operations); err != nil {
 			return nil, err
 		}
 	}
@@ -74,10 +84,12 @@ type nativeDeploymentRoute struct {
 }
 
 type nativeDeploymentBuilder struct {
-	branch     Branch
-	state      Projection
-	routes     map[string]nativeDeploymentRoute
-	operations []Operation
+	branch               Branch
+	state                Projection
+	routes               map[string]nativeDeploymentRoute
+	operations           []Operation
+	proposedAvailability map[string]bool
+	approval             *contractBridgeApproval
 }
 
 type nativeDeploymentCursor struct {
@@ -121,15 +133,76 @@ func (builder *nativeDeploymentBuilder) updateTarget(ctx context.Context, target
 	cursor := nativeDeploymentCursor{
 		target: target, expectedRef: deployment.CurrentRef, expectedContract: deployment.CurrentContract,
 	}
-	if profile != prior.Profile || available != prior.Available {
-		if err := builder.appendUpdate(&cursor, profile, available, true); err != nil {
+	routes := map[string]string{}
+	if builder.approval == nil && len(deployment.ContractRoutes) != 0 {
+		return queueError("deployment_invalid", "installed contract routes require protected bridge approval; do not remove the migration manifest")
+	}
+	var routeUpdate *map[string]string
+	if builder.approval != nil {
+		routes, err = bridgeContractRoutes(builder.state, target.Pool, target.WorkerProfile, profile, builder.approval)
+		if err != nil {
+			return err
+		}
+		copy := *deployment
+		copy.Revisions = maps.Clone(deployment.Revisions)
+		deployment = &copy
+		if err := builder.registerContractBridges(ctx, &cursor, profile, deployment, routes); err != nil {
+			return err
+		}
+		routeUpdate = &routes
+	}
+	if profile != prior.Profile || available != prior.Available || !sameJSON(routes, deployment.ContractRoutes) && (len(routes) != 0 || len(deployment.ContractRoutes) != 0) {
+		if err := builder.appendUpdateWithRoutes(&cursor, profile, available, true, routeUpdate); err != nil {
 			return err
 		}
 	}
-	return builder.refreshPins(ctx, &cursor, deployment)
+	if err := builder.refreshPins(ctx, &cursor, deployment, routes); err != nil {
+		return err
+	}
+	if len(builder.operations) > builder.state.Policy.Limits.Operations {
+		return queueError("resource_limit", "bridge migration exceeds the atomic operation limit")
+	}
+	return nil
+}
+
+func (builder *nativeDeploymentBuilder) registerContractBridges(ctx context.Context, cursor *nativeDeploymentCursor, profile WorkerProfile, deployment *WorkerDeployment, routes map[string]string) error {
+	for _, contract := range sortedSettingsKeys(routes) {
+		ref := routes[contract]
+		bridge := profile
+		bridge.Ref, bridge.LogicalContract = ref, contract
+		checked, available, err := builder.resolvedProfile(ctx, bridge, ref)
+		if err != nil {
+			return err
+		}
+		_, registered := deployment.Revisions[ref]
+		if checked != bridge || !available && !registered {
+			return queueError("deployment_invalid", "approved contract bridge must have its exact source, contract and active native registration")
+		}
+		if err := builder.branch.verifyBridgeReaders(ctx, builder.approval, ref, bridge.Workflow); err != nil {
+			return err
+		}
+		if !registered {
+			update := DeploymentOperation{
+				Kind: "Deployment", Pool: cursor.target.Pool, WorkerProfile: cursor.target.WorkerProfile,
+				ExpectedRef: cursor.expectedRef, ExpectedContract: cursor.expectedContract,
+				Profile: bridge, Available: true, Activate: new(bool), Register: true, Reason: "contract_bridge",
+			}
+			operation, err := Op(update)
+			if err != nil {
+				return err
+			}
+			builder.operations = append(builder.operations, operation)
+			deployment.Revisions[ref] = WorkerRevision{Profile: bridge, Available: true}
+		}
+	}
+	return validateContractRoutes(routes, deployment.Revisions)
 }
 
 func (builder *nativeDeploymentBuilder) appendUpdate(cursor *nativeDeploymentCursor, profile WorkerProfile, available, activate bool) error {
+	return builder.appendUpdateWithRoutes(cursor, profile, available, activate, nil)
+}
+
+func (builder *nativeDeploymentBuilder) appendUpdateWithRoutes(cursor *nativeDeploymentCursor, profile WorkerProfile, available, activate bool, routes *map[string]string) error {
 	reason := "worker_deployed"
 	if !available {
 		reason = "worker_unavailable"
@@ -137,7 +210,7 @@ func (builder *nativeDeploymentBuilder) appendUpdate(cursor *nativeDeploymentCur
 	update := DeploymentOperation{
 		Kind: "Deployment", Pool: cursor.target.Pool, WorkerProfile: cursor.target.WorkerProfile,
 		ExpectedRef: cursor.expectedRef, ExpectedContract: cursor.expectedContract,
-		Profile: profile, Available: available, Reason: reason,
+		Profile: profile, Available: available, Reason: reason, ContractRoutes: routes,
 	}
 	if !activate {
 		update.Activate = &activate
@@ -156,14 +229,8 @@ func (builder *nativeDeploymentBuilder) appendUpdate(cursor *nativeDeploymentCur
 	return nil
 }
 
-func (builder *nativeDeploymentBuilder) refreshPins(ctx context.Context, cursor *nativeDeploymentCursor, deployment *WorkerDeployment) error {
-	pins := map[string]struct{}{}
-	for _, work := range builder.state.Works {
-		if work.State == "available" && work.Pool == cursor.target.Pool && work.WorkerProfile == cursor.target.WorkerProfile &&
-			work.ExecutionRef != "" && work.ExecutionRef != cursor.expectedRef {
-			pins[work.ExecutionRef] = struct{}{}
-		}
-	}
+func (builder *nativeDeploymentBuilder) refreshPins(ctx context.Context, cursor *nativeDeploymentCursor, deployment *WorkerDeployment, routes map[string]string) error {
+	pins := retainedDeploymentRefs(builder.state, cursor.target.Pool, cursor.target.WorkerProfile, cursor.expectedRef, routes)
 	for _, ref := range sortedSettingsKeys(pins) {
 		historical := deployment.Revisions[ref]
 		key := historical.Profile.Workflow + "\n" + ref
@@ -254,14 +321,37 @@ func (b Branch) verifyNativeDeploymentEvidence(ctx context.Context, state Projec
 	if err := json.Unmarshal(request.Parameters, &parameters); err != nil {
 		return err
 	}
+	proposedAvailability := map[string]bool{}
+	for _, operation := range parameters.Operations {
+		var update DeploymentOperation
+		if err := json.Unmarshal(operation, &update); err != nil {
+			return err
+		}
+		proposedAvailability[update.Pool+"\n"+update.WorkerProfile+"\n"+update.Profile.Ref] = update.Available
+	}
 	repository, defaultRevision, err := b.verifiedDefaultReference(ctx)
 	if err != nil {
 		return err
 	}
 	b.Remote = repository
-	builder := nativeDeploymentBuilder{branch: b, routes: map[string]nativeDeploymentRoute{}}
+	approval, err := b.approvedContractBridges(ctx, defaultRevision)
+	if err != nil {
+		return err
+	}
+	if approval != nil {
+		if err := b.verifyProspectiveBridgeReaders(ctx, state, approval, parameters.Operations); err != nil {
+			return err
+		}
+	}
+	state = cloneDeploymentState(state)
+	builder := nativeDeploymentBuilder{branch: b, state: state, routes: map[string]nativeDeploymentRoute{}, proposedAvailability: proposedAvailability, approval: approval}
+	return builder.verifyOperations(ctx, parameters.Operations, defaultRevision)
+}
+
+func (builder *nativeDeploymentBuilder) verifyOperations(ctx context.Context, operations []Operation, defaultRevision string) error {
+	state := builder.state
 	expected := map[string][2]string{}
-	for _, operation := range parameters.Operations {
+	for _, operation := range operations {
 		var update DeploymentOperation
 		if err := json.Unmarshal(operation, &update); err != nil {
 			return err
@@ -289,7 +379,13 @@ func (b Branch) verifyNativeDeploymentEvidence(ctx context.Context, state Projec
 		if err := builder.verifyUpdate(ctx, deployment, current, update, defaultRevision); err != nil {
 			return err
 		}
+		if update.Register {
+			deployment.Revisions[profile.Ref] = WorkerRevision{Profile: profile, Available: update.Available}
+		}
 		if update.Activate == nil || *update.Activate {
+			if builder.approval != nil && update.ContractRoutes == nil {
+				return queueError("deployment_invalid", "approved bridge migration requires the exact contract route map")
+			}
 			expected[key] = [2]string{profile.Ref, profile.LogicalContract}
 		} else {
 			expected[key] = prior
@@ -300,16 +396,25 @@ func (b Branch) verifyNativeDeploymentEvidence(ctx context.Context, state Projec
 
 func (builder *nativeDeploymentBuilder) verifyUpdate(ctx context.Context, deployment *WorkerDeployment, current WorkerProfile, update DeploymentOperation, defaultRevision string) error {
 	if update.Activate == nil || *update.Activate {
-		profile, available, err := builder.resolvedProfile(ctx, current, defaultRevision)
+		return builder.verifyActivation(ctx, deployment, current, update, defaultRevision)
+	}
+	revision, exists := deployment.Revisions[update.Profile.Ref]
+	if update.Register {
+		if builder.approval == nil || builder.approval.Routes[update.Profile.Workflow][update.Profile.LogicalContract] != update.Profile.Ref {
+			return queueError("deployment_invalid", "bridge registration requires exact protected default-ref approval")
+		}
+		if err := builder.branch.verifyBridgeReaders(ctx, builder.approval, update.Profile.Ref, update.Profile.Workflow); err != nil {
+			return err
+		}
+		checked, available, err := builder.resolvedProfile(ctx, update.Profile, update.Profile.Ref)
 		if err != nil {
 			return err
 		}
-		if update.Profile != profile || update.Available != available {
-			return queueError("deployment_invalid", "activation requires the verified default revision's AW worker contract and exact native availability; refresh with deploy --from-config")
+		if checked != update.Profile || !available || !update.Available {
+			return queueError("deployment_invalid", "bridge registration requires exact active compiled authority")
 		}
 		return nil
 	}
-	revision, exists := deployment.Revisions[update.Profile.Ref]
 	if !exists || revision.Profile != update.Profile {
 		return queueError("deployment_invalid", "availability-only updates require an already registered immutable worker revision")
 	}
@@ -321,6 +426,44 @@ func (builder *nativeDeploymentBuilder) verifyUpdate(ctx context.Context, deploy
 	available := result.available && result.contract == profile.LogicalContract
 	if update.Available != available {
 		return queueError("deployment_invalid", "historical availability must match the registered immutable worker's compiler contract and native availability")
+	}
+	return nil
+}
+
+func (builder *nativeDeploymentBuilder) verifyActivation(ctx context.Context, deployment *WorkerDeployment, current WorkerProfile, update DeploymentOperation, defaultRevision string) error {
+	profile, available, err := builder.resolvedProfile(ctx, current, defaultRevision)
+	if err != nil {
+		return err
+	}
+	if update.Profile != profile || update.Available != available {
+		return queueError("deployment_invalid", "activation requires the verified default revision's AW worker contract and exact native availability; refresh with deploy --from-config")
+	}
+	if update.ContractRoutes == nil {
+		return nil
+	}
+	if builder.approval == nil {
+		return queueError("deployment_invalid", "contract routing requires reviewed default-ref bridge approval")
+	}
+	routes, err := bridgeContractRoutes(builder.state, update.Pool, update.WorkerProfile, profile, builder.approval)
+	if err != nil {
+		return err
+	}
+	if !sameJSON(routes, *update.ContractRoutes) {
+		return queueError("deployment_conflict", "contract routes changed; recompute the protected bridge mappings for unfinished Work")
+	}
+	for ref := range retainedDeploymentRefs(builder.state, update.Pool, update.WorkerProfile, profile.Ref, routes) {
+		historical := deployment.Revisions[ref]
+		result, err := builder.checkedRoute(ctx, historical.Profile, ref, historical.Profile.Workflow+"\n"+ref)
+		if err != nil {
+			return err
+		}
+		expected := historical.Available
+		if proposed, exists := builder.proposedAvailability[update.Pool+"\n"+update.WorkerProfile+"\n"+ref]; exists {
+			expected = proposed
+		}
+		if expected != (result.available && result.contract == historical.Profile.LogicalContract) {
+			return queueError("deployment_conflict", "retained worker availability changed; refresh the immutable deployment evidence")
+		}
 	}
 	return nil
 }

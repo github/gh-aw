@@ -54,7 +54,7 @@ async function readWorkerFile({ githubClient, owner, repo, path, ref, sleepFn })
     file = (await readQueueMetadata(() => metadataRequest(request => githubClient.rest.repos.getContent({ owner, repo, path, ref, request })), log, "worker.file.read", sleepFn))?.data;
   } catch (error) {
     if (error?.status !== 404) throw error;
-    throw queueError("policy_missing", "approved worker route cannot be verified at its immutable revision");
+    throw Object.assign(queueError("policy_missing", "approved worker route cannot be verified at its immutable revision"), { status: 404 });
   }
   if (!isRecord(file) || file.type !== "file" || file.path !== path || file.encoding !== "base64" || typeof file.content !== "string") throw queueError("policy_missing", "approved worker route is not an exact immutable workflow file");
   if (file.content.length > Math.ceil(MAX_WORKFLOW_BYTES / 3) * 4 + 65536) throw queueError("policy_missing", "approved worker route content exceeds the bounded workflow limit");
@@ -176,4 +176,4 @@ async function verifyWorkerRoutes({ githubClient, owner, repo, policy }) {
     }
 }
 
-module.exports = { MAX_WORKFLOW_BYTES, verifyWorkerRoute, verifyWorkerRoutes, workerContract, verifiedDefaultReference, configuredWorkerDeployment };
+module.exports = { MAX_WORKFLOW_BYTES, verifyWorkerRoute, verifyWorkerRoutes, workerContract, verifiedDefaultReference, configuredWorkerDeployment, readWorkerFile, parsedWorkflow };

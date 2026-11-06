@@ -47,7 +47,10 @@ const {
 const OP_FIELDS = {
   Policy: [["kind", "epoch", "policy"], []],
   PoolInstall: [["kind", "pool", "config"], ["config_ref"]],
-  Deployment: [["kind", "pool", "worker_profile", "expected_ref", "expected_contract", "profile", "available", "reason"], ["activate"]],
+  Deployment: [
+    ["kind", "pool", "worker_profile", "expected_ref", "expected_contract", "profile", "available", "reason"],
+    ["activate", "contract_routes", "register"],
+  ],
   Control: [["kind", "control", "value", "reason"], []],
   Work: [
     ["kind", "work_id", "graph_id", "node_key", "pool", "priority", "fairness_key", "worker_profile", "batch_trust_domain", "payload", "depends_on", "enqueued"],
