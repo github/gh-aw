@@ -18,6 +18,9 @@ func TestStepReferenceExpressions(t *testing.T) {
 	}{
 		{"missing dot", "steps.PRIVATE_VALUE.outputs.value", true},
 		{"missing bracket", "steps['PRIVATE_VALUE']['outputs']['value']", true},
+		{"missing dot with non-empty fallback", "steps.PRIVATE_VALUE.outputs.value || 'fallback'", false},
+		{"missing dot with empty fallback", "steps.PRIVATE_VALUE.outputs.value || ''", true},
+		{"missing dot with non-literal fallback", "steps.PRIVATE_VALUE.outputs.value || inputs.fallback", true},
 		{"case insensitive", "STEPS['PrOdUcEr'].outputs.external", false},
 		{"external output", "steps.producer.outputs.not_declared", false},
 		{"step object", "toJSON(steps.PRIVATE_VALUE)", true},

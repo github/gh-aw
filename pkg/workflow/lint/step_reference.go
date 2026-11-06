@@ -134,13 +134,15 @@ func checkStepReferenceBlock(ctx context.Context, block aw.ExecutionBlock, autho
 			return nil
 		}
 		visit := func(_, _, _ int, node actionlint.ExprNode) error {
+			fallbacks := stepReferenceFallbackNodes(node, ids)
 			actionlint.VisitExprNode(node, func(child, _ actionlint.ExprNode, entering bool) {
 				if !entering || ctx.Err() != nil {
 					return
 				}
 				id, literal := stepReferenceID(child)
 				_, alreadyReported := reported[path]
-				if _, exists := ids[strings.ToLower(id)]; literal && !exists && !alreadyReported {
+				_, hasFallback := fallbacks[child]
+				if _, exists := ids[strings.ToLower(id)]; literal && !exists && !alreadyReported && !hasFallback {
 					reported[path] = struct{}{}
 					diagnostics = append(diagnostics, Diagnostic{
 						Path: path, Message: "Step expression references an unknown step; use a step ID declared in the same job",
@@ -160,6 +162,33 @@ func checkStepReferenceBlock(ctx context.Context, block aw.ExecutionBlock, autho
 		return taint.VisitInterpolations(ctx, text, path, visit)
 	})
 	return diagnostics, err
+}
+
+func stepReferenceFallbackNodes(node actionlint.ExprNode, ids map[string]struct{}) map[actionlint.ExprNode]struct{} {
+	fallbacks := make(map[actionlint.ExprNode]struct{})
+	actionlint.VisitExprNode(node, func(child, _ actionlint.ExprNode, entering bool) {
+		if !entering {
+			return
+		}
+		logical, ok := child.(*actionlint.LogicalOpNode)
+		if !ok || logical.Kind != actionlint.LogicalOpNodeKindOr {
+			return
+		}
+		fallback, ok := logical.Right.(*actionlint.StringNode)
+		if !ok || fallback.Value == "" {
+			return
+		}
+		actionlint.VisitExprNode(logical.Left, func(candidate, _ actionlint.ExprNode, nestedEntering bool) {
+			if !nestedEntering {
+				return
+			}
+			id, literal := stepReferenceID(candidate)
+			if _, exists := ids[strings.ToLower(id)]; literal && !exists {
+				fallbacks[candidate] = struct{}{}
+			}
+		})
+	})
+	return fallbacks
 }
 
 func stepReferenceAgentMetadataPath(jobPath, path string) bool {
