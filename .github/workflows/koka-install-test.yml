@@ -1,0 +1,136 @@
+name: Koka Installation Test
+
+on:
+  push:
+    paths:
+      - '.github/aw/formal-methods.md'
+      - '.github/workflows/koka-install-test.yml'
+      - '.github/workflows/shared/koka.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  koka:
+    name: Install and check Koka on Ubuntu x64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout instructions
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Extract documented installation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import re
+          import textwrap
+
+          guide = Path(".github/aw/formal-methods.md").read_text()
+          section = guide.split("## Install Koka in GitHub Actions\n", 1)[1]
+          section = section.split("\n## Establish the model\n", 1)[0]
+          setup, = re.findall(r"```yaml\n(.*?)\n```", section, re.S)
+          install = textwrap.dedent(setup.split("  run: |\n", 1)[1])
+          shared = Path(".github/workflows/shared/koka.md").read_text()
+          frontmatter = shared.split("---\n", 2)[1]
+          shared_install = textwrap.dedent(frontmatter.split("    run: |\n", 1)[1])
+          shared_install = "\n".join(
+              line for line in shared_install.splitlines()
+              if not line.startswith("# runner-guard:")
+          )
+          if shared_install.strip() != install.strip():
+              raise ValueError("Shared Koka setup differs from the documented installation")
+          temporary = Path(os.environ["RUNNER_TEMP"])
+          (temporary / "install-koka.sh").write_text(install + "\n")
+          PY
+
+      - name: Run documented installation
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash "$RUNNER_TEMP/install-koka.sh" 2>&1 | tee "$RUNNER_TEMP/koka-install.log"
+
+      - name: Compile and run an effect handler
+        shell: bash
+        run: |
+          set -euo pipefail
+          koka --version | tee "$RUNNER_TEMP/koka-version.log"
+          grep -F 'Koka 3.2.9' "$RUNNER_TEMP/koka-version.log"
+          results=/tmp/gh-aw/agent/koka-results
+          mkdir -p "$results"
+          cat > "$results/smoke.kk" <<'KOKA'
+          effect fun answer() : int
+
+          fun handled-answer() : int
+            with fun answer() 42
+            answer()
+
+          pub fun main()
+            assert("handler returns 42", handled-answer() == 42)
+            println("koka smoke: ok")
+          KOKA
+          cd "$results"
+          timeout 2m /tmp/gh-aw/agent/koka/bin/koka \
+            --output="$results/smoke" smoke.kk \
+            2>&1 | tee "$RUNNER_TEMP/koka-compile.log"
+          timeout 30s "$results/smoke" 2>&1 | tee "$RUNNER_TEMP/koka-smoke.log"
+          grep -Fx 'koka smoke: ok' "$RUNNER_TEMP/koka-smoke.log"
+
+      - name: Reject an unhandled effect
+        shell: bash
+        run: |
+          set -euo pipefail
+          results=/tmp/gh-aw/agent/koka-results
+          cat > "$results/unhandled.kk" <<'KOKA'
+          effect fun answer() : int
+
+          fun unhandled-answer() : int
+            answer()
+
+          pub fun main()
+            println(unhandled-answer())
+          KOKA
+          cd "$results"
+          set +e
+          timeout 2m /tmp/gh-aw/agent/koka/bin/koka \
+            --output="$results/unhandled" unhandled.kk \
+            > "$RUNNER_TEMP/koka-unhandled.log" 2>&1
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/koka-unhandled.log"
+          test "$status" -eq 1
+          grep -F 'type error: effects do not match' "$RUNNER_TEMP/koka-unhandled.log"
+          grep -E 'expected effect: *total' "$RUNNER_TEMP/koka-unhandled.log"
+          printf 'Expected unhandled-effect rejection: exit %s\n' "$status"
+
+      - name: Summarize evidence
+        if: always()
+        shell: bash
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          {
+            printf '## Koka installation and effect checks\n\n'
+            printf 'Result: **%s**\n\n' "$JOB_STATUS"
+            printf 'Runner: Ubuntu 24.04 x64; compiler: Koka 3.2.9.\n\n'
+            printf 'The job executes the installation extracted from `.github/aw/formal-methods.md` and keeps its smoke fixtures in the workflow.\n'
+            printf 'Success requires checksum verification, native C compilation, handler execution, and rejection of an unhandled effect.\n'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: koka-installation-evidence
+          path: |
+            ${{ runner.temp }}/koka-*.log
+            /tmp/gh-aw/agent/koka-results/*.kk
+          retention-days: 7
+          if-no-files-found: error
