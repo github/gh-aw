@@ -110,6 +110,29 @@ func TestCurrentWikiGitCredentialIdentity(t *testing.T) {
 	}
 }
 
+func TestTrialWithoutLogicalRepositoryGitCredentialIdentity(t *testing.T) {
+	c := NewCompiler()
+	c.trialMode = true
+	data := &WorkflowData{
+		CheckoutConfigs: []*CheckoutConfig{{Wiki: true}},
+		SafeOutputs:     &SafeOutputsConfig{CreatePullRequests: &CreatePullRequestsConfig{}},
+	}
+	checkout := strings.Join(NewCheckoutManager(data.CheckoutConfigs).GenerateDefaultCheckoutStep(true, "", func(action string) string {
+		return action
+	}), "")
+	require.NotContains(t, checkout, "repository:")
+	for name, steps := range map[string][]string{
+		"agent":        c.generateGitConfigurationStepsForData(data),
+		"safe outputs": c.buildSharedPRCheckoutSteps(data),
+	} {
+		t.Run(name, func(t *testing.T) {
+			content := strings.Join(steps, "")
+			require.Contains(t, content, "GH_AW_GIT_REPOSITORY: ${{ github.repository }}\n")
+			require.NotContains(t, content, ".wiki")
+		})
+	}
+}
+
 func TestCredentialCheckoutDashPath(t *testing.T) {
 	for _, expression := range []bool{false, true} {
 		for _, oldPWDSet := range []bool{false, true} {

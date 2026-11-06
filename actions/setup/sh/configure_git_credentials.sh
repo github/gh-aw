@@ -96,7 +96,23 @@ TOKEN="${GITHUB_TOKEN:-${GIT_TOKEN:-}}"
 
 # Do not discover a parent checkout when this directory has no checkout of its own.
 # Git worktrees and submodules use a .git file rather than a directory.
-if { [ ! -d .git ] && [ ! -f .git ]; } || ! ORIGINAL_URLS=$(git config --get-all remote.origin.url 2>/dev/null); then
+if [ ! -d .git ] && [ ! -f .git ]; then
+  echo "Git configured with standard GitHub Actions identity" >&2
+  exit 0
+fi
+
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "Git checkout configuration could not be read; check repository ownership, safe.directory, and Git configuration. Remote URLs are omitted to protect credentials." >&2
+  exit 1
+fi
+if ORIGINAL_URLS=$(git config --get-all remote.origin.url 2>/dev/null); then
+  :
+else
+  CONFIG_STATUS=$?
+  if [ "${CONFIG_STATUS}" -ne 1 ]; then
+    echo "Git checkout configuration could not be read; remote URL omitted to protect credentials." >&2
+    exit 1
+  fi
   echo "Git configured with standard GitHub Actions identity" >&2
   exit 0
 fi

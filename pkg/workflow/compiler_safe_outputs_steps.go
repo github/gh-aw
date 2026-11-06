@@ -35,8 +35,11 @@ func (c *Compiler) buildSharedPRCheckoutSteps(data *WorkflowData) []string {
 	checkoutMgr, prCheckoutToken := prepareSharedPRCheckout(data)
 	steps, condition := c.buildSharedPRCheckoutLayout(data, checkoutMgr)
 	rootRepo := checkoutMgr.effectiveRootCheckoutRepository()
-	if c.trialMode && c.trialLogicalRepoSlug != "" && !checkoutMgr.HasExternalRootCheckout() {
-		rootRepo = fmt.Sprintf("%q", c.trialLogicalRepoSlug)
+	if c.trialMode && !checkoutMgr.HasExternalRootCheckout() {
+		rootRepo = "${{ github.repository }}"
+		if c.trialLogicalRepoSlug != "" {
+			rootRepo = fmt.Sprintf("%q", c.trialLogicalRepoSlug)
+		}
 	}
 	steps = append(steps, checkoutMgr.generateConfigureGitCredentialsStepsForRoot(prCheckoutToken, condition, rootRepo)...)
 	c.prCheckoutLintBlock = preparePRCheckoutLintBlock(steps, c.formatFrameworkJobRunsOn(data))

@@ -118,6 +118,16 @@ describe("configure_git_credentials.sh repository identity", () => {
     expect(git("remote")).toBe("");
   });
 
+  it("does not mistake an untrusted checkout for a missing origin", () => {
+    const configPath = path.join(target, ".git", "config");
+    const configBefore = fs.readFileSync(configPath, "utf8");
+    const result = runScript({ ...env, GIT_TEST_ASSUME_DIFFERENT_OWNER: "1" }, target);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("Git checkout configuration could not be read");
+    expect(result.stdout + result.stderr).not.toContain("test-token");
+    expect(fs.readFileSync(configPath, "utf8")).toBe(configBefore);
+  });
+
   it.each([true, false])("skips a directory without its own checkout with authentication=%s", authenticate => {
     fs.rmSync(path.join(target, ".git"), { recursive: true });
     const result = runScript({ ...env, GITHUB_TOKEN: authenticate ? "test-token" : "" }, target);

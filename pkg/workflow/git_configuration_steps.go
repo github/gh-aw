@@ -35,7 +35,7 @@ func (c *Compiler) generateGitConfigurationStepsForData(data *WorkflowData) []st
 	if currentPath == "" {
 		// No current checkout in a subdirectory — use the standard workspace-root behaviour.
 		rootRepo := checkoutMgr.effectiveRootCheckoutRepository()
-		if c.trialMode && c.trialLogicalRepoSlug != "" && !checkoutMgr.HasExternalRootCheckout() {
+		if c.trialMode && !checkoutMgr.HasExternalRootCheckout() {
 			rootRepo = c.trialLogicalRepoSlug
 		}
 		return c.generateGitConfigurationStepsWithToken(token, rootRepo)
