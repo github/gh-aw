@@ -994,9 +994,10 @@ function sortMessagesByTemporaryIdDependencies(messages) {
  * @param {Map<string, Function>} messageHandlers - Map of message handler functions
  * @param {Array<Object>} messages - Array of safe output messages
  * @param {((item: {type: string, url?: string, number?: number, repo?: string, temporaryId?: string}) => void)|null} [onItemCreated] - Optional callback invoked after each successful create operation (for manifest logging)
+ * @param {((results: Array<any>) => Promise<void>)|null} [finalizeBufferedOutputs] - Finalize buffered effects before resolving waiting dependencies
  * @returns {Promise<{success: boolean, results: Array<any>, temporaryIdMap: Object, artifactUrlMap: Map<string, string>, outputsWithUnresolvedIds: Array<any>, missings: Object, codePushFailures: Array<{type: string, error: string}>}>}
  */
-async function processMessages(messageHandlers, messages, onItemCreated = null) {
+async function processMessages(messageHandlers, messages, onItemCreated = null, finalizeBufferedOutputs = null) {
   if (readClaimScopeContext() && !currentClaimHandle()) {
     throw new Error("Queue safe outputs must execute in a trusted per-Claim handler context; use the scoped manager");
   }
@@ -1656,6 +1657,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
   }
 
   await retryDeferredMessages();
+  if (finalizeBufferedOutputs) await finalizeBufferedOutputs(results);
   for (const i of waitingMessages) {
     await processMessage(i, false);
   }
@@ -2289,63 +2291,66 @@ async function main(options = {}) {
     // even if no individual write fails.  The check is best-effort – failures are non-fatal.
     await checkRateLimitHeadroom(github, "safe_outputs_pre_check");
 
-    // Process all messages in order of appearance
-    const processingResult = await processMessages(messageHandlers, allMessages, logCreatedItem);
-    outcomeResults = processingResult.results;
-    await finalizeLedgerAppend(config, messageHandlers);
-
-    // Finalize buffered PR reviews — one review submission per distinct PR
-    const registryEntries = prReviewBufferRegistry.getAllEntries();
-    for (const { repo: reviewRepo, prNumber: reviewPrNum, buffer: reviewBuffer } of registryEntries) {
-      if (reviewBuffer.hasBufferedComments() || reviewBuffer.hasReviewMetadata()) {
-        core.info(`\n=== Finalizing PR Review for ${reviewRepo}#${reviewPrNum} ===`);
-        const bufferedCount = reviewBuffer.getBufferedCount();
-        if (bufferedCount > 0) {
-          core.info(`Submitting ${bufferedCount} buffered review comment(s) for ${reviewRepo}#${reviewPrNum}`);
-        } else {
-          core.info(`Submitting PR review for ${reviewRepo}#${reviewPrNum} (body-only, no inline comments)`);
-        }
-        /** @type {any} */
-        let reviewFailureError = null;
-        try {
-          await assertClaimAuthorized({ type: "submit_pull_request_review", claim_handle: currentClaimHandle(), repo: reviewRepo, pull_request_number: reviewPrNum });
-          const stalePRReason = await getStalePullRequestReason(github, context);
-          if (stalePRReason) {
-            core.info(stalePRReason);
-            skipReviewResultsForPR(processingResult.results, reviewRepo, reviewPrNum, stalePRReason);
-            continue;
+    // Finalize buffered PR reviews before releasing their dependent outputs.
+    /** @param {Array<any>} results */
+    async function finalizeBufferedReviews(results) {
+      const registryEntries = prReviewBufferRegistry.getAllEntries();
+      for (const { repo: reviewRepo, prNumber: reviewPrNum, buffer: reviewBuffer } of registryEntries) {
+        if (reviewBuffer.hasBufferedComments() || reviewBuffer.hasReviewMetadata()) {
+          core.info(`\n=== Finalizing PR Review for ${reviewRepo}#${reviewPrNum} ===`);
+          const bufferedCount = reviewBuffer.getBufferedCount();
+          if (bufferedCount > 0) {
+            core.info(`Submitting ${bufferedCount} buffered review comment(s) for ${reviewRepo}#${reviewPrNum}`);
+          } else {
+            core.info(`Submitting PR review for ${reviewRepo}#${reviewPrNum} (body-only, no inline comments)`);
           }
-          const reviewResult = await reviewBuffer.submitReview();
-          if (reviewResult.success && !reviewResult.skipped) {
-            finalizeBufferedReviewOutcomes(processingResult.results, reviewRepo, reviewPrNum, reviewResult);
-            logCreatedItemFromResult(logCreatedItem, "submit_pull_request_review", reviewResult);
-            logCreatedItemFromResult(
-              logCreatedItem,
-              "create_pull_request_review_comment",
-              reviewResult.review_comments?.map(comment => (comment && typeof comment === "object" ? { ...comment, success: true } : comment))
-            );
-            core.info(`✓ PR review submitted for ${reviewRepo}#${reviewPrNum}: ${reviewResult.review_url}`);
-          } else if (reviewResult.success && reviewResult.skipped) {
-            const skipReason = reviewResult.reason || `PR review for ${reviewRepo}#${reviewPrNum} skipped`;
-            core.warning(`⚠ ${skipReason}`);
-            if (reviewResult.pr_locked) {
-              core.setOutput("pr_locked", "true");
+          /** @type {any} */
+          let reviewFailureError = null;
+          try {
+            await assertClaimAuthorized({ type: "submit_pull_request_review", claim_handle: currentClaimHandle(), repo: reviewRepo, pull_request_number: reviewPrNum });
+            const stalePRReason = await getStalePullRequestReason(github, context);
+            if (stalePRReason) {
+              core.info(stalePRReason);
+              skipReviewResultsForPR(results, reviewRepo, reviewPrNum, stalePRReason);
+              continue;
             }
-            skipReviewResultsForPR(processingResult.results, reviewRepo, reviewPrNum, skipReason);
-          } else if (!reviewResult.success) {
-            reviewFailureError = reviewResult.error || `PR review finalization failed for ${reviewRepo}#${reviewPrNum}`;
-            core.error(`✗ Failed to submit PR review for ${reviewRepo}#${reviewPrNum}: ${reviewFailureError}`);
+            const reviewResult = await reviewBuffer.submitReview();
+            if (reviewResult.success && !reviewResult.skipped) {
+              finalizeBufferedReviewOutcomes(results, reviewRepo, reviewPrNum, reviewResult);
+              logCreatedItemFromResult(logCreatedItem, "submit_pull_request_review", reviewResult);
+              logCreatedItemFromResult(
+                logCreatedItem,
+                "create_pull_request_review_comment",
+                reviewResult.review_comments?.map(comment => (comment && typeof comment === "object" ? { ...comment, success: true } : comment))
+              );
+              core.info(`✓ PR review submitted for ${reviewRepo}#${reviewPrNum}: ${reviewResult.review_url}`);
+            } else if (reviewResult.success && reviewResult.skipped) {
+              const skipReason = reviewResult.reason || `PR review for ${reviewRepo}#${reviewPrNum} skipped`;
+              core.warning(`⚠ ${skipReason}`);
+              if (reviewResult.pr_locked) {
+                core.setOutput("pr_locked", "true");
+              }
+              skipReviewResultsForPR(results, reviewRepo, reviewPrNum, skipReason);
+            } else if (!reviewResult.success) {
+              reviewFailureError = reviewResult.error || `PR review finalization failed for ${reviewRepo}#${reviewPrNum}`;
+              core.error(`✗ Failed to submit PR review for ${reviewRepo}#${reviewPrNum}: ${reviewFailureError}`);
+            }
+          } catch (reviewError) {
+            reviewFailureError = getErrorMessage(reviewError);
+            core.error(`✗ Exception while submitting PR review for ${reviewRepo}#${reviewPrNum}: ${reviewFailureError}`);
           }
-        } catch (reviewError) {
-          reviewFailureError = getErrorMessage(reviewError);
-          core.error(`✗ Exception while submitting PR review for ${reviewRepo}#${reviewPrNum}: ${reviewFailureError}`);
-        }
 
-        if (reviewFailureError !== null) {
-          rollbackReviewResultsForPR(processingResult.results, reviewRepo, reviewPrNum, reviewFailureError);
+          if (reviewFailureError !== null) {
+            rollbackReviewResultsForPR(results, reviewRepo, reviewPrNum, reviewFailureError);
+          }
         }
       }
     }
+
+    // Process all messages in order of appearance
+    const processingResult = await processMessages(messageHandlers, allMessages, logCreatedItem, finalizeBufferedReviews);
+    outcomeResults = processingResult.results;
+    await finalizeLedgerAppend(config, messageHandlers);
 
     // Store collected missings in helper module for handlers to access
     if (processingResult.missings) {

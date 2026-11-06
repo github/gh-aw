@@ -287,6 +287,57 @@ describe("safe-output application outcomes", () => {
     expect(JSON.stringify(outcome)).not.toContain("PRIVATE");
   });
 
+  it.each(["success", "failed", "skipped", "staged"])("resolves a check depending on a buffered review after %s submission", async scenario => {
+    const pullRequest = { number: 1, state: "open", head: { sha: "abc123" }, user: { login: "review-author" } };
+    const summary = { addRaw: vi.fn().mockReturnThis(), write: vi.fn().mockResolvedValue(undefined) };
+    vi.stubGlobal("core", { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), error: vi.fn(), setOutput: vi.fn(), setFailed: vi.fn(), summary });
+    vi.stubGlobal("context", { eventName: "pull_request", repo: { owner: "org", repo: "repo" }, payload: { pull_request: pullRequest } });
+    const calls = [];
+    const createReview = vi.fn(async () => {
+      calls.push("review");
+      if (scenario === "failed") throw Object.assign(new Error("Review rejected"), { status: 422 });
+      return { data: { id: 5, html_url: "https://github.com/org/repo/pull/1#pullrequestreview-5" } };
+    });
+    const createCheck = vi.fn(async () => {
+      calls.push("check");
+      return { data: { id: 6, html_url: "https://github.com/org/repo/check-runs/6" } };
+    });
+    vi.stubGlobal("github", {
+      rest: {
+        rateLimit: { get: vi.fn().mockResolvedValue({ data: { resources: { core: { remaining: 5000, limit: 5000, reset: 0 } } } }) },
+        pulls: { get: vi.fn().mockResolvedValue({ data: { ...pullRequest, ...(scenario === "skipped" ? { state: "closed" } : {}) } }), listReviews: vi.fn().mockResolvedValue({ data: [] }), createReview },
+        checks: { create: createCheck },
+      },
+    });
+    vi.stubEnv("GH_AW_SAFE_OUTPUTS_STAGED", "false");
+    vi.stubEnv("GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG", JSON.stringify({ submit_pull_request_review: { staged: scenario === "staged" }, create_check_run: {} }));
+    vi.spyOn(fs, "mkdirSync").mockImplementation(() => undefined);
+    vi.spyOn(fs, "writeFileSync").mockImplementation(() => undefined);
+    const append = vi.spyOn(fs, "appendFileSync").mockImplementation(() => undefined);
+    await handlerManagerMain({
+      messages: [
+        { type: "submit_pull_request_review", output_id: "so_000000000001", pull_request_number: 1, body: "PRIVATE_REVIEW_BODY", event: "COMMENT" },
+        { type: "create_check_run", output_id: "so_000000000002", "depends-on": "so_000000000001", conclusion: "success", title: "Review complete", summary: "PRIVATE_CHECK_BODY" },
+      ],
+    });
+    const outcomesCall = append.mock.calls.find(([file]) => String(file).endsWith("safe-output-outcomes.jsonl"));
+    expect(outcomesCall).toBeDefined();
+    const outcomes = String(outcomesCall[1])
+      .trim()
+      .split("\n")
+      .map(line => JSON.parse(line));
+    if (scenario === "success") {
+      expect(calls).toEqual(["review", "check"]);
+      expect(global.core.setFailed).not.toHaveBeenCalled();
+      expect(outcomes.map(outcome => outcome.status)).toEqual(["success", "success"]);
+    } else {
+      expect(createCheck).not.toHaveBeenCalled();
+      expect(global.core.setFailed).toHaveBeenCalled();
+      expect(outcomes.find(outcome => outcome.type === "create_check_run").status).toBe("failed");
+    }
+    expect(JSON.stringify(outcomes)).not.toContain("PRIVATE");
+  });
+
   it("persists real processing results and collects root and Claim outcomes into the unified session", async () => {
     const root = fs.mkdtempSync(path.join(process.cwd(), ".safe-output-outcomes-test-"));
     vi.stubGlobal("core", { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), error: vi.fn(), setOutput: vi.fn(), setFailed: vi.fn() });

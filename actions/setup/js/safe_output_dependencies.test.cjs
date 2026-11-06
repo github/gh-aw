@@ -6,7 +6,7 @@ import { buildSafeOutputDependencyPlan, isConfirmedDependencySuccess } from "./s
 import { main as createActionHandler } from "./safe_output_action_handler.cjs";
 import { main as createCallWorkflowHandler } from "./call_workflow.cjs";
 import { createHandlers } from "./safe_outputs_handlers.cjs";
-import { buildSafeOutputOutcomes, projectSafeOutputData } from "./safe_output_outcomes.cjs";
+import { buildSafeOutputOutcomes, finalizeBufferedReviewOutcomes, projectSafeOutputData } from "./safe_output_outcomes.cjs";
 import { createSessionValidator } from "./scripts/validate_session.cjs";
 
 const id = index => `so_${String(index).padStart(12, "0")}`;
@@ -161,6 +161,46 @@ describe("safe-output runtime dependencies", () => {
     const result = await processMessages(new Map([["add_comment", handler]]), [message(3, id(2)), message(2, id(1)), message(1), message(4)]);
     expect(calls).toEqual([id(1), id(4), id(1), id(2), id(3)]);
     expect(result.results.every(item => item.success)).toBe(true);
+  });
+
+  it.each(["submit_pull_request_review", "create_pull_request_review_comment"])("waits for buffered %s submission before running a dependent check and its dependent", async type => {
+    const calls = [];
+    const review = vi.fn(async () => {
+      calls.push("buffer");
+      return { success: true, repo: "owner/repo", pull_request_number: 42, deferred_manifest: true, ...(type === "create_pull_request_review_comment" ? { buffered: true, metadata: { path: "file.js", line: 1, side: "RIGHT" } } : {}) };
+    });
+    const check = vi.fn(async () => {
+      calls.push("check");
+      return { success: true };
+    });
+    const comment = vi.fn(async () => {
+      calls.push("comment");
+      return { success: true };
+    });
+    const finalize = vi.fn(async results => {
+      calls.push("submit");
+      expect(check).not.toHaveBeenCalled();
+      finalizeBufferedReviewOutcomes(results, "owner/repo", 42, {
+        success: true,
+        review_url: "https://github.com/owner/repo/pull/42#pullrequestreview-1",
+        comment_count: 1,
+        review_comments: [{ metadata: { path: "file.js", line: 1, side: "RIGHT" } }],
+      });
+    });
+    const result = await processMessages(
+      new Map([
+        [type, review],
+        ["create_check_run", check],
+        ["add_comment", comment],
+      ]),
+      [message(1, undefined, type), message(2, id(1), "create_check_run"), message(3, id(2))],
+      null,
+      finalize
+    );
+    expect(calls).toEqual(["buffer", "submit", "check", "comment"]);
+    expect(finalize).toHaveBeenCalledOnce();
+    expect(result.results.every(item => item.success)).toBe(true);
+    expect(result.results[0].result.deferred_manifest).toBe(false);
   });
 
   it("retries a waiting dependent that itself defers, before releasing its dependent", async () => {

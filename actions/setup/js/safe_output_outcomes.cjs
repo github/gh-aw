@@ -129,6 +129,7 @@ function finalizeBufferedReviewOutcomes(results, repo, prNumber, review) {
       if (index >= 0) {
         const [comment] = comments.splice(index, 1);
         result.deferred_manifest = false;
+        result.buffered = false;
         result.url = comment.url || review.review_url;
       } else if (completeComments) {
         record.skipped = true;

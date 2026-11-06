@@ -150,7 +150,7 @@ function checkSafeOutputDependencies(plan, index, results, allowWaiting) {
     if (records.length > 1) return { state: "failed", errorCode: "safe_output_dependency_failed", error: "Ambiguous safe-output prerequisite result" };
     const record = records[0];
     if (isConfirmedDependencySuccess(record)) continue;
-    if (allowWaiting && (!record || classifySafeOutputResult(record) === "deferred")) {
+    if (allowWaiting && (!record || classifySafeOutputResult(record) === "deferred" || (record.success === true && pickOutcomeField(record, "deferred_manifest")))) {
       waiting = true;
       continue;
     }
