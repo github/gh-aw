@@ -67,15 +67,17 @@ jobs:
         run: |
           set -euo pipefail
           results=/tmp/gh-aw/agent/koka-results
+          cd "$results"
           set +e
           timeout 2m /tmp/gh-aw/agent/koka/bin/koka \
-            --output="$results/unhandled" "$results/unhandled.kk" \
+            --output="$results/unhandled" unhandled.kk \
             > "$RUNNER_TEMP/koka-unhandled.log" 2>&1
           status=$?
           set -e
           cat "$RUNNER_TEMP/koka-unhandled.log"
           test "$status" -eq 1
-          grep -Ei 'effect|total' "$RUNNER_TEMP/koka-unhandled.log"
+          grep -F 'type error: effects do not match' "$RUNNER_TEMP/koka-unhandled.log"
+          grep -E 'expected effect: *total' "$RUNNER_TEMP/koka-unhandled.log"
           printf 'Expected unhandled-effect rejection: exit %s\n' "$status"
 
       - name: Summarize evidence

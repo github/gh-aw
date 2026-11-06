@@ -109,14 +109,20 @@ Compile and execute separately so an installation check also exercises the
 standard library, C backend, linker, and handler behavior:
 
 ```bash
+set -euo pipefail
 KOKA_BIN=/tmp/gh-aw/agent/koka/bin/koka
 results=/tmp/gh-aw/agent/koka-results
 mkdir -p "$results"
-timeout 2m "$KOKA_BIN" --output="$results/smoke" "$results/smoke.kk"
+cd "$results"
+timeout 2m "$KOKA_BIN" --output="$results/smoke" smoke.kk
 timeout 30s "$results/smoke"
 ```
 
 The expected output is `koka smoke: ok`, with exit status zero for both commands.
+Run from the model directory so Koka can resolve its generated main module and
+local imports; passing an absolute source path from an unrelated directory can
+fail during main-module generation. Keep generated `.koka` files in the results
+directory too.
 For an intentional negative control, save this as `unhandled.kk`; compilation
 must fail because a function declared total cannot leave `answer` unhandled:
 
