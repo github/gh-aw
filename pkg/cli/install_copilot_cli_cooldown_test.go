@@ -32,7 +32,7 @@ func TestInstallCopilotCLIReleaseAgeRequiresJQ(t *testing.T) {
 			binDir := filepath.Join(dir, "bin")
 			prepareCopilotInstallerTestBin(t, binDir)
 			// Restrict PATH to installer prerequisites, deliberately excluding jq.
-			for _, name := range []string{"bash", "dirname", "mkdir", "id", "mktemp", "rm", "chown"} {
+			for _, name := range []string{"bash", "dirname", "mkdir", "id", "mktemp", "rm"} {
 				path, err := exec.LookPath(name)
 				require.NoError(t, err)
 				require.NoError(t, os.Symlink(path, filepath.Join(binDir, name)))
@@ -132,6 +132,7 @@ func TestInstallCopilotCLIReleaseAgeCooldown(t *testing.T) {
 case "$1" in "$RUNNER_TOOL_CACHE"/*) exec /usr/bin/find "$@" ;; *) exit 0 ;; esac
 `), 0o755))
 			require.NoError(t, os.WriteFile(filepath.Join(binDir, "sudo"), []byte(`#!/usr/bin/env bash
+if [ "${1:-}" = -n ]; then shift; fi
 if [ "${1:-}" = chown ]; then exit 0; fi
 exec "$@"
 `), 0o755))

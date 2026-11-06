@@ -37,7 +37,9 @@ Self-hosted runners may require `sudo` depending on the selected engine and conf
 
 - **AWF (Agentic Workflow Firewall)**: Runs rootless in the default network-isolation mode. Egress is enforced via Docker network topology — an internal Docker network (`awf-net`) with no internet route and a dual-homed Squid proxy as the sole egress path. No `sudo` and no `NET_ADMIN` are required on the runner for AWF in this mode. Container-level `iptables`, Squid proxy ACLs, and capability drops provide defense in depth, all managed inside the Docker daemon's domain.
 
-- **Copilot CLI install**: The `install_copilot_cli.sh` script runs as the runner user. By default it escalates via `sudo` for file operations (fixing `.copilot` directory ownership, cleaning stale chroot directories, and installing the Copilot binary to `/usr/local/bin`). Pass `--rootless` to the script to install to `~/.local/bin` without `sudo`, which is required on ARC pods with `allowPrivilegeEscalation: false`.
+- **Copilot CLI and external threat-detect installation**: Both installers automatically use `~/.local/bin` when the runner is neither root nor able to run `sudo -n true`. No topology setting is required for native no-sudo runners. The home and install directories must be writable; the installers expose the selected executables through `$GITHUB_PATH` so subsequent agent and detection steps find them. Root installs directly, and runners with passwordless sudo retain privileged installation to `/usr/local/bin`. ARC/DinD explicitly selects `--rootless`, even when sudo is available. Version pins, checksum verification, and Copilot's trusted toolcache policy are unchanged.
+
+`engine.command` skips standard Copilot installation only for the primary agent. External Copilot threat detection still installs and uses the standard `copilot` executable; it does not run the primary agent's custom command. A preinstalled executable on `PATH` does not skip either installer or its privilege checks. Copilot may reuse a compatible executable from the trusted Actions toolcache under the existing version/checksum policy.
 
 ## Runner HTTP proxy settings
 

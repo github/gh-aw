@@ -67,9 +67,18 @@ echo unverified >>"${SANDBOX_EXECUTION_LOG}"
 EOF
   cat >"${sandbox}/bin/sudo" <<'EOF'
 #!/usr/bin/env bash
+if [ "${SANDBOX_AUTO_PRIVILEGES:-false}" = true ]; then
+  echo "$*" >>"${SANDBOX_SUDO_LOG}"
+  exit 1
+fi
 echo 'rootless installation must not use sudo' >&2
 exit 1
 EOF
+  cat >"${sandbox}/bin/id" <<'EOF'
+#!/usr/bin/env bash
+case "$1" in -u) echo 12345 ;; -g) echo 31 ;; *) exit 1 ;; esac
+EOF
+  chmod +x "${sandbox}/bin/id"
   chmod +x "${sandbox}/bin/uname" "${sandbox}/bin/curl" "${sandbox}/bin/threat-detect" "${sandbox}/bin/sudo"
 
   local payload_hash
@@ -97,12 +106,17 @@ EOF
   : >"$github_path"
   : >"$github_output"
 
+  local privilege_args=(--rootless)
+  if [ "${AUTO_PRIVILEGES:-false}" = true ]; then privilege_args=(); fi
   RUN_OUTPUT=$(cd "$sandbox" && env PATH="${sandbox}/bin:${PATH}" HOME="${sandbox}/home" \
+    SANDBOX_AUTO_PRIVILEGES="${AUTO_PRIVILEGES:-false}" SANDBOX_SUDO_LOG="${sandbox}/sudo.log" \
     SANDBOX_URL_LOG="$url_log" SANDBOX_EXECUTION_LOG="$execution_log" GITHUB_PATH="$github_path" GITHUB_OUTPUT="$github_output" \
-    bash "$INSTALL_SCRIPT" v0.5.2 --rootless --artifact-base-url "$base_url" "${pin_args[@]}" "$@" 2>&1)
+    bash "$INSTALL_SCRIPT" v0.5.2 "${privilege_args[@]}" --artifact-base-url "$base_url" "${pin_args[@]}" "$@" 2>&1)
   RUN_STATUS=$?
   RUN_URLS=$(cat "$url_log")
   RUN_EXECUTIONS=$(cat "$execution_log")
+  RUN_PATHS=$(cat "$github_path")
+  RUN_SUDO_CALLS=$(cat "${sandbox}/sudo.log" 2>/dev/null || true)
   RUN_BINARY_PATH=$(sed -n 's/^binary-path=//p' "$github_output")
   RUN_EXPECTED_BINARY_PATH="${sandbox}/home/.local/bin/threat-detect"
   RUN_INSTALLED_EXECUTABLE=false
@@ -209,6 +223,20 @@ assert_failure_before_download "Darwin remains unsupported" "macOS is not a supp
   Darwin arm64 valid https://mirror.example.com/detector
 assert_failure_before_download "Unknown Linux architecture is rejected" "Unsupported Linux architecture" \
   Linux riscv64 valid https://mirror.example.com/detector
+
+AUTO_PRIVILEGES=true assert_success "Native UID 12345/GID 31 without passwordless sudo installs locally" \
+  Linux x86_64 valid https://mirror.example.com/detector
+if [ "$RUN_SUDO_CALLS" = "-n true" ] && grep -qF "${RUN_EXPECTED_BINARY_PATH%/*}" <<<"$RUN_PATHS"; then
+  pass "Automatic rootless installation only probes sudo and exports the local PATH"
+else
+  fail "Automatic rootless privilege and PATH policy" "sudo calls: ${RUN_SUDO_CALLS}; PATH: ${RUN_PATHS}"
+fi
+AUTO_PRIVILEGES=true run_installer Linux x86_64 tampered https://mirror.example.com/detector
+if [ "$RUN_STATUS" -ne 0 ] && [ -z "$RUN_BINARY_PATH" ] && ! grep -qF unverified <<<"$RUN_EXECUTIONS_AFTER_FAILURE"; then
+  pass "Automatic rootless installation preserves fail-closed checksum verification"
+else
+  fail "Automatic rootless checksum policy" "$RUN_OUTPUT"
+fi
 
 echo
 echo "Tests passed: $TESTS_PASSED"

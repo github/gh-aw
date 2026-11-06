@@ -5,7 +5,41 @@ package workflow
 import (
 	"strings"
 	"testing"
+
+	"github.com/github/gh-aw/pkg/constants"
+	"github.com/stretchr/testify/assert"
 )
+
+func TestNativeCustomCopilotCommandKeepsStandardExternalDetectorInstallation(t *testing.T) {
+	compiler := NewCompiler()
+	data := &WorkflowData{
+		AI: "copilot",
+		EngineConfig: &EngineConfig{
+			ID:      "copilot",
+			Command: "/opt/custom/copilot",
+		},
+		SafeOutputs: &SafeOutputsConfig{
+			ThreatDetection: &ThreatDetectionConfig{},
+		},
+	}
+	assert.False(t, isArcDindTopology(data))
+	for _, step := range NewCopilotEngine().GetInstallationSteps(data) {
+		assert.NotContains(t, strings.Join(step, "\n"), "install_copilot_cli.sh")
+	}
+	detection := buildExternalDetectorWorkflowData(data, "copilot")
+	assert.Empty(t, detection.EngineConfig.Command)
+	assert.Equal(t, "/opt/custom/copilot", data.EngineConfig.Command)
+	install := strings.Join(compiler.buildInstallDetectionEngineForExternalDetectorStep(data), "")
+	assert.Contains(t, install, "install_copilot_cli.sh")
+	assert.Contains(t, install, "--checksums-sha256 "+constants.DefaultCopilotChecksumsSHA256)
+	assert.Contains(t, install, "--prefer-toolcache")
+	assert.Contains(t, strings.Join(compiler.buildInstallThreatDetectStep(data), ""), "install_threat_detect_binary.sh")
+	execution := strings.Join(compiler.buildExternalDetectorExecutionStep(data), "")
+	assert.Contains(t, execution, `command -v copilot`)
+	assert.Contains(t, execution, `cp "$GH_AW_COPILOT_SRC" "$GH_AW_COPILOT_BIN"`)
+	assert.True(t, containsExternalDetectorCopilotPathPrefix(execution))
+	assert.NotContains(t, execution, "/opt/custom/copilot")
+}
 
 func TestExternalDetectorExecutionStepIncludesThreatDetectionContext(t *testing.T) {
 	compiler := NewCompiler()

@@ -13,8 +13,8 @@ set +o histexpand
 #                resolves the version via compat.json (using GH_AW_COMPILED_VERSION) and
 #                falls back to DEFAULT_COPILOT_VERSION baked into this script.
 #   --rootless - Install to ~/.local/bin without sudo; appends that directory to
-#                $GITHUB_PATH so subsequent steps find the binary.  Use this on
-#                ARC/DinD runners that enforce allowPrivilegeEscalation: false.
+#                $GITHUB_PATH so subsequent steps find the binary. Selected
+#                automatically when neither root nor passwordless sudo is available.
 #   --checksums-sha256 - Independently trusted SHA256SUMS.txt digest for VERSION.
 #                       Requires a literal release version; bypasses toolcache unless
 #                       --prefer-toolcache is also supplied.
@@ -128,21 +128,14 @@ case "$COPILOT_GUEST_LIBC" in
     ;;
 esac
 
-# In rootless mode, install into the user's home directory instead of /usr/local/bin
-# so that ARC/DinD runners with allowPrivilegeEscalation: false can run without sudo.
+# shellcheck source=actions/setup/sh/install_privileges.sh
+source "${SCRIPT_DIR}/install_privileges.sh"
+configure_install_privileges
+
+# In rootless mode, install into the user's home directory instead of /usr/local/bin.
 if [ "$ROOTLESS" = "true" ]; then
   INSTALL_DIR="${HOME}/.local/bin"
 fi
-
-# maybe_sudo runs a command with sudo unless --rootless was specified.
-# In rootless mode, sudo is not available or needed.
-maybe_sudo() {
-  if [ "$ROOTLESS" = "true" ]; then
-    "$@"
-  else
-    sudo "$@"
-  fi
-}
 
 # Rootless mode preflight: create and verify write access to the install directory.
 if [ "$ROOTLESS" = "true" ]; then
