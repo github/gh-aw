@@ -68,23 +68,30 @@ class PRSpecificationReviewerTests(unittest.TestCase):
         self.assertIn("A missing or truncated patch is not proof of conformance", self.text)
         self.assertIn("report_incomplete", self.prompt)
 
-    def test_spec_patch_is_scoped_to_triggering_pr_and_documents(self):
-        push = self.config["push_to_pull_request_branch"]
-        self.assertEqual(push["target"], "triggering")
-        self.assertEqual(
-            push["allowed_files"],
-            [
-                "specs/*.md",
-                "docs/src/content/docs/specs/*.md",
-                "docs/src/content/docs/experimental/experiments-specification.md",
-            ],
-        )
-        self.assertFalse(push["fallback_as_pull_request"])
-        self.assertEqual(push["protected_files_policy"], "blocked")
-        self.assertEqual(push["if_no_changes"], "error")
-        self.assertEqual(push["max_patch_size"], 512)
+    def test_spec_proposals_are_comment_only_and_document_scoped(self):
+        self.assertNotIn("push_to_pull_request_branch", self.config)
+        self.assertNotIn("push-to-pull-request-branch:", self.frontmatter)
+        self.assertNotIn("  edit:", self.frontmatter)
         self.assertNotIn("GH_AW_CI_TRIGGER_TOKEN", self.lock)
-        self.assertIn("Limit edits to five existing", self.text)
+        safe_outputs_job = re.search(
+            r"^  safe_outputs:\n(.*?)(?=^  [a-zA-Z_][\w-]*:\n|\Z)",
+            self.lock,
+            re.MULTILINE | re.DOTALL,
+        )
+        self.assertIsNotNone(safe_outputs_job)
+        self.assertNotIn("contents: write", safe_outputs_job.group(1))
+        self.assertIn("Limit proposals to five existing", self.text)
+        for path in (
+            "specs/*.md",
+            "docs/src/content/docs/specs/*.md",
+            "docs/src/content/docs/experimental/experiments-specification.md",
+        ):
+            self.assertIn(path, self.prompt)
+        self.assertIn("safeoutputs create_pull_request_review_comment", self.text)
+        self.assertIn("exact proposed replacement text", self.text)
+        self.assertIn("without a valid changed-line anchor belong in the overall review", self.text)
+        self.assertIn("Prioritize blocking findings within the shared six-comment limit", self.text)
+        self.assertIn("it must not edit files or publish safe outputs", self.text)
 
     def test_regressions_are_not_normalized_and_versions_stay_consistent(self):
         for guard in (
@@ -100,9 +107,11 @@ class PRSpecificationReviewerTests(unittest.TestCase):
         self.assertIn("git rev-parse HEAD", self.prompt)
         self.assertIn("Before any publication, re-read the PR state and head", self.text)
         self.assertIn("head differs from the captured SHA", self.text)
-        self.assertIn("For fork PRs, do not attempt branch writes", self.text)
+        self.assertIn("same comment-only publication for same-repository and fork PRs", self.text)
+        self.assertIn("Never write the PR branch or substitute credentials", self.text)
         self.assertIn("Never force-push or retry against a different head", self.text)
-        self.assertIn("acknowledges intent, not a successful push", self.text)
+        self.assertIn("acknowledges intent, not a successfully published review comment", self.text)
+        self.assertIn("specification updates as proposed, never applied or synchronized", self.text)
 
     def test_reviews_are_bounded_and_clean_noops_do_not_create_issues(self):
         review = self.config["submit_pull_request_review"]

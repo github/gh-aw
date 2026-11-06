@@ -12,6 +12,8 @@ var issueHandlerRegistry = map[string]handlerBuilder{
 			AddIfTrue("require_temporary_id", c.RequireTemporaryID).
 			AddStringSlice("allowed_labels", c.AllowedLabels).
 			AddStringSlice("allowed_fields", c.AllowedFields).
+			AddDefault("max_issue_artifacts", c.maxIssueArtifacts()).
+			AddDefault("max_issue_artifact_size", c.maxIssueArtifactSize()).
 			AddStringSlice("allowed_repos", c.AllowedRepos).
 			AddIfPositive("expires", c.Expires).
 			AddStringSlice("labels", c.Labels).

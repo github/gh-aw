@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { performance } from "node:perf_hooks";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
@@ -10,7 +11,7 @@ const { createGitLedgerClient, gitEnvironment, queueLedgerClient, registerQueueL
 const { wrapGithubClient } = require("./work_queue_issue_pacing.cjs");
 const { readWorkQueueLog, publishWorkQueueRequest } = require("./work_queue_store.cjs");
 const { readCheckedQueue, writeCheckedFiles } = require("./work_queue_checked_transport.cjs");
-const { compactTransactions, newRequest, serializeTransactionLog } = require("./work_queue_replay.cjs");
+const { compactTransactions, newRequest, replayTransactions, serializeProjection, serializeTransactionLog } = require("./work_queue_replay.cjs");
 const { queueFixture } = require("./work_queue_lifecycle.test_helpers.cjs");
 const { context } = require("./work_queue_test_helpers.cjs");
 const { canonical } = require("./work_queue_codec.cjs");
@@ -20,7 +21,7 @@ afterEach(() => {
   for (const cleanup of cleanups.splice(0).reverse()) cleanup();
 });
 
-function fixture() {
+function fixture(options = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "queue-git-test-"));
   cleanups.push(() => fs.rmSync(directory, { recursive: true, force: true }));
   const env = gitEnvironment();
@@ -30,14 +31,29 @@ function fixture() {
       .trim();
   }
   git(["init", "--bare", "--quiet", "--initial-branch=main", "--template="]);
-  const queue = queueFixture({ count: 2, batch: 1 });
+  const queue = queueFixture({ count: 2, batch: 1, ...options });
   let head;
   let serial = 0;
   function store(transactions, { mode = "100644", parents = head ? [head] : [] } = {}) {
-    const blob = git(["hash-object", "-w", "--stdin"], transactions.map(commit => canonical(commit)).join("\n") + "\n");
+    const contents = typeof transactions === "string" ? transactions : transactions.map(commit => canonical(commit)).join("\n") + "\n";
+    const blob = git(["hash-object", "-w", "--stdin"], contents);
     const tree = git(["mktree"], `${mode} blob ${blob}\twork-queue.jsonl\n`);
     head = git(["commit-tree", tree, ...parents.flatMap(parent => ["-p", parent]), "-F", "-"], `Queue fixture ${++serial}`);
     git(["update-ref", "refs/heads/work-queue", head]);
+    return head;
+  }
+  function storeHistory(transactions, count) {
+    const contents = transactions.map(commit => canonical(commit) + "\n").join("");
+    const input = [`blob\nmark :1\ndata ${Buffer.byteLength(contents)}\n${contents}\n`];
+    for (let index = 0; index < count; index++) {
+      const message = `Queue fixture ${++serial}`;
+      input.push(
+        `commit refs/heads/work-queue\nmark :${index + 2}\ncommitter Queue fixture <queue-fixture@example.invalid> ${queue.at} +0000\ndata ${Buffer.byteLength(message)}\n${message}\nfrom ${index ? `:${index + 1}` : head}\nM 100644 :1 work-queue.jsonl\n\n`
+      );
+    }
+    input.push("done\n");
+    git(["fast-import", "--quiet"], input.join(""));
+    head = git(["rev-parse", "refs/heads/work-queue"]);
     return head;
   }
   store(queue.transactions);
@@ -58,7 +74,41 @@ function fixture() {
   const ledger = createGitLedgerClient({ githubClient, owner: "owner", repo: "repo", branch: "work-queue", remote: directory });
   registerQueueLedgerClient(githubClient, ledger);
   cleanups.push(() => ledger.close());
-  return { queue, githubClient, ledger, calls, networkCalls, store, git, options: { githubClient, owner: "owner", repo: "repo" }, head: () => head };
+  return { queue, githubClient, ledger, calls, networkCalls, store, storeHistory, git, options: { githubClient, owner: "owner", repo: "repo" }, head: () => head };
+}
+
+function performanceHistory({ generations = 4, commitsPerCheckpoint = 32, bound = false, corruptOldest = false } = {}) {
+  const f = fixture({
+    count: 135,
+    granted: bound,
+    bound,
+    workDefaults: { payload: { plan: "Verify the original synthetic work item without resource effects. ".repeat(80), effect_contract: { kind: "none" } } },
+  });
+  const retained = 1200;
+  const initial = f.queue.state;
+  let transactions = [...f.queue.transactions];
+  for (let index = 0; index < retained; index++) {
+    const operations = [{ kind: "Control", control: "admission_paused", value: index % 2 === 0, reason: "performance_fixture" }];
+    transactions.push({
+      version: 3,
+      id: `performance-control-${index}`,
+      previous: transactions.at(-1).id,
+      request: newRequest(`performance-request-${index}`, "control", f.queue.administrator, { operations }),
+      actor: f.queue.administrator,
+      policy_epoch: initial.policy_epoch,
+      at: f.queue.at + index + 1,
+      operations,
+    });
+  }
+  f.store(transactions);
+  for (let generation = 0; generation < generations; generation++) {
+    const source = transactions;
+    transactions = compactTransactions(source, f.head(), f.queue.administrator, f.queue.at + retained + generation);
+    // Preserve valid logical snapshots while breaking the oldest checkpoint's Git-parent binding.
+    if (generation === 0 && corruptOldest) f.store(source, { parents: [] });
+    f.storeHistory(transactions, commitsPerCheckpoint);
+  }
+  return { f, transactions, retained, generations, commitsPerCheckpoint, initial };
 }
 
 describe("Git-only work queue ledger", { timeout: 30000 }, () => {
@@ -124,6 +174,95 @@ describe("Git-only work queue ledger", { timeout: 30000 }, () => {
       expect(serializeTransactionLog(current.transactions)).toBe(serializeTransactionLog(second));
       current.state.works.clear();
     }
+    expect(f.calls).toEqual([]);
+  });
+
+  it("validates a synthetic live-sized nested Git history in less than three seconds from cold", async () => {
+    const { f, transactions, retained } = performanceHistory();
+    const bytes = Buffer.byteLength(transactions.map(commit => canonical(commit) + "\n").join(""));
+    expect(bytes).toBeGreaterThan(700 * 1024);
+    const start = performance.now();
+    const cold = await readWorkQueueLog(f.options);
+    const coldMs = performance.now() - start;
+    expect(cold.state.works.size).toBe(135);
+    expect(cold.state.requests.size).toBe(f.queue.state.requests.size + retained + 4);
+    expect(cold.sha).toBe(f.head());
+    expect(coldMs).toBeLessThan(3000);
+    cold.state.works.clear();
+    const warmStart = performance.now();
+    const warm = await readWorkQueueLog(f.options);
+    const warmMs = performance.now() - warmStart;
+    expect(warm.state.works.size).toBe(135);
+    expect(warmMs).toBeLessThan(3000);
+    expect(f.calls).toEqual([]);
+    console.info(
+      JSON.stringify({
+        benchmark: "synthetic-cold-queue-validation",
+        works: 135,
+        retained_requests: retained,
+        checkpoint_generations: 4,
+        ancestry_commits: 128,
+        checkpoint_bytes: bytes,
+        cold_ms: Math.round(coldMs),
+        warm_ms: Math.round(warmMs),
+        budget_ms: 3000,
+      })
+    );
+  });
+
+  it.each([false, true])("verifies the full cold Git history, including its oldest checkpoint (corrupted: %s)", async corruptOldest => {
+    const { f, transactions, retained, generations, commitsPerCheckpoint, initial } = performanceHistory({ generations: 70, commitsPerCheckpoint: 21, bound: true, corruptOldest });
+    expect(Number(f.git(["rev-list", "--count", f.head()]))).toBe(generations * commitsPerCheckpoint + (corruptOldest ? 1 : 2));
+    expect(f.networkCalls).toEqual([]);
+    expect(initial.claims.size).toBeGreaterThan(0);
+    const expected = canonical(serializeProjection(replayTransactions(transactions)));
+    const start = performance.now();
+    let cold;
+    if (corruptOldest) {
+      await expect(readWorkQueueLog(f.options)).rejects.toMatchObject({ code: "checkpoint_invalid" });
+    } else {
+      cold = await readWorkQueueLog(f.options);
+    }
+    const coldMs = performance.now() - start;
+    if (!corruptOldest) {
+      expect(cold.sha).toBe(f.head());
+      expect(canonical(serializeProjection(cold.state))).toBe(expected);
+      expect(cold.transactions).toEqual(transactions);
+      expect(cold.state.requests.size).toBe(initial.requests.size + retained + generations);
+      expect(cold.state.claims.size).toBe(initial.claims.size);
+    }
+    expect(f.networkCalls).toHaveLength(2);
+    expect(f.calls).toEqual([]);
+    console.info(
+      JSON.stringify({
+        benchmark: "full-git-history-verification",
+        works: 135,
+        claims: initial.claims.size,
+        retained_requests: retained,
+        checkpoint_generations: generations,
+        ancestry_commits: generations * commitsPerCheckpoint,
+        corrupt_oldest: corruptOldest,
+        cold_ms: Math.round(coldMs),
+        budget_ms: 10000,
+      })
+    );
+    expect(coldMs).toBeLessThan(10000);
+  });
+
+  it.each(["duplicate-key", "truncated", "invalid-request"])("rejects a %s historical log even when the descendant checkpoint is valid", async defect => {
+    const f = fixture();
+    const checkpoint = compactTransactions(f.queue.transactions, f.head(), f.queue.administrator, f.queue.at);
+    const contents = canonical(checkpoint[0]) + "\n";
+    f.store(checkpoint);
+    if (defect === "duplicate-key") f.store(contents.replace('"version":3', '"version":3,"version":3'));
+    else if (defect === "truncated") f.store(contents.slice(0, -1));
+    else {
+      const invalid = structuredClone(checkpoint[0]);
+      invalid.request.parameters.prior_tip = "different-tip";
+      f.store([invalid]);
+    }
+    f.store(checkpoint);
+    await expect(readWorkQueueLog(f.options)).rejects.toThrow();
     expect(f.calls).toEqual([]);
   });
 
