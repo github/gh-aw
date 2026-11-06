@@ -10,16 +10,20 @@ import (
 )
 
 func TestCompileRejectsInvalidRunnerInstallation(t *testing.T) {
-	for _, config := range []string{
-		"installation: unknown",
-		"installation: true",
-		"installation: '${{ inputs.installation }}'",
-		"topology: arc-dind\n  installation: privileged",
+	for _, tc := range []struct {
+		name      string
+		config    string
+		wantError string
+	}{
+		{name: "unknown", config: "installation: unknown", wantError: "value must be one of 'rootless', 'privileged'"},
+		{name: "boolean", config: "installation: true", wantError: "got boolean, want string"},
+		{name: "expression", config: "installation: '${{ inputs.installation }}'", wantError: "value must be one of"},
+		{name: "privileged ARC/DinD", config: "topology: arc-dind\n  installation: privileged", wantError: "not supported with runner.topology: arc-dind"},
 	} {
-		t.Run(config, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "runner.md")
-			require.NoError(t, os.WriteFile(path, []byte("---\non: workflow_dispatch\nrunner:\n  "+config+"\n---\nTest.\n"), 0600))
-			require.Error(t, NewCompiler().CompileWorkflow(path))
+			require.NoError(t, os.WriteFile(path, []byte("---\non: workflow_dispatch\nrunner:\n  "+tc.config+"\n---\nTest.\n"), 0600))
+			require.ErrorContains(t, NewCompiler().CompileWorkflow(path), tc.wantError)
 		})
 	}
 }

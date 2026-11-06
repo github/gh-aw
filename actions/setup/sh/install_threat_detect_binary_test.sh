@@ -128,6 +128,17 @@ EOF
   local script="$INSTALL_SCRIPT"
   if [ "${INSTALL_MODE:-rootless}" = privileged ]; then
     # Redirect only the final version invocation; sudo file operations are mocked.
+    if ! grep -Fqx '"${THREAT_DETECT_INSTALL_DIR}/${THREAT_DETECT_INSTALL_NAME}" --version' "$INSTALL_SCRIPT"; then
+      RUN_STATUS=1
+      RUN_OUTPUT="privileged test setup could not find the installer version invocation"
+      RUN_BINARY_PATH=""
+      RUN_EXPECTED_BINARY_PATH="/usr/local/bin/threat-detect"
+      RUN_INSTALLED_EXECUTABLE=false
+      RUN_PATH=""
+      RUN_SUDO=""
+      rm -rf "$sandbox"
+      return
+    fi
     script="${sandbox}/installer.sh"
     sed 's|^"${THREAT_DETECT_INSTALL_DIR}/${THREAT_DETECT_INSTALL_NAME}" --version$|"${SANDBOX_PRIVILEGED_BIN}/threat-detect" --version|' "$INSTALL_SCRIPT" >"$script"
   fi

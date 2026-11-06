@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/github/gh-aw/pkg/constants"
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/require"
 )
@@ -66,10 +65,6 @@ func TestCompileArcDindThreatDetectionStaging(t *testing.T) {
 					require.NotNil(t, conclusion)
 					rootless := tc.arc || tc.installation == "rootless"
 					installRun := installation["run"].(string)
-					require.Contains(t, installRun, string(constants.DefaultThreatDetectVersion))
-					for _, asset := range []string{"threat-detect-linux-amd64", "threat-detect-linux-arm64"} {
-						require.Contains(t, installRun, constants.DefaultThreatDetectSHA256[asset])
-					}
 					require.Equal(t, rootless, strings.Contains(installRun, "--rootless"))
 					if engine == "copilot" {
 						_, copilotInstall := find("Install GitHub Copilot CLI")

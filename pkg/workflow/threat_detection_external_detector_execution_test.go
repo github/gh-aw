@@ -12,6 +12,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestNativeRootlessCopilotStagesVerifiedDetectorBeforeCopilot(t *testing.T) {
+	data := &WorkflowData{RunnerConfig: &RunnerConfig{Installation: "rootless"}}
+	setup := NewCompiler().buildExternalDetectorPathSetup(data, "copilot")
+
+	detectorCopy := strings.Index(setup.hostSetup, `cp "$detector" "${RUNNER_TEMP}/gh-aw/bin/threat-detect"`)
+	copilotSetup := strings.Index(setup.hostSetup, `GH_AW_COPILOT_SRC=`)
+	require.NotEqual(t, -1, detectorCopy)
+	require.NotEqual(t, -1, copilotSetup)
+	require.Less(t, detectorCopy, copilotSetup)
+}
+
 func TestNativeRootlessThreatDetectionUsesVerifiedBinary(t *testing.T) {
 	for _, state := range []string{"verified", "missing", "not executable", "symlink", "unset"} {
 		t.Run(state, func(t *testing.T) {
