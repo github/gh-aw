@@ -836,7 +836,7 @@ function rollbackReviewResultsForPR(results, repo, prNumber, errorMessage) {
  * the skip must be back-propagated here so the Processing Summary reflects the actual
  * outcome (skipped) rather than a misleading success count.
  *
- * @param {Array<{type: string, success: boolean, skipped?: boolean, skipReason?: string}>} results - Processing results to mutate
+ * @param {Array<{type: string, success: boolean, skipped?: boolean, skipReason?: string, deferred_manifest?: boolean, result?: {deferred_manifest?: boolean}}>} results - Processing results to mutate
  * @param {string} skipReason - Human-readable reason for the skip
  */
 function skipReviewResults(results, skipReason) {
@@ -844,6 +844,8 @@ function skipReviewResults(results, skipReason) {
     if ((r.type === "submit_pull_request_review" || r.type === "create_pull_request_review_comment") && r.success === true) {
       r.skipped = true;
       r.skipReason = skipReason;
+      r.deferred_manifest = false;
+      if (r.result) r.result.deferred_manifest = false;
     }
   }
 }
@@ -851,7 +853,7 @@ function skipReviewResults(results, skipReason) {
 /**
  * Mark buffered review results for a specific PR as skipped.
  *
- * @param {Array<{type: string, success: boolean, skipped?: boolean, skipReason?: string, repo?: string, pull_request_number?: number, result?: {repo?: string, pull_request_number?: number}}>} results
+ * @param {Array<{type: string, success: boolean, skipped?: boolean, skipReason?: string, deferred_manifest?: boolean, repo?: string, pull_request_number?: number, result?: {repo?: string, pull_request_number?: number, deferred_manifest?: boolean}}>} results
  * @param {string} repo - Repository slug (owner/repo)
  * @param {number} prNumber - Pull request number
  * @param {string} skipReason - Human-readable reason for the skip
@@ -864,6 +866,8 @@ function skipReviewResultsForPR(results, repo, prNumber, skipReason) {
     if ((r.type === "submit_pull_request_review" || r.type === "create_pull_request_review_comment") && r.success === true && (r.result?.repo ?? r.repo) === repo && (r.result?.pull_request_number ?? r.pull_request_number) === prNumber) {
       r.skipped = true;
       r.skipReason = skipReason;
+      r.deferred_manifest = false;
+      if (r.result) r.result.deferred_manifest = false;
     }
   }
 }
@@ -1658,13 +1662,19 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
 
   await retryDeferredMessages();
   if (finalizeBufferedOutputs) {
-    let previousResultCount;
-    do {
+    for (let pass = 0; pass <= messages.length; pass++) {
+      const pendingPublications = results.filter(record => record.success && !record.skipped && record.result?.deferred_manifest);
+      const pendingResults = new Set(pendingPublications.map(record => record.result));
+      const temporaryIdCount = temporaryIdMap.size;
+      const deferredCount = deferredMessages.length;
       await finalizeBufferedOutputs(results);
-      previousResultCount = results.length;
+      const publicationProgress = pendingPublications.some(record => classifySafeOutputResult(record) !== "deferred");
       await drainWaitingMessages();
-      await retryDeferredMessages();
-    } while (results.length > previousResultCount);
+      if (publicationProgress || temporaryIdMap.size !== temporaryIdCount || deferredMessages.length !== deferredCount) {
+        await retryDeferredMessages();
+      }
+      if (!results.some(record => record.success && !record.skipped && record.result?.deferred_manifest && !pendingResults.has(record.result))) break;
+    }
   }
   for (const i of waitingMessages) {
     await processMessage(i, false);

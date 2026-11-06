@@ -42,6 +42,8 @@ describe("safe-output application outcomes", () => {
     const skipped = { ...result, success: true };
     skipReviewResultsForPR([skipped], "org/repo", 1, "PRIVATE_REASON");
     expect(buildSafeOutputOutcomes([skipped])[0]).toMatchObject({ status: "skipped" });
+    expect(skipped.result.deferred_manifest).toBe(false);
+    expect(skipped.skipReason).toBe("PRIVATE_REASON");
     expect(buildSafeOutputOutcomes([{ success: true }], true)[0]).toMatchObject({ status: "staged", staged: true });
   });
 
@@ -287,7 +289,7 @@ describe("safe-output application outcomes", () => {
     expect(JSON.stringify(outcome)).not.toContain("PRIVATE");
   });
 
-  it.each(["success", "chained", "chained-comment", "chained-comment-failed", "failed", "skipped", "staged"])("resolves a check depending on a buffered review after %s submission", async scenario => {
+  it.each(["success", "chained", "chained-comment", "chained-comment-failed", "failed", "skipped", "skipped-after-buffering", "staged"])("resolves a check depending on a buffered review after %s submission", async scenario => {
     const pullRequest = { number: 1, state: "open", head: { sha: "abc123" }, user: { login: "review-author" } };
     const summary = { addRaw: vi.fn().mockReturnThis(), write: vi.fn().mockResolvedValue(undefined) };
     vi.stubGlobal("core", { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), error: vi.fn(), setOutput: vi.fn(), setFailed: vi.fn(), summary });
@@ -306,7 +308,9 @@ describe("safe-output application outcomes", () => {
       rest: {
         rateLimit: { get: vi.fn().mockResolvedValue({ data: { resources: { core: { remaining: 5000, limit: 5000, reset: 0 } } } }) },
         pulls: {
-          get: vi.fn().mockResolvedValue({ data: { ...pullRequest, ...(scenario === "skipped" ? { state: "closed" } : {}) } }),
+          get: vi.fn(async () => ({
+            data: { ...pullRequest, ...(scenario === "skipped" || (scenario === "skipped-after-buffering" && global.core.info.mock.calls.some(([text]) => String(text).includes("=== Finalizing PR Review"))) ? { state: "closed" } : {}) },
+          })),
           listReviews: vi.fn().mockResolvedValue({ data: [] }),
           listFiles: vi.fn().mockResolvedValue({ data: [{ filename: "file.js" }] }),
           createReview,
@@ -346,6 +350,10 @@ describe("safe-output application outcomes", () => {
       expect(createCheck).not.toHaveBeenCalled();
       expect(global.core.setFailed).toHaveBeenCalled();
       expect(outcomes.find(outcome => outcome.type === "create_check_run").status).toBe("failed");
+      if (scenario.startsWith("skipped")) {
+        expect(outcomes.find(outcome => outcome.type === "submit_pull_request_review").status).toBe("skipped");
+        expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Safe-output prerequisite did not complete successfully: Pull request #1 closed after this workflow was triggered"));
+      }
       if (scenario === "chained-comment-failed") {
         expect(calls).toEqual(["review", "review"]);
         expect(outcomes.find(outcome => outcome.type === "submit_pull_request_review").status).toBe("success");

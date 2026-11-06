@@ -85,8 +85,7 @@ function buildSafeOutputOutcomes(results, staged = false) {
     const items = fanout ? (record.result.length ? record.result : [undefined]) : [record.result];
     return items.map(result => {
       const item = fanout ? { ...record, result, success: record.success === false ? false : (result?.success ?? record.success), ...(record.result.length ? {} : { skipped: true }) } : record;
-      let status = classifySafeOutputResult(item);
-      if (status === "success" && pickOutcomeField(item, "deferred_manifest")) status = "deferred";
+      const status = classifySafeOutputResult(item);
       const isStaged = staged || pickOutcomeField(item, "staged") === true;
       const url = !isStaged && (status === "success" || status === "warning") ? RESULT_URL_FIELDS.map(field => canonicalSafeOutputUrl(result?.[field])).find(Boolean) : undefined;
       return {

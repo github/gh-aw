@@ -212,7 +212,7 @@ async function main(config = {}) {
     if (filterResult) return filterResult;
 
     const reviewTarget = `${repo}#${prNum}`;
-    if (buffer.hasReviewMetadata() || reviewTargets.has(reviewTarget)) {
+    if (reviewTargets.has(reviewTarget)) {
       const errMsg = `PR ${repo}#${prNum} already has a pending review submission. Only one submit_pull_request_review per PR per run is allowed; use target: "*" with max: 1 so each PR gets its own invocation.`;
       core.warning(`submit_pull_request_review: ${errMsg}`);
       return { success: false, error: errMsg };
