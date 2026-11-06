@@ -402,7 +402,7 @@ describe("checkBranchPushable", () => {
         get: vi.fn().mockResolvedValue({ data: { default_branch: defaultBranch } }),
         getBranch: protectionStatus === null ? vi.fn().mockResolvedValue({ data: { protected: isProtected } }) : vi.fn().mockRejectedValue(Object.assign(new Error("error"), { status: protectionStatus })),
         getBranchRules: vi.fn().mockResolvedValue({ data: [{ type: "copilot_code_review" }] }),
-        getBranchProtection: vi.fn().mockRejectedValue(Object.assign(new Error("Branch not protected"), { status: 404 })),
+        getBranchProtection: vi.fn().mockRejectedValue(Object.assign(new Error("Not Found"), { status: 404, response: { data: { message: "Branch not protected" } } })),
       },
     },
   });
@@ -536,12 +536,30 @@ describe("checkBranchPushable", () => {
     expect(await checkBranchPushable(client, "owner", "repo", "feature", true)).toContain("Cannot verify branch protection rules");
   });
 
-  it("fails closed on a generic 404 from the classic protection endpoint", async () => {
+  it.each([
+    ["generic API response", Object.assign(new Error("Branch not protected"), { status: 404, response: { data: { message: "Not Found" } } })],
+    ["missing API response", Object.assign(new Error("Branch not protected"), { status: 404 })],
+    ["missing API message", Object.assign(new Error("Branch not protected"), { status: 404, response: { data: {} } })],
+  ])("fails closed on a classic protection 404 with %s", async (_scenario, error) => {
     const client = makeClient("main", null, true);
     client.rest.repos.getBranch.mockResolvedValue({ data: { protected: true, protection: { enabled: false } } });
-    client.rest.repos.getBranchProtection.mockRejectedValue(Object.assign(new Error("Not Found"), { status: 404 }));
+    client.rest.repos.getBranchProtection.mockRejectedValue(error);
 
     expect(await checkBranchPushable(client, "owner", "repo", "feature", true)).toContain("Cannot verify branch protection rules");
+  });
+
+  it("explains the token permission needed when classic protection returns 403", async () => {
+    const client = makeClient("main", null, true);
+    client.rest.repos.getBranch.mockResolvedValue({ data: { protected: true, protection: { enabled: false } } });
+    client.rest.repos.getBranchProtection.mockRejectedValue(Object.assign(new Error("Resource not accessible by integration"), { status: 403 }));
+
+    const result = await checkBranchPushable(client, "owner", "repo", "feature", true);
+
+    expect(result).toContain("Cannot verify branch protection rules");
+    expect(result).toContain("Resource not accessible by integration");
+    expect(result).toContain("Administration: read");
+    expect(result).toContain("GITHUB_TOKEN cannot provide");
+    expect(result).toContain("Push blocked");
   });
 
   it("still blocks the default branch when its only ruleset is Copilot code review", async () => {
@@ -556,12 +574,14 @@ describe("checkBranchPushable", () => {
   it.each([
     ["repository metadata unavailable", client => client.rest.repos.get.mockRejectedValue(new Error("API unavailable"))],
     ["default branch missing", client => client.rest.repos.get.mockResolvedValue({ data: {} })],
+    ["default branch empty", client => client.rest.repos.get.mockResolvedValue({ data: { default_branch: "" } })],
+    ["default branch malformed", client => client.rest.repos.get.mockResolvedValue({ data: { default_branch: 123 } })],
   ])("blocks a protected branch when %s", async (_scenario, setMetadata) => {
     const client = makeClient(null, null, true);
     setMetadata(client);
     client.rest.repos.getBranch.mockResolvedValue({ data: { protected: true, protection: { enabled: false } } });
 
-    expect(await checkBranchPushable(client, "owner", "repo", "feature", true)).toContain("protection rules");
+    expect(await checkBranchPushable(client, "owner", "repo", "main", true)).toContain("protection rules");
     expect(client.rest.repos.getBranchRules).not.toHaveBeenCalled();
     expect(client.rest.repos.getBranchProtection).not.toHaveBeenCalled();
   });

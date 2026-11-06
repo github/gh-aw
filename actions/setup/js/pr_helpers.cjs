@@ -175,7 +175,13 @@ async function checkBranchPushable(githubClient, owner, repo, branchName, checkB
               await githubClient.rest.repos.getBranchProtection({ owner, repo, branch: branchName });
             } catch (classicError) {
               const classicStatus = classicError && typeof classicError === "object" && "status" in classicError ? classicError.status : undefined;
-              const classicMessage = classicError && typeof classicError === "object" ? (classicError.response?.data?.message ?? getErrorMessage(classicError)) : getErrorMessage(classicError);
+              const classicMessage = classicError && typeof classicError === "object" ? classicError.response?.data?.message : undefined;
+              if (classicStatus === 403) {
+                throw new Error(
+                  `${getErrorMessage(classicError)}. Reading classic branch protection requires a GitHub App installation token or fine-grained PAT with Administration: read repository permission; GITHUB_TOKEN cannot provide this permission`,
+                  { cause: classicError }
+                );
+              }
               if (classicStatus !== 404 || classicMessage !== "Branch not protected") throw classicError;
               core.info(`Branch "${branchName}" only has Copilot code review rules and no classic protection; proceeding to push`);
               isBranchProtected = false;
