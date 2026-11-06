@@ -10,6 +10,7 @@ permissions:
   contents: read
   issues: read
   pull-requests: read # required by pull_requests
+  copilot-requests: write
 
 
 tools:
@@ -122,7 +123,7 @@ network:
     - defaults
 engine:
   id: codex
-  model-provider: openai
+  model-provider: github
   model-routing:
     goal: cost
     mode: economy

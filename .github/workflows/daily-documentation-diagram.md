@@ -41,7 +41,7 @@ safe-outputs:
   noop:
 engine:
   id: codex
-  model-provider: openai
+  model-provider: github
   model-routing:
     goal: cost
     mode: economy
