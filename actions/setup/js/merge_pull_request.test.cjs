@@ -220,6 +220,7 @@ describe("merge_pull_request branch validation", () => {
               base: { ref: "integration-branch" },
               labels: [],
               title: "Test PR",
+              body: null,
               requested_reviewers: [],
               requested_teams: [],
             },
@@ -282,6 +283,7 @@ describe("merge_pull_request policy hardening", () => {
       user: { login: "author" },
       labels: [{ name: "ready" }],
       title: "Test PR",
+      body: null,
       requested_reviewers: [],
       requested_teams: [],
     };
@@ -314,6 +316,7 @@ describe("merge_pull_request policy hardening", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllEnvs();
     vi.resetModules();
     vi.clearAllMocks();
     delete global.core;
@@ -433,8 +436,130 @@ describe("merge_pull_request policy hardening", () => {
   });
 
   function approval(overrides = {}) {
-    return { id: 1, state: "APPROVED", commit_id: "abc123", submitted_at: "2026-01-01T00:00:00Z", user: { login: "reviewer", type: "User" }, ...overrides };
+    return { id: 1, state: "APPROVED", body: "", commit_id: "abc123", submitted_at: "2026-01-01T00:00:00Z", user: { login: "reviewer", type: "User" }, ...overrides };
   }
+
+  it.each([
+    ["threat marker", "<!-- gh-aw-threat-detected -->"],
+    ["engine error marker", "<!-- gh-aw-threat-engine-error -->"],
+    ["legacy threat title", "> agentic threat detected"],
+    ["legacy engine error title", "> Threat detection engine error"],
+    ["protected-file notice", "Protected files were modified in this change."],
+    ["other caution", "> [!CAUTION]\n> Requires manual review."],
+  ])("blocks a live %s even with independent head approval and passing CI", async (_name, body) => {
+    pr.body = body;
+    pr.head.sha = "a".repeat(40);
+    pr.base.sha = "b".repeat(40);
+    reviewPR.headRefOid = pr.head.sha;
+    reviewPR.reviewDecision = "APPROVED";
+    client.paginate.mockImplementation(async method =>
+      method === client.rest.pulls.listReviews ? [approval({ commit_id: pr.head.sha })] : [{ id: 1, name: "ci", head_sha: pr.head.sha, status: "completed", conclusion: "success", app: { id: 5 } }]
+    );
+    const result = await run({ required_approvers: ["reviewer"], required_checks: ["ci"] });
+    expect(result.success).toBe(false);
+    expect(result.failure_reasons).toContainEqual(expect.objectContaining({ code: "manual_review_caution" }));
+    expect(result.decision_evidence.approval_policy.approvals).toHaveLength(1);
+    expect(result.failure_reasons[0].message).toContain("normal manual process");
+    expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+    expect(JSON.stringify(persistDecision(result))).not.toContain(body);
+  });
+
+  it.each(["agentic-threat-detected", "AGENTIC-THREAT-DETECTED", "gh-aw-threat-engine-error", "threat-detection-engine-error"])("blocks detection label %s without a body marker", async name => {
+    pr.labels.push({ name });
+    const result = await run();
+    expect(result.failure_reasons).toContainEqual(expect.objectContaining({ code: "manual_review_caution" }));
+    expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+  });
+
+  it.each(["COMMENTED", "DISMISSED", "APPROVED", "CHANGES_REQUESTED"])("retains caution veto from a bot's %s review artifact", async state => {
+    client.paginate.mockResolvedValue([
+      approval({ state, body: "Protected files were modified in this pull request and require manual scrutiny before merge.", commit_id: "old", user: { login: "author", type: "Bot" } }),
+      approval({ id: 2, submitted_at: "2026-01-01T00:00:01Z", user: { login: "author", type: "Bot" } }),
+      approval({ id: 3, submitted_at: "2026-01-01T00:00:02Z" }),
+    ]);
+    const result = await run({ required_approvers: ["reviewer"] });
+    expect(result.decision_evidence.approval_policy.blocking_reviews).toEqual([]);
+    expect(result.decision_evidence.approval_policy.approvals).toHaveLength(1);
+    expect(result.failure_reasons).toContainEqual(expect.objectContaining({ code: "manual_review_caution" }));
+    expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+  });
+
+  it.each(["<!-- gh-aw-threat-detected -->", "<!-- gh-aw-threat-engine-error -->", "Threat detection produced a warning for this pull request output."])(
+    "blocks historical detection review body %s without current workflow detection or PR markers",
+    async body => {
+      vi.stubEnv("GH_AW_DETECTION_CONCLUSION", "success");
+      client.paginate.mockResolvedValue([approval({ state: "COMMENTED", body })]);
+      const result = await run();
+      expect(result.failure_reasons).toContainEqual(expect.objectContaining({ code: "manual_review_caution" }));
+      expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([false, true])("blocks cautions in same-repository and cross-repository staged evaluation (%s)", async crossRepository => {
+    pr.body = "> [!CAUTION]\n> Protected files were modified in this change.";
+    const result = await run({ staged: true, target: "*", ...(crossRepository ? { "target-repo": "trusted/other" } : {}) }, { pull_request_number: 100 });
+    expect(result).toMatchObject({ success: false, staged: true });
+    expect(result.failure_reasons).toContainEqual(expect.objectContaining({ code: "manual_review_caution" }));
+    expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["warning", "threat_detected"],
+    ["warning", "agent_failure"],
+    ["failure", "agent_failure"],
+    ["failure", "parse_error"],
+    ["failure", "threat_detected"],
+    ["unknown", ""],
+    ["skipped", ""],
+    ["", ""],
+  ])("fails closed when required detection reports %s / %s", async (conclusion, reason) => {
+    vi.stubEnv("GH_AW_RUN_DETECTION", "true");
+    vi.stubEnv("GH_AW_DETECTION_CONCLUSION", conclusion);
+    vi.stubEnv("GH_AW_DETECTION_REASON", reason);
+    const result = await run();
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("complete detection");
+    expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+  });
+
+  it.each(["body", "labels"])("fails closed on missing live PR %s caution evidence", async field => {
+    delete pr[field];
+    const result = await run();
+    expect(result.error).toContain("caution evidence");
+    expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, {}, 42])("fails closed on inaccessible review body %s", async body => {
+    client.paginate.mockResolvedValue([approval({ body })]);
+    const result = await run();
+    expect(result.error).toContain("Incomplete approval evidence");
+    expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+  });
+
+  it("preserves ordinary unmarked merges with null review bodies and informational warnings", async () => {
+    pr.body = "> [!WARNING]\n> This is an ordinary release note.";
+    client.paginate.mockResolvedValue([approval({ body: null })]);
+    const result = await run();
+    expect(result.success).toBe(true);
+    expect(result.decision_evidence.caution_reasons).toEqual([]);
+    expect(client.rest.pulls.merge).toHaveBeenCalledOnce();
+  });
+
+  it("detects a same-head caution added to the PR body during evaluation", async () => {
+    const changed = structuredClone(pr);
+    changed.body = "<!-- gh-aw-threat-engine-error -->";
+    client.rest.pulls.get.mockResolvedValueOnce({ data: structuredClone(pr) }).mockResolvedValueOnce({ data: changed });
+    const result = await run();
+    expect(result.error).toContain("policy state changed");
+    expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+  });
+
+  it("detects a historical caution newly exposed during review revalidation", async () => {
+    client.paginate.mockResolvedValueOnce([approval()]).mockResolvedValueOnce([approval({ body: "Threat detection produced a warning for this pull request output." })]);
+    const result = await run();
+    expect(result.error).toContain("evidence changed");
+    expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+  });
 
   function debugRecords() {
     return global.core.debug.mock.calls

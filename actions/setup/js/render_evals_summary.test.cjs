@@ -216,6 +216,15 @@ describe("render_evals_summary.cjs", () => {
       expect(body).not.toContain("❓ UNKNOWN");
     });
 
+    it("renders unavailable-model markers without question results", async () => {
+      fs.writeFileSync(STATUS_PATH, JSON.stringify({ status: "not_evaluated", reason_code: "model_unavailable", reason: "Select a Decisions-compatible evals.model.", engine: "decisions" }));
+      await module.main();
+      const summary = mockCore.summary.addRaw.mock.calls[0][0];
+      expect(summary).toContain("**Reason** (model_unavailable): Select a Decisions-compatible evals.model.");
+      expect(summary).not.toContain("| ID | Question | Answer |");
+      expect(summary).not.toContain("**UNKNOWN**:");
+    });
+
     it.each([
       ["missing reason_code", { status: "not_evaluated", reason: "The judge did not start." }],
       ["unknown reason_code", { status: "not_evaluated", reason_code: "judge_exploded", reason: "The judge did not start." }],

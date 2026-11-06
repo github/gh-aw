@@ -12,8 +12,41 @@ const { withRetry, isTransientError } = require("./error_recovery.cjs");
 const { normalizeBranchName } = require("./normalize_branch_name.cjs");
 const { resolveNumberFromTemporaryId } = require("./temporary_id.cjs");
 const { SAFE_OUTPUT_E001, SAFE_OUTPUT_E007, SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
+const { getEffectiveDetectionConclusion, getThreatDetectedMarker, getThreatEngineErrorMarker } = require("./threat_detection_warning.cjs");
 const MERGEABILITY_PENDING_ERROR = "pull request mergeability is still being computed";
 const MERGEABILITY_PENDING_ERROR_E099 = `${SAFE_OUTPUT_E099}: ${MERGEABILITY_PENDING_ERROR}`;
+
+/**
+ * Caution text is a veto, never approval evidence. Include historical review
+ * artifacts even when dismissed or superseded: neither action attests that the
+ * underlying detection or protected-file risk was independently resolved.
+ * @param {string|null} body
+ * @returns {string[]}
+ */
+function getCautionReasons(body) {
+  const text = (body || "").toLowerCase();
+  const reasons = [];
+  if (text.includes(getThreatDetectedMarker(null)) || text.includes("agentic threat detected")) reasons.push("threat_detected");
+  if (text.includes(getThreatEngineErrorMarker()) || text.includes("threat detection engine error")) reasons.push("detection_engine_error");
+  if (text.includes("protected files were modified")) reasons.push("protected_files");
+  if (text.includes("threat detection produced a warning")) reasons.push("detection_review_required");
+  if (text.includes("[!caution]")) reasons.push("caution");
+  return reasons;
+}
+
+/** @param {any} pr @returns {string[]} */
+function getPullRequestCautions(pr) {
+  if (!(pr.body === null || typeof pr.body === "string") || !Array.isArray(pr.labels) || pr.labels.some(label => typeof label?.name !== "string")) {
+    throw new Error(`${SAFE_OUTPUT_E007}: Missing or malformed pull request caution evidence; fetch the complete live body and labels before merging`);
+  }
+  const reasons = getCautionReasons(pr.body);
+  for (const label of pr.labels) {
+    const name = label.name.toLowerCase();
+    if (name === "agentic-threat-detected" || name === "gh-aw-threat-detected") reasons.push("threat_label");
+    if (name === "gh-aw-threat-engine-error" || name === "threat-detection-engine-error") reasons.push("detection_engine_error_label");
+  }
+  return [...new Set(reasons)].sort();
+}
 
 class CheckProducerError extends Error {
   /** @param {string} message @param {Record<string, any>} rejection */
@@ -186,7 +219,10 @@ async function getApprovalEvidence(githubClient, owner, repo, pr, requiredApprov
     pull_number: pr.number,
     per_page: 100,
   });
-  if (!Array.isArray(reviews) || reviews.some(r => !r?.user?.login || !Number.isInteger(r.id) || !["APPROVED", "CHANGES_REQUESTED", "COMMENTED", "DISMISSED", "PENDING"].includes(r.state))) {
+  if (
+    !Array.isArray(reviews) ||
+    reviews.some(r => !r?.user?.login || !Number.isInteger(r.id) || !(r.body === null || typeof r.body === "string") || !["APPROVED", "CHANGES_REQUESTED", "COMMENTED", "DISMISSED", "PENDING"].includes(r.state))
+  ) {
     throw new Error(`${SAFE_OUTPUT_E007}: Incomplete approval evidence for PR #${pr.number}`);
   }
   const decisiveReviews = reviews
@@ -227,7 +263,8 @@ async function getApprovalEvidence(githubClient, owner, repo, pr, requiredApprov
     )
     .map(review => ({ login: review.user.login, review_id: review.id, commit_id: review.commit_id }));
   core.debug(`merge_pull_request: ${JSON.stringify({ event: "approval_evidence", reviews: reviews.length, eligible_approvals: approvals.length })}`);
-  return { approvals, blocking_reviews: blockingReviews };
+  const cautionReasons = [...new Set(reviews.flatMap(review => getCautionReasons(review.body)))].sort();
+  return { approvals, blocking_reviews: blockingReviews, caution_reasons: cautionReasons };
 }
 
 /**
@@ -243,6 +280,7 @@ function policySnapshot(pr) {
     base: [pr.base?.sha, pr.base?.ref, pr.base?.repo?.full_name],
     author: pr.user?.login,
     title: pr.title,
+    body: pr.body,
     labels: (pr.labels || []).map(label => label.name).sort(),
     reviewers: (pr.requested_reviewers || []).map(user => user.login).sort(),
     teams: (pr.requested_teams || []).map(team => team.slug).sort(),
@@ -666,6 +704,13 @@ async function main(config = {}) {
       if (typeof pr.head?.sha !== "string" || !pr.head.sha) {
         throw new Error(`${SAFE_OUTPUT_E007}: Missing evaluated pull request head SHA`);
       }
+      phase = "caution_evidence";
+      const detectionConclusion = getEffectiveDetectionConclusion(process.env.GH_AW_DETECTION_CONCLUSION, process.env.GH_AW_DETECTION_REASON);
+      const missingDetectionConclusion = String(process.env.GH_AW_RUN_DETECTION || "").trim() === "true" && (detectionConclusion === "" || detectionConclusion === "skipped");
+      if (missingDetectionConclusion || !["", "success", "skipped"].includes(detectionConclusion)) {
+        throw new Error(`${SAFE_OUTPUT_E007}: Current threat detection does not authorize merging; complete detection and obtain independent manual review`);
+      }
+      const prCautions = getPullRequestCautions(pr);
       const evaluatedSnapshot = policySnapshot(pr);
       evidence.eligibility = {
         state: pr.state,
@@ -794,6 +839,15 @@ async function main(config = {}) {
       phase = "approval_evidence";
       const approvalEvidence = await getApprovalEvidence(githubClient, owner, repo, pr, requiredApprovers);
       evidence.approval_policy = { required_approvers: requiredApprovers, ...approvalEvidence };
+      const cautionReasons = [...new Set([...prCautions, ...approvalEvidence.caution_reasons])].sort();
+      evidence.caution_reasons = cautionReasons;
+      if (cautionReasons.length > 0) {
+        failureReasons.push({
+          code: "manual_review_caution",
+          message:
+            "Pull request or review history contains a detection, protected-files, or caution notice. Independently review and merge through the repository's normal manual process; approvals, dismissals, labels, and passing checks do not clear these notices for merge-pull-request.",
+        });
+      }
       if (approvalEvidence.blocking_reviews.length > 0) {
         failureReasons.push({
           code: "blocking_individual_review",
@@ -840,6 +894,7 @@ async function main(config = {}) {
         throw new Error(`${SAFE_OUTPUT_E007}: Missing target base branch for final policy evaluation`);
       }
       const currentPR = await getPullRequestWithMergeability(githubClient, owner, repo, pullNumber);
+      if (currentPR) getPullRequestCautions(currentPR);
       if (!currentPR || !isDeepStrictEqual(policySnapshot(currentPR), evaluatedSnapshot)) {
         throw new Error(`${SAFE_OUTPUT_E007}: Pull request policy state changed after evaluation; fresh evaluation required`);
       }
