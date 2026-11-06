@@ -76,20 +76,25 @@ projections, and `report.json` with source/tool/fixture/projection hashes, comma
 arguments, state counts, Java version, and verdicts. Retain that directory for
 run-level evidence; generated artifacts are not source files.
 
-## Verified bounds and controls
+## Last recorded bounds and controls
 
-TLC 2.19 (official v1.7.4 distribution) exhaustively checked the following finite
-bounds. The controls column identifies what each positive run is paired with; the
-mutation controls must fail with the exact invariant named in the table below.
+The following are the last recorded TLC 2.19 results (official v1.7.4
+distribution), not verification from this update. TLC was not rerun because
+`TLA2TOOLS_JAR` was not configured. The shared corpus now contains 95 cases,
+all projected by `check.mjs`; verification of the current corpus is pending.
+The controls column identifies what each positive run is paired with; mutation
+controls must fail with the exact invariant named below.
 
 | Model | Exhaustive bound | Controls |
 |---|---|---|
 | Baseline | 18,984 generated states, 16,272 distinct states, depth 5, zero queued states | Ten deliberate defects below check acceptance evidence, delivery/deletion, attribution, publication, and summary invariants. |
-| Shared fixtures | All 77 cases; 420 generated states, 360 distinct states, zero queued states | `FixtureAgreement` checks each case's expected typed result. Equal projected records collapse into the same initial state. |
+| Shared fixtures | 77 cases in the recorded run; 420 generated states, 360 distinct states, zero queued states | `FixtureAgreement` checks each case's expected typed result. Equal projected records collapse into the same initial state. |
 
 These are reproducible finite bounds, not a proof over arbitrary inputs.
 
-All ten negative controls produced their required invariant counterexamples:
+In the last recorded run, all ten negative controls produced their required
+invariant counterexamples. They were not rerun for this update; verification
+against the current 95-case corpus and controls is pending.
 
 | Deliberate defect | Required invariant violation |
 |---|---|
@@ -126,9 +131,12 @@ claimed.
 
 ## Last synced with implementation (2026-11-06)
 
-- **Go:** `pkg/cli/outcome_evaluation.go`, `pkg/cli/outcome_eval.go`,
-  `pkg/cli/outcome_eval_evidence.go`, `pkg/cli/outcome_conformance_test.go`,
-  and `pkg/cli/outcome_eval_formal_test.go`.
+- **Go evaluators and tests:** `pkg/cli/outcome_evaluation.go`,
+  `pkg/cli/outcome_eval.go`, the per-action `pkg/cli/outcome_eval_*.go`
+  evaluators, `pkg/cli/outcome_conformance_test.go`, and
+  `pkg/cli/outcome_eval_formal_test.go`.
+- **Shared conformance input:** `pkg/cli/testdata/outcome_conformance.json`,
+  projected by `check.mjs` and consumed by the Go conformance test.
 - **TLA+:** `specs/outcomes/OutcomeEvaluation.tla` and
   `specs/outcomes/OutcomeEvaluation.cfg`.
 - **Checker:** `specs/outcomes/check.mjs`.

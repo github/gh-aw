@@ -306,6 +306,9 @@ budget, and `ClaimDeliveryHealth` checks staged isolation and aggregate reportin
 Existing historical verification counts elsewhere in this guide are not results
 for this new refinement.
 
+These safeguards are normative for the current Claim delivery recovery protocol,
+not only for the historical `WorkQueue.tla` model.
+
 **Safeguards:** Recovery MUST use exact authenticated terminal evidence and checked
 publication against the original owner and pending barrier. It MUST NOT infer
 terminality from elapsed time or capacity release, reconstruct a Result, or replay

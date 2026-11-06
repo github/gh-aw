@@ -30,12 +30,13 @@ The model checks these safety properties in every reachable state:
 
 ## Behavioral test coverage
 
-The conformance tests use the repository's JavaScript ledger implementation;
-there is no Go ledger package to test. `ledger_protocol_generated.test.cjs`
-checks each TLC operation witness against `replayBuiltin`, verifies append-only
-history and shard coverage, and ensures queueing or validation leaves the
-snapshot unchanged. `ledger_protocol_model.test.cjs` adds hand-selected witnesses for each ledger
-type, including invalid note votes.
+The conformance tests use the repository's JavaScript ledger implementation.
+Go compiler wiring and tests live in `pkg/workflow/`, rather than a dedicated
+Go ledger package. `ledger_protocol_generated.test.cjs` checks each TLC
+operation witness against `replayBuiltin`, verifies append-only history and
+shard coverage, and ensures queueing or validation leaves the snapshot
+unchanged. `ledger_protocol_model.test.cjs` adds hand-selected witnesses for
+each ledger type, including invalid note votes.
 
 | Property | Concrete test |
 | --- | --- |
@@ -115,6 +116,12 @@ is distinct from the passing safety checks above.
 
 - A value MUST be understood as a canonical-JSON equality class; table rows,
   counters, notes, transaction IDs, and artifacts remain bounded abstractions.
+- The table model has a primary key and one non-key field per row; counter
+  operations change the value by one; note votes require a citation to an
+  existing note. Each artifact contains one operation, and only one agent
+  request is in flight at a time; independent branch appends may interleave.
+- Transaction IDs are deterministic non-hash strings. Duplicate-ID collision
+  and retry behavior is not modeled.
 - Claims about `Compact` MUST be limited to preserving modeled history and
   shard-ID coverage; physical compaction is not represented or verified.
 - The model MUST NOT be cited as evidence of liveness or
@@ -122,10 +129,15 @@ is distinct from the passing safety checks above.
 
 ## Last synced with implementation (2026-11-06)
 
-- **Go:** None; this repository has no Go ledger package.
+- **Go compiler wiring and tests:** `pkg/workflow/ledger.go`,
+  `pkg/workflow/ledger_job.go`, and `pkg/workflow/ledger_test.go` generate and
+  test persistence, the read-only projection, and compaction plan/apply jobs.
 - **TLA+:** `LedgerProtocol.tla`, `LedgerProtocolWitness.tla`, and the `*.cfg`
   model configurations in this directory.
-- **JavaScript implementation and tests:** `actions/setup/js/ledger_append.cjs`,
+- **JavaScript entry points:** `actions/setup/js/ledger_append.cjs`,
   `ledger_replay.cjs`, `ledger_builtin.cjs`, `ledger_transactions.cjs`,
-  `push_ledger_changes.cjs`, `ledger_compaction.cjs`,
-  `ledger_protocol_model.test.cjs`, and `ledger_protocol_generated.test.cjs`.
+  `push_ledger_changes.cjs`, and `ledger_compaction.cjs`.
+- **Conformance inputs and tests:** `actions/setup/js/ledger_protocol_vectors.json`,
+  `ledger_protocol_model.test.cjs`, `ledger_protocol_generated.test.cjs`,
+  `ledger_builtin.test.cjs`, `push_ledger_changes.test.cjs`, and
+  `ledger_compaction.test.cjs`.

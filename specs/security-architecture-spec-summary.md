@@ -234,6 +234,7 @@ variant shown in that section.
 | Formal requirement | Entry in `security-architecture-spec.md` |
 |---|---|
 | SG-01–SG-07 | [§3.2 Security Guarantees](security-architecture-spec.md#32-security-guarantees) |
+| SP-01–SP-06 | [§3.4 Security Principles](security-architecture-spec.md#34-security-principles) |
 | IS-01–IS-03 | [§4.2 Sanitization Requirements](security-architecture-spec.md#42-sanitization-requirements) |
 | IS-04 | [§4.3.1 Mention Neutralization](security-architecture-spec.md#431-mention-neutralization) |
 | IS-05 | [§4.3.2 Bot Trigger Protection](security-architecture-spec.md#432-bot-trigger-protection) |
@@ -254,6 +255,7 @@ variant shown in that section.
 | NI-09–NI-11 | [§6.5 Domain Blocking](security-architecture-spec.md#65-domain-blocking) |
 | NI-12–NI-13 | [§6.6 Enforcement Mechanisms](security-architecture-spec.md#66-enforcement-mechanisms) |
 | NI-14 | [§6.7 Content Sanitization Integration](security-architecture-spec.md#67-content-sanitization-integration) |
+| TT-01–TT-04 | [§6.8 Transport Trust and Bootstrap Integrity](security-architecture-spec.md#68-transport-trust-and-bootstrap-integrity) |
 | PM-01–PM-02 | [§7.2 Permission Defaults](security-architecture-spec.md#72-permission-defaults) |
 | PM-03–PM-04 | [§7.3 Permission Configuration](security-architecture-spec.md#73-permission-configuration) |
 | PM-05–PM-07 | [§7.4 Strict Mode](security-architecture-spec.md#74-strict-mode) |
@@ -283,6 +285,8 @@ variant shown in that section.
 | RS-12–RS-13 | [§11.6 Network Enforcement](security-architecture-spec.md#116-network-enforcement) |
 | RS-14–RS-15 | [§11.7 Output Validation](security-architecture-spec.md#117-output-validation) |
 | RS-16–RS-22 | [§11.8 Concurrency Control](security-architecture-spec.md#118-concurrency-control) |
+| TP-01–TP-03 | [§12.4 Test Execution Procedures](security-architecture-spec.md#124-test-execution-procedures) |
+| BP-01–BP-06 (best practices) | [Appendix H: Security Best Practices](security-architecture-spec.md#appendix-h-security-best-practices) |
 
 ### Test Categories
 

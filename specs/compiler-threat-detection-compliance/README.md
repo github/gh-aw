@@ -79,29 +79,29 @@ These annotations are verified against the specification artifacts by `pkg/workf
 
 ## Section 6.4 False-Positive Handling Norms
 
-| Test ID | Norm | Test file |
-|---------|------|-----------|
-| T-CTR-024 | Suppression validation requires `rule` and a non-empty `reason`. | `pkg/workflow/compiler_threat_optimizer_protocol_test.go` |
-| T-CTR-025 | Active suppressions retain `rule`, `reason`, and `expires` for audit. | `pkg/workflow/compiler_threat_optimizer_protocol_test.go` |
-| T-CTR-026 | MUST-level suppressions have a 10-business-day resolution SLA. | `pkg/workflow/compiler_threat_optimizer_protocol_test.go` |
-| T-CTR-027 | SLA breaches include `rule`, `reason`, `age_business_days`, `owner`, and `expires`. | `pkg/workflow/compiler_threat_optimizer_protocol_test.go` |
-| T-CTR-028 | MUST-level suppressions older than 20 business days create a follow-up sync action. | `pkg/workflow/compiler_threat_optimizer_protocol_test.go` |
-| T-CTR-029 | Expired suppressions are re-evaluated and treated as absent. | `pkg/workflow/compiler_threat_optimizer_protocol_test.go` |
+| Test ID | Norm |
+|---------|------|
+| T-CTR-024 | Suppression validation requires `rule` and a non-empty `reason`. |
+| T-CTR-025 | Active suppressions retain `rule`, `reason`, and `expires` for audit. |
+| T-CTR-026 | MUST-level suppressions have a 10-business-day resolution SLA. |
+| T-CTR-027 | SLA breaches include `rule`, `reason`, `age_business_days`, `owner`, and `expires`. |
+| T-CTR-028 | MUST-level suppressions older than 20 business days create a follow-up sync action. |
+| T-CTR-029 | Expired suppressions are re-evaluated and treated as absent. |
 
 ## Section 6.6 Optimizer Failure Safeguards
 
-| Test ID | Norm | Test file |
-|---------|------|-----------|
-| T-CTR-030 | API unavailability emits `OPTIMIZER_DEGRADED`. | `pkg/workflow/compiler_threat_optimizer_protocol_test.go` |
-| T-CTR-031 | Degraded evaluation cannot mutate specifications or open a pull request. | `pkg/workflow/compiler_threat_optimizer_protocol_test.go` |
-| T-CTR-032 | API retry uses bounded exponential back-off. | `pkg/workflow/compiler_threat_optimizer_protocol_test.go` |
-| T-CTR-033 | Runner timeout emits `OPTIMIZER_TIMEOUT`. | `pkg/workflow/compiler_threat_optimizer_protocol_test.go` |
-| T-CTR-034 | Runner timeout discards partial output. | `pkg/workflow/compiler_threat_optimizer_protocol_test.go` |
-| T-CTR-035 | The workflow defines a timeout and same-day retry behavior. | `pkg/workflow/compiler_threat_optimizer_protocol_test.go` |
-| T-CTR-036 | Rate limiting applies `RATE_LIMIT_RETRY_CONFIG`. | `pkg/workflow/compiler_threat_optimizer_protocol_test.go` |
-| T-CTR-037 | Exhausted rate limiting emits `OPTIMIZER_RATE_LIMITED`. | `pkg/workflow/compiler_threat_optimizer_protocol_test.go` |
-| T-CTR-038 | Rate-limited runs remain incomplete and retry in the next window. | `pkg/workflow/compiler_threat_optimizer_protocol_test.go` |
-| T-CTR-040 | Missed scheduled optimizer runs emit `OPTIMIZER_MISSED_CRON`, remain incomplete, and create a follow-up sync action. | `pkg/workflow/compiler_threat_optimizer_protocol_test.go` |
+| Test ID | Norm |
+|---------|------|
+| T-CTR-030 | API unavailability emits `OPTIMIZER_DEGRADED`. |
+| T-CTR-031 | Degraded evaluation cannot mutate specifications or open a pull request. |
+| T-CTR-032 | API retry uses bounded exponential back-off. |
+| T-CTR-033 | Runner timeout emits `OPTIMIZER_TIMEOUT`. |
+| T-CTR-034 | Runner timeout discards partial output. |
+| T-CTR-035 | The workflow defines a timeout and same-day retry behavior. |
+| T-CTR-036 | Rate limiting applies `RATE_LIMIT_RETRY_CONFIG`. |
+| T-CTR-037 | Exhausted rate limiting emits `OPTIMIZER_RATE_LIMITED`. |
+| T-CTR-038 | Rate-limited runs remain incomplete and retry in the next window. |
+| T-CTR-040 | Missed scheduled optimizer runs emit `OPTIMIZER_MISSED_CRON`, remain incomplete, and create a follow-up sync action. |
 
 The Section 6 norm tests are implemented in `pkg/workflow/compiler_threat_optimizer_protocol_test.go`. Run them with:
 
