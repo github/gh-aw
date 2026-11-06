@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -8,6 +9,23 @@ import (
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/stretchr/testify/require"
 )
+
+func TestDeepReportPreservesAdmittedDailyReportContract(t *testing.T) {
+	path := filepath.Join("..", "..", ".github", "workflows", "deep-report.md")
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	contract, err := workQueueLogicalContractFromContentWithCache(path, string(content), parser.NewImportCache(filepath.Dir(path)))
+	require.NoError(t, err)
+	// Pending daily reports retain this immutable admission contract across deployments.
+	require.Equal(t, "099f49b1f233e2c5ebfe89e8fb87697affeb622b76156d375591191c6b28872c", contract)
+
+	scoped := strings.Replace(string(content), "    deduplicate-by-title: 28\n",
+		"    deduplicate-by-title: 28\n    deduplicate-by-labels: [automation, improvement, quick-win, cookie, code-quality, task-mining]\n", 1)
+	require.NotEqual(t, string(content), scoped)
+	incompatible, err := workQueueLogicalContractFromContentWithCache(path, scoped, parser.NewImportCache(filepath.Dir(path)))
+	require.NoError(t, err)
+	require.NotEqual(t, contract, incompatible)
+}
 
 func TestWorkQueueLogicalContractPreservesInputTypes(t *testing.T) {
 	stringValue := map[string]any{"inputs": map[string]any{"default": "3"}}

@@ -59,7 +59,10 @@ If there is no qualifying data, the worker stages a scoped `noop` and finishes a
 
 Follow the [native queue deployment sequence](/gh-aw/patterns/workqueue-ops/#deploy-a-native-queue), using the linked portfolio sources. Merge the `daily-reports` pool into shared `aw.json`; preserve other pools. The first authorized submission creates Policy and Work together.
 
-For an installed portfolio, drain existing Claims before changing Policy or worker revisions. Resume on a date not already admitted by the old planner. The 30-pending-task limit rejects excess admission rather than hiding an unlimited backlog.
+For an installed portfolio, compatible worker deployments do not require draining Claims.
+Scheduling-policy changes require quiescence. Resume on a date not already admitted
+by the old planner. The 30-pending-task limit rejects excess admission rather than
+hiding an unlimited backlog.
 
 ```bash
 gh aw work-queue --repo OWNER/REPO state
@@ -68,5 +71,43 @@ gh aw work-queue --repo OWNER/REPO replay --json
 ```
 
 Use the [queue reference](/gh-aw/reference/work-queue/) for scheduling, cancellation, reconciliation, and [diagnostic artifacts](/gh-aw/reference/work-queue/#diagnostic-artifacts). Unknown launches retain reservations until exact evidence permits release; rerunning effects is not recovery.
+
+### Recover incompatible routes without rewriting Work
+
+Start with read-only `stats`, `explain --pool daily-reports`, and
+`inspect --work-id ID`. `worker_incompatible` means the selected deployed worker's
+logical contract differs from the Work's immutable admission contract; it does not
+mean the worker failed or a new attempt should be launched.
+
+DeepReport keeps its original title-deduplication contract for admitted reports.
+Adding label-scoped deduplication changes which auxiliary issues can be created,
+so it changes the authority contract even when the labels themselves are unchanged.
+Restore compatible source and regenerate its lock before an operator explicitly
+deploys the reviewed default-branch revision. Before restoring an older contract,
+inspect every unfinished Work for that profile: Work already admitted under the
+newer contract would become incompatible. Settle those newer-contract items under
+their current deployment first, and coordinate admission so no new-contract Work
+is admitted during the transition. A failed delivery is not settlement.
+Source publication alone does not
+update the installed route. Do not edit admission contracts, clear the queue, or
+fall back to an arbitrary historical worker revision. Introduce intentional
+incompatible semantics only with a separate migration for existing Work.
+
+### Recover failed delivery without replaying effects
+
+A completed Claim with failed delivery is not a verified Result, even when its
+native run has ended and its reservation is released. Inspect the original run,
+`safe-outputs-items` artifact, exact source revision, and existing resource.
+Successful creation followed by failed verification must never trigger another
+creation or a fallback issue.
+
+Transport metadata such as `output_id` and `depends-on` is accepted by current
+native-creation verification, but older revisions rejected it before resource
+readback. That prospective fix does not settle historical failed delivery.
+An existing Discussion URL or handler-success receipt alone is insufficient:
+recovery must preserve the original Claim binding, independent scoped resource
+verification, and exact delivery evidence. If the original private receipt cannot
+be reconstructed through a supported verifier, retain the failed barrier and
+escalate evidence-only recovery rather than rerunning the worker or claiming Result.
 
 For a write-capable factory with memory snapshots, see [Linter Factory](/gh-aw/gallery/linter-factory/). The reusable orchestration pattern is [WorkQueueOps](/gh-aw/patterns/workqueue-ops/).
