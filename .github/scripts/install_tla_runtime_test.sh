@@ -13,6 +13,12 @@ cat > "$sandbox/fixtures/jre/bin/java" <<'JAVA'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$EXECUTION_LOG"
 if [ "${MODE:-}" = java-failure ]; then exit 1; fi
+if [ "${1:-}" = -cp ]; then
+  if [ "${MODE:-}" != tlc-failure ]; then
+    echo 'provides model checking and simulation of TLA+ specifications'
+  fi
+  exit 1
+fi
 JAVA
 chmod +x "$sandbox/fixtures/jre/bin/java"
 tar -czf "$sandbox/fixtures/jre.tar.gz" -C "$sandbox/fixtures" jre
@@ -100,7 +106,7 @@ run_case() {
     [ "$status" -ne 0 ]
     [ ! -e "$destination" ]
     grep -q 'ERROR:' "$sandbox/output"
-    if [ "$MODE" != java-failure ]; then [ ! -s "$EXECUTION_LOG" ]; fi
+    if [ "$MODE" != java-failure ] && [ "$MODE" != tlc-failure ]; then [ ! -s "$EXECUTION_LOG" ]; fi
   fi
   [ -z "$(find "$(dirname "$destination")" -name 'runtime.install.*' -print)" ]
   echo "PASS: $name"
@@ -118,6 +124,8 @@ run_case extraction failure
 fixture_pins
 MODE=java-failure
 run_case java-failure failure
+MODE=tlc-failure
+run_case tlc-failure failure
 MODE=success
 FAKE_ARCH=aarch64 run_case unsupported failure
 run_case invalid-flag failure --unknown

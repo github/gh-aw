@@ -67,7 +67,16 @@ jobs:
       - name: Download pinned TLC
         shell: bash
         run: |
-          bash "$GITHUB_WORKSPACE/.github/scripts/install_tla_runtime.sh" "$RUNNER_TEMP/tla-tools" --jar-only
+          set -euo pipefail
+          trusted=$(mktemp -d "$RUNNER_TEMP/tla-installer.XXXXXX")
+          trap 'rm -rf "$trusted"' EXIT
+          mkdir -p "$trusted/.github/scripts" "$trusted/actions/setup/sh"
+          cp "$GITHUB_WORKSPACE/.github/scripts/install_tla_runtime.sh" "$trusted/.github/scripts/"
+          cp "$GITHUB_WORKSPACE/actions/setup/sh/release_integrity.sh" "$trusted/actions/setup/sh/"
+          printf '%s  %s\n' \
+            b6e2054d1df3a27795b60c5f35b655a038a6b4140e8b401369e6cb03016b8d32 "$trusted/.github/scripts/install_tla_runtime.sh" \
+            306fb2fce7cb05d44b3cb32a227b2e549c5b81c2f7be3fc26deeacbea1d7eb0c "$trusted/actions/setup/sh/release_integrity.sh" | sha256sum --check --strict
+          bash "$trusted/.github/scripts/install_tla_runtime.sh" "$RUNNER_TEMP/tla-tools" --jar-only
       - name: Collect formal verification evidence
         id: verification
         continue-on-error: true

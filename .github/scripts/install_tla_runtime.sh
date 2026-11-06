@@ -59,8 +59,11 @@ if [ "$jar_only" = false ]; then
     echo "ERROR: Verified JRE archive could not be extracted; refusing installation" >&2
     exit 1
   fi
-  if ! "$staging/runtime/jre/bin/java" -version ||
-    ! "$staging/runtime/jre/bin/java" -cp "$staging/runtime/tla2tools.jar" tlc2.TLC -help > /dev/null; then
+  tlc_status=0
+  "$staging/runtime/jre/bin/java" -version &&
+    "$staging/runtime/jre/bin/java" -cp "$staging/runtime/tla2tools.jar" tlc2.TLC -help > "$staging/tlc-help" 2>&1 || tlc_status=$?
+  if [ "$tlc_status" -ne 1 ] ||
+    ! grep -Fq 'provides model checking and simulation of TLA+ specifications' "$staging/tlc-help"; then
     echo "ERROR: Verified TLA+ runtime smoke check failed; refusing installation" >&2
     exit 1
   fi
