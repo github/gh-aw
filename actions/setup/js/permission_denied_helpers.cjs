@@ -70,12 +70,22 @@ function extractDeniedCommands(output) {
 }
 
 /**
+ * Detect explicit workflow tool-permission denial summaries.
+ * @param {string} output
+ * @returns {boolean}
+ */
+function hasWorkflowToolPermissionDenial(output) {
+  return typeof output === "string" && /\bpermission denied by workflow tool permissions\s*:/i.test(output);
+}
+
+/**
  * Build a structured report_missing_tool payload for repeated permission-denied failures.
  * @param {string[]} [deniedCommands] - Commands that were denied (may be empty)
+ * @param {string} [permissionOutput] - Original output containing permission-denial summaries
  * @returns {string}
  */
-function buildMissingToolPermissionIssuePayload(deniedCommands) {
-  const workflowToolDenial = deniedCommands?.some(command => /^(?:shell|read|write|mcp|custom-tool)\(/.test(command)) === true;
+function buildMissingToolPermissionIssuePayload(deniedCommands, permissionOutput) {
+  const workflowToolDenial = hasWorkflowToolPermissionDenial(permissionOutput);
   return JSON.stringify({
     type: "report_missing_tool",
     tool: "tool/permission",
@@ -91,5 +101,6 @@ module.exports = {
   countPermissionDeniedIssues,
   hasNumerousPermissionDeniedIssues,
   extractDeniedCommands,
+  hasWorkflowToolPermissionDenial,
   buildMissingToolPermissionIssuePayload,
 };

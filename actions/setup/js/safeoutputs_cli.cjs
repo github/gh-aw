@@ -101,7 +101,8 @@ function buildMissingToolAlternatives(baseAlternatives, deniedCommands) {
  *   safeOutputsPath?: string,
  *   runSafeOutputsCLI?: RunSafeOutputsCLILike,
  *   logger?: (message: string) => void,
- *   deniedCommands?: string[]
+ *   deniedCommands?: string[],
+ *   permissionOutput?: string
  * }=} options
  */
 function emitMissingToolPermissionIssue(options) {
@@ -109,13 +110,14 @@ function emitMissingToolPermissionIssue(options) {
   const runSafeOutputs = options && options.runSafeOutputsCLI ? options.runSafeOutputsCLI : runSafeOutputsCLI;
   const logger = options && options.logger ? options.logger : defaultLog;
   const deniedCommands = options && options.deniedCommands ? options.deniedCommands : [];
+  const permissionOutput = options && typeof options.permissionOutput === "string" ? options.permissionOutput : "";
 
   if (!safeOutputsPath) {
     logger("report_missing_tool skipped: GH_AW_SAFE_OUTPUTS is not set");
     return;
   }
   try {
-    const payload = JSON.parse(buildMissingToolPermissionIssuePayload(deniedCommands));
+    const payload = JSON.parse(buildMissingToolPermissionIssuePayload(deniedCommands, permissionOutput));
     runSafeOutputs("report_missing_tool", {
       tool: payload.tool,
       reason: payload.reason,

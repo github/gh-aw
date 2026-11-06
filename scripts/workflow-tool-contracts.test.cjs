@@ -25,16 +25,21 @@ function checkCommand(handler, command, expected) {
 
 test("Fixer metadata alternatives succeed while the observed denied commands remain restricted", () => {
   const handler = permissionHandler("code-scanning-fixer");
-  for (const command of ["safeoutputs --help", "github --help", "git status --short", "git branch --show-current", "git diff --binary --no-ext-diff | wc -c"]) {
+  for (const command of ["safeoutputs --help", "github --help", "git status --short", "git diff --binary --no-ext-diff | wc -c"]) {
     checkCommand(handler, command, "approve-once");
   }
   for (const command of [
-    "safeoutputs --help | head -40; github --help | head -60; git status --short; git branch --show-current; git log --oneline -1",
+    "safeoutputs --help | head -40; github --help | head -60; git status --short; git log --oneline -1",
     'grep -rn "test.mjs" Makefile package.json | head; node --version',
     "node --test scripts/pr-sous-chef.test.mjs",
   ]) {
     checkCommand(handler, command, "reject");
   }
+});
+
+test("Fixer prompt does not advertise an ungranted branch-inspection command", () => {
+  const prompt = fs.readFileSync(path.join(__dirname, "..", ".github", "workflows", "code-scanning-fixer.md"), "utf8");
+  assert.doesNotMatch(prompt, /git branch --show-current/);
 });
 
 test("Tidy separates permitted formatting from exact permitted status inspection", () => {

@@ -192,7 +192,7 @@ Use the `edit` tool to write cache records, not shell heredocs. Pass report bodi
 
 ### Tool and Validation Contract
 
-This workflow provides restricted shell readers, GitHub/safeoutputs CLI transport, and code/cache edits, not unrestricted bash or test execution. Run metadata commands separately: `safeoutputs --help`, `github --help`, `git status --short`, and `git branch --show-current`. Do not probe `git log`, `node --version`, `node --test`, `make`, or other executables absent from the workflow allowlist. The exact patch-size pipeline below is the only required compound command.
+This workflow provides restricted shell readers, GitHub/safeoutputs CLI transport, and code/cache edits, not unrestricted bash or test execution. Run metadata commands separately: `safeoutputs --help`, `github --help`, and `git status --short`. Do not probe `git branch`, `git log`, `node --version`, `node --test`, `make`, or other executables absent from the workflow allowlist. The exact patch-size pipeline below is the only required compound command.
 
 After the first denied call, use an explicitly allowed tool for the required capability or emit `safeoutputs report_missing_tool` and stop. Never spend the remaining denial budget trying command variants. A workflow tool denial is not evidence of missing token scopes.
 

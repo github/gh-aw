@@ -110,6 +110,7 @@ describe("safeoutputs_cli.cjs", () => {
       emitMissingToolPermissionIssue({
         safeOutputsPath: "/tmp/safeoutputs.jsonl",
         deniedCommands: ["shell(node --test scripts/pr-sous-chef.test.mjs)"],
+        permissionOutput: "[sdk-driver] permission denied by workflow tool permissions: shell(node --test scripts/pr-sous-chef.test.mjs)",
         runSafeOutputsCLI: (toolName, args) => calls.push({ toolName, args }),
         logger: () => {},
       });
