@@ -19,3 +19,13 @@ func BadDotReadFile() {
 func BadDotWriteFile() {
 	_ = WriteFile("file.txt", []byte{}, 0644) // want `ioutil\.WriteFile is deprecated; use os\.WriteFile instead`
 }
+
+func BadDotDiscard() {
+	_ = Discard // want `ioutil\.Discard is deprecated; use io\.Discard instead`
+}
+
+// Discard used as a selector receiver was previously skipped because the
+// identifier's parent is a SelectorExpr.
+func BadDotDiscardMethod() {
+	_, _ = Discard.Write([]byte("x")) // want `ioutil\.Discard is deprecated; use io\.Discard instead`
+}

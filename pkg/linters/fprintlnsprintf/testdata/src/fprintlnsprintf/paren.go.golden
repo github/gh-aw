@@ -1,0 +1,22 @@
+package fprintlnsprintf
+
+import (
+	"fmt"
+	"os"
+)
+
+func flaggedParenCallee(name string) {
+	(fmt.Fprintf)(os.Stderr, "hello %s\n", name) // want "use fmt.Fprintf"
+}
+
+func flaggedParenSprintfCallee(name string) {
+	fmt.Fprintf(os.Stderr, "hello %s\n", name) // want "use fmt.Fprintf"
+}
+
+func flaggedParenSprintfCall(name string) {
+	fmt.Fprintf(os.Stderr, "hello %s\n", name) // want "use fmt.Fprintf"
+}
+
+func flaggedParenFormat(name string) {
+	fmt.Fprintf(os.Stderr, ("hello %s\n"), name) // want "use fmt.Fprintf"
+}

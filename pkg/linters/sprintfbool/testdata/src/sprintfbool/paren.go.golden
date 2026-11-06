@@ -1,0 +1,11 @@
+package sprintfbool
+
+import "strconv"
+
+func badParenCallee(b bool) string {
+	return strconv.FormatBool(b) // want `use strconv\.FormatBool\(b\) instead of fmt\.Sprintf\("%t", b\)`
+}
+
+func badParenFormat(b bool) string {
+	return strconv.FormatBool(b) // want `use strconv\.FormatBool\(b\) instead of fmt\.Sprintf\("%t", b\)`
+}
