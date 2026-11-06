@@ -815,7 +815,7 @@ jobs:
         env:
           GH_AW_FILE_ROOT: "${{ runner.temp }}/gh-aw"
           GH_AW_FILE_CONFIG: "{\"files\":[{\"path\":\"safeoutputs/config.json\",\"content_env\":\"GH_AW_SAFE_OUTPUTS_CONFIG\"}]}"
-          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_discussion\":{\"category\":\"audits\",\"close_older_discussions\":true,\"expires\":24,\"fallback_to_issue\":true,\"max\":1,\"title_prefix\":\"[eslint-refiner] \"},\"create_issue\":{\"expires\":168,\"labels\":[\"eslint\",\"cookie\"],\"max\":3},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"true\"},\"persist_eslint_memory\":{\"description\":\"Prepare one schema-validated immutable memory snapshot for this Claim\",\"inputs\":{\"memory\":{\"default\":null,\"description\":\"Structured memory data conforming to the configured schema\",\"required\":true,\"type\":\"object\"}},\"max\":1},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_discussion\":{\"category\":\"audits\",\"close_older_discussions\":true,\"expires\":24,\"fallback_to_issue\":true,\"max\":1,\"title_prefix\":\"[eslint-refiner] \"},\"create_issue\":{\"expires\":168,\"labels\":[\"eslint\",\"cookie\"],\"max\":3,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"true\"},\"persist_eslint_memory\":{\"description\":\"Prepare one schema-validated immutable memory snapshot for this Claim\",\"inputs\":{\"memory\":{\"default\":null,\"description\":\"Structured memory data conforming to the configured schema\",\"required\":true,\"type\":\"object\"}},\"max\":1},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
         with:
           script: |
             const path = require('path');
@@ -830,7 +830,7 @@ jobs:
             {
               "description_suffixes": {
                 "create_discussion": " CONSTRAINTS: Maximum 1 discussion(s) can be created. Title will be prefixed with \"[eslint-refiner] \". Discussions will be created in category \"audits\".",
-                "create_issue": " CONSTRAINTS: Maximum 3 issue(s) can be created. Labels [\"eslint\" \"cookie\"] will be automatically added."
+                "create_issue": " CONSTRAINTS: Maximum 3 issue(s) can be created. Labels [\"eslint\" \"cookie\"] will be automatically added. Maximum 10 artifact(s) can be attached per issue. Maximum artifact body size: 1048576 UTF-8 bytes."
               },
               "repo_params": {},
               "dynamic_tools": [
@@ -940,6 +940,9 @@ jobs:
               "create_issue": {
                 "defaultMax": 1,
                 "fields": {
+                  "artifacts": {
+                    "type": "array"
+                  },
                   "blocked_by": {},
                   "body": {
                     "required": true,
@@ -2957,7 +2960,7 @@ jobs:
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
           GH_AW_SAFE_OUTPUT_SCRIPTS: "{\"persist_eslint_memory\":\"safe_output_script_persist_eslint_memory.cjs\"}"
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"claim_adapters\":{\"persist_eslint_memory\":{\"mode\":\"script\",\"effect-type\":\"git_tree\",\"target-repo\":\"github/gh-aw\",\"field-map\":{\"files\":\"files\"},\"git-tree\":{\"base-revision\":\"46b68a61c366a01d86dc319b8e689d09a48bad04\",\"branch-prefix\":\"memory/eslint-refiner-runs\"}}},\"create_discussion\":{\"category\":\"audits\",\"close_older_discussions\":true,\"expires\":24,\"fallback_to_issue\":true,\"max\":1,\"title_prefix\":\"[eslint-refiner] \"},\"create_issue\":{\"expires\":168,\"labels\":[\"eslint\",\"cookie\"],\"max\":3},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"true\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"claim_adapters\":{\"persist_eslint_memory\":{\"mode\":\"script\",\"effect-type\":\"git_tree\",\"target-repo\":\"github/gh-aw\",\"field-map\":{\"files\":\"files\"},\"git-tree\":{\"base-revision\":\"46b68a61c366a01d86dc319b8e689d09a48bad04\",\"branch-prefix\":\"memory/eslint-refiner-runs\"}}},\"create_discussion\":{\"category\":\"audits\",\"close_older_discussions\":true,\"expires\":24,\"fallback_to_issue\":true,\"max\":1,\"title_prefix\":\"[eslint-refiner] \"},\"create_issue\":{\"expires\":168,\"labels\":[\"eslint\",\"cookie\"],\"max\":3,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"true\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
           GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}

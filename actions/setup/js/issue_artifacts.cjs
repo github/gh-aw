@@ -1,0 +1,195 @@
+// @ts-check
+/// <reference types="@actions/github-script" />
+
+const { ERR_API, ERR_VALIDATION } = require("./error_codes.cjs");
+const { getErrorMessage } = require("./error_helpers.cjs");
+const { GITHUB_API_VERSION } = require("./constants.cjs");
+const { withRetry, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
+const { sanitizeContent } = require("./sanitize_content.cjs");
+const { convertXmlTags, removeXmlComments, sanitizeUrlProtocols, sanitizeUrlDomains, buildAllowedDomains } = require("./sanitize_content_core.cjs");
+const { sanitizeTitle } = require("./sanitize_title.cjs");
+const path = require("node:path");
+const { isUtf8 } = require("node:buffer");
+const { readGuardedFile, resolveIssueArtifactPath } = require("./symlink_guard.cjs");
+const DEFAULT_MAX_ISSUE_ARTIFACT_SIZE = 1024 * 1024;
+
+/**
+ * @typedef {import("./types/safe-outputs").IssueArtifact} IssueArtifact
+ * @typedef {import("./types/safe-outputs").IssueArtifactInput} IssueArtifactInput
+ * @typedef {import("./types/safe-outputs").CreatedIssueArtifact} CreatedIssueArtifact
+ */
+
+/**
+ * Validate all artifacts before creating their issue.
+ * @param {unknown} value
+ * @param {number} [maxArtifacts=10] - Per-issue limit; non-positive values disable artifacts.
+ * @param {number} [maxSizeBytes=1048576] - Maximum UTF-8 bytes per artifact body.
+ * @returns {IssueArtifact[]}
+ */
+function normalizeIssueArtifacts(value, maxArtifacts = 10, maxSizeBytes = DEFAULT_MAX_ISSUE_ARTIFACT_SIZE) {
+  return normalizeIssueArtifactInputs(value, maxArtifacts, maxSizeBytes).map((artifact, index) => {
+    if (artifact.path !== undefined) throw new Error(`${ERR_VALIDATION}: create_issue artifacts[${index}].path must be read by the safeoutputs MCP backend before processing`);
+    return { type: artifact.type ?? "generic", name: artifact.name, body: artifact.body };
+  });
+}
+
+/**
+ * @param {unknown} value
+ * @param {number} maxArtifacts
+ * @param {number} maxSizeBytes
+ * @returns {IssueArtifactInput[]}
+ */
+function normalizeIssueArtifactInputs(value, maxArtifacts, maxSizeBytes) {
+  if (!Number.isSafeInteger(maxArtifacts)) throw new Error(`${ERR_VALIDATION}: max-issue-artifacts must be an integer`);
+  if (!Number.isSafeInteger(maxSizeBytes) || maxSizeBytes <= 0) throw new Error(`${ERR_VALIDATION}: max-issue-artifact-size must be a positive integer in bytes`);
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) throw new Error(`${ERR_VALIDATION}: create_issue 'artifacts' must be an array`);
+  if (value.length > Math.max(0, maxArtifacts)) {
+    throw new Error(maxArtifacts <= 0 ? `${ERR_VALIDATION}: Issue artifacts are disabled by max-issue-artifacts; omit artifacts` : `${ERR_VALIDATION}: create_issue artifacts exceeds max-issue-artifacts limit of ${maxArtifacts} per issue`);
+  }
+  /** @type {unknown[]} */
+  const artifacts = value;
+  return artifacts.map((artifact, index) => {
+    const field = `create_issue artifacts[${index}]`;
+    if (!artifact || typeof artifact !== "object" || Array.isArray(artifact)) {
+      throw new Error(`${ERR_VALIDATION}: ${field} must be an object`);
+    }
+    if (Object.keys(artifact).some(key => !["type", "name", "body", "path"].includes(key))) {
+      throw new Error(`${ERR_VALIDATION}: ${field} accepts only type, name, body, and path`);
+    }
+    const type = !("type" in artifact) || artifact.type === undefined ? "generic" : artifact.type;
+    if (type !== "generic" && type !== "link" && type !== "plan" && type !== "embedded_html") {
+      throw new Error(`${ERR_VALIDATION}: ${field}.type must be generic, link, plan, or embedded_html`);
+    }
+    if (!("name" in artifact) || typeof artifact.name !== "string" || !artifact.name.trim()) {
+      throw new Error(`${ERR_VALIDATION}: ${field}.name must be a non-empty string`);
+    }
+    const hasBody = "body" in artifact;
+    const hasPath = "path" in artifact;
+    if (hasBody === hasPath) {
+      throw new Error(`${ERR_VALIDATION}: ${field} requires exactly one of body or path`);
+    }
+    if ("path" in artifact) {
+      if (typeof artifact.path !== "string" || !artifact.path.trim() || !path.isAbsolute(artifact.path)) {
+        throw new Error(`${ERR_VALIDATION}: ${field}.path must be a non-empty absolute file path`);
+      }
+      return { type, name: artifact.name.trim(), path: artifact.path };
+    }
+    if (!("body" in artifact) || typeof artifact.body !== "string" || !artifact.body.trim()) {
+      throw new Error(`${ERR_VALIDATION}: ${field}.body must be a non-empty string`);
+    }
+    validateIssueArtifactBodySize(artifact.body, maxSizeBytes, `${field}.body`);
+    return { type, name: artifact.name.trim(), body: artifact.body };
+  });
+}
+
+/**
+ * Read path-based requests in the unprivileged MCP backend; persist content, not paths.
+ * @param {unknown} value
+ * @param {number} [maxArtifacts=10]
+ * @param {number} [maxSizeBytes=1048576]
+ * @returns {IssueArtifact[]}
+ */
+function resolveIssueArtifactPaths(value, maxArtifacts = 10, maxSizeBytes = DEFAULT_MAX_ISSUE_ARTIFACT_SIZE) {
+  const artifacts = normalizeIssueArtifactInputs(value, maxArtifacts, maxSizeBytes);
+  return artifacts.map((artifact, index) => {
+    if (artifact.path === undefined) return { type: artifact.type ?? "generic", name: artifact.name, body: artifact.body };
+    let content;
+    try {
+      content = readGuardedFile(resolveIssueArtifactPath(artifact.path), maxSizeBytes);
+    } catch (error) {
+      throw new Error(`${ERR_VALIDATION}: create_issue artifacts[${index}].path could not be read: ${getErrorMessage(error)}`, { cause: error });
+    }
+    if (!isUtf8(content) || content.includes(0)) throw new Error(`${ERR_VALIDATION}: create_issue artifacts[${index}].path must contain UTF-8 text without NUL bytes`);
+    const body = content.toString("utf8");
+    if (!body.trim()) throw new Error(`${ERR_VALIDATION}: create_issue artifacts[${index}].path must contain non-empty text`);
+    return { type: artifact.type ?? "generic", name: artifact.name, body };
+  });
+}
+
+/**
+ * @param {unknown} value
+ * @returns {CreatedIssueArtifact}
+ */
+function normalizeCreatedIssueArtifact(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${ERR_API}: Invalid issue artifact API response; expected an object`);
+  }
+  const number = "number" in value ? value.number : undefined;
+  const url = "html_url" in value ? value.html_url : undefined;
+  if (typeof number !== "number" || !Number.isSafeInteger(number) || number <= 0 || (url !== undefined && typeof url !== "string")) {
+    throw new Error(`${ERR_API}: Invalid issue artifact API response; expected a positive integer number and an optional string html_url`);
+  }
+  return { number, url };
+}
+
+/**
+ * @param {string} body
+ * @param {number} maxSizeBytes
+ * @param {string} field
+ */
+function validateIssueArtifactBodySize(body, maxSizeBytes, field) {
+  const size = Buffer.byteLength(body, "utf8");
+  if (size > maxSizeBytes) {
+    throw new Error(`${ERR_VALIDATION}: ${field} is ${size} UTF-8 bytes, exceeding max-issue-artifact-size limit of ${maxSizeBytes} bytes`);
+  }
+}
+
+/**
+ * Preserve supported HTML tags, without treating rendered HTML as inert Markdown code.
+ * @param {IssueArtifact[]} artifacts
+ * @param {import("./sanitize_content.cjs").SanitizeOptions} options
+ * @returns {IssueArtifact[]}
+ */
+function sanitizeIssueArtifacts(artifacts, options) {
+  // Size limits reject content before and after sanitization instead of truncating it.
+  const bodyOptions = { ...options, maxLength: Number.MAX_SAFE_INTEGER, maxLines: Number.MAX_SAFE_INTEGER };
+  return artifacts.map(artifact => {
+    const name = sanitizeTitle(artifact.name);
+    let body = sanitizeContent(artifact.body, bodyOptions);
+    if (artifact.type === "embedded_html") {
+      // Backticks in HTML do not create inert regions in an HTML preview.
+      body = convertXmlTags(removeXmlComments(body));
+      body = sanitizeUrlDomains(sanitizeUrlProtocols(body), buildAllowedDomains());
+    }
+    if (!name.trim() || !body.trim()) throw new Error(`${ERR_VALIDATION}: Issue artifact name and body must remain non-empty after sanitization`);
+    return { ...artifact, name, body };
+  });
+}
+
+/**
+ * @param {typeof github} githubClient
+ * @param {string} owner
+ * @param {string} repo
+ * @param {number} issueNumber
+ * @param {IssueArtifact[]} artifacts
+ * @param {number} [maxSizeBytes=1048576]
+ * @returns {Promise<CreatedIssueArtifact[]>}
+ */
+async function createIssueArtifacts(githubClient, owner, repo, issueNumber, artifacts, maxSizeBytes = DEFAULT_MAX_ISSUE_ARTIFACT_SIZE) {
+  /** @type {CreatedIssueArtifact[]} */
+  const created = [];
+  for (const artifact of artifacts) {
+    try {
+      validateIssueArtifactBodySize(artifact.body, maxSizeBytes, `Artifact "${artifact.name}" body`);
+      const { data } = await withRetry(
+        () =>
+          githubClient.request("POST /repos/{owner}/{repo}/issues/{issue_number}/artifacts", {
+            owner,
+            repo,
+            issue_number: issueNumber,
+            ...artifact,
+            headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION },
+          }),
+        RATE_LIMIT_RETRY_CONFIG,
+        `create issue artifact on ${owner}/${repo}#${issueNumber}`
+      );
+      created.push(normalizeCreatedIssueArtifact(data));
+    } catch (error) {
+      throw new Error(`${ERR_API}: Issue ${owner}/${repo}#${issueNumber} was created, but artifact "${artifact.name}" could not be attached (${created.length}/${artifacts.length} attached): ${getErrorMessage(error)}`, { cause: error });
+    }
+  }
+  return created;
+}
+
+module.exports = { normalizeIssueArtifacts, resolveIssueArtifactPaths, sanitizeIssueArtifacts, createIssueArtifacts };
