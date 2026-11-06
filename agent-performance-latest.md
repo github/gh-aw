@@ -88,3 +88,6 @@ metrics/latest.json now dated 2026-10-31 but collection_status=partial: run coun
 
 ## Run 2026-11-03T12:45Z
 latest.json (2026-11-03, complete 24h): 593 executed / 438 ok (73.9%), 465 safe-output items, PR merge 88.9% (16/18). Weakest: pr-sous-chef 39% (60/98 failed), ai-moderator 12/24 failed (avg 4812s), smoke-copilot-aoai-apikey 0/3, 44 workflows with a single failed run. Pocock reviewer 20/24 ok but 1.96M tokens. Discussion posted.
+
+## Run 2026-11-06T12:43Z
+No new discussion/issue: weekly report already posted 2026-11-03; no new evidence gathered this run.
