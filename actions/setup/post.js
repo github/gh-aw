@@ -4,6 +4,16 @@
 
 const path = require("path");
 const fs = require("fs");
+const { spawnSync } = require("child_process");
+
+function cleanupRuntimeTmp() {
+  if (!process.env.GH_AW_RUNTIME_TMP_DIR) return;
+  const cleanupScript = path.join(__dirname, "sh", "cleanup_runtime_tmp.sh");
+  const result = spawnSync("bash", [cleanupScript], { stdio: "inherit" });
+  if (result.error || result.status !== 0) {
+    console.warn(`Warning: unable to run scoped AWF runtime temp cleanup: ${result.error?.message || result.status}`);
+  }
+}
 
 function isDebugModeEnabled() {
   const toBool = value => {
@@ -96,4 +106,6 @@ function listTmpGhAwFiles(tmpDir, maxDepth, maxFiles) {
   if (fs.existsSync(tmpDir)) {
     console.warn(`Warning: leaving shared ${tmpDir} untouched; per-invocation ownership cannot be established.`);
   }
+
+  cleanupRuntimeTmp();
 })();

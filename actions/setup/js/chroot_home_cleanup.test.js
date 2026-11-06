@@ -41,6 +41,32 @@ describe("shared-runner cleanup boundary", () => {
     expect(warnings).toEqual(["Warning: leaving shared /tmp/gh-aw untouched; per-invocation ownership cannot be established."]);
   });
 
+  it("post.js invokes only the scoped AWF runtime cleanup recorded by setup", async () => {
+    const calls = [];
+    const script = fs.readFileSync(path.join(__dirname, "../post.js"), "utf8");
+    vm.runInNewContext(script, {
+      __dirname: path.resolve(__dirname, ".."),
+      process: { env: { GH_AW_RUNTIME_TMP_DIR: "/tmp/gh-aw-runtime-test" } },
+      console: { warn: () => {}, log: () => {}, error: () => {} },
+      require(name) {
+        if (name === "path") return path;
+        if (name === "fs") return { existsSync: () => false };
+        if (name === "child_process") {
+          return {
+            spawnSync: (...args) => {
+              calls.push(args);
+              return { status: 0 };
+            },
+          };
+        }
+        if (name.endsWith("action_conclusion_otlp.cjs")) return { run: async () => {} };
+        throw new Error(`Unexpected import: ${name}`);
+      },
+    });
+    await new Promise(resolve => setImmediate(resolve));
+    expect(calls).toEqual([["bash", [path.join(__dirname, "../sh/cleanup_runtime_tmp.sh")], { stdio: "inherit" }]]);
+  });
+
   it("clean.sh never invokes removal or privileged cleanup", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-clean-test-"));
     try {

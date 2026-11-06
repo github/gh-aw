@@ -34,3 +34,7 @@ tmpDir="/tmp/gh-aw"
 if [ -e "${tmpDir}" ] || [ -L "${tmpDir}" ]; then
   echo "Warning: leaving shared ${tmpDir} untouched; per-invocation ownership cannot be established." >&2
 fi
+
+if [[ -n "${GH_AW_RUNTIME_TMP_DIR:-}" && -f "${DESTINATION}/cleanup_runtime_tmp.sh" ]]; then
+  bash "${DESTINATION}/cleanup_runtime_tmp.sh"
+fi

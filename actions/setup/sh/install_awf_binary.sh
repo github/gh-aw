@@ -155,6 +155,10 @@ sha256_hash() {
   fi
 }
 
+# The AWF CLI uses TMPDIR for its chroot scratch directories. Persist a private
+# directory for subsequent workflow steps and leave cleanup to the scoped post step.
+create_awf_runtime_tmp
+
 # Create a private staging directory on the runner's job-owned filesystem.
 create_release_staging awf
 

@@ -29,14 +29,27 @@ create_release_staging() {
     echo "ERROR: Invalid release staging prefix" >&2
     return 1
   fi
-  parent="${RUNNER_TEMP:-$PWD}"
+  parent="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
   if command -v cygpath >/dev/null 2>&1; then
     parent="$(cygpath -u "$parent")" || return 1
   fi
-  parent="$(cd "$parent" && pwd -P)" || return 1
+  if ! parent="$(cd "$parent" && pwd -P)"; then
+    if [[ -n "${RUNNER_TEMP:-}" ]]; then
+      return 1
+    fi
+    parent="$(cd /tmp && pwd -P)" || return 1
+  fi
   if ! TEMP_DIR="$(umask 077; mktemp -d "${parent}/${prefix}-install-XXXXXX")"; then
-    echo "ERROR: Could not allocate release staging under $parent" >&2
-    return 1
+    if [[ -z "${RUNNER_TEMP:-}" && "$parent" != "$(cd /tmp && pwd -P)" ]]; then
+      parent="$(cd /tmp && pwd -P)" || return 1
+      TEMP_DIR="$(umask 077; mktemp -d "${parent}/${prefix}-install-XXXXXX")" || {
+        echo "ERROR: Could not allocate release staging under $parent" >&2
+        return 1
+      }
+    else
+      echo "ERROR: Could not allocate release staging under $parent" >&2
+      return 1
+    fi
   fi
   readonly TEMP_DIR
   if ! GH_AW_RELEASE_STAGING_ID="$(release_staging_identity "$TEMP_DIR")"; then
@@ -48,6 +61,63 @@ create_release_staging() {
   trap 'exit 130' INT
   trap 'exit 143' TERM
   trap 'exit 129' HUP
+}
+
+create_awf_runtime_tmp() {
+  local runtime_parent runtime_dir runtime_id
+  if [[ -z "${GITHUB_ENV:-}" ]]; then
+    return 0
+  fi
+  if [[ -n "${GH_AW_RUNTIME_TMP_DIR:-}" ]]; then
+    if [[ ! -d "$GH_AW_RUNTIME_TMP_DIR" || -L "$GH_AW_RUNTIME_TMP_DIR" || ! -O "$GH_AW_RUNTIME_TMP_DIR" ||
+      "$(release_staging_identity "$GH_AW_RUNTIME_TMP_DIR")" != "${GH_AW_RUNTIME_TMP_ID:-}" ]]; then
+      echo "ERROR: Existing AWF runtime temp directory is not owned by this invocation" >&2
+      return 1
+    fi
+    export TMPDIR="$GH_AW_RUNTIME_TMP_DIR"
+    return 0
+  fi
+  runtime_parent="$(cd /tmp && pwd -P)" || return 1
+  if ! runtime_dir="$(umask 077; mktemp -d "${runtime_parent}/gh-aw-runtime-XXXXXX")"; then
+    echo "ERROR: Could not allocate private AWF runtime temp directory under $runtime_parent" >&2
+    return 1
+  fi
+  runtime_id="$(release_staging_identity "$runtime_dir")" || {
+    rm -rf -- "$runtime_dir"
+    return 1
+  }
+  if ! printf 'GH_AW_RUNTIME_TMP_DIR=%s\nGH_AW_RUNTIME_TMP_ID=%s\nTMPDIR=%s\n' \
+    "$runtime_dir" "$runtime_id" "$runtime_dir" >>"$GITHUB_ENV"; then
+    rm -rf -- "$runtime_dir"
+    echo "ERROR: Could not persist private AWF runtime temp directory" >&2
+    return 1
+  fi
+  export GH_AW_RUNTIME_TMP_DIR="$runtime_dir"
+  export GH_AW_RUNTIME_TMP_ID="$runtime_id"
+  export TMPDIR="$runtime_dir"
+}
+
+cleanup_awf_runtime_tmp() {
+  local runtime_dir="${GH_AW_RUNTIME_TMP_DIR:-}" runtime_id="${GH_AW_RUNTIME_TMP_ID:-}" runtime_parent
+  if [[ -z "$runtime_dir" ]]; then
+    return 0
+  fi
+  runtime_parent="$(cd /tmp && pwd -P)" || return 0
+  if [[ "${runtime_dir%/*}" != "$runtime_parent" || "${runtime_dir##*/}" != gh-aw-runtime-* ]]; then
+    echo "Warning: refusing to clean an AWF runtime temp path outside its private temp root: $runtime_dir" >&2
+    return 0
+  fi
+  if [[ ! -e "$runtime_dir" && ! -L "$runtime_dir" ]]; then
+    return 0
+  fi
+  if [[ -L "$runtime_dir" || ! -d "$runtime_dir" || ! -O "$runtime_dir" ||
+    "$(release_staging_identity "$runtime_dir")" != "$runtime_id" ]]; then
+    echo "Warning: refusing to clean a replaced or unowned AWF runtime temp directory: $runtime_dir" >&2
+    return 0
+  fi
+  if ! rm -rf -- "$runtime_dir"; then
+    echo "Warning: unable to reclaim owned AWF runtime temp directory without elevated permissions: $runtime_dir" >&2
+  fi
 }
 
 # Each entry binds repository, immutable release version, asset name, and SHA256.
