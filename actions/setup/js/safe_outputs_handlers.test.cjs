@@ -866,6 +866,16 @@ describe("safe_outputs_handlers", () => {
       expect(() => handlers.uploadAssetHandler(args)).toThrow("GH_AW_ASSETS_BRANCH not set");
     });
 
+    it("should reject an asset branch that normalizes to empty before staging", () => {
+      process.env.GH_AW_ASSETS_BRANCH = "!!!";
+      const testFile = path.join(testWorkspaceDir, "invalid-branch.png");
+      fs.writeFileSync(testFile, "test content");
+
+      expect(() => handlers.uploadAssetHandler({ path: testFile })).toThrow(/GH_AW_ASSETS_BRANCH must normalize to a non-empty branch name/);
+      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+      expect(fs.existsSync(path.join(testRunnerTemp, "gh-aw", "safeoutputs", "assets"))).toBe(false);
+    });
+
     it("should throw error if file not found", () => {
       process.env.GH_AW_ASSETS_BRANCH = "test-branch";
 

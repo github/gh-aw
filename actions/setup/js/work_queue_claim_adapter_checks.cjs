@@ -461,7 +461,7 @@ function registerTests({ describe, it }) {
             },
             createRef: async args => {
               calls.push("ref");
-              assert.match(args.ref, /^refs\/heads\/assets\/trusted\/claims\//);
+              assert.match(args.ref, /^refs\/heads\/assets\/trusted-claim-[a-f0-9]{64}$/);
               ref = args.sha;
               return { data: { object: { sha: ref } } };
             },

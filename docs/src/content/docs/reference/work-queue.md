@@ -116,6 +116,8 @@ When listed in `<mcp-clis>`, invoke tools as `work-queue work_queue_read '{}'`. 
 
 The immutable Work payload declares its output contract in `effect_contract`. A read-only task can use `{"kind":"none"}`; a missing contract or successful `noop` alone does not prove no-write delivery. Write-capable contracts must bound the permitted outputs and resource scope.
 
+Claim-scoped asset uploads publish to a sibling branch named by appending `-claim-<namespace>` to the configured asset branch, while keeping content under `claims/<namespace>/`. Legacy refs remain untouched; historical delivery failures are not repaired.
+
 Worker conclusion performs inline reservation cleanup. Scheduled `agentics-maintenance.yml` reconciliation handles stranded reservations and pending delivery before compaction. Maintenance never cancels active runs or manufactures Result; disabling it leaves dispatcher/operator reconciliation as the fallback.
 
 ### Claim-scoped memory

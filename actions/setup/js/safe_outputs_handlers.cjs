@@ -750,6 +750,9 @@ function createHandlers(server, appendSafeOutput, config = {}) {
 
     // Normalize the branch name to ensure it's a valid git branch name
     const normalizedBranchName = normalizeBranchName(branchName);
+    if (!normalizedBranchName) {
+      throw new Error(`${ERR_CONFIG}: GH_AW_ASSETS_BRANCH must normalize to a non-empty branch name`);
+    }
 
     const { path: filePath } = args;
 
