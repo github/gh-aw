@@ -1,7 +1,7 @@
 # ADR-74943: Explicit Git Repository Identity for Credential Setup
 
-**Date**: 2025-07-14
-**Status**: Draft
+**Date**: 2026-11-06
+**Status**: Proposed
 **Deciders**: pelikhan, Copilot coding agent
 
 ---
@@ -12,7 +12,13 @@
 
 ### Decision
 
-We will pass the intended repository to credential setup through a new non-reserved variable, `GH_AW_GIT_REPOSITORY`. The compiler will emit the actual checkout identity for workspace-root, subdirectory, trial, and safe-output sub-checkouts, including the `.wiki` suffix where applicable. When the variable is absent, the script falls back to `GITHUB_REPOSITORY` so older callers keep working; an explicitly empty identity is rejected. The script will also fail closed: it checks that the effective fetch and push URLs match the expected server and repository both before and after it writes credentials, rejecting plaintext HTTP. On a mismatch it exits non-zero without printing URLs or tokens, restoring the original remote configuration if post-authentication verification fails. Workspaces without a checkout or `origin` retain their no-op behavior. Safe-output sub-checkouts use the same helper, so every path goes through one validation point.
+Credential setup receives the intended repository through the non-reserved variable `GH_AW_GIT_REPOSITORY`. The compiler emits the actual checkout identity for workspace-root, subdirectory, trial, and safe-output sub-checkouts, including the `.wiki` suffix where applicable. State-persistence jobs use the workflow repository they actually clone, rather than inheriting the trial logical repository. When the variable is absent, the script falls back to `GITHUB_REPOSITORY` for legacy callers; an explicitly empty identity is rejected.
+
+For expression-based paths, generated credential steps resolve the evaluated checkout directories at runtime in checkout order. The last checkout whose resolved directory equals the workspace root determines the expected root identity. This handles `.`, empty paths, equivalent normalized paths, and absolute root paths without deriving identity from `origin`. Superseded root checkouts are not re-authenticated with earlier identities. A current checkout that resolves to a subdirectory keeps its own identity; one that resolves to the root follows the same ordering rule. Expressions are passed as environment data, not interpolated into shell commands, and a literal or evaluated `-` is normalized to `./-` before `cd`.
+
+The shared shell helper checks that every effective fetch and push URL matches the expected server and repository before and after writing credentials, rejecting plaintext HTTP. It uses the shell, Git, and standard utilities without requiring Node for identity verification. On failure it exits non-zero without printing URLs or tokens. Failed post-authentication verification restores the original raw origin URL; restoration failure triggers credential-URL removal with explicit diagnostics if cleanup also fails.
+
+Workspaces without their own checkout or `origin` retain no-op authentication behavior without discovering a parent checkout. Untrusted checkouts, Git configuration-read errors, and runtime directory-resolution failures stop credential setup rather than being treated as missing remotes. This change does not grant new token permissions or change per-checkout token selection.
 
 ### Alternatives Considered
 
@@ -28,22 +34,30 @@ The script would read the repository identity from the checkout's own remote and
 
 This would pass `GH_AW_GIT_REPOSITORY` but skip the before/after URL checks. It is simpler, but a mismatch would go unnoticed and credentials could be attached to an unexpected remote.
 
+#### Alternative 4: Resolve root identity only at compile time
+
+A literal `path: .` can be resolved at compile time, but an expression may evaluate to the root and replace the default checkout. Checking only literal paths rejects that valid layout. Runtime directory comparison preserves checkout ordering while retaining an independently configured repository identity.
+
 ### Consequences
 
 #### Positive
 - Credential setup no longer depends on a runner-reserved variable for cross-repository checkouts.
 - Fail-closed checks stop tokens from being attached to the wrong repository or server, and error output does not expose URLs or tokens.
 - Safe-output sub-checkouts and the main checkout share one helper and one set of identity rules.
+- Expression-resolved root paths work consistently in agent and safe-output jobs, without weakening remote verification.
 
 #### Negative
 - Existing workflows have to be recompiled to emit `GH_AW_GIT_REPOSITORY`. Until then they use the legacy fallback.
 - Strict URL matching can reject setups that worked before, such as unusual remote forms or mirrors. It recognizes HTTPS, SSH, scp-style, and case-insensitive equivalents only.
 - The shell script now does more parsing and comparison, which adds maintenance work.
+- Workflows with expression-based paths add runtime directory checks. Missing checkout directories fail explicitly.
 
 #### Neutral
-- Ten golden test fixtures change because of the new env line in generated steps.
-- The documentation adds a supported pattern for central workflows that sets `GH_AW_GIT_REPOSITORY` and `GITHUB_SERVER_URL`.
+- Compiled workflow locks and ten golden fixtures were regenerated for the non-reserved identity variable. Existing checked-in workflows have no additional drift from the runtime-path fix.
+- The checkout reference documents explicit identities, runtime path resolution, and failure behavior.
 
----
+### Validation and Limits
 
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
+The credential-helper suite covers 42 cases, including runner-reserved identity precedence, URL rewrites, rollback, missing checkouts, untrusted ownership, and operation without Node. Forty generated-step execution cases exercise agent and safe-output runtime paths, checkout ordering, wiki/trial/current layouts, shell-data safety, and fail-closed boundaries. Focused Go and WASM checks and compilation/drift checks for all 356 repository workflows passed.
+
+The aggregate local gate remains blocked by previously documented custom-linter findings on unchanged lines. An unrelated, intermittent environment-override Go test failed in CI but passed repeated checks on both the PR head and original base; it is deferred rather than hidden. These local results do not establish live GitHub authentication compatibility for every runner/server configuration or prove the cause of the original intermittent reports. Approval of this proposed decision remains a maintainer responsibility.
