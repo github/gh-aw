@@ -83,6 +83,9 @@ func TestPiEngine_GetExecutionSteps_DefaultWithoutGateway(t *testing.T) {
 	assert.Contains(t, stepText, `--model "${GH_AW_PI_NATIVE_PROVIDER}/${GH_AW_PI_MODEL_ID}"`)
 	assert.Contains(t, stepText, "GH_AW_PI_NATIVE_PROVIDER: github-copilot")
 	assert.Contains(t, stepText, "GH_AW_PI_MODEL_ID: gpt-5.4")
+	resolvedStepText := strings.ReplaceAll(stepText, "${GH_AW_PI_NATIVE_PROVIDER}", "github-copilot")
+	resolvedStepText = strings.ReplaceAll(resolvedStepText, "${GH_AW_PI_MODEL_ID}", "gpt-5.4")
+	assert.Contains(t, resolvedStepText, `--model "github-copilot/gpt-5.4"`)
 	assert.NotContains(t, stepText, "--model github-copilot/auto")
 }
 
@@ -682,6 +685,8 @@ func TestPiEngine_GetExecutionSteps_AliasModelResolvedAtRuntime(t *testing.T) {
 			} else {
 				assert.Contains(t, stepText, `--model "aw-gateway/${GH_AW_PI_MODEL_ID}"`)
 				assert.Contains(t, stepText, "GH_AW_PI_MODEL_ID: "+modelID)
+				assert.Contains(t, strings.ReplaceAll(stepText, "${GH_AW_PI_MODEL_ID}", modelID),
+					fmt.Sprintf(`--model "aw-gateway/%s"`, modelID))
 				assert.NotContains(t, stepText, "/tmp/gh-aw/pi-model")
 			}
 		})
