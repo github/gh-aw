@@ -668,7 +668,7 @@ function renderBlocks(nodes, compactExpiration = false) {
         case "alert":
           return (node.type === "alert" ? `[!${node.kind}]\n` : "") + renderBlocks(node.children, node.type === "quote");
         case "details":
-          return `<details${node.open ? " open" : ""}>\n<summary>${typeof node.summary === "string" ? escapeSummaryText(node.summary) : renderInlines(node.summary, true)}</summary>\n\n${renderBlocks(node.children)}\n\n</details>`;
+          return `<details${node.open === true ? " open" : ""}>\n<summary>${typeof node.summary === "string" ? escapeSummaryText(node.summary) : renderInlines(node.summary, true)}</summary>\n\n${renderBlocks(node.children)}\n\n</details>`;
         case "table": {
           const row = cells => `| ${cells.map(cell => renderInlines(cell).replace(/(?<!\\)\|/g, "\\|")).join(" | ")} |`;
           return [row(node.headers), `| ${node.headers.map(() => "---").join(" | ")} |`, ...node.rows.map(row)].join("\n");
