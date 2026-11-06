@@ -15,6 +15,12 @@ is saved with catalog-derived AIC and USD costs for summaries and daily accounti
 Missing usage or pricing is reported as unavailable, not zero. AWF per-request
 credit limits and sandbox target overrides do not apply to evals.
 Request failures produce a `not_evaluated` marker, not `UNKNOWN` question results.
+If the provider explicitly reports that the configured Decisions model is missing
+or unsupported, the runtime warns and records `not_evaluated` with reason code
+`model_unavailable` without failing the execution step. It does not retry or
+fall back to a chat model. Select a Decisions-compatible `evals.model` offered
+to the workflow. Authentication, transport, and other request errors still fail
+the execution step and are recorded as `judge_failed`.
 Both providers use `/v1/decisions`. Configure the actual provider model ID:
 `copilot/gpt-6-luna-decisions` for Copilot or `openai/gpt-6-luna` for OpenAI.
 Model IDs are sent without provider-specific name mapping.

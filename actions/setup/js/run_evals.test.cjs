@@ -6,6 +6,7 @@ const require = createRequire(import.meta.url);
 const { executeMain, parseMain, summarizeUsageMain, recordUsage, classifyJudgeExecution } = require("./run_evals.cjs");
 const { findModelPricing } = require("./model_costs.cjs");
 const { sumAICFromUsageJSONLFiles } = require("./daily_aic_workflow_helpers.cjs");
+const { readEvalsNotEvaluatedStatus } = require("./evals_status.cjs");
 const dir = "/tmp/gh-aw/evals";
 const output = "/tmp/gh-aw/evals.jsonl";
 const status = "/tmp/gh-aw/evals_status.json";
@@ -139,6 +140,50 @@ describe("Decisions BinEval harness", () => {
     await expect(executeMain()).rejects.toThrow("HTTP 401");
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(fs.existsSync(`${dir}/decisions.json`)).toBe(false);
+  });
+
+  it.each([
+    [400, { error: { code: "model_not_supported" } }],
+    [404, { error: { code: "model_not_found" } }],
+    [422, { code: "unsupported_model" }],
+  ])("gracefully records unavailable Decisions models without answers or costs (HTTP %s)", async (httpStatus, body) => {
+    fs.writeFileSync(`${dir}/decisions.json`, "{}");
+    fs.writeFileSync(output, "stale answers");
+    fs.writeFileSync(status, "{}");
+    fs.writeFileSync(usagePath, '{"ai_credits":42}');
+    fetch.mockResolvedValue({ ok: false, status: httpStatus, json: async () => ({ ...body, message: "sensitive provider message" }) });
+    await expect(executeMain()).resolves.toBeUndefined();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(readEvalsNotEvaluatedStatus()).toMatchObject({ status: "not_evaluated", reason_code: "model_unavailable", model: "copilot/gpt-6-luna-decisions", run_id: "123", run_attempt: "1" });
+    await parseMain();
+    expect(readEvalsNotEvaluatedStatus()).toMatchObject({ reason_code: "model_unavailable", execution_outcome: "success", execution_state: "model_unavailable" });
+    for (const file of [output, usagePath, `${dir}/decisions.json`]) expect(fs.existsSync(file)).toBe(false);
+    expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("Decisions-compatible evals.model"));
+    expect(JSON.stringify(core.warning.mock.calls)).not.toContain("sensitive");
+  });
+
+  it("does not reuse unavailable-model evidence from another attempt", async () => {
+    fetch.mockResolvedValue({ ok: false, status: 400, json: async () => ({ error: { code: "model_not_supported" } }) });
+    await executeMain();
+    vi.stubEnv("GITHUB_RUN_ATTEMPT", "2");
+    await parseMain();
+    expect(readEvalsNotEvaluatedStatus().reason_code).toBe("no_assistant_response");
+  });
+
+  it.each(["cancelled", "skipped"])("preserves %s outcomes over unavailable-model evidence", async outcome => {
+    fetch.mockResolvedValue({ ok: false, status: 400, json: async () => ({ error: { code: "model_not_supported" } }) });
+    await executeMain();
+    vi.stubEnv("GH_AW_EVALS_EXECUTION_OUTCOME", outcome);
+    await parseMain();
+    expect(readEvalsNotEvaluatedStatus().reason_code).toBe(outcome === "skipped" ? "judge_not_started" : "judge_failed");
+  });
+
+  it.each([400, 404, 422])("still fails ordinary HTTP %s errors instead of skipping evals", async httpStatus => {
+    fetch.mockResolvedValue({ ok: false, status: httpStatus, json: async () => ({ error: { code: "invalid_request_error" } }) });
+    await expect(executeMain()).rejects.toThrow(`HTTP ${httpStatus}`);
+    vi.stubEnv("GH_AW_EVALS_EXECUTION_OUTCOME", "failure");
+    await parseMain();
+    expect(readEvalsNotEvaluatedStatus().reason_code).toBe("judge_failed");
   });
 
   it("classifies skipped execution as not started", () => {

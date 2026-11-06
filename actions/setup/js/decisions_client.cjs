@@ -14,6 +14,14 @@
 
 const MAX_DECISION_QUESTIONS = 400;
 
+class DecisionsModelUnavailableError extends Error {
+  /** @param {number} status */
+  constructor(status) {
+    super(`Decisions model is unavailable or unsupported (HTTP ${status})`);
+    this.name = "DecisionsModelUnavailableError";
+  }
+}
+
 /**
  * Validate a complete batch before sending any request.
  * @param {DecisionQuestion[]} questions
@@ -109,8 +117,22 @@ async function invokeDecisions({ baseURL, apiKey, model, input, questions, timeo
     signal: AbortSignal.timeout(timeoutMs),
     redirect: "error",
   });
-  // Do not include provider bodies: they may echo credentials or untrusted evidence.
-  if (!response.ok) throw new Error(`Decisions request failed (HTTP ${response.status})`);
+  // Inspect only allowlisted codes; never expose provider bodies or messages.
+  if (!response.ok) {
+    if ([400, 404, 422].includes(response.status)) {
+      let body;
+      try {
+        body = await response.json();
+      } catch (error) {
+        if (!(error instanceof SyntaxError)) throw error;
+      }
+      const code = body?.error?.code ?? body?.code;
+      if (["model_not_supported", "model_not_found", "model_not_available", "model_unavailable", "unsupported_model"].includes(code)) {
+        throw new DecisionsModelUnavailableError(response.status);
+      }
+    }
+    throw new Error(`Decisions request failed (HTTP ${response.status})`);
+  }
   const result = await response.json();
   // Account for billed requests even if the answer batch fails validation.
   if (onUsage && result && typeof result === "object") {
@@ -119,4 +141,4 @@ async function invokeDecisions({ baseURL, apiKey, model, input, questions, timeo
   return validateDecisionResponse(result, questions);
 }
 
-module.exports = { invokeDecisions, validateDecisionResponse, validateQuestions, MAX_DECISION_QUESTIONS };
+module.exports = { invokeDecisions, validateDecisionResponse, validateQuestions, MAX_DECISION_QUESTIONS, DecisionsModelUnavailableError };
