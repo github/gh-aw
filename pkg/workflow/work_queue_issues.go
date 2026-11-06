@@ -160,6 +160,6 @@ func (c *Compiler) buildWorkQueueIssuesStep(data *WorkflowData) []string {
 		"          script: |\n",
 		"            const { main } = require('${{ runner.temp }}/gh-aw/actions/work_queue_issues.cjs');\n",
 		"            const result = await main({ core, githubClient: github, context });\n",
-		"            if (result.pending?.length) core.setFailed('Work queue is committed; Issue synchronization remains pending. Inspect the exact terminal request before using work-queue sync-issues --request-id.');\n",
+		"            if (result.pending?.length) core.warning('Work queue is committed; Issue synchronization remains pending. Inspect the exact terminal request before using work-queue sync-issues --request-id.');\n",
 	)
 }
