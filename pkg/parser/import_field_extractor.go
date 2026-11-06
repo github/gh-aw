@@ -18,6 +18,7 @@ import (
 // BFS import traversal. It accumulates results from all imported files and provides
 // a method to convert the accumulated state into the final ImportsResult.
 type importAccumulator struct {
+	connectors               []ConnectorImport
 	toolsBuilder             strings.Builder
 	mcpServersBuilder        strings.Builder
 	markdownBuilder          strings.Builder // imports with substituted inputs or schema defaults (compile-time substitution)
@@ -147,6 +148,12 @@ func (acc *importAccumulator) extractImportFields(content []byte, item importQue
 			return err
 		}
 	}
+	if registrations, ok := fm["connectors"].(map[string]any); ok {
+		if err := validateSharedConnectorFields(fm); err != nil {
+			return fmt.Errorf("import %q: %w", item.importPath, err)
+		}
+		acc.connectors = append(acc.connectors, ConnectorImport{Source: item.importPath, Registrations: registrations})
+	}
 
 	// Phase 3: Extract engine configuration (id, runtime, mcp timeouts, model preference).
 	acc.extractEngineConfig(fm, item.fullPath)
@@ -185,8 +192,9 @@ func (acc *importAccumulator) extractImportFields(content []byte, item importQue
 // fm (parsed from possibly-substituted content, used for all field extraction), and
 // any error that should abort processing for this import.
 func (acc *importAccumulator) prepareFrontmatter(content []byte, item importQueueItem, visited map[string]struct{}) (origFm, fm map[string]any, err error) {
-	origContent := string(content)
-	origParsed, origParseErr := parseOriginalFrontmatter(content, item.fullPath, origContent)
+	origContent := RemoveConnectorDocumentation(string(content))
+	documentationRemoved := origContent != string(content)
+	origParsed, origParseErr := parseOriginalFrontmatter([]byte(origContent), item.fullPath, origContent)
 	if origParseErr == nil {
 		acc.collectActionPinSourceVersions([]byte(strings.Join(origParsed.FrontmatterLines, "\n")))
 	}
@@ -198,7 +206,7 @@ func (acc *importAccumulator) prepareFrontmatter(content []byte, item importQueu
 	if err := acc.collectInlineSubAgentWarnings(item.importPath, item.sectionName, rawContent, wasSubstituted, origParsed, origParseErr); err != nil {
 		return nil, nil, err
 	}
-	toolsContent, err := acc.extractToolsContent(rawContent, item, visited, wasSubstituted)
+	toolsContent, err := acc.extractToolsContent(rawContent, item, visited, wasSubstituted || documentationRemoved)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1061,6 +1069,7 @@ func (acc *importAccumulator) toImportsResult(topologicalOrder []string) *Import
 // ImportedFiles which is populated separately from the topological sort order.
 func (acc *importAccumulator) buildImportsResult() *ImportsResult {
 	result := &ImportsResult{
+		Connectors:                    acc.connectors,
 		MergedTools:                   acc.toolsBuilder.String(),
 		MergedMCPServers:              acc.mcpServersBuilder.String(),
 		MergedEngines:                 acc.engines,

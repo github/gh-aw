@@ -1362,7 +1362,7 @@ compile-cli-workflows:
 		echo "./$(BINARY_NAME) not found; building it first..."; \
 		$(MAKE) build; \
 	fi
-	@TMP_WORKFLOWS_DIR=$$(mktemp -d); \
+	@set -e; TMP_WORKFLOWS_DIR=$$(mktemp -d); \
 	trap 'rm -rf "$$TMP_WORKFLOWS_DIR"' EXIT; \
 	cp -R pkg/cli/workflows "$$TMP_WORKFLOWS_DIR/workflows"; \
 	WORKFLOWS=$$(find "$$TMP_WORKFLOWS_DIR/workflows" -maxdepth 1 -type f -name '*.lock.yml' | sed 's/\.lock\.yml$$/.md/' | sort | tr '\n' ' '); \
@@ -1370,7 +1370,11 @@ compile-cli-workflows:
 		echo "No workflow files found in pkg/cli/workflows"; \
 		exit 1; \
 	fi; \
-	./$(BINARY_NAME) compile --fix --no-check-update $$WORKFLOWS
+	./$(BINARY_NAME) compile --fix --no-check-update $$WORKFLOWS; \
+	mkdir -p "$$TMP_WORKFLOWS_DIR/.github/workflows"; \
+	cp -R .github/workflows/connectors "$$TMP_WORKFLOWS_DIR/.github/workflows/connectors"; \
+	cp pkg/cli/workflows/*-golden.md "$$TMP_WORKFLOWS_DIR/.github/workflows/"; \
+	./$(BINARY_NAME) compile --validate --strict --no-emit --no-check-update "$$TMP_WORKFLOWS_DIR"/.github/workflows/*-golden.md
 
 # Apply automatic fixes to workflow files
 .PHONY: fix

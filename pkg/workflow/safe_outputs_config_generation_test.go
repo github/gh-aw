@@ -6,11 +6,35 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.yaml.in/yaml/v3"
 )
+
+func TestConnectorSafeScriptThreatWarningPolicy(t *testing.T) {
+	config := map[string]any{}
+	addSafeScriptsConfig(config, map[string]*SafeScriptConfig{
+		"custom-alias-mutate": {connectorInputSchema: map[string]any{}},
+		"ordinary-script":     {},
+	})
+	require.Equal(t, "abort", config["custom_alias_mutate"].(map[string]any)["threat_warning_policy"])
+	require.NotContains(t, config["ordinary_script"], "threat_warning_policy")
+	compiler := NewCompiler()
+	var steps []string
+	compiler.addHandlerManagerConfigEnvVar(&steps, &WorkflowData{SafeOutputs: &SafeOutputsConfig{Scripts: map[string]*SafeScriptConfig{
+		"custom-alias-mutate": {connectorInputSchema: map[string]any{}},
+		"ordinary-script":     {},
+	}}})
+	var env map[string]string
+	require.NoError(t, yaml.Unmarshal([]byte(strings.Join(steps, "")), &env))
+	var runtimeConfig map[string]any
+	require.NoError(t, json.Unmarshal([]byte(env["GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG"]), &runtimeConfig))
+	require.Equal(t, "abort", runtimeConfig["custom_alias_mutate"].(map[string]any)["threat_warning_policy"])
+	require.NotContains(t, runtimeConfig, "ordinary_script")
+}
 
 func TestBuildSafeOutputInputsConfigIncludesMaxLength(t *testing.T) {
 	maxLength := 40000

@@ -6,8 +6,10 @@ import (
 	"maps"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/sliceutil"
 	"github.com/github/gh-aw/pkg/stringutil"
 )
 
@@ -22,6 +24,43 @@ type SampleEntry struct {
 	// Sidecars carries fields stripped from Arguments that need out-of-band
 	// pre-staging by the driver (e.g. `patch` for create_pull_request).
 	Sidecars map[string]any `json:"sidecars,omitempty"`
+}
+
+type sampleRuntimeBinding struct {
+	Entry int      `json:"entry"`
+	Path  []string `json:"path"`
+	Env   string   `json:"env"`
+}
+
+// Keep runtime values outside serialized replay control data. Bindings point
+// only to authored string values, never tool names or object keys.
+func collectSampleRuntimeBindings(entries []SampleEntry) ([]sampleRuntimeBinding, map[string]string) {
+	var bindings []sampleRuntimeBinding
+	values := make(map[string]string)
+	var visit func(int, []string, any)
+	visit = func(entry int, path []string, value any) {
+		switch v := value.(type) {
+		case string:
+			if sampleRuntimeExpressionPattern.MatchString(v) {
+				name := fmt.Sprintf("GH_AW_SAMPLE_VALUE_%d", len(bindings))
+				bindings = append(bindings, sampleRuntimeBinding{Entry: entry, Path: slices.Clone(path), Env: name})
+				values[name] = v
+			}
+		case map[string]any:
+			for _, key := range sliceutil.SortedKeys(v) {
+				visit(entry, append(path, key), v[key])
+			}
+		case []any:
+			for i, item := range v {
+				visit(entry, append(path, strconv.Itoa(i)), item)
+			}
+		}
+	}
+	for i, entry := range entries {
+		visit(i, []string{"arguments"}, entry.Arguments)
+		visit(i, []string{"sidecars"}, entry.Sidecars)
+	}
+	return bindings, values
 }
 
 // samplesFeatureName is the frontmatter feature flag that opts a single
@@ -141,6 +180,18 @@ func collectSampleEntries(config *SafeOutputsConfig) []SampleEntry {
 				Tool:      toolName,
 				Arguments: args,
 				Sidecars:  sidecars,
+			})
+		}
+	}
+	for _, name := range sliceutil.SortedKeys(config.Scripts) {
+		script := config.Scripts[name]
+		if script == nil || script.connectorOptions == nil {
+			continue
+		}
+		for _, sample := range script.connectorOptions.Samples {
+			entries = append(entries, SampleEntry{
+				Tool:      stringutil.NormalizeSafeOutputIdentifier(name),
+				Arguments: maps.Clone(sample),
 			})
 		}
 	}
@@ -267,6 +318,24 @@ func writeSampleReplayInputEnvVars(yaml *strings.Builder, inputEnvVars map[strin
 	}
 }
 
+func writeSampleReplayPayloadEnv(yaml *strings.Builder, entries []SampleEntry, payload []byte) {
+	bindings, sampleValues := collectSampleRuntimeBindings(entries)
+	// Only the driver decodes JSON escapes; Actions cannot expand control data.
+	staticPayload := strings.ReplaceAll(string(payload), "$", `\u0024`)
+	yaml.WriteString("          GH_AW_SAMPLES: |\n")
+	for line := range strings.SplitSeq(staticPayload, "\n") {
+		yaml.WriteString("            " + line + "\n")
+	}
+	if len(bindings) == 0 {
+		return
+	}
+	bindingJSON, _ := json.Marshal(bindings) //nolint:jsonmarshalignoredeerror // bindings contain only integers and strings.
+	yaml.WriteString("          GH_AW_SAMPLE_BINDINGS: |\n            " + strings.ReplaceAll(string(bindingJSON), "$", `\u0024`) + "\n")
+	for _, binding := range bindings {
+		writeYAMLEnv(yaml, "          ", binding.Env, sampleValues[binding.Env])
+	}
+}
+
 // generateSamplesReplayStep emits the YAML that replaces the agentic
 // `Execute coding agent` step when the hidden `gh aw compile --use-samples`
 // flag is used. It spawns the safe-outputs MCP server over stdio and feeds it
@@ -295,7 +364,6 @@ func (c *Compiler) generateSamplesReplayStep(yaml *strings.Builder, data *Workfl
 		compilerYamlLog.Printf("Warning: failed to marshal samples entries: %v", err)
 		payload = []byte("[]")
 	}
-
 	// Build the per-repo token map so apply_samples.cjs can reach repos that
 	// require a non-default token (cross-repo `checkout:` entries with their
 	// own `github-token:` or `github-app:`).
@@ -305,10 +373,7 @@ func (c *Compiler) generateSamplesReplayStep(yaml *strings.Builder, data *Workfl
 	yaml.WriteString("      - name: Replay safe-outputs samples (deterministic)\n")
 	yaml.WriteString("        id: agentic_execution\n")
 	yaml.WriteString("        env:\n")
-	yaml.WriteString("          GH_AW_SAMPLES: |\n")
-	for line := range strings.SplitSeq(string(payload), "\n") {
-		fmt.Fprintf(yaml, "            %s\n", line)
-	}
+	writeSampleReplayPayloadEnv(yaml, entries, payload)
 	fmt.Fprintf(yaml, "          GH_AW_AGENT_STDIO_LOG: %s\n", logFile)
 	yaml.WriteString("          GH_AW_SAFE_OUTPUTS_CONFIG_PATH: ${{ runner.temp }}/gh-aw/safeoutputs/config.json\n")
 	yaml.WriteString("          GH_AW_SAFE_OUTPUTS: ${{ runner.temp }}/gh-aw/safeoutputs/outputs.jsonl\n")
@@ -350,6 +415,11 @@ func safeOutputsMissingSamples(config *SafeOutputsConfig) []string {
 			continue
 		}
 		keys = append(keys, toolDisplayKey(handler.Key))
+	}
+	for name, script := range config.Scripts {
+		if script != nil && script.connectorOptions != nil && len(script.connectorOptions.Samples) == 0 {
+			keys = append(keys, name)
+		}
 	}
 	sort.Strings(keys)
 	return keys

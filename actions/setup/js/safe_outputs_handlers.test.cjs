@@ -85,17 +85,6 @@ describe("safe_outputs_handlers", () => {
     handlers = createHandlers(mockServer, mockAppendSafeOutput);
   });
 
-  it("collects Azure DevOps proposals using namespaced message types", () => {
-    handlers.createWorkItemHandler({ temporary_id: "item", title: "Create item" });
-    handlers.updateWorkItemHandler({ id: "#item", title: "Update item" });
-    handlers.commentOnWorkItemHandler({ work_item_id: "#item", body: "Comment" });
-    handlers.assignWorkItemHandler({ work_item_id: "#item", assignee: "user@example.com" });
-    handlers.linkWorkItemsHandler({ source_id: "#item", target_id: 42, type: "related" });
-
-    expect(mockAppendSafeOutput.mock.calls.map(call => call[0].type)).toEqual(["ado_create_work_item", "ado_update_work_item", "ado_comment_on_work_item", "ado_assign_work_item", "ado_link_work_items"]);
-    expect(mockAppendSafeOutput.mock.calls[0][0].temporary_id).toMatch(/^#aw_/);
-  });
-
   describe("create_issue artifact paths", () => {
     let restoreDescriptors;
     const request = artifacts => ({ title: "Implement parser caching", body: "Cache parsed workflows and add regression coverage.", artifacts });
@@ -5240,39 +5229,6 @@ describe("safe_outputs_handlers", () => {
       } finally {
         global.context = savedContext;
       }
-    });
-  });
-
-  describe("Jira handlers", () => {
-    it("assigns a temporary ID when recording issue creation", () => {
-      const result = handlers.jiraCreateIssueHandler({ project_key: "ENG", issue_type: "Task", summary: "Smoke test" });
-      const response = JSON.parse(result.content[0].text);
-
-      expect(response).toMatchObject({ result: "success", temporary_id: expect.stringMatching(/^#aw_[A-Za-z0-9]{8}$/) });
-      expect(result.structuredContent).toEqual(response);
-      expect(mockAppendSafeOutput).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: "jira_create_issue",
-          temporary_id: response.temporary_id,
-        })
-      );
-    });
-
-    it.each([{}, { summary: "" }, { description: "   " }])("rejects updates without a non-empty field", args => {
-      const result = handlers.jiraUpdateIssueHandler(args);
-      expect(result.isError).toBe(true);
-      expect(JSON.parse(result.content[0].text)).toMatchObject({
-        result: "error",
-        error: expect.stringContaining("summary or description"),
-      });
-      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
-    });
-
-    it("records an update with a non-empty field", () => {
-      const result = handlers.jiraUpdateIssueHandler({ issue_key: "ENG-123", summary: "Updated" });
-      expect(result.isError).toBeUndefined();
-      expect(JSON.parse(result.content[0].text).result).toBe("success");
-      expect(mockAppendSafeOutput).toHaveBeenCalledWith(expect.objectContaining({ type: "jira_update_issue", issue_key: "ENG-123", summary: "Updated" }));
     });
   });
 

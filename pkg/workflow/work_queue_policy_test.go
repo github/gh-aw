@@ -548,16 +548,6 @@ func TestWorkQueueRejectsUnscopedDelegation(t *testing.T) {
 	}
 }
 
-func TestWorkQueueRejectsExternalHandlerTransports(t *testing.T) {
-	for _, safe := range []*SafeOutputsConfig{
-		{CreateWorkItems: &CreateWorkItemConfig{}},
-		{UploadWorkItemAttachments: &UploadWorkItemAttachmentConfig{}},
-	} {
-		data := &WorkflowData{Tools: map[string]any{"work-queue": map[string]any{"worker": true}}, SafeOutputs: safe}
-		require.ErrorContains(t, validateWorkQueueConfiguration(data), "trusted per-Claim target and delivery adapter")
-	}
-}
-
 func TestWorkQueueRejectsPersistentStandaloneWrites(t *testing.T) {
 	for _, data := range []*WorkflowData{
 		{LedgerConfig: &LedgerToolConfig{}},

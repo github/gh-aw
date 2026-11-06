@@ -43,6 +43,21 @@ describe("safe-output submission tracker", () => {
     ]);
   });
 
+  it("returns matching text, structured-content and queued IDs", () => {
+    const tracker = createSubmissionTracker();
+    const queued = [];
+    const handler = tracker.wrap(args => {
+      tracker.append({ type: "custom_create", ...args }, entry => queued.push(entry));
+      const result = { result: "success", temporary_id: "aw_12345678" };
+      return { content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: result };
+    });
+    const response = handler({ temporary_id: "aw_12345678" });
+    const result = payload(response);
+    expect(result).toEqual({ result: "success", temporary_id: "aw_12345678", output_id: expect.stringMatching(outputIdPattern) });
+    expect(response.structuredContent).toEqual(result);
+    expect(queued).toEqual([{ type: "custom_create", temporary_id: result.temporary_id, output_id: result.output_id }]);
+  });
+
   it("reports all queued IDs for a multi-output call", () => {
     const tracker = createSubmissionTracker();
     const queued = [];
@@ -242,18 +257,18 @@ describe("safe-output submission handler integration", () => {
     expect(append).not.toHaveBeenCalled();
   });
 
-  it("returns matching text, structured-content and queued IDs", () => {
-    const response = handlers.jiraCreateIssueHandler({ project_key: "ENG", issue_type: "Task", summary: "Meaningful issue" });
+  it("returns matching text and queued IDs for connector creation proposals", () => {
+    const connectorHandlers = createHandlers({ debug: vi.fn() }, append, { jira_create_issue: { temporary_id_field: "temporary_id" } });
+    const response = connectorHandlers.defaultHandler("jira_create_issue")({ project: "ENG", issue_type: "Task", summary: "Meaningful issue" });
     const result = payload(response);
     expect(result).toEqual({
       result: "success",
-      temporary_id: expect.stringMatching(/^#aw_[A-Za-z0-9]{8}$/),
+      temporary_id: expect.stringMatching(/^aw_[A-Za-z0-9]{8}$/),
       output_id: expect.stringMatching(outputIdPattern),
     });
-    expect(response.structuredContent).toEqual(result);
     expect(append).toHaveBeenCalledExactlyOnceWith({
       type: "jira_create_issue",
-      project_key: "ENG",
+      project: "ENG",
       issue_type: "Task",
       summary: "Meaningful issue",
       temporary_id: result.temporary_id,

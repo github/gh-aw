@@ -526,14 +526,50 @@ describe("safe_output_manifest", () => {
 
     it.each([
       ["add_comment", { commentId: 123, itemNumber: 7, repo: "owner/repo" }, { provider: "github", id: 123 }],
-      ["jira_create_issue", { issue_id: "10001", issue_key: "ENG-7" }, { provider: "jira", id: "10001", identifier: "ENG-7" }],
-      ["linear_create_issue", { id: "linear-id", identifier: "ENG-8" }, { provider: "linear", id: "linear-id", identifier: "ENG-8" }],
+      ["jira_create_issue", { provider: "jira", issue_id: "10001", issue_key: "ENG-7" }, { provider: "jira", id: "10001", identifier: "ENG-7" }],
+      ["linear_create_issue", { provider: "linear", id: "linear-id", identifier: "ENG-8" }, { provider: "linear", id: "linear-id", identifier: "ENG-8" }],
     ])("should preserve identity for %s", (type, result, expected) => {
       expect(extractCreatedItemFromResult(type, result)).toMatchObject(expected);
     });
 
-    it("should infer the azure-devops provider (hyphenated) from the metadata provider, matching ADO handler naming", () => {
-      const item = extractCreatedItemFromResult("ado_add_comment", {
+    it.each(["linear", "jira", "aw.github.com/linear", "custom-tracker"])("should preserve trusted %s connector identity from the runtime result", connector => {
+      const item = extractCreatedItemFromResult("connector_add_comment", {
+        connector,
+        capability: "safe-output/add-comment",
+        untrusted: true,
+        statusCode: 200,
+        data: { provider: "github", connector: "untrusted-response" },
+      });
+      expect(item).toEqual({ type: "connector_add_comment", provider: connector });
+      const log = createManifestLogger(testManifestFile);
+      log(item);
+      expect(JSON.parse(fs.readFileSync(testManifestFile, "utf8")).provider).toBe(connector);
+    });
+
+    it.each([
+      [{ provider: "explicit-provider", metadata: { provider: "metadata-provider" } }, "explicit-provider"],
+      [{ metadata: { provider: "metadata-provider" } }, "metadata-provider"],
+    ])("should prefer explicit provider fields over connector identity: %j", (fields, provider) => {
+      const item = extractCreatedItemFromResult("connector_add_comment", {
+        success: true,
+        connector: "linear",
+        target: "ENG-123",
+        ...fields,
+      });
+      expect(item).toMatchObject({ status: "success", provider, target: { provider, identifier: "ENG-123" } });
+    });
+
+    it.each([undefined, null, "", false, 123, {}])("should keep the GitHub fallback without a valid connector identity: %j", connector => {
+      const item = extractCreatedItemFromResult("jira_create_issue", { success: true, connector });
+      expect(item).toMatchObject({ status: "success", provider: "github" });
+    });
+
+    it.each(["linear", "jira", "custom-tracker"])("should not record staged %s connector results as applied writes", connector => {
+      expect(extractCreatedItemFromResult("connector_add_comment", { success: true, staged: true, connector, url: "https://example.com/item" })).toBeNull();
+    });
+
+    it("should preserve an explicitly reported external provider without inferring it from a tool prefix", () => {
+      const item = extractCreatedItemFromResult("azure_devops_comment_on_work_item", {
         success: true,
         number: 123,
         metadata: { provider: "azure-devops", project: "my-project", comment_id: 5 },
@@ -544,6 +580,7 @@ describe("safe_output_manifest", () => {
 
     it("should convert a scalar target (e.g. Linear issue key) into a provider-neutral object", () => {
       const item = extractCreatedItemFromResult("linear_add_comment", {
+        provider: "linear",
         success: true,
         id: "comment-1",
         target: "ENG-123",

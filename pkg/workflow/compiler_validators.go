@@ -11,6 +11,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/sliceutil"
 	"github.com/goccy/go-yaml"
 )
 
@@ -585,18 +586,8 @@ func (c *Compiler) emitExperimentalFeatureWarningsTo(workflowData *WorkflowData,
 		{enabled: slices.ContainsFunc(workflowData.WebhookSubscriptions, func(subscription WebhookSubscription) bool { return subscription.Event == "projects_v2_item" }), message: "Using experimental feature: on.gateway-dispatch.projects-items (hosted CAO triggers)"},
 		{enabled: slices.ContainsFunc(workflowData.WebhookSubscriptions, func(subscription WebhookSubscription) bool { return subscription.Event == "code_scanning_alert" }), message: "Using experimental feature: on.gateway-dispatch.code-scanning-alert (hosted CAO triggers)"},
 		{enabled: slices.ContainsFunc(workflowData.WebhookSubscriptions, func(subscription WebhookSubscription) bool { return subscription.Event == "dependabot_alert" }), message: "Using experimental feature: on.gateway-dispatch.dependabot-alerts (hosted CAO triggers)"},
-		{enabled: slices.ContainsFunc(workflowData.WebhookSubscriptions, func(subscription WebhookSubscription) bool { return subscription.Event == "jira_issue" }), message: "Using experimental feature: on.gateway-dispatch.jira-issue (approved webhook bridge required)"},
-		{enabled: slices.ContainsFunc(workflowData.WebhookSubscriptions, func(subscription WebhookSubscription) bool { return subscription.Event == "linear_issue" }), message: "Using experimental feature: on.gateway-dispatch.linear-issue (approved webhook bridge required)"},
-		{enabled: slices.ContainsFunc(workflowData.WebhookSubscriptions, func(subscription WebhookSubscription) bool { return subscription.Event == "azure_devops_issue" }), message: "Using experimental feature: on.gateway-dispatch.azure-devops-issue (approved webhook bridge required)"},
 		{enabled: workflowData.RawFrontmatter["graders"] != nil && workflowData.Graders != nil && workflowData.Graders.HasGraders(), message: "Using experimental feature: graders"},
 		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.MergePullRequest != nil, message: "Using experimental feature: merge-pull-request"},
-		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.CreateWorkItems != nil, message: "Using experimental feature: ado-create-work-item"},
-		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.UpdateWorkItems != nil, message: "Using experimental feature: ado-update-work-item"},
-		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.CommentOnWorkItems != nil, message: "Using experimental feature: ado-comment-on-work-item"},
-		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.AssignWorkItems != nil, message: "Using experimental feature: ado-assign-work-item"},
-		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.LinkWorkItems != nil, message: "Using experimental feature: ado-link-work-items"},
-		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.UploadWorkItemAttachments != nil, message: "Using experimental feature: ado-upload-workitem-attachment"},
-		{enabled: hasLinearSafeOutputs(workflowData.SafeOutputs), message: "Using experimental feature: Linear safe outputs"},
 		{enabled: len(workflowData.LSP) > 0, message: "Using experimental feature: lsp"},
 		{enabled: hasCloudHypervisorEnclaves(workflowData), message: "Using experimental feature: enclaves cloud-hypervisor runtime"},
 		{enabled: len(workflowData.Plugins) > 0, message: "Using experimental feature: plugins"},
@@ -604,6 +595,15 @@ func (c *Compiler) emitExperimentalFeatureWarningsTo(workflowData *WorkflowData,
 		{enabled: workflowData.RepoMemoryConfig != nil && slices.ContainsFunc(workflowData.RepoMemoryConfig.Memories, func(memory RepoMemoryEntry) bool { return memory.Ledger != nil }), message: "Using experimental feature: repo-memory ledger"},
 		{enabled: hasContinualExperiment(workflowData.ExperimentConfigs), message: "Using experimental feature: continual experiments"},
 		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.Steer, message: "Using experimental feature: safe-outputs steer"},
+	}
+	for _, alias := range sliceutil.SortedKeys(workflowData.Connectors) {
+		warnings = append(warnings, struct {
+			enabled bool
+			message string
+		}{
+			enabled: workflowData.Connectors[alias].Experimental,
+			message: "Using experimental feature: connectors." + alias,
+		})
 	}
 	for _, warning := range warnings {
 		if warning.enabled {

@@ -3,16 +3,13 @@
 const { ERR_VALIDATION } = require("./error_codes.cjs");
 const { isGatewayCommand, resolveGatewayCommandResource } = require("./gateway_command_webhook.cjs");
 const { GITHUB_NOTIFICATION_EVENTS, isGitHubNotification, resolveGitHubNotificationResource } = require("./github_notification_webhook.cjs");
+const { isConnectorWebhookEvent, resolveConnectorWebhookResource } = require("./connector_webhook.cjs");
 
 const WEBHOOK_PAYLOAD_POLICY = "resource-url-types-filters/v2";
-const ISSUE_TYPES = ["opened", "edited", "closed", "reopened", "labeled", "unlabeled", "deleted"];
 const WEBHOOK_TYPES = {
   projects_v2_item: ["archived", "converted", "created", "deleted", "edited", "reordered", "restored"],
   code_scanning_alert: ["appeared_in_branch", "closed_by_user", "created", "fixed", "reopened", "reopened_by_user", "updated_assignment"],
   dependabot_alert: ["assignees_changed", "auto_dismissed", "auto_reopened", "created", "dismissed", "fixed", "reintroduced", "reopened", "withdrawn"],
-  jira_issue: ISSUE_TYPES,
-  linear_issue: ISSUE_TYPES,
-  azure_devops_issue: [...ISSUE_TYPES, "restored"],
   slash_command: ["opened", "edited", "reopened", "created"],
   label_command: ["labeled"],
   ...Object.fromEntries(Object.entries(GITHUB_NOTIFICATION_EVENTS).map(([event, definition]) => [event, definition.actions])),
@@ -24,7 +21,7 @@ function reject(message) {
 }
 
 function isWebhookEvent(event) {
-  return typeof event === "string" && Object.hasOwn(WEBHOOK_TYPES, event);
+  return typeof event === "string" && (Object.hasOwn(WEBHOOK_TYPES, event) || isConnectorWebhookEvent(event));
 }
 
 function isWebhookFilterName(name) {
@@ -74,25 +71,7 @@ function resolveGitHubResource(event, url, env) {
 }
 
 function resolveProviderResource(event, url) {
-  if (event === "jira_issue") {
-    const match = url.pathname.match(/^\/rest\/api\/[23]\/issue\/([1-9][0-9]*)$/);
-    if (!match) reject("Jira payload requires a canonical REST issue URL with a decimal issue ID");
-    return { item_type: event, item_number: match[1], repo: "", source: url.origin, url: url.href };
-  }
-  if (event === "linear_issue") {
-    const match = url.pathname.match(/^\/([a-zA-Z0-9_-]+)\/issue\/([A-Z][A-Z0-9_-]*-[1-9][0-9]*)(?:\/(?:[a-zA-Z0-9_-]|%[0-9a-fA-F]{2})+)?$/);
-    if (url.origin !== "https://linear.app" || !match || match[1] === "issue") {
-      reject("Linear payload requires a canonical workspace-qualified Linear issue URL");
-    }
-    return { item_type: event, item_number: match[2], repo: "", source: `${url.origin}/${match[1]}`, url: url.href };
-  }
-  // Work item IDs are collection-scoped, not update/revision IDs. The optional
-  // project segment does not change that identity.
-  const match = url.pathname.match(/^\/([a-zA-Z0-9_-]+)(?:\/(?:[a-zA-Z0-9_.-]|%[0-9a-fA-F]{2})+)?\/_apis\/wit\/work[Ii]tems\/([1-9][0-9]*)$/);
-  if (!match || (url.hostname !== "dev.azure.com" && !/^[a-zA-Z0-9-]+\.visualstudio\.com$/.test(url.hostname))) {
-    reject("Azure DevOps payload requires a canonical collection work item API URL");
-  }
-  return { item_type: event, item_number: match[2], repo: "", source: `${url.origin}/${match[1]}`, url: url.href };
+  return reject("unsupported provider resource");
 }
 
 function resolveWebhookResource(event, payload, env = process.env) {
@@ -109,7 +88,10 @@ function resolveWebhookResource(event, payload, env = process.env) {
   ) {
     reject("webhook payload filters must contain only named, distinct homogeneous scalar value arrays");
   }
-  const supported = isWebhookEvent(event) ? WEBHOOK_TYPES[event] : undefined;
+  const supported = isConnectorWebhookEvent(event) ? payload.type : isWebhookEvent(event) ? WEBHOOK_TYPES[event] : undefined;
+  if (isConnectorWebhookEvent(event) && (!Array.isArray(payload.type) || !payload.type.every(value => typeof value === "string" && /^[a-z][a-z0-9-]{0,62}$/.test(value)))) {
+    reject("connector payload type must contain declared trigger names");
+  }
   if (!supported || !Array.isArray(payload.type) || payload.type.length === 0 || payload.type.some(type => !supported.includes(type)) || new Set(payload.type).size !== payload.type.length) {
     reject("webhook payload type must be a non-empty array of distinct supported event activities");
   }
@@ -123,6 +105,7 @@ function resolveWebhookResource(event, payload, env = process.env) {
         ? "security alert payload requires a canonical GitHub API alert URL"
         : "provider payload requires a canonical HTTPS resource URL";
   const url = resourceURL(payload.url, message, isGatewayCommand(event) || isGitHubNotification(event));
+  if (isConnectorWebhookEvent(event)) return resolveConnectorWebhookResource(event, url);
   if (isGatewayCommand(event)) return resolveGatewayCommandResource(event, url, payload, env);
   if (isGitHubNotification(event)) return resolveGitHubNotificationResource(event, url, env);
   return event.endsWith("_issue") ? resolveProviderResource(event, url) : resolveGitHubResource(event, url, env);

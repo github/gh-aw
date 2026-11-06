@@ -1,0 +1,11 @@
+{
+  "id": 301,
+  "body": "Coordination review requested.",
+  "system": false,
+  "noteable_id": 123,
+  "noteable_type": "MergeRequest",
+  "project_id": 42,
+  "noteable_iid": 7,
+  "author": { "id": 999, "username": "not-projected" },
+  "internal": false
+}

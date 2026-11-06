@@ -176,6 +176,15 @@ func TestGenerateCustomScriptToolDefinition(t *testing.T) {
 	assert.Contains(t, required, "message", "Should require message")
 }
 
+func TestGenerateSafeOutputScriptQuotesHyphenatedInputs(t *testing.T) {
+	content := generateSafeOutputScriptContent("notion-add-comment", &SafeScriptConfig{
+		Script: "return item;",
+		Inputs: map[string]*InputDefinition{"page-id": {Type: "string"}, "text": {Type: "string"}},
+	})
+	require.Contains(t, content, `const { "page-id": page_id, text } = config;`)
+	require.NotContains(t, content, "const { page-id:")
+}
+
 // TestScriptToolsInFilteredJSON verifies scripts appear in the filtered tools JSON
 func TestGenerateSafeOutputScriptContent(t *testing.T) {
 	scriptConfig := &SafeScriptConfig{

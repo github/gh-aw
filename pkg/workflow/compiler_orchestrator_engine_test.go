@@ -902,6 +902,21 @@ func TestShouldScanImportedMarkdown(t *testing.T) {
 			want:           true,
 		},
 		{
+			name:           "scans pinned remote markdown imports",
+			importFilePath: "owner/repo/.github/workflows/connectors/tracker.md@1111111111111111111111111111111111111111",
+			want:           true,
+		},
+		{
+			name:           "does not infer markdown from the remote ref",
+			importFilePath: "owner/repo/workflow.yml@release.md",
+			want:           false,
+		},
+		{
+			name:           "preserves local at signs",
+			importFilePath: "shared/workflow@release.md",
+			want:           true,
+		},
+		{
 			name:           "skips builtin markdown imports",
 			importFilePath: parser.BuiltinPathPrefix + "engines/claude.md",
 			want:           false,

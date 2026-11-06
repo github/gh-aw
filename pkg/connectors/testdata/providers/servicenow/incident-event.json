@@ -1,0 +1,7 @@
+{
+  "event": "record.updated",
+  "instance": "https://example.service-now.com",
+  "table": "incident",
+  "sys_id": "0123456789abcdef0123456789abcdef",
+  "delivery_id": "example-incident-delivery-1"
+}

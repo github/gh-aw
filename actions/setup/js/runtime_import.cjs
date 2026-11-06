@@ -74,17 +74,31 @@ function shouldPreserveFrontMatter(filepath) {
 }
 
 /**
+ * Removes connector authoring documentation before imported content is sliced
+ * or inlined. Keep line breaks so partial imports retain their source offsets.
+ * @param {string} content
+ * @returns {string}
+ */
+function removeConnectorDocumentation(content) {
+  if (!content.includes("<!--") || !content.includes("connector-documentation")) {
+    return content;
+  }
+  return content.replace(/<!--\s*<connector-documentation(?:\s|>)[\s\S]*?<\/connector-documentation>\s*-->/g, comment => comment.replace(/[^\r\n]/g, ""));
+}
+
+/**
  * Removes XML comments from content
  * @param {string} content - The content to process
+ * @param {boolean} [preserveLines] - Keep source line numbers stable for partial imports
  * @returns {string} - Content with XML comments removed
  */
-function removeXMLComments(content) {
+function removeXMLComments(content, preserveLines = false) {
   // Remove XML/HTML comments: <!-- ... -->
   // Apply repeatedly to handle nested/overlapping patterns that could reintroduce comment markers
   let previous;
   do {
     previous = content;
-    content = content.replace(/<!--[\s\S]*?-->/g, "");
+    content = content.replace(/<!--[\s\S]*?-->/g, comment => (preserveLines ? comment.replace(/[^\r\n]/g, "") : ""));
   } while (content !== previous);
   return content;
 }
@@ -968,8 +982,11 @@ async function processRuntimeImport(filepathOrUrl, optional, workspaceDir, start
     throw new Error(`${ERR_SYSTEM}: Failed to read file ${normalizedPath}: ${getErrorMessage(err)}`, { cause: err });
   }
 
-  // If line range is specified, extract those lines first (before other processing)
+  content = removeConnectorDocumentation(content);
+
+  // Strip comments before slicing: selecting their interior must not expose hidden instructions.
   if (startLine !== undefined || endLine !== undefined) {
+    content = removeXMLComments(content, true);
     const lines = content.split("\n");
     const totalLines = lines.length;
 
@@ -1314,6 +1331,7 @@ module.exports = {
   resolveRuntimeImportKey,
   closeUnterminatedInlineMarkers,
   hasFrontMatter,
+  removeConnectorDocumentation,
   removeXMLComments,
   neutralizeSystemTags,
   hasGitHubActionsMacros,

@@ -395,7 +395,7 @@ func generateSafeOutputScriptContent(scriptName string, scriptConfig *SafeScript
 		for name := range scriptConfig.Inputs {
 			safeName := stringutil.SanitizeParameterName(name)
 			if safeName != name {
-				inputNames = append(inputNames, name+": "+safeName)
+				inputNames = append(inputNames, fmt.Sprintf("%q: %s", name, safeName))
 			} else {
 				inputNames = append(inputNames, name)
 			}

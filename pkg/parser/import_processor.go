@@ -22,8 +22,15 @@ type PromptImportEntry struct {
 	Markdown   string // Non-empty when this import should be inlined into the prompt at compile time
 }
 
+// ConnectorImport retains registrations after normal import-schema/with substitution.
+type ConnectorImport struct {
+	Source        string
+	Registrations map[string]any
+}
+
 // ImportsResult holds the result of processing imports from frontmatter
 type ImportsResult struct {
+	Connectors                    []ConnectorImport
 	MergedTools                   string                // Merged tools configuration from all imports
 	MergedMCPServers              string                // Merged mcp-servers configuration from all imports
 	MergedEngines                 []string              // Merged engine configurations from all imports

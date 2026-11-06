@@ -95,11 +95,6 @@ func validateWorkQueueConfiguration(data *WorkflowData) error {
 func validateWorkQueueSafeOutputs(data *WorkflowData) error {
 	// Delegated effects require explicit trusted adapters and independent delivery evidence.
 	if data.SafeOutputs != nil {
-		for name, builder := range handlerRegistry {
-			if (strings.HasPrefix(name, "linear_") || strings.HasPrefix(name, "jira_") || strings.HasPrefix(name, "ado_")) && builder(data.SafeOutputs) != nil {
-				return fmt.Errorf("work-queue: external handler %q requires a trusted per-Claim target and delivery adapter", name)
-			}
-		}
 		if err := validateWorkQueueClaimAdapters(data); err != nil {
 			return err
 		}

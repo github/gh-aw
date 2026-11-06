@@ -1,0 +1,12 @@
+apiVersion: github.com/gh-aw/connectors/v1
+kind: ConnectorConnection
+connector: atlassian.com/confluence
+credentials:
+  reader: {secret: CONFLUENCE_READ_ACCESS_TOKEN}
+  context-reader: {secret: CONFLUENCE_CONTEXT_ACCESS_TOKEN}
+  page-writer: {secret: CONFLUENCE_PAGE_WRITE_ACCESS_TOKEN}
+  comment-writer: {secret: CONFLUENCE_COMMENT_WRITE_ACCESS_TOKEN}
+resources:
+  clouds: [11111111-2222-4333-8444-555555555555]
+  spaces: ["123"]
+  pages: ["456"]

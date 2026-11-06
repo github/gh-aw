@@ -321,7 +321,7 @@ func scanImportedMarkdownFiles(importedFiles []string, markdownDir string, impor
 			fmt.Fprintf(os.Stderr, "WARNING: Skipping security scan for unreadable import '%s' (resolved path: %s): %v\n", importedFile, fullPath, readErr)
 			continue
 		}
-		if findings := ScanMarkdownSecurity(string(importContent)); len(findings) > 0 {
+		if findings := scanImportedMarkdownSecurity(string(importContent)); len(findings) > 0 {
 			orchestratorEngineLog.Printf("Security scan failed for imported file: %s (%d findings)", importedFile, len(findings))
 			return fmt.Errorf("imported workflow '%s' failed security scan: %s", importedFile, FormatSecurityFindings(findings, importedFile))
 		}
@@ -804,6 +804,9 @@ func validateNativeSessionCapture(data *WorkflowData) error {
 // shouldScanImportedMarkdown reports whether an import path should be processed by
 // markdown security scanning.
 func shouldScanImportedMarkdown(importFilePath string) bool {
+	if parser.IsWorkflowSpec(importFilePath) {
+		importFilePath, _, _ = strings.Cut(importFilePath, "@")
+	}
 	if !strings.HasSuffix(importFilePath, ".md") {
 		return false
 	}

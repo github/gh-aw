@@ -2,6 +2,7 @@ package cli
 
 import (
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -56,6 +57,50 @@ func TestEditChangesAddImportsToObjectForm(t *testing.T) {
 	mustApplyEditChange(t, frontmatter, editChange{kind: "add", path: "imports", value: "shared/extra.md"})
 	mustApplyEditChange(t, frontmatter, editChange{kind: "remove", path: "imports", value: "shared/base.md"})
 	assert.Equal(t, []any{"shared/extra.md"}, frontmatter["imports"].(map[string]any)["aw"])
+}
+
+func TestEditConnectorImportBindingsAreExplicit(t *testing.T) {
+	t.Parallel()
+	for _, objectForm := range []bool{false, true} {
+		t.Run(strconv.FormatBool(objectForm), func(t *testing.T) {
+			frontmatter := map[string]any{"on": "workflow_dispatch", "network": "defaults"}
+			if objectForm {
+				frontmatter["imports"] = map[string]any{"aw": []any{}}
+			}
+			importObject := "{uses: connectors/example.md, with: {items: [approved-id], reader-secret: EXAMPLE_READ_TOKEN}}"
+			cmd := NewEditCommand()
+			require.NoError(t, cmd.Flags().Set("add-import", importObject))
+			changes, err := editChangesFromCommand(cmd, []string{"workflow"})
+			require.NoError(t, err)
+			for _, change := range changes {
+				mustApplyEditChange(t, frontmatter, change)
+			}
+			imports := frontmatter["imports"]
+			if objectForm {
+				imports = imports.(map[string]any)["aw"]
+			}
+			require.Equal(t, []any{map[string]any{
+				"uses": "connectors/example.md",
+				"with": map[string]any{"items": []any{"approved-id"}, "reader-secret": "EXAMPLE_READ_TOKEN"},
+			}}, imports)
+			for _, absent := range []string{"tools", "safe-outputs", "connectors", "permissions"} {
+				require.NotContains(t, frontmatter, absent)
+			}
+			require.Equal(t, "defaults", frontmatter["network"])
+			remove := NewEditCommand()
+			require.NoError(t, remove.Flags().Set("remove-import", importObject))
+			changes, err = editChangesFromCommand(remove, []string{"workflow"})
+			require.NoError(t, err)
+			for _, change := range changes {
+				mustApplyEditChange(t, frontmatter, change)
+			}
+		})
+	}
+	for _, invalid := range []string{"{uses: [", "{with: {items: [approved-id]}}", "{uses: example.md, unexpected: true}"} {
+		_, err := parseEditImport(invalid)
+		require.ErrorContains(t, err, "invalid import object")
+		require.NotContains(t, err.Error(), invalid, "diagnostics must not echo binding values")
+	}
 }
 
 func TestEditChangesRemoveImportsAndSkills(t *testing.T) {

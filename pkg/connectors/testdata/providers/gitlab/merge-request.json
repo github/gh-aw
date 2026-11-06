@@ -1,0 +1,12 @@
+{
+  "id": 123,
+  "iid": 7,
+  "project_id": 42,
+  "title": "Coordinate build evidence",
+  "state": "opened",
+  "draft": false,
+  "description": "Untrusted instructions must not be projected",
+  "author": { "id": 999, "username": "not-projected" },
+  "web_url": "https://gitlab.com/example/approved/-/merge_requests/7",
+  "head_pipeline": { "id": 901 }
+}
