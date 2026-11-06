@@ -12,7 +12,7 @@
 
 ### Decision
 
-We will add two outcome-backed metric references, `outcome:accepted` and `outcome:zero_touch`. They are valid in `metric`, `secondary_metrics`, and `guardrail_metrics`. The `experiments analyze` CLI computes them on demand by running the existing deterministic outcome evaluators over each assigned run in the assignment history. Each mature run contributes one observation to the existing observation-set and statistics pipeline. The value is accepted (or zero-touch) outputs divided by resolved outputs. Resolved outputs are accepted, rejected, and stale-pending outputs; stale-pending outputs count toward the denominator but never the numerator.
+We will add two outcome-backed metric references, `outcome:accepted` and `outcome:zero_touch`. They are valid in `metric`, `secondary_metrics`, and `guardrail_metrics`. The `experiments analyze --outcome` CLI computes them on demand by running the existing deterministic outcome evaluators over each assigned run in the assignment history. Collection is opt-in because it makes additional GitHub API requests. Without `--outcome`, analysis of any outcome-backed metric returns an actionable error before collecting metric evidence. Each mature run contributes one observation to the existing observation-set and statistics pipeline. The value is accepted (or zero-touch) outputs divided by resolved outputs. Resolved outputs are accepted, rejected, and stale-pending outputs; stale-pending outputs count toward the denominator but never the numerator.
 
 Run maturity uses a **per-workflow `outcome_window`**. It defaults to `auto`, which estimates the pooled 95th-percentile time to decision across variants using Kaplan–Meier estimation. Still-open outputs are right-censored at their current age. The estimated window is clamped to 24 hours–30 days and falls back to `72h` until at least 20 outputs have known decision times. An explicit positive Go duration overrides learning. Runs younger than the effective window are reported as `immature` and do not count toward `min_samples`. The analyzer never treats incomplete evidence as a negative outcome:
 - Unknown or errored outcomes and accepted PRs with incomplete zero-touch evidence are excluded as `unavailable`. To support this, a new `ZeroTouchEvidenceComplete` field on `OutcomeReport` separates "a human touched the PR" from "the evidence is incomplete".
@@ -42,7 +42,7 @@ Each safe output could be treated as an independent observation. This gives more
 
 #### Negative
 - Learned windows can change as new outcomes arrive, so analyses may use different maturity cutoffs over time. Explicit durations provide a stable alternative.
-- `experiments analyze` now makes GitHub API calls for assigned runs, including recent runs used as censored observations. This increases analysis latency, rate-limit exposure, and dependence on network availability at analyze time.
+- `experiments analyze --outcome` makes GitHub API calls for assigned runs, including recent runs used as censored observations. This increases analysis latency, rate-limit exposure, and dependence on network availability only when explicitly enabled.
 - Outcome values are re-evaluated each time analyze runs, so a run's observation can change between runs (for example, a stale-pending PR that is merged later). Analyze results are therefore not strictly reproducible.
 - Ratios from runs that create several outputs produce fractional values, which force Welch's t-test instead of the two-proportion test and reduce statistical power for those experiments.
 

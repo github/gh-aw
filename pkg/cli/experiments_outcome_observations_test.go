@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -402,6 +403,55 @@ esac
 `)
 }
 
+func TestOutcomeMetricsRequireOptIn(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		config *workflow.ExperimentConfig
+	}{
+		{name: "primary", config: &workflow.ExperimentConfig{Metric: "outcome:accepted"}},
+		{name: "secondary", config: &workflow.ExperimentConfig{SecondaryMetrics: []string{"outcome:zero_touch"}}},
+		{name: "guardrail", config: &workflow.ExperimentConfig{
+			Metric: "grader:tool-success-rate",
+			GuardrailMetrics: []workflow.GuardrailMetric{
+				{Name: "outcome:accepted", Threshold: ">=0.8"},
+			},
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls := installOutcomeAPIFixture(t, "exit 1\n")
+			frontmatter := experimentFrontmatterResult{
+				ExperimentConfigs: map[string]*workflow.ExperimentConfig{"prompt": tc.config},
+			}
+			bundle, cleanup, err := loadMetricObservationSetsForAnalysis(&ExperimentDetails{}, frontmatter, "acme/repo", false)
+			defer cleanup()
+			require.ErrorContains(t, err, "require --outcome")
+			assert.Contains(t, err.Error(), "additional GitHub API requests")
+			assert.Nil(t, bundle)
+			_, err = os.Stat(calls)
+			assert.True(t, os.IsNotExist(err), "opt-in must be checked before any metric API requests")
+		})
+	}
+}
+
+func TestOutcomeOptInWithoutOutcomeMetrics(t *testing.T) {
+	for _, outcome := range []bool{false, true} {
+		t.Run(strconv.FormatBool(outcome), func(t *testing.T) {
+			calls := installOutcomeAPIFixture(t, "exit 1\n")
+			bundle, cleanup, err := loadMetricObservationSetsForAnalysis(
+				&ExperimentDetails{}, experimentFrontmatterResult{}, "acme/repo", outcome,
+			)
+			defer cleanup()
+			require.NoError(t, err)
+			require.NotNil(t, bundle)
+			assert.Empty(t, bundle.Primary)
+			assert.Empty(t, bundle.Secondary)
+			assert.Empty(t, bundle.Guardrails)
+			_, err = os.Stat(calls)
+			assert.True(t, os.IsNotExist(err), "workflows without outcome metrics need no outcome API requests")
+		})
+	}
+}
+
 func TestLoadOutcomeObservationSetsUsesLiveCollector(t *testing.T) {
 	calls := installExperimentOutcomeFixture(t, `{"type":"create_pull_request","number":42,"timestamp":"2026-01-01T00:00:00Z","url":"https://github.com/acme/repo/pull/42"}`+"\n")
 	details := &ExperimentDetails{
@@ -417,7 +467,7 @@ func TestLoadOutcomeObservationSetsUsesLiveCollector(t *testing.T) {
 			GuardrailMetrics: []workflow.GuardrailMetric{{Name: "outcome:zero_touch", Threshold: ">=0.5"}},
 		},
 	}}
-	bundle, cleanup, err := loadMetricObservationSetsForAnalysis(details, frontmatter, "acme/repo")
+	bundle, cleanup, err := loadMetricObservationSetsForAnalysis(details, frontmatter, "acme/repo", true)
 	require.NoError(t, err)
 	defer cleanup()
 	require.Len(t, bundle.Primary["prompt"].ByVariant["control"], 1)

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"os"
@@ -25,6 +26,7 @@ type ExperimentsAnalyzeConfig struct {
 	ExperimentName string
 	RepoOverride   string
 	JSONOutput     bool
+	Outcome        bool
 }
 
 // NewExperimentsCommand creates the experiments command with its subcommands.
@@ -106,24 +108,31 @@ The experiment argument is the workflow ID (branch name without the "experiments
 prefix, e.g., "my-workflow" for the "experiments/my-workflow" branch).
 
 Reads the state.jsonl/state.json file from the branch and shows per-variant counts, total
-runs, and the most recent run assignments.`,
+runs, and the most recent run assignments.
+
+Outcome-backed metrics require --outcome to opt into additional GitHub API requests
+for live safe-output evidence.`,
 		Example: `  ` + string(constants.CLIExtensionPrefix) + ` experiments analyze my-workflow              # Analyze experiments/my-workflow
   ` + string(constants.CLIExtensionPrefix) + ` experiments analyze my-workflow --json       # Output in JSON format
+  ` + string(constants.CLIExtensionPrefix) + ` experiments analyze my-workflow --outcome    # Evaluate live outcome metrics
   ` + string(constants.CLIExtensionPrefix) + ` experiments analyze my-workflow --repo owner/repo  # Analyze in a specific repository`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			jsonOutput, _ := cmd.Flags().GetBool("json")
 			repoOverride, _ := cmd.Flags().GetString("repo")
+			outcome, _ := cmd.Flags().GetBool("outcome")
 			return RunExperimentsAnalyze(ExperimentsAnalyzeConfig{
 				ExperimentName: args[0],
 				RepoOverride:   repoOverride,
 				JSONOutput:     jsonOutput,
+				Outcome:        outcome,
 			})
 		},
 	}
 
 	addJSONFlag(cmd)
 	addRepoFlag(cmd)
+	cmd.Flags().Bool("outcome", false, "Evaluate live outcome-backed metrics (additional GitHub API requests)")
 
 	return cmd
 }
@@ -195,6 +204,7 @@ func RunExperimentsAnalyze(config ExperimentsAnalyzeConfig) error {
 		details,
 		frontmatterResult,
 		config.RepoOverride,
+		config.Outcome,
 	)
 	if err != nil {
 		return err
@@ -287,7 +297,17 @@ func loadMetricObservationSetsForAnalysis(
 	details *ExperimentDetails,
 	frontmatter experimentFrontmatterResult,
 	repoOverride string,
+	outcome bool,
 ) (*experimentMetricObservationSets, func(), error) {
+	if !outcome {
+		_, _, windows, _, err := resolveOutcomeMetricReferences(frontmatter.ExperimentConfigs)
+		if err != nil {
+			return nil, func() {}, err
+		}
+		if len(windows) > 0 {
+			return nil, func() {}, errors.New("outcome-backed experiment metrics require --outcome to enable additional GitHub API requests. Example: gh aw experiments analyze <workflow> --outcome")
+		}
+	}
 	graderSets, graderGuardrails, cleanup, err := loadGraderObservationSetsForAnalysis(details, frontmatter, repoOverride)
 	if err != nil {
 		return nil, func() {}, err
@@ -306,6 +326,9 @@ func loadMetricObservationSetsForAnalysis(
 		graderGuardrails = make(map[string]map[string]*graderMetricObservationSet, len(evalGuardrails))
 	}
 	mergeGuardrailObservationSets(graderGuardrails, evalGuardrails)
+	if !outcome {
+		return &experimentMetricObservationSets{Primary: graderSets, Guardrails: graderGuardrails}, cleanup, nil
+	}
 	outcomeSets, outcomeSecondary, outcomeGuardrails, outcomeCleanup, err := loadOutcomeObservationSetsForAnalysis(details, frontmatter, repoOverride)
 	if err != nil {
 		cleanup()

@@ -672,9 +672,12 @@ usable per-run value is 0 or 1; fractional run values require Welch's t-test.
 `secondary_metrics`, and `guardrail_metrics`. Unknown `outcome:` kinds **MUST** be
 rejected with an error identifying the supported kinds and an example.
 
-Outcome evaluation **MUST** run only when the CLI analyzes experiments, using the
+Outcome evaluation **MUST** run only when the CLI analyzes experiments with the
+explicit `--outcome` flag, using the
 assignment history for variant attribution and the existing deterministic safe-output
-outcome evaluators. No scheduled collector is required.
+outcome evaluators. Without the flag, the CLI **MUST NOT** fetch outcome evidence
+and **MUST** return an actionable error when a primary, secondary, or guardrail metric
+references an outcome. No scheduled collector is required.
 
 When `outcome_window` is `auto` or omitted, implementations **MUST** estimate the
 pooled 95th-percentile time to decision from the experiment's own outputs across all variants, treating still-open

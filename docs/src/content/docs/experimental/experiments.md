@@ -89,7 +89,7 @@ When `graders` are configured, `metric` can reference a grader result using
 `graders.<id>.value`.
 
 Use `outcome:accepted` or `outcome:zero_touch` to measure live GitHub outcomes
-when analyzing results. These references also work in `secondary_metrics` and
+with `gh aw experiments analyze <workflow> --outcome`. These references also work in `secondary_metrics` and
 `guardrail_metrics`, without declaring a grader or eval.
 
 `gh aw experiments analyze <workflow>` resolves the referenced eval question and, when
@@ -318,8 +318,12 @@ experiments:
 Follow the **${{ experiments.prompt_v2 }}** instructions.
 ```
 
-`gh aw experiments analyze <workflow>` evaluates outcomes on demand; no scheduled
-collector is needed. `outcome_window` defaults to `auto`: analysis estimates the
+Run `gh aw experiments analyze <workflow> --outcome` to evaluate outcomes on demand;
+no scheduled collector is needed. Live outcome collection is opt-in because it
+downloads artifacts and makes additional GitHub API requests. Without `--outcome`,
+analysis of an outcome-backed primary, secondary, or guardrail metric returns an
+error explaining how to enable collection; no outcome evidence is fetched.
+`outcome_window` defaults to `auto`: analysis estimates the
 pooled 95th-percentile decision time from this experiment's outputs across variants
 with Kaplan–Meier censoring
 for still-open outputs, clamps the window to 24 hours–30 days, and uses `72h`
