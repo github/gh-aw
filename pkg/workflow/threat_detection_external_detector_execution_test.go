@@ -3,9 +3,58 @@
 package workflow
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
+
+func TestNativeRootlessThreatDetectionUsesVerifiedBinary(t *testing.T) {
+	for _, state := range []string{"verified", "missing", "not executable", "symlink", "unset"} {
+		t.Run(state, func(t *testing.T) {
+			root := t.TempDir()
+			home := filepath.Join(root, "runner home")
+			bin := filepath.Join(home, ".local", "bin")
+			require.NoError(t, os.MkdirAll(bin, 0700))
+			verified := filepath.Join(bin, "threat-detect")
+			shadow := filepath.Join(root, "threat-detect")
+			require.NoError(t, os.WriteFile(shadow, []byte("#!/bin/bash\nexit 99\n"), 0700))
+			switch state {
+			case "verified":
+				require.NoError(t, os.WriteFile(verified, []byte("#!/bin/bash\nprintf verified\n"), 0700))
+			case "not executable":
+				require.NoError(t, os.WriteFile(verified, []byte("#!/bin/bash\nexit 99\n"), 0600))
+			case "symlink":
+				require.NoError(t, os.Symlink(shadow, verified))
+			case "unset":
+				verified = ""
+			}
+			// A stale destination symlink must not redirect the verified copy.
+			stagedBin := filepath.Join(root, "gh-aw", "bin")
+			require.NoError(t, os.MkdirAll(stagedBin, 0700))
+			require.NoError(t, os.Symlink(shadow, filepath.Join(stagedBin, "threat-detect")))
+			data := &WorkflowData{RunnerConfig: &RunnerConfig{Installation: "rootless"}}
+			setup := NewCompiler().buildExternalDetectorPathSetup(data, "claude")
+			cmd := exec.Command("bash", "-c", setup.hostSetup+setup.commandPrefix+buildThreatDetectCommand("true", "claude", &ThreatDetectionConfig{}, false))
+			cmd.Env = append(os.Environ(), "RUNNER_TEMP="+root, "HOME="+home,
+				"THREAT_DETECT_BINARY="+verified, "PATH="+root+":"+os.Getenv("PATH"))
+			out, err := cmd.CombinedOutput()
+			if state != "verified" {
+				require.Error(t, err, "%s", out)
+				require.NotContains(t, string(out), "verified")
+				return
+			}
+			require.NoError(t, err, "%s", out)
+			require.Equal(t, "verified", string(out))
+			shadowContent, err := os.ReadFile(shadow)
+			require.NoError(t, err)
+			require.Equal(t, "#!/bin/bash\nexit 99\n", string(shadowContent))
+		})
+	}
+}
 
 func TestExternalDetectorExecutionStepIncludesThreatDetectionContext(t *testing.T) {
 	compiler := NewCompiler()
