@@ -392,6 +392,9 @@ function generateSafeOutputSummary(options) {
     if (codes.length > 0) {
       summary += `**Blocked Gates:** ${codes.map(code => `\`${code}\``).join(", ")}\n\n`;
     }
+    if (codes.includes("manual_review_caution")) {
+      summary += "Independently review the detection or protected-files caution and merge through the repository's normal manual process. Approvals or dismissed reviews do not clear this automated-merge veto.\n\n";
+    }
     if (result.audit_failed) {
       summary += "> ⚠️ Merge decision audit persistence failed; the operation outcome is unchanged.\n\n";
     } else if (result.audit_recorded) {

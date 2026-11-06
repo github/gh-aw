@@ -2265,13 +2265,14 @@ ${diffs}
     expect(result.error).toContain("protected files");
   });
 
-  it("should create PR with caution and request-changes review when protected-files is request_review", async () => {
+  it("should disable auto-merge even after a successful protected-files request-changes review", async () => {
     const patchPath = writePatch("should-create-pr-with-caution-and-request-changes-review-whe", createPatchWithFiles(".github/aw/instructions.md"));
 
     const { main } = require("./create_pull_request.cjs");
     const handler = await main({
       protected_path_prefixes: [".github/"],
       protected_files_policy: "request_review",
+      auto_merge: true,
     });
     const result = await handler({ title: "Test PR", body: "Body text", branch: "should-create-pr-with-caution-and-request-changes-review-whe" }, {});
 
@@ -2286,6 +2287,9 @@ ${diffs}
     expect(createReviewCall.event).toBe("REQUEST_CHANGES");
     expect(createReviewCall.body).toContain("Protected files were modified");
     expect(createReviewCall.body).toContain(".github/aw/instructions.md");
+    expect(global.github.graphql).not.toHaveBeenCalledWith(expect.stringContaining("enablePullRequestAutoMerge"), expect.anything());
+    expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("Auto-merge is disabled"));
+    expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("Manual review by an independent reviewer is required before merge"));
   });
 
   it("should default to request_review when protected-files policy is unset", async () => {
@@ -2304,24 +2308,41 @@ ${diffs}
     expect(createReviewCall.event).toBe("REQUEST_CHANGES");
   });
 
-  it("should retry with COMMENT when REQUEST_CHANGES review is rejected on own pull request", async () => {
-    const patchPath = writePatch("should-retry-with-comment-when-request-changes-review-is-rej", createPatchWithFiles(".github/aw/instructions.md"));
-    global.github.rest.pulls.createReview = vi
-      .fn()
-      .mockRejectedValueOnce(new Error("Can not request changes on your own pull request"))
-      .mockResolvedValueOnce({ data: { id: 78, html_url: "https://github.com/test/review/78" } });
+  it("should disable auto-merge without downgrading a rejected protected-files review to COMMENT", async () => {
+    writePatch("protected-review-own-pr", createPatchWithFiles(".github/aw/instructions.md"));
+    global.github.rest.pulls.createReview.mockRejectedValue(new Error("Can not request changes on your own pull request"));
 
     const { main } = require("./create_pull_request.cjs");
     const handler = await main({
       protected_path_prefixes: [".github/"],
       protected_files_policy: "request_review",
+      auto_merge: true,
     });
-    const result = await handler({ title: "Test PR", body: "Body text", branch: "should-retry-with-comment-when-request-changes-review-is-rej" }, {});
+    const result = await handler({ title: "Test PR", body: "Body text", branch: "protected-review-own-pr" }, {});
 
     expect(result.success).toBe(true);
-    expect(global.github.rest.pulls.createReview).toHaveBeenCalledTimes(2);
+    expect(global.github.rest.pulls.createReview).toHaveBeenCalledTimes(1);
     expect(global.github.rest.pulls.createReview.mock.calls[0][0].event).toBe("REQUEST_CHANGES");
-    expect(global.github.rest.pulls.createReview.mock.calls[1][0].event).toBe("COMMENT");
+    expect(global.github.graphql).not.toHaveBeenCalledWith(expect.stringContaining("enablePullRequestAutoMerge"), expect.anything());
+    expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("independent reviewer"));
+  });
+
+  it("should disable auto-merge when a protected-files review fails for another reason", async () => {
+    writePatch("protected-review-failure", createPatchWithFiles(".github/aw/instructions.md"));
+    global.github.rest.pulls.createReview.mockRejectedValue(new Error("Review permission denied"));
+
+    const { main } = require("./create_pull_request.cjs");
+    const handler = await main({
+      protected_path_prefixes: [".github/"],
+      protected_files_policy: "request_review",
+      auto_merge: true,
+    });
+    const result = await handler({ title: "Test PR", body: "Body text", branch: "protected-review-failure" }, {});
+
+    expect(result.success).toBe(true);
+    expect(global.github.graphql).not.toHaveBeenCalledWith(expect.stringContaining("enablePullRequestAutoMerge"), expect.anything());
+    expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("Review permission denied"));
+    expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("independent reviewer"));
   });
 
   it.each([
@@ -4046,6 +4067,42 @@ describe("create_pull_request - threat detection caution", () => {
     delete global.context;
     delete global.exec;
     vi.clearAllMocks();
+  });
+
+  it.each([
+    ["warning", "threat_detected", "[!CAUTION]"],
+    ["failure", "agent_failure", "[!WARNING]"],
+    ["failure", "parse_error", "[!WARNING]"],
+  ])("should disable auto-merge for detection %s / %s even after requesting reviewers", async (conclusion, reason, alert) => {
+    process.env.GH_AW_DETECTION_CONCLUSION = conclusion;
+    process.env.GH_AW_DETECTION_REASON = reason;
+
+    const { main } = require("./create_pull_request.cjs");
+    const handler = await main({ allow_empty: true, auto_merge: true, draft: false, reviewers: ["human-reviewer"] });
+    const result = await handler({ title: "Test PR", body: "Agent body content" }, {});
+
+    expect(result.success).toBe(true);
+    expect(global.github.rest.pulls.create).toHaveBeenCalledWith(expect.objectContaining({ body: expect.stringContaining(alert) }));
+    expect(global.github.rest.pulls.requestReviewers).toHaveBeenCalledWith(expect.objectContaining({ reviewers: ["human-reviewer"] }));
+    expect(global.github.rest.pulls.createReview).toHaveBeenCalledWith(expect.objectContaining({ event: "REQUEST_CHANGES", body: expect.stringContaining(reason) }));
+    expect(global.github.graphql).not.toHaveBeenCalledWith(expect.stringContaining("enablePullRequestAutoMerge"), expect.anything());
+    expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("Auto-merge is disabled"));
+  });
+
+  it.each(["Can not request changes on your own pull request", "Review permission denied"])("should keep auto-merge disabled when the detection review fails: %s", async errorMessage => {
+    process.env.GH_AW_DETECTION_CONCLUSION = "warning";
+    process.env.GH_AW_DETECTION_REASON = "threat_detected";
+    global.github.rest.pulls.createReview.mockRejectedValue(new Error(errorMessage));
+
+    const { main } = require("./create_pull_request.cjs");
+    const handler = await main({ allow_empty: true, auto_merge: true, draft: false });
+    const result = await handler({ title: "Test PR", body: "Agent body content" }, {});
+
+    expect(result.success).toBe(true);
+    expect(global.github.rest.pulls.createReview).toHaveBeenCalledTimes(1);
+    expect(global.github.rest.pulls.createReview).toHaveBeenCalledWith(expect.objectContaining({ event: "REQUEST_CHANGES" }));
+    expect(global.github.graphql).not.toHaveBeenCalledWith(expect.stringContaining("enablePullRequestAutoMerge"), expect.anything());
+    expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("independent reviewer"));
   });
 
   it("should prepend caution alert at top of PR body when GH_AW_DETECTION_CONCLUSION is warning", async () => {
