@@ -100,7 +100,7 @@ exit "$result"`,
 }
 
 async function allocateRuntime(root) {
-  const envFile = path.join(root, `runtime-env-${runtimeRoots.length}`);
+  const envFile = path.join(fs.mkdtempSync(path.join(root, "runtime-env-")), "env");
   fs.writeFileSync(envFile, "");
   const child = spawn(
     "bash",
@@ -273,7 +273,11 @@ printf '%s\\n' "$TEMP_DIR"`,
       const mktemp = spawnSync("bash", ["-c", "command -v mktemp"], { encoding: "utf8" }).stdout.trim();
       fs.writeFileSync(path.join(bin, "mktemp"), '#!/bin/sh\ndir=$("$REAL_MKTEMP" "$@") || exit $?\nprintf "%s\\n" "$dir" >> "$ALLOCATIONS"\nprintf "%s\\n" "$dir"\n', { mode: 0o755 });
       fs.writeFileSync(path.join(bin, "curl"), "#!/bin/sh\nexit 22\n", { mode: 0o755 });
-      const result = spawnSync("bash", [path.resolve(__dirname, "../sh", script), version, "--rootless"], {
+      const bash = process.env.PATH.split(path.delimiter)
+        .map(dir => path.join(dir, "bash"))
+        .find(candidate => spawnSync(candidate, ["-c", "(( BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 4) ))"]).status === 0);
+      expect(bash, "Installer fixtures require Bash 4.4 or newer on PATH").toBeDefined();
+      const result = spawnSync(bash, [path.resolve(__dirname, "../sh", script), version, "--rootless"], {
         cwd: root,
         env: environment(root, {
           HOME: path.join(root, "home"),
@@ -286,7 +290,7 @@ printf '%s\\n' "$TEMP_DIR"`,
         timeout: 30000,
       });
       expect(result.error).toBeUndefined();
-      expect(result.status).not.toBe(0);
+      expect(result.status, result.stderr || result.stdout).toBe(22);
       const dirs = fs.readFileSync(allocations, "utf8").trim().split("\n");
       expect(dirs.some(dir => /(?:awf|copilot)-install-/.test(dir))).toBe(true);
       for (const dir of dirs) expect(fs.existsSync(dir)).toBe(false);
@@ -327,7 +331,7 @@ printf 'copilot 1.0.103\\n'
       fs.mkdirSync(workdir);
       const child = spawn("bash", [installer, "--rootless", "1.0.103"], {
         cwd: workdir,
-        env: environment(sharedTemp, {
+        env: environment(workdir, {
           HOME: path.join(workdir, "home"),
           TMPDIR: sharedTemp,
           RUNNER_TOOL_CACHE: cache,
@@ -351,34 +355,45 @@ printf 'copilot 1.0.103\\n'
         child.once("error", reject);
         child.once("close", code => resolve({ code, output }));
       });
-      return { child, ready, release, completion };
+      return { child, ready, release, completion, workdir };
     });
     try {
       const deadline = Date.now() + 10000;
       while (!jobs.every(job => fs.existsSync(job.ready))) {
+        for (const job of jobs) {
+          if (job.child.exitCode !== null || job.child.signalCode !== null) {
+            const result = await job.completion;
+            throw new Error(`Concurrent installer exited before the toolcache barrier (${result.code}): ${result.output}`);
+          }
+        }
         if (Date.now() > deadline) throw new Error("Concurrent installers did not reach the toolcache barrier");
         await new Promise(resolve => setTimeout(resolve, 25));
       }
-      const stagingNames = () => fs.readdirSync(sharedTemp).filter(name => name.startsWith("copilot-install-"));
-      expect(stagingNames()).toHaveLength(2);
-      for (const name of stagingNames()) {
-        const dir = path.join(sharedTemp, name);
+      const stagingDirs = () =>
+        jobs.flatMap(job =>
+          fs
+            .readdirSync(job.workdir)
+            .filter(name => name.startsWith("copilot-install-"))
+            .map(name => path.join(job.workdir, name))
+        );
+      expect(stagingDirs()).toHaveLength(2);
+      for (const dir of stagingDirs()) {
         expect(fs.statSync(dir).mode & 0o777).toBe(0o700);
         const chroot = path.join(dir, "awf-own-chroot-home");
         fs.mkdirSync(chroot);
-        fs.writeFileSync(path.join(chroot, "artifact"), name);
+        fs.writeFileSync(path.join(chroot, "artifact"), dir);
       }
       fs.writeFileSync(jobs[0].release, "");
       const first = await jobs[0].completion;
       expect(first.code, first.output).toBe(0);
-      expect(stagingNames()).toHaveLength(1);
-      const remaining = stagingNames()[0];
-      expect(fs.readFileSync(path.join(sharedTemp, remaining, "awf-own-chroot-home/artifact"), "utf8")).toBe(remaining);
+      expect(stagingDirs()).toHaveLength(1);
+      const remaining = stagingDirs()[0];
+      expect(fs.readFileSync(path.join(remaining, "awf-own-chroot-home/artifact"), "utf8")).toBe(remaining);
       expect(fs.readFileSync(path.join(otherChroot, "artifact"), "utf8")).toBe("another invocation");
       fs.writeFileSync(jobs[1].release, "");
       const second = await jobs[1].completion;
       expect(second.code, second.output).toBe(0);
-      expect(stagingNames()).toHaveLength(0);
+      expect(stagingDirs()).toHaveLength(0);
       expect(fs.readFileSync(path.join(otherChroot, "artifact"), "utf8")).toBe("another invocation");
       expect(fs.existsSync(forbiddenLog)).toBe(false);
     } finally {

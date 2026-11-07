@@ -88,13 +88,15 @@ gh aw work-queue --repo OWNER/REPO state --pool daily-reports --search deep-repo
 ```
 
 Review the available and claimed rows, then inspect each with
-`gh aw work-queue --repo OWNER/REPO inspect --work-id ID`. This identifies the
-contract-specific routes needed; it does not settle Work or require pausing
-admissions.
+`gh aw work-queue --repo OWNER/REPO inspect --work-id ID`. Search matches the
+worker profile; follow additional pages with `--offset` if the view is bounded.
+This identifies the contract-specific routes needed; it does not settle Work or
+require pausing admissions.
 
 Protected producer/dispatcher processing automatically installs contract-specific
-routes when adopting a verified default revision. The default route serves new
-admissions and compatible Work. For each different contract still needed by
+routes during submission and dispatch when adopting a verified default-branch
+revision; a separate operator deployment is not required. The default route serves
+new admissions and compatible Work. For each different contract still needed by
 unpinned available or claimed Work, synchronization selects the reviewed bridge
 approved at the immutable default revision and rechecks its exact source, compiled
 stamp, native registration, and queue-reader digests before publishing. It does not choose an arbitrary
@@ -105,9 +107,15 @@ them, pausing admission, or rewriting admission contracts. Explicit execution pi
 and existing assignments stay frozen. An unavailable retained route blocks only
 its matching Work; synchronization never searches for an older fallback to bypass
 unavailability. Failed or pending delivery remains blocked regardless of routes.
-Source publication alone does not update the installed route, and observers never
-perform synchronization. Upgrade queue readers before adopting deployment records
-with `contract_routes`; Older closed-schema readers reject those records. The protected
+Feature-branch source publication alone does not update the installed route, and
+observers never perform synchronization. Merging makes the verified default revision
+eligible for automatic adoption by the next protected submission or dispatch.
+Before merging, coordinate reader readiness across all available default routes,
+runnable execution pins and unreleased assignments, and verify approved bridges
+cover unfinished contracts that differ from the new default. Do not rely on a
+later operator deployment to delay adoption or assume mixed-contract Work must
+settle manually. Older closed-schema readers reject deployment records with
+`contract_routes`. The protected
 `.github/aw/work-queue-contract-routes.json` manifest approves exact workflow,
 contract and bridge revisions plus SHA256 digests of both queue readers.
 Synchronization registers bridges and installs the default and retained routes

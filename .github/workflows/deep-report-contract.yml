@@ -1,0 +1,36 @@
+name: Deep-report admission contract
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+    - '.github/workflows/deep-report.md'
+    - '.github/workflows/shared/**'
+    - '.github/skills/**'
+    - '**/*.go'
+    - 'pkg/**'
+    - 'go.mod'
+    - 'go.sum'
+    - 'Makefile'
+    - 'scripts/agent-report-progress*.sh'
+    - '.github/workflows/deep-report-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  deep-report-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - name: Set up Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version-file: go.mod
+        cache: true
+    - name: Preserve admitted daily-report contract
+      run: make test-deep-report-contract

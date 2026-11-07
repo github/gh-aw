@@ -321,6 +321,11 @@ test-impacted-js: build-js
 		cd "$$ROOT/eslint-factory" && npm test; \
 	fi
 
+# Preserve the immutable contract of already-admitted daily reports.
+.PHONY: test-deep-report-contract
+test-deep-report-contract:
+	go test ./pkg/workflow -tags '!integration' -run '^TestDeepReportPreservesAdmittedDailyReportContract$$' -count=1 -timeout=3m
+
 # Test impacted Go unit tests only (excluding integration tests)
 .PHONY: test-impacted-go
 test-impacted-go:
@@ -1497,6 +1502,7 @@ help:
 	@echo "  test-impacted-go - Run impacted Go unit tests for current branch changes"
 	@echo "  test-impacted    - Run impacted JavaScript and Go unit tests for current branch changes"
 	@echo "  test-scripts     - Run Bash script tests (check-stale-lock-files, check-workflow-drift)"
+	@echo "  test-deep-report-contract - Verify the immutable admission contract after worker/import changes"
 	@echo "  check-npm-1es    - Verify locked npm package tarballs are available in the 1ES feed"
 	@echo "  test-all         - Run all tests (Go, JavaScript, wasm golden, shell scripts, and guidance contracts)"
 	@echo "  test-guidance    - Run agentic-workflows documentation contract tests"

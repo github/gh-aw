@@ -86,6 +86,7 @@ setup_js_files=()
 eslint_factory_files=()
 action_shell_files=()
 workflow_drift_required=0
+deep_report_contract_required=0
 model_alias_validation_required=0
 session_schema_validation_required=0
 
@@ -130,6 +131,12 @@ for file in "${CHANGED_FILES[@]}"; do
     case "$file" in
         .github/workflows/*.md|.github/workflows/*.lock.yml|cmd/*.go|pkg/*.go|go.mod|go.sum)
             workflow_drift_required=1
+            ;;
+    esac
+
+    case "$file" in
+        .github/workflows/deep-report.md|.github/workflows/shared/*|.github/skills/*)
+            deep_report_contract_required=1
             ;;
     esac
 
@@ -346,6 +353,9 @@ fi
 
 if [ "$WITH_TESTS" -eq 1 ]; then
     start_job "impacted Go tests" test_go_packages
+    if [ "$deep_report_contract_required" -eq 1 ]; then
+        start_job "admitted daily-report contract" make --no-print-directory test-deep-report-contract
+    fi
     if [ "${#setup_js_files[@]}" -gt 0 ]; then
         start_job "impacted setup JavaScript tests" test_setup_javascript
     fi

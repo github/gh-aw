@@ -28,6 +28,10 @@ if [ "${FAIL_SCHEMA:-0}" = 1 ] && [[ "$*" = *check-stale-schema-binary* ]]; then
     echo "fixture schema failure" >&2
     exit 1
 fi
+if [ "${FAIL_CONTRACT:-0}" = 1 ] && [[ "$*" = *test-deep-report-contract* ]]; then
+    echo "fixture contract failure" >&2
+    exit 1
+fi
 SH
 cat > "$TMP_ROOT/bin/go" <<'SH'
 #!/bin/bash
@@ -82,6 +86,47 @@ if grep -Eq '^(lint|gofmt):' "$CALL_LOG"; then
     exit 1
 fi
 echo "PASS: non-Go changes tolerate empty Go arrays under nounset"
+
+for workflow_file in \
+    .github/workflows/deep-report.md \
+    .github/workflows/shared/daily-report-worker.md \
+    .github/workflows/shared/mcp/agentdb.md \
+    .github/skills/jqschema/SKILL.md; do
+    printf '%s\n' "$workflow_file" > "$CHANGED_LIST_FILE"
+    run_gate --with-tests
+    grep -Fxq "make:<test-deep-report-contract>" "$CALL_LOG"
+    grep -Fq "✓ admitted daily-report contract" "$OUTPUT"
+    if grep -Eq '^(lint|gofmt):' "$CALL_LOG"; then
+        echo "Unexpected Go changes in workflow-only fixture" >&2
+        exit 1
+    fi
+done
+echo "PASS: worker and transitive import changes run the contract guard without Go changes"
+
+run_gate
+if grep -Fxq "make:<test-deep-report-contract>" "$CALL_LOG"; then
+    echo "No-test gate ran the contract test" >&2
+    exit 1
+fi
+echo "PASS: no-test gate still skips tests"
+
+printf '%s\n' ".github/workflows/unrelated.md" > "$CHANGED_LIST_FILE"
+run_gate --with-tests
+if grep -Fxq "make:<test-deep-report-contract>" "$CALL_LOG"; then
+    echo "Unrelated workflow changes ran the contract test" >&2
+    exit 1
+fi
+echo "PASS: unrelated workflow changes skip the contract guard"
+
+printf '%s\n' ".github/workflows/deep-report.md" > "$CHANGED_LIST_FILE"
+export FAIL_CONTRACT=1
+if run_gate --with-tests; then
+    echo "Gate ignored a failing contract guard" >&2
+    exit 1
+fi
+unset FAIL_CONTRACT
+grep -Fq "fixture contract failure" "$OUTPUT"
+echo "PASS: contract guard failures propagate"
 
 printf '%s\n' "pkg/space name/two.go" "pkg/another/example.go" "pkg/space name/one.go" "pkg/space name/one.go" > "$CHANGED_LIST_FILE"
 run_gate --with-tests
