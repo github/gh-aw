@@ -139,6 +139,10 @@ From the list, identify workflows for testing different scenarios:
 - **Scheduled workflow**: A workflow triggered on a schedule
 - **Event-triggered workflow**: A workflow triggered by issues/PRs
 
+Before selecting compile targets, inspect their frontmatter and all transitive imports against `.github/aw/debug-compilation.md`. Repository trust alone does not imply dry-run compatibility. Exclude candidates containing host steps, custom MCP servers, `mcp-scripts`, custom safe-output scripts/actions, enabled Bash graders, or authored OIDC permissions (including imported declarations and unsafe built-in job overrides). Keep these candidates available for logs/audit testing, but record their compile coverage as **not tested (expected exclusion)** before making any compile call. Choose compatible alternatives to satisfy all 3 required compiles; complex targets may use built-in tools, and imported targets must have compatible imports.
+
+Do not remove declarations, weaken validation, or retry a rejected target to make it pass. An unexpected rejection of a selected compatible target still requires `report_incomplete`; so does inability to find 3 compatible targets. Do not reclassify an attempted required compile as an expected exclusion.
+
 Document your selections and rationale.
 
 #### Phase 2: Test `gh aw logs` Command
@@ -356,7 +360,7 @@ Create a summary:
 Test compilation with a targeted sample of representative workflows instead of bulk compiling all workflows. This keeps output tokens bounded.
 
 ```
-Select 3 representative workflows from Phase 1.2 (one simple, one complex, one with imports).
+Select 3 dry-run-compatible representative workflows from Phase 1.2 (one simple, one complex, one with imports), using the source/import preflight in Phase 1.3.
 Use the agentic-workflows "compile" tool for each individually.
 Pass dry_run: true and strict: true for every compile call.
 Do not bulk compile or claim repository-wide compilation health from this sample.
