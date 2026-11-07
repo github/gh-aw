@@ -79,5 +79,8 @@ If it is missing, create it. If it exists, improve it only when needed to match 
 
 #### Output rules
 
-- If changes are required (including updates to `.github/workflows/windows-cli-integration.yml` or this builder file), use `create-issue` to request those updates. Keep headers at `###` (h3) or lower, and wrap long details — full job logs, diffs, or scenario matrices — in `<details><summary><b>...</b></summary>...</details>` blocks per the `reporting` skill.
+- For any issue body, use `###` (h3) or lower headers only. Keep the summary and decisions visible; put long findings, logs, diffs, and scenario matrices in `<details><summary><b>...</b></summary>...</details>` blocks.
+- Structure reports as overview → key findings/metrics → detailed findings → next actions.
+- Use `- [ ]` for follow-up work and format workflow run references as `[§12345](https://github.com/github/gh-aw/actions/runs/12345)`.
+- If changes are required (including updates to `.github/workflows/windows-cli-integration.yml` or this builder file), use `create-issue` to request those updates.
 - If no changes are needed, use `noop` with a short explanation.
