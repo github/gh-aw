@@ -134,6 +134,27 @@ fi
      `.lock.yml` to `.md`. Migrate legacy display-name/title keys only when their
      mapping to a source path is unambiguous; otherwise leave them unresolved.
 
+3. Before aggregation, migrate legacy `runs.json` records whose identity is in
+   `workflow` rather than `workflow_id`. Keep an existing canonical
+   `workflow_id`; otherwise resolve `workflow` only when it is an exact
+   repository-relative workflow source path (normalize `.lock.yml` to `.md` if
+   that source exists), or an exact display name mapped to one source path by
+   that run's metadata. Do not infer identity from similar titles. Replace a
+   uniquely resolved legacy `workflow` with `workflow_id`, preserve its run
+   fields, then upsert by `(workflow_id, run_id, run_attempt)`. Repeating this
+   migration must not change an already canonical record or create a duplicate.
+
+   Apply the same exact, one-to-one mapping to legacy `index.json` keys. Move
+   resolved entries to the canonical source-path key and retain their existing
+   dates and metrics; recompute derived streaks and rates only from deduplicated
+   observed run records. If both legacy and canonical entries map to one key,
+   keep the newest `last_analyzed` and prefer metrics derived from observed
+   records; do not add legacy streaks together. Preserve unresolved records and
+   keys verbatim under their legacy identities, exclude them from canonical
+   statistics, and report history as incomplete rather than treating missing
+   mappings as a reset or a healthy cache. Persist the migration so subsequent
+   runs are idempotent.
+
 ---
 
 ## Phase 1: Download Recent Workflow Logs
