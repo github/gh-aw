@@ -122,7 +122,7 @@ while IFS= read -r md; do
 
     if [ ! -f "$lock" ]; then
         missing_locks+=("$md")
-    elif ! printf '%s\n' "$all_modified" | grep -Fxq "$lock"; then
+    elif ! printf '%s\n' "$all_modified" | grep -Fx "$lock" >/dev/null; then
         stale_files+=("$md")
     fi
 done <<< "$modified_mds"
