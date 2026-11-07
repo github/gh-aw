@@ -91,3 +91,6 @@ latest.json (2026-11-03, complete 24h): 593 executed / 438 ok (73.9%), 465 safe-
 
 ## Run 2026-11-06T12:43Z
 No new discussion/issue: weekly report already posted 2026-11-03; no new evidence gathered this run.
+
+## Run 2026-11-07T12:42Z
+metrics/latest.json is fresh (2026-11-07) but partial: 100 runs over 2.83h, no safe-output/engagement data. Ranking deferred; no discussion/issue filed.
