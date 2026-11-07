@@ -2,6 +2,9 @@
 
 This guide explains how to configure GitHub Agentic Workflows to use custom API endpoints for GitHub Enterprise Cloud (GHEC), GitHub Enterprise Server (GHES), or custom AI endpoints.
 
+> [!IMPORTANT]
+> These are endpoint compatibility examples, not an end-to-end product support statement. Consult the consolidated [deployment and runner applicability summary](src/content/docs/reference/enterprise-configuration.md#deployment-and-runner-applicability), including unconfirmed GHES/GHEC/ARC combinations, and [AWF enterprise routing scope](https://github.com/github/gh-aw-firewall/blob/main/docs/enterprise-configuration.md).
+
 ## Overview
 
 GitHub Agentic Workflows supports custom API endpoints through the `engine.api-target` configuration field. This allows you to specify custom endpoints for:

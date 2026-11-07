@@ -9,6 +9,9 @@ Use the `runs-on` frontmatter field to target a self-hosted runner instead of th
 
 Runners must be Linux with Docker support. macOS and Windows are not supported.
 
+> [!IMPORTANT]
+> **Runner configuration is not a product availability statement.** Choose your GitHub deployment separately from your runner topology in the [deployment and runner applicability summary](/gh-aw/reference/enterprise-configuration/#deployment-and-runner-applicability). GHES, data-residency tenant, and Kubernetes ARC end-to-end combinations remain unconfirmed unless explicitly confirmed by the product owners. See also [AWF applicability and CI boundaries](https://github.com/github/gh-aw-firewall/blob/main/docs/compatibility.md#environment-and-runner-applicability) and [AWF ARC/DinD requirements](https://github.com/github/gh-aw-firewall/blob/main/docs/arc-dind.md).
+
 To enforce self-hosted runners for every generated job, set `require_self_hosted_runners` in `.github/workflows/aw.json` or pass `--require-self-hosted-runners` for a one-off compile:
 
 ```json title=".github/workflows/aw.json"
@@ -75,7 +78,7 @@ CLI proxy startup checks upstream GitHub API connectivity before reporting readi
 
 ## ARC with Docker-in-Docker (DinD)
 
-For a complete ARC DinD setup walkthrough for GitHub Copilot coding agent, see [How to run GitHub Copilot coding agent on ARC with Docker-in-Docker](/gh-aw/reference/arc-dind-copilot-agent/).
+For a complete ARC DinD setup walkthrough for the gh-aw Copilot engine, see [How to run the gh-aw Copilot engine on ARC with Docker-in-Docker](/gh-aw/reference/arc-dind-copilot-agent/).
 
 Actions Runner Controller (ARC) deployments that use a Docker-in-Docker sidecar split the runner container and the Docker daemon container across separate filesystems.
 
@@ -370,9 +373,11 @@ Self-hosted runners must meet these requirements for agentic workflows to run re
 
 A working Docker daemon is required. The MCP gateway and sandbox run as containers.
 
+AWF documents Docker Engine `20.10+` and Docker Compose `v2.0+` as installation baselines, not certified deployment versions. Verify `docker info` and `docker compose version` on the actual runner. See [component prerequisites and evidence](/gh-aw/reference/enterprise-configuration/#component-versions-and-validation-evidence).
+
 - **Unix socket**: Docker must be accessible via a Unix socket (typically `/var/run/docker.sock`). If `DOCKER_HOST` is unset, the gateway mounts `/var/run/docker.sock`. If `DOCKER_HOST` is `unix://...` or a bare absolute path, the gateway mounts that socket path. Other schemes (for example `tcp://...`) are ignored for mounts and default back to `/var/run/docker.sock`.
 - **Docker group**: Grant the runner user access through the socket's owning group (typically `docker`). Do not make the socket world-accessible; Docker daemon access is a privileged host capability.
-- **ARC/Kubernetes**: Docker-in-Docker (DinD) is **required** for ARC. Set `containerMode.type="dind"` in your ARC Helm configuration. The `containerMode.type="kubernetes"` mode is not supported. The dind sidecar must share the Docker socket via an `emptyDir` volume, and the gateway retries the socket check for up to 10 seconds to handle startup race conditions. See [How to run GitHub Copilot coding agent on ARC with Docker-in-Docker](/gh-aw/reference/arc-dind-copilot-agent/) for the complete setup guide, and [ARC (Actions Runner Controller)](#arc-actions-runner-controller) below for pod security details.
+- **ARC/Kubernetes**: Docker-in-Docker (DinD) is **required** for this ARC execution path. Set `containerMode.type="dind"` in your ARC Helm configuration. The `containerMode.type="kubernetes"` mode without a Docker daemon does not satisfy this setup. The dind sidecar must share the Docker socket via an `emptyDir` volume, and the gateway retries the socket check for up to 10 seconds to handle startup race conditions. See [How to run the gh-aw Copilot engine on ARC with Docker-in-Docker](/gh-aw/reference/arc-dind-copilot-agent/) for the complete setup guide, and [ARC (Actions Runner Controller)](#arc-actions-runner-controller) below for pod security details.
 - **Split-daemon override**: On ARC or other split-daemon topologies where the socket path or group ID cannot be auto-detected, set `GH_AW_DOCKER_SOCK_PATH` and `GH_AW_DOCKER_SOCK_GID` environment variables at the runner level. See [Docker socket override for split-daemon topologies](#docker-socket-override-for-split-daemon-topologies) for details.
 
 ### Node.js
@@ -424,11 +429,11 @@ Self-hosted runners need outbound HTTPS access to:
 
 ## GHES (GitHub Enterprise Server)
 
-Agentic workflows can run on GHES with some additional configuration.
+gh-aw implements GHES compatibility paths; these are not an owner-confirmed end-to-end GHES support commitment. See the [applicability summary](/gh-aw/reference/enterprise-configuration/#deployment-and-runner-applicability) and [AWF enterprise routing scope](https://github.com/github/gh-aw-firewall/blob/main/docs/enterprise-configuration.md).
 
 ### GHES compatibility mode
 
-GHES does not support the `@actions/artifact` v2.0.0+ backend used by `upload-artifact@v4+` and `download-artifact@v4+`. Compiled workflows use the latest artifact action versions by default, which fail on GHES with `GHESNotSupportedError`.
+GHES instances without the `@actions/artifact` v2.0.0+ backend cannot use `upload-artifact@v4+` and `download-artifact@v4+`. Default compiled artifact actions fail there with `GHESNotSupportedError`.
 
 Enable GHES compatibility mode in `.github/workflows/aw.json` to compile with GHES mode explicitly enabled:
 
@@ -446,11 +451,11 @@ gh aw compile --ghes my-workflow.md
 
 Compatibility mode emits `upload-artifact@v3.2.2` and `download-artifact@v3.1.0`, which use the artifact backend supported by GHES. Default GitHub.com compilation continues to use the latest artifact actions.
 
-This path supports GHES 3.21.x and earlier when the workflow runs on Actions Runner 2.327.1 or later, which is required by the Node.js 24 runtime used by these pinned artifact actions. Keep compatibility mode enabled on later releases until the instance supports the v4 artifact backend.
+Compatibility mode also omits compiler-generated `cache-mode` fields. The historical GHES 3.21.x-and-earlier guidance concerns artifact-backend compatibility only; Actions Runner `2.327.1+` is the pinned actions' Node.js 24 requirement. Neither is a stack certification or a tested GHES release matrix. See [GHES compatibility mode and its cache security caveat](/gh-aw/reference/enterprise-configuration/#ghes-compatibility-mode).
 
 ### API endpoint
 
-GHES instances need the `api-target` engine configuration. See [Enterprise Configuration](/gh-aw/reference/enterprise-configuration/) for full setup instructions.
+For Copilot compatibility investigations, configure the inference endpoint confirmed for your deployment, independently of the GHES repository/API host. The example below is an enterprise endpoint routing example, not proof that Copilot is available on the server. See [Copilot prerequisites](/gh-aw/troubleshooting/common-issues/#copilot-engine-prerequisites-on-ghes).
 
 ```aw
 ---
@@ -467,7 +472,7 @@ network:
 
 ## ARC (Actions Runner Controller)
 
-GitHub Copilot coding agent **requires** Docker-in-Docker (DinD) mode on ARC. Set `containerMode.type="dind"` in your ARC Helm configuration. The `containerMode.type="kubernetes"` mode is not supported.
+The gh-aw Copilot engine's ARC path **requires** Docker-in-Docker (DinD). It runs Copilot CLI in an Actions job, not the separate GitHub Copilot coding-agent service. Set `containerMode.type="dind"` in your ARC Helm configuration; Kubernetes mode without a Docker daemon does not satisfy this path.
 
 Set `runner.topology: arc-dind` in workflow frontmatter to enable ARC DinD split-filesystem handling. See the [ARC with Docker-in-Docker (DinD)](#arc-with-docker-in-docker-dind) section above and the [ARC DinD setup guide](/gh-aw/reference/arc-dind-copilot-agent/) for a complete walkthrough.
 

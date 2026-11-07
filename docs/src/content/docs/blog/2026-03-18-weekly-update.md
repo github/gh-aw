@@ -26,6 +26,9 @@ This release rewires the security model. **Breaking change**: automatic `lockdow
 Other highlights:
 
 - **GHES domain auto-allowlisting** ([#21301](https://github.com/github/gh-aw/pull/21301)): When `engine.api-target` points to a GHES instance, the compiler automatically adds GHES API hostnames to the firewall. No more silent blocks after every recompile.
+
+> [!NOTE]
+> GHES routing and host auto-detection are component compatibility paths, not confirmation of official end-to-end Agentic Workflows availability on GHES or a particular release. See the current [deployment and runner applicability summary](/gh-aw/reference/enterprise-configuration/#deployment-and-runner-applicability).
 - **`github-app:` auth in APM dependencies** ([#21286](https://github.com/github/gh-aw/pull/21286)): APM `dependencies:` can now use `github-app:` auth for cross-org private package access.
 
 ### [v0.59.0](https://github.com/github/gh-aw/releases/tag/v0.59.0) — March 16
