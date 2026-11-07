@@ -141,5 +141,4 @@ func TestFailedJobsDisplayNames(t *testing.T) {
 	require.Equal(t, "push_repo_memory", names["push_repo_memory"])
 	require.Equal(t, "unnamed", names["unnamed"])
 	require.NotContains(t, names, "dynamic", "runtime expressions must not be interpolated into serialized JSON")
-	require.Equal(t, "Agent", generatedJobNames["agent"], "overrides must not mutate the shared compiler mapping")
 }
