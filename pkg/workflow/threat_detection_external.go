@@ -699,6 +699,13 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 	// Pass context as environment variables: AWF's --env-all forwards them to
 	// threat-detect without interpolating user-controlled prompt text into a command.
 	steps = append(steps, c.buildThreatDetectionContextEnvVars(data, continueOnError, continueOnErrorExpr)...)
+	if engineID == "copilot" {
+		inputDir := constants.ThreatDetectionDir
+		if isArcDindTopology(threatDetectionData) {
+			inputDir = strings.ReplaceAll(rewriteArcDindPath(inputDir), "${RUNNER_TEMP}", "${{ runner.temp }}")
+		}
+		steps = append(steps, fmt.Sprintf("          GH_AW_DETECTION_INPUT_DIR: %q\n", inputDir))
+	}
 	if useRootlessCLIInstallation(threatDetectionData) {
 		steps = append(steps, "          THREAT_DETECT_BINARY: ${{ steps.threat_detect_install.outputs.binary-path }}\n")
 	}

@@ -62,6 +62,7 @@ const {
   isSDKSessionIdleTimeoutError,
   PROMPT_FILE_INLINE_THRESHOLD_BYTES,
   resolvePromptFileInput,
+  addCopilotDetectionDirectory,
   resolveRetryConfig,
   shouldRetryFailedExecution,
   shouldContinueCopilotSessionAfterFailure,
@@ -85,6 +86,25 @@ const {
   resolveLongRunTokenThreshold,
   computeStartupRetryEligible,
 } = require("./copilot_harness.cjs");
+
+describe("external detection artifact access", () => {
+  it.each(["/tmp/gh-aw/threat-detection", "/runner temp/gh-aw/threat-detection"])("grants access to the prepared inputs at %s without broadening other permissions", inputDir => {
+    const args = ["--add-dir", "/runtime/prompt", "--allow-all-tools", "--add-dir", "/workspace", "--prompt", "Inspect artifacts"];
+    expect(addCopilotDetectionDirectory(args, { GH_AW_PHASE: "detection", GH_AW_DETECTION_INPUT_DIR: inputDir })).toEqual(["--add-dir", inputDir, ...args]);
+    expect(args[1]).toBe("/runtime/prompt");
+  });
+
+  it.each(["agent", "", undefined])("does not grant artifact access outside detection (%s)", phase => {
+    const args = ["--prompt", "Hello"];
+    expect(addCopilotDetectionDirectory(args, { GH_AW_PHASE: phase, GH_AW_DETECTION_INPUT_DIR: "/tmp/gh-aw/threat-detection" })).toBe(args);
+  });
+
+  it("leaves inline detection unchanged and rejects relative external input paths", () => {
+    const args = ["--prompt", "Hello"];
+    expect(addCopilotDetectionDirectory(args, { GH_AW_PHASE: "detection" })).toBe(args);
+    expect(() => addCopilotDetectionDirectory(args, { GH_AW_PHASE: "detection", GH_AW_DETECTION_INPUT_DIR: "." })).toThrow("absolute path");
+  });
+});
 
 describe("native invocation model and session selection", () => {
   const sessionId = "aabbccdd-1122-3344-5566-778899aabbcc";

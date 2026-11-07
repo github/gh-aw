@@ -63,6 +63,17 @@ func TestCompileArcDindThreatDetectionStaging(t *testing.T) {
 					upload, _ := find("Upload threat detection artifact")
 					_, conclusion := find("Conclude threat detection")
 					require.NotNil(t, conclusion)
+					executionEnv := execution["env"].(map[string]any)
+					if engine == "copilot" {
+						inputDir := "/tmp/gh-aw/threat-detection"
+						if tc.arc {
+							inputDir = "${{ runner.temp }}/gh-aw/threat-detection"
+						}
+						require.Equal(t, inputDir, executionEnv["GH_AW_DETECTION_INPUT_DIR"])
+						require.Equal(t, "detection", executionEnv["GH_AW_PHASE"])
+					} else {
+						require.NotContains(t, executionEnv, "GH_AW_DETECTION_INPUT_DIR")
+					}
 					rootless := tc.arc || tc.installation == "rootless"
 					installRun := installation["run"].(string)
 					require.Equal(t, rootless, strings.Contains(installRun, "--rootless"))

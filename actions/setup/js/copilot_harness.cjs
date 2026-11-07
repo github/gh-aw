@@ -1657,6 +1657,21 @@ function removeExplicitPromptOptions(args) {
 }
 
 /**
+ * Grant external detection access to its compiler-owned artifact directory.
+ * The detector's prompt directory may be elsewhere, so --allow-all-tools alone
+ * does not permit Copilot to read the inputs or record a verdict.
+ * @param {string[]} args
+ * @param {NodeJS.ProcessEnv} env
+ * @returns {string[]}
+ */
+function addCopilotDetectionDirectory(args, env) {
+  const inputDir = env.GH_AW_DETECTION_INPUT_DIR;
+  if (!isDetectionPhase(env.GH_AW_PHASE) || !inputDir) return args;
+  if (!path.isAbsolute(inputDir)) throw new Error("GH_AW_DETECTION_INPUT_DIR must be an absolute path");
+  return ["--add-dir", inputDir, ...args];
+}
+
+/**
  * Resolve --prompt-file arguments for the Copilot CLI.
  * Small files are inlined as -p prompt text for compatibility with older Copilot CLIs.
  * Larger files and files containing NUL bytes are returned as stdin data so the full
@@ -1760,7 +1775,7 @@ async function main() {
     const resolvedPrompt = resolvePromptFileInput(args);
     const fallbackConfigPath = !process.env.GH_AW_AWF_CONFIG_PATH && process.env.RUNNER_TEMP ? path.join(process.env.RUNNER_TEMP, "gh-aw", "awf-config.json") : undefined;
     const configPath = process.env.GH_AW_AWF_CONFIG_PATH || AWF_CONFIG_PATH;
-    resolvedArgs = addCopilotURLPermissions(resolvedPrompt.args, { sdkMode: copilotSDKMode, configPath, fallbackConfigPath });
+    resolvedArgs = addCopilotURLPermissions(addCopilotDetectionDirectory(resolvedPrompt.args, process.env), { sdkMode: copilotSDKMode, configPath, fallbackConfigPath });
     promptStdin = resolvedPrompt.stdin;
   }
 
@@ -2610,6 +2625,7 @@ if (typeof module !== "undefined" && module.exports) {
     waitForCopilotSDKServer,
     writeCopilotOutputs,
     resolvePromptFileInput,
+    addCopilotDetectionDirectory,
     resolveRetryConfig,
     parseCopilotSDKServerArgsFromEnv,
     isCAPIQuotaExceededError,
