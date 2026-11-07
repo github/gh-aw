@@ -5,6 +5,7 @@ package workflow
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -710,7 +711,7 @@ func TestSanitizeRunStepExpressionsRejectsShellCodeEvaluation(t *testing.T) {
 			workflow := map[string]any{
 				"steps": []any{result},
 			}
-			assert.Error(t, validateNoGitHubExpressionsInRunScriptsFromParsed(workflow))
+			require.Error(t, validateNoGitHubExpressionsInRunScriptsFromParsed(workflow))
 		})
 	}
 }
@@ -733,8 +734,64 @@ func TestRunStepShellEvaluationRejectsAllowlistedExpressions(t *testing.T) {
 			assert.Equal(t, before, step)
 			assert.Equal(t, before, result)
 			workflow := map[string]any{"steps": []any{result}}
-			assert.Error(t, validateNoGitHubExpressionsInRunScriptsFromParsed(workflow))
-			assert.Error(t, validateNoTemplateInjectionFromParsed(workflow))
+			require.Error(t, validateNoGitHubExpressionsInRunScriptsFromParsed(workflow))
+			require.Error(t, validateNoTemplateInjectionFromParsed(workflow))
+		})
+	}
+}
+
+func TestRunStepShellEvaluationCompilationBoundary(t *testing.T) {
+	for _, skipValidation := range []bool{false, true} {
+		for _, field := range []string{"steps", "pre-steps", "post-steps", "on.steps", "jobs.custom.steps", "jobs.custom.setup-steps"} {
+			t.Run(field+map[bool]string{false: "/validated", true: "/skip-validation"}[skipValidation], func(t *testing.T) {
+				steps := "  - run: eval \"${{ env.VALUE }}\"\n"
+				authored := "on: workflow_dispatch\n" + field + ":\n" + steps
+				switch field {
+				case "on.steps":
+					authored = "on:\n  workflow_dispatch:\n  steps:\n  " + steps
+				case "jobs.custom.steps", "jobs.custom.setup-steps":
+					key := strings.TrimPrefix(field, "jobs.custom.")
+					authored = "on: workflow_dispatch\njobs:\n  custom:\n    runs-on: ubuntu-latest\n    " + key + ":\n    " + steps
+				}
+				source := "---\nengine: copilot\npermissions:\n  contents: read\nnetwork:\n  allowed: [defaults]\n" + authored + "---\nTest.\n"
+				path := filepath.Join(t.TempDir(), "test.md")
+				require.NoError(t, os.WriteFile(path, []byte(source), 0600))
+				compiler := NewCompiler()
+				compiler.SetSkipValidation(skipValidation)
+				err := compiler.CompileWorkflow(path)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "CTR-006")
+				assert.Contains(t, err.Error(), "${{ env.VALUE }}")
+			})
+		}
+	}
+}
+
+func TestRunStepShellEvaluationImportedSteps(t *testing.T) {
+	for _, field := range []string{"custom", "pre", "pre-agent", "post", "safe-outputs", "detection", "detection-post", "secret-masking"} {
+		t.Run(field, func(t *testing.T) {
+			data := &WorkflowData{}
+			steps := "steps:\n  - run: bash -c \"${{ vars.VALUE }}\"\n"
+			step := map[string]any{"run": `bash -c "${{ vars.VALUE }}"`}
+			switch field {
+			case "custom":
+				data.CustomSteps = steps
+			case "pre":
+				data.PreSteps = steps
+			case "pre-agent":
+				data.PreAgentSteps = steps
+			case "post":
+				data.PostSteps = steps
+			case "safe-outputs":
+				data.SafeOutputs = &SafeOutputsConfig{Steps: []any{step}}
+			case "detection":
+				data.SafeOutputs = &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{Steps: []any{step}}}
+			case "detection-post":
+				data.SafeOutputs = &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{PostSteps: []any{step}}}
+			case "secret-masking":
+				data.SecretMasking = &SecretMaskingConfig{Steps: []map[string]any{step}}
+			}
+			require.Error(t, validateAuthoredShellCodeEvaluation(data))
 		})
 	}
 }

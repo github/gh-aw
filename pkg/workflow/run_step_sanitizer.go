@@ -157,7 +157,7 @@ func runStepUsesShellCodeEvaluation(run string) bool {
 		}
 		start, end := int(word.Pos().Offset()), int(word.End().Offset())
 		for _, expression := range expressions {
-			if len(expression) >= 2 && start < expression[1] && expression[0] < end {
+			if len(expression) >= 2 && start < expression[1] && expression[0] < end { //nolint:uncheckedsliceindex // The guard requires the complete match offset pair.
 				return true
 			}
 		}

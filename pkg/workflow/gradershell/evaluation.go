@@ -38,13 +38,14 @@ func HasShellCodeEvaluation(file *syntax.File, dynamicWord func(*syntax.Word) bo
 }
 
 func commandReevaluatesCode(args []*syntax.Word, isDynamic func(*syntax.Word) bool, depth int) bool {
-	if len(args) == 0 || depth > 16 {
+	word, exists := evaluationArgument(args, 0)
+	if !exists || depth > 16 {
 		return depth > 16
 	}
-	if isDynamic(args[0]) {
+	if isDynamic(word) {
 		return true
 	}
-	name, literal := LiteralWord(args[0])
+	name, literal := LiteralWord(word)
 	if !literal {
 		return true
 	}
@@ -90,14 +91,38 @@ func shellCommand(name string) bool {
 	}
 }
 
-func powershellHasCodeFlag(args []*syntax.Word, isDynamic func(*syntax.Word) bool) bool {
-	optionsWithOperands := map[string]bool{
-		"-configurationname": true, "-configurationfile": true, "-executionpolicy": true,
-		"-inputformat": true, "-outputformat": true, "-settingsfile": true,
-		"-workingdirectory": true, "-windowstyle": true, "-custompipename": true,
+func evaluationArgument(args []*syntax.Word, index int) (*syntax.Word, bool) {
+	if index < 0 || index >= len(args) {
+		return nil, false
 	}
-	for i := 0; i < len(args); i++ {
-		word := args[i] //nolint:uncheckedsliceindex // The loop bounds i before every iteration.
+	return args[index], true
+}
+
+func argumentIsDynamic(args []*syntax.Word, index int, isDynamic func(*syntax.Word) bool) bool {
+	word, exists := evaluationArgument(args, index)
+	return !exists || isDynamic(word)
+}
+
+func scriptArgumentReadsCode(args []*syntax.Word, index int, isDynamic func(*syntax.Word) bool) bool {
+	word, exists := evaluationArgument(args, index)
+	if !exists {
+		return true
+	}
+	script, literal := LiteralWord(word)
+	return !literal || isDynamic(word) || scriptUsesStandardInput(script)
+}
+
+func powershellHasCodeFlag(args []*syntax.Word, isDynamic func(*syntax.Word) bool) bool {
+	optionsWithOperands := map[string]struct{}{
+		"-configurationname": {}, "-configurationfile": {}, "-executionpolicy": {},
+		"-inputformat": {}, "-outputformat": {}, "-settingsfile": {},
+		"-workingdirectory": {}, "-windowstyle": {}, "-custompipename": {},
+	}
+	for i := 0; ; i++ {
+		word, exists := evaluationArgument(args, i)
+		if !exists {
+			break
+		}
 		if isDynamic(word) {
 			return true
 		}
@@ -109,15 +134,11 @@ func powershellHasCodeFlag(args []*syntax.Word, isDynamic func(*syntax.Word) boo
 		case "-command", "-c", "-encodedcommand", "-e", "-commandwithargs":
 			return true
 		case "-file", "-f":
-			if i+1 >= len(args) {
-				return true
-			}
-			file, static := LiteralWord(args[i+1])
-			return !static || isDynamic(args[i+1]) || scriptUsesStandardInput(file)
+			return scriptArgumentReadsCode(args, i+1, isDynamic)
 		}
-		if optionsWithOperands[strings.ToLower(option)] {
+		if _, found := optionsWithOperands[strings.ToLower(option)]; found {
 			i++
-			if i >= len(args) || isDynamic(args[i]) {
+			if argumentIsDynamic(args, i, isDynamic) {
 				return true
 			}
 			continue
@@ -135,8 +156,11 @@ func powershellHasCodeFlag(args []*syntax.Word, isDynamic func(*syntax.Word) boo
 }
 
 func shellHasCodeFlag(args []*syntax.Word, isDynamic func(*syntax.Word) bool) bool {
-	for i := 0; i < len(args); i++ {
-		word := args[i] //nolint:uncheckedsliceindex // The loop bounds i before every iteration.
+	for i := 0; ; i++ {
+		word, exists := evaluationArgument(args, i)
+		if !exists {
+			break
+		}
 		if isDynamic(word) {
 			return true
 		}
@@ -145,11 +169,7 @@ func shellHasCodeFlag(args []*syntax.Word, isDynamic func(*syntax.Word) bool) bo
 			return true
 		}
 		if arg == "--" {
-			if i+1 == len(args) {
-				return true
-			}
-			operand, literal := LiteralWord(args[i+1])
-			return !literal || isDynamic(args[i+1]) || scriptUsesStandardInput(operand)
+			return scriptArgumentReadsCode(args, i+1, isDynamic)
 		}
 		switch arg {
 		case "-c", "--command":
@@ -158,7 +178,7 @@ func shellHasCodeFlag(args []*syntax.Word, isDynamic func(*syntax.Word) bool) bo
 			return true
 		case "-o", "+o", "-O", "+O", "--rcfile", "--init-file":
 			i++
-			if i >= len(args) || isDynamic(args[i]) {
+			if argumentIsDynamic(args, i, isDynamic) {
 				return true
 			}
 			continue
@@ -170,16 +190,8 @@ func shellHasCodeFlag(args []*syntax.Word, isDynamic func(*syntax.Word) bool) bo
 			continue
 		}
 		if strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") {
-			for _, flag := range strings.TrimPrefix(arg, "-") {
-				switch flag {
-				case 'c':
-					return true
-				case 's':
-					return true
-				case 'a', 'e', 'f', 'h', 'i', 'm', 'n', 'p', 'r', 'u', 'v', 'x', 'B', 'C', 'E', 'H', 'P', 'T', 'l', 'D':
-				default:
-					return true
-				}
+			if shellShortOptionsEvaluateCode(arg) {
+				return true
 			}
 			continue
 		}
@@ -199,12 +211,26 @@ func shellHasCodeFlag(args []*syntax.Word, isDynamic func(*syntax.Word) bool) bo
 	return true
 }
 
+func shellShortOptionsEvaluateCode(option string) bool {
+	for _, flag := range strings.TrimPrefix(option, "-") {
+		switch flag {
+		case 'a', 'e', 'f', 'h', 'i', 'm', 'n', 'p', 'r', 'u', 'v', 'x', 'B', 'C', 'E', 'H', 'P', 'T', 'l', 'D':
+		default:
+			return true
+		}
+	}
+	return false
+}
+
 func interpreterHasCode(name string, args []*syntax.Word, isDynamic func(*syntax.Word) bool) bool {
 	if !codeInterpreter(name) {
 		return false
 	}
-	for i := 0; i < len(args); i++ {
-		word := args[i] //nolint:uncheckedsliceindex // The loop bounds i before every iteration.
+	for i := 0; ; i++ {
+		word, exists := evaluationArgument(args, i)
+		if !exists {
+			break
+		}
 		if isDynamic(word) {
 			return true
 		}
@@ -216,73 +242,26 @@ func interpreterHasCode(name string, args []*syntax.Word, isDynamic func(*syntax
 			if isAwk(name) {
 				return true
 			}
-			if i+1 == len(args) {
-				return true
-			}
-			file, static := LiteralWord(args[i+1])
-			return !static || isDynamic(args[i+1]) || scriptUsesStandardInput(file)
+			return scriptArgumentReadsCode(args, i+1, isDynamic)
 		}
-		switch name {
-		case "python", "python2", "python3", "pypy", "pypy3":
-			if option == "-c" || option == "--command" {
-				return true
-			}
-			if option == "-m" || option == "--module" {
-				return true
-			}
-			if option == "-W" || option == "-X" {
-				i++
-				if i >= len(args) || isDynamic(args[i]) {
-					return true
-				}
-				continue
-			}
-		case "ruby":
-			if option == "-e" || option == "--eval" {
-				return true
-			}
-		case "perl":
-			if option == "-e" || option == "-E" {
-				return true
-			}
-		case "php":
-			if option == "-r" {
-				return true
-			}
-		case "node", "bun":
-			if option == "-e" || option == "--eval" || option == "-p" || option == "--print" {
-				return true
-			}
-		case "deno":
-			if option == "eval" || option == "--eval" {
-				return true
-			}
-			if option == "run" {
-				return denoRunReadsCode(args[i+1:], isDynamic)
-			}
-		case "lua", "qjs", "js":
-			if option == "-e" || option == "--eval" {
-				return true
-			}
-		case "R", "Rscript":
-			if option == "-e" || option == "--expression" {
-				return true
-			}
-		case "awk", "gawk", "mawk", "nawk":
-			if option == "-F" || option == "-v" || option == "--field-separator" || option == "--assign" {
-				i++
-				if i >= len(args) || isDynamic(args[i]) {
-					return true
-				}
-				continue
-			}
-			if strings.HasPrefix(option, "-") {
-				continue
-			}
+		if interpreterOptionEvaluatesCode(name, option) {
 			return true
+		}
+		if interpreterOptionHasOperand(name, option) {
+			i++
+			if argumentIsDynamic(args, i, isDynamic) {
+				return true
+			}
+			continue
+		}
+		if name == "deno" && option == "run" {
+			return denoRunReadsCode(args[i+1:], isDynamic)
 		}
 		if strings.HasPrefix(option, "-") {
 			continue
+		}
+		if isAwk(name) {
+			return true
 		}
 		// A static script-file operand is data; following words are script args.
 		return scriptUsesStandardInput(option)
@@ -290,6 +269,39 @@ func interpreterHasCode(name string, args []*syntax.Word, isDynamic func(*syntax
 	// Without a script-file operand, these interpreters consume program text
 	// from stdin (or enter an interactive mode that evaluates stdin).
 	return true
+}
+
+func interpreterOptionEvaluatesCode(name, option string) bool {
+	switch name {
+	case "python", "python2", "python3", "pypy", "pypy3":
+		return option == "-c" || option == "--command" || option == "-m" || option == "--module"
+	case "ruby":
+		return option == "-e" || option == "--eval"
+	case "perl":
+		return option == "-e" || option == "-E"
+	case "php":
+		return option == "-r"
+	case "node", "bun":
+		return option == "-e" || option == "--eval" || option == "-p" || option == "--print"
+	case "deno":
+		return option == "eval" || option == "--eval"
+	case "lua", "qjs", "js":
+		return option == "-e" || option == "--eval"
+	case "R", "Rscript":
+		return option == "-e" || option == "--expression"
+	}
+	return false
+}
+
+func interpreterOptionHasOperand(name, option string) bool {
+	switch name {
+	case "python", "python2", "python3", "pypy", "pypy3":
+		return option == "-W" || option == "-X"
+	case "awk", "gawk", "mawk", "nawk":
+		return option == "-F" || option == "-v" || option == "--field-separator" || option == "--assign"
+	default:
+		return false
+	}
 }
 
 func codeInterpreter(name string) bool {
@@ -311,12 +323,15 @@ func isAwk(name string) bool {
 }
 
 func denoRunReadsCode(args []*syntax.Word, isDynamic func(*syntax.Word) bool) bool {
-	optionsWithOperands := map[string]bool{
-		"--config": true, "--import-map": true, "--lock": true, "--seed": true,
-		"--watch-exclude": true, "--cert": true, "--ext": true,
+	optionsWithOperands := map[string]struct{}{
+		"--config": {}, "--import-map": {}, "--lock": {}, "--seed": {},
+		"--watch-exclude": {}, "--cert": {}, "--ext": {},
 	}
-	for i := 0; i < len(args); i++ {
-		word := args[i] //nolint:uncheckedsliceindex // The loop bounds i before every iteration.
+	for i := 0; ; i++ {
+		word, exists := evaluationArgument(args, i)
+		if !exists {
+			break
+		}
 		if isDynamic(word) {
 			return true
 		}
@@ -325,15 +340,11 @@ func denoRunReadsCode(args []*syntax.Word, isDynamic func(*syntax.Word) bool) bo
 			return true
 		}
 		if option == "--" {
-			if i+1 == len(args) {
-				return true
-			}
-			script, static := LiteralWord(args[i+1])
-			return !static || isDynamic(args[i+1]) || scriptUsesStandardInput(script)
+			return scriptArgumentReadsCode(args, i+1, isDynamic)
 		}
-		if optionsWithOperands[option] {
+		if _, found := optionsWithOperands[option]; found {
 			i++
-			if i >= len(args) || isDynamic(args[i]) {
+			if argumentIsDynamic(args, i, isDynamic) {
 				return true
 			}
 			continue
@@ -347,28 +358,30 @@ func denoRunReadsCode(args []*syntax.Word, isDynamic func(*syntax.Word) bool) bo
 }
 
 func sourceCommandEvaluatesCode(args []*syntax.Word, isDynamic func(*syntax.Word) bool) bool {
-	if len(args) == 0 {
+	word, exists := evaluationArgument(args, 0)
+	if !exists {
 		return false
 	}
-	if option, literal := LiteralWord(args[0]); literal && option == "--" {
-		args = args[1:]
-		if len(args) == 0 {
+	if option, literal := LiteralWord(word); literal && option == "--" {
+		word, exists = evaluationArgument(args, 1)
+		if !exists {
 			return false
 		}
 	}
-	if isDynamic(args[0]) {
+	if isDynamic(word) {
 		return true
 	}
-	source, literal := LiteralWord(args[0])
+	source, literal := LiteralWord(word)
 	return !literal || scriptUsesStandardInput(source)
 }
 
 func trapEvaluatesCode(args []*syntax.Word, isDynamic func(*syntax.Word) bool) bool {
-	if len(args) == 0 {
+	word, exists := evaluationArgument(args, 0)
+	if !exists {
 		return false
 	}
-	action, literal := LiteralWord(args[0])
-	if !literal || isDynamic(args[0]) {
+	action, literal := LiteralWord(word)
+	if !literal || isDynamic(word) {
 		return true
 	}
 	if action == "--" {
@@ -410,27 +423,28 @@ func unwrapEvaluationWrapper(name string, args []*syntax.Word, isDynamic func(*s
 		nested, _, known := unwrapCommand(name, args)
 		return nested, known
 	case "builtin":
-		if len(args) == 0 {
+		word, exists := evaluationArgument(args, 0)
+		if !exists {
 			return nil, true
 		}
-		if arg, literal := LiteralWord(args[0]); literal && arg == "--" {
+		if arg, literal := LiteralWord(word); literal && arg == "--" {
 			return args[1:], true
 		}
 		return args, true
 	case "nohup":
-		return unwrapSimpleOptions(args, isDynamic, map[string]bool{"--": true, "--help": true, "--version": true}, nil)
+		return unwrapSimpleOptions(args, isDynamic, map[string]struct{}{"--": {}, "--help": {}, "--version": {}}, nil)
 	case "setsid":
-		return unwrapSimpleOptions(args, isDynamic, map[string]bool{
-			"--": true, "-c": true, "--ctty": true, "-f": true, "--fork": true,
-			"-w": true, "--wait": true, "-n": true, "--no-stdin": true,
-		}, map[string]bool{"-k": true, "--kill-after": true})
+		return unwrapSimpleOptions(args, isDynamic, map[string]struct{}{
+			"--": {}, "-c": {}, "--ctty": {}, "-f": {}, "--fork": {},
+			"-w": {}, "--wait": {}, "-n": {}, "--no-stdin": {},
+		}, map[string]struct{}{"-k": {}, "--kill-after": {}})
 	case "timeout":
 		return unwrapTimeout(args, isDynamic)
 	case "time":
-		return unwrapSimpleOptions(args, isDynamic, map[string]bool{
-			"--": true, "-p": true, "--portability": true, "-a": true, "--append": true,
-			"--verbose": true, "--quiet": true,
-		}, map[string]bool{"-f": true, "--format": true, "-o": true, "--output": true})
+		return unwrapSimpleOptions(args, isDynamic, map[string]struct{}{
+			"--": {}, "-p": {}, "--portability": {}, "-a": {}, "--append": {},
+			"--verbose": {}, "--quiet": {},
+		}, map[string]struct{}{"-f": {}, "--format": {}, "-o": {}, "--output": {}})
 	case "busybox":
 		for i, word := range args {
 			if isDynamic(word) {
@@ -455,9 +469,12 @@ func unwrapEvaluationWrapper(name string, args []*syntax.Word, isDynamic func(*s
 	}
 }
 
-func unwrapSimpleOptions(args []*syntax.Word, isDynamic func(*syntax.Word) bool, flags, operands map[string]bool) ([]*syntax.Word, bool) {
-	for i := 0; i < len(args); i++ {
-		word := args[i] //nolint:uncheckedsliceindex // The loop bounds i before every iteration.
+func unwrapSimpleOptions(args []*syntax.Word, isDynamic func(*syntax.Word) bool, flags, operands map[string]struct{}) ([]*syntax.Word, bool) {
+	for i := 0; ; i++ {
+		word, exists := evaluationArgument(args, i)
+		if !exists {
+			break
+		}
 		if isDynamic(word) {
 			return nil, false
 		}
@@ -471,12 +488,12 @@ func unwrapSimpleOptions(args []*syntax.Word, isDynamic func(*syntax.Word) bool,
 		if !strings.HasPrefix(value, "-") || value == "-" {
 			return args[i:], true
 		}
-		if flags[value] {
+		if _, found := flags[value]; found {
 			continue
 		}
-		if operands[value] {
+		if _, found := operands[value]; found {
 			i++
-			if i >= len(args) || isDynamic(args[i]) {
+			if argumentIsDynamic(args, i, isDynamic) {
 				return nil, false
 			}
 			continue
@@ -499,14 +516,17 @@ func unwrapSimpleOptions(args []*syntax.Word, isDynamic func(*syntax.Word) bool,
 }
 
 func unwrapXargs(args []*syntax.Word, isDynamic func(*syntax.Word) bool) ([]*syntax.Word, bool) {
-	operandOptions := map[string]bool{
-		"-E": true, "-I": true, "-L": true, "-n": true, "-P": true, "-s": true,
-		"-a": true, "-d": true, "-e": true, "--eof": true, "--replace": true,
-		"--max-lines": true, "--max-args": true, "--max-procs": true, "--max-chars": true,
-		"--arg-file": true, "--delimiter": true, "--process-slot-var": true,
+	operandOptions := map[string]struct{}{
+		"-E": {}, "-I": {}, "-L": {}, "-n": {}, "-P": {}, "-s": {},
+		"-a": {}, "-d": {}, "-e": {}, "--eof": {}, "--replace": {},
+		"--max-lines": {}, "--max-args": {}, "--max-procs": {}, "--max-chars": {},
+		"--arg-file": {}, "--delimiter": {}, "--process-slot-var": {},
 	}
-	for i := 0; i < len(args); i++ {
-		word := args[i] //nolint:uncheckedsliceindex // The loop bounds i before every iteration.
+	for i := 0; ; i++ {
+		word, exists := evaluationArgument(args, i)
+		if !exists {
+			break
+		}
 		if isDynamic(word) {
 			return nil, false
 		}
@@ -520,9 +540,9 @@ func unwrapXargs(args []*syntax.Word, isDynamic func(*syntax.Word) bool) ([]*syn
 		if !strings.HasPrefix(value, "-") || value == "-" {
 			return args[i:], true
 		}
-		if operandOptions[value] {
+		if _, found := operandOptions[value]; found {
 			i++
-			if i >= len(args) || isDynamic(args[i]) {
+			if argumentIsDynamic(args, i, isDynamic) {
 				return nil, false
 			}
 			continue
@@ -554,9 +574,12 @@ func unwrapXargs(args []*syntax.Word, isDynamic func(*syntax.Word) bool) ([]*syn
 }
 
 func unwrapTimeout(args []*syntax.Word, isDynamic func(*syntax.Word) bool) ([]*syntax.Word, bool) {
-	optionsWithOperands := map[string]bool{"-k": true, "--kill-after": true, "-s": true, "--signal": true}
-	for i := 0; i < len(args); i++ {
-		word := args[i] //nolint:uncheckedsliceindex // The loop bounds i before every iteration.
+	optionsWithOperands := map[string]struct{}{"-k": {}, "--kill-after": {}, "-s": {}, "--signal": {}}
+	for i := 0; ; i++ {
+		word, exists := evaluationArgument(args, i)
+		if !exists {
+			break
+		}
 		value, literal := LiteralWord(word)
 		if !literal {
 			return nil, false
@@ -575,7 +598,7 @@ func unwrapTimeout(args []*syntax.Word, isDynamic func(*syntax.Word) bool) ([]*s
 		if isDynamic(word) {
 			return nil, false
 		}
-		if optionsWithOperands[value] {
+		if _, found := optionsWithOperands[value]; found {
 			i++
 			if i >= len(args) {
 				return nil, false
@@ -596,8 +619,12 @@ func unwrapTimeout(args []*syntax.Word, isDynamic func(*syntax.Word) bool) ([]*s
 }
 
 func findExecReevaluatesCode(args []*syntax.Word, isDynamic func(*syntax.Word) bool, depth int) bool {
-	for i := 0; i < len(args); i++ {
-		value, literal := LiteralWord(args[i])
+	for i := 0; ; i++ {
+		word, exists := evaluationArgument(args, i)
+		if !exists {
+			break
+		}
+		value, literal := LiteralWord(word)
 		if !literal {
 			continue
 		}
@@ -606,7 +633,11 @@ func findExecReevaluatesCode(args []*syntax.Word, isDynamic func(*syntax.Word) b
 			start := i + 1
 			end := start
 			for ; end < len(args); end++ {
-				delimiter, known := LiteralWord(args[end]) //nolint:uncheckedsliceindex // The range bounds end.
+				word, exists := evaluationArgument(args, end)
+				if !exists {
+					break
+				}
+				delimiter, known := LiteralWord(word)
 				if known && (delimiter == ";" || delimiter == "+") {
 					break
 				}
@@ -633,79 +664,26 @@ func isContainerCommand(name string) bool {
 }
 
 func containerReevaluatesCode(name string, args []*syntax.Word, isDynamic func(*syntax.Word) bool, depth int) bool {
-	if len(args) == 0 {
+	word, exists := evaluationArgument(args, 0)
+	if !exists {
 		return false
 	}
-	subcommand, literal := LiteralWord(args[0])
-	if !literal || isDynamic(args[0]) {
+	subcommand, literal := LiteralWord(word)
+	if !literal || isDynamic(word) {
 		return true
 	}
 	if subcommand != "run" && subcommand != "exec" {
 		return false
 	}
-	start := 1
-	var entrypoint string
-	for start < len(args) {
-		option, literal := LiteralWord(args[start]) //nolint:uncheckedsliceindex // The loop bounds start.
-		if !literal {
-			return true
-		}
-		if option == "--" {
-			start++
-			break
-		}
-		if !strings.HasPrefix(option, "-") {
-			break
-		}
-		if value, found := strings.CutPrefix(option, "--entrypoint="); found {
-			if isDynamic(args[start]) {
-				return true
-			}
-			entrypoint = value
-			start++
-			continue
-		}
-		if strings.HasPrefix(option, "--env=") || strings.HasPrefix(option, "--volume=") ||
-			strings.HasPrefix(option, "--publish=") || strings.HasPrefix(option, "--workdir=") ||
-			strings.HasPrefix(option, "--name=") {
-			start++
-			continue
-		}
-		if isDynamic(args[start]) {
-			return true
-		}
-		switch option {
-		case "-e", "--env", "-v", "--volume", "-p", "--publish", "-w", "--workdir", "--name", "--entrypoint", "-u", "--user", "--network":
-			start++
-			if start >= len(args) {
-				return true
-			}
-			if option == "--entrypoint" {
-				var static bool
-				entrypoint, static = LiteralWord(args[start])
-				if !static || isDynamic(args[start]) {
-					return true
-				}
-			}
-		case "--rm", "-i", "-t", "-d", "--detach", "--interactive", "--tty", "--privileged", "--read-only":
-		default:
-			if len(option) > 2 && strings.HasPrefix(option, "-") && !strings.HasPrefix(option, "--") &&
-				strings.Trim(option[1:], "itd") == "" {
-				break
-			}
-			return true
-		}
-		start++
+	start, entrypoint, known := containerCommandOptions(args, isDynamic)
+	if !known {
+		return true
 	}
 	if start >= len(args) {
 		return entrypoint != "" && commandReevaluatesCode([]*syntax.Word{{Parts: []syntax.WordPart{&syntax.Lit{Value: entrypoint}}}}, isDynamic, depth+1) ||
 			subcommand == "run" && entrypoint == ""
 	}
-	if subcommand == "run" {
-		start++ // The image name precedes its optional command.
-	} else {
-		start++ // The container name precedes the command for exec.
-	}
+	start++ // The image or container name precedes the command.
 	command := args[start:]
 	if entrypoint != "" {
 		command = append([]*syntax.Word{{Parts: []syntax.WordPart{&syntax.Lit{Value: entrypoint}}}}, command...)
@@ -714,6 +692,70 @@ func containerReevaluatesCode(name string, args []*syntax.Word, isDynamic func(*
 		return subcommand == "run"
 	}
 	return commandReevaluatesCode(command, isDynamic, depth+1)
+}
+
+func containerCommandOptions(args []*syntax.Word, isDynamic func(*syntax.Word) bool) (int, string, bool) {
+	start := 1
+	var entrypoint string
+	for {
+		word, exists := evaluationArgument(args, start)
+		if !exists {
+			break
+		}
+		option, literal := LiteralWord(word)
+		if !literal {
+			return start, entrypoint, false
+		}
+		if option == "--" {
+			start++
+			break
+		}
+		if !strings.HasPrefix(option, "-") {
+			break
+		}
+		var known bool
+		start, entrypoint, known = consumeContainerOption(args, start, word, option, entrypoint, isDynamic)
+		if !known {
+			return start, entrypoint, false
+		}
+	}
+	return start, entrypoint, true
+}
+
+func consumeContainerOption(args []*syntax.Word, start int, word *syntax.Word, option, entrypoint string, isDynamic func(*syntax.Word) bool) (int, string, bool) {
+	if value, found := strings.CutPrefix(option, "--entrypoint="); found {
+		return start + 1, value, !isDynamic(word)
+	}
+	if strings.HasPrefix(option, "--env=") || strings.HasPrefix(option, "--volume=") ||
+		strings.HasPrefix(option, "--publish=") || strings.HasPrefix(option, "--workdir=") ||
+		strings.HasPrefix(option, "--name=") {
+		return start + 1, entrypoint, true
+	}
+	if isDynamic(word) {
+		return start, entrypoint, false
+	}
+	switch option {
+	case "-e", "--env", "-v", "--volume", "-p", "--publish", "-w", "--workdir", "--name", "--entrypoint", "-u", "--user", "--network":
+		start++
+		operand, exists := evaluationArgument(args, start)
+		if !exists {
+			return start, entrypoint, false
+		}
+		if option == "--entrypoint" {
+			var static bool
+			entrypoint, static = LiteralWord(operand)
+			if !static || isDynamic(operand) {
+				return start, entrypoint, false
+			}
+		}
+	case "--rm", "-i", "-t", "-d", "--detach", "--interactive", "--tty", "--privileged", "--read-only":
+	default:
+		if len(option) <= 2 || !strings.HasPrefix(option, "-") || strings.HasPrefix(option, "--") ||
+			strings.Trim(option[1:], "itd") != "" {
+			return start, entrypoint, false
+		}
+	}
+	return start + 1, entrypoint, true
 }
 
 func hasInputRedirection(redirections []*syntax.Redirect) bool {
@@ -739,10 +781,11 @@ func commandTreeReadsShellStdin(command syntax.Command, isDynamic func(*syntax.W
 }
 
 func commandReadsShellStdin(args []*syntax.Word, isDynamic func(*syntax.Word) bool, depth int) bool {
-	if len(args) == 0 || depth > 16 || isDynamic(args[0]) {
+	word, exists := evaluationArgument(args, 0)
+	if !exists || depth > 16 || isDynamic(word) {
 		return false
 	}
-	name, literal := LiteralWord(args[0])
+	name, literal := LiteralWord(word)
 	if !literal {
 		return false
 	}
@@ -758,20 +801,20 @@ func commandReadsShellStdin(args []*syntax.Word, isDynamic func(*syntax.Word) bo
 }
 
 func shellReadsStdin(args []*syntax.Word, isDynamic func(*syntax.Word) bool) bool {
-	for i := 0; i < len(args); i++ {
-		if isDynamic(args[i]) {
+	for i := 0; ; i++ {
+		word, exists := evaluationArgument(args, i)
+		if !exists {
+			break
+		}
+		if isDynamic(word) {
 			return true
 		}
-		option, literal := LiteralWord(args[i])
+		option, literal := LiteralWord(word)
 		if !literal {
 			return true
 		}
 		if option == "--" {
-			if i+1 == len(args) {
-				return true
-			}
-			operand, literal := LiteralWord(args[i+1])
-			return !literal || isDynamic(args[i+1]) || scriptUsesStandardInput(operand)
+			return scriptArgumentReadsCode(args, i+1, isDynamic)
 		}
 		if option == "-s" {
 			return true
@@ -779,7 +822,7 @@ func shellReadsStdin(args []*syntax.Word, isDynamic func(*syntax.Word) bool) boo
 		switch option {
 		case "-o", "+o", "-O", "+O", "--rcfile", "--init-file":
 			i++
-			if i >= len(args) || isDynamic(args[i]) {
+			if argumentIsDynamic(args, i, isDynamic) {
 				return true
 			}
 			continue

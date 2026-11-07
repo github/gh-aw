@@ -340,6 +340,10 @@ func scanRunContentExpressions(yamlContent string) runContentExpressionScan {
 // injection vulnerabilities. It is called when the caller already holds a parsed
 // representation of the compiled YAML, avoiding a redundant parse.
 func validateNoTemplateInjectionFromParsed(workflow map[string]any) error {
+	return validateRunScriptTemplateInjection(workflow, true)
+}
+
+func validateRunScriptTemplateInjection(workflow map[string]any, checkShellEvaluation bool) error {
 	// Extract all run blocks from the workflow
 	runBlocks := extractRunBlocks(workflow)
 	templateInjectionValidationLog.Printf("Found %d run blocks to scan", len(runBlocks))
@@ -354,7 +358,7 @@ func validateNoTemplateInjectionFromParsed(workflow map[string]any) error {
 
 		expressions := runScriptExpressions(runContent)
 		quotedHeredocSnippets, boundariesProven := runScriptHeredocExpressionSnippets(runContent)
-		shellCodeEvaluation := runStepUsesShellCodeEvaluation(runContent)
+		shellCodeEvaluation := checkShellEvaluation && runStepUsesShellCodeEvaluation(runContent)
 
 		// Check each expression for unsafe contexts
 		for _, expr := range expressions {
@@ -395,6 +399,10 @@ func validateNoTemplateInjectionFromParsed(workflow map[string]any) error {
 // This raw-content guardrail rejects prohibited expressions left in run: scripts,
 // including comments and quoted heredocs that the sanitizer preserves.
 func validateNoGitHubExpressionsInRunScriptsFromParsed(workflow map[string]any) error {
+	return validateRunScriptExpressions(workflow, true)
+}
+
+func validateRunScriptExpressions(workflow map[string]any, checkShellEvaluation bool) error {
 	runBlocks := extractRunBlocks(workflow)
 	templateInjectionValidationLog.Printf("Found %d run blocks to scan for raw expressions", len(runBlocks))
 
@@ -407,7 +415,7 @@ func validateNoGitHubExpressionsInRunScriptsFromParsed(workflow map[string]any) 
 
 		expressions := runScriptExpressions(runContent)
 		quotedHeredocSnippets, boundariesProven := runScriptHeredocExpressionSnippets(runContent)
-		shellCodeEvaluation := runStepUsesShellCodeEvaluation(runContent)
+		shellCodeEvaluation := checkShellEvaluation && runStepUsesShellCodeEvaluation(runContent)
 		for _, expr := range expressions {
 			_, hasQuotedSnippet := quotedHeredocSnippets[expr]
 			quotedEnv := isRunScriptEnvExpression(expr) &&
@@ -444,5 +452,51 @@ func validateNoGitHubExpressionsInRunScriptsFromParsed(workflow map[string]any) 
 		return formatRunScriptExpressionValidationError(violations)
 	}
 
+	return nil
+}
+
+// Validate authored/imported steps separately from compiler-owned shell scripts,
+// whose runtime script paths and traps cannot be classified as authored evaluators.
+func validateAuthoredShellCodeEvaluation(data *WorkflowData) error {
+	runBlocks := extractRunBlocks(data.RawFrontmatter)
+	runBlocks = append(runBlocks, extractRunBlocks(data.Jobs)...)
+	for _, step := range data.OnSteps {
+		runBlocks = append(runBlocks, extractRunBlocks(step)...)
+	}
+	if data.SafeOutputs != nil {
+		runBlocks = append(runBlocks, extractRunBlocks(data.SafeOutputs.Steps)...)
+		if detection := data.SafeOutputs.ThreatDetection; detection != nil {
+			runBlocks = append(runBlocks, extractRunBlocks(detection.Steps)...)
+			runBlocks = append(runBlocks, extractRunBlocks(detection.PostSteps)...)
+		}
+	}
+	if data.SecretMasking != nil {
+		for _, step := range data.SecretMasking.Steps {
+			runBlocks = append(runBlocks, extractRunBlocks(step)...)
+		}
+	}
+	for _, steps := range []string{data.CustomSteps, data.PreSteps, data.PreAgentSteps, data.PostSteps} {
+		walkRunBlocks(steps, func(run string) bool {
+			runBlocks = append(runBlocks, run)
+			return false
+		})
+	}
+
+	var violations []TemplateInjectionViolation
+	for _, run := range runBlocks {
+		if !mayContainInlineExpression(run) || !runStepUsesShellCodeEvaluation(run) {
+			continue
+		}
+		for _, expression := range runScriptExpressions(run) {
+			violations = append(violations, TemplateInjectionViolation{
+				Expression: expression,
+				Snippet:    extractRunSnippet(run, expression),
+				Context:    "shell code evaluation",
+			})
+		}
+	}
+	if len(violations) > 0 {
+		return formatTemplateInjectionError(violations)
+	}
 	return nil
 }
