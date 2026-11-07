@@ -123,6 +123,9 @@ You MUST NOT:
    }
    ```
 
+   Report `Cache hit` only after successfully reading reusable rotation state,
+   or `Cache miss` if the file is missing. Directory creation is not a miss.
+
 3. If `rotation.json` is missing or empty, fetch the most recently merged PR with:
    - `gh pr list --repo ${{ github.repository }} --state merged --label pkg-specifications --limit 1 --json number,body,mergedAt`
    Then use the `rotation-state-recoverer` agent — pass it the PR body text and the eligible package list — to produce the rotation JSON. Write the agent's output to `rotation.json` (set `last_run` to the PR's `mergedAt` UTC date). If no matching PR exists, write fallback state:
@@ -315,6 +318,13 @@ Only after verifying `cobertura.xml` exists and is non-empty, call `upload_code_
 `file: "cobertura.xml"`, `language: "Go"`, and `label: "spec-enforcer/generated-tests"`.
 
 ## Phase 5: Save Cache and Create PR
+
+Before either a PR or `noop`, update
+`/tmp/gh-aw/cache-memory/spec-enforcer/rotation.json` with `last_index`,
+`last_packages`, `last_run`, and `total_eligible` from this run. In full-sweep
+mode preserve the round-robin cursor. Merge updated README hashes into
+`/tmp/gh-aw/cache-memory/spec-enforcer/spec-hashes.json`, preserving unprocessed
+packages, and read both files back to verify persistence.
 
 ### Save Enforcement Data
 

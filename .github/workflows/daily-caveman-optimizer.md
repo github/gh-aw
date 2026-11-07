@@ -187,6 +187,8 @@ Collect the sorted list of files.
 ## Step 2: Load Round-Robin State
 
 Read `/tmp/gh-aw/cache-memory/caveman-optimizer/state.json` if it exists.
+Report `Cache hit` after successfully reading reusable state, or `Cache miss`
+if the file is missing; creating the directory alone is not a miss.
 
 Expected format:
 ```json
@@ -255,6 +257,8 @@ Write the updated state to `/tmp/gh-aw/cache-memory/caveman-optimizer/state.json
 ```
 
 Use filesystem-safe format `YYYY-MM-DD` for the date (no colons, no T, no Z).
+Update this state even when the batch needs no edits, then read the file back
+to verify the write before requesting a PR or `noop`.
 
 ## Step 5: Record the Run
 
