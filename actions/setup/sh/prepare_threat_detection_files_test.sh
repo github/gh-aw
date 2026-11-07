@@ -31,8 +31,9 @@ test_stages_detection_inputs() {
   sandbox="$(mktemp -d)"
   local source_dir="${sandbox}/gh-aw"
   local detection_dir="${source_dir}/threat-detection"
+  local input_dir="${source_dir}/threat-detection-inputs"
 
-  mkdir -p "${source_dir}/aw-prompts" "${source_dir}/comment-memory"
+  mkdir -p "${source_dir}/aw-prompts" "${source_dir}/comment-memory" "${detection_dir}"
   printf 'prompt\n' >"${source_dir}/aw-prompts/prompt.txt"
   printf 'template\n' >"${source_dir}/aw-prompts/prompt-template.txt"
   printf '{"imports":[]}\n' >"${source_dir}/aw-prompts/prompt-import-tree.json"
@@ -42,6 +43,10 @@ test_stages_detection_inputs() {
   printf 'ignored\n' >"${source_dir}/comment-memory/context.txt"
   printf 'patch\n' >"${source_dir}/aw-test.patch"
   printf 'bundle\n' >"${source_dir}/aw-test.bundle"
+  printf '{"verdict":"do not expose"}\n' >"${detection_dir}/detection_result.json"
+  printf '{"evidence":"do not expose"}\n' >"${detection_dir}/execution.json"
+  mkdir -p "${detection_dir}/sandbox/firewall"
+  printf 'firewall log\n' >"${detection_dir}/sandbox/firewall/access.log"
 
   local output
   if ! output="$(bash "${PREPARE_SCRIPT}" "${source_dir}" "${detection_dir}" 2>&1)"; then
@@ -58,6 +63,17 @@ test_stages_detection_inputs() {
   assert_file_content "copies markdown comment memory" "${detection_dir}/comment-memory/context.md" "memory"
   assert_file_content "copies patch artifact" "${detection_dir}/aw-test.patch" "patch"
   assert_file_content "copies bundle artifact" "${detection_dir}/aw-test.bundle" "bundle"
+  assert_file_content "stages agent output in isolated input directory" "${input_dir}/agent_output.json" '{"output":"done"}'
+  assert_file_content "stages workflow information in isolated input directory" "${input_dir}/aw_info.json" '{"engine":"copilot"}'
+  assert_file_content "stages patch in isolated input directory" "${input_dir}/aw-test.patch" "patch"
+  assert_file_content "stages bundle in isolated input directory" "${input_dir}/aw-test.bundle" "bundle"
+  assert_file_content "stages prompt in isolated input directory" "${input_dir}/aw-prompts/prompt.txt" "prompt"
+  assert_file_content "stages comment memory in isolated input directory" "${input_dir}/comment-memory/context.md" "memory"
+  if [ -e "${input_dir}/detection_result.json" ] || [ -e "${input_dir}/execution.json" ] || [ -e "${input_dir}/sandbox/firewall/access.log" ]; then
+    fail "excludes verdict, evidence, and firewall files from allowed inputs" "sensitive detection outputs were staged"
+  else
+    pass "excludes verdict, evidence, and firewall files from allowed inputs"
+  fi
 
   if [ -e "${detection_dir}/comment-memory/context.txt" ]; then
     fail "ignores non-markdown comment memory" "context.txt was copied"
