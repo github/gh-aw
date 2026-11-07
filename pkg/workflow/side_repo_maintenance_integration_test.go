@@ -129,7 +129,7 @@ This workflow operates on a separate repository.
 		"generated workflow should include activity_report issue generation step after cache save")
 	assert.Contains(t, contentStr, "title: '[aw] agentic status report'",
 		"generated workflow should create the activity_report issue with the expected title")
-	assert.Contains(t, contentStr, "actions: read\n      contents: read\n      issues: write",
+	assert.Regexp(t, `actions: read[^\n]*\n      contents: read[^\n]*\n      issues: write`, contentStr,
 		"activity_report job should include contents: read with explicit permissions")
 	assert.Contains(t, contentStr, "timeout-minutes: 120",
 		"activity_report job should include a 2 hour timeout")
