@@ -237,6 +237,9 @@ function readGuardedFile(filename, maximumBytes = 10 * 1024 * 1024) {
  * @param {{mode?: number, directoryMode?: number}} [options]
  */
 function writeGuardedFile(filename, content, { mode = 0o600, directoryMode = 0o700 } = {}) {
+  if (!((mode === 0o600 && directoryMode === 0o700) || (mode === 0o644 && directoryMode === 0o755))) {
+    throw assetValidationError("Invalid guarded asset permissions");
+  }
   return withGuardedDirectory(
     path.dirname(filename),
     true,

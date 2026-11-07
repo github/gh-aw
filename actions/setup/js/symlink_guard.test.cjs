@@ -149,42 +149,37 @@ describe("lstatGuard", () => {
       }
     });
 
-    it.skipIf(process.platform !== "linux")("creates uploader-readable assets and directories despite restrictive umasks", () => {
+    it.skipIf(process.platform !== "linux")("creates private assets and directories despite restrictive umasks", () => {
       for (const mask of ["000", "077"]) {
         const target = path.resolve(tmpDir, `assets-${mask}`, "claims", "claim-1", "chart.png");
-        execFileSync(process.execPath, [
-          "-e",
-          'process.umask(parseInt(process.argv[1], 8)); require(process.argv[2]).writeGuardedFile(process.argv[3], Buffer.from("chart"), { mode: 0o644, directoryMode: 0o755 });',
-          mask,
-          path.resolve(__dirname, "symlink_guard.cjs"),
-          target,
-        ]);
+        execFileSync(process.execPath, ["-e", 'process.umask(parseInt(process.argv[1], 8)); require(process.argv[2]).writeGuardedFile(process.argv[3], Buffer.from("chart"));', mask, path.resolve(__dirname, "symlink_guard.cjs"), target]);
         const stat = fs.statSync(target);
-        expect(stat.mode & 0o777).toBe(0o644);
+        expect(stat.mode & 0o777).toBe(0o600);
         expect(stat.uid).toBe(process.getuid());
         expect(stat.gid).toBe(process.getgid());
-        for (const directory of [path.dirname(target), path.dirname(path.dirname(target)), path.resolve(tmpDir, `assets-${mask}`)]) {
-          expect(fs.statSync(directory).mode & 0o777).toBe(0o755);
+        for (const directory of [path.dirname(target), path.dirname(path.dirname(target)), path.dirname(path.dirname(path.dirname(target))), path.resolve(tmpDir, `assets-${mask}`)]) {
+          expect(fs.statSync(directory).mode & 0o777).toBe(0o700);
         }
-        expect(() => writeGuardedFile(target, Buffer.from("overwrite"), { mode: 0o644, directoryMode: 0o755 })).toThrow("EEXIST");
+        expect(() => writeGuardedFile(target, Buffer.from("overwrite"))).toThrow("EEXIST");
         expect(fs.readFileSync(target, "utf8")).toBe("chart");
       }
       expect(fs.statSync(tmpDir).mode & 0o777).toBe(0o700);
     });
 
-    it.skipIf(process.platform !== "linux" || process.getuid?.() !== 0)("lets an unprivileged uploader read root-owned staged assets", () => {
-      const root = fs.mkdtempSync(path.join(os.tmpdir(), "asset-uploader-"));
-      try {
-        fs.chmodSync(root, 0o755);
-        const target = path.join(root, "assets", "claims", "claim-1", "chart.png");
-        writeGuardedFile(target, Buffer.from("chart"), { mode: 0o644, directoryMode: 0o755 });
-        expect(fs.statSync(target).uid).toBe(0);
-        expect(fs.statSync(target).gid).toBe(process.getgid());
-        expect(fs.statSync(target).mode & 0o777).toBe(0o644);
-        const output = execFileSync(process.execPath, ["-e", 'process.stdout.write(require("fs").readFileSync(process.argv[1]));', target], { uid: 65534, gid: 65534, encoding: "utf8" });
-        expect(output).toBe("chart");
-      } finally {
-        fs.rmSync(root, { recursive: true, force: true });
+    it("accepts only the private staging and published asset permission pairs", () => {
+      const publishTarget = path.join(tmpDir, "published", "chart.png");
+      writeGuardedFile(publishTarget, Buffer.from("chart"), { mode: 0o644, directoryMode: 0o755 });
+      expect(fs.statSync(publishTarget).mode & 0o777).toBe(0o644);
+      expect(fs.statSync(path.dirname(publishTarget)).mode & 0o777).toBe(0o755);
+
+      for (const options of [
+        { mode: 0o666, directoryMode: 0o777 },
+        { mode: 0o600, directoryMode: 0o755 },
+        { mode: 0o644, directoryMode: 0o700 },
+      ]) {
+        const target = path.join(tmpDir, "invalid", `${options.mode}-${options.directoryMode}`, "chart.png");
+        expect(() => writeGuardedFile(target, Buffer.from("chart"), options)).toThrow(expect.objectContaining({ code: "ERR_VALIDATION" }));
+        expect(fs.existsSync(path.dirname(target))).toBe(false);
       }
     });
 
