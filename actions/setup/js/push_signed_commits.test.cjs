@@ -548,7 +548,7 @@ describe("push_signed_commits integration tests", () => {
       expect(resolvedContent).not.toContain("#aw_test1");
     });
 
-    it("should still run replacement logic for malformed temporary ID candidates and emit warning", async () => {
+    it("should preserve malformed temporary ID candidates and emit warning", async () => {
       execGit(["checkout", "-b", "temp-id-malformed-candidate-branch"], { cwd: workDir });
       fs.writeFileSync(path.join(workDir, "quarantine.cs"), "// malformed link: #aw_test-id\n");
       execGit(["add", "quarantine.cs"], { cwd: workDir });
@@ -574,7 +574,7 @@ describe("push_signed_commits integration tests", () => {
       expect(githubClient.graphql).toHaveBeenCalledTimes(1);
       const additions = githubClient.graphql.mock.calls[0][1].input.fileChanges.additions;
       const replayedContent = Buffer.from(additions[0].contents, "base64").toString();
-      expect(replayedContent).toContain("#66708-id");
+      expect(replayedContent).toContain("#aw_test-id");
       expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Malformed temporary ID reference '#aw_test-id'"));
     });
 
