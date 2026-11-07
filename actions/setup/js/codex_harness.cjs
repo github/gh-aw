@@ -1335,11 +1335,8 @@ async function main() {
         const budget = refreshed.ok ? exhaustedInvocationBudget(refreshed.reflectData) : null;
         if (budget) {
           nonRetryableGuard.maxRunsExceeded = true;
-          result.failureClasses.push("max_runs_exceeded");
+          result.failureClasses.push("invocation_cap_exceeded");
           log(`attempt ${attempt + 1}: AWF shared invocation budget exhausted (${budget.invocationCount}/${budget.maxRuns}) — confirmed by fresh reflection`);
-          if (!safeOutputsPath || !hasExpectedSafeOutputs(safeOutputsPath, { logger: log })) {
-            emitInfrastructureIncomplete(`AWF shared per-run invocation budget exhausted (${budget.invocationCount}/${budget.maxRuns}), including sub-agents. Retrying cannot restore this budget.`, { logger: log });
-          }
         }
       }
       if (nonRetryableGuard.apiProxyGuardRejection) {
@@ -1371,9 +1368,14 @@ async function main() {
           log(`attempt ${attempt + 1}: AI credits budget enforced — exiting 0 (budget control, not an error)`);
           return { action: "stop", exitCode: 0 };
         }
-        if (nonRetryableGuard.maxRunsExceeded && safeOutputsPath && hasExpectedSafeOutputs(safeOutputsPath, { logger: log })) {
+        if (nonRetryableGuard.maxRunsExceeded && safeOutputsPath && hasExpectedSafeOutputs(safeOutputsPath, { logger: log }) && hasTerminalSafeOutput(safeOutputsPath, { excludePartialReviewComments: true, logger: log })) {
           log(`attempt ${attempt + 1}: invocation cap saturated but safe-outputs already contain expected output — suppressing terminal verdict (false-red: core work succeeded)`);
           return { action: "stop", exitCode: 0 };
+        }
+        if (nonRetryableGuard.maxRunsExceeded) {
+          emitInfrastructureIncomplete("AWF shared per-run invocation budget exhausted, including sub-agents, before a completed task output was staged. Partial findings are preserved. Retrying cannot restore this budget.", {
+            logger: log,
+          });
         }
         return { action: "stop" };
       }

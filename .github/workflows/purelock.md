@@ -195,20 +195,20 @@ Treat `candidates.json` as the **complete** working set. Do not scan the reposit
 2. Walk `candidates.json` in order (already sorted by score) and pick the first candidate whose `key` (`file:line:name`) is absent from `processed`, or was processed more than 60 days ago.
 3. If every candidate was processed recently, call `noop` explaining that the current candidate set is exhausted, and still update cache memory.
 
-For each selected candidate, write its JSON entry to `/tmp/gh-aw/agent/purelock-<name>/input.json` (creating the directory first).
+Write the selected candidate's JSON entry to `/tmp/gh-aw/agent/purelock-selected/input.json` (creating the directory first). Use this single work directory for the run; do not create additional candidate directories.
 
 ## 2. Generate tests
 
 Invoke exactly one `test-writer` sub-agent for the selected candidate. Do not replace an impure candidate or a failed child with another candidate in this run. Read its persisted result instead of polling repeatedly.
 
-Pass each agent the path to its input file:
+Pass the sub-agent the path to its input file:
 
 ```
-Use the `test-writer` agent for the function described in /tmp/gh-aw/agent/purelock-<name>/input.json.
-Work dir: /tmp/gh-aw/agent/purelock-<name>/
+Use the `test-writer` agent for the function described in /tmp/gh-aw/agent/purelock-selected/input.json.
+Work dir: /tmp/gh-aw/agent/purelock-selected/
 ```
 
-Each agent writes `/tmp/gh-aw/agent/purelock-<name>/result.json`:
+The sub-agent writes `/tmp/gh-aw/agent/purelock-selected/result.json`:
 
 ```json
 {
@@ -228,27 +228,26 @@ Each agent writes `/tmp/gh-aw/agent/purelock-<name>/result.json`:
 }
 ```
 
-## 3. Collect and validate results
+## 3. Read and validate the result
 
-After all agents finish, read every `result.json`. Separate results into `succeeded` (outcome=pr) and `failed` (outcome=noop).
+After the sub-agent finishes, read its persisted `/tmp/gh-aw/agent/purelock-selected/result.json`. Verify that `key` matches the selected candidate and `outcome` is `pr` or `noop`. A missing, malformed, or mismatched result is a failed attempt, not permission to select another function.
 
-For each failed entry record it in cache memory with `"outcome":"noop"`. If **all** agents reported noop, call `noop` explaining the reasons, update cache memory, and stop.
-
-For each succeeded entry verify:
+If the result reports `pr`, verify:
 
 1. `gofmt -l <test_file>` reports nothing.
 2. `go vet ./<package-dir>/` passes.
 3. `go test ./<package-dir>/ -race -count=1` passes.
 4. `coverage_after > coverage_before` for both the function and the package.
+5. `git diff --name-only` lists only `*_test.go` files and `testdata/fuzz/**`.
 
-Drop any entry that fails validation and record it as noop. If no entries remain, call `noop`, update cache, and stop.
+If the result reports `noop`, is invalid, or fails any validation, discard only changes made for the selected candidate, record that candidate in cache memory with `"outcome":"noop"`, call `noop` with the actual reason (including false-positive impurity), and stop. Do not replace the candidate or start another child.
 
-After the final succeeded set is known, publish one experimental coverage report for the changed package set:
+After the selected candidate passes validation, publish one experimental coverage report for its package:
 
 ```bash
 mkdir -p /tmp/gh-aw/purelock "$GITHUB_WORKSPACE/coverage"
 go install github.com/boumenot/gocover-cobertura@4afa1205ab3b54ae098dd4724c1657aad10f7484
-go test ./<unique-succeeded-package-dir>/... -count=1 -covermode=atomic -coverprofile=/tmp/gh-aw/purelock/generated-tests.out
+go test ./<package-dir>/ -count=1 -covermode=atomic -coverprofile=/tmp/gh-aw/purelock/generated-tests.out
 "$(go env GOPATH)/bin/gocover-cobertura" < /tmp/gh-aw/purelock/generated-tests.out > "$GITHUB_WORKSPACE/coverage/purelock-cobertura.xml"
 ```
 
@@ -260,7 +259,7 @@ If generation or upload fails, call `report_incomplete` with the actual error; d
 
 ## 4. Create PR and update cache
 
-Create one draft pull request. Title: `[purelock] Lock down <FuncA>, <FuncB>, … with pure-function test suites` (list all succeeded function names). In the body include a section per function:
+Create one draft pull request for the validated function. Title: `[purelock] Lock down <FuncName> with a pure-function test suite`. In the body include:
 
 - function, file, and signature
 - why it is pure, quoting `purity_notes` and Serena verification from the sub-agent result
@@ -268,7 +267,7 @@ Create one draft pull request. Title: `[purelock] Lock down <FuncA>, <FuncB>, �
 - test count, subtest count, and assertion count
 - whether fuzzing was needed, and any residual uncovered lines
 
-Always — on pull request, noop, or exhausted list — write `/tmp/gh-aw/cache-memory/purelock/state.json` with **all** processed entries (both pr and noop) appended, deduplicated by `key`, keeping the newest date. This is what cycles the workflow through every pure function in the repository.
+Always — on pull request, noop, or exhausted list — write `/tmp/gh-aw/cache-memory/purelock/state.json`, preserving prior processed entries. Append only the selected candidate's final outcome (`pr` or `noop`) and today's date, deduplicating by `key` and keeping the newest date. When the list is exhausted, retain the existing entries without adding an unselected candidate. This cycles the workflow through every pure function in the repository, one per run.
 
 ## agent: `test-writer`
 

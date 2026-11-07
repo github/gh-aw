@@ -296,6 +296,20 @@ describe("safeoutputs_cli.cjs", () => {
   });
 
   describe("hasTerminalSafeOutput", () => {
+    it.each(["create_pull_request_review_comment", "create-pull-request-review-comment"])("excludes %s only when completed-review semantics are requested", type => {
+      const options = { readFileSync: () => JSON.stringify({ type, body: "Partial finding" }) + "\n" };
+      expect(hasTerminalSafeOutput("/fake/path.jsonl", options)).toBe(true);
+      expect(hasTerminalSafeOutput("/fake/path.jsonl", { ...options, excludePartialReviewComments: true })).toBe(false);
+    });
+
+    it.each(["submit_pull_request_review", "add_comment"])("accepts %s after partial findings with completed-review semantics", type => {
+      const options = {
+        excludePartialReviewComments: true,
+        readFileSync: () => [JSON.stringify({ type: "create_pull_request_review_comment", body: "Partial finding" }), JSON.stringify({ type, body: "Complete" })].join("\n") + "\n",
+      };
+      expect(hasTerminalSafeOutput("/fake/path.jsonl", options)).toBe(true);
+    });
+
     function makeTempFile(content) {
       const p = path.join(os.tmpdir(), `safeoutputs-terminal-test-${Date.now()}-${Math.random().toString(36).slice(2)}.jsonl`);
       fs.writeFileSync(p, content, "utf8");

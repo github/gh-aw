@@ -92,8 +92,6 @@ Never store secrets or credentials.
 
 Use only the pre-downloaded 24h logs for fleet collection. This overrides the shared import's continuation guidance: do not call `agentic-workflows logs` or start another fleet download in the agent. Project `summary`, `failure_investigation`, `continuation`, and `stale_warning` from `summary.json`; when coverage is incomplete, report the analyzed subset and the missing window without refetching.
 
-The redundant-refetch experiment is retired for future runs; do not revise its historical results.
-
 From logs output and saved summaries, identify episodes and lineage edges. Prioritize episodes that:
 - span multiple workflows,
 - include retries/failures/recovery,
