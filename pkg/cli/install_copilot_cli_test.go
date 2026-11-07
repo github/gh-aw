@@ -21,6 +21,12 @@ import (
 func prepareCopilotInstallerTestBin(t *testing.T, dir string) {
 	t.Helper()
 	require.NoError(t, os.MkdirAll(dir, 0o755))
+	wd, err := os.Getwd()
+	require.NoError(t, err)
+	privileges, err := os.ReadFile(filepath.Join(wd, "..", "..", "actions", "setup", "sh", "install_privileges.sh"))
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(filepath.Dir(dir), "install_privileges.sh"), privileges, 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "chown"), []byte("#!/usr/bin/env bash\nexit 0\n"), 0o755))
 	// Never run the installer's shared-runner cleanup against the test host.
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "find"), []byte(`#!/usr/bin/env bash
 if [ "${1:-}" = /tmp ]; then exit 0; fi
@@ -79,6 +85,7 @@ case "${1:-}" in
 esac
 `), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(fakeBinDir, "sudo"), []byte(`#!/usr/bin/env bash
+if [ "${1:-}" = -n ]; then shift; fi
 if [ "${1:-}" = "chown" ]; then exit 0; fi
 exec "$@"
 `), 0o755))
@@ -107,6 +114,7 @@ esac
 	require.NoError(t, os.MkdirAll(installDir, 0o755))
 	cmd := exec.Command("bash", installScript, "1.2.3")
 	cmd.Env = append(os.Environ(),
+		"HOME="+tempDir,
 		"RUNNER_TOOL_CACHE="+filepath.Join(tempDir, "toolcache"),
 		"COPILOT_INSTALL_DIR="+installDir,
 		"GH_AW_COPILOT_GUEST_LIBC=musl",
@@ -193,10 +201,9 @@ case "$url" in
 esac
 `), 0o755))
 			home := filepath.Join(tempDir, "home")
-			installDir := filepath.Join(home, ".local", "bin")
-			require.NoError(t, os.MkdirAll(installDir, 0o755))
 			runnerTemp := filepath.Join(tempDir, "runner-temp")
 			require.NoError(t, os.MkdirAll(runnerTemp, 0o700))
+			installDir := filepath.Join(runnerTemp, "gh-aw", "bin")
 			curlLog := filepath.Join(tempDir, "curl.log")
 			githubPath := filepath.Join(tempDir, "github-path")
 			cmd := exec.Command("bash", installScript, "--rootless")
@@ -236,7 +243,8 @@ esac
 				assert.NotContains(t, string(output), "no reviewed manifest pin for musl guest")
 				assert.NotContains(t, string(curlOutput), "SHA256SUMS.txt")
 				assert.Contains(t, string(installed), cachedCopilot)
-				assert.Contains(t, string(pathOutput), toolcacheBin)
+				assert.Contains(t, string(pathOutput), installDir)
+				assert.NotContains(t, string(pathOutput), toolcacheBin)
 			}
 		})
 	}
@@ -265,6 +273,7 @@ func TestInstallCopilotCLIScriptUsesToolcacheBeforeDownload(t *testing.T) {
 	curlScript := filepath.Join(fakeBinDir, "curl")
 
 	require.NoError(t, os.WriteFile(sudoScript, []byte(`#!/usr/bin/env bash
+if [ "${1:-}" = -n ]; then shift; fi
 if [ "${1:-}" = "chown" ]; then
   exit 0
 fi
@@ -280,6 +289,7 @@ exit 97
 	require.NoError(t, os.MkdirAll(installDir, 0o755))
 	cmd := exec.Command("bash", installScript, "1.2.3")
 	cmd.Env = append(os.Environ(),
+		"HOME="+tempDir,
 		"RUNNER_TOOL_CACHE="+filepath.Join(tempDir, "toolcache"),
 		"GITHUB_PATH="+githubPath,
 		"COPILOT_INSTALL_DIR="+installDir,
@@ -293,8 +303,9 @@ exit 97
 	assert.NoFileExists(t, curlLog, "curl should not run when a cached Copilot CLI is available")
 
 	githubPathContent, err := os.ReadFile(githubPath)
-	require.NoError(t, err, "Expected the script to append the cached bin dir to GITHUB_PATH")
-	assert.Contains(t, string(githubPathContent), toolcacheBin, "cached Copilot bin directory should be exported for later steps")
+	require.NoError(t, err, "Expected the script to append the install dir to GITHUB_PATH")
+	assert.Contains(t, string(githubPathContent), installDir, "the install dir should be exported for later steps")
+	assert.NotContains(t, string(githubPathContent), toolcacheBin, "the cache directory should not be exposed through GITHUB_PATH")
 
 	// The agent is launched with the absolute install path, so a toolcache hit must still
 	// materialize ${INSTALL_DIR}/copilot (see spawn ENOENT regression).
@@ -327,6 +338,7 @@ func TestInstallCopilotCLIScriptPreservesCachedBinaryAtInstallPath(t *testing.T)
 	fakeBinDir := filepath.Join(tempDir, "fake-bin")
 	prepareCopilotInstallerTestBin(t, fakeBinDir)
 	require.NoError(t, os.WriteFile(filepath.Join(fakeBinDir, "sudo"), []byte(`#!/usr/bin/env bash
+if [ "${1:-}" = -n ]; then shift; fi
 if [ "${1:-}" = "chown" ]; then
   exit 0
 fi
@@ -335,6 +347,7 @@ exec "$@"
 
 	cmd := exec.Command("bash", installScript, "1.2.3")
 	cmd.Env = append(os.Environ(),
+		"HOME="+tempDir,
 		"RUNNER_TOOL_CACHE="+filepath.Join(tempDir, "toolcache"),
 		"GITHUB_PATH="+filepath.Join(tempDir, "github-path"),
 		"COPILOT_INSTALL_DIR="+toolcacheBin,
@@ -395,6 +408,7 @@ func TestInstallCopilotCLIScriptDevModeUsesToolcache(t *testing.T) {
 	curlScript := filepath.Join(fakeBinDir, "curl")
 
 	require.NoError(t, os.WriteFile(sudoScript, []byte(`#!/usr/bin/env bash
+if [ "${1:-}" = -n ]; then shift; fi
 if [ "${1:-}" = "chown" ]; then
   exit 0
 fi
@@ -444,6 +458,7 @@ exit 97
 	require.NoError(t, os.MkdirAll(installDir, 0o755))
 	cmd := exec.Command("bash", installScript)
 	cmd.Env = append(os.Environ(),
+		"HOME="+tempDir,
 		"RUNNER_TOOL_CACHE="+filepath.Join(tempDir, "toolcache"),
 		"GITHUB_PATH="+githubPath,
 		"GH_AW_COMPILED_VERSION=dev",
@@ -521,6 +536,7 @@ func TestInstallCopilotCLIScriptAppliesCopilotMinVersionOverrideToToolcache(t *t
 	curlScript := filepath.Join(fakeBinDir, "curl")
 
 	require.NoError(t, os.WriteFile(sudoScript, []byte(`#!/usr/bin/env bash
+if [ "${1:-}" = -n ]; then shift; fi
 if [ "${1:-}" = "chown" ]; then
   exit 0
 fi
@@ -570,6 +586,7 @@ exit 97
 	require.NoError(t, os.MkdirAll(installDir, 0o755))
 	cmd := exec.Command("bash", installScript)
 	cmd.Env = append(os.Environ(),
+		"HOME="+tempDir,
 		"RUNNER_TOOL_CACHE="+filepath.Join(tempDir, "toolcache"),
 		"GITHUB_PATH="+githubPath,
 		"GH_AW_COMPILED_VERSION=dev",
@@ -620,6 +637,7 @@ func TestInstallCopilotCLIScriptLatestAppliesCopilotMinVersionToToolcache(t *tes
 			fakeBinDir := filepath.Join(tempDir, "fake-bin")
 			prepareCopilotInstallerTestBin(t, fakeBinDir)
 			require.NoError(t, os.WriteFile(filepath.Join(fakeBinDir, "sudo"), []byte(`#!/usr/bin/env bash
+if [ "${1:-}" = -n ]; then shift; fi
 if [ "${1:-}" = "chown" ]; then exit 0; fi
 exec "$@"
 `), 0o755))
@@ -630,6 +648,7 @@ exec "$@"
 			require.NoError(t, os.MkdirAll(installDir, 0o755))
 			cmd := exec.Command("bash", installScript, "latest")
 			cmd.Env = append(os.Environ(),
+				"HOME="+tempDir,
 				"RUNNER_TOOL_CACHE="+toolcache,
 				"GH_AW_COPILOT_MIN_VERSION=1.0.35",
 				"COPILOT_INSTALL_DIR="+installDir,
@@ -667,6 +686,7 @@ func TestInstallCopilotCLIScriptRejectsExplicitVersionBelowCopilotMinVersion(t *
 	fakeBinDir := filepath.Join(tempDir, "fake-bin")
 	prepareCopilotInstallerTestBin(t, fakeBinDir)
 	require.NoError(t, os.WriteFile(filepath.Join(fakeBinDir, "sudo"), []byte(`#!/usr/bin/env bash
+if [ "${1:-}" = -n ]; then shift; fi
 if [ "${1:-}" = "chown" ]; then
   exit 0
 fi
@@ -675,6 +695,7 @@ exec "$@"
 
 	cmd := exec.Command("bash", installScript, "1.0.85")
 	cmd.Env = append(os.Environ(),
+		"HOME="+tempDir,
 		"GH_AW_COPILOT_MIN_VERSION=1.0.87",
 		"COPILOT_INSTALL_DIR="+filepath.Join(tempDir, "install-bin"),
 		"GITHUB_PATH="+filepath.Join(tempDir, "github-path"),
@@ -715,11 +736,23 @@ func TestInstallCopilotCLIScriptRootlessModeUsesRealScriptWithToolcacheAndNoSudo
 	installScript := filepath.Join(projectRoot, "actions", "setup", "sh", "install_copilot_cli.sh")
 
 	testCases := []struct {
-		name string
-		args []string
+		name                string
+		args                []string
+		autoSelect          bool
+		blockedInstall      bool
+		symlinkInstall      bool
+		blockedState        bool
+		staleCleanupFailure bool
 	}{
 		{name: "rootless flag before version", args: []string{"--rootless", "1.2.3"}},
 		{name: "rootless flag after version", args: []string{"1.2.3", "--rootless"}},
+		{name: "native runner without passwordless sudo", args: []string{"1.2.3"}, autoSelect: true},
+		{name: "native runner with unwritable job-scoped directory", args: []string{"1.2.3"}, autoSelect: true, blockedInstall: true},
+		{name: "native runner with symlinked job-scoped directory", args: []string{"1.2.3"}, autoSelect: true, symlinkInstall: true},
+		{name: "native runner with legacy root-owned state", args: []string{"1.2.3"}, autoSelect: true, blockedState: true},
+		{name: "explicit rootless with legacy root-owned state", args: []string{"--rootless", "1.2.3"}, blockedState: true},
+		{name: "native runner with inaccessible state directory", args: []string{"1.2.3"}, autoSelect: true, blockedState: true},
+		{name: "native runner with stale privileged AWF directories", args: []string{"1.2.3"}, autoSelect: true, staleCleanupFailure: true},
 	}
 
 	for _, tc := range testCases {
@@ -727,6 +760,20 @@ func TestInstallCopilotCLIScriptRootlessModeUsesRealScriptWithToolcacheAndNoSudo
 			tempDir := t.TempDir()
 			homeDir := filepath.Join(tempDir, "home")
 			require.NoError(t, os.MkdirAll(homeDir, 0o755))
+			runnerTemp := filepath.Join(tempDir, "runner-temp")
+			rootlessInstallDir := filepath.Join(runnerTemp, "gh-aw", "bin")
+			if tc.blockedInstall {
+				require.NoError(t, os.MkdirAll(filepath.Dir(rootlessInstallDir), 0o755))
+				require.NoError(t, os.WriteFile(rootlessInstallDir, []byte("not a directory"), 0o644))
+			}
+			if tc.symlinkInstall {
+				require.NoError(t, os.MkdirAll(filepath.Join(homeDir, ".local", "bin"), 0o755))
+				require.NoError(t, os.MkdirAll(filepath.Dir(rootlessInstallDir), 0o755))
+				require.NoError(t, os.Symlink(filepath.Join(homeDir, ".local", "bin"), rootlessInstallDir))
+			}
+			if tc.blockedState {
+				require.NoError(t, os.WriteFile(filepath.Join(homeDir, ".copilot"), []byte("not a directory"), 0o644))
+			}
 
 			toolcacheBin := filepath.Join(tempDir, "toolcache", "copilot-cli", "1.2.3", "x64", "bin")
 			require.NoError(t, os.MkdirAll(toolcacheBin, 0o755))
@@ -746,24 +793,78 @@ exit 99
 echo "chown-called: $*" >> "`+chownLog+`"
 exit 99
 `), 0o755))
+			if tc.autoSelect {
+				require.NoError(t, os.WriteFile(filepath.Join(fakeBinDir, "id"), []byte(`#!/usr/bin/env bash
+case "$1" in -u) echo 12345 ;; -g) echo 31 ;; *) exit 1 ;; esac
+`), 0o755))
+			}
+			if tc.staleCleanupFailure {
+				require.NoError(t, os.WriteFile(filepath.Join(fakeBinDir, "find"), []byte(`#!/usr/bin/env bash
+if [ "${1:-}" = /tmp ]; then exit 1; fi
+exec /usr/bin/find "$@"
+`), 0o755))
+			}
 
 			cmd := exec.Command("bash", append([]string{installScript}, tc.args...)...)
+			systemBin := filepath.Join(tempDir, "usr", "local", "bin")
+			require.NoError(t, os.MkdirAll(systemBin, 0o755))
+			require.NoError(t, os.Chmod(systemBin, 0o555))
+			githubPath := ""
+			if tc.autoSelect {
+				githubPath = filepath.Join(tempDir, "github-path")
+			}
 			cmd.Env = append(os.Environ(),
 				"HOME="+homeDir,
+				"RUNNER_TEMP="+runnerTemp,
 				"RUNNER_TOOL_CACHE="+filepath.Join(tempDir, "toolcache"),
-				"GITHUB_PATH=",
+				"COPILOT_INSTALL_DIR="+systemBin,
+				"GITHUB_PATH="+githubPath,
 				"PATH="+fakeBinDir+":"+os.Getenv("PATH"),
 			)
 
 			output, err := cmd.CombinedOutput()
+			if tc.blockedState {
+				require.Error(t, err)
+				assert.Contains(t, string(output), "Cannot prepare Copilot state at "+filepath.Join(homeDir, ".copilot"))
+				assert.Contains(t, string(output), "Ask a runner administrator to restore ownership")
+				assert.Contains(t, string(output), "make it writable before retrying")
+				assert.NotContains(t, string(output), "Using cached GitHub Copilot CLI")
+				assert.NoFileExists(t, filepath.Join(rootlessInstallDir, "copilot"))
+				assert.NoFileExists(t, filepath.Join(systemBin, "copilot"))
+				assert.NoFileExists(t, githubPath)
+				assert.NoFileExists(t, chownLog, "rootless installation must not recursively re-own Copilot state")
+				return
+			}
+			if tc.blockedInstall || tc.symlinkInstall {
+				require.Error(t, err)
+				assert.Contains(t, string(output), "could not create a writable install directory at "+rootlessInstallDir)
+				assert.NoFileExists(t, filepath.Join(systemBin, "copilot"))
+				return
+			}
 			require.NoError(t, err, "install_copilot_cli.sh should succeed in rootless mode with toolcache and no sudo: %s", output)
+			if tc.staleCleanupFailure {
+				assert.Contains(t, string(output), "WARNING: Could not remove stale /tmp/awf-*-chroot-home directories")
+				assert.Contains(t, string(output), "WARNING: Could not remove stale /tmp/awf-chroot-* directories")
+				assert.Contains(t, string(output), "installation will continue")
+			}
 
 			assert.Contains(t, string(output), "Using cached GitHub Copilot CLI", "script should use cached copilot CLI")
-			assert.Contains(t, string(output), "GITHUB_PATH not set — relying on "+filepath.Join(homeDir, ".local", "bin", "copilot"))
-			assert.Contains(t, string(output), "Wrapper installed at "+filepath.Join(homeDir, ".local", "bin", "copilot"))
-			assert.FileExists(t, filepath.Join(homeDir, ".local", "bin", "copilot"))
-			assert.NoFileExists(t, sudoLog, "sudo should not be called in rootless mode")
+			assert.Contains(t, string(output), "Wrapper installed at "+filepath.Join(rootlessInstallDir, "copilot"))
+			assert.FileExists(t, filepath.Join(rootlessInstallDir, "copilot"))
+			assert.NoFileExists(t, filepath.Join(systemBin, "copilot"))
 			assert.NoFileExists(t, chownLog, "rootless installation must not recursively re-own Copilot configuration")
+			if tc.autoSelect {
+				pathContents, err := os.ReadFile(githubPath)
+				require.NoError(t, err)
+				assert.Contains(t, string(pathContents), rootlessInstallDir)
+				assert.NotContains(t, string(pathContents), toolcacheBin)
+				sudoCalls, err := os.ReadFile(sudoLog)
+				require.NoError(t, err)
+				assert.Equal(t, "sudo-called: -n true\n", string(sudoCalls), "only the non-interactive privilege probe may use sudo")
+			} else {
+				assert.Contains(t, string(output), "GITHUB_PATH not set — relying on "+filepath.Join(rootlessInstallDir, "copilot"))
+				assert.NoFileExists(t, sudoLog, "sudo should not be called in explicit rootless mode")
+			}
 		})
 	}
 }
@@ -808,6 +909,7 @@ func TestInstallCopilotCLIScriptFallsBackToBakedInDefaultWhenCompatUnavailable(t
 	curlScript := filepath.Join(fakeBinDir, "curl")
 
 	require.NoError(t, os.WriteFile(sudoScript, []byte(`#!/usr/bin/env bash
+if [ "${1:-}" = -n ]; then shift; fi
 if [ "${1:-}" = "chown" ]; then
   exit 0
 fi
@@ -825,6 +927,7 @@ exit 97
 	// No version argument, no GH_AW_COMPILED_VERSION → script must fall back to DEFAULT_COPILOT_VERSION.
 	cmd := exec.Command("bash", installScript)
 	cmd.Env = append(os.Environ(),
+		"HOME="+tempDir,
 		"RUNNER_TOOL_CACHE="+filepath.Join(tempDir, "toolcache"),
 		"GITHUB_PATH="+githubPath,
 		"COPILOT_INSTALL_DIR="+installDir,
