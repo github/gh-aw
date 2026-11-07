@@ -537,7 +537,6 @@ func TestExpressionModelUsesEnvVar(t *testing.T) {
 			model:               "copilot/${{ inputs.model }}",
 			expectedModelEnvVar: "GH_AW_PI_MODEL",
 			expectedModelEnvVal: "copilot/${{ inputs.model }}",
-			additionalModelEnv:  []string{"GH_AW_PI_MODEL_ID: ${{ inputs.model }}"},
 		},
 	}
 

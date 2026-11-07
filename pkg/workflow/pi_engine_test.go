@@ -45,8 +45,13 @@ func TestPiEngine_GetExecutionSteps_AutoModels(t *testing.T) {
 			steps := NewPiEngine().GetExecutionSteps(workflowData, "/tmp/gh-aw/agent-stdio.log")
 			require.Len(t, steps, 1)
 			stepText := strings.Join(steps[0], "\n")
-			assert.Contains(t, stepText, `--model "aw-gateway/${GH_AW_PI_MODEL_ID}"`)
-			assert.Contains(t, stepText, "GH_AW_PI_MODEL_ID: auto")
+			assert.Contains(t, stepText, `--model "aw-gateway/${GH_AW_PI_MODEL#*/}"`)
+			expectedModel := model
+			if expectedModel == "" {
+				expectedModel = "copilot/auto"
+			}
+			assert.Contains(t, stepText, "GH_AW_PI_MODEL: "+expectedModel)
+			assert.NotContains(t, stepText, "GH_AW_PI_MODEL_ID:")
 			assert.Contains(t, stepText, "GH_AW_LLM_PROVIDER=github")
 			assert.Contains(t, stepText, "GH_AW_PI_GATEWAY_FALLBACK_PORT=10002")
 			assert.NotContains(t, stepText, "aw-gateway/gpt-5.4")
@@ -65,8 +70,9 @@ func TestPiEngine_GetExecutionSteps_DefaultWithOpenAIProvider(t *testing.T) {
 	steps := NewPiEngine().GetExecutionSteps(workflowData, "/tmp/gh-aw/agent-stdio.log")
 	require.Len(t, steps, 1)
 	stepText := strings.Join(steps[0], "\n")
-	assert.Contains(t, stepText, `--model "aw-gateway/${GH_AW_PI_MODEL_ID}"`)
-	assert.Contains(t, stepText, "GH_AW_PI_MODEL_ID: gpt-5.4")
+	assert.Contains(t, stepText, `--model "aw-gateway/${GH_AW_PI_MODEL#*/}"`)
+	assert.Contains(t, stepText, "GH_AW_PI_MODEL: copilot/gpt-5.4")
+	assert.NotContains(t, stepText, "GH_AW_PI_MODEL_ID:")
 	assert.Contains(t, stepText, "GH_AW_LLM_PROVIDER=openai")
 	assert.NotContains(t, stepText, "--model aw-gateway/auto")
 }
@@ -80,11 +86,12 @@ func TestPiEngine_GetExecutionSteps_DefaultWithoutGateway(t *testing.T) {
 	steps := NewPiEngine().GetExecutionSteps(workflowData, "/tmp/gh-aw/agent-stdio.log")
 	require.Len(t, steps, 1)
 	stepText := strings.Join(steps[0], "\n")
-	assert.Contains(t, stepText, `--model "${GH_AW_PI_NATIVE_PROVIDER}/${GH_AW_PI_MODEL_ID}"`)
+	assert.Contains(t, stepText, `--model "${GH_AW_PI_NATIVE_PROVIDER}/${GH_AW_PI_MODEL#*/}"`)
 	assert.Contains(t, stepText, "GH_AW_PI_NATIVE_PROVIDER: github-copilot")
-	assert.Contains(t, stepText, "GH_AW_PI_MODEL_ID: gpt-5.4")
+	assert.Contains(t, stepText, "GH_AW_PI_MODEL: copilot/gpt-5.4")
+	assert.NotContains(t, stepText, "GH_AW_PI_MODEL_ID:")
 	resolvedStepText := strings.ReplaceAll(stepText, "${GH_AW_PI_NATIVE_PROVIDER}", "github-copilot")
-	resolvedStepText = strings.ReplaceAll(resolvedStepText, "${GH_AW_PI_MODEL_ID}", "gpt-5.4")
+	resolvedStepText = strings.ReplaceAll(resolvedStepText, "${GH_AW_PI_MODEL#*/}", "gpt-5.4")
 	assert.Contains(t, resolvedStepText, `--model "github-copilot/gpt-5.4"`)
 	assert.NotContains(t, stepText, "--model github-copilot/auto")
 }
@@ -471,7 +478,8 @@ func TestPiEngine_GetExecutionSteps_FirewallCopilotProvider(t *testing.T) {
 	// live api-proxy port via AWF's /reflect endpoint and falls back to the compile-time
 	// gatewayPort otherwise. Verify the setup command exports the expected inputs.
 	assert.Contains(t, stepText, "pi_models_json.cjs", "Firewall mode should invoke pi_models_json.cjs to generate models.json at runtime")
-	assert.Contains(t, stepText, "GH_AW_PI_MODEL_ID: claude-sonnet-4-20250514", "Should expose the model ID for pi_models_json.cjs")
+	assert.Contains(t, stepText, "GH_AW_PI_MODEL: copilot/claude-sonnet-4-20250514", "Should expose the configured model for pi_models_json.cjs")
+	assert.NotContains(t, stepText, "GH_AW_PI_MODEL_ID:")
 	assert.Contains(t, stepText, "GH_AW_PI_GATEWAY_SECRET_ENV=COPILOT_GITHUB_TOKEN", "Should export the gateway secret env var name for pi_models_json.cjs")
 	assert.Contains(t, stepText, fmt.Sprintf("GH_AW_PI_GATEWAY_FALLBACK_PORT=%d", constants.CopilotLLMGatewayPort), "Should export the compile-time fallback port")
 	assert.Contains(t, stepText, "GH_AW_LLM_PROVIDER=github", "Should export the reflect provider name for pi_models_json.cjs")
@@ -526,14 +534,15 @@ func TestPiEngine_GetExecutionSteps_FirewallAnthropicProvider(t *testing.T) {
 	stepText := strings.Join(steps[0], "\n")
 	assert.Contains(t, stepText, "PI_CODING_AGENT_DIR", "Firewall mode should set PI_CODING_AGENT_DIR for models.json config")
 	assert.Contains(t, stepText, "aw-gateway", "Firewall mode should register the aw-gateway provider in models.json")
-	assert.Contains(t, stepText, `--model "aw-gateway/${GH_AW_PI_MODEL_ID}"`, "Firewall mode should route model via aw-gateway provider")
+	assert.Contains(t, stepText, `--model "aw-gateway/${GH_AW_PI_MODEL#*/}"`, "Firewall mode should route model via aw-gateway provider")
 	assert.NotContains(t, stepText, " --model anthropic/claude-opus-4-20251101", "Firewall mode must not use native provider resolution")
 	assert.Contains(t, stepText, "claude-opus-4-20251101", "Step should include the model ID in models.json")
 	assert.Contains(t, stepText, `\"enabled\":true`, "Firewall mode should enable the api-proxy in AWF config JSON")
 	// Anthropic provider routes through the Claude LLM gateway port as a fallback; the live
 	// port is resolved at runtime via /reflect by pi_models_json.cjs.
 	assert.Contains(t, stepText, "pi_models_json.cjs", "Firewall mode should invoke pi_models_json.cjs to generate models.json at runtime")
-	assert.Contains(t, stepText, "GH_AW_PI_MODEL_ID: claude-opus-4-20251101", "Should expose the model ID for pi_models_json.cjs")
+	assert.Contains(t, stepText, "GH_AW_PI_MODEL: anthropic/claude-opus-4-20251101", "Should expose the configured model for pi_models_json.cjs")
+	assert.NotContains(t, stepText, "GH_AW_PI_MODEL_ID:")
 	assert.Contains(t, stepText, "GH_AW_PI_GATEWAY_SECRET_ENV=ANTHROPIC_API_KEY", "Should export the gateway secret env var name for pi_models_json.cjs")
 	assert.Contains(t, stepText, fmt.Sprintf("GH_AW_PI_GATEWAY_FALLBACK_PORT=%d", constants.ClaudeLLMGatewayPort), "Should export the compile-time fallback port")
 	assert.Contains(t, stepText, "GH_AW_LLM_PROVIDER=anthropic", "Should export the reflect provider name for pi_models_json.cjs")
@@ -561,14 +570,15 @@ func TestPiEngine_GetExecutionSteps_FirewallCodexProvider(t *testing.T) {
 	stepText := strings.Join(steps[0], "\n")
 	assert.Contains(t, stepText, "PI_CODING_AGENT_DIR", "Firewall mode should set PI_CODING_AGENT_DIR for models.json config")
 	assert.Contains(t, stepText, "aw-gateway", "Firewall mode should register the aw-gateway provider in models.json")
-	assert.Contains(t, stepText, `--model "aw-gateway/${GH_AW_PI_MODEL_ID}"`, "Firewall mode should route model via aw-gateway provider")
+	assert.Contains(t, stepText, `--model "aw-gateway/${GH_AW_PI_MODEL#*/}"`, "Firewall mode should route model via aw-gateway provider")
 	assert.NotContains(t, stepText, " --model openai/gpt-4.1", "Firewall mode must not use native provider resolution")
 	assert.Contains(t, stepText, "gpt-4.1", "Step should include the model ID in models.json")
 	assert.Contains(t, stepText, `\"enabled\":true`, "Firewall mode should enable the api-proxy in AWF config JSON")
 	// Codex/OpenAI provider routes through the Codex LLM gateway port as a fallback; the live
 	// port is resolved at runtime via /reflect by pi_models_json.cjs.
 	assert.Contains(t, stepText, "pi_models_json.cjs", "Firewall mode should invoke pi_models_json.cjs to generate models.json at runtime")
-	assert.Contains(t, stepText, "GH_AW_PI_MODEL_ID: gpt-4.1", "Should expose the model ID for pi_models_json.cjs")
+	assert.Contains(t, stepText, "GH_AW_PI_MODEL: codex/gpt-4.1", "Should expose the configured model for pi_models_json.cjs")
+	assert.NotContains(t, stepText, "GH_AW_PI_MODEL_ID:")
 	assert.Contains(t, stepText, "GH_AW_PI_GATEWAY_SECRET_ENV=CODEX_API_KEY", "Should export the gateway secret env var name for pi_models_json.cjs")
 	assert.Contains(t, stepText, fmt.Sprintf("GH_AW_PI_GATEWAY_FALLBACK_PORT=%d", constants.CodexLLMGatewayPort), "Should export the compile-time fallback port")
 	assert.Contains(t, stepText, "GH_AW_LLM_PROVIDER=openai", "Should export the reflect provider name for pi_models_json.cjs")
@@ -608,12 +618,13 @@ func TestPiEngine_GetExecutionSteps_FirewallCopilotProvider_CopilotRequestsWrite
 	assert.Contains(t, stepText, "models.json", "Firewall mode should write a models.json gateway config")
 	assert.Contains(t, stepText, "aw-gateway", "Should use aw-gateway provider (api-proxy) not native github-copilot provider")
 	assert.NotContains(t, stepText, "github-copilot/gpt-5.4", "Should not pass github-copilot provider directly to Pi CLI (would bypass firewall)")
-	assert.Contains(t, stepText, `--model "aw-gateway/${GH_AW_PI_MODEL_ID}"`, "Should use aw-gateway model flag")
+	assert.Contains(t, stepText, `--model "aw-gateway/${GH_AW_PI_MODEL#*/}"`, "Should use aw-gateway model flag")
 	// The models.json must route through the Copilot gateway port using COPILOT_GITHUB_TOKEN
 	// (set to ${{ github.token }} in copilot-requests: write mode); pi_models_json.cjs
 	// resolves the live port via /reflect at runtime and falls back to this compile-time port.
 	assert.Contains(t, stepText, "pi_models_json.cjs", "Firewall mode should invoke pi_models_json.cjs to generate models.json at runtime")
-	assert.Contains(t, stepText, "GH_AW_PI_MODEL_ID: gpt-5.4", "Should expose the model ID for pi_models_json.cjs")
+	assert.Contains(t, stepText, "GH_AW_PI_MODEL: copilot/gpt-5.4", "Should expose the configured model for pi_models_json.cjs")
+	assert.NotContains(t, stepText, "GH_AW_PI_MODEL_ID:")
 	assert.Contains(t, stepText, "GH_AW_PI_GATEWAY_SECRET_ENV=COPILOT_GITHUB_TOKEN", "Should export the gateway secret env var name for pi_models_json.cjs")
 	assert.Contains(t, stepText, fmt.Sprintf("GH_AW_PI_GATEWAY_FALLBACK_PORT=%d", constants.CopilotLLMGatewayPort), "Should export the compile-time fallback port")
 	assert.Contains(t, stepText, "GH_AW_LLM_PROVIDER=github", "Should export the reflect provider name for pi_models_json.cjs")
@@ -683,9 +694,10 @@ func TestPiEngine_GetExecutionSteps_AliasModelResolvedAtRuntime(t *testing.T) {
 				assert.Contains(t, stepText, `--model "aw-gateway/$(cat /tmp/gh-aw/pi-model)"`)
 				assert.NotContains(t, stepText, "--model aw-gateway/"+modelID)
 			} else {
-				assert.Contains(t, stepText, `--model "aw-gateway/${GH_AW_PI_MODEL_ID}"`)
-				assert.Contains(t, stepText, "GH_AW_PI_MODEL_ID: "+modelID)
-				assert.Contains(t, strings.ReplaceAll(stepText, "${GH_AW_PI_MODEL_ID}", modelID),
+				assert.Contains(t, stepText, `--model "aw-gateway/${GH_AW_PI_MODEL#*/}"`)
+				assert.Contains(t, stepText, "GH_AW_PI_MODEL: "+tt.model)
+				assert.NotContains(t, stepText, "GH_AW_PI_MODEL_ID:")
+				assert.Contains(t, strings.ReplaceAll(stepText, "${GH_AW_PI_MODEL#*/}", modelID),
 					fmt.Sprintf(`--model "aw-gateway/%s"`, modelID))
 				assert.NotContains(t, stepText, "/tmp/gh-aw/pi-model")
 			}

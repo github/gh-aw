@@ -346,7 +346,7 @@ Say hello.
 			lock, _ := compileBareInlineSkillWorkflow(t, workflowPath)
 
 			args := compiledPiArgs(t, lock)
-			assert.Equal(t, `--print --mode json --no-session --no-approve --exclude-tools bash --model "aw-gateway/${GH_AW_PI_MODEL_ID}"`, args,
+			assert.Equal(t, `--print --mode json --no-session --no-approve --exclude-tools bash --model "aw-gateway/${GH_AW_PI_MODEL#*/}"`, args,
 				"non-bare pi arguments should pass the model through the environment")
 			assert.NotContains(t, lock, "--skill", "non-bare pi should rely on normal discovery")
 			assert.NotContains(t, lock, "workflow-skill-args", "non-bare pi should not load the runtime skill list")
@@ -379,7 +379,7 @@ Say hello.
 	lock, _ := compileBareInlineSkillWorkflow(t, workflowPath)
 
 	args := compiledPiArgs(t, lock)
-	assert.Equal(t, "--print --mode json --no-session --no-approve --exclude-tools bash "+strings.Join(bareInlineSkillPiFlags, " ")+" "+bareInlineSkillArgsFragment+` --model "aw-gateway/${GH_AW_PI_MODEL_ID}"`, args,
+	assert.Equal(t, "--print --mode json --no-session --no-approve --exclude-tools bash "+strings.Join(bareInlineSkillPiFlags, " ")+" "+bareInlineSkillArgsFragment+` --model "aw-gateway/${GH_AW_PI_MODEL#*/}"`, args,
 		"bare pi arguments should pass the runtime skill list and model through their respective runtime mechanisms")
 	assert.NotContains(t, lock, "--skill")
 	assert.NotContains(t, lock, "reporting")

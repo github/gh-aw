@@ -668,7 +668,7 @@ describe("pi_models_json.cjs", () => {
   describe("shared model resolution (recorded /reflect from run 38945917145)", () => {
     function configure(model, aliases = reflectFixtures.builtinAliases()) {
       process.env.GH_AW_PI_MODEL = model;
-      process.env.GH_AW_PI_MODEL_ID = model.slice(model.indexOf("/") + 1);
+      delete process.env.GH_AW_PI_MODEL_ID;
       process.env.GH_AW_PI_MODEL_ALIASES = JSON.stringify(aliases);
       process.env.GH_AW_PI_GATEWAY_SECRET_ENV = "COPILOT_GITHUB_TOKEN";
       process.env.GH_AW_PI_GATEWAY_FALLBACK_PORT = "10002";

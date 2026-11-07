@@ -478,9 +478,9 @@ func (e *PiEngine) buildPiCommand(workflowData *WorkflowData, commandName string
 		} else if workflowData.Model != "" {
 			// Keep model expressions in env, never in the shell source.
 			if piModelsJSONSetup != "" {
-				modelArg = ` --model "aw-gateway/${GH_AW_PI_MODEL_ID}"`
+				modelArg = ` --model "aw-gateway/${GH_AW_PI_MODEL#*/}"`
 			} else {
-				modelArg = ` --model "${GH_AW_PI_NATIVE_PROVIDER}/${GH_AW_PI_MODEL_ID}"`
+				modelArg = ` --model "${GH_AW_PI_NATIVE_PROVIDER}/${GH_AW_PI_MODEL#*/}"`
 			}
 		}
 		piCommand = fmt.Sprintf(
@@ -616,7 +616,6 @@ func (e *PiEngine) buildPiExecutionEnv(workflowData *WorkflowData, profile unive
 func applyPiModelEnv(env map[string]string, workflowData *WorkflowData, modelConfigured bool) {
 	if modelConfigured {
 		env["GH_AW_PI_MODEL"] = workflowData.Model
-		env["GH_AW_PI_MODEL_ID"] = extractPiModelID(workflowData.Model)
 		env["GH_AW_PI_NATIVE_PROVIDER"] = piExecutionProvider(workflowData)
 	}
 }

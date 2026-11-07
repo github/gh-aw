@@ -1221,7 +1221,6 @@ jobs:
           GH_AW_PI_DURABLE_PACKAGE_ROOT: /tmp/gh-aw/pi-durable-runtime/node_modules
           GH_AW_PI_DURABLE_STORAGE: artifact
           GH_AW_PI_MODEL: copilot/gpt-6-sol
-          GH_AW_PI_MODEL_ID: gpt-6-sol
           GH_AW_PI_NATIVE_PROVIDER: github-copilot
           GH_AW_PI_SUBAGENT_ARGS: '["--print","--mode","json","--no-session","--no-approve"]'
           GH_AW_PI_SYSTEM_PROMPT: /tmp/gh-aw/aw-prompts/system.txt

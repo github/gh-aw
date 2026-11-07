@@ -1443,7 +1443,6 @@ jobs:
           GH_AW_PI_BARE: false
           GH_AW_PI_CONFIG: '{"mcp":{"exposure":"direct"}}'
           GH_AW_PI_MODEL: copilot/grok
-          GH_AW_PI_MODEL_ID: grok
           GH_AW_PI_NATIVE_PROVIDER: github-copilot
           GH_AW_PI_SUBAGENT_ARGS: '["--print","--mode","json","--no-session","--no-approve"]'
           GH_AW_PI_SYSTEM_PROMPT: /tmp/gh-aw/aw-prompts/system.txt

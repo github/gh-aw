@@ -17,7 +17,7 @@
  * potentially stale compiled-in value.
  *
  * Environment variables:
- *   GH_AW_PI_MODEL_ID              — Pi model ID (without provider prefix)
+ *   GH_AW_PI_MODEL_ID              — legacy Pi model ID override (without provider prefix)
  *   GH_AW_PI_MODEL                 — configured model (exact id or gh-aw alias, optional provider/ prefix)
  *   GH_AW_PI_MODEL_ALIASES         — workflow-defined and imported gh-aw aliases (JSON; built-ins ship in model_aliases.json)
  *   GH_AW_PI_MODEL_FILE            — where the resolved main model id is written for the Pi CLI
@@ -371,7 +371,9 @@ function resolveAndRecordPiModelRoutingEndpoint({ reflectData, modelId, api, sel
 /** @param {{ loadSDK?: typeof loadPiSDK, loadModelsJson?: typeof loadModelsJson, fetchReflect?: typeof fetchAWFReflect, logger?: (message: string) => void }} [options] */
 async function main(options = {}) {
   const logger = options.logger || DEFAULT_LOGGER;
-  let modelId = process.env.GH_AW_PI_MODEL_ID || "";
+  const configuredModel = process.env.GH_AW_PI_MODEL || "";
+  const modelSlash = configuredModel.indexOf("/");
+  let modelId = process.env.GH_AW_PI_MODEL_ID || (modelSlash >= 0 ? configuredModel.slice(modelSlash + 1) : configuredModel);
   const routingRequired = process.env.GH_AW_MODEL_ROUTING === "1";
   const apiKeyEnvVar = process.env.GH_AW_PI_GATEWAY_SECRET_ENV || "";
   const contextWindow = process.env.GH_AW_PI_CONTEXT_WINDOW || "";
@@ -381,7 +383,7 @@ async function main(options = {}) {
   const outputPath = process.env.GH_AW_PI_MODELS_JSON_PATH || path.join(agentDir, "models.json");
 
   if ((!modelId && !routingRequired) || !apiKeyEnvVar || !Number.isFinite(fallbackPort)) {
-    logger("fatal: missing required env vars (GH_AW_PI_MODEL_ID, GH_AW_PI_GATEWAY_SECRET_ENV, GH_AW_PI_GATEWAY_FALLBACK_PORT)");
+    logger("fatal: missing required env vars (GH_AW_PI_MODEL or GH_AW_PI_MODEL_ID, GH_AW_PI_GATEWAY_SECRET_ENV, GH_AW_PI_GATEWAY_FALLBACK_PORT)");
     process.exitCode = 1;
     return;
   }
@@ -422,14 +424,14 @@ async function main(options = {}) {
       return null;
     }
   };
-  const configuredModel = routingRequired ? modelId : process.env.GH_AW_PI_MODEL || modelId;
+  const configuredModelForResolution = routingRequired ? modelId : configuredModel || modelId;
   if (!routingRequired) {
     // Shared "resolve configured model" step: aliases resolve to the newest live match on
     // the configured provider, exact ids stay exact, and Copilot's `auto` stays a gateway sentinel.
     const resolution = await resolveEngineModel({
       engine: "pi",
       role: "main",
-      configuredModel,
+      configuredModel: configuredModelForResolution,
       provider,
       aliasMap: loadModelAliasMap({ reflectData, envVar: "GH_AW_PI_MODEL_ALIASES" }),
       reflectData,
@@ -443,10 +445,10 @@ async function main(options = {}) {
   }
 
   try {
-    validatePiModelAvailability({ provider, modelId, configuredModel, reflectData, logger });
+    validatePiModelAvailability({ provider, modelId, configuredModel: configuredModelForResolution, reflectData, logger });
   } catch (error) {
     if (error instanceof ModelAliasResolutionError && !routingRequired) {
-      recordModelResolution({ engine: "pi", role: "main", configured_model: configuredModel, resolved_model: null, provider: error.provider || null, status: "failed", cause: error.reason });
+      recordModelResolution({ engine: "pi", role: "main", configured_model: configuredModelForResolution, resolved_model: null, provider: error.provider || null, status: "failed", cause: error.reason });
     }
     throw error;
   }
