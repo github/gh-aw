@@ -77,7 +77,7 @@ const {
 } = require("./awf_reflect.cjs");
 const { emitMissingToolPermissionIssue, emitInfrastructureIncomplete, hasExpectedSafeOutputs, hasNoopInSafeOutputs, hasTerminalSafeOutput } = require("./safeoutputs_cli.cjs");
 const { countPermissionDeniedIssues, hasNumerousPermissionDeniedIssues, extractDeniedCommands, buildMissingToolPermissionIssuePayload } = require("./permission_denied_helpers.cjs");
-const { detectNonRetryableHarnessGuard, buildSoftTimeoutGuard, emitSoftTimeoutSignal, isAuthenticationFailedError, parseAICreditsExceededProxyRejection } = require("./harness_retry_guard.cjs");
+const { detectNonRetryableHarnessGuard, detectExhaustedAWFInvocationBudget, buildSoftTimeoutGuard, emitSoftTimeoutSignal, isAuthenticationFailedError, parseAICreditsExceededProxyRejection } = require("./harness_retry_guard.cjs");
 const { isCrashSignalExitCode, crashSignalNameForExitCode } = require("./harness_crash_signals.cjs");
 const { MODEL_NOT_SUPPORTED_PATTERN: INVALID_MODEL_ERROR_PATTERN } = require("./detect_agent_errors.cjs");
 const { applyModelFallback, normalizeClaudeModel } = require("./model_fallback.cjs");
@@ -652,6 +652,7 @@ async function main() {
     softTimeoutGuard,
     getRetryMode: () => (useContinueOnRetry ? `--resume ${sessionId}` : "fresh run"),
     runAttempt: async (attempt, observeStrategy) => {
+      let nativeTerminalRateLimitError = false;
       // Resume only the captured session; never select the latest unrelated conversation.
       // Claude Code resumes the session from on-disk state; re-sending the original
       // instructions would re-execute the full task from scratch.
@@ -680,7 +681,13 @@ async function main() {
         log,
         logArgs,
         env: childEnv,
-        onStdoutLine: line => observeDurableSession(durableSession, "claude", line),
+        onStdoutLine: line => {
+          observeDurableSession(durableSession, "claude", line);
+          if (isRateLimitError(classifiableOutput(line))) nativeTerminalRateLimitError = true;
+        },
+        onStderrLine: line => {
+          if (isRateLimitError(line)) nativeTerminalRateLimitError = true;
+        },
         stdin: attempt > 0 && useContinueOnRetry ? CLAUDE_RESUME_PROMPT : (prompt ?? undefined),
         postResultWatchdog: safeOutputsPath
           ? {
@@ -695,9 +702,15 @@ async function main() {
           : undefined,
       });
       sessionId = claudeSessionId(result.output) || sessionId;
-      return { ...result, exitCode: result.runtimeGuardFired && result.exitCode === 0 ? 1 : result.exitCode, safeOutputsByteOffset, strategy };
+      return {
+        ...result,
+        exitCode: result.runtimeGuardFired && result.exitCode === 0 ? 1 : result.exitCode,
+        safeOutputsByteOffset,
+        strategy,
+        nativeTerminalRateLimitError,
+      };
     },
-    handleFailure: ({ attempt, result }) => {
+    handleFailure: async ({ attempt, result }) => {
       if (result.runtimeGuardFired && softTimeoutGuard) {
         emitSoftTimeoutSignal(softTimeoutGuard, "during execution", "Claude harness", log);
         return { action: "stop" };
@@ -762,6 +775,14 @@ async function main() {
       }
 
       const nonRetryableGuard = detectNonRetryableHarnessGuard(classifierOutput);
+      if (!nonRetryableGuard.maxRunsExceeded) {
+        const budget = await detectExhaustedAWFInvocationBudget({ nativeTerminalRateLimitError: result.nativeTerminalRateLimitError === true, logger: log });
+        if (budget) {
+          nonRetryableGuard.maxRunsExceeded = true;
+          result.failureClasses.push("invocation_cap_exceeded");
+          log(`attempt ${attempt + 1}: AWF shared invocation budget exhausted (${budget.invocationCount}/${budget.maxRuns}) — confirmed by fresh reflection`);
+        }
+      }
       if (nonRetryableGuard.apiProxyGuardRejection) {
         const reason = `AWF API proxy guardrail rejected the request: ${nonRetryableGuard.apiProxyGuardRejection.guard}`;
         log(`${reason} — not retrying`);

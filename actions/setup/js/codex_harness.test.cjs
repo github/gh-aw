@@ -12,7 +12,6 @@ const {
   buildCodexResumeArgs,
   injectJsonFlag,
   isRateLimitError,
-  exhaustedInvocationBudget,
   isTokenPerMinuteRateLimitError,
   isAuthenticationFailedError,
   isMissingApiKeyError,
@@ -59,7 +58,7 @@ const {
 } = require("./codex_harness.cjs");
 const { TMP_GH_AW_PATH } = require("./constants.cjs");
 const reflectFixtures = require("./fixtures/model_resolution_reflect.cjs");
-const { detectNonRetryableHarnessGuard } = require("./harness_retry_guard.cjs");
+const { detectExhaustedAWFInvocationBudget, detectNonRetryableHarnessGuard } = require("./harness_retry_guard.cjs");
 const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
 
 let agentTempDir;
@@ -866,9 +865,15 @@ fs.appendFileSync(process.env.GH_AW_SAFE_OUTPUTS, JSON.stringify(item) + "\\n");
 process.stdout.write(JSON.stringify({type:"turn.failed",error:{message:"exceeded retry limit, last status: 429 Too Many Requests"}})+"\\n");
 process.exit(1);`;
 
-    it("requires a complete, consistent exhausted counter", () => {
-      expect(exhaustedInvocationBudget({ runs })).toEqual({ invocationCount: 60, maxRuns: 60 });
-      expect(exhaustedInvocationBudget({ runs: { ...runs, invocation_count: 61 } })).toEqual({ invocationCount: 61, maxRuns: 60 });
+    it("requires a complete, consistent exhausted counter", async () => {
+      const detectBudget = reflectData =>
+        detectExhaustedAWFInvocationBudget({
+          nativeTerminalRateLimitError: true,
+          env: { AWF_REFLECT_ENABLED: "1" },
+          fetchReflect: async () => ({ ok: true, reflectData }),
+        });
+      await expect(detectBudget({ runs })).resolves.toEqual({ invocationCount: 60, maxRuns: 60 });
+      await expect(detectBudget({ runs: { ...runs, invocation_count: 61 } })).resolves.toEqual({ invocationCount: 61, maxRuns: 60 });
       for (const invalid of [
         null,
         {},
@@ -881,7 +886,7 @@ process.exit(1);`;
         { runs: { ...runs, remaining_runs: 1 } },
         { runs: { enabled: true, max_runs: 60, invocation_count: 60 } },
       ]) {
-        expect(exhaustedInvocationBudget(invalid)).toBeNull();
+        await expect(detectBudget(invalid)).resolves.toBeNull();
       }
     });
 

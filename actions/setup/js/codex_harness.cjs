@@ -66,7 +66,7 @@ const {
 } = require("./awf_reflect.cjs");
 const { emitInfrastructureIncomplete, emitMissingToolPermissionIssue, hasExpectedSafeOutputs, hasTerminalSafeOutput, hasNoopInSafeOutputs } = require("./safeoutputs_cli.cjs");
 const { countPermissionDeniedIssues, hasNumerousPermissionDeniedIssues, extractDeniedCommands, buildMissingToolPermissionIssuePayload } = require("./permission_denied_helpers.cjs");
-const { detectNonRetryableHarnessGuard, buildSoftTimeoutGuard, emitSoftTimeoutSignal, isAuthenticationFailedError, parseAICreditsExceededProxyRejection } = require("./harness_retry_guard.cjs");
+const { detectNonRetryableHarnessGuard, detectExhaustedAWFInvocationBudget, buildSoftTimeoutGuard, emitSoftTimeoutSignal, isAuthenticationFailedError, parseAICreditsExceededProxyRejection } = require("./harness_retry_guard.cjs");
 const { MODEL_NOT_SUPPORTED_PATTERN: INVALID_MODEL_ERROR_PATTERN } = require("./detect_agent_errors.cjs");
 const { resolveRetryConfig } = require("./harness_retry_config.cjs");
 const { applyModelFallback, injectModelFlagAfterExec, normalizeCodexModel, normalizeCodexModelArgs } = require("./model_fallback.cjs");
@@ -276,21 +276,6 @@ function log(message) {
  */
 function isRateLimitError(output) {
   return RATE_LIMIT_ERROR_PATTERN.test(output);
-}
-
-/**
- * @param {unknown} reflectData
- * @returns {{ invocationCount: number, maxRuns: number } | null}
- */
-function exhaustedInvocationBudget(reflectData) {
-  if (!reflectData || typeof reflectData !== "object" || !("runs" in reflectData)) return null;
-  const runs = reflectData.runs;
-  if (!runs || typeof runs !== "object") return null;
-  if (!("enabled" in runs) || runs.enabled !== true || !("max_runs" in runs) || !("invocation_count" in runs) || !("remaining_runs" in runs)) return null;
-  const maxRuns = runs.max_runs;
-  const invocationCount = runs.invocation_count;
-  if (typeof maxRuns !== "number" || !Number.isSafeInteger(maxRuns) || maxRuns <= 0 || typeof invocationCount !== "number" || !Number.isSafeInteger(invocationCount) || invocationCount < maxRuns || runs.remaining_runs !== 0) return null;
-  return { invocationCount, maxRuns };
 }
 
 /**
@@ -1330,9 +1315,8 @@ async function main() {
 
       const nonRetryableGuard = detectNonRetryableHarnessGuard(result.output);
       // Codex can omit the proxy error body and expose only a generic terminal 429.
-      if (!nonRetryableGuard.maxRunsExceeded && process.env.AWF_REFLECT_ENABLED === "1" && result.nativeTerminalRateLimitError === true) {
-        const refreshed = await fetchAWFReflect({ logger: log, timeoutMs: 3000, modelsTimeoutMs: 1000 });
-        const budget = refreshed.ok ? exhaustedInvocationBudget(refreshed.reflectData) : null;
+      if (!nonRetryableGuard.maxRunsExceeded) {
+        const budget = await detectExhaustedAWFInvocationBudget({ nativeTerminalRateLimitError: result.nativeTerminalRateLimitError === true, logger: log });
         if (budget) {
           nonRetryableGuard.maxRunsExceeded = true;
           result.failureClasses.push("invocation_cap_exceeded");
@@ -1482,7 +1466,6 @@ if (typeof module !== "undefined" && module.exports) {
     buildCodexResumeArgs,
     injectJsonFlag,
     isRateLimitError,
-    exhaustedInvocationBudget,
     isTokenPerMinuteRateLimitError,
     isAuthenticationFailedError,
     isMissingApiKeyError,
