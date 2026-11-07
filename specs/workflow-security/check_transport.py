@@ -140,7 +140,7 @@ def run_case(jar, temporary, module, name, config, invariant):
 def main(model="all"):
     jar_env = os.environ.get("TLA2TOOLS_JAR")
     if not jar_env:
-        raise RuntimeError("Set TLA2TOOLS_JAR to the official v1.8.0 tla2tools.jar")
+        raise RuntimeError("Set TLA2TOOLS_JAR to the official v1.7.4 tla2tools.jar")
     jar = Path(jar_env).resolve()
     if not jar.is_file() or hashlib.sha256(jar.read_bytes()).hexdigest() != JAR_SHA256:
         raise RuntimeError("TLA2TOOLS_JAR is missing or does not match the pinned SHA-256")
