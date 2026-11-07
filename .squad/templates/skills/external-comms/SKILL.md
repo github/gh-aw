@@ -229,7 +229,7 @@ We reproduced the issue in preview builds and we're checking the regression poin
 Let us know if you can share the command you ran right before the failure.
 
 ## Post Result (post, delete actions)
-https://github.com/bradygaster/squad/issues/426#issuecomment-123456
+https://github.com/github/squad/issues/426#issuecomment-123456
 ```
 
 ### T1 — Welcome

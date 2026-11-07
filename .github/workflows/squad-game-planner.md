@@ -2,7 +2,7 @@
 private: true
 emoji: "🎮"
 name: Squad Game Planner
-description: Uses Squad (bradygaster/squad) multi-agent planning to design a new game concept daily and file the plan as tracked issues
+description: Uses Squad (github/squad) multi-agent planning to design a new game concept daily and file the plan as tracked issues
 on:
   schedule: daily
   workflow_dispatch:
@@ -54,7 +54,7 @@ pre-agent-steps:
 
 # Squad Game Planner
 
-Use the Squad (https://github.com/bradygaster/squad) team to plan a
+Use the Squad (https://github.com/github/squad) team to plan a
 brand-new, original game concept today.
 
 ## Task

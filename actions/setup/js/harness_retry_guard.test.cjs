@@ -4,10 +4,57 @@ import { describe, expect, it } from "vitest";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { detectNonRetryableHarnessGuard, buildSoftTimeoutGuard, isMaxRunsExceededError, isAuthenticationFailedError, parseAICreditsExceededProxyRejection, parseAPIProxyGuardRejection } = require("./harness_retry_guard.cjs");
+const {
+  detectNonRetryableHarnessGuard,
+  detectExhaustedAWFInvocationBudget,
+  buildSoftTimeoutGuard,
+  isMaxRunsExceededError,
+  isAuthenticationFailedError,
+  parseAICreditsExceededProxyRejection,
+  parseAPIProxyGuardRejection,
+} = require("./harness_retry_guard.cjs");
 const { parseModelEndpointMismatch, MODEL_ENDPOINT_MISMATCH_PATTERN, shouldSuppressGuardCategory } = require("./harness_error_patterns.cjs");
 
 describe("harness_retry_guard.cjs", () => {
+  describe("detectExhaustedAWFInvocationBudget", () => {
+    const options = { nativeTerminalRateLimitError: true, env: { AWF_REFLECT_ENABLED: "1" } };
+    const exhaustedReflect = {
+      ok: true,
+      reflectData: { runs: { enabled: true, max_runs: 60, invocation_count: 60, remaining_runs: 0 } },
+    };
+
+    it("confirms exhaustion only from a fresh, complete reflection", async () => {
+      const fetchReflect = async () => exhaustedReflect;
+      await expect(detectExhaustedAWFInvocationBudget({ ...options, fetchReflect })).resolves.toEqual({ invocationCount: 60, maxRuns: 60 });
+    });
+
+    it.each([
+      { ok: false, reflectData: exhaustedReflect.reflectData },
+      { ok: true, reflectData: { runs: { enabled: false, max_runs: 60, invocation_count: 60, remaining_runs: 0 } } },
+      { ok: true, reflectData: { runs: { enabled: true, max_runs: 60, invocation_count: 59, remaining_runs: 1 } } },
+      { ok: true, reflectData: { runs: { enabled: true, max_runs: 60, invocation_count: 60 } } },
+      { ok: true, reflectData: { runs: { enabled: true, max_runs: "60", invocation_count: 60, remaining_runs: 0 } } },
+    ])("preserves fallback behavior when reflection is incomplete or does not show exhaustion", async reflection => {
+      const fetchReflect = async () => reflection;
+      await expect(detectExhaustedAWFInvocationBudget({ ...options, fetchReflect })).resolves.toBeNull();
+    });
+
+    it("does not fetch reflection without a native terminal 429 or enabled AWF reflection", async () => {
+      const fetchReflect = async () => {
+        throw new Error("must not fetch");
+      };
+      await expect(detectExhaustedAWFInvocationBudget({ ...options, nativeTerminalRateLimitError: false, fetchReflect })).resolves.toBeNull();
+      await expect(detectExhaustedAWFInvocationBudget({ ...options, env: { AWF_REFLECT_ENABLED: "0" }, fetchReflect })).resolves.toBeNull();
+    });
+
+    it("preserves fallback behavior when fresh reflection throws", async () => {
+      const fetchReflect = async () => {
+        throw new Error("reflection unavailable");
+      };
+      await expect(detectExhaustedAWFInvocationBudget({ ...options, fetchReflect })).resolves.toBeNull();
+    });
+  });
+
   it.each([
     "400 Cannot translate Copilot request feature: tool_search",
     "400 Unsupported Responses custom tool: web_search",

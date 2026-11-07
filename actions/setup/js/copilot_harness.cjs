@@ -100,7 +100,14 @@ const {
 } = require("./awf_reflect.cjs");
 const { runSafeOutputsCLI, buildMissingToolAlternatives, emitMissingToolPermissionIssue, emitInfrastructureIncomplete, hasExpectedSafeOutputs, hasTerminalSafeOutput, hasNoopInSafeOutputs } = require("./safeoutputs_cli.cjs");
 const { countPermissionDeniedIssues, hasNumerousPermissionDeniedIssues, extractDeniedCommands, buildMissingToolPermissionIssuePayload } = require("./permission_denied_helpers.cjs");
-const { detectNonRetryableHarnessGuard, buildSoftTimeoutGuard, emitSoftTimeoutSignal, isAuthenticationFailedError: isCommonAuthenticationFailedError, parseAICreditsExceededProxyRejection } = require("./harness_retry_guard.cjs");
+const {
+  detectNonRetryableHarnessGuard,
+  detectExhaustedAWFInvocationBudget,
+  buildSoftTimeoutGuard,
+  emitSoftTimeoutSignal,
+  isAuthenticationFailedError: isCommonAuthenticationFailedError,
+  parseAICreditsExceededProxyRejection,
+} = require("./harness_retry_guard.cjs");
 const { isCrashSignalExitCode, crashSignalNameForExitCode } = require("./harness_crash_signals.cjs");
 const { isCAPIQuotaExceededError, isCAPIServerError } = require("./detect_agent_errors.cjs");
 const { applyModelFallback } = require("./model_fallback.cjs");
@@ -147,6 +154,7 @@ function resolveLongRunTokenThreshold(env = process.env) {
 const LONG_RUN_TOKEN_THRESHOLD = resolveLongRunTokenThreshold();
 const POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS = resolvePostResultWatchdogIdleTimeoutMs();
 const COPILOT_REQUESTS_PROXY_AUTH_403_TEMPLATE_NAME = "copilot_requests_proxy_auth_403.md";
+const NATIVE_RATE_LIMIT_ERROR_PATTERN = /\b429\b|too many requests|rate[\s_-]*limit/i;
 // Pattern to detect transient CAPIError 400 in copilot output
 const CAPI_ERROR_400_PATTERN = /CAPIError:\s*400/;
 // Pattern to detect generic HTTP 400 Bad Request responses emitted by engine CLI / SDK wrappers.
@@ -2120,6 +2128,7 @@ async function main() {
           observeStrategy(strategy);
           const safeArgs = currentArgs.map((arg, i) => (currentArgs[i - 1] === "--prompt" || currentArgs[i - 1] === "-p" ? "<redacted>" : arg));
           const modelObserver = !verifyModel ? { check: () => "" } : createCopilotModelObserver({ configuredModel: selectionConfiguredModel, resolvedModel: process.env.COPILOT_MODEL || "", sessionId, logger: log });
+          let nativeTerminalRateLimitError = false;
           // Driver mode: run copilot_sdk_driver.cjs as a normal subprocess. The harness has
           // already started the sidecar; the driver only opens an SDK client connection.
           const result = await runProcess({
@@ -2130,6 +2139,20 @@ async function main() {
             logArgs: safeArgs,
             env: childEnv,
             stdin: promptStdin,
+            onStdoutLine: line => {
+              let event;
+              try {
+                event = JSON.parse(line);
+              } catch {
+                return;
+              }
+              if (["error", "session.error", "turn.failed"].includes(event?.type) && NATIVE_RATE_LIMIT_ERROR_PATTERN.test(JSON.stringify(event))) {
+                nativeTerminalRateLimitError = true;
+              }
+            },
+            onStderrLine: line => {
+              if (NATIVE_RATE_LIMIT_ERROR_PATTERN.test(line)) nativeTerminalRateLimitError = true;
+            },
             runtimeGuard: { shouldTerminate: () => ({ terminate: Boolean(modelObserver.check()), reason: "copilot_model_verification" }) },
             postResultWatchdog: safeOutputsPath
               ? {
@@ -2153,7 +2176,7 @@ async function main() {
           detectedCopilotErrors.agenticEngineTimeout ||= attemptDetections.agenticEngineTimeout;
           detectedCopilotErrors.modelNotSupportedError ||= attemptDetections.modelNotSupportedError;
           detectedCopilotErrors.http400ResponseError ||= attemptDetections.http400ResponseError;
-          return { ...result, strategy };
+          return { ...result, strategy, nativeTerminalRateLimitError };
         },
         handleFailure: async ({ attempt, result }) => {
           if (result.runtimeGuardReason === "copilot_model_verification") {
@@ -2193,7 +2216,15 @@ async function main() {
           const hasNumerousPermissionDenied = hasNumerousPermissionDeniedIssues(result.output);
           const nonRetryableGuard = detectNonRetryableHarnessGuard(result.output);
           const isContentFiltered = isCopilotContentFilterError(result.output);
-          const isInvocationCapExceeded = nonRetryableGuard.maxRunsExceeded;
+          let isInvocationCapExceeded = nonRetryableGuard.maxRunsExceeded;
+          if (!isInvocationCapExceeded) {
+            const budget = await detectExhaustedAWFInvocationBudget({ nativeTerminalRateLimitError: result.nativeTerminalRateLimitError === true, logger: log });
+            if (budget) {
+              nonRetryableGuard.maxRunsExceeded = true;
+              isInvocationCapExceeded = true;
+              log(`attempt ${attempt + 1}: AWF shared invocation budget exhausted (${budget.invocationCount}/${budget.maxRuns}) — confirmed by fresh reflection`);
+            }
+          }
           const tokenCount = extractTokenCountFromOutput(result.output);
           const attemptDurationMs = result.durationMs ?? 0;
           const proxyAICreditsRejection = parseAICreditsExceededProxyRejection(result.output);

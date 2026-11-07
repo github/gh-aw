@@ -44,7 +44,9 @@ async function fixture(t, options = {}) {
     constructor(...args) {
       super(...(args.length ? args : [clock.time]));
     }
-    static now() { return Date.parse(clock.time); }
+    static now() {
+      return Date.parse(clock.time);
+    }
   }
   let used = 20;
   const github = {
@@ -247,8 +249,7 @@ for (const [name, options] of [
 }
 
 test("large historical failure inventory is outside recent discovery", async t => {
-  const history = Array.from({ length: 40000 }, (_, n) =>
-    run(n + 1, { created_at: "2020-01-01T00:00:00Z" }));
+  const history = Array.from({ length: 40000 }, (_, n) => run(n + 1, { created_at: "2020-01-01T00:00:00Z" }));
   const f = await fixture(t, { runs: [...history, run(40001)] });
   await f.execute();
   assert.equal(f.outputs.has_new_failures, "true");
@@ -257,8 +258,7 @@ test("large historical failure inventory is outside recent discovery", async t =
 });
 
 test("cold discovery covers one hour, not the busy preceding 24 hours", async t => {
-  const history = Array.from({ length: 1500 }, (_, n) =>
-    run(n + 1, { created_at: new Date(Date.parse(now) - 7200000).toISOString() }));
+  const history = Array.from({ length: 1500 }, (_, n) => run(n + 1, { created_at: new Date(Date.parse(now) - 7200000).toISOString() }));
   const f = await fixture(t, { runs: [...history, run(1501)] });
   await f.execute();
   const manifest = JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json")));
@@ -299,9 +299,12 @@ for (const [name, age, total] of [
 ]) {
   test(`${name} preserves an existing checkpoint and does not activate`, async t => {
     const state = {
-      version: 1, repository: "example/repo",
+      version: 1,
+      repository: "example/repo",
       checkpoint: new Date(Date.parse(now) - age).toISOString(),
-      seen: [], backlog: [], pending: [42],
+      seen: [],
+      backlog: [],
+      pending: [42],
     };
     const f = await fixture(t, { state, total });
     await assert.rejects(f.execute(), /checkpoint|scope/);
@@ -393,10 +396,14 @@ test("shared API budget interruption checkpoints a resumable evidence batch", as
 test("tracked successful completion and superseded failure drop obsolete opportunities", async t => {
   const f = await fixture(t, { runs: [run(42), run(43, { status: "queued", conclusion: null })] });
   await f.execute();
-  f.runs.forEach(r => Object.assign(r, {
-    created_at: "2020-01-01T00:00:00Z", run_attempt: 2,
-    status: "completed", conclusion: "success",
-  }));
+  f.runs.forEach(r =>
+    Object.assign(r, {
+      created_at: "2020-01-01T00:00:00Z",
+      run_attempt: 2,
+      status: "completed",
+      conclusion: "success",
+    })
+  );
   await f.execute();
   assert.equal(f.outputs.has_new_failures, "false");
   const state = JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json")));
