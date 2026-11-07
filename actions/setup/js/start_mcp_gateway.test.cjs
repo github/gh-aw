@@ -3,7 +3,7 @@ import os from "os";
 import path from "path";
 import http from "http";
 import { createRequire } from "node:module";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import vm from "node:vm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -348,6 +348,12 @@ describe("MCP transported-data startup rejection", () => {
 });
 
 describe.each(["agenticworkflows", "safeoutputs"])("%s backend ownership", name => {
+  it.each([0, 31, 123, 1001])("preserves the numeric primary GID %s and configured supplementary group access", gid => {
+    const backend = { container: "example/server", args: ["--group-add", "1005"] };
+    applyBuiltinMCPRunnerIdentity({ mcpServers: { [name]: backend } }, 2001, gid);
+    expect(backend.args).toEqual(["--group-add", "1005", "--user", `2001:${gid}`]);
+  });
+
   it.each(["localhost/gh-aw:dev", "alpine:3.24"])("uses the runner identity without widening private artifact modes (%s)", container => {
     const env = { GITHUB_TOKEN: "${GITHUB_TOKEN}", GITHUB_ACTOR: "${GITHUB_ACTOR}" };
     const backend = { container, args: ["--network", "host", "-w", "/workspace"], env };
@@ -422,13 +428,130 @@ describe.each(["agenticworkflows", "safeoutputs"])("%s backend ownership", name 
 });
 
 describe("safeoutputs asset ownership", () => {
-  it("publishes the runner identity and writable HOME before launching the gateway", async () => {
+  it.skipIf(process.platform !== "linux" || process.env.GH_AW_TEST_MCP_DOCKER !== "1")(
+    "mcpg launches safeoutputs with UID >1000/GID 31 and reads runner-owned 0600 inputs without sudo",
+    async () => {
+      const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "safeoutputs-mcpg-")));
+      const uid = process.geteuid();
+      const gid = 31;
+      expect(uid).toBeGreaterThan(1000);
+      const name = path.basename(directory);
+      const pins = JSON.parse(fs.readFileSync(new URL("../../../.github/aw/actions-lock.json", import.meta.url), "utf8")).containers;
+      const nodeImage = pins["ghcr.io/github/gh-aw-node"].pinned_image;
+      const versionConstants = fs.readFileSync(new URL("../../../pkg/constants/version_constants.go", import.meta.url), "utf8");
+      const gatewayVersion = versionConstants.match(/^const DefaultMCPGatewayVersion Version = "([^"]+)"/m)?.[1];
+      expect(gatewayVersion).toBeDefined();
+      const gatewayImage = pins[`ghcr.io/github/gh-aw-mcpg:${gatewayVersion}`].pinned_image;
+      const configPath = path.join(directory, "config.json");
+      const toolsPath = path.join(directory, "tools.json");
+      const outputPath = path.join(directory, "output.json");
+      const scriptPath = path.join(directory, "backend.cjs");
+      fs.writeFileSync(configPath, '{"private":true}', { mode: 0o600 });
+      fs.writeFileSync(toolsPath, "[]", { mode: 0o600 });
+      fs.writeFileSync(
+        scriptPath,
+        `const fs = require("fs");
+const readline = require("readline");
+const config = JSON.parse(fs.readFileSync(process.argv[2]));
+const tools = JSON.parse(fs.readFileSync(process.argv[3]));
+fs.writeFileSync(process.argv[4], JSON.stringify({ uid: process.geteuid(), gid: process.getegid(), config, tools }), { mode: 0o600 });
+readline.createInterface({ input: process.stdin }).on("line", line => {
+  const request = JSON.parse(line);
+  if (request.id === undefined) return;
+  const result = request.method === "initialize"
+    ? { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "safeoutputs-test", version: "1" } }
+    : { tools: [] };
+  console.log(JSON.stringify({ jsonrpc: "2.0", id: request.id, result }));
+});`,
+        { mode: 0o600 }
+      );
+      const backend = {
+        container: nodeImage,
+        mounts: [`${directory}:${directory}:rw`],
+        args: ["--network", "none", "--name", `${name}-backend`],
+        entrypoint: "node",
+        entrypointArgs: [scriptPath, configPath, toolsPath, outputPath],
+      };
+      const config = { gateway: { port: 8080, domain: "localhost", agentId: "test-agent" }, mcpServers: { safeoutputs: backend } };
+      applyBuiltinMCPRunnerIdentity(config, uid, gid);
+      const socket = "/var/run/docker.sock";
+      const dockerArgs = ["--host", `unix://${socket}`];
+      const docker = args => execFileSync("docker", [...dockerArgs, ...args], { timeout: 30000, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+      let gateway;
+      try {
+        docker(["run", "--rm", "--network", "none", "-v", `${directory}:${directory}:rw`, "--entrypoint", "chown", nodeImage, "-R", `${uid}:${gid}`, directory]);
+        gateway = spawn("docker", [
+          ...dockerArgs,
+          "run",
+          "--rm",
+          "-i",
+          "--name",
+          name,
+          "--network",
+          "none",
+          "--user",
+          `${uid}:${gid}`,
+          "--group-add",
+          String(fs.statSync(socket).gid),
+          "-v",
+          `${socket}:${socket}`,
+          "-e",
+          "MCP_GATEWAY_PORT=8080",
+          "-e",
+          "MCP_GATEWAY_DOMAIN=localhost",
+          "-e",
+          "MCP_GATEWAY_AGENT_ID=test-agent",
+          gatewayImage,
+          "--config-stdin",
+        ]);
+        let stderr = "";
+        gateway.stderr.on("data", data => {
+          stderr += data;
+        });
+        await new Promise((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error(`Gateway startup timed out: ${stderr}`)), 30000);
+          gateway.once("error", error => {
+            clearTimeout(timer);
+            reject(error);
+          });
+          gateway.once("exit", code => {
+            clearTimeout(timer);
+            reject(new Error(`Gateway exited (${code}): ${stderr}`));
+          });
+          gateway.stdout.on("data", data => {
+            if (data.toString().includes('"safeoutputs"')) {
+              clearTimeout(timer);
+              resolve();
+            }
+          });
+          gateway.stdin.end(JSON.stringify(config));
+        });
+        expect(docker(["inspect", `${name}-backend`, "--format", "{{.Config.User}}"]).trim()).toBe(`${uid}:${gid}`);
+        expect(JSON.parse(fs.readFileSync(outputPath, "utf8"))).toEqual({ uid, gid, config: { private: true }, tools: [] });
+        for (const file of [configPath, toolsPath, outputPath]) {
+          const stat = fs.statSync(file);
+          expect(stat.uid).toBe(uid);
+          expect(stat.gid).toBe(gid);
+          expect(stat.mode & 0o777).toBe(0o600);
+        }
+      } finally {
+        for (const container of [name, `${name}-backend`]) {
+          try {
+            docker(["rm", "-f", container]);
+          } catch {}
+        }
+        gateway?.kill();
+        fs.rmSync(directory, { recursive: true, force: true });
+      }
+    },
+    90000
+  );
+
+  it.each(["copilot", "codex", "claude", "gemini", "pi"])("publishes the runner identity before launching the gateway for %s", async engine => {
     const require = createRequire(import.meta.url);
     const core = { info: vi.fn(), warning: vi.fn(), error: vi.fn(), setFailed: vi.fn() };
     const spawn = vi.fn();
-    const writeMcpConfiguration = vi.fn(() => {
-      throw new Error("stop before gateway launch");
-    });
+    const writeMcpConfiguration = vi.fn();
     const config = {
       gateway: { port: 8080, domain: "localhost", agentId: "test-agent" },
       mcpServers: {
@@ -440,35 +563,60 @@ describe("safeoutputs asset ownership", () => {
         readFileSync: vi.fn(() => Buffer.from(JSON.stringify(config))),
         mkdirSync: vi.fn(),
         chmodSync: vi.fn(),
+        statSync: vi.fn(() => ({ size: 1 })),
+        existsSync: vi.fn(() => false),
+        unlinkSync: vi.fn(),
       },
-      child_process: { spawn, execSync: vi.fn() },
+      child_process: {
+        spawn,
+        execSync: vi.fn(),
+        execFileSync: vi.fn(() => {
+          throw new Error("converter reached");
+        }),
+      },
       "./shim.cjs": {},
       "./symlink_guard.cjs": { lstatGuard: vi.fn(() => ({})) },
       "./mcp_configuration.cjs": { writeMcpConfiguration },
     };
     const source = fs.readFileSync(new URL("./start_mcp_gateway.cjs", import.meta.url), "utf8");
-    await vm.runInNewContext(`${source}\nmain().catch(err => core.setFailed(err.message));`, {
+    const overrides = `
+      startGatewayWithRetry = async () => ({ gatewayPid: 123, stderrPath: "/tmp/gateway.stderr" });
+      sleep = async () => {};
+      isProcessAlive = () => true;
+      httpGet = async () => ({ statusCode: 200, body: "ok" });
+      waitForSafeOutputsReadiness = async () => {};
+      writeGatewayStartupMarker = () => {};
+      main().catch(err => core.setFailed(err.message));
+    `;
+    await vm.runInNewContext(`${source}\n${overrides}`, {
       require: id => mocks[id] || require(id),
       module: { exports: {} },
       process: {
         env: {
+          GH_AW_ENGINE: engine,
           RUNNER_TEMP: "/tmp/test-runner",
           GITHUB_WORKSPACE: "/workspace",
+          MCP_GATEWAY_AGENT_ID: "test-agent",
+          MCP_GATEWAY_PORT: "8080",
+          MCP_GATEWAY_DOMAIN: "localhost",
           MCP_GATEWAY_DOCKER_COMMAND: "docker run --rm -i --network host gateway:latest --config-stdin",
         },
-        getuid: () => 1001,
-        getgid: () => 123,
+        geteuid: () => 2001,
+        getegid: () => 31,
         umask: vi.fn(),
         on: vi.fn(),
+        kill: vi.fn(),
       },
       core,
     });
     expect(writeMcpConfiguration).toHaveBeenCalledOnce();
     expect(writeMcpConfiguration.mock.calls[0][1].mcpServers.safeoutputs).toMatchObject({
-      args: ["-w", "${GITHUB_WORKSPACE}", "--user", "1001:123"],
+      args: ["-w", "${GITHUB_WORKSPACE}", "--user", "2001:31"],
       env: { HOME: "/tmp", RUNNER_TEMP: "${RUNNER_TEMP}" },
     });
-    expect(core.setFailed).toHaveBeenCalledExactlyOnceWith("stop before gateway launch");
+    expect(core.info).toHaveBeenCalledWith(`Detected engine type: ${engine}`);
+    expect(mocks.child_process.execFileSync).toHaveBeenCalledWith("node", [expect.stringContaining(`convert_gateway_config_${engine}.cjs`)], expect.any(Object));
+    expect(core.setFailed).toHaveBeenCalledExactlyOnceWith(expect.stringContaining("converter reached"));
     expect(spawn).not.toHaveBeenCalled();
   });
 

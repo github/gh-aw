@@ -36,7 +36,7 @@ function classifySafeOutputResult(result) {
   // A skipped operation did not apply a mutation, even when it carries a warning.
   if (pickOutcomeField(result, "skipped")) return "skipped";
   if (pickOutcomeField(result, "warning")) return "warning";
-  if (pickOutcomeField(result, "success")) return "success";
+  if (pickOutcomeField(result, "success")) return pickOutcomeField(result, "deferred_manifest") ? "deferred" : "success";
   return "failed";
 }
 

@@ -37,7 +37,33 @@ Self-hosted runners may require `sudo` depending on the selected engine and conf
 
 - **AWF (Agentic Workflow Firewall)**: Runs rootless in the default network-isolation mode. Egress is enforced via Docker network topology — an internal Docker network (`awf-net`) with no internet route and a dual-homed Squid proxy as the sole egress path. No `sudo` and no `NET_ADMIN` are required on the runner for AWF in this mode. Container-level `iptables`, Squid proxy ACLs, and capability drops provide defense in depth, all managed inside the Docker daemon's domain.
 
-- **Copilot CLI install**: The `install_copilot_cli.sh` script runs as the runner user. By default it escalates via `sudo` for file operations (fixing `.copilot` directory ownership, cleaning stale chroot directories, and installing the Copilot binary to `/usr/local/bin`). Pass `--rootless` to the script to install to `~/.local/bin` without `sudo`, which is required on ARC pods with `allowPrivilegeEscalation: false`.
+- **Copilot CLI and threat-detect installation**: Root and passwordless-sudo runners install these binaries to `/usr/local/bin`. Rootless installation uses the job-scoped `$RUNNER_TEMP/gh-aw/bin` directory without `sudo`.
+
+### Unprivileged CLI installation
+
+Set `runner.installation: rootless` for a native Linux runner without `sudo` or write access to `/usr/local/bin`:
+
+```aw
+---
+on: issues
+runs-on: linux64-selfhosted
+runner:
+  installation: rootless
+---
+Triage this issue.
+```
+
+This setting applies to the generated Copilot CLI and threat-detect installers in the agent and detection jobs, including when `safe-outputs.threat-detection.runs-on` selects a different runner. Rootless installs use `$RUNNER_TEMP/gh-aw/bin`, a job-scoped directory that AWF mounts read-only, and publish it through `GITHUB_PATH`. This protects host-executed binaries from sandbox changes. The directory must be writable during setup. External threat detection stages the verified detector there so the sandbox can resolve it independently of its home directory. Release pins, checksum verification, HTTPS requirements, platform checks, and Copilot's trusted toolcache policy remain unchanged.
+
+Omitting `runner.installation` preserves the existing defaults. Explicit `privileged` selects the native sudo-based installation and is rejected with `runner.topology: arc-dind`.
+
+Installation privilege does not change AWF runtime privileges or enable split-filesystem handling. Leave `runner.topology` unset for a native runner; use `arc-dind` only for a split runner/daemon filesystem. Other engines, custom steps, and privileged runtime profiles may still require `sudo`. Recompile with `gh aw compile` after changing the setting; do not edit the generated lock file.
+
+When `runner.installation` is omitted, native installers automatically choose rootless mode if the runner is neither root nor able to run `sudo -n true`; root and passwordless-sudo runners retain privileged installation. ARC/DinD explicitly selects rootless mode even when sudo is available.
+
+`engine.command` skips standard Copilot installation only for the primary agent. External Copilot threat detection still installs and uses the standard `copilot` executable; it does not run the primary agent's custom command. A preinstalled executable on `PATH` does not skip either installer or its privilege checks.
+
+Rootless installation cannot repair root-owned state from previous privileged AWF runs. If preparing `~/.copilot` fails, installation stops with an ownership-repair diagnostic. Before retrying, a runner administrator must restore ownership of that directory and its contents to the runner's UID and GID and make it writable. Failed cleanup of stale `/tmp/awf-*-chroot-home` or `/tmp/awf-chroot-*` directories emits a warning and does not stop installation; an administrator must remove those stale directories before the runner is reused.
 
 ## Runner HTTP proxy settings
 
@@ -460,4 +486,4 @@ The dind sidecar requires `privileged: true` so `dockerd` can run. The runner co
 In network-isolation mode (the default for `topology: arc-dind`), AWF enforces egress via Docker network topology — an internal Docker network with no internet route and a dual-homed Squid proxy. All network enforcement happens inside the Docker daemon's domain (the dind sidecar). The runner container only issues Docker API commands via the socket; it never manipulates host `iptables` or network namespaces.
 
 > [!NOTE]
-> If your cluster enforces `allowPrivilegeEscalation: false` or `no-new-privileges` on the runner container, pass `--rootless` to the Copilot CLI install script so it installs to `~/.local/bin` without `sudo`. See [Pod security and rootless install](/gh-aw/reference/arc-dind-copilot-agent/#pod-security-and-rootless-install) in the ARC DinD guide.
+> If your cluster enforces `allowPrivilegeEscalation: false` or `no-new-privileges` on the runner container, pass `--rootless` to the Copilot CLI install script so it installs to `$RUNNER_TEMP/gh-aw/bin` without `sudo`. See [Pod security and rootless install](/gh-aw/reference/arc-dind-copilot-agent/#pod-security-and-rootless-install) in the ARC DinD guide.

@@ -30,9 +30,10 @@ func TestInstallCopilotCLIReleaseAgeRequiresJQ(t *testing.T) {
 		t.Run(version, func(t *testing.T) {
 			dir := t.TempDir()
 			binDir := filepath.Join(dir, "bin")
+			runnerTemp := filepath.Join(dir, "runner-temp")
 			prepareCopilotInstallerTestBin(t, binDir)
 			// Restrict PATH to installer prerequisites, deliberately excluding jq.
-			for _, name := range []string{"bash", "dirname", "mkdir", "id", "mktemp", "rm", "chown"} {
+			for _, name := range []string{"bash", "dirname", "mkdir", "id", "mktemp", "stat", "rm"} {
 				path, err := exec.LookPath(name)
 				require.NoError(t, err)
 				require.NoError(t, os.Symlink(path, filepath.Join(binDir, name)))
@@ -44,14 +45,14 @@ exit 97
 `), 0o755))
 			cmd := exec.Command(bash, installer, version, "--rootless", "--cooldown-days", "3")
 			cmd.Env = append(os.Environ(), "HOME="+dir, "PATH="+binDir,
-				"TMPDIR="+dir, "CURL_LOG="+logPath, "GITHUB_TOKEN=test-token")
+				"TMPDIR="+dir, "RUNNER_TEMP="+runnerTemp, "CURL_LOG="+logPath, "GITHUB_TOKEN=test-token")
 			output, err := cmd.CombinedOutput()
 			require.Error(t, err, "%s", output)
 			assert.Contains(t, string(output), "jq is required for Copilot release-age validation")
 			assert.Contains(t, string(output), "Install jq from https://jqlang.github.io/jq/download/")
 			assert.NotContains(t, string(output), "release metadata is invalid")
 			assert.NoFileExists(t, logPath, "missing jq must fail before fetching metadata")
-			assert.NoFileExists(t, filepath.Join(dir, ".local", "bin", "copilot"))
+			assert.NoFileExists(t, filepath.Join(runnerTemp, "gh-aw", "bin", "copilot"))
 		})
 	}
 }
@@ -132,6 +133,7 @@ func TestInstallCopilotCLIReleaseAgeCooldown(t *testing.T) {
 case "$1" in "$RUNNER_TOOL_CACHE"/*) exec /usr/bin/find "$@" ;; *) exit 0 ;; esac
 `), 0o755))
 			require.NoError(t, os.WriteFile(filepath.Join(binDir, "sudo"), []byte(`#!/usr/bin/env bash
+if [ "${1:-}" = -n ]; then shift; fi
 if [ "${1:-}" = chown ]; then exit 0; fi
 exec "$@"
 `), 0o755))
@@ -164,6 +166,8 @@ esac
 			logPath := filepath.Join(dir, "curl.log")
 			installDir := filepath.Join(dir, "installed")
 			require.NoError(t, os.MkdirAll(installDir, 0o755))
+			runnerTemp := filepath.Join(dir, "runner-temp")
+			require.NoError(t, os.MkdirAll(runnerTemp, 0o700))
 			args := []string{installerPath, test.version, "--cooldown-days", test.days}
 			if test.cached {
 				args = append(args, "--checksums-sha256", pin, "--prefer-toolcache")
@@ -171,7 +175,7 @@ esac
 			cmd := exec.Command("bash", args...)
 			cmd.Env = append(os.Environ(),
 				"HOME="+dir, "RUNNER_TOOL_CACHE="+cache,
-				"RUNNER_TEMP="+filepath.Join(dir, "runner-temp"),
+				"RUNNER_TEMP="+runnerTemp,
 				"COPILOT_INSTALL_DIR="+installDir, "GITHUB_PATH="+filepath.Join(dir, "github-path"),
 				"PATH="+binDir+":"+os.Getenv("PATH"), "CURL_LOG="+logPath,
 				"MOCK_RELEASE="+metadataPath, "MOCK_MANIFEST="+manifestPath, "MOCK_ARCHIVE="+archivePath,
