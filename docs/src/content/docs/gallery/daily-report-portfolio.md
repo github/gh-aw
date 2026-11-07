@@ -81,6 +81,17 @@ DeepReport keeps its original title-deduplication contract for admitted reports.
 Adding label-scoped deduplication changes which auxiliary issues can be created,
 so it changes the authority contract even when the labels themselves are unchanged.
 
+For a read-only inventory of unfinished DeepReport Work, run:
+
+```bash
+gh aw work-queue --repo OWNER/REPO state --pool daily-reports --search deep-report
+```
+
+Review the available and claimed rows, then inspect each with
+`gh aw work-queue --repo OWNER/REPO inspect --work-id ID`. This identifies the
+contract-specific routes needed; it does not settle Work or require pausing
+admissions.
+
 Protected producer/dispatcher processing automatically installs contract-specific
 routes when adopting a verified default revision. The default route serves new
 admissions and compatible Work. For each different contract still needed by

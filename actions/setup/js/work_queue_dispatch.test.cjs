@@ -74,14 +74,17 @@ function setupPoolInstallation(newWorker = false) {
     options.config.aw_context_workflows.push("smoke-work-queue-worker");
   }
   const contents = `on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\nenv:\n  GH_AW_WORK_QUEUE_CONTRACT: "${"a".repeat(64)}"\n`;
-  fixture.githubClient.rest.repos.getContent = vi.fn(async ({ path: workflowPath }) => ({
-    data: {
-      type: "file",
-      path: workflowPath,
-      encoding: "base64",
-      content: Buffer.from(workflowPath.endsWith(".md") ? "---\ntools:\n  work-queue:\n    worker: true\n---\nWorker.\n" : contents).toString("base64"),
-    },
-  }));
+  fixture.githubClient.rest.repos.getContent = vi.fn(async ({ path: workflowPath }) => {
+    if (workflowPath === ".github/aw/work-queue-contract-routes.json") throw Object.assign(new Error("no bridge approval"), { status: 404 });
+    return {
+      data: {
+        type: "file",
+        path: workflowPath,
+        encoding: "base64",
+        content: Buffer.from(workflowPath.endsWith(".md") ? "---\ntools:\n  work-queue:\n    worker: true\n---\nWorker.\n" : contents).toString("base64"),
+      },
+    };
+  });
   fixture.githubClient.rest.repos.get = async () => ({ status: 200, data: { full_name: REPOSITORY, id: 7, default_branch: "main", permissions: { push: true } } });
   const getRef = fixture.githubClient.rest.git.getRef;
   fixture.githubClient.rest.git.getRef = async parameters => (parameters.ref === "heads/main" ? { data: { ref: "refs/heads/main", object: { type: "commit", sha: REF } } } : getRef(parameters));
@@ -2052,6 +2055,7 @@ describe("native queue launch fencing and conservative recovery", () => {
       fixture.githubClient.rest.repos.get = vi.fn(async () => ({ data: { full_name: REPOSITORY, default_branch: "main" } }));
       fixture.githubClient.rest.git.getRef = vi.fn(async () => ({ data: { ref: "refs/heads/main", object: { sha: "b".repeat(40) } } }));
       fixture.githubClient.rest.repos.getContent = vi.fn(async ({ path: workflowPath }) => {
+        if (workflowPath === ".github/aw/work-queue-contract-routes.json") throw Object.assign(new Error("no bridge approval"), { status: 404 });
         const contents = workflowPath.endsWith(".md") ? "---\ntools:\n  work-queue:\n    worker: true\n---\nApproved worker.\n" : workerContents.replace("a".repeat(64), "b".repeat(64));
         return { data: { type: "file", path: workflowPath, encoding: "base64", content: Buffer.from(contents).toString("base64") } };
       });
@@ -2624,7 +2628,10 @@ describe("native queue launch fencing and conservative recovery", () => {
     fixture.githubClient.rest.git.getRef = async parameters => (parameters.ref === "heads/main" ? { data: { ref: "refs/heads/main", object: { sha: REF } } } : reference(parameters));
     const source = "---\ntools:\n  work-queue:\n    worker: true\n---\nExecute approved instructions.\n";
     const lock = `on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\nenv:\n  GH_AW_WORK_QUEUE_CONTRACT: "${contract}"\n`;
-    fixture.githubClient.rest.repos.getContent = async ({ path }) => ({ data: { type: "file", path, encoding: "base64", content: Buffer.from(path.endsWith(".md") ? source : lock).toString("base64") } });
+    fixture.githubClient.rest.repos.getContent = async ({ path }) => {
+      if (path === ".github/aw/work-queue-contract-routes.json") throw Object.assign(new Error("no bridge approval"), { status: 404 });
+      return { data: { type: "file", path, encoding: "base64", content: Buffer.from(path.endsWith(".md") ? source : lock).toString("base64") } };
+    };
     fixture.githubClient.rest.actions.getWorkflow = async () => ({ data: { path: ".github/workflows/worker.lock.yml", state: "active" } });
     const runs = new Map();
     post.mockImplementation(async parameters => {

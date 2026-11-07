@@ -31,17 +31,15 @@ tools:
     worker: true
 ```
 
-Dispatchers require `tools.work-queue: true`, worker allowlist, bounded
-`dispatch-workflow.max`. Approved AW routes/credentials bind Claims to immutable
-native runs; ignore moved `target-ref`.
+Dispatchers require `tools.work-queue: true`, worker allowlist and bounded
+`dispatch-workflow.max`. AW routes/credentials bind Claims to immutable runs;
+ignore moved `target-ref`.
 
-`aw.json` `work_queue`: concurrency, pending limits, retries, pools, fairness,
-Issues. Defaults: weighted-priority, concurrency 16,
-pending 4,096, singleton assignments, three attempts, 30-second backoff.
-Submission initializes Policy/Work. Trusted submit/dispatch install pools/profiles;
-workers, observers, previews and accepted-request recovery never install.
-New workers require default-revision
-AW source/contract verification and active registration.
+`aw.json` `work_queue` configures concurrency, pending limits, retries, pools,
+fairness and Issues. Defaults: weighted-priority, concurrency 16, pending 4,096,
+singleton assignments, three attempts, 30-second backoff. Submission initializes
+Policy/Work; only trusted submit/dispatch install pools/profiles. New workers require
+default-revision AW source/contract verification and active registration.
 `PoolInstall.config_ref` records provenance, not authority.
 Preserve installed profiles/limits/epoch.
 Standalone seeding is unsupported; AW/Actions authorize submissions.
@@ -51,33 +49,25 @@ Compatible deployments need no drain. Never expose queue-write credentials to
 agents/snapshot MCP. Repository access rules are GitHub's responsibility.
 See [deployment](../../docs/src/content/docs/patterns/workqueue-ops.md#deploy-a-native-queue).
 
-Protected deployment synchronization automatically retains exact contract routes
-for differently admitted available/claimed Work. It selects the exact bridge
-approved at the immutable default ref in `.github/aw/work-queue-contract-routes.json`,
-rechecks its source/stamp/registration and both reader digests,
-and publishes bridge registration, route and availability together. No manual admission pause or ordering
-is needed. Pins and frozen Claims never change; unavailable retained routes pause
-only affected Work without older fallback. Upgrade closed-schema readers before
-adopting `Deployment.contract_routes`. Observer reads never install routes.
-Migration verifies all available defaults, runnable pins and unreleased assignment
-readers before publication. An incompatible immutable pin or active assignment
-blocks the transition; never rewrite it or replay effects.
+Protected synchronization selects the exact immutable bridge approved in
+`.github/aw/work-queue-contract-routes.json` for differently admitted available or
+claimed Work. It verifies source, stamp, registration and reader digests before
+publishing registration, routes and availability atomically. No pause, ordering or
+manual settlement is needed. Pins and Claims stay frozen; unavailable routes pause
+affected Work without fallback. Upgrade closed-schema readers before adopting
+`Deployment.contract_routes`; observer reads never install routes. All available
+defaults, runnable pins and unreleased assignments must load approved readers.
+Incompatible immutable pins or assignments block publication; never rewrite or
+replay effects.
 
 ## Mirror admitted Work with Issues
 
-`aw.json` `work_queue.issues: true` mirrors admitted Work with purple `work` /
-`work:<status>` labels. `label` customizes both prefixes; `title_prefix` defaults
-to `[work queue]`. Titles/summaries show 12-character Work IDs; bodies use full IDs.
-No per-workflow overrides. Only protected AW hooks project admissions/original Claims.
-Immutable `backing_issue` binds one Work per Issue. Agents never write
-mirrors; human edits never establish Result. Pre-existing Issues require exact
-installed `backing_issues` grants. Only trusted admission-time `completion_policy`
-permits closure, never payload. Keep uncertain writes pending; never recreate or
-globally repair. Maintenance: exact-run sync; recovery: `work-queue sync-issues --request-id ID`.
-Upgrade closed-schema readers. See
+Set `aw.json work_queue.issues: true` to mirror trusted admissions and original
+Claims to Issues. Immutable `backing_issue` binds one Work per Issue; human edits
+never establish Results. Only admission-time `completion_policy` permits closure.
+Keep uncertain writes pending; never recreate or globally repair. Use exact-run
+sync or `work-queue sync-issues --request-id ID`; see the
 [backing Issue reference](../../docs/src/content/docs/reference/work-queue.md#backing-issues).
-Mirroring generates `.github/workflows/agentic-workqueue.yml` for Issue lifecycle
-events; disabling removes it.
 
 ## Plan and dispatch
 
@@ -133,21 +123,18 @@ Retries/checkpoints preserve submission identity; never delete queues to retry a
 
 ## Load details only when needed
 
-- Operator commands, TUI and diagnostic artifacts:
-  [queue reference](../../docs/src/content/docs/reference/work-queue.md).
-  Cancellation terminates Work, not workers; reconcile separately.
-  `gh aw work-queue --repo OWNER/REPO stats --json`. `dispatch-next` grants
-  reservations, never launches; use the authorized dispatcher.
-- Destructive: `gh aw work-queue clear --reason CODE [--dry-run | --hard]`
-  requires repo maintain/admin, forbids CI, and requires interactive confirmation
-  of the exact snapshot preview; no bypass. `--hard` replaces the ledger,
-  forgetting Work/Claim identities, retry history and fairness debt. Admission/grants
-  must already be paused, without open Claims/pending deliveries.
-  See [hard reset](../../docs/src/content/docs/reference/work-queue.md#hard-reset).
+- Commands/TUI/diagnostics: [queue reference](../../docs/src/content/docs/reference/work-queue.md).
+  Cancellation ends Work, not workers; reconcile. `stats --json`
+  reads state; `dispatch-next` only grants reservations.
+- Destructive reset: `gh aw work-queue clear --reason CODE [--dry-run | --hard]`
+  requires repo maintain/admin, forbids CI and confirms the snapshot preview.
+  `--hard` forgets Work/Claim identities, retry history and fairness debt. Pause
+  admissions/grants and clear Claims/pending deliveries first. See
+  [hard reset](../../docs/src/content/docs/reference/work-queue.md#hard-reset).
 - Daily report rotation and Claims:
   [portfolio example](../../docs/src/content/docs/gallery/daily-report-portfolio.md)
   and [shared worker instructions](../workflows/shared/daily-report-worker.md).
 - Contracts: [specification](../../docs/src/content/docs/specs/work-queue-specification.md#91-implementation-coverage-and-remaining-requirements).
 - Models/fixtures/bounded verification: [formal reference](../../specs/work-queue/README.md).
 
-Tests prove neither Result nor live deployment.
+Tests cannot verify live Results/deployments.

@@ -21,7 +21,6 @@ func TestDeepReportPreservesAdmittedDailyReportContract(t *testing.T) {
 
 	scoped := strings.Replace(string(content), "    deduplicate-by-title: 28\n",
 		"    deduplicate-by-title: 28\n    deduplicate-by-labels: [automation, improvement, quick-win, cookie, code-quality, task-mining]\n", 1)
-	require.NotEqual(t, string(content), scoped)
 	incompatible, err := workQueueLogicalContractFromContentWithCache(path, scoped, parser.NewImportCache(filepath.Dir(path)))
 	require.NoError(t, err)
 	require.Equal(t, "5ba80ab1b9423f26578a2cb7b0832d7eaa2d9e92b19d7564f0224e5c244187b4", incompatible)

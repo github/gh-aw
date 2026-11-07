@@ -54,6 +54,7 @@ function installFactoryNativeAPI(fake, fixture) {
   const workerFiles = ESLINT_WORKERS.flatMap(profile => [`.github/workflows/${profile}.md`, `.github/workflows/${profile}.lock.yml`]);
   fake.githubClient.rest.repos.getContent = async ({ path: filename, ref }) => {
     assert.ok([REF, fake.state.defaultRevision].includes(ref));
+    if (filename === ".github/aw/work-queue-contract-routes.json") throw Object.assign(new Error("no bridge approval"), { status: 404 });
     assert.ok(workerFiles.includes(filename));
     fileReads.push(filename);
     const content = fs.readFileSync(path.resolve(__dirname, "../../..", filename));
