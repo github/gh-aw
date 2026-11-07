@@ -3,12 +3,41 @@
 "use strict";
 
 const { emitInfrastructureIncomplete } = require("./safeoutputs_cli.cjs");
+const { fetchAWFReflect } = require("./awf_reflect.cjs");
 
 // Stop retrying this long before the step hard timeout so the harness can emit
 // structured safe-output diagnostics instead of being terminated by Actions.
 const SOFT_TIMEOUT_BUFFER_MS = 90 * 1000;
 
 const errorPatterns = require("./harness_error_patterns.cjs");
+
+/**
+ * Validate a fresh AWF reflection before treating a native terminal 429 as an
+ * exhausted shared invocation budget. Missing or malformed evidence preserves
+ * the engine's existing retry policy.
+ * @param {{
+ *   nativeTerminalRateLimitError: boolean,
+ *   env?: NodeJS.ProcessEnv,
+ *   fetchReflect?: typeof fetchAWFReflect,
+ *   logger?: (message: string) => void,
+ * }} options
+ * @returns {Promise<{ invocationCount: number, maxRuns: number } | null>}
+ */
+async function detectExhaustedAWFInvocationBudget({ nativeTerminalRateLimitError, env = process.env, fetchReflect = fetchAWFReflect, logger = () => {} }) {
+  if (!nativeTerminalRateLimitError || env.AWF_REFLECT_ENABLED !== "1") return null;
+  try {
+    const refreshed = await fetchReflect({ logger, timeoutMs: 3000, modelsTimeoutMs: 1000 });
+    if (!refreshed.ok) return null;
+    const runs = refreshed.reflectData?.runs;
+    if (!runs || typeof runs !== "object" || Array.isArray(runs) || runs.enabled !== true) return null;
+    const invocationCount = runs.invocation_count;
+    const maxRuns = runs.max_runs;
+    if (typeof maxRuns !== "number" || !Number.isSafeInteger(maxRuns) || maxRuns <= 0 || typeof invocationCount !== "number" || !Number.isSafeInteger(invocationCount) || invocationCount < maxRuns || runs.remaining_runs !== 0) return null;
+    return { invocationCount, maxRuns };
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Compute a soft timeout deadline for the harness based on GH_AW_TIMEOUT_MINUTES.
@@ -44,6 +73,7 @@ if (typeof module !== "undefined" && module.exports) {
     ...errorPatterns,
     SOFT_TIMEOUT_BUFFER_MS,
     buildSoftTimeoutGuard,
+    detectExhaustedAWFInvocationBudget,
     emitSoftTimeoutSignal,
   };
 }

@@ -82,6 +82,7 @@ const REFLECT_PROVIDER_ANTHROPIC = "anthropic";
 /**
  * @typedef {{
  *   endpoints?: ReflectEndpoint[],
+ *   runs?: { enabled?: boolean, max_runs?: number, invocation_count?: number, remaining_runs?: number },
  *   routing?: {
  *     status?: string,
  *     failure_code?: string,

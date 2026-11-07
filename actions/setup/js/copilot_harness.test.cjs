@@ -246,6 +246,53 @@ describe("copilot_harness.cjs", () => {
     }
   });
 
+  it("stops a native terminal 429 when fresh AWF reflection confirms the shared invocation cap", () => {
+    const directory = makeHarnessTempDir("copilot-invocation-cap-");
+    const stubPath = path.join(directory, "stub.cjs");
+    const preloadPath = path.join(directory, "reflect-fixture.cjs");
+    const awfConfigPath = path.join(directory, "awf-config.json");
+    const callsPath = path.join(directory, "calls.jsonl");
+    const reflectData = { runs: { enabled: true, max_runs: 60, invocation_count: 60, remaining_runs: 0 } };
+    fs.writeFileSync(preloadPath, `require(${JSON.stringify(require.resolve("./awf_reflect.cjs"))}).fetchAWFReflect = async () => ({ ok: true, reflectData: ${JSON.stringify(reflectData)} });`);
+    fs.writeFileSync(awfConfigPath, "{}");
+    fs.writeFileSync(
+      stubPath,
+      `
+      const fs = require("fs");
+      fs.appendFileSync(process.env.COPILOT_HARNESS_STUB_CALLS, JSON.stringify({ called: true }) + "\\n");
+      console.error("429 Too Many Requests");
+      process.exitCode = 1;
+    `
+    );
+    try {
+      const result = spawnSync(process.execPath, ["copilot_harness.cjs", process.execPath, stubPath, "--prompt", "test"], {
+        cwd: path.dirname(require.resolve("./copilot_harness.cjs")),
+        env: {
+          ...harnessChildEnv,
+          NODE_OPTIONS: `${harnessChildEnv.NODE_OPTIONS || ""} --require=${JSON.stringify(preloadPath)}`,
+          AWF_REFLECT_ENABLED: "1",
+          GH_AW_TMP_DIR: directory,
+          GH_AW_AWF_CONFIG_PATH: awfConfigPath,
+          GH_AW_HARNESS_TELEMETRY_DIR: directory,
+          GH_AW_HARNESS_MAX_RETRIES: "2",
+          GH_AW_SAFE_OUTPUTS: "",
+          COPILOT_MODEL: "",
+          COPILOT_HARNESS_STUB_CALLS: callsPath,
+        },
+        encoding: "utf8",
+        timeout: 10000,
+      });
+      expect(result.status, result.stderr).toBe(1);
+      expect(fs.existsSync(callsPath), result.stderr).toBe(true);
+      expect(fs.readFileSync(callsPath, "utf8").trim().split("\n")).toHaveLength(1);
+      const telemetry = JSON.parse(fs.readFileSync(path.join(directory, "harness_retry.json"), "utf8"));
+      expect(telemetry.attempt_results[0].failure_classes).toContain("invocation_cap_exceeded");
+      expect(result.stderr).toContain("AWF shared invocation budget exhausted (60/60)");
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   describe("SDK content-filter rejection", () => {
     const content = "The model returned no content because the response was blocked by content filtering.";
     it("skips corrupt JSONL and short-circuits without decoding later records", () => {

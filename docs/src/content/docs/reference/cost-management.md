@@ -256,6 +256,8 @@ max-turns: 20
 
 `max-turns` works across Claude, Codex, Copilot, Gemini, and Pi. When set, gh-aw exports the compiled value as `GH_AW_MAX_TURNS` for the engine runtime, so you do not need to set `CLAUDE_CODE_MAX_TURNS` or an equivalent variable separately.
 
+With AWF, the invocation budget is shared with sub-agents. Parallel workers do not receive independent budgets; reserve capacity for the orchestrator's validation and final outputs. When Codex exposes a generic terminal HTTP 429, the harness checks fresh AWF reflection before retrying. A confirmed exhausted invocation budget stops retries because resuming cannot restore it. Missing or unavailable counter evidence does not turn an ordinary rate limit into a terminal budget error.
+
 The field accepts integer literals or GitHub Actions expressions, making it composable with `workflow_call` inputs:
 
 ```aw wrap

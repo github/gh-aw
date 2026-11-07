@@ -66,7 +66,7 @@ const {
 } = require("./awf_reflect.cjs");
 const { emitInfrastructureIncomplete, emitMissingToolPermissionIssue, hasExpectedSafeOutputs, hasTerminalSafeOutput, hasNoopInSafeOutputs } = require("./safeoutputs_cli.cjs");
 const { countPermissionDeniedIssues, hasNumerousPermissionDeniedIssues, extractDeniedCommands, buildMissingToolPermissionIssuePayload } = require("./permission_denied_helpers.cjs");
-const { detectNonRetryableHarnessGuard, buildSoftTimeoutGuard, emitSoftTimeoutSignal, isAuthenticationFailedError, parseAICreditsExceededProxyRejection } = require("./harness_retry_guard.cjs");
+const { detectNonRetryableHarnessGuard, detectExhaustedAWFInvocationBudget, buildSoftTimeoutGuard, emitSoftTimeoutSignal, isAuthenticationFailedError, parseAICreditsExceededProxyRejection } = require("./harness_retry_guard.cjs");
 const { MODEL_NOT_SUPPORTED_PATTERN: INVALID_MODEL_ERROR_PATTERN } = require("./detect_agent_errors.cjs");
 const { resolveRetryConfig } = require("./harness_retry_config.cjs");
 const { applyModelFallback, injectModelFlagAfterExec, normalizeCodexModel, normalizeCodexModelArgs } = require("./model_fallback.cjs");
@@ -156,6 +156,7 @@ function createMCPCallWatchdog(timeoutMs, now = Date.now) {
     observePrefix(prefix) {
       const event = parseJsonPrefix(prefix);
       track(event?.type, event?.item);
+      return event;
     },
     expiredTimeoutMs() {
       const current = now();
@@ -1143,6 +1144,11 @@ async function main() {
       const strategy = selectedHarnessStrategy(resumeArgs || resolvedArgs, "codex");
       observeStrategy(strategy);
       const terminalErrors = [];
+      let nativeStderrRateLimitError = false;
+      const recordTerminalError = line => {
+        terminalErrors.push(line);
+        if (terminalErrors.length > 8) terminalErrors.shift();
+      };
       const mcpWatchdog = createMCPCallWatchdog(item => {
         const server = item.server ?? item.server_name ?? item.serverName;
         return serverToolTimeouts[server] ? serverToolTimeouts[server] * 1000 + MCP_CALL_TRANSPORT_GRACE_MS : fallbackToolTimeoutMs;
@@ -1166,12 +1172,15 @@ async function main() {
           const event = mcpWatchdog.observe(line);
           if (!event) return;
           if (event.type === "thread.started" && typeof event.thread_id === "string") lastThreadId = event.thread_id;
-          if (event.type === "turn.failed" || event.type === "error") {
-            terminalErrors.push(line);
-            if (terminalErrors.length > 8) terminalErrors.shift();
-          }
+          if (event.type === "turn.failed" || event.type === "error") recordTerminalError(line);
         },
-        onStdoutLinePrefix: prefix => mcpWatchdog.observePrefix(prefix),
+        onStdoutLinePrefix: prefix => {
+          const event = mcpWatchdog.observePrefix(prefix);
+          if (event?.type === "turn.failed" || event?.type === "error") recordTerminalError(prefix);
+        },
+        onStderrLine: line => {
+          if (isRateLimitError(line)) nativeStderrRateLimitError = true;
+        },
         runtimeGuard: {
           pollIntervalMs: Math.min(contextRebuildCircuitBreaker.pollIntervalMs, 1000),
           termGraceMs: contextRebuildCircuitBreaker.termGraceMs,
@@ -1223,9 +1232,14 @@ async function main() {
         log(`attempt ${attempt + 1}: runtime guard fired but process exited 0 — normalizing exit code to 1`);
         return { ...result, exitCode: 1, safeOutputsByteOffset, strategy };
       }
-      return { ...result, safeOutputsByteOffset, strategy };
+      return {
+        ...result,
+        safeOutputsByteOffset,
+        strategy,
+        nativeTerminalRateLimitError: nativeStderrRateLimitError || isRateLimitError(terminalErrors.join("\n")),
+      };
     },
-    handleFailure: ({ attempt, result }) => {
+    handleFailure: async ({ attempt, result }) => {
       if (result.runtimeGuardFired) {
         const details = result.runtimeGuardReason || "Codex runtime guard terminated the run after context rebuild thresholds were exceeded.";
         emitInfrastructureIncomplete(`Codex run stopped by a runtime guard. ${details}`, { logger: log });
@@ -1300,6 +1314,15 @@ async function main() {
       }
 
       const nonRetryableGuard = detectNonRetryableHarnessGuard(result.output);
+      // Codex can omit the proxy error body and expose only a generic terminal 429.
+      if (!nonRetryableGuard.maxRunsExceeded) {
+        const budget = await detectExhaustedAWFInvocationBudget({ nativeTerminalRateLimitError: result.nativeTerminalRateLimitError === true, logger: log });
+        if (budget) {
+          nonRetryableGuard.maxRunsExceeded = true;
+          result.failureClasses.push("invocation_cap_exceeded");
+          log(`attempt ${attempt + 1}: AWF shared invocation budget exhausted (${budget.invocationCount}/${budget.maxRuns}) — confirmed by fresh reflection`);
+        }
+      }
       if (nonRetryableGuard.apiProxyGuardRejection) {
         const guard = nonRetryableGuard.apiProxyGuardRejection.guard;
         emitInfrastructureIncomplete(`AWF API proxy rejected the request: ${guard}`, { logger: log });
@@ -1329,9 +1352,14 @@ async function main() {
           log(`attempt ${attempt + 1}: AI credits budget enforced — exiting 0 (budget control, not an error)`);
           return { action: "stop", exitCode: 0 };
         }
-        if (nonRetryableGuard.maxRunsExceeded && safeOutputsPath && hasExpectedSafeOutputs(safeOutputsPath, { logger: log })) {
+        if (nonRetryableGuard.maxRunsExceeded && safeOutputsPath && hasExpectedSafeOutputs(safeOutputsPath, { logger: log }) && hasTerminalSafeOutput(safeOutputsPath, { excludePartialReviewComments: true, logger: log })) {
           log(`attempt ${attempt + 1}: invocation cap saturated but safe-outputs already contain expected output — suppressing terminal verdict (false-red: core work succeeded)`);
           return { action: "stop", exitCode: 0 };
+        }
+        if (nonRetryableGuard.maxRunsExceeded) {
+          emitInfrastructureIncomplete("AWF shared per-run invocation budget exhausted, including sub-agents, before a completed task output was staged. Partial findings are preserved. Retrying cannot restore this budget.", {
+            logger: log,
+          });
         }
         return { action: "stop" };
       }
