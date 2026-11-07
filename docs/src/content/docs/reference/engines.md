@@ -32,8 +32,8 @@ The engine, inference provider, and enabled tools determine where repository con
 | --- | :---: | :---: | :---: | :---: | :---: | :---: |
 | Top-level `max-turns` | Yes | Yes | Yes | Yes | Yes | No |
 | `max-continuations` | Yes | No | No | No | No | No |
-| `tools.web-fetch` | SDK only | Yes | Yes | Yes | Yes | Cannot disable |
-| Native `tools.web-search` | No | Yes | Yes | No | No | Cannot disable |
+| `tools.web-fetch` | SDK only | Anthropic only | Yes | Yes | Yes | Cannot disable |
+| Native `tools.web-search` | No | Anthropic only | Yes | No | No | Cannot disable |
 | Native `engine.agent` selection | Yes | No | No | No | No | No |
 | `engine.api-target` | Yes | Yes | Yes | Yes | Yes | No |
 | `engine.bare` | Yes | Yes | No | No | Yes | No |

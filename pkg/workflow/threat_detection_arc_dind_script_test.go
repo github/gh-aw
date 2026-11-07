@@ -21,39 +21,41 @@ func TestArcDindThreatDetectionFileRoundTrip(t *testing.T) {
 			root := t.TempDir()
 			runnerTemp := filepath.Join(root, "shared temp")
 			hostDir := filepath.Join(root, "runner private", "threat-detection")
+			hostInputDir := filepath.Join(root, "runner private", "threat-detection-inputs")
 			binDir := filepath.Join(root, "installed bin")
 			stagedDir := filepath.Join(runnerTemp, "gh-aw", "threat-detection")
-			for _, dir := range []string{hostDir, binDir, stagedDir} {
+			for _, dir := range []string{hostDir, hostInputDir, binDir, stagedDir} {
 				require.NoError(t, os.MkdirAll(dir, 0700))
 			}
 			write := func(path, content string) {
 				t.Helper()
 				require.NoError(t, os.WriteFile(path, []byte(content), 0700))
 			}
-			write(filepath.Join(hostDir, "agent_output.json"), "input")
 			write(filepath.Join(hostDir, "detection.log"), "host log")
 			write(filepath.Join(hostDir, "execution.json"), "host evidence")
 			write(filepath.Join(hostDir, "detection_result.json"), "stale downloaded verdict")
 			write(filepath.Join(stagedDir, "detection_result.json"), "stale staged verdict")
 			write(filepath.Join(stagedDir, ".stale-input"), "must not reach the detector")
+			write(filepath.Join(hostInputDir, "agent_output.json"), "input")
 			require.NoError(t, os.MkdirAll(filepath.Join(stagedDir, "aw-prompts"), 0700))
 			write(filepath.Join(stagedDir, "aw-prompts", "prompt-template.txt"), "stale optional prompt")
-			require.NoError(t, os.MkdirAll(filepath.Join(hostDir, "codex-home"), 0700))
-			write(filepath.Join(hostDir, "codex-home", "config.toml"), "provider config")
+			require.NoError(t, os.MkdirAll(filepath.Join(hostInputDir, "codex-home"), 0700))
+			write(filepath.Join(hostInputDir, "codex-home", "config.toml"), "provider config")
 			write(filepath.Join(binDir, "threat-detect"), `#!/bin/bash
 set -euo pipefail
 [[ "$1" = --engine && "$3" = --output && "$#" = 5 ]]
 [[ "$(<"$5/agent_output.json")" = input ]]
 [[ ! -e "$5/.stale-input" && ! -e "$5/aw-prompts/prompt-template.txt" ]]
 [[ "$(<"$5/codex-home/config.toml")" = 'provider config' ]]
-printf 'usage' > "$5/detection_usage.json"
+output_dir="$(dirname "$4")"
+printf 'usage' > "$output_dir/detection_usage.json"
 if [[ "${FAIL_DETECTION:-}" = true ]]; then
   echo 'engine failed'
   exit 37
 fi
 printf '{"prompt_injection":false,"secret_leak":false,"malicious_patch":false,"reasons":[]}' > "$4"
-printf 'full result' > "$5/detection_result_full.json"
-printf 'usage events' > "$5/detection_usage.jsonl"
+printf 'full result' > "$output_dir/detection_result_full.json"
+printf 'usage events' > "$output_dir/detection_usage.jsonl"
 `)
 			script := filepath.Join("..", "..", "actions", "setup", "sh", "stage_threat_detection_arc_dind.sh")
 			runScript := func(mode string) {

@@ -62,8 +62,11 @@ Repository: ${{ github.repository }}. Run: ${{ github.run_id }}.
   `pkg/workflow/lint/rule_contract_test.go`, and `pkg/cli/lint_command.go`.
   Read `pkg/workflow/actions/`, `pkg/workflow/aw/`, and
   `pkg/workflow/taint/` selectively to understand existing semantic APIs.
-- Read compact JSON state from `/tmp/gh-aw/cache-memory/` if present. Treat it as
-  advisory, not authoritative: verify proposal status against GitHub every run.
+- Read `/tmp/gh-aw/cache-memory/actions-aw-linter-factory/index.json` before
+  mining evidence. Reuse its review cursor, candidate IDs, evidence URLs, and
+  outcomes; initialize empty state only when missing. Report `Cache hit` only
+  after a successful read, or `Cache miss` when missing. Treat it as advisory,
+  not authoritative: verify proposal status against GitHub every run.
 - Use `gh` through the configured GitHub proxy to inspect at most 100 recently
   updated issues and 100 pull requests in this repository over the last 30 days.
   Prefer merged fixes and review feedback; inspect at most 10 relevant diffs or
@@ -138,9 +141,11 @@ Repository: ${{ github.repository }}. Run: ${{ github.run_id }}.
 3. Never fix target workflows as part of the rule PR. If validation fails or
    findings cannot be explained after two focused correction attempts, discard
    the implementation and use `noop` with the limitation.
-4. Persist only compact identifiers, evidence URLs, review cursor, and outcomes
-   in cache-memory JSON. Cache entries are not proof that a PR was created;
-   recheck GitHub before suppressing or retrying a proposal.
+4. Before either terminal output, merge compact identifiers, evidence URLs,
+   review cursor, outcomes, and the analysis date into
+   `/tmp/gh-aw/cache-memory/actions-aw-linter-factory/index.json`, including on
+   no-change runs. Read it back to verify the write. Cache entries are not proof
+   that a PR was created; recheck GitHub before suppressing or retrying a proposal.
 5. Finish with exactly one terminal safe output: `create-pull-request` for one
    focused draft PR, or `noop` with a specific reason. The PR must describe the
    evidence and published guidance, risk and remediation, AST targets, overlap
