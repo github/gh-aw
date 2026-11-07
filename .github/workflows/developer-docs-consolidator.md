@@ -38,7 +38,7 @@ engine:
   model-provider: github
   model-routing:
     goal: cost
-    mode: balanced
+    mode: economy
 name: Developer Documentation Consolidator
 strict: true
 timeout-minutes: 30
