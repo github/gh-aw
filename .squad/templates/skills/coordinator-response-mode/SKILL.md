@@ -4,7 +4,7 @@ description: "Selecting WHO handles work is the Routing table; selecting HOW the
 allowedTools: []
 confidence: high
 domain: squad-internals
-source: "Extracted from squad.agent.md as part of the slimming effort (bradygaster/squad#1308). Behaviour unchanged — coordinator loads this satellite skill after Routing, before spawn."
+source: "Extracted from squad.agent.md as part of the slimming effort (github/squad#1308). Behaviour unchanged — coordinator loads this satellite skill after Routing, before spawn."
 ---
 
 > **Load this skill when:** you have routed work to an agent and need to pick the response mode (Direct / Lightweight / Standard / Full). The 1-line stub in `squad.agent.md` is for awareness; this skill is the full decision table + templates.

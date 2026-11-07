@@ -32,7 +32,7 @@ safe-outputs:
 
 # Squad Plan
 
-Use the Squad (https://github.com/bradygaster/squad) team to review the issue
+Use the Squad (https://github.com/github/squad) team to review the issue
 where `/squad-plan` was invoked, produce an implementation plan, and create
 small Copilot-ready sub-issues.
 

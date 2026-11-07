@@ -1,5 +1,5 @@
 ---
-# Squad Bootstrap — lazily installs and initializes Squad (https://github.com/bradygaster/squad)
+# Squad Bootstrap — lazily installs and initializes Squad (https://github.com/github/squad)
 # in the activation job when needed, then republishes the team state to the agent job.
 #
 # The Squad CLI is never installed or executed in the agent job — only the files it
@@ -66,7 +66,7 @@ jobs:
 
 ## Squad Bootstrap Component
 
-This shared component moves the Squad (https://github.com/bradygaster/squad)
+This shared component moves the Squad (https://github.com/github/squad)
 install/init lifecycle out of the agent job and performs it lazily:
 
 1. **`jobs.activation.steps`** — the repository is already checked out by the
