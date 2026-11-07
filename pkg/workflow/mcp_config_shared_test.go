@@ -49,6 +49,21 @@ func TestRewriteLocalhostToDockerHost(t *testing.T) {
 			inputURL: "https://api.github.com/localhost",
 			expected: "https://api.github.com/localhost",
 		},
+		{
+			name:     "localhost lookalike host should not be rewritten",
+			inputURL: "http://localhost.evil.example:8765/mcp",
+			expected: "http://localhost.evil.example:8765/mcp",
+		},
+		{
+			name:     "127.0.0.1 lookalike host should not be rewritten",
+			inputURL: "http://127.0.0.1.evil.example:8765/mcp",
+			expected: "http://127.0.0.1.evil.example:8765/mcp",
+		},
+		{
+			name:     "unsupported scheme should not be rewritten",
+			inputURL: "ftp://localhost:8765/mcp",
+			expected: "ftp://localhost:8765/mcp",
+		},
 	}
 
 	for _, tt := range tests {
