@@ -257,7 +257,7 @@ printf '%s\\n' "$TEMP_DIR"`,
     expect(result.status).toBe(1);
     expect(result.stderr).toContain(`Cannot prepare Copilot state at ${path.join(home, ".copilot")}`);
     expect(result.stderr).toContain("Ask a runner administrator to restore ownership");
-    expect(result.stderr).toContain("Rootless installation cannot reclaim or re-own state");
+    expect(result.stderr).toContain("Rootless installation cannot reclaim or re-own state left by a privileged AWF run");
     expect(fs.readFileSync(path.join(home, ".copilot"), "utf8")).toBe("existing state");
     expect(fs.existsSync(log)).toBe(false);
   });
@@ -294,99 +294,104 @@ printf '%s\\n' "$TEMP_DIR"`,
     });
   }
 
-  it("runs simultaneous rootless installers with shared scratch without chown, sudo, or cross-job cleanup", async () => {
-    const root = workspace();
-    const sharedTemp = path.join(root, "shared-temp");
-    const bin = path.join(root, "bin");
-    const cache = path.join(root, "toolcache");
-    const cacheBin = path.join(cache, "copilot-cli", "1.0.103", "x64", "bin");
-    const forbiddenLog = path.join(root, "forbidden.log");
-    fs.mkdirSync(sharedTemp);
-    fs.mkdirSync(bin);
-    fs.mkdirSync(cacheBin, { recursive: true });
-    fs.writeFileSync(
-      path.join(cacheBin, "copilot"),
-      `#!/bin/sh
+  it(
+    "runs simultaneous rootless installers with shared scratch without chown, sudo, or cross-job cleanup",
+    { timeout: 30000 },
+    async () => {
+      const root = workspace();
+      const sharedTemp = path.join(root, "shared-temp");
+      const bin = path.join(root, "bin");
+      const cache = path.join(root, "toolcache");
+      const cacheBin = path.join(cache, "copilot-cli", "1.0.103", "x64", "bin");
+      const forbiddenLog = path.join(root, "forbidden.log");
+      fs.mkdirSync(sharedTemp);
+      fs.mkdirSync(bin);
+      fs.mkdirSync(cacheBin, { recursive: true });
+      fs.writeFileSync(
+        path.join(cacheBin, "copilot"),
+        `#!/bin/sh
 touch "$INSTALLER_READY"
 while [ ! -e "$INSTALLER_RELEASE" ]; do sleep 0.05; done
 printf 'copilot 1.0.103\\n'
 `,
-      { mode: 0o755 }
-    );
-    for (const command of ["sudo", "chown", "curl"]) {
-      fs.writeFileSync(path.join(bin, command), '#!/bin/sh\necho forbidden >> "$FORBIDDEN_LOG"\nexit 99\n', { mode: 0o755 });
-    }
-    fs.writeFileSync(path.join(bin, "uname"), '#!/bin/sh\ncase "$1" in -m) echo x86_64 ;; *) echo Linux ;; esac\n', { mode: 0o755 });
-    const otherChroot = path.join(sharedTemp, "awf-existing-chroot-home");
-    fs.mkdirSync(otherChroot);
-    fs.writeFileSync(path.join(otherChroot, "artifact"), "another invocation");
-    const installer = path.resolve(__dirname, "../sh/install_copilot_cli.sh");
-    const jobs = [0, 1].map(index => {
-      const workdir = path.join(root, `runner-${index}`);
-      const ready = path.join(workdir, "ready");
-      const release = path.join(workdir, "release");
-      fs.mkdirSync(workdir);
-      const child = spawn("bash", [installer, "--rootless", "1.0.103"], {
-        cwd: workdir,
-        env: environment(sharedTemp, {
-          HOME: path.join(workdir, "home"),
-          TMPDIR: sharedTemp,
-          RUNNER_TOOL_CACHE: cache,
-          GITHUB_PATH: "",
-          PATH: `${bin}:${process.env.PATH}`,
-          INSTALLER_READY: ready,
-          INSTALLER_RELEASE: release,
-          FORBIDDEN_LOG: forbiddenLog,
-        }),
-        stdio: ["ignore", "pipe", "pipe"],
-      });
-      children.push(child);
-      let output = "";
-      child.stdout.on("data", chunk => {
-        output += chunk;
-      });
-      child.stderr.on("data", chunk => {
-        output += chunk;
-      });
-      const completion = new Promise((resolve, reject) => {
-        child.once("error", reject);
-        child.once("close", code => resolve({ code, output }));
-      });
-      return { child, ready, release, completion };
-    });
-    try {
-      const deadline = Date.now() + 25000;
-      while (!jobs.every(job => fs.existsSync(job.ready))) {
-        if (Date.now() > deadline) throw new Error("Concurrent installers did not reach the toolcache barrier");
-        await new Promise(resolve => setTimeout(resolve, 25));
+        { mode: 0o755 }
+      );
+      for (const command of ["sudo", "chown", "curl"]) {
+        fs.writeFileSync(path.join(bin, command), '#!/bin/sh\necho forbidden >> "$FORBIDDEN_LOG"\nexit 99\n', { mode: 0o755 });
       }
-      const stagingNames = () => fs.readdirSync(sharedTemp).filter(name => name.startsWith("copilot-install-"));
-      expect(stagingNames()).toHaveLength(2);
-      for (const name of stagingNames()) {
-        const dir = path.join(sharedTemp, name);
-        expect(fs.statSync(dir).mode & 0o777).toBe(0o700);
-        const chroot = path.join(dir, "awf-own-chroot-home");
-        fs.mkdirSync(chroot);
-        fs.writeFileSync(path.join(chroot, "artifact"), name);
+      fs.writeFileSync(path.join(bin, "uname"), '#!/bin/sh\ncase "$1" in -m) echo x86_64 ;; *) echo Linux ;; esac\n', { mode: 0o755 });
+      const otherChroot = path.join(sharedTemp, "awf-existing-chroot-home");
+      fs.mkdirSync(otherChroot);
+      fs.writeFileSync(path.join(otherChroot, "artifact"), "another invocation");
+      const installer = path.resolve(__dirname, "../sh/install_copilot_cli.sh");
+      const jobs = [0, 1].map(index => {
+        const workdir = path.join(root, `runner-${index}`);
+        const ready = path.join(workdir, "ready");
+        const release = path.join(workdir, "release");
+        fs.mkdirSync(workdir);
+        const child = spawn("bash", [installer, "--rootless", "1.0.103"], {
+          cwd: workdir,
+          env: environment(sharedTemp, {
+            HOME: path.join(workdir, "home"),
+            TMPDIR: sharedTemp,
+            RUNNER_TOOL_CACHE: cache,
+            GITHUB_PATH: "",
+            PATH: `${bin}:${process.env.PATH}`,
+            INSTALLER_READY: ready,
+            INSTALLER_RELEASE: release,
+            FORBIDDEN_LOG: forbiddenLog,
+          }),
+          stdio: ["ignore", "pipe", "pipe"],
+        });
+        children.push(child);
+        let output = "";
+        child.stdout.on("data", chunk => {
+          output += chunk;
+        });
+        child.stderr.on("data", chunk => {
+          output += chunk;
+        });
+        const completion = new Promise((resolve, reject) => {
+          child.once("error", reject);
+          child.once("close", code => resolve({ code, output }));
+        });
+        return { child, ready, release, completion };
+      });
+      try {
+        const deadline = Date.now() + 25000;
+        while (!jobs.every(job => fs.existsSync(job.ready))) {
+          if (Date.now() > deadline) throw new Error("Concurrent installers did not reach the toolcache barrier");
+          await new Promise(resolve => setTimeout(resolve, 25));
+        }
+        const stagingNames = () => fs.readdirSync(sharedTemp).filter(name => name.startsWith("copilot-install-"));
+        expect(stagingNames()).toHaveLength(2);
+        for (const name of stagingNames()) {
+          const dir = path.join(sharedTemp, name);
+          expect(fs.statSync(dir).mode & 0o777).toBe(0o700);
+          const chroot = path.join(dir, "awf-own-chroot-home");
+          fs.mkdirSync(chroot);
+          fs.writeFileSync(path.join(chroot, "artifact"), name);
+        }
+        fs.writeFileSync(jobs[0].release, "");
+        const first = await jobs[0].completion;
+        expect(first.code, first.output).toBe(0);
+        expect(stagingNames()).toHaveLength(1);
+        const remaining = stagingNames()[0];
+        expect(fs.readFileSync(path.join(sharedTemp, remaining, "awf-own-chroot-home/artifact"), "utf8")).toBe(remaining);
+        expect(fs.readFileSync(path.join(otherChroot, "artifact"), "utf8")).toBe("another invocation");
+        fs.writeFileSync(jobs[1].release, "");
+        const second = await jobs[1].completion;
+        expect(second.code, second.output).toBe(0);
+        expect(stagingNames()).toHaveLength(0);
+        expect(fs.readFileSync(path.join(otherChroot, "artifact"), "utf8")).toBe("another invocation");
+        expect(fs.existsSync(forbiddenLog)).toBe(false);
+      } finally {
+        for (const job of jobs) fs.writeFileSync(job.release, "");
+        await Promise.all(jobs.map(job => job.completion));
       }
-      fs.writeFileSync(jobs[0].release, "");
-      const first = await jobs[0].completion;
-      expect(first.code, first.output).toBe(0);
-      expect(stagingNames()).toHaveLength(1);
-      const remaining = stagingNames()[0];
-      expect(fs.readFileSync(path.join(sharedTemp, remaining, "awf-own-chroot-home/artifact"), "utf8")).toBe(remaining);
-      expect(fs.readFileSync(path.join(otherChroot, "artifact"), "utf8")).toBe("another invocation");
-      fs.writeFileSync(jobs[1].release, "");
-      const second = await jobs[1].completion;
-      expect(second.code, second.output).toBe(0);
-      expect(stagingNames()).toHaveLength(0);
-      expect(fs.readFileSync(path.join(otherChroot, "artifact"), "utf8")).toBe("another invocation");
-      expect(fs.existsSync(forbiddenLog)).toBe(false);
-    } finally {
-      for (const job of jobs) fs.writeFileSync(job.release, "");
-      await Promise.all(jobs.map(job => job.completion));
-    }
-  }, 30000);
+    },
+    30000
+  );
 
   it.skipIf(process.getuid && process.getuid() === 0)("rejects an unwritable Copilot directory without reclaiming or re-owning it", () => {
     const root = workspace();
@@ -409,7 +414,7 @@ printf 'copilot 1.0.103\\n'
       expect(result.status).toBe(1);
       expect(result.stderr).toContain(`Cannot prepare Copilot state at ${copilot}`);
       expect(result.stderr).toContain("Ask a runner administrator to restore ownership");
-      expect(result.stderr).toContain("Rootless installation cannot reclaim or re-own state");
+      expect(result.stderr).toContain("Rootless installation cannot reclaim or re-own state left by a privileged AWF run");
       expect(fs.statSync(copilot).mode & 0o777).toBe(0o555);
       expect(fs.existsSync(log)).toBe(false);
       expect(fs.readdirSync(root).filter(name => name.startsWith("copilot-install-"))).toHaveLength(0);
