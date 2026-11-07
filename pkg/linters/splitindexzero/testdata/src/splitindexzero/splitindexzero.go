@@ -10,15 +10,15 @@ const (
 )
 
 func splitFirst(value string) string {
-	return s.Split(value, separator)[0] // want `strings\.Split`
+	return s.Split(value, separator)[0]
 }
 
 func splitNFirst(value string) string {
-	return s.SplitN(value, separator, limit)[first] // want `strings\.Split`
+	return s.SplitN(value, separator, limit)[first] // want `strings\.SplitN\(\.\.\.\)\[0\] allocates a \[\]string just to read the first segment; use strings\.Cut instead`
 }
 
 func parenthesizedSplit(value string) string {
-	return (s.Split(value, ","))[0] // want `strings\.Split`
+	return (s.Split(value, ","))[0]
 }
 
 func emptySeparator(value string) string {
@@ -35,6 +35,14 @@ func splitNWithDifferentLimit(value string) string {
 
 func splitNWithOneLimit(value string) string {
 	return s.SplitN(value, ",", 1)[0]
+}
+
+func splitNEmptySeparator(value string) string {
+	return s.SplitN(value, empty, 2)[0]
+}
+
+func splitNDynamicSeparator(value, sep string) string {
+	return s.SplitN(value, sep, 2)[0]
 }
 
 func laterElement(value string) string {
@@ -58,5 +66,5 @@ func shadowedPackageName(value string) string {
 
 func suppressed(value string) string {
 	//nolint:splitindexzero
-	return s.Split(value, ",")[0]
+	return s.SplitN(value, ",", 2)[0]
 }

@@ -1,6 +1,6 @@
 // Package splitindexzero implements a Go analysis linter that reports
-// strings.Split(s, sep)[0] and strings.SplitN(s, sep, 2)[0] calls, which
-// allocate a slice to read only the first segment.
+// strings.SplitN(s, sep, 2)[0] calls, which allocate a slice to read only the
+// first segment.
 package splitindexzero
 
 import (
@@ -17,7 +17,7 @@ import (
 )
 
 // Analyzer is the split-index-zero analysis pass.
-var Analyzer = analyzerutil.New("splitindexzero", "reports strings.Split(s, sep)[0] and strings.SplitN(s, sep, 2)[0] calls that allocate a slice to read only the first segment; use strings.Cut instead", run)
+var Analyzer = analyzerutil.New("splitindexzero", "reports strings.SplitN(s, sep, 2)[0] calls that allocate a slice to read only the first segment; use strings.Cut instead", run)
 
 var hotThreshold *int
 
@@ -38,7 +38,7 @@ func run(pass *analysis.Pass) (any, error) {
 			return
 		}
 
-		if !isSplitCall(pass, index.X) {
+		if !isSplitNCall(pass, index.X) {
 			return
 		}
 
@@ -56,12 +56,12 @@ func run(pass *analysis.Pass) (any, error) {
 		pass.Report(analysis.Diagnostic{
 			Pos:     index.Pos(),
 			End:     index.End(),
-			Message: "strings.Split/SplitN(...)[0] allocates a []string just to read the first segment; use strings.Cut instead",
+			Message: "strings.SplitN(...)[0] allocates a []string just to read the first segment; use strings.Cut instead",
 		})
 	})
 }
 
-func isSplitCall(pass *analysis.Pass, expr ast.Expr) bool {
+func isSplitNCall(pass *analysis.Pass, expr ast.Expr) bool {
 	call, ok := astutil.UnwrapParenExpr(expr).(*ast.CallExpr)
 	if !ok {
 		return false
@@ -71,23 +71,13 @@ func isSplitCall(pass *analysis.Pass, expr ast.Expr) bool {
 		return false
 	}
 
-	switch sel.Sel.Name {
-	case "Split":
-		if len(call.Args) != 2 {
-			return false
-		}
-		return hasNonEmptyStringArgument(pass, call.Args[1]) //nolint:uncheckedsliceindex // len(call.Args) is checked above
-	case "SplitN":
-		if len(call.Args) != 3 {
-			return false
-		}
-		if !hasNonEmptyStringArgument(pass, call.Args[1]) { //nolint:uncheckedsliceindex // len(call.Args) is checked above
-			return false
-		}
-		return isConstantInt(pass, call.Args[2], 2) //nolint:uncheckedsliceindex // len(call.Args) is checked above
-	default:
+	if sel.Sel.Name != "SplitN" || len(call.Args) != 3 {
 		return false
 	}
+	if !hasNonEmptyStringArgument(pass, call.Args[1]) { //nolint:uncheckedsliceindex // len(call.Args) is checked above
+		return false
+	}
+	return isConstantInt(pass, call.Args[2], 2) //nolint:uncheckedsliceindex // len(call.Args) is checked above
 }
 
 func hasNonEmptyStringArgument(pass *analysis.Pass, expr ast.Expr) bool {

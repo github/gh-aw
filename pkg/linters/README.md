@@ -66,7 +66,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `seenmapbool` — reports `map[string]bool` used as a set (values always `true`) that should use `map[string]struct{}` instead.
 - `slicemakezerolength` — reports zero-length slice allocations before known-size range loops that append exactly one element per iteration, where the range length provides a capacity hint.
 - `sortslice` — reports `sort.Slice` / `sort.SliceStable` calls that should use `slices.SortFunc` / `slices.SortStableFunc`.
-- `splitindexzero` — reports `strings.Split(s, sep)[0]` and `strings.SplitN(s, sep, 2)[0]` calls that allocate a slice to read only the first segment; use `strings.Cut`.
+- `splitindexzero` — reports `strings.SplitN(s, sep, 2)[0]` calls that allocate a slice to read only the first segment; use `strings.Cut`.
 - `sprintferrdot` — reports redundant `.Error()` calls on error values passed to `fmt` format functions where the fmt package calls `.Error()` automatically.
 - `sprintferrorsnew` — reports `errors.New(fmt.Sprintf(...))` calls that should use `fmt.Errorf` instead.
 - `sprintfbool` — reports `fmt.Sprintf("%t", b)` calls where `b` is a single bool value and suggests using `strconv.FormatBool(b)` instead.
@@ -80,6 +80,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `stringsindexcontains` — reports `strings.Index(s, substr)` comparisons with `-1` or `0` (e.g. `!= -1`, `>= 0`, `> -1`, `== -1`, `< 0`, `<= -1`) and their yoda-order variants that should use `strings.Contains(s, substr)` or `!strings.Contains(s, substr)` instead.
 - `stringsindexhasprefix` — reports `strings.Index(s, sub)` comparisons with `0` (`== 0`, `!= 0`) and their yoda-order variants that should use `strings.HasPrefix(s, sub)` or `!strings.HasPrefix(s, sub)` instead.
 - `stringsjoinone` — reports `strings.Join([]string{s}, sep)` calls with a single-element slice literal where the separator is never used and the call is equivalent to just `s`.
+- `stringssplitfirst` — reports `strings.Split(s, sep)[0]` with a constant non-empty separator; use `strings.Cut` to read the first segment without allocating a slice.
 - `timeafterleak` — reports `time.After` calls used as the channel-receive expression in a `select` case inside a `for` or `range` loop that leak a timer channel on each iteration when another case fires first.
 - `timesleepnocontext` — reports `time.Sleep` calls inside functions that already receive a `context.Context`, where a context-aware `select` should be used instead.
 - `timenowsub` — reports `time.Now().Sub(t)` calls that should be simplified to `time.Since(t)`.
@@ -153,7 +154,7 @@ returning a channel does not transfer ownership.
 
 Micro-optimizations flagged by allocation/perf linters (e.g. `stringsconcatloop`, `appendoneelement`,
 `appendbytestring`, `bytesbufferstring`, `bytescomparestring`, `lenstringsplit`, `mapclearloop`,
-`readerstringconv`, `reflectdeepequalusage`, `seenmapbool`, `slicemakezerolength`, `sortslice`, `splitindexzero`,
+`readerstringconv`, `reflectdeepequalusage`, `seenmapbool`, `slicemakezerolength`, `sortslice`, `splitindexzero`, `stringssplitfirst`,
 `stringbytesroundtrip`, `stringsjoinone`, `tolowerequalfold`, and `writebytestring`) only matter on hot paths: applying them to code that tests never execute adds
 churn without a measurable benefit. These linters consult the shared
 `pkg/linters/internal/coverage` package, which loads a Go coverage profile (produced by
@@ -234,7 +235,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `seenmapbool` | Custom `go/analysis` analyzer that flags `map[string]bool` used as a set that should use `map[string]struct{}` |
 | `slicemakezerolength` | Custom `go/analysis` analyzer that flags zero-length slice allocations before known-size range loops that append one element per iteration |
 | `sortslice` | Custom `go/analysis` analyzer that flags `sort.Slice` / `sort.SliceStable` calls that should use `slices.SortFunc` / `slices.SortStableFunc` |
-| `splitindexzero` | Custom `go/analysis` analyzer that flags `strings.Split(s, sep)[0]` and `strings.SplitN(s, sep, 2)[0]` calls that allocate a slice to read only the first segment |
+| `splitindexzero` | Custom `go/analysis` analyzer that flags `strings.SplitN(s, sep, 2)[0]` calls that allocate a slice to read only the first segment |
 | `sprintferrdot` | Custom `go/analysis` analyzer that flags redundant `.Error()` calls on error values passed to `fmt` format functions |
 | `sprintferrorsnew` | Custom `go/analysis` analyzer that flags `errors.New(fmt.Sprintf(...))` calls that should use `fmt.Errorf` instead |
 | `sprintfbool` | Custom `go/analysis` analyzer that flags `fmt.Sprintf("%t", b)` calls where `b` is a single bool value and suggests using `strconv.FormatBool(b)` instead |
@@ -248,6 +249,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `stringsindexcontains` | Custom `go/analysis` analyzer that flags `strings.Index(s, substr)` comparisons with `-1` or `0` that should use `strings.Contains` or `!strings.Contains` |
 | `stringsindexhasprefix` | Custom `go/analysis` analyzer that flags `strings.Index(s, sub)` comparisons with `0` (`== 0`, `!= 0`) that should use `strings.HasPrefix` or `!strings.HasPrefix` |
 | `stringsjoinone` | Custom `go/analysis` analyzer that flags `strings.Join([]string{s}, sep)` calls with a single-element slice literal where the separator is unused and the call is equivalent to just `s` |
+| `stringssplitfirst` | Custom `go/analysis` analyzer that flags `strings.Split(s, sep)[0]` with a constant non-empty separator |
 | `timeafterleak` | Custom `go/analysis` analyzer that flags `time.After` in `select` cases inside loops that leak a timer channel on each iteration when another case fires first |
 | `timesleepnocontext` | Custom `go/analysis` analyzer that flags `time.Sleep` calls in context-aware functions |
 | `timenowsub` | Custom `go/analysis` analyzer that flags `time.Now().Sub(t)` calls that should use `time.Since(t)` |
@@ -301,6 +303,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/sprintfbool"
 	"github.com/github/gh-aw/pkg/linters/sprintfint"
 	"github.com/github/gh-aw/pkg/linters/ssljson"
+	"github.com/github/gh-aw/pkg/linters/stringssplitfirst"
 	"github.com/github/gh-aw/pkg/linters/timesleepnocontext"
 	"github.com/github/gh-aw/pkg/linters/trimleftright"
 	"github.com/github/gh-aw/pkg/linters/typeassertionnil"
@@ -332,6 +335,7 @@ _ = sortslice.Analyzer
 _ = sprintfbool.Analyzer
 _ = sprintfint.Analyzer
 _ = ssljson.Analyzer
+_ = stringssplitfirst.Analyzer
 _ = timesleepnocontext.Analyzer
 _ = trimleftright.Analyzer
 _ = typeassertionnil.Analyzer
@@ -399,6 +403,7 @@ _ = typeassertionnil.Analyzer
 - `github.com/github/gh-aw/pkg/linters/stringsindexcontains` — strings-index-contains analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/stringsindexhasprefix` — strings-index-has-prefix analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/stringsjoinone` — strings-join-one analyzer subpackage
+- `github.com/github/gh-aw/pkg/linters/stringssplitfirst` — strings-split-first analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/timeafterleak` — time-after-leak analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/timesleepnocontext` — time-sleep-no-context analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/tolowerequalfold` — to-lower-equal-fold analyzer subpackage
