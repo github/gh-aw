@@ -12,21 +12,22 @@ import (
 
 // HealthRevisionCohort is a bounded, recent sample of one AW content revision.
 type HealthRevisionCohort struct {
-	FrontmatterHash  string    `json:"frontmatter_hash,omitempty"`
-	BodyHash         string    `json:"body_hash,omitempty"`
-	CompilerVersion  string    `json:"compiler_version,omitempty"`
-	SourceSHA        string    `json:"source_sha,omitempty"`
-	RunIDs           []int64   `json:"run_ids"`
-	Successes        int       `json:"successes"`
-	Failures         int       `json:"failures"`
-	SubagentFailures int       `json:"subagent_failures"`
-	Pending          int       `json:"pending"`
-	IndependentRuns  int       `json:"independent_runs"`
-	FirstSeen        time.Time `json:"first_seen"`
-	LastSeen         time.Time `json:"last_seen"`
-	lastCompleted    time.Time
-	key              string
-	revisionUnknown  bool
+	FrontmatterHash      string    `json:"frontmatter_hash,omitempty"`
+	BodyHash             string    `json:"body_hash,omitempty"`
+	CompilerVersion      string    `json:"compiler_version,omitempty"`
+	SourceSHA            string    `json:"source_sha,omitempty"`
+	RunIDs               []int64   `json:"run_ids"`
+	Successes            int       `json:"successes"`
+	Failures             int       `json:"failures"`
+	SubagentFailures     int       `json:"subagent_failures"`
+	DetectionFailureRuns int       `json:"detection_failure_runs"`
+	Pending              int       `json:"pending"`
+	IndependentRuns      int       `json:"independent_runs"`
+	FirstSeen            time.Time `json:"first_seen"`
+	LastSeen             time.Time `json:"last_seen"`
+	lastCompleted        time.Time
+	key                  string
+	revisionUnknown      bool
 }
 
 type HealthRevisionStatus struct {
@@ -241,6 +242,7 @@ func calculateCurrentWorkflowHealth(name string, runs []WorkflowRun, config Heal
 		health.DisplayRate += " (insufficient evidence)"
 	}
 	applyHealthSubagentFailures(&health, currentRuns, config)
+	applyHealthDetectionFailures(&health, currentRuns, config)
 	return health
 }
 
@@ -315,9 +317,9 @@ func renderHealthRevisions(w io.Writer, statuses []HealthRevisionStatus) error {
 	out.printf("\n[health_revisions] minimum_completed_runs=%d; recovery is observed evidence, not proof of causation\n", healthMinimumRuns)
 	for _, status := range statuses {
 		current := status.Current
-		out.printf("workflow=%q branch=%q event=%q status=%s source_sha=%q frontmatter_hash=%q body_hash=%q successes=%d failures=%d subagent_failures=%d pending=%d runs=%s\n",
+		out.printf("workflow=%q branch=%q event=%q status=%s source_sha=%q frontmatter_hash=%q body_hash=%q successes=%d failures=%d subagent_failures=%d detection_failure_runs=%d pending=%d runs=%s\n",
 			status.WorkflowPath, status.Branch, status.Event, status.Status, current.SourceSHA, current.FrontmatterHash,
-			current.BodyHash, current.Successes, current.Failures, current.SubagentFailures, current.Pending, failureRunIDsDisplay(current.RunIDs))
+			current.BodyHash, current.Successes, current.Failures, current.SubagentFailures, current.DetectionFailureRuns, current.Pending, failureRunIDsDisplay(current.RunIDs))
 		if previous := status.Previous; previous != nil {
 			out.printf("  previous source_sha=%q frontmatter_hash=%q body_hash=%q successes=%d failures=%d runs=%s\n",
 				previous.SourceSHA, previous.FrontmatterHash, previous.BodyHash, previous.Successes, previous.Failures, failureRunIDsDisplay(previous.RunIDs))

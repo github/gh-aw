@@ -15,30 +15,32 @@ var healthMetricsLog = logger.New("cli:health_metrics")
 
 // WorkflowHealth represents health metrics for a single workflow
 type WorkflowHealth struct {
-	WorkflowPath           string                  `json:"workflow_path,omitempty" console:"-"`
-	Revisions              []HealthRevisionStatus  `json:"revisions,omitempty" console:"-"`
-	Status                 string                  `json:"status,omitempty" console:"header:Status"`
-	Collection             *HealthCollection       `json:"collection,omitempty" console:"-"`
-	FailureClusters        []FailureCluster        `json:"failure_clusters,omitempty" console:"-"`
-	FailureInvestigation   *FailureInvestigation   `json:"failure_investigation,omitempty" console:"-"`
-	WorkflowName           string                  `json:"workflow_name" console:"header:Workflow"`
-	TotalRuns              int                     `json:"total_runs" console:"-"`
-	SuccessCount           int                     `json:"success_count" console:"-"`
-	FailureCount           int                     `json:"failure_count" console:"-"`
-	DriverExitCount        int                     `json:"driver_exit_count" console:"-"`
-	AgentLogicFailureCount int                     `json:"agent_logic_failure_count" console:"-"`
-	SubagentFailureCount   int                     `json:"subagent_failure_count" console:"header:Sub-agent Failures"`
-	SubagentFailureRuns    int                     `json:"subagent_failure_runs" console:"-"`
-	SubagentFailures       []HealthSubagentFailure `json:"subagent_failures,omitempty" console:"-"`
-	SuccessRate            float64                 `json:"success_rate" console:"-"`
-	DisplayRate            string                  `json:"-" console:"header:Success Rate"`
-	Trend                  string                  `json:"trend" console:"header:Trend"`
-	AvgDuration            time.Duration           `json:"avg_duration" console:"-"`
-	DisplayDur             string                  `json:"-" console:"header:Avg Duration"`
-	TotalTokens            int                     `json:"total_tokens" console:"-"`
-	AvgTokens              int                     `json:"avg_tokens" console:"-"`
-	DisplayTokens          string                  `json:"-" console:"header:Avg Tokens"`
-	BelowThresh            bool                    `json:"below_threshold" console:"-"`
+	WorkflowPath           string                   `json:"workflow_path,omitempty" console:"-"`
+	Revisions              []HealthRevisionStatus   `json:"revisions,omitempty" console:"-"`
+	Status                 string                   `json:"status,omitempty" console:"header:Status"`
+	Collection             *HealthCollection        `json:"collection,omitempty" console:"-"`
+	FailureClusters        []FailureCluster         `json:"failure_clusters,omitempty" console:"-"`
+	FailureInvestigation   *FailureInvestigation    `json:"failure_investigation,omitempty" console:"-"`
+	WorkflowName           string                   `json:"workflow_name" console:"header:Workflow"`
+	TotalRuns              int                      `json:"total_runs" console:"-"`
+	SuccessCount           int                      `json:"success_count" console:"-"`
+	FailureCount           int                      `json:"failure_count" console:"-"`
+	DriverExitCount        int                      `json:"driver_exit_count" console:"-"`
+	AgentLogicFailureCount int                      `json:"agent_logic_failure_count" console:"-"`
+	SubagentFailureCount   int                      `json:"subagent_failure_count" console:"header:Sub-agent Failures"`
+	SubagentFailureRuns    int                      `json:"subagent_failure_runs" console:"-"`
+	SubagentFailures       []HealthSubagentFailure  `json:"subagent_failures,omitempty" console:"-"`
+	DetectionFailureRuns   int                      `json:"detection_failure_runs" console:"header:Detection Failure Runs"`
+	DetectionFailures      []HealthDetectionFailure `json:"detection_failures,omitempty" console:"-"`
+	SuccessRate            float64                  `json:"success_rate" console:"-"`
+	DisplayRate            string                   `json:"-" console:"header:Success Rate"`
+	Trend                  string                   `json:"trend" console:"header:Trend"`
+	AvgDuration            time.Duration            `json:"avg_duration" console:"-"`
+	DisplayDur             string                   `json:"-" console:"header:Avg Duration"`
+	TotalTokens            int                      `json:"total_tokens" console:"-"`
+	AvgTokens              int                      `json:"avg_tokens" console:"-"`
+	DisplayTokens          string                   `json:"-" console:"header:Avg Tokens"`
+	BelowThresh            bool                     `json:"below_threshold" console:"-"`
 	// IntentionalFailure is true when the workflow is tagged with intentional-failure: true.
 	// These workflows are excluded from fleet-health and prod-main success-rate rollups.
 	IntentionalFailure bool `json:"intentional_failure,omitempty" console:"-"`
@@ -60,6 +62,7 @@ type HealthSummary struct {
 	DegradedWorkflows        int                   `json:"degraded_workflows"`
 	SubagentFailureCount     int                   `json:"subagent_failure_count"`
 	SubagentFailureRuns      int                   `json:"subagent_failure_runs"`
+	DetectionFailureRuns     int                   `json:"detection_failure_runs"`
 }
 
 // TrendDirection represents the trend of a workflow's health
@@ -195,9 +198,8 @@ func calculateSuccessRate(runs []WorkflowRun) float64 {
 func CalculateHealthSummary(workflowHealths []WorkflowHealth, period string, threshold float64) HealthSummary {
 	healthMetricsLog.Printf("Calculating health summary: workflows=%d, period=%s", len(workflowHealths), period)
 
-	healthyCount := 0
-	belowThresholdCount := 0
-	degradedCount, subagentFailures, subagentFailureRuns := 0, 0, 0
+	healthyCount, belowThresholdCount := 0, 0
+	degradedCount, subagentFailures, subagentFailureRuns, detectionFailureRuns := 0, 0, 0, 0
 	statusCounts := make(map[string]int)
 	observedFailures := 0
 
@@ -216,13 +218,14 @@ func CalculateHealthSummary(workflowHealths []WorkflowHealth, period string, thr
 		}
 		subagentFailures += wh.SubagentFailureCount
 		subagentFailureRuns += wh.SubagentFailureRuns
-		if wh.SubagentFailureCount > 0 {
+		detectionFailureRuns += wh.DetectionFailureRuns
+		if wh.SubagentFailureCount > 0 || wh.DetectionFailureRuns > 0 {
 			degradedCount++
 		}
 		if isHealthEvidenceInsufficient(wh.Status) {
 			continue
 		}
-		if wh.SuccessRate >= threshold && wh.SubagentFailureCount == 0 &&
+		if wh.SuccessRate >= threshold && wh.SubagentFailureCount == 0 && wh.DetectionFailureRuns == 0 &&
 			(wh.Status == "healthy" || wh.Status == "recovery_observed" || wh.Status == "") {
 			healthyCount++
 		}
@@ -242,6 +245,7 @@ func CalculateHealthSummary(workflowHealths []WorkflowHealth, period string, thr
 		DegradedWorkflows:        degradedCount,
 		SubagentFailureCount:     subagentFailures,
 		SubagentFailureRuns:      subagentFailureRuns,
+		DetectionFailureRuns:     detectionFailureRuns,
 	}
 	for _, wh := range workflowHealths {
 		if isHealthEvidenceInsufficient(wh.Status) {

@@ -26,6 +26,8 @@
 package workflow
 
 import (
+	"net"
+	"net/url"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
@@ -36,28 +38,26 @@ var mcpRenderingLog = logger.New("workflow:mcp-rendering")
 // rewriteLocalhostToDockerHost rewrites localhost URLs to use host.docker.internal
 // This is necessary when MCP servers run on the host machine but are accessed from within
 // a Docker container (e.g., when firewall/sandbox is enabled)
-func rewriteLocalhostToDockerHost(url string) string {
-	// Define the localhost patterns to replace and their docker equivalents
-	// Each pattern is a (prefix, replacement) pair
-	replacements := []struct {
-		prefix      string
-		replacement string
-	}{
-		{"http://localhost", "http://host.docker.internal"},
-		{"https://localhost", "https://host.docker.internal"},
-		{"http://127.0.0.1", "http://host.docker.internal"},
-		{"https://127.0.0.1", "https://host.docker.internal"},
+func rewriteLocalhostToDockerHost(rawURL string) string {
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil || (!strings.EqualFold(parsedURL.Scheme, "http") && !strings.EqualFold(parsedURL.Scheme, "https")) {
+		return rawURL
 	}
 
-	for _, r := range replacements {
-		if strings.HasPrefix(url, r.prefix) {
-			newURL := r.replacement + url[len(r.prefix):]
-			mcpRenderingLog.Printf("Rewriting localhost URL for Docker access: %s -> %s", url, newURL)
-			return newURL
+	switch strings.ToLower(parsedURL.Hostname()) {
+	case "localhost", "127.0.0.1":
+		port := parsedURL.Port()
+		if port == "" {
+			parsedURL.Host = "host.docker.internal"
+		} else {
+			parsedURL.Host = net.JoinHostPort("host.docker.internal", port)
 		}
+		newURL := parsedURL.String()
+		mcpRenderingLog.Printf("Rewriting localhost URL for Docker access: %s -> %s", rawURL, newURL)
+		return newURL
 	}
 
-	return url
+	return rawURL
 }
 
 // shouldRewriteLocalhostToDocker returns true when MCP server localhost URLs should be

@@ -102,9 +102,9 @@ jobs:
     runs-on: ubuntu-slim
     # Permissions for the activation job (workflow permissions default to none).
     permissions:
-      actions: read
-      contents: write
-      issues: write
+      actions: read # Read workflow runs and artifacts for workflow context.
+      contents: write # Create or update repository contents.
+      issues: write # Create or update issues and comments.
     env:
       GH_AW_ADMISSION_RESULT: ${{ needs.admission.outputs.result }}
       GH_AW_MAX_DAILY_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_DAILY_AI_CREDITS || '5000' }}
@@ -557,7 +557,7 @@ jobs:
     # Permissions for the admission job (workflow permissions default to none).
     permissions:
       contents: read
-      id-token: write
+      id-token: write # Request an OIDC token for authenticated services.
     timeout-minutes: 5
     outputs:
       max-ai-credits: ${{ steps.admission.outputs.max-ai-credits }}
@@ -607,11 +607,11 @@ jobs:
     runs-on: ubuntu-latest
     # Permissions for the agent job (workflow permissions default to none).
     permissions:
-      actions: read
+      actions: read # Read workflow runs and artifacts for workflow context.
       contents: read
-      discussions: read
-      issues: read
-      pull-requests: read
+      discussions: read # Read discussions and comments for workflow context.
+      issues: read # Read issues and comments for workflow context.
+      pull-requests: read # Read pull requests and review comments for workflow context.
     cache-mode: read
     timeout-minutes: 60
     env:
@@ -1715,9 +1715,9 @@ jobs:
     runs-on: ubuntu-slim
     # Permissions for the conclusion job (workflow permissions default to none).
     permissions:
-      actions: read
-      contents: write
-      issues: write
+      actions: read # Read workflow runs and artifacts for workflow context.
+      contents: write # Create or update repository contents.
+      issues: write # Create or update issues and comments.
     concurrency:
       group: "gh-aw-conclusion-eslint-refiner-${{ github.run_id }}"
       cancel-in-progress: false
@@ -2000,7 +2000,7 @@ jobs:
     # Permissions for the conclusion_admission job (workflow permissions default to none).
     permissions:
       contents: read
-      id-token: write
+      id-token: write # Request an OIDC token for authenticated services.
     timeout-minutes: 5
     env:
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
@@ -2285,7 +2285,7 @@ jobs:
           fi
           # shellcheck disable=SC1003,SC2016,SC2086
           awf --config "${RUNNER_TEMP}/gh-aw/awf-config.json" --container-workdir "${GITHUB_WORKSPACE}" --mount "${RUNNER_TEMP}/gh-aw:${RUNNER_TEMP}/gh-aw:ro" --mount "${RUNNER_TEMP}/gh-aw:/host${RUNNER_TEMP}/gh-aw:ro" ${GH_AW_TOOL_CACHE_MOUNT:+--mount "$GH_AW_TOOL_CACHE_MOUNT"} ${GH_AW_DOCKER_HOST:+--docker-host "$GH_AW_DOCKER_HOST"} --env-all --exclude-env ACTIONS_ID_TOKEN_REQUEST_TOKEN --exclude-env ACTIONS_ID_TOKEN_REQUEST_URL --exclude-env ANTHROPIC_API_KEY --exclude-env GH_AW_OTLP_ALL_HEADERS --exclude-env GH_AW_OTLP_ENDPOINTS --exclude-env OTEL_EXPORTER_OTLP_ENDPOINT --exclude-env OTEL_EXPORTER_OTLP_HEADERS --mount /tmp/gh-aw:/tmp/gh-aw:rw --mount /tmp/gh-aw/threat-detection:/tmp/gh-aw/threat-detection:rw --log-level info --skip-pull \
-            -- /bin/bash -c 'set +o histexpand; : "${RUNNER_TOOL_CACHE:?RUNNER_TOOL_CACHE must be set}"; GH_AW_TOOL_CACHE="$RUNNER_TOOL_CACHE"; GH_AW_TOOL_BINS="$(find "$GH_AW_TOOL_CACHE" -maxdepth 5 -type d -name bin 2>/dev/null | tr "\n" ":")"; GH_AW_TOOL_BINS="${GH_AW_TOOL_BINS%:}"; export PATH="$PATH${GH_AW_TOOL_BINS:+:}$GH_AW_TOOL_BINS"; [ -n "$GOROOT" ] && export PATH="$GOROOT/bin:$PATH" || true; [ -n "$ERLANG_HOME" ] && export PATH="$ERLANG_HOME/bin:$PATH" || true && threat-detect --engine claude --output /tmp/gh-aw/threat-detection/detection_result.json /tmp/gh-aw/threat-detection' 2>&1 | tee -a /tmp/gh-aw/threat-detection/detection.log
+            -- /bin/bash -c 'set +o histexpand; : "${RUNNER_TOOL_CACHE:?RUNNER_TOOL_CACHE must be set}"; GH_AW_TOOL_CACHE="$RUNNER_TOOL_CACHE"; GH_AW_TOOL_BINS="$(find "$GH_AW_TOOL_CACHE" -maxdepth 5 -type d -name bin 2>/dev/null | tr "\n" ":")"; GH_AW_TOOL_BINS="${GH_AW_TOOL_BINS%:}"; export PATH="$PATH${GH_AW_TOOL_BINS:+:}$GH_AW_TOOL_BINS"; [ -n "$GOROOT" ] && export PATH="$GOROOT/bin:$PATH" || true; [ -n "$ERLANG_HOME" ] && export PATH="$ERLANG_HOME/bin:$PATH" || true && threat-detect --engine claude --output /tmp/gh-aw/threat-detection/detection_result.json /tmp/gh-aw/threat-detection-inputs' 2>&1 | tee -a /tmp/gh-aw/threat-detection/detection.log
       - name: Copy detection firewall logs
         if: always() && steps.detection_guard.outputs.run_detection == 'true'
         continue-on-error: true
@@ -2583,7 +2583,7 @@ jobs:
     runs-on: ubuntu-slim
     # Permissions for the push_evals_state job (workflow permissions default to none).
     permissions:
-      contents: write
+      contents: write # Create or update repository contents.
     env:
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     steps:
@@ -2687,10 +2687,10 @@ jobs:
     runs-on: ubuntu-slim
     # Permissions for the safe_outputs job (workflow permissions default to none).
     permissions:
-      actions: write
-      contents: write
-      discussions: write
-      issues: write
+      actions: write # Create or update workflow runs and artifacts.
+      contents: write # Create or update repository contents.
+      discussions: write # Create or update discussions and comments.
+      issues: write # Create or update issues and comments.
     timeout-minutes: 15
     env:
       GH_AW_AGENT_AIC: ${{ needs.agent.outputs.aic }}
@@ -3035,7 +3035,7 @@ jobs:
     # Permissions for the work_queue_prepare_persist_eslint_memory_0 job (workflow permissions default to none).
     permissions:
       contents: read
-      actions: read
+      actions: read # Read workflow runs and artifacts for workflow context.
     timeout-minutes: 10
     env:
       GH_AW_OTLP_ALL_HEADERS: ""
@@ -3194,7 +3194,7 @@ jobs:
     # Permissions for the work_queue_prepare_persist_eslint_memory_1 job (workflow permissions default to none).
     permissions:
       contents: read
-      actions: read
+      actions: read # Read workflow runs and artifacts for workflow context.
     timeout-minutes: 10
     env:
       GH_AW_OTLP_ALL_HEADERS: ""
@@ -3353,7 +3353,7 @@ jobs:
     # Permissions for the work_queue_prepare_persist_eslint_memory_10 job (workflow permissions default to none).
     permissions:
       contents: read
-      actions: read
+      actions: read # Read workflow runs and artifacts for workflow context.
     timeout-minutes: 10
     env:
       GH_AW_OTLP_ALL_HEADERS: ""
@@ -3512,7 +3512,7 @@ jobs:
     # Permissions for the work_queue_prepare_persist_eslint_memory_11 job (workflow permissions default to none).
     permissions:
       contents: read
-      actions: read
+      actions: read # Read workflow runs and artifacts for workflow context.
     timeout-minutes: 10
     env:
       GH_AW_OTLP_ALL_HEADERS: ""
@@ -3671,7 +3671,7 @@ jobs:
     # Permissions for the work_queue_prepare_persist_eslint_memory_12 job (workflow permissions default to none).
     permissions:
       contents: read
-      actions: read
+      actions: read # Read workflow runs and artifacts for workflow context.
     timeout-minutes: 10
     env:
       GH_AW_OTLP_ALL_HEADERS: ""
@@ -3830,7 +3830,7 @@ jobs:
     # Permissions for the work_queue_prepare_persist_eslint_memory_13 job (workflow permissions default to none).
     permissions:
       contents: read
-      actions: read
+      actions: read # Read workflow runs and artifacts for workflow context.
     timeout-minutes: 10
     env:
       GH_AW_OTLP_ALL_HEADERS: ""
@@ -3989,7 +3989,7 @@ jobs:
     # Permissions for the work_queue_prepare_persist_eslint_memory_14 job (workflow permissions default to none).
     permissions:
       contents: read
-      actions: read
+      actions: read # Read workflow runs and artifacts for workflow context.
     timeout-minutes: 10
     env:
       GH_AW_OTLP_ALL_HEADERS: ""
@@ -4148,7 +4148,7 @@ jobs:
     # Permissions for the work_queue_prepare_persist_eslint_memory_15 job (workflow permissions default to none).
     permissions:
       contents: read
-      actions: read
+      actions: read # Read workflow runs and artifacts for workflow context.
     timeout-minutes: 10
     env:
       GH_AW_OTLP_ALL_HEADERS: ""
@@ -4307,7 +4307,7 @@ jobs:
     # Permissions for the work_queue_prepare_persist_eslint_memory_2 job (workflow permissions default to none).
     permissions:
       contents: read
-      actions: read
+      actions: read # Read workflow runs and artifacts for workflow context.
     timeout-minutes: 10
     env:
       GH_AW_OTLP_ALL_HEADERS: ""
@@ -4466,7 +4466,7 @@ jobs:
     # Permissions for the work_queue_prepare_persist_eslint_memory_3 job (workflow permissions default to none).
     permissions:
       contents: read
-      actions: read
+      actions: read # Read workflow runs and artifacts for workflow context.
     timeout-minutes: 10
     env:
       GH_AW_OTLP_ALL_HEADERS: ""
@@ -4625,7 +4625,7 @@ jobs:
     # Permissions for the work_queue_prepare_persist_eslint_memory_4 job (workflow permissions default to none).
     permissions:
       contents: read
-      actions: read
+      actions: read # Read workflow runs and artifacts for workflow context.
     timeout-minutes: 10
     env:
       GH_AW_OTLP_ALL_HEADERS: ""
@@ -4784,7 +4784,7 @@ jobs:
     # Permissions for the work_queue_prepare_persist_eslint_memory_5 job (workflow permissions default to none).
     permissions:
       contents: read
-      actions: read
+      actions: read # Read workflow runs and artifacts for workflow context.
     timeout-minutes: 10
     env:
       GH_AW_OTLP_ALL_HEADERS: ""
@@ -4943,7 +4943,7 @@ jobs:
     # Permissions for the work_queue_prepare_persist_eslint_memory_6 job (workflow permissions default to none).
     permissions:
       contents: read
-      actions: read
+      actions: read # Read workflow runs and artifacts for workflow context.
     timeout-minutes: 10
     env:
       GH_AW_OTLP_ALL_HEADERS: ""
@@ -5102,7 +5102,7 @@ jobs:
     # Permissions for the work_queue_prepare_persist_eslint_memory_7 job (workflow permissions default to none).
     permissions:
       contents: read
-      actions: read
+      actions: read # Read workflow runs and artifacts for workflow context.
     timeout-minutes: 10
     env:
       GH_AW_OTLP_ALL_HEADERS: ""
@@ -5261,7 +5261,7 @@ jobs:
     # Permissions for the work_queue_prepare_persist_eslint_memory_8 job (workflow permissions default to none).
     permissions:
       contents: read
-      actions: read
+      actions: read # Read workflow runs and artifacts for workflow context.
     timeout-minutes: 10
     env:
       GH_AW_OTLP_ALL_HEADERS: ""
@@ -5420,7 +5420,7 @@ jobs:
     # Permissions for the work_queue_prepare_persist_eslint_memory_9 job (workflow permissions default to none).
     permissions:
       contents: read
-      actions: read
+      actions: read # Read workflow runs and artifacts for workflow context.
     timeout-minutes: 10
     env:
       GH_AW_OTLP_ALL_HEADERS: ""

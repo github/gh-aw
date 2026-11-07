@@ -541,9 +541,18 @@ func TestGenerateMaintenanceWorkflow_OperationJobConditions(t *testing.T) {
 	// Verify apply_safe_outputs job exposes run_url output
 	applyIdx2 := strings.Index(yaml, "\n  apply_safe_outputs:")
 	if applyIdx2 != -1 {
-		applySection2 := yaml[applyIdx2 : applyIdx2+600]
+		applySection2 := yaml[applyIdx2:]
+		headerLength := len("\n  apply_safe_outputs:")
+		sectionOffset := 0
+		for _, line := range strings.SplitAfter(applySection2[headerLength:], "\n") {
+			if strings.HasPrefix(line, "  ") && !strings.HasPrefix(line, "   ") {
+				applySection2 = applySection2[:headerLength+sectionOffset]
+				break
+			}
+			sectionOffset += len(line)
+		}
 		if !strings.Contains(applySection2, "outputs:\n      run_url: ${{ steps.record.outputs.run_url }}") {
-			t.Errorf("apply_safe_outputs job should declare run_url output, got:\n%s", applySection2[:300])
+			t.Errorf("apply_safe_outputs job should declare run_url output, got:\n%s", applySection2[:min(300, len(applySection2))])
 		}
 	}
 }

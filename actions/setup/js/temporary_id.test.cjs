@@ -106,6 +106,11 @@ describe("temporary_id.cjs", () => {
   });
 
   describe("normalizeTemporaryId", () => {
+    it("should normalize Markdown-escaped references", async () => {
+      const { normalizeTemporaryId } = await import("./temporary_id.cjs");
+      expect(normalizeTemporaryId("\\#AW\\_PR\\_FIX")).toBe("aw_pr_fix");
+    });
+
     it("should convert to lowercase", async () => {
       const { normalizeTemporaryId } = await import("./temporary_id.cjs");
       expect(normalizeTemporaryId("aw_ABC123")).toBe("aw_abc123");
@@ -120,6 +125,34 @@ describe("temporary_id.cjs", () => {
   });
 
   describe("replaceTemporaryIdReferences", () => {
+    it.each(["#aw\\_track1", "\\#aw_track1", "\\#aw\\_track1", "\\#AW\\_TRACK1"])("should resolve Markdown-escaped reference %s", async reference => {
+      const { replaceTemporaryIdReferences } = await import("./temporary_id.cjs");
+      const map = new Map([["aw_track1", { repo: "github/gh-aw-firewall", number: 123 }]]);
+      expect(replaceTemporaryIdReferences(`🔗 AWF tracking issue: ${reference}`, map, "github/gh-aw")).toBe("🔗 AWF tracking issue: github/gh-aw-firewall#123");
+      expect(replaceTemporaryIdReferences(reference, map, "github/gh-aw-firewall")).toBe("#123");
+      expect(mockCore.warning).not.toHaveBeenCalled();
+    });
+
+    it("should resolve escaped underscores within temporary IDs without unescaping other Markdown", async () => {
+      const { replaceTemporaryIdReferences } = await import("./temporary_id.cjs");
+      const map = new Map([["aw_pr_fix", { repo: "owner/repo", number: 100 }]]);
+      expect(replaceTemporaryIdReferences("See \\#aw\\_pr\\_fix and \\_literal\\_", map, "owner/repo")).toBe("See #100 and \\_literal\\_");
+    });
+
+    it("should preserve unresolved and malformed escaped references exactly", async () => {
+      const { replaceTemporaryIdReferences } = await import("./temporary_id.cjs");
+      const text = "See \\#aw\\_track1, \\#aw\\_ab and \\#aw\\_toolongname123";
+      expect(replaceTemporaryIdReferences(text, new Map(), "owner/repo")).toBe(text);
+      expect(mockCore.warning).toHaveBeenCalledTimes(2);
+    });
+
+    it.each(["\\#aw\\_test-id", "\\#aw\\_test\\_12345678"])("should not resolve a valid prefix of malformed escaped reference %s", async reference => {
+      const { replaceTemporaryIdReferences } = await import("./temporary_id.cjs");
+      const map = new Map([["aw_test", { repo: "owner/repo", number: 100 }]]);
+      expect(replaceTemporaryIdReferences(reference, map, "owner/repo")).toBe(reference);
+      expect(mockCore.warning).toHaveBeenCalledOnce();
+    });
+
     it("should replace #aw_ID with issue numbers (same repo)", async () => {
       const { replaceTemporaryIdReferences } = await import("./temporary_id.cjs");
       const map = new Map([["aw_abc123", { repo: "owner/repo", number: 100 }]]);
@@ -223,6 +256,12 @@ describe("temporary_id.cjs", () => {
   });
 
   describe("replaceTemporaryIdReferencesInPatch", () => {
+    it("should resolve escaped URL references without leaving a fragment or escape", async () => {
+      const { replaceTemporaryIdReferencesInPatch } = await import("./temporary_id.cjs");
+      const map = new Map([["aw_track1", { repo: "owner/repo", number: 100 }]]);
+      expect(replaceTemporaryIdReferencesInPatch("https://github.com/owner/repo/issues/\\#aw\\_track1", map, "owner/repo")).toBe("https://github.com/owner/repo/issues/100");
+    });
+
     it("should replace #aw_ID in text context within patch content", async () => {
       const { replaceTemporaryIdReferencesInPatch } = await import("./temporary_id.cjs");
       const map = new Map([["aw_abc123", { repo: "owner/repo", number: 100 }]]);
@@ -574,6 +613,13 @@ describe("temporary_id.cjs", () => {
   });
 
   describe("hasUnresolvedTemporaryIds", () => {
+    it("should detect escaped references until their targets are created", async () => {
+      const { hasUnresolvedTemporaryIds } = await import("./temporary_id.cjs");
+      const text = "🔗 AWF tracking issue: \\#aw\\_track1";
+      expect(hasUnresolvedTemporaryIds(text, new Map())).toBe(true);
+      expect(hasUnresolvedTemporaryIds(text, new Map([["aw_track1", { repo: "owner/repo", number: 100 }]]))).toBe(false);
+    });
+
     it("should return false when text has no temporary IDs", async () => {
       const { hasUnresolvedTemporaryIds } = await import("./temporary_id.cjs");
       const map = new Map();
@@ -661,6 +707,13 @@ describe("temporary_id.cjs", () => {
   });
 
   describe("replaceArtifactUrlReferences", () => {
+    it("should resolve escaped artifact references", async () => {
+      const { replaceArtifactUrlReferences } = await import("./temporary_id.cjs");
+      const url = "https://github.com/owner/repo/actions/runs/1/artifacts/42";
+      expect(replaceArtifactUrlReferences("See \\#aw\\_chart1", new Map([["aw_chart1", url]]))).toBe(`See ${url}`);
+      expect(mockCore.warning).not.toHaveBeenCalled();
+    });
+
     it("should replace #aw_ID with the artifact URL", async () => {
       const { replaceArtifactUrlReferences } = await import("./temporary_id.cjs");
       const artifactUrlMap = new Map([["aw_chart1", "https://github.com/owner/repo/actions/runs/1/artifacts/42"]]);
@@ -725,6 +778,12 @@ describe("temporary_id.cjs", () => {
   });
 
   describe("replaceTemporaryProjectReferences", () => {
+    it("should resolve escaped project references", async () => {
+      const { replaceTemporaryProjectReferences } = await import("./temporary_id.cjs");
+      const url = "https://github.com/orgs/myorg/projects/123";
+      expect(replaceTemporaryProjectReferences("See \\#aw\\_project1", new Map([["aw_project1", url]]))).toBe(`See ${url}`);
+    });
+
     it("should replace #aw_ID with project URLs", async () => {
       const { replaceTemporaryProjectReferences } = await import("./temporary_id.cjs");
       const map = new Map([["aw_abc123", "https://github.com/orgs/myorg/projects/123"]]);
@@ -788,6 +847,17 @@ describe("temporary_id.cjs", () => {
   });
 
   describe("extractTemporaryIdReferences", () => {
+    it("should extract normalized dependencies from Markdown-escaped text fields", async () => {
+      const { extractTemporaryIdReferences } = await import("./temporary_id.cjs");
+      expect(
+        extractTemporaryIdReferences({
+          body: "🔗 AWF tracking issue: \\#aw\\_track1",
+          title: "Follow up \\#AW\\_TRACK1",
+          description: "See \\#aw\\_pr\\_fix",
+        })
+      ).toEqual(new Set(["aw_track1", "aw_pr_fix"]));
+    });
+
     it("should extract temporary IDs from body field", async () => {
       const { extractTemporaryIdReferences } = await import("./temporary_id.cjs");
 

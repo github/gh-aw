@@ -469,6 +469,7 @@ func TestExpressionModelUsesEnvVar(t *testing.T) {
 		expectedModelEnvVar  string
 		expectedModelEnvVal  string
 		expectedFallbackVal  string
+		additionalModelEnv   []string
 		expectShellExpansion bool // whether command should use ${VAR:+ --model "$VAR"}
 	}{
 		{
@@ -516,6 +517,27 @@ func TestExpressionModelUsesEnvVar(t *testing.T) {
 			expectedFallbackVal:  "${{ vars." + constants.EnvVarModelAgentCodex + " || vars." + compilerenv.DefaultModelCodex + " || '' }}",
 			expectShellExpansion: true, // Codex has no native model env var, uses shell expansion
 		},
+		{
+			name:                "Gemini agent passes expression model through its native env",
+			engine:              "gemini",
+			model:               "${{ inputs.model }}",
+			expectedModelEnvVar: constants.GeminiCLIModelEnvVar,
+			expectedModelEnvVal: "${{ inputs.model }}",
+		},
+		{
+			name:                "Agy agent passes expression model through its native env",
+			engine:              "agy",
+			model:               "${{ inputs.model }}",
+			expectedModelEnvVar: "GH_AW_AGY_MODEL",
+			expectedModelEnvVal: "${{ inputs.model }}",
+		},
+		{
+			name:                "Pi agent passes expression model through its runtime env",
+			engine:              "pi",
+			model:               "copilot/${{ inputs.model }}",
+			expectedModelEnvVar: "GH_AW_PI_MODEL",
+			expectedModelEnvVal: "copilot/${{ inputs.model }}",
+		},
 	}
 
 	for _, tt := range tests {
@@ -549,10 +571,25 @@ func TestExpressionModelUsesEnvVar(t *testing.T) {
 			}
 			stepsContent := stepsStr.String()
 
-			// The expression must NOT appear directly in the shell command run: block
-			// (it should be in the env: block only)
-			if strings.Contains(stepsContent, "--model ${{") || strings.Contains(stepsContent, "--model \"${{") {
-				t.Errorf("Model expression should not be embedded directly in shell command in steps:\n%s", stepsContent)
+			var commandContent strings.Builder
+			for _, step := range steps {
+				inRunBlock := false
+				for _, line := range step {
+					switch strings.TrimSpace(line) {
+					case "run: |":
+						inRunBlock = true
+					case "env:":
+						inRunBlock = false
+					default:
+						if inRunBlock {
+							commandContent.WriteString(line)
+							commandContent.WriteString("\n")
+						}
+					}
+				}
+			}
+			if strings.Contains(commandContent.String(), tt.model) {
+				t.Errorf("Model expression should not be embedded directly in shell commands:\n%s", commandContent.String())
 			}
 
 			// The env var must be set to the expression value
@@ -560,9 +597,16 @@ func TestExpressionModelUsesEnvVar(t *testing.T) {
 			if !strings.Contains(stepsContent, expectedModelEnvLine) {
 				t.Errorf("Expected env line '%s' not found in steps:\n%s", expectedModelEnvLine, stepsContent)
 			}
-			expectedFallbackEnvLine := constants.EnvVarModelFallback + ": " + tt.expectedFallbackVal
-			if !strings.Contains(stepsContent, expectedFallbackEnvLine) {
-				t.Errorf("Expected fallback env line '%s' not found in steps:\n%s", expectedFallbackEnvLine, stepsContent)
+			if tt.expectedFallbackVal != "" {
+				expectedFallbackEnvLine := constants.EnvVarModelFallback + ": " + tt.expectedFallbackVal
+				if !strings.Contains(stepsContent, expectedFallbackEnvLine) {
+					t.Errorf("Expected fallback env line '%s' not found in steps:\n%s", expectedFallbackEnvLine, stepsContent)
+				}
+			}
+			for _, expectedEnvLine := range tt.additionalModelEnv {
+				if !strings.Contains(stepsContent, expectedEnvLine) {
+					t.Errorf("Expected model env line '%s' not found in steps:\n%s", expectedEnvLine, stepsContent)
+				}
 			}
 
 			// Check shell expansion expectation
