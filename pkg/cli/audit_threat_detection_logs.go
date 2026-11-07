@@ -75,7 +75,7 @@ func uniqueQualifiedConclusionLog(workflowLogsDir string) (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	names := make(map[string]bool)
+	names := make(map[string]struct{})
 	for _, entry := range entries {
 		if entry.Type()&os.ModeSymlink != 0 {
 			continue
@@ -89,7 +89,7 @@ func uniqueQualifiedConclusionLog(workflowLogsDir string) (string, bool) {
 			name = jobName
 		}
 		if strings.HasSuffix(name, " _ conclusion") {
-			names[name] = true
+			names[name] = struct{}{}
 		}
 	}
 	if len(names) != 1 {
