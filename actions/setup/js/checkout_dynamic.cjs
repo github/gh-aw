@@ -7,6 +7,8 @@ const { createInterface } = require("readline");
 const { isRepoAllowed } = require("./repo_helpers.cjs");
 const { getSetupTimeoutMs } = require("./child_process_timeouts.cjs");
 
+const NO_OP_STEP = { shell: "bash", run: "true" };
+
 // Only controlled messages may be propagated to workflow failure issues.
 class CheckoutPreparationError extends Error {}
 
@@ -223,12 +225,13 @@ async function prepareCheckouts({ github, getOctokit }, token) {
   // A composite action must contain at least one step, even for an empty scheduled batch.
   try {
     fs.mkdirSync(actionDir, { recursive: true });
+    fs.writeFileSync(path.join(actionDir, ".gitignore"), "*\n");
     fs.writeFileSync(
       path.join(actionDir, "action.yml"),
       JSON.stringify({
         name: "Runtime repository checkout",
         description: "Checkout prevalidated runtime repositories",
-        runs: { using: "composite", steps: steps.length ? steps : [{ shell: "bash", run: "true" }] },
+        runs: { using: "composite", steps: steps.length ? steps : [NO_OP_STEP] },
       })
     );
   } catch (error) {
@@ -394,10 +397,26 @@ async function finish(options = {}) {
   }
   const actionDir = workspacePath(config.workspace, `.gh-aw/checkouts/${config.index}`);
   try {
-    fs.unlinkSync(path.join(actionDir, "action.yml"));
-    fs.rmdirSync(actionDir);
+    // The runner reloads this composite for checkout post hooks; retain a token-free no-op.
+    const temporaryDir = fs.mkdtempSync(path.join(actionDir, ".finalize-"));
+    try {
+      const temporaryManifest = path.join(temporaryDir, "action.yml");
+      fs.writeFileSync(
+        temporaryManifest,
+        JSON.stringify({
+          name: "Runtime repository checkout",
+          description: "Runtime repository checkout finalized",
+          runs: { using: "composite", steps: [NO_OP_STEP] },
+        }),
+        { flag: "wx" }
+      );
+      // Rename atomically to preserve the original on failure without following a manifest symlink.
+      fs.renameSync(temporaryManifest, path.join(actionDir, "action.yml"));
+    } finally {
+      fs.rmSync(temporaryDir, { recursive: true, force: true });
+    }
   } catch (error) {
-    throw new Error("Unable to remove the temporary runtime checkout action", { cause: error });
+    throw new Error("Unable to finalize the temporary runtime checkout action", { cause: error });
   }
   return entries;
 }
