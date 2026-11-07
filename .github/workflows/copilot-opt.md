@@ -80,6 +80,8 @@ steps:
       if [ -d "$LOG_DIR" ]; then
         for f in "$LOG_DIR"/*; do
           if [ -f "$f" ]; then
+            # Structured events must remain valid and complete for telemetry analysis.
+            case "$f" in *-events.jsonl) continue ;; esac
             SIZE=$(wc -c < "$f")
             if [ "$SIZE" -gt "$THRESHOLD" ]; then
               # THRESHOLD (10240) > FIRST_CHUNK+LAST_CHUNK (6144), so no chunk overlap possible
@@ -109,6 +111,7 @@ Pre-fetched data is available from shared imports:
 
 - `/tmp/gh-aw/agent/session-data/sessions-list.json`
 - `/tmp/gh-aw/agent/session-data/logs/` (conversation logs and/or fallback logs)
+- `/tmp/gh-aw/agent/session-data/tool-summaries.json` (per-session tool latency and UTF-8 payload sizes; unavailable measurements are null)
 - `/tmp/gh-aw/agent/pr-data/copilot-prs.json` (cross-analysis source — always present)
 
 These paths are populated by imported setup components:
@@ -120,6 +123,7 @@ These paths are populated by imported setup components:
 0. **Use `gh` CLI for GitHub reads** (`gh pr list`, `gh pr view`, `gh issue list`, etc.) in analysis steps. The `gh` CLI is pre-authenticated and is the primary tool for reading from GitHub.
 1. Process **all available sessions** in the last 14 days (deterministic; no sampling unless data is too large to load in one pass).
 2. Parse session event data from `events.jsonl` when available.
+   Use `tool-summaries.json` for an initial scan; transcript-only or missing sessions do not provide structured tool measurements. Check invalid events and unmatched/incomplete calls before drawing conclusions.
 3. Detect these classes of issues:
    - slow MCP/tool calls
    - oversized tool responses
