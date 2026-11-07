@@ -6,7 +6,7 @@
 // It also adds the categorized, privacy-safe noop body to the activation comment.
 
 const { loadAgentOutput } = require("./load_agent_output.cjs");
-const { getRunSuccessMessage, getRunFailureMessage, getDetectionFailureMessage, getDetectionWarningMessage } = require("./messages_run_status.cjs");
+const { getRunSuccessMessage, getRunFailureMessage, getDetectionFailureBlocks, getDetectionWarningBlocks } = require("./messages_run_status.cjs");
 const { getMessages } = require("./messages_core.cjs");
 const { getErrorMessage, isLockedError } = require("./error_helpers.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
@@ -192,14 +192,16 @@ async function main() {
 
   // Determine the message based on agent conclusion using custom messages if configured
   let message;
-  let detectionWarningMessage = "";
+  let detectionBlocks = [];
 
   // Check if detection job failed (if detection job exists)
   if (detectionConclusion && detectionConclusion === "failure") {
     // Detection job failed in error mode - report this prominently
-    message = getDetectionFailureMessage({
-      workflowName: "{workflow_name}",
-      runUrl: "{run_url}",
+    message = "";
+    detectionBlocks = getDetectionFailureBlocks({
+      workflowName: sanitizeContent(workflowName),
+      runUrl,
+      reason: detectionReason,
     });
   } else if (detectionConclusion && detectionConclusion === "warning") {
     // Detection job produced a warning (continue-on-error mode)
@@ -217,9 +219,9 @@ async function main() {
       });
     }
     // Build the caution section for detection warning
-    detectionWarningMessage = getDetectionWarningMessage({
-      workflowName: "{workflow_name}",
-      runUrl: "{run_url}",
+    detectionBlocks = getDetectionWarningBlocks({
+      workflowName: sanitizeContent(workflowName),
+      runUrl,
       reason: detectionReason,
     });
   } else if (agentConclusion === "success" && assignToAgentErrorCount === 0 && safeOutputsResult !== "failure") {
@@ -235,15 +237,13 @@ async function main() {
     });
   }
 
-  const templateContext = Object.fromEntries(Array.from((message + detectionWarningMessage).matchAll(/\{(\w+)\}/g), match => [match[1], match[0]]));
+  const templateContext = Object.fromEntries(Array.from(message.matchAll(/\{(\w+)\}/g), match => [match[1], match[0]]));
   Object.assign(templateContext, { workflow_name: sanitizeContent(workflowName), run_url: runUrl });
   const children = parseReportMarkdown(sanitizeContent(message), { context: templateContext, agentTainted: false, minimumHeadingLevel: 2 });
 
   // Import template and existing Markdown separately so an unclosed fence cannot
   // consume the following status sections or generated metadata.
-  if (detectionWarningMessage) {
-    children.push(...parseReportMarkdown(sanitizeContent(detectionWarningMessage), { context: templateContext, agentTainted: false, minimumHeadingLevel: 2 }));
-  }
+  children.push(...detectionBlocks);
 
   // Preserve links (e.g. "Pull request created: #X") that safe outputs appended to the
   // activation comment; otherwise this final status update would overwrite them.

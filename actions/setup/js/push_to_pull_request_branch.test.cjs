@@ -2021,14 +2021,15 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
     });
 
     it.each([
-      ["warning", "agent_failure", "> [!WARNING]", "> Threat detection engine error", "<!-- gh-aw-threat-engine-error -->", "<!-- gh-aw-threat-detected -->"],
+      ["warning", "agent_failure", "> [!WARNING]", "> **Threat detection engine error**", "<!-- gh-aw-threat-engine-error -->", "<!-- gh-aw-threat-detected -->"],
       ["warning", "threat_detected", "> [!CAUTION]", "> agentic threat detected", "<!-- gh-aw-threat-detected -->", "<!-- gh-aw-threat-engine-error -->"],
       // Warn-mode detection engine failure as concluded by threat-detect v0.5.2 (run 39191157830).
-      ["failure", "agent_failure", "> [!WARNING]", "> Threat detection engine error", "<!-- gh-aw-threat-engine-error -->", "<!-- gh-aw-threat-detected -->"],
-      ["failure", "parse_error", "> [!WARNING]", "> Threat detection engine error", "<!-- gh-aw-threat-engine-error -->", "<!-- gh-aw-threat-detected -->"],
+      ["failure", "agent_failure", "> [!WARNING]", "> **Threat detection engine error**", "<!-- gh-aw-threat-engine-error -->", "<!-- gh-aw-threat-detected -->"],
+      ["failure", "parse_error", "> [!WARNING]", "> **Threat detection engine error**", "<!-- gh-aw-threat-engine-error -->", "<!-- gh-aw-threat-detected -->"],
     ])("should create a review PR body for %s/%s with the correct admonition and marker", async (conclusion, reason, admonition, title, expectedMarker, unexpectedMarker) => {
       process.env.GH_AW_DETECTION_CONCLUSION = conclusion;
       process.env.GH_AW_DETECTION_REASON = reason;
+      process.env.GH_AW_DETECTION_THREAT_KINDS = "secret_leak,malicious_patch,PRIVATE_TEXT";
       mockContext.runId = 12345;
       createPatchFile(`review-branch-body-${conclusion}-${reason}`);
 
@@ -2042,6 +2043,12 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
       expect(params.body).toContain(title);
       expect(params.body).toContain(expectedMarker);
       expect(params.body).not.toContain(unexpectedMarker);
+      expect(params.body).not.toContain("PRIVATE_TEXT");
+      if (reason === "threat_detected") {
+        expect(params.body).toContain("Detected threat types: secret leak, malicious patch.");
+      } else {
+        expect(params.body).not.toContain("Detected threat types:");
+      }
     });
 
     it("preserves the compiler callout when changes require a separate review PR", async () => {

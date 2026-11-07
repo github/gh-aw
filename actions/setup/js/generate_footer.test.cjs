@@ -488,6 +488,7 @@ describe("generate_footer.cjs", () => {
     it("should NOT include caution alert (caution is now injected by callers at the top)", () => {
       process.env.GH_AW_DETECTION_CONCLUSION = "warning";
       process.env.GH_AW_DETECTION_REASON = "threat_detected";
+      process.env.GH_AW_DETECTION_THREAT_KINDS = "secret_leak PRIVATE_TEXT";
 
       const result = generateExpiredEntityFooter("Test Workflow", "https://github.com/test/repo/actions/runs/123", "test-workflow");
 
@@ -522,6 +523,8 @@ describe("generate_footer.cjs", () => {
         expect(result).toContain("agentic threat detected");
         expect(result).toContain("<!-- gh-aw-threat-detected -->");
         expect(result).toContain("Potential security threats were detected");
+        expect(result).toContain("Detected threat types: secret leak.");
+        expect(result).not.toContain("PRIVATE_TEXT");
       });
 
       it("should return warning alert for agent_failure (tooling failure, not security finding)", () => {

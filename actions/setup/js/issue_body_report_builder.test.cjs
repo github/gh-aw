@@ -42,6 +42,20 @@ describe("issue report builder slots", () => {
     vi.unstubAllEnvs();
   });
 
+  it("keeps detector-defined threat types in the generated issue warning, separate from agent prose", () => {
+    vi.stubEnv("GH_AW_PROMPTS_DIR", new URL("../md/", import.meta.url).pathname);
+    vi.stubEnv("GH_AW_DETECTION_CONCLUSION", "warning");
+    vi.stubEnv("GH_AW_DETECTION_REASON", "threat_detected");
+    vi.stubEnv("GH_AW_DETECTION_THREAT_KINDS", "prompt_injection,malicious_patch,PRIVATE_DETECTOR_TEXT");
+    const report = buildIssueBodyReport("Finding", "Agent body: secret leak", { repo });
+    const { body } = renderReport(report);
+    expect(body).toContain("Detected threat types: prompt injection, malicious patch.");
+    expect(body).toContain("Agent body: secret leak");
+    expect(body).not.toContain("PRIVATE_DETECTOR_TEXT");
+    const alert = report.children.find(node => node.type === "alert" && node.kind === "CAUTION");
+    expect(alert.agentTainted).toBe(false);
+  });
+
   it("shallow-copies inserted block slots like inline slots without changing provenance", () => {
     const source = { type: "paragraph", agentTainted: true, children: [{ type: "text", value: "Payload", agentTainted: true }] };
     const blocks = parseReportMarkdown("{body}\n\n{body}", { blockSlots: { body: [source] }, agentTainted: false });

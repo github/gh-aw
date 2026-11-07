@@ -39,11 +39,11 @@ const fs = require("fs");
  * @property {string} [runStarted] - Custom workflow activation message template
  * @property {string} [runSuccess] - Custom workflow success message template
  * @property {string} [runFailure] - Custom workflow failure message template
- * @property {string} [detectionFailure] - Custom detection job failure message template
+ * @property {string} [detectionFailure] - Custom detection job failure message template. Placeholders: {workflow_name}, {run_url}, {reason_text}, {threat_kinds}
  * @property {string} [pullRequestCreated] - Custom template for pull request creation link. Placeholders: {item_number}, {item_url}
  * @property {string} [issueCreated] - Custom template for issue creation link. Placeholders: {item_number}, {item_url}
  * @property {string} [commitPushed] - Custom template for commit push link. Placeholders: {commit_sha}, {short_sha}, {commit_url}
- * @property {string} [detectionWarning] - Custom detection warning message template (continue-on-error mode). Placeholders: {workflow_name}, {run_url}, {reason_text}
+ * @property {string} [detectionWarning] - Custom detection warning message template (continue-on-error mode). Placeholders: {workflow_name}, {run_url}, {reason_text}, {threat_kinds}
  * @property {string} [agentFailureIssue] - Custom footer template for agent failure tracking issues
  * @property {string} [agentFailureComment] - Custom footer template for comments on agent failure tracking issues
  * @property {string} [closeOlderDiscussion] - Custom message for closing older discussions as outdated

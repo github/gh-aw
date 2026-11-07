@@ -9,6 +9,7 @@ const { ERR_API, ERR_SYSTEM } = require("./error_codes.cjs");
 const { parseReportMarkdown } = require("./report_markdown.cjs");
 const { renderSizedReport } = require("./report_size.cjs");
 const { getPromptPath } = require("./messages_core.cjs");
+const { getDetectionReasonText } = require("./threat_detection_warning.cjs");
 
 /**
  * Classify the warning/failure reasons emitted by parse_threat_detection_results.
@@ -22,7 +23,7 @@ function classifyDetectionOutcome(reason) {
       return {
         category: "threat_finding",
         reason,
-        description: "The detector reported a potential security threat. This is a finding, not a detector execution failure.",
+        description: `${getDetectionReasonText(reason)} This is a finding, not a detector execution failure.`,
       };
     case "agent_failure":
       return {

@@ -2043,6 +2043,7 @@ jobs:
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_DETECTION_CONCLUSION: ${{ needs.detection.outputs.detection_conclusion }}
           GH_AW_DETECTION_REASON: ${{ needs.detection.outputs.detection_reason }}
+          GH_AW_DETECTION_THREAT_KINDS: ${{ needs.detection.outputs.detection_threat_kinds }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -2191,6 +2192,7 @@ jobs:
           GH_AW_ACTIVATION_COMMENT_LINKS: ${{ needs.safe_outputs.outputs.activation_comment_links }}
           GH_AW_DETECTION_CONCLUSION: ${{ needs.detection.outputs.detection_conclusion }}
           GH_AW_DETECTION_REASON: ${{ needs.detection.outputs.detection_reason }}
+          GH_AW_DETECTION_THREAT_KINDS: ${{ needs.detection.outputs.detection_threat_kinds }}
           GH_AW_SAFE_OUTPUT_MESSAGES: "{\"footer\":\"\\u003e 🎤 *Magnifique! Performance by [{workflow_name}]({run_url})*{ai_credits_suffix}{history_link}\",\"runStarted\":\"🎵 Comme d'habitude! [{workflow_name}]({run_url}) takes the stage on this {event_type}...\",\"runSuccess\":\"🎤 Bravo! [{workflow_name}]({run_url}) has delivered a stunning performance! Standing ovation! 🌟\",\"runFailure\":\"🎵 Intermission... [{workflow_name}]({run_url}) {status}. Check the [run logs]({run_url}) for details.\"}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
@@ -2409,6 +2411,7 @@ jobs:
       detection_conclusion: ${{ steps.detection_conclusion.outputs.conclusion }}
       detection_reason: ${{ steps.detection_conclusion.outputs.reason }}
       detection_success: ${{ steps.detection_conclusion.outputs.success }}
+      detection_threat_kinds: ${{ steps.detection_conclusion.outputs.threat_kinds }}
       run_detection: ${{ steps.detection_guard.outputs.run_detection }}
     steps:
       - name: Checkout actions folder
@@ -3120,6 +3123,7 @@ jobs:
       GH_AW_COMMANDS: "[\"cloclo\"]"
       GH_AW_DETECTION_CONCLUSION: ${{ needs.detection.outputs.detection_conclusion }}
       GH_AW_DETECTION_REASON: ${{ needs.detection.outputs.detection_reason }}
+      GH_AW_DETECTION_THREAT_KINDS: ${{ needs.detection.outputs.detection_threat_kinds }}
       GH_AW_ENGINE_ID: "codex"
       GH_AW_ENGINE_MODEL: "copilot/gpt-5.6-terra"
       GH_AW_LABEL_COMMANDS: "[\"cloclo\"]"

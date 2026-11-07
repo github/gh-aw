@@ -11,7 +11,18 @@ const mockCore = {
 };
 global.core = mockCore;
 
-const { getRunStartedMessage, getRunSuccessMessage, getRunFailureMessage, getDetectionFailureMessage, getPullRequestCreatedMessage, getIssueCreatedMessage, getCommitPushedMessage } = require("./messages_run_status.cjs");
+const {
+  getRunStartedMessage,
+  getRunSuccessMessage,
+  getRunFailureMessage,
+  getDetectionFailureMessage,
+  getDetectionFailureBlocks,
+  getDetectionWarningBlocks,
+  getPullRequestCreatedMessage,
+  getIssueCreatedMessage,
+  getCommitPushedMessage,
+} = require("./messages_run_status.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 
 const WORKFLOW = "My Workflow";
 const RUN_URL = "https://github.com/owner/repo/actions/runs/99";
@@ -20,6 +31,8 @@ describe("messages_run_status", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     delete process.env.GH_AW_SAFE_OUTPUT_MESSAGES;
+    delete process.env.GH_AW_DETECTION_REASON;
+    delete process.env.GH_AW_DETECTION_THREAT_KINDS;
   });
 
   describe("getRunStartedMessage", () => {
@@ -97,7 +110,23 @@ describe("messages_run_status", () => {
   describe("getDetectionFailureMessage", () => {
     it("returns default template with placeholders substituted", () => {
       const msg = getDetectionFailureMessage({ workflowName: WORKFLOW, runUrl: RUN_URL });
-      expect(msg).toBe(`⚠️ Security scanning failed for [${WORKFLOW}](${RUN_URL}). Review the logs for details.`);
+      expect(msg).toBe(`⚠️ Security scanning failed for [${WORKFLOW}](${RUN_URL}). The threat detection analysis could not be completed. Review the logs for details.`);
+    });
+
+    it.each([getDetectionFailureBlocks, getDetectionWarningBlocks])("renders category-only details in failure and warning report trees", buildBlocks => {
+      process.env.GH_AW_PROMPTS_DIR = new URL("../md/", import.meta.url).pathname;
+      const children = buildBlocks({ workflowName: WORKFLOW, runUrl: RUN_URL, reason: "threat_detected", threatKinds: "prompt_injection,malicious_patch,PRIVATE_TEXT" });
+      const body = renderSizedReport({ type: "report", title: "Detection", children }).body;
+      expect(body).toContain("Detected threat types: prompt injection, malicious patch.");
+      expect(body).not.toContain("secret leak");
+      expect(body).not.toContain("PRIVATE_TEXT");
+      expect(JSON.stringify(children)).toContain('"agentTainted":false');
+    });
+
+    it("supplies safe category and description placeholders in configured templates", () => {
+      process.env.GH_AW_SAFE_OUTPUT_MESSAGES = JSON.stringify({ detectionFailure: "{threat_kinds}: {reason_text}" });
+      const body = getDetectionFailureMessage({ workflowName: WORKFLOW, runUrl: RUN_URL, reason: "threat_detected", threatKinds: "secret_leak PRIVATE_TEXT" });
+      expect(body).toBe("secret_leak: Potential security threats were detected in the agent output. Detected threat types: secret leak.");
     });
 
     it("uses custom template from config", () => {

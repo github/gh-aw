@@ -21,6 +21,54 @@ func isolatedPath(t *testing.T, binDir string) string {
 	return binDir
 }
 
+func TestConcludeThreatDetectionScript_ThreatKinds(t *testing.T) {
+	for _, tt := range []struct {
+		name, result, reason, wantKinds string
+	}{
+		{"multiple findings", `{"prompt_injection":true,"secret_leak":false,"malicious_patch":true,"reasons":["PRIVATE_TEXT"]}`, "threat_detected", "prompt_injection,malicious_patch"},
+		{"secret leak", `{"prompt_injection":false,"secret_leak":true,"malicious_patch":false}`, "threat_detected", "secret_leak"},
+		{"invalid boolean", `{"prompt_injection":"true","secret_leak":false,"malicious_patch":true}`, "threat_detected", ""},
+		{"malformed", `not-json PRIVATE_TEXT`, "threat_detected", ""},
+		{"tooling error", `{"prompt_injection":true,"secret_leak":true,"malicious_patch":true}`, "agent_failure", ""},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, policy := range []string{"true", "false"} {
+				tmpDir := t.TempDir()
+				resultFile := filepath.Join(tmpDir, "detection_result.json")
+				outputFile := filepath.Join(tmpDir, "github_output")
+				binDir := filepath.Join(tmpDir, "bin")
+				if err := os.MkdirAll(binDir, 0755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(resultFile, []byte(tt.result), 0644); err != nil {
+					t.Fatal(err)
+				}
+				stub := "#!/bin/bash\necho conclusion=failure >> \"$GITHUB_OUTPUT\"\necho reason=" + tt.reason + " >> \"$GITHUB_OUTPUT\"\nexit 1\n"
+				if err := os.WriteFile(filepath.Join(binDir, "threat-detect"), []byte(stub), 0755); err != nil {
+					t.Fatal(err)
+				}
+				cmd := exec.Command("bash", filepath.Join("..", "..", "actions", "setup", "sh", "conclude_threat_detection.sh"), resultFile)
+				cmd.Env = append(os.Environ(), "RUN_DETECTION=true", "GH_AW_DETECTION_CONTINUE_ON_ERROR="+policy, "GITHUB_OUTPUT="+outputFile, "PATH="+binDir+":"+os.Getenv("PATH"))
+				out, err := cmd.CombinedOutput()
+				wantErr := policy == "false" || tt.reason == "threat_detected"
+				if (err != nil) != wantErr {
+					t.Fatalf("exit error = %v, want error %v; output: %s", err, wantErr, out)
+				}
+				output, err := os.ReadFile(outputFile)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got := lastKeyValue(string(output), "threat_kinds"); got != tt.wantKinds {
+					t.Errorf("threat_kinds = %q, want %q", got, tt.wantKinds)
+				}
+				if strings.Contains(string(output)+string(out), "PRIVATE_TEXT") {
+					t.Fatal("category outputs or diagnostics exposed generated text")
+				}
+			}
+		})
+	}
+}
+
 // TestConcludeThreatDetectionScript_MissingBinaryWarnMode verifies that the
 // script's sole remaining shell-side special case — threat-detect missing
 // from PATH — warns and exits 0 when GH_AW_DETECTION_CONTINUE_ON_ERROR is not
@@ -477,7 +525,7 @@ func TestConcludeThreatDetectionScript_SkippedDetectionDoesNotInvokeBinary(t *te
 			if err != nil {
 				t.Fatalf("failed to read conclusion outputs: %v", err)
 			}
-			if string(output) != "conclusion=skipped\nsuccess=true\nreason=\n" {
+			if string(output) != "threat_kinds=\nconclusion=skipped\nsuccess=true\nreason=\n" {
 				t.Fatalf("unexpected explicit skip outputs: %s", output)
 			}
 		})

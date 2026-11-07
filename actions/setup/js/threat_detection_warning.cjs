@@ -1,7 +1,7 @@
 // @ts-check
 
 /**
- * Normalizes one or more threat-kind labels for XML marker use.
+ * Normalizes schema-defined threat-kind labels for public messages.
  * Accepts comma/space-delimited values and falls back to "unknown".
  *
  * @param {string | undefined | null} reason
@@ -14,21 +14,40 @@ function normalizeThreatKinds(reason) {
     .split(/[\s,]+/)
     .map(kind => kind.toLowerCase())
     .filter(Boolean)
-    // Marker values are machine-readable tokens; keep a strict safe charset.
-    .map(kind => kind.replace(/[^a-z0-9_-]/g, ""))
-    .filter(Boolean);
+    .filter(kind => Object.hasOwn(THREAT_KIND_LABELS, kind));
   return kinds.length > 0 ? Array.from(new Set(kinds)).join(",") : "unknown";
+}
+
+const THREAT_KIND_LABELS = {
+  prompt_injection: "prompt injection",
+  secret_leak: "secret leak",
+  malicious_patch: "malicious patch",
+};
+
+/**
+ * @param {string | undefined | null} [threatKinds]
+ * @returns {string}
+ */
+function getDetectedThreatKindsText(threatKinds = process.env.GH_AW_DETECTION_THREAT_KINDS) {
+  const normalized = normalizeThreatKinds(threatKinds);
+  return normalized === "unknown"
+    ? "Threat types were not reported."
+    : `Detected threat types: ${normalized
+        .split(",")
+        .map(kind => THREAT_KIND_LABELS[kind])
+        .join(", ")}.`;
 }
 
 /**
  * Returns a human-readable reason text for detection warnings.
  *
  * @param {string | undefined | null} reason
+ * @param {string | undefined | null} [threatKinds]
  * @returns {string}
  */
-function getDetectionReasonText(reason) {
+function getDetectionReasonText(reason, threatKinds = process.env.GH_AW_DETECTION_THREAT_KINDS) {
   const reasonDescriptions = {
-    threat_detected: "Potential security threats were detected in the agent output.",
+    threat_detected: `Potential security threats were detected in the agent output. ${getDetectedThreatKindsText(threatKinds)}`,
     agent_failure: "The threat detection engine failed to produce results.",
     parse_error: "The threat detection results could not be parsed.",
   };
@@ -146,6 +165,7 @@ function getThreatDetectedMarkerTemplate() {
 
 module.exports = {
   normalizeThreatKinds,
+  getDetectedThreatKindsText,
   getThreatWarningPresentation,
   getThreatDetectedMarker,
   getThreatDetectedMarkerTemplate,
