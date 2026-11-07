@@ -56,7 +56,7 @@ func run(pass *analysis.Pass) (any, error) {
 		pass.Report(analysis.Diagnostic{
 			Pos:     index.Pos(),
 			End:     index.End(),
-			Message: "strings.Split/SplitN(...)[0] allocates a []string just to read the first segment; use strings.Cut instead",
+			Message: "strings.SplitN(...)[0] allocates a []string just to read the first segment; use strings.Cut instead",
 		})
 	})
 }

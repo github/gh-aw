@@ -14,7 +14,7 @@ func splitFirst(value string) string {
 }
 
 func splitNFirst(value string) string {
-	return s.SplitN(value, separator, limit)[first] // want `strings\.Split`
+	return s.SplitN(value, separator, limit)[first] // want `strings\.SplitN\(\.\.\.\)\[0\] allocates a \[\]string just to read the first segment; use strings\.Cut instead`
 }
 
 func parenthesizedSplit(value string) string {

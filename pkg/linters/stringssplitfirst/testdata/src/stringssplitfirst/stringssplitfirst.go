@@ -16,6 +16,10 @@ func parenthesizedSplit(value string) string {
 	return (s.Split(value, ","))[0] // want `strings\.Split`
 }
 
+func parenthesizedSelector(value string) string {
+	return (s.Split)(value, ",")[0] // want `strings\.Split`
+}
+
 func emptySeparator(value string) string {
 	return s.Split(value, empty)[0]
 }

@@ -63,8 +63,7 @@ func run(pass *analysis.Pass) (any, error) {
 }
 
 func isStringsSplit(pass *analysis.Pass, call *ast.CallExpr) bool {
-	sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
-	if !ok || sel.Sel.Name != "Split" || !astutil.IsPkgSelector(pass, sel, "strings") {
+	if _, ok := astutil.AsStringsMethodCall(pass, call, "Split"); !ok {
 		return false
 	}
 	if len(call.Args) != 2 {
