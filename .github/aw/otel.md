@@ -8,7 +8,7 @@ This reference describes telemetry data, not agent instructions. Quoted external
 
 ## Scope and evidence
 
-This is a compact starting reference, not a completed exhaustive inventory. The implementation determines what is emitted; specification recommendations do not establish runtime availability. Attributes are conditional on job, engine, configuration, and available artifacts. Missing measurements are unknown, not zero.
+This is a source-contract inventory of production emitters found under `actions/setup/js`; it is not live telemetry. Attribute lists in the families table remain representative, and the detailed attribute reference holds the full key inventory. The implementation determines what is emitted; specification recommendations do not establish runtime availability. Attributes are conditional on job, engine, configuration, and available artifacts. Missing measurements are unknown, not zero.
 
 The source map is:
 
@@ -21,7 +21,7 @@ The source map is:
 | `pkg/workflow/observability_otlp.go` | Compiler-side configuration normalization and environment wiring. |
 | `actions/setup/js/send_otlp_span.test.cjs`, `actions/setup/js/otel_contract.test.cjs` | Runtime compatibility evidence; the `validate-otel-contract` Make target checks the contract. |
 
-No OTel TypeSpec model was found in the repository at seeding time. `specs/work-queue/transactions.tsp` describes work-queue transactions, not telemetry; the Markdown observability specification is the relevant contract.
+No OTel TypeSpec model exists in the repository. `specs/work-queue/transactions.tsp` describes work-queue transactions, not telemetry. See [TypeSpec applicability](#typespec-applicability).
 
 ## Signals and span placement
 
@@ -46,6 +46,96 @@ The keys below are representative entry points into the detailed attribute inven
 | Experiments and episodes | `gh-aw.experiment.<name>`, `gh-aw.experiments`; `gh-aw.episode.id`, `gh-aw.hop.id`, `gh-aw.hop.parent_id`, and workflow-call aliases correlate variants and nested executions. | `buildExperimentAttributes`, `buildEpisodeAttributesFromContext`; detailed attribute reference and spec section 7. |
 | Outputs and exporter health | `gh-aw.output.item_count`, `gh-aw.output.item_types`, `gh-aw.otlp.export_errors`, `gh-aw.otlp.export_error_details`, and `gh-aw.github.rate_limit.*`. Export-error counts describe observed export failures, not necessarily missing local traces. | `sendJobConclusionSpan`, `recordOTLPExportError`; spec sections 14-16. |
 
+## Additional emitters
+
+| Signal | Name or pattern | Producer | Conditions and shape |
+|---|---|---|---|
+| Span | `gh-aw.admission` (internal) and `gh-aw.admission.http` (client, child) | `main` in `check_admission.cjs` | Emitted only when the admission result is not `skipped` and at least one endpoint is configured. Attribute lists are empty; the span carries timing, trace/parent IDs, and resource attributes (`github.repository`, `github.run_id`, `deployment.environment`). HTTP attempts use `maxRetries: 0` export. |
+| Span | `<toolName>.run` (client) | `logSpan` in `otlp.cjs` | Dropped silently without a valid `GITHUB_AW_OTEL_TRACE_ID` (or `options.traceId`). Parent is `GITHUB_AW_OTEL_PARENT_SPAN_ID` when valid. Caller-supplied scalar attributes; status 2 plus optional message when `isError`. Sanitized, mirrored to `otel.jsonl`, then exported. |
+| Span | `work_queue.<operation>` (client, via `logSpan`) | `observeQueueOperation` in `work_queue_telemetry.cjs` | Requires a valid trace ID. Attributes use prefix `gh-aw.work_queue.`: `operation`, `publication.{attempts,conflict,ambiguous,commits,recovered}`, `request.kind`, `reason`, `outcome`, `error.type`, `reconciliation.{checked,unresolved}`, `queue.id` (SHA-256 hex of owner/repo/branch, not a raw name), `snapshot.present`, and when a snapshot exists `observed_at_unix_ms`, `work.{total,available,claimed,completed,cancelled,expired,retry_delayed,oldest_available_age_ms}`, `delivery.{pending,failed}`, `claims.open`, `reservations.{active,unbound,uncertain,unresolved}`, `capacity.{logical_limit,native_limit,logical_saturated_pools,native_saturated_pools}`. Enum-valued keys (`reason`, `request.kind`, `outcome`) are restricted to fixed sets in the source. Gauges-at-a-point-in-time stored as span attributes; not deduplicated across operations. |
+| Span | Engine-chosen name; links and events | `createDurableTelemetry` in `pi_durable_telemetry.cjs` | Durable-engine host telemetry. Written only to the journal `/tmp/gh-aw/agent/durable-otel.jsonl` (mode 0600), sanitized; this path is a separate file from `otel.jsonl`. Spans carry `links` (`traceId`, `spanId`), events, and status 2 when the record status is `error`. |
+| Log | Scope `gh-aw.session`, `severityText` `INFO` (number 9) | `sendSessionLogs` in `send_otlp_session_logs.cjs` | Opt-in via `GH_AW_OTLP_LOGS_ENABLED=true`; size cap `GH_AW_OTLP_LOGS_MAX_BYTES` (default 65536 bytes). Exports redacted compact session events as log bodies (kvlist), with log attribute `gh-aw.session.event_type`. Resource attributes: `service.name`, `gh-aw.session.compact.version`, `gh-aw.session.oversized_lines`, `gh-aw.session.scan_truncated`, `gh-aw.session.included_events`, `gh-aw.session.omitted_events`, `gh-aw.session.truncated`, `gh-aw.session.untimed_events`. Identity fields (repository, run, session, agent, ref, sha, path and similar) are stripped from bodies. Not mirrored locally (`skipJSONL`); integers are string-encoded `intValue`. |
+| Events | `exception`, `grader.result`, `eval.result`, `eval.status` | `sendJobConclusionSpan`, `buildGraderTelemetry`, `buildEvalTelemetry` | `exception` carries `exception.type` and `exception.message`. `eval.status` (`gh-aw.evals.status`, `gh-aw.evals.reason_code`, optional `gh-aw.eval.model`) replaces the count summary when evaluation did not run. Grader result keys: `gh-aw.grader.{id,name,status,source,unit,value,passed,severity}`; `value` is a double. |
+
+## Wire encoding and redaction
+
+- Traces are OTLP/HTTP JSON (`resourceSpans[].scopeSpans[].spans[]`), instrumentation scope `gh-aw` with the CLI version (or `unknown`). Span kinds: internal 1, client 3. Status code 1 is OK, 2 is error.
+- `buildAttr` encodes booleans as `boolValue`, safe integers as `intValue`, other finite numbers as `doubleValue`, everything else as `stringValue`. `buildDoubleAttr` (used for `gh-aw.aic`) always uses `doubleValue`, so a zero cost is the float `0`. In local mirror spans, `intValue` is a JSON number; timestamps are decimal strings. Session logs use string-encoded `intValue`.
+- `sanitizeOTLPPayload` runs on resource, span, and event attributes: string values whose key matches the sensitive-key pattern (token, secret, password, key, auth, credential and similar) become `[REDACTED]`; other strings are truncated to 1024 characters. `logSpan` sanitizes before mirroring; `appendToOTLPJSONL` itself does not sanitize, so treat a mirror as potentially containing run metadata.
+- Absent attributes mean unknown. For example `gen_ai.usage.total_tokens` is emitted only when both input and output counts are numbers.
+- Protocol: `http/json` or `http/protobuf` (`OTEL_EXPORTER_OTLP_*_PROTOCOL`); logs go to `/v1/logs`, traces to `/v1/traces`.
+
+## Synthetic examples
+
+Span in the local mirror (synthetic values):
+
+```json
+{"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"gh-aw"}},{"key":"github.run_id","value":{"stringValue":"123"}}]},"scopeSpans":[{"scope":{"name":"gh-aw","version":"1.0.0"},"spans":[{"traceId":"0af7651916cd43dd8448eb211c80319c","spanId":"b7ad6b7169203331","name":"gh-aw.agent.agent","kind":3,"startTimeUnixNano":"1700000000000000000","endTimeUnixNano":"1700000060000000000","status":{"code":1},"attributes":[{"key":"gh-aw.aic","value":{"doubleValue":0.125}},{"key":"gen_ai.usage.input_tokens","value":{"intValue":100}}]}]}]}]}
+```
+
+Session log record (synthetic):
+
+```json
+{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"gh-aw"}},{"key":"gh-aw.session.included_events","value":{"intValue":"1"}}]},"scopeLogs":[{"scope":{"name":"gh-aw.session","version":"1"},"logRecords":[{"severityNumber":9,"severityText":"INFO","body":{"kvlistValue":{"values":[{"key":"type","value":{"stringValue":"example"}}]}},"attributes":[{"key":"gh-aw.session.event_type","value":{"stringValue":"example"}}]}]}]}]}
+```
+
+## Query recipes
+
+Local mirror (`/tmp/gh-aw/otel.jsonl`, one JSON object per line). These were run against a synthetic fixture:
+
+```bash
+F=otel.jsonl
+# Span durations in seconds
+jq -r '.resourceSpans[]?.scopeSpans[]?.spans[]? | [.name, ((.endTimeUnixNano|tonumber)-(.startTimeUnixNano|tonumber))/1e9] | @tsv' $F
+# AI credits: only dedicated agent spans, deduplicated by trace+span ID
+jq -s '[.[].resourceSpans[]?.scopeSpans[]?.spans[]? | select(.name|test("^gh-aw\\..+\\.agent$")) | {k:(.traceId+"/"+.spanId), a:((.attributes[]?|select(.key=="gh-aw.aic")|.value.doubleValue) // null)} | select(.a!=null)] | unique_by(.k) | map(.a) | add' $F
+# Error spans
+jq -r '.resourceSpans[]?.scopeSpans[]?.spans[]? | select(.status.code==2) | [.name,.status.message//""]|@tsv' $F
+# Token attributes on usage-owning agent spans
+jq -r '.resourceSpans[]?.scopeSpans[]?.spans[]? | select(.name|endswith(".agent")) | .attributes[]? | select(.key|startswith("gen_ai.usage.")) | [.key,(.value.intValue // .value.doubleValue)]|@tsv' $F
+```
+
+Backend-neutral recipes (span name, then attribute key):
+
+| Question | Filter | Measure |
+|---|---|---|
+| Latency by job | spans named `gh-aw.<job>.conclusion` or `gh-aw.<job>.agent` | end minus start; setup spans are not full-job durations |
+| Tokens | `gh-aw.<job>.agent` (or the conclusion span when no agent span exists) | `gen_ai.usage.*` |
+| AI credits and budgets | same cost-owning span | `gh-aw.aic`, `gh-aw.max_ai_credits`, `gh-aw.max_ai_credits_exceeded`; deduplicate by trace+span |
+| Errors | status code 2, `gh-aw.error_count`, `exception` events | group by `gh-aw.workflow.name` |
+| Tools/MCP, firewall, integrity | conclusion spans | `gh-aw.mcp.*`, `gh-aw.firewall.*`, `gh-aw.integrity.filtered_events` |
+| Graders, evals, outputs | agent-job conclusion span; `grader.result`/`eval.result` events | `gh-aw.graders.*`, `gh-aw.evals.*`, `gh-aw.output.*` |
+| Work queue | `work_queue.<operation>` | `gh-aw.work_queue.*` |
+
+Filter resource-level keys (`github.repository`, `github.run_id`, `deployment.environment`) on the resource, and `gh-aw.*` job keys on the span; they are different OTLP levels. Treat missing attributes as unknown, not zero.
+
+## Coverage
+
+| Emitter family | Sections | Evidence |
+|---|---|---|
+| Setup/conclusion/agent spans, events, resources | Signals; Built-in families | `send_otlp_span.cjs`: `sendJobSetupSpan`, `sendJobConclusionSpan`, `buildGitHubActionsResourceAttributes`; `send_otlp_span.test.cjs`, `otel_contract.test.cjs` |
+| Action entry points | Signals | `action_setup_otlp.cjs`, `action_conclusion_otlp.cjs` (`buildSpanName`) |
+| Admission spans | Additional emitters | `check_admission.cjs` `main` |
+| Custom tool spans | Additional emitters | `otlp.cjs` `logSpan` |
+| Work-queue spans | Additional emitters | `work_queue_telemetry.cjs` `observeQueueOperation`, `snapshotAttributes` |
+| Durable journal | Additional emitters | `pi_durable_telemetry.cjs`, `engine_durable.go` (`durableOTelJournal`) |
+| Session logs | Additional emitters | `send_otlp_session_logs.cjs` `sendSessionLogs`; compiler env `GH_AW_OTLP_LOGS_ENABLED` in `pkg/workflow/observability_otlp.go` |
+| Export, config, redaction | Wire encoding | `send_otlp_span.cjs` `sendOTLPSpan`, `sanitizeOTLPPayload`, `parseOTLPEndpoints` |
+| Metrics | Signals | No emitter found: no `resourceMetrics` or `/v1/metrics` code under `actions/` or `pkg/` |
+| Engine-native telemetry (Copilot CLI and others) | Query semantics | Exported by the engines directly; no gh-aw implementation to inspect |
+
+## Discrepancies and limitations
+
+- Spec section 11 describes optional metric instruments; no metric emitter is implemented, so metrics are unavailable.
+- `gh-aw.error_count` (conclusion) and `gh-aw.error.count` (output errors) are distinct keys; compare by name, not by assumption.
+- `pi_durable_telemetry` writes a journal separate from `otel.jsonl`; its span names are chosen by the engine host and are not enumerated here.
+- Resource builders in `check_admission.cjs` pass only repository and run ID, so admission spans have fewer resource attributes than other spans.
+- Not inspected in depth: `pi_provider.cjs`, `copilot_wire_api.cjs`, and `handle_agent_failure.cjs` mention telemetry-related fields but no distinct OTel emission was identified; their absence from the tables is not proof none exists.
+
+## TypeSpec applicability
+
+Stable shapes (attribute sets for work-queue spans, grader/eval events, session log records) could be described in TypeSpec. The checkout has no installed `@typespec/compiler` with an exact pin and a checked-in integrity lock, so no `specs/otel/messages.tsp` was created. Deferred prerequisite: a repository-pinned compiler and lock, then validation with `compile specs/otel/messages.tsp --no-emit`.
+
 ## Outcomes are a separate measurement path
 
 Spec section 13 states that `gh aw logs --outcomes` produces JSON/optional JSONL, not outcome spans. A downstream exporter may emit a separate evaluation trace with source-run correlation; this is not a built-in extension of the original run trace. The attribute reference documents outcome summary/per-item fields for such producers. Its `gh-aw.outcome.evaluation` name and the spec's recommended `gh-aw.outcome.evaluate` name are distinct documented surfaces, not proof of a shared emitter.
@@ -58,4 +148,4 @@ AI-credit totals use only cost-owning spans, deduplicated by trace/span IDs acro
 
 The gh-aw helper mirror is runtime file `/tmp/gh-aw/otel.jsonl`, exposed as `otel.jsonl` in the `agent` artifact when uploaded. Each line is a raw OTLP JSON fragment with `resourceSpans`, not a flattened event. Copilot CLI spans export directly to the configured backend and have no gh-aw companion mirror; a helper artifact is not a complete runtime trace inventory.
 
-Exporter headers, credentials, full prompts/responses, and tool arguments/results are sensitive, not reference examples. Specification section 15 defines capture/redaction boundaries. Source paths and emitter symbols provide evidence without reproducing untrusted external text. Remaining inventory work includes engine/gateway-specific producers, custom `logSpan` callers, and verification of optional instruments against their actual emitters.
+Exporter headers, credentials, full prompts/responses, and tool arguments/results are sensitive, not reference examples. Specification section 15 defines capture/redaction boundaries. Source paths and emitter symbols provide evidence without reproducing untrusted external text. Remaining inventory work includes engine/gateway-specific producers; see the discrepancies section.
