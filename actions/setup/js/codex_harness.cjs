@@ -66,7 +66,15 @@ const {
 } = require("./awf_reflect.cjs");
 const { emitInfrastructureIncomplete, emitMissingToolPermissionIssue, hasExpectedSafeOutputs, hasTerminalSafeOutput, hasNoopInSafeOutputs } = require("./safeoutputs_cli.cjs");
 const { countPermissionDeniedIssues, hasNumerousPermissionDeniedIssues, extractDeniedCommands, buildMissingToolPermissionIssuePayload } = require("./permission_denied_helpers.cjs");
-const { detectNonRetryableHarnessGuard, detectExhaustedAWFInvocationBudget, buildSoftTimeoutGuard, emitSoftTimeoutSignal, isAuthenticationFailedError, parseAICreditsExceededProxyRejection } = require("./harness_retry_guard.cjs");
+const {
+  createOutputPatternMatcher,
+  detectNonRetryableHarnessGuard,
+  detectExhaustedAWFInvocationBudget,
+  buildSoftTimeoutGuard,
+  emitSoftTimeoutSignal,
+  isAuthenticationFailedError,
+  parseAICreditsExceededProxyRejection,
+} = require("./harness_retry_guard.cjs");
 const { MODEL_NOT_SUPPORTED_PATTERN: INVALID_MODEL_ERROR_PATTERN } = require("./detect_agent_errors.cjs");
 const { resolveRetryConfig } = require("./harness_retry_config.cjs");
 const { stopForPermissionDenied } = require("./harness_failure_handling.cjs");
@@ -276,9 +284,7 @@ function log(message) {
  * @param {string} output - Collected stdout+stderr from the process
  * @returns {boolean}
  */
-function isRateLimitError(output) {
-  return RATE_LIMIT_ERROR_PATTERN.test(output);
-}
+const isRateLimitError = createOutputPatternMatcher(RATE_LIMIT_ERROR_PATTERN);
 
 /**
  * Determines if the collected output indicates OpenAI token-per-minute exhaustion.
@@ -315,9 +321,7 @@ function isServerError(output) {
  * @param {string} output - Collected stdout+stderr from the process
  * @returns {boolean}
  */
-function isInvalidModelError(output) {
-  return INVALID_MODEL_ERROR_PATTERN.test(output);
-}
+const isInvalidModelError = createOutputPatternMatcher(INVALID_MODEL_ERROR_PATTERN);
 
 /**
  * Determines if Codex emitted a `turn.failed` provider event containing a deterministic
