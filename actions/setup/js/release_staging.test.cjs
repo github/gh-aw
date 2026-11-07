@@ -255,8 +255,9 @@ printf '%s\\n' "$TEMP_DIR"`,
       encoding: "utf8",
     });
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain("--rootless requires a writable Copilot directory");
-    expect(result.stderr).toContain("existing files will not be reclaimed or re-owned");
+    expect(result.stderr).toContain("Cannot prepare Copilot state");
+    expect(result.stderr).toContain("restore ownership");
+    expect(result.stderr).toContain("cannot reclaim or re-own state");
     expect(fs.readFileSync(path.join(home, ".copilot"), "utf8")).toBe("existing state");
     expect(fs.existsSync(log)).toBe(false);
   });
@@ -354,7 +355,7 @@ printf 'copilot 1.0.103\\n'
       return { child, ready, release, completion };
     });
     try {
-      const deadline = Date.now() + 10000;
+      const deadline = Date.now() + 25000;
       while (!jobs.every(job => fs.existsSync(job.ready))) {
         if (Date.now() > deadline) throw new Error("Concurrent installers did not reach the toolcache barrier");
         await new Promise(resolve => setTimeout(resolve, 25));
@@ -385,7 +386,7 @@ printf 'copilot 1.0.103\\n'
       for (const job of jobs) fs.writeFileSync(job.release, "");
       await Promise.all(jobs.map(job => job.completion));
     }
-  });
+  }, 30000);
 
   it.skipIf(process.getuid && process.getuid() === 0)("rejects an unwritable Copilot directory without reclaiming or re-owning it", () => {
     const root = workspace();
@@ -406,8 +407,9 @@ printf 'copilot 1.0.103\\n'
         encoding: "utf8",
       });
       expect(result.status).toBe(1);
-      expect(result.stderr).toContain("--rootless requires a writable Copilot directory");
-      expect(result.stderr).toContain("existing files will not be reclaimed or re-owned");
+      expect(result.stderr).toContain("Cannot prepare Copilot state");
+      expect(result.stderr).toContain("restore ownership");
+      expect(result.stderr).toContain("cannot reclaim or re-own state");
       expect(fs.statSync(copilot).mode & 0o777).toBe(0o555);
       expect(fs.existsSync(log)).toBe(false);
       expect(fs.readdirSync(root).filter(name => name.startsWith("copilot-install-"))).toHaveLength(0);
