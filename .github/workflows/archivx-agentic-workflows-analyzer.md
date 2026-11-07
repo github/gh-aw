@@ -48,7 +48,7 @@ steps:
   run: |
     set -euo pipefail
     mkdir -p /tmp/gh-aw/aw-mcp/logs
-    ./gh-aw logs --start-date -7d --count 200 -o /tmp/gh-aw/aw-mcp/logs
+    ./gh-aw logs --start-date -7d --count 2000 --artifacts usage --timeout 5 --max-storage 1024 -o /tmp/gh-aw/aw-mcp/logs
 timeout-minutes: 30
 tools:
   agentic-workflows: null
@@ -79,11 +79,17 @@ Analyze the past 7 days of agentic workflow runs and generate an SVG visual summ
 
 Apply the installed `diagram-design` skill's layout guidance when composing the diagram structure (grouping, hierarchy, labelling, and edge routing), and use `glowmotion` to render it.
 
-{{#runtime-import? shared/aw-logs-24h-fetch-prompt.md}}
-
 ## Step 1: Collect Workflow Data
 
-Workflow logs for the past 7 days have been pre-downloaded to `/tmp/gh-aw/aw-mcp/logs/`. Read the `aw_info.json` metadata files to extract:
+Compact metadata and usage for the requested past 7 days have been pre-downloaded to `/tmp/gh-aw/aw-mcp/logs/`, subject to count, timeout, storage, and API budgets.
+
+Read `/tmp/gh-aw/aw-mcp/logs/summary.json` first, projecting `summary`, `runs`, `continuation`, `continuations`, and `message`. If a continuation is present, collection is incomplete. Use the `agentic-workflows` MCP `logs` tool for any continuation, preserving all returned parameters including `start_date`, updated `end_date`, and `before_run_id`. Never run `./gh-aw` or `gh aw` directly in the agent environment: the binary is not authenticated there. Deduplicate combined pages by run ID.
+
+If collection stops at a budget, a continuation times out, metadata is missing, or completeness cannot be established, label the result **Partial coverage**. Report the requested 7-day window, the earliest and latest collected `runs[].created_at` timestamps in UTC, the unique run count, the limiting reason, and the observed time span as a percentage of 168 hours (for example, 6 hours = 3.6%). This percentage describes temporal span, not the fraction of all runs collected; gaps and missing artifacts may remain. Never infer completeness from timestamps or absence of a continuation alone when collection errors are present.
+
+Use only collected runs for metrics; label partial results as sampled counts and sampled success rates, never full-week totals or weekly health trends. Carry the same coverage status and observed date range into the SVG, pull request body, and discussion. If no reliable timestamps are available, report coverage as unknown rather than inventing a percentage.
+
+Read the collected run metadata and usage to extract:
 - Total runs and overall success rate
 - Top 5 workflows by run count
 - Top 3 failing workflows
@@ -91,8 +97,8 @@ Workflow logs for the past 7 days have been pre-downloaded to `/tmp/gh-aw/aw-mcp
 - Average token usage
 
 ```bash
-# Count total runs
-ls /tmp/gh-aw/aw-mcp/logs/ | wc -l
+# Count collected runs, excluding summary files
+jq '.runs | length' /tmp/gh-aw/aw-mcp/logs/summary.json
 
 # Read metadata from all runs
 for d in /tmp/gh-aw/aw-mcp/logs/*/; do
@@ -101,7 +107,7 @@ done
 ```
 
 If fewer than 5 runs are found, call `noop` with message:
-"Insufficient workflow data for visual summary (fewer than 5 runs in the past 7 days)."
+"Insufficient workflow data for visual summary (fewer than 5 collected runs in the requested 7-day window)."
 Then stop immediately.
 
 ## Step 2: Locate Glowmotion Scripts
@@ -122,8 +128,8 @@ Write a graph JSON to `/tmp/gh-aw/agent/glowmotion-graph.json` describing the ag
 - **mode**: `"architecture"`
 - **darkTheme**: `"aurora"` (appropriate for data/ML topics)
 - **title**: `"Agentic Workflow Health"`
-- **titleHighlight**: the overall success-rate percentage (e.g., `"94% healthy"`)
-- **subtitle**: the date range covered (e.g., `"Past 7 days — YYYY-MM-DD"`)
+- **titleHighlight**: the success-rate percentage, explicitly labelled sampled when coverage is partial (e.g., `"94% sampled success"`)
+- **subtitle**: coverage status and actual UTC date range; for partial results include the temporal-span percentage (e.g., `"Partial coverage — 6h / 168h (3.6%) — YYYY-MM-DD HH:MM–HH:MM UTC"`). Use `"Past 7 days"` only when complete collection is established.
 - **summary**: exactly 3 cards — total runs, top engine, most active workflow
 - **nodes**: group the top workflows by category (analysis, triage, security/scanning, CI/release, reporting) as service boxes with `type: "service"`
 - **groups**: one group per category
@@ -177,7 +183,7 @@ Create a discussion titled `[archivx] Agentic Workflow Visual Summary — YYYY-M
 ```
 ### Overview
 
-2-3 sentence narrative of workflow health for the past 7 days.
+2-3 sentence narrative of workflow health for the observed range, explicitly stating complete, partial, or unknown coverage of the requested 7 days and any limiting reason. Do not extrapolate partial results to weekly health.
 
 ---
 
@@ -185,6 +191,7 @@ Create a discussion titled `[archivx] Agentic Workflow Visual Summary — YYYY-M
 
 | Metric | Value |
 |---|---|
+| Coverage | Complete / Partial / Unknown; observed UTC range and temporal-span percentage |
 | Total Runs | N |
 | Success Rate | N% |
 | Top Engine | engine-name |

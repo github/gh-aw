@@ -6,28 +6,47 @@ const { actorFromContext, dispatchPrincipal } = require("./work_queue_policy.cjs
 const { authenticatePublisher, validateNativeRun } = require("./work_queue_native.cjs");
 const { validateStoredAssignment, expectedWorkerRun, bindingForRun } = require("./work_queue_binding.cjs");
 const { readInboundWorkQueueAssignment, resolveWorkQueueRuntime } = require("./aw_context.cjs");
-const { assertProjectionAuthority, issueIdentity, issueCompletionPolicy } = require("./work_queue_issue_contract.cjs");
+const { assertProjectionAuthority, issueIdentity, issueCompletionPolicy, issueCompletionPolicyForWork } = require("./work_queue_issue_contract.cjs");
 const { dependencyStatus } = require("./work_queue_graph.cjs");
 const { appendCommit, newRequest, proposedCommitId, replayTransactions } = require("./work_queue_replay.cjs");
 const { readCheckedQueue, writeCheckedFiles } = require("./work_queue_checked_transport.cjs");
 const { withProjectionLocks, projectionNonce } = require("./work_queue_issue_coordination.cjs");
-const { MAX_PROJECTION_TARGETS, LABELS_PAGE_SIZE, STATUSES, statusLabelName, ensureStatusLabel, discoverTarget, preflightIssues, mutateIssues, issueResource, ISSUE_SELECTION, issueReadQuery } = require("./work_queue_issue_api.cjs");
+const {
+  MAX_PROJECTION_TARGETS,
+  LABELS_PAGE_SIZE,
+  statusLabelOperations,
+  statusLabelReceiptVerified,
+  ensureStatusLabel,
+  discoverTarget,
+  preflightIssues,
+  mutateIssues,
+  issueResource,
+  ISSUE_SELECTION,
+  issueReadQuery,
+} = require("./work_queue_issue_api.cjs");
 const { wrapGithubClient } = require("./work_queue_issue_pacing.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { validateJournal } = require("./work_queue_issue_journal.cjs");
-const { issueBodyReport, issueTitle, renderSummary, renderClaim, runLink } = require("./work_queue_issue_messages.cjs");
-const { transitionProjectionTargets } = require("./work_queue_issue_transitions.cjs");
+const { issueBodyReport, issueTitle, renderSummary, renderClaim, runLink, renderOrphanComment } = require("./work_queue_issue_messages.cjs");
+const { transitionProjectionTargets, reconciliationProjectionTargets } = require("./work_queue_issue_transitions.cjs");
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("issues");
 
 function projectionTargets(options, state, origin, assignment) {
+  if (options.reconcileMirrors === true) return reconciliationProjectionTargets(state, origin);
   return options.transitionRequestIds === undefined ? ownProjectionTargets(state, origin, origin.ref, assignment) : transitionProjectionTargets(state, origin, options.transitionRequestIds);
 }
 
 function issuesConfiguration(value) {
   if (value === undefined || value === false) return null;
-  if (value === true) return { label: "work", title_prefix: "[work queue]" };
-  closed(value, [], ["label", "title_prefix"], "work-queue issues");
+  if (value === true) return { label: "work", title_prefix: "[work queue]", orphaned_after_days: 30 };
+  closed(value, [], ["label", "title_prefix", "orphaned_after_days"], "work-queue issues");
+  const config = { label: "work", title_prefix: "[work queue]", orphaned_after_days: 30 };
   for (const [key, field] of Object.entries(value)) {
+    if (key === "orphaned_after_days") {
+      if (!Number.isSafeInteger(field) || field < 1 || field > 3650) throw queueError("projection_invalid", "orphaned_after_days must be an integer in 1..3650");
+      config.orphaned_after_days = field;
+      continue;
+    }
     if (
       typeof field !== "string" ||
       !field.trim() ||
@@ -37,8 +56,9 @@ function issuesConfiguration(value) {
       /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(field)
     )
       throw queueError("projection_invalid", `${SAFE_OUTPUT_E001}: ${key} must be a nonblank bounded literal`);
+    config[key] = field;
   }
-  return { label: "work", title_prefix: "[work queue]", ...value };
+  return config;
 }
 
 function ownProjectionTargets(state, origin, ref, assignment) {
@@ -421,35 +441,17 @@ async function projectLinkedIssues(options, current, actor, origin, config, targ
     if (!issue) continue;
     const work = current.state.works.get(target.work_id);
     const journal = journals.get(journalPath(target.work_id));
-    const existingOnly = target.transition_request_id !== undefined;
+    const existingOnly = target.transition_request_id !== undefined || target.reconciliation === true;
     if (existingOnly) {
-      const checked = transitionProjectionTargets(current.state, origin, options.transitionRequestIds).targets.find(candidate => candidate.work_id === target.work_id);
+      const selected = target.reconciliation ? reconciliationProjectionTargets(current.state, origin) : transitionProjectionTargets(current.state, origin, options.transitionRequestIds);
+      const checked = selected.targets.find(candidate => candidate.work_id === target.work_id);
       const { comments: _, commentAliases: __, ...scope } = target;
       if (!checked || canonical(checked) !== canonical(scope)) throw queueError("projection_scope_changed", "terminal projection target changed after coordination");
     } else assertProjectionAuthority(current.state, actor, work.work_id, origin.ref, target.resource.repository, target.authority_claim_id);
     const discovered = discovery.get(target.resource.repository);
     const status = workIssueStatus(current.state, work, options.now ?? Date.now());
     const desiredStatusId = statusLabels.get(`${target.resource.repository}:${status}`);
-    const missing = [discovered.labelId, desiredStatusId].filter(id => !issue.labels.nodes.some(label => label.id === id));
-    if (missing.length)
-      edits.push({
-        key: target.work_id,
-        name: "addLabelsToLabelable",
-        type: "AddLabelsToLabelableInput",
-        input: { labelableId: issue.id, labelIds: missing },
-        selection: `labelable { id ... on Issue { labels(first:${LABELS_PAGE_SIZE}) { nodes { id } pageInfo { hasNextPage } } } }`,
-        expectedLabels: missing,
-      });
-    const obsolete = issue.labels.nodes.filter(label => STATUSES.some(candidate => candidate !== status && label.name === statusLabelName(config, candidate))).map(label => label.id);
-    if (obsolete.length)
-      edits.push({
-        key: target.work_id,
-        name: "removeLabelsFromLabelable",
-        type: "RemoveLabelsFromLabelableInput",
-        input: { labelableId: issue.id, labelIds: obsolete },
-        selection: `labelable { id ... on Issue { labels(first:${LABELS_PAGE_SIZE}) { nodes { id } pageInfo { hasNextPage } } } }`,
-        removedLabels: obsolete,
-      });
+    edits.push(...statusLabelOperations(issue, target.work_id, config, status, [discovered.labelId, desiredStatusId]));
     const diagnostics = jobDiagnostics(options.jobResults ?? process.env.GH_AW_WORK_QUEUE_JOB_RESULTS);
     const bodies = new Map([["summary", summaryBody(current.state, work, options.now ?? Date.now(), diagnostics, current.branch, origin)]]);
     for (const claimId of target.claim_ids) bodies.set(claimId, claimBody(current.state, current.state.claims.get(claimId), options.now ?? Date.now(), diagnostics));
@@ -481,7 +483,8 @@ async function projectLinkedIssues(options, current, actor, origin, config, targ
         newComments.push({ key: target.work_id, handle: key, name: "addComment", type: "AddCommentInput", input: { subjectId: issue.id, body }, selection: "commentEdge { node { id body ... on IssueComment { issue { id } } } }" });
       }
     }
-    if (!existingOnly && status === "Done" && issueCompletionPolicy(current.state, work, actor, origin.ref, target.resource.repository) === "close-on-result" && issue.state !== "CLOSED")
+    const completionPolicy = target.reconciliation ? issueCompletionPolicyForWork(current.state, work, target.resource.repository) : issueCompletionPolicy(current.state, work, actor, origin.ref, target.resource.repository);
+    if (status === "Done" && completionPolicy === "close-on-result" && issue.state !== "CLOSED")
       edits.push({ key: target.work_id, name: "closeIssue", type: "CloseIssueInput", input: { issueId: issue.id, stateReason: "COMPLETED" }, selection: "issue { id state }" });
   }
   if (newComments.length) current = await publishProjection(options, current, actor, journals, []);
@@ -501,14 +504,7 @@ async function projectLinkedIssues(options, current, actor, origin, config, targ
       recordUncertainReceipt(result, batch, pending, "Issue closure returned no exact native receipt");
       continue;
     }
-    if (
-      (result.operation.expectedLabels || result.operation.removedLabels) &&
-      (result.value.labelable?.id !== result.operation.input.labelableId ||
-        result.value.labelable?.labels?.pageInfo?.hasNextPage !== false ||
-        result.operation.expectedLabels?.some(id => !result.value.labelable.labels.nodes.some(label => label.id === id)) ||
-        result.operation.removedLabels?.some(id => result.value.labelable.labels.nodes.some(label => label.id === id)))
-    )
-      recordUncertainReceipt(result, batch, pending, "status label synchronization was not verified");
+    if (!statusLabelReceiptVerified(result)) recordUncertainReceipt(result, batch, pending, "status label synchronization was not verified");
     if (result.operation.handle) {
       const node = result.value.commentEdge?.node;
       const target = targets.find(target => target.work_id === result.operation.key);
@@ -536,6 +532,178 @@ function recordUncertainReceipt(result, batch, pending, reason) {
   result.uncertain = true;
   batch.ambiguous = true;
   pending.push({ work_id: result.operation.key, reason: `queue committed; ${reason}; synchronization pending` });
+}
+
+async function listTrackedIssues(githubClient, owner, repo, label) {
+  const issues = [];
+  for (let page = 1; page <= 10; page++) {
+    const response = await githubClient.rest.issues.listForRepo({
+      owner,
+      repo,
+      state: "open",
+      labels: label,
+      per_page: 100,
+      page,
+      request: { retries: 0, timeout: 15000 },
+    });
+    if (!Array.isArray(response?.data) || response.data.length > 100) throw queueError("projection_target_unavailable", "tracked Issue enumeration is incomplete");
+    issues.push(...response.data);
+    if (response.data.length < 100) return issues;
+  }
+  const overflow = await githubClient.rest.issues.listForRepo({
+    owner,
+    repo,
+    state: "open",
+    labels: label,
+    per_page: 1,
+    page: 1001,
+    request: { retries: 0, timeout: 15000 },
+  });
+  if (!Array.isArray(overflow?.data) || overflow.data.length > 1) throw queueError("projection_target_unavailable", "tracked Issue enumeration is incomplete");
+  if (overflow.data.length) throw queueError("projection_limit", "tracked Issue reconciliation exceeds 1000 Issues");
+  return issues;
+}
+
+function orphanWorkId(issue, state, config, at) {
+  if (
+    issue.pull_request ||
+    issue.state !== "open" ||
+    typeof issue.title !== "string" ||
+    !issue.title.startsWith(`${config.title_prefix} `) ||
+    typeof issue.body !== "string" ||
+    !Array.isArray(issue.labels) ||
+    !issue.labels.some(label => label.name === config.label) ||
+    !Number.isSafeInteger(issue.number) ||
+    typeof issue.node_id !== "string" ||
+    !issue.node_id
+  )
+    return undefined;
+  const createdAt = Date.parse(issue.created_at);
+  if (!Number.isFinite(createdAt) || at - createdAt < config.orphaned_after_days * 86400000) return undefined;
+  for (const work of state.works.values()) {
+    if ([work.backing_issue, work.issue_link].some(resource => resource?.repository.toLowerCase() === state.repository.toLowerCase() && resource.resource_id === String(issue.id) && resource.number === String(issue.number)))
+      return undefined;
+  }
+  const match = issue.body.match(/<!-- work-id: ([a-f0-9]{64}) -->/);
+  if (!match || state.works.has(match[1])) return undefined;
+  const titlePrefix = `${config.title_prefix} ${match[1].slice(0, 12)}`;
+  if (!issue.title.startsWith(titlePrefix) || (issue.title.length > titlePrefix.length && !/^[\s—]/u.test(issue.title.slice(titlePrefix.length)))) return undefined;
+  return match[1];
+}
+
+async function hasOrphanComment(githubClient, owner, repo, number, marker) {
+  for (let page = 1; page <= 20; page++) {
+    const response = await githubClient.rest.issues.listComments({
+      owner,
+      repo,
+      issue_number: number,
+      per_page: 100,
+      page,
+      request: { retries: 0, timeout: 15000 },
+    });
+    if (!Array.isArray(response?.data) || response.data.length > 100) throw queueError("projection_comment_pending", "orphan Issue comments are inaccessible");
+    if (response.data.some(comment => typeof comment.body === "string" && comment.body.includes(marker))) return true;
+    if (response.data.length < 100) return false;
+  }
+  throw queueError("projection_comment_pending", "orphan Issue comment pagination exceeded its bound");
+}
+
+async function flagOrphanIssue(options, current, config, issue, workId) {
+  const { githubClient, owner, repo } = options;
+  const marker = `<!-- gh-aw-work-queue-orphan:${workId} -->`;
+  const resource = issueResource({
+    databaseId: issue.id,
+    number: issue.number,
+    repository: { databaseId: options.repositoryDatabaseId, nameWithOwner: `${owner}/${repo}` },
+  });
+  const lockKey = `issue:${issueIdentity(resource)}`;
+  const result = await (options.withProjectionLocks || withProjectionLocks)(
+    {
+      ...options,
+      head: current.sha,
+      repositoryId: current.repositoryId,
+      keys: [lockKey],
+    },
+    async () => {
+      const read = options.readCheckedQueue || readCheckedQueue;
+      const latest = await read({ ...options, paths: [] });
+      if (latest.state.works.has(workId)) return { pending: [] };
+      const fresh = await githubClient.rest.issues.get({ owner, repo, issue_number: issue.number, request: { retries: 0, timeout: 15000 } });
+      const currentIssue = fresh?.data;
+      if (!currentIssue || String(currentIssue.id) !== String(issue.id) || currentIssue.node_id !== issue.node_id || !orphanWorkId(currentIssue, latest.state, config, options.now ?? Date.now())) return { pending: [] };
+      const discovered = await discoverTarget(githubClient, `${owner}/${repo}`, config);
+      const labelId = await ensureStatusLabel(githubClient, discovered.repositoryId, config, "Needs attention");
+      const labels = { nodes: currentIssue.labels.map(label => ({ id: label.node_id, name: label.name })) };
+      const operations = statusLabelOperations({ id: currentIssue.node_id, labels }, String(issue.number), config, "Needs attention", [labelId]);
+      const batch = await mutateIssues(githubClient, operations, { sleep: options.sleep });
+      if (batch.results.some(result => result.pending || !statusLabelReceiptVerified(result)))
+        return {
+          ambiguous: batch.ambiguous || batch.results.some(result => !result.pending && !statusLabelReceiptVerified(result)),
+          retain_keys: batch.ambiguous || batch.results.some(result => !result.pending && !statusLabelReceiptVerified(result)) ? [lockKey] : [],
+          pending: [{ work_id: workId, reason: "orphan Issue status label synchronization remains pending" }],
+        };
+      if (!(await hasOrphanComment(githubClient, owner, repo, issue.number, marker))) {
+        const body = renderOrphanComment(`${owner}/${repo}`, latest.branch, workId);
+        const comment = await mutateIssues(githubClient, [
+          {
+            key: String(issue.number),
+            handle: "orphan",
+            name: "addComment",
+            type: "AddCommentInput",
+            input: { subjectId: issue.node_id, body },
+            selection: "commentEdge { node { id body ... on IssueComment { issue { id } } } }",
+          },
+        ]);
+        const receipt = comment.results[0];
+        if (receipt?.pending || receipt?.value?.commentEdge?.node?.issue?.id !== issue.node_id || receipt.value.commentEdge.node.body !== body) {
+          if (receipt?.uncertain || !receipt) {
+            try {
+              if (!(await hasOrphanComment(githubClient, owner, repo, issue.number, marker))) {
+                return {
+                  ambiguous: true,
+                  retain_keys: [lockKey],
+                  pending: [{ work_id: workId, reason: "orphan Issue explanation remains pending" }],
+                };
+              }
+            } catch {
+              throw queueError("projection_write_ambiguous", "orphan Issue comment has no exact acknowledgement");
+            }
+          } else if (receipt.pending) {
+            return { pending: [{ work_id: workId, reason: "orphan Issue explanation was rejected" }] };
+          } else {
+            throw queueError("projection_write_ambiguous", "orphan Issue comment has no exact acknowledgement");
+          }
+        }
+      }
+      return { pending: [] };
+    }
+  );
+  return result;
+}
+
+async function reconcileOrphanIssues(options, current, config) {
+  const githubClient = options.githubClient || global.github;
+  const owner = options.owner || options.context.repo.owner;
+  const repo = options.repo || options.context.repo.repo;
+  const list = await listTrackedIssues(githubClient, owner, repo, config.label);
+  /** @type {{ pending: Array<{ work_id?: string, reason: string }> }} */
+  const result = { pending: [] };
+  const candidates = list.flatMap(issue => {
+    const workId = orphanWorkId(issue, current.state, config, options.now ?? Date.now());
+    return workId ? [{ issue, workId }] : [];
+  });
+  if (!candidates.length) return result;
+  const repository = await githubClient.rest.repos.get({ owner, repo, request: { retries: 0, timeout: 15000 } });
+  if (!Number.isSafeInteger(repository?.data?.id) || repository.data.id < 1) throw queueError("projection_target_unavailable", "tracked Issue repository identity is unavailable");
+  for (const { issue, workId } of candidates) {
+    try {
+      const flagged = await flagOrphanIssue({ ...options, githubClient, owner, repo, repositoryDatabaseId: repository.data.id }, current, config, issue, workId);
+      result.pending.push(...(flagged.pending || []));
+    } catch (error) {
+      result.pending.push({ work_id: workId, reason: projectionFailureReason(error) });
+    }
+  }
+  return result;
 }
 
 function projectionFailureReason(error) {
@@ -578,17 +746,17 @@ async function main(options = {}) {
   boundOptions.githubClient = measured;
   const pending = [];
   try {
-    const runtime = options.transitionRequestIds === undefined ? resolveWorkQueueRuntime(repositoryContext.payload, { role: options.role }) : { role: "reconciler", assignment: null };
+    const runtime = options.reconcileMirrors === true || options.transitionRequestIds !== undefined ? { role: "reconciler", assignment: null } : resolveWorkQueueRuntime(repositoryContext.payload, { role: options.role });
     if (runtime.role === "observer") return { disabled: true, observer: true };
     const origin =
       options.trustedContext ||
       (await authenticatePublisher({
         ...boundOptions,
         context: repositoryContext,
-        role: options.transitionRequestIds === undefined ? (runtime.assignment ? "worker" : "dispatcher") : "reconciler",
+        role: options.reconcileMirrors === true || options.transitionRequestIds !== undefined ? "reconciler" : runtime.assignment ? "worker" : "dispatcher",
         ...(runtime.assignment ? { dispatch_id: runtime.assignment.dispatch_id } : {}),
       }));
-    const assignment = options.transitionRequestIds === undefined ? runtime.assignment || readInboundWorkQueueAssignment(repositoryContext.payload) : null;
+    const assignment = options.reconcileMirrors === true || options.transitionRequestIds !== undefined ? null : runtime.assignment || readInboundWorkQueueAssignment(repositoryContext.payload);
     const initial = await (options.readCheckedQueue || readCheckedQueue)(boundOptions);
     if (assignment && origin.native_run) {
       const { dispatch, profile } = validateStoredAssignment(initial.state, assignment, { allowReleased: true });
@@ -626,6 +794,16 @@ async function main(options = {}) {
         );
       }
     }
+    if (options.reconcileMirrors === true) {
+      try {
+        const latest = await (options.readCheckedQueue || readCheckedQueue)({ ...boundOptions, paths: [] });
+        const orphans = await reconcileOrphanIssues(boundOptions, latest, config);
+        pending.push(...orphans.pending);
+      } catch (error) {
+        log.failure("projection.orphan_reconciliation.failed", error.originalError || error, true);
+        pending.push({ reason: "orphan Issue reconciliation remains pending; inspect safe API diagnostics" });
+      }
+    }
   } catch (error) {
     log.failure("projection.failed", error.originalError || error, true);
     coreApi.warning(`Work queue Issues: ${projectionFailureReason(error)}`);
@@ -638,4 +816,4 @@ async function main(options = {}) {
   return { pending, metrics };
 }
 
-module.exports = { main, issuesConfiguration, ownProjectionTargets, workIssueStatus, summaryBody, claimBody, publishProjection, projectBatch, journalPath };
+module.exports = { main, issuesConfiguration, ownProjectionTargets, workIssueStatus, summaryBody, claimBody, publishProjection, projectBatch, journalPath, reconcileOrphanIssues };

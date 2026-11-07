@@ -140,7 +140,7 @@ describe("work_queue scheduling settings", () => {
       [{ label: "😀".repeat(8) + "a" }, "😀".repeat(8) + "a", "[work queue]"],
     ]) {
       const settings = parseSettings({ issues: value });
-      assert.deepEqual(settings.issues, { label, title_prefix: titlePrefix });
+      assert.deepEqual(settings.issues, { label, title_prefix: titlePrefix, orphaned_after_days: 30 });
       const policy = defaultPolicy({ principal: "1001", repository: "owner/repo" });
       assert.deepEqual(applySettings(policy, settings), policy);
       const aw = buildAWPolicy({ repository: "owner/repo", ref: "a".repeat(40), workflows: ["worker"], settings: { issues: value } });
@@ -175,6 +175,11 @@ describe("work_queue scheduling settings", () => {
       [{ title_prefix: "a\uDC00b" }, "issues.title_prefix"],
       [{ title_prefix: "a".repeat(81) }, "issues.title_prefix"],
       [{ title_prefix: "😀".repeat(21) }, "issues.title_prefix"],
+      [{ orphaned_after_days: null }, "issues.orphaned_after_days"],
+      [{ orphaned_after_days: 0 }, "issues.orphaned_after_days"],
+      [{ orphaned_after_days: 3651 }, "issues.orphaned_after_days"],
+      [{ orphaned_after_days: 1.5 }, "issues.orphaned_after_days"],
+      [{ orphaned_after_days: "30" }, "issues.orphaned_after_days"],
       [{ "tracking-label": "work" }, "issues.tracking-label"],
       [{ "status-label-prefix": "queue" }, "issues.status-label-prefix"],
       [{ routes: [] }, "issues.routes"],
@@ -187,6 +192,14 @@ describe("work_queue scheduling settings", () => {
   });
 
   it("accepts issue literals at their byte limits", () => {
-    assert.deepEqual(parseSettings({ issues: { label: "x".repeat(33), title_prefix: "y".repeat(80) } }).issues, { label: "x".repeat(33), title_prefix: "y".repeat(80) });
+    assert.deepEqual(parseSettings({ issues: { label: "x".repeat(33), title_prefix: "y".repeat(80) } }).issues, { label: "x".repeat(33), title_prefix: "y".repeat(80), orphaned_after_days: 30 });
+  });
+
+  it("accepts a configured orphan age", () => {
+    assert.deepEqual(parseSettings({ issues: { orphaned_after_days: 7 } }).issues, {
+      label: "work",
+      title_prefix: "[work queue]",
+      orphaned_after_days: 7,
+    });
   });
 });

@@ -50,12 +50,14 @@ func TestWorkQueueIssuesConfiguration(t *testing.T) {
 		{"false", false, true, ""},
 		{"object", map[string]any{"label": "cookie"}, true, "cookie"},
 		{"custom-title", map[string]any{"title_prefix": "[cookie queue]"}, true, "work"},
+		{"orphaned-age", map[string]any{"orphaned_after_days": float64(7)}, true, "work"},
 		{"maximum-label-prefix", map[string]any{"label": strings.Repeat("x", 33)}, true, strings.Repeat("x", 33)},
 		{"empty-object", map[string]any{}, true, "work"},
 		{"blank-label", map[string]any{"label": " "}, false, ""},
 		{"label-prefix-too-long", map[string]any{"label": strings.Repeat("x", 34)}, false, ""},
 		{"status-field", map[string]any{"status-field": "CustomStatus"}, false, ""},
 		{"unknown", map[string]any{"storage": "issues"}, false, ""},
+		{"invalid-orphaned-age", map[string]any{"orphaned_after_days": float64(3651)}, false, ""},
 		{"null", nil, false, ""},
 		{"expression", map[string]any{"label": "${{ inputs.label }}"}, false, ""},
 		{"blank-title", map[string]any{"title_prefix": " "}, false, ""},
@@ -76,6 +78,11 @@ func TestWorkQueueIssuesConfiguration(t *testing.T) {
 				require.Nil(t, config)
 			} else {
 				require.Equal(t, test.label, config.Label)
+				if test.name == "orphaned-age" {
+					require.Equal(t, 7, config.OrphanedAfterDays)
+				} else {
+					require.Equal(t, 30, config.OrphanedAfterDays)
+				}
 				if test.name == "custom-title" {
 					require.Equal(t, "[cookie queue]", config.TitlePrefix)
 				} else {
@@ -121,38 +128,41 @@ func TestWorkQueueIssuesCompilationUsesExistingJobs(t *testing.T) {
 	activation := jobs["activation"].(map[string]any)
 	conclusion := jobs["conclusion"].(map[string]any)
 	require.Equal(t, "always()", conclusion["if"])
-	for _, job := range []map[string]any{activation, conclusion} {
-		perms := job["permissions"].(map[string]any)
-		require.Equal(t, "write", perms["contents"])
-		require.Equal(t, "write", perms["issues"])
-		require.Equal(t, "read", perms["actions"])
-	}
+	activationPerms := activation["permissions"].(map[string]any)
+	require.Equal(t, "write", activationPerms["contents"])
+	require.Equal(t, "write", activationPerms["issues"])
+	conclusionPerms := conclusion["permissions"].(map[string]any)
+	require.Equal(t, "write", conclusionPerms["contents"])
+	require.Equal(t, "write", conclusionPerms["issues"])
+	require.Equal(t, "read", conclusionPerms["actions"])
 	agent := jobs["agent"].(map[string]any)
 	perms := agent["permissions"].(map[string]any)
 	require.NotEqual(t, "write", perms["issues"])
 	require.NotEqual(t, "write", perms["contents"])
-	seen := false
+	conclusionSteps := conclusion["steps"].([]any)
+	conclusionYAML, err := yaml.Marshal(conclusionSteps)
+	require.NoError(t, err)
+	require.Contains(t, string(conclusionYAML), "work_queue_issues.cjs")
+	require.Contains(t, string(conclusionYAML), "GH_AW_WORK_QUEUE_CHECKED_TRANSPORT: graphql")
 	detectionSeen := false
-	for _, value := range conclusion["steps"].([]any) {
+	projectionSeen := false
+	for _, value := range conclusionSteps {
 		step := value.(map[string]any)
 		if step["id"] == "work_queue_issues" {
 			require.Equal(t, "always()", step["if"])
 			env := step["env"].(map[string]any)
-			require.JSONEq(t, `{"label":"cookie","title_prefix":"[cookie queue]"}`, env["GH_AW_WORK_QUEUE_ISSUES"].(string))
+			require.JSONEq(t, `{"label":"cookie","orphaned_after_days":30,"title_prefix":"[cookie queue]"}`, env["GH_AW_WORK_QUEUE_ISSUES"].(string))
 			script := step["with"].(map[string]any)["script"].(string)
-			require.Contains(t, script, "if (result.pending?.length) core.warning(")
-			require.NotContains(t, script, "core.setFailed(")
-			require.Equal(t, "${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}", step["with"].(map[string]any)["github-token"])
 			require.Contains(t, script, "githubClient: github")
-			seen = true
+			require.NotContains(t, script, "reconcileMirrors")
+			projectionSeen = true
 		}
 		if step["id"] == "detection_runs" {
-			require.True(t, seen, "the detection tracker follows the warning-only Issue projection")
-			require.Equal(t, "always()", step["if"], "pending mirrors must not skip required detection reporting")
+			require.Equal(t, "always()", step["if"])
 			detectionSeen = true
 		}
 	}
-	require.True(t, seen)
+	require.True(t, projectionSeen)
 	require.True(t, detectionSeen)
 	trial := compile("true", true)
 	for _, name := range []string{"activation", "conclusion"} {

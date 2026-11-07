@@ -10,6 +10,7 @@ const { normalizeReportText } = require("./report_ast.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { buildAllowedDomains, sanitizeUrlDomains, sanitizeUrlProtocols } = require("./sanitize_content_core.cjs");
 const { redactDiagnosticText } = require("./diagnostic_sanitization.cjs");
+const { expectedGitHubHost } = require("./work_queue_host.cjs");
 
 function presentationText(value, limit, singleLine = false, maskedValues = [], literal = false) {
   if (typeof value !== "string") return "";
@@ -77,6 +78,49 @@ function runLink(run) {
   return `https://github.com/${run.repository}/actions/runs/${run.run_id}/attempts/${run.run_attempt}`;
 }
 
+function workQueueLedgerUrl(repository, branch) {
+  return `https://${expectedGitHubHost()}/${repository}/blob/${branch}/work-queue.jsonl`;
+}
+
+/** @returns {import("./report_ast.cjs").Report} */
+function orphanIssueReport(repository, branch, workId) {
+  return {
+    type: "report",
+    title: "Work queue orphan review",
+    children: [
+      {
+        type: "paragraph",
+        children: [
+          {
+            type: "text",
+            value: "This mirror is older than the configured orphan age and has no matching Work ID in the checked ledger. It has been flagged for maintainer review; this does not change or recreate queue work.",
+            agentTainted: false,
+          },
+        ],
+        agentTainted: false,
+      },
+      {
+        type: "paragraph",
+        children: [
+          {
+            type: "link",
+            url: workQueueLedgerUrl(repository, branch),
+            children: [{ type: "text", value: "View the checked ledger", agentTainted: false }],
+            agentTainted: false,
+          },
+        ],
+        agentTainted: false,
+      },
+      { type: "xml_marker", name: "gh-aw-work-queue-orphan", value: workId, compact: true, agentTainted: false },
+    ],
+    agentTainted: false,
+  };
+}
+
+function renderOrphanComment(repository, branch, workId) {
+  return renderSizedReport(orphanIssueReport(repository, branch, workId)).body;
+}
+
 /** @returns {import("./report_ast.cjs").Report} */
 function buildWorkQueueMessageReport(template, values, run) {
   const workflowName =
@@ -105,7 +149,7 @@ function buildWorkQueueMessageReport(template, values, run) {
 function issueBodyReport(state, work, origin, config, branch, maskedValues = []) {
   const admission = state.workCreators?.get(work.work_id);
   if (!admission) throw new Error("work_queue_admission_provenance_missing");
-  const ledgerUrl = `https://github.com/${state.repository}/blob/${branch}/work-queue.jsonl`;
+  const ledgerUrl = workQueueLedgerUrl(state.repository, branch);
   const description = presentationText(work.payload?.description, 4096, false, maskedValues, true);
   return buildWorkQueueMessageReport(
     "work_queue_issue_body.md",
@@ -157,4 +201,4 @@ function renderClaim(values, run) {
   return renderSizedReport(claimReport(values, run)).body;
 }
 
-module.exports = { issueBody, issueBodyReport, issueTitle, renderSummary, summaryReport, renderClaim, claimReport, runLink };
+module.exports = { issueBody, issueBodyReport, issueTitle, renderSummary, summaryReport, renderClaim, claimReport, runLink, workQueueLedgerUrl, orphanIssueReport, renderOrphanComment };

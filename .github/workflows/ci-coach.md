@@ -110,6 +110,13 @@ The `ci-data-analysis` shared module has pre-downloaded CI run data and attempte
 
 Start by reading `validation-status.json`. If any step failed, jump to the **Pre-flight Repair** path below. Otherwise read `ci-summary.json` and only touch raw files when a summary metric needs verification.
 
+Before either path, read `/tmp/gh-aw/cache-memory/ci-coach/last-analysis.json`.
+Report `Cache hit` after successfully reading prior analysis, or `Cache miss`
+if missing. Use it to avoid repeating unchanged proposals, but verify current
+CI data and GitHub status before relying on it. Before any PR or `noop`, merge
+this run's date, input revision, outcome, and proposal identifiers into the same
+file and read it back to verify the write, including in the concise variant.
+
 ## Pre-flight Repair Path (takes precedence)
 
 If `validation-status.json` shows any failed step:

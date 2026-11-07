@@ -39,9 +39,11 @@ safe-outputs:
     action: string
   add-labels:
     max: 100
+    target: "*"
     # Omitting 'allowed' to permit dynamic label creation (pr-type:*, pr-risk:*, etc.)
   add-comment:
     max: 50
+    target: "*"
   create-issue:
     max: 1
     title-prefix: "[PR Triage Report] "
@@ -149,6 +151,7 @@ Write `/tmp/gh-aw/repo-memory/default/pr-triage-latest.json` containing run meta
 - Be consistent and criteria-driven.
 - Prefer actionable outputs over narration.
 - Respect the 1-hour cooldown: never label, comment on, or report an action for a PR opened or updated within the last hour.
+- Include the PR's `item_number` in every `add_labels` and `add_comment` call; never include a `target` field.
 - Handle edge cases: empty PR descriptions, mixed-change PRs, stale PRs, superseded PRs, and failing CI.
 - **Never use `gh pr checks` or `gh pr view`** — these commands issue GraphQL operations that the CLI proxy blocks with 403. Use the GitHub MCP `pull_request_read` tool with method `get_check_runs` for CI status and method `get` for PR details instead.
 - When `get_check_runs` returns no data or fails for a PR, treat CI status as unknown and continue triaging; do not retry via CLI commands.
