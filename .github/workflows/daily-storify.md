@@ -44,24 +44,6 @@ imports:
       expires: 2d
 features:
   gh-aw-detection: true
-experiments:
-  deterministic_precondition_v1:
-    variants: [control, candidate]
-    description: "Gate the optional redundant 24h-logs re-fetch behind a deterministic summary.json continuation/stale_warning check instead of the agent's own 'coverage incomplete' judgment."
-    hypothesis: "H0: no meaningful difference between control and candidate in average execution-step-count. H1: candidate reduces average execution-step-count by >=0.5 steps relative to control, without reducing eval:episodes_analyzed or eval:feedback_loops_documented pass rate below 0.9."
-    metric: "grader:execution-step-count"
-    guardrail_metrics:
-      - name: "eval:episodes_analyzed"
-        threshold: ">=0.9"
-      - name: "eval:feedback_loops_documented"
-        threshold: ">=0.9"
-    min_samples: 20
-    analysis_type: mann_whitney
-    decision:
-      minimum_effect: 0.5
-      regression_tolerance: 0.5
-      confidence: 0.95
-    tags: ["harness_dimension:tool interaction", "harness_subtype:deterministic_precondition"]
 evals:
   - id: episodes_analyzed
     question: Did the workflow identify and analyze episode-level activity from the last 24 hours?
@@ -81,7 +63,7 @@ Your mission: transform the last 24 hours of workflow execution into a concise b
 - Repository: `${{ github.repository }}`
 - Primary evidence sources:
   1. pre-fetched workflow logs under `/tmp/gh-aw/aw-mcp/logs/`
-  2. `agentic-workflows` MCP (`logs`, `audit`, optional `status`)
+  2. `agentic-workflows` MCP (`audit`, optional `status`; no fleet log collection)
   3. GitHub MCP search/read tools for issues, PRs, comments, and reviews
 
 ## Required Memory Pattern (repo-memory)
@@ -108,21 +90,7 @@ Never store secrets or credentials.
 
 ### 1) Build the episode candidate set
 
-Use the pre-downloaded 24h logs first.
-
-{{#if experiments.deterministic_precondition_v1 == 'candidate' }}
-Check `/tmp/gh-aw/aw-mcp/logs/summary.json` for a non-null `continuation` field or a `stale_warning` flag — these indicate truncated coverage. Only when one of those fields signals truncation, run one additional `agentic-workflows logs` call with:
-{{#else}}
-If coverage is incomplete, run one additional `agentic-workflows logs` call with:
-{{#endif}}
-
-```json
-{
-  "start_date": "-1d",
-  "count": 3000,
-  "artifacts": ["usage"]
-}
-```
+Use only the pre-downloaded 24h logs for fleet collection. This overrides the shared import's continuation guidance: do not call `agentic-workflows logs` or start another fleet download in the agent. Project `summary`, `failure_investigation`, `continuation`, and `stale_warning` from `summary.json`; when coverage is incomplete, report the analyzed subset and the missing window without refetching.
 
 From logs output and saved summaries, identify episodes and lineage edges. Prioritize episodes that:
 - span multiple workflows,
@@ -131,7 +99,7 @@ From logs output and saved summaries, identify episodes and lineage edges. Prior
 
 ### 2) Deep-audit representative episodes
 
-Select 3-6 representative episodes and audit at least one run per episode using `agentic-workflows audit`.
+Select at most 3 representative episodes. Read their cached audit files first; only when necessary, use one `agentic-workflows audit` call per episode with compact `usage` artifacts and a one-minute timeout. Project the returned file reference and needed fields rather than reading full audit blobs into context. A failed or timed-out call is an evidence gap: record it and continue with the cached subset, without overlapping or retrying it.
 
 For each episode, capture:
 - workflows involved,
