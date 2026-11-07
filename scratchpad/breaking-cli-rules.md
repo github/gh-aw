@@ -4,7 +4,7 @@ This document defines what constitutes a breaking change for the gh-aw CLI. Thes
 
 ## Overview
 
-Breaking changes require special attention during development and review because they can disrupt existing user workflows. This document provides criteria for identifying breaking changes and guidance on how to handle them.
+Breaking changes require additional review during development and review because they can disrupt existing user workflows. This document provides criteria for identifying breaking changes and guidance on how to handle them.
 
 ## Categories of Changes
 
@@ -284,7 +284,7 @@ When adding or modifying JSON output:
 
 ## Strict Mode and Security Changes
 
-Special consideration for strict mode changes:
+Additional review applies to strict mode changes:
 
 - **Making strict mode validation refuse instead of warn** is breaking (e.g., v0.30.0)
 - **Changing strict mode defaults** is breaking (e.g., v0.31.0)
@@ -296,7 +296,7 @@ Special consideration for strict mode changes:
 
 A changeset marked `major` (breaking change) requires explicit review and approval before merge:
 
-- **Minimum quorum:** At least **2 maintainer approvals** on the PR. A single maintainer approval is insufficient for breaking changes, regardless of how small the change appears.
+- **Minimum quorum:** At least **2 maintainer approvals** on the PR. A single maintainer approval is insufficient for breaking changes, regardless of the size of the change.
 - **Maintainer role:** A maintainer is any contributor listed in `CODEOWNERS` with write or admin access to the repository. For internal contributors, this maps to the `@github/gh-aw-maintainers` team. External contributors can identify current maintainers via the `CODEOWNERS` file at the repository root.
 - **Author exclusion:** The PR author does not count toward the quorum even if they are a maintainer.
 - **Review window:** Breaking change PRs must remain open for a minimum of **48 hours** after the first maintainer approval to allow the team to surface objections.

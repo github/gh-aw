@@ -1,6 +1,6 @@
 # YAML Version Gotchas: 1.1 vs 1.2 Parser Compatibility
 
-This document explains the critical differences between YAML 1.1 and YAML 1.2 parsers and their impact on GitHub Agentic Workflows validation and compatibility.
+This document explains the differences between YAML 1.1 and YAML 1.2 parsers and their impact on GitHub Agentic Workflows validation and compatibility.
 
 ## Table of Contents
 
@@ -21,7 +21,7 @@ YAML has two major versions with incompatible boolean parsing behavior:
 - **YAML 1.1** (2005): Treats keywords like `on`, `off`, `yes`, `no` as boolean values
 - **YAML 1.2** (2009): Treats these keywords as regular strings (only `true` and `false` are booleans)
 
-This difference has critical implications for GitHub Agentic Workflows, particularly around the `on:` trigger key in workflow frontmatter.
+This difference affects GitHub Agentic Workflows, particularly around the `on:` trigger key in workflow frontmatter.
 
 ## The Core Issue
 
@@ -84,10 +84,10 @@ on:
 GitHub Agentic Workflows uses **`goccy/go-yaml` v1.18.0**, which is a **YAML 1.2 compliant parser**. This means:
 
 ✅ **`on:` is correctly parsed as a string key**, not a boolean  
-✅ **Workflow frontmatter validation works correctly**  
+✅ **Workflow frontmatter validation does not misread `on:` as a boolean**
 ✅ **GitHub Actions YAML is compatible** (GitHub Actions also uses YAML 1.2 parsing)
 
-The compiler in `pkg/workflow/compiler.go` uses this parser to process workflow frontmatter, ensuring consistent and correct behavior.
+The compiler in `pkg/workflow/compiler.go` uses this parser to process workflow frontmatter, ensuring consistent parsing behavior.
 
 ## Affected Keywords
 
@@ -225,7 +225,7 @@ $ python -c "import yaml; yaml.safe_load(open('workflow.md'))"
 # Error: Invalid structure - key is boolean True instead of string "on"
 ```
 
-**This is NOT a real error!** The workflow is valid and will work correctly with gh-aw.
+**This is a false positive.** The workflow is valid and gh-aw parses it as expected.
 
 ### True Validation with YAML 1.2 Tools
 
@@ -385,15 +385,15 @@ If you have existing YAML 1.1 code that needs to work with YAML 1.2:
 
 ### GitHub Actions Compatibility
 
-GitHub Actions uses YAML 1.2 parsing for workflow files, which is why the `on:` trigger key works correctly. gh-aw's use of YAML 1.2 ensures full compatibility with GitHub Actions semantics.
+GitHub Actions uses YAML 1.2 parsing for workflow files, which is why the `on:` trigger key is parsed as a string. gh-aw's use of YAML 1.2 matches GitHub Actions semantics for this key.
 
 ## Conclusion
 
-The YAML version difference between 1.1 and 1.2 is a critical gotcha that affects workflow validation and compatibility. gh-aw correctly uses YAML 1.2 parsing (via `goccy/go-yaml`), which:
+The YAML version difference between 1.1 and 1.2 is a common source of errors in workflow validation and compatibility. gh-aw correctly uses YAML 1.2 parsing (via `goccy/go-yaml`), which:
 
 1. ✅ Allows `on:` to be used as a trigger key (as a string, not boolean)
 2. ✅ Maintains compatibility with GitHub Actions
-3. ✅ Follows modern YAML standards (1.2 is from 2009)
+3. ✅ Follows the YAML 1.2 specification (published 2009)
 
 However, this means that **Python yaml.safe_load and other YAML 1.1 tools will give false positives** when validating workflows. Always use gh-aw's compiler (`gh aw compile`) for validation.
 

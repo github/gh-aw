@@ -462,7 +462,7 @@ printf "%s\n" "$@" >> "$GH_AW_TEST_PIP_ARGS_FILE"
 	}
 	t.Setenv("GH_AW_TEST_PIP_ARGS_FILE", argsFile)
 
-	compiler.validatePythonPackagesWithPip([]string{"--index-url"}, "pip", fakePip)
+	compiler.validatePythonPackagesWithPip([]string{"--index-url", "pkg;whoami", "pkg$(whoami)", "pkg`whoami`"}, "pip", fakePip)
 
 	if _, err := os.Stat(argsFile); err == nil {
 		t.Fatalf("expected invalid package to be rejected before exec; args file %q was created", argsFile)
@@ -573,6 +573,18 @@ printf "%s\n" "$@" > "$GH_AW_TEST_UV_ARGS_FILE"
 // or invoked, so the test is deterministic regardless of whether uv is installed
 // on the host running the test.
 func TestValidateUvPackages_RejectsInvalidPackageName(t *testing.T) {
+	tempDir := t.TempDir()
+	argsFile := filepath.Join(tempDir, "uv-args.txt")
+	fakeUv := filepath.Join(tempDir, "uv")
+	script := `#!/bin/sh
+printf "%s\n" "$@" >> "$GH_AW_TEST_UV_ARGS_FILE"
+`
+	if err := os.WriteFile(fakeUv, []byte(script), 0o755); err != nil {
+		t.Fatalf("failed to write fake uv executable: %v", err)
+	}
+	t.Setenv("PATH", tempDir)
+	t.Setenv("GH_AW_TEST_UV_ARGS_FILE", argsFile)
+
 	compiler := NewCompiler()
 	err := compiler.validateUvPackages(&WorkflowData{
 		CustomSteps: "uvx pkg;whoami",
@@ -582,6 +594,9 @@ func TestValidateUvPackages_RejectsInvalidPackageName(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "invalid pip package name") {
 		t.Errorf("expected error to mention invalid package name, got: %v", err)
+	}
+	if _, err := os.Stat(argsFile); !os.IsNotExist(err) {
+		t.Fatalf("expected invalid package to be rejected before uv execution; stat error = %v", err)
 	}
 }
 

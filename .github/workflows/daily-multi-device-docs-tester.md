@@ -234,10 +234,11 @@ For each device viewport, use playwright-cli to:
 - Test interactions (navigation, search, buttons)
 - Check for layout issues (overflow, truncation, broken layouts)
 
-For mobile and tablet viewports (width ≤1050px), test the responsive header navigation explicitly:
-- Click `.hamburger-btn` and verify its `aria-expanded` attribute is `true`.
-- Target a visible `.tablet-dropdown .dropdown-link[href$="setup/quick-start/"]:visible` rather than a generic `nav a[href]`, which can select the hidden desktop navigation.
-- Click the visible link and verify that it navigates to its expected URL.
+The responsive header switches at 800px. Below 800px, test the landing page navigation explicitly:
+- On `/gh-aw/`, click `.site-menu-toggle`, verify `aria-expanded` is `true`, and verify `#site-menu` is visible.
+- Click the visible `#site-menu .mobile-menu-cta[href$="setup/quick-start/"]` and verify the URL is `/gh-aw/setup/quick-start/`.
+- On documentation pages, the same button opens `#starlight__sidebar` instead of `#site-menu`; do not assume the landing-page menu structure applies there.
+At 800px and above, verify `.site-menu-toggle` is hidden and `.site-header-nav` is visible.
 
 ## Step 4: Analyze Results
 

@@ -89,7 +89,7 @@ func writingRedirect(redir *syntax.Redirect) bool {
 	case syntax.RdrOut, syntax.AppOut, syntax.RdrClob, syntax.RdrAll, syntax.AppAll, syntax.RdrInOut:
 		return !outputSink(redir.Word)
 	case syntax.DplOut:
-		value, static := literalWord(redir.Word)
+		value, static := LiteralWord(redir.Word)
 		if static && (value == "-" || numericFD(strings.TrimSuffix(value, "-"))) {
 			return false
 		}
@@ -117,7 +117,7 @@ func outputSink(word *syntax.Word) bool {
 			return true
 		}
 	}
-	value, static := literalWord(word)
+	value, static := LiteralWord(word)
 	return static && sinkPath(value)
 }
 
