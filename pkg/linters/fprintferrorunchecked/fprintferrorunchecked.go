@@ -122,11 +122,35 @@ func checkUncheckedFprintAssign(pass *analysis.Pass, assign *ast.AssignStmt, noL
 
 func reportUncheckedFprint(pass *analysis.Pass, call *ast.CallExpr, funcName string, noLintIndex nolint.DirectiveIndex) {
 	position := pass.Fset.PositionFor(call.Pos(), false)
-	if nolint.HasDirectiveForLinter(position, noLintIndex, "fprintferrorunchecked") || isConsoleOutput(pass, call) {
+	if nolint.HasDirectiveForLinter(position, noLintIndex, "fprintferrorunchecked") || isConsoleOutput(pass, call) || isInfallibleWriter(pass, call) {
 		return
 	}
 	pkgLog.Printf("flagging unchecked fmt.%s() error at %s:%d", funcName, position.Filename, position.Line)
 	pass.ReportRangef(call, "error return from fmt.%s() is not checked; write failures may be silently ignored", funcName)
+}
+
+func isInfallibleWriter(pass *analysis.Pass, call *ast.CallExpr) bool {
+	if len(call.Args) == 0 {
+		return false
+	}
+
+	pointer, ok := types.Unalias(pass.TypesInfo.TypeOf(call.Args[0])).(*types.Pointer) //nolint:uncheckedsliceindex // len(call.Args) is checked above
+	if !ok {
+		return false
+	}
+	writer, ok := types.Unalias(pointer.Elem()).(*types.Named)
+	if !ok || writer.Obj().Pkg() == nil {
+		return false
+	}
+
+	switch {
+	case writer.Obj().Pkg().Path() == "bytes" && writer.Obj().Name() == "Buffer":
+		return true
+	case writer.Obj().Pkg().Path() == "strings" && writer.Obj().Name() == "Builder":
+		return true
+	default:
+		return false
+	}
 }
 
 // Console writes are best-effort diagnostics; unlike file or network writes,
