@@ -41,7 +41,9 @@ func applyHealthDetectionFailures(health *WorkflowHealth, runs []WorkflowRun, co
 	if health.DetectionFailureRuns == 0 {
 		return
 	}
-	health.Status = "detection_failures_observed"
+	if health.Status == "healthy" || health.Status == "recovery_observed" {
+		health.Status = "detection_failures_observed"
+	}
 	for i := range health.Revisions {
 		revision := &health.Revisions[i]
 		for _, id := range revision.Current.RunIDs {
@@ -49,8 +51,9 @@ func applyHealthDetectionFailures(health *WorkflowHealth, runs []WorkflowRun, co
 				revision.Current.DetectionFailureRuns++
 			}
 		}
-		if revision.Current.DetectionFailureRuns > 0 {
-			revision.Status = health.Status
+		if revision.Current.DetectionFailureRuns > 0 &&
+			(revision.Status == "healthy" || revision.Status == "recovery_observed") {
+			revision.Status = "detection_failures_observed"
 		}
 	}
 }

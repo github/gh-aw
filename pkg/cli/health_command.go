@@ -316,9 +316,14 @@ func displayDetailedHealth(runs []WorkflowRun, config HealthConfig) error {
 func displayDetailedHealthStatus(health WorkflowHealth, threshold float64) {
 	if health.DetectionFailureRuns > 0 {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("%d run(s) have threat-detection failures or threats; Actions success rate does not establish successful threat detection", health.DetectionFailureRuns)))
-	} else if health.SubagentFailureCount > 0 {
+	}
+	if health.SubagentFailureCount > 0 {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("%d sub-agent invocation(s) failed across %d run(s); Actions success rate does not establish healthy delegation", health.SubagentFailureCount, health.SubagentFailureRuns)))
-	} else if health.Status == "no_current_revision_runs" {
+	}
+	if health.DetectionFailureRuns > 0 || health.SubagentFailureCount > 0 {
+		return
+	}
+	if health.Status == "no_current_revision_runs" {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Current workflow revision has no matching runs; awaiting new evidence instead of investigating superseded failures"))
 	} else if health.BelowThresh {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Success rate (%.1f%%) is below threshold (%.1f%%)", health.SuccessRate, threshold)))

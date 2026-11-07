@@ -18,7 +18,7 @@ Determine job presence from a schema-minimal raw jobs array, independently of op
 
 Typed enrichment is best-effort: API, budget or decoding failures must not abort an otherwise usable health report or erase known presence. Report incomplete evidence and an explicit warning. Emit job/step boundary signals from live evidence only when the inventory is complete; partial inventories remain diagnostic evidence, not clustering boundaries.
 
-Expose producer version, report schema version, capabilities, cache compatibility, job-evidence completeness and API/job request counts. Keep `degraded_workflows` restricted to workflows with failed sub-agent invocations; `observed_failure_workflows` separately counts workflows with sampled current-revision Actions failures. Both counters exclude intentional-failure workflows and may overlap.
+Expose producer version, report schema version, capabilities, cache compatibility, job-evidence completeness and API/job request counts. `degraded_workflows` counts workflows with either failed sub-agent invocations or threat-detection failures, while `observed_failure_workflows` separately counts workflows with sampled current-revision Actions failures. Both counters exclude intentional-failure workflows and may overlap.
 
 ### Alternatives Considered
 
@@ -40,4 +40,4 @@ Identity-checked cached jobs and complete live inventories can recover shared fa
 
 The 300-job expansion cap intentionally sacrifices coverage: larger inventories, exhausted budgets and failed decoding can suppress job/step clustering rather than create misleading boundaries. Raw cache decoding still depends on a compatible job shape; identity checks do not guarantee schema compatibility, so incompatible evidence must be rejected rather than treated as valid.
 
-Reports and in-memory state grow. Consumers must distinguish sub-agent degradation from observed Actions failures instead of interpreting `degraded_workflows` as a general failure count. `report_schema_version: 1`, capability metadata and request counts make these changes explicit, but do not guarantee complete coverage.
+Reports and in-memory state grow. Consumers must distinguish sub-agent or threat-detection degradation from observed Actions failures instead of interpreting `degraded_workflows` as a general failure count. `report_schema_version: 1`, capability metadata and request counts make these changes explicit, but do not guarantee complete coverage.

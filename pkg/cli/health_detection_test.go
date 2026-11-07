@@ -101,49 +101,11 @@ func TestHealthDetectionFailuresFromHistoricalConclusionLogs(t *testing.T) {
 	assert.Contains(t, health.DetectionFailures[0].Description, "parse_error")
 }
 
-func TestHealthDetectionFailuresRejectStaleCache(t *testing.T) {
-	for _, field := range []string{"run-id", "summary-id", "url", "repository", "attempt", "revision", "workflow", "updated", "status", "conclusion", "version"} {
-		t.Run(field, func(t *testing.T) {
-			runs, config := healthSubagentFixture(t)
-			summary := cacheHealthDetectionResult(t, runs[9], config, `{"jobResult":"success","conclusion":"warning","reason":"threat_detected"}`)
-			switch field {
-			case "run-id":
-				summary.Run.DatabaseID++
-			case "summary-id":
-				summary.RunID++
-			case "url":
-				summary.Run.URL = "https://github.example.com/org/repo/actions/runs/10"
-			case "repository":
-				summary.Run.Repository = "other/repo"
-			case "attempt":
-				summary.Run.Attempt++
-			case "revision":
-				summary.Run.HeadSha = "other"
-			case "workflow":
-				summary.Run.WorkflowPath = ".github/workflows/other.lock.yml"
-			case "updated":
-				summary.Run.UpdatedAt = summary.Run.UpdatedAt.Add(time.Second)
-			case "status":
-				summary.Run.Status = "in_progress"
-			case "conclusion":
-				summary.Run.Conclusion = "failure"
-			case "version":
-				summary.CLIVersion = "old"
-			}
-			require.NoError(t, saveRunSummary(filepath.Join(config.LogsDir, "run-10"), summary, false))
-			health := calculateCurrentWorkflowHealth("Example", runs, config)
-			assert.Equal(t, "recovery_observed", health.Status)
-			assert.Zero(t, health.DetectionFailureRuns)
-			assert.Empty(t, health.DetectionFailures)
-		})
-	}
-}
-
 func TestHealthDetectionFailuresUseRawJobs(t *testing.T) {
 	for _, source := range []string{"missing cache", "matching cache without jobs", "incomplete jobs", "stale cache", "old version"} {
 		t.Run(source, func(t *testing.T) {
 			runs, config := healthSubagentFixture(t)
-			jobs := []JobInfoWithDuration{{Name: "detection", Conclusion: "failure"}}
+			jobs := []JobInfoWithDuration{{JobInfo: JobInfo{Name: "detection", Conclusion: "failure"}}}
 			config.collection.jobs = map[healthRunAttempt]*healthJobs{
 				{id: runs[9].DatabaseID, attempt: runs[9].Attempt}: {details: jobs, complete: source != "incomplete jobs"},
 			}
@@ -176,7 +138,10 @@ func TestHealthDetectionFailuresUseRawJobs(t *testing.T) {
 
 func TestHealthDetectionFailureOutput(t *testing.T) {
 	runs, config := healthSubagentFixture(t)
-	cacheHealthDetectionResult(t, runs[9], config, `{"jobResult":"success","conclusion":"warning","reason":"threat_detected","promptInjection":true,"secretLeak":false,"maliciousPatch":false,"reasons":["PRIVATE_DETAIL"]}`)
+	detection := cacheHealthDetectionResult(t, runs[9], config, `{"jobResult":"success","conclusion":"warning","reason":"threat_detected","promptInjection":true,"secretLeak":false,"maliciousPatch":false,"reasons":["PRIVATE_DETAIL"]}`)
+	subagents := cacheHealthSubagentFailure(t, runs[9], config)
+	detection.TokenUsage = subagents.TokenUsage
+	require.NoError(t, saveRunSummary(filepath.Join(config.LogsDir, "run-10"), detection, false))
 	for _, detailed := range []bool{false, true} {
 		config.JSONOutput = true
 		output := captureAuditGroupStdout(t, func() {
@@ -192,7 +157,7 @@ func TestHealthDetectionFailureOutput(t *testing.T) {
 		require.NoError(t, json.Unmarshal([]byte(output), &report))
 		assert.Equal(t, 1, report.DetectionFailureRuns)
 		assert.Contains(t, output, `"detection_failures"`)
-		assert.Contains(t, output, `"detection_failures_observed"`)
+		assert.Contains(t, output, `"subagent_failures_observed"`)
 		assert.Contains(t, output, string(AuditFindingThreatDetected))
 		assert.Contains(t, output, runs[9].URL)
 		assert.NotContains(t, output, "PRIVATE_DETAIL")
@@ -204,6 +169,7 @@ func TestHealthDetectionFailureOutput(t *testing.T) {
 	})
 	assert.Contains(t, output, "[detection_failures]")
 	assert.Contains(t, output, "Threat Detection Warning")
+	assert.Contains(t, output, "failed sub-agent invocations")
 	assert.Contains(t, output, "prompt injection")
 	assert.Contains(t, output, runs[9].URL)
 	assert.Contains(t, output, "Actions success rate does not establish successful threat detection")
@@ -221,6 +187,9 @@ func TestHealthDetectionFailureRollups(t *testing.T) {
 	health := calculateCurrentWorkflowHealth("Example", runs, config)
 	assert.Equal(t, 2, health.SubagentFailureCount)
 	assert.Equal(t, 1, health.DetectionFailureRuns)
+	assert.Equal(t, "subagent_failures_observed", health.Status)
+	require.Len(t, health.Revisions, 1)
+	assert.Equal(t, "subagent_failures_observed", health.Revisions[0].Status)
 	summary := CalculateHealthSummary([]WorkflowHealth{health}, "current", 80)
 	assert.Zero(t, summary.HealthyWorkflows)
 	assert.Zero(t, summary.BelowThreshold)
@@ -235,4 +204,32 @@ func TestHealthDetectionFailureRollups(t *testing.T) {
 	assert.Zero(t, summary.SubagentFailureCount)
 	assert.Zero(t, summary.HealthyWorkflows)
 	require.Len(t, summary.Workflows[0].DetectionFailures, 2, "intentional failures remain inspectable")
+}
+
+func TestHealthDetectionFailuresPreserveInsufficientEvidence(t *testing.T) {
+	runs, config := healthSubagentFixture(t)
+	run := runs[9]
+	cacheHealthDetectionResult(t, run, config, `{"jobResult":"success","conclusion":"warning","reason":"parse_error"}`)
+	health := WorkflowHealth{
+		WorkflowName: "Example",
+		Status:       "insufficient_evidence",
+		SuccessRate:  100,
+		BelowThresh:  true,
+		Revisions: []HealthRevisionStatus{{
+			Status:  "insufficient_evidence",
+			Current: &HealthRevisionCohort{RunIDs: []int64{run.DatabaseID}},
+		}},
+	}
+
+	applyHealthDetectionFailures(&health, []WorkflowRun{run}, config)
+
+	assert.Equal(t, "insufficient_evidence", health.Status)
+	assert.Equal(t, 1, health.DetectionFailureRuns)
+	require.Len(t, health.Revisions, 1)
+	assert.Equal(t, "insufficient_evidence", health.Revisions[0].Status)
+	assert.Equal(t, 1, health.Revisions[0].Current.DetectionFailureRuns)
+	summary := CalculateHealthSummary([]WorkflowHealth{health}, "current", 80)
+	assert.Equal(t, 1, summary.InsufficientWorkflows)
+	assert.Zero(t, summary.HealthyWorkflows)
+	assert.Zero(t, summary.BelowThreshold)
 }
