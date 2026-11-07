@@ -96,16 +96,16 @@ The following tools are available for querying GitHub data:
 
 ### 1.1 Query Pull Requests
 
-Calculate one UTC `window_start` timestamp exactly 90 days before the run and use the same value in every query and Python filter. Do not count closed or merged items only because their `updatedAt` is inside the window; the query tools use `updatedAt` for pagination, so lifecycle metrics must be filtered again by `mergedAt` or `closedAt`.
+Calculate one UTC `window_start` timestamp exactly 90 days before the run and one `window_end` timestamp at the start of analysis. Use these same values in every query and Python filter. To avoid timing out on the full 90-day candidate set, query it in three contiguous date-bounded batches of about 30 days each. Use both `since` and `until` for every batch, and combine the results by item number before analysis. If a batch reaches the tool's 1,000-item limit, split that batch into smaller ranges and retry until every batch completes below the limit. The bounded query uses `updatedAt` only to find candidates; count created activity by `createdAt` and lifecycle metrics by `mergedAt` or `closedAt`.
 
 **Use the `github-pr-query` mcp-script tool** to get PR data:
 
 ```
-github-pr-query with state: "all", since: "<window_start>", jq: "."
+github-pr-query with state: "all", since: "<batch_start>", until: "<batch_end>", limit: 1000, jq: "[.[] | {number, author, createdAt, updatedAt, mergedAt, closedAt, reviewDecision, labels}]"
 github-pr-query with state: "open", limit: 1000, jq: "."
 ```
 
-Save the rolling-window candidate output to `/tmp/gh-aw/python/data/prs.json` and the current open backlog output to `/tmp/gh-aw/python/data/open_prs.json`.
+Run the bounded query for each batch. Combine the results, deduplicating by `number`, and save them to `/tmp/gh-aw/python/data/prs.json`. Save the current open backlog output to `/tmp/gh-aw/python/data/open_prs.json`.
 
 The tool provides:
 - PRs updated since `window_start` for the activity candidate set; filter totals by `createdAt >= window_start` and merged throughput by `mergedAt >= window_start` in analysis
@@ -119,11 +119,11 @@ The tool provides:
 **Use the `github-issue-query` mcp-script tool** to get issue data:
 
 ```
-github-issue-query with state: "all", since: "<window_start>", jq: "."
+github-issue-query with state: "all", since: "<batch_start>", until: "<batch_end>", limit: 1000, jq: "[.[] | {number, author, createdAt, updatedAt, closedAt, labels}]"
 github-issue-query with state: "open", limit: 1000, jq: "."
 ```
 
-Save the rolling-window candidate output to `/tmp/gh-aw/python/data/issues.json` and the current open backlog output to `/tmp/gh-aw/python/data/open_issues.json`.
+Run the bounded query for each batch. Combine the results, deduplicating by `number`, and save them to `/tmp/gh-aw/python/data/issues.json`. Save the current open backlog output to `/tmp/gh-aw/python/data/open_issues.json`.
 
 The tool provides:
 - Issues updated since `window_start` for the activity candidate set; filter totals by `createdAt >= window_start` and resolved throughput by `closedAt >= window_start` in analysis
@@ -532,11 +532,11 @@ A successful run will:
 
 This workflow uses mcp-script tools imported from `shared/github-queries-mcp-script.md`:
 1. Tools are defined in the shared workflow with shell script implementations
-2. Set `window_start` to the exact UTC timestamp 90 days before the run; the tools paginate by `updatedAt` through that boundary rather than using a record cap
+2. Set `window_start` to the exact UTC timestamp 90 days before the run and `window_end` to the analysis start; batch PR/issue queries into contiguous ranges using both `since` and `until`, deduplicate by item number, and split any range that reaches the 1,000-item limit
 3. Use `createdAt >= window_start` for total PR/issue activity, `mergedAt >= window_start` for merged PR metrics, and `closedAt >= window_start` for resolved issue metrics; do not use `updatedAt` as the final metric date
 4. Query open PRs/issues separately without `since` and save them to `open_prs.json` / `open_issues.json` so backlog counts are current rather than update-window counts
 5. Each tool supports jq-based filtering for efficient data querying
 6. Tools are authenticated with `GITHUB_TOKEN` for GitHub API access
-7. Call tools with parameters like: `github-pr-query with state: "all", since: "YYYY-MM-DDT00:00:00Z", jq: "."`
+7. Call bounded PR/issue queries with both `since` and `until`; `since`-only queries retain their existing pagination behavior
 
 Begin your analysis now. **Use the mcp-script tools** to gather data, run Python analysis, generate charts, and create the discussion report.
