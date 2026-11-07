@@ -39,7 +39,7 @@ on:
 
 permissions:
   contents: read
-  issues: write
+  issues: write # Create or update issues and comments.
 
 jobs:
   auto-upgrade:

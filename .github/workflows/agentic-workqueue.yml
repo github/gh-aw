@@ -39,9 +39,9 @@ jobs:
     name: Handle work queue Issue events
     runs-on: ubuntu-slim
     permissions:
-      actions: read
-      contents: write
-      issues: write
+      actions: read # Read workflow runs and artifacts for workflow context.
+      contents: write # Create or update repository contents.
+      issues: write # Create or update issues and comments.
     steps:
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

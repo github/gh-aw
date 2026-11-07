@@ -102,7 +102,7 @@ jobs:
     runs-on: ubuntu-slim
     # Permissions for the activation job (workflow permissions default to none).
     permissions:
-      actions: read
+      actions: read # Read workflow runs and artifacts for workflow context.
       contents: read
     env:
       GH_AW_ADMISSION_RESULT: ${{ needs.admission.outputs.result }}
@@ -559,7 +559,7 @@ jobs:
     # Permissions for the admission job (workflow permissions default to none).
     permissions:
       contents: read
-      id-token: write
+      id-token: write # Request an OIDC token for authenticated services.
     timeout-minutes: 5
     outputs:
       max-ai-credits: ${{ steps.admission.outputs.max-ai-credits }}
@@ -610,9 +610,9 @@ jobs:
     # Permissions for the agent job (workflow permissions default to none).
     permissions:
       contents: read
-      copilot-requests: write
-      issues: read
-      pull-requests: read
+      copilot-requests: write # Authenticate requests to the Copilot engine.
+      issues: read # Read issues and comments for workflow context.
+      pull-requests: read # Read pull requests and review comments for workflow context.
     cache-mode: read
     concurrency:
       group: "gh-aw-copilot-${{ github.workflow }}"
@@ -1933,11 +1933,11 @@ jobs:
     runs-on: ubuntu-slim
     # Permissions for the conclusion job (workflow permissions default to none).
     permissions:
-      actions: read
-      checks: read
-      discussions: write
-      issues: write
-      pull-requests: read
+      actions: read # Read workflow runs and artifacts for workflow context.
+      checks: read # Read check runs for workflow context.
+      discussions: write # Create or update discussions and comments.
+      issues: write # Create or update issues and comments.
+      pull-requests: read # Read pull requests and review comments for workflow context.
     concurrency:
       group: "gh-aw-conclusion-daily-mcp-concurrency-analysis"
       cancel-in-progress: false
@@ -2330,7 +2330,7 @@ jobs:
     # Permissions for the conclusion_admission job (workflow permissions default to none).
     permissions:
       contents: read
-      id-token: write
+      id-token: write # Request an OIDC token for authenticated services.
     timeout-minutes: 5
     env:
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
@@ -2383,7 +2383,7 @@ jobs:
     # Permissions for the detection job (workflow permissions default to none).
     permissions:
       contents: read
-      copilot-requests: write
+      copilot-requests: write # Authenticate requests to the Copilot engine.
     timeout-minutes: 10
     env:
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
@@ -2757,7 +2757,7 @@ jobs:
     # Permissions for the evals job (workflow permissions default to none).
     permissions:
       contents: read
-      copilot-requests: write
+      copilot-requests: write # Authenticate requests to the Copilot engine.
     env:
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     outputs:
@@ -2931,7 +2931,7 @@ jobs:
     runs-on: ubuntu-slim
     # Permissions for the push_evals_state job (workflow permissions default to none).
     permissions:
-      contents: write
+      contents: write # Create or update repository contents.
     env:
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     steps:
@@ -3020,7 +3020,7 @@ jobs:
     runs-on: ubuntu-slim
     # Permissions for the push_ledger_changes job (workflow permissions default to none).
     permissions:
-      contents: write
+      contents: write # Create or update repository contents.
     env:
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     steps:
@@ -3084,9 +3084,9 @@ jobs:
     runs-on: ubuntu-slim
     # Permissions for the safe_outputs job (workflow permissions default to none).
     permissions:
-      actions: write
-      discussions: write
-      issues: write
+      actions: write # Create or update workflow runs and artifacts.
+      discussions: write # Create or update discussions and comments.
+      issues: write # Create or update issues and comments.
     timeout-minutes: 15
     env:
       GH_AW_AGENT_AIC: ${{ needs.agent.outputs.aic }}
@@ -3238,7 +3238,7 @@ jobs:
     runs-on: ubuntu-slim
     # Permissions for the update_cache_memory job (workflow permissions default to none).
     permissions:
-      actions: write
+      actions: write # Create or update workflow runs and artifacts.
       contents: read
     cache-mode: write-only
     env:

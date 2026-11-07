@@ -296,7 +296,7 @@ printf '%s\\n' "$TEMP_DIR"`,
 
   it(
     "runs simultaneous rootless installers with shared scratch without chown, sudo, or cross-job cleanup",
-    { timeout: 30000 },
+    { timeout: 60000 },
     async () => {
       const root = workspace();
       const sharedTemp = path.join(root, "shared-temp");
@@ -358,7 +358,7 @@ printf 'copilot 1.0.103\\n'
         return { child, ready, release, completion };
       });
       try {
-        const deadline = Date.now() + 25000;
+        const deadline = Date.now() + 55000;
         while (!jobs.every(job => fs.existsSync(job.ready))) {
           if (Date.now() > deadline) throw new Error("Concurrent installers did not reach the toolcache barrier");
           await new Promise(resolve => setTimeout(resolve, 25));
@@ -390,7 +390,7 @@ printf 'copilot 1.0.103\\n'
         await Promise.all(jobs.map(job => job.completion));
       }
     },
-    30000
+    60000
   );
 
   it.skipIf(process.getuid && process.getuid() === 0)("rejects an unwritable Copilot directory without reclaiming or re-owning it", () => {

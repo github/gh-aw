@@ -341,7 +341,7 @@ describe("Safe Output Handler Manager", () => {
         expect(sortMessageIndicesByTemporaryIdDependencies([dependent, producer, unrelated])).toEqual([1, 0, 2]);
       });
 
-      it("tracks a comment emitted before its temporary-ID producer", async () => {
+      it.each(["#aw_track1", "\\#aw\\_track1"])("tracks a comment emitted before its temporary-ID producer with posted reference %s", async reference => {
         const callOrder = [];
         const handlers = new Map([
           [
@@ -355,7 +355,7 @@ describe("Safe Output Handler Manager", () => {
                 itemNumber: 42,
                 repo: "owner/repo",
                 isDiscussion: false,
-                body: "Tracking issue: #aw_track1\n\nHandler footer marker",
+                body: `Tracking issue: ${reference}\n\nHandler footer marker`,
               };
             }),
           ],
@@ -386,14 +386,14 @@ describe("Safe Output Handler Manager", () => {
               itemNumber: 42,
               repo: "owner/repo",
               isDiscussion: false,
-              body: "Tracking issue: #aw_track1\n\nHandler footer marker",
+              body: `Tracking issue: ${reference}\n\nHandler footer marker`,
             },
             originalTempIdMapSize: 0,
           },
         ]);
       });
 
-      it("updates the posted comment body while retaining handler metadata", async () => {
+      it.each(["#aw_track1", "\\#aw\\_track1"])("updates the posted comment body with reference %s while retaining handler metadata", async reference => {
         const updateComment = vi.fn().mockResolvedValue({});
         const github = { rest: { issues: { updateComment } } };
         const trackedOutputs = [
@@ -406,7 +406,7 @@ describe("Safe Output Handler Manager", () => {
               itemNumber: 42,
               repo: "owner/repo",
               isDiscussion: false,
-              body: "Tracking issue: #aw_track1\n\nHandler footer marker",
+              body: `Tracking issue: ${reference}\n\nHandler footer marker`,
             },
             originalTempIdMapSize: 0,
           },

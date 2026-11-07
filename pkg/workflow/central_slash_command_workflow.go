@@ -449,7 +449,7 @@ jobs:
 	if err != nil {
 		return "", err
 	}
-	return finalYAML, nil
+	return documentPermissionComments(finalYAML, "")
 }
 
 func buildHelpCommandEntries(workflowDataList []*WorkflowData) []helpCommandEntry {

@@ -98,7 +98,7 @@ jobs:
     runs-on: ubuntu-slim
     # Permissions for the activation job (workflow permissions default to none).
     permissions:
-      actions: read
+      actions: read # Read workflow runs and artifacts for workflow context.
       contents: read
     env:
       GH_AW_ADMISSION_RESULT: ${{ needs.admission.outputs.result }}
@@ -548,7 +548,7 @@ jobs:
     # Permissions for the admission job (workflow permissions default to none).
     permissions:
       contents: read
-      id-token: write
+      id-token: write # Request an OIDC token for authenticated services.
     timeout-minutes: 5
     outputs:
       max-ai-credits: ${{ steps.admission.outputs.max-ai-credits }}
@@ -598,7 +598,7 @@ jobs:
     runs-on: ubuntu-latest
     # Permissions for the agent job (workflow permissions default to none).
     permissions:
-      actions: read
+      actions: read # Read workflow runs and artifacts for workflow context.
       contents: read
     cache-mode: read
     concurrency:
@@ -1592,11 +1592,11 @@ jobs:
     runs-on: ubuntu-slim
     # Permissions for the conclusion job (workflow permissions default to none).
     permissions:
-      actions: read
-      checks: read
-      contents: write
-      issues: write
-      pull-requests: write
+      actions: read # Read workflow runs and artifacts for workflow context.
+      checks: read # Read check runs for workflow context.
+      contents: write # Create or update repository contents.
+      issues: write # Create or update issues and comments.
+      pull-requests: write # Create or update pull requests and review comments.
     concurrency:
       group: "gh-aw-conclusion-jsweep"
       cancel-in-progress: false
@@ -1980,7 +1980,7 @@ jobs:
     # Permissions for the conclusion_admission job (workflow permissions default to none).
     permissions:
       contents: read
-      id-token: write
+      id-token: write # Request an OIDC token for authenticated services.
     timeout-minutes: 5
     env:
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
@@ -2406,9 +2406,9 @@ jobs:
     runs-on: ubuntu-latest # Safe-output code publication checks out repository files; ubuntu-slim is limited to 15 minutes.
     # Permissions for the safe_outputs job (workflow permissions default to none).
     permissions:
-      contents: write
-      issues: write
-      pull-requests: write
+      contents: write # Create or update repository contents.
+      issues: write # Create or update issues and comments.
+      pull-requests: write # Create or update pull requests and review comments.
     timeout-minutes: 45
     env:
       GH_AW_AGENT_AIC: ${{ needs.agent.outputs.aic }}
@@ -2582,7 +2582,7 @@ jobs:
     runs-on: ubuntu-slim
     # Permissions for the update_cache_memory job (workflow permissions default to none).
     permissions:
-      actions: write
+      actions: write # Create or update workflow runs and artifacts.
       contents: read
     cache-mode: write-only
     env:

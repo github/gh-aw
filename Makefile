@@ -882,6 +882,7 @@ deps: check-node-version
 	go mod tidy
 	cd actions/setup/js && npm ci
 	cd eslint-factory && npm ci
+	cd specs/otel && npm ci
 
 # Install development tools (including linter)
 .PHONY: deps-dev
@@ -1142,9 +1143,18 @@ validate-registry:
 .PHONY: validate-otel-contract
 validate-otel-contract:
 	@echo "Validating gh-aw OpenTelemetry compatibility contract..."
+	@$(MAKE) --no-print-directory check-otel-attributes
 	@go test ./pkg/parser ./pkg/workflow -run 'TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_OTLP(CustomAttributes|ResourceAttributes|GitHubAppImplicitOIDC)|TestInjectOTLPConfig|TestApplyTraceContextEnvToMap' -count=1
 	@cd actions/setup/js && npm run test:js -- otel_contract.test.cjs send_otlp_span.test.cjs --no-file-parallelism >/dev/null
 	@echo "✓ OpenTelemetry compatibility contract validated"
+
+.PHONY: check-otel-attributes
+check-otel-attributes:
+	@npm run check --prefix specs/otel
+
+.PHONY: generate-otel-attributes
+generate-otel-attributes:
+	npm run generate --prefix specs/otel
 
 MODELS_DEV_MODELS_JSON_URL ?= https://models.dev/catalog.json
 
@@ -1216,7 +1226,7 @@ shellcheck-setup-sh:
 
 # Validate all project files
 .PHONY: lint
-lint: check-stale-lock-files check-skill-file-paths fmt-check fmt-check-json lint-cjs golint validate-model-alias-chains lint-action-sh shellcheck-setup-sh check-stale-schema-binary
+lint: check-stale-lock-files check-skill-file-paths fmt-check fmt-check-json lint-cjs golint validate-model-alias-chains lint-action-sh shellcheck-setup-sh check-stale-schema-binary check-otel-attributes
 	@echo "✓ All validations passed"
 
 # Install the binary locally

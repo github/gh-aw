@@ -105,9 +105,9 @@ jobs:
     runs-on: ubuntu-slim
     # Permissions for the activation job (workflow permissions default to none).
     permissions:
-      actions: read
+      actions: read # Read workflow runs and artifacts for workflow context.
       contents: read
-      issues: write
+      issues: write # Create or update issues and comments.
     env:
       GH_AW_ADMISSION_RESULT: ${{ needs.admission.outputs.result }}
       GH_AW_MAX_DAILY_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_DAILY_AI_CREDITS || '5000' }}
@@ -588,7 +588,7 @@ jobs:
     # Permissions for the admission job (workflow permissions default to none).
     permissions:
       contents: read
-      id-token: write
+      id-token: write # Request an OIDC token for authenticated services.
     timeout-minutes: 5
     outputs:
       max-ai-credits: ${{ steps.admission.outputs.max-ai-credits }}
@@ -641,9 +641,9 @@ jobs:
     # Permissions for the agent job (workflow permissions default to none).
     permissions:
       contents: read
-      copilot-requests: write
-      issues: read
-      pull-requests: read
+      copilot-requests: write # Authenticate requests to the Copilot engine.
+      issues: read # Read issues and comments for workflow context.
+      pull-requests: read # Read pull requests and review comments for workflow context.
     cache-mode: read
     concurrency:
       group: "gh-aw-copilot-${{ github.workflow }}"
@@ -1641,11 +1641,11 @@ jobs:
     runs-on: ubuntu-slim
     # Permissions for the conclusion job (workflow permissions default to none).
     permissions:
-      actions: read
-      checks: read
-      contents: write
-      issues: write
-      pull-requests: write
+      actions: read # Read workflow runs and artifacts for workflow context.
+      checks: read # Read check runs for workflow context.
+      contents: write # Create or update repository contents.
+      issues: write # Create or update issues and comments.
+      pull-requests: write # Create or update pull requests and review comments.
     concurrency:
       group: "gh-aw-conclusion-dead-code-remover"
       cancel-in-progress: false
@@ -2044,7 +2044,7 @@ jobs:
     # Permissions for the conclusion_admission job (workflow permissions default to none).
     permissions:
       contents: read
-      id-token: write
+      id-token: write # Request an OIDC token for authenticated services.
     timeout-minutes: 5
     env:
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
@@ -2097,7 +2097,7 @@ jobs:
     # Permissions for the detection job (workflow permissions default to none).
     permissions:
       contents: read
-      copilot-requests: write
+      copilot-requests: write # Authenticate requests to the Copilot engine.
     timeout-minutes: 10
     env:
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
@@ -2537,9 +2537,9 @@ jobs:
     runs-on: ubuntu-latest # Safe-output code publication checks out repository files; ubuntu-slim is limited to 15 minutes.
     # Permissions for the safe_outputs job (workflow permissions default to none).
     permissions:
-      contents: write
-      issues: write
-      pull-requests: write
+      contents: write # Create or update repository contents.
+      issues: write # Create or update issues and comments.
+      pull-requests: write # Create or update pull requests and review comments.
     timeout-minutes: 45
     env:
       GH_AW_AGENT_AIC: ${{ needs.agent.outputs.aic }}
@@ -2712,7 +2712,7 @@ jobs:
     runs-on: ubuntu-slim
     # Permissions for the update_cache_memory job (workflow permissions default to none).
     permissions:
-      actions: write
+      actions: write # Create or update workflow runs and artifacts.
       contents: read
     cache-mode: write-only
     env:
