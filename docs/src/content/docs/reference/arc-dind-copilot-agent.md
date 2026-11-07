@@ -209,7 +209,7 @@ To migrate:
 
 Clusters that enforce `allowPrivilegeEscalation: false` (via PodSecurity Admission or OPA policies) prevent the default Copilot CLI install script from using `sudo`.
 
-Pass `--rootless` to `install_copilot_cli.sh` in your `copilot-setup-steps` to install to `~/.local/bin` without any `sudo` calls. The script adds that directory to `$GITHUB_PATH` so subsequent steps find the binary:
+Pass `--rootless` to `install_copilot_cli.sh` in your `copilot-setup-steps` to install to `$RUNNER_TEMP/gh-aw/bin` without any `sudo` calls. AWF mounts this job-scoped directory read-only; the script adds it to `$GITHUB_PATH` so subsequent steps find the binary:
 
 ```yaml
 copilot-setup-steps:
@@ -226,8 +226,8 @@ copilot-setup-steps:
 ```
 
 In rootless mode:
-- The binary is installed to `~/.local/bin/copilot` (no `sudo` required).
-- `~/.local/bin` is appended to `$GITHUB_PATH` so `copilot` is on `PATH` for all later steps.
+- The binary is installed to `$RUNNER_TEMP/gh-aw/bin/copilot` (no `sudo` required).
+- `$RUNNER_TEMP/gh-aw/bin` is appended to `$GITHUB_PATH` so `copilot` is on `PATH` for all later steps.
 - Ownership and cleanup operations that previously used `sudo` run as the current user (which owns the relevant files in rootless deployments).
 
 ## Known limitations

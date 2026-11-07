@@ -12,6 +12,7 @@ source "$SCRIPT_DIR/release_integrity.sh"
 mkdir -p "$TEMP_DIR/bin" "$TEMP_DIR/home" "$TEMP_DIR/scripts" "$TEMP_DIR/copilot-fixture" "$TEMP_DIR/runner"
 cp "$SCRIPT_DIR/install_awf_binary.sh" "$TEMP_DIR/scripts/"
 cp "$SCRIPT_DIR/install_copilot_cli.sh" "$TEMP_DIR/scripts/"
+cp "$SCRIPT_DIR/install_privileges.sh" "$TEMP_DIR/scripts/"
 printf '#!/usr/bin/env bash\necho EXECUTED >>"$EXECUTION_LOG"\n' >"$TEMP_DIR/payload"
 payload_digest="$(shasum -a 256 "$TEMP_DIR/payload" | awk '{print $1}')"
 for asset in awf-bundle.js awf-linux-x64 awf-linux-arm64 awf-darwin-x64 awf-darwin-arm64; do
@@ -125,6 +126,7 @@ run_copilot() {
     GH_AW_COPILOT_MIN_VERSION="${PIN_TEST_MIN_VERSION:-}" PATH="$TEMP_DIR/bin:$PATH" \
     bash "$TEMP_DIR/scripts/install_copilot_cli.sh" "$@" >"$TEMP_DIR/output" 2>&1
 }
+COPILOT_INSTALL_DIR="$TEMP_DIR/runner/gh-aw/bin"
 
 run_awf v0.28.62 --rootless
 test -x "$TEMP_DIR/home/.local/bin/awf"
@@ -175,13 +177,36 @@ test "$(wc -l <"$TEMP_DIR/curl.log" | tr -d ' ')" = 2
 echo "PASS: failed platform-binary downloads cannot install or execute partial files"
 
 run_copilot --rootless
-test -x "$TEMP_DIR/home/.local/bin/copilot"
+test -x "$COPILOT_INSTALL_DIR/copilot"
 grep -q '/v1.0.103/copilot-linux-x64.tar.gz' "$TEMP_DIR/curl.log"
 echo "PASS: default Copilot release installs with its reviewed manifest pin"
 run_copilot 1.0.98 --rootless
-test -x "$TEMP_DIR/home/.local/bin/copilot"
-rm -f "$TEMP_DIR/home/.local/bin/copilot"
+test -x "$COPILOT_INSTALL_DIR/copilot"
+rm -f "$COPILOT_INSTALL_DIR/copilot"
 echo "PASS: authenticated Copilot archive installs and executes"
+
+cat >"$TEMP_DIR/bin/id" <<'EOF'
+#!/usr/bin/env bash
+case "$1" in -u) echo 12345 ;; -g) echo 31 ;; *) exit 1 ;; esac
+EOF
+cat >"$TEMP_DIR/bin/chown" <<'EOF'
+#!/usr/bin/env bash
+test "$1" = -R && test "$2" = 12345:31 && test "$3" = "$HOME/.copilot"
+EOF
+cat >"$TEMP_DIR/bin/sudo" <<'EOF'
+#!/usr/bin/env bash
+echo "$*" >>"$TEST_ROOT/sudo.log"
+exit 1
+EOF
+chmod +x "$TEMP_DIR/bin/id" "$TEMP_DIR/bin/chown" "$TEMP_DIR/bin/sudo"
+rm -f "$TEMP_DIR/github-path"
+run_copilot 1.0.98
+test -x "$COPILOT_INSTALL_DIR/copilot"
+grep -qF "$COPILOT_INSTALL_DIR" "$TEMP_DIR/github-path"
+test "$(cat "$TEMP_DIR/sudo.log")" = "-n true"
+echo "PASS: native UID 12345/GID 31 installs a checksum-verified Copilot archive without privileged file operations"
+rm -f "$TEMP_DIR/bin/id" "$TEMP_DIR/bin/chown" "$COPILOT_INSTALL_DIR/copilot"
+printf '#!/usr/bin/env bash\nexit 0\n' >"$TEMP_DIR/bin/sudo"
 
 printf '%s\n' '{"agent-compat-v1":{"copilot":[{"min-gh-aw":"0.72.0","max-gh-aw":"*","min-agent":"1.0.21","max-agent":"1.0.103"}]}}' >"$TEMP_DIR/compat.json"
 PIN_TEST_COMPILED_VERSION=v0.93.0 PIN_TEST_MIN_VERSION=1.0.35 run_copilot --rootless
@@ -220,7 +245,7 @@ if run_copilot 9.9.9 --rootless; then
   echo "FAIL: explicit unreviewed release silently fell back" >&2; exit 1
 fi
 test ! -e "$TEMP_DIR/curl.log"
-rm -f "$TEMP_DIR/home/.local/bin/copilot"
+rm -f "$COPILOT_INSTALL_DIR/copilot"
 echo "PASS: fallback respects compatibility bounds, feature minimums, and explicit versions"
 
 for platform in Linux Darwin; do
@@ -268,7 +293,7 @@ if grep -q CACHED_EXECUTED "$TEMP_DIR/executions"; then
   echo "FAIL: prefer-toolcache selected a different version" >&2; exit 1
 fi
 echo "PASS: a cache miss downloads the exact version with checksum verification"
-rm -f "$cache_bin/copilot" "$TEMP_DIR/home/.local/bin/copilot"
+rm -f "$cache_bin/copilot" "$COPILOT_INSTALL_DIR/copilot"
 
 rm -f "$TEMP_DIR/curl.log" "$TEMP_DIR/executions"
 for bad_pin in "" abc "${copilot_digest^^}" '${{ inputs.pin }}'; do
@@ -330,7 +355,7 @@ if run_copilot 1.0.98 --rootless; then
 fi
 grep -q 'Trusted SHA256 verification failed' "$TEMP_DIR/output"
 test "$(wc -l <"$TEMP_DIR/curl.log" | tr -d ' ')" = 1
-test ! -e "$TEMP_DIR/home/.local/bin/copilot"
+test ! -e "$COPILOT_INSTALL_DIR/copilot"
 echo "PASS: Copilot authenticates its manifest before downloading or extracting executable"
 
 rm -f "$TEMP_DIR/curl.log"
