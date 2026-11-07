@@ -1,30 +1,37 @@
 ### Executive totals
-- Open Copilot PRs: 26
-- Eligible for triage: 3
-- Skipped by 1h cooldown: 23
-- Categories: feature 2, bug 1
-- Risk mix: high 2, low 1
-- Priority mix: high 1, medium 2
+- Eligible Copilot PRs: 15
+- Category mix: bug 13, feature 1, docs 1
+- Risk mix: high 11, medium 2, low 2
+- Priority mix: high 5, medium 6, low 4
+- Recommended actions: fast_track 4, batch_review 7, auto_merge 3, defer 1
 
 ### Top-priority PRs
-- #74937 — Support GitHub App authentication for repo-memory — score 80 — fast_track — high-risk feature with direct product impact and good readiness
-- #74940 — Preserve retry diagnostics in external threat-detection artifacts — score 72 — auto_merge — low-risk bug with strong quality signals
-- #74992 — [WIP] Add support for outcome-backed metrics in experiments — score 64 — batch_review — high-risk feature still in work-in-progress state
+- #75446 — Support no-sudo Copilot installation in agent and detection jobs — score 78 — fast_track
+- #75445 — Decouple rootless CLI installation from runner topology — score 81 — fast_track
+- #75382 — Honor imported engine secret allowlists in strict mode — score 80 — fast_track
+- #75366 — Reject run-step expressions in shell re-evaluation contexts — score 72 — batch_review
+- #75385 — Allow pi model selection from dispatch inputs — score 71 — batch_review
 
 ### Auto-merge candidates
-- #74940
+- #75453 — Sync SPDD spec guidance, safeguards, and evidence maps
+- #75427 — Align modelsdev README with the implemented API
+- #75365 — Validate pip and uv executables before package checks
 
 ### Fast-track items
-- #74937
+- #75446
+- #75445
+- #75382
+- #75443
 
 ### Batch opportunities
-- agent-triage-2026-11-05: #74937, #74940, #74992
+- `agent-triage-2026-11-06-runtime`: #75446, #75445, #75444, #75443
+- `agent-triage-2026-11-06-security`: #75382, #75381, #75379, #75366, #75365, #75362
+- `agent-triage-2026-11-06-docs`: #75453, #75427
 
 ### Close candidates
-- None identified; no stale or superseded PRs were available in the persisted snapshot.
+- None identified.
 
 ### Key trends and next actions
-- Most eligible work is feature-oriented and sits in a narrow set of agent-created PRs.
-- The primary high-value item is the repo-memory auth feature, which should be reviewed first.
-- The pair of feature PRs are a good batch for coordinated review once WIP status is resolved.
-- Keep the 1h cooldown enforcement to avoid re-triaging active work.
+- Runtime safety and shell/secret validation dominate the highest-risk set.
+- We should prioritize the no-sudo install and rootless runtime fixes first, then the strict-mode secret checks and shell-expression rejections.
+- Low-risk docs and validation work can move to auto-merge once CI remains green.

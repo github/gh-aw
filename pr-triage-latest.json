@@ -1,6 +1,6 @@
 {
-  "run_id": "42269446638",
-  "run_date": "2026-11-06T18:26:10.214694Z",
+  "run_id": 42318904520,
+  "run_date": "2026-11-07T00:37:00.086+00:00",
   "source": "pr-triage",
   "eligible_total": 15,
   "open_copilot_prs": 15,
@@ -272,5 +272,6 @@
         "quality": 16
       }
     }
-  ]
+  ],
+  "notes": "Current environment could not authenticate to GitHub for live PR reads; triage follows the latest eligible snapshot preserved in repository memory."
 }
