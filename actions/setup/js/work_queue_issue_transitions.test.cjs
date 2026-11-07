@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import path from "node:path";
 import { fixture, mock } from "./work_queue_issues_checks.cjs";
 import { main, workIssueStatus } from "./work_queue_issues.cjs";
-import { transitionProjectionTargets } from "./work_queue_issue_transitions.cjs";
+import { reconciliationProjectionTargets, transitionProjectionTargets } from "./work_queue_issue_transitions.cjs";
 import { compactTransactions, newRequest, replayTransactions } from "./work_queue_replay.cjs";
 import { bind, evidence, finish, grant, operationCommit, context } from "./work_queue_test_helpers.cjs";
 
@@ -91,6 +91,16 @@ describe("exact committed terminal Issue projection", () => {
     const count = m.calls.length;
     expect(await main({ ...m.options, trustedContext: maintenance })).toMatchObject({ pending: [] });
     expect(m.calls.slice(count).some(call => call[0] === "mutation" || call[0] === "lock")).toBe(false);
+  });
+
+  it("does not reconcile pre-existing backing Issues without a maintenance authorization path", async () => {
+    const { m, workId } = await setup();
+    const state = m.state();
+    const work = state.works.get(workId);
+    work.backing_issue = structuredClone(work.issue_link);
+    const selection = reconciliationProjectionTargets(state, maintenance);
+    expect(selection.targets.map(target => target.work_id)).not.toContain(workId);
+    expect(selection.targets).toHaveLength(1);
   });
 
   it("keeps missing immutable receipts pending instead of creating another mirror", async () => {
@@ -185,6 +195,49 @@ describe("exact committed terminal Issue projection", () => {
       expect(selection.targets.map(target => target.work_id)).toEqual([f.nodes[1].work_id]);
       expect(selection.pending).toEqual([0, 2].map(index => ({ work_id: f.nodes[index].work_id, reason: "projection_receipt_pending" })));
     }
+  });
+
+  it("rotates through mirrors while limiting each reconciliation run to 256", () => {
+    const f = fixture({ backing: false });
+    const policy = f.log[0].operations[0].policy;
+    policy.authorization = "aw";
+    policy.producers = {};
+    delete policy.projectors;
+    f.log[0].request = newRequest(f.log[0].request.id, "policy", f.log[0].actor, { operations: f.log[0].operations });
+    const state = replayTransactions(f.log);
+    const [template] = state.works.values();
+    const admission = state.workCreators.get(template.work_id);
+    template.issue_link = {
+      kind: "issue",
+      host: "github.com",
+      repository: "owner/repo",
+      repository_id: "1",
+      resource_id: "2000",
+      number: "1",
+    };
+    template.issue_summary = "summary-0";
+    for (let index = 1000; index < 1299; index++) {
+      const workId = index.toString(16).padStart(64, "0");
+      const work = structuredClone(template);
+      work.work_id = workId;
+      work.issue_link = {
+        kind: "issue",
+        host: "github.com",
+        repository: "owner/repo",
+        repository_id: "1",
+        resource_id: String(2000 + index),
+        number: String(index + 1),
+      };
+      work.issue_summary = `summary-${index}`;
+      state.works.set(workId, work);
+      state.workCreators.set(workId, admission);
+    }
+
+    const first = reconciliationProjectionTargets(state, maintenance);
+    const second = reconciliationProjectionTargets(state, { ...maintenance, run_id: "301" });
+    expect(first.targets).toHaveLength(256);
+    expect(second.targets).toHaveLength(256);
+    expect(new Set([...first.targets, ...second.targets].map(target => target.work_id))).toHaveLength(300);
   });
 
   it("maps completed Work with failed delivery to Needs attention rather than Done", () => {

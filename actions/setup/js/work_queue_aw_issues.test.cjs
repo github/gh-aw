@@ -66,6 +66,7 @@ describe("AW Issue projection without projector enrollment", () => {
       delete options.issues;
       expect(await projectIssues(options)).toMatchObject({ pending: [] });
       expect(m.calls.some(call => call[0] === "authentication-run")).toBe(true);
+      expect(m.calls.some(call => call[0] === "tracked-issues")).toBe(false);
       expect(m.state().policy).not.toHaveProperty("projectors");
       expect(m.issues.size).toBe(2);
       expect(m.comments.size).toBe(worker ? 4 : 2);

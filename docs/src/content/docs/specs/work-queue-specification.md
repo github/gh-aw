@@ -571,8 +571,9 @@ limit 4,096, singleton assignments and three attempts with 30-second backoff.
 Invalid settings MUST produce property-specific errors. Optional advanced pools
 and fairness MUST remain scheduling, not identity authorization.
 `work_queue.issues` MUST configure projection globally; a boolean selects
-defaults or disables it, and an object MAY supply the optional `label` and
-`title_prefix` fields.
+defaults or disables it, and an object MAY supply `label`, `title_prefix`, and
+`orphaned_after_days` (default 30; integer 1–3,650) to control when tracked
+Issues without ledger Work are flagged for maintainer review.
 Workflow-level `work-queue-policy` and `tools.work-queue.issues` are deprecated;
 conflicting global/local definitions MUST fail.
 Concurrent first submissions MUST use the winning installed Policy and retry
@@ -1371,7 +1372,7 @@ Repository configuration:
     "pending_limit": 30,
     "accounting_weights": {"": 1, "project-a": 2, "project-b": 1},
     "retry": {"max_attempts": 3, "backoff_seconds": 30},
-    "issues": {"label": "work", "title_prefix": "[work queue]"},
+    "issues": {"label": "work", "title_prefix": "[work queue]", "orphaned_after_days": 30},
     "pools": {"default": {"per_account_limit": 2}}
   }
 }
@@ -3319,7 +3320,7 @@ unexecuted formal, supported-host, performance, or deployment-security gate.
 
 | Requirement | Implementation/evidence status |
 |---|---|
-| Git-authoritative backing Issue mirrors | AW-managed activation/conclusion hooks project own authenticated admissions/original Claims without enrollment. Maintenance additionally projects existing mirrors for exact terminal requests authored by its authenticated current run/attempt; maintain/admin operators may explicitly synchronize one committed terminal request. Neither path grants admission/Claim authority, creates/rebinds Issues or comments, closes Issues, scans global dirty Work, or steals ambiguous-write fences. Automatic projection stays in the queue repository/pool scope. Exact pre-existing Issue grants, cross-repository projection and closure retain explicit trusted projector rules. No ledger operation/field is added. Local mocks cover these paths; no live intended-token Issue writes or hosted workflow runs are claimed |
+| Git-authoritative backing Issue mirrors | AW-managed activation/conclusion hooks project own authenticated admissions/original Claims without enrollment. Scheduled maintenance reconciles all existing same-repository mirrors against the checked ledger, closes verified non-PR results only under the admission-time `close-on-result` policy, and flags tracked issues older than configured `orphaned_after_days` with no matching Work for maintainer review. It is bounded to 256 ledger-bound mirrors and 1,000 tracked Issues per run, does not create/rebind mirrors or change queue state, and retains ambiguous-write fences. Maintain/admin operators may explicitly synchronize one committed terminal request without closing Issues. Automatic projection stays in the queue repository/pool scope. Exact pre-existing Issue grants, cross-repository projection and closure retain explicit trusted projector rules. No ledger operation/field is added. Local mocks cover these paths; no live intended-token Issue writes or hosted workflow runs are claimed |
 | Current-only QueueCommit contract and native Go/JavaScript conformance | Implemented. An earlier combined-source local capture passed 286 independent cases with 136 dependency hashes unchanged during that capture. Safe-output changes invalidate its claim to match the current source; regenerate the capture before using it as current release evidence. Typed Go canonicalization rejects invalid Unicode before JSON encoding repairs it; checked operation-construction errors propagate through CLI and delivery consumers. Conformance does not prove arbitrary runtime/host refinement |
 | Exact fairness, FIFO defaults, deterministic fair-prefix packing and CAS recovery | Implemented in both engines, with exact integer passes, causal FIFO positions, literal shared expectations and mocked CAS/ambiguous-acknowledgment regressions. Charges are durable Claims, not CPU time or successful completions. Live Git/network contention remains unverified |
 | Work/Issue/PR DAG, observations, Result/DeliveryFailure and replacements | Implemented with atomic graph admission, typed bounded observations, immutable resource bindings and verified Result barriers. Native and runtime tests cover stale/error observations, mixed outcomes, delivery deadlines and safe replacements; actual external API availability/rate behavior is not established by injected clients |

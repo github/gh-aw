@@ -53,13 +53,17 @@
         "pending_limit": { "type": "integer", "minimum": 1, "maximum": 4096 },
         "retry": { "$ref": "#/definitions/workQueueRetry" },
         "issues": {
-          "description": "Global backing Issue projection and label prefix for work-queue participants. Omitted or false disables projection; true uses work and work:<status> labels.",
+          "description": "Global backing Issue projection, label prefix, and age threshold for flagging tracked Issues without matching Work. Omitted or false disables projection; true uses work and work:<status> labels.",
           "oneOf": [
             { "type": "boolean" },
             {
               "type": "object",
               "additionalProperties": false,
-              "properties": { "label": { "type": "string", "minLength": 1, "maxLength": 33, "pattern": "^[^\\x00-\\x1f\\x7f]+$" }, "title_prefix": { "type": "string", "minLength": 1, "maxLength": 80, "pattern": "^[^\\x00-\\x1f\\x7f]+$" } }
+              "properties": {
+                "label": { "type": "string", "minLength": 1, "maxLength": 33, "pattern": "^[^\\x00-\\x1f\\x7f]+$" },
+                "title_prefix": { "type": "string", "minLength": 1, "maxLength": 80, "pattern": "^[^\\x00-\\x1f\\x7f]+$" },
+                "orphaned_after_days": { "type": "integer", "minimum": 1, "maximum": 3650 }
+              }
             }
           ]
         },

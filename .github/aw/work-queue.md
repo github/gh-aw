@@ -4,25 +4,23 @@ description: Git-backed work queue agent instructions.
 
 # Work Queue
 
-`tools.work-queue` schedules immutable DAGs and Claim-scoped effects.
+`tools.work-queue` schedules DAGs and Claim-scoped effects.
 `work-queue.jsonl` is authoritative; V3 omits storage selectors. Issues/PRs are dependencies.
 For issue-backed WorkQueueOps: [WorkQueueOps](../../docs/src/content/docs/patterns/workqueue-ops.md).
 
 ## Select the role
 
-- **Observer:** read/explain only; never submit, dispatch or finish Work.
+- **Observer:** explain only; never submit, dispatch or finish Work.
 - **Producer/dispatcher:** submit trusted plans/request bounded pool work;
   queue authority grants no arbitrary resource writes.
 - **Worker:** require compiler-supplied version-3 `claims`; never override
   reserved `work_queue_assignment` or caller context.
 
-Trust runtime roles, not snapshots: AW authenticates native run/workflow/revision;
+Trust roles, not snapshots: AW authenticates run/workflow/revision;
 reruns cannot inherit attempt 1. Absent branches are empty;
 reject malformed/unsupported logs.
 
 ## Configure deployment
-
-Declare workers:
 
 ```yaml
 tools:
@@ -31,8 +29,8 @@ tools:
     worker: true
 ```
 
-Dispatchers require `tools.work-queue: true`, worker allowlist, bounded
-`dispatch-workflow.max`. Approved AW routes/credentials bind Claims to immutable
+Dispatchers require `tools.work-queue: true`, a worker allowlist, bounded
+`dispatch-workflow.max`. Approved routes/credentials bind Claims to immutable
 native runs; ignore moved `target-ref`.
 
 `aw.json` `work_queue`: concurrency, pending limits, retries, pools, fairness,
@@ -45,23 +43,25 @@ AW source/contract verification and active registration.
 `PoolInstall.config_ref` records provenance, not authority.
 Preserve installed profiles/limits/epoch.
 Standalone seeding is unsupported; AW/Actions authorize submissions.
-Economic/installed-authority changes require quiescence and
-`policy --from-config --epoch EPOCH`; config edits never rewrite active state.
-Compatible deployments need no drain. Never expose queue-write credentials to
-agents/snapshot MCP. Repository access rules are GitHub's responsibility.
+Quiesce economic/authority changes; apply with
+`policy --from-config --epoch EPOCH`. Config edits never rewrite active state.
+Never expose queue-write credentials to agents or snapshot MCP. Repository access rules are GitHub's responsibility.
 See [deployment](../../docs/src/content/docs/patterns/workqueue-ops.md#deploy-a-native-queue).
 
 ## Mirror admitted Work with Issues
 
 `aw.json` `work_queue.issues: true` mirrors admitted Work with purple `work` /
 `work:<status>` labels. `label` customizes both prefixes; `title_prefix` defaults
-to `[work queue]`. Titles/summaries show 12-character Work IDs; bodies use full IDs.
-No per-workflow overrides. Only protected AW hooks project admissions/original Claims.
-Immutable `backing_issue` binds one Work per Issue. Agents never write
-mirrors; human edits never establish Result. Pre-existing Issues require exact
-installed `backing_issues` grants. Only trusted admission-time `completion_policy`
-permits closure, never payload. Keep uncertain writes pending; never recreate or
-globally repair. Maintenance: exact-run sync; recovery: `work-queue sync-issues --request-id ID`.
+to `[work queue]`; `orphaned_after_days` defaults to 30. Titles/summaries show
+12-character Work IDs; bodies use full IDs.
+Protected AW hooks alone project admissions/Claims. Immutable `backing_issue`
+binds one Work per Issue. Agents never write mirrors; human edits never establish
+Results. Pre-existing Issues require exact installed `backing_issues` grants.
+Only admission-time `completion_policy` closes verified non-PR results.
+Maintenance reconciles at most 256 same-repository mirrors/run from the checked
+ledger and flags aged orphan Issues for review, leaving them open. Keep uncertain
+writes pending; never recreate mirrors or repair untracked Issues. Recovery:
+`work-queue sync-issues --request-id ID`.
 Upgrade closed-schema readers. See
 [backing Issue reference](../../docs/src/content/docs/reference/work-queue.md#backing-issues).
 Mirroring generates `.github/workflows/agentic-workqueue.yml` for Issue lifecycle
@@ -103,7 +103,6 @@ Unassigned dispatchers cannot emit `noop` or `report_incomplete`.
   an independently verified result, never job success alone.
 
 `<mcp-clis>` takes one JSON argument. `uninitialized` plus null SHA is empty.
-Submit before dispatch.
 Policyless ledgers fail; workers require Policy; `status: "staged"` is no grant.
 
 ## Dependencies and recovery
@@ -137,5 +136,3 @@ Retries/checkpoints preserve submission identity; never delete queues to retry a
   and [shared worker instructions](../workflows/shared/daily-report-worker.md).
 - Contracts: [specification](../../docs/src/content/docs/specs/work-queue-specification.md#91-implementation-coverage-and-remaining-requirements).
 - Models/fixtures/bounded verification: [formal reference](../../specs/work-queue/README.md).
-
-Tests prove neither Result nor live deployment.
