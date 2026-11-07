@@ -769,6 +769,18 @@ class GuidanceTests(unittest.TestCase):
         self.assertIn("including its fragment", start)
         self.assertNotIn('gh aw audit "$RUN_ID"', start)
 
+    def test_debug_playbook_preserves_policy_and_tool_scope_guidance(self):
+        guide = (ROOT / ".github/aw/debug-playbook.md").read_text()
+        self.assertIn("advisory/pending/skipped/policy-denied", guide)
+        rows = {
+            line.split("|")[1].strip(): line
+            for line in guide.splitlines() if line.startswith("|")
+        }
+        self.assertIn("Fix tool/config/auth; retain permission scope.", rows["`tool_error`"])
+        self.assertIn("Fix tool/server/config/auth; retain permission scope.",
+                      rows["`mcp_server_failures`, `tools_not_available`"])
+        self.assertIn("provider policy", rows["`subagent_model_unavailable`"])
+
     def test_diagnostic_routing_mini_eval_contract(self):
         guide = (ROOT / ".github/aw/debug-playbook.md").read_text()
         for case in FIXTURES["diagnostic_routing"]:
