@@ -357,7 +357,7 @@ func buildSideRepoMaintenanceWorkflowYAML(renderCtx sideRepoMaintenanceRenderCon
 	if err != nil {
 		return "", fmt.Errorf("runner temp safety: %w", err)
 	}
-	return finalYAML, nil
+	return documentPermissionComments(finalYAML, "")
 }
 
 func buildSideRepoMaintenanceHeader(repoSlug string, logo bool) string {

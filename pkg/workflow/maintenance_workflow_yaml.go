@@ -92,7 +92,7 @@ func buildMaintenanceWorkflowYAML(
 	if err != nil {
 		return "", fmt.Errorf("runner temp safety: %w", err)
 	}
-	return finalYAML, nil
+	return documentPermissionComments(finalYAML, "")
 }
 
 func buildMaintenanceAppliedRunURLOutput(opts buildMaintenanceWorkflowYAMLOptions) (string, string) {
