@@ -6,9 +6,12 @@ package workflow
 import (
 	"strings"
 
+	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/setutil"
 	"github.com/github/gh-aw/pkg/workflow/compilerenv"
 )
+
+var awfConfigPolicyLog = logger.New("workflow:awf_config_policy")
 
 // splitDomainList splits a comma-separated domain string into a deduplicated
 // slice. Empty entries are ignored. The order of the original list is preserved for
@@ -40,6 +43,7 @@ func resolveModelPolicyForAWFConfig(workflowData *WorkflowData) ([]string, []str
 		allowed = workflowData.ModelPolicyAllowed
 		blocked = workflowData.ModelPolicyBlocked
 	}
+	awfConfigPolicyLog.Printf("Resolving model policy: workflow_allowed=%d, workflow_blocked=%d, env_allowed_override=%t, env_blocked_override=%t", len(allowed), len(blocked), hasAllowedOverride, hasBlockedOverride)
 	if hasAllowedOverride {
 		allowed = intersectModelPolicyRules(allowed, envAllowed)
 	}
@@ -51,6 +55,7 @@ func resolveModelPolicyForAWFConfig(workflowData *WorkflowData) ([]string, []str
 		blockedSet[model] = struct{}{}
 	}
 	allowed = filterAllowedModelConflictsWithSet(allowed, blockedSet)
+	awfConfigPolicyLog.Printf("Resolved model policy: allowed=%d, blocked=%d", len(allowed), len(blocked))
 	return allowed, blocked
 }
 

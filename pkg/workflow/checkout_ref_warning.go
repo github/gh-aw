@@ -5,17 +5,22 @@ import (
 	"os"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 	"github.com/github/gh-aw/pkg/workflow/checkoutpolicy"
 	"github.com/goccy/go-yaml"
 )
 
+var checkoutRefWarningLog = logger.New("workflow:checkout_ref_warning")
+
 // warnCheckoutRefWithSteps flags potentially untrusted code running before the sandbox.
 func (c *Compiler) warnCheckoutRefWithSteps(data *WorkflowData, markdownPath string) {
 	if !hasCheckoutRefWarningHostSteps(data) {
+		checkoutRefWarningLog.Print("No host steps or pre-agent-steps; skipping checkout ref warning check")
 		return
 	}
 
+	checkoutRefWarningLog.Printf("Checking %d checkout config(s) for untrusted refs before host steps", len(data.CheckoutConfigs))
 	checkoutMgr := NewCheckoutManager(data.CheckoutConfigs)
 	defaultCheckout := checkoutMgr.GetDefaultCheckoutOverride()
 	for _, entry := range checkoutMgr.ordered {
@@ -50,6 +55,7 @@ func hasCheckoutRefWarningSteps(sectionYAML, sectionName string) bool {
 	}
 	var section map[string]any
 	if err := yaml.Unmarshal([]byte(sectionYAML), &section); err != nil {
+		checkoutRefWarningLog.Printf("Failed to parse %s YAML, treating as present: %v", sectionName, err)
 		return true
 	}
 	value, ok := section[sectionName]
@@ -71,6 +77,7 @@ func checkoutRefMayBeUntrusted(repository, ref string) bool {
 
 	expressions, err := actionslanguageservice.ExtractExpressions(ref)
 	if err != nil {
+		checkoutRefWarningLog.Printf("Cannot extract expressions from checkout ref %q, treating as untrusted: %v", ref, err)
 		return true
 	}
 	for _, span := range expressions {
