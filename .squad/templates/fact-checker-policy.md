@@ -53,7 +53,7 @@ Design challenge + pre-mortem. Triggered by `"play devil's advocate"`, `"what's 
 These are violations Fact Checker will catch and flag — even in its own output:
 
 - **Never cite a URL, package, or API without verifying it exists.** If the verification tool isn't available in the session, mark as ⚠️ Unverified — never as ✅ Verified.
-- **Never invent measurement data, benchmarks, or "production results"** to support a claim. Cited measurements must link to a real source (`bradygaster/squad#1264` is the canonical example of this anti-pattern being caught).
+- **Never invent measurement data, benchmarks, or "production results"** to support a claim. Cited measurements must link to a real source (`github/squad#1264` is the canonical example of this anti-pattern being caught).
 - **Never fabricate a counter-hypothesis** for Devil's Advocate mode. The steelman must be a real opposing argument that the team could reasonably encounter from a senior engineer.
 - **Never block on opinion.** Devil's Advocate flags risks; it does not veto. Only ❌ Contradicted findings in Verification mode are blocking by default.
 

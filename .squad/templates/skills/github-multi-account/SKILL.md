@@ -84,7 +84,7 @@ ghw api user --jq '.login'   # should show work username
 
 ## Repo-Specific Account Binding
 
-This repo (`bradygaster/squad`) is bound to the **bradygaster** (personal) account.
+This repo (`github/squad`) is bound to the **bradygaster** (personal) account.
 All `gh` operations in this repo MUST use `ghp` / `gh-personal`.
 
 ## For Squad Agents

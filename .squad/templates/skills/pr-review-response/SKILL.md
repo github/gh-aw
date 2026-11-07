@@ -86,15 +86,15 @@ gh api repos/{owner}/{repo}/pulls/{pr_number}/comments/{comment_id}/replies \
 
 ```bash
 # Specific and traceable
-gh api repos/bradygaster/squad/pulls/42/comments/18234/replies \
+gh api repos/github/squad/pulls/42/comments/18234/replies \
   -f body="Fixed in a1b2c3d — switched to path.dirname(squadDirInfo.path) for worktree consistency"
 
 # When applying a suggested code change
-gh api repos/bradygaster/squad/pulls/42/comments/18235/replies \
+gh api repos/github/squad/pulls/42/comments/18235/replies \
   -f body="Applied suggestion — updated error message to include the file path for debuggability"
 
 # When pushing back on a suggestion
-gh api repos/bradygaster/squad/pulls/42/comments/18236/replies \
+gh api repos/github/squad/pulls/42/comments/18236/replies \
   -f body="Considered but not applied — this path needs to stay absolute because worktree resolution depends on it. See detectSquadDir() in detect-squad-dir.ts."
 ```
 
@@ -186,7 +186,7 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 3. Commit: `fix: add null check for squadDir (PR #99 review)`
 4. Reply:
    ```bash
-   gh api repos/bradygaster/squad/pulls/99/comments/55123/replies \
+   gh api repos/github/squad/pulls/99/comments/55123/replies \
      -f body="Fixed in f4e5d6c — added early return when squadDir is undefined, matching the pattern in loadConfig()"
    ```
 5. Resolve the thread (Copilot → agent, safe to resolve)
@@ -211,13 +211,13 @@ git commit -m "fix: address 3 review comments on PR #99
 git push
 
 # Reply to each thread individually
-gh api repos/bradygaster/squad/pulls/99/comments/55123/replies \
+gh api repos/github/squad/pulls/99/comments/55123/replies \
   -f body="Fixed — added early return when squadDir is undefined"
 
-gh api repos/bradygaster/squad/pulls/99/comments/55124/replies \
+gh api repos/github/squad/pulls/99/comments/55124/replies \
   -f body="Fixed — switched to path.join(squadDir, 'config.json') for cross-platform consistency"
 
-gh api repos/bradygaster/squad/pulls/99/comments/55125/replies \
+gh api repos/github/squad/pulls/99/comments/55125/replies \
   -f body="Fixed — changed from console.log to debug() so it only shows with --verbose flag"
 ```
 
@@ -235,13 +235,13 @@ const name = config?.agent?.name ?? 'default';
 
 **Reply format when applying:**
 ```bash
-gh api repos/bradygaster/squad/pulls/99/comments/55130/replies \
+gh api repos/github/squad/pulls/99/comments/55130/replies \
   -f body="Applied suggestion — using optional chaining with nullish coalescing"
 ```
 
 **Reply format when not applying:**
 ```bash
-gh api repos/bradygaster/squad/pulls/99/comments/55130/replies \
+gh api repos/github/squad/pulls/99/comments/55130/replies \
   -f body="Not applied — config is guaranteed non-null at this point (validated on line 12). Optional chaining would mask errors."
 ```
 
@@ -250,7 +250,7 @@ gh api repos/bradygaster/squad/pulls/99/comments/55130/replies \
 Not every review comment should be accepted. When a suggestion is incorrect or doesn't apply:
 
 ```bash
-gh api repos/bradygaster/squad/pulls/99/comments/55140/replies \
+gh api repos/github/squad/pulls/99/comments/55140/replies \
   -f body="Considered but not applied — this file is in the zero-dependency bootstrap set (see copilot-instructions.md § Protected Files). Adding path.join() would require importing from the SDK, which breaks the bootstrap constraint."
 ```
 

@@ -149,7 +149,7 @@ Do not mention the update check, the cache, or the mechanism. Just the notice.
    release notes:
 
    ```
-   gh api repos/bradygaster/squad/releases --jq '[.[] | select(.tag_name | test("^v"))]'
+   gh api repos/github/squad/releases --jq '[.[] | select(.tag_name | test("^v"))]'
    ```
 
    - Extract 3–6 bullet points from releases between `oldVersion` and
@@ -164,7 +164,7 @@ Do not mention the update check, the cache, or the mechanism. Just the notice.
      ```
    - **Fallback chain:**
      - `gh` not authenticated → "See full release notes at:
-       https://github.com/bradygaster/squad/releases"
+       https://github.com/github/squad/releases"
      - No releases found → "No release notes found for this version range."
      - Network failure → link to releases page
 
