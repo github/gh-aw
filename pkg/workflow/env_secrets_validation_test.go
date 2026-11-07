@@ -4,6 +4,8 @@ package workflow
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -11,6 +13,146 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestCompileImportedEngineSupportedEnvVarKeysStrict(t *testing.T) {
+	tests := []struct {
+		name        string
+		key         string
+		topLevelEnv string
+		strict      bool
+		wantSection string
+		awfVersion  string
+		wantError   string
+		envValue    string
+	}{
+		{name: "declared key", key: "ANTHROPIC_API_KEY", strict: true},
+		{name: "undeclared key", key: "OTHER_API_KEY", strict: true, wantSection: "engine.env"},
+		{name: "top-level secret", key: "ANTHROPIC_API_KEY", topLevelEnv: "env:\n  TOP_SECRET: ${{ secrets.TOP_SECRET }}\n", strict: true, wantSection: "env"},
+		{name: "non-strict top-level warning once", key: "ANTHROPIC_API_KEY", topLevelEnv: "env:\n  TOP_SECRET: ${{ secrets.TOP_SECRET }}\n"},
+		{name: "non-strict engine warning once", key: "OTHER_API_KEY"},
+		{name: "older firewall", key: "ANTHROPIC_API_KEY", strict: true, awfVersion: "v0.25.0", wantError: "requires AWF v0.25.3 or newer"},
+		{name: "minimum firewall", key: "ANTHROPIC_API_KEY", strict: true, awfVersion: "v0.25.3"},
+		{name: "latest firewall", key: "ANTHROPIC_API_KEY", strict: true, awfVersion: "latest"},
+		{name: "unversioned firewall", key: "ANTHROPIC_API_KEY", strict: true, awfVersion: "custom", wantError: "requires AWF v0.25.3 or newer"},
+		{name: "non-strict older firewall", key: "ANTHROPIC_API_KEY", awfVersion: "v0.25.0"},
+		{name: "older firewall without secrets", key: "ANTHROPIC_API_KEY", strict: true, awfVersion: "v0.25.0", envValue: "plain-value"},
+	}
+	for _, api := range []string{"file", "string"} {
+		for _, tt := range tests {
+			t.Run(api+"/"+tt.name, func(t *testing.T) {
+				dir := t.TempDir()
+				sharedDir := filepath.Join(dir, "shared")
+				require.NoError(t, os.MkdirAll(sharedDir, 0755))
+				require.NoError(t, os.WriteFile(filepath.Join(sharedDir, "engine.md"), []byte(`---
+engine:
+  id: my-engine
+  display-name: My Engine
+  behaviors:
+    secret-strategy: universal-llm-consumer
+    supported-env-var-keys: [ANTHROPIC_API_KEY]
+    execution:
+      command-name: my-engine
+      step-name: Execute My Engine
+---
+`), 0600))
+				path := filepath.Join(dir, "repro.md")
+				sandbox := ""
+				if tt.awfVersion != "" {
+					sandbox = fmt.Sprintf("sandbox:\n  agent:\n    version: %s\n", tt.awfVersion)
+				}
+				envValue := tt.envValue
+				if envValue == "" {
+					envValue = "${{ secrets.MY_ANTHROPIC_KEY }}"
+				}
+				content := fmt.Sprintf(`---
+on: workflow_dispatch
+permissions:
+  contents: read
+strict: %t
+imports: [shared/engine.md]
+engine:
+  id: my-engine
+  model: anthropic/claude-sonnet-4
+  env:
+    %s: %s
+%s%s---
+Say hello.
+`, tt.strict, tt.key, envValue, tt.topLevelEnv, sandbox)
+				require.NoError(t, os.WriteFile(path, []byte(content), 0600))
+				var compileErr error
+				var yamlContent string
+				stderr := captureStderr(func() {
+					compiler := NewCompiler()
+					if api == "file" {
+						compileErr = compiler.CompileWorkflow(path)
+						return
+					}
+					var data *WorkflowData
+					data, compileErr = compiler.ParseWorkflowString(content, path)
+					if compileErr == nil && tt.wantSection == "" && tt.wantError == "" {
+						yamlContent, compileErr = compiler.CompileToYAML(data, path)
+					}
+				})
+				if tt.wantSection != "" {
+					require.ErrorContains(t, compileErr, "strict mode: secrets detected in '"+tt.wantSection+"' section")
+					return
+				}
+				if tt.wantError != "" {
+					require.ErrorContains(t, compileErr, tt.wantError)
+					return
+				}
+				require.NoError(t, compileErr)
+				if api == "file" {
+					lock, err := os.ReadFile(filepath.Join(dir, "repro.lock.yml"))
+					require.NoError(t, err)
+					yamlContent = string(lock)
+				}
+				if tt.awfVersion == "v0.25.0" {
+					assert.NotContains(t, yamlContent, "--exclude-env ")
+				} else {
+					assert.Contains(t, yamlContent, "--exclude-env "+tt.key)
+				}
+				assert.Contains(t, yamlContent, envValue)
+				wantTopWarnings, wantEngineWarnings := 0, 0
+				if tt.topLevelEnv != "" {
+					wantTopWarnings = 1
+				}
+				if tt.key == "OTHER_API_KEY" {
+					wantEngineWarnings = 1
+				}
+				assert.Equal(t, wantTopWarnings, strings.Count(stderr, "secrets detected in 'env' section"))
+				assert.Equal(t, wantEngineWarnings, strings.Count(stderr, "secrets detected in 'engine.env' section"))
+			})
+		}
+	}
+}
+
+func TestCompileEngineFallbackTopLevelModelEnvSecret(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "fallback.md")
+	content := `---
+on: workflow_dispatch
+permissions:
+  contents: read
+strict: true
+model: anthropic/claude-sonnet-4
+engine:
+  id: copilot
+  fallback-models: [secondary]
+  env:
+    ANTHROPIC_API_KEY: ${{ secrets.MY_ANTHROPIC_KEY }}
+---
+Say hello.
+`
+	require.NoError(t, os.WriteFile(path, []byte(content), 0600))
+	t.Run("file", func(t *testing.T) {
+		require.NoError(t, NewCompiler().CompileWorkflow(path))
+	})
+	t.Run("string", func(t *testing.T) {
+		_, err := NewCompiler().ParseWorkflowString(content, path)
+		require.NoError(t, err)
+	})
+}
 
 func TestValidateEnvSecrets(t *testing.T) {
 	tests := []struct {
