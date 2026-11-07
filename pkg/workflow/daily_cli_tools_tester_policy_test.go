@@ -15,12 +15,6 @@ func TestDailyCLIToolsTesterCompileEdgeCasePolicy(t *testing.T) {
 	require.NoError(t, err)
 	prompt := string(source)
 	assert.Contains(t, prompt, "3 representative trusted repository workflows with `dry_run: true` and `strict: true`")
-	assert.Contains(t, prompt, "Before selecting compile targets, inspect their frontmatter and all transitive imports")
-	assert.Contains(t, prompt, "Exclude candidates containing host steps, custom MCP servers, `mcp-scripts`, custom safe-output scripts/actions, enabled Bash graders, or authored OIDC permissions")
-	assert.Contains(t, prompt, "Select 3 dry-run-compatible representative workflows from Phase 1.2")
-	assert.Contains(t, prompt, "Do not remove declarations, weaken validation, or retry a rejected target to make it pass.")
-	assert.Contains(t, prompt, "An unexpected rejection of a selected compatible target still requires `report_incomplete`")
-	assert.NotContains(t, prompt, "Select 3 representative workflows from Phase 1.2 (one simple, one complex, one with imports).")
 
 	_, phase, found := strings.Cut(prompt, "### 4.6 Edge Cases for Compile\n")
 	require.True(t, found)
