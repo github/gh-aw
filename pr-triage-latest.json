@@ -1,277 +1,53 @@
 {
-  "run_id": 42318904520,
-  "run_date": "2026-11-07T00:37:00.086+00:00",
+  "run_id": 42346559351,
+  "run_date": "2026-11-07T06:25:18.977592Z",
   "source": "pr-triage",
-  "eligible_total": 15,
-  "open_copilot_prs": 15,
-  "cooldown_skipped": 0,
+  "eligible_total": 1,
+  "open_copilot_prs": 7,
+  "cooldown_skipped": 6,
   "category_counts": {
-    "bug": 13,
-    "feature": 1,
-    "docs": 1
+    "feature": 1
   },
   "risk_counts": {
-    "high": 11,
-    "medium": 2,
-    "low": 2
+    "high": 1
   },
   "priority_counts": {
-    "high": 5,
-    "medium": 6,
-    "low": 4
+    "high": 1
   },
   "action_counts": {
-    "fast_track": 4,
-    "batch_review": 7,
-    "auto_merge": 3,
-    "defer": 1
+    "fast_track": 1
   },
-  "batches": [
-    {
-      "id": "agent-triage-2026-11-06-runtime",
-      "prs": [
-        75446,
-        75445,
-        75444,
-        75443
-      ],
-      "category": "feature+bug",
-      "risk": "high"
-    },
-    {
-      "id": "agent-triage-2026-11-06-security",
-      "prs": [
-        75382,
-        75381,
-        75379,
-        75366,
-        75365,
-        75362
-      ],
-      "category": "bug",
-      "risk": "high"
-    },
-    {
-      "id": "agent-triage-2026-11-06-docs",
-      "prs": [
-        75453,
-        75427
-      ],
-      "category": "docs",
-      "risk": "low"
-    }
-  ],
+  "batches": [],
   "selected_candidates": [
-    {
-      "number": 75453,
-      "title": "Sync SPDD spec guidance, safeguards, and evidence maps",
-      "category": "docs",
-      "risk": "low",
-      "priority": "medium",
-      "action": "auto_merge",
-      "score": 52,
-      "score_breakdown": {
-        "impact": 18,
-        "urgency": 16,
-        "quality": 18
-      }
-    },
-    {
-      "number": 75446,
-      "title": "Support no-sudo Copilot installation in agent and detection jobs",
-      "category": "feature",
-      "risk": "high",
-      "priority": "high",
-      "action": "fast_track",
-      "score": 78,
-      "score_breakdown": {
-        "impact": 40,
-        "urgency": 22,
-        "quality": 16
-      }
-    },
-    {
-      "number": 75445,
-      "title": "Decouple rootless CLI installation from runner topology",
-      "category": "bug",
-      "risk": "high",
-      "priority": "high",
-      "action": "fast_track",
-      "score": 81,
-      "score_breakdown": {
-        "impact": 42,
-        "urgency": 23,
-        "quality": 16
-      }
-    },
-    {
-      "number": 75444,
-      "title": "[WIP] Fix cleanup and isolation for self-hosted job runtimes",
-      "category": "bug",
-      "risk": "high",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 69,
-      "score_breakdown": {
-        "impact": 35,
-        "urgency": 20,
-        "quality": 14
-      }
-    },
-    {
-      "number": 75443,
-      "title": "Use effective runner identity and owner-only configs for safeoutputs",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 64,
-      "score_breakdown": {
-        "impact": 30,
-        "urgency": 18,
-        "quality": 16
-      }
-    },
-    {
-      "number": 75427,
-      "title": "Align modelsdev README with the implemented API",
-      "category": "docs",
-      "risk": "low",
-      "priority": "low",
-      "action": "auto_merge",
-      "score": 46,
-      "score_breakdown": {
-        "impact": 16,
-        "urgency": 12,
-        "quality": 18
-      }
-    },
-    {
-      "number": 75387,
-      "title": "Confirm buffered PR reviews before executing dependent safe outputs",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 66,
-      "score_breakdown": {
-        "impact": 31,
-        "urgency": 19,
-        "quality": 16
-      }
-    },
     {
       "number": 75385,
       "title": "Allow pi model selection from dispatch inputs",
       "category": "feature",
       "risk": "high",
       "priority": "high",
-      "action": "batch_review",
+      "action": "fast_track",
       "score": 71,
       "score_breakdown": {
         "impact": 36,
         "urgency": 20,
         "quality": 15
-      }
-    },
-    {
-      "number": 75382,
-      "title": "Honor imported engine secret allowlists in strict mode",
-      "category": "bug",
-      "risk": "high",
-      "priority": "high",
-      "action": "fast_track",
-      "score": 80,
-      "score_breakdown": {
-        "impact": 40,
-        "urgency": 23,
-        "quality": 17
-      }
-    },
-    {
-      "number": 75381,
-      "title": "Preserve runtime checkout manifests for post-job hooks",
-      "category": "bug",
-      "risk": "high",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 67,
-      "score_breakdown": {
-        "impact": 33,
-        "urgency": 19,
-        "quality": 15
-      }
-    },
-    {
-      "number": 75379,
-      "title": "Fail explicitly on unsupported Copilot BYOK tool images",
-      "category": "bug",
-      "risk": "high",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 69,
-      "score_breakdown": {
-        "impact": 34,
-        "urgency": 20,
-        "quality": 15
-      }
-    },
-    {
-      "number": 75366,
-      "title": "Reject run-step expressions in shell re-evaluation contexts",
-      "category": "bug",
-      "risk": "high",
-      "priority": "high",
-      "action": "batch_review",
-      "score": 72,
-      "score_breakdown": {
-        "impact": 37,
-        "urgency": 21,
-        "quality": 14
-      }
-    },
-    {
-      "number": 75365,
-      "title": "Validate pip and uv executables before package checks",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "auto_merge",
-      "score": 61,
-      "score_breakdown": {
-        "impact": 29,
-        "urgency": 18,
-        "quality": 14
-      }
-    },
-    {
-      "number": 75362,
-      "title": "Preserve external threat-detection retry diagnostics across jobs",
-      "category": "bug",
-      "risk": "high",
-      "priority": "high",
-      "action": "fast_track",
-      "score": 82,
-      "score_breakdown": {
-        "impact": 42,
-        "urgency": 23,
-        "quality": 17
-      }
-    },
-    {
-      "number": 74943,
-      "title": "Preserve cross-repository checkout identity during credential setup",
-      "category": "bug",
-      "risk": "high",
-      "priority": "high",
-      "action": "fast_track",
-      "score": 78,
-      "score_breakdown": {
-        "impact": 40,
-        "urgency": 22,
-        "quality": 16
-      }
+      },
+      "labels": [
+        "pr-type:feature",
+        "pr-risk:high",
+        "pr-priority:high",
+        "pr-action:fast_track",
+        "pr-agent:copilot",
+        "pr-batch:agent-triage-2026-11-07-single"
+      ]
     }
   ],
-  "notes": "Current environment could not authenticate to GitHub for live PR reads; triage follows the latest eligible snapshot preserved in repository memory."
+  "skipped_prs": [
+    75621,
+    75620,
+    75619,
+    75615,
+    75366,
+    74943
+  ]
 }
