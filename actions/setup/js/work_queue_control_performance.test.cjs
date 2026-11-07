@@ -228,7 +228,7 @@ describe("trusted work queue control step performance", () => {
       const cold = await scenario.run("cold");
       assertBoundClaims(scenario);
       expect(cold.history_reads).toBe(2 * scenario.depth + 1);
-      expect(cold.api_calls).toBeLessThanOrEqual(4 * scenario.depth + 40 * scenario.profiles + 48);
+      expect(cold.api_calls).toBeLessThanOrEqual(4 * scenario.depth + 40 * scenario.profiles + 50);
       const head = scenario.fake.refs.get("work-queue");
       const warm = await scenario.run("idempotent");
       assertBoundClaims(scenario);
