@@ -30,9 +30,10 @@ func TestInstallCopilotCLIReleaseAgeRequiresJQ(t *testing.T) {
 		t.Run(version, func(t *testing.T) {
 			dir := t.TempDir()
 			binDir := filepath.Join(dir, "bin")
+			runnerTemp := filepath.Join(dir, "runner-temp")
 			prepareCopilotInstallerTestBin(t, binDir)
 			// Restrict PATH to installer prerequisites, deliberately excluding jq.
-			for _, name := range []string{"bash", "dirname", "mkdir", "id", "mktemp", "stat", "rm", "chown"} {
+			for _, name := range []string{"bash", "dirname", "mkdir", "id", "mktemp", "stat", "rm"} {
 				path, err := exec.LookPath(name)
 				require.NoError(t, err)
 				require.NoError(t, os.Symlink(path, filepath.Join(binDir, name)))
@@ -44,14 +45,14 @@ exit 97
 `), 0o755))
 			cmd := exec.Command(bash, installer, version, "--rootless", "--cooldown-days", "3")
 			cmd.Env = append(os.Environ(), "HOME="+dir, "PATH="+binDir,
-				"TMPDIR="+dir, "CURL_LOG="+logPath, "GITHUB_TOKEN=test-token")
+				"TMPDIR="+dir, "RUNNER_TEMP="+runnerTemp, "CURL_LOG="+logPath, "GITHUB_TOKEN=test-token")
 			output, err := cmd.CombinedOutput()
 			require.Error(t, err, "%s", output)
 			assert.Contains(t, string(output), "jq is required for Copilot release-age validation")
 			assert.Contains(t, string(output), "Install jq from https://jqlang.github.io/jq/download/")
 			assert.NotContains(t, string(output), "release metadata is invalid")
 			assert.NoFileExists(t, logPath, "missing jq must fail before fetching metadata")
-			assert.NoFileExists(t, filepath.Join(dir, ".local", "bin", "copilot"))
+			assert.NoFileExists(t, filepath.Join(runnerTemp, "gh-aw", "bin", "copilot"))
 		})
 	}
 }
