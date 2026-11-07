@@ -31,7 +31,7 @@ import "embed"
 //go:embed js/log_parser_bootstrap.cjs js/log_parser_format.cjs js/log_parser_shared.cjs
 //go:embed js/protected_command_output.cjs
 //go:embed js/log_parser_step_summary_builder.cjs js/markdown_unfencing.cjs
-//go:embed js/report_ast.cjs js/sanitize_content_core.cjs js/markdown_code_region_balancer.cjs
+//go:embed js/report_ast.cjs js/sanitize_content_core.cjs js/markdown_code_region_balancer.cjs js/temporary_id.cjs
 //go:embed js/diagnostic_sanitization.cjs js/sanitize_content.cjs js/missing_info_formatter.cjs
 //go:embed js/ephemerals.cjs js/project_timezone.cjs
 //go:embed js/add_mask_redaction.cjs js/json_string_scanner.cjs js/mask_value_matcher.cjs js/redact_secrets.cjs js/safe_output_redaction.cjs js/safe_outputs_tools.json js/safe_outputs_config_redact.cjs js/safe_output_manifest.cjs js/safe_output_outcomes.cjs js/safe_outputs_status.cjs
