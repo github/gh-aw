@@ -7,7 +7,7 @@ sidebar:
 
 # Enterprise Configuration
 
-This page covers configuration options specific to GitHub Enterprise Server (GHES) and GitHub Enterprise Cloud (GHEC) deployments.
+Use this page to assess deployment and runner applicability, and to configure GitHub Enterprise Server (GHES) and GitHub Enterprise Cloud (GHEC) compatibility options.
 
 > [!IMPORTANT]
 > **Component compatibility is not end-to-end product support.** This is the consolidated applicability reference for the gh-aw stack. GHES endpoint routing, artifact compatibility mode, and ARC/DinD execution do not establish official GitHub Agentic Workflows availability on GHES or certify a server release or ARC chart. Combinations without an explicit owner-confirmed commitment remain **unconfirmed**.
@@ -34,11 +34,9 @@ For official runner availability, see [GitHub-hosted runners](https://docs.githu
 
 An end-to-end statement must cover the **gh-aw compiler, selected engine and inference provider, MCP gateway and configured MCP servers, AWF, Actions runner, and dependent GitHub services**: Actions workflow syntax, tokens/permissions, artifacts, caches, APIs, and any enabled Copilot services. A passing compiler test or accepted AWF schema establishes none of the other components' availability.
 
-GitHub's [published GHEC product requirements](https://docs.github.com/en/enterprise-cloud@latest/copilot/concepts/agent-capabilities/agent-powered-workflows-and-operations/about-github-agentic-workflows#requirements) require Actions, an AI-engine account, and an authenticated CLI; they do not provide a GHES/ARC component-version certification. The evidence linked here does not include an owner-confirmed release-by-release support commitment for GHES, data-residency tenants, or Kubernetes ARC. Those combinations remain unconfirmed, rather than being declared supported or unsupported from configuration examples. Selecting Claude, Codex, Pi, or a custom engine does not by itself resolve deployment/service compatibility. Consult [engine contracts](/gh-aw/reference/engines/) and [authentication](/gh-aw/reference/auth/) for the selected provider's requirements.
+GitHub's [published GHEC product requirements](https://docs.github.com/en/enterprise-cloud@latest/copilot/concepts/agent-capabilities/agent-powered-workflows-and-operations/about-github-agentic-workflows#requirements) require Actions, an AI-engine account, and an authenticated CLI; they do not provide a GHES/ARC component-version certification. No owner-confirmed release-by-release support commitment is documented for GHES, data-residency tenants, or Kubernetes ARC. Those combinations remain unconfirmed; configuration examples alone do not establish support. Selecting Claude, Codex, Pi, or a custom engine does not by itself resolve deployment/service compatibility. Consult [engine contracts](/gh-aw/reference/engines/) and [authentication](/gh-aw/reference/auth/) for the selected provider's requirements.
 
-The gh-aw/Next and GitHub Docs owners need to confirm the deployment × topology × engine combinations, exact component versions, product availability, limitations, and validation evidence before a support commitment is published. [gh-aw#75716](https://github.com/github/gh-aw/issues/75716) records this coordination request; the [AWF owner request](https://github.com/github/gh-aw-firewall/issues/11245#issuecomment-6710853719) requests the corresponding upstream clarification, not a support certification.
-
-**Navigation follow-up:** gh-aw/Next and Docs owners should evaluate product/version self-service navigation, including whether a product/version selector would help readers distinguish GHEC, GHES, and component versions. That decision is pending and does not block this clarification, commit to a selector implementation, or commit to migration to `docs.github.com`.
+The [tracking issue](https://github.com/github/gh-aw/issues/75716) records this confirmation gap. The [AWF owner request](https://github.com/github/gh-aw-firewall/issues/11245#issuecomment-6710853719) covers firewall applicability, not gh-aw product support.
 
 ### Component versions and validation evidence
 

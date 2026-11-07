@@ -22,8 +22,8 @@ test("enterprise reference separates deployment, topology, and support evidence"
   await expect(content).toContainText("Actions runner, and dependent GitHub services");
   await expect(content).toContainText("Those combinations remain unconfirmed");
   await expect(content).toContainText("not Kubernetes ARC");
-  await expect(content).toContainText("Navigation follow-up");
-  await expect(content).toContainText("That decision is pending");
+  await expect(content).toContainText("No owner-confirmed release-by-release support commitment is documented");
+  await expect(content.locator('a[href="https://github.com/github/gh-aw/issues/75716"]')).toContainText("tracking issue");
 
   for (const document of ["compatibility.md#environment-and-runner-applicability", "enterprise-configuration.md", "arc-dind.md"]) {
     await expect(content.locator(`a[href="${awf}${document}"]`).first()).toBeVisible();
