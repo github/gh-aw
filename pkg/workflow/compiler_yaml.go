@@ -308,6 +308,10 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("runner temp safety rewriting could not complete; ensure generated run/script steps are valid shell or JavaScript commands: %w", err)
 	}
+	yamlContent, err = documentPermissionComments(yamlContent, data.FrontmatterYAML)
+	if err != nil {
+		return "", nil, nil, err
+	}
 
 	// Normalize assembled YAML whitespace. This clears indentation-only blank lines
 	// everywhere, trims trailing whitespace on structural YAML lines, preserves
