@@ -236,6 +236,7 @@ function writeGuardedFile(filename, content) {
     const target = path.join(directory, path.basename(filename));
     const fd = fs.openSync(target, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_NOFOLLOW, 0o600);
     try {
+      fs.fchmodSync(fd, 0o600);
       fs.writeFileSync(fd, content);
     } finally {
       fs.closeSync(fd);
