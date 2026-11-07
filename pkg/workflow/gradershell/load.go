@@ -15,7 +15,10 @@ import (
 
 	"github.com/github/gh-aw/pkg/fileutil"
 	"github.com/github/gh-aw/pkg/gitutil"
+	"github.com/github/gh-aw/pkg/logger"
 )
+
+var loadLog = logger.New("gradershell:load")
 
 const (
 	maxSourceBytes       = 64 * 1024
@@ -66,6 +69,7 @@ func Load(workflowPath, runPath string) (string, error) {
 		base = filepath.Dir(workflow)
 	}
 	file := filepath.Join(base, filepath.FromSlash(runPath))
+	loadLog.Printf("Resolved shell grader source: run=%s, base=%s, file=%s", runPath, base, file)
 	if err := fileutil.ValidatePathWithinBase(root, file); err != nil {
 		return "", errors.New("shell grader source escapes the repository")
 	}
@@ -77,6 +81,7 @@ func Load(workflowPath, runPath string) (string, error) {
 		return "", errors.New("cannot stat shell grader source; provide an existing regular Bash file")
 	}
 	if !info.Mode().IsRegular() || info.Size() > maxSourceBytes {
+		loadLog.Printf("Rejecting shell grader source: mode=%s, size=%d", info.Mode(), info.Size())
 		return "", errors.New("shell grader source must be a regular non-symlink file of at most 64 KiB")
 	}
 	return readSource(file, info)
@@ -107,8 +112,10 @@ func readSource(file string, info os.FileInfo) (source string, err error) {
 	source = string(content)
 	line, _, _ := strings.Cut(source, "\n")
 	if !bashShebang(line) {
+		loadLog.Printf("Shell grader source has no Bash shebang: %q", line)
 		return "", errors.New("shell grader source must start with a Bash shebang")
 	}
+	loadLog.Printf("Loaded shell grader source: bytes=%d", len(content))
 	return source, nil
 }
 

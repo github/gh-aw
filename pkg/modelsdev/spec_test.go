@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestSpec_PublicAPI_NormalizeProvider validates the documented alias and
-// case-normalization behavior of NormalizeProvider as described in the
-// modelsdev README.md specification.
+// TestSpec_PublicAPI_NormalizeProvider validates the documented alias,
+// whitespace, and case-normalization behavior of NormalizeProvider as
+// described in the modelsdev README.md specification.
 func TestSpec_PublicAPI_NormalizeProvider(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -21,6 +21,7 @@ func TestSpec_PublicAPI_NormalizeProvider(t *testing.T) {
 		{name: "copilot alias", input: "copilot", expected: "github-copilot"},
 		{name: "github_models alias", input: "GITHUB_MODELS", expected: "github-copilot"},
 		{name: "other provider lower-cased", input: "OpenAI", expected: "openai"},
+		{name: "other provider trimmed and lower-cased", input: " OpenAI ", expected: "openai"},
 	}
 
 	for _, tt := range tests {

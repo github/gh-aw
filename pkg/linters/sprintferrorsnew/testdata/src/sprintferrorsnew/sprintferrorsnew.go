@@ -16,6 +16,16 @@ func badWithMultipleArgs() error {
 	return errors.New(fmt.Sprintf("invalid value %q for flag %s", "x", "-n")) // want `use fmt\.Errorf instead of errors\.New\(fmt\.Sprintf\(\.\.\.\)\)`
 }
 
+// badParenthesized demonstrates the flagged pattern with redundant parentheses
+// around the errors.New callee, the argument, and the fmt.Sprintf callee.
+func badParenthesized() []error {
+	return []error{
+		(errors.New)(fmt.Sprintf("invalid engine: %s", "claude")), // want `use fmt\.Errorf instead of errors\.New\(fmt\.Sprintf\(\.\.\.\)\)`
+		errors.New((fmt.Sprintf("invalid engine: %s", "claude"))), // want `use fmt\.Errorf instead of errors\.New\(fmt\.Sprintf\(\.\.\.\)\)`
+		errors.New((fmt.Sprintf)("invalid engine: %s", "claude")), // want `use fmt\.Errorf instead of errors\.New\(fmt\.Sprintf\(\.\.\.\)\)`
+	}
+}
+
 // goodErrorf uses fmt.Errorf directly — no diagnostic expected.
 func goodErrorf() error {
 	return fmt.Errorf("invalid engine: %s", "claude")

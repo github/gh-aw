@@ -48,18 +48,22 @@ invariants also constrain the evidence that can justify acceptance.
 
 ## Verify
 
-Use Node.js and a working Java runtime with the official
-[TLA+ Tools v1.7.4 JAR](https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar).
-The checker rejects any other SHA-256:
-`936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88`.
-It does not download tools or install dependencies.
+Follow these operations in order:
 
-From the repository root:
+1. Provide Node.js, a working Java runtime, and the official
+   [TLA+ Tools v1.7.4 JAR](https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar).
+   The checker rejects any other SHA-256:
+   `936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88`.
+   It does not download tools or install dependencies.
+2. From the repository root, run the checker and retain its output:
 
-```sh
-JAVA_BIN=/path/to/java TLA2TOOLS_JAR=/path/to/tla2tools.jar \
-  node specs/outcomes/check.mjs /path/to/verification-output
-```
+   ```sh
+   JAVA_BIN=/path/to/java TLA2TOOLS_JAR=/path/to/tla2tools.jar \
+     node specs/outcomes/check.mjs /path/to/verification-output
+   ```
+
+3. Confirm the baseline and fixture verdicts and all named negative controls
+   against the bounds below. Keep the report directory as run-level evidence.
 
 Omit the output argument to use a new temporary directory. Each TLC process is
 limited to two workers, 1 GiB heap, seed 1, and 60 seconds. Successful positive
@@ -72,16 +76,25 @@ projections, and `report.json` with source/tool/fixture/projection hashes, comma
 arguments, state counts, Java version, and verdicts. Retain that directory for
 run-level evidence; generated artifacts are not source files.
 
-## Verified bounds and controls
+## Last recorded bounds and controls
 
-TLC 2.19 (official v1.7.4 distribution) exhaustively checked the baseline:
-**18,984 generated states, 16,272 distinct states, depth 5, zero queued states**.
-The fixture model checked **all 77 shared cases**:
-**420 generated states, 360 distinct states, zero queued states**. Equal projected
-records collapse into the same initial state, explaining the smaller state count.
-These results are reproducible bounds, not a proof over arbitrary inputs.
+The following are the last recorded TLC 2.19 results (official v1.7.4
+distribution), not verification from this update. TLC was not rerun because
+`TLA2TOOLS_JAR` was not configured. The shared corpus now contains 95 cases,
+all projected by `check.mjs`; verification of the current corpus is pending.
+The controls column identifies what each positive run is paired with; mutation
+controls must fail with the exact invariant named below.
 
-All ten negative controls produced their required invariant counterexamples:
+| Model | Exhaustive bound | Controls |
+|---|---|---|
+| Baseline | 18,984 generated states, 16,272 distinct states, depth 5, zero queued states | Ten deliberate defects below check acceptance evidence, delivery/deletion, attribution, publication, and summary invariants. |
+| Shared fixtures | 77 cases in the recorded run; 420 generated states, 360 distinct states, zero queued states | `FixtureAgreement` checks each case's expected typed result. Equal projected records collapse into the same initial state. |
+
+These are reproducible finite bounds, not a proof over arbitrary inputs.
+
+In the last recorded run, all ten negative controls produced their required
+invariant counterexamples. They were not rerun for this update; verification
+against the current 95-case corpus and controls is pending.
 
 | Deliberate defect | Required invariant violation |
 |---|---|
@@ -115,3 +128,15 @@ parsing, merge ancestry returned by GitHub, transport persistence, later CLI
 reevaluation, or economic/AIC attribution. It also does not prove unbounded
 multi-action aggregation or telemetry delivery. No TLAPS, F*, or Z3 proof is
 claimed.
+
+## Last synced with implementation (2026-11-06)
+
+- **Go evaluators and tests:** `pkg/cli/outcome_evaluation.go`,
+  `pkg/cli/outcome_eval.go`, the per-action `pkg/cli/outcome_eval_*.go`
+  evaluators, `pkg/cli/outcome_conformance_test.go`, and
+  `pkg/cli/outcome_eval_formal_test.go`.
+- **Shared conformance input:** `pkg/cli/testdata/outcome_conformance.json`,
+  projected by `check.mjs` and consumed by the Go conformance test.
+- **TLA+:** `specs/outcomes/OutcomeEvaluation.tla` and
+  `specs/outcomes/OutcomeEvaluation.cfg`.
+- **Checker:** `specs/outcomes/check.mjs`.

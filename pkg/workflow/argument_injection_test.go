@@ -471,6 +471,27 @@ printf "%s\n" "$@" >> "$GH_AW_TEST_PIP_ARGS_FILE"
 	}
 }
 
+func TestValidatePythonPackagesWithPip_SkipsInvalidExecutablePath(t *testing.T) {
+	compiler := NewCompiler()
+	tempDir := t.TempDir()
+	argsFile := filepath.Join(tempDir, "pip-args.txt")
+	fakePip := filepath.Join(tempDir, "pip")
+	script := `#!/bin/sh
+printf "%s\n" "$@" >> "$GH_AW_TEST_PIP_ARGS_FILE"
+`
+	if err := os.WriteFile(fakePip, []byte(script), 0o755); err != nil {
+		t.Fatalf("failed to write fake pip executable: %v", err)
+	}
+	t.Setenv("PATH", tempDir)
+	t.Setenv("GH_AW_TEST_PIP_ARGS_FILE", argsFile)
+
+	compiler.validatePythonPackagesWithPip([]string{"requests"}, "pip", "pip")
+
+	if _, err := os.Stat(argsFile); !os.IsNotExist(err) {
+		t.Fatalf("expected invalid executable path to be rejected before exec; stat error = %v", err)
+	}
+}
+
 func TestValidatePythonPackagesWithPip_ExecutesValidatedPackage(t *testing.T) {
 	compiler := NewCompiler()
 	tempDir := t.TempDir()
@@ -509,6 +530,39 @@ printf "%s\n" "$@" >> "$GH_AW_TEST_PIP_ARGS_FILE"
 	for i, want := range wantArgs {
 		if gotArgs[i] != want {
 			t.Fatalf("unexpected pip args at position %d: got %q, want %q (full args: %q)", i, gotArgs[i], want, args)
+		}
+	}
+}
+
+func TestValidateUvPackages_ExecutesFixedArguments(t *testing.T) {
+	tempDir := t.TempDir()
+	argsFile := filepath.Join(tempDir, "uv-args.txt")
+	uvPath := filepath.Join(tempDir, "uv")
+	script := `#!/bin/sh
+printf "%s\n" "$@" > "$GH_AW_TEST_UV_ARGS_FILE"
+`
+	if err := os.WriteFile(uvPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("failed to write fake uv executable: %v", err)
+	}
+	t.Setenv("PATH", tempDir)
+	t.Setenv("GH_AW_TEST_UV_ARGS_FILE", argsFile)
+
+	if err := NewCompiler().validateUvPackages(&WorkflowData{CustomSteps: "uvx requests"}); err != nil {
+		t.Fatalf("validateUvPackages returned an error: %v", err)
+	}
+
+	argsData, err := os.ReadFile(argsFile)
+	if err != nil {
+		t.Fatalf("failed to read recorded uv arguments: %v", err)
+	}
+	gotArgs := strings.Split(strings.TrimSpace(string(argsData)), "\n")
+	wantArgs := []string{"pip", "show", "requests", "--no-cache"}
+	if len(gotArgs) != len(wantArgs) {
+		t.Fatalf("expected %d fixed uv arguments, got %d: %q", len(wantArgs), len(gotArgs), gotArgs)
+	}
+	for i, want := range wantArgs {
+		if gotArgs[i] != want {
+			t.Fatalf("unexpected uv args at position %d: got %q, want %q (all args: %q)", i, gotArgs[i], want, gotArgs)
 		}
 	}
 }

@@ -3318,13 +3318,18 @@
     },
     "runner": {
       "type": "object",
-      "description": "Runner topology configuration. Tells gh-aw and AWF what kind of runner environment the workflow targets, so they can activate topology-specific behaviors automatically (split-filesystem handling, network isolation, sysroot images, tool cache redirection). The runner.topology key is the single stable contract between gh-aw and AWF for runner environment detection.",
+      "description": "Runner configuration. Installation privilege is independent of runner topology. The runner.topology key tells gh-aw and AWF to activate topology-specific behaviors (split-filesystem handling, sysroot images, tool cache redirection).",
       "additionalProperties": false,
       "properties": {
         "topology": {
           "type": "string",
           "description": "Runner execution topology. When set to 'arc-dind', gh-aw emits the topology in the AWF config, redirects the tool cache to a shared volume, and validates that no generated steps require root. AWF then activates split-filesystem handling, network isolation, sysroot image staging, and DinD pre-staging automatically.",
           "enum": ["arc-dind"]
+        },
+        "installation": {
+          "type": "string",
+          "description": "Installation privilege for Copilot CLI and threat-detect in the agent and detection jobs. Rootless installs to ~/.local/bin without sudo. Defaults to rootless for arc-dind and privileged (/usr/local/bin via sudo) otherwise. Privileged is not supported with arc-dind. Does not change AWF runtime privileges or enable split-filesystem handling.",
+          "enum": ["rootless", "privileged"]
         }
       }
     },

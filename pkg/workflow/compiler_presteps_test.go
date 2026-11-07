@@ -322,6 +322,12 @@ This workflow tests that comment-memory files are prepared before custom steps r
 	if !strings.Contains(agentSection, "name: Write comment-memory configuration") {
 		t.Error("Expected 'Write comment-memory configuration' step in agent job")
 	}
+	if !strings.Contains(agentSection, "create_files.cjs") || !strings.Contains(agentSection, "renderFiles(") {
+		t.Error("Expected comment-memory configuration to use the owner-only file writer")
+	}
+	if strings.Contains(agentSection, `printf '%s\n' "$GH_AW_EARLY_COMMENT_MEMORY_CONFIG"`) {
+		t.Error("Comment-memory configuration must not be written through a shell redirect")
+	}
 	if !strings.Contains(agentSection, "name: Prepare comment memory files") {
 		t.Error("Expected 'Prepare comment memory files' step in agent job")
 	}
@@ -412,8 +418,11 @@ strict: false
 	if !strings.Contains(lockContent, "${{ inputs.max }}") {
 		t.Fatal("Expected the comment-memory max input expression to be preserved")
 	}
-	if !strings.Contains(lockContent, `printf '%s\n' "$GH_AW_EARLY_COMMENT_MEMORY_CONFIG"`) {
-		t.Fatal("Expected the early config to be written with printf")
+	if !strings.Contains(lockContent, "create_files.cjs") || !strings.Contains(lockContent, "renderFiles(") {
+		t.Fatal("Expected the early config to use the owner-only file writer")
+	}
+	if strings.Contains(lockContent, `printf '%s\n' "$GH_AW_EARLY_COMMENT_MEMORY_CONFIG"`) {
+		t.Fatal("Expected the early config not to use a shell redirect")
 	}
 	if strings.Contains(lockContent, "<< 'COMMENT_MEMORY_CONFIG") {
 		t.Fatal("Expected the early config to avoid a quoted heredoc")

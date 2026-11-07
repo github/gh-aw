@@ -12,9 +12,9 @@ set +o histexpand
 #   VERSION    - Optional Copilot CLI version to install. When omitted, the script
 #                resolves the version via compat.json (using GH_AW_COMPILED_VERSION) and
 #                falls back to DEFAULT_COPILOT_VERSION baked into this script.
-#   --rootless - Install to ~/.local/bin without sudo; appends that directory to
-#                $GITHUB_PATH so subsequent steps find the binary.  Use this on
-#                ARC/DinD runners that enforce allowPrivilegeEscalation: false.
+#   --rootless - Install to $RUNNER_TEMP/gh-aw/bin without sudo; appends that
+#                directory to $GITHUB_PATH so subsequent steps find the binary.
+#                Selected automatically when neither root nor passwordless sudo is available.
 #   --checksums-sha256 - Independently trusted SHA256SUMS.txt digest for VERSION.
 #                       Requires a literal release version; bypasses toolcache unless
 #                       --prefer-toolcache is also supplied.
@@ -128,21 +128,18 @@ case "$COPILOT_GUEST_LIBC" in
     ;;
 esac
 
-# In rootless mode, install into the user's home directory instead of /usr/local/bin
-# so that ARC/DinD runners with allowPrivilegeEscalation: false can run without sudo.
-if [ "$ROOTLESS" = "true" ]; then
-  INSTALL_DIR="${HOME}/.local/bin"
-fi
+# shellcheck source=actions/setup/sh/install_privileges.sh
+source "${SCRIPT_DIR}/install_privileges.sh"
+configure_install_privileges
 
-# maybe_sudo runs a command with sudo unless --rootless was specified.
-# In rootless mode, sudo is not available or needed.
-maybe_sudo() {
-  if [ "$ROOTLESS" = "true" ]; then
-    "$@"
+# In rootless mode, install under the job-scoped gh-aw tree, which AWF mounts read-only.
+if [ "$ROOTLESS" = "true" ]; then
+  if [ "$IS_WINDOWS" = "true" ]; then
+    INSTALL_DIR="${HOME}/.local/bin"
   else
-    sudo "$@"
+    INSTALL_DIR="$(prepare_rootless_install_dir)"
   fi
-}
+fi
 
 # Rootless mode preflight: create and verify write access to the install directory.
 if [ "$ROOTLESS" = "true" ]; then
@@ -157,9 +154,18 @@ fi
 # `sudo -E awf --enable-chroot ...`, which creates the .copilot directory with
 # root ownership. The Copilot CLI (running as the runner user) then fails when
 # trying to create subdirectories. See: https://github.com/github/gh-aw/issues/12066
-echo "Ensuring correct ownership of $COPILOT_DIR..."
-mkdir -p "$COPILOT_DIR"
-maybe_sudo chown -R "$(id -u):$(id -g)" "$COPILOT_DIR"
+if [ "$ROOTLESS" = "true" ]; then
+  if ! { mkdir -p "$COPILOT_DIR" && [ -w "$COPILOT_DIR" ]; }; then
+    echo "ERROR: Cannot prepare Copilot state at $COPILOT_DIR. Ask a runner administrator to restore ownership of this directory and its contents to $(id -u):$(id -g) and make it writable before retrying. Rootless installation cannot reclaim or re-own state left by a privileged AWF run." >&2
+    exit 1
+  fi
+else
+  echo "Ensuring correct ownership of $COPILOT_DIR..."
+  if ! { mkdir -p "$COPILOT_DIR" && maybe_sudo chown -R "$(id -u):$(id -g)" "$COPILOT_DIR"; }; then
+    echo "ERROR: Cannot prepare Copilot state at $COPILOT_DIR. Ask a runner administrator to restore ownership of this directory and its contents to $(id -u):$(id -g) and make it writable before retrying." >&2
+    exit 1
+  fi
+fi
 
 # Clean up any stale AWF chroot directories left by previous runs.
 # When AWF ran with `sudo -E awf --enable-host-access`, it created
@@ -169,8 +175,12 @@ maybe_sudo chown -R "$(id -u):$(id -g)" "$COPILOT_DIR"
 # reports as "engine terminated unexpectedly" or fatal EACCES errors.
 # Remove them here before the agent starts so the runner is in a clean state.
 echo "Cleaning up stale AWF chroot directories..."
-maybe_sudo find /tmp -maxdepth 1 -name 'awf-*-chroot-home' -type d -exec rm -rf -- {} + 2>/dev/null || true
-maybe_sudo find /tmp -maxdepth 1 -name 'awf-chroot-*' -type d -exec rm -rf -- {} + 2>/dev/null || true
+if ! maybe_sudo find /tmp -maxdepth 1 -name 'awf-*-chroot-home' -type d -exec rm -rf -- {} + 2>/dev/null; then
+  echo "WARNING: Could not remove stale /tmp/awf-*-chroot-home directories. Ask a runner administrator to remove stale directories from previous runs before using this runner; installation will continue." >&2
+fi
+if ! maybe_sudo find /tmp -maxdepth 1 -name 'awf-chroot-*' -type d -exec rm -rf -- {} + 2>/dev/null; then
+  echo "WARNING: Could not remove stale /tmp/awf-chroot-* directories. Ask a runner administrator to remove stale directories from previous runs before using this runner; installation will continue." >&2
+fi
 
 # Detect architecture
 ARCH="$(uname -m)"
@@ -629,17 +639,15 @@ find_cached_copilot_bin() {
 # Make a cached Copilot CLI available both to the current shell and later GitHub Actions steps.
 activate_cached_copilot_bin() {
   local cached_copilot_bin="$1"
-  local cached_copilot_dir=""
   local wrapper_path=""
 
-  cached_copilot_dir="$(dirname "$cached_copilot_bin")"
   echo "Activating cached Copilot CLI from ${cached_copilot_bin}..."
-  export PATH="${cached_copilot_dir}:$PATH"
-  echo "  Prepended ${cached_copilot_dir} to PATH"
+  export PATH="${INSTALL_DIR}:$PATH"
+  echo "  Prepended ${INSTALL_DIR} to PATH"
 
   if [ -n "${GITHUB_PATH:-}" ]; then
-    echo "  Exporting ${cached_copilot_dir} to GITHUB_PATH (${GITHUB_PATH})"
-    echo "$cached_copilot_dir" >> "${GITHUB_PATH}"
+    echo "  Exporting ${INSTALL_DIR} to GITHUB_PATH (${GITHUB_PATH})"
+    echo "$INSTALL_DIR" >> "${GITHUB_PATH}"
   else
     echo "  GITHUB_PATH not set — relying on ${INSTALL_DIR}/copilot"
   fi
@@ -729,9 +737,8 @@ stage_musl_guest_copilot() {
   echo "✓ Staged musl Copilot CLI at ${destination}"
 }
 
-# Create temp directory with cleanup on exit
-TEMP_DIR=$(mktemp -d)
-trap 'rm -rf "$TEMP_DIR"' EXIT
+# Keep downloads private and cleanup confined to this invocation's allocation.
+create_release_staging copilot
 
 # Version resolution follows this priority order:
 # Check publication time before activating any cached binary or downloading an

@@ -53,6 +53,7 @@ negative controls and validated readable traces without live effects.
 | [`no-json-stringify-set-or-map`](#no-json-stringify-set-or-map) | Disallow `JSON.stringify()` directly on `Set` or `Map` instances |
 | [`no-math-minmax-array-spread`](#no-math-minmax-array-spread) | Disallow spreading a non-literal array into `Math.min(...)` / `Math.max(...)` |
 | [`no-map-parseint-callback`](#no-map-parseint-callback) | Disallow passing `parseInt` directly as an array callback, because the element index is used as the radix |
+| [`no-path-startswith-without-separator`](#no-path-startswith-without-separator) | Disallow `startsWith()` containment checks against a bare `path.resolve/join/normalize` result |
 | [`no-misplaced-error-code-definition`](#no-misplaced-error-code-definition) | Require exported error-code constants to be defined in `error_codes.cjs` |
 | [`no-single-char-string-replace`](#no-single-char-string-replace) | Disallow `String.prototype.replace()` with a single-character string pattern, which replaces only the first occurrence |
 | [`no-split-filter-trim-without-trim-map`](#no-split-filter-trim-without-trim-map) | Require split values to be trimmed before filtering out empty entries |
@@ -244,6 +245,10 @@ Disallow spreading an array of unknown size into `Math.min(...)` / `Math.max(...
 ### `no-map-parseint-callback`
 
 Disallow passing global `parseInt` or `Number.parseInt` directly to `.map()`, because `.map()` passes the element index as the second callback argument and `parseInt` interprets it as the radix. Use `.map(value => parseInt(value, 10))` or `.map(Number)` instead.
+
+### `no-path-startswith-without-separator`
+
+Disallow `value.startsWith(root)` where `root` is a bare `path.resolve()`/`path.join()`/`path.normalize()` result (directly or via a single-assignment variable). `/work/repo-evil` passes a `startsWith("/work/repo")` check. Compare against `root.endsWith(path.sep) ? root : root + path.sep` (plus `=== root`) or use `path.relative()` and reject `relative === ".."`, `relative.startsWith(".." + path.sep)`, or `path.isAbsolute(relative)`.
 
 ### `no-split-filter-trim-without-trim-map`
 

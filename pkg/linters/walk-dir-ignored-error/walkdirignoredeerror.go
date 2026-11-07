@@ -61,8 +61,8 @@ func analyzeAssignStmt(pass *analysis.Pass, assign *ast.AssignStmt, generatedFil
 			if !ok {
 				return
 			}
-			if isWalkDirCall(pass, call) {
-				reportIfNotSkipped(pass, call, generatedFiles, nolintIndex)
+			if funcName, ok := walkDirCallName(pass, call); ok {
+				reportIfNotSkipped(pass, call, funcName, generatedFiles, nolintIndex)
 			}
 		}
 		return
@@ -77,29 +77,32 @@ func analyzeExprStmt(pass *analysis.Pass, exprStmt *ast.ExprStmt, generatedFiles
 		return
 	}
 
-	if isWalkDirCall(pass, call) {
-		reportIfNotSkipped(pass, call, generatedFiles, nolintIndex)
+	if funcName, ok := walkDirCallName(pass, call); ok {
+		reportIfNotSkipped(pass, call, funcName, generatedFiles, nolintIndex)
 	}
 }
 
-// isWalkDirCall returns true if call is filepath.Walk or filepath.WalkDir.
-func isWalkDirCall(pass *analysis.Pass, call *ast.CallExpr) bool {
+// walkDirCallName returns the resolved function name ("Walk" or "WalkDir")
+// when call is filepath.Walk or filepath.WalkDir. The name comes from type
+// information, so parenthesized callees such as (filepath.Walk)(...) and
+// dot-imported calls such as Walk(...) are reported with the right name.
+func walkDirCallName(pass *analysis.Pass, call *ast.CallExpr) (string, bool) {
 	pkgPath, funcName, ok := astutil.PackageCall(pass, call)
 	if !ok {
-		return false
+		return "", false
 	}
 
 	funcs, ok := checkedFuncs[pkgPath]
 	if !ok {
-		return false
+		return "", false
 	}
 
 	_, checked := funcs[funcName]
-	return checked
+	return funcName, checked
 }
 
 // reportIfNotSkipped reports a diagnostic if the linter is not suppressed.
-func reportIfNotSkipped(pass *analysis.Pass, call *ast.CallExpr, generatedFiles filecheck.GeneratedIndex, nolintIndex nolint.DirectiveIndex) {
+func reportIfNotSkipped(pass *analysis.Pass, call *ast.CallExpr, funcName string, generatedFiles filecheck.GeneratedIndex, nolintIndex nolint.DirectiveIndex) {
 	pos := pass.Fset.PositionFor(call.Pos(), false)
 	if filecheck.ShouldSkipFilename(pos.Filename, generatedFiles) {
 		return
@@ -107,13 +110,6 @@ func reportIfNotSkipped(pass *analysis.Pass, call *ast.CallExpr, generatedFiles 
 	if nolint.HasDirectiveForLinter(pos, nolintIndex, "walkdirignoredeerror") {
 		return
 	}
-
-	// Get function name for better error message
-	sel, ok := call.Fun.(*ast.SelectorExpr)
-	if !ok {
-		return
-	}
-	funcName := sel.Sel.Name
 
 	pass.ReportRangef(call, "error return from filepath.%s is discarded; directory traversal errors are silently ignored", funcName)
 }

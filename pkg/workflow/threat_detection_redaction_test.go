@@ -79,6 +79,10 @@ func TestDetectionRedactionOrderingAndGates(t *testing.T) {
 						continue
 					}
 					consumers++
+					if step.Name == "Upload threat detection log" || step.Name == "Upload threat detection artifact" {
+						assert.Contains(t, strings.Split(step.With["path"].(string), "\n"), "/tmp/gh-aw/threat-detection/detection_harness_retry.json")
+						assert.Equal(t, "ignore", step.With["if-no-files-found"])
+					}
 					node, err := ParseExpression(step.If)
 					require.NoError(t, err)
 					skipUpload := step.Name == "Upload skipped detection execution evidence"

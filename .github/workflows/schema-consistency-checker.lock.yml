@@ -1,5 +1,5 @@
-# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"4d1fdadb14e99592abf145ccec64889389b3f4a572c1bbd11a36bb5d5ee1f933","body_hash":"9b4773bc423f9015062f987f6bf512f0ac818a82657013351b4ae0e4cabee305","strict":true,"agent_id":"codex","agent_model":"openai/gpt-6.1-sol","engine_versions":{"codex":"0.166.0"}}
-# gh-aw-manifest: {"version":1,"secrets":["CODEX_API_KEY","COPILOT_GITHUB_TOKEN","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GH_AW_OTEL_GRAFANA_AUTHORIZATION","GH_AW_OTEL_GRAFANA_ENDPOINT","GH_AW_OTEL_SENTRY_AUTHORIZATION","GH_AW_OTEL_SENTRY_ENDPOINT","GITHUB_TOKEN","OPENAI_API_KEY"],"actions":[{"repo":"actions/cache/restore","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/cache/save","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"949feb2413d6458794dcd2491c4babbbce0c15c1","version":"v7.1.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.29.7","digest":"sha256:bd8d363c11b65632920850a44aa61cf9857e2ce9bcd78016e5e9ff57861cb2f5","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.29.7@sha256:bd8d363c11b65632920850a44aa61cf9857e2ce9bcd78016e5e9ff57861cb2f5"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.7","digest":"sha256:c3b4c800634b9e314b80c0cd8daa6d861ed849381bf69234cd77417e7b79b94a","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.7@sha256:c3b4c800634b9e314b80c0cd8daa6d861ed849381bf69234cd77417e7b79b94a"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.29.7","digest":"sha256:0790d978a820af2dc1bfab74d1f06b159f3a57ad4893ec49f475289691c4d154","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.29.7@sha256:0790d978a820af2dc1bfab74d1f06b159f3a57ad4893ec49f475289691c4d154"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.5.4","digest":"sha256:801db64c2456ba2132733b23141fb52ca9d4691765181ee957ee121a21b86c09","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.5.4@sha256:801db64c2456ba2132733b23141fb52ca9d4691765181ee957ee121a21b86c09"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:2c2ea524e648b91c8333ce246e3838fcf5b19ac70e45baac1a51b9207299749f","pinned_image":"ghcr.io/github/gh-aw-node@sha256:2c2ea524e648b91c8333ce246e3838fcf5b19ac70e45baac1a51b9207299749f"},{"image":"ghcr.io/github/github-mcp-server:v2.0.3","digest":"sha256:250bc6ce70788207608ef74cef4397230ff2e8481218da74d6093e4bd9101132","pinned_image":"ghcr.io/github/github-mcp-server:v2.0.3@sha256:250bc6ce70788207608ef74cef4397230ff2e8481218da74d6093e4bd9101132"}],"mcp_servers":[{"name":"github","tools":["get_commit","get_discussion","get_discussion_comments","get_file_contents","get_latest_release","get_me","get_pull_request","get_pull_request_comments","get_pull_request_diff","get_pull_request_files","get_pull_request_review_comments","get_pull_request_reviews","get_pull_request_status","get_release_by_tag","get_tag","issue_read","list_branches","list_commits","list_discussion_categories","list_discussions","list_issue_types","list_issues","list_pull_requests","list_releases","list_starred_repositories","list_tags","pull_request_read","search_code","search_issues","search_pull_requests","search_repositories"]},{"name":"safeoutputs","tools":["create_discussion","noop","report_incomplete","report_missing_data","report_missing_tool"]}],"threat_detection":{"mode":"enabled"},"admission":true}
+# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"c7da340bec1e428190697b197803ea7f62fc4dce940de398325a29c96e3241a3","body_hash":"9b4773bc423f9015062f987f6bf512f0ac818a82657013351b4ae0e4cabee305","strict":true,"agent_id":"codex","engine_versions":{"codex":"0.166.0"}}
+# gh-aw-manifest: {"version":1,"secrets":["GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GH_AW_OTEL_GRAFANA_AUTHORIZATION","GH_AW_OTEL_GRAFANA_ENDPOINT","GH_AW_OTEL_SENTRY_AUTHORIZATION","GH_AW_OTEL_SENTRY_ENDPOINT","GITHUB_TOKEN"],"actions":[{"repo":"actions/cache/restore","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/cache/save","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"949feb2413d6458794dcd2491c4babbbce0c15c1","version":"v7.1.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.29.7@sha256:bd8d363c11b65632920850a44aa61cf9857e2ce9bcd78016e5e9ff57861cb2f5"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.7@sha256:c3b4c800634b9e314b80c0cd8daa6d861ed849381bf69234cd77417e7b79b94a"},{"image":"ghcr.io/github/gh-aw-firewall/router:0.29.7@sha256:6f1b3160d95de1b24ca448afab5b39bed97ae773ecddb9952221ef05995bb29c"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.29.7@sha256:0790d978a820af2dc1bfab74d1f06b159f3a57ad4893ec49f475289691c4d154"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.5.4","digest":"sha256:801db64c2456ba2132733b23141fb52ca9d4691765181ee957ee121a21b86c09","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.5.4@sha256:801db64c2456ba2132733b23141fb52ca9d4691765181ee957ee121a21b86c09"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:2c2ea524e648b91c8333ce246e3838fcf5b19ac70e45baac1a51b9207299749f","pinned_image":"ghcr.io/github/gh-aw-node@sha256:2c2ea524e648b91c8333ce246e3838fcf5b19ac70e45baac1a51b9207299749f"},{"image":"ghcr.io/github/github-mcp-server:v2.1.0","digest":"sha256:f6056fc10bfffcc8c81a6417a2e9ca12808647e8dd6049642a4feaadee0e0f8a","pinned_image":"ghcr.io/github/github-mcp-server:v2.1.0@sha256:f6056fc10bfffcc8c81a6417a2e9ca12808647e8dd6049642a4feaadee0e0f8a"}],"mcp_servers":[{"name":"github","tools":["get_commit","get_discussion","get_discussion_comments","get_file_contents","get_latest_release","get_me","get_pull_request","get_pull_request_comments","get_pull_request_diff","get_pull_request_files","get_pull_request_review_comments","get_pull_request_reviews","get_pull_request_status","get_release_by_tag","get_tag","issue_read","list_branches","list_commits","list_discussion_categories","list_discussions","list_issue_types","list_issues","list_pull_requests","list_releases","list_starred_repositories","list_tags","pull_request_read","search_code","search_issues","search_pull_requests","search_repositories"]},{"name":"safeoutputs","tools":["create_discussion","noop","report_incomplete","report_missing_data","report_missing_tool"]}],"threat_detection":{"mode":"enabled"},"admission":true}
 # This file was automatically generated by gh-aw. DO NOT EDIT. To debug this workflow, load the skill at https://github.com/github/gh-aw/blob/main/debug.md
 #
 #    ___                   _   _
@@ -33,8 +33,6 @@
 #     - shared/daily-audit-base.md
 #
 # Secrets used:
-#   - CODEX_API_KEY
-#   - COPILOT_GITHUB_TOKEN
 #   - GH_AW_GITHUB_MCP_SERVER_TOKEN
 #   - GH_AW_GITHUB_TOKEN
 #   - GH_AW_OTEL_GRAFANA_AUTHORIZATION
@@ -42,7 +40,6 @@
 #   - GH_AW_OTEL_SENTRY_AUTHORIZATION
 #   - GH_AW_OTEL_SENTRY_ENDPOINT
 #   - GITHUB_TOKEN
-#   - OPENAI_API_KEY
 #
 # Custom actions used:
 #   - actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -54,12 +51,13 @@
 #   - actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
 #
 # Container images used:
-#   - ghcr.io/github/gh-aw-firewall/agent:0.29.7@sha256:bd8d363c11b65632920850a44aa61cf9857e2ce9bcd78016e5e9ff57861cb2f5
-#   - ghcr.io/github/gh-aw-firewall/api-proxy:0.29.7@sha256:c3b4c800634b9e314b80c0cd8daa6d861ed849381bf69234cd77417e7b79b94a
-#   - ghcr.io/github/gh-aw-firewall/squid:0.29.7@sha256:0790d978a820af2dc1bfab74d1f06b159f3a57ad4893ec49f475289691c4d154
 #   - ghcr.io/github/gh-aw-mcpg:v0.5.4@sha256:801db64c2456ba2132733b23141fb52ca9d4691765181ee957ee121a21b86c09
 #   - ghcr.io/github/gh-aw-node@sha256:2c2ea524e648b91c8333ce246e3838fcf5b19ac70e45baac1a51b9207299749f
-#   - ghcr.io/github/github-mcp-server:v2.0.3@sha256:250bc6ce70788207608ef74cef4397230ff2e8481218da74d6093e4bd9101132
+#   - ghcr.io/github/github-mcp-server:v2.1.0@sha256:f6056fc10bfffcc8c81a6417a2e9ca12808647e8dd6049642a4feaadee0e0f8a
+#   - ghcr.io/github/gh-aw-firewall/agent:0.29.7@sha256:bd8d363c11b65632920850a44aa61cf9857e2ce9bcd78016e5e9ff57861cb2f5
+#   - ghcr.io/github/gh-aw-firewall/api-proxy:0.29.7@sha256:c3b4c800634b9e314b80c0cd8daa6d861ed849381bf69234cd77417e7b79b94a
+#   - ghcr.io/github/gh-aw-firewall/router:0.29.7@sha256:6f1b3160d95de1b24ca448afab5b39bed97ae773ecddb9952221ef05995bb29c
+#   - ghcr.io/github/gh-aw-firewall/squid:0.29.7@sha256:0790d978a820af2dc1bfab74d1f06b159f3a57ad4893ec49f475289691c4d154
 
 name: "Schema Consistency Checker"
 on:
@@ -125,7 +123,6 @@ jobs:
       lockdown_check_failed: ${{ steps.generate_aw_info.outputs.lockdown_check_failed == 'true' }}
       model: ${{ steps.generate_aw_info.outputs.model }}
       oauth_token_check_failed: ${{ steps.check-oauth-tokens.outputs.oauth_token_check_failed == 'true' }}
-      secret_verification_result: ${{ steps.validate-secret.outputs.verification_result }}
       setup-parent-span-id: ${{ steps.setup.outputs.parent-span-id || steps.setup.outputs.span-id }}
       setup-span-id: ${{ steps.setup.outputs.span-id }}
       setup-trace-id: ${{ steps.setup.outputs.trace-id }}
@@ -162,7 +159,7 @@ jobs:
         env:
           GH_AW_INFO_ENGINE_ID: "codex"
           GH_AW_INFO_ENGINE_NAME: "Codex"
-          GH_AW_INFO_MODEL: "openai/gpt-6.1-sol"
+          GH_AW_INFO_MODEL: ${{ vars.GH_AW_MODEL_AGENT_CODEX || vars.GH_AW_DEFAULT_MODEL_CODEX || '' }}
           GH_AW_INFO_VERSION: "0.166.0"
           GH_AW_INFO_AGENT_VERSION: "0.166.0"
           GH_AW_INFO_WORKFLOW_NAME: "Schema Consistency Checker"
@@ -176,12 +173,11 @@ jobs:
           GH_AW_INFO_AWMG_VERSION: ""
           GH_AW_INFO_FIREWALL_TYPE: "squid"
           GH_AW_INFO_AGENT_RUNTIME: ""
-          GH_AW_INFO_MODEL_CONFIG: '{"routing":{"enabled":false},"models":{"allowed":[],"blocked":[]},"max_ai_credits_source":"frontmatter"}'
+          GH_AW_INFO_MODEL_CONFIG: '{"routing":{"enabled":true,"goal":"cost","mode":"economy","candidate_models":["github-copilot/gpt-*"]},"models":{"allowed":[],"blocked":[]},"max_ai_credits_source":"frontmatter"}'
           GH_AW_INFO_MAX_AI_CREDITS: "1500"
           GH_AW_INFO_CACHE_MEMORY: "true"
           GH_AW_INFO_FRONTMATTER_EMOJI: "✅"
           GH_AW_COMPILED_STRICT: "true"
-          GH_AW_INFO_MODEL_COSTS: '{"providers":{"openai":{"models":{"gpt-6.1-sol":{"cost":{"cache_read":"1e-07","cache_write":"2.5e-06","input":"2e-06","output":"1e-05"}}}}}}'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
@@ -240,17 +236,10 @@ jobs:
           overwrite: true
           if-no-files-found: ignore
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '3' }}
-      - name: Validate CODEX_API_KEY or OPENAI_API_KEY secret
-        id: validate-secret
-        run: bash "${RUNNER_TEMP}/gh-aw/actions/validate_multi_secret.sh" CODEX_API_KEY OPENAI_API_KEY Codex https://github.github.com/gh-aw/reference/engines/#openai-codex
-        env:
-          CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       - name: Check for OAuth tokens
         id: check-oauth-tokens
         run: bash "${RUNNER_TEMP}/gh-aw/actions/check_oauth_tokens.sh"
         env:
-          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}
           GH_AW_GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN }}
       - name: Checkout .github and .agents folders
@@ -594,7 +583,7 @@ jobs:
           GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
           GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
           GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
-          GH_AW_ADMISSION_WORKFLOW_HASH: "4d1fdadb14e99592abf145ccec64889389b3f4a572c1bbd11a36bb5d5ee1f933:9b4773bc423f9015062f987f6bf512f0ac818a82657013351b4ae0e4cabee305"
+          GH_AW_ADMISSION_WORKFLOW_HASH: "c7da340bec1e428190697b197803ea7f62fc4dce940de398325a29c96e3241a3:9b4773bc423f9015062f987f6bf512f0ac818a82657013351b4ae0e4cabee305"
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
@@ -611,6 +600,7 @@ jobs:
     # Permissions for the agent job (workflow permissions default to none).
     permissions:
       contents: read
+      copilot-requests: write
       discussions: read
       issues: read
       pull-requests: read
@@ -656,9 +646,11 @@ jobs:
       mcp_policy_error: ${{ steps.detect-agent-errors.outputs.mcp_policy_error || 'false' }}
       missing_model_pricing_error: ${{ steps.detect-agent-errors.outputs.missing_model_pricing_error || 'false' }}
       missing_model_pricing_model_name: ${{ steps.detect-agent-errors.outputs.missing_model_pricing_model_name || '' }}
-      model: ${{ needs.activation.outputs.model }}
+      model: ${{ steps.parse-token-usage.outputs.model || needs.activation.outputs.model }}
+      model_effort: ${{ steps.parse-token-usage.outputs.model_effort }}
       model_endpoint_mismatch_error: ${{ steps.detect-agent-errors.outputs.model_endpoint_mismatch_error || 'false' }}
       model_not_supported_error: ${{ steps.detect-agent-errors.outputs.model_not_supported_error || 'false' }}
+      model_routing_status: ${{ steps.parse-token-usage.outputs.model_routing_status }}
       output: ${{ steps.collect_output.outputs.output }}
       output_types: ${{ steps.collect_output.outputs.output_types }}
       setup-parent-span-id: ${{ steps.setup.outputs.parent-span-id || steps.setup.outputs.span-id }}
@@ -811,13 +803,15 @@ jobs:
         run: "set -e\nmkdir -p /tmp/gh-aw/agent\n\necho \"=== Extracting schema fields ===\"\n\n# 1. All top-level fields in the main JSON schema\nSCHEMA_FIELDS=$(jq -r '.properties | keys[]' pkg/parser/schemas/main_workflow_schema.json 2>/dev/null | sort -u || echo \"\")\n\n# 2. JSON/YAML-tagged fields in the top-level frontmatter type.\n# pkg/parser/frontmatter.go is only a logger declaration; frontmatter fields\n# are extracted and represented in pkg/workflow/frontmatter_types.go.\nFRONTMATTER_FIELDS=$(sed -n '/^type FrontmatterConfig struct {$/,/^}$/p' pkg/workflow/frontmatter_types.go 2>/dev/null \\\n  | grep -Eo '(json|yaml):\"[^\"]*\"' \\\n  | sed -E 's/^(json|yaml):\"//;s/\"$//' \\\n  | sed 's/,omitempty//' \\\n  | sed 's/,.*$//' \\\n  | grep -v '^-$' \\\n  | grep -v '^$' \\\n  | sort -u || echo \"\")\n\n# 3. yaml-tagged struct fields in pkg/workflow/*.go\nWORKFLOW_YAML_FIELDS=$(grep -rh 'yaml:\"' pkg/workflow/*.go 2>/dev/null \\\n  | grep -o 'yaml:\"[^\"]*\"' \\\n  | sed 's/yaml:\"//;s/\"//' \\\n  | sed 's/,omitempty//' \\\n  | sed 's/,.*$//' \\\n  | grep -v '^-$' \\\n  | grep -v '^$' \\\n  | sort -u || echo \"\")\n\n# 4. Top-level frontmatter keys actually used in workflow .md files\nUSED_FIELDS=$(bash scripts/extract-workflow-frontmatter-keys.sh .github/workflows/*.md 2>/dev/null || echo \"\")\n\n# 5. Schema field types for all top-level fields\nFIELD_TYPES=$(jq -r '.properties | to_entries[] |\n  \"\\(.key): \\(.value.type // (.value.anyOf // .value.oneOf // [] | map(.type // \"complex\") | unique | join(\"|\")) // \"complex\")\"' \\\n  pkg/parser/schemas/main_workflow_schema.json 2>/dev/null | sort || echo \"\")\n\n# 6. Fields in schema but absent from the frontmatter type definitions\nIN_SCHEMA_NOT_FRONTMATTER=$(comm -23 \\\n  <(echo \"$SCHEMA_FIELDS\") \\\n  <(echo \"$FRONTMATTER_FIELDS\" | sort -u) 2>/dev/null || echo \"\")\n\n# 7. Fields in frontmatter type definitions absent from schema\nIN_FRONTMATTER_NOT_SCHEMA=$(comm -23 \\\n  <(echo \"$FRONTMATTER_FIELDS\" | sort -u) \\\n  <(echo \"$SCHEMA_FIELDS\") 2>/dev/null || echo \"\")\n\n# 8. Fields in schema but absent from workflow compiler structs\nIN_SCHEMA_NOT_WORKFLOW=$(comm -23 \\\n  <(echo \"$SCHEMA_FIELDS\") \\\n  <(echo \"$WORKFLOW_YAML_FIELDS\" | sort -u) 2>/dev/null || echo \"\")\n\n# 9. Fields used in actual workflow .md files but not in schema\nIN_USED_NOT_SCHEMA=$(comm -23 \\\n  <(echo \"$USED_FIELDS\" | sort -u) \\\n  <(echo \"$SCHEMA_FIELDS\") 2>/dev/null || echo \"\")\n\n# Write JSON output\njq -n \\\n  --arg generated_at \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\" \\\n  --arg schema_fields \"$SCHEMA_FIELDS\" \\\n  --arg frontmatter_fields \"$FRONTMATTER_FIELDS\" \\\n  --arg workflow_yaml_fields \"$WORKFLOW_YAML_FIELDS\" \\\n  --arg used_in_workflows \"$USED_FIELDS\" \\\n  --arg field_types \"$FIELD_TYPES\" \\\n  --arg in_schema_not_frontmatter \"$IN_SCHEMA_NOT_FRONTMATTER\" \\\n  --arg in_frontmatter_not_schema \"$IN_FRONTMATTER_NOT_SCHEMA\" \\\n  --arg in_schema_not_workflow \"$IN_SCHEMA_NOT_WORKFLOW\" \\\n  --arg in_used_not_schema \"$IN_USED_NOT_SCHEMA\" \\\n  '{\n    generated_at: $generated_at,\n    schema_fields: ($schema_fields | split(\"\\n\") | map(select(. != \"\"))),\n    frontmatter_fields: ($frontmatter_fields | split(\"\\n\") | map(select(. != \"\"))),\n    workflow_yaml_fields: ($workflow_yaml_fields | split(\"\\n\") | map(select(. != \"\"))),\n    used_in_workflows: ($used_in_workflows | split(\"\\n\") | map(select(. != \"\"))),\n    field_types: ($field_types | split(\"\\n\") | map(select(. != \"\"))),\n    field_gaps: {\n      in_schema_not_frontmatter: ($in_schema_not_frontmatter | split(\"\\n\") | map(select(. != \"\"))),\n      in_frontmatter_not_schema: ($in_frontmatter_not_schema | split(\"\\n\") | map(select(. != \"\"))),\n      in_schema_not_workflow: ($in_schema_not_workflow | split(\"\\n\") | map(select(. != \"\"))),\n      in_used_not_schema: ($in_used_not_schema | split(\"\\n\") | map(select(. != \"\")))\n    }\n  }' > /tmp/gh-aw/agent/schema-diff.json\n\necho \"✓ Schema diff written to /tmp/gh-aw/agent/schema-diff.json\"\necho \"Summary:\"\njq '{\n  schema_field_count: (.schema_fields | length),\n  frontmatter_field_count: (.frontmatter_fields | length),\n  workflow_yaml_field_count: (.workflow_yaml_fields | length),\n  gaps: {\n    in_schema_not_frontmatter: (.field_gaps.in_schema_not_frontmatter | length),\n    in_frontmatter_not_schema: (.field_gaps.in_frontmatter_not_schema | length),\n    in_schema_not_workflow: (.field_gaps.in_schema_not_workflow | length),\n    in_used_not_schema: (.field_gaps.in_used_not_schema | length)\n  }\n}' /tmp/gh-aw/agent/schema-diff.json\n\necho \"=== AWF config source drift pre-check (gh-aw-firewall) ===\"\nAWF_SNAPSHOT_CACHE_DIR=/tmp/gh-aw/cache-memory/awf-config-sources\nif [ \"${RUNNER_ENVIRONMENT:-github-hosted}\" = \"self-hosted\" ]; then\n  AWF_SNAPSHOT_DIR=\"${HOME}/.cache/gh-aw/schema-consistency/last-known-snapshot\"\nelse\n  AWF_SNAPSHOT_DIR=/tmp/gh-aw/agent/schema-consistency/last-known-snapshot\nfi\nmkdir -p \"$AWF_SNAPSHOT_DIR\"\nif [ -d \"$AWF_SNAPSHOT_CACHE_DIR\" ]; then\n  cp -a \"$AWF_SNAPSHOT_CACHE_DIR/.\" \"$AWF_SNAPSHOT_DIR/\"\nfi\nAWF_CANONICAL_FETCH_DEGRADED=false\nAWF_USING_SNAPSHOT=false\nAWF_SNAPSHOT_EXPIRED=false\nAWF_FETCH_FAILED_SOURCES=\"\"\nAWF_SNAPSHOT_MAX_AGE_SECONDS=604800\nAWF_SNAPSHOT_DELETE_AGE_SECONDS=1209600\n\nsnapshot_age_seconds() {\n  [ -s \"$AWF_SNAPSHOT_DIR/detected_at\" ] || return 1\n  snapshot_epoch=$(date -u -d \"$(cat \"$AWF_SNAPSHOT_DIR/detected_at\")\" +%s 2>/dev/null) || return 1\n  now_epoch=$(date -u +%s)\n  [ \"$snapshot_epoch\" -le \"$now_epoch\" ] || return 1\n  printf '%s\\n' \"$((now_epoch - snapshot_epoch))\"\n}\n\nAWF_SNAPSHOT_AGE_SECONDS=$(snapshot_age_seconds || true)\nif [ -e \"$AWF_SNAPSHOT_DIR/awf-config.schema.json\" ] && [ -z \"$AWF_SNAPSHOT_AGE_SECONDS\" ]; then\n  AWF_SNAPSHOT_EXPIRED=true\n  echo \"AWF last-known snapshot has no valid refresh timestamp; stale data will not suppress drift warnings\"\nelif [ -n \"$AWF_SNAPSHOT_AGE_SECONDS\" ] && [ \"$AWF_SNAPSHOT_AGE_SECONDS\" -gt \"$AWF_SNAPSHOT_MAX_AGE_SECONDS\" ]; then\n  AWF_SNAPSHOT_EXPIRED=true\n  echo \"AWF last-known snapshot is older than 7 days; stale data will not suppress drift warnings\"\n  if [ \"$AWF_SNAPSHOT_AGE_SECONDS\" -gt \"$AWF_SNAPSHOT_DELETE_AGE_SECONDS\" ]; then\n    rm -rf \"$AWF_SNAPSHOT_DIR\" \"$AWF_SNAPSHOT_CACHE_DIR\"\n    mkdir -p \"$AWF_SNAPSHOT_DIR\"\n  fi\nfi\n\nfetch_awf_source() {\n  local source_path=\"$1\"\n  local target_path=\"$2\"\n  if ! gh api -H \"Accept: application/vnd.github.raw\" \"/repos/github/gh-aw-firewall/contents/${source_path}\" > \"$target_path\"; then\n    AWF_CANONICAL_FETCH_DEGRADED=true\n    AWF_FETCH_FAILED_SOURCES=\"${AWF_FETCH_FAILED_SOURCES}${source_path}\\n\"\n    rm -f \"$target_path\"\n    return 1\n  fi\n}\n\nif [ -n \"${GH_TOKEN:-${GITHUB_TOKEN:-}}\" ]; then\n  fetch_awf_source docs/awf-config.schema.json /tmp/gh-aw/agent/awf-config.schema.json || true\n  fetch_awf_source src/awf-config-schema.json /tmp/gh-aw/agent/awf-config-runtime.schema.json || true\n  fetch_awf_source docs/awf-config-spec.md /tmp/gh-aw/agent/awf-config-spec.md || true\nelse\n  AWF_CANONICAL_FETCH_DEGRADED=true\n  AWF_FETCH_FAILED_SOURCES=\"docs/awf-config.schema.json\\nsrc/awf-config-schema.json\\ndocs/awf-config-spec.md\\n\"\n  echo \"⚠️ AWF canonical source fetch degraded: GH_TOKEN/GITHUB_TOKEN is not set\"\nfi\n\nfor source_path in docs/awf-config.schema.json src/awf-config-schema.json docs/awf-config-spec.md; do\n  source_file=$(basename \"$source_path\")\n  if [ \"$source_path\" = \"src/awf-config-schema.json\" ]; then\n    target_path=/tmp/gh-aw/agent/awf-config-runtime.schema.json\n    source_file=awf-config-runtime.schema.json\n  else\n    target_path=/tmp/gh-aw/agent/\"$source_file\"\n  fi\n\n  if [ ! -s \"$target_path\" ] && [ \"$AWF_SNAPSHOT_EXPIRED\" = false ] && [ -s \"$AWF_SNAPSHOT_DIR/$source_file\" ]; then\n    cp \"$AWF_SNAPSHOT_DIR/$source_file\" \"$target_path\"\n    AWF_USING_SNAPSHOT=true\n    echo \"Using last-known AWF snapshot for $source_path\"\n  fi\ndone\n\nif [ -s /tmp/gh-aw/agent/awf-config.schema.json ] && [ -s /tmp/gh-aw/agent/awf-config-runtime.schema.json ] && [ -s /tmp/gh-aw/agent/awf-config-spec.md ]; then\n  if [ \"$AWF_CANONICAL_FETCH_DEGRADED\" = false ]; then\n    cp /tmp/gh-aw/agent/awf-config.schema.json \"$AWF_SNAPSHOT_DIR/awf-config.schema.json\"\n    cp /tmp/gh-aw/agent/awf-config-runtime.schema.json \"$AWF_SNAPSHOT_DIR/awf-config-runtime.schema.json\"\n    cp /tmp/gh-aw/agent/awf-config-spec.md \"$AWF_SNAPSHOT_DIR/awf-config-spec.md\"\n    date -u +%Y-%m-%dT%H:%M:%SZ > \"$AWF_SNAPSHOT_DIR/detected_at\"\n    rm -rf \"$AWF_SNAPSHOT_CACHE_DIR\"\n    mkdir -p \"$AWF_SNAPSHOT_CACHE_DIR\"\n    cp -a \"$AWF_SNAPSHOT_DIR/.\" \"$AWF_SNAPSHOT_CACHE_DIR/\"\n  fi\n\n  jq -r '.properties | keys[]' /tmp/gh-aw/agent/awf-config.schema.json | sort -u \\\n    > /tmp/gh-aw/agent/awf-config-top-level.txt\n  jq -r '.properties | keys[]' /tmp/gh-aw/agent/awf-config-runtime.schema.json | sort -u \\\n    > /tmp/gh-aw/agent/awf-config-runtime-top-level.txt\n  rg --no-heading --no-filename 'apiProxy|container|sandbox|auth|network' pkg/workflow actions/setup \\\n    | head -200 > /tmp/gh-aw/agent/awf-config-ghaw-refs.txt || true\n\n  FAILED_SOURCES_JSON=$(printf \"%b\" \"$AWF_FETCH_FAILED_SOURCES\" | sed '/^$/d' | sort -u | jq -Rsc 'split(\"\\n\") | map(select(length > 0))')\n  jq -n \\\n    --arg generated_at \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\" \\\n    --arg spec_path \"docs/awf-config-spec.md\" \\\n    --arg schema_path \"docs/awf-config.schema.json\" \\\n    --arg runtime_schema_path \"src/awf-config-schema.json\" \\\n    --arg top_level_count \"$(wc -l < /tmp/gh-aw/agent/awf-config-top-level.txt | tr -d ' ')\" \\\n    --arg runtime_top_level_count \"$(wc -l < /tmp/gh-aw/agent/awf-config-runtime-top-level.txt | tr -d ' ')\" \\\n    --arg refs_sample_count \"$(wc -l < /tmp/gh-aw/agent/awf-config-ghaw-refs.txt | tr -d ' ')\" \\\n    --arg degraded \"$AWF_CANONICAL_FETCH_DEGRADED\" \\\n    --arg using_snapshot \"$AWF_USING_SNAPSHOT\" \\\n    --arg snapshot_expired \"$AWF_SNAPSHOT_EXPIRED\" \\\n    --arg snapshot_path \"$AWF_SNAPSHOT_DIR\" \\\n    --argjson failed_sources \"$FAILED_SOURCES_JSON\" \\\n    '{\n      generated_at: $generated_at,\n      source_repo: \"github/gh-aw-firewall\",\n      canonical_spec: $spec_path,\n      canonical_schema: $schema_path,\n      canonical_runtime_schema: $runtime_schema_path,\n      top_level_property_count: ($top_level_count | tonumber),\n      runtime_top_level_property_count: ($runtime_top_level_count | tonumber),\n      ghaw_reference_sample_count: ($refs_sample_count | tonumber),\n      degraded: ($degraded == \"true\"),\n      using_snapshot: ($using_snapshot == \"true\"),\n      snapshot_expired: ($snapshot_expired == \"true\"),\n      snapshot_path: $snapshot_path,\n      failed_sources: $failed_sources\n    }' > /tmp/gh-aw/agent/awf-config-drift.json\n  if [ \"$AWF_CANONICAL_FETCH_DEGRADED\" = true ]; then\n    printf 'AWF canonical source retrieval failed at %s for:\\n%b' \\\n      \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\" \"$AWF_FETCH_FAILED_SOURCES\"\n    echo \"AWF canonical source fetch degraded; continuing in non-fatal mode\"\n  else\n    echo \"✓ AWF config source pre-check artifacts written under /tmp/gh-aw/agent/\"\n  fi\nelse\n  AWF_CANONICAL_FETCH_DEGRADED=true\n  FAILED_SOURCES_JSON=$(printf \"%b\" \"$AWF_FETCH_FAILED_SOURCES\" | sed '/^$/d' | sort -u | jq -Rsc 'split(\"\\n\") | map(select(length > 0))')\n  jq -n \\\n    --arg generated_at \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\" \\\n    --argjson failed_sources \"$FAILED_SOURCES_JSON\" \\\n    '{\n      generated_at: $generated_at,\n      source_repo: \"github/gh-aw-firewall\",\n      degraded: true,\n      warning: \"canonical source retrieval failed; skipping destructive AWF drift actions\",\n      failed_sources: $failed_sources\n    }' > /tmp/gh-aw/agent/awf-config-drift.json\n  printf 'AWF canonical source retrieval failed at %s for:\\n%b' \\\n    \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\" \"$AWF_FETCH_FAILED_SOURCES\"\n  echo \"AWF canonical source fetch failed; run marked degraded (non-fatal)\"\nfi"
 
       - name: Download container images
-        run: bash "${RUNNER_TEMP}/gh-aw/actions/download_docker_images.sh" ghcr.io/github/gh-aw-firewall/agent:0.29.7@sha256:bd8d363c11b65632920850a44aa61cf9857e2ce9bcd78016e5e9ff57861cb2f5 ghcr.io/github/gh-aw-firewall/api-proxy:0.29.7@sha256:c3b4c800634b9e314b80c0cd8daa6d861ed849381bf69234cd77417e7b79b94a ghcr.io/github/gh-aw-firewall/squid:0.29.7@sha256:0790d978a820af2dc1bfab74d1f06b159f3a57ad4893ec49f475289691c4d154 ghcr.io/github/gh-aw-mcpg:v0.5.4@sha256:801db64c2456ba2132733b23141fb52ca9d4691765181ee957ee121a21b86c09 ghcr.io/github/gh-aw-node@sha256:2c2ea524e648b91c8333ce246e3838fcf5b19ac70e45baac1a51b9207299749f ghcr.io/github/github-mcp-server:v2.0.3@sha256:250bc6ce70788207608ef74cef4397230ff2e8481218da74d6093e4bd9101132
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/download_docker_images.sh" ghcr.io/github/gh-aw-mcpg:v0.5.4@sha256:801db64c2456ba2132733b23141fb52ca9d4691765181ee957ee121a21b86c09 ghcr.io/github/gh-aw-node@sha256:2c2ea524e648b91c8333ce246e3838fcf5b19ac70e45baac1a51b9207299749f ghcr.io/github/github-mcp-server:v2.1.0@sha256:f6056fc10bfffcc8c81a6417a2e9ca12808647e8dd6049642a4feaadee0e0f8a ghcr.io/github/gh-aw-firewall/agent:0.29.7@sha256:bd8d363c11b65632920850a44aa61cf9857e2ce9bcd78016e5e9ff57861cb2f5 ghcr.io/github/gh-aw-firewall/api-proxy:0.29.7@sha256:c3b4c800634b9e314b80c0cd8daa6d861ed849381bf69234cd77417e7b79b94a ghcr.io/github/gh-aw-firewall/router:0.29.7@sha256:6f1b3160d95de1b24ca448afab5b39bed97ae773ecddb9952221ef05995bb29c ghcr.io/github/gh-aw-firewall/squid:0.29.7@sha256:0790d978a820af2dc1bfab74d1f06b159f3a57ad4893ec49f475289691c4d154
       - name: Configure Codex
         run: |
+          set -o pipefail
+          codex debug models --bundled | "$(command -v node)" "${RUNNER_TEMP}/gh-aw/actions/convert_gateway_config_codex.cjs" --direct-tools
           "$(command -v node)" "${RUNNER_TEMP}/gh-aw/actions/convert_gateway_config_codex.cjs" --bootstrap
         env:
           CODEX_HOME: /tmp/gh-aw/mcp-config
-          GH_AW_CODEX_CONFIG_JSON: '{"defaults":{"features":{"plugins":false},"history":{"persistence":"none"},"mcp_servers":{"github":{"http_headers":{"User-Agent":"schema-consistency-checker"},"startup_timeout_sec":120,"tool_timeout_sec":60},"safeoutputs":{"startup_timeout_sec":120,"tool_timeout_sec":60}},"model_provider":"openai-proxy","model_providers":{"openai-proxy":{"base_url":"http://172.30.0.30:10000","env_key":"CODEX_API_KEY","name":"OpenAI AWF proxy","requires_openai_auth":false,"supports_websockets":false,"wire_api":"responses"}},"otel":{"metrics_exporter":"none"},"shell_environment_policy":{"ignore_default_excludes":false,"include_only":["ALL_PROXY","CURL_CA_BUNDLE","GITHUB_WORKSPACE","GIT_AUTHOR_EMAIL","GIT_AUTHOR_NAME","GIT_COMMITTER_EMAIL","GIT_COMMITTER_NAME","HOME","HTTPS_PROXY","HTTP_PROXY","LANG","LC_ALL","LC_CTYPE","LOGNAME","NODE_EXTRA_CA_CERTS","NO_PROXY","PATH","PLAYWRIGHT_BROWSERS_PATH","REQUESTS_CA_BUNDLE","RUNNER_TEMP","RUNNER_TOOL_CACHE","SHELL","SSL_CERT_DIR","SSL_CERT_FILE","TEMP","TMP","TMPDIR","USER","all_proxy","http_proxy","https_proxy","no_proxy"],"inherit":"all"}},"overrides":{},"disablePlugins":true}'
+          GH_AW_CODEX_CONFIG_JSON: '{"defaults":{"features":{"code_mode":false,"code_mode_only":false,"plugins":false,"shell_tool":true},"history":{"persistence":"none"},"mcp_servers":{"github":{"http_headers":{"User-Agent":"schema-consistency-checker"},"startup_timeout_sec":120,"tool_timeout_sec":60},"safeoutputs":{"startup_timeout_sec":120,"tool_timeout_sec":60}},"model_catalog_json":"/tmp/gh-aw/mcp-config/models.json","model_provider":"openai-proxy","model_providers":{"openai-proxy":{"base_url":"http://172.30.0.30:10002","env_key":"CODEX_API_KEY","name":"OpenAI AWF proxy","requires_openai_auth":false,"supports_websockets":false,"wire_api":"responses"}},"otel":{"metrics_exporter":"none"},"shell_environment_policy":{"ignore_default_excludes":false,"include_only":["ALL_PROXY","CURL_CA_BUNDLE","GITHUB_WORKSPACE","GIT_AUTHOR_EMAIL","GIT_AUTHOR_NAME","GIT_COMMITTER_EMAIL","GIT_COMMITTER_NAME","HOME","HTTPS_PROXY","HTTP_PROXY","LANG","LC_ALL","LC_CTYPE","LOGNAME","NODE_EXTRA_CA_CERTS","NO_PROXY","PATH","PLAYWRIGHT_BROWSERS_PATH","REQUESTS_CA_BUNDLE","RUNNER_TEMP","RUNNER_TOOL_CACHE","SHELL","SSL_CERT_DIR","SSL_CERT_FILE","TEMP","TMP","TMPDIR","USER","all_proxy","http_proxy","https_proxy","no_proxy"],"inherit":"all"}},"overrides":{},"disablePlugins":true}'
       - name: Prepare Safe Outputs Directories
         run: |
           mkdir -p "${RUNNER_TEMP}/gh-aw/safeoutputs"
@@ -1019,11 +1013,11 @@ jobs:
 
           # Generate JSON config for MCP gateway
           GH_AW_NODE=$(which node 2>/dev/null || command -v node 2>/dev/null || echo node)
-          cat << GH_AW_MCP_CONFIG_41e889f8e0d6bc8b_EOF | "$GH_AW_NODE" "${RUNNER_TEMP}/gh-aw/actions/start_mcp_gateway.cjs"
+          cat << GH_AW_MCP_CONFIG_36a910ec8591b2d1_EOF | "$GH_AW_NODE" "${RUNNER_TEMP}/gh-aw/actions/start_mcp_gateway.cjs"
           {
             "mcpServers": {
               "github": {
-                "container": "ghcr.io/github/github-mcp-server:v2.0.3",
+                "container": "ghcr.io/github/github-mcp-server:v2.1.0",
                 "env": {
                   "GITHUB_FEATURES": "fields_param",
                   "GITHUB_HOST": "$GITHUB_SERVER_URL",
@@ -1097,7 +1091,7 @@ jobs:
               }
             }
           }
-          GH_AW_MCP_CONFIG_41e889f8e0d6bc8b_EOF
+          GH_AW_MCP_CONFIG_36a910ec8591b2d1_EOF
 
           # Sync converter output to writable CODEX_HOME for Codex
           "$(command -v node)" "${RUNNER_TEMP}/gh-aw/actions/convert_gateway_config_codex.cjs" --copy-config
@@ -1125,6 +1119,12 @@ jobs:
         id: pre_agent_audit
         continue-on-error: true
         run: bash "${RUNNER_TEMP}/gh-aw/actions/audit_pre_agent_workspace.sh"
+      - name: Prepare model-routing conversation
+        env:
+          GH_AW_ROUTING_PROMPT: /tmp/gh-aw/aw-prompts/user.txt
+          GH_AW_ROUTING_PROMPT_FALLBACK: /tmp/gh-aw/aw-prompts/prompt.txt
+          GH_AW_ROUTING_CONVERSATION_FILE: /tmp/gh-aw/routing-conversation.json
+        run: node -e "const fs=require('node:fs'); const path=require('node:path'); const readPrompt=file=>{try{return fs.readFileSync(file,'utf8');}catch(error){if(error.code==='ENOENT')return '';throw error;}}; let prompt=readPrompt(process.env.GH_AW_ROUTING_PROMPT); if (!prompt.trim()) prompt=readPrompt(process.env.GH_AW_ROUTING_PROMPT_FALLBACK); if (!prompt.trim()) throw new Error('Rendered workflow prompt is empty; cannot route this task'); const destination=process.env.GH_AW_ROUTING_CONVERSATION_FILE; fs.mkdirSync(path.dirname(destination),{recursive:true,mode:0o700}); fs.writeFileSync(destination,JSON.stringify([{role:'user',parts:[{text:prompt}]}]),{mode:0o600});"
       - name: Log GitHub rate limits at agent start
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -1167,7 +1167,7 @@ jobs:
             echo "No component admission allowance; retaining existing budget policy (value withheld)."
           fi
           unset GH_AW_ADMISSION_RESULT GH_AW_ADMISSION_MAX_AI_CREDITS
-          printf '%s\n' "{\"\$schema\":\"https://github.com/github/gh-aw-firewall/releases/download/v0.29.7/awf-config.schema.json\",\"network\":{\"allowDomains\":[\"*.grafana.net\",\"*.sentry.io\",\"archive.ubuntu.com\",\"azure.archive.ubuntu.com\",\"crl.geotrust.com\",\"crl.globalsign.com\",\"crl.identrust.com\",\"crl.sectigo.com\",\"crl.thawte.com\",\"crl.usertrust.com\",\"crl.verisign.com\",\"crl3.digicert.com\",\"crl4.digicert.com\",\"crls.ssl.com\",\"json-schema.org\",\"json.schemastore.org\",\"keyserver.ubuntu.com\",\"ocsp.digicert.com\",\"ocsp.geotrust.com\",\"ocsp.globalsign.com\",\"ocsp.identrust.com\",\"ocsp.sectigo.com\",\"ocsp.ssl.com\",\"ocsp.thawte.com\",\"ocsp.usertrust.com\",\"ocsp.verisign.com\",\"s.symcb.com\",\"s.symcd.com\",\"security.ubuntu.com\",\"ts-crl.ws.symantec.com\",\"ts-ocsp.ws.symantec.com\"],\"isolation\":true,\"topologyAttach\":[\"awmg-mcpg\"]},\"apiProxy\":{\"enabled\":true,\"enableTokenSteering\":true,\"hostedWeb\":{\"codex\":{\"enabled\":false}},\"maxRuns\":500,\"maxCacheMisses\":5,\"maxAiCredits\":${GH_AW_MAX_AI_CREDITS},\"providers\":{\"openai\":{\"models\":{\"gpt-6.1-sol\":{\"cost\":{\"cache_read\":\"1e-07\",\"cache_write\":\"2.5e-06\",\"input\":\"2e-06\",\"output\":\"1e-05\"}}}}},\"models\":{\"agent\":[\"sonnet-6x\",\"gpt-6\",\"gpt-5.4\",\"gpt-5.5\",\"gpt-5.6\",\"gpt-5.3\",\"gemini-pro\",\"any\"],\"antigravity\":[\"copilot/antigravity*\",\"google/antigravity*\",\"gemini/antigravity*\"],\"any\":[\"copilot/*\",\"anthropic/*\",\"openai/*\",\"google/*\",\"gemini/*\"],\"auto\":[\"copilot/auto\",\"large\"],\"claude\":[\"agent\"],\"codex\":[\"agent\"],\"coding\":[\"copilot/gpt-5*codex*\",\"openai/gpt-5*codex*\",\"gpt-5-codex\",\"kimi\"],\"computer-use\":[\"copilot/*computer-use*\",\"google/*computer-use*\",\"gemini/*computer-use*\",\"openai/*computer-use*\"],\"copilot\":[\"agent\"],\"deep-research\":[\"copilot/deep-research*\",\"copilot/o3-deep-research*\",\"copilot/o4-mini-deep-research*\",\"google/deep-research*\",\"gemini/deep-research*\",\"openai/o3-deep-research*\",\"openai/o4-mini-deep-research*\"],\"detection\":[\"small\",\"copilot/gpt-*-luna\",\"openai/gpt-*-luna\",\"small-agent\",\"agent\"],\"evals\":[\"copilot/gpt-6-luna-decisions\"],\"fable\":[\"copilot/*fable*\",\"anthropic/*fable*\"],\"gemini\":[\"agent\"],\"gemini-3-flash\":[\"copilot/gemini-3*flash*\",\"google/gemini-3*flash*\",\"gemini/gemini-3*flash*\"],\"gemini-3-pro\":[\"copilot/gemini-3*pro*\",\"google/gemini-3*pro*\",\"google/nano-banana*\",\"gemini/gemini-3*pro*\"],\"gemini-3.1-flash\":[\"copilot/gemini-3.1*flash*\",\"google/gemini-3.1*flash*\",\"gemini/gemini-3.1*flash*\"],\"gemini-3.1-pro\":[\"copilot/gemini-3.1*pro*\",\"google/gemini-3.1*pro*\",\"gemini/gemini-3.1*pro*\"],\"gemini-3.5-flash\":[\"copilot/gemini-3.5*flash*\",\"google/gemini-3.5*flash*\",\"gemini/gemini-3.5*flash*\"],\"gemini-3.6-flash\":[\"copilot/gemini-3.6*flash*\",\"google/gemini-3.6*flash*\",\"gemini/gemini-3.6*flash*\"],\"gemini-3.7-flash\":[\"copilot/gemini-3.7*flash*\",\"google/gemini-3.7*flash*\",\"gemini/gemini-3.7*flash*\"],\"gemini-3.8-flash\":[\"copilot/gemini-3.8*flash*\",\"google/gemini-3.8*flash*\",\"gemini/gemini-3.8*flash*\"],\"gemini-flash\":[\"copilot/gemini-*flash*\",\"google/gemini-*flash*\",\"gemini/gemini-*flash*\"],\"gemini-flash-lite\":[\"copilot/gemini-*flash*lite*\",\"google/gemini-*flash*lite*\",\"gemini/gemini-*flash*lite*\"],\"gemini-omni\":[\"copilot/gemini-omni*\",\"google/gemini-omni*\",\"gemini/gemini-omni*\"],\"gemini-pro\":[\"copilot/gemini-*pro*\",\"google/gemini-*pro*\",\"gemini/gemini-*pro*\"],\"gemma\":[\"copilot/gemma*\",\"google/gemma*\",\"gemini/gemma*\"],\"gpt-5\":[\"copilot/gpt-5*\",\"openai/gpt-5*\"],\"gpt-5-codex\":[\"copilot/gpt-5*codex*\",\"openai/gpt-5*codex*\"],\"gpt-5-mini\":[\"copilot/gpt-5*mini*\",\"openai/gpt-5*mini*\"],\"gpt-5-nano\":[\"copilot/gpt-5*nano*\",\"openai/gpt-5*nano*\"],\"gpt-5-pro\":[\"copilot/gpt-5*pro*\",\"openai/gpt-5*pro*\"],\"gpt-5.1\":[\"copilot/gpt-5.1*\",\"openai/gpt-5.1*\"],\"gpt-5.2\":[\"copilot/gpt-5.2*\",\"openai/gpt-5.2*\"],\"gpt-5.3\":[\"copilot/gpt-5.3*\",\"openai/gpt-5.3*\"],\"gpt-5.4\":[\"copilot/gpt-5.4*\",\"openai/gpt-5.4*\"],\"gpt-5.5\":[\"copilot/gpt-5.5*\",\"openai/gpt-5.5*\"],\"gpt-5.6\":[\"copilot/gpt-5.6*\",\"openai/gpt-5.6*\"],\"gpt-6\":[\"copilot/gpt-6*\",\"openai/gpt-6*\"],\"grok\":[\"copilot/*grok*\",\"openai/*grok*\"],\"haiku\":[\"copilot/*haiku*\",\"anthropic/*haiku*\"],\"image-generation\":[\"copilot/gpt-image*\",\"openai/gpt-image*\",\"openai/chatgpt-image*\",\"copilot/gemini-*image*\",\"google/gemini-*image*\",\"gemini/gemini-*image*\",\"google/imagen*\"],\"kimi\":[\"copilot/kimi*\",\"openai/kimi*\"],\"kiwi\":[\"copilot/kiwi*\",\"openai/kiwi*\"],\"large\":[\"sonnet\",\"gpt-6\",\"gpt-5-pro\",\"gpt-5\",\"gemini-pro\"],\"lyria\":[\"google/lyria*\",\"gemini/lyria*\",\"copilot/lyria*\"],\"mai-code\":[\"copilot/MAI-Code*\",\"copilot/mai-code*\",\"openai/MAI-Code*\"],\"mini\":[\"haiku\",\"gpt-5-mini\",\"gpt-5-nano\",\"gemini-flash-lite\"],\"nano-banana\":[\"copilot/nano-banana*\",\"google/nano-banana*\",\"gemini/nano-banana*\"],\"opus\":[\"copilot/*opus*\",\"anthropic/*opus*\"],\"opusplan\":[\"opus?effort=high\"],\"raptor-mini\":[\"copilot/raptor*\",\"openai/raptor*\"],\"reasoning\":[\"copilot/o1*\",\"copilot/o3*\",\"copilot/o4*\",\"openai/o1*\",\"openai/o3*\",\"openai/o4*\"],\"robotics\":[\"copilot/*robotics*\",\"google/*robotics*\",\"gemini/*robotics*\"],\"small\":[\"mini\"],\"small-agent\":[\"haiku\",\"gpt-5-mini\",\"gemini-flash\"],\"sonnet\":[\"copilot/*sonnet*\",\"anthropic/*sonnet*\"],\"sonnet-6x\":[\"copilot/*sonnet-4.5*\",\"copilot/*sonnet-4.6*\",\"copilot/*sonnet-5*\",\"copilot/*sonnet-4-5-*\",\"anthropic/*sonnet-4-5-*\",\"copilot/*sonnet-4-6*\",\"anthropic/*sonnet-4-6*\",\"anthropic/*sonnet-5*\"],\"summarization\":[\"haiku\",\"gpt-5-mini\",\"gemini-flash-lite\",\"mini\"],\"veo\":[\"google/veo*\",\"gemini/veo*\"],\"vision\":[\"copilot/gemini-*image*\",\"google/gemini-*image*\",\"gemini/gemini-*image*\",\"copilot/gemini-*flash*\",\"google/gemini-*flash*\",\"gemini/gemini-*flash*\"]}},\"container\":{\"imageTag\":\"0.29.7,squid=sha256:0790d978a820af2dc1bfab74d1f06b159f3a57ad4893ec49f475289691c4d154,agent=sha256:bd8d363c11b65632920850a44aa61cf9857e2ce9bcd78016e5e9ff57861cb2f5,api-proxy=sha256:c3b4c800634b9e314b80c0cd8daa6d861ed849381bf69234cd77417e7b79b94a,cli-proxy=sha256:d2c0259d8d3529012885f8b7f7e0d7a20b0e8f4b15a6f5b1d6853999cce124bb\",\"agentTimeout\":30},\"logging\":{\"proxyLogsDir\":\"/tmp/gh-aw/sandbox/firewall/logs\",\"auditDir\":\"/tmp/gh-aw/sandbox/firewall/audit\"}}" > "${RUNNER_TEMP}/gh-aw/awf-config.json"
+          printf '%s\n' "{\"\$schema\":\"https://github.com/github/gh-aw-firewall/releases/download/v0.29.7/awf-config.schema.json\",\"experimental\":{\"modelRouting\":true},\"network\":{\"allowDomains\":[\"*.grafana.net\",\"*.sentry.io\",\"archive.ubuntu.com\",\"azure.archive.ubuntu.com\",\"crl.geotrust.com\",\"crl.globalsign.com\",\"crl.identrust.com\",\"crl.sectigo.com\",\"crl.thawte.com\",\"crl.usertrust.com\",\"crl.verisign.com\",\"crl3.digicert.com\",\"crl4.digicert.com\",\"crls.ssl.com\",\"json-schema.org\",\"json.schemastore.org\",\"keyserver.ubuntu.com\",\"ocsp.digicert.com\",\"ocsp.geotrust.com\",\"ocsp.globalsign.com\",\"ocsp.identrust.com\",\"ocsp.sectigo.com\",\"ocsp.ssl.com\",\"ocsp.thawte.com\",\"ocsp.usertrust.com\",\"ocsp.verisign.com\",\"s.symcb.com\",\"s.symcd.com\",\"security.ubuntu.com\",\"ts-crl.ws.symantec.com\",\"ts-ocsp.ws.symantec.com\"],\"isolation\":true,\"topologyAttach\":[\"awmg-mcpg\"]},\"apiProxy\":{\"enabled\":true,\"enableTokenSteering\":true,\"hostedWeb\":{\"codex\":{\"enabled\":false}},\"maxRuns\":500,\"maxCacheMisses\":5,\"maxAiCredits\":${GH_AW_MAX_AI_CREDITS},\"models\":{\"agent\":[\"sonnet-6x\",\"gpt-6\",\"gpt-5.4\",\"gpt-5.5\",\"gpt-5.6\",\"gpt-5.3\",\"gemini-pro\",\"any\"],\"antigravity\":[\"copilot/antigravity*\",\"google/antigravity*\",\"gemini/antigravity*\"],\"any\":[\"copilot/*\",\"anthropic/*\",\"openai/*\",\"google/*\",\"gemini/*\"],\"auto\":[\"copilot/auto\",\"large\"],\"claude\":[\"agent\"],\"codex\":[\"agent\"],\"coding\":[\"copilot/gpt-5*codex*\",\"openai/gpt-5*codex*\",\"gpt-5-codex\",\"kimi\"],\"computer-use\":[\"copilot/*computer-use*\",\"google/*computer-use*\",\"gemini/*computer-use*\",\"openai/*computer-use*\"],\"copilot\":[\"agent\"],\"deep-research\":[\"copilot/deep-research*\",\"copilot/o3-deep-research*\",\"copilot/o4-mini-deep-research*\",\"google/deep-research*\",\"gemini/deep-research*\",\"openai/o3-deep-research*\",\"openai/o4-mini-deep-research*\"],\"detection\":[\"small\",\"copilot/gpt-*-luna\",\"openai/gpt-*-luna\",\"small-agent\",\"agent\"],\"evals\":[\"copilot/gpt-6-luna-decisions\"],\"fable\":[\"copilot/*fable*\",\"anthropic/*fable*\"],\"gemini\":[\"agent\"],\"gemini-3-flash\":[\"copilot/gemini-3*flash*\",\"google/gemini-3*flash*\",\"gemini/gemini-3*flash*\"],\"gemini-3-pro\":[\"copilot/gemini-3*pro*\",\"google/gemini-3*pro*\",\"google/nano-banana*\",\"gemini/gemini-3*pro*\"],\"gemini-3.1-flash\":[\"copilot/gemini-3.1*flash*\",\"google/gemini-3.1*flash*\",\"gemini/gemini-3.1*flash*\"],\"gemini-3.1-pro\":[\"copilot/gemini-3.1*pro*\",\"google/gemini-3.1*pro*\",\"gemini/gemini-3.1*pro*\"],\"gemini-3.5-flash\":[\"copilot/gemini-3.5*flash*\",\"google/gemini-3.5*flash*\",\"gemini/gemini-3.5*flash*\"],\"gemini-3.6-flash\":[\"copilot/gemini-3.6*flash*\",\"google/gemini-3.6*flash*\",\"gemini/gemini-3.6*flash*\"],\"gemini-3.7-flash\":[\"copilot/gemini-3.7*flash*\",\"google/gemini-3.7*flash*\",\"gemini/gemini-3.7*flash*\"],\"gemini-3.8-flash\":[\"copilot/gemini-3.8*flash*\",\"google/gemini-3.8*flash*\",\"gemini/gemini-3.8*flash*\"],\"gemini-flash\":[\"copilot/gemini-*flash*\",\"google/gemini-*flash*\",\"gemini/gemini-*flash*\"],\"gemini-flash-lite\":[\"copilot/gemini-*flash*lite*\",\"google/gemini-*flash*lite*\",\"gemini/gemini-*flash*lite*\"],\"gemini-omni\":[\"copilot/gemini-omni*\",\"google/gemini-omni*\",\"gemini/gemini-omni*\"],\"gemini-pro\":[\"copilot/gemini-*pro*\",\"google/gemini-*pro*\",\"gemini/gemini-*pro*\"],\"gemma\":[\"copilot/gemma*\",\"google/gemma*\",\"gemini/gemma*\"],\"gpt-5\":[\"copilot/gpt-5*\",\"openai/gpt-5*\"],\"gpt-5-codex\":[\"copilot/gpt-5*codex*\",\"openai/gpt-5*codex*\"],\"gpt-5-mini\":[\"copilot/gpt-5*mini*\",\"openai/gpt-5*mini*\"],\"gpt-5-nano\":[\"copilot/gpt-5*nano*\",\"openai/gpt-5*nano*\"],\"gpt-5-pro\":[\"copilot/gpt-5*pro*\",\"openai/gpt-5*pro*\"],\"gpt-5.1\":[\"copilot/gpt-5.1*\",\"openai/gpt-5.1*\"],\"gpt-5.2\":[\"copilot/gpt-5.2*\",\"openai/gpt-5.2*\"],\"gpt-5.3\":[\"copilot/gpt-5.3*\",\"openai/gpt-5.3*\"],\"gpt-5.4\":[\"copilot/gpt-5.4*\",\"openai/gpt-5.4*\"],\"gpt-5.5\":[\"copilot/gpt-5.5*\",\"openai/gpt-5.5*\"],\"gpt-5.6\":[\"copilot/gpt-5.6*\",\"openai/gpt-5.6*\"],\"gpt-6\":[\"copilot/gpt-6*\",\"openai/gpt-6*\"],\"grok\":[\"copilot/*grok*\",\"openai/*grok*\"],\"haiku\":[\"copilot/*haiku*\",\"anthropic/*haiku*\"],\"image-generation\":[\"copilot/gpt-image*\",\"openai/gpt-image*\",\"openai/chatgpt-image*\",\"copilot/gemini-*image*\",\"google/gemini-*image*\",\"gemini/gemini-*image*\",\"google/imagen*\"],\"kimi\":[\"copilot/kimi*\",\"openai/kimi*\"],\"kiwi\":[\"copilot/kiwi*\",\"openai/kiwi*\"],\"large\":[\"sonnet\",\"gpt-6\",\"gpt-5-pro\",\"gpt-5\",\"gemini-pro\"],\"lyria\":[\"google/lyria*\",\"gemini/lyria*\",\"copilot/lyria*\"],\"mai-code\":[\"copilot/MAI-Code*\",\"copilot/mai-code*\",\"openai/MAI-Code*\"],\"mini\":[\"haiku\",\"gpt-5-mini\",\"gpt-5-nano\",\"gemini-flash-lite\"],\"nano-banana\":[\"copilot/nano-banana*\",\"google/nano-banana*\",\"gemini/nano-banana*\"],\"opus\":[\"copilot/*opus*\",\"anthropic/*opus*\"],\"opusplan\":[\"opus?effort=high\"],\"raptor-mini\":[\"copilot/raptor*\",\"openai/raptor*\"],\"reasoning\":[\"copilot/o1*\",\"copilot/o3*\",\"copilot/o4*\",\"openai/o1*\",\"openai/o3*\",\"openai/o4*\"],\"robotics\":[\"copilot/*robotics*\",\"google/*robotics*\",\"gemini/*robotics*\"],\"small\":[\"mini\"],\"small-agent\":[\"haiku\",\"gpt-5-mini\",\"gemini-flash\"],\"sonnet\":[\"copilot/*sonnet*\",\"anthropic/*sonnet*\"],\"sonnet-6x\":[\"copilot/*sonnet-4.5*\",\"copilot/*sonnet-4.6*\",\"copilot/*sonnet-5*\",\"copilot/*sonnet-4-5-*\",\"anthropic/*sonnet-4-5-*\",\"copilot/*sonnet-4-6*\",\"anthropic/*sonnet-4-6*\",\"anthropic/*sonnet-5*\"],\"summarization\":[\"haiku\",\"gpt-5-mini\",\"gemini-flash-lite\",\"mini\"],\"veo\":[\"google/veo*\",\"gemini/veo*\"],\"vision\":[\"copilot/gemini-*image*\",\"google/gemini-*image*\",\"gemini/gemini-*image*\",\"copilot/gemini-*flash*\",\"google/gemini-*flash*\",\"gemini/gemini-*flash*\"]},\"routing\":{\"objective\":{\"goal\":\"cost\",\"mode\":\"economy\"},\"task\":{\"conversationFile\":\"/tmp/gh-aw/routing-conversation.json\"},\"candidateModels\":[\"github-copilot/gpt-*\"]}},\"container\":{\"agentTimeout\":30,\"images\":{\"agent\":\"ghcr.io/github/gh-aw-firewall/agent:0.29.7@sha256:bd8d363c11b65632920850a44aa61cf9857e2ce9bcd78016e5e9ff57861cb2f5\",\"apiProxy\":\"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.7@sha256:c3b4c800634b9e314b80c0cd8daa6d861ed849381bf69234cd77417e7b79b94a\",\"cliProxy\":\"ghcr.io/github/gh-aw-firewall/cli-proxy:0.29.7@sha256:d2c0259d8d3529012885f8b7f7e0d7a20b0e8f4b15a6f5b1d6853999cce124bb\",\"router\":\"ghcr.io/github/gh-aw-firewall/router:0.29.7@sha256:6f1b3160d95de1b24ca448afab5b39bed97ae773ecddb9952221ef05995bb29c\",\"squid\":\"ghcr.io/github/gh-aw-firewall/squid:0.29.7@sha256:0790d978a820af2dc1bfab74d1f06b159f3a57ad4893ec49f475289691c4d154\"}},\"logging\":{\"proxyLogsDir\":\"/tmp/gh-aw/sandbox/firewall/logs\",\"auditDir\":\"/tmp/gh-aw/sandbox/firewall/audit\"}}" > "${RUNNER_TEMP}/gh-aw/awf-config.json"
           cp "${RUNNER_TEMP}/gh-aw/awf-config.json" /tmp/gh-aw/awf-config.json
           export GH_AW_MODELS_JSON_PATH="/tmp/gh-aw/models.json"
           GH_AW_DOCKER_HOST=""
@@ -1197,18 +1197,19 @@ jobs:
           GH_AW_AWF_ATTEMPT_LOG_NAME=codex \
           bash "${RUNNER_TEMP}/gh-aw/actions/run_awf_with_startup_retries.sh" -- \
             awf --config "${RUNNER_TEMP}/gh-aw/awf-config.json" --container-workdir "${GITHUB_WORKSPACE}" --mount "${RUNNER_TEMP}/gh-aw:${RUNNER_TEMP}/gh-aw:ro" --mount "${RUNNER_TEMP}/gh-aw:/host${RUNNER_TEMP}/gh-aw:ro" ${GH_AW_TOOL_CACHE_MOUNT:+--mount "$GH_AW_TOOL_CACHE_MOUNT"} ${GH_AW_DOCKER_HOST:+--docker-host "$GH_AW_DOCKER_HOST"} --env-all --exclude-env ACTIONS_ID_TOKEN_REQUEST_TOKEN --exclude-env ACTIONS_ID_TOKEN_REQUEST_URL --exclude-env CODEX_API_KEY --exclude-env COPILOT_GITHUB_TOKEN --exclude-env GH_AW_OTLP_ALL_HEADERS --exclude-env GH_AW_OTLP_ENDPOINTS --exclude-env GITHUB_MCP_SERVER_TOKEN --exclude-env MCP_GATEWAY_AGENT_ID --exclude-env OPENAI_API_KEY --exclude-env OTEL_EXPORTER_OTLP_ENDPOINT --exclude-env OTEL_EXPORTER_OTLP_HEADERS --mount /tmp/gh-aw:/tmp/gh-aw:rw --log-level info --skip-pull \
-            -- /bin/bash -c 'set +o histexpand; export PATH="${RUNNER_TEMP}/gh-aw/mcp-cli/bin:$PATH" && : "${RUNNER_TOOL_CACHE:?RUNNER_TOOL_CACHE must be set}"; GH_AW_TOOL_CACHE="$RUNNER_TOOL_CACHE"; GH_AW_TOOL_BINS="$(find "$GH_AW_TOOL_CACHE" -maxdepth 5 -type d -name bin 2>/dev/null | tr "\n" ":")"; GH_AW_TOOL_BINS="${GH_AW_TOOL_BINS%:}"; export PATH="$PATH${GH_AW_TOOL_BINS:+:}$GH_AW_TOOL_BINS"; [ -n "$GOROOT" ] && export PATH="$GOROOT/bin:$PATH" || true; [ -n "$ERLANG_HOME" ] && export PATH="$ERLANG_HOME/bin:$PATH" || true && GH_AW_NODE_EXEC="${GH_AW_NODE_BIN:-}"; if [ -z "$GH_AW_NODE_EXEC" ] || [ ! -x "$GH_AW_NODE_EXEC" ]; then GH_AW_NODE_EXEC="$(command -v node 2>/dev/null || true)"; fi; if [ -z "$GH_AW_NODE_EXEC" ]; then echo "node runtime missing on this runner — check runtimes.node in workflow YAML" >&2; exit 127; fi; GH_AW_NPM_GLOBAL_ROOT="$(npm root -g 2>/dev/null || true)"; if [ -n "$GH_AW_NPM_GLOBAL_ROOT" ]; then export NODE_PATH="${GH_AW_NPM_GLOBAL_ROOT}${NODE_PATH:+:${NODE_PATH}}"; fi; "$GH_AW_NODE_EXEC" ${RUNNER_TEMP}/gh-aw/actions/codex_harness.cjs codex exec${GH_AW_MODEL_AGENT_CODEX:+ --model "$GH_AW_MODEL_AGENT_CODEX"} -c web_search="disabled" --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check  --prompt-file /tmp/gh-aw/aw-prompts/prompt.txt'
+            -- /bin/bash -c 'set +o histexpand; export CODEX_API_KEY="$COPILOT_DUMMY_BYOK" && export PATH="${RUNNER_TEMP}/gh-aw/mcp-cli/bin:$PATH" && : "${RUNNER_TOOL_CACHE:?RUNNER_TOOL_CACHE must be set}"; GH_AW_TOOL_CACHE="$RUNNER_TOOL_CACHE"; GH_AW_TOOL_BINS="$(find "$GH_AW_TOOL_CACHE" -maxdepth 5 -type d -name bin 2>/dev/null | tr "\n" ":")"; GH_AW_TOOL_BINS="${GH_AW_TOOL_BINS%:}"; export PATH="$PATH${GH_AW_TOOL_BINS:+:}$GH_AW_TOOL_BINS"; [ -n "$GOROOT" ] && export PATH="$GOROOT/bin:$PATH" || true; [ -n "$ERLANG_HOME" ] && export PATH="$ERLANG_HOME/bin:$PATH" || true && GH_AW_NODE_EXEC="${GH_AW_NODE_BIN:-}"; if [ -z "$GH_AW_NODE_EXEC" ] || [ ! -x "$GH_AW_NODE_EXEC" ]; then GH_AW_NODE_EXEC="$(command -v node 2>/dev/null || true)"; fi; if [ -z "$GH_AW_NODE_EXEC" ]; then echo "node runtime missing on this runner — check runtimes.node in workflow YAML" >&2; exit 127; fi; GH_AW_NPM_GLOBAL_ROOT="$(npm root -g 2>/dev/null || true)"; if [ -n "$GH_AW_NPM_GLOBAL_ROOT" ]; then export NODE_PATH="${GH_AW_NPM_GLOBAL_ROOT}${NODE_PATH:+:${NODE_PATH}}"; fi; "$GH_AW_NODE_EXEC" ${RUNNER_TEMP}/gh-aw/actions/codex_harness.cjs codex exec -c web_search="disabled" --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check  --prompt-file /tmp/gh-aw/aw-prompts/prompt.txt'
         env:
           AWF_REFLECT_ENABLED: 1
-          CODEX_API_KEY: ${{ secrets.CODEX_API_KEY || secrets.OPENAI_API_KEY }}
           CODEX_HOME: /tmp/gh-aw/mcp-config
+          COPILOT_DUMMY_BYOK: dummy-byok-key-for-offline-mode
+          COPILOT_GITHUB_TOKEN: ${{ github.token }}
           GH_AW_ADMISSION_MAX_AI_CREDITS: ${{ needs.activation.outputs.admission-max-ai-credits }}
           GH_AW_ADMISSION_RESULT: ${{ needs.activation.outputs.admission-result }}
-          GH_AW_LLM_PROVIDER: openai
+          GH_AW_LLM_PROVIDER: github
           GH_AW_LLM_PROVIDER_EXPLICIT: 1
           GH_AW_MAX_TURNS: ${{ vars.GH_AW_DEFAULT_MAX_TURNS || '' }}
           GH_AW_MCP_CONFIG: ${{ runner.temp }}/gh-aw/mcp-config/config.toml
-          GH_AW_MODEL_AGENT_CODEX: gpt-6.1-sol
+          GH_AW_MODEL_ROUTING: 1
           GH_AW_PHASE: agent
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
           GH_AW_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}
@@ -1219,7 +1220,6 @@ jobs:
           GIT_AUTHOR_NAME: github-actions[bot]
           GIT_COMMITTER_EMAIL: github-actions[bot]@users.noreply.github.com
           GIT_COMMITTER_NAME: github-actions[bot]
-          OPENAI_API_KEY: ${{ secrets.CODEX_API_KEY || secrets.OPENAI_API_KEY }}
           RUNNER_TEMP: ${{ runner.temp }}
           RUST_LOG: ${{ runner.debug == 1 && 'trace,hyper_util=info,mio=info,reqwest=info,os_info=info,codex_otel=warn,codex_core=debug,codex_exec=debug' || 'warn' }}
           TRACEPARENT: ${{ env.GITHUB_AW_OTEL_TRACE_ID != '' && env.GITHUB_AW_OTEL_PARENT_SPAN_ID != '' && format('00-{0}-{1}-01', env.GITHUB_AW_OTEL_TRACE_ID, env.GITHUB_AW_OTEL_PARENT_SPAN_ID) || '' }}
@@ -1281,12 +1281,10 @@ jobs:
             const { main } = require(path.join(actionsDir, 'redact_secrets.cjs'));
             await main();
         env:
-          GH_AW_SECRET_NAMES: 'CODEX_API_KEY,GH_AW_GITHUB_MCP_SERVER_TOKEN,GH_AW_GITHUB_TOKEN,GITHUB_TOKEN,OPENAI_API_KEY'
-          SECRET_CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
+          GH_AW_SECRET_NAMES: 'GH_AW_GITHUB_MCP_SERVER_TOKEN,GH_AW_GITHUB_TOKEN,GITHUB_TOKEN'
           SECRET_GH_AW_GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN }}
           SECRET_GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}
           SECRET_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SECRET_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       - name: Validate recovery envelopes before upload
         id: validate_recovery_envelopes
         if: always() && steps.redact_secrets.outcome == 'success'
@@ -1366,6 +1364,9 @@ jobs:
         if: always()
         id: parse-token-usage
         continue-on-error: true
+        env:
+          GH_AW_MODEL_ROUTING_ENABLED: "true"
+          GH_AW_ENGINE_ID: "codex"
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
@@ -1448,7 +1449,7 @@ jobs:
           GH_AW_OBJECT_PACK_MAX_OBJECTS: ${{ vars.GH_AW_OBJECT_PACK_MAX_OBJECTS }}
           GH_AW_OBJECT_PACK_TIMEOUT_MS: ${{ vars.GH_AW_OBJECT_PACK_TIMEOUT_MS }}
           GH_AW_OBJECT_PACK_FETCH_DEPTHS: ${{ vars.GH_AW_OBJECT_PACK_FETCH_DEPTHS }}
-          GH_AW_RECOVERY_ADDITIONAL_ROOTS: '["/tmp/gh-aw/aw-prompts/prompt.txt","/tmp/gh-aw/agent_execution.json","/tmp/gh-aw/agent_execution_exit_code.txt","/tmp/gh-aw/agent-session.jsonl","/tmp/gh-aw/agent-errors.jsonl","/tmp/gh-aw/aw-prompts/user.txt","/tmp/gh-aw/aw-prompts/system.txt","/tmp/gh-aw/skill_inventory.json","/tmp/gh-aw/mcp-config/logs/","/tmp/gh-aw/redacted-urls.log","/tmp/gh-aw/mcp-logs/","/tmp/gh-aw/agent_usage.json","/tmp/gh-aw/agent/model-resolution.json","/tmp/gh-aw/agent-stdio.log","/tmp/gh-aw/agent/harness_retry.json","/tmp/gh-aw/pre-agent-audit.txt","/tmp/gh-aw/github_rate_limits.jsonl","/tmp/gh-aw/otel.jsonl","/tmp/gh-aw/otlp-export-errors.jsonl","/tmp/gh-aw/safeoutputs.jsonl","/tmp/gh-aw/agent_output.json","/tmp/gh-aw","/tmp/gh-aw","/tmp/gh-aw/awf-config.json","/tmp/gh-aw/awf-resolved-config.json","/tmp/gh-aw/sandbox/firewall/logs/","/tmp/gh-aw/sandbox/firewall/audit/","/tmp/gh-aw/sandbox/firewall/awf-reflect.json"]'
+          GH_AW_RECOVERY_ADDITIONAL_ROOTS: '["/tmp/gh-aw/aw-prompts/prompt.txt","/tmp/gh-aw/agent_execution.json","/tmp/gh-aw/agent_execution_exit_code.txt","/tmp/gh-aw/agent-session.jsonl","/tmp/gh-aw/agent-errors.jsonl","/tmp/gh-aw/aw-prompts/user.txt","/tmp/gh-aw/aw-prompts/system.txt","/tmp/gh-aw/skill_inventory.json","/tmp/gh-aw/mcp-config/logs/","/tmp/gh-aw/redacted-urls.log","/tmp/gh-aw/mcp-logs/","/tmp/gh-aw/agent_usage.json","/tmp/gh-aw/agent/aw_info.json","/tmp/gh-aw/agent/awf-routing-outcome.json","/tmp/gh-aw/runtime/aw_info.json","/tmp/gh-aw/agent/model-resolution.json","/tmp/gh-aw/agent-stdio.log","/tmp/gh-aw/agent/harness_retry.json","/tmp/gh-aw/pre-agent-audit.txt","/tmp/gh-aw/github_rate_limits.jsonl","/tmp/gh-aw/otel.jsonl","/tmp/gh-aw/otlp-export-errors.jsonl","/tmp/gh-aw/safeoutputs.jsonl","/tmp/gh-aw/agent_output.json","/tmp/gh-aw","/tmp/gh-aw","/tmp/gh-aw/awf-config.json","/tmp/gh-aw/awf-resolved-config.json","/tmp/gh-aw/sandbox/firewall/logs/","/tmp/gh-aw/sandbox/firewall/audit/","/tmp/gh-aw/sandbox/firewall/awf-reflect.json"]'
         with:
           script: |
             const path = require('path');
@@ -1500,6 +1501,9 @@ jobs:
             /tmp/gh-aw/redacted-urls.log
             /tmp/gh-aw/mcp-logs/
             /tmp/gh-aw/agent_usage.json
+            /tmp/gh-aw/agent/aw_info.json
+            /tmp/gh-aw/agent/awf-routing-outcome.json
+            /tmp/gh-aw/runtime/aw_info.json
             /tmp/gh-aw/agent/model-resolution.json
             /tmp/gh-aw/agent-stdio.log
             /tmp/gh-aw/agent/harness_retry.json
@@ -1531,8 +1535,8 @@ jobs:
     if: >
       always() && (needs.agent.result != 'skipped' || needs.activation.result == 'failure' || needs.activation.outputs.lockdown_check_failed == 'true' ||
       needs.activation.outputs.oauth_token_check_failed == 'true' || needs.activation.outputs.stale_lock_file_failed == 'true' ||
-      needs.activation.outputs.secret_verification_result == 'failed' || needs.activation.outputs.daily_ai_credits_exceeded == 'true' ||
-      needs.activation.outputs.daily_ai_credits_guardrail_status == 'structural_error' || needs.activation.outputs.daily_ai_credits_guardrail_status == 'transient_error')
+      needs.activation.outputs.daily_ai_credits_exceeded == 'true' || needs.activation.outputs.daily_ai_credits_guardrail_status == 'structural_error' ||
+      needs.activation.outputs.daily_ai_credits_guardrail_status == 'transient_error')
     runs-on: ubuntu-slim
     # Permissions for the conclusion job (workflow permissions default to none).
     permissions:
@@ -1601,6 +1605,10 @@ jobs:
           if [ -f "/tmp/gh-aw/agent_output.json" ]; then
             echo "GH_AW_AGENT_OUTPUT=/tmp/gh-aw/agent_output.json" >> "$GITHUB_OUTPUT"
           fi
+      - name: Restore runtime model metadata
+        if: always()
+        run: |
+          if [ -f /tmp/gh-aw/runtime/aw_info.json ]; then cp /tmp/gh-aw/runtime/aw_info.json /tmp/gh-aw/aw_info.json; fi
       - name: Warn if threat detection produced no verdict
         if: always() && needs.detection.result != 'skipped' && (needs.detection.outputs.detection_reason == 'agent_failure' || needs.detection.outputs.detection_reason == 'parse_error' || needs.detection.outputs.detection_conclusion == '')
         run: echo "::warning::Threat detection produced no security verdict. Review the detection job logs before trusting the agent outputs."
@@ -1629,7 +1637,9 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Schema Consistency Checker"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/schema-consistency-checker.md"
           GH_AW_ENGINE_ID: "codex"
-          GH_AW_ENGINE_MODEL: "openai/gpt-6.1-sol"
+          GH_AW_ENGINE_MODEL: ${{ needs.agent.outputs.model }}
+          GH_AW_ENGINE_MODEL_EFFORT: ${{ needs.agent.outputs.model_effort }}
+          GH_AW_MODEL_ROUTING_STATUS: ${{ needs.agent.outputs.model_routing_status }}
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
           GH_AW_NOOP_REPORT_AS_ISSUE: "false"
@@ -1674,7 +1684,9 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Schema Consistency Checker"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/schema-consistency-checker.md"
           GH_AW_ENGINE_ID: "codex"
-          GH_AW_ENGINE_MODEL: "openai/gpt-6.1-sol"
+          GH_AW_ENGINE_MODEL: ${{ needs.agent.outputs.model }}
+          GH_AW_ENGINE_MODEL_EFFORT: ${{ needs.agent.outputs.model_effort }}
+          GH_AW_MODEL_ROUTING_STATUS: ${{ needs.agent.outputs.model_routing_status }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -1693,7 +1705,9 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Schema Consistency Checker"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/schema-consistency-checker.md"
           GH_AW_ENGINE_ID: "codex"
-          GH_AW_ENGINE_MODEL: "openai/gpt-6.1-sol"
+          GH_AW_ENGINE_MODEL: ${{ needs.agent.outputs.model }}
+          GH_AW_ENGINE_MODEL_EFFORT: ${{ needs.agent.outputs.model_effort }}
+          GH_AW_MODEL_ROUTING_STATUS: ${{ needs.agent.outputs.model_routing_status }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -1715,9 +1729,11 @@ jobs:
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
           GH_AW_ACTIVATION_RESULT: ${{ needs.activation.result }}
           GH_AW_WORKFLOW_ID: "schema-consistency-checker"
+          GH_AW_ENGINE_MODEL: ${{ needs.agent.outputs.model }}
+          GH_AW_ENGINE_MODEL_EFFORT: ${{ needs.agent.outputs.model_effort }}
+          GH_AW_MODEL_ROUTING_STATUS: ${{ needs.agent.outputs.model_routing_status }}
           GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS: "12"
           GH_AW_ENGINE_ID: "codex"
-          GH_AW_SECRET_VERIFICATION_RESULT: ${{ needs.activation.outputs.secret_verification_result }}
           GH_AW_CHECKOUT_PR_SUCCESS: ${{ needs.agent.outputs.checkout_pr_success }}
           GH_AW_CHECKOUT_PR_INVALIDATED: ${{ needs.agent.outputs.checkout_pr_invalidated }}
           GH_AW_AI_CREDITS_RATE_LIMIT_ERROR: ${{ needs.agent.outputs.ai_credits_rate_limit_error || 'false' }}
@@ -1737,7 +1753,7 @@ jobs:
           GH_AW_MISSING_MODEL_PRICING_ERROR: ${{ needs.agent.outputs.missing_model_pricing_error }}
           GH_AW_MISSING_MODEL_PRICING_MODEL_NAME: ${{ needs.agent.outputs.missing_model_pricing_model_name }}
           GH_AW_SHELL_EXPANSION_GUARD_REJECTED: ${{ needs.agent.outputs.shell_expansion_guard_rejected }}
-          GH_AW_ENGINE_API_HOSTS: "api.openai.com"
+          GH_AW_ENGINE_API_HOSTS: "api.enterprise.githubcopilot.com,api.githubcopilot.com,api.business.githubcopilot.com,api.individual.githubcopilot.com"
           GH_AW_CREATE_DISCUSSION_ERRORS: ${{ needs.safe_outputs.outputs.create_discussion_errors }}
           GH_AW_CREATE_DISCUSSION_ERROR_COUNT: ${{ needs.safe_outputs.outputs.create_discussion_error_count }}
           GH_AW_LOCKDOWN_CHECK_FAILED: ${{ needs.activation.outputs.lockdown_check_failed }}
@@ -1943,7 +1959,7 @@ jobs:
           GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
           GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
           GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
-          GH_AW_ADMISSION_WORKFLOW_HASH: "4d1fdadb14e99592abf145ccec64889389b3f4a572c1bbd11a36bb5d5ee1f933:9b4773bc423f9015062f987f6bf512f0ac818a82657013351b4ae0e4cabee305"
+          GH_AW_ADMISSION_WORKFLOW_HASH: "c7da340bec1e428190697b197803ea7f62fc4dce940de398325a29c96e3241a3:9b4773bc423f9015062f987f6bf512f0ac818a82657013351b4ae0e4cabee305"
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
@@ -1966,6 +1982,7 @@ jobs:
     # Permissions for the detection job (workflow permissions default to none).
     permissions:
       contents: read
+      copilot-requests: write
     timeout-minutes: 10
     env:
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
@@ -2103,34 +2120,12 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
-      - name: Install Codex CLI
-        run: npm install --ignore-scripts -g @openai/codex@0.166.0
+      - name: Install GitHub Copilot CLI
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/install_copilot_cli.sh" 1.0.103 --checksums-sha256 26cd3e4b32cde498e4961fb4d48e7b85d7859fc69af1a645a19201fdd577bdb2 --prefer-toolcache --cooldown-days 3
         env:
-          NPM_CONFIG_MIN_RELEASE_AGE: '3'
-      - name: Prepare Codex config for threat-detect
-        if: always() && steps.detection_guard.outputs.run_detection == 'true'
-        run: |
-          mkdir -p "${RUNNER_TEMP}/gh-aw/mcp-config" "/tmp/gh-aw/mcp-config" "/tmp/gh-aw/mcp-config/logs/"
-          printf '%s\n' "{\"mcpServers\":{}}" > "${RUNNER_TEMP}/gh-aw/mcp-config/mcp-servers.json"
-          # Point Codex at the AWF OpenAI proxy and disable websocket startup.
-          cat > "${RUNNER_TEMP}/gh-aw/mcp-config/config.toml" << GH_AW_CODEX_DETECTION_CONFIG_af28c8b5454431f5_EOF
-          model_provider = "openai-proxy"
-
-          [history]
-          persistence = "none"
-
-          [model_providers.openai-proxy]
-          name = "OpenAI AWF proxy"
-          base_url = "http://172.30.0.30:10000"
-          api_base = "http://172.30.0.30:10000"
-          wss_base = "ws://172.30.0.30:10000"
-          env_key = "CODEX_API_KEY"
-          wire_api = "responses"
-          requires_openai_auth = false
-          supports_websockets = false
-          GH_AW_CODEX_DETECTION_CONFIG_af28c8b5454431f5_EOF
-          cp "${RUNNER_TEMP}/gh-aw/mcp-config/config.toml" "/tmp/gh-aw/mcp-config/config.toml"
-          chmod 600 "${RUNNER_TEMP}/gh-aw/mcp-config/config.toml" "/tmp/gh-aw/mcp-config/config.toml"
+          GH_HOST: github.com
+          GITHUB_TOKEN: ${{ github.token }}
+          GH_AW_COPILOT_MIN_VERSION: 1.0.35
       - name: Install threat-detect binary
         id: threat_detect_install
         if: always() && steps.detection_guard.outputs.run_detection == 'true'
@@ -2144,29 +2139,36 @@ jobs:
         timeout-minutes: 10
         env:
           AWF_REFLECT_ENABLED: 1
-          CODEX_API_KEY: ${{ secrets.CODEX_API_KEY || secrets.OPENAI_API_KEY }}
-          CODEX_HOME: /tmp/gh-aw/mcp-config
+          COPILOT_AGENT_RUNNER_TYPE: STANDALONE
+          COPILOT_DUMMY_BYOK: dummy-byok-key-for-offline-mode
+          COPILOT_GITHUB_TOKEN: ${{ github.token }}
+          COPILOT_MODEL: ${{ vars.GH_AW_MODEL_DETECTION_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'detection' }}
           GH_AW_ADMISSION_MAX_AI_CREDITS: ${{ needs.activation.outputs.admission-max-ai-credits-threat-detection }}
           GH_AW_ADMISSION_RESULT: ${{ needs.activation.outputs.admission-result }}
           GH_AW_HARNESS_MAX_RETRIES: 0
-          GH_AW_LLM_PROVIDER: openai
-          GH_AW_LLM_PROVIDER_EXPLICIT: 1
+          GH_AW_LLM_PROVIDER: github
           GH_AW_MAX_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS || '400' }}
           GH_AW_MAX_TURNS: ${{ vars.GH_AW_DEFAULT_MAX_TURNS || '' }}
-          GH_AW_MCP_CONFIG: ${{ runner.temp }}/gh-aw/mcp-config/config.toml
-          GH_AW_MODEL_DETECTION_CODEX: gpt-6.1-sol
+          GH_AW_MODEL_FALLBACK: ${{ vars.GH_AW_MODEL_DETECTION_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'auto' }}
           GH_AW_PHASE: detection
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
+          GH_AW_TIMEOUT_MINUTES: 10
           GH_AW_VERSION: dev
+          GITHUB_API_URL: ${{ github.api_url }}
           GITHUB_AW: true
+          GITHUB_COPILOT_INTEGRATION_ID: agentic-workflows
+          GITHUB_COPILOT_PROMPT_MODE_EXTENSIONS: false
+          GITHUB_HEAD_REF: ${{ github.head_ref }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_STEP_SUMMARY: /tmp/gh-aw/agent-step-summary.md
+          GITHUB_WORKSPACE: ${{ github.workspace }}
           GIT_AUTHOR_EMAIL: github-actions[bot]@users.noreply.github.com
           GIT_AUTHOR_NAME: github-actions[bot]
           GIT_COMMITTER_EMAIL: github-actions[bot]@users.noreply.github.com
           GIT_COMMITTER_NAME: github-actions[bot]
-          OPENAI_API_KEY: ${{ secrets.CODEX_API_KEY || secrets.OPENAI_API_KEY }}
           RUNNER_TEMP: ${{ runner.temp }}
-          RUST_LOG: ${{ runner.debug == 1 && 'trace,hyper_util=info,mio=info,reqwest=info,os_info=info,codex_otel=warn,codex_core=debug,codex_exec=debug' || 'warn' }}
+          S2STOKENS: true
           TRACEPARENT: ${{ env.GITHUB_AW_OTEL_TRACE_ID != '' && env.GITHUB_AW_OTEL_PARENT_SPAN_ID != '' && format('00-{0}-{1}-01', env.GITHUB_AW_OTEL_TRACE_ID, env.GITHUB_AW_OTEL_PARENT_SPAN_ID) || '' }}
           WORKFLOW_NAME: "Schema Consistency Checker"
           WORKFLOW_DESCRIPTION: "Detects inconsistencies between JSON schema, implementation code, and documentation"
@@ -2181,6 +2183,18 @@ jobs:
           export GH_AW_AWF_EXECUTION_EVIDENCE_FILE="/tmp/gh-aw/threat-detection/execution.json"
           set -o pipefail
           printf '%s' "$(date +%s%3N)" > /tmp/gh-aw/agent_cli_start_ms.txt
+          GH_AW_COPILOT_SRC="$(command -v copilot 2>/dev/null || true)"
+          if [ -z "$GH_AW_COPILOT_SRC" ] || [ ! -x "$GH_AW_COPILOT_SRC" ]; then
+            echo "GitHub Copilot CLI executable not found on PATH after installation" >&2
+            exit 127
+          fi
+          GH_AW_COPILOT_BIN="${RUNNER_TEMP}/gh-aw/bin/copilot"
+          mkdir -p "${RUNNER_TEMP}/gh-aw/bin"
+          if [ "$GH_AW_COPILOT_SRC" != "$GH_AW_COPILOT_BIN" ]; then
+            cp "$GH_AW_COPILOT_SRC" "$GH_AW_COPILOT_BIN"
+          fi
+          chmod 755 "$GH_AW_COPILOT_BIN"
+
           (umask 177 && touch /tmp/gh-aw/threat-detection/detection.log)
           GH_AW_MAX_AI_CREDITS="${GH_AW_MAX_AI_CREDITS:-400}"
           if [[ ! "$GH_AW_MAX_AI_CREDITS" =~ ^[0-9]+$ ]]; then
@@ -2198,7 +2212,7 @@ jobs:
             echo "No component admission allowance; retaining existing budget policy (value withheld)."
           fi
           unset GH_AW_ADMISSION_RESULT GH_AW_ADMISSION_MAX_AI_CREDITS
-          printf '%s\n' "{\"\$schema\":\"https://github.com/github/gh-aw-firewall/releases/download/v0.29.7/awf-config.schema.json\",\"network\":{\"allowDomains\":[\"172.30.0.1\",\"api.github.com\",\"api.openai.com\",\"github.com\",\"host.docker.internal\"]},\"apiProxy\":{\"enabled\":true,\"enableTokenSteering\":true,\"maxRuns\":500,\"maxAiCredits\":${GH_AW_MAX_AI_CREDITS},\"maxCacheMisses\":5,\"providers\":{\"openai\":{\"models\":{\"gpt-6.1-sol\":{\"cost\":{\"cache_read\":\"1e-07\",\"cache_write\":\"2.5e-06\",\"input\":\"2e-06\",\"output\":\"1e-05\"}}}}},\"models\":{\"agent\":[\"sonnet-6x\",\"gpt-6\",\"gpt-5.4\",\"gpt-5.5\",\"gpt-5.6\",\"gpt-5.3\",\"gemini-pro\",\"any\"],\"antigravity\":[\"copilot/antigravity*\",\"google/antigravity*\",\"gemini/antigravity*\"],\"any\":[\"copilot/*\",\"anthropic/*\",\"openai/*\",\"google/*\",\"gemini/*\"],\"auto\":[\"copilot/auto\",\"large\"],\"claude\":[\"agent\"],\"codex\":[\"agent\"],\"coding\":[\"copilot/gpt-5*codex*\",\"openai/gpt-5*codex*\",\"gpt-5-codex\",\"kimi\"],\"computer-use\":[\"copilot/*computer-use*\",\"google/*computer-use*\",\"gemini/*computer-use*\",\"openai/*computer-use*\"],\"copilot\":[\"agent\"],\"deep-research\":[\"copilot/deep-research*\",\"copilot/o3-deep-research*\",\"copilot/o4-mini-deep-research*\",\"google/deep-research*\",\"gemini/deep-research*\",\"openai/o3-deep-research*\",\"openai/o4-mini-deep-research*\"],\"detection\":[\"small\",\"copilot/gpt-*-luna\",\"openai/gpt-*-luna\",\"small-agent\",\"agent\"],\"evals\":[\"copilot/gpt-6-luna-decisions\"],\"fable\":[\"copilot/*fable*\",\"anthropic/*fable*\"],\"gemini\":[\"agent\"],\"gemini-3-flash\":[\"copilot/gemini-3*flash*\",\"google/gemini-3*flash*\",\"gemini/gemini-3*flash*\"],\"gemini-3-pro\":[\"copilot/gemini-3*pro*\",\"google/gemini-3*pro*\",\"google/nano-banana*\",\"gemini/gemini-3*pro*\"],\"gemini-3.1-flash\":[\"copilot/gemini-3.1*flash*\",\"google/gemini-3.1*flash*\",\"gemini/gemini-3.1*flash*\"],\"gemini-3.1-pro\":[\"copilot/gemini-3.1*pro*\",\"google/gemini-3.1*pro*\",\"gemini/gemini-3.1*pro*\"],\"gemini-3.5-flash\":[\"copilot/gemini-3.5*flash*\",\"google/gemini-3.5*flash*\",\"gemini/gemini-3.5*flash*\"],\"gemini-3.6-flash\":[\"copilot/gemini-3.6*flash*\",\"google/gemini-3.6*flash*\",\"gemini/gemini-3.6*flash*\"],\"gemini-3.7-flash\":[\"copilot/gemini-3.7*flash*\",\"google/gemini-3.7*flash*\",\"gemini/gemini-3.7*flash*\"],\"gemini-3.8-flash\":[\"copilot/gemini-3.8*flash*\",\"google/gemini-3.8*flash*\",\"gemini/gemini-3.8*flash*\"],\"gemini-flash\":[\"copilot/gemini-*flash*\",\"google/gemini-*flash*\",\"gemini/gemini-*flash*\"],\"gemini-flash-lite\":[\"copilot/gemini-*flash*lite*\",\"google/gemini-*flash*lite*\",\"gemini/gemini-*flash*lite*\"],\"gemini-omni\":[\"copilot/gemini-omni*\",\"google/gemini-omni*\",\"gemini/gemini-omni*\"],\"gemini-pro\":[\"copilot/gemini-*pro*\",\"google/gemini-*pro*\",\"gemini/gemini-*pro*\"],\"gemma\":[\"copilot/gemma*\",\"google/gemma*\",\"gemini/gemma*\"],\"gpt-5\":[\"copilot/gpt-5*\",\"openai/gpt-5*\"],\"gpt-5-codex\":[\"copilot/gpt-5*codex*\",\"openai/gpt-5*codex*\"],\"gpt-5-mini\":[\"copilot/gpt-5*mini*\",\"openai/gpt-5*mini*\"],\"gpt-5-nano\":[\"copilot/gpt-5*nano*\",\"openai/gpt-5*nano*\"],\"gpt-5-pro\":[\"copilot/gpt-5*pro*\",\"openai/gpt-5*pro*\"],\"gpt-5.1\":[\"copilot/gpt-5.1*\",\"openai/gpt-5.1*\"],\"gpt-5.2\":[\"copilot/gpt-5.2*\",\"openai/gpt-5.2*\"],\"gpt-5.3\":[\"copilot/gpt-5.3*\",\"openai/gpt-5.3*\"],\"gpt-5.4\":[\"copilot/gpt-5.4*\",\"openai/gpt-5.4*\"],\"gpt-5.5\":[\"copilot/gpt-5.5*\",\"openai/gpt-5.5*\"],\"gpt-5.6\":[\"copilot/gpt-5.6*\",\"openai/gpt-5.6*\"],\"gpt-6\":[\"copilot/gpt-6*\",\"openai/gpt-6*\"],\"grok\":[\"copilot/*grok*\",\"openai/*grok*\"],\"haiku\":[\"copilot/*haiku*\",\"anthropic/*haiku*\"],\"image-generation\":[\"copilot/gpt-image*\",\"openai/gpt-image*\",\"openai/chatgpt-image*\",\"copilot/gemini-*image*\",\"google/gemini-*image*\",\"gemini/gemini-*image*\",\"google/imagen*\"],\"kimi\":[\"copilot/kimi*\",\"openai/kimi*\"],\"kiwi\":[\"copilot/kiwi*\",\"openai/kiwi*\"],\"large\":[\"sonnet\",\"gpt-6\",\"gpt-5-pro\",\"gpt-5\",\"gemini-pro\"],\"lyria\":[\"google/lyria*\",\"gemini/lyria*\",\"copilot/lyria*\"],\"mai-code\":[\"copilot/MAI-Code*\",\"copilot/mai-code*\",\"openai/MAI-Code*\"],\"mini\":[\"haiku\",\"gpt-5-mini\",\"gpt-5-nano\",\"gemini-flash-lite\"],\"nano-banana\":[\"copilot/nano-banana*\",\"google/nano-banana*\",\"gemini/nano-banana*\"],\"opus\":[\"copilot/*opus*\",\"anthropic/*opus*\"],\"opusplan\":[\"opus?effort=high\"],\"raptor-mini\":[\"copilot/raptor*\",\"openai/raptor*\"],\"reasoning\":[\"copilot/o1*\",\"copilot/o3*\",\"copilot/o4*\",\"openai/o1*\",\"openai/o3*\",\"openai/o4*\"],\"robotics\":[\"copilot/*robotics*\",\"google/*robotics*\",\"gemini/*robotics*\"],\"small\":[\"mini\"],\"small-agent\":[\"haiku\",\"gpt-5-mini\",\"gemini-flash\"],\"sonnet\":[\"copilot/*sonnet*\",\"anthropic/*sonnet*\"],\"sonnet-6x\":[\"copilot/*sonnet-4.5*\",\"copilot/*sonnet-4.6*\",\"copilot/*sonnet-5*\",\"copilot/*sonnet-4-5-*\",\"anthropic/*sonnet-4-5-*\",\"copilot/*sonnet-4-6*\",\"anthropic/*sonnet-4-6*\",\"anthropic/*sonnet-5*\"],\"summarization\":[\"haiku\",\"gpt-5-mini\",\"gemini-flash-lite\",\"mini\"],\"veo\":[\"google/veo*\",\"gemini/veo*\"],\"vision\":[\"copilot/gemini-*image*\",\"google/gemini-*image*\",\"gemini/gemini-*image*\",\"copilot/gemini-*flash*\",\"google/gemini-*flash*\",\"gemini/gemini-*flash*\"]}},\"container\":{\"imageTag\":\"0.29.7,squid=sha256:0790d978a820af2dc1bfab74d1f06b159f3a57ad4893ec49f475289691c4d154,agent=sha256:bd8d363c11b65632920850a44aa61cf9857e2ce9bcd78016e5e9ff57861cb2f5,api-proxy=sha256:c3b4c800634b9e314b80c0cd8daa6d861ed849381bf69234cd77417e7b79b94a,cli-proxy=sha256:d2c0259d8d3529012885f8b7f7e0d7a20b0e8f4b15a6f5b1d6853999cce124bb\",\"agentTimeout\":10},\"logging\":{\"proxyLogsDir\":\"/tmp/gh-aw/sandbox/firewall/logs\",\"auditDir\":\"/tmp/gh-aw/sandbox/firewall/audit\"}}" > "${RUNNER_TEMP}/gh-aw/awf-config.json"
+          printf '%s\n' "{\"\$schema\":\"https://github.com/github/gh-aw-firewall/releases/download/v0.29.7/awf-config.schema.json\",\"apiProxy\":{\"enabled\":true,\"enableTokenSteering\":true,\"maxRuns\":500,\"maxAiCredits\":${GH_AW_MAX_AI_CREDITS},\"maxCacheMisses\":5,\"models\":{\"agent\":[\"sonnet-6x\",\"gpt-6\",\"gpt-5.4\",\"gpt-5.5\",\"gpt-5.6\",\"gpt-5.3\",\"gemini-pro\",\"any\"],\"antigravity\":[\"copilot/antigravity*\",\"google/antigravity*\",\"gemini/antigravity*\"],\"any\":[\"copilot/*\",\"anthropic/*\",\"openai/*\",\"google/*\",\"gemini/*\"],\"auto\":[\"copilot/auto\",\"large\"],\"claude\":[\"agent\"],\"codex\":[\"agent\"],\"coding\":[\"copilot/gpt-5*codex*\",\"openai/gpt-5*codex*\",\"gpt-5-codex\",\"kimi\"],\"computer-use\":[\"copilot/*computer-use*\",\"google/*computer-use*\",\"gemini/*computer-use*\",\"openai/*computer-use*\"],\"copilot\":[\"agent\"],\"deep-research\":[\"copilot/deep-research*\",\"copilot/o3-deep-research*\",\"copilot/o4-mini-deep-research*\",\"google/deep-research*\",\"gemini/deep-research*\",\"openai/o3-deep-research*\",\"openai/o4-mini-deep-research*\"],\"detection\":[\"small\",\"copilot/gpt-*-luna\",\"openai/gpt-*-luna\",\"small-agent\",\"agent\"],\"evals\":[\"copilot/gpt-6-luna-decisions\"],\"fable\":[\"copilot/*fable*\",\"anthropic/*fable*\"],\"gemini\":[\"agent\"],\"gemini-3-flash\":[\"copilot/gemini-3*flash*\",\"google/gemini-3*flash*\",\"gemini/gemini-3*flash*\"],\"gemini-3-pro\":[\"copilot/gemini-3*pro*\",\"google/gemini-3*pro*\",\"google/nano-banana*\",\"gemini/gemini-3*pro*\"],\"gemini-3.1-flash\":[\"copilot/gemini-3.1*flash*\",\"google/gemini-3.1*flash*\",\"gemini/gemini-3.1*flash*\"],\"gemini-3.1-pro\":[\"copilot/gemini-3.1*pro*\",\"google/gemini-3.1*pro*\",\"gemini/gemini-3.1*pro*\"],\"gemini-3.5-flash\":[\"copilot/gemini-3.5*flash*\",\"google/gemini-3.5*flash*\",\"gemini/gemini-3.5*flash*\"],\"gemini-3.6-flash\":[\"copilot/gemini-3.6*flash*\",\"google/gemini-3.6*flash*\",\"gemini/gemini-3.6*flash*\"],\"gemini-3.7-flash\":[\"copilot/gemini-3.7*flash*\",\"google/gemini-3.7*flash*\",\"gemini/gemini-3.7*flash*\"],\"gemini-3.8-flash\":[\"copilot/gemini-3.8*flash*\",\"google/gemini-3.8*flash*\",\"gemini/gemini-3.8*flash*\"],\"gemini-flash\":[\"copilot/gemini-*flash*\",\"google/gemini-*flash*\",\"gemini/gemini-*flash*\"],\"gemini-flash-lite\":[\"copilot/gemini-*flash*lite*\",\"google/gemini-*flash*lite*\",\"gemini/gemini-*flash*lite*\"],\"gemini-omni\":[\"copilot/gemini-omni*\",\"google/gemini-omni*\",\"gemini/gemini-omni*\"],\"gemini-pro\":[\"copilot/gemini-*pro*\",\"google/gemini-*pro*\",\"gemini/gemini-*pro*\"],\"gemma\":[\"copilot/gemma*\",\"google/gemma*\",\"gemini/gemma*\"],\"gpt-5\":[\"copilot/gpt-5*\",\"openai/gpt-5*\"],\"gpt-5-codex\":[\"copilot/gpt-5*codex*\",\"openai/gpt-5*codex*\"],\"gpt-5-mini\":[\"copilot/gpt-5*mini*\",\"openai/gpt-5*mini*\"],\"gpt-5-nano\":[\"copilot/gpt-5*nano*\",\"openai/gpt-5*nano*\"],\"gpt-5-pro\":[\"copilot/gpt-5*pro*\",\"openai/gpt-5*pro*\"],\"gpt-5.1\":[\"copilot/gpt-5.1*\",\"openai/gpt-5.1*\"],\"gpt-5.2\":[\"copilot/gpt-5.2*\",\"openai/gpt-5.2*\"],\"gpt-5.3\":[\"copilot/gpt-5.3*\",\"openai/gpt-5.3*\"],\"gpt-5.4\":[\"copilot/gpt-5.4*\",\"openai/gpt-5.4*\"],\"gpt-5.5\":[\"copilot/gpt-5.5*\",\"openai/gpt-5.5*\"],\"gpt-5.6\":[\"copilot/gpt-5.6*\",\"openai/gpt-5.6*\"],\"gpt-6\":[\"copilot/gpt-6*\",\"openai/gpt-6*\"],\"grok\":[\"copilot/*grok*\",\"openai/*grok*\"],\"haiku\":[\"copilot/*haiku*\",\"anthropic/*haiku*\"],\"image-generation\":[\"copilot/gpt-image*\",\"openai/gpt-image*\",\"openai/chatgpt-image*\",\"copilot/gemini-*image*\",\"google/gemini-*image*\",\"gemini/gemini-*image*\",\"google/imagen*\"],\"kimi\":[\"copilot/kimi*\",\"openai/kimi*\"],\"kiwi\":[\"copilot/kiwi*\",\"openai/kiwi*\"],\"large\":[\"sonnet\",\"gpt-6\",\"gpt-5-pro\",\"gpt-5\",\"gemini-pro\"],\"lyria\":[\"google/lyria*\",\"gemini/lyria*\",\"copilot/lyria*\"],\"mai-code\":[\"copilot/MAI-Code*\",\"copilot/mai-code*\",\"openai/MAI-Code*\"],\"mini\":[\"haiku\",\"gpt-5-mini\",\"gpt-5-nano\",\"gemini-flash-lite\"],\"nano-banana\":[\"copilot/nano-banana*\",\"google/nano-banana*\",\"gemini/nano-banana*\"],\"opus\":[\"copilot/*opus*\",\"anthropic/*opus*\"],\"opusplan\":[\"opus?effort=high\"],\"raptor-mini\":[\"copilot/raptor*\",\"openai/raptor*\"],\"reasoning\":[\"copilot/o1*\",\"copilot/o3*\",\"copilot/o4*\",\"openai/o1*\",\"openai/o3*\",\"openai/o4*\"],\"robotics\":[\"copilot/*robotics*\",\"google/*robotics*\",\"gemini/*robotics*\"],\"small\":[\"mini\"],\"small-agent\":[\"haiku\",\"gpt-5-mini\",\"gemini-flash\"],\"sonnet\":[\"copilot/*sonnet*\",\"anthropic/*sonnet*\"],\"sonnet-6x\":[\"copilot/*sonnet-4.5*\",\"copilot/*sonnet-4.6*\",\"copilot/*sonnet-5*\",\"copilot/*sonnet-4-5-*\",\"anthropic/*sonnet-4-5-*\",\"copilot/*sonnet-4-6*\",\"anthropic/*sonnet-4-6*\",\"anthropic/*sonnet-5*\"],\"summarization\":[\"haiku\",\"gpt-5-mini\",\"gemini-flash-lite\",\"mini\"],\"veo\":[\"google/veo*\",\"gemini/veo*\"],\"vision\":[\"copilot/gemini-*image*\",\"google/gemini-*image*\",\"gemini/gemini-*image*\",\"copilot/gemini-*flash*\",\"google/gemini-*flash*\",\"gemini/gemini-*flash*\"]}},\"container\":{\"agentTimeout\":10,\"images\":{\"agent\":\"ghcr.io/github/gh-aw-firewall/agent:0.29.7@sha256:bd8d363c11b65632920850a44aa61cf9857e2ce9bcd78016e5e9ff57861cb2f5\",\"apiProxy\":\"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.7@sha256:c3b4c800634b9e314b80c0cd8daa6d861ed849381bf69234cd77417e7b79b94a\",\"cliProxy\":\"ghcr.io/github/gh-aw-firewall/cli-proxy:0.29.7@sha256:d2c0259d8d3529012885f8b7f7e0d7a20b0e8f4b15a6f5b1d6853999cce124bb\",\"squid\":\"ghcr.io/github/gh-aw-firewall/squid:0.29.7@sha256:0790d978a820af2dc1bfab74d1f06b159f3a57ad4893ec49f475289691c4d154\"}},\"logging\":{\"proxyLogsDir\":\"/tmp/gh-aw/sandbox/firewall/logs\",\"auditDir\":\"/tmp/gh-aw/sandbox/firewall/audit\"}}" > "${RUNNER_TEMP}/gh-aw/awf-config.json"
           cp "${RUNNER_TEMP}/gh-aw/awf-config.json" /tmp/gh-aw/awf-config.json
           export GH_AW_MODELS_JSON_PATH="/tmp/gh-aw/models.json"
           GH_AW_DOCKER_HOST=""
@@ -2217,8 +2231,8 @@ jobs:
             fi
           fi
           # shellcheck disable=SC1003,SC2016,SC2086
-          awf --config "${RUNNER_TEMP}/gh-aw/awf-config.json" --container-workdir "${GITHUB_WORKSPACE}" --mount "${RUNNER_TEMP}/gh-aw:${RUNNER_TEMP}/gh-aw:ro" --mount "${RUNNER_TEMP}/gh-aw:/host${RUNNER_TEMP}/gh-aw:ro" ${GH_AW_TOOL_CACHE_MOUNT:+--mount "$GH_AW_TOOL_CACHE_MOUNT"} ${GH_AW_DOCKER_HOST:+--docker-host "$GH_AW_DOCKER_HOST"} --env-all --exclude-env ACTIONS_ID_TOKEN_REQUEST_TOKEN --exclude-env ACTIONS_ID_TOKEN_REQUEST_URL --exclude-env CODEX_API_KEY --exclude-env COPILOT_GITHUB_TOKEN --exclude-env GH_AW_OTLP_ALL_HEADERS --exclude-env GH_AW_OTLP_ENDPOINTS --exclude-env OPENAI_API_KEY --exclude-env OTEL_EXPORTER_OTLP_ENDPOINT --exclude-env OTEL_EXPORTER_OTLP_HEADERS --mount /tmp/gh-aw:/tmp/gh-aw:rw --mount /tmp/gh-aw/threat-detection:/tmp/gh-aw/threat-detection:rw --log-level info --skip-pull \
-            -- /bin/bash -c 'set +o histexpand; : "${RUNNER_TOOL_CACHE:?RUNNER_TOOL_CACHE must be set}"; GH_AW_TOOL_CACHE="$RUNNER_TOOL_CACHE"; GH_AW_TOOL_BINS="$(find "$GH_AW_TOOL_CACHE" -maxdepth 5 -type d -name bin 2>/dev/null | tr "\n" ":")"; GH_AW_TOOL_BINS="${GH_AW_TOOL_BINS%:}"; export PATH="$PATH${GH_AW_TOOL_BINS:+:}$GH_AW_TOOL_BINS"; [ -n "$GOROOT" ] && export PATH="$GOROOT/bin:$PATH" || true; [ -n "$ERLANG_HOME" ] && export PATH="$ERLANG_HOME/bin:$PATH" || true && threat-detect --engine codex --output /tmp/gh-aw/threat-detection/detection_result.json /tmp/gh-aw/threat-detection' 2>&1 | tee -a /tmp/gh-aw/threat-detection/detection.log
+          awf --config "${RUNNER_TEMP}/gh-aw/awf-config.json" --container-workdir "${GITHUB_WORKSPACE}" --mount "${RUNNER_TEMP}/gh-aw:${RUNNER_TEMP}/gh-aw:ro" --mount "${RUNNER_TEMP}/gh-aw:/host${RUNNER_TEMP}/gh-aw:ro" ${GH_AW_TOOL_CACHE_MOUNT:+--mount "$GH_AW_TOOL_CACHE_MOUNT"} ${GH_AW_DOCKER_HOST:+--docker-host "$GH_AW_DOCKER_HOST"} --env-all --exclude-env ACTIONS_ID_TOKEN_REQUEST_TOKEN --exclude-env ACTIONS_ID_TOKEN_REQUEST_URL --exclude-env COPILOT_GITHUB_TOKEN --exclude-env GH_AW_OTLP_ALL_HEADERS --exclude-env GH_AW_OTLP_ENDPOINTS --exclude-env OTEL_EXPORTER_OTLP_ENDPOINT --exclude-env OTEL_EXPORTER_OTLP_HEADERS --mount /tmp/gh-aw:/tmp/gh-aw:rw --mount /tmp/gh-aw/threat-detection:/tmp/gh-aw/threat-detection:rw --log-level info --session-state-dir /tmp/gh-aw/sandbox/agent/session-state --skip-pull \
+            -- /bin/bash -c 'set +o histexpand; export PATH="${RUNNER_TEMP}/gh-aw/bin:$PATH" && : "${RUNNER_TOOL_CACHE:?RUNNER_TOOL_CACHE must be set}"; GH_AW_TOOL_CACHE="$RUNNER_TOOL_CACHE"; GH_AW_TOOL_BINS="$(find "$GH_AW_TOOL_CACHE" -maxdepth 5 -type d -name bin 2>/dev/null | tr "\n" ":")"; GH_AW_TOOL_BINS="${GH_AW_TOOL_BINS%:}"; export PATH="$PATH${GH_AW_TOOL_BINS:+:}$GH_AW_TOOL_BINS"; [ -n "$GOROOT" ] && export PATH="$GOROOT/bin:$PATH" || true; [ -n "$ERLANG_HOME" ] && export PATH="$ERLANG_HOME/bin:$PATH" || true && threat-detect --engine copilot --output /tmp/gh-aw/threat-detection/detection_result.json /tmp/gh-aw/threat-detection' 2>&1 | tee -a /tmp/gh-aw/threat-detection/detection.log
       - name: Copy detection firewall logs
         if: always() && steps.detection_guard.outputs.run_detection == 'true'
         continue-on-error: true
@@ -2231,13 +2245,11 @@ jobs:
         if: always() && steps.detection_guard.outputs.run_detection == 'true'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          GH_AW_SECRET_NAMES: 'CODEX_API_KEY,GH_AW_OTEL_GRAFANA_AUTHORIZATION,GH_AW_OTEL_GRAFANA_ENDPOINT,GH_AW_OTEL_SENTRY_AUTHORIZATION,GH_AW_OTEL_SENTRY_ENDPOINT,OPENAI_API_KEY'
-          SECRET_CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
+          GH_AW_SECRET_NAMES: 'GH_AW_OTEL_GRAFANA_AUTHORIZATION,GH_AW_OTEL_GRAFANA_ENDPOINT,GH_AW_OTEL_SENTRY_AUTHORIZATION,GH_AW_OTEL_SENTRY_ENDPOINT'
           SECRET_GH_AW_OTEL_GRAFANA_AUTHORIZATION: ${{ secrets.GH_AW_OTEL_GRAFANA_AUTHORIZATION }}
           SECRET_GH_AW_OTEL_GRAFANA_ENDPOINT: ${{ secrets.GH_AW_OTEL_GRAFANA_ENDPOINT }}
           SECRET_GH_AW_OTEL_SENTRY_AUTHORIZATION: ${{ secrets.GH_AW_OTEL_SENTRY_AUTHORIZATION }}
           SECRET_GH_AW_OTEL_SENTRY_ENDPOINT: ${{ secrets.GH_AW_OTEL_SENTRY_ENDPOINT }}
-          SECRET_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         with:
           script: |
             const path = require('path');
@@ -2271,13 +2283,11 @@ jobs:
         if: always() && steps.detection_guard.outputs.run_detection == 'true'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          GH_AW_SECRET_NAMES: 'CODEX_API_KEY,GH_AW_OTEL_GRAFANA_AUTHORIZATION,GH_AW_OTEL_GRAFANA_ENDPOINT,GH_AW_OTEL_SENTRY_AUTHORIZATION,GH_AW_OTEL_SENTRY_ENDPOINT,OPENAI_API_KEY'
-          SECRET_CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
+          GH_AW_SECRET_NAMES: 'GH_AW_OTEL_GRAFANA_AUTHORIZATION,GH_AW_OTEL_GRAFANA_ENDPOINT,GH_AW_OTEL_SENTRY_AUTHORIZATION,GH_AW_OTEL_SENTRY_ENDPOINT'
           SECRET_GH_AW_OTEL_GRAFANA_AUTHORIZATION: ${{ secrets.GH_AW_OTEL_GRAFANA_AUTHORIZATION }}
           SECRET_GH_AW_OTEL_GRAFANA_ENDPOINT: ${{ secrets.GH_AW_OTEL_GRAFANA_ENDPOINT }}
           SECRET_GH_AW_OTEL_SENTRY_AUTHORIZATION: ${{ secrets.GH_AW_OTEL_SENTRY_AUTHORIZATION }}
           SECRET_GH_AW_OTEL_SENTRY_ENDPOINT: ${{ secrets.GH_AW_OTEL_SENTRY_ENDPOINT }}
-          SECRET_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         with:
           script: |
             const path = require('path');
@@ -2309,6 +2319,7 @@ jobs:
             /tmp/gh-aw/threat-detection/execution.json
             /tmp/gh-aw/threat-detection/detection_usage.json
             /tmp/gh-aw/threat-detection/detection_usage.jsonl
+            /tmp/gh-aw/threat-detection/detection_harness_retry.json
             /tmp/gh-aw/threat-detection/sandbox/firewall/logs/
             /tmp/gh-aw/threat-detection/sandbox/firewall/audit/
           if-no-files-found: ignore
@@ -2354,7 +2365,9 @@ jobs:
       GH_AW_DETECTION_CONCLUSION: ${{ needs.detection.outputs.detection_conclusion }}
       GH_AW_DETECTION_REASON: ${{ needs.detection.outputs.detection_reason }}
       GH_AW_ENGINE_ID: "codex"
-      GH_AW_ENGINE_MODEL: "openai/gpt-6.1-sol"
+      GH_AW_ENGINE_MODEL: ${{ needs.agent.outputs.model }}
+      GH_AW_ENGINE_MODEL_EFFORT: ${{ needs.agent.outputs.model_effort }}
+      GH_AW_MODEL_ROUTING_STATUS: ${{ needs.agent.outputs.model_routing_status }}
       GH_AW_OBJECT_PACK_FETCH_DEPTHS: ${{ vars.GH_AW_OBJECT_PACK_FETCH_DEPTHS }}
       GH_AW_OBJECT_PACK_MAX_BYTES: ${{ vars.GH_AW_OBJECT_PACK_MAX_BYTES }}
       GH_AW_OBJECT_PACK_MAX_OBJECTS: ${{ vars.GH_AW_OBJECT_PACK_MAX_OBJECTS }}
