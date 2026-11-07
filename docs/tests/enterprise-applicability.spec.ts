@@ -28,8 +28,8 @@ test("enterprise reference separates deployment, topology, and support evidence"
   for (const document of ["compatibility.md#environment-and-runner-applicability", "enterprise-configuration.md", "arc-dind.md"]) {
     await expect(content.locator(`a[href="${awf}${document}"]`).first()).toBeVisible();
   }
-  for (const schema of ["docs/awf-config.schema.json", "src/awf-config-schema.json"]) {
-    await expect(content.locator(`a[href="https://github.com/github/gh-aw-firewall/blob/v0.29.7/${schema}"]`)).toBeVisible();
+  for (const schema of ["https://github.com/github/gh-aw-firewall/blob/v0.29.7/docs/awf-config.schema.json", "https://github.com/github/gh-aw-firewall/blob/v0.29.7/src/awf-config-schema.json"]) {
+    await expect(content.locator(`a[href="${schema}"]`)).toBeVisible();
   }
 });
 

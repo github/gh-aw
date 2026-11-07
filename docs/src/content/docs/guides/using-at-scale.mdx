@@ -112,7 +112,7 @@ For deployments on GitHub Enterprise Server or GitHub Enterprise Cloud with data
 
 ## Self-Hosted Runners
 
-Organizations that need to run agentic workflows on their own infrastructure — for network isolation, compliance, or cost reasons — can use self-hosted runners. See the [Self-Hosted Runners guide](/gh-aw/reference/self-hosted-runners/) for configuration requirements, ARC/Kubernetes setup, and GHES-specific considerations. For Kubernetes runner scale sets, [ARC DinD for Copilot Coding Agent](/gh-aw/reference/arc-dind-copilot-agent/) provides the complete Docker-in-Docker deployment configuration. Runners must be Linux with Docker support; use the `runs-on:` frontmatter field to target them.
+Organizations that need to run agentic workflows on their own infrastructure — for network isolation, compliance, or cost reasons — can use self-hosted runners. See the [Self-Hosted Runners guide](/gh-aw/reference/self-hosted-runners/) for configuration requirements, ARC/Kubernetes setup, and GHES-specific considerations. For Kubernetes runner scale sets, the [gh-aw Copilot engine ARC/DinD walkthrough (end-to-end availability unconfirmed)](/gh-aw/reference/arc-dind-copilot-agent/) provides the Docker-in-Docker configuration. Runners must be Linux with Docker support; use the `runs-on:` frontmatter field to target them.
 
 ## A/B Experiments
 

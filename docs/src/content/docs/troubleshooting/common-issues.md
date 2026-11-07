@@ -291,13 +291,14 @@ See [Enterprise API Endpoint](/gh-aw/reference/engines/#enterprise-api-endpoint-
 | Firewall blocking `api.<ghes-host>` | Domain not in allowed list | Add to `network.allowed` (see below) |
 | `gh aw add-wizard` creates PR on github.com | Not inside a GHES repo clone | Run from within GHES repo, or use `gh aw add` + `gh pr create` |
 
-For firewall issues, add the actual GHES repository/API hostname to your workflow's allowed list. Do not substitute a `*.ghe.com` data-residency example for a GHES host or assume that the repository API is the Copilot inference endpoint:
+For firewall issues, add the actual GHES repository hostname to your workflow's allowed list. If the GHES API is served from a separate hostname, allow that hostname too. Do not substitute a `*.ghe.com` data-residency example for a GHES host or assume that the repository API is the Copilot inference endpoint:
 
 ```aw wrap
 network:
   allowed:
     - defaults
     - github.company.com
+    - api.github.company.com
 ```
 
 ## Context Expression Issues
