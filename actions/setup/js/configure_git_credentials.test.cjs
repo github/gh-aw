@@ -20,8 +20,8 @@ function removeDir(dir) {
  * Run configure_git_credentials.sh in an isolated HOME so that the global git
  * config it writes does not affect the developer's real ~/.gitconfig.
  */
-function runScript(env, cwd) {
-  return spawnSync("sh", [SCRIPT_PATH], {
+function runScript(env, cwd, shellFlags = []) {
+  return spawnSync("sh", [...shellFlags, SCRIPT_PATH], {
     cwd,
     encoding: "utf8",
     env: { ...process.env, GITHUB_TOKEN: "", GIT_TOKEN: "", GH_AW_GIT_REPOSITORY: undefined, GH_AW_GIT_CREDENTIALS_DEBUG: "", RUNNER_DEBUG: "", ...env },
@@ -112,6 +112,56 @@ describe("configure_git_credentials.sh repository identity", () => {
     for (const value of ["owner/target", "owner/workflow", "github.com", target, root, "test-token", "private-secret"]) {
       expect(result.stdout + result.stderr).not.toContain(value);
     }
+  });
+
+  it.each([true, false])("disables shell tracing before reading credentials with token present=%s", tokenPresent => {
+    git("remote", "set-url", "origin", authenticatedURL("existing-private-token"));
+    const result = runScript({ ...env, GITHUB_TOKEN: tokenPresent ? "test-token" : "", GH_AW_GIT_CREDENTIALS_DEBUG: "true" }, target, ["-x"]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stderr).toContain("identity_result=verified");
+    for (const value of ["existing-private-token", "test-token", "owner/target", target]) {
+      expect(result.stdout + result.stderr).not.toContain(value);
+    }
+  });
+
+  it.each(["stderr", "file"])("disables inherited Git trace outputs directed to %s", destination => {
+    const traceFile = path.join(root, "git-trace.log");
+    const traceTarget = destination === "stderr" ? "1" : traceFile;
+    const tracing = Object.fromEntries(
+      ["GIT_TRACE", "GIT_TRACE_SETUP", "GIT_TRACE_PACKET", "GIT_TRACE_PACK_ACCESS", "GIT_TRACE_PACKFILE", "GIT_TRACE_PERFORMANCE", "GIT_TRACE_SHALLOW", "GIT_TRACE_CURL", "GIT_TRACE2", "GIT_TRACE2_EVENT", "GIT_TRACE2_PERF"].map(key => [
+        key,
+        traceTarget,
+      ])
+    );
+    git("remote", "set-url", "origin", authenticatedURL("existing-private-token"));
+    const result = runScript({ ...env, ...tracing, GIT_CURL_VERBOSE: "1", GIT_TRACE2_ENV_VARS: "GITHUB_TOKEN,GIT_TOKEN", GH_AW_GIT_CREDENTIALS_DEBUG: "true" }, target);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stderr).toContain("authentication=installed");
+    expect(result.stdout + result.stderr).not.toMatch(/test-token|existing-private-token|owner\/target|def_param|trace:|start /);
+    expect(fs.existsSync(traceFile)).toBe(false);
+  });
+
+  it("redacts global configuration failures even with external tracing enabled", () => {
+    const blocked = path.join(root, "private-test-token-config");
+    fs.mkdirSync(blocked);
+    const result = runScript({ ...env, GIT_CONFIG_GLOBAL: blocked, GIT_TRACE2: "1", GIT_TRACE2_ENV_VARS: "GITHUB_TOKEN", GH_AW_GIT_CREDENTIALS_DEBUG: "true" }, target, ["-x"]);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Git global configuration failed");
+    expect(result.stdout + result.stderr).not.toMatch(/test-token|private-test-token-config|def_param/);
+  });
+
+  it("overrides Git configuration-based Trace2 targets", () => {
+    const traceFile = path.join(root, "configured-trace.log");
+    git("config", "--global", "trace2.normalTarget", traceFile);
+    git("config", "--global", "trace2.eventTarget", traceFile);
+    git("config", "--global", "trace2.perfTarget", traceFile);
+    git("config", "--global", "trace2.envVars", "GITHUB_TOKEN");
+    // Configuring the targets itself can create a trace; start the helper with a clean sink.
+    if (fs.existsSync(traceFile)) fs.rmSync(traceFile);
+    const result = runScript(env, target);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout + result.stderr).not.toContain("test-token");
+    expect(fs.existsSync(traceFile)).toBe(false);
   });
 
   it.each(["https://github.com/OWNER/Target", "git@github.com:owner/target.git", "ssh://git@github.com/owner/target.git", authenticatedURL("old-token")])("recognizes equivalent repository identity for %s", remote => {

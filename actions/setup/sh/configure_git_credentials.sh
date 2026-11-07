@@ -33,17 +33,31 @@
 #   0 - Success
 #   1 - Error
 
+# External tracing can print expanded credentials before stderr redaction applies.
+set +x
+set +v
 set -eu
+export GIT_TRACE=0 GIT_TRACE_SETUP=0 GIT_TRACE_PACKET=0 GIT_TRACE_PACK_ACCESS=0
+export GIT_TRACE_PACKFILE=0 GIT_TRACE_PERFORMANCE=0 GIT_TRACE_SHALLOW=0
+export GIT_TRACE_CURL=0 GIT_TRACE2=0 GIT_TRACE2_EVENT=0 GIT_TRACE2_PERF=0
+unset GIT_CURL_VERBOSE GIT_TRACE2_ENV_VARS GIT_TRACE2_CONFIG_PARAMS
+
+configure_git_global() {
+  if ! git config --global "$@" 2>/dev/null; then
+    echo "Git global configuration failed; configuration details are omitted to protect credentials." >&2
+    exit 1
+  fi
+}
 
 # Configure git identity
-git config --global user.email "github-actions[bot]@users.noreply.github.com"
-git config --global user.name "github-actions[bot]"
-git config --global am.keepcr true
+configure_git_global user.email "github-actions[bot]@users.noreply.github.com"
+configure_git_global user.name "github-actions[bot]"
+configure_git_global am.keepcr true
 
 # Trust the workspace directory to avoid "dubious ownership" errors
 # when the repository is owned by a different user (e.g., in mounted containers)
 if [ -n "${GITHUB_WORKSPACE:-}" ]; then
-  git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+  configure_git_global --add safe.directory "${GITHUB_WORKSPACE}"
 fi
 
 # Trust cross-repository checkout directories recorded in the checkout manifest.
@@ -85,7 +99,7 @@ if [ -n "${GITHUB_WORKSPACE:-}" ] && [ -n "${MANIFEST_PATH}" ] && [ -f "${MANIFE
       /* ignore missing or malformed manifest */
     }
   ' 2>/dev/null | while IFS= read -r dir; do
-    [ -n "${dir}" ] && git config --global --add safe.directory "${dir}"
+    [ -n "${dir}" ] && configure_git_global --add safe.directory "${dir}"
   done
 fi
 
