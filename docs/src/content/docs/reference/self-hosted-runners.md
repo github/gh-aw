@@ -63,7 +63,7 @@ When `runner.installation` is omitted, native installers automatically choose ro
 
 `engine.command` skips standard Copilot installation only for the primary agent. External Copilot threat detection still installs and uses the standard `copilot` executable; it does not run the primary agent's custom command. A preinstalled executable on `PATH` does not skip either installer or its privilege checks.
 
-Rootless installation cannot repair root-owned state from previous privileged AWF runs. If preparing `~/.copilot` fails, installation stops with an ownership-repair diagnostic. Before retrying, a runner administrator must restore ownership of that directory and its contents to the runner's UID and GID and make it writable. Failed cleanup of stale `/tmp/awf-*-chroot-home` or `/tmp/awf-chroot-*` directories emits a warning and does not stop installation; an administrator must remove those stale directories before the runner is reused.
+Rootless installation cannot repair root-owned state from previous privileged AWF runs. If preparing `~/.copilot` fails, installation stops with an ownership-repair diagnostic. Before retrying, a runner administrator must restore ownership of that directory and its contents to the runner's UID and GID and make it writable. Installers clean only their own staging directories, not shared `/tmp/awf-*-chroot-home` or `/tmp/awf-chroot-*` directories that may belong to active jobs. A runner administrator must remove confirmed stale directories before the runner is reused.
 
 ## Runner HTTP proxy settings
 
