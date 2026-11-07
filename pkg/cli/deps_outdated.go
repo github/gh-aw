@@ -178,7 +178,9 @@ func getLatestVersion(ctx context.Context, modulePath, currentVersion string, ve
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		_, _ = io.Copy(io.Discard, resp.Body)
+		if _, err := io.Copy(io.Discard, resp.Body); err != nil {
+			return "", 0, fmt.Errorf("proxy returned status %d and failed to drain response body: %w", resp.StatusCode, err)
+		}
 		return "", 0, fmt.Errorf("proxy returned status %d", resp.StatusCode)
 	}
 

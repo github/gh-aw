@@ -205,7 +205,9 @@ func (s *SpinnerWrapper) Start() {
 					spinnerLog.Printf("Panic in spinner program (recovered): %v", r)
 				}
 			}()
-			_, _ = s.program.Run()
+			if _, err := s.program.Run(); err != nil {
+				spinnerLog.Printf("Spinner program failed: %v", err)
+			}
 		}()
 	}
 }

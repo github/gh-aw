@@ -72,8 +72,14 @@ func generateCallWorkflowTool(workflowName string, workflowInputs map[string]any
 		metadataKey:       "_call_workflow_name",
 	})
 
-	inputSchema, _ := tool["inputSchema"].(map[string]any)
-	properties, _ := inputSchema["properties"].(map[string]any)
+	inputSchema, ok := tool["inputSchema"].(map[string]any)
+	if !ok {
+		return tool
+	}
+	properties, ok := inputSchema["properties"].(map[string]any)
+	if !ok {
+		properties = nil
+	}
 	requiredCount := 0
 	if required, ok := inputSchema["required"].([]string); ok {
 		requiredCount = len(required)

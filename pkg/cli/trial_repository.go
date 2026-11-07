@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"os"
@@ -180,8 +181,9 @@ func ensureTrialRepository(repoSlug string, cloneRepoSlug string, forceDeleteHos
 
 	// Wait for user confirmation
 	fmt.Fprint(os.Stderr, console.FormatPromptMessage("Press Enter after you have enabled these permissions..."))
-	var userInput string
-	_, _ = fmt.Scanln(&userInput) // Ignore error (user pressed Enter without typing anything)
+	if _, err := bufio.NewReader(os.Stdin).ReadString('\n'); err != nil {
+		return fmt.Errorf("failed waiting for repository permissions confirmation: %w", err)
+	}
 	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Continuing with trial setup"))
 
 	// Enable discussions in the repository as most workflows use them

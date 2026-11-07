@@ -725,6 +725,10 @@ func fetchAndSaveRemoteIncludesWithOptions(ctx context.Context, content string, 
 		}
 	}
 
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("failed to scan workflow includes: %w", err)
+	}
+
 	return nil
 }
 

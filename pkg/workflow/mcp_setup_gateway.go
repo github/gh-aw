@@ -81,7 +81,10 @@ func generateMCPGatewaySetup(yaml *strings.Builder, tools map[string]any, mcpToo
 	}
 	port, domain, payloadDir, payloadPathPrefix, payloadSizeThreshold := resolveMCPGatewayValues(workflowData, gatewayConfig)
 	githubToolRaw, hasGitHub := tools["github"]
-	githubTool, _ := githubToolRaw.(map[string]any)
+	githubTool, ok := githubToolRaw.(map[string]any)
+	if hasGitHub && !ok {
+		return fmt.Errorf("tools.github must be a mapping")
+	}
 	if err := writeMCPGatewayExports(yaml, writeMCPGatewayExportsOptions{
 		engine:               engine,
 		workflowData:         workflowData,

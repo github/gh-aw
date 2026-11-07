@@ -449,10 +449,7 @@ func processIncludesWithWorkflowSpec(content string, workflow *WorkflowSpec, com
 		}
 
 		// Scan for nested includes
-		nestedScanner := bufio.NewScanner(strings.NewReader(markdownContent))
-		for nestedScanner.Scan() {
-			line := nestedScanner.Text()
-
+		for _, line := range strings.Split(markdownContent, "\n") {
 			directive := parser.ParseImportDirective(line)
 			if directive != nil {
 				includePath := directive.Path

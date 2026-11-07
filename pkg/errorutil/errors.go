@@ -3,12 +3,22 @@
 package errorutil
 
 import (
+	"errors"
+	"fmt"
+	"io"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
 )
 
 var errorutilLog = logger.New("errorutil:errors")
+
+// CloseWithError closes closer and joins any close failure into err.
+func CloseWithError(closer io.Closer, err *error) {
+	if closeErr := closer.Close(); closeErr != nil {
+		*err = errors.Join(*err, fmt.Errorf("failed to close resource: %w", closeErr))
+	}
+}
 
 // IsNotFoundError reports whether err represents an HTTP 404 / "not found" response.
 // It returns false when err is nil.

@@ -179,8 +179,8 @@ func reconcileGithubActionsIgnoreEntry(updateAny any, managedPatterns []string, 
 		return reconcileGithubActionsIgnoreResult{}
 	}
 
-	ecosystem, _ := updateMap["package-ecosystem"].(string)
-	if ecosystem != "github-actions" {
+	ecosystem, ok := updateMap["package-ecosystem"].(string)
+	if !ok || ecosystem != "github-actions" {
 		return reconcileGithubActionsIgnoreResult{}
 	}
 
@@ -204,7 +204,11 @@ func reconcileGithubActionsIgnoreEntry(updateAny any, managedPatterns []string, 
 	reconciledIgnoreEntries := make([]any, 0, len(ignoreEntries))
 	for _, ignoreEntryAny := range ignoreEntries {
 		ignoreEntryMap, ok := dependabotToStringAnyMap(ignoreEntryAny)
-		dependencyName, _ := ignoreEntryMap["dependency-name"].(string)
+		if !ok {
+			reconciledIgnoreEntries = append(reconciledIgnoreEntries, ignoreEntryAny)
+			continue
+		}
+		dependencyName, ok := ignoreEntryMap["dependency-name"].(string)
 		if !ok || dependencyName == "" {
 			reconciledIgnoreEntries = append(reconciledIgnoreEntries, ignoreEntryAny)
 			continue

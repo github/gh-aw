@@ -46,8 +46,8 @@ func (c *SafeOutputsConfig) linearUpdateIssueMax() *string {
 }
 
 func preprocessLinearBaseConfig(outputMap map[string]any, key string) {
-	configData, _ := outputMap[key].(map[string]any)
-	if configData == nil {
+	configData, ok := outputMap[key].(map[string]any)
+	if !ok || configData == nil {
 		return
 	}
 	if err := preprocessIntFieldAsString(configData, "max", linearSafeOutputsLog); err != nil {

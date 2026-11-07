@@ -109,7 +109,11 @@ func (c *Compiler) parseCloseEntityConfig(outputMap map[string]any, params Close
 	}
 
 	// Get config data for pre-processing before YAML unmarshaling
-	configData, _ := outputMap[params.ConfigKey].(map[string]any)
+	configData, ok := outputMap[params.ConfigKey].(map[string]any)
+	if !ok {
+		logger.Printf("Invalid %s configuration: expected a mapping", params.ConfigKey)
+		return nil
+	}
 
 	// Pre-process templatable int fields
 	if err := preprocessIntFieldAsString(configData, "max", logger); err != nil {

@@ -161,7 +161,9 @@ func querySecurityAdvisories(ctx context.Context, depVersions map[string]string,
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		_, _ = io.Copy(io.Discard, resp.Body)
+		if _, err := io.Copy(io.Discard, resp.Body); err != nil {
+			return nil, fmt.Errorf("GitHub API returned status %d and failed to drain response body: %w", resp.StatusCode, err)
+		}
 		return nil, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
 	}
 

@@ -141,7 +141,7 @@ func extractConcurrencyLimit(cfg *workflow.FrontmatterConfig) int {
 	}
 	// When concurrency is configured with cancel-in-progress: true, effective concurrency = 1.
 	if v, ok := cfg.Concurrency["cancel-in-progress"]; ok {
-		if b, _ := v.(bool); b {
+		if b, ok := v.(bool); ok && b {
 			return 1
 		}
 	}

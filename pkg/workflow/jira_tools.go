@@ -90,9 +90,9 @@ func expandJiraToolConfig(tools map[string]any) error {
 		headers["Authorization"] = "Basic ${{ env." + jiraBasicAuthEnvVar + " }}"
 	}
 
-	url, _ := config["url"].(string)
-	if strings.TrimSpace(url) == "" {
-		url = defaultJiraMCPURL
+	url := defaultJiraMCPURL
+	if configuredURL, ok := config["url"].(string); ok && strings.TrimSpace(configuredURL) != "" {
+		url = configuredURL
 	}
 
 	expanded := map[string]any{
@@ -211,15 +211,18 @@ func expandJiraAllowedTools(value any) any {
 }
 
 func validateJiraAuthConfig(auth map[string]any) error {
-	authType, _ := auth["type"].(string)
+	authType, ok := auth["type"].(string)
+	if !ok {
+		return fmt.Errorf("tools.jira.auth.type must be %q or %q", jiraServiceAccountAuth, jiraAPITokenAuth)
+	}
 	for field := range auth {
 		if field != "type" && field != "token" && (authType != jiraAPITokenAuth || field != "email") {
 			return fmt.Errorf("tools.jira.auth.%s is not supported for %s authentication", field, authType)
 		}
 	}
 
-	token, _ := auth["token"].(string)
-	if token == "" {
+	token, ok := auth["token"].(string)
+	if !ok || token == "" {
 		return errors.New("tools.jira.auth.token is required")
 	}
 	if !jiraSecretExpressionPattern.MatchString(token) {
@@ -229,8 +232,8 @@ func validateJiraAuthConfig(auth map[string]any) error {
 	case jiraServiceAccountAuth:
 		return nil
 	case jiraAPITokenAuth:
-		email, _ := auth["email"].(string)
-		if email == "" {
+		email, ok := auth["email"].(string)
+		if !ok || email == "" {
 			return errors.New("tools.jira.auth.email is required for api-token authentication")
 		}
 		if !jiraSecretExpressionPattern.MatchString(email) {

@@ -25,7 +25,11 @@ func (c *Compiler) parseAddReviewerConfig(outputMap map[string]any) *AddReviewer
 	}
 
 	// Get config data for pre-processing before YAML unmarshaling
-	configData, _ := outputMap["add-reviewer"].(map[string]any)
+	configData, ok := outputMap["add-reviewer"].(map[string]any)
+	if !ok {
+		addReviewerLog.Print("Invalid add-reviewer configuration: expected a mapping")
+		return nil
+	}
 
 	// Pre-process reviewers fields to convert single string to array BEFORE unmarshaling
 	if configData != nil {

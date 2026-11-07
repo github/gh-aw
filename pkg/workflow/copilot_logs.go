@@ -627,9 +627,12 @@ func buildWireRequestCallIDMap(inputs []any) map[string]string {
 		if !ok {
 			continue
 		}
-		if typ, _ := itemMap["type"].(string); typ == "function_call" {
-			callID, _ := itemMap["call_id"].(string)
-			name, _ := itemMap["name"].(string)
+		if typ, ok := itemMap["type"].(string); ok && typ == "function_call" {
+			callID, callIDOK := itemMap["call_id"].(string)
+			name, nameOK := itemMap["name"].(string)
+			if !callIDOK || !nameOK {
+				continue
+			}
 			if callID != "" && name != "" {
 				callIDToTool[callID] = name
 			}
@@ -644,11 +647,15 @@ func applyWireRequestOutputs(inputs []any, callIDToTool map[string]string, toolC
 		if !ok {
 			continue
 		}
-		if typ, _ := itemMap["type"].(string); typ != "function_call_output" {
+		if typ, ok := itemMap["type"].(string); !ok || typ != "function_call_output" {
 			continue
 		}
-		callID, _ := itemMap["call_id"].(string)
-		output, _ := itemMap["output"].(string)
+
+		callID, callIDOK := itemMap["call_id"].(string)
+		output, outputOK := itemMap["output"].(string)
+		if !callIDOK || !outputOK {
+			continue
+		}
 		toolName := callIDToTool[callID]
 		if callID == "" || output == "" || toolName == "" {
 			continue

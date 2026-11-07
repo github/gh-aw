@@ -132,8 +132,8 @@ func normalizeInputSchemaRefs(schema map[string]any, sharedDefs map[string]any) 
 		return
 	}
 
-	localDefs, _ := schema["$defs"].(map[string]any)
-	if localDefs == nil {
+	localDefs, ok := schema["$defs"].(map[string]any)
+	if !ok || localDefs == nil {
 		localDefs = map[string]any{}
 		schema["$defs"] = localDefs
 	}
@@ -272,13 +272,17 @@ func substituteRuntimeExpressionsForValidation(v any, schema map[string]any) any
 	case map[string]any:
 		var props map[string]any
 		if schema != nil {
-			props, _ = schema["properties"].(map[string]any)
+			if value, ok := schema["properties"].(map[string]any); ok {
+				props = value
+			}
 		}
 		out := make(map[string]any, len(val))
 		for k, vv := range val {
 			var propSchema map[string]any
 			if props != nil {
-				propSchema, _ = props[k].(map[string]any)
+				if value, ok := props[k].(map[string]any); ok {
+					propSchema = value
+				}
 			}
 			out[k] = substituteRuntimeExpressionsForValidation(vv, propSchema)
 		}
@@ -286,7 +290,9 @@ func substituteRuntimeExpressionsForValidation(v any, schema map[string]any) any
 	case []any:
 		var itemSchema map[string]any
 		if schema != nil {
-			itemSchema, _ = schema["items"].(map[string]any)
+			if value, ok := schema["items"].(map[string]any); ok {
+				itemSchema = value
+			}
 		}
 		out := make([]any, len(val))
 		for i, vv := range val {
@@ -365,8 +371,14 @@ func placeholderForType(t string, schema map[string]any) any {
 	case "array":
 		return []any{}
 	case "object":
-		props, _ := schema["properties"].(map[string]any)
-		required, _ := schema["required"].([]any)
+		props := map[string]any{}
+		if value, ok := schema["properties"].(map[string]any); ok {
+			props = value
+		}
+		required := []any{}
+		if value, ok := schema["required"].([]any); ok {
+			required = value
+		}
 		out := make(map[string]any, len(required))
 		for _, rv := range required {
 			k, ok := rv.(string)
@@ -375,7 +387,9 @@ func placeholderForType(t string, schema map[string]any) any {
 			}
 			var propSchema map[string]any
 			if props != nil {
-				propSchema, _ = props[k].(map[string]any)
+				if value, ok := props[k].(map[string]any); ok {
+					propSchema = value
+				}
 			}
 			out[k] = placeholderForSchema(propSchema)
 		}

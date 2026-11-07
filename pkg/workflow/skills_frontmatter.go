@@ -249,8 +249,8 @@ func parseRawSkillReferences(rawSkills []any) []SkillReference {
 			}
 			refs = append(refs, SkillReference{Skill: skillSpec})
 		case map[string]any:
-			skillSpec, _ := typed["skill"].(string)
-			if strings.TrimSpace(skillSpec) == "" {
+			skillSpec, ok := typed["skill"].(string)
+			if !ok || strings.TrimSpace(skillSpec) == "" {
 				continue
 			}
 			ref := SkillReference{Skill: strings.TrimSpace(skillSpec)}

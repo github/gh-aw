@@ -158,7 +158,9 @@ func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrerel
 		// First attempt succeeded without any file manipulation.
 		if needsRenameWorkaround() {
 			// Replay the buffered output that was not shown during the attempt.
-			_, _ = io.Copy(os.Stderr, &firstAttemptBuf)
+			if _, err := io.Copy(os.Stderr, &firstAttemptBuf); err != nil {
+				return false, "", fmt.Errorf("failed to replay extension upgrade output: %w", err)
+			}
 		}
 		installedVersion, versionErr := installedExtensionVersion()
 		if versionErr != nil {

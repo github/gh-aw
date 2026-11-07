@@ -53,6 +53,10 @@ func processIncludesWithVisited(content, baseDir string, extractTools bool, visi
 		}
 	}
 
+	if err := scanner.Err(); err != nil {
+		return "", fmt.Errorf("failed to scan include content: %w", err)
+	}
+
 	return result.String(), nil
 }
 

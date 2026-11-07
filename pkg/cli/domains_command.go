@@ -239,7 +239,9 @@ func extractWorkflowDomainConfig(filePath string) (engineID string, network *wor
 	// Extract tools map from raw frontmatter (tools is kept as map[string]any)
 	var toolsMap map[string]any
 	if toolsRaw, ok := result.Frontmatter["tools"]; ok {
-		toolsMap, _ = toolsRaw.(map[string]any)
+		if value, ok := toolsRaw.(map[string]any); ok {
+			toolsMap = value
+		}
 	}
 
 	return engineID, config.Network, toolsMap, config.Runtimes

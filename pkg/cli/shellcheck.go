@@ -158,7 +158,10 @@ func resolveDefaultShell(defaults map[string]any) string {
 	if !ok {
 		return ""
 	}
-	shell, _ := run["shell"].(string)
+	shell, ok := run["shell"].(string)
+	if !ok {
+		return ""
+	}
 	return shell
 }
 
@@ -182,7 +185,10 @@ func extractRunStepsFromJob(job map[string]any, jobDefaultShell, lockFile string
 			continue
 		}
 
-		shell, _ := step["shell"].(string)
+		shell := ""
+		if value, ok := step["shell"].(string); ok {
+			shell = value
+		}
 		effectiveShell := shell
 		if effectiveShell == "" {
 			effectiveShell = jobDefaultShell
@@ -191,8 +197,14 @@ func extractRunStepsFromJob(job map[string]any, jobDefaultShell, lockFile string
 		if !isShellcheckableShell(effectiveShell) {
 			continue
 		}
-		name, _ := step["name"].(string)
-		id, _ := step["id"].(string)
+		name := ""
+		if value, ok := step["name"].(string); ok {
+			name = value
+		}
+		id := ""
+		if value, ok := step["id"].(string); ok {
+			id = value
+		}
 		steps = append(steps, runStepInfo{
 			ID:       id,
 			Index:    index + 1,
@@ -235,8 +247,10 @@ func extractRunStepsFromLockFile(lockFile string) ([]runStepInfo, error) {
 
 	// Resolve workflow-level default shell (lowest priority).
 	workflowDefaultShell := resolveDefaultShell(func() map[string]any {
-		d, _ := workflowYAML["defaults"].(map[string]any)
-		return d
+		if defaults, ok := workflowYAML["defaults"].(map[string]any); ok {
+			return defaults
+		}
+		return nil
 	}())
 
 	for jobID, jobData := range jobs {

@@ -281,7 +281,9 @@ func buildBootstrapGitHubAppMux(ctx context.Context, csrfState, owner, ownerType
 	mux := http.NewServeMux()
 	mux.HandleFunc("/register", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = io.WriteString(w, registrationPage)
+		if _, err := io.WriteString(w, registrationPage); err != nil {
+			githubAppBootstrapLog.Printf("Failed to write GitHub App registration page: %v", err)
+		}
 	})
 	mux.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
 		returnedState := r.URL.Query().Get("state")

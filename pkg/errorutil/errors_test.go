@@ -15,6 +15,25 @@ import (
 	"github.com/github/gh-aw/pkg/errorutil"
 )
 
+type testCloser struct {
+	err error
+}
+
+func (c testCloser) Close() error {
+	return c.err
+}
+
+func TestCloseWithError(t *testing.T) {
+	originalErr := errors.New("read failed")
+	closeErr := errors.New("close failed")
+	err := originalErr
+
+	errorutil.CloseWithError(testCloser{err: closeErr}, &err)
+
+	assert.ErrorIs(t, err, originalErr)
+	assert.ErrorIs(t, err, closeErr)
+}
+
 func TestIsNotFoundError(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

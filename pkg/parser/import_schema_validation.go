@@ -42,10 +42,13 @@ func validateWithImportSchema(inputs map[string]any, fm map[string]any, importPa
 
 	// Check each declared schema field
 	for paramName, paramDefRaw := range schemaMap {
-		paramDef, _ := paramDefRaw.(map[string]any)
+		paramDef, ok := paramDefRaw.(map[string]any)
+		if !ok {
+			continue
+		}
 
 		// Check required parameters
-		if req, _ := paramDef["required"].(bool); req {
+		if req, ok := paramDef["required"].(bool); ok && req {
 			if _, provided := inputs[paramName]; !provided {
 				return fmt.Errorf("import '%s': required 'with' input %q is missing (declared in import-schema)", importPath, paramName)
 			}
@@ -57,7 +60,10 @@ func validateWithImportSchema(inputs map[string]any, fm map[string]any, importPa
 		}
 
 		// Skip type validation when type is not specified
-		declaredType, _ := paramDef["type"].(string)
+		declaredType, ok := paramDef["type"].(string)
+		if !ok {
+			continue
+		}
 		if declaredType == "" {
 			continue
 		}
@@ -93,9 +99,12 @@ func validateObjectInput(name string, value any, paramDef map[string]any, import
 	}
 	// Validate each declared property
 	for propName, propDefRaw := range propsMap {
-		propDef, _ := propDefRaw.(map[string]any)
+		propDef, ok := propDefRaw.(map[string]any)
+		if !ok {
+			continue
+		}
 		// Check required sub-fields
-		if req, _ := propDef["required"].(bool); req {
+		if req, ok := propDef["required"].(bool); ok && req {
 			if _, provided := objMap[propName]; !provided {
 				return fmt.Errorf("import '%s': required property %q of 'with' input %q is missing", importPath, propName, name)
 			}
@@ -104,7 +113,10 @@ func validateObjectInput(name string, value any, paramDef map[string]any, import
 		if !provided {
 			continue
 		}
-		propType, _ := propDef["type"].(string)
+		propType, ok := propDef["type"].(string)
+		if !ok {
+			continue
+		}
 		if propType == "" {
 			continue
 		}
@@ -162,8 +174,14 @@ func validateImportInputType(name string, value any, declaredType string, paramD
 		if !hasItems {
 			return nil
 		}
-		itemsDef, _ := itemsDefRaw.(map[string]any)
-		itemType, _ := itemsDef["type"].(string)
+		itemsDef, ok := itemsDefRaw.(map[string]any)
+		if !ok {
+			return nil
+		}
+		itemType, ok := itemsDef["type"].(string)
+		if !ok {
+			return nil
+		}
 		if itemType == "" {
 			return nil
 		}

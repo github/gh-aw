@@ -65,11 +65,20 @@ func applyRuntimeOverrides(runtimes map[string]any, requirements map[string]*Run
 		}
 
 		// Extract action-repo and action-version from config
-		actionRepo, _ := configMap["action-repo"].(string)
-		actionVersion, _ := configMap["action-version"].(string)
+		actionRepo := ""
+		if value, ok := configMap["action-repo"].(string); ok {
+			actionRepo = value
+		}
+		actionVersion := ""
+		if value, ok := configMap["action-version"].(string); ok {
+			actionVersion = value
+		}
 
 		// Extract if condition from config
-		ifCondition, _ := configMap["if"].(string)
+		ifCondition := ""
+		if value, ok := configMap["if"].(string); ok {
+			ifCondition = value
+		}
 
 		// Extract cooldown flag from config (optional)
 		cooldown, hasCooldown := configMap["cooldown"].(bool)

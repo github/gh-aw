@@ -219,7 +219,10 @@ func validateDriveMemoryRuntime(data *WorkflowData) error {
 		if !ok {
 			continue
 		}
-		restoreMemory, _ := job["restore-memory"].(bool)
+		restoreMemory := false
+		if value, ok := job["restore-memory"].(bool); ok {
+			restoreMemory = value
+		}
 		if !restoreMemory {
 			continue
 		}

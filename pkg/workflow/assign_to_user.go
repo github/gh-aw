@@ -23,7 +23,11 @@ func (c *Compiler) parseAssignToUserConfig(outputMap map[string]any) *AssignToUs
 	}
 
 	// Get config data for pre-processing before YAML unmarshaling
-	configData, _ := outputMap["assign-to-user"].(map[string]any)
+	configData, ok := outputMap["assign-to-user"].(map[string]any)
+	if !ok {
+		assignToUserLog.Print("Invalid assign-to-user configuration: expected a mapping")
+		return nil
+	}
 
 	// Pre-process templatable bool fields
 	if err := preprocessBoolFieldAsString(configData, "unassign-first", assignToUserLog); err != nil {

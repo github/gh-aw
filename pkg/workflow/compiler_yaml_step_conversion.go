@@ -168,7 +168,10 @@ func (c *Compiler) renderStepFromMap(out *strings.Builder, step map[string]any, 
 		step = sanitized
 	}
 
-	stepName, _ := step["name"].(string)
+	stepName := ""
+	if name, ok := step["name"].(string); ok {
+		stepName = name
+	}
 	stepConversionLog.Printf("Rendering step from map: name=%q, fields=%d", stepName, len(step))
 	// Start the step with a dash
 	out.WriteString(indent + "- ")
