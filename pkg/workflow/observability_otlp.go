@@ -1023,7 +1023,7 @@ func encodeOTELResourceAttributeValue(value string) string {
 }
 
 func formatOTELResourceAttribute(key, value string) string {
-	trimmedKey := strings.TrimSpace(key)
+	trimmedKey := canonicalOTelAttributeName(strings.TrimSpace(key))
 	trimmedValue := strings.TrimSpace(value)
 	if strings.Contains(trimmedValue, "${{") {
 		return encodeOTELResourceAttributeValue(trimmedKey) + "=" + trimmedValue

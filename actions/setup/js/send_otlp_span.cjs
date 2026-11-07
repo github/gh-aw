@@ -19,7 +19,7 @@ const { resolveEffectiveModel, resolveModelRoutingSummary } = require("./model_a
 const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
 const { readEvalsNotEvaluatedStatus } = require("./evals_status.cjs");
 const { MAX_OTLP_RESPONSE_BYTES, readOTLPResponse, inspectOTLPResponse, unavailableOTLPResponse } = require("./otlp_response.cjs");
-const { OTEL_ATTR_WORKFLOW_NAME, OTEL_ATTR_REPOSITORY, OTEL_ATTR_RUN_ID, OTEL_ATTR_GITHUB_RUN_ID, OTEL_ATTR_ENGINE_ID } = require("./otel_attributes_generated.cjs");
+const { OTEL_ATTR_WORKFLOW_NAME, OTEL_ATTR_REPOSITORY, OTEL_ATTR_RUN_ID, OTEL_ATTR_GITHUB_RUN_ID, OTEL_ATTR_ENGINE_ID, canonicalAttributeName } = require("./otel_attributes_generated.cjs");
 
 function getGhAwPath(relativePath) {
   const root = (process.env.GH_AW_TMP_DIR || "").trim() || "/tmp/gh-aw";
@@ -109,6 +109,7 @@ function toNanoString(ms) {
  * @returns {{ key: string, value: object }}
  */
 function buildAttr(key, value) {
+  key = canonicalAttributeName(key);
   if (typeof value === "boolean") {
     return { key, value: { boolValue: value } };
   }
@@ -137,7 +138,7 @@ function buildAttr(key, value) {
  * @returns {{ key: string, value: { doubleValue: number } }}
  */
 function buildDoubleAttr(key, value) {
-  return { key, value: { doubleValue: typeof value === "number" && Number.isFinite(value) ? value : 0 } };
+  return { key: canonicalAttributeName(key), value: { doubleValue: typeof value === "number" && Number.isFinite(value) ? value : 0 } };
 }
 
 /**
@@ -150,7 +151,7 @@ function buildDoubleAttr(key, value) {
  * @returns {{ key: string, value: { arrayValue: { values: Array<{ stringValue: string }> } } }}
  */
 function buildArrayAttr(key, values) {
-  return { key, value: { arrayValue: { values: values.map(v => ({ stringValue: String(v) })) } } };
+  return { key: canonicalAttributeName(key), value: { arrayValue: { values: values.map(v => ({ stringValue: String(v) })) } } };
 }
 
 /**

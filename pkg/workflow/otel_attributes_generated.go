@@ -3,9 +3,412 @@
 package workflow
 
 const (
-	OTelAttrWorkflowName = "gh-aw.workflow.name"
-	OTelAttrRepository   = "gh-aw.repository"
-	OTelAttrRunID        = "gh-aw.run.id"
-	OTelAttrGitHubRunID  = "github.run_id"
-	OTelAttrEngineID     = "gh-aw.engine.id"
+	OTelAttrGhAwSessionEventType                       = "gh-aw.session.event_type"
+	OTelAttrGhAwSessionCompactVersion                  = "gh-aw.session.compact.version"
+	OTelAttrGhAwSessionOversizedLines                  = "gh-aw.session.oversized_lines"
+	OTelAttrGhAwSessionScanTruncated                   = "gh-aw.session.scan_truncated"
+	OTelAttrGhAwSessionIncludedEvents                  = "gh-aw.session.included_events"
+	OTelAttrGhAwSessionOmittedEvents                   = "gh-aw.session.omitted_events"
+	OTelAttrGhAwSessionTruncated                       = "gh-aw.session.truncated"
+	OTelAttrGhAwSessionUntimedEvents                   = "gh-aw.session.untimed_events"
+	OTelAttrGhAwWorkingSetCumulativeInputTokens        = "gh-aw.working_set.cumulative_input_tokens"
+	OTelAttrGhAwWorkingSetInvocations                  = "gh-aw.working_set.invocations"
+	OTelAttrGhAwWorkingSetPeakInputTokens              = "gh-aw.working_set.peak_input_tokens"
+	OTelAttrGhAwWorkingSetRebuildExcessTokens          = "gh-aw.working_set.rebuild_excess_tokens"
+	OTelAttrGhAwWorkQueueOperation                     = "gh-aw.work_queue.operation"
+	OTelAttrGhAwWorkQueuePublicationAttempts           = "gh-aw.work_queue.publication.attempts"
+	OTelAttrGhAwWorkQueuePublicationConflict           = "gh-aw.work_queue.publication.conflict"
+	OTelAttrGhAwWorkQueuePublicationAmbiguous          = "gh-aw.work_queue.publication.ambiguous"
+	OTelAttrGhAwWorkQueuePublicationCommits            = "gh-aw.work_queue.publication.commits"
+	OTelAttrGhAwWorkQueuePublicationRecovered          = "gh-aw.work_queue.publication.recovered"
+	OTelAttrGhAwWorkQueueRequestKind                   = "gh-aw.work_queue.request.kind"
+	OTelAttrGhAwWorkQueueReason                        = "gh-aw.work_queue.reason"
+	OTelAttrGhAwWorkQueueOutcome                       = "gh-aw.work_queue.outcome"
+	OTelAttrGhAwWorkQueueErrorType                     = "gh-aw.work_queue.error.type"
+	OTelAttrGhAwWorkQueueReconciliationChecked         = "gh-aw.work_queue.reconciliation.checked"
+	OTelAttrGhAwWorkQueueReconciliationUnresolved      = "gh-aw.work_queue.reconciliation.unresolved"
+	OTelAttrGhAwWorkQueueQueueID                       = "gh-aw.work_queue.queue.id"
+	OTelAttrGhAwWorkQueueSnapshotPresent               = "gh-aw.work_queue.snapshot.present"
+	OTelAttrGhAwWorkQueueObservedAtUnixMs              = "gh-aw.work_queue.observed_at_unix_ms"
+	OTelAttrGhAwWorkQueueWorkTotal                     = "gh-aw.work_queue.work.total"
+	OTelAttrGhAwWorkQueueWorkAvailable                 = "gh-aw.work_queue.work.available"
+	OTelAttrGhAwWorkQueueWorkClaimed                   = "gh-aw.work_queue.work.claimed"
+	OTelAttrGhAwWorkQueueWorkCompleted                 = "gh-aw.work_queue.work.completed"
+	OTelAttrGhAwWorkQueueWorkCancelled                 = "gh-aw.work_queue.work.cancelled"
+	OTelAttrGhAwWorkQueueWorkExpired                   = "gh-aw.work_queue.work.expired"
+	OTelAttrGhAwWorkQueueWorkRetryDelayed              = "gh-aw.work_queue.work.retry_delayed"
+	OTelAttrGhAwWorkQueueWorkOldestAvailableAgeMs      = "gh-aw.work_queue.work.oldest_available_age_ms"
+	OTelAttrGhAwWorkQueueDeliveryPending               = "gh-aw.work_queue.delivery.pending"
+	OTelAttrGhAwWorkQueueDeliveryFailed                = "gh-aw.work_queue.delivery.failed"
+	OTelAttrGhAwWorkQueueClaimsOpen                    = "gh-aw.work_queue.claims.open"
+	OTelAttrGhAwWorkQueueReservationsActive            = "gh-aw.work_queue.reservations.active"
+	OTelAttrGhAwWorkQueueReservationsUnbound           = "gh-aw.work_queue.reservations.unbound"
+	OTelAttrGhAwWorkQueueReservationsUncertain         = "gh-aw.work_queue.reservations.uncertain"
+	OTelAttrGhAwWorkQueueReservationsUnresolved        = "gh-aw.work_queue.reservations.unresolved"
+	OTelAttrGhAwWorkQueueCapacityLogicalLimit          = "gh-aw.work_queue.capacity.logical_limit"
+	OTelAttrGhAwWorkQueueCapacityNativeLimit           = "gh-aw.work_queue.capacity.native_limit"
+	OTelAttrGhAwWorkQueueCapacityLogicalSaturatedPools = "gh-aw.work_queue.capacity.logical_saturated_pools"
+	OTelAttrGhAwWorkQueueCapacityNativeSaturatedPools  = "gh-aw.work_queue.capacity.native_saturated_pools"
+	OTelAttrGhAwWorkQueueInitialized                   = "gh-aw.work_queue.initialized"
+	OTelAttrGhAwWorkQueueAdmissionPaused               = "gh-aw.work_queue.admission_paused"
+	OTelAttrGhAwWorkQueueGrantsPaused                  = "gh-aw.work_queue.grants_paused"
+	OTelAttrGhAwWorkQueueCommittedWork                 = "gh-aw.work_queue.committed.Work"
+	OTelAttrGhAwWorkQueueCommittedClaim                = "gh-aw.work_queue.committed.Claim"
+	OTelAttrGhAwWorkQueueCommittedCompletion           = "gh-aw.work_queue.committed.Completion"
+	OTelAttrGhAwWorkQueueCommittedClaimCancellation    = "gh-aw.work_queue.committed.ClaimCancellation"
+	OTelAttrGhAwWorkQueueCommittedWorkCancellation     = "gh-aw.work_queue.committed.WorkCancellation"
+	OTelAttrGhAwWorkQueueCommittedResult               = "gh-aw.work_queue.committed.Result"
+	OTelAttrGhAwWorkQueueCommittedDeliveryFailure      = "gh-aw.work_queue.committed.DeliveryFailure"
+	OTelAttrGhAwWorkQueueCommittedRelease              = "gh-aw.work_queue.committed.Release"
+	OTelAttrGhAwWorkQueueCommittedDispatch             = "gh-aw.work_queue.committed.Dispatch"
+	OTelAttrDeploymentEnvironment                      = "deployment.environment"
+	OTelAttrExceptionMessage                           = "exception.message"
+	OTelAttrExceptionType                              = "exception.type"
+	OTelAttrGenAiOperationName                         = "gen_ai.operation.name"
+	OTelAttrGenAiRequestModel                          = "gen_ai.request.model"
+	OTelAttrGenAiResponseFinishReasons                 = "gen_ai.response.finish_reasons"
+	OTelAttrGenAiResponseModel                         = "gen_ai.response.model"
+	OTelAttrGenAiSystem                                = "gen_ai.system"
+	OTelAttrGenAiUsageCacheCreationInputTokens         = "gen_ai.usage.cache_creation.input_tokens"
+	OTelAttrGenAiUsageCacheReadInputTokens             = "gen_ai.usage.cache_read.input_tokens"
+	OTelAttrGenAiUsageInputTokens                      = "gen_ai.usage.input_tokens"
+	OTelAttrGenAiUsageOutputTokens                     = "gen_ai.usage.output_tokens"
+	OTelAttrGenAiUsageTotalTokens                      = "gen_ai.usage.total_tokens"
+	OTelAttrGenAiWorkflowName                          = "gen_ai.workflow.name"
+	OTelAttrGhAwActionMinutes                          = "gh-aw.action_minutes"
+	OTelAttrGhAwAgentConclusion                        = "gh-aw.agent.conclusion"
+	OTelAttrGhAwAgentExecutionExitCode                 = "gh-aw.agent.execution.exit_code"
+	OTelAttrGhAwAiCreditsRateLimitError                = "gh-aw.ai_credits_rate_limit_error"
+	OTelAttrGhAwAic                                    = "gh-aw.aic"
+	OTelAttrGhAwAwfVersion                             = "gh-aw.awf.version"
+	OTelAttrGhAwAwmgVersion                            = "gh-aw.awmg.version"
+	OTelAttrGhAwCliVersion                             = "gh-aw.cli.version"
+	OTelAttrGhAwDeploymentState                        = "gh-aw.deployment.state"
+	OTelAttrGhAwDetectionConclusion                    = "gh-aw.detection.conclusion"
+	OTelAttrGhAwDetectionReason                        = "gh-aw.detection.reason"
+	OTelAttrGhAwEpisodeID                              = "gh-aw.episode.id"
+	OTelAttrGhAwEpisodeKind                            = "gh-aw.episode.kind"
+	OTelAttrGhAwErrorNestedCount                       = "gh-aw.error.count"
+	OTelAttrGhAwErrorMessages                          = "gh-aw.error.messages"
+	OTelAttrGhAwErrorCount                             = "gh-aw.error_count"
+	OTelAttrGhAwEvalAnswer                             = "gh-aw.eval.answer"
+	OTelAttrGhAwEvalID                                 = "gh-aw.eval.id"
+	OTelAttrGhAwEvalModel                              = "gh-aw.eval.model"
+	OTelAttrGhAwEvalsCount                             = "gh-aw.evals.count"
+	OTelAttrGhAwEvalsNo                                = "gh-aw.evals.no"
+	OTelAttrGhAwEvalsReasonCode                        = "gh-aw.evals.reason_code"
+	OTelAttrGhAwEvalsStatus                            = "gh-aw.evals.status"
+	OTelAttrGhAwEvalsUnknown                           = "gh-aw.evals.unknown"
+	OTelAttrGhAwEvalsYes                               = "gh-aw.evals.yes"
+	OTelAttrGhAwEventName                              = "gh-aw.event_name"
+	OTelAttrGhAwExperiments                            = "gh-aw.experiments"
+	OTelAttrGhAwFailureCategories                      = "gh-aw.failure.categories"
+	OTelAttrGhAwFirewallAllowedRequests                = "gh-aw.firewall.allowed_requests"
+	OTelAttrGhAwFirewallBlockedRequests                = "gh-aw.firewall.blocked_requests"
+	OTelAttrGhAwFirewallRequests                       = "gh-aw.firewall.requests"
+	OTelAttrGhAwFrontmatterBodyModified                = "gh-aw.frontmatter.body_modified"
+	OTelAttrGhAwFrontmatterEmoji                       = "gh-aw.frontmatter.emoji"
+	OTelAttrGhAwFrontmatterSource                      = "gh-aw.frontmatter.source"
+	OTelAttrGhAwGitHubRateLimitLimit                   = "gh-aw.github.rate_limit.limit"
+	OTelAttrGhAwGitHubRateLimitRemaining               = "gh-aw.github.rate_limit.remaining"
+	OTelAttrGhAwGitHubRateLimitReset                   = "gh-aw.github.rate_limit.reset"
+	OTelAttrGhAwGitHubRateLimitResource                = "gh-aw.github.rate_limit.resource"
+	OTelAttrGhAwGitHubRateLimitUsed                    = "gh-aw.github.rate_limit.used"
+	OTelAttrGhAwGraderID                               = "gh-aw.grader.id"
+	OTelAttrGhAwGraderName                             = "gh-aw.grader.name"
+	OTelAttrGhAwGraderPassed                           = "gh-aw.grader.passed"
+	OTelAttrGhAwGraderSeverity                         = "gh-aw.grader.severity"
+	OTelAttrGhAwGraderSource                           = "gh-aw.grader.source"
+	OTelAttrGhAwGraderStatus                           = "gh-aw.grader.status"
+	OTelAttrGhAwGraderUnit                             = "gh-aw.grader.unit"
+	OTelAttrGhAwGraderValue                            = "gh-aw.grader.value"
+	OTelAttrGhAwGradersCount                           = "gh-aw.graders.count"
+	OTelAttrGhAwGradersErrors                          = "gh-aw.graders.errors"
+	OTelAttrGhAwGradersFailed                          = "gh-aw.graders.failed"
+	OTelAttrGhAwGradersOther                           = "gh-aw.graders.other"
+	OTelAttrGhAwGradersPassed                          = "gh-aw.graders.passed"
+	OTelAttrGhAwGradersUnavailable                     = "gh-aw.graders.unavailable"
+	OTelAttrGhAwHarnessAttempts                        = "gh-aw.harness.attempts"
+	OTelAttrGhAwHarnessRetryReasons                    = "gh-aw.harness.retry_reasons"
+	OTelAttrGhAwHopID                                  = "gh-aw.hop.id"
+	OTelAttrGhAwHopParentID                            = "gh-aw.hop.parent_id"
+	OTelAttrGhAwIntegrityFilteredEvents                = "gh-aw.integrity.filtered_events"
+	OTelAttrGhAwJobName                                = "gh-aw.job.name"
+	OTelAttrGhAwMaxAiCredits                           = "gh-aw.max_ai_credits"
+	OTelAttrGhAwMaxAiCreditsExceeded                   = "gh-aw.max_ai_credits_exceeded"
+	OTelAttrGhAwMcpFailedToolCalls                     = "gh-aw.mcp.failed_tool_calls"
+	OTelAttrGhAwMcpInputBytes                          = "gh-aw.mcp.input_bytes"
+	OTelAttrGhAwMcpMaxInputBytes                       = "gh-aw.mcp.max_input_bytes"
+	OTelAttrGhAwMcpMaxOutputBytes                      = "gh-aw.mcp.max_output_bytes"
+	OTelAttrGhAwMcpOutputBytes                         = "gh-aw.mcp.output_bytes"
+	OTelAttrGhAwMcpToolCalls                           = "gh-aw.mcp.tool_calls"
+	OTelAttrGhAwModelEffort                            = "gh-aw.model.effort"
+	OTelAttrGhAwModelRequested                         = "gh-aw.model.requested"
+	OTelAttrGhAwModelRoutingClassifierAic              = "gh-aw.model_routing.classifier_aic"
+	OTelAttrGhAwModelRoutingComplexity                 = "gh-aw.model_routing.complexity"
+	OTelAttrGhAwModelRoutingDegraded                   = "gh-aw.model_routing.degraded"
+	OTelAttrGhAwModelRoutingDeviatedRequests           = "gh-aw.model_routing.deviated_requests"
+	OTelAttrGhAwModelRoutingFailureCode                = "gh-aw.model_routing.failure_code"
+	OTelAttrGhAwModelRoutingMode                       = "gh-aw.model_routing.mode"
+	OTelAttrGhAwModelRoutingObjective                  = "gh-aw.model_routing.objective"
+	OTelAttrGhAwModelRoutingRouterVersion              = "gh-aw.model_routing.router_version"
+	OTelAttrGhAwModelRoutingScope                      = "gh-aw.model_routing.scope"
+	OTelAttrGhAwModelRoutingStatus                     = "gh-aw.model_routing.status"
+	OTelAttrGhAwModelRoutingTaskType                   = "gh-aw.model_routing.task_type"
+	OTelAttrGhAwOriginEvent                            = "gh-aw.origin.event"
+	OTelAttrGhAwOtlpExportErrorDetails                 = "gh-aw.otlp.export_error_details"
+	OTelAttrGhAwOtlpExportErrors                       = "gh-aw.otlp.export_errors"
+	OTelAttrGhAwOutputItemCount                        = "gh-aw.output.item_count"
+	OTelAttrGhAwOutputItemTypes                        = "gh-aw.output.item_types"
+	OTelAttrGhAwPermissionDeniedCount                  = "gh-aw.permission_denied_count"
+	OTelAttrGhAwRootRepo                               = "gh-aw.root.repo"
+	OTelAttrGhAwRootWorkflowID                         = "gh-aw.root.workflow_id"
+	OTelAttrGhAwRunActor                               = "gh-aw.run.actor"
+	OTelAttrGhAwRunAttempt                             = "gh-aw.run.attempt"
+	OTelAttrGhAwRunStatus                              = "gh-aw.run.status"
+	OTelAttrGhAwStaged                                 = "gh-aw.staged"
+	OTelAttrGhAwSteeringEventCount                     = "gh-aw.steering_event_count"
+	OTelAttrGhAwTrackerID                              = "gh-aw.tracker.id"
+	OTelAttrGhAwTriggerCommentID                       = "gh-aw.trigger.comment_id"
+	OTelAttrGhAwTriggerItemNumber                      = "gh-aw.trigger.item_number"
+	OTelAttrGhAwTriggerItemType                        = "gh-aw.trigger.item_type"
+	OTelAttrGhAwTriggerLabel                           = "gh-aw.trigger.label"
+	OTelAttrGhAwTurns                                  = "gh-aw.turns"
+	OTelAttrGhAwWarningCount                           = "gh-aw.warning_count"
+	OTelAttrGhAwWorkflowCallID                         = "gh-aw.workflow_call.id"
+	OTelAttrGhAwWorkflowCallParentID                   = "gh-aw.workflow_call.parent_id"
+	OTelAttrGhAwWorkflowRunConclusion                  = "gh-aw.workflow_run.conclusion"
+	OTelAttrGhAwWorkingSetMeasurementState             = "gh-aw.working_set.measurement_state"
+	OTelAttrGhAwWorkingSetRebuildFactor                = "gh-aw.working_set.rebuild_factor"
+	OTelAttrGitHubActionsRunUrl                        = "github.actions.run_url"
+	OTelAttrGitHubActorID                              = "github.actor_id"
+	OTelAttrGitHubEventName                            = "github.event_name"
+	OTelAttrGitHubHeadRef                              = "github.head_ref"
+	OTelAttrGitHubJob                                  = "github.job"
+	OTelAttrGitHubRef                                  = "github.ref"
+	OTelAttrGitHubRefName                              = "github.ref_name"
+	OTelAttrGitHubRepository                           = "github.repository"
+	OTelAttrGitHubRunAttempt                           = "github.run_attempt"
+	OTelAttrGitHubSha                                  = "github.sha"
+	OTelAttrGitHubWorkflowRef                          = "github.workflow_ref"
+	OTelAttrRunnerArch                                 = "runner.arch"
+	OTelAttrRunnerEnvironment                          = "runner.environment"
+	OTelAttrRunnerName                                 = "runner.name"
+	OTelAttrRunnerOs                                   = "runner.os"
+	OTelAttrServiceName                                = "service.name"
+	OTelAttrServiceVersion                             = "service.version"
+	OTelAttrWorkflowName                               = "gh-aw.workflow.name"
+	OTelAttrRepository                                 = "gh-aw.repository"
+	OTelAttrRunID                                      = "gh-aw.run.id"
+	OTelAttrGitHubRunID                                = "github.run_id"
+	OTelAttrEngineID                                   = "gh-aw.engine.id"
 )
+
+var otelAttributeNamesByValue = map[string]string{
+	"gh-aw.session.event_type":                          "gh-aw.session.event_type",
+	"gh-aw.session.compact.version":                     "gh-aw.session.compact.version",
+	"gh-aw.session.oversized_lines":                     "gh-aw.session.oversized_lines",
+	"gh-aw.session.scan_truncated":                      "gh-aw.session.scan_truncated",
+	"gh-aw.session.included_events":                     "gh-aw.session.included_events",
+	"gh-aw.session.omitted_events":                      "gh-aw.session.omitted_events",
+	"gh-aw.session.truncated":                           "gh-aw.session.truncated",
+	"gh-aw.session.untimed_events":                      "gh-aw.session.untimed_events",
+	"gh-aw.working_set.cumulative_input_tokens":         "gh-aw.working_set.cumulative_input_tokens",
+	"gh-aw.working_set.invocations":                     "gh-aw.working_set.invocations",
+	"gh-aw.working_set.peak_input_tokens":               "gh-aw.working_set.peak_input_tokens",
+	"gh-aw.working_set.rebuild_excess_tokens":           "gh-aw.working_set.rebuild_excess_tokens",
+	"gh-aw.work_queue.operation":                        "gh-aw.work_queue.operation",
+	"gh-aw.work_queue.publication.attempts":             "gh-aw.work_queue.publication.attempts",
+	"gh-aw.work_queue.publication.conflict":             "gh-aw.work_queue.publication.conflict",
+	"gh-aw.work_queue.publication.ambiguous":            "gh-aw.work_queue.publication.ambiguous",
+	"gh-aw.work_queue.publication.commits":              "gh-aw.work_queue.publication.commits",
+	"gh-aw.work_queue.publication.recovered":            "gh-aw.work_queue.publication.recovered",
+	"gh-aw.work_queue.request.kind":                     "gh-aw.work_queue.request.kind",
+	"gh-aw.work_queue.reason":                           "gh-aw.work_queue.reason",
+	"gh-aw.work_queue.outcome":                          "gh-aw.work_queue.outcome",
+	"gh-aw.work_queue.error.type":                       "gh-aw.work_queue.error.type",
+	"gh-aw.work_queue.reconciliation.checked":           "gh-aw.work_queue.reconciliation.checked",
+	"gh-aw.work_queue.reconciliation.unresolved":        "gh-aw.work_queue.reconciliation.unresolved",
+	"gh-aw.work_queue.queue.id":                         "gh-aw.work_queue.queue.id",
+	"gh-aw.work_queue.snapshot.present":                 "gh-aw.work_queue.snapshot.present",
+	"gh-aw.work_queue.observed_at_unix_ms":              "gh-aw.work_queue.observed_at_unix_ms",
+	"gh-aw.work_queue.work.total":                       "gh-aw.work_queue.work.total",
+	"gh-aw.work_queue.work.available":                   "gh-aw.work_queue.work.available",
+	"gh-aw.work_queue.work.claimed":                     "gh-aw.work_queue.work.claimed",
+	"gh-aw.work_queue.work.completed":                   "gh-aw.work_queue.work.completed",
+	"gh-aw.work_queue.work.cancelled":                   "gh-aw.work_queue.work.cancelled",
+	"gh-aw.work_queue.work.expired":                     "gh-aw.work_queue.work.expired",
+	"gh-aw.work_queue.work.retry_delayed":               "gh-aw.work_queue.work.retry_delayed",
+	"gh-aw.work_queue.work.oldest_available_age_ms":     "gh-aw.work_queue.work.oldest_available_age_ms",
+	"gh-aw.work_queue.delivery.pending":                 "gh-aw.work_queue.delivery.pending",
+	"gh-aw.work_queue.delivery.failed":                  "gh-aw.work_queue.delivery.failed",
+	"gh-aw.work_queue.claims.open":                      "gh-aw.work_queue.claims.open",
+	"gh-aw.work_queue.reservations.active":              "gh-aw.work_queue.reservations.active",
+	"gh-aw.work_queue.reservations.unbound":             "gh-aw.work_queue.reservations.unbound",
+	"gh-aw.work_queue.reservations.uncertain":           "gh-aw.work_queue.reservations.uncertain",
+	"gh-aw.work_queue.reservations.unresolved":          "gh-aw.work_queue.reservations.unresolved",
+	"gh-aw.work_queue.capacity.logical_limit":           "gh-aw.work_queue.capacity.logical_limit",
+	"gh-aw.work_queue.capacity.native_limit":            "gh-aw.work_queue.capacity.native_limit",
+	"gh-aw.work_queue.capacity.logical_saturated_pools": "gh-aw.work_queue.capacity.logical_saturated_pools",
+	"gh-aw.work_queue.capacity.native_saturated_pools":  "gh-aw.work_queue.capacity.native_saturated_pools",
+	"gh-aw.work_queue.initialized":                      "gh-aw.work_queue.initialized",
+	"gh-aw.work_queue.admission_paused":                 "gh-aw.work_queue.admission_paused",
+	"gh-aw.work_queue.grants_paused":                    "gh-aw.work_queue.grants_paused",
+	"gh-aw.work_queue.committed.Work":                   "gh-aw.work_queue.committed.Work",
+	"gh-aw.work_queue.committed.Claim":                  "gh-aw.work_queue.committed.Claim",
+	"gh-aw.work_queue.committed.Completion":             "gh-aw.work_queue.committed.Completion",
+	"gh-aw.work_queue.committed.ClaimCancellation":      "gh-aw.work_queue.committed.ClaimCancellation",
+	"gh-aw.work_queue.committed.WorkCancellation":       "gh-aw.work_queue.committed.WorkCancellation",
+	"gh-aw.work_queue.committed.Result":                 "gh-aw.work_queue.committed.Result",
+	"gh-aw.work_queue.committed.DeliveryFailure":        "gh-aw.work_queue.committed.DeliveryFailure",
+	"gh-aw.work_queue.committed.Release":                "gh-aw.work_queue.committed.Release",
+	"gh-aw.work_queue.committed.Dispatch":               "gh-aw.work_queue.committed.Dispatch",
+	"deployment.environment":                            "deployment.environment",
+	"exception.message":                                 "exception.message",
+	"exception.type":                                    "exception.type",
+	"gen_ai.operation.name":                             "gen_ai.operation.name",
+	"gen_ai.request.model":                              "gen_ai.request.model",
+	"gen_ai.response.finish_reasons":                    "gen_ai.response.finish_reasons",
+	"gen_ai.response.model":                             "gen_ai.response.model",
+	"gen_ai.system":                                     "gen_ai.system",
+	"gen_ai.usage.cache_creation.input_tokens":          "gen_ai.usage.cache_creation.input_tokens",
+	"gen_ai.usage.cache_read.input_tokens":              "gen_ai.usage.cache_read.input_tokens",
+	"gen_ai.usage.input_tokens":                         "gen_ai.usage.input_tokens",
+	"gen_ai.usage.output_tokens":                        "gen_ai.usage.output_tokens",
+	"gen_ai.usage.total_tokens":                         "gen_ai.usage.total_tokens",
+	"gen_ai.workflow.name":                              "gen_ai.workflow.name",
+	"gh-aw.action_minutes":                              "gh-aw.action_minutes",
+	"gh-aw.agent.conclusion":                            "gh-aw.agent.conclusion",
+	"gh-aw.agent.execution.exit_code":                   "gh-aw.agent.execution.exit_code",
+	"gh-aw.ai_credits_rate_limit_error":                 "gh-aw.ai_credits_rate_limit_error",
+	"gh-aw.aic":                                         "gh-aw.aic",
+	"gh-aw.awf.version":                                 "gh-aw.awf.version",
+	"gh-aw.awmg.version":                                "gh-aw.awmg.version",
+	"gh-aw.cli.version":                                 "gh-aw.cli.version",
+	"gh-aw.deployment.state":                            "gh-aw.deployment.state",
+	"gh-aw.detection.conclusion":                        "gh-aw.detection.conclusion",
+	"gh-aw.detection.reason":                            "gh-aw.detection.reason",
+	"gh-aw.episode.id":                                  "gh-aw.episode.id",
+	"gh-aw.episode.kind":                                "gh-aw.episode.kind",
+	"gh-aw.error.count":                                 "gh-aw.error.count",
+	"gh-aw.error.messages":                              "gh-aw.error.messages",
+	"gh-aw.error_count":                                 "gh-aw.error_count",
+	"gh-aw.eval.answer":                                 "gh-aw.eval.answer",
+	"gh-aw.eval.id":                                     "gh-aw.eval.id",
+	"gh-aw.eval.model":                                  "gh-aw.eval.model",
+	"gh-aw.evals.count":                                 "gh-aw.evals.count",
+	"gh-aw.evals.no":                                    "gh-aw.evals.no",
+	"gh-aw.evals.reason_code":                           "gh-aw.evals.reason_code",
+	"gh-aw.evals.status":                                "gh-aw.evals.status",
+	"gh-aw.evals.unknown":                               "gh-aw.evals.unknown",
+	"gh-aw.evals.yes":                                   "gh-aw.evals.yes",
+	"gh-aw.event_name":                                  "gh-aw.event_name",
+	"gh-aw.experiments":                                 "gh-aw.experiments",
+	"gh-aw.failure.categories":                          "gh-aw.failure.categories",
+	"gh-aw.firewall.allowed_requests":                   "gh-aw.firewall.allowed_requests",
+	"gh-aw.firewall.blocked_requests":                   "gh-aw.firewall.blocked_requests",
+	"gh-aw.firewall.requests":                           "gh-aw.firewall.requests",
+	"gh-aw.frontmatter.body_modified":                   "gh-aw.frontmatter.body_modified",
+	"gh-aw.frontmatter.emoji":                           "gh-aw.frontmatter.emoji",
+	"gh-aw.frontmatter.source":                          "gh-aw.frontmatter.source",
+	"gh-aw.github.rate_limit.limit":                     "gh-aw.github.rate_limit.limit",
+	"gh-aw.github.rate_limit.remaining":                 "gh-aw.github.rate_limit.remaining",
+	"gh-aw.github.rate_limit.reset":                     "gh-aw.github.rate_limit.reset",
+	"gh-aw.github.rate_limit.resource":                  "gh-aw.github.rate_limit.resource",
+	"gh-aw.github.rate_limit.used":                      "gh-aw.github.rate_limit.used",
+	"gh-aw.grader.id":                                   "gh-aw.grader.id",
+	"gh-aw.grader.name":                                 "gh-aw.grader.name",
+	"gh-aw.grader.passed":                               "gh-aw.grader.passed",
+	"gh-aw.grader.severity":                             "gh-aw.grader.severity",
+	"gh-aw.grader.source":                               "gh-aw.grader.source",
+	"gh-aw.grader.status":                               "gh-aw.grader.status",
+	"gh-aw.grader.unit":                                 "gh-aw.grader.unit",
+	"gh-aw.grader.value":                                "gh-aw.grader.value",
+	"gh-aw.graders.count":                               "gh-aw.graders.count",
+	"gh-aw.graders.errors":                              "gh-aw.graders.errors",
+	"gh-aw.graders.failed":                              "gh-aw.graders.failed",
+	"gh-aw.graders.other":                               "gh-aw.graders.other",
+	"gh-aw.graders.passed":                              "gh-aw.graders.passed",
+	"gh-aw.graders.unavailable":                         "gh-aw.graders.unavailable",
+	"gh-aw.harness.attempts":                            "gh-aw.harness.attempts",
+	"gh-aw.harness.retry_reasons":                       "gh-aw.harness.retry_reasons",
+	"gh-aw.hop.id":                                      "gh-aw.hop.id",
+	"gh-aw.hop.parent_id":                               "gh-aw.hop.parent_id",
+	"gh-aw.integrity.filtered_events":                   "gh-aw.integrity.filtered_events",
+	"gh-aw.job.name":                                    "gh-aw.job.name",
+	"gh-aw.max_ai_credits":                              "gh-aw.max_ai_credits",
+	"gh-aw.max_ai_credits_exceeded":                     "gh-aw.max_ai_credits_exceeded",
+	"gh-aw.mcp.failed_tool_calls":                       "gh-aw.mcp.failed_tool_calls",
+	"gh-aw.mcp.input_bytes":                             "gh-aw.mcp.input_bytes",
+	"gh-aw.mcp.max_input_bytes":                         "gh-aw.mcp.max_input_bytes",
+	"gh-aw.mcp.max_output_bytes":                        "gh-aw.mcp.max_output_bytes",
+	"gh-aw.mcp.output_bytes":                            "gh-aw.mcp.output_bytes",
+	"gh-aw.mcp.tool_calls":                              "gh-aw.mcp.tool_calls",
+	"gh-aw.model.effort":                                "gh-aw.model.effort",
+	"gh-aw.model.requested":                             "gh-aw.model.requested",
+	"gh-aw.model_routing.classifier_aic":                "gh-aw.model_routing.classifier_aic",
+	"gh-aw.model_routing.complexity":                    "gh-aw.model_routing.complexity",
+	"gh-aw.model_routing.degraded":                      "gh-aw.model_routing.degraded",
+	"gh-aw.model_routing.deviated_requests":             "gh-aw.model_routing.deviated_requests",
+	"gh-aw.model_routing.failure_code":                  "gh-aw.model_routing.failure_code",
+	"gh-aw.model_routing.mode":                          "gh-aw.model_routing.mode",
+	"gh-aw.model_routing.objective":                     "gh-aw.model_routing.objective",
+	"gh-aw.model_routing.router_version":                "gh-aw.model_routing.router_version",
+	"gh-aw.model_routing.scope":                         "gh-aw.model_routing.scope",
+	"gh-aw.model_routing.status":                        "gh-aw.model_routing.status",
+	"gh-aw.model_routing.task_type":                     "gh-aw.model_routing.task_type",
+	"gh-aw.origin.event":                                "gh-aw.origin.event",
+	"gh-aw.otlp.export_error_details":                   "gh-aw.otlp.export_error_details",
+	"gh-aw.otlp.export_errors":                          "gh-aw.otlp.export_errors",
+	"gh-aw.output.item_count":                           "gh-aw.output.item_count",
+	"gh-aw.output.item_types":                           "gh-aw.output.item_types",
+	"gh-aw.permission_denied_count":                     "gh-aw.permission_denied_count",
+	"gh-aw.root.repo":                                   "gh-aw.root.repo",
+	"gh-aw.root.workflow_id":                            "gh-aw.root.workflow_id",
+	"gh-aw.run.actor":                                   "gh-aw.run.actor",
+	"gh-aw.run.attempt":                                 "gh-aw.run.attempt",
+	"gh-aw.run.status":                                  "gh-aw.run.status",
+	"gh-aw.staged":                                      "gh-aw.staged",
+	"gh-aw.steering_event_count":                        "gh-aw.steering_event_count",
+	"gh-aw.tracker.id":                                  "gh-aw.tracker.id",
+	"gh-aw.trigger.comment_id":                          "gh-aw.trigger.comment_id",
+	"gh-aw.trigger.item_number":                         "gh-aw.trigger.item_number",
+	"gh-aw.trigger.item_type":                           "gh-aw.trigger.item_type",
+	"gh-aw.trigger.label":                               "gh-aw.trigger.label",
+	"gh-aw.turns":                                       "gh-aw.turns",
+	"gh-aw.warning_count":                               "gh-aw.warning_count",
+	"gh-aw.workflow_call.id":                            "gh-aw.workflow_call.id",
+	"gh-aw.workflow_call.parent_id":                     "gh-aw.workflow_call.parent_id",
+	"gh-aw.workflow_run.conclusion":                     "gh-aw.workflow_run.conclusion",
+	"gh-aw.working_set.measurement_state":               "gh-aw.working_set.measurement_state",
+	"gh-aw.working_set.rebuild_factor":                  "gh-aw.working_set.rebuild_factor",
+	"github.actions.run_url":                            "github.actions.run_url",
+	"github.actor_id":                                   "github.actor_id",
+	"github.event_name":                                 "github.event_name",
+	"github.head_ref":                                   "github.head_ref",
+	"github.job":                                        "github.job",
+	"github.ref":                                        "github.ref",
+	"github.ref_name":                                   "github.ref_name",
+	"github.repository":                                 "github.repository",
+	"github.run_attempt":                                "github.run_attempt",
+	"github.sha":                                        "github.sha",
+	"github.workflow_ref":                               "github.workflow_ref",
+	"runner.arch":                                       "runner.arch",
+	"runner.environment":                                "runner.environment",
+	"runner.name":                                       "runner.name",
+	"runner.os":                                         "runner.os",
+	"service.name":                                      "service.name",
+	"service.version":                                   "service.version",
+	"gh-aw.workflow.name":                               "gh-aw.workflow.name",
+	"gh-aw.repository":                                  "gh-aw.repository",
+	"gh-aw.run.id":                                      "gh-aw.run.id",
+	"github.run_id":                                     "github.run_id",
+	"gh-aw.engine.id":                                   "gh-aw.engine.id",
+}
+
+func canonicalOTelAttributeName(name string) string {
+	if canonical, ok := otelAttributeNamesByValue[name]; ok {
+		return canonical
+	}
+	return name
+}
