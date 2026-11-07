@@ -159,3 +159,32 @@ func workQueueIssuesEnvironment(data *WorkflowData) []string {
 		"          GH_AW_WORK_QUEUE_CHECKED_TRANSPORT: \"graphql\"\n",
 	}
 }
+
+func (c *Compiler) buildWorkQueueIssuesStep(data *WorkflowData) []string {
+	if workQueueIssuesConfig(data) == nil || !isWorkQueueParticipant(data) {
+		return nil
+	}
+	steps := c.workQueueProjectorTokenSteps(data, "conclusion")
+	steps = append(steps,
+		"      - name: Project this run's work queue Issues\n",
+		"        id: work_queue_issues\n",
+		"        if: always()\n",
+		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/github-script")),
+	)
+	steps = append(steps, workQueuePolicyEnvironment(data)...)
+	var staged *TemplatableBool
+	if data.SafeOutputs != nil {
+		staged = data.SafeOutputs.Staged
+	}
+	if value := resolveSafeOutputsStagedValue(c.trialMode, staged); value != nil {
+		steps = append(steps, "          GH_AW_SAFE_OUTPUTS_STAGED: "+fmt.Sprintf("%q", *value)+"\n")
+	}
+	steps = append(steps, "          GH_AW_WORK_QUEUE_JOB_RESULTS: ${{ toJSON(needs) }}\n", "        with:\n")
+	c.addWorkQueueProjectorToken(&steps, data)
+	return append(steps,
+		"          script: |\n",
+		"            const { main } = require('${{ runner.temp }}/gh-aw/actions/work_queue_issues.cjs');\n",
+		"            const result = await main({ core, githubClient: github, context });\n",
+		"            if (result.pending?.length) core.warning('Work queue is committed; Issue synchronization remains pending. Inspect the exact terminal request before using work-queue sync-issues --request-id.');\n",
+	)
+}

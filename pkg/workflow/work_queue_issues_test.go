@@ -133,6 +133,7 @@ func TestWorkQueueIssuesCompilationUsesExistingJobs(t *testing.T) {
 	require.Equal(t, "write", activationPerms["issues"])
 	conclusionPerms := conclusion["permissions"].(map[string]any)
 	require.Equal(t, "write", conclusionPerms["contents"])
+	require.Equal(t, "write", conclusionPerms["issues"])
 	require.Equal(t, "read", conclusionPerms["actions"])
 	agent := jobs["agent"].(map[string]any)
 	perms := agent["permissions"].(map[string]any)
@@ -141,21 +142,35 @@ func TestWorkQueueIssuesCompilationUsesExistingJobs(t *testing.T) {
 	conclusionSteps := conclusion["steps"].([]any)
 	conclusionYAML, err := yaml.Marshal(conclusionSteps)
 	require.NoError(t, err)
-	require.NotContains(t, string(conclusionYAML), "work_queue_issues.cjs")
+	require.Contains(t, string(conclusionYAML), "work_queue_issues.cjs")
+	require.Contains(t, string(conclusionYAML), "GH_AW_WORK_QUEUE_CHECKED_TRANSPORT: graphql")
 	detectionSeen := false
+	projectionSeen := false
 	for _, value := range conclusionSteps {
 		step := value.(map[string]any)
+		if step["id"] == "work_queue_issues" {
+			require.Equal(t, "always()", step["if"])
+			env := step["env"].(map[string]any)
+			require.JSONEq(t, `{"label":"cookie","orphaned_after_days":30,"title_prefix":"[cookie queue]"}`, env["GH_AW_WORK_QUEUE_ISSUES"].(string))
+			script := step["with"].(map[string]any)["script"].(string)
+			require.Contains(t, script, "githubClient: github")
+			require.NotContains(t, script, "reconcileMirrors")
+			projectionSeen = true
+		}
 		if step["id"] == "detection_runs" {
 			require.Equal(t, "always()", step["if"])
 			detectionSeen = true
 		}
 	}
+	require.True(t, projectionSeen)
 	require.True(t, detectionSeen)
 	trial := compile("true", true)
-	for _, value := range trial["jobs"].(map[string]any)["activation"].(map[string]any)["steps"].([]any) {
-		step := value.(map[string]any)
-		if step["id"] == "work_queue_snapshot" {
-			require.Equal(t, "true", step["env"].(map[string]any)["GH_AW_SAFE_OUTPUTS_STAGED"])
+	for _, name := range []string{"activation", "conclusion"} {
+		for _, value := range trial["jobs"].(map[string]any)[name].(map[string]any)["steps"].([]any) {
+			step := value.(map[string]any)
+			if step["id"] == "work_queue_snapshot" || step["id"] == "work_queue_issues" {
+				require.Equal(t, "true", step["env"].(map[string]any)["GH_AW_SAFE_OUTPUTS_STAGED"])
+			}
 		}
 	}
 }
