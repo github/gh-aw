@@ -34,6 +34,34 @@ do not describe the new current protocol.
 
 The design rationale and trade-offs are recorded in [ADR-64955](../../docs/adr/64955-git-backed-work-queue-coordination.md).
 
+## Analysis Index
+
+| Section | Goal | Risk |
+|---|---|---|
+| [Current operator interface](#current-operator-interface) | Point operators to the supported commands and deployment guidance. | Historical model details could be mistaken for current operator guidance. |
+| [Unclaimed Work expiration model](#unclaimed-work-expiration-model) | Check immutable deadlines without changing Claim authority. | Bounded deadline checks do not prove wall-clock scheduling or eventual service. |
+| [Retained Claim completion model](#retained-claim-completion-model) | Check retained completion, delivery barriers, and subsequent re-claim. | Abstract receipts do not prove external effects or runtime refinement. |
+| [Claim delivery health and native capacity](#claim-delivery-health-and-native-capacity) | Separate aggregate delivery reporting from per-Claim results and capacity release. | Trusted receipt and terminal evidence are model premises, not verified implementations. |
+| [Released Claim delivery recovery](#released-claim-delivery-recovery) | Check recovery of released Claims whose delivery remains pending. | Fair recovery depends on stable terminal evidence, writable storage, and successful retries. |
+| [Abandoned dispatcher reservation recovery](#abandoned-dispatcher-reservation-recovery) | Check bounded recovery of reservations whose original dispatch never started. | Abstract evidence and checked publication do not prove GitHub identity or live Git CAS. |
+| [First-submit bootstrap model](#first-submit-bootstrap-model) | Check first-submit Policy installation and admission boundaries. | The bounded bootstrap model does not prove deployment ordering or live repository behavior. |
+| [Prospective worker evolution model](#prospective-worker-evolution-model) | Check prospective worker and policy updates without changing existing assignments. | Bounded transitions do not establish deployment behavior for every configuration. |
+| [Local stress simulator](#local-stress-simulator) | Exercise queue behavior under reproducible local stress scenarios. | Simulation results are not exhaustive protocol or production-load evidence. |
+| [Runtime scaling and compaction](#runtime-scaling-and-compaction) | Describe replay indexes, scaling controls, and compaction behavior. | Resource and compaction behavior still depends on the concrete runtime and storage. |
+| [Historical queue inspection and operator commands](#historical-queue-inspection-and-operator-commands) | Preserve historical inspection and migration context. | Historical commands and formats are not current supported deployment guidance. |
+| [Inline worker termination](#inline-worker-termination) | Release execution capacity from authenticated, quiescent inline termination evidence. | Capacity release alone does not establish native terminality or delivery settlement. |
+| [Current wire contract and schema checks](#current-wire-contract-and-schema-checks) | Define the current version-3 wire contract and generated-schema checks. | Local schema and parity checks do not establish live API writes or full codec refinement. |
+| [Historical arbitration model](#historical-arbitration-model) | Retain the original arbitration model as historical evidence. | Its scalar and best-effort behavior does not describe the current protocol. |
+| [Historical model's concrete protocol choices](#historical-models-concrete-protocol-choices) | Record concrete choices made by the historical model. | Those choices must not be read as current runtime requirements. |
+| [Historical model's state and job boundaries](#historical-models-state-and-job-boundaries) | Explain the historical model's durable state and job boundaries. | Abstract branch versions and jobs do not model all runtime persistence details. |
+| [Required protections](#required-protections) | State the protections represented by the retained historical model. | Model-level protections do not prove implementation conformance. |
+| [Invariants](#invariants) | Enumerate the historical model's safety properties. | Invariant checking is bounded by the stated model configuration. |
+| [Inductive proof argument](#inductive-proof-argument) | Explain why the stated safety predicates are inductive. | The argument applies only to its abstraction and assumptions. |
+| [Reproduce verification](#reproduce-verification) | Provide commands for reproducing formal checks. | Results depend on the pinned tools, bounds, and available runtime. |
+| [Inspect execution traces](#inspect-execution-traces) | Generate and inspect bounded execution traces. | Sampled traces do not enumerate all reachable behavior. |
+| [Runtime smoke coverage](#runtime-smoke-coverage) | Record read-only runtime smoke evidence. | Smoke coverage does not prove production execution or end-to-end refinement. |
+| [Limits](#limits) | Summarize protocol and verification limits. | Safety evidence must not be interpreted as liveness or exactly-once delivery. |
+
 ## Current operator interface
 
 The current operator commands and keyboard browser are documented in the
@@ -277,6 +305,14 @@ existing `QueueLifecycle` model separately checks the finite verification-attemp
 budget, and `ClaimDeliveryHealth` checks staged isolation and aggregate reporting.
 Existing historical verification counts elsewhere in this guide are not results
 for this new refinement.
+
+These safeguards are normative for the current Claim delivery recovery protocol,
+not only for the historical `WorkQueue.tla` model.
+
+**Safeguards:** Recovery MUST use exact authenticated terminal evidence and checked
+publication against the original owner and pending barrier. It MUST NOT infer
+terminality from elapsed time or capacity release, reconstruct a Result, or replay
+completed effects.
 
 ## Abandoned dispatcher reservation recovery
 
@@ -794,6 +830,12 @@ per-worker completion-triggered workflow. Upgrade closed-schema readers before
 publishing the new evidence variant. Cross-language worker-termination tests
 cover the new release boundary; existing native-terminal formal models continue
 to cover the recovery path, not the inline job-inventory receipt check.
+
+**Safeguards:** Inline termination evidence MUST come from the authenticated
+original run and a complete, quiescent job inventory. It MUST NOT be treated as
+proof that the native run completed or that delivery barriers settled. Hard-cancelled
+workers MUST continue through scheduled reconciliation with exact native-terminal
+evidence.
 
 ## Current wire contract and schema checks
 

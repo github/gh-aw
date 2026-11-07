@@ -78,7 +78,7 @@ The following gosec rules are globally excluded across the entire codebase:
 - **Mitigation**:
   - Unit tests cover slice operations
   - Integration tests validate real-world usage patterns
-  - Panics are handled gracefully at API boundaries
+  - Panics are handled at API boundaries
 - **Review Date**: 2025-12-25
 
 ## File-Specific Exclusions
@@ -138,13 +138,13 @@ The following files have specific gosec rule exclusions with documented rational
 - **Configuration**: `G204: "0644"`, `G306: "0644"` allowed
 - **Rationale**:
   - 0644 permissions are appropriate for regular files (owner read/write, group/others read)
-  - 0755 permissions are correct for executable scripts (owner read/write/execute, group/others read/execute)
+  - 0755 is the mode executable scripts require (owner read/write/execute, group/others read/execute)
   - Test files are in temporary directories and cleaned up
   - Production files are in user-controlled directories
 - **Mitigation**:
   - File permissions match Unix conventions
   - Sensitive data files use restrictive permissions (0600)
-  - Executable scripts correctly marked as executable
+  - Executable scripts are marked executable (mode 0755)
 - **Review Date**: 2025-12-25
 
 ### G305: File Traversal in Archive Extraction
@@ -218,7 +218,7 @@ The following files have specific gosec rule exclusions with documented rational
 
 ## Suppression Guidelines
 
-When you need to suppress gosec warnings in code, use `#nosec` annotations with proper justification:
+When you need to suppress gosec warnings in code, use `#nosec` annotations with a documented justification:
 
 **Required Format**:
 ```go

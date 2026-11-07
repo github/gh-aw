@@ -219,6 +219,8 @@ tools:
 
 Compiler creates a separate `push_repo_memory` job with `contents: write`; main agent job stays read-only.
 
+To push to ruleset-protected memory branches, add `github-app: {client-id, private-key}` (app needs **Contents: read and write**). Use `github-app-read` / `github-app-write` to split read and write apps; only the write app needs the ruleset bypass. Without an app, `github.token` is used.
+
 ### Structured event history: standalone ledger (experimental)
 
 For immutable, structured events where each run appends records and later runs

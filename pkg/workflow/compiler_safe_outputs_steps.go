@@ -34,7 +34,14 @@ func (c *Compiler) buildSharedPRCheckoutSteps(data *WorkflowData) []string {
 	consolidatedSafeOutputsStepsLog.Print("Building shared PR checkout steps (mirroring agent job layout)")
 	checkoutMgr, prCheckoutToken := prepareSharedPRCheckout(data)
 	steps, condition := c.buildSharedPRCheckoutLayout(data, checkoutMgr)
-	steps = append(steps, checkoutMgr.GenerateConfigureGitCredentialsSteps(prCheckoutToken, condition)...)
+	rootRepo := checkoutMgr.effectiveRootCheckoutRepository()
+	if c.trialMode && !checkoutMgr.HasExternalRootCheckout() {
+		rootRepo = "${{ github.repository }}"
+		if c.trialLogicalRepoSlug != "" {
+			rootRepo = fmt.Sprintf("%q", c.trialLogicalRepoSlug)
+		}
+	}
+	steps = append(steps, checkoutMgr.generateConfigureGitCredentialsStepsForRoot(prCheckoutToken, condition, rootRepo)...)
 	c.prCheckoutLintBlock = preparePRCheckoutLintBlock(steps, c.formatFrameworkJobRunsOn(data))
 	consolidatedSafeOutputsStepsLog.Printf("Built shared PR checkout steps with condition: %s", condition.Render())
 	return steps

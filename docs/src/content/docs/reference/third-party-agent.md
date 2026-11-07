@@ -70,6 +70,21 @@ Start from a sample with a matching transport rather than copying installation o
 
 See [imports](/gh-aw/reference/imports/) for resolution and pinning rules.
 
+### Secret environment overrides
+
+An imported definition declares supported environment variable names in
+`engine.behaviors.supported-env-var-keys`. In strict mode, these names are
+allowed to carry secret references in the consuming workflow's `engine.env`.
+The compiler checks those overrides after resolving imports and registering
+the engine, so the imported definition's allowlist applies.
+
+This does not permit arbitrary secret-bearing variables: undeclared keys in
+`engine.env` remain subject to strict-mode validation, and secret references in
+top-level `env` are still rejected. In strict mode, secret overrides require
+AWF v0.25.3 or newer to exclude them from the agent container. See
+[workflow environment variables](/gh-aw/reference/frontmatter/#environment-variables-env)
+for the restrictions on top-level `env`.
+
 ### Durable execution
 
 > [!WARNING]

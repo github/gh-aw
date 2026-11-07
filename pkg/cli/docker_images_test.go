@@ -238,8 +238,9 @@ func TestScannerImageReleasePins(t *testing.T) {
 	for _, tt := range []struct {
 		name, got, want string
 	}{
-		{"syft", SyftImage, "anchore/syft:v1.55.0@sha256:4cc92b64ca74ffca4c94d4c8fcc01f217731375300be14d0b6eeb2e82eaa110a"},
-		{"grype", GrypeImage, "anchore/grype:v0.121.0@sha256:621d56d1d68106b787022c81546f7e0a36202a25d1239f0c20195fab8c16f7ea"},
+		{"syft", SyftImage, "anchore/syft:v1.56.0@sha256:697ae864af1299cfa43c54b161cea3dd65c6d54de82e3dba66ea3dccb3acc313"},
+		{"grype", GrypeImage, "anchore/grype:v0.121.1@sha256:6b06708b036f74b2cd70e94b706b4586af96d1932e6ac46255940b2e39dd44a9"},
+		{"grant", GrantImage, "anchore/grant:v0.7.0@sha256:2f273ee261204d24a4d7e8799c2bcc210374c652000e7c415da2bb5173ec99d3"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.got != tt.want {

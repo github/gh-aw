@@ -389,6 +389,17 @@ type externalDetectorPathSetup struct {
 	commandPrefix string
 }
 
+const threatDetectBinaryPathSetup = `detector="${THREAT_DETECT_BINARY:?Verified detector path must be supplied by the install step}"
+if [[ ! -f "$detector" || ! -x "$detector" || -L "$detector" ]]; then
+  echo "ERROR: Verified detector must be a regular executable file" >&2
+  exit 1
+fi
+mkdir -p "${RUNNER_TEMP}/gh-aw/bin"
+rm -f "${RUNNER_TEMP}/gh-aw/bin/threat-detect"
+cp "$detector" "${RUNNER_TEMP}/gh-aw/bin/threat-detect"
+chmod +x "${RUNNER_TEMP}/gh-aw/bin/threat-detect"
+`
+
 // buildExternalDetectorPathSetup returns the host-side shell commands that run
 // before AWF plus any command prefix needed inside the external detector container.
 // For the installed Copilot engine, threat-detect invokes the engine binary by
@@ -400,6 +411,11 @@ type externalDetectorPathSetup struct {
 func (c *Compiler) buildExternalDetectorPathSetup(data *WorkflowData, engineID string) externalDetectorPathSetup {
 	setup := externalDetectorPathSetup{}
 	threatLog.Printf("Building external detector path setup: engine=%s", engineID)
+	if useRootlessCLIInstallation(data) && !isArcDindTopology(data) {
+		// Mount the verified user-space binary without relying on the container's HOME.
+		setup.hostSetup = threatDetectBinaryPathSetup
+		setup.commandPrefix = `export PATH="${RUNNER_TEMP}/gh-aw/bin:$PATH" && `
+	}
 	if isArcDindTopology(data) {
 		threatLog.Print("ARC/DinD topology detected, staging threat detection inputs on shared volume")
 		setup.hostSetup = `bash "${RUNNER_TEMP}/gh-aw/actions/stage_threat_detection_arc_dind.sh" stage`
@@ -423,7 +439,7 @@ func (c *Compiler) buildExternalDetectorPathSetup(data *WorkflowData, engineID s
 		return setup
 	}
 	setup.commandPrefix = `export PATH="${RUNNER_TEMP}/gh-aw/bin:$PATH" && `
-	setup.hostSetup = copilotBinaryPathSetup
+	setup.hostSetup += copilotBinaryPathSetup
 	return setup
 }
 
@@ -683,7 +699,7 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 	// Pass context as environment variables: AWF's --env-all forwards them to
 	// threat-detect without interpolating user-controlled prompt text into a command.
 	steps = append(steps, c.buildThreatDetectionContextEnvVars(data, continueOnError, continueOnErrorExpr)...)
-	if isArcDindTopology(threatDetectionData) {
+	if useRootlessCLIInstallation(threatDetectionData) {
 		steps = append(steps, "          THREAT_DETECT_BINARY: ${{ steps.threat_detect_install.outputs.binary-path }}\n")
 	}
 	steps = append(steps, "        run: |\n")
@@ -801,6 +817,7 @@ func (c *Compiler) buildUploadDetectionArtifactStep(data *WorkflowData) []string
 		"            " + detectionExecutionEvidencePath + "\n",
 		"            " + constants.TmpGhAwDir + "/threat-detection/detection_usage.json\n",
 		"            " + constants.TmpGhAwDir + "/threat-detection/detection_usage.jsonl\n",
+		"            " + constants.TmpGhAwDir + "/threat-detection/detection_harness_retry.json\n",
 	}
 	// Include the detection AWF run's own firewall proxy/audit logs (token usage, squid
 	// logs) so detection-phase usage surfaces in the usage artifact and counts toward the

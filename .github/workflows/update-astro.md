@@ -13,11 +13,14 @@ permissions:
   contents: read
   issues: read
   pull-requests: read
+  copilot-requests: write
 tracker-id: update-astro
 engine:
   id: codex
   model-provider: github
-model: copilot/gpt-5.6-sol
+  model-routing:
+    goal: cost
+    mode: economy
 strict: true
 
 timeout-minutes: 45

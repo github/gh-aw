@@ -13,6 +13,7 @@ import { preferGetErrorMessageOverStringRule } from "./rules/prefer-get-error-me
 import { preferNumberIsNanRule } from "./rules/prefer-number-isnan";
 import { noDeprecatedStringSubstrRule } from "./rules/no-deprecated-string-substr";
 import { noMapParseIntCallbackRule } from "./rules/no-map-parseint-callback";
+import { noPathStartsWithoutSeparatorRule } from "./rules/no-path-startswith-without-separator";
 import { requireAsyncEntrypointCatchRule } from "./rules/require-async-entrypoint-catch";
 import { requireAwaitCoreSummaryWriteRule } from "./rules/require-await-core-summary-write";
 import { requireFsCloseSyncRule } from "./rules/require-fs-close-sync";
@@ -92,6 +93,7 @@ const plugin = {
     "prefer-number-isnan": preferNumberIsNanRule,
     "no-deprecated-string-substr": noDeprecatedStringSubstrRule,
     "no-map-parseint-callback": noMapParseIntCallbackRule,
+    "no-path-startswith-without-separator": noPathStartsWithoutSeparatorRule,
     "require-async-entrypoint-catch": requireAsyncEntrypointCatchRule,
     "require-await-core-summary-write": requireAwaitCoreSummaryWriteRule,
     "require-fs-close-sync": requireFsCloseSyncRule,

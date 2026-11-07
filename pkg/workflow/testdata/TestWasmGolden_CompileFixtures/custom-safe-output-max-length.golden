@@ -579,7 +579,7 @@ jobs:
           path: /tmp/gh-aw
       - name: Configure Git credentials
         env:
-          GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_AW_GIT_REPOSITORY: ${{ github.repository }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_TOKEN: ${{ github.token }}
         run: bash "${RUNNER_TEMP}/gh-aw/actions/configure_git_credentials.sh"
@@ -1081,7 +1081,7 @@ jobs:
             await main();
       - name: Configure Git credentials
         env:
-          GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_AW_GIT_REPOSITORY: ${{ github.repository }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_TOKEN: ${{ github.token }}
         run: bash "${RUNNER_TEMP}/gh-aw/actions/configure_git_credentials.sh"
@@ -2019,6 +2019,7 @@ jobs:
             /tmp/gh-aw/threat-detection/execution.json
             /tmp/gh-aw/threat-detection/detection_usage.json
             /tmp/gh-aw/threat-detection/detection_usage.jsonl
+            /tmp/gh-aw/threat-detection/detection_harness_retry.json
             /tmp/gh-aw/threat-detection/sandbox/firewall/logs/
             /tmp/gh-aw/threat-detection/sandbox/firewall/audit/
           if-no-files-found: ignore

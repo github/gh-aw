@@ -199,22 +199,30 @@ class TransportRunnerTest(unittest.TestCase):
 
 class RuntimePinTest(unittest.TestCase):
     def test_release_pin_matches_workflow_and_documentation(self):
-        expected = "011267fca25d0752cf18894dd585cd28b96960c112ea8a20b823ea770e7e10cd"
+        expected = "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88"
         self.assertEqual(check.JAR_SHA256, expected)
+        self.assertEqual(check_transport.JAR_SHA256, expected)
         workflow = (check.ROOT.parents[1] / ".github/workflows/daily-workflow-security-model.md").read_text()
         self.assertIn("  - shared/tla-plus.md", workflow)
         runtime = (check.ROOT.parents[1] / ".github/workflows/shared/tla-plus.md").read_text()
-        self.assertIn("https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar",
-                      runtime)
-        match = re.search(
-            r"printf '%s  %s\\n' \\\n\s+([a-f0-9]{64}) \\\n"
-            r'\s+"\$tools/tla2tools\.jar" \| sha256sum --check --strict',
+        installer = (check.ROOT.parents[1] / ".github/scripts/install_tla_runtime.sh").read_text()
+        self.assertIn("https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar",
+                      installer)
+        self.assertIn(f"jar_sha={expected}", installer)
+        self.assertIn('"$staging/runtime/tla2tools.jar" "$jar_sha"', installer)
+        installer_hash = re.search(
+            r'([a-f0-9]{64}) "\$trusted/\.github/scripts/install_tla_runtime\.sh"',
             runtime,
         )
-        self.assertIsNotNone(match)
-        self.assertEqual(match.group(1), expected)
+        self.assertIsNotNone(installer_hash)
+        self.assertIn('bash "$trusted/.github/scripts/install_tla_runtime.sh"', runtime)
         lock = (check.ROOT.parents[1] / ".github/workflows/daily-workflow-security-model.lock.yml").read_text()
-        self.assertIn(expected, lock)
+        self.assertIn(".github/scripts/install_tla_runtime.sh", lock)
+        self.assertIn(installer_hash.group(1), lock)
+        for content in [runtime, lock]:
+            self.assertNotIn("releases/download/v1.8.0/tla2tools.jar", content)
+            self.assertNotIn("011267fca25d0752cf18894dd585cd28b96960c112ea8a20b823ea770e7e10cd",
+                             content)
         self.assertIn(expected, (check.ROOT / "README.md").read_text())
 
     def test_missing_or_mismatched_jar_fails_before_execution(self):

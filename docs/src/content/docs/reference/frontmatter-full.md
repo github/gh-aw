@@ -2304,11 +2304,9 @@ runs-on-slim:
   labels: []
     # Array of strings
 
-# Runner topology configuration. Tells gh-aw and AWF what kind of runner
-# environment the workflow targets, so they can activate topology-specific
-# behaviors automatically (split-filesystem handling, network isolation, sysroot
-# images, tool cache redirection). The runner.topology key is the single stable
-# contract between gh-aw and AWF for runner environment detection.
+# Runner configuration. Installation privilege is independent of runner topology.
+# The runner.topology key tells gh-aw and AWF to activate topology-specific
+# behaviors (split-filesystem handling, sysroot images, tool cache redirection).
 # (optional)
 runner:
   # Runner execution topology. When set to 'arc-dind', gh-aw emits the topology in
@@ -2317,6 +2315,14 @@ runner:
   # network isolation, sysroot image staging, and DinD pre-staging automatically.
   # (optional)
   topology: "arc-dind"
+
+  # Installation privilege for Copilot CLI and threat-detect in the agent and
+  # detection jobs. Rootless installs to ~/.local/bin without sudo. Defaults to
+  # rootless for arc-dind and privileged (/usr/local/bin via sudo) otherwise.
+  # Privileged is not supported with arc-dind. Does not change AWF runtime
+  # privileges or enable split-filesystem handling.
+  # (optional)
+  installation: "rootless"
 
 # Agentic execution step timeout in minutes. Defaults to 20 minutes for agentic
 # workflows, or the GH_AW_DEFAULT_TIMEOUT_MINUTES GitHub Actions variable. The

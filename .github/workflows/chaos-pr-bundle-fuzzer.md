@@ -10,10 +10,13 @@ permissions:
   contents: read
   pull-requests: read
   issues: read
-model: openai/gpt-5.6-terra
+  copilot-requests: write
 engine:
   id: codex
-  model-provider: openai
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
 strict: true
 tools:
   cli-proxy: true

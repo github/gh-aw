@@ -828,12 +828,13 @@ describe("submit_pr_review multi-buffer (registry mode)", () => {
     expect(ctx2.pullRequestNumber).toBe(2);
   });
 
-  it("second call targeting the same PR is rejected with an error", async () => {
+  it.each([false, true])("second call targeting the same PR is rejected even after draining: %s", async drained => {
     const registry = createPrReviewBufferRegistry();
     const { main } = require("./submit_pr_review.cjs");
     const handler = await main({ max: 5, target: "*", _prReviewBufferRegistry: registry });
 
     const result1 = await handler({ body: "First call", event: "COMMENT", pull_request_number: 7 }, {});
+    if (drained) registry.drainEntries();
     const result2 = await handler({ body: "Second call", event: "APPROVE", pull_request_number: 7 }, {});
 
     expect(result1.success).toBe(true);

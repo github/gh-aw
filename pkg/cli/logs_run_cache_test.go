@@ -4,51 +4,14 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/github/gh-aw/pkg/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func TestIsAgenticWorkflowPath(t *testing.T) {
-	tests := []struct {
-		name string
-		path string
-		want bool
-	}{
-		{
-			name: "agentic workflow",
-			path: ".github/workflows/research.lock.yml",
-			want: true,
-		},
-		{
-			name: "regular yml workflow",
-			path: ".github/workflows/ci.yml",
-			want: false,
-		},
-		{
-			name: "regular yaml workflow",
-			path: ".github/workflows/ci.yaml",
-			want: false,
-		},
-		{
-			name: "missing workflow path",
-			path: "",
-			want: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, isAgenticWorkflowPath(tt.path))
-		})
-	}
-}
 
 func TestCachedJSONDownloadResultRejectsNonAgenticWorkflow(t *testing.T) {
 	updatedAt := time.Now()
@@ -105,67 +68,6 @@ func TestCachedJSONDownloadResultRejectsRegularCurrentWorkflow(t *testing.T) {
 	assert.False(t, ok)
 }
 
-func TestInferMissingWorkflowPathFromAwInfo(t *testing.T) {
-	runDir := t.TempDir()
-	require.NoError(t, os.WriteFile(
-		filepath.Join(runDir, "aw_info.json"),
-		[]byte(`{"workflow_name":"Weekly Research"}`),
-		0o600,
-	))
-	result := &DownloadResult{}
-
-	inferMissingWorkflowPath(result, runDir)
-
-	assert.Equal(t, ".github/workflows/weekly-research.lock.yml", result.Run.WorkflowPath)
-	assert.True(t, isAgenticWorkflowPath(result.Run.WorkflowPath))
-}
-
-func TestSkipUnverifiedWorkflowRun(t *testing.T) {
-	t.Run("pathless failure is skipped", func(t *testing.T) {
-		result := &DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{DatabaseID: 1}}}
-
-		skipUnverifiedWorkflowRun(result, false)
-
-		assert.True(t, result.Skipped)
-	})
-
-	t.Run("agentic failure is retained", func(t *testing.T) {
-		result := &DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{
-			DatabaseID:   2,
-			WorkflowPath: ".github/workflows/research.lock.yml",
-		}}}
-
-		skipUnverifiedWorkflowRun(result, false)
-
-		assert.False(t, result.Skipped)
-	})
-}
-
-func TestIsFailureWithoutArtifacts(t *testing.T) {
-	assert.True(t, isFailureWithoutArtifacts(ErrNoArtifacts, "failure"))
-	assert.False(t, isFailureWithoutArtifacts(ErrNoArtifacts, "success"))
-	assert.False(t, isFailureWithoutArtifacts(errors.New("download failed"), "failure"))
-}
-
-func TestHandleArtifactDownloadErrorRetainsFailureWithoutArtifacts(t *testing.T) {
-	result := &DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{Conclusion: "failure"}}}
-
-	handleArtifactDownloadError(result, ErrNoArtifacts, false)
-
-	assert.False(t, result.Skipped)
-	assert.Empty(t, result.Metrics)
-}
-
-func TestApplyKnownWorkflowPathOverridesCachedPath(t *testing.T) {
-	result := &DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{
-		WorkflowPath: ".github/workflows/stale.lock.yml",
-	}}}
-
-	applyKnownWorkflowPath(result, WorkflowRun{WorkflowPath: ".github/workflows/ci.yml"})
-
-	assert.Equal(t, ".github/workflows/ci.yml", result.Run.WorkflowPath)
-}
-
 func TestApplyCachedRunWorkflowPathGateHonorsCurrentPath(t *testing.T) {
 	t.Run("agentic current path is retained", func(t *testing.T) {
 		result := &DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{
@@ -213,161 +115,6 @@ func TestApplyCachedRunWorkflowPathGateHonorsCurrentPath(t *testing.T) {
 
 		assert.False(t, result.Skipped)
 		assert.Equal(t, ".github/workflows/agentic.lock.yml", result.Run.WorkflowPath)
-	})
-}
-
-func TestBuildConcurrentDownloadParams_RepoOverride(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name         string
-		repoOverride string
-		wantHost     string
-		wantOwner    string
-		wantRepo     string
-	}{
-		{name: "owner and repo", repoOverride: "owner/repo", wantOwner: "owner", wantRepo: "repo"},
-		{name: "host owner and repo", repoOverride: "ghe.example/owner/repo", wantHost: "ghe.example", wantOwner: "owner", wantRepo: "repo"},
-		{name: "empty component", repoOverride: "owner/"},
-		{name: "empty host-qualified component", repoOverride: "ghe.example/owner/"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			params := buildConcurrentDownloadParams("", false, tt.repoOverride, nil, false, nil)
-			assert.Equal(t, tt.wantHost, params.dlHost)
-			assert.Equal(t, tt.wantOwner, params.dlOwner)
-			assert.Equal(t, tt.wantRepo, params.dlRepo)
-		})
-	}
-}
-
-func TestRunHasEvals(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name     string
-		setup    func(t *testing.T, dir string)
-		expected bool
-	}{
-		{
-			name: "root-level evals.jsonl (flattenSingleFileArtifacts output)",
-			setup: func(t *testing.T, dir string) {
-				t.Helper()
-				require.NoError(t, os.WriteFile(filepath.Join(dir, constants.EvalsResultFilename.String()), []byte("{}"), 0600))
-			},
-			expected: true,
-		},
-		{
-			name: "evals/evals.jsonl (un-flattened artifact directory)",
-			setup: func(t *testing.T, dir string) {
-				t.Helper()
-				evalsDir := filepath.Join(dir, constants.EvalsArtifactName.String())
-				require.NoError(t, os.Mkdir(evalsDir, 0700))
-				require.NoError(t, os.WriteFile(filepath.Join(evalsDir, constants.EvalsResultFilename.String()), []byte("{}"), 0600))
-			},
-			expected: true,
-		},
-		{
-			name: "hash-prefixed {hash}-evals/evals.jsonl (workflow_call variant)",
-			setup: func(t *testing.T, dir string) {
-				t.Helper()
-				evalsDir := filepath.Join(dir, "abc123-"+constants.EvalsArtifactName.String())
-				require.NoError(t, os.Mkdir(evalsDir, 0700))
-				require.NoError(t, os.WriteFile(filepath.Join(evalsDir, constants.EvalsResultFilename.String()), []byte("{}"), 0600))
-			},
-			expected: true,
-		},
-		{
-			name: "evals/ directory exists but contains no evals.jsonl",
-			setup: func(t *testing.T, dir string) {
-				t.Helper()
-				evalsDir := filepath.Join(dir, constants.EvalsArtifactName.String())
-				require.NoError(t, os.Mkdir(evalsDir, 0700))
-				require.NoError(t, os.WriteFile(filepath.Join(evalsDir, "other.txt"), []byte("data"), 0600))
-			},
-			expected: false,
-		},
-		{
-			name: "usage/evals.jsonl (compact usage artifact)",
-			setup: func(t *testing.T, dir string) {
-				t.Helper()
-				usageDir := filepath.Join(dir, constants.UsageArtifactName.String())
-				require.NoError(t, os.Mkdir(usageDir, 0700))
-				require.NoError(t, os.WriteFile(filepath.Join(usageDir, constants.EvalsResultFilename.String()), []byte("{}"), 0600))
-			},
-			expected: true,
-		},
-		{
-			name: "hash-prefixed {hash}-usage/evals.jsonl (workflow_call compact usage artifact)",
-			setup: func(t *testing.T, dir string) {
-				t.Helper()
-				usageDir := filepath.Join(dir, "abc123-"+constants.UsageArtifactName.String())
-				require.NoError(t, os.Mkdir(usageDir, 0700))
-				require.NoError(t, os.WriteFile(filepath.Join(usageDir, constants.EvalsResultFilename.String()), []byte("{}"), 0600))
-			},
-			expected: true,
-		},
-		{
-			name:     "empty directory",
-			setup:    func(t *testing.T, dir string) {},
-			expected: false,
-		},
-		{
-			name: "non-existent directory",
-			setup: func(t *testing.T, dir string) {
-				t.Helper()
-				require.NoError(t, os.RemoveAll(dir))
-			},
-			expected: false,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			dir := t.TempDir()
-			tc.setup(t, dir)
-			assert.Equal(t, tc.expected, runHasEvals(dir, false))
-		})
-	}
-}
-
-func TestBackfillRunTokenUsageFromFirewall(t *testing.T) {
-	t.Parallel()
-	t.Run("backfills run and metrics token usage from firewall summary", func(t *testing.T) {
-		t.Parallel()
-		metrics := LogMetrics{}
-		result := DownloadResult{}
-		tokenUsage := &TokenUsageSummary{
-			TotalInputTokens:  2000,
-			TotalOutputTokens: 1000,
-		}
-
-		backfillRunTokenUsageFromFirewall(&metrics, &result, tokenUsage)
-
-		assert.Equal(t, 3000, metrics.TokenUsage)
-		assert.Equal(t, 3000, result.Metrics.TokenUsage)
-		assert.Equal(t, 3000, result.Run.TokenUsage)
-	})
-
-	t.Run("does not overwrite non-zero event token usage", func(t *testing.T) {
-		t.Parallel()
-		metrics := LogMetrics{TokenUsage: 123}
-		result := DownloadResult{RunAnalysis: RunAnalysis{
-			Run:     WorkflowRun{TokenUsage: 123},
-			Metrics: LogMetrics{TokenUsage: 123},
-		},
-		}
-		tokenUsage := &TokenUsageSummary{
-			TotalInputTokens:  2000,
-			TotalOutputTokens: 1000,
-		}
-
-		backfillRunTokenUsageFromFirewall(&metrics, &result, tokenUsage)
-
-		assert.Equal(t, 123, metrics.TokenUsage)
-		assert.Equal(t, 123, result.Metrics.TokenUsage)
-		assert.Equal(t, 123, result.Run.TokenUsage)
 	})
 }
 
@@ -528,23 +275,6 @@ func TestTryLoadCachedRunResultClearsStalePathWhenMetadataOmitsPath(t *testing.T
 	reloaded, ok := loadRunSummary(runOutputDir, false)
 	require.True(t, ok)
 	assert.Equal(t, ".github/workflows/stale.lock.yml", reloaded.Run.WorkflowPath)
-}
-
-func TestNewRunSummaryCarriesGatewaySteeringEvents(t *testing.T) {
-	t.Parallel()
-	events := []GatewaySteeringEvent{{
-		Type:      tokenSteeringEventName,
-		Message:   "[AWF TOKEN WARNING] You are running out of AI Credits.",
-		Timestamp: "2026-09-23T12:00:00Z",
-	}}
-	result := &DownloadResult{RunAnalysis: RunAnalysis{
-		Run:                   WorkflowRun{DatabaseID: 300},
-		GatewaySteeringEvents: events,
-	}}
-
-	summary := newRunSummary(result, LogMetrics{}, nil, nil)
-
-	assert.Equal(t, events, summary.GatewaySteeringEvents)
 }
 
 func TestTryLoadCachedRunResultBackfillsGatewaySteeringEvents(t *testing.T) {

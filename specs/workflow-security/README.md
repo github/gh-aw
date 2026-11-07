@@ -208,7 +208,7 @@ hard spending cap**. The model consumes already-resolved runtime settings;
 repository-variable shadowing and an editor removing the job remain outside
 the participating-workflow machine.
 
-Use the same checksum-pinned TLA+ Tools v1.8.0 described below:
+Use the same checksum-pinned TLA+ Tools v1.7.4 described below:
 
 ```bash
 TLA2TOOLS_JAR=/path/to/tla2tools.jar JAVA_BIN=/path/to/java \
@@ -758,30 +758,30 @@ implementation and unit-test mapping in compiler threat §7.3.
 ## Run the machine
 
 Use Java 21, Python 3 (standard library only), the repository's Go toolchain,
-and official [TLA+ Tools v1.8.0](https://github.com/tlaplus/tlaplus/releases/tag/v1.8.0).
-The runner verifies this jar SHA-256 before executing it (the v1.8.0 release
-asset SHA-256 published by GitHub for asset `670958559`, updated on
-2026-10-24; the release notes publish SHA-1):
+and official [TLA+ Tools v1.7.4](https://github.com/tlaplus/tlaplus/releases/tag/v1.7.4)
+(TLC 2.19). Both runners verify this jar SHA-256 before executing it:
 
 ```text
-011267fca25d0752cf18894dd585cd28b96960c112ea8a20b823ea770e7e10cd
+936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88
 ```
 
-Upstream rebuilds this release asset and moves the `v1.8.0` tag; its versioned
-URL is not immutable. This pin identifies the 4,502,259-byte asset uploaded by
-[upstream build 40049599214](https://github.com/tlaplus/tlaplus/actions/runs/40049599214)
-at source commit `2ef2af8c767b76e5db5cba2878f027ac07aad36c`.
-The downloaded SHA-256 matches both GitHub's asset metadata and that build's
-upload log. This correlation is not an independent build attestation.
+The repository-owned [installer](../../.github/scripts/install_tla_runtime.sh)
+uses the same pin. Its digest matches the prior work-queue pin, and the verified
+bytes match the v1.7.4 publisher's historical SHA-1; SHA-256, not SHA-1, enforces
+installation integrity. The apparent v1.8.0 release is a rolling build and is
+not the supported runtime. See the [runtime provenance contract](../../.github/aw/formal-methods.md)
+for the publisher evidence and pinned Linux x64 Temurin JRE.
 
-When upstream replaces the asset again, verification must fail closed. Do not
-derive the expected checksum dynamically or bypass either runtime check.
-When intentionally updating the release pin, verify the downloaded bytes
-against the release asset metadata and the upstream build's upload log, then
-update the workflow and generated lock, runner, regression test, and this digest
-together. An immutable, vetted distribution would be needed to prevent future
-release-URL drift.
+Release URLs are not immutable: replacements must fail closed. Do not derive
+the expected checksum dynamically or bypass either runner's integrity check.
+For intentional updates, independently verify publisher release/asset identity
+and digest, then update the installer, trusted workflow source hashes and locks,
+runners, regression test, and this digest together. The full installer checks
+Java startup separately and requires TLC's expected help text and exit status 1;
+a JVM startup error or another TLC status is not a successful smoke check.
 Existing example reports retain the jar digest used to generate their evidence.
+The historical v1.8.0 model results above do not verify this v1.7.4 runtime;
+the bounded models must be revalidated before claiming equivalent results.
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s specs/workflow-security -p '*_test.py'

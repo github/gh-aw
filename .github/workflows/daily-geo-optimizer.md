@@ -175,7 +175,7 @@ jobs:
           import os
 
           metadata = {
-            "run_id": "${{ github.run_id }}",
+            "run_id": os.environ["GITHUB_RUN_ID"],
             "timestamp": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H-%M-%S"),
             "docs_url": "https://github.github.com/gh-aw/",
             "readme_url": os.environ["REPOSITORY_URL"],

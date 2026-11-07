@@ -114,6 +114,40 @@ describe("generate_safe_outputs_tools", () => {
     expect(result.map((/** @type {{name: string}} */ t) => t.name)).not.toContain("report_missing_tool");
   });
 
+  it.skipIf(process.platform !== "linux").each([false, true])("keeps generated files owner-only, including existing files: %s", existing => {
+    const validationPath = path.join(testDir, "validation.json");
+    fs.writeFileSync(configPath, JSON.stringify({ create_issue: {} }), { mode: 0o600 });
+    for (const file of [toolsMetaPath, validationPath, outputPath]) {
+      if (existing) {
+        fs.writeFileSync(file, "old");
+        fs.chmodSync(file, 0o666);
+      }
+    }
+
+    runScript({
+      GH_AW_TOOLS_META_JSON: "{}",
+      GH_AW_VALIDATION_JSON: "{}",
+    });
+
+    for (const file of [configPath, toolsMetaPath, validationPath, outputPath]) {
+      const stat = fs.statSync(file);
+      expect(stat.mode & 0o777).toBe(0o600);
+      expect(stat.uid).toBe(process.geteuid());
+      expect(stat.gid).toBe(process.getegid());
+    }
+    expect(JSON.parse(fs.readFileSync(outputPath, "utf8"))[0].name).toBe("create_issue");
+  });
+
+  it.skipIf(process.platform !== "linux")("rejects a symlinked tools output without modifying its target", () => {
+    fs.writeFileSync(configPath, JSON.stringify({ create_issue: {} }), { mode: 0o600 });
+    const target = path.join(testDir, "private.json");
+    fs.writeFileSync(target, "unchanged", { mode: 0o600 });
+    fs.symlinkSync(target, outputPath);
+
+    expect(() => runScript()).toThrow();
+    expect(fs.readFileSync(target, "utf8")).toBe("unchanged");
+  });
+
   it.each([
     ["missing_tool", "missing_data"],
     ["missing-tool", "missing-data"],

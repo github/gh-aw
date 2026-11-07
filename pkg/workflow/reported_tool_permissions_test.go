@@ -21,6 +21,7 @@ func TestReportedWorkflowToolPermissions(t *testing.T) {
 		{"daily-regression-audit-kiro", []string{"shell(cd)", "shell(cut)", "shell(jq)"}},
 		{"daily-compiler-quality", []string{"shell(cd)", "shell(test)", "shell([)", "shell(awk)"}},
 		{"code-scanning-fixer", []string{"shell(cut)", "shell(github:*)", "shell(safeoutputs:*)"}},
+		{"tidy", []string{"shell(make:*)", "shell(git status)", "shell(safeoutputs:*)"}},
 		{"smoke-copilot-aoai-apikey", []string{"shell", "safeoutputs"}},
 		{"smoke-workflow-call", []string{"Bash(git status:*)", "Bash(git branch:*)", "Bash(git remote:*)", "Bash(git log:*)"}},
 		{"sighthound-security-scan", nil},
@@ -52,6 +53,30 @@ func TestReportedWorkflowToolPermissions(t *testing.T) {
 					require.True(t, ok)
 					assert.Contains(t, graft["allowed"], "graft_check")
 					assert.Contains(t, graft["allowed"], "graft_map")
+				}
+				if tt.workflow == "code-scanning-fixer" {
+					assert.NotContains(t, args, "shell")
+					assert.NotContains(t, args, "shell(node:*)")
+					assert.NotContains(t, args, "shell(make:*)")
+					assert.NotContains(t, data.MarkdownContent, "full bash access")
+					require.NotEmpty(t, data.ImportedFiles)
+					for _, importedFile := range data.ImportedFiles {
+						importedPath := strings.SplitN(importedFile, "#", 2)[0]
+						assert.NotEqual(t, "security-analysis-base.md", filepath.Base(importedPath),
+							"restricted fixer must not import the full-Bash security prompt: %s", importedFile)
+					}
+					assert.Contains(t, data.MarkdownContent, "Tests not run: test execution is not available in this workflow")
+					assert.Contains(t, data.MarkdownContent, "DIFC/policy-filtered result")
+					assert.Contains(t, data.MarkdownContent, "only after the tool accepts the intent")
+					github, ok := data.Tools["github"].(map[string]any)
+					require.True(t, ok)
+					assert.Contains(t, github["toolsets"], "repos")
+					assert.Contains(t, github["toolsets"], "code_security")
+				}
+				if tt.workflow == "tidy" {
+					assert.NotContains(t, args, "shell(git status:*)")
+					assert.NotContains(t, data.MarkdownContent, "git status --porcelain")
+					assert.Contains(t, data.MarkdownContent, "git status` reports a clean working tree")
 				}
 				if tt.workflow == "smoke-copilot-aoai-apikey" {
 					assert.Contains(t, getMCPCLIExcludeFromAgentConfig(data), "safeoutputs")
