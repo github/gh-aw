@@ -72,6 +72,7 @@ const {
 } = require("./process_runner.cjs");
 const { buildCopilotSDKServerArgs, getCopilotSDKServerPort, startCopilotSDKServer, stopCopilotSDKServer, waitForCopilotSDKServer } = require("./copilot_sdk_sidecar.cjs");
 const { resolveRetryConfig: resolveSharedRetryConfig } = require("./harness_retry_config.cjs");
+const { stopForPermissionDenied } = require("./harness_failure_handling.cjs");
 const {
   captureExecutionEvidenceConfiguration,
   resolveHarnessRetryTelemetryPath,
@@ -2429,14 +2430,7 @@ async function main() {
           }
 
           if (hasNumerousPermissionDenied) {
-            if (safeOutputsPath && hasExpectedSafeOutputs(safeOutputsPath, { logger: log })) {
-              log(`attempt ${attempt + 1}: detected numerous permission-denied issues but safe-outputs already contain expected output — suppressing terminal verdict (false-red: core work succeeded)`);
-              return { action: "stop", exitCode: 0 };
-            }
-            const deniedCommands = extractDeniedCommands(result.output);
-            emitMissingToolPermissionIssue({ deniedCommands, permissionOutput: result.output, logger: log });
-            log(`attempt ${attempt + 1}: detected numerous permission-denied issues — not retrying (classified as missing tool/permission issue)`);
-            return { action: "stop" };
+            return stopForPermissionDenied({ attempt, output: result.output, safeOutputsPath, log, deniedCommands: extractDeniedCommands(result.output) });
           }
 
           if (isMCPPolicy) {
