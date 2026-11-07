@@ -30,7 +30,17 @@ function createAppendFunction(outputFile) {
     // Each entry must be on a single line, followed by a newline character
     const jsonLine = JSON.stringify(entry) + "\n";
     try {
-      fs.appendFileSync(outputFile, jsonLine);
+      if (fs.constants.O_NOFOLLOW === undefined) {
+        throw new Error(`${ERR_SYSTEM}: O_NOFOLLOW is not available on this platform; cannot append safe outputs safely`);
+      }
+      const flags = fs.constants.O_WRONLY | fs.constants.O_APPEND | fs.constants.O_CREAT | fs.constants.O_NOFOLLOW;
+      const fd = fs.openSync(outputFile, flags, 0o600);
+      try {
+        fs.fchmodSync(fd, 0o600);
+        fs.writeFileSync(fd, jsonLine, "utf8");
+      } finally {
+        fs.closeSync(fd);
+      }
     } catch (error) {
       throw new Error(`${ERR_SYSTEM}: Failed to write to output file: ${getErrorMessage(error)}`, { cause: error });
     }

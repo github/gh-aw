@@ -1,17 +1,19 @@
 // Setup Activation Action - Post Step
-// Sends an OTLP conclusion span for the job, then removes the /tmp/gh-aw/
-// directory created during the main action step.
-// Runs in the post-job phase so that temporary files are erased after the
-// workflow job completes, regardless of success or failure.
-//
-// Files inside /tmp/gh-aw/ may be owned by root (written by Docker containers
-// or privileged scripts), so we use `sudo rm -rf` — GitHub-hosted runners have
-// passwordless sudo.  We fall back to fs.rmSync for self-hosted runners that
-// don't have sudo but do have direct write access.
+// Sends an OTLP conclusion span for the job. Shared legacy runtime paths have
+// no per-invocation ownership record and must not be reclaimed by this step.
 
 const path = require("path");
-const { spawnSync } = require("child_process");
 const fs = require("fs");
+const { spawnSync } = require("child_process");
+
+function cleanupRuntimeTmp() {
+  if (!process.env.GH_AW_RUNTIME_TMP_DIR) return;
+  const cleanupScript = path.join(__dirname, "sh", "cleanup_runtime_tmp.sh");
+  const result = spawnSync("bash", [cleanupScript], { stdio: "inherit" });
+  if (result.error || result.status !== 0) {
+    console.warn(`Warning: unable to run scoped AWF runtime temp cleanup: ${result.error?.message || result.status}`);
+  }
+}
 
 function isDebugModeEnabled() {
   const toBool = value => {
@@ -80,8 +82,7 @@ function listTmpGhAwFiles(tmpDir, maxDepth, maxFiles) {
   }
 }
 
-// Wrap everything in an async IIFE so that the OTLP span is fully sent before
-// the cleanup deletes /tmp/gh-aw/ (which contains aw_info.json and otel.jsonl).
+// Wait for the OTLP span before completing the post step.
 (async () => {
   // Send a gh-aw.<jobName>.conclusion span to the configured OTLP endpoint, if any.
   // Delegates to action_conclusion_otlp.cjs so that script mode (clean.sh) and
@@ -102,55 +103,9 @@ function listTmpGhAwFiles(tmpDir, maxDepth, maxFiles) {
     listTmpGhAwFiles(tmpDir, maxDebugDepth, maxDebugFiles);
   }
 
-  console.log(`Cleaning up ${tmpDir}...`);
-
-  // Try sudo rm -rf first (handles root-owned files on GitHub-hosted runners)
-  const result = spawnSync("sudo", ["rm", "-rf", tmpDir], { stdio: "inherit" });
-
-  if (result.status === 0) {
-    console.log(`Cleaned up ${tmpDir}`);
-  } else {
-    // Fall back to fs.rmSync for environments without sudo
-    try {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-      console.log(`Cleaned up ${tmpDir}`);
-    } catch (err) {
-      // Log but do not fail — cleanup is best-effort
-      console.error(`Warning: failed to clean up ${tmpDir}: ${err.message}`);
-    }
+  if (fs.existsSync(tmpDir)) {
+    console.warn(`Warning: leaving shared ${tmpDir} untouched; per-invocation ownership cannot be established.`);
   }
 
-  // Clean up AWF chroot directories under /tmp (e.g. /tmp/awf-*-chroot-home
-  // and /tmp/awf-chroot-*). These are created by AWF when running with
-  // --enable-host-access on GitHub-hosted runners. Files inside may be owned
-  // by root (written by Docker containers or privileged AWF processes),
-  // causing EACCES failures if cleanup is attempted without sudo.
-  for (const pattern of ["awf-*-chroot-home", "awf-chroot-*"]) {
-    const awfChrootFindResult = spawnSync("sudo", ["find", "/tmp", "-maxdepth", "1", "-name", pattern, "-type", "d", "-print"], { encoding: "utf8" });
-    if (awfChrootFindResult.status !== 0) {
-      console.log(`Failed to inspect /tmp/${pattern} directories`);
-      continue;
-    }
-
-    const awfChrootDirs = awfChrootFindResult.stdout
-      .split("\n")
-      .map(line => line.trim())
-      .filter(Boolean);
-    if (awfChrootDirs.length === 0) {
-      console.log(`No /tmp/${pattern} directories found`);
-      continue;
-    }
-
-    const awfChrootCleanupResult = spawnSync(
-      "sudo",
-      ["find", "/tmp", "-maxdepth", "1", "-name", pattern, "-type", "d", "-exec", "rm", "-rf", "--", "{}", "+"],
-      { stdio: "inherit" }
-    );
-    if (awfChrootCleanupResult.status === 0) {
-      const awfChrootNoun = awfChrootDirs.length === 1 ? "directory" : "directories";
-      console.log(`Cleaned up ${awfChrootDirs.length} /tmp/${pattern} ${awfChrootNoun}`);
-    } else {
-      console.log(`Failed to clean /tmp/${pattern} directories`);
-    }
-  }
+  cleanupRuntimeTmp();
 })();

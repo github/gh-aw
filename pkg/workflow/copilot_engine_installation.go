@@ -134,11 +134,11 @@ func (e *CopilotEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHu
 
 	// Use the installer script for global installation
 	copilotInstallLog.Print("Using new installer script for Copilot installation")
-	// On ARC/DinD runners, sudo may not be available (allowPrivilegeEscalation: false).
+	// Unprivileged native runners and ARC/DinD runners may not have sudo.
 	// Pass --rootless so the script installs to ~/.local/bin without sudo.
 	// The "Copy Copilot CLI to daemon-visible path" step in nodejs.go then copies from
 	// the rootless location to ${RUNNER_TEMP}/gh-aw/bin/copilot where AWF expects it.
-	rootless := isArcDindTopology(workflowData)
+	rootless := useRootlessCLIInstallation(workflowData)
 	compiledVersion := workflowData.CompiledVersion
 	checksumsSHA256 := ""
 	if workflowData.EngineConfig != nil {

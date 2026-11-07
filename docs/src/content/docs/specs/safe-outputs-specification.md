@@ -2502,6 +2502,18 @@ If an optional advisory or enrichment field is declared with `x-strip-on-error: 
 
 Fields used for privileged transport metadata, including patch anchoring and upload asset file metadata, MUST be derived by trusted workflow steps or privileged processors rather than accepted from agent-controlled NDJSON.
 
+### 7.0.4 Dependency and Batch Processing Semantics
+
+**Requirement DSB1 (Eligible Review Prerequisites):** Implementations MUST permit `submit_pull_request_review` and `create_pull_request_review_comment` outputs to serve as `depends-on` prerequisites.
+
+**Requirement DSB2 (Review Buffer Drain):** Implementations MUST drain and finalize the applicable buffered review batch before releasing outputs that depend on it.
+
+**Requirement DSB3 (Publication-Based Success):** Buffering MUST NOT establish prerequisite success; success requires confirmed publication. Failed, skipped, staged, queued, or otherwise unconfirmed outputs MUST NOT establish prerequisite success. Unsupported or delegated outputs, including custom jobs and standalone steps, MUST NOT establish prerequisite success.
+
+**Requirement DSB4 (Deferred-Dependent Retry):** Newly eligible deferred dependents MUST be retried without replaying completed handlers. Implementations MUST finalize newly buffered batches, including batches created by in-place retries, before releasing their dependents. Retries MUST be bounded and contingent on resolution progress; unresolved prerequisites MUST fail closed.
+
+**Requirement DSB5 (Single Explicit Review Submission):** Implementations MUST preserve at most one explicit `submit_pull_request_review` per pull request per run across drained batches.
+
 ### 7.1 Core Issue Operations
 
 #### Type: create_issue
@@ -4217,6 +4229,7 @@ or review bodies to returned or persisted decision evidence.
 **Notes**:
 
 - Comments buffered via PR review buffer for batch submission
+- Publication and dependent-output release MUST follow [§7.0.4](#704-dependency-and-batch-processing-semantics).
 - Higher default max (10) enables comprehensive code review
 - When `safe-outputs.create-pull-request-review-comment.target` is `"*"`, requests MUST include `pull_request_number`.
 
@@ -4244,6 +4257,7 @@ or review bodies to returned or persisted decision evidence.
 **Notes**:
 
 - Submits all buffered review comments from `create_pull_request_review_comment`
+- Publication, dependent-output release, and the per-run explicit-review limit MUST follow [§7.0.4](#704-dependency-and-batch-processing-semantics).
 - Review status affects PR merge requirements
 - **Target**: `target` accepts `"triggering"` (default), `"*"` (request MUST include `pull_request_number`), or an explicit PR number (e.g. `${{ github.event.inputs.pr_number }}`). Required when the workflow is not triggered by a pull request (e.g. `workflow_dispatch`).
 - **Cross-Repository**: `target-repo` specifies a repository in `owner/repo` format to submit reviews on PRs in another repo. Use `allowed-repos` to permit additional repositories.
@@ -4971,7 +4985,9 @@ These are MCP arguments to `upload_asset`, not an `artifacts` entry on `create_i
 
 The `upload_asset` MCP handler stages files inside a backend container; the agent job's host-side `Upload Safe Outputs Assets` action reads them to create the `safe-outputs-assets` artifact. The downstream `upload_assets` job downloads that artifact before publishing to the asset branch. A shared mount or a successful MCP tool result MUST NOT be treated as evidence that the host can read the staged bytes or that publication completed.
 
-Unless an explicit container user is configured, gateway startup MUST run the built-in `safeoutputs` backend with the host runner's numeric UID and GID before serializing or publishing its configuration. The backend MUST NOT rely on inheriting the outer gateway container's Docker user. Missing or invalid runner identity MUST fail startup rather than silently fall back to root. This default identity MUST include a writable, container-local `HOME` at `/tmp` unless `HOME` is already configured, so local Git configuration does not require `/root` access or exposure of the host's home directory. Explicit container-user settings and configured `HOME` values MUST remain effective; deployments using these overrides are responsible for compatible host access. Other MCP backends, mounts, credentials, and network policies MUST remain unchanged by this ownership policy.
+Unless an explicit container user is configured, gateway startup MUST run the built-in `safeoutputs` backend with the host runner's effective numeric UID and primary GID before serializing or publishing its configuration. The backend MUST NOT rely on inheriting the outer gateway container's Docker user. Missing or invalid runner identity MUST fail startup rather than silently fall back to root. This default identity MUST include a writable, container-local `HOME` at `/tmp` unless `HOME` is already configured, so local Git configuration does not require `/root` access or exposure of the host's home directory. Explicit container-user settings and configured `HOME` values MUST remain effective; deployments using these overrides are responsible for compatible host access. Configured supplementary container groups MUST be preserved, but runner supplementary groups MUST NOT be added automatically. Other MCP backends, mounts, credentials, and network policies MUST remain unchanged by this ownership policy.
+
+The generated safeoutputs `config.json`, `tools.json`, `tools_meta.json`, `validation.json`, and output files MUST use mode `0600` both when created and when replacing or appending to existing files. Writes MUST reject symbolic links and MUST NOT broaden permissions to compensate for mismatched ownership.
 
 Guarded staging MUST exclusively create regular files with mode `0600`; private subdirectories created by the guard, including Claim-specific directories, MUST use mode `0700`. The ownership contract MUST keep those files and directories readable and traversable by the host uploader without broadening their modes. Source and destination symlink rejection, hard-link and nonregular-source rejection, descriptor-relative path checks, bounded reads, and content-derived metadata MUST remain enforced. Implementations MUST NOT repair ownership by following agent-controlled links, recursively changing arbitrary trees, or disabling these guards.
 
@@ -6749,6 +6765,13 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.29.19** (2026-11-06):
+
+- **Specified**: Effective runner UID and primary GID defaults for the built-in `safeoutputs` backend, preserving explicit users, configured HOME, and supplementary group arguments.
+- **Required**: Owner-only (`0600`) no-follow writes for generated safeoutputs config, tools, metadata, validation, and output files, including replacements.
+- **Added**: §7.0.4 specifies review prerequisites, publication-confirmed dependency success, bounded batch finalization and deferred retries without replay, and one explicit review per PR per run.
+- **Preserved**: Fail-closed dependency handling and rejection of unsupported, delegated, staged, queued, or otherwise unconfirmed prerequisites.
 
 **Version 1.29.18** (2026-11-06):
 

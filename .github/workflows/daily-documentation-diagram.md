@@ -41,8 +41,10 @@ safe-outputs:
   noop:
 engine:
   id: codex
-  model-provider: openai
-model: openai/gpt-5.6-sol
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
 strict: true
 timeout-minutes: 20
 evals:
