@@ -1668,7 +1668,20 @@ function addCopilotDetectionDirectory(args, env) {
   const inputDir = env.GH_AW_DETECTION_INPUT_DIR;
   if (!isDetectionPhase(env.GH_AW_PHASE) || !inputDir) return args;
   if (!path.isAbsolute(inputDir)) throw new Error("GH_AW_DETECTION_INPUT_DIR must be an absolute path");
-  return ["--add-dir", inputDir, ...args];
+  const resolvedInputDir = path.resolve(inputDir);
+  const expectedRelativePath = path.join("gh-aw", "threat-detection-inputs");
+  const tempRoots = [os.tmpdir()];
+  if (env.RUNNER_TEMP && path.isAbsolute(env.RUNNER_TEMP)) {
+    tempRoots.unshift(env.RUNNER_TEMP);
+  }
+  const allowed = tempRoots.some(tempRoot => {
+    const relativePath = path.relative(path.resolve(tempRoot), resolvedInputDir);
+    return relativePath === expectedRelativePath && !path.isAbsolute(relativePath);
+  });
+  if (!allowed) {
+    throw new Error("GH_AW_DETECTION_INPUT_DIR must resolve to the compiler-owned gh-aw/threat-detection-inputs directory under RUNNER_TEMP or the OS temp directory");
+  }
+  return ["--add-dir", resolvedInputDir, ...args];
 }
 
 /**

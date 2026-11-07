@@ -88,12 +88,33 @@ const {
 } = require("./copilot_harness.cjs");
 
 describe("external detection artifact access", () => {
-  it.each(["/tmp/gh-aw/threat-detection-inputs", "/runner temp/gh-aw/threat-detection-inputs"])("grants access only to the prepared inputs at %s", inputDir => {
+  it.each([
+    [path.join(os.tmpdir(), "gh-aw", "threat-detection-inputs"), {}],
+    [path.join(os.tmpdir(), "runner temp", "gh-aw", "threat-detection-inputs"), { RUNNER_TEMP: path.join(os.tmpdir(), "runner temp") }],
+  ])("grants access only to the prepared inputs at %s", (inputDir, extraEnv) => {
     const args = ["--add-dir", "/runtime/prompt", "--allow-all-tools", "--add-dir", "/workspace", "--prompt", "Inspect artifacts"];
-    expect(addCopilotDetectionDirectory(args, { GH_AW_PHASE: "detection", GH_AW_DETECTION_INPUT_DIR: inputDir })).toEqual(["--add-dir", inputDir, ...args]);
+    expect(addCopilotDetectionDirectory(args, { GH_AW_PHASE: "detection", GH_AW_DETECTION_INPUT_DIR: inputDir, ...extraEnv })).toEqual(["--add-dir", path.resolve(inputDir), ...args]);
     expect(args).not.toContain("/tmp/gh-aw/threat-detection");
     expect(args[1]).toBe("/runtime/prompt");
   });
+
+  it("normalizes the compiler-owned input path before granting access", () => {
+    const inputDir = path.join(os.tmpdir(), "gh-aw", "intermediate", "..", "threat-detection-inputs");
+    const args = ["--prompt", "Inspect artifacts"];
+    expect(addCopilotDetectionDirectory(args, { GH_AW_PHASE: "detection", GH_AW_DETECTION_INPUT_DIR: inputDir })).toEqual(["--add-dir", path.resolve(inputDir), ...args]);
+  });
+
+  it.each(["/", "/workspace", path.join(os.tmpdir(), "gh-aw", "threat-detection"), path.join(os.tmpdir(), "gh-aw-other", "threat-detection-inputs"), path.join(os.tmpdir(), "gh-aw", "threat-detection-inputs", "child")])(
+    "rejects paths outside the exact compiler-owned input directory: %s",
+    inputDir => {
+      expect(() =>
+        addCopilotDetectionDirectory(["--prompt", "Inspect artifacts"], {
+          GH_AW_PHASE: "detection",
+          GH_AW_DETECTION_INPUT_DIR: inputDir,
+        })
+      ).toThrow("compiler-owned");
+    }
+  );
 
   it.each(["agent", "", undefined])("does not grant artifact access outside detection (%s)", phase => {
     const args = ["--prompt", "Hello"];
@@ -4576,9 +4597,17 @@ process.stdout.write("done\\n");`
 
   it.each([true, false])("does not create a CLI selection record in SDK mode (routed=%s)", async routed => {
     const [providerPort, sdkPort] = [await freePort(), await freePort()];
-    const inputDir = "/runner temp/gh-aw/threat-detection-inputs";
+    const runnerTemp = path.join(os.tmpdir(), "runner temp");
+    const inputDir = path.join(runnerTemp, "gh-aw", "threat-detection-inputs");
     const { tmpDir, result, args, sidecarArgs, selection } = runHarness(
-      { AWF_REFLECT_ENABLED: "1", GH_AW_PHASE: "detection", GH_AW_DETECTION_INPUT_DIR: inputDir, ...(routed ? { GH_AW_MODEL_ROUTING: "1" } : { COPILOT_MODEL: "gpt-5.6-luna" }), COPILOT_SDK_URI: `http://127.0.0.1:${sdkPort}` },
+      {
+        AWF_REFLECT_ENABLED: "1",
+        GH_AW_PHASE: "detection",
+        RUNNER_TEMP: runnerTemp,
+        GH_AW_DETECTION_INPUT_DIR: inputDir,
+        ...(routed ? { GH_AW_MODEL_ROUTING: "1" } : { COPILOT_MODEL: "gpt-5.6-luna" }),
+        COPILOT_SDK_URI: `http://127.0.0.1:${sdkPort}`,
+      },
       { routed, providerPort, sdk: true }
     );
 
