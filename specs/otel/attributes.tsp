@@ -1,5 +1,10 @@
+import "@typespec/json-schema";
+
+using TypeSpec.JsonSchema;
+
 namespace GH.AW.Telemetry;
 
+@jsonSchema
 model AttributeNames {
   workflowName: "gh-aw.workflow.name";
   repository: "gh-aw.repository";

@@ -1,0 +1,11 @@
+{
+  "private": true,
+  "scripts": {
+    "generate": "node generate_attributes.mjs",
+    "check": "node generate_attributes.mjs --check"
+  },
+  "devDependencies": {
+    "@typespec/compiler": "1.17.0",
+    "@typespec/json-schema": "1.17.0"
+  }
+}

@@ -881,6 +881,7 @@ deps: check-node-version
 	go mod tidy
 	cd actions/setup/js && npm ci
 	cd eslint-factory && npm ci
+	cd specs/otel && npm ci
 
 # Install development tools (including linter)
 .PHONY: deps-dev
@@ -1148,11 +1149,11 @@ validate-otel-contract:
 
 .PHONY: check-otel-attributes
 check-otel-attributes:
-	@python3 specs/otel/generate_attributes.py --check
+	@npm run check --prefix specs/otel
 
 .PHONY: generate-otel-attributes
 generate-otel-attributes:
-	python3 specs/otel/generate_attributes.py
+	npm run generate --prefix specs/otel
 
 MODELS_DEV_MODELS_JSON_URL ?= https://models.dev/catalog.json
 
