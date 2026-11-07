@@ -651,7 +651,7 @@ func (c *Compiler) buildInstallThreatDetectStep(data *WorkflowData) []string {
 	amd64Digest := constants.DefaultThreatDetectSHA256["threat-detect-linux-amd64"]
 	arm64Digest := constants.DefaultThreatDetectSHA256["threat-detect-linux-arm64"]
 	installFlags := ""
-	if isArcDindTopology(data) {
+	if useRootlessCLIInstallation(data) {
 		installFlags = " --rootless"
 	}
 
