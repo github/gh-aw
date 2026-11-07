@@ -521,9 +521,9 @@ printf "%s\n" "$@" >> "$GH_AW_TEST_PIP_ARGS_FILE"
 	}
 	args := string(argsData)
 
-	// validatePythonPackagesWithPip executes: pip index versions <package> --pre
+	// validatePythonPackagesWithPip executes: pip index versions --pre -- <package>
 	gotArgs := strings.Split(strings.TrimSpace(args), "\n")
-	wantArgs := []string{"index", "versions", "requests", "--pre"}
+	wantArgs := []string{"index", "versions", "--pre", "--", "requests"}
 	if len(gotArgs) != len(wantArgs) {
 		t.Fatalf("expected one pip invocation with %d args, got %d args: %q", len(wantArgs), len(gotArgs), args)
 	}
@@ -556,7 +556,7 @@ printf "%s\n" "$@" > "$GH_AW_TEST_UV_ARGS_FILE"
 		t.Fatalf("failed to read recorded uv arguments: %v", err)
 	}
 	gotArgs := strings.Split(strings.TrimSpace(string(argsData)), "\n")
-	wantArgs := []string{"pip", "show", "requests", "--no-cache"}
+	wantArgs := []string{"pip", "show", "--no-cache", "--", "requests"}
 	if len(gotArgs) != len(wantArgs) {
 		t.Fatalf("expected %d fixed uv arguments, got %d: %q", len(wantArgs), len(gotArgs), gotArgs)
 	}
@@ -564,6 +564,27 @@ printf "%s\n" "$@" > "$GH_AW_TEST_UV_ARGS_FILE"
 		if gotArgs[i] != want {
 			t.Fatalf("unexpected uv args at position %d: got %q, want %q (all args: %q)", i, gotArgs[i], want, gotArgs)
 		}
+	}
+}
+
+func TestValidateUvPackagesWithExecutable_RejectsDashPrefixBeforeExec(t *testing.T) {
+	tempDir := t.TempDir()
+	argsFile := filepath.Join(tempDir, "uv-args.txt")
+	uvPath := filepath.Join(tempDir, "uv")
+	script := `#!/bin/sh
+printf "%s\n" "$@" > "$GH_AW_TEST_UV_ARGS_FILE"
+`
+	if err := os.WriteFile(uvPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("failed to write fake uv executable: %v", err)
+	}
+	t.Setenv("GH_AW_TEST_UV_ARGS_FILE", argsFile)
+
+	err := NewCompiler().validateUvPackagesWithExecutable([]string{"--index-url"}, uvPath)
+	if err == nil {
+		t.Fatal("expected dash-prefixed package name to be rejected")
+	}
+	if _, err := os.Stat(argsFile); !os.IsNotExist(err) {
+		t.Fatalf("expected invalid package to be rejected before uv execution; stat error = %v", err)
 	}
 }
 
