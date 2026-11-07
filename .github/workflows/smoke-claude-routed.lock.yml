@@ -106,9 +106,9 @@ jobs:
     runs-on: ubuntu-slim
     # Permissions for the activation job (workflow permissions default to none).
     permissions:
-      actions: read
+      actions: read # Read workflow runs and artifacts for workflow context.
       contents: read
-      issues: write
+      issues: write # Create or update issues and comments.
     env:
       GH_AW_ADMISSION_RESULT: ${{ needs.admission.outputs.result }}
       GH_AW_MAX_DAILY_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_DAILY_AI_CREDITS || '5000' }}
@@ -580,7 +580,7 @@ jobs:
     # Permissions for the admission job (workflow permissions default to none).
     permissions:
       contents: read
-      id-token: write
+      id-token: write # Request an OIDC token for authenticated services.
     timeout-minutes: 5
     outputs:
       max-ai-credits: ${{ steps.admission.outputs.max-ai-credits }}
@@ -633,7 +633,7 @@ jobs:
     # Permissions for the agent job (workflow permissions default to none).
     permissions:
       contents: read
-      copilot-requests: write
+      copilot-requests: write # Authenticate requests to the Copilot engine.
     cache-mode: read
     timeout-minutes: 60
     env:
@@ -1605,10 +1605,10 @@ jobs:
     runs-on: ubuntu-slim
     # Permissions for the conclusion job (workflow permissions default to none).
     permissions:
-      actions: read
-      checks: read
-      issues: write
-      pull-requests: read
+      actions: read # Read workflow runs and artifacts for workflow context.
+      checks: read # Read check runs for workflow context.
+      issues: write # Create or update issues and comments.
+      pull-requests: read # Read pull requests and review comments for workflow context.
     concurrency:
       group: "gh-aw-conclusion-smoke-claude-routed-${{ github.run_id }}"
       cancel-in-progress: false
@@ -1988,7 +1988,7 @@ jobs:
     # Permissions for the conclusion_admission job (workflow permissions default to none).
     permissions:
       contents: read
-      id-token: write
+      id-token: write # Request an OIDC token for authenticated services.
     timeout-minutes: 5
     env:
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
@@ -2041,7 +2041,7 @@ jobs:
     # Permissions for the detection job (workflow permissions default to none).
     permissions:
       contents: read
-      copilot-requests: write
+      copilot-requests: write # Authenticate requests to the Copilot engine.
     timeout-minutes: 10
     env:
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
@@ -2444,7 +2444,7 @@ jobs:
     # Permissions for the pre_activation job (workflow permissions default to none).
     permissions:
       contents: read
-      pull-requests: read
+      pull-requests: read # Read pull requests and review comments for workflow context.
     env:
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     outputs:
@@ -2503,7 +2503,7 @@ jobs:
     runs-on: ubuntu-slim
     # Permissions for the safe_outputs job (workflow permissions default to none).
     permissions:
-      issues: write
+      issues: write # Create or update issues and comments.
     timeout-minutes: 15
     env:
       GH_AW_AGENT_AIC: ${{ needs.agent.outputs.aic }}

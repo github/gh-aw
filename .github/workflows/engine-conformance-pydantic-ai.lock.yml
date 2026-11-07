@@ -98,9 +98,9 @@ jobs:
     runs-on: ubuntu-slim
     # Permissions for the activation job (workflow permissions default to none).
     permissions:
-      actions: read
-      contents: write
-      issues: write
+      actions: read # Read workflow runs and artifacts for workflow context.
+      contents: write # Create or update repository contents.
+      issues: write # Create or update issues and comments.
     env:
       GH_AW_ADMISSION_RESULT: ${{ needs.admission.outputs.result }}
       GH_AW_MAX_DAILY_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_DAILY_AI_CREDITS || '5000' }}
@@ -550,7 +550,7 @@ jobs:
     # Permissions for the admission job (workflow permissions default to none).
     permissions:
       contents: read
-      id-token: write
+      id-token: write # Request an OIDC token for authenticated services.
     timeout-minutes: 5
     outputs:
       max-ai-credits: ${{ steps.admission.outputs.max-ai-credits }}
@@ -600,9 +600,9 @@ jobs:
     runs-on: ubuntu-latest
     # Permissions for the agent job (workflow permissions default to none).
     permissions:
-      actions: read
+      actions: read # Read workflow runs and artifacts for workflow context.
       contents: read
-      copilot-requests: write
+      copilot-requests: write # Authenticate requests to the Copilot engine.
     timeout-minutes: 60
     env:
       DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
@@ -2296,9 +2296,9 @@ jobs:
     runs-on: ubuntu-slim
     # Permissions for the conclusion job (workflow permissions default to none).
     permissions:
-      actions: read
-      contents: write
-      issues: write
+      actions: read # Read workflow runs and artifacts for workflow context.
+      contents: write # Create or update repository contents.
+      issues: write # Create or update issues and comments.
     concurrency:
       group: "gh-aw-conclusion-engine-conformance-pydantic-ai"
       cancel-in-progress: false
@@ -2536,7 +2536,7 @@ jobs:
     # Permissions for the conclusion_admission job (workflow permissions default to none).
     permissions:
       contents: read
-      id-token: write
+      id-token: write # Request an OIDC token for authenticated services.
     timeout-minutes: 5
     env:
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
@@ -2588,9 +2588,9 @@ jobs:
     runs-on: ubuntu-slim
     # Permissions for the safe_outputs job (workflow permissions default to none).
     permissions:
-      actions: write
-      contents: write
-      issues: write
+      actions: write # Create or update workflow runs and artifacts.
+      contents: write # Create or update repository contents.
+      issues: write # Create or update issues and comments.
     timeout-minutes: 15
     env:
       GH_AW_AGENT_AIC: ${{ needs.agent.outputs.aic }}

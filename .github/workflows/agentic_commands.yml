@@ -141,11 +141,11 @@ jobs:
     runs-on: ubuntu-slim
     timeout-minutes: 15
     permissions:
-      actions: write
+      actions: write # Create or update workflow runs and artifacts.
       contents: read
-      issues: write
-      pull-requests: write
-      discussions: write
+      issues: write # Create or update issues and comments.
+      pull-requests: write # Create or update pull requests and review comments.
+      discussions: write # Create or update discussions and comments.
 
     steps:
       - name: Checkout repository
