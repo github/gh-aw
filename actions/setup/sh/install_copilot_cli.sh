@@ -157,20 +157,16 @@ fi
 # `sudo -E awf --enable-chroot ...`, which creates the .copilot directory with
 # root ownership. The Copilot CLI (running as the runner user) then fails when
 # trying to create subdirectories. See: https://github.com/github/gh-aw/issues/12066
-echo "Ensuring correct ownership of $COPILOT_DIR..."
-mkdir -p "$COPILOT_DIR"
-maybe_sudo chown -R "$(id -u):$(id -g)" "$COPILOT_DIR"
-
-# Clean up any stale AWF chroot directories left by previous runs.
-# When AWF ran with `sudo -E awf --enable-host-access`, it created
-# /tmp/awf-*-chroot-home and /tmp/awf-chroot-* directories with root-owned
-# files. These cause EACCES failures in the Copilot CLI cleanup path
-# (rimrafSync) or AWF writeConfigs on the same or subsequent runs, which
-# reports as "engine terminated unexpectedly" or fatal EACCES errors.
-# Remove them here before the agent starts so the runner is in a clean state.
-echo "Cleaning up stale AWF chroot directories..."
-maybe_sudo find /tmp -maxdepth 1 -name 'awf-*-chroot-home' -type d -exec rm -rf -- {} + 2>/dev/null || true
-maybe_sudo find /tmp -maxdepth 1 -name 'awf-chroot-*' -type d -exec rm -rf -- {} + 2>/dev/null || true
+if [ "$ROOTLESS" = "true" ]; then
+  if ! { mkdir -p "$COPILOT_DIR" && [ -w "$COPILOT_DIR" ]; }; then
+    echo "ERROR: --rootless requires a writable Copilot directory at $COPILOT_DIR; existing files will not be reclaimed or re-owned." >&2
+    exit 1
+  fi
+else
+  echo "Ensuring correct ownership of $COPILOT_DIR..."
+  mkdir -p "$COPILOT_DIR"
+  maybe_sudo chown -R "$(id -u):$(id -g)" "$COPILOT_DIR"
+fi
 
 # Detect architecture
 ARCH="$(uname -m)"
@@ -729,9 +725,8 @@ stage_musl_guest_copilot() {
   echo "✓ Staged musl Copilot CLI at ${destination}"
 }
 
-# Create temp directory with cleanup on exit
-TEMP_DIR=$(mktemp -d)
-trap 'rm -rf "$TEMP_DIR"' EXIT
+# Keep downloads private and cleanup confined to this invocation's allocation.
+create_release_staging copilot
 
 # Version resolution follows this priority order:
 # Check publication time before activating any cached binary or downloading an

@@ -9,7 +9,7 @@ trap 'rm -rf "$TEMP_DIR"' EXIT
 # shellcheck source=actions/setup/sh/release_integrity.sh
 source "$SCRIPT_DIR/release_integrity.sh"
 
-mkdir -p "$TEMP_DIR/bin" "$TEMP_DIR/home" "$TEMP_DIR/scripts" "$TEMP_DIR/copilot-fixture"
+mkdir -p "$TEMP_DIR/bin" "$TEMP_DIR/home" "$TEMP_DIR/scripts" "$TEMP_DIR/copilot-fixture" "$TEMP_DIR/runner"
 cp "$SCRIPT_DIR/install_awf_binary.sh" "$TEMP_DIR/scripts/"
 cp "$SCRIPT_DIR/install_copilot_cli.sh" "$TEMP_DIR/scripts/"
 printf '#!/usr/bin/env bash\necho EXECUTED >>"$EXECUTION_LOG"\n' >"$TEMP_DIR/payload"

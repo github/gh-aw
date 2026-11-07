@@ -3,7 +3,7 @@ set +o histexpand
 
 # Clean Action Post Script
 # Mirror of actions/setup/post.js for script mode (run: bash steps).
-# Sends an OTLP conclusion span then removes the /tmp/gh-aw/ directory.
+# Sends an OTLP conclusion span without reclaiming unowned shared runtime paths.
 #
 # Must be called from an `if: always()` step so it runs even when job steps fail,
 # ensuring both the trace span and the cleanup always complete.
@@ -29,47 +29,12 @@ if command -v node &>/dev/null && [ -f "${DESTINATION}/action_conclusion_otlp.cj
   echo "OTLP conclusion span step complete"
 fi
 
-# Remove /tmp/gh-aw/ (mirrors post.js cleanup).
+# Shared legacy state has no per-invocation ownership record (mirrors post.js).
 tmpDir="/tmp/gh-aw"
-if [ -d "${tmpDir}" ]; then
-  if sudo rm -rf "${tmpDir}" 2>/dev/null; then
-    echo "Cleaned up ${tmpDir} (sudo)"
-  elif rm -rf "${tmpDir}" 2>/dev/null; then
-    echo "Cleaned up ${tmpDir}"
-  else
-    echo "Warning: failed to clean up ${tmpDir}" >&2
-  fi
+if [ -e "${tmpDir}" ] || [ -L "${tmpDir}" ]; then
+  echo "Warning: leaving shared ${tmpDir} untouched; per-invocation ownership cannot be established." >&2
 fi
 
-# Remove AWF chroot directories under /tmp (e.g. /tmp/awf-*-chroot-home and
-# /tmp/awf-chroot-*). These are created by AWF when running with
-# --enable-host-access on GitHub-hosted runners. Files inside may be owned by
-# root (written by Docker containers or privileged AWF processes), causing
-# EACCES failures if cleanup is attempted without sudo.
-if awf_chroot_home_dirs="$(sudo find /tmp -maxdepth 1 -name 'awf-*-chroot-home' -type d -print 2>/dev/null)"; then
-  if [ -n "${awf_chroot_home_dirs}" ]; then
-    if sudo find /tmp -maxdepth 1 -name 'awf-*-chroot-home' -type d -exec rm -rf -- {} + 2>/dev/null; then
-      echo "Cleaned up /tmp/awf-*-chroot-home directories (sudo)"
-    else
-      echo "Warning: failed to clean /tmp/awf-*-chroot-home directories" >&2
-    fi
-  else
-    echo "No /tmp/awf-*-chroot-home directories found"
-  fi
-else
-  echo "Warning: unable to inspect /tmp/awf-*-chroot-home directories with sudo" >&2
-fi
-
-if awf_chroot_dirs="$(sudo find /tmp -maxdepth 1 -name 'awf-chroot-*' -type d -print 2>/dev/null)"; then
-  if [ -n "${awf_chroot_dirs}" ]; then
-    if sudo find /tmp -maxdepth 1 -name 'awf-chroot-*' -type d -exec rm -rf -- {} + 2>/dev/null; then
-      echo "Cleaned up /tmp/awf-chroot-* directories (sudo)"
-    else
-      echo "Warning: failed to clean /tmp/awf-chroot-* directories" >&2
-    fi
-  else
-    echo "No /tmp/awf-chroot-* directories found"
-  fi
-else
-  echo "Warning: unable to inspect /tmp/awf-chroot-* directories with sudo" >&2
+if [[ -n "${GH_AW_RUNTIME_TMP_DIR:-}" && -f "${DESTINATION}/cleanup_runtime_tmp.sh" ]]; then
+  bash "${DESTINATION}/cleanup_runtime_tmp.sh"
 fi
