@@ -108,9 +108,10 @@ func reportUncheckedFlush(pass *analysis.Pass, call *ast.CallExpr, noLintIndex n
 }
 
 // isFlushCallReturningError returns true when call is a method named Flush
-// that takes no arguments and returns a single error value.
+// that takes no arguments and returns a single error value. Parenthesized
+// callees such as (w.Flush)() are matched as well.
 func isFlushCallReturningError(pass *analysis.Pass, call *ast.CallExpr) bool {
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok {
 		return false
 	}

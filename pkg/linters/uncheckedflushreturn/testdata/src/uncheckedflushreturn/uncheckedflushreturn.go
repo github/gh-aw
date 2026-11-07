@@ -16,6 +16,14 @@ func bad() {
 	tw.Flush() // want `error return from Flush\(\) is discarded`
 }
 
+func badParenthesizedCallee() {
+	var sb strings.Builder
+	bw := bufio.NewWriter(&sb)
+	(bw.Flush)()       // want `error return from Flush\(\) is discarded`
+	_ = (bw.Flush)()   // want `error return from Flush\(\) is discarded`
+	defer (bw.Flush)() // want `error return from Flush\(\) is discarded`
+}
+
 func badBlankAssign() {
 	var sb strings.Builder
 	bw := bufio.NewWriter(&sb)

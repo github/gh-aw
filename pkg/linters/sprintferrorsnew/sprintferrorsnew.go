@@ -36,8 +36,9 @@ func run(pass *analysis.Pass) (any, error) {
 			return
 		}
 
-		// Match errors.New(...)
-		sel, ok := call.Fun.(*ast.SelectorExpr)
+		// Match errors.New(...), including a parenthesized callee such as
+		// (errors.New)(...).
+		sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 		if !ok || sel.Sel.Name != "New" {
 			return
 		}
@@ -48,12 +49,13 @@ func run(pass *analysis.Pass) (any, error) {
 			return
 		}
 
-		// Check if the sole argument is a direct fmt.Sprintf(...) call.
-		argCall, ok := call.Args[0].(*ast.CallExpr)
+		// Check if the sole argument is a fmt.Sprintf(...) call, ignoring
+		// redundant parentheses around the argument or its callee.
+		argCall, ok := astutil.UnwrapParenExpr(call.Args[0]).(*ast.CallExpr)
 		if !ok {
 			return
 		}
-		argSel, ok := argCall.Fun.(*ast.SelectorExpr)
+		argSel, ok := astutil.UnwrapParenExpr(argCall.Fun).(*ast.SelectorExpr)
 		if !ok || argSel.Sel.Name != "Sprintf" {
 			return
 		}
