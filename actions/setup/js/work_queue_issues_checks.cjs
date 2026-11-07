@@ -8,7 +8,7 @@ const { newWork } = require("./work_queue_graph.cjs");
 const { defaultPolicy, validatePolicy } = require("./work_queue_policy.cjs");
 const { main, ownProjectionTargets, workIssueStatus, summaryBody, journalPath } = require("./work_queue_issues.cjs");
 const { issueBody } = require("./work_queue_issue_messages.cjs");
-const { issueCompletionPolicy } = require("./work_queue_issue_contract.cjs");
+const { issueCompletionPolicy, issueCompletionPolicyForWork } = require("./work_queue_issue_contract.cjs");
 const { STATUSES, discoverTarget, ensureStatusLabel, mutateIssues, statusLabelName } = require("./work_queue_issue_api.cjs");
 const { withProjectionLocks } = require("./work_queue_issue_coordination.cjs");
 const { canonical, digest } = require("./work_queue_codec.cjs");
@@ -733,6 +733,21 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
       assert.equal(issueCompletionPolicy(state, work, { ...originalAdmission, role: "projector" }, ref, "owner/repo"), "keep-open");
       assert.ok(summaryBody(state, work, 10).includes(`/actions/runs/${originalAdmission.run_id}`));
       assert.ok(issueBody(state, work, helpers.context(otherRun, { ref }), { label: "work" }, "work-queue").includes(`/actions/runs/${originalAdmission.run_id}`));
+    });
+    it("uses the checked IssueLink revision with the shared admission-time policy matcher", () => {
+      const f = protocolFixture();
+      const projectors = f.log[0].operations[0].policy.projectors;
+      projectors[0].completion_policy = "close-on-result";
+      projectors[1].completion_policy = "keep-open";
+      f.log[0].request = q.newRequest(f.log[0].request.id, "policy", f.log[0].actor, { operations: f.log[0].operations });
+      const state = q.replayTransactions(f.log);
+      const work = state.works.values().next().value;
+      assert.equal(issueCompletionPolicyForWork(state, work, "owner/repo"), "close-on-result");
+
+      const issueLinkCommit = state.transactions.find(commit => commit.operations.some(operation => operation.kind === "IssueLink" && operation.work_id === work.work_id));
+      issueLinkCommit.operations.find(operation => operation.kind === "IssueLink").projector_ref = "1".repeat(40);
+      assert.equal(issueCompletionPolicyForWork(state, work, "owner/repo"), "keep-open");
+      assert.equal(issueCompletionPolicy(state, work, state.workCreators.get(work.work_id), ref, "owner/repo", resource(99)), "keep-open");
     });
     it("does not treat configuration or API access as installed projector authority", async () => {
       const f = fixture();

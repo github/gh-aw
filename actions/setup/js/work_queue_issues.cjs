@@ -11,11 +11,23 @@ const { dependencyStatus } = require("./work_queue_graph.cjs");
 const { appendCommit, newRequest, proposedCommitId, replayTransactions } = require("./work_queue_replay.cjs");
 const { readCheckedQueue, writeCheckedFiles } = require("./work_queue_checked_transport.cjs");
 const { withProjectionLocks, projectionNonce } = require("./work_queue_issue_coordination.cjs");
-const { MAX_PROJECTION_TARGETS, LABELS_PAGE_SIZE, STATUSES, statusLabelName, ensureStatusLabel, discoverTarget, preflightIssues, mutateIssues, issueResource, ISSUE_SELECTION, issueReadQuery } = require("./work_queue_issue_api.cjs");
+const {
+  MAX_PROJECTION_TARGETS,
+  LABELS_PAGE_SIZE,
+  statusLabelOperations,
+  statusLabelReceiptVerified,
+  ensureStatusLabel,
+  discoverTarget,
+  preflightIssues,
+  mutateIssues,
+  issueResource,
+  ISSUE_SELECTION,
+  issueReadQuery,
+} = require("./work_queue_issue_api.cjs");
 const { wrapGithubClient } = require("./work_queue_issue_pacing.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { validateJournal } = require("./work_queue_issue_journal.cjs");
-const { issueBodyReport, issueTitle, renderSummary, renderClaim, runLink } = require("./work_queue_issue_messages.cjs");
+const { issueBodyReport, issueTitle, renderSummary, renderClaim, runLink, renderOrphanComment } = require("./work_queue_issue_messages.cjs");
 const { transitionProjectionTargets, reconciliationProjectionTargets } = require("./work_queue_issue_transitions.cjs");
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("issues");
 
@@ -439,26 +451,7 @@ async function projectLinkedIssues(options, current, actor, origin, config, targ
     const discovered = discovery.get(target.resource.repository);
     const status = workIssueStatus(current.state, work, options.now ?? Date.now());
     const desiredStatusId = statusLabels.get(`${target.resource.repository}:${status}`);
-    const missing = [discovered.labelId, desiredStatusId].filter(id => !issue.labels.nodes.some(label => label.id === id));
-    if (missing.length)
-      edits.push({
-        key: target.work_id,
-        name: "addLabelsToLabelable",
-        type: "AddLabelsToLabelableInput",
-        input: { labelableId: issue.id, labelIds: missing },
-        selection: `labelable { id ... on Issue { labels(first:${LABELS_PAGE_SIZE}) { nodes { id } pageInfo { hasNextPage } } } }`,
-        expectedLabels: missing,
-      });
-    const obsolete = issue.labels.nodes.filter(label => STATUSES.some(candidate => candidate !== status && label.name === statusLabelName(config, candidate))).map(label => label.id);
-    if (obsolete.length)
-      edits.push({
-        key: target.work_id,
-        name: "removeLabelsFromLabelable",
-        type: "RemoveLabelsFromLabelableInput",
-        input: { labelableId: issue.id, labelIds: obsolete },
-        selection: `labelable { id ... on Issue { labels(first:${LABELS_PAGE_SIZE}) { nodes { id } pageInfo { hasNextPage } } } }`,
-        removedLabels: obsolete,
-      });
+    edits.push(...statusLabelOperations(issue, target.work_id, config, status, [discovered.labelId, desiredStatusId]));
     const diagnostics = jobDiagnostics(options.jobResults ?? process.env.GH_AW_WORK_QUEUE_JOB_RESULTS);
     const bodies = new Map([["summary", summaryBody(current.state, work, options.now ?? Date.now(), diagnostics, current.branch, origin)]]);
     for (const claimId of target.claim_ids) bodies.set(claimId, claimBody(current.state, current.state.claims.get(claimId), options.now ?? Date.now(), diagnostics));
@@ -511,14 +504,7 @@ async function projectLinkedIssues(options, current, actor, origin, config, targ
       recordUncertainReceipt(result, batch, pending, "Issue closure returned no exact native receipt");
       continue;
     }
-    if (
-      (result.operation.expectedLabels || result.operation.removedLabels) &&
-      (result.value.labelable?.id !== result.operation.input.labelableId ||
-        result.value.labelable?.labels?.pageInfo?.hasNextPage !== false ||
-        result.operation.expectedLabels?.some(id => !result.value.labelable.labels.nodes.some(label => label.id === id)) ||
-        result.operation.removedLabels?.some(id => result.value.labelable.labels.nodes.some(label => label.id === id)))
-    )
-      recordUncertainReceipt(result, batch, pending, "status label synchronization was not verified");
+    if (!statusLabelReceiptVerified(result)) recordUncertainReceipt(result, batch, pending, "status label synchronization was not verified");
     if (result.operation.handle) {
       const node = result.value.commentEdge?.node;
       const target = targets.find(target => target.work_id === result.operation.key);
@@ -625,18 +611,18 @@ async function hasOrphanComment(githubClient, owner, repo, number, marker) {
 async function flagOrphanIssue(options, current, config, issue, workId) {
   const { githubClient, owner, repo } = options;
   const marker = `<!-- gh-aw-work-queue-orphan:${workId} -->`;
-  const statusLabel = statusLabelName(config, "Needs attention");
   const resource = issueResource({
     databaseId: issue.id,
     number: issue.number,
     repository: { databaseId: options.repositoryDatabaseId, nameWithOwner: `${owner}/${repo}` },
   });
+  const lockKey = `issue:${issueIdentity(resource)}`;
   const result = await (options.withProjectionLocks || withProjectionLocks)(
     {
       ...options,
       head: current.sha,
       repositoryId: current.repositoryId,
-      keys: [`issue:${issueIdentity(resource)}`],
+      keys: [lockKey],
     },
     async () => {
       const read = options.readCheckedQueue || readCheckedQueue;
@@ -647,36 +633,17 @@ async function flagOrphanIssue(options, current, config, issue, workId) {
       if (!currentIssue || String(currentIssue.id) !== String(issue.id) || currentIssue.node_id !== issue.node_id || !orphanWorkId(currentIssue, latest.state, config, options.now ?? Date.now())) return { pending: [] };
       const discovered = await discoverTarget(githubClient, `${owner}/${repo}`, config);
       const labelId = await ensureStatusLabel(githubClient, discovered.repositoryId, config, "Needs attention");
-      const labels = currentIssue.labels.map(label => ({ id: label.node_id, name: label.name }));
-      const operations = [];
-      const obsolete = labels.filter(label => STATUSES.some(status => label.name === statusLabelName(config, status) && label.name !== statusLabel)).map(label => label.id);
-      if (!labels.some(label => label.name === statusLabel))
-        operations.push({
-          key: String(issue.number),
-          name: "addLabelsToLabelable",
-          type: "AddLabelsToLabelableInput",
-          input: { labelableId: issue.node_id, labelIds: [labelId] },
-          selection: `labelable { id ... on Issue { labels(first:${LABELS_PAGE_SIZE}) { nodes { id } pageInfo { hasNextPage } } } }`,
-          expectedLabels: [labelId],
-        });
-      if (obsolete.length)
-        operations.push({
-          key: String(issue.number),
-          name: "removeLabelsFromLabelable",
-          type: "RemoveLabelsFromLabelableInput",
-          input: { labelableId: issue.node_id, labelIds: obsolete },
-          selection: `labelable { id ... on Issue { labels(first:${LABELS_PAGE_SIZE}) { nodes { id } pageInfo { hasNextPage } } } }`,
-          removedLabels: obsolete,
-        });
+      const labels = { nodes: currentIssue.labels.map(label => ({ id: label.node_id, name: label.name })) };
+      const operations = statusLabelOperations({ id: currentIssue.node_id, labels }, String(issue.number), config, "Needs attention", [labelId]);
       const batch = await mutateIssues(githubClient, operations, { sleep: options.sleep });
-      if (batch.results.some(result => result.pending))
+      if (batch.results.some(result => result.pending || !statusLabelReceiptVerified(result)))
         return {
-          ambiguous: batch.ambiguous,
-          retain_keys: batch.ambiguous ? [`issue:${canonical([owner + "/" + repo, String(issue.id)])}`] : [],
+          ambiguous: batch.ambiguous || batch.results.some(result => !result.pending && !statusLabelReceiptVerified(result)),
+          retain_keys: batch.ambiguous || batch.results.some(result => !result.pending && !statusLabelReceiptVerified(result)) ? [lockKey] : [],
           pending: [{ work_id: workId, reason: "orphan Issue status label synchronization remains pending" }],
         };
       if (!(await hasOrphanComment(githubClient, owner, repo, issue.number, marker))) {
-        const body = `This mirror is older than the configured orphan age and has no matching Work ID in the checked ledger. It has been flagged for maintainer review; this does not change or recreate queue work.\n\n[View the checked ledger](https://github.com/${owner}/${repo}/blob/${latest.branch}/work-queue.jsonl)\n\n${marker}`;
+        const body = renderOrphanComment(`${owner}/${repo}`, latest.branch, workId);
         const comment = await mutateIssues(githubClient, [
           {
             key: String(issue.number),
@@ -694,7 +661,7 @@ async function flagOrphanIssue(options, current, config, issue, workId) {
               if (!(await hasOrphanComment(githubClient, owner, repo, issue.number, marker))) {
                 return {
                   ambiguous: true,
-                  retain_keys: [`issue:${canonical([owner + "/" + repo, String(issue.id)])}`],
+                  retain_keys: [lockKey],
                   pending: [{ work_id: workId, reason: "orphan Issue explanation remains pending" }],
                 };
               }

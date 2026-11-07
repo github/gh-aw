@@ -60,7 +60,19 @@ function assertProjectionAuthority(state, actor, workId, ref, repository, claimI
   return work;
 }
 
-function issueCompletionPolicy(state, work, actor, ref, repository) {
+function matchingProjectorRules(policy, work, actor, ref, repository, backingIssue) {
+  return (policy.projectors || []).filter(
+    rule =>
+      rule.principal === actor.principal &&
+      rule.workflow === actor.workflow &&
+      rule.ref === ref &&
+      rule.pools.includes(work.pool) &&
+      rule.repositories.includes(repository) &&
+      (!backingIssue || rule.backing_issues?.some(resource => canonical(resource) === canonical(backingIssue)))
+  );
+}
+
+function issueCompletionPolicy(state, work, actor, ref, repository, backingIssue = work.backing_issue) {
   // Closure is fixed by trusted policy at admission, not agent payload or a later
   // policy expansion. Original worker Claims still need current projection authority.
   for (let commit = work.position.commit; commit >= 0; commit--) {
@@ -68,9 +80,7 @@ function issueCompletionPolicy(state, work, actor, ref, repository) {
     const end = commit === work.position.commit ? work.position.operation : operations.length;
     for (let index = end - 1; index >= 0; index--) {
       if (operations[index].kind !== "Policy") continue;
-      const rules = (operations[index].policy.projectors || []).filter(
-        rule => rule.principal === actor.principal && rule.workflow === actor.workflow && rule.ref === ref && rule.pools.includes(work.pool) && rule.repositories.includes(repository)
-      );
+      const rules = matchingProjectorRules(operations[index].policy, work, actor, ref, repository, backingIssue);
       return rules.length && rules.every(rule => rule.completion_policy === "close-on-result") ? "close-on-result" : "keep-open";
     }
   }
@@ -79,14 +89,13 @@ function issueCompletionPolicy(state, work, actor, ref, repository) {
 
 function issueCompletionPolicyForWork(state, work, repository) {
   const admission = state.workCreators?.get(work.work_id);
-  if (!admission) return "keep-open";
-  for (let commit = work.position.commit; commit >= 0; commit--) {
-    const operations = transactionAt(state, commit)?.operations || [];
-    const end = commit === work.position.commit ? work.position.operation : operations.length;
-    for (let index = end - 1; index >= 0; index--) {
-      if (operations[index].kind !== "Policy") continue;
-      const rules = (operations[index].policy.projectors || []).filter(rule => rule.principal === admission.principal && rule.workflow === admission.workflow && rule.pools.includes(work.pool) && rule.repositories.includes(repository));
-      return rules.length && rules.every(rule => rule.completion_policy === "close-on-result") ? "close-on-result" : "keep-open";
+  if (!admission || !work.issue_link) return "keep-open";
+  const transactionCount = (state.historicalTransactions?.length || 0) + state.transactions.length;
+  for (let commit = work.position.commit; commit < transactionCount; commit++) {
+    const transaction = transactionAt(state, commit);
+    for (const operation of transaction.operations) {
+      if (operation.kind === "IssueLink" && operation.work_id === work.work_id && canonical(operation.resource) === canonical(work.issue_link))
+        return issueCompletionPolicy(state, work, transaction.actor, operation.projector_ref, repository, work.backing_issue);
     }
   }
   return "keep-open";

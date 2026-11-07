@@ -76,20 +76,27 @@ function reconciliationProjectionTargets(state, origin) {
   )
     throw queueError("projection_unauthorized", "mirror reconciliation requires the authenticated maintenance run");
   const actor = actorFromContext(origin);
-  const targets = [];
-  const pending = [];
+  const candidates = [];
   for (const work of state.works.values()) {
     if (work.backing_issue) continue;
     const resource = work.issue_link;
     if (!resource || resource.repository !== state.repository || !state.policy.pools[work.pool].allowed_repositories.includes(state.repository)) continue;
     if (!work.issue_summary) {
-      pending.push({ work_id: work.work_id, reason: "projection_receipt_pending" });
+      candidates.push({ pending: { work_id: work.work_id, reason: "projection_receipt_pending" } });
       continue;
     }
-    targets.push({ work_id: work.work_id, claim_ids: [], resource, reconciliation: true });
+    candidates.push({ target: { work_id: work.work_id, claim_ids: [], resource, reconciliation: true } });
   }
-  if (targets.length > 256) throw queueError("projection_limit", "mirror reconciliation requires at most 256 existing mirrors");
-  return { actor, targets, pending };
+  candidates.sort((a, b) => (a.target?.work_id || a.pending.work_id).localeCompare(b.target?.work_id || b.pending.work_id));
+  const limit = 256;
+  const runId = /^\d+$/.test(origin.run_id || "") ? BigInt(origin.run_id) : 0n;
+  const offset = candidates.length ? Number((runId * BigInt(limit)) % BigInt(candidates.length)) : 0;
+  const selected = [...candidates.slice(offset), ...candidates.slice(0, offset)].slice(0, limit);
+  return {
+    actor,
+    targets: selected.flatMap(candidate => (candidate.target ? [candidate.target] : [])),
+    pending: selected.flatMap(candidate => (candidate.pending ? [candidate.pending] : [])),
+  };
 }
 
 module.exports = { transitionProjectionTargets, reconciliationProjectionTargets };

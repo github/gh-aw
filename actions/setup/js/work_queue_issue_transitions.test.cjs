@@ -197,6 +197,49 @@ describe("exact committed terminal Issue projection", () => {
     }
   });
 
+  it("rotates through mirrors while limiting each reconciliation run to 256", () => {
+    const f = fixture({ backing: false });
+    const policy = f.log[0].operations[0].policy;
+    policy.authorization = "aw";
+    policy.producers = {};
+    delete policy.projectors;
+    f.log[0].request = newRequest(f.log[0].request.id, "policy", f.log[0].actor, { operations: f.log[0].operations });
+    const state = replayTransactions(f.log);
+    const [template] = state.works.values();
+    const admission = state.workCreators.get(template.work_id);
+    template.issue_link = {
+      kind: "issue",
+      host: "github.com",
+      repository: "owner/repo",
+      repository_id: "1",
+      resource_id: "2000",
+      number: "1",
+    };
+    template.issue_summary = "summary-0";
+    for (let index = 1000; index < 1299; index++) {
+      const workId = index.toString(16).padStart(64, "0");
+      const work = structuredClone(template);
+      work.work_id = workId;
+      work.issue_link = {
+        kind: "issue",
+        host: "github.com",
+        repository: "owner/repo",
+        repository_id: "1",
+        resource_id: String(2000 + index),
+        number: String(index + 1),
+      };
+      work.issue_summary = `summary-${index}`;
+      state.works.set(workId, work);
+      state.workCreators.set(workId, admission);
+    }
+
+    const first = reconciliationProjectionTargets(state, maintenance);
+    const second = reconciliationProjectionTargets(state, { ...maintenance, run_id: "301" });
+    expect(first.targets).toHaveLength(256);
+    expect(second.targets).toHaveLength(256);
+    expect(new Set([...first.targets, ...second.targets].map(target => target.work_id))).toHaveLength(300);
+  });
+
   it("maps completed Work with failed delivery to Needs attention rather than Done", () => {
     expect(workIssueStatus({}, { state: "completed", barrier: "failed" }, 100)).toBe("Needs attention");
   });
