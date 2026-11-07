@@ -63,6 +63,17 @@ func TestCompileArcDindThreatDetectionStaging(t *testing.T) {
 					upload, _ := find("Upload threat detection artifact")
 					_, conclusion := find("Conclude threat detection")
 					require.NotNil(t, conclusion)
+					executionEnv := execution["env"].(map[string]any)
+					if engine == "copilot" {
+						inputDir := "/tmp/gh-aw/threat-detection-inputs"
+						if tc.arc {
+							inputDir = "${{ runner.temp }}/gh-aw/threat-detection-inputs"
+						}
+						require.Equal(t, inputDir, executionEnv["GH_AW_DETECTION_INPUT_DIR"])
+						require.Equal(t, "detection", executionEnv["GH_AW_PHASE"])
+					} else {
+						require.NotContains(t, executionEnv, "GH_AW_DETECTION_INPUT_DIR")
+					}
 					rootless := tc.arc || tc.installation == "rootless"
 					installRun := installation["run"].(string)
 					require.Equal(t, rootless, strings.Contains(installRun, "--rootless"))
@@ -84,7 +95,7 @@ func TestCompileArcDindThreatDetectionStaging(t *testing.T) {
 						require.Equal(t, -1, reset)
 						require.Equal(t, -1, collect)
 						require.NotContains(t, execution["run"], "stage_threat_detection_arc_dind.sh")
-						require.Contains(t, execution["run"], "--output /tmp/gh-aw/threat-detection/detection_result.json /tmp/gh-aw/threat-detection")
+						require.Contains(t, execution["run"], "--output /tmp/gh-aw/threat-detection/detection_result.json /tmp/gh-aw/threat-detection-inputs")
 						if rootless {
 							env := execution["env"].(map[string]any)
 							require.Equal(t, "${{ steps.threat_detect_install.outputs.binary-path }}", env["THREAT_DETECT_BINARY"])
@@ -117,7 +128,7 @@ func TestCompileArcDindThreatDetectionStaging(t *testing.T) {
 					require.Contains(t, run, `--mount "${RUNNER_TEMP}/gh-aw:${RUNNER_TEMP}/gh-aw:ro"`)
 					require.Contains(t, run, `--mount "${RUNNER_TEMP}/gh-aw/threat-detection:${RUNNER_TEMP}/gh-aw/threat-detection:rw"`)
 					require.NotContains(t, run, "--mount /tmp/gh-aw/threat-detection:")
-					require.Contains(t, run, `--output "${RUNNER_TEMP}/gh-aw/threat-detection/detection_result.json" "${RUNNER_TEMP}/gh-aw/threat-detection"`)
+					require.Contains(t, run, `--output "${RUNNER_TEMP}/gh-aw/threat-detection/detection_result.json" "${RUNNER_TEMP}/gh-aw/threat-detection-inputs"`)
 					if engine == "codex" {
 						_, config := find("Prepare Codex config for threat-detect")
 						require.Contains(t, config["run"], `"/tmp/gh-aw/threat-detection/codex-home/config.toml"`)

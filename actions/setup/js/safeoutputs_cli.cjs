@@ -223,6 +223,7 @@ function hasExpectedSafeOutputs(safeOutputsPath, options) {
  *   byteOffset?: number,
  *   includeMissingData?: boolean,
  *   includeReportIncomplete?: boolean,
+ *   excludePartialReviewComments?: boolean,
  *   logger?: (msg: string) => void,
  *   readFileSync?: (path: string, encoding: BufferEncoding) => string
  * }=} options
@@ -266,6 +267,8 @@ function hasTerminalSafeOutput(safeOutputsPath, options) {
   for (const parsed of iterateJsonl(content)) {
     const type = parsed && typeof parsed.type === "string" ? normalizeSafeOutputName(parsed.type) : "";
     if (!type) continue;
+    // Inline findings do not prove that the final review was submitted.
+    if ((type === "create_pull_request_review_comment" || type === "create-pull-request-review-comment") && options?.excludePartialReviewComments) continue;
     if (TERMINAL_SAFE_OUTPUT_TYPES.has(type)) {
       logger(`hasTerminalSafeOutput: terminal entry found in ${safeOutputsPath}: type=${type}`);
       return true;

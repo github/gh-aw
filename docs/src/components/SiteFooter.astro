@@ -58,6 +58,12 @@ const legalLinks = [
 			</div>
 		</div>
 
+		<p class="site-footer-skill">
+			Have a question or a workflow issue? Use the{' '}
+			<a href={`${base}reference/custom-agent-for-aw/`}>agentic-workflows skill</a>
+			{' '}with your coding agent to ask questions or troubleshoot.
+		</p>
+
 		<div class="site-footer-bottom">
 			<p>
 				Made by <a href="https://githubnext.com/">GitHub Next</a> &amp;{' '}
@@ -192,6 +198,17 @@ const legalLinks = [
 		gap: 0.75rem;
 	}
 
+	.site-footer-skill {
+		max-width: 38.75rem;
+		padding-top: 2rem;
+		color: var(--aw-color-text-muted);
+	}
+
+	.site-footer-skill a {
+		text-decoration: underline;
+		text-underline-offset: 0.2em;
+	}
+
 	/* Bottom bar */
 	.site-footer-bottom {
 		display: flex;
@@ -199,7 +216,7 @@ const legalLinks = [
 		align-items: center;
 		justify-content: space-between;
 		gap: 0.75rem 2rem;
-		margin-top: 3rem;
+		margin-top: 1.5rem;
 		padding-top: 1.5rem;
 		border-top: 1px solid var(--aw-color-divider);
 		color: var(--aw-color-text-muted);
@@ -230,6 +247,7 @@ const legalLinks = [
 		}
 
 		.site-footer-groups a,
+		.site-footer-skill a,
 		.site-footer-bottom a {
 			display: inline-block;
 			padding-block: 0.375rem;

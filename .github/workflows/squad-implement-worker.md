@@ -103,7 +103,7 @@ safe-outputs:
     workflows: [squad]
     max: 1
     target-ref: ${{ github.event.repository.default_branch }}
-source: bradygaster/squad/workflows/squad-implement-worker.md@a70c752010f8adfb33f06c7aafb32db09aab1060
+source: github/squad/workflows/squad-implement-worker.md@a70c752010f8adfb33f06c7aafb32db09aab1060
 ---
 
 # Squad Implementation Worker

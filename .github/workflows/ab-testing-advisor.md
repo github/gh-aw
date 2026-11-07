@@ -373,7 +373,6 @@ Propose how experiments should integrate with `gh aw audit` and OTEL observabili
 ## agent: `workflow-characterizer`
 ---
 description: Read a selected workflow file and return a concise structured characterization for experiment design
-model: small
 ---
 You receive a single file path to a `.github/workflows/<name>.md` workflow file.
 
@@ -404,7 +403,6 @@ Requirements:
 ## agent: `field-presence-checker`
 ---
 description: Check whether named experiment fields are genuinely implemented in the compiler and picker code
-model: small
 ---
 You receive two file paths:
 - `pkg/workflow/compiler_experiments.go`

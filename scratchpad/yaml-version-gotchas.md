@@ -84,7 +84,7 @@ on:
 GitHub Agentic Workflows uses **`goccy/go-yaml` v1.18.0**, which is a **YAML 1.2 compliant parser**. This means:
 
 ✅ **`on:` is correctly parsed as a string key**, not a boolean  
-✅ **Workflow frontmatter validation does not misread `on:` as a boolean**  
+✅ **Workflow frontmatter validation does not misread `on:` as a boolean**
 ✅ **GitHub Actions YAML is compatible** (GitHub Actions also uses YAML 1.2 parsing)
 
 The compiler in `pkg/workflow/compiler.go` uses this parser to process workflow frontmatter, ensuring consistent parsing behavior.

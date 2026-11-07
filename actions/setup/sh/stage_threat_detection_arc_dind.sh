@@ -7,11 +7,13 @@ set -euo pipefail
 # The optional second argument isolates the host directory in runtime tests.
 MODE="${1:?Expected reset, stage or collect}"
 DETECTION_DIR="${2:-/tmp/gh-aw/threat-detection}"
+DETECTION_INPUT_DIR="$(dirname "$DETECTION_DIR")/threat-detection-inputs"
 STAGED_DIR="${RUNNER_TEMP:?RUNNER_TEMP must be set}/gh-aw/threat-detection"
+STAGED_INPUT_DIR="${RUNNER_TEMP}/gh-aw/threat-detection-inputs"
 BIN_DIR="${RUNNER_TEMP}/gh-aw/bin"
 RESULT_FILES=(detection_result.json detection_result_full.json detection_usage.json detection_usage.jsonl)
 
-if [[ -L "$STAGED_DIR" || -L "$DETECTION_DIR" || "$STAGED_DIR" = "$DETECTION_DIR" ]]; then
+if [[ -L "$STAGED_DIR" || -L "$DETECTION_DIR" || -L "$STAGED_INPUT_DIR" || -L "$DETECTION_INPUT_DIR" || "$STAGED_DIR" = "$DETECTION_DIR" ]]; then
   echo "ERROR: Detection staging requires separate, non-symlink directories" >&2
   exit 1
 fi
@@ -24,9 +26,11 @@ case "$MODE" in
       rm -f "${DETECTION_DIR}/${name}" "${STAGED_DIR}/${name}"
     done
     mkdir -p "$STAGED_DIR"
+    mkdir -p "$STAGED_INPUT_DIR"
     # Clear optional inputs too, including nested files and dotfiles. Do not
     # follow symlinks when clearing this dedicated, validated staging directory.
     find "$STAGED_DIR" -mindepth 1 -delete
+    find "$STAGED_INPUT_DIR" -mindepth 1 -delete
     ;;
 esac
 
@@ -40,6 +44,7 @@ case "$MODE" in
     fi
     mkdir -p "$BIN_DIR"
     cp -R "${DETECTION_DIR}/." "$STAGED_DIR/"
+    cp -R "${DETECTION_INPUT_DIR}/." "$STAGED_INPUT_DIR/"
     # Remove a stale destination symlink instead of following it during copy.
     rm -f "${BIN_DIR}/threat-detect"
     cp "$detector" "${BIN_DIR}/threat-detect"
