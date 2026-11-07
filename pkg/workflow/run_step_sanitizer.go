@@ -47,6 +47,7 @@
 package workflow
 
 import (
+	"bytes"
 	"fmt"
 	"maps"
 	"slices"
@@ -56,7 +57,9 @@ import (
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/setutil"
 	"github.com/github/gh-aw/pkg/typeutil"
+	"github.com/github/gh-aw/pkg/workflow/gradershell"
 	"github.com/goccy/go-yaml"
+	"mvdan.cc/sh/v3/syntax"
 )
 
 var runStepSanitizerLog = logger.New("workflow:run_step_sanitizer")
@@ -110,6 +113,13 @@ func sanitizeRunStepExpressions(step map[string]any) (map[string]any, []string, 
 		return step, nil, false
 	}
 
+	// Environment-variable expansion is not safe when its result is subsequently
+	// parsed as shell code (for example, by eval or bash -c). Leave these expressions
+	// intact so the compiler's raw run-expression validator rejects the step.
+	if runStepUsesShellCodeEvaluation(runVal) {
+		return step, nil, false
+	}
+
 	newEnv := mergeSanitizedRunStepEnv(step, ordered)
 
 	// Replace every occurrence of each expression in the run: script.
@@ -131,6 +141,28 @@ func sanitizeRunStepExpressions(step map[string]any) (map[string]any, []string, 
 	sanitized["env"] = newEnv
 
 	return sanitized, sanitizedRunStepDescriptions(step, ordered), true
+}
+
+func runStepUsesShellCodeEvaluation(run string) bool {
+	masked := maskShellActionsExpressions(run)
+	tree, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(bytes.NewReader(masked), "")
+	if err != nil {
+		return true
+	}
+
+	expressions := ExpressionPattern.FindAllStringSubmatchIndex(run, -1)
+	return gradershell.HasShellCodeEvaluation(tree, func(word *syntax.Word) bool {
+		if _, literal := gradershell.LiteralWord(word); !literal {
+			return true
+		}
+		start, end := int(word.Pos().Offset()), int(word.End().Offset())
+		for _, expression := range expressions {
+			if len(expression) >= 2 && start < expression[1] && expression[0] < end { //nolint:uncheckedsliceindex // The guard requires the complete match offset pair.
+				return true
+			}
+		}
+		return false
+	})
 }
 
 func runStepExpressionsToExtract(scanContent string) []sanitizedExpression {
