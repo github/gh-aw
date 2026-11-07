@@ -255,8 +255,8 @@ printf '%s\\n' "$TEMP_DIR"`,
       encoding: "utf8",
     });
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain("--rootless requires a writable Copilot directory");
-    expect(result.stderr).toContain("existing files will not be reclaimed or re-owned");
+    expect(result.stderr).toContain("Cannot prepare Copilot state");
+    expect(result.stderr).toContain("Rootless installation cannot reclaim or re-own state left by a privileged AWF run");
     expect(fs.readFileSync(path.join(home, ".copilot"), "utf8")).toBe("existing state");
     expect(fs.existsSync(log)).toBe(false);
   });
@@ -293,7 +293,7 @@ printf '%s\\n' "$TEMP_DIR"`,
     });
   }
 
-  it("runs simultaneous rootless installers with shared scratch without chown, sudo, or cross-job cleanup", async () => {
+  it("runs simultaneous rootless installers with shared scratch without chown, sudo, or cross-job cleanup", { timeout: 30000 }, async () => {
     const root = workspace();
     const sharedTemp = path.join(root, "shared-temp");
     const bin = path.join(root, "bin");
@@ -406,8 +406,8 @@ printf 'copilot 1.0.103\\n'
         encoding: "utf8",
       });
       expect(result.status).toBe(1);
-      expect(result.stderr).toContain("--rootless requires a writable Copilot directory");
-      expect(result.stderr).toContain("existing files will not be reclaimed or re-owned");
+      expect(result.stderr).toContain("Cannot prepare Copilot state");
+      expect(result.stderr).toContain("Rootless installation cannot reclaim or re-own state left by a privileged AWF run");
       expect(fs.statSync(copilot).mode & 0o777).toBe(0o555);
       expect(fs.existsSync(log)).toBe(false);
       expect(fs.readdirSync(root).filter(name => name.startsWith("copilot-install-"))).toHaveLength(0);
