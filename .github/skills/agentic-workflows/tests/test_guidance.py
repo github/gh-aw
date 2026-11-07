@@ -812,7 +812,7 @@ class GuidanceTests(unittest.TestCase):
             for pattern in code_patterns:
                 for code in set(re.findall(pattern, path.read_text())):
                     with self.subTest(path=path.name, code=code):
-                        self.assertTrue(code in rows, f"{code} needs an evidence/remedy row")
+                        self.assertTrue(code in rows, f"{code} needs an evidence/remedy row in .github/aw/debug-playbook.md")
         registries = (
             ("pkg/cli/audit_finding_codes.go", r'AuditFindingCode = "([^"]+)"'),
             ("actions/setup/js/error_codes.cjs", r'const [A-Z_0-9]+ = "([^"]+)"'),
@@ -824,11 +824,11 @@ class GuidanceTests(unittest.TestCase):
             for code in re.findall(pattern, (ROOT / name).read_text()):
                 if code != "missing_model_pricing_model_name":
                     with self.subTest(registry=name, code=code):
-                        self.assertTrue(code in rows, f"{code} needs an evidence/remedy row")
+                        self.assertTrue(code in rows, f"{code} needs an evidence/remedy row in .github/aw/debug-playbook.md")
         causes = (ROOT / "actions/setup/js/empty_output_outcome.cjs").read_text()
         for block in re.findall(r"const EMPTY_OUTPUT_(?:FAILURE_)?CAUSES = Object.freeze\(\{(.*?)\}\)", causes, re.S):
             for code in re.findall(r"^\s+([a-z_]+):", block, re.M):
-                self.assertTrue(code in rows, f"{code} needs an evidence/remedy row")
+                self.assertTrue(code in rows, f"{code} needs an evidence/remedy row in .github/aw/debug-playbook.md")
         self.assertIn("debug-playbook.md", DEBUG_GUIDE.read_text())
         for required in ("gh aw audit", "--no-baseline", "gh aw models", "--refresh-observed=false",
                          "Do not dispatch workflows", "first failing boundary", "Unmapped codes"):
