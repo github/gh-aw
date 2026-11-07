@@ -1040,13 +1040,13 @@ func otelResourceAttributes(workflowData *WorkflowData) string {
 	}
 
 	attrs := []string{
-		formatOTELResourceAttribute("gh-aw.workflow.name", workflowNameAttrValue),
-		formatOTELResourceAttribute("gh-aw.repository", "${{ github.repository }}"),
-		formatOTELResourceAttribute("gh-aw.run.id", "${{ github.run_id }}"),
-		formatOTELResourceAttribute("github.run_id", "${{ github.run_id }}"),
+		formatOTELResourceAttribute(OTelAttrWorkflowName, workflowNameAttrValue),
+		formatOTELResourceAttribute(OTelAttrRepository, "${{ github.repository }}"),
+		formatOTELResourceAttribute(OTelAttrRunID, "${{ github.run_id }}"),
+		formatOTELResourceAttribute(OTelAttrGitHubRunID, "${{ github.run_id }}"),
 	}
 	if engineID := ResolveEngineID(workflowData); engineID != "" {
-		attrs = append(attrs, formatOTELResourceAttribute("gh-aw.engine.id", engineID))
+		attrs = append(attrs, formatOTELResourceAttribute(OTelAttrEngineID, engineID))
 	}
 	resourceAttrs := getOTLPResourceAttributes(workflowData)
 	if len(resourceAttrs) > 0 {

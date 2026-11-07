@@ -19,6 +19,7 @@ const { resolveEffectiveModel, resolveModelRoutingSummary } = require("./model_a
 const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
 const { readEvalsNotEvaluatedStatus } = require("./evals_status.cjs");
 const { MAX_OTLP_RESPONSE_BYTES, readOTLPResponse, inspectOTLPResponse, unavailableOTLPResponse } = require("./otlp_response.cjs");
+const { OTEL_ATTR_WORKFLOW_NAME, OTEL_ATTR_REPOSITORY, OTEL_ATTR_RUN_ID, OTEL_ATTR_GITHUB_RUN_ID, OTEL_ATTR_ENGINE_ID } = require("./otel_attributes_generated.cjs");
 
 function getGhAwPath(relativePath) {
   const root = (process.env.GH_AW_TMP_DIR || "").trim() || "/tmp/gh-aw";
@@ -440,7 +441,7 @@ function buildGitHubActionsResourceAttributes({
   };
 
   upsertResourceAttr(buildAttr("github.repository", repository));
-  upsertResourceAttr(buildAttr("github.run_id", runId));
+  upsertResourceAttr(buildAttr(OTEL_ATTR_GITHUB_RUN_ID, runId));
   upsertResourceAttr(buildAttr("github.run_attempt", runAttempt));
   const runUrlAttr = buildGitHubActionsRunUrlAttribute(repository, runId);
   if (runUrlAttr) {
@@ -1572,11 +1573,11 @@ async function sendJobSetupSpan(options = {}) {
 
   const attributes = [
     buildAttr("gh-aw.job.name", jobName),
-    buildAttr("gh-aw.workflow.name", workflowName),
-    buildAttr("gh-aw.run.id", runId),
+    buildAttr(OTEL_ATTR_WORKFLOW_NAME, workflowName),
+    buildAttr(OTEL_ATTR_RUN_ID, runId),
     buildAttr("gh-aw.run.attempt", runAttempt),
     buildAttr("gh-aw.run.actor", actor),
-    buildAttr("gh-aw.repository", repository),
+    buildAttr(OTEL_ATTR_REPOSITORY, repository),
   ];
   const runUrlAttr = buildGitHubActionsRunUrlAttribute(repository, runId);
   if (runUrlAttr) {
@@ -1589,7 +1590,7 @@ async function sendJobSetupSpan(options = {}) {
   if (engineId) {
     const genAiSystem = ENGINE_TO_SYSTEM_MAP[engineId] || engineId;
     attributes.push(buildAttr("gen_ai.system", genAiSystem));
-    attributes.push(buildAttr("gh-aw.engine.id", engineId));
+    attributes.push(buildAttr(OTEL_ATTR_ENGINE_ID, engineId));
   }
   if (eventName) {
     attributes.push(buildAttr("gh-aw.event_name", eventName));
@@ -2375,7 +2376,7 @@ async function sendJobConclusionSpan(spanName, options = {}) {
     statusMessage = `agent ${agentConclusion}: ${errorMessages[0]}`.slice(0, 256);
   }
 
-  const attributes = [buildAttr("gh-aw.workflow.name", workflowName), buildAttr("gh-aw.run.id", runId), buildAttr("gh-aw.run.attempt", runAttempt), buildAttr("gh-aw.run.actor", actor), buildAttr("gh-aw.repository", repository)];
+  const attributes = [buildAttr(OTEL_ATTR_WORKFLOW_NAME, workflowName), buildAttr(OTEL_ATTR_RUN_ID, runId), buildAttr("gh-aw.run.attempt", runAttempt), buildAttr("gh-aw.run.actor", actor), buildAttr(OTEL_ATTR_REPOSITORY, repository)];
   const runUrlAttr = buildGitHubActionsRunUrlAttribute(repository, runId);
   if (runUrlAttr) {
     attributes.push(runUrlAttr);
@@ -2446,7 +2447,7 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   if (engineId) {
     const genAiSystem = ENGINE_TO_SYSTEM_MAP[engineId] || engineId;
     attributes.push(buildAttr("gen_ai.system", genAiSystem));
-    attributes.push(buildAttr("gh-aw.engine.id", engineId));
+    attributes.push(buildAttr(OTEL_ATTR_ENGINE_ID, engineId));
   }
   if (model) attributes.push(buildAttr("gen_ai.request.model", model));
   if (modelAttribution.routing) {
