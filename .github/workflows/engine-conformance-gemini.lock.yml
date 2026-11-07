@@ -727,7 +727,7 @@ jobs:
             await main();
       - name: Configure Git credentials
         env:
-          GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_AW_GIT_REPOSITORY: ${{ github.repository }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_TOKEN: ${{ github.token }}
         run: bash "${RUNNER_TEMP}/gh-aw/actions/configure_git_credentials.sh"
@@ -1299,7 +1299,7 @@ jobs:
           TRACEPARENT: ${{ env.GITHUB_AW_OTEL_TRACE_ID != '' && env.GITHUB_AW_OTEL_PARENT_SPAN_ID != '' && format('00-{0}-{1}-01', env.GITHUB_AW_OTEL_TRACE_ID, env.GITHUB_AW_OTEL_PARENT_SPAN_ID) || '' }}
       - name: Configure Git credentials
         env:
-          GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_AW_GIT_REPOSITORY: ${{ github.repository }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_TOKEN: ${{ github.token }}
         run: bash "${RUNNER_TEMP}/gh-aw/actions/configure_git_credentials.sh"

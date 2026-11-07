@@ -8,15 +8,15 @@ import (
 
 func unwrapCommand(name string, args []*syntax.Word) (tail []*syntax.Word, query, known bool) {
 	for i := 0; i < len(args); i++ {
-		value, static := literalWord(args[i]) //nolint:uncheckedsliceindex // The nonnegative cursor is rechecked by the loop after option-operand skips.
+		value, static := LiteralWord(args[i]) //nolint:uncheckedsliceindex // The nonnegative cursor is rechecked by the loop after option-operand skips.
+		if name == "env" && envAssignmentWord(args[i]) {
+			continue
+		}
 		if !static {
 			return args[i:], false, true // The command checker reports the dynamic name.
 		}
 		if value == "--" {
 			return args[i+1:], false, true
-		}
-		if name == "env" && strings.Contains(value, "=") && !strings.HasPrefix(value, "-") {
-			continue
 		}
 		if !strings.HasPrefix(value, "-") || value == "-" {
 			return args[i:], false, true
@@ -65,4 +65,31 @@ func unwrapCommand(name string, args []*syntax.Word) (tail []*syntax.Word, query
 		}
 	}
 	return nil, false, true
+}
+
+func envAssignmentWord(word *syntax.Word) bool {
+	if word == nil || len(word.Parts) == 0 {
+		return false
+	}
+	first, ok := word.Parts[0].(*syntax.Lit) //nolint:uncheckedsliceindex // The preceding guard requires a nonempty parts slice.
+	if !ok {
+		return false
+	}
+	name, _, assignment := strings.Cut(first.Value, "=")
+	if !assignment || name == "" {
+		return false
+	}
+	for i, char := range name {
+		if i == 0 {
+			if (char < 'A' || char > 'Z') && (char < 'a' || char > 'z') && char != '_' {
+				return false
+			}
+			continue
+		}
+		if (char < 'A' || char > 'Z') && (char < 'a' || char > 'z') &&
+			(char < '0' || char > '9') && char != '_' {
+			return false
+		}
+	}
+	return true
 }

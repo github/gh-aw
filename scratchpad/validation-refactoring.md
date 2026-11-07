@@ -284,7 +284,7 @@ func BundleJavaScriptWithMode(...) (string, error) {
 
 ### Target Size
 
-- **100-200 lines**: Ideal size for focused validator
+- **100-200 lines**: Typical size for a single-domain validator
 - **200-300 lines**: Acceptable but consider splitting
 - **300+ lines**: Should be refactored
 
@@ -330,10 +330,10 @@ Single file with 3 domains:
 ### Benefits
 
 - Each file under 250 lines (target: 100-200)
-- Clear single responsibility per file
-- Easier to test each domain independently
-- Simpler to add new validation (clear where it belongs)
-- Better documentation organization
+- Each file has a single responsibility
+- Each domain can be tested independently
+- New validation has a defined file location based on its domain
+- Documentation is organized by domain
 
 ## Checklist
 

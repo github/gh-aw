@@ -1858,7 +1858,7 @@ func TestGenerateConfigureGitCredentialsSteps(t *testing.T) {
 		combined := strings.Join(steps, "")
 
 		assert.Contains(t, combined, "name: Configure Git credentials")
-		assert.Contains(t, combined, "GITHUB_REPOSITORY: ${{ github.repository }}")
+		assert.Contains(t, combined, "GH_AW_GIT_REPOSITORY: ${{ github.repository }}")
 		assert.Contains(t, combined, "GIT_TOKEN: "+token)
 		assert.Contains(t, combined, `run: bash "${RUNNER_TEMP}/gh-aw/actions/configure_git_credentials.sh"`)
 		assert.NotContains(t, combined, "GH_AW_SUBREPO_", "single-repo case must not emit subrepo env vars")
@@ -1866,15 +1866,16 @@ func TestGenerateConfigureGitCredentialsSteps(t *testing.T) {
 
 	t.Run("multi-repo with literal repo name places it in env var", func(t *testing.T) {
 		cm := NewCheckoutManager([]*CheckoutConfig{
-			{Repository: "org/other-repo", Path: "./target-repo"},
+			{Repository: "org/other-repo", Path: "-target-repo"},
 		})
 		steps := cm.GenerateConfigureGitCredentialsSteps(token, alwaysTrue)
 		combined := strings.Join(steps, "")
 
 		assert.Contains(t, combined, `GH_AW_SUBREPO_0: "org/other-repo"`, "literal repo must be in env var (quoted)")
-		assert.Contains(t, combined, "${GH_AW_SUBREPO_0}.git", "shell command must reference the env var")
+		assert.Contains(t, combined, `GH_AW_GIT_REPOSITORY="${GH_AW_SUBREPO_0}"`, "shell command must reference the env var")
+		assert.Contains(t, combined, `(cd -- "-target-repo"`, "hyphen-prefixed paths must not be interpreted as cd options")
 		assert.NotContains(t, combined, "org/other-repo.git", "literal repo must not be inlined in shell command")
-		assert.Contains(t, combined, "GITHUB_REPOSITORY:", "root repo env var must be present")
+		assert.Contains(t, combined, "GH_AW_GIT_REPOSITORY:", "root repo env var must be present")
 		assert.Contains(t, combined, "GIT_TOKEN: "+token, "token env var must be present")
 	})
 
@@ -1890,7 +1891,7 @@ func TestGenerateConfigureGitCredentialsSteps(t *testing.T) {
 		// Expression must be in the env: block, not inlined in the shell command.
 		assert.Contains(t, combined, "GH_AW_SUBREPO_0: github/${{ github.event.inputs.target_repo }}",
 			"expression-based repo must be assigned to an env var")
-		assert.Contains(t, combined, "${GH_AW_SUBREPO_0}.git",
+		assert.Contains(t, combined, `GH_AW_GIT_REPOSITORY="${GH_AW_SUBREPO_0}"`,
 			"shell command must reference env var, not the raw expression")
 		assert.NotContains(t, combined, "github/${{ github.event.inputs.target_repo }}.git",
 			"expression must not be inlined in the git remote set-url command (template injection risk)")
@@ -1899,7 +1900,7 @@ func TestGenerateConfigureGitCredentialsSteps(t *testing.T) {
 			"comment must reference checkout path, never the raw expression")
 		assert.NotContains(t, combined, "# Re-authenticate git for github/${{",
 			"expression must not appear in bash comment (template injection risk)")
-		assert.Contains(t, combined, "GITHUB_REPOSITORY:", "root repo env var must be present")
+		assert.Contains(t, combined, "GH_AW_GIT_REPOSITORY:", "root repo env var must be present")
 		assert.Contains(t, combined, "GIT_TOKEN: "+token, "token env var must be present")
 		// No raw Actions expression may appear in the run: block.
 		runIdx := strings.Index(combined, "run: |")
@@ -1919,9 +1920,9 @@ func TestGenerateConfigureGitCredentialsSteps(t *testing.T) {
 		assert.Contains(t, combined, "GH_AW_SUBREPO_PATH_0: ${{ github.event.inputs.target_path }}",
 			"expression-based path must be assigned to an env var")
 		assert.Contains(t, combined, "${GH_AW_SUBREPO_PATH_0}",
-			"git -C argument must reference the path env var, not the raw expression")
-		assert.NotContains(t, combined, `git -C "${{ github.event.inputs.target_path }}"`,
-			"expression path must not be inlined in git -C argument (template injection risk)")
+			"cd argument must reference the path env var, not the raw expression")
+		assert.NotContains(t, combined, `cd -- "${{ github.event.inputs.target_path }}"`,
+			"expression path must not be inlined in cd argument (template injection risk)")
 		// No raw Actions expression may appear in the run: block.
 		runIdx := strings.Index(combined, "run: |")
 		if runIdx >= 0 {
@@ -1940,7 +1941,7 @@ func TestGenerateConfigureGitCredentialsSteps(t *testing.T) {
 
 		assert.Contains(t, combined, `GH_AW_SUBREPO_0: "org/repo-a"`)
 		assert.Contains(t, combined, `GH_AW_SUBREPO_1: "org/repo-b"`)
-		assert.Contains(t, combined, `${GH_AW_SUBREPO_0}.git`)
-		assert.Contains(t, combined, `${GH_AW_SUBREPO_1}.git`)
+		assert.Contains(t, combined, `GH_AW_GIT_REPOSITORY="${GH_AW_SUBREPO_0}"`)
+		assert.Contains(t, combined, `GH_AW_GIT_REPOSITORY="${GH_AW_SUBREPO_1}"`)
 	})
 }

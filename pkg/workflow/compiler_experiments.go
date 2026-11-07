@@ -983,7 +983,7 @@ func (c *Compiler) buildPushExperimentsStateSteps(data *WorkflowData) []string {
 	var steps []string
 	steps = append(steps, c.buildPushExperimentsStateSetupSteps(data)...)
 	steps = append(steps, buildPushExperimentsStateCheckoutStep())
-	steps = append(steps, c.generateGitConfigurationSteps()...)
+	steps = append(steps, c.generateGitConfigurationStepsWithToken("${{ github.token }}", "${{ github.repository }}")...)
 	steps = append(steps, c.buildPushExperimentsStateDownloadStep(data))
 	steps = append(steps, buildPushExperimentsStateScriptStep(data))
 	if c.actionMode.IsDev() {
