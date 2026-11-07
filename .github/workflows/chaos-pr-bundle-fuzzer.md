@@ -29,6 +29,7 @@ safe-outputs:
     title-prefix: "[chaos-test] "
     preserve-branch-name: true
     recreate-ref: true
+    allowed-base-branches: "${{ github.ref_name }}"
     labels: [test-in-progress]
     draft: true
     max: 5
