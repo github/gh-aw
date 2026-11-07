@@ -1,6 +1,6 @@
 // Package linters is a namespace for gh-aw's custom Go analysis linters.
 //
-// All 87 active analyzers:
+// All 88 active analyzers:
 //
 //   - appendbytestring — flags append(b, []byte(s)...) calls where s is a string that can be simplified to append(b, s...)
 //   - appendoneelement — flags append(s, []T{x}...) calls where a single-element slice literal is spread and can be simplified to append(s, x)
@@ -60,7 +60,7 @@
 //   - seenmapbool — flags map[string]bool used as a set that should use map[string]struct{}
 //   - slicemakezerolength — flags zero-length slice allocations before known-size range loops that append one element per iteration
 //   - sortslice — flags sort.Slice / sort.SliceStable calls that should use slices.SortFunc / slices.SortStableFunc
-//   - splitindexzero — flags strings.Split(s, sep)[0] and strings.SplitN(s, sep, 2)[0] calls that allocate a slice to read only the first segment; use strings.Cut
+//   - splitindexzero — flags strings.SplitN(s, sep, 2)[0] calls that allocate a slice to read only the first segment; use strings.Cut
 //   - sprintferrdot — flags redundant .Error() calls on error values passed to fmt format functions
 //   - sprintferrorsnew — flags errors.New(fmt.Sprintf(...)) calls that should use fmt.Errorf instead
 //   - sprintfbool — flags fmt.Sprintf("%t", b) calls where b is a single bool value and suggests using strconv.FormatBool(b) instead
@@ -74,6 +74,7 @@
 //   - stringsindexcontains — flags strings.Index(s, substr) comparisons that should use strings.Contains
 //   - stringsindexhasprefix — reports strings.Index(s, sub) comparisons with 0 (== 0 and != 0) and their yoda-order variants that should use strings.HasPrefix(s, sub) or !strings.HasPrefix(s, sub)
 //   - stringsjoinone — flags strings.Join([]string{s}, sep) calls with a single-element slice literal where the separator is unused and the call is equivalent to just s
+//   - stringssplitfirst — flags strings.Split(s, sep)[0] with a constant non-empty separator; use strings.Cut to read the first segment without allocating a slice
 //   - timeafterleak — flags time.After in select cases inside loops that leak timer channels
 //   - timesleepnocontext — flags time.Sleep calls in context-aware functions that should propagate cancellation
 //   - timenowsub — reports time.Now().Sub(t) calls that should be simplified to time.Since(t)
