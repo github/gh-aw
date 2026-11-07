@@ -83,6 +83,12 @@ adopted. Available default routes, runnable pins and unreleased assignments are
 checked together before publication; an old immutable reader blocks migration
 rather than being silently retargeted. Bridge registration and route activation
 are one atomic transition.
+Reader provenance is checked on the compiler's `agent` job before its
+`agentic_execution` step, and independently on jobs whose configuration mentions
+`work_queue` or `work-queue`. Each requires an unconditional pinned same-repository
+checkout followed by local `./actions/setup` before scripts or other actions run.
+A compliant unrelated job cannot satisfy this gate. Non-queue helper jobs do not
+require a queue reader loader.
 Keep approved bridge commits reachable. Preserve their commit identities when
 merging, or maintain a durable reviewed repository ref; a squash or rebase alone
 does not preserve a manifest's immutable bridge revision. An initial all-target

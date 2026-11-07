@@ -72,10 +72,19 @@ function compiledBridgeRuntime(contents, repository, ref) {
   const jobs = workflow instanceof Map ? workflow.get("jobs") : undefined;
   if (!(jobs instanceof Map)) return false;
   let found = false;
-  for (const job of jobs.values()) {
-    const steps = job instanceof Map ? job.get("steps") : undefined;
-    if (!Array.isArray(steps)) continue;
+  for (const [name, job] of jobs) {
+    if (!(job instanceof Map)) return false;
+    const steps = job.get("steps");
+    // The compiler fixes the execution job as agent. Queue readers in other
+    // jobs also need their own loader, not an unrelated job's setup.
+    const text = JSON.stringify(job, (_, value) => (value instanceof Map ? Object.fromEntries(value) : value)).toLowerCase();
+    const queueJob = name === "agent" || text.includes("work_queue") || text.includes("work-queue");
+    if (!Array.isArray(steps)) {
+      if (queueJob) return false;
+      continue;
+    }
     let checkout = false;
+    let loaded = false;
     for (const step of steps) {
       if (!(step instanceof Map)) return false;
       const uses = step.get("uses") ?? "";
@@ -91,16 +100,27 @@ function compiledBridgeRuntime(contents, repository, ref) {
           !/^0+$/.test(uses.slice("actions/checkout@".length)) &&
           (from === undefined || (typeof from === "string" && from.toLowerCase() === repository.toLowerCase())) &&
           (revision === undefined || revision === ref || revision === "${{ github.sha }}") &&
-          (path === undefined || path === ".");
+          (path === undefined || path === ".") &&
+          !step.has("if") &&
+          !step.has("continue-on-error");
+        if (queueJob && !loaded && !checkout) return false;
       } else if (uses === "./actions/setup") {
-        if (!checkout) return false;
-        found = true;
+        if (!checkout || step.has("if") || step.has("continue-on-error")) return false;
+        loaded = true;
         checkout = false;
       } else {
         if (uses.toLowerCase().includes("/setup@")) return false;
-        if (uses || step.has("run")) checkout = false;
+        if (uses || step.has("run")) {
+          if (queueJob && !loaded) return false;
+          checkout = false;
+        }
+      }
+      if (step.get("id") === "agentic_execution") {
+        if (name !== "agent" || !loaded || found || typeof step.get("run") !== "string" || !step.get("run")) return false;
+        found = true;
       }
     }
+    if (queueJob && !loaded) return false;
   }
   return found;
 }

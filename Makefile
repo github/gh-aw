@@ -560,6 +560,7 @@ test-scripts: build
 	bash actions/setup/sh/install_gh_cli_test.sh
 	bash actions/setup/sh/install_threat_detect_binary_test.sh
 	bash actions/setup/sh/release_integrity_test.sh
+	bash .github/scripts/install_tla_runtime_test.sh
 	bash actions/setup/sh/runtime_trust_inventory_test.sh
 	@echo "✓ All script tests passed"
 

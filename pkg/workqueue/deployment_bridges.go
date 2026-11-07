@@ -115,54 +115,93 @@ func (b Branch) verifyBridgeReaders(ctx context.Context, approval *contractBridg
 	return nil
 }
 
+type bridgeRuntimeStep struct {
+	ID              string    `yaml:"id"`
+	Uses            string    `yaml:"uses"`
+	Run             string    `yaml:"run"`
+	With            yaml.Node `yaml:"with"`
+	If              yaml.Node `yaml:"if"`
+	ContinueOnError yaml.Node `yaml:"continue-on-error"`
+}
+
+func compiledBridgeCheckout(step bridgeRuntimeStep, pin, repository, ref string) (approved, valid bool) {
+	values := map[string]any{}
+	if step.With.Kind != 0 {
+		if step.With.Kind != yaml.MappingNode || step.With.Decode(&values) != nil {
+			return false, false
+		}
+	}
+	repoValue, hasRepo := values["repository"]
+	from, repoString := repoValue.(string)
+	refValue, hasRef := values["ref"]
+	revision, refString := refValue.(string)
+	pathValue, hasPath := values["path"]
+	path, pathString := pathValue.(string)
+	approved = revisionPattern.MatchString(pin) && strings.Trim(pin, "0") != "" &&
+		(!hasRepo || repoString && strings.EqualFold(from, repository)) &&
+		(!hasRef || refString && (revision == ref || revision == "${{ github.sha }}")) &&
+		(!hasPath || pathString && path == ".") && step.If.Kind == 0 && step.ContinueOnError.Kind == 0
+	return approved, true
+}
+
 func compiledBridgeRuntime(content []byte, repository, ref string) bool {
 	var workflow struct {
-		Jobs map[string]struct {
-			Steps []struct {
-				Uses string    `yaml:"uses"`
-				Run  string    `yaml:"run"`
-				With yaml.Node `yaml:"with"`
-			} `yaml:"steps"`
-		} `yaml:"jobs"`
+		Jobs map[string]yaml.Node `yaml:"jobs"`
 	}
 	if err := yaml.Unmarshal(content, &workflow); err != nil {
 		return false
 	}
 	found := false
-	for _, job := range workflow.Jobs {
-		checkout := false
+	for name, node := range workflow.Jobs {
+		var job struct {
+			Steps []bridgeRuntimeStep `yaml:"steps"`
+		}
+		var fields map[string]any
+		if node.Decode(&job) != nil || node.Decode(&fields) != nil {
+			return false
+		}
+		normalized, err := yaml.Marshal(fields)
+		if err != nil {
+			return false
+		}
+		// The compiler fixes the execution job as agent. Queue readers in other
+		// jobs also need their own loader, not an unrelated job's setup.
+		text := strings.ToLower(string(normalized))
+		queueJob := name == "agent" || strings.Contains(text, "work_queue") || strings.Contains(text, "work-queue")
+		checkout, loaded := false, false
 		for _, step := range job.Steps {
 			if pin, ok := strings.CutPrefix(step.Uses, "actions/checkout@"); ok {
-				values := map[string]any{}
-				if step.With.Kind != 0 {
-					if step.With.Kind != yaml.MappingNode || step.With.Decode(&values) != nil {
-						return false
-					}
-				}
-				repoValue, hasRepo := values["repository"]
-				from, repoString := repoValue.(string)
-				refValue, hasRef := values["ref"]
-				revision, refString := refValue.(string)
-				pathValue, hasPath := values["path"]
-				path, pathString := pathValue.(string)
-				checkout = revisionPattern.MatchString(pin) && strings.Trim(pin, "0") != "" &&
-					(!hasRepo || repoString && strings.EqualFold(from, repository)) &&
-					(!hasRef || refString && (revision == ref || revision == "${{ github.sha }}")) &&
-					(!hasPath || pathString && path == ".")
-			} else if step.Uses == "./actions/setup" {
-				if !checkout {
+				var valid bool
+				checkout, valid = compiledBridgeCheckout(step, pin, repository, ref)
+				if !valid || queueJob && !loaded && !checkout {
 					return false
 				}
-				found = true
+			} else if step.Uses == "./actions/setup" {
+				if !checkout || step.If.Kind != 0 || step.ContinueOnError.Kind != 0 {
+					return false
+				}
+				loaded = true
 				checkout = false
 			} else {
 				if strings.Contains(strings.ToLower(step.Uses), "/setup@") {
 					return false
 				}
 				if step.Uses != "" || step.Run != "" {
+					if queueJob && !loaded {
+						return false
+					}
 					checkout = false
 				}
 			}
+			if step.ID == "agentic_execution" {
+				if name != "agent" || !loaded || found || step.Run == "" {
+					return false
+				}
+				found = true
+			}
+		}
+		if queueJob && !loaded {
+			return false
 		}
 	}
 	return found

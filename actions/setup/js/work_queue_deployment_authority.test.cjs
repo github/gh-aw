@@ -1,6 +1,7 @@
 // @ts-check
 import { describe, expect, it, vi } from "vitest";
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { canonical } from "./work_queue_codec.cjs";
 import { synchronizeDeployments } from "./work_queue_deployment_control.cjs";
 import { compiledBridgeRuntime } from "./work_queue_contract_bridges.cjs";
@@ -15,7 +16,7 @@ const CONTRACT = "a".repeat(64);
 const NEXT_CONTRACT = "b".repeat(64);
 const SOURCE = "---\ntools:\n  work-queue:\n    worker: true\n---\nExecute approved instructions.\n";
 const lock = (contract = CONTRACT) => `on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\nenv:\n  GH_AW_WORK_QUEUE_CONTRACT: "${contract}"\n`;
-const bridgeLock = (contract = CONTRACT) => lock(contract) + `jobs:\n  worker:\n    steps:\n      - uses: actions/checkout@${"a".repeat(40)}\n      - uses: ./actions/setup\n`;
+const bridgeLock = (contract = CONTRACT) => lock(contract) + `jobs:\n  agent:\n    steps:\n      - uses: actions/checkout@${"a".repeat(40)}\n      - uses: ./actions/setup\n      - id: agentic_execution\n        run: echo execute\n`;
 
 function fixture({ otherPool = false, mixed = false, bridges = false } = {}) {
   const f = queueFixture({
@@ -122,15 +123,44 @@ describe("verified default worker deployment authority", () => {
     ["mutable checkout", bridgeLock().replace(`actions/checkout@${"a".repeat(40)}`, "actions/checkout@main"), false],
     ["foreign repository", bridgeLock().replace("      - uses: ./actions/setup", "        with:\n          repository: other/repo\n      - uses: ./actions/setup"), false],
     ["script loader", bridgeLock().replace("      - uses: ./actions/setup", "      - run: echo replace-actions\n      - uses: ./actions/setup"), false],
+    ["non-queue helper", bridgeLock() + "  helper:\n    steps:\n      - run: echo helper\n", true],
+    [
+      "compliant decoy",
+      bridgeLock().replace(`      - uses: actions/checkout@${"a".repeat(40)}\n      - uses: ./actions/setup\n`, "") + `  decoy:\n    steps:\n      - uses: actions/checkout@${"a".repeat(40)}\n      - uses: ./actions/setup\n`,
+      false,
+    ],
+    ["renamed execution", bridgeLock().replace("  agent:", "  decoy:"), false],
+    ["missing execution", bridgeLock().replace("      - id: agentic_execution\n        run: echo execute\n", ""), false],
+    ["queue reader helper", bridgeLock() + "  helper:\n    steps:\n      - run: node work_queue_replay.cjs\n", false],
+    ["queue env helper", bridgeLock() + "  helper:\n    env:\n      GH_AW_WORK_QUEUE_ROLE: worker\n    steps:\n      - run: echo consume\n", false],
+    ["queue action helper", bridgeLock() + `  helper:\n    steps:\n      - uses: actions/github-script@${"a".repeat(40)}\n        with:\n          script: require('./work_queue_replay.cjs')\n`, false],
+    ["conditional setup", bridgeLock().replace("      - uses: ./actions/setup", "      - if: false\n        uses: ./actions/setup"), false],
+    ["conditional checkout", bridgeLock().replace("      - uses: actions/checkout@", "      - if: false\n        uses: actions/checkout@"), false],
+    ["fallible setup", bridgeLock().replace("      - uses: ./actions/setup", "      - continue-on-error: true\n        uses: ./actions/setup"), false],
+    ["early script", bridgeLock().replace("      - uses: actions/checkout@", "      - run: echo execute-before-loader\n      - uses: actions/checkout@"), false],
   ])("binds reviewed reader bytes to the actual %s loader", (_, content, expected) => {
     expect(compiledBridgeRuntime(content, REPOSITORY, DEFAULT_REF)).toBe(expected);
   });
 
-  it("rejects a foreign runtime even when both approved reader files exist", async () => {
+  it("preserves generated non-worker jobs without accepting activation as an agent decoy", () => {
+    const compiled = readFileSync(new URL("../../../.github/workflows/deep-report.lock.yml", import.meta.url), "utf8");
+    expect(compiledBridgeRuntime(compiled, "github/gh-aw", DEFAULT_REF)).toBe(true);
+    const agentStart = compiled.indexOf("\n  agent:\n");
+    const agentEnd = compiled.indexOf("\n  conclusion:\n", agentStart);
+    expect(agentStart).toBeGreaterThan(0);
+    expect(agentEnd).toBeGreaterThan(agentStart);
+    const agent = compiled.slice(agentStart, agentEnd).replace("uses: ./actions/setup", "run: echo unreviewed-loader");
+    expect(compiledBridgeRuntime(compiled.slice(0, agentStart) + agent + compiled.slice(agentEnd), "github/gh-aw", DEFAULT_REF)).toBe(false);
+  });
+
+  it.each([
+    ["foreign runtime", bridgeLock() + `  external:\n    steps:\n      - uses: github/gh-aw-actions/setup@${"d".repeat(40)}\n`],
+    ["decoy runtime", bridgeLock().replace("      - uses: ./actions/setup\n", "") + `  decoy:\n    steps:\n      - uses: actions/checkout@${"a".repeat(40)}\n      - uses: ./actions/setup\n`],
+  ])("rejects %s without publication even when both approved reader files exist", async (_, content) => {
     const { f, options, trusted } = fixture();
     installBridgeFixture(f, {});
     f.githubClient.rest.repos.getContent = vi.fn(async ({ path }) => ({
-      data: { type: "file", path, encoding: "base64", content: Buffer.from(path.endsWith(".md") ? SOURCE : bridgeLock() + `  external:\n    steps:\n      - uses: github/gh-aw-actions/setup@${"d".repeat(40)}\n`).toString("base64") },
+      data: { type: "file", path, encoding: "base64", content: Buffer.from(path.endsWith(".md") ? SOURCE : content).toString("base64") },
     }));
     const before = canonical(f.transactions);
     await expect(synchronizeDeployments(options, trusted)).rejects.toThrow("same-repository");

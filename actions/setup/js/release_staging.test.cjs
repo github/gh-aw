@@ -51,6 +51,38 @@ function environment(root, extra = {}) {
   };
 }
 
+function isolateInstallerHousekeeping(root, bin) {
+  const namespace = path.join(root, "installer-housekeeping");
+  const log = path.join(root, "housekeeping.log");
+  fs.mkdirSync(namespace);
+  const find = spawnSync("bash", ["-c", "command -v find"], { encoding: "utf8" }).stdout.trim();
+  expect(path.isAbsolute(find)).toBe(true);
+  fs.writeFileSync(
+    path.join(bin, "find"),
+    `#!/bin/sh
+if [ "$1" = /tmp ] || [ "$1" = "$HOUSEKEEPING_SHARED_ROOT" ]; then
+  if [ "$#" -ne 13 ] || [ "$2" != -maxdepth ] || [ "$3" != 1 ] ||
+     [ "$4" != -name ] || [ "$6" != -type ] || [ "$7" != d ] ||
+     [ "$8" != -exec ] || [ "$9" != rm ] || [ "\${10}" != -rf ] ||
+     [ "\${11}" != -- ] || [ "\${12}" != '{}' ] || [ "\${13}" != + ]; then
+    echo "Refusing unexpected shared-temp find" >&2
+    exit 98
+  fi
+  case "$5" in
+    'awf-*-chroot-home'|'awf-chroot-*') ;;
+    *) echo "Refusing unexpected shared-temp find" >&2; exit 98 ;;
+  esac
+  printf '%s\\n' "$5" >> "$HOUSEKEEPING_LOG"
+  shift
+  exec "$REAL_FIND" "$HOUSEKEEPING_NAMESPACE" "$@"
+fi
+exec "$REAL_FIND" "$@"
+`,
+    { mode: 0o755 }
+  );
+  return { REAL_FIND: find, HOUSEKEEPING_NAMESPACE: namespace, HOUSEKEEPING_LOG: log, HOUSEKEEPING_SHARED_ROOT: fs.realpathSync("/tmp") };
+}
+
 async function allocate(root, extra = {}) {
   const child = spawn(
     "bash",
@@ -177,6 +209,37 @@ afterEach(async () => {
 });
 
 describe("invocation-owned release staging", () => {
+  it("confines installer shared-temp housekeeping to its fixture namespace", () => {
+    const root = workspace();
+    const bin = path.join(root, "bin");
+    fs.mkdirSync(bin);
+    const isolated = isolateInstallerHousekeeping(root, bin);
+    const env = environment(root, { ...isolated, PATH: `${bin}:${process.env.PATH}` });
+    const names = ["awf-fixture-chroot-home", "awf-chroot-fixture"];
+    for (const name of names) {
+      fs.mkdirSync(path.join(isolated.HOUSEKEEPING_NAMESPACE, name));
+      fs.mkdirSync(path.join(root, name));
+    }
+    for (const pattern of ["awf-*-chroot-home", "awf-chroot-*"]) {
+      const result = spawnSync("find", ["/tmp", "-maxdepth", "1", "-name", pattern, "-type", "d", "-exec", "rm", "-rf", "--", "{}", "+"], { env, encoding: "utf8" });
+      expect(result.status, result.stderr).toBe(0);
+    }
+    expect(fs.readdirSync(isolated.HOUSEKEEPING_NAMESPACE)).toEqual([]);
+    for (const name of names) expect(fs.existsSync(path.join(root, name))).toBe(true);
+    expect(fs.readFileSync(isolated.HOUSEKEEPING_LOG, "utf8").trim().split("\n")).toEqual(["awf-*-chroot-home", "awf-chroot-*"]);
+
+    for (const sharedRoot of new Set(["/tmp", isolated.HOUSEKEEPING_SHARED_ROOT])) {
+      const rejected = spawnSync("find", [sharedRoot, "-delete"], { env, encoding: "utf8" });
+      expect(rejected.status).toBe(98);
+      expect(rejected.stderr).toContain("Refusing unexpected shared-temp find");
+    }
+    for (const name of names) expect(fs.existsSync(path.join(root, name))).toBe(true);
+
+    const passthrough = spawnSync("find", [root, "-maxdepth", "1", "-name", names[0], "-type", "d"], { env, encoding: "utf8" });
+    expect(passthrough.status, passthrough.stderr).toBe(0);
+    expect(passthrough.stdout.trim()).toBe(path.join(root, names[0]));
+  });
+
   it("allocates concurrent AWF runtime roots and cleans only the selected invocation", async () => {
     const root = workspace();
     const jobs = await Promise.all([allocateRuntime(root), allocateRuntime(root)]);
@@ -255,8 +318,9 @@ printf '%s\\n' "$TEMP_DIR"`,
       encoding: "utf8",
     });
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain("Cannot prepare Copilot state");
-    expect(result.stderr).toContain("cannot reclaim or re-own state");
+    expect(result.stderr).toContain(`Cannot prepare Copilot state at ${path.join(home, ".copilot")}`);
+    expect(result.stderr).toContain("Ask a runner administrator to restore ownership");
+    expect(result.stderr).toContain("Rootless installation cannot reclaim or re-own state");
     expect(fs.readFileSync(path.join(home, ".copilot"), "utf8")).toBe("existing state");
     expect(fs.existsSync(log)).toBe(false);
   });
@@ -270,6 +334,7 @@ printf '%s\\n' "$TEMP_DIR"`,
       const bin = path.join(root, "bin");
       const allocations = path.join(root, "allocations");
       fs.mkdirSync(bin);
+      const housekeeping = script === "install_copilot_cli.sh" ? isolateInstallerHousekeeping(root, bin) : {};
       const mktemp = spawnSync("bash", ["-c", "command -v mktemp"], { encoding: "utf8" }).stdout.trim();
       fs.writeFileSync(path.join(bin, "mktemp"), '#!/bin/sh\ndir=$("$REAL_MKTEMP" "$@") || exit $?\nprintf "%s\\n" "$dir" >> "$ALLOCATIONS"\nprintf "%s\\n" "$dir"\n', { mode: 0o755 });
       fs.writeFileSync(path.join(bin, "curl"), "#!/bin/sh\nexit 22\n", { mode: 0o755 });
@@ -285,6 +350,7 @@ printf '%s\\n' "$TEMP_DIR"`,
           PATH: `${bin}:${process.env.PATH}`,
           REAL_MKTEMP: mktemp,
           ALLOCATIONS: allocations,
+          ...housekeeping,
         }),
         encoding: "utf8",
         timeout: 30000,
@@ -294,6 +360,9 @@ printf '%s\\n' "$TEMP_DIR"`,
       const dirs = fs.readFileSync(allocations, "utf8").trim().split("\n");
       expect(dirs.some(dir => /(?:awf|copilot)-install-/.test(dir))).toBe(true);
       for (const dir of dirs) expect(fs.existsSync(dir)).toBe(false);
+      if (script === "install_copilot_cli.sh") {
+        expect(fs.readFileSync(housekeeping.HOUSEKEEPING_LOG, "utf8").trim().split("\n")).toEqual(["awf-*-chroot-home", "awf-chroot-*"]);
+      }
     });
   }
 
@@ -306,6 +375,7 @@ printf '%s\\n' "$TEMP_DIR"`,
     const forbiddenLog = path.join(root, "forbidden.log");
     fs.mkdirSync(sharedTemp);
     fs.mkdirSync(bin);
+    const housekeeping = isolateInstallerHousekeeping(root, bin);
     fs.mkdirSync(cacheBin, { recursive: true });
     fs.writeFileSync(
       path.join(cacheBin, "copilot"),
@@ -332,6 +402,7 @@ printf 'copilot 1.0.103\\n'
       const child = spawn("bash", [installer, "--rootless", "1.0.103"], {
         cwd: workdir,
         env: environment(workdir, {
+          ...housekeeping,
           HOME: path.join(workdir, "home"),
           TMPDIR: sharedTemp,
           RUNNER_TOOL_CACHE: cache,
@@ -396,6 +467,7 @@ printf 'copilot 1.0.103\\n'
       expect(stagingDirs()).toHaveLength(0);
       expect(fs.readFileSync(path.join(otherChroot, "artifact"), "utf8")).toBe("another invocation");
       expect(fs.existsSync(forbiddenLog)).toBe(false);
+      expect(fs.readFileSync(housekeeping.HOUSEKEEPING_LOG, "utf8").trim().split("\n").sort()).toEqual(["awf-*-chroot-home", "awf-*-chroot-home", "awf-chroot-*", "awf-chroot-*"].sort());
     } finally {
       for (const job of jobs) fs.writeFileSync(job.release, "");
       await Promise.all(jobs.map(job => job.completion));
@@ -421,8 +493,9 @@ printf 'copilot 1.0.103\\n'
         encoding: "utf8",
       });
       expect(result.status).toBe(1);
-      expect(result.stderr).toContain("Cannot prepare Copilot state");
-      expect(result.stderr).toContain("cannot reclaim or re-own state");
+      expect(result.stderr).toContain(`Cannot prepare Copilot state at ${copilot}`);
+      expect(result.stderr).toContain("Ask a runner administrator to restore ownership");
+      expect(result.stderr).toContain("Rootless installation cannot reclaim or re-own state");
       expect(fs.statSync(copilot).mode & 0o777).toBe(0o555);
       expect(fs.existsSync(log)).toBe(false);
       expect(fs.readdirSync(root).filter(name => name.startsWith("copilot-install-"))).toHaveLength(0);

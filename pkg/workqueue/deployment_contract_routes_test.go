@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -223,15 +224,16 @@ func installBridgeApproval(t *testing.T, mock *queueAPI, routes map[string]strin
 }
 
 func bridgeStampedWorker(contract string) string {
-	return stampedWorker(contract) + "      - uses: actions/checkout@" + strings.Repeat("a", 40) + "\n      - uses: ./actions/setup\n"
+	return strings.Replace(stampedWorker(contract), "  worker:", "  agent:", 1) + "      - uses: actions/checkout@" + strings.Repeat("a", 40) + "\n      - uses: ./actions/setup\n      - id: agentic_execution\n        run: echo execute\n"
 }
 
 func TestCompiledBridgeRuntimeProvenance(t *testing.T) {
 	base := bridgeStampedWorker(strings.Repeat("a", 64))
 	for name, content := range map[string]string{
-		"local":       base,
-		"exact ref":   strings.Replace(base, "      - uses: ./actions/setup", "        with:\n          ref: "+strings.Repeat("b", 40)+"\n      - uses: ./actions/setup", 1),
-		"trigger sha": strings.Replace(base, "      - uses: ./actions/setup", "        with:\n          ref: ${{ github.sha }}\n      - uses: ./actions/setup", 1),
+		"local":            base,
+		"exact ref":        strings.Replace(base, "      - uses: ./actions/setup", "        with:\n          ref: "+strings.Repeat("b", 40)+"\n      - uses: ./actions/setup", 1),
+		"trigger sha":      strings.Replace(base, "      - uses: ./actions/setup", "        with:\n          ref: ${{ github.sha }}\n      - uses: ./actions/setup", 1),
+		"non-queue helper": base + "  helper:\n    steps:\n      - run: echo helper\n",
 	} {
 		if !compiledBridgeRuntime([]byte(content), testRepository, strings.Repeat("b", 40)) {
 			t.Fatalf("rejected supported %s loader", name)
@@ -246,10 +248,48 @@ func TestCompiledBridgeRuntimeProvenance(t *testing.T) {
 		"mutable checkout":     strings.Replace(base, "actions/checkout@"+strings.Repeat("a", 40), "actions/checkout@main", 1),
 		"script loader":        strings.Replace(base, "      - uses: ./actions/setup", "      - run: echo replace-actions\n      - uses: ./actions/setup", 1),
 		"no loader":            stampedWorker(strings.Repeat("a", 64)),
+		"compliant decoy": strings.Replace(base, "      - uses: actions/checkout@"+strings.Repeat("a", 40)+"\n      - uses: ./actions/setup\n", "", 1) +
+			"  decoy:\n    steps:\n      - uses: actions/checkout@" + strings.Repeat("a", 40) + "\n      - uses: ./actions/setup\n",
+		"renamed execution":    strings.Replace(base, "  agent:", "  decoy:", 1),
+		"missing execution":    strings.Replace(base, "      - id: agentic_execution\n        run: echo execute\n", "", 1),
+		"queue reader helper":  base + "  helper:\n    steps:\n      - run: node work_queue_replay.cjs\n",
+		"queue env helper":     base + "  helper:\n    env:\n      GH_AW_WORK_QUEUE_ROLE: worker\n    steps:\n      - run: echo consume\n",
+		"queue action helper":  base + "  helper:\n    steps:\n      - uses: actions/github-script@" + strings.Repeat("a", 40) + "\n        with:\n          script: require('./work_queue_replay.cjs')\n",
+		"conditional setup":    strings.Replace(base, "      - uses: ./actions/setup", "      - if: false\n        uses: ./actions/setup", 1),
+		"conditional checkout": strings.Replace(base, "      - uses: actions/checkout@", "      - if: false\n        uses: actions/checkout@", 1),
+		"fallible setup":       strings.Replace(base, "      - uses: ./actions/setup", "      - continue-on-error: true\n        uses: ./actions/setup", 1),
+		"execution before setup": strings.Replace(base, "      - id: agentic_execution\n        run: echo execute\n", "", 1) +
+			"  other:\n    steps:\n      - id: agentic_execution\n        run: echo execute\n",
+		"early script": strings.Replace(base, "      - uses: actions/checkout@", "      - run: echo execute-before-loader\n      - uses: actions/checkout@", 1),
 	} {
 		if compiledBridgeRuntime([]byte(content), testRepository, strings.Repeat("b", 40)) {
 			t.Fatalf("accepted unsupported %s loader", name)
 		}
+	}
+}
+
+func TestCompiledBridgeRuntimeGeneratedWorker(t *testing.T) {
+	content, err := os.ReadFile("../../.github/workflows/deep-report.lock.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !compiledBridgeRuntime(content, "github/gh-aw", strings.Repeat("b", 40)) {
+		t.Fatal("rejected normal compiled worker with activation, admission and helper jobs")
+	}
+	// A compliant activation job cannot cover a missing loader in the real agent.
+	start := bytes.Index(content, []byte("\n  agent:\n"))
+	if start < 0 {
+		t.Fatal("compiled worker lost canonical agent topology")
+	}
+	offset := bytes.Index(content[start+1:], []byte("\n  conclusion:\n"))
+	if offset < 0 {
+		t.Fatal("compiled worker lost canonical agent/conclusion topology")
+	}
+	end := start + offset + 1
+	agent := bytes.Replace(content[start:end], []byte("uses: ./actions/setup"), []byte("run: echo unreviewed-loader"), 1)
+	mutated := append(append(append([]byte{}, content[:start]...), agent...), content[end:]...)
+	if compiledBridgeRuntime(mutated, "github/gh-aw", strings.Repeat("b", 40)) {
+		t.Fatal("accepted compliant activation decoy with a noncompliant real compiled worker")
 	}
 }
 
@@ -311,7 +351,7 @@ func TestNativeContractBridgeApprovalCannotBeRemovedAfterRouteClearing(t *testin
 }
 
 func TestNativeContractBridgeReaderAndApprovalFailuresPublishNothing(t *testing.T) {
-	for _, scenario := range []string{"missing mapping", "duplicate key", "null routes", "wrong reader", "wrong runtime", "mixed runtime", "old default", "old pin", "active assignment", "unapproved registration"} {
+	for _, scenario := range []string{"missing mapping", "duplicate key", "null routes", "wrong reader", "wrong runtime", "mixed runtime", "decoy runtime", "old default", "old pin", "active assignment", "unapproved registration"} {
 		t.Run(scenario, func(t *testing.T) {
 			branch, mock := newQueueAPI(t)
 			commits, _ := mixedContractQueue(t)
@@ -354,6 +394,10 @@ func TestNativeContractBridgeReaderAndApprovalFailuresPublishNothing(t *testing.
 			case "mixed runtime":
 				key := ".github/workflows/worker.lock.yml\n" + bridgeRef
 				mock.workerRevisions[key] += "  external:\n    steps:\n      - uses: github/gh-aw-actions/setup@" + strings.Repeat("d", 40) + "\n"
+			case "decoy runtime":
+				key := ".github/workflows/worker.lock.yml\n" + bridgeRef
+				mock.workerRevisions[key] = strings.Replace(mock.workerRevisions[key], "      - uses: ./actions/setup\n", "", 1) +
+					"  decoy:\n    steps:\n      - uses: actions/checkout@" + strings.Repeat("a", 40) + "\n      - uses: ./actions/setup\n"
 			case "old default":
 				mock.bridgeReaders[reader+"\n"+state.Policy.Pools["default"].Profiles["other"].Ref] = "old_reader"
 			case "old pin", "active assignment":
