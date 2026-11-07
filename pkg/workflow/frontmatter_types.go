@@ -11,7 +11,7 @@ type RunnerTopology string
 // RunnerTopologyArcDind is the topology value for ARC runners with Docker-in-Docker sidecars.
 const RunnerTopologyArcDind RunnerTopology = "arc-dind"
 
-// RunnerConfig represents runner topology configuration from the workflow frontmatter.
+// RunnerConfig represents runner configuration from the workflow frontmatter.
 // The topology field is the single stable contract between gh-aw and AWF for runner
 // environment detection — AWF resolves all internal details (network isolation, sysroot
 // image, path-prefix probes, tool cache validation) from this signal.
@@ -19,6 +19,8 @@ type RunnerConfig struct {
 	// Topology identifies the runner execution topology.
 	// Supported values: "arc-dind" (ARC with Docker-in-Docker sidecar).
 	Topology RunnerTopology `json:"topology,omitempty" yaml:"topology,omitempty"`
+	// Installation selects the privilege used to install Copilot and threat-detect.
+	Installation string `json:"installation,omitempty" yaml:"installation,omitempty"`
 }
 
 // RuntimeConfig represents the configuration for a single runtime

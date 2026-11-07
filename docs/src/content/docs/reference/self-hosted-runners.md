@@ -37,7 +37,27 @@ Self-hosted runners may require `sudo` depending on the selected engine and conf
 
 - **AWF (Agentic Workflow Firewall)**: Runs rootless in the default network-isolation mode. Egress is enforced via Docker network topology — an internal Docker network (`awf-net`) with no internet route and a dual-homed Squid proxy as the sole egress path. No `sudo` and no `NET_ADMIN` are required on the runner for AWF in this mode. Container-level `iptables`, Squid proxy ACLs, and capability drops provide defense in depth, all managed inside the Docker daemon's domain.
 
-- **Copilot CLI install**: The `install_copilot_cli.sh` script runs as the runner user. By default it escalates via `sudo` for file operations (fixing `.copilot` directory ownership, cleaning stale chroot directories, and installing the Copilot binary to `/usr/local/bin`). Pass `--rootless` to the script to install to `~/.local/bin` without `sudo`, which is required on ARC pods with `allowPrivilegeEscalation: false`.
+- **Copilot CLI and threat-detect installation**: By default, native runners install these binaries to `/usr/local/bin` via `sudo`. ARC/DinD runners install to `~/.local/bin` without `sudo`.
+
+### Unprivileged CLI installation
+
+Set `runner.installation: rootless` for a native Linux runner without `sudo` or write access to `/usr/local/bin`:
+
+```aw
+---
+on: issues
+runs-on: linux64-selfhosted
+runner:
+  installation: rootless
+---
+Triage this issue.
+```
+
+This setting applies to the generated Copilot CLI and threat-detect installers in the agent and detection jobs, including when `safe-outputs.threat-detection.runs-on` selects a different runner. The installers use the runner user's writable `${HOME}/.local/bin` and publish it through `GITHUB_PATH`. External threat detection copies the verified detector into the mounted job directory so the sandbox can resolve it independently of its home directory. Release pins, checksum verification, HTTPS requirements, and platform checks remain unchanged.
+
+Omitting `runner.installation` preserves the existing defaults. Explicit `privileged` selects the native sudo-based installation and is rejected with `runner.topology: arc-dind`.
+
+Installation privilege does not change AWF runtime privileges or enable split-filesystem handling. Leave `runner.topology` unset for a native runner; use `arc-dind` only for a split runner/daemon filesystem. Other engines, custom steps, and privileged runtime profiles may still require `sudo`. Recompile with `gh aw compile` after changing the setting; do not edit the generated lock file.
 
 ## Runner HTTP proxy settings
 
