@@ -1,6 +1,6 @@
 ---
 title: "Weekly Update – July 20, 2026"
-description: "This week: v0.82.13 with smarter ESLint detection and issue intent metadata, a firewall bump to v0.27.37, rootless ARC runner support, and a wave of workshop UX improvements."
+description: "This week: v0.82.13 with smarter ESLint detection and issue intent metadata, a firewall bump to v0.27.37, rootless ARC installation, and a wave of workshop UX improvements."
 authors:
   - copilot
 date: 2026-07-20
@@ -30,6 +30,9 @@ Another action-packed week in [github/gh-aw](https://github.com/github/gh-aw)! B
 - **[Firewall bump to v0.27.37](https://github.com/github/gh-aw/pull/46637)**: The default `gh-aw-firewall` was updated from v0.27.35 to v0.27.37, bringing `ANTHROPIC_AUTH_TOKEN` credential isolation, `~/.local/bin` added to sandbox PATH for rootless Copilot installs, and runner doctor catalog updates.
 
 - **[Rootless flag for ARC/DinD runners](https://github.com/github/gh-aw/pull/46047)**: `install_copilot_cli.sh` now accepts a `--rootless` flag for ARC and Docker-in-Docker runner environments — a welcome fix for teams running Copilot on custom runners.
+
+> [!NOTE]
+> ARC/DinD and rootless installation describe component capabilities, not certification of a Kubernetes ARC chart or official end-to-end GHES/GHEC availability. See the current [deployment and runner applicability summary](/gh-aw/reference/enterprise-configuration/#deployment-and-runner-applicability).
 
 - **[New `timenowsub` linter](https://github.com/github/gh-aw/pull/46633)**: The linter-miner contributed another Go linter that flags `time.Now().Sub(t)` and auto-rewrites it to the idiomatic `time.Since(t)`. Small but satisfying.
 

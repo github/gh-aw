@@ -38,10 +38,7 @@ function compileSchema() {
     throw new Error("AttributeNames generated identifiers must be unique");
   }
   const values = new Set(fields.map(([, value]) => value.const));
-  const emitterSources = [
-    "actions/setup/js/send_otlp_span.cjs",
-    "actions/setup/js/send_otlp_session_logs.cjs",
-  ].map(file => readFileSync(path.join(root, file), "utf8"));
+  const emitterSources = ["actions/setup/js/send_otlp_span.cjs", "actions/setup/js/send_otlp_session_logs.cjs"].map(file => readFileSync(path.join(root, file), "utf8"));
   const emittedNames = new Set();
   for (const source of emitterSources) {
     for (const match of source.matchAll(/build(?:Double|Array)?Attr\(\s*"([^"]+)"/g)) emittedNames.add(match[1]);

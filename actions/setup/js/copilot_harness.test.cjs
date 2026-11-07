@@ -62,6 +62,7 @@ const {
   isSDKSessionIdleTimeoutError,
   PROMPT_FILE_INLINE_THRESHOLD_BYTES,
   resolvePromptFileInput,
+  addCopilotDetectionDirectory,
   resolveRetryConfig,
   shouldRetryFailedExecution,
   shouldContinueCopilotSessionAfterFailure,
@@ -85,6 +86,26 @@ const {
   resolveLongRunTokenThreshold,
   computeStartupRetryEligible,
 } = require("./copilot_harness.cjs");
+
+describe("external detection artifact access", () => {
+  it.each(["/tmp/gh-aw/threat-detection-inputs", "/runner temp/gh-aw/threat-detection-inputs"])("grants access only to the prepared inputs at %s", inputDir => {
+    const args = ["--add-dir", "/runtime/prompt", "--allow-all-tools", "--add-dir", "/workspace", "--prompt", "Inspect artifacts"];
+    expect(addCopilotDetectionDirectory(args, { GH_AW_PHASE: "detection", GH_AW_DETECTION_INPUT_DIR: inputDir })).toEqual(["--add-dir", inputDir, ...args]);
+    expect(args).not.toContain("/tmp/gh-aw/threat-detection");
+    expect(args[1]).toBe("/runtime/prompt");
+  });
+
+  it.each(["agent", "", undefined])("does not grant artifact access outside detection (%s)", phase => {
+    const args = ["--prompt", "Hello"];
+    expect(addCopilotDetectionDirectory(args, { GH_AW_PHASE: phase, GH_AW_DETECTION_INPUT_DIR: "/tmp/gh-aw/threat-detection-inputs" })).toBe(args);
+  });
+
+  it("leaves inline detection unchanged and rejects relative external input paths", () => {
+    const args = ["--prompt", "Hello"];
+    expect(addCopilotDetectionDirectory(args, { GH_AW_PHASE: "detection" })).toBe(args);
+    expect(() => addCopilotDetectionDirectory(args, { GH_AW_PHASE: "detection", GH_AW_DETECTION_INPUT_DIR: "." })).toThrow("absolute path");
+  });
+});
 
 describe("native invocation model and session selection", () => {
   const sessionId = "aabbccdd-1122-3344-5566-778899aabbcc";
@@ -220,6 +241,53 @@ describe("copilot_harness.cjs", () => {
       expect(telemetry.attempt_results.map(attempt => attempt.strategy)).toEqual([initialResume ? "resume" : "restart", "resume"]);
       expect(telemetry.attempt_results.map(attempt => attempt.outcome)).toEqual(["failure", "success"]);
       expect(telemetry.attempt_results.map(attempt => attempt.attempt_id)).toEqual(["harness:1", "harness:2"]);
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("stops a native terminal 429 when fresh AWF reflection confirms the shared invocation cap", () => {
+    const directory = makeHarnessTempDir("copilot-invocation-cap-");
+    const stubPath = path.join(directory, "stub.cjs");
+    const preloadPath = path.join(directory, "reflect-fixture.cjs");
+    const awfConfigPath = path.join(directory, "awf-config.json");
+    const callsPath = path.join(directory, "calls.jsonl");
+    const reflectData = { runs: { enabled: true, max_runs: 60, invocation_count: 60, remaining_runs: 0 } };
+    fs.writeFileSync(preloadPath, `require(${JSON.stringify(require.resolve("./awf_reflect.cjs"))}).fetchAWFReflect = async () => ({ ok: true, reflectData: ${JSON.stringify(reflectData)} });`);
+    fs.writeFileSync(awfConfigPath, "{}");
+    fs.writeFileSync(
+      stubPath,
+      `
+      const fs = require("fs");
+      fs.appendFileSync(process.env.COPILOT_HARNESS_STUB_CALLS, JSON.stringify({ called: true }) + "\\n");
+      console.error("429 Too Many Requests");
+      process.exitCode = 1;
+    `
+    );
+    try {
+      const result = spawnSync(process.execPath, ["copilot_harness.cjs", process.execPath, stubPath, "--prompt", "test"], {
+        cwd: path.dirname(require.resolve("./copilot_harness.cjs")),
+        env: {
+          ...harnessChildEnv,
+          NODE_OPTIONS: `${harnessChildEnv.NODE_OPTIONS || ""} --require=${JSON.stringify(preloadPath)}`,
+          AWF_REFLECT_ENABLED: "1",
+          GH_AW_TMP_DIR: directory,
+          GH_AW_AWF_CONFIG_PATH: awfConfigPath,
+          GH_AW_HARNESS_TELEMETRY_DIR: directory,
+          GH_AW_HARNESS_MAX_RETRIES: "2",
+          GH_AW_SAFE_OUTPUTS: "",
+          COPILOT_MODEL: "",
+          COPILOT_HARNESS_STUB_CALLS: callsPath,
+        },
+        encoding: "utf8",
+        timeout: 10000,
+      });
+      expect(result.status, result.stderr).toBe(1);
+      expect(fs.existsSync(callsPath), result.stderr).toBe(true);
+      expect(fs.readFileSync(callsPath, "utf8").trim().split("\n")).toHaveLength(1);
+      const telemetry = JSON.parse(fs.readFileSync(path.join(directory, "harness_retry.json"), "utf8"));
+      expect(telemetry.attempt_results[0].failure_classes).toContain("invocation_cap_exceeded");
+      expect(result.stderr).toContain("AWF shared invocation budget exhausted (60/60)");
     } finally {
       fs.rmSync(directory, { recursive: true, force: true });
     }
@@ -4462,8 +4530,13 @@ if (args.includes("--session-id")) {
 process.stdout.write("done\\n");`
     );
     // SDK sidecar double: listens on the requested --port until the harness stops it.
+    const sidecarArgsPath = path.join(tmpDir, "sidecar-args.json");
     const sidecarPath = path.join(tmpDir, "copilot-sidecar.cjs");
-    fs.writeFileSync(sidecarPath, `#!/usr/bin/env node\nconst args = process.argv.slice(2);\nrequire("net").createServer(socket => socket.end()).listen(Number(args[args.indexOf("--port") + 1]), "127.0.0.1");\n`, { mode: 0o755 });
+    fs.writeFileSync(
+      sidecarPath,
+      `#!/usr/bin/env node\nconst fs = require("fs");\nconst args = process.argv.slice(2);\nfs.writeFileSync(${JSON.stringify(sidecarArgsPath)}, JSON.stringify(args));\nrequire("net").createServer(socket => socket.end()).listen(Number(args[args.indexOf("--port") + 1]), "127.0.0.1");\n`,
+      { mode: 0o755 }
+    );
     const env = {
       ...harnessChildEnv,
       GH_AW_TMP_DIR: tmpDir,
@@ -4473,7 +4546,19 @@ process.stdout.write("done\\n");`
       GH_AW_HARNESS_STALL_WARNING_MS: "0",
       NODE_OPTIONS: `--require ${preloadPath}`,
     };
-    for (const key of ["COPILOT_MODEL", "GH_AW_MODEL_FALLBACK", "GH_AW_MODEL_ROUTING", "AWF_REFLECT_ENABLED", "GH_AW_SKIP_REFLECT", "COPILOT_SDK_URI", "GH_AW_PHASE", "GH_AW_SAFE_OUTPUTS", "COPILOT_PROVIDER_WIRE_API", "GH_AW_MODEL_ALIASES"])
+    for (const key of [
+      "COPILOT_MODEL",
+      "GH_AW_MODEL_FALLBACK",
+      "GH_AW_MODEL_ROUTING",
+      "AWF_REFLECT_ENABLED",
+      "GH_AW_SKIP_REFLECT",
+      "COPILOT_SDK_URI",
+      "GH_AW_PHASE",
+      "GH_AW_DETECTION_INPUT_DIR",
+      "GH_AW_SAFE_OUTPUTS",
+      "COPILOT_PROVIDER_WIRE_API",
+      "GH_AW_MODEL_ALIASES",
+    ])
       delete env[key];
     Object.assign(env, envOverrides);
     const result = spawnSync(process.execPath, ["copilot_harness.cjs", process.execPath, ...(sdk ? [stubPath, sidecarPath] : [stubPath, "--prompt", "Hello"])], {
@@ -4487,6 +4572,7 @@ process.stdout.write("done\\n");`
       tmpDir,
       result,
       args: fs.existsSync(argsPath) ? JSON.parse(fs.readFileSync(argsPath, "utf8")) : null,
+      sidecarArgs: fs.existsSync(sidecarArgsPath) ? JSON.parse(fs.readFileSync(sidecarArgsPath, "utf8")) : null,
       selection: fs.existsSync(selectionPath) ? JSON.parse(fs.readFileSync(selectionPath, "utf8")) : null,
     };
   }
@@ -4537,13 +4623,18 @@ process.stdout.write("done\\n");`
 
   it.each([true, false])("does not create a CLI selection record in SDK mode (routed=%s)", async routed => {
     const [providerPort, sdkPort] = [await freePort(), await freePort()];
-    const { result, args, selection } = runHarness(
-      { AWF_REFLECT_ENABLED: "1", ...(routed ? { GH_AW_MODEL_ROUTING: "1" } : { COPILOT_MODEL: "gpt-5.6-luna" }), COPILOT_SDK_URI: `http://127.0.0.1:${sdkPort}` },
+    const inputDir = "/runner temp/gh-aw/threat-detection-inputs";
+    const { tmpDir, result, args, sidecarArgs, selection } = runHarness(
+      { AWF_REFLECT_ENABLED: "1", GH_AW_PHASE: "detection", GH_AW_DETECTION_INPUT_DIR: inputDir, ...(routed ? { GH_AW_MODEL_ROUTING: "1" } : { COPILOT_MODEL: "gpt-5.6-luna" }), COPILOT_SDK_URI: `http://127.0.0.1:${sdkPort}` },
       { routed, providerPort, sdk: true }
     );
 
     expect(result.status, result.stderr).toBe(0);
     expect(result.stderr).toContain("copilot-sdk driver mode: starting sidecar");
+    expect(sidecarArgs).toContain("--add-dir");
+    expect(sidecarArgs[sidecarArgs.indexOf("--add-dir") + 1]).toBe(inputDir);
+    expect(sidecarArgs).not.toContain("/tmp/gh-aw/threat-detection");
+    expect(fs.readFileSync(path.join(tmpDir, "sidecar-args.json"), "utf8")).toContain(inputDir);
     expect(args).not.toContain("--session-id");
     expect(selection).toBeNull();
   });

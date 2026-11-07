@@ -167,21 +167,6 @@ else
   fi
 fi
 
-# Clean up any stale AWF chroot directories left by previous runs.
-# When AWF ran with `sudo -E awf --enable-host-access`, it created
-# /tmp/awf-*-chroot-home and /tmp/awf-chroot-* directories with root-owned
-# files. These cause EACCES failures in the Copilot CLI cleanup path
-# (rimrafSync) or AWF writeConfigs on the same or subsequent runs, which
-# reports as "engine terminated unexpectedly" or fatal EACCES errors.
-# Remove them here before the agent starts so the runner is in a clean state.
-echo "Cleaning up stale AWF chroot directories..."
-if ! maybe_sudo find /tmp -maxdepth 1 -name 'awf-*-chroot-home' -type d -exec rm -rf -- {} + 2>/dev/null; then
-  echo "WARNING: Could not remove stale /tmp/awf-*-chroot-home directories. Ask a runner administrator to remove stale directories from previous runs before using this runner; installation will continue." >&2
-fi
-if ! maybe_sudo find /tmp -maxdepth 1 -name 'awf-chroot-*' -type d -exec rm -rf -- {} + 2>/dev/null; then
-  echo "WARNING: Could not remove stale /tmp/awf-chroot-* directories. Ask a runner administrator to remove stale directories from previous runs before using this runner; installation will continue." >&2
-fi
-
 # Detect architecture
 ARCH="$(uname -m)"
 
@@ -640,6 +625,7 @@ find_cached_copilot_bin() {
 activate_cached_copilot_bin() {
   local cached_copilot_bin="$1"
   local wrapper_path=""
+  local staged_wrapper=""
 
   echo "Activating cached Copilot CLI from ${cached_copilot_bin}..."
   export PATH="${INSTALL_DIR}:$PATH"
@@ -666,7 +652,12 @@ activate_cached_copilot_bin() {
 #!/usr/bin/env bash
 exec "$cached_copilot_bin" "\$@"
 EOF
-  maybe_sudo install -m 0755 "$wrapper_path" "${INSTALL_DIR}/copilot"
+  staged_wrapper="$(maybe_sudo mktemp "${INSTALL_DIR}/.copilot.XXXXXXXX")"
+  if ! maybe_sudo install -m 0755 "$wrapper_path" "$staged_wrapper" ||
+    ! maybe_sudo mv -f "$staged_wrapper" "${INSTALL_DIR}/copilot"; then
+    maybe_sudo rm -f "$staged_wrapper"
+    return 1
+  fi
   echo "  Wrapper installed at ${INSTALL_DIR}/copilot"
 }
 

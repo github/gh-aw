@@ -62,6 +62,8 @@ const {
   stripExecutionEvidenceEnv,
 } = require("./harness_retry_runner.cjs");
 const { resolveRetryConfig: resolveSharedRetryConfig } = require("./harness_retry_config.cjs");
+const { stopForPermissionDenied } = require("./harness_failure_handling.cjs");
+const { resolveHarnessPromptFileArgs } = require("./harness_prompt_input.cjs");
 const {
   AWF_API_PROXY_REFLECT_URL,
   AWF_REFLECT_TIMEOUT_MS,
@@ -77,7 +79,7 @@ const {
 } = require("./awf_reflect.cjs");
 const { emitMissingToolPermissionIssue, emitInfrastructureIncomplete, hasExpectedSafeOutputs, hasNoopInSafeOutputs, hasTerminalSafeOutput } = require("./safeoutputs_cli.cjs");
 const { countPermissionDeniedIssues, hasNumerousPermissionDeniedIssues, extractDeniedCommands, buildMissingToolPermissionIssuePayload } = require("./permission_denied_helpers.cjs");
-const { detectNonRetryableHarnessGuard, buildSoftTimeoutGuard, emitSoftTimeoutSignal, isAuthenticationFailedError, parseAICreditsExceededProxyRejection } = require("./harness_retry_guard.cjs");
+const { detectNonRetryableHarnessGuard, detectExhaustedAWFInvocationBudget, buildSoftTimeoutGuard, emitSoftTimeoutSignal, isAuthenticationFailedError, parseAICreditsExceededProxyRejection } = require("./harness_retry_guard.cjs");
 const { isCrashSignalExitCode, crashSignalNameForExitCode } = require("./harness_crash_signals.cjs");
 const { MODEL_NOT_SUPPORTED_PATTERN: INVALID_MODEL_ERROR_PATTERN } = require("./detect_agent_errors.cjs");
 const { applyModelFallback, normalizeClaudeModel } = require("./model_fallback.cjs");
@@ -311,37 +313,7 @@ function shouldRetryWithContinue({ attempt, maxRetries, exitCode, hasOutput, isN
  * @returns {{args: string[], prompt: string | null}}
  */
 function resolveClaudePromptFileArgs(args) {
-  /** @type {string[]} */
-  const filteredArgs = [];
-  /** @type {string|null} */
-  let promptContent = null;
-
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] !== "--prompt-file") {
-      filteredArgs.push(args[i]);
-      continue;
-    }
-
-    if (i + 1 >= args.length) {
-      throw new Error("--prompt-file requires a readable file path");
-    }
-
-    const promptFile = args[i + 1];
-    try {
-      const stat = fs.statSync(promptFile);
-      log(`resolved --prompt-file: path=${promptFile} size=${stat.size}B`);
-      promptContent = fs.readFileSync(promptFile, "utf8");
-    } catch (error) {
-      const err = /** @type {Error} */ error;
-      // An unreadable prompt file means no task instructions can be delivered to Claude.
-      // Propagate as a fatal error rather than forwarding the harness-only flag to the
-      // claude subprocess (which would fail with an "unknown option" error).
-      throw new Error(`--prompt-file '${promptFile}' is not readable: ${err.message}`, { cause: err });
-    }
-    i++; // Skip the prompt-file path argument
-  }
-
-  return { args: filteredArgs, prompt: promptContent };
+  return resolveHarnessPromptFileArgs(args, { logger: log });
 }
 
 /**
@@ -652,6 +624,7 @@ async function main() {
     softTimeoutGuard,
     getRetryMode: () => (useContinueOnRetry ? `--resume ${sessionId}` : "fresh run"),
     runAttempt: async (attempt, observeStrategy) => {
+      let nativeTerminalRateLimitError = false;
       // Resume only the captured session; never select the latest unrelated conversation.
       // Claude Code resumes the session from on-disk state; re-sending the original
       // instructions would re-execute the full task from scratch.
@@ -680,7 +653,13 @@ async function main() {
         log,
         logArgs,
         env: childEnv,
-        onStdoutLine: line => observeDurableSession(durableSession, "claude", line),
+        onStdoutLine: line => {
+          observeDurableSession(durableSession, "claude", line);
+          if (isRateLimitError(classifiableOutput(line))) nativeTerminalRateLimitError = true;
+        },
+        onStderrLine: line => {
+          if (isRateLimitError(line)) nativeTerminalRateLimitError = true;
+        },
         stdin: attempt > 0 && useContinueOnRetry ? CLAUDE_RESUME_PROMPT : (prompt ?? undefined),
         postResultWatchdog: safeOutputsPath
           ? {
@@ -695,9 +674,15 @@ async function main() {
           : undefined,
       });
       sessionId = claudeSessionId(result.output) || sessionId;
-      return { ...result, exitCode: result.runtimeGuardFired && result.exitCode === 0 ? 1 : result.exitCode, safeOutputsByteOffset, strategy };
+      return {
+        ...result,
+        exitCode: result.runtimeGuardFired && result.exitCode === 0 ? 1 : result.exitCode,
+        safeOutputsByteOffset,
+        strategy,
+        nativeTerminalRateLimitError,
+      };
     },
-    handleFailure: ({ attempt, result }) => {
+    handleFailure: async ({ attempt, result }) => {
       if (result.runtimeGuardFired && softTimeoutGuard) {
         emitSoftTimeoutSignal(softTimeoutGuard, "during execution", "Claude harness", log);
         return { action: "stop" };
@@ -762,6 +747,14 @@ async function main() {
       }
 
       const nonRetryableGuard = detectNonRetryableHarnessGuard(classifierOutput);
+      if (!nonRetryableGuard.maxRunsExceeded) {
+        const budget = await detectExhaustedAWFInvocationBudget({ nativeTerminalRateLimitError: result.nativeTerminalRateLimitError === true, logger: log });
+        if (budget) {
+          nonRetryableGuard.maxRunsExceeded = true;
+          result.failureClasses.push("invocation_cap_exceeded");
+          log(`attempt ${attempt + 1}: AWF shared invocation budget exhausted (${budget.invocationCount}/${budget.maxRuns}) — confirmed by fresh reflection`);
+        }
+      }
       if (nonRetryableGuard.apiProxyGuardRejection) {
         const reason = `AWF API proxy guardrail rejected the request: ${nonRetryableGuard.apiProxyGuardRejection.guard}`;
         log(`${reason} — not retrying`);
@@ -826,14 +819,7 @@ async function main() {
       }
 
       if (hasNumerousPermissionDenied) {
-        if (safeOutputsPath && hasExpectedSafeOutputs(safeOutputsPath, { logger: log })) {
-          log(`attempt ${attempt + 1}: detected numerous permission-denied issues but safe-outputs already contain expected output — suppressing terminal verdict (false-red: core work succeeded)`);
-          return { action: "stop", exitCode: 0 };
-        }
-        const deniedCommands = denials.commands;
-        emitMissingToolPermissionIssue({ deniedCommands, permissionOutput: result.output, logger: log });
-        log(`attempt ${attempt + 1}: detected numerous permission-denied issues — not retrying (classified as missing tool/permission issue)`);
-        return { action: "stop" };
+        return stopForPermissionDenied({ attempt, output: result.output, safeOutputsPath, log, deniedCommands: denials.commands });
       }
 
       if (isMaxTurns) {

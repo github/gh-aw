@@ -4,7 +4,7 @@ description: "Internals of how @bradygaster/squad-cli stamps its version, how `s
 allowedTools: []
 confidence: medium
 domain: squad-internals
-source: "Discovered by Data; validated in bradygaster/squad#1173 recon (2026-05-26)."
+source: "Discovered by Data; validated in github/squad#1173 recon (2026-05-26)."
 ---
 
 # SKILL: Squad CLI Internals — Version Stamping & Upgrade Mechanics
@@ -12,7 +12,7 @@ source: "Discovered by Data; validated in bradygaster/squad#1173 recon (2026-05-
 **Confidence:** medium
 **Discovered by:** Data
 **Date:** 2026-05-26
-**Validated in:** Issue #1173 recon (bradygaster/squad)
+**Validated in:** Issue #1173 recon (github/squad)
 
 ---
 

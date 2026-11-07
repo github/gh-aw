@@ -769,6 +769,9 @@ func hasInputRedirection(redirections []*syntax.Redirect) bool {
 }
 
 func commandTreeReadsShellStdin(command syntax.Command, isDynamic func(*syntax.Word) bool) bool {
+	if command == nil {
+		return false
+	}
 	reads := false
 	syntax.Walk(command, func(node syntax.Node) bool {
 		if call, ok := node.(*syntax.CallExpr); ok && commandReadsShellStdin(call.Args, isDynamic, 0) {

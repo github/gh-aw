@@ -448,7 +448,7 @@ func TestBuildThreatDetectCommandEmitsConfiguredOptionalFlags(t *testing.T) {
 		"--engine-timeout 10m",
 		"--max-turns 100",
 		"--retries 1",
-		"--output /tmp/gh-aw/threat-detection/detection_result.json /tmp/gh-aw/threat-detection",
+		"--output /tmp/gh-aw/threat-detection/detection_result.json /tmp/gh-aw/threat-detection-inputs",
 	} {
 		if !strings.Contains(cmd, want) {
 			t.Fatalf("expected command to contain %q, got: %s", want, cmd)

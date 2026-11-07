@@ -85,6 +85,31 @@ function runHarnessWithStub({ stubScript, prompt = "fix the bug", extraArgs = []
 }
 
 describe("claude_harness.cjs", () => {
+  it("handles structured permission failures without replaying work", () => {
+    const directory = makeHarnessTempDir("claude-permission-output-");
+    const safeOutputsPath = path.join(directory, "safe-outputs.jsonl");
+    try {
+      const { result, calls, harnessRetry } = runHarnessWithStub({
+        extraEnv: { GH_AW_SAFE_OUTPUTS: safeOutputsPath, GH_AW_SAFEOUTPUTS_CLI: "true", GH_AW_HARNESS_MAX_RETRIES: "2" },
+        stubScript: `
+          const fs = require("fs");
+          fs.appendFileSync(process.env.CLAUDE_HARNESS_STUB_CALLS, "{}\\n");
+          console.log(JSON.stringify({
+            type: "result", is_error: true, result: "Tool access failed",
+            permission_denials: [1, 2, 3].map(id => ({ tool_use_id: String(id), tool_input: { command: "observed command " + id } }))
+          }));
+          process.exit(1);
+        `,
+      });
+      expect(result.status, result.stderr).toBe(1);
+      expect(calls).toHaveLength(1);
+      expect(harnessRetry.attempt_results[0].failure_classes).toContain("permission_denied");
+      expect(result.stderr).toContain("classified as missing tool/permission issue");
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it("checkpoints an initial explicit resume before spawning rather than inferring a retry", () => {
     const { result, calls, harnessRetry } = runHarnessWithStub({
       extraArgs: ["--resume", "private-session"],
@@ -132,6 +157,24 @@ describe("claude_harness.cjs", () => {
       expect(attempt.started_at).toBeLessThanOrEqual(attempt.finished_at);
       expect(attempt.backoff_ms).toBe(index === 0 ? 0 : 1);
     }
+  });
+
+  it("stops a native terminal 429 when fresh AWF reflection confirms the shared invocation cap", () => {
+    const reflectData = { runs: { enabled: true, max_runs: 60, invocation_count: 60, remaining_runs: 0 } };
+    const { result, calls, harnessRetry } = runHarnessWithStub({
+      reflectData,
+      extraEnv: { AWF_REFLECT_ENABLED: "1", GH_AW_HARNESS_MAX_RETRIES: "2", GH_AW_HARNESS_STARTUP_RETRIES: "0", GH_AW_SAFE_OUTPUTS: "" },
+      stubScript: `
+        const fs = require("fs");
+        fs.appendFileSync(process.env.CLAUDE_HARNESS_STUB_CALLS, JSON.stringify({ called: true }) + "\\n");
+        console.error("429 Too Many Requests");
+        process.exitCode = 1;
+      `,
+    });
+    expect(result.status, result.stderr).toBe(1);
+    expect(calls).toEqual([{ called: true }]);
+    expect(harnessRetry.attempt_results[0].failure_classes).toContain("invocation_cap_exceeded");
+    expect(result.stderr).toContain("AWF shared invocation budget exhausted (60/60)");
   });
 
   describe("threat detection model aliases", () => {
