@@ -11,8 +11,9 @@ import (
 // IssuesSettings describes optional Issues projection, not queue authority.
 // Nil Settings.Issues means disabled; true or {} uses the default label and title prefix.
 type IssuesSettings struct {
-	Label       string `json:"label"`
-	TitlePrefix string `json:"title_prefix"`
+	Label             string `json:"label"`
+	TitlePrefix       string `json:"title_prefix"`
+	OrphanedAfterDays int    `json:"orphaned_after_days"`
 }
 
 func parseIssuesSettings(data []byte) (*IssuesSettings, error) {
@@ -20,13 +21,13 @@ func parseIssuesSettings(data []byte) (*IssuesSettings, error) {
 	case "false":
 		return nil, nil
 	case "true":
-		return &IssuesSettings{Label: "work", TitlePrefix: "[work queue]"}, nil
+		return &IssuesSettings{Label: "work", TitlePrefix: "[work queue]", OrphanedAfterDays: 30}, nil
 	}
-	fields, err := settingsObject(data, "work_queue.issues", []string{"label", "title_prefix"})
+	fields, err := settingsObject(data, "work_queue.issues", []string{"label", "title_prefix", "orphaned_after_days"})
 	if err != nil {
-		return nil, fmt.Errorf("work_queue.issues: use true, false, or an object with optional literal label and title_prefix: %w", err)
+		return nil, fmt.Errorf("work_queue.issues: use true, false, or an object with optional literal label, title_prefix, and orphaned_after_days: %w", err)
 	}
-	issues := &IssuesSettings{Label: "work", TitlePrefix: "[work queue]"}
+	issues := &IssuesSettings{Label: "work", TitlePrefix: "[work queue]", OrphanedAfterDays: 30}
 	if data, exists := fields["label"]; exists {
 		var label string
 		if json.Unmarshal(data, &label) != nil || strings.TrimSpace(label) == "" || len(label) > 33 ||
@@ -42,6 +43,13 @@ func parseIssuesSettings(data []byte) (*IssuesSettings, error) {
 			return nil, settingsError("work_queue.issues.title_prefix", "must be a nonblank literal of at most 80 UTF-8 bytes without control characters or expressions")
 		}
 		issues.TitlePrefix = prefix
+	}
+	if data, exists := fields["orphaned_after_days"]; exists {
+		days, err := settingsInteger(data, "work_queue.issues.orphaned_after_days", 3650)
+		if err != nil {
+			return nil, err
+		}
+		issues.OrphanedAfterDays = days
 	}
 	return issues, nil
 }

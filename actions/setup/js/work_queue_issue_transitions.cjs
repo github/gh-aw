@@ -16,7 +16,7 @@ function terminalTraceOperation(operation) {
 }
 
 // This authority updates existing AW mirrors only. It cannot publish bindings,
-// create resources, close Issues, or acquire another run's original Claims.
+// create resources, or acquire another run's original Claims.
 function transitionProjectionTargets(state, origin, requestIds) {
   if (
     state.policy.authorization !== "aw" ||
@@ -62,4 +62,33 @@ function transitionProjectionTargets(state, origin, requestIds) {
   return { actor, targets: [...targets.values()], pending: [...pending.values()] };
 }
 
-module.exports = { transitionProjectionTargets };
+function reconciliationProjectionTargets(state, origin) {
+  if (
+    state.policy.authorization !== "aw" ||
+    origin.authenticated !== true ||
+    origin.role !== "reconciler" ||
+    origin.repository !== state.repository ||
+    origin.workflow !== ".github/workflows/agentics-maintenance.yml" ||
+    !["schedule", "workflow_dispatch"].includes(origin.event) ||
+    !Number.isSafeInteger(origin.run_attempt) ||
+    origin.run_attempt < 1 ||
+    !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(origin.ref)
+  )
+    throw queueError("projection_unauthorized", "mirror reconciliation requires the authenticated maintenance run");
+  const actor = actorFromContext(origin);
+  const targets = [];
+  const pending = [];
+  for (const work of state.works.values()) {
+    const resource = work.backing_issue || work.issue_link;
+    if (!resource || resource.repository !== state.repository || !state.policy.pools[work.pool].allowed_repositories.includes(state.repository)) continue;
+    if (!work.issue_summary) {
+      pending.push({ work_id: work.work_id, reason: "projection_receipt_pending" });
+      continue;
+    }
+    targets.push({ work_id: work.work_id, claim_ids: [], resource, reconciliation: true });
+  }
+  if (targets.length > 256) throw queueError("projection_limit", "mirror reconciliation requires at most 256 existing mirrors");
+  return { actor, targets, pending };
+}
+
+module.exports = { transitionProjectionTargets, reconciliationProjectionTargets };

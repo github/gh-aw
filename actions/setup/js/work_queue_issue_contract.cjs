@@ -77,6 +77,29 @@ function issueCompletionPolicy(state, work, actor, ref, repository) {
   return "keep-open";
 }
 
+function issueCompletionPolicyForWork(state, work, repository) {
+  const admission = state.workCreators?.get(work.work_id);
+  if (!admission) return "keep-open";
+  for (let commit = work.position.commit; commit >= 0; commit--) {
+    const operations = transactionAt(state, commit)?.operations || [];
+    const end = commit === work.position.commit ? work.position.operation : operations.length;
+    for (let index = end - 1; index >= 0; index--) {
+      if (operations[index].kind !== "Policy") continue;
+      const rules = (operations[index].policy.projectors || []).filter(
+        rule =>
+          rule.principal === admission.principal &&
+          rule.workflow === admission.workflow &&
+          rule.ref === admission.ref &&
+          rule.pools.includes(work.pool) &&
+          rule.repositories.includes(repository) &&
+          (!work.backing_issue || rule.backing_issues?.some(resource => canonical(resource) === canonical(work.backing_issue)))
+      );
+      return rules.length && rules.every(rule => rule.completion_policy === "close-on-result") ? "close-on-result" : "keep-open";
+    }
+  }
+  return "keep-open";
+}
+
 function applyIssueBinding(state, operation, commit) {
   const work = state.works.get(operation.work_id);
   const resource = operation.kind === "IssueLink" ? operation.resource : work?.backing_issue || work?.issue_link;
@@ -113,4 +136,4 @@ function applyIssueBinding(state, operation, commit) {
   }
 }
 
-module.exports = { issueIdentity, transactionAt, assertProjectionAuthority, applyIssueBinding, issueCompletionPolicy };
+module.exports = { issueIdentity, transactionAt, assertProjectionAuthority, applyIssueBinding, issueCompletionPolicy, issueCompletionPolicyForWork };

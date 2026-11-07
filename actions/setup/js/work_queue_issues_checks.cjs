@@ -77,6 +77,7 @@ function mock(f, { labelMissing = false } = {}) {
   const locks = new Set();
   const warnings = [];
   const restBlobs = new Map();
+  const orphanComments = [];
   const nativeRun = {
     id: Number(f.origin.run_id),
     run_attempt: f.origin.run_attempt,
@@ -102,6 +103,10 @@ function mock(f, { labelMissing = false } = {}) {
       viewerCanSetFields: true,
       repository: { id: "Repository1", databaseId: 1, nameWithOwner: "owner/repo" },
       author: { login: "bot" },
+      node_id: `Issue${r.number}`,
+      title: "",
+      body: "",
+      created_at: new Date(0).toISOString(),
       labels: { nodes: [{ id: "label-work", name: "work" }], pageInfo: { hasNextPage: false } },
     };
   }
@@ -118,6 +123,44 @@ function mock(f, { labelMissing = false } = {}) {
           calls.push(["authentication-run"]);
           return { status: 200, data: structuredClone(nativeRun) };
         },
+      },
+      issues: {
+        listForRepo: async ({ labels: label, page = 1, per_page = 100 }) => {
+          calls.push(["tracked-issues", page, per_page]);
+          const matches = [...issues.values()].filter(issue => issue.state === "OPEN" && issue.labels.nodes.some(value => value.name === label));
+          return {
+            data: matches.slice((page - 1) * per_page, page * per_page).map(issue => ({
+              id: issue.databaseId,
+              node_id: issue.id,
+              number: issue.number,
+              state: "open",
+              title: issue.title,
+              body: issue.body,
+              created_at: issue.created_at,
+              labels: issue.labels.nodes.map(value => ({ name: value.name, node_id: value.id })),
+            })),
+          };
+        },
+        get: async ({ issue_number }) => {
+          const issue = issues.get(String(issue_number));
+          return {
+            data: issue
+              ? {
+                  id: issue.databaseId,
+                  node_id: issue.id,
+                  number: issue.number,
+                  state: issue.state.toLowerCase(),
+                  title: issue.title,
+                  body: issue.body,
+                  created_at: issue.created_at,
+                  labels: issue.labels.nodes.map(value => ({ name: value.name, node_id: value.id })),
+                }
+              : null,
+          };
+        },
+        listComments: async ({ issue_number }) => ({
+          data: [...comments.values(), ...orphanComments].filter(comment => comment.issue?.id === `Issue${issue_number}`).map(comment => ({ body: comment.body })),
+        }),
       },
       git: {
         getRef: async ({ ref }) => {
@@ -255,6 +298,7 @@ function mock(f, { labelMissing = false } = {}) {
           } else if (name === "addComment") {
             const comment = { id: `Comment${++sequence}`, body: input.body, issue: { id: issue.id } };
             comments.set(comment.id, comment);
+            if (input.body.includes("gh-aw-work-queue-orphan:")) orphanComments.push(comment);
             result[key] = { commentEdge: { node: structuredClone(comment) } };
           } else if (name === "updateIssueComment") {
             comments.get(input.id).body = input.body;
@@ -285,7 +329,15 @@ function mock(f, { labelMissing = false } = {}) {
   }
   const readCheckedQueue = async () => {
     calls.push(["ledger-read"]);
-    return { sha, treeSha: "tree", transactions, state: q.replayTransactions(transactions), branch: "work-queue", logPath: "work-queue.jsonl", journal: new Map([...journals].map(([path, value]) => [path, structuredClone(value)])) };
+    return {
+      sha,
+      treeSha: "tree",
+      transactions,
+      state: q.replayTransactions(transactions),
+      branch: "work-queue",
+      logPath: "work-queue.jsonl",
+      journal: new Map([...journals].map(([path, value]) => [path, structuredClone(value)])),
+    };
   };
   const writeCheckedFiles = async ({ expectedHeadOid, files }) => {
     calls.push(["publish"]);
@@ -320,6 +372,7 @@ function mock(f, { labelMissing = false } = {}) {
     discovery,
     labels,
     warnings,
+    orphanComments,
     nativeRun,
     state: () => q.replayTransactions(transactions),
     setLog: value => {
@@ -831,6 +884,135 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
       work.barrier = "failed";
       assert.equal(workIssueStatus(state, work, 100), "Needs attention");
       assert.match(summaryBody(state, work, 100), /Status: \*\*Needs attention\*\*/);
+    });
+    it("reconciles all checked mirrors and closes a terminal mirror under its admission policy", async () => {
+      const f = fixture({ worker: true });
+      const policy = f.log[0].operations[0].policy;
+      policy.authorization = "aw";
+      policy.producers = {};
+      for (const projector of policy.projectors) projector.completion_policy = "close-on-result";
+      f.log[0].request = q.newRequest(f.log[0].request.id, "policy", f.log[0].actor, { operations: f.log[0].operations });
+      const m = mock(f);
+      assert.deepEqual((await main(m.options)).pending, []);
+      let log = [...m.state().transactions];
+      log.push(helpers.finish(log, f.assignment.dispatch_id, "h1", "completed", { at: 200 }));
+      const state = q.replayTransactions(log);
+      const member = f.assignment.claims[0];
+      const work = state.works.get(member.work_id);
+      const dispatch = state.dispatches.get(f.assignment.dispatch_id);
+      const result = {
+        kind: "Result",
+        work_id: member.work_id,
+        claim_id: member.claim_id,
+        completion_id: work.completion_id,
+        descriptor: { outputs: [] },
+        evidence: helpers.evidence(state, dispatch, "delivery", 210, {
+          source: "verified_receipts",
+          run_id: dispatch.run.run_id,
+          run_attempt: 1,
+          receipt: "checked-delivery",
+        }),
+      };
+      log.push(helpers.operationCommit(log, "checked-result", "result", [result], helpers.reconciler, 210));
+      m.setLog(log);
+      const maintenance = helpers.context({ role: "reconciler", principal: "1001", repository: "owner/repo", workflow: ".github/workflows/agentics-maintenance.yml", run_id: "300", run_attempt: 1 }, { event: "schedule", ref });
+      const issue = m.issues.get("1");
+      issue.labels.nodes = [
+        { id: "label-work", name: "work" },
+        { id: "label-queued", name: "work:queued" },
+      ];
+      const missingWorkId = "f".repeat(64);
+      issue.title = `[work queue] ${missingWorkId.slice(0, 12)}`;
+      issue.body = `<!-- work-id: ${missingWorkId} -->`;
+      issue.created_at = new Date(0).toISOString();
+      const reconciled = await main({ ...m.options, trustedContext: maintenance, reconcileMirrors: true, now: 31 * 86400000 });
+      assert.deepEqual(reconciled.pending, []);
+      assert.equal(issue.state, "CLOSED");
+      assert.deepEqual(
+        issue.labels.nodes.map(label => label.name),
+        ["work", "work:done"]
+      );
+      assert.match(m.comments.get(m.state().works.get(member.work_id).issue_summary).body, /Status: \*\*Done\*\*/);
+      assert.equal(m.orphanComments.length, 0);
+    });
+    it("flags old tracked Issues without a checked Work entry once and leaves the Issue open", async () => {
+      const f = fixture();
+      f.log[0].operations[0].policy.authorization = "aw";
+      f.log[0].operations[0].policy.producers = {};
+      f.log[0].request = q.newRequest(f.log[0].request.id, "policy", f.log[0].actor, { operations: f.log[0].operations });
+      const m = mock(f);
+      assert.deepEqual((await main(m.options)).pending, []);
+      const missingWorkId = "f".repeat(64);
+      const orphan = {
+        id: "Issue99",
+        node_id: "Issue99",
+        databaseId: 1099,
+        number: 99,
+        state: "OPEN",
+        title: `[work queue] ${missingWorkId.slice(0, 12)}`,
+        body: `<!-- work-id: ${missingWorkId} -->`,
+        created_at: new Date(0).toISOString(),
+        repository: { id: "Repository1", databaseId: 1, nameWithOwner: "owner/repo" },
+        author: { login: "bot" },
+        labels: { nodes: [{ id: "label-work", name: "work" }], pageInfo: { hasNextPage: false } },
+      };
+      m.issues.set("99", orphan);
+      const unrelated = {
+        ...structuredClone(orphan),
+        id: "Issue98",
+        node_id: "Issue98",
+        databaseId: 1098,
+        number: 98,
+        title: `[work queue] ${"e".repeat(12)}`,
+      };
+      m.issues.set("98", unrelated);
+      const maintenance = helpers.context({ role: "reconciler", principal: "1001", repository: "owner/repo", workflow: ".github/workflows/agentics-maintenance.yml", run_id: "300", run_attempt: 1 }, { event: "schedule", ref });
+      const options = { ...m.options, issues: { orphaned_after_days: 30 }, trustedContext: maintenance, reconcileMirrors: true, now: 31 * 86400000 };
+      assert.deepEqual((await main(options)).pending, []);
+      assert.equal(orphan.state, "OPEN");
+      assert.ok(orphan.labels.nodes.some(label => label.name === "work:needs-attention"));
+      assert.ok(!unrelated.labels.nodes.some(label => label.name === "work:needs-attention"));
+      assert.equal(m.orphanComments.length, 1);
+      assert.match(m.orphanComments[0].body, /no matching Work ID in the checked ledger/);
+      assert.deepEqual((await main(options)).pending, []);
+      assert.equal(m.orphanComments.length, 1);
+    });
+    it("reconciles exactly 1000 tracked Issues without treating the bound as overflow", async () => {
+      const f = fixture({ backing: false });
+      f.log[0].operations[0].policy.authorization = "aw";
+      f.log[0].operations[0].policy.producers = {};
+      f.log[0].request = q.newRequest(f.log[0].request.id, "policy", f.log[0].actor, { operations: f.log[0].operations });
+      const m = mock(f);
+      for (let number = 1; number <= 1000; number++) {
+        const issue = {
+          id: `Issue${number}`,
+          node_id: `Issue${number}`,
+          databaseId: 1000 + number,
+          number,
+          state: "OPEN",
+          title: "unrelated tracked issue",
+          body: "",
+          created_at: new Date().toISOString(),
+          labels: { nodes: [{ id: "label-work", name: "work" }], pageInfo: { hasNextPage: false } },
+        };
+        m.issues.set(String(number), issue);
+      }
+      const maintenance = helpers.context({ role: "reconciler", principal: "1001", repository: "owner/repo", workflow: ".github/workflows/agentics-maintenance.yml", run_id: "300", run_attempt: 1 }, { event: "schedule", ref });
+      const result = await main({ ...m.options, trustedContext: maintenance, reconcileMirrors: true, now: Date.now() });
+      assert.deepEqual(result.pending, []);
+      assert.ok(m.calls.some(call => call[0] === "tracked-issues" && call[1] === 11 && call[2] === 1));
+      m.issues.set("1001", {
+        id: "Issue1001",
+        node_id: "Issue1001",
+        databaseId: 2001,
+        number: 1001,
+        state: "OPEN",
+        title: "unrelated tracked issue",
+        body: "",
+        created_at: new Date().toISOString(),
+        labels: { nodes: [{ id: "label-work", name: "work" }], pageInfo: { hasNextPage: false } },
+      });
+      assert.equal((await main({ ...m.options, trustedContext: maintenance, reconcileMirrors: true, now: Date.now() })).pending?.length, 1);
     });
     it("rejects concurrent Issue rebinding and immutable comment-handle replacement", () => {
       const f = protocolFixture();

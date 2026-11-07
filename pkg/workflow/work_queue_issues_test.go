@@ -50,12 +50,14 @@ func TestWorkQueueIssuesConfiguration(t *testing.T) {
 		{"false", false, true, ""},
 		{"object", map[string]any{"label": "cookie"}, true, "cookie"},
 		{"custom-title", map[string]any{"title_prefix": "[cookie queue]"}, true, "work"},
+		{"orphaned-age", map[string]any{"orphaned_after_days": float64(7)}, true, "work"},
 		{"maximum-label-prefix", map[string]any{"label": strings.Repeat("x", 33)}, true, strings.Repeat("x", 33)},
 		{"empty-object", map[string]any{}, true, "work"},
 		{"blank-label", map[string]any{"label": " "}, false, ""},
 		{"label-prefix-too-long", map[string]any{"label": strings.Repeat("x", 34)}, false, ""},
 		{"status-field", map[string]any{"status-field": "CustomStatus"}, false, ""},
 		{"unknown", map[string]any{"storage": "issues"}, false, ""},
+		{"invalid-orphaned-age", map[string]any{"orphaned_after_days": float64(3651)}, false, ""},
 		{"null", nil, false, ""},
 		{"expression", map[string]any{"label": "${{ inputs.label }}"}, false, ""},
 		{"blank-title", map[string]any{"title_prefix": " "}, false, ""},
@@ -76,6 +78,11 @@ func TestWorkQueueIssuesConfiguration(t *testing.T) {
 				require.Nil(t, config)
 			} else {
 				require.Equal(t, test.label, config.Label)
+				if test.name == "orphaned-age" {
+					require.Equal(t, 7, config.OrphanedAfterDays)
+				} else {
+					require.Equal(t, 30, config.OrphanedAfterDays)
+				}
 				if test.name == "custom-title" {
 					require.Equal(t, "[cookie queue]", config.TitlePrefix)
 				} else {
@@ -138,7 +145,7 @@ func TestWorkQueueIssuesCompilationUsesExistingJobs(t *testing.T) {
 		if step["id"] == "work_queue_issues" {
 			require.Equal(t, "always()", step["if"])
 			env := step["env"].(map[string]any)
-			require.JSONEq(t, `{"label":"cookie","title_prefix":"[cookie queue]"}`, env["GH_AW_WORK_QUEUE_ISSUES"].(string))
+			require.JSONEq(t, `{"label":"cookie","orphaned_after_days":30,"title_prefix":"[cookie queue]"}`, env["GH_AW_WORK_QUEUE_ISSUES"].(string))
 			script := step["with"].(map[string]any)["script"].(string)
 			require.Contains(t, script, "if (result.pending?.length) core.warning(")
 			require.NotContains(t, script, "core.setFailed(")
