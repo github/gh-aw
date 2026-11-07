@@ -148,6 +148,22 @@ function runHarnessFixture(script, { prompt = "fix the bug", args = [], env = {}
 }
 
 describe("codex_harness.cjs", () => {
+  it("handles repeated permission failures without replaying work", () => {
+    const directory = makeHarnessTempDir("permission-output-");
+    const safeOutputsPath = path.join(directory, "safe-outputs.jsonl");
+    const { result, calls, harnessRetry } = runHarnessFixture(
+      `
+        console.log("  | observed command\\nPermission denied\\npermission denied\\npermission denied");
+        process.exit(1);
+      `,
+      { env: { GH_AW_SAFE_OUTPUTS: safeOutputsPath, GH_AW_SAFEOUTPUTS_CLI: "true", GH_AW_HARNESS_MAX_RETRIES: "2" } }
+    );
+    expect(result.status, result.stderr).toBe(1);
+    expect(calls).toHaveLength(1);
+    expect(harnessRetry.attempt_results[0].failure_classes).toContain("permission_denied");
+    expect(result.stderr).toContain("classified as missing tool/permission issue");
+  });
+
   it("records an initial explicit Codex resume as continuation, not a retry", () => {
     const { result, calls, harnessRetry } = runHarnessFixture("", { args: ["resume", "00000000-0000-4000-8000-000000000001"] });
     expect(result.status, result.stderr).toBe(0);

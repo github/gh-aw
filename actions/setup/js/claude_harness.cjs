@@ -62,6 +62,8 @@ const {
   stripExecutionEvidenceEnv,
 } = require("./harness_retry_runner.cjs");
 const { resolveRetryConfig: resolveSharedRetryConfig } = require("./harness_retry_config.cjs");
+const { stopForPermissionDenied } = require("./harness_failure_handling.cjs");
+const { resolveHarnessPromptFileArgs } = require("./harness_prompt_input.cjs");
 const {
   AWF_API_PROXY_REFLECT_URL,
   AWF_REFLECT_TIMEOUT_MS,
@@ -311,37 +313,7 @@ function shouldRetryWithContinue({ attempt, maxRetries, exitCode, hasOutput, isN
  * @returns {{args: string[], prompt: string | null}}
  */
 function resolveClaudePromptFileArgs(args) {
-  /** @type {string[]} */
-  const filteredArgs = [];
-  /** @type {string|null} */
-  let promptContent = null;
-
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] !== "--prompt-file") {
-      filteredArgs.push(args[i]);
-      continue;
-    }
-
-    if (i + 1 >= args.length) {
-      throw new Error("--prompt-file requires a readable file path");
-    }
-
-    const promptFile = args[i + 1];
-    try {
-      const stat = fs.statSync(promptFile);
-      log(`resolved --prompt-file: path=${promptFile} size=${stat.size}B`);
-      promptContent = fs.readFileSync(promptFile, "utf8");
-    } catch (error) {
-      const err = /** @type {Error} */ error;
-      // An unreadable prompt file means no task instructions can be delivered to Claude.
-      // Propagate as a fatal error rather than forwarding the harness-only flag to the
-      // claude subprocess (which would fail with an "unknown option" error).
-      throw new Error(`--prompt-file '${promptFile}' is not readable: ${err.message}`, { cause: err });
-    }
-    i++; // Skip the prompt-file path argument
-  }
-
-  return { args: filteredArgs, prompt: promptContent };
+  return resolveHarnessPromptFileArgs(args, { logger: log });
 }
 
 /**
@@ -847,14 +819,7 @@ async function main() {
       }
 
       if (hasNumerousPermissionDenied) {
-        if (safeOutputsPath && hasExpectedSafeOutputs(safeOutputsPath, { logger: log })) {
-          log(`attempt ${attempt + 1}: detected numerous permission-denied issues but safe-outputs already contain expected output — suppressing terminal verdict (false-red: core work succeeded)`);
-          return { action: "stop", exitCode: 0 };
-        }
-        const deniedCommands = denials.commands;
-        emitMissingToolPermissionIssue({ deniedCommands, permissionOutput: result.output, logger: log });
-        log(`attempt ${attempt + 1}: detected numerous permission-denied issues — not retrying (classified as missing tool/permission issue)`);
-        return { action: "stop" };
+        return stopForPermissionDenied({ attempt, output: result.output, safeOutputsPath, log, deniedCommands: denials.commands });
       }
 
       if (isMaxTurns) {

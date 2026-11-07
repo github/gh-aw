@@ -287,7 +287,7 @@ printf '%s\\n' "$TEMP_DIR"`,
         timeout: 30000,
       });
       expect(result.error).toBeUndefined();
-      expect(result.status).not.toBe(0);
+      expect(result.status, result.stdout + result.stderr).not.toBe(0);
       const dirs = fs.readFileSync(allocations, "utf8").trim().split("\n");
       expect(dirs.some(dir => /(?:awf|copilot)-install-/.test(dir))).toBe(true);
       for (const dir of dirs) expect(fs.existsSync(dir)).toBe(false);
@@ -304,6 +304,7 @@ printf '%s\\n' "$TEMP_DIR"`,
       const cache = path.join(root, "toolcache");
       const cacheBin = path.join(cache, "copilot-cli", "1.0.103", "x64", "bin");
       const forbiddenLog = path.join(root, "forbidden.log");
+      const installLog = path.join(root, "install.log");
       fs.mkdirSync(sharedTemp);
       fs.mkdirSync(bin);
       fs.mkdirSync(cacheBin, { recursive: true });
@@ -320,6 +321,10 @@ printf 'copilot 1.0.103\\n'
         fs.writeFileSync(path.join(bin, command), '#!/bin/sh\necho forbidden >> "$FORBIDDEN_LOG"\nexit 99\n', { mode: 0o755 });
       }
       fs.writeFileSync(path.join(bin, "uname"), '#!/bin/sh\ncase "$1" in -m) echo x86_64 ;; *) echo Linux ;; esac\n', { mode: 0o755 });
+      const realFind = spawnSync("bash", ["-c", "command -v find"], { encoding: "utf8" }).stdout.trim();
+      fs.writeFileSync(path.join(bin, "find"), '#!/bin/sh\nif [ "$1" = /tmp ]; then echo forbidden >> "$FORBIDDEN_LOG"; exit 99; fi\nexec "$REAL_FIND" "$@"\n', { mode: 0o755 });
+      const realInstall = spawnSync("bash", ["-c", "command -v install"], { encoding: "utf8" }).stdout.trim();
+      fs.writeFileSync(path.join(bin, "install"), '#!/bin/sh\nprintf "%s\\n" "$4" >> "$INSTALL_LOG"\nexec "$REAL_INSTALL" "$@"\n', { mode: 0o755 });
       const otherChroot = path.join(sharedTemp, "awf-existing-chroot-home");
       fs.mkdirSync(otherChroot);
       fs.writeFileSync(path.join(otherChroot, "artifact"), "another invocation");
@@ -340,6 +345,9 @@ printf 'copilot 1.0.103\\n'
             INSTALLER_READY: ready,
             INSTALLER_RELEASE: release,
             FORBIDDEN_LOG: forbiddenLog,
+            INSTALL_LOG: installLog,
+            REAL_FIND: realFind,
+            REAL_INSTALL: realInstall,
           }),
           stdio: ["ignore", "pipe", "pipe"],
         });
@@ -360,6 +368,12 @@ printf 'copilot 1.0.103\\n'
       try {
         const deadline = Date.now() + 55000;
         while (!jobs.every(job => fs.existsSync(job.ready))) {
+          for (const job of jobs) {
+            if (job.child.exitCode !== null) {
+              const result = await job.completion;
+              throw new Error(`Concurrent installer exited before the toolcache barrier (${result.code}):\n${result.output}`);
+            }
+          }
           if (Date.now() > deadline) throw new Error("Concurrent installers did not reach the toolcache barrier");
           await new Promise(resolve => setTimeout(resolve, 25));
         }
@@ -385,6 +399,9 @@ printf 'copilot 1.0.103\\n'
         expect(stagingNames()).toHaveLength(0);
         expect(fs.readFileSync(path.join(otherChroot, "artifact"), "utf8")).toBe("another invocation");
         expect(fs.existsSync(forbiddenLog)).toBe(false);
+        const installedPaths = fs.readFileSync(installLog, "utf8").trim().split("\n");
+        expect(installedPaths).toHaveLength(2);
+        for (const installedPath of installedPaths) expect(path.basename(installedPath)).toMatch(/^\.copilot\./);
       } finally {
         for (const job of jobs) fs.writeFileSync(job.release, "");
         await Promise.all(jobs.map(job => job.completion));
