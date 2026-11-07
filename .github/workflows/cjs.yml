@@ -215,6 +215,45 @@ jobs:
       - name: Run impacted JavaScript unit tests
         run: make test-impacted-js BASE_REF=HEAD^
 
+  docker-root-owned-cleanup:
+    name: Docker root-owned staging cleanup
+    needs: [checkout-cache]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    concurrency:
+      group: ci-${{ github.ref }}-docker-root-owned-cleanup
+      cancel-in-progress: true
+    env:
+      GH_AW_TEST_DOCKER_IMAGE: alpine:3.21@sha256:2d8a11041a92082ba21e364dec73559ce44f1de69b60fa68315f6d3774e59117
+    steps:
+      - name: Restore checkout
+        id: restore-checkout
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .
+          key: checkout-cjs-${{ github.run_id }}-${{ github.sha }}
+      - name: Checkout on cache miss
+        if: steps.restore-checkout.outputs.cache-hit != 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Ensure runner is unprivileged
+        run: test "$(id -u)" -ne 0
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
+        with:
+          node-version: "24"
+      - name: Install npm dependencies
+        run: cd actions/setup/js && npm ci
+      - name: Preload pinned Docker fixture
+        run: docker pull "$GH_AW_TEST_DOCKER_IMAGE"
+      - name: Run root-owned cleanup regression
+        run: cd actions/setup/js && npm run test:js -- --no-file-parallelism release_staging.test.cjs
+
   lint-js:
     needs: [checkout-cache]
     runs-on: ubuntu-latest
@@ -357,6 +396,7 @@ jobs:
       - otlp-protobuf
       - js-tests
       - impacted-js-tests
+      - docker-root-owned-cleanup
       - lint-js
       - artifact-integration
       - nvx-musl-integration

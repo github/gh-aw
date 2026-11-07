@@ -12,6 +12,7 @@ permissions:
   issues: read
   pull-requests: read
   actions: read
+  copilot-requests: write
 tools:
   cli-proxy: true
   agentic-workflows:
@@ -28,8 +29,10 @@ safe-outputs:
 timeout-minutes: 60
 engine:
   id: codex
-  model-provider: openai
-model: openai/gpt-6-astra
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
 strict: true
 imports:
   - uses: shared/daily-audit-base.md

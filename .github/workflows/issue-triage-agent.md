@@ -4,7 +4,9 @@ timeout-minutes: 5
 engine:
   id: codex
   model-provider: github
-model: copilot/gpt-6-sol
+  model-routing:
+    goal: cost
+    mode: economy
 strict: true
 on:
   schedule: "daily around 14:00 on weekdays"  # ~2 PM UTC, weekdays only
