@@ -60,6 +60,15 @@ func (b Branch) DeploymentOperationsFromConfig(ctx context.Context, state Projec
 	if err != nil {
 		return nil, err
 	}
+	if approval == nil {
+		used, err := requiresContractBridgeApproval(state)
+		if err != nil {
+			return nil, err
+		}
+		if used {
+			return nil, queueError("deployment_invalid", "deployment history requires protected bridge approval; do not remove the migration manifest")
+		}
+	}
 	builder := nativeDeploymentBuilder{
 		branch: b, state: state, routes: map[string]nativeDeploymentRoute{}, operations: []Operation{}, approval: approval,
 	}
@@ -337,6 +346,15 @@ func (b Branch) verifyNativeDeploymentEvidence(ctx context.Context, state Projec
 	approval, err := b.approvedContractBridges(ctx, defaultRevision)
 	if err != nil {
 		return err
+	}
+	if approval == nil {
+		used, err := requiresContractBridgeApproval(state)
+		if err != nil {
+			return err
+		}
+		if used {
+			return queueError("deployment_invalid", "deployment history requires protected bridge approval; do not remove the migration manifest")
+		}
 	}
 	if approval != nil {
 		if err := b.verifyProspectiveBridgeReaders(ctx, state, approval, parameters.Operations); err != nil {

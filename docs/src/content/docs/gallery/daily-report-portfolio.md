@@ -118,6 +118,9 @@ settle manually. Older closed-schema readers reject deployment records with
 `contract_routes`. The protected
 `.github/aw/work-queue-contract-routes.json` manifest approves exact workflow,
 contract and bridge revisions plus SHA256 digests of both queue readers.
+Retain the manifest after the last contract route is cleared: deployment history
+and checkpoints still contain the newer protocol fields, so synchronization rejects
+its removal even when updating a different worker.
 Synchronization registers bridges and installs the default and retained routes
 atomically across selected targets. All available default routes, runnable pinned
 Work and unreleased assignments must load the approved reader ABI first. Frozen

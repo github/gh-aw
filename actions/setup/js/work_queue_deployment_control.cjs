@@ -5,7 +5,7 @@ const { canonical, digest, queueError } = require("./work_queue_codec.cjs");
 const { policyProposalFor, loadQueue, publishOperations } = require("./work_queue_binding.cjs");
 const { serializeProjection } = require("./work_queue_replay.cjs");
 const { verifiedDefaultReference, configuredWorkerDeployment } = require("./work_queue_provisioning.cjs");
-const { approvedContractBridges, bridgeContractRoutes, verifyBridgeReaders, verifyProspectiveBridgeReaders } = require("./work_queue_contract_bridges.cjs");
+const { approvedContractBridges, bridgeContractRoutes, verifyBridgeReaders, verifyProspectiveBridgeReaders, requiresContractBridgeApproval } = require("./work_queue_contract_bridges.cjs");
 
 function approvedWorkerProfiles(state, pool, config) {
   const workflows = new Set(config.work_queue_workflows ?? []);
@@ -40,6 +40,7 @@ async function synchronizeDeployments(options, context, pools = undefined) {
   const revision = await verifiedDefaultReference(provisioning);
   const approval = await approvedContractBridges(provisioning, revision);
   for (let attempt = 0; attempt < 3; attempt++) {
+    if (!approval && requiresContractBridgeApproval(latest.projection)) throw queueError("deployment_invalid", "deployment history requires protected bridge approval; do not remove the migration manifest");
     const operations = [];
     const requirements = [];
     for (const [pool, name] of targets) {
@@ -112,6 +113,7 @@ async function synchronizeDeployments(options, context, pools = undefined) {
     const expectedReaders = approval ? serializeProjection(latest.projection) : undefined;
     try {
       await publishOperations(options, context, { deployment: digest(operations), tip: latest.projection.tip }, "deployment", operations, state => {
+        if (!approval && requiresContractBridgeApproval(state)) throw queueError("deployment_conflict", "deployment history changed; refresh protected bridge approval");
         if (expectedReaders) {
           const freshReaders = serializeProjection(state);
           if (["deployments", "works", "dispatches"].some(key => canonical(freshReaders[key] ?? {}) !== canonical(expectedReaders[key] ?? {})))

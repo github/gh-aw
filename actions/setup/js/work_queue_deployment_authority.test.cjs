@@ -6,6 +6,7 @@ import { synchronizeDeployments } from "./work_queue_deployment_control.cjs";
 import { compiledBridgeRuntime } from "./work_queue_contract_bridges.cjs";
 import { executionProfile, futurePolicy } from "./work_queue_deployment.cjs";
 import { normalizeSubmitParameters } from "./work_queue_intents.cjs";
+import { compactTransactions, replayTransactions } from "./work_queue_replay.cjs";
 import { queueFixture, REF, WORKFLOW, REPOSITORY } from "./work_queue_lifecycle.test_helpers.cjs";
 
 const DEFAULT_REF = "b".repeat(40);
@@ -86,6 +87,34 @@ function installBridgeFixture(f, routes) {
 }
 
 describe("verified default worker deployment authority", () => {
+  it.each([false, true])("retains protected approval after route clearing (checkpoint=%s)", async compacted => {
+    const { f, options, trusted } = fixture();
+    f.append("deployment", {
+      operations: [
+        {
+          kind: "Deployment",
+          pool: "default",
+          worker_profile: "default",
+          expected_ref: REF,
+          expected_contract: CONTRACT,
+          profile: futurePolicy(f.state).pools.default.profiles.default,
+          available: true,
+          contract_routes: {},
+          reason: "compiler_deployment",
+        },
+      ],
+    });
+    expect(f.state.deployments.get("default").get("default").contract_routes).toBeUndefined();
+    options.config = { work_queue_workflows: ["other"], aw_context_workflows: ["other"] };
+    if (compacted) {
+      const transactions = compactTransactions(f.transactions, "c".repeat(40), { ...f.dispatcher, role: "administrator" }, 6000);
+      options.readWorkQueueLog = async () => ({ sha: "checkpoint-head", transactions, state: replayTransactions(transactions) });
+    }
+    const before = canonical(f.transactions);
+    await expect(synchronizeDeployments(options, trusted)).rejects.toThrow("deployment history requires protected bridge approval");
+    expect(canonical(f.transactions)).toBe(before);
+  });
+
   it.each([
     ["local", bridgeLock(), true],
     ["foreign setup", bridgeLock().replace("./actions/setup", `github/gh-aw/actions/setup@${"d".repeat(40)}`), false],

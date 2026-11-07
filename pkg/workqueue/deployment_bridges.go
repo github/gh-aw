@@ -21,6 +21,39 @@ type contractBridgeApproval struct {
 	Routes  map[string]map[string]string `json:"routes"`
 }
 
+func requiresContractBridgeApproval(state Projection) (bool, error) {
+	for _, commit := range state.Requests {
+		operations := commit.Operations
+		if commit.Request.Kind == "deployment" {
+			var parameters OperationsParameters
+			if err := json.Unmarshal(commit.Request.Parameters, &parameters); err != nil {
+				return false, err
+			}
+			operations = append(append([]Operation{}, operations...), parameters.Operations...)
+		}
+		for _, operation := range operations {
+			kind, err := operationKind(operation)
+			if err != nil {
+				return false, err
+			}
+			if kind != "Deployment" {
+				continue
+			}
+			var fields map[string]json.RawMessage
+			if err := json.Unmarshal(operation, &fields); err != nil {
+				return false, err
+			}
+			if _, exists := fields["contract_routes"]; exists {
+				return true, nil
+			}
+			if _, exists := fields["register"]; exists {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
 func (b Branch) approvedContractBridges(ctx context.Context, revision string) (*contractBridgeApproval, error) {
 	content, err := b.configFile(ctx, contractBridgeManifest, revision)
 	if err != nil {

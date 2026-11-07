@@ -9,6 +9,14 @@ const { applyDeployment, executionProfile } = require("./work_queue_deployment.c
 const MANIFEST = ".github/aw/work-queue-contract-routes.json";
 const READERS = ["actions/setup/js/work_queue_replay.cjs", "actions/setup/js/work_queue_deployment.cjs"];
 
+function requiresContractBridgeApproval(state) {
+  for (const commit of state.requests.values()) {
+    const operations = [...commit.operations, ...(commit.request.kind === "deployment" ? (commit.request.parameters?.operations ?? []) : [])];
+    if (operations.some(operation => operation.kind === "Deployment" && (Object.hasOwn(operation, "contract_routes") || Object.hasOwn(operation, "register")))) return true;
+  }
+  return false;
+}
+
 async function approvedContractBridges(options, revision) {
   let content;
   try {
@@ -119,4 +127,4 @@ async function verifyProspectiveBridgeReaders(options, state, approval, operatio
   }
 }
 
-module.exports = { approvedContractBridges, bridgeContractRoutes, verifyBridgeReaders, verifyProspectiveBridgeReaders, compiledBridgeRuntime };
+module.exports = { approvedContractBridges, bridgeContractRoutes, verifyBridgeReaders, verifyProspectiveBridgeReaders, compiledBridgeRuntime, requiresContractBridgeApproval };

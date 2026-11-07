@@ -253,6 +253,63 @@ func TestCompiledBridgeRuntimeProvenance(t *testing.T) {
 	}
 }
 
+func TestNativeContractBridgeApprovalCannotBeRemovedAfterRouteClearing(t *testing.T) {
+	for _, compacted := range []bool{false, true} {
+		t.Run(map[bool]string{false: "history", true: "checkpoint"}[compacted], func(t *testing.T) {
+			branch, mock := newQueueAPI(t)
+			commits := testGenesis(t, deploymentPolicy)
+			initial, err := Replay(commits)
+			if err != nil {
+				t.Fatal(err)
+			}
+			profile := initial.Policy.Pools["default"].Profiles["default"]
+			routes := map[string]string{}
+			commits = testOperations(t, commits, testActor("dispatcher"), "cleared-routes", "deployment", mustOp(t, DeploymentOperation{
+				Kind: "Deployment", Pool: "default", WorkerProfile: "default", ExpectedRef: profile.Ref,
+				ExpectedContract: profile.LogicalContract, Profile: profile, Available: true, Reason: "compiler_deployment", ContractRoutes: &routes,
+			}))
+			if compacted {
+				commits, err = CompactCheckpoint(commits, strings.Repeat("d", 40), testActor("administrator"), 4000)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			installMockLog(t, mock, commits)
+			state, err := Replay(commits)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(state.Deployments["default"]["default"].ContractRoutes) != 0 {
+				t.Fatal("fixture must have no remaining contract routes")
+			}
+			mock.workerContent = stampedWorker(profile.LogicalContract)
+			if _, err := branch.DeploymentOperationsFromConfig(context.Background(), state, "default", "other"); err == nil || !strings.Contains(err.Error(), "deployment history requires protected bridge approval") {
+				t.Fatalf("allowed missing approval for a different selected worker: %v", err)
+			}
+			profile.Ref = strings.Repeat("f", 40)
+			operation := mustOp(t, DeploymentOperation{
+				Kind: "Deployment", Pool: "default", WorkerProfile: "default", ExpectedRef: initial.Policy.Pools["default"].Profiles["default"].Ref,
+				ExpectedContract: profile.LogicalContract, Profile: profile, Available: true, Reason: "compiler_deployment",
+			})
+			request, err := NewRequest("removed-manifest", "deployment", testActor("administrator"), OperationsParameters{Operations: []Operation{operation}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if compacted {
+				err = branch.verifyNativeDeploymentEvidence(context.Background(), state, request)
+			} else {
+				_, err = branch.Publish(context.Background(), testActor("administrator"), request)
+			}
+			if err == nil || !strings.Contains(err.Error(), "deployment history requires protected bridge approval") {
+				t.Fatalf("direct publication bypassed missing approval: %v", err)
+			}
+			if mock.refWrites != 0 {
+				t.Fatal("removed approval mutated the queue")
+			}
+		})
+	}
+}
+
 func TestNativeContractBridgeReaderAndApprovalFailuresPublishNothing(t *testing.T) {
 	for _, scenario := range []string{"missing mapping", "duplicate key", "null routes", "wrong reader", "wrong runtime", "mixed runtime", "old default", "old pin", "active assignment", "unapproved registration"} {
 		t.Run(scenario, func(t *testing.T) {
@@ -264,6 +321,7 @@ func TestNativeContractBridgeReaderAndApprovalFailuresPublishNothing(t *testing.
 				pin.LogicalContract, pin.ExecutionRef = strings.Repeat("b", 64), oldRef
 				commits = testSubmit(t, commits, "exact-pin", pin)
 			}
+
 			if scenario == "active assignment" {
 				commits, _ = testGrant(t, commits, "active-newer", 1, 1)
 			}
