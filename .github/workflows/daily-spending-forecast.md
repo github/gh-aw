@@ -13,7 +13,9 @@ permissions:
 engine:
   id: codex
   model-provider: github
-model: copilot/gpt-6.1-sol
+  model-routing:
+    goal: cost
+    mode: economy
 strict: true
 imports:
   - shared/trending-charts-simple.md
