@@ -8,6 +8,9 @@ sidebar:
 
 GitHub Agentic Workflows lets developers define AI-powered repository automation in Markdown with YAML frontmatter and run AI agents through GitHub Actions. The `gh-aw` CLI compiles the source into a standard GitHub Actions workflow while adding controls for permissions, tools, sandboxing, and writes.
 
+> [!IMPORTANT]
+> Choose your GitHub deployment (`github.com`/GHEC, data-residency `*.ghe.com`, or GHES) separately from your runner topology (hosted Linux, self-hosted Linux, or ARC/DinD). See the [deployment and runner applicability summary](/gh-aw/reference/enterprise-configuration/#deployment-and-runner-applicability) for component prerequisites, evidence, and unconfirmed support combinations.
+
 ## What is an agentic workflow?
 
 **[Agentic workflows](/gh-aw/reference/glossary/#agentic-workflow)** are AI-powered automation that can understand context, make decisions, and take meaningful actions—all from natural-language instructions written in Markdown.

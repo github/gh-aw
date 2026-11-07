@@ -69,6 +69,8 @@ const { countPermissionDeniedIssues, hasNumerousPermissionDeniedIssues, extractD
 const { detectNonRetryableHarnessGuard, detectExhaustedAWFInvocationBudget, buildSoftTimeoutGuard, emitSoftTimeoutSignal, isAuthenticationFailedError, parseAICreditsExceededProxyRejection } = require("./harness_retry_guard.cjs");
 const { MODEL_NOT_SUPPORTED_PATTERN: INVALID_MODEL_ERROR_PATTERN } = require("./detect_agent_errors.cjs");
 const { resolveRetryConfig } = require("./harness_retry_config.cjs");
+const { stopForPermissionDenied } = require("./harness_failure_handling.cjs");
+const { resolveHarnessPromptFileArgs } = require("./harness_prompt_input.cjs");
 const { applyModelFallback, injectModelFlagAfterExec, normalizeCodexModel, normalizeCodexModelArgs } = require("./model_fallback.cjs");
 const { resolveEngineModel } = require("./resolve_model_alias.cjs");
 const { applyCodexSubagentModels, isDetectionPhase } = require("./engine_subagent_models.cjs");
@@ -383,37 +385,7 @@ function isReconnectExhaustedError(output) {
  * @returns {string[]} Args with --prompt-file resolved to inline prompt content
  */
 function resolveCodexPromptFileArgs(args) {
-  /** @type {string[]} */
-  const filteredArgs = [];
-  /** @type {string|null} */
-  let promptContent = null;
-
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] !== "--prompt-file") {
-      filteredArgs.push(args[i]);
-      continue;
-    }
-
-    if (i + 1 >= args.length) {
-      log("warning: --prompt-file provided without a path; leaving arguments unchanged");
-      filteredArgs.push(args[i]);
-      continue;
-    }
-
-    const promptFile = args[i + 1];
-    try {
-      const stat = fs.statSync(promptFile);
-      log(`resolved --prompt-file: path=${promptFile} size=${stat.size}B`);
-      promptContent = fs.readFileSync(promptFile, "utf8");
-    } catch (error) {
-      const err = /** @type {Error} */ error;
-      // An unreadable prompt file means no task instructions can be delivered to Codex.
-      // Propagate as a fatal error rather than forwarding the harness-only flag to the
-      // codex subprocess (which would fail with an "unknown option" error).
-      throw new Error(`--prompt-file '${promptFile}' is not readable: ${err.message}`, { cause: err });
-    }
-    i++; // Skip the prompt-file path argument
-  }
+  const { args: filteredArgs, prompt: promptContent } = resolveHarnessPromptFileArgs(args, { logger: log, allowMissingPath: true });
 
   // Append the prompt content as the last positional argument (codex exec convention).
   if (promptContent !== null) {
@@ -1402,14 +1374,7 @@ async function main() {
       }
 
       if (hasNumerousPermissionDenied) {
-        if (safeOutputsPath && hasExpectedSafeOutputs(safeOutputsPath, { logger: log })) {
-          log(`attempt ${attempt + 1}: detected numerous permission-denied issues but safe-outputs already contain expected output — suppressing terminal verdict (false-red: core work succeeded)`);
-          return { action: "stop", exitCode: 0 };
-        }
-        const deniedCommands = extractDeniedCommands(result.output);
-        emitMissingToolPermissionIssue({ deniedCommands, permissionOutput: result.output, logger: log });
-        log(`attempt ${attempt + 1}: detected numerous permission-denied issues — not retrying (classified as missing tool/permission issue)`);
-        return { action: "stop" };
+        return stopForPermissionDenied({ attempt, output: result.output, safeOutputsPath, log, deniedCommands: extractDeniedCommands(result.output) });
       }
 
       if (isTokenPerMinuteRateLimit) {

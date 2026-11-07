@@ -604,14 +604,14 @@ jobs:
         path: gh-aw
         retention-days: 1
 
-    - name: Test update command (dry-run)
+    - name: Test upstream update command
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
         echo "Testing update command to ensure it runs successfully..."
-        # Run update with verbose flag to check for and apply workflow updates from source repositories
-        # The command may modify workflow files if upstream updates are available
-        ./gh-aw update --verbose
+        # Refresh the disposable CI checkout without merging downstream customizations.
+        # Merge behavior is covered by the update tests, not floating upstream changes.
+        ./gh-aw update --verbose --no-merge
         echo "✅ Update command executed successfully" >> $GITHUB_STEP_SUMMARY
 
   compile-cli-workflows:

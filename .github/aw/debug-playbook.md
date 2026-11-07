@@ -5,8 +5,8 @@ disable-model-invocation: true
 
 # Debug Playbook
 
-Fix first failing boundary; follow [debugging gates](debug-agentic-workflow.md).
-Do not dispatch workflows or execute artifacts. Keep secrets/prompts/configuration/reasoning private.
+Fix first failing boundary; [debugging gates](debug-agentic-workflow.md).
+Do not dispatch workflows or execute artifacts; keep secrets/prompts/config/reasoning private.
 
 ## Start here
 
@@ -24,21 +24,22 @@ Read completeness/`overview`/`key_findings`/`recommendations`/`errors`.
 Timeout: incomplete JSON report; fetch evidence.
 Read only the linked `playbook_url`/code row; [cluster fleets](analyzing-runs.md).
 Keep codes/severity; advisory/pending/skipped/policy-denied may be intentional.
-Unknown: [unmapped codes](#unmapped-codes).
+[Unmapped codes](#unmapped-codes).
 
 ## Audit findings
 
 | Codes | Check | Remedy |
 | --- | --- | --- |
-| `workflow_failed` | First step error. | Fix cause, not conclusion. |
-| `workflow_timeout` | Step/budget/result. | Remove blockers/narrow scope; justify timeout changes. |
+| `workflow_failed` | First error. | Fix cause, not conclusion. |
+| `workflow_timeout` | Step/budget/result. | Unblock/narrow scope; justify timeout changes. |
 | `multiple_errors` | Cause vs cascades. | Fix cause. |
-| `mcp_server_failures`, `tools_not_available`, `tool_error` | MCP setup/call failure. | Fix tool/server/config/auth; retain permission scope. |
+| `mcp_server_failures`, `tools_not_available` | MCP setup/availability. | Fix tool/server/config/auth; retain permission scope. |
+| `tool_error` | Call result. | Fix tool/config/auth; retain permission scope. |
 | `model_unavailable`, `model_endpoint_unsupported` | Full same-run inventory: absent model/incompatible endpoint. | [Model availability](#model-availability); verify candidate/API, edit pin, recompile. |
 | `model_availability_unknown` | Missing/incomplete/malformed/ambiguous/contradictory reflection. | Inspect discovery/auth; do not declare removal/switch models without evidence. |
 | `model_resolution_failed` | Failed `model.resolution`; missing same-role startup-stop evidence. | Advisory: verify pins; unproven cause. |
-| `subagent_model_not_observed` | Spawn, child usage, evidence coverage. | Missing observations != nonexecution. |
-| `subagent_model_unavailable` | Child model, request, provider policy/catalog. | Verify child separately; follow [model/engine guide](debug-model-engine-misconfiguration.md). |
+| `subagent_model_not_observed` | Spawn, child usage, evidence. | Missing observations != nonexecution. |
+| `subagent_model_unavailable` | Child model/request/provider policy/catalog. | Verify child separately; [model/engine guide](debug-model-engine-misconfiguration.md). |
 | `subagent_failed` | Child error; parent dispatch. | Fix child cause; parent success != child success. |
 | `blocked_network_requests` | Destination, caller, denial, necessity. | Fix URL/tool or authorize narrow destination; retain firewall. |
 | `threat_detection_job_failed`, `engine_step_failed` | Detector/evals step, first error, execution state. | Fix engine/proxy startup; failed/green job != clean verdict/evals. |

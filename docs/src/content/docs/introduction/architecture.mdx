@@ -209,7 +209,7 @@ Runner topology determines where the Docker daemon and workspace live. Agent run
 > [!IMPORTANT]
 > Cloud Hypervisor is incompatible with `runner.topology: arc-dind`. The compiler rejects incompatible runtime, topology, and AWF-version combinations and verifies the required GitHub-hosted Ubuntu x86_64 KVM environment before agent startup.
 
-ARC DinD preserves AWF's egress policy through Docker network topology rather than host `iptables`: the DinD daemon creates an internal network with no direct internet route and a dual-homed Squid proxy as the sole egress path. See [Self-Hosted Runners](/gh-aw/reference/self-hosted-runners/) and [How to run GitHub Copilot coding agent on ARC with Docker-in-Docker](/gh-aw/reference/arc-dind-copilot-agent/) for deployment details.
+ARC DinD preserves AWF's egress policy through Docker network topology rather than host `iptables`: the DinD daemon creates an internal network with no direct internet route and a dual-homed Squid proxy as the sole egress path. See [Self-Hosted Runners](/gh-aw/reference/self-hosted-runners/) and the [ARC/DinD walkthrough](/gh-aw/reference/arc-dind-copilot-agent/) for deployment details.
 
 ```mermaid
 flowchart TB

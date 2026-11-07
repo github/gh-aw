@@ -35,6 +35,9 @@ func FuzzValidateNoTemplateInjection(f *testing.F) {
     steps:
       - run: echo "Hello World"`)
 
+	f.Add("run: < input")
+	f.Add("run: printf data | < input")
+
 	f.Add(`jobs:
   test:
     steps:
