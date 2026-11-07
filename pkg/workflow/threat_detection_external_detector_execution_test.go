@@ -3,9 +3,107 @@
 package workflow
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/github/gh-aw/pkg/constants"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestNativeCustomCopilotCommandKeepsStandardExternalDetectorInstallation(t *testing.T) {
+	compiler := NewCompiler()
+	data := &WorkflowData{
+		AI: "copilot",
+		EngineConfig: &EngineConfig{
+			ID:      "copilot",
+			Command: "/opt/custom/copilot",
+		},
+		SafeOutputs: &SafeOutputsConfig{
+			ThreatDetection: &ThreatDetectionConfig{},
+		},
+	}
+	assert.False(t, isArcDindTopology(data))
+	for _, step := range NewCopilotEngine().GetInstallationSteps(data) {
+		assert.NotContains(t, strings.Join(step, "\n"), "install_copilot_cli.sh")
+	}
+	detection := buildExternalDetectorWorkflowData(data, "copilot")
+	assert.Empty(t, detection.EngineConfig.Command)
+	assert.Equal(t, "/opt/custom/copilot", data.EngineConfig.Command)
+	install := strings.Join(compiler.buildInstallDetectionEngineForExternalDetectorStep(data), "")
+	assert.Contains(t, install, "install_copilot_cli.sh")
+	assert.Contains(t, install, "--checksums-sha256 "+constants.DefaultCopilotChecksumsSHA256)
+	assert.Contains(t, install, "--prefer-toolcache")
+	assert.Contains(t, strings.Join(compiler.buildInstallThreatDetectStep(data), ""), "install_threat_detect_binary.sh")
+	execution := strings.Join(compiler.buildExternalDetectorExecutionStep(data), "")
+	assert.Contains(t, execution, `command -v copilot`)
+	assert.Contains(t, execution, `cp "$GH_AW_COPILOT_SRC" "$GH_AW_COPILOT_BIN"`)
+	assert.True(t, containsExternalDetectorCopilotPathPrefix(execution))
+	assert.NotContains(t, execution, "/opt/custom/copilot")
+}
+
+func TestNativeRootlessCopilotStagesVerifiedDetectorBeforeCopilot(t *testing.T) {
+	data := &WorkflowData{RunnerConfig: &RunnerConfig{Installation: "rootless"}}
+	setup := NewCompiler().buildExternalDetectorPathSetup(data, "copilot")
+
+	detectorCopy := strings.Index(setup.hostSetup, `cp "$detector" "${RUNNER_TEMP}/gh-aw/bin/threat-detect"`)
+	copilotSetup := strings.Index(setup.hostSetup, `GH_AW_COPILOT_SRC=`)
+	require.NotEqual(t, -1, detectorCopy)
+	require.NotEqual(t, -1, copilotSetup)
+	require.Less(t, detectorCopy, copilotSetup)
+}
+
+func TestNativeRootlessThreatDetectionUsesVerifiedBinary(t *testing.T) {
+	for _, state := range []string{"verified", "missing", "not executable", "symlink", "unset"} {
+		t.Run(state, func(t *testing.T) {
+			root := t.TempDir()
+			home := filepath.Join(root, "runner home")
+			bin := filepath.Join(home, ".local", "bin")
+			require.NoError(t, os.MkdirAll(bin, 0700))
+			verified := filepath.Join(bin, "threat-detect")
+			shadow := filepath.Join(root, "threat-detect")
+			require.NoError(t, os.WriteFile(shadow, []byte("#!/bin/bash\nexit 99\n"), 0700))
+			switch state {
+			case "verified":
+				require.NoError(t, os.WriteFile(verified, []byte("#!/bin/bash\nprintf verified\n"), 0700))
+			case "not executable":
+				require.NoError(t, os.WriteFile(verified, []byte("#!/bin/bash\nexit 99\n"), 0600))
+			case "symlink":
+				require.NoError(t, os.Symlink(shadow, verified))
+			case "unset":
+				verified = ""
+			}
+			// A stale destination symlink must not redirect the verified copy.
+			stagedBin := filepath.Join(root, "gh-aw", "bin")
+			require.NoError(t, os.MkdirAll(stagedBin, 0700))
+			require.NoError(t, os.Symlink(shadow, filepath.Join(stagedBin, "threat-detect")))
+			data := &WorkflowData{RunnerConfig: &RunnerConfig{Installation: "rootless"}}
+			setup := NewCompiler().buildExternalDetectorPathSetup(data, "claude")
+			cmd := exec.Command("bash", "-c", setup.hostSetup+setup.commandPrefix+buildThreatDetectCommand("true", "claude", &ThreatDetectionConfig{}, false))
+			cmd.Env = append(os.Environ(), "RUNNER_TEMP="+root, "HOME="+home,
+				"THREAT_DETECT_BINARY="+verified, "PATH="+root+":"+os.Getenv("PATH"))
+			out, err := cmd.CombinedOutput()
+			if state != "verified" {
+				require.ErrorContains(t, err, "exit status 1", "%s", out)
+				if state == "unset" {
+					require.Contains(t, string(out), "Verified detector path must be supplied by the install step")
+				} else {
+					require.Contains(t, string(out), "ERROR: Verified detector must be a regular executable file")
+				}
+				require.NotContains(t, string(out), "verified")
+				return
+			}
+			require.NoError(t, err, "%s", out)
+			require.Equal(t, "verified", string(out))
+			shadowContent, err := os.ReadFile(shadow)
+			require.NoError(t, err)
+			require.Equal(t, "#!/bin/bash\nexit 99\n", string(shadowContent))
+		})
+	}
+}
 
 func TestExternalDetectorExecutionStepIncludesThreatDetectionContext(t *testing.T) {
 	compiler := NewCompiler()
