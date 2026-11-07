@@ -511,14 +511,16 @@ describe("empty output outcome", () => {
     expect(outcome.failureCause).toBe("missing_terminal_safe_output");
   });
 
-  it("reports only the last tool status without identifiers, arguments, or successful results", () => {
+  it("reports the last agent action and tool status without identifiers, arguments, or results", () => {
     writeEvents([
       { type: "tool.execution_start", data: { toolCallId: "first", toolName: "bash", input: { command: "private-command" } } },
       { type: "tool.execution_start", data: { toolCallId: "last", toolName: "get_file_contents", mcpServerName: "github", arguments: { token: "private-token" } } },
       { type: "tool.execution_complete", data: { toolCallId: "last", success: true, result: "private-result" } },
+      { type: "assistant.message", data: { content: "private-response" } },
     ]);
     const outcome = buildEmptyOutputOutcome([], rootDir);
     expect(outcome.details).toContain("Last tool call status: succeeded");
+    expect(outcome.details).toContain("Last agent action: assistant response recorded");
     expect(outcome.details).not.toContain("get_file_contents");
     expect(outcome.details).not.toContain("private-");
   });

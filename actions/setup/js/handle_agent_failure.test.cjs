@@ -1688,7 +1688,7 @@ describe("handle_agent_failure", () => {
     it.each([
       ["crash", "TypeError: private-driver-payload\n", "process.exit(139)", 139, "driver_crash", "engine driver crashed"],
       ["outage", "CAPIError: 503 Service Unavailable\n", "process.exit(1)", 1, "engine_outage", "experienced an engine outage"],
-    ])("publishes exit details and final error summaries for a simulated driver %s", async (_kind, finalError, termination, exitCode, failureCause, titleSuffix) => {
+    ])("publishes driver exit and classified stderr diagnostics for a simulated %s", async (_kind, finalError, termination, exitCode, failureCause, titleSuffix) => {
       syncRuntimePromptTemplates(import.meta.url);
       const { runProcess } = require("./process_runner.cjs");
       const { buildEmptyOutputOutcome } = require("./empty_output_outcome.cjs");
@@ -1740,6 +1740,9 @@ describe("handle_agent_failure", () => {
         expect(body).toContain(`Driver exit code: ${exitCode}`);
         expect(body).toContain("Last engine error lines (summarized");
         expect(body).toContain("Provider server error (HTTP 5xx)");
+        expect(body).toContain(
+          failureCause === "driver_crash" ? "Last driver stderr summary: Driver execution failed (unhandled JavaScript exception)" : "Last driver stderr summary: Engine error: Provider server error (HTTP 5xx) (capi_server_error)"
+        );
         if (failureCause === "driver_crash") {
           expect(body).toContain("Driver exit signal (inferred from exit code): SIGSEGV");
           expect(body).toContain("Driver exit meaning: Terminated by SIGSEGV");
@@ -2297,7 +2300,7 @@ describe("handle_agent_failure", () => {
       }
     });
 
-    it.each([false, true, "disabled"])("reports declared reasons and runtime classification in the issue and conclusion (existing issue: %s)", async existingIssue => {
+    it.each([false, true, "disabled"])("deduplicates missing-output notices by workflow and reports the cause (existing issue: %s)", async existingIssue => {
       const template = "{report_incomplete_context}{missing_data_context}{missing_tool_context}{permission_denied_context}{engine_failure_context}";
       fs.writeFileSync(path.join(promptsDir, "agent_failure_issue.md"), template);
       fs.writeFileSync(path.join(promptsDir, "agent_failure_comment.md"), template);
@@ -2365,6 +2368,7 @@ describe("handle_agent_failure", () => {
         expect(body).not.toContain("engine_outage");
         expect(body).toContain("Driver exit code: 0");
         expect(body).toContain("Last tool call status: failed");
+        expect(body).toContain("Last agent action: tool call failed");
         expect(body).toContain("Last tool exit code: 2");
         expect(body).not.toContain("private-");
         expect(body).not.toContain("Driver exit code: 255");
