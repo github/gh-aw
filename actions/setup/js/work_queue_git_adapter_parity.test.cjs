@@ -39,6 +39,7 @@ const environmentKeys = [
 const globalKeys = ["core", "github", "exec", "context", "getOctokit"];
 const roots = [];
 let environment;
+let gitConfigEnvironment;
 let globals;
 let restoreAssetDescriptors;
 
@@ -97,6 +98,8 @@ const digest = value => crypto.createHash("sha256").update(value).digest("hex");
 
 beforeEach(() => {
   environment = Object.fromEntries(environmentKeys.map(key => [key, process.env[key]]));
+  // createHandlers injects safe.directory into process.env, not only child env.
+  gitConfigEnvironment = Object.fromEntries(Object.entries(process.env).filter(([key]) => key.startsWith("GIT_CONFIG_")));
   globals = Object.fromEntries(globalKeys.map(key => [key, Object.getOwnPropertyDescriptor(global, key)]));
   environmentKeys.forEach(key => delete process.env[key]);
   process.env.GITHUB_SHA = "a".repeat(40);
@@ -109,6 +112,10 @@ afterEach(() => {
   restoreAssetDescriptors?.();
   restoreAssetDescriptors = undefined;
   vi.unstubAllGlobals();
+  Object.keys(process.env)
+    .filter(key => key.startsWith("GIT_CONFIG_"))
+    .forEach(key => delete process.env[key]);
+  Object.assign(process.env, gitConfigEnvironment);
   for (const [key, value] of Object.entries(environment)) value === undefined ? delete process.env[key] : (process.env[key] = value);
   for (const [key, descriptor] of Object.entries(globals)) descriptor === undefined ? delete global[key] : Object.defineProperty(global, key, descriptor);
   roots.splice(0).forEach(root => fs.rmSync(root, { recursive: true, force: true }));
@@ -383,11 +390,25 @@ describe.each([1, 2])("native standalone adapters with %i original Claims", coun
       const sha = value => crypto.createHash("sha1").update(JSON.stringify(value)).digest("hex");
       const github = {
         rest: {
-          repos: { get: async () => ({ data: { id: 7, full_name: "owner/repo" } }) },
+          repos: {
+            get: async () => ({ data: { id: 7, full_name: "owner/repo" } }),
+            compareCommits: vi.fn(async ({ base, head }) => {
+              const pending = [head];
+              const seen = new Set();
+              while (pending.length) {
+                const commit = pending.pop();
+                if (commit === base) return { data: { base_commit: { sha: base }, merge_base_commit: { sha: base }, status: "ahead", ahead_by: 1, behind_by: 0 } };
+                if (seen.has(commit)) continue;
+                seen.add(commit);
+                pending.push(...(commits.get(commit)?.parents || []).map(parent => parent.sha));
+              }
+              return { data: { base_commit: { sha: base }, status: "diverged", ahead_by: 1, behind_by: 1 } };
+            }),
+          },
           git: {
             getRef: async input => {
               if (!refs.has(input.ref)) throw Object.assign(new Error("missing ref"), { status: 404 });
-              return { data: { object: { sha: refs.get(input.ref) } } };
+              return { data: { ref: `refs/${input.ref}`, object: { type: "commit", sha: refs.get(input.ref) } } };
             },
             createBlob: async input => {
               const id = sha(input);
@@ -396,7 +417,9 @@ describe.each([1, 2])("native standalone adapters with %i original Claims", coun
             },
             createTree: async input => {
               const id = sha(input);
-              trees.set(id, input.tree);
+              const entries = new Map((trees.get(input.base_tree) || []).map(entry => [entry.path, entry]));
+              input.tree.forEach(entry => entries.set(entry.path, entry));
+              trees.set(id, [...entries.values()]);
               return { data: { sha: id } };
             },
             createCommit: async input => {
@@ -442,13 +465,89 @@ describe.each([1, 2])("native standalone adapters with %i original Claims", coun
             expect(result.branch).toMatch(/^assets\/audit-claim-[a-f0-9]{64}$/);
             expect((await assets.verifyAssetDelivery({ claim: member, result, github, authorize: allow })).verified).toBe(true);
             expect((await assets.verifyAssetDelivery({ claim: member, result: structuredClone(result), github })).verified).toBe(false);
-            const receiptFromAnotherClaim = results.find(receipt => receipt.claimHandle !== member.handle);
-            if (receiptFromAnotherClaim) {
-              expect((await assets.verifyAssetDelivery({ claim: member, result: receiptFromAnotherClaim.result, github })).verified).toBe(false);
-            }
           }
         });
       }
+      for (const member of original.claims) {
+        await scope.withClaimExecution({ assignment: original, claim_handle: member.handle, authorize: allow, effects: [] }, async () => {
+          for (const { result } of results.filter(receipt => receipt.claimHandle === member.handle)) {
+            const proof = await assets.verifyAssetDelivery({ claim: member, result, github, authorize: allow });
+            expect(proof.verified).toBe(true);
+            expect(proof.effect_resources).toEqual([
+              { kind: "git_blob", repository: result.repo, id: trees.get(commits.get(result.commit).tree.sha).find(entry => entry.path === result.path).sha },
+              { kind: "git_tree", repository: result.repo, id: commits.get(result.commit).tree.sha },
+              { kind: "git_commit", repository: result.repo, id: result.commit },
+              { kind: "git_ref", repository: result.repo, id: result.commit },
+            ]);
+            expect((await assets.verifyAssetDelivery({ claim: member, result: structuredClone(result), github })).verified).toBe(false);
+            const differentClaim = original.claims.find(claim => claim.handle !== member.handle) || assignment(2).claims[1];
+            expect((await assets.verifyAssetDelivery({ claim: differentClaim, result, github })).verified).toBe(false);
+          }
+        });
+      }
+      const member = original.claims[0];
+      const result = results[0].result;
+      const ref = `heads/${result.branch}`;
+      const head = refs.get(ref);
+      const headTree = commits.get(head).tree.sha;
+      const headEntries = trees.get(headTree);
+      const asset = headEntries.find(entry => entry.path === result.path);
+      await scope.withClaimExecution({ assignment: original, claim_handle: member.handle, authorize: allow, effects: [] }, async () => {
+        for (const mutation of ["unrelated", "removed", "replaced", "moved", "mode"]) {
+          const tree = sha({ mutation, headTree });
+          const commit = sha({ mutation, head });
+          const entries = headEntries.filter(entry => entry.path !== result.path);
+          if (mutation === "unrelated") entries.push(asset);
+          if (mutation === "replaced") entries.push({ ...asset, sha: "b".repeat(40) });
+          if (mutation === "moved") entries.push({ ...asset, path: `moved/${asset.path}` });
+          if (mutation === "mode") entries.push({ ...asset, mode: "100755" });
+          trees.set(tree, entries);
+          commits.set(commit, { sha: commit, tree: { sha: tree }, parents: mutation === "unrelated" ? [] : [{ sha: head }] });
+          refs.set(ref, commit);
+          try {
+            expect((await assets.verifyAssetDelivery({ claim: member, result, github, authorize: allow })).verified, mutation).toBe(false);
+          } finally {
+            refs.set(ref, head);
+            commits.delete(commit);
+            trees.delete(tree);
+          }
+        }
+        const originalCompare = github.rest.repos.compareCommits;
+        for (const mismatch of [{ base_commit: { sha: "b".repeat(40) } }, { merge_base_commit: { sha: "b".repeat(40) } }, { status: "diverged" }, { ahead_by: 0 }, { ahead_by: 1.5 }, { behind_by: 1 }]) {
+          github.rest.repos.compareCommits = vi.fn(async () => ({ data: { base_commit: { sha: result.commit }, merge_base_commit: { sha: result.commit }, status: "ahead", ahead_by: 1, behind_by: 0, ...mismatch } }));
+          expect((await assets.verifyAssetDelivery({ claim: member, result, github, authorize: allow })).verified).toBe(false);
+        }
+        github.rest.repos.compareCommits = vi.fn(async () => {
+          throw new Error("comparison unavailable");
+        });
+        await expect(assets.verifyAssetDelivery({ claim: member, result, github, authorize: allow })).rejects.toThrow(/comparison unavailable/);
+        github.rest.repos.compareCommits = originalCompare;
+        const originalGetTree = github.rest.git.getTree;
+        for (const mismatch of [{ truncated: true }, { sha: "b".repeat(40) }]) {
+          github.rest.git.getTree = async input => {
+            const response = await originalGetTree(input);
+            return input.tree_sha === headTree ? { data: { ...response.data, ...mismatch } } : response;
+          };
+          expect((await assets.verifyAssetDelivery({ claim: member, result, github, authorize: allow })).verified).toBe(false);
+        }
+        github.rest.git.getTree = originalGetTree;
+        const originalGetRef = github.rest.git.getRef;
+        for (const receipt of [result, results[1].result]) {
+          for (const mismatch of [{ ref: "refs/heads/unrelated" }, { object: { type: "tree", sha: head } }, { object: { type: "commit", sha: "" } }, { object: null }]) {
+            github.rest.git.getRef = async input => ({ data: { ...(await originalGetRef(input)).data, ...mismatch } });
+            expect((await assets.verifyAssetDelivery({ claim: member, result: receipt, github, authorize: allow })).verified).toBe(false);
+          }
+        }
+        let refReads = 0;
+        github.rest.git.getRef = async input => {
+          const response = await originalGetRef(input);
+          return ++refReads === 2 ? { data: { ...response.data, object: { type: "commit", sha: legacyHead } } } : response;
+        };
+        expect((await assets.verifyAssetDelivery({ claim: member, result, github, authorize: allow })).verified).toBe(false);
+        github.rest.git.getRef = originalGetRef;
+        await expect(assets.verifyAssetDelivery({ claim: member, result, github, authorize: async request => ({ claim_handle: request.claim_handle, authorized: false }) })).rejects.toThrow(/Completion/);
+        expect((await assets.verifyAssetDelivery({ claim: member, result, github, authorize: allow })).verified).toBe(true);
+      });
       expect(refs.get("heads/assets/audit")).toBe(legacyHead);
       expect(git(["rev-parse", "refs/heads/assets/audit"])).toBe(legacyHead);
       const legacyRefCount = 1;
@@ -459,11 +558,22 @@ describe.each([1, 2])("native standalone adapters with %i original Claims", coun
       expect(new Set(results.map(({ result }) => result.branch)).size).toBe(count);
       expect(new Set(results.map(({ result }) => result.path)).size).toBe(count * 2);
     },
-    30000
+    60000
   );
 });
 
 describe("standalone adapter rejection before file or native effect access", () => {
+  it.each(["!!!", "", "   "])("rejects an empty normalized publisher branch %j before files or native endpoints", async branch => {
+    const access = vi.fn(() => {
+      throw new Error("invalid branch cannot access native endpoints");
+    });
+    const github = new Proxy({}, { get: access });
+    await scope.withClaimExecution({ assignment: assignment(), claim_handle: "h1", authorize: allow }, async () => {
+      await expect(assets.main({ branch, "assets-dir": "missing-assets", "target-repo": "owner/repo" }, github)).rejects.toThrow(/E001:.*non-empty normalized name/);
+    });
+    expect(access).not.toHaveBeenCalled();
+  });
+
   it.each(["symlink", "dangling", "hardlink"])("rejects %s Claim assets before native publication", async kind => {
     simulateLinuxAssetDescriptors();
     const root = directory();

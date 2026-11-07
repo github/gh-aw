@@ -434,15 +434,17 @@ function registerTests({ describe, it }) {
       const sha = createHash("sha256").update(content).digest("hex");
       const effects = [];
       const calls = [];
-      let ref, file;
+      let ref, refName, file;
       let incorrect = false;
+      let restoreAssetDescriptors;
       const source = {
         rest: {
           repos: { get: async () => ({ data: { id: 7, full_name: "owner/repo" } }) },
           git: {
-            getRef: async () => {
+            getRef: async args => {
               if (!ref) throw Object.assign(new Error("missing"), { status: 404 });
-              return { data: { object: { sha: ref } } };
+              assert.equal(`refs/${args.ref}`, refName);
+              return { data: { ref: refName, object: { type: "commit", sha: ref } } };
             },
             createBlob: async args => {
               calls.push("blob");
@@ -463,7 +465,8 @@ function registerTests({ describe, it }) {
               calls.push("ref");
               assert.match(args.ref, /^refs\/heads\/assets\/trusted-claim-[a-f0-9]{64}$/);
               ref = args.sha;
-              return { data: { object: { sha: ref } } };
+              refName = args.ref;
+              return { data: { ref: refName, object: { type: "commit", sha: ref } } };
             },
             getCommit: async () => ({ data: { sha: "commit-sha", tree: { sha: "tree-sha" }, parents: [] } }),
             getTree: async () => ({ data: { sha: "tree-sha", truncated: false, tree: [file] } }),
@@ -481,6 +484,40 @@ function registerTests({ describe, it }) {
         return { claim_handle: request.claim_handle, authorized: request.message.repo === undefined || request.message.repo === "owner/repo" };
       };
       try {
+        if (process.platform === "darwin") {
+          // Model descriptor-relative reads with real macOS I/O for this case only.
+          const processDescriptor = Object.getOwnPropertyDescriptor(global, "process");
+          if (!processDescriptor) throw new Error("Asset descriptor simulation requires the original global process descriptor");
+          const originals = { openSync: fs.openSync, lstatSync: fs.lstatSync, mkdirSync: fs.mkdirSync };
+          const pinned = new Map();
+          const resolve = filename => {
+            if (typeof filename !== "string") return filename;
+            const match = /^\/proc\/self\/fd\/(\d+)(?:\/(.*))?$/.exec(filename);
+            return match ? path.join(pinned.get(Number(match[1])), match[2] || "") : filename;
+          };
+          restoreAssetDescriptors = () => {
+            Object.assign(fs, originals);
+            Object.defineProperty(global, "process", processDescriptor);
+          };
+          fs.openSync = (filename, ...args) => {
+            const resolved = resolve(filename);
+            const fd = originals.openSync(resolved, ...args);
+            pinned.set(fd, resolved);
+            return fd;
+          };
+          fs.lstatSync = new Proxy(originals.lstatSync, {
+            apply: (target, thisArg, args) => Reflect.apply(target, thisArg, [resolve(args[0]), ...args.slice(1)]),
+          });
+          fs.mkdirSync = new Proxy(originals.mkdirSync, {
+            apply: (target, thisArg, args) => Reflect.apply(target, thisArg, [resolve(args[0]), ...args.slice(1)]),
+          });
+          Object.defineProperty(global, "process", {
+            configurable: true,
+            enumerable: processDescriptor.enumerable,
+            writable: true,
+            value: new Proxy(process, { get: (target, key) => (key === "platform" ? "linux" : Reflect.get(target, key)) }),
+          });
+        }
         const directory = claimArtifactPath(root, "h1", scoped);
         fs.mkdirSync(directory, { recursive: true });
         fs.writeFileSync(path.join(directory, createHash("sha256").update(sourcePath).digest("hex") + ".png"), content);
@@ -510,6 +547,7 @@ function registerTests({ describe, it }) {
           await assert.rejects(handler({ ...message, claim_handle: "h2" }), /cannot escape/);
         });
       } finally {
+        restoreAssetDescriptors?.();
         fs.rmSync(root, { recursive: true, force: true });
       }
     });

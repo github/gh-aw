@@ -25,19 +25,24 @@ const { readGuardedFile } = require("./symlink_guard.cjs");
 
 const receipts = new WeakMap();
 
+function isAssetBranchRef(data, branch) {
+  return data?.ref === `refs/heads/${branch}` && data.object?.type === "commit" && typeof data.object.sha === "string" && data.object.sha.trim() !== "";
+}
+
 /** @param {{ "target-repo"?: string, "assets-dir"?: string, "allowed-exts"?: string[], "max-size"?: number, max?: number, branch?: string, staged?: boolean }} [config] @param {import("./types/work-queue-native-client").ClaimNativeClient} [suppliedClient] */
 async function main(config = {}, suppliedClient) {
   const factoryClaim = currentClaimHandle();
   if (!factoryClaim) throw new Error(`${SAFE_OUTPUT_E001}: Queue asset adapter requires an immutable Claim factory`);
   const factoryIdentity = claimIdentity(factoryClaim);
+  const namespace = path.basename(claimArtifactPath("", factoryClaim));
+  const branch = normalizeBranchName(config.branch === undefined ? `assets/${process.env.GH_AW_WORKFLOW_ID || "work-queue"}` : config.branch, `claim-${namespace}`);
+  if (typeof branch !== "string" || branch.trim() === "") throw new Error(`${SAFE_OUTPUT_E001}: Queue asset branch must have a non-empty normalized name`);
   /** @type {import("./types/work-queue-native-client").ClaimNativeClient} */
   const selectedClient = suppliedClient || global.github;
   const client = wrapClaimEffectClient(selectedClient, { claim_handle: factoryClaim });
   const repository = config["target-repo"] || process.env.GITHUB_REPOSITORY || `${global.context.repo.owner}/${global.context.repo.repo}`;
   if (typeof repository !== "string" || !/^[A-Za-z0-9_-]+\/[A-Za-z0-9._-]+$/.test(repository)) throw new Error("Queue asset requires its trusted repository destination");
   const [owner, repo] = repository.split("/");
-  const namespace = path.basename(claimArtifactPath("", factoryClaim));
-  const branch = normalizeBranchName(config.branch || `assets/${process.env.GH_AW_WORKFLOW_ID || "work-queue"}`, `claim-${namespace}`);
   const allowed = config["allowed-exts"] || [".png", ".jpg", ".jpeg"];
   const maximum = Number(config["max-size"] || 10240) * 1024;
   const limit = Number(config.max || 10);
@@ -74,6 +79,7 @@ async function main(config = {}, suppliedClient) {
     let baseTree;
     try {
       const { data } = await getRef({ owner, repo, ref: `heads/${branch}` });
+      if (!isAssetBranchRef(data, branch)) throw new Error(`${SAFE_OUTPUT_E001}: Queue asset branch readback must match its trusted commit ref`);
       head = data.object.sha;
     } catch (error) {
       if (error.status !== 404) throw error;
@@ -107,14 +113,29 @@ async function verifyAssetDelivery(options) {
   if (!receiptMatchesClaim(receipt, claim)) return { verified: false };
   const [owner, repo] = receipt.repository.split("/");
   const ref = await github.rest.git.getRef({ owner, repo, ref: `heads/${receipt.branch}` });
-  if (ref.data.object.sha !== receipt.commit) return { verified: false };
+  if (!isAssetBranchRef(ref.data, receipt.branch)) return { verified: false };
+  const head = ref.data.object.sha;
+  // Later uploads may advance this Claim's branch before its outputs settle.
+  if (head !== receipt.commit) {
+    const { data } = await github.rest.repos.compareCommits({ owner, repo, base: receipt.commit, head });
+    if (data?.base_commit?.sha !== receipt.commit || data.merge_base_commit?.sha !== receipt.commit || data.status !== "ahead" || !Number.isSafeInteger(data.ahead_by) || data.ahead_by < 1 || data.behind_by !== 0) return { verified: false };
+  }
   const commit = await github.rest.git.getCommit({ owner, repo, commit_sha: receipt.commit });
   if (commit.data.sha !== receipt.commit || commit.data.tree.sha !== receipt.tree) return { verified: false };
   if (receipt.parent ? commit.data.parents?.length !== 1 || commit.data.parents[0].sha !== receipt.parent : commit.data.parents?.length !== 0) return { verified: false };
   const tree = await github.rest.git.getTree({ owner, repo, tree_sha: receipt.tree, recursive: "true" });
   if (tree.data.truncated || tree.data.sha !== receipt.tree || !tree.data.tree?.some(entry => entry.path === receipt.path && entry.type === "blob" && entry.mode === "100644" && entry.sha === receipt.blob)) return { verified: false };
+  if (head !== receipt.commit) {
+    const headCommit = await github.rest.git.getCommit({ owner, repo, commit_sha: head });
+    if (headCommit.data.sha !== head) return { verified: false };
+    const headTree = await github.rest.git.getTree({ owner, repo, tree_sha: headCommit.data.tree.sha, recursive: "true" });
+    if (headTree.data.truncated || headTree.data.sha !== headCommit.data.tree.sha || !headTree.data.tree?.some(entry => entry.path === receipt.path && entry.type === "blob" && entry.mode === "100644" && entry.sha === receipt.blob))
+      return { verified: false };
+  }
   const blob = await github.rest.git.getBlob({ owner, repo, file_sha: receipt.blob });
   if (blob.data.sha !== receipt.blob || blob.data.encoding !== "base64" || crypto.createHash("sha256").update(Buffer.from(blob.data.content, "base64")).digest("hex") !== receipt.sha256) return { verified: false };
+  const currentRef = await github.rest.git.getRef({ owner, repo, ref: `heads/${receipt.branch}` });
+  if (!isAssetBranchRef(currentRef.data, receipt.branch) || currentRef.data.object.sha !== head) return { verified: false };
   const proof = createClaimResourceVerification({
     verified: true,
     claim_handle: claim.handle,
@@ -126,7 +147,7 @@ async function verifyAssetDelivery(options) {
       { kind: "git_commit", repository: receipt.repository, id: receipt.commit },
       { kind: "git_ref", repository: receipt.repository, id: receipt.commit },
     ],
-    evidence: { source: "github_git_api", commit: receipt.commit, tree: receipt.tree, blob: receipt.blob, sha256: receipt.sha256 },
+    evidence: { source: "github_git_api", commit: receipt.commit, head, tree: receipt.tree, blob: receipt.blob, sha256: receipt.sha256 },
   });
   return withClaimResourceVerification(proof, () => proof, { authorize: options.authorize, context: options.context, github });
 }
