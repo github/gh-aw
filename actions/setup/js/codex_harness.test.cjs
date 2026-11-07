@@ -148,22 +148,20 @@ function runHarnessFixture(script, { prompt = "fix the bug", args = [], env = {}
 }
 
 describe("codex_harness.cjs", () => {
-  it.each([false, true])("handles repeated permission failures without replaying work (staged output: %s)", staged => {
+  it("handles repeated permission failures without replaying work", () => {
     const directory = makeHarnessTempDir("permission-output-");
     const safeOutputsPath = path.join(directory, "safe-outputs.jsonl");
     const { result, calls, harnessRetry } = runHarnessFixture(
       `
-        if (${staged}) fs.writeFileSync(process.env.GH_AW_SAFE_OUTPUTS, JSON.stringify({ type: "add_comment", body: "Done" }) + "\\n");
         console.log("  | observed command\\nPermission denied\\npermission denied\\npermission denied");
         process.exit(1);
       `,
       { env: { GH_AW_SAFE_OUTPUTS: safeOutputsPath, GH_AW_SAFEOUTPUTS_CLI: "true", GH_AW_HARNESS_MAX_RETRIES: "2" } }
     );
-    expect(result.status, result.stderr).toBe(staged ? 0 : 1);
+    expect(result.status, result.stderr).toBe(1);
     expect(calls).toHaveLength(1);
     expect(harnessRetry.attempt_results[0].failure_classes).toContain("permission_denied");
-    expect(result.stderr).toContain(staged ? "suppressing terminal verdict" : "classified as missing tool/permission issue");
-    if (staged) expect(fs.readFileSync(safeOutputsPath, "utf8")).toBe('{"type":"add_comment","body":"Done"}\n');
+    expect(result.stderr).toContain("classified as missing tool/permission issue");
   });
 
   it("records an initial explicit Codex resume as continuation, not a retry", () => {

@@ -1374,7 +1374,7 @@ async function main() {
       }
 
       if (hasNumerousPermissionDenied) {
-        return stopForPermissionDenied({ attempt, output: result.output, safeOutputsPath, log });
+        return stopForPermissionDenied({ attempt, output: result.output, safeOutputsPath, log, deniedCommands: extractDeniedCommands(result.output) });
       }
 
       if (isTokenPerMinuteRateLimit) {

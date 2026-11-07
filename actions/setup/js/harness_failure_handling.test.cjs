@@ -7,6 +7,7 @@ import path from "path";
 const require = createRequire(import.meta.url);
 const childProcess = require("child_process");
 const { stopForPermissionDenied } = require("./harness_failure_handling.cjs");
+const { extractDeniedCommands } = require("./permission_denied_helpers.cjs");
 
 let directory;
 let safeOutputsPath;
@@ -28,7 +29,7 @@ afterEach(() => {
   fs.rmSync(directory, { recursive: true, force: true });
 });
 
-function stop(output, deniedCommands) {
+function stop(output, deniedCommands = extractDeniedCommands(output)) {
   return stopForPermissionDenied({ attempt: 1, output, safeOutputsPath, log, deniedCommands });
 }
 
