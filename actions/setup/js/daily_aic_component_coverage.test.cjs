@@ -8,7 +8,7 @@ const require = createRequire(import.meta.url);
 const { getRunAIC } = require("./check_daily_aic_workflow_guardrail.cjs");
 const { sumAICFromUsageJSONLFiles } = require("./daily_aic_workflow_helpers.cjs");
 const { createAPIBudget } = require("./daily_aic_api_budget.cjs");
-const { loadBillableJobs } = require("./daily_aic_component_coverage.cjs");
+const { loadBillableJobs, sumCoveredComponents } = require("./daily_aic_component_coverage.cjs");
 const { captureExecutionEvidenceConfiguration, shouldSkipForNoopSafeOutputs } = require("./harness_retry_runner.cjs");
 const time = "2025-01-01T12:00:00Z";
 const later = "2025-01-01T12:30:00Z";
@@ -873,6 +873,71 @@ it.each([
 it("rejects a cancelled rerun when the carried-forward accounting is missing", async () => {
   const f = evaluate({}, [job("agent"), job("agent", { id: 10, run_attempt: 2, conclusion: "cancelled", started_at: later, completed_at: later })], { attempt: 2, runStarted: later, producerTime: time });
   await expect(f.result).rejects.toThrow("Missing accounting for executed agent");
+});
+
+// Boundary cases from specs/daily-aic/CancelledRerunAccounting.tla.
+it.each([
+  ["verified", [job("agent")]],
+  ["ambiguous", [job("agent"), job("Agent", { id: 11 })]],
+])("prefers a cancelled rerun's own verified producer over a %s earlier attempt", async (_prior, earlier) => {
+  const f = evaluate(
+    { "agent_usage.jsonl": '{"aic":2}' },
+    [...earlier, job("agent", { id: 10, run_attempt: 2, conclusion: "cancelled", runner_id: 123, runner_name: "runner", steps: [{ name: "Set up job" }], started_at: later, completed_at: later })],
+    { attempt: 2, runStarted: later, producerTime: later }
+  );
+  await expect(f.result).resolves.toBe(2);
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"jobId":10,"runAttempt":2,"conclusion":"cancelled","aic":2,"reason":"accounting_file"'));
+  expect(global.core.warning).not.toHaveBeenCalled();
+});
+
+it.each([
+  ["no producer artifact", []],
+  ["an expired producer bound to the earlier attempt", [{ id: 1, name: "agent", createdAt: new Date(time), expired: true }]],
+  ["an expired producer bound to the cancelled attempt", [{ id: 10, name: "agent", createdAt: new Date(later), expired: true }]],
+])("rejects a cancelled rerun with %s", async (_description, producers) => {
+  const f = evaluate({ "agent_usage.jsonl": '{"aic":2}' }, [job("agent"), job("agent", { id: 10, run_attempt: 2, conclusion: "cancelled", started_at: later, completed_at: later })], { attempt: 2, runStarted: later });
+  f.client.listArtifacts.mockResolvedValue({ artifacts: [{ id: 20, name: "usage", createdAt: new Date(later) }, ...producers] });
+  await expect(f.result).rejects.toThrow("Cannot verify the agent producer artifact");
+  expect(global.core.warning).not.toHaveBeenCalled();
+});
+
+it("rejects a cancelled rerun whose only earlier attempt was skipped", async () => {
+  const f = evaluate({ "agent_usage.jsonl": '{"aic":2}' }, [job("agent", { conclusion: "skipped" }), job("agent", { id: 10, run_attempt: 2, conclusion: "cancelled", started_at: later, completed_at: later })], {
+    attempt: 2,
+    runStarted: later,
+    producerTime: time,
+  });
+  await expect(f.result).rejects.toThrow("Cannot verify the agent producer artifact");
+  expect(global.core.warning).not.toHaveBeenCalled();
+});
+
+it.each(["success", "timed_out"])("does not carry forward verified earlier usage for a %s rerun without its own producer", async conclusion => {
+  const f = evaluate({ "agent_usage.jsonl": '{"aic":2}' }, [job("agent"), job("agent", { id: 10, run_attempt: 2, conclusion, started_at: later, completed_at: later })], {
+    attempt: 2,
+    runStarted: later,
+    producerTime: time,
+  });
+  await expect(f.result).rejects.toThrow("Cannot verify the agent producer artifact");
+  expect(global.core.warning).not.toHaveBeenCalled();
+});
+
+it.each([
+  ["cancelled", 2],
+  ["success", null],
+  ["failure", null],
+  ["timed_out", null],
+])("only carries forward supplied verified prior usage for a cancelled rerun (%s)", (conclusion, expected) => {
+  fs.writeFileSync(path.join(directory, "agent_usage.jsonl"), '{"aic":2}');
+  const rerun = job("agent", { id: 10, run_attempt: 2, conclusion, runner_id: 123, runner_name: "runner", steps: [{ name: "Set up job" }], started_at: later, completed_at: later });
+  const sum = () => sumCoveredComponents(directory, new Map([["agent", rerun]]), Date.parse(later), [{ id: 1, name: "agent", createdAt: new Date(time) }], "usage", 2, 1, null, new Map([["agent", [job("agent")]]]));
+  if (expected === null) {
+    expect(sum).toThrow("Cannot verify the agent producer artifact");
+    expect(global.core.warning).not.toHaveBeenCalled();
+  } else {
+    expect(sum()).toBe(expected);
+    expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("counting carried-forward usage from attempt 1"));
+    expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"jobId":1,"runAttempt":1,"conclusion":"success","aic":2,"reason":"accounting_file"'));
+  }
 });
 
 it("accepts an earlier usage artifact when only a nonbillable job was rerun", async () => {

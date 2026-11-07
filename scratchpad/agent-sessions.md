@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the plan to migrate from the old terminology "agent session" to the new terminology "agent session" throughout the GitHub Agentic Workflows codebase.
+This document outlines the plan to migrate from the old terminology "agent task" to the new terminology "agent session" throughout the GitHub Agentic Workflows codebase.
 
 **Status**: Planning Phase  
 **Target**: Complete terminology update to "agent session"  

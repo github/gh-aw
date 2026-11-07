@@ -22,14 +22,14 @@ GitHub Agentic Workflows uses an adaptive color system that provides readability
 
 **Dark Mode**:
 - Inspired by the [Dracula color theme](https://draculatheme.com/)
-- Bright, saturated colors optimized for dark backgrounds
+- Bright, saturated colors chosen for dark backgrounds
 - Maintains consistency with common dark terminal themes
 
 ### Automatic Adaptation
 
 The lipgloss library automatically detects the terminal's background and selects the appropriate color variant:
 - No configuration required by end users
-- Consistent experience across different terminal emulators
+- Same palette across terminal emulators; rendering depends on each emulator's color support
 - Fallback for terminals with limited color support
 
 ## Color Palette
@@ -244,9 +244,9 @@ When adding new styles to the system:
 
 ## Color Contrast and Accessibility
 
-The color palette is designed with accessibility in mind:
+The color palette targets WCAG AA contrast ratios:
 
-- **Light Mode**: All colors have been chosen to provide sufficient contrast (WCAG AA minimum) on light backgrounds
+- **Light Mode**: Colors are intended to meet the WCAG AA contrast minimum on light backgrounds
 - **Dark Mode**: Dracula theme colors are used for readability on dark backgrounds
 - **Fallback**: The system degrades in terminals with limited color support
 

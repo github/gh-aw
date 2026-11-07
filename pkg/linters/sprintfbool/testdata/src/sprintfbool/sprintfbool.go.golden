@@ -8,9 +8,9 @@ import (
 
 type myBool bool
 
-// bad demonstrates the flagged pattern: fmt.Sprintf with a single "%t" verb
+// badSprintfBool demonstrates the flagged pattern: fmt.Sprintf with a single "%t" verb
 // and a bool argument, which should be replaced by strconv.FormatBool.
-func bad(b bool) string {
+func badSprintfBool(b bool) string {
 	return strconv.FormatBool(b) // want `use strconv\.FormatBool\(b\) instead of fmt\.Sprintf\("%t", b\)`
 }
 
@@ -40,7 +40,7 @@ func goodOtherVerb(b bool) string {
 	return fmt.Sprintf("%v", b)
 }
 
-// suppressed suppresses the linter directive — no diagnostic expected.
-func suppressed(b bool) string {
+// suppressedSprintfBoolDiagnostic suppresses the linter directive — no diagnostic expected.
+func suppressedSprintfBoolDiagnostic(b bool) string {
 	return fmt.Sprintf("%t", b) //nolint:sprintfbool
 }

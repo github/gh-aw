@@ -6,9 +6,9 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
-// literalWord performs quote removal only, never parameter or command
+// LiteralWord performs quote removal only, never parameter or command
 // expansion. Unknown values are not guessed from assignments or environment.
-func literalWord(word *syntax.Word) (string, bool) {
+func LiteralWord(word *syntax.Word) (string, bool) {
 	if word == nil {
 		return "", false
 	}
