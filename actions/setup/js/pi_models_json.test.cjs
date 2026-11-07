@@ -704,6 +704,15 @@ describe("pi_models_json.cjs", () => {
       expect(records()).toEqual([{ engine: "pi", role: "main", configured_model: "copilot/opus", resolved_model: "claude-opus-5.5", provider: "copilot", status: "resolved", cause: null }]);
     });
 
+    it("escapes control characters in model resolution diagnostics", async () => {
+      configure("copilot/opus\n::add-mask::secret");
+      const { promise } = run([reflectFixtures.ddgReflect()]);
+      await promise.catch(() => {});
+      const output = stderrOutput.join("");
+      expect(output).not.toContain("\n::add-mask::secret");
+      expect(output).toContain("copilot/opus\\u000a::add-mask::secret");
+    });
+
     it("fails closed with model_unavailable for a retired exact id", async () => {
       configure("copilot/claude-opus-5");
       const { promise } = run([reflectFixtures.ddgReflect()]);

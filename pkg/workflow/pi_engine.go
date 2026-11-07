@@ -416,6 +416,10 @@ func piModelIsAlias(workflowData *WorkflowData) bool {
 	return ok
 }
 
+func piModelRequiresRuntimeResolution(workflowData *WorkflowData) bool {
+	return workflowData != nil && (piModelIsAlias(workflowData) || hasExpressionMarker(workflowData.Model))
+}
+
 // GetErrorDetectionScriptId returns the host-runner script that detects agent errors,
 // including an unavailable configured model reported by the shared model resolution step.
 func (e *PiEngine) GetErrorDetectionScriptId() string {
@@ -473,7 +477,7 @@ func (e *PiEngine) buildPiCommand(workflowData *WorkflowData, commandName string
 		if isModelRoutingEnabled(workflowData) {
 			routingEnv = `GH_AW_PI_MODEL="aw-gateway/$(cat /tmp/gh-aw/pi-routing-model)" GH_AW_PI_NATIVE_PROVIDER="aw-gateway" `
 			modelArg = ` --model "aw-gateway/$(cat /tmp/gh-aw/pi-routing-model)"`
-		} else if piModelsJSONSetup != "" && piModelIsAlias(workflowData) {
+		} else if piModelsJSONSetup != "" && piModelRequiresRuntimeResolution(workflowData) {
 			modelArg = ` --model "aw-gateway/$(cat ` + piResolvedModelFile + `)"`
 		} else if workflowData.Model != "" {
 			// Keep model expressions in env, never in the shell source.

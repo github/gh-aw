@@ -29,7 +29,7 @@ on:
     inputs:
       model:
         type: choice
-        options: [grok-4.7, gpt-6.1-sol, claude-opus-5.5]
+        options: [opus, grok-4.7, gpt-6.1-sol, claude-opus-5.5]
 permissions:
   contents: read
   copilot-requests: write
@@ -71,7 +71,8 @@ Report status.
 						require.NotContains(t, step.Env, "GH_AW_PI_MODEL_ID")
 						require.Equal(t, "github-copilot", step.Env["GH_AW_PI_NATIVE_PROVIDER"])
 						if firewall {
-							require.Contains(t, step.Run, `--model "aw-gateway/${GH_AW_PI_MODEL#*/}"`)
+							require.Contains(t, step.Run, `--model "aw-gateway/$(cat /tmp/gh-aw/pi-model)"`)
+							require.NotContains(t, step.Run, `--model "aw-gateway/${GH_AW_PI_MODEL#*/}"`)
 							require.Contains(t, step.Run, "GH_AW_LLM_PROVIDER=github")
 						} else {
 							require.Contains(t, step.Run, `--model "${GH_AW_PI_NATIVE_PROVIDER}/${GH_AW_PI_MODEL#*/}"`)
@@ -153,9 +154,8 @@ Report status.
 						require.NotContains(t, step.Run, expression, "Dispatch model must not be embedded in the shell command")
 						if tt.engine == "pi" {
 							require.NotContains(t, step.Env, "GH_AW_PI_MODEL_ID")
-							require.Contains(t, step.Run, `--model "aw-gateway/${GH_AW_PI_MODEL#*/}"`)
-							require.Contains(t, strings.ReplaceAll(step.Run, "${GH_AW_PI_MODEL#*/}", expression),
-								`--model "aw-gateway/`+expression+`"`)
+							require.Contains(t, step.Run, `--model "aw-gateway/$(cat /tmp/gh-aw/pi-model)"`)
+							require.NotContains(t, step.Run, `--model "aw-gateway/${GH_AW_PI_MODEL#*/}"`)
 						}
 					}
 				}

@@ -62,9 +62,14 @@ const PI_API_ROUTING_ENDPOINTS = Object.freeze(Object.fromEntries(Object.entries
 const PI_ROUTING_POLICY = getAWFModelRoutingPolicy("pi");
 const PI_ROUTING_ENDPOINTS = PI_ROUTING_POLICY.endpoints;
 const COPILOT_CLAUDE_SONNET_5_CONTEXT_WINDOW = 1000000;
+const CONTROL_CHARACTERS_RE = /[\u0000-\u001f\u007f-\u009f]/g;
 
 // prettier-ignore
 const DEFAULT_LOGGER = /** @type {(msg: string) => void} */ (msg => process.stderr.write(`[gh-aw/pi-models-json] ${new Date().toISOString()} ${msg}\n`));
+
+function escapeControlCharacters(value) {
+  return String(value).replace(CONTROL_CHARACTERS_RE, character => `\\u${character.charCodeAt(0).toString(16).padStart(4, "0")}`);
+}
 
 /**
  * Resolve the models.json gateway base URL for the given provider, preferring
@@ -370,7 +375,8 @@ function resolveAndRecordPiModelRoutingEndpoint({ reflectData, modelId, api, sel
 
 /** @param {{ loadSDK?: typeof loadPiSDK, loadModelsJson?: typeof loadModelsJson, fetchReflect?: typeof fetchAWFReflect, logger?: (message: string) => void }} [options] */
 async function main(options = {}) {
-  const logger = options.logger || DEFAULT_LOGGER;
+  const outputLogger = options.logger || DEFAULT_LOGGER;
+  const logger = message => outputLogger(escapeControlCharacters(message));
   const configuredModel = process.env.GH_AW_PI_MODEL || "";
   const modelSlash = configuredModel.indexOf("/");
   let modelId = process.env.GH_AW_PI_MODEL_ID || (modelSlash >= 0 ? configuredModel.slice(modelSlash + 1) : configuredModel);
@@ -578,7 +584,7 @@ async function main(options = {}) {
 
 if (require.main === module) {
   main().catch(error => {
-    process.stderr.write(`[gh-aw/pi-models-json] fatal: ${getErrorMessage(error)}\n`);
+    process.stderr.write(`[gh-aw/pi-models-json] fatal: ${escapeControlCharacters(getErrorMessage(error))}\n`);
     process.exitCode = 1;
   });
 }
