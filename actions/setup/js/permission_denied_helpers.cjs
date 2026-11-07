@@ -70,16 +70,29 @@ function extractDeniedCommands(output) {
 }
 
 /**
+ * Detect explicit workflow tool-permission denial summaries.
+ * @param {string | undefined} output
+ * @returns {boolean}
+ */
+function hasWorkflowToolPermissionDenial(output) {
+  return typeof output === "string" && /\bpermission denied by workflow tool permissions\s*:/i.test(output);
+}
+
+/**
  * Build a structured report_missing_tool payload for repeated permission-denied failures.
  * @param {string[]} [deniedCommands] - Commands that were denied (may be empty)
+ * @param {string} [permissionOutput] - Original output containing permission-denial summaries
  * @returns {string}
  */
-function buildMissingToolPermissionIssuePayload(deniedCommands) {
+function buildMissingToolPermissionIssuePayload(deniedCommands, permissionOutput) {
+  const workflowToolDenial = hasWorkflowToolPermissionDenial(permissionOutput);
   return JSON.stringify({
     type: "report_missing_tool",
     tool: "tool/permission",
     reason: "missing tool/permission issue: numerous permission denied errors detected",
-    alternatives: "Verify token scopes, repository permissions, and MCP/tool access configuration.",
+    alternatives: workflowToolDenial
+      ? "Use only commands allowed by the workflow tools configuration; stop unsupported probes before the denial budget is exhausted. A workflow tool denial does not establish missing token scopes or invalid credentials."
+      : "Verify token scopes, repository permissions, and MCP/tool access configuration.",
     denied_commands: deniedCommands && deniedCommands.length > 0 ? deniedCommands : [],
   });
 }
@@ -88,5 +101,6 @@ module.exports = {
   countPermissionDeniedIssues,
   hasNumerousPermissionDeniedIssues,
   extractDeniedCommands,
+  hasWorkflowToolPermissionDenial,
   buildMissingToolPermissionIssuePayload,
 };

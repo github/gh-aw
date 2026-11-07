@@ -14,9 +14,9 @@ a substitute for TLC's model checking.
 
 Workflows that run TLC in the agent sandbox should import
 `shared/tla-plus.md` in their frontmatter. It installs checksum-pinned Temurin
-JRE 21 and TLC 1.8.0 before the workflow's own setup steps. Use `JAVA_BIN` and
-`TLA2TOOLS_JAR` rather than relying on a runner-installed Java or downloading
-additional tools. The shared setup supports Linux x64 runners.
+JRE 21 and TLA+ Tools v1.7.4 (TLC 2.19) before the workflow's own setup steps.
+Use `JAVA_BIN` and `TLA2TOOLS_JAR` rather than relying on a runner-installed Java
+or downloading additional tools. The shared setup supports Linux x64 runners.
 
 The import does not grant shell tools, network access, or safe outputs; the
 consuming workflow must declare those according to its task. Keep any
@@ -24,8 +24,62 @@ model-specific verifier build or evidence collection in the consuming workflow.
 
 Custom verification jobs do not inherit the agent's setup steps. Preserve their
 explicit runtime and TLC version pins, including the work-queue checks using
-TLC 1.7.4; importing agent tooling is not a migration of those jobs. Change a
+TLA+ Tools v1.7.4; importing agent tooling is not a migration of those jobs. Change a
 tool version only with updated checksums and revalidated model results.
+
+### Install the verified TLA+ runtime
+
+Both paths use the repository-owned `.github/scripts/install_tla_runtime.sh`,
+which contains the reviewed TLA+ and JRE SHA-256 pins and reuses
+`actions/setup/sh/release_integrity.sh` for digest verification. The installer
+and its tests are not part of the distributed setup action. The workflow setup
+copies both files into an isolated temporary directory and verifies their bytes
+against SHA-256 pins in the trusted workflow before executing either file. A
+different checkout therefore fails closed, even if it supplies different pins.
+Preserve the repository layout so the installer can resolve the integrity helper.
+
+From an independently trusted, verified checkout on Linux x64, install the complete runtime into a fresh directory:
+
+```bash
+bash "$GITHUB_WORKSPACE/.github/scripts/install_tla_runtime.sh" "$RUNNER_TEMP/tla-tools"
+export JAVA_BIN="$RUNNER_TEMP/tla-tools/jre/bin/java"
+export TLA2TOOLS_JAR="$RUNNER_TEMP/tla-tools/tla2tools.jar"
+```
+
+For a custom job with Java 21 already installed, append `--jar-only` to the
+installer command and set `JAVA_BIN` to that Java executable. This mode installs
+the same verified JAR without downloading the Linux x64 JRE. It does not install
+or validate the separately supplied Java runtime. To share paths across Actions
+steps, write them to `$GITHUB_ENV`; `export` applies only to the current shell.
+
+The destination must not exist. Do not reuse a failed or cached installation.
+Downloads are staged, verified before extraction or execution, and published
+only after successful setup; failures remove staging files and fail the step.
+On download, checksum, extraction, or startup failure, stop verification and
+report a tooling/setup failure, not a model verdict. Never bypass verification,
+run a partial runtime, delete an unrelated directory to retry, or substitute an
+unreviewed JAR. A retry must retain the reviewed pins and use a fresh destination.
+
+### Review runtime updates
+
+Do not pin the apparent `v1.8.0` release: it is a rolling build.
+[Upstream publishing code](https://github.com/tlaplus/tlaplus/blob/c058b21a5013c31281312d3f029bcbb5c98e3748/.github/workflows/main.yml)
+deletes/replaces its assets and force-moves its tag. This caused checksum failures
+on November 6, 2026; refreshing its digest would not provide a stable installation.
+The v1.7.4 SHA-256 matches the pre-existing work-queue pin and the publisher's
+[release notes](https://github.com/tlaplus/tlaplus/releases/tag/v1.7.4) SHA-1
+`bee4a54f3ee3d4afc347c3240ec2d9e93b075104` for asset `184694200`.
+SHA-1 is historical provenance evidence, not the installation integrity check.
+The JRE SHA-256 matches GitHub's publisher asset digest for asset `521122088`.
+GitHub reports these releases as non-immutable, so replacement must still fail
+closed rather than automatically accepting a new checksum.
+
+For updates, independently verify publisher release/asset identity and digest,
+update the pins and literal URLs in `.github/scripts/install_tla_runtime.sh`
+together, update the installer and helper hashes in both workflow setup steps,
+run `bash .github/scripts/install_tla_runtime_test.sh`, revalidate bounded models,
+and recompile every consumer. Never derive a trusted pin solely from downloaded
+bytes or a checksum fetched beside them; do not change prior verification results.
 
 For Koka, use the repository's existing setup and verification commands when
 available. Otherwise, declare a version-pinned compiler setup in the consuming

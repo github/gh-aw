@@ -6,34 +6,26 @@ steps:
   - name: Prepare pinned TLA+ runtime
     shell: bash
     run: |
-      # runner-guard:ignore RGS-018
       set -euo pipefail
-      tools=/tmp/gh-aw/agent/tla-tools
-      mkdir -p "$tools/jre"
-      curl --fail --location --silent --show-error \
-        --retry 2 --connect-timeout 10 --max-time 120 \
-        --output "$tools/jre.tar.gz" \
-        'https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jre_x64_linux_hotspot_21.0.12.1_1.tar.gz'
+      trusted=$(mktemp -d "$RUNNER_TEMP/tla-installer.XXXXXX")
+      trap 'rm -rf "$trusted"' EXIT
+      mkdir -p "$trusted/.github/scripts" "$trusted/actions/setup/sh"
+      cp "$GITHUB_WORKSPACE/.github/scripts/install_tla_runtime.sh" "$trusted/.github/scripts/"
+      cp "$GITHUB_WORKSPACE/actions/setup/sh/release_integrity.sh" "$trusted/actions/setup/sh/"
       printf '%s  %s\n' \
-        2413149700df0f7d440500a84a8f764c535f21e5a5e87d38328b64eec2c5b500 \
-        "$tools/jre.tar.gz" | sha256sum --check --strict
-      tar -xzf "$tools/jre.tar.gz" --strip-components=1 -C "$tools/jre"
-      curl --fail --location --silent --show-error \
-        --retry 2 --connect-timeout 10 --max-time 120 \
-        --output "$tools/tla2tools.jar" \
-        'https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar'
-      printf '%s  %s\n' \
-        011267fca25d0752cf18894dd585cd28b96960c112ea8a20b823ea770e7e10cd \
-        "$tools/tla2tools.jar" | sha256sum --check --strict
-      "$tools/jre/bin/java" -version
+        15317bc27032f3c8160cb47fb77084683e21e3c37680db90b9bb2e57adea16e2 "$trusted/.github/scripts/install_tla_runtime.sh" \
+        31ef8b9a9bd4dc4d84db08d21a677c838f1c2d55d43fb834c3fbcf1f47b6ba4d "$trusted/actions/setup/sh/release_integrity.sh" | sha256sum --check --strict
+      bash "$trusted/.github/scripts/install_tla_runtime.sh" /tmp/gh-aw/agent/tla-tools
 ---
 
 <!--
 Import shared/tla-plus.md to install checksum-verified Temurin JRE 21 and
-TLC 1.8.0 before the agent runs on a Linux x64 runner. The portable runtime
+TLA+ Tools v1.7.4 (TLC 2.19) before the agent runs on a Linux x64 runner. The portable runtime
 and jar live under /tmp/gh-aw/agent so they are accessible in the sandbox.
 This fragment does not grant tools, network access, or safe outputs.
 Custom jobs do not inherit these agent setup steps.
+The installer and helper are copied from the checkout and verified against reviewed
+workflow-owned hashes before execution, not trusted merely because they are in the checkout.
 -->
 
 {{#import .github/aw/formal-methods.md}}

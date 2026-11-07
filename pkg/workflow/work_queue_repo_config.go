@@ -10,9 +10,12 @@ import (
 	"slices"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/workqueue"
 )
+
+var workQueueRepoConfigLog = logger.New("workflow:work_queue_repo_config")
 
 func (c *Compiler) applyRepositoryWorkQueueOptions(data *WorkflowData) error {
 	if !isWorkQueueEnabled(data) || data.workQueueRepoIssuesConfigured {
@@ -38,6 +41,7 @@ func (c *Compiler) applyRepositoryWorkQueueOptions(data *WorkflowData) error {
 	}
 	issues, configured := fields["issues"]
 	if !configured {
+		workQueueRepoConfigLog.Printf("%s work_queue has no issues section; keeping workflow-level settings", RepoConfigFileName)
 		c.warnLegacyWorkQueueIssues(data)
 		return nil
 	}
@@ -56,6 +60,7 @@ func (c *Compiler) applyRepositoryWorkQueueOptions(data *WorkflowData) error {
 	if err := json.Unmarshal(issues, &value); err != nil {
 		return fmt.Errorf("%s work_queue.issues: %w", RepoConfigFileName, err)
 	}
+	workQueueRepoConfigLog.Printf("Applying work_queue.issues from %s to tools.work-queue", RepoConfigFileName)
 	tool["issues"] = value
 	data.Tools["work-queue"] = tool
 	data.workQueueRepoIssuesConfigured = true
@@ -84,7 +89,9 @@ func (c *Compiler) configureAWWorkQueue(data *WorkflowData, markdownPath string)
 	if err != nil {
 		return fmt.Errorf("work-queue: cannot resolve scheduling from %s: %w", RepoConfigFileName, err)
 	}
+	workQueueRepoConfigLog.Printf("Configuring AW work queue: path=%s", markdownPath)
 	if hasWorkQueuePolicyProposal(data) {
+		workQueueRepoConfigLog.Print("Legacy work-queue-policy proposal present; skipping aw.json scheduling")
 		if len(config.WorkQueue) > 0 {
 			return fmt.Errorf("work-queue-policy conflicts with %s work_queue; move scheduling to work_queue and keep worker targets in safe-outputs.dispatch-workflow.workflows", RepoConfigFileName)
 		}
@@ -176,6 +183,7 @@ func approvedAWQueueProfiles(markdownPath string, worker bool, cache *parser.Imp
 			profiles[name] = template
 		}
 	}
+	workQueueRepoConfigLog.Printf("Discovered %d AW worker profile(s) from %d markdown file(s)", len(profiles), len(paths))
 	if len(profiles) == 0 {
 		return nil, errors.New("work-queue: declare at least one AW worker with tools.work-queue.worker: true and approve it in safe-outputs.dispatch-workflow.workflows")
 	}

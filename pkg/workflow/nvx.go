@@ -8,8 +8,11 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 )
+
+var nvxLog = logger.New("workflow:nvx")
 
 const (
 	defaultNVXSignerWorkflow = "github/gh-aw-firewall/.github/workflows/release.yml"
@@ -53,6 +56,7 @@ func validateNVXRuntimeConfig(workflowData *WorkflowData, agentConfig *AgentSand
 		return nil
 	}
 
+	nvxLog.Print("Validating NVX runtime configuration")
 	nvx := effectiveNVXConfig(agentConfig.NVX)
 	if err := validateNVXPathInputs(nvx); err != nil {
 		return err
@@ -110,6 +114,7 @@ func validateNVXResourceOptions(nvx *AgentNVXConfig) error {
 	if memoryMaxBytes == 0 {
 		memoryMaxBytes = constants.DefaultNVXMemoryMaxBytes
 	}
+	nvxLog.Printf("NVX resource limits: memory_mib=%d, memory_max_bytes=%d, pids_max=%d, mount_policy=%q", memoryMiB, memoryMaxBytes, nvx.PidsMax, nvx.MountPolicy)
 	if memoryMaxBytes < int64(memoryMiB)*1024*1024 {
 		return nvxValidationError("sandbox.agent.nvx.memory-max-bytes", strconv.FormatInt(memoryMaxBytes, 10), "NVX cgroup memory ceiling must be at least memory-mib × 1048576", "Increase memory-max-bytes or reduce memory-mib.")
 	}
@@ -288,8 +293,10 @@ func generateNVXRuntimeSetupSteps(workflowData *WorkflowData) []GitHubActionStep
 	}
 	agentConfig := getAgentConfig(workflowData)
 	if agentConfig == nil {
+		nvxLog.Print("NVX runtime selected but no agent sandbox config; skipping setup steps")
 		return nil
 	}
+	nvxLog.Print("Generating NVX runtime setup step")
 	return []GitHubActionStep{generateNVXSetupStep(agentConfig.NVX, getAWFVersionForSetup(workflowData))}
 }
 

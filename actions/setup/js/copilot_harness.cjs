@@ -2418,7 +2418,7 @@ async function main() {
               return { action: "stop", exitCode: 0 };
             }
             const deniedCommands = extractDeniedCommands(result.output);
-            emitMissingToolPermissionIssue({ deniedCommands, logger: log });
+            emitMissingToolPermissionIssue({ deniedCommands, permissionOutput: result.output, logger: log });
             log(`attempt ${attempt + 1}: detected numerous permission-denied issues — not retrying (classified as missing tool/permission issue)`);
             return { action: "stop" };
           }

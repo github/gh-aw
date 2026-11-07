@@ -13,6 +13,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/github/gh-aw/pkg/linters/internal/analyzerutil"
+	"github.com/github/gh-aw/pkg/linters/internal/astutil"
 	"github.com/github/gh-aw/pkg/linters/internal/filecheck"
 	"github.com/github/gh-aw/pkg/linters/internal/nolint"
 	"github.com/github/gh-aw/pkg/logger"
@@ -142,7 +143,7 @@ func inspectNode(pass *analysis.Pass, respVars map[types.Object]map[token.Pos]*r
 		trackHTTPAssignment(pass, respVars, reported, assign, noLintIndex)
 		// Also check RHS for manual Body.Close() in assignments like: err := resp.Body.Close()
 		for _, rhs := range assign.Rhs {
-			if call, ok := rhs.(*ast.CallExpr); ok {
+			if call, ok := astutil.UnwrapParenExpr(rhs).(*ast.CallExpr); ok {
 				markBodyClose(pass, respVars, call)
 			}
 		}
@@ -157,7 +158,7 @@ func inspectNode(pass *analysis.Pass, respVars map[types.Object]map[token.Pos]*r
 	}
 
 	if exprStmt, ok := node.(*ast.ExprStmt); ok {
-		if call, ok := exprStmt.X.(*ast.CallExpr); ok {
+		if call, ok := astutil.UnwrapParenExpr(exprStmt.X).(*ast.CallExpr); ok {
 			markBodyClose(pass, respVars, call)
 		}
 	}
@@ -257,16 +258,18 @@ func isHTTPResponsePtr(t types.Type) bool {
 
 // bodyCloseReceiver returns the types.Object for the *http.Response receiver
 // of a resp.Body.Close() call, or nil if the call is not of that form.
+// Redundant parentheses such as (resp.Body.Close)() or (resp.Body).Close()
+// are ignored so they are matched like the unparenthesized call.
 func bodyCloseReceiver(pass *analysis.Pass, call *ast.CallExpr) types.Object {
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok || sel.Sel.Name != "Close" {
 		return nil
 	}
-	bodySel, ok := sel.X.(*ast.SelectorExpr)
+	bodySel, ok := astutil.UnwrapParenExpr(sel.X).(*ast.SelectorExpr)
 	if !ok || bodySel.Sel.Name != "Body" {
 		return nil
 	}
-	ident, ok := bodySel.X.(*ast.Ident)
+	ident, ok := astutil.UnwrapParenExpr(bodySel.X).(*ast.Ident)
 	if !ok {
 		return nil
 	}

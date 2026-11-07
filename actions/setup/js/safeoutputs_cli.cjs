@@ -18,6 +18,7 @@ const fs = require("fs");
 const { ERR_VALIDATION, ERR_SYSTEM } = require("./error_codes.cjs");
 const { getSetupTimeoutMs } = require("./child_process_timeouts.cjs");
 const { iterateJsonl } = require("./jsonl_helpers.cjs");
+const { buildMissingToolPermissionIssuePayload } = require("./permission_denied_helpers.cjs");
 
 const SAFEOUTPUTS_CLI_TIMEOUT_MS = getSetupTimeoutMs("safeoutputsCli");
 
@@ -100,7 +101,8 @@ function buildMissingToolAlternatives(baseAlternatives, deniedCommands) {
  *   safeOutputsPath?: string,
  *   runSafeOutputsCLI?: RunSafeOutputsCLILike,
  *   logger?: (message: string) => void,
- *   deniedCommands?: string[]
+ *   deniedCommands?: string[],
+ *   permissionOutput?: string
  * }=} options
  */
 function emitMissingToolPermissionIssue(options) {
@@ -108,16 +110,18 @@ function emitMissingToolPermissionIssue(options) {
   const runSafeOutputs = options && options.runSafeOutputsCLI ? options.runSafeOutputsCLI : runSafeOutputsCLI;
   const logger = options && options.logger ? options.logger : defaultLog;
   const deniedCommands = options && options.deniedCommands ? options.deniedCommands : [];
+  const permissionOutput = options && typeof options.permissionOutput === "string" ? options.permissionOutput : "";
 
   if (!safeOutputsPath) {
     logger("report_missing_tool skipped: GH_AW_SAFE_OUTPUTS is not set");
     return;
   }
   try {
+    const payload = JSON.parse(buildMissingToolPermissionIssuePayload(deniedCommands, permissionOutput));
     runSafeOutputs("report_missing_tool", {
-      tool: "tool/permission",
-      reason: "missing tool/permission issue: numerous permission denied errors detected",
-      alternatives: buildMissingToolAlternatives("Verify token scopes, repository permissions, and MCP/tool access configuration.", deniedCommands),
+      tool: payload.tool,
+      reason: payload.reason,
+      alternatives: buildMissingToolAlternatives(payload.alternatives, deniedCommands),
     });
     logger(`report_missing_tool emitted via safeoutputs CLI: ${safeOutputsPath}`);
   } catch (error) {

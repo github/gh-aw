@@ -3,7 +3,10 @@
 package workflow
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -63,11 +66,18 @@ func TestSmokeAndCoverageFailureContracts(t *testing.T) {
 		{
 			name: "shared/tla-plus",
 			required: []string{
-				"https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar",
-				"011267fca25d0752cf18894dd585cd28b96960c112ea8a20b823ea770e7e10cd",
-				`"$tools/tla2tools.jar" | sha256sum --check --strict`,
+				`bash "$trusted/.github/scripts/install_tla_runtime.sh" /tmp/gh-aw/agent/tla-tools`,
+				"TLC 2.19",
 			},
-			rejected: []string{"d15655eeaff4b3f7b3d65c46b838bc0f35d131b2ef4b1e473689b62c98d4726f"},
+			rejected: []string{"releases/download/v1.8.0", "curl", "011267fca25d0752cf18894dd585cd28b96960c112ea8a20b823ea770e7e10cd"},
+		},
+		{
+			name: "daily-work-queue-formal-verification",
+			required: []string{
+				`bash "$trusted/.github/scripts/install_tla_runtime.sh" "$RUNNER_TEMP/tla-tools" --jar-only`,
+				`printf 'TLA2TOOLS_JAR=%s/tla-tools/tla2tools.jar\n'`,
+			},
+			rejected: []string{"curl", "releases/download/"},
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -79,6 +89,107 @@ func TestSmokeAndCoverageFailureContracts(t *testing.T) {
 			for _, rejected := range test.rejected {
 				assert.NotContains(t, string(content), rejected)
 			}
+		})
+	}
+}
+
+func TestTLARuntimeRejectsTamperedCheckout(t *testing.T) {
+	if _, err := exec.LookPath("sha256sum"); err != nil {
+		t.Skip("sha256sum is required by the Linux workflow")
+	}
+	for _, workflow := range []struct {
+		path string
+		step string
+	}{
+		{"shared/tla-plus.md", "Prepare pinned TLA+ runtime"},
+		{"daily-work-queue-formal-verification.md", "Download pinned TLC"},
+	} {
+		content, err := os.ReadFile(filepath.Join(workflowsDir, workflow.path))
+		require.NoError(t, err)
+		section := strings.SplitN(string(content), "name: "+workflow.step, 2)
+		require.Len(t, section, 2)
+		section = strings.SplitN(section[1], "run: |\n", 2)
+		require.Len(t, section, 2)
+		var script strings.Builder
+		for line := range strings.SplitSeq(section[1], "\n") {
+			if strings.TrimSpace(line) == "---" || strings.HasPrefix(strings.TrimSpace(line), "- name:") {
+				break
+			}
+			script.WriteString(strings.TrimSpace(line) + "\n")
+		}
+		for _, tampered := range []string{".github/scripts/install_tla_runtime.sh", "actions/setup/sh/release_integrity.sh"} {
+			t.Run(workflow.path+"/"+tampered, func(t *testing.T) {
+				root := t.TempDir()
+				workspace := filepath.Join(root, "workspace")
+				for _, path := range []string{".github/scripts/install_tla_runtime.sh", "actions/setup/sh/release_integrity.sh"} {
+					data, err := os.ReadFile(filepath.Join("../..", path))
+					require.NoError(t, err)
+					if path == tampered {
+						data = []byte("touch \"$RUNNER_TEMP/executed\"\n")
+					}
+					dest := filepath.Join(workspace, path)
+					require.NoError(t, os.MkdirAll(filepath.Dir(dest), 0o755))
+					require.NoError(t, os.WriteFile(dest, data, 0o644))
+				}
+				bin := filepath.Join(root, "bin")
+				require.NoError(t, os.Mkdir(bin, 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(bin, "curl"), []byte("#!/bin/sh\ntouch \"$RUNNER_TEMP/executed\"\nexit 1\n"), 0o755))
+				cmd := exec.Command("bash", "-c", script.String())
+				cmd.Env = append(os.Environ(), "GITHUB_WORKSPACE="+workspace, "RUNNER_TEMP="+root, "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+				output, err := cmd.CombinedOutput()
+				require.Error(t, err, string(output))
+				assert.Contains(t, string(output), "FAILED")
+				_, err = os.Stat(filepath.Join(root, "executed"))
+				assert.True(t, os.IsNotExist(err), "untrusted code or download ran")
+			})
+		}
+	}
+}
+
+func TestTLARuntimeWorkflowContracts(t *testing.T) {
+	pins := make(map[string]string)
+	for _, path := range []string{
+		"../../.github/scripts/install_tla_runtime.sh",
+		"../../actions/setup/sh/release_integrity.sh",
+	} {
+		content, err := os.ReadFile(path)
+		require.NoError(t, err)
+		pins[filepath.Base(path)] = fmt.Sprintf("%x", sha256.Sum256(content))
+	}
+	for _, name := range []string{
+		"daily-formal-spec-verifier",
+		"daily-tlc-test-expert",
+		"daily-workflow-security-model",
+		"daily-work-queue-formal-verification",
+	} {
+		t.Run(name, func(t *testing.T) {
+			content, err := os.ReadFile(filepath.Join(workflowsDir, name+".lock.yml"))
+			require.NoError(t, err)
+			lock := string(content)
+			for _, rejected := range []string{
+				"releases/download/v1.8.0",
+				"011267fca25d0752cf18894dd585cd28b96960c112ea8a20b823ea770e7e10cd",
+			} {
+				assert.NotContains(t, lock, rejected)
+			}
+			stepName := "Prepare pinned TLA+ runtime"
+			if name == "daily-work-queue-formal-verification" {
+				stepName = "Download pinned TLC"
+			}
+			parts := strings.SplitN(lock, "- name: "+stepName, 2)
+			require.Len(t, parts, 2)
+			step := strings.ReplaceAll(strings.SplitN(parts[1], "\n      - name:", 2)[0], `\"`, `"`)
+			for file, pin := range pins {
+				assert.Contains(t, step, pin)
+				assert.Contains(t, step, `"$trusted/`+map[string]string{
+					"install_tla_runtime.sh": ".github/scripts/",
+					"release_integrity.sh":   "actions/setup/sh/",
+				}[file]+file+`"`)
+			}
+			verify := strings.Index(step, "sha256sum --check --strict")
+			install := strings.Index(step, `bash "$trusted/.github/scripts/install_tla_runtime.sh"`)
+			require.NotEqual(t, -1, verify)
+			require.Greater(t, install, verify)
 		})
 	}
 }

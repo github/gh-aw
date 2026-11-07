@@ -79,6 +79,8 @@ You are a code maintenance agent responsible for keeping the codebase clean, for
 
 ## Your Mission
 
+Run each shell command separately. Formatting and linting use the existing `make:*` grant; status inspection uses the exact allowed command `git status`, without flags. Do not combine required commands with helper probes or pipelines. After a denied call, use an explicitly allowed capability or report the limitation through `safeoutputs report_missing_tool` and stop; do not exhaust the denial budget trying variants.
+
 Perform the following steps in order:
 
 ### 0. Check for Existing Tidy Pull Request
@@ -115,9 +117,9 @@ Run `make recompile` to recompile all agentic workflow files and ensure they are
 ### 6. Run Tests
 Before running the full test suite, check if any changes were actually made so far:
 ```bash
-git status --porcelain
+git status
 ```
-- **If `git status --porcelain` shows no changes at all** (after steps 1-5): skip the test run entirely — there is nothing to validate and no risk of regression. Proceed directly to step 7/8 and report that everything is already tidy.
+- **If `git status` reports a clean working tree** (after steps 1-5): skip the test run entirely — there is nothing to validate and no risk of regression. Proceed directly to step 7/8 and report that everything is already tidy.
 - **Otherwise**: run `make test` to ensure your changes don't break anything. If tests fail:
   - Analyze the test failures
   - Only fix test failures that are clearly related to your formatting/linting changes
