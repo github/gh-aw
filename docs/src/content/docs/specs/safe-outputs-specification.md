@@ -7,9 +7,9 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.29.19<br>
+**Version**: 1.29.20<br>
 **Status**: Working Draft<br>
-**Publication Date**: 2026-11-06<br>
+**Publication Date**: 2026-11-07<br>
 **Editor**: GitHub Agentic Workflows Team<br>
 **This Version**: [safe-outputs-specification](/gh-aw/specs/safe-outputs-specification/)<br>
 **Latest Published Version**: This document
@@ -65,7 +65,7 @@ This specification uses the following terms with precise definitions:
 
 **Staged Mode**: Preview execution mode where operations are simulated without creating permanent GitHub resources.
 
-**Temporary ID**: A placeholder identifier (format: `aw_<id>`) used to reference not-yet-created resources. Resolved to actual resource numbers during processing.
+**Temporary ID**: A workflow-scoped placeholder identifier using the form `aw_<id>` for a not-yet-created resource. A reference MAY appear in ordinary Markdown form or with a Markdown escape immediately before `#`, `_`, or both (for example, `#aw_track1`, `\#aw_track1`, `#aw\_track1`, or `\#aw\_track1`). Implementations MUST remove only those backslash escapes immediately preceding `#` or `_` when normalizing a reference for lookup or emitted replacement. They MUST preserve unrelated backslash escapes. A valid temporary-ID candidate MUST match the complete identifier form; implementations MUST NOT match a valid prefix of a longer or malformed identifier.
 
 **Provenance**: Metadata identifying the workflow and run that created a GitHub resource. Included in footers or API metadata fields.
 
@@ -174,7 +174,7 @@ This specification uses the following terms with precise meanings:
 
 **Footer**: An AI attribution message appended to created content, identifying the workflow source, providing provenance via run URL, and optionally including installation instructions.
 
-**Temporary ID**: A workflow-scoped identifier (format: `aw_<alphanumeric>`) allowing agents to reference not-yet-created issues in subsequent operations. Resolved to actual issue numbers during execution.
+**Temporary ID**: A workflow-scoped placeholder identifier using the form `aw_<id>`; references may use ordinary Markdown or escaped forms as defined above.
 
 ---
 
@@ -782,7 +782,7 @@ Implementations MUST execute validation steps in this exact sequence for all saf
 **Stage 6: Dependency Resolution (CONDITIONAL)**
 
 - Input: Temporary IDs, parent references
-- Check: Resolve references to actual GitHub resource numbers
+- Check: Resolve references to actual GitHub resource numbers, recognizing ordinary and Markdown-escaped or partially escaped forms. Remove only backslash escapes immediately preceding `#` or `_` for lookup and replacement, preserve unrelated escapes, and require a complete valid identifier without matching a valid prefix.
 - On failure: Reject with E005 (MISSING_PARENT)
 - Output: Fully-resolved operation data
 
@@ -1078,7 +1078,7 @@ When `tools.comment-memory` is enabled, implementations MUST support this additi
 2. **Local files → agent**: The prompt MUST include instructions that memory files are edited directly in `/tmp/gh-aw/comment-memory/`.
 3. **Agent → artifact**: The unified agent artifact MUST include `/tmp/gh-aw/comment-memory/` when comment memory is enabled.
 4. **Artifact → threat detection**: Threat-detection prompt setup MUST include discovered comment-memory files in analysis context.
-5. **Artifact/files → safe output processor**: The processor MUST load edited `*.md` files, synthesize `comment_memory` operations, and execute them through the `comment_memory` handler.
+5. **Artifact/files → safe output processor**: The processor MUST load edited `*.md` files, synthesize `comment_memory` operations, and execute them through the `comment_memory` handler. When resolving temporary IDs, it MUST recognize ordinary and Markdown-escaped or partially escaped references, remove only escapes immediately preceding `#` or `_` for lookup and output, preserve unrelated escapes, and require a complete valid identifier without matching a valid prefix.
 6. **Safe output processor → GitHub comment**: The handler MUST upsert the managed comment using the `gh-aw-comment-memory` marker and preserve only user content within the managed XML block.
 
 This round-trip path ensures memory edits remain file-based for the agent while keeping GitHub as the authoritative persistent store.
@@ -2589,7 +2589,7 @@ Fields used for privileged transport metadata, including patch anchoring and upl
 **Operational Semantics**:
 
 1. **Atomicity**: Pre-creation validation failure prevents issue creation. Dependency attachment after creation is best-effort and MUST NOT report the created issue as uncreated. Issue artifact failures after creation MUST retain the created issue's identity as specified below.
-2. **Temporary ID Resolution**: References to `#aw_<id>` in bodies replaced with actual numbers post-creation.
+2. **Temporary ID Resolution**: References to temporary IDs in issue bodies MUST be recognized in ordinary Markdown form and in Markdown-escaped or partially escaped forms, including `#aw_track1`, `\#aw_track1`, `#aw\_track1`, and `\#aw\_track1`. Implementations MUST remove only backslash escapes immediately preceding `#` or `_` for lookup and replacement, then replace resolved references with the actual resource numbers. Unresolved references and malformed identifiers MUST remain unchanged. Implementations MUST require a complete valid identifier and MUST NOT replace a valid prefix within a longer or malformed identifier.
 3. **Parent Linking**: When `parent` specified, tasklist entry added to parent issue.
 4. **Label Validation**: Labels must exist in repository; non-existent labels cause failure.
 5. **Issue Field Validation**: Field names/values must match configured repository issue fields; invalid values return actionable errors.
@@ -3244,7 +3244,7 @@ None. `comment_memory` MUST NOT be exposed as an agent-callable MCP tool when fi
 2. **Setup Extraction**: Pre-agent setup extracts marker content from GitHub comments into `/tmp/gh-aw/comment-memory/<memory_id>.md`.
 3. **File-Based Editing**: Agent updates memory by editing files only; no direct `comment_memory` tool call is required.
 4. **Automatic Sync**: Processor reads `*.md` files and upserts corresponding managed comments after agent execution.
-5. **Temporary ID Rewrite**: If temporary IDs (workflow-run-scoped placeholders prefixed with `aw_`, such as `aw_abc123`) are resolved during processing, comment-memory content MUST be rewritten using the resolved IDs before final upsert.
+5. **Temporary ID Rewrite**: If temporary IDs are resolved during processing, comment-memory content MUST recognize ordinary and Markdown-escaped or partially escaped references, remove only escapes immediately preceding `#` or `_` for lookup and output, and rewrite resolved references before final upsert. Unresolved references, malformed identifiers, and unrelated backslash escapes MUST remain unchanged; valid prefixes MUST NOT be rewritten.
 6. **Precedence Rule**: If both an explicit `comment_memory` operation and a file-backed entry exist for the same `memory_id`, the explicit operation takes precedence.
 
 **Configuration Parameters**:
@@ -6765,6 +6765,13 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.29.20** (2026-11-07):
+
+- **Specified**: Temporary-ID resolution recognizes Markdown-escaped and partially escaped hashes and underscores across dependency extraction, unresolved detection, replacement, supported URL patch handling, and artifact/project URL replacement.
+- **Specified**: Implementations remove only escapes immediately preceding `#` or `_` for lookup and output, preserve unrelated escapes, leave unresolved or malformed references unchanged, and reject valid-prefix matching.
+- **Clarified**: Issue-body and comment-memory rewrites apply the same normalization and complete-identifier requirements before replacement or comment upsert.
+- **Updated**: Publication metadata to 1.29.20.
 
 **Version 1.29.19** (2026-11-06):
 
