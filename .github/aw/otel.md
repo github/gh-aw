@@ -27,6 +27,7 @@ Resource attributes identify the service and workflow run, for example `service.
 | Work queue | `gh-aw.work_queue.*` |
 
 See the [OpenTelemetry attribute reference](../../docs/src/content/docs/reference/open-telemetry-attributes.mdx) for attribute descriptions and availability.
+For work-queue operation names and instrumentation availability, see [OpenTelemetry queue health](../../docs/src/content/docs/reference/work-queue.md#open-telemetry-queue-health).
 
 AI credits (`gh-aw.aic`) and token usage belong to the span that owns the usage: usually the dedicated agent span, or the executing job's conclusion span when no dedicated agent span is emitted. A run can have other conclusion spans that do not own that usage. Deduplicate records by trace ID and span ID before aggregating mirrored data. Explicit numeric zero is a measured value; missing cost or token data is not zero.
 
@@ -42,7 +43,7 @@ Durable engine spans, when available, are included in the exported trace stream 
 
 ## Encoding and privacy
 
-OTLP JSON spans are under `resourceSpans[].scopeSpans[].spans[]`; log records are under `resourceLogs[].scopeLogs[].logRecords[]`. Resource attributes and span attributes are separate. Numeric attributes can be integers or doubles; session-log integer values are string-encoded. Span timestamps in the local mirror are decimal nanosecond strings.
+OTLP JSON spans are under `resourceSpans[].scopeSpans[].spans[]`; log records are under `resourceLogs[].scopeLogs[].logRecords[]`. Resource attributes and span attributes are separate. Numeric attributes can be integers or doubles; integer values in session log bodies are string-encoded, while resource attribute integers remain numeric. Span timestamps in the local mirror are decimal nanosecond strings.
 
 Telemetry is redacted before export where sensitive-looking attribute keys are recognized. Redaction is not a reason to include credentials or private data in custom attributes. Do not send secrets, exporter headers, prompts, tool arguments, or tool results as telemetry. Treat identifiers and free-form errors as potentially sensitive and high-cardinality.
 
