@@ -224,8 +224,8 @@ func documentPermissionComments(content, frontmatter string) (string, error) {
 	edits := permissionCommentEdits{
 		lines: strings.Split(content, "\n"), before: make(map[int][]string), after: make(map[int][]string),
 	}
-	edits.documentJob(permissionCommentEntry(document.Content[0], "permissions"), permissionCommentSource{}) //nolint:uncheckedsliceindex // The empty-document guard above ensures a root exists.
-	jobs := permissionCommentEntry(document.Content[0], "jobs").value                                        //nolint:uncheckedsliceindex // The empty-document guard above ensures a root exists.
+	edits.documentJob(permissionCommentEntry(document.Content[0], "permissions"), sources[string(constants.AgentJobName)]) //nolint:uncheckedsliceindex // The empty-document guard above ensures a root exists.
+	jobs := permissionCommentEntry(document.Content[0], "jobs").value                                                      //nolint:uncheckedsliceindex // The empty-document guard above ensures a root exists.
 	if jobs != nil && jobs.Kind == yaml.MappingNode {
 		for i := 0; i+1 < len(jobs.Content); i += 2 {
 			perms := permissionCommentEntry(jobs.Content[i+1], "permissions") //nolint:uncheckedsliceindex // The loop bounds both members of this mapping entry.

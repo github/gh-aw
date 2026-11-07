@@ -308,9 +308,11 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("runner temp safety rewriting could not complete; ensure generated run/script steps are valid shell or JavaScript commands: %w", err)
 	}
-	yamlContent, err = documentPermissionComments(yamlContent, data.FrontmatterYAML)
+	documentedYAML, err := documentPermissionComments(yamlContent, data.FrontmatterYAML)
 	if err != nil {
-		return "", nil, nil, err
+		compilerYamlLog.Printf("Could not document permission comments for workflow %s: %v", data.Name, err)
+	} else {
+		yamlContent = documentedYAML
 	}
 
 	// Normalize assembled YAML whitespace. This clears indentation-only blank lines
