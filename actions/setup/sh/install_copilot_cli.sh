@@ -12,9 +12,9 @@ set +o histexpand
 #   VERSION    - Optional Copilot CLI version to install. When omitted, the script
 #                resolves the version via compat.json (using GH_AW_COMPILED_VERSION) and
 #                falls back to DEFAULT_COPILOT_VERSION baked into this script.
-#   --rootless - Install to ~/.local/bin without sudo; appends that directory to
-#                $GITHUB_PATH so subsequent steps find the binary. Selected
-#                automatically when neither root nor passwordless sudo is available.
+#   --rootless - Install to $RUNNER_TEMP/gh-aw/bin without sudo; appends that
+#                directory to $GITHUB_PATH so subsequent steps find the binary.
+#                Selected automatically when neither root nor passwordless sudo is available.
 #   --checksums-sha256 - Independently trusted SHA256SUMS.txt digest for VERSION.
 #                       Requires a literal release version; bypasses toolcache unless
 #                       --prefer-toolcache is also supplied.
@@ -132,9 +132,13 @@ esac
 source "${SCRIPT_DIR}/install_privileges.sh"
 configure_install_privileges
 
-# In rootless mode, install into the user's home directory instead of /usr/local/bin.
+# In rootless mode, install under the job-scoped gh-aw tree, which AWF mounts read-only.
 if [ "$ROOTLESS" = "true" ]; then
-  INSTALL_DIR="${HOME}/.local/bin"
+  if [ "$IS_WINDOWS" = "true" ]; then
+    INSTALL_DIR="${HOME}/.local/bin"
+  else
+    INSTALL_DIR="$(prepare_rootless_install_dir)"
+  fi
 fi
 
 # Rootless mode preflight: create and verify write access to the install directory.
@@ -628,17 +632,15 @@ find_cached_copilot_bin() {
 # Make a cached Copilot CLI available both to the current shell and later GitHub Actions steps.
 activate_cached_copilot_bin() {
   local cached_copilot_bin="$1"
-  local cached_copilot_dir=""
   local wrapper_path=""
 
-  cached_copilot_dir="$(dirname "$cached_copilot_bin")"
   echo "Activating cached Copilot CLI from ${cached_copilot_bin}..."
-  export PATH="${cached_copilot_dir}:$PATH"
-  echo "  Prepended ${cached_copilot_dir} to PATH"
+  export PATH="${INSTALL_DIR}:$PATH"
+  echo "  Prepended ${INSTALL_DIR} to PATH"
 
   if [ -n "${GITHUB_PATH:-}" ]; then
-    echo "  Exporting ${cached_copilot_dir} to GITHUB_PATH (${GITHUB_PATH})"
-    echo "$cached_copilot_dir" >> "${GITHUB_PATH}"
+    echo "  Exporting ${INSTALL_DIR} to GITHUB_PATH (${GITHUB_PATH})"
+    echo "$INSTALL_DIR" >> "${GITHUB_PATH}"
   else
     echo "  GITHUB_PATH not set — relying on ${INSTALL_DIR}/copilot"
   fi

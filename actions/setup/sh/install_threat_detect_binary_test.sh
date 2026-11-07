@@ -24,7 +24,8 @@ run_installer() {
 
   local sandbox
   sandbox=$(mktemp -d)
-  mkdir -p "${sandbox}/bin" "${sandbox}/home/.local/bin"
+  mkdir -p "${sandbox}/bin" "${sandbox}/home"
+  local rootless_bin="${sandbox}/runner/gh-aw/bin"
 
   cat >"${sandbox}/bin/uname" <<EOF
 #!/usr/bin/env bash
@@ -109,6 +110,7 @@ EOF
   local privilege_args=(--rootless)
   if [ "${AUTO_PRIVILEGES:-false}" = true ]; then privilege_args=(); fi
   RUN_OUTPUT=$(cd "$sandbox" && env PATH="${sandbox}/bin:${PATH}" HOME="${sandbox}/home" \
+    RUNNER_TEMP="${sandbox}/runner" \
     SANDBOX_AUTO_PRIVILEGES="${AUTO_PRIVILEGES:-false}" SANDBOX_SUDO_LOG="${sandbox}/sudo.log" \
     SANDBOX_URL_LOG="$url_log" SANDBOX_EXECUTION_LOG="$execution_log" GITHUB_PATH="$github_path" GITHUB_OUTPUT="$github_output" \
     bash "$INSTALL_SCRIPT" v0.5.2 "${privilege_args[@]}" --artifact-base-url "$base_url" "${pin_args[@]}" "$@" 2>&1)
@@ -118,15 +120,15 @@ EOF
   RUN_PATHS=$(cat "$github_path")
   RUN_SUDO_CALLS=$(cat "${sandbox}/sudo.log" 2>/dev/null || true)
   RUN_BINARY_PATH=$(sed -n 's/^binary-path=//p' "$github_output")
-  RUN_EXPECTED_BINARY_PATH="${sandbox}/home/.local/bin/threat-detect"
+  RUN_EXPECTED_BINARY_PATH="${rootless_bin}/threat-detect"
   RUN_INSTALLED_EXECUTABLE=false
   if [ -x "$RUN_EXPECTED_BINARY_PATH" ]; then
     RUN_INSTALLED_EXECUTABLE=true
   fi
 
   # Simulate the subsequent detection step after a failed tolerated install.
-  if [ "$RUN_STATUS" -ne 0 ] && [ -x "${sandbox}/home/.local/bin/threat-detect" ]; then
-    env PATH="${sandbox}/home/.local/bin:${sandbox}/bin:${PATH}" \
+  if [ "$RUN_STATUS" -ne 0 ] && [ -x "${rootless_bin}/threat-detect" ]; then
+    env PATH="${rootless_bin}:${sandbox}/bin:${PATH}" \
       SANDBOX_EXECUTION_LOG="$execution_log" threat-detect >/dev/null 2>&1 || true
     RUN_EXECUTIONS_AFTER_FAILURE=$(cat "$execution_log")
   else

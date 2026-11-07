@@ -200,9 +200,8 @@ case "$url" in
 esac
 `), 0o755))
 			home := filepath.Join(tempDir, "home")
-			installDir := filepath.Join(home, ".local", "bin")
-			require.NoError(t, os.MkdirAll(installDir, 0o755))
 			runnerTemp := filepath.Join(tempDir, "runner-temp")
+			installDir := filepath.Join(runnerTemp, "gh-aw", "bin")
 			curlLog := filepath.Join(tempDir, "curl.log")
 			githubPath := filepath.Join(tempDir, "github-path")
 			cmd := exec.Command("bash", installScript, "--rootless")
@@ -242,7 +241,8 @@ esac
 				assert.NotContains(t, string(output), "no reviewed manifest pin for musl guest")
 				assert.NotContains(t, string(curlOutput), "SHA256SUMS.txt")
 				assert.Contains(t, string(installed), cachedCopilot)
-				assert.Contains(t, string(pathOutput), toolcacheBin)
+				assert.Contains(t, string(pathOutput), installDir)
+				assert.NotContains(t, string(pathOutput), toolcacheBin)
 			}
 		})
 	}
@@ -301,8 +301,9 @@ exit 97
 	assert.NoFileExists(t, curlLog, "curl should not run when a cached Copilot CLI is available")
 
 	githubPathContent, err := os.ReadFile(githubPath)
-	require.NoError(t, err, "Expected the script to append the cached bin dir to GITHUB_PATH")
-	assert.Contains(t, string(githubPathContent), toolcacheBin, "cached Copilot bin directory should be exported for later steps")
+	require.NoError(t, err, "Expected the script to append the install dir to GITHUB_PATH")
+	assert.Contains(t, string(githubPathContent), installDir, "the install dir should be exported for later steps")
+	assert.NotContains(t, string(githubPathContent), toolcacheBin, "the cache directory should not be exposed through GITHUB_PATH")
 
 	// The agent is launched with the absolute install path, so a toolcache hit must still
 	// materialize ${INSTALL_DIR}/copilot (see spawn ENOENT regression).
@@ -736,7 +737,8 @@ func TestInstallCopilotCLIScriptRootlessModeUsesRealScriptWithToolcacheAndNoSudo
 		name                string
 		args                []string
 		autoSelect          bool
-		blockedHome         bool
+		blockedInstall      bool
+		symlinkInstall      bool
 		blockedState        bool
 		failedChown         bool
 		staleCleanupFailure bool
@@ -744,7 +746,8 @@ func TestInstallCopilotCLIScriptRootlessModeUsesRealScriptWithToolcacheAndNoSudo
 		{name: "rootless flag before version", args: []string{"--rootless", "1.2.3"}},
 		{name: "rootless flag after version", args: []string{"1.2.3", "--rootless"}},
 		{name: "native runner without passwordless sudo", args: []string{"1.2.3"}, autoSelect: true},
-		{name: "native runner with unwritable local directory", args: []string{"1.2.3"}, autoSelect: true, blockedHome: true},
+		{name: "native runner with unwritable job-scoped directory", args: []string{"1.2.3"}, autoSelect: true, blockedInstall: true},
+		{name: "native runner with symlinked job-scoped directory", args: []string{"1.2.3"}, autoSelect: true, symlinkInstall: true},
 		{name: "native runner with legacy root-owned state", args: []string{"1.2.3"}, autoSelect: true, failedChown: true},
 		{name: "explicit rootless with legacy root-owned state", args: []string{"--rootless", "1.2.3"}, failedChown: true},
 		{name: "native runner with inaccessible state directory", args: []string{"1.2.3"}, autoSelect: true, blockedState: true},
@@ -756,9 +759,16 @@ func TestInstallCopilotCLIScriptRootlessModeUsesRealScriptWithToolcacheAndNoSudo
 			tempDir := t.TempDir()
 			homeDir := filepath.Join(tempDir, "home")
 			require.NoError(t, os.MkdirAll(homeDir, 0o755))
-			if tc.blockedHome {
-				require.NoError(t, os.MkdirAll(filepath.Join(homeDir, ".local"), 0o755))
-				require.NoError(t, os.WriteFile(filepath.Join(homeDir, ".local", "bin"), []byte("not a directory"), 0o644))
+			runnerTemp := filepath.Join(tempDir, "runner-temp")
+			rootlessInstallDir := filepath.Join(runnerTemp, "gh-aw", "bin")
+			if tc.blockedInstall {
+				require.NoError(t, os.MkdirAll(filepath.Dir(rootlessInstallDir), 0o755))
+				require.NoError(t, os.WriteFile(rootlessInstallDir, []byte("not a directory"), 0o644))
+			}
+			if tc.symlinkInstall {
+				require.NoError(t, os.MkdirAll(filepath.Join(homeDir, ".local", "bin"), 0o755))
+				require.NoError(t, os.MkdirAll(filepath.Dir(rootlessInstallDir), 0o755))
+				require.NoError(t, os.Symlink(filepath.Join(homeDir, ".local", "bin"), rootlessInstallDir))
 			}
 			if tc.blockedState {
 				require.NoError(t, os.WriteFile(filepath.Join(homeDir, ".copilot"), []byte("not a directory"), 0o644))
@@ -806,6 +816,7 @@ exec /usr/bin/find "$@"
 			}
 			cmd.Env = append(os.Environ(),
 				"HOME="+homeDir,
+				"RUNNER_TEMP="+runnerTemp,
 				"RUNNER_TOOL_CACHE="+filepath.Join(tempDir, "toolcache"),
 				"COPILOT_INSTALL_DIR="+systemBin,
 				"GITHUB_PATH="+githubPath,
@@ -819,14 +830,14 @@ exec /usr/bin/find "$@"
 				assert.Contains(t, string(output), "Ask a runner administrator to restore ownership")
 				assert.Contains(t, string(output), "make it writable before retrying")
 				assert.NotContains(t, string(output), "Using cached GitHub Copilot CLI")
-				assert.NoFileExists(t, filepath.Join(homeDir, ".local", "bin", "copilot"))
+				assert.NoFileExists(t, filepath.Join(rootlessInstallDir, "copilot"))
 				assert.NoFileExists(t, filepath.Join(systemBin, "copilot"))
 				assert.NoFileExists(t, githubPath)
 				return
 			}
-			if tc.blockedHome {
+			if tc.blockedInstall || tc.symlinkInstall {
 				require.Error(t, err)
-				assert.Contains(t, string(output), "could not create a writable install directory")
+				assert.Contains(t, string(output), "could not create a writable install directory at "+rootlessInstallDir)
 				assert.NoFileExists(t, filepath.Join(systemBin, "copilot"))
 				return
 			}
@@ -838,18 +849,19 @@ exec /usr/bin/find "$@"
 			}
 
 			assert.Contains(t, string(output), "Using cached GitHub Copilot CLI", "script should use cached copilot CLI")
-			assert.Contains(t, string(output), "Wrapper installed at "+filepath.Join(homeDir, ".local", "bin", "copilot"))
-			assert.FileExists(t, filepath.Join(homeDir, ".local", "bin", "copilot"))
+			assert.Contains(t, string(output), "Wrapper installed at "+filepath.Join(rootlessInstallDir, "copilot"))
+			assert.FileExists(t, filepath.Join(rootlessInstallDir, "copilot"))
 			assert.NoFileExists(t, filepath.Join(systemBin, "copilot"))
 			if tc.autoSelect {
 				pathContents, err := os.ReadFile(githubPath)
 				require.NoError(t, err)
-				assert.Contains(t, string(pathContents), toolcacheBin)
+				assert.Contains(t, string(pathContents), rootlessInstallDir)
+				assert.NotContains(t, string(pathContents), toolcacheBin)
 				sudoCalls, err := os.ReadFile(sudoLog)
 				require.NoError(t, err)
 				assert.Equal(t, "sudo-called: -n true\n", string(sudoCalls), "only the non-interactive privilege probe may use sudo")
 			} else {
-				assert.Contains(t, string(output), "GITHUB_PATH not set — relying on "+filepath.Join(homeDir, ".local", "bin", "copilot"))
+				assert.Contains(t, string(output), "GITHUB_PATH not set — relying on "+filepath.Join(rootlessInstallDir, "copilot"))
 				assert.NoFileExists(t, sudoLog, "sudo should not be called in explicit rootless mode")
 			}
 		})

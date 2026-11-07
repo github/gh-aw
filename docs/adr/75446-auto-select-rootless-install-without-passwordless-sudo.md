@@ -19,8 +19,10 @@ Share privilege selection through `actions/setup/sh/install_privileges.sh`.
 An explicit `--rootless` takes precedence. Otherwise, root installs directly,
 a non-root runner with a successful `sudo -n true` probe uses `sudo -n` for
 privileged operations, and other runners automatically select rootless mode.
-Rootless installation uses `$HOME/.local/bin`, verifies that the directory is
-writable, and exposes the selected executable through `$GITHUB_PATH`.
+Rootless installation uses `$RUNNER_TEMP/gh-aw/bin`, rejects symlinked or
+unwritable install directories, and exposes the selected executable through
+`$GITHUB_PATH`. AWF mounts this job-scoped directory read-only so sandboxed
+workloads cannot modify host-executed Copilot or threat-detection binaries.
 
 Retain the existing version selection, checksum verification, and trusted
 Copilot toolcache policy. External Copilot threat detection continues to install
@@ -52,14 +54,14 @@ threat detection receives the standard executable it requires.
 
 Native no-sudo runners no longer require a topology setting to select a writable
 installation location. Privilege probes and subsequent sudo calls are
-non-interactive, and both installers share one policy.
+non-interactive, and both installers share one policy. Rootless host binaries
+are kept in the read-only AWF mount rather than sandbox-writable home paths.
 
 The fallback still requires writable runner-owned home state. It does not
 promise automatic recovery from earlier privileged AWF runs; failures now
 identify the administrative repair needed.
 
-User-local installation does not itself establish a sandbox trust boundary.
-Sandbox mounts and subsequent host command lookup need separate protection;
-installation-time checksum verification does not protect an executable from
-later sandbox modification. This privilege-selection decision does not resolve
-that separate review finding.
+The host-binary directory must remain on a read-only sandbox mount, and
+subsequent host command lookup must use that protected directory rather than a
+sandbox-writable cache path. Installation-time checksum verification remains
+necessary but is not a substitute for that mount boundary.
