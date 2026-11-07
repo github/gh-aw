@@ -570,7 +570,7 @@ async function listTrackedIssues(githubClient, owner, repo, label) {
     state: "open",
     labels: label,
     per_page: 1,
-    page: 11,
+    page: 1001,
     request: { retries: 0, timeout: 15000 },
   });
   if (!Array.isArray(overflow?.data) || overflow.data.length > 1) throw queueError("projection_target_unavailable", "tracked Issue enumeration is incomplete");

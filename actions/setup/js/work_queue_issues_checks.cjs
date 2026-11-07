@@ -886,7 +886,7 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
       assert.match(summaryBody(state, work, 100), /Status: \*\*Needs attention\*\*/);
     });
     it("reconciles all checked mirrors and closes a terminal mirror under its admission policy", async () => {
-      const f = fixture({ worker: true });
+      const f = fixture({ worker: true, backing: false });
       const policy = f.log[0].operations[0].policy;
       policy.authorization = "aw";
       policy.producers = {};
@@ -1000,7 +1000,7 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
       const maintenance = helpers.context({ role: "reconciler", principal: "1001", repository: "owner/repo", workflow: ".github/workflows/agentics-maintenance.yml", run_id: "300", run_attempt: 1 }, { event: "schedule", ref });
       const result = await main({ ...m.options, trustedContext: maintenance, reconcileMirrors: true, now: Date.now() });
       assert.deepEqual(result.pending, []);
-      assert.ok(m.calls.some(call => call[0] === "tracked-issues" && call[1] === 11 && call[2] === 1));
+      assert.ok(m.calls.some(call => call[0] === "tracked-issues" && call[1] === 1001 && call[2] === 1));
       m.issues.set("1001", {
         id: "Issue1001",
         node_id: "Issue1001",

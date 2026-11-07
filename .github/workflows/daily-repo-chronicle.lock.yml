@@ -1739,25 +1739,6 @@ jobs:
             const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
             const { main } = require(path.join(actionsDir, 'reconcile_work_queue_run.cjs'));
             await main({ core, githubClient: github, context });
-      - name: Project this run's work queue Issues
-        id: work_queue_issues
-        if: always()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_WORK_QUEUE_ENABLED: "true"
-          GH_AW_WORK_QUEUE_ROLE: "worker"
-          GH_AW_WORK_QUEUE_ISSUES: "{\"label\":\"work\",\"orphaned_after_days\":30}"
-          GH_AW_WORK_QUEUE_CHECKED_TRANSPORT: "graphql"
-          GH_AW_WORK_QUEUE_CONTRACT: "78799541c29d883427fb7226a9aaafa9e7a523d94214cc9fce4a123841cc85e7"
-          GH_AW_WORK_QUEUE_JOB_RESULTS: ${{ toJSON(needs) }}
-        with:
-          github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { main } = require(path.join(actionsDir, 'work_queue_issues.cjs'));
-            const result = await main({ core, githubClient: github, context });
-            if (result.pending?.length) core.warning('Work queue is committed; Issue synchronization remains pending. Inspect the exact terminal request before using work-queue sync-issues --request-id.');
       - name: Download activation artifact for work queue summary
         if: always()
         continue-on-error: true

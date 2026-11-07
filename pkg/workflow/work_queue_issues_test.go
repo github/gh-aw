@@ -128,46 +128,34 @@ func TestWorkQueueIssuesCompilationUsesExistingJobs(t *testing.T) {
 	activation := jobs["activation"].(map[string]any)
 	conclusion := jobs["conclusion"].(map[string]any)
 	require.Equal(t, "always()", conclusion["if"])
-	for _, job := range []map[string]any{activation, conclusion} {
-		perms := job["permissions"].(map[string]any)
-		require.Equal(t, "write", perms["contents"])
-		require.Equal(t, "write", perms["issues"])
-		require.Equal(t, "read", perms["actions"])
-	}
+	activationPerms := activation["permissions"].(map[string]any)
+	require.Equal(t, "write", activationPerms["contents"])
+	require.Equal(t, "write", activationPerms["issues"])
+	conclusionPerms := conclusion["permissions"].(map[string]any)
+	require.Equal(t, "write", conclusionPerms["contents"])
+	require.Equal(t, "read", conclusionPerms["actions"])
 	agent := jobs["agent"].(map[string]any)
 	perms := agent["permissions"].(map[string]any)
 	require.NotEqual(t, "write", perms["issues"])
 	require.NotEqual(t, "write", perms["contents"])
-	seen := false
+	conclusionSteps := conclusion["steps"].([]any)
+	conclusionYAML, err := yaml.Marshal(conclusionSteps)
+	require.NoError(t, err)
+	require.NotContains(t, string(conclusionYAML), "work_queue_issues.cjs")
 	detectionSeen := false
-	for _, value := range conclusion["steps"].([]any) {
+	for _, value := range conclusionSteps {
 		step := value.(map[string]any)
-		if step["id"] == "work_queue_issues" {
-			require.Equal(t, "always()", step["if"])
-			env := step["env"].(map[string]any)
-			require.JSONEq(t, `{"label":"cookie","orphaned_after_days":30,"title_prefix":"[cookie queue]"}`, env["GH_AW_WORK_QUEUE_ISSUES"].(string))
-			script := step["with"].(map[string]any)["script"].(string)
-			require.Contains(t, script, "if (result.pending?.length) core.warning(")
-			require.NotContains(t, script, "core.setFailed(")
-			require.Equal(t, "${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}", step["with"].(map[string]any)["github-token"])
-			require.Contains(t, script, "githubClient: github")
-			seen = true
-		}
 		if step["id"] == "detection_runs" {
-			require.True(t, seen, "the detection tracker follows the warning-only Issue projection")
-			require.Equal(t, "always()", step["if"], "pending mirrors must not skip required detection reporting")
+			require.Equal(t, "always()", step["if"])
 			detectionSeen = true
 		}
 	}
-	require.True(t, seen)
 	require.True(t, detectionSeen)
 	trial := compile("true", true)
-	for _, name := range []string{"activation", "conclusion"} {
-		for _, value := range trial["jobs"].(map[string]any)[name].(map[string]any)["steps"].([]any) {
-			step := value.(map[string]any)
-			if step["id"] == "work_queue_snapshot" || step["id"] == "work_queue_issues" {
-				require.Equal(t, "true", step["env"].(map[string]any)["GH_AW_SAFE_OUTPUTS_STAGED"])
-			}
+	for _, value := range trial["jobs"].(map[string]any)["activation"].(map[string]any)["steps"].([]any) {
+		step := value.(map[string]any)
+		if step["id"] == "work_queue_snapshot" {
+			require.Equal(t, "true", step["env"].(map[string]any)["GH_AW_SAFE_OUTPUTS_STAGED"])
 		}
 	}
 }

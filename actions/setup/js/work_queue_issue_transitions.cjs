@@ -79,7 +79,8 @@ function reconciliationProjectionTargets(state, origin) {
   const targets = [];
   const pending = [];
   for (const work of state.works.values()) {
-    const resource = work.backing_issue || work.issue_link;
+    if (work.backing_issue) continue;
+    const resource = work.issue_link;
     if (!resource || resource.repository !== state.repository || !state.policy.pools[work.pool].allowed_repositories.includes(state.repository)) continue;
     if (!work.issue_summary) {
       pending.push({ work_id: work.work_id, reason: "projection_receipt_pending" });

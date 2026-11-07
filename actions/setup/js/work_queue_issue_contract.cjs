@@ -85,15 +85,7 @@ function issueCompletionPolicyForWork(state, work, repository) {
     const end = commit === work.position.commit ? work.position.operation : operations.length;
     for (let index = end - 1; index >= 0; index--) {
       if (operations[index].kind !== "Policy") continue;
-      const rules = (operations[index].policy.projectors || []).filter(
-        rule =>
-          rule.principal === admission.principal &&
-          rule.workflow === admission.workflow &&
-          rule.ref === admission.ref &&
-          rule.pools.includes(work.pool) &&
-          rule.repositories.includes(repository) &&
-          (!work.backing_issue || rule.backing_issues?.some(resource => canonical(resource) === canonical(work.backing_issue)))
-      );
+      const rules = (operations[index].policy.projectors || []).filter(rule => rule.principal === admission.principal && rule.workflow === admission.workflow && rule.pools.includes(work.pool) && rule.repositories.includes(repository));
       return rules.length && rules.every(rule => rule.completion_policy === "close-on-result") ? "close-on-result" : "keep-open";
     }
   }

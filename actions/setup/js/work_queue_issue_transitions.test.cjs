@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import path from "node:path";
 import { fixture, mock } from "./work_queue_issues_checks.cjs";
 import { main, workIssueStatus } from "./work_queue_issues.cjs";
-import { transitionProjectionTargets } from "./work_queue_issue_transitions.cjs";
+import { reconciliationProjectionTargets, transitionProjectionTargets } from "./work_queue_issue_transitions.cjs";
 import { compactTransactions, newRequest, replayTransactions } from "./work_queue_replay.cjs";
 import { bind, evidence, finish, grant, operationCommit, context } from "./work_queue_test_helpers.cjs";
 
@@ -91,6 +91,16 @@ describe("exact committed terminal Issue projection", () => {
     const count = m.calls.length;
     expect(await main({ ...m.options, trustedContext: maintenance })).toMatchObject({ pending: [] });
     expect(m.calls.slice(count).some(call => call[0] === "mutation" || call[0] === "lock")).toBe(false);
+  });
+
+  it("does not reconcile pre-existing backing Issues without a maintenance authorization path", async () => {
+    const { m, workId } = await setup();
+    const state = m.state();
+    const work = state.works.get(workId);
+    work.backing_issue = structuredClone(work.issue_link);
+    const selection = reconciliationProjectionTargets(state, maintenance);
+    expect(selection.targets.map(target => target.work_id)).not.toContain(workId);
+    expect(selection.targets).toHaveLength(1);
   });
 
   it("keeps missing immutable receipts pending instead of creating another mirror", async () => {

@@ -84,6 +84,7 @@ func TestConclusionWorkerTerminationIsInlineAndAlwaysRuns(t *testing.T) {
 		require.Contains(t, steps, "id: worker_termination\n        if: always()")
 		require.NotContains(t, steps, "worker_termination\n        if: always()\n        continue-on-error")
 		require.Contains(t, steps, "reconcile_work_queue_run.cjs")
+		require.NotContains(t, steps, "work_queue_issues.cjs")
 		require.Less(t, strings.Index(steps, "reconcile_work_queue_run.cjs"), strings.Index(steps, "work_queue_summary.cjs"))
 	}
 }

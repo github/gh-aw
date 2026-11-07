@@ -71,7 +71,6 @@ func (c *Compiler) buildConclusionJob(data *WorkflowData, mainJobName string, sa
 func (c *Compiler) buildConclusionJobSteps(data *WorkflowData, mainJobName string, safeOutputJobNames []string) ([]string, error) {
 	steps := c.buildConclusionSetupSteps(data)
 	steps = append(steps, c.buildWorkQueueTerminationStep(data)...)
-	steps = append(steps, c.buildWorkQueueIssuesStep(data)...)
 	steps = append(steps, c.buildConclusionWorkQueueSummaryStep(data)...)
 	if isWorkQueueParticipant(data) {
 		// Queue outputs and failure reports are settled only in their trusted Claim pass.
@@ -177,10 +176,6 @@ func computeConclusionJobPermissions(data *WorkflowData) *Permissions {
 		conclusionPerms.Set(PermissionActions, PermissionRead)
 		if workQueueRequiresAssignment(data) {
 			conclusionPerms.Set(PermissionContents, PermissionWrite)
-		}
-		if workQueueIssuesConfig(data) != nil {
-			conclusionPerms.Set(PermissionContents, PermissionWrite)
-			conclusionPerms.Set(PermissionIssues, PermissionWrite)
 		}
 		if conclusionDetectionMayCreateIssue(data) {
 			conclusionPerms.Set(PermissionIssues, PermissionWrite)
