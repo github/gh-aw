@@ -84,12 +84,12 @@ func TestAWQueueDefaultOnlyCompilerBootstrap(t *testing.T) {
 }
 
 func TestAWQueueSharedSchedulingAndGlobalIssues(t *testing.T) {
-	c, path := awQueueCompilerFixture(t, `{"work_queue":{"concurrency":3,"pending_limit":30,"retry":{"max_attempts":2,"backoff_seconds":45},"pools":{"default":{},"reports":{"concurrency":2,"per_account_limit":1}},"issues":{"label":"cookie"}}}`)
+	c, path := awQueueCompilerFixture(t, `{"work_queue":{"concurrency":3,"pending_limit":30,"retry":{"max_attempts":2,"backoff_seconds":45},"pools":{"default":{},"reports":{"concurrency":2,"per_account_limit":1}},"issues":{"label":"cookie","orphaned_after_days":7}}}`)
 	data := awQueueDispatcherFixture()
 	require.NoError(t, c.applyRepositoryWorkQueueOptions(data))
 	require.NoError(t, validateWorkQueueConfiguration(data))
 	require.NoError(t, c.configureAWWorkQueue(data, path))
-	require.JSONEq(t, `{"label":"cookie"}`, data.WorkQueuePolicy.IssuesJSON)
+	require.JSONEq(t, `{"label":"cookie","orphaned_after_days":7}`, data.WorkQueuePolicy.IssuesJSON)
 	require.Equal(t, 30, data.WorkQueuePolicy.Policy.Limits.PendingNodes)
 	require.Equal(t, 3, data.WorkQueuePolicy.Policy.Pools["default"].LogicalLimit)
 	require.Equal(t, 2, data.WorkQueuePolicy.Policy.Pools["reports"].LogicalLimit)
@@ -102,6 +102,7 @@ func TestAWQueueConfigErrorsDoNotFallBackToDefaults(t *testing.T) {
 		`{"work_queue":null}`, `{"work_queue":{"concurrency":0}}`,
 		`{"work_queue":{"pending_limit":1.5}}`, `{"work_queue":{"producers":{}}}`,
 		`{"work_queue":{"issues":{"label":" "}}}`, `{"work_queue":{"issues":{"label":"${{ inputs.label }}"}}}`,
+		`{"work_queue":{"issues":{"orphaned_after_days":0}}}`, `{"work_queue":{"issues":{"orphaned_after_days":3651}}}`,
 		`{"work_queue":{"retry":{"backoff_seconds":0}}}`,
 	} {
 		t.Run(config, func(t *testing.T) {

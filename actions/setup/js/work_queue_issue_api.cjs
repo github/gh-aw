@@ -68,6 +68,43 @@ function statusLabelName(config, status) {
   return `${prefix}:${suffix}`;
 }
 
+function statusLabelOperations(issue, key, config, status, requiredLabelIds) {
+  const labels = issue.labels.nodes;
+  const missing = requiredLabelIds.filter(id => !labels.some(label => label.id === id));
+  const obsolete = labels.filter(label => STATUSES.some(candidate => candidate !== status && label.name === statusLabelName(config, candidate))).map(label => label.id);
+  const operations = [];
+  if (missing.length)
+    operations.push({
+      key,
+      name: "addLabelsToLabelable",
+      type: "AddLabelsToLabelableInput",
+      input: { labelableId: issue.id, labelIds: missing },
+      selection: `labelable { id ... on Issue { labels(first:${LABELS_PAGE_SIZE}) { nodes { id } pageInfo { hasNextPage } } } }`,
+      expectedLabels: missing,
+    });
+  if (obsolete.length)
+    operations.push({
+      key,
+      name: "removeLabelsFromLabelable",
+      type: "RemoveLabelsFromLabelableInput",
+      input: { labelableId: issue.id, labelIds: obsolete },
+      selection: `labelable { id ... on Issue { labels(first:${LABELS_PAGE_SIZE}) { nodes { id } pageInfo { hasNextPage } } } }`,
+      removedLabels: obsolete,
+    });
+  return operations;
+}
+
+function statusLabelReceiptVerified(result) {
+  const operation = result.operation;
+  if (!operation.expectedLabels && !operation.removedLabels) return true;
+  return (
+    result.value?.labelable?.id === operation.input.labelableId &&
+    result.value.labelable.labels?.pageInfo?.hasNextPage === false &&
+    !operation.expectedLabels?.some(id => !result.value.labelable.labels.nodes.some(label => label.id === id)) &&
+    !operation.removedLabels?.some(id => result.value.labelable.labels.nodes.some(label => label.id === id))
+  );
+}
+
 async function ensureStatusLabel(github, repositoryId, config, status) {
   const name = statusLabelName(config, status);
   const response = await findStatusLabel(github, repositoryId, name);
@@ -324,6 +361,8 @@ module.exports = {
   STATUSES,
   ISSUE_SELECTION,
   statusLabelName,
+  statusLabelOperations,
+  statusLabelReceiptVerified,
   ensureStatusLabel,
   discoverTarget,
   preflightIssues,

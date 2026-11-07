@@ -141,7 +141,7 @@ Replay uses maximum committed time; live reads also evaluate current time, and a
 ```json title=".github/workflows/aw.json"
 {
   "work_queue": {
-    "issues": { "label": "work", "title_prefix": "[work queue]" }
+    "issues": { "label": "work", "title_prefix": "[work queue]", "orphaned_after_days": 30 }
   }
 }
 ```
@@ -152,10 +152,11 @@ Replay uses maximum committed time; live reads also evaluate current time, and a
 | `true` or `{}` | Use tracking label `work`, status labels `work:<status>`, and title prefix `[work queue]`. |
 | `label` | Nonblank literal, at most 33 UTF-8 bytes; whitespace becomes hyphens in status labels. |
 | `title_prefix` | Nonblank literal, at most 80 UTF-8 bytes. |
+| `orphaned_after_days` | Default `30`; integer 1–3,650. Flags tracked Issues with no matching ledger Work after this many days. |
 
 Unknown keys are errors. Labels are created as needed. Titles show the first 12 Work-ID characters; the body retains the full ID. Newly created Issues omit payload titles/descriptions because conclusion lacks the original runtime redaction context.
 
-Projection updates only Work owned by the authenticated admission/Claim hooks, or exact authorized terminal requests. Immutable `IssueLink` records bind one Work to one Issue. Human titles, bodies, discussion, and unrelated labels are preserved.
+Admission and Claim hooks update their own Work; scheduled maintenance reconciles same-repository mirrors against the checked ledger. Immutable `IssueLink` records bind one Work to one Issue. Maintenance updates labels and summaries from ledger state, closes verified non-PR results only when the admission-time `close-on-result` policy allows it, and flags old tracked Issues with no ledger Work for maintainer review. It does not create mirrors, change ledger state, or close orphaned Issues. Human titles, bodies, discussion, and unrelated labels are preserved.
 
 | Queue outcome | Issue summary |
 | --- | --- |
@@ -183,7 +184,7 @@ Resource hosts must match `GITHUB_SERVER_URL` (default `github.com`). A backing 
 
 The compiler generates `agentic-workqueue.yml` for Issue events. Closing an exactly bound Issue can cancel unfinished Work after fresh identity and label checks; it cannot revoke completed delivery, stop a worker, or establish Result.
 
-Projection hooks require `contents: write`, `issues: write`, and `actions: read`, with credentials kept outside agent execution. Issue updates and coordination-lock cleanup use the same projector token; custom tokens must grant those permissions for every projected repository. Failed projection emits a warning rather than failing worker conclusion or scheduled maintenance; it does not roll back queue admission or justify rerunning a worker. Claim delivery and Result verification failures remain fatal. Ambiguous Issue/comment creation remains pending rather than blindly creating duplicates; automatic recovery of unreceipted creation is not implemented.
+Projection hooks require `contents: write`, `issues: write`, and `actions: read`, with credentials kept outside agent execution. Issue updates and coordination-lock cleanup use the same projector token; custom tokens must grant those permissions for every projected repository. Scheduled maintenance bounds reconciliation to 256 bound mirrors and 1,000 tracked Issues per run. Failed projection emits a warning rather than failing worker conclusion or scheduled maintenance; it does not roll back queue admission or justify rerunning a worker. Claim delivery and Result verification failures remain fatal. Ambiguous Issue/comment creation remains pending rather than blindly creating duplicates; automatic recovery of unreceipted creation is not implemented.
 
 ### Projector grants
 
@@ -207,7 +208,7 @@ Protected hooks need permission to create/delete their `gh-aw-issue-projection/*
 gh aw work-queue --repo OWNER/REPO sync-issues --request-id REQUEST_ID
 ```
 
-A repository maintainer or administrator can synchronize one committed terminal request identified with `trace`. This updates existing same-repository AW-created mirrors only; it does not create Issues, rebind receipts, close/reopen Issues, repeat effects, or change queue state. Missing or ambiguous receipts remain pending. There is no global Issue scan.
+A repository maintainer or administrator can synchronize one committed terminal request identified with `trace`. This updates existing same-repository AW-created mirrors only; it does not create Issues, rebind receipts, repeat effects, or change queue state. Missing or ambiguous receipts remain pending. Scheduled maintenance separately reconciles bound mirrors and scans the configured tracking label to flag old orphaned mirrors.
 
 ## Operator commands
 

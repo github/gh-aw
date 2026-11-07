@@ -40,6 +40,9 @@ func TestSettingsIssuesEnabledWithoutPolicyAuthority(t *testing.T) {
 			if settings.Issues.TitlePrefix != wantPrefix {
 				t.Fatalf("Issues preferences did not retain the title prefix: %+v", settings.Issues)
 			}
+			if settings.Issues.OrphanedAfterDays != 30 {
+				t.Fatalf("Issues preferences did not retain the orphan age default: %+v", settings.Issues)
+			}
 			policy := DefaultPolicy(testPrincipal, testRepository)
 			result, err := settings.Apply(policy)
 			if err != nil || !sameJSON(result, policy) {
@@ -74,6 +77,11 @@ func TestSettingsIssuesMalformedConfiguration(t *testing.T) {
 		`{"issues":{"title_prefix":"queue\n"}}`:                         "work_queue.issues.title_prefix",
 		`{"issues":{"title_prefix":"queue\u0085"}}`:                     "work_queue.issues.title_prefix",
 		`{"issues":{"title_prefix":"` + strings.Repeat("a", 81) + `"}}`: "work_queue.issues.title_prefix",
+		`{"issues":{"orphaned_after_days":null}}`:                       "work_queue.issues.orphaned_after_days",
+		`{"issues":{"orphaned_after_days":0}}`:                          "work_queue.issues.orphaned_after_days",
+		`{"issues":{"orphaned_after_days":3651}}`:                       "work_queue.issues.orphaned_after_days",
+		`{"issues":{"orphaned_after_days":1.5}}`:                        "work_queue.issues.orphaned_after_days",
+		`{"issues":{"orphaned_after_days":"30"}}`:                       "work_queue.issues.orphaned_after_days",
 		`{"issues":{"tracking-label":"work"}}`:                          "work_queue.issues.tracking-label",
 		`{"issues":{"status-label-prefix":"queue"}}`:                    "work_queue.issues.status-label-prefix",
 		`{"issues":{"routes":[]}}`:                                      "work_queue.issues.routes",
@@ -84,5 +92,12 @@ func TestSettingsIssuesMalformedConfiguration(t *testing.T) {
 				t.Fatalf("malformed Issues preferences were silently accepted: %v", err)
 			}
 		})
+	}
+}
+
+func TestSettingsIssuesOrphanAgeCanBeConfigured(t *testing.T) {
+	settings, err := ParseSettings([]byte(`{"issues":{"orphaned_after_days":7}}`))
+	if err != nil || settings.Issues == nil || settings.Issues.OrphanedAfterDays != 7 {
+		t.Fatalf("configured orphan age was not retained: %+v %v", settings.Issues, err)
 	}
 }

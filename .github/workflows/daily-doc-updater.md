@@ -64,7 +64,6 @@ sandbox:
 tools:
   bash:
   - "*"
-  cache-memory: true
   cli-proxy: true
   edit: null
   github:

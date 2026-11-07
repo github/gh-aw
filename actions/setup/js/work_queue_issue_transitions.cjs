@@ -16,7 +16,7 @@ function terminalTraceOperation(operation) {
 }
 
 // This authority updates existing AW mirrors only. It cannot publish bindings,
-// create resources, close Issues, or acquire another run's original Claims.
+// create resources, or acquire another run's original Claims.
 function transitionProjectionTargets(state, origin, requestIds) {
   if (
     state.policy.authorization !== "aw" ||
@@ -62,4 +62,41 @@ function transitionProjectionTargets(state, origin, requestIds) {
   return { actor, targets: [...targets.values()], pending: [...pending.values()] };
 }
 
-module.exports = { transitionProjectionTargets };
+function reconciliationProjectionTargets(state, origin) {
+  if (
+    state.policy.authorization !== "aw" ||
+    origin.authenticated !== true ||
+    origin.role !== "reconciler" ||
+    origin.repository !== state.repository ||
+    origin.workflow !== ".github/workflows/agentics-maintenance.yml" ||
+    !["schedule", "workflow_dispatch"].includes(origin.event) ||
+    !Number.isSafeInteger(origin.run_attempt) ||
+    origin.run_attempt < 1 ||
+    !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(origin.ref)
+  )
+    throw queueError("projection_unauthorized", "mirror reconciliation requires the authenticated maintenance run");
+  const actor = actorFromContext(origin);
+  const candidates = [];
+  for (const work of state.works.values()) {
+    if (work.backing_issue) continue;
+    const resource = work.issue_link;
+    if (!resource || resource.repository !== state.repository || !state.policy.pools[work.pool].allowed_repositories.includes(state.repository)) continue;
+    if (!work.issue_summary) {
+      candidates.push({ pending: { work_id: work.work_id, reason: "projection_receipt_pending" } });
+      continue;
+    }
+    candidates.push({ target: { work_id: work.work_id, claim_ids: [], resource, reconciliation: true } });
+  }
+  candidates.sort((a, b) => (a.target?.work_id || a.pending.work_id).localeCompare(b.target?.work_id || b.pending.work_id));
+  const limit = 256;
+  const runId = /^\d+$/.test(origin.run_id || "") ? BigInt(origin.run_id) : 0n;
+  const offset = candidates.length ? Number((runId * BigInt(limit)) % BigInt(candidates.length)) : 0;
+  const selected = [...candidates.slice(offset), ...candidates.slice(0, offset)].slice(0, limit);
+  return {
+    actor,
+    targets: selected.flatMap(candidate => (candidate.target ? [candidate.target] : [])),
+    pending: selected.flatMap(candidate => (candidate.pending ? [candidate.pending] : [])),
+  };
+}
+
+module.exports = { transitionProjectionTargets, reconciliationProjectionTargets };

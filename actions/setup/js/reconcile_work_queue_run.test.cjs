@@ -290,7 +290,7 @@ describe("scheduled work queue recovery", () => {
     { pending: false, deferIssueWarning: false },
     { pending: true, deferIssueWarning: false },
     { pending: true, deferIssueWarning: true },
-  ])("projects only this maintenance run's committed terminal requests without rollback: %j", async ({ pending, deferIssueWarning }) => {
+  ])("reconciles all mirrors from the checked ledger without rollback: %j", async ({ pending, deferIssueWarning }) => {
     const { fixture, options, nativeRun } = setup({ count: 1 });
     const member = fixture.assignment.claims[0];
     fixture.append("finish", { dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle, outcome: "completed" }, { ...fixture.workerActor, dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle });
@@ -315,18 +315,16 @@ describe("scheduled work queue recovery", () => {
       expect(projection).toHaveBeenCalledOnce();
       const args = projection.mock.calls[0][0];
       expect(args.trustedContext).toMatchObject({ role: "reconciler", workflow: publisher.path, event: "schedule" });
-      expect(args.transitionRequestIds).toHaveLength(1);
-      const receipt = fixture.state.requests.get(args.transitionRequestIds[0]);
-      expect(receipt.operations.some(operation => operation.kind === "DeliveryFailure" && operation.work_id === member.work_id)).toBe(true);
-      expect(receipt.actor.run_id).toBe(String(publisher.id));
-      expect(receipt.actor.run_attempt).toBe(publisher.run_attempt);
+      expect(args.reconcileMirrors).toBe(true);
+      expect(args.transitionRequestIds).toBeUndefined();
+      expect(fixture.state.works.get(member.work_id).barrier).toBe("failed");
     } finally {
       configuration.mockRestore();
       projection.mockRestore();
     }
   });
 
-  it.each(["pending", "throw"])("attempts later projection batches after an earlier %s batch and collects diagnostics", async mode => {
+  it.each(["pending", "throw"])("collects checked-ledger projection diagnostics after a %s failure", async mode => {
     const { fixture, options, nativeRun } = setup({ count: 1 });
     options.context = { ...fixture.dispatcherContext, job: "work_queue_compaction" };
     const publisher = fixture.nativeRun(fixture.dispatcherContext);
@@ -338,19 +336,16 @@ describe("scheduled work queue recovery", () => {
     const workId = fixture.assignment.claims[0].work_id;
     for (let index = 0; index < 17; index++) fixture.append("cancel_work", { operations: [{ kind: "WorkCancellation", work_id: workId, reason: "attempts_exhausted" }] }, actor, `terminal-${index}`);
     const configuration = vi.spyOn(require("./cancel_work_queue_closed_issue.cjs"), "readIssuesConfig").mockResolvedValue({ label: "work" });
-    const projection = vi
-      .spyOn(require("./work_queue_issues.cjs"), "main")
-      .mockImplementationOnce(async () => {
-        if (mode === "throw") throw new Error("secret-batch-failure");
-        return { pending: [{ work_id: workId, reason: "first batch pending" }] };
-      })
-      .mockResolvedValue({ pending: [{ work_id: workId, reason: "second batch pending" }] });
+    const projection = vi.spyOn(require("./work_queue_issues.cjs"), "main").mockImplementation(async () => {
+      if (mode === "throw") throw new Error("secret-batch-failure");
+      return { pending: [{ work_id: workId, reason: "reconciliation pending" }] };
+    });
     try {
       const result = await maintenance({ ...options, projectIssues: true, deferIssueWarning: true });
-      expect(projection).toHaveBeenCalledTimes(2);
-      expect(projection.mock.calls.map(([args]) => args.transitionRequestIds.length)).toEqual([16, 1]);
-      expect(result.issue_sync_pending).toHaveLength(2);
-      expect(result.issue_sync_pending[1].reason).toBe("second batch pending");
+      expect(projection).toHaveBeenCalledOnce();
+      expect(projection.mock.calls[0][0].reconcileMirrors).toBe(true);
+      expect(result.issue_sync_pending).toHaveLength(1);
+      expect(result.issue_sync_pending[0].reason).toBe(mode === "throw" ? "Issue reconciliation setup failed; inspect safe API diagnostics and the checked ledger" : "reconciliation pending");
       expect(JSON.stringify(result.issue_sync_pending)).not.toContain("secret-batch-failure");
       expect(fixture.state.dispatches.get(fixture.assignment.dispatch_id).released).toBe(true);
     } finally {

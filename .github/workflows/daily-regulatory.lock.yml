@@ -501,7 +501,7 @@ jobs:
         env:
           GH_AW_WORK_QUEUE_ENABLED: "true"
           GH_AW_WORK_QUEUE_ROLE: "worker"
-          GH_AW_WORK_QUEUE_ISSUES: "{\"label\":\"work\"}"
+          GH_AW_WORK_QUEUE_ISSUES: "{\"label\":\"work\",\"orphaned_after_days\":30}"
           GH_AW_WORK_QUEUE_CHECKED_TRANSPORT: "graphql"
           GH_AW_WORK_QUEUE_CONTRACT: "eebc7db2ff6a11853a9f58ebe98a0e03bb8120607d0a40b7be7d75daf7a5ff1e"
         with:
@@ -2321,7 +2321,7 @@ jobs:
         env:
           GH_AW_WORK_QUEUE_ENABLED: "true"
           GH_AW_WORK_QUEUE_ROLE: "worker"
-          GH_AW_WORK_QUEUE_ISSUES: "{\"label\":\"work\"}"
+          GH_AW_WORK_QUEUE_ISSUES: "{\"label\":\"work\",\"orphaned_after_days\":30}"
           GH_AW_WORK_QUEUE_CHECKED_TRANSPORT: "graphql"
           GH_AW_WORK_QUEUE_CONTRACT: "eebc7db2ff6a11853a9f58ebe98a0e03bb8120607d0a40b7be7d75daf7a5ff1e"
         with:
@@ -2337,7 +2337,7 @@ jobs:
         env:
           GH_AW_WORK_QUEUE_ENABLED: "true"
           GH_AW_WORK_QUEUE_ROLE: "worker"
-          GH_AW_WORK_QUEUE_ISSUES: "{\"label\":\"work\"}"
+          GH_AW_WORK_QUEUE_ISSUES: "{\"label\":\"work\",\"orphaned_after_days\":30}"
           GH_AW_WORK_QUEUE_CHECKED_TRANSPORT: "graphql"
           GH_AW_WORK_QUEUE_CONTRACT: "eebc7db2ff6a11853a9f58ebe98a0e03bb8120607d0a40b7be7d75daf7a5ff1e"
           GH_AW_WORK_QUEUE_JOB_RESULTS: ${{ toJSON(needs) }}
@@ -3303,7 +3303,7 @@ jobs:
         env:
           GH_AW_WORK_QUEUE_ENABLED: "true"
           GH_AW_WORK_QUEUE_ROLE: "worker"
-          GH_AW_WORK_QUEUE_ISSUES: "{\"label\":\"work\"}"
+          GH_AW_WORK_QUEUE_ISSUES: "{\"label\":\"work\",\"orphaned_after_days\":30}"
           GH_AW_WORK_QUEUE_CHECKED_TRANSPORT: "graphql"
           GH_AW_WORK_QUEUE_CONTRACT: "eebc7db2ff6a11853a9f58ebe98a0e03bb8120607d0a40b7be7d75daf7a5ff1e"
           GH_AW_WORK_QUEUE_FINISH_INTENT: /tmp/gh-aw/work-queue.finish.jsonl
@@ -3321,7 +3321,7 @@ jobs:
         env:
           GH_AW_WORK_QUEUE_ENABLED: "true"
           GH_AW_WORK_QUEUE_ROLE: "worker"
-          GH_AW_WORK_QUEUE_ISSUES: "{\"label\":\"work\"}"
+          GH_AW_WORK_QUEUE_ISSUES: "{\"label\":\"work\",\"orphaned_after_days\":30}"
           GH_AW_WORK_QUEUE_CHECKED_TRANSPORT: "graphql"
           GH_AW_WORK_QUEUE_CONTRACT: "eebc7db2ff6a11853a9f58ebe98a0e03bb8120607d0a40b7be7d75daf7a5ff1e"
           GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}

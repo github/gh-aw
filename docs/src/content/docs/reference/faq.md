@@ -542,7 +542,10 @@ macOS runners (`macos-*`) don't support container jobs, which agentic workflows 
 
 ### Can I use agentic workflows on GitHub Enterprise Server (GHES)?
 
-Yes, but enable GHES compatibility mode on instances predating `@actions/artifact` v2.0.0 — otherwise compiled workflows fail with `GHESNotSupportedError` because the compiler emits `upload-artifact@v4+` by default. Compatibility mode emits `v3.2.2`/`v3.1.0` instead:
+> [!IMPORTANT]
+> **GHES end-to-end availability is unconfirmed here.** gh-aw implements artifact/cache and endpoint compatibility paths, not a certified GHES release matrix. Check the [deployment and runner applicability summary](/gh-aw/reference/enterprise-configuration/#deployment-and-runner-applicability) for your deployment, topology, engine, and component versions, and [AWF applicability](https://github.com/github/gh-aw-firewall/blob/main/docs/compatibility.md#environment-and-runner-applicability) for firewall-only boundaries.
+
+For a server without the `@actions/artifact` v2.0.0+ backend or `cache-mode` syntax, compatibility mode emits artifact actions `v3.2.2`/`v3.1.0` and omits compiler-generated `cache-mode` fields:
 
 ```json
 // aw.json (applies to all workflows)
@@ -554,7 +557,11 @@ Yes, but enable GHES compatibility mode on instances predating `@actions/artifac
 gh aw compile --ghes my-workflow.md
 ```
 
-`gh aw init` auto-detects GHES and writes `ghes: true` for you. See [Enterprise Configuration](/gh-aw/reference/enterprise-configuration/) for CLI and Copilot prerequisites.
+`gh aw init` auto-detects GHES and writes `ghes: true` for you. This does not verify dependent service availability. See [Enterprise Configuration](/gh-aw/reference/enterprise-configuration/#ghes-compatibility-mode) for the action-runtime requirement and cache security caveat, and [AWF enterprise configuration](https://github.com/github/gh-aw-firewall/blob/main/docs/enterprise-configuration.md) for endpoint routing.
+
+### Does ARC/DinD configuration imply GHES or GHEC support?
+
+No. ARC is a runner topology, independent of the GitHub deployment. The [ARC walkthrough](/gh-aw/reference/arc-dind-copilot-agent/) describes the gh-aw Copilot CLI engine, not availability of the separate Copilot coding-agent service. AWF's [live split-DinD checks](https://github.com/github/gh-aw-firewall/blob/main/docs/compatibility.md#ci-test-matrix) are not live Kubernetes ARC, GHES, or data-residency tenant certification. See the [applicability summary](/gh-aw/reference/enterprise-configuration/#deployment-and-runner-applicability).
 
 ### I'm not using a supported AI Engine (coding agent). What should I do?
 

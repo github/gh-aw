@@ -254,12 +254,19 @@ If this fails, contact your organization administrator to enable Copilot for the
 
 ## GitHub Enterprise Server Issues
 
+> [!IMPORTANT]
+> **Troubleshooting a compatibility path does not establish product availability.** GHES, GHEC with data residency, and ARC/DinD are different deployment/topology dimensions. End-to-end combinations without owner confirmation remain unconfirmed. Start with the [deployment and runner applicability summary](/gh-aw/reference/enterprise-configuration/#deployment-and-runner-applicability), [AWF applicability](https://github.com/github/gh-aw-firewall/blob/main/docs/compatibility.md#environment-and-runner-applicability), and [AWF enterprise routing](https://github.com/github/gh-aw-firewall/blob/main/docs/enterprise-configuration.md).
+
 > [!TIP]
 > For a complete walkthrough of setting up and debugging workflows on **GHE Cloud with data residency** (`*.ghe.com`), see [Debugging GHE Cloud with Data Residency](/gh-aw/troubleshooting/debug-ghe/).
 
 ### Copilot Engine Prerequisites on GHES
 
-Before running Copilot-based workflows on GHES, verify three things: site admins have enabled GitHub Connect, enterprise Copilot licensing, and outbound HTTPS to `api.githubcopilot.com` and `api.enterprise.githubcopilot.com`; enterprise or org admins have assigned a Copilot seat to the `COPILOT_GITHUB_TOKEN` owner and allowed usage by policy; and the workflow targets the enterprise endpoint:
+For a GHES compatibility investigation, first have the enterprise administrator confirm that the selected Copilot product, model, and authentication path are available under the applicable license and policies. A GHES repository token or ARC registration credential does not grant cloud Copilot inference access. For the PAT path, the `COPILOT_GITHUB_TOKEN` owner needs an active Copilot entitlement and the required account permission; organization-billed `copilot-requests: write` must be separately available on the target deployment. See [authentication requirements](/gh-aw/reference/auth/).
+
+Verify outbound HTTPS from the runner and proxy containers to the confirmed inference endpoint, GitHub API, and required image/download hosts. GitHub Connect alone does not establish Copilot CLI or Agentic Workflows availability; any Connect requirement must come from the selected product's versioned documentation and enterprise configuration, not from the firewall example.
+
+The following demonstrates enterprise Copilot endpoint routing **only if that endpoint is available for your account and deployment**; it is not a GHES support promise:
 
 ```aw wrap
 engine:
@@ -277,24 +284,21 @@ See [Enterprise API Endpoint](/gh-aw/reference/engines/#enterprise-api-endpoint-
 
 | Error | Cause | Fix |
 |-------|-------|-----|
-| `Error loading models: 400 Bad Request` | Enterprise Copilot not licensed or GitHub Connect not enabled | Enable GitHub Connect and enterprise Copilot in site admin settings |
-| `403 "unauthorized: not licensed to use Copilot"` | No Copilot seat for PAT owner | Site admin enables Copilot; org admin assigns a seat to the token owner |
-| `403 "Resource not accessible by personal access token"` | Wrong token type or missing permissions | Use fine-grained PAT with **Copilot Requests: Read**, or classic PAT with `copilot` scope — see [`COPILOT_GITHUB_TOKEN`](/gh-aw/reference/auth/#copilot_github_token) |
+| `Error loading models: 400 Bad Request` | Possible endpoint, account, model, or policy mismatch | Verify product availability, endpoint selection, and account policy with the enterprise administrator; this error alone does not prove a GitHub Connect issue |
+| `403 "unauthorized: not licensed to use Copilot"` | Inference identity lacks an applicable Copilot entitlement | Enterprise or org administrator verifies licensing, assigns the required entitlement, and checks policy |
+| `403 "Resource not accessible by personal access token"` | Wrong token type or missing permissions | Use a fine-grained PAT with **Copilot Requests: Read**; classic PATs are rejected — see [`COPILOT_GITHUB_TOKEN`](/gh-aw/reference/auth/#copilot_github_token) |
 | `Could not resolve to a Repository` | `GH_HOST` not set in custom jobs | Recompile (`gh aw compile`), or set `GH_HOST=github.company.com` explicitly for local CLI commands |
 | Firewall blocking `api.<ghes-host>` | Domain not in allowed list | Add to `network.allowed` (see below) |
 | `gh aw add-wizard` creates PR on github.com | Not inside a GHES repo clone | Run from within GHES repo, or use `gh aw add` + `gh pr create` |
 
-For firewall issues, add the GHES domain to your workflow's allowed list:
+For firewall issues, add the actual GHES repository hostname to your workflow's allowed list. If the GHES API is served from a separate hostname, allow that hostname too. Do not substitute a `*.ghe.com` data-residency example for a GHES host or assume that the repository API is the Copilot inference endpoint:
 
 ```aw wrap
-engine:
-  id: copilot
-  api-target: api.company.ghe.com
 network:
   allowed:
     - defaults
-    - company.ghe.com
-    - api.company.ghe.com
+    - github.company.com
+    - api.github.company.com
 ```
 
 ## Context Expression Issues

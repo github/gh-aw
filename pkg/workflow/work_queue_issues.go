@@ -8,8 +8,9 @@ import (
 )
 
 type WorkQueueIssuesConfig struct {
-	Label       string `json:"label"`
-	TitlePrefix string `json:"title_prefix,omitempty"`
+	Label             string `json:"label"`
+	TitlePrefix       string `json:"title_prefix,omitempty"`
+	OrphanedAfterDays int    `json:"orphaned_after_days"`
 }
 
 func workQueueProjectorPermissions() *Permissions {
@@ -58,7 +59,7 @@ func workQueueIssuesConfig(data *WorkflowData) *WorkQueueIssuesConfig {
 	if !exists || value == false {
 		return nil
 	}
-	result := &WorkQueueIssuesConfig{Label: "work"}
+	result := &WorkQueueIssuesConfig{Label: "work", OrphanedAfterDays: 30}
 	if fields, ok := value.(map[string]any); ok {
 		if label, ok := fields["label"].(string); ok {
 			result.Label = label
@@ -66,8 +67,26 @@ func workQueueIssuesConfig(data *WorkflowData) *WorkQueueIssuesConfig {
 		if prefix, ok := fields["title_prefix"].(string); ok {
 			result.TitlePrefix = prefix
 		}
+		if days, ok := workQueueOrphanedAfterDays(fields["orphaned_after_days"]); ok {
+			result.OrphanedAfterDays = days
+		}
 	}
 	return result
+}
+
+func workQueueOrphanedAfterDays(value any) (int, bool) {
+	switch days := value.(type) {
+	case int:
+		return days, days >= 1 && days <= 3650
+	case float64:
+		if days != float64(int(days)) {
+			return 0, false
+		}
+		integer := int(days)
+		return integer, integer >= 1 && integer <= 3650
+	default:
+		return 0, false
+	}
 }
 
 // WorkQueueIssueMirroringEnabled reports whether any compiled workflow enables
@@ -95,11 +114,17 @@ func validateWorkQueueIssuesConfig(data *WorkflowData) error {
 	}
 	fields, ok := value.(map[string]any)
 	if !ok {
-		return errors.New("tools.work-queue.issues must be true, false, or an object with optional label and title_prefix fields")
+		return errors.New("tools.work-queue.issues must be true, false, or an object with optional label, title_prefix, and orphaned_after_days fields")
 	}
 	for key, value := range fields {
+		if key == "orphaned_after_days" {
+			if _, ok := workQueueOrphanedAfterDays(value); !ok {
+				return errors.New("tools.work-queue.issues.orphaned_after_days must be an integer between 1 and 3650")
+			}
+			continue
+		}
 		if key != "label" && key != "title_prefix" {
-			return fmt.Errorf("tools.work-queue.issues: unsupported field %q; use label or title_prefix", key)
+			return fmt.Errorf("tools.work-queue.issues: unsupported field %q; use label, title_prefix, or orphaned_after_days", key)
 		}
 		text, ok := value.(string)
 		maxBytes := 33

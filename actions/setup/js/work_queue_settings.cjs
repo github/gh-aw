@@ -49,13 +49,14 @@ function validLiteral(value, maximum) {
 
 function issuesSettings(value) {
   if (value === false) return undefined;
-  if (value === true) return { label: "work", title_prefix: "[work queue]" };
-  const fields = object(value, "work_queue.issues", ["label", "title_prefix"]);
+  if (value === true) return { label: "work", title_prefix: "[work queue]", orphaned_after_days: 30 };
+  const fields = object(value, "work_queue.issues", ["label", "title_prefix", "orphaned_after_days"]);
   const label = Object.hasOwn(fields, "label") ? fields.label : "work";
   if (!validLiteral(label, 33)) throw settingsError("work_queue.issues.label", "must be a nonblank literal of at most 33 UTF-8 bytes without control characters or expressions");
   const titlePrefix = Object.hasOwn(fields, "title_prefix") ? fields.title_prefix : "[work queue]";
   if (!validLiteral(titlePrefix, 80)) throw settingsError("work_queue.issues.title_prefix", "must be a nonblank literal of at most 80 UTF-8 bytes without control characters or expressions");
-  return { label, title_prefix: titlePrefix };
+  const orphanedAfterDays = Object.hasOwn(fields, "orphaned_after_days") ? integer(fields.orphaned_after_days, "work_queue.issues.orphaned_after_days", 3650) : 30;
+  return { label, title_prefix: titlePrefix, orphaned_after_days: orphanedAfterDays };
 }
 
 // Accept a raw work_queue section or an already decoded JSON object. Undefined
