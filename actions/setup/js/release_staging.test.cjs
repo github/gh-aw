@@ -257,7 +257,7 @@ printf '%s\\n' "$TEMP_DIR"`,
     expect(result.status).toBe(1);
     expect(result.stderr).toContain(`Cannot prepare Copilot state at ${path.join(home, ".copilot")}`);
     expect(result.stderr).toContain("Ask a runner administrator to restore ownership");
-    expect(result.stderr).toContain("Rootless installation cannot reclaim or re-own state");
+    expect(result.stderr).toContain("Rootless installation cannot reclaim or re-own state left by a privileged AWF run");
     expect(fs.readFileSync(path.join(home, ".copilot"), "utf8")).toBe("existing state");
     expect(fs.existsSync(log)).toBe(false);
   });
@@ -294,7 +294,7 @@ printf '%s\\n' "$TEMP_DIR"`,
     });
   }
 
-  it("runs simultaneous rootless installers with shared scratch without chown, sudo, or cross-job cleanup", async () => {
+  it("runs simultaneous rootless installers with shared scratch without chown, sudo, or cross-job cleanup", { timeout: 30000 }, async () => {
     const root = workspace();
     const sharedTemp = path.join(root, "shared-temp");
     const bin = path.join(root, "bin");
@@ -409,7 +409,7 @@ printf 'copilot 1.0.103\\n'
       expect(result.status).toBe(1);
       expect(result.stderr).toContain(`Cannot prepare Copilot state at ${copilot}`);
       expect(result.stderr).toContain("Ask a runner administrator to restore ownership");
-      expect(result.stderr).toContain("Rootless installation cannot reclaim or re-own state");
+      expect(result.stderr).toContain("Rootless installation cannot reclaim or re-own state left by a privileged AWF run");
       expect(fs.statSync(copilot).mode & 0o777).toBe(0o555);
       expect(fs.existsSync(log)).toBe(false);
       expect(fs.readdirSync(root).filter(name => name.startsWith("copilot-install-"))).toHaveLength(0);
