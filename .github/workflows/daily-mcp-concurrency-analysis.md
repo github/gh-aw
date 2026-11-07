@@ -156,6 +156,8 @@ When issues are identified, create detailed issues with specific recommendations
 ### Step 1: Load Round-Robin State from Cache
 
 Use native `glob` to discover existing state files under `/tmp/gh-aw/cache-memory/`, then `view` to read the concurrency audit state. Reuse the existing state file and its format; if none exists, initialize `/tmp/gh-aw/cache-memory/concurrency-state.json` with the structure in Step 8. Do not inspect unrelated cache contents.
+Report `Cache hit` only after successfully reading reusable state, or `Cache miss`
+if the state file is missing. Keep the same state path across runs.
 
 Check your cache for:
 - `last_analyzed_tool`: The most recently analyzed tool
