@@ -207,6 +207,11 @@ describe("toNanoString", () => {
 // ---------------------------------------------------------------------------
 
 describe("buildAttr", () => {
+  it("uses the generated attribute registry and preserves caller-defined keys", () => {
+    expect(buildAttr("gh-aw.work_queue.initialized", true).key).toBe("gh-aw.work_queue.initialized");
+    expect(buildAttr("custom.attribute", true).key).toBe("custom.attribute");
+  });
+
   it("returns stringValue for string input", () => {
     expect(buildAttr("k", "v")).toEqual({ key: "k", value: { stringValue: "v" } });
   });
