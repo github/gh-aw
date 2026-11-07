@@ -30,12 +30,13 @@ The model checks these safety properties in every reachable state:
 
 ## Behavioral test coverage
 
-The conformance tests use the repository's JavaScript ledger implementation;
-there is no Go ledger package to test. `ledger_protocol_generated.test.cjs`
-checks each TLC operation witness against `replayBuiltin`, verifies append-only
-history and shard coverage, and ensures queueing or validation leaves the
-snapshot unchanged. `ledger_protocol_model.test.cjs` adds hand-selected witnesses for each ledger
-type, including invalid note votes.
+The conformance tests use the repository's JavaScript ledger implementation.
+Go compiler wiring and tests live in `pkg/workflow/`, rather than a dedicated
+Go ledger package. `ledger_protocol_generated.test.cjs` checks each TLC
+operation witness against `replayBuiltin`, verifies append-only history and
+shard coverage, and ensures queueing or validation leaves the snapshot
+unchanged. `ledger_protocol_model.test.cjs` adds hand-selected witnesses for
+each ledger type, including invalid note votes.
 
 | Property | Concrete test |
 | --- | --- |
@@ -98,18 +99,45 @@ is distinct from the passing safety checks above.
 
 ## Abstraction boundary
 
-These are **bounded model-checking results**, not an unbounded TLAPS theorem or
-a proof of the implementation. A value denotes a canonical-JSON equality
-class, a table row has a primary key and one non-key field, a counter operation
-has amount one, and a note has a valid citation represented abstractly. IDs
-distinguish transactions but do not model hashes or duplicate-ID retries. One
-artifact contains one operation at a time; the generated traces are shortest
-operation witnesses, **not** exhaustive conformance tests for every reachable
-state. Batch temporary-ID rewriting,
-forward references in a batch, SHA-256 collision resistance, JSON schemas,
-record/shard byte limits, Git authentication, failed network pushes, DAG
-topological ordering, and real SQLite are not modeled. In particular,
-`Compact` preserves modeled history and shard-ID coverage but does not
-represent or verify the physical compaction implementation. Production tests
-cover these separate obligations. Do not interpret the safety results as a
-liveness or distributed-serializability guarantee.
+**Requirements**
+
+- Results MUST be interpreted only as bounded checks of the abstractions and
+  configurations listed above, not as an unbounded theorem or a proof of the
+  implementation.
+- Concrete runtime behavior MUST be assessed separately with implementation
+  tests; the model's shortest operation witnesses are not exhaustive
+  conformance tests for every reachable state.
+- The model does not prove batch temporary-ID rewriting, forward references,
+  SHA-256 collision resistance, JSON schemas, record/shard byte limits, Git
+  authentication, failed network pushes, DAG topological ordering, or real
+  SQLite behavior.
+
+**Safeguards**
+
+- A value MUST be understood as a canonical-JSON equality class; table rows,
+  counters, notes, transaction IDs, and artifacts remain bounded abstractions.
+- The table model has a primary key and one non-key field per row; counter
+  operations change the value by one; note votes require a citation to an
+  existing note. Each artifact contains one operation, and only one agent
+  request is in flight at a time; independent branch appends may interleave.
+- Transaction IDs are deterministic non-hash strings. Duplicate-ID collision
+  and retry behavior is not modeled.
+- Claims about `Compact` MUST be limited to preserving modeled history and
+  shard-ID coverage; physical compaction is not represented or verified.
+- The model MUST NOT be cited as evidence of liveness or
+  distributed-serializability. Production tests cover separate obligations.
+
+## Last synced with implementation (2026-11-06)
+
+- **Go compiler wiring and tests:** `pkg/workflow/ledger.go`,
+  `pkg/workflow/ledger_job.go`, and `pkg/workflow/ledger_test.go` generate and
+  test persistence, the read-only projection, and compaction plan/apply jobs.
+- **TLA+:** `LedgerProtocol.tla`, `LedgerProtocolWitness.tla`, and the `*.cfg`
+  model configurations in this directory.
+- **JavaScript entry points:** `actions/setup/js/ledger_append.cjs`,
+  `ledger_replay.cjs`, `ledger_builtin.cjs`, `ledger_transactions.cjs`,
+  `push_ledger_changes.cjs`, and `ledger_compaction.cjs`.
+- **Conformance inputs and tests:** `actions/setup/js/ledger_protocol_vectors.json`,
+  `ledger_protocol_model.test.cjs`, `ledger_protocol_generated.test.cjs`,
+  `ledger_builtin.test.cjs`, `push_ledger_changes.test.cjs`, and
+  `ledger_compaction.test.cjs`.
