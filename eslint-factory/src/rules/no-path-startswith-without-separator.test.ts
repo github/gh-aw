@@ -15,6 +15,10 @@ describe("no-path-startswith-without-separator", () => {
         `const root = path.resolve(base) + path.sep; if (!dest.startsWith(root)) {}`,
         `const root = path.resolve(base); if (dest.startsWith(root + path.sep)) {}`,
         "const root = path.resolve(base); if (dest.startsWith(`${root}${path.sep}`)) {}",
+        `if (dest.startsWith(path.join(base, path.sep))) {}`,
+        `if (dest.startsWith(path.normalize("/work/repo/"))) {}`,
+        `const root = path.join(base, path.sep); dest.startsWith(root);`,
+        `const root = path.normalize("/work/repo/"); dest.startsWith(root);`,
         `if (path.resolve(target).startsWith("/tmp/gh-aw/")) {}`,
         `function f(root) { return file.startsWith(root); }`,
         `const prefix = "github/gh-aw/"; s.startsWith(prefix);`,
@@ -25,6 +29,8 @@ describe("no-path-startswith-without-separator", () => {
         { code: `if (dest.startsWith(path.resolve(base))) {}`, errors: [{ messageId: "noBarePathPrefix" }] },
         { code: `const root = path.join(a, "b"); dest.startsWith(root);`, errors: [{ messageId: "noBarePathPrefix" }] },
         { code: `const root = path.normalize(a); dest.startsWith(root);`, errors: [{ messageId: "noBarePathPrefix" }] },
+        { code: `if (dest.startsWith(path.join(base, "child"))) {}`, errors: [{ messageId: "noBarePathPrefix" }] },
+        { code: `const root = path.normalize("/work/repo"); dest.startsWith(root);`, errors: [{ messageId: "noBarePathPrefix" }] },
       ],
     });
   });

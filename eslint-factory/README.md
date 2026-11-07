@@ -248,7 +248,7 @@ Disallow passing global `parseInt` or `Number.parseInt` directly to `.map()`, be
 
 ### `no-path-startswith-without-separator`
 
-Disallow `value.startsWith(root)` where `root` is a bare `path.resolve()`/`path.join()`/`path.normalize()` result (directly or via a single-assignment variable). `/work/repo-evil` passes a `startsWith("/work/repo")` check. Compare against `root + path.sep` (plus `=== root`) or use `path.relative()` instead.
+Disallow `value.startsWith(root)` where `root` is a bare `path.resolve()`/`path.join()`/`path.normalize()` result (directly or via a single-assignment variable). `/work/repo-evil` passes a `startsWith("/work/repo")` check. Compare against `root.endsWith(path.sep) ? root : root + path.sep` (plus `=== root`) or use `path.relative()` and reject `relative === ".."`, `relative.startsWith(".." + path.sep)`, or `path.isAbsolute(relative)`.
 
 ### `no-split-filter-trim-without-trim-map`
 

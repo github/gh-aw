@@ -14,7 +14,7 @@ export const noPathStartsWithoutSeparatorRule = createRule({
     schema: [],
     messages: {
       noBarePathPrefix:
-        "startsWith() with a bare directory path also matches sibling directories (e.g. /work/repo-evil starts with /work/repo). Compare against `root + path.sep` (and allow `=== root` separately) or use path.relative() and reject results starting with '..'.",
+        "startsWith() with a bare directory path also matches sibling directories (e.g. /work/repo-evil starts with /work/repo). Compare against `root.endsWith(path.sep) ? root : root + path.sep` (and allow `=== root` separately), or use path.relative() and reject `relative === '..'`, `relative.startsWith('..' + path.sep)`, or `path.isAbsolute(relative)`.",
     },
   },
   defaultOptions: [],
@@ -33,9 +33,35 @@ export const noPathStartsWithoutSeparatorRule = createRule({
       );
     }
 
+    function isPathSeparator(node: TSESTree.Node): boolean {
+      if (node.type === "MemberExpression" && !node.computed && node.object.type === "Identifier" && node.object.name === "path" && node.property.type === "Identifier") {
+        return node.property.name === "sep";
+      }
+      if (node.type === "Literal" && typeof node.value === "string") {
+        return node.value.endsWith("/");
+      }
+      return node.type === "TemplateLiteral" && node.expressions.length === 0 && node.quasis[0]?.value.cooked?.endsWith("/") === true;
+    }
+
+    function isSeparatorTerminatedPathCall(node: TSESTree.Node): boolean {
+      if (!isPathCall(node) || node.type !== "CallExpression" || node.callee.type !== "MemberExpression" || node.callee.property.type !== "Identifier") {
+        return false;
+      }
+      const method = node.callee.property.name;
+      if (method === "join") {
+        const lastArgument = node.arguments[node.arguments.length - 1];
+        return lastArgument != null && isPathSeparator(lastArgument);
+      }
+      if (method === "normalize") {
+        const argument = node.arguments[0];
+        return argument != null && isPathSeparator(argument);
+      }
+      return false;
+    }
+
     function isBarePathValue(node: TSESTree.Node): boolean {
       if (isPathCall(node)) {
-        return true;
+        return !isSeparatorTerminatedPathCall(node);
       }
       if (node.type !== "Identifier") {
         return false;
@@ -48,7 +74,7 @@ export const noPathStartsWithoutSeparatorRule = createRule({
             return false;
           }
           const def = variable.defs[0];
-          return def.type === "Variable" && def.node.type === "VariableDeclarator" && def.node.id.type === "Identifier" && def.node.init != null && isPathCall(def.node.init);
+          return def.type === "Variable" && def.node.type === "VariableDeclarator" && def.node.id.type === "Identifier" && def.node.init != null && isPathCall(def.node.init) && !isSeparatorTerminatedPathCall(def.node.init);
         }
         scope = scope.upper;
       }
