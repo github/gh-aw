@@ -100,7 +100,7 @@ exit "$result"`,
 }
 
 async function allocateRuntime(root) {
-  const envFile = path.join(root, `runtime-env-${runtimeRoots.length}`);
+  const envFile = path.join(fs.mkdtempSync(path.join(root, "runtime-env-")), "env");
   fs.writeFileSync(envFile, "");
   const child = spawn(
     "bash",
