@@ -1,30 +1,31 @@
 {
-  "last_run_date": "2026-11-04",
+  "last_run_date": "2026-11-07",
   "last_window": {
-    "start": "2026-11-03T07:56:08Z",
-    "end": "2026-11-04T07:56:08Z"
+    "start": "2026-11-06T07:55:47Z",
+    "end": "2026-11-07T07:55:47Z"
   },
   "observed_window": {
-    "coverage": "Partial: cached runs begin 2026-11-03T22:16:59Z; continuation to 07:56 UTC failed with GitHub API rate limit",
+    "coverage": "Partial: 256 cached runs from 2026-11-06T22:17:43Z through 2026-11-07T07:53:03Z; continuation 07:55:47-22:15:38 UTC unavailable because agentic-workflows MCP tools were not exposed",
     "representative_audits": [
-      41756205044,
-      41755176166,
-      41757056245,
-      41781694094,
-      41790720670,
-      41779387214,
-      41778039952
+      42317297653,
+      42317328131,
+      42318371322,
+      42333626965,
+      42333649040,
+      42341806704,
+      42342838287
     ]
   },
   "key_themes": [
-    "PR #74560 Finisher agent-step failures after Sous Chef dispatch",
-    "PR #74752 and #74785 five-reviewer fanout succeeded",
-    "Scheduled security checks failed at distinct gates"
+    "ESLint work queue safe-output failures alongside merged reviewed rule",
+    "Cross-repository create/update smoke checkout failures",
+    "Human review corrections to TLA runtime provenance merged; hosted recovery unverified",
+    "Daily image scan failed at vendored enforcement gate"
   ],
   "carry_forward_questions": [
-    "Does PR #74560 Finisher recover, and what caused its repeated agent exits?",
-    "Did PR review feedback affect #74752 or #74785 implementation?",
-    "Do the image scan and TLA+ runtime gates recover?",
-    "What occurred in the missing 07:56-22:16 UTC interval?"
+    "Did the cross-repo smoke checkout recover after the observed slice?",
+    "Why did Process Safe Outputs fail across unrelated workflows?",
+    "Does the TLA security model pass a complete hosted run after PR #75487?",
+    "What occurred in the missing 07:55-22:15 UTC interval?"
   ]
 }
