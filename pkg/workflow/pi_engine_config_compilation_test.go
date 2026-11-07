@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -78,6 +79,85 @@ Report status.
 					}
 				}
 				require.True(t, found, "Compiled workflow must contain the pi execution step")
+			})
+		}
+	}
+}
+
+func TestCompileDispatchModelAcrossEngines(t *testing.T) {
+	tests := []struct {
+		engine        string
+		model         string
+		modelEnv      string
+		modelEnvValue string
+	}{
+		{engine: "copilot", model: "${{ inputs.model }}", modelEnv: "COPILOT_MODEL", modelEnvValue: "${{ inputs.model }}"},
+		{engine: "claude", model: "${{ inputs.model }}", modelEnv: "ANTHROPIC_MODEL", modelEnvValue: "${{ inputs.model }}"},
+		{engine: "codex", model: "copilot/${{ inputs.model }}", modelEnv: "GH_AW_MODEL_AGENT_CODEX", modelEnvValue: "${{ inputs.model }}"},
+		{engine: "gemini", model: "${{ inputs.model }}", modelEnv: "GEMINI_MODEL", modelEnvValue: "${{ inputs.model }}"},
+		{engine: "agy", model: "${{ inputs.model }}", modelEnv: "GH_AW_AGY_MODEL", modelEnvValue: "${{ inputs.model }}"},
+		{engine: "pi", model: "copilot/${{ inputs.model }}", modelEnv: "GH_AW_PI_MODEL", modelEnvValue: "copilot/${{ inputs.model }}"},
+	}
+	expressions := []string{"${{ inputs.model }}", "${{ github.event.inputs.model }}"}
+
+	for _, tt := range tests {
+		for _, expression := range expressions {
+			t.Run(tt.engine+"/"+expression, func(t *testing.T) {
+				dir := t.TempDir()
+				source := filepath.Join(dir, "dispatch-model.md")
+				model := strings.ReplaceAll(tt.model, "${{ inputs.model }}", expression)
+				modelEnvValue := strings.ReplaceAll(tt.modelEnvValue, "${{ inputs.model }}", expression)
+				markdown := fmt.Sprintf(`---
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        type: string
+permissions:
+  contents: read
+  copilot-requests: write
+checkout: false
+engine:
+  id: %s
+  model: "%s"
+tools:
+  github: false
+safe-outputs:
+  noop:
+  threat-detection: false
+---
+Report status.
+`, tt.engine, model)
+				require.NoError(t, os.WriteFile(source, []byte(markdown), 0o600))
+				require.NoError(t, NewCompiler(WithVersion("dev")).CompileWorkflow(source))
+				lock, err := os.ReadFile(filepath.Join(dir, "dispatch-model.lock.yml"))
+				require.NoError(t, err)
+				var workflow struct {
+					Jobs map[string]struct {
+						Steps []struct {
+							ID  string            `yaml:"id"`
+							Run string            `yaml:"run"`
+							Env map[string]string `yaml:"env"`
+						} `yaml:"steps"`
+					} `yaml:"jobs"`
+				}
+				require.NoError(t, yaml.Unmarshal(lock, &workflow))
+
+				found := false
+				for _, job := range workflow.Jobs {
+					for _, step := range job.Steps {
+						if step.Env[tt.modelEnv] != modelEnvValue {
+							continue
+						}
+						found = true
+						require.NotContains(t, step.Run, expression, "Dispatch model must not be embedded in the shell command")
+						if tt.engine == "pi" {
+							require.Equal(t, expression, step.Env["GH_AW_PI_MODEL_ID"])
+							require.Contains(t, step.Run, `--model "aw-gateway/${GH_AW_PI_MODEL_ID}"`)
+						}
+					}
+				}
+				require.True(t, found, "Compiled workflow must pass the dispatch model through %s", tt.modelEnv)
 			})
 		}
 	}
