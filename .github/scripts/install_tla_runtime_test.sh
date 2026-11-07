@@ -14,9 +14,13 @@ cat > "$sandbox/fixtures/jre/bin/java" <<'JAVA'
 printf '%s\n' "$*" >> "$EXECUTION_LOG"
 if [ "${MODE:-}" = java-failure ]; then exit 1; fi
 if [ "${1:-}" = -cp ]; then
-  if [ "${MODE:-}" != tlc-failure ]; then
-    echo 'provides model checking and simulation of TLA+ specifications'
+  if [ "${MODE:-}" = tlc-failure ]; then
+    echo 'Error: Could not find or load main class tlc2.TLC'
+    exit 1
   fi
+  echo 'provides model checking and simulation of TLA+ specifications'
+  if [ "${MODE:-}" = tlc-zero-status ]; then exit 0; fi
+  if [ "${MODE:-}" = tlc-wrong-status ]; then exit 2; fi
   exit 1
 fi
 JAVA
@@ -106,7 +110,11 @@ run_case() {
     [ "$status" -ne 0 ]
     [ ! -e "$destination" ]
     grep -q 'ERROR:' "$sandbox/output"
-    if [ "$MODE" != java-failure ] && [ "$MODE" != tlc-failure ]; then [ ! -s "$EXECUTION_LOG" ]; fi
+    case "$MODE" in
+      java-failure) ! grep -q -- 'tlc2.TLC' "$EXECUTION_LOG" ;;
+      tlc-failure|tlc-zero-status|tlc-wrong-status) ;;
+      *) [ ! -s "$EXECUTION_LOG" ] ;;
+    esac
   fi
   [ -z "$(find "$(dirname "$destination")" -name 'runtime.install.*' -print)" ]
   echo "PASS: $name"
@@ -126,6 +134,10 @@ MODE=java-failure
 run_case java-failure failure
 MODE=tlc-failure
 run_case tlc-failure failure
+MODE=tlc-zero-status
+run_case tlc-zero-status failure
+MODE=tlc-wrong-status
+run_case tlc-wrong-status failure
 MODE=success
 FAKE_ARCH=aarch64 run_case unsupported failure
 run_case invalid-flag failure --unknown
