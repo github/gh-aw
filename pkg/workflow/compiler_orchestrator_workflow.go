@@ -104,13 +104,13 @@ func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error {
 	if err != nil {
 		return c.formatToolsProcessingError(ctx.cleanPath, err)
 	}
-	if err := c.validateCopilotWebToolsSupport(engineSetup.agenticEngine, engineSetup.engineConfig, toolsResult.tools); err != nil {
-		return c.formatToolsProcessingError(ctx.cleanPath, err)
-	}
 	ctx.engineSetup = engineSetup
 	ctx.toolsResult = toolsResult
 	ctx.workflowData, err = c.buildInitialWorkflowData(ctx.frontmatter, toolsResult, engineSetup, engineSetup.importsResult)
 	if err != nil {
+		return c.formatToolsProcessingError(ctx.cleanPath, err)
+	}
+	if err := c.validateCopilotWebToolsSupport(engineSetup.agenticEngine, ctx.workflowData, toolsResult.tools); err != nil {
 		return c.formatToolsProcessingError(ctx.cleanPath, err)
 	}
 	if err := c.validateResolvedEngineEnvSecrets(ctx); err != nil {

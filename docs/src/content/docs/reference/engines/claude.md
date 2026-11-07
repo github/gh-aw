@@ -24,6 +24,8 @@ permissions:
 
 The `copilot/` prefix selects the provider and is removed from the model ID passed to Claude. An explicit `engine.model-provider` overrides provider selection. For a fully dynamic model expression whose provider cannot be inferred at compile time, set `engine.model-provider: github`.
 
+Native `tools.web-fetch` and `tools.web-search` are unavailable on GitHub Copilot inference because the proxy sets `COPILOT_OFFLINE=true`, even for allowlisted domains. The compiler rejects these tools on this provider. Use `engine.model-provider: anthropic` or an MCP fetch server instead.
+
 Copilot writes Claude model versions with a dot (`claude-opus-5.5`), while Anthropic uses hyphenated ids (`claude-opus-5-5`). With GitHub inference, the gh-aw harness maps Anthropic ids to Copilot ids before launching Claude Code, including fixed models, dynamic expressions, and threat-detection models. Dotted ids and major-only ids such as `claude-sonnet-5` remain unchanged; Anthropic inference keeps its native ids.
 
 gh-aw also passes a `--settings` value containing a `modelOverrides` map, but Claude Code does not apply that map on every inference route. If `engine.args` already passes `--settings`, gh-aw keeps that value, does not add the map, and emits a compile warning. Harness model-id normalization still applies independently of these settings.
