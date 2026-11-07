@@ -38,7 +38,7 @@ jobs:
         run: |
           set -euo pipefail
           printf 'RESULTS_DIR=%s/work-queue-formal/%s\n' "$RUNNER_TEMP" "$FORMAL_CONFIG" >> "$GITHUB_ENV"
-          printf 'TLA2TOOLS_JAR=%s/tla2tools.jar\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+          printf 'TLA2TOOLS_JAR=%s/tla-tools/tla2tools.jar\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Initialize analysis artifact
         uses: actions/github-script@v9.0.0
         with:
@@ -68,11 +68,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # runner-guard:ignore RGS-018 -- version-pinned TLC JAR is downloaded to disk and SHA-256 verified before use.
-          curl --fail --silent --show-error --location --retry 2 --connect-timeout 10 --max-time 120 \
-            https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar \
-            --output "$TLA2TOOLS_JAR"
-          echo "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88  $TLA2TOOLS_JAR" | sha256sum --check
+          trusted=$(mktemp -d "$RUNNER_TEMP/tla-installer.XXXXXX")
+          trap 'rm -rf "$trusted"' EXIT
+          mkdir -p "$trusted/.github/scripts" "$trusted/actions/setup/sh"
+          cp "$GITHUB_WORKSPACE/.github/scripts/install_tla_runtime.sh" "$trusted/.github/scripts/"
+          cp "$GITHUB_WORKSPACE/actions/setup/sh/release_integrity.sh" "$trusted/actions/setup/sh/"
+          printf '%s  %s\n' \
+            15317bc27032f3c8160cb47fb77084683e21e3c37680db90b9bb2e57adea16e2 "$trusted/.github/scripts/install_tla_runtime.sh" \
+            31ef8b9a9bd4dc4d84db08d21a677c838f1c2d55d43fb834c3fbcf1f47b6ba4d "$trusted/actions/setup/sh/release_integrity.sh" | sha256sum --check --strict
+          bash "$trusted/.github/scripts/install_tla_runtime.sh" "$RUNNER_TEMP/tla-tools" --jar-only
       - name: Collect formal verification evidence
         id: verification
         continue-on-error: true

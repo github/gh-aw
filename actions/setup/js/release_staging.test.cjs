@@ -100,7 +100,7 @@ exit "$result"`,
 }
 
 async function allocateRuntime(root) {
-  const envFile = path.join(root, `runtime-env-${runtimeRoots.length}`);
+  const envFile = path.join(fs.mkdtempSync(path.join(root, "runtime-env-")), "env");
   fs.writeFileSync(envFile, "");
   const child = spawn(
     "bash",
@@ -255,7 +255,8 @@ printf '%s\\n' "$TEMP_DIR"`,
       encoding: "utf8",
     });
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain("Cannot prepare Copilot state at");
+    expect(result.stderr).toContain(`Cannot prepare Copilot state at ${path.join(home, ".copilot")}`);
+    expect(result.stderr).toContain("Ask a runner administrator to restore ownership");
     expect(result.stderr).toContain("Rootless installation cannot reclaim or re-own state left by a privileged AWF run.");
     expect(fs.readFileSync(path.join(home, ".copilot"), "utf8")).toBe("existing state");
     expect(fs.existsSync(log)).toBe(false);
@@ -406,7 +407,8 @@ printf 'copilot 1.0.103\\n'
         encoding: "utf8",
       });
       expect(result.status).toBe(1);
-      expect(result.stderr).toContain("Cannot prepare Copilot state at");
+      expect(result.stderr).toContain(`Cannot prepare Copilot state at ${copilot}`);
+      expect(result.stderr).toContain("Ask a runner administrator to restore ownership");
       expect(result.stderr).toContain("Rootless installation cannot reclaim or re-own state left by a privileged AWF run.");
       expect(fs.statSync(copilot).mode & 0o777).toBe(0o555);
       expect(fs.existsSync(log)).toBe(false);

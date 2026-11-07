@@ -14,7 +14,7 @@ import tempfile
 
 
 ROOT = Path(__file__).resolve().parent
-JAR_SHA256 = "011267fca25d0752cf18894dd585cd28b96960c112ea8a20b823ea770e7e10cd"
+JAR_SHA256 = "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88"
 MUTATIONS = {
     "agent-write": "JobIsolation",
     "persist-credentials": "NoCredentialPersistence",
@@ -581,7 +581,7 @@ def main():
         parser.error("--compiler, --verifier, and --write-examples require --model all")
     jar_env = os.environ.get("TLA2TOOLS_JAR")
     if not jar_env:
-        parser.error("Set TLA2TOOLS_JAR to the official v1.8.0 tla2tools.jar")
+        parser.error("Set TLA2TOOLS_JAR to the official v1.7.4 tla2tools.jar")
     jar = Path(jar_env).resolve()
     if not jar.is_file() or hashlib.sha256(jar.read_bytes()).hexdigest() != JAR_SHA256:
         parser.error("TLA2TOOLS_JAR is missing or does not match the pinned SHA-256")
