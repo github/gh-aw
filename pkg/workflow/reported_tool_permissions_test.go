@@ -59,6 +59,12 @@ func TestReportedWorkflowToolPermissions(t *testing.T) {
 					assert.NotContains(t, args, "shell(node:*)")
 					assert.NotContains(t, args, "shell(make:*)")
 					assert.NotContains(t, data.MarkdownContent, "full bash access")
+					require.NotEmpty(t, data.ImportedFiles)
+					for _, importedFile := range data.ImportedFiles {
+						importedPath := strings.SplitN(importedFile, "#", 2)[0]
+						assert.NotEqual(t, "security-analysis-base.md", filepath.Base(importedPath),
+							"restricted fixer must not import the full-Bash security prompt: %s", importedFile)
+					}
 					assert.Contains(t, data.MarkdownContent, "Tests not run: test execution is not available in this workflow")
 					assert.Contains(t, data.MarkdownContent, "DIFC/policy-filtered result")
 					assert.Contains(t, data.MarkdownContent, "only after the tool accepts the intent")

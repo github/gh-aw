@@ -291,14 +291,14 @@ check-cjs-syntax:
 	@echo "✓ CommonJS runtime syntax validated"
 
 .PHONY: test-js
-test-js: build-js
+test-js: build-js test-workflow-tool-contracts
 	node --test scripts/pr-sous-chef.test.mjs
 	cd actions/setup/js && npm run test:js -- --no-file-parallelism
 	cd eslint-factory && npm test
 
 # Test impacted JavaScript unit tests only (excluding integration tests)
 .PHONY: test-impacted-js
-test-impacted-js: build-js
+test-impacted-js: build-js test-workflow-tool-contracts
 	@BASE_COMMIT=$$(bash scripts/resolve-base-commit.sh --base-ref $(BASE_REF)); \
 	if [ -z "$$BASE_COMMIT" ]; then \
 		echo "Set BASE_REF explicitly, for example: make test-impacted-js BASE_REF=origin/main"; \
@@ -523,13 +523,17 @@ bundle-js:
 	@echo "✓ bundle-js tool built"
 	@echo "To bundle a JavaScript file: ./bundle-js <input-file> [output-file]"
 
+# Run workflow contracts in CJS CI even when impacted runtime tests are skipped.
+.PHONY: test-workflow-tool-contracts
+test-workflow-tool-contracts:
+	node --test scripts/workflow-tool-contracts.test.cjs scripts/code-scanning-fixer-selection.test.cjs
+
 # Run script tests (authentication probes, stale locks, workflow drift, and workflow purity).
 .PHONY: test-scripts
-test-scripts: build
+test-scripts: build test-workflow-tool-contracts
 	@echo "Running script tests..."
 	node --test scripts/agy-authentication.test.cjs
 	node --test scripts/check-npm-1es.test.mjs
-	node --test scripts/workflow-tool-contracts.test.cjs
 	node --test scripts/release-workflows.test.cjs
 	bash scripts/extract-workflow-frontmatter-keys_test.sh
 	bash scripts/check-stale-lock-files_test.sh
