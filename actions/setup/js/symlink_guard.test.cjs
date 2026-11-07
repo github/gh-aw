@@ -4,6 +4,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const fs = require("fs");
 const path = require("path");
+const os = require("os");
 const { execFileSync } = require("child_process");
 const { lstatGuard, readGuardedFile, writeGuardedFile } = require("./symlink_guard.cjs");
 
@@ -145,6 +146,45 @@ describe("lstatGuard", () => {
         const target = path.resolve(tmpDir, `mask-${mask}`);
         execFileSync(process.execPath, ["-e", 'process.umask(parseInt(process.argv[1], 8)); require(process.argv[2]).writeGuardedFile(process.argv[3], Buffer.from("safe"));', mask, path.resolve(__dirname, "symlink_guard.cjs"), target]);
         expect(fs.statSync(target).mode & 0o777).toBe(0o600);
+      }
+    });
+
+    it.skipIf(process.platform !== "linux")("creates uploader-readable assets and directories despite restrictive umasks", () => {
+      for (const mask of ["000", "077"]) {
+        const target = path.resolve(tmpDir, `assets-${mask}`, "claims", "claim-1", "chart.png");
+        execFileSync(process.execPath, [
+          "-e",
+          'process.umask(parseInt(process.argv[1], 8)); require(process.argv[2]).writeGuardedFile(process.argv[3], Buffer.from("chart"), { mode: 0o644, directoryMode: 0o755 });',
+          mask,
+          path.resolve(__dirname, "symlink_guard.cjs"),
+          target,
+        ]);
+        const stat = fs.statSync(target);
+        expect(stat.mode & 0o777).toBe(0o644);
+        expect(stat.uid).toBe(process.getuid());
+        expect(stat.gid).toBe(process.getgid());
+        for (const directory of [path.dirname(target), path.dirname(path.dirname(target)), path.resolve(tmpDir, `assets-${mask}`)]) {
+          expect(fs.statSync(directory).mode & 0o777).toBe(0o755);
+        }
+        expect(() => writeGuardedFile(target, Buffer.from("overwrite"), { mode: 0o644, directoryMode: 0o755 })).toThrow("EEXIST");
+        expect(fs.readFileSync(target, "utf8")).toBe("chart");
+      }
+      expect(fs.statSync(tmpDir).mode & 0o777).toBe(0o700);
+    });
+
+    it.skipIf(process.platform !== "linux" || process.getuid?.() !== 0)("lets an unprivileged uploader read root-owned staged assets", () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "asset-uploader-"));
+      try {
+        fs.chmodSync(root, 0o755);
+        const target = path.join(root, "assets", "claims", "claim-1", "chart.png");
+        writeGuardedFile(target, Buffer.from("chart"), { mode: 0o644, directoryMode: 0o755 });
+        expect(fs.statSync(target).uid).toBe(0);
+        expect(fs.statSync(target).gid).toBe(process.getgid());
+        expect(fs.statSync(target).mode & 0o777).toBe(0o644);
+        const output = execFileSync(process.execPath, ["-e", 'process.stdout.write(require("fs").readFileSync(process.argv[1]));', target], { uid: 65534, gid: 65534, encoding: "utf8" });
+        expect(output).toBe("chart");
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
       }
     });
 
