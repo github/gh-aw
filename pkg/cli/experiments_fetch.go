@@ -86,7 +86,7 @@ func parseEvalResultRecords(data []byte) []evalResultRecord {
 		return nil
 	}
 	var records []evalResultRecord
-	for _, line := range bytes.Split(data, []byte{'\n'}) {
+	for line := range bytes.SplitSeq(data, []byte{'\n'}) {
 		if record, ok := parseEvalResultRecordLine(line); ok {
 			records = append(records, record)
 		}

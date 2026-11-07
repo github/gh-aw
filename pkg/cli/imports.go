@@ -449,7 +449,7 @@ func processIncludesWithWorkflowSpec(content string, workflow *WorkflowSpec, com
 		}
 
 		// Scan for nested includes
-		for _, line := range strings.Split(markdownContent, "\n") {
+		for line := range strings.SplitSeq(markdownContent, "\n") {
 			directive := parser.ParseImportDirective(line)
 			if directive != nil {
 				includePath := directive.Path

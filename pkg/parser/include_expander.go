@@ -170,7 +170,7 @@ func ExtractBodyLevelImportPaths(content, baseDir string) []BodyLevelImport {
 	repoRoot := findGitHubRepoRoot(baseDir)
 
 	var results []BodyLevelImport
-	for _, line := range strings.Split(content, "\n") {
+	for line := range strings.SplitSeq(content, "\n") {
 		line = strings.TrimSpace(line)
 
 		// Match {{#runtime-import}} directives only.

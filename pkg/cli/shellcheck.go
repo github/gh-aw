@@ -287,12 +287,28 @@ func writeTempScriptFile(script string) (string, error) {
 		return "", fmt.Errorf("failed to create temp file for shellcheck: %w", err)
 	}
 	if _, err := tmpFile.WriteString(sanitizedScript); err != nil {
-		tmpFile.Close()
-		os.Remove(tmpFile.Name())
-		return "", fmt.Errorf("failed to write shellcheck temp file: %w", err)
+		writeErr := fmt.Errorf("failed to write shellcheck temp file: %w", err)
+		closeErr := tmpFile.Close()
+		removeErr := os.Remove(tmpFile.Name())
+		return "", errors.Join(
+			writeErr,
+			wrapShellcheckTempFileError("close", closeErr),
+			wrapShellcheckTempFileError("remove incomplete", removeErr),
+		)
 	}
-	tmpFile.Close()
+	if err := tmpFile.Close(); err != nil {
+		closeErr := fmt.Errorf("failed to close shellcheck temp file: %w", err)
+		removeErr := os.Remove(tmpFile.Name())
+		return "", errors.Join(closeErr, wrapShellcheckTempFileError("remove incomplete", removeErr))
+	}
 	return tmpFile.Name(), nil
+}
+
+func wrapShellcheckTempFileError(operation string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("failed to %s shellcheck temp file: %w", operation, err)
 }
 
 // runShellcheckOnScript writes script to a temporary file and invokes shellcheck.

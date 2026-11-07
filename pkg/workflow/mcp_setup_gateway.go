@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -83,7 +84,7 @@ func generateMCPGatewaySetup(yaml *strings.Builder, tools map[string]any, mcpToo
 	githubToolRaw, hasGitHub := tools["github"]
 	githubTool, ok := githubToolRaw.(map[string]any)
 	if hasGitHub && !ok {
-		return fmt.Errorf("tools.github must be a mapping")
+		return errors.New("tools.github must be a mapping")
 	}
 	if err := writeMCPGatewayExports(yaml, writeMCPGatewayExportsOptions{
 		engine:               engine,

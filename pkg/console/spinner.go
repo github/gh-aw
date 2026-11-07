@@ -84,7 +84,7 @@ func (m spinnerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // render manually prints the spinner frame (required when using WithoutRenderer)
 func (m spinnerModel) render() {
 	if m.output != nil {
-		fmt.Fprintf(m.output, "%s%s%s %s", ansiCarriageReturn, ansiClearLine, m.spinner.View(), m.message)
+		fmt.Fprintf(m.output, "%s%s%s %s", ansiCarriageReturn, ansiClearLine, m.spinner.View(), m.message) //nolint:fprintferrorunchecked // spinner rendering is best-effort terminal output
 	}
 }
 
@@ -232,8 +232,8 @@ func (s *SpinnerWrapper) Stop() {
 		if wasRendering {
 			spinnerLog.Print("Stopping spinner")
 			s.program.Quit()
-			s.wg.Wait() // Wait for the goroutine to complete (goroutine releases the slot)
-			fmt.Fprintf(s.out, "%s%s", ansiCarriageReturn, ansiClearLine)
+			s.wg.Wait()                                                   // Wait for the goroutine to complete (goroutine releases the slot)
+			fmt.Fprintf(s.out, "%s%s", ansiCarriageReturn, ansiClearLine) //nolint:fprintferrorunchecked // spinner rendering is best-effort terminal output
 		} else {
 			// Suppressed spinner has no goroutine; release the slot directly (no-op).
 			releaseActiveSpinner(s)
@@ -258,22 +258,22 @@ func (s *SpinnerWrapper) StopWithMessage(msg string) {
 		if wasRunning {
 			if wasRendering {
 				s.program.Quit()
-				s.wg.Wait() // Wait for the goroutine to complete (goroutine releases the slot)
-				fmt.Fprintf(s.out, "%s%s%s\n", ansiCarriageReturn, ansiClearLine, msg)
+				s.wg.Wait()                                                            // Wait for the goroutine to complete (goroutine releases the slot)
+				fmt.Fprintf(s.out, "%s%s%s\n", ansiCarriageReturn, ansiClearLine, msg) //nolint:fprintferrorunchecked // spinner rendering is best-effort terminal output
 			} else {
 				// Suppressed spinner never rendered; release the slot and print the message.
 				// Still emit CR+ClearLine so the message is not appended to any active
 				// spinner frame that may currently occupy the terminal line.
 				releaseActiveSpinner(s)
-				fmt.Fprintf(s.out, "%s%s%s\n", ansiCarriageReturn, ansiClearLine, msg)
+				fmt.Fprintf(s.out, "%s%s%s\n", ansiCarriageReturn, ansiClearLine, msg) //nolint:fprintferrorunchecked // spinner rendering is best-effort terminal output
 			}
 		} else {
 			// Still print the message even if spinner wasn't running
-			fmt.Fprintf(s.out, "%s\n", msg)
+			fmt.Fprintf(s.out, "%s\n", msg) //nolint:fprintferrorunchecked // spinner rendering is best-effort terminal output
 		}
 	} else if msg != "" {
 		// If spinner is disabled, still print the message for user feedback
-		fmt.Fprintf(s.out, "%s\n", msg)
+		fmt.Fprintf(s.out, "%s\n", msg) //nolint:fprintferrorunchecked // spinner rendering is best-effort terminal output
 	}
 }
 

@@ -175,7 +175,11 @@ func getLatestVersion(ctx context.Context, modulePath, currentVersion string, ve
 	if err != nil {
 		return "", 0, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			depsOutdatedLog.Printf("Failed to close Go proxy response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		if _, err := io.Copy(io.Discard, resp.Body); err != nil {

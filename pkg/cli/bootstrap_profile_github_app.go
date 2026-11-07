@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -192,7 +193,11 @@ func createBootstrapGitHubApp(ctx context.Context, repo, owner, repoName, ownerT
 	if err != nil {
 		return nil, err
 	}
-	defer listener.Close()
+	defer func() {
+		if err := listener.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+			githubAppBootstrapLog.Printf("Failed to close GitHub App registration listener: %v", err)
+		}
+	}()
 
 	appOwner, appOwnerType, appName, homepageURL, description, err := setupBootstrapGitHubAppDetails(ctx, repo, owner, ownerType, action, overrides)
 	if err != nil {

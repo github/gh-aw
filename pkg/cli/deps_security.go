@@ -158,7 +158,11 @@ func querySecurityAdvisories(ctx context.Context, depVersions map[string]string,
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			depsSecurityLog.Printf("Failed to close GitHub advisory response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		if _, err := io.Copy(io.Discard, resp.Body); err != nil {

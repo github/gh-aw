@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/github/gh-aw/pkg/errorutil"
 )
@@ -30,8 +31,8 @@ func TestCloseWithError(t *testing.T) {
 
 	errorutil.CloseWithError(testCloser{err: closeErr}, &err)
 
-	assert.ErrorIs(t, err, originalErr)
-	assert.ErrorIs(t, err, closeErr)
+	require.ErrorIs(t, err, originalErr)
+	require.ErrorIs(t, err, closeErr)
 }
 
 func TestIsNotFoundError(t *testing.T) {
