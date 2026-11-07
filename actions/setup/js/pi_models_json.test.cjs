@@ -668,7 +668,7 @@ describe("pi_models_json.cjs", () => {
   describe("shared model resolution (recorded /reflect from run 38945917145)", () => {
     function configure(model, aliases = reflectFixtures.builtinAliases()) {
       process.env.GH_AW_PI_MODEL = model;
-      process.env.GH_AW_PI_MODEL_ID = model.slice(model.indexOf("/") + 1);
+      delete process.env.GH_AW_PI_MODEL_ID;
       process.env.GH_AW_PI_MODEL_ALIASES = JSON.stringify(aliases);
       process.env.GH_AW_PI_GATEWAY_SECRET_ENV = "COPILOT_GITHUB_TOKEN";
       process.env.GH_AW_PI_GATEWAY_FALLBACK_PORT = "10002";
@@ -702,6 +702,15 @@ describe("pi_models_json.cjs", () => {
       expect(lines).toHaveLength(1);
       expect(lines[0]).toContain("configured=copilot/opus resolved=claude-opus-5.5");
       expect(records()).toEqual([{ engine: "pi", role: "main", configured_model: "copilot/opus", resolved_model: "claude-opus-5.5", provider: "copilot", status: "resolved", cause: null }]);
+    });
+
+    it("escapes control characters in model resolution diagnostics", async () => {
+      configure("copilot/opus\n::add-mask::secret");
+      const { promise } = run([reflectFixtures.ddgReflect()]);
+      await promise.catch(() => {});
+      const output = stderrOutput.join("");
+      expect(output).not.toContain("\n::add-mask::secret");
+      expect(output).toContain("copilot/opus\\u000a::add-mask::secret");
     });
 
     it("fails closed with model_unavailable for a retired exact id", async () => {

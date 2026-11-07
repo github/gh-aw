@@ -74,7 +74,7 @@ jobs:
 	if err != nil {
 		return "", fmt.Errorf("failed to finalize work queue event workflow: %w", err)
 	}
-	return finalized, nil
+	return documentPermissionComments(finalized, "")
 }
 
 func writeWorkQueueIssueEventsJob(b *strings.Builder, actionMode ActionMode, setupActionRef string, resolver SHAResolver) {

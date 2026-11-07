@@ -79,7 +79,7 @@ steps:
           if [ -s "$logs_dir/${agent_run_id}-events.jsonl" ] || [ -s "$logs_dir/${agent_run_id}-conversation.txt" ]; then
             count=$((count + 1))
           fi
-        done < <(jq -r '.[] | select(.status == "completed" and .conclusion != "action_required") | .id' "$sessions_file")
+        done < <(jq -r '.[] | select(.conclusion != "action_required") | .id' "$sessions_file")
 
         echo "$count"
       }
@@ -87,8 +87,8 @@ steps:
       USE_CACHE=false
 
       # Check if restored cache data is still fresh enough to reuse
-      if cache_is_fresh "$CACHE_FILE"; then
-        CACHED_AGENT_COUNT=$(jq '[.[] | select(.status == "completed" and .conclusion != "action_required")] | length' "$CACHE_FILE")
+      if cache_is_fresh "$CACHE_FILE" && jq -e 'all(.[]; .path == "dynamic/copilot-swe-agent/copilot" and .status == "completed")' "$CACHE_FILE" >/dev/null; then
+        CACHED_AGENT_COUNT=$(jq '[.[] | select(.conclusion != "action_required")] | length' "$CACHE_FILE")
         CACHED_LOG_RUN_COUNT=$(count_agent_logs "$CACHE_FILE" "$CACHE_LOGS_DIR")
         if [ "$CACHED_AGENT_COUNT" -eq 0 ] || [ "$CACHED_LOG_RUN_COUNT" -ge "$CACHED_AGENT_COUNT" ]; then
           USE_CACHE=true
@@ -123,14 +123,12 @@ steps:
         # Calculate date 30 days ago
         DATE_30_DAYS_AGO=$(date -d '30 days ago' '+%Y-%m-%d' 2>/dev/null || date -v-30d '+%Y-%m-%d')
 
-        # Search for workflow runs from copilot/* branches
-        # This fetches GitHub Copilot coding agent task runs by searching for workflow runs on copilot/* branches
+        # Select the coding-agent workflow itself, not ordinary CI on Copilot branches.
         echo "Fetching Copilot coding agent workflow runs from the last 30 days..."
         
-        # Get workflow runs from copilot/* branches
-        gh api "repos/$GITHUB_REPOSITORY/actions/runs" \
+        gh api "repos/$GITHUB_REPOSITORY/actions/runs?per_page=100&created=>=${DATE_30_DAYS_AGO}" \
           --paginate \
-          --jq ".workflow_runs[] | select(.head_branch | startswith(\"copilot/\")) | select(.created_at >= \"${DATE_30_DAYS_AGO}\") | {id, name, head_branch, created_at, updated_at, status, conclusion, html_url}" \
+          --jq '.workflow_runs[] | select(.path == "dynamic/copilot-swe-agent/copilot") | {id, name, path, head_branch, created_at, updated_at, status, conclusion: (.conclusion // (if .status == "completed" then "unknown" else .status // "unknown" end)), html_url}' \
           | jq -s '.[0:50]' \
           > /tmp/gh-aw/agent/session-data/sessions-list.json
 
@@ -144,11 +142,11 @@ steps:
         # Prefer structured events.jsonl artifacts; fall back to [cca-engine] turn= lines
         # in raw Actions job logs when no events.jsonl artifact is available.
         SESSION_COUNT=$(jq 'length' /tmp/gh-aw/agent/session-data/sessions-list.json)
-        AGENT_COUNT=$(jq '[.[] | select(.status == "completed" and .conclusion != "action_required")] | length' /tmp/gh-aw/agent/session-data/sessions-list.json)
+        AGENT_COUNT=$(jq '[.[] | select(.conclusion != "action_required")] | length' /tmp/gh-aw/agent/session-data/sessions-list.json)
         echo "Downloading per-session logs for $AGENT_COUNT agent runs (skipping $((SESSION_COUNT - AGENT_COUNT)) CI gate runs)..."
 
         RUNS_TO_FETCH="${RUNNER_TEMP:-/tmp}/copilot-session-runs-${RUN_TAG}.txt"
-        jq -r '.[] | select(.status == "completed" and .conclusion != "action_required") | "\(.id) \(.head_branch)"' /tmp/gh-aw/agent/session-data/sessions-list.json > "$RUNS_TO_FETCH"
+        jq -r '.[] | select(.conclusion != "action_required") | "\(.id) \(.head_branch)"' /tmp/gh-aw/agent/session-data/sessions-list.json > "$RUNS_TO_FETCH"
 
         FETCH_STATUS_LOG="${RUNNER_TEMP:-/tmp}/copilot-session-fetch-status-${RUN_TAG}.log"
         rm -f "$FETCH_STATUS_LOG"
@@ -171,7 +169,7 @@ steps:
             rm -f "$events_tmp" "$events_out"
 
             for artifact_id in $(gh api "repos/$GITHUB_REPOSITORY/actions/runs/${run_id}/artifacts" \
-              --jq '.artifacts[] | select(.expired == false) | .id' 2>/dev/null || true); do
+              --paginate --jq '.artifacts[] | select(.expired == false) | .id' 2>/dev/null || true); do
               artifact_zip="${artifact_work_dir}/${artifact_id}.zip"
               artifact_dir="${artifact_work_dir}/${artifact_id}"
               mkdir -p "$artifact_dir"
@@ -182,9 +180,17 @@ steps:
               fi
             done
 
-            for events_file in $(find "$artifact_work_dir" -type f -name events.jsonl 2>/dev/null || true); do
+            while IFS= read -r -d '' events_file; do
               cat "$events_file" >> "$events_tmp"
-            done
+              printf '\n' >> "$events_tmp"
+            done < <(find "$artifact_work_dir" -type f -name events.jsonl -print0)
+
+            conversation_out="/tmp/gh-aw/agent/session-data/logs/${run_id}-conversation.txt"
+            rm -f "$conversation_out"
+            while IFS= read -r -d '' conversation_file; do
+              cat "$conversation_file" >> "$conversation_out"
+              printf '\n' >> "$conversation_out"
+            done < <(find "$artifact_work_dir" -type f \( -name conversation.txt -o -name conversation.md \) -print0)
 
             if [ -s "$events_tmp" ]; then
               cp "$events_tmp" "$events_out"
@@ -194,7 +200,7 @@ steps:
             rm -f "$events_tmp"
             rm -rf "$artifact_work_dir"
 
-            if [ ! -s "$events_out" ]; then
+            if [ ! -s "$events_out" ] && [ ! -s "$conversation_out" ]; then
               # Download raw job logs as a transcript fallback. gh api follows the
               # 302 redirect automatically; inspect every job in case the agent job
               # is not first in the run.
@@ -206,7 +212,7 @@ steps:
               rm -f "$jobs_err"
               jobs_rc=0
               job_ids="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/${run_id}/jobs" \
-                --jq '.jobs[].id' 2>"$jobs_err")" || jobs_rc=$?
+                --paginate --jq '.jobs[].id' 2>"$jobs_err")" || jobs_rc=$?
 
               if [ -z "$job_ids" ]; then
                 if [ "$jobs_rc" -ne 0 ]; then
@@ -291,10 +297,86 @@ steps:
         echo "Total sessions found: $(jq 'length' /tmp/gh-aw/agent/session-data/sessions-list.json)"
       fi
       
+      # Normalize restored metadata too, and regenerate its schema.
+      jq 'map(.conclusion = (.conclusion // (if .status == "completed" then "unknown" else .status // "unknown" end)))' \
+        /tmp/gh-aw/agent/session-data/sessions-list.json > /tmp/gh-aw/agent/session-data/sessions-list.json.tmp
+      mv /tmp/gh-aw/agent/session-data/sessions-list.json.tmp /tmp/gh-aw/agent/session-data/sessions-list.json
+      ./.github/skills/jqschema/jqschema.sh < /tmp/gh-aw/agent/session-data/sessions-list.json > /tmp/gh-aw/agent/session-data/sessions-schema.json
+
+      # Summaries contain measurements only; never copy tool inputs/results into them.
+      python3 - <<'PY'
+      import datetime
+      import json
+      from pathlib import Path
+
+      root = Path("/tmp/gh-aw/agent/session-data")
+
+      def timestamp(value):
+          try:
+              return datetime.datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+          except (AttributeError, TypeError, ValueError):
+              return None
+
+      def payload_bytes(data, *keys):
+          for key in keys:
+              if key in data and data[key] is not None:
+                  value = data[key]
+                  text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+                  return len(text.encode("utf-8"))
+          return None
+
+      summaries = []
+      for session in json.loads((root / "sessions-list.json").read_text()):
+          run_id = session["id"]
+          events_file = root / "logs" / f"{run_id}-events.jsonl"
+          conversation_file = root / "logs" / f"{run_id}-conversation.txt"
+          source = "events" if events_file.is_file() and events_file.stat().st_size else "conversation" if conversation_file.is_file() and conversation_file.stat().st_size else "missing"
+          summary = {"id": run_id, "status": session["status"], "conclusion": session["conclusion"], "source": source, "event_count": 0, "invalid_event_count": 0, "tool_calls": [], "unmatched_completions": 0}
+          pending = {}
+          scope = None
+          if source == "events":
+              with events_file.open() as lines:
+                  for line in lines:
+                      if not line.strip():
+                          continue
+                      try:
+                          event = json.loads(line)
+                          if not isinstance(event, dict) or not isinstance(event.get("data"), dict) or not isinstance(event.get("type"), str):
+                              raise ValueError("Invalid event")
+                      except (ValueError, TypeError):
+                          summary["invalid_event_count"] += 1
+                          continue
+                      summary["event_count"] += 1
+                      data = event["data"]
+                      if event["type"] == "session.start":
+                          scope = data.get("sessionId", event.get("id"))
+                      call_id = data.get("toolCallId")
+                      key = json.dumps([scope, event.get("agentId"), call_id])
+                      if event["type"] == "tool.execution_start":
+                          call = {"tool_call_id": call_id, "tool": data.get("toolName"), "started_at": event.get("timestamp"), "duration_ms": None, "input_bytes": payload_bytes(data, "arguments", "input"), "output_bytes": None, "success": None, "completed": False}
+                          summary["tool_calls"].append(call)
+                          if call_id is not None:
+                              pending[key] = call
+                      elif event["type"] == "tool.execution_complete":
+                          call = pending.pop(key, None) if call_id is not None else None
+                          if call is None:
+                              summary["unmatched_completions"] += 1
+                              continue
+                          start, end = timestamp(call["started_at"]), timestamp(event.get("timestamp"))
+                          if start is not None and end is not None and end >= start:
+                              call["duration_ms"] = round((end - start) * 1000, 3)
+                          call.update(output_bytes=payload_bytes(data, "result", "output"), success=data.get("success"), completed=True)
+          summary["incomplete_tool_calls"] = sum(not call["completed"] for call in summary["tool_calls"])
+          summary["measurements_available"] = source == "events"
+          summaries.append(summary)
+      (root / "tool-summaries.json").write_text(json.dumps(summaries, indent=2) + "\n")
+      PY
+
       # Always ensure data is available at expected locations for backward compatibility
       echo "Session data available at: /tmp/gh-aw/agent/session-data/sessions-list.json"
       echo "Schema available at: /tmp/gh-aw/agent/session-data/sessions-schema.json"
       echo "Logs available at: /tmp/gh-aw/agent/session-data/logs/"
+      echo "Tool latency and payload summaries available at: /tmp/gh-aw/agent/session-data/tool-summaries.json"
 
       TELEMETRY_LOG_COUNT=$(find /tmp/gh-aw/agent/session-data/logs -type f \( -name "*-events.jsonl" -o -name "*-conversation.txt" \) | wc -l)
       TOTAL_SESSION_COUNT=$(jq 'length' /tmp/gh-aw/agent/session-data/sessions-list.json 2>/dev/null || echo 0)
@@ -315,12 +397,12 @@ steps:
 <!--
 ## Copilot Session Data Fetch
 
-This shared component fetches GitHub Copilot coding agent session data by analyzing workflow runs from `copilot/*` branches, with intelligent caching to avoid redundant API calls.
+This shared component fetches GitHub Copilot coding agent session data from the `dynamic/copilot-swe-agent/copilot` workflow, with intelligent caching to avoid redundant API calls. Ordinary CI runs on `copilot/*` branches are not sessions.
 
 ### What It Does
 
 1. Creates output directories at `/tmp/gh-aw/agent/session-data/` and `/tmp/gh-aw/cache-memory/`
-2. Checks the restored cache for `copilot-sessions-latest.json` and reuses it when it is younger than `CACHE_MAX_AGE_SECONDS` (default 6 hours) and its cached logs cover every agent run
+2. Checks the restored cache for `copilot-sessions-latest.json` and reuses it when it is younger than `CACHE_MAX_AGE_SECONDS` (default 6 hours), contains only completed coding-agent runs, and its cached logs cover every agent run
 3. If a fresh and complete cache exists (written by any earlier run, on any date):
    - Uses cached data instead of making API calls
    - Copies data from cache to working directory
@@ -328,15 +410,16 @@ This shared component fetches GitHub Copilot coding agent session data by analyz
    - Emits a warning if session metadata is present but no telemetry logs were restored
 4. If the cache is missing, stale, or incomplete:
    - Calculates the date 30 days ago (cross-platform compatible)
-   - Fetches all workflow runs from branches starting with `copilot/` using GitHub API
+   - Fetches up to 50 coding-agent workflow runs using GitHub API
    - **Downloads per-session logs** for actual agent runs (skips CI gate runs): structured `events.jsonl` from run artifacts first, then conversation transcripts from GitHub Actions job logs as a fallback
    - Saves data to cache under the stable filename `copilot-sessions-latest.json` (logs under `session-logs-latest/`)
    - Copies data to working directory for use
-5. Generates a schema of the data structure
+5. Normalizes null conclusions to the unfinished run status, or `unknown` for completed runs, and generates a schema of the data structure
+6. Emits `tool-summaries.json` for both fresh and cached logs, with per-call duration in milliseconds and UTF-8 input/result byte sizes. Missing measurements remain null; transcript-only and missing telemetry are explicitly marked unavailable.
 
 ### Session Log Access
 
-The fetcher first downloads non-expired GitHub Actions artifacts for each completed real agent run (status = `completed`, conclusion ≠ `action_required`) and extracts any `events.jsonl` files. When no structured events artifact is available, it falls back to raw GitHub Actions job logs and extracts `[cca-engine] turn=` lines as a transcript. CI gate runs (`action_required`) are skipped because they have no agent conversation.
+The fetcher downloads non-expired GitHub Actions artifacts for real coding-agent runs (conclusion ≠ `action_required`), including available artifacts from unfinished runs, and extracts `events.jsonl`, `conversation.txt`, and `conversation.md` files. Artifact and job listings are paginated. When no events or conversation artifact is available, it falls back to raw GitHub Actions job logs and extracts `[cca-engine] turn=` lines as a transcript. Approval-gated runs (`action_required`) are skipped because they have no agent conversation.
 
 If a real agent run has neither an `events.jsonl` artifact nor a transcript fallback, the fetch step emits a GitHub Actions warning and continues with the available logs. Every per-run failure (job listing error, log download error, empty log, or a downloaded log with no matching `[cca-engine]` lines) is logged individually with its specific reason, and a summary warning breaks down the failure counts by category (API errors, no jobs found, empty logs, no matching lines) so the actual cause is visible instead of a silently empty `logs/` directory. API errors are counted by non-zero `gh api` exit code and can stem from permission errors, rate limiting, or deleted runs — check the per-run log lines for the specific reason rather than assuming a permissions issue.
 
@@ -361,11 +444,12 @@ The `gh agent-task view --log` approach that was previously used **requires an O
 
 ### Output Files
 
-- **`/tmp/gh-aw/agent/session-data/sessions-list.json`**: Full session data including run ID, name, branch, timestamps, status, conclusion, and URL
+- **`/tmp/gh-aw/agent/session-data/sessions-list.json`**: Full session data including run ID, workflow path, name, branch, timestamps, status, normalized conclusion, and URL
 - **`/tmp/gh-aw/agent/session-data/sessions-schema.json`**: JSON schema showing the structure of the session data
 - **`/tmp/gh-aw/agent/session-data/logs/`**: Directory containing session logs
   - **`{run_id}-events.jsonl`**: Structured Copilot session events extracted from run artifacts (preferred; only present for actual agent runs with events artifacts)
-  - **`{run_id}-conversation.txt`**: Agent conversation transcript fallback — `[cca-engine] turn=` lines from the job log containing turn-by-turn model/token/tool data (only present when `events.jsonl` is unavailable)
+  - **`{run_id}-conversation.txt`**: Conversation artifacts when available, otherwise `[cca-engine] turn=` lines from job logs
+- **`/tmp/gh-aw/agent/session-data/tool-summaries.json`**: Per-session source coverage, invalid-event and unmatched/incomplete-call counts, and per-call latency/payload measurements. Calls are paired by session scope, agent and tool-call ID; summaries do not include tool input/result contents.
 - **`/tmp/gh-aw/cache-memory/copilot-sessions-latest.json`**: Cached session data (stable filename)
 - **`/tmp/gh-aw/cache-memory/copilot-sessions-latest-schema.json`**: Cached schema (stable filename)
 - **`/tmp/gh-aw/cache-memory/session-logs-latest/`**: Cached log files (stable directory name)
@@ -407,14 +491,14 @@ cat /tmp/gh-aw/agent/session-data/logs/29001106791-conversation.txt
 ### Requirements
 
 - Automatically imports the `jqschema` skill for schema generation (via transitive import closure)
-- Uses GitHub Actions API to fetch workflow runs from `copilot/*` branches
+- Uses GitHub Actions API to fetch the coding-agent workflow's runs, artifacts and logs
 - **Fetches structured `events.jsonl` from GitHub Actions artifacts**, then falls back to conversation transcripts from GitHub Actions job logs using `actions: read` permission. For most repository workflow runs the standard `GITHUB_TOKEN` is sufficient; downloading job logs from GitHub Copilot coding-agent runs specifically may require a PAT configured as the `GH_AW_GITHUB_TOKEN` repository secret (the fetch step falls back to `GITHUB_TOKEN` automatically if that secret is unset)
 - Cross-platform date calculation (works on both GNU and BSD date commands)
 - Cache-memory tool is automatically configured for data persistence
 
-### Why Branch-Based Search?
+### Why Workflow-Based Search?
 
-GitHub Copilot creates branches with the `copilot/` prefix, making branch-based workflow run search a reliable way to identify Copilot coding agent sessions.
+The coding-agent workflow path identifies actual sessions without confusing ordinary branch CI with agent activity or relying on descriptive branch slugs to encode session IDs.
 
 ### Session Log Format
 
@@ -438,9 +522,8 @@ Each line carries: timestamp, turn number, event type, and event-specific payloa
 
 ### Cache Behavior
 
-The cache is date-based, meaning:
-- All workflows running on the same day share cached data
-- Cache refreshes automatically the next day
-- First workflow of the day fetches fresh data and populates the cache
-- Subsequent workflows use the cached data for faster execution
+The cache is freshness- and coverage-based, meaning:
+- Workflows share complete cached data within the six-hour freshness window
+- Stale, incomplete, legacy branch-CI, and unfinished-run caches are refreshed
+- Summaries are regenerated from restored logs rather than cached separately
 -->

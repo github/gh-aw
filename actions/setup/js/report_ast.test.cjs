@@ -293,6 +293,23 @@ describe("report AST", () => {
     expect(body).toContain("`@octocat` &amp; text");
   });
 
+  it("preserves complete temporary references for later expansion while escaping other Markdown", () => {
+    const { replaceTemporaryIdReferences } = require("./temporary_id.cjs");
+    const input = "See #aw_track1 and #aw_other_id; not #aw_test-id or # heading, *bold* and ordinary_text.";
+    const body = renderReport(report([paragraph(input)])).body;
+    expect(body).toBe("See #aw_track1 and #aw_other_id; not \\#aw\\_test-id or \\# heading, \\*bold\\* and ordinary\\_text.\n");
+    const ids = new Map([["aw_track1", { repo: "owner/repo", number: 123 }]]);
+    expect(replaceTemporaryIdReferences(body.split(";")[0], ids, "owner/repo")).toBe("See #123 and #aw_other_id");
+    expect(renderReport(report(parseReportMarkdown(body))).body).toBe(body);
+  });
+
+  it("preserves temporary references in image alt text", () => {
+    const body = renderReport(report([{ type: "paragraph", children: [{ type: "image", url: "https://example.com/image.png", alt: "Chart #aw_chart1 and other_text" }] }])).body;
+    expect(body).toBe("![Chart #aw_chart1 and other\\_text](https://example.com/image.png)\n");
+    const literalSlash = renderReport(report([{ type: "paragraph", children: [{ type: "image", url: "https://example.com/image.png", alt: "Chart \\#aw_chart1" }] }])).body;
+    expect(literalSlash).toBe("![Chart \\\\#aw\\_chart1](https://example.com/image.png)\n");
+  });
+
   it("chooses fences after normalization and redaction", () => {
     vi.stubEnv("GH_AW_SECRET_NAMES", "REPORT_TEST");
     vi.stubEnv("SECRET_REPORT_TEST", "report-secret-fixture");

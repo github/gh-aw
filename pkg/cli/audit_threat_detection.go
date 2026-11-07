@@ -67,6 +67,7 @@ func generateThreatDetectionFindings(processedRun ProcessedRun) []AuditFinding {
 		description := "The threat-detection job failed before producing a threat verdict"
 		impact := "Safe outputs may have been blocked because the security control did not complete"
 		title := "Threat Detection Job Failed"
+		category := "security"
 		if detectionExecutionNotStarted && !detectionJobFailed {
 			description = "Usage artifact evidence indicates the threat-detection job did not start"
 			impact = "Safe outputs may have been blocked because the security control did not run"
@@ -81,13 +82,16 @@ func generateThreatDetectionFindings(processedRun ProcessedRun) []AuditFinding {
 		}
 		if detectionFailed {
 			switch usageResult.Reason {
-			case "agent_failure", "parse_error", "threat_detected":
+			case "agent_failure", "parse_error":
+				category = "tooling"
+				description = "The threat detection engine could not complete its analysis (" + usageResult.Reason + "); this is a tooling error, not a security finding"
+			case "threat_detected":
 				description += " (" + usageResult.Reason + ")"
 			}
 		}
 		findings = append(findings, AuditFinding{
 			Code:        AuditFindingDetectionJobFailed,
-			Category:    "security",
+			Category:    category,
 			Severity:    "high",
 			Title:       title,
 			Description: description,
@@ -133,6 +137,24 @@ func readDetectionUsageResult(runDir string) (detectionUsageResult, bool) {
 	return evidence.Result, evidence.HasResult
 }
 
+func appendAuditDetectionIssues(data *AuditData) {
+	for _, finding := range data.KeyFindings {
+		if finding.Code != AuditFindingDetectionJobFailed && finding.Code != AuditFindingThreatDetected {
+			continue
+		}
+		issue := ValidationIssue{Type: "error", Message: finding.Description}
+		if finding.Title == "Threat Detection Warning" {
+			issue.Type = "warning"
+			data.Warnings = append(data.Warnings, issue)
+		} else {
+			data.Errors = append(data.Errors, issue)
+		}
+	}
+	// The same failure may already have been counted from job or agent logs.
+	data.Metrics.ErrorCount = max(data.Metrics.ErrorCount, len(data.Errors))
+	data.Metrics.WarningCount = max(data.Metrics.WarningCount, len(data.Warnings))
+}
+
 func validDetectionJobResult(result string) bool {
 	return result == "success" || result == "failure" || result == "cancelled" || result == "skipped"
 }
@@ -143,14 +165,17 @@ func readLegacyDetectionUsageResult(runDir string) (detectionUsageResult, bool) 
 	}
 	file, err := os.Open(filepath.Join(runDir, constants.UsageArtifactName.String(), "detection", "detection_result.json"))
 	if err != nil {
-		return detectionUsageResult{}, false
+		return readConclusionDetectionUsageResult(runDir)
 	}
 	defer closeThreatDetectionFile(file)
 	var result detectionUsageResult
 	if err := json.NewDecoder(io.LimitReader(file, 1024*1024)).Decode(&result); err != nil {
-		return detectionUsageResult{}, false
+		return readConclusionDetectionUsageResult(runDir)
 	}
-	return result, validDetectionJobResult(result.JobResult)
+	if !validDetectionJobResult(result.JobResult) {
+		return readConclusionDetectionUsageResult(runDir)
+	}
+	return result, true
 }
 
 func (v threatDetectionVerdict) threatKinds() []string {

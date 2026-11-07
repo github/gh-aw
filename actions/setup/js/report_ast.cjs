@@ -4,6 +4,7 @@ const { canonicalizePublicationText, buildAllowedDomains, sanitizeUrlDomains } =
 const { redactDiagnosticText } = require("./diagnostic_sanitization.cjs");
 const { escapeMarkdown } = require("./missing_info_formatter.cjs");
 const { createExpirationLine } = require("./ephemerals.cjs");
+const { TEMPORARY_ID_PATTERN } = require("./temporary_id.cjs");
 
 /**
  * @typedef {{agentTainted?: boolean, sizeProtected?: boolean}} ReportProvenance
@@ -510,6 +511,7 @@ function escapeReportText(value) {
             .replace(/[|#~!]/g, "\\$&")
             .replace(/^([-+])(?= )/, "\\$1")
             .replace(/^(\d+)\.(?= )/, "$1\\.")
+            .replace(TEMPORARY_ID_PATTERN, match => match.replace(/\\([#_])/g, "$1"))
     )
     .join("");
 }
@@ -583,7 +585,9 @@ function renderInlines(nodes, html = false) {
           ];
           return `<img ${attributes.join(" ")}>`;
         }
-        return `![${escapeMarkdown(node.alt.replace(/&/g, "&amp;")).replace(/@/g, "&#64;")}](${escapeURLDestination(node.url)})`;
+        return `![${escapeMarkdown(node.alt.replace(/&/g, "&amp;"))
+          .replace(/@/g, "&#64;")
+          .replace(TEMPORARY_ID_PATTERN, match => (match.startsWith("#") ? match.replace(/\\_/g, "_") : match))}](${escapeURLDestination(node.url)})`;
       }
       case "mention":
         return `@${node.login}`;

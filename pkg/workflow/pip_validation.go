@@ -78,8 +78,8 @@ func (c *Compiler) validatePythonPackagesWithPip(packages []string, packageType 
 		// or uvx-style "@version", e.g. "ruff@0.1.0").
 		pkgName := stripUvPackageVersion(pkg)
 
-		// Validate the package name against PyPI naming rules (PEP 508).
-		// pip does not universally honour '--', so we validate upfront.
+		// Validate the package name against PyPI naming rules (PEP 508), even
+		// though the option terminator below also prevents option parsing.
 		if err := validatePipCommandPackageArg(pkgName); err != nil {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("%s package name '%s' is invalid: %v", packageType, pkg, err)))
 			continue
@@ -92,7 +92,7 @@ func (c *Compiler) validatePythonPackagesWithPip(packages []string, packageType 
 		// #nosec G204 -- pipPath is resolved from the hardcoded executable names "pip" or "pip3"
 		// and validated immediately above; pkgName is
 		// validated above by validatePipPackageName against the strict PyPI PEP 508 allowlist.
-		cmd := exec.Command(validatedPipPath, "index", "versions", pkgName, "--pre")
+		cmd := exec.Command(validatedPipPath, "index", "versions", "--pre", "--", pkgName)
 		output, err := cmd.CombinedOutput()
 
 		if err != nil {
@@ -247,7 +247,7 @@ func (c *Compiler) validateUvPackagesWithExecutable(packages []string, uvPath st
 		// #nosec G204 -- uvPath is resolved from the hardcoded executable name "uv" via
 		// fileutil.ResolveExecutablePath and validated before calling this method;
 		// pkgName is validated above by validatePipPackageName against the strict PEP 508 allowlist.
-		cmd := exec.Command(uvPath, "pip", "show", pkgName, "--no-cache")
+		cmd := exec.Command(uvPath, "pip", "show", "--no-cache", "--", pkgName)
 		_, err := cmd.CombinedOutput()
 
 		if err != nil {

@@ -26,10 +26,18 @@ on:
 engine: copilot
 strict: false
 permissions:
-  contents: read
+  contents: read # Agent checkout
+  issues: read # Agent issue lookup
 safe-outputs:
   add-comment:
   threat-detection: true
+  jobs:
+    publish:
+      runs-on: ubuntu-latest
+      permissions: # Publish the report
+        issues: write # Post the report issue
+      steps:
+        - run: echo ok
 jobs:
   probe:
     runs-on: ubuntu-latest
@@ -79,7 +87,12 @@ Run the agent.
 	}
 	require.NotContains(t, output, "# # Needed by on.steps", "source comments should not be double-commented")
 	require.Contains(t, output, "  probe:\n")
-	require.Contains(t, output, "    # Custom job needs checkout access\n    # Read the source\n    # repo checkout\n    permissions:")
+	require.Contains(t, output, "    # Custom job needs checkout access\n    permissions:\n      # Read the source\n      contents: read # repo checkout")
+	require.Contains(t, output, "issues: read # Agent issue lookup")
+	require.Contains(t, output, "contents: read # Agent checkout")
+	require.Contains(t, output, "permissions: # Publish the report")
+	require.Contains(t, output, "issues: write # Post the report issue")
+	require.Contains(t, output, "id-token: write # token mint")
 }
 
 func TestSourceJobPermissionCommentsAreScoped(t *testing.T) {
@@ -107,11 +120,15 @@ jobs:
       contents: read # second permission
     # not a permission comment
 `
-	comments := sourceJobPermissionComments(source)
-	require.Equal(t, []string{"# before on permissions", "# on permission", "# read repo"}, comments["pre_activation"])
-	require.Equal(t, []string{"# before first permissions", "# first permission"}, comments["first"])
-	require.Equal(t, []string{"# custom purpose", "# second permission"}, comments["second"])
-	require.NotContains(t, strings.Join(comments["first"], "\n"), "unrelated")
+	comments, err := permissionCommentSources(source)
+	require.NoError(t, err)
+	require.Equal(t, "# before on permissions", comments["pre_activation"].key.HeadComment)
+	require.Equal(t, "# on permission", permissionCommentEntry(comments["pre_activation"].value, "contents").key.HeadComment)
+	require.Equal(t, "# read repo", permissionCommentEntry(comments["pre_activation"].value, "contents").value.LineComment)
+	require.Equal(t, "# before first permissions", comments["first"].key.HeadComment)
+	require.Equal(t, "# first permission", permissionCommentEntry(comments["first"].value, "issues").key.HeadComment)
+	require.Equal(t, "# custom purpose", comments["second"].key.LineComment)
+	require.Equal(t, "# second permission", permissionCommentEntry(comments["second"].value, "contents").value.LineComment)
 }
 
 func TestOptionalGeneratedJobAnnotations(t *testing.T) {
@@ -151,7 +168,11 @@ func TestSourceJobPermissionCommentsWithWideIndentation(t *testing.T) {
 		"        steps:",
 		"            - run: echo ok",
 	}, "\n")
-	comments := sourceJobPermissionComments(source)
-	require.Equal(t, []string{"# Trigger permissions", "# Read issue"}, comments["pre_activation"])
-	require.Equal(t, []string{"# Job permissions", "# Read source", "# Checkout"}, comments["probe"])
+	comments, err := permissionCommentSources(source)
+	require.NoError(t, err)
+	require.Equal(t, "# Trigger permissions", comments["pre_activation"].key.HeadComment)
+	require.Equal(t, "# Read issue", permissionCommentEntry(comments["pre_activation"].value, "issues").value.LineComment)
+	require.Equal(t, "# Job permissions", comments["probe"].key.HeadComment)
+	require.Equal(t, "# Read source", permissionCommentEntry(comments["probe"].value, "contents").key.HeadComment)
+	require.Equal(t, "# Checkout", permissionCommentEntry(comments["probe"].value, "contents").value.LineComment)
 }
