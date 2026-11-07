@@ -75,6 +75,7 @@ on:
         type: string
 
 # Jobs receive only their explicitly declared permissions.
+# Minimal permissions - safe-outputs handles write operations
 permissions: {}
 
 concurrency:
