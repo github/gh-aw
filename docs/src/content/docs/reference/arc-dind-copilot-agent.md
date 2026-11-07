@@ -1,11 +1,14 @@
 ---
-title: How to run GitHub Copilot coding agent on ARC with Docker-in-Docker
-description: Configure Actions Runner Controller with Docker-in-Docker so GitHub Copilot coding agent can run on self-hosted Kubernetes runners.
+title: How to run the gh-aw Copilot engine on ARC with Docker-in-Docker
+description: Configure the gh-aw Copilot CLI engine's ARC/DinD execution path, including prerequisites, shared filesystems, and applicability boundaries.
 sidebar:
   order: 440
 ---
 
-Use this guide to run GitHub Copilot coding agent on an [Actions Runner Controller (ARC)](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners-with-actions-runner-controller/about-actions-runner-controller) runner scale set with Docker-in-Docker (DinD).
+Use this guide to configure the gh-aw Copilot engine on an [Actions Runner Controller (ARC)](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners-with-actions-runner-controller/about-actions-runner-controller) runner scale set with Docker-in-Docker (DinD). This engine runs Copilot CLI inside an Actions job; it is not the separate GitHub Copilot coding-agent service.
+
+> [!IMPORTANT]
+> **This walkthrough describes an implemented execution path, not certified ARC or GHES product availability.** Check the [deployment and runner applicability summary](/gh-aw/reference/enterprise-configuration/#deployment-and-runner-applicability) for your deployment, engine, and versions. End-to-end combinations remain unconfirmed pending owner confirmation. AWF's live split-DinD CI is not Kubernetes ARC validation; no minimum ARC chart or GHES release is established here. See [AWF applicability](https://github.com/github/gh-aw-firewall/blob/main/docs/compatibility.md#environment-and-runner-applicability) and [AWF ARC/DinD configuration](https://github.com/github/gh-aw-firewall/blob/main/docs/arc-dind.md).
 
 For the full self-hosted runner reference (including `runs-on` formats, framework job runners, Docker socket overrides, and GHES), see [Self-Hosted Runners](/gh-aw/reference/self-hosted-runners/).
 
@@ -16,8 +19,10 @@ For the full self-hosted runner reference (including `runs-on` formats, framewor
 
 Before starting, confirm you have a Kubernetes cluster, `helm` and `kubectl` installed, and credentials for runner registration (a GitHub PAT or GitHub App credentials).
 
+The runner needs working Docker and Compose access, Node.js for framework scripts, and separate Copilot inference credentials/licensing/policy authorization. See [component prerequisites](/gh-aw/reference/enterprise-configuration/#component-versions-and-validation-evidence). The example chart commands do not pin or certify a chart version; validate and pin the chart, runner image, and pod configuration for your cluster.
+
 > [!IMPORTANT]
-> DinD (`containerMode.type="dind"`) is required for GitHub Copilot coding agent on ARC. Kubernetes mode (`containerMode.type="kubernetes"`) is not supported for this setup.
+> DinD (`containerMode.type="dind"`) is required for this gh-aw ARC execution path. Kubernetes mode (`containerMode.type="kubernetes"`) without a Docker daemon does not satisfy this setup.
 
 ## 1. Install the ARC controller
 
@@ -84,7 +89,7 @@ runner:
 ---
 ```
 
-`runner.topology: arc-dind` is required so compiled workflows enable ARC DinD split-filesystem handling (a shared runner/daemon workspace root, Docker-daemon-visible mount paths, and ARC-specific sandbox setup). No other sandbox or network settings are needed — the defaults handle everything else.
+`runner.topology: arc-dind` is required so compiled workflows enable ARC DinD split-filesystem handling (a shared runner/daemon workspace root, Docker-daemon-visible mount paths, and ARC-specific sandbox setup). The compiler handles its staging and default network isolation, but the operator must provide shared volumes, Docker socket access for the MCP gateway, and deployment-specific connectivity and policy configuration.
 
 > [!TIP]
 > `runner.topology: arc-dind` enables sysroot staging and tool-cache warnings at compile time. Other ARC-specific behaviors (network isolation, chroot identity, `--docker-host` passthrough) are activated at **runtime** when the compiled workflow detects a `tcp://` value in `DOCKER_HOST`. You do not need to configure these separately.
@@ -101,7 +106,7 @@ Commit both the `.md` workflow file and the generated `.lock.yml` file.
 
 When compiled workflows detect a `tcp://` value in `DOCKER_HOST` (set automatically by ARC DinD), a runtime probe activates ARC DinD handling:
 
-- **Sysroot staging** — system binaries (`/usr`, `/lib`, `/bin`, `/sbin`) are copied into a Docker named volume so the Docker daemon can provide them to the agent container without bind-mounting the runner's filesystem.
+- **Sysroot staging** — AWF stages the release-tagged `build-tools` image's system binaries and libraries into a Docker named volume for the agent chroot. It does not make the runner's private `/usr`, `/lib`, `/bin`, or `/sbin` visible to the daemon. Runner-installed tools still need daemon-visible shared paths.
 - **Workspace mount** — the checked-out repository at `GITHUB_WORKSPACE` is explicitly mounted into the agent container. Both runner and daemon can see it because ARC DinD shares the `/home/runner/_work/` volume.
 - **Chroot identity** — the runner's UID/GID and home directory are patched into the AWF config so the agent runs with the correct identity inside the chroot.
 - **Artifact consolidation** — agent output files are consolidated under `${{ runner.temp }}/gh-aw/` before upload so downstream jobs (detection, safe-outputs) can find them.
@@ -136,12 +141,14 @@ AWF creates Docker networks inside the DinD daemon for sandbox isolation. All ag
 
 ## 7. Required versions
 
-Use versions at or above these minimums:
+These are historical component-specific fix floors, not an end-to-end support matrix. Use a reviewed compiler release and its matching AWF pin, then recompile; meeting these floors does not certify an arbitrary newer release, GHES version, or ARC chart:
 
 | Component | Minimum version | Why |
 | --- | --- | --- |
 | `gh-aw` | `v0.82.8` | Includes ARC DinD workspace/detection fixes and the MCP gateway Docker socket access fix. |
 | AWF (`agentic-workflow-firewall`) | `v0.27.22` | Includes DinD squid log permission fixes. |
+
+The compiler's narrower ARC startup gate is AWF `v0.27.20+` for sysroot/chroot mount fixes; the walkthrough's `v0.27.22` floor includes subsequent log-permission fixes. See [version constants](https://github.com/github/gh-aw/blob/main/pkg/constants/version_constants.go) and [ARC validation](https://github.com/github/gh-aw/blob/main/pkg/workflow/runner_topology_validation.go).
 
 If you're on `gh-aw` `v0.82.5`–`v0.82.7`, upgrade and recompile before using this guide:
 
@@ -154,13 +161,13 @@ gh aw compile
 
 | Item | Required? | Notes |
 | --- | --- | --- |
-| DinD container mode | **Yes** | GitHub Copilot coding agent needs a Docker daemon in the runner pod. |
+| DinD container mode | **Yes** | This gh-aw ARC path needs a Docker daemon in the runner pod. |
 | `NET_ADMIN` capability | **No** | Not required. AWF enforces egress via Docker network topology (network isolation mode), not host `iptables`. The DinD sidecar daemon manages all network enforcement internally. |
 | `ghcr.io/actions/actions-runner:latest` | Recommended | Use the official runner image, or a compatible custom image with equivalent runner requirements. |
 | Runner user | **Yes** | Non-root runner users are supported. By default, `sudo` must be available on the runner container for the Copilot CLI install script. If your cluster enforces `allowPrivilegeEscalation: false`, use the `--rootless` flag — see [Pod security and rootless install](#pod-security-and-rootless-install) below. |
 | DinD sidecar privilege | **Yes** | ARC DinD mode configures a privileged sidecar for Docker daemon operation. |
 | Shared work volume (`/home/runner/_work`) | **Yes** | Runner and Docker daemon share this volume in ARC DinD mode, so workspace mounts work without host path translation. |
-| Specific Kubernetes distribution | **No** | Any conformant cluster works (for example minikube, EKS, AKS, or GKE). |
+| Specific Kubernetes distribution | Not established | No distribution/chart validation matrix is declared; validate cluster networking, volumes, and privilege policies. |
 | Specific namespace names | **No** | `arc-system` and `arc-runners` are conventions only. |
 
 ## Tool cache redirection
@@ -173,10 +180,10 @@ Redirect the tool cache to a shared path by setting `RUNNER_TOOL_CACHE` in your 
 # In your runner container spec
 env:
   - name: RUNNER_TOOL_CACHE
-    value: /tmp/gh-aw/tool-cache
+    value: /home/runner/_work/_toolcache
 ```
 
-The compiled workflow emits a warning at runtime if it detects `RUNNER_TOOL_CACHE` under `/opt`. If you see this warning, apply the redirect and re-run.
+Use the actual shared work root if your pod changes `/home/runner/_work`; the runner and daemon must see the tool cache at the same absolute path. A private runner `/tmp` path is not sufficient. The compiled workflow emits a warning at runtime if it detects `RUNNER_TOOL_CACHE` under `/opt`. If you see this warning, apply the redirect and re-run.
 
 ## Finding AWF logs
 
@@ -232,7 +239,7 @@ In rootless mode:
 
 ## Known limitations
 
-- **MCP gateway Docker socket access** — on runners where `DOCKER_HOST` is a TCP endpoint and no Unix socket exists at `/var/run/docker.sock`, the MCP gateway may fail to connect to the Docker daemon (`Docker daemon is not accessible`). As a workaround, expose the DinD sidecar's Unix socket on the runner container at `/var/run/docker.sock` via a shared volume or symlink. See [#44251](https://github.com/github/gh-aw/issues/44251) for tracking.
+- **MCP gateway Docker socket access** — AWF's TCP `DOCKER_HOST` handling does not remove the gateway's Unix socket requirement. Expose the DinD sidecar's socket on the runner through a shared volume with the correct owning-group access; a symlink alone does not expose a daemon-private socket. For non-standard paths, configure [Docker socket overrides](/gh-aw/reference/self-hosted-runners/#docker-socket-override-for-split-daemon-topologies). See [#44251](https://github.com/github/gh-aw/issues/44251) for tracking.
 
 ## Troubleshooting
 
