@@ -359,6 +359,7 @@ func buildLocalAuditData(processedRun ProcessedRun, metrics LogMetrics, mcpToolU
 	auditData.SteeringNoticesUnavailable = tokenUsageSteeringNoticesUnavailable(processedRun.TokenUsage)
 	auditData.ModelEndpointMismatches = readSessionModelEndpointMismatches(processedRun.Run.LogsPath)
 	auditData.DetectionModelUsage = readDetectionModelUsage(processedRun.Run.LogsPath)
+	appendAuditDetectionIssues(&auditData)
 	return auditData, createdItems
 }
 

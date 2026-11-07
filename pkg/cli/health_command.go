@@ -286,6 +286,7 @@ func displayDetailedHealth(runs []WorkflowRun, config HealthConfig) error {
 		{"Failed", strconv.Itoa(health.FailureCount)},
 		{"Sub-agent Failures", strconv.Itoa(health.SubagentFailureCount)},
 		{"Runs with Failed Sub-agents", strconv.Itoa(health.SubagentFailureRuns)},
+		{"Runs with Detection Failures", strconv.Itoa(health.DetectionFailureRuns)},
 		{"Success Rate", health.DisplayRate},
 		{"Trend", health.Trend},
 		{"Avg Duration", health.DisplayDur},
@@ -306,11 +307,16 @@ func displayDetailedHealth(runs []WorkflowRun, config HealthConfig) error {
 	if err := renderHealthSubagentFailures(os.Stderr, health); err != nil {
 		return err
 	}
+	if err := renderHealthDetectionFailures(os.Stderr, health); err != nil {
+		return err
+	}
 	return renderFailureReportToWriter(os.Stderr, health.FailureClusters, health.FailureInvestigation, "", config.Verbose)
 }
 
 func displayDetailedHealthStatus(health WorkflowHealth, threshold float64) {
-	if health.SubagentFailureCount > 0 {
+	if health.DetectionFailureRuns > 0 {
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("%d run(s) have threat-detection failures or threats; Actions success rate does not establish successful threat detection", health.DetectionFailureRuns)))
+	} else if health.SubagentFailureCount > 0 {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("%d sub-agent invocation(s) failed across %d run(s); Actions success rate does not establish healthy delegation", health.SubagentFailureCount, health.SubagentFailureRuns)))
 	} else if health.Status == "no_current_revision_runs" {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Current workflow revision has no matching runs; awaiting new evidence instead of investigating superseded failures"))
@@ -343,13 +349,16 @@ func outputHealthTable(summary HealthSummary, threshold float64) error {
 	fmt.Fprintln(os.Stderr, "")
 
 	// Display summary message
-	fmt.Fprintf(os.Stderr, "[health_population] workflows=%d healthy=%d observed_failure_workflows=%d subagent_degraded_workflows=%d statuses=%v\n",
+	fmt.Fprintf(os.Stderr, "[health_population] workflows=%d healthy=%d observed_failure_workflows=%d degraded_workflows=%d statuses=%v\n",
 		summary.TotalWorkflows, summary.HealthyWorkflows, summary.ObservedFailureWorkflows, summary.DegradedWorkflows, summary.StatusCounts)
 	if summary.ObservedFailureWorkflows > 0 {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("%d workflow(s) have sampled current-revision Actions failures", summary.ObservedFailureWorkflows)))
 	}
-	if summary.DegradedWorkflows > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("%d workflow(s) have failed sub-agent invocations across %d run(s)", summary.DegradedWorkflows, summary.SubagentFailureRuns)))
+	if summary.SubagentFailureCount > 0 {
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("%d failed sub-agent invocations across %d run(s)", summary.SubagentFailureCount, summary.SubagentFailureRuns)))
+	}
+	if summary.DetectionFailureRuns > 0 {
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("%d run(s) have threat-detection failures or threats; Actions success rate does not establish successful threat detection", summary.DetectionFailureRuns)))
 	}
 	if summary.BelowThreshold > 0 {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("%d workflow(s) below %.0f%% success threshold", summary.BelowThreshold, threshold)))
@@ -370,6 +379,9 @@ func outputHealthTable(summary HealthSummary, threshold float64) error {
 			return err
 		}
 		if err := renderHealthSubagentFailures(os.Stderr, health); err != nil {
+			return err
+		}
+		if err := renderHealthDetectionFailures(os.Stderr, health); err != nil {
 			return err
 		}
 	}
