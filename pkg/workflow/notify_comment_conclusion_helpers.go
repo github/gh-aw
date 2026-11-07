@@ -164,13 +164,10 @@ func (c *Compiler) buildConclusionDetectionRunsStep(data *WorkflowData, mainJobN
 	// Add detection runs logging step if threat detection is enabled.
 	// This posts a comment to the "[aw] Detection Runs" tracking issue whenever
 	// the detection job produces a warning or failure conclusion.
-	if !IsDetectionJobEnabled(data.SafeOutputs) {
-		return nil
-	}
 	// Allow opting out of the "[aw] Detection Runs" tracking issue independently of
 	// threat detection itself via safe-outputs.threat-detection.report-as-issue: false.
-	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && !data.SafeOutputs.ThreatDetection.IsReportAsIssueEnabled() {
-		notifyCommentLog.Print("Skipping detection runs logging step: report-as-issue is disabled")
+	if !conclusionDetectionMayCreateIssue(data) {
+		notifyCommentLog.Print("Skipping detection runs logging step: detection is not runnable or report-as-issue is disabled")
 		return nil
 	}
 	envVars := buildWorkflowMetadataEnvVarsWithTrackerID(data.Name, data.Source, data.TrackerID, buildLocalWorkflowSourceURL(c.markdownPath))
@@ -525,14 +522,15 @@ func (c *Compiler) buildAgentFailureStep(data *WorkflowData, mainJobName, messag
 	envVars = append(envVars, buildAgentFailureReportingPolicyVars(data)...)
 	envVars = append(envVars, buildAgentFailureCacheMemoryVars(data, mainJobName)...)
 	return c.buildGitHubScriptStepWithoutDownload(data, GitHubScriptStepConfig{
-		StepName:      constants.AgentFailureStepName,
-		StepID:        "handle_agent_failure",
-		MainJobName:   mainJobName,
-		CustomEnvVars: envVars,
-		Script:        "const { main } = require('${{ runner.temp }}/gh-aw/actions/handle_agent_failure.cjs'); await main();",
-		ScriptFile:    "handle_agent_failure.cjs",
-		CustomToken:   steeringToken,
-		StepCondition: "always()",
+		StepName:              constants.AgentFailureStepName,
+		StepID:                "handle_agent_failure",
+		MainJobName:           mainJobName,
+		CustomEnvVars:         envVars,
+		Script:                "const { main } = require('${{ runner.temp }}/gh-aw/actions/handle_agent_failure.cjs'); await main();",
+		ScriptFile:            "handle_agent_failure.cjs",
+		CustomToken:           steeringToken,
+		FallbackToGitHubToken: true,
+		StepCondition:         "always()",
 	}), nil
 }
 
@@ -758,12 +756,13 @@ func (c *Compiler) buildConclusionReportFailedJobsStep(data *WorkflowData, mainJ
 		envVars = append(envVars, "          GH_AW_REPORT_FAILED_JOBS: \"true\"\n")
 	}
 	return c.buildGitHubScriptStepWithoutDownload(data, GitHubScriptStepConfig{
-		StepName:      "Report failed jobs",
-		StepID:        "report_failed_jobs",
-		MainJobName:   mainJobName,
-		CustomEnvVars: envVars,
-		ScriptFile:    "report_failed_jobs.cjs",
-		StepCondition: "always()",
+		StepName:              "Report failed jobs",
+		StepID:                "report_failed_jobs",
+		MainJobName:           mainJobName,
+		CustomEnvVars:         envVars,
+		ScriptFile:            "report_failed_jobs.cjs",
+		FallbackToGitHubToken: true,
+		StepCondition:         "always()",
 	}), nil
 }
 

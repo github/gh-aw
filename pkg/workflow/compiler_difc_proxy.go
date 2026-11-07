@@ -209,14 +209,14 @@ func getDIFCProxyPolicyJSON(githubTool map[string]any, data *WorkflowData, gatew
 	return string(jsonBytes)
 }
 
-// resolveProxyContainerImage returns the full container image reference (container:version)
-// for the DIFC/CLI proxy, falling back to the default MCP gateway version if none is configured.
-func resolveProxyContainerImage(gatewayConfig *MCPGatewayRuntimeConfig) string {
+// resolveProxyContainerImage returns the pinned container image reference for the
+// DIFC/CLI proxy, using the same version fallback and pins as the MCP gateway.
+func resolveProxyContainerImage(gatewayConfig *MCPGatewayRuntimeConfig, data *WorkflowData) string {
 	version := gatewayConfig.Version
 	if version == "" {
-		version = string(constants.DefaultMCPGatewayVersion)
+		version = effectiveMCPGatewayVersion(data)
 	}
-	return gatewayConfig.Container + ":" + version
+	return resolveContainerImage(gatewayConfig.Container+":"+version, data)
 }
 
 // writeProxyUpstreamEnv writes the curated upstream GitHub env passed to DIFC/CLI
@@ -256,7 +256,7 @@ func (c *Compiler) buildStartDIFCProxyStepYAML(data *WorkflowData) string {
 
 	// Resolve the container image from the MCP gateway configuration
 	// (proxy uses the same image as the gateway, just in "proxy" mode)
-	containerImage := resolveProxyContainerImage(data.SandboxConfig.MCP)
+	containerImage := resolveProxyContainerImage(data.SandboxConfig.MCP, data)
 
 	var sb strings.Builder
 	sb.WriteString("      - name: Start DIFC Proxy\n")
@@ -580,7 +580,7 @@ func (c *Compiler) buildStartCliProxyStepYAML(data *WorkflowData) string {
 	policyJSON := buildCLIProxyPolicyJSON(githubToolConfig, data)
 
 	// Resolve the container image from the MCP gateway configuration
-	containerImage := resolveProxyContainerImage(data.SandboxConfig.MCP)
+	containerImage := resolveProxyContainerImage(data.SandboxConfig.MCP, data)
 
 	var sb strings.Builder
 	sb.WriteString("      - name: Start CLI Proxy\n")

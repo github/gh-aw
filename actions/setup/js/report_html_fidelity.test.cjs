@@ -166,6 +166,50 @@ describe("typed report image presentation", () => {
 });
 
 describe("report HTML import boundary", () => {
+  it.each(["<details open><summary>Open</summary>", "<details open>\n<summary>Open</summary>"])("preserves expanded details blocks: %s", opening => {
+    const source = `${opening}\n\nbody\n\n</details>`;
+    const input = parse(source);
+    expect(input.children).toEqual([
+      {
+        type: "details",
+        open: true,
+        agentTainted: true,
+        summary: "Open",
+        children: [{ type: "paragraph", agentTainted: true, children: [{ type: "text", value: "body", agentTainted: true }] }],
+      },
+    ]);
+    expect(normalizeReport(input).children[0].open).toBe(true);
+    const body = renderReport(input).body;
+    expect(body).toBe("<details open>\n<summary>Open</summary>\n\nbody\n\n</details>\n");
+    expect(renderReport(parse(body)).body).toBe(body);
+    expect(renderReport(parse(sanitizeContent(source))).body).toBe(body);
+  });
+
+  it.each(["<details><summary>Closed</summary>", "<details>\n<summary>Closed</summary>"])("keeps details collapsed by default: %s", opening => {
+    const input = parse(`${opening}\n\nbody\n\n</details>`);
+    expect(input.children[0].type).toBe("details");
+    expect(input.children[0]).not.toHaveProperty("open");
+    expect(normalizeReport(input).children[0]).not.toHaveProperty("open");
+    expect(renderReport(input).body).toBe("<details>\n<summary>Closed</summary>\n\nbody\n\n</details>\n");
+  });
+
+  it("recognizes expanded details immediately after a paragraph", () => {
+    const input = parse("Introduction\n<details open>\n<summary>Open</summary>\n\nbody\n\n</details>");
+    expect(input.children.map(node => node.type)).toEqual(["paragraph", "details"]);
+    expect(input.children[1].open).toBe(true);
+    expect(renderReport(input).body).toBe("Introduction\n\n<details open>\n<summary>Open</summary>\n\nbody\n\n</details>\n");
+  });
+
+  it.each(['class="extra"', 'open class="extra"', 'onclick="attack()"', 'open onclick="attack()"', 'open="true"', "open open"])("keeps unsupported details attributes inert: %s", attributes => {
+    for (const separator of ["", "\n"]) {
+      const input = parse(`<details ${attributes}>${separator}<summary>Rejected</summary>\n\nbody\n\n</details>`);
+      expect(input.children.some(node => node.type === "details")).toBe(false);
+      const body = renderReport(input).body;
+      expect(body).not.toContain("<details");
+      expect(body).toContain("&lt;details ");
+    }
+  });
+
   it.each([
     '<img src="https://github.com/o/r/image.png" alt="Mascot" width="120" height="80" align="right" />',
     "<IMG ALIGN='RIGHT' HEIGHT='80' WIDTH='120' ALT='Mascot' SRC='https://github.com/o/r/image.png'>",

@@ -38,6 +38,7 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const fs = require("fs");
+const { openDurableSession, observeDurableSession } = require("./durable_native_session.cjs");
 const { runProcess, formatDuration, resolvePostResultWatchdogIdleTimeoutMs } = require("./process_runner.cjs");
 const { applyClaudeRuntimeTimeouts } = require("./tool_timeouts.cjs");
 const {
@@ -633,7 +634,8 @@ async function main() {
   // emits anything) even though earlier attempts in the same session already made progress.
   // Reset only when a genuinely fresh run begins (see below), never on a --continue attempt.
   let sessionHasProgress = false;
-  let sessionId;
+  const durableSession = openDurableSession("claude");
+  let sessionId = durableSession?.id || undefined;
   const driverStartTime = Date.now();
   // The same deadline guards both the retry loop and each active child process.
   const softTimeoutGuard = buildSoftTimeoutGuard(driverStartTime);
@@ -654,9 +656,10 @@ async function main() {
       // Claude Code resumes the session from on-disk state; re-sending the original
       // instructions would re-execute the full task from scratch.
       let currentArgs;
-      if (attempt > 0 && useContinueOnRetry) {
+      if ((attempt === 0 && durableSession?.id) || (attempt > 0 && useContinueOnRetry)) {
         currentArgs = [...continueBaseArgs, "--resume", sessionId];
       } else {
+        if (durableSession?.id && attempt > 0) throw new Error("Durable Claude continuation cannot restart a recorded session as a fresh conversation");
         currentArgs = attempt === 0 ? initialArgs : freshRetryArgs;
         // This attempt starts a brand-new session (either attempt 0, or a fresh
         // retry that discards prior on-disk state) — no assistant progress can carry
@@ -677,6 +680,7 @@ async function main() {
         log,
         logArgs,
         env: childEnv,
+        onStdoutLine: line => observeDurableSession(durableSession, "claude", line),
         stdin: attempt > 0 && useContinueOnRetry ? CLAUDE_RESUME_PROMPT : (prompt ?? undefined),
         postResultWatchdog: safeOutputsPath
           ? {

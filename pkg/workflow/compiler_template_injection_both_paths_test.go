@@ -118,7 +118,7 @@ jobs:
       - name: Heredoc expression is file content
         run: |
           cat > config.txt << 'EOF'
-          token=${{ github.event.issue.title }}
+          title=${{ github.event.issue.title }}
           EOF
 `
 
@@ -212,6 +212,7 @@ jobs:
 		require.ErrorContains(t, err, "CTR-006")
 		require.ErrorContains(t, err, "Actions interpolates expressions before Bash")
 		require.ErrorContains(t, err, "unquoted heredoc")
+		require.ErrorContains(t, err, "github.event")
 	})
 
 	t.Run("Path B - schema disabled - heredoc expression rejected", func(t *testing.T) {
@@ -220,6 +221,7 @@ jobs:
 		require.ErrorContains(t, err, "CTR-006")
 		require.ErrorContains(t, err, "Actions interpolates expressions before Bash")
 		require.ErrorContains(t, err, "unquoted heredoc")
+		require.ErrorContains(t, err, "github.event")
 	})
 
 	t.Run("Path A - schema enabled - comment expression rejected", func(t *testing.T) {
@@ -228,6 +230,7 @@ jobs:
 		require.ErrorContains(t, err, "CTR-006")
 		require.ErrorContains(t, err, "Actions interpolates expressions before Bash")
 		require.ErrorContains(t, err, "Remove expressions from comments")
+		require.ErrorContains(t, err, "github.event")
 	})
 
 	t.Run("Path B - schema disabled - comment expression rejected", func(t *testing.T) {
@@ -236,6 +239,7 @@ jobs:
 		require.ErrorContains(t, err, "CTR-006")
 		require.ErrorContains(t, err, "Actions interpolates expressions before Bash")
 		require.ErrorContains(t, err, "Remove expressions from comments")
+		require.ErrorContains(t, err, "github.event")
 	})
 
 	t.Run("both paths agree on unsafe YAML", func(t *testing.T) {

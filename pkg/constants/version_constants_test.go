@@ -15,18 +15,18 @@ func TestDefaultCLIMCPVersions(t *testing.T) {
 		got  Version
 		want Version
 	}{
-		{"Claude Code", DefaultClaudeCodeVersion, "2.1.312"},
+		{"Claude Code", DefaultClaudeCodeVersion, "2.1.317"},
 		{"Copilot CLI", DefaultCopilotVersion, "1.0.103"},
 		{"Copilot SDK", DefaultCopilotSDKVersion, "1.0.16"},
-		{"Codex", DefaultCodexVersion, "0.165.0"},
+		{"Codex", DefaultCodexVersion, "0.166.0"},
 		{"Gemini CLI", DefaultGeminiVersion, "0.64.0"},
 		{"Agy CLI", DefaultAgyVersion, "1.3.6"},
-		{"Pi CLI", DefaultPiVersion, "1.4.0"},
-		{"GitHub MCP Server", DefaultGitHubMCPServerVersion, "v2.0.3"},
-		{"Firewall", DefaultFirewallVersion, "v0.29.6"},
+		{"Pi CLI", DefaultPiVersion, "1.5.0"},
+		{"GitHub MCP Server", DefaultGitHubMCPServerVersion, "v2.1.0"},
+		{"Firewall", DefaultFirewallVersion, "v0.29.7"},
 		{"Router", DefaultRouterVersion, "0.1.3"},
 		{"Router image release", AWFRouterReleaseImageMinVersion, "v0.28.62"},
-		{"MCP Gateway", DefaultMCPGatewayVersion, "v0.5.2"},
+		{"MCP Gateway", DefaultMCPGatewayVersion, "v0.5.4"},
 		{"Threat Detect", DefaultThreatDetectVersion, "v0.5.3"},
 	}
 
@@ -81,8 +81,8 @@ func TestDefaultThreatDetectReleasePins(t *testing.T) {
 func TestDefaultPlaywrightCLIVersionOutsideCooldownWindow(t *testing.T) {
 	t.Parallel()
 	const (
-		expectedVersion    Version = "0.1.22"
-		publishedAtRFC3339         = "2026-09-28T23:24:31.286Z"
+		expectedVersion    Version = "0.1.23"
+		publishedAtRFC3339         = "2026-10-31T15:22:58.073Z"
 		minReleaseAge              = 72 * time.Hour
 	)
 

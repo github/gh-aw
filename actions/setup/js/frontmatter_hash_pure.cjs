@@ -31,6 +31,18 @@ async function defaultFileReader(filePath) {
 }
 
 /**
+ * @param {any} error - Reader error, possibly wrapped with a cause
+ * @returns {boolean} Whether the file is genuinely absent
+ */
+function isFileNotFound(error) {
+  if (!error) return false;
+  const status = error.status || error.response?.status;
+  if (status !== undefined) return status === HTTP_STATUS_NOT_FOUND;
+  if (error.code !== undefined) return error.code === "ENOENT";
+  return error.cause ? isFileNotFound(error.cause) : false;
+}
+
+/**
  * Parses a boolean flag from frontmatter text using simple text scanning.
  * Matches lines of the form "key: true" or "key: false" at the top level.
  * Returns false when the key is absent or the value is not "true".
@@ -53,6 +65,7 @@ function parseBoolFromFrontmatter(frontmatterText, key) {
  * @param {string} workflowPath - Path to the workflow file
  * @param {Object} [options] - Optional configuration
  * @param {Function} [options.fileReader] - Custom file reader function (async (filePath) => content); defaults to fs.readFileSync
+ * @param {(filePath: string, error: Error) => void} [options.onMissingImport] - Called when an import file is missing
  * @param {"local"|"github-api"} [options.readerMode] - Reader source; set to "github-api" for API-backed readers, including wrappers
  * @param {boolean} [options.verbose] - When true, emits detailed debug logging via core.info()
  *                                      for every step of the computation. Useful when diagnosing
@@ -61,6 +74,7 @@ function parseBoolFromFrontmatter(frontmatterText, key) {
  */
 async function computeFrontmatterHash(workflowPath, options = {}) {
   const fileReader = options.fileReader || defaultFileReader;
+  const onMissingImport = options.onMissingImport;
   const readerMode = options.readerMode || "local";
   const verbose = options.verbose === true;
   // log is a thin helper that only emits when verbose mode is active.
@@ -93,7 +107,7 @@ async function computeFrontmatterHash(workflowPath, options = {}) {
   log(`inlined-imports: ${inlinedImports}`);
 
   // Process imports using text-based parsing
-  const { importedFiles, importedFrontmatterTexts } = await processImportsTextBased(frontmatterText, baseDir, undefined, fileReader);
+  const { importedFiles, importedFrontmatterTexts } = await processImportsTextBased(frontmatterText, baseDir, undefined, fileReader, onMissingImport);
 
   log(`Imported files (${importedFiles.length}): ${JSON.stringify(importedFiles)}`);
 
@@ -191,9 +205,11 @@ function extractFrontmatterAndBody(content) {
  * @param {string} baseDir - Base directory for resolving imports
  * @param {Set<string>} visited - Set of visited files for cycle detection
  * @param {Function} fileReader - File reader function (async (filePath) => content)
+ * @param {(filePath: string, error: Error) => void} [onMissingImport] - Called when an import file is missing
+ * @param {string} [rootDir] - Directory of the root workflow, retained across nested imports
  * @returns {Promise<{importedFiles: string[], importedFrontmatterTexts: string[]}>}
  */
-async function processImportsTextBased(frontmatterText, baseDir, visited = new Set(), fileReader = defaultFileReader) {
+async function processImportsTextBased(frontmatterText, baseDir, visited = new Set(), fileReader = defaultFileReader, onMissingImport, rootDir = baseDir) {
   const importedFiles = [];
   const importedFrontmatterTexts = [];
 
@@ -209,7 +225,7 @@ async function processImportsTextBased(frontmatterText, baseDir, visited = new S
 
   for (const importPath of sortedImports) {
     // Join import path with base directory (preserves relative paths for GitHub API compatibility)
-    const fullPath = path.join(baseDir, importPath);
+    const fullPath = resolveHashImportPath(importPath, baseDir, rootDir);
 
     // Skip if already visited (cycle detection)
     if (visited.has(fullPath)) continue;
@@ -226,13 +242,14 @@ async function processImportsTextBased(frontmatterText, baseDir, visited = new S
 
       // Recursively process imports in the imported file
       const importBaseDir = path.dirname(fullPath);
-      const nestedResult = await processImportsTextBased(importFrontmatterText, importBaseDir, visited, fileReader);
+      const nestedResult = await processImportsTextBased(importFrontmatterText, importBaseDir, visited, fileReader, onMissingImport, rootDir);
 
       // Add nested imports
       importedFiles.push(...nestedResult.importedFiles);
       importedFrontmatterTexts.push(...nestedResult.importedFrontmatterTexts);
     } catch (err) {
-      // Skip files that can't be read
+      if (!isFileNotFound(err)) throw err;
+      onMissingImport?.(fullPath, /** @type {Error} */ err);
       continue;
     }
   }
@@ -474,23 +491,29 @@ function extractRuntimeImportReferences(markdown) {
  * @returns {Promise<string|null>}
  */
 async function readRuntimeImportBodyForHash(ref, baseDir, seen, fileReader, readerMode) {
+  let firstReadError;
   for (const candidate of runtimeImportHashCandidatePaths(ref.path, baseDir)) {
     const key = `${candidate}:${ref.startLine ?? 0}-${ref.endLine ?? 0}`;
     if (seen.has(key)) return null;
     // API candidates use the allowlisted paths below and the reader's remote symlink resolution; local realpath checks inspect the unrelated runner checkout.
     if (readerMode !== "github-api" && fs.existsSync(candidate) && !runtimeImportHashRealPathAllowed(candidate, baseDir)) continue;
+    let content;
     try {
-      let content = await fileReader(candidate);
-      seen.add(key);
-      if (ref.startLine !== null || ref.endLine !== null) {
-        content = applyRuntimeImportLineRangeForHash(content, ref.startLine, ref.endLine);
-      }
-      const { markdown } = extractFrontmatterAndBody(content);
-      return markdown;
+      content = await fileReader(candidate);
     } catch (err) {
+      if (isFileNotFound(err)) continue;
+      firstReadError ||= err;
       continue;
     }
+
+    seen.add(key);
+    if (ref.startLine !== null || ref.endLine !== null) {
+      content = applyRuntimeImportLineRangeForHash(content, ref.startLine, ref.endLine);
+    }
+    const { markdown } = extractFrontmatterAndBody(content);
+    return markdown;
   }
+  if (firstReadError) throw firstReadError;
   return null;
 }
 
@@ -636,9 +659,10 @@ function marshalSorted(data) {
  * @param {string} baseDir - Base directory for resolving imports
  * @param {Set<string>} visited - Set of visited files for cycle detection
  * @param {Function} fileReader - File reader function (async (filePath) => content)
+ * @param {string} [rootDir] - Directory of the root workflow, retained across nested imports
  * @returns {Promise<string[]>} Array of imported body texts
  */
-async function collectImportedBodies(frontmatterText, baseDir, visited = new Set(), fileReader = defaultFileReader) {
+async function collectImportedBodies(frontmatterText, baseDir, visited = new Set(), fileReader = defaultFileReader, rootDir = baseDir) {
   const importedBodyTexts = [];
 
   const imports = extractImportsFromText(frontmatterText);
@@ -649,7 +673,7 @@ async function collectImportedBodies(frontmatterText, baseDir, visited = new Set
   const sortedImports = [...imports].sort();
 
   for (const importPath of sortedImports) {
-    const fullPath = path.join(baseDir, importPath);
+    const fullPath = resolveHashImportPath(importPath, baseDir, rootDir);
 
     if (visited.has(fullPath)) continue;
     visited.add(fullPath);
@@ -661,14 +685,28 @@ async function collectImportedBodies(frontmatterText, baseDir, visited = new Set
       importedBodyTexts.push(importBody);
 
       const importBaseDir = path.dirname(fullPath);
-      const nestedBodies = await collectImportedBodies(importFrontmatterText, importBaseDir, visited, fileReader);
+      const nestedBodies = await collectImportedBodies(importFrontmatterText, importBaseDir, visited, fileReader, rootDir);
       importedBodyTexts.push(...nestedBodies);
     } catch (err) {
+      if (!isFileNotFound(err)) throw err;
       continue;
     }
   }
 
   return importedBodyTexts;
+}
+
+/**
+ * Mirrors the compiler's nested local import resolution: bare names and ./ paths
+ * are file-relative; qualified paths are relative to the root workflow directory.
+ * @param {string} importPath
+ * @param {string} baseDir
+ * @param {string} rootDir
+ * @returns {string}
+ */
+function resolveHashImportPath(importPath, baseDir, rootDir) {
+  const fileRelative = !importPath.includes("/") || importPath.startsWith("./");
+  return path.join(fileRelative ? baseDir : rootDir, importPath);
 }
 
 /**
@@ -965,7 +1003,8 @@ function createGitHubFileReader(github, owner, repo, ref) {
       }
 
       const errorMessage = getErrorMessage(error);
-      throw new Error(`${ERR_SYSTEM}: Failed to read file ${filePath} from GitHub: ${errorMessage}`);
+      const statusMessage = status !== undefined ? ` (HTTP ${status})` : "";
+      throw new Error(`${ERR_SYSTEM}: Failed to read file ${filePath} from GitHub${statusMessage}: ${errorMessage}`, { cause: error });
     }
   }
 

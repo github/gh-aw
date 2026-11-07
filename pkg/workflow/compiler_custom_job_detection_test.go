@@ -4,7 +4,10 @@ package workflow
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/workflow/actions"
@@ -13,6 +16,129 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestCustomJobDetectionStatusOnlyPreAgentOutputs(t *testing.T) {
+	source, err := os.ReadFile("testdata/status_only_pre_agent.md")
+	require.NoError(t, err)
+	document, err := aw.Parse(string(source))
+	require.NoError(t, err)
+	compiler := NewCompiler(WithNoEmit(true))
+	data, err := compiler.ParseWorkflowDocument(document, filepath.Join(t.TempDir(), "test.md"))
+	require.NoError(t, err)
+	content, err := compiler.CompileToYAML(data, "test.md")
+	require.NoError(t, err)
+	workflow, err := actions.Parse([]byte(content))
+	require.NoError(t, err)
+	agent, exists := compiler.jobManager.GetJob("agent")
+	require.True(t, exists)
+	assert.Contains(t, agent.Needs, "eligibility")
+	reporter, exists := compiler.jobManager.GetJob("flag_failed_review")
+	require.True(t, exists)
+	assert.Contains(t, reporter.Needs, "detection")
+	assert.Equal(t, "always()", reporter.If)
+	assert.Contains(t, content, "needs.eligibility.outputs.head_sha")
+	assert.NotContains(t, content, "detection-gate:")
+
+	runner, err := workflowlint.Default().Select("custom-job-detection")
+	require.NoError(t, err)
+	for _, input := range []workflowlint.Input{{Document: document}, {Workflow: workflow, Document: document}} {
+		diagnostics, err := runner.Run(context.Background(), input)
+		require.NoError(t, err)
+		assert.Empty(t, diagnostics)
+	}
+}
+
+func TestCustomJobDetectionStatusOnlyPreAgentOutputAccess(t *testing.T) {
+	source, err := os.ReadFile("testdata/status_only_pre_agent.md")
+	require.NoError(t, err)
+	for _, tt := range []struct {
+		name, source, want string
+	}{
+		{
+			name:   "producer must be a direct dependency",
+			source: strings.Replace(string(source), "needs: [eligibility, agent, detection, safe_outputs]", "needs: [agent, detection, safe_outputs]", 1),
+			want:   "listed in needs",
+		},
+		{
+			name: "pre-agent output cannot be interpolated into run",
+			source: strings.Replace(string(source),
+				`run: printf '%s %s %s\n' "$PR_NUMBER" "$HEAD_SHA" "$FAILED"`,
+				`run: printf '%s %s %s\n' "$PR_NUMBER" "$HEAD_SHA" "$FAILED"; echo '${{ needs.eligibility.outputs.head_sha }}'`, 1),
+			want: "through env",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			document, err := aw.Parse(tt.source)
+			require.NoError(t, err)
+			compiler := NewCompiler(WithNoEmit(true))
+			data, err := compiler.ParseWorkflowDocument(document, filepath.Join(t.TempDir(), "test.md"))
+			require.NoError(t, err)
+			_, err = compiler.CompileToYAML(data, "test.md")
+			require.ErrorContains(t, err, tt.want)
+		})
+	}
+}
+
+func TestCustomJobDetectionStatusOnlyPreAgentTaint(t *testing.T) {
+	source, err := os.ReadFile("testdata/status_only_pre_agent.md")
+	require.NoError(t, err)
+	for _, tt := range []struct {
+		name, jobs string
+		allowed    bool
+	}{
+		{"transitive pre-agent", "  metadata:\n    runs-on: ubuntu-latest\n    steps: [{run: echo metadata}]\n  eligibility:\n    needs: metadata\n", true},
+		{"before activation", "  eligibility:\n    needs: pre_activation\n", true},
+		{"direct agent", "  eligibility:\n    needs: agent\n", false},
+		{"direct detection", "  eligibility:\n    needs: detection\n", false},
+		{"transitive agent", "  relay:\n    runs-on: ubuntu-latest\n    needs: agent\n    steps: [{run: echo relay}]\n  eligibility:\n    needs: relay\n", false},
+		{"transitive detection", "  relay:\n    runs-on: ubuntu-latest\n    needs: detection\n    steps: [{run: echo relay}]\n  eligibility:\n    needs: relay\n", false},
+		{"mixed pre-agent and downstream", "  metadata:\n    runs-on: ubuntu-latest\n    steps: [{run: echo metadata}]\n  relay:\n    runs-on: ubuntu-latest\n    needs: safe_outputs\n    steps: [{run: echo relay}]\n  eligibility:\n    needs: [metadata, relay]\n", false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			text := strings.Replace(string(source), "  eligibility:\n", tt.jobs, 1)
+			document, err := aw.Parse(text)
+			require.NoError(t, err)
+			compiler := NewCompiler(WithNoEmit(true))
+			data, err := compiler.ParseWorkflowDocument(document, filepath.Join(t.TempDir(), "test.md"))
+			require.NoError(t, err)
+			_, err = compiler.CompileToYAML(data, "test.md")
+			if tt.allowed {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, "needs.eligibility.outputs")
+			}
+			runner, err := workflowlint.Default().Select("custom-job-detection")
+			require.NoError(t, err)
+			diagnostics, err := runner.Run(context.Background(), workflowlint.Input{Document: document})
+			require.NoError(t, err)
+			if tt.allowed {
+				assert.Empty(t, diagnostics)
+			} else {
+				assert.Contains(t, fmt.Sprint(diagnostics), "needs.eligibility.outputs")
+			}
+		})
+	}
+}
+
+func TestCustomJobDetectionStatusOnlyGeneratedPreAgentOutput(t *testing.T) {
+	compiler := NewCompiler()
+	compiler.jobManager = NewJobManager()
+	for _, job := range []*Job{
+		{Name: "generated_metadata"},
+		{Name: "agent", Needs: []string{"generated_metadata"}},
+		{Name: "detection", Needs: []string{"agent"}},
+		{Name: "status", Needs: []string{"generated_metadata", "agent", "detection"}, If: "always()"},
+	} {
+		require.NoError(t, compiler.jobManager.AddJob(job))
+	}
+	data := &WorkflowData{Jobs: map[string]any{
+		"status": map[string]any{
+			"detection-gate": "status-only",
+			"env":            map[string]any{"METADATA": "${{ needs.generated_metadata.outputs.value }}"},
+		},
+	}}
+	require.ErrorContains(t, compiler.guardCustomJobDetection(data), "needs.generated_metadata.outputs")
+}
 
 func TestCustomJobDetectionCompilation(t *testing.T) {
 	for _, tt := range []struct {
@@ -142,7 +268,7 @@ func TestCustomJobDetectionStatusOnlyContract(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			document, err := aw.Parse("---\non: workflow_dispatch\nengine: copilot\npermissions: {contents: read}\nsafe-outputs:\n  create-issue:\njobs:\n  producer:\n    runs-on: ubuntu-latest\n    steps: [{run: echo producer}]\n  status:\n    runs-on: ubuntu-latest\n    " + tt.fields + "\n---\nPublic prompt.\n")
+			document, err := aw.Parse("---\non: workflow_dispatch\nengine: copilot\npermissions: {contents: read}\nsafe-outputs:\n  create-issue:\njobs:\n  producer:\n    needs: agent\n    runs-on: ubuntu-latest\n    steps: [{run: echo producer}]\n  status:\n    runs-on: ubuntu-latest\n    " + tt.fields + "\n---\nPublic prompt.\n")
 			require.NoError(t, err)
 			compiler := NewCompiler(WithNoEmit(true))
 			data, err := compiler.ParseWorkflowDocument(document, filepath.Join(t.TempDir(), "test.md"))

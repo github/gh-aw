@@ -938,7 +938,9 @@ evals:
 
 ### Feature Flags (`features:`)
 
-A frontmatter section that enables experimental or optional compiler and runtime behaviors as key-value pairs. Feature flags provide controlled access to new capabilities before they become defaults or are fully stabilized. Common flags include `action-mode` (controls how custom action references are compiled), `copilot-requests` (enables GitHub Actions token authentication for Copilot), `mcp-gateway` (enables the MCP gateway proxy), `integrity-reactions` (enables reaction-based integrity promotion and demotion), `cli-proxy` (enables CLI proxy mode for integrity enforcement at the network boundary), and `awf-diagnostic-logs` (enables AWF Docker operational diagnostics collection on failure). `byok-copilot` is deprecated because Copilot BYOK behavior is now the default for `engine: copilot`. See [Feature Flags Reference](/gh-aw/reference/feature-flags/).
+A frontmatter section that enables experimental or optional compiler and runtime behaviors as key-value pairs. Feature flags provide controlled access to new capabilities before they become defaults or are fully stabilized. Common flags include `action-mode` (controls how custom action references are compiled), `mcp-gateway` (enables the MCP gateway proxy), `integrity-reactions` (enables reaction-based integrity promotion and demotion), `cli-proxy` (enables CLI proxy mode for integrity enforcement at the network boundary), and `awf-diagnostic-logs` (enables AWF Docker operational diagnostics collection on failure). `byok-copilot` is deprecated because Copilot BYOK behavior is now the default for `engine: copilot`. See [Feature Flags Reference](/gh-aw/reference/feature-flags/).
+
+Workflows that still use the legacy `features.copilot-requests` flag should use `permissions.copilot-requests: write` instead when enabled. Run `gh aw fix --write` to apply the `features-copilot-requests-to-permissions` codemod, which removes the old flag and grants the permission when it was enabled.
 
 ### Force Clean Git Credentials (`force-clean-git-credentials`)
 
@@ -1415,6 +1417,8 @@ on:
 ### Frontmatter Hash
 
 A deterministic SHA-256 hash of a workflow's frontmatter configuration, including all imported workflow frontmatter collected in breadth-first order. The hash covers security-relevant fields (`engine`, `on`, `permissions`, `tools`, `network`, `safe-outputs`, etc.) while excluding the markdown body. Identical configurations produce identical hashes across the Go and JavaScript compiler implementations, enabling change detection, tamper verification, and reproducibility checks. To also hash the prompt body, use `on.stale-check: "full"` (see [Body Hash](#body-hash)). See [Frontmatter Hash Specification](/gh-aw/specs/frontmatter-hash-specification/).
+
+Activation reads the source, lock file, and imports at the immutable `GITHUB_WORKFLOW_SHA` when `GITHUB_WORKFLOW_REF` identifies the workflow being checked. This avoids depending on a pull request merge ref that may disappear after merge, or a branch or tag that may move while the run is queued. Reusable workflow resolution continues to prefer the callee's SHA from `referenced_workflows`, not the caller's SHA. Hash mismatches and unverifiable contents still fail the check.
 
 ### Custom Routing Signal (`engine_base_url_customized`)
 

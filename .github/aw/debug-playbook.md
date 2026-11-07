@@ -23,17 +23,17 @@ gh aw audit "$RUN_URL" --no-baseline --timeout 2m \
 Read completeness/`overview`/`key_findings`/`recommendations`/`errors`.
 Timeout: incomplete JSON report; fetch evidence.
 Read only the linked `playbook_url`/code row; [cluster fleets](analyzing-runs.md).
-Keep codes/severity; advisory/pending/skipped/policy-denied need not be bugs.
+Keep codes/severity; advisory/pending/skipped/policy-denied may be intentional.
 Unknown: [unmapped codes](#unmapped-codes).
 
 ## Audit findings
 
 | Codes | Check | Remedy |
 | --- | --- | --- |
-| `workflow_failed` | First failed step; native error. | Route specific cause; conclusion isn't root cause. |
+| `workflow_failed` | First step error. | Fix cause, not conclusion. |
 | `workflow_timeout` | Step/budget/result. | Remove blockers/narrow scope; justify timeout changes. |
-| `multiple_errors` | First error vs cascades. | Fix cause, not repeats. |
-| `mcp_server_failures`, `tools_not_available` | MCP startup, registration, failed calls. | Fix tool/server/config/auth; no blind permission expansion. |
+| `multiple_errors` | Cause vs cascades. | Fix cause. |
+| `mcp_server_failures`, `tools_not_available`, `tool_error` | MCP setup/call failure. | Fix tool/server/config/auth; retain permission scope. |
 | `model_unavailable`, `model_endpoint_unsupported` | Full same-run inventory: absent model/incompatible endpoint. | [Model availability](#model-availability); verify candidate/API, edit pin, recompile. |
 | `model_availability_unknown` | Missing/incomplete/malformed/ambiguous/contradictory reflection. | Inspect discovery/auth; do not declare removal/switch models without evidence. |
 | `model_resolution_failed` | Failed `model.resolution`; missing same-role startup-stop evidence. | Advisory: verify pins; unproven cause. |
@@ -48,12 +48,12 @@ Unknown: [unmapped codes](#unmapped-codes).
 | `agentic_poor_agentic_control`, `agentic_partially_reducible` | Stop rules, tools, reducible stages. | Bound loops; extract deterministic work; preserve outcomes. |
 | `agentic_model_downgrade_available` | Capability/API needs; measured alternatives. | Benchmark; no automatic downgrade. |
 | `agentic_delegated_context_present` | Delegation/context. | Deduplicate; advisory, not always error. |
-| `workflow_succeeded` | Required downstream effect. | Verify missing effect; conclusion alone insufficient. |
+| `workflow_succeeded` | Downstream effect. | Verify effect; conclusion alone insufficient. |
 
 ## Agent, model, and proxy classifications
 
-Inspect `agent-stdio.log`, `agent_execution.json`, native errors/reflection/proxy events; [inventory](#model-availability).
-Assistant/tool prose isn't native error.
+Inspect `agent-stdio.log`, `agent_execution.json`, errors/reflection/proxy and [inventory](#model-availability).
+Prose isn't native error.
 
 | Codes | Check | Remedy |
 | --- | --- | --- |
@@ -81,10 +81,10 @@ Assistant/tool prose isn't native error.
 
 ## Model availability
 
-Read `engine_config` ([Start here](#start-here)). Pi `not advertised`:
+Read `engine_config` ([start](#start-here)). Pi `not advertised`:
 confirmed absence → `model_unavailable`; incomplete/invalid/ambiguous evidence →
 `model_availability_unknown`. No auto-substitution.
-Inspect quoted job/step URLs/lines; missing context:
+Inspect job/step URLs/lines; missing context:
 `gh run view "$RUN_ID" --repo "$REPO" --log`.
 
 ### Inspect cached models
@@ -95,12 +95,12 @@ gh aw models --json --refresh-observed=false --logs-dir "$EVIDENCE"
 gh aw models --repo "$REPO" --logs-dir "$EVIDENCE" --refresh-count 5
 ```
 
-`catalog`/`aliases`/`observed` differ; aggregates don't prove same-run access.
+`catalog`/`aliases`/`observed` differ; aggregates != same-run access.
 Refresh downloads artifacts.
 
 ### Verify exact same-run inventory
 
-Read same-run `$EVIDENCE/run-$RUN_ID/sandbox/firewall/awf-reflect.json` (or audit-reported path).
+Read same-run `$EVIDENCE/run-$RUN_ID/sandbox/firewall/awf-reflect.json` (or audit path).
 
 ```bash
 : "${MODEL:?Set exact model}" "${PROVIDER:?Set provider}"
@@ -113,8 +113,8 @@ jq --arg model "$MODEL" --arg provider "$PROVIDER" '
   ]}' "$EVIDENCE/run-$RUN_ID/sandbox/firewall/awf-reflect.json"
 ```
 
-Strip provider prefix/query; preserve dated/version IDs.
-Resolve provider aliases (`github` → `copilot`); inspect `auto`/`opus`
+Strip provider prefix/query; retain dated/version IDs.
+Resolve aliases (`github` → `copilot`); inspect `auto`/`opus`
 `model_aliases`/harness resolution. Alias != concrete ID; `routing_models` != inventory.
 
 | Evidence | Meaning |
@@ -125,7 +125,7 @@ Resolve provider aliases (`github` → `copilot`); inspect `auto`/`opus`
 | ID present; inference rejected | Inspect request model/API/status/policy/auth error. |
 
 `token-usage.jsonl`: empty file + fatal startup rejection supports no inference;
-missing file proves nothing. Missing/expired/denied artifacts: unavailable.
+missing file: unknown. Missing/expired/denied artifacts: unavailable.
 If audit fails, target `gh run download` at `agent`/`info`.
 
 ### Compare one success
@@ -138,8 +138,8 @@ gh aw audit "$BASE_RUN_ID" "$RUN_ID" --repo "$REPO" \
 
 First run = reference. Compare model/provider, credential source (names only),
 revision/runtimes/inventory; success != identity.
-Different inventories, same AWF version: not proof of regression/retirement.
-Require evidence for removal time/cause.
+Different inventories/same AWF version: not proof of regression/retirement.
+Evidence required for removal time/cause.
 Trace pins: `git log -S 'model: PROVIDER/MODEL' -- WORKFLOW.md`.
 
 Absent pin: verify same-provider API/capabilities/policy.
@@ -157,6 +157,7 @@ Nonempty `safeoutputs.jsonl` != publication.
 | `secret_redaction_failure` | Redaction status; sanitized diagnostic. | Repair redaction before publication; never expose raw logs/disable masking. |
 | `safeoutputs_cli_error` | Arguments, registration, denial. | Fix supported invocation/allowlist; no unauthorized `gh` writes. |
 | `invalid_safe_outputs` | Record errors; generated schema. | Fix emitted type/fields; retain validation. |
+| `safe_output_dependency_invalid`, `safe_output_dependency_failed` | Graph IDs/aliases/edges/cycles; prerequisite results. | Fix graph or failed prerequisites; queued/staged/delegated != published. Never replay mutations. |
 | `missing_terminal_safe_output` | Expected terminal tool, denied calls, last session event. | Fix publication/prompt completion contract; silence is not an intentional noop. |
 | `request_rejection`, `prompt_exhaustion`, `unknown` | Native error, budget, missing evidence. | Resolve cause; retain unknown without evidence. |
 | `ERR_VALIDATION`, `E001` | Fields/types, target IDs, schema. | Fix producer; no silent coercion. |
@@ -166,11 +167,11 @@ Nonempty `safeoutputs.jsonl` != publication.
 | `E006` | Body/string length. | Shorten; retain required content. |
 | `E008` | URL count/limit. | Reduce links; no concealment. |
 | `ERR_API`, `E007` | GitHub status; operation guard. | Resolve API/target cause; policy skip != failed mutation. |
-| `ERR_CONFIG`, `ERR_ADMISSION`, `ERR_TOKEN_BROKER_AUTHENTICATION` | Config/schema, OIDC/auth, admission. | Fix config/auth; honor denials/outage policy; recompile; keep credentials/environment private. |
-| `ERR_COMPILED_WORKFLOW_PROVENANCE_REQUIRED`, `ERR_COMPILE_AGENTIC_VERSION_BLOCKED`, `ERR_COMPILE_AGENTIC_VERSION_OUTDATED` | Compiler version vs provenance/compatibility minimums/blocklist. | Update gh-aw; recompile/publish source+lock; retain enforcement. |
+| `ERR_CONFIG`, `ERR_ADMISSION`, `ERR_TOKEN_BROKER_AUTHENTICATION` | Schema/OIDC/auth/admission. | Fix config/auth; honor denials/outage policy; recompile; keep credentials/environment private. |
+| `ERR_COMPILED_WORKFLOW_PROVENANCE_REQUIRED`, `ERR_COMPILE_AGENTIC_VERSION_BLOCKED`, `ERR_COMPILE_AGENTIC_VERSION_OUTDATED` | Version vs provenance/minimums/blocklist. | Update gh-aw; recompile/publish source+lock; retain enforcement. |
 | `ERR_GRADER_SESSION_INVALID` | Unified event array: type/data/provenance. | Fix producer/caller; never fabricate sessions. |
 | `ERR_SAFE_OUTPUT_TOOL_COPY_FAILED` | Tool deep-copy failure. | Fix definition/loader; retain copy isolation. |
-| `ERR_SAFE_OUTPUTS_GATEWAY_CONFIG` | Numeric `MCP_GATEWAY_PORT`; present `MCP_GATEWAY_AGENT_ID` (private). | Repair configuration; retain readiness/authentication checks. |
+| `ERR_SAFE_OUTPUTS_GATEWAY_CONFIG` | Numeric `MCP_GATEWAY_PORT`; present `MCP_GATEWAY_AGENT_ID` (private). | Fix config; retain readiness/auth checks. |
 | `ERR_NOT_FOUND`, `TARGET_NOT_FOUND` | Target/repository; visibility. | Correct target/access; 404 may conceal inaccessible resources. |
 | `ERR_PARSE` | JSON/NDJSON framing/schema/producer. | Fix producer/format; retain private evidence. |
 | `ERR_SYSTEM`, `E099` | First file/git/process failure. | Fix I/O/runtime/checkout; wrapper is not cause. |
@@ -198,12 +199,11 @@ Check current PR head/base/checks/reviews/guards; diagnosis isn't merge authoriz
 | `merge_conflicts`, `not_mergeable` | Mergeability/conflicts; unknown != conflict. | Resolve reviewed-head conflicts; bound waits. |
 | `missing_required_labels`, `title_prefix_mismatch` | Labels/title. | Correct authorized metadata; retain guards. |
 | `required_checks_missing`, `required_checks_failing`, `required_check_producer_missing`, `required_check_producer_mismatch`, `required_check_producer_ambiguous` | Identity/SHA/completion/result/app IDs. | Require complete, unambiguous current-head configured-producer checks; no bypass. |
-| `pending_reviewers`, `blocking_review_state`, `blocking_individual_review`, `unresolved_review_threads`, `required_approval_missing` | Pending/blocked reviews/vetoes; threads; current-head allowlisted human approval. | Address feedback; retain reviewer authority/independent-human approval. |
+| `pending_reviewers`, `blocking_review_state`, `blocking_individual_review`, `unresolved_review_threads`, `required_approval_missing` | Reviews/vetoes/threads; current-head allowlisted human approval. | Address feedback; retain independent reviewer authority. |
+| `manual_review_caution` | PR/review detection/protected-files/caution notice. | Use independent manual review/merge; approvals/dismissals/labels/green checks cannot clear this guard. |
 | `merge_not_completed`, `merge_operation_error` | API/live state. | Reconcile possibly-merged state before retry. |
 
 ## Parser and ledger diagnostics
-
-Check producer/version/location/completeness.
 
 | Codes | Check | Remedy |
 | --- | --- | --- |
@@ -216,10 +216,9 @@ Check producer/version/location/completeness.
 ## Work-queue codes
 
 Follow [queue playbook](work-queue.md); inspect read-only.
-Verify repo/branch/tip, epoch, fingerprint, Work/Claim/Delivery IDs, run binding/receipts.
-Pending projection != claim failure.
-Never rewrite history, fabricate evidence, reuse credentials/request IDs across work,
-or bypass profiles/effect scopes.
+Check repo/branch/tip, epoch, fingerprint, Work/Claim/Delivery IDs, run binding/receipts.
+No history rewriting, fabricated evidence, cross-work credential/request ID reuse,
+or profile/effect-scope bypass.
 
 | Codes | Check | Remedy |
 | --- | --- | --- |
@@ -256,19 +255,18 @@ or bypass profiles/effect scopes.
 | `issue_binding_invalid`, `issue_binding_conflict` | Queue-issue binding; ownership. | Correct authorized binding; never adopt another work item's issue. |
 | `projection_invalid`, `projection_journal_invalid`, `projection_journal_conflict`, `projection_scope_changed`, `projection_write_ambiguous` | Journal, native acknowledgement, target, CAS. | Reconcile receipts; never duplicate uncertain writes, drop uncertain locks or rewrite history. |
 | `projection_target_unavailable`, `projection_unavailable` | Actual failure; safe status/request ID. | Diagnose cause; preserve mirrors and locks. |
-| `projection_receipt_pending`, `projection_comment_pending`, `projection_label_pending`, `projection_coordination_pending`, `projection_pagination_pending`, `projection_rate_pending` | Checkpoint, pacing, existing mirrors/receipts. | Reconcile exact request; never recreate mirrors or mistake pending for terminal failure. |
+| `projection_receipt_pending`, `projection_comment_pending`, `projection_label_pending`, `projection_coordination_pending`, `projection_pagination_pending`, `projection_rate_pending` | Checkpoint/pacing/mirrors/receipts. | Reconcile exact request; never recreate mirrors or mistake pending for terminal failure. |
 
 ## Unmapped codes
 
 | Codes or signature | Check | Remedy |
 | --- | --- | --- |
 | HTTP `401`, `403`, `404`, `429`, `5xx` | Operation, response, proxy guard, policy. | Distinguish auth/SSO, hidden resource, quota, outage; status alone insufficient. |
-| JSON-RPC `-32700`, `-32600`, `-32601`, `-32602`, `-32603`, `isError` | Protocol vs tool failure. | Fix parse/request/method/params/client/schema/server; tool errors need not be protocol errors. |
+| JSON-RPC `-32700`, `-32600`, `-32601`, `-32602`, `-32603`, `isError` | Protocol vs tool failure. | Fix parse/request/method/params/client/schema/server. |
 | `EACCES`, `ENOENT`, `ETIMEDOUT`, process exit/signal | Operation/path; fatal vs caught. | Fix boundary; caught `/run/awf-config-audit` warning doesn't prove later inference failure. |
-| Unlisted code, compile/schema/scanner error | Exact identifier at producing revision; emitter/caller. | Trace cause; add regression/code row; report gaps, never guess. |
+| Unlisted code, compile/schema/scanner error | Identifier/revision; emitter/caller. | Trace cause; add regression/code row; report gaps, never guess. |
 
 No run: inspect file/line; follow [compile-only gates](debug-compilation.md).
-Compilation doesn't verify inference/authorize execution.
+Compilation != inference/execution authority.
 
-Report code/boundary/revision, evidence/uncertainty, remedy/files/execution.
-No blind retries/downgrades/credential-rotation/guard-bypass.
+Report code/boundary/revision, evidence/uncertainty, remedy/files/execution; no blind retries/downgrades/credential-rotation/guard-bypass.

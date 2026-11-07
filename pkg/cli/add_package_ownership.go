@@ -104,7 +104,10 @@ func packageSourceForSpec(spec *WorkflowSpec, sourceInfo *FetchedWorkflow) strin
 		return ""
 	}
 	ref := spec.Version
-	if sourceInfo != nil && sourceInfo.CommitSHA != "" {
+	if spec.VersionInferred {
+		ref = ""
+	}
+	if ref == "" && sourceInfo != nil && sourceInfo.CommitSHA != "" {
 		ref = sourceInfo.CommitSHA
 	}
 	return manifestSourceWithRef(&RepoSpec{
@@ -123,6 +126,9 @@ func buildPackageOwnershipRecord(gitRoot, packageSource string, workflows []*Res
 		Installer:      "gh-aw " + GetVersion(),
 	}
 	for _, resolved := range workflows {
+		if resolved.SourceInfo != nil && IsCommitSHA(resolved.SourceInfo.CommitSHA) {
+			record.ResolvedCommit = resolved.SourceInfo.CommitSHA
+		}
 		destination, err := packageManagedDestination(resolved, opts)
 		if err != nil {
 			return nil, err
@@ -253,7 +259,7 @@ func readPackageOwnershipRecords(gitRoot string) ([]packageOwnershipRecord, erro
 	return records, nil
 }
 
-func syncManifestManagedResources(ctx context.Context, repoSpec *RepoSpec, pkg *resolvedRepositoryPackage, ref string, opts UpdateWorkflowsOptions) error { //nolint:largefunc
+func syncManifestManagedResources(ctx context.Context, repoSpec *RepoSpec, pkg *resolvedRepositoryPackage, ref, sourceRef string, opts UpdateWorkflowsOptions) error { //nolint:largefunc
 	if pkg == nil || repoSpec == nil {
 		return nil
 	}
@@ -271,7 +277,7 @@ func syncManifestManagedResources(ctx context.Context, repoSpec *RepoSpec, pkg *
 	record := packageOwnershipRecord{
 		SchemaVersion:  packageOwnershipSchemaVersion,
 		Package:        packageBase,
-		Source:         manifestSourceWithRef(repoSpec, ref),
+		Source:         manifestSourceWithRef(repoSpec, sourceRef),
 		ResolvedCommit: ref,
 		Installer:      "gh-aw " + GetVersion(),
 	}
@@ -449,7 +455,7 @@ func refreshManifestManagedOwnership(repoSpec *RepoSpec, pkg *resolvedRepository
 		SchemaVersion:  packageOwnershipSchemaVersion,
 		Package:        packageBase,
 		Source:         manifestSourceWithRef(repoSpec, ref),
-		ResolvedCommit: ref,
+		ResolvedCommit: pkg.ResolvedRef,
 		Installer:      "gh-aw " + GetVersion(),
 	}
 	record.Files, err = readExistingPackageOwnershipFiles(gitRoot, recordPath)

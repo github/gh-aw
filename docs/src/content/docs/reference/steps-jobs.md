@@ -76,6 +76,8 @@ steps:
 
 Use custom steps to precompute data, filter triggers, or prepare context for AI agents. Steps can also short-circuit the agent by writing a `noop` entry to `$GH_AW_SAFE_OUTPUTS` — the harness detects this at startup and exits cleanly without incurring any AI inference cost. See [Skip the Agent When It Is Not Needed](/gh-aw/reference/cost-management/#skip-the-agent-when-it-is-not-needed) for details.
 
+See [Checkout and Host Step Order](/gh-aw/reference/checkout/#checkout-and-host-step-order) for checkout ordering, untrusted-ref warnings, and safe handling of fetched refs.
+
 ## Custom Pre-Agent Steps (`pre-agent-steps:`)
 
 Add custom steps before MCP gateway startup in the agent job so prerequisite MCP installation/configuration can happen first.
@@ -126,7 +128,9 @@ jobs:
       - run: echo "${{ needs.agent.result }} ${{ needs.detection.result }} ${{ needs.safe_outputs.outputs.created_issue_number }}"
 ```
 
-The compiler adds `detection` to `needs` if needed and preserves the authored `if`, but rejects the opt-out if the job downloads artifacts, calls an opaque reusable workflow, reads outputs other than those of detection-gated compiler-owned jobs (such as `safe_outputs`), or references `GH_AW_AGENT_OUTPUT` or agent/safe-output files in `env` or `run`. Other custom jobs cannot depend on a job using this option. The `detection-gate` key is compiler-only and is not emitted in the Actions workflow. See [Custom job detection gates](/gh-aw/reference/workflow-linters/#custom-job-detection-gates).
+The compiler adds `detection` to `needs` if needed and preserves the authored `if`. The job may read outputs from detection-gated compiler-owned jobs (such as `safe_outputs`) and authored custom jobs that the dependency graph proves run before `agent`, with no direct or transitive dependency on `agent` or `detection`. This allows a reporter to use pre-agent metadata, such as a validated PR number and head SHA, even when detection fails. Declare each metadata job as a direct dependency in the reporter's `needs`, then pass its outputs through `env`; do not interpolate custom outputs directly into `run` or `actions/github-script` code.
+
+The compiler rejects the opt-out if the job downloads artifacts, calls an opaque reusable workflow, reads other job outputs, or references `GH_AW_AGENT_OUTPUT` or agent/safe-output files in `env` or `run`. Other custom jobs cannot depend on a job using this option. The `detection-gate` key is compiler-only and is not emitted in the Actions workflow. See [Custom job detection gates](/gh-aw/reference/workflow-linters/#custom-job-detection-gates).
 
 ```yaml wrap
 jobs:

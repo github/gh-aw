@@ -377,17 +377,13 @@ describe("extractCommandNamesFromPipeline", () => {
 
   it("extracts all command names from multiline script with variables and control flow", () => {
     const cmd = `set -euo pipefail
-CACHE_DIR='cache/gh-aw/cache-memory/compiler-quality'
-ANALYSES_DIR="$CACHE_DIR/analyses"
-mkdir -p "$ANALYSES_DIR"
-FILES='compiler.go compiler_activation_jobs.go compiler_orchestrator.go compiler_jobs.go compiler_safe_outputs.go compiler_safe_outputs_config.go compiler_safe_outputs_job.go compiler_yaml.go compiler_yaml_main_job.go'
-for f in $FILES; do git -C /home/runner/work/gh-aw/gh-aw log -1 --format='%H' -- "pkg/workflow/$f" | sed "s|^|$f |"; done
-printf '---ROTATION---\n'
-if [ -f "$CACHE_DIR/rotation.json" ]; then cat "$CACHE_DIR/rotation.json"; fi
-printf '\n---HASHES---\n'
-if [ -f "$CACHE_DIR/file-hashes.json" ]; then cat "$CACHE_DIR/file-hashes.json"; fi
-printf '\n---FILES---\n'
-for f in $FILES; do wc -l "/home/runner/work/gh-aw/gh-aw/pkg/workflow/$f"; done`;
+WORK_DIR='/tmp/work'
+mkdir -p "$WORK_DIR"
+FILES='file1.txt file2.txt'
+git log -1 --format='%H' -- file.txt | sed 's|^|file.txt |'
+printf '%s\n' '---FILES---'
+if [ -f "$WORK_DIR/result.json" ]; then cat "$WORK_DIR/result.json"; fi
+for f in $FILES; do wc -l "$WORK_DIR/$f"; done`;
     expect(extractCommandNamesFromPipeline(cmd)).toEqual(["set", "mkdir", "git", "sed", "printf", "cat", "wc"]);
   });
 

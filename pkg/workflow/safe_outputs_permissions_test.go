@@ -321,20 +321,19 @@ func TestComputePermissionsForSafeOutputs(t *testing.T) {
 			},
 		},
 		{
-			name: "push-to-pull-request-branch default fallback - requires pull-requests write and administration read",
+			name: "push-to-pull-request-branch default fallback - requires pull-requests write",
 			safeOutputs: &SafeOutputsConfig{
 				PushToPullRequestBranch: &PushToPullRequestBranchConfig{
 					BaseSafeOutputConfig: BaseSafeOutputConfig{},
 				},
 			},
 			expected: map[PermissionScope]PermissionLevel{
-				PermissionContents:       PermissionWrite,
-				PermissionPullRequests:   PermissionWrite,
-				PermissionAdministration: PermissionRead,
+				PermissionContents:     PermissionWrite,
+				PermissionPullRequests: PermissionWrite,
 			},
 		},
 		{
-			name: "push-to-pull-request-branch with fallback-as-pull-request false - requires pull-requests read and administration read",
+			name: "push-to-pull-request-branch with fallback-as-pull-request false - requires pull-requests read",
 			safeOutputs: &SafeOutputsConfig{
 				PushToPullRequestBranch: &PushToPullRequestBranchConfig{
 					BaseSafeOutputConfig:  BaseSafeOutputConfig{},
@@ -342,9 +341,8 @@ func TestComputePermissionsForSafeOutputs(t *testing.T) {
 				},
 			},
 			expected: map[PermissionScope]PermissionLevel{
-				PermissionContents:       PermissionWrite,
-				PermissionPullRequests:   PermissionRead,
-				PermissionAdministration: PermissionRead,
+				PermissionContents:     PermissionWrite,
+				PermissionPullRequests: PermissionRead,
 			},
 		},
 		{
@@ -361,7 +359,7 @@ func TestComputePermissionsForSafeOutputs(t *testing.T) {
 			},
 		},
 		{
-			name: "push-to-pull-request-branch with check-branch-protection explicit true - includes administration read",
+			name: "push-to-pull-request-branch with check-branch-protection explicit true - no administration permission",
 			safeOutputs: &SafeOutputsConfig{
 				PushToPullRequestBranch: &PushToPullRequestBranchConfig{
 					BaseSafeOutputConfig:  BaseSafeOutputConfig{},
@@ -369,9 +367,8 @@ func TestComputePermissionsForSafeOutputs(t *testing.T) {
 				},
 			},
 			expected: map[PermissionScope]PermissionLevel{
-				PermissionContents:       PermissionWrite,
-				PermissionPullRequests:   PermissionWrite,
-				PermissionAdministration: PermissionRead,
+				PermissionContents:     PermissionWrite,
+				PermissionPullRequests: PermissionWrite,
 			},
 		},
 		{

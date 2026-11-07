@@ -3,7 +3,6 @@
 package workflow
 
 import (
-	"errors"
 	"strings"
 	"testing"
 )
@@ -879,63 +878,7 @@ func TestParseExpression(t *testing.T) {
 	}
 }
 
-// TestVisitExpressionTree tests the tree visitor functionality
-func TestVisitExpressionTree(t *testing.T) {
-	// Create a complex expression tree
-	expr1 := &ExpressionNode{Expression: "github.event_name == 'issues'"}
-	expr2 := &ExpressionNode{Expression: "github.event.action == 'opened'"}
-	expr3 := &ExpressionNode{Expression: "github.event.pull_request.draft == true"}
-
-	// Build tree: (expr1 && expr2) || !expr3
-	andNode := &AndNode{Left: expr1, Right: expr2}
-	notNode := &NotNode{Child: expr3}
-	orNode := &OrNode{Left: andNode, Right: notNode}
-
-	// Collect all literal expressions
-	var collected []string
-	err := VisitExpressionTree(orNode, func(expr *ExpressionNode) error {
-		collected = append(collected, expr.Expression)
-		return nil
-	})
-
-	if err != nil {
-		t.Errorf("VisitExpressionTree() unexpected error: %v", err)
-	}
-
-	expected := []string{
-		"github.event_name == 'issues'",
-		"github.event.action == 'opened'",
-		"github.event.pull_request.draft == true",
-	}
-
-	if len(collected) != len(expected) {
-		t.Errorf("VisitExpressionTree() collected %d expressions, expected %d", len(collected), len(expected))
-		return
-	}
-
-	for i, expr := range expected {
-		if collected[i] != expr {
-			t.Errorf("VisitExpressionTree() collected[%d] = '%s', expected '%s'", i, collected[i], expr)
-		}
-	}
-}
-
-// TestVisitExpressionTreeWithError tests error handling in tree visitor
-func TestVisitExpressionTreeWithError(t *testing.T) {
-	expr := &ExpressionNode{Expression: "test.expression"}
-
-	// Test that visitor errors are propagated
-	expectedError := errors.New("test error")
-	err := VisitExpressionTree(expr, func(expr *ExpressionNode) error {
-		return expectedError
-	})
-
-	if !errors.Is(err, expectedError) {
-		t.Errorf("VisitExpressionTree() error = %v, expected %v", err, expectedError)
-	}
-}
-
-// TestParseExpressionIntegration tests parsing and then visiting the tree
+// TestParseExpressionIntegration tests parsing and rendering the tree
 func TestParseExpressionIntegration(t *testing.T) {
 	input := "(github.event_name == 'issues') && (github.event.action == 'opened') || !(contains(github.event.labels, 'wip'))"
 
@@ -943,34 +886,6 @@ func TestParseExpressionIntegration(t *testing.T) {
 	tree, err := ParseExpression(input)
 	if err != nil {
 		t.Fatalf("ParseExpression() error: %v", err)
-	}
-
-	// Collect all literal expressions using the visitor
-	var literals []string
-	err = VisitExpressionTree(tree, func(expr *ExpressionNode) error {
-		literals = append(literals, expr.Expression)
-		return nil
-	})
-
-	if err != nil {
-		t.Errorf("VisitExpressionTree() error: %v", err)
-	}
-
-	expected := []string{
-		"github.event_name == 'issues'",
-		"github.event.action == 'opened'",
-		"contains(github.event.labels, 'wip')",
-	}
-
-	if len(literals) != len(expected) {
-		t.Errorf("Expected %d literals, got %d", len(expected), len(literals))
-		return
-	}
-
-	for i, expectedLiteral := range expected {
-		if literals[i] != expectedLiteral {
-			t.Errorf("Literal[%d] = '%s', expected '%s'", i, literals[i], expectedLiteral)
-		}
 	}
 
 	// Verify the tree structure by rendering

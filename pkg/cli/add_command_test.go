@@ -903,13 +903,14 @@ func TestAddWorkflowWithTracking_SourceFieldVariants(t *testing.T) {
 	simpleContent := []byte("---\non: push\n---\n\n# Workflow\n")
 	const sha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
-	tests := []struct {
+	type testCase struct {
 		name            string
 		spec            *WorkflowSpec
 		sourceInfo      *FetchedWorkflow
 		wantContains    string
 		wantNotContains string
-	}{
+	}
+	tests := []testCase{
 		{
 			// Local workflows must NOT get a source: field — the code guards on !sourceInfo.IsLocal.
 			name: "local workflow — no source field written",
@@ -942,7 +943,7 @@ func TestAddWorkflowWithTracking_SourceFieldVariants(t *testing.T) {
 				IsLocal:    false,
 				SourcePath: ".github/workflows/my-workflow.md", // identical — no fallback
 			},
-			wantContains:    "source: owner/repo/.github/workflows/my-workflow.md@" + sha,
+			wantContains:    "source: owner/repo/.github/workflows/my-workflow.md@main",
 			wantNotContains: "",
 		},
 		{
@@ -961,9 +962,30 @@ func TestAddWorkflowWithTracking_SourceFieldVariants(t *testing.T) {
 				IsLocal:    false,
 				SourcePath: ".github/workflows/my-workflow.md", // resolved via fallback
 			},
-			wantContains:    "source: current-org/current-repo/.github/workflows/my-workflow.md@" + sha,
+			wantContains:    "source: current-org/current-repo/.github/workflows/my-workflow.md@main",
 			wantNotContains: "source: current-org/current-repo/my-workflow.md",
 		},
+	}
+
+	for _, ref := range []string{"v1.2.0", "v1", "release/stable", sha, ""} {
+		wantRef := ref
+		if wantRef == "" {
+			wantRef = sha
+		}
+		tests = append(tests, testCase{
+			name: "remote workflow ref " + ref,
+			spec: &WorkflowSpec{
+				RepoSpec:     RepoSpec{RepoSlug: "owner/repo", Version: ref},
+				WorkflowPath: ".github/workflows/my-workflow.md",
+				WorkflowName: "my-workflow",
+			},
+			sourceInfo: &FetchedWorkflow{
+				Content:    simpleContent,
+				CommitSHA:  sha,
+				SourcePath: ".github/workflows/my-workflow.md",
+			},
+			wantContains: "source: owner/repo/.github/workflows/my-workflow.md@" + wantRef,
+		})
 	}
 
 	for _, tt := range tests {
@@ -1041,7 +1063,7 @@ func TestAddWorkflowWithTracking_UsesActualFetchedPath(t *testing.T) {
 
 	// The source: field must use the full path, not the short-form WorkflowPath
 	assert.Contains(t, string(written),
-		"source: owner/repo/.github/workflows/my-workflow.md@abc123def456789012345678901234567890abcd",
+		"source: owner/repo/.github/workflows/my-workflow.md@main",
 		"source field should use the actual fetched path so gh aw update can find the file")
 	assert.NotContains(t, string(written),
 		"source: owner/repo/my-workflow.md",

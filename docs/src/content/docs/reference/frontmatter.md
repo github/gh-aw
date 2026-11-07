@@ -611,7 +611,17 @@ Specifies the environment for deployment protection rules and environment-specif
 environment: production
 ```
 
-The activation job inherits this environment, including its deployment protection rules. If [`on.manual-approval`](/gh-aw/reference/triggers/#manual-approval-gates-manual-approval) is configured, its environment takes precedence for the activation job.
+The activation job inherits this environment, including its deployment protection rules. If [`on.manual-approval`](/gh-aw/reference/triggers/#manual-approval-gates-manual-approval) is configured, its environment name takes precedence for the activation job; settings such as `deployment` and `url` from an object environment are retained.
+
+The object form accepts `name`, optional `url`, and optional `deployment` (a boolean or GitHub Actions expression, such as `${{ github.ref_name == 'main' }}`). For environments that only gate secrets, set `deployment: false` to retain environment secrets and protection rules—including branch policies, required reviewers, and wait timers—without creating deployment records:
+
+```aw wrap
+environment:
+  name: protected-secrets
+  deployment: false
+```
+
+Omitting `deployment` preserves GitHub Actions' default deployment behavior. The CLI `--environment` override replaces the entire environment block with a literal name, including any `deployment` setting.
 
 See [GitHub Actions environment docs](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment).
 
@@ -723,6 +733,8 @@ Enabling this increases supply chain risk because install hooks from dependencie
 ### Source Tracking (`source:`)
 
 Tracks workflow origin in format `owner/repo/path@ref`. Automatically populated when using `gh aw add` to install workflows from external repositories. Optional for manually created workflows.
+
+Explicit refs are preserved so updates follow the requested branch or compatible releases. The optional `source-sha` field records the installed 40-character commit SHA separately. `gh aw add` and `gh aw update` manage this field and use it as the base for three-way merges; it does not change the tracking ref.
 
 ```yaml wrap
 source: "githubnext/agentics/workflows/ci-doctor.md@v1.0.0"

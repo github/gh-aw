@@ -205,6 +205,7 @@ func (c *Compiler) validateWorkflowEngineSettings(cleanPath string, workflowData
 	checks := []func(*WorkflowData) error{
 		c.validateRunInstallScripts,
 		c.validateEngineVersion,
+		c.validateEngineDurable,
 		c.validatePlaywrightMode,
 		c.validateLSPSupport,
 		c.validateEngineHarnessScript,

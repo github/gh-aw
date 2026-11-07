@@ -445,7 +445,7 @@ func TestCodexEngineRenderMCPConfig(t *testing.T) {
 		`"container": "ghcr.io/github/github-mcp-server:` + string(constants.DefaultGitHubMCPServerVersion),
 		`"GITHUB_PERSONAL_ACCESS_TOKEN": "$GITHUB_MCP_SERVER_TOKEN"`,
 		`"guard-policies"`, `"allow-only"`, `"startupTimeout": 120`,
-		`start_mcp_gateway.cjs`, `GH_AW_CODEX_CONFIG=`, `cp "${RUNNER_TEMP}/gh-aw/mcp-config/config.toml" "${CODEX_HOME}/config.toml"`,
+		`start_mcp_gateway.cjs`, `GH_AW_CODEX_CONFIG=`, `convert_gateway_config_codex.cjs" --copy-config`,
 	} {
 		assert.Contains(t, generated.String(), fragment)
 	}

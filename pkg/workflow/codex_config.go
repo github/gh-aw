@@ -268,10 +268,44 @@ func validateCodexManagedConfig(config *codexNativeConfig, firewallEnabled, gith
 }
 
 func codexHome(workflowData *WorkflowData) string {
+	if workflowData != nil && workflowData.EngineConfig != nil && workflowData.EngineConfig.Durable != nil {
+		return durableSessionDirectory("codex")
+	}
 	if home := getEngineEnvOverrides(workflowData)["CODEX_HOME"]; home != "" {
-		return home
+		if isSafeCodexHome(home) {
+			return home
+		}
 	}
 	return constants.TmpMcpConfigDir
+}
+
+func isSafeCodexHome(home string) bool {
+	if !path.IsAbs(home) || path.Clean(home) != home {
+		return false
+	}
+	if home == constants.TmpGhAwDir {
+		return true
+	}
+	prefix := constants.TmpGhAwDir + "/"
+	if !strings.HasPrefix(home, prefix) {
+		return false
+	}
+	for component := range strings.SplitSeq(strings.TrimPrefix(home, prefix), "/") {
+		if component == "" || component == "." || component == ".." {
+			return false
+		}
+		for _, char := range component {
+			if (char >= 'a' && char <= 'z') ||
+				(char >= 'A' && char <= 'Z') ||
+				(char >= '0' && char <= '9') ||
+				char == '.' || char == '_' || char == '-' {
+				continue
+			} else {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func codexConfigEnv(workflowData *WorkflowData) map[string]string {

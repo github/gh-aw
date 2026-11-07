@@ -315,7 +315,7 @@ Fields that influence permission computation (`add-comment.discussions`, `hide-c
     - `max-ai-credits:` - Per-run AIC budget for the detection engine (numeric only, no expressions; default `${{ vars.GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS || '400' }}`)
     - `runs-on:` - Runner override for the detection job (defaults to `agent.runs-on`)
     - `continue-on-error:` - When `true` (default), detection failures emit a warning and proceed with a `needs-review` label; when `false`, failures block safe outputs (boolean or expression)
-    - `report-as-issue:` - When `true` (default), detection warnings/failures create or update the `[aw] Detection Runs` tracking issue; set `false` to keep detection and its enforcement active while skipping the tracking issue (results stay visible in Actions run diagnostics) (boolean)
+    - `report-as-issue:` - When `true` (default), detection warnings/failures create or update the `[aw] Detection Runs` tracking issue; set `false` to keep detection and its enforcement active while skipping the tracking issue (results stay visible in Actions run diagnostics) (boolean). While enabled with runnable detection, the `conclusion` job requests `issues: write` (as does its token when `safe-outputs.github-app` is configured, so the App needs **Issues: write**); reusable-workflow callers must grant it through the caller chain. `false` drops only this detection-specific grant; other issue-writing outputs can still require it.
   - Example to disable AI-based detection (use custom steps only):
 
     ```yaml
@@ -341,4 +341,4 @@ The safe-outputs job emits named step outputs for the first successful result of
 
 ### Code-Push Failure Handling
 
-If `create-pull-request` or `push-to-pull-request-branch` fails, remaining safe outputs still run; later `add_comment` outputs get a failure note, and the conclusion job reports details. No setting cancels selected outputs on code-push failure. To gate dependent work, use a custom safe-output job with `needs: safe_outputs` and `if: needs.safe_outputs.outputs.code_push_failure_count == '0'`.
+If `create-pull-request` or `push-to-pull-request-branch` fails, remaining safe outputs still run; later `add_comment` outputs get a failure note, and the conclusion job reports details. No setting cancels selected outputs on code-push failure. To gate a later built-in output, have the agent pass the code-push call's `output_id` as `depends-on` (see [Shared Rules](safe-outputs.md#shared-rules)). Custom safe jobs reject `depends-on`; gate them with `needs: safe_outputs` and `if: needs.safe_outputs.outputs.code_push_failure_count == '0'`.

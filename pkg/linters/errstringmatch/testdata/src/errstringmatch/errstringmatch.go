@@ -16,6 +16,14 @@ func checkParenthesizedLiteral(err error) bool {
 	return strings.Contains(err.Error(), ("not found")) // want `avoid strings\.Contains\(err\.Error\(\)`
 }
 
+func checkParenthesizedCallee(err error) bool {
+	return (strings.Contains)(err.Error(), "not found") // want `avoid strings\.Contains\(err\.Error\(\)`
+}
+
+func checkParenthesizedErrorCall(err error) bool {
+	return strings.HasPrefix((err.Error()), "denied") || strings.HasSuffix((err.Error)(), "denied") // want `avoid strings\.HasPrefix\(err\.Error\(\)` `avoid strings\.HasSuffix\(err\.Error\(\)`
+}
+
 // flagged: same pattern with a different variable name
 func checkPermission(e error) bool {
 	return strings.Contains(e.Error(), "403") // want `avoid strings\.Contains\(err\.Error\(\)`

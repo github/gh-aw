@@ -11,8 +11,9 @@ charset-normalizer==3.5.2 \
     --hash=sha256:211d5a3eb6af8f513b8d4ca19a8c1b7accab1b5f0d3175f9826b03c1a920dc1f
 click==8.5.0 \
     --hash=sha256:255bc9599cf7748b4b1a446ccc735421bd08a2ae529a8b88597d3de5664ee360
-geo-optimizer-skill==4.19.4 \
-    --hash=sha256:245dce62ae0b22ccc16526ad813fd60369fa236ba295584ae9451e8b9e27054a
+geo-optimizer-skill==4.19.9 \
+    --hash=sha256:e098699ec05ccec7c4ca457e89b4fe7cbd04fe1f38ac72469f7631c82904eab2 \
+    --hash=sha256:facec04eb8551899b745c9c8a797d22ec89c39b67ec03a60865cfa6260c33b37
 idna==3.20 \
     --hash=sha256:ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c
 lxml==6.1.3 \

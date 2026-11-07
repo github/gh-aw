@@ -36,7 +36,7 @@ A dedicated `LLMProviderRegistry` that maps provider strings to backend profiles
 #### Negative
 - OpenCode and Crush are now structurally coupled: a bug or breaking change in `UniversalLLMConsumerEngine` will affect both engines simultaneously.
 - The `engine.model` field becomes required for both engines, which is a breaking change for any existing workflow frontmatter that omits it.
-- The `copilot-requests` feature flag path remains in the shared base, meaning the shared logic must be kept aware of Copilot-specific feature flags.
+- The Copilot authentication path remains in the shared base, meaning the shared logic must be kept aware of Copilot-specific permissions.
 
 #### Neutral
 - Compiled workflow lock files (`.lock.yml`) are regenerated to reflect the new secret names and environment variables, which will require safe-update approval gates for secrets like `ANTHROPIC_API_KEY`.
@@ -61,11 +61,11 @@ A dedicated `LLMProviderRegistry` that maps provider strings to backend profiles
 
 ### Backend Profile Resolution
 
-1. The backend profile (secret names, environment variables, base URL env name, gateway port) **MUST** be derived exclusively from the resolved `UniversalLLMBackend` value and the `copilot-requests` feature flag state.
+1. The backend profile (secret names, environment variables, base URL env name, gateway port) **MUST** be derived exclusively from the resolved `UniversalLLMBackend` value and the `permissions.copilot-requests` setting.
 2. Implementations **MUST NOT** hard-code provider-specific secret names or environment variables in individual engine files (`opencode_engine.go`, `crush_engine.go`); all such logic **MUST** live in `universal_llm_consumer_engine.go`.
 3. When the resolved backend is `anthropic`, the execution environment **MUST** include `ANTHROPIC_API_KEY` and, when the firewall is enabled, **MUST** set `ANTHROPIC_BASE_URL` to the gateway's internal address.
 4. When the resolved backend is `codex`/`openai`, the execution environment **MUST** include both `CODEX_API_KEY` and `OPENAI_API_KEY` (falling back to the same secret value), and **MUST** set `OPENAI_BASE_URL` when the firewall is enabled.
-5. When the resolved backend is `copilot`, the engine **SHOULD** check the `copilot-requests` feature flag; if enabled, **MUST** use `${{ github.token }}` and require no additional secret.
+5. When the resolved backend is `copilot`, the engine **SHOULD** check `permissions.copilot-requests`; if set to `write`, **MUST** use `${{ github.token }}` and require no additional secret.
 
 ### Adding New Providers
 

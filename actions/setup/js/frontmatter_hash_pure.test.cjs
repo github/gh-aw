@@ -4,6 +4,7 @@ const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
 const interpolationVectors = require("../../../pkg/parser/testdata/frontmatter_hash_interpolation_vectors.json");
+const nestedImportFixture = require("../../../pkg/parser/testdata/nested_import_hash.json");
 const {
   computeFrontmatterHash,
   computeBodyHash,
@@ -23,6 +24,126 @@ const {
 } = require("./frontmatter_hash_pure.cjs");
 
 describe("frontmatter_hash_pure (text-based)", () => {
+  describe("nested import resolution", () => {
+    const { workflow, imports, expressions } = nestedImportFixture;
+    const hash = text => crypto.createHash("sha256").update(text).digest("hex");
+    const expectedFrontmatter = hash(
+      marshalCanonicalJSON({
+        "frontmatter-text": workflow.frontmatter,
+        imports: imports.map(file => file.importPath).sort(),
+        "imported-frontmatters": imports
+          .map(file => file.frontmatter)
+          .sort()
+          .join("\n---\n"),
+        "template-expressions": expressions,
+      })
+    );
+    const expectedBody = hash([workflow.body, ...imports.map(file => file.body).sort()].join("\n---\n"));
+    const content = file => `---\n${file.frontmatter}\n---\n${file.body}`;
+
+    it("should hash qualified and sibling imports through the API without doubled directories", async () => {
+      const baseDir = ".github/workflows";
+      const files = new Map([workflow, ...imports].map(file => [path.join(baseDir, file.path), content(file)]));
+      const getContent = vi.fn(async ({ path: filePath }) => {
+        if (!files.has(filePath)) throw Object.assign(new Error(`Unexpected path: ${filePath}`), { status: 500 });
+        return { data: { content: files.get(filePath) } };
+      });
+      const fileReader = createGitHubFileReader({ rest: { repos: { getContent } } }, "owner", "repo", "main");
+      const workflowPath = path.join(baseDir, workflow.path);
+      const compute = async () => [await computeFrontmatterHash(workflowPath, { fileReader, readerMode: "github-api" }), await computeBodyHash(workflowPath, { fileReader })];
+      expect(await compute()).toEqual([expectedFrontmatter, expectedBody]);
+      for (const file of imports) {
+        const filePath = path.join(baseDir, file.path);
+        files.set(filePath, content({ ...file, frontmatter: `${file.frontmatter}\ndescription: changed` }));
+        const [changedFrontmatter, sameBody] = await compute();
+        expect(changedFrontmatter).not.toBe(expectedFrontmatter);
+        expect(sameBody).toBe(expectedBody);
+        files.set(filePath, content({ ...file, body: `${file.body}\nChanged \${{ vars.NESTED_CHANGE }}` }));
+        const [expressionHash, changedBody] = await compute();
+        expect(expressionHash).not.toBe(expectedFrontmatter);
+        expect(changedBody).not.toBe(expectedBody);
+        files.set(filePath, content(file));
+      }
+      expect(getContent.mock.calls.every(([request]) => !request.path.includes("/shared/shared/"))).toBe(true);
+    });
+
+    it("should produce the same complete hashes for local fallback without missing imports", async () => {
+      const baseDir = fs.mkdtempSync(path.join(require("os").tmpdir(), "nested-import-hash-"));
+      try {
+        for (const file of [workflow, ...imports]) {
+          const filePath = path.join(baseDir, file.path);
+          fs.mkdirSync(path.dirname(filePath), { recursive: true });
+          fs.writeFileSync(filePath, content(file));
+        }
+        const workflowPath = path.join(baseDir, workflow.path);
+        const onMissingImport = vi.fn();
+        expect(await computeFrontmatterHash(workflowPath, { onMissingImport })).toBe(expectedFrontmatter);
+        expect(await computeBodyHash(workflowPath)).toBe(expectedBody);
+        expect(onMissingImport).not.toHaveBeenCalled();
+      } finally {
+        fs.rmSync(baseDir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe("import read failures", () => {
+    const workflowPath = ".github/workflows/test.md";
+    const cases = [
+      { name: "frontmatter imports", computeHash: computeFrontmatterHash, content: "---\nengine: copilot\nimports:\n  - shared/test.md\n---\nBody" },
+      { name: "body imports", computeHash: computeBodyHash, content: "---\nengine: copilot\nimports:\n  - shared/test.md\n---\nBody" },
+      { name: "runtime imports", computeHash: computeFrontmatterHash, content: "---\nengine: copilot\n---\n{{#runtime-import shared/test.md}}" },
+    ];
+
+    describe.each(cases)("$name", ({ computeHash, content }) => {
+      function readerWithError(error) {
+        return createGitHubFileReader(
+          {
+            rest: {
+              repos: {
+                getContent: vi.fn(async ({ path: filePath }) => {
+                  if (filePath === workflowPath) return { data: { content } };
+                  throw error;
+                }),
+              },
+            },
+          },
+          "owner",
+          "repo",
+          "main"
+        );
+      }
+
+      it.each([{ status: 500, message: "Internal Server Error" }, { status: 403, message: "Secondary rate limit" }, { message: "Request timed out" }])("should propagate unreadable imports: $message", async error => {
+        await expect(computeHash(workflowPath, { fileReader: readerWithError(error), readerMode: "github-api" })).rejects.toThrow(error.message);
+      });
+
+      it("should skip genuinely absent API imports", async () => {
+        const hash = await computeHash(workflowPath, {
+          fileReader: readerWithError({ status: 404, message: "Not Found" }),
+          readerMode: "github-api",
+        });
+        const expected = await computeHash(workflowPath, {
+          fileReader: async filePath => {
+            if (filePath === workflowPath) return content;
+            throw Object.assign(new Error("not found"), { code: "ENOENT" });
+          },
+          readerMode: "github-api",
+        });
+        expect(hash).toBe(expected);
+      });
+
+      it("should skip genuinely absent local imports", async () => {
+        const fileReader = async filePath => (filePath === workflowPath ? content : defaultFileReader(filePath));
+        await expect(computeHash(workflowPath, { fileReader, readerMode: "github-api" })).resolves.toMatch(/^[a-f0-9]{64}$/);
+      });
+
+      it("should propagate errors from malformed imported frontmatter", async () => {
+        const fileReader = async filePath => (filePath === workflowPath ? content : "---\nengine: copilot");
+        await expect(computeHash(workflowPath, { fileReader, readerMode: "github-api" })).rejects.toThrow("ERR_PARSE: Frontmatter not properly closed");
+      });
+    });
+  });
+
   describe("shared interpolation hash vectors", () => {
     it.each(interpolationVectors)("$name", async ({ markdown, relevant, all }) => {
       expect(extractRelevantTemplateExpressions(markdown)).toEqual(relevant);
@@ -217,6 +338,24 @@ engine: copilot`;
       expect(relativeHash).toBe(absoluteHash);
     });
 
+    it("should try later runtime-import candidates after a read failure", async () => {
+      const workflowPath = ".github/workflows/test.md";
+      const firstCandidate = ".github/shared/test.md";
+      const secondCandidate = ".github/workflows/shared/test.md";
+      const reads = [];
+      const fileReader = async filePath => {
+        reads.push(filePath);
+        if (filePath === workflowPath) return "---\nengine: copilot\n---\n{{#runtime-import shared/test.md}}";
+        if (filePath === firstCandidate) throw Object.assign(new Error("Internal Server Error"), { status: 500 });
+        if (filePath === secondCandidate) return "Imported ${{ github.repository }}";
+        throw Object.assign(new Error("Not Found"), { status: 404 });
+      };
+
+      await expect(computeFrontmatterHash(workflowPath, { fileReader, readerMode: "github-api" })).resolves.toMatch(/^[a-f0-9]{64}$/);
+      expect(reads).toContain(firstCandidate);
+      expect(reads).toContain(secondCandidate);
+    });
+
     it("should not use local symlink containment when hashing GitHub API content", async () => {
       const workflowPath = ".github/workflows/remote-context-workflow.md";
       const promptPath = ".github/prompts/remote-context.md";
@@ -331,7 +470,7 @@ Cycle hash coverage.
         ["/repo/.github/workflows/shared/b.md", "B $" + "{{ needs.b.outputs.value }}\n{{#runtime-import shared/a.md}}\n"],
       ]);
       const fileReader = async filePath => {
-        if (!files.has(filePath)) throw new Error(`missing ${filePath}`);
+        if (!files.has(filePath)) throw Object.assign(new Error(`missing ${filePath}`), { code: "ENOENT" });
         return files.get(filePath);
       };
 

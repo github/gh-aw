@@ -4,6 +4,122 @@ set +o histexpand
 # Sourced by installers from the trusted setup action, never from the download origin.
 # Review new pins against authenticated release provenance before committing them.
 # Add pins with scripts/update-release-pins.sh using an independently trusted manifest SHA256.
+release_staging_identity() {
+  stat -c '%d:%i:%u' "$1" 2>/dev/null || stat -f '%d:%i:%u' "$1"
+}
+
+cleanup_release_staging() {
+  if [ ! -e "$TEMP_DIR" ] && [ ! -L "$TEMP_DIR" ]; then
+    return 0
+  fi
+  # Keep the ownership evidence in the installer process, not in mutable staging.
+  if [ -L "$TEMP_DIR" ] || [ ! -d "$TEMP_DIR" ] || [ ! -O "$TEMP_DIR" ] ||
+    [ "$(release_staging_identity "$TEMP_DIR")" != "$GH_AW_RELEASE_STAGING_ID" ]; then
+    echo "Warning: refusing to clean replaced installer staging directory: $TEMP_DIR" >&2
+    return 0
+  fi
+  if ! rm -rf -- "$TEMP_DIR"; then
+    echo "Warning: unable to reclaim owned installer staging directory without elevated permissions: $TEMP_DIR" >&2
+  fi
+}
+
+create_release_staging() {
+  local prefix="$1" parent
+  if [[ ! "$prefix" =~ ^[a-z][a-z0-9-]*$ ]]; then
+    echo "ERROR: Invalid release staging prefix" >&2
+    return 1
+  fi
+  parent="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
+  if command -v cygpath >/dev/null 2>&1; then
+    parent="$(cygpath -u "$parent")" || return 1
+  fi
+  if ! parent="$(cd "$parent" && pwd -P)"; then
+    if [[ -n "${RUNNER_TEMP:-}" ]]; then
+      return 1
+    fi
+    parent="$(cd /tmp && pwd -P)" || return 1
+  fi
+  if ! TEMP_DIR="$(umask 077; mktemp -d "${parent}/${prefix}-install-XXXXXX")"; then
+    if [[ -z "${RUNNER_TEMP:-}" && "$parent" != "$(cd /tmp && pwd -P)" ]]; then
+      parent="$(cd /tmp && pwd -P)" || return 1
+      TEMP_DIR="$(umask 077; mktemp -d "${parent}/${prefix}-install-XXXXXX")" || {
+        echo "ERROR: Could not allocate release staging under $parent" >&2
+        return 1
+      }
+    else
+      echo "ERROR: Could not allocate release staging under $parent" >&2
+      return 1
+    fi
+  fi
+  readonly TEMP_DIR
+  if ! GH_AW_RELEASE_STAGING_ID="$(release_staging_identity "$TEMP_DIR")"; then
+    echo "Warning: could not record ownership; leaving installer staging directory untouched: $TEMP_DIR" >&2
+    return 1
+  fi
+  readonly GH_AW_RELEASE_STAGING_ID
+  trap cleanup_release_staging EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  trap 'exit 129' HUP
+}
+
+create_awf_runtime_tmp() {
+  local runtime_parent runtime_dir runtime_id
+  if [[ -z "${GITHUB_ENV:-}" ]]; then
+    return 0
+  fi
+  if [[ -n "${GH_AW_RUNTIME_TMP_DIR:-}" ]]; then
+    if [[ ! -d "$GH_AW_RUNTIME_TMP_DIR" || -L "$GH_AW_RUNTIME_TMP_DIR" || ! -O "$GH_AW_RUNTIME_TMP_DIR" ||
+      "$(release_staging_identity "$GH_AW_RUNTIME_TMP_DIR")" != "${GH_AW_RUNTIME_TMP_ID:-}" ]]; then
+      echo "ERROR: Existing AWF runtime temp directory is not owned by this invocation" >&2
+      return 1
+    fi
+    export TMPDIR="$GH_AW_RUNTIME_TMP_DIR"
+    return 0
+  fi
+  runtime_parent="$(cd /tmp && pwd -P)" || return 1
+  if ! runtime_dir="$(umask 077; mktemp -d "${runtime_parent}/gh-aw-runtime-XXXXXX")"; then
+    echo "ERROR: Could not allocate private AWF runtime temp directory under $runtime_parent" >&2
+    return 1
+  fi
+  runtime_id="$(release_staging_identity "$runtime_dir")" || {
+    rm -rf -- "$runtime_dir"
+    return 1
+  }
+  if ! printf 'GH_AW_RUNTIME_TMP_DIR=%s\nGH_AW_RUNTIME_TMP_ID=%s\nTMPDIR=%s\n' \
+    "$runtime_dir" "$runtime_id" "$runtime_dir" >>"$GITHUB_ENV"; then
+    rm -rf -- "$runtime_dir"
+    echo "ERROR: Could not persist private AWF runtime temp directory" >&2
+    return 1
+  fi
+  export GH_AW_RUNTIME_TMP_DIR="$runtime_dir"
+  export GH_AW_RUNTIME_TMP_ID="$runtime_id"
+  export TMPDIR="$runtime_dir"
+}
+
+cleanup_awf_runtime_tmp() {
+  local runtime_dir="${GH_AW_RUNTIME_TMP_DIR:-}" runtime_id="${GH_AW_RUNTIME_TMP_ID:-}" runtime_parent
+  if [[ -z "$runtime_dir" ]]; then
+    return 0
+  fi
+  runtime_parent="$(cd /tmp && pwd -P)" || return 0
+  if [[ "${runtime_dir%/*}" != "$runtime_parent" || "${runtime_dir##*/}" != gh-aw-runtime-* ]]; then
+    echo "Warning: refusing to clean an AWF runtime temp path outside its private temp root: $runtime_dir" >&2
+    return 0
+  fi
+  if [[ ! -e "$runtime_dir" && ! -L "$runtime_dir" ]]; then
+    return 0
+  fi
+  if [[ -L "$runtime_dir" || ! -d "$runtime_dir" || ! -O "$runtime_dir" ||
+    "$(release_staging_identity "$runtime_dir")" != "$runtime_id" ]]; then
+    echo "Warning: refusing to clean a replaced or unowned AWF runtime temp directory: $runtime_dir" >&2
+    return 0
+  fi
+  if ! rm -rf -- "$runtime_dir"; then
+    echo "Warning: unable to reclaim owned AWF runtime temp directory without elevated permissions: $runtime_dir" >&2
+  fi
+}
+
 # Each entry binds repository, immutable release version, asset name, and SHA256.
 # The optional fourth argument is a literal pin from trusted workflow frontmatter.
 release_artifact_sha256() {
@@ -23,6 +139,7 @@ github/gh-aw-firewall v0.29.0 checksums.txt 2d49727b3b65630b5d0ba5375168687a852a
 github/gh-aw-firewall v0.29.5 checksums.txt df77f6dd216030f6c604839136ccfed07b922690594db518a83ff3bcc555e788
 github/copilot-cli v1.0.103 SHA256SUMS.txt 26cd3e4b32cde498e4961fb4d48e7b85d7859fc69af1a645a19201fdd577bdb2
 github/gh-aw-firewall v0.29.6 checksums.txt b8c184739fe435513e91b8736417d12d3901205f63bc9587e656a3cffb4c59f1
+github/gh-aw-firewall v0.29.7 checksums.txt 10896644ecf2f7305299458d61ad5194cba825dff537d63a5c194b80f5746bd5
 PINS
     ) || {
       local config_field="engine"

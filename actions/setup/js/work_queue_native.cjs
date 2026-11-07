@@ -60,9 +60,9 @@ function dispatchResponse(response, destination) {
 }
 
 // Polling callers own their retry budget; standalone metadata reads recover here.
-function readNativeMetadata(read, event, { sleepFn = undefined, retryMetadata = true } = {}) {
+function readNativeMetadata(read, event, { sleepFn = undefined, retryMetadata = true, attemptBudget = undefined, expectedStatus = undefined } = {}) {
   const attempt = () => metadataRequest(request => read({ ...request, timeout: 15000 }));
-  return retryMetadata ? readQueueMetadata(attempt, log, event, sleepFn) : attempt();
+  return retryMetadata ? readQueueMetadata(attempt, log, event, sleepFn, { attemptBudget, expectedStatus }) : attempt();
 }
 
 async function fetchNativeRepository(githubClient, repository, readOptions = {}) {
@@ -149,9 +149,11 @@ async function dispatchTag(githubClient, destination) {
   const sha = immutableRef(destination.ref);
   const ref = `refs/tags/gh-aw/work-queue/${sha}`;
   const parameters = { owner, repo, ref: ref.slice("refs/".length), headers: { "X-GitHub-Api-Version": API_VERSION }, request: { retries: 0, retryCount: 0, timeout: 15000 } };
+  const attemptBudget = { remaining: 3 };
+  const readTag = options => readNativeMetadata(request => githubClient.rest.git.getRef({ ...parameters, request }), "dispatch.tag.read", { ...options, attemptBudget });
   let response;
   try {
-    response = await githubClient.rest.git.getRef(parameters);
+    response = await readTag({ expectedStatus: 404 });
   } catch (error) {
     const failure = error && typeof error === "object" ? /** @type {{status?: unknown}} */ error : undefined;
     if (failure?.status !== 404) throw error;
@@ -163,7 +165,7 @@ async function dispatchTag(githubClient, destination) {
       if (failure?.status !== 422 || failure.response?.status !== 422 || failure.response.data?.message !== "Reference already exists") throw creationError;
       log.failure("dispatch.tag.create_conflict", creationError, true);
     }
-    response = await githubClient.rest.git.getRef(parameters);
+    response = await readTag();
   }
   if (response.status !== 200 || response.data?.ref !== ref || response.data?.object?.type !== "commit" || response.data.object.sha !== sha) throw new Error("work_queue_dispatch_tag_mismatch");
   log.diagnostic("dispatch.tag.verified", { verified: true });

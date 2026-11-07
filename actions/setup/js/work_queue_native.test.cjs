@@ -418,7 +418,7 @@ describe("authenticated native queue runs", () => {
     expect(post).not.toHaveBeenCalled();
   });
 
-  it.each([403, 429, 502])("propagates ref API failures without dispatch or retries: %s", async status => {
+  it.each([403, 429])("propagates ref API failures without dispatch or retries: %s", async status => {
     const getRef = vi.fn().mockRejectedValue({ status });
     const createRef = vi.fn();
     const post = vi.fn();

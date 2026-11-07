@@ -119,6 +119,14 @@ async function main() {
   const envRefMatchesWorkflow = envRefWithoutAt.endsWith(`/.github/workflows/${workflowFile}`);
 
   if (envRefMatchesWorkflow) {
+    // Pin source, lock and import reads to the workflow's commit: PR merge refs can
+    // disappear after merge, and branch/tag refs can move while a run is queued.
+    // Never pair an explicit ref override with the original workflow's SHA.
+    const workflowSha = process.env.GITHUB_WORKFLOW_SHA;
+    if (workflowEnvRef === process.env.GITHUB_WORKFLOW_REF && workflowSha) {
+      ref = workflowSha;
+      core.info(`Using immutable workflow revision from GITHUB_WORKFLOW_SHA: ${ref}`);
+    }
     core.info("Env workflow ref already identifies this workflow, skipping referenced_workflows API lookup");
   } else if (Number.isFinite(runId)) {
     const [runOwner, runRepo] = currentRepo.split("/");
@@ -210,6 +218,9 @@ async function main() {
     return { match, storedHash: storedBodyHash, recomputedHash: recomputedBodyHash, hashKind: "body" };
   }
 
+  let hashReadFailure = "";
+  let localFallbackMissingImport = "";
+
   async function compareFrontmatterHashesFromLocalFiles() {
     const workspace = process.env.GITHUB_WORKSPACE;
     if (!workspace) {
@@ -256,7 +267,17 @@ async function main() {
       }
 
       // computeFrontmatterHash uses the local filesystem reader by default
-      const recomputedHash = await computeFrontmatterHash(localMdFilePath);
+      const recomputedHash = await computeFrontmatterHash(localMdFilePath, {
+        onMissingImport: (importPath, error) => {
+          localFallbackMissingImport ||= `${importPath}: ${getErrorMessage(error)}`;
+        },
+      });
+
+      if (hashReadFailure && localFallbackMissingImport) {
+        hashReadFailure = `${hashReadFailure}; local fallback could not read import ${localFallbackMissingImport}`;
+        core.info(`Local filesystem fallback was incomplete: ${localFallbackMissingImport}`);
+        return null;
+      }
 
       const match = storedHash === recomputedHash;
 
@@ -273,7 +294,9 @@ async function main() {
 
       return { match, storedHash, recomputedHash, hashKind: "frontmatter" };
     } catch (error) {
-      core.info(`Could not compute frontmatter hash from local files: ${getErrorMessage(error)}`);
+      const localError = getErrorMessage(error);
+      hashReadFailure = hashReadFailure ? `${hashReadFailure}; local fallback: ${localError}` : localError;
+      core.info(`Could not compute frontmatter hash from local files: ${localError}`);
       return null;
     }
   }
@@ -335,6 +358,7 @@ async function main() {
       return { result: { match, storedHash, recomputedHash, hashKind: "frontmatter" }, crossRepoAuthFailure: null };
     } catch (error) {
       const errorMessage = getErrorMessage(error);
+      hashReadFailure = errorMessage;
       core.info(`Could not compute frontmatter hash via API: ${errorMessage}`);
       // Fall back to local filesystem when API is unavailable
       // (e.g., cross-org reusable workflow where caller token lacks source repo access)
@@ -398,7 +422,7 @@ async function main() {
 
   if (!hashComparison) {
     // Could not compute hash - run verbose pass for debugging then fail
-    core.warning("Could not compare frontmatter hashes - assuming lock file is outdated");
+    core.warning(hashReadFailure ? `Could not compare frontmatter hashes: ${hashReadFailure}` : "Could not compare frontmatter hashes - assuming lock file is outdated");
     await recomputeHashWithDebugLogging();
 
     let warningMessage;
@@ -409,6 +433,9 @@ async function main() {
       // not to re-run `gh aw compile` (which would not resolve the issue).
       warningMessage = `Lock file '${lockFilePath}' could not be verified: GITHUB_TOKEN cannot access the callee repo '${crossRepoAuthFailure.repo}' (HTTP ${crossRepoAuthFailure.status}). Configure GH_AW_GITHUB_TOKEN with read access to '${crossRepoAuthFailure.repo}'.`;
       actionRequiredText = `**Root cause:** \`GITHUB_TOKEN\` is scoped to the caller repo and cannot read from the private callee repo \`${crossRepoAuthFailure.repo}\`.\n\n**Action Required:** Configure \`GH_AW_GITHUB_TOKEN\` with \`contents: read\` access to \`${crossRepoAuthFailure.repo}\`.\n\n`;
+    } else if (hashReadFailure) {
+      warningMessage = `Lock file '${lockFilePath}' could not be verified: ${hashReadFailure}`;
+      actionRequiredText = "**Action Required:** Check source file access and retry the workflow.\n\n";
     } else {
       warningMessage = `Lock file '${lockFilePath}' is outdated or unverifiable! Could not verify frontmatter hash for '${workflowMdPath}'. Run 'gh aw compile' to regenerate the lock file.`;
       actionRequiredText = "**Action Required:** Run `gh aw compile` to regenerate the lock file.\n\n";

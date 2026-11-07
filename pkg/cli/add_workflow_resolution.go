@@ -971,6 +971,7 @@ func appendRepositoryPackageWorkflowSpecs(parsedSpecs []*WorkflowSpec, repoSpec 
 	if pkg == nil {
 		return parsedSpecs
 	}
+	firstPackageSpec := len(parsedSpecs)
 	host := explicitHostForRepo(repoSpec.RepoSlug)
 	effectiveVersion := repositoryPackageEffectiveRef(repoSpec, pkg)
 	for _, installable := range pkg.InstallationSource {
@@ -1015,7 +1016,11 @@ func appendRepositoryPackageWorkflowSpecs(parsedSpecs []*WorkflowSpec, repoSpec 
 			IsPackageResourceFile:  true,
 		})
 	}
-	return appendRepositoryPackageExtensionSpecs(parsedSpecs, repoSpec, pkg, effectiveVersion, host)
+	parsedSpecs = appendRepositoryPackageExtensionSpecs(parsedSpecs, repoSpec, pkg, effectiveVersion, host)
+	for _, spec := range parsedSpecs[firstPackageSpec:] {
+		spec.VersionInferred = repoSpec.Version == ""
+	}
+	return parsedSpecs
 }
 
 func appendRepositoryPackageExtensionSpecs(parsedSpecs []*WorkflowSpec, repoSpec *RepoSpec, pkg *resolvedRepositoryPackage, effectiveVersion, host string) []*WorkflowSpec {

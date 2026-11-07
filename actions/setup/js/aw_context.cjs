@@ -284,6 +284,7 @@ function normalizeLegacyWorkQueueContext(awContext, rawClaim) {
  *   episode_id: string,
  *   hop_id: string,
  *   parent_hop_id: string,
+ *   parent_run_id: string,
  *   origin_event: string,
  *   root_repo: string,
  *   root_workflow_id: string,
@@ -416,6 +417,7 @@ function buildAwContext() {
     // parent_hop_id identifies the immediate caller when a workflow was spawned
     // by a previous automation hop.
     parent_hop_id: parentHopId,
+    parent_run_id: parentHopId.match(/^([1-9]\d*)-/)?.[1] || "",
     // origin_event captures the original GitHub event that started the episode.
     origin_event: originEvent,
     // root_* fields stay stable across all child workflow hops in the episode.

@@ -603,6 +603,8 @@ The separate [Work Queue Stress workflow](../../.github/workflows/work-queue-str
 runs on pull requests and `main` pushes changing `actions/setup/js` JavaScript,
 the simulator, its workflow or protocol fixtures. It runs the 100,000-item history
 profile, 1,024 live lifecycles and admission saturation independently. Its step
+budgets allow ten minutes each for history and live lifecycles, with a thirty-minute
+job deadline covering invariant checks, saturation and diagnostic uploads. The
 summary reports profile outcomes, measured workload, elapsed time, throughput and
 peak memory, with phase timings and Git contention in a collapsible section.
 History validation throughput is separate from live Work completion throughput;

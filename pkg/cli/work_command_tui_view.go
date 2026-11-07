@@ -131,7 +131,7 @@ func (m workQueueTUI) View() tea.View {
 		header += "Search " + workQueueText(m.filter.Query) + " | / edit | Esc clear\n"
 	}
 	frame := lipgloss.NewStyle().Border(workQueueBorder)
-	body := ""
+	var body string
 	if m.mode != "" {
 		body = frame.Width(width - 2).Height(height).Render(m.modalView())
 	} else if width >= 100 {

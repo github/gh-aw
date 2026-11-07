@@ -79,7 +79,7 @@ func run(pass *analysis.Pass) (any, error) {
 // brittleErrStringFuncName returns the matched strings function name and true
 // when call is a strings.<BrittleFunc>(...) call expression.
 func brittleErrStringFuncName(pass *analysis.Pass, call *ast.CallExpr) (string, bool) {
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok {
 		return "", false
 	}
@@ -95,11 +95,11 @@ func brittleErrStringFuncName(pass *analysis.Pass, call *ast.CallExpr) (string, 
 // isErrDotError returns true when expr is a method call of the form <expr>.Error()
 // where the receiver implements the error interface.
 func isErrDotError(pass *analysis.Pass, expr ast.Expr) bool {
-	call, ok := expr.(*ast.CallExpr)
+	call, ok := astutil.UnwrapParenExpr(expr).(*ast.CallExpr)
 	if !ok {
 		return false
 	}
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok {
 		return false
 	}

@@ -123,9 +123,6 @@ func TestCompileSafeOutputsPRCredentialsSpecificationIntegration(t *testing.T) {
 			if tt.fixture == "handler-app" || tt.fixture == "handler-token" {
 				expectedPermissions = map[string]any{"permission-issues": "write"}
 			}
-			if tt.fixture == "host" {
-				expectedPermissions["permission-administration"] = "read"
-			}
 			assert.Equal(t, expectedPermissions, permissions, "persistence must not expand global App permissions")
 			if tt.fixture == "target" {
 				assert.Equal(t, "OrgB", mint.With["owner"])

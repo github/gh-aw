@@ -26,6 +26,30 @@ func TestAuthoredJobDependencies(t *testing.T) {
 	assert.False(t, graph.DependsOn("missing", "agent"))
 }
 
+func TestIsPreAgentCustomJob(t *testing.T) {
+	for _, tt := range []struct {
+		name  string
+		job   string
+		graph JobDependencyGraph
+		want  bool
+	}{
+		{"direct", "metadata", JobDependencyGraph{"agent": {"metadata"}, "metadata": {}}, true},
+		{"transitive", "metadata", JobDependencyGraph{"agent": {"activation"}, "activation": {"metadata"}, "metadata": {}}, true},
+		{"parallel", "metadata", JobDependencyGraph{"agent": {}, "metadata": {}}, false},
+		{"missing", "metadata", JobDependencyGraph{"agent": {}}, false},
+		{"agent", "agent", JobDependencyGraph{"agent": {}}, false},
+		{"compiler-owned pre-agent", "activation", JobDependencyGraph{"agent": {"activation"}, "activation": {}}, false},
+		{"cycle through agent", "metadata", JobDependencyGraph{"agent": {"metadata"}, "metadata": {"agent"}}, false},
+		{"detection dependency", "metadata", JobDependencyGraph{"agent": {"metadata"}, "metadata": {"detection"}}, false},
+		{"transitive detection", "metadata", JobDependencyGraph{"agent": {"metadata"}, "metadata": {"relay"}, "relay": {"detection"}}, false},
+		{"mixed transitive taint", "metadata", JobDependencyGraph{"agent": {"metadata", "clean"}, "metadata": {"clean", "relay"}, "relay": {"safe_outputs"}, "safe_outputs": {"agent"}, "clean": {}}, false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.graph.IsPreAgentCustomJob(tt.job))
+		})
+	}
+}
+
 func TestAuthoredJobDependenciesPostAgentMaintenance(t *testing.T) {
 	for _, job := range []string{
 		"push_repo_memory",

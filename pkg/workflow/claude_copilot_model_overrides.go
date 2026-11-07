@@ -17,40 +17,19 @@ var claudeCopilotModelOverridesLog = logger.New("workflow:claude_copilot_model_o
 // from this variable when the arguments do not already contain one.
 const claudeSettingsEnvVar = "GH_AW_CLAUDE_SETTINGS"
 
-// copilotClaudeModelIDs lists the Claude model ids of the github-copilot provider in
-// gh-aw's model catalog (pkg/cli/data/models.json). The catalog is embedded in pkg/cli,
-// which pkg/workflow cannot import, so the ids are kept here; a pkg/cli test fails
-// when this list drifts from the catalog.
-var copilotClaudeModelIDs = []string{
-	"claude-fable-5",
-	"claude-fable-5.1",
-	"claude-haiku-4.5",
-	"claude-haiku-5.5",
-	"claude-opus-4.5",
-	"claude-opus-4.6",
-	"claude-opus-4.7",
-	"claude-opus-4.8",
-	"claude-opus-5",
-	"claude-opus-5.5",
-	"claude-sonnet-4",
-	"claude-sonnet-4.5",
-	"claude-sonnet-4.6",
-	"claude-sonnet-5",
-	"claude-sonnet-5.5",
-}
-
 // claudeCopilotModelOverrides maps each Anthropic model id to the Copilot model id for
 // every Copilot Claude id whose version uses a dot (claude-haiku-4.5) instead of
-// Anthropic's hyphen (claude-haiku-4-5). Ids that already match get no entry.
+// Anthropic's hyphen (claude-haiku-4-5), using the same bundled catalog as the harness.
+// Ids that already match get no entry.
 func claudeCopilotModelOverrides() map[string]string {
 	overrides := make(map[string]string)
-	for _, id := range copilotClaudeModelIDs {
-		if !strings.Contains(id, ".") {
+	for id := range bundledProviderModelIDs()[copilotRoutingNamespace] {
+		if !strings.HasPrefix(id, "claude-") || !strings.Contains(id, ".") {
 			continue
 		}
 		overrides[strings.ReplaceAll(id, ".", "-")] = id
 	}
-	claudeCopilotModelOverridesLog.Printf("Built %d Claude model override(s) out of %d Copilot Claude model id(s)", len(overrides), len(copilotClaudeModelIDs))
+	claudeCopilotModelOverridesLog.Printf("Built %d Claude model override(s) from the bundled Copilot catalog", len(overrides))
 	return overrides
 }
 
@@ -83,8 +62,9 @@ func claudeArgsHaveSettings(args []string) bool {
 func claudeArgsSettingsValue(args []string) (string, bool) {
 	value, found := "", false
 	for i, arg := range args {
-		if arg == "--settings" && i+1 < len(args) {
-			value, found = args[i+1], true
+		next := i + 1
+		if arg == "--settings" && next >= 0 && next < len(args) {
+			value, found = args[next], true
 		} else if after, ok := strings.CutPrefix(arg, "--settings="); ok {
 			value, found = after, true
 		}

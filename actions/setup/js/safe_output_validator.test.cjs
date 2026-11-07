@@ -290,23 +290,30 @@ describe("safe_output_validator.cjs", () => {
       expect(result.value).toEqual(["bug"]);
     });
 
-    it("should match blocked patterns against the raw label before sanitization", () => {
+    it("should not match blocked patterns against the raw label", () => {
       const result = validator.validateLabels(["bug", "@copilot"], undefined, 10, ["@copilot"]);
 
       expect(result.valid).toBe(true);
-      expect(result.value).toEqual(["bug"]);
+      expect(result.value).toEqual(["bug", "`@copilot`"]);
     });
 
-    it("should match allowed patterns against the raw label before sanitization", () => {
-      const result = validator.validateLabels(["@bot"], ["@bot"], 10);
+    it("should match allowed patterns against the sanitized label", () => {
+      const result = validator.validateLabels(["@bot"], ["`@bot`"], 10);
 
       expect(result.valid).toBe(true);
       expect(result.value).toEqual(["`@bot`"]);
     });
 
+    it("should not match allowed patterns against the raw label", () => {
+      const result = validator.validateLabels(["@bot"], ["@bot"], 10);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain("No valid labels found");
+    });
+
     it("should block labels that match a blocked pattern after sanitization and truncation", () => {
       const label = "🐛".repeat(27) + " @blocked!";
-      const result = validator.validateLabels(["bug", label], undefined, 10, ["*blocked"]);
+      const result = validator.validateLabels(["bug", label], undefined, 10, ["🐛*"]);
 
       expect(result.valid).toBe(true);
       expect(result.value).toEqual(["bug"]);

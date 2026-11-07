@@ -518,6 +518,7 @@ func (e *CodexEngine) buildCodexExecutionEnv(workflowData *WorkflowData, firewal
 	applyCodexModelEnv(env, workflowData, modelConfigured, modelEnvVar)
 	applyEngineCwdEnv(env, workflowData)
 	applyEngineAndAgentEnv(env, workflowData, codexEngineLog)
+	env["CODEX_HOME"] = codexHome(workflowData)
 	if isCodexAzureOIDC(workflowData) {
 		// Non-secret launch policy; the harness also verifies fresh AWF reflection.
 		env["GH_AW_CODEX_OIDC_AUTH"] = "azure"
@@ -527,6 +528,7 @@ func (e *CodexEngine) buildCodexExecutionEnv(workflowData *WorkflowData, firewal
 	}
 	applyModelRoutingEnv(env, workflowData)
 	applyModelAliasesEnv(env, workflowData)
+	applyDurableExecutionEnv(env, workflowData)
 	return env
 }
 

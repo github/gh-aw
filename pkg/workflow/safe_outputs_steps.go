@@ -122,6 +122,9 @@ type GitHubScriptStepConfig struct {
 	// CustomToken configuration (passed to addSafeOutputGitHubTokenForConfig or addSafeOutputCopilotGitHubTokenForConfig)
 	CustomToken string
 
+	// FallbackToGitHubToken keeps failure reporting available when App token minting fails.
+	FallbackToGitHubToken bool
+
 	// UseCopilotRequestsToken indicates whether to use the Copilot token preference chain
 	// custom token > COPILOT_GITHUB_TOKEN
 	// This should be true for Copilot-related operations like creating agent tasks,
@@ -194,7 +197,10 @@ func (c *Compiler) buildGitHubScriptStepCommon(data *WorkflowData, config GitHub
 
 	// With section for github-token
 	steps = append(steps, "        with:\n")
-	if config.UseCopilotCodingAgentToken {
+	if config.FallbackToGitHubToken && data.SafeOutputs != nil && data.SafeOutputs.GitHubApp != nil {
+		token := resolveSafeOutputGitHubTokenForConfig(data, config.CustomToken, resolveSafeOutputGitHubToken, true)
+		steps = append(steps, fmt.Sprintf("          github-token: %s\n", combineTokenExpressions(token, "${{ github.token }}")))
+	} else if config.UseCopilotCodingAgentToken {
 		c.addSafeOutputAgentGitHubTokenForConfig(&steps, data, config.CustomToken)
 	} else if config.UseCopilotRequestsToken {
 		c.addSafeOutputCopilotGitHubTokenForConfig(&steps, data, config.CustomToken)

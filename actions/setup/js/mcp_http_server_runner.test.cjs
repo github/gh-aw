@@ -258,7 +258,9 @@ describe("mcp_http_server_runner.cjs - runHttpServer", () => {
   });
 
   it.each([undefined, "", "   "])("fails explicitly when the API key is missing or empty (%s)", async apiKey => {
-    await expect(runHttpServer({ transport: makeMockTransport(), port: 0, getHealthPayload: () => ({}), logger: makeMockLogger(), serverLabel: "Test", apiKey })).rejects.toThrow("must be set to a non-empty API key");
+    await expect(runHttpServer({ transport: makeMockTransport(), port: 0, getHealthPayload: () => ({}), logger: makeMockLogger(), serverLabel: "Test", apiKey })).rejects.toThrow(
+      /^ERR_CONFIG: Test API key must be set to a non-empty API key/
+    );
   });
 
   it.each([undefined, "", "wrong-key", "runner-test-api-keX", `Bearer ${API_KEY}`])("rejects an unauthorized POST before reading its body (%s)", async authorization => {

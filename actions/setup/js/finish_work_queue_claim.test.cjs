@@ -139,31 +139,44 @@ describe("independent trusted Claim finalization", () => {
   });
 
   it("aborts checkpoint-history lookup at its one-second deadline", async () => {
-    const controller = vi.fn();
-    const client = {
-      rest: {
-        git: {
-          getCommit: vi.fn(({ request }) => {
-            request.signal.addEventListener("abort", controller, { once: true });
-            return new Promise(() => {});
-          }),
+    vi.useFakeTimers();
+    try {
+      const controller = vi.fn();
+      const client = {
+        rest: {
+          git: {
+            getCommit: vi.fn(({ request }) => {
+              request.signal.addEventListener("abort", controller, { once: true });
+              return new Promise(() => {});
+            }),
+          },
         },
-      },
-    };
-    const latest = { sha: "c".repeat(40), eventLocations: { checkpoint_prior_git_sha: "b".repeat(40) } };
+      };
+      const latest = { sha: "c".repeat(40), eventLocations: { checkpoint_prior_git_sha: "b".repeat(40) } };
 
-    await expect(
-      workQueueStore.resolveWorkQueueEventLocations({
+      const lookup = workQueueStore.resolveWorkQueueEventLocations({
         githubClient: client,
         owner: "owner",
         repo: "repo",
         latest,
         work_id: "work-1",
         claim_id: "claim-1",
-        timeoutMs: 1,
-      })
-    ).resolves.toBeUndefined();
-    expect(controller).toHaveBeenCalledTimes(1);
+      });
+      expect(client.rest.git.getCommit).toHaveBeenCalledTimes(1);
+      const { signal } = client.rest.git.getCommit.mock.calls[0][0].request;
+      expect(signal.aborted).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(999);
+      expect(controller).not.toHaveBeenCalled();
+      expect(signal.aborted).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(1);
+      await expect(lookup).resolves.toBeUndefined();
+      expect(controller).toHaveBeenCalledTimes(1);
+      expect(signal.aborted).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("reuses only repository-scoped footer links from the reconciliation output after trusted authorization", async () => {

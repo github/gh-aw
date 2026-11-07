@@ -67,7 +67,7 @@ func resolveRedirectedUpdateLocation(ctx context.Context, workflowName string, i
 				coolDownBlocked: true,
 			}, nil
 		}
-		latestRef := latestRefResult.Ref
+		latestRef := latestRefResult.downloadRef()
 
 		content, err := downloadWorkflowContentFn(ctx, current.Repo, current.Path, latestRef, verbose)
 		if err != nil {
@@ -79,7 +79,7 @@ func resolveRedirectedUpdateLocation(ctx context.Context, workflowName string, i
 			return nil, err
 		}
 
-		sourceFieldRef := latestRef
+		sourceFieldRef := latestRefResult.Ref
 		if isBranchRef(currentRef) {
 			sourceFieldRef = currentRef
 		}

@@ -22,6 +22,7 @@
 const http = require("http");
 const { timingSafeEqual } = require("crypto");
 const { createLogger } = require("./mcp_logger.cjs");
+const { ERR_CONFIG } = require("./error_codes.cjs");
 
 const MAX_REQUEST_BODY_BYTES = 1024 * 1024;
 const REQUEST_BODY_TIMEOUT_MS = 30_000;
@@ -33,7 +34,7 @@ const REQUEST_BODY_TIMEOUT_MS = 30_000;
  */
 function requireHttpApiKey(apiKey, credentialName) {
   if (typeof apiKey !== "string" || !apiKey.trim()) {
-    throw new Error(`${credentialName} must be set to a non-empty API key for HTTP MCP requests`);
+    throw new Error(`${ERR_CONFIG}: ${credentialName} must be set to a non-empty API key for HTTP MCP requests`);
   }
   return apiKey;
 }

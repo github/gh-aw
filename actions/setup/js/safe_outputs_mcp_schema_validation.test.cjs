@@ -23,6 +23,26 @@ describe("Safe Outputs MCP Schema Validation", () => {
   const toolsContent = fs.readFileSync(toolsPath, "utf8");
   tools = JSON.parse(toolsContent);
 
+  describe("Issue artifact content sources", () => {
+    const schema = tools.find(tool => tool.name === "create_issue").inputSchema;
+    const validate = new Ajv({ strict: false }).compile(schema);
+    const request = artifact => ({ title: "Parser caching", body: "Implementation details", artifacts: [artifact] });
+
+    it.each([
+      { name: "Notes", body: "Details" },
+      { type: "plan", name: "Plan", path: "/tmp/gh-aw/agent/plan.md" },
+    ])("accepts a single content source: %j", artifact => {
+      expect(validate(request(artifact))).toBe(true);
+    });
+
+    it.each([{ name: "Notes" }, { name: "Notes", body: "Details", path: "/tmp/plan.md" }, { name: "Notes", path: "" }, { name: "Notes", path: "plan.md" }, { name: "Notes", path: 42 }, { name: "Notes", body: "" }])(
+      "rejects an invalid content source: %j",
+      artifact => {
+        expect(validate(request(artifact))).toBe(false);
+      }
+    );
+  });
+
   describe("Discussion temporary IDs", () => {
     const schema = tools.find(tool => tool.name === "create_discussion").inputSchema;
     const validate = new Ajv({ strict: false }).compile(schema);

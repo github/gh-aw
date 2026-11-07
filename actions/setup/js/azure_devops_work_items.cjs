@@ -183,6 +183,14 @@ function resolveWorkItemReference(value, resolvedTemporaryIds, allowStaged) {
   throw new Error(`temporary work-item ID '#${key}' does not reference a created work item`);
 }
 
+function normalizeTargetId(target) {
+  if (typeof target === "string" && /^[1-9][0-9]*$/.test(target.trim())) {
+    const id = Number(target);
+    if (Number.isSafeInteger(id)) return id;
+  }
+  return target;
+}
+
 function targetAllowsId(target, id) {
   if (target === "*") return true;
   if (Number.isSafeInteger(target)) return target === id;
@@ -197,6 +205,8 @@ async function getWorkItem(ado, id, fields = []) {
 
 async function enforceTarget(ado, target, id) {
   if (target == null) throw new Error("target is required for pre-existing work items");
+  if (typeof target === "string" && !target.trim()) throw new Error("target must not be empty; expression targets must evaluate to a work-item ID");
+  target = Array.isArray(target) ? target.map(normalizeTargetId) : normalizeTargetId(target);
   const allowed = targetAllowsId(target, id);
   if (allowed === true) return;
   if (allowed === false) throw new Error(`work item #${id} is not permitted by the target configuration`);

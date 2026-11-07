@@ -371,3 +371,88 @@ describe("bundled built-in model aliases", () => {
     expect(loadBuiltinModelAliases()?.sonnet).toEqual(ALIAS_MAP.sonnet);
   });
 });
+
+// Threat detection selection with the built-in alias map (github/gh-aw#74955).
+describe("built-in detection alias selection", () => {
+  // Exact 26-model Copilot catalog from cli/cli run 41881019520 (sandbox/firewall/awf-reflect.json).
+  const CLI_CLI_CATALOG = [
+    "claude-opus-4.8",
+    "claude-opus-4.8-fast",
+    "claude-opus-5",
+    "claude-sonnet-5",
+    "gpt-3.5-turbo",
+    "gpt-3.5-turbo-0613",
+    "gpt-4",
+    "gpt-4-0613",
+    "gpt-4-o-preview",
+    "gpt-4.1",
+    "gpt-4.1-2025-04-14",
+    "gpt-41-copilot",
+    "gpt-4o",
+    "gpt-4o-2024-05-13",
+    "gpt-4o-2024-08-06",
+    "gpt-4o-2024-11-20",
+    "gpt-4o-mini",
+    "gpt-4o-mini-2024-07-18",
+    "gpt-5.3-codex",
+    "gpt-5.6-luna",
+    "gpt-5.6-luna-utility",
+    "gpt-5.6-sol",
+    "gpt-5.6-terra",
+    "text-embedding-3-small",
+    "text-embedding-3-small-inference",
+    "text-embedding-ada-002",
+  ];
+
+  // Mirrors the compiled detection step: COPILOT_MODEL: ${{ vars.GH_AW_MODEL_DETECTION_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'detection' }}
+  const detectionConfiguredModel = (vars = {}) => vars.GH_AW_MODEL_DETECTION_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || "detection";
+
+  const resolveDetection = async (models, vars) => {
+    const aliasMap = loadBuiltinModelAliases();
+    expect(aliasMap).toEqual(ALIAS_MAP);
+    const result = await resolveEngineModel({
+      engine: "copilot",
+      role: "detection",
+      configuredModel: detectionConfiguredModel(vars),
+      aliasMap,
+      reflectData: { models_fetch_complete: true, endpoints: [{ configured: true, provider: "copilot", models }] },
+      env: {},
+      record: false,
+      normalize: r => normalizeForCopilotCLI(r.resolvedModel),
+    });
+    return result.engineModel;
+  };
+
+  it("resolves the real cli/cli catalog to gpt-5.6-luna, never the utility variant", async () => {
+    expect(CLI_CLI_CATALOG).toHaveLength(26);
+    expect(await resolveDetection(CLI_CLI_CATALOG)).toBe("gpt-5.6-luna");
+  });
+
+  it("keeps preferring haiku over Luna models", async () => {
+    expect(await resolveDetection(["claude-haiku-5.5", "gpt-5.6-luna", "gpt-6-luna"])).toBe("claude-haiku-5.5");
+  });
+
+  it("selects the latest Luna model and ignores suffixed Luna variants", async () => {
+    expect(await resolveDetection(["gpt-5.6-luna", "gpt-6-luna", "gpt-5.6-luna-utility", "gpt-6-luna-decisions"])).toBe("gpt-6-luna");
+  });
+
+  it("falls back to the agent tier when no small model is available", async () => {
+    expect(await resolveDetection(["claude-sonnet-5", "claude-opus-4.8", "gpt-5.6-sol"])).toBe("claude-sonnet-5");
+  });
+
+  it("does not match suffixed Luna variants and falls through to the agent tier", async () => {
+    expect(await resolveDetection(["gpt-5.6-luna-utility", "gpt-6-luna-decisions", "claude-sonnet-5"])).toBe("claude-sonnet-5");
+  });
+
+  it("falls back to the small-agent tier when no small or Luna model is available", async () => {
+    expect(await resolveDetection(["gemini-3.8-flash", "claude-sonnet-5", "gpt-5.6-sol"])).toBe("gemini-3.8-flash");
+  });
+
+  it("selects Luna when Haiku, GPT-5 Mini/Nano and Gemini Flash Lite are absent", async () => {
+    expect(await resolveDetection(["gpt-5.6-luna", "gemini-3.8-flash", "claude-sonnet-5"])).toBe("gpt-5.6-luna");
+  });
+
+  it("keeps an explicit GH_AW_MODEL_DETECTION_COPILOT override", async () => {
+    expect(await resolveDetection(CLI_CLI_CATALOG, { GH_AW_MODEL_DETECTION_COPILOT: "gpt-5.3-codex" })).toBe("gpt-5.3-codex");
+  });
+});

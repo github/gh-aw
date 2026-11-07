@@ -40,9 +40,7 @@ func (e *CodexEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]an
 
 	yaml.WriteString(codexRunBlockIndent + "\n")
 	yaml.WriteString(codexRunBlockIndent + "# Sync converter output to writable CODEX_HOME for Codex\n")
-	yaml.WriteString(codexRunBlockIndent + "mkdir -p \"${CODEX_HOME}\"\n")
-	yaml.WriteString(codexRunBlockIndent + "if [ \"${RUNNER_TEMP}/gh-aw/mcp-config/config.toml\" != \"${CODEX_HOME}/config.toml\" ]; then cp \"${RUNNER_TEMP}/gh-aw/mcp-config/config.toml\" \"${CODEX_HOME}/config.toml\"; fi\n")
-	yaml.WriteString(codexRunBlockIndent + "chmod 600 \"${CODEX_HOME}/config.toml\"\n")
+	yaml.WriteString(codexRunBlockIndent + `"$(command -v node)" "${RUNNER_TEMP}/gh-aw/actions/convert_gateway_config_codex.cjs" --copy-config` + "\n")
 
 	return nil
 }

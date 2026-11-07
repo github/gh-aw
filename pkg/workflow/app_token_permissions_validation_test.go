@@ -312,6 +312,50 @@ func TestAppTokenPermissionsGeneratedTokenDefaults(t *testing.T) {
 	}
 }
 
+func TestAppTokenPermissionsPushToPullRequestBranch(t *testing.T) {
+	for _, check := range []string{"", "    check-branch-protection: true\n", "    check-branch-protection: false\n"} {
+		t.Run(strings.TrimSpace(check), func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, "push.md")
+			content := `---
+on: workflow_dispatch
+engine: copilot
+permissions:
+  contents: read
+network:
+  allowed: [defaults]
+safe-outputs:
+  github-app:
+    app-id: ${{ vars.APP_ID }}
+    private-key: ${{ secrets.APP_KEY }}
+  push-to-pull-request-branch:
+` + check + `---
+
+Test push permissions.
+`
+			if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			compiler := NewCompiler()
+			if err := compiler.CompileWorkflow(path); err != nil {
+				t.Fatalf("expected push handler with GitHub App to compile: %v", err)
+			}
+			lock, err := os.ReadFile(filepath.Join(dir, "push.lock.yml"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(string(lock), "permission-administration:") {
+				t.Fatal("push handler must not request Administration permission")
+			}
+			for _, permission := range []string{"permission-contents: write", "permission-pull-requests: write"} {
+				if !strings.Contains(string(lock), permission) {
+					t.Errorf("push handler must retain %s", permission)
+				}
+			}
+		})
+	}
+}
+
 func TestAppTokenPermissionsGeneratedOTLPAndSideRepoSteps(t *testing.T) {
 	compiler := NewCompiler()
 	data := &WorkflowData{

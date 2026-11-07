@@ -13,6 +13,22 @@ Before the agent job, activation separately checks out workflow configuration to
 
 Use `checkout:` when you need to check out additional branches, check out multiple repositories, or to disable checkout entirely for workflows that don't need to access code or can access code dynamically through the GitHub Tools.
 
+## Checkout and Host Step Order
+
+The relevant agent-job order is:
+
+1. Repository checkout, using `checkout.ref` when configured.
+2. Imported `steps:` (including shared toolchain setup).
+3. The workflow's own `steps:`.
+4. Automatic "Checkout PR branch", when enabled for the event.
+5. `pre-agent-steps:`.
+6. The sandboxed engine.
+
+> [!WARNING]
+> Imported, workflow-owned, and pre-agent steps execute on the host, outside the sandbox. Setting `checkout.ref` to an untrusted branch can make those steps execute branch-controlled code with the job's available credentials. The compiler warns when a ref expression uses `needs.*`, `github.event.*`, `inputs.*`, `github.head_ref`, `github.base_ref`, `github.ref`, or `github.ref_name` while `steps:` or `pre-agent-steps:` are present. It exempts the exact default-branch expression for the current repository and the supported pull-request base SHA/ref expressions for that repository. Unparseable expressions are treated conservatively. Warnings identify the checkout entry and ref; no warning establishes that a ref is trusted.
+
+Keep the agent workspace on a trusted ref and, when needed, fetch untrusted refs only to inspect their contents as data. Do not switch the host workspace to an untrusted branch or run its scripts: a manual checkout can execute Git hooks and can expose branch-controlled agent configuration. For PR-head work, use compiler-managed automatic PR checkout so the trusted agent configuration is restored; disabling that checkout also disables its paired configuration restore.
+
 ## PR Revision Binding
 
 By default, the compiler-generated "Checkout PR branch" step fetches a specific commit SHA from the current repository's `origin`, then verifies the checked-out `HEAD` before reporting success or recording a patch baseline. It does not resolve a moving `refs/pull/N/head` during fetch.

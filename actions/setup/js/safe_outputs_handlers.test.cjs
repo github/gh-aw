@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from "vitest";
 import crypto from "crypto";
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { execSync } from "child_process";
 import { createHandlers, hasUpdatePullRequestFields } from "./safe_outputs_handlers.cjs";
@@ -93,6 +94,188 @@ describe("safe_outputs_handlers", () => {
 
     expect(mockAppendSafeOutput.mock.calls.map(call => call[0].type)).toEqual(["ado_create_work_item", "ado_update_work_item", "ado_comment_on_work_item", "ado_assign_work_item", "ado_link_work_items"]);
     expect(mockAppendSafeOutput.mock.calls[0][0].temporary_id).toMatch(/^#aw_/);
+  });
+
+  describe("create_issue artifact paths", () => {
+    let restoreDescriptors;
+    const request = artifacts => ({ title: "Implement parser caching", body: "Cache parsed workflows and add regression coverage.", artifacts });
+
+    beforeEach(() => {
+      restoreDescriptors = simulateLinuxDescriptors(vi);
+    });
+
+    afterEach(() => {
+      restoreDescriptors?.();
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    });
+
+    it("reads UTF-8 files into recorded content without echoing them or persisting paths", () => {
+      const source = path.join(testWorkspaceDir, "plan.md");
+      const output = path.join(testWorkspaceDir, "output.jsonl");
+      const body = "## Plan\n\n" + "Cache éach parsed workflow.\n".repeat(3000);
+      fs.writeFileSync(source, body);
+      const input = request([
+        { type: "plan", name: "Plan", path: source },
+        { name: "Notes", body: "Inline notes" },
+      ]);
+      const configured = createHandlers(mockServer, entry => fs.appendFileSync(output, `${JSON.stringify(entry)}\n`), { create_issue: { staged: true } });
+
+      const result = configured.createIssueHandler(input);
+      const recorded = JSON.parse(fs.readFileSync(output, "utf8"));
+      expect(recorded.artifacts).toEqual([
+        { type: "plan", name: "Plan", body },
+        { type: "generic", name: "Notes", body: "Inline notes" },
+      ]);
+      expect(recorded.artifacts[0]).not.toHaveProperty("path");
+      expect(input.artifacts[0]).toHaveProperty("path", source);
+      expect(JSON.parse(result.content[0].text)).toEqual({ result: "success", output_id: outputId });
+      expect(result.content[0].text).not.toContain(body);
+    });
+
+    it("accepts the exact default byte limit and rejects an oversized file before recording", () => {
+      const source = path.join(testWorkspaceDir, "plan.md");
+      const body = "x".repeat(1024 * 1024);
+      fs.writeFileSync(source, body);
+      handlers.createIssueHandler(request([{ name: "Plan", path: source }]));
+      expect(mockAppendSafeOutput.mock.calls[0][0].artifacts[0].body).toBe(body);
+      mockAppendSafeOutput.mockClear();
+      fs.appendFileSync(source, "x");
+      expect(() => handlers.createIssueHandler(request([{ name: "Plan", path: source }]))).toThrow("exceeds maximum allowed size");
+      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+    });
+
+    it("applies configured UTF-8 byte limits to both file and inline content", () => {
+      const source = path.join(testWorkspaceDir, "plan.md");
+      const configured = createHandlers(mockServer, mockAppendSafeOutput, { create_issue: { max_issue_artifacts: 2, max_issue_artifact_size: 2 } });
+      fs.writeFileSync(source, "é");
+      configured.createIssueHandler(
+        request([
+          { name: "Plan", path: source },
+          { name: "Note", body: "é" },
+        ])
+      );
+      expect(mockAppendSafeOutput.mock.calls[0][0].artifacts[0].body).toBe("é");
+      mockAppendSafeOutput.mockClear();
+      fs.writeFileSync(source, "éa");
+      expect(() => configured.createIssueHandler(request([{ name: "Plan", path: source }]))).toThrow("exceeds maximum allowed size");
+      expect(() => configured.createIssueHandler(request([{ name: "Note", body: "éa" }]))).toThrow("3 UTF-8 bytes");
+      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+    });
+
+    it.each([0, -1, 1])("checks count limit %s before opening any source", max => {
+      const configured = createHandlers(mockServer, mockAppendSafeOutput, { create_issue: { max_issue_artifacts: max } });
+      const open = vi.spyOn(fs, "openSync");
+      expect(() =>
+        configured.createIssueHandler(
+          request([
+            { name: "Plan", path: path.join(testWorkspaceDir, "missing.md") },
+            { name: "Notes", body: "Details" },
+          ])
+        )
+      ).toThrow("max-issue-artifacts");
+      expect(open).not.toHaveBeenCalled();
+      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+    });
+
+    it("validates every input before reading any file", () => {
+      const open = vi.spyOn(fs, "openSync");
+      expect(() => handlers.createIssueHandler(request([{ name: "Plan", path: path.join(testWorkspaceDir, "plan.md") }, { name: "Invalid" }]))).toThrow("exactly one of body or path");
+      expect(open).not.toHaveBeenCalled();
+      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+    });
+
+    it.each([{ name: "Plan" }, { name: "Plan", body: "Details", path: "/tmp/plan.md" }, { name: "Plan", path: "" }, { name: "Plan", path: "plan.md" }, { name: "Plan", path: 42 }])("rejects invalid content sources: %j", artifact => {
+      expect(() => handlers.createIssueHandler(request([artifact]))).toThrow("artifacts[0]");
+      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+    });
+
+    it.each(["", " \n\t", Buffer.from([0xff, 0xfe]), Buffer.from([0])])("rejects empty or invalid UTF-8 files: %j", content => {
+      const source = path.join(testWorkspaceDir, "plan.md");
+      fs.writeFileSync(source, content);
+      expect(() => handlers.createIssueHandler(request([{ name: "Plan", path: source }]))).toThrow(/non-empty text|UTF-8 text/);
+      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+    });
+
+    it("rejects outside-root paths, traversal, and prefix collisions", () => {
+      for (const source of [path.join(testWorkspaceDir, "..", "outside.md"), `${testWorkspaceDir}-other/plan.md`]) {
+        expect(() => handlers.createIssueHandler(request([{ name: "Plan", path: source }]))).toThrow("within workspace directory");
+      }
+      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+    });
+
+    it.each([".git/config", "nested/.git/credentials"])("rejects repository metadata before reading: %s", filename => {
+      const source = path.join(testWorkspaceDir, filename);
+      fs.mkdirSync(path.dirname(source), { recursive: true });
+      fs.writeFileSync(source, "sensitive metadata");
+      const open = vi.spyOn(fs, "openSync");
+      expect(() => handlers.createIssueHandler(request([{ name: "Plan", path: source }]))).toThrow("sensitive repository metadata");
+      expect(open).not.toHaveBeenCalled();
+      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+    });
+
+    it.each([".ssh/id_rsa", ".aws/credentials", ".config/gh/hosts.yml", ".netrc", ".npmrc", ".git-credentials"])("rejects HOME credentials even when HOME is the workspace: %s", filename => {
+      vi.spyOn(os, "homedir").mockReturnValue(testWorkspaceDir);
+      const open = vi.spyOn(fs, "openSync");
+      expect(() => handlers.createIssueHandler(request([{ name: "Plan", path: path.join(testWorkspaceDir, filename) }]))).toThrow("sensitive HOME location");
+      expect(open).not.toHaveBeenCalled();
+      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+    });
+
+    it.each(["/tmp/gh-aw/mcp-config.json", "/tmp/runtime.log", "/tmp/gh-aw/agent-other/plan.md", "/tmp/gh-aw/agent/../gateway/config.json"])("rejects general temporary files before opening: %s", source => {
+      const open = vi.spyOn(fs, "openSync");
+      expect(() => handlers.createIssueHandler(request([{ name: "Plan", path: source }]))).toThrow("/tmp/gh-aw/agent directory");
+      expect(open).not.toHaveBeenCalled();
+      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+    });
+
+    it("allows absolute paths in the agent working root without permitting sibling roots", () => {
+      const { resolveIssueArtifactPath, normalizeGuardedPath } = require("./symlink_guard.cjs");
+      expect(resolveIssueArtifactPath("/tmp/gh-aw/agent/plan.md")).toBe(normalizeGuardedPath("/tmp/gh-aw/agent/plan.md"));
+      expect(resolveIssueArtifactPath(path.join(testWorkspaceDir, "plan.md"))).toBe(normalizeGuardedPath(path.join(testWorkspaceDir, "plan.md")));
+    });
+
+    it("rejects system files even if the configured workspace overlaps a system directory", () => {
+      vi.stubEnv("GITHUB_WORKSPACE", "/etc");
+      const open = vi.spyOn(fs, "openSync");
+      expect(() => handlers.createIssueHandler(request([{ name: "Plan", path: "/etc/passwd" }]))).toThrow("system directory");
+      expect(open).not.toHaveBeenCalled();
+      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+    });
+
+    it("does not expand variables or glob patterns", () => {
+      for (const name of ["$GITHUB_WORKSPACE/plan.md", "*.md"]) {
+        expect(() => handlers.createIssueHandler(request([{ name: "Plan", path: path.join(testWorkspaceDir, name) }]))).toThrow("could not be read");
+      }
+      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+    });
+
+    it("rejects symlinks, hard links, directories, and missing files", () => {
+      const source = path.join(testWorkspaceDir, "plan.md");
+      fs.writeFileSync(source, "Plan");
+      const symlink = path.join(testWorkspaceDir, "symlink.md");
+      const hardlink = path.join(testWorkspaceDir, "hardlink.md");
+      const parentLink = path.join(testWorkspaceDir, "linked-directory");
+      fs.symlinkSync(source, symlink);
+      fs.symlinkSync(testWorkspaceDir, parentLink);
+      fs.linkSync(source, hardlink);
+      for (const filename of [symlink, hardlink, path.join(parentLink, "plan.md"), testWorkspaceDir, path.join(testWorkspaceDir, "missing.md")]) {
+        expect(() => handlers.createIssueHandler(request([{ name: "Plan", path: filename }]))).toThrow("could not be read");
+      }
+      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+    });
+
+    it("leaves deduplication state and operation budgets unchanged after a failed read", () => {
+      const source = path.join(testWorkspaceDir, "plan.md");
+      const configured = createHandlers(mockServer, mockAppendSafeOutput, { create_issue: { max: 1 } });
+      const input = { ...request([{ name: "Plan", path: source }]), temporary_id: "aw_artifact" };
+      expect(() => configured.createIssueHandler(input)).toThrow("could not be read");
+      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+      fs.writeFileSync(source, "Plan");
+      expect(JSON.parse(configured.createIssueHandler(input).content[0].text)).toEqual({ result: "success", output_id: outputId });
+      expect(mockAppendSafeOutput).toHaveBeenCalledTimes(1);
+      expect(mockAppendSafeOutput.mock.calls[0][0].artifacts).toEqual([{ type: "generic", name: "Plan", body: "Plan" }]);
+    });
   });
 
   it("converts built-in map calls into ledger_append entries", () => {
@@ -3870,6 +4053,28 @@ describe("safe_outputs_handlers", () => {
   });
 
   describe("createIssueHandler", () => {
+    it.each([
+      [true, ["documentation", "automated"], "Same title", "duplicate_dropped"],
+      [true, ["automated"], "Same title", "success"],
+      [true, ["documentation", "automated"], "Different title", "success"],
+      [1, ["Documentation", "automated"], "Same titlf", "duplicate_dropped"],
+      [false, ["documentation", "automated"], "Different title", "duplicate_dropped"],
+      [false, ["automated"], "Different title", "success"],
+    ])("should combine MCP title %j and labels %j as AND filters for %s", (titleFilter, firstLabels, secondTitle, expected) => {
+      const h = createHandlers(mockServer, mockAppendSafeOutput, {
+        create_issue: {
+          deduplicate_by_title: titleFilter,
+          deduplicate_by_labels: [" documentation ", "automated", " "],
+          labels: ["automated"],
+        },
+      });
+
+      h.createIssueHandler({ title: "Same title", body: "First body", labels: firstLabels.filter(label => label !== "automated") });
+      const second = h.createIssueHandler({ title: secondTitle, body: "Second body", labels: ["documentation"] });
+
+      expect(JSON.parse(second.content[0].text).result).toBe(expected);
+    });
+
     it("should deduplicate against fallback title derived from first meaningful body line", () => {
       const h = createHandlers(mockServer, mockAppendSafeOutput, {
         create_issue: {

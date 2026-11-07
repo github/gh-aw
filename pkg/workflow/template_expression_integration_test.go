@@ -13,6 +13,21 @@ import (
 	"github.com/github/gh-aw/pkg/testutil"
 )
 
+const issueContextCondition = "github.event.issue.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'issue' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number)"
+const pullRequestContextCondition = "github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number)"
+
+func assertCompiledContextCondition(t *testing.T, compiled, expression string) {
+	t.Helper()
+
+	envVar := NewExpressionExtractor().generateEnvVarName(expression)
+	if !strings.Contains(compiled, envVar+": ${{ "+expression+" }}") {
+		t.Errorf("Compiled workflow should evaluate context condition %q in an environment variable", expression)
+	}
+	if !strings.Contains(promptRenderPlan(t, compiled), "{{#if __"+envVar+"__ }}") {
+		t.Errorf("Prompt render plan should use the evaluated context condition %q", expression)
+	}
+}
+
 // TestTemplateExpressionWrappingIntegration verifies end-to-end compilation
 // with template expressions that should be wrapped
 func TestTemplateExpressionWrappingIntegration(t *testing.T) {
@@ -93,16 +108,9 @@ ${{ steps.sanitized.outputs.text }}
 		t.Error("Compiled workflow should contain interpolation and template rendering step")
 	}
 
-	// Verify GitHub context section contains issue/PR number conditionals.
-	// Per ADR-31820, these use compound fallback expressions of the form
-	// "github.event.* || aw_context fallback" (not wrapped in GitHub's ${{ }} syntax).
-	// User markdown content is loaded via runtime-import and processed at runtime.
-	if !strings.Contains(compiledStr, "{{#if github.event.issue.number ||") {
-		t.Error("Compiled workflow should contain issue number conditional with aw_context fallback in GitHub context")
-	}
-	if !strings.Contains(compiledStr, "{{#if github.event.pull_request.number ||") {
-		t.Error("Compiled workflow should contain PR number conditional with aw_context fallback in GitHub context")
-	}
+	// Context conditions use evaluated placeholders, including the ADR-31820 fallbacks.
+	assertCompiledContextCondition(t, compiledStr, issueContextCondition)
+	assertCompiledContextCondition(t, compiledStr, pullRequestContextCondition)
 
 	// Verify that the main workflow content is loaded as an author file.
 	// Template conditionals in the user's markdown (like steps.sanitized.outputs.text)
@@ -183,17 +191,8 @@ This expression needs wrapping.
 	// 2. Expressions are not double-wrapped
 	// 3. The original already-wrapped ${{ }} syntax is handled correctly
 
-	// Verify the GitHub context section contains the issue number conditional.
-	// Per ADR-31820, the condition uses a compound fallback expression of the form
-	// "github.event.* || aw_context fallback" (not a ${{ }}-wrapped placeholder).
-	if !strings.Contains(compiledStr, "{{#if github.event.issue.number ||") {
-		t.Error("Expected issue number conditional with aw_context fallback in GitHub context")
-	}
-
-	// Verify the GitHub context section contains the actor conditional (bare expression).
-	if !strings.Contains(compiledStr, "{{#if github.actor}}") {
-		t.Error("Expected actor conditional in GitHub context")
-	}
+	assertCompiledContextCondition(t, compiledStr, issueContextCondition)
+	assertCompiledContextCondition(t, compiledStr, "github.actor")
 
 	// Verify that expressions are not double-wrapped with ${{ ${{ ... }}
 	if strings.Contains(compiledStr, "${{ ${{") {
@@ -264,12 +263,7 @@ Steps expression - will be wrapped.
 
 	compiledStr := string(compiledYAML)
 
-	// Verify the GitHub context section contains the issue number conditional.
-	// Per ADR-31820, the condition uses a compound fallback expression (not a simple placeholder).
-	// (These are in the built-in context, not the user's markdown)
-	if !strings.Contains(compiledStr, "{{#if github.event.issue.number ||") {
-		t.Error("GitHub context should contain issue number conditional with aw_context fallback")
-	}
+	assertCompiledContextCondition(t, compiledStr, issueContextCondition)
 
 	// Verify that the main workflow content is loaded as an author file.
 	// Template conditionals in the user's markdown (like steps, true/false literals, etc.)

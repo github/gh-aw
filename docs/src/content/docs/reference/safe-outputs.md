@@ -84,13 +84,21 @@ Skipped, cancelled, staged, deferred, or delegated results do not establish
 success. Missing, ambiguous, or cyclic dependencies also fail closed. Independent
 outputs retain their existing behavior and policy checks.
 
+`submit_pull_request_review` and `create_pull_request_review_comment` can be
+prerequisites. Inline comments and the review body are buffered and submitted
+together at the end of message processing, before dependent outputs run.
+Buffering alone does not confirm success: dependents wait for submission and
+run only if their prerequisite was actually published.
+Review comments released by a dependency are submitted in a subsequent batch.
+
 Dependencies apply within a single safe-output processing pass (and within the
 same Claim in queue workflows). Custom safe jobs, `call_workflow`,
 `push_repo_memory`, `upload_asset`, `noop`, and out-of-band diagnostics
 (`report_incomplete`, `report_missing_tool`, `report_missing_data`) reject
-`depends-on`. The effects of `upload_code_coverage` run in a later job, so
-staging it cannot establish a successful prerequisite. Dependencies do not
-provide rollback for operations that have already succeeded.
+`depends-on`. `upload_code_coverage`, `dispatch_workflow`, `dispatch_repository`,
+and custom action outputs delegate effects outside this manager, so they cannot
+establish successful prerequisites. Dependencies do not provide rollback for
+operations that have already succeeded.
 
 ## Available Safe Output Types
 
@@ -354,6 +362,8 @@ safe-outputs:
     allowed-fields: [Priority, Iteration] # restrict issue fields this workflow may set
     assignees: [user1, copilot]      # assignees (use 'copilot' for bot)
     max: 5                           # max issues (default: 1)
+    max-issue-artifacts: 3            # max artifacts per issue (default: 10; <=0 disables)
+    max-issue-artifact-size: 1mb       # max UTF-8 size per artifact body (default: 1 MB)
     expires: 7                       # auto-close after 7 days (or false to disable)
     group: true                      # group as sub-issues under parent
     close-older-issues: true         # close previous issues from same workflow
@@ -391,6 +401,53 @@ See [Cross-Repository Operations](/gh-aw/reference/cross-repository/) for compre
   ]
 }
 ```
+
+#### Issue Artifacts
+
+`create_issue` accepts an optional `artifacts` array. Each item requires a non-empty `name` and exactly one of `body` (inline content) or `path` (a UTF-8 text file), with an optional `type`: `generic` (default), `plan`, `link`, or `embedded_html`. Link bodies contain a URL; HTML bodies contain HTML source for GitHub's artifact preview. Names and content follow safe-output sanitization. HTML preserves supported safe-output tags, strips dangerous attributes, and converts unsupported tags to visible text. HTML URLs always use `allowed-only` filtering, even inside backticks and when the workflow allows URLs in Markdown code regions. Temporary issue references in artifact bodies are resolved, including the newly created issue's temporary ID.
+
+`safe-outputs.create-issue.max-issue-artifacts` limits attachments **per issue**, defaulting to **10**. Zero or any negative integer disables attachments. Requests exceeding the limit are rejected before issue creation, including in staged mode; requests with no artifacts remain valid. The generated tool description includes the configured limit or disabled state.
+
+`safe-outputs.create-issue.max-issue-artifact-size` accepts positive integer bytes or a human-friendly size such as `512kb`, `1mb`, or `1.5mb`, defaulting to **1mb (1048576 bytes)**. Units `B`, `K`/`KB`/`KiB`, `M`/`MB`/`MiB`, `G`/`GB`/`GiB`, and `T`/`TB`/`TiB` are case-insensitive and use multiples of 1024; spaces between the number and unit are accepted. Values must resolve to a positive whole byte count. Raw bodies and sanitized, reference-resolved content must fit the limit; oversized bodies are rejected rather than silently truncated. Each artifact is measured separately, not as a combined upload. The final body is checked again immediately before attachment.
+
+```json
+{
+  "type": "create_issue",
+  "title": "Implement parser caching",
+  "body": "Cache parsed workflows to reduce compilation time.",
+  "artifacts": [
+    { "type": "plan", "name": "Implementation plan", "body": "## Plan\n\nAdd a cache and regression coverage." }
+  ]
+}
+```
+
+Artifacts are attached using the issue's repository and credentials with `issues: write` permission. Staged mode previews artifacts without writing them. Requests with artifacts create a new issue rather than grouping content into a same-day comment; title deduplication still applies. If an attachment fails, the handler still attempts normal issue assignment and parent linking, then reports failure with the created issue's number and URL and the number of artifacts already attached; it does not delete the issue or retry the entire creation. See the [issue artifacts REST API](https://docs.github.com/en/rest/issues/artifacts?apiVersion=2026-03-10).
+
+##### Attaching Files by Path
+
+Pass an absolute `path` to attach a file without loading its content into the agent's conversation:
+
+```json
+{
+  "title": "Implement parser caching",
+  "body": "The implementation plan is attached.",
+  "artifacts": [
+    { "type": "plan", "name": "Implementation plan", "path": "/tmp/gh-aw/agent/issue-plan.md" }
+  ]
+}
+```
+
+The unprivileged safeoutputs MCP backend reads the file and replaces `path` with its complete `body` before recording the request. The privileged issue job receives content only and never opens the agent-supplied path. The source file does not require a separate artifact upload or custom-job file declaration.
+
+Paths must be literal absolute paths within the workspace or `/tmp/gh-aw/agent`; general temporary runtime files are not allowed. The shared file-upload denylist rejects any `.git` path component, system directories, and HOME credential/config locations such as `.ssh`, `.aws`, `.config`, `.npmrc`, and `.git-credentials`, even when they overlap an allowed root. Variables and globs are not expanded. Guarded reads on the Linux workflow runtime reject symlinks (including directory links), hard links, non-regular files, invalid UTF-8, empty content, and files exceeding `max-issue-artifact-size`. Unsupported platforms fail closed. A read or validation failure records no issue request. Do not specify both `body` and `path`. Passing a pathname as `body` still attaches that pathname as text.
+
+For an image, binary file, or downloadable original, use [upload-artifact](#artifact-uploads-upload-artifact) with a literal file path:
+
+```json
+{"type": "upload_artifact", "path": "/tmp/gh-aw/agent/chart.png"}
+```
+
+This creates a run-scoped GitHub Actions artifact, not an issue artifact. Use [upload-asset](#asset-uploads-upload-asset) with `path` when a persistent repository-branch URL is required, then reference the published URL in the issue body or a `link` artifact. Upload retention, path authorization, and file-size policies are separate from the issue artifact count and body-size limits.
 
 #### Blocked-By Dependencies
 
@@ -457,12 +514,17 @@ The `deduplicate-by-title` field drops duplicate issues by comparing titles befo
 
 Deduplication runs at both the MCP tool-call boundary (within-run drops with immediate `duplicate_dropped` feedback to the agent) and at apply time (within-run plus open and recently-closed repository issues). Dropped items are recorded in the safe-output summary with the matched title, edit distance, and source (`mcp-precheck`, `within-run`, or `repo-level`).
 
+The optional `deduplicate-by-labels` array drops duplicates when an existing issue has **all** listed labels. It works independently of `deduplicate-by-title`; when both are configured, both the title and all labels must match (AND). Filters apply within-run and to repository searches for open issues and issues closed within the last 30 days. Omitted, empty, or whitespace-only label filters preserve title-only behavior; without either filter, deduplication is disabled.
+
+Filter labels must be literal strings, not GitHub Actions expressions. Repository filtering uses GitHub's issue-search syntax; matching labels containing double quotes or backslashes is not verified. Prefer labels without those characters. The `labels` field only controls labels applied at creation. Include filter labels in `labels` (or supply them in the tool call) if newly created issues should match future deduplication searches; filter labels are not added automatically.
+
 ```yaml wrap
 safe-outputs:
   create-issue:
-    title-prefix: "[triage] "
-    labels: [bug]
+    title-prefix: "[docs-consistency-check] "
+    labels: [documentation, automated]
     deduplicate-by-title: 1   # tolerate one-character title differences
+    deduplicate-by-labels: [documentation, automated]
 ```
 
 #### Searching for Workflow-Created Items
@@ -1085,6 +1147,11 @@ Exposes outputs: `status-update-id`, `project-id`, `status`.
 
 Creates PRs with code changes. Includes configurable [Protected Files](/gh-aw/reference/safe-outputs-pull-requests/#protected-files) against supply chain attacks.
 
+Detection caution, protected-files `request-review`, or a failed required
+`REQUEST_CHANGES` review withholds configured auto-merge and requires independent
+review. A successful review request or blocking-review API response alone does
+not prove that repository policy enforces human approval.
+
 See the full reference: [Safe Outputs (Pull Requests) — create-pull-request](/gh-aw/reference/safe-outputs-pull-requests/#pull-request-creation-create-pull-request)
 
 ```yaml wrap
@@ -1355,6 +1422,14 @@ safe-outputs:
 Authentication uses `SYSTEM_ACCESSTOKEN` when present, otherwise `AZURE_DEVOPS_EXT_PAT`. `AZURE_DEVOPS_ORG_URL` must use `https://dev.azure.com/{organization}` or `https://{organization}.visualstudio.com`; redirects and embedded credentials are rejected.
 
 `ado_create_work_item` returns a run-scoped `#aw_...` temporary ID. The other work-item tools accept that ID, and same-run IDs bypass their consuming `target` policy because creation was already scoped by trusted configuration. Numeric IDs are checked against `target`, which accepts `"*"`, a single ID, a list of IDs, or an area-path prefix.
+
+To restrict comments to a work item selected at runtime, set `target` from an expression. The value must evaluate to a positive, safe-integer work-item ID; an empty value is rejected.
+
+```aw wrap
+safe-outputs:
+  ado-comment-on-work-item:
+    target: "${{ inputs.work_item_id }}"
+```
 
 For `ado-update-work-item`, each mutable field must be explicitly enabled. Assignment always rejects the reserved `Agency` and `GitHub Copilot` identities. Attachments must be regular workspace files and are checked for traversal, symbolic links, size, extension, and Azure Pipelines command sequences before upload.
 
@@ -2046,7 +2121,17 @@ safe-outputs:
     private-key: ${{ secrets.WORKFLOW_APP_PRIVATE_KEY }}
 ```
 
-Accepts a plain string or an object with `name` and optional `url`, consistent with the top-level `environment:` syntax.
+Accepts a plain string or an object with `name`, optional `url`, and optional `deployment`, consistent with the top-level `environment:` syntax. `deployment` accepts a boolean or GitHub Actions expression, such as `${{ github.ref_name == 'main' }}`; omitting it preserves the default deployment behavior.
+
+For environments that only gate write credentials, `deployment: false` keeps environment secrets and protection rules (including branch policies, required reviewers, and wait timers) without creating deployment records:
+
+```aw wrap
+safe-outputs:
+  environment:
+    name: protected-write-secrets
+    deployment: false
+  add-comment:
+```
 
 ### Safe Outputs Dependencies (`needs:`)
 

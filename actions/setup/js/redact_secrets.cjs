@@ -623,8 +623,9 @@ function processFile(filePath, secretValues, maskedValues = [], prepareForCustom
   /** @type {number | undefined} */
   let inputBytes;
   try {
-    const content = additionalArtifact ? readAdditionalArtifactText(filePath) : fs.readFileSync(filePath, "utf8");
-    inputBytes = Buffer.byteLength(content, "utf8");
+    const input = additionalArtifact ? readAdditionalArtifactText(filePath) : fs.readFileSync(filePath);
+    const content = typeof input === "string" ? input : input.toString("utf8");
+    inputBytes = typeof input === "string" ? Buffer.byteLength(input, "utf8") : input.length;
     stage = "redact";
     const structured = redactSafeOutputContent(
       filePath,
@@ -639,6 +640,17 @@ function processFile(filePath, secretValues, maskedValues = [], prepareForCustom
         writeProcessedFile(filePath, structured, Boolean(redactionCount));
       }
       return redactionCount;
+    }
+    // Scan binary bytes losslessly in memory; remove sensitive binary state rather than rewrite it.
+    if (Buffer.isBuffer(input) && !input.equals(Buffer.from(content, "utf8"))) {
+      const byteResult = redactArtifactContent(input.toString("latin1"), secretValues, maskedValues);
+      const textResult = redactArtifactContent(content, secretValues, maskedValues);
+      const redactionCount = byteResult.redactionCount + textResult.redactionCount;
+      if (redactionCount > 0) {
+        stage = "unlink";
+        fs.unlinkSync(filePath);
+        return redactionCount;
+      }
     }
     const encodedResult = path.extname(filePath).toLowerCase() === ".html" ? redactPiSessionHTML(content, text => redactArtifactContent(text, secretValues, maskedValues)) : { content, redactionCount: 0 };
     const genericResult = redactArtifactContent(encodedResult.content, secretValues, maskedValues);

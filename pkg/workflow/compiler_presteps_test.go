@@ -322,6 +322,12 @@ This workflow tests that comment-memory files are prepared before custom steps r
 	if !strings.Contains(agentSection, "name: Write comment-memory configuration") {
 		t.Error("Expected 'Write comment-memory configuration' step in agent job")
 	}
+	if !strings.Contains(agentSection, "create_files.cjs") || !strings.Contains(agentSection, "renderFiles(") {
+		t.Error("Expected comment-memory configuration to use the owner-only file writer")
+	}
+	if strings.Contains(agentSection, `printf '%s\n' "$GH_AW_EARLY_COMMENT_MEMORY_CONFIG"`) {
+		t.Error("Comment-memory configuration must not be written through a shell redirect")
+	}
 	if !strings.Contains(agentSection, "name: Prepare comment memory files") {
 		t.Error("Expected 'Prepare comment memory files' step in agent job")
 	}
@@ -368,6 +374,59 @@ This workflow tests that comment-memory files are prepared before custom steps r
 
 	t.Logf("Step order verified: download(%d) < config(%d) < prepare(%d) < custom(%d)",
 		downloadIdx, configIdx, prepareIdx, customIdx)
+}
+
+func TestCommentMemoryTemplatableMaxCompiles(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "comment-memory-input-test")
+	testContent := `---
+on:
+  workflow_dispatch:
+    inputs:
+      max:
+        description: Maximum comment-memory entries
+        required: false
+        type: number
+permissions:
+  contents: read
+  issues: read
+tools:
+  comment-memory:
+    max: ${{ inputs.max }}
+engine: claude
+strict: false
+---
+
+# Test Comment Memory Input
+`
+	testFile := filepath.Join(tmpDir, "test-comment-memory-input.md")
+	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := NewCompiler().CompileWorkflow(testFile); err != nil {
+		t.Fatalf("Unexpected error compiling workflow with templatable comment-memory max: %v", err)
+	}
+	lockFile := filepath.Join(tmpDir, "test-comment-memory-input.lock.yml")
+	content, err := os.ReadFile(lockFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lockContent := string(content)
+	if !strings.Contains(lockContent, "GH_AW_EARLY_COMMENT_MEMORY_CONFIG:") {
+		t.Fatal("Expected early comment-memory config to be passed through an environment variable")
+	}
+	if !strings.Contains(lockContent, "${{ inputs.max }}") {
+		t.Fatal("Expected the comment-memory max input expression to be preserved")
+	}
+	if !strings.Contains(lockContent, "create_files.cjs") || !strings.Contains(lockContent, "renderFiles(") {
+		t.Fatal("Expected the early config to use the owner-only file writer")
+	}
+	if strings.Contains(lockContent, `printf '%s\n' "$GH_AW_EARLY_COMMENT_MEMORY_CONFIG"`) {
+		t.Fatal("Expected the early config not to use a shell redirect")
+	}
+	if strings.Contains(lockContent, "<< 'COMMENT_MEMORY_CONFIG") {
+		t.Fatal("Expected the early config to avoid a quoted heredoc")
+	}
 }
 
 // TestActivationArtifactWithoutCommentMemory verifies that the activation artifact download

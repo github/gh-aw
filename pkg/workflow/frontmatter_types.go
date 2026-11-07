@@ -11,7 +11,7 @@ type RunnerTopology string
 // RunnerTopologyArcDind is the topology value for ARC runners with Docker-in-Docker sidecars.
 const RunnerTopologyArcDind RunnerTopology = "arc-dind"
 
-// RunnerConfig represents runner topology configuration from the workflow frontmatter.
+// RunnerConfig represents runner configuration from the workflow frontmatter.
 // The topology field is the single stable contract between gh-aw and AWF for runner
 // environment detection — AWF resolves all internal details (network isolation, sysroot
 // image, path-prefix probes, tool cache validation) from this signal.
@@ -19,6 +19,8 @@ type RunnerConfig struct {
 	// Topology identifies the runner execution topology.
 	// Supported values: "arc-dind" (ARC with Docker-in-Docker sidecar).
 	Topology RunnerTopology `json:"topology,omitempty" yaml:"topology,omitempty"`
+	// Installation selects the privilege used to install Copilot and threat-detect.
+	Installation string `json:"installation,omitempty" yaml:"installation,omitempty"`
 }
 
 // RuntimeConfig represents the configuration for a single runtime
@@ -184,6 +186,9 @@ type ExperimentConfig struct {
 
 	// Metric names the primary metric that should be observed (e.g. "aic").
 	Metric string `json:"metric,omitempty"`
+
+	// OutcomeWindow is the maturity duration for outcome-backed metrics; empty or "auto" learns it.
+	OutcomeWindow string `json:"outcome_window,omitempty"`
 
 	// SecondaryMetrics lists additional metrics to track alongside the primary metric.
 	SecondaryMetrics []string `json:"secondary_metrics,omitempty"`
@@ -362,6 +367,7 @@ type FrontmatterConfig struct {
 	// ParseFrontmatterConfig to return nil and break features that depend on it (e.g. OTLP).
 	Engine                      any                          `json:"engine,omitempty"`
 	Source                      string                       `json:"source,omitempty"`
+	SourceSHA                   string                       `json:"source-sha,omitempty"`
 	Redirect                    string                       `json:"redirect,omitempty"`
 	TrackerID                   string                       `json:"tracker-id,omitempty"`
 	ThreatDetectionSuppressions []ThreatDetectionSuppression `json:"threat-detection-suppress,omitempty"`

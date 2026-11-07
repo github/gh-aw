@@ -24,6 +24,7 @@ All functions emit debug output only when `DEBUG=fileutil:*` is active, and neve
 | `ExtractFileFromTar` | `func(data []byte, path string) ([]byte, error)` | Extracts a single file by `path` from a tar archive; rejects unsafe entry names (absolute or `..`-containing paths) using `filepath.IsLocal` |
 | `ValidateExecutablePath` | `func(path string) (string, error)` | Validates that `path` is absolute, resolves symlinks, points to a regular file, and (on non-Windows platforms) is executable; returns the resolved, cleaned path |
 | `ResolveExecutablePath` | `func(name string) (string, error)` | Resolves `name` from `PATH` via `exec.LookPath`, makes the result absolute if necessary, and validates it with `ValidateExecutablePath` |
+| `ReadFileWithinBase` | `func(base, candidate string) (content []byte, err error)` | Reads an existing file while preventing symlinks from escaping `base`; the base directory itself must not be a symlink. |
 
 **Behavioral contracts**:
 

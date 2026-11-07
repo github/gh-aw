@@ -10,7 +10,7 @@
 
 ### Context
 
-PR #25868 merged firewall audit/log files (squid.conf, cache.log, access.log, etc.) into the unified agent artifact. When the detection job downloads this artifact, it extracts into `/tmp/gh-aw/`, which pre-populates `sandbox/firewall/logs` and `sandbox/firewall/audit` with files from the completed agent run. The AWF (Agent Workflow Firewall) squid container then crashes on startup with exit code 1 because squid cannot initialize when these directories are already populated by a prior run. Separately, `buildPullAWFContainersStep` constructed a minimal `WorkflowData` without the `Features` field, so when the `copilot-requests` feature flag was enabled, the `cli-proxy` image was silently omitted from the detection job's container pre-pull.
+PR #25868 merged firewall audit/log files (squid.conf, cache.log, access.log, etc.) into the unified agent artifact. When the detection job downloads this artifact, it extracts into `/tmp/gh-aw/`, which pre-populates `sandbox/firewall/logs` and `sandbox/firewall/audit` with files from the completed agent run. The AWF (Agent Workflow Firewall) squid container then crashes on startup with exit code 1 because squid cannot initialize when these directories are already populated by a prior run. Separately, `buildPullAWFContainersStep` constructed a minimal `WorkflowData` without the `Features` field, so feature-dependent container images were silently omitted from the detection job's container pre-pull.
 
 ### Decision
 
@@ -34,7 +34,7 @@ The detection job could download the agent artifact to a temporary location and 
 
 #### Positive
 - The detection job's squid container starts reliably regardless of what the agent artifact deposited in the firewall directories.
-- The `cli-proxy` image is correctly included in the detection job's container pre-pull when the `copilot-requests` feature flag is enabled, preventing silent feature gaps between the agent job and the detection job.
+- Feature-dependent container images are correctly included in the detection job's container pre-pull, preventing silent feature gaps between the agent job and the detection job.
 - The fix is minimal and localized—one new function and one field addition—with low regression risk.
 
 #### Negative
