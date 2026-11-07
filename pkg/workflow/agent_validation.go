@@ -254,7 +254,7 @@ func (c *Compiler) validateUniversalLLMConsumerModel(frontmatter map[string]any,
 
 // validateCopilotWebToolsSupport uses the resolved engine configuration so imported
 // SDK settings are honored. Native web tools are unavailable in offline BYOK mode.
-func (c *Compiler) validateCopilotWebToolsSupport(engine CodingAgentEngine, data *WorkflowData, tools map[string]any) error {
+func (c *Compiler) validateCopilotWebToolsSupport(engine CodingAgentEngine, data *WorkflowData) error {
 	claudeOnCopilot := engine.GetID() == string(constants.ClaudeEngine) && claudeUsesCopilotInference(data)
 	if engine.GetID() != string(constants.CopilotEngine) && !claudeOnCopilot {
 		return nil
@@ -263,14 +263,18 @@ func (c *Compiler) validateCopilotWebToolsSupport(engine CodingAgentEngine, data
 	engineConfig := data.EngineConfig
 	collector := NewErrorCollector(c.failFast)
 	for _, tool := range []string{"web-fetch", "web-search"} {
-		if !isCopilotToolValueEnabled(tools, tool) || (!claudeOnCopilot && tool == "web-fetch" && engineConfig != nil && engineConfig.CopilotSDK) {
+		if !isCopilotToolValueEnabled(data.Tools, tool) || (!claudeOnCopilot && tool == "web-fetch" && engineConfig != nil && engineConfig.CopilotSDK) {
 			continue
 		}
 		message := fmt.Sprintf("Copilot's native '%s' tool is unavailable because offline BYOK mode disables web tools (COPILOT_OFFLINE=true)", tool)
 		suggestion := fmt.Sprintf("Remove tools.%s and configure an MCP server instead, or use a supported engine, for example:\n\nengine: codex", tool)
 		if claudeOnCopilot {
 			message = fmt.Sprintf("Claude's native '%s' tool is unavailable on GitHub Copilot inference because offline BYOK mode disables web tools (COPILOT_OFFLINE=true)", tool)
-			suggestion = fmt.Sprintf("Remove tools.%s and configure an MCP fetch server instead, or use engine.model-provider: anthropic", tool)
+			server := "fetch"
+			if tool == "web-search" {
+				server = "search"
+			}
+			suggestion = fmt.Sprintf("Remove tools.%s and configure an MCP %s server instead, or use engine.model-provider: anthropic", tool, server)
 		} else if tool == "web-fetch" {
 			suggestion += "\n\nFor Copilot's proxy-aware custom fetch tool, enable SDK mode:\n\nengine:\n  id: copilot\n  copilot-sdk: true"
 		}

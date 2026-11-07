@@ -312,7 +312,7 @@ func TestValidateCopilotWebToolsSupport(t *testing.T) {
 			compiler := NewCompiler(WithFailFast(false))
 			compiler.strictMode = tt.strictMode
 
-			err := compiler.validateCopilotWebToolsSupport(tt.engine, &WorkflowData{EngineConfig: tt.engineConfig}, tt.tools)
+			err := compiler.validateCopilotWebToolsSupport(tt.engine, &WorkflowData{EngineConfig: tt.engineConfig, Tools: tt.tools})
 
 			if tt.wantErr {
 				require.Error(t, err)

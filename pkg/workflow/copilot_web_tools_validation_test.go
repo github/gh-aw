@@ -123,7 +123,11 @@ Test Claude web tool availability.
 							require.ErrorContains(t, err, "GitHub Copilot inference")
 							require.ErrorContains(t, err, "COPILOT_OFFLINE=true")
 							require.ErrorContains(t, err, "engine.model-provider: anthropic")
-							require.ErrorContains(t, err, "MCP fetch server")
+							server := "fetch"
+							if tool == "web-search" {
+								server = "search"
+							}
+							require.ErrorContains(t, err, "MCP "+server+" server")
 							require.Nil(t, data)
 						} else {
 							require.NoError(t, err)
