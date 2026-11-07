@@ -2384,6 +2384,7 @@ jobs:
           WORKFLOW_DESCRIPTION: "Picks one specification from specs/ daily, incrementally adopts executable TLA+/TLC or Koka models where appropriate, and generates a Go testify unit-test suite covering the inferred behaviors. Other formal notation stays illustrative. Results are delivered as a validated test-suite pull request."
           HAS_PATCH: ${{ needs.agent.outputs.has_patch }}
           GH_AW_DETECTION_CONTINUE_ON_ERROR: "true"
+          GH_AW_DETECTION_INPUT_DIR: "/tmp/gh-aw/threat-detection"
         run: |
           mkdir -p "/tmp/gh-aw/threat-detection"
           evidence_tmp="/tmp/gh-aw/threat-detection/execution.json.tmp"

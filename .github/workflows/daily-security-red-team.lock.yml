@@ -2443,6 +2443,7 @@ jobs:
           WORKFLOW_DESCRIPTION: "Daily deep red teaming security scan of actions/setup/js and actions/setup/sh directories, looking for backdoors, secret leaks, and malicious code"
           HAS_PATCH: ${{ needs.agent.outputs.has_patch }}
           GH_AW_DETECTION_CONTINUE_ON_ERROR: "true"
+          GH_AW_DETECTION_INPUT_DIR: "/tmp/gh-aw/threat-detection"
         run: |
           mkdir -p "/tmp/gh-aw/threat-detection"
           evidence_tmp="/tmp/gh-aw/threat-detection/execution.json.tmp"

@@ -2279,6 +2279,7 @@ jobs:
           WORKFLOW_DESCRIPTION: "Daily optimizer that reconciles compiler threat coverage with W3C specification-driven detection rules"
           HAS_PATCH: ${{ needs.agent.outputs.has_patch }}
           GH_AW_DETECTION_CONTINUE_ON_ERROR: "true"
+          GH_AW_DETECTION_INPUT_DIR: "/tmp/gh-aw/threat-detection"
         run: |
           mkdir -p "/tmp/gh-aw/threat-detection"
           evidence_tmp="/tmp/gh-aw/threat-detection/execution.json.tmp"

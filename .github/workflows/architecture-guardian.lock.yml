@@ -2190,6 +2190,7 @@ jobs:
           WORKFLOW_DESCRIPTION: "Daily analysis of commits from the last 24 hours to detect code structure violations in Go and JavaScript files, such as large files, oversized functions, high export counts, and import cycles"
           HAS_PATCH: ${{ needs.agent.outputs.has_patch }}
           GH_AW_DETECTION_CONTINUE_ON_ERROR: "true"
+          GH_AW_DETECTION_INPUT_DIR: "/tmp/gh-aw/threat-detection"
         run: |
           mkdir -p "/tmp/gh-aw/threat-detection"
           evidence_tmp="/tmp/gh-aw/threat-detection/execution.json.tmp"

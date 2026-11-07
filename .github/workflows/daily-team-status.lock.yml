@@ -2145,6 +2145,7 @@ jobs:
           WORKFLOW_DESCRIPTION: "This workflow is a daily team status reporter creating upbeat activity summaries.\nGathers recent repository activity (issues, PRs, discussions, releases, code changes)\nand generates engaging GitHub issues with productivity insights, community\nhighlights, and project recommendations. Uses a positive, encouraging tone with\nmoderate emoji usage to boost team morale."
           HAS_PATCH: ${{ needs.agent.outputs.has_patch }}
           GH_AW_DETECTION_CONTINUE_ON_ERROR: "true"
+          GH_AW_DETECTION_INPUT_DIR: "/tmp/gh-aw/threat-detection"
         run: |
           mkdir -p "/tmp/gh-aw/threat-detection"
           evidence_tmp="/tmp/gh-aw/threat-detection/execution.json.tmp"

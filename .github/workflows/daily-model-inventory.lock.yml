@@ -2542,6 +2542,7 @@ jobs:
           WORKFLOW_DESCRIPTION: "Queries model lists from OpenAI, Anthropic, and Google APIs daily, uses AWF /reflect for Copilot models, checks every workflow model pin against the live Copilot catalogue, then analyzes the combined inventory to propose updates to the builtin model alias mapping"
           HAS_PATCH: ${{ needs.agent.outputs.has_patch }}
           GH_AW_DETECTION_CONTINUE_ON_ERROR: "true"
+          GH_AW_DETECTION_INPUT_DIR: "/tmp/gh-aw/threat-detection"
         run: |
           mkdir -p "/tmp/gh-aw/threat-detection"
           evidence_tmp="/tmp/gh-aw/threat-detection/execution.json.tmp"

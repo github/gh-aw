@@ -2234,6 +2234,7 @@ jobs:
           WORKFLOW_DESCRIPTION: "Analyzes the largest Go source file daily and creates an issue to refactor it into smaller files if it exceeds the healthy size threshold"
           HAS_PATCH: ${{ needs.agent.outputs.has_patch }}
           GH_AW_DETECTION_CONTINUE_ON_ERROR: "true"
+          GH_AW_DETECTION_INPUT_DIR: "/tmp/gh-aw/threat-detection"
         run: |
           mkdir -p "/tmp/gh-aw/threat-detection"
           evidence_tmp="/tmp/gh-aw/threat-detection/execution.json.tmp"

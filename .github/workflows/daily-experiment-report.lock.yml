@@ -2281,6 +2281,7 @@ jobs:
           WORKFLOW_DESCRIPTION: "Daily statistical report that uses the experiments CLI command to list active experiments and consume deterministic core decisions, then computes descriptive success rates and durations from run artifacts, renders charts and comparison tables, posts a discussion with extend/promote/reject/inconclusive results, and includes a self-tuning continuation plan"
           HAS_PATCH: ${{ needs.agent.outputs.has_patch }}
           GH_AW_DETECTION_CONTINUE_ON_ERROR: "true"
+          GH_AW_DETECTION_INPUT_DIR: "/tmp/gh-aw/threat-detection"
         run: |
           mkdir -p "/tmp/gh-aw/threat-detection"
           evidence_tmp="/tmp/gh-aw/threat-detection/execution.json.tmp"

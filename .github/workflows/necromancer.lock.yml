@@ -2195,6 +2195,7 @@ jobs:
           WORKFLOW_DESCRIPTION: "Investigates merge-ready pull requests, traces root-cause issues, and adds regression tests before merge"
           HAS_PATCH: ${{ needs.agent.outputs.has_patch }}
           GH_AW_DETECTION_CONTINUE_ON_ERROR: "true"
+          GH_AW_DETECTION_INPUT_DIR: "/tmp/gh-aw/threat-detection"
         run: |
           mkdir -p "/tmp/gh-aw/threat-detection"
           evidence_tmp="/tmp/gh-aw/threat-detection/execution.json.tmp"

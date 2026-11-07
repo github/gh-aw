@@ -2132,6 +2132,7 @@ jobs:
           WORKFLOW_DESCRIPTION: "Reviews changes to the Safe Outputs specification and ensures the conformance checker script is up to date"
           HAS_PATCH: ${{ needs.agent.outputs.has_patch }}
           GH_AW_DETECTION_CONTINUE_ON_ERROR: "true"
+          GH_AW_DETECTION_INPUT_DIR: "/tmp/gh-aw/threat-detection"
         run: |
           mkdir -p "/tmp/gh-aw/threat-detection"
           evidence_tmp="/tmp/gh-aw/threat-detection/execution.json.tmp"

@@ -2244,6 +2244,7 @@ jobs:
           WORKFLOW_DESCRIPTION: "Feature grower (all-you-can-eat) workflow that implements exactly one grader per run from the ranked graders catalog (shared/graders/README.md) as a new, self-contained shared agentic workflow component, and opens a draft PR with the addition."
           HAS_PATCH: ${{ needs.agent.outputs.has_patch }}
           GH_AW_DETECTION_CONTINUE_ON_ERROR: "true"
+          GH_AW_DETECTION_INPUT_DIR: "/tmp/gh-aw/threat-detection"
         run: |
           mkdir -p "/tmp/gh-aw/threat-detection"
           evidence_tmp="/tmp/gh-aw/threat-detection/execution.json.tmp"
