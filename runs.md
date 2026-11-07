@@ -37,3 +37,4 @@
 2026-11-04: discovery; only already-reviewed repos surfaced; no blog; backlog 0.
 2026-11-05: discovery (repo search; code search rate-limited); nothing new; no blog; backlog 0.
 2026-11-06: reviewed factory (9, blogged), review-council (8), gh-aw-codex-pilot (3); blog PR; backlog 0.
+2026-11-07: backlog empty; blogged review-council (8) from earlier review; blog PR.

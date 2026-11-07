@@ -626,6 +626,6 @@
    "inlined-imports locks",
    "base-commit law"
   ],
-  "blogged": false
+  "blogged": true
  }
 }
