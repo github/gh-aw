@@ -1105,6 +1105,11 @@
       "digest": "sha256:250bc6ce70788207608ef74cef4397230ff2e8481218da74d6093e4bd9101132",
       "pinned_image": "ghcr.io/github/github-mcp-server:v2.0.3@sha256:250bc6ce70788207608ef74cef4397230ff2e8481218da74d6093e4bd9101132"
     },
+    "ghcr.io/github/github-mcp-server:v2.1.0": {
+      "image": "ghcr.io/github/github-mcp-server:v2.1.0",
+      "digest": "sha256:f6056fc10bfffcc8c81a6417a2e9ca12808647e8dd6049642a4feaadee0e0f8a",
+      "pinned_image": "ghcr.io/github/github-mcp-server:v2.1.0@sha256:f6056fc10bfffcc8c81a6417a2e9ca12808647e8dd6049642a4feaadee0e0f8a"
+    },
     "ghcr.io/githubnext/gh-aw-router:0.1.3": {
       "image": "ghcr.io/githubnext/gh-aw-router:0.1.3",
       "digest": "sha256:c934c8c9f77ee6b2ed9e07c21dbd896faa4ccd63b4206518f05da0bcebb4a553",
