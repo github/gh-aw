@@ -640,6 +640,7 @@ find_cached_copilot_bin() {
 activate_cached_copilot_bin() {
   local cached_copilot_bin="$1"
   local wrapper_path=""
+  local staged_wrapper=""
 
   echo "Activating cached Copilot CLI from ${cached_copilot_bin}..."
   export PATH="${INSTALL_DIR}:$PATH"
@@ -666,7 +667,12 @@ activate_cached_copilot_bin() {
 #!/usr/bin/env bash
 exec "$cached_copilot_bin" "\$@"
 EOF
-  maybe_sudo install -m 0755 "$wrapper_path" "${INSTALL_DIR}/copilot"
+  staged_wrapper="$(maybe_sudo mktemp "${INSTALL_DIR}/.copilot.XXXXXXXX")"
+  if ! maybe_sudo install -m 0755 "$wrapper_path" "$staged_wrapper" ||
+    ! maybe_sudo mv -f "$staged_wrapper" "${INSTALL_DIR}/copilot"; then
+    maybe_sudo rm -f "$staged_wrapper"
+    return 1
+  fi
   echo "  Wrapper installed at ${INSTALL_DIR}/copilot"
 }
 

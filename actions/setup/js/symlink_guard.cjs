@@ -230,13 +230,13 @@ function readGuardedFile(filename, maximumBytes = 10 * 1024 * 1024) {
  * Exclusively create a staged/published file without following destination links.
  * @param {string} filename
  * @param {Buffer} content
- * @param {number} [mode]
  */
-function writeGuardedFile(filename, content, mode = 0o600) {
+function writeGuardedFile(filename, content) {
   return withGuardedDirectory(path.dirname(filename), true, directory => {
     const target = path.join(directory, path.basename(filename));
-    const fd = fs.openSync(target, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_NOFOLLOW, mode);
+    const fd = fs.openSync(target, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_NOFOLLOW, 0o600);
     try {
+      fs.fchmodSync(fd, 0o600);
       fs.writeFileSync(fd, content);
     } finally {
       fs.closeSync(fd);

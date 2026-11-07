@@ -4,6 +4,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const fs = require("fs");
 const path = require("path");
+const { execFileSync } = require("child_process");
 const { lstatGuard, readGuardedFile, writeGuardedFile } = require("./symlink_guard.cjs");
 
 function setPlatform(platform) {
@@ -125,10 +126,9 @@ describe("lstatGuard", () => {
       restoreDescriptors?.();
     });
 
-    it("reads bounded regular files and exclusively stages their bytes with the requested mode", () => {
+    it("reads bounded regular files and exclusively stages their bytes privately", () => {
       const source = path.join(tmpDir, "source.png");
       const target = path.join(tmpDir, "staging", "chart.png");
-      const publicTarget = path.join(tmpDir, "staging", "published.png");
       fs.writeFileSync(source, "chart");
       const content = readGuardedFile(source, 5);
       expect(content.toString()).toBe("chart");
@@ -136,10 +136,16 @@ describe("lstatGuard", () => {
       writeGuardedFile(target, content);
       expect(fs.readFileSync(target)).toEqual(content);
       expect(fs.statSync(target).mode & 0o777).toBe(0o600);
-      writeGuardedFile(publicTarget, content, 0o644);
-      expect(fs.statSync(publicTarget).mode & 0o777).toBe(0o644);
       expect(() => writeGuardedFile(target, Buffer.from("overwrite"))).toThrow("EEXIST");
       expect(fs.readFileSync(target)).toEqual(content);
+    });
+
+    it.skipIf(process.platform !== "linux")("creates private files regardless of umask", () => {
+      for (const mask of ["000", "077", "777"]) {
+        const target = path.resolve(tmpDir, `mask-${mask}`);
+        execFileSync(process.execPath, ["-e", 'process.umask(parseInt(process.argv[1], 8)); require(process.argv[2]).writeGuardedFile(process.argv[3], Buffer.from("safe"));', mask, path.resolve(__dirname, "symlink_guard.cjs"), target]);
+        expect(fs.statSync(target).mode & 0o777).toBe(0o600);
+      }
     });
 
     it.each(["symlink", "regular"])("rejects a file swapped to a different %s between inspection and open", kind => {
