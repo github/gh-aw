@@ -736,7 +736,7 @@ jobs:
           path: /tmp/gh-aw
       - name: Configure Git credentials
         env:
-          GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_AW_GIT_REPOSITORY: ${{ github.repository }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_TOKEN: ${{ github.token }}
         run: bash "${RUNNER_TEMP}/gh-aw/actions/configure_git_credentials.sh"
@@ -1356,7 +1356,7 @@ jobs:
             await main();
       - name: Configure Git credentials
         env:
-          GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_AW_GIT_REPOSITORY: ${{ github.repository }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_TOKEN: ${{ github.token }}
         run: bash "${RUNNER_TEMP}/gh-aw/actions/configure_git_credentials.sh"
@@ -2671,7 +2671,7 @@ jobs:
           sparse-checkout: .
       - name: Configure Git credentials
         env:
-          GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_AW_GIT_REPOSITORY: ${{ github.repository }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_TOKEN: ${{ github.token }}
         run: bash "${RUNNER_TEMP}/gh-aw/actions/configure_git_credentials.sh"
@@ -2827,7 +2827,7 @@ jobs:
       - name: Configure Git credentials
         if: (!cancelled()) && needs.agent.result != 'skipped' && contains(needs.agent.outputs.output_types, 'create_pull_request')
         env:
-          GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_AW_GIT_REPOSITORY: ${{ github.repository }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GIT_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
         run: bash "${RUNNER_TEMP}/gh-aw/actions/configure_git_credentials.sh"

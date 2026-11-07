@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/setutil"
@@ -30,39 +31,66 @@ func (c *Compiler) generateGitConfigurationStepsForData(data *WorkflowData) []st
 
 	checkoutMgr := NewCheckoutManager(data.CheckoutConfigs)
 	currentPath := checkoutMgr.GetCurrentCheckoutPath()
+	currentRepo := checkoutMgr.GetCurrentRepository()
 
 	if currentPath == "" {
 		// No current checkout in a subdirectory — use the standard workspace-root behaviour.
-		return c.generateGitConfigurationStepsWithToken(token, "")
+		rootRepo := checkoutMgr.effectiveRootCheckoutRepository()
+		if c.trialMode && !checkoutMgr.HasExternalRootCheckout() {
+			rootRepo = c.trialLogicalRepoSlug
+		}
+		steps := c.generateGitConfigurationStepsWithToken(token, rootRepo)
+		candidates := checkoutMgr.runtimeRootCandidates()
+		if len(candidates) == 0 {
+			return steps
+		}
+		steps = steps[:len(steps)-1]
+		steps = append(steps, runtimeRootEnvironmentLines(candidates)...)
+		return append(steps, runtimeRootCredentialCommandLines(nil, candidates)...)
 	}
+	return generateCurrentCheckoutGitConfigurationSteps(checkoutMgr, token, currentPath, currentRepo)
+}
 
+func generateCurrentCheckoutGitConfigurationSteps(checkoutMgr *CheckoutManager, token, currentPath, currentRepo string) []string {
 	// current: true checkout is in a subdirectory. Emit the step with a working-directory
 	// so configure_git_credentials.sh runs from that directory. This ensures that
 	// `git remote set-url origin` targets the correct git repository even when the
 	// workspace root no longer contains a .git directory.
-	currentRepo := checkoutMgr.GetCurrentRepository()
 	repoNameValue := "${{ github.repository }}"
 	if currentRepo != "" {
 		repoNameValue = fmt.Sprintf("%q", currentRepo)
-		gitConfigStepsLog.Printf("Generating git config steps for current checkout: path=%s repo=%s", currentPath, currentRepo)
-	} else if c.trialMode && c.trialLogicalRepoSlug != "" {
-		repoNameValue = fmt.Sprintf("%q", c.trialLogicalRepoSlug)
-		gitConfigStepsLog.Printf("Generating git config steps in trial mode with logical repo and current path=%s", currentPath)
+		gitConfigStepsLog.Print("Generating git config steps for current checkout: explicit_repository=true")
 	} else {
-		gitConfigStepsLog.Printf("Generating git config steps for current checkout: path=%s (workflow repo)", currentPath)
+		gitConfigStepsLog.Print("Generating git config steps for current checkout: explicit_repository=false")
 	}
 
-	return []string{
+	steps := []string{
 		"      - name: Configure Git credentials\n",
 		fmt.Sprintf("        working-directory: %q\n", currentPath),
 		"        env:\n",
-		fmt.Sprintf("          GITHUB_REPOSITORY: %s\n", repoNameValue),
+		fmt.Sprintf("          GH_AW_GIT_REPOSITORY: %s\n", repoNameValue),
 		"          GITHUB_SERVER_URL: ${{ github.server_url }}\n",
 		// SECURITY: token moved to env mapping so the shell treats it as data,
 		// not syntax. Prevents shell injection if token value contains metacharacters.
 		fmt.Sprintf("          GITHUB_TOKEN: %s\n", token),
 		"        run: bash \"${RUNNER_TEMP}/gh-aw/actions/configure_git_credentials.sh\"\n",
 	}
+	if !strings.Contains(currentPath, "${{") {
+		return steps
+	}
+	candidates := checkoutMgr.runtimeRootCandidates()
+	steps = steps[:len(steps)-1]
+	steps = append(steps, runtimeRootEnvironmentLines(candidates)...)
+	steps = append(steps,
+		"        run: |\n",
+		"          GH_AW_WORKSPACE_DIRECTORY=$(cd -- \"$GITHUB_WORKSPACE\" && pwd -P)\n",
+		"          if [ \"$(pwd -P)\" = \"$GH_AW_WORKSPACE_DIRECTORY\" ]; then\n",
+	)
+	steps = append(steps, runtimeRootIdentityLines(candidates)...)
+	return append(steps,
+		"          fi\n",
+		"          bash \"${RUNNER_TEMP}/gh-aw/actions/configure_git_credentials.sh\"\n",
+	)
 }
 
 // generateGitConfigurationStepsWithToken generates git credential setup with a custom token
@@ -70,18 +98,19 @@ func (c *Compiler) generateGitConfigurationStepsForData(data *WorkflowData) []st
 // Parameters:
 //   - token: GitHub token to use for authentication
 //   - targetRepoSlug: optional target repository (e.g., "org/repo") for cross-repo operations
-//     If empty, uses source repository (github.repository)
-//     If set, configures git remote to point to the target repository
+//     If empty, uses the trial logical repository or source repository (github.repository)
+//     If set, verifies that the checkout matches the target repository
 func (c *Compiler) generateGitConfigurationStepsWithToken(token string, targetRepoSlug string) []string {
-	// Determine which repository to configure git remote for
-	// Priority: targetRepoSlug > trialLogicalRepoSlug > default (source repo)
+	// An explicit checkout identity takes precedence over the trial fallback.
 	repoNameValue := "${{ github.repository }}"
 	if targetRepoSlug != "" {
-		repoNameValue = fmt.Sprintf("%q", targetRepoSlug)
-		gitConfigStepsLog.Printf("Generating git config steps with target repo: %s", targetRepoSlug)
+		if targetRepoSlug != repoNameValue {
+			repoNameValue = fmt.Sprintf("%q", targetRepoSlug)
+		}
+		gitConfigStepsLog.Print("Generating git config steps with explicit checkout identity")
 	} else if c.trialMode && c.trialLogicalRepoSlug != "" {
 		repoNameValue = fmt.Sprintf("%q", c.trialLogicalRepoSlug)
-		gitConfigStepsLog.Printf("Generating git config steps in trial mode with logical repo: %s", c.trialLogicalRepoSlug)
+		gitConfigStepsLog.Print("Generating git config steps with trial checkout identity")
 	} else {
 		gitConfigStepsLog.Print("Generating git config steps with default github.repository")
 	}
@@ -89,7 +118,7 @@ func (c *Compiler) generateGitConfigurationStepsWithToken(token string, targetRe
 	return []string{
 		"      - name: Configure Git credentials\n",
 		"        env:\n",
-		fmt.Sprintf("          GITHUB_REPOSITORY: %s\n", repoNameValue),
+		fmt.Sprintf("          GH_AW_GIT_REPOSITORY: %s\n", repoNameValue),
 		"          GITHUB_SERVER_URL: ${{ github.server_url }}\n",
 		// SECURITY: token moved to env mapping so the shell treats it as data,
 		// not syntax. Prevents shell injection if token value contains metacharacters.

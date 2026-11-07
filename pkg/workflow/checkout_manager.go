@@ -536,11 +536,15 @@ func resolveCheckoutPermissions(data *WorkflowData) *Permissions {
 }
 
 // GetCurrentRepository returns the repository slug for the checkout marked
-// current:true. Returns an empty string when no current checkout is configured
-// or when the current checkout targets the workflow repository.
+// current:true, including the .wiki suffix for wiki checkouts. Returns an empty
+// string when no current checkout is configured or when a non-wiki current
+// checkout targets the workflow repository.
 func (cm *CheckoutManager) GetCurrentRepository() string {
 	for _, entry := range cm.ordered {
 		if entry.current {
+			if entry.key.wiki {
+				return wikiRepository(entry.key.repository)
+			}
 			return entry.key.repository
 		}
 	}
