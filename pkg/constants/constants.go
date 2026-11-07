@@ -661,6 +661,9 @@ const ThreatDetectionLogPath = TmpGhAwDir + "/threat-detection/detection.log"
 // ThreatDetectionDir is the threat detection working directory.
 const ThreatDetectionDir = TmpGhAwDir + "/threat-detection"
 
+// ThreatDetectionInputDir contains only prepared threat detection inputs.
+const ThreatDetectionInputDir = TmpGhAwDir + "/threat-detection-inputs"
+
 // ThreatDetectionResultPath is the structured verdict output file written by the
 // external threat-detect binary (enabled by default; set features.gh-aw-detection to false
 // to use the inline path). The binary writes

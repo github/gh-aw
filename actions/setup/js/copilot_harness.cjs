@@ -2066,6 +2066,7 @@ async function main() {
       } else {
         let driverServerArgs = parseCopilotSDKServerArgsFromEnv(process.env.GH_AW_COPILOT_SDK_SERVER_ARGS, { logger: log });
         if (driverServerArgs.length === 0) driverServerArgs = buildCopilotSDKServerArgs(childEnv ?? process.env);
+        driverServerArgs = addCopilotDetectionDirectory(driverServerArgs, process.env);
         if (process.env.GITHUB_WORKSPACE) {
           driverServerArgs = [...driverServerArgs, "--add-dir", process.env.GITHUB_WORKSPACE];
           log(`copilot-sdk driver mode: appended workspace --add-dir ${process.env.GITHUB_WORKSPACE}`);

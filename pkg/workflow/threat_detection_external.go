@@ -700,7 +700,7 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 	// threat-detect without interpolating user-controlled prompt text into a command.
 	steps = append(steps, c.buildThreatDetectionContextEnvVars(data, continueOnError, continueOnErrorExpr)...)
 	if engineID == "copilot" {
-		inputDir := constants.ThreatDetectionDir
+		inputDir := constants.ThreatDetectionInputDir
 		if isArcDindTopology(threatDetectionData) {
 			inputDir = strings.ReplaceAll(rewriteArcDindPath(inputDir), "${RUNNER_TEMP}", "${{ runner.temp }}")
 		}
@@ -757,12 +757,12 @@ func buildThreatDetectCommand(npmPathSetup, engineID string, config *ThreatDetec
 	}
 
 	resultPath := shellEscapeArg(constants.ThreatDetectionResultPath)
-	inputPath := shellEscapeArg(constants.ThreatDetectionDir)
+	inputPath := shellEscapeArg(constants.ThreatDetectionInputDir)
 	if arcDind {
 		// These compiler-owned expressions must expand inside the sandbox, with
 		// quotes retained so runner temp paths containing spaces remain single args.
 		resultPath = strconv.Quote(rewriteArcDindPath(constants.ThreatDetectionResultPath))
-		inputPath = strconv.Quote(rewriteArcDindPath(constants.ThreatDetectionDir))
+		inputPath = strconv.Quote(rewriteArcDindPath(constants.ThreatDetectionInputDir))
 	}
 	args = append(args, "--output", resultPath, inputPath)
 
