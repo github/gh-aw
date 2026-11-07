@@ -287,7 +287,7 @@ printf '%s\\n' "$TEMP_DIR"`,
         timeout: 30000,
       });
       expect(result.error).toBeUndefined();
-      expect(result.status).not.toBe(0);
+      expect(result.status, result.stdout + result.stderr).not.toBe(0);
       const dirs = fs.readFileSync(allocations, "utf8").trim().split("\n");
       expect(dirs.some(dir => /(?:awf|copilot)-install-/.test(dir))).toBe(true);
       for (const dir of dirs) expect(fs.existsSync(dir)).toBe(false);
@@ -321,6 +321,8 @@ printf 'copilot 1.0.103\\n'
         fs.writeFileSync(path.join(bin, command), '#!/bin/sh\necho forbidden >> "$FORBIDDEN_LOG"\nexit 99\n', { mode: 0o755 });
       }
       fs.writeFileSync(path.join(bin, "uname"), '#!/bin/sh\ncase "$1" in -m) echo x86_64 ;; *) echo Linux ;; esac\n', { mode: 0o755 });
+      const realFind = spawnSync("bash", ["-c", "command -v find"], { encoding: "utf8" }).stdout.trim();
+      fs.writeFileSync(path.join(bin, "find"), '#!/bin/sh\nif [ "$1" = /tmp ]; then echo forbidden >> "$FORBIDDEN_LOG"; exit 99; fi\nexec "$REAL_FIND" "$@"\n', { mode: 0o755 });
       const realInstall = spawnSync("bash", ["-c", "command -v install"], { encoding: "utf8" }).stdout.trim();
       fs.writeFileSync(path.join(bin, "install"), '#!/bin/sh\nprintf "%s\\n" "$4" >> "$INSTALL_LOG"\nexec "$REAL_INSTALL" "$@"\n', { mode: 0o755 });
       const otherChroot = path.join(sharedTemp, "awf-existing-chroot-home");
@@ -344,6 +346,7 @@ printf 'copilot 1.0.103\\n'
             INSTALLER_RELEASE: release,
             FORBIDDEN_LOG: forbiddenLog,
             INSTALL_LOG: installLog,
+            REAL_FIND: realFind,
             REAL_INSTALL: realInstall,
           }),
           stdio: ["ignore", "pipe", "pipe"],

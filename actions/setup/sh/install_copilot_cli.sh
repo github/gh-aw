@@ -167,21 +167,6 @@ else
   fi
 fi
 
-# Clean up any stale AWF chroot directories left by previous runs.
-# When AWF ran with `sudo -E awf --enable-host-access`, it created
-# /tmp/awf-*-chroot-home and /tmp/awf-chroot-* directories with root-owned
-# files. These cause EACCES failures in the Copilot CLI cleanup path
-# (rimrafSync) or AWF writeConfigs on the same or subsequent runs, which
-# reports as "engine terminated unexpectedly" or fatal EACCES errors.
-# Remove them here before the agent starts so the runner is in a clean state.
-echo "Cleaning up stale AWF chroot directories..."
-if ! maybe_sudo find /tmp -maxdepth 1 -name 'awf-*-chroot-home' -type d -exec rm -rf -- {} + 2>/dev/null; then
-  echo "WARNING: Could not remove stale /tmp/awf-*-chroot-home directories. Ask a runner administrator to remove stale directories from previous runs before using this runner; installation will continue." >&2
-fi
-if ! maybe_sudo find /tmp -maxdepth 1 -name 'awf-chroot-*' -type d -exec rm -rf -- {} + 2>/dev/null; then
-  echo "WARNING: Could not remove stale /tmp/awf-chroot-* directories. Ask a runner administrator to remove stale directories from previous runs before using this runner; installation will continue." >&2
-fi
-
 # Detect architecture
 ARCH="$(uname -m)"
 
