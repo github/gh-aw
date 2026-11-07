@@ -113,6 +113,9 @@ description: Safe-output reference for issue, discussion, comment, and pull requ
       close-older-issues: true        # Optional: close previous issues from same workflow (default: false)
       close-older-key: "my-key"       # Optional: explicit deduplication key for close-older matching (uses gh-aw-close-key marker)
       deduplicate-by-title: true      # Optional: skip creating an issue when one with the same title exists; integer N allows fuzzy matches up to edit distance N (default: off)
+      deduplicate-by-labels: [triage] # Optional: drop when an open/recently closed issue has ALL labels; ANDed with deduplicate-by-title
+      max-issue-artifacts: 10         # Optional: max `artifacts` per issue (default: 10; <=0 disables)
+      max-issue-artifact-size: 1mb    # Optional: max UTF-8 size per artifact body (bytes or 512kb/1mb; default: 1mb)
       require-temporary-id: true      # Optional: require temporary_id on every create_issue call (default: false)
       normalize-closing-keywords: true # Optional: strip backticks around recognized issue-closing keywords in body text
       # create_issue output may set blocked_by to an issue reference or list of references
@@ -124,6 +127,8 @@ description: Safe-output reference for issue, discussion, comment, and pull requ
   `create_issue` output validation requires:
   - `body` minimum length: **20** characters
   - `body` maximum length: **65000** characters
+
+  **Issue artifacts**: `create_issue` accepts optional `artifacts: [{name, body | path, type?}]` (`type`: `generic`, `plan`, `link`, `embedded_html`). `path` must be a literal absolute path under the workspace or `/tmp/gh-aw/agent`; the unprivileged MCP backend reads it so content never enters the agent context. Oversized or over-limit requests are rejected before creation (no truncation). See [docs: Issue Artifacts](https://github.github.com/gh-aw/reference/safe-outputs/#issue-artifacts).
 
   **Auto-Expiration**: The `expires` field auto-closes issues after a time period. Supports integers (days) or relative formats (2h, 7d, 2w, 1m, 1y). Generates `agentics-maintenance.yml` workflow that runs at minimum required frequency based on shortest expiration time: 1 day or less → every 2 hours, 2 days → every 6 hours, 3-4 days → every 12 hours, 5+ days → daily.
   **Deduplication for Scheduled Workflows**: When `schedule:` is combined with `create-issue`, use `skip-if-match:` in the `on:` block to prevent opening a duplicate issue every run. Pair with `expires:` to clean up stale issues:
