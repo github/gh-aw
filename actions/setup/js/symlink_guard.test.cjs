@@ -125,15 +125,19 @@ describe("lstatGuard", () => {
       restoreDescriptors?.();
     });
 
-    it("reads bounded regular files and exclusively stages their bytes", () => {
+    it("reads bounded regular files and exclusively stages their bytes with the requested mode", () => {
       const source = path.join(tmpDir, "source.png");
       const target = path.join(tmpDir, "staging", "chart.png");
+      const publicTarget = path.join(tmpDir, "staging", "published.png");
       fs.writeFileSync(source, "chart");
       const content = readGuardedFile(source, 5);
       expect(content.toString()).toBe("chart");
       expect(() => readGuardedFile(source, 4)).toThrow("exceeds maximum allowed size");
       writeGuardedFile(target, content);
       expect(fs.readFileSync(target)).toEqual(content);
+      expect(fs.statSync(target).mode & 0o777).toBe(0o600);
+      writeGuardedFile(publicTarget, content, 0o644);
+      expect(fs.statSync(publicTarget).mode & 0o777).toBe(0o644);
       expect(() => writeGuardedFile(target, Buffer.from("overwrite"))).toThrow("EEXIST");
       expect(fs.readFileSync(target)).toEqual(content);
     });

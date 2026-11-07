@@ -826,6 +826,7 @@ describe("safe_outputs_handlers", () => {
       expect(entry.size).toBe(Buffer.byteLength("test content"));
       const stagedFile = path.join(testRunnerTemp, "gh-aw", "safeoutputs", "assets", `${crypto.createHash("sha256").update(testFile).digest("hex")}.png`);
       expect(fs.readFileSync(stagedFile)).toEqual(Buffer.from("test content"));
+      expect(fs.statSync(stagedFile).mode & 0o777).toBe(0o644);
       expect(entry.url).toContain("test-branch");
 
       expect(result.content[0].type).toBe("text");
