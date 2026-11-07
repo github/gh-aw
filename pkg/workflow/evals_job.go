@@ -147,7 +147,7 @@ func (c *Compiler) buildPushEvalsStateJob(data *WorkflowData) (*Job, error) {
 		"          sparse-checkout: .\n",
 	)
 
-	steps = append(steps, c.generateGitConfigurationSteps()...)
+	steps = append(steps, c.generateGitConfigurationStepsWithToken("${{ github.token }}", "${{ github.repository }}")...)
 
 	evalsArtifactName := artifactPrefixExprForDownstreamJob(data) + constants.EvalsArtifactName.String()
 	downloadAction := c.getActionPin("actions/download-artifact")

@@ -132,6 +132,15 @@ decide whether it represents an implementation defect, a model error, or an
 architectural gap. Do not file the intentional `Fault != "none"` controls or
 `No*` reachability witnesses as vulnerabilities.
 
+## Report formatting
+
+For any issue or pull request body, use `###` (h3) or lower headers only. Keep the
+summary and decisions visible; put long findings, logs, and evidence in
+`<details><summary><b>...</b></summary>...</details>` blocks. Structure the report
+as overview → key findings/metrics → detailed findings → next actions. Use `- [ ]`
+for follow-up work and format workflow run references as
+`[§12345](https://github.com/github/gh-aw/actions/runs/12345)`.
+
 ## Concretize and report
 
 For a credible implementation violation, write a minimal agentic workflow source

@@ -2,10 +2,10 @@ package sprintfbool
 
 import "fmt"
 
-func badOne(b bool) string {
+func firstBadSprintfBool(b bool) string {
 	return fmt.Sprintf("%t", b) // want `use strconv\.FormatBool\(b\) instead of fmt\.Sprintf\("%t", b\)`
 }
 
-func badTwo(b bool) string {
+func secondBadSprintfBool(b bool) string {
 	return fmt.Sprintf("%t", b) // want `use strconv\.FormatBool\(b\) instead of fmt\.Sprintf\("%t", b\)`
 }

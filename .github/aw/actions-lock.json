@@ -78,11 +78,6 @@
       "version": "v7.0.0",
       "sha": "b7ad1dad31e06c5925ef5d2fc7ad053ef454303e"
     },
-    "actions/setup-java@v6.1.0": {
-      "repo": "actions/setup-java",
-      "version": "v6.1.0",
-      "sha": "b843ebf9b913146b38da2eaa7aeddf76074ae1ad"
-    },
     "actions/setup-java@v6.2.0": {
       "repo": "actions/setup-java",
       "version": "v6.2.0",
@@ -128,10 +123,10 @@
       "version": "v7.4.0",
       "sha": "c3c9e263c25d99ce0380d002d59b67737d91b0dc"
     },
-    "docker/login-action@v4.7.0": {
+    "docker/login-action@v4.8.0": {
       "repo": "docker/login-action",
-      "version": "v4.7.0",
-      "sha": "81c6f93d4bc991e510b342a00b419b3bb4efc5c6"
+      "version": "v4.8.0",
+      "sha": "8aa5831fb8d48d8f76594c7ddde61ae58019f550"
     },
     "docker/metadata-action@v6.2.0": {
       "repo": "docker/metadata-action",
@@ -168,10 +163,10 @@
       "version": "v2.2.0",
       "sha": "0c5077e51419868618aeaa5fe8019c62421857d6"
     },
-    "ruby/setup-ruby@v1.336.0": {
+    "ruby/setup-ruby@v1.338.0": {
       "repo": "ruby/setup-ruby",
-      "version": "v1.336.0",
-      "sha": "de492cf36cbab201753d720ce4f4e336cd688c94"
+      "version": "v1.338.0",
+      "sha": "b3aaceaef7e0ee231b499e7b5f49c03fc1d32199"
     },
     "safedep/pmg@v1": {
       "repo": "safedep/pmg",
@@ -1099,11 +1094,6 @@
       "image": "ghcr.io/github/gh-aw-node",
       "digest": "sha256:2c2ea524e648b91c8333ce246e3838fcf5b19ac70e45baac1a51b9207299749f",
       "pinned_image": "ghcr.io/github/gh-aw-node@sha256:2c2ea524e648b91c8333ce246e3838fcf5b19ac70e45baac1a51b9207299749f"
-    },
-    "ghcr.io/github/github-mcp-server:v2.0.3": {
-      "image": "ghcr.io/github/github-mcp-server:v2.0.3",
-      "digest": "sha256:250bc6ce70788207608ef74cef4397230ff2e8481218da74d6093e4bd9101132",
-      "pinned_image": "ghcr.io/github/github-mcp-server:v2.0.3@sha256:250bc6ce70788207608ef74cef4397230ff2e8481218da74d6093e4bd9101132"
     },
     "ghcr.io/github/github-mcp-server:v2.1.0": {
       "image": "ghcr.io/github/github-mcp-server:v2.1.0",
