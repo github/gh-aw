@@ -1,108 +1,46 @@
 {
-  "run_id": "42371862305",
-  "run_date": "2026-11-07T12:20:21.500Z",
+  "run_id": "42400301233",
+  "run_date": "2026-11-07T18:17:31Z",
   "source": "pr-triage",
-  "eligible_total": 3,
-  "open_copilot_prs": 7,
-  "cooldown_skipped": 4,
+  "eligible_total": 1,
+  "open_copilot_prs": 6,
+  "cooldown_skipped": 5,
   "category_counts": {
-    "feature": 1,
-    "bug": 2
+    "bug": 1
   },
   "risk_counts": {
-    "high": 2,
-    "medium": 1
+    "high": 1
   },
   "priority_counts": {
-    "high": 3
+    "high": 1
   },
   "action_counts": {
-    "fast_track": 2,
     "batch_review": 1
   },
-  "batches": [
-    {
-      "id": "agent-triage-2026-11-07",
-      "prs": [
-        75385,
-        75366,
-        74943
-      ]
-    }
-  ],
+  "batches": [],
   "selected_candidates": [
     {
-      "number": 75385,
-      "title": "Allow pi model selection from dispatch inputs",
-      "category": "feature",
-      "risk": "high",
-      "priority": "high",
-      "action": "fast_track",
-      "score": 70,
-      "score_breakdown": {
-        "impact": 35,
-        "urgency": 20,
-        "quality": 15
-      },
-      "labels": [
-        "pr-type:feature",
-        "pr-risk:high",
-        "pr-priority:high",
-        "pr-action:fast_track",
-        "pr-agent:copilot",
-        "pr-batch:agent-triage-2026-11-07"
-      ]
-    },
-    {
-      "number": 75366,
-      "title": "Reject run-step expressions in shell re-evaluation contexts",
+      "number": 75705,
+      "title": "[WIP] Fix ignored errors and discarded results in lint findings",
       "category": "bug",
       "risk": "high",
-      "priority": "high",
-      "action": "fast_track",
-      "score": 77,
-      "score_breakdown": {
-        "impact": 40,
-        "urgency": 22,
-        "quality": 15
-      },
-      "labels": [
-        "pr-type:bug",
-        "pr-risk:high",
-        "pr-priority:high",
-        "pr-action:fast_track",
-        "pr-agent:copilot",
-        "pr-batch:agent-triage-2026-11-07"
-      ]
-    },
-    {
-      "number": 74943,
-      "title": "Preserve cross-repository checkout identity during credential setup",
-      "category": "bug",
-      "risk": "medium",
       "priority": "high",
       "action": "batch_review",
-      "score": 71,
+      "score": 72,
       "score_breakdown": {
         "impact": 38,
-        "urgency": 18,
-        "quality": 15
+        "urgency": 21,
+        "quality": 13
       },
       "labels": [
         "pr-type:bug",
-        "pr-risk:medium",
+        "pr-risk:high",
         "pr-priority:high",
         "pr-action:batch_review",
-        "pr-agent:copilot",
-        "pr-batch:agent-triage-2026-11-07"
+        "pr-agent:copilot"
       ]
     }
   ],
-  "skipped_prs": [
-    75621,
-    75620,
-    75619,
-    75615
-  ],
-  "notes": "All four recent draft PRs were excluded by the 1-hour cooldown; eligible set comprises the three non-draft Copilot PRs with recent green CI signals."
+  "skipped_prs": [75720, 75717, 75715, 75714, 75713],
+  "notes": "Five PRs were excluded by the 1-hour cooldown; 75705 remains the only eligible Copilot-authored open PR and is a large, high-risk lint/validation fix with an impacted-go-tests failure."
 }
