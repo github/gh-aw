@@ -958,9 +958,13 @@ jobs:
       - name: Write comment-memory configuration
         env:
           GH_AW_EARLY_COMMENT_MEMORY_CONFIG: "{\"comment_memory\":{\"max\":1,\"memory_id\":\"default\"}}"
-        run: |
-          mkdir -p "${RUNNER_TEMP}/gh-aw/safeoutputs"
-          printf '%s\n' "$GH_AW_EARLY_COMMENT_MEMORY_CONFIG" > "${RUNNER_TEMP}/gh-aw/safeoutputs/config.json"
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { renderFiles } = require(path.join(actionsDir, 'create_files.cjs'));
+            renderFiles({ files: [{ path: "gh-aw/safeoutputs/config.json", content_env: "GH_AW_EARLY_COMMENT_MEMORY_CONFIG" }] }, process.env, process.env.RUNNER_TEMP);
       - name: Prepare comment memory files
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:

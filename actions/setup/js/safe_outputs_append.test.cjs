@@ -181,6 +181,29 @@ describe("safe_outputs_append", () => {
       expect(lines).toHaveLength(2);
     });
 
+    it.skipIf(process.platform !== "linux").each([false, true])("keeps the output file owner-only: %s", existing => {
+      if (existing) {
+        fs.writeFileSync(testOutputFile, "existing\n");
+        fs.chmodSync(testOutputFile, 0o666);
+      }
+
+      appendFn({ type: "private-output", data: true });
+
+      expect(fs.statSync(testOutputFile).mode & 0o777).toBe(0o600);
+    });
+
+    it.skipIf(process.platform !== "linux")("does not follow a symlink when appending output", () => {
+      const target = `${testOutputFile}.target`;
+      fs.writeFileSync(target, "untouched\n");
+      fs.symlinkSync(target, testOutputFile);
+      try {
+        expect(() => appendFn({ type: "private-output", data: true })).toThrow("Failed to write to output file");
+        expect(fs.readFileSync(target, "utf8")).toBe("untouched\n");
+      } finally {
+        fs.unlinkSync(target);
+      }
+    });
+
     it("should write single-line JSON without formatting (JSONL format)", () => {
       // Test that JSON is written as a single line, not formatted/pretty-printed
       const entry = {

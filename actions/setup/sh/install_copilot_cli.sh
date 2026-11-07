@@ -154,10 +154,17 @@ fi
 # `sudo -E awf --enable-chroot ...`, which creates the .copilot directory with
 # root ownership. The Copilot CLI (running as the runner user) then fails when
 # trying to create subdirectories. See: https://github.com/github/gh-aw/issues/12066
-echo "Ensuring correct ownership of $COPILOT_DIR..."
-if ! { mkdir -p "$COPILOT_DIR" && maybe_sudo chown -R "$(id -u):$(id -g)" "$COPILOT_DIR"; }; then
-  echo "ERROR: Cannot prepare Copilot state at $COPILOT_DIR. Ask a runner administrator to restore ownership of this directory and its contents to $(id -u):$(id -g) and make it writable before retrying. Rootless installation cannot repair state left by a privileged AWF run." >&2
-  exit 1
+if [ "$ROOTLESS" = "true" ]; then
+  if ! { mkdir -p "$COPILOT_DIR" && [ -w "$COPILOT_DIR" ]; }; then
+    echo "ERROR: Cannot prepare Copilot state at $COPILOT_DIR. Ask a runner administrator to restore ownership of this directory and its contents to $(id -u):$(id -g) and make it writable before retrying. Rootless installation cannot reclaim or re-own state left by a privileged AWF run." >&2
+    exit 1
+  fi
+else
+  echo "Ensuring correct ownership of $COPILOT_DIR..."
+  if ! { mkdir -p "$COPILOT_DIR" && maybe_sudo chown -R "$(id -u):$(id -g)" "$COPILOT_DIR"; }; then
+    echo "ERROR: Cannot prepare Copilot state at $COPILOT_DIR. Ask a runner administrator to restore ownership of this directory and its contents to $(id -u):$(id -g) and make it writable before retrying." >&2
+    exit 1
+  fi
 fi
 
 # Clean up any stale AWF chroot directories left by previous runs.
@@ -730,9 +737,8 @@ stage_musl_guest_copilot() {
   echo "✓ Staged musl Copilot CLI at ${destination}"
 }
 
-# Create temp directory with cleanup on exit
-TEMP_DIR=$(mktemp -d)
-trap 'rm -rf "$TEMP_DIR"' EXIT
+# Keep downloads private and cleanup confined to this invocation's allocation.
+create_release_staging copilot
 
 # Version resolution follows this priority order:
 # Check publication time before activating any cached binary or downloading an

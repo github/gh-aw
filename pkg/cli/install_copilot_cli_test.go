@@ -109,6 +109,7 @@ esac
 `), 0o755))
 
 	runnerTemp := filepath.Join(tempDir, "runner-temp")
+	require.NoError(t, os.MkdirAll(runnerTemp, 0o700))
 	installDir := filepath.Join(tempDir, "install-bin")
 	require.NoError(t, os.MkdirAll(installDir, 0o755))
 	cmd := exec.Command("bash", installScript, "1.2.3")
@@ -201,6 +202,7 @@ esac
 `), 0o755))
 			home := filepath.Join(tempDir, "home")
 			runnerTemp := filepath.Join(tempDir, "runner-temp")
+			require.NoError(t, os.MkdirAll(runnerTemp, 0o700))
 			installDir := filepath.Join(runnerTemp, "gh-aw", "bin")
 			curlLog := filepath.Join(tempDir, "curl.log")
 			githubPath := filepath.Join(tempDir, "github-path")
@@ -740,7 +742,6 @@ func TestInstallCopilotCLIScriptRootlessModeUsesRealScriptWithToolcacheAndNoSudo
 		blockedInstall      bool
 		symlinkInstall      bool
 		blockedState        bool
-		failedChown         bool
 		staleCleanupFailure bool
 	}{
 		{name: "rootless flag before version", args: []string{"--rootless", "1.2.3"}},
@@ -748,8 +749,8 @@ func TestInstallCopilotCLIScriptRootlessModeUsesRealScriptWithToolcacheAndNoSudo
 		{name: "native runner without passwordless sudo", args: []string{"1.2.3"}, autoSelect: true},
 		{name: "native runner with unwritable job-scoped directory", args: []string{"1.2.3"}, autoSelect: true, blockedInstall: true},
 		{name: "native runner with symlinked job-scoped directory", args: []string{"1.2.3"}, autoSelect: true, symlinkInstall: true},
-		{name: "native runner with legacy root-owned state", args: []string{"1.2.3"}, autoSelect: true, failedChown: true},
-		{name: "explicit rootless with legacy root-owned state", args: []string{"--rootless", "1.2.3"}, failedChown: true},
+		{name: "native runner with legacy root-owned state", args: []string{"1.2.3"}, autoSelect: true, blockedState: true},
+		{name: "explicit rootless with legacy root-owned state", args: []string{"--rootless", "1.2.3"}, blockedState: true},
 		{name: "native runner with inaccessible state directory", args: []string{"1.2.3"}, autoSelect: true, blockedState: true},
 		{name: "native runner with stale privileged AWF directories", args: []string{"1.2.3"}, autoSelect: true, staleCleanupFailure: true},
 	}
@@ -787,17 +788,15 @@ func TestInstallCopilotCLIScriptRootlessModeUsesRealScriptWithToolcacheAndNoSudo
 echo "sudo-called: $*" >> "`+sudoLog+`"
 exit 99
 `), 0o755))
+			chownLog := filepath.Join(tempDir, "chown.log")
+			require.NoError(t, os.WriteFile(filepath.Join(fakeBinDir, "chown"), []byte(`#!/usr/bin/env bash
+echo "chown-called: $*" >> "`+chownLog+`"
+exit 99
+`), 0o755))
 			if tc.autoSelect {
 				require.NoError(t, os.WriteFile(filepath.Join(fakeBinDir, "id"), []byte(`#!/usr/bin/env bash
 case "$1" in -u) echo 12345 ;; -g) echo 31 ;; *) exit 1 ;; esac
 `), 0o755))
-				require.NoError(t, os.WriteFile(filepath.Join(fakeBinDir, "chown"), []byte(`#!/usr/bin/env bash
-test "$1" = -R && test "$2" = 12345:31 && test "$3" = "$HOME/.copilot"
-`), 0o755))
-			}
-			if tc.failedChown {
-				require.NoError(t, os.MkdirAll(filepath.Join(homeDir, ".copilot", "legacy"), 0o755))
-				require.NoError(t, os.WriteFile(filepath.Join(fakeBinDir, "chown"), []byte("#!/usr/bin/env bash\necho 'chown: Operation not permitted' >&2\nexit 1\n"), 0o755))
 			}
 			if tc.staleCleanupFailure {
 				require.NoError(t, os.WriteFile(filepath.Join(fakeBinDir, "find"), []byte(`#!/usr/bin/env bash
@@ -824,7 +823,7 @@ exec /usr/bin/find "$@"
 			)
 
 			output, err := cmd.CombinedOutput()
-			if tc.failedChown || tc.blockedState {
+			if tc.blockedState {
 				require.Error(t, err)
 				assert.Contains(t, string(output), "Cannot prepare Copilot state at "+filepath.Join(homeDir, ".copilot"))
 				assert.Contains(t, string(output), "Ask a runner administrator to restore ownership")
@@ -833,6 +832,7 @@ exec /usr/bin/find "$@"
 				assert.NoFileExists(t, filepath.Join(rootlessInstallDir, "copilot"))
 				assert.NoFileExists(t, filepath.Join(systemBin, "copilot"))
 				assert.NoFileExists(t, githubPath)
+				assert.NoFileExists(t, chownLog, "rootless installation must not recursively re-own Copilot state")
 				return
 			}
 			if tc.blockedInstall || tc.symlinkInstall {
@@ -852,6 +852,7 @@ exec /usr/bin/find "$@"
 			assert.Contains(t, string(output), "Wrapper installed at "+filepath.Join(rootlessInstallDir, "copilot"))
 			assert.FileExists(t, filepath.Join(rootlessInstallDir, "copilot"))
 			assert.NoFileExists(t, filepath.Join(systemBin, "copilot"))
+			assert.NoFileExists(t, chownLog, "rootless installation must not recursively re-own Copilot configuration")
 			if tc.autoSelect {
 				pathContents, err := os.ReadFile(githubPath)
 				require.NoError(t, err)
