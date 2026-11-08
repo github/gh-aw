@@ -9,6 +9,7 @@ on:
 permissions:
   copilot-requests: write
   contents: read
+  pull-requests: read
 
 engine:
   id: pi
@@ -33,11 +34,21 @@ tools:
   cli-proxy: true
   github:
     mode: gh-proxy
-    toolsets: [repos]
+    toolsets: [repos, pull_requests]
   edit:
   bash:
     - "*"
 
+safe-outputs:
+  create-pull-request:
+    title-prefix: "[terminal-stylist] "
+    draft: true
+    max: 1
+    allowed-files:
+      - "pkg/**/*.go"
+    excluded-files:
+      - "**/*.log"
+      - "**/*.log.*"
 
 ---
 # Terminal Stylist - Console Output Analysis
@@ -76,6 +87,7 @@ Analyze Go source files to:
 5. Evaluate proper usage of Lipgloss styling patterns
 6. Assess interactive form implementations using Huh
 7. Recommend improvements based on Charmbracelet ecosystem best practices
+8. Implement focused improvements and submit them for review through safe outputs
 
 ## Current Context
 
@@ -147,6 +159,15 @@ Create a discussion with:
   - Validation and accessibility improvements
   - User experience enhancements through better field types
 
+### Phase 5: Implement Improvements and Create a Pull Request
+
+- Check existing open pull requests before editing; do not duplicate improvements already proposed.
+- Select a small, actionable improvement supported by the analysis. Limit changes to Go files under `pkg/`, preserving existing behavior and adding focused tests where appropriate.
+- Run `make fmt` and the relevant existing tests. Review the diff and include only the intended source and test changes.
+- Keep logs and other temporary output outside the repository. Never include log files in the pull request.
+- Create at most one draft pull request using the `create_pull_request` safe-output tool, summarizing the improvement and validation results. Do not push branches or create pull requests directly through `git`, `gh`, or GitHub APIs.
+- If no novel improvement can be safely implemented and validated, use `noop` to explain why no pull request is needed; still publish the analysis discussion.
+
 ## Success Criteria
 
 1. ✅ All Go source files are scanned
@@ -155,5 +176,6 @@ Create a discussion with:
 4. ✅ Huh form implementations are evaluated for usability and accessibility
 5. ✅ Recommendations for improvement are provided with specific examples
 6. ✅ A formatted discussion is created with findings organized by library and pattern
+7. ✅ A focused, validated improvement is submitted through safe outputs without log files, or a justified no-op is recorded
 
 **Objective**: Ensure consistent, well-formatted, and accessible console output throughout the codebase using modern Charmbracelet ecosystem best practices.
