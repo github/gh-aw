@@ -1,53 +1,18 @@
 {
-  "run_id": "42430628618",
-  "run_date": "2026-11-08T00:42:44Z",
+  "run_id": "42509022113",
+  "run_date": "2026-11-08T18:17:19Z",
   "source": "pr-triage",
-  "eligible_total": 1,
-  "open_copilot_prs": 7,
-  "cooldown_skipped": 6,
-  "category_counts": {
-    "feature": 1
-  },
-  "risk_counts": {
-    "medium": 1
-  },
-  "priority_counts": {
-    "medium": 1
-  },
-  "action_counts": {
-    "fast_track": 1
-  },
+  "eligible_total": 5,
+  "category_counts": {"chore": 1, "test": 1, "refactor": 1, "bug": 2},
+  "risk_counts": {"low": 2, "medium": 3},
+  "priority_counts": {"low": 2, "medium": 3},
+  "action_counts": {"auto_merge": 2, "batch_review": 2, "defer": 1},
+  "batches": [{"id": "pr-batch:quality-copilot", "prs": [75821, 75807, 75806, 75793]}],
   "selected_candidates": [
-    {
-      "number": 75764,
-      "title": "Route remaining workflows through economy model routing",
-      "category": "feature",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "fast_track",
-      "score": 60,
-      "score_breakdown": {
-        "impact": 33,
-        "urgency": 13,
-        "quality": 14
-      },
-      "labels": [
-        "pr-type:feature",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:fast_track",
-        "pr-agent:copilot"
-      ]
-    }
-  ],
-  "batches": [],
-  "skipped_prs": [
-    75777,
-    75774,
-    75773,
-    75765,
-    75763,
-    75761
-  ],
-  "summary": "Single eligible PR; one workflow-compliance feature change meets the cooldown gate and has passing route checks."
+    {"number": 75843, "title": "Bump gh-aw-firewall to v0.29.10", "category": "chore", "risk": "medium", "priority": "medium", "action": "batch_review", "score": 59, "score_breakdown": {"impact": 32, "urgency": 15, "quality": 12}},
+    {"number": 75821, "title": "Improve safe-output helper test coverage", "category": "test", "risk": "low", "priority": "low", "action": "auto_merge", "score": 35, "score_breakdown": {"impact": 14, "urgency": 6, "quality": 15}},
+    {"number": 75807, "title": "Extract shared work-queue worker target resolution", "category": "refactor", "risk": "medium", "priority": "medium", "action": "batch_review", "score": 47, "score_breakdown": {"impact": 26, "urgency": 10, "quality": 11}},
+    {"number": 75806, "title": "Exclude vendored YAML from ESLint custom rules", "category": "bug", "risk": "medium", "priority": "medium", "action": "defer", "score": 48, "score_breakdown": {"impact": 22, "urgency": 18, "quality": 8}},
+    {"number": 75793, "title": "Normalize blocked labels and cover run-step sanitization", "category": "bug", "risk": "low", "priority": "low", "action": "auto_merge", "score": 42, "score_breakdown": {"impact": 20, "urgency": 8, "quality": 14}}
+  ]
 }
