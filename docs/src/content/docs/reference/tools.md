@@ -174,18 +174,11 @@ tools:
 
 See **[Repo Memory Reference](/gh-aw/reference/repo-memory/)** for complete configuration options and usage examples.
 
-### QMD Documentation Search (`qmd:`) — Experimental
+### QMD Documentation Search — Experimental
 
-Build a local vector search index over documentation files and expose it as an MCP search tool. The index is built in a dedicated indexing job (no `contents: read` needed in the agent job):
+Import a shared agentic workflow file to configure [QMD Documentation Search](/gh-aw/experimental/qmd/), including its custom MCP server, indexing job, and cache-memory.
 
-```yaml wrap
-tools:
-  qmd:
-    checkouts:
-      - pattern: "docs/**/*.md"
-```
-
-See **[QMD Documentation Search](/gh-aw/experimental/qmd/)** for complete configuration options, checkout support, GitHub search integration, and cache key usage.
+The index/search pattern restores cache-memory in a separate deterministic job, incrementally updates documents and embeddings, and passes the fresh index to the agent through an artifact. The agent searches a working copy without checking out the source, then gh-aw persists the snapshot for subsequent runs. See the [example shared workflow](/gh-aw/experimental/qmd/#example-shared-workflow).
 
 ### Introspection on Agentic Workflows (`agentic-workflows:`)
 

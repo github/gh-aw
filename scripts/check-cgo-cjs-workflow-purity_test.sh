@@ -127,6 +127,73 @@ else
   fail "multiple input output was incorrect" "$(cat "$T5_OUT")"
 fi
 
+echo "Test 6: CJS permits Copilot inference with only its built-in token..."
+T6="$TMP_ROOT/t6"
+T6_CJS="$T6/.github/workflows/cjs.yml"
+write_workflow "$T6_CJS" "    permissions:
+      contents: read
+      copilot-requests: write
+    steps:
+      - run: echo ok
+        env:
+          GITHUB_TOKEN: \${{ github.token }}"
+T6_OUT="$TMP_ROOT/t6-output.txt"
+if (cd "$T6" && bash "$PURITY_SCRIPT" .github/workflows/cjs.yml >"$T6_OUT" 2>&1); then
+  pass "CJS permits Copilot inference with only its built-in token"
+else
+  fail "CJS Copilot inference permission should pass" "$(cat "$T6_OUT")"
+fi
+
+echo "Test 7: CGO still rejects Copilot write permission..."
+T7="$TMP_ROOT/t7"
+T7_CGO="$T7/cgo.yml"
+write_workflow "$T7_CGO" "    permissions: { contents: read, copilot-requests: write }
+    steps:
+      - run: echo ok"
+T7_OUT="$TMP_ROOT/t7-output.txt"
+if (cd "$T7" && bash "$PURITY_SCRIPT" cgo.yml >"$T7_OUT" 2>&1); then
+  fail "CGO Copilot write permission should exit 1" "$(cat "$T7_OUT")"
+elif grep -q "copilot-requests: write" "$T7_OUT"; then
+  pass "CGO still rejects Copilot write permission"
+else
+  fail "CGO write permission output was incorrect" "$(cat "$T7_OUT")"
+fi
+
+echo "Test 8: Copilot inference does not permit CJS repository writes or PAT secrets..."
+T8="$TMP_ROOT/t8"
+T8_CJS="$T8/.github/workflows/cjs.yml"
+write_workflow "$T8_CJS" "    permissions:
+      copilot-requests: write
+      contents: write
+    steps:
+      - run: echo \"\${{ secrets.COPILOT_GITHUB_TOKEN }}\""
+T8_OUT="$TMP_ROOT/t8-output.txt"
+if (cd "$T8" && bash "$PURITY_SCRIPT" .github/workflows/cjs.yml >"$T8_OUT" 2>&1); then
+  fail "CJS repository writes and PAT secrets should exit 1" "$(cat "$T8_OUT")"
+elif grep -q "contents: write" "$T8_OUT" && grep -q "secrets.COPILOT_GITHUB_TOKEN" "$T8_OUT"; then
+  pass "Copilot inference does not permit CJS repository writes or PAT secrets"
+else
+  fail "CJS repository write and secret output was incorrect" "$(cat "$T8_OUT")"
+fi
+
+echo "Test 9: same-basename CJS impostors reject Copilot write permission..."
+T9="$TMP_ROOT/t9"
+write_workflow "$T9/cjs.yml" "    permissions:
+      copilot-requests: write
+    steps:
+      - run: echo ok"
+write_workflow "$T9/other/cjs.yml" "    permissions: { contents: read, copilot-requests: write }
+    steps:
+      - run: echo ok"
+T9_OUT="$TMP_ROOT/t9-output.txt"
+if (cd "$T9" && bash "$PURITY_SCRIPT" cjs.yml other/cjs.yml >"$T9_OUT" 2>&1); then
+  fail "CJS impostors should exit 1" "$(cat "$T9_OUT")"
+elif grep -q "^cjs.yml:.*copilot-requests: write" "$T9_OUT" && grep -q "^other/cjs.yml:.*copilot-requests: write" "$T9_OUT"; then
+  pass "same-basename CJS impostors reject Copilot write permission"
+else
+  fail "CJS impostor permission output was incorrect" "$(cat "$T9_OUT")"
+fi
+
 echo
 echo "Tests passed: $TESTS_PASSED"
 echo "Tests failed: $TESTS_FAILED"

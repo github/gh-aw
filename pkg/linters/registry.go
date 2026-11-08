@@ -63,6 +63,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/slicemakezerolength"
 	"github.com/github/gh-aw/pkg/linters/sortslice"
 	"github.com/github/gh-aw/pkg/linters/splitindexzero"
+	splitlinesonnewline "github.com/github/gh-aw/pkg/linters/splitlines-on-newline"
 	"github.com/github/gh-aw/pkg/linters/sprintfbool"
 	"github.com/github/gh-aw/pkg/linters/sprintferrdot"
 	"github.com/github/gh-aw/pkg/linters/sprintferrorsnew"
@@ -162,6 +163,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	slicemakezerolength.Analyzer,
 	sortslice.Analyzer,
 	splitindexzero.Analyzer,
+	splitlinesonnewline.Analyzer,
 	sprintferrdot.Analyzer,
 	sprintferrorsnew.Analyzer,
 	sprintfbool.Analyzer,

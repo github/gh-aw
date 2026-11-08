@@ -73,6 +73,7 @@ PY
 
   write_permissions_file="$tmp_dir/write-permissions.txt"
   if ! python3 - "$workflow" >"$write_permissions_file" <<'PY'; then
+import pathlib
 import re
 import sys
 
@@ -81,6 +82,9 @@ workflow = sys.argv[1]
 # `actions: write` is required by the cleanup jobs that delete the shared
 # checkout cache at the end of a run; it grants no access to repository content.
 allowed_write_scopes = {"actions"}
+# CJS may exercise Copilot inference with its job token, not repository writes.
+if pathlib.Path(workflow) == pathlib.Path(".github/workflows/cjs.yml"):
+    allowed_write_scopes.add("copilot-requests")
 
 
 def strip_comment(line):
