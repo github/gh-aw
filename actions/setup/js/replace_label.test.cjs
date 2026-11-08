@@ -204,7 +204,7 @@ describe("replace_label", () => {
     expect(result.success).toBe(false);
   });
 
-  it("should succeed even when label_to_remove is not present on the issue", async () => {
+  it("T-RL-045 uses the current REST label state when label_to_remove is absent", async () => {
     mockGithub.rest.issues.get = async () => ({
       data: {
         title: "Test issue",
@@ -260,7 +260,43 @@ describe("replace_label", () => {
     expect(result.success).toBe(false);
   });
 
-  it("should reject label_to_add before setLabels when blocklist changes mid-flight", async () => {
+  it.each([
+    ["case variation", "BlOcKeD"],
+    ["zero-width character", "block\u200Bed"],
+    ["full-width characters", "ｂｌｏｃｋｅｄ"],
+  ])("should reject blocked labels with %s", async (_variant, label) => {
+    const handler = await main({ blocked: ["blocked"] });
+    const result = await handler({ label_to_remove: "in-progress", label_to_add: label }, {});
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("blocked pattern");
+  });
+
+  it.each([
+    ["ｂｌｏｃｋｅｄ", "blocked"],
+    ["Ｂｌｏｃｋ*", "blocked-label"],
+    ["Β", "β"],
+    ["Β*", "β-label"],
+    ["＊", "*"],
+    ["&#42;", "*"],
+    ["prefix＊*", "prefix*tail"],
+  ])("should reject blocked pattern %s with label %s after matching or normalization", async (pattern, label) => {
+    const handler = await main({ blocked: [pattern] });
+    const result = await handler({ label_to_remove: label, label_to_add: "done" }, {});
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("label_to_remove");
+    expect(result.error).toContain("blocked pattern");
+  });
+
+  it.each(["＊", "&#42;", "prefix＊suffix", "prefix&#42;suffix", "prefix＊*"])("should keep normalized asterisks literal in blocked pattern %s", async pattern => {
+    const handler = await main({ blocked: [pattern] });
+    const result = await handler({ label_to_remove: "in-progress", label_to_add: "prefix-any-suffix" }, {});
+
+    expect(result.success).toBe(true);
+  });
+
+  it("T-RL-026 rechecks blocklist state before setLabels", async () => {
     let setLabelsCalls = 0;
     let getCalls = 0;
     const config = { allowed_add: ["done"], blocked: [] };
@@ -313,7 +349,8 @@ describe("replace_label", () => {
     expect(result.skipped).toBe(true);
   });
 
-  it("should return staged result when in staged mode", async () => {
+  it("T-RL-060 does not call setLabels in staged mode", async () => {
+    const setLabels = vi.spyOn(mockGithub.rest.issues, "setLabels");
     const handler = await main({ staged: true });
     const result = await handler({ label_to_remove: "in-progress", label_to_add: "done" }, {});
 
@@ -321,9 +358,10 @@ describe("replace_label", () => {
     expect(result.staged).toBe(true);
     expect(result.previewInfo?.labelToRemove).toBe("in-progress");
     expect(result.previewInfo?.labelToAdd).toBe("done");
+    expect(setLabels).not.toHaveBeenCalled();
   });
 
-  it("should return error when no item number is available", async () => {
+  it("T-RL-019 rejects when no item number is available", async () => {
     global.context = {
       repo: { owner: "test-owner", repo: "test-repo" },
       payload: {}, // no issue or pull_request in payload
@@ -344,6 +382,36 @@ describe("replace_label", () => {
     const result = await handler({ label_to_remove: "in-progress", label_to_add: "done" }, {});
 
     expect(result.success).toBe(false);
+  });
+
+  it.each([
+    { status: 429, headers: { "retry-after": "0.001" } },
+    { status: 403, headers: { "retry-after": "0.001" } },
+  ])("T-RL-054 retries rate-limit response $status", async response => {
+    let setLabelsCalls = 0;
+    mockGithub.rest.issues.setLabels = async ({ labels }) => {
+      setLabelsCalls++;
+      if (setLabelsCalls === 1) {
+        const error = new Error("Rate limited");
+        error.status = response.status;
+        error.response = response;
+        throw error;
+      }
+      return { data: labels.map(name => ({ name })) };
+    };
+
+    vi.useFakeTimers();
+    try {
+      const handler = await main({});
+      const resultPromise = handler({ label_to_remove: "in-progress", label_to_add: "done" }, {});
+      await vi.runAllTimersAsync();
+      const result = await resultPromise;
+
+      expect(result.success).toBe(true);
+      expect(setLabelsCalls).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("should reject a successful setLabels response that omits label_to_add", async () => {

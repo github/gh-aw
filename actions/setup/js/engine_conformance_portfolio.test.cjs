@@ -12,7 +12,7 @@ const policyOptions = { repository: options.repository, ref: "a".repeat(40), set
 
 describe("engine conformance queue portfolio", () => {
   it("selects supported engines first, recent changes next and eventually covers every engine", () => {
-    expect(ENGINES).toHaveLength(14);
+    expect(ENGINES).toHaveLength(15);
     const seen = new Set();
     for (let day = 0; day < 42; day++) {
       const date = new Date(Date.parse("2026-01-01T00:00:00Z") + day * 86400000).toISOString().slice(0, 10);
@@ -28,6 +28,7 @@ describe("engine conformance queue portfolio", () => {
     expect(changedEngines(["pkg/workflow/engine.go"]).size).toBe(ENGINES.length);
     expect([...changedEngines(["pkg/workflow/codex_config.go", ".github/workflows/shared/agy-conformance.md"])].sort()).toEqual(["agy", "codex"]);
     expect([...changedEngines(["pkg/workflow/copilot_engine.go"])]).toEqual(["copilot"]);
+    expect([...changedEngines([".github/workflows/engine-conformance-mini-swe-agent.md"])]).toEqual(["mini-swe-agent"]);
   });
 
   it("rejects invalid dates, identities and changed-path inputs", () => {
@@ -80,6 +81,7 @@ describe("engine conformance queue portfolio", () => {
     const compiled = name => fs.readFileSync(new URL(`../../../.github/workflows/${name}.lock.yml`, import.meta.url), "utf8");
     const dispatcher = source("engine-conformance-dispatcher");
     const shared = source("shared/engine-conformance");
+    expect(shared).toContain("github: false");
     expect(shared).not.toMatch(/^\s+staged:\s*true$/m);
     expect(shared).toContain("noop:\n    report-as-issue: false");
     expect(shared).toContain("activation-comments: false");
@@ -100,6 +102,12 @@ describe("engine conformance queue portfolio", () => {
       expect(compiled(`engine-conformance-${engine}`)).toContain("work_queue_assignment:");
       expect(compiled(`engine-conformance-${engine}`)).toContain('GH_AW_WORK_QUEUE_ROLE: "worker"');
       expect(compiled(`engine-conformance-${engine}`)).toContain("work_queue_claim_finish");
+      if (["aider", "deepseek-harness", "mini-swe-agent"].includes(engine)) {
+        expect(worker).toContain("mode: gh-proxy");
+        expect(worker).toContain("toolsets: [repos]");
+      } else {
+        expect(compiled(`engine-conformance-${engine}`)).not.toMatch(/^\s+GH_AW_MCP_CLI_SERVERS:.*\bgithub\b/m);
+      }
       expect(compiled(`engine-conformance-${engine}`)).not.toMatch(/GH_AW_(?:SAFE_OUTPUTS_STAGED|INFO_STAGED):\s*"?true"?/);
       expect(compiled(`engine-conformance-${engine}`)).toContain("name: Terminate work queue worker");
       expect(compiled(`engine-conformance-${engine}`)).toContain('\\"report-as-issue\\":\\"false\\"');

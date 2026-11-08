@@ -101,6 +101,13 @@ Ledger writes are **deferred** safe outputs: their immediate response only confi
 that the intent was queued. The trusted persistence job resolves the outcome
 later, after the agent has finished.
 
+Do not use a ledger call's `output_id` as a `depends-on` prerequisite. A queued
+write is not a completed effect, so dependent outputs fail rather than execute.
+Submit related ledger operations sequentially without ledger dependencies.
+Trusted validation preserves their batch order and resolves temporary record
+references, such as a vote's `note_id: "#smoke-note"` after adding a note with
+`temp_id: smoke-note`. These references identify records, not safe-output IDs.
+
 The declared schema validates **values**, not operation envelopes. `table` rows
 must be objects with a string primary key. `insert` rejects duplicate keys;
 `update` requires an existing row and shallowly merges the object `patch`,

@@ -250,9 +250,18 @@ Use `validation.script` when generic storage and schema checks are not enough. T
 
 The script also checks the cloned baseline before the agent starts, without formatting or filtering the checkout. A baseline failure is shown to the agent with the validator's output so it can repair memory and call `push_repo_memory` to verify the change. If an invalid baseline remains unchanged, the agent job warns and skips its memory artifact instead of failing after the agent exits. Any changed memory still requires successful validation before upload and again before the push.
 
-Available globals are Node.js `fs` and `path`, plus `memoryRoot`/`memoryDir`, `memoryId`, `memoryKind` (`"repo"`), and `memoryPhase` (`"baseline"`, `"upload"`, or `"push"`). These paths and the working directory point to a temporary copy of the eligible memory files, excluding the checkout's `.git` directory. Changes to this copy are not persisted and do not modify the original memory directory. This copy is not a sandbox: validators remain trusted code with the runner's filesystem permissions.
+Available globals are Node.js `fs` and `path`, plus `memoryRoot`/`memoryDir`, `memoryId`, `memoryKind` (`"repo"`), `memoryPhase` (`"baseline"`, `"upload"`, or `"push"`), and `memorySourceJobResult`. These paths and the working directory point to a temporary copy of the eligible memory files, excluding the checkout's `.git` directory. Changes to this copy are not persisted and do not modify the original memory directory. This copy is not a sandbox: validators remain trusted code with the runner's filesystem permissions.
 
 `memoryPhase` is set by the runtime, not memory contents. Use it to distinguish upload-directory limits from backing-branch checks: `"push"` sees the complete branch overlay, including historical files omitted from the upload. Repo-memory does not delete those omitted files. Keep snapshot integrity checks in every phase; apply upload-only retention or aggregate artifact limits during `"upload"` (and optionally `"baseline"` for repair diagnostics).
+
+During downstream repo-memory validation, `memorySourceJobResult` contains the
+completed agent job's GitHub Actions result. It is empty during baseline/upload
+validation and for callers without source-job metadata. A validator can require
+`memorySourceJobResult === "success"` during `"push"` to block publication after
+failed preparation or execution. This is an opt-in policy; ordinary repo-memory
+still supports recovery after failed runs. The result is runtime-controlled,
+not read from memory, and does not prove that queued outputs or persistence
+already succeeded.
 
 Environment variables available to the validator are intentionally limited to basic runner paths plus `GH_AW_MEMORY_ROOT`, `GH_AW_MEMORY_DIR`, `GH_AW_MEMORY_ID`, and `GH_AW_MEMORY_KIND`; GitHub tokens and write credentials are not passed to the validator subprocess. Network access follows the workflow runner's normal network policy. The default timeout is 1 minute and may be set with `validation.timeout-minutes` (1-5 minutes).
 

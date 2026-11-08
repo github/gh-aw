@@ -99,11 +99,21 @@ Mounts at `/tmp/gh-aw/cache-memory/` (default) or `/tmp/gh-aw/cache-memory-<id>/
 
 With `tools.cache-memory` enabled, MCP servers can persist temporary state under `/tmp/gh-aw/cache-memory/`. Configure the server in the workflow and point it at a subdirectory such as `/tmp/gh-aw/cache-memory/<server-name>/`.
 
+For [QMD's index/search pattern](/gh-aw/experimental/qmd/#indexsearch-pattern), a separate custom job restores prior memory and incrementally builds a documentation index. Pass its current-run snapshot to the agent through an artifact, then let cache-memory persist that snapshot. `jobs.<id>.restore-memory: true` restores memory read-only; it does not publish custom-job changes or transfer files between runners. SQLite snapshots require an explicit `.sqlite` entry in `allowed-extensions`.
+
 ## Behavior
 
 GitHub Actions cache provides a 10GB per-repository limit with LRU eviction, and evicts unused entries after 7 days. `retention-days` controls only uploaded artifact retention (1-90 days); it does not extend cache lifetime. The repository-wide [artifact retention policy](/gh-aw/reference/compiler-enterprise-environment-controls/#artifact-retention) overrides this per-cache artifact setting when configured.
 
 Cache memory is branch-scoped: runs restore from the same branch first, then can fall back to the default branch. On a non-default branch, the first restore often comes from the default branch; later saves create a branch-local cache lineage.
+
+Caches saved by `pull_request` runs are isolated to the PR merge ref. A scheduled
+workflow on the default branch cannot restore those PR-local caches, even with the same key or
+`scope: repo`. PR runs may restore eligible default-branch caches, but their
+updates do not flow back to the default branch. Scheduled cache-memory
+consolidation therefore applies only to default-branch history; use local
+cleanup inside PR workflows. Cross-workflow restores also require compatible
+key prefixes and cache versions.
 
 Absent cache files are expected on cold starts, after eviction, or when branch scoping prevents restoring another branch's cache. When the workflow defines initialization or a full-analysis fallback, the agent follows that path without reporting `report_missing_data` and saves updated state for future runs. Required cached inputs with no fallback still produce `report_missing_data`; malformed or unreadable required state also remains a failure unless the workflow explicitly defines recovery. A cache restore miss alone cannot distinguish optional history from required input, so it does not suppress an explicit missing-data report.
 
