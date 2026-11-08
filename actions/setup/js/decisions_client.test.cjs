@@ -30,7 +30,7 @@ describe("generic Decisions client", () => {
     const server = createServer(async (request, response) => {
       let body = "";
       for await (const chunk of request) body += chunk;
-      requests.push({ method: request.method, url: request.url, body: JSON.parse(body) });
+      requests.push({ method: request.method, url: request.url, integrationId: request.headers["copilot-integration-id"], body: JSON.parse(body) });
       response.writeHead(200, { "Content-Type": "application/json" });
       response.end(JSON.stringify({ answers }));
     });
@@ -38,6 +38,7 @@ describe("generic Decisions client", () => {
     try {
       const result = await invokeDecisions({
         baseURL: `http://127.0.0.1:${server.address().port}/v1`,
+        integrationId: "agentic-workflows",
         model: "decision-model",
         input: "Shared evidence",
         questions,
@@ -47,6 +48,7 @@ describe("generic Decisions client", () => {
       expect(requests[0]).toEqual({
         method: "POST",
         url: "/v1/decisions",
+        integrationId: "agentic-workflows",
         body: { model: "decision-model", input: "Shared evidence", questions },
       });
     } finally {
@@ -62,9 +64,20 @@ describe("generic Decisions client", () => {
     expect(url).toBe("https://example.com/v1/decisions");
     expect(request.method).toBe("POST");
     expect(request.redirect).toBe("error");
+    expect(request.headers).not.toHaveProperty("Copilot-Integration-Id");
     expect(request.headers.Authorization).toBe("Bearer test-key");
     expect(request.signal).toBeInstanceOf(AbortSignal);
     expect(JSON.parse(request.body)).toEqual({ model: config.model, input: config.input, questions });
+  });
+
+  it("sends the caller's Copilot integration identity without changing authentication", async () => {
+    const config = { ...options(), integrationId: "agentic-workflows" };
+    await invokeDecisions(config);
+    expect(config.fetchImpl.mock.calls[0][1].headers).toEqual({
+      "Content-Type": "application/json",
+      Authorization: ["Bearer", "test-key"].join(" "),
+      "Copilot-Integration-Id": "agentic-workflows",
+    });
   });
 
   it("supports credential-free proxies and named refusals", async () => {
