@@ -14,6 +14,14 @@ func discarded(path string, data []byte) {
 	_ = (stdos.Remove(path))               // want `cleanup error from os\.Remove is discarded`
 }
 
+func parallelAssignments(path string) {
+	_, kept := stdos.Remove(path), 1 // want `cleanup error from os\.Remove is discarded`
+	if kept != 1 {
+		return
+	}
+	kept, _ = 1, stdos.RemoveAll(path) // want `cleanup error from os\.RemoveAll is discarded`
+}
+
 func deferredCleanup(path string) {
 	defer func() {
 		_ = stdos.Remove(path) // want `cleanup error from os\.Remove is discarded`
@@ -52,5 +60,6 @@ func suppressed(path string) {
 }
 
 func suppressedWithLegacyDirective(path string) {
-	_ = stdos.Remove(path) //nolint:osremoveuncheckedcleanup
+	_ = stdos.Remove(path)    //nolint:osremoveuncheckedcleanup
+	_ = stdos.RemoveAll(path) //nolint:osremoveuncheckedcleanup
 }

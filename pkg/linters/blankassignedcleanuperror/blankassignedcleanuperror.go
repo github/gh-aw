@@ -25,34 +25,37 @@ func run(pass *analysis.Pass) (any, error) {
 	nodeFilter := []ast.Node{(*ast.AssignStmt)(nil)}
 	return analyzerutil.Preorder(pass, nodeFilter, func(n ast.Node) {
 		assign, ok := n.(*ast.AssignStmt)
-		if !ok || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 {
-			return
-		}
-		blank, ok := astutil.UnwrapParenExpr(assign.Lhs[0]).(*ast.Ident) //nolint:uncheckedsliceindex // lengths are checked above
-		if !ok || blank.Name != "_" {
+		if !ok || len(assign.Lhs) != len(assign.Rhs) {
 			return
 		}
 
-		call, ok := astutil.UnwrapParenExpr(assign.Rhs[0]).(*ast.CallExpr) //nolint:uncheckedsliceindex // lengths are checked above
-		if !ok {
-			return
-		}
-		pkgPath, funcName, ok := astutil.PackageCall(pass, call)
-		if !ok || pkgPath != "os" || !isCleanupFunction(funcName) {
-			return
-		}
+		for i, lhs := range assign.Lhs {
+			blank, ok := astutil.UnwrapParenExpr(lhs).(*ast.Ident)
+			if !ok || blank.Name != "_" {
+				continue
+			}
 
-		position := pass.Fset.PositionFor(call.Pos(), false)
-		if filecheck.ShouldSkipFilename(position.Filename, generatedFiles) ||
-			nolint.HasDirectiveForLinter(position, nolintIndex, "blankassignedcleanuperror") {
-			return
-		}
-		if (funcName == "Remove" || funcName == "RemoveAll") &&
-			nolint.HasDirectiveForLinter(position, nolintIndex, "osremoveuncheckedcleanup") {
-			return
-		}
+			call, ok := astutil.UnwrapParenExpr(assign.Rhs[i]).(*ast.CallExpr) //nolint:uncheckedsliceindex // lengths are checked above
+			if !ok {
+				continue
+			}
+			pkgPath, funcName, ok := astutil.PackageCall(pass, call)
+			if !ok || pkgPath != "os" || !isCleanupFunction(funcName) {
+				continue
+			}
 
-		pass.ReportRangef(call, "cleanup error from os.%s is discarded by assignment to _", funcName)
+			position := pass.Fset.PositionFor(call.Pos(), false)
+			if filecheck.ShouldSkipFilename(position.Filename, generatedFiles) ||
+				nolint.HasDirectiveForLinter(position, nolintIndex, "blankassignedcleanuperror") {
+				continue
+			}
+			if (funcName == "Remove" || funcName == "RemoveAll") &&
+				nolint.HasDirectiveForLinter(position, nolintIndex, "osremoveuncheckedcleanup") {
+				continue
+			}
+
+			pass.ReportRangef(call, "cleanup error from os.%s is discarded by assignment to _", funcName)
+		}
 	})
 }
 
