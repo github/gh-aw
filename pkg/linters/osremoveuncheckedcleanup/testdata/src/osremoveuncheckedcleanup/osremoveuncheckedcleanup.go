@@ -6,10 +6,9 @@ import (
 )
 
 func discarded(path string) {
-	stdos.Remove(path)     // want `error return from os\.Remove is discarded`
-	stdos.RemoveAll(path)  // want `error return from os\.RemoveAll is discarded`
-	(stdos.Remove(path))   // want `error return from os\.Remove is discarded`
-	_ = stdos.Remove(path) // want `error return from os\.Remove is discarded`
+	stdos.Remove(path)    // want `error return from os\.Remove is discarded`
+	stdos.RemoveAll(path) // want `error return from os\.RemoveAll is discarded`
+	(stdos.Remove(path))  // want `error return from os\.Remove is discarded`
 }
 
 func launched(path string) {
@@ -42,6 +41,5 @@ func sameNamedMethods(path string) {
 }
 
 func suppressed(path string) {
-	stdos.Remove(path)        //nolint:osremoveuncheckedcleanup
-	_ = stdos.RemoveAll(path) //nolint:osremoveuncheckedcleanup
+	stdos.Remove(path) //nolint:osremoveuncheckedcleanup
 }
