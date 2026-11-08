@@ -429,7 +429,16 @@ Daily Compiler Code Quality Report - YYYY-MM-DD
 
 ### Discussion Body
 
-```markdown
+Format the generated report in this order: overview → key metrics/issues →
+collapsible detailed findings → next actions or limitations. Use `###` or lower
+for every report heading; reserve h1/h2 for the platform-rendered title. Keep the
+executive summary, average score, threshold status, and top issues visible. Put
+long per-file analysis, tables, historical evidence, and logs in
+`<details><summary><b>...</b></summary>...</details>` blocks. Use `- [ ]` for
+follow-up actions and format applicable workflow runs as
+`[§12345](https://github.com/${{ github.repository }}/actions/runs/12345)`.
+
+````markdown
 ### 🔍 Compiler Code Quality Analysis Report
 
 **Analysis Date**: YYYY-MM-DD  
@@ -449,11 +458,17 @@ Daily Compiler Code Quality Report - YYYY-MM-DD
 
 ---
 
+### Key Metrics and Issues
+
+**Average Score**: [score] · **Files Meeting Threshold**: [count]/[total]
+
+- **Top issue**: [highest-priority issue across analyzed files]
+
 {{#if experiments.output_format == 'detailed' }}
 ### Files Analyzed Today
 
 <details>
-<summary>📁 Detailed File Analysis</summary>
+<summary><b>Detailed File Analysis</b></summary>
 
 #### 1. `compiler_orchestrator.go` - Score: 82/100 ✅
 
@@ -531,7 +546,8 @@ Estimated Complexity Score: 7.2/10
 
 ---
 
-### Overall Statistics
+<details>
+<summary><b>Quality Score Distribution and Patterns</b></summary>
 
 ### Quality Score Distribution
 
@@ -559,10 +575,12 @@ Estimated Complexity Score: 7.2/10
 - ⚠️ Occasional missing documentation for exported functions
 - ⚠️ Test coverage varies between files
 
+</details>
+
 ---
 
 <details>
-<summary>📈 Historical Trends</summary>
+<summary><b>Historical Trends</b></summary>
 
 #### Progress Since Last Analysis
 
@@ -589,47 +607,54 @@ Based on historical analysis, these files consistently score below 70:
 
 ---
 
+<details>
+<summary><b>Detailed Recommendations</b></summary>
+
 ### Actionable Recommendations
 
 #### Immediate Actions (High Priority)
 
-1. **Add missing documentation**
+- [ ] **Add missing documentation**
    - Files: `compiler_orchestrator.go`, `compiler_jobs.go`
    - Focus: Exported functions without godoc comments
    - Estimated effort: 30 minutes
 
-2. **Review error handling in `compiler_yaml.go`**
+- [ ] **Review error handling in `compiler_yaml.go`**
    - Current score: 68/100 (below good threshold)
    - Issue: Some error cases return generic errors without context
    - Estimated effort: 1-2 hours
 
 #### Short-term Improvements (Medium Priority)
 
-3. **Refactor oversized files**
+- [ ] **Refactor oversized files**
    - `compiler_orchestrator.go` (859 lines) - Split into 2-3 files
    - `compiler_activation_jobs.go` (759 lines) - Extract helpers
    - Estimated effort: 1 day per file
 
-4. **Increase test coverage**
+- [ ] **Increase test coverage**
    - Files with low test-to-source ratio (<0.5)
    - Focus on edge cases and error paths
    - Estimated effort: 2-4 hours per file
 
 #### Long-term Goals (Low Priority)
 
-5. **Establish code quality baseline**
+- [ ] **Establish code quality baseline**
    - Set minimum quality score for new code: 75/100
    - Add linting rules to enforce patterns
    - Integrate Serena analysis into CI/CD
 
-6. **Standardize documentation**
+- [ ] **Standardize documentation**
    - Create documentation template
    - Ensure all exported functions have godoc comments
    - Add examples for complex functions
 
 {{/if}}
+</details>
 {{#if experiments.output_format == 'concise' }}
 ### Summary Table
+
+<details>
+<summary><b>Per-file quality scores</b></summary>
 
 | File | Score | Rating | Top Issue |
 |------|-------|--------|-----------|
@@ -638,17 +663,19 @@ Based on historical analysis, these files consistently score below 70:
 | compiler_yaml.go | 68/100 | ⚠️ Acceptable | Weak error wrapping |
 [One row per file analyzed today — replace example rows with actual Serena analysis results]
 
+</details>
+
 **Avg score**: 76/100 · **Files meeting threshold**: 2/3
 [Replace with real average score and threshold count from today's analysis]
 
 ### Top 3 Issues
-1. File size — split `compiler_orchestrator.go` (859 lines)
-2. Missing godoc on 3 exported functions
-3. Weak error context in `compiler_yaml.go`
+- [ ] File size — split `compiler_orchestrator.go` (859 lines)
+- [ ] Missing godoc on 3 exported functions
+- [ ] Weak error context in `compiler_yaml.go`
 [Replace with the actual top 3 issues identified across all analyzed files]
 
 ### Recommended Action
-Priority: add godoc comments (estimated 30 min).
+- [ ] Priority: add godoc comments (estimated 30 min).
 [Replace with the single highest-priority actionable recommendation from today's analysis]
 {{/if}}
 {{#if experiments.output_format == 'ste' }}
@@ -661,6 +688,9 @@ Write every sentence below using Simplified Technical English (STE) rules:
 
 ### Summary Table
 
+<details>
+<summary><b>Per-file quality scores</b></summary>
+
 | File | Score | Rating | Top Issue |
 |------|-------|--------|-----------|
 | compiler_orchestrator.go | 82/100 | ✅ Good | File size 859 lines |
@@ -668,24 +698,26 @@ Write every sentence below using Simplified Technical English (STE) rules:
 | compiler_yaml.go | 68/100 | ⚠️ Acceptable | Weak error wrapping |
 [One row per file analyzed today — replace example rows with actual Serena analysis results]
 
+</details>
+
 **Avg score**: 76/100 · **Files meeting threshold**: 2/3
 [Replace with real average score and threshold count from today's analysis]
 
 ### Top 3 Issues
-1. File size is too large. Split `compiler_orchestrator.go` (859 lines).
-2. Three exported functions have no godoc comment.
-3. `compiler_yaml.go` has weak error context.
+- [ ] File size is too large. Split `compiler_orchestrator.go` (859 lines).
+- [ ] Three exported functions have no godoc comment.
+- [ ] `compiler_yaml.go` has weak error context.
 [Replace with the actual top 3 issues identified across all analyzed files, each as one short sentence]
 
 ### Recommended Action
-Add godoc comments. This takes about 30 minutes.
+- [ ] Add godoc comments. This takes about 30 minutes.
 [Replace with the single highest-priority actionable recommendation from today's analysis, written as one short sentence]
 {{/if}}
 
 ---
 
 <details>
-<summary>💾 Cache Memory Summary</summary>
+<summary><b>Cache Memory Summary</b></summary>
 
 **Cache Location**: `/tmp/gh-aw/cache-memory/compiler-quality/`
 
@@ -718,17 +750,18 @@ The compiler codebase maintains **good overall quality** with an average score o
 - ⚠️ Some files could benefit from splitting for better maintainability
 - ⚠️ Documentation coverage is good but not comprehensive
 
-**Next Steps**:
-1. Address high-priority documentation gaps
-2. Review and improve error handling in lower-scoring files
-3. Continue daily rotation to analyze remaining files
+### Next Steps or Limitations
+
+- [ ] Address the highest-priority documentation gap.
+- [ ] Review the most significant error-handling issue.
+- [ ] Continue the analysis rotation or note any evidence limitations.
 
 ---
 
 *Report generated by Daily Compiler Quality Check workflow*  
 *Analysis powered by Serena MCP Server*  
 *Cache memory: `/tmp/gh-aw/cache-memory/compiler-quality/`*
-```
+````
 
 ---
 
