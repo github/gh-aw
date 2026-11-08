@@ -17,10 +17,8 @@ func TestDryRunRejectsUnsupportedEffects(t *testing.T) {
 		name string
 		data WorkflowData
 	}{
-		{"steps", WorkflowData{CustomSteps: "steps:\n  - run: echo unsafe"}},
 		{"pre-steps", WorkflowData{PreSteps: "- run: echo unsafe"}},
 		{"pre-agent-steps", WorkflowData{PreAgentSteps: "- run: echo unsafe"}},
-		{"post-steps", WorkflowData{PostSteps: "- run: echo unsafe"}},
 		{"on.steps", WorkflowData{OnSteps: []map[string]any{{"run": "echo unsafe"}}}},
 		{"custom MCP servers", WorkflowData{ResolvedMCPServers: map[string]any{"external": map[string]any{"command": "unsafe"}}}},
 		{"custom MCP servers", WorkflowData{ParsedTools: &Tools{Custom: map[string]MCPServerConfig{"external": {Command: "unsafe"}}}}},
@@ -52,6 +50,38 @@ func TestDryRunRejectsUnsupportedEffects(t *testing.T) {
 			"custom": map[string]any{"steps": []any{map[string]any{"run": "echo disabled"}}},
 		},
 	}))
+}
+
+func TestDryRunCompilesWorkflowStepsAndPostSteps(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "workflow.md")
+	source := `---
+on: workflow_dispatch
+engine: copilot
+permissions:
+  contents: read
+network:
+  allowed: [defaults]
+steps:
+  - name: Set up trusted test fixture
+    run: echo setup
+post-steps:
+  - name: Clean up trusted test fixture
+    run: echo cleanup
+---
+Analyze the repository.
+`
+	require.NoError(t, os.WriteFile(path, []byte(source), 0600))
+
+	c := NewCompiler()
+	c.SetStrictMode(true)
+	c.SetDryRun(true)
+	require.NoError(t, c.CompileWorkflow(path))
+
+	lock, err := os.ReadFile(filepath.Join(dir, "workflow.lock.yml"))
+	require.NoError(t, err)
+	assert.Contains(t, string(lock), "echo setup")
+	assert.Contains(t, string(lock), "echo cleanup")
 }
 
 func TestDryRunCustomJobsAreInert(t *testing.T) {
