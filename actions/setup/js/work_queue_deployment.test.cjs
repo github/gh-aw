@@ -17,7 +17,7 @@ import { queueFixture, REF, WORKFLOW, REPOSITORY, DISPATCHER } from "./work_queu
 const CONTRACT = "a".repeat(64);
 const NEW_REF = "b".repeat(40);
 const workerLock = (contract = CONTRACT) =>
-  `# gh-aw-manifest: ${JSON.stringify({ work_queue: { worker: true, logical_contract: contract } })}\non:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\nenv:\n  GH_AW_WORK_QUEUE_CONTRACT: "${contract}"\n`;
+  `# gh-aw-manifest: ${JSON.stringify({ work_queue: { worker: true, assignment_input: "work_queue_assignment", assignment_input_type: "string", logical_contract: contract } })}\non:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\nenv:\n  GH_AW_WORK_QUEUE_CONTRACT: "${contract}"\n`;
 function nativeFile(path, contents) {
   return { data: { type: "file", path, encoding: "base64", content: Buffer.from(contents).toString("base64") } };
 }

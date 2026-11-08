@@ -13,6 +13,20 @@ const resourceFixture = require("../../../specs/work-queue/fixtures/resource-sco
 const contractFixture = require("../../../specs/work-queue/fixtures/contract.json");
 const { registerQueueLedgerClient } = require("./work_queue_git_transport.cjs");
 
+/** @param {string} content @param {{worker?: boolean, assignmentInput?: string, assignmentInputType?: string, logicalContract?: string}} [options] */
+function compiledWorker(content, options = {}) {
+  const assignmentInput = Object.hasOwn(options, "assignmentInput") ? options.assignmentInput : "work_queue_assignment";
+  const assignmentInputType = Object.hasOwn(options, "assignmentInputType") ? options.assignmentInputType : "string";
+  const logicalContract = Object.hasOwn(options, "logicalContract") ? options.logicalContract : "a".repeat(64);
+  const workQueue = {
+    worker: options.worker ?? true,
+    ...(assignmentInput !== undefined ? { assignment_input: assignmentInput } : {}),
+    ...(assignmentInputType !== undefined ? { assignment_input_type: assignmentInputType } : {}),
+    ...(logicalContract !== undefined ? { logical_contract: logicalContract } : {}),
+  };
+  return `# gh-aw-manifest: ${JSON.stringify({ work_queue: workQueue })}\n${content}`;
+}
+
 function fakeGitHub(initial = [], { immutableIds = false } = {}) {
   let serial = 0;
   const blobs = new Map();
@@ -29,7 +43,7 @@ function fakeGitHub(initial = [], { immutableIds = false } = {}) {
     bootstrapAmbiguous: false,
     bootstrapWrites: 0,
     defaultRevision: "a".repeat(40),
-    workerContent: "on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\n        required: true\n",
+    workerContent: compiledWorker("on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\n        required: true\n"),
     workerWorkflow: { id: 42, path: ".github/workflows/worker.lock.yml", state: "active" },
     missingLog: false,
     truncated: false,
@@ -1090,7 +1104,7 @@ function registerTests({ describe, it }) {
       await assert.rejects(publishWorkQueueRequest(options(fake, request, producer, { policyProposal: policy, maxRetries: 0 })), /policy_missing/);
       assert.equal(fake.state.bootstrapWrites, 1);
       assert.equal(fake.refs.has("work-queue"), false);
-      fake.state.workerContent = "on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\n        required: true\n";
+      fake.state.workerContent = compiledWorker("on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\n        required: true\n");
       const result = await publishWorkQueueRequest(options(fake, request, producer, { policyProposal: policy, maxRetries: 0 }));
       assert.equal(result.publishedNow, true);
       assert.equal(fake.state.bootstrapWrites, 1);
@@ -1165,19 +1179,33 @@ function registerTests({ describe, it }) {
     it("rejects genuine default genesis before writing without an immutable assignment-capable active worker route", async () => {
       const nodes = submission([genesis()], ["a"]).operations;
       const request = newRequest("default-worker-route-required", "submit", producer, { nodes });
-      for (const change of [
-        state => (state.workerContent = null),
-        state => (state.workerContent = "on: push\n"),
-        state => (state.workerContent = "on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: boolean\n        required: true\n"),
-        state => (state.workerContent = "on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        required: true\n"),
-        state => (state.workerWorkflow = null),
-        state => (state.workerWorkflow.state = "disabled_manually"),
-        state => (state.workerWorkflow.path = ".github/workflows/unapproved.lock.yml"),
-      ]) {
+      const routeChanges = /** @type {Array<{name: string, change: (state: ReturnType<typeof fakeGitHub>["state"]) => unknown}>} */ [
+        { name: "missing lock file", change: state => (state.workerContent = null) },
+        { name: "not a compiler-marked worker", change: state => (state.workerContent = compiledWorker("on: push\n", { worker: false })) },
+        { name: "different assignment input", change: state => (state.workerContent = compiledWorker("on: push\n", { assignmentInput: "other" })) },
+        { name: "missing assignment input", change: state => (state.workerContent = compiledWorker("on: push\n", { assignmentInput: undefined })) },
+        { name: "non-string assignment input", change: state => (state.workerContent = compiledWorker("on: push\n", { assignmentInputType: "boolean" })) },
+        { name: "missing assignment input type", change: state => (state.workerContent = compiledWorker("on: push\n", { assignmentInputType: undefined })) },
+        { name: "missing contract", change: state => (state.workerContent = compiledWorker("on: push\n", { logicalContract: undefined })) },
+        { name: "missing registration", change: state => (state.workerWorkflow = null) },
+        {
+          name: "inactive registration",
+          change: state => {
+            if (state.workerWorkflow) state.workerWorkflow.state = "disabled_manually";
+          },
+        },
+        {
+          name: "foreign registration path",
+          change: state => {
+            if (state.workerWorkflow) state.workerWorkflow.path = ".github/workflows/unapproved.lock.yml";
+          },
+        },
+      ];
+      for (const routeChange of routeChanges) {
         const fake = fakeGitHub();
-        change(fake.state);
+        routeChange.change(fake.state);
         const policy = defaultPolicy({ repository: "owner/repo", principal: "1001", ref: fake.state.defaultRevision });
-        await assert.rejects(publishWorkQueueRequest(options(fake, request, producer, { policyProposal: policy })), /policy_missing/);
+        await assert.rejects(publishWorkQueueRequest(options(fake, request, producer, { policyProposal: policy })), /policy_missing/, routeChange.name);
         assert.equal(fake.refs.has("work-queue"), false);
         assert.equal(fake.blobs.size, 0);
         assert.equal(fake.state.updates, 0);
@@ -1185,7 +1213,7 @@ function registerTests({ describe, it }) {
     });
     it("accepts an assignment-capable immutable default worker when the string input is optional", async () => {
       const fake = fakeGitHub();
-      fake.state.workerContent = "on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\n        required: false\n";
+      fake.state.workerContent = compiledWorker("on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\n        required: false\n");
       const nodes = submission([genesis()], ["a"]).operations;
       const request = newRequest("optional-default-worker-input", "submit", producer, { nodes });
       const policy = defaultPolicy({ repository: "owner/repo", principal: "1001", ref: fake.state.defaultRevision });

@@ -6,7 +6,7 @@ const { defaultPolicy } = require("./work_queue_policy.cjs");
 const { createWorkQueueLogger, queueControlErrorCode, queueControlErrorExplanation } = require("./work_queue_logging.cjs");
 
 const profile = defaultPolicy({ repository: "owner/repo", principal: "1001", ref: "a".repeat(40) }).pools.default.profiles.default;
-const workflow = `# gh-aw-manifest: ${JSON.stringify({ work_queue: { worker: true, logical_contract: "b".repeat(64) } })}\non:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\nenv:\n  GH_AW_WORK_QUEUE_CONTRACT: "${"b".repeat(64)}"\n`;
+const workflow = `# gh-aw-manifest: ${JSON.stringify({ work_queue: { worker: true, assignment_input: "work_queue_assignment", assignment_input_type: "string", logical_contract: "b".repeat(64) } })}\non:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\nenv:\n  GH_AW_WORK_QUEUE_CONTRACT: "${"b".repeat(64)}"\n`;
 const deploymentEndpoints = ["repository", "reference", "contents", "registration"];
 
 afterEach(() => {

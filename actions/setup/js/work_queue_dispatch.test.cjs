@@ -73,7 +73,7 @@ function setupPoolInstallation(newWorker = false) {
     options.config.work_queue_workflows.push("smoke-work-queue-worker");
     options.config.aw_context_workflows.push("smoke-work-queue-worker");
   }
-  const contents = `# gh-aw-manifest: {"work_queue":{"worker":true,"logical_contract":"${"a".repeat(64)}"}}\non:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\nenv:\n  GH_AW_WORK_QUEUE_CONTRACT: "${"a".repeat(64)}"\n`;
+  const contents = `# gh-aw-manifest: {"work_queue":{"worker":true,"assignment_input":"work_queue_assignment","assignment_input_type":"string","logical_contract":"${"a".repeat(64)}"}}\non:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\nenv:\n  GH_AW_WORK_QUEUE_CONTRACT: "${"a".repeat(64)}"\n`;
   fixture.githubClient.rest.repos.getContent = vi.fn(async ({ path: workflowPath }) => ({
     data: {
       type: "file",
@@ -2002,7 +2002,7 @@ describe("native queue launch fencing and conservative recovery", () => {
     const beforeEpoch = fixture.state.policy_epoch;
     const proposal = structuredClone(fixture.policy);
     proposal.pools.smoke = structuredClone(proposal.pools.default);
-    const workerContents = `# gh-aw-manifest: {"work_queue":{"worker":true,"logical_contract":"${"a".repeat(64)}"}}\non:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\nenv:\n  GH_AW_WORK_QUEUE_CONTRACT: "${"a".repeat(64)}"\n`;
+    const workerContents = `# gh-aw-manifest: {"work_queue":{"worker":true,"assignment_input":"work_queue_assignment","assignment_input_type":"string","logical_contract":"${"a".repeat(64)}"}}\non:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\nenv:\n  GH_AW_WORK_QUEUE_CONTRACT: "${"a".repeat(64)}"\n`;
     fixture.githubClient.rest.repos.getContent = vi.fn(async ({ path: workflowPath }) => ({
       data: { type: "file", path: workflowPath, encoding: "base64", content: Buffer.from(workerContents).toString("base64") },
     }));
@@ -2034,7 +2034,7 @@ describe("native queue launch fencing and conservative recovery", () => {
     if (revision !== "installed") proposal.pools.default.profiles.default.ref = "b".repeat(40);
     if (revision === "later-ref-and-contract") proposal.pools.default.profiles.default.logical_contract = "b".repeat(64);
     proposal.pools.smoke = structuredClone(proposal.pools.default);
-    const workerContents = `# gh-aw-manifest: {"work_queue":{"worker":true,"logical_contract":"${"a".repeat(64)}"}}\non:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\nenv:\n  GH_AW_WORK_QUEUE_CONTRACT: "${"a".repeat(64)}"\n`;
+    const workerContents = `# gh-aw-manifest: {"work_queue":{"worker":true,"assignment_input":"work_queue_assignment","assignment_input_type":"string","logical_contract":"${"a".repeat(64)}"}}\non:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\nenv:\n  GH_AW_WORK_QUEUE_CONTRACT: "${"a".repeat(64)}"\n`;
     fixture.githubClient.rest.repos.getContent = vi.fn(async ({ path: workflowPath }) => ({
       data: { type: "file", path: workflowPath, encoding: "base64", content: Buffer.from(workerContents).toString("base64") },
     }));
@@ -2391,7 +2391,7 @@ describe("native queue launch fencing and conservative recovery", () => {
       fixture.githubClient.rest.repos.getContent = vi.fn(async args => {
         const response = await getContent(args);
         if (args.path.includes("smoke-work-queue-worker") && args.path.endsWith(".yml")) {
-          const manifest = failure === "manifest" ? '{"work_queue":{"worker":false}}' : '{"work_queue":{"worker":true,"logical_contract":"invalid"}}';
+          const manifest = failure === "manifest" ? '{"work_queue":{"worker":false}}' : '{"work_queue":{"worker":true,"assignment_input":"work_queue_assignment","assignment_input_type":"string","logical_contract":"invalid"}}';
           response.data.content = Buffer.from(`# gh-aw-manifest: ${manifest}\n`).toString("base64");
         }
         return response;
@@ -2625,7 +2625,7 @@ describe("native queue launch fencing and conservative recovery", () => {
     const reference = fixture.githubClient.rest.git.getRef;
     fixture.githubClient.rest.git.getRef = async parameters => (parameters.ref === "heads/main" ? { data: { ref: "refs/heads/main", object: { sha: REF } } } : reference(parameters));
     const source = "---\ntools:\n  work-queue:\n    worker: true\n---\nExecute approved instructions.\n";
-    const lock = `# gh-aw-manifest: {"work_queue":{"worker":true,"logical_contract":"${contract}"}}\non:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\nenv:\n  GH_AW_WORK_QUEUE_CONTRACT: "${contract}"\n`;
+    const lock = `# gh-aw-manifest: {"work_queue":{"worker":true,"assignment_input":"work_queue_assignment","assignment_input_type":"string","logical_contract":"${contract}"}}\non:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\nenv:\n  GH_AW_WORK_QUEUE_CONTRACT: "${contract}"\n`;
     fixture.githubClient.rest.repos.getContent = async ({ path }) => ({ data: { type: "file", path, encoding: "base64", content: Buffer.from(path.endsWith(".md") ? source : lock).toString("base64") } });
     fixture.githubClient.rest.actions.getWorkflow = async () => ({ data: { path: ".github/workflows/worker.lock.yml", state: "active" } });
     const runs = new Map();

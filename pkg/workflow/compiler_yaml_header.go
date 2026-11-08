@@ -89,7 +89,7 @@ func (c *Compiler) generateManifestHeader(yaml *strings.Builder, data *WorkflowD
 	// for CAO discovery without interpreting generated workflow steps.
 	manifest := NewGHAWManifest(secrets, actions, data.ActionResolutionFailures, data.DockerImagePins, data.Redirect, data.Skills, data.Plugins, data.RawFrontmatter["on"])
 	if isWorkQueueWorker(data) {
-		manifest.WorkQueue = &GHAWManifestWorkQueue{Worker: true}
+		manifest.WorkQueue = &GHAWManifestWorkQueue{Worker: true, AssignmentInput: WorkQueueAssignmentInputName, AssignmentInputType: "string"}
 		if data.WorkQueuePolicy != nil {
 			manifest.WorkQueue.LogicalContract = data.WorkQueuePolicy.WorkerContract
 		}

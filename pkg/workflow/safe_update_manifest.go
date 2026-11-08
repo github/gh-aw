@@ -4,7 +4,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"regexp"
 	"slices"
 	"sort"
@@ -71,8 +73,10 @@ type GHAWManifestDetectionPolicy struct {
 
 // GHAWManifestWorkQueue records compiler-derived work-queue worker metadata.
 type GHAWManifestWorkQueue struct {
-	Worker          bool   `json:"worker"`
-	LogicalContract string `json:"logical_contract,omitempty"`
+	Worker              bool   `json:"worker"`
+	AssignmentInput     string `json:"assignment_input,omitempty"`
+	AssignmentInputType string `json:"assignment_input_type,omitempty"`
+	LogicalContract     string `json:"logical_contract,omitempty"`
 }
 
 // GHAWManifest is the single-line JSON payload embedded as a "# gh-aw-manifest: ..."
@@ -401,7 +405,14 @@ func ExtractGHAWManifestFromLockFile(content string) (*GHAWManifest, error) {
 	match := ghawManifestPattern.FindString(content)
 	if _, payload, found := strings.Cut(match, ":"); found {
 		var m GHAWManifest
-		if err := json.Unmarshal([]byte(payload), &m); err != nil {
+		decoder := json.NewDecoder(strings.NewReader(payload))
+		if err := decoder.Decode(&m); err != nil {
+			return nil, fmt.Errorf("gh-aw-manifest JSON is not recognized, expected the JSON emitted by ToJSON in the lock file header: %w", err)
+		}
+		if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+			if err == nil {
+				err = errors.New("unexpected trailing JSON value")
+			}
 			return nil, fmt.Errorf("gh-aw-manifest JSON is not recognized, expected the JSON emitted by ToJSON in the lock file header: %w", err)
 		}
 		safeUpdateManifestLog.Printf("Extracted gh-aw-manifest: version=%d secrets=%d actions=%d",

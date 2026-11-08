@@ -11,12 +11,18 @@ const { buildAWPolicy } = require("./work_queue_settings.cjs");
 const { MAX_WORKFLOW_BYTES, verifyWorkerRoute, verifyWorkerRoutes, readLockFileHeaders, workerContract } = require("./work_queue_provisioning.cjs");
 
 const validYAML = "on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\n";
+const validManifest = { work_queue: { worker: true, assignment_input: "work_queue_assignment", assignment_input_type: "string", logical_contract: "a".repeat(64) } };
 const profile = defaultPolicy({ repository: "owner/repo", principal: "1001", ref: "a".repeat(40) }).pools.default.profiles.default;
 
-/** @param {string} content @param {{contentError?: Error, registrationError?: Error}} failures */
-function nativeRoute(content = validYAML, failures = {}) {
+/** @param {string} content @param {Record<string, unknown>} manifest */
+function workerLock(content = validYAML, manifest = validManifest) {
+  return `# gh-aw-manifest: ${JSON.stringify(manifest)}\n${content}`;
+}
+
+/** @param {string} content @param {{contentError?: Error, registrationError?: Error}} [failures] @param {Record<string, unknown>} [manifest] */
+function nativeRoute(content = validYAML, failures = {}, manifest = validManifest) {
   const calls = [];
-  const bytes = Buffer.from(content, "utf8");
+  const bytes = Buffer.from(workerLock(content, manifest), "utf8");
   const state = {
     file: { type: "file", path: profile.workflow, encoding: "base64", content: bytes.toString("base64"), size: bytes.length },
     registration: { path: profile.workflow, state: "active" },
@@ -73,7 +79,7 @@ function registerTests({ describe, it }) {
     });
     it("reads lock metadata headers through a bounded reader", async () => {
       const metadata = { schema_version: "v1" };
-      const manifest = { work_queue: { worker: true, logical_contract: "a".repeat(64) } };
+      const manifest = validManifest;
       const reader = Readable.from([`# gh-aw-metadata: ${JSON.stringify(metadata)}\n`, `# gh-aw-manifest: ${JSON.stringify(manifest)}\n`, "on: [\n", "# gh-aw-manifest: invalid\n"]);
       const headers = await readLockFileHeaders(reader);
       assert.equal(headers.metadata?.schema_version, metadata.schema_version);
@@ -86,11 +92,19 @@ function registerTests({ describe, it }) {
     });
     it("reads only valid worker metadata from the compiler manifest", () => {
       const contract = "a".repeat(64);
-      assert.equal(workerContract({ work_queue: { worker: true, logical_contract: contract } }), contract);
-      assert.equal(workerContract({ work_queue: { worker: false, logical_contract: contract } }), undefined);
+      assert.equal(workerContract(validManifest), contract);
+      assert.equal(workerContract({ work_queue: { worker: false, assignment_input: "work_queue_assignment", logical_contract: contract } }), undefined);
+      assert.equal(workerContract({ work_queue: { worker: true, logical_contract: contract } }), undefined);
+      assert.equal(workerContract({ work_queue: { worker: true, assignment_input: "other", logical_contract: contract } }), undefined);
+      assert.equal(workerContract({ work_queue: { worker: true, assignment_input: "work_queue_assignment", assignment_input_type: "boolean", logical_contract: contract } }), undefined);
       assert.equal(workerContract({ work_queue: { worker: true } }), undefined);
       assert.equal(workerContract(undefined), undefined);
       assert.equal(workerContract({ work_queue: { worker: true, logical_contract: "invalid" } }), undefined);
+    });
+    it("rejects missing worker metadata and a profile contract mismatch", async () => {
+      await rejected(nativeRoute(validYAML, {}, { work_queue: { worker: true, logical_contract: "a".repeat(64) } }));
+      await rejected(nativeRoute(validYAML, {}, { work_queue: { worker: false, assignment_input: "work_queue_assignment", assignment_input_type: "string", logical_contract: "a".repeat(64) } }));
+      await rejected(nativeRoute(), { ...profile, logical_contract: "b".repeat(64) });
     });
     it("rejects constructor revisions without a native read", async () => {
       for (const ref of ["0".repeat(40), "0".repeat(64)]) {
@@ -124,7 +138,7 @@ function registerTests({ describe, it }) {
       await verifyWorkerRoute(options(native));
     });
     it("checks the exact 1 MiB decoded boundary and refuses one additional byte", async () => {
-      const contents = validYAML + "#" + "x".repeat(MAX_WORKFLOW_BYTES - Buffer.byteLength(validYAML) - 1);
+      const contents = validYAML + "#".repeat(MAX_WORKFLOW_BYTES - Buffer.byteLength(workerLock(validYAML)));
       await verifyWorkerRoute(options(nativeRoute(contents)));
       const oversized = nativeRoute(contents + "x");
       await rejected(oversized);
@@ -203,7 +217,7 @@ function registerTests({ describe, it }) {
           error => { console.error(error); process.exitCode = 1; }
         ).catch(error => { console.error(error); process.exitCode = 1; });
       `;
-      const result = spawnSync(process.execPath, ["-e", script, require.resolve("./work_queue_provisioning.cjs"), JSON.stringify(profile), validYAML], { encoding: "utf8" });
+      const result = spawnSync(process.execPath, ["-e", script, require.resolve("./work_queue_provisioning.cjs"), JSON.stringify(profile), workerLock(validYAML)], { encoding: "utf8" });
       assert.equal(result.status, 0, result.stderr);
     });
     it("provisions from copied runtime scripts with all npm package imports denied", () => {
@@ -235,7 +249,7 @@ function registerTests({ describe, it }) {
           };
           const { verifyWorkerRoute, verifiedDefaultReference, configuredWorkerDeployment } = require(process.argv[1]);
           const profile = {...JSON.parse(process.argv[2]), logical_contract: "a".repeat(64)};
-          const bytes = Buffer.from('# gh-aw-manifest: ' + JSON.stringify({work_queue: {worker: true, logical_contract: profile.logical_contract}}) + '\\n', "utf8");
+          const bytes = Buffer.from('# gh-aw-manifest: ' + JSON.stringify({work_queue: {worker: true, assignment_input: "work_queue_assignment", assignment_input_type: "string", logical_contract: profile.logical_contract}}) + '\\n', "utf8");
           let reads = 0;
           const githubClient = {rest: {
             repos: {

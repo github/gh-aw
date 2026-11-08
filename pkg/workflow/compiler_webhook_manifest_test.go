@@ -145,5 +145,7 @@ func TestWorkQueueMetadataManifestCompilation(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, manifest.WorkQueue)
 	assert.True(t, manifest.WorkQueue.Worker)
+	assert.Equal(t, WorkQueueAssignmentInputName, manifest.WorkQueue.AssignmentInput)
+	assert.Equal(t, "string", manifest.WorkQueue.AssignmentInputType)
 	assert.Equal(t, contract, manifest.WorkQueue.LogicalContract)
 }

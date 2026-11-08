@@ -45,7 +45,9 @@ async function verifyWorkerRoute(options) {
   const { profile } = options;
   validateProfile(profile);
   if (/^(?:0{40}|0{64})$/.test(profile.ref)) throw queueError("policy_missing", "constructor placeholder revisions cannot provision a worker route");
-  await readWorkerFile({ ...options, path: profile.workflow, ref: profile.ref });
+  const headers = await readWorkerFile({ ...options, path: profile.workflow, ref: profile.ref });
+  const contract = workerContract(headers.manifest);
+  if (!contract || (profile.logical_contract && profile.logical_contract !== contract)) throw queueError("policy_missing", "approved worker route does not match the compiled worker contract");
   await verifyRegisteredWorker(options);
 }
 
@@ -120,6 +122,7 @@ function parseHeaderJSON(value) {
 
 function workerContract(manifest) {
   if (!isRecord(manifest) || !isRecord(manifest.work_queue) || manifest.work_queue.worker !== true) return undefined;
+  if (manifest.work_queue.assignment_input !== "work_queue_assignment" || manifest.work_queue.assignment_input_type !== "string") return undefined;
   const contract = manifest.work_queue.logical_contract;
   return typeof contract === "string" && /^[a-f0-9]{64}$/.test(contract) ? contract : undefined;
 }
