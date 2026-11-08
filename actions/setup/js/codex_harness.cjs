@@ -62,7 +62,6 @@ const {
   normalizeReflectProviderName,
   REFLECT_PROVIDER_ALIASES,
   resolveProviderEndpointFromReflect,
-  hasAzureOIDCProviderEndpoint,
   hasOIDCProviderEndpoint,
 } = require("./awf_reflect.cjs");
 const { emitInfrastructureIncomplete, emitMissingToolPermissionIssue, hasExpectedSafeOutputs, hasTerminalSafeOutput, hasNoopInSafeOutputs } = require("./safeoutputs_cli.cjs");
@@ -593,20 +592,16 @@ function buildCodexChildEnv(baseEnv, codexApiKey, openaiApiKey) {
 }
 
 /**
- * Keyless Codex may only use the configured Entra-authenticated AWF endpoint.
+ * Keyless Codex may only use the configured OIDC-authenticated AWF endpoint.
  * Reflection is fetched in this run, not accepted from a previous run's file.
  * @param {any} reflectData
  * @param {NodeJS.ProcessEnv} env
+ * @param {string} authProvider
  * @returns {boolean}
  */
-function hasCodexAzureOIDCProxy(reflectData, env) {
-  if (env.GH_AW_CODEX_OIDC_AUTH !== "azure" || env.AWF_REFLECT_ENABLED !== "1" || normalizeReflectProviderName(env.GH_AW_LLM_PROVIDER, "openai") !== "openai") return false;
-  return hasAzureOIDCProviderEndpoint(reflectData, "openai");
-}
-
-function hasCodexOpenAIWIFProxy(reflectData, env) {
-  if (env.GH_AW_CODEX_OIDC_AUTH !== "openai" || env.AWF_REFLECT_ENABLED !== "1" || normalizeReflectProviderName(env.GH_AW_LLM_PROVIDER, "openai") !== "openai") return false;
-  return hasOIDCProviderEndpoint(reflectData, "openai", "openai");
+function hasCodexOIDCProxy(reflectData, env, authProvider) {
+  if (env.GH_AW_CODEX_OIDC_AUTH !== authProvider || env.AWF_REFLECT_ENABLED !== "1" || normalizeReflectProviderName(env.GH_AW_LLM_PROVIDER, "openai") !== "openai") return false;
+  return hasOIDCProviderEndpoint(reflectData, "openai", authProvider);
 }
 
 /**
@@ -990,12 +985,12 @@ async function main() {
     const reflectResult = await fetchAWFReflect({ logger: log });
     if (reflectResult.ok && reflectResult.reflectData) reflectData = reflectResult.reflectData;
   }
-  if (azureOIDC && !hasCodexAzureOIDCProxy(reflectData, process.env)) {
+  if (azureOIDC && !hasCodexOIDCProxy(reflectData, process.env, "azure")) {
     log("fatal: Azure OIDC requires a configured OpenAI AWF proxy with github-oidc/azure authentication; refusing to start Codex");
     process.exit(1);
     return;
   }
-  if (openaiWIF && !hasCodexOpenAIWIFProxy(reflectData, process.env)) {
+  if (openaiWIF && !hasCodexOIDCProxy(reflectData, process.env, "openai")) {
     log("fatal: OpenAI WIF requires a configured OpenAI AWF proxy with github-oidc/openai authentication; refusing to start Codex");
     process.exit(1);
     return;
@@ -1466,8 +1461,7 @@ if (typeof module !== "undefined" && module.exports) {
     buildCodexChildEnv,
     resolveCodexConfiguredModel,
     resolveSafeCodexConfigPath,
-    hasCodexAzureOIDCProxy,
-    hasCodexOpenAIWIFProxy,
+    hasCodexOIDCProxy,
     extractPortFromURL,
     extractOpenAIProxyBaseURLFromToml,
     getConfiguredProviderPortFromReflect,

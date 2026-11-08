@@ -788,6 +788,15 @@ func validateOpenAIWIFEngineAuth(workflowData *WorkflowData) error {
 	if len(missing) > 0 {
 		return fmt.Errorf("engine.auth with provider=openai requires the following fields: %s", strings.Join(missing, ", "))
 	}
+	if workflowData.EngineConfig.ID != "codex" {
+		return errors.New("engine.auth with provider=openai requires engine.id: codex")
+	}
+	if !isFirewallEnabled(workflowData) {
+		return errors.New("engine.auth with provider=openai requires the firewall to be enabled")
+	}
+	if NewCodexEngine().ResolveLLMProvider(workflowData) != LLMProviderOpenAI {
+		return errors.New("engine.auth with provider=openai requires the OpenAI inference provider")
+	}
 	return nil
 }
 

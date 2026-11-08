@@ -107,23 +107,18 @@ func applyFallbackProviderEnv(env map[string]string, data *WorkflowData) {
 	}
 }
 
-func usesAzureOIDCForOpenAI(data *WorkflowData) bool {
+func usesOIDCForOpenAI(data *WorkflowData) bool {
 	if data == nil || data.EngineConfig == nil {
 		return false
 	}
 	switch data.EngineConfig.ID {
 	case "codex":
-		return isCodexAzureOIDC(data)
+		return isCodexAzureOIDC(data) || isCodexOpenAIWIF(data)
 	case "pi":
 		return isPiAzureOIDC(data)
 	default:
 		return false
 	}
-}
-
-func usesOIDCForOpenAI(data *WorkflowData) bool {
-	return usesAzureOIDCForOpenAI(data) || data != nil && data.EngineConfig != nil &&
-		data.EngineConfig.ID == "codex" && isCodexOpenAIWIF(data)
 }
 
 func fallbackProviderValidationStepID(provider LLMProvider) string {

@@ -274,9 +274,9 @@ func (c *Compiler) buildPullAWFContainersStep(data *WorkflowData) []string {
 	}
 
 	// Split the generated YAML into individual lines so each is a separate entry
-	lines := strings.FieldsFunc(b.String(), func(r rune) bool { return r == '\n' || r == '\r' })
 	var steps []string
-	for _, line := range lines {
+	for line := range strings.Lines(b.String()) {
+		line = strings.TrimSuffix(line, "\n")
 		if line != "" {
 			steps = append(steps, line+"\n")
 		}
@@ -725,16 +725,18 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 }
 
 func codexOIDCReflectionGuard(provider string) string {
+	authType := strconv.Quote("github-oidc/" + provider)
+	errorMessage := strconv.Quote("No configured OpenAI endpoint uses github-oidc/" + provider)
 	script := fmt.Sprintf(`fetch("http://api-proxy:10000/reflect", { signal: AbortSignal.timeout(60000) }).then(async response => {
   if (!response.ok) throw new Error("AWF /reflect request failed");
   const reflectData = await response.json();
   const endpoints = Array.isArray(reflectData?.endpoints) ? reflectData.endpoints.filter(endpoint => endpoint?.configured === true) : [];
   const endpoint = endpoints.find(candidate => String(candidate?.provider || "").trim().toLowerCase() === "openai");
-  if (!endpoint || endpoint.auth_type !== "github-oidc/%s") throw new Error("No configured OpenAI endpoint uses github-oidc/%s");
+  if (!endpoint || endpoint.auth_type !== %s) throw new Error(%s);
 }).catch(error => {
   console.error("OpenAI OIDC threat detection requires fresh AWF reflection:", error);
   process.exitCode = 1;
-})`, provider, provider)
+})`, authType, errorMessage)
 	return "node -e " + shellEscapeArg(script)
 }
 

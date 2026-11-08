@@ -416,7 +416,9 @@ network:
 ```
 
 `identity-provider-id`, `service-account-id`, and `audience` are required for
-`provider: openai`. The compiler maps these values to `AWF_AUTH_OPENAI_*` and
+`provider: openai`. This authentication mode requires Codex, the OpenAI inference
+provider, and an enabled firewall; `sandbox.agent: false` is not supported.
+The compiler maps these values to `AWF_AUTH_OPENAI_*` and
 `AWF_AUTH_OIDC_AUDIENCE` for the AWF API proxy. This requires an AWF release
 that supports OpenAI WIF; confirm that support is available in the selected
 firewall version before using this configuration. Codex startup verifies that
