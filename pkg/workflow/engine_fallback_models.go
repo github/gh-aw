@@ -84,7 +84,7 @@ func fallbackProviderSecretNames(data *WorkflowData) []string {
 	var names []string
 	for _, provider := range fallbackModelProviders(data) {
 		if provider == LLMProviderAnthropic && isAnthropicWIF(data) ||
-			provider == LLMProviderOpenAI && usesAzureOIDCForOpenAI(data) {
+			provider == LLMProviderOpenAI && usesOIDCForOpenAI(data) {
 			continue
 		}
 		names = append(names, llmProviderSecretNames(provider)...)
@@ -95,7 +95,7 @@ func fallbackProviderSecretNames(data *WorkflowData) []string {
 func applyFallbackProviderEnv(env map[string]string, data *WorkflowData) {
 	for _, provider := range fallbackModelProviders(data) {
 		if provider == LLMProviderAnthropic && isAnthropicWIF(data) ||
-			provider == LLMProviderOpenAI && usesAzureOIDCForOpenAI(data) {
+			provider == LLMProviderOpenAI && usesOIDCForOpenAI(data) {
 			continue
 		}
 		for _, name := range llmProviderSecretNames(provider) {
@@ -119,6 +119,11 @@ func usesAzureOIDCForOpenAI(data *WorkflowData) bool {
 	default:
 		return false
 	}
+}
+
+func usesOIDCForOpenAI(data *WorkflowData) bool {
+	return usesAzureOIDCForOpenAI(data) || data != nil && data.EngineConfig != nil &&
+		data.EngineConfig.ID == "codex" && isCodexOpenAIWIF(data)
 }
 
 func fallbackProviderValidationStepID(provider LLMProvider) string {

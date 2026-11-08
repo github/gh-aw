@@ -16123,7 +16123,8 @@
                 },
                 "provider": {
                   "type": "string",
-                  "description": "Optional WIF provider discriminator. Recognized values are 'azure', 'anthropic', and 'gcp'."
+                  "enum": ["azure", "anthropic", "gcp", "openai"],
+                  "description": "Optional WIF provider discriminator. Recognized values are 'azure', 'anthropic', 'gcp', and 'openai'."
                 },
                 "federation-rule-id": {
                   "type": "string",
@@ -16135,7 +16136,7 @@
                 },
                 "service-account-id": {
                   "type": "string",
-                  "description": "Anthropic WIF service account ID (e.g., svac_...)."
+                  "description": "Provider service account ID (Anthropic e.g., svac_...; OpenAI as configured in the OpenAI admin console)."
                 },
                 "workspace-id": {
                   "type": "string",
@@ -16156,6 +16157,10 @@
                 "location": {
                   "type": "string",
                   "description": "Google Cloud region for Vertex AI inference (e.g., us-central1). Defaults to us-central1 when omitted."
+                },
+                "identity-provider-id": {
+                  "type": "string",
+                  "description": "OpenAI Workload Identity Provider ID configured in the OpenAI admin console."
                 }
               },
               "required": ["type"],

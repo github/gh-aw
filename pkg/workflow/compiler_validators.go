@@ -292,7 +292,7 @@ func (c *Compiler) validateCoreToolConfiguration(workflowData *WorkflowData, mar
 		{logMessage: "Validating max-daily-ai-credits frontmatter", validateFn: func() error { return validateMaxDailyAICFrontmatter(workflowData) }},
 		{logMessage: "Validating private-to-public-flows string value", validateFn: func() error { return validatePrivateToPublicFlowsStringValue(workflowData) }},
 		{logMessage: "Validating private-to-public-flows server IDs", validateFn: func() error { return validatePrivateToPublicFlowsServerIDs(workflowData) }},
-		{logMessage: "Validating Azure and GCP WIF engine auth required fields", validateFn: func() error { return validateWIFEngineAuth(workflowData) }},
+		{logMessage: "Validating WIF engine auth required fields", validateFn: func() error { return validateWIFEngineAuth(workflowData) }},
 		{logMessage: "Validating OTLP workload identity configuration", validateFn: func() error { return validateOTLPWorkloadIdentity(workflowData) }},
 		{logMessage: "Validating default AI credits pricing values", validateFn: func() error { return validateDefaultAiCreditsPricing(workflowData) }},
 		{logMessage: "Validating enclaves configuration", validateFn: func() error { return validateEnclavesConfig(workflowData) }},
@@ -760,7 +760,35 @@ func validateWIFEngineAuth(workflowData *WorkflowData) error {
 	if err := validateAzureWIFEngineAuth(workflowData); err != nil {
 		return err
 	}
-	return validateGCPWIFEngineAuth(workflowData)
+	if err := validateGCPWIFEngineAuth(workflowData); err != nil {
+		return err
+	}
+	return validateOpenAIWIFEngineAuth(workflowData)
+}
+
+func validateOpenAIWIFEngineAuth(workflowData *WorkflowData) error {
+	if workflowData == nil || workflowData.EngineConfig == nil || workflowData.EngineConfig.Auth == nil {
+		return nil
+	}
+	auth := workflowData.EngineConfig.Auth
+	if auth.Type != "github-oidc" || auth.Provider != "openai" {
+		return nil
+	}
+
+	var missing []string
+	if auth.OpenAIIdentityProviderID == "" {
+		missing = append(missing, "identity-provider-id")
+	}
+	if auth.ServiceAccountID == "" {
+		missing = append(missing, "service-account-id")
+	}
+	if auth.Audience == "" {
+		missing = append(missing, "audience")
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("engine.auth with provider=openai requires the following fields: %s", strings.Join(missing, ", "))
+	}
+	return nil
 }
 
 func validateAzureWIFEngineAuth(workflowData *WorkflowData) error {
