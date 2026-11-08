@@ -3,6 +3,9 @@
 package workflow
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -70,7 +73,12 @@ func TestGitHubMCPGovernanceAndAutomationToolsets(t *testing.T) {
 	require.True(t, ok, "copilot toolset must be mapped")
 	for _, tool := range []string{
 		"get_automation",
+		"get_automation_group",
 		"get_automation_revision",
+		"get_automations_configuration_for_repository",
+		"get_copilot_session_events",
+		"get_copilot_task_status",
+		"list_automation_groups",
 		"list_automation_revisions",
 		"list_automations",
 		"list_available_automation_tools",
@@ -78,4 +86,26 @@ func TestGitHubMCPGovernanceAndAutomationToolsets(t *testing.T) {
 	} {
 		assert.Contains(t, copilot.Tools, tool)
 	}
+
+	reference, err := os.ReadFile(filepath.Join("..", "..", ".github", "aw", "github-mcp-server-tools.md"))
+	require.NoError(t, err)
+	referenceText := string(reference)
+	const sectionMarker = "### copilot\n"
+	sectionStart := strings.Index(referenceText, sectionMarker)
+	require.NotEqual(t, -1, sectionStart, "Copilot toolset section must be documented")
+	section := referenceText[sectionStart+len(sectionMarker):]
+	sectionEnd := strings.Index(section, "\n---")
+	require.NotEqual(t, -1, sectionEnd, "Copilot toolset section must be delimited")
+	section = section[:sectionEnd]
+
+	var documentedTools []string
+	for line := range strings.SplitSeq(section, "\n") {
+		if !strings.HasPrefix(line, "| `") {
+			continue
+		}
+		toolEnd := strings.Index(line[3:], "`")
+		require.NotEqual(t, -1, toolEnd, "malformed tool row: %s", line)
+		documentedTools = append(documentedTools, line[3:3+toolEnd])
+	}
+	assert.ElementsMatch(t, copilot.Tools, documentedTools)
 }
