@@ -61,6 +61,7 @@ describe("Decisions BinEval harness", () => {
     expect(fetch).toHaveBeenCalledTimes(1);
     const [url, request] = fetch.mock.calls[0];
     expect(url).toBe("https://api.githubcopilot.com/v1/decisions");
+    expect(request.headers["Copilot-Integration-Id"]).toBe("agentic-workflows");
     expect(request.headers.Authorization).toBe("Bearer test-token");
     const body = JSON.parse(request.body);
     expect(body.model).toBe("gpt-6-luna-decisions");
@@ -92,6 +93,17 @@ describe("Decisions BinEval harness", () => {
     const records = fs.readFileSync(output, "utf8").trim().split("\n").map(JSON.parse);
     expect(records.map(record => record.answer)).toEqual(["UNKNOWN", "UNKNOWN"]);
     expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("refused"));
+  });
+
+  it.each(["github-copilot", "copilot", "github"])("retains the Copilot integration identity and usage accounting for provider %s", async provider => {
+    vi.stubEnv("GH_AW_DECISIONS_PROVIDER", provider);
+    await executeMain();
+    expect(fetch.mock.calls[0][1].headers["Copilot-Integration-Id"]).toBe("agentic-workflows");
+    expect(fetch.mock.calls[0][1].headers.Authorization).toBe(`Bearer ${process.env.GH_AW_DECISIONS_API_KEY}`);
+    const usage = JSON.parse(fs.readFileSync(usagePath, "utf8"));
+    expect(usage.provider).toBe(provider);
+    expect(usage.ai_credits).toBeGreaterThan(0);
+    expect(findModelPricing(provider, usage.model)).toEqual(findModelPricing("github-copilot", usage.model));
   });
 
   it("preserves experiment assignments", async () => {
@@ -318,6 +330,7 @@ describe("Decisions BinEval harness", () => {
     vi.stubEnv("GH_AW_DECISIONS_PROVIDER", provider);
     await executeMain();
     expect(JSON.parse(fetch.mock.calls[0][1].body).model).toBe(expected);
+    expect(fetch.mock.calls[0][1].headers["Copilot-Integration-Id"]).toBe(provider === "github-copilot" ? "agentic-workflows" : undefined);
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 });

@@ -117,7 +117,7 @@ values; the runner-mask policy does not reduce that redaction.
 ### Decisions client
 
 `js/decisions_client.cjs` exports
-`invokeDecisions({ baseURL, apiKey?, model, input, questions, timeoutMs?, fetchImpl?, onUsage? })`.
+`invokeDecisions({ baseURL, apiKey?, integrationId?, model, input, questions, timeoutMs?, fetchImpl?, onUsage? })`.
 It sends the whole question array in one `POST` to `<baseURL>/decisions` and
 returns the response, including its named answers, model, and token usage.
 The helper supports `predicate`, `choice`, and `score` questions, string or
@@ -130,10 +130,25 @@ HTTP failures, and redirects without retrying or logging provider bodies.
 Refusals remain typed answers for the caller to handle. It requires no SDK,
 Actions globals, or agentic engine.
 
+The optional `integrationId` adds the `Copilot-Integration-Id` request header.
+Copilot evals set it to `agentic-workflows`, matching the firewall's default
+integration identity. OpenAI evals omit it.
+
 The optional `onUsage(usage, model)` callback runs after receiving JSON, before
 answer validation, so callers can collect costs even when the answer batch is
 invalid. Evals use it to save response token usage and catalog-derived AIC and
 USD costs to the accounting artifact.
+
+The CJS workflow's **Copilot Decisions API Integration** job runs
+`node --test actions/setup/js/scripts/test_decisions_client.cjs` with
+`GITHUB_TOKEN` from a job granting `copilot-requests: write`. It makes one live
+choice request using synthetic evidence and requires a named `basket_fruit`
+answer of type `choice` with the exact value `apples` rather than `bananas`.
+This single-request API, authentication, and protocol smoke check is not a
+statistical model-quality evaluation; it uses no confidence threshold or retries.
+Missing credentials, API errors, and incorrect or malformed answers fail the test.
+The job excludes fork pull requests and Dependabot-triggered runs, whose tokens
+are read-only, and does not use PATs or repository secrets.
 
 ### Synthetic message previews
 
