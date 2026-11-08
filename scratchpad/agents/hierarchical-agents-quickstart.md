@@ -324,9 +324,9 @@ The following table traces each major Quick-Start step to the specification or a
 | Check Agent Performance report for best practices before creating a workflow | Agent Performance Analyzer must surface at least the top-3 performing agents with actionable patterns; spec: `scratchpad/agents/hierarchical-agents.md` §Agent Performance Analyzer Success Metrics |
 | Check Campaign Manager for potential conflicts when starting a campaign | Campaign Manager must detect and report cross-campaign conflicts in each portfolio report; spec: `scratchpad/agents/hierarchical-agents.md` §Campaign Manager Responsibilities |
 | Recompile workflow with `gh aw compile <workflow>.md` after schedule changes | Compilation must succeed without errors and regenerate the `.lock.yml` file; spec: `DEVGUIDE.md` §Compilation |
-| Increase `safe-outputs.create-issue.max` if meta-orchestrators hit limits | Safe output limits must be configurable in workflow frontmatter; spec: `scratchpad/safe-outputs-specification.md` |
+| Increase `safe-outputs.create-issue.max` if meta-orchestrators hit limits | Safe output limits must be configurable in workflow frontmatter; spec: `../../docs/src/content/docs/specs/safe-outputs-specification.md` |
 
-These requirements are derived from the feature specifications in `scratchpad/agents/hierarchical-agents.md` and the safe-outputs contract in `scratchpad/safe-outputs-specification.md`. Any change to a Quick-Start step must be accompanied by a corresponding update to the linked specification.
+These requirements are derived from the feature specifications in `scratchpad/agents/hierarchical-agents.md` and the safe-outputs contract in `../../docs/src/content/docs/specs/safe-outputs-specification.md`. Any change to a Quick-Start step must be accompanied by a corresponding update to the linked specification.
 
 ---
 
