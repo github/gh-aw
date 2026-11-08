@@ -48,7 +48,8 @@ function addDependencySchema(tool) {
   tool.inputSchema ||= { type: "object" };
   tool.inputSchema.properties ||= {};
   const dependencySchema = {
-    description: "One output_id, or a nonempty array of output_id values returned by earlier safe-output calls. Execute only after every prerequisite succeeds; otherwise this output fails. These are not temporary resource IDs.",
+    description:
+      "One output_id, or a nonempty array of output_id values returned by earlier safe-output calls. Execute only after every prerequisite succeeds; otherwise this output fails. These are not temporary resource IDs. Do not use ledger output IDs as prerequisites: ledger writes are queued until the later persistence job. Submit related ledger operations sequentially without depends-on; use temporary record IDs for same-batch references.",
     "x-synonyms": ["depends_on"],
     oneOf: [
       { type: "string", pattern: OUTPUT_ID_PATTERN },

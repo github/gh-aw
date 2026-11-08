@@ -154,6 +154,13 @@ function checkSafeOutputDependencies(plan, index, results, allowWaiting) {
       waiting = true;
       continue;
     }
+    if (record?.type === "ledger_append" && pickOutcomeField(record, "queued")) {
+      return {
+        state: "failed",
+        errorCode: "safe_output_dependency_failed",
+        error: "Ledger prerequisite is queued, not persisted. Submit related ledger operations sequentially without depends-on; use temporary record IDs for same-batch references. Durability requires push_ledger_changes to succeed.",
+      };
+    }
     const skipReason = pickOutcomeField(record, "skipReason") || (pickOutcomeField(record, "skipped") && pickOutcomeField(record, "reason"));
     return { state: "failed", errorCode: "safe_output_dependency_failed", error: `Safe-output prerequisite did not complete successfully${skipReason ? `: ${skipReason}` : ""}` };
   }
