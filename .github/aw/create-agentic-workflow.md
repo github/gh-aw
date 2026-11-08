@@ -21,6 +21,7 @@ Design and create new workflow files under `.github/workflows/` using the instal
 
 Load these topic files only when relevant:
 
+- [memory.md](memory.md#scheduled-dreaming) for memory selection and scheduled dreaming: evidence-backed consolidation, file ownership, notes-ledger corrections, and consumer recall
 - [maintainer.md](maintainer.md) for recurring repository maintenance, backlog triage, owned-PR upkeep, or long-term code health
 - [documentation-workflows.md](documentation-workflows.md) for documentation agents, required docs checks, and post-merge page/index upkeep
 - [campaign.md](campaign.md) for campaign, KPI, pacing, cadence, or `stop-after`

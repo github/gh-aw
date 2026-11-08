@@ -4,6 +4,9 @@ import json
 from pathlib import Path
 import posixpath
 import re
+import subprocess
+import tempfile
+import textwrap
 import unittest
 from urllib.parse import urljoin
 
@@ -33,6 +36,123 @@ def checklist(text):
 
 
 class GuidanceTests(unittest.TestCase):
+    def test_dreaming_is_discoverable_and_uses_current_memory_contracts(self):
+        memory = (ROOT / ".github/aw/memory.md").read_text()
+        section = memory.split("## Scheduled dreaming\n", 1)[1].split("\n## ", 1)[0]
+        creator = (ROOT / ".github/aw/create-agentic-workflow.md").read_text()
+        self.assertIn("](memory.md#scheduled-dreaming)", creator)
+        for router in (SKILL / "SKILL.md", ROOT / "pkg/cli/data/agentic_workflows_skill.md"):
+            self.assertIn(".github/aw/memory.md#scheduled-dreaming", router.read_text())
+        for required in (
+            "filters **persistence**, not reads",
+            "logical record IDs",
+            "ledger_note_add",
+            "ledger_note_vote",
+            "mode=ro",
+            "not durable success",
+            "not\n   atomic",
+            "Omission or local deletion does not remove",
+            "explicit authorization",
+            "consumer",
+        ):
+            with self.subTest(contract=required):
+                self.assertIn(required, section)
+        for link in re.findall(r"\]\(([^)]+)\)", section):
+            if not link.startswith("https://"):
+                self.assertTrue(((ROOT / ".github/aw") / link.split("#")[0]).is_file())
+
+    def test_dreaming_and_producer_have_disjoint_persistence_ownership(self):
+        producer = (ROOT / ".github/workflows/daily-safeoutputs-git-simulator.md").read_text()
+        dreamer = (ROOT / ".github/workflows/weekly-git-simulator-dreaming.md").read_text()
+        producer_files = json.loads(re.search(r"file-glob: (\[.*\])", producer).group(1))
+        dreaming_files = json.loads(re.search(r"file-glob: (\[.*\])", dreamer).group(1))
+        self.assertEqual(producer_files, ["git-sim-state.json", "git-sim-strategies.md"])
+        self.assertEqual(dreaming_files, ["dreaming-index.md", "dreaming-lessons.md", "dreaming-review.json"])
+        self.assertFalse(set(producer_files) & set(dreaming_files))
+        for guide in (producer, dreamer):
+            self.assertIn("branch-name: memory/git-simulator", guide)
+            self.assertIn("git-simulator-lessons:\n      type: notes\n      max-record-kb: 4\n      max-patch-kb: 16", guide)
+            self.assertIn("mode=ro", guide)
+        self.assertIn("schedule: weekly", dreamer)
+        self.assertIn("cancel-in-progress: false", dreamer)
+        self.assertIn("allowed: []", dreamer)
+        self.assertIn("max-patch-size: 65536", dreamer)
+        self.assertIn("Never modify those files", producer)
+        self.assertIn("Never let dreaming change `next_index`", producer)
+        self.assertIn("without creating an empty\nview or ledger operations", dreamer)
+
+    def test_dreaming_validator_enforces_actual_budgets_in_all_phases(self):
+        dreamer = (ROOT / ".github/workflows/weekly-git-simulator-dreaming.md").read_text()
+        script = textwrap.dedent(dreamer.split("      script: |\n", 1)[1].split("\n  ledger:", 1)[0])
+        review = {
+            "version": 1,
+            "source_hashes": {"git-sim-state.json": "a" * 64},
+            "repository_files": {"pkg/workflow/repo_memory.go": "b" * 64},
+            "reviewed_note_ids": ["persisted-note"],
+            "lesson_count": 1,
+        }
+        files = {
+            "dreaming-index.md": "index\n",
+            "dreaming-lessons.md": "### Lesson 1\nSupported, scoped lesson.\n",
+            "dreaming-review.json": json.dumps(review),
+        }
+        cases = [
+            ("cold-start", {}, True),
+            ("complete-view", files, True),
+            ("partial-view", {"dreaming-index.md": "index"}, False),
+            ("index-at-byte-limit", {**files, "dreaming-index.md": "\u00e9" * 1024}, True),
+            ("index-over-byte-limit", {**files, "dreaming-index.md": "\u00e9" * 1025}, False),
+            ("lessons-at-byte-limit", {**files, "dreaming-lessons.md": "### Lesson 1\n" + "x" * (12288 - 13)}, True),
+            ("lessons-over-byte-limit", {**files, "dreaming-lessons.md": "### Lesson 1\n" + "x" * (12289 - 13)}, False),
+            ("review-over-byte-limit", {**files, "dreaming-review.json": json.dumps(review) + " " * 16384}, False),
+            ("malformed-review", {**files, "dreaming-review.json": "{"}, False),
+        ]
+        for name, fields in (
+            ("too-many-lessons", {"lesson_count": 11}),
+            ("count-mismatch", {"lesson_count": 0}),
+            ("bad-hash", {"source_hashes": {"git-sim-state.json": "not-a-hash"}}),
+            ("unsafe-path", {"repository_files": {"../secret": "a" * 64}}),
+            ("too-many-notes", {"reviewed_note_ids": [str(i) for i in range(21)]}),
+            ("too-many-sources", {"source_hashes": {str(i): "a" * 64 for i in range(21)}}),
+        ):
+            cases.append((name, {**files, "dreaming-review.json": json.dumps({**review, **fields})}, False))
+        cases.append(("nonconsecutive-headings", {**files, "dreaming-lessons.md": "### Lesson 2\n"}, False))
+        cases.append(("ten-lessons", {
+            **files,
+            "dreaming-lessons.md": "".join(f"### Lesson {i}\nScoped lesson.\n" for i in range(1, 11)),
+            "dreaming-review.json": json.dumps({**review, "lesson_count": 10}),
+        }, True))
+        cases.append(("review-at-byte-limit", {
+            **files, "dreaming-review.json": json.dumps(review) + " " * (16384 - len(json.dumps(review))),
+        }, True))
+        harness = """
+const fs = require("fs");
+const path = require("path");
+const { runCustomMemoryValidation } = require("./actions/setup/js/memory_custom_validation.cjs");
+const input = JSON.parse(fs.readFileSync(0, "utf8"));
+const results = [];
+for (const phase of ["baseline", "upload", "push"]) {
+  for (const [name, files, expected] of input.cases) {
+    const dir = path.join(input.root, `${phase}-${name}`);
+    fs.mkdirSync(dir);
+    for (const [file, text] of Object.entries(files)) fs.writeFileSync(path.join(dir, file), text);
+    const result = runCustomMemoryValidation({
+      script: input.script, memoryDir: dir, kind: "repo", phase, timeoutSeconds: 5
+    });
+    results.push({ name, phase, expected, ok: result.ok, error: result.stderr });
+  }
+}
+process.stdout.write(JSON.stringify(results));
+"""
+        with tempfile.TemporaryDirectory(prefix="gh-aw-dreaming-test-") as root:
+            result = subprocess.run(
+                ["node", "-e", harness], cwd=ROOT, text=True, capture_output=True,
+                input=json.dumps({"script": script, "cases": cases, "root": root}), check=True,
+            )
+        for case in json.loads(result.stdout):
+            with self.subTest(name=case["name"], phase=case["phase"]):
+                self.assertEqual(case["ok"], case["expected"], case["error"])
+
     def test_persona_intents_have_explicit_routes_before_cli_setup(self):
         guide = BOOTSTRAP.read_text()
         index = SCENARIOS.read_text()
