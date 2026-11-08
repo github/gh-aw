@@ -350,30 +350,17 @@ func DownloadWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) (err er
 }
 
 func renderCollectedWorkflowLogs(result workflowLogsResult, opts LogsDownloadOptions, apiRateLimit *GitHubAPIRateLimitReport, outcomeReports []OutcomesData) error {
-	return renderLogsOutput(result.processedRuns, renderLogsOutputOptions{
-		outputDir:         opts.OutputDir,
-		summaryFile:       opts.SummaryFile,
-		format:            opts.Format,
-		reportFile:        opts.ReportFile,
-		jsonOutput:        opts.JSONOutput,
-		episodes:          opts.Episodes,
-		toolGraph:         opts.ToolGraph,
-		train:             opts.Train,
-		drain3Weights:     opts.Drain3Weights,
-		audit:             opts.Audit,
-		continuation:      result.continuation,
-		verbose:           opts.Verbose,
-		artifactFilter:    result.artifactFilter,
-		includeWorkQueue:  workQueueEvidenceRequested(opts.ArtifactSets),
-		startDate:         opts.StartDate,
-		endDate:           opts.EndDate,
-		checkStaleness:    true,
-		countLimitReached: result.countLimitReached,
-		suppressRender:    opts.SuppressRender,
-		apiRateLimit:      apiRateLimit,
-		cachedJSONLWriter: opts.cachedJSONLWriter,
-		outcomeReports:    outcomeReports,
-	})
+	renderOpts := newRenderLogsOutputOptions(opts, result.artifactFilter)
+	renderOpts.continuation = result.continuation
+	renderOpts.startDate = opts.StartDate
+	renderOpts.endDate = opts.EndDate
+	renderOpts.checkStaleness = true
+	renderOpts.countLimitReached = result.countLimitReached
+	renderOpts.suppressRender = opts.SuppressRender
+	renderOpts.apiRateLimit = apiRateLimit
+	renderOpts.cachedJSONLWriter = opts.cachedJSONLWriter
+	renderOpts.outcomeReports = outcomeReports
+	return renderLogsOutput(result.processedRuns, renderOpts)
 }
 
 func collectWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) (workflowLogsResult, error) {
