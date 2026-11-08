@@ -26,6 +26,15 @@ def heading_anchor(heading):
     return re.sub(r"[^\w -]", "", heading.lower()).replace(" ", "-")
 
 
+def normalized(text):
+    return " ".join(text.split())
+
+
+def has_dreaming_implementation_heading(text):
+    headings = re.findall(r"^#{1,6}\s+(.+?)\s*#*\s*$", text, re.MULTILINE)
+    return any(heading.strip().lower() == "write the dreaming prompt" for heading in headings)
+
+
 def checklist(text):
     if "## Model and engine misconfiguration\n" not in text:
         return text
@@ -33,6 +42,170 @@ def checklist(text):
 
 
 class GuidanceTests(unittest.TestCase):
+    def test_creator_discovers_memory_reuse_before_selecting_persistence(self):
+        designer = (ROOT / ".github/aw/designer.md").read_text()
+        phase = designer.split("### Phase 4: Data Strategy\n", 1)[1].split("\n### Phase 5:", 1)[0]
+        phase = normalized(phase)
+        creator = (ROOT / ".github/aw/create-agentic-workflow.md").read_text()
+        self.assertLess(phase.index("#### Memory reuse checkpoint"), phase.index("Ask:"))
+        self.assertIn("](memory.md#scheduled-dreaming)", phase)
+        for required in (
+            "Before choosing tools or persistence",
+            "repeated investigations",
+            "growing history or recall cost",
+            "stale/contradictory advice",
+            "even when the user does not mention memory or dreaming",
+            "loading the guide does not mean adding a dreamer",
+            "That guide owns the deterministic-first decision, cost gate, and input-scope checks",
+            "Apply its decision before loading implementation guidance",
+        ):
+            with self.subTest(checkpoint=required):
+                self.assertIn(required, phase)
+        route = "](designer.md#memory-reuse-checkpoint)"
+        self.assertIn(route, creator)
+        self.assertLess(creator.index(route), creator.index("### 4. Select tools"))
+        self.assertIn("even without an explicit memory or dreaming request", creator)
+        memory = (ROOT / ".github/aw/memory.md").read_text()
+        self.assertIn("A recurring schedule or a growing note count alone is not enough", normalized(memory))
+
+    def test_dreaming_selection_prefers_deterministic_existing_work(self):
+        memory = (ROOT / ".github/aw/memory.md").read_text()
+        section = memory.split("## Scheduled dreaming\n", 1)[1].split("\n## ", 1)[0]
+        section = normalized(section)
+        self.assertLess(section.index("Deterministic cleanup in the existing workflow"), section.index("Bounded review by the already-running agent"))
+        self.assertLess(section.index("Bounded review by the already-running agent"), section.index("A separate dreamer"))
+        for required in (
+            "Use the cheapest sufficient option, in this order",
+            "no model invocation",
+            "already-running agent; no additional workflow",
+            "primary evidence",
+            "later consumer",
+            "extra workflow, model invocation, and maintenance",
+            "Compare total cost",
+            "quick design decision, not a separate investigation",
+            "defer the dreamer",
+            "one-off task",
+            "small, current, and cheap to use",
+            "does not verify the new assertion's meaning",
+            "Never prune canonical ledger evidence or producer task state",
+            "If the benefit is uncertain, do not add the dreamer",
+        ):
+            with self.subTest(cost_gate=required):
+                self.assertIn(required, section)
+        dreaming = normalized((ROOT / ".github/aw/dreaming.md").read_text())
+        self.assertIn("post-agent `noop` does not avoid the model invocation cost", dreaming)
+
+    def test_dreaming_is_discoverable_and_uses_current_memory_contracts(self):
+        memory = (ROOT / ".github/aw/memory.md").read_text()
+        section = normalized(memory.split("## Scheduled dreaming\n", 1)[1].split("\n## ", 1)[0])
+        dreaming = normalized((ROOT / ".github/aw/dreaming.md").read_text())
+        creator = normalized((ROOT / ".github/aw/create-agentic-workflow.md").read_text())
+        self.assertIn("](memory.md#scheduled-dreaming)", creator)
+        self.assertIn("](dreaming.md)", creator)
+        self.assertIn("only after the [memory decision and input-scope checks](memory.md#scheduled-dreaming)", creator)
+        self.assertIn("](dreaming.md)", section)
+        self.assertIn("Do not load implementation details", section)
+        self.assertIn("](memory.md#scheduled-dreaming)", dreaming)
+        self.assertIn("Load this guide only after", dreaming)
+        for implementation in ("```yaml", "max-patch-size", "ledger_note_add"):
+            self.assertNotIn(implementation, section)
+        self.assertFalse(has_dreaming_implementation_heading(section))
+        for heading in ("## Write the Dreaming Prompt", "### Write the dreaming prompt"):
+            with self.subTest(heading=heading):
+                self.assertTrue(has_dreaming_implementation_heading(heading))
+        for router in (SKILL / "SKILL.md", ROOT / "pkg/cli/data/agentic_workflows_skill.md"):
+            routing = router.read_text()
+            self.assertIn(".github/aw/memory.md#scheduled-dreaming", routing)
+            self.assertIn(".github/aw/dreaming.md` only when the decision and input scope justify implementation", routing)
+        fallback = json.loads((ROOT / "pkg/cli/data/agentic_workflows_fallback_aw_files.json").read_text())
+        self.assertIn("dreaming.md", fallback)
+        for required in (
+            "filters **persistence**, not reads",
+            "logical record IDs",
+            "ledger_note_add",
+            "ledger_note_vote",
+            "mode=ro",
+            "not durable success",
+            "not atomic",
+            "Omission or local deletion does not remove",
+            "explicit authorization",
+            "consumer",
+        ):
+            with self.subTest(contract=required):
+                self.assertIn(normalized(required), dreaming)
+        for guidance in (section, dreaming):
+            for link in re.findall(r"\]\(([^)]+)\)", guidance):
+                if not link.startswith("https://"):
+                    path, _, anchor = link.partition("#")
+                    target = (ROOT / ".github/aw") / path
+                    with self.subTest(link=link):
+                        self.assertTrue(target.is_file())
+                        if anchor:
+                            headings = re.findall(r"^#{1,6} (.+)$", target.read_text(), re.MULTILINE)
+                            self.assertIn(anchor, [heading_anchor(heading) for heading in headings])
+
+    def test_dreaming_cache_scope_is_owned_by_memory_guide(self):
+        memory = (ROOT / ".github/aw/memory.md").read_text()
+        section = normalized(memory.split("## Scheduled dreaming\n", 1)[1].split("\n## ", 1)[0])
+        for required in (
+            "scheduled and manual dreamer runs must use the repository's actual default branch",
+            "default-branch history only, not PR-local caches",
+            "PR merge-ref run may restore an eligible default-branch cache",
+            "updates do not flow back to the default branch",
+            "Keep PR-local cleanup inside the PR workflow",
+            "default keys are workflow-scoped",
+            "`scope: repo` broadens eligible restore keys, not GitHub's branch visibility",
+            "Do not silently export PR content into shared memory",
+        ):
+            with self.subTest(scope=required):
+                self.assertIn(required, section)
+        for path in (".github/aw/designer.md", ".github/aw/create-agentic-workflow.md", ".github/aw/dreaming.md"):
+            guidance = normalized((ROOT / path).read_text())
+            with self.subTest(router=path):
+                self.assertIn("](memory.md#scheduled-dreaming)", guidance)
+                self.assertNotIn("not PR-local caches", guidance)
+                self.assertNotIn("actual default branch", guidance)
+                self.assertNotIn("Try deterministic cleanup first", guidance)
+                self.assertNotIn("Choose dreaming only", guidance)
+        reference = " ".join((ROOT / "docs/src/content/docs/reference/cache-memory.md").read_text().split())
+        self.assertIn("cannot restore those PR-local caches, even with the same key or `scope: repo`", reference)
+        self.assertIn("updates do not flow back to the default branch", reference)
+
+    def test_dreaming_and_producer_have_disjoint_persistence_ownership(self):
+        producer = (ROOT / ".github/workflows/daily-safeoutputs-git-simulator.md").read_text()
+        dreamer = (ROOT / ".github/workflows/weekly-git-simulator-dreaming.md").read_text()
+        producer_files = json.loads(re.search(r"file-glob: (\[.*\])", producer).group(1))
+        dreaming_files = json.loads(re.search(r"file-glob: (\[.*\])", dreamer).group(1))
+        self.assertEqual(producer_files, ["git-sim-state.json", "git-sim-strategies.md"])
+        self.assertEqual(dreaming_files, ["dreaming-index.md", "dreaming-lessons.md", "dreaming-review.json"])
+        self.assertFalse(set(producer_files) & set(dreaming_files))
+        for guide in (producer, dreamer):
+            self.assertIn("branch-name: memory/git-simulator", guide)
+        self.assertIn("git-simulator-lessons: type: notes max-record-kb: 4 max-patch-kb: 16", normalized(dreamer))
+        self.assertIn("mode=ro", dreamer)
+        self.assertNotIn("\n  ledger:", producer)
+        self.assertIn("schedule: weekly", dreamer)
+        self.assertIn("cancel-in-progress: false", dreamer)
+        self.assertIn("allowed: []", dreamer)
+        self.assertIn("max-patch-size: 65536", dreamer)
+        self.assertIn("this workflow never persists changes to them", normalized(producer))
+        self.assertIn("alter `next_index` or tested cells", " ".join(producer.split()))
+        self.assertIn("without creating an empty view or ledger operations", normalized(dreamer))
+
+    def test_dreaming_workflow_declares_memory_limits_and_validation(self):
+        dreamer = (ROOT / ".github/workflows/weekly-git-simulator-dreaming.md").read_text()
+        for declaration in ("max-file-size: 16384", "max-file-count: 3", "max-patch-size: 65536", "validation: script: |"):
+            with self.subTest(declaration=declaration):
+                self.assertIn(declaration, normalized(dreamer))
+
+    def test_daily_simulator_has_no_ledger_mutation_handlers(self):
+        source = (ROOT / ".github/workflows/daily-safeoutputs-git-simulator.md").read_text()
+        lock = (ROOT / ".github/workflows/daily-safeoutputs-git-simulator.lock.yml").read_text()
+        self.assertNotIn("\n  ledger:", source)
+        for operation in ("ledger_note_add", "ledger_note_vote", "ledger_request_compaction"):
+            with self.subTest(operation=operation):
+                self.assertNotIn(operation, lock)
+
     def test_persona_intents_have_explicit_routes_before_cli_setup(self):
         guide = BOOTSTRAP.read_text()
         index = SCENARIOS.read_text()

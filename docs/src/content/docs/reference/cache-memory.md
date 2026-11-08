@@ -107,6 +107,14 @@ GitHub Actions cache provides a 10GB per-repository limit with LRU eviction, and
 
 Cache memory is branch-scoped: runs restore from the same branch first, then can fall back to the default branch. On a non-default branch, the first restore often comes from the default branch; later saves create a branch-local cache lineage.
 
+Caches saved by `pull_request` runs are isolated to the PR merge ref. A scheduled
+workflow on the default branch cannot restore those PR-local caches, even with the same key or
+`scope: repo`. PR runs may restore eligible default-branch caches, but their
+updates do not flow back to the default branch. Scheduled cache-memory
+consolidation therefore applies only to default-branch history; use local
+cleanup inside PR workflows. Cross-workflow restores also require compatible
+key prefixes and cache versions.
+
 Absent cache files are expected on cold starts, after eviction, or when branch scoping prevents restoring another branch's cache. When the workflow defines initialization or a full-analysis fallback, the agent follows that path without reporting `report_missing_data` and saves updated state for future runs. Required cached inputs with no fallback still produce `report_missing_data`; malformed or unreadable required state also remains a failure unless the workflow explicitly defines recovery. A cache restore miss alone cannot distinguish optional history from required input, so it does not suppress an explicit missing-data report.
 
 The compiler strips `${{ github.run_id }}` from restore keys so each run can fall back to earlier runs. For `scope: repo`, it also adds a broader restore key for cross-workflow sharing within the same branch scope.

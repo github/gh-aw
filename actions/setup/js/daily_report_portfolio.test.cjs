@@ -223,6 +223,9 @@ describe("bounded daily and weekly discussion-report portfolio", () => {
       expect(REPORT_PROFILES).not.toContain(profile);
       expect(source(profile).split("\n---")[0]).toMatch(/^\s+schedule:/m);
     }
+    const hippoFrontmatter = source("daily-hippo-learn").split("\n---")[0];
+    expect(hippoFrontmatter).toMatch(/^\s+workflow_dispatch:/m);
+    expect(hippoFrontmatter).not.toMatch(/^\s+schedule:/m);
     expect(REPORT_PROFILES).not.toContain("agent-performance-analyzer");
     expect(source("agent-performance-analyzer")).toContain("on: daily");
   });

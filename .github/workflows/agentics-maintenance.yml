@@ -1045,7 +1045,7 @@ jobs:
     permissions:
       contents: read
     outputs:
-      plan_created: ${{ steps.plan_0.outputs.plan_created == 'true' || steps.plan_1.outputs.plan_created == 'true' || steps.plan_2.outputs.plan_created == 'true' || steps.plan_3.outputs.plan_created == 'true' || steps.plan_4.outputs.plan_created == 'true' || steps.plan_5.outputs.plan_created == 'true' || steps.plan_6.outputs.plan_created == 'true' }}
+      plan_created: ${{ steps.plan_0.outputs.plan_created == 'true' || steps.plan_1.outputs.plan_created == 'true' || steps.plan_2.outputs.plan_created == 'true' || steps.plan_3.outputs.plan_created == 'true' || steps.plan_4.outputs.plan_created == 'true' || steps.plan_5.outputs.plan_created == 'true' || steps.plan_6.outputs.plan_created == 'true' || steps.plan_7.outputs.plan_created == 'true' }}
       plans_uploaded: ${{ steps.upload_plans.outcome == 'success' }}
       plan_0_created: ${{ steps.plan_0.outputs.plan_created }}
       plan_1_created: ${{ steps.plan_1.outputs.plan_created }}
@@ -1054,6 +1054,7 @@ jobs:
       plan_4_created: ${{ steps.plan_4.outputs.plan_created }}
       plan_5_created: ${{ steps.plan_5.outputs.plan_created }}
       plan_6_created: ${{ steps.plan_6.outputs.plan_created }}
+      plan_7_created: ${{ steps.plan_7.outputs.plan_created }}
     steps:
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1545,11 +1546,46 @@ jobs:
             const { main } = require(path.join(actionsDir, 'ledger_compaction_plan.cjs'));
             await main();
 
+      - name: Plan ledger compaction (git-simulator-lessons, untrusted, read-only)
+        if: ${{ inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'git-simulator-lessons' }}
+        continue-on-error: true
+        timeout-minutes: 15
+        id: plan_6
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_AW_LEDGER_COMPACTION_CONFIG: |-
+            {
+              "branch_name": "ledgers/git-simulator-lessons",
+              "compaction": {
+                "schedule": "daily",
+                "min_segments": 32,
+                "max_segments": 128
+              },
+              "key": "",
+              "max_patch_kb": 16,
+              "max_record_kb": 4,
+              "max_segment_kb": 100,
+              "name": "git-simulator-lessons",
+              "schema": null,
+              "type": "notes"
+            }
+          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-6.json
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'ledger_compaction_plan.cjs'));
+            await main();
+
       - name: Plan ledger compaction (smoke, untrusted, read-only)
         if: ${{ inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'smoke' }}
         continue-on-error: true
         timeout-minutes: 15
-        id: plan_6
+        id: plan_7
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ github.token }}
@@ -1593,7 +1629,7 @@ jobs:
               "type": "table"
             }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-6.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-7.json
         with:
           script: |
             const path = require('path');
@@ -1604,7 +1640,7 @@ jobs:
             await main();
 
       - name: Upload ledger compaction plans
-        if: ${{ steps.plan_0.outputs.plan_created == 'true' || steps.plan_1.outputs.plan_created == 'true' || steps.plan_2.outputs.plan_created == 'true' || steps.plan_3.outputs.plan_created == 'true' || steps.plan_4.outputs.plan_created == 'true' || steps.plan_5.outputs.plan_created == 'true' || steps.plan_6.outputs.plan_created == 'true' }}
+        if: ${{ steps.plan_0.outputs.plan_created == 'true' || steps.plan_1.outputs.plan_created == 'true' || steps.plan_2.outputs.plan_created == 'true' || steps.plan_3.outputs.plan_created == 'true' || steps.plan_4.outputs.plan_created == 'true' || steps.plan_5.outputs.plan_created == 'true' || steps.plan_6.outputs.plan_created == 'true' || steps.plan_7.outputs.plan_created == 'true' }}
         id: upload_plans
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -1613,7 +1649,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
           if-no-files-found: error
       - name: Report ledger compaction planning failures
-        if: ${{ steps.plan_0.outcome == 'failure' || steps.plan_1.outcome == 'failure' || steps.plan_2.outcome == 'failure' || steps.plan_3.outcome == 'failure' || steps.plan_4.outcome == 'failure' || steps.plan_5.outcome == 'failure' || steps.plan_6.outcome == 'failure' }}
+        if: ${{ steps.plan_0.outcome == 'failure' || steps.plan_1.outcome == 'failure' || steps.plan_2.outcome == 'failure' || steps.plan_3.outcome == 'failure' || steps.plan_4.outcome == 'failure' || steps.plan_5.outcome == 'failure' || steps.plan_6.outcome == 'failure' || steps.plan_7.outcome == 'failure' }}
         run: exit 1
 
   ledger_compaction_apply:
@@ -2121,9 +2157,44 @@ jobs:
             const { main } = require(path.join(actionsDir, 'ledger_compaction_apply.cjs'));
             await main();
 
-      - name: Validate and apply ledger compaction (smoke, trusted)
+      - name: Validate and apply ledger compaction (git-simulator-lessons, trusted)
         if: ${{ needs.ledger_compaction_plan.outputs.plan_6_created == 'true' }}
         id: apply_6
+        continue-on-error: true
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_AW_LEDGER_COMPACTION_CONFIG: |-
+            {
+              "branch_name": "ledgers/git-simulator-lessons",
+              "compaction": {
+                "schedule": "daily",
+                "min_segments": 32,
+                "max_segments": 128
+              },
+              "key": "",
+              "max_patch_kb": 16,
+              "max_record_kb": 4,
+              "max_segment_kb": 100,
+              "name": "git-simulator-lessons",
+              "schema": null,
+              "type": "notes"
+            }
+          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-6.json
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'ledger_compaction_apply.cjs'));
+            await main();
+
+      - name: Validate and apply ledger compaction (smoke, trusted)
+        if: ${{ needs.ledger_compaction_plan.outputs.plan_7_created == 'true' }}
+        id: apply_7
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
@@ -2168,7 +2239,7 @@ jobs:
               "type": "table"
             }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-6.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-7.json
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -2179,7 +2250,7 @@ jobs:
             const { main } = require(path.join(actionsDir, 'ledger_compaction_apply.cjs'));
             await main();
       - name: Report ledger compaction application failures
-        if: ${{ steps.apply_0.outcome == 'failure' || steps.apply_1.outcome == 'failure' || steps.apply_2.outcome == 'failure' || steps.apply_3.outcome == 'failure' || steps.apply_4.outcome == 'failure' || steps.apply_5.outcome == 'failure' || steps.apply_6.outcome == 'failure' }}
+        if: ${{ steps.apply_0.outcome == 'failure' || steps.apply_1.outcome == 'failure' || steps.apply_2.outcome == 'failure' || steps.apply_3.outcome == 'failure' || steps.apply_4.outcome == 'failure' || steps.apply_5.outcome == 'failure' || steps.apply_6.outcome == 'failure' || steps.apply_7.outcome == 'failure' }}
         run: exit 1
 
   work_queue_compaction:
