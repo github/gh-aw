@@ -21,8 +21,8 @@ Design and create new workflow files under `.github/workflows/` using the instal
 
 Load these topic files only when relevant:
 
-- [memory.md](memory.md#scheduled-dreaming) when later runs need semantic knowledge reuse or reconciliation beyond deterministic cleanup — even without an explicit memory or dreaming request
-- [dreaming.md](dreaming.md) only after the memory decision and input-scope checks justify a separate dreamer; configuration, publication, and consumer-recall implementation
+- [memory.md](memory.md#scheduled-dreaming) when later runs need knowledge reuse or reconciliation — even without an explicit memory or dreaming request; owns the deterministic-first decision, cost gate, and input scope
+- [dreaming.md](dreaming.md) only after the [memory decision and input-scope checks](memory.md#scheduled-dreaming) justify a separate dreamer; configuration, publication, and consumer-recall implementation
 - [maintainer.md](maintainer.md) for recurring repository maintenance, backlog triage, owned-PR upkeep, or long-term code health
 - [documentation-workflows.md](documentation-workflows.md) for documentation agents, required docs checks, and post-merge page/index upkeep
 - [campaign.md](campaign.md) for campaign, KPI, pacing, cadence, or `stop-after`
@@ -155,10 +155,8 @@ When evaluating scenarios, classify any failure before stopping:
 Use the smallest trigger that satisfies the augmented intent. Treat the mappings below as implementation options, not direct substitutions for intent reasoning. See the [Decision Matrix](triggers.md#decision-matrix) in triggers.md for the base trigger-to-use-case mapping.
 
 Apply the [memory reuse checkpoint](designer.md#memory-reuse-checkpoint) before
-selecting tools or persistence. Prefer deterministic cleanup in the existing
-workflow, then bounded review by an already-running agent. Add a separate dreamer
-only for recurring semantic work whose benefit justifies the extra workflow,
-model invocation, and maintenance. A recurring schedule alone is not a reason.
+selecting tools or persistence, following the decision and scope policy in
+[memory.md](memory.md#scheduled-dreaming).
 
 | Scenario | Trigger and default output | Details |
 |---|---|---|

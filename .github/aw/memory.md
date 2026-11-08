@@ -261,26 +261,36 @@ Deterministic cleanup is preferable whenever the rules reliably express the
 operation. Invalidating a changed citation by hash does not verify the new
 assertion's meaning. Never prune canonical ledger evidence or producer task
 state under the guise of retention; clean disposable state and derived views.
+Keep semantic review by the already-running producer within its budget and
+ownership; do not use it to rewrite another workflow's files.
 
 Inspect the producer workflow and its actual memory format first. Repeated
 investigations, tested strategies, environment gotchas, and recurring explicit
 corrections are good inputs. A deduplication list, backlog cursor, numeric
-baseline, or raw transcript alone does not justify dreaming. Preserve successful
-techniques as well as failures; distinguish observed outcomes from hypotheses.
+baseline, one-off task, or raw transcript alone does not justify dreaming.
+Preserve successful techniques as well as failures; distinguish observed
+outcomes from hypotheses.
 
 Recommend dreaming only when a later consumer will reuse the knowledge and
 the expected reduction in repeated reasoning or stale advice justifies the
 extra workflow, model invocation, and maintenance after cheaper options are
 ruled out. Compare total cost, not just reduced online tokens; do not invent
 savings. If the benefit is uncertain, do not add the dreamer.
+Identify the observed problem, primary evidence source, later consumer, and
+why an additional workflow is worth its total cost. Keep this a quick design
+decision, not a separate investigation; defer the dreamer when these are unknown.
 A recurring schedule or a growing note count
 alone is not enough. Prefer direct recall and producer-owned corrections when
 the existing view is already small, current, and cheap to use.
 
 For `cache-memory`, scheduled dreaming is eligible for default-branch history
 only, not PR-local caches. A PR merge-ref run may restore an eligible
-default-branch cache, but its updates do not flow back to the default branch. Keep PR-local cleanup
-inside the PR workflow; a shared key does not remove branch isolation.
+default-branch cache, but its updates do not flow back to the default branch.
+Keep PR-local cleanup inside the PR workflow; a shared key does not remove
+branch isolation.
+If knowledge must outlive or cross PR boundaries, require explicitly authorized,
+evidence-validated publication to durable repo-memory or a ledger. Do not silently
+export PR content into shared memory to bypass cache isolation.
 
 Once the need, cost, and input scope justify a separate dreamer, load
 [dreaming.md](dreaming.md) for configuration, ownership, bounded consolidation,

@@ -56,6 +56,26 @@ describe("memory_custom_validation", () => {
     expect(result.ok).toBe(true);
   });
 
+  it("provides source job status without exposing publisher credentials", () => {
+    const result = runCustomMemoryValidation({
+      script: 'if (memorySourceJobResult !== "failure" || process.env.GH_TOKEN) throw new Error("incorrect source context");',
+      memoryDir: tempDir,
+      kind: "repo",
+      phase: "push",
+      sourceJobResult: "failure",
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("defaults source job status to unknown for existing callers", () => {
+    const result = runCustomMemoryValidation({
+      script: 'if (memorySourceJobResult !== "") throw new Error("unexpected source status");',
+      memoryDir: tempDir,
+      kind: "repo",
+    });
+    expect(result.ok).toBe(true);
+  });
+
   it("filters the disposable validation copy without changing sibling files", () => {
     fs.mkdirSync(path.join(tempDir, "nested"));
     fs.mkdirSync(path.join(tempDir, "sibling-only"));
