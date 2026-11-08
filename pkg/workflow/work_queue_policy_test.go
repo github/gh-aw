@@ -4,12 +4,84 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/workqueue"
 	"github.com/stretchr/testify/require"
 )
+
+func TestResolveWorkQueueWorkerTarget(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), ".github", "workflows")
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	markdownPath := filepath.Join(dir, "dispatcher.md")
+	for name, content := range map[string]string{
+		"worker":   "---\ntools:\n  work-queue:\n    worker: true\n---\n",
+		"ordinary": "---\ntools:\n  work-queue: true\n---\n",
+	} {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, name+".md"), []byte(content), 0o600))
+	}
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "generated.lock.yml"), nil, 0o600))
+
+	worker, err := resolveWorkQueueWorkerTarget("worker", markdownPath)
+	require.NoError(t, err)
+	require.True(t, worker)
+
+	worker, err = resolveWorkQueueWorkerTarget("ordinary", markdownPath)
+	require.NoError(t, err)
+	require.False(t, worker)
+
+	worker, err = resolveWorkQueueWorkerTarget("generated", markdownPath)
+	require.ErrorIs(t, err, errNotCompilerManagedWorkQueueTarget)
+	require.False(t, worker)
+
+	worker, err = resolveWorkQueueWorkerTarget("../outside", markdownPath)
+	require.ErrorContains(t, err, "path traversal not allowed")
+	require.False(t, worker)
+}
+
+func TestWorkQueueTargetCallersPreserveWorkerPolicies(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), ".github", "workflows")
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	markdownPath := filepath.Join(dir, "dispatcher.md")
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "ordinary.md"), []byte("---\ntools:\n  work-queue: true\n---\n"), 0o600))
+
+	dispatch := &SafeOutputsConfig{DispatchWorkflow: &DispatchWorkflowConfig{Workflows: []string{"ordinary"}}}
+	require.EqualError(t, validateApprovedWorkQueueTargets(&WorkflowData{SafeOutputs: dispatch}, markdownPath),
+		"work-queue: approved target \"ordinary\" must declare tools.work-queue.worker: true; ordinary delegated workflows have no Claim-scoped delivery adapter")
+
+	policy := workqueue.DefaultPolicy("1", "owner/repo")
+	data := &WorkflowData{WorkQueuePolicy: &WorkQueuePolicyConfig{Policy: policy}, SafeOutputs: dispatch}
+	require.EqualError(t, populateDefaultWorkQueueProfiles(data, markdownPath),
+		"work-queue: dispatcher must approve at least one compiler-managed queue worker")
+
+	policy = workqueue.DefaultPolicy("1", "owner/repo")
+	pool := policy.Pools["default"]
+	pool.Profiles = map[string]workqueue.WorkerProfile{"ordinary": {Workflow: ".github/workflows/ordinary.lock.yml"}}
+	policy.Pools["default"] = pool
+	data = &WorkflowData{WorkQueuePolicy: &WorkQueuePolicyConfig{Policy: policy}}
+	require.EqualError(t, validateWorkQueueProfileTargets(data, markdownPath),
+		"work-queue: profile default/ordinary target must declare tools.work-queue.worker: true")
+
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "generated.lock.yml"), nil, 0o600))
+	dispatch = &SafeOutputsConfig{DispatchWorkflow: &DispatchWorkflowConfig{Workflows: []string{"generated"}}}
+	require.EqualError(t, validateApprovedWorkQueueTargets(&WorkflowData{SafeOutputs: dispatch}, markdownPath),
+		"work-queue: approved worker \"generated\" requires compiler-managed workflow source")
+
+	policy = workqueue.DefaultPolicy("1", "owner/repo")
+	data = &WorkflowData{WorkQueuePolicy: &WorkQueuePolicyConfig{Policy: policy}, SafeOutputs: dispatch}
+	require.EqualError(t, populateDefaultWorkQueueProfiles(data, markdownPath),
+		"work-queue: worker profile \"generated\" requires compiler-managed workflow source")
+
+	policy = workqueue.DefaultPolicy("1", "owner/repo")
+	pool = policy.Pools["default"]
+	pool.Profiles = map[string]workqueue.WorkerProfile{"generated": {Workflow: ".github/workflows/generated.lock.yml"}}
+	policy.Pools["default"] = pool
+	data = &WorkflowData{WorkQueuePolicy: &WorkQueuePolicyConfig{Policy: policy}}
+	require.EqualError(t, validateWorkQueueProfileTargets(data, markdownPath),
+		"work-queue: profile default/generated requires compiler-managed worker source")
+}
 
 func TestWorkQueueProposalValidationPreservesTemplatesAndNativePrincipalKeys(t *testing.T) {
 	policy := workqueue.DefaultPolicy("${{ github.actor_id }}", "${{ github.repository }}")
