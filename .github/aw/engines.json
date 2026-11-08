@@ -33,6 +33,10 @@
       "import": "github/gh-aw/.github/workflows/shared/kiro.md"
     },
     {
+      "id": "mini-swe-agent",
+      "import": "github/gh-aw/.github/workflows/shared/mini-swe-agent.md"
+    },
+    {
       "id": "pydantic-ai",
       "import": "pydantic/pydantic-ai/src/pydantic_ai_harness/gh-aw/pydantic.md"
     },

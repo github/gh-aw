@@ -101,11 +101,19 @@ func TestSharedGitHubQueryRepositoryDefaults(t *testing.T) {
 						script = prefix + "\nprintf '%s/%s' \"$OWNER\" \"$NAME\"\n"
 						expected = wantRepo
 					} else {
-						selection, _, ok := strings.Cut(run, "PAGE=1")
+						defaults, _, ok := strings.Cut(run, "OUTPUT_FILE=")
+						if !ok {
+							t.Fatal("missing output-file boundary")
+						}
+						_, pagination, ok := strings.Cut(run, "elif [[ -n \"$SINCE\" ]]; then\n")
+						if !ok {
+							t.Fatal("missing pagination boundary")
+						}
+						selection, _, ok := strings.Cut(pagination, "PAGE=1")
 						if !ok {
 							t.Fatal("missing pagination loop boundary")
 						}
-						script = selection + "fi\nprintf '%s' \"$API_PATH\"\n"
+						script = defaults + selection + "printf '%s' \"$API_PATH\"\n"
 						resource := "issues"
 						if name == "github-pr-query" {
 							resource = "pulls"
