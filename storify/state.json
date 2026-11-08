@@ -1,31 +1,27 @@
 {
-  "last_run_date": "2026-11-07",
+  "last_run_date": "2026-11-08",
   "last_window": {
-    "start": "2026-11-06T07:55:47Z",
-    "end": "2026-11-07T07:55:47Z"
+    "start": "2026-11-07T07:53:01Z",
+    "end": "2026-11-08T07:53:01Z"
   },
   "observed_window": {
-    "coverage": "Partial: 256 cached runs from 2026-11-06T22:17:43Z through 2026-11-07T07:53:03Z; continuation 07:55:47-22:15:38 UTC unavailable because agentic-workflows MCP tools were not exposed",
+    "coverage": "Partial: 343 cached run records, from 2026-11-07T20:01:34Z through 2026-11-08T07:53:01Z; 07:53:01-20:01:34 UTC missing because collection hit count limit; 8 records still in progress at snapshot",
     "representative_audits": [
-      42317297653,
-      42317328131,
-      42318371322,
-      42333626965,
-      42333649040,
-      42341806704,
-      42342838287
+      42409016328,
+      42423438587,
+      42453386098,
+      42458892731
     ]
   },
   "key_themes": [
-    "ESLint work queue safe-output failures alongside merged reviewed rule",
-    "Cross-repository create/update smoke checkout failures",
-    "Human review corrections to TLA runtime provenance merged; hosted recovery unverified",
-    "Daily image scan failed at vendored enforcement gate"
+    "PR review safe-output processing failed in 10 distinct runs across three workflows",
+    "Review feedback led to human assignments and merged corrections on PRs #75736 and #75761",
+    "Hourly Auditor failed in evidence collection 12 times while six-hour investigator succeeded"
   ],
   "carry_forward_questions": [
-    "Did the cross-repo smoke checkout recover after the observed slice?",
-    "Why did Process Safe Outputs fail across unrelated workflows?",
-    "Does the TLA security model pass a complete hosted run after PR #75487?",
-    "What occurred in the missing 07:55-22:15 UTC interval?"
+    "Why does reviewer Process Safe Outputs fail after successful agent, detection, and eval jobs?",
+    "What failed inside hourly Auditor evidence collection?",
+    "Did PR #75761 resolve guarded uploader access on later runs?",
+    "What occurred in missing 2026-11-07 07:53-20:01 UTC interval?"
   ]
 }
