@@ -201,7 +201,7 @@ An open-source vulnerability hunting methodology from Capital One that provides 
 
 ### Workload Identity Federation (WIF)
 
-A keyless authentication mechanism that exchanges short-lived GitHub OIDC tokens for provider-specific credentials, eliminating the need for long-lived API key secrets in the repository. Supported for the `claude` engine (Anthropic WIF) and the `gemini` engine (Google Cloud WIF via Vertex AI). Configured under `engine.auth` with `type: github-oidc` and a `provider` discriminator (`anthropic` or `gcp`). When active, the compiler suppresses static-key validation and emits the appropriate authentication environment variables for the runtime. See [Auth Reference](/gh-aw/reference/auth/).
+A keyless authentication mechanism that exchanges short-lived GitHub OIDC tokens for provider-specific credentials, eliminating the need for long-lived API key secrets in the repository. Supported for the `claude` engine (Anthropic WIF), the `gemini` engine (Google Cloud WIF via Vertex AI), and Codex using OpenAI WIF through AWF. Configured under `engine.auth` with `type: github-oidc` and a provider discriminator (`anthropic`, `gcp`, or `openai`). When active, the compiler suppresses static-key validation and emits the appropriate authentication environment variables for the runtime. See [Auth Reference](/gh-aw/reference/auth/).
 
 ### Safe-Output Field Aliases
 
@@ -764,7 +764,7 @@ An OpenAI Codex engine mode that routes model calls through the GitHub inference
 
 ### Engine Auth (`engine.auth`)
 
-An `engine:` configuration field for keyless authentication. When `engine.auth` is configured, the compiler emits authentication environment variables consumed by the AWF api-proxy sidecar and suppresses the static API key requirement. Supports `type: github-oidc` with an optional `provider` for service-specific token exchange — for example, `provider: anthropic` for [Anthropic WIF](#anthropic-workload-identity-federation-wif) or without a provider for Azure Entra ID BYOK mode. Requires `permissions: id-token: write` in the workflow. See [Authentication Reference](/gh-aw/reference/auth/) and [AI Engines Reference](/gh-aw/reference/engines/).
+An `engine:` configuration field for keyless authentication. When `engine.auth` is configured, the compiler emits authentication environment variables consumed by the AWF api-proxy sidecar and suppresses the static API key requirement. Supports `type: github-oidc` with an optional `provider` for service-specific token exchange — for example, `provider: anthropic` for [Anthropic WIF](#anthropic-workload-identity-federation-wif), `provider: openai` for Codex OpenAI WIF, or without a provider for Azure Entra ID BYOK mode. Requires `permissions: id-token: write` in the workflow. See [Authentication Reference](/gh-aw/reference/auth/) and [AI Engines Reference](/gh-aw/reference/engines/).
 
 ```aw wrap
 engine:

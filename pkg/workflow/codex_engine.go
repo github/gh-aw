@@ -140,7 +140,7 @@ func (e *CodexEngine) GetSecretValidationStep(workflowData *WorkflowData) GitHub
 }
 
 func codexSkipsStaticSecret(provider LLMProvider, workflowData *WorkflowData) bool {
-	return isCodexAzureOIDC(workflowData) ||
+	return isCodexAzureOIDC(workflowData) || isCodexOpenAIWIF(workflowData) ||
 		provider == LLMProviderGitHub && hasCopilotRequestsWritePermission(workflowData)
 }
 
@@ -148,6 +148,21 @@ func codexSkipsStaticSecret(provider LLMProvider, workflowData *WorkflowData) bo
 func isCodexAzureOIDC(workflowData *WorkflowData) bool {
 	return isAzureOIDCWithAWF(workflowData) &&
 		NewCodexEngine().ResolveLLMProvider(workflowData) == LLMProviderOpenAI
+}
+
+func isCodexOpenAIWIF(workflowData *WorkflowData) bool {
+	return isOpenAIWIFWithAWF(workflowData) &&
+		NewCodexEngine().ResolveLLMProvider(workflowData) == LLMProviderOpenAI
+}
+
+func codexOIDCAuthMode(workflowData *WorkflowData) string {
+	if isCodexAzureOIDC(workflowData) {
+		return "azure"
+	}
+	if isCodexOpenAIWIF(workflowData) {
+		return "openai"
+	}
+	return ""
 }
 
 func (e *CodexEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHubActionStep {
@@ -473,6 +488,7 @@ func codexBYOKAPIKeyExport() string {
 func (e *CodexEngine) buildCodexExecutionEnv(workflowData *WorkflowData, firewallEnabled, modelConfigured bool, modelEnvVar string) map[string]string {
 	resolvedGitHubToken := resolveGitHubToken("")
 	provider := e.ResolveLLMProvider(workflowData)
+	oidcAuth := codexOIDCAuthMode(workflowData)
 	env := map[string]string{
 		"CODEX_HOME":                   codexHome(workflowData),
 		"GH_AW_GITHUB_TOKEN":           resolvedGitHubToken,
@@ -489,7 +505,7 @@ func (e *CodexEngine) buildCodexExecutionEnv(workflowData *WorkflowData, firewal
 		copilotToken := llmProviderSecretExpression(provider, workflowData)
 		env["COPILOT_GITHUB_TOKEN"] = copilotToken
 		env[constants.CopilotBYOKDummyAPIKeyEnvVar] = constants.CopilotBYOKDummyAPIKey
-	} else if !isCodexAzureOIDC(workflowData) {
+	} else if oidcAuth == "" {
 		openAIKey := llmProviderSecretExpression(provider, workflowData)
 		env["CODEX_API_KEY"] = openAIKey
 		env["OPENAI_API_KEY"] = openAIKey
@@ -519,9 +535,9 @@ func (e *CodexEngine) buildCodexExecutionEnv(workflowData *WorkflowData, firewal
 	applyEngineCwdEnv(env, workflowData)
 	applyEngineAndAgentEnv(env, workflowData, codexEngineLog)
 	env["CODEX_HOME"] = codexHome(workflowData)
-	if isCodexAzureOIDC(workflowData) {
+	if oidcAuth != "" {
 		// Non-secret launch policy; the harness also verifies fresh AWF reflection.
-		env["GH_AW_CODEX_OIDC_AUTH"] = "azure"
+		env["GH_AW_CODEX_OIDC_AUTH"] = oidcAuth
 	}
 	if !firewallEnabled && provider == LLMProviderOpenAI && workflowData.EngineConfig != nil && workflowData.EngineConfig.APITarget != "" {
 		env["OPENAI_BASE_URL"] = "https://" + path.Join(workflowData.EngineConfig.APITarget, "v1")

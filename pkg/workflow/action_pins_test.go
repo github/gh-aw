@@ -441,6 +441,15 @@ func TestApplyActionPinToTypedStep(t *testing.T) {
 			expectedUses: "./.github/actions/my-setup",
 		},
 		{
+			name: "self-repository action ref ($/) is passed through unchanged",
+			step: &WorkflowStep{
+				Name: "Self-repository action",
+				Uses: "$/.github/actions/my-setup",
+			},
+			expectPinned: false,
+			expectedUses: "$/.github/actions/my-setup",
+		},
+		{
 			name: "local action ref (../) returns error",
 			step: &WorkflowStep{
 				Name: "Parent local action",

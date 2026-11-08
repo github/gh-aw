@@ -11,6 +11,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `appendbytestring` — reports `append(b, []byte(s)...)` calls where `b` is `[]byte` and `s` is a string, which can be simplified to `append(b, s...)`.
 - `appendoneelement` — reports `append(s, []T{x}...)` calls where a single-element slice literal is spread and can be simplified to `append(s, x)`.
 - `blankassigncomma` — reports assignment statements where every result is discarded via 2 or more blank identifiers (e.g. `_, _ = f()`), which may indicate unintended result ignoring.
+- `blankassignedcleanuperror` — reports discarded errors from `os.Remove`, `os.RemoveAll`, `os.WriteFile`, and `os.MkdirAll` when assigned to `_`, including in deferred closures. Existing `//nolint:osremoveuncheckedcleanup` directives continue to suppress `_ = os.Remove/RemoveAll` findings.
 - `bufferresetbeforereuse` — reports `bytes.Buffer` or `strings.Builder` writes after a read without an intervening `Reset()`, which can accumulate stale content.
 - `bufioscannererunchecked` — reports `bufio.Scanner` loops that do not check `Err()` after scanning completes.
 - `bytescomparestring` — reports `string(a) == string(b)` and `string(a) != string(b)` comparisons where `a` and `b` are `[]byte` values; use `bytes.Equal(a, b)` for `==` and `!bytes.Equal(a, b)` for `!=`.
@@ -42,6 +43,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `httpstatuscode` — reports raw HTTP status-code integer literals that should use `net/http` named constants.
 - `ioutildeprecated` — reports uses of deprecated `io/ioutil` functions (deprecated since Go 1.16) and suggests their replacements in the `io` and `os` packages.
 - `jsonmarshalignoredeerror` — reports `json.Marshal` and `json.Unmarshal` calls where the error return is discarded.
+- `jsonunmarshalbytesconversion` — reports `json.Unmarshal([]byte(s), ...)` calls where `s` is a string; use a decoder for streams, or require a second `Decode` to return `io.EOF` to preserve whole-document validation.
 - `largefunc` — reports function bodies that exceed a configurable line-count threshold.
 - `lenstringsplit` — reports `len(strings.Split(s, sep))` expressions with a non-empty separator that should use `strings.Count(s, sep)+1` to avoid an intermediate slice allocation.
 - `lenstringzero` — reports `len(s) == 0` / `len(s) != 0` comparisons on string values that should use `s == ""` / `s != ""`.
@@ -55,7 +57,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `osisnotexist` — reports `os.IsNotExist`, `os.IsExist`, `os.IsPermission`, and `os.IsTimeout`, which do not inspect arbitrary wrapped errors. Immediate checks of fresh, unmodified errors from direct filesystem `os` calls in an adjacent assignment or enclosing `if` initializer are exempt. Use `errors.Is` with `fs.ErrNotExist`, `fs.ErrExist`, or `fs.ErrPermission`. For timeouts, use `errors.As` with `interface{ Timeout() bool }` and check `Timeout()`; `errors.Is(err, os.ErrDeadlineExceeded)` only covers deadline errors, not every timeout.
 - `osexitinlibrary` — reports `os.Exit` calls in library packages (`pkg/*`) where process termination should be delegated to `cmd/*` entry points.
 - `osopenreadallpreferreadfile` — implements the `osopen-readall-prefer-readfile` rule: recommends `os.ReadFile` when a newly declared `os.Open` file is used only by a direct deferred `Close` and one `io.ReadAll` or `ioutil.ReadAll` in the same block. Extra uses, reassignment, nested reads, and write-side opens are excluded. No automatic fix is offered; review open/read error handling when simplifying.
-- `osremoveuncheckedcleanup` — reports `os.Remove` and `os.RemoveAll` calls whose errors are discarded, which can hide cleanup failures.
+- `osremoveuncheckedcleanup` — reports `os.Remove` and `os.RemoveAll` expression and `go` statements whose errors are discarded, which can hide cleanup failures.
 - `ossetenvlibrary` — reports `os.Setenv` calls in library packages (`pkg/*`) where side effects should be isolated.
 - `packagelevelmutableslicemap` — reports package-level (file/package-scope) `var` slice/map declarations mutated from inside a function body via `append()` re-assignment, index assignment, or `delete()`. Mutations inside a top-level `init()` are exempt.
 - `panic-in-library-code` — reports `panic()` calls in library packages (`pkg/*`) where errors should be returned instead.
@@ -182,6 +184,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `appendbytestring` | Custom `go/analysis` analyzer that flags `append(b, []byte(s)...)` calls where `s` is a string that can be simplified to `append(b, s...)` |
 | `appendoneelement` | Custom `go/analysis` analyzer that flags `append(s, []T{x}...)` calls where a single-element slice literal is spread and can be simplified to `append(s, x)` |
 | `blankassigncomma` | Custom `go/analysis` analyzer that flags assignment statements where every result is discarded via 2 or more blank identifiers |
+| `blankassignedcleanuperror` | Custom `go/analysis` analyzer that flags discarded errors from `os.Remove`, `os.RemoveAll`, `os.WriteFile`, and `os.MkdirAll` when assigned to `_`, including in deferred closures |
 | `bufferresetbeforereuse` | Custom `go/analysis` analyzer that flags `bytes.Buffer` or `strings.Builder` writes after a read without an intervening `Reset()` |
 | `bufioscannererunchecked` | Custom `go/analysis` analyzer that flags `bufio.Scanner` loops that do not check `Err()` after scanning completes |
 | `bytescomparestring` | Custom `go/analysis` analyzer that flags `string(a) == string(b)` / `!=` comparisons on `[]byte` values; use `bytes.Equal(a, b)` for `==` and `!bytes.Equal(a, b)` for `!=` |
@@ -213,6 +216,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `httpstatuscode` | Custom `go/analysis` analyzer that flags raw HTTP status-code integer literals that should use `net/http` named constants |
 | `ioutildeprecated` | Custom `go/analysis` analyzer that flags deprecated `io/ioutil` function calls (deprecated since Go 1.16) and suggests replacements in the `io` and `os` packages |
 | `jsonmarshalignoredeerror` | Custom `go/analysis` analyzer that flags `json.Marshal`/`json.Unmarshal` calls where the error return is discarded |
+| `jsonunmarshalbytesconversion` | Custom `go/analysis` analyzer that flags `json.Unmarshal([]byte(s), ...)` calls where `s` is a string and recommends `strings.NewReader(s)` for streams or requiring a second `Decode` to return `io.EOF` for whole-document validation |
 | `largefunc` | Custom `go/analysis` analyzer that flags large functions with actionable diagnostics |
 | `lenstringsplit` | Custom `go/analysis` analyzer that flags `len(strings.Split(s, sep))` with a non-empty separator that should use `strings.Count(s, sep)+1` |
 | `lenstringzero` | Custom `go/analysis` analyzer that flags `len(s) == 0` / `len(s) != 0` on string values that should use `s == ""` / `s != ""` |
@@ -226,7 +230,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `osisnotexist` | Custom `go/analysis` analyzer that flags legacy `os` error predicates and recommends wrapped-error-aware checks |
 | `osopenreadallpreferreadfile` | Custom `go/analysis` analyzer that recommends `os.ReadFile` for an `os.Open` file used only by deferred `Close` and one `ReadAll` |
 | `osexitinlibrary` | Custom `go/analysis` analyzer that flags `os.Exit` usage in library packages |
-| `osremoveuncheckedcleanup` | Custom `go/analysis` analyzer that flags discarded errors from `os.Remove` and `os.RemoveAll` |
+| `osremoveuncheckedcleanup` | Custom `go/analysis` analyzer that flags discarded errors from `os.Remove` and `os.RemoveAll` expression and `go` statements |
 | `ossetenvlibrary` | Custom `go/analysis` analyzer that flags `os.Setenv` usage in library packages |
 | `packagelevelmutableslicemap` | Custom `go/analysis` analyzer that flags package-level slice/map `var` declarations mutated from inside a function body via `append()` re-assignment, index assignment, or `delete()` |
 | `panic-in-library-code` | Custom `go/analysis` analyzer that flags `panic()` usage in library packages |

@@ -35,6 +35,7 @@ Configure the authentication method your AI engine needs before running your fir
 
 - **Standard:** [`OPENAI_API_KEY`](#openai_api_key) or `CODEX_API_KEY`; the runtime checks `CODEX_API_KEY` first
 - **Keyless alternative:** [Azure Entra OIDC](#codex-azure-entra-oidc) through the AWF API proxy
+- **Keyless alternative:** [OpenAI Workload Identity Federation](#codex-openai-workload-identity-federation) through the AWF API proxy
 
 ### Gemini
 
@@ -381,6 +382,47 @@ models use the same authentication. Other fallback providers still require
 their own credentials.
 
 See also [AI Engines](/gh-aw/reference/engines/#built-in-ai-engines) for additional configuration needed when using Codex with GitHub MCP.
+
+---
+
+### Codex OpenAI Workload Identity Federation
+
+Codex can use an OpenAI service account with GitHub Actions Workload Identity
+Federation through the AWF API proxy, without a long-lived `OPENAI_API_KEY`.
+The proxy exchanges the GitHub OIDC token for an OpenAI access token and keeps
+both credentials outside the agent container.
+
+Configure an OpenAI Workload Identity Provider and service account in the OpenAI
+admin console. Restrict its GitHub claims to the intended repository, ref,
+environment, and workflow. Set the OIDC audience to the exact audience configured
+for that OpenAI provider. The workflow also needs `permissions.id-token: write`.
+
+```aw wrap
+permissions:
+  contents: read
+  id-token: write
+engine:
+  id: codex
+  auth:
+    type: github-oidc
+    provider: openai
+    identity-provider-id: ${{ vars.OPENAI_IDENTITY_PROVIDER_ID }}
+    service-account-id: ${{ vars.OPENAI_SERVICE_ACCOUNT_ID }}
+    audience: https://api.openai.com/v1
+network:
+  allowed:
+    - defaults
+    - api.openai.com
+```
+
+`identity-provider-id`, `service-account-id`, and `audience` are required for
+`provider: openai`. This authentication mode requires Codex, the OpenAI inference
+provider, and an enabled firewall; `sandbox.agent: false` is not supported.
+The compiler maps these values to `AWF_AUTH_OPENAI_*` and
+`AWF_AUTH_OIDC_AUDIENCE` for the AWF API proxy. This requires an AWF release
+that supports OpenAI WIF; confirm that support is available in the selected
+firewall version before using this configuration. Codex startup verifies that
+fresh AWF reflection reports the configured OpenAI WIF endpoint before launching.
 
 ---
 

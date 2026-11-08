@@ -141,7 +141,7 @@ func (e *CodexEngine) buildNativeConfig(workflowData *WorkflowData, mcpTools []s
 }
 
 func configureCodexProxyAuthentication(proxy map[string]any, workflowData *WorkflowData) {
-	if !isCodexAzureOIDC(workflowData) {
+	if !isCodexAzureOIDC(workflowData) && !isCodexOpenAIWIF(workflowData) {
 		proxy["env_key"] = "CODEX_API_KEY"
 	}
 }

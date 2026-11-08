@@ -26,6 +26,7 @@ const {
   waitForProviderListenerReady,
   getCatalogModelEntry,
   hasAzureOIDCProviderEndpoint,
+  hasOIDCProviderEndpoint,
   hasAPIProxyLocalhostAlias,
   inferProviderTypeForModel,
   inferWireApiForModel,
@@ -44,6 +45,16 @@ describe("awf_reflect.cjs", () => {
       expect(hasAzureOIDCProviderEndpoint({ endpoints: [{ ...endpoint, auth_type: "static-key" }] }, "openai")).toBe(false);
       expect(hasAzureOIDCProviderEndpoint({ endpoints: [{ ...endpoint, configured: false }] }, "openai")).toBe(false);
       expect(hasAzureOIDCProviderEndpoint({ endpoints: [endpoint] }, "anthropic")).toBe(false);
+    });
+
+    describe("hasOIDCProviderEndpoint", () => {
+      it("requires a configured resolved endpoint using the selected provider OIDC", () => {
+        const endpoint = { provider: "openai", configured: true, auth_type: "github-oidc/openai", port: 10000 };
+        expect(hasOIDCProviderEndpoint({ endpoints: [endpoint] }, "openai", "openai")).toBe(true);
+        expect(hasOIDCProviderEndpoint({ endpoints: [{ ...endpoint, auth_type: "github-oidc/azure" }] }, "openai", "openai")).toBe(false);
+        expect(hasOIDCProviderEndpoint({ endpoints: [{ ...endpoint, configured: false }] }, "openai", "openai")).toBe(false);
+        expect(hasOIDCProviderEndpoint({ endpoints: [endpoint] }, "anthropic", "openai")).toBe(false);
+      });
     });
   });
 

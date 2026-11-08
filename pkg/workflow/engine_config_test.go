@@ -798,7 +798,7 @@ func TestExtractEngineConfig_AnthropicWIFMapsToAWFEnv(t *testing.T) {
 		assert.Equal(t, "anthropic", config.Auth.Provider)
 		assert.Equal(t, "fr_01ABC", config.Auth.AnthropicFederationRuleID)
 		assert.Equal(t, "org_01XYZ", config.Auth.AnthropicOrganizationID)
-		assert.Equal(t, "sa_01DEF", config.Auth.AnthropicServiceAccountID)
+		assert.Equal(t, "sa_01DEF", config.Auth.ServiceAccountID)
 		assert.Equal(t, "ws_01GHI", config.Auth.AnthropicWorkspaceID)
 	}
 
@@ -808,6 +808,34 @@ func TestExtractEngineConfig_AnthropicWIFMapsToAWFEnv(t *testing.T) {
 	assert.Equal(t, "org_01XYZ", config.Env["AWF_AUTH_ANTHROPIC_ORGANIZATION_ID"])
 	assert.Equal(t, "sa_01DEF", config.Env["AWF_AUTH_ANTHROPIC_SERVICE_ACCOUNT_ID"])
 	assert.Equal(t, "ws_01GHI", config.Env["AWF_AUTH_ANTHROPIC_WORKSPACE_ID"])
+}
+
+func TestExtractEngineConfig_OpenAIWIFMapsToAWFEnv(t *testing.T) {
+	_, config, _ := NewCompiler().ExtractEngineConfig(map[string]any{
+		"engine": map[string]any{
+			"id": "codex",
+			"auth": map[string]any{
+				"type":                 "github-oidc",
+				"provider":             "openai",
+				"identity-provider-id": "idp_01ABC",
+				"service-account-id":   "svc_01DEF",
+				"audience":             "https://api.openai.com/v1",
+			},
+		},
+	})
+
+	assert.NotNil(t, config)
+	if assert.NotNil(t, config.Auth) {
+		assert.Equal(t, "openai", config.Auth.Provider)
+		assert.Equal(t, "idp_01ABC", config.Auth.OpenAIIdentityProviderID)
+		assert.Equal(t, "svc_01DEF", config.Auth.ServiceAccountID)
+	}
+	assert.Equal(t, "github-oidc", config.Env["AWF_AUTH_TYPE"])
+	assert.Equal(t, "openai", config.Env["AWF_AUTH_PROVIDER"])
+	assert.Equal(t, "https://api.openai.com/v1", config.Env["AWF_AUTH_OIDC_AUDIENCE"])
+	assert.Equal(t, "idp_01ABC", config.Env["AWF_AUTH_OPENAI_IDENTITY_PROVIDER_ID"])
+	assert.Equal(t, "svc_01DEF", config.Env["AWF_AUTH_OPENAI_SERVICE_ACCOUNT_ID"])
+	assert.NotContains(t, config.Env, "AWF_AUTH_ANTHROPIC_SERVICE_ACCOUNT_ID")
 }
 
 func TestCompileWorkflowWithExtendedEngine(t *testing.T) {
