@@ -93,18 +93,32 @@ class GuidanceTests(unittest.TestCase):
             "does not verify the new\nassertion's meaning",
             "Never prune canonical ledger evidence or producer task\nstate",
             "If the benefit is uncertain, do not add the dreamer",
-            "post-agent `noop` does not avoid\nthe model invocation cost",
         ):
             with self.subTest(cost_gate=required):
                 self.assertIn(required, section)
+        dreaming = (ROOT / ".github/aw/dreaming.md").read_text()
+        self.assertIn("post-agent `noop` does not avoid\nthe model invocation cost", dreaming)
 
     def test_dreaming_is_discoverable_and_uses_current_memory_contracts(self):
         memory = (ROOT / ".github/aw/memory.md").read_text()
         section = memory.split("## Scheduled dreaming\n", 1)[1].split("\n## ", 1)[0]
+        dreaming = (ROOT / ".github/aw/dreaming.md").read_text()
         creator = (ROOT / ".github/aw/create-agentic-workflow.md").read_text()
         self.assertIn("](memory.md#scheduled-dreaming)", creator)
+        self.assertIn("](dreaming.md)", creator)
+        self.assertIn("only after the memory decision and input-scope checks", creator)
+        self.assertIn("](dreaming.md)", section)
+        self.assertIn("Do not load implementation details", section)
+        self.assertIn("](memory.md#scheduled-dreaming)", dreaming)
+        self.assertIn("Load this guide only after", dreaming)
+        for implementation in ("```yaml", "max-patch-size", "ledger_note_add", "### Write the dreaming prompt"):
+            self.assertNotIn(implementation, section)
         for router in (SKILL / "SKILL.md", ROOT / "pkg/cli/data/agentic_workflows_skill.md"):
-            self.assertIn(".github/aw/memory.md#scheduled-dreaming", router.read_text())
+            routing = router.read_text()
+            self.assertIn(".github/aw/memory.md#scheduled-dreaming", routing)
+            self.assertIn(".github/aw/dreaming.md` only when the decision and input scope justify implementation", routing)
+        fallback = json.loads((ROOT / "pkg/cli/data/agentic_workflows_fallback_aw_files.json").read_text())
+        self.assertIn("dreaming.md", fallback)
         for required in (
             "filters **persistence**, not reads",
             "logical record IDs",
@@ -118,10 +132,44 @@ class GuidanceTests(unittest.TestCase):
             "consumer",
         ):
             with self.subTest(contract=required):
-                self.assertIn(required, section)
-        for link in re.findall(r"\]\(([^)]+)\)", section):
-            if not link.startswith("https://"):
-                self.assertTrue(((ROOT / ".github/aw") / link.split("#")[0]).is_file())
+                self.assertIn(required, dreaming)
+        for guidance in (section, dreaming):
+            for link in re.findall(r"\]\(([^)]+)\)", guidance):
+                if not link.startswith("https://"):
+                    path, _, anchor = link.partition("#")
+                    target = (ROOT / ".github/aw") / path
+                    with self.subTest(link=link):
+                        self.assertTrue(target.is_file())
+                        if anchor:
+                            headings = re.findall(r"^#{1,6} (.+)$", target.read_text(), re.MULTILINE)
+                            self.assertIn(anchor, [heading_anchor(heading) for heading in headings])
+
+    def test_dreaming_cache_scope_excludes_pr_local_history(self):
+        for path in (".github/aw/memory.md", ".github/aw/designer.md", ".github/aw/dreaming.md"):
+            guidance = " ".join((ROOT / path).read_text().split())
+            with self.subTest(guide=path):
+                self.assertIn("default-branch history", guidance)
+                self.assertIn("not PR-local caches", guidance)
+                self.assertIn("PR-local cleanup", guidance)
+        designer = (ROOT / ".github/aw/designer.md").read_text()
+        self.assertLess(designer.index("Check input scope before adding a dreamer"), designer.index("](dreaming.md)"))
+        dreaming = " ".join((ROOT / ".github/aw/dreaming.md").read_text().split())
+        for required in (
+            "scheduled and manual dreamer runs",
+            "actual default branch",
+            "cannot restore PR merge-ref caches",
+            "saved updates remain PR-local",
+            "default keys are workflow-scoped",
+            "compatible restore/save key prefixes, cache versions and paths",
+            "`scope: repo` broadens eligible restore keys, not GitHub's branch visibility",
+            "schema, and integrity/access policy",
+            "Do not silently export PR content into shared memory",
+        ):
+            with self.subTest(scope=required):
+                self.assertIn(required, dreaming)
+        reference = " ".join((ROOT / "docs/src/content/docs/reference/cache-memory.md").read_text().split())
+        self.assertIn("cannot restore those PR-local caches, even with the same key or `scope: repo`", reference)
+        self.assertIn("updates do not flow back to the default branch", reference)
 
     def test_dreaming_and_producer_have_disjoint_persistence_ownership(self):
         producer = (ROOT / ".github/workflows/daily-safeoutputs-git-simulator.md").read_text()

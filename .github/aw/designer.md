@@ -85,10 +85,16 @@ and why an additional workflow is worth its total cost, not just its potential
 online savings. Keep this a quick design decision, not a separate investigation.
 If these are unknown, defer the dreamer rather than inventing a need.
 
+Check input scope before adding a dreamer: scheduled `cache-memory` dreaming
+can use default-branch history only, not PR-local caches. Shared cache keys do
+not remove branch isolation. Keep PR-local cleanup in its existing workflow.
+When dreaming is justified, load [dreaming.md](dreaming.md) for implementation;
+do not load those details for ordinary memory cleanup.
+
 For deduplication lists, cursors, numeric baselines, one-off tasks, or a small
 current index with cheap recall, keep ordinary state or direct memory updates
 unless a separate knowledge problem is demonstrated. Preserve producer task
-state and follow the memory guide's ownership and evidence rules when dreaming
+state and follow the dreaming guide's ownership and evidence rules when dreaming
 is justified.
 
 Ask:
