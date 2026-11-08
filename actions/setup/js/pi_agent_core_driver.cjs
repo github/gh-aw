@@ -35,7 +35,7 @@ function jsonEvent(event) {
 async function main(options = {}) {
   const sdk = options.sdk || (await loadPiSDK());
   const emit = options.emit || (event => process.stdout.write(JSON.stringify(event) + "\n"));
-  const { agentDir, settings, config, routingSelection, skillPaths } = preparePiRuntime();
+  const { agentDir, settings, config, routingSelection, skillPaths, durableSession } = preparePiRuntime();
   if (routingSelection) {
     process.env.GH_AW_PI_MODEL = `aw-gateway/${routingSelection.wire_model}`;
     process.env.GH_AW_PI_NATIVE_PROVIDER = "aw-gateway";
@@ -73,13 +73,17 @@ async function main(options = {}) {
   });
   await resourceLoader.reload();
   const sessionOptions = config.session || {};
-  const sessionManager = !sessionOptions.enabled
-    ? sdk.SessionManager.inMemory(cwd)
-    : sessionOptions.resume
-      ? sdk.SessionManager.open(sessionOptions.resume, DEFAULT_SESSION_DIR, cwd)
-      : sessionOptions.fork
-        ? sdk.SessionManager.forkFrom(sessionOptions.fork, cwd, DEFAULT_SESSION_DIR, sessionOptions.id ? { id: sessionOptions.id } : undefined)
-        : sdk.SessionManager.create(cwd, DEFAULT_SESSION_DIR, sessionOptions.id ? { id: sessionOptions.id } : undefined);
+  const sessionManager = durableSession
+    ? sdk.SessionManager.open(durableSession.file, durableSession.directory, cwd)
+    : !sessionOptions.enabled
+      ? sdk.SessionManager.inMemory(cwd)
+      : sessionOptions.resume
+        ? sdk.SessionManager.open(sessionOptions.resume, DEFAULT_SESSION_DIR, cwd)
+        : sessionOptions.fork
+          ? sdk.SessionManager.forkFrom(sessionOptions.fork, cwd, DEFAULT_SESSION_DIR, sessionOptions.id ? { id: sessionOptions.id } : undefined)
+          : sdk.SessionManager.create(cwd, DEFAULT_SESSION_DIR, sessionOptions.id ? { id: sessionOptions.id } : undefined);
+  // Native resume prefers historical effort unless the current run supplies it explicitly.
+  const thinkingLevel = durableSession?.id ? (routingSelection?.mapped_effort ?? (model ? settingsManager.getModelThinkingLevel(model.provider, model.id) : undefined) ?? settingsManager.getDefaultThinkingLevel() ?? "medium") : undefined;
   const { session, modelFallbackMessage } = await sdk.createAgentSession({
     cwd,
     agentDir,
@@ -88,8 +92,10 @@ async function main(options = {}) {
     settingsManager,
     resourceLoader,
     sessionManager,
+    ...(thinkingLevel !== undefined ? { thinkingLevel } : {}),
   });
   try {
+    if (durableSession?.id && session.sessionId !== durableSession.id) throw new Error("Pi SDK did not resume the exact durable session");
     if (modelFallbackMessage) throw new Error(modelFallbackMessage);
     if (modelString && !model && (session.model?.provider !== provider || session.model?.id !== modelId)) throw new Error(`Pi model is not available: ${modelString}`);
     emit({ type: "session", version: 3, id: session.sessionId, cwd });

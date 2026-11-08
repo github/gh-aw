@@ -91,6 +91,18 @@ func TestPiSubagentArgumentsAreIsolated(t *testing.T) {
 	require.True(t, piSessionSettings(data).Enabled, "child isolation must not mutate the parent configuration")
 }
 
+func TestPiDurableSubagentsRemainEphemeral(t *testing.T) {
+	data := &WorkflowData{
+		EngineConfig: &EngineConfig{ID: "pi", Durable: &DurableConfig{RetentionDays: 7}},
+		Tools:        map[string]any{},
+	}
+	env := make(map[string]string)
+	NewPiEngine().applyPiConfigEnv(env, data)
+	require.Contains(t, env["GH_AW_PI_SUBAGENT_ARGS"], `"--no-session"`)
+	require.NotContains(t, env["GH_AW_PI_SUBAGENT_ARGS"], "durable-sessions")
+	require.NotNil(t, data.EngineConfig.Durable, "child isolation must not disable parent continuation")
+}
+
 func TestPiCompiledDisabledBash(t *testing.T) {
 	dir := t.TempDir()
 	source := filepath.Join(dir, "workflow.md")

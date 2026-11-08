@@ -23,7 +23,7 @@ func piSessionSettings(data *WorkflowData) piSessionConfig {
 		Session piSessionConfig `json:"session"`
 	}
 	if data != nil && data.EngineConfig != nil && data.EngineConfig.Config != "" {
-		if err := json.Unmarshal([]byte(data.EngineConfig.Config), &parsed); err != nil {
+		if err := json.Unmarshal([]byte(data.EngineConfig.Config), &parsed); err != nil { //nolint:jsonunmarshalbytesconversion // Small configuration requires whole-document validation.
 			panic(fmt.Sprintf("BUG: invalid validated Pi configuration: %v", err))
 		}
 	}
@@ -81,7 +81,7 @@ func validatePiJSONConfig(raw string) error {
 		return nil
 	}
 	var parsed map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+	if err := json.Unmarshal([]byte(raw), &parsed); err != nil { //nolint:jsonunmarshalbytesconversion // Small configuration requires whole-document validation.
 		return fmt.Errorf("engine.config for Pi must be a JSON object: %w", err)
 	}
 	if parsed == nil {
@@ -137,7 +137,7 @@ func validatePiSessionConfig(raw json.RawMessage) error {
 func piRuntimeConfigJSON(data *WorkflowData) string {
 	config := make(map[string]json.RawMessage)
 	if data.EngineConfig != nil && data.EngineConfig.Config != "" {
-		if err := json.Unmarshal([]byte(data.EngineConfig.Config), &config); err != nil || config == nil {
+		if err := json.Unmarshal([]byte(data.EngineConfig.Config), &config); err != nil || config == nil { //nolint:jsonunmarshalbytesconversion // Small configuration requires whole-document validation.
 			panic(fmt.Sprintf("BUG: invalid validated Pi configuration: %v", err))
 		}
 	}
@@ -170,6 +170,7 @@ func (e *PiEngine) applyPiConfigEnv(env map[string]string, data *WorkflowData) {
 		childConfig := *data.EngineConfig
 		childConfig.Config = ""
 		childConfig.Args = nil
+		childConfig.Durable = nil
 		childData.EngineConfig = &childConfig
 	}
 	childArgs, err := json.Marshal(e.buildPiArgs(&childData))

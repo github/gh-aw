@@ -15748,7 +15748,7 @@
     },
     "durable_config": {
       "type": "object",
-      "description": "Experimental. Persist engine-declared session files in GitHub Actions artifacts. Using this field emits a compile-time warning. Configuration and behavior may change without deprecation. Copilot, Claude, and Codex resume the exact native session; other session-based engines receive a continuation prompt. Pi uses its native durable task runtime. Starts fresh when no prior history exists. No memory tool is required.",
+      "description": "Experimental. Persist engine-declared session files in GitHub Actions artifacts. Using this field emits a compile-time warning. Configuration and behavior may change without deprecation. Copilot, Claude, Codex, and Pi resume the exact native session with the current workflow prompt; other session-based engines receive a continuation prompt. Starts fresh when no prior history exists. No memory tool is required.",
       "properties": {
         "retention-days": {
           "type": "integer",
