@@ -94,3 +94,6 @@ No new discussion/issue: weekly report already posted 2026-11-03; no new evidenc
 
 ## Run 2026-11-07T12:42Z
 metrics/latest.json is fresh (2026-11-07) but partial: 100 runs over 2.83h, no safe-output/engagement data. Ranking deferred; no discussion/issue filed.
+
+## Run 2026-11-08T12:42Z
+No new evidence; weekly report already posted 2026-11-03. No discussion/issue filed.
