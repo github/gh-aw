@@ -295,13 +295,6 @@ type outcomeWindowObservation struct {
 	decided  bool
 }
 
-// estimateOutcomeWindow pools variant outputs and treats pending outputs as
-// right-censored at their current age. If p95 is not observable, the upper cap
-// is used rather than underestimating the maturity period.
-func estimateOutcomeWindow(runs []ExperimentRunRecord, automatic map[string]struct{}, data map[string]outcomeRunData, now time.Time) time.Duration {
-	return estimateOutcomeWindowInfo(runs, automatic, data, now).duration()
-}
-
 func estimateOutcomeWindowInfo(runs []ExperimentRunRecord, automatic map[string]struct{}, data map[string]outcomeRunData, now time.Time) OutcomeWindowInfo {
 	observations, decided := collectOutcomeWindowObservations(runs, automatic, data, now)
 	if decided < minExperimentOutcomeDecisions {

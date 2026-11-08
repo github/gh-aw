@@ -1672,14 +1672,19 @@ check_wtd_convertible_fallback() {
         fi
 
         # Check that the caution text is emitted in the fallback.
-        # The handler may delegate to threat_detection_warning.cjs via
-        # getThreatWarningPresentation(), so accept that as equivalent evidence.
+        # The handler may delegate to messages_run_status.cjs via
+        # getDetectionWarningBlocks(), which renders the WTD1 caution template
+        # (threat_detection_caution.md) for threat_detected and the WTD1a
+        # engine-error template for tooling failures. Accept that chain as
+        # equivalent evidence.
         local threat_label_found=0
         if grep -q "agentic threat detected" "$push_handler" 2>/dev/null; then
             threat_label_found=1
-        elif grep -q "getThreatWarningPresentation" "$push_handler" 2>/dev/null; then
-            local threat_warning_file="actions/setup/js/threat_detection_warning.cjs"
-            if [ -f "$threat_warning_file" ] && grep -q "agentic threat detected" "$threat_warning_file" 2>/dev/null; then
+        elif grep -q "getDetectionWarningBlocks" "$push_handler" 2>/dev/null; then
+            local threat_status_file="actions/setup/js/messages_run_status.cjs"
+            local threat_caution_template="actions/setup/md/threat_detection_caution.md"
+            if [ -f "$threat_status_file" ] && grep -q "threat_detection_caution.md" "$threat_status_file" 2>/dev/null &&
+                [ -f "$threat_caution_template" ] && grep -q "agentic threat detected" "$threat_caution_template" 2>/dev/null; then
                 threat_label_found=1
             fi
         fi

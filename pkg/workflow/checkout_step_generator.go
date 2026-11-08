@@ -279,18 +279,6 @@ func (cm *CheckoutManager) GenerateGitHubFolderCheckoutStep(repository, ref, tok
 	return []string{sb.String()}
 }
 
-// GenerateConfigureGitCredentialsSteps emits the "Configure Git credentials" step that
-// installs a push-capable token for the effective root workspace checkout. Any cross-repo
-// checkout placed into a subdirectory is re-authenticated in place so a later push can
-// reach it. The provided gitRemoteToken is used for all remotes.
-//
-// The agent job never pushes, so it has no equivalent of this step; it is used by the
-// safe_outputs job, which supplies the push token (resolvePRCheckoutToken) and a gating
-// condition.
-func (cm *CheckoutManager) GenerateConfigureGitCredentialsSteps(gitRemoteToken string, condition ConditionNode) []string {
-	return cm.generateConfigureGitCredentialsStepsForRoot(gitRemoteToken, condition, cm.effectiveRootCheckoutRepository())
-}
-
 func (cm *CheckoutManager) generateConfigureGitCredentialsStepsForRoot(gitRemoteToken string, condition ConditionNode, rootRepo string) []string {
 	conditionStr := RenderCondition(condition)
 	subRepos := cm.credentialSubrepositories()

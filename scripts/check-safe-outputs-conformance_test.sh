@@ -87,6 +87,35 @@ trap 'rm -f "$OUTPUT"; rm -rf "$FIXTURE_ROOT"' EXIT
     fi
 )
 
+# Exercise WTD-002 through the getDetectionWarningBlocks caution chain, and reject a fallback whose caution template lost its label.
+(
+    cd "$FIXTURE_ROOT"
+    rm -rf actions
+    mkdir -p actions/setup/js actions/setup/md
+    printf 'const { getDetectionWarningBlocks } = require("./messages_run_status.cjs");\nconst conclusion = process.env.GH_AW_DETECTION_CONCLUSION;\nawait githubClient.rest.pulls.create({});\nmodule.exports = { getDetectionWarningBlocks, conclusion };\n' >actions/setup/js/push_to_pull_request_branch.cjs
+    printf 'const template = "threat_detection_caution.md";\nmodule.exports = { template };\n' >actions/setup/js/messages_run_status.cjs
+    printf '> [!CAUTION]\n> agentic threat detected\n> <!-- gh-aw-threat-detected -->\n' >actions/setup/md/threat_detection_caution.md
+
+    log_high() { echo "HIGH: $1"; }
+    log_medium() { echo "MEDIUM: $1"; }
+    log_pass() { echo "PASS: $1"; }
+    eval "$(sed -n '/^check_wtd_convertible_fallback() {/,/^}/p' "$SCRIPT_DIR/check-safe-outputs-conformance.sh")"
+    check_wtd_convertible_fallback >"$OUTPUT"
+    if ! grep -q '^PASS: WTD-002: push_to_pull_request_branch has convertible fallback' "$OUTPUT" || grep -q '^HIGH:' "$OUTPUT"; then
+        echo "FAIL: WTD-002 must accept the getDetectionWarningBlocks caution chain"
+        cat "$OUTPUT"
+        exit 1
+    fi
+
+    printf '> [!CAUTION]\n> threat detected\n' >actions/setup/md/threat_detection_caution.md
+    check_wtd_convertible_fallback >"$OUTPUT"
+    if ! grep -q "^HIGH: WTD-002: push_to_pull_request_branch fallback missing 'agentic threat detected' text" "$OUTPUT" || grep -q '^PASS:' "$OUTPUT"; then
+        echo "FAIL: WTD-002 must reject a fallback whose caution template lacks the threat label"
+        cat "$OUTPUT"
+        exit 1
+    fi
+)
+
 bash "$SCRIPT_DIR/check-safe-outputs-transport-integrity_test.sh"
 
 (cd "$REPO_ROOT" && bash "$SCRIPT_DIR/check-safe-outputs-conformance.sh" 2>&1 | sed -E $'s/\033\\[[0-9;]*[[:alpha:]]//g' >"$OUTPUT") || true
@@ -98,7 +127,7 @@ if ! grep -q 'SEC-005: All cross-repo handlers validate allowlists' "$OUTPUT" ||
     exit 1
 fi
 
-for finding in TYPE-016 MCE-001 USE-001 USE-003; do
+for finding in TYPE-016 MCE-001 USE-001 USE-003 WTD-002; do
     if grep -E "\\[(HIGH|MEDIUM|LOW)\\] $finding:" "$OUTPUT" >/dev/null; then
         echo "FAIL: Expected no $finding safe-output conformance findings"
         grep -E "\\[(HIGH|MEDIUM|LOW)\\] $finding:" "$OUTPUT"

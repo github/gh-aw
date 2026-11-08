@@ -646,20 +646,25 @@ function createReviewBuffer() {
             per_page: 100,
           });
           if (Array.isArray(data) && data.length > 0) {
-            reviewComments = data.map(comment => ({
-              id: comment.id,
-              url: comment.html_url,
-              repo,
-              pull_request_number: pullRequestNumber,
-              metadata: {
-                review_id: review.id,
-                ...(comment.node_id ? { node_id: comment.node_id } : {}),
-                ...(comment.path ? { path: comment.path } : {}),
-                ...(comment.line != null ? { line: comment.line } : {}),
-                ...(comment.start_line != null ? { start_line: comment.start_line } : {}),
-                ...(comment.side ? { side: comment.side } : {}),
-              },
-            }));
+            // Identity lookup is optional enrichment, not evidence that a submitted
+            // anchor disappeared. GitHub can return null coordinates after publication.
+            const sideOrDefault = side => (side === undefined ? "RIGHT" : side);
+            const sameAnchor = (comment, submitted) =>
+              comment.path === submitted.path && comment.line === submitted.line && (comment.start_line ?? undefined) === submitted.start_line && sideOrDefault(comment.side) === sideOrDefault(submitted.side);
+            reviewComments = reviewComments.map(submitted => {
+              const matches = data.filter(comment => sameAnchor(comment, submitted.metadata));
+              if (matches.length !== 1 || reviewComments.filter(candidate => sameAnchor(matches[0], candidate.metadata)).length !== 1) {
+                core.warning(`Could not uniquely resolve review comment identity at ${submitted.metadata.path}:${submitted.metadata.line}; retaining submitted anchor`);
+                return submitted;
+              }
+              const comment = matches[0];
+              return {
+                ...submitted,
+                id: comment.id,
+                url: comment.html_url,
+                metadata: { ...submitted.metadata, ...(comment.node_id ? { node_id: comment.node_id } : {}) },
+              };
+            });
           }
         } catch (error) {
           core.warning(`Could not resolve IDs for review comments on ${repo}#${pullRequestNumber}: ${getErrorMessage(error)}`);
