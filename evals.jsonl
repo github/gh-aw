@@ -1004,3 +1004,5 @@
 {"id":"report-created","question":"Was a report issue created summarizing PR compliance with the contributing guidelines?","answer":"YES","model":"evals","timestamp":"2026-11-01T20:57:46.785Z","runid":"41348894852"}
 {"id":"prs-evaluated","question":"Did the agent dispatch PRs to the contribution-checker subagent and produce evaluation results for each PR?","answer":"YES","model":"evals","timestamp":"2026-11-02T01:00:48.356Z","runid":"41369564510"}
 {"id":"report-created","question":"Was a report issue created summarizing PR compliance with the contributing guidelines?","answer":"YES","model":"evals","timestamp":"2026-11-02T01:00:48.356Z","runid":"41369564510"}
+{"id":"prs-evaluated","question":"Did the agent dispatch PRs to the contribution-checker subagent and produce evaluation results for each PR?","answer":"UNKNOWN","model":"gpt-6-luna","timestamp":"2026-11-08T12:57:32.646Z","runid":"42482138972"}
+{"id":"report-created","question":"Was a report issue created summarizing PR compliance with the contributing guidelines?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-08T12:57:32.646Z","runid":"42482138972"}
