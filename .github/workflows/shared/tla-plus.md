@@ -4,9 +4,9 @@ env:
   TLA2TOOLS_JAR: /tmp/gh-aw/agent/tla-tools/tla2tools.jar
 steps:
   - name: Prepare pinned TLA+ runtime
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     shell: bash
     run: |
-      # runner-guard:ignore RGS-018 -- Version-pinned TLA+ runtime artifacts are SHA-256 verified before use.
       set -euo pipefail
       trusted=$(mktemp -d "$RUNNER_TEMP/tla-installer.XXXXXX")
       trap 'rm -rf "$trusted"' EXIT
@@ -17,6 +17,7 @@ steps:
         15317bc27032f3c8160cb47fb77084683e21e3c37680db90b9bb2e57adea16e2 "$trusted/.github/scripts/install_tla_runtime.sh" \
         31ef8b9a9bd4dc4d84db08d21a677c838f1c2d55d43fb834c3fbcf1f47b6ba4d "$trusted/actions/setup/sh/release_integrity.sh" | sha256sum --check --strict
       bash "$trusted/.github/scripts/install_tla_runtime.sh" /tmp/gh-aw/agent/tla-tools
+      # runner-guard:ignore RGS-018 -- Default-branch installer and integrity helper are SHA-256 verified before execution.
 ---
 
 <!--
@@ -25,8 +26,8 @@ TLA+ Tools v1.7.4 (TLC 2.19) before the agent runs on a Linux x64 runner. The po
 and jar live under /tmp/gh-aw/agent so they are accessible in the sandbox.
 This fragment does not grant tools, network access, or safe outputs.
 Custom jobs do not inherit these agent setup steps.
-The installer and helper are copied from the checkout and verified against reviewed
-workflow-owned hashes before execution, not trusted merely because they are in the checkout.
+The setup runs only on the configured default branch, where the scripts and hashes are
+reviewed together; non-default refs skip setup instead of executing checkout-controlled copies.
 -->
 
 {{#import .github/aw/formal-methods.md}}
