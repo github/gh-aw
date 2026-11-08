@@ -46,6 +46,7 @@ safe-outputs:
     allowed-files:
       - docs/adr/**
     patch-format: bundle
+    exclude-lock-yml: true
     ignore-missing-branch-failure: true
     commit-title-suffix: " [design-decision-gate]"
   noop:
