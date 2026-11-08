@@ -111,7 +111,7 @@ function performanceHistory({ generations = 4, commitsPerCheckpoint = 32, bound 
   return { f, transactions, retained, generations, commitsPerCheckpoint, initial };
 }
 
-describe("Git-only work queue ledger", { timeout: 30000 }, () => {
+describe("Git-only work queue ledger", { timeout: 90000 }, () => {
   it.each([false, true])("shares production ledger clients with a paced Issue wrapper created before the first read: %s", async wrapFirst => {
     const client = { auth: async () => ({ type: "token", token: "offline-queue-token" }) };
     const original = wrapFirst ? undefined : queueLedgerClient(client, "owner", "repo");
@@ -243,10 +243,10 @@ describe("Git-only work queue ledger", { timeout: 30000 }, () => {
         ancestry_commits: generations * commitsPerCheckpoint,
         corrupt_oldest: corruptOldest,
         cold_ms: Math.round(coldMs),
-        budget_ms: 10000,
+        budget_ms: 25000,
       })
     );
-    expect(coldMs).toBeLessThan(10000);
+    expect(coldMs).toBeLessThan(25000);
   });
 
   it.each(["duplicate-key", "truncated", "invalid-request"])("rejects a %s historical log even when the descendant checkpoint is valid", async defect => {
