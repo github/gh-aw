@@ -16,6 +16,7 @@ network:
 imports:
 - shared/github-guard-policy.md
 - shared/ai-coding-dictionary.md
+- shared/pageindex.md
 - shared/otlp.md
 safe-outputs:
   steer: true
@@ -100,6 +101,7 @@ Do not modify the top-level `README.md` or `docs/src/content/docs/index.mdx`. Th
 - **Do NOT** use `mcpscripts` for any GitHub reads — use `gh` CLI or GitHub MCP tools directly
 - **Documentation editing**: use the `Edit` tool, not bash `sed`
 - **AI terminology normalization**: use the shared AI Coding Dictionary reference to keep AI-coding terms consistent
+- **Documentation discovery**: use the local PageIndex catalog and tree-guided search to locate sections affected by recent changes; verify each proposed update against the source file
 
 ## Pre-flight: Batch Data Fetch (do this first, before any analysis)
 
