@@ -21,7 +21,7 @@ For workflows that **persist state across runs** — deduplication, incremental 
 | Long-lived knowledge base visible in PRs and code reviews | `repo-memory` |
 | Baselines that must survive cache expiry (e.g. security findings, dedup lists) | `repo-memory` |
 | Bounded append-only structured event history and built-in current-state projections | Experimental `tools.ledger` — see [ledger.md](ledger.md) |
-| Periodically consolidate evidence into reusable lessons | [Scheduled dreaming](#scheduled-dreaming) over `repo-memory`, optionally with a notes ledger |
+| Reusable lessons need semantic consolidation beyond deterministic cleanup | [Scheduled dreaming](#scheduled-dreaming) only when cheaper options cannot meet the need |
 | Human-readable wiki pages for knowledge accumulation | `repo-memory` with `wiki: true` |
 | Persist notes/state inline on the triggering issue or PR | `comment-memory` |
 | Private-preview GitHub Drives backend (enrolled repos only) | `drive-memory` — see [drive-memory.md](drive-memory.md) |
@@ -251,6 +251,19 @@ are useful, experimental `tools.ledger` with `type: notes`.
 
 ### Choose a useful input and an owner
 
+Use the cheapest sufficient option, in this order:
+
+| Need | First choice |
+|---|---|
+| Exact-key deduplication, sorting, hash-based invalidation, retention of disposable state, rebuilding an index | Deterministic cleanup in the existing workflow; no model invocation |
+| Meaning-based reconciliation or synthesis that fits an existing run's budget | Bounded review by the already-running agent; no additional workflow |
+| Recurring semantic consolidation that the cheaper options cannot cover economically | A separate dreamer, only with primary evidence, a consumer, and a credible benefit |
+
+Deterministic cleanup is preferable whenever the rules reliably express the
+operation. Invalidating a changed citation by hash does not verify the new
+assertion's meaning. Never prune canonical ledger evidence or producer task
+state under the guise of retention; clean disposable state and derived views.
+
 Inspect the producer workflow and its actual memory format first. Repeated
 investigations, tested strategies, environment gotchas, and recurring explicit
 corrections are good inputs. A deduplication list, backlog cursor, numeric
@@ -259,7 +272,10 @@ techniques as well as failures; distinguish observed outcomes from hypotheses.
 
 Recommend dreaming only when a later consumer will reuse the knowledge and
 the expected reduction in repeated reasoning or stale advice justifies the
-consolidation and maintenance cost. A recurring schedule or a growing note count
+extra workflow, model invocation, and maintenance after cheaper options are
+ruled out. Compare total cost, not just reduced online tokens; do not invent
+savings. If the benefit is uncertain, do not add the dreamer.
+A recurring schedule or a growing note count
 alone is not enough. Prefer direct recall and producer-owned corrections when
 the existing view is already small, current, and cheap to use.
 
@@ -271,8 +287,10 @@ the same summary. An isolated output branch is another option, but explicitly
 configure how producers restore and read it. A generated view with no consumer
 is not an integration.
 
-Start weekly with manual dispatch, a short timeout, and no public report unless
-attention is needed. Serialize the dreamer's runs without cancelling publication:
+If a separate dreamer is justified, start weekly with manual dispatch, a short
+timeout, and no public report unless attention is needed. For rare semantic work,
+prefer manual dispatch or a lower cadence. A post-agent `noop` does not avoid
+the model invocation cost. Serialize runs without cancelling publication:
 
 ```yaml
 on:

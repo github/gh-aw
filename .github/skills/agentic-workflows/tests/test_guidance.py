@@ -65,6 +65,39 @@ class GuidanceTests(unittest.TestCase):
         memory = (ROOT / ".github/aw/memory.md").read_text()
         self.assertIn("A recurring schedule or a growing note count\nalone is not enough", memory)
 
+    def test_dreaming_selection_prefers_deterministic_existing_work(self):
+        designer = (ROOT / ".github/aw/designer.md").read_text()
+        phase = designer.split("### Phase 4: Data Strategy\n", 1)[1].split("\n### Phase 5:", 1)[0]
+        self.assertLess(phase.index("Try deterministic cleanup first"), phase.index("](memory.md#scheduled-dreaming)"))
+        self.assertLess(phase.index("already-running producer"), phase.index("Choose dreaming only"))
+        for required in (
+            "exact-key\ndeduplication",
+            "bounded retention of disposable state",
+            "hash-based\ninvalidation",
+            "rules cannot resolve",
+            "consolidation workflow is the last resort",
+            "after cheaper\noptions are ruled out",
+            "worth its total cost",
+            "quick design decision, not a separate investigation",
+        ):
+            with self.subTest(selection=required):
+                self.assertIn(required, phase)
+        creator = (ROOT / ".github/aw/create-agentic-workflow.md").read_text()
+        self.assertIn("beyond deterministic cleanup", creator)
+        memory = (ROOT / ".github/aw/memory.md").read_text()
+        section = memory.split("## Scheduled dreaming\n", 1)[1].split("\n## ", 1)[0]
+        for required in (
+            "Use the cheapest sufficient option, in this order",
+            "no model invocation",
+            "already-running agent; no additional workflow",
+            "does not verify the new\nassertion's meaning",
+            "Never prune canonical ledger evidence or producer task\nstate",
+            "If the benefit is uncertain, do not add the dreamer",
+            "post-agent `noop` does not avoid\nthe model invocation cost",
+        ):
+            with self.subTest(cost_gate=required):
+                self.assertIn(required, section)
+
     def test_dreaming_is_discoverable_and_uses_current_memory_contracts(self):
         memory = (ROOT / ".github/aw/memory.md").read_text()
         section = memory.split("## Scheduled dreaming\n", 1)[1].split("\n## ", 1)[0]
