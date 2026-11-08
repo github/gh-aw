@@ -27,21 +27,28 @@ Full tool reference for each toolset. See [github-mcp-server.md](github-mcp-serv
 ---
 
 ### copilot
-**Description**: GitHub Copilot assignment, review, coding agent, and Automation tools
+**Description**: GitHub Copilot assignment, review, coding agent, Automation, and task status tools; requires `issues` and `pull-requests` write permissions
 
 | Tool | Purpose | Key Parameters |
 |------|---------|----------------|
 | `assign_copilot_to_issue` | Assign GitHub Copilot to an issue | `owner`, `repo`, `issue_number` |
 | `create_pull_request_with_copilot` | Ask Copilot to create a pull request | `owner`, `repo`, `issue_number` |
 | `get_automation` | Get a Copilot Automation | `owner`, `repo`, `automation_id` |
+| `get_automation_group` | Get a repository Automation group and its visible members | Remote schema |
 | `get_automation_revision` | Get a Copilot Automation revision | `owner`, `repo`, `automation_id`, `revision_id` |
+| `get_automations_configuration_for_repository` | Get Copilot Automations configuration for a repository | Remote schema |
+| `get_copilot_session_events` | Read a chronological page of Copilot session events | Remote schema |
+| `get_copilot_task_status` | Read a Copilot task-status snapshot | Remote schema |
+| `list_automation_groups` | List repository Automation groups and the authenticated identity | Remote schema |
 | `list_automation_revisions` | List Copilot Automation revisions | `owner`, `repo`, `automation_id` |
 | `list_automations` | List Copilot Automations | `owner`, `repo` |
 | `list_available_automation_tools` | List available Copilot Automation tools | None |
 | `list_available_automation_triggers` | List available Copilot Automation triggers | None |
 | `request_copilot_review` | Request a Copilot review on a pull request | `owner`, `repo`, `pullNumber` |
 
-> **Note**: Automation tools are exposed by the remote GitHub MCP service; their placement under `copilot` has not been confirmed against public upstream toolset registration.
+> **Permissions**: Read-only Automation and task status tools share the `issues` and `pull-requests` write permissions required by the Copilot toolset's assignment and review operations.
+>
+> **Remote schema**: The local mapping records toolset membership and permissions only. Automation and task status parameters are defined by the remote GitHub MCP service, and their placement under `copilot` has not been confirmed against public upstream toolset registration.
 
 ---
 
