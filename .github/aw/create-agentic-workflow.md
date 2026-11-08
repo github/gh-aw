@@ -155,13 +155,8 @@ When evaluating scenarios, classify any failure before stopping:
 Use the smallest trigger that satisfies the augmented intent. Treat the mappings below as implementation options, not direct substitutions for intent reasoning. See the [Decision Matrix](triggers.md#decision-matrix) in triggers.md for the base trigger-to-use-case mapping.
 
 Apply the [memory reuse checkpoint](designer.md#memory-reuse-checkpoint) before
-<<<<<<< HEAD
-selecting tools or persistence, and follow its routes to the decision and
-implementation guidance.
-=======
 selecting tools or persistence, following the decision and scope policy in
 [memory.md](memory.md#scheduled-dreaming).
->>>>>>> origin/pelikhan/agent-memory-differential
 
 | Scenario | Trigger and default output | Details |
 |---|---|---|

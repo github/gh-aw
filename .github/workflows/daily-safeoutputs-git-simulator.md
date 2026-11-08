@@ -24,31 +24,6 @@ strict: true
 runtimes:
   python:
     version: "3.11"
-steps:
-  - name: Create read-only ledger projection
-    uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-    env:
-      GH_TOKEN: ${{ github.token }}
-    with:
-      github-token: ${{ github.token }}
-      script: |
-        const path = require('path');
-        const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-        const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-        setupGlobals(core, github, context, exec, io, getOctokit);
-        const { main } = require(path.join(actionsDir, 'create_ledger_projection.cjs'));
-        await main({
-          githubClient: github,
-          owner: context.repo.owner,
-          repo: context.repo.repo,
-          ledgerConfigs: [{
-            name: 'git-simulator-lessons',
-            type: 'notes',
-            max_record_kb: 4,
-            max_segment_kb: 100,
-            max_patch_kb: 16,
-          }],
-        });
 tools:
   cli-proxy: true
   bash: true
@@ -60,8 +35,6 @@ tools:
     file-glob: ["git-sim-state.json", "git-sim-strategies.md"]
     allowed-extensions: [".json", ".md"]
     max-file-size: 204800
-<<<<<<< HEAD
-=======
     validation:
       script: |
         if (memoryPhase === "push" && memorySourceJobResult !== "success") {
@@ -158,7 +131,6 @@ post-steps:
       overwrite: true
       retention-days: 1
       if-no-files-found: error
->>>>>>> origin/pelikhan/agent-memory-differential
 safe-outputs:
   create-issue:
     title-prefix: "[git-sim] "
@@ -300,27 +272,12 @@ The preparation step discards their local restored copies; this workflow never
 persists changes to them. The daily reader has no ledger safe-output handlers
 or persistence job: do not write, vote, or request compaction.
 
-<<<<<<< HEAD
-Query the current ledger projection at
-`/tmp/gh-aw/ledgers/git-simulator-lessons/ledger.db` using Python's
-standard-library `sqlite3` with `mode=ro`. A read-only workflow step creates
-the projection; this workflow does not configure ledger mutation tools or a
-ledger write job. Read at most 20 relevant notes with their citations and
-votes. If current notes conflict with a derived lesson, revalidate the primary
-evidence and abstain from the lesson when unresolved. Votes are endorsements,
-not verification.
-
-Use supported lessons only to interpret results or choose high-risk regression
-cells within Phase 1's existing rules. Never let dreaming change `next_index`,
-the tested-cell map, the deterministic primary selection, or output guardrails.
-=======
 Use `regression_priority` only when fewer than four untested cells remain.
 Fill the remaining slots from that ordered list, skipping already selected IDs.
 Never use this projection to interpret new outcomes, change primary selection,
 authorize operations, choose tools or outputs, alter `next_index` or tested
 cells, or change guardrails.
 Missing accepted signals means baseline deterministic regression ordering.
->>>>>>> origin/pelikhan/agent-memory-differential
 
 ## Phase 1: Select 4 Configurations for This Run
 

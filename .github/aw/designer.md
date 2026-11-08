@@ -65,18 +65,12 @@ Before choosing tools or persistence, check whether later runs need reusable
 knowledge rather than just processing state. Infer this from the request and
 available repository evidence; do not add a mandatory interview question.
 
-<<<<<<< HEAD
-Use [memory.md](memory.md#scheduled-dreaming) for the decision and input-scope
-criteria. Load [dreaming.md](dreaming.md) only when that guide justifies a
-separate workflow, and only for implementation.
-=======
 For repeated investigations, growing history or recall cost, accumulated
 successful techniques, or stale/contradictory advice, load
 [memory.md](memory.md#scheduled-dreaming) even when the user does not mention
 memory or dreaming. That guide owns the deterministic-first decision, cost
 gate, and input-scope checks; loading the guide does not mean adding a dreamer.
 Apply its decision before loading implementation guidance.
->>>>>>> origin/pelikhan/agent-memory-differential
 
 Ask:
 - **"What data does the agent need to make decisions?"**

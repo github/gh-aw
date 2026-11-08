@@ -54,6 +54,7 @@ describe("memory_custom_validation", () => {
       repository_files: { "pkg/workflow/repo_memory.go": "b".repeat(64) },
       reviewed_note_ids: ["persisted-note"],
       lesson_count: 1,
+      signals: [],
     };
     const files = {
       "dreaming-index.md": "index\n",

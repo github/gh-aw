@@ -283,24 +283,20 @@ A recurring schedule or a growing note count
 alone is not enough. Prefer direct recall and producer-owned corrections when
 the existing view is already small, current, and cheap to use.
 
-For `cache-memory`, scheduled dreaming is eligible for default-branch history
-only, not PR-local caches. A PR merge-ref run may restore an eligible
-<<<<<<< HEAD
-default-branch cache, but its updates do not flow back to the default branch. Keep PR-local cleanup
-inside the PR workflow; a shared key does not remove branch isolation.
+For `cache-memory`, scheduled and manual dreamer runs must use the repository's
+actual default branch, not a hard-coded `main`. Scheduled dreaming is eligible
+for default-branch history only, not PR-local caches. A PR merge-ref run may
+restore an eligible default-branch cache, but its updates do not flow back to the
+default branch. Keep PR-local cleanup inside the PR workflow.
+
 Separate workflows do not automatically share cache-memory: default keys are
-workflow-scoped. Verify compatible restore/save key prefixes, cache versions
-and paths, schema, and integrity/access policy. `scope: repo` broadens eligible
-restore keys, not GitHub's branch visibility. Cache eviction remains possible,
-so define a rebuildable cold start.
-=======
-default-branch cache, but its updates do not flow back to the default branch.
-Keep PR-local cleanup inside the PR workflow; a shared key does not remove
-branch isolation.
+workflow-scoped. Verify compatible restore/save key prefixes, cache versions and
+paths, schema, and integrity/access policy. `scope: repo` broadens eligible
+restore keys, not GitHub's branch visibility; a shared key does not remove PR
+isolation. Cache eviction remains possible, so define a rebuildable cold start.
 If knowledge must outlive or cross PR boundaries, require explicitly authorized,
 evidence-validated publication to durable repo-memory or a ledger. Do not silently
 export PR content into shared memory to bypass cache isolation.
->>>>>>> origin/pelikhan/agent-memory-differential
 
 Once the need, cost, and input scope justify a separate dreamer, load
 [dreaming.md](dreaming.md) for configuration, ownership, bounded consolidation,
