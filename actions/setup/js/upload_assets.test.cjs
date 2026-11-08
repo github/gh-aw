@@ -193,6 +193,10 @@ describe("upload_assets.cjs", () => {
       }
       expect(mockCore.setFailed).not.toHaveBeenCalled();
       expect(fs.readFileSync(target, "utf8")).toBe("verified chart");
+      const publishedStat = fs.statSync(target);
+      expect(publishedStat.mode & 0o777).toBe(0o644);
+      expect(publishedStat.uid).toBe(process.getuid());
+      expect(publishedStat.gid).toBe(process.getgid());
       expect(crypto.createHash("sha256").update(fs.readFileSync(target)).digest("hex")).toBe(sha);
     });
 

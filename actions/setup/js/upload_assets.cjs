@@ -178,7 +178,7 @@ async function main() {
 
       // Copy file to branch with target filename
       try {
-        writeGuardedFile(targetFileName, fileContent);
+        writeGuardedFile(targetFileName, fileContent, { mode: 0o644, directoryMode: 0o755 });
 
         // Add to git
         await exec.exec("git", ["add", targetFileName]);
