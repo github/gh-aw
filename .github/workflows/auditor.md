@@ -98,7 +98,9 @@ jobs:
             if (state.version !== 1 || state.repository !== repository ||
                 !Number.isFinite(Date.parse(state.checkpoint)) || Date.parse(state.checkpoint) > Date.parse(end) ||
                 !Array.isArray(state.seen) || !Array.isArray(state.backlog) ||
-                (state.pending !== undefined && !Array.isArray(state.pending))) {
+                (state.pending !== undefined && !Array.isArray(state.pending)) ||
+                (state.catchup_failures !== undefined &&
+                 (!Array.isArray(state.catchup_failures) || state.catchup_failures.some(key => typeof key !== 'string')))) {
               throw new Error('Invalid collection checkpoint; refusing to reset it silently');
             }
             core.setOutput('has_new_failures', 'false');
@@ -116,23 +118,38 @@ jobs:
               return method({...context.repo, ...params});
             };
             const observed = [];
+            let discoveryEnd = end;
             let total;
             for (let page = 1; page <= 10; page++) {
               const response = await request(github.rest.actions.listWorkflowRunsForRepo, {
-                created: `${start}..${end}`, per_page: 100, page, exclude_pull_requests: true
+                created: `${start}..${discoveryEnd}`, per_page: 100, page, exclude_pull_requests: true
               });
               const body = response.data;
-              if (!Number.isInteger(body.total_count) || !Array.isArray(body.workflow_runs) ||
-                  body.total_count >= 1000 || (total !== undefined && total !== body.total_count)) {
-                throw new Error('Incomplete or oversized recent run scope; checkpoint unchanged');
+              if (!Number.isInteger(body.total_count) || body.total_count < 0 || !Array.isArray(body.workflow_runs) ||
+                  (total !== undefined && total !== body.total_count)) {
+                throw new Error('Incomplete or changing recent run scope; checkpoint unchanged');
+              }
+              if (body.total_count >= 1000) {
+                // Complete the oldest bounded prefix, never skip the unseen suffix.
+                const midpoint = Math.floor((Date.parse(start) + Date.parse(discoveryEnd)) / 2000) * 1000;
+                if (page !== 1 || midpoint <= Date.parse(state.checkpoint)) {
+                  throw new Error('Oversized indivisible recent run scope; checkpoint unchanged');
+                }
+                discoveryEnd = new Date(midpoint).toISOString();
+                page = 0;
+                continue;
               }
               total = body.total_count;
               observed.push(...body.workflow_runs);
               if (observed.length >= total) break;
             }
-            if (observed.length !== total || new Set(observed.map(r => r.id)).size !== total) {
+            if (observed.length !== total || new Set(observed.map(r => r.id)).size !== total ||
+                observed.some(r => !Number.isSafeInteger(r.id) || r.id <= 0 ||
+                  !Number.isFinite(Date.parse(r.created_at)) ||
+                  Date.parse(r.created_at) < Date.parse(start) || Date.parse(r.created_at) > Date.parse(discoveryEnd))) {
               throw new Error('Recent run pagination incomplete or raced; checkpoint unchanged');
             }
+            const discoveryComplete = discoveryEnd === end;
             const pendingIDs = [...new Set([...(state.pending || []),
               ...state.backlog.filter(item => Date.parse(item.run.updated_at) >= Date.parse(retentionStart))
                 .map(item => item.run.id)])];
@@ -269,10 +286,12 @@ jobs:
               b.members.length - a.members.length ||
               Number(b.signal_role === 'failure_boundary') - Number(a.signal_role === 'failure_boundary') ||
               a.id.localeCompare(b.id));
-            const newFailures = fresh.filter(r => backlog.some(m => m.key === identity(r))).length;
+            const newFailureKeys = [...new Set([...(state.catchup_failures || []),
+              ...fresh.map(identity)])].filter(key => backlog.some(m => m.key === key));
+            const newFailures = newFailureKeys.length;
             let auditCount = 0;
             for (const cluster of ranked) {
-              if (newFailures === 0 || deferred > 0 || auditCount >= 3) break;
+              if (!discoveryComplete || newFailures === 0 || deferred > 0 || auditCount >= 3) break;
               const member = cluster.members[0];
               const dir = path.join(cache, path.dirname(member.report_file));
               const currentRate = (await github.rest.rateLimit.get()).data.resources.core;
@@ -311,10 +330,11 @@ jobs:
             // Copy ONLY this collection's compact reports and selected audit
             // evidence. Do not upload the whole historical download cache.
             const manifest = {
-              complete: true, repository, window_start: start, window_end: end,
+              complete: true, repository, window_start: start, window_end: discoveryEnd,
+              discovery_complete: discoveryComplete, discovery_target: end,
               retention_start: retentionStart, bootstrap, cli_version: cliVersion,
               new_failures: newFailures,
-              evidence_complete: deferred === 0, pending_runs: pending.length, deferred_failures: deferred,
+              evidence_complete: discoveryComplete && deferred === 0, pending_runs: pending.length, deferred_failures: deferred,
               open_prs_complete: true, open_prs: openPRs, clusters: ranked,
               limits: {recent_pages: 10, metadata_requests: 1025, metadata_runs: 999,
                 pr_pages: 10, new_runs: 25, audits: 3, api_used_ceiling: ceiling}
@@ -339,13 +359,16 @@ jobs:
             write(path.join(data, 'manifest.json'), manifest);
             // Complete metadata/PR scope; evidence may be a declared FIFO batch.
             // Never mark deferred attempts seen. Cache save must also succeed.
-            write(stateFile, {...state, checkpoint: end,
+            write(stateFile, {...state, checkpoint: discoveryEnd,
               seen: eligible.filter(r => Date.parse(r.updated_at) >= Date.parse(retentionStart))
-                .map(identity).filter(key => seen.has(key)), backlog, pending});
+                .map(identity).filter(key => seen.has(key)), backlog, pending,
+              catchup_failures: !manifest.evidence_complete &&
+                (!discoveryComplete || (state.catchup_failures || []).length) ? newFailureKeys : []});
             core.setOutput('has_new_failures',
               manifest.new_failures > 0 && manifest.evidence_complete ? 'true' : 'false');
             await core.summary.addRaw(`Collected ${manifest.new_failures} new non-intentional failures; ` +
-              `${ranked.length} symptom clusters; ${pending.length} unfinished/deferred runs. Created window ${start} to ${end}. ` +
+              `${ranked.length} symptom clusters; ${pending.length} unfinished/deferred runs. Created window ${start} to ${discoveryEnd}. ` +
+              `Discovery through ${end} ${discoveryComplete ? 'complete' : 'pending catch-up'}. ` +
               'No new failures means no agent, not proof that the backlog is healthy.').write();
       - name: Upload compact collection
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -383,7 +406,8 @@ invalid, incomplete, has no **new** non-intentional failures, or lacks a complet
 open-PR listing. “Bail out” means no NEW failures, not no historical failures.
 Collection failure must never be interpreted as an empty result.
 If `evidence_complete` is false, `noop`: the checkpoint retains deferred failures
-for later batches; cluster rankings are not yet scope-complete. Unfinished runs
+and any undiscovered creation-time suffix for later batches; cluster rankings are
+not yet scope-complete. Unfinished runs
 are tracked separately and do not block ranking completed failures.
 
 ## Evidence and selection
@@ -472,7 +496,13 @@ dispatch cannot activate this auditor. A cold or
 evicted cache starts with runs **created** in the preceding one hour. Each later
 invocation discovers all statuses from the successful collection checkpoint minus
 a one-second overlap through now. Checkpoint gaps over 24 hours fail closed without
-resetting or advancing the checkpoint; oversized or truncated scopes also fail closed.
+resetting or advancing the checkpoint. Oversized discovery windows are bisected
+until their oldest prefix fits below 1,000 runs; only a fully paginated prefix
+advances the checkpoint. The undiscovered suffix is covered on later invocations,
+with the same one-second overlap. New failure identities collected during catch-up
+remain activation candidates until discovery and evidence are complete; no audits
+or agent activation occur before then. Indivisible oversized seconds, truncated
+or changing pages, and oversized combined recent/tracked scopes still fail closed.
 Observed unfinished or
 unprocessed run IDs persist beyond it and are refreshed individually until terminal
 and processed. Old reruns first observed outside discovery and cache loss are not

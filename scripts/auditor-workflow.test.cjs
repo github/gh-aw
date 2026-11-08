@@ -58,12 +58,14 @@ async function fixture(t, options = {}) {
           calls.push(["runs", params.page, params.created]);
           const [start, end] = params.created.split("..").map(Date.parse);
           const recent = runs.filter(r => Date.parse(r.created_at) >= start && Date.parse(r.created_at) <= end);
-          return {
+          const response = {
             data: {
               total_count: options.total ?? recent.length,
               workflow_runs: recent.slice((params.page - 1) * 100, params.page * 100),
             },
           };
+          if (options.runResponse) options.runResponse(response.data, params);
+          return response;
         },
         getWorkflowRun: async params => {
           calls.push(["tracked", params.run_id]);
@@ -323,6 +325,141 @@ test("a checkpoint gap of exactly 24 hours remains covered, not silently clamped
   await f.execute();
   const manifest = JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json")));
   assert.equal(Date.parse(manifest.window_start), Date.parse(checkpoint) - 1000);
+});
+
+test("oversized checkpoint gap catches up complete prefixes before auditing or activating", async t => {
+  const checkpoint = new Date(Date.parse(now) - 12 * 3600000).toISOString();
+  const history = Array.from({ length: 1200 }, (_, n) =>
+    run(n + 1, {
+      created_at: new Date(Date.parse(checkpoint) + (n + 1) * 36000).toISOString(),
+      updated_at: new Date(Date.parse(checkpoint) + (n + 1) * 36000).toISOString(),
+      conclusion: n === 0 ? "failure" : "success",
+    })
+  );
+  const f = await fixture(t, {
+    runs: history,
+    state: { version: 1, repository: "example/repo", checkpoint, seen: [], backlog: [], pending: [] },
+  });
+  await f.execute();
+  let manifest = JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json")));
+  let state = JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json")));
+  assert.equal(manifest.complete, true, "the reported prefix must be complete");
+  assert.equal(manifest.discovery_complete, false);
+  assert.equal(manifest.discovery_target, now);
+  assert.equal(manifest.window_end, state.checkpoint);
+  assert.ok(Date.parse(state.checkpoint) > Date.parse(checkpoint));
+  assert.ok(Date.parse(state.checkpoint) < Date.parse(now));
+  assert.equal(manifest.new_failures, 1);
+  assert.equal(manifest.evidence_complete, false);
+  assert.deepEqual(state.catchup_failures, [`1-1-${history[0].updated_at}`]);
+  assert.equal(f.outputs.has_new_failures, "false");
+  assert.equal(f.calls.filter(call => call.includes("--audit")).length, 0);
+  const prefixEnd = state.checkpoint;
+  await f.execute();
+  manifest = JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json")));
+  state = JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json")));
+  assert.equal(Date.parse(manifest.window_start), Date.parse(prefixEnd) - 1000);
+  assert.equal(manifest.discovery_complete, true);
+  assert.equal(manifest.evidence_complete, true);
+  assert.equal(state.checkpoint, now);
+  assert.equal(manifest.new_failures, 1, "retain activation for failures from earlier prefixes");
+  assert.equal(manifest.clusters[0].count, 1);
+  assert.deepEqual(state.catchup_failures, []);
+  assert.equal(f.outputs.has_new_failures, "true");
+  assert.equal(f.calls.filter(call => call.includes("--audit")).length, 1);
+  assert.equal(f.calls.filter(call => call[1] === "logs" && !call.includes("--audit")).length, 1);
+  await f.execute();
+  assert.equal(f.outputs.has_new_failures, "false");
+});
+
+for (const [name, options] of [
+  [
+    "indivisible busy second",
+    {
+      runs: Array.from({ length: 1000 }, (_, n) => run(n + 1, { created_at: new Date(Date.parse(now) - 3600000 - 1000).toISOString() })),
+    },
+  ],
+  [
+    "changing page total",
+    {
+      runs: Array.from({ length: 101 }, (_, n) => run(n + 1)),
+      runResponse: (body, params) => {
+        if (params.page === 2) body.total_count++;
+      },
+    },
+  ],
+  [
+    "duplicate page identities",
+    {
+      runs: Array.from({ length: 101 }, (_, n) => run(n + 1)),
+      runResponse: (body, params) => {
+        if (params.page === 2) body.workflow_runs[0] = run(1);
+      },
+    },
+  ],
+  [
+    "run outside the complete prefix",
+    {
+      runs: [run(1)],
+      runResponse: body => {
+        body.workflow_runs[0] = run(1, { created_at: "2020-01-01T00:00:00Z" });
+      },
+    },
+  ],
+  [
+    "PR failure after narrowing discovery",
+    {
+      runs: Array.from({ length: 1200 }, (_, n) => run(n + 1, { created_at: new Date(Date.parse(now) - n * 3000).toISOString() })),
+      prError: true,
+    },
+  ],
+]) {
+  test(`${name} preserves the exact checkpoint without advancing or activating`, async t => {
+    const state = {
+      version: 1,
+      repository: "example/repo",
+      checkpoint: new Date(Date.parse(now) - 3600000).toISOString(),
+      seen: [],
+      backlog: [],
+      pending: [],
+    };
+    const f = await fixture(t, { state, ...options });
+    const before = fs.readFileSync(path.join(f.cache, "checkpoint.json"), "utf8");
+    await assert.rejects(f.execute());
+    assert.equal(fs.readFileSync(path.join(f.cache, "checkpoint.json"), "utf8"), before);
+    assert.equal(f.outputs.has_new_failures, "false");
+    assert.equal(f.calls.filter(call => call[1] === "logs").length, 0);
+  });
+}
+
+test("an empty oldest prefix safely advances without crossing an oversized suffix", async t => {
+  const checkpoint = new Date(Date.parse(now) - 3600000).toISOString();
+  const f = await fixture(t, {
+    runs: Array.from({ length: 1000 }, (_, n) => run(n + 1)),
+    state: { version: 1, repository: "example/repo", checkpoint, seen: [], backlog: [], pending: [] },
+  });
+  await f.execute();
+  const state = JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json")));
+  const manifest = JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json")));
+  assert.ok(Date.parse(state.checkpoint) > Date.parse(checkpoint));
+  assert.ok(Date.parse(state.checkpoint) < Date.parse(now));
+  assert.equal(manifest.discovery_complete, false);
+  assert.equal(manifest.evidence_complete, false);
+  assert.equal(manifest.new_failures, 0);
+  assert.deepEqual(state.catchup_failures, []);
+  assert.equal(f.outputs.has_new_failures, "false");
+  assert.equal(f.calls.filter(call => call[1] === "logs").length, 0);
+});
+
+test("bisection cannot move a checkpoint backward into its overlap", async t => {
+  const checkpoint = new Date(Math.floor(Date.parse(now) / 1000) * 1000 + 100).toISOString();
+  const time = new Date(Date.parse(checkpoint) + 100).toISOString();
+  const state = { version: 1, repository: "example/repo", checkpoint, seen: [], backlog: [], pending: [] };
+  const f = await fixture(t, { state, time, total: 1000 });
+  await assert.rejects(f.execute(), /Oversized indivisible/);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json"))), state);
+  assert.equal(f.outputs.has_new_failures, "false");
+  assert.equal(f.calls.filter(call => call[1] === "logs").length, 0);
 });
 
 test("observed unfinished run completes after aging out of creation window", async t => {
