@@ -22,6 +22,12 @@ The Dev Container installs all required dependencies and runs `make deps` automa
 
 If you encounter errors about Node.js or Go versions when running `make deps` or other build commands, this is a sign that you are not using the Dev Container. Please switch to a Dev Container or Codespace environment.
 
+### Keep local agent settings private
+
+Claude Code can persist plaintext credentials from approved commands in `.claude/settings.local.json`. Repository ignore rules exclude this file at every project depth. Builds and the **Agent local settings security** PR check reject indexed copies, including files added with `git add -f`. Run `make test-agent-local-settings` to check the repository and exercise the guard.
+
+If the check fails, use `git rm --cached -- <path>` to untrack each reported file without deleting the local copy. Rotate any credentials already published: untracking does not erase Git history or forks. Shared `.claude/settings.json` files and skills remain allowed, but must not contain credentials. This guard checks the current Git index; it is not a general secret scanner or a history audit.
+
 ## 🤖 How Development Works
 
 GitHub Agentic Workflows is developed by a core team using agentic development — primarily GitHub Copilot coding agent and local coding agents. This means:

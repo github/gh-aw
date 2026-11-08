@@ -17,7 +17,11 @@ mcp-scripts:
         required: false
       since:
         type: string
-        description: "ISO 8601 date or timestamp. When set, paginate by updatedAt until this boundary instead of applying limit."
+        description: "ISO 8601 date or timestamp. Paginate back to this boundary, or use as the lower bound with until."
+        required: false
+      until:
+        type: string
+        description: "ISO 8601 date or timestamp. When used with since, query only items updated within that date range."
         required: false
       jq:
         type: string
@@ -34,6 +38,7 @@ mcp-scripts:
       STATE="${INPUT_STATE:-open}"
       LIMIT="${INPUT_LIMIT:-30}"
       SINCE="${INPUT_SINCE:-}"
+      UNTIL="${INPUT_UNTIL:-}"
       JQ_FILTER="${INPUT_JQ:-}"
       
       # JSON fields to fetch
@@ -48,9 +53,39 @@ mcp-scripts:
       }
       trap cleanup EXIT
 
-      # Fetch all items updated in a date window. REST results are ordered by
-      # updated time, so stop only after reaching the requested boundary.
-      if [[ -n "$SINCE" ]]; then
+      if [[ -n "$UNTIL" && -z "$SINCE" ]]; then
+        echo "Error: until requires since" >&2
+        exit 1
+      fi
+
+      if [[ -n "$SINCE" && -n "$UNTIL" ]]; then
+        if ! date -d "$SINCE" --iso-8601=seconds >/dev/null 2>&1 || ! date -d "$UNTIL" --iso-8601=seconds >/dev/null 2>&1; then
+          echo "Error: since and until must be ISO 8601 dates or timestamps" >&2
+          exit 1
+        fi
+        SINCE=$(date -u -d "$SINCE" '+%Y-%m-%dT%H:%M:%SZ')
+        UNTIL=$(date -u -d "$UNTIL" '+%Y-%m-%dT%H:%M:%SZ')
+        if [[ "$SINCE" > "$UNTIL" ]]; then
+          echo "Error: since must be earlier than or equal to until" >&2
+          exit 1
+        fi
+        SEARCH_START=$(date -u -d "$SINCE" '+%Y-%m-%d')
+        SEARCH_END=$(date -u -d "$UNTIL" '+%Y-%m-%d')
+        RANGE_LIMIT="${INPUT_LIMIT:-1000}"
+        SEARCH_QUERY="updated:${SEARCH_START}..${SEARCH_END}"
+        GH_ARGS=(issue list --state "$STATE" --search "$SEARCH_QUERY" --limit "$RANGE_LIMIT" --json "$JSON_FIELDS")
+        [[ -n "$REPO" ]] && GH_ARGS+=(--repo "$REPO")
+        gh "${GH_ARGS[@]}" > "$OUTPUT_FILE"
+        ITEM_COUNT=$(jq 'length' < "$OUTPUT_FILE")
+        if [[ "$ITEM_COUNT" -ge "$RANGE_LIMIT" ]]; then
+          echo "Error: bounded query reached its $RANGE_LIMIT item limit; retry with a smaller date range" >&2
+          exit 1
+        fi
+        FILTERED_OUTPUT_FILE=$(mktemp)
+        jq --arg since "$SINCE" --arg until "$UNTIL" '[.[] | select(.updatedAt >= $since and .updatedAt <= $until)]' "$OUTPUT_FILE" > "$FILTERED_OUTPUT_FILE"
+        mv "$FILTERED_OUTPUT_FILE" "$OUTPUT_FILE"
+        FILTERED_OUTPUT_FILE=""
+      elif [[ -n "$SINCE" ]]; then
         if ! date -d "$SINCE" --iso-8601=seconds >/dev/null 2>&1; then
           echo "Error: since must be an ISO 8601 date or timestamp" >&2
           exit 1
@@ -163,7 +198,11 @@ mcp-scripts:
         required: false
       since:
         type: string
-        description: "ISO 8601 date or timestamp. When set, paginate by updatedAt until this boundary instead of applying limit."
+        description: "ISO 8601 date or timestamp. Paginate back to this boundary, or use as the lower bound with until."
+        required: false
+      until:
+        type: string
+        description: "ISO 8601 date or timestamp. When used with since, query only items updated within that date range."
         required: false
       jq:
         type: string
@@ -180,6 +219,7 @@ mcp-scripts:
       STATE="${INPUT_STATE:-open}"
       LIMIT="${INPUT_LIMIT:-30}"
       SINCE="${INPUT_SINCE:-}"
+      UNTIL="${INPUT_UNTIL:-}"
       JQ_FILTER="${INPUT_JQ:-}"
       
       # JSON fields to fetch
@@ -194,9 +234,39 @@ mcp-scripts:
       }
       trap cleanup EXIT
 
-      # Fetch all items updated in a date window. REST results are ordered by
-      # updated time, so stop only after reaching the requested boundary.
-      if [[ -n "$SINCE" ]]; then
+      if [[ -n "$UNTIL" && -z "$SINCE" ]]; then
+        echo "Error: until requires since" >&2
+        exit 1
+      fi
+
+      if [[ -n "$SINCE" && -n "$UNTIL" ]]; then
+        if ! date -d "$SINCE" --iso-8601=seconds >/dev/null 2>&1 || ! date -d "$UNTIL" --iso-8601=seconds >/dev/null 2>&1; then
+          echo "Error: since and until must be ISO 8601 dates or timestamps" >&2
+          exit 1
+        fi
+        SINCE=$(date -u -d "$SINCE" '+%Y-%m-%dT%H:%M:%SZ')
+        UNTIL=$(date -u -d "$UNTIL" '+%Y-%m-%dT%H:%M:%SZ')
+        if [[ "$SINCE" > "$UNTIL" ]]; then
+          echo "Error: since must be earlier than or equal to until" >&2
+          exit 1
+        fi
+        SEARCH_START=$(date -u -d "$SINCE" '+%Y-%m-%d')
+        SEARCH_END=$(date -u -d "$UNTIL" '+%Y-%m-%d')
+        RANGE_LIMIT="${INPUT_LIMIT:-1000}"
+        SEARCH_QUERY="updated:${SEARCH_START}..${SEARCH_END}"
+        GH_ARGS=(pr list --state "$STATE" --search "$SEARCH_QUERY" --limit "$RANGE_LIMIT" --json "$JSON_FIELDS")
+        [[ -n "$REPO" ]] && GH_ARGS+=(--repo "$REPO")
+        gh "${GH_ARGS[@]}" > "$OUTPUT_FILE"
+        ITEM_COUNT=$(jq 'length' < "$OUTPUT_FILE")
+        if [[ "$ITEM_COUNT" -ge "$RANGE_LIMIT" ]]; then
+          echo "Error: bounded query reached its $RANGE_LIMIT item limit; retry with a smaller date range" >&2
+          exit 1
+        fi
+        FILTERED_OUTPUT_FILE=$(mktemp)
+        jq --arg since "$SINCE" --arg until "$UNTIL" '[.[] | select(.updatedAt >= $since and .updatedAt <= $until)]' "$OUTPUT_FILE" > "$FILTERED_OUTPUT_FILE"
+        mv "$FILTERED_OUTPUT_FILE" "$OUTPUT_FILE"
+        FILTERED_OUTPUT_FILE=""
+      elif [[ -n "$SINCE" ]]; then
         if ! date -d "$SINCE" --iso-8601=seconds >/dev/null 2>&1; then
           echo "Error: since must be an ISO 8601 date or timestamp" >&2
           exit 1
