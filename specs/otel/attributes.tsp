@@ -14,6 +14,7 @@ model AttributeNames {
   ghAwSessionOmittedEvents: "gh-aw.session.omitted_events";
   ghAwSessionTruncated: "gh-aw.session.truncated";
   ghAwSessionUntimedEvents: "gh-aw.session.untimed_events";
+  ghAwDurableParentRunId: "gh-aw.durable.parent_run_id";
   ghAwWorkingSetCumulativeInputTokens: "gh-aw.working_set.cumulative_input_tokens";
   ghAwWorkingSetInvocations: "gh-aw.working_set.invocations";
   ghAwWorkingSetPeakInputTokens: "gh-aw.working_set.peak_input_tokens";

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -80,6 +81,7 @@ type AuditData struct {
 	EvidenceSearch             *AuditEvidenceSearch     `json:"evidence_search,omitempty"`
 	ModelCatalog               *AuditModelCatalog       `json:"model_catalog,omitempty"`
 	Retries                    *AuditRetrySummary       `json:"retries,omitempty"`
+	DurableSession             *DurableSessionReport    `json:"durable_session,omitempty"`
 }
 
 // AuditFinding represents a key insight discovered during audit
@@ -573,6 +575,7 @@ func assembleAuditData(inputs auditDataInputs) AuditData {
 	return AuditData{
 		SchemaVersion:           auditSchemaVersion,
 		Retries:                 readAuditRetrySummary(run.LogsPath),
+		DurableSession:          readDurableSessionReport(run.LogsPath, run, hasDurableRestoreStep(inputs.processedRun.JobDetails)),
 		Overview:                inputs.overview,
 		TaskDomain:              inputs.taskDomain,
 		BehaviorFingerprint:     inputs.behaviorFingerprint,
@@ -707,12 +710,12 @@ func extractCreatedItemsFromManifest(logsPath string) []CreatedItemReport {
 	var items []CreatedItemReport
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
+		line := bytes.TrimSpace(scanner.Bytes())
+		if len(line) == 0 {
 			continue
 		}
 		var item CreatedItemReport
-		if err := json.Unmarshal([]byte(line), &item); err != nil {
+		if err := json.Unmarshal(line, &item); err != nil {
 			auditReportLog.Printf("Skipping invalid manifest line: %v", err)
 			continue
 		}
@@ -1013,7 +1016,12 @@ func isAgentToolResultAnnotation(line string) bool {
 			} `json:"content"`
 		} `json:"message"`
 	}
-	if err := json.Unmarshal([]byte(strings.TrimSpace(payload)), &event); err != nil || event.Type != "user" {
+	decoder := json.NewDecoder(strings.NewReader(strings.TrimSpace(payload)))
+	if err := decoder.Decode(&event); err != nil || event.Type != "user" {
+		return false
+	}
+	var trailing json.RawMessage
+	if err := decoder.Decode(&trailing); err != io.EOF {
 		return false
 	}
 	hasToolResult := false
@@ -1100,7 +1108,10 @@ func extractAgentStdioFailureExcerpt(agentStdioPath string, maxMessageLen int) s
 		return ""
 	}
 
-	lines := strings.Split(stripGHALogTimestamps(string(tail)), "\n")
+	var lines []string
+	for line := range strings.Lines(stripGHALogTimestamps(string(tail))) {
+		lines = append(lines, strings.TrimRight(line, "\r\n"))
+	}
 	nonEmpty, errorLike := classifyAgentStdioLines(lines)
 
 	if len(errorLike) > 0 {
@@ -1162,9 +1173,9 @@ func parseStepFilename(filename string) (int, string) {
 // e.g. "2024-01-01T10:00:00.1234567Z message here". This function strips those prefixes so the
 // returned string contains only the actual log content.
 func stripGHALogTimestamps(content string) string {
-	lines := strings.Split(content, "\n")
-	stripped := make([]string, 0, len(lines))
-	for _, line := range lines {
+	var stripped []string
+	for raw := range strings.Lines(content) {
+		line := strings.TrimSuffix(strings.TrimSuffix(raw, "\n"), "\r")
 		// GHA timestamp format: YYYY-MM-DDTHH:MM:SS[.sss...]Z<space>
 		// The 'T' separator is always at position 10. Search for the terminating 'Z' after 'T'
 		// in a generous window (positions 11-35) to handle any fractional seconds length.
@@ -1182,5 +1193,9 @@ func stripGHALogTimestamps(content string) string {
 		}
 		stripped = append(stripped, line)
 	}
-	return strings.Join(stripped, "\n")
+	result := strings.Join(stripped, "\n")
+	if strings.HasSuffix(content, "\n") {
+		result += "\n"
+	}
+	return result
 }

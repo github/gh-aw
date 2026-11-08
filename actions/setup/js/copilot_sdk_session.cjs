@@ -461,6 +461,7 @@ async function runCopilotSDKSession({
       ? await client.resumeSession(restoredSessionId, { ...sessionConfig, allowTranscriptRecovery: false })
       : await client.createSession({ ...sessionConfig, ...(durableSessionId ? { sessionId: durableSessionId } : {}) });
     durableSession?.save(session.sessionId);
+    durableSession?.started(session.sessionId);
     log(`session created: sessionId=${session.sessionId}`);
     verification.sessionId = session.sessionId;
     modelObserver.setSessionId(session.sessionId);

@@ -66,6 +66,7 @@ type HealthCollection struct {
 	jobPresence               map[healthRunAttempt]bool
 	jobs                      map[healthRunAttempt]*healthJobs
 	cacheSummaries            map[healthRunAttempt]*RunSummary
+	cacheSessionCompatibility map[healthRunAttempt]bool
 	failureScopes             map[string]map[string]struct{}
 }
 

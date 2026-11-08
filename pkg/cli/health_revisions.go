@@ -243,6 +243,7 @@ func calculateCurrentWorkflowHealth(name string, runs []WorkflowRun, config Heal
 	}
 	applyHealthSubagentFailures(&health, currentRuns, config)
 	applyHealthDetectionFailures(&health, currentRuns, config)
+	applyHealthDurableSessions(&health, currentRuns, config)
 	return health
 }
 

@@ -9,6 +9,7 @@ const { sessionTimestampNs } = require("./unified_session_order.cjs");
 const { getOTLPSecretValues } = require("./otlp_header_helpers.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
+const { isDurableSessionRecord } = require("./durable_session_record.cjs");
 const otlp = require("./send_otlp_span.cjs");
 const DEFAULT_MAX_SESSION_LOG_BYTES = 64 * 1024;
 
@@ -105,7 +106,10 @@ async function sendSessionLogs({ sessionPath = "/tmp/gh-aw/usage/aw_session.json
         severityText: "INFO",
         ...(otlp.isValidTraceId(traceId) ? { traceId, ...(otlp.isValidSpanId(spanId) ? { spanId } : {}) } : {}),
         body: anyValue(event),
-        attributes: [otlp.buildAttr("gh-aw.session.event_type", event.type)],
+        attributes: [
+          otlp.buildAttr("gh-aw.session.event_type", event.type),
+          ...(isDurableSessionRecord(event) && ["restored", "resumed"].includes(event.data.status) && event.data.parentRunId ? [otlp.buildAttr("gh-aw.durable.parent_run_id", event.data.parentRunId)] : []),
+        ],
       };
     });
     const resourceAttributes = [
