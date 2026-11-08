@@ -222,6 +222,7 @@ func buildAction(actionsDir, actionName string) error {
 	if err != nil {
 		return fmt.Errorf("failed to check action type: %w", err)
 	}
+	actionsBuildLog.Printf("Detected action type: action=%s, composite=%t", actionName, isComposite)
 
 	if isComposite {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("  Composite action - no JavaScript bundling needed"))
@@ -238,9 +239,11 @@ func buildAction(actionsDir, actionName string) error {
 func buildJavaScriptAction(actionPath, actionName string) error {
 	srcPath := filepath.Join(actionPath, "src", "index.js")
 	outputPath := filepath.Join(actionPath, "index.js")
+	actionsBuildLog.Printf("Bundling JavaScript action: action=%s, src=%s, output=%s", actionName, srcPath, outputPath)
 
 	// Check if source file exists
 	if _, err := os.Stat(srcPath); os.IsNotExist(err) {
+		actionsBuildLog.Printf("JavaScript action source missing: %s", srcPath)
 		return fmt.Errorf("source file not found: %s", srcPath)
 	}
 
@@ -264,9 +267,11 @@ func buildJavaScriptAction(actionPath, actionName string) error {
 			files[dep] = content
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("    - "+dep))
 		} else {
+			actionsBuildLog.Printf("Dependency not found in embedded JavaScript sources: action=%s, dependency=%s", actionName, dep)
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("    Could not find "+dep))
 		}
 	}
+	actionsBuildLog.Printf("Resolved %d of %d dependencies for action=%s", len(files), len(dependencies), actionName)
 
 	// Generate FILES object with embedded content
 	filesJSON, err := json.MarshalIndent(files, "", "  ")
@@ -286,6 +291,7 @@ func buildJavaScriptAction(actionPath, actionName string) error {
 	if err := os.WriteFile(outputPath, []byte(outputContent), constants.FilePermSensitive); err != nil {
 		return fmt.Errorf("failed to write output file: %w", err)
 	}
+	actionsBuildLog.Printf("Wrote bundled action: output=%s, bytes=%d", outputPath, len(outputContent))
 
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("  Built "+outputPath))
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("  Embedded %d files", len(files))))
