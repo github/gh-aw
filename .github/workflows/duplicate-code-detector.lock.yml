@@ -748,8 +748,9 @@ jobs:
           GH_HOST: github.com
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.10 --rootless
       - name: Install Pi CLI
-        run: npm install --ignore-scripts -g @earendil-works/pi-coding-agent@1.5.0
+        run: npm install -g @earendil-works/pi-coding-agent@1.5.0
         env:
+          NPM_CONFIG_IGNORE_SCRIPTS: 'true'
           NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Record Pi package location
         run: |
