@@ -69,6 +69,12 @@ type GHAWManifestDetectionPolicy struct {
 	Condition string `json:"condition,omitempty"`
 }
 
+// GHAWManifestWorkQueue records compiler-derived work-queue worker metadata.
+type GHAWManifestWorkQueue struct {
+	Worker          bool   `json:"worker"`
+	LogicalContract string `json:"logical_contract,omitempty"`
+}
+
 // GHAWManifest is the single-line JSON payload embedded as a "# gh-aw-manifest: ..."
 // comment in generated lock files. It records the secrets, external actions, and
 // container images that were detected at the time the lock file was last compiled
@@ -91,6 +97,7 @@ type GHAWManifest struct {
 	ThreatDetection             *GHAWManifestDetectionPolicy         `json:"threat_detection,omitempty"`
 	Admission                   bool                                 `json:"admission"`
 	WebhookSubscriptions        []WebhookSubscription                `json:"webhook_subscriptions,omitempty"`
+	WorkQueue                   *GHAWManifestWorkQueue               `json:"work_queue,omitempty"`
 }
 
 // NewGHAWManifest builds a GHAWManifest from the raw secret names, action reference

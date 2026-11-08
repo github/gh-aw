@@ -88,6 +88,12 @@ func (c *Compiler) generateManifestHeader(yaml *strings.Builder, data *WorkflowD
 	// The manifest records safe-update inventory and normalized webhook declarations
 	// for CAO discovery without interpreting generated workflow steps.
 	manifest := NewGHAWManifest(secrets, actions, data.ActionResolutionFailures, data.DockerImagePins, data.Redirect, data.Skills, data.Plugins, data.RawFrontmatter["on"])
+	if isWorkQueueWorker(data) {
+		manifest.WorkQueue = &GHAWManifestWorkQueue{Worker: true}
+		if data.WorkQueuePolicy != nil {
+			manifest.WorkQueue.LogicalContract = data.WorkQueuePolicy.WorkerContract
+		}
+	}
 	if data.ParsedFrontmatter != nil {
 		manifest.ThreatDetectionSuppressions = data.ParsedFrontmatter.ThreatDetectionSuppressions
 	} else {
