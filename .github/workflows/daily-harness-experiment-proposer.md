@@ -344,7 +344,17 @@ Title: `<workflow_target basename> — <primary_dimension>/<subtype> A/B harness
 
 Body — include the following sections **in this exact order** every time. `Summary` is optional and may be added without disturbing the relative order of the other nine (required) headings:
 
-```markdown
+Use `###` or lower for every heading in the generated issue; reserve h1/h2 for
+the platform-rendered title. Keep the summary and decision-relevant metric,
+hypothesis, and guardrail visible. Follow the report sequence overview → key
+metrics/issues → collapsible detailed findings → next actions or limitations,
+while preserving the required section order. Put long lists, tables, logs,
+evidence, and the complete patch in
+`<details><summary><b>...</b></summary>...</details>` blocks. Use `- [ ]` for
+follow-up actions and format applicable workflow runs as
+`[§12345](https://github.com/${{ github.repository }}/actions/runs/12345)`.
+
+````markdown
 ### Summary
 (optional) One paragraph: what workflow, what primary_dimension/subtype, why now (cite the strongest evidence signal).
 
@@ -376,16 +386,20 @@ State explicitly: applying this patch only *starts* the experiment; no decision 
 Exact steps to revert (revert the commit that applied this patch; confirm no other files/branches depend on this change).
 
 ### Manual Patch (apply by hand)
+<details>
+<summary><b>Exact proposed patch</b></summary>
+
 ```diff
 <the exact unified diff you produced, from `git diff`>
 ```
+</details>
 
 ### Application Plan
-1. Save the diff above as `proposal.patch`.
-2. `git apply proposal.patch`
-3. `gh aw compile <target> --strict --validate`
-4. Open a PR manually if compilation succeeds.
-```
+- [ ] Save the diff above as `proposal.patch`.
+- [ ] `git apply proposal.patch`
+- [ ] `gh aw compile <target> --strict --validate`
+- [ ] Open a PR manually if compilation succeeds.
+````
 
 ## Phase 7 — Update the Ledger
 
