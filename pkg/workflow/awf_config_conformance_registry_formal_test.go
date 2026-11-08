@@ -47,11 +47,11 @@ func formalConformanceRegistryBaselineRows(t *testing.T) []formalConformanceRegi
 			continue
 		}
 
-		cells := strings.Split(line, "|")
-		require.Len(t, cells, 6, "registry row: %s", line)
+		cells := strings.Split(strings.Trim(line, "|"), "|")
+		require.Len(t, cells, 5, "registry row: %s", line)
 		rows = append(rows, formalConformanceRegistryRow{
-			TestID:      strings.TrimSpace(cells[1]),
-			Requirement: strings.TrimSpace(cells[2]),
+			TestID:      strings.TrimSpace(cells[0]),
+			Requirement: strings.TrimSpace(cells[1]),
 			TestFile:    strings.Trim(strings.TrimSpace(cells[4]), "`"),
 		})
 	}
