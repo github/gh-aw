@@ -520,6 +520,7 @@ try {
  *   memoryId?: string,
  *   kind: "repo" | "cache" | "drive",
  *   phase?: "baseline" | "upload" | "push",
+ *   sourceJobResult?: string,
  *   timeoutSeconds?: number,
  *   isEligibleFile?: (relativePath: string) => boolean,
  * }} options
@@ -628,6 +629,7 @@ const memoryDir = memoryRoot;
 const memoryId = ${JSON.stringify(memoryId)};
 const memoryKind = ${JSON.stringify(options.kind)};
 const memoryPhase = ${JSON.stringify(options.phase || "upload")};
+const memorySourceJobResult = ${JSON.stringify(options.sourceJobResult || "")};
 process.env.GH_AW_MEMORY_ROOT = memoryRoot;
 process.env.GH_AW_MEMORY_DIR = memoryRoot;
 process.env.GH_AW_MEMORY_ID = memoryId;
