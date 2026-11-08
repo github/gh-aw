@@ -9,7 +9,7 @@ import (
 	"github.com/github/gh-aw/pkg/console"
 )
 
-const dryRunScopeMessage = "Dry-run is compile-only: compiler-managed GitHub mutations, authored custom jobs, daily credit accounting, and OTLP telemetry configuration are disabled; OTEL_* and GH_AW_OTLP_* environment variables are removed. Host scripts, custom MCP servers, custom safe-output scripts, Bash graders, and authored OIDC permissions are rejected. Per-run credit limits are retained or derived from configured daily limits. Manual dispatch is enabled with maintainer/admin authorization. Agent shell commands and custom credentials remain unverified. Compilation does not authorize execution or approve emitted files."
+const dryRunScopeMessage = "Dry-run is compile-only: compiler-managed GitHub mutations, authored custom jobs, daily credit accounting, and OTLP telemetry configuration are disabled; OTEL_* and GH_AW_OTLP_* environment variables are removed. Authored steps and post-steps are omitted from emitted locks, including their code and credentials; separate dispatch does not execute them. Pre-steps, pre-agent-steps, on.steps, custom MCP servers, custom safe-output scripts, Bash graders, and authored OIDC permissions are rejected. Per-run credit limits are retained or derived from configured daily limits. Manual dispatch is enabled with maintainer/admin authorization. Agent shell commands and custom credentials remain unverified. Compilation does not authorize execution or approve emitted files."
 
 // DryRunCompileReport describes the compilation gate, not execution authorization.
 type DryRunCompileReport struct {
@@ -21,6 +21,7 @@ type DryRunCompileReport struct {
 	ValidateImagesRequired       bool                          `json:"validate_images_required"`
 	ModelInventoryAvailable      bool                          `json:"model_inventory_available"`
 	UnverifiedEffects            []string                      `json:"unverified_effects"`
+	DisabledEffects              []string                      `json:"disabled_effects"`
 	AcceptedExperimentalWarnings int                           `json:"accepted_experimental_warnings,omitempty"`
 	IgnoredLowSeverityWarnings   int                           `json:"ignored_low_severity_warnings,omitempty"`
 	WarningBaseline              string                        `json:"warning_baseline"`
@@ -42,6 +43,7 @@ func newDryRunCompileReport(config CompileConfig) *DryRunCompileReport {
 		IgnoredScannerRules:    map[string][]string{"zizmor": {"secrets-outside-env"}},
 		Scanners:               make(map[string]DryRunScannerCheck),
 		ValidateImagesRequired: config.ValidateImages,
+		DisabledEffects:        []string{"steps", "post-steps"},
 		UnverifiedEffects: []string{
 			"agent shell commands", "custom engine execution", "custom credentials", "compiler-managed OIDC integrations",
 			"hosted approvals/OIDC/runners", "live model availability", "diagnostic artifacts/summaries",

@@ -33,13 +33,14 @@ Historical repository scoring and the separate offline episode-join command have
 also been removed. Use `gh aw logs --episodes --outcomes` for episode summaries.
 `--outcomes-dir` remains available for JSONL export.
 
-`compile --dry-run` retains workflow `steps` and `post-steps` in emitted locks
-without executing them. It rejects pre-activation steps, custom MCP
+`compile --dry-run` accepts workflow `steps` and `post-steps` but omits their
+code and credentials from emitted locks, so separate dispatch cannot execute
+them. It rejects `pre-steps`, `pre-agent-steps`, `on.steps`, custom MCP
 servers/scripts, custom safe-output scripts, enabled Bash graders, and authored
 OIDC permissions, including imports. Custom jobs and custom safe-output jobs
 become disabled, credential-free placeholders with empty outputs. Existing
 actionable scanner findings fail alongside added findings. Migrate by removing
-unsupported declarations in a separate diagnostic workflow, reviewing retained
+unsupported declarations in a separate diagnostic workflow, reviewing omitted
 steps and skipped dependencies, and resolving actionable findings before live
 testing. Ordinary compilation is unchanged; dry-run is still not a hosted
 execution sandbox.
