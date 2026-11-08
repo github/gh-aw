@@ -6,7 +6,7 @@ import { execFileSync } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
 import { runCustomMemoryValidation } from "./memory_custom_validation.cjs";
 import { filterIneligibleMemoryFiles } from "./memory_file_eligibility.cjs";
-import { acceptSignals, configIds, freshState, isolateMemory as prepareMemory, restoreProducerHistory, validateProducerUpload, sanitizeState, validSignal } from "./git_simulator_memory.cjs";
+import { acceptSignals, configIds, freshState, isolateMemory as prepareMemory, restoreProducerHistory, validateProducerUpload, sanitizeState, validSignal } from "./git_simulator_memory_helpers.test.cjs";
 
 describe("git simulator memory isolation", () => {
   let root, memoryDir, workspace, outputPath, privateHistoryPath, signal, review;
@@ -178,7 +178,7 @@ describe("git simulator memory isolation", () => {
     let recovered = false;
     const mockRequire = name => {
       if (name.endsWith("create_ledger_projection.cjs")) return { main: async () => [databasePath] };
-      if (name.endsWith("git_simulator_memory.cjs"))
+      if (name.endsWith("git_simulator_memory_helpers.test.cjs"))
         return {
           isolateMemory: options => prepareMemory({ ...options, memoryDir, outputPath, privateHistoryPath }),
           restoreProducerHistory: options => restoreProducerHistory({ ...options, memoryDir, privateHistoryPath }),
@@ -360,7 +360,7 @@ describe("git simulator memory isolation", () => {
             return [databasePath];
           },
         };
-      if (name.endsWith("git_simulator_memory.cjs"))
+      if (name.endsWith("git_simulator_memory_helpers.test.cjs"))
         return {
           isolateMemory: options => {
             expect(options.memoryDir).toBe("/tmp/gh-aw/repo-memory/default");

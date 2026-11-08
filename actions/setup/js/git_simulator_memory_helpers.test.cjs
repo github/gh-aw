@@ -1,4 +1,5 @@
 // @ts-check
+// Test-only workflow memory helpers; the setup action excludes this test-suffixed file.
 "use strict";
 
 const fs = require("node:fs");

@@ -53,7 +53,7 @@ pre-agent-steps:
         const { DatabaseSync } = require("node:sqlite");
         const actionsDir = path.join(process.env.RUNNER_TEMP, "gh-aw", "actions");
         const { main } = require(path.join(actionsDir, "create_ledger_projection.cjs"));
-        const { isolateMemory } = require(path.join(process.env.GITHUB_WORKSPACE, "actions/setup/js/git_simulator_memory.cjs"));
+        const { isolateMemory } = require(path.join(process.env.GITHUB_WORKSPACE, "actions/setup/js/git_simulator_memory_helpers.test.cjs"));
         const ledgerName = "git-simulator-lessons";
         const ledgerWorkspace = path.join(process.env.RUNNER_TEMP, "git-simulator-private-ledger");
         fs.mkdirSync(ledgerWorkspace, { recursive: true });
@@ -106,7 +106,7 @@ post-steps:
         const actionsDir = path.join(process.env.RUNNER_TEMP, "gh-aw", "actions");
         const { setupGlobals } = require(path.join(actionsDir, "setup_globals.cjs"));
         setupGlobals(core, github, context, exec, io, getOctokit);
-        const { restoreProducerHistory, validateProducerUpload } = require(path.join(process.env.GITHUB_WORKSPACE, "actions/setup/js/git_simulator_memory.cjs"));
+        const { restoreProducerHistory, validateProducerUpload } = require(path.join(process.env.GITHUB_WORKSPACE, "actions/setup/js/git_simulator_memory_helpers.test.cjs"));
         const memoryDir = "/tmp/gh-aw/repo-memory/default";
         restoreProducerHistory({
           memoryDir, workspace: process.env.GITHUB_WORKSPACE,
