@@ -366,33 +366,53 @@ Pre-computed data is available in `/tmp/gh-aw/agent/` and is the authoritative s
 
 When a material delta exists, create or update a pinned issue with this structure. Otherwise call `noop`.
 
-```markdown
-# Workflow Health Dashboard - [DATE]
+Use `###` or lower for every heading in the generated issue; reserve h1/h2 for
+the platform-rendered title. Follow this order: overview → key metrics/issues →
+collapsible detailed findings → next actions or limitations. Keep the overall
+health counts and highest-priority issues visible. Put long issue lists, tables,
+logs, and evidence in `<details><summary><b>...</b></summary>...</details>`
+blocks. Use `- [ ]` for follow-up actions and format applicable workflow runs as
+`[§12345](https://github.com/${{ github.repository }}/actions/runs/12345)`.
 
-## Overview
+```markdown
+### Workflow Health Dashboard - [DATE]
+
+### Overview
 Total: X | Healthy: X (X%) | Warning: X (X%) | Critical: X (X%) | Inactive: X
 
-## Critical Issues 🚨
+### Key Metrics and Issues
+
+- **Highest-priority finding**: [brief P0/P1 issue and impact]
+- **Trend**: [brief health change or state that no material issue was found]
+
+<details>
+<summary><b>Detailed workflow findings and evidence</b></summary>
+
+### Critical Issues
+
 ### [Workflow Name] (Score: X/100) — P[0|1]
 - **Status/Error:** [brief description]  **Impact:** [brief]  **Action:** Issue #XXX
 
-## Warnings ⚠️
+### Warnings
+
 ### [Workflow Name] (Score: X/100)
 - [Issue summary and action taken]
 
-## Systemic Issues
+### Systemic Issues
 - [Pattern] — X workflows affected — [Recommendation] — Issue #XXX
 
-## Recommendations
-**High:** [P0/P1 items]  **Medium:** [P2 items]  **Low:** [P3 items]
+</details>
 
-## Trends
-Health score: X/100 (↑/↓/→) | New failures: X | Fixed: X | Avg success: X%
+**Recommendations:** **High:** [P0/P1] · **Medium:** [P2] · **Low:** [P3]<br>
+**Trends:** Health score X/100 (↑/↓/→) · New failures X · Fixed X · Avg success X%<br>
+**Actions taken:** Created X issues · Updated X · Closed X<br>
+**Last updated:** [TIMESTAMP]
 
-## Actions Taken
-Created X issues | Updated X | Closed X
+### Next Actions or Limitations
 
-> Last updated: [TIMESTAMP]
+- [ ] [Highest-priority P0/P1 action]
+- [ ] [Medium-priority maintenance or optimization]
+- [ ] [State any data coverage limitation]
 ```
 
 Execute all phases systematically and maintain a proactive approach to workflow health management.

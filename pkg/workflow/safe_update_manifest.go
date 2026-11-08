@@ -4,7 +4,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"regexp"
 	"slices"
 	"sort"
@@ -401,7 +403,14 @@ func ExtractGHAWManifestFromLockFile(content string) (*GHAWManifest, error) {
 	match := ghawManifestPattern.FindString(content)
 	if _, payload, found := strings.Cut(match, ":"); found {
 		var m GHAWManifest
-		if err := json.Unmarshal([]byte(payload), &m); err != nil {
+		decoder := json.NewDecoder(strings.NewReader(payload))
+		if err := decoder.Decode(&m); err != nil {
+			return nil, fmt.Errorf("gh-aw-manifest JSON is not recognized, expected the JSON emitted by ToJSON in the lock file header: %w", err)
+		}
+		if err := decoder.Decode(new(any)); err != io.EOF {
+			if err == nil {
+				return nil, errors.New("gh-aw-manifest JSON is not recognized, expected the JSON emitted by ToJSON in the lock file header: unexpected trailing JSON value")
+			}
 			return nil, fmt.Errorf("gh-aw-manifest JSON is not recognized, expected the JSON emitted by ToJSON in the lock file header: %w", err)
 		}
 		safeUpdateManifestLog.Printf("Extracted gh-aw-manifest: version=%d secrets=%d actions=%d",
