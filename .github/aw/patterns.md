@@ -51,6 +51,11 @@ Pattern docs base path: `https://github.com/github/gh-aw/blob/main/docs/src/cont
 - **Load when:** The user needs deterministic data collection steps followed by agentic analysis and reporting.
 - **Pattern doc:** https://github.com/github/gh-aw/blob/main/docs/src/content/docs/patterns/deterministic-ops.md
 
+### Indexing and Read-Only Search
+- **Load when:** The user needs cached indexes, incremental or scheduled indexing, or shared search tools (including MCP).
+- **Pattern doc:** https://github.com/github/gh-aw/blob/main/docs/src/content/docs/patterns/deterministic-ops.md#indexing-and-read-only-search
+- **Constraint:** Trusted indexing jobs publish versioned caches; agents and PR jobs only restore and search, never refresh or save indexes.
+
 ### DispatchOps
 - **Load when:** The user needs manual trigger flows (`workflow_dispatch`) with custom inputs for testing or controlled runs.
 - **Pattern doc:** https://github.com/github/gh-aw/blob/main/docs/src/content/docs/patterns/dispatch-ops.md

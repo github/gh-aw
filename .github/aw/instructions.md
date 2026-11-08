@@ -19,6 +19,21 @@ These rules override conflicting upstream guidance.
 - Before inventing workflow/shared-component/tool/safe-output patterns, inspect
   `https://github.com/gm3dmo/the-power` through GitHub APIs or `gh` for prior art.
 
+## Indexing and Search
+
+Follow [DeterministicOps: Indexing and read-only search](../../docs/src/content/docs/patterns/deterministic-ops.md#indexing-and-read-only-search)
+when integrating an existing indexer or search tool, including MCP.
+Keep indexing in a separate deterministic job for cheap/incremental work, or
+in a dedicated trusted workflow/action for expensive, slow-changing, shared data.
+Run publishers only from trusted `main` workflow definitions and code, with
+job-scoped indexing credentials; never execute PR code in that context.
+Publish versioned Actions caches and restore only compatible, visible indexes.
+Agents may search only: enforce read-only access, expose no build/refresh tools,
+and never save agent-modified indexes or let PR runs mutate shared caches.
+Require provenance, schema, and freshness checks before search; fail explicitly
+on a missing/stale index or use the workflow's documented read-only fallback.
+Do not use writable `cache-memory` as a shared search-index store.
+
 ## Session Graders
 
 Ten fast built-ins run by default in conclusion after session collection.
