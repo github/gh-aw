@@ -257,6 +257,12 @@ corrections are good inputs. A deduplication list, backlog cursor, numeric
 baseline, or raw transcript alone does not justify dreaming. Preserve successful
 techniques as well as failures; distinguish observed outcomes from hypotheses.
 
+Recommend dreaming only when a later consumer will reuse the knowledge and
+the expected reduction in repeated reasoning or stale advice justifies the
+consolidation and maintenance cost. A recurring schedule or a growing note count
+alone is not enough. Prefer direct recall and producer-owned corrections when
+the existing view is already small, current, and cheap to use.
+
 Give the dreamer exclusive ownership of a few derived files. A shared branch
 can work when producers and the dreamer persist disjoint filenames:
 `file-glob` filters **persistence**, not reads, and existing files outside the

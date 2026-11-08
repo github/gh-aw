@@ -36,6 +36,35 @@ def checklist(text):
 
 
 class GuidanceTests(unittest.TestCase):
+    def test_creator_discovers_memory_reuse_before_selecting_persistence(self):
+        designer = (ROOT / ".github/aw/designer.md").read_text()
+        phase = designer.split("### Phase 4: Data Strategy\n", 1)[1].split("\n### Phase 5:", 1)[0]
+        creator = (ROOT / ".github/aw/create-agentic-workflow.md").read_text()
+        self.assertLess(phase.index("#### Memory reuse checkpoint"), phase.index("Ask:"))
+        self.assertIn("](memory.md#scheduled-dreaming)", phase)
+        for required in (
+            "Before choosing tools or persistence",
+            "repeated investigations",
+            "growing history or recall cost",
+            "stale/contradictory advice",
+            "even when the user does not mention\nmemory or dreaming",
+            "loading the guide does not mean adding one",
+            "primary evidence is available",
+            "a later consumer will\nreuse the lessons",
+            "execution and maintenance cost",
+            "defer the dreamer",
+            "deduplication lists, cursors, numeric baselines, one-off tasks",
+            "small\ncurrent index with cheap recall",
+        ):
+            with self.subTest(checkpoint=required):
+                self.assertIn(required, phase)
+        route = "](designer.md#memory-reuse-checkpoint)"
+        self.assertIn(route, creator)
+        self.assertLess(creator.index(route), creator.index("### 4. Select tools"))
+        self.assertIn("even without an explicit memory or dreaming request", creator)
+        memory = (ROOT / ".github/aw/memory.md").read_text()
+        self.assertIn("A recurring schedule or a growing note count\nalone is not enough", memory)
+
     def test_dreaming_is_discoverable_and_uses_current_memory_contracts(self):
         memory = (ROOT / ".github/aw/memory.md").read_text()
         section = memory.split("## Scheduled dreaming\n", 1)[1].split("\n## ", 1)[0]

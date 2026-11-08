@@ -59,6 +59,30 @@ Map to:
 
 ### Phase 4: Data Strategy
 
+#### Memory reuse checkpoint
+
+Before choosing tools or persistence, check whether later runs need reusable
+knowledge rather than just processing state. Infer this from the request and
+available repository evidence; do not add a mandatory interview question.
+
+For repeated investigations, growing history or recall cost, accumulated
+successful techniques, or stale/contradictory advice, load
+[memory.md](memory.md#scheduled-dreaming) even when the user does not mention
+memory or dreaming. Compare direct recall and producer-owned updates with a
+separate consolidation workflow; loading the guide does not mean adding one.
+
+Choose dreaming only when primary evidence is available, a later consumer will
+reuse the lessons, and consolidation can reduce repeated reasoning or repair
+knowledge enough to justify its execution and maintenance cost. Identify the
+observed problem, evidence source, consumer, and expected benefit in the design.
+If these are unknown, defer the dreamer rather than inventing a need.
+
+For deduplication lists, cursors, numeric baselines, one-off tasks, or a small
+current index with cheap recall, keep ordinary state or direct memory updates
+unless a separate knowledge problem is demonstrated. Preserve producer task
+state and follow the memory guide's ownership and evidence rules when dreaming
+is justified.
+
 Ask:
 - **"What data does the agent need to make decisions?"**
 - Follow up: **"Can we pre-fetch and aggregate that data with shell commands so the agent only reads compact JSON?"**
