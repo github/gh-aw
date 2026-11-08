@@ -8,428 +8,236 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/github/gh-aw/pkg/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-// TestWorkflowRunBranchValidation tests the validation of workflow_run triggers with and without branch restrictions
 func TestWorkflowRunBranchValidation(t *testing.T) {
-	// Create temporary directory for test files
-	tmpDir := testutil.TempDir(t, "workflow-run-validation-test")
-
 	tests := []struct {
 		name          string
-		frontmatter   string
-		filename      string
+		onYAML        string
 		strictMode    bool
-		expectError   bool
-		expectWarning bool
 		errorContains string
 		warningCount  int
 	}{
 		{
-			name: "workflow_run without branches - normal mode - should warn",
-			frontmatter: `---
-strict: false
-on:
-  workflow_run:
-    workflows: ["build"]
-    types: [completed]
-tools:
-  github: false
-features:
-  dangerously-disable-sandbox-agent: true
-sandbox:
-  agent: false
----
-
-# Workflow Run Without Branches
-Test workflow content.`,
-			filename:      "workflow-run-no-branches.md",
-			strictMode:    false,
-			expectError:   false,
-			expectWarning: true,
-			warningCount:  1, // workflow_run without branches
+			name:         "workflow_run without branches - normal mode - should warn",
+			onYAML:       "  workflow_run:\n    workflows: [build]\n    types: [completed]",
+			warningCount: 1,
 		},
 		{
-			name: "workflow_run without branches - strict mode - should error",
-			frontmatter: `---
-on:
-  workflow_run:
-    workflows: ["build"]
-    types: [completed]
-tools:
-  github:
-    toolsets: [repos]
----
-
-# Workflow Run Without Branches Strict
-Test workflow content.`,
-			filename:      "workflow-run-no-branches-strict.md",
+			name:          "workflow_run without branches - strict mode - should error",
+			onYAML:        "  workflow_run:\n    workflows: [build]\n    types: [completed]",
 			strictMode:    true,
-			expectError:   true,
-			expectWarning: false,
 			errorContains: "workflow_run trigger should include branch restrictions",
 		},
 		{
-			name: "workflow_run with branches - should pass",
-			frontmatter: `---
-strict: false
-on:
-  workflow_run:
-    workflows: ["build"]
-    types: [completed]
-    branches:
-      - main
-      - develop
-tools:
-  github: false
-features:
-  dangerously-disable-sandbox-agent: true
-sandbox:
-  agent: false
----
-
-# Workflow Run With Branches
-Test workflow content.`,
-			filename:      "workflow-run-with-branches.md",
-			strictMode:    false,
-			expectError:   false,
-			expectWarning: false,
-			warningCount:  0,
+			name:         "workflow_run with branches - should pass",
+			onYAML:       "  workflow_run:\n    workflows: [build]\n    types: [completed]\n    branches: [main, develop]",
+			warningCount: 0,
 		},
 		{
-			name: "workflow_run with branches - strict mode - should pass",
-			frontmatter: `---
-on:
-  workflow_run:
-    workflows: ["build"]
-    types: [completed]
-    branches:
-      - main
-tools:
-  github:
-    toolsets: [repos]
----
-
-# Workflow Run With Branches Strict
-Test workflow content.`,
-			filename:      "workflow-run-with-branches-strict.md",
-			strictMode:    true,
-			expectError:   false,
-			expectWarning: false,
-			warningCount:  0,
+			name:       "workflow_run with branches - strict mode - should pass",
+			onYAML:     "  workflow_run:\n    workflows: [build]\n    types: [completed]\n    branches: [main]",
+			strictMode: true,
 		},
 		{
-			name: "workflow_run with sibling bots - strict mode - should pass",
-			frontmatter: `---
-on:
-  bots:
-    - dependabot
-  workflow_run:
-    workflows:
-      - build
-    types:
-      - completed
-    branches:
-      - main
-tools:
-  github:
-    toolsets: [repos]
----
-
-# Workflow Run With Bots
-Test workflow content.`,
-			filename:      "workflow-run-with-bots-strict.md",
-			strictMode:    true,
-			expectError:   false,
-			expectWarning: false,
-			warningCount:  0,
+			name:       "workflow_run with sibling bots - strict mode - should pass",
+			onYAML:     "  bots: [dependabot]\n  workflow_run:\n    workflows: [build]\n    types: [completed]\n    branches: [main]",
+			strictMode: true,
 		},
 		{
-			name: "workflow_run with sibling roles all - strict mode - should pass",
-			frontmatter: `---
-on:
-  roles: all
-  workflow_run:
-    workflows:
-      - build
-    types:
-      - completed
-    branches:
-      - main
-tools:
-  github:
-    toolsets: [repos]
----
-
-# Workflow Run With Roles
-Test workflow content.`,
-			filename:      "workflow-run-with-roles-strict.md",
-			strictMode:    true,
-			expectError:   false,
-			expectWarning: false,
-			warningCount:  0,
+			name:       "workflow_run with sibling roles - strict mode - should pass",
+			onYAML:     "  roles: all\n  workflow_run:\n    workflows: [build]\n    types: [completed]\n    branches: [main]",
+			strictMode: true,
 		},
 		{
-			name: "workflow_run without workflows - should error",
-			frontmatter: `---
-strict: false
-on:
-  workflow_run:
-    types: [completed]
-tools:
-  github: false
----
-
-# Workflow Run Without Workflows
-Test workflow content.`,
-			filename:      "workflow-run-no-workflows.md",
-			strictMode:    false,
-			expectError:   true,
-			expectWarning: false,
+			name:          "workflow_run without workflows - should error",
+			onYAML:        "  workflow_run:\n    types: [completed]",
 			errorContains: "workflow_run trigger must include a non-empty workflows field",
-			warningCount:  0,
 		},
 		{
-			name: "workflow_run with empty workflows - strict mode - should error",
-			frontmatter: `---
-on:
-  workflow_run:
-    workflows: []
-    types: [completed]
-tools:
-  github:
-    toolsets: [repos]
----
-
-# Workflow Run Empty Workflows
-Test workflow content.`,
-			filename:      "workflow-run-empty-workflows.md",
+			name:          "workflow_run without workflows - strict mode - should error",
+			onYAML:        "  workflow_run:\n    types: [completed]",
 			strictMode:    true,
-			expectError:   true,
-			expectWarning: false,
 			errorContains: "workflow_run trigger must include a non-empty workflows field",
-			warningCount:  0,
 		},
 		{
-			name: "workflow_run with whitespace workflows - non-strict mode - should error",
-			frontmatter: `---
-strict: false
-on:
-  workflow_run:
-    workflows: [" ", ""]
-    types: [completed]
-tools:
-  github: false
----
-
-# Workflow Run Whitespace Workflows
-Test workflow content.`,
-			filename:      "workflow-run-whitespace-workflows.md",
-			strictMode:    false,
-			expectError:   true,
-			expectWarning: false,
+			name:          "workflow_run with empty workflows - strict mode - should error",
+			onYAML:        "  workflow_run:\n    workflows: []\n    types: [completed]",
+			strictMode:    true,
 			errorContains: "workflow_run trigger must include a non-empty workflows field",
-			warningCount:  0,
 		},
 		{
-			name: "no workflow_run - should pass",
-			frontmatter: `---
-strict: false
-on:
-  push:
-    branches: [main]
-tools:
-  github: false
-features:
-  dangerously-disable-sandbox-agent: true
-sandbox:
-  agent: false
----
-
-# Push Workflow
-Test workflow content.`,
-			filename:      "push-workflow.md",
-			strictMode:    false,
-			expectError:   false,
-			expectWarning: false,
-			warningCount:  0,
+			name:          "workflow_run with whitespace workflows - non-strict mode - should error",
+			onYAML:        "  workflow_run:\n    workflows: [\" \", \"\"]\n    types: [completed]",
+			errorContains: "workflow_run trigger must include a non-empty workflows field",
 		},
 		{
-			name: "mixed triggers with workflow_run without branches - should warn/error",
-			frontmatter: `---
-strict: false
-on:
-  push:
-    branches: [main]
-  workflow_run:
-    workflows: ["build"]
-    types: [completed]
-tools:
-  github: false
-features:
-  dangerously-disable-sandbox-agent: true
-sandbox:
-  agent: false
----
-
-# Mixed Triggers
-Test workflow content.`,
-			filename:      "mixed-triggers.md",
-			strictMode:    false,
-			expectError:   false,
-			expectWarning: true,
-			warningCount:  1, // workflow_run without branches
+			name:   "no workflow_run - should pass",
+			onYAML: "  push:\n    branches: [main]",
 		},
 		{
-			name: "workflow_run with empty branches array - should warn/error",
-			frontmatter: `---
-strict: false
-on:
-  workflow_run:
-    workflows: ["build"]
-    types: [completed]
-    branches: []
-tools:
-  github: false
-features:
-  dangerously-disable-sandbox-agent: true
-sandbox:
-  agent: false
----
-
-# Workflow Run With Empty Branches
-Test workflow content.`,
-			filename:      "workflow-run-empty-branches.md",
-			strictMode:    false,
-			expectError:   false,
-			expectWarning: false,
-			warningCount:  0,
+			name:         "mixed triggers with workflow_run without branches - should warn",
+			onYAML:       "  push:\n    branches: [main]\n  workflow_run:\n    workflows: [build]\n    types: [completed]",
+			warningCount: 1,
+		},
+		{
+			name:   "workflow_run with empty branches array - should not warn",
+			onYAML: "  workflow_run:\n    workflows: [build]\n    types: [completed]\n    branches: []",
+		},
+		{
+			name:          "absent on field - should be detected as a shared workflow",
+			errorContains: "Shared agentic workflow detected",
+		},
+		{
+			name:         "workflow_run with multiple workflow names - should warn",
+			onYAML:       "  workflow_run:\n    workflows: [build, test]\n    types: [completed]",
+			warningCount: 1,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create the markdown file
-			mdFile := filepath.Join(tmpDir, tt.filename)
-			if err := os.WriteFile(mdFile, []byte(tt.frontmatter), 0644); err != nil {
-				t.Fatal(err)
-			}
+			filename := strings.ReplaceAll(tt.name, " ", "-") + ".md"
+			mdFile := filepath.Join(t.TempDir(), filename)
+			require.NoError(t, os.WriteFile(mdFile, []byte(frontmatterWithOn(tt.onYAML, tt.strictMode)), 0644))
 
-			// Create compiler with appropriate mode
 			compiler := NewCompiler()
 			compiler.SetStrictMode(tt.strictMode)
-			compiler.SetNoEmit(true) // Don't write lock files for these tests
+			compiler.SetNoEmit(true)
 
-			// Compile the workflow
 			err := compiler.CompileWorkflow(mdFile)
-
-			// Check error expectations
-			if tt.expectError {
-				if err == nil {
-					t.Errorf("Expected error but got none")
-				} else if tt.errorContains != "" && !strings.Contains(err.Error(), tt.errorContains) {
-					t.Errorf("Expected error to contain %q but got: %v", tt.errorContains, err)
-				}
+			if tt.errorContains != "" {
+				require.ErrorContains(t, err, tt.errorContains)
 			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
+				require.NoError(t, err)
 			}
+			assert.Equal(t, tt.warningCount, compiler.GetWarningCount())
+		})
+	}
+}
 
-			// Check warning count
-			if compiler.GetWarningCount() != tt.warningCount {
-				t.Errorf("Expected %d warnings but got %d", tt.warningCount, compiler.GetWarningCount())
+func frontmatterWithOn(onYAML string, strictMode bool) string {
+	if onYAML == "" {
+		return `---
+features:
+  samples: true
+---
+
+# Workflow Run Validation
+Test workflow content.`
+	}
+
+	onField := "on:\n" + onYAML + "\n"
+
+	var settings string
+	if strictMode {
+		settings = `tools:
+  github:
+    toolsets: [repos]`
+	} else {
+		settings = `strict: false
+tools:
+  github: false
+features:
+  dangerously-disable-sandbox-agent: true
+sandbox:
+  agent: false`
+	}
+
+	return `---
+` + onField + settings + `
+---
+
+# Workflow Run Validation
+Test workflow content.`
+}
+
+func TestParseWorkflowRunTrigger(t *testing.T) {
+	tests := []struct {
+		name      string
+		onYAML    string
+		wantMap   map[string]any
+		wantFound bool
+	}{
+		{
+			name:   "valid workflow_run mapping",
+			onYAML: "on:\n  workflow_run:\n    workflows: [build]",
+			wantMap: map[string]any{
+				"workflows": []any{"build"},
+			},
+			wantFound: true,
+		},
+		{name: "invalid YAML", onYAML: "on: [", wantFound: false},
+		{name: "missing on key", onYAML: "push: {}", wantFound: false},
+		{name: "on is scalar", onYAML: "on: push", wantFound: false},
+		{name: "on is null", onYAML: "on: null", wantFound: false},
+		{name: "workflow_run is scalar", onYAML: "on:\n  workflow_run: build", wantFound: false},
+		{name: "workflow_run is null", onYAML: "on:\n  workflow_run: null", wantFound: false},
+		{name: "workflow_run key missing", onYAML: "on:\n  push: {}", wantFound: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			workflowRunMap, ok := parseWorkflowRunTrigger(tt.onYAML)
+			assert.Equal(t, tt.wantFound, ok)
+			if tt.wantFound {
+				assert.Equal(t, tt.wantMap, workflowRunMap)
+			} else {
+				assert.Nil(t, workflowRunMap)
 			}
 		})
 	}
 }
 
-// TestWorkflowRunBranchValidationEdgeCases tests edge cases for workflow_run validation
-func TestWorkflowRunBranchValidationEdgeCases(t *testing.T) {
-	// Create temporary directory for test files
-	tmpDir := testutil.TempDir(t, "workflow-run-validation-edge-test")
-
+func TestValidateWorkflowRunHasWorkflows(t *testing.T) {
 	tests := []struct {
-		name         string
-		frontmatter  string
-		filename     string
-		expectError  bool
-		warningCount int
+		name        string
+		workflowRun map[string]any
+		wantError   bool
 	}{
-		{
-			name: "on field empty - should not error",
-			frontmatter: `---
-strict: false
-on: push
-tools:
-  github: false
-features:
-  dangerously-disable-sandbox-agent: true
-sandbox:
-  agent: false
----
-
-# No On Field
-Test workflow content.`,
-			filename:     "no-on-field.md",
-			expectError:  false,
-			warningCount: 0,
-		},
-		{
-			name: "multiple workflow_run configs - first without branches - should warn",
-			frontmatter: `---
-strict: false
-on:
-  workflow_run:
-    workflows: ["build", "test"]
-    types: [completed]
-tools:
-  github: false
-features:
-  dangerously-disable-sandbox-agent: true
-sandbox:
-  agent: false
----
-
-# Multiple Workflows
-Test workflow content.`,
-			filename:     "multiple-workflows.md",
-			expectError:  false,
-			warningCount: 1, // workflow_run without branches
-		},
+		{name: "missing workflows", workflowRun: map[string]any{}, wantError: true},
+		{name: "empty workflows array", workflowRun: map[string]any{"workflows": []any{}}, wantError: true},
+		{name: "empty workflows string", workflowRun: map[string]any{"workflows": ""}, wantError: true},
+		{name: "whitespace workflows string", workflowRun: map[string]any{"workflows": " \t"}, wantError: true},
+		{name: "non-string workflows value", workflowRun: map[string]any{"workflows": 42}, wantError: true},
+		{name: "non-string array items", workflowRun: map[string]any{"workflows": []any{42, nil}}, wantError: true},
+		{name: "valid workflow name", workflowRun: map[string]any{"workflows": []any{"build"}}, wantError: false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create the markdown file
-			mdFile := filepath.Join(tmpDir, tt.filename)
-			if err := os.WriteFile(mdFile, []byte(tt.frontmatter), 0644); err != nil {
-				t.Fatal(err)
-			}
-
-			// Create compiler in normal mode
-			compiler := NewCompiler()
-			compiler.SetNoEmit(true)
-
-			// Compile the workflow
-			err := compiler.CompileWorkflow(mdFile)
-
-			// Check error expectations
-			if tt.expectError {
-				if err == nil {
-					t.Errorf("Expected error but got none")
-				}
+			err := validateWorkflowRunHasWorkflows(tt.workflowRun, "workflow.md")
+			if tt.wantError {
+				require.ErrorContains(t, err, "workflow_run trigger must include a non-empty workflows field")
 			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
+				assert.NoError(t, err)
 			}
+		})
+	}
+}
 
-			// Check warning count
-			if compiler.GetWarningCount() != tt.warningCount {
-				t.Errorf("Expected %d warnings but got %d", tt.warningCount, compiler.GetWarningCount())
-			}
+func TestHasNonEmptyWorkflowRunWorkflows(t *testing.T) {
+	tests := []struct {
+		name      string
+		workflows any
+		want      bool
+	}{
+		{name: "non-empty string", workflows: "build", want: true},
+		{name: "empty string", workflows: "", want: false},
+		{name: "whitespace string", workflows: " \t", want: false},
+		{name: "string slice with non-empty name", workflows: []string{" ", "build"}, want: true},
+		{name: "empty string slice", workflows: []string{}, want: false},
+		{name: "any slice with non-empty name", workflows: []any{42, "build"}, want: true},
+		{name: "any slice without non-empty string", workflows: []any{42, ""}, want: false},
+		{name: "non-string value", workflows: 42, want: false},
+		{name: "nil value", workflows: nil, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, hasNonEmptyWorkflowRunWorkflows(tt.workflows))
 		})
 	}
 }
