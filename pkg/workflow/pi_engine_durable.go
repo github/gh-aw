@@ -2,8 +2,8 @@ package workflow
 
 import (
 	"errors"
+	"fmt"
 	"path"
-	"strings"
 )
 
 const piDurableVersion = "1.4.0"
@@ -23,21 +23,17 @@ func (e *PiEngine) GetDurableExecutionPlan(data *WorkflowData, logFile string) (
 	if !isFirewallEnabled(data) {
 		return nil, errors.New("pi durable requires the credential-isolated model gateway; enable sandbox.agent and remove network.firewall: false")
 	}
-	cooldown := resolveEngineCooldownDays(data)
-	var installSteps []GitHubActionStep
-	for _, name := range []string{"pi-durable", "pi-ai", "chord", "pi-telemetry"} {
-		steps := GenerateNpmInstallStepsWithScope("@earendil-works/"+name, piDurableVersion,
-			"Install Pi durable "+name, "pi-durable", NPMInstallOptions{CooldownDays: &cooldown})
-		for i, step := range steps {
-			for j, line := range step {
-				if strings.HasPrefix(line, "        run: npm install ") {
-					step[j] = strings.Replace(line, "npm install ", "npm install --prefix /tmp/gh-aw/pi-durable-runtime --no-package-lock --no-audit --no-fund ", 1)
-				}
-			}
-			steps[i] = step
-		}
-		installSteps = append(installSteps, steps...)
-	}
+	installSteps := []GitHubActionStep{{
+		"      - name: Install Pi durable dependencies",
+		"        run: |",
+		"          set -euo pipefail",
+		"          mkdir -p /tmp/gh-aw/pi-durable-runtime",
+		`          cp "${RUNNER_TEMP}/gh-aw/actions/pi-durable/package.json" /tmp/gh-aw/pi-durable-runtime/package.json`,
+		`          cp "${RUNNER_TEMP}/gh-aw/actions/pi-durable/package-lock.json" /tmp/gh-aw/pi-durable-runtime/package-lock.json`,
+		"          npm ci --prefix /tmp/gh-aw/pi-durable-runtime --ignore-scripts --no-audit --no-fund",
+		"        env:",
+		fmt.Sprintf("          NPM_CONFIG_MIN_RELEASE_AGE: '%d'", resolveEngineCooldownDays(data)),
+	}}
 	installSteps = append(installSteps, GitHubActionStep{
 		"      - name: Verify Pi durable dependencies",
 		"        run: |",

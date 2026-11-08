@@ -191,6 +191,13 @@ for file in "${JS_SOURCE_DIR}"/*.json; do
   fi
 done
 
+# Copy the reviewed Pi durable dependency graph without installing setup dependencies.
+create_dir "${DESTINATION}/pi-durable"
+for filename in package.json package-lock.json; do
+  cp "${JS_SOURCE_DIR}/pi-durable/${filename}" "${DESTINATION}/pi-durable/${filename}"
+  FILE_COUNT=$((FILE_COUNT + 1))
+done
+
 # Copy shell scripts from sh/ directory with executable permissions
 SH_SOURCE_DIR="${SCRIPT_DIR}/sh"
 if [ -d "${SH_SOURCE_DIR}" ]; then

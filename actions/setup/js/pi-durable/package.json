@@ -1,0 +1,11 @@
+{
+  "name": "gh-aw-pi-durable-runtime",
+  "version": "1.4.0",
+  "private": true,
+  "dependencies": {
+    "@earendil-works/chord": "1.4.0",
+    "@earendil-works/pi-ai": "1.4.0",
+    "@earendil-works/pi-durable": "1.4.0",
+    "@earendil-works/pi-telemetry": "1.4.0"
+  }
+}

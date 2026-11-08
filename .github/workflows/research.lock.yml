@@ -740,20 +740,13 @@ jobs:
         run: |
           GH_AW_PI_PACKAGE_ROOT="$(npm root -g)/@earendil-works/pi-coding-agent"
           printf 'GH_AW_PI_PACKAGE_ROOT=%s\n' "$GH_AW_PI_PACKAGE_ROOT" >> "$GITHUB_ENV"
-      - name: Install Pi durable pi-durable
-        run: npm install --prefix /tmp/gh-aw/pi-durable-runtime --no-package-lock --no-audit --no-fund --ignore-scripts @earendil-works/pi-durable@1.4.0
-        env:
-          NPM_CONFIG_MIN_RELEASE_AGE: '3'
-      - name: Install Pi durable pi-ai
-        run: npm install --prefix /tmp/gh-aw/pi-durable-runtime --no-package-lock --no-audit --no-fund --ignore-scripts @earendil-works/pi-ai@1.4.0
-        env:
-          NPM_CONFIG_MIN_RELEASE_AGE: '3'
-      - name: Install Pi durable chord
-        run: npm install --prefix /tmp/gh-aw/pi-durable-runtime --no-package-lock --no-audit --no-fund --ignore-scripts @earendil-works/chord@1.4.0
-        env:
-          NPM_CONFIG_MIN_RELEASE_AGE: '3'
-      - name: Install Pi durable pi-telemetry
-        run: npm install --prefix /tmp/gh-aw/pi-durable-runtime --no-package-lock --no-audit --no-fund --ignore-scripts @earendil-works/pi-telemetry@1.4.0
+      - name: Install Pi durable dependencies
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/gh-aw/pi-durable-runtime
+          cp "${RUNNER_TEMP}/gh-aw/actions/pi-durable/package.json" /tmp/gh-aw/pi-durable-runtime/package.json
+          cp "${RUNNER_TEMP}/gh-aw/actions/pi-durable/package-lock.json" /tmp/gh-aw/pi-durable-runtime/package-lock.json
+          npm ci --prefix /tmp/gh-aw/pi-durable-runtime --ignore-scripts --no-audit --no-fund
         env:
           NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Verify Pi durable dependencies

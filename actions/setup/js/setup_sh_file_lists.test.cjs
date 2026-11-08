@@ -40,6 +40,25 @@ describe("setup.sh Copilot runtime files", () => {
   });
 });
 
+describe("setup.sh Pi durable dependencies", () => {
+  it("deploys both reviewed dependency files without installing them", () => {
+    const runnerRoot = resolve(__dirname, `.setup-pi-durable-${process.pid}`);
+    mkdirSync(runnerRoot);
+    try {
+      const deploymentBlock = setupShContent.slice(setupShContent.indexOf("# Copy the reviewed Pi durable"), setupShContent.indexOf("# Copy shell scripts"));
+      execFileSync("bash", ["-ec", `create_dir() { mkdir -p "$1"; }\nFILE_COUNT=0\n${deploymentBlock}`], {
+        env: { ...process.env, DESTINATION: runnerRoot, JS_SOURCE_DIR: __dirname },
+      });
+      for (const name of ["package.json", "package-lock.json"]) {
+        expect(readFileSync(resolve(runnerRoot, "pi-durable", name), "utf8")).toBe(readFileSync(resolve(__dirname, "pi-durable", name), "utf8"));
+      }
+      expect(existsSync(resolve(runnerRoot, "pi-durable/node_modules"))).toBe(false);
+    } finally {
+      rmSync(runnerRoot, { recursive: true, force: true });
+    }
+  });
+});
+
 /**
  * Parse a bash array from setup.sh, e.g.:
  *   MCP_SCRIPTS_FILES=(

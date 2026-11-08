@@ -79,6 +79,11 @@ does not use or require `tools.repo-memory` or `tools.cache-memory`.
 
 The compiler installs and verifies pinned `@earendil-works/pi-durable`, `pi-ai`,
 `chord` and `pi-telemetry` dependencies separately from the ordinary Pi CLI.
+All four packages share a reviewed manifest and integrity-bearing lockfile,
+installed together with `npm ci --ignore-scripts`. The installation retains
+`engine.cooldown`. Dependency updates must update both files in
+`actions/setup/js/pi-durable/`, keep the compiler's durable version in sync, and
+verify all four package imports and durable runtime compatibility.
 Unsupported engines and custom drivers fail compilation rather than falling back
 to a non-durable invocation. Custom commands, CLI arguments, extensions, native
 session settings and sub-agents cannot be combined with the durable harness.

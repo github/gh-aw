@@ -333,7 +333,7 @@ func TestCompilePiDurableArtifactLifecycle(t *testing.T) {
 			require.NoError(t, err)
 			text := string(lock)
 			require.Contains(t, text, "pi_durable_driver.cjs")
-			require.Contains(t, text, "@earendil-works/pi-durable@1.4.0")
+			require.Contains(t, text, "npm ci --prefix /tmp/gh-aw/pi-durable-runtime --ignore-scripts")
 			require.Contains(t, text, "Verify Pi durable dependencies")
 			require.Equal(t, 1, strings.Count(text, "- name: Restore durable workflow state"))
 			require.Contains(t, text, "await restoreCheckpoint(")
