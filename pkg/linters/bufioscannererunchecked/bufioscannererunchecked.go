@@ -10,6 +10,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/github/gh-aw/pkg/linters/internal/analyzerutil"
+	"github.com/github/gh-aw/pkg/linters/internal/astutil"
 	"github.com/github/gh-aw/pkg/linters/internal/filecheck"
 	"github.com/github/gh-aw/pkg/linters/internal/nolint"
 	"github.com/github/gh-aw/pkg/logger"
@@ -86,7 +87,7 @@ func analyzeBlockStatements(pass *analysis.Pass, stmts, following []ast.Stmt, ge
 			return true
 		})
 
-		forStmt, ok := stmt.(*ast.ForStmt)
+		forStmt, ok := unlabeledStmt(stmt).(*ast.ForStmt)
 		if !ok {
 			continue
 		}
@@ -115,6 +116,18 @@ func analyzeBlockStatements(pass *analysis.Pass, stmts, following []ast.Stmt, ge
 			End:     forStmt.End(),
 			Message: "Scanner loop does not check Err() after completion; read errors may be silently dropped",
 		})
+	}
+}
+
+// unlabeledStmt strips any labels (e.g. "outer:") from stmt so that labeled
+// loops are analyzed the same way as unlabeled ones.
+func unlabeledStmt(stmt ast.Stmt) ast.Stmt {
+	for {
+		labeled, ok := stmt.(*ast.LabeledStmt)
+		if !ok {
+			return stmt
+		}
+		stmt = labeled.Stmt
 	}
 }
 
@@ -201,7 +214,7 @@ func scannerMethodCallReceiver(pass *analysis.Pass, node ast.Node, methodName st
 		return nil
 	}
 
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok {
 		return nil
 	}
@@ -238,7 +251,7 @@ func isBufioScanner(pass *analysis.Pass, expr ast.Expr) bool {
 // append field names so calls like holder.scanner.Scan() match holder.scanner.Err().
 // Receivers without object identity are skipped instead of matched textually.
 func receiverKey(pass *analysis.Pass, expr ast.Expr) *receiverRef {
-	switch e := expr.(type) {
+	switch e := astutil.UnwrapParenExpr(expr).(type) {
 	case *ast.Ident:
 		obj := objectForIdent(pass, e)
 		if obj == nil {

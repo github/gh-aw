@@ -10,6 +10,8 @@ ARG DOCKERFILE_HASH=""
 ARG NPM_VERSION=11.19.0
 
 # Intentional: upgrade all packages to pick up security fixes; downstream digest pins the result.
+# Require zlib/libexpat fixes for CVE-2026-4738 and CVE-2026-113351, CVE-2026-115506,
+# CVE-2026-117610, CVE-2026-118370; fail the build if the base repositories lack them.
 # After upgrading npm, patch its bundled dependencies to meet minimum safe versions.
 # Install into a temp prefix (avoids npm's own private package.json) then replace the package
 # directories in npm's bundled node_modules: brace-expansion >= 5.0.11 (GHSA-qhr7-859c-m2p7),
@@ -18,7 +20,7 @@ ARG NPM_VERSION=11.19.0
 # the globally installed npm tree is not on Node's default resolution path, so a bare
 # require("<pkg>") would always fail with MODULE_NOT_FOUND and break the build.
 RUN apk upgrade --no-cache \
-    && apk add --no-cache git "brotli-libs>=1.2.1-r0" \
+    && apk add --no-cache git "brotli-libs>=1.2.1-r0" "zlib>=1.4-r0" "libexpat>=2.10.0-r0" \
     && apk info -v | sort \
     && npm install --global "npm@${NPM_VERSION}" \
     && tmpdir=$(mktemp -d) \
