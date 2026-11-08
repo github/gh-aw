@@ -18,7 +18,7 @@ const now = new Date().toISOString();
 const run = (id, overrides = {}) => ({
   id,
   run_attempt: 1,
-  path: ".github/workflows/example.lock.yml",
+  path: `.github/workflows/example-${id}.lock.yml`,
   status: "completed",
   conclusion: "failure",
   created_at: now,
@@ -52,19 +52,7 @@ async function fixture(t, options = {}) {
   const github = {
     rest: {
       actions: {
-        listWorkflowRunsForRepo: async params => {
-          assert.match(params.created, /^\d{4}-.*\.\.\d{4}-/, "must bound discovery by creation time");
-          assert.equal(params.status, undefined, "discover unfinished runs too");
-          calls.push(["runs", params.page, params.created]);
-          const [start, end] = params.created.split("..").map(Date.parse);
-          const recent = runs.filter(r => Date.parse(r.created_at) >= start && Date.parse(r.created_at) <= end);
-          return {
-            data: {
-              total_count: options.total ?? recent.length,
-              workflow_runs: recent.slice((params.page - 1) * 100, params.page * 100),
-            },
-          };
-        },
+        listWorkflowRunsForRepo: async () => assert.fail("Discovery must use health, not an all-run census"),
         getWorkflowRun: async params => {
           calls.push(["tracked", params.run_id]);
           const selected = runs.find(r => r.id === params.run_id);
@@ -100,6 +88,34 @@ async function fixture(t, options = {}) {
         calls.push(args);
         if (args[1] === "version") return "gh aw test-version";
         assert.ok(!args.includes("all"));
+        if (args[1] === "health") {
+          assert.equal(args[args.indexOf("--repo") + 1], "example/repo");
+          const start = args[args.indexOf("--start-date") + 1];
+          const end = args[args.indexOf("--end-date") + 1];
+          assert.equal(Date.parse(start), Date.parse(clock.time) - 86400000);
+          assert.equal(end, clock.time);
+          const recent = runs.filter(r => Date.parse(r.created_at) >= Date.parse(start) && Date.parse(r.created_at) <= Date.parse(end) && r.path.endsWith(".lock.yml"));
+          return JSON.stringify({
+            collection: {
+              partial: false,
+              failure_listing_complete: true,
+              failure_pass_complete: true,
+              potential_issues: recent
+                .filter(r => r.conclusion === "failure")
+                .map(r => ({
+                  workflow_path: r.path,
+                  representative_run_id: r.id,
+                  representative_status: options.representativeStatus || "revision_checked",
+                })),
+              ...options.healthCollection,
+            },
+            workflows: recent.map(r => ({
+              workflow_path: r.path,
+              intentional_failure: options.intentional,
+              revisions: [{ current: { run_ids: options.representativeStatus === "superseded" ? [] : [r.id] } }],
+            })),
+          });
+        }
         if (args[1] === "logs") {
           used += options.logCost || 0;
           const id = Number(args[args.indexOf("--after-run-id") + 1]) + 1;
@@ -141,7 +157,7 @@ async function fixture(t, options = {}) {
           }
           return JSON.stringify(report);
         }
-        assert.fail("Only budgeted logs queries may contact GitHub");
+        assert.fail("Only health and budgeted logs queries may contact GitHub");
       },
     };
   };
@@ -179,7 +195,7 @@ test("repeated observation is not new", async t => {
 test("old-run rerun attempt is independently collected", async t => {
   const old = run(42);
   const f = await fixture(t, {
-    runs: [run(42, { run_attempt: 2, created_at: "2020-01-01T00:00:00Z" })],
+    runs: [run(42, { run_attempt: 2, created_at: new Date(Date.parse(now) - 7200000).toISOString() })],
     state: {
       version: 1,
       repository: "example/repo",
@@ -211,7 +227,7 @@ test("intentional failures and auditor never activate the agent", async t => {
   await f.execute();
   assert.equal(f.outputs.has_new_failures, "false");
   assert.equal(f.calls.filter(call => call.includes("--audit")).length, 0);
-  assert.equal(f.calls.filter(call => call[1] === "logs").length, 1);
+  assert.equal(f.calls.filter(call => call[1] === "logs").length, 0);
 });
 
 test("PR pagination includes human and draft PRs on subsequent pages", async t => {
@@ -232,9 +248,9 @@ test("PR pagination includes human and draft PRs on subsequent pages", async t =
 });
 
 for (const [name, options] of [
-  ["API filtered-result overflow", { total: 1001 }],
-  ["API filtered-result ceiling is ambiguous", { total: 1000 }],
-  ["incomplete failure pagination", { total: 1 }],
+  ["health API error", { healthCollection: { partial: true, reason: "api_error" } }],
+  ["health time budget", { healthCollection: { partial: true, reason: "time_budget" } }],
+  ["missing health completeness", { healthCollection: { partial: undefined } }],
   ["incomplete PR pagination", { prOverflow: true }],
   ["PR access denied", { prError: true }],
   ["partial logs query", { runs: [run(42)], partial: true }],
@@ -253,28 +269,31 @@ test("large historical failure inventory is outside recent discovery", async t =
   const f = await fixture(t, { runs: [...history, run(40001)] });
   await f.execute();
   assert.equal(f.outputs.has_new_failures, "true");
-  assert.equal(f.calls.filter(call => call[0] === "runs").length, 1);
-  assert.equal(f.calls.filter(call => call[0] === "tracked").length, 0);
+  assert.equal(f.calls.filter(call => call[1] === "health").length, 1);
+  assert.equal(f.calls.filter(call => call[0] === "tracked").length, 1);
 });
 
-test("cold discovery covers one hour, not the busy preceding 24 hours", async t => {
-  const history = Array.from({ length: 1500 }, (_, n) => run(n + 1, { created_at: new Date(Date.parse(now) - 7200000).toISOString() }));
+test("busy recent non-agentic runs do not overflow health discovery", async t => {
+  const history = Array.from({ length: 1500 }, (_, n) => run(n + 1, { path: ".github/workflows/ci.yml" }));
   const f = await fixture(t, { runs: [...history, run(1501)] });
   await f.execute();
   const manifest = JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json")));
-  assert.equal(Date.parse(manifest.window_start), Date.parse(now) - 3600000);
+  assert.equal(Date.parse(manifest.window_start), Date.parse(now) - 86400000);
   assert.equal(Date.parse(manifest.retention_start), Date.parse(now) - 86400000);
   assert.equal(manifest.new_failures, 1);
+  assert.deepEqual(
+    f.calls.filter(call => call[0] === "tracked"),
+    [["tracked", 1501]]
+  );
 });
 
-test("checkpoint overlap retains processed backlog identities outside narrow discovery until expiry", async t => {
+test("health cohorts retain processed backlog identities until expiry", async t => {
   const checkpoint = new Date(Date.parse(now) - 3600000).toISOString();
   const f = await fixture(t, {
-    runs: [run(42, { created_at: new Date(Date.parse(checkpoint) - 1000).toISOString() })],
+    runs: [run(42)],
     state: { version: 1, repository: "example/repo", checkpoint, seen: [], backlog: [], pending: [] },
   });
   await f.execute();
-  assert.equal(f.calls.find(call => call[0] === "runs")[2], `${new Date(Date.parse(checkpoint) - 1000).toISOString()}..${now}`);
   for (let hour = 1; hour <= 24; hour++) {
     f.clock.time = new Date(Date.parse(now) + hour * 3600000).toISOString();
     await f.execute();
@@ -284,18 +303,18 @@ test("checkpoint overlap retains processed backlog identities outside narrow dis
     assert.equal(f.outputs.has_new_failures, "false");
   }
   assert.equal(f.calls.filter(call => call[1] === "logs").length, 2);
-  assert.equal(f.calls.filter(call => call[0] === "tracked").length, 24);
+  assert.equal(f.calls.filter(call => call[0] === "tracked").length, 25);
   f.clock.time = new Date(Date.parse(now) + 25 * 3600000).toISOString();
   await f.execute();
   const state = JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json")));
   assert.deepEqual(state.seen, []);
   assert.deepEqual(state.backlog, []);
-  assert.equal(f.calls.filter(call => call[0] === "tracked").length, 24);
+  assert.equal(f.calls.filter(call => call[0] === "tracked").length, 25);
 });
 
-for (const [name, age, total] of [
+for (const [name, age, healthCollection] of [
   ["gap beyond 24 hours", 86400001, undefined],
-  ["truncated incremental discovery", 3600000, 1000],
+  ["failed health discovery", 3600000, { partial: true, reason: "api_error" }],
 ]) {
   test(`${name} preserves an existing checkpoint and does not activate`, async t => {
     const state = {
@@ -306,7 +325,7 @@ for (const [name, age, total] of [
       backlog: [],
       pending: [42],
     };
-    const f = await fixture(t, { state, total });
+    const f = await fixture(t, { state, healthCollection });
     await assert.rejects(f.execute(), /checkpoint|scope/);
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json"))), state);
     assert.equal(f.outputs.has_new_failures, "false");
@@ -322,15 +341,15 @@ test("a checkpoint gap of exactly 24 hours remains covered, not silently clamped
   });
   await f.execute();
   const manifest = JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json")));
-  assert.equal(Date.parse(manifest.window_start), Date.parse(checkpoint) - 1000);
+  assert.equal(Date.parse(manifest.window_start), Date.parse(checkpoint));
 });
 
-test("observed unfinished run completes after aging out of creation window", async t => {
+test("unfinished run is discovered by health after failing", async t => {
   const f = await fixture(t, { runs: [run(42, { status: "in_progress", conclusion: null })] });
   await f.execute();
   assert.equal(f.outputs.has_new_failures, "false");
-  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json"))).pending, [42]);
-  Object.assign(f.runs[0], { created_at: "2020-01-01T00:00:00Z", status: "completed", conclusion: "failure" });
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json"))).pending, []);
+  Object.assign(f.runs[0], { status: "completed", conclusion: "failure" });
   await f.execute();
   assert.equal(f.outputs.has_new_failures, "true");
   assert.ok(f.calls.some(call => call[0] === "tracked" && call[1] === 42));
@@ -411,13 +430,45 @@ test("tracked successful completion and superseded failure drop obsolete opportu
   assert.deepEqual(state.backlog, []);
 });
 
-test("unobserved rerun outside the creation window is explicitly not covered", async t => {
+test("unobserved rerun outside the health horizon is explicitly not covered", async t => {
   const f = await fixture(t, {
     runs: [run(42, { created_at: "2020-01-01T00:00:00Z", run_attempt: 2 })],
   });
   await f.execute();
   assert.equal(f.outputs.has_new_failures, "false");
   assert.equal(f.calls.filter(call => call[1] === "logs").length, 0);
+});
+
+for (const status of ["superseded", "jobless", "unverified", "revision_unknown"]) {
+  test(`health ${status} representatives never activate or download logs`, async t => {
+    const f = await fixture(t, { runs: [run(42)], representativeStatus: status });
+    await f.execute();
+    assert.equal(f.outputs.has_new_failures, "false");
+    assert.equal(f.calls.filter(call => call[1] === "logs").length, 0);
+  });
+}
+
+test("bounded health inventory keeps verified failures actionable and reports partial coverage", async t => {
+  const f = await fixture(t, {
+    runs: [run(42)],
+    healthCollection: { partial: true, reason: "failure_listing_limit", failure_listing_complete: false, failure_pass_complete: false },
+  });
+  await f.execute();
+  assert.equal(f.outputs.has_new_failures, "true");
+  const manifest = JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json")));
+  assert.equal(manifest.discovery.partial, true);
+  assert.equal(manifest.discovery.reason, "failure_listing_limit");
+});
+
+test("health removes previously collected superseded failures from the backlog", async t => {
+  const options = { runs: [run(42)] };
+  const f = await fixture(t, options);
+  await f.execute();
+  options.representativeStatus = "superseded";
+  await f.execute();
+  const state = JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json")));
+  assert.deepEqual(state.backlog, []);
+  assert.equal(f.outputs.has_new_failures, "false");
 });
 
 test("native exclusion and no-dispatch policy are explicit", () => {
