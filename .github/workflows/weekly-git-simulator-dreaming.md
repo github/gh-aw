@@ -79,6 +79,38 @@ tools:
         if (!Number.isInteger(review.lesson_count) || review.lesson_count < 0 || review.lesson_count > 10) {
           throw new Error("Dreaming view requires between zero and ten lessons");
         }
+        if (!Array.isArray(review.signals) || review.signals.length > 10) {
+          throw new Error("Dreaming review requires at most ten structured signals");
+        }
+        const dimensions = [
+          ["tiny", "small", "medium", "large", "huge"],
+          ["none", "shallow", "medium", "deep"],
+          ["single", "few", "many", "batch"],
+          ["micro", "small", "medium", "large", "xlarge"],
+          ["clean", "ahead", "diverged"],
+          ["single", "multi", "merge_msg"]
+        ];
+        const configIds = dimensions.reduce((prefixes, values) =>
+          prefixes.flatMap(prefix => values.map(value => prefix ? `${prefix}-${value}` : value)), [""]);
+        for (const entry of review.signals) {
+          const keys = ["config_id", "signal", "confidence", "evidence_paths", "evidence_hashes"];
+          if (!entry || typeof entry !== "object" || Array.isArray(entry) ||
+              Object.keys(entry).length !== keys.length || keys.some(key => !Object.hasOwn(entry, key)) ||
+              !configIds.includes(entry.config_id) ||
+              !["pass", "fail", "error", "rejected", "timeout"].includes(entry.signal) ||
+              entry.confidence !== "corroborated" ||
+              !Array.isArray(entry.evidence_paths) || entry.evidence_paths.length < 1 || entry.evidence_paths.length > 3 ||
+              !Array.isArray(entry.evidence_hashes) || entry.evidence_hashes.length !== entry.evidence_paths.length ||
+              new Set(entry.evidence_paths).size !== entry.evidence_paths.length ||
+              entry.evidence_paths.some((name, index) =>
+                typeof name !== "string" ||
+                !/^(pkg\/workflow|actions\/setup\/js)\/[A-Za-z0-9_./-]+\.(go|cjs)$/.test(name) ||
+                name.split("/").some(part => part === ".." || part === "." || part === "") ||
+                typeof entry.evidence_hashes[index] !== "string" || !/^[a-f0-9]{64}$/.test(entry.evidence_hashes[index]) ||
+                review.repository_files[name] !== entry.evidence_hashes[index])) {
+            throw new Error("Invalid structured dreaming signal");
+          }
+        }
         const lessons = fs.readFileSync(path.join(root, "dreaming-lessons.md"), "utf8");
         const headings = [...lessons.matchAll(/^### Lesson ([0-9]+)$/gm)];
         if (headings.length !== review.lesson_count ||
@@ -159,6 +191,13 @@ most 1 KiB and each reason at most 512 characters, within the declared total
 append budget. Citations must point to inspected current repository paths and
 line ranges, not pretend that memory-branch files are main-checkout sources.
 
+For a note intended for the daily consumer, use an exact configuration ID as
+`subject` and serialize one structured signal (defined below) as the entire
+`note` JSON text. Its citation paths must exactly match `evidence_paths`; keep
+the narrative and correction digest in `reason`, which the daily consumer never
+ingests. Prose-only legacy notes remain useful for human/weekly review but cannot
+influence the daily simulator.
+
 Before `ledger_note_add`, compare persisted subjects, note text, scope, and
 citations to avoid an equivalent note. Before `ledger_note_vote`, inspect
 persisted vote reasons to avoid repeating the same evidence-based judgment.
@@ -185,6 +224,18 @@ Publish only useful changes, including removal of previously unsupported advice.
   at most 20 IDs already present in the read-only projection, and `lesson_count`.
   Each hash map has at most 20 entries. Omit absent inputs from the hash map.
   Do not put queued note IDs or persistence claims in this manifest.
+  Include `signals`, an array of at most ten exact-key records:
+  `{"config_id":"tiny-none-single-micro-clean-single","signal":"fail","confidence":"corroborated","evidence_paths":["pkg/workflow/example_test.go"],"evidence_hashes":["<64 lowercase hex characters>"]}`.
+  `config_id` must be an exact matrix cell, `signal` one of `pass`, `fail`,
+  `error`, `rejected`, `timeout`, and `confidence` exactly `corroborated`.
+  Include one to three unique current file paths under `pkg/workflow/` or
+  `actions/setup/js/`, ending in `.go` or `.cjs`, without traversal components,
+  and corresponding SHA-256 hashes also present in `repository_files`.
+  Extra fields, arbitrary narrative, hypotheses, and unverifiable claims are
+  excluded. Use `signals: []` if there is no corroborated configuration outcome.
+  The daily consumer rehashes citations and uses only the bounded enum projection
+  to rank already eligible fail/error regression cells, never primary selection,
+  interpretation, tool choice, authorization, or output policy.
 
 Use content hashes to recognize already reviewed evidence, but still inspect
 current relevant notes and votes: a previous review marker does not prove

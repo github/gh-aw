@@ -51,8 +51,18 @@ class GuidanceTests(unittest.TestCase):
         self.assertIn("](memory.md#scheduled-dreaming)", phase)
         for required in (
             "Before choosing tools or persistence",
+<<<<<<< HEAD
             "memory.md#scheduled-dreaming",
             "dreaming.md",
+=======
+            "repeated investigations",
+            "growing history or recall cost",
+            "stale/contradictory advice",
+            "even when the user does not mention\nmemory or dreaming",
+            "loading the guide does not mean adding a dreamer",
+            "That guide owns the deterministic-first decision, cost",
+            "Apply its decision before loading implementation guidance",
+>>>>>>> origin/pelikhan/agent-memory-differential
         ):
             with self.subTest(checkpoint=required):
                 self.assertIn(required, phase)
@@ -63,6 +73,7 @@ class GuidanceTests(unittest.TestCase):
         self.assertIn("A recurring schedule or a growing note count alone is not enough", normalized(memory))
 
     def test_dreaming_selection_prefers_deterministic_existing_work(self):
+<<<<<<< HEAD
         designer = (ROOT / ".github/aw/designer.md").read_text()
         phase = designer.split("### Phase 4: Data Strategy\n", 1)[1].split("\n### Phase 5:", 1)[0]
         self.assertIn("](memory.md#scheduled-dreaming)", phase)
@@ -74,12 +85,31 @@ class GuidanceTests(unittest.TestCase):
         memory = (ROOT / ".github/aw/memory.md").read_text()
         section = memory.split("## Scheduled dreaming\n", 1)[1].split("\n## ", 1)[0]
         section = normalized(section)
+=======
+        memory = (ROOT / ".github/aw/memory.md").read_text()
+        section = memory.split("## Scheduled dreaming\n", 1)[1].split("\n## ", 1)[0]
+        self.assertLess(section.index("Deterministic cleanup in the existing workflow"), section.index("Bounded review by the already-running agent"))
+        self.assertLess(section.index("Bounded review by the already-running agent"), section.index("A separate dreamer"))
+>>>>>>> origin/pelikhan/agent-memory-differential
         for required in (
             "Use the cheapest sufficient option, in this order",
             "no model invocation",
             "already-running agent; no additional workflow",
+<<<<<<< HEAD
             "does not verify the new assertion's meaning",
             "Never prune canonical ledger evidence or producer task state",
+=======
+            "primary evidence",
+            "later consumer",
+            "extra workflow, model invocation, and maintenance",
+            "Compare total cost",
+            "quick design\ndecision, not a separate investigation",
+            "defer the dreamer",
+            "one-off task",
+            "small, current, and cheap to use",
+            "does not verify the new\nassertion's meaning",
+            "Never prune canonical ledger evidence or producer task\nstate",
+>>>>>>> origin/pelikhan/agent-memory-differential
             "If the benefit is uncertain, do not add the dreamer",
             "default-branch history only, not PR-local caches",
             "Separate workflows do not automatically share cache-memory",
@@ -97,6 +127,10 @@ class GuidanceTests(unittest.TestCase):
         creator = (ROOT / ".github/aw/create-agentic-workflow.md").read_text()
         self.assertIn("](memory.md#scheduled-dreaming)", creator)
         self.assertIn("](dreaming.md)", creator)
+<<<<<<< HEAD
+=======
+        self.assertIn("only after the [memory decision and input-scope checks](memory.md#scheduled-dreaming)", creator)
+>>>>>>> origin/pelikhan/agent-memory-differential
         self.assertIn("](dreaming.md)", section)
         self.assertIn("Do not load implementation details", section)
         self.assertIn("](memory.md#scheduled-dreaming)", dreaming)
@@ -137,6 +171,7 @@ class GuidanceTests(unittest.TestCase):
                             headings = re.findall(r"^#{1,6} (.+)$", target.read_text(), re.MULTILINE)
                             self.assertIn(anchor, [heading_anchor(heading) for heading in headings])
 
+<<<<<<< HEAD
     def test_dreaming_cache_scope_is_owned_by_memory_guide(self):
         memory = normalized((ROOT / ".github/aw/memory.md").read_text())
         self.assertIn("default-branch history only, not PR-local caches", memory)
@@ -148,6 +183,38 @@ class GuidanceTests(unittest.TestCase):
         dreaming = normalized((ROOT / ".github/aw/dreaming.md").read_text())
         self.assertIn("](memory.md#scheduled-dreaming)", dreaming)
         self.assertNotIn("PR-local caches", dreaming)
+=======
+    def test_dreaming_cache_scope_excludes_pr_local_history(self):
+        memory = (ROOT / ".github/aw/memory.md").read_text()
+        section = " ".join(memory.split("## Scheduled dreaming\n", 1)[1].split("\n## ", 1)[0].split())
+        for required in (
+            "default-branch history",
+            "not PR-local caches",
+            "PR-local cleanup",
+            "Do not silently export PR content into shared memory",
+        ):
+            self.assertIn(required, section)
+        for path in (".github/aw/designer.md", ".github/aw/create-agentic-workflow.md", ".github/aw/dreaming.md"):
+            guidance = (ROOT / path).read_text()
+            with self.subTest(router=path):
+                self.assertIn("](memory.md#scheduled-dreaming)", guidance)
+                self.assertNotIn("not PR-local caches", guidance)
+                self.assertNotIn("Try deterministic cleanup first", guidance)
+                self.assertNotIn("Choose dreaming only", guidance)
+        dreaming = " ".join((ROOT / ".github/aw/dreaming.md").read_text().split())
+        for required in (
+            "scheduled and manual dreamer runs",
+            "actual default branch",
+            "cannot restore PR merge-ref caches",
+            "saved updates remain PR-local",
+            "default keys are workflow-scoped",
+            "compatible restore/save key prefixes, cache versions and paths",
+            "`scope: repo` broadens eligible restore keys, not GitHub's branch visibility",
+            "schema, and integrity/access policy",
+        ):
+            with self.subTest(scope=required):
+                self.assertIn(required, dreaming)
+>>>>>>> origin/pelikhan/agent-memory-differential
         reference = " ".join((ROOT / "docs/src/content/docs/reference/cache-memory.md").read_text().split())
         self.assertIn("cannot restore those PR-local caches, even with the same key or `scope: repo`", reference)
         self.assertIn("updates do not flow back to the default branch", reference)
@@ -162,6 +229,7 @@ class GuidanceTests(unittest.TestCase):
         self.assertEqual(producer_files, ["git-sim-state.json", "git-sim-strategies.md"])
         self.assertEqual(dreaming_files, ["dreaming-index.md", "dreaming-lessons.md", "dreaming-review.json"])
         self.assertFalse(set(producer_files) & set(dreaming_files))
+<<<<<<< HEAD
         self.assertIn("branch-name: memory/git-simulator", producer_text)
         self.assertIn("branch-name: memory/git-simulator", dreamer_text)
         self.assertNotIn("  ledger:\n", producer)
@@ -185,6 +253,26 @@ class GuidanceTests(unittest.TestCase):
                          '"dreaming-lessons.md": 12288', '"dreaming-review.json": 16384'):
             with self.subTest(contract=required):
                 self.assertIn(required, contract)
+=======
+        for guide in (producer, dreamer):
+            self.assertIn("branch-name: memory/git-simulator", guide)
+        self.assertIn("git-simulator-lessons:\n      type: notes\n      max-record-kb: 4\n      max-patch-kb: 16", dreamer)
+        self.assertIn("mode=ro", dreamer)
+        self.assertNotIn("\n  ledger:", producer)
+        self.assertIn("schedule: weekly", dreamer)
+        self.assertIn("cancel-in-progress: false", dreamer)
+        self.assertIn("allowed: []", dreamer)
+        self.assertIn("max-patch-size: 65536", dreamer)
+        self.assertIn("this workflow never\npersists changes to them", producer)
+        self.assertIn("alter `next_index` or tested cells", " ".join(producer.split()))
+        self.assertIn("without creating an empty\nview or ledger operations", dreamer)
+
+    def test_dreaming_workflow_declares_memory_limits_and_validation(self):
+        dreamer = (ROOT / ".github/workflows/weekly-git-simulator-dreaming.md").read_text()
+        for declaration in ("max-file-size: 16384", "max-file-count: 3", "max-patch-size: 65536", "validation:\n      script: |"):
+            with self.subTest(declaration=declaration):
+                self.assertIn(declaration, dreamer)
+>>>>>>> origin/pelikhan/agent-memory-differential
 
     def test_persona_intents_have_explicit_routes_before_cli_setup(self):
         guide = BOOTSTRAP.read_text()

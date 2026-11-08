@@ -1016,6 +1016,9 @@ func buildRepoMemoryGitHubEnv(data *WorkflowData, hasConsolidatedSafeOutputsJob 
 	env := fmt.Sprintf("          GH_TOKEN: %s\n", token) +
 		"          GITHUB_RUN_ID: ${{ github.run_id }}\n" +
 		"          GITHUB_SERVER_URL: ${{ github.server_url }}\n"
+	if memory.Validation != nil && memory.Validation.Script != "" {
+		env += fmt.Sprintf("          GH_AW_MEMORY_SOURCE_JOB_RESULT: ${{ needs.%s.result }}\n", constants.AgentJobName)
+	}
 	if hasConsolidatedSafeOutputsJob {
 		env += "          GH_AW_TEMPORARY_ID_MAP_FILE: /tmp/gh-aw/safe-outputs-items/" + constants.TemporaryIdMapFilename.String() + "\n"
 	}

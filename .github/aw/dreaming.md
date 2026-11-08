@@ -4,9 +4,36 @@ description: Implementation guidance for justified scheduled dreaming workflows,
 
 # Implement Scheduled Dreaming
 
+<<<<<<< HEAD
 This guide covers implementation after the decision and input-scope checks in
 the [memory guide](memory.md#scheduled-dreaming). It does not define when to add
 a dreamer.
+=======
+Load this guide only after the [memory decision guide](memory.md#scheduled-dreaming)
+justifies a separate dreamer and its input scope. Implement it with existing
+memory tools; no Managed Agents service, embeddings, or vector database is required.
+
+## Check Input Scope
+
+Inspect the producer workflow and its actual memory format. For shared durable
+knowledge, use existing `tools.repo-memory` and, when immutable lessons and
+corrections are useful, independently configured experimental `tools.ledger`
+with `type: notes`. Treat every restored input as untrusted data.
+
+For `cache-memory`, implement the [approved input scope](memory.md#scheduled-dreaming):
+keep scheduled and manual dreamer runs on the repository's actual default branch,
+not a hard-coded `main`. A default-branch
+workflow cannot restore PR merge-ref caches. PR merge-ref runs may restore
+eligible default-branch caches, but their saved updates remain PR-local and do not flow
+back to the default branch.
+
+Separate workflows do not automatically share cache-memory: default keys are
+workflow-scoped. Verify compatible restore/save key prefixes, cache versions
+and paths, schema, and integrity/access policy. `scope: repo` broadens eligible
+restore keys, not GitHub's branch visibility; a shared key does not remove PR
+isolation. Cache eviction remains possible, so define a rebuildable cold start.
+See the [cache-memory reference](../../docs/src/content/docs/reference/cache-memory.md#behavior).
+>>>>>>> origin/pelikhan/agent-memory-differential
 
 ## Own the Derived View
 
@@ -23,7 +50,7 @@ consolidation to the derived view; it is not permission to rewrite history.
 
 ## Configure a Bounded Workflow
 
-If a separate dreamer is justified, start weekly with manual dispatch, a short
+Start weekly with manual dispatch, a short
 timeout, and no public report unless attention is needed. For rare semantic work,
 prefer manual dispatch or a lower cadence. A post-agent `noop` does not avoid
 the model invocation cost. Serialize runs without cancelling publication:

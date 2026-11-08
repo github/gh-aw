@@ -1,5 +1,10 @@
+<<<<<<< HEAD
 # gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"893fba34225ac5e8af70f81cb4d69e408a2bf3b24b684c710388f46a9ea9d7e3","body_hash":"5a78f6e51a7345944c8b457cd52223bf8765d8332ab627b10e291a4d65783523","strict":true,"agent_id":"claude","engine_versions":{"claude":"2.1.317"}}
 # gh-aw-manifest: {"version":1,"secrets":["GH_AW_CI_TRIGGER_TOKEN","GH_AW_DEFAULT_OTLP_ENDPOINT","GH_AW_DEFAULT_OTLP_HEADERS","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GITHUB_TOKEN"],"actions":[{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"949feb2413d6458794dcd2491c4babbbce0c15c1","version":"v7.1.0"},{"repo":"actions/setup-python","sha":"6d4fd22b20465ccc0f7354476588e8df7c9ca0e0","version":"v7.1.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.29.7@sha256:bd8d363c11b65632920850a44aa61cf9857e2ce9bcd78016e5e9ff57861cb2f5"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.7@sha256:c3b4c800634b9e314b80c0cd8daa6d861ed849381bf69234cd77417e7b79b94a"},{"image":"ghcr.io/github/gh-aw-firewall/cli-proxy:0.29.7@sha256:d2c0259d8d3529012885f8b7f7e0d7a20b0e8f4b15a6f5b1d6853999cce124bb"},{"image":"ghcr.io/github/gh-aw-firewall/router:0.29.7@sha256:6f1b3160d95de1b24ca448afab5b39bed97ae773ecddb9952221ef05995bb29c"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.29.7@sha256:0790d978a820af2dc1bfab74d1f06b159f3a57ad4893ec49f475289691c4d154"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.5.4","digest":"sha256:801db64c2456ba2132733b23141fb52ca9d4691765181ee957ee121a21b86c09","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.5.4@sha256:801db64c2456ba2132733b23141fb52ca9d4691765181ee957ee121a21b86c09"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:2c2ea524e648b91c8333ce246e3838fcf5b19ac70e45baac1a51b9207299749f","pinned_image":"ghcr.io/github/gh-aw-node@sha256:2c2ea524e648b91c8333ce246e3838fcf5b19ac70e45baac1a51b9207299749f"},{"image":"ghcr.io/github/github-mcp-server:v2.1.0","digest":"sha256:f6056fc10bfffcc8c81a6417a2e9ca12808647e8dd6049642a4feaadee0e0f8a","pinned_image":"ghcr.io/github/github-mcp-server:v2.1.0@sha256:f6056fc10bfffcc8c81a6417a2e9ca12808647e8dd6049642a4feaadee0e0f8a"}],"mcp_servers":[{"name":"safeoutputs","tools":["create_issue","create_pull_request","noop","push_to_pull_request_branch","report_incomplete","report_missing_data","report_missing_tool"]}],"threat_detection":{"mode":"enabled"},"admission":true}
+=======
+# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"c08c89c65e5d220d364535fa3c52b85399746ffff64f2043d8e3eaccc6b811b9","body_hash":"7f46b25185b1a521aaa36eeb33380e2c2807d0508b2c0e7a4d54583103729fc4","strict":true,"agent_id":"claude","engine_versions":{"claude":"2.1.317"}}
+# gh-aw-manifest: {"version":1,"secrets":["GH_AW_CI_TRIGGER_TOKEN","GH_AW_DEFAULT_OTLP_ENDPOINT","GH_AW_DEFAULT_OTLP_HEADERS","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GITHUB_TOKEN"],"actions":[{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"949feb2413d6458794dcd2491c4babbbce0c15c1","version":"v7.1.0"},{"repo":"actions/setup-python","sha":"6d4fd22b20465ccc0f7354476588e8df7c9ca0e0","version":"v7.1.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.29.7@sha256:bd8d363c11b65632920850a44aa61cf9857e2ce9bcd78016e5e9ff57861cb2f5"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.7@sha256:c3b4c800634b9e314b80c0cd8daa6d861ed849381bf69234cd77417e7b79b94a"},{"image":"ghcr.io/github/gh-aw-firewall/cli-proxy:0.29.7@sha256:d2c0259d8d3529012885f8b7f7e0d7a20b0e8f4b15a6f5b1d6853999cce124bb"},{"image":"ghcr.io/github/gh-aw-firewall/router:0.29.7@sha256:6f1b3160d95de1b24ca448afab5b39bed97ae773ecddb9952221ef05995bb29c"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.29.7@sha256:0790d978a820af2dc1bfab74d1f06b159f3a57ad4893ec49f475289691c4d154"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.5.4","digest":"sha256:801db64c2456ba2132733b23141fb52ca9d4691765181ee957ee121a21b86c09","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.5.4@sha256:801db64c2456ba2132733b23141fb52ca9d4691765181ee957ee121a21b86c09"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:2c2ea524e648b91c8333ce246e3838fcf5b19ac70e45baac1a51b9207299749f","pinned_image":"ghcr.io/github/gh-aw-node@sha256:2c2ea524e648b91c8333ce246e3838fcf5b19ac70e45baac1a51b9207299749f"},{"image":"ghcr.io/github/github-mcp-server:v2.1.0","digest":"sha256:f6056fc10bfffcc8c81a6417a2e9ca12808647e8dd6049642a4feaadee0e0f8a","pinned_image":"ghcr.io/github/github-mcp-server:v2.1.0@sha256:f6056fc10bfffcc8c81a6417a2e9ca12808647e8dd6049642a4feaadee0e0f8a"}],"memory_validation_scripts":[{"memory":"repo-memory:default","sha256":"62d7541f158ca1ce18961e89cc15ff50cd3886ce468b6c9049da0ae7123afb99"}],"mcp_servers":[{"name":"safeoutputs","tools":["create_issue","create_pull_request","noop","push_to_pull_request_branch","report_incomplete","report_missing_data","report_missing_tool"]}],"threat_detection":{"mode":"enabled"},"admission":true}
+>>>>>>> origin/pelikhan/agent-memory-differential
 # This file was automatically generated by gh-aw. DO NOT EDIT. To debug this workflow, load the skill at https://github.com/github/gh-aw/blob/main/debug.md
 #
 #    ___                   _   _
@@ -624,7 +629,11 @@ jobs:
           GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
           GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
           GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
+<<<<<<< HEAD
           GH_AW_ADMISSION_WORKFLOW_HASH: "893fba34225ac5e8af70f81cb4d69e408a2bf3b24b684c710388f46a9ea9d7e3:5a78f6e51a7345944c8b457cd52223bf8765d8332ab627b10e291a4d65783523"
+=======
+          GH_AW_ADMISSION_WORKFLOW_HASH: "c08c89c65e5d220d364535fa3c52b85399746ffff64f2043d8e3eaccc6b811b9:7f46b25185b1a521aaa36eeb33380e2c2807d0508b2c0e7a4d54583103729fc4"
+>>>>>>> origin/pelikhan/agent-memory-differential
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
@@ -800,6 +809,7 @@ jobs:
           MEMORY_DIR: /tmp/gh-aw/repo-memory/default
           CREATE_ORPHAN: true
         run: bash "${RUNNER_TEMP}/gh-aw/actions/clone_repo_memory_branch.sh"
+<<<<<<< HEAD
       - env:
           GH_TOKEN: ${{ github.token }}
         name: Create read-only ledger projection
@@ -808,6 +818,22 @@ jobs:
           github-token: ${{ github.token }}
           script: "const path = require('path');\nconst actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');\nconst { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));\nsetupGlobals(core, github, context, exec, io, getOctokit);\nconst { main } = require(path.join(actionsDir, 'create_ledger_projection.cjs'));\nawait main({\n  githubClient: github,\n  owner: context.repo.owner,\n  repo: context.repo.repo,\n  ledgerConfigs: [{\n    name: 'git-simulator-lessons',\n    type: 'notes',\n    max_record_kb: 4,\n    max_segment_kb: 100,\n    max_patch_kb: 16,\n  }],\n});"
 
+=======
+      - name: Validate repo-memory baseline (default)
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          MEMORY_DIR: /tmp/gh-aw/repo-memory/default
+          MEMORY_ID: default
+          VALIDATION_SCRIPT_B64: aWYgKG1lbW9yeVBoYXNlID09PSAicHVzaCIgJiYgbWVtb3J5U291cmNlSm9iUmVzdWx0ICE9PSAic3VjY2VzcyIpIHsKICB0aHJvdyBuZXcgRXJyb3IoIlNpbXVsYXRvciBtZW1vcnkgcHVibGljYXRpb24gcmVxdWlyZXMgc3VjY2Vzc2Z1bCBmaW5hbCBldmlkZW5jZSBwcmVwYXJhdGlvbiIpOwp9CnJldHVybiB0cnVlOwo=
+          VALIDATION_SCRIPT_REQUIRED: 'true'
+          VALIDATION_TIMEOUT_SECONDS: 60
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { validateRepoMemoryBaseline } = require(path.join(actionsDir, 'validate_memory_step.cjs'));
+            validateRepoMemoryBaseline(core);
+>>>>>>> origin/pelikhan/agent-memory-differential
       - name: Configure Git credentials
         env:
           GH_AW_GIT_REPOSITORY: ${{ github.repository }}
@@ -871,6 +897,13 @@ jobs:
         env:
           GH_AW_SKILL_DIR: ".claude/skills"
         run: bash "${RUNNER_TEMP}/gh-aw/actions/restore_inline_skills.sh"
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        name: Isolate simulator memory and read-only ledger signals
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: "const fs = require(\"node:fs\");\nconst path = require(\"node:path\");\nconst { DatabaseSync } = require(\"node:sqlite\");\nconst actionsDir = path.join(process.env.RUNNER_TEMP, \"gh-aw\", \"actions\");\nconst { main } = require(path.join(actionsDir, \"create_ledger_projection.cjs\"));\nconst { isolateMemory } = require(path.join(process.env.GITHUB_WORKSPACE, \"actions/setup/js/git_simulator_memory.cjs\"));\nconst ledgerName = \"git-simulator-lessons\";\nconst ledgerWorkspace = path.join(process.env.RUNNER_TEMP, \"git-simulator-private-ledger\");\nfs.mkdirSync(ledgerWorkspace, { recursive: true });\nawait exec.exec(\"git\", [\"init\", \"--quiet\", ledgerWorkspace]);\nconst [databasePath] = await main({\n  githubClient: github, owner: context.repo.owner, repo: context.repo.repo,\n  workspaceDir: ledgerWorkspace,\n  ledgerConfigs: [{\n    name: ledgerName, type: \"notes\",\n    max_record_kb: 4, max_segment_kb: 100, max_patch_kb: 16\n  }]\n});\nconst database = new DatabaseSync(databasePath, { readOnly: true });\nlet notes;\ntry {\n  notes = database.prepare(`\n    SELECT n.id, n.subject, n.note, s.downvotes\n    FROM notes n JOIN note_state s ON n.id = s.note_id\n    ORDER BY n.id LIMIT 20\n  `).all().map(row => ({\n    ...row,\n    citations: database.prepare(`\n      SELECT path FROM note_citations WHERE note_id = ? ORDER BY ordinal LIMIT 4\n    `).all(row.id).map(citation => citation.path)\n  }));\n} finally {\n  database.close();\n}\nisolateMemory({\n  memoryDir: \"/tmp/gh-aw/repo-memory/default\",\n  workspace: process.env.GITHUB_WORKSPACE, notes,\n  outputPath: \"/tmp/gh-aw/agent/git-simulator-signals.json\",\n  privateGitDir: path.join(process.env.RUNNER_TEMP, \"git-simulator-private-memory-git\"),\n  privateHistoryPath: path.join(process.env.RUNNER_TEMP, \"git-simulator-private-producer-history.json\")\n});\n// The reader does not declare tools.ledger, so no ledger write or compaction handler exists.\nconst projectionRoot = path.dirname(path.dirname(databasePath));\nfs.chmodSync(projectionRoot, 0o700);\nfs.chmodSync(path.dirname(databasePath), 0o700);\nfs.rmSync(projectionRoot, { recursive: true });\nfs.rmSync(ledgerWorkspace, { recursive: true });"
+
       - name: Download container images
         run: bash "${RUNNER_TEMP}/gh-aw/actions/download_docker_images.sh" ghcr.io/github/gh-aw-mcpg:v0.5.4@sha256:801db64c2456ba2132733b23141fb52ca9d4691765181ee957ee121a21b86c09 ghcr.io/github/gh-aw-node@sha256:2c2ea524e648b91c8333ce246e3838fcf5b19ac70e45baac1a51b9207299749f ghcr.io/github/github-mcp-server:v2.1.0@sha256:f6056fc10bfffcc8c81a6417a2e9ca12808647e8dd6049642a4feaadee0e0f8a ghcr.io/github/gh-aw-firewall/agent:0.29.7@sha256:bd8d363c11b65632920850a44aa61cf9857e2ce9bcd78016e5e9ff57861cb2f5 ghcr.io/github/gh-aw-firewall/api-proxy:0.29.7@sha256:c3b4c800634b9e314b80c0cd8daa6d861ed849381bf69234cd77417e7b79b94a ghcr.io/github/gh-aw-firewall/cli-proxy:0.29.7@sha256:d2c0259d8d3529012885f8b7f7e0d7a20b0e8f4b15a6f5b1d6853999cce124bb ghcr.io/github/gh-aw-firewall/router:0.29.7@sha256:6f1b3160d95de1b24ca448afab5b39bed97ae773ecddb9952221ef05995bb29c ghcr.io/github/gh-aw-firewall/squid:0.29.7@sha256:0790d978a820af2dc1bfab74d1f06b159f3a57ad4893ec49f475289691c4d154
       - name: Prepare Safe Outputs Directories
@@ -883,7 +916,11 @@ jobs:
         env:
           GH_AW_FILE_ROOT: "${{ runner.temp }}/gh-aw"
           GH_AW_FILE_CONFIG: "{\"files\":[{\"path\":\"safeoutputs/config.json\",\"content_env\":\"GH_AW_SAFE_OUTPUTS_CONFIG\"}]}"
+<<<<<<< HEAD
           GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_issue\":{\"close_older_issues\":false,\"deduplicate_by_title\":3,\"labels\":[\"git-simulator\",\"safe-outputs\",\"automated\"],\"max\":10,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10,\"title_prefix\":\"[git-sim] \"},\"create_pull_request\":{\"allowed_files\":[\"sim/**\",\"stuff.md\",\"history.md\"],\"draft\":true,\"expires\":24,\"if_no_changes\":\"warn\",\"labels\":[\"git-sim-probe\",\"automated\"],\"max\":1,\"max_patch_files\":200,\"max_patch_size\":5120,\"protect_top_level_dot_folders\":true,\"protected_files\":[\"package.json\",\"bun.lockb\",\"bunfig.toml\",\"deno.json\",\"deno.jsonc\",\"deno.lock\",\"global.json\",\"NuGet.Config\",\"Directory.Packages.props\",\"mix.exs\",\"mix.lock\",\"go.mod\",\"go.sum\",\"stack.yaml\",\"stack.yaml.lock\",\"pom.xml\",\"build.gradle\",\"build.gradle.kts\",\"settings.gradle\",\"settings.gradle.kts\",\"gradle.properties\",\"package-lock.json\",\"yarn.lock\",\"pnpm-lock.yaml\",\"npm-shrinkwrap.json\",\"requirements.txt\",\"Pipfile\",\"Pipfile.lock\",\"pyproject.toml\",\"setup.py\",\"setup.cfg\",\"Gemfile\",\"Gemfile.lock\",\"uv.lock\",\"CODEOWNERS\",\"DESIGN.md\",\"README.md\",\"CONTRIBUTING.md\",\"SECURITY.md\",\"CODE_OF_CONDUCT.md\",\"CLAUDE.md\",\"AGENTS.md\"],\"protected_files_path_exclude\":[\".changeset/*.md\"],\"protected_files_policy\":\"request-review\",\"title_prefix\":\"[git-sim] \"},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"push_repo_memory\":{\"memories\":[{\"allowed_extensions\":[\".json\",\".md\"],\"dir\":\"/tmp/gh-aw/repo-memory/default\",\"file_glob\":\"git-sim-state.json git-sim-strategies.md\",\"id\":\"default\",\"max_file_count\":100,\"max_file_size\":204800,\"max_patch_size\":10240}]},\"push_to_pull_request_branch\":{\"allowed_files\":[\"sim/**\",\"stuff.md\",\"history.md\"],\"if_no_changes\":\"ignore\",\"max_patch_size\":5120,\"protect_top_level_dot_folders\":true,\"protected_files\":[\"package.json\",\"bun.lockb\",\"bunfig.toml\",\"deno.json\",\"deno.jsonc\",\"deno.lock\",\"global.json\",\"NuGet.Config\",\"Directory.Packages.props\",\"mix.exs\",\"mix.lock\",\"go.mod\",\"go.sum\",\"stack.yaml\",\"stack.yaml.lock\",\"pom.xml\",\"build.gradle\",\"build.gradle.kts\",\"settings.gradle\",\"settings.gradle.kts\",\"gradle.properties\",\"package-lock.json\",\"yarn.lock\",\"pnpm-lock.yaml\",\"npm-shrinkwrap.json\",\"requirements.txt\",\"Pipfile\",\"Pipfile.lock\",\"pyproject.toml\",\"setup.py\",\"setup.cfg\",\"Gemfile\",\"Gemfile.lock\",\"uv.lock\",\"CODEOWNERS\",\"DESIGN.md\",\"README.md\",\"CONTRIBUTING.md\",\"SECURITY.md\",\"CODE_OF_CONDUCT.md\",\"CLAUDE.md\",\"AGENTS.md\"],\"protected_files_path_exclude\":[\".changeset/*.md\"],\"protected_files_policy\":\"request-review\",\"required_labels\":[\"git-sim-probe\",\"automated\"],\"target\":\"*\",\"title_prefix\":\"[git-sim] \"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
+=======
+          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_issue\":{\"close_older_issues\":false,\"deduplicate_by_title\":3,\"labels\":[\"git-simulator\",\"safe-outputs\",\"automated\"],\"max\":10,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10,\"title_prefix\":\"[git-sim] \"},\"create_pull_request\":{\"allowed_files\":[\"sim/**\",\"stuff.md\",\"history.md\"],\"draft\":true,\"expires\":24,\"if_no_changes\":\"warn\",\"labels\":[\"git-sim-probe\",\"automated\"],\"max\":1,\"max_patch_files\":200,\"max_patch_size\":5120,\"protect_top_level_dot_folders\":true,\"protected_files\":[\"package.json\",\"bun.lockb\",\"bunfig.toml\",\"deno.json\",\"deno.jsonc\",\"deno.lock\",\"global.json\",\"NuGet.Config\",\"Directory.Packages.props\",\"mix.exs\",\"mix.lock\",\"go.mod\",\"go.sum\",\"stack.yaml\",\"stack.yaml.lock\",\"pom.xml\",\"build.gradle\",\"build.gradle.kts\",\"settings.gradle\",\"settings.gradle.kts\",\"gradle.properties\",\"package-lock.json\",\"yarn.lock\",\"pnpm-lock.yaml\",\"npm-shrinkwrap.json\",\"requirements.txt\",\"Pipfile\",\"Pipfile.lock\",\"pyproject.toml\",\"setup.py\",\"setup.cfg\",\"Gemfile\",\"Gemfile.lock\",\"uv.lock\",\"CODEOWNERS\",\"DESIGN.md\",\"README.md\",\"CONTRIBUTING.md\",\"SECURITY.md\",\"CODE_OF_CONDUCT.md\",\"CLAUDE.md\",\"AGENTS.md\"],\"protected_files_path_exclude\":[\".changeset/*.md\"],\"protected_files_policy\":\"request-review\",\"title_prefix\":\"[git-sim] \"},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"push_repo_memory\":{\"memories\":[{\"allowed_extensions\":[\".json\",\".md\"],\"dir\":\"/tmp/gh-aw/repo-memory/default\",\"file_glob\":\"git-sim-state.json git-sim-strategies.md\",\"id\":\"default\",\"max_file_count\":100,\"max_file_size\":204800,\"max_patch_size\":10240,\"validation\":{\"script\":\"if (memoryPhase === \\\"push\\\" && memorySourceJobResult !== \\\"success\\\") {\\n  throw new Error(\\\"Simulator memory publication requires successful final evidence preparation\\\");\\n}\\nreturn true;\\n\",\"script_required\":true,\"timeout\":60}}]},\"push_to_pull_request_branch\":{\"allowed_files\":[\"sim/**\",\"stuff.md\",\"history.md\"],\"if_no_changes\":\"ignore\",\"max_patch_size\":5120,\"protect_top_level_dot_folders\":true,\"protected_files\":[\"package.json\",\"bun.lockb\",\"bunfig.toml\",\"deno.json\",\"deno.jsonc\",\"deno.lock\",\"global.json\",\"NuGet.Config\",\"Directory.Packages.props\",\"mix.exs\",\"mix.lock\",\"go.mod\",\"go.sum\",\"stack.yaml\",\"stack.yaml.lock\",\"pom.xml\",\"build.gradle\",\"build.gradle.kts\",\"settings.gradle\",\"settings.gradle.kts\",\"gradle.properties\",\"package-lock.json\",\"yarn.lock\",\"pnpm-lock.yaml\",\"npm-shrinkwrap.json\",\"requirements.txt\",\"Pipfile\",\"Pipfile.lock\",\"pyproject.toml\",\"setup.py\",\"setup.cfg\",\"Gemfile\",\"Gemfile.lock\",\"uv.lock\",\"CODEOWNERS\",\"DESIGN.md\",\"README.md\",\"CONTRIBUTING.md\",\"SECURITY.md\",\"CODE_OF_CONDUCT.md\",\"CLAUDE.md\",\"AGENTS.md\"],\"protected_files_path_exclude\":[\".changeset/*.md\"],\"protected_files_policy\":\"request-review\",\"required_labels\":[\"git-sim-probe\",\"automated\"],\"target\":\"*\",\"title_prefix\":\"[git-sim] \"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
+>>>>>>> origin/pelikhan/agent-memory-differential
         with:
           script: |
             const path = require('path');
@@ -1616,15 +1653,28 @@ jobs:
             echo '{"items":[]}' > /tmp/gh-aw/agent_output.json
           fi
       # Upload repo memory as artifacts for push job
-      - name: Sanitize repo-memory filenames (default)
+      - name: Check repo-memory baseline (default)
+        id: check_repo_memory_baseline_64656661756c74
         if: always()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          MEMORY_DIR: /tmp/gh-aw/repo-memory/default
+          MEMORY_ID: default
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { checkRepoMemoryBaseline } = require(path.join(actionsDir, 'validate_memory_step.cjs'));
+            checkRepoMemoryBaseline(core);
+      - name: Sanitize repo-memory filenames (default)
+        if: always() && steps.check_repo_memory_baseline_64656661756c74.outputs.skip != 'true'
         continue-on-error: true
         env:
           MEMORY_DIR: /tmp/gh-aw/repo-memory/default
         run: bash "${RUNNER_TEMP}/gh-aw/actions/sanitize_repo_memory_filenames.sh"
       - name: Filter repo-memory files (default)
         id: filter_repo_memory_64656661756c74
-        if: always()
+        if: always() && steps.check_repo_memory_baseline_64656661756c74.outputs.skip != 'true'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           MEMORY_DIR: /tmp/gh-aw/repo-memory/default
@@ -1638,6 +1688,24 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'memory_file_eligibility.cjs'));
             await main();
+      - name: Validate repo-memory domain content (default)
+        id: validate_repo_memory_64656661756c74
+        if: always() && steps.check_repo_memory_baseline_64656661756c74.outputs.skip != 'true' && steps.filter_repo_memory_64656661756c74.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          MEMORY_DIR: /tmp/gh-aw/repo-memory/default
+          MEMORY_ID: default
+          VALIDATION_SCRIPT_B64: aWYgKG1lbW9yeVBoYXNlID09PSAicHVzaCIgJiYgbWVtb3J5U291cmNlSm9iUmVzdWx0ICE9PSAic3VjY2VzcyIpIHsKICB0aHJvdyBuZXcgRXJyb3IoIlNpbXVsYXRvciBtZW1vcnkgcHVibGljYXRpb24gcmVxdWlyZXMgc3VjY2Vzc2Z1bCBmaW5hbCBldmlkZW5jZSBwcmVwYXJhdGlvbiIpOwp9CnJldHVybiB0cnVlOwo=
+          VALIDATION_SCRIPT_REQUIRED: 'true'
+          VALIDATION_TIMEOUT_SECONDS: 60
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { validateMemoryStep } = require(path.join(actionsDir, 'validate_memory_step.cjs'));
+            validateMemoryStep(core, { kind: 'repo', formatJSON: process.env.FORMAT_JSON === 'true', requireValidationScript: process.env.VALIDATION_SCRIPT_REQUIRED === 'true' });
       - name: Validate recovery envelopes before upload
         id: validate_recovery_repo_default
         if: always() && steps.redact_secrets.outcome == 'success'
@@ -1655,13 +1723,29 @@ jobs:
             const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
             main({ core, additionalRoots: JSON.parse(process.env.GH_AW_RECOVERY_ADDITIONAL_ROOTS) });
       - name: Upload repo-memory artifact (default)
-        if: always() && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success' && steps.validate_recovery_repo_default.outcome == 'success' && steps.filter_repo_memory_64656661756c74.outcome == 'success'
+        if: always() && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success' && steps.validate_recovery_repo_default.outcome == 'success' && steps.check_repo_memory_baseline_64656661756c74.outputs.skip != 'true' && steps.filter_repo_memory_64656661756c74.outcome == 'success' && steps.validate_repo_memory_64656661756c74.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: repo-memory-default
           path: /tmp/gh-aw/repo-memory/default
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
           if-no-files-found: ignore
+      - id: restore_simulator_evidence
+        if: ${{ always() && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success' }}
+        name: Restore producer evidence and validate final memory
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: "const path = require(\"node:path\");\nconst actionsDir = path.join(process.env.RUNNER_TEMP, \"gh-aw\", \"actions\");\nconst { setupGlobals } = require(path.join(actionsDir, \"setup_globals.cjs\"));\nsetupGlobals(core, github, context, exec, io, getOctokit);\nconst { restoreProducerHistory, validateProducerUpload } = require(path.join(process.env.GITHUB_WORKSPACE, \"actions/setup/js/git_simulator_memory.cjs\"));\nconst memoryDir = \"/tmp/gh-aw/repo-memory/default\";\nrestoreProducerHistory({\n  memoryDir, workspace: process.env.GITHUB_WORKSPACE,\n  privateGitDir: path.join(process.env.RUNNER_TEMP, \"git-simulator-private-memory-git\"),\n  privateHistoryPath: path.join(process.env.RUNNER_TEMP, \"git-simulator-private-producer-history.json\")\n});\nconst { processFile, extractMCPGatewayTokens, MCP_GATEWAY_CONFIG_PATHS } = require(path.join(actionsDir, \"redact_secrets.cjs\"));\nconst { getOTLPSecretValues } = require(path.join(actionsDir, \"otlp_header_helpers.cjs\"));\nconst secrets = extractMCPGatewayTokens(MCP_GATEWAY_CONFIG_PATHS);\nfor (const name of [\"git-sim-state.json\", \"git-sim-strategies.md\"]) {\n  processFile(path.join(memoryDir, name), secrets, getOTLPSecretValues());\n}\nvalidateProducerUpload({ memoryDir, core });\nconst { main } = require(path.join(actionsDir, \"validate_recovery_envelopes.cjs\"));\nmain({ roots: [memoryDir], core });\n"
+      - if: ${{ always() && steps.restore_simulator_evidence.outcome == 'success' }}
+        name: Replace staged memory with reconstructed producer evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          if-no-files-found: error
+          name: repo-memory-default
+          overwrite: true
+          path: /tmp/gh-aw/repo-memory/default
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
+
       - name: Validate recovery envelopes before upload
         id: validate_final_recovery_envelopes
         if: always() && steps.redact_secrets.outcome == 'success'
@@ -2220,7 +2304,11 @@ jobs:
           GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
           GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
           GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
+<<<<<<< HEAD
           GH_AW_ADMISSION_WORKFLOW_HASH: "893fba34225ac5e8af70f81cb4d69e408a2bf3b24b684c710388f46a9ea9d7e3:5a78f6e51a7345944c8b457cd52223bf8765d8332ab627b10e291a4d65783523"
+=======
+          GH_AW_ADMISSION_WORKFLOW_HASH: "c08c89c65e5d220d364535fa3c52b85399746ffff64f2043d8e3eaccc6b811b9:7f46b25185b1a521aaa36eeb33380e2c2807d0508b2c0e7a4d54583103729fc4"
+>>>>>>> origin/pelikhan/agent-memory-differential
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
@@ -2948,6 +3036,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
+          GH_AW_MEMORY_SOURCE_JOB_RESULT: ${{ needs.agent.result }}
           GH_AW_TEMPORARY_ID_MAP_FILE: /tmp/gh-aw/safe-outputs-items/temporary-id-map.json
           ARTIFACT_DIR: /tmp/gh-aw/repo-memory/default
           MEMORY_ID: default
@@ -2958,6 +3047,9 @@ jobs:
           MAX_PATCH_SIZE: 10240
           ALLOWED_EXTENSIONS: '[".json",".md"]'
           FILE_GLOB_FILTER: "git-sim-state.json git-sim-strategies.md"
+          VALIDATION_SCRIPT_B64: aWYgKG1lbW9yeVBoYXNlID09PSAicHVzaCIgJiYgbWVtb3J5U291cmNlSm9iUmVzdWx0ICE9PSAic3VjY2VzcyIpIHsKICB0aHJvdyBuZXcgRXJyb3IoIlNpbXVsYXRvciBtZW1vcnkgcHVibGljYXRpb24gcmVxdWlyZXMgc3VjY2Vzc2Z1bCBmaW5hbCBldmlkZW5jZSBwcmVwYXJhdGlvbiIpOwp9CnJldHVybiB0cnVlOwo=
+          VALIDATION_SCRIPT_REQUIRED: 'true'
+          VALIDATION_TIMEOUT_SECONDS: 60
         with:
           script: |
             const path = require('path');
