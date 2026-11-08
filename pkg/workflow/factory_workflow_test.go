@@ -63,7 +63,7 @@ func TestFactorySampleExecution(t *testing.T) {
 		installation.WriteString(strings.Join(step, "\n"))
 	}
 	assert.Contains(t, installation.String(), "@factory/cli@"+def.Version)
-	assert.Contains(t, installation.String(), "--ignore-scripts")
+	assert.Contains(t, installation.String(), "NPM_CONFIG_IGNORE_SCRIPTS: 'true'")
 	assert.Contains(t, installation.String(), "droid --version")
 	assert.Contains(t, strings.Join(engine.GetSecretValidationStep(data), "\n"), "COPILOT_GITHUB_TOKEN")
 
@@ -95,7 +95,8 @@ func TestFactorySmokeContract(t *testing.T) {
 	lock, err := os.ReadFile("../../.github/workflows/smoke-factory.lock.yml")
 	require.NoError(t, err)
 	for _, expected := range []string{
-		"npm install --ignore-scripts -g @factory/cli@" + loadFactorySample(t).Version,
+		"npm install -g @factory/cli@" + loadFactorySample(t).Version,
+		"NPM_CONFIG_IGNORE_SCRIPTS: 'true'",
 		"GH_AW_ENGINE_VERSION: " + loadFactorySample(t).Version,
 		"FACTORY_MODEL: copilot/gpt-5.3-codex",
 		"GH_AW_MCP_CONFIG: .factory/mcp.json",

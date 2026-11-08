@@ -185,13 +185,14 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
+        fetch-depth: 0
         persist-credentials: false
     - name: Compare pinned specification commit
       shell: bash
       run: |
         set -euo pipefail
 
-        pinned="90babbc85fe4bb201c20b943a2fbb9a19783af54"
+        pinned="34f03fba65c7bf34c1c03654b3c03900b7597a39"
         current="$(git log -n1 --format=%H -- scratchpad/github-mcp-access-control-specification.md)"
         if [ -z "$current" ]; then
           echo "No commit found for scratchpad/github-mcp-access-control-specification.md"
