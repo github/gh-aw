@@ -1106,10 +1106,34 @@ class GuidanceTests(unittest.TestCase):
         self.assertIn("policy/compliance", creator)
         self.assertIn("structurally", creator)
 
+    def test_ad_hoc_evaluation_uses_requirement_first_triggers_and_targeted_guidance(self):
+        creator = (ROOT / ".github/aw/create-agentic-workflow.md").read_text()
+        ad_hoc = creator.split("## Ad Hoc Evaluation Mode\n", 1)[1].split(
+            "\n### Invocation Surface", 1
+        )[0]
+        self.assertIn("relevant guidance sections", ad_hoc)
+        self.assertIn("[trigger decision matrix](triggers.md#decision-matrix)", ad_hoc)
+        self.assertIn(
+            "[least-privilege checklist](workflow-patterns.md#"
+            "least-privilege-for-review-only-and-comment-only-workflows)",
+            ad_hoc,
+        )
+        self.assertIn(
+            "recommend the trigger that satisfies the requirement first",
+            ad_hoc,
+        )
+        patterns = (ROOT / ".github/aw/workflow-patterns.md").read_text()
+        checklist = patterns.split(
+            "## Least Privilege for Review-Only and Comment-Only Workflows\n", 1
+        )[1].split("\n## ", 1)[0]
+        self.assertIn("Remove `edit` and other write-capable tools", checklist)
+        self.assertIn("use `safe-outputs.add-comment`", checklist)
+
     def test_persona_rotation_finishes_remaining_personas(self):
         explorer = (ROOT / ".github/workflows/agent-persona-explorer.md").read_text()
         self.assertIn("If 1 or 2 remain, select those before resetting", explorer)
         self.assertIn("If the updated list now contains all 9 personas, reset to an empty list", explorer)
+        self.assertIn('labels: ["agent-research", "cookie"]', explorer)
         self.assertNotIn("If fewer than 3 remain, reset", explorer)
 
     def test_security_reporting_omits_empty_findings_tables(self):

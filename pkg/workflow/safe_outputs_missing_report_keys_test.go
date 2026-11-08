@@ -122,3 +122,24 @@ Report unavailable capabilities and data.
 	assert.Contains(t, string(serialized), "report-missing-tool:")
 	assert.Contains(t, string(serialized), "report-missing-data:")
 }
+
+func TestMissingReportCanonicalEmptyStrictCompile(t *testing.T) {
+	t.Parallel()
+	file := filepath.Join(t.TempDir(), "reports.md")
+	require.NoError(t, os.WriteFile(file, []byte(`---
+on: workflow_dispatch
+permissions:
+  contents: read
+engine: copilot
+network: {}
+strict: true
+safe-outputs:
+  report-missing-tool:
+---
+Report unavailable capabilities.
+`), 0600))
+	require.NoError(t, NewCompiler().CompileWorkflow(file))
+	content, err := os.ReadFile(filepath.Join(filepath.Dir(file), "reports.lock.yml"))
+	require.NoError(t, err)
+	assert.Contains(t, string(content), `"report_missing_tool"`)
+}
