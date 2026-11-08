@@ -122,7 +122,7 @@ func TestGeminiEngineInstallation(t *testing.T) {
 
 		steps := engine.GetInstallationSteps(workflowData)
 		assert.Equal(t, string(constants.DefaultGeminiVersion), workflowData.EngineConfig.Version)
-		assert.Contains(t, stepsToString(steps), "npm install --ignore-scripts -g @google/gemini-cli@"+string(constants.DefaultGeminiVersion))
+		assert.Contains(t, stepsToString(steps), "npm install -g @google/gemini-cli@"+string(constants.DefaultGeminiVersion))
 	})
 
 	t.Run("explicit version overrides the default", func(t *testing.T) {
@@ -135,7 +135,7 @@ func TestGeminiEngineInstallation(t *testing.T) {
 
 		steps := engine.GetInstallationSteps(workflowData)
 		assert.Equal(t, "0.62.0", workflowData.EngineConfig.Version)
-		assert.Contains(t, stepsToString(steps), "npm install --ignore-scripts -g @google/gemini-cli@0.62.0")
+		assert.Contains(t, stepsToString(steps), "npm install -g @google/gemini-cli@0.62.0")
 		assert.NotContains(t, stepsToString(steps), "@google/gemini-cli@"+string(constants.DefaultGeminiVersion))
 	})
 

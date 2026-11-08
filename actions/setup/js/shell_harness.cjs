@@ -4,6 +4,7 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { runProcess } = require("./process_runner.cjs");
+const { openPiDurableSession, observeDurableSession } = require("./durable_native_session.cjs");
 
 async function main() {
   const [engineName, command] = process.argv.slice(2);
@@ -13,12 +14,14 @@ async function main() {
     return;
   }
 
+  const durableSession = engineName === "pi" ? openPiDurableSession() : undefined;
   const result = await runProcess({
     command: "bash",
     args: ["-o", "pipefail", "-c", command],
     logArgs: [engineName],
     attempt: 0,
     log: message => process.stderr.write(`[${engineName}-harness] ${message}\n`),
+    onStdoutLine: line => observeDurableSession(durableSession, engineName, line),
   });
   process.exitCode = result.exitCode;
 }

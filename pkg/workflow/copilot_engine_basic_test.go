@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 	"testing"
@@ -169,8 +170,9 @@ func TestCopilotEngineInstallationSteps_WithLSPConfig(t *testing.T) {
 	if !strings.Contains(allLinesStr, "Install Python LSP dependencies") {
 		t.Fatalf("Expected Python LSP install step, got:\n%s", allLinesStr)
 	}
-	if !strings.Contains(allLinesStr, "npm install -g --ignore-scripts pyright") {
-		t.Fatalf("Expected pyright install command, got:\n%s", allLinesStr)
+	expectedInstall := fmt.Sprintf("      - name: Install Python LSP dependencies\n        run: npm install -g pyright@1.1.399\n        env:\n          NPM_CONFIG_IGNORE_SCRIPTS: 'true'\n          NPM_CONFIG_MIN_RELEASE_AGE: '%d'\n", npmDefaultCooldownDays)
+	if !strings.Contains(allLinesStr, expectedInstall) {
+		t.Fatalf("Expected pinned pyright install command with script suppression and cooldown env, got:\n%s", allLinesStr)
 	}
 }
 

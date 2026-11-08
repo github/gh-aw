@@ -28,6 +28,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `errortypeassertion` — reports type assertions from `error` to concrete types and recommends `errors.As`.
 - `errstringmatch` — reports `strings.Contains(err.Error(), "...")` patterns and recommends `errors.Is` / `errors.As`.
 - `fileclosenotdeferred` — reports non-deferred file `Close()` calls that can leak resources.
+- `filepathwalkpreferwalkdir` — reports `filepath.Walk` calls and recommends `filepath.WalkDir`.
 - `execcommandwithoutcontext` — reports `exec.Command(...)` calls inside functions that already receive `context.Context` and should use `exec.CommandContext(...)`.
 - `fmterrorfnoverbs` — reports `fmt.Errorf` calls whose format string contains no verbs, recommending `errors.New` instead.
 - `formatintitoa` — reports `strconv.FormatInt(int64(x), 10)` for `int` arguments, recommending `strconv.Itoa(x)`. Supports constant decimal bases, parentheses, and import/type aliases; excludes defined integer types and non-decimal bases. Suggested fixes are limited to package-qualified calls without overlapping comments.
@@ -202,6 +203,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `errstringmatch` | Custom `go/analysis` analyzer that flags brittle `strings.Contains(err.Error(), "...")` checks |
 | `execcommandwithoutcontext` | Custom `go/analysis` analyzer that flags `exec.Command(...)` calls that should use `exec.CommandContext(...)` in context-receiving functions |
 | `fileclosenotdeferred` | Custom `go/analysis` analyzer that flags file `Close()` calls that are not deferred immediately |
+| `filepathwalkpreferwalkdir` | Custom `go/analysis` analyzer that flags `filepath.Walk` calls and recommends `filepath.WalkDir` |
 | `fmterrorfnoverbs` | Custom `go/analysis` analyzer that flags `fmt.Errorf` calls with no format verbs, recommending `errors.New` |
 | `formatintitoa` | Custom `go/analysis` analyzer that simplifies decimal `strconv.FormatInt(int64(x), 10)` calls on `int` arguments to `strconv.Itoa(x)` |
 | `fprintferrorunchecked` | Custom `go/analysis` analyzer that warns about unchecked `fmt.Fprintf`/`Fprint`/`Fprintln` writes other than direct console output |

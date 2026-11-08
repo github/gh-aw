@@ -14,6 +14,8 @@ const MAX_SOURCE_SCAN_BYTES = 64 * 1024 * 1024;
 
 /** @type {Record<string, readonly string[]>} */
 const EVENT_FIELDS = {
+  "durable.restore": ["engine", "storage", "runId", "runAttempt", "status", "parentRunId", "artifactId"],
+  "durable.session": ["engine", "storage", "runId", "runAttempt", "status", "parentRunId", "sessionId"],
   "session.format": ["version"],
   "workflow.info": ["engineId", "agentVersion", "cliVersion", "awfVersion", "mcpgVersion", "model", "requestedModel", "triggerType", "dryRun", "workflowId", "workflowCallId", "repository", "runId", "runAttempt", "ref", "sha"],
   "session.result": ["sourceEngine", "numTurns", "durationMs", "totalCostUsd", "status", "sourceType", "sessionId", "agentId"],
@@ -34,6 +36,8 @@ const GRADER_RUN_FIELDS = ["id", "attempt", "graderCount", "passed", "failed", "
 
 /** @type {Record<string, number>} Lower numbers preserve more essential evidence. */
 const SESSION_EVENT_PRIORITIES = {
+  "durable.restore": 2,
+  "durable.session": 2,
   "session.format": 0,
   "workflow.info": 1,
   "execution.result": 2,

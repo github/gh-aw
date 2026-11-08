@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "fs";
+import os from "node:os";
+import path from "node:path";
 
 const { sendJobSetupSpan, sendJobConclusionSpan, OTEL_JSONL_PATH } = await import("./send_otlp_span.cjs");
 
@@ -41,6 +43,48 @@ function attrsByKey(span) {
 function firstSpan(payload) {
   return payload.resourceSpans[0].scopeSpans[0].spans[0];
 }
+
+describe("durable parent OpenTelemetry evidence", () => {
+  let root;
+  let appendSpy;
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-durable-otel-"));
+    vi.stubEnv("GH_AW_TMP_DIR", root);
+    vi.stubEnv("INPUT_JOB_NAME", "agent");
+    vi.stubEnv("GITHUB_RUN_ID", "200");
+    vi.stubEnv("GITHUB_RUN_ATTEMPT", "1");
+    vi.stubEnv("GH_AW_OTLP_ENDPOINTS", "");
+    vi.stubEnv("GH_AW_OTLP_IF_MISSING", "ignore");
+    appendSpy = vi.spyOn(fs, "appendFileSync").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it.each([
+    { status: "restored", parentRunId: "100", expected: "100" },
+    { status: "fresh", expected: undefined },
+    { status: "restored", parentRunId: "../../secret", expected: undefined },
+    { status: "restored", parentRunId: "100", runAttempt: "2", expected: undefined },
+  ])("attaches only a validated current-attempt checkpoint parent: $status / $parentRunId / $runAttempt", async ({ status, parentRunId, runAttempt = "1", expected }) => {
+    fs.mkdirSync(path.join(root, "agent"));
+    fs.writeFileSync(
+      path.join(root, "agent/durable-session.jsonl"),
+      JSON.stringify({
+        type: "durable.restore",
+        data: { engine: "codex", storage: "artifact", runId: "200", runAttempt, status, ...(parentRunId ? { parentRunId, artifactId: "99" } : {}) },
+      }) + "\n"
+    );
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    await sendJobConclusionSpan("gh-aw.agent.conclusion", { startMs: Date.now() - 1000 });
+    const spans = appendSpy.mock.calls.filter(call => call[0] === OTEL_JSONL_PATH).map(call => firstSpan(JSON.parse(String(call[1]))));
+    expect(spans.length).toBeGreaterThan(0);
+    for (const span of spans) expect(attrsByKey(span)["gh-aw.durable.parent_run_id"]).toBe(expected);
+    if (parentRunId === "../../secret") expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("Durable session parent unavailable"));
+  });
+});
 
 describe("gh-aw OpenTelemetry compatibility contract", () => {
   let appendFileSyncSpy;
