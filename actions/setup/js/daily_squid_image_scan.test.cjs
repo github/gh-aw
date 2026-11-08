@@ -64,18 +64,14 @@ describe("daily container image scan analysis", () => {
     expect(references).toBeGreaterThan(0);
   });
 
-  it("requires fixed brotli and undici versions in the vendored Node rebuild", () => {
+  it("requires fixed brotli, zlib, libexpat, and undici versions in the vendored Node rebuild", () => {
     const dockerfile = readFileSync(new URL("./Dockerfile.safe-outputs-mcp", import.meta.url), "utf8");
     expect(dockerfile).toContain('apk add --no-cache git "brotli-libs>=1.2.1-r0"');
     expect(dockerfile).toContain('"undici@^6.29.1"');
-    expect(dockerfile).toContain("RUN apk upgrade --no-cache");
-  });
-
-  it.each(["zlib>=1.4-r0", "libexpat>=2.10.0-r0"])("requires %s in the vendored Node rebuild rather than accepting an unpatched repository version", constraint => {
-    const dockerfile = readFileSync(new URL("./Dockerfile.safe-outputs-mcp", import.meta.url), "utf8");
     const install = dockerfile.match(/&& apk add --no-cache ([^\n]+)/);
     expect(install).not.toBeNull();
-    expect(install[1]).toContain(`"${constraint}"`);
+    expect(install[1]).toContain('"zlib>=1.4-r0"');
+    expect(install[1]).toContain('"libexpat>=2.10.0-r0"');
     expect(dockerfile).toContain("RUN apk upgrade --no-cache");
     expect(dockerfile).not.toMatch(/apk (add|upgrade)[^\n]*(?:\|\| true|--force-broken-world)/);
   });
