@@ -355,7 +355,8 @@ jobs:
   decisions-integration:
     name: Copilot Decisions API Integration
     needs: [checkout-cache]
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    # Fork PRs and Dependabot runs have read-only tokens, even with the permission below.
+    if: github.actor != 'dependabot[bot]' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
