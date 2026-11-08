@@ -204,7 +204,7 @@ describe("replace_label", () => {
     expect(result.success).toBe(false);
   });
 
-  it("should succeed even when label_to_remove is not present on the issue", async () => {
+  it("T-RL-045 uses the current REST label state when label_to_remove is absent", async () => {
     mockGithub.rest.issues.get = async () => ({
       data: {
         title: "Test issue",
@@ -296,7 +296,7 @@ describe("replace_label", () => {
     expect(result.success).toBe(true);
   });
 
-  it("should reject label_to_add before setLabels when blocklist changes mid-flight", async () => {
+  it("T-RL-026 rechecks blocklist state before setLabels", async () => {
     let setLabelsCalls = 0;
     let getCalls = 0;
     const config = { allowed_add: ["done"], blocked: [] };
@@ -349,7 +349,8 @@ describe("replace_label", () => {
     expect(result.skipped).toBe(true);
   });
 
-  it("should return staged result when in staged mode", async () => {
+  it("T-RL-060 does not call setLabels in staged mode", async () => {
+    const setLabels = vi.spyOn(mockGithub.rest.issues, "setLabels");
     const handler = await main({ staged: true });
     const result = await handler({ label_to_remove: "in-progress", label_to_add: "done" }, {});
 
@@ -357,9 +358,10 @@ describe("replace_label", () => {
     expect(result.staged).toBe(true);
     expect(result.previewInfo?.labelToRemove).toBe("in-progress");
     expect(result.previewInfo?.labelToAdd).toBe("done");
+    expect(setLabels).not.toHaveBeenCalled();
   });
 
-  it("should return error when no item number is available", async () => {
+  it("T-RL-019 rejects when no item number is available", async () => {
     global.context = {
       repo: { owner: "test-owner", repo: "test-repo" },
       payload: {}, // no issue or pull_request in payload
@@ -380,6 +382,36 @@ describe("replace_label", () => {
     const result = await handler({ label_to_remove: "in-progress", label_to_add: "done" }, {});
 
     expect(result.success).toBe(false);
+  });
+
+  it.each([
+    { status: 429, headers: { "retry-after": "0.001" } },
+    { status: 403, headers: { "retry-after": "0.001" } },
+  ])("T-RL-054 retries rate-limit response $status", async response => {
+    let setLabelsCalls = 0;
+    mockGithub.rest.issues.setLabels = async ({ labels }) => {
+      setLabelsCalls++;
+      if (setLabelsCalls === 1) {
+        const error = new Error("Rate limited");
+        error.status = response.status;
+        error.response = response;
+        throw error;
+      }
+      return { data: labels.map(name => ({ name })) };
+    };
+
+    vi.useFakeTimers();
+    try {
+      const handler = await main({});
+      const resultPromise = handler({ label_to_remove: "in-progress", label_to_add: "done" }, {});
+      await vi.runAllTimersAsync();
+      const result = await resultPromise;
+
+      expect(result.success).toBe(true);
+      expect(setLabelsCalls).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("should reject a successful setLabels response that omits label_to_add", async () => {

@@ -565,6 +565,7 @@ For outcome evaluation compliance (verifying that the `replace_label` outcome ev
 - **T-RL-016**: Verify that a fixed numeric target ignores a conflicting agent-supplied item number.
 - **T-RL-017**: Verify that a fixed numeric target is used when the message omits an item number.
 - **T-RL-018**: Verify that `target: "*"` accepts an agent-supplied item number.
+- **T-RL-019**: Verify that the handler rejects the message when no target item number can be resolved.
 
 #### 9.2.4 Label Validation Tests
 
@@ -578,6 +579,7 @@ and `specs/replace-label-compliance/rl-003-blocklist-ordering.yaml`.
 - **T-RL-023**: Verify that `label_to_add` matching a `blocked` pattern is rejected even when it also matches `allowed-add`.
 - **T-RL-024**: Verify that `label_to_remove` matching a `blocked` pattern is rejected.
 - **T-RL-025**: Verify that `label_to_remove` is accepted when `allowed-remove` is empty.
+- **T-RL-026**: Verify that `label_to_add` is rechecked against current blocklist state immediately before `setLabels`.
 
 Fixture linkage check (2026-08-01):
 
@@ -602,6 +604,7 @@ Error-category fixture: `specs/replace-label-compliance/rl-004-error-categories.
 - **T-RL-040**: Verify that when `label_to_remove` is on the item, the computed new label set excludes it and includes `label_to_add`.
 - **T-RL-041**: Verify that when `label_to_add` is passed to `setLabels` and the label does not exist in the repository, the call fails with a hard error.
 - **T-RL-044**: Verify that when `label_to_remove` is not on the item, the computed new label set adds `label_to_add` without removing any label.
+- **T-RL-045**: Verify that the handler derives current labels from the REST response when `label_to_remove` is absent.
 
 #### 9.2.7 REST setLabels Tests
 
@@ -609,7 +612,7 @@ Error-category fixture: `specs/replace-label-compliance/rl-004-error-categories.
 - **T-RL-051**: Verify that the updated label list returned by `setLabels` is logged.
 - **T-RL-052**: Verify that a `setLabels` failure produces a hard error result with `success: false`.
 - **T-RL-053**: Verify that `label_to_add` always appears exactly once in the `labels` array.
-- **T-RL-054**: Verify that rate-limit responses trigger retry behavior.
+- **T-RL-054**: Verify that primary (HTTP 429) and secondary (HTTP 403 with `Retry-After`) rate-limit responses trigger retry behavior.
 
 #### 9.2.8 Staged Mode Tests
 
@@ -622,6 +625,12 @@ Error-category fixture: `specs/replace-label-compliance/rl-004-error-categories.
 - **T-RL-070**: Verify that a message with a `repo` in `allowed-repos` is accepted.
 - **T-RL-071**: Verify that a message with a `repo` not in `allowed-repos` is rejected.
 - **T-RL-072**: Verify that `target-repo` is used as the default when `repo` is absent from the message.
+
+#### 9.2.10 Partial-Success Response Tests
+
+- **T-RL-057**: Verify that the returned `setLabels` response contains `label_to_add` and omits the removed label.
+- **T-RL-058**: Verify that a partial-success response is rejected with a hard error.
+- **T-RL-059**: Verify that partial success uses the existing `SETLABELS_FAILED` category and introduces no new error code.
 
 ### 9.3 Compliance Checklist
 
@@ -637,7 +646,7 @@ Error-category fixture: `specs/replace-label-compliance/rl-004-error-categories.
 | RL-010 Count gate enforcement | T-RL-010, T-RL-011 | 1 | Required |
 | RL-012 Default max = 5 | T-RL-012 | 1 | Required |
 | RL-016 Target mode precedence | T-RL-014 – T-RL-018 | 1 | Required |
-| RL-017 No item number error | T-RL-006 | 1 | Required |
+| RL-017 No item number error | T-RL-019 | 1 | Required |
 | RL-018 Triggering target authorization | T-RL-014, T-RL-015 | 1 | Required |
 | RL-019 Fixed target authorization | T-RL-016, T-RL-017 | 1 | Required |
 | RL-020 Wildcard target authorization | T-RL-018 | 1 | Required |
@@ -647,11 +656,78 @@ Error-category fixture: `specs/replace-label-compliance/rl-004-error-categories.
 | RL-029 Label set computation | T-RL-040 | 1 | Required |
 | RL-034 Missing label_to_remove proceeds | T-RL-044 | 1 | Required |
 | RL-036 Single REST setLabels call | T-RL-050 | 1 | Required |
-| RL-037 Rate-limit retry on REST call | T-RL-054 | 2 | Recommended |
+| RL-037 Rate-limit retry on REST call | T-RL-054 | 1 | Required |
 | RL-041 label_to_add in labels array | T-RL-053 | 1 | Required |
 | RL-043 Atomic REST operation | T-RL-050 | 1 | Required |
+| RL-057 Verify returned labels | T-RL-057 | 1 | Required |
+| RL-058 Reject partial success | T-RL-058 | 1 | Required |
+| RL-059 Reuse SETLABELS_FAILED category | T-RL-059 | 1 | Required |
 | RL-050 Cross-repo restrictions | T-RL-070 – T-RL-072 | 1 | Required |
 | RL-052 setLabels fails for missing label | T-RL-041 | 1 | Required |
+| RL-049a Recheck blocklist before write | T-RL-026 | 1 | Required |
+| RL-033 Use current REST response for label state | T-RL-045 | 1 | Required |
+
+### 9.4 Normative MUST Coverage Index (§§5–8)
+
+Each MUST-level requirement is mapped to a compliance test ID or an explicit
+evidence gap. Test IDs identify the expected conformance case; the evidence table
+in [`specs/replace-label-compliance/README.md`](replace-label-compliance/README.md)
+records the implementation test or remaining gap.
+
+| Requirement | Test ID(s) or documented gap |
+|---|---|
+| §5 ordered processing pipeline | **Gap:** no end-to-end test asserts that every stage stops subsequent stages after failure. |
+| RL-008 | T-RL-001–006; `TestFormalSchemaRequiredFields` |
+| RL-009 | `TestFormalReplaceLabelP3_ValidationConfigFields`; **gap:** common-pipeline invocation is not directly tested. |
+| RL-010 | T-RL-010–011; `TestFormalCountGate` |
+| RL-011 | **Gap:** expression resolution for `max` is not directly tested. |
+| RL-012 | T-RL-012; `TestFormalReplaceLabelP3_DefaultMaxFive` |
+| RL-013 | T-RL-070–072; `TestFormalCrossRepoRestriction` |
+| RL-014 | **Gap:** malformed `owner/repo` rejection is not directly tested. |
+| RL-015 | T-RL-070–072; `TestFormalCrossRepoRestriction` |
+| RL-016 | T-RL-014–018; `TestFormalReplaceLabelP15_TargetModeEnforcement` |
+| RL-017 | T-RL-019 |
+| RL-018 | T-RL-014–015 |
+| RL-019 | T-RL-016–017 |
+| RL-020 | T-RL-018; `TestFormalItemNumberAliases` |
+| RL-020a | T-RL-014–019; `TestFormalReplaceLabelP15_TargetModeEnforcement` |
+| RL-021 | T-RL-023–024; `TestFormalBlocklistOrdering`, `TestFormalBlocklistSymmetry` |
+| RL-022 | T-RL-020–023; `TestFormalBlocklistOrdering`, `TestFormalBlocklistSymmetry` |
+| RL-023 | **Gap:** workflow warning-only behavior is not directly asserted by a handler integration test. |
+| RL-024 | T-RL-030–031; `TestFormalRequiredLabelsGate` |
+| RL-025 | T-RL-032–033; `TestFormalTitlePrefixGate` |
+| RL-026 | T-RL-030–033; handler tests for skipped gate results |
+| RL-027 | T-RL-060–061; **gap:** the staged-preview log text is not asserted directly. |
+| RL-028 | T-RL-062; `TestFormalReplaceLabelP9_StagedHandlerResult` |
+| RL-029 | T-RL-040; `TestFormalLabelSetComputation` |
+| RL-033 | T-RL-045; `replace_label.test.cjs` uses a mocked current REST response. |
+| RL-034 | T-RL-044; `TestFormalReplaceLabelP11_IdempotentMissingRemove` |
+| RL-036 | T-RL-050; `TestFormalSingleRESTCall` |
+| RL-037 | T-RL-054 covers 403/429; **gap:** handler-level 5xx, timeout, and transport retry cases are not covered. |
+| RL-038 | T-RL-051; **gap:** required success-log fields are not asserted directly. |
+| RL-039 | **Gap:** no test asserts the complete success-result field set. |
+| RL-040 | **Gap:** `attachExecutionState` before/after metadata is not asserted for this handler. |
+| RL-041 | T-RL-040, T-RL-050; `TestFormalLabelSetComputation` |
+| RL-042 | T-RL-053; `TestFormalAddDeduplication` |
+| RL-043 | T-RL-050; **gap:** GitHub's server-side atomicity guarantee is not locally testable. |
+| RL-044 | **Gap:** workflow-level warning-only behavior for every soft-skip category is not directly tested. |
+| RL-045 | **Gap:** `core.error()` logging for all hard-error categories is not directly asserted. |
+| RL-046 | T-RL-052; `TestFormalHardErrorOnRESTFail` |
+| RL-046a | **Gap:** HTTP 404 rejection has no focused handler test. |
+| RL-046b | **Gap:** handler-level 5xx, timeout, and transport retries and exhaustion are not directly tested. |
+| RL-048 | T-RL-054; handler test covers 403 and 429 retries. |
+| RL-057 | `TestFormalPostSetLabelsAddPresent`, `TestFormalPostSetLabelsRemoveAbsent` |
+| RL-058 | `TestFormalPartialSuccessRejected` |
+| RL-059 | `TestFormalPartialSuccessNoNewErrorCode` |
+| RL-049 | T-RL-020–025; `TestFormalBlocklistOrdering` |
+| RL-049a | `TestFormalBlockedLabelAddedViaReplaceLabelMidBlocklistChange_NoWriteAPI` |
+| RL-050 | T-RL-070–072; `TestFormalCrossRepoRestriction` |
+| RL-051 | **Gap:** cross-repository token permission is not checked by a focused conformance test. |
+| RL-052 | T-RL-041; handler test for nonexistent `label_to_add` |
+| RL-053 | T-RL-030–031; **gap:** no test substitutes agent-provided label state for the REST response. |
+| RL-054 | **Gap:** the minimum `issues: write` token scope is not covered by a focused conformance test. |
+| RL-055 | **Gap:** dedicated per-type token use for narrower permissions is not covered by a conformance test. |
+| RL-056 | T-RL-060; `replace_label.test.cjs` asserts staged mode never calls `setLabels`. |
 
 ---
 

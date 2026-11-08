@@ -76,7 +76,7 @@ func TestSharedGitHubQueryRepositoryBindings(t *testing.T) {
 	}
 }
 
-// Execute repository selection only, before any API calls or scratch-file writes.
+// Execute repository selection only, before any API calls or pagination.
 func TestSharedGitHubQueryRepositoryDefaults(t *testing.T) {
 	config := loadSharedMCPScripts(t, "github-queries-mcp-script.md")
 	for _, name := range []string{"github-issue-query", "github-pr-query", "github-discussion-query"} {
@@ -105,7 +105,7 @@ func TestSharedGitHubQueryRepositoryDefaults(t *testing.T) {
 						if !ok {
 							t.Fatal("missing output-file boundary")
 						}
-						_, pagination, ok := strings.Cut(run, "# Fetch all items updated in a date window. REST results are ordered by\n")
+						_, pagination, ok := strings.Cut(run, "elif [[ -n \"$SINCE\" ]]; then\n")
 						if !ok {
 							t.Fatal("missing pagination boundary")
 						}
@@ -113,7 +113,7 @@ func TestSharedGitHubQueryRepositoryDefaults(t *testing.T) {
 						if !ok {
 							t.Fatal("missing pagination loop boundary")
 						}
-						script = defaults + selection + "fi\nprintf '%s' \"$API_PATH\"\n"
+						script = defaults + selection + "printf '%s' \"$API_PATH\"\n"
 						resource := "issues"
 						if name == "github-pr-query" {
 							resource = "pulls"
