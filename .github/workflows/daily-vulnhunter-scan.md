@@ -16,7 +16,7 @@ engine:
   model-provider: github
   model-routing:
     goal: cost
-    mode: economy
+    mode: balanced
 jobs:
   vulnhunter_bundle:
     runs-on: ubuntu-latest
