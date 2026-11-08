@@ -346,7 +346,7 @@ When `target: "*"` is configured, the agent must supply `pull_request_number` in
 
 Submits a consolidated pull request review. Inline comments buffered by `create-pull-request-review-comment` are included automatically.
 
-Buffered inline comments satisfy safe-output dependencies only after successful review publication. Optional comment-identity lookup preserves the submitted anchors when GitHub returns missing coordinates or a partial list; an ambiguous identity is not assigned to a comment. Comments filtered out before submission or moved into a body-only fallback do not count as published inline comments.
+Buffered inline comments satisfy safe-output dependencies only after successful review publication. Optional comment-identity lookup preserves the submitted anchors when GitHub returns missing coordinates or a partial list; an ambiguous identity is not assigned to a comment. Comments whose identities cannot be uniquely matched have no comment `id` or `url`, even if GitHub returned those fields, but still count as published. Comments filtered out before submission or moved into a body-only fallback do not count as published inline comments.
 
 ```yaml wrap
 safe-outputs:

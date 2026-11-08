@@ -404,8 +404,8 @@ describe("pr_review_buffer (factory pattern)", () => {
       ]);
     });
 
-    it("does not enrich identities shared by omitted and explicit RIGHT submitted sides", async () => {
-      buffer.addComment({ path: "src/index.js", line: 10, body: "First finding" });
+    it.each([undefined, "RIGHT"])("does not enrich duplicate submitted anchors with first side %s and second side RIGHT", async firstSide => {
+      buffer.addComment({ path: "src/index.js", line: 10, body: "First finding", ...(firstSide !== undefined ? { side: firstSide } : {}) });
       buffer.addComment({ path: "src/index.js", line: 10, body: "Second finding", side: "RIGHT" });
       buffer.setReviewContext({
         repo: "owner/repo",
@@ -423,13 +423,31 @@ describe("pr_review_buffer (factory pattern)", () => {
       const result = await buffer.submitReview();
 
       expect(result.success).toBe(true);
+      expect(result.comment_count).toBe(2);
+      expect(mockGithub.rest.pulls.createReview.mock.calls[0][0].comments).toHaveLength(2);
       expect(result.review_comments).toEqual([
-        { repo: "owner/repo", pull_request_number: 42, metadata: { review_id: 100, path: "src/index.js", line: 10, side: undefined } },
+        { repo: "owner/repo", pull_request_number: 42, metadata: { review_id: 100, path: "src/index.js", line: 10, side: firstSide } },
         { repo: "owner/repo", pull_request_number: 42, metadata: { review_id: 100, path: "src/index.js", line: 10, side: "RIGHT" } },
       ]);
+      for (const comment of result.review_comments) {
+        expect(comment.id).toBeUndefined();
+        expect(comment.url).toBeUndefined();
+      }
     });
 
-    it.each(["null anchors", "partial lookup", "reordered lookup", "ambiguous identities"])("preserves published anchors and dependent eligibility with %s", async scenario => {
+    it.each([
+      {
+        scenario: "null anchors",
+        expectedIds: [undefined, undefined],
+        lookup: (first, second) => [
+          { ...first, line: null, side: null },
+          { ...second, line: null, start_line: null, side: null },
+        ],
+      },
+      { scenario: "partial lookup", expectedIds: [200, undefined], lookup: first => [first] },
+      { scenario: "reordered lookup", expectedIds: [200, 201], lookup: (first, second) => [second, first] },
+      { scenario: "ambiguous identities", expectedIds: [undefined, 201], lookup: (first, second) => [first, { ...first, id: 202 }, second] },
+    ])("preserves published anchors and dependent eligibility with $scenario", async ({ expectedIds, lookup }) => {
       const first = { path: "src/index.js", line: 10, body: "First finding", side: "RIGHT" };
       const second = { path: "src/index.js", line: 20, start_line: 18, body: "Second finding", side: "RIGHT" };
       buffer.addComment(first);
@@ -445,17 +463,7 @@ describe("pr_review_buffer (factory pattern)", () => {
       });
       const firstIdentity = { ...first, id: 200, html_url: "https://github.com/owner/repo/pull/42#discussion_r200" };
       const secondIdentity = { ...second, id: 201, html_url: "https://github.com/owner/repo/pull/42#discussion_r201" };
-      const data =
-        scenario === "null anchors"
-          ? [
-              { ...firstIdentity, line: null, side: null },
-              { ...secondIdentity, line: null, start_line: null, side: null },
-            ]
-          : scenario === "partial lookup"
-            ? [firstIdentity]
-            : scenario === "ambiguous identities"
-              ? [firstIdentity, { ...firstIdentity, id: 202 }, secondIdentity]
-              : [secondIdentity, firstIdentity];
+      const data = lookup(firstIdentity, secondIdentity);
       mockGithub.rest.pulls.listCommentsForReview.mockResolvedValue({ data });
       const messages = [
         { type: "create_pull_request_review_comment", output_id: "so_000000000001" },
@@ -482,8 +490,7 @@ describe("pr_review_buffer (factory pattern)", () => {
       ]);
       expect(records.every(record => !record.skipped && !record.result.buffered && !record.result.deferred_manifest)).toBe(true);
       expect(checkSafeOutputDependencies(plan, 2, records, false)).toEqual({ state: "ready" });
-      expect(review.review_comments[0].id).toBe(scenario === "null anchors" || scenario === "ambiguous identities" ? undefined : 200);
-      expect(review.review_comments[1].id).toBe(scenario === "null anchors" || scenario === "partial lookup" ? undefined : 201);
+      expect(review.review_comments.map(comment => comment.id)).toEqual(expectedIds);
     });
 
     it("should continue when before-state capture is rate-limited", async () => {
