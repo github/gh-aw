@@ -38,6 +38,11 @@ describe("permission_denied_helpers.cjs", () => {
     expect(payload.denied_commands).toEqual([summary]);
   });
 
+  it("does not classify arbitrary output containing a workflow permission-denial phrase", () => {
+    const output = "tool output: permission denied by workflow tool permissions: shell(echo test)";
+    expect(hasWorkflowToolPermissionDenial(output)).toBe(false);
+  });
+
   it("builds report_missing_tool payload with default denied commands", () => {
     const payload = JSON.parse(buildMissingToolPermissionIssuePayload());
     expect(payload).toEqual({
@@ -59,6 +64,7 @@ describe("permission_denied_helpers.cjs", () => {
     expect(payload.alternatives).toContain("commands allowed by the workflow tools configuration");
     expect(payload.alternatives).toContain("does not establish missing token scopes");
     expect(payload.alternatives).not.toContain("Verify token scopes");
+    expect(payload.reason).toBe("missing tool/permission issue: workflow tool permission denial detected");
   });
 
   it.each(["shell(node test.js)", "read(/workspace/file)", "write(/workspace/file)", "mcp(github.get_file_contents)", "custom-tool(example)"])("preserves generic permission guidance for tool-like denial prefixes: %s", command => {

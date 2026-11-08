@@ -20,9 +20,14 @@ network:
     - go
 tools:
   cli-proxy: true
+  github:
+    toolsets: [issues]
   bash:
     - "cat /tmp/gh-aw/agent/image-scan/compile-output.txt"
     - "cat /tmp/gh-aw/agent/image-scan/candidate-output.txt"
+    - "wc -l /tmp/gh-aw/agent/image-scan/*-output.txt"
+    - "grep -nE * /tmp/gh-aw/agent/image-scan/*-output.txt"
+    - "grep -oE * /tmp/gh-aw/agent/image-scan/*-output.txt | sort | uniq -c"
 safe-outputs:
   create-issue:
     title-prefix: "[container-image-scan] "

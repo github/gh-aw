@@ -100,7 +100,7 @@ const {
   REFLECT_PROVIDER_ALIASES,
 } = require("./awf_reflect.cjs");
 const { runSafeOutputsCLI, buildMissingToolAlternatives, emitMissingToolPermissionIssue, emitInfrastructureIncomplete, hasExpectedSafeOutputs, hasTerminalSafeOutput, hasNoopInSafeOutputs } = require("./safeoutputs_cli.cjs");
-const { countPermissionDeniedIssues, hasNumerousPermissionDeniedIssues, extractDeniedCommands, buildMissingToolPermissionIssuePayload } = require("./permission_denied_helpers.cjs");
+const { countPermissionDeniedIssues, hasNumerousPermissionDeniedIssues, hasWorkflowToolPermissionDenial, extractDeniedCommands, buildMissingToolPermissionIssuePayload } = require("./permission_denied_helpers.cjs");
 const {
   detectNonRetryableHarnessGuard,
   detectExhaustedAWFInvocationBudget,
@@ -1263,6 +1263,7 @@ function isCopilotContentFilterError(output) {
  *   isSDKSessionIdleTimeout?: boolean,
  *   isModelRoutingFailure?: boolean,
  *   isModelEndpointMismatch?: boolean,
+ *   hasWorkflowToolPermissionDenial?: boolean,
  *   hasNumerousPermissionDenied?: boolean,
  *   tokenCount?: number,
  * }} detection
@@ -1290,7 +1291,7 @@ function classifyCopilotFailure(detection) {
   if (detection.isAuthenticationFailed) return "authentication_failed";
   if (detection.isSDKSessionIdleTimeout) return "sdk_session_idle_timeout";
   if (detection.isMCPGatewayShutdown) return "mcp_gateway_shutdown";
-  if (detection.hasNumerousPermissionDenied) return "permission_denied";
+  if (detection.hasWorkflowToolPermissionDenial || detection.hasNumerousPermissionDenied) return "permission_denied";
   if (detection.isTransientCAPIError) return "capi_error_400";
   if (detection.hasOutput && (detection.tokenCount ?? 0) > LONG_RUN_TOKEN_THRESHOLD) return "long_run_exit";
   return detection.hasOutput ? "partial_execution" : "no_output";
@@ -1307,7 +1308,7 @@ function shouldRetryFailedExecution(params) {
   if (params.exitCode === 0) return false;
   if (isCopilotContentFilterError(params.output)) return false;
   if (params.isModelRoutingFailure) return false;
-  if (hasNumerousPermissionDeniedIssues(params.output)) return false;
+  if (hasNumerousPermissionDeniedIssues(params.output) || hasWorkflowToolPermissionDenial(params.output)) return false;
   if (isCAPIQuotaExceededError(params.output)) return false;
   const nonRetryableGuard = detectNonRetryableHarnessGuard(params.output);
   if (nonRetryableGuard.modelEndpointMismatch) return false;
@@ -2214,6 +2215,7 @@ async function main() {
           const isConnectionRefused = isConnectionRefusedError(result.output);
           const permissionDeniedCount = countPermissionDeniedIssues(result.output);
           const hasNumerousPermissionDenied = hasNumerousPermissionDeniedIssues(result.output);
+          const isWorkflowToolPermissionDenied = hasWorkflowToolPermissionDenial(result.output);
           const nonRetryableGuard = detectNonRetryableHarnessGuard(result.output);
           const isContentFiltered = isCopilotContentFilterError(result.output);
           let isInvocationCapExceeded = nonRetryableGuard.maxRunsExceeded;
@@ -2262,6 +2264,7 @@ async function main() {
             isCAPIServerError: hasCAPIServerError,
             isTrustedAICreditsBudgetExhausted,
             isSDKSessionIdleTimeout,
+            hasWorkflowToolPermissionDenial: isWorkflowToolPermissionDenied,
             hasNumerousPermissionDenied,
             tokenCount,
           });
@@ -2288,6 +2291,7 @@ async function main() {
               ` isAuthError=${isAuthErr}` +
               ` isAuthenticationFailedError=${isAuthenticationFailed}` +
               ` permissionDeniedCount=${permissionDeniedCount}` +
+              ` isWorkflowToolPermissionDenied=${isWorkflowToolPermissionDenied}` +
               ` hasNumerousPermissionDenied=${hasNumerousPermissionDenied}` +
               ` hasOutput=${result.hasOutput}` +
               ` tokenCount=${tokenCount}` +
@@ -2428,7 +2432,7 @@ async function main() {
             return { action: "stop" };
           }
 
-          if (hasNumerousPermissionDenied) {
+          if (hasNumerousPermissionDenied || isWorkflowToolPermissionDenied) {
             return stopForPermissionDenied({ attempt, output: result.output, safeOutputsPath, log, deniedCommands: extractDeniedCommands(result.output) });
           }
 

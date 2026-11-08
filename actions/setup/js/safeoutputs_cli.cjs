@@ -180,7 +180,7 @@ const NON_TERMINAL_SAFE_OUTPUT_TYPES = new Set(["report_missing_tool", "report_m
  * Read the safe-outputs JSONL file and check whether it contains at least one
  * non-diagnostic entry (i.e. an output that represents real, task-level work).
  * Returns true when such an entry exists; false otherwise.
- * Used by harnesses to suppress the terminal "numerous permission-denied" verdict
+ * Used by harnesses to suppress the terminal permission-denied verdict
  * when the agent already produced the expected output — preventing false-red runs.
  * @param {string} safeOutputsPath - Path to the safe-outputs JSONL file
  * @param {{

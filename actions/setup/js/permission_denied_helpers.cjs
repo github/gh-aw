@@ -75,7 +75,7 @@ function extractDeniedCommands(output) {
  * @returns {boolean}
  */
 function hasWorkflowToolPermissionDenial(output) {
-  return typeof output === "string" && /\bpermission denied by workflow tool permissions\s*:/i.test(output);
+  return typeof output === "string" && /(?:^|\r?\n)[ \t]*(?:\[copilot-sdk-driver\][ \t]*)?\[sdk-driver\][ \t]+permission denied by workflow tool permissions\s*:/i.test(output);
 }
 
 /**
@@ -89,7 +89,7 @@ function buildMissingToolPermissionIssuePayload(deniedCommands, permissionOutput
   return JSON.stringify({
     type: "report_missing_tool",
     tool: "tool/permission",
-    reason: "missing tool/permission issue: numerous permission denied errors detected",
+    reason: workflowToolDenial ? "missing tool/permission issue: workflow tool permission denial detected" : "missing tool/permission issue: numerous permission denied errors detected",
     alternatives: workflowToolDenial
       ? "Use only commands allowed by the workflow tools configuration; stop unsupported probes before the denial budget is exhausted. A workflow tool denial does not establish missing token scopes or invalid credentials."
       : "Verify token scopes, repository permissions, and MCP/tool access configuration.",

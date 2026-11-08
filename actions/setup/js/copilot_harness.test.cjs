@@ -8,6 +8,7 @@ import path from "path";
 const require = createRequire(import.meta.url);
 const { EventEmitter } = require("events");
 const { PassThrough } = require("stream");
+const { hasWorkflowToolPermissionDenial } = require("./permission_denied_helpers.cjs");
 const { COPILOT_SDK_SERVER_STARTUP_TIMEOUT_MS, buildCopilotSDKServerArgs, getCopilotSDKServerPort, startCopilotSDKServer, stopCopilotSDKServer, waitForCopilotSDKServer } = require("./copilot_sdk_sidecar.cjs");
 const { buildCopilotSDKEnv, isCopilotSDKEnabled } = require("./process_runner.cjs");
 const {
@@ -1100,6 +1101,17 @@ describe("copilot_harness.cjs", () => {
       it("mcp_gateway_shutdown outranks permission_denied in failure classification", () => {
         // Both flags set — the more specific signal must win.
         expect(classifyCopilotFailure({ hasOutput: true, isMCPGatewayShutdown: true, hasNumerousPermissionDenied: true })).toBe("mcp_gateway_shutdown");
+      });
+
+      it("classifies an explicit workflow tool denial instead of a generic CLI exit", () => {
+        const output = "[copilot-sdk-driver] [sdk-driver] permission denied by workflow tool permissions: shell(git status)";
+        expect(
+          classifyCopilotFailure({
+            hasOutput: true,
+            hasWorkflowToolPermissionDenial: hasWorkflowToolPermissionDenial(output),
+          })
+        ).toBe("permission_denied");
+        expect(shouldRetryFailedExecution({ exitCode: 1, hasOutput: true, output, attempt: 0, maxRetries: 3 })).toBe(false);
       });
 
       it("retries sdk_session_idle_timeout as partial execution (shouldRetry)", () => {
@@ -3346,7 +3358,7 @@ process.exit(1);`,
       });
       // Harness exits 1 because no expected output was produced
       expect(result.status).toBe(1);
-      expect(result.stderr).toContain("detected numerous permission-denied issues — not retrying");
+      expect(result.stderr).toContain("detected permission-denied failure — not retrying");
     });
 
     it("exits 0 without retrying when the LLM invocation cap is saturated but a terminal safe-output was already produced", () => {

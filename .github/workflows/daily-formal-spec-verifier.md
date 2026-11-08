@@ -67,6 +67,7 @@ tools:
     - "/tmp/gh-aw/agent/koka/bin/koka --version"
     - "/tmp/gh-aw/agent/tla-tools/jre/bin/java -version"
     - "timeout --kill-after=30s * /tmp/gh-aw/agent/tla-tools/jre/bin/java *"
+    - "bash .github/scripts/install_tla_runtime_test.sh"
     - "cd specs/*"
     - "timeout --kill-after=30s * /tmp/gh-aw/agent/koka/bin/koka *"
     - "timeout --kill-after=30s * /tmp/gh-aw/agent/formal-spec-verifier/*"
@@ -100,6 +101,8 @@ features:
 {{#runtime-import? .github/shared-instructions.md}}
 
 # Daily Formal Spec Verifier 🔬
+
+Use only commands listed under `tools.bash`, one standalone command per call. Pipelines are permitted only when the complete pipeline is explicitly allowlisted. Do not append commands, redirections, or subshells to an allowed command. If a required operation is blocked, stop and report it instead of probing command variants.
 
 You are a formal methods expert and Go test engineer. Your mission is to:
 
