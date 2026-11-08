@@ -9,20 +9,20 @@ const { readInboundAwContext } = require("./aw_context.cjs");
 const { DefaultArtifactClient } = require("./artifact_client.cjs");
 const { restoreFiles } = require("./durable_files.cjs");
 const { preparePrompt } = require("./durable_session.cjs");
-const { recordDurableSessionEvent } = require("./durable_session_record.cjs");
+const { tryRecordDurableSessionEvent } = require("./durable_session_record.cjs");
 
 /** Select and restore a checkpoint before exposing continuation to the engine. */
 async function restoreCheckpoint({ github, context, core, token, artifactClient = new DefaultArtifactClient(), root = "/tmp/gh-aw/agent", promptFile }) {
   const outputs = new Map();
   const record = status =>
-    recordDurableSessionEvent(
+    tryRecordDurableSessionEvent(
       "durable.restore",
       {
         status,
         parentRunId: outputs.get("parent-run-id"),
         artifactId: outputs.get("artifact-id"),
       },
-      { root, env: { ...process.env, GITHUB_RUN_ID: String(context.runId) } }
+      { core, root, env: { ...process.env, GITHUB_RUN_ID: String(context.runId) } }
     );
   try {
     await selectCheckpoint({

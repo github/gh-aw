@@ -8,6 +8,9 @@ import (
 	"strings"
 )
 
+// DurableRestoreStepName identifies durable configuration in compiled jobs and run evidence.
+const DurableRestoreStepName = "Restore durable workflow state"
+
 func (c *Compiler) generateDurableArtifactRestore(yaml *strings.Builder, data *WorkflowData) {
 	if data.EngineConfig == nil || data.EngineConfig.Durable == nil {
 		return
@@ -16,7 +19,7 @@ func (c *Compiler) generateDurableArtifactRestore(yaml *strings.Builder, data *W
 	if err != nil {
 		panic(fmt.Sprintf("BUG: cannot encode durable files: %v", err))
 	}
-	yaml.WriteString("      - name: Restore durable workflow state\n")
+	yaml.WriteString("      - name: " + DurableRestoreStepName + "\n")
 	yaml.WriteString("        id: durable_checkpoint\n")
 	yaml.WriteString("        uses: " + c.getActionPin("actions/github-script") + "\n")
 	yaml.WriteString("        env:\n")

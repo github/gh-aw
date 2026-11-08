@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/stretchr/testify/require"
 )
 
@@ -67,6 +68,7 @@ func TestDurableSessionRejectsUntrustedAndInconsistentEvidence(t *testing.T) {
 		"untrusted_provenance": strings.ReplaceAll(restore+startup, `"component":"durable"`, `"component":"agent"`),
 		"wrong_attempt":        strings.ReplaceAll(restore+startup, `"runAttempt":"1"`, `"runAttempt":"2"`),
 		"wrong_run":            strings.ReplaceAll(restore+startup, `"runId":"200"`, `"runId":"201"`),
+		"local_run":            strings.ReplaceAll(restore+startup, `"runId":"200"`, `"runId":"local"`),
 		"wrong_parent":         restore + strings.ReplaceAll(startup, `"parentRunId":"100"`, `"parentRunId":"101"`),
 		"fresh_after_restore":  restore + durableTestEvent("durable.session", "fresh"),
 		"startup_only":         startup,
@@ -90,6 +92,7 @@ func TestDurableSessionRejectsSymlink(t *testing.T) {
 	require.NoError(t, os.WriteFile(target, []byte(sessionTestHeader+durableTestEvent("durable.restore", "restored")), 0o600))
 	require.NoError(t, os.Symlink(target, filepath.Join(dir, "aw_session.jsonl")))
 	require.Equal(t, "invalid_session_source", readDurableSessionReport(dir, WorkflowRun{DatabaseID: 200}, true).Reason)
+	require.Nil(t, readDurableSessionReport(dir, WorkflowRun{DatabaseID: 200}, false))
 }
 
 func TestDurableAuditAssemblyAndCacheBackfill(t *testing.T) {
@@ -135,7 +138,7 @@ func TestHealthDurableRetainsUnavailableEvidenceAfterCancellation(t *testing.T) 
 	run := WorkflowRun{DatabaseID: 200, Attempt: 1}
 	collection := &HealthCollection{ctx: ctx, jobs: map[healthRunAttempt]*healthJobs{
 		{id: 200, attempt: 1}: {details: []JobInfoWithDuration{{JobInfo: JobInfo{
-			Name: "agent", Steps: []JobStep{{Name: "Restore durable workflow state"}},
+			Name: "agent", Steps: []JobStep{{Name: workflow.DurableRestoreStepName}},
 		}}}},
 	}}
 	health := WorkflowHealth{}
@@ -143,6 +146,128 @@ func TestHealthDurableRetainsUnavailableEvidenceAfterCancellation(t *testing.T) 
 	require.NotNil(t, health.DurableSessions)
 	require.Equal(t, 1, health.DurableSessions.UnavailableRuns)
 	require.Equal(t, "canceled", health.DurableSessions.Runs[0].Session.Reason)
+}
+
+func TestDurableRestoreStepUsesCompilerName(t *testing.T) {
+	require.True(t, hasDurableRestoreStep([]JobInfoWithDuration{{JobInfo: JobInfo{
+		Steps: []JobStep{{Name: workflow.DurableRestoreStepName}},
+	}}}))
+	require.False(t, hasDurableRestoreStep([]JobInfoWithDuration{{JobInfo: JobInfo{
+		Steps: []JobStep{{Name: "ordinary restore"}},
+	}}}))
+}
+
+func TestDurableSessionIDEngineRules(t *testing.T) {
+	for _, tc := range []struct {
+		name, engine, id string
+		valid            bool
+	}{
+		{"ordinary", "codex", "session_1", true},
+		{"ordinary_boundary", "copilot", strings.Repeat("a", 128), true},
+		{"ordinary_too_long", "copilot", strings.Repeat("a", 129), false},
+		{"pi_full_workflow", "pi", "pi-durable-" + strings.Repeat("workflow_", 20) + ":session-1", true},
+		{"pi_boundary", "pi", "pi-durable-" + strings.Repeat("w", 499) + ":1", true},
+		{"pi_too_long", "pi", "pi-durable-" + strings.Repeat("w", 500) + ":1", false},
+		{"pi_missing_library", "pi", "session-1", false},
+		{"pi_missing_native_id", "pi", "pi-durable-workflow:", false},
+		{"pi_extra_separator", "pi", "pi-durable-workflow:session:1", false},
+		{"pi_path", "pi", "pi-durable-workflow:../session", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.valid, validDurableSessionID(tc.engine, tc.id))
+		})
+	}
+}
+
+func TestOrdinarySessionErrorsDoNotImplyDurableConfiguration(t *testing.T) {
+	for _, tc := range []struct {
+		name, content string
+	}{
+		{"malformed", "not-json\n"},
+		{"missing_header", ""},
+		{"oversized_record", strings.Repeat("x", maxUnifiedSessionLineSize+1)},
+		{"invalid_durable_record", sessionTestHeader + strings.ReplaceAll(durableTestEvent("durable.restore", "restored"), `"runId":"200"`, `"runId":"local"`)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			dir := filepath.Join(root, "run-200")
+			writeSessionTestFile(t, dir, "aw_session.jsonl", tc.content)
+			run := WorkflowRun{DatabaseID: 200, Attempt: 1}
+			require.Nil(t, readDurableSessionReport(dir, run, false))
+			require.Equal(t, "unavailable", readDurableSessionReport(dir, run, true).Status)
+			health := WorkflowHealth{}
+			applyHealthDurableSessions(&health, []WorkflowRun{run}, HealthConfig{LogsDir: root})
+			require.Nil(t, health.DurableSessions)
+		})
+	}
+	t.Run("oversized_source", func(t *testing.T) {
+		dir := t.TempDir()
+		file := filepath.Join(dir, "aw_session.jsonl")
+		require.NoError(t, os.WriteFile(file, nil, 0o600))
+		require.NoError(t, os.Truncate(file, maxModelResolutionSessionBytes+1))
+		require.Nil(t, readDurableSessionReport(dir, WorkflowRun{DatabaseID: 200}, false))
+		require.Equal(t, "invalid_session_source", readDurableSessionReport(dir, WorkflowRun{DatabaseID: 200}, true).Reason)
+	})
+}
+
+func TestHealthDurableRejectsIncompatibleCacheIdentity(t *testing.T) {
+	run := WorkflowRun{DatabaseID: 200, Attempt: 1, Repository: "org/repo",
+		URL: "https://github.com/org/repo/actions/runs/200"}
+	for name, mutate := range map[string]func(*WorkflowRun){
+		"compatible": func(_ *WorkflowRun) {},
+		"other_host": func(cached *WorkflowRun) {
+			cached.URL = "https://github.example.com/org/repo/actions/runs/200"
+		},
+		"other_repository": func(cached *WorkflowRun) { cached.Repository = "other/repo" },
+		"other_attempt":    func(cached *WorkflowRun) { cached.Attempt++ },
+	} {
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			dir := filepath.Join(root, "run-200")
+			writeSessionTestFile(t, dir, "aw_session.jsonl", sessionTestHeader+
+				durableTestEvent("durable.restore", "restored")+durableTestEvent("durable.session", "resumed"))
+			cached := run
+			mutate(&cached)
+			require.NoError(t, saveRunSummary(dir, &RunSummary{CLIVersion: GetVersion(), RunID: 200, Run: cached}, false))
+			for _, memoized := range []bool{false, true} {
+				config := HealthConfig{LogsDir: root}
+				if memoized {
+					config.collection = &HealthCollection{}
+					loadHealthRunSummary(run, config)
+				}
+				health := WorkflowHealth{}
+				applyHealthDurableSessions(&health, []WorkflowRun{run}, config)
+				if name == "compatible" {
+					require.NotNil(t, health.DurableSessions)
+					require.Equal(t, 1, health.DurableSessions.ResumedRuns)
+				} else {
+					require.Nil(t, health.DurableSessions)
+				}
+			}
+		})
+	}
+}
+
+func TestHealthDurableRawSessionCompatibilityMemoizedPerAttempt(t *testing.T) {
+	root := t.TempDir()
+	run := WorkflowRun{DatabaseID: 200, Attempt: 1, Repository: "org/repo",
+		URL: "https://github.com/org/repo/actions/runs/200"}
+	dir := filepath.Join(root, "run-200")
+	writeSessionTestFile(t, dir, "aw_session.jsonl", sessionTestHeader+
+		durableTestEvent("durable.restore", "restored")+durableTestEvent("durable.session", "resumed"))
+	otherHost := run
+	otherHost.URL = "https://github.example.com/org/repo/actions/runs/200"
+	require.NoError(t, saveRunSummary(dir, &RunSummary{CLIVersion: GetVersion(), RunID: 200, Run: otherHost}, false))
+	config := HealthConfig{LogsDir: root, collection: &HealthCollection{}}
+	_, _, compatible := loadHealthRunSummaryWithSessionCompatibility(run, config)
+	require.False(t, compatible)
+	require.NoError(t, os.Remove(filepath.Join(dir, runSummaryFileName)))
+	nextAttempt := run
+	nextAttempt.Attempt++
+	_, _, compatible = loadHealthRunSummaryWithSessionCompatibility(nextAttempt, config)
+	require.True(t, compatible)
+	_, _, compatible = loadHealthRunSummaryWithSessionCompatibility(run, config)
+	require.False(t, compatible, "another attempt's missing summary must not authenticate rejected evidence")
 }
 
 func TestDurableAuditLogInputBoundaries(t *testing.T) {

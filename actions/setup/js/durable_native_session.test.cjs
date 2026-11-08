@@ -20,6 +20,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
   fs.rmSync(directory, { recursive: true, force: true });
 });
@@ -72,6 +73,22 @@ function artifactRoundtrip(env, files) {
 }
 
 describe("native CLI artifact continuation", () => {
+  it("keeps exact native session startup when metadata recording fails", () => {
+    const env = environment("codex");
+    const session = openDurableSession("codex", env);
+    session.save(id);
+    fs.mkdirSync(path.join(directory, "agent/durable-session.jsonl"));
+    const warning = vi.fn();
+    vi.stubGlobal("core", { warning });
+    expect(() => session.started("00000000-0000-4000-8000-000000000002")).toThrow("selected native session");
+    expect(() => session.started(id)).not.toThrow();
+    expect(session.id).toBe(id);
+    expect(JSON.parse(fs.readFileSync(path.join(env.GH_AW_DURABLE_SESSION_DIR, "session.json"), "utf8")).id).toBe(id);
+    session.started(id);
+    expect(warning).toHaveBeenCalledTimes(1);
+    expect(warning).toHaveBeenCalledWith("Durable session metadata could not be recorded; continuation evidence is unavailable.");
+  });
+
   it.each(["claude", "codex", "copilot"])("starts %s fresh, then restores its exact session and sends new workflow instructions", engine => {
     const env = environment(engine);
     const state = env.GH_AW_DURABLE_SESSION_DIR;

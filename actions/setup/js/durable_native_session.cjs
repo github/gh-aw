@@ -5,7 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
 const { randomUUID } = require("node:crypto");
-const { recordDurableSessionEvent } = require("./durable_session_record.cjs");
+const { tryRecordDurableSessionEvent } = require("./durable_session_record.cjs");
 const SESSION_ID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
 function readCopilotCaptureBaseline(directory) {
@@ -70,7 +70,7 @@ function openDurableSession(engine, env = process.env) {
     started(sessionId = id) {
       if (!SESSION_ID.test(sessionId) || sessionId !== id) throw new Error("Durable startup must use the selected native session");
       if (startupRecorded) return;
-      recordDurableSessionEvent(
+      tryRecordDurableSessionEvent(
         "durable.session",
         {
           status: resumed ? "resumed" : "fresh",

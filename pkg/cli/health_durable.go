@@ -23,7 +23,7 @@ func applyHealthDurableSessions(health *WorkflowHealth, runs []WorkflowRun, conf
 	var missing []HealthDurableRun
 	knownDurable := false
 	for _, run := range runs {
-		summary, dir := loadHealthRunSummary(run, config)
+		summary, dir, compatible := loadHealthRunSummaryWithSessionCompatibility(run, config)
 		configured := false
 		if summary != nil {
 			configured = hasDurableRestoreStep(summary.JobDetails)
@@ -40,6 +40,11 @@ func applyHealthDurableSessions(health *WorkflowHealth, runs []WorkflowRun, conf
 			}
 		}
 		knownDurable = knownDurable || configured
+		if !compatible {
+			missing = append(missing, HealthDurableRun{RunID: run.DatabaseID, URL: run.URL,
+				Session: &DurableSessionReport{Status: "unavailable", Reason: "incompatible_session_cache"}})
+			continue
+		}
 		session := readDurableSessionReport(dir, run, configured)
 		if session == nil {
 			missing = append(missing, HealthDurableRun{RunID: run.DatabaseID, URL: run.URL,

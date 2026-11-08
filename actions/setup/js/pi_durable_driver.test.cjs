@@ -18,6 +18,7 @@ const directories = [];
 
 describe("official Pi durable offline integration", () => {
   afterEach(() => {
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
     for (const name of Object.keys(process.env)) if (!(name in originalEnv)) delete process.env[name];
     Object.assign(process.env, originalEnv);
@@ -139,6 +140,32 @@ describe("official Pi durable offline integration", () => {
       const next = JSON.parse(fs.readFileSync(process.env.GH_AW_PI_DURABLE_CHECKPOINT, "utf8"));
       assert.equal(next.state.usage.models["scripted/offline"].totalTokens, 10);
     }
+  });
+
+  test.each([120, 200])("starts Pi with an exact %i-character workflow name without truncating its session identity", async length => {
+    const options = fixture();
+    const scope = `pi-durable-${"a".repeat(length)}`;
+    process.env.GH_AW_PI_DURABLE_CHECKPOINT = path.join(process.env.GH_AW_PI_DURABLE_DIR, `${scope}.json`);
+    const engine = await scripted(async () => [{ type: "text", text: "Long-name answer" }]);
+    const events = [];
+    await main({ ...options, ...engine, emit: event => events.push(event) });
+    const record = JSON.parse(fs.readFileSync(path.join(options.directory, "agent/durable-session.jsonl"), "utf8"));
+    assert.equal(record.data.sessionId, `${scope}:1`);
+    assert.ok(events.some(event => event.type === "session" && event.id === record.data.sessionId));
+    assert.equal(engine.requests(), 1);
+  });
+
+  test("Pi continues running when startup metadata cannot be written", async () => {
+    const options = fixture();
+    fs.mkdirSync(path.join(options.directory, "agent/durable-session.jsonl"));
+    const warning = vi.fn();
+    vi.stubGlobal("core", { warning });
+    const engine = await scripted(async () => [{ type: "text", text: "Metadata unavailable" }]);
+    await main({ ...options, ...engine });
+    assert.equal(engine.requests(), 1);
+    assert.equal(JSON.parse(fs.readFileSync(process.env.GH_AW_PI_DURABLE_CHECKPOINT, "utf8")).state.pending, false);
+    assert.equal(warning.mock.calls.length, 1);
+    assert.equal(warning.mock.calls[0][0], "Durable session metadata could not be recorded; continuation evidence is unavailable.");
   });
 
   test("clean interrupted model request resumes the original pending submission after storage reopen", async () => {

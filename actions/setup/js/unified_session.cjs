@@ -361,13 +361,15 @@ function collectUnifiedSession({
   if (durableFile) {
     const events = [];
     for (const record of records(durableFile)) {
-      if (!isDurableSessionRecord(record)) {
+      const timestampMs = typeof record?.timestamp === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(record.timestamp) ? sessionTimestamp({ timestamp: record.timestamp }) : undefined;
+      if (!isDurableSessionRecord(record) || (record.timestamp !== undefined && timestampMs === undefined)) {
         report(durableFile, "invalid_durable_session", undefined);
         continue;
       }
       if (currentRunId && record.data.runId !== String(currentRunId)) continue;
       if (currentRunAttempt && record.data.runAttempt !== String(currentRunAttempt)) continue;
-      events.push(record);
+      const { data } = normalizeUnifiedSessionEvent({ type: record.type, data: record.data }, "agent");
+      events.push({ type: record.type, data, ...(timestampMs !== undefined ? { timestamp: new Date(timestampMs).toISOString() } : {}) });
     }
     sources.push({ component: "durable", phase: "agent", path: path.relative(rootDir, durableFile), events });
   }

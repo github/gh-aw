@@ -47,9 +47,29 @@ function isDurableSessionRecord(record) {
     /^[1-9]\d*$/.test(data.runAttempt) &&
     (record.type === "durable.restore" ? ["restored", "fresh", "failed"] : ["resumed", "fresh"]).includes(data.status) &&
     ["parentRunId", "artifactId"].every(key => data[key] === undefined || (typeof data[key] === "string" && /^[1-9]\d*$/.test(data[key]))) &&
-    (record.type !== "durable.session" || (typeof data.sessionId === "string" && /^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$/.test(data.sessionId))) &&
+    (record.type !== "durable.session" ||
+      (typeof data.sessionId === "string" &&
+        (data.engine === "pi" ? data.sessionId.length <= 512 && /^pi-durable-[A-Za-z0-9_-]+:[A-Za-z0-9][A-Za-z0-9_-]*$/.test(data.sessionId) : /^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$/.test(data.sessionId)))) &&
     (data.status !== "restored" || (data.parentRunId !== undefined && data.artifactId !== undefined))
   );
 }
 
-module.exports = { recordDurableSessionEvent, isDurableSessionRecord };
+/**
+ * Observability failures must not change the engine's continuation outcome.
+ * @param {string} type
+ * @param {any} data
+ * @param {{ core?: { warning: (message: string) => void }, env?: NodeJS.ProcessEnv, root?: string }} [options]
+ */
+function tryRecordDurableSessionEvent(type, data, { core = global.core, ...options } = {}) {
+  try {
+    recordDurableSessionEvent(type, data, options);
+    return true;
+  } catch {
+    const message = "Durable session metadata could not be recorded; continuation evidence is unavailable.";
+    if (core?.warning) core.warning(message);
+    else console.error(message);
+    return false;
+  }
+}
+
+module.exports = { recordDurableSessionEvent, tryRecordDurableSessionEvent, isDurableSessionRecord };

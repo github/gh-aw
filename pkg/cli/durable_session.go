@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+
+	"github.com/github/gh-aw/pkg/workflow"
 )
 
 // DurableSessionReport separates validated restoration from observed native startup.
@@ -38,12 +40,13 @@ type durableSessionRecord struct {
 }
 
 var durableSessionIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$`)
+var durablePiSessionIDPattern = regexp.MustCompile(`^pi-durable-[A-Za-z0-9_-]+:[A-Za-z0-9][A-Za-z0-9_-]*$`)
 var durableNumericIDPattern = regexp.MustCompile(`^[1-9][0-9]*$`)
 
 func hasDurableRestoreStep(jobs []JobInfoWithDuration) bool {
 	for _, job := range jobs {
 		for _, step := range job.Steps {
-			if step.Name == "Restore durable workflow state" {
+			if step.Name == workflow.DurableRestoreStepName {
 				return true
 			}
 		}
@@ -53,6 +56,9 @@ func hasDurableRestoreStep(jobs []JobInfoWithDuration) bool {
 
 func readDurableSessionReport(runDir string, run WorkflowRun, configured bool) *DurableSessionReport {
 	unavailable := func(reason string) *DurableSessionReport {
+		if !configured {
+			return nil
+		}
 		return &DurableSessionReport{Status: "unavailable", Reason: reason}
 	}
 	for _, relative := range []string{"usage/aw_session.jsonl", "aw_session.jsonl"} {
@@ -184,10 +190,17 @@ func validDurableSessionRecord(record durableSessionRecord, eventType string) bo
 		}
 	}
 	if eventType == "durable.session" {
-		return (record.Status == "resumed" || record.Status == "fresh") && durableSessionIDPattern.MatchString(record.SessionID)
+		return (record.Status == "resumed" || record.Status == "fresh") && validDurableSessionID(record.Engine, record.SessionID)
 	}
 	return record.Status == "fresh" || record.Status == "failed" ||
 		(record.Status == "restored" && record.ParentRunID != "" && record.ArtifactID != "")
+}
+
+func validDurableSessionID(engine, id string) bool {
+	if engine == "pi" {
+		return len(id) <= 512 && durablePiSessionIDPattern.MatchString(id)
+	}
+	return durableSessionIDPattern.MatchString(id)
 }
 
 func renderDurableSession(w io.Writer, report *DurableSessionReport) error {

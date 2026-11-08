@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { collectUnifiedSession, mergeSessionSources, normalizeRuntimeEvent, parseEngineSession, sessionTimestamp, writeUnifiedSession } from "./unified_session.cjs";
 import { serializeSessionArtifact, writeSessionArtifact } from "./session_artifact.cjs";
 import { normalizeUnifiedSessionEvent } from "./unified_session_payload.cjs";
 import { validateSession } from "./scripts/validate_session.cjs";
+import { compactUnifiedSession } from "./compact_unified_session.cjs";
+import { sendSessionLogs } from "./send_otlp_session_logs.cjs";
 
 const req = require;
 const { writeDetectionUsageResult } = req("./generate_usage_activity_summary.cjs");
@@ -20,7 +21,7 @@ describe("Unified conclusion session", () => {
   let originalEnv;
   let originalCore;
   beforeEach(() => {
-    root = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-unified-session-"));
+    root = fs.mkdtempSync(path.resolve(".gh-aw-unified-session-"));
     originalEnv = { ...process.env };
     process.env.GITHUB_RUN_ID = "123";
     process.env.GITHUB_RUN_ATTEMPT = "2";
@@ -41,12 +42,20 @@ describe("Unified conclusion session", () => {
     return target;
   }
 
-  it("collects run-scoped durable restoration and startup without historical content", () => {
+  it("collects and exports only run-scoped durable metadata without historical top-level content", async () => {
     const metadata = { engine: "codex", storage: "artifact", runId: "123", runAttempt: "2", parentRunId: "122" };
     write("agent/durable-session.jsonl", [
-      { type: "durable.restore", data: { ...metadata, status: "restored", artifactId: "99", transcript: "historical instructions" } },
-      { type: "durable.session", data: { ...metadata, status: "resumed", sessionId: "native-id" } },
+      {
+        type: "durable.restore",
+        timestamp: "2026-11-08T15:00:00+01:00",
+        provenance: { transcript: "historical provenance" },
+        metadata: "historical metadata",
+        id: "historical id",
+        data: { ...metadata, status: "restored", artifactId: "99", transcript: "historical instructions" },
+      },
+      { type: "durable.session", metadata: "historical startup", data: { ...metadata, status: "resumed", sessionId: "native-id" } },
       { type: "durable.session", data: { ...metadata, runAttempt: "1", status: "fresh", sessionId: "previous-attempt" } },
+      { type: "durable.session", timestamp: "historical timestamp", data: { ...metadata, status: "resumed", sessionId: "invalid-timestamp" } },
     ]);
     const output = path.join(root, "usage/aw_session.jsonl");
     const events = writeUnifiedSession({ rootDir: root, outputPath: output });
@@ -54,9 +63,20 @@ describe("Unified conclusion session", () => {
     expect(durable).toHaveLength(2);
     expect(durable[1].data).toMatchObject({ status: "resumed", parentRunId: "122", sessionId: "native-id" });
     expect(durable[0].provenance).toMatchObject({ component: "durable", phase: "agent", path: "agent/durable-session.jsonl" });
+    expect(durable[0].timestamp).toBe("2026-11-08T14:00:00.000Z");
+    expect(durable[0].provenance).not.toHaveProperty("native");
+    expect(events).toContainEqual(expect.objectContaining({ type: "session.collection_warning", data: expect.objectContaining({ code: "invalid_durable_session" }) }));
     const content = fs.readFileSync(output, "utf8");
-    expect(content).not.toContain("historical instructions");
+    expect(content).not.toContain("historical");
     expect(validateSession(content)).toBe(events.length);
+    expect(JSON.stringify(compactUnifiedSession(events))).not.toContain("historical");
+    const otlp = require("./send_otlp_span.cjs");
+    vi.spyOn(otlp, "parseOTLPEndpoints").mockReturnValue([{ url: "https://collector.example/otlp", headers: {} }]);
+    const send = vi.spyOn(otlp, "sendOTLPToAllEndpoints").mockResolvedValue(undefined);
+    process.env.GH_AW_OTLP_LOGS_ENABLED = "true";
+    await sendSessionLogs({ sessionPath: output });
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(send.mock.calls[0])).not.toContain("historical");
   });
 
   it("reports malformed durable evidence instead of synthesizing a resumed session", () => {
@@ -64,6 +84,14 @@ describe("Unified conclusion session", () => {
     const { events } = collectUnifiedSession({ rootDir: root, warn() {} });
     expect(events.some(event => event.type === "durable.session")).toBe(false);
     expect(events).toContainEqual(expect.objectContaining({ type: "session.collection_warning", data: expect.objectContaining({ code: "invalid_durable_session" }) }));
+  });
+
+  it.each(["2026-02-30T12:00:00Z", "2026-11-08T24:00:00Z", "historical secret", 123, { secret: "historical instructions" }])("rejects invalid durable timestamps without retaining their content: %j", timestamp => {
+    write("agent/durable-session.jsonl", [{ type: "durable.session", timestamp, data: { engine: "codex", storage: "artifact", runId: "123", runAttempt: "2", status: "fresh", sessionId: "native-id" } }]);
+    const { events } = collectUnifiedSession({ rootDir: root, warn() {} });
+    expect(events.some(event => event.type === "durable.session")).toBe(false);
+    expect(events).toContainEqual(expect.objectContaining({ type: "session.collection_warning", data: expect.objectContaining({ code: "invalid_durable_session" }) }));
+    expect(JSON.stringify(events)).not.toContain("historical");
   });
 
   it("records the selected PR revision in the unified session", () => {

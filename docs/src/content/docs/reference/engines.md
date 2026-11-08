@@ -111,6 +111,8 @@ This restores session files, not workspace edits, credentials, or exactly-once t
 
 The unified session records `durable.restore` with `restored`, `fresh`, or `failed` status and available parent-run and artifact IDs. Copilot, Claude, Codex, and Pi additionally record `durable.session` after native session startup, with `resumed` or `fresh` status and the selected session ID. These records contain metadata, not historical conversation content. Restoration alone does not establish native continuation for Gemini, Agy, or imported engines.
 
+Metadata recording and collection are best effort: failures emit warnings without changing restoration or native startup outcomes. Missing records leave continuation evidence unavailable; they do not establish a fresh start or a failed restore.
+
 `gh aw audit RUN --artifacts info,usage --json` exposes this evidence as `durable_session`. `gh aw health WORKFLOW --json --logs-dir DIRECTORY` summarizes cached current-revision evidence under `durable_sessions`, without downloading artifacts. Missing historical events or uncached sessions are unavailable evidence, not fresh starts. An Actions success does not by itself verify continuation.
 
 OpenTelemetry agent spans and exported durable session log records expose the validated checkpoint parent as the string attribute `gh-aw.durable.parent_run_id`. Pi durable spans also include it on restored runs. This identifies the parent Actions run; it does not replace OTel trace/span parentage or prove native startup by itself. Fresh runs omit the attribute.
