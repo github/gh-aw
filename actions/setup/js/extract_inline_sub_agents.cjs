@@ -144,7 +144,7 @@ function resolveSubAgentExperimentReferences(agentName, content, env = process.e
  * @returns {string} Content with a top-level `name:` in its frontmatter.
  */
 function ensureClaudeSubAgentName(agentName, content) {
-  const { parseDocument } = require("./work_queue_yaml.cjs");
+  const { parseDocument } = require("yaml");
   const nameEntry = `name: ${JSON.stringify(agentName)}`;
   const match = /^---[ \t]*\r?\n(?:([\s\S]*?)\r?\n)?---[ \t]*\r?(?=\n|$)/.exec(content);
   if (!match) return `---\n${nameEntry}\n---\n${content}`;
@@ -447,7 +447,7 @@ function writeInlineSubAgents(content, workspaceDir, agentsBaseDir, engineId, re
  */
 function loadCopilotSDKCustomAgents(workspaceDir, agentsBaseDir, logger) {
   const { extractFrontmatterAndBody } = require("./frontmatter_hash_pure.cjs");
-  const { parseDocument } = require("./work_queue_yaml.cjs");
+  const { parseDocument } = require("yaml");
   const target = inlineArtifactTarget("SUB_AGENT", getEngineSubAgentTarget("copilot"));
   const directories = new Set([path.join(workspaceDir, ".github/agents"), path.join(agentsBaseDir, target.dir)]);
   const agents = new Map();

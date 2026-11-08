@@ -61,7 +61,7 @@ function restoreInlineMetadata(content, restore) {
     return placeholder;
   });
   const decode = (/** @type {string} */ value) => value.replace(/_VALUE_[0-9a-f-]+_\d+_/g, token => tokens.get(token) ?? token);
-  const { parseDocument } = require("./work_queue_yaml.cjs");
+  const { parseDocument } = require("yaml");
   /** @type {any} */
   const document = parseDocument(printable);
   /** @type {Array<{start: number, end: number, text: string}>} */

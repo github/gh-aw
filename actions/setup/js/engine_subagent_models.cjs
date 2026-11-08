@@ -85,7 +85,7 @@ function reflectProvidersFor(provider) {
  */
 function parseAgentFrontmatter(content) {
   const { extractFrontmatterAndBody } = require("./frontmatter_hash_pure.cjs");
-  const { parseDocument } = require("./work_queue_yaml.cjs");
+  const { parseDocument } = require("yaml");
   const { frontmatterText } = extractFrontmatterAndBody(content);
   /** @type {any} */
   const document = parseDocument(frontmatterText);
@@ -144,7 +144,7 @@ function listMarkdownAgentFiles(directory, logger, options = {}) {
  */
 function replaceAgentModel(content, model) {
   const { extractFrontmatterAndBody } = require("./frontmatter_hash_pure.cjs");
-  const { parseDocument } = require("./work_queue_yaml.cjs");
+  const { parseDocument } = require("yaml");
   const { frontmatterText } = extractFrontmatterAndBody(content);
   /** @type {any} */
   const document = parseDocument(frontmatterText);

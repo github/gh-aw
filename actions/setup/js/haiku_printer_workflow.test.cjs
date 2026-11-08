@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { parseDocument } from "./work_queue_yaml.cjs";
+import { parseDocument } from "yaml";
 
 const source = readFileSync(resolve(import.meta.dirname, "../../../.github/workflows/haiku-printer.yml"), "utf8");
 const document = parseDocument(source, { version: "1.2", uniqueKeys: true });

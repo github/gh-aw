@@ -137,7 +137,7 @@ function parseHeaderJSON(value) {
 function parsedWorkflow(contents) {
   let parseDocument;
   try {
-    ({ parseDocument } = require("./work_queue_yaml.cjs"));
+    ({ parseDocument } = require("yaml"));
   } catch {
     throw queueError("policy_missing", "worker route provisioning requires the deployed YAML parser");
   }

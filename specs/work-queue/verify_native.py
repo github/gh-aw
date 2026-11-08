@@ -40,7 +40,8 @@ def engine_source_hashes():
              if path.is_file() and (path.suffix == ".json" or path.suffix == ".go" and not path.name.endswith("_test.go"))]
     files += [ROOT / "actions/setup/js" / f"work_queue_{module}.cjs"
               for module in ("codec", "policy", "scheduler", "graph", "limits", "replay",
-                             "resource_scope", "store", "provisioning", "yaml")]
+                             "resource_scope", "store", "provisioning")]
+    files += [ROOT / "actions/setup/runtime/package.json", ROOT / "actions/setup/runtime/package-lock.json"]
     files += [ROOT / "go.mod", ROOT / "go.sum", SPEC / "effect-contract.schema.json",
               SPEC / "resource-scope.schema.json", SPEC / "native_probe.cjs",
               SPEC / "verify_native.py", SPEC / "verify_native_fixtures.py"]

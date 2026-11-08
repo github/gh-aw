@@ -3,8 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-/** @type {(source: string, options: { version: string; uniqueKeys: boolean }) => { errors: unknown[]; toJS: () => Record<string, unknown> | null } | null} */
-const parseDocument = require("./work_queue_yaml.cjs").parseDocument;
+const { parseDocument } = require("yaml");
 
 const INVENTORY_PATH = "/tmp/gh-aw/skill_inventory.json";
 const INSTALL_HISTORY_PATH = "/tmp/gh-aw/skill_install_history.json";

@@ -32,6 +32,15 @@ describe("setup action Windows support", () => {
 });
 
 describe("setup.sh Copilot runtime files", () => {
+  it("pins the same YAML package for development and runtime deployment", () => {
+    const development = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8"));
+    const runtime = JSON.parse(readFileSync(resolve(__dirname, "../runtime/package.json"), "utf8"));
+    const lock = JSON.parse(readFileSync(resolve(__dirname, "../runtime/package-lock.json"), "utf8"));
+    expect(runtime.dependencies).toEqual({ yaml: development.dependencies.yaml });
+    expect(lock.packages["node_modules/yaml"].version).toBe(runtime.dependencies.yaml);
+    expect(setupShContent).toContain('npm ci --prefix "${DESTINATION}" --omit=dev --ignore-scripts --no-audit --no-fund');
+  });
+
   it("copies the shared routing effort dependency alongside Copilot runtime scripts", () => {
     expect(setupShContent).toContain('for file in "${JS_SOURCE_DIR}"/*.cjs; do');
     expect(setupShContent).toContain('cp "$file" "${DESTINATION}/${filename}"');
@@ -134,7 +143,7 @@ describe("setup.sh MCP_SCRIPTS_FILES", () => {
       // Run only the real MCP deployment block, not setup's runner-wide initialization.
       const deploymentBlock = setupShContent.slice(setupShContent.indexOf("# Copy mcp-scripts files"), setupShContent.indexOf("# Copy safe-outputs files"));
       execFileSync("bash", ["-ec", `create_dir() { mkdir -p "$1"; }\ndebug_log() { :; }\n${deploymentBlock}`], {
-        env: { ...process.env, GH_AW_ROOT: runnerRoot, JS_SOURCE_DIR: __dirname },
+        env: { ...process.env, GH_AW_ROOT: runnerRoot, JS_SOURCE_DIR: __dirname, DESTINATION: __dirname },
       });
       execFileSync(
         process.execPath,
@@ -142,6 +151,7 @@ describe("setup.sh MCP_SCRIPTS_FILES", () => {
           "-e",
           `
             const assert = require("node:assert/strict");
+            assert.deepEqual(require("./node_modules/yaml").parseDocument("key: value").toJS(), { key: "value" });
             const { createServer } = require("./mcp_server_core.cjs");
             const { normalizeSafeOutputName } = require("./safe_output_names.cjs");
             assert.equal(createServer({ name: "mcpscripts", version: "test" }).serverInfo.name, "mcpscripts");
@@ -202,7 +212,7 @@ describe("setup.sh SAFE_OUTPUTS_FILES", () => {
     try {
       const deploymentBlock = setupShContent.slice(setupShContent.indexOf("# Copy safe-outputs files"), setupShContent.indexOf("# Copy configure_git_credentials.sh"));
       execFileSync("bash", ["-ec", `create_dir() { mkdir -p "$1"; }\ndebug_log() { :; }\n${deploymentBlock}`], {
-        env: { ...process.env, GH_AW_ROOT: runnerRoot, JS_SOURCE_DIR: __dirname },
+        env: { ...process.env, GH_AW_ROOT: runnerRoot, JS_SOURCE_DIR: __dirname, DESTINATION: __dirname },
       });
       execFileSync(
         process.execPath,
@@ -210,6 +220,7 @@ describe("setup.sh SAFE_OUTPUTS_FILES", () => {
           "-e",
           `
             const assert = require("node:assert/strict");
+            assert.deepEqual(require("./node_modules/yaml").parseDocument("key: value").toJS(), { key: "value" });
             assert.equal(typeof require("./generate_git_patch.cjs").generateGitPatch, "function");
             assert.equal(typeof require("./generate_git_bundle.cjs").generateGitBundle, "function");
             assert.equal(typeof require("./object_pack_fetch.cjs").fetchRecoveryObjects, "function");
@@ -278,8 +289,8 @@ describe("setup.sh SAFE_OUTPUTS_FILES", () => {
 
   it("deploys Claim authority and worker route provisioning dependencies", () => {
     expect(getDirectLocalRequires("safe_outputs_handlers.cjs")).toContain("work_queue_claim_scope.cjs");
-    expect(getDirectLocalRequires("work_queue_provisioning.cjs")).toContain("work_queue_yaml.cjs");
-    for (const file of ["work_queue_claim_scope.cjs", "finish_work_queue_claim.cjs", "work_queue_resource_scope.cjs", "work_queue_effect_client.cjs", "work_queue_yaml.cjs"]) {
+    expect(readFileSync(resolve(__dirname, "work_queue_provisioning.cjs"), "utf8")).toContain('require("yaml")');
+    for (const file of ["work_queue_claim_scope.cjs", "finish_work_queue_claim.cjs", "work_queue_resource_scope.cjs", "work_queue_effect_client.cjs"]) {
       expect(safeOutputsFiles).toContain(file);
     }
   });

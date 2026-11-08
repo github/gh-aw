@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { parseDocument } from "./work_queue_yaml.cjs";
+import { parseDocument } from "yaml";
 
 const root = resolve(import.meta.dirname, "../../..");
 const source = readFileSync(resolve(root, ".github/workflows/daily-mcp-concurrency-analysis.md"), "utf8");

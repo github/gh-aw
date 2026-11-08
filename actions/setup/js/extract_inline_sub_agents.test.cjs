@@ -453,7 +453,7 @@ describe("Claude staged sub-agent identity", () => {
   let tmpDir;
   const parseFrontmatter = content => {
     const { extractFrontmatterAndBody } = require("./frontmatter_hash_pure.cjs");
-    const { parseDocument } = require("./work_queue_yaml.cjs");
+    const { parseDocument } = require("yaml");
     return parseDocument(extractFrontmatterAndBody(content).frontmatterText).toJS() || {};
   };
 

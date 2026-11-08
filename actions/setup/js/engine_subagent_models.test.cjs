@@ -12,7 +12,7 @@ const { applyClaudeSubagentModels, applyCodexSubagentModels, isDetectionPhase, r
 const { extractInlineSubAgents, writeInlineSubAgents } = require("./extract_inline_sub_agents.cjs");
 const { claudeBareCapabilities, removeClaudePlugin } = require("./claude_runtime.cjs");
 const { extractFrontmatterAndBody } = require("./frontmatter_hash_pure.cjs");
-const { parseDocument } = require("./work_queue_yaml.cjs");
+const { parseDocument } = require("yaml");
 const { recordModelResolution } = require("./resolve_model_alias.cjs");
 const runs = require("./fixtures/claude_codex_subagent_runs.cjs");
 

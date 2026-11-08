@@ -11,7 +11,7 @@ const { resolveMultiProviderFromReflect } = require("./awf_reflect.cjs");
 const { extractInlineSubAgents } = require("./extract_inline_sub_agents.cjs");
 const { writeInlineSkills } = require("./extract_inline_skills.cjs");
 const { extractFrontmatterAndBody } = require("./frontmatter_hash_pure.cjs");
-const { parseDocument } = require("./work_queue_yaml.cjs");
+const { parseDocument } = require("yaml");
 const models = [
   { id: "gpt-5.4", provider: "openai" },
   { id: "claude-sonnet-4.6", provider: "anthropic" },

@@ -690,7 +690,7 @@ async function resolveCopilotSDKMultiProvider(options) {
  */
 function listCopilotAgentFiles(directory, logger = log) {
   const { extractFrontmatterAndBody } = require("./frontmatter_hash_pure.cjs");
-  const { parseDocument } = require("./work_queue_yaml.cjs");
+  const { parseDocument } = require("yaml");
   let entries;
   try {
     entries = fs.readdirSync(directory, { withFileTypes: true });
@@ -746,7 +746,7 @@ function listCopilotSubagents(workingDirectory, agentsBaseDir, logger = log) {
  */
 function getCopilotAgentModelScalar(content) {
   const { extractFrontmatterAndBody } = require("./frontmatter_hash_pure.cjs");
-  const { parseDocument } = require("./work_queue_yaml.cjs");
+  const { parseDocument } = require("yaml");
   const { frontmatterText } = extractFrontmatterAndBody(content);
   /** @type {any} */
   const document = parseDocument(frontmatterText);

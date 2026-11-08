@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { minimatch } from "minimatch";
-import { parseDocument } from "./work_queue_yaml.cjs";
+import { parseDocument } from "yaml";
 
 const root = resolve(import.meta.dirname, "../../..");
 const document = parseDocument(readFileSync(resolve(root, ".github/workflows/work-queue-stress.yml"), "utf8"), { version: "1.2", uniqueKeys: true });

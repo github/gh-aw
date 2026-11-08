@@ -10,7 +10,7 @@ const { main } = require("./interpolate_prompt.cjs");
 const substitutePlaceholders = require("./substitute_placeholders.cjs");
 const { createLiteralValues, restoreInlineMetadata, literalStatePath } = require("./prompt_literal_values.cjs");
 const { processExpressions } = require("./runtime_import.cjs");
-const { parseDocument } = require("./work_queue_yaml.cjs");
+const { parseDocument } = require("yaml");
 
 describe("prompt provenance through the generated substitution sequence", () => {
   let directory, promptPath, originalEnv;

@@ -64,7 +64,7 @@ import "embed"
 //go:embed js/work_queue_expiration.cjs
 //go:embed js/work_queue_deployment.cjs js/work_queue_deployment_control.cjs
 //go:embed js/work_queue_git_tree_adapter.cjs js/work_queue_graphql_adapter.cjs js/work_queue_rest_adapter.cjs
-//go:embed js/work_queue_graph.cjs js/work_queue_limits.cjs js/work_queue_scheduler.cjs js/work_queue_yaml.cjs js/work_queue_expiration.cjs
+//go:embed js/work_queue_graph.cjs js/work_queue_limits.cjs js/work_queue_scheduler.cjs js/work_queue_expiration.cjs
 //go:embed js/work_queue_indexes.cjs
 //go:embed js/mcp_server_core.cjs js/mcp_dependencies_manager.cjs js/mcp_enhanced_errors.cjs js/mcp_logger.cjs
 //go:embed js/levenshtein_distance.cjs

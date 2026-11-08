@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
-import { parseDocument } from "./work_queue_yaml.cjs";
+import { parseDocument } from "yaml";
 
 function readWorkflow(name, compiled = false) {
   const source = readFileSync(new URL(`../../../.github/workflows/smoke-work-queue-${name}.${compiled ? "lock.yml" : "md"}`, import.meta.url), "utf8");

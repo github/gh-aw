@@ -1,4 +1,7 @@
 {
+  "dependencies": {
+    "yaml": "2.9.1"
+  },
   "devDependencies": {
     "@actions/artifact": "^6.3.1",
     "@actions/core": "^3.0.1",

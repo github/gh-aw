@@ -4,7 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
 const { sanitizeIncomingText } = require("./sanitize_incoming_text.cjs");
-const { parseDocument } = require("./work_queue_yaml.cjs");
+const { parseDocument } = require("yaml");
 
 describe("fuzz_template_substitution_harness", () => {
   describe("production provenance adversarial corpus", () => {

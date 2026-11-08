@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
-import { parseDocument } from "./work_queue_yaml.cjs";
+import { parseDocument } from "yaml";
 
 // Latest 100 merged PRs: these workflows produced closing issues with gh-aw provenance.
 const migrated = [

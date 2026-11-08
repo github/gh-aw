@@ -9,7 +9,7 @@ const { createLiteralValues, literalStatePath, writeLiteralState, readLiteralSta
 const { interpolateVariables, main } = require("./interpolate_prompt.cjs");
 const { renderMarkdownTemplate } = require("./render_template.cjs");
 const substitutePlaceholders = require("./substitute_placeholders.cjs");
-const { parseDocument } = require("./work_queue_yaml.cjs");
+const { parseDocument } = require("yaml");
 
 describe("literal prompt values and private diagnostics", () => {
   let directory, file;
