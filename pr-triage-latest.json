@@ -1,6 +1,6 @@
 {
-  "run_id": "42430628618",
-  "run_date": "2026-11-08T00:42:44Z",
+  "run_id": "42454401876",
+  "run_date": "2026-11-08T06:23:44Z",
   "source": "pr-triage",
   "eligible_total": 1,
   "open_copilot_prs": 7,
@@ -49,5 +49,6 @@
     75763,
     75761
   ],
-  "notes": "Only one Copilot-authored PR remained outside the 1-hour cooldown window. It is a workflow-routing feature change with passing route checks and high-value routing cleanup."
+  "notes": "Only one Copilot-authored PR remained outside the 1-hour cooldown window. It is a workflow-routing feature change with passing route checks and high-value routing cleanup.",
+  "summary": "Single eligible PR; one workflow-compliance feature change meets the cooldown gate and has passing route checks."
 }
