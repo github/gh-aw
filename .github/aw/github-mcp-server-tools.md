@@ -27,21 +27,26 @@ Full tool reference for each toolset. See [github-mcp-server.md](github-mcp-serv
 ---
 
 ### copilot
-**Description**: GitHub Copilot assignment, review, coding agent, and Automation tools
+**Description**: GitHub Copilot assignment, review, coding agent, Automation, and task status tools
 
 | Tool | Purpose | Key Parameters |
 |------|---------|----------------|
 | `assign_copilot_to_issue` | Assign GitHub Copilot to an issue | `owner`, `repo`, `issue_number` |
 | `create_pull_request_with_copilot` | Ask Copilot to create a pull request | `owner`, `repo`, `issue_number` |
 | `get_automation` | Get a Copilot Automation | `owner`, `repo`, `automation_id` |
+| `get_automation_group` | Get a repository Automation group and its visible members | `owner`, `repo`, `group_id` |
 | `get_automation_revision` | Get a Copilot Automation revision | `owner`, `repo`, `automation_id`, `revision_id` |
+| `get_automations_configuration_for_repository` | Get Copilot Automations configuration for a repository | `owner`, `repo` |
+| `get_copilot_session_events` | Read a chronological page of Copilot session events | `session_id`, `page_number` or `after`, `page_size` |
+| `get_copilot_task_status` | Read a Copilot task-status snapshot | `task_id` |
+| `list_automation_groups` | List repository Automation groups and the authenticated identity | `owner`, `repo` |
 | `list_automation_revisions` | List Copilot Automation revisions | `owner`, `repo`, `automation_id` |
 | `list_automations` | List Copilot Automations | `owner`, `repo` |
 | `list_available_automation_tools` | List available Copilot Automation tools | None |
 | `list_available_automation_triggers` | List available Copilot Automation triggers | None |
 | `request_copilot_review` | Request a Copilot review on a pull request | `owner`, `repo`, `pullNumber` |
 
-> **Note**: Automation tools are exposed by the remote GitHub MCP service; their placement under `copilot` has not been confirmed against public upstream toolset registration.
+> **Note**: Automation and task status tools are exposed by the remote GitHub MCP service; their placement under `copilot` has not been confirmed against public upstream toolset registration.
 
 ---
 

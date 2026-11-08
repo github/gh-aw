@@ -70,7 +70,12 @@ func TestGitHubMCPGovernanceAndAutomationToolsets(t *testing.T) {
 	require.True(t, ok, "copilot toolset must be mapped")
 	for _, tool := range []string{
 		"get_automation",
+		"get_automation_group",
 		"get_automation_revision",
+		"get_automations_configuration_for_repository",
+		"get_copilot_session_events",
+		"get_copilot_task_status",
+		"list_automation_groups",
 		"list_automation_revisions",
 		"list_automations",
 		"list_available_automation_tools",
