@@ -38,8 +38,17 @@ func TestNpmEngineCooldownAtInstallationTime(t *testing.T) {
 	var archive bytes.Buffer
 	gz := gzip.NewWriter(&archive)
 	tw := tar.NewWriter(gz)
+	scripts := map[string]string{}
+	for _, phase := range []string{"preinstall", "install", "postinstall"} {
+		scripts[phase] = fmt.Sprintf(`node -e 'require("fs").appendFileSync(process.env.GH_AW_TEST_INSTALL_MARKER, "%s\n")'`, phase)
+	}
+	packageJSON, err := json.Marshal(map[string]any{
+		"name": "cooldown-test", "version": "1.2.3",
+		"bin": map[string]string{"cooldown-test": "cli.js"}, "scripts": scripts,
+	})
+	require.NoError(t, err)
 	for name, content := range map[string]string{
-		"package/package.json": `{"name":"cooldown-test","version":"1.2.3","bin":{"cooldown-test":"cli.js"}}`,
+		"package/package.json": string(packageJSON),
 		"package/cli.js":       "#!/usr/bin/env node\n",
 	} {
 		require.NoError(t, tw.WriteHeader(&tar.Header{Name: name, Mode: 0o755, Size: int64(len(content)), Typeflag: tar.TypeReg}))
@@ -54,15 +63,17 @@ func TestNpmEngineCooldownAtInstallationTime(t *testing.T) {
 		ageDays int
 		days    int
 		allowed bool
+		scripts bool
 	}{
-		{"recent-pinned-release", 1, 3, false},
-		{"old-pinned-release", 8, 3, true},
-		{"custom-cooldown-rejects", 4, 7, false},
-		{"custom-cooldown-allows", 8, 7, true},
-		{"disabled-cooldown", 1, 0, true},
+		{"recent-pinned-release", 1, 3, false, false},
+		{"old-pinned-release", 8, 3, true, false},
+		{"custom-cooldown-rejects", 4, 7, false, false},
+		{"custom-cooldown-allows", 8, 7, true, false},
+		{"disabled-cooldown", 1, 0, true, false},
+		{"install-scripts-opt-in", 8, 0, true, true},
 	} {
-		for _, microVM := range []bool{false, true} {
-			t.Run(test.name+map[bool]string{false: "/host", true: "/microVM"}[microVM], func(t *testing.T) {
+		for _, mode := range []string{"host", "global", "microVM"} {
+			t.Run(test.name+"/"+mode, func(t *testing.T) {
 				var downloads atomic.Int32
 				registry := httptest.NewUnstartedServer(nil)
 				registryURL := "http://" + registry.Listener.Addr().String()
@@ -75,8 +86,9 @@ func TestNpmEngineCooldownAtInstallationTime(t *testing.T) {
 							"dist-tags": map[string]string{"latest": "1.2.3"},
 							"versions": map[string]any{"1.2.3": map[string]any{
 								"name": "cooldown-test", "version": "1.2.3",
-								"bin":  map[string]string{"cooldown-test": "cli.js"},
-								"dist": map[string]string{"tarball": registryURL + "/archive.tgz"},
+								"scripts": scripts,
+								"bin":     map[string]string{"cooldown-test": "cli.js"},
+								"dist":    map[string]string{"tarball": registryURL + "/archive.tgz"},
 							}},
 							"time": map[string]string{"1.2.3": time.Now().Add(-time.Duration(test.ageDays) * 24 * time.Hour).UTC().Format(time.RFC3339)},
 						}
@@ -94,12 +106,15 @@ func TestNpmEngineCooldownAtInstallationTime(t *testing.T) {
 				defer registry.Close()
 
 				dir := t.TempDir()
+				marker := filepath.Join(dir, "install-scripts.txt")
 				days := test.days
 				step := GenerateNpmInstallStepsWithScope("cooldown-test", "${{ inputs.version }}", "Install", "cooldown-test", NPMInstallOptions{
-					CooldownDays: &days,
+					CooldownDays:      &days,
+					IsGlobal:          mode == "global",
+					RunInstallScripts: test.scripts,
 				})[0]
-				if microVM {
-					step = GenerateMicroVMNpmCLIInstallStep("cooldown-test", "${{ inputs.version }}", "Install", "cooldown-test", false, true, days)
+				if mode == "microVM" {
+					step = GenerateMicroVMNpmCLIInstallStep("cooldown-test", "${{ inputs.version }}", "Install", "cooldown-test", test.scripts, true, days)
 				}
 				var parsed []struct {
 					Run string            `yaml:"run"`
@@ -116,6 +131,8 @@ func TestNpmEngineCooldownAtInstallationTime(t *testing.T) {
 					"NPM_CONFIG_REGISTRY="+registry.URL,
 					"NPM_CONFIG_CACHE="+filepath.Join(dir, "cache"),
 					"NPM_CONFIG_USERCONFIG="+filepath.Join(dir, ".npmrc"),
+					"NPM_CONFIG_PREFIX="+filepath.Join(dir, "global"),
+					"GH_AW_TEST_INSTALL_MARKER="+marker,
 					"NPM_CONFIG_AUDIT=false", "NPM_CONFIG_FUND=false",
 					"NPM_CONFIG_FETCH_RETRIES=0",
 				)
@@ -134,6 +151,14 @@ func TestNpmEngineCooldownAtInstallationTime(t *testing.T) {
 					assert.Contains(t, string(output), "ETARGET")
 					assert.Zero(t, downloads.Load(), "recent releases must be rejected before downloading the archive")
 				}
+				if test.allowed && test.scripts {
+					content, err := os.ReadFile(marker)
+					require.NoError(t, err)
+					assert.Equal(t, "preinstall\ninstall\npostinstall\n", string(content))
+				} else {
+					_, err := os.Stat(marker)
+					require.ErrorIs(t, err, os.ErrNotExist, "install lifecycle scripts must not run")
+				}
 			})
 		}
 	}
@@ -145,7 +170,8 @@ func TestNpmEngineInstallPathsUseBuiltinCooldown(t *testing.T) {
 			CooldownDays: &days,
 		})
 		host := strings.Join(hostSteps[0], "\n")
-		assert.Contains(t, host, "run: npm install --ignore-scripts -g example-engine@1.2.3")
+		assert.Contains(t, host, "run: npm install -g example-engine@1.2.3")
+		assert.Contains(t, host, "NPM_CONFIG_IGNORE_SCRIPTS: 'true'")
 		microVM := strings.Join(GenerateMicroVMNpmCLIInstallStep("example-engine", "1.2.3", "Install microVM", "example", false, true, days), "\n")
 		for name, step := range map[string]string{"host": host, "microVM": microVM} {
 			t.Run(fmt.Sprintf("%s/%d", name, days), func(t *testing.T) {

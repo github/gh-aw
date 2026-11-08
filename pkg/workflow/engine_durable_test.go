@@ -200,7 +200,7 @@ func TestBehaviorDefinedDurablePlan(t *testing.T) {
 	install := durableStepsText(plan.InstallationSteps)
 	execution := durableStepsText(plan.ExecutionSteps)
 	require.Contains(t, install, "example-durable@1.2.3")
-	require.Contains(t, install, "--ignore-scripts")
+	require.Contains(t, install, "NPM_CONFIG_IGNORE_SCRIPTS: 'true'")
 	require.Contains(t, install, "example-durable --version")
 	require.Contains(t, execution, "Durable invocation")
 	require.Contains(t, execution, "GH_AW_DURABLE_CHECKPOINT")
