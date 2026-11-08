@@ -99,6 +99,8 @@ Mounts at `/tmp/gh-aw/cache-memory/` (default) or `/tmp/gh-aw/cache-memory-<id>/
 
 With `tools.cache-memory` enabled, MCP servers can persist temporary state under `/tmp/gh-aw/cache-memory/`. Configure the server in the workflow and point it at a subdirectory such as `/tmp/gh-aw/cache-memory/<server-name>/`.
 
+For [QMD's index/search pattern](/gh-aw/experimental/qmd/#indexsearch-pattern), a separate custom job restores prior memory and incrementally builds a documentation index. Pass its current-run snapshot to the agent through an artifact, then let cache-memory persist that snapshot. `jobs.<id>.restore-memory: true` restores memory read-only; it does not publish custom-job changes or transfer files between runners. SQLite snapshots require an explicit `.sqlite` entry in `allowed-extensions`.
+
 ## Behavior
 
 GitHub Actions cache provides a 10GB per-repository limit with LRU eviction, and evicts unused entries after 7 days. `retention-days` controls only uploaded artifact retention (1-90 days); it does not extend cache lifetime. The repository-wide [artifact retention policy](/gh-aw/reference/compiler-enterprise-environment-controls/#artifact-retention) overrides this per-cache artifact setting when configured.
