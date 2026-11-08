@@ -6,7 +6,7 @@ description: Trusted indexing and read-only search patterns.
 
 Separate **index construction** from **agent search**. A deterministic publisher builds an index using trusted code from `main`, then saves it to GitHub Actions cache. Eligible agent jobs restore that index and query it through existing search tools, optionally an MCP server. The agent never builds, refreshes, or modifies the index.
 
-This pattern reuses [`jobs:` and `pre-agent-steps:`](/gh-aw/reference/steps-jobs/) and standard Actions cache restore/save actions. It requires no new indexing service or mandatory dependency. Unlike the general data-caching example above, shared search indexes must not use top-level `cache:` (which can save at job completion) or writable [`cache-memory`](/gh-aw/reference/cache-memory/).
+This pattern reuses [`jobs:` and `pre-agent-steps:`](/gh-aw/reference/steps-jobs/) and standard Actions cache restore/save actions. It requires no new indexing service or mandatory dependency. Unlike the general [`cache:` configuration](/gh-aw/reference/syntax-tools-imports/), shared search indexes must not use top-level `cache:` (which can save at job completion) or writable [`cache-memory`](/gh-aw/reference/cache-memory/).
 
 ### Choose the Publisher Model
 
@@ -25,7 +25,9 @@ Both the publisher workflow definition and the indexer, dependencies, configurat
 
 Give the publisher a separate runner job with explicit least-privilege permissions. Keep indexing secrets step-scoped there, not in workflow-level `env`, agent setup, MCP configuration, job outputs, artifacts, or caches. Grant any required write scope only to that job. Cache restore/save uses the Actions cache service, not repository `contents: write`; grant repository or external write access only if the existing indexer actually needs it.
 
-Restore-only caching prevents write-back, **not local index mutation**. Configure the existing search tool or MCP server in query-only mode, with the index mounted read-only or protected by an equivalent enforced access boundary. Expose only search/query tools, not refresh/build/admin endpoints, and disable automatic indexing on startup or on a miss. A prompt or `chmod` on files owned by the agent is not sufficient isolation. Keep any necessary search scratch files separate from the index. If an existing tool cannot operate without modifying its index, it does not satisfy this shared-index pattern.
+Restore-only caching prevents write-back through that action, **not direct writes through the job's cache token or local index mutation**. On GitHub.com, require threat detection and omit nonempty top-level `cache:` entries so gh-aw enforces `cache-mode: read` for the agent job. This is the cache-token boundary; a restore-only action alone is insufficient. Workflows that need dependency-cache saves retain token write access and are unsupported consumers of this shared-index pattern. GHES configurations without scoped `cache-mode` enforcement are also unsupported; use a different read-only delivery mechanism. Do not disable detection or override the read-only mode.
+
+Configure the existing search tool or MCP server in query-only mode, with the index mounted read-only or protected by an equivalent enforced access boundary. Expose only search/query tools, not refresh/build/admin endpoints, and disable automatic indexing on startup or on a miss. A prompt or `chmod` on files owned by the agent is not sufficient isolation. Keep any necessary search scratch files separate from the index. If an existing tool cannot operate without modifying its index, it does not satisfy this shared-index pattern.
 
 > [!CAUTION]
 > PR jobs must never save, replace, delete, or otherwise mutate shared index caches, even for same-repository PRs. They may only restore eligible snapshots. Do not provide cache administration credentials or cache-save actions to the agent, and never publish files returned from agent execution. gh-aw trigger/actor restrictions still apply; cache visibility does not authorize an otherwise ineligible agent run.
@@ -38,9 +40,9 @@ Caches are not secret storage. Fork PR workflows can potentially read default/ba
 
 Use a key such as `docs-search-v1-linux-<source-sha>-<build-id>`. The prefix identifies the corpus, index schema/tool compatibility, and platform. The suffix identifies an immutable source snapshot and build. Actions also matches an internal cache version derived from paths and compression tooling: producers and consumers must use compatible paths and runners, not just the same key. Existing entries cannot be updated in place; publish a new key for each changed snapshot. Serialize publishers where needed to avoid competing builds.
 
-Restore an exact key when a workflow requires a specific revision. For shared scheduled indexes, a compatibility-scoped `restore-keys` prefix may select the most recently created eligible matching entry. Do not use broad prefixes that cross corpora, schema versions, or trust boundaries. GitHub searches eligible current-ref caches before default-branch caches, so a matching key alone does not prove main-branch provenance: prohibit other publishers in that namespace and verify the selected snapshot's trusted provenance. A manifest claim alone is not authentication against a malicious cache writer.
+Restore the exact key from the trusted publisher record; do not derive it from the consumer's `github.sha` or `github.run_id`. Do not use `restore-keys` for shared consumers, especially PR consumers: GitHub searches eligible current-ref caches before default-branch caches, so a prefix can select an unintended snapshot. A matching key alone does not prove provenance.
 
-Store a manifest with schema/tool version, corpus, source revision or cursor, build time, and checksums. Before starting search, trusted validation must check compatibility, expected provenance, integrity, and the workflow's maximum age or exact-revision requirement. Define how that provenance is established, for example an exact key from a trusted publisher job or comparison against trusted publisher records; do not accept a self-declared `branch: main` as proof.
+Store a manifest with schema/tool version, corpus, source revision or cursor, build time, and checksums. The trusted publisher must also publish a digest of the complete snapshot through a trusted channel independent of the cache, such as a prerequisite job output or an authenticated publisher record. Before starting search, trusted validation must compare the restored snapshot's digest with that independently obtained value and check compatibility, provenance, and the workflow's maximum age or exact-revision requirement. A manifest claim, cache key, or digest stored only inside the cache is not authentication.
 
 Caches can expire or be evicted; they are not durable storage. A miss, incompatible index, or stale snapshot must fail with a diagnostic identifying the expected key/version and freshness requirement, or take a **documented read-only fallback** such as GitHub code search or bounded text search of available files. Mark fallback results as degraded and state the unavailable index revision. Never silently treat a miss as empty results or ask the agent to rebuild. Index repair belongs to the trusted publisher's next authorized run.
 
@@ -70,6 +72,7 @@ jobs:
       contents: read
     outputs:
       cache-key: ${{ steps.key.outputs.value }}
+      snapshot-digest: ${{ steps.digest.outputs.sha256 }}
     steps:
       - uses: actions/checkout@<approved-ref>
         with:
@@ -84,6 +87,8 @@ jobs:
         run: |
           ./scripts/search-index build --output /tmp/gh-aw/search-index
           ./scripts/search-index validate --index /tmp/gh-aw/search-index
+      - id: digest
+        run: echo "sha256=$(./scripts/search-index digest --index /tmp/gh-aw/search-index)" >> "$GITHUB_OUTPUT"
       - uses: actions/cache/save@<approved-ref>
         with:
           path: /tmp/gh-aw/search-index
@@ -99,7 +104,8 @@ pre-agent-steps:
   - name: Validate before opening read-only search
     env:
       EXPECTED_SOURCE_SHA: ${{ github.sha }}
-    run: ./scripts/search-index validate --index /tmp/gh-aw/search-index --source "$EXPECTED_SOURCE_SHA"
+      EXPECTED_SHA256: ${{ needs.index.outputs.snapshot-digest }}
+    run: ./scripts/search-index validate --index /tmp/gh-aw/search-index --source "$EXPECTED_SOURCE_SHA" --expected-sha256 "$EXPECTED_SHA256"
 ---
 
 # Indexed Documentation Search
@@ -132,27 +138,31 @@ jobs:
     # Copy runs-on, permissions, outputs, and steps from jobs.index above.
 ```
 
-Consumers omit `jobs.index` and `jobs.agent.needs: [index]`. They retain the existing query-only tool configuration and use this restore/validation fragment instead. All consumers agree on the corpus, schema, platform, manifest, and maximum age; they do not invoke or dispatch the publisher.
+Consumers omit `jobs.index` and `jobs.agent.needs: [index]`. They retain the existing query-only tool configuration and use this restore/validation fragment instead. First, an existing trusted lookup retrieves the publisher record from a channel independent of the cache; that record supplies the exact cache key, source revision, build time, and SHA-256 digest. Do not use a cache or artifact as the source of this record. All consumers agree on the corpus, schema, platform, manifest, and maximum age; they do not invoke or dispatch the publisher.
 
 ```aw wrap title="Shared consumer frontmatter fragment"
 checkout:
   ref: main
   pull-request: false
 pre-agent-steps:
+  - id: publisher_record
+    name: Read the trusted publisher record
+    run: ./scripts/search-index publisher-record --output "$GITHUB_OUTPUT"
   - uses: actions/cache/restore@<approved-ref>
     id: search_index
     with:
       path: /tmp/gh-aw/search-index
-      key: docs-search-v1-linux-${{ github.sha }}-${{ github.run_id }}
-      restore-keys: |
-        docs-search-v1-linux-
+      key: ${{ steps.publisher_record.outputs.cache-key }}
       fail-on-cache-miss: true
   - name: Check the selected snapshot
     env:
       RESTORED_KEY: ${{ steps.search_index.outputs.cache-matched-key }}
-    run: ./scripts/search-index validate --index /tmp/gh-aw/search-index --cache-key "$RESTORED_KEY" --max-age-hours 48
+      TRUSTED_KEY: ${{ steps.publisher_record.outputs.cache-key }}
+      EXPECTED_SOURCE_SHA: ${{ steps.publisher_record.outputs.source-sha }}
+      EXPECTED_SHA256: ${{ steps.publisher_record.outputs.sha256 }}
+    run: ./scripts/search-index validate --index /tmp/gh-aw/search-index --cache-key "$RESTORED_KEY" --expected-cache-key "$TRUSTED_KEY" --source "$EXPECTED_SOURCE_SHA" --expected-sha256 "$EXPECTED_SHA256" --max-age-hours 48
 ```
 
-Here, a prefix match is expected: `cache-hit` is only `true` for an exact primary-key match, so it must not be used alone to reject a successful prefix restore. Validation still enforces the 48-hour example freshness policy and trusted provenance; a successful restore does not imply freshness.
+The publisher-record lookup is conceptual: use an existing authenticated trusted channel and trusted code from `main`. The digest must be computed over the restored snapshot and compared with the independently retrieved publisher record. The exact key and digest are both required; a successful restore does not imply authenticity or freshness.
 
 For PR consumers, this fragment deliberately disables automatic PR checkout so host validation uses trusted `main` code. Inspect PR changes as data through existing read-only tools. If a workflow needs compiler-managed PR checkout, keep its validator/search configuration in a separate trusted location and never execute scripts from the PR workspace. PR search results describe the published main snapshot, not unindexed PR changes; document that limitation or use a bounded read-only fallback for changed files.
