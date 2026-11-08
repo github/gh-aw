@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
 const { randomUUID } = require("node:crypto");
+const { recordDurableSessionEvent } = require("./durable_session_record.cjs");
 const SESSION_ID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
 function readCopilotCaptureBaseline(directory) {
@@ -24,6 +25,8 @@ function openDurableSession(engine, env = process.env) {
   fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
   if (fs.lstatSync(file, { throwIfNoEntry: false })?.isSymbolicLink()) throw new Error("Durable session selector must not be a symlink");
   let id = "";
+  let startupRecorded = false;
+  const resumed = env.GH_AW_DURABLE_RESUMED === "true";
   if (fs.existsSync(file)) {
     const state = JSON.parse(fs.readFileSync(file, "utf8"));
     if (state.version !== 1 || state.engine !== engine || !SESSION_ID.test(state.id || "")) throw new Error("Invalid durable session selector");
@@ -64,6 +67,20 @@ function openDurableSession(engine, env = process.env) {
     },
     save,
     copilotSession,
+    started(sessionId = id) {
+      if (!SESSION_ID.test(sessionId) || sessionId !== id) throw new Error("Durable startup must use the selected native session");
+      if (startupRecorded) return;
+      recordDurableSessionEvent(
+        "durable.session",
+        {
+          status: resumed ? "resumed" : "fresh",
+          sessionId,
+          parentRunId: env.GH_AW_DURABLE_PARENT_RUN_ID,
+        },
+        { env }
+      );
+      startupRecorded = true;
+    },
   };
 }
 
@@ -77,7 +94,10 @@ function observeDurableSession(session, engine, line) {
   }
   if (!event || typeof event !== "object") return;
   const id = engine === "codex" && event.type === "thread.started" ? event.thread_id : engine === "claude" && event.type === "system" && event.subtype === "init" ? event.session_id : undefined;
-  if (id !== undefined) session.save(id);
+  if (id !== undefined) {
+    session.save(id);
+    session.started(id);
+  }
 }
 
 module.exports = { openDurableSession, observeDurableSession, readCopilotCaptureBaseline };

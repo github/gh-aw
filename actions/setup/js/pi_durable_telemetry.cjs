@@ -71,8 +71,20 @@ function createDurableTelemetry(options = {}) {
     const context = {
       propagation,
       async startSpan(spanOptions, callback) {
+        const durableParentRunId = process.env.GH_AW_DURABLE_RESUMED === "true" && /^[1-9]\d*$/.test(process.env.GH_AW_DURABLE_PARENT_RUN_ID || "") ? process.env.GH_AW_DURABLE_PARENT_RUN_ID : undefined;
         /** @type {DurableSpan} */
-        const record = { traceId: trace, id: randomBytes(8).toString("hex"), parentId: parent, name: spanOptions.name, startedMs: Date.now(), endedMs: 0, attributes: { ...spanOptions.attributes }, events: [], links: [], status: "ok" };
+        const record = {
+          traceId: trace,
+          id: randomBytes(8).toString("hex"),
+          parentId: parent,
+          name: spanOptions.name,
+          startedMs: Date.now(),
+          endedMs: 0,
+          attributes: { ...spanOptions.attributes, ...(durableParentRunId ? { "gh-aw.durable.parent_run_id": durableParentRunId } : {}) },
+          events: [],
+          links: [],
+          status: "ok",
+        };
         const addLink = link => {
           const current = contexts.get(link.context);
           if (current?.id) record.links.push({ ...current, attributes: link.attributes || {} });

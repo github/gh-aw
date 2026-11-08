@@ -181,6 +181,8 @@ describe("single-step durable restoration", () => {
     expect(fs.existsSync(options.session)).toBe(false);
     expect(fs.readFileSync(options.promptFile, "utf8")).toBe("Current task");
     expect(options.core.setOutput).not.toHaveBeenCalledWith("restored", "true");
+    const record = JSON.parse(fs.readFileSync(path.join(options.root, "durable-session.jsonl"), "utf8"));
+    expect(record).toMatchObject({ type: "durable.restore", data: { status: "fresh", runId: "200" } });
   });
 
   it.each(["copilot", "claude", "codex", "gemini", "agy", "pi", "imported-engine"])("downloads and validates %s state before enabling continuation", async engine => {
@@ -193,6 +195,9 @@ describe("single-step durable restoration", () => {
     expect(fs.readFileSync(options.session, "utf8")).toBe("previous task state");
     expect(options.core.setOutput).toHaveBeenCalledWith("parent-run-id", "100");
     expect(options.core.setOutput).toHaveBeenLastCalledWith("restored", "true");
+    const record = JSON.parse(fs.readFileSync(path.join(options.root, "durable-session.jsonl"), "utf8"));
+    expect(record).toMatchObject({ type: "durable.restore", data: { status: "restored", parentRunId: "100", artifactId: "999" } });
+    expect(JSON.stringify(record)).not.toContain("previous task state");
     const prompt = fs.readFileSync(options.promptFile, "utf8");
     if (engine === "pi" || engine === "imported-engine") expect(prompt).toBe("Current task");
     else {
@@ -205,6 +210,7 @@ describe("single-step durable restoration", () => {
     const options = restoreFixture();
     options.artifactClient.downloadArtifact.mockRejectedValue(new Error("403 forbidden"));
     await expect(restoreCheckpoint(options)).rejects.toThrow("403 forbidden");
+    expect(JSON.parse(fs.readFileSync(path.join(options.root, "durable-session.jsonl"), "utf8")).data.status).toBe("failed");
     expect(fs.existsSync(options.session)).toBe(false);
     expect(fs.readFileSync(options.promptFile, "utf8")).toBe("Current task");
     expect(options.core.setOutput).not.toHaveBeenCalledWith("restored", "true");

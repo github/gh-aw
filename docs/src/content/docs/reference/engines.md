@@ -109,6 +109,12 @@ The first run starts normally when no prior run or implicit checkpoint exists. N
 
 This restores session files, not workspace edits, credentials, or exactly-once tool execution. Pi additionally preserves pending tasks using its native durable library. Existing unified session capture and trace propagation remain enabled; restored Copilot events are excluded from current-run capture and model verification.
 
+The unified session records `durable.restore` with `restored`, `fresh`, or `failed` status and available parent-run and artifact IDs. Copilot, Claude, Codex, and Pi additionally record `durable.session` after native session startup, with `resumed` or `fresh` status and the selected session ID. These records contain metadata, not historical conversation content. Restoration alone does not establish native continuation for Gemini, Agy, or imported engines.
+
+`gh aw audit RUN --artifacts info,usage --json` exposes this evidence as `durable_session`. `gh aw health WORKFLOW --json --logs-dir DIRECTORY` summarizes cached current-revision evidence under `durable_sessions`, without downloading artifacts. Missing historical events or uncached sessions are unavailable evidence, not fresh starts. An Actions success does not by itself verify continuation.
+
+OpenTelemetry agent spans and exported durable session log records expose the validated checkpoint parent as the string attribute `gh-aw.durable.parent_run_id`. Pi durable spans also include it on restored runs. This identifies the parent Actions run; it does not replace OTel trace/span parentage or prove native startup by itself. Fresh runs omit the attribute.
+
 Threat detection uses a separate fresh session and does not inherit the primary agent's durable state.
 
 Built-in session-based durable mode rejects replacement commands, drivers, and harnesses because their session files may differ. Ordinary CLI arguments remain supported, but native session selectors and flags that disable persistence cannot override compiler-managed continuation. Copilot cannot override `COPILOT_HOME` because durable mode collects its standard native session directory. Pi has [additional restrictions](/gh-aw/reference/engines/pi/#durable-runs). [Imported engines](/gh-aw/reference/third-party-agent/#durable-execution) must declare their own durable files and execution behavior; unsupported definitions still fail compilation.

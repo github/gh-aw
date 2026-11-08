@@ -10148,6 +10148,46 @@
                     "detection_engine_retries"
                   ],
                   "additionalProperties": false
+                },
+                "durable_session": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "engine": {
+                      "type": "string"
+                    },
+                    "storage": {
+                      "type": "string"
+                    },
+                    "parent_run_id": {
+                      "type": "string"
+                    },
+                    "artifact_id": {
+                      "type": "string"
+                    },
+                    "session_id": {
+                      "type": "string"
+                    },
+                    "started": {
+                      "type": "boolean"
+                    },
+                    "evidence": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "started"
+                  ],
+                  "additionalProperties": false
                 }
               },
               "required": [

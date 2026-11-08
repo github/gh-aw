@@ -52,6 +52,8 @@ function environment(engine) {
     GH_AW_DURABLE_ENGINE: engine,
     GH_AW_DURABLE_SESSION_DIR: state,
     GH_AW_DURABLE_RESUMED: "false",
+    GITHUB_RUN_ID: "100",
+    GITHUB_RUN_ATTEMPT: "1",
   };
 }
 
@@ -65,6 +67,8 @@ function artifactRoundtrip(env, files) {
   fs.rmSync(env.HOME, { recursive: true, force: true });
   restoreFiles({ core, root });
   env.GH_AW_DURABLE_RESUMED = "true";
+  env.GITHUB_RUN_ID = "101";
+  env.GH_AW_DURABLE_PARENT_RUN_ID = "100";
 }
 
 describe("native CLI artifact continuation", () => {
@@ -113,6 +117,11 @@ process.stdin.on("end", () => {
     const marker = engine === "copilot" ? "--session-id" : engine === "claude" ? "--resume" : "resume";
     expect(second.args[second.args.indexOf(marker) + 1]).toBe(selector.id);
     expect(second.input || second.args.join(" ")).toContain("Continue current task B");
+    const records = fs.readFileSync(path.join(directory, "agent/durable-session.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
+    expect(records).toEqual([
+      expect.objectContaining({ type: "durable.session", data: expect.objectContaining({ status: "fresh", runId: "100", sessionId: selector.id }) }),
+      expect.objectContaining({ type: "durable.session", data: expect.objectContaining({ status: "resumed", runId: "101", parentRunId: "100", sessionId: selector.id }) }),
+    ]);
     if (engine === "copilot") {
       const baseline = JSON.parse(fs.readFileSync(path.join(state, "capture-offset.json"), "utf8"));
       expect(baseline.bytes).toBeGreaterThan(0);

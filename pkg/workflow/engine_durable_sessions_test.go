@@ -40,6 +40,7 @@ func TestCompileDurableBuiltinEngines(t *testing.T) {
 				require.NotContains(t, text, "restore_durable_files")
 				require.NotContains(t, text, "Prepare durable continuation prompt")
 				require.Contains(t, text, "steps.durable_checkpoint.outputs.restored")
+				require.Contains(t, text, "/tmp/gh-aw/agent/durable-session.jsonl")
 				if engine == "pi" {
 					require.Contains(t, text, "pi_durable_driver.cjs")
 					require.Contains(t, text, "@earendil-works/pi-durable@1.4.0")

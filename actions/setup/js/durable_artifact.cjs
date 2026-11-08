@@ -9,31 +9,51 @@ const { readInboundAwContext } = require("./aw_context.cjs");
 const { DefaultArtifactClient } = require("./artifact_client.cjs");
 const { restoreFiles } = require("./durable_files.cjs");
 const { preparePrompt } = require("./durable_session.cjs");
+const { recordDurableSessionEvent } = require("./durable_session_record.cjs");
 
 /** Select and restore a checkpoint before exposing continuation to the engine. */
 async function restoreCheckpoint({ github, context, core, token, artifactClient = new DefaultArtifactClient(), root = "/tmp/gh-aw/agent", promptFile }) {
   const outputs = new Map();
-  await selectCheckpoint({
-    github,
-    context,
-    core: {
-      ...core,
-      setOutput(name, value) {
-        outputs.set(name, value);
-        core.setOutput(name, value);
+  const record = status =>
+    recordDurableSessionEvent(
+      "durable.restore",
+      {
+        status,
+        parentRunId: outputs.get("parent-run-id"),
+        artifactId: outputs.get("artifact-id"),
       },
-    },
-  });
-  if (!outputs.has("artifact-id")) return;
-  await artifactClient.downloadArtifact(Number(outputs.get("artifact-id")), {
-    path: path.join(root, "durable/bundle"),
-    findBy: { token, repositoryOwner: context.repo.owner, repositoryName: context.repo.repo },
-  });
-  restoreFiles({ core: { ...core, setOutput() {} }, root });
-  if (["copilot", "claude", "codex", "gemini", "agy"].includes(process.env.GH_AW_DURABLE_ENGINE || "")) {
-    preparePrompt({ env: { ...process.env, GH_AW_DURABLE_RESUMED: "true" }, promptFile });
+      { root, env: { ...process.env, GITHUB_RUN_ID: String(context.runId) } }
+    );
+  try {
+    await selectCheckpoint({
+      github,
+      context,
+      core: {
+        ...core,
+        setOutput(name, value) {
+          outputs.set(name, value);
+          core.setOutput(name, value);
+        },
+      },
+    });
+    if (!outputs.has("artifact-id")) {
+      record("fresh");
+      return;
+    }
+    await artifactClient.downloadArtifact(Number(outputs.get("artifact-id")), {
+      path: path.join(root, "durable/bundle"),
+      findBy: { token, repositoryOwner: context.repo.owner, repositoryName: context.repo.repo },
+    });
+    restoreFiles({ core: { ...core, setOutput() {} }, root });
+    if (["copilot", "claude", "codex", "gemini", "agy"].includes(process.env.GH_AW_DURABLE_ENGINE || "")) {
+      preparePrompt({ env: { ...process.env, GH_AW_DURABLE_RESUMED: "true" }, promptFile });
+    }
+    record("restored");
+    core.setOutput("restored", "true");
+  } catch (error) {
+    record("failed");
+    throw error;
   }
-  core.setOutput("restored", "true");
 }
 
 /**

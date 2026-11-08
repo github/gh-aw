@@ -9,6 +9,7 @@ const { createCheckpoint } = require("./pi_durable_checkpoint.cjs");
 const { createDurableTelemetry } = require("./pi_durable_telemetry.cjs");
 const { loadDurablePackage, createGatewayModels, installGatewayTools, installWorkflowPolicy, createEventEmitter } = require("./pi_durable_runtime.cjs");
 const { sanitizeProviderErrorMessage } = require("./pi_provider_error.cjs");
+const { recordDurableSessionEvent } = require("./durable_session_record.cjs");
 
 async function bounded(promise, milliseconds, message) {
   let timer;
@@ -121,6 +122,15 @@ async function main(options = {}) {
     // Stored agent choices contain only references; every run rebinds the gateway and policy.
     await root.configure({ model: gateway.model, cwd, ...(settings.defaultThinkingLevel ? { thinkingLevel: settings.defaultThinkingLevel } : {}) }, context);
     emit({ type: "session", version: 3, id: `${scope}:${root.id}`, cwd });
+    recordDurableSessionEvent(
+      "durable.session",
+      {
+        status: process.env.GH_AW_DURABLE_RESUMED === "true" ? "resumed" : "fresh",
+        sessionId: `${scope}:${root.id}`,
+        parentRunId: process.env.GH_AW_DURABLE_PARENT_RUN_ID,
+      },
+      { env: { ...process.env, GH_AW_DURABLE_ENGINE: "pi" } }
+    );
     watch = await durable.watchEvents(harness, root.id, context);
     watch.start(async events => {
       for (const event of events) {

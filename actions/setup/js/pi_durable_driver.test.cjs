@@ -36,6 +36,7 @@ describe("official Pi durable offline integration", () => {
       GH_AW_PI_DURABLE_STORAGE: storage,
       GH_AW_PROMPT: path.join(directory, "prompt"),
       GH_AW_ENGINE_CWD: directory,
+      GH_AW_TMP_DIR: directory,
       GITHUB_RUN_ID: "100",
       GITHUB_RUN_ATTEMPT: "1",
       GH_AW_PI_TOOL_POLICY: '{"bash":false,"edit":true}',
@@ -150,13 +151,24 @@ describe("official Pi durable offline integration", () => {
     const before = JSON.parse(fs.readFileSync(process.env.GH_AW_PI_DURABLE_CHECKPOINT, "utf8"));
     assert.equal(before.state.pending, true);
     process.env.GITHUB_RUN_ID = "200";
+    process.env.GH_AW_DURABLE_RESUMED = "true";
+    process.env.GH_AW_DURABLE_PARENT_RUN_ID = "100";
     const resumed = await scripted(async () => [{ type: "text", text: "Resumed" }]);
-    await main({ ...options, ...resumed });
+    const resumedSpans = [];
+    await main({ ...options, ...resumed, exportSpan: async span => resumedSpans.push(span) });
     const after = JSON.parse(fs.readFileSync(process.env.GH_AW_PI_DURABLE_CHECKPOINT, "utf8"));
     assert.equal(after.state.submissionId, before.state.submissionId);
     assert.equal(after.state.requestId, before.state.requestId);
     assert.equal(after.state.pending, false);
     assert.equal(resumed.requests(), 1);
+    const records = fs.readFileSync(path.join(options.directory, "agent/durable-session.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
+    assert.equal(records.length, 2);
+    assert.equal(records[0].data.status, "fresh");
+    assert.equal(records[1].data.status, "resumed");
+    assert.equal(records[1].data.parentRunId, "100");
+    assert.equal(records[1].data.sessionId, records[0].data.sessionId);
+    assert.ok(resumedSpans.length > 0);
+    assert.ok(resumedSpans.every(span => span.attributes["gh-aw.durable.parent_run_id"] === "100"));
     process.env.GITHUB_RUN_ATTEMPT = "2";
     await main({ ...options, ...resumed });
     assert.equal(resumed.requests(), 1, "retrying the run that completed a resumed submission must not submit another prompt");

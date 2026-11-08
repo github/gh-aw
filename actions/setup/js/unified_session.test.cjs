@@ -41,6 +41,31 @@ describe("Unified conclusion session", () => {
     return target;
   }
 
+  it("collects run-scoped durable restoration and startup without historical content", () => {
+    const metadata = { engine: "codex", storage: "artifact", runId: "123", runAttempt: "2", parentRunId: "122" };
+    write("agent/durable-session.jsonl", [
+      { type: "durable.restore", data: { ...metadata, status: "restored", artifactId: "99", transcript: "historical instructions" } },
+      { type: "durable.session", data: { ...metadata, status: "resumed", sessionId: "native-id" } },
+      { type: "durable.session", data: { ...metadata, runAttempt: "1", status: "fresh", sessionId: "previous-attempt" } },
+    ]);
+    const output = path.join(root, "usage/aw_session.jsonl");
+    const events = writeUnifiedSession({ rootDir: root, outputPath: output });
+    const durable = events.filter(event => event.type.startsWith("durable."));
+    expect(durable).toHaveLength(2);
+    expect(durable[1].data).toMatchObject({ status: "resumed", parentRunId: "122", sessionId: "native-id" });
+    expect(durable[0].provenance).toMatchObject({ component: "durable", phase: "agent", path: "agent/durable-session.jsonl" });
+    const content = fs.readFileSync(output, "utf8");
+    expect(content).not.toContain("historical instructions");
+    expect(validateSession(content)).toBe(events.length);
+  });
+
+  it("reports malformed durable evidence instead of synthesizing a resumed session", () => {
+    write("usage/agent/durable-session.jsonl", [{ type: "durable.session", data: { status: "resumed", engine: "codex" } }]);
+    const { events } = collectUnifiedSession({ rootDir: root, warn() {} });
+    expect(events.some(event => event.type === "durable.session")).toBe(false);
+    expect(events).toContainEqual(expect.objectContaining({ type: "session.collection_warning", data: expect.objectContaining({ code: "invalid_durable_session" }) }));
+  });
+
   it("records the selected PR revision in the unified session", () => {
     const selectedSha = "ABCDEF0123456789ABCDEF0123456789ABCDEF01";
     const outputPath = path.join(root, "usage/aw_session.jsonl");
