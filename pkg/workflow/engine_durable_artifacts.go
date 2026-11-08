@@ -3,7 +3,6 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
-	"path"
 	"strconv"
 	"strings"
 )
@@ -69,7 +68,6 @@ func (c *Compiler) generateDurableArtifactUpload(yaml *strings.Builder, data *Wo
 	yaml.WriteString("        if: " + condition + "\n")
 	yaml.WriteString("        uses: " + c.getActionPin("actions/github-script") + "\n")
 	yaml.WriteString("        env:\n")
-	yaml.WriteString("          GH_AW_DURABLE_CHECKPOINT: " + strconv.Quote(path.Join(durableStateDirectory, durableCheckpointName(data))) + "\n")
 	yaml.WriteString("          GH_AW_DURABLE_ENGINE: " + strconv.Quote(data.EngineConfig.ID) + "\n")
 	files, err := json.Marshal(data.durableExecutionPlan.Files)
 	if err != nil {
@@ -78,10 +76,6 @@ func (c *Compiler) generateDurableArtifactUpload(yaml *strings.Builder, data *Wo
 	yaml.WriteString("          GH_AW_DURABLE_FILES: " + strconv.Quote(string(files)) + "\n")
 	yaml.WriteString("        with:\n")
 	yaml.WriteString("          script: |\n")
-	yaml.WriteString("            const { validateCheckpoint } = require('${{ runner.temp }}/gh-aw/actions/durable_artifact.cjs');\n")
-	yaml.WriteString("            const { exportDurableTelemetry } = require('${{ runner.temp }}/gh-aw/actions/pi_durable_telemetry.cjs');\n")
-	yaml.WriteString("            await exportDurableTelemetry();\n")
-	yaml.WriteString("            if (process.env.GH_AW_DURABLE_ENGINE === 'pi') validateCheckpoint({ core });\n")
 	yaml.WriteString("            const { validateFiles } = require('${{ runner.temp }}/gh-aw/actions/durable_files.cjs');\n")
 	yaml.WriteString("            validateFiles({ core });\n")
 	yaml.WriteString("      - name: Upload durable checkpoint artifact\n")

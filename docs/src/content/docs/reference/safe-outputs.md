@@ -1877,6 +1877,8 @@ Without a more specific runtime failure, the failure classification is `missing_
 
 Explicit `report_incomplete` signals also include registration, call-count, and persistence evidence, even alongside ordinary safe outputs. They are not reclassified as missing terminal output. Failure issues, follow-up comments, and run summaries can include a bounded, secret-redacted agent-declared reason labeled unverified; summaries are also written when failure-issue reporting is disabled. A reason matching a trusted collector cause is presented only as runtime-derived classification. Agent tool names, commands, arguments, results, schemas, and diagnostic/error text remain excluded, even when they contain no recognized secrets. Reasons are omitted from summaries when secret redaction fails. Missing evidence is reported as unknown or not recorded, and malformed call logs are marked as partial evidence.
 
+Within the failure-report reuse window, incomplete runs reuse an open, unexpired issue for the same workflow and classified runtime cause. Without a classified cause, matching uses the failure categories but ignores supplemental `missing_tool` and `missing_data` categories when `report_incomplete` is present. Other failure categories remain distinct. Each follow-up retains its own reported reason and diagnostics; the full category set still applies to reporting filters.
+
 **Use case: Suppress transient infrastructure failures**
 
 For scheduled workflows that frequently encounter transient infrastructure failures (Docker registry timeouts, AI server 5xx errors, firewall issues), you can either:

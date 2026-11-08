@@ -10,31 +10,34 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCompilePiDurableRequiresEffectiveFirewall(t *testing.T) {
+func TestCompilePiDurableNativeModes(t *testing.T) {
 	for _, test := range []struct {
 		name   string
 		config string
-		want   string
 	}{
-		{"disabled agent in strict mode", "sandbox:\n  agent: false\n", "strict mode: 'sandbox.agent: false' is not allowed"},
-		{"disabled agent", "strict: false\nsandbox:\n  agent: false\n", "pi durable requires the credential-isolated model gateway"},
-		{"disabled network firewall", "network:\n  firewall: false\n", "Unknown property: firewall"},
-		{"disabled firewall with enabled sandbox", "network:\n  firewall: false\nsandbox:\n  agent:\n    runtime: docker\n", "Unknown property: firewall"},
+		{"CLI", ""},
+		{"SDK", "  driver: pi_agent_core_driver.cjs\n"},
+		{"RPC", "  driver: pi_rpc_driver.cjs\n"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			dir := t.TempDir()
-			source := filepath.Join(dir, "durable-invalid.md")
-			markdown := "---\non: workflow_dispatch\nengine:\n  pi:\n    durable: {}\n" + test.config + "---\nContinue the pending task.\n"
+			source := filepath.Join(dir, "durable.md")
+			markdown := "---\non: workflow_dispatch\nengine:\n  id: pi\n  durable: {}\n" + test.config + "---\nContinue the workflow task.\n"
 			require.NoError(t, os.WriteFile(source, []byte(markdown), 0o600))
-			err := NewCompiler(WithVersion("dev")).CompileWorkflow(source)
-			require.ErrorContains(t, err, test.want)
-			_, err = os.Stat(filepath.Join(dir, "durable-invalid.lock.yml"))
-			require.ErrorIs(t, err, os.ErrNotExist)
+			require.NoError(t, NewCompiler(WithVersion("dev")).CompileWorkflow(source))
+			lock, err := os.ReadFile(filepath.Join(dir, "durable.lock.yml"))
+			require.NoError(t, err)
+			require.Contains(t, string(lock), "/tmp/gh-aw/agent/durable-sessions/pi/session.jsonl")
+			require.Contains(t, string(lock), `GH_AW_PI_SUBAGENT_ARGS: '["--print","--mode","json","--no-session","--no-approve"]'`)
+			require.NotContains(t, string(lock), "pi_durable_")
+			if test.config != "" {
+				require.Contains(t, string(lock), test.config[len("  driver: "):len(test.config)-1])
+			}
 		})
 	}
 }
 
-func TestPiDurablePlanRejectsDisabledEffectiveFirewall(t *testing.T) {
+func TestPiDurablePlanUsesNativeSessionsWithoutExtraDependencies(t *testing.T) {
 	for _, sandbox := range []*SandboxConfig{
 		nil,
 		{Agent: &AgentSandboxConfig{Type: SandboxTypeAWF, Runtime: AgentRuntimeDocker}},
@@ -48,10 +51,22 @@ func TestPiDurablePlanRejectsDisabledEffectiveFirewall(t *testing.T) {
 		require.False(t, isFirewallDisabledBySandboxAgent(data))
 		require.False(t, isFirewallEnabled(data))
 		plan, err := NewPiEngine().GetDurableExecutionPlan(data, "")
-		require.Nil(t, plan)
-		require.ErrorContains(t, err, "pi durable requires the credential-isolated model gateway")
-		require.ErrorContains(t, err, "remove network.firewall: false")
+		require.NoError(t, err)
+		require.Equal(t, []string{"/tmp/gh-aw/agent/durable-sessions/pi/session.jsonl"}, plan.Files)
+		require.Empty(t, plan.InstallationSteps)
+		data.EngineConfig.Extensions = []string{"npm:@example/workflow"}
+		data.EngineConfig.Args = []string{"--thinking", "high"}
+		plan, err = NewPiEngine().GetDurableExecutionPlan(data, "")
+		require.NoError(t, err)
+		require.Empty(t, plan.InstallationSteps)
+		require.Contains(t, durableStepsText(plan.ExecutionSteps), "--thinking high")
 	}
+}
+
+func TestPiDurableRejectsConflictingNativeSessionSelection(t *testing.T) {
+	data := &WorkflowData{EngineConfig: &EngineConfig{ID: "pi", Durable: &DurableConfig{RetentionDays: 7}, Config: `{"session":{"enabled":true}}`}}
+	_, err := NewPiEngine().GetDurableExecutionPlan(data, "")
+	require.ErrorContains(t, err, "remove engine.config.session")
 }
 
 func TestCompilePiDurableSandboxRuntimes(t *testing.T) {
@@ -80,8 +95,9 @@ func TestCompilePiDurableSandboxRuntimes(t *testing.T) {
 			lock, err := os.ReadFile(filepath.Join(dir, "durable.lock.yml"))
 			require.NoError(t, err)
 			require.Contains(t, string(lock), "pi_models_json.cjs")
-			require.Contains(t, string(lock), "GH_AW_PI_DURABLE_PACKAGE_ROOT: /tmp/gh-aw/pi-durable-runtime/node_modules")
-			require.Contains(t, string(lock), "npm install --prefix /tmp/gh-aw/pi-durable-runtime")
+			require.Contains(t, string(lock), "/tmp/gh-aw/agent/durable-sessions/pi/session.jsonl")
+			require.NotContains(t, string(lock), "GH_AW_PI_DURABLE")
+			require.NotContains(t, string(lock), "Install Pi durable")
 		})
 	}
 }
