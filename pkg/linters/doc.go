@@ -1,6 +1,6 @@
 // Package linters is a namespace for gh-aw's custom Go analysis linters.
 //
-// All 90 active analyzers:
+// All 91 active analyzers:
 //
 //   - appendbytestring — flags append(b, []byte(s)...) calls where s is a string that can be simplified to append(b, s...)
 //   - appendoneelement — flags append(s, []T{x}...) calls where a single-element slice literal is spread and can be simplified to append(s, x)
@@ -89,6 +89,7 @@
 //   - uncheckedtypeassertion — flags unchecked single-value type assertions
 //   - uncheckedflushreturn — flags Flush() method calls where the error return is discarded
 //   - walkdirignoredeerror — flags filepath.Walk/WalkDir calls where the error return is discarded
+//   - filepathwalkpreferwalkdir — flags filepath.Walk calls and recommends filepath.WalkDir
 //   - walkfuncerrshadow — flags filepath.Walk/WalkDir callbacks whose err parameter shadows an outer err variable assigned from the walk call
 //   - wgdonenotdeferred — flags non-deferred sync.WaitGroup.Done() calls
 //   - writebytestring — flags w.Write([]byte(s)) calls where s is a string that can be replaced with io.WriteString(w, s)

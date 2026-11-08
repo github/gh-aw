@@ -31,6 +31,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/excessivefuncparams"
 	"github.com/github/gh-aw/pkg/linters/execcommandwithoutcontext"
 	"github.com/github/gh-aw/pkg/linters/fileclosenotdeferred"
+	filepathwalkpreferwalkdir "github.com/github/gh-aw/pkg/linters/filepath-walk-prefer-walkdir"
 	"github.com/github/gh-aw/pkg/linters/fmterrorfnoverbs"
 	"github.com/github/gh-aw/pkg/linters/formatintitoa"
 	"github.com/github/gh-aw/pkg/linters/fprintferrorunchecked"
@@ -129,7 +130,7 @@ type docAnalyzer struct {
 //	readerstringconv, reflectdeepequalusage, regexpcompileinfunction, regexpdynamicpattern, seenmapbool, slicemakezerolength, sortslice, splitindexzero, splitlines-on-newline, sprintferrdot, sprintferrorsnew, sprintfbool, sprintfint, ssljson,
 //	strconvparseignorederror, stringbytesroundtrip, stringreplaceminusone, stringsconcatloop, stringscountcontains, stringsindexcontains, stringsindexhasprefix, stringsjoinone, stringssplitfirst,
 //	timeafterleak, timesleepnocontext, timenowsub,
-//	tolowerequalfold, trimleftright, typeassertionnil, typeassertionokdiscarded, unchecked_deferredclose, uncheckedflushreturn, uncheckedsliceindex, uncheckedtypeassertion, walkdirignoredeerror, walkfuncerrshadow, wgdonenotdeferred, writebytestring
+//	tolowerequalfold, trimleftright, typeassertionnil, typeassertionokdiscarded, unchecked_deferredclose, uncheckedflushreturn, uncheckedsliceindex, uncheckedtypeassertion, walkdirignoredeerror, filepathwalkpreferwalkdir, walkfuncerrshadow, wgdonenotdeferred, writebytestring
 func documentedAnalyzers() []docAnalyzer {
 	return []docAnalyzer{
 		{"appendbytestring", appendbytestring.Analyzer},
@@ -219,6 +220,7 @@ func documentedAnalyzers() []docAnalyzer {
 		{"uncheckedtypeassertion", uncheckedtypeassertion.Analyzer},
 		{"uncheckedflushreturn", uncheckedflushreturn.Analyzer},
 		{"walkdirignoredeerror", walkdirignoredeerror.Analyzer},
+		{"filepathwalkpreferwalkdir", filepathwalkpreferwalkdir.Analyzer},
 		{"walkfuncerrshadow", walkfuncerrshadow.Analyzer},
 		{"wgdonenotdeferred", wgdonenotdeferred.Analyzer},
 		{"writebytestring", writebytestring.Analyzer},

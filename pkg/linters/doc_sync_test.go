@@ -32,6 +32,7 @@ var notYetEnforced = map[string]string{
 	"errorfwrapv":                 "requires an enforcement audit after the recent false-positive fix (#51928)",
 	"errormessage":                "dedicated lint-error-messages CI job is intentionally advisory (continue-on-error per #54800)",
 	"excessivefuncparams":         "existing production violations need remediation before enforcement; nolint suppression already works",
+	"filepathwalkpreferwalkdir":   "new analyzer; existing filepath.Walk call sites need remediation before CI enforcement",
 	"formatintitoa":               "existing FormatInt conversions need remediation before CI enforcement",
 	"fprintferrorunchecked":       "existing production violations need remediation before enforcement; nolint suppression already works",
 	"goroutineresourceleak":       "requires an enforcement-readiness audit before native and WebAssembly CI enable it",

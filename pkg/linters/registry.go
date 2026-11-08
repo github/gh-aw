@@ -23,6 +23,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/excessivefuncparams"
 	"github.com/github/gh-aw/pkg/linters/execcommandwithoutcontext"
 	"github.com/github/gh-aw/pkg/linters/fileclosenotdeferred"
+	filepathwalkpreferwalkdir "github.com/github/gh-aw/pkg/linters/filepath-walk-prefer-walkdir"
 	"github.com/github/gh-aw/pkg/linters/fmterrorfnoverbs"
 	"github.com/github/gh-aw/pkg/linters/formatintitoa"
 	"github.com/github/gh-aw/pkg/linters/fprintferrorunchecked"
@@ -192,6 +193,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	uncheckedtypeassertion.Analyzer,
 	uncheckedflushreturn.Analyzer,
 	walkdirignoredeerror.Analyzer,
+	filepathwalkpreferwalkdir.Analyzer,
 	walkfuncerrshadow.Analyzer,
 	wgdonenotdeferred.Analyzer,
 	writebytestring.Analyzer,
