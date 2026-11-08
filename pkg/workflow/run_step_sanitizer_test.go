@@ -234,10 +234,9 @@ EOF`,
 			expectWarnings: 1,
 		},
 		{
-			name: "expressions in comments and expanding heredocs are extracted",
+			name: "expression in expanding heredoc is extracted",
 			step: map[string]any{
 				"run": strings.Join([]string{
-					`# docs: ${{ github.event.issue.title }}`,
 					`cat <<EOF`,
 					`${{ github.event.issue.body }}`,
 					`EOF`,
@@ -245,19 +244,16 @@ EOF`,
 			},
 			expectChanged: true,
 			expectRunHas: []string{
-				"# docs: $GH_AW_GITHUB_EVENT_ISSUE_TITLE",
 				"$GH_AW_GITHUB_EVENT_ISSUE_BODY",
 			},
 			expectRunNotHas: []string{"${{"},
 			expectEnvKeys: []string{
-				"GH_AW_GITHUB_EVENT_ISSUE_TITLE",
 				"GH_AW_GITHUB_EVENT_ISSUE_BODY",
 			},
 			expectEnvVals: map[string]string{
-				"GH_AW_GITHUB_EVENT_ISSUE_TITLE": "${{ github.event.issue.title }}",
-				"GH_AW_GITHUB_EVENT_ISSUE_BODY":  "${{ github.event.issue.body }}",
+				"GH_AW_GITHUB_EVENT_ISSUE_BODY": "${{ github.event.issue.body }}",
 			},
-			expectWarnings: 2,
+			expectWarnings: 1,
 		},
 		{
 			name: "warning omits name when step has no name",

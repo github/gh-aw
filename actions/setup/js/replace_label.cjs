@@ -60,7 +60,16 @@ const SET_LABELS_RETRY_CONFIG = {
 function validateSingleLabel(labelName, allowedPatterns, blockedPatterns, fieldName) {
   const normalizedLabelName = hardenUnicodeText(labelName);
   if (blockedPatterns.length > 0) {
-    const isBlocked = blockedPatterns.some(pattern => matchesSimpleGlob(normalizedLabelName, hardenUnicodeText(pattern)));
+    const isBlocked = blockedPatterns.some(pattern => {
+      if (matchesSimpleGlob(labelName, pattern)) return true;
+      // Only asterisks present in the original pattern are glob operators.
+      const normalizedPattern = pattern
+        .split("*")
+        .map(part => hardenUnicodeText(part).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+        .join(".*");
+      // eslint-disable-next-line gh-aw-custom/require-escaped-regexp-interpolation -- literal fragments are escaped before joining the original wildcard operators
+      return !!normalizedLabelName && !!normalizedPattern && new RegExp(`^${normalizedPattern}$`, "i").test(normalizedLabelName);
+    });
     if (isBlocked) {
       return { valid: false, error: `${fieldName} "${labelName}" matches a blocked pattern` };
     }
