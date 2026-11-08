@@ -37,6 +37,7 @@ var notYetEnforced = map[string]string{
 	"fprintferrorunchecked":       "existing production violations need remediation before enforcement; nolint suppression already works",
 	"goroutineresourceleak":       "requires an enforcement-readiness audit before native and WebAssembly CI enable it",
 	"hardcodedfilepath":           "requires an enforcement audit after the same-package constant fix (#52428)",
+	"jsonunmarshalbytesconversion": "existing production conversions need review before CI enforcement",
 	"largefunc":                   "existing production violations need remediation before enforcement; nolint suppression already works",
 	"lenstringzero":               "requires an enforcement audit after the diagnostic-message fix (#54717)",
 	"manualpathconcat":            "existing production violations need remediation",

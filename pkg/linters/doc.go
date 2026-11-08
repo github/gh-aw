@@ -37,6 +37,7 @@
 //   - httpstatuscode — flags HTTP status code anti-patterns
 //   - ioutildeprecated — reports uses of deprecated io/ioutil functions that should be replaced with io or os package equivalents
 //   - jsonmarshalignoredeerror — flags json.Marshal/Unmarshal calls where the error is discarded with _
+//   - jsonunmarshalbytesconversion — reports json.Unmarshal calls that convert a string to []byte
 //   - largefunc — flags function bodies that exceed a configurable line-count threshold
 //   - lenstringsplit — flags len(strings.Split(s, sep)) with a non-empty separator that should use strings.Count(s, sep)+1
 //   - lenstringzero — flags len(s) == 0 / len(s) != 0 on string values that should use s == "" / s != ""
