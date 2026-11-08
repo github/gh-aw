@@ -54,6 +54,6 @@ func run(pass *analysis.Pass) (any, error) {
 			!coverage.ShouldApply(pass, call.Pos(), *hotThreshold) {
 			return
 		}
-		pass.ReportRangef(call, "json.Unmarshal([]byte(s), ...) copies the string; use json.NewDecoder(strings.NewReader(s)).Decode(...) to avoid the conversion copy")
+		pass.ReportRangef(call, "json.Unmarshal([]byte(s), ...) copies the string; use json.NewDecoder(strings.NewReader(s)) for streams, or follow Decode with a second Decode that returns io.EOF to preserve Unmarshal's whole-document validation")
 	})
 }

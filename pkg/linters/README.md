@@ -42,7 +42,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `httpstatuscode` — reports raw HTTP status-code integer literals that should use `net/http` named constants.
 - `ioutildeprecated` — reports uses of deprecated `io/ioutil` functions (deprecated since Go 1.16) and suggests their replacements in the `io` and `os` packages.
 - `jsonmarshalignoredeerror` — reports `json.Marshal` and `json.Unmarshal` calls where the error return is discarded.
-- `jsonunmarshalbytesconversion` — reports `json.Unmarshal([]byte(s), ...)` calls where `s` is a string; use `json.NewDecoder(strings.NewReader(s)).Decode(...)` to avoid the conversion copy.
+- `jsonunmarshalbytesconversion` — reports `json.Unmarshal([]byte(s), ...)` calls where `s` is a string; use a decoder for streams, or require a second `Decode` to return `io.EOF` to preserve whole-document validation.
 - `largefunc` — reports function bodies that exceed a configurable line-count threshold.
 - `lenstringsplit` — reports `len(strings.Split(s, sep))` expressions with a non-empty separator that should use `strings.Count(s, sep)+1` to avoid an intermediate slice allocation.
 - `lenstringzero` — reports `len(s) == 0` / `len(s) != 0` comparisons on string values that should use `s == ""` / `s != ""`.
@@ -214,7 +214,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `httpstatuscode` | Custom `go/analysis` analyzer that flags raw HTTP status-code integer literals that should use `net/http` named constants |
 | `ioutildeprecated` | Custom `go/analysis` analyzer that flags deprecated `io/ioutil` function calls (deprecated since Go 1.16) and suggests replacements in the `io` and `os` packages |
 | `jsonmarshalignoredeerror` | Custom `go/analysis` analyzer that flags `json.Marshal`/`json.Unmarshal` calls where the error return is discarded |
-| `jsonunmarshalbytesconversion` | Custom `go/analysis` analyzer that flags `json.Unmarshal([]byte(s), ...)` calls where `s` is a string and recommends streaming from `strings.NewReader(s)` |
+| `jsonunmarshalbytesconversion` | Custom `go/analysis` analyzer that flags `json.Unmarshal([]byte(s), ...)` calls where `s` is a string and recommends `strings.NewReader(s)` for streams or requiring a second `Decode` to return `io.EOF` for whole-document validation |
 | `largefunc` | Custom `go/analysis` analyzer that flags large functions with actionable diagnostics |
 | `lenstringsplit` | Custom `go/analysis` analyzer that flags `len(strings.Split(s, sep))` with a non-empty separator that should use `strings.Count(s, sep)+1` |
 | `lenstringzero` | Custom `go/analysis` analyzer that flags `len(s) == 0` / `len(s) != 0` on string values that should use `s == ""` / `s != ""` |

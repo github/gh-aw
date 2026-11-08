@@ -8,7 +8,7 @@ import (
 type namedString string
 
 func BadString(data string, target any) error {
-	return json.Unmarshal([]byte(data), target) // want `json.Unmarshal\(\[\]byte\(s\), \.\.\.\) copies the string`
+	return json.Unmarshal([]byte(data), target) // want `json.Unmarshal\(\[\]byte\(s\), \.\.\.\) copies the string; .*second Decode that returns io\.EOF`
 }
 
 func BadParenthesized(data string, target any) error {
