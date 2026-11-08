@@ -3448,9 +3448,9 @@ engine:
     azure-cloud: "example-value"
 
     # Optional WIF provider discriminator. Recognized values are 'azure', 'anthropic',
-    # and 'gcp'.
+    # 'gcp', and 'openai'.
     # (optional)
-    provider: "example-value"
+    provider: "azure"
 
     # Anthropic WIF federation rule ID (e.g., fdrl_...).
     # (optional)
@@ -3460,7 +3460,8 @@ engine:
     # (optional)
     organization-id: "example-value"
 
-    # Anthropic WIF service account ID (e.g., svac_...).
+    # Provider service account ID (Anthropic e.g., svac_...; OpenAI as configured in
+    # the OpenAI admin console).
     # (optional)
     service-account-id: "example-value"
 
@@ -3486,6 +3487,10 @@ engine:
     # us-central1 when omitted.
     # (optional)
     location: "example-value"
+
+    # OpenAI Workload Identity Provider ID configured in the OpenAI admin console.
+    # (optional)
+    identity-provider-id: "example-value"
 
   # Additional engine configuration text. Codex accepts TOML structurally merged
   # into config.toml. Pi accepts a JSON object with settings, model metadata

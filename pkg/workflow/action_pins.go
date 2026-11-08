@@ -514,15 +514,15 @@ func warnIfOutdatedActionVersion(actionRepo, rawVersion, latestVersion string, d
 // If the step doesn't use an action or the action is not pinned, returns the original step.
 // Returns an error if the step uses an unversioned action reference with no available pin,
 // because emitting such a reference would produce invalid GitHub Actions workflow syntax.
-// Local action refs (./...) and Docker image refs (docker://...) are always passed through as-is.
+// Local (./...), self-repository ($/...), and Docker image (docker://...) refs are passed through as-is.
 func applyActionPinToTypedStep(step *WorkflowStep, data *WorkflowData) (*WorkflowStep, error) {
 	if step == nil || !step.IsUsesStep() {
 		return step, nil
 	}
 
-	// Local action references (./...) and Docker image references (docker://...)
+	// Local (./...), self-repository ($/...), and Docker image (docker://...) references
 	// are valid GitHub Actions syntax that cannot and should not be pinned — emit as-is.
-	if strings.HasPrefix(step.Uses, "./") || strings.HasPrefix(step.Uses, "docker://") {
+	if strings.HasPrefix(step.Uses, "./") || strings.HasPrefix(step.Uses, "$/") || strings.HasPrefix(step.Uses, "docker://") {
 		return step, nil
 	}
 

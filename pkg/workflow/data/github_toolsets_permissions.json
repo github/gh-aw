@@ -1,6 +1,6 @@
 {
-  "version": "2.6",
-  "description": "GitHub MCP server toolsets and their required permissions (synced to github/github-mcp-server main: restored semantic search, advisory, and secret scanning tools; search tools remain redistributed to repos/orgs/users/issues; experiments toolset removed; list_org_repository_security_advisories moved orgs->security_advisories; get_label dual-registered in issues; create_pull_request_with_copilot added; find_duplicate added to issues; copilot_issue_intents added; governance and Copilot Automation tools added)",
+  "version": "2.7",
+  "description": "GitHub MCP server toolsets and their required permissions (synced to github/github-mcp-server main: restored semantic search, advisory, and secret scanning tools; search tools remain redistributed to repos/orgs/users/issues; experiments toolset removed; list_org_repository_security_advisories moved orgs->security_advisories; get_label dual-registered in issues; create_pull_request_with_copilot added; find_duplicate added to issues; copilot_issue_intents added; governance, Copilot Automation, and task status tools added)",
   "toolsets": {
     "actions": {
       "description": "GitHub Actions workflows",
@@ -27,14 +27,19 @@
       "tools": ["get_me", "get_team_members", "get_teams"]
     },
     "copilot": {
-      "description": "GitHub Copilot assignment, review, coding agent, and Automation tools",
+      "description": "GitHub Copilot assignment, review, coding agent, Automation, and task status tools; requires issues and pull-requests write permissions",
       "read_permissions": [],
       "write_permissions": ["issues", "pull-requests"],
       "tools": [
         "assign_copilot_to_issue",
         "create_pull_request_with_copilot",
         "get_automation",
+        "get_automation_group",
         "get_automation_revision",
+        "get_automations_configuration_for_repository",
+        "get_copilot_session_events",
+        "get_copilot_task_status",
+        "list_automation_groups",
         "list_automation_revisions",
         "list_automations",
         "list_available_automation_tools",

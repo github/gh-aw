@@ -338,6 +338,9 @@ func TestArtifactExecutionOrderingAndScopes(t *testing.T) {
 		name, source, path string
 	}{
 		{"local action", artifactTrigger + contractJob + artifactDownloadSteps + "      - uses: ./incoming/action\n", "jobs.check.steps[1].uses"},
+		{"self-repository action", artifactTrigger + contractJob + artifactDownloadSteps + "      - uses: $/incoming/action\n", "jobs.check.steps[1].uses"},
+		{"self-repository action outside artifact", artifactTrigger + contractJob + artifactDownloadSteps + "      - uses: $/trusted/action\n", ""},
+		{"current run self-repository action", artifactTrigger + contractJob + "    steps:\n      - uses: actions/download-artifact@v4\n        with: {path: incoming}\n      - uses: $/incoming/action\n", ""},
 		{"earlier execution", artifactTrigger + contractJob + "    steps:\n      - run: bash incoming/run.sh\n      - uses: actions/download-artifact@v4\n        with: {github-token: '${{ github.token }}', run-id: 123, path: incoming}\n", ""},
 		{"other job", artifactTrigger + contractJob + artifactDownloadSteps + "  other:\n    runs-on: ubuntu-latest\n    steps: [{run: bash incoming/run.sh}]\n", ""},
 		{"current run execution", artifactTrigger + contractJob + "    steps:\n      - uses: actions/download-artifact@v4\n        with: {path: incoming}\n      - run: bash incoming/run.sh\n", ""},
