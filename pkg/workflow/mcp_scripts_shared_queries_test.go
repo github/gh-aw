@@ -76,7 +76,7 @@ func TestSharedGitHubQueryRepositoryBindings(t *testing.T) {
 	}
 }
 
-// Execute repository selection only, before any API calls or scratch-file writes.
+// Execute repository selection only, before any API calls or pagination.
 func TestSharedGitHubQueryRepositoryDefaults(t *testing.T) {
 	config := loadSharedMCPScripts(t, "github-queries-mcp-script.md")
 	for _, name := range []string{"github-issue-query", "github-pr-query", "github-discussion-query"} {
