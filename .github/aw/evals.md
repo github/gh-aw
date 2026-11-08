@@ -80,7 +80,9 @@ evals:
 - `runs-on:` — optional runner override.
 
 Copilot requests use `COPILOT_GITHUB_TOKEN` or the workflow's
-`copilot-requests: write` permission. OpenAI requests use `CODEX_API_KEY` or
+`copilot-requests: write` permission and send
+`Copilot-Integration-Id: agentic-workflows`, matching the firewall's default
+integration identity. OpenAI requests omit that header and use `CODEX_API_KEY` or
 `OPENAI_API_KEY`. Per-question model overrides are not supported because the
 entire batch shares one request.
 
