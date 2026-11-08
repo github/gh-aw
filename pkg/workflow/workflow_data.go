@@ -215,7 +215,7 @@ type WorkflowData struct {
 	ReportBlockedVersionDisabled   bool                            // true when on.report-blocked-version: false is set in frontmatter (disables the blocked-version notification issue in activation, independent of check-for-updates and safe-outputs.report-failure-as-issue)
 	EngineConfigSteps              []map[string]any                // steps returned by engine.RenderConfig — prepended before execution steps
 	ServicePortExpressions         string                          // comma-separated ${{ job.services['<id>'].ports['<port>'] }} expressions for AWF --allow-host-service-ports
-	RunInstallScripts              bool                            // true when runtimes.node.run-install-scripts: true is set (main workflow and/or imports); disables --ignore-scripts on generated npm install steps
+	RunInstallScripts              bool                            // true when runtimes.node.run-install-scripts: true is set (main workflow and/or imports); omits script suppression on generated Node.js runtime and engine npm install steps
 	CachedPermissions              *Permissions                    // cached parsed Permissions object (for performance optimization); populated by applyDefaults after all permission mutations
 	CachedPermissionScopeNamesErr  error                           // cached result of ValidatePermissionScopeNames(Permissions); nil = valid; populated by applyDefaults
 	CachedPermissionScopeNamesSet  bool                            // true once CachedPermissionScopeNamesErr has been populated; distinguishes "valid (nil)" from "not yet computed"
