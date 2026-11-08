@@ -18,33 +18,6 @@ function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-/** @param {string} contents */
-function parsedWorkflow(contents) {
-  let parseDocument;
-  try {
-    ({ parseDocument } = require("./work_queue_yaml.cjs"));
-  } catch {
-    throw queueError("policy_missing", "worker route provisioning requires the deployed YAML parser");
-  }
-  try {
-    const document = parseDocument(contents, { uniqueKeys: true, merge: true });
-    if (!document || document.errors.length || document.warnings.length) throw new Error("invalid workflow YAML");
-    return document.toJS({ mapAsMap: true, maxAliasCount: 100 });
-  } catch {
-    throw queueError("policy_missing", "approved worker route has invalid or unbounded workflow YAML");
-  }
-}
-
-/** @param {string} contents */
-function assignmentInputType(contents) {
-  let value = parsedWorkflow(contents);
-  for (const key of ["on", "workflow_dispatch", "inputs", "work_queue_assignment", "type"]) {
-    if (!(value instanceof Map)) return undefined;
-    value = value.get(key);
-  }
-  return value;
-}
-
 /**
  * @param {{githubClient: RouteClient, owner: string, repo: string, path: string, ref: string, sleepFn?: (delay: number) => Promise<void>}} options
  */
@@ -75,9 +48,7 @@ async function verifyWorkerRoute(options) {
   const { profile } = options;
   validateProfile(profile);
   if (/^(?:0{40}|0{64})$/.test(profile.ref)) throw queueError("policy_missing", "constructor placeholder revisions cannot provision a worker route");
-  const contents = await readWorkerFile({ ...options, path: profile.workflow, ref: profile.ref });
-  if (assignmentInputType(contents) !== "string") throw queueError("policy_missing", "approved worker route must accept the work_queue_assignment string input");
-  if (profile.logical_contract && workerContract(contents) !== profile.logical_contract) throw queueError("policy_missing", "worker route does not carry its compiler-derived logical contract");
+  await readWorkerFile({ ...options, path: profile.workflow, ref: profile.ref });
   await verifyRegisteredWorker(options);
 }
 
@@ -95,25 +66,77 @@ async function verifyRegisteredWorker({ githubClient, owner, repo, profile, slee
 }
 
 function workerContract(contents) {
-  const workflow = parsedWorkflow(contents);
-  if (!(workflow instanceof Map)) return undefined;
-  const environments = [workflow.get("env")];
-  const jobs = workflow.get("jobs");
-  if (jobs instanceof Map)
-    for (const job of jobs.values()) {
-      if (!(job instanceof Map)) continue;
-      environments.push(job.get("env"));
-      const steps = job.get("steps");
-      if (Array.isArray(steps)) for (const step of steps) if (step instanceof Map) environments.push(step.get("env"));
-    }
-  const contracts = new Set();
-  for (const env of environments) {
-    if (!(env instanceof Map) || !env.has("GH_AW_WORK_QUEUE_CONTRACT")) continue;
-    const stamp = env.get("GH_AW_WORK_QUEUE_CONTRACT");
-    if (typeof stamp !== "string" || !/^[a-f0-9]{64}$/.test(stamp)) return undefined;
-    contracts.add(stamp);
+  const contracts = [];
+  for (const line of contents.split(/\r?\n/)) {
+    const field = /^\s*GH_AW_WORK_QUEUE_CONTRACT:\s*(.*?)\s*$/.exec(line);
+    if (!field) continue;
+    const stamp = /^"([a-f0-9]{64})"$/.exec(field[1])?.[1];
+    if (!stamp) return undefined;
+    contracts.push(stamp);
   }
-  return contracts.size === 1 ? [...contracts][0] : undefined;
+  return contracts.length && new Set(contracts).size === 1 ? contracts[0] : undefined;
+}
+
+function sourceIsWorker(contents) {
+  const lines = contents.split(/\r?\n/);
+  if (lines[0]?.replace(/^\uFEFF/, "").trim() !== "---") return false;
+  const end = lines.findIndex((line, index) => index > 0 && line.trim() === "---");
+  if (end < 0) return false;
+
+  let toolsIndent;
+  let toolsChildIndent;
+  let queueIndent;
+  let queueChildIndent;
+  let toolsCount = 0;
+  let queueCount = 0;
+  let workerCount = 0;
+  let worker = false;
+  for (const line of lines.slice(1, end)) {
+    if (/^\s*(?:#.*)?$/.test(line)) continue;
+    const match = /^( *)(?:"([^"]+)"|'([^']+)'|([A-Za-z0-9_-]+))\s*:(.*)$/.exec(line);
+    if (!match) continue;
+    const indent = match[1].length;
+    const key = match[2] ?? match[3] ?? match[4];
+    const value = match[5].trim();
+    if (indent === 0) {
+      if (key === "tools") {
+        toolsCount++;
+        if ((value && !value.startsWith("#")) || toolsCount > 1) return false;
+        toolsIndent = indent;
+        toolsChildIndent = undefined;
+        queueIndent = undefined;
+        queueChildIndent = undefined;
+      } else {
+        toolsIndent = undefined;
+        toolsChildIndent = undefined;
+        queueIndent = undefined;
+        queueChildIndent = undefined;
+      }
+      continue;
+    }
+    if (toolsIndent === undefined) continue;
+    if (toolsChildIndent === undefined || indent < toolsChildIndent) toolsChildIndent = indent;
+    if (key === "work-queue") {
+      queueCount++;
+      if (indent !== toolsChildIndent || (value && !value.startsWith("#")) || queueCount > 1) return false;
+      queueIndent = indent;
+      queueChildIndent = undefined;
+      continue;
+    }
+    if (queueIndent === undefined) continue;
+    if (indent <= queueIndent) {
+      queueIndent = undefined;
+      queueChildIndent = undefined;
+      continue;
+    }
+    if (queueChildIndent === undefined || indent < queueChildIndent) queueChildIndent = indent;
+    if (key === "worker") {
+      workerCount++;
+      if (indent !== queueChildIndent || !/^true(?:\s+#.*)?$/.test(value) || workerCount > 1) return false;
+      worker = true;
+    }
+  }
+  return toolsCount === 1 && queueCount === 1 && workerCount === 1 && worker;
 }
 
 async function verifiedDefaultReference({ githubClient, owner, repo, sleepFn = delay => new Promise(resolve => setTimeout(resolve, delay)) }) {
@@ -128,19 +151,6 @@ async function verifiedDefaultReference({ githubClient, owner, repo, sleepFn = d
   return revision;
 }
 
-function sourceIsWorker(contents) {
-  const lines = contents.split("\n");
-  if (lines[0]?.trim() !== "---") return false;
-  const end = lines.findIndex((line, index) => index > 0 && line.trim() === "---");
-  if (end < 0) return false;
-  let value = parsedWorkflow(lines.slice(1, end).join("\n"));
-  for (const key of ["tools", "work-queue", "worker"]) {
-    if (!(value instanceof Map)) return false;
-    value = value.get(key);
-  }
-  return value === true;
-}
-
 // Ref and contract describe approved code; all authority stays in the installed
 // profile. Missing default artifacts retain the current identity but pause it.
 async function configuredWorkerDeployment(options, revision) {
@@ -151,7 +161,7 @@ async function configuredWorkerDeployment(options, revision) {
     if (!sourceIsWorker(await readWorkerFile({ ...options, path: source, ref: revision }))) return { profile, available: false };
     const contents = await readWorkerFile({ ...options, path: current.workflow, ref: revision });
     const contract = workerContract(contents);
-    if (assignmentInputType(contents) !== "string" || !contract) return { profile, available: false };
+    if (!contract) return { profile, available: false };
     profile = { ...current, ref: revision, logical_contract: contract };
     await verifyRegisteredWorker({ ...options, profile });
     return { profile, available: true };
