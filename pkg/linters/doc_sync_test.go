@@ -41,11 +41,13 @@ var notYetEnforced = map[string]string{
 	"manualpathconcat":            "existing production violations need remediation",
 	"osisnotexist":                "existing os error predicates need case-by-case review before CI enforcement",
 	"osopenreadallpreferreadfile": "os.Open/ReadAll simplifications need an enforcement-readiness audit before CI enables it",
+	"osremoveuncheckedcleanup":    "existing cleanup error findings need remediation before CI enforcement",
 	"packagelevelmutableslicemap": "existing production violations need remediation",
 	"readerstringconv":            "existing reader conversions need an enforcement-readiness audit before CI enables it",
 	"reflectdeepequalusage":       "existing reflect.DeepEqual uses need case-by-case review before CI enforcement",
 	"seenmapbool":                 "existing production violations need remediation",
 	"splitindexzero":              "existing production violations need remediation before CI enforcement",
+	"splitlinesonnewline":         "existing production violations need remediation before CI enforcement",
 	"stringssplitfirst":           "existing production violations need remediation before CI enforcement",
 	"sprintferrdot":               "has not yet completed an enforcement-readiness audit",
 	"ssljson":                     "has not yet completed an enforcement-readiness audit",
@@ -287,6 +289,8 @@ func docSlugToAnalyzerName(slug string) string {
 	switch slug {
 	case "panic-in-library-code":
 		return "panicinlibrarycode"
+	case "splitlines-on-newline":
+		return "splitlinesonnewline"
 	default:
 		return slug
 	}

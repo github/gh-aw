@@ -75,11 +75,12 @@ func (c *Compiler) buildDetectionJob(data *WorkflowData) (*Job, error) { //nolin
 
 	// Build job outputs
 	outputs := map[string]string{
-		"detection_success":    "${{ steps.detection_conclusion.outputs.success }}",
-		"detection_conclusion": "${{ steps.detection_conclusion.outputs.conclusion }}",
-		"detection_reason":     "${{ steps.detection_conclusion.outputs.reason }}",
-		"run_detection":        "${{ steps.detection_guard.outputs.run_detection }}",
-		"aic":                  "${{ steps.parse_detection_token_usage.outputs.aic }}",
+		"detection_success":      "${{ steps.detection_conclusion.outputs.success }}",
+		"detection_conclusion":   "${{ steps.detection_conclusion.outputs.conclusion }}",
+		"detection_reason":       "${{ steps.detection_conclusion.outputs.reason }}",
+		"detection_threat_kinds": "${{ steps.detection_conclusion.outputs.threat_kinds }}",
+		"run_detection":          "${{ steps.detection_guard.outputs.run_detection }}",
+		"aic":                    "${{ steps.parse_detection_token_usage.outputs.aic }}",
 	}
 
 	// Detection job depends on agent job and activation job (for trace ID)

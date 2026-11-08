@@ -16,6 +16,9 @@ permissions:
 tracker-id: daily-code-metrics
 engine:
   id: copilot
+  model-routing:
+    goal: cost
+    mode: economy
   copilot-sdk: true
 sandbox:
   agent:

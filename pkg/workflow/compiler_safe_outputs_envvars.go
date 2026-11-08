@@ -164,6 +164,7 @@ func (c *Compiler) addJobLevelSafeOutputConfig(envVars map[string]string, data *
 	if IsDetectionJobEnabled(data.SafeOutputs) {
 		envVars["GH_AW_DETECTION_CONCLUSION"] = fmt.Sprintf("${{ needs.%s.outputs.detection_conclusion }}", constants.DetectionJobName)
 		envVars["GH_AW_DETECTION_REASON"] = fmt.Sprintf("${{ needs.%s.outputs.detection_reason }}", constants.DetectionJobName)
+		envVars["GH_AW_DETECTION_THREAT_KINDS"] = fmt.Sprintf("${{ needs.%s.outputs.detection_threat_kinds }}", constants.DetectionJobName)
 		envVars["GH_AW_RUN_DETECTION"] = fmt.Sprintf("${{ needs.%s.outputs.run_detection }}", constants.DetectionJobName)
 		envVars["GH_AW_THREAT_DETECTION_AIC"] = fmt.Sprintf("${{ needs.%s.outputs.aic }}", constants.DetectionJobName)
 	}

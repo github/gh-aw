@@ -55,6 +55,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `osisnotexist` — reports `os.IsNotExist`, `os.IsExist`, `os.IsPermission`, and `os.IsTimeout`, which do not inspect arbitrary wrapped errors. Immediate checks of fresh, unmodified errors from direct filesystem `os` calls in an adjacent assignment or enclosing `if` initializer are exempt. Use `errors.Is` with `fs.ErrNotExist`, `fs.ErrExist`, or `fs.ErrPermission`. For timeouts, use `errors.As` with `interface{ Timeout() bool }` and check `Timeout()`; `errors.Is(err, os.ErrDeadlineExceeded)` only covers deadline errors, not every timeout.
 - `osexitinlibrary` — reports `os.Exit` calls in library packages (`pkg/*`) where process termination should be delegated to `cmd/*` entry points.
 - `osopenreadallpreferreadfile` — implements the `osopen-readall-prefer-readfile` rule: recommends `os.ReadFile` when a newly declared `os.Open` file is used only by a direct deferred `Close` and one `io.ReadAll` or `ioutil.ReadAll` in the same block. Extra uses, reassignment, nested reads, and write-side opens are excluded. No automatic fix is offered; review open/read error handling when simplifying.
+- `osremoveuncheckedcleanup` — reports `os.Remove` and `os.RemoveAll` calls whose errors are discarded, which can hide cleanup failures.
 - `ossetenvlibrary` — reports `os.Setenv` calls in library packages (`pkg/*`) where side effects should be isolated.
 - `packagelevelmutableslicemap` — reports package-level (file/package-scope) `var` slice/map declarations mutated from inside a function body via `append()` re-assignment, index assignment, or `delete()`. Mutations inside a top-level `init()` are exempt.
 - `panic-in-library-code` — reports `panic()` calls in library packages (`pkg/*`) where errors should be returned instead.
@@ -67,6 +68,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `slicemakezerolength` — reports zero-length slice allocations before known-size range loops that append exactly one element per iteration, where the range length provides a capacity hint.
 - `sortslice` — reports `sort.Slice` / `sort.SliceStable` calls that should use `slices.SortFunc` / `slices.SortStableFunc`.
 - `splitindexzero` — reports `strings.SplitN(s, sep, 2)[0]` calls that allocate a slice to read only the first segment; use `strings.Cut`.
+- `splitlines-on-newline` — reports `strings.Split(s, "\n")` calls that can retain carriage returns on CRLF input or produce a trailing empty element.
 - `sprintferrdot` — reports redundant `.Error()` calls on error values passed to `fmt` format functions where the fmt package calls `.Error()` automatically.
 - `sprintferrorsnew` — reports `errors.New(fmt.Sprintf(...))` calls that should use `fmt.Errorf` instead.
 - `sprintfbool` — reports `fmt.Sprintf("%t", b)` calls where `b` is a single bool value and suggests using `strconv.FormatBool(b)` instead.
@@ -224,6 +226,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `osisnotexist` | Custom `go/analysis` analyzer that flags legacy `os` error predicates and recommends wrapped-error-aware checks |
 | `osopenreadallpreferreadfile` | Custom `go/analysis` analyzer that recommends `os.ReadFile` for an `os.Open` file used only by deferred `Close` and one `ReadAll` |
 | `osexitinlibrary` | Custom `go/analysis` analyzer that flags `os.Exit` usage in library packages |
+| `osremoveuncheckedcleanup` | Custom `go/analysis` analyzer that flags discarded errors from `os.Remove` and `os.RemoveAll` |
 | `ossetenvlibrary` | Custom `go/analysis` analyzer that flags `os.Setenv` usage in library packages |
 | `packagelevelmutableslicemap` | Custom `go/analysis` analyzer that flags package-level slice/map `var` declarations mutated from inside a function body via `append()` re-assignment, index assignment, or `delete()` |
 | `panic-in-library-code` | Custom `go/analysis` analyzer that flags `panic()` usage in library packages |
@@ -236,6 +239,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `slicemakezerolength` | Custom `go/analysis` analyzer that flags zero-length slice allocations before known-size range loops that append one element per iteration |
 | `sortslice` | Custom `go/analysis` analyzer that flags `sort.Slice` / `sort.SliceStable` calls that should use `slices.SortFunc` / `slices.SortStableFunc` |
 | `splitindexzero` | Custom `go/analysis` analyzer that flags `strings.SplitN(s, sep, 2)[0]` calls that allocate a slice to read only the first segment |
+| `splitlines-on-newline` | Custom `go/analysis` analyzer that flags `strings.Split` calls using a newline separator |
 | `sprintferrdot` | Custom `go/analysis` analyzer that flags redundant `.Error()` calls on error values passed to `fmt` format functions |
 | `sprintferrorsnew` | Custom `go/analysis` analyzer that flags `errors.New(fmt.Sprintf(...))` calls that should use `fmt.Errorf` instead |
 | `sprintfbool` | Custom `go/analysis` analyzer that flags `fmt.Sprintf("%t", b)` calls where `b` is a single bool value and suggests using `strconv.FormatBool(b)` instead |
@@ -302,6 +306,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/sortslice"
 	"github.com/github/gh-aw/pkg/linters/sprintfbool"
 	"github.com/github/gh-aw/pkg/linters/sprintfint"
+	"github.com/github/gh-aw/pkg/linters/splitlines-on-newline"
 	"github.com/github/gh-aw/pkg/linters/ssljson"
 	"github.com/github/gh-aw/pkg/linters/stringssplitfirst"
 	"github.com/github/gh-aw/pkg/linters/timesleepnocontext"
@@ -334,6 +339,7 @@ _ = regexpdynamicpattern.Analyzer
 _ = sortslice.Analyzer
 _ = sprintfbool.Analyzer
 _ = sprintfint.Analyzer
+_ = splitlinesonnewline.Analyzer
 _ = ssljson.Analyzer
 _ = stringssplitfirst.Analyzer
 _ = timesleepnocontext.Analyzer
@@ -381,6 +387,7 @@ _ = typeassertionnil.Analyzer
 - `github.com/github/gh-aw/pkg/linters/osgetenvlibrary` — os-getenv-library analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/osisnotexist` — os-error-predicate analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/osopenreadallpreferreadfile` — os.Open/ReadAll simplification analyzer subpackage
+- `github.com/github/gh-aw/pkg/linters/osremoveuncheckedcleanup` — os-remove-unchecked-cleanup analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/osexitinlibrary` — os-exit-in-library analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/ossetenvlibrary` — os-setenv-library analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/packagelevelmutableslicemap` — package-level-mutable-slice-map analyzer subpackage

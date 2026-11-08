@@ -31,7 +31,10 @@ const gitHelpers = require("./git_helpers.cjs");
 const { ensureFullHistoryForBundle, importLocalBundle, offlineGitOptions, linearizeRangeAsCommit, ensureSafeDirectoryTrust } = gitHelpers;
 const { extractPatchBaseCommit } = require("./commit_sha_helpers.cjs");
 const { findRepoCheckout } = require("./find_repo_checkout.cjs");
-const { getThreatWarningPresentation, getEffectiveDetectionConclusion } = require("./threat_detection_warning.cjs");
+const { getEffectiveDetectionConclusion } = require("./threat_detection_warning.cjs");
+const { getDetectionWarningBlocks } = require("./messages_run_status.cjs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 const { attachExecutionState } = require("./safe_output_execution_metadata.cjs");
 const { resolveTransportPaths } = require("./resolve_transport_paths.cjs");
 const { recoverObjectPack, isObjectPack, recoveryToken, traceObjectPack } = require("./object_pack_transport.cjs");
@@ -1597,21 +1600,27 @@ async function main(config = {}) {
           // For fork-backed PRs, use an owner-qualified head reference.
           const reviewHeadRef = pushRemoteUrl ? `${pushRepoParts.owner}:${reviewBranchName}` : reviewBranchName;
           const detectionReasonEnv = process.env.GH_AW_DETECTION_REASON || "unknown";
-          const warning = getThreatWarningPresentation(detectionReasonEnv);
-          const prBody = [
-            `> [!${warning.admonition}]`,
-            `> ${warning.title}`,
-            `> ${warning.summary}`,
-            `> ${warning.marker}`,
-            ">",
-            `> **Reason:** ${detectionReasonEnv}`,
-            ">",
-            `> Review the [workflow run logs](${buildWorkflowRunUrl(context, context.repo)}) for details.`,
-            "",
-            `This PR contains changes that were originally intended for PR #${pullNumber} (\`${branchName}\`).`,
-            "Please review the changes carefully before merging.",
-            ...(compilationNotice ? ["", compilationNotice] : []),
-          ].join("\n");
+          /** @type {import("./report_ast.cjs").ReportBlock[]} */
+          const reviewChildren = [
+            ...getDetectionWarningBlocks({
+              workflowName: process.env.GH_AW_WORKFLOW_NAME || "Workflow",
+              runUrl: buildWorkflowRunUrl(context, context.repo),
+              reason: detectionReasonEnv,
+            }),
+            {
+              type: "paragraph",
+              agentTainted: false,
+              children: [
+                { type: "text", value: "This PR contains changes that were originally intended for PR ", agentTainted: false },
+                { type: "issue_reference", number: String(pullNumber), agentTainted: false },
+                { type: "text", value: " (", agentTainted: false },
+                { type: "code", value: branchName, agentTainted: false },
+                { type: "text", value: "). Please review the changes carefully before merging.", agentTainted: false },
+              ],
+            },
+            ...(compilationNotice ? parseReportMarkdown(compilationNotice, { agentTainted: false }) : []),
+          ];
+          const prBody = renderSizedReport({ type: "report", title: "Changes require review", children: reviewChildren }).body;
 
           transport.assertUnchanged();
           const { data: reviewPR } = await githubClient.rest.pulls.create({

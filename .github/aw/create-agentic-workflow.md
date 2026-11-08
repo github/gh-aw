@@ -21,6 +21,8 @@ Design and create new workflow files under `.github/workflows/` using the instal
 
 Load these topic files only when relevant:
 
+- [memory.md](memory.md#scheduled-dreaming) when later runs need knowledge reuse or reconciliation — even without an explicit memory or dreaming request; owns the deterministic-first decision, cost gate, and input scope
+- [dreaming.md](dreaming.md) only after the [memory decision and input-scope checks](memory.md#scheduled-dreaming) justify a separate dreamer; configuration, publication, and consumer-recall implementation
 - [maintainer.md](maintainer.md) for recurring repository maintenance, backlog triage, owned-PR upkeep, or long-term code health
 - [documentation-workflows.md](documentation-workflows.md) for documentation agents, required docs checks, and post-merge page/index upkeep
 - [campaign.md](campaign.md) for campaign, KPI, pacing, cadence, or `stop-after`
@@ -96,6 +98,8 @@ Use this mode for exploratory testing, persona walkthroughs, and "what workflow 
 
 - Do not create or edit workflow files.
 - Return a compact recommendation covering trigger, any scoped `paths:` filters for file-event triggers, read tools, safe outputs, permissions, and explicit `noop` criteria.
+- Use only the relevant guidance sections for each scenario, not entire files. Start with the [trigger decision matrix](triggers.md#decision-matrix); for review/comment-only workflows, use the [least-privilege checklist](workflow-patterns.md#least-privilege-for-review-only-and-comment-only-workflows). Otherwise, consult only the matching workflow-pattern and topic sections.
+- When a stated requirement conflicts with a trigger, recommend the trigger that satisfies the requirement first, then list the conflicting trigger as an alternative and explain its consequence.
 - Before finalizing trigger or safe-output recommendations, check whether terms that affect scope or matching are ambiguous (for example, whether "completed" means closed issues or merged PRs, or where a coverage threshold comes from). Ask 1-2 targeted clarifying questions when the answer would change the recommendation. If the request needs an immediate recommendation, state the assumption and the relevant alternative rather than silently choosing.
 - For recurring reports or digests, always include the report window, grouping dimensions, and deduplication key. See [triggers.md](triggers.md) for key-format examples.
 - Exit ad hoc evaluation mode only when the user explicitly asks to create, implement, or write the workflow file.
@@ -151,6 +155,10 @@ When evaluating scenarios, classify any failure before stopping:
 ### 2. Derive architecture, then choose the trigger
 
 Use the smallest trigger that satisfies the augmented intent. Treat the mappings below as implementation options, not direct substitutions for intent reasoning. See the [Decision Matrix](triggers.md#decision-matrix) in triggers.md for the base trigger-to-use-case mapping.
+
+Apply the [memory reuse checkpoint](designer.md#memory-reuse-checkpoint) before
+selecting tools or persistence, following the decision and scope policy in
+[memory.md](memory.md#scheduled-dreaming).
 
 | Scenario | Trigger and default output | Details |
 |---|---|---|

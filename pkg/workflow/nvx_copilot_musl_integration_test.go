@@ -12,6 +12,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -131,8 +132,27 @@ func TestNVXStagedMuslCopilotInvokesAPIProxy(t *testing.T) {
 	}
 }
 
+func TestGetReleaseAssetResponseRetriesServerErrors(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		attempts++
+		if attempts == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	response, err := getReleaseAssetResponse(server.Client(), server.URL)
+	require.NoError(t, err)
+	defer response.Body.Close()
+	assert.Equal(t, http.StatusOK, response.StatusCode)
+	assert.Equal(t, 2, attempts)
+}
+
 func downloadVerifiedReleaseAsset(client *http.Client, baseURL, assetName, destination string) error {
-	checksumsResponse, err := client.Get(baseURL + "/SHA256SUMS.txt")
+	checksumsResponse, err := getReleaseAssetResponse(client, baseURL+"/SHA256SUMS.txt")
 	if err != nil {
 		return err
 	}
@@ -156,7 +176,7 @@ func downloadVerifiedReleaseAsset(client *http.Client, baseURL, assetName, desti
 		return fmt.Errorf("checksum for %s not found", assetName)
 	}
 
-	assetResponse, err := client.Get(baseURL + "/" + assetName)
+	assetResponse, err := getReleaseAssetResponse(client, baseURL+"/"+assetName)
 	if err != nil {
 		return err
 	}
@@ -182,6 +202,22 @@ func downloadVerifiedReleaseAsset(client *http.Client, baseURL, assetName, desti
 		return fmt.Errorf("checksum mismatch for %s: expected %s, got %s", assetName, expected, actual)
 	}
 	return nil
+}
+
+func getReleaseAssetResponse(client *http.Client, url string) (*http.Response, error) {
+	const maxAttempts = 3
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		response, err := client.Get(url)
+		if err != nil {
+			return nil, err
+		}
+		if response.StatusCode < http.StatusInternalServerError || attempt == maxAttempts-1 {
+			return response, nil
+		}
+		_ = response.Body.Close()
+		time.Sleep(time.Duration(attempt+1) * 250 * time.Millisecond)
+	}
+	return nil, fmt.Errorf("release download failed after %d attempts", maxAttempts)
 }
 
 func copyFile(source, destination string, mode os.FileMode) error {

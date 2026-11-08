@@ -1,6 +1,6 @@
 // Package linters is a namespace for gh-aw's custom Go analysis linters.
 //
-// All 88 active analyzers:
+// All 90 active analyzers:
 //
 //   - appendbytestring — flags append(b, []byte(s)...) calls where s is a string that can be simplified to append(b, s...)
 //   - appendoneelement — flags append(s, []T{x}...) calls where a single-element slice literal is spread and can be simplified to append(s, x)
@@ -49,6 +49,7 @@
 //   - osgetenvlibrary — flags os.Getenv calls in library packages
 //   - osisnotexist — flags legacy os error predicates that should use errors.Is or errors.As for wrapped errors
 //   - osopenreadallpreferreadfile — recommends os.ReadFile for files used only by deferred Close and a single ReadAll
+//   - osremoveuncheckedcleanup — flags os.Remove and os.RemoveAll calls where the error return is discarded
 //   - ossetenvlibrary — flags os.Setenv calls in library packages
 //   - packagelevelmutableslicemap — reports mutation of package-level slice/map variables from inside function bodies, which risks data races and cross-call state leaks
 //   - panic-in-library-code — flags panic() calls in library packages
@@ -61,6 +62,7 @@
 //   - slicemakezerolength — flags zero-length slice allocations before known-size range loops that append one element per iteration
 //   - sortslice — flags sort.Slice / sort.SliceStable calls that should use slices.SortFunc / slices.SortStableFunc
 //   - splitindexzero — flags strings.SplitN(s, sep, 2)[0] calls that allocate a slice to read only the first segment; use strings.Cut
+//   - splitlines-on-newline — flags strings.Split calls using a newline separator that can retain carriage returns on CRLF input or produce a trailing empty element
 //   - sprintferrdot — flags redundant .Error() calls on error values passed to fmt format functions
 //   - sprintferrorsnew — flags errors.New(fmt.Sprintf(...)) calls that should use fmt.Errorf instead
 //   - sprintfbool — flags fmt.Sprintf("%t", b) calls where b is a single bool value and suggests using strconv.FormatBool(b) instead

@@ -80,15 +80,30 @@ function getRunFailureMessage(ctx) {
  * @typedef {Object} DetectionFailureContext
  * @property {string} workflowName - Name of the workflow
  * @property {string} runUrl - URL of the workflow run
+ * @property {string} [reason] - Categorized detection outcome
+ * @property {string} [threatKinds] - Schema-defined threat categories
  */
 
+const DETECTION_FAILURE_TEMPLATE = "⚠️ Security scanning failed for [{workflow_name}]({run_url}). {reason_text} Review the logs for details.";
+
 /**
- * Get the detection-failure message, using custom template if configured.
- * @param {DetectionFailureContext} ctx - Context for detection-failure message generation
- * @returns {string} Detection-failure message
+ * @param {DetectionFailureContext | DetectionWarningContext} ctx
  */
-function getDetectionFailureMessage(ctx) {
-  return renderConfiguredMessage("detectionFailure", "⚠️ Security scanning failed for [{workflow_name}]({run_url}). Review the logs for details.", ctx);
+function detectionMessageContext(ctx) {
+  const reason = ctx.reason ?? process.env.GH_AW_DETECTION_REASON;
+  const threatKinds = ctx.threatKinds ?? process.env.GH_AW_DETECTION_THREAT_KINDS;
+  return { ...ctx, reasonText: getDetectionReasonText(reason, threatKinds), threatKinds: reason === "threat_detected" ? normalizeThreatKinds(threatKinds) : "unknown" };
+}
+
+/**
+ * @param {DetectionFailureContext} ctx
+ * @returns {import("./report_ast.cjs").ReportBlock[]}
+ */
+function getDetectionFailureBlocks(ctx) {
+  return parseReportMarkdown(getMessages()?.detectionFailure ?? DETECTION_FAILURE_TEMPLATE, {
+    context: toSnakeCase(detectionMessageContext(ctx)),
+    agentTainted: false,
+  });
 }
 
 /**
@@ -153,6 +168,7 @@ function buildCreatedMessageBlocks(kind, ctx) {
  * @property {string} workflowName - Name of the workflow
  * @property {string} runUrl - URL of the workflow run
  * @property {string} reason - Categorized reason for the warning (e.g. "threat_detected", "agent_failure", "parse_error")
+ * @property {string} [threatKinds] - Schema-defined threat categories
  */
 
 /**
@@ -168,7 +184,6 @@ function buildCreatedMessageBlocks(kind, ctx) {
  * @returns {string} Detection-warning message with admonition
  */
 function getDetectionWarningMessage(ctx) {
-  const reasonText = getDetectionReasonText(ctx.reason);
   const isEngineError = isToolingFailureReason(ctx.reason);
   const templateFile = isEngineError ? "threat_detection_engine_error.md" : "threat_detection_caution.md";
   const messageKey = isEngineError ? "detectionEngineError" : "detectionWarning";
@@ -176,9 +191,9 @@ function getDetectionWarningMessage(ctx) {
   const messages = getMessages();
   const configTemplate = messages?.[messageKey];
   if (configTemplate) {
-    return renderTemplate(configTemplate, toSnakeCase({ ...ctx, reasonText, threat_detected_marker: markerTemplate, threatKinds: normalizeThreatKinds(ctx.reason) }));
+    return renderTemplate(configTemplate, toSnakeCase({ ...detectionMessageContext(ctx), threat_detected_marker: markerTemplate }));
   }
-  return renderTemplateFromFile(getPromptPath(templateFile), toSnakeCase({ ...ctx, reasonText, threat_detected_marker: markerTemplate, threatKinds: normalizeThreatKinds(ctx.reason) })).trimEnd();
+  return renderTemplateFromFile(getPromptPath(templateFile), toSnakeCase({ ...detectionMessageContext(ctx), threat_detected_marker: markerTemplate })).trimEnd();
 }
 
 /**
@@ -193,9 +208,7 @@ function getDetectionWarningBlocks(ctx) {
     agentTainted: false,
     allowFlagMarkers: true,
     context: toSnakeCase({
-      ...ctx,
-      reasonText: getDetectionReasonText(ctx.reason),
-      threatKinds: normalizeThreatKinds(ctx.reason),
+      ...detectionMessageContext(ctx),
       threat_detected_marker: [{ type: "marker", name: isEngineError ? "gh-aw-threat-engine-error" : "gh-aw-threat-detected", agentTainted: false }],
     }),
   });
@@ -205,7 +218,7 @@ module.exports = {
   getRunStartedMessage,
   getRunSuccessMessage,
   getRunFailureMessage,
-  getDetectionFailureMessage,
+  getDetectionFailureBlocks,
   getDetectionWarningMessage,
   getDetectionWarningBlocks,
   getPullRequestCreatedMessage,

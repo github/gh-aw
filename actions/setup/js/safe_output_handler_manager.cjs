@@ -48,7 +48,7 @@ const { emitSafeOutputActionOutputs } = require("./safe_outputs_action_outputs.c
 const { listCommentMemoryFiles, COMMENT_MEMORY_DIR } = require("./comment_memory_helpers.cjs");
 const { checkRateLimitHeadroom } = require("./rate_limit_helpers.cjs");
 const { redactSensitiveConfig } = require("./safe_outputs_config_redact.cjs");
-const { getEffectiveDetectionConclusion } = require("./threat_detection_warning.cjs");
+const { getEffectiveDetectionConclusion, getDetectionReasonText } = require("./threat_detection_warning.cjs");
 const nodePath = require("path");
 const fs = require("fs");
 const {
@@ -1109,7 +1109,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
       const errorCode = detectionConclusionMissing ? "threat_detection_conclusion_missing" : "threat_detection_failure_blocked";
       const error = detectionConclusionMissing
         ? `Threat detection was required but reported no conclusion; "${messageType}" was not applied.`
-        : `Threat detection concluded failure (reason: ${process.env.GH_AW_DETECTION_REASON || "unknown"}); "${messageType}" was not applied.`;
+        : `Threat detection concluded failure. ${getDetectionReasonText(process.env.GH_AW_DETECTION_REASON)} "${messageType}" was not applied.`;
       core.warning(`🚫 ${error}`);
       results.push({
         type: messageType,

@@ -380,21 +380,14 @@ gh aw json-schema logs-jsonl
 |---|---|
 | `gh aw status` | `status` |
 | `gh aw compile` | `compile` |
-| `gh aw run` | Not provided; no API/MCP/manual-dispatch substitution |
 | `gh aw logs` | `logs` |
 | `gh aw audit` | `audit` |
 | `gh aw audit <id1> <id2>` | `audit-diff` |
 | `gh aw checks` | `checks` |
-| `gh aw health` | *(local only)* |
-| `gh aw experiments` | *(local only)* |
 | `gh aw mcp inspect` | `mcp-inspect` |
 | `gh aw add` | `add` |
 | `gh aw update` | `update` |
 | `gh aw fix` | `fix` |
-| `gh aw format` | *(local only)* |
 | `gh aw upgrade` | `upgrade` |
-| `gh aw deploy` | *(local only)* |
-| `gh aw env` | *(local only)* |
-| `gh aw init` | *(local only)* |
-| `gh aw doctor` | *(local only)* |
-| `gh aw json-schema` | *(local only)* |
+
+Local only (no MCP tool): `skill`, `init`, `doctor`, `health`, `experiments`, `format`, `deploy`, `env`, `json-schema`. `gh aw run` has no MCP tool and no API/MCP/manual-dispatch substitution.

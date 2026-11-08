@@ -1710,8 +1710,11 @@ engine: copilot
 safe-outputs:
   actions:
     add-label:
-      uses: actions-ecosystem/action-add-labels@v1
+      uses: actions-ecosystem/action-add-labels@18f1af5e3544586314bbe15c0273249c770b2daf
       description: Add a label to the current PR
+      inputs:
+        labels:
+          required: true
       env:
         GITHUB_TOKEN: ${{ github.token }}
 ---
@@ -2074,13 +2077,19 @@ engine: copilot
 safe-outputs:
   actions:
     add-bug-label:
-      uses: actions-ecosystem/action-add-labels@v1
+      uses: actions-ecosystem/action-add-labels@18f1af5e3544586314bbe15c0273249c770b2daf
       description: Add a bug label
+      inputs:
+        labels:
+          required: true
       env:
         GITHUB_TOKEN: ${{ github.token }}
     close-issue:
-      uses: peter-evans/close-issue@v3
+      uses: peter-evans/close-issue@05dff7ca07116e5707cfb3a3cd4af7bb5e43524c
       description: Close the issue
+      inputs:
+        comment:
+          description: Comment before closing the issue
 ---
 
 # Test Multiple Safe Output Actions
@@ -2153,8 +2162,11 @@ safe-outputs:
     allowed: [bug, enhancement]
   actions:
     apply-fix:
-      uses: actions-ecosystem/action-add-labels@v1
+      uses: actions-ecosystem/action-add-labels@18f1af5e3544586314bbe15c0273249c770b2daf
       description: Apply fix label
+      inputs:
+        labels:
+          required: true
       env:
         GITHUB_TOKEN: ${{ github.token }}
 ---
@@ -2212,8 +2224,11 @@ engine: copilot
 safe-outputs:
   actions:
     pin-pr:
-      uses: actions-ecosystem/action-add-labels@v1
+      uses: actions-ecosystem/action-add-labels@18f1af5e3544586314bbe15c0273249c770b2daf
       description: Pin the PR
+      inputs:
+        labels:
+          required: true
 ---
 
 # Actions Only Safe Outputs

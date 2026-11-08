@@ -144,7 +144,7 @@ function renderMessagePreviews() {
   const previews = [];
   const add = (name, body) => previews.push(`## ${name}\n\n${body.trimEnd() || "_Empty by default._"}\n`);
 
-  for (const name of ["getRunStartedMessage", "getRunSuccessMessage", "getRunFailureMessage", "getDetectionFailureMessage", "getPullRequestCreatedMessage", "getIssueCreatedMessage", "getCommitPushedMessage"]) {
+  for (const name of ["getRunStartedMessage", "getRunSuccessMessage", "getRunFailureMessage", "getPullRequestCreatedMessage", "getIssueCreatedMessage", "getCommitPushedMessage"]) {
     add(name, status[name](context));
   }
   for (const reason of ["threat_detected", "agent_failure", "parse_error"]) {

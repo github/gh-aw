@@ -76,7 +76,7 @@ Repositories with thousands of open issues require chunked or parallel processin
 
 ## Large Monorepos
 
-Monorepos with many packages or deep histories can cause agent jobs to spend most of their time on repository checkout. Use `sparse-checkout` in the `checkout:` field to fetch only the paths a workflow actually needs — this can reduce checkout time from tens of minutes to seconds. For workflows that need to reason about the full codebase without fetching it, the [QMD search tool](/gh-aw/experimental/qmd/) runs vector similarity search over indexed repository content without requiring a full clone. When full history is genuinely needed (e.g., changelog generation or blame analysis), `fetch-depth: 0` is available but should be combined with sparse paths to limit clone size.
+Monorepos with many packages or deep histories can cause agent jobs to spend most of their time on repository checkout. Use `sparse-checkout` in the `checkout:` field to fetch only the paths a workflow actually needs — this can reduce checkout time from tens of minutes to seconds. For workflows that need to reason about repository content without fetching it in the agent job, import a [shared QMD workflow](/gh-aw/experimental/qmd/). Its index/search pattern incrementally indexes the selected corpus in a separate job, persists snapshots in cache-memory, and exposes search and retrieval through a custom MCP server. When full history is genuinely needed (e.g., changelog generation or blame analysis), `fetch-depth: 0` is available but should be combined with sparse paths to limit clone size.
 
 See [GitHub Repository Checkout](/gh-aw/reference/checkout/) for the full configuration reference and examples, including sparse checkout patterns and multi-repository checkouts.
 

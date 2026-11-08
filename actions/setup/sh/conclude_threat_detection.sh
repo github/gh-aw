@@ -6,6 +6,7 @@ set -euo pipefail
 RESULT_FILE="${1:-/tmp/gh-aw/threat-detection/detection_result.json}"
 RESULT_DIR="$(dirname "${RESULT_FILE}")"
 DETECTION_LOG_FILE="${DETECTION_LOG_FILE:-${RESULT_DIR}/detection.log}"
+echo "threat_kinds=" >> "${GITHUB_OUTPUT}"
 
 # report_detector_unavailable emits the agent_failure conclusion outputs for a
 # detector that could never run, without invoking any binary. Warn mode exits 0
@@ -76,6 +77,21 @@ threat-detect conclude \
 # warning/agent_failure, strict mode fails closed.
 if [ "${conclude_exit}" -ne 0 ] && [ -z "$(last_output_value conclusion)" ]; then
   report_detector_unavailable "threat-detect conclude exited with status ${conclude_exit} without reporting a conclusion"
+fi
+
+# Publish only schema-defined boolean findings, never the detector's prose.
+if [ "$(last_output_value reason)" = "threat_detected" ]; then
+  if threat_kinds="$(jq -er '
+    . as $verdict |
+    ["prompt_injection", "secret_leak", "malicious_patch"] as $kinds |
+    if type == "object" and all($kinds[]; $verdict[.] | type == "boolean")
+    then [$kinds[] | select($verdict[.] == true)] | join(",")
+    else error("Invalid threat verdict") end
+  ' "${RESULT_FILE}" 2>/dev/null)"; then
+    echo "threat_kinds=${threat_kinds}" >> "${GITHUB_OUTPUT}"
+  else
+    echo "::warning::Detected threat types could not be read from the structured verdict; threat details are unavailable."
+  fi
 fi
 
 # In warn mode a detection engine failure (agent_failure/parse_error) applies the

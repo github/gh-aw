@@ -3,8 +3,6 @@ emoji: "📊"
 name: Slide Deck Maintainer
 description: Maintains the gh-aw slide deck by scanning repository content and detecting layout issues using Playwright
 on:
-  schedule:
-    - cron: "daily around 16:00 on weekdays"  # ~4 PM UTC on weekdays
   workflow_dispatch:
     inputs:
       focus:

@@ -68,6 +68,9 @@ Create an issue.
 	if !strings.Contains(yaml, "detection_reason:") {
 		t.Error("Detection job missing detection_reason output")
 	}
+	if !strings.Contains(detectionSection, "detection_threat_kinds: ${{ steps.detection_conclusion.outputs.threat_kinds }}") {
+		t.Error("Detection job missing schema-defined threat categories output")
+	}
 	if !strings.Contains(yaml, "aic:") {
 		t.Error("Detection job missing aic output")
 	}
@@ -167,6 +170,11 @@ Create outputs.
 	}
 	if !strings.Contains(yaml, "GH_AW_THREAT_DETECTION_AIC: ${{ needs.detection.outputs.aic }}") {
 		t.Error("Safe output jobs should receive threat-detection AI Credits separately")
+	}
+	for _, job := range []string{"safe_outputs", "conclusion"} {
+		if !strings.Contains(extractJobSection(yaml, job), "GH_AW_DETECTION_THREAT_KINDS: ${{ needs.detection.outputs.detection_threat_kinds }}") {
+			t.Errorf("%s job should receive detector-defined threat types", job)
+		}
 	}
 }
 

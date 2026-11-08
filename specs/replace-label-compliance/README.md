@@ -171,3 +171,65 @@ formal predicates.
 The RL-057/RL-058/RL-059 post-`setLabels` checks are enforced by
 `actions/setup/js/replace_label.cjs` and covered by
 `actions/setup/js/replace_label.test.cjs`.
+
+## Normative MUST Evidence Index (§§5–8)
+
+Each MUST-level requirement is mapped to a test ID and its implementation test,
+or to a specific evidence gap. This index is complete when every requirement in
+§§5–8 of `specs/replace-label-spec.md` appears below with a test mapping or an
+explicit gap; completion does not depend on an owner or a review date.
+
+| Requirement | Test ID(s) or documented gap | Implementation evidence |
+|---|---|---|
+| §5 ordered processing pipeline | **Gap:** no end-to-end stage-order/early-stop test. | — |
+| RL-008 | T-RL-001–006 | `TestFormalSchemaRequiredFields` |
+| RL-009 | **Gap:** common-pipeline invocation is not directly tested. | `TestFormalReplaceLabelP3_ValidationConfigFields` covers config shape only. |
+| RL-010 | T-RL-010–011 | `TestFormalCountGate` |
+| RL-011 | **Gap:** expression resolution for `max` is not directly tested. | — |
+| RL-012 | T-RL-012 | `TestFormalReplaceLabelP3_DefaultMaxFive` |
+| RL-013 | T-RL-070–072 | `TestFormalCrossRepoRestriction` |
+| RL-014 | **Gap:** malformed `owner/repo` rejection is not directly tested. | — |
+| RL-015 | T-RL-070–072 | `TestFormalCrossRepoRestriction` |
+| RL-016 | T-RL-014–018 | `TestFormalReplaceLabelP15_TargetModeEnforcement` |
+| RL-017 | T-RL-019 | `T-RL-019 rejects when no item number is available` |
+| RL-018 | T-RL-014–015 | `TestFormalReplaceLabelP15_TargetModeEnforcement` |
+| RL-019 | T-RL-016–017 | `TestFormalReplaceLabelP15_TargetModeEnforcement` |
+| RL-020 | T-RL-018 | `TestFormalItemNumberAliases` |
+| RL-020a | T-RL-014–019 | `TestFormalReplaceLabelP15_TargetModeEnforcement` |
+| RL-021 | T-RL-023–024 | `TestFormalBlocklistOrdering`, `TestFormalBlocklistSymmetry` |
+| RL-022 | T-RL-020–023 | `TestFormalBlocklistOrdering`, `TestFormalBlocklistSymmetry` |
+| RL-023 | **Gap:** workflow warning-only behavior is not directly asserted by a handler integration test. | — |
+| RL-024 | T-RL-030–031 | `TestFormalRequiredLabelsGate`; JS required-label skip test |
+| RL-025 | T-RL-032–033 | `TestFormalTitlePrefixGate`; JS title-prefix skip test |
+| RL-026 | T-RL-030–033 | JS required-label and title-prefix skip tests |
+| RL-027 | T-RL-060–061; **gap:** preview log text is not asserted directly. | `T-RL-060 does not call setLabels in staged mode` |
+| RL-028 | T-RL-062 | `TestFormalReplaceLabelP9_StagedHandlerResult`; staged handler test |
+| RL-029 | T-RL-040 | `TestFormalLabelSetComputation` |
+| RL-033 | T-RL-040; **gap:** no focused assertion ties computation to the stage-5 REST response. | `TestFormalLabelSetComputation` models the current-label input. |
+| RL-034 | T-RL-044 | `TestFormalReplaceLabelP11_IdempotentMissingRemove`; JS missing-remove test |
+| RL-036 | T-RL-050 | `TestFormalSingleRESTCall` |
+| RL-037 | T-RL-054 for 403/429; **gap:** handler-level 5xx, timeout, and transport retry cases. | `T-RL-054 retries rate-limit response` (403 and 429) |
+| RL-038 | T-RL-051; **gap:** required success-log fields are not asserted directly. | — |
+| RL-039 | **Gap:** no test asserts the complete success-result field set. | — |
+| RL-040 | **Gap:** `attachExecutionState` before/after metadata is not asserted for this handler. | — |
+| RL-041 | T-RL-040, T-RL-050 | `TestFormalLabelSetComputation` |
+| RL-042 | T-RL-053 | `TestFormalAddDeduplication` |
+| RL-043 | T-RL-050; **gap:** GitHub's server-side atomicity guarantee is not locally testable. | `TestFormalSingleRESTCall` |
+| RL-044 | **Gap:** warning-only behavior for every soft-skip category is not directly tested. | — |
+| RL-045 | **Gap:** `core.error()` logging for all hard-error categories is not directly asserted. | — |
+| RL-046 | T-RL-052 | `TestFormalHardErrorOnRESTFail`; JS setLabels failure test |
+| RL-046a | **Gap:** HTTP 404 rejection has no focused handler test. | — |
+| RL-046b | **Gap:** handler-level 5xx, timeout, and transport retries and exhaustion are not directly tested. | — |
+| RL-048 | T-RL-054 | `T-RL-054 retries rate-limit response` (403 and 429) |
+| RL-057 | T-RL-057 | `TestFormalPostSetLabelsAddPresent`, `TestFormalPostSetLabelsRemoveAbsent` |
+| RL-058 | T-RL-058 | `TestFormalPartialSuccessRejected` |
+| RL-059 | T-RL-059 | `TestFormalPartialSuccessNoNewErrorCode` |
+| RL-049 | T-RL-020–025 | `TestFormalBlocklistOrdering`; JS allow/blocklist tests |
+| RL-049a | T-RL-026 | `T-RL-026 rechecks blocklist state before setLabels`; `TestFormalBlockedLabelAddedViaReplaceLabelMidBlocklistChange_NoWriteAPI` |
+| RL-050 | T-RL-070–072 | `TestFormalCrossRepoRestriction` |
+| RL-051 | **Gap:** cross-repository token permission is not checked by a focused conformance test. | — |
+| RL-052 | T-RL-041 | JS nonexistent-label hard-error test |
+| RL-053 | T-RL-030–031 | JS required-label gate test uses the REST response; the agent message has no label-state field. |
+| RL-054 | **Gap:** the minimum `issues: write` token scope is not covered by a focused conformance test. | — |
+| RL-055 | **Gap:** dedicated per-type token use for narrower permissions is not covered by a conformance test. | — |
+| RL-056 | T-RL-060 | `T-RL-060 does not call setLabels in staged mode` |

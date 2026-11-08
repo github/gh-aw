@@ -24,6 +24,8 @@ on:
       - '.github/aw/compat.json'
       - '.github/aw/compat.schema.json'
       - 'install-gh-aw.sh'
+      - 'specs/github-mcp-access-control-compliance/**'
+      - 'scratchpad/github-mcp-access-control-specification.md'
   schedule:
   - cron: 0 * * * *
   workflow_dispatch: {}
@@ -173,6 +175,32 @@ jobs:
         fi
 
         echo "validated $checked_images container pins across $checked_files workflow lock files"
+  validate-mcp-access-control-spec-pin:
+    name: Validate GitHub MCP access-control spec pin
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+    - name: Compare pinned specification commit
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        pinned="57111b2d03d5be9a30a998f518c9712700ebfa63"
+        current="$(git log -n1 --format=%H -- scratchpad/github-mcp-access-control-specification.md)"
+        if [ -z "$current" ]; then
+          echo "No commit found for scratchpad/github-mcp-access-control-specification.md"
+          exit 1
+        fi
+        if [ "$current" != "$pinned" ]; then
+          echo "Spec pin drift: README pin=$pinned current=$current"
+          exit 1
+        fi
   test-race:
     name: Race detector
     if: ${{ github.event_name == 'schedule' && needs.changes.outputs.has_changes == 'true' }}

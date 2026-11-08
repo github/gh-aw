@@ -16594,6 +16594,14 @@
                   },
                   "description": "Secret or env var keys the engine accepts through engine.env."
                 },
+                "output-files": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^/tmp/gh-aw/agent/[A-Za-z0-9._/-]+\\.(txt|json|log|md|mdx|yml|jsonl|patch|html)$"
+                  },
+                  "description": "Untrusted diagnostic files retained in the unified agent artifact after secret redaction and recovery-envelope validation, including failed executions. Paths must be literal files under /tmp/gh-aw/agent/ without traversal or wildcards and have a secret-redactable extension. Does not enable structured session parsing."
+                },
                 "capabilities": {
                   "type": "object",
                   "properties": {
