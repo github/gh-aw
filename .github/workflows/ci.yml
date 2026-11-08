@@ -191,7 +191,7 @@ jobs:
       run: |
         set -euo pipefail
 
-        pinned="57111b2d03d5be9a30a998f518c9712700ebfa63"
+        pinned="90babbc85fe4bb201c20b943a2fbb9a19783af54"
         current="$(git log -n1 --format=%H -- scratchpad/github-mcp-access-control-specification.md)"
         if [ -z "$current" ]; then
           echo "No commit found for scratchpad/github-mcp-access-control-specification.md"
