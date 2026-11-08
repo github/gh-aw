@@ -4,7 +4,7 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import { main, validateEnvelope } from "./validate_recovery_envelopes.cjs";
-import { processFile } from "./redact_secrets.cjs";
+import { main as redactSecrets, processFile } from "./redact_secrets.cjs";
 
 const MAGIC = Buffer.from("GH-AW-OBJECT-PACK 1\n");
 const hash = bytes => crypto.createHash("sha256").update(bytes).digest("hex");
@@ -59,6 +59,56 @@ describe("final recovery envelope upload boundary", () => {
     vi.unstubAllEnvs();
     global.core = originalCore;
     fs.rmSync(root, { recursive: true, force: true });
+  });
+  it.each(["success", "read-failure"])("redacts the native trajectory or blocks publication on %s", async outcome => {
+    global.core = { ...global.core, error: vi.fn(), setFailed: vi.fn() };
+    vi.stubEnv("RUNNER_TEMP", path.join(root, "runner-temp"));
+    vi.stubEnv("HOME", path.join(root, "home"));
+    vi.stubEnv("GITHUB_WORKSPACE", repo);
+    vi.stubEnv("GH_AW_SECRET_NAMES", "MINI_TRAJECTORY_TEST");
+    vi.stubEnv("SECRET_MINI_TRAJECTORY_TEST", secret);
+    const exists = fs.existsSync;
+    vi.spyOn(fs, "existsSync").mockImplementation(file => (String(file) === "/tmp/gh-aw" || String(file).startsWith("/tmp/gh-aw/") ? false : exists(file)));
+    const artifactRoot = path.join(process.env.RUNNER_TEMP, "gh-aw");
+    const trajectory = path.join(artifactRoot, "agent/mini-swe-agent.traj.json");
+    fs.mkdirSync(path.dirname(trajectory), { recursive: true });
+    fs.writeFileSync(
+      trajectory,
+      JSON.stringify({
+        info: { exit_status: "RuntimeError" },
+        messages: [{ role: "user", content: secret }],
+      })
+    );
+    const read = fs.readFileSync;
+    const failure =
+      outcome === "read-failure"
+        ? vi.spyOn(fs, "readFileSync").mockImplementation((file, ...args) => {
+            if (file === trajectory) throw Object.assign(new Error(secret), { code: "EIO" });
+            return read(file, ...args);
+          })
+        : undefined;
+    try {
+      await redactSecrets();
+    } finally {
+      failure?.mockRestore();
+    }
+    if (outcome === "read-failure") {
+      expect(fs.existsSync(trajectory)).toBe(false);
+      expect(global.core.setFailed).toHaveBeenCalled();
+    } else {
+      expect(global.core.setFailed).not.toHaveBeenCalled();
+      expect(JSON.parse(fs.readFileSync(trajectory, "utf8"))).toEqual({
+        info: { exit_status: "RuntimeError" },
+        messages: [{ role: "user", content: "***REDACTED***" }],
+      });
+      expect(main({ roots: [artifactRoot] })).toEqual({ removed: 0 });
+      const external = path.join(root, "external-trajectory.json");
+      fs.writeFileSync(external, secret);
+      fs.unlinkSync(trajectory);
+      fs.symlinkSync(external, trajectory);
+      expect(() => main({ roots: [artifactRoot] })).toThrow("escapes trusted roots");
+    }
+    for (const method of ["info", "warning", "error", "setFailed"]) expect(JSON.stringify(global.core[method].mock.calls)).not.toContain(secret);
   });
   it.each(["MAX_OBJECTS", "MAX_BYTES"])("removes envelopes that exceed the trusted %s upload limit", name => {
     const artifact = envelope();

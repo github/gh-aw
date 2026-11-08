@@ -4,10 +4,14 @@ package workflow
 
 import (
 	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -30,6 +34,10 @@ func TestMiniSweAgentSampleExecution(t *testing.T) {
 	assert.True(t, def.Experimental)
 	assert.False(t, engine.GetCapabilities().MCP)
 	assert.True(t, engine.GetCapabilities().MaxTurns)
+	for _, step := range engine.GetInstallationSteps(&WorkflowData{}) {
+		assert.NotContains(t, strings.Join(step, "\n"), "pip install")
+		assert.NotContains(t, strings.Join(step, "\n"), "minisweagent")
+	}
 	for _, test := range []struct{ model, provider string }{
 		{"copilot/claude-haiku-5.5", "github"},
 		{"openai/gpt-4o", "openai"},
@@ -176,10 +184,10 @@ func TestMiniSweAgentPythonExecution(t *testing.T) {
 			script := filepath.Join(dir, "mini.py")
 			require.NoError(t, os.WriteFile(script, []byte(args[2]), 0o600))
 			cmd := miniSweAgentHarnessCommand(t, dir, "python3", "-I", "-c", miniSweAgentPythonStubs, script)
+			cmd.Args = append(cmd.Args, status)
 			cmd.Env = append(cmd.Env, "GH_AW_ENGINE_VERSION="+def.Version,
 				"GH_AW_MINI_DEPS="+filepath.Join(dir, "dependencies"),
-				"GH_AW_MINI_TRAJECTORY="+filepath.Join(dir, "agent", "trajectory.json"),
-				"MINI_TEST_STATUS="+status)
+				"GH_AW_MINI_TRAJECTORY="+filepath.Join(dir, "agent", "trajectory.json"))
 			output, err := cmd.CombinedOutput()
 			if status == "Submitted" {
 				require.NoError(t, err, "%s", output)
@@ -213,7 +221,7 @@ model_class = Mock(return_value=model)
 environment = object()
 environment_class = Mock(return_value=environment)
 agent = Mock()
-agent.run.return_value = {"exit_status": os.environ["MINI_TEST_STATUS"]}
+agent.run.return_value = {"exit_status": sys.argv[2]}
 agent_class = Mock(return_value=agent)
 yaml_load = Mock(return_value=config)
 
@@ -229,7 +237,13 @@ for name, attributes in {
     sys.modules[name] = module
 
 exit_code = 0
-with patch("subprocess.run") as install, patch("importlib.metadata.version") as version:
+with (
+    patch("subprocess.run") as install,
+    patch("importlib.metadata.version") as version,
+    patch("sys.version_info", (3, 12)),
+    patch("sys.platform", "linux"),
+    patch("platform.machine", return_value="x86_64"),
+):
     version.return_value = os.environ["GH_AW_ENGINE_VERSION"]
     try:
         exec(compile(Path(sys.argv[1]).read_text(), sys.argv[1], "exec"))
@@ -237,9 +251,10 @@ with patch("subprocess.run") as install, patch("importlib.metadata.version") as 
         exit_code = error.code
     install.assert_called_once_with([
         sys.executable, "-I", "-m", "pip", "install", "--quiet",
-        "--disable-pip-version-check", "--only-binary=:all:",
+        "--isolated", "--disable-pip-version-check", "--only-binary=:all:",
+        "--require-hashes",
         "--target", os.environ["GH_AW_MINI_DEPS"],
-        "mini-swe-agent==" + os.environ["GH_AW_ENGINE_VERSION"],
+        "--requirement", str(Path(os.environ["GH_AW_MINI_DEPS"]) / "requirements.lock"),
     ], check=True)
     version.assert_called_once_with("mini-swe-agent")
 
@@ -259,3 +274,122 @@ agent.run.assert_called_once_with("literal task --- with file-based input")
 print("Python wiring verified", flush=True)
 raise SystemExit(exit_code)
 `
+
+func TestMiniSweAgentHarnessEnvironment(t *testing.T) {
+	dir := t.TempDir()
+	cmd := miniSweAgentHarnessCommand(t, dir, "node", "-e", `console.log(JSON.stringify(process.env))`)
+	cmd.Env = append(cmd.Env,
+		"PATH="+os.Getenv("PATH"),
+		"GH_AW_MCP_DEFERRED_SERVERS=work-queue",
+		"GH_AW_SAFE_OUTPUTS_TOOLS_PATH="+filepath.Join(dir, "tools.json"),
+		"ENGINE_CONFORMANCE_SENTINEL=conformance-mini-swe-agent",
+		"AWF_CLI_PROXY_URL=http://cli-proxy:11000",
+		"HTTP_PROXY=http://squid-proxy:3128", "HTTPS_PROXY=http://squid-proxy:3128",
+		"NO_PROXY=api-proxy,cli-proxy", "no_proxy=api-proxy,cli-proxy",
+		"GH_AW_GITHUB_MCP_SERVER_TOKEN=do-not-inherit",
+		"GITHUB_MCP_SERVER_TOKEN=do-not-inherit",
+		"GH_TOKEN=do-not-inherit", "OPENAI_API_KEY=do-not-inherit",
+		"FUTURE_SECRET=do-not-inherit", "PYTHONPATH=do-not-inherit",
+		"NODE_OPTIONS=--no-warnings", "BASH_ENV=do-not-inherit")
+	output, err := cmd.Output()
+	require.NoError(t, err)
+	var env map[string]string
+	require.NoError(t, json.Unmarshal(output, &env))
+	assert.Equal(t, os.Getenv("PATH"), env["PATH"])
+	assert.Equal(t, dir, env["GITHUB_WORKSPACE"])
+	assert.Equal(t, "work-queue", env["GH_AW_MCP_DEFERRED_SERVERS"])
+	assert.Equal(t, filepath.Join(dir, "tools.json"), env["GH_AW_SAFE_OUTPUTS_TOOLS_PATH"])
+	assert.Equal(t, "conformance-mini-swe-agent", env["ENGINE_CONFORMANCE_SENTINEL"])
+	assert.Equal(t, "http://cli-proxy:11000", env["AWF_CLI_PROXY_URL"])
+	assert.Equal(t, "http://squid-proxy:3128", env["HTTP_PROXY"])
+	assert.Equal(t, "http://squid-proxy:3128", env["HTTPS_PROXY"])
+	assert.Equal(t, "api-proxy,cli-proxy", env["NO_PROXY"])
+	assert.Equal(t, "api-proxy,cli-proxy", env["no_proxy"])
+	for _, name := range []string{
+		"GH_AW_GITHUB_MCP_SERVER_TOKEN", "GITHUB_MCP_SERVER_TOKEN", "GH_TOKEN",
+		"OPENAI_API_KEY", "FUTURE_SECRET", "PYTHONPATH", "NODE_OPTIONS", "BASH_ENV",
+	} {
+		assert.NotContains(t, env, name)
+	}
+	t.Run("authenticated proxy rejected", func(t *testing.T) {
+		cmd := miniSweAgentHarnessCommand(t, t.TempDir(), "node", "-e", "process.exit(0)")
+		cmd.Env = append(cmd.Env, "HTTP_PROXY=http://user:do-not-inherit@proxy:3128")
+		output, err := cmd.CombinedOutput()
+		require.Error(t, err)
+		assert.Contains(t, string(output), "HTTP_PROXY must be a credential-free HTTP(S) URL")
+		assert.NotContains(t, string(output), "do-not-inherit")
+	})
+}
+
+func TestMiniSweAgentPythonRejectsUnlockedVersion(t *testing.T) {
+	def := loadMiniSweAgentSample(t)
+	cmd := miniSweAgentHarnessCommand(t, t.TempDir(), append([]string{"python3"}, def.Behaviors.Execution.Args...)...)
+	cmd.Env = append(cmd.Env, "GH_AW_ENGINE_VERSION=0.0.0")
+	output, err := cmd.CombinedOutput()
+	require.Error(t, err)
+	assert.Contains(t, string(output), "version must match the dependency lock")
+}
+
+func TestMiniSweAgentPinnedPackageSmoke(t *testing.T) {
+	if os.Getenv("GH_AW_MINI_REAL_SMOKE") != "1" {
+		t.Skip("set GH_AW_MINI_REAL_SMOKE=1 to install the hash-locked wheels and exercise a local mock LLM")
+	}
+	dir := t.TempDir()
+	def := loadMiniSweAgentSample(t)
+	prompt := "Local mini-SWE-agent smoke: print MINI_LOCAL_SMOKE and submit."
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "prompt with spaces.md"), []byte(prompt), 0o600))
+	var mu sync.Mutex
+	var requests []string
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" {
+			http.NotFound(w, r)
+			return
+		}
+		var request struct {
+			Messages []struct {
+				Content string `json:"content"`
+			} `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		mu.Lock()
+		for _, message := range request.Messages {
+			requests = append(requests, message.Content)
+		}
+		calls++
+		content := "THOUGHT: Execute the local smoke marker.\n```mswea_bash_command\nprintf 'MINI_LOCAL_SMOKE\\n'\n```"
+		if calls > 1 {
+			content = "THOUGHT: Submit the completed local smoke.\n```mswea_bash_command\necho COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT\n```"
+		}
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id": "mini-local-smoke", "object": "chat.completion", "created": 1, "model": "test-model",
+			"choices": []any{map[string]any{
+				"index": 0, "finish_reason": "stop",
+				"message": map[string]string{"role": "assistant", "content": content},
+			}},
+			"usage": map[string]int{"prompt_tokens": 10, "completion_tokens": 10, "total_tokens": 20},
+		})
+	}))
+	defer server.Close()
+	cmd := miniSweAgentHarnessCommand(t, dir, append([]string{"python3"}, def.Behaviors.Execution.Args...)...)
+	cmd.Env = append(cmd.Env,
+		"GH_AW_ENGINE_VERSION="+def.Version,
+		"GH_AW_MINI_DEPS="+filepath.Join(dir, "dependencies"),
+		"GH_AW_MINI_TRAJECTORY="+filepath.Join(dir, "trajectory.json"),
+		fmt.Sprintf(`MINI_TEST_REFLECT={"ok":true,"reflectData":{"endpoints":[{"provider":"github","configured":true,"models_url":"%s/v1/models"}]}}`, server.URL))
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, "%s", output)
+	assert.Contains(t, string(output), "mini-SWE-agent exit status: Submitted")
+	mu.Lock()
+	assert.Contains(t, strings.Join(requests, "\n"), prompt)
+	assert.Equal(t, 2, calls)
+	mu.Unlock()
+	trajectory, err := os.ReadFile(filepath.Join(dir, "trajectory.json"))
+	require.NoError(t, err)
+	assert.Contains(t, string(trajectory), "MINI_LOCAL_SMOKE")
+}

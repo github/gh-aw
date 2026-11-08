@@ -19,6 +19,9 @@ engine:
   env:
     ENGINE_CONFORMANCE_SENTINEL: conformance-mini-swe-agent
 tools:
+  github:
+    mode: gh-proxy
+    toolsets: [repos]
   work-queue:
     worker: true
     require-assignment: true

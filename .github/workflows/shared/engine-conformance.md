@@ -9,6 +9,7 @@ runtimes:
   node:
     version: "24"
 tools:
+  github: false
   edit:
   bash:
     - "*"

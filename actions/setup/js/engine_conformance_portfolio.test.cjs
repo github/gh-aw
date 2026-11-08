@@ -81,6 +81,7 @@ describe("engine conformance queue portfolio", () => {
     const compiled = name => fs.readFileSync(new URL(`../../../.github/workflows/${name}.lock.yml`, import.meta.url), "utf8");
     const dispatcher = source("engine-conformance-dispatcher");
     const shared = source("shared/engine-conformance");
+    expect(shared).toContain("github: false");
     expect(shared).not.toMatch(/^\s+staged:\s*true$/m);
     expect(shared).toContain("noop:\n    report-as-issue: false");
     expect(shared).toContain("activation-comments: false");
@@ -101,6 +102,12 @@ describe("engine conformance queue portfolio", () => {
       expect(compiled(`engine-conformance-${engine}`)).toContain("work_queue_assignment:");
       expect(compiled(`engine-conformance-${engine}`)).toContain('GH_AW_WORK_QUEUE_ROLE: "worker"');
       expect(compiled(`engine-conformance-${engine}`)).toContain("work_queue_claim_finish");
+      if (["aider", "deepseek-harness", "mini-swe-agent"].includes(engine)) {
+        expect(worker).toContain("mode: gh-proxy");
+        expect(worker).toContain("toolsets: [repos]");
+      } else {
+        expect(compiled(`engine-conformance-${engine}`)).not.toMatch(/^\s+GH_AW_MCP_CLI_SERVERS:.*\bgithub\b/m);
+      }
       expect(compiled(`engine-conformance-${engine}`)).not.toMatch(/GH_AW_(?:SAFE_OUTPUTS_STAGED|INFO_STAGED):\s*"?true"?/);
       expect(compiled(`engine-conformance-${engine}`)).toContain("name: Terminate work queue worker");
       expect(compiled(`engine-conformance-${engine}`)).toContain('\\"report-as-issue\\":\\"false\\"');
