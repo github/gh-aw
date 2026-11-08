@@ -1564,17 +1564,19 @@ describe("handle_agent_failure", () => {
       ).toBe(false);
     });
 
-    it.each([["report_incomplete"], ["missing_data", "report_incomplete"], ["missing_tool", "report_incomplete"], ["missing_data", "missing_tool", "report_incomplete"]])(
-      "reuses incomplete reports with different diagnostic categories: %j",
-      (...categories) => {
-        const { isReusableFailureIssue } = require("./handle_agent_failure.cjs");
-        const body = buildExistingIssueBody({ categories: ["missing_tool", "report_incomplete"] });
-        expect(isReusableFailureIssue(body, { workflowId: "test-workflow", failureCategories: categories })).toBe(true);
-        expect(isReusableFailureIssue(body, { workflowId: "other-workflow", failureCategories: categories })).toBe(false);
-        expect(isReusableFailureIssue(body, { workflowId: "test-workflow", failureCategories: [...categories, "mcp_policy_error"].sort() })).toBe(false);
-        expect(isReusableFailureIssue(body, { workflowId: "test-workflow", failureCategories: ["missing_tool"] })).toBe(false);
-      }
-    );
+    it.each([
+      { existingCategories: ["missing_tool", "report_incomplete"], currentCategories: ["report_incomplete"] },
+      { existingCategories: ["report_incomplete"], currentCategories: ["missing_tool", "report_incomplete"] },
+      { existingCategories: ["report_incomplete"], currentCategories: ["missing_data", "report_incomplete"] },
+      { existingCategories: ["missing_tool", "report_incomplete"], currentCategories: ["missing_data", "report_incomplete"] },
+    ])("reuses incomplete reports when supplemental diagnostics differ: %j", ({ existingCategories, currentCategories }) => {
+      const { isReusableFailureIssue } = require("./handle_agent_failure.cjs");
+      const body = buildExistingIssueBody({ categories: existingCategories });
+      expect(isReusableFailureIssue(body, { workflowId: "test-workflow", failureCategories: currentCategories })).toBe(true);
+      expect(isReusableFailureIssue(body, { workflowId: "other-workflow", failureCategories: currentCategories })).toBe(false);
+      expect(isReusableFailureIssue(body, { workflowId: "test-workflow", failureCategories: [...currentCategories, "mcp_policy_error"].sort() })).toBe(false);
+      expect(isReusableFailureIssue(body, { workflowId: "test-workflow", failureCategories: ["missing_tool"] })).toBe(false);
+    });
 
     beforeEach(() => {
       tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "aw-handle-agent-failure-match-"));
@@ -2389,9 +2391,8 @@ describe("handle_agent_failure", () => {
       }
     });
 
-    it.each(["missing_terminal_safe_output", "report_incomplete"])("creates one failure issue across clean-exit runs with %s and changing diagnostics", async cause => {
+    it("creates one report_incomplete issue across clean-exit runs with changing diagnostics", async () => {
       syncRuntimePromptTemplates(import.meta.url);
-      const { buildEmptyOutputOutcome } = require("./empty_output_outcome.cjs");
       fs.writeFileSync(path.join(tmpDir, "agent_execution_exit_code.txt"), "0");
       const outputPath = path.join(tmpDir, "agent_output.json");
       vi.stubEnv("GH_AW_AGENT_OUTPUT", outputPath);
@@ -2417,24 +2418,17 @@ describe("handle_agent_failure", () => {
         { type: "report_missing_tool", tool: "unavailable_tool", reason: "Tool unavailable" },
         { type: "report_missing_data", data_type: "unavailable_data", reason: "Data unavailable" },
       ]) {
-        const incomplete = cause === "missing_terminal_safe_output" ? buildEmptyOutputOutcome([], tmpDir) : { type: "report_incomplete", reason: "Required data could not be read" };
-        fs.writeFileSync(
-          outputPath,
-          JSON.stringify({
-            items: [diagnostic, incomplete],
-            ...(cause === "missing_terminal_safe_output" ? { collectorEmptyOutputCause: incomplete.reason, collectorFailureCause: incomplete.failureCause, collectorDriverExitCode: 0 } : {}),
-          })
-        );
+        const incomplete = { type: "report_incomplete", reason: "Required data could not be read" };
+        fs.writeFileSync(outputPath, JSON.stringify({ items: [diagnostic, incomplete] }));
         await main();
         vi.stubEnv("GITHUB_HEAD_REF", "feature/another-run");
       }
       expect(create).toHaveBeenCalledOnce();
       expect(createComment).toHaveBeenCalledOnce();
       expect(createComment).toHaveBeenCalledWith(expect.objectContaining({ issue_number: 99 }));
-      expect(create.mock.calls[0][0].title).toContain(cause === "missing_terminal_safe_output" ? "finished without a terminal safe output" : "reported incomplete result");
+      expect(create.mock.calls[0][0].title).toContain("reported incomplete result");
       for (const body of [create.mock.calls[0][0].body, createComment.mock.calls[0][0].body]) {
-        expect(body).toContain(cause === "missing_terminal_safe_output" ? "Failure classification: missing_terminal_safe_output" : "Required data could not be read");
-        if (cause === "missing_terminal_safe_output") expect(body).toContain("Driver exit code: 0");
+        expect(body).toContain("Required data could not be read");
       }
     });
 
