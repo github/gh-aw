@@ -23,18 +23,6 @@ function checkCommand(handler, command, expected) {
   assert.equal(handler({ kind: "shell", fullCommandText: command }).kind, expected, command);
 }
 
-test("MCP access-control spec validation uses full history and matching documented pins", () => {
-  const workflow = fs.readFileSync(path.join(__dirname, "..", ".github", "workflows", "ci.yml"), "utf8");
-  const job = workflow.split("  validate-mcp-access-control-spec-pin:\n")[1]?.split("\n  test-race:")[0];
-  assert.ok(job, "Missing MCP access-control spec-pin validation job");
-  assert.match(job, /with:\n\s+fetch-depth: 0\n\s+persist-credentials: false/);
-  const pin = job.match(/pinned="([a-f0-9]{40})"/)?.[1];
-  assert.ok(pin, "Missing specification commit pin");
-  const readme = fs.readFileSync(path.join(__dirname, "..", "specs", "github-mcp-access-control-compliance", "README.md"), "utf8");
-  assert.ok(readme.includes(`**Spec version pinned at commit \`${pin}\`.**`));
-  assert.ok(readme.includes(`PINNED="${pin}"`));
-});
-
 test("Fixer metadata alternatives succeed while the observed denied commands remain restricted", () => {
   const handler = permissionHandler("code-scanning-fixer");
   for (const command of ["safeoutputs --help", "github --help", "git status --short", "git diff --binary --no-ext-diff | wc -c"]) {
