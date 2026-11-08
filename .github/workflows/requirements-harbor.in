@@ -1,0 +1,2 @@
+# Native consumer used by make test-harbor-conformance.
+harbor==0.25.0
