@@ -1,3 +1,3 @@
 {
-  "log_fetch_strategy": "eager"
+  "log_fetch_strategy": "lazy"
 }
