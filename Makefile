@@ -536,7 +536,7 @@ bundle-js:
 # Run workflow contracts in CJS CI even when impacted runtime tests are skipped.
 .PHONY: test-workflow-tool-contracts
 test-workflow-tool-contracts:
-	node --test scripts/workflow-tool-contracts.test.cjs scripts/code-scanning-fixer-selection.test.cjs scripts/cache-strategy-workflows.test.cjs
+	node --test scripts/workflow-tool-contracts.test.cjs scripts/code-scanning-fixer-selection.test.cjs scripts/cache-strategy-workflows.test.cjs scripts/harness-research-gate.test.cjs
 
 # Run script tests (authentication probes, stale locks, workflow drift, and workflow purity).
 .PHONY: test-scripts
