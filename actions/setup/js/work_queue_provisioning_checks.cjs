@@ -194,16 +194,18 @@ function registerTests({ describe, it }) {
       await rejected(native, policy.pools.default.profiles.worker);
       assert.equal(native.calls.length, 1);
     });
-    it("validates compiler worker metadata without npm package imports", () => {
+    it("reads lock metadata and manifests with the JavaScript helper, without parsers or native processes", () => {
       const script = `
         const assert = require("node:assert/strict");
         const Module = require("node:module");
         const load = Module._load;
         Module._load = function(name, ...args) {
+          if (name.includes("markdown_metadata") || name === "node:child_process" || name === "child_process") throw new Error("lock headers must not use a native metadata parser");
           if (!Module.isBuiltin(name) && !name.startsWith(".") && !name.startsWith("/")) throw new Error("unexpected runtime npm package: " + name);
           return load.call(this, name, ...args);
         };
-        const { verifyWorkerRoute } = require(process.argv[1]);
+        const { verifyWorkerRoute, readLockFileHeaders } = require(process.argv[1]);
+        const { Readable } = require("node:stream");
         const profile = JSON.parse(process.argv[2]);
         const bytes = Buffer.from(process.argv[3], "utf8");
         let registrations = 0;
@@ -212,12 +214,20 @@ function registerTests({ describe, it }) {
             encoding: "base64", content: bytes.toString("base64"), size: bytes.length}})},
           actions: {getWorkflow: async () => { registrations++; return {data: {path: profile.workflow, state: "active"}}; }}
         }};
-        verifyWorkerRoute({githubClient, owner: "owner", repo: "repo", profile}).then(
-          () => assert.equal(registrations, 1),
+        Promise.all([
+          verifyWorkerRoute({githubClient, owner: "owner", repo: "repo", profile}),
+          readLockFileHeaders(Readable.from([bytes])),
+        ]).then(
+          ([, headers]) => {
+            assert.equal(registrations, 1);
+            assert.equal(headers.metadata.schema_version, "v4");
+            assert.equal(headers.manifest.work_queue.worker, true);
+          },
           error => { console.error(error); process.exitCode = 1; }
         ).catch(error => { console.error(error); process.exitCode = 1; });
       `;
-      const result = spawnSync(process.execPath, ["-e", script, require.resolve("./work_queue_provisioning.cjs"), JSON.stringify(profile), validYAML], { encoding: "utf8" });
+      const contents = '# gh-aw-metadata: {"schema_version":"v4"}\n' + validYAML.split("\n")[0] + "\nthis body deliberately is not valid workflow syntax: [";
+      const result = spawnSync(process.execPath, ["-e", script, require.resolve("./work_queue_provisioning.cjs"), JSON.stringify(profile), contents], { encoding: "utf8" });
       assert.equal(result.status, 0, result.stderr);
     });
     it("provisions from copied runtime scripts without any npm packages", () => {
