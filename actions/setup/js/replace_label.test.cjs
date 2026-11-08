@@ -260,6 +260,42 @@ describe("replace_label", () => {
     expect(result.success).toBe(false);
   });
 
+  it.each([
+    ["case variation", "BlOcKeD"],
+    ["zero-width character", "block\u200Bed"],
+    ["full-width characters", "ｂｌｏｃｋｅｄ"],
+  ])("should reject blocked labels with %s", async (_variant, label) => {
+    const handler = await main({ blocked: ["blocked"] });
+    const result = await handler({ label_to_remove: "in-progress", label_to_add: label }, {});
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("blocked pattern");
+  });
+
+  it.each([
+    ["ｂｌｏｃｋｅｄ", "blocked"],
+    ["Ｂｌｏｃｋ*", "blocked-label"],
+    ["Β", "β"],
+    ["Β*", "β-label"],
+    ["＊", "*"],
+    ["&#42;", "*"],
+    ["prefix＊*", "prefix*tail"],
+  ])("should reject blocked pattern %s with label %s after matching or normalization", async (pattern, label) => {
+    const handler = await main({ blocked: [pattern] });
+    const result = await handler({ label_to_remove: label, label_to_add: "done" }, {});
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("label_to_remove");
+    expect(result.error).toContain("blocked pattern");
+  });
+
+  it.each(["＊", "&#42;", "prefix＊suffix", "prefix&#42;suffix", "prefix＊*"])("should keep normalized asterisks literal in blocked pattern %s", async pattern => {
+    const handler = await main({ blocked: [pattern] });
+    const result = await handler({ label_to_remove: "in-progress", label_to_add: "prefix-any-suffix" }, {});
+
+    expect(result.success).toBe(true);
+  });
+
   it("T-RL-026 rechecks blocklist state before setLabels", async () => {
     let setLabelsCalls = 0;
     let getCalls = 0;

@@ -43,6 +43,9 @@ steps:
     with:
       go-version-file: go.mod
       cache: true
+  - name: Install locked JavaScript test dependencies
+    working-directory: actions/setup/js
+    run: npm ci --ignore-scripts --no-audit --no-fund
 safe-outputs:
   create-pull-request:
     title-prefix: "[tlc-tests] "
