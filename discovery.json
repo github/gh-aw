@@ -155,6 +155,10 @@
   {
    "q": "agentic-workflows in:name,description fork:false archived:false pushed:>2026-11-01",
    "last_run": "2026-11-06"
+  },
+  {
+   "q": "gh-aw fork:false archived:false pushed:>2026-11-05",
+   "last_run": "2026-11-08"
   }
  ]
 }
