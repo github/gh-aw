@@ -257,11 +257,13 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
     /** @type {any} */
     const data = event.data;
     const context = sessionContext(event);
-    if (event.type === "assistant.refusal" && data.reason === "content_filter" && context.agentId === undefined && !context.parentToolUseId) {
-      contentFiltered = true;
-      diagnostics.add("The model response was blocked by content filtering; task completion could not be confirmed.");
+    if (event.type === "assistant.refusal" && context.agentId === undefined && !context.parentToolUseId) {
+      if (data.reason === "content_filter") {
+        contentFiltered = true;
+        diagnostics.add("The model response was blocked by content filtering; task completion could not be confirmed.");
+      }
       lastAgentAction = "assistant refusal recorded";
-    } else if (event.type === "assistant.message") {
+    } else if (event.type === "assistant.message" && context.agentId === undefined && !context.parentToolUseId) {
       lastAgentAction = "assistant response recorded";
     } else if (event.type === "tool.execution_start") {
       lastToolCallStatus = "started (completion not recorded)";
@@ -407,7 +409,7 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
           `Failure classification: ${failureCause}`,
           ...(driverExitCode !== undefined ? [`Driver exit code: ${driverExitCode}`] : []),
           ...(lastToolCallStatus !== "not recorded" ? [`Last tool call status: ${lastToolCallStatus}`] : []),
-          `Last agent action: ${lastAgentAction}`,
+          ...(lastAgentAction !== "not recorded" && !lastAgentAction.startsWith("tool call ") ? [`Last agent action: ${lastAgentAction}`] : []),
           ...(lastToolExitCode !== undefined ? [`Last tool exit code: ${lastToolExitCode}`] : []),
           ...(failedToolCalls ? [`Failed tool calls observed: ${failedToolCalls}`] : []),
           ...observedCompletionEvidence,
@@ -427,7 +429,7 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
               ]
             : []),
           `Last tool call status: ${lastToolCallStatus}`,
-          `Last agent action: ${lastAgentAction}`,
+          ...(lastAgentAction !== "not recorded" && !lastAgentAction.startsWith("tool call ") ? [`Last agent action: ${lastAgentAction}`] : []),
           ...(lastToolExitCode !== undefined ? [`Last tool exit code: ${lastToolExitCode}`] : []),
           `Failed tool calls observed: ${failedToolCalls}`,
           `Token budget state: ${executionCategories.includes("effective_tokens_limit_exceeded") ? "exceeded" : "unknown (no exhaustion signal recorded)"}`,

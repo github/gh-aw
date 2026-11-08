@@ -526,10 +526,41 @@ describe("empty output outcome", () => {
     expect(outcome.details).not.toContain("private-");
   });
 
+  it("reports an ordinary assistant refusal as the last action", () => {
+    writeEvents([{ type: "assistant.refusal", data: { reason: "refusal", message: "private refusal" } }]);
+    const outcome = buildEmptyOutputOutcome([], rootDir);
+    expect(outcome.details).toContain("Last agent action: assistant refusal recorded");
+    expect(outcome.details).not.toContain("content filtering");
+    expect(outcome.details).not.toContain("private refusal");
+  });
+
+  it("does not let nested assistant messages or refusals replace the top-level last action", () => {
+    writeEvents([
+      { type: "assistant.refusal", data: { reason: "refusal" } },
+      { type: "assistant.message", data: { agentId: "child-agent", content: "private child response" } },
+    ]);
+    expect(buildEmptyOutputOutcome([], rootDir).details).toContain("Last agent action: assistant refusal recorded");
+
+    writeEvents([
+      { type: "assistant.message", data: { content: "top-level response" } },
+      { type: "assistant.refusal", data: { agentId: "child-agent", reason: "refusal" } },
+    ]);
+    expect(buildEmptyOutputOutcome([], rootDir).details).toContain("Last agent action: assistant response recorded");
+  });
+
+  it("reports an unfinished tool call through tool status without duplicating the action line", () => {
+    writeEvents([{ type: "tool.execution_start", data: { toolName: "bash", input: { command: "private-command" } } }]);
+    const outcome = buildEmptyOutputOutcome([], rootDir);
+    expect(outcome.details).toContain("Last tool call status: started (completion not recorded)");
+    expect(outcome.details).not.toContain("Last agent action:");
+    expect(outcome.details).not.toContain("private-command");
+  });
+
   it("does not copy malformed tool identifiers into the last-call summary", () => {
     writeEvents([{ type: "tool.execution_start", data: { toolName: "bash\nprivate-tool-payload", input: "private-input" } }]);
     const outcome = buildEmptyOutputOutcome([], rootDir);
     expect(outcome.details).toContain("Last tool call status: started (completion not recorded)");
+    expect(outcome.details).not.toContain("Last agent action:");
     expect(outcome.details).not.toContain("private-");
   });
 

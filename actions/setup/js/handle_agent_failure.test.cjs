@@ -2368,7 +2368,7 @@ describe("handle_agent_failure", () => {
         expect(body).not.toContain("engine_outage");
         expect(body).toContain("Driver exit code: 0");
         expect(body).toContain("Last tool call status: failed");
-        expect(body).toContain("Last agent action: tool call failed");
+        expect(body).not.toContain("Last agent action: tool call failed");
         expect(body).toContain("Last tool exit code: 2");
         expect(body).not.toContain("private-");
         expect(body).not.toContain("Driver exit code: 255");
