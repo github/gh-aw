@@ -13,7 +13,7 @@ One AI reviewer that comments on everything tends to produce vague, overlapping 
 
 ## Why it's awesome
 
-**Sharp scopes, one verdict each.** The council has a Steward (written law and PR claims), an Architect (layers and contracts), an Inspector (bugs), a Warden (abuse) and an Editor (prose, for documents repositories). Each workflow states what is *not* its job. The [Warden](https://github.com/witt3rd/review-council/blob/main/.github/workflows/warden.md), for example, requires every finding to name a concrete path: who sends what, and what they get that they should not. "No path, no finding" and no defence-in-depth requests "just in case" keeps the output actionable.
+**Sharp scopes, one verdict each.** The council has a Steward (written law and PR claims), an Architect (layers and contracts), an Inspector (bugs), a Warden (abuse) and an Editor (prose, for documents repositories). Each workflow states what is *not* its job. The [Warden](https://github.com/witt3rd/review-council/blob/main/.github/workflows/warden.md), for example, requires every finding to name a concrete path: who sends what, and what they get that they should not. "No path, no finding" and no defense-in-depth requests "just in case" keeps the output actionable.
 
 **A thin, pinned caller.** [caller/review-council.yml](https://github.com/witt3rd/review-council/blob/main/caller/review-council.yml) uses YAML anchors to share permissions, inputs and secrets across one job per reviewer. Each `uses:` is pinned to a release commit SHA with the tag as a comment, and a `pins.yml` workflow reports which callers lag behind the newest release.
 

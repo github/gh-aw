@@ -174,6 +174,7 @@ func (c *Compiler) buildConclusionDetectionRunsStep(data *WorkflowData, mainJobN
 	envVars = append(envVars, "          GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n")
 	envVars = append(envVars, fmt.Sprintf("          GH_AW_DETECTION_CONCLUSION: ${{ needs.%s.outputs.detection_conclusion }}\n", constants.DetectionJobName))
 	envVars = append(envVars, fmt.Sprintf("          GH_AW_DETECTION_REASON: ${{ needs.%s.outputs.detection_reason }}\n", constants.DetectionJobName))
+	envVars = append(envVars, fmt.Sprintf("          GH_AW_DETECTION_THREAT_KINDS: ${{ needs.%s.outputs.detection_threat_kinds }}\n", constants.DetectionJobName))
 	stepCondition := ""
 	if isWorkQueueParticipant(data) {
 		stepCondition = "always()"
@@ -569,6 +570,7 @@ func (c *Compiler) buildConclusionScriptEnvVars(data *WorkflowData, mainJobName 
 	if IsDetectionJobEnabled(data.SafeOutputs) {
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_DETECTION_CONCLUSION: ${{ needs.%s.outputs.detection_conclusion }}\n", constants.DetectionJobName))
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_DETECTION_REASON: ${{ needs.%s.outputs.detection_reason }}\n", constants.DetectionJobName))
+		envVars = append(envVars, fmt.Sprintf("          GH_AW_DETECTION_THREAT_KINDS: ${{ needs.%s.outputs.detection_threat_kinds }}\n", constants.DetectionJobName))
 		notifyCommentLog.Print("Added detection conclusion and reason environment variables to conclusion job")
 	}
 	if data.SafeOutputs.AssignToAgent != nil {

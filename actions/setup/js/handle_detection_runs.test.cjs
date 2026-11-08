@@ -15,6 +15,7 @@ describe("handle_detection_runs", () => {
     process.env.GH_AW_PROMPTS_DIR = path.resolve(import.meta.dirname, "../md");
     process.env.GH_AW_WORKFLOW_NAME = "Test Workflow";
     process.env.GH_AW_RUN_URL = "https://github.com/test-owner/test-repo/actions/runs/123";
+    delete process.env.GH_AW_DETECTION_THREAT_KINDS;
     mockCore = { info: vi.fn(), warning: vi.fn() };
     mockGithub = {
       rest: {
@@ -79,6 +80,17 @@ describe("handle_detection_runs", () => {
     expect(mockCore.info).toHaveBeenCalledWith(`Detection conclusion: ${conclusion}`);
     expect(mockGithub.rest.search.issuesAndPullRequests).not.toHaveBeenCalled();
     expect(mockGithub.rest.issues.createComment).not.toHaveBeenCalled();
+  });
+
+  it.each(["warning", "failure"])("publishes only allowlisted threat categories under %s policy", async conclusion => {
+    process.env.GH_AW_DETECTION_CONCLUSION = conclusion;
+    process.env.GH_AW_DETECTION_REASON = "threat_detected";
+    process.env.GH_AW_DETECTION_THREAT_KINDS = "secret_leak,malicious_patch,PRIVATE_TEXT";
+    await main();
+    const body = mockGithub.rest.issues.createComment.mock.lastCall[0].body;
+    expect(body).toContain("Detected threat types: secret leak, malicious patch.");
+    expect(body).not.toContain("prompt injection");
+    expect(body).not.toContain("PRIVATE_TEXT");
   });
 
   it.each(["", "private conclusion: warning\nfailure", "SUCCESS", "future_conclusion"])("redacts unrecognized conclusion %s", async conclusion => {

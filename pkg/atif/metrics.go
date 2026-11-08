@@ -75,6 +75,7 @@ func reconcileMetrics(previous, supplied map[string]json.RawMessage) (map[string
 	}
 	var incoming map[string]json.RawMessage
 	if json.Unmarshal(raw, &incoming) != nil || incoming == nil {
+		metricsLog.Print("Supplied usage is not a JSON object, storing raw value without alias reconciliation")
 		merged["usage"] = raw
 		return merged, nil
 	}
@@ -96,6 +97,7 @@ func reconcileMetrics(previous, supplied map[string]json.RawMessage) (map[string
 		}
 		if overflowed(incoming, aliases.names...) {
 			// Persist invalidation even when a later snapshot omits overflow metadata.
+			metricsLog.Printf("Usage field %s marked as overflowed, invalidating to null", aliases.canonical)
 			usage[aliases.canonical] = json.RawMessage("null")
 		}
 		for _, alias := range aliases.names {
@@ -138,6 +140,7 @@ func finalMetrics(data map[string]json.RawMessage, steps int) *FinalMetrics {
 	}
 	var usage map[string]json.RawMessage
 	if json.Unmarshal(data["usage"], &usage) != nil {
+		metricsLog.Print("Terminal session.result has no parseable usage object, omitting token metrics")
 		return metrics
 	}
 	metrics.PromptTokens = count(usage, "input_tokens", "inputTokens")
@@ -176,6 +179,7 @@ func finalMetrics(data map[string]json.RawMessage, steps int) *FinalMetrics {
 		}
 	}
 	if metrics.PromptTokens != nil && metrics.CachedTokens != nil && *metrics.CachedTokens > *metrics.PromptTokens {
+		metricsLog.Printf("Cached tokens (%d) exceed prompt tokens (%d), discarding both as inconsistent", *metrics.CachedTokens, *metrics.PromptTokens)
 		metrics.PromptTokens = nil
 		metrics.CachedTokens = nil
 	}

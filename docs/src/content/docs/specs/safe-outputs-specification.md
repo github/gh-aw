@@ -5943,6 +5943,9 @@ When threat detection executes in `warn` mode and reports a threat signal for a 
 
 2. A visible threat label string: `agentic threat detected`.
 3. An XML comment marker in emitted markdown content: `<!-- gh-aw-threat-detected -->`.
+4. Detector-defined threat types from the boolean verdict fields: `prompt_injection`, `secret_leak`, and `malicious_patch`. Public warnings, failure notifications, tracking comments, and review messages MUST describe only the fields set to `true`, using framework-authored labels. They MUST NOT publish detector-generated explanations or agent text as threat details. If the types are unavailable, the message MUST say they were not reported rather than infer a finding. Tooling failures MUST remain distinct from threat findings.
+
+The configurable `detection-failure` template can use `{reason_text}` for a framework-authored description and `{threat_kinds}` for the comma-separated category identifiers (`unknown` when unavailable). Warn-mode detection warnings use framework-provided templates and are not configurable through the safe-outputs messages setting.
 
 **Requirement WTD1a (Threat Engine Error Annotation)**: When warn-mode threat detection produces a tooling-failure reason (`agent_failure` or `parse_error`) instead of a real threat verdict, including when the detection execution step itself failed, implementations MUST emit a review-first artifact with all of the following. A warn-mode detection conclusion of `failure` with a tooling-failure reason MUST be handled as `warning` and MUST NOT be treated as a passed detection:
 

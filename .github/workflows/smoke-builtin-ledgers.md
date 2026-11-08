@@ -68,7 +68,7 @@ evals:
   - id: projection_timing
     question: Does the output distinguish previously projected ledger state from pending same-run writes without claiming those writes are already visible?
   - id: ledger_write_contracts
-    question: Do the submitted ledger operations follow the specified per-ledger argument shapes, including separate ledger_map_put and table keys derived from value.id for insert or upsert?
+    question: Do the submitted ledger operations follow the specified per-ledger argument shapes, including separate ledger_map_put, table keys derived from value.id for insert or upsert, and sequential same-batch writes without depends-on referencing queued ledger output IDs?
   - id: first_run_restraint
     question: When the read-only projections are empty on a first run, does the agent avoid reporting that emptiness alone as a failure? Return UNKNOWN when prior state is present.
   - id: failure_reporting
@@ -92,6 +92,11 @@ features:
 Exercise all built-in ledger types through their safe-output operations and verify
 the persisted state projection. Writes from a run are projected at the start of
 the next run, so validate existing state before submitting this run's writes.
+Submit related ledger calls sequentially without `depends-on` or `depends_on`
+referencing ledger output IDs. Those IDs confirm queued intent, not persistence,
+so they cannot satisfy safe-output prerequisites. Trusted validation preserves
+same-batch record order and resolves temporary record references such as
+`#smoke-note`; it does not require an explicit safe-output dependency.
 
 1. Use the configured Python runtime's `sqlite3` standard library to query
    `/tmp/gh-aw/ledgers/{log,set,map,table,counter,notes}/ledger.db` read-only

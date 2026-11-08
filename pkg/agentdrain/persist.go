@@ -53,15 +53,19 @@ func (m *Miner) LoadJSON(data []byte) error {
 	persistLog.Printf("Loading miner state: bytes=%d", len(data))
 	var snap Snapshot
 	if err := json.Unmarshal(data, &snap); err != nil {
+		persistLog.Printf("Failed to decode miner snapshot JSON: %v", err)
 		return fmt.Errorf("agentdrain: LoadJSON: %w", err)
 	}
+	persistLog.Printf("Decoded miner snapshot: clusters=%d, next_id=%d, mask_rules=%d", len(snap.Clusters), snap.NextID, len(snap.Config.MaskRules))
 
 	masker, err := NewMasker(snap.Config.MaskRules)
 	if err != nil {
+		persistLog.Printf("Failed to rebuild masker from snapshot config: %v", err)
 		return fmt.Errorf("agentdrain: LoadJSON: %w", err)
 	}
 	detector, err := NewAnomalyDetector(snap.Config.SimThreshold, snap.Config.RareClusterThreshold)
 	if err != nil {
+		persistLog.Printf("Failed to rebuild anomaly detector from snapshot config: %v", err)
 		return fmt.Errorf("agentdrain: LoadJSON: %w", err)
 	}
 

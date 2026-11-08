@@ -517,6 +517,8 @@ async function main() {
   const continueOnError = process.env.GH_AW_DETECTION_CONTINUE_ON_ERROR !== "false";
   const detectionExecutionOutcome = process.env.DETECTION_AGENTIC_EXECUTION_OUTCOME || "";
   const isWarnMode = continueOnError;
+  core.setOutput("threat_kinds", "");
+  core.exportVariable("GH_AW_DETECTION_THREAT_KINDS", "");
 
   /**
    * Helper to set detection failure/warning outputs based on continue-on-error mode.
@@ -530,6 +532,8 @@ async function main() {
    */
   function setDetectionFailure(reason, message) {
     if (reason === "agent_failure" || reason === "parse_error") {
+      core.setOutput("threat_kinds", "");
+      core.exportVariable("GH_AW_DETECTION_THREAT_KINDS", "");
       reportAPIProxyGuardRejection();
     }
     core.setOutput("reason", reason);
@@ -553,6 +557,9 @@ async function main() {
    * @param {string} sourceLabel
    */
   function evaluateAndReportVerdict(verdict, sourceLabel) {
+    const threatKinds = STRUCTURED_OUTPUT_REQUIRED_FIELDS.filter(field => verdict[field] === true).join(",");
+    core.setOutput("threat_kinds", threatKinds);
+    core.exportVariable("GH_AW_DETECTION_THREAT_KINDS", threatKinds);
     core.info(`📋 Threat detection verdict${sourceLabel ? ` (${sourceLabel})` : ""}:`);
     core.info(`   prompt_injection : ${verdict.prompt_injection}`);
     core.info(`   secret_leak      : ${verdict.secret_leak}`);

@@ -9,6 +9,12 @@ import { main as createCallWorkflowHandler } from "./call_workflow.cjs";
 import { createHandlers } from "./safe_outputs_handlers.cjs";
 import { buildSafeOutputOutcomes, finalizeBufferedReviewOutcomes, projectSafeOutputData } from "./safe_output_outcomes.cjs";
 import { createSessionValidator } from "./scripts/validate_session.cjs";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { main as createLedgerAppendHandler, transactionPath } from "./ledger_append.cjs";
+import { validateTransactions } from "./push_ledger_changes.cjs";
+import { createReducer } from "./ledger_builtin.cjs";
 
 const id = index => `so_${String(index).padStart(12, "0")}`;
 const message = (index, dependencies, type = "add_comment") => ({
@@ -67,6 +73,57 @@ describe("safe-output runtime dependencies", () => {
     const result = await processMessages(new Map([["add_comment", handler]]), [message(3, [id(1), id(2)]), message(1), message(2), message(4)]);
     expect(handler.mock.calls.map(([msg]) => msg.output_id)).toEqual([id(1), id(2), id(4)]);
     expect(result.results.find(item => item.output_id === id(3))).toMatchObject({ success: false, errorCode: "safe_output_dependency_failed" });
+  });
+
+  it.each([false, true])("keeps queued ledger writes unconfirmed while accepting sequential same-batch operations (depends-on: %s)", async dependencies => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-dependencies-"));
+    vi.stubEnv("RUNNER_TEMP", directory);
+    const ledgers = [
+      { name: "table", type: "table", key: "id" },
+      { name: "notes", type: "notes" },
+    ];
+    try {
+      const handler = await createLedgerAppendHandler({ ledgers });
+      const messages = [
+        { ...message(1, undefined, "ledger_append"), ledger: "table", operation: "insert", value: { id: "run", status: "inserted" } },
+        { ...message(2, dependencies ? id(1) : undefined, "ledger_append"), ledger: "table", operation: "update", key: "run", patch: { status: "updated" } },
+        { ...message(3, dependencies ? id(2) : undefined, "ledger_append"), ledger: "table", operation: "upsert", value: { id: "run", status: "passed" } },
+        {
+          ...message(4, undefined, "ledger_append"),
+          ledger: "notes",
+          operation: "note",
+          temp_id: "smoke-note",
+          subject: "smoke",
+          note: "README describes the project",
+          reason: "Verified source",
+          citations: [{ type: "repository", path: "README.md" }],
+        },
+        { ...message(5, dependencies ? id(4) : undefined, "ledger_append"), ledger: "notes", operation: "vote", note_id: "#smoke-note", vote: "up" },
+      ];
+      const result = await processMessages(new Map([["ledger_append", handler]]), messages);
+      handler.finalize();
+      const artifact = JSON.parse(fs.readFileSync(transactionPath(), "utf8"));
+      expect(() => validateTransactions(artifact, ledgers)).not.toThrow();
+      expect(result.results.filter(item => !item.success)).toHaveLength(dependencies ? 3 : 0);
+      expect(result.results.filter(item => item.success).every(item => !isConfirmedDependencySuccess(item))).toBe(true);
+      if (dependencies) {
+        expect(result.results.find(item => item.output_id === id(2))).toMatchObject({ errorCode: "safe_output_dependency_failed", error: expect.stringContaining("Ledger prerequisite is queued, not persisted") });
+        expect(result.results.find(item => item.output_id === id(5))).toMatchObject({ errorCode: "safe_output_dependency_failed", error: expect.stringContaining("without depends-on") });
+        expect(artifact.ledgers.table.appends).toHaveLength(1);
+        expect(artifact.ledgers.notes.appends).toHaveLength(1);
+      } else {
+        const reducer = createReducer(ledgers[0]);
+        for (const append of artifact.ledgers.table.appends) reducer.apply(append.record);
+        expect(reducer.output().tables.state.rows).toEqual([{ key: "run", value: '{"id":"run","status":"passed"}' }]);
+        const [note, vote] = artifact.ledgers.notes.appends;
+        expect(vote.record.note_id).toBe(note.record.id);
+        const notesReducer = createReducer(ledgers[1]);
+        for (const append of artifact.ledgers.notes.appends) notesReducer.apply(append.record);
+        expect(notesReducer.output().tables.note_state.rows[0]).toMatchObject({ note_id: note.record.id, upvotes: 1, net_votes: 1 });
+      }
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   it.each([

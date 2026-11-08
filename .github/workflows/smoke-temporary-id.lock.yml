@@ -1863,6 +1863,7 @@ jobs:
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_DETECTION_CONCLUSION: ${{ needs.detection.outputs.detection_conclusion }}
           GH_AW_DETECTION_REASON: ${{ needs.detection.outputs.detection_reason }}
+          GH_AW_DETECTION_THREAT_KINDS: ${{ needs.detection.outputs.detection_threat_kinds }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -2002,6 +2003,7 @@ jobs:
           GH_AW_SAFE_OUTPUTS_RESULT: ${{ needs.safe_outputs.result }}
           GH_AW_DETECTION_CONCLUSION: ${{ needs.detection.outputs.detection_conclusion }}
           GH_AW_DETECTION_REASON: ${{ needs.detection.outputs.detection_reason }}
+          GH_AW_DETECTION_THREAT_KINDS: ${{ needs.detection.outputs.detection_threat_kinds }}
           GH_AW_SAFE_OUTPUT_MESSAGES: "{\"footer\":\"\\u003e 🧪 *Temporary ID smoke test by [{workflow_name}]({run_url})*{ai_credits_suffix}{history_link}\",\"appendOnlyComments\":true,\"runStarted\":\"🧪 [{workflow_name}]({run_url}) is now testing temporary ID functionality...\",\"runSuccess\":\"✅ [{workflow_name}]({run_url}) completed successfully. Temporary ID validation passed.\",\"runFailure\":\"❌ [{workflow_name}]({run_url}) encountered failures. Check the logs for details.\"}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
@@ -2201,6 +2203,7 @@ jobs:
       detection_conclusion: ${{ steps.detection_conclusion.outputs.conclusion }}
       detection_reason: ${{ steps.detection_conclusion.outputs.reason }}
       detection_success: ${{ steps.detection_conclusion.outputs.success }}
+      detection_threat_kinds: ${{ steps.detection_conclusion.outputs.threat_kinds }}
       run_detection: ${{ steps.detection_guard.outputs.run_detection }}
     steps:
       - name: Checkout actions folder
@@ -3039,6 +3042,7 @@ jobs:
       GH_AW_COMMANDS: "[\"smoke-temporary-id\"]"
       GH_AW_DETECTION_CONCLUSION: ${{ needs.detection.outputs.detection_conclusion }}
       GH_AW_DETECTION_REASON: ${{ needs.detection.outputs.detection_reason }}
+      GH_AW_DETECTION_THREAT_KINDS: ${{ needs.detection.outputs.detection_threat_kinds }}
       GH_AW_ENGINE_ID: "pi"
       GH_AW_ENGINE_MODEL: "copilot/gpt-5"
       GH_AW_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
