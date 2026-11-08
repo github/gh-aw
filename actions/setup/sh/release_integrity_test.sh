@@ -391,6 +391,10 @@ echo "PASS: missing-pin errors explain upgrade, recompile, and independently tru
 test -n "$(release_artifact_sha256 github/gh-aw-firewall v0.28.62 checksums.txt)"
 test "$(release_artifact_sha256 github/gh-aw-firewall v0.29.0 checksums.txt)" = \
   "2d49727b3b65630b5d0ba5375168687a852afac319d05c911d4769c43fa2ed61"
+for version in v0.29.10 0.29.10; do
+  test "$(release_artifact_sha256 github/gh-aw-firewall "$version" checksums.txt)" = \
+    "a60c61e67aad4810e9a4f52ae26d3b2a58a7cf190aff66aeb338238b7b0e1467"
+done
 test "$(release_artifact_sha256 github/copilot-cli v1.0.101 SHA256SUMS.txt)" = \
   "018625eac68670d66ede904b9b82cdcd6ab8f87ba20e6e1fbdf0b62c8295d5be"
 test "$(release_artifact_sha256 github/copilot-cli v1.0.103 SHA256SUMS.txt)" = \

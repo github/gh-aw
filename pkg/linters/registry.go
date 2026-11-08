@@ -6,6 +6,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/appendbytestring"
 	"github.com/github/gh-aw/pkg/linters/appendoneelement"
 	"github.com/github/gh-aw/pkg/linters/blankassigncomma"
+	"github.com/github/gh-aw/pkg/linters/blankassignedcleanuperror"
 	"github.com/github/gh-aw/pkg/linters/bufferresetbeforereuse"
 	"github.com/github/gh-aw/pkg/linters/bufioscannererunchecked"
 	"github.com/github/gh-aw/pkg/linters/bytesbufferstring"
@@ -37,6 +38,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/httpstatuscode"
 	"github.com/github/gh-aw/pkg/linters/ioutildeprecated"
 	"github.com/github/gh-aw/pkg/linters/jsonmarshalignoredeerror"
+	"github.com/github/gh-aw/pkg/linters/jsonunmarshalbytesconversion"
 	"github.com/github/gh-aw/pkg/linters/largefunc"
 	"github.com/github/gh-aw/pkg/linters/lenstringsplit"
 	"github.com/github/gh-aw/pkg/linters/lenstringzero"
@@ -108,6 +110,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	appendbytestring.Analyzer,
 	appendoneelement.Analyzer,
 	blankassigncomma.Analyzer,
+	blankassignedcleanuperror.Analyzer,
 	bufferresetbeforereuse.Analyzer,
 	bufioscannererunchecked.Analyzer,
 	bytesbufferstring.Analyzer,
@@ -178,6 +181,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	stringssplitfirst.Analyzer,
 	stringscountcontains.Analyzer,
 	jsonmarshalignoredeerror.Analyzer,
+	jsonunmarshalbytesconversion.Analyzer,
 	lenstringzero.Analyzer,
 	lenstringsplit.Analyzer,
 	timeafterleak.Analyzer,

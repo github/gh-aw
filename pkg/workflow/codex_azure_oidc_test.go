@@ -5,6 +5,7 @@ package workflow
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -20,8 +21,10 @@ func TestCodexAzureOIDCAuthentication(t *testing.T) {
 		provider LLMProvider
 		firewall bool
 		keyless  bool
+		authMode string
 	}{
-		{name: "Entra behind AWF", auth: &EngineAuthConfig{Type: "github-oidc", Provider: "azure", AzureTenantID: "tenant", AzureClientID: "client"}, firewall: true, keyless: true},
+		{name: "Entra behind AWF", auth: &EngineAuthConfig{Type: "github-oidc", Provider: "azure", AzureTenantID: "tenant", AzureClientID: "client"}, firewall: true, keyless: true, authMode: "azure"},
+		{name: "OpenAI WIF behind AWF", auth: &EngineAuthConfig{Type: "github-oidc", Provider: "openai", OpenAIIdentityProviderID: "idp", ServiceAccountID: "service-account", Audience: "https://api.openai.com/v1"}, firewall: true, keyless: true, authMode: "openai"},
 		{name: "API key", firewall: true},
 		{name: "Entra without AWF", auth: &EngineAuthConfig{Type: "github-oidc", Provider: "azure", AzureTenantID: "tenant", AzureClientID: "client"}},
 		{name: "other OIDC", auth: &EngineAuthConfig{Type: "github-oidc", Provider: "anthropic"}, firewall: true},
@@ -47,7 +50,7 @@ func TestCodexAzureOIDCAuthentication(t *testing.T) {
 				assert.Empty(t, engine.GetSecretValidationStep(data))
 				assert.NotContains(t, env, "CODEX_API_KEY")
 				assert.NotContains(t, env, "OPENAI_API_KEY")
-				assert.Equal(t, "azure", env["GH_AW_CODEX_OIDC_AUTH"])
+				assert.Equal(t, tt.authMode, env["GH_AW_CODEX_OIDC_AUTH"])
 				proxy := config.Defaults["model_providers"].(map[string]any)[codexOpenAIProxyProviderID].(map[string]any)
 				assert.NotContains(t, proxy, "env_key")
 				assert.Equal(t, false, proxy["requires_openai_auth"])
@@ -179,4 +182,153 @@ func TestValidateAzureWIFEngineAuth(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValidateOpenAIWIFEngineAuth(t *testing.T) {
+	tests := []struct {
+		name        string
+		auth        *EngineAuthConfig
+		wantErr     bool
+		errContains string
+	}{
+		{name: "other provider", auth: &EngineAuthConfig{Type: "github-oidc", Provider: "anthropic"}},
+		{name: "complete OpenAI auth", auth: &EngineAuthConfig{Type: "github-oidc", Provider: "openai", OpenAIIdentityProviderID: "idp", ServiceAccountID: "service-account", Audience: "https://api.openai.com/v1"}},
+		{name: "missing identity provider ID", auth: &EngineAuthConfig{Type: "github-oidc", Provider: "openai", ServiceAccountID: "service-account", Audience: "https://api.openai.com/v1"}, wantErr: true, errContains: "identity-provider-id"},
+		{name: "missing service account ID", auth: &EngineAuthConfig{Type: "github-oidc", Provider: "openai", OpenAIIdentityProviderID: "idp", Audience: "https://api.openai.com/v1"}, wantErr: true, errContains: "service-account-id"},
+		{name: "missing audience", auth: &EngineAuthConfig{Type: "github-oidc", Provider: "openai", OpenAIIdentityProviderID: "idp", ServiceAccountID: "service-account"}, wantErr: true, errContains: "audience"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			workflow := &WorkflowData{
+				EngineConfig:       &EngineConfig{ID: "codex", Auth: tt.auth},
+				NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}},
+			}
+			err := validateOpenAIWIFEngineAuth(workflow)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestCodexOpenAIWIFWorkflow(t *testing.T) {
+	dir := testutil.TempDir(t, "codex-openai-wif-*")
+	workflows := filepath.Join(dir, constants.GetWorkflowDir())
+	require.NoError(t, os.MkdirAll(workflows, 0o755))
+	file := filepath.Join(workflows, "openai-wif.md")
+	require.NoError(t, os.WriteFile(file, []byte(`---
+on: workflow_dispatch
+permissions:
+  contents: read
+  id-token: write
+engine:
+  id: codex
+  auth:
+    type: github-oidc
+    provider: openai
+    identity-provider-id: ${{ vars.OPENAI_IDENTITY_PROVIDER_ID }}
+    service-account-id: ${{ vars.OPENAI_SERVICE_ACCOUNT_ID }}
+    audience: https://api.openai.com/v1
+network:
+  allowed: [defaults]
+safe-outputs:
+  add-comment:
+---
+Inspect the repository and report findings.
+`), 0o644))
+	require.NoError(t, NewCompiler().CompileWorkflow(file))
+	content, err := os.ReadFile(filepath.Join(workflows, "openai-wif.lock.yml"))
+	require.NoError(t, err)
+	lock := string(content)
+	assert.NotContains(t, lock, "secrets.CODEX_API_KEY")
+	assert.NotContains(t, lock, "secrets.OPENAI_API_KEY")
+	assert.Contains(t, lock, "AWF_AUTH_PROVIDER: openai")
+	assert.Contains(t, lock, "AWF_AUTH_OPENAI_IDENTITY_PROVIDER_ID: ${{ vars.OPENAI_IDENTITY_PROVIDER_ID }}")
+	assert.Contains(t, lock, "AWF_AUTH_OPENAI_SERVICE_ACCOUNT_ID: ${{ vars.OPENAI_SERVICE_ACCOUNT_ID }}")
+	assert.Contains(t, lock, "AWF_AUTH_OIDC_AUDIENCE: https://api.openai.com/v1")
+	assert.Contains(t, lock, "GH_AW_CODEX_OIDC_AUTH: openai")
+	detectionSection := extractJobSection(lock, "detection")
+	assert.NotEmpty(t, detectionSection)
+	assert.Contains(t, detectionSection, "http://api-proxy:10000/reflect")
+	assert.Contains(t, detectionSection, "github-oidc/openai")
+	assert.Contains(t, detectionSection, "No configured OpenAI endpoint uses github-oidc/openai")
+	assert.NotContains(t, detectionSection, `env_key = "CODEX_API_KEY"`)
+}
+
+func TestCodexOpenAIWIFUnsupportedConfigurations(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		engine  string
+		network string
+		wantErr string
+	}{
+		{name: "Codex", engine: "codex"},
+		{name: "Claude", engine: "claude", wantErr: "requires engine.id: codex"},
+		{name: "firewall disabled", engine: "codex", network: "strict: false\nfeatures:\n  dangerously-disable-sandbox-agent: true\nsandbox:\n  agent: false\n", wantErr: "requires the firewall to be enabled"},
+		{name: "GitHub inference", engine: "codex\n  model-provider: github", wantErr: "requires the OpenAI inference provider"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := testutil.TempDir(t, "openai-wif-validation-*")
+			file := filepath.Join(dir, "workflow.md")
+			source := `---
+on: workflow_dispatch
+permissions:
+  contents: read
+  id-token: write
+engine:
+  id: ENGINE
+  auth:
+    type: github-oidc
+    provider: openai
+    identity-provider-id: idp
+    service-account-id: service-account
+    audience: https://api.openai.com/v1
+NETWORK---
+Inspect the repository.
+`
+			source = strings.ReplaceAll(source, "ENGINE", tt.engine)
+			source = strings.ReplaceAll(source, "NETWORK", tt.network)
+			require.NoError(t, os.WriteFile(file, []byte(source), 0o644))
+			err := NewCompiler().CompileWorkflow(file)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestCodexOpenAIWIFFallbackKeepsKeylessProvider(t *testing.T) {
+	data := &WorkflowData{
+		Model: "gpt-5.4",
+		EngineConfig: &EngineConfig{
+			ID: "codex", FallbackModels: []string{"openai/gpt-5.3-codex"},
+			Auth: &EngineAuthConfig{Type: "github-oidc", Provider: "openai", OpenAIIdentityProviderID: "idp", ServiceAccountID: "service-account", Audience: "https://api.openai.com/v1"},
+		},
+		NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}},
+	}
+	assert.Empty(t, fallbackProviderSecretNames(data))
+	env := map[string]string{}
+	applyFallbackProviderEnv(env, data)
+	assert.NotContains(t, env, "CODEX_API_KEY")
+	assert.NotContains(t, env, "OPENAI_API_KEY")
+	env = NewCodexEngine().buildCodexExecutionEnv(data, true, true, "GH_AW_MODEL_AGENT_CODEX")
+	assert.Equal(t, "openai", env["GH_AW_CODEX_OIDC_AUTH"])
+	assert.NotContains(t, env, "CODEX_API_KEY")
+	assert.NotContains(t, env, "OPENAI_API_KEY")
+	data.EngineConfig.FallbackModels = append(data.EngineConfig.FallbackModels, "anthropic/claude-sonnet-4-6")
+	assert.Equal(t, []string{"ANTHROPIC_API_KEY"}, fallbackProviderSecretNames(data))
+	applyFallbackProviderEnv(env, data)
+	assert.Contains(t, env, "ANTHROPIC_API_KEY")
+	assert.NotContains(t, env, "OPENAI_API_KEY")
+}
+
+func TestCodexOIDCReflectionGuardEscapesProvider(t *testing.T) {
+	guard := codexOIDCReflectionGuard("openai\"; process.exit(0); //")
+	assert.Contains(t, guard, `github-oidc/openai\"; process.exit(0); //`)
 }

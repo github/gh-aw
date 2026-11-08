@@ -134,7 +134,7 @@ type InlineEngineDriver struct {
 type EngineAuthConfig struct {
 	Type     string `json:"type"`
 	Audience string `json:"audience"`
-	Provider string `json:"provider"` // "azure", "anthropic", or "gcp"
+	Provider string `json:"provider"` // "azure", "anthropic", "gcp", or "openai"
 	// Azure WIF fields
 	AzureTenantID string `json:"azure-tenant-id"`
 	AzureClientID string `json:"azure-client-id"`
@@ -143,13 +143,15 @@ type EngineAuthConfig struct {
 	// Anthropic WIF fields
 	AnthropicFederationRuleID string `json:"federation-rule-id"`
 	AnthropicOrganizationID   string `json:"organization-id"`
-	AnthropicServiceAccountID string `json:"service-account-id"`
+	ServiceAccountID          string `json:"service-account-id"`
 	AnthropicWorkspaceID      string `json:"workspace-id"`
 	// Google / Vertex AI WIF fields
 	GoogleWorkloadIdentityProvider string `json:"workload-identity-provider"`
 	GoogleServiceAccount           string `json:"service-account"`
 	GoogleProject                  string `json:"project"`
 	GoogleLocation                 string `json:"location"`
+	// OpenAI WIF fields
+	OpenAIIdentityProviderID string `json:"identity-provider-id"`
 }
 
 // NetworkPermissions represents network access permissions for workflow execution
@@ -915,7 +917,12 @@ func applyEngineAuthEnv(config *EngineConfig) {
 	setEngineAuthEnv(config.Env, "AWF_AUTH_PROVIDER", config.Auth.Provider)
 	setEngineAuthEnv(config.Env, "AWF_AUTH_ANTHROPIC_FEDERATION_RULE_ID", config.Auth.AnthropicFederationRuleID)
 	setEngineAuthEnv(config.Env, "AWF_AUTH_ANTHROPIC_ORGANIZATION_ID", config.Auth.AnthropicOrganizationID)
-	setEngineAuthEnv(config.Env, "AWF_AUTH_ANTHROPIC_SERVICE_ACCOUNT_ID", config.Auth.AnthropicServiceAccountID)
+	if config.Auth.Provider == "openai" {
+		setEngineAuthEnv(config.Env, "AWF_AUTH_OPENAI_IDENTITY_PROVIDER_ID", config.Auth.OpenAIIdentityProviderID)
+		setEngineAuthEnv(config.Env, "AWF_AUTH_OPENAI_SERVICE_ACCOUNT_ID", config.Auth.ServiceAccountID)
+	} else {
+		setEngineAuthEnv(config.Env, "AWF_AUTH_ANTHROPIC_SERVICE_ACCOUNT_ID", config.Auth.ServiceAccountID)
+	}
 	setEngineAuthEnv(config.Env, "AWF_AUTH_ANTHROPIC_WORKSPACE_ID", config.Auth.AnthropicWorkspaceID)
 	setEngineAuthEnv(config.Env, "AWF_AUTH_GCP_WORKLOAD_IDENTITY_PROVIDER", config.Auth.GoogleWorkloadIdentityProvider)
 	setEngineAuthEnv(config.Env, "AWF_AUTH_GCP_SERVICE_ACCOUNT", config.Auth.GoogleServiceAccount)

@@ -1,10 +1,11 @@
 // Package linters is a namespace for gh-aw's custom Go analysis linters.
 //
-// All 90 active analyzers:
+// All 92 active analyzers:
 //
 //   - appendbytestring — flags append(b, []byte(s)...) calls where s is a string that can be simplified to append(b, s...)
 //   - appendoneelement — flags append(s, []T{x}...) calls where a single-element slice literal is spread and can be simplified to append(s, x)
 //   - blankassigncomma — flags assignment statements where every result is discarded via 2 or more blank identifiers
+//   - blankassignedcleanuperror — reports discarded errors from os.Remove, os.RemoveAll, os.WriteFile, and os.MkdirAll when assigned to _, including in deferred closures
 //   - bufferresetbeforereuse — flags bytes.Buffer or strings.Builder reuse after a read without an intervening Reset
 //   - bufioscannererunchecked — flags bufio.Scanner loops that do not check Err after scanning completes
 //   - bytesbufferstring — reports string(buf.Bytes()) calls where buf is a bytes.Buffer value and suggests buf.String() instead
@@ -36,6 +37,7 @@
 //   - httpstatuscode — flags HTTP status code anti-patterns
 //   - ioutildeprecated — reports uses of deprecated io/ioutil functions that should be replaced with io or os package equivalents
 //   - jsonmarshalignoredeerror — flags json.Marshal/Unmarshal calls where the error is discarded with _
+//   - jsonunmarshalbytesconversion — reports json.Unmarshal calls that convert a string to []byte
 //   - largefunc — flags function bodies that exceed a configurable line-count threshold
 //   - lenstringsplit — flags len(strings.Split(s, sep)) with a non-empty separator that should use strings.Count(s, sep)+1
 //   - lenstringzero — flags len(s) == 0 / len(s) != 0 on string values that should use s == "" / s != ""
@@ -49,7 +51,7 @@
 //   - osgetenvlibrary — flags os.Getenv calls in library packages
 //   - osisnotexist — flags legacy os error predicates that should use errors.Is or errors.As for wrapped errors
 //   - osopenreadallpreferreadfile — recommends os.ReadFile for files used only by deferred Close and a single ReadAll
-//   - osremoveuncheckedcleanup — flags os.Remove and os.RemoveAll calls where the error return is discarded
+//   - osremoveuncheckedcleanup — flags os.Remove and os.RemoveAll expression and go statements where the error return is discarded
 //   - ossetenvlibrary — flags os.Setenv calls in library packages
 //   - packagelevelmutableslicemap — reports mutation of package-level slice/map variables from inside function bodies, which risks data races and cross-call state leaks
 //   - panic-in-library-code — flags panic() calls in library packages
