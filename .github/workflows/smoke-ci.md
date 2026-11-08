@@ -7,7 +7,6 @@ on:
   push:
     branches: [main]
     paths: ['cmd/**', 'pkg/**', '*.go', 'go.mod', 'actions/setup/js/**']
-  schedule: every 2 days
   pull_request:
     types: [opened, synchronize, reopened]
     paths: ['cmd/**', 'pkg/**', '*.go', 'go.mod', 'actions/setup/js/**']
