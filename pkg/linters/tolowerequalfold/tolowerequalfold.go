@@ -253,7 +253,7 @@ func isCaseConvAlias(pass *analysis.Pass, expr ast.Expr, aliases map[types.Objec
 }
 
 func caseConvAliasArg(pass *analysis.Pass, expr ast.Expr, aliases map[types.Object]caseConvAliasInfo) (ast.Expr, bool) {
-	ident, ok := expr.(*ast.Ident)
+	ident, ok := astutil.UnwrapParenExpr(expr).(*ast.Ident)
 	if !ok {
 		return nil, false
 	}
@@ -268,17 +268,26 @@ func caseConvAliasArg(pass *analysis.Pass, expr ast.Expr, aliases map[types.Obje
 	return info.arg, true
 }
 
+// unwrapParenNode strips redundant parentheses when n is an expression and
+// returns n unchanged otherwise.
+func unwrapParenNode(n ast.Node) ast.Node {
+	if expr, ok := n.(ast.Expr); ok {
+		return astutil.UnwrapParenExpr(expr)
+	}
+	return n
+}
+
 // caseConvFuncAndArg returns the function name ("ToLower" or "ToUpper") and
 // the argument when n is a direct strings.ToLower/ToUpper call.
 func caseConvFuncAndArg(pass *analysis.Pass, n ast.Node) (funcName string, arg ast.Expr, ok bool) {
-	call, callOK := n.(*ast.CallExpr)
+	call, callOK := unwrapParenNode(n).(*ast.CallExpr)
 	if !callOK {
 		return "", nil, false
 	}
 	if len(call.Args) != 1 {
 		return "", nil, false
 	}
-	sel, selOK := call.Fun.(*ast.SelectorExpr)
+	sel, selOK := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !selOK {
 		return "", nil, false
 	}
@@ -359,7 +368,7 @@ func caseConvIsCompatible(pass *analysis.Pass, convSide ast.Node, otherSide ast.
 // caseConvAliasIsCompatible reports whether it is safe to rewrite a comparison
 // where aliasExpr is a case-conversion alias and litExpr is a string literal.
 func caseConvAliasIsCompatible(pass *analysis.Pass, aliasExpr ast.Expr, litExpr ast.Expr, aliases map[types.Object]caseConvAliasInfo) bool {
-	ident, ok := aliasExpr.(*ast.Ident)
+	ident, ok := astutil.UnwrapParenExpr(aliasExpr).(*ast.Ident)
 	if !ok {
 		return false
 	}
@@ -379,11 +388,11 @@ func caseConvAliasIsCompatible(pass *analysis.Pass, aliasExpr ast.Expr, litExpr 
 }
 
 func caseConvPkgName(pass *analysis.Pass, n ast.Node) (string, bool) {
-	call, ok := n.(*ast.CallExpr)
+	call, ok := unwrapParenNode(n).(*ast.CallExpr)
 	if !ok {
 		return "", false
 	}
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok || !astutil.IsPkgSelector(pass, sel, "strings") {
 		return "", false
 	}
@@ -395,8 +404,8 @@ func caseConvPkgName(pass *analysis.Pass, n ast.Node) (string, bool) {
 }
 
 func sameOperand(pass *analysis.Pass, left ast.Expr, right ast.Expr) bool {
-	leftIdent, leftOK := left.(*ast.Ident)
-	rightIdent, rightOK := right.(*ast.Ident)
+	leftIdent, leftOK := astutil.UnwrapParenExpr(left).(*ast.Ident)
+	rightIdent, rightOK := astutil.UnwrapParenExpr(right).(*ast.Ident)
 	if !leftOK || !rightOK {
 		return false
 	}
