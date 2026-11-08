@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"os"
 	"strconv"
 	"strings"
@@ -171,21 +170,6 @@ func TestAuditHealthRejectsChangedOrMissingReports(t *testing.T) {
 	}
 }
 
-func TestAuditHealthStdinChainEmptyReport(t *testing.T) {
-	t.Parallel()
-	cmd := NewAuditCommand()
-	cmd.SetIn(bytes.NewReader(healthAuditFixture(t, 0)))
-	var output bytes.Buffer
-	cmd.SetOut(&output)
-	cmd.SetArgs([]string{"--health", "--stdin", "--json"})
-	require.NoError(t, cmd.Execute())
-	var report HealthAuditReport
-	require.NoError(t, json.Unmarshal(output.Bytes(), &report))
-	assert.True(t, report.Complete)
-	assert.Empty(t, report.Audits)
-	assert.JSONEq(t, string(healthAuditFixture(t, 0)), string(report.Health))
-}
-
 func TestAuditHealthJSONUsesStdoutWithRootHelpRouting(t *testing.T) {
 	t.Parallel()
 	cmd := NewAuditCommand()
@@ -202,7 +186,7 @@ func TestAuditHealthFlagValidation(t *testing.T) {
 		{"--health-limit", "2"}, {"--start-date", "-24h"},
 		{"--health", "--health-limit", "6"}, {"--health", "--health-timeout", "-1s"},
 		{"--health", "--group"}, {"--health", "--search", "error"},
-		{"--health", "--stdin", "workflow"}, {"--health", "--stdin", "--start-date", "-24h"},
+		{"--health", "--stdin"}, {"--health", "--stdin", "workflow"},
 	} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			t.Parallel()
@@ -213,20 +197,6 @@ func TestAuditHealthFlagValidation(t *testing.T) {
 		})
 	}
 }
-
-func TestReadHealthAuditInput(t *testing.T) {
-	t.Parallel()
-	for _, raw := range []string{"", "42\n", "{} {}", strings.Repeat(" ", maximumHealthAuditInputBytes+1)} {
-		_, err := readHealthAuditInput(strings.NewReader(raw))
-		require.Error(t, err)
-	}
-	_, err := readHealthAuditInput(healthAuditErrorReader{})
-	require.Error(t, err)
-}
-
-type healthAuditErrorReader struct{}
-
-func (healthAuditErrorReader) Read([]byte) (int, error) { return 0, errors.New("read failed") }
 
 func TestAuditHealthReportCallback(t *testing.T) {
 	t.Parallel()

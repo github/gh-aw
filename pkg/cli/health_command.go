@@ -79,8 +79,6 @@ still stop collection; primary inventory and presence errors remain errors.
 Collection has a two-minute time budget by default. Use --timeout to change it
 (0 disables the deadline). Expiry returns available evidence with
 collection.partial=true and reason=time_budget, not a healthy verdict.
-Pipe --json to audit --health --stdin to audit the selected investigation targets
-individually without repeating discovery. Enable shell pipefail to retain errors.
 
 `
 
@@ -98,8 +96,7 @@ func NewHealthCommand() *cobra.Command {
   ` + string(constants.CLIExtensionPrefix) + ` health --start-date -24h      # Evidence from the last 24 hours
   ` + string(constants.CLIExtensionPrefix) + ` health --start-date 2026-10-14T04:49:11Z  # Evidence since a release
   ` + string(constants.CLIExtensionPrefix) + ` health --start-date 2026-10-14 --end-date 2026-10-15  # Bounded window
-  ` + string(constants.CLIExtensionPrefix) + ` health issue-monster --days 90  # Current status; at most 90 days
-  ` + string(constants.CLIExtensionPrefix) + ` health --json | ` + string(constants.CLIExtensionPrefix) + ` audit --health --stdin --json`,
+  ` + string(constants.CLIExtensionPrefix) + ` health issue-monster --days 90  # Current status; at most 90 days`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			threshold, _ := cmd.Flags().GetFloat64("threshold")

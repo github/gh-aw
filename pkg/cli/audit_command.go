@@ -29,8 +29,8 @@ remaining runs are compared against it, producing a diff report.
 
 With --health, select up to five investigation targets using the existing
 revision-aware health algorithm and audit them individually, not as a diff.
-An optional positional argument selects a workflow. Combine --health --stdin
-to consume health --json from a pipeline without repeating discovery.
+An optional positional argument selects a workflow. Health targets are discovered
+directly; --health cannot be combined with --stdin.
 Partial discovery starts no audits. JSON preserves the health report, individual
 audit reports, remaining targets and explicit collection failures.
 
@@ -66,8 +66,7 @@ var auditCommandExample = `  ` + string(constants.CLIExtensionPrefix) + ` audit 
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891 --format markdown  # Markdown diff output for PR comments
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891 --group # Group findings by run and audit code
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 --runtime cloud-hypervisor   # Skip run unless sandbox agent runtime matches
-  ` + string(constants.CLIExtensionPrefix) + ` audit --health --repo owner/repo --json  # Health discovery followed by individual audits
-  ` + string(constants.CLIExtensionPrefix) + ` health --repo owner/repo --json | ` + string(constants.CLIExtensionPrefix) + ` audit --health --stdin --json`
+  ` + string(constants.CLIExtensionPrefix) + ` audit --health --repo owner/repo --json  # Health discovery followed by individual audits`
 
 type auditCommandOptions struct {
 	outputDir        string

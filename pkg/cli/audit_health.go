@@ -16,8 +16,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const maximumHealthAuditInputBytes = 16 * 1024 * 1024
-
 type healthAuditInput struct {
 	Collection *struct {
 		Partial                *bool  `json:"partial"`
@@ -45,7 +43,7 @@ type HealthAuditRun struct {
 }
 
 func registerAuditHealthFlags(cmd *cobra.Command) {
-	cmd.Flags().Bool("health", false, "Select runs with revision-aware health discovery; with --stdin, consume health --json without rescanning")
+	cmd.Flags().Bool("health", false, "Select runs with revision-aware health discovery")
 	cmd.Flags().Int("health-limit", defaultFailureInvestigationBudget, "Maximum selected health targets to audit (1-5)")
 	cmd.Flags().Duration("health-timeout", 2*time.Minute, "Time budget for health discovery before auditing")
 	cmd.Flags().String("start-date", "", "Health discovery creation-time start (default: -24h; requires --health)")
@@ -69,15 +67,11 @@ func validateAuditHealthCommand(cmd *cobra.Command, args []string, opts auditCom
 		opts.experimentFilter != "" || opts.variantFilter != "" || opts.runtimeFilter != "" || opts.parse {
 		return errors.New("--health cannot be combined with run filters, --group, --parse, --search, or --models")
 	}
-	if len(args) > 1 || (opts.stdin && len(args) != 0) {
-		return errors.New("--health accepts at most one workflow, or --stdin without positional arguments")
-	}
 	if opts.stdin {
-		for _, name := range []string{"health-timeout", "start-date", "end-date"} {
-			if cmd.Flags().Changed(name) {
-				return fmt.Errorf("--%s cannot rescope a health report supplied through --stdin", name)
-			}
-		}
+		return errors.New("--health discovers runs directly and cannot be combined with --stdin")
+	}
+	if len(args) > 1 {
+		return errors.New("--health accepts at most one workflow")
 	}
 	if getDurationFlag(cmd, "health-timeout") < 0 {
 		return errors.New("--health-timeout must not be negative")
@@ -89,13 +83,7 @@ func runAuditHealthCommand(cmd *cobra.Command, args []string, opts auditCommandO
 	if err := validateAuditHealthCommand(cmd, args, opts); err != nil {
 		return err
 	}
-	var raw json.RawMessage
-	var err error
-	if opts.stdin {
-		raw, err = readHealthAuditInput(cmd.InOrStdin())
-	} else {
-		raw, err = collectAuditHealth(cmd.Context(), cmd, args, opts)
-	}
+	raw, err := collectAuditHealth(cmd.Context(), cmd, args, opts)
 	if err != nil {
 		return err
 	}
@@ -154,20 +142,6 @@ func collectAuditHealth(ctx context.Context, cmd *cobra.Command, args []string, 
 		return nil, err
 	}
 	return json.Marshal(buildHealthSummary(runs, config))
-}
-
-func readHealthAuditInput(reader io.Reader) (json.RawMessage, error) {
-	raw, err := io.ReadAll(io.LimitReader(reader, maximumHealthAuditInputBytes+1))
-	if err != nil {
-		return nil, fmt.Errorf("failed to read health JSON: %w", err)
-	}
-	if len(raw) > maximumHealthAuditInputBytes {
-		return nil, errors.New("health JSON exceeds 16 MiB")
-	}
-	if !json.Valid(raw) || !strings.HasPrefix(strings.TrimSpace(string(raw)), "{") {
-		return nil, errors.New("--health --stdin requires one valid health JSON report")
-	}
-	return raw, nil
 }
 
 func auditHealthTargets(ctx context.Context, raw json.RawMessage, opts auditCommandOptions,
