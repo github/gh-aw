@@ -117,7 +117,8 @@ func integrityReference(uses string, reusable bool) (string, bool) {
 	}) >= 0 {
 		return malformed, true
 	}
-	if local, ok := strings.CutPrefix(uses, "./"); ok {
+	if strings.HasPrefix(uses, "./") || strings.HasPrefix(uses, "$/") {
+		local := uses[2:]
 		if strings.Contains(local, "@") || !integrityPath(local, true) {
 			return malformed, true
 		}

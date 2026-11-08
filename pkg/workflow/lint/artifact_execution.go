@@ -184,8 +184,8 @@ func artifactStepExecution(ctx context.Context, input Input, block aw.ExecutionB
 			Message: "A later step may execute cross-run artifact content with workflow_run privileges; treat artifacts as untrusted data or establish independent provenance before executing them. Upstream success, branch filters and repository identity alone do not authenticate content",
 		}}
 	}
-	if uses, ok := step.Fields["uses"].(string); ok && strings.HasPrefix(uses, "./") {
-		return diagnostic(related(artifactLiteralPath(uses)), step.Path+".uses", 0), nil
+	if uses, ok := step.Fields["uses"].(string); ok && (strings.HasPrefix(uses, "./") || strings.HasPrefix(uses, "$/")) {
+		return diagnostic(related(artifactLiteralPath(uses[2:])), step.Path+".uses", 0), nil
 	}
 	directory := artifactWorkingDirectory(input, block, step)
 	return policyShellCalls(ctx, input, block, step, func(call *syntax.CallExpr, script string) ([]Diagnostic, error) {

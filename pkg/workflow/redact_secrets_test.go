@@ -125,6 +125,26 @@ func TestCollectActionReferences(t *testing.T) {
 			expected: []string{"actions/checkout@abc123 # v4"},
 		},
 		{
+			name: "Self-repository references are excluded",
+			yaml: `
+      steps:
+        - uses: $/actions/setup
+        - uses: $/actions/report # self-repository
+        - uses: actions/checkout@abc123 # v4
+      call:
+        uses: $/.github/workflows/worker.yml`,
+			expected: []string{"actions/checkout@abc123 # v4"},
+		},
+		{
+			name: "Only self-repository references",
+			yaml: `
+      steps:
+        - uses: $/actions/setup
+      call:
+        uses: $/.github/workflows/worker.yml`,
+			expected: []string{},
+		},
+		{
 			name: "Action without inline tag",
 			yaml: `
       steps:
