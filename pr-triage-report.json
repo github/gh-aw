@@ -1,20 +1,53 @@
 {
-  "run_id": "41942373514",
-  "run_date": "2026-11-05T00:37:13.427+00:00",
+  "run_id": "42430628618",
+  "run_date": "2026-11-08T00:42:44Z",
   "source": "pr-triage",
-  "eligible_total": 0,
-  "open_copilot_prs": 4,
-  "cooldown_skipped": [
-    74906,
-    74905,
-    74904,
-    74793
+  "eligible_total": 1,
+  "open_copilot_prs": 7,
+  "cooldown_skipped": 6,
+  "category_counts": {
+    "feature": 1
+  },
+  "risk_counts": {
+    "medium": 1
+  },
+  "priority_counts": {
+    "medium": 1
+  },
+  "action_counts": {
+    "fast_track": 1
+  },
+  "selected_candidates": [
+    {
+      "number": 75764,
+      "title": "Route remaining workflows through economy model routing",
+      "category": "feature",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "fast_track",
+      "score": 60,
+      "score_breakdown": {
+        "impact": 33,
+        "urgency": 13,
+        "quality": 14
+      },
+      "labels": [
+        "pr-type:feature",
+        "pr-risk:medium",
+        "pr-priority:medium",
+        "pr-action:fast_track",
+        "pr-agent:copilot"
+      ]
+    }
   ],
-  "category_counts": {},
-  "risk_counts": {},
-  "priority_counts": {},
-  "action_counts": {},
   "batches": [],
-  "selected_candidates": [],
-  "notes": "All open app/github-copilot PRs were updated within the 1-hour cooldown window; no eligible PRs remain for classification or labeling."
+  "skipped_prs": [
+    75777,
+    75774,
+    75773,
+    75765,
+    75763,
+    75761
+  ],
+  "summary": "Single eligible PR; one workflow-compliance feature change meets the cooldown gate and has passing route checks."
 }

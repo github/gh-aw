@@ -1,46 +1,53 @@
 {
-  "run_id": "42400301233",
-  "run_date": "2026-11-07T18:17:31Z",
+  "run_id": "42430628618",
+  "run_date": "2026-11-08T00:42:44Z",
   "source": "pr-triage",
   "eligible_total": 1,
-  "open_copilot_prs": 6,
-  "cooldown_skipped": 5,
+  "open_copilot_prs": 7,
+  "cooldown_skipped": 6,
   "category_counts": {
-    "bug": 1
+    "feature": 1
   },
   "risk_counts": {
-    "high": 1
+    "medium": 1
   },
   "priority_counts": {
-    "high": 1
+    "medium": 1
   },
   "action_counts": {
-    "batch_review": 1
+    "fast_track": 1
   },
   "batches": [],
   "selected_candidates": [
     {
-      "number": 75705,
-      "title": "[WIP] Fix ignored errors and discarded results in lint findings",
-      "category": "bug",
-      "risk": "high",
-      "priority": "high",
-      "action": "batch_review",
-      "score": 72,
+      "number": 75764,
+      "title": "Route remaining workflows through economy model routing",
+      "category": "feature",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "fast_track",
+      "score": 60,
       "score_breakdown": {
-        "impact": 38,
-        "urgency": 21,
-        "quality": 13
+        "impact": 33,
+        "urgency": 13,
+        "quality": 14
       },
       "labels": [
-        "pr-type:bug",
-        "pr-risk:high",
-        "pr-priority:high",
-        "pr-action:batch_review",
+        "pr-type:feature",
+        "pr-risk:medium",
+        "pr-priority:medium",
+        "pr-action:fast_track",
         "pr-agent:copilot"
       ]
     }
   ],
-  "skipped_prs": [75720, 75717, 75715, 75714, 75713],
-  "notes": "Five PRs were excluded by the 1-hour cooldown; 75705 remains the only eligible Copilot-authored open PR and is a large, high-risk lint/validation fix with an impacted-go-tests failure."
+  "skipped_prs": [
+    75777,
+    75774,
+    75773,
+    75765,
+    75763,
+    75761
+  ],
+  "notes": "Only one Copilot-authored PR remained outside the 1-hour cooldown window. It is a workflow-routing feature change with passing route checks and high-value routing cleanup."
 }
