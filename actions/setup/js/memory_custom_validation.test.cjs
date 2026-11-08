@@ -37,6 +37,84 @@ describe("memory_custom_validation", () => {
     expect(result.stdout).toContain("domain ok");
   });
 
+  it("enforces the dreaming view budgets and shape in every persistence phase", () => {
+    const workflow = fs.readFileSync(new URL("../../../.github/workflows/weekly-git-simulator-dreaming.md", import.meta.url), "utf8");
+    const scriptStart = workflow.indexOf("      script: |\n");
+    const scriptEnd = workflow.indexOf("\n  ledger:", scriptStart);
+    expect(scriptStart).toBeGreaterThanOrEqual(0);
+    expect(scriptEnd).toBeGreaterThan(scriptStart);
+    const script = workflow
+      .slice(scriptStart + "      script: |\n".length, scriptEnd)
+      .split("\n")
+      .map(line => (line.startsWith("        ") ? line.slice(8) : line))
+      .join("\n");
+    const review = {
+      version: 1,
+      source_hashes: { "git-sim-state.json": "a".repeat(64) },
+      repository_files: { "pkg/workflow/repo_memory.go": "b".repeat(64) },
+      reviewed_note_ids: ["persisted-note"],
+      lesson_count: 1,
+    };
+    const files = {
+      "dreaming-index.md": "index\n",
+      "dreaming-lessons.md": "### Lesson 1\nSupported, scoped lesson.\n",
+      "dreaming-review.json": JSON.stringify(review),
+    };
+    const cases = [
+      ["cold-start", {}, true],
+      ["complete-view", files, true],
+      ["partial-view", { "dreaming-index.md": "index" }, false],
+      ["index-at-byte-limit", { ...files, "dreaming-index.md": "é".repeat(1024) }, true],
+      ["index-over-byte-limit", { ...files, "dreaming-index.md": "é".repeat(1025) }, false],
+      ["lessons-at-byte-limit", { ...files, "dreaming-lessons.md": `### Lesson 1\n${"x".repeat(12288 - 13)}` }, true],
+      ["lessons-over-byte-limit", { ...files, "dreaming-lessons.md": `### Lesson 1\n${"x".repeat(12289 - 13)}` }, false],
+      ["review-over-byte-limit", { ...files, "dreaming-review.json": `${JSON.stringify(review)}${" ".repeat(16384)}` }, false],
+      ["malformed-review", { ...files, "dreaming-review.json": "{" }, false],
+      ["too-many-lessons", { ...files, "dreaming-review.json": JSON.stringify({ ...review, lesson_count: 11 }) }, false],
+      ["count-mismatch", { ...files, "dreaming-review.json": JSON.stringify({ ...review, lesson_count: 0 }) }, false],
+      ["bad-hash", { ...files, "dreaming-review.json": JSON.stringify({ ...review, source_hashes: { "git-sim-state.json": "not-a-hash" } }) }, false],
+      ["unsafe-path", { ...files, "dreaming-review.json": JSON.stringify({ ...review, repository_files: { "../secret": "a".repeat(64) } }) }, false],
+      ["too-many-notes", { ...files, "dreaming-review.json": JSON.stringify({ ...review, reviewed_note_ids: Array.from({ length: 21 }, (_, index) => String(index)) }) }, false],
+      ["too-many-sources", { ...files, "dreaming-review.json": JSON.stringify({ ...review, source_hashes: Object.fromEntries(Array.from({ length: 21 }, (_, index) => [String(index), "a".repeat(64)])) }) }, false],
+      ["nonconsecutive-headings", { ...files, "dreaming-lessons.md": "### Lesson 2\n" }, false],
+      [
+        "ten-lessons",
+        {
+          ...files,
+          "dreaming-lessons.md": Array.from({ length: 10 }, (_, index) => `### Lesson ${index + 1}\nScoped lesson.\n`).join(""),
+          "dreaming-review.json": JSON.stringify({ ...review, lesson_count: 10 }),
+        },
+        true,
+      ],
+      [
+        "review-at-byte-limit",
+        {
+          ...files,
+          "dreaming-review.json": `${JSON.stringify(review)}${" ".repeat(16384 - Buffer.byteLength(JSON.stringify(review)))}`,
+        },
+        true,
+      ],
+    ];
+
+    for (const phase of ["baseline", "upload", "push"]) {
+      for (const [name, caseFiles, expected] of cases) {
+        const memoryDir = path.join(tempDir, `${phase}-${name}`);
+        fs.mkdirSync(memoryDir);
+        for (const [file, contents] of Object.entries(caseFiles)) {
+          fs.writeFileSync(path.join(memoryDir, file), contents);
+        }
+        const result = runCustomMemoryValidation({
+          script,
+          memoryDir,
+          kind: "repo",
+          phase,
+          timeoutSeconds: 5,
+        });
+        expect(result.ok, `${phase}: ${name}: ${result.stderr}`).toBe(expected);
+      }
+    }
+  });
+
   it.each(["baseline", "upload", "push"])("provides runtime-controlled %s phase metadata", phase => {
     const result = runCustomMemoryValidation({
       script: `if (memoryPhase !== ${JSON.stringify(phase)}) throw new Error("incorrect phase");`,

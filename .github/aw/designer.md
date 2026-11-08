@@ -65,37 +65,9 @@ Before choosing tools or persistence, check whether later runs need reusable
 knowledge rather than just processing state. Infer this from the request and
 available repository evidence; do not add a mandatory interview question.
 
-Try deterministic cleanup first in the existing workflow: exact-key
-deduplication, sorting, bounded retention of disposable state, hash-based
-invalidation, and index rebuilding. Prefer rules whenever they reliably solve
-the problem; neither growing history nor cleanup alone needs another agent run.
-
-For repeated investigations, growing history or recall cost, accumulated
-successful techniques, or stale/contradictory advice that rules cannot resolve, load
-[memory.md](memory.md#scheduled-dreaming) even when the user does not mention
-memory or dreaming. Prefer direct recall or bounded semantic review by the
-already-running producer when its budget and ownership permit. A separate
-consolidation workflow is the last resort; loading the guide does not mean adding one.
-
-Choose dreaming only when primary evidence is available, a later consumer will
-reuse the lessons, and consolidation can reduce repeated reasoning or repair
-knowledge enough to justify its execution and maintenance cost after cheaper
-options are ruled out. Identify the observed problem, evidence source, consumer,
-and why an additional workflow is worth its total cost, not just its potential
-online savings. Keep this a quick design decision, not a separate investigation.
-If these are unknown, defer the dreamer rather than inventing a need.
-
-Check input scope before adding a dreamer: scheduled `cache-memory` dreaming
-can use default-branch history only, not PR-local caches. Shared cache keys do
-not remove branch isolation. Keep PR-local cleanup in its existing workflow.
-When dreaming is justified, load [dreaming.md](dreaming.md) for implementation;
-do not load those details for ordinary memory cleanup.
-
-For deduplication lists, cursors, numeric baselines, one-off tasks, or a small
-current index with cheap recall, keep ordinary state or direct memory updates
-unless a separate knowledge problem is demonstrated. Preserve producer task
-state and follow the dreaming guide's ownership and evidence rules when dreaming
-is justified.
+Use [memory.md](memory.md#scheduled-dreaming) for the decision and input-scope
+criteria. Load [dreaming.md](dreaming.md) only when that guide justifies a
+separate workflow, and only for implementation.
 
 Ask:
 - **"What data does the agent need to make decisions?"**

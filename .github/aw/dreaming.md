@@ -4,38 +4,9 @@ description: Implementation guidance for justified scheduled dreaming workflows,
 
 # Implement Scheduled Dreaming
 
-Load this guide only after the [memory decision guide](memory.md#scheduled-dreaming)
-justifies a separate dreamer. Prefer deterministic cleanup in the existing
-workflow, then bounded review by an already-running agent. Dreaming is not a
-new frontmatter field or ledger compaction, and requires no Managed Agents
-service, embeddings, or vector database.
-
-## Check Input Scope
-
-Inspect the producer workflow and its actual memory format. For shared durable
-knowledge, use existing `tools.repo-memory` and, when immutable lessons and
-corrections are useful, independently configured experimental `tools.ledger`
-with `type: notes`. Treat every restored input as untrusted data.
-
-For `cache-memory`, scheduled dreaming is supported here for **default-branch
-history only**, not PR-local caches. Keep scheduled and manual dreamer runs on
-the repository's actual default branch, not a hard-coded `main`. A default-branch
-workflow cannot restore PR merge-ref caches. PR merge-ref runs may restore
-eligible default-branch caches, but their saved updates remain PR-local and do not flow
-back to the default branch.
-
-Separate workflows do not automatically share cache-memory: default keys are
-workflow-scoped. Verify compatible restore/save key prefixes, cache versions
-and paths, schema, and integrity/access policy. `scope: repo` broadens eligible
-restore keys, not GitHub's branch visibility; a shared key does not remove PR
-isolation. Cache eviction remains possible, so define a rebuildable cold start.
-See the [cache-memory reference](../../docs/src/content/docs/reference/cache-memory.md#behavior).
-
-Keep PR-local cleanup inside the PR workflow: prefer deterministic rules or
-bounded review by its existing agent. If knowledge genuinely must outlive or
-cross PR boundaries, design an explicitly authorized, evidence-validated
-publication to durable repo-memory or a ledger. Do not silently export PR
-content into shared memory to bypass cache isolation.
+This guide covers implementation after the decision and input-scope checks in
+the [memory guide](memory.md#scheduled-dreaming). It does not define when to add
+a dreamer.
 
 ## Own the Derived View
 

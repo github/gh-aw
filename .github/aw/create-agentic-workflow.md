@@ -155,10 +155,8 @@ When evaluating scenarios, classify any failure before stopping:
 Use the smallest trigger that satisfies the augmented intent. Treat the mappings below as implementation options, not direct substitutions for intent reasoning. See the [Decision Matrix](triggers.md#decision-matrix) in triggers.md for the base trigger-to-use-case mapping.
 
 Apply the [memory reuse checkpoint](designer.md#memory-reuse-checkpoint) before
-selecting tools or persistence. Prefer deterministic cleanup in the existing
-workflow, then bounded review by an already-running agent. Add a separate dreamer
-only for recurring semantic work whose benefit justifies the extra workflow,
-model invocation, and maintenance. A recurring schedule alone is not a reason.
+selecting tools or persistence, and follow its routes to the decision and
+implementation guidance.
 
 | Scenario | Trigger and default output | Details |
 |---|---|---|

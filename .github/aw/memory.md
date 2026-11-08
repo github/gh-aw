@@ -281,6 +281,11 @@ For `cache-memory`, scheduled dreaming is eligible for default-branch history
 only, not PR-local caches. A PR merge-ref run may restore an eligible
 default-branch cache, but its updates do not flow back to the default branch. Keep PR-local cleanup
 inside the PR workflow; a shared key does not remove branch isolation.
+Separate workflows do not automatically share cache-memory: default keys are
+workflow-scoped. Verify compatible restore/save key prefixes, cache versions
+and paths, schema, and integrity/access policy. `scope: repo` broadens eligible
+restore keys, not GitHub's branch visibility. Cache eviction remains possible,
+so define a rebuildable cold start.
 
 Once the need, cost, and input scope justify a separate dreamer, load
 [dreaming.md](dreaming.md) for configuration, ownership, bounded consolidation,
