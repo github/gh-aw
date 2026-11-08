@@ -178,7 +178,7 @@ func TestTLARuntimeWorkflowContracts(t *testing.T) {
 			}
 			parts := strings.SplitN(lock, "name: "+stepName, 2)
 			require.Len(t, parts, 2)
-			step := strings.ReplaceAll(strings.SplitN(parts[1], "\n      - ", 2)[0], `\"`, `"`)
+			step := strings.ReplaceAll(strings.SplitN(parts[1], "\n       - ", 2)[0], `\"`, `"`)
 			for file, pin := range pins {
 				assert.Contains(t, step, pin)
 				assert.Contains(t, step, `"$trusted/`+map[string]string{
