@@ -539,8 +539,21 @@ test-workflow-tool-contracts:
 	node --test scripts/workflow-tool-contracts.test.cjs scripts/code-scanning-fixer-selection.test.cjs scripts/cache-strategy-workflows.test.cjs
 
 # Run script tests (authentication probes, stale locks, workflow drift, and workflow purity).
+.PHONY: test-pageindex-workflow
+test-pageindex-workflow:
+	@set -eu; \
+	if ! command -v uv >/dev/null 2>&1; then \
+		echo "uv is required to run PageIndex workflow tests (requires pageindex==0.5.3)." >&2; \
+		exit 1; \
+	fi; \
+	tmp_dir=$$(mktemp -d); \
+	trap 'rm -rf "$$tmp_dir"' EXIT; \
+	uv venv --python 3.12 "$$tmp_dir/venv"; \
+	uv pip install --exclude-newer "$$(date -u -d '3 days ago' +%Y-%m-%dT%H:%M:%SZ)" --only-binary=:all: --python "$$tmp_dir/venv/bin/python" "pageindex==0.5.3"; \
+	"$$tmp_dir/venv/bin/python" scripts/test_pageindex_workflow.py
+
 .PHONY: test-scripts
-test-scripts: build test-workflow-tool-contracts test-agent-local-settings
+test-scripts: build test-workflow-tool-contracts test-agent-local-settings test-pageindex-workflow
 	@echo "Running script tests..."
 	node --test scripts/agy-authentication.test.cjs
 	node --test scripts/check-npm-1es.test.mjs
