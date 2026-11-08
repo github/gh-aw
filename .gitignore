@@ -70,6 +70,10 @@ docs/public/wasm/wasm_exec.js
 # credentials
 .credentials/
 
+# Claude Code's persisted command approvals can contain plaintext credentials.
+# Keep local settings private at every project depth; shared settings and skills stay tracked.
+**/.claude/settings.local.json
+
 # Environment variable files - may contain sensitive API keys, tokens, and passwords
 .env
 .env.*

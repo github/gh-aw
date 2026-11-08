@@ -14,6 +14,7 @@ describe("no-dynamic-string-replacement", () => {
       valid: [
         `s.replace(/x/g, "literal");`,
         "s.replace(/x/g, `static`);",
+        `const REDACTED = "[REDACTED]"; s.replace(/x/g, REDACTED);`,
         `s.replace(/x/g, () => value);`,
         `s.replace(/x/g, function () { return value; });`,
         `function escape(m) { return m; } s.replace(/x/g, escape);`,
@@ -59,6 +60,18 @@ describe("no-dynamic-string-replacement", () => {
         },
         {
           code: `s.replace(/x/g, get());`,
+          errors: [{ messageId: "dynamicReplacement", suggestions: [] }],
+        },
+        {
+          code: `const R = "$1"; s.replace(/x/g, R);`,
+          errors: [{ messageId: "dynamicReplacement", suggestions: [{ messageId: "useReplacerFunction", output: `const R = "$1"; s.replace(/x/g, ((_replacement) => () => _replacement)(R));` }] }],
+        },
+        {
+          code: `const x = foo(); s.replace(/x/g, x);`,
+          errors: [{ messageId: "dynamicReplacement" }],
+        },
+        {
+          code: `let value = "ok"; value = input; s.replace(/x/g, value);`,
           errors: [{ messageId: "dynamicReplacement", suggestions: [] }],
         },
         {
