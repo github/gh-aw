@@ -4,7 +4,6 @@ package osremoveuncheckedcleanup
 
 import (
 	"go/ast"
-	"path"
 
 	"golang.org/x/tools/go/analysis"
 
@@ -23,7 +22,7 @@ func run(pass *analysis.Pass) (any, error) {
 		return nil, err
 	}
 
-	nodeFilter := []ast.Node{(*ast.AssignStmt)(nil), (*ast.ExprStmt)(nil)}
+	nodeFilter := []ast.Node{(*ast.AssignStmt)(nil), (*ast.ExprStmt)(nil), (*ast.GoStmt)(nil)}
 	return analyzerutil.Preorder(pass, nodeFilter, func(n ast.Node) {
 		analyzeDiscardedCleanup(pass, n, generatedFiles, nolintIndex)
 	})
@@ -42,23 +41,15 @@ func analyzeDiscardedCleanup(pass *analysis.Pass, n ast.Node, generatedFiles fil
 		if len(stmt.Lhs) != 1 || len(stmt.Rhs) != 1 {
 			return
 		}
-		var lhs ast.Expr
-		for _, expr := range stmt.Lhs {
-			lhs = expr
-			break
-		}
-		blank, ok := lhs.(*ast.Ident)
+		blank, ok := stmt.Lhs[0].(*ast.Ident) //nolint:uncheckedsliceindex // len(stmt.Lhs) == 1 was checked above.
 		if !ok || blank.Name != "_" {
 			return
 		}
-		var rhs ast.Expr
-		for _, expr := range stmt.Rhs {
-			rhs = expr
-			break
-		}
-		call, callOK = astutil.UnwrapParenExpr(rhs).(*ast.CallExpr)
+		call, callOK = astutil.UnwrapParenExpr(stmt.Rhs[0]).(*ast.CallExpr) //nolint:uncheckedsliceindex // len(stmt.Rhs) == 1 was checked above.
 	case *ast.ExprStmt:
 		call, callOK = astutil.UnwrapParenExpr(stmt.X).(*ast.CallExpr)
+	case *ast.GoStmt:
+		call, callOK = astutil.UnwrapParenExpr(stmt.Call).(*ast.CallExpr)
 	}
 	if !callOK {
 		return
@@ -77,5 +68,5 @@ func analyzeDiscardedCleanup(pass *analysis.Pass, n ast.Node, generatedFiles fil
 		return
 	}
 
-	pass.ReportRangef(call, "error return from %s.%s is discarded; cleanup failures may be silently ignored", path.Base(pkgPath), funcName)
+	pass.ReportRangef(call, "error return from os.%s is discarded; cleanup failures may be silently ignored", funcName)
 }

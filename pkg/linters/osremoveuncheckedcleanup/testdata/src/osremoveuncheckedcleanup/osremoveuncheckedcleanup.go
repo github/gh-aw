@@ -12,6 +12,10 @@ func discarded(path string) {
 	_ = stdos.Remove(path) // want `error return from os\.Remove is discarded`
 }
 
+func launched(path string) {
+	go stdos.Remove(path) // want `error return from os\.Remove is discarded`
+}
+
 func handled(path string) error {
 	err := stdos.Remove(path)
 	if err != nil {
