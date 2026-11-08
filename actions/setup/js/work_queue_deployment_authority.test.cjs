@@ -10,8 +10,8 @@ const DEFAULT_REF = "b".repeat(40);
 const BRANCH_REF = "e".repeat(40);
 const CONTRACT = "a".repeat(64);
 const NEXT_CONTRACT = "b".repeat(64);
-const SOURCE = "---\ntools:\n  work-queue:\n    worker: true\n---\nExecute approved instructions.\n";
-const lock = (contract = CONTRACT) => `on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\nenv:\n  GH_AW_WORK_QUEUE_CONTRACT: "${contract}"\n`;
+const lock = (contract = CONTRACT) =>
+  `# gh-aw-manifest: ${JSON.stringify({ work_queue: { worker: true, logical_contract: contract } })}\non:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\nenv:\n  GH_AW_WORK_QUEUE_CONTRACT: "${contract}"\n`;
 
 function fixture({ otherPool = false } = {}) {
   const f = queueFixture({
@@ -36,7 +36,8 @@ function fixture({ otherPool = false } = {}) {
   f.githubClient.rest.git = { getRef: vi.fn(async () => ({ data: { ref: "refs/heads/release/main", object: { sha: DEFAULT_REF } } })) };
   f.githubClient.rest.repos.getContent = vi.fn(async ({ path, ref }) => {
     expect([DEFAULT_REF, REF]).toContain(ref);
-    return { data: { type: "file", path, encoding: "base64", content: Buffer.from(path.endsWith(".md") ? SOURCE : lock()).toString("base64") } };
+    expect(path.endsWith(".lock.yml")).toBe(true);
+    return { data: { type: "file", path, encoding: "base64", content: Buffer.from(lock()).toString("base64") } };
   });
   f.githubClient.rest.actions.getWorkflow = vi.fn(async ({ workflow_id }) => ({ data: { path: `.github/workflows/${workflow_id}`, state: "active" } }));
   const options = {
@@ -100,16 +101,30 @@ describe("verified default worker deployment authority", () => {
     f.githubClient.rest.git.getRef = vi.fn(async () => ({ data: { ref: "refs/heads/release/main", object: { sha: revision } } }));
     f.githubClient.rest.repos.getContent = vi.fn(async ({ path, ref }) => {
       expect([revision, REF]).toContain(ref);
-      return { data: { type: "file", path, encoding: "base64", content: Buffer.from(path.endsWith(".md") ? SOURCE : lock()).toString("base64") } };
+      return { data: { type: "file", path, encoding: "base64", content: Buffer.from(lock()).toString("base64") } };
     });
     await synchronizeDeployments(options, trusted);
     expect(f.state.deployments.get("default").get("default").current_ref).toBe(revision);
   });
 
+  it("uses the compiler manifest without requiring Markdown source or an environment stamp", async () => {
+    const { f, options, trusted } = fixture();
+    f.githubClient.rest.repos.getContent = vi.fn(async ({ path }) => {
+      expect(path.endsWith(".lock.yml")).toBe(true);
+      const content = lock().replace(`env:\n  GH_AW_WORK_QUEUE_CONTRACT: "${CONTRACT}"\n`, "");
+      return { data: { type: "file", path, encoding: "base64", content: Buffer.from(content).toString("base64") } };
+    });
+    await synchronizeDeployments(options, trusted);
+    const worker = f.state.deployments.get("default").get("default");
+    expect(worker.current_ref).toBe(DEFAULT_REF);
+    expect(worker.current_contract).toBe(CONTRACT);
+    expect(worker.revisions[DEFAULT_REF].available).toBe(true);
+  });
+
   it.each([CONTRACT, NEXT_CONTRACT])("automatically upgrades verified default revisions with contract %s while preserving old obligations", async contract => {
     const { f, options, trusted } = fixture();
     f.githubClient.rest.repos.getContent = vi.fn(async ({ path, ref }) => ({
-      data: { type: "file", path, encoding: "base64", content: Buffer.from(path.endsWith(".md") ? SOURCE : lock(ref === DEFAULT_REF ? contract : CONTRACT)).toString("base64") },
+      data: { type: "file", path, encoding: "base64", content: Buffer.from(lock(ref === DEFAULT_REF ? contract : CONTRACT)).toString("base64") },
     }));
     f.append("dispatch_next", { pool: "default", max_claims: 1, max_dispatches: 1, max_bytes: 48000 }, f.dispatcher);
     const before = f.state;
@@ -132,7 +147,7 @@ describe("verified default worker deployment authority", () => {
   it("pauses incompatible pending unpinned Work without charging service or affecting an exact old pin", async () => {
     const { f, options, trusted } = fixture();
     f.githubClient.rest.repos.getContent = vi.fn(async ({ path, ref }) => ({
-      data: { type: "file", path, encoding: "base64", content: Buffer.from(path.endsWith(".md") ? SOURCE : lock(ref === DEFAULT_REF ? NEXT_CONTRACT : CONTRACT)).toString("base64") },
+      data: { type: "file", path, encoding: "base64", content: Buffer.from(lock(ref === DEFAULT_REF ? NEXT_CONTRACT : CONTRACT)).toString("base64") },
     }));
     await synchronizeDeployments(options, trusted);
     const work = [...f.state.works.values()];
@@ -202,7 +217,7 @@ describe("verified default worker deployment authority", () => {
     expect(canonical(f.transactions)).toBe(before);
   });
 
-  it.each(["repository", "reference", "source", "lock", "registration"])("propagates permission/rate/transport errors at %s without publishing unavailability", async endpoint => {
+  it.each(["repository", "reference", "lock", "registration"])("propagates permission/rate/transport errors at %s without publishing unavailability", async endpoint => {
     for (const status of [401, 403, 422, 429, 500, undefined, ...(["repository", "reference"].includes(endpoint) ? [404] : [])]) {
       const { f, options, trusted } = fixture();
       const failure = Object.assign(new Error("verified metadata denied"), status === undefined ? {} : { status });
@@ -215,7 +230,7 @@ describe("verified default worker deployment authority", () => {
       else {
         const read = f.githubClient.rest.repos.getContent;
         f.githubClient.rest.repos.getContent = vi.fn(async args => {
-          if (args.path.endsWith(endpoint === "source" ? ".md" : ".lock.yml")) return reject();
+          if (args.path.endsWith(".lock.yml")) return reject();
           return read(args);
         });
       }
@@ -245,22 +260,20 @@ describe("verified default worker deployment authority", () => {
   });
 
   it.each([
-    ["missing source", "source", undefined],
-    ["unapproved source", "source", "---\ntools: {work-queue: {worker: false}}\n---\n"],
-    ["string approval", "source", '---\ntools: {work-queue: {worker: "true"}}\n---\n'],
-    ["malformed source", "source", "---\ntools: [\n---\n"],
-    ["missing lock", "lock", undefined],
-    ["missing stamp", "lock", lock().replace(`env:\n  GH_AW_WORK_QUEUE_CONTRACT: "${CONTRACT}"\n`, "")],
-    ["mutable stamp", "lock", lock("${{ github.sha }}")],
-    ["non-environment stamp", "lock", lock().replace("env:", "example:\n  env:").replace("  GH_AW", "    GH_AW")],
-    ["malformed lock", "lock", lock() + "broken: [\n"],
-    ["missing assignment", "lock", lock().replace("work_queue_assignment:", "foreign:")],
-  ])("handles %s locally without installing unknown code or pausing unrelated workers", async (_, endpoint, content) => {
+    ["missing lock", undefined],
+    ["missing manifest", lock().replace(/^# gh-aw-manifest:.*\n/, "")],
+    ["unapproved worker", lock().replace('"worker":true', '"worker":false')],
+    ["string approval", lock().replace('"worker":true', '"worker":"true"')],
+    ["malformed manifest", lock().replace(/^# gh-aw-manifest:.*\n/, "# gh-aw-manifest: {\n")],
+    ["mutable contract", lock("${{ github.sha }}")],
+    ["malformed lock", lock() + "broken: [\n"],
+    ["missing assignment", lock().replace("work_queue_assignment:", "foreign:")],
+  ])("handles %s locally without installing unknown code or pausing unrelated workers", async (_, content) => {
     const { f, options, trusted } = fixture();
     options.config = { work_queue_workflows: ["worker", "other"], aw_context_workflows: ["worker", "other"] };
     const read = f.githubClient.rest.repos.getContent;
     f.githubClient.rest.repos.getContent = vi.fn(async args => {
-      if (args.ref === DEFAULT_REF && args.path === WORKFLOW.replace(/\.lock\.yml$/, endpoint === "source" ? ".md" : ".lock.yml")) {
+      if (args.ref === DEFAULT_REF && args.path === WORKFLOW) {
         if (content === undefined) throw Object.assign(new Error("missing approved artifact"), { status: 404 });
         return { data: { type: "file", path: args.path, encoding: "base64", content: Buffer.from(content).toString("base64") } };
       }
