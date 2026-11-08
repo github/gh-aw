@@ -122,7 +122,7 @@ func TestImpeccableSkillsReviewerHasDeterministicSkillSelectionGuidance(t *testi
 	require.NoError(t, err, "Should read impeccable-skills-reviewer workflow")
 
 	text := string(content)
-	assert.Contains(t, text, "pbakaus/impeccable/.agents/skills/impeccable@19786e7a225c3688e558f8694a7c8c6a8a25d840", "Impeccable reviewer should install the pinned skill")
+	assert.Contains(t, text, "pbakaus/impeccable/.agents/skills/impeccable@924bbd194d02e5e15a227e75b5901fb0d7a4ecad", "Impeccable reviewer should install the pinned skill")
 	assert.Contains(t, text, "using the first matching row", "Impeccable reviewer should select modes deterministically")
 	assert.Contains(t, text, "`tests_only`")
 	assert.Contains(t, text, "`bug_fix`")
