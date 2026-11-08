@@ -39,9 +39,13 @@ samples rather than presenting missing or budget-skipped evidence as fresh
 sessions or confirmed resumptions. Historical runs without startup records remain
 unavailable; this change does not rewrite earlier session artifacts.
 
-Use the string attribute `gh-aw.durable.parent_run_id` on agent spans, session
-logs, and Pi durable spans for validated checkpoint lineage. This attribute is
+Use the string attribute `gh-aw.durable.parent_run_id` on agent spans and session
+logs, including Pi native sessions, for validated checkpoint lineage. This attribute is
 correlation metadata, not an OpenTelemetry parent span or a replacement trace ID.
+
+Pi follows the native CLI, SDK, and RPC session chaining adopted in
+[PR #75995](https://github.com/github/gh-aw/pull/75995). Audit retains support for
+historical task-journal identities, but new startup records use native session UUIDs.
 
 ## Alternatives considered
 

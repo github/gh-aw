@@ -5,7 +5,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 const require = createRequire(import.meta.url);
-const { openDurableSession, observeDurableSession } = require("./durable_native_session.cjs");
+const { openDurableSession, observeDurableSession, openPiDurableSession } = require("./durable_native_session.cjs");
 const { stageFiles, restoreFiles, validateFiles } = require("./durable_files.cjs");
 const { captureCopilotSessions } = require("./durable_session.cjs");
 const { createCopilotSDKModelObserver } = require("./copilot_model_selection.cjs");
@@ -13,6 +13,8 @@ const { runWithCopilotSDK } = require("./copilot_sdk_session.cjs");
 const { TMP_GH_AW_PATH } = require("./constants.cjs");
 const core = { info() {}, setOutput() {} };
 const id = "00000000-0000-4000-8000-000000000001";
+const timestamp = "2026-11-08T22:00:00.000Z";
+const piHeader = { type: "session", version: 3, id, timestamp, cwd: "/workspace" };
 let directory;
 beforeEach(() => {
   fs.mkdirSync(TMP_GH_AW_PATH, { recursive: true });
@@ -73,6 +75,22 @@ function artifactRoundtrip(env, files) {
 }
 
 describe("native CLI artifact continuation", () => {
+  it("reports Pi startup once without weakening exact identity or requiring eager transcript persistence", () => {
+    const env = environment("pi");
+    const session = openPiDurableSession(env);
+    fs.mkdirSync(path.join(directory, "agent/durable-session.jsonl"));
+    const warning = vi.fn();
+    vi.stubGlobal("core", { warning });
+    observeDurableSession(session, "pi", "ordinary diagnostic output");
+    expect(() => session.started("invalid-id")).toThrow("selected native session");
+    observeDurableSession(session, "pi", JSON.stringify({ type: "session", version: 3, id }));
+    observeDurableSession(session, "pi", JSON.stringify({ type: "session", version: 3, id }));
+    expect(session.id).toBe(id);
+    expect(warning).toHaveBeenCalledTimes(1);
+    expect(warning).toHaveBeenCalledWith("Durable session metadata could not be recorded; continuation evidence is unavailable.");
+    expect(() => session.started("00000000-0000-4000-8000-000000000002")).toThrow("selected native session");
+  });
+
   it("keeps exact native session startup when metadata recording fails", () => {
     const env = environment("codex");
     const session = openDurableSession("codex", env);
@@ -87,6 +105,62 @@ describe("native CLI artifact continuation", () => {
     session.started(id);
     expect(warning).toHaveBeenCalledTimes(1);
     expect(warning).toHaveBeenCalledWith("Durable session metadata could not be recorded; continuation evidence is unavailable.");
+  });
+
+  it("chains Pi's exact native transcript and submits each run's current prompt", () => {
+    const env = {
+      ...environment("pi"),
+      GH_AW_PI_CONFIG: "{}",
+      PI_CODING_AGENT_DIR: path.join(directory, "pi-agent"),
+      GH_AW_PI_STAGING_DIR: path.join(directory, "missing-staging"),
+      GH_AW_PI_MODEL_FILE: path.join(directory, "missing-model"),
+      GH_AW_PI_SUBAGENT_CHILD: "",
+    };
+    const file = path.join(env.GH_AW_DURABLE_SESSION_DIR, "session.jsonl");
+    const cli = path.join(directory, "pi-cli.cjs");
+    fs.writeFileSync(
+      cli,
+      `#!${process.execPath}
+const fs = require("node:fs");
+const args = process.argv.slice(2);
+if (args.includes("--version")) { console.log("1.3.0"); process.exit(0); }
+const file = args[args.indexOf("--session") + 1];
+if (!file || args.includes("--no-session")) throw new Error("Native session persistence was not selected");
+if (!fs.existsSync(file)) fs.writeFileSync(file, JSON.stringify(${JSON.stringify(piHeader)}) + "\\n");
+const records = fs.readFileSync(file, "utf8").trim().split("\\n").map(line => JSON.parse(line));
+fs.appendFileSync(file, JSON.stringify({ type: "message", id: "entry-" + records.length, parentId: records.length === 1 ? null : records.at(-1).id, timestamp: ${JSON.stringify(timestamp)}, message: { role: "user", content: args.at(-1) } }) + "\\n");
+console.log(JSON.stringify({ type: "session", version: 3, id: ${JSON.stringify(id)} }));
+console.log(JSON.stringify({ type: "message_end", message: { role: "assistant", content: args.at(-1) } }));
+`
+    );
+    fs.chmodSync(cli, 0o700);
+    env.GH_AW_PI_COMMAND = cli;
+    const runtime = require.resolve("./pi_runtime.cjs");
+    const harness = require.resolve("./shell_harness.cjs");
+    function run(prompt) {
+      const command = `${JSON.stringify(process.execPath)} ${JSON.stringify(runtime)} && ${JSON.stringify(process.execPath)} ${JSON.stringify(cli)} --session-dir ${JSON.stringify(env.GH_AW_DURABLE_SESSION_DIR)} --session ${JSON.stringify(file)} ${JSON.stringify(prompt)}`;
+      const result = spawnSync(process.execPath, [harness, "pi", command], { env, encoding: "utf8", timeout: 15000 });
+      expect(result.status, result.stderr).toBe(0);
+      return result.stdout;
+    }
+    run("First task A");
+    expect(openPiDurableSession(env).id).toBe(id);
+    artifactRoundtrip(env, [file]);
+    const output = run("Current task B");
+    expect(output).toContain("Current task B");
+    expect(output).not.toContain("First task A");
+    const records = fs
+      .readFileSync(file, "utf8")
+      .trim()
+      .split("\n")
+      .map(line => JSON.parse(line));
+    expect(records[0].id).toBe(id);
+    expect(records.slice(1).map(record => record.message.content)).toEqual(["First task A", "Current task B"]);
+    const evidence = fs.readFileSync(path.join(directory, "agent/durable-session.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
+    expect(evidence).toEqual([
+      expect.objectContaining({ type: "durable.session", data: expect.objectContaining({ engine: "pi", status: "fresh", sessionId: id, runId: "100" }) }),
+      expect.objectContaining({ type: "durable.session", data: expect.objectContaining({ engine: "pi", status: "resumed", sessionId: id, runId: "101", parentRunId: "100" }) }),
+    ]);
   });
 
   it.each(["claude", "codex", "copilot"])("starts %s fresh, then restores its exact session and sends new workflow instructions", engine => {
@@ -146,6 +220,169 @@ process.stdin.on("end", () => {
       reopened.copilotSession(selector.id);
       expect(JSON.parse(fs.readFileSync(path.join(state, "capture-offset.json"), "utf8"))).toEqual(baseline);
     }
+  });
+});
+
+it("refuses missing, corrupt, incompatible or redirected Pi transcripts and leaves sub-agents ephemeral", () => {
+  const env = environment("pi");
+  const session = openPiDurableSession(env);
+  expect(session.id).toBeUndefined();
+  env.GH_AW_DURABLE_RESUMED = "true";
+  expect(() => openPiDurableSession(env)).toThrow("transcript is missing");
+  for (const content of ["{", '{"type":"session","version":3,"id":"../../other"}\n', JSON.stringify({ ...piHeader, version: 2 }), JSON.stringify(piHeader) + "\n{"]) {
+    fs.writeFileSync(session.file, content);
+    expect(() => openPiDurableSession(env)).toThrow();
+  }
+  fs.writeFileSync(session.file, JSON.stringify(piHeader) + "\n");
+  expect(openPiDurableSession(env).id).toBe(id);
+  fs.unlinkSync(session.file);
+  fs.symlinkSync(path.join(directory, "outside"), session.file);
+  expect(() => openPiDurableSession(env)).toThrow("regular file");
+  expect(openPiDurableSession({ ...env, GH_AW_PI_SUBAGENT_CHILD: "1" })).toBeUndefined();
+});
+
+describe("Pi native history integrity", () => {
+  function entry(fields = {}) {
+    return { type: "message", id: "entry-1", parentId: null, timestamp, message: { role: "user", content: "hello" }, ...fields };
+  }
+
+  function restore(records) {
+    const env = environment("pi");
+    const session = openPiDurableSession(env);
+    fs.writeFileSync(session.file, records.map(record => JSON.stringify(record)).join("\n") + "\n");
+    env.GH_AW_DURABLE_RESUMED = "true";
+    return env;
+  }
+
+  it("rejects invalid UTF-8 inside otherwise valid JSON message text without exposing history", () => {
+    const env = restore([piHeader, entry()]);
+    const file = path.join(env.GH_AW_DURABLE_SESSION_DIR, "session.jsonl");
+    const bytes = Buffer.from(fs.readFileSync(file, "utf8"));
+    bytes[bytes.indexOf("hello")] = 0xff;
+    fs.writeFileSync(file, bytes);
+    expect(() => openPiDurableSession(env)).toThrow("invalid UTF-8");
+    expect(() => openPiDurableSession(env)).not.toThrow("hello");
+    expect(openPiDurableSession({ ...env, GH_AW_PI_SUBAGENT_CHILD: "1" })).toBeUndefined();
+  });
+
+  it.each([
+    ["empty transcript", []],
+    ["null before header", [null, piHeader]],
+    ["primitive before header", [false, piHeader]],
+    ["array header", [[]]],
+    ["non-string session ID", [{ ...piHeader, id: [id] }]],
+    ["missing header timestamp", [{ ...piHeader, timestamp: undefined }]],
+    ["invalid header timestamp", [{ ...piHeader, timestamp: "invalid" }]],
+    ["missing cwd", [{ ...piHeader, cwd: undefined }]],
+    ["invalid parent session", [{ ...piHeader, parentSession: false }]],
+    ["repeated header", [piHeader, piHeader]],
+    ["repeated header after entry", [piHeader, entry(), piHeader]],
+  ])("rejects %s", (_name, records) => {
+    expect(() => openPiDurableSession(restore(records))).toThrow("native session");
+  });
+
+  it.each([
+    ["null", null],
+    ["primitive", false],
+    ["array", []],
+    ["missing type", entry({ type: undefined })],
+    ["invalid type", entry({ type: 1 })],
+    ["missing ID", entry({ id: undefined })],
+    ["empty ID", entry({ id: "" })],
+    ["non-string ID", entry({ id: ["entry-2"] })],
+    ["missing parent", entry({ parentId: undefined })],
+    ["non-string parent", entry({ parentId: 1 })],
+    ["missing parent target", entry({ parentId: "missing" })],
+    ["self-parent", entry({ parentId: "entry-1" })],
+    ["missing timestamp", entry({ timestamp: undefined })],
+    ["invalid timestamp", entry({ timestamp: "invalid" })],
+    ["primitive message", entry({ message: false })],
+    ["missing message role", entry({ message: { content: "hello" } })],
+    ["missing compaction target", entry({ type: "compaction", firstKeptEntryId: "missing" })],
+    ["missing label target", entry({ type: "label", targetId: "missing" })],
+    ["missing context-edit target", entry({ type: "context_edit", targetId: "missing" })],
+    ["invalid branch provenance", entry({ type: "branch_summary", fromId: null })],
+  ])("rejects broken entry: %s", (_name, record) => {
+    expect(() => openPiDurableSession(restore([piHeader, record]))).toThrow("native");
+  });
+
+  it.each([
+    ["duplicate IDs", [entry(), entry()]],
+    ["forward parent", [entry({ parentId: "entry-2" }), entry({ id: "entry-2" })]],
+    ["cycle", [entry({ parentId: "entry-2" }), entry({ id: "entry-2", parentId: "entry-1" })]],
+    ["forward compaction target", [entry({ type: "compaction", firstKeptEntryId: "entry-2" }), entry({ id: "entry-2" })]],
+    ["forward label target", [entry({ type: "label", targetId: "entry-2" }), entry({ id: "entry-2" })]],
+  ])("rejects %s", (_name, records) => {
+    expect(() => openPiDurableSession(restore([piHeader, ...records]))).toThrow("native");
+  });
+
+  it("accepts native entry kinds, opaque extension data, compaction and multiple branches", () => {
+    const records = [
+      entry({ id: "model", type: "model_change", provider: "github-copilot", modelId: "model" }),
+      entry({ id: "thinking", parentId: "model", type: "thinking_level_change", thinkingLevel: "high" }),
+      entry({ id: "user", parentId: "thinking" }),
+      entry({ id: "assistant", parentId: "user", message: { role: "assistant", content: [{ type: "text", text: "answer" }] } }),
+      entry({ id: "compacted", parentId: "assistant", type: "compaction", firstKeptEntryId: "user", summary: "summary", tokensBefore: 42, details: { extension: [null, false] } }),
+      entry({ id: "no-kept-entries", parentId: "compacted", type: "compaction", firstKeptEntryId: "no-kept-entries", summary: "", tokensBefore: 42, fromHook: true }),
+      entry({ id: "custom", parentId: "no-kept-entries", type: "custom", customType: "extension", data: [false, null, { nested: "data" }] }),
+      entry({ id: "custom-message", parentId: "custom", type: "custom_message", customType: "extension", content: "injected", display: false, details: "opaque" }),
+      entry({ id: "edit", parentId: "custom-message", type: "context_edit", targetId: "custom-message", replacement: { content: [] } }),
+      entry({ id: "omit", parentId: "edit", type: "context_edit", targetId: "user", replacement: null }),
+      entry({ id: "usage", parentId: "omit", type: "usage", kind: "cache_warm", provider: "github-copilot", model: "model", usage: { input: 2, output: 0 } }),
+      entry({ id: "label", parentId: "usage", type: "label", targetId: "user", label: "bookmark" }),
+      entry({ id: "clear-label", parentId: "label", type: "label", targetId: "user" }),
+      entry({ id: "info", parentId: "clear-label", type: "session_info", name: "" }),
+      entry({ id: "branch", parentId: "user", type: "branch_summary", fromId: "info", summary: "abandoned branch", details: null }),
+      entry({ id: "another-root", parentId: null }),
+      entry({ id: "root-summary", parentId: null, type: "branch_summary", fromId: "root", summary: "" }),
+      entry({ id: "tool", parentId: "another-root", message: { role: "toolResult", toolCallId: "call", content: [] } }),
+      entry({ id: "bash", parentId: "tool", message: { role: "bashExecution", command: "true", output: "", excludeFromContext: true } }),
+    ];
+    const env = restore([piHeader, ...records]);
+    expect(openPiDurableSession(env).id).toBe(id);
+  });
+
+  it("accepts forked branch-summary provenance outside the retained tree and header-only sessions", () => {
+    const fork = { ...piHeader, parentSession: "/sessions/original.jsonl" };
+    const env = restore([fork, entry(), entry({ id: "branch", parentId: "entry-1", type: "branch_summary", fromId: "abandoned-entry", summary: "retained summary" })]);
+    expect(openPiDurableSession(env).id).toBe(id);
+    expect(openPiDurableSession(restore([piHeader])).id).toBe(id);
+  });
+
+  it("accepts Pi 1.5.0 fork records with re-chained labels, compaction state and extension edits", () => {
+    // Mirrors v1.5.0 session-manager.ts appendCompaction/appendContextEdit/createBranchedSession.
+    const extensionId = "00000000-0000-4000-8000-000000000002";
+    const records = [
+      { ...piHeader, parentSession: "/sessions/original.jsonl" },
+      { type: "message", id: "abcd0001", parentId: null, timestamp, message: { role: "user", content: "task", timestamp: Date.parse(timestamp) } },
+      {
+        type: "compaction",
+        id: "abcd0002",
+        parentId: "abcd0001",
+        timestamp,
+        summary: "summary",
+        firstKeptEntryId: "abcd0002",
+        tokensBefore: 42,
+        systemMessage: { role: "system", content: "policy", timestamp: Date.parse(timestamp) },
+        fromHook: true,
+        details: { extension: [null, false] },
+        usage: { input: 10, output: 2, cacheRead: 0, cacheWrite: 0, totalTokens: 12, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+      },
+      { type: "custom_message", id: extensionId, parentId: "abcd0002", timestamp, customType: "extension", content: [{ type: "text", text: "extension content" }], display: false, details: ["opaque", null] },
+      { type: "context_edit", id: "abcd0003", parentId: extensionId, timestamp, targetId: extensionId, replacement: null },
+      { type: "branch_summary", id: "abcd0004", parentId: "abcd0003", timestamp, fromId: "abcdffff", summary: "retained provenance", details: false, fromHook: true },
+      { type: "label", id: "abcd0005", parentId: "abcd0004", timestamp, targetId: "abcd0001", label: "regenerated bookmark" },
+      { type: "label", id: "abcd0006", parentId: "abcd0005", timestamp, targetId: "abcd0001" },
+    ];
+    expect(openPiDurableSession(restore(records)).id).toBe(id);
+  });
+
+  it("preserves valid Unicode message and custom data bytes", () => {
+    const env = restore([piHeader, entry({ message: { role: "user", content: "café 🌳" } }), entry({ type: "custom", id: "custom", parentId: "entry-1", customType: "extension", data: "日本語" })]);
+    const file = path.join(env.GH_AW_DURABLE_SESSION_DIR, "session.jsonl");
+    const bytes = fs.readFileSync(file);
+    expect(openPiDurableSession(env).id).toBe(id);
+    expect(fs.readFileSync(file)).toEqual(bytes);
   });
 });
 

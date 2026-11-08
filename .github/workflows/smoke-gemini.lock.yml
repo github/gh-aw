@@ -907,8 +907,9 @@ jobs:
           GH_HOST: github.com
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.10 --rootless
       - name: Install Gemini CLI
-        run: npm install --ignore-scripts -g @google/gemini-cli@0.64.0
+        run: npm install -g @google/gemini-cli@0.64.0
         env:
+          NPM_CONFIG_IGNORE_SCRIPTS: 'true'
           NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Install Playwright CLI
         run: npm install -g @playwright/cli@0.1.23

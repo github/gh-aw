@@ -135,21 +135,54 @@ For each loop, include:
 
 Create one discussion entry with a narrative, not a bullet dump.
 
-Required structure:
+Required report sequence:
+
+1. **Overview**: a one- or two-paragraph narrative with the outcome.
+2. **Key metrics and issues**: keep decision-relevant episode counts and the most
+   important intervention or loop visible.
+3. **Detailed findings**: put long episode lists, evidence, and raw diagnostics in
+   `<details><summary><b>...</b></summary>...</details>` blocks.
+4. **Next actions or limitations**: close with concise signals to watch, follow-up
+   actions, or any missing evidence.
+
+Use `###` or lower for every report heading; reserve h1/h2 for the
+platform-rendered title. Use `- [ ]` for follow-up actions. Format run references
+as `[§12345](https://github.com/${{ github.repository }}/actions/runs/12345)` and
+include up to 3 relevant runs under `**References:**`.
 
 ### Storify Daily Entry (YYYY-MM-DD)
 
-- 1-2 paragraph opening narrative.
-- **Episode Highlights**: top episodes with evidence.
-- **Feedback Loops Across Workflows**: emergent loops and trajectory.
-- **Human Interventions That Mattered**: concrete interventions and impact.
-- **Signals to Watch Next**: short forward-looking section.
+### Summary
 
-Formatting rules:
-- Use `###` headers (or lower).
-- Keep key takeaways visible; move long raw evidence to `<details>` blocks.
-- Include run links as `[§run_id](https://github.com/${{ github.repository }}/actions/runs/run_id)`.
-- Include up to 3 most relevant run references under `**References:**`.
+One or two paragraphs with the overall outcome and the key episode or metric.
+
+### Key Metrics and Issues
+
+Keep the most decision-relevant episode count, feedback loop, or intervention visible.
+
+<details>
+<summary><b>Episode Highlights and Evidence</b></summary>
+
+### Episode Highlights
+
+Describe the top episodes with concise evidence.
+
+### Feedback Loops Across Workflows
+
+Describe the strongest emergent loops and their trajectory.
+
+### Human Interventions That Mattered
+
+Connect concrete human decisions to episode outcomes.
+
+Long episode lists, evidence chains, and raw diagnostics belong here.
+
+</details>
+
+### Signals to Watch Next
+
+- [ ] Follow up on the highest-priority signal, if one is warranted.
+- State any missing evidence or analysis limitation.
 
 ### 6) Safe-output behavior
 

@@ -19,6 +19,11 @@ These rules override conflicting upstream guidance.
 - Before inventing workflow/shared-component/tool/safe-output patterns, inspect
   `https://github.com/gm3dmo/the-power` through GitHub APIs or `gh` for prior art.
 
+## Indexing and Search
+
+Follow [index-search.md](index-search.md) when integrating existing indexes or
+search tools, including MCP.
+
 ## Session Graders
 
 Ten fast built-ins run by default in conclusion after session collection.

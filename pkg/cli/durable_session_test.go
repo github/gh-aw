@@ -166,6 +166,7 @@ func TestDurableSessionIDEngineRules(t *testing.T) {
 		{"ordinary_boundary", "copilot", strings.Repeat("a", 128), true},
 		{"ordinary_too_long", "copilot", strings.Repeat("a", 129), false},
 		{"pi_full_workflow", "pi", "pi-durable-" + strings.Repeat("workflow_", 20) + ":session-1", true},
+		{"pi_native_session", "pi", "00000000-0000-4000-8000-000000000001", true},
 		{"pi_boundary", "pi", "pi-durable-" + strings.Repeat("w", 499) + ":1", true},
 		{"pi_too_long", "pi", "pi-durable-" + strings.Repeat("w", 500) + ":1", false},
 		{"pi_missing_library", "pi", "session-1", false},

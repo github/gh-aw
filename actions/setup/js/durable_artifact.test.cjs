@@ -4,10 +4,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 const fs = require("node:fs");
 const path = require("node:path");
-const { createHash } = require("node:crypto");
-const { selectCheckpoint, restoreCheckpoint, validateCheckpoint } = require("./durable_artifact.cjs");
+const { selectCheckpoint, restoreCheckpoint } = require("./durable_artifact.cjs");
 const { stageFiles } = require("./durable_files.cjs");
-const { SOURCE, VERSION } = require("./pi_durable_checkpoint.cjs");
 const directories = [];
 
 afterEach(() => {
@@ -166,10 +164,16 @@ describe("single-step durable restoration", () => {
     fs.unlinkSync(session);
     const promptFile = path.join(root, "prompt.txt");
     fs.writeFileSync(promptFile, "Current task");
+    const userPromptFile = path.join(root, "user.txt");
+    const systemPromptFile = path.join(root, "system.txt");
+    if (engine === "pi") {
+      fs.writeFileSync(userPromptFile, "Current task");
+      fs.writeFileSync(systemPromptFile, "Current system instructions");
+    }
     const artifactClient = {
       downloadArtifact: vi.fn(async (_id, { path: destination }) => fs.cpSync(saved, destination, { recursive: true })),
     };
-    return { ...options, root, session, promptFile, saved, artifactClient, token: "test-download-token" };
+    return { ...options, root, session, promptFile, userPromptFile, systemPromptFile, saved, artifactClient, token: "test-download-token" };
   }
 
   it("starts fresh without a download, file restore, or prompt rewrite", async () => {
@@ -197,12 +201,48 @@ describe("single-step durable restoration", () => {
     const record = JSON.parse(fs.readFileSync(path.join(options.root, "durable-session.jsonl"), "utf8"));
     expect(record).toMatchObject({ type: "durable.restore", data: { status: "restored", parentRunId: "100", artifactId: "999" } });
     expect(JSON.stringify(record)).not.toContain("previous task state");
-    const prompt = fs.readFileSync(options.promptFile, "utf8");
-    if (engine === "pi" || engine === "imported-engine") expect(prompt).toBe("Current task");
+    const prompt = fs.readFileSync(engine === "pi" ? options.userPromptFile : options.promptFile, "utf8");
+    if (engine === "imported-engine") expect(prompt).toBe("Current task");
     else {
       expect(prompt).toContain("untrusted historical data");
       expect(prompt.endsWith("Current task")).toBe(true);
     }
+    if (engine === "pi") {
+      expect(fs.readFileSync(options.promptFile, "utf8")).toBe("Current task");
+      expect(fs.readFileSync(options.systemPromptFile, "utf8")).toBe("Current system instructions");
+    }
+  });
+
+  it("uses an explicitly configured Pi user prompt without changing the raw or system prompt", async () => {
+    const options = restoreFixture("pi");
+    const userPromptFile = path.join(options.root, "custom-user.txt");
+    fs.writeFileSync(userPromptFile, "Current split workflow task");
+    vi.stubEnv("GH_AW_PI_USER_PROMPT", userPromptFile);
+    await restoreCheckpoint(options);
+    const prompt = fs.readFileSync(userPromptFile, "utf8");
+    expect(prompt).toContain("untrusted historical data");
+    expect(prompt).toContain("The harness resumes your exact native session");
+    expect(prompt.endsWith("Current split workflow task")).toBe(true);
+    expect(fs.readFileSync(options.userPromptFile, "utf8")).toBe("Current task");
+    expect(fs.readFileSync(options.promptFile, "utf8")).toBe("Current task");
+    expect(fs.readFileSync(options.systemPromptFile, "utf8")).toBe("Current system instructions");
+  });
+
+  it("does not rewrite a first-run Pi split prompt when no checkpoint exists", async () => {
+    const options = restoreFixture("pi");
+    options.github.rest.actions.listWorkflowRuns.mockResolvedValue({ data: { workflow_runs: [] } });
+    await restoreCheckpoint(options);
+    expect(fs.readFileSync(options.userPromptFile, "utf8")).toBe("Current task");
+    expect(fs.readFileSync(options.systemPromptFile, "utf8")).toBe("Current system instructions");
+    expect(options.core.setOutput).not.toHaveBeenCalledWith("restored", "true");
+  });
+
+  it("fails closed when Pi's consumed split prompt is missing, without rewriting the raw prompt", async () => {
+    const options = restoreFixture("pi");
+    fs.unlinkSync(options.userPromptFile);
+    await expect(restoreCheckpoint(options)).rejects.toThrow("ENOENT");
+    expect(fs.readFileSync(options.promptFile, "utf8")).toBe("Current task");
+    expect(options.core.setOutput).not.toHaveBeenCalledWith("restored", "true");
   });
 
   it("fails without restoring files or enabling continuation when download authorization fails", async () => {
@@ -255,46 +295,5 @@ describe("single-step durable restoration", () => {
     fs.unlinkSync(options.promptFile);
     await expect(restoreCheckpoint(options)).rejects.toThrow("ENOENT");
     expect(options.core.setOutput).not.toHaveBeenCalledWith("restored", "true");
-  });
-});
-
-describe("durable artifact publication", () => {
-  function checkpointFixture() {
-    vi.stubEnv("GH_AW_DURABLE_CHECKPOINT", "/tmp/gh-aw/agent/durable/pi-durable-continuable.json");
-    vi.stubEnv("GH_AW_DURABLE_ENGINE", "pi");
-    const content = '{"seq":1}\n';
-    const checkpoint = {
-      source: SOURCE,
-      packageVersion: VERSION,
-      contractVersion: 1,
-      scope: "pi-durable-continuable",
-      storage: "artifact",
-      files: { "main.jsonl": content },
-      hashes: { "main.jsonl": createHash("sha256").update(content).digest("hex") },
-    };
-    vi.spyOn(fs, "existsSync").mockReturnValue(true);
-    vi.spyOn(fs, "lstatSync").mockReturnValue({ isFile: () => true, isSymbolicLink: () => false });
-    vi.spyOn(fs, "readFileSync").mockImplementation(() => JSON.stringify(checkpoint));
-    const core = { setOutput: vi.fn(), info: vi.fn() };
-    return { checkpoint, core };
-  }
-
-  it("publishes only a valid complete checkpoint", () => {
-    const { core } = checkpointFixture();
-    validateCheckpoint({ core });
-    expect(core.setOutput).toHaveBeenCalledWith("present", "true");
-  });
-
-  it("rejects a checkpoint modified by secret redaction", () => {
-    const { checkpoint, core } = checkpointFixture();
-    checkpoint.files["main.jsonl"] = '{"seq":"***"}\n';
-    expect(() => validateCheckpoint({ core })).toThrow("damaged or redacted");
-    expect(core.setOutput).not.toHaveBeenCalled();
-  });
-
-  it("rejects symlink checkpoints", () => {
-    const { core } = checkpointFixture();
-    fs.lstatSync.mockReturnValue({ isFile: () => false, isSymbolicLink: () => true });
-    expect(() => validateCheckpoint({ core })).toThrow("regular files");
   });
 });

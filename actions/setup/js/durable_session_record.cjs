@@ -49,7 +49,9 @@ function isDurableSessionRecord(record) {
     ["parentRunId", "artifactId"].every(key => data[key] === undefined || (typeof data[key] === "string" && /^[1-9]\d*$/.test(data[key]))) &&
     (record.type !== "durable.session" ||
       (typeof data.sessionId === "string" &&
-        (data.engine === "pi" ? data.sessionId.length <= 512 && /^pi-durable-[A-Za-z0-9_-]+:[A-Za-z0-9][A-Za-z0-9_-]*$/.test(data.sessionId) : /^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$/.test(data.sessionId)))) &&
+        (data.engine === "pi"
+          ? /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(data.sessionId) || (data.sessionId.length <= 512 && /^pi-durable-[A-Za-z0-9_-]+:[A-Za-z0-9][A-Za-z0-9_-]*$/.test(data.sessionId))
+          : /^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$/.test(data.sessionId)))) &&
     (data.status !== "restored" || (data.parentRunId !== undefined && data.artifactId !== undefined))
   );
 }

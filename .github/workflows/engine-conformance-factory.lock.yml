@@ -753,8 +753,9 @@ jobs:
           GH_HOST: github.com
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.10 --rootless
       - name: Install Factory Droid CLI
-        run: npm install --ignore-scripts -g @factory/cli@0.248.0
+        run: npm install -g @factory/cli@0.248.0
         env:
+          NPM_CONFIG_IGNORE_SCRIPTS: 'true'
           NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Verify Factory Droid CLI installation
         run: droid --version

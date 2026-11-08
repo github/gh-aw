@@ -41,6 +41,7 @@ type durableSessionRecord struct {
 
 var durableSessionIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$`)
 var durablePiSessionIDPattern = regexp.MustCompile(`^pi-durable-[A-Za-z0-9_-]+:[A-Za-z0-9][A-Za-z0-9_-]*$`)
+var durableNativeSessionIDPattern = regexp.MustCompile(`(?i)^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$`)
 var durableNumericIDPattern = regexp.MustCompile(`^[1-9][0-9]*$`)
 
 func hasDurableRestoreStep(jobs []JobInfoWithDuration) bool {
@@ -198,7 +199,7 @@ func validDurableSessionRecord(record durableSessionRecord, eventType string) bo
 
 func validDurableSessionID(engine, id string) bool {
 	if engine == "pi" {
-		return len(id) <= 512 && durablePiSessionIDPattern.MatchString(id)
+		return durableNativeSessionIDPattern.MatchString(id) || (len(id) <= 512 && durablePiSessionIDPattern.MatchString(id))
 	}
 	return durableSessionIDPattern.MatchString(id)
 }

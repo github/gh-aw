@@ -266,15 +266,19 @@ describe("collect_ndjson_output.cjs", () => {
         expect(mockCore.setOutput).toHaveBeenCalledWith("output", incompleteOutput),
         expect(mockCore.info).toHaveBeenCalledWith("Output file is empty"));
     }),
-    it("adds a terminal incompletion signal when the agent emitted only diagnostics", async () => {
+    it.each([undefined, 0])("adds one terminal incompletion signal for diagnostic-only output after driver exit %s", async driverExitCode => {
       const testFile = "/tmp/gh-aw/test-ndjson-output.txt";
       fs.writeFileSync(testFile, '{"type":"report_missing_tool","tool":"read","reason":"Unavailable","alternatives":"Check permissions"}');
+      if (driverExitCode !== undefined) fs.writeFileSync(path.join(diagnosticRoot, "agent_execution_exit_code.txt"), String(driverExitCode));
       process.env.GH_AW_SAFE_OUTPUTS = testFile;
       fs.writeFileSync(process.env.GH_AW_SAFE_OUTPUTS_CONFIG_PATH, JSON.stringify({ report_missing_tool: {}, report_incomplete: {} }));
       await eval(`(async () => { ${collectScript}; await main(); })()`);
       const output = JSON.parse(mockCore.setOutput.mock.calls.find(call => call[0] === "output")[1]);
       expect(output.items.map(item => item.type)).toEqual(["report_missing_tool", "report_incomplete"]);
       expect(output.items[1].reason).toBe("missing_terminal_safe_output");
+      expect(output.collectorFailureCause).toBe("missing_terminal_safe_output");
+      expect(output.collectorDriverExitCode).toBe(driverExitCode);
+      expect(output.errors).toEqual([]);
     }),
     it.each(["missing_tool", "missing_data"])("normalizes legacy %s records and shares their canonical output budget", async legacy => {
       const canonical = `report_${legacy}`;

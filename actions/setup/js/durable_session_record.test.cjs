@@ -50,6 +50,13 @@ it("retains the non-Pi ID bound", () => {
   expect(() => recordDurableSessionEvent("durable.session", { status: "fresh", sessionId: "a".repeat(129) }, options)).toThrow("Invalid durable session metadata");
 });
 
+it("accepts Pi native session UUIDs alongside historical task identities", () => {
+  options.env.GH_AW_DURABLE_ENGINE = "pi";
+  const sessionId = "00000000-0000-4000-8000-000000000001";
+  recordDurableSessionEvent("durable.session", { status: "fresh", sessionId }, options);
+  expect(JSON.parse(fs.readFileSync(path.join(options.root, "durable-session.jsonl"), "utf8")).data.sessionId).toBe(sessionId);
+});
+
 it("warns safely when metadata cannot be validated or written", () => {
   const core = { warning: vi.fn() };
   expect(tryRecordDurableSessionEvent("durable.restore", { status: "restored" }, { ...options, core })).toBe(false);

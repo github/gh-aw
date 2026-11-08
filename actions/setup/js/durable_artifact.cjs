@@ -1,10 +1,8 @@
 // @ts-check
 "use strict";
 
-const fs = require("node:fs");
 const path = require("node:path");
 const { createHash } = require("node:crypto");
-const { assertNoSecrets, SOURCE, VERSION } = require("./pi_durable_checkpoint.cjs");
 const { readInboundAwContext } = require("./aw_context.cjs");
 const { DefaultArtifactClient } = require("./artifact_client.cjs");
 const { restoreFiles } = require("./durable_files.cjs");
@@ -12,7 +10,7 @@ const { preparePrompt } = require("./durable_session.cjs");
 const { tryRecordDurableSessionEvent } = require("./durable_session_record.cjs");
 
 /** Select and restore a checkpoint before exposing continuation to the engine. */
-async function restoreCheckpoint({ github, context, core, token, artifactClient = new DefaultArtifactClient(), root = "/tmp/gh-aw/agent", promptFile }) {
+async function restoreCheckpoint({ github, context, core, token, artifactClient = new DefaultArtifactClient(), root = "/tmp/gh-aw/agent", promptFile = "/tmp/gh-aw/aw-prompts/prompt.txt" }) {
   const outputs = new Map();
   const record = status =>
     tryRecordDurableSessionEvent(
@@ -45,8 +43,9 @@ async function restoreCheckpoint({ github, context, core, token, artifactClient 
       findBy: { token, repositoryOwner: context.repo.owner, repositoryName: context.repo.repo },
     });
     restoreFiles({ core: { ...core, setOutput() {} }, root });
-    if (["copilot", "claude", "codex", "gemini", "agy"].includes(process.env.GH_AW_DURABLE_ENGINE || "")) {
-      preparePrompt({ env: { ...process.env, GH_AW_DURABLE_RESUMED: "true" }, promptFile });
+    if (["copilot", "claude", "codex", "gemini", "agy", "pi"].includes(process.env.GH_AW_DURABLE_ENGINE || "")) {
+      const currentPrompt = process.env.GH_AW_DURABLE_ENGINE === "pi" ? process.env.GH_AW_PI_USER_PROMPT || path.join(path.dirname(promptFile), "user.txt") : promptFile;
+      preparePrompt({ env: { ...process.env, GH_AW_DURABLE_RESUMED: "true" }, promptFile: currentPrompt });
     }
     record("restored");
     core.setOutput("restored", "true");
@@ -135,39 +134,4 @@ async function selectCheckpoint({ github, context, core }) {
 }
 
 /** Recheck integrity after host secret redaction, never upload a damaged store. */
-function validateCheckpoint({ core }) {
-  const file = process.env.GH_AW_DURABLE_CHECKPOINT;
-  if (!file || path.dirname(file) !== "/tmp/gh-aw/agent/durable" || !/^pi-durable-[A-Za-z0-9_-]+\.json$/.test(path.basename(file))) {
-    throw new Error("Invalid durable artifact checkpoint path");
-  }
-  if (!fs.existsSync(file)) {
-    core.info("The engine did not produce a durable checkpoint");
-    return;
-  }
-  if (fs.lstatSync("/tmp/gh-aw/agent/durable").isSymbolicLink() || !fs.lstatSync(file).isFile()) throw new Error("Durable checkpoints must be regular files");
-  const checkpoint = JSON.parse(fs.readFileSync(file, "utf8"));
-  assertNoSecrets(checkpoint);
-  if (process.env.GH_AW_DURABLE_ENGINE === "pi") {
-    if (
-      checkpoint.source !== SOURCE ||
-      checkpoint.packageVersion !== VERSION ||
-      checkpoint.contractVersion !== 1 ||
-      checkpoint.storage !== "artifact" ||
-      checkpoint.scope !== path.basename(file, ".json") ||
-      !checkpoint.files ||
-      !Object.hasOwn(checkpoint.files, "main.jsonl") ||
-      !checkpoint.hashes ||
-      JSON.stringify(Object.keys(checkpoint.files).sort()) !== JSON.stringify(Object.keys(checkpoint.hashes).sort())
-    ) {
-      throw new Error("Invalid Pi durable checkpoint manifest");
-    }
-    for (const [name, content] of Object.entries(checkpoint.files)) {
-      if (!/^(?:main|(?:doc|task)-(?:0|[1-9]\d*))\.jsonl$/.test(name) || typeof content !== "string" || checkpoint.hashes[name] !== createHash("sha256").update(content).digest("hex")) {
-        throw new Error("Pi durable checkpoint was damaged or redacted; refusing publication");
-      }
-    }
-  }
-  core.setOutput("present", "true");
-}
-
-module.exports = { selectCheckpoint, restoreCheckpoint, validateCheckpoint };
+module.exports = { selectCheckpoint, restoreCheckpoint };

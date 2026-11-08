@@ -830,8 +830,9 @@ jobs:
         env:
           NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Install TypeScript LSP dependencies
-        run: npm install -g --ignore-scripts typescript@5.8.3 typescript-language-server@4.3.3
+        run: npm install -g typescript@5.8.3 typescript-language-server@4.3.3
         env:
+          NPM_CONFIG_IGNORE_SCRIPTS: 'true'
           NPM_CONFIG_MIN_RELEASE_AGE: '3'
         timeout-minutes: 10
       - name: Determine automatic lockdown mode for GitHub MCP Server
