@@ -7,7 +7,7 @@ import { newState, newRequest, generateRequestOperations, replayTransactions } f
 import { validatePolicy } from "./work_queue_policy.cjs";
 import { frozenResourceScope } from "./work_queue_resource_scope.cjs";
 import { validateDeliveryContract } from "./work_queue_delivery.cjs";
-import { parseDocument } from "yaml";
+import { readDocumentMetadata } from "./markdown_metadata.cjs";
 
 const repository = "owner/repo";
 const settings = JSON.parse(fs.readFileSync(new URL("../../../.github/workflows/aw.json", import.meta.url), "utf8")).work_queue;
@@ -174,9 +174,8 @@ describe("bounded daily and weekly discussion-report portfolio", () => {
     expect(dispatcher).not.toMatch(/^\s+workflow_dispatch:/m);
     expect(dispatcher).toContain("    max: 3");
     const lock = fs.readFileSync(new URL("../../../.github/workflows/daily-report-dispatcher.lock.yml", import.meta.url), "utf8");
-    const document = parseDocument(lock, { version: "1.2", uniqueKeys: true });
-    expect(document.errors).toEqual([]);
-    const activation = document.toJS().jobs.activation;
+    const document = readDocumentMetadata(lock, { version: "1.2", uniqueKeys: true });
+    const activation = document.value.jobs.activation;
     expect(activation.if).toContain("github.run_attempt == 1");
     expect(activation.if).toContain("needs.admission.result == 'success' || needs.admission.result == 'skipped'");
     expect(activation.needs).toBe("admission");
@@ -235,10 +234,9 @@ describe("bounded daily and weekly discussion-report portfolio", () => {
     const frontmatter = source("daily-hippo-learn").split("\n---")[0];
     expect(frontmatter).toMatch(/^\s+workflow_dispatch:/m);
     expect(frontmatter).not.toMatch(/^\s+schedule:/m);
-    const compiled = parseDocument(fs.readFileSync(new URL("../../../.github/workflows/daily-hippo-learn.lock.yml", import.meta.url), "utf8"), { version: "1.2", uniqueKeys: true });
-    expect(compiled.errors).toEqual([]);
-    expect(compiled.toJS().on).toHaveProperty("workflow_dispatch");
-    expect(compiled.toJS().on).not.toHaveProperty("schedule");
+    const compiled = readDocumentMetadata(fs.readFileSync(new URL("../../../.github/workflows/daily-hippo-learn.lock.yml", import.meta.url), "utf8"), { version: "1.2", uniqueKeys: true });
+    expect(compiled.value.on).toHaveProperty("workflow_dispatch");
+    expect(compiled.value.on).not.toHaveProperty("schedule");
   });
 
   it("preserves DeepReport's bounded follow-ups without authorizing unscoped repository-memory writes", () => {

@@ -12,7 +12,7 @@ const { applyClaudeSubagentModels, applyCodexSubagentModels, isDetectionPhase, r
 const { extractInlineSubAgents, writeInlineSubAgents } = require("./extract_inline_sub_agents.cjs");
 const { claudeBareCapabilities, removeClaudePlugin } = require("./claude_runtime.cjs");
 const { extractFrontmatterAndBody } = require("./frontmatter_hash_pure.cjs");
-const { parseDocument } = require("yaml");
+const { readDocumentMetadata } = require("./markdown_metadata.cjs");
 const { recordModelResolution } = require("./resolve_model_alias.cjs");
 const runs = require("./fixtures/claude_codex_subagent_runs.cjs");
 
@@ -22,7 +22,7 @@ afterEach(() => {
   for (const dir of tempDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 });
 
-const frontmatterOf = content => parseDocument(extractFrontmatterAndBody(content).frontmatterText).toJS() || {};
+const frontmatterOf = content => readDocumentMetadata(extractFrontmatterAndBody(content).frontmatterText).value || {};
 const sha = content => crypto.createHash("sha256").update(content).digest("hex");
 
 /**

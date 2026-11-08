@@ -3,7 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const { parseDocument } = require("yaml");
+const { readMarkdownMetadata } = require("./markdown_metadata.cjs");
 
 const INVENTORY_PATH = "/tmp/gh-aw/skill_inventory.json";
 const INSTALL_HISTORY_PATH = "/tmp/gh-aw/skill_install_history.json";
@@ -12,9 +12,7 @@ function declaredPurpose(text) {
   const frontmatter = text.match(/^---[ \t]*\r?\n([\s\S]*?)^---[ \t]*(?:\r?\n|$)/m)?.[1];
   if (frontmatter === undefined) return undefined;
   try {
-    const document = parseDocument(frontmatter, { version: "1.2", uniqueKeys: true });
-    if (!document || document.errors.length) return undefined;
-    const metadata = document.toJS();
+    const metadata = readMarkdownMetadata("agent", text).value;
     if (!metadata || typeof metadata !== "object" || Array.isArray(metadata) || typeof metadata.description !== "string") return undefined;
     return metadata.description.trim() || undefined;
   } catch {

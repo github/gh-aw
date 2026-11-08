@@ -88,8 +88,12 @@ action_shell_files=()
 workflow_drift_required=0
 model_alias_validation_required=0
 session_schema_validation_required=0
+markdown_metadata_validation_required=0
 
 for file in "${CHANGED_FILES[@]}"; do
+    case "$file" in
+        actions/markdown-metadata/*) markdown_metadata_validation_required=1 ;;
+    esac
     case "$file" in
         *.go)
             package_dir=$(dirname "$file")
@@ -97,6 +101,7 @@ for file in "${CHANGED_FILES[@]}"; do
             # patterns, so they must not be linted or tested as real packages.
             case "$file" in
                 testdata/*|*/testdata/*) package_dir="" ;;
+                actions/markdown-metadata/*) package_dir="" ;;
             esac
             if [ -n "$package_dir" ] && find "$package_dir" -maxdepth 1 -type f -name '*.go' -print -quit 2>/dev/null | grep -q .; then
                 go_packages+=("./$package_dir")
@@ -176,6 +181,9 @@ if [ "${#go_packages[@]}" -gt 0 ]; then
         sorted_go_packages+=("$package")
     done < <(printf '%s\n' "${go_packages[@]}" | LC_ALL=C sort -u)
     go_packages=("${sorted_go_packages[@]}")
+fi
+if [ "$markdown_metadata_validation_required" -eq 1 ]; then
+    start_job "native Markdown metadata lint" make --no-print-directory lint-markdown-metadata
 fi
 
 normalize_repo_path() {

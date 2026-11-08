@@ -9,7 +9,7 @@ const { createLiteralValues, literalStatePath, writeLiteralState, readLiteralSta
 const { interpolateVariables, main } = require("./interpolate_prompt.cjs");
 const { renderMarkdownTemplate } = require("./render_template.cjs");
 const substitutePlaceholders = require("./substitute_placeholders.cjs");
-const { parseDocument } = require("yaml");
+const { readDocumentMetadata } = require("./markdown_metadata.cjs");
 
 describe("literal prompt values and private diagnostics", () => {
   let directory, file;
@@ -120,7 +120,7 @@ describe("literal prompt values and private diagnostics", () => {
     const literals = createLiteralValues();
     const rendered = restoreInlineMetadata(`---\ndescription: ${literals.protect(value)}\nmodel: author-model\n---\nAUTHOR RULE`, literals.restore);
     const frontmatter = /^---\n([\s\S]*?)\n---/.exec(rendered)[1];
-    expect(parseDocument(frontmatter).toJS()).toEqual({ description: value, model: "author-model" });
+    expect(readDocumentMetadata(frontmatter).value).toEqual({ description: value, model: "author-model" });
     expect(rendered).toContain("\nAUTHOR RULE");
   });
 

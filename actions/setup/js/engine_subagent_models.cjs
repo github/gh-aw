@@ -84,13 +84,8 @@ function reflectProvidersFor(provider) {
  * @returns {Record<string, any>}
  */
 function parseAgentFrontmatter(content) {
-  const { extractFrontmatterAndBody } = require("./frontmatter_hash_pure.cjs");
-  const { parseDocument } = require("yaml");
-  const { frontmatterText } = extractFrontmatterAndBody(content);
-  /** @type {any} */
-  const document = parseDocument(frontmatterText);
-  if (!document || document.errors.length) throw new Error("cannot parse agent frontmatter");
-  const frontmatter = document.toJS() || {};
+  const { readMarkdownMetadata } = require("./markdown_metadata.cjs");
+  const frontmatter = readMarkdownMetadata("agent", content).value;
   if (typeof frontmatter !== "object" || Array.isArray(frontmatter)) throw new Error("agent frontmatter must be a mapping");
   return frontmatter;
 }
@@ -143,21 +138,12 @@ function listMarkdownAgentFiles(directory, logger, options = {}) {
  * @returns {string}
  */
 function replaceAgentModel(content, model) {
-  const { extractFrontmatterAndBody } = require("./frontmatter_hash_pure.cjs");
-  const { parseDocument } = require("yaml");
-  const { frontmatterText } = extractFrontmatterAndBody(content);
-  /** @type {any} */
-  const document = parseDocument(frontmatterText);
-  if (!document || document.errors.length || !document.contents || !Array.isArray(document.contents.items)) {
-    throw new Error("cannot parse agent frontmatter");
-  }
-  const pairs = document.contents.items.filter(pair => pair?.key?.value === "model");
-  if (pairs.length !== 1 || typeof pairs[0].value?.value !== "string" || !Array.isArray(pairs[0].value.range)) {
+  const { readMarkdownMetadata } = require("./markdown_metadata.cjs");
+  const scalar = readMarkdownMetadata("agent", content).scalars?.model;
+  if (!scalar) {
     throw new Error("expected exactly one top-level string 'model:' scalar in the frontmatter");
   }
-  const frontmatterStart = content.indexOf("\n") + 1;
-  const start = frontmatterStart + pairs[0].value.range[0];
-  const end = frontmatterStart + pairs[0].value.range[1];
+  const { start, end } = scalar;
   const lineEnding = content.slice(start, end).match(/(?:\r?\n)+$/)?.[0] || "";
   return content.slice(0, start) + JSON.stringify(model) + lineEnding + content.slice(end);
 }

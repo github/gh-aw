@@ -34,7 +34,7 @@
 const fs = require("fs");
 const path = require("path");
 const { ERR_CONFIG, ERR_MODEL_PIN_REFLECT_REQUIRED } = require("./error_codes.cjs");
-const { parseDocument } = require("yaml");
+const { readMarkdownMetadata } = require("./markdown_metadata.cjs");
 const { extractInlineSubAgents } = require("./extract_inline_sub_agents.cjs");
 const { buildProviderCatalog, canonicalModelProvider, isLiveModelId, loadBuiltinModelAliases, ModelAliasResolutionError, resolveConfiguredModel, resolveModelAlias, splitModelIdentifier } = require("./resolve_model_alias.cjs");
 
@@ -100,14 +100,10 @@ function parseMarkdownFrontmatter(content) {
   if (lines.length === 0 || lines[0].trim() !== "---") return { frontmatter: null, body: text, error: null };
   const end = lines.findIndex((line, index) => index > 0 && line.trim() === "---");
   if (end < 0) return { frontmatter: null, body: text, error: "unterminated frontmatter" };
-  const yaml = lines.slice(1, end).join("\n");
+  const metadata = lines.slice(1, end).join("\n");
   const body = lines.slice(end + 1).join("\n");
   try {
-    /** @type {any} */
-    const document = parseDocument(yaml, { version: "1.2", uniqueKeys: false });
-    if (!document) return { frontmatter: {}, body, error: null };
-    if (document.errors.length) return { frontmatter: null, body, error: String(document.errors[0]) };
-    const value = document.toJS();
+    const value = readMarkdownMetadata("document", metadata, { allowDuplicates: true }).value;
     return { frontmatter: value && typeof value === "object" && !Array.isArray(value) ? value : {}, body, error: null };
   } catch (error) {
     return { frontmatter: null, body, error: error instanceof Error ? error.message : String(error) };

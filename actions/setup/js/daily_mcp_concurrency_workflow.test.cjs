@@ -2,14 +2,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { parseDocument } from "yaml";
+import { readDocumentMetadata } from "./markdown_metadata.cjs";
 
 const root = resolve(import.meta.dirname, "../../..");
 const source = readFileSync(resolve(root, ".github/workflows/daily-mcp-concurrency-analysis.md"), "utf8");
 const [, frontmatter, prompt] = source.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
-const document = parseDocument(frontmatter, { version: "1.2", uniqueKeys: true });
-if (document.errors.length) throw new AggregateError(document.errors, "Invalid concurrency workflow");
-const workflow = document.toJS();
+const document = readDocumentMetadata(frontmatter, { version: "1.2", uniqueKeys: true });
+const workflow = document.value;
 const require = createRequire(import.meta.url);
 const { buildCopilotSDKPermissionHandler } = require("./copilot_sdk_permissions.cjs");
 

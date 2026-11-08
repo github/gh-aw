@@ -3,12 +3,11 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { parseDocument } from "yaml";
+import { readDocumentMetadata } from "./markdown_metadata.cjs";
 
 const source = readFileSync(resolve(import.meta.dirname, "../../../.github/workflows/haiku-printer.yml"), "utf8");
-const document = parseDocument(source, { version: "1.2", uniqueKeys: true });
-if (document.errors.length) throw new AggregateError(document.errors, "Invalid haiku workflow");
-const step = document.toJS().jobs["print-message"].steps[0];
+const document = readDocumentMetadata(source, { version: "1.2", uniqueKeys: true });
+const step = document.value.jobs["print-message"].steps[0];
 
 describe("haiku printer input handling", () => {
   it("passes the dispatch message as data rather than shell source", () => {

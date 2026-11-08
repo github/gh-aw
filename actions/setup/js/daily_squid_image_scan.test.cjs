@@ -4,6 +4,8 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Readable } from "node:stream";
+import { readLockFileHeaders } from "./work_queue_provisioning.cjs";
 
 const require = createRequire(import.meta.url);
 const { buildCopilotSDKPermissionHandler } = require("./copilot_sdk_permissions.cjs");
@@ -38,7 +40,7 @@ const stepScript = name =>
     .replace(/^      /gm, "");
 
 describe("daily container image scan analysis", () => {
-  it.each(["ghcr.io/github/gh-aw-node", "node:lts-alpine"])("uses the same immutable %s pin in the compiler caches and every compiled manifest", image => {
+  it.each(["ghcr.io/github/gh-aw-node", "node:lts-alpine"])("uses the same immutable %s pin in the compiler caches and every compiled manifest", async image => {
     const cachePaths = ["../../../.github/aw/actions-lock.json", "../../../pkg/actionpins/data/action_pins.json", "../../../pkg/workflow/data/action_pins.json"];
     const pins = cachePaths.map(path => JSON.parse(readFileSync(new URL(path, import.meta.url), "utf8")).containers[image].pinned_image);
     expect(pins[0]).toMatch(/@sha256:[a-f0-9]{64}$/);
@@ -53,7 +55,7 @@ describe("daily container image scan analysis", () => {
     let references = 0;
     for (const file of readdirSync(workflowDir).filter(file => file.endsWith(".lock.yml"))) {
       const compiled = readFileSync(new URL(file, workflowDir), "utf8");
-      const manifest = JSON.parse(compiled.match(/^# gh-aw-manifest: (.+)$/m)[1]);
+      const { manifest } = await readLockFileHeaders(Readable.from([compiled]));
       for (const container of manifest.containers ?? []) {
         if (container.image === image) {
           expect(container.pinned_image, file).toBe(pins[0]);

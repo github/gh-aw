@@ -134,13 +134,7 @@ debug_log "Created /tmp/gh-aw directory"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 JS_SOURCE_DIR="${SCRIPT_DIR}/js"
 
-# Install only locked runtime dependencies, never the development toolchain.
-cp "${SCRIPT_DIR}/runtime/package.json" "${DESTINATION}/package.json"
-cp "${SCRIPT_DIR}/runtime/package-lock.json" "${DESTINATION}/package-lock.json"
-if ! npm ci --prefix "${DESTINATION}" --omit=dev --ignore-scripts --no-audit --no-fund; then
-  echo "::error::Failed to install locked setup runtime dependencies."
-  exit 1
-fi
+bash "${SCRIPT_DIR}/../markdown-metadata/setup.sh" "${DESTINATION}"
 
 debug_log "Script directory: ${SCRIPT_DIR}"
 debug_log "Looking for JavaScript sources in: ${JS_SOURCE_DIR}"
@@ -251,8 +245,6 @@ fi
 MCP_SCRIPTS_DEST="${GH_AW_ROOT}/mcp-scripts"
 debug_log "Copying mcp-scripts files to ${MCP_SCRIPTS_DEST}"
 create_dir "${MCP_SCRIPTS_DEST}"
-create_dir "${MCP_SCRIPTS_DEST}/node_modules"
-cp -R "${DESTINATION}/node_modules/yaml" "${MCP_SCRIPTS_DEST}/node_modules/"
 
 MCP_SCRIPTS_FILES=(
   "mcp_scripts_bootstrap.cjs"
@@ -404,8 +396,6 @@ echo "Successfully copied ${MCP_SCRIPTS_COUNT} mcp-scripts files to ${MCP_SCRIPT
 SAFE_OUTPUTS_DEST="${GH_AW_ROOT}/safeoutputs"
 debug_log "Copying safe-outputs files to ${SAFE_OUTPUTS_DEST}"
 create_dir "${SAFE_OUTPUTS_DEST}"
-create_dir "${SAFE_OUTPUTS_DEST}/node_modules"
-cp -R "${DESTINATION}/node_modules/yaml" "${SAFE_OUTPUTS_DEST}/node_modules/"
 create_dir "${SAFE_OUTPUTS_DEST}/work-queue"
 
 SAFE_OUTPUTS_FILES=(

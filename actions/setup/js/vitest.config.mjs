@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: true,
+    globalSetup: ["../../markdown-metadata/vitest_setup.mjs"],
     setupFiles: ["./scripts/test_safeoutputs_setup.mjs"],
     include: ["**/*.test.{js,cjs}"],
     exclude: ["**/frontmatter_hash_github_api.test.cjs", "**/git_simulator_memory_helpers.test.cjs", ...configDefaults.exclude],

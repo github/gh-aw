@@ -689,8 +689,7 @@ async function resolveCopilotSDKMultiProvider(options) {
  * @returns {Array<{ name: string, model?: string, path: string }>}
  */
 function listCopilotAgentFiles(directory, logger = log) {
-  const { extractFrontmatterAndBody } = require("./frontmatter_hash_pure.cjs");
-  const { parseDocument } = require("yaml");
+  const { readMarkdownMetadata } = require("./markdown_metadata.cjs");
   let entries;
   try {
     entries = fs.readdirSync(directory, { withFileTypes: true });
@@ -703,11 +702,7 @@ function listCopilotAgentFiles(directory, logger = log) {
     if (!entry.isFile() || !entry.name.endsWith(".agent.md")) continue;
     const agentPath = path.join(directory, entry.name);
     try {
-      const { frontmatterText } = extractFrontmatterAndBody(fs.readFileSync(agentPath, "utf8"));
-      /** @type {any} */
-      const document = parseDocument(frontmatterText);
-      if (!document || document.errors.length) throw new Error("cannot parse agent frontmatter");
-      const frontmatter = document.toJS() || {};
+      const frontmatter = readMarkdownMetadata("agent", fs.readFileSync(agentPath, "utf8")).value;
       if (typeof frontmatter !== "object" || Array.isArray(frontmatter)) throw new Error("agent frontmatter must be a mapping");
       const name = typeof frontmatter.name === "string" && frontmatter.name.trim() ? frontmatter.name.trim() : entry.name.slice(0, -".agent.md".length);
       agents.push({ name, path: agentPath, ...(typeof frontmatter.model === "string" ? { model: frontmatter.model.trim() } : {}) });
@@ -745,22 +740,13 @@ function listCopilotSubagents(workingDirectory, agentsBaseDir, logger = log) {
  * @returns {{ value: string, source: string, start: number, end: number }}
  */
 function getCopilotAgentModelScalar(content) {
-  const { extractFrontmatterAndBody } = require("./frontmatter_hash_pure.cjs");
-  const { parseDocument } = require("yaml");
-  const { frontmatterText } = extractFrontmatterAndBody(content);
-  /** @type {any} */
-  const document = parseDocument(frontmatterText);
-  if (!document || document.errors.length || !document.contents || !Array.isArray(document.contents.items)) {
-    throw new Error("cannot parse agent frontmatter");
-  }
-  const pairs = document.contents.items.filter(pair => pair?.key?.value === "model");
-  if (pairs.length !== 1 || typeof pairs[0].value?.value !== "string" || !Array.isArray(pairs[0].value.range)) {
+  const { readMarkdownMetadata } = require("./markdown_metadata.cjs");
+  const scalar = readMarkdownMetadata("agent", content).scalars?.model;
+  if (!scalar) {
     throw new Error("expected exactly one top-level string 'model:' scalar in the frontmatter");
   }
-  const frontmatterStart = content.indexOf("\n") + 1;
-  const start = frontmatterStart + pairs[0].value.range[0];
-  const end = frontmatterStart + pairs[0].value.range[1];
-  return { value: pairs[0].value.value, source: content.slice(start, end), start, end };
+  const { value, start, end } = scalar;
+  return { value, source: content.slice(start, end), start, end };
 }
 
 /**

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync, existsSync, mkdirSync, rmSync } from "fs";
+import { readFileSync, existsSync, mkdirSync, rmSync, copyFileSync } from "fs";
 import { execFileSync } from "child_process";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -32,13 +32,32 @@ describe("setup action Windows support", () => {
 });
 
 describe("setup.sh Copilot runtime files", () => {
-  it("pins the same YAML package for development and runtime deployment", () => {
+  it("deploys native Markdown metadata processing without npm runtime dependencies", () => {
     const development = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8"));
-    const runtime = JSON.parse(readFileSync(resolve(__dirname, "../runtime/package.json"), "utf8"));
-    const lock = JSON.parse(readFileSync(resolve(__dirname, "../runtime/package-lock.json"), "utf8"));
-    expect(runtime.dependencies).toEqual({ yaml: development.dependencies.yaml });
-    expect(lock.packages["node_modules/yaml"].version).toBe(runtime.dependencies.yaml);
-    expect(setupShContent).toContain('npm ci --prefix "${DESTINATION}" --omit=dev --ignore-scripts --no-audit --no-fund');
+    expect(development.dependencies).toBeUndefined();
+    expect(setupShContent).toContain('bash "${SCRIPT_DIR}/../markdown-metadata/setup.sh" "${DESTINATION}"');
+    expect(setupShContent).not.toContain("npm ci");
+  });
+
+  it("provisions the separate metadata helper and exchanges JSON from an isolated runtime directory", () => {
+    const directory = resolve(__dirname, `.setup-metadata-${process.pid}`);
+    mkdirSync(directory);
+    try {
+      execFileSync("bash", [resolve(__dirname, "../../markdown-metadata/setup.sh"), directory], { stdio: "pipe" });
+      copyFileSync(resolve(__dirname, "markdown_metadata.cjs"), resolve(directory, "markdown_metadata.cjs"));
+      const output = execFileSync(
+        process.execPath,
+        [
+          "-e",
+          `const {readMarkdownMetadata} = require("./markdown_metadata.cjs"); process.stdout.write(JSON.stringify(readMarkdownMetadata("agent", "---\\n" + JSON.stringify({model: "small", description: "Read files"}) + "\\n---\\nBody").value));`,
+        ],
+        { cwd: directory, encoding: "utf8" }
+      );
+      expect(JSON.parse(output)).toEqual({ model: "small", description: "Read files" });
+      expect(existsSync(resolve(directory, "node_modules"))).toBe(false);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   it("copies the shared routing effort dependency alongside Copilot runtime scripts", () => {
@@ -151,7 +170,6 @@ describe("setup.sh MCP_SCRIPTS_FILES", () => {
           "-e",
           `
             const assert = require("node:assert/strict");
-            assert.deepEqual(require("./node_modules/yaml").parseDocument("key: value").toJS(), { key: "value" });
             const { createServer } = require("./mcp_server_core.cjs");
             const { normalizeSafeOutputName } = require("./safe_output_names.cjs");
             assert.equal(createServer({ name: "mcpscripts", version: "test" }).serverInfo.name, "mcpscripts");
@@ -220,7 +238,6 @@ describe("setup.sh SAFE_OUTPUTS_FILES", () => {
           "-e",
           `
             const assert = require("node:assert/strict");
-            assert.deepEqual(require("./node_modules/yaml").parseDocument("key: value").toJS(), { key: "value" });
             assert.equal(typeof require("./generate_git_patch.cjs").generateGitPatch, "function");
             assert.equal(typeof require("./generate_git_bundle.cjs").generateGitBundle, "function");
             assert.equal(typeof require("./object_pack_fetch.cjs").fetchRecoveryObjects, "function");
@@ -289,7 +306,7 @@ describe("setup.sh SAFE_OUTPUTS_FILES", () => {
 
   it("deploys Claim authority and worker route provisioning dependencies", () => {
     expect(getDirectLocalRequires("safe_outputs_handlers.cjs")).toContain("work_queue_claim_scope.cjs");
-    expect(readFileSync(resolve(__dirname, "work_queue_provisioning.cjs"), "utf8")).toContain('require("yaml")');
+    expect(readFileSync(resolve(__dirname, "work_queue_provisioning.cjs"), "utf8")).not.toContain("readDocumentMetadata");
     for (const file of ["work_queue_claim_scope.cjs", "finish_work_queue_claim.cjs", "work_queue_resource_scope.cjs", "work_queue_effect_client.cjs"]) {
       expect(safeOutputsFiles).toContain(file);
     }

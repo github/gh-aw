@@ -284,21 +284,7 @@ process.stdin.on("end", () => {
       expect(parentPrompt).not.toContain("## agent:");
       stagePiArtifacts(process.env.PI_CODING_AGENT_DIR);
       const expected = ["claude-haiku-4.5", "gpt-5.6-luna", "gpt-4o-mini"];
-      const sdk = {
-        parseFrontmatter: content => {
-          const [, header, body] = content.split("---");
-          const frontmatter = Object.fromEntries(
-            header
-              .trim()
-              .split("\n")
-              .map(line => {
-                const colon = line.indexOf(":");
-                return [line.slice(0, colon), line.slice(colon + 1).trim()];
-              })
-          );
-          return { frontmatter, body };
-        },
-      };
+      const sdk = {};
       const agents = preparePiSubagents({
         agentDir: process.env.PI_CODING_AGENT_DIR,
         sdk,

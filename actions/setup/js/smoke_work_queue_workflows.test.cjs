@@ -2,14 +2,13 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
-import { parseDocument } from "yaml";
+import { readDocumentMetadata } from "./markdown_metadata.cjs";
 
 function readWorkflow(name, compiled = false) {
   const source = readFileSync(new URL(`../../../.github/workflows/smoke-work-queue-${name}.${compiled ? "lock.yml" : "md"}`, import.meta.url), "utf8");
   const yaml = compiled ? source : source.match(/^---\n([\s\S]*?)\n---\n/)[1];
-  const document = parseDocument(yaml, { version: "1.2", uniqueKeys: true });
-  if (document.errors.length) throw new AggregateError(document.errors, "Invalid smoke workflow");
-  return document.toJS();
+  const document = readDocumentMetadata(yaml, { version: "1.2", uniqueKeys: true });
+  return document.value;
 }
 
 function verification(name) {

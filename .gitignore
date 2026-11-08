@@ -106,6 +106,8 @@ sbom.spdx.json
 sbom.cdx.json
 
 node_modules/
+actions/setup/js/markdown-metadata
+actions/setup/js/markdown-metadata.exe
 gh-aw-test/
 
 # Root package.json and package-lock.json are only for build tooling

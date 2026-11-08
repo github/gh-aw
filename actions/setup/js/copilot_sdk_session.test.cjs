@@ -11,7 +11,7 @@ const { resolveMultiProviderFromReflect } = require("./awf_reflect.cjs");
 const { extractInlineSubAgents } = require("./extract_inline_sub_agents.cjs");
 const { writeInlineSkills } = require("./extract_inline_skills.cjs");
 const { extractFrontmatterAndBody } = require("./frontmatter_hash_pure.cjs");
-const { parseDocument } = require("yaml");
+const { readDocumentMetadata } = require("./markdown_metadata.cjs");
 const models = [
   { id: "gpt-5.4", provider: "openai" },
   { id: "claude-sonnet-4.6", provider: "anthropic" },
@@ -210,7 +210,7 @@ describe("copilot_sdk_session runtime configuration", () => {
       expect(prompt).not.toContain(`Invoke skill \`${name}\``);
     }
     expect(prompt).toContain("Do not use `cd`, `cut`, or `sed`");
-    const document = parseDocument(extractFrontmatterAndBody(workflow).frontmatterText).toJS();
+    const document = readDocumentMetadata(extractFrontmatterAndBody(workflow).frontmatterText).value;
     expect(document["max-tool-denials"]).toBe(3);
     for (const command of ["cd *", "cut *", "sed *", "*"]) expect(document.tools.bash).not.toContain(command);
   });
@@ -351,12 +351,10 @@ describe("copilot_sdk_session runtime configuration", () => {
     const root = path.resolve(import.meta.dirname, "../../..");
     const workflow = fs.readFileSync(path.join(root, ".github/workflows/contribution-check.md"), "utf8");
     const { frontmatterText } = extractFrontmatterAndBody(workflow);
-    const document = parseDocument(frontmatterText);
-    expect(document.errors).toEqual([]);
-    expect(document.toJS().engine).toMatchObject({ id: "copilot", "copilot-sdk": true, agent: "contribution-checker" });
-    const lock = parseDocument(fs.readFileSync(path.join(root, ".github/workflows/contribution-check.lock.yml"), "utf8"));
-    expect(lock.errors).toEqual([]);
-    const executionEnv = lock.toJS().jobs.agent.steps.find(step => step.id === "agentic_execution").env;
+    const document = readDocumentMetadata(frontmatterText);
+    expect(document.value.engine).toMatchObject({ id: "copilot", "copilot-sdk": true, agent: "contribution-checker" });
+    const lock = readDocumentMetadata(fs.readFileSync(path.join(root, ".github/workflows/contribution-check.lock.yml"), "utf8"));
+    const executionEnv = lock.value.jobs.agent.steps.find(step => step.id === "agentic_execution").env;
     expect(String(executionEnv.GH_AW_COPILOT_SDK_DRIVER)).toBe("1");
     expect(executionEnv.COPILOT_PROVIDER_WIRE_API).toBeUndefined();
 

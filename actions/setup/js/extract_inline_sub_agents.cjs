@@ -144,25 +144,9 @@ function resolveSubAgentExperimentReferences(agentName, content, env = process.e
  * @returns {string} Content with a top-level `name:` in its frontmatter.
  */
 function ensureClaudeSubAgentName(agentName, content) {
-  const { parseDocument } = require("yaml");
-  const nameEntry = `name: ${JSON.stringify(agentName)}`;
-  const match = /^---[ \t]*\r?\n(?:([\s\S]*?)\r?\n)?---[ \t]*\r?(?=\n|$)/.exec(content);
-  if (!match) return `---\n${nameEntry}\n---\n${content}`;
-  const frontmatter = match[1] ?? "";
-  const start = content.indexOf("\n") + 1;
-  /** @type {any} */
-  const document = parseDocument(frontmatter.replace(/\x00VALUE_[0-9a-f-]+_\d+\x00/g, token => token.replace(/\x00/g, "_")));
-  if (!document || document.errors.length) return content;
-  const map = document.contents;
-  if (map === null || map === undefined) return content.slice(0, start) + nameEntry + "\n" + content.slice(start);
-  if (!Array.isArray(map.items) || !Array.isArray(map.range)) return content;
-  if (map.items.some((/** @type {any} */ pair) => pair?.key?.value === "name")) return content;
-  const position = start + map.range[0];
-  if (map.flow) {
-    return content.slice(0, position + 1) + nameEntry + (map.items.length > 0 ? ", " : "") + content.slice(position + 1);
-  }
-  const indent = content.slice(content.lastIndexOf("\n", position - 1) + 1, position);
-  return content.slice(0, position) + nameEntry + "\n" + indent + content.slice(position);
+  const { readMarkdownMetadata } = require("./markdown_metadata.cjs");
+  const replacements = Object.fromEntries([...content.matchAll(/\x00VALUE_[0-9a-f-]+_\d+\x00/g)].map(match => [match[0], match[0]]));
+  return readMarkdownMetadata("ensure-name", content, { value: agentName, replacements }).content;
 }
 
 /**
@@ -447,7 +431,7 @@ function writeInlineSubAgents(content, workspaceDir, agentsBaseDir, engineId, re
  */
 function loadCopilotSDKCustomAgents(workspaceDir, agentsBaseDir, logger) {
   const { extractFrontmatterAndBody } = require("./frontmatter_hash_pure.cjs");
-  const { parseDocument } = require("yaml");
+  const { readMarkdownMetadata } = require("./markdown_metadata.cjs");
   const target = inlineArtifactTarget("SUB_AGENT", getEngineSubAgentTarget("copilot"));
   const directories = new Set([path.join(workspaceDir, ".github/agents"), path.join(agentsBaseDir, target.dir)]);
   const agents = new Map();
@@ -464,11 +448,7 @@ function loadCopilotSDKCustomAgents(workspaceDir, agentsBaseDir, logger) {
       const agentPath = path.join(directory, entry.name);
       try {
         const { frontmatterText, markdown } = extractFrontmatterAndBody(fs.readFileSync(agentPath, "utf8"));
-        /** @type {any} */
-        const document = parseDocument(frontmatterText);
-        if (!document) throw new Error("cannot parse agent frontmatter");
-        if (document.errors.length) throw new Error(document.errors.map(error => error.message).join("; "));
-        const frontmatter = document.toJS() || {};
+        const frontmatter = readMarkdownMetadata("agent", fs.readFileSync(agentPath, "utf8")).value;
         if (typeof frontmatter !== "object" || Array.isArray(frontmatter)) throw new Error("agent frontmatter must be a mapping");
         const name = typeof frontmatter.name === "string" && frontmatter.name.trim() ? frontmatter.name.trim() : entry.name.slice(0, -".agent.md".length);
         let tools = frontmatter.tools;

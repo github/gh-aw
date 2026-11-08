@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
-import { parseDocument } from "yaml";
+import { readDocumentMetadata } from "./markdown_metadata.cjs";
 
 // Latest 100 merged PRs: these workflows produced closing issues with gh-aw provenance.
 const migrated = [
@@ -21,9 +21,8 @@ const retained = ["semantic-function-refactor", "go-fan"];
 function readWorkflow(id) {
   const source = fs.readFileSync(new URL(`../../../.github/workflows/${id}.md`, import.meta.url), "utf8");
   const frontmatter = source.match(/^---\n([\s\S]*?)\n---/)[1];
-  const document = parseDocument(frontmatter, { version: "1.2", uniqueKeys: true });
-  expect(document.errors).toEqual([]);
-  return { source, config: document.toJS() };
+  const document = readDocumentMetadata(frontmatter, { version: "1.2", uniqueKeys: true });
+  return { source, config: document.value };
 }
 
 describe("code-producing issue workflow migration", () => {

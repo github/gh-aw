@@ -2,12 +2,11 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { minimatch } from "minimatch";
-import { parseDocument } from "yaml";
+import { readDocumentMetadata } from "./markdown_metadata.cjs";
 
 const root = resolve(import.meta.dirname, "../../..");
-const document = parseDocument(readFileSync(resolve(root, ".github/workflows/work-queue-stress.yml"), "utf8"), { version: "1.2", uniqueKeys: true });
-if (document.errors.length) throw new AggregateError(document.errors, "Invalid work queue stress workflow");
-const workflow = document.toJS();
+const document = readDocumentMetadata(readFileSync(resolve(root, ".github/workflows/work-queue-stress.yml"), "utf8"), { version: "1.2", uniqueKeys: true });
+const workflow = document.value;
 const pins = JSON.parse(readFileSync(resolve(root, ".github/aw/actions-lock.json"), "utf8")).entries;
 
 describe("local work queue stress CI", () => {
