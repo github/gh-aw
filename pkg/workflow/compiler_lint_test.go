@@ -425,10 +425,10 @@ Use self-repository actions and workflows.
 			compiler := NewCompiler(WithLint(true))
 			compiler.gitRoot = dir
 			compiler.SetReadOnly(true)
-			compiler.SetSkipValidation(true)
 			require.NoError(t, compiler.CompileWorkflow(path))
 			lock, err := os.ReadFile(filepath.Join(dir, "self-repository.lock.yml"))
 			require.NoError(t, err)
+			require.NotContains(t, string(lock), "#   - $/")
 			for _, uses := range []string{
 				"$/some/agent-action",
 				"$/some/custom-action",
