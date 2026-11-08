@@ -77,7 +77,7 @@ func runEditCommand(cmd *cobra.Command, args []string) error {
 	}
 	if _, managed := parsed.Frontmatter["source"]; managed {
 		for _, change := range changes {
-			if strings.Split(change.path, ".")[0] == "source" {
+			if first, _, _ := strings.Cut(change.path, "."); first == "source" {
 				return errors.New("cannot edit source for a source-managed workflow")
 			}
 		}
