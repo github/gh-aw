@@ -64,11 +64,16 @@ describe("daily container image scan analysis", () => {
     expect(references).toBeGreaterThan(0);
   });
 
-  it("requires fixed brotli and undici versions in the vendored Node rebuild", () => {
+  it("requires fixed brotli, zlib, libexpat, and undici versions in the vendored Node rebuild", () => {
     const dockerfile = readFileSync(new URL("./Dockerfile.safe-outputs-mcp", import.meta.url), "utf8");
     expect(dockerfile).toContain('apk add --no-cache git "brotli-libs>=1.2.1-r0"');
     expect(dockerfile).toContain('"undici@^6.29.1"');
+    const install = dockerfile.match(/&& apk add --no-cache ([^\n]+)/);
+    expect(install).not.toBeNull();
+    expect(install[1]).toContain('"zlib>=1.4-r0"');
+    expect(install[1]).toContain('"libexpat>=2.10.0-r0"');
     expect(dockerfile).toContain("RUN apk upgrade --no-cache");
+    expect(dockerfile).not.toMatch(/apk (add|upgrade)[^\n]*(?:\|\| true|--force-broken-world)/);
   });
 
   it("classifies the locally built Node image as vendored without promising automatic release upgrades", () => {
@@ -244,6 +249,8 @@ fi
   });
 
   it.each([
+    ["ghcr.io/github/gh-aw-node:1:1: error: [Critical] CVE-2026-4738: zlib@1.3.2-r1 (fix: 1.4-r0)", 1],
+    ["ghcr.io/github/gh-aw-node:1:1: error: [High] CVE-2026-113351: libexpat@2.9.0-r0 (fix: 2.10.0-r0)", 1],
     ["ghcr.io/github/gh-aw-node:1:1: error: [Critical] CVE-2026-111497: brotli-libs@1.2.0-r1 (fix: 1.2.1-r0)", 1],
     ["ghcr.io/github/gh-aw-node:1:1: error: [High] CVE-2026-92392: libcurl@8.22.0-r0 (fix: 8.23.0-r0)", 1],
     ["ghcr.io/github/gh-aw-node@sha256:abc:1:1: warning: [High] CVE-2026-1234: pkg@1 (fix: 2)", 1],

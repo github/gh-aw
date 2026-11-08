@@ -815,7 +815,13 @@ describe("safe_outputs_handlers", () => {
       expect(entry.size).toBe(Buffer.byteLength("test content"));
       const stagedFile = path.join(testRunnerTemp, "gh-aw", "safeoutputs", "assets", `${crypto.createHash("sha256").update(testFile).digest("hex")}.png`);
       expect(fs.readFileSync(stagedFile)).toEqual(Buffer.from("test content"));
-      expect(fs.statSync(stagedFile).mode & 0o777).toBe(0o600);
+      const stagedStat = fs.statSync(stagedFile);
+      expect(stagedStat.mode & 0o777).toBe(0o600);
+      expect(stagedStat.uid).toBe(process.getuid());
+      expect(stagedStat.gid).toBe(process.getgid());
+      for (const directory of [path.dirname(stagedFile), path.dirname(path.dirname(stagedFile)), path.dirname(path.dirname(path.dirname(stagedFile)))]) {
+        expect(fs.statSync(directory).mode & 0o777).toBe(0o700);
+      }
       expect(entry.url).toContain("test-branch");
 
       expect(result.content[0].type).toBe("text");

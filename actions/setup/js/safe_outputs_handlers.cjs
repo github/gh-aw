@@ -823,7 +823,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     const stagedFileName = `${crypto.createHash("sha256").update(filePath).digest("hex")}${fileExt}`;
     const targetPath = path.join(assetsDir, stagedFileName);
     try {
-      writeGuardedFile(targetPath, fileContent);
+      writeGuardedFile(targetPath, fileContent, { mode: 0o600, directoryMode: 0o700 });
     } catch (err) {
       if (err && typeof err === "object" && "code" in err && err.code === ERR_VALIDATION) throw err;
       throw new Error(`${ERR_SYSTEM}: Failed to copy file ${filePath} to ${targetPath}: ${getErrorMessage(err)}`, { cause: err });

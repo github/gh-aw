@@ -162,3 +162,31 @@ func badErrAfterUnreachableReturn(scanner *bufio.Scanner, enabled bool) {
 	}
 	_ = scanner.Err()
 }
+
+func badParenthesizedScan(scanner *bufio.Scanner) {
+	for (scanner).Scan() { // want "Scanner loop does not check Err\\(\\) after completion; read errors may be silently dropped"
+		println(scanner.Text())
+	}
+}
+
+func badParenthesizedScanCallee(scanner *bufio.Scanner) {
+	for (scanner.Scan)() { // want "Scanner loop does not check Err\\(\\) after completion; read errors may be silently dropped"
+		println(scanner.Text())
+	}
+}
+
+func badLabeledLoop(scanner *bufio.Scanner) {
+lines:
+	for scanner.Scan() { // want "Scanner loop does not check Err\\(\\) after completion; read errors may be silently dropped"
+		if scanner.Text() == "" {
+			continue lines
+		}
+	}
+}
+
+func badParenthesizedErrOnOtherScanner(scanner, other *bufio.Scanner) error {
+	for (scanner).Scan() { // want "Scanner loop does not check Err\\(\\) after completion; read errors may be silently dropped"
+		println(scanner.Text())
+	}
+	return (other).Err()
+}

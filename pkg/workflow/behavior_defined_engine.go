@@ -44,6 +44,9 @@ func NewBehaviorDefinedEngine(def *EngineDefinition) (*BehaviorDefinedEngine, er
 	if def.Behaviors == nil {
 		return nil, fmt.Errorf("engine definition %q is missing behaviors", def.ID)
 	}
+	if err := validateBehaviorOutputFiles(def.Behaviors.OutputFiles); err != nil {
+		return nil, fmt.Errorf("engine definition %q behaviors.output-files: %w", def.ID, err)
+	}
 	if def.Behaviors.Execution != nil && def.Behaviors.Execution.ProtectedSessionCapture && def.Behaviors.LogParser == "" {
 		return nil, fmt.Errorf("engine definition %q enables protected-session-capture without a log-parser", def.ID)
 	}

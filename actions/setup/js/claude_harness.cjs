@@ -79,7 +79,15 @@ const {
 } = require("./awf_reflect.cjs");
 const { emitMissingToolPermissionIssue, emitInfrastructureIncomplete, hasExpectedSafeOutputs, hasNoopInSafeOutputs, hasTerminalSafeOutput } = require("./safeoutputs_cli.cjs");
 const { countPermissionDeniedIssues, hasNumerousPermissionDeniedIssues, extractDeniedCommands, buildMissingToolPermissionIssuePayload } = require("./permission_denied_helpers.cjs");
-const { detectNonRetryableHarnessGuard, detectExhaustedAWFInvocationBudget, buildSoftTimeoutGuard, emitSoftTimeoutSignal, isAuthenticationFailedError, parseAICreditsExceededProxyRejection } = require("./harness_retry_guard.cjs");
+const {
+  createOutputPatternMatcher,
+  detectNonRetryableHarnessGuard,
+  detectExhaustedAWFInvocationBudget,
+  buildSoftTimeoutGuard,
+  emitSoftTimeoutSignal,
+  isAuthenticationFailedError,
+  parseAICreditsExceededProxyRejection,
+} = require("./harness_retry_guard.cjs");
 const { isCrashSignalExitCode, crashSignalNameForExitCode } = require("./harness_crash_signals.cjs");
 const { MODEL_NOT_SUPPORTED_PATTERN: INVALID_MODEL_ERROR_PATTERN } = require("./detect_agent_errors.cjs");
 const { applyModelFallback, normalizeClaudeModel } = require("./model_fallback.cjs");
@@ -191,9 +199,7 @@ function isOverloadedError(output) {
  * @param {string} output - Collected stdout+stderr from the process
  * @returns {boolean}
  */
-function isRateLimitError(output) {
-  return RATE_LIMIT_ERROR_PATTERN.test(output);
-}
+const isRateLimitError = createOutputPatternMatcher(RATE_LIMIT_ERROR_PATTERN);
 
 /**
  * Remove stream-JSON user events, which contain tool results, from output used
@@ -237,9 +243,7 @@ function isInvalidJsonBodyError(output) {
  * @param {string} output - Collected stdout+stderr from the process
  * @returns {boolean}
  */
-function isConnectionRefusedError(output) {
-  return CONNECTION_REFUSED_ERROR_PATTERN.test(output);
-}
+const isConnectionRefusedError = createOutputPatternMatcher(CONNECTION_REFUSED_ERROR_PATTERN);
 
 /**
  * Determines whether Claude produced an assistant response before failing.
@@ -265,9 +269,7 @@ function isNoDeferredMarkerError(output) {
  * @param {string} output - Collected stdout+stderr from the process
  * @returns {boolean}
  */
-function isInvalidModelError(output) {
-  return INVALID_MODEL_ERROR_PATTERN.test(output);
-}
+const isInvalidModelError = createOutputPatternMatcher(INVALID_MODEL_ERROR_PATTERN);
 
 /**
  * Determines whether the exit code corresponds to signal-style termination

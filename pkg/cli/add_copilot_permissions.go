@@ -106,6 +106,7 @@ func ensureCopilotRequestsPermission(lines []string, level string, replaceExisti
 	}
 	if permissionsIdx == -1 {
 		insertAt := findPermissionsInsertIndex(lines)
+		copilotPermissionsLog.Printf("No permissions block found, inserting new block with copilot-requests: %s at line index %d", level, insertAt)
 		result := make([]string, 0, len(lines)+2)
 		result = append(result, lines[:insertAt]...)
 		result = append(result, "permissions:", "  copilot-requests: "+level)
@@ -115,15 +116,18 @@ func ensureCopilotRequestsPermission(lines []string, level string, replaceExisti
 	if inlineValue != "" && !strings.HasPrefix(inlineValue, "#") {
 		valuePart, _, _ := strings.Cut(inlineValue, "#")
 		if strings.TrimSpace(valuePart) == "{}" {
+			copilotPermissionsLog.Print("Expanding empty inline permissions mapping ({}) to add copilot-requests")
 			result := make([]string, 0, len(lines)+1)
 			result = append(result, lines[:permissionsIdx]...)
 			result = append(result, permissionsIndent+"permissions:", permissionsIndent+"  copilot-requests: "+level)
 			return append(result, lines[permissionsIdx+1:]...)
 		}
+		copilotPermissionsLog.Printf("Permissions block has inline scalar value %q, leaving lines unchanged", inlineValue)
 		return lines
 	}
 	for offset, line := range lines[permissionsIdx+1 : permissionsEnd] {
 		if parseYAMLMapKey(strings.TrimSpace(line)) == "copilot-requests" {
+			copilotPermissionsLog.Printf("copilot-requests already declared in permissions block: replace_existing=%t", replaceExisting)
 			if replaceExisting {
 				position := permissionsIdx + 1 + offset
 				result := append([]string(nil), lines[:position]...)
@@ -133,6 +137,7 @@ func ensureCopilotRequestsPermission(lines []string, level string, replaceExisti
 			return lines
 		}
 	}
+	copilotPermissionsLog.Printf("Appending copilot-requests: %s to existing permissions block", level)
 	result := make([]string, 0, len(lines)+1)
 	result = append(result, lines[:permissionsEnd]...)
 	result = append(result, permissionsIndent+"  copilot-requests: "+level)

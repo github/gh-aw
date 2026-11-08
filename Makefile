@@ -40,8 +40,18 @@ all: build
 
 # Build the binary, run make deps before this
 .PHONY: build
-build: sync-action-pins sync-action-scripts sync-compat sync-model-aliases
+build: check-agent-local-settings sync-action-pins sync-action-scripts sync-compat sync-model-aliases
 	go build $(LDFLAGS) -o $(BINARY_NAME) ./cmd/gh-aw
+
+# Reject persisted local command approvals even if force-added or already tracked.
+.PHONY: check-agent-local-settings test-agent-local-settings
+check-agent-local-settings:
+	bash scripts/check-agent-local-settings.sh
+
+test-agent-local-settings: check-agent-local-settings
+	bash scripts/check-agent-local-settings_test.sh
+
+build-all build-linux build-darwin build-windows build-android build-wasm: check-agent-local-settings
 
 # Build for all platforms
 .PHONY: build-all
@@ -530,7 +540,7 @@ test-workflow-tool-contracts:
 
 # Run script tests (authentication probes, stale locks, workflow drift, and workflow purity).
 .PHONY: test-scripts
-test-scripts: build test-workflow-tool-contracts
+test-scripts: build test-workflow-tool-contracts test-agent-local-settings
 	@echo "Running script tests..."
 	node --test scripts/agy-authentication.test.cjs
 	node --test scripts/check-npm-1es.test.mjs
@@ -1514,6 +1524,8 @@ help:
 	@echo "  test-unit        - Run impacted Go unit tests first (~$(TEST_UNIT_MAX_SECONDS)s budget); set TEST_UNIT_RUN_FULL=1 for full suite"
 	@echo "  test-unit-all    - Run full Go unit test suite"
 	@echo "  test-security    - Run security regression tests"
+	@echo "  check-agent-local-settings - Reject tracked Claude Code local permission settings"
+	@echo "  test-agent-local-settings - Test local settings secret-leak prevention"
 	@echo "  test-js          - Run JavaScript tests"
 	@echo "  test-impacted-js - Run impacted JavaScript unit tests for current branch changes"
 	@echo "  test-impacted-go - Run impacted Go unit tests for current branch changes"

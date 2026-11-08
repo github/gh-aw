@@ -103,9 +103,9 @@ A response pattern used by the `gh aw` MCP server's `logs` tool when a gateway t
 
 A `gh aw logs` flag that sets a soft budget for total on-disk storage in MB for downloaded run artifacts and cache data (default: 1024 MB, or 1 GB; `0` disables the limit). Concurrent in-flight downloads can temporarily exceed the budget. When downloads approach the configured limit, the command performs selective pruning: it removes non-essential cache data (such as prunable log-cache files not needed by already-completed runs) before falling back to stopping further downloads with `errLogsStorageLimitReached`. Reserving space per download and recording pruned bytes lets long-running multi-workflow log collection stay within a fixed disk budget instead of exhausting it. See [Monitoring Costs with `gh aw logs`](/gh-aw/reference/cost-management/#monitoring-costs-with-gh-aw-logs).
 
-### QMD Documentation Search (`qmd:`)
+### QMD Documentation Search
 
-A built-in tool that provides vector similarity search over documentation files. Configured via `tools.qmd:` in frontmatter, the `qmd` tool runs [tobi/qmd](https://github.com/tobi/qmd) as an MCP server so agents can find relevant documentation by natural language query. The search index is built in a dedicated indexing job (which has `contents: read`) and shared with the agent job via `actions/cache`, so the agent job does not need `contents: read`. Supports indexing from repository checkouts, GitHub code search queries, and cache-only read-only mode. See [QMD Documentation Search](/gh-aw/experimental/qmd/).
+[QMD](https://github.com/tobi/qmd) (Query Markup Documents) combines keyword and vector search with local LLM reranking. Its gh-aw integration is a shared agentic workflow file providing a custom MCP server, indexing job, and cache-memory. In the index/search pattern, the separate job incrementally indexes documentation, an artifact supplies the fresh snapshot to the agent job, and cache-memory persists it across runs. See [QMD Documentation Search](/gh-aw/experimental/qmd/).
 
 ### Tools
 

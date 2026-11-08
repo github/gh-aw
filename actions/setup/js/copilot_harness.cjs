@@ -107,6 +107,7 @@ const {
   buildSoftTimeoutGuard,
   emitSoftTimeoutSignal,
   isAuthenticationFailedError: isCommonAuthenticationFailedError,
+  createOutputPatternMatcher,
   parseAICreditsExceededProxyRejection,
 } = require("./harness_retry_guard.cjs");
 const { isCrashSignalExitCode, crashSignalNameForExitCode } = require("./harness_crash_signals.cjs");
@@ -1167,9 +1168,7 @@ function isMCPGatewayShutdownError(output) {
  * @param {string} output
  * @returns {boolean}
  */
-function isConnectionRefusedError(output) {
-  return CONNECTION_REFUSED_ERROR_PATTERN.test(output);
-}
+const isConnectionRefusedError = createOutputPatternMatcher(CONNECTION_REFUSED_ERROR_PATTERN);
 
 /**
  * Decide whether a failed attempt qualifies for the one-shot connection-refused retry.

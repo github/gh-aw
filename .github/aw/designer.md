@@ -59,6 +59,19 @@ Map to:
 
 ### Phase 4: Data Strategy
 
+#### Memory reuse checkpoint
+
+Before choosing tools or persistence, check whether later runs need reusable
+knowledge rather than just processing state. Infer this from the request and
+available repository evidence; do not add a mandatory interview question.
+
+For repeated investigations, growing history or recall cost, accumulated
+successful techniques, or stale/contradictory advice, load
+[memory.md](memory.md#scheduled-dreaming) even when the user does not mention
+memory or dreaming. That guide owns the deterministic-first decision, cost
+gate, and input-scope checks; loading the guide does not mean adding a dreamer.
+Apply its decision before loading implementation guidance.
+
 Ask:
 - **"What data does the agent need to make decisions?"**
 - Follow up: **"Can we pre-fetch and aggregate that data with shell commands so the agent only reads compact JSON?"**

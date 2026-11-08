@@ -1750,6 +1750,7 @@ jobs:
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_DETECTION_CONCLUSION: ${{ needs.detection.outputs.detection_conclusion }}
           GH_AW_DETECTION_REASON: ${{ needs.detection.outputs.detection_reason }}
+          GH_AW_DETECTION_THREAT_KINDS: ${{ needs.detection.outputs.detection_threat_kinds }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -1891,6 +1892,7 @@ jobs:
           GH_AW_SAFE_OUTPUTS_RESULT: ${{ needs.safe_outputs.result }}
           GH_AW_DETECTION_CONCLUSION: ${{ needs.detection.outputs.detection_conclusion }}
           GH_AW_DETECTION_REASON: ${{ needs.detection.outputs.detection_reason }}
+          GH_AW_DETECTION_THREAT_KINDS: ${{ needs.detection.outputs.detection_threat_kinds }}
           GH_AW_SAFE_OUTPUT_MESSAGES: "{\"footer\":\"\\u003e 😤 *Reluctantly reviewed by [{workflow_name}]({run_url})*{ai_credits_suffix}{history_link}\",\"runStarted\":\"😤 *sigh* [{workflow_name}]({run_url}) is begrudgingly looking at this {event_type}... This better be worth my time.\",\"runSuccess\":\"😤 Fine. [{workflow_name}]({run_url}) finished the review. It wasn't completely terrible. I guess. 🙄\",\"runFailure\":\"😤 Great. [{workflow_name}]({run_url}) {status}. As if my day couldn't get any worse...\"}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
@@ -2089,6 +2091,7 @@ jobs:
       detection_conclusion: ${{ steps.detection_conclusion.outputs.conclusion }}
       detection_reason: ${{ steps.detection_conclusion.outputs.reason }}
       detection_success: ${{ steps.detection_conclusion.outputs.success }}
+      detection_threat_kinds: ${{ steps.detection_conclusion.outputs.threat_kinds }}
       run_detection: ${{ steps.detection_guard.outputs.run_detection }}
     steps:
       - name: Checkout actions folder
@@ -2794,6 +2797,7 @@ jobs:
       GH_AW_COMMANDS: "[\"grumpy\"]"
       GH_AW_DETECTION_CONCLUSION: ${{ needs.detection.outputs.detection_conclusion }}
       GH_AW_DETECTION_REASON: ${{ needs.detection.outputs.detection_reason }}
+      GH_AW_DETECTION_THREAT_KINDS: ${{ needs.detection.outputs.detection_threat_kinds }}
       GH_AW_ENGINE_ID: "codex"
       GH_AW_ENGINE_MODEL: "copilot/gpt-6.1-sol"
       GH_AW_OBJECT_PACK_FETCH_DEPTHS: ${{ vars.GH_AW_OBJECT_PACK_FETCH_DEPTHS }}

@@ -50,6 +50,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/osgetenvlibrary"
 	"github.com/github/gh-aw/pkg/linters/osisnotexist"
 	"github.com/github/gh-aw/pkg/linters/osopenreadallpreferreadfile"
+	"github.com/github/gh-aw/pkg/linters/osremoveuncheckedcleanup"
 	"github.com/github/gh-aw/pkg/linters/ossetenvlibrary"
 	"github.com/github/gh-aw/pkg/linters/packagelevelmutableslicemap"
 	panicinlibrarycode "github.com/github/gh-aw/pkg/linters/panic-in-library-code"
@@ -62,6 +63,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/slicemakezerolength"
 	"github.com/github/gh-aw/pkg/linters/sortslice"
 	"github.com/github/gh-aw/pkg/linters/splitindexzero"
+	splitlinesonnewline "github.com/github/gh-aw/pkg/linters/splitlines-on-newline"
 	"github.com/github/gh-aw/pkg/linters/sprintfbool"
 	"github.com/github/gh-aw/pkg/linters/sprintferrdot"
 	"github.com/github/gh-aw/pkg/linters/sprintferrorsnew"
@@ -75,6 +77,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/stringsindexcontains"
 	"github.com/github/gh-aw/pkg/linters/stringsindexhasprefix"
 	"github.com/github/gh-aw/pkg/linters/stringsjoinone"
+	"github.com/github/gh-aw/pkg/linters/stringssplitfirst"
 	"github.com/github/gh-aw/pkg/linters/timeafterleak"
 	"github.com/github/gh-aw/pkg/linters/timenowsub"
 	"github.com/github/gh-aw/pkg/linters/timesleepnocontext"
@@ -146,6 +149,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	osgetenvlibrary.Analyzer,
 	osisnotexist.Analyzer,
 	osopenreadallpreferreadfile.Analyzer,
+	osremoveuncheckedcleanup.Analyzer,
 	ossetenvlibrary.Analyzer,
 	packagelevelmutableslicemap.Analyzer,
 	panicinlibrarycode.Analyzer,
@@ -159,6 +163,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	slicemakezerolength.Analyzer,
 	sortslice.Analyzer,
 	splitindexzero.Analyzer,
+	splitlinesonnewline.Analyzer,
 	sprintferrdot.Analyzer,
 	sprintferrorsnew.Analyzer,
 	sprintfbool.Analyzer,
@@ -170,6 +175,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	stringsindexcontains.Analyzer,
 	stringsindexhasprefix.Analyzer,
 	stringsjoinone.Analyzer,
+	stringssplitfirst.Analyzer,
 	stringscountcontains.Analyzer,
 	jsonmarshalignoredeerror.Analyzer,
 	lenstringzero.Analyzer,

@@ -847,6 +847,7 @@ async function main() {
       memoryId,
       kind: "repo",
       phase: "push",
+      sourceJobResult: process.env.GH_AW_MEMORY_SOURCE_JOB_RESULT,
       timeoutSeconds: validationTimeoutSeconds,
       isEligibleFile,
     });
@@ -1021,6 +1022,7 @@ async function main() {
               memoryId,
               kind: "repo",
               phase: "push",
+              sourceJobResult: process.env.GH_AW_MEMORY_SOURCE_JOB_RESULT,
               timeoutSeconds: validationTimeoutSeconds,
               isEligibleFile,
             });

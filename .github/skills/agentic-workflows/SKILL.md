@@ -40,6 +40,7 @@ If GitHub API, `gh api`, or GitHub MCP downloads return HTTP 403 (including a to
 - `.github/aw/cli-commands.md`
 - `.github/aw/compat.md`
 - `.github/aw/configure-agentic-engine.md`
+- `.github/aw/connectors.md`
 - `.github/aw/context.md`
 - `.github/aw/create-agentic-workflow-trigger-details.md`
 - `.github/aw/create-agentic-workflow.md`
@@ -60,6 +61,7 @@ If GitHub API, `gh api`, or GitHub MCP downloads return HTTP 403 (including a to
 - `.github/aw/designer.md`
 - `.github/aw/doctor.md`
 - `.github/aw/documentation-workflows.md`
+- `.github/aw/dreaming.md`
 - `.github/aw/drive-memory.md`
 - `.github/aw/enclaves.md`
 - `.github/aw/evals.md`
@@ -125,6 +127,7 @@ If GitHub API, `gh api`, or GitHub MCP downloads return HTTP 403 (including a to
 After loading the matching workflow prompt or skill, follow it directly:
 - Design workflows from scratch via interview: `.github/aw/designer.md`
 - Create new workflows: `.github/aw/create-agentic-workflow.md`
+- Configure scheduled dreaming or consolidate persistent memory: `.github/aw/create-agentic-workflow.md`, then `.github/aw/memory.md#scheduled-dreaming`; load `.github/aw/dreaming.md` only when the decision and input scope justify implementation
 - Configure or add declarative engines: `.github/aw/configure-agentic-engine.md`
 - Consume, author, or document third-party connectors: `.github/aw/connectors.md`
 - Update existing workflows: `.github/aw/update-agentic-workflow.md`

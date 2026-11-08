@@ -4076,6 +4076,7 @@ describe("create_pull_request - threat detection caution", () => {
   ])("should disable auto-merge for detection %s / %s even after requesting reviewers", async (conclusion, reason, alert) => {
     process.env.GH_AW_DETECTION_CONCLUSION = conclusion;
     process.env.GH_AW_DETECTION_REASON = reason;
+    process.env.GH_AW_DETECTION_THREAT_KINDS = "prompt_injection,secret_leak,PRIVATE_TEXT";
 
     const { main } = require("./create_pull_request.cjs");
     const handler = await main({ allow_empty: true, auto_merge: true, draft: false, reviewers: ["human-reviewer"] });
@@ -4085,6 +4086,15 @@ describe("create_pull_request - threat detection caution", () => {
     expect(global.github.rest.pulls.create).toHaveBeenCalledWith(expect.objectContaining({ body: expect.stringContaining(alert) }));
     expect(global.github.rest.pulls.requestReviewers).toHaveBeenCalledWith(expect.objectContaining({ reviewers: ["human-reviewer"] }));
     expect(global.github.rest.pulls.createReview).toHaveBeenCalledWith(expect.objectContaining({ event: "REQUEST_CHANGES", body: expect.stringContaining(reason) }));
+    for (const mock of [global.github.rest.pulls.create, global.github.rest.pulls.createReview]) {
+      const body = mock.mock.lastCall[0].body;
+      expect(body).not.toContain("PRIVATE_TEXT");
+      if (reason === "threat_detected") {
+        expect(body).toContain("Detected threat types: prompt injection, secret leak.");
+      } else {
+        expect(body).not.toContain("Detected threat types:");
+      }
+    }
     expect(global.github.graphql).not.toHaveBeenCalledWith(expect.stringContaining("enablePullRequestAutoMerge"), expect.anything());
     expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("Auto-merge is disabled"));
   });

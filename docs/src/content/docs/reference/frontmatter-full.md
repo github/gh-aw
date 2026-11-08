@@ -3913,6 +3913,14 @@ engine:
     supported-env-var-keys: []
       # Array of strings
 
+    # Untrusted diagnostic files retained in the unified agent artifact after secret
+    # redaction and recovery-envelope validation, including failed executions. Paths
+    # must be literal files under /tmp/gh-aw/agent/ without traversal or wildcards and
+    # have a secret-redactable extension. Does not enable structured session parsing.
+    # (optional)
+    output-files: []
+      # Array of strings
+
     # (optional)
     capabilities:
       # (optional)
@@ -22208,6 +22216,14 @@ safe-outputs:
         # Secret or env var keys the engine accepts through engine.env.
         # (optional)
         supported-env-var-keys: []
+          # Array of strings
+
+        # Untrusted diagnostic files retained in the unified agent artifact after secret
+        # redaction and recovery-envelope validation, including failed executions. Paths
+        # must be literal files under /tmp/gh-aw/agent/ without traversal or wildcards and
+        # have a secret-redactable extension. Does not enable structured session parsing.
+        # (optional)
+        output-files: []
           # Array of strings
 
         # (optional)

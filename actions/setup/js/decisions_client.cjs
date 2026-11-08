@@ -98,10 +98,10 @@ function validateDecisionResponse(response, questions) {
  * No SDK, Actions globals, agent engine, automatic retries, or credential discovery.
  * Refusals are returned to the caller; transport and protocol failures throw.
  *
- * @param {{baseURL: string, apiKey?: string, model: string, input: string | object[], questions: DecisionQuestion[], timeoutMs?: number, fetchImpl?: typeof fetch, onUsage?: (usage: unknown, model: string) => void}} options
+ * @param {{baseURL: string, apiKey?: string, integrationId?: string, model: string, input: string | object[], questions: DecisionQuestion[], timeoutMs?: number, fetchImpl?: typeof fetch, onUsage?: (usage: unknown, model: string) => void}} options
  * @returns {Promise<DecisionResponse>}
  */
-async function invokeDecisions({ baseURL, apiKey, model, input, questions, timeoutMs = 120000, fetchImpl = fetch, onUsage }) {
+async function invokeDecisions({ baseURL, apiKey, integrationId, model, input, questions, timeoutMs = 120000, fetchImpl = fetch, onUsage }) {
   validateQuestions(questions);
   if (typeof model !== "string" || !model.trim()) throw new Error("Decisions requires a model");
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new Error("Decisions timeout must be positive");
@@ -112,7 +112,11 @@ async function invokeDecisions({ baseURL, apiKey, model, input, questions, timeo
   url.pathname = url.pathname.replace(/\/+$/, "") + "/decisions";
   const response = await fetchImpl(url.toString(), {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) },
+    headers: {
+      "Content-Type": "application/json",
+      ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      ...(integrationId ? { "Copilot-Integration-Id": integrationId } : {}),
+    },
     body: JSON.stringify({ model, input, questions }),
     signal: AbortSignal.timeout(timeoutMs),
     redirect: "error",

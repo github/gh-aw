@@ -303,6 +303,16 @@ function parseAICreditsExceededProxyRejectionRecord(parsed) {
 }
 
 /**
+ * Build a predicate for a regular expression that classifies harness output.
+ *
+ * @param {RegExp} pattern
+ * @returns {(output: string) => boolean}
+ */
+function createOutputPatternMatcher(pattern) {
+  return output => pattern.test(output);
+}
+
+/**
  * Detect retry guard conditions that should stop harness retries immediately.
  * @param {unknown} output
  * @returns {{ aiCreditsExceeded: boolean, awfAPIProxyBlockingRequests: boolean, goalAlreadyActive: boolean, maxRunsExceeded: boolean, modelEndpointMismatch: { model?: string, endpoint?: string, detail: string } | null, apiProxyGuardRejection: { guard: string, counters: Record<string, string|number> } | null }}
@@ -320,6 +330,7 @@ function detectNonRetryableHarnessGuard(output) {
 }
 
 module.exports = {
+  createOutputPatternMatcher,
   detectNonRetryableHarnessGuard,
   AI_CREDITS_EXCEEDED_PATTERNS,
   AI_CREDITS_EXCEEDED_PROXY_REJECTION_RE,

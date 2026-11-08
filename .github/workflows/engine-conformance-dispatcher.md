@@ -32,6 +32,7 @@ safe-outputs:
       - engine-conformance-gemini
       - engine-conformance-goose
       - engine-conformance-kiro
+      - engine-conformance-mini-swe-agent
       - engine-conformance-opencode
       - engine-conformance-pi
       - engine-conformance-pydantic-ai

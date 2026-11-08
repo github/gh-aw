@@ -284,6 +284,10 @@ else
   fi
 fi
 
+# Exclude test files and test directories from the security scan.
+awk '!/(^|\/)(test|tests|__tests__)\// && !/\.test\.cjs$/' /tmp/gh-aw/agent/files-to-scan.txt > /tmp/gh-aw/agent/files-to-scan.filtered.txt
+mv /tmp/gh-aw/agent/files-to-scan.filtered.txt /tmp/gh-aw/agent/files-to-scan.txt
+
 FILE_COUNT=$(wc -l < /tmp/gh-aw/agent/files-to-scan.txt)
 echo "📊 Files to scan: $FILE_COUNT"
 cat /tmp/gh-aw/agent/files-to-scan.txt
