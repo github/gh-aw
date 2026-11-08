@@ -27,6 +27,13 @@ When a single run is provided, generates a detailed Markdown report for that run
 When two or more runs are provided, the first is used as the base (reference) and the
 remaining runs are compared against it, producing a diff report.
 
+With --health, select up to five investigation targets using the existing
+revision-aware health algorithm and audit them individually, not as a diff.
+An optional positional argument selects a workflow. Combine --health --stdin
+to consume health --json from a pipeline without repeating discovery.
+Partial discovery starts no audits. JSON preserves the health report, individual
+audit reports, remaining targets and explicit collection failures.
+
 Available unified JSONL sessions are retained and automatically exported to
 sibling .atif trajectories, without changing the report format.
 
@@ -58,7 +65,9 @@ var auditCommandExample = `  ` + string(constants.CLIExtensionPrefix) + ` audit 
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891 1234567892  # Diff base against multiple runs
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891 --format markdown  # Markdown diff output for PR comments
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891 --group # Group findings by run and audit code
-  ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 --runtime cloud-hypervisor   # Skip run unless sandbox agent runtime matches`
+  ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 --runtime cloud-hypervisor   # Skip run unless sandbox agent runtime matches
+  ` + string(constants.CLIExtensionPrefix) + ` audit --health --repo owner/repo --json  # Health discovery followed by individual audits
+  ` + string(constants.CLIExtensionPrefix) + ` health --repo owner/repo --json | ` + string(constants.CLIExtensionPrefix) + ` audit --health --stdin --json`
 
 type auditCommandOptions struct {
 	outputDir        string
@@ -79,6 +88,8 @@ type auditCommandOptions struct {
 	search           string
 	searchLimit      int
 	models           bool
+	health           bool
+	healthLimit      int
 }
 
 // NewAuditCommand creates the audit command
@@ -114,12 +125,19 @@ func registerAuditCommandFlags(cmd *cobra.Command) {
 	cmd.Flags().String("search", "", "Retrieve relevant evidence from the unified session using local BM25 search (single-run only)")
 	cmd.Flags().Int("search-limit", defaultAuditSearchLimit, "Maximum evidence groups returned by --search (1-20)")
 	cmd.Flags().Bool("models", false, "Include the run's model catalog, discovery status, and supported endpoints (single-run only)")
+	registerAuditHealthFlags(cmd)
 	RegisterDirFlagCompletion(cmd, "output")
 }
 
 func runAuditCommand(cmd *cobra.Command, args []string) error {
 	opts, err := getAuditCommandOptions(cmd)
 	if err != nil {
+		return err
+	}
+	if opts.health {
+		return runAuditHealthCommand(cmd, args, opts)
+	}
+	if err := validateAuditHealthOnlyFlags(cmd); err != nil {
 		return err
 	}
 	args, handled, err := resolveAuditCommandArgs(args, opts.stdin)
@@ -174,6 +192,8 @@ func getAuditCommandOptions(cmd *cobra.Command) (auditCommandOptions, error) {
 	opts.search, _ = cmd.Flags().GetString("search")
 	opts.searchLimit, _ = cmd.Flags().GetInt("search-limit")
 	opts.models, _ = cmd.Flags().GetBool("models")
+	opts.health, _ = cmd.Flags().GetBool("health")
+	opts.healthLimit, _ = cmd.Flags().GetInt("health-limit")
 	if cmd.Flags().Changed("search") || cmd.Flags().Changed("search-limit") {
 		if err := validateAuditSearch(opts.search, opts.searchLimit); err != nil {
 			return auditCommandOptions{}, err

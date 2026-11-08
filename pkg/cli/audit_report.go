@@ -112,6 +112,7 @@ type PerformanceMetrics struct {
 // OverviewData contains basic information about the workflow run
 type OverviewData struct {
 	RunID        int64      `json:"run_id" console:"header:Run ID"`
+	RunAttempt   int        `json:"run_attempt,omitempty" console:"-"`
 	WorkflowName string     `json:"workflow_name" console:"header:Workflow"`
 	Status       string     `json:"status" console:"header:Status"`
 	Conclusion   string     `json:"conclusion,omitempty" console:"header:Conclusion,omitempty"`
@@ -366,6 +367,7 @@ func buildLocalAuditData(processedRun ProcessedRun, metrics LogMetrics, mcpToolU
 func buildAuditOverview(run WorkflowRun, expData *ExperimentData) OverviewData {
 	overview := OverviewData{
 		RunID:        run.DatabaseID,
+		RunAttempt:   run.Attempt,
 		WorkflowName: run.WorkflowName,
 		Status:       run.Status,
 		Conclusion:   run.Conclusion,

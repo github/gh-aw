@@ -79,6 +79,8 @@ still stop collection; primary inventory and presence errors remain errors.
 Collection has a two-minute time budget by default. Use --timeout to change it
 (0 disables the deadline). Expiry returns available evidence with
 collection.partial=true and reason=time_budget, not a healthy verdict.
+Pipe --json to audit --health --stdin to audit the selected investigation targets
+individually without repeating discovery. Enable shell pipefail to retain errors.
 
 `
 
@@ -96,7 +98,8 @@ func NewHealthCommand() *cobra.Command {
   ` + string(constants.CLIExtensionPrefix) + ` health --start-date -24h      # Evidence from the last 24 hours
   ` + string(constants.CLIExtensionPrefix) + ` health --start-date 2026-10-14T04:49:11Z  # Evidence since a release
   ` + string(constants.CLIExtensionPrefix) + ` health --start-date 2026-10-14 --end-date 2026-10-15  # Bounded window
-  ` + string(constants.CLIExtensionPrefix) + ` health issue-monster --days 90  # Current status; at most 90 days`,
+  ` + string(constants.CLIExtensionPrefix) + ` health issue-monster --days 90  # Current status; at most 90 days
+  ` + string(constants.CLIExtensionPrefix) + ` health --json | ` + string(constants.CLIExtensionPrefix) + ` audit --health --stdin --json`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			threshold, _ := cmd.Flags().GetFloat64("threshold")
@@ -158,11 +161,32 @@ func runHealth(ctx context.Context, config HealthConfig) error {
 		ctx, cancel = context.WithTimeout(ctx, config.Timeout)
 		defer cancel()
 	}
+	runs, config, err := collectHealthRuns(ctx, config, started)
+	if err != nil {
+		return err
+	}
 
+	if len(runs) == 0 && len(config.collection.workflows) == 0 && !config.collection.Partial {
+		if config.WorkflowName != "" {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("No runs found for workflow '%s' created from %s to %s", config.WorkflowName, config.StartDate, config.EndDate)))
+		} else {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("No workflow runs found created from %s to %s", config.StartDate, config.EndDate)))
+		}
+		if !config.JSONOutput {
+			return nil
+		}
+	}
+	if config.WorkflowName != "" {
+		return displayDetailedHealth(runs, config)
+	}
+	return displayHealthSummary(runs, config)
+}
+
+func collectHealthRuns(ctx context.Context, config HealthConfig, started time.Time) ([]WorkflowRun, HealthConfig, error) {
 	config.explicitTimeWindow = config.StartDate != "" || config.EndDate != ""
 	start, end, err := resolveHealthTimeWindow(config, time.Now())
 	if err != nil {
-		return err
+		return nil, config, err
 	}
 	config.StartDate, config.EndDate = start.Format(time.RFC3339Nano), end.Format(time.RFC3339Nano)
 
@@ -174,39 +198,16 @@ func runHealth(ctx context.Context, config HealthConfig) error {
 	config.collection = newHealthCollection(ctx, config, start, end)
 	config.collection.startedAt = started
 	if err := discoverHealthWorkflows(&config); err != nil {
-		return err
+		return nil, config, err
 	}
 	runs, err := fetchWorkflowRuns("", config.StartDate, config.RepoOverride, config.Verbose, config.collection)
 	if err != nil {
-		return fmt.Errorf("failed to fetch workflow runs: %w", err)
+		return nil, config, fmt.Errorf("failed to fetch workflow runs: %w", err)
 	}
 	collectHealthWorkQueue(config.collection)
 	checkHealthTimeBudget(config.collection)
 
-	if len(runs) == 0 && len(config.collection.workflows) == 0 && !config.collection.Partial {
-		if config.WorkflowName != "" {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("No runs found for workflow '%s' created from %s to %s", config.WorkflowName, config.StartDate, config.EndDate)))
-			// When JSON output is requested for a specific workflow, still output a valid
-			// zero-run JSON structure so callers can parse the result programmatically.
-			if config.JSONOutput {
-				return displayDetailedHealth(runs, config)
-			}
-		} else {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("No workflow runs found created from %s to %s", config.StartDate, config.EndDate)))
-			if config.JSONOutput {
-				return displayHealthSummary(runs, config)
-			}
-		}
-		return nil
-	}
-
-	if config.WorkflowName != "" {
-		// Detailed view for specific workflow
-		return displayDetailedHealth(runs, config)
-	}
-
-	// Summary view for all workflows
-	return displayHealthSummary(runs, config)
+	return runs, config, nil
 }
 
 func newHealthCollection(ctx context.Context, config HealthConfig, start, end time.Time) *HealthCollection {
@@ -227,7 +228,14 @@ func newHealthCollection(ctx context.Context, config HealthConfig, start, end ti
 // displayHealthSummary displays a summary of health metrics for all workflows
 func displayHealthSummary(runs []WorkflowRun, config HealthConfig) error {
 	healthLog.Printf("Displaying health summary: %d runs", len(runs))
+	summary := buildHealthSummary(runs, config)
+	if config.JSONOutput {
+		return outputHealthJSON(summary)
+	}
+	return outputHealthTable(summary, config.Threshold)
+}
 
+func buildHealthSummary(runs []WorkflowRun, config HealthConfig) HealthSummary {
 	workflowHealths := calculateHealthWorkflowReports(runs, config)
 
 	// Sort by success rate ascending (lowest first to highlight issues)
@@ -241,12 +249,7 @@ func displayHealthSummary(runs []WorkflowRun, config HealthConfig) error {
 	summary.FailureClusters, summary.FailureInvestigation = buildHealthFailureClusters(runs, config)
 	finishHealthCollection(config.collection)
 
-	// Output results
-	if config.JSONOutput {
-		return outputHealthJSON(summary)
-	}
-
-	return outputHealthTable(summary, config.Threshold)
+	return summary
 }
 
 // displayDetailedHealth displays detailed health metrics for a specific workflow

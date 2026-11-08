@@ -88,6 +88,9 @@ func renderPreparedAuditReport(ctx context.Context, auditData AuditData, opts Au
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	if opts.report != nil {
+		return opts.report(auditData)
+	}
 	if err := renderAuditOutput(auditData, runOutputDir, opts.JSONOutput, opts.Verbose); err != nil {
 		return err
 	}

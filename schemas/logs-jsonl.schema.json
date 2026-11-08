@@ -4006,6 +4006,9 @@
                     "run_id": {
                       "type": "integer"
                     },
+                    "run_attempt": {
+                      "type": "integer"
+                    },
                     "workflow_name": {
                       "type": "string"
                     },

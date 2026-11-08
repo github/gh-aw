@@ -89,7 +89,7 @@ func auditPreparationTimeoutStage(run WorkflowRun) string {
 
 // Incomplete reports are never written to the full-audit or run-summary caches.
 func renderIncompleteAuditIfTimedOut(cfg auditRunConfig, run WorkflowRun, results auditAnalysisResults, stage string, err error) error {
-	if !cfg.jsonOutput || !errors.Is(err, context.DeadlineExceeded) {
+	if cfg.report != nil || !cfg.jsonOutput || !errors.Is(err, context.DeadlineExceeded) {
 		return err
 	}
 	if run.DatabaseID == 0 {
@@ -166,6 +166,7 @@ func newAuditRunConfig(runID int64, opts AuditOptions) (auditRunConfig, error) {
 		search:                 opts.Search,
 		searchLimit:            opts.SearchLimit,
 		models:                 opts.Models,
+		report:                 opts.report,
 		evalsArtifactRequested: isEvalsArtifactRequested(opts.EvalsOnly, opts.ArtifactSets),
 	}, nil
 }
@@ -251,6 +252,7 @@ func (cfg auditRunConfig) auditOptions() AuditOptions {
 		Search:      cfg.search,
 		SearchLimit: cfg.searchLimit,
 		Models:      cfg.models,
+		report:      cfg.report,
 	}
 }
 

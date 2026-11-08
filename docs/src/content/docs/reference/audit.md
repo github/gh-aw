@@ -24,6 +24,10 @@ In single-run mode, a job URL without a step anchor extracts the first failing s
 | `--parse` | off | Run JavaScript parsers on agent and firewall logs, writing `log.md` and `firewall.md` (single-run only) |
 | `--repo <owner/repo>` | auto | Specify repository when the run ID is not from a URL |
 | `--stdin` | off | Read run IDs or URLs from stdin (one per line) instead of positional arguments |
+| `--health` | off | Select and individually audit revision-aware health investigation targets; with `--stdin`, consume a health JSON report instead of run-ID lines |
+| `--health-limit <n>` | `5` | Maximum health-selected targets to audit, from 1 to 5 |
+| `--health-timeout <duration>` | `2m` | Health discovery deadline; `0` disables it |
+| `--start-date`, `--end-date` | `-24h`, now | Creation-time window for `--health` discovery; cannot rescope stdin reports |
 | `--verbose` | off | Print detailed progress information |
 | `--format <fmt>` | `pretty` | Diff output format: `pretty` or `markdown` (multi-run only) |
 | `--group` | off | Group audit findings so each `[run, code]` pair appears once with an occurrence count and representative entry |
@@ -136,6 +140,39 @@ echo -e "1234567890\n9876543210" | gh aw audit --stdin   # diff mode: first is b
 cat run-ids.txt | gh aw audit --stdin
 cat run-ids.txt | gh aw audit --stdin --repo owner/repo  # required for bare numeric IDs
 ```
+
+### Health-selected audits
+
+`--health` reuses the health command's current-revision selection, lifecycle
+filtering and cached evidence. It audits selected targets individually rather
+than comparing unrelated workflows. An optional positional argument selects a
+workflow; without one, discovery is repository-wide.
+
+```bash
+gh aw audit --health --repo owner/repo --health-limit 3 --no-baseline --json
+gh aw health --repo owner/repo --start-date -24h --json > health.json &&
+  gh aw audit --health --stdin --no-baseline --json < health.json
+```
+
+The second form reuses the exact report without rescanning. A direct pipeline
+also works; enable the shell's `pipefail` option to preserve upstream failures.
+Plain `--stdin` continues to accept run-ID lines. `--health --stdin` instead
+requires one health JSON object, bounded to 16 MiB, with explicit collection
+completeness and host metadata. Invalid, duplicate or out-of-scope targets are
+rejected before auditing. Run attempts and update timestamps are checked against
+the resulting audit.
+
+Partial health discovery starts no audits. Audit errors return nonzero and
+preserve completed reports in an explicitly partial JSON result. Health mode
+cannot combine with `--group`, `--parse`, `--search`, `--models` or run filters.
+`--timeout` bounds the audit batch separately from `--health-timeout`.
+
+JSON contains `health`, `audits` (`target` and `report` per run), `complete`,
+`partial`, `remaining_targets`, and an `error` on failure. `complete` describes
+successful processing of the requested bounded batch, not exhaustive history or
+all selected targets: a smaller `--health-limit` leaves `remaining_targets`.
+Health's `remaining_clusters` and sample/collection metadata remain unchanged.
+No selected failures does not prove the repository is healthy.
 
 **Multi-run diff examples:**
 
