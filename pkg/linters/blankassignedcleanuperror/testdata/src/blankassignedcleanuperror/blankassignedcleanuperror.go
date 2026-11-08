@@ -16,10 +16,10 @@ func discarded(path string, data []byte) {
 
 func deferredCleanup(path string) {
 	defer func() {
-		_ = stdos.Remove(path)
+		_ = stdos.Remove(path) // want `cleanup error from os\.Remove is discarded`
 	}()
 	defer (func() {
-		_ = stdos.RemoveAll(path)
+		_ = stdos.RemoveAll(path) // want `cleanup error from os\.RemoveAll is discarded`
 	})()
 }
 
@@ -49,4 +49,8 @@ func closeErrorAlreadyHandled(c closer) {
 
 func suppressed(path string) {
 	_ = stdos.Remove(path) //nolint:blankassignedcleanuperror
+}
+
+func suppressedWithLegacyDirective(path string) {
+	_ = stdos.Remove(path) //nolint:osremoveuncheckedcleanup
 }

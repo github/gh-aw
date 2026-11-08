@@ -4,7 +4,6 @@ package blankassignedcleanuperror
 
 import (
 	"go/ast"
-	"go/token"
 
 	"golang.org/x/tools/go/analysis"
 
@@ -15,12 +14,7 @@ import (
 )
 
 // Analyzer is the blank-assigned-cleanup-error analysis pass.
-var Analyzer = analyzerutil.New("blankassignedcleanuperror", "reports discarded cleanup errors assigned to the blank identifier", run)
-
-type sourceRange struct {
-	start token.Pos
-	end   token.Pos
-}
+var Analyzer = analyzerutil.New("blankassignedcleanuperror", "reports discarded cleanup errors assigned to the blank identifier, including in deferred closures", run)
 
 func run(pass *analysis.Pass) (any, error) {
 	nolintIndex, generatedFiles, err := analyzerutil.Indexes(pass)
@@ -28,31 +22,18 @@ func run(pass *analysis.Pass) (any, error) {
 		return nil, err
 	}
 
-	deferredClosures := deferredCleanupClosures(pass.Files)
 	nodeFilter := []ast.Node{(*ast.AssignStmt)(nil)}
 	return analyzerutil.Preorder(pass, nodeFilter, func(n ast.Node) {
 		assign, ok := n.(*ast.AssignStmt)
 		if !ok || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 {
 			return
 		}
-		var lhs, rhs ast.Expr
-		for _, expr := range assign.Lhs {
-			lhs = expr
-		}
-		for _, expr := range assign.Rhs {
-			rhs = expr
-		}
-		blank, ok := astutil.UnwrapParenExpr(lhs).(*ast.Ident)
+		blank, ok := astutil.UnwrapParenExpr(assign.Lhs[0]).(*ast.Ident) //nolint:uncheckedsliceindex // lengths are checked above
 		if !ok || blank.Name != "_" {
 			return
 		}
-		for _, deferred := range deferredClosures {
-			if assign.Pos() >= deferred.start && assign.End() <= deferred.end {
-				return
-			}
-		}
 
-		call, ok := astutil.UnwrapParenExpr(rhs).(*ast.CallExpr)
+		call, ok := astutil.UnwrapParenExpr(assign.Rhs[0]).(*ast.CallExpr) //nolint:uncheckedsliceindex // lengths are checked above
 		if !ok {
 			return
 		}
@@ -66,30 +47,13 @@ func run(pass *analysis.Pass) (any, error) {
 			nolint.HasDirectiveForLinter(position, nolintIndex, "blankassignedcleanuperror") {
 			return
 		}
+		if (funcName == "Remove" || funcName == "RemoveAll") &&
+			nolint.HasDirectiveForLinter(position, nolintIndex, "osremoveuncheckedcleanup") {
+			return
+		}
 
 		pass.ReportRangef(call, "cleanup error from os.%s is discarded by assignment to _", funcName)
 	})
-}
-
-func deferredCleanupClosures(files []*ast.File) []sourceRange {
-	var ranges []sourceRange
-	for _, file := range files {
-		ast.Inspect(file, func(n ast.Node) bool {
-			deferStmt, ok := n.(*ast.DeferStmt)
-			if !ok {
-				return true
-			}
-			call, ok := deferStmt.Call.Fun.(*ast.FuncLit)
-			if !ok {
-				call, ok = astutil.UnwrapParenExpr(deferStmt.Call.Fun).(*ast.FuncLit)
-			}
-			if ok {
-				ranges = append(ranges, sourceRange{start: call.Body.Pos(), end: call.Body.End()})
-			}
-			return true
-		})
-	}
-	return ranges
 }
 
 func isCleanupFunction(name string) bool {
