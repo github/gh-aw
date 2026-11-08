@@ -146,7 +146,7 @@ The harness also receives `GH_AW_DURABLE_STORAGE=artifact`,
 never credentials or runtime authentication. gh-aw restores and publishes the artifact and applies
 the configured retention period. The engine is responsible for checkpoint
 compatibility, replay safety, fresh credential binding, telemetry, and unified
-session events. See [Pi durable runs](/gh-aw/reference/engines/pi/#durable-runs)
+session events. See [Durable runs](/gh-aw/reference/engines/#durable-runs)
 for parent selection, retention, and continuation limitations.
 
 Artifact files include an integrity-checked UTF-8 projection so host secret

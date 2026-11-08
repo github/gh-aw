@@ -189,10 +189,18 @@ Based on error clustering and root cause analysis, provide:
 
 Create a discussion with the following structure:
 
-```markdown
-# 🏥 Safe Output Health Report - [DATE]
+Use `###` or lower for every report heading; reserve h1/h2 for the
+platform-rendered title. Follow this order: overview → key metrics/issues →
+collapsible detailed findings → next actions or limitations. Keep the executive
+summary and decision-relevant metrics visible. Put long tables, lists, and
+evidence in `<details><summary><b>...</b></summary>...</details>` blocks. Use
+`- [ ]` for follow-up actions and format applicable workflow runs as
+`[§12345](https://github.com/${{ github.repository }}/actions/runs/12345)`.
 
-## Executive Summary
+```markdown
+### 🏥 Safe Output Health Report - [DATE]
+
+### Summary
 
 - **Period**: Last 24 hours
 - **Runs Analyzed**: [NUMBER]
@@ -200,8 +208,17 @@ Create a discussion with the following structure:
 - **Safe Output Jobs Executed**: [NUMBER]
 - **Safe Output Jobs Failed**: [NUMBER]
 - **Error Clusters Identified**: [NUMBER]
+- **Cadence**: [healthy/stale/unknown, elapsed hours, and previous successful run]
 
-## Safe Output Job Statistics
+### Key Metrics and Issues
+
+- **Overall success rate**: [PERCENTAGE]%
+- **Most important finding**: [brief issue or state that no errors were found]
+
+<details>
+<summary><b>Detailed findings, statistics, and evidence</b></summary>
+
+### Safe Output Job Statistics
 
 | Job Type | Total Executions | Failures | Success Rate |
 |----------|------------------|----------|--------------|
@@ -211,125 +228,110 @@ Create a discussion with the following structure:
 | create_pull_request | [NUM] | [NUM] | [PCT]% |
 | other... | [NUM] | [NUM] | [PCT]% |
 
-## Error Clusters
+### Error Clusters
 
-### Cluster 1: [Error Type/Pattern]
+#### Cluster 1: [Error Type/Pattern]
 
 - **Count**: [NUMBER] occurrences
 - **Affected Jobs**: [Job types]
 - **Affected Workflows**: [Workflow names]
-- **Sample Error**:
-  ```
-  [Error message excerpt]
-  ```
+- **Sample Error**: [brief excerpt]
 - **Root Cause**: [Analysis of underlying cause]
 - **Impact**: [Severity and impact description]
 
-### Cluster 2: [Error Type/Pattern]
+#### Cluster 2: [Error Type/Pattern]
 
 [Same structure as above]
 
-## Root Cause Analysis
+### Root Cause Analysis
 
-### API-Related Issues
+#### API-Related Issues
 
 [Details of API errors, rate limits, authentication problems]
 
-### Data Validation Issues
+#### Data Validation Issues
 
 [Details of parsing and validation errors]
 
-### Permission Issues
+#### Permission and Other Issues
 
-[Details of permission-related failures]
+[Details of permission-related failures and any other categories]
 
-### Other Issues
+### Recommendations
 
-[Any other categories of errors found]
+#### Critical Issues (Immediate Action Required)
 
-## Recommendations
+- **[Issue Title]** — **Priority**: [Critical/High/Medium/Low]
+- **Root Cause**: [Brief explanation]
+- **Recommended Action**: [Specific steps to fix]
+- **Affected**: [Workflows/job types affected]
 
-### Critical Issues (Immediate Action Required)
+#### Bug Fixes Required
 
-1. **[Issue Title]**
-   - **Priority**: Critical/High/Medium/Low
-   - **Root Cause**: [Brief explanation]
-   - **Recommended Action**: [Specific steps to fix]
-   - **Affected**: [Workflows/job types affected]
+- **[Bug Title]**
+  - **File/Location**: [Specific file and function]
+  - **Problem**: [What's wrong]
+  - **Fix**: [What needs to change]
+  - **Affected Jobs**: [Job types]
 
-2. [Additional critical issues]
+#### Configuration Changes
 
-### Bug Fixes Required
+- **[Configuration Item]**
+  - **Current**: [Current setting]
+  - **Recommended**: [Recommended change]
+  - **Reason**: [Why this change helps]
 
-1. **[Bug Title]**
-   - **File/Location**: [Specific file and function]
-   - **Problem**: [What's wrong]
-   - **Fix**: [What needs to change]
-   - **Affected Jobs**: [Job types]
+#### Process Improvements
 
-2. [Additional bug fixes]
+- **[Improvement Area]**
+  - **Current State**: [How it works now]
+  - **Proposed**: [How it should work]
+  - **Benefits**: [Expected improvements]
 
-### Configuration Changes
+### Work Item Plans
 
-1. **[Configuration Item]**
-   - **Current**: [Current setting]
-   - **Recommended**: [Recommended change]
-   - **Reason**: [Why this change helps]
+For each significant issue cluster, provide a structured plan:
 
-2. [Additional configuration changes]
-
-### Process Improvements
-
-1. **[Improvement Area]**
-   - **Current State**: [How it works now]
-   - **Proposed**: [How it should work]
-   - **Benefits**: [Expected improvements]
-
-2. [Additional improvements]
-
-## Work Item Plans
-
-For each significant issue cluster, provide a structured work item plan:
-
-### Work Item 1: [Title]
+#### Work Item 1: [Title]
 
 - **Type**: Bug Fix / Enhancement / Investigation
 - **Priority**: Critical / High / Medium / Low
-- **Description**: [Detailed description of the issue]
+- **Description**: [Detailed description]
 - **Acceptance Criteria**:
-  - [ ] [Specific measurable outcome 1]
-  - [ ] [Specific measurable outcome 2]
+  - [ ] [Specific measurable outcome]
 - **Technical Approach**: [How to implement the fix]
 - **Estimated Effort**: [Small / Medium / Large]
-- **Dependencies**: [Any dependencies or prerequisites]
+- **Dependencies**: [Prerequisites]
 
-### Work Item 2: [Title]
+#### Work Item 2: [Title]
 
 [Same structure as above]
 
-## Historical Context
+### Historical Context
 
-[Compare with previous safe output health audits if available from cache memory]
+Compare with previous safe output health audits when available.
 
-### Trends
+#### Trends
 
-- Error rate trend: [Increasing/Decreasing/Stable]
-- Most common recurring issue: [Description]
-- Improvement since last audit: [Metrics]
+- **Error rate trend**: [Increasing/Decreasing/Stable]
+- **Most common recurring issue**: [Description]
+- **Improvement since last audit**: [Metrics]
 
-## Metrics and KPIs
+### Metrics and KPIs
 
 - **Overall Safe Output Success Rate**: [PERCENTAGE]%
 - **Most Reliable Job Type**: [Job type with highest success rate]
 - **Most Problematic Job Type**: [Job type with lowest success rate]
 - **Average Time to Failure**: [If applicable]
 
-## Next Steps
+</details>
 
-- [ ] [Immediate action item 1]
-- [ ] [Immediate action item 2]
-- [ ] [Follow-up investigation]
-- [ ] [Process improvement task]
+### Next Steps or Limitations
+
+- [ ] [Highest-priority follow-up action]
+- [ ] [Follow-up investigation or process improvement]
+- [ ] State any missing logs, incomplete coverage, or unavailable historical evidence.
+
 ```
 
 ## Important Guidelines
