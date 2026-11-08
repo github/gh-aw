@@ -38,6 +38,6 @@ func run(pass *analysis.Pass) (any, error) {
 			nolint.HasDirectiveForLinter(pos, noLintIndex, linterName) {
 			return
 		}
-		pass.ReportRangef(call, "filepath.Walk is less efficient than filepath.WalkDir; prefer filepath.WalkDir")
+		pass.ReportRangef(call, "filepath.Walk is less efficient than filepath.WalkDir; prefer filepath.WalkDir (its callback receives fs.DirEntry; use d.Info() for metadata)")
 	})
 }

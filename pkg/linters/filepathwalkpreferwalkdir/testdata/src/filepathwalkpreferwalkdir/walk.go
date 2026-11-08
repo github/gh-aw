@@ -15,6 +15,12 @@ func functionAlias(root string) {
 	walk(root, nil) // want "filepath.Walk is less efficient"
 }
 
+func reassignedFunctionAlias(root string) {
+	walk := filepath.Walk
+	walk = func(string, filepath.WalkFunc) error { return nil }
+	walk(root, nil)
+}
+
 func alreadyWalkDir(root string) {
 	filepath.WalkDir(root, nil)
 }
