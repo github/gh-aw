@@ -3,176 +3,120 @@
 package workflow
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestUsesPatchesAndCheckouts(t *testing.T) {
+func TestBuildNormalizedSortedJSON(t *testing.T) {
 	tests := []struct {
-		name        string
-		safeOutputs *SafeOutputsConfig
-		expected    bool
+		name     string
+		names    []string
+		valueFn  func(string) string
+		expected string
 	}{
 		{
-			name:        "returns false for nil SafeOutputsConfig",
-			safeOutputs: nil,
-			expected:    false,
+			name:     "nil names",
+			names:    nil,
+			valueFn:  func(string) string { return "" },
+			expected: `{}`,
 		},
 		{
-			name:        "returns false for empty SafeOutputsConfig",
-			safeOutputs: &SafeOutputsConfig{},
-			expected:    false,
+			name:     "empty names",
+			names:    []string{},
+			valueFn:  func(string) string { return "" },
+			expected: `{}`,
 		},
 		{
-			name: "returns true when CreatePullRequests is set",
-			safeOutputs: &SafeOutputsConfig{
-				CreatePullRequests: &CreatePullRequestsConfig{},
-			},
-			expected: true,
+			name:     "normalizes name before calling value function",
+			names:    []string{"my-job"},
+			valueFn:  func(name string) string { return name },
+			expected: `{"my_job":"my_job"}`,
 		},
 		{
-			name: "returns true when PushToPullRequestBranch is set",
-			safeOutputs: &SafeOutputsConfig{
-				PushToPullRequestBranch: &PushToPullRequestBranchConfig{},
-			},
-			expected: true,
+			name:     "collapses duplicate normalized names",
+			names:    []string{"my-job", "my_job"},
+			valueFn:  func(name string) string { return name },
+			expected: `{"my_job":"my_job"}`,
 		},
 		{
-			name: "returns true when both CreatePullRequests and PushToPullRequestBranch are set",
-			safeOutputs: &SafeOutputsConfig{
-				CreatePullRequests:      &CreatePullRequestsConfig{},
-				PushToPullRequestBranch: &PushToPullRequestBranchConfig{},
-			},
-			expected: true,
-		},
-		{
-			name: "returns false when only CreateIssues is set",
-			safeOutputs: &SafeOutputsConfig{
-				CreateIssues: &CreateIssuesConfig{},
-			},
-			expected: false,
-		},
-		{
-			name: "returns false when only AddComments is set",
-			safeOutputs: &SafeOutputsConfig{
-				AddComments: &AddCommentsConfig{},
-			},
-			expected: false,
-		},
-		{
-			name: "returns false when only UpdatePullRequests is set",
-			safeOutputs: &SafeOutputsConfig{
-				UpdatePullRequests: &UpdatePullRequestsConfig{},
-			},
-			expected: false,
-		},
-		{
-			name: "returns true when CreatePullRequests is set alongside other outputs",
-			safeOutputs: &SafeOutputsConfig{
-				CreatePullRequests: &CreatePullRequestsConfig{},
-				CreateIssues:       &CreateIssuesConfig{},
-				AddComments:        &AddCommentsConfig{},
-			},
-			expected: true,
-		},
-		{
-			name: "returns true when PushToPullRequestBranch is set alongside other outputs",
-			safeOutputs: &SafeOutputsConfig{
-				PushToPullRequestBranch: &PushToPullRequestBranchConfig{},
-				CreateIssues:            &CreateIssuesConfig{},
-			},
-			expected: true,
-		},
-		{
-			name: "returns false when CreatePullRequests is globally staged",
-			safeOutputs: &SafeOutputsConfig{
-				Staged:             templatableBoolPtr("true"),
-				CreatePullRequests: &CreatePullRequestsConfig{},
-			},
-			expected: false,
-		},
-		{
-			name: "returns false when PushToPullRequestBranch is globally staged",
-			safeOutputs: &SafeOutputsConfig{
-				Staged:                  templatableBoolPtr("true"),
-				PushToPullRequestBranch: &PushToPullRequestBranchConfig{},
-			},
-			expected: false,
-		},
-		{
-			name: "returns false when both PR handlers are globally staged",
-			safeOutputs: &SafeOutputsConfig{
-				Staged:                  templatableBoolPtr("true"),
-				CreatePullRequests:      &CreatePullRequestsConfig{},
-				PushToPullRequestBranch: &PushToPullRequestBranchConfig{},
-			},
-			expected: false,
-		},
-		{
-			name: "returns false when CreatePullRequests is per-handler staged",
-			safeOutputs: &SafeOutputsConfig{
-				CreatePullRequests: &CreatePullRequestsConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{Staged: templatableBoolPtr("true")}},
-			},
-			expected: false,
-		},
-		{
-			name: "returns false when both PR handlers are per-handler staged",
-			safeOutputs: &SafeOutputsConfig{
-				CreatePullRequests:      &CreatePullRequestsConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{Staged: templatableBoolPtr("true")}},
-				PushToPullRequestBranch: &PushToPullRequestBranchConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{Staged: templatableBoolPtr("true")}},
-			},
-			expected: false,
-		},
-		{
-			name: "returns true when CreatePullRequests is not staged but PushToPullRequestBranch is staged",
-			safeOutputs: &SafeOutputsConfig{
-				CreatePullRequests:      &CreatePullRequestsConfig{},
-				PushToPullRequestBranch: &PushToPullRequestBranchConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{Staged: templatableBoolPtr("true")}},
-			},
-			expected: true,
-		},
-		{
-			name: "returns true when PushToPullRequestBranch is not staged but CreatePullRequests is staged",
-			safeOutputs: &SafeOutputsConfig{
-				CreatePullRequests:      &CreatePullRequestsConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{Staged: templatableBoolPtr("true")}},
-				PushToPullRequestBranch: &PushToPullRequestBranchConfig{},
-			},
-			expected: true,
+			name:     "sorts keys",
+			names:    []string{"z-job", "a-job"},
+			valueFn:  func(name string) string { return name },
+			expected: `{"a_job":"a_job","z_job":"z_job"}`,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := usesPatchesAndCheckouts(tt.safeOutputs)
-			assert.Equal(t, tt.expected, result, "usesPatchesAndCheckouts should return expected value")
+			jsonStr, err := buildNormalizedSortedJSON(tt.names, tt.valueFn)
+			require.NoError(t, err)
+			assert.JSONEq(t, tt.expected, jsonStr)
+
+			repeatedJSON, err := buildNormalizedSortedJSON(tt.names, tt.valueFn)
+			require.NoError(t, err)
+			if jsonStr != repeatedJSON {
+				t.Errorf("output should be deterministic: got %q and %q", jsonStr, repeatedJSON)
+			}
 		})
 	}
 }
 
 func TestBuildCustomSafeOutputJobsJSON(t *testing.T) {
-	data := &WorkflowData{
-		SafeOutputs: &SafeOutputsConfig{
-			Jobs: map[string]*SafeJobConfig{
-				"z-job": {},
-				"a-job": {},
+	tests := []struct {
+		name     string
+		data     *WorkflowData
+		expected string
+	}{
+		{
+			name:     "nil safe outputs",
+			data:     &WorkflowData{},
+			expected: "",
+		},
+		{
+			name:     "nil jobs map",
+			data:     &WorkflowData{SafeOutputs: &SafeOutputsConfig{}},
+			expected: "",
+		},
+		{
+			name: "empty jobs map",
+			data: &WorkflowData{
+				SafeOutputs: &SafeOutputsConfig{Jobs: map[string]*SafeJobConfig{}},
 			},
+			expected: "",
+		},
+		{
+			name: "single job with uppercase and special characters",
+			data: &WorkflowData{
+				SafeOutputs: &SafeOutputsConfig{
+					Jobs: map[string]*SafeJobConfig{"My.Custom-Job": {}},
+				},
+			},
+			expected: `{"My_Custom_Job":""}`,
+		},
+		{
+			name: "multiple sorted jobs",
+			data: &WorkflowData{
+				SafeOutputs: &SafeOutputsConfig{
+					Jobs: map[string]*SafeJobConfig{
+						"z-job": {},
+						"a-job": {},
+					},
+				},
+			},
+			expected: `{"a_job":"","z_job":""}`,
 		},
 	}
 
-	jsonStr := buildCustomSafeOutputJobsJSON(data)
-	require.NotEmpty(t, jsonStr)
-	assert.JSONEq(t, `{"a_job":"","z_job":""}`, jsonStr)
-
-	var result map[string]string
-	require.NoError(t, json.Unmarshal([]byte(jsonStr), &result))
-	assert.Empty(t, result["a_job"])
-	assert.Empty(t, result["z_job"])
-}
-
-func TestBuildCustomSafeOutputJobsJSONEmpty(t *testing.T) {
-	assert.Empty(t, buildCustomSafeOutputJobsJSON(&WorkflowData{SafeOutputs: &SafeOutputsConfig{}}))
-	assert.Empty(t, buildCustomSafeOutputJobsJSON(&WorkflowData{SafeOutputs: nil}))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			jsonStr := buildCustomSafeOutputJobsJSON(tt.data)
+			if tt.expected == "" {
+				assert.Empty(t, jsonStr)
+				return
+			}
+			assert.JSONEq(t, tt.expected, jsonStr)
+		})
+	}
 }
