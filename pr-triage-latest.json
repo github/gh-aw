@@ -1,54 +1,157 @@
 {
-  "run_id": "42454401876",
-  "run_date": "2026-11-08T06:23:44Z",
+  "run_id": "42479556705",
+  "run_date": "2026-11-08T12:20:31Z",
   "source": "pr-triage",
-  "eligible_total": 1,
-  "open_copilot_prs": 7,
-  "cooldown_skipped": 6,
+  "eligible_total": 5,
+  "open_copilot_prs": 15,
+  "cooldown_skipped": 10,
   "category_counts": {
-    "feature": 1
+    "chore": 1,
+    "test": 1,
+    "refactor": 1,
+    "bug": 2
   },
   "risk_counts": {
-    "medium": 1
+    "low": 2,
+    "medium": 3
   },
   "priority_counts": {
-    "medium": 1
+    "low": 2,
+    "medium": 3
   },
   "action_counts": {
-    "fast_track": 1
+    "auto_merge": 2,
+    "batch_review": 2,
+    "defer": 1
   },
-  "batches": [],
+  "batches": [
+    {
+      "id": "pr-batch:quality-copilot",
+      "prs": [75821, 75807, 75806, 75793]
+    }
+  ],
   "selected_candidates": [
     {
-      "number": 75764,
-      "title": "Route remaining workflows through economy model routing",
-      "category": "feature",
+      "number": 75843,
+      "title": "Bump gh-aw-firewall to v0.29.10",
+      "category": "chore",
       "risk": "medium",
       "priority": "medium",
-      "action": "fast_track",
-      "score": 60,
+      "action": "batch_review",
+      "score": 59,
       "score_breakdown": {
-        "impact": 33,
-        "urgency": 13,
+        "impact": 32,
+        "urgency": 15,
+        "quality": 12
+      },
+      "labels": [
+        "pr-type:chore",
+        "pr-risk:medium",
+        "pr-priority:medium",
+        "pr-action:batch_review",
+        "pr-agent:copilot"
+      ]
+    },
+    {
+      "number": 75821,
+      "title": "Improve safe-output helper test coverage",
+      "category": "test",
+      "risk": "low",
+      "priority": "low",
+      "action": "auto_merge",
+      "score": 35,
+      "score_breakdown": {
+        "impact": 14,
+        "urgency": 6,
+        "quality": 15
+      },
+      "labels": [
+        "pr-type:test",
+        "pr-risk:low",
+        "pr-priority:low",
+        "pr-action:auto_merge",
+        "pr-agent:copilot",
+        "pr-batch:quality-copilot"
+      ]
+    },
+    {
+      "number": 75807,
+      "title": "Extract shared work-queue worker target resolution",
+      "category": "refactor",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 47,
+      "score_breakdown": {
+        "impact": 26,
+        "urgency": 10,
+        "quality": 11
+      },
+      "labels": [
+        "pr-type:refactor",
+        "pr-risk:medium",
+        "pr-priority:medium",
+        "pr-action:batch_review",
+        "pr-agent:copilot",
+        "pr-batch:quality-copilot"
+      ]
+    },
+    {
+      "number": 75806,
+      "title": "Exclude vendored YAML from ESLint custom rules",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "defer",
+      "score": 48,
+      "score_breakdown": {
+        "impact": 22,
+        "urgency": 18,
+        "quality": 8
+      },
+      "labels": [
+        "pr-type:bug",
+        "pr-risk:medium",
+        "pr-priority:medium",
+        "pr-action:defer",
+        "pr-agent:copilot",
+        "pr-batch:quality-copilot"
+      ]
+    },
+    {
+      "number": 75793,
+      "title": "Normalize blocked labels and cover run-step sanitization",
+      "category": "bug",
+      "risk": "low",
+      "priority": "low",
+      "action": "auto_merge",
+      "score": 42,
+      "score_breakdown": {
+        "impact": 20,
+        "urgency": 8,
         "quality": 14
       },
       "labels": [
-        "pr-type:feature",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:fast_track",
-        "pr-agent:copilot"
+        "pr-type:bug",
+        "pr-risk:low",
+        "pr-priority:low",
+        "pr-action:auto_merge",
+        "pr-agent:copilot",
+        "pr-batch:quality-copilot"
       ]
     }
   ],
   "skipped_prs": [
-    75777,
-    75774,
+    75890,
+    75875,
+    75868,
+    75865,
+    75862,
+    75841,
+    75838,
+    75775,
     75773,
-    75765,
-    75763,
-    75761
+    74077
   ],
-  "notes": "Only one Copilot-authored PR remained outside the 1-hour cooldown window. It is a workflow-routing feature change with passing route checks and high-value routing cleanup.",
-  "summary": "Single eligible PR; one workflow-compliance feature change meets the cooldown gate and has passing route checks."
+  "summary": "Five Copilot PRs were eligible after the 1-hour cooldown. The batch of four quality-focused PRs is healthy and ready for a grouped pass, with one draft CI-failing PR deferred and one medium-risk infrastructure bump queued for batched review."
 }
