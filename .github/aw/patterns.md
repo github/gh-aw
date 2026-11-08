@@ -53,7 +53,7 @@ Pattern docs base path: `https://github.com/github/gh-aw/blob/main/docs/src/cont
 
 ### Indexing and Read-Only Search
 - **Load when:** The user needs cached indexes, incremental or scheduled indexing, or shared search tools (including MCP).
-- **Pattern doc:** https://github.com/github/gh-aw/blob/main/docs/src/content/docs/patterns/deterministic-ops.md#indexing-and-read-only-search
+- **Pattern doc:** [index-search.md](index-search.md)
 - **Constraint:** Trusted indexing jobs publish versioned caches; agents and PR jobs only restore and search, never refresh or save indexes.
 
 ### DispatchOps
