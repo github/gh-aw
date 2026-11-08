@@ -142,8 +142,11 @@ USD costs to the accounting artifact.
 The CJS workflow's **Copilot Decisions API Integration** job runs
 `node --test actions/setup/js/scripts/test_decisions_client.cjs` with
 `GITHUB_TOKEN` from a job granting `copilot-requests: write`. It makes one live
-predicate request using synthetic evidence and requires a correct answer with
-probability at least 0.9. Missing credentials and API errors fail the test.
+choice request using synthetic evidence and requires a named `basket_fruit`
+answer of type `choice` with the exact value `apples` rather than `bananas`.
+This single-request API, authentication, and protocol smoke check is not a
+statistical model-quality evaluation; it uses no confidence threshold or retries.
+Missing credentials, API errors, and incorrect or malformed answers fail the test.
 The job excludes fork pull requests and does not use PATs or repository secrets.
 
 ### Synthetic message previews

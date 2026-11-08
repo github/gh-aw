@@ -95,6 +95,17 @@ describe("Decisions BinEval harness", () => {
     expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("refused"));
   });
 
+  it.each(["github-copilot", "copilot", "github"])("retains the Copilot integration identity and usage accounting for provider %s", async provider => {
+    vi.stubEnv("GH_AW_DECISIONS_PROVIDER", provider);
+    await executeMain();
+    expect(fetch.mock.calls[0][1].headers["Copilot-Integration-Id"]).toBe("agentic-workflows");
+    expect(fetch.mock.calls[0][1].headers.Authorization).toBe(`Bearer ${process.env.GH_AW_DECISIONS_API_KEY}`);
+    const usage = JSON.parse(fs.readFileSync(usagePath, "utf8"));
+    expect(usage.provider).toBe(provider);
+    expect(usage.ai_credits).toBeGreaterThan(0);
+    expect(findModelPricing(provider, usage.model)).toEqual(findModelPricing("github-copilot", usage.model));
+  });
+
   it("preserves experiment assignments", async () => {
     fs.mkdirSync("/tmp/gh-aw/experiments", { recursive: true });
     fs.writeFileSync("/tmp/gh-aw/experiments/assignments.json", JSON.stringify({ style: "concise" }));

@@ -83,7 +83,7 @@ workflow = sys.argv[1]
 # checkout cache at the end of a run; it grants no access to repository content.
 allowed_write_scopes = {"actions"}
 # CJS may exercise Copilot inference with its job token, not repository writes.
-if pathlib.Path(workflow).name == "cjs.yml":
+if pathlib.Path(workflow) == pathlib.Path(".github/workflows/cjs.yml"):
     allowed_write_scopes.add("copilot-requests")
 
 

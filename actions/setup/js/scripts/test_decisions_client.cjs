@@ -15,12 +15,13 @@ test("Copilot Decisions accepts the copilot-requests: write job token", { timeou
     integrationId: "agentic-workflows",
     model: "gpt-6-luna-decisions",
     input: "The basket contains three apples and no other fruit.",
-    questions: [{ type: "predicate", name: "contains_apples", instructions: "Does the basket contain apples?" }],
+    questions: [{ type: "choice", name: "basket_fruit", instructions: "Which fruit does the basket contain?", choices: [{ value: "apples" }, { value: "bananas" }] }],
     timeoutMs: 30000,
   });
 
   assert.equal(response.answers.length, 1);
   const answer = response.answers[0];
-  assert.equal(answer.name, "contains_apples");
-  assert.ok(answer.type === "predicate" && answer.probability >= 0.9, "The Decisions API must confidently recognize the apples in the supplied evidence");
+  assert.equal(answer.name, "basket_fruit");
+  assert.equal(answer.type, "choice");
+  assert.equal(answer.choice, "apples", "The Decisions API must recognize the apples in the supplied evidence");
 });
