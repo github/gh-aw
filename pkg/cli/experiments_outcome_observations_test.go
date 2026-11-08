@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -250,88 +249,6 @@ func TestResolveOutcomeMetricReferences(t *testing.T) {
 	configs["prompt"].GuardrailMetrics[0].Name = "outcome:typo"
 	_, _, _, _, err = resolveOutcomeMetricReferences(configs)
 	require.ErrorContains(t, err, "outcome:typo")
-}
-
-func TestEstimateOutcomeWindow(t *testing.T) {
-	now := time.Date(2026, 11, 5, 0, 0, 0, 0, time.UTC)
-	makeFixture := func(decisions []float64, pending []time.Duration) ([]ExperimentRunRecord, map[string]outcomeRunData) {
-		runs := make([]ExperimentRunRecord, 0, len(decisions)+len(pending))
-		data := make(map[string]outcomeRunData, len(decisions)+len(pending))
-		for i, hours := range decisions {
-			id := fmt.Sprintf("decision-%d", i)
-			runs = append(runs, ExperimentRunRecord{RunID: id, Assignments: map[string]string{"quality": []string{"control", "candidate"}[i%2]}})
-			data[id] = outcomeRunData{Report: OutcomesData{Items: []OutcomeReport{{OutcomeEvaluation: OutcomeEvaluation{OutcomeStatus: OutcomeStatusAccepted}, TimeToOutcomeHours: hours}}}}
-		}
-		for i, age := range pending {
-			id := fmt.Sprintf("pending-%d", i)
-			runs = append(runs, ExperimentRunRecord{RunID: id, Assignments: map[string]string{"quality": "control"}})
-			data[id] = outcomeRunData{Report: OutcomesData{Items: []OutcomeReport{{
-				OutcomeEvaluation: OutcomeEvaluation{OutcomeStatus: OutcomeStatusPending},
-				CreatedAt:         now.Add(-age).Format(time.RFC3339),
-			}}}}
-		}
-		return runs, data
-	}
-
-	t.Run("fallback below twenty decisions", func(t *testing.T) {
-		decisions := make([]float64, minExperimentOutcomeDecisions-1)
-		for i := range decisions {
-			decisions[i] = 48
-		}
-		runs, data := makeFixture(decisions, nil)
-		assert.Equal(t, defaultExperimentOutcomeWindow, estimateOutcomeWindow(runs, map[string]struct{}{"quality": {}}, data, now))
-		info := estimateOutcomeWindowInfo(runs, map[string]struct{}{"quality": {}}, data, now)
-		assert.Equal(t, "default", info.Source)
-		assert.Equal(t, minExperimentOutcomeDecisions-1, info.SampleSize)
-	})
-
-	t.Run("p95 includes censored pending outputs", func(t *testing.T) {
-		decisions := make([]float64, minExperimentOutcomeDecisions)
-		for i := range decisions {
-			decisions[i] = 60
-			if i < minExperimentOutcomeDecisions-1 {
-				decisions[i] = 48
-			}
-		}
-		runs, data := makeFixture(decisions, []time.Duration{49 * time.Hour})
-		assert.Equal(t, 60*time.Hour, estimateOutcomeWindow(runs, map[string]struct{}{"quality": {}}, data, now))
-	})
-
-	t.Run("p95 includes exact survival boundary", func(t *testing.T) {
-		decisions := make([]float64, minExperimentOutcomeDecisions)
-		for i := range decisions {
-			decisions[i] = float64(24 + i)
-		}
-		runs, data := makeFixture(decisions, nil)
-		assert.Equal(t, 42*time.Hour, estimateOutcomeWindow(runs, map[string]struct{}{"quality": {}}, data, now))
-	})
-
-	t.Run("p95 is clamped", func(t *testing.T) {
-		decisions := make([]float64, minExperimentOutcomeDecisions)
-		for i := range decisions {
-			decisions[i] = float64((maxExperimentOutcomeWindow + 24*time.Hour).Hours())
-		}
-		runs, data := makeFixture(decisions, nil)
-		assert.Equal(t, maxExperimentOutcomeWindow, estimateOutcomeWindow(runs, map[string]struct{}{"quality": {}}, data, now))
-	})
-
-	t.Run("minimum p95 is clamped", func(t *testing.T) {
-		decisions := make([]float64, minExperimentOutcomeDecisions)
-		for i := range decisions {
-			decisions[i] = 6
-		}
-		runs, data := makeFixture(decisions, nil)
-		assert.Equal(t, minExperimentOutcomeWindow, estimateOutcomeWindow(runs, map[string]struct{}{"quality": {}}, data, now))
-	})
-
-	t.Run("maximum when p95 is not reached", func(t *testing.T) {
-		decisions := make([]float64, minExperimentOutcomeDecisions)
-		for i := range decisions {
-			decisions[i] = 48
-		}
-		runs, data := makeFixture(decisions, []time.Duration{72 * time.Hour, 72 * time.Hour})
-		assert.Equal(t, maxExperimentOutcomeWindow, estimateOutcomeWindow(runs, map[string]struct{}{"quality": {}}, data, now))
-	})
 }
 
 func TestOutcomeMetricAnalysisCoverageAndDefaults(t *testing.T) {

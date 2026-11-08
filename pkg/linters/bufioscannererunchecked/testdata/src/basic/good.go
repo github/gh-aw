@@ -202,3 +202,27 @@ func goodErrAfterOuterLoop(scanner *bufio.Scanner) error {
 	}
 	return scanner.Err()
 }
+
+func goodParenthesizedScanAndErr(scanner *bufio.Scanner) error {
+	for (scanner).Scan() {
+		println(scanner.Text())
+	}
+	return (scanner).Err()
+}
+
+func goodParenthesizedErrCallee(scanner *bufio.Scanner) error {
+	for (scanner.Scan)() {
+		println(scanner.Text())
+	}
+	return (scanner.Err)()
+}
+
+func goodLabeledLoop(scanner *bufio.Scanner) error {
+lines:
+	for scanner.Scan() {
+		if scanner.Text() == "" {
+			continue lines
+		}
+	}
+	return scanner.Err()
+}

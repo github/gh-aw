@@ -1743,6 +1743,7 @@ func TestRepoMemoryValidationConfigAndGeneratedSteps(t *testing.T) {
 	require.NotNil(t, pushJob)
 	pushYAML := strings.Join(pushJob.Steps, "\n")
 	assert.Contains(t, pushYAML, "VALIDATION_SCRIPT_B64:")
+	assert.Contains(t, pushYAML, "GH_AW_MEMORY_SOURCE_JOB_RESULT: ${{ needs.agent.result }}")
 	assert.Contains(t, pushYAML, "MEMORY_JSON_SCHEMAS_REQUIRED: 'true'")
 	assert.Contains(t, pushYAML, "VALIDATION_TIMEOUT_SECONDS: 60")
 }

@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import path from "path";
 import { fileURLToPath } from "url";
+import { finalizeBufferedReviewOutcomes } from "./safe_output_outcomes.cjs";
+import { buildSafeOutputDependencyPlan, checkSafeOutputDependencies } from "./safe_output_dependencies.cjs";
 
 const mockCore = {
   debug: vi.fn(),
@@ -359,8 +361,52 @@ describe("pr_review_buffer (factory pattern)", () => {
       });
     });
 
-    it("should capture created review comment identities", async () => {
-      buffer.addComment({ path: "src/index.js", line: 10, body: "Fix this", side: "RIGHT" });
+    it.each([
+      { submittedSide: "RIGHT", apiSide: "RIGHT", enriched: true },
+      { submittedSide: undefined, apiSide: "RIGHT", enriched: true },
+      { submittedSide: "RIGHT", apiSide: undefined, enriched: true },
+      { submittedSide: undefined, apiSide: undefined, enriched: true },
+      { submittedSide: undefined, apiSide: null, enriched: false },
+      { submittedSide: "RIGHT", apiSide: null, enriched: false },
+      { submittedSide: "LEFT", apiSide: "RIGHT", enriched: false },
+      { submittedSide: "LEFT", apiSide: "LEFT", enriched: true },
+    ])("resolves identities conservatively with submitted side $submittedSide and API side $apiSide", async ({ submittedSide, apiSide, enriched }) => {
+      buffer.addComment({ path: "src/index.js", line: 10, body: "Fix this", ...(submittedSide !== undefined ? { side: submittedSide } : {}) });
+      buffer.setReviewContext({
+        repo: "owner/repo",
+        repoParts: { owner: "owner", repo: "repo" },
+        pullRequestNumber: 42,
+        pullRequest: { head: { sha: "abc123" } },
+      });
+      mockGithub.rest.pulls.createReview.mockResolvedValue({
+        data: { id: 100, html_url: "https://github.com/owner/repo/pull/42#pullrequestreview-100" },
+      });
+      mockGithub.rest.pulls.listCommentsForReview.mockResolvedValue({
+        data: [{ id: 200, node_id: "PRRC_200", html_url: "https://github.com/owner/repo/pull/42#discussion_r200", path: "src/index.js", line: 10, ...(apiSide !== undefined ? { side: apiSide } : {}) }],
+      });
+
+      const result = await buffer.submitReview();
+
+      expect(mockGithub.rest.pulls.listCommentsForReview).toHaveBeenCalledWith({
+        owner: "owner",
+        repo: "repo",
+        pull_number: 42,
+        review_id: 100,
+        per_page: 100,
+      });
+      expect(result.review_comments).toEqual([
+        {
+          ...(enriched ? { id: 200, url: "https://github.com/owner/repo/pull/42#discussion_r200" } : {}),
+          repo: "owner/repo",
+          pull_request_number: 42,
+          metadata: { review_id: 100, ...(enriched ? { node_id: "PRRC_200" } : {}), path: "src/index.js", line: 10, side: submittedSide },
+        },
+      ]);
+    });
+
+    it.each([undefined, "RIGHT"])("does not enrich duplicate submitted anchors with first side %s and second side RIGHT", async firstSide => {
+      buffer.addComment({ path: "src/index.js", line: 10, body: "First finding", ...(firstSide !== undefined ? { side: firstSide } : {}) });
+      buffer.addComment({ path: "src/index.js", line: 10, body: "Second finding", side: "RIGHT" });
       buffer.setReviewContext({
         repo: "owner/repo",
         repoParts: { owner: "owner", repo: "repo" },
@@ -376,22 +422,75 @@ describe("pr_review_buffer (factory pattern)", () => {
 
       const result = await buffer.submitReview();
 
-      expect(mockGithub.rest.pulls.listCommentsForReview).toHaveBeenCalledWith({
-        owner: "owner",
-        repo: "repo",
-        pull_number: 42,
-        review_id: 100,
-        per_page: 100,
-      });
+      expect(result.success).toBe(true);
+      expect(result.comment_count).toBe(2);
+      expect(mockGithub.rest.pulls.createReview.mock.calls[0][0].comments).toHaveLength(2);
       expect(result.review_comments).toEqual([
-        {
-          id: 200,
-          url: "https://github.com/owner/repo/pull/42#discussion_r200",
-          repo: "owner/repo",
-          pull_request_number: 42,
-          metadata: { review_id: 100, node_id: "PRRC_200", path: "src/index.js", line: 10, side: "RIGHT" },
-        },
+        { repo: "owner/repo", pull_request_number: 42, metadata: { review_id: 100, path: "src/index.js", line: 10, side: firstSide } },
+        { repo: "owner/repo", pull_request_number: 42, metadata: { review_id: 100, path: "src/index.js", line: 10, side: "RIGHT" } },
       ]);
+      for (const comment of result.review_comments) {
+        expect(comment.id).toBeUndefined();
+        expect(comment.url).toBeUndefined();
+      }
+    });
+
+    it.each([
+      {
+        scenario: "null anchors",
+        expectedIds: [undefined, undefined],
+        lookup: (first, second) => [
+          { ...first, line: null, side: null },
+          { ...second, line: null, start_line: null, side: null },
+        ],
+      },
+      { scenario: "partial lookup", expectedIds: [200, undefined], lookup: first => [first] },
+      { scenario: "reordered lookup", expectedIds: [200, 201], lookup: (first, second) => [second, first] },
+      { scenario: "ambiguous identities", expectedIds: [undefined, 201], lookup: (first, second) => [first, { ...first, id: 202 }, second] },
+    ])("preserves published anchors and dependent eligibility with $scenario", async ({ expectedIds, lookup }) => {
+      const first = { path: "src/index.js", line: 10, body: "First finding", side: "RIGHT" };
+      const second = { path: "src/index.js", line: 20, start_line: 18, body: "Second finding", side: "RIGHT" };
+      buffer.addComment(first);
+      buffer.addComment(second);
+      buffer.setReviewContext({
+        repo: "owner/repo",
+        repoParts: { owner: "owner", repo: "repo" },
+        pullRequestNumber: 42,
+        pullRequest: { head: { sha: "abc123" } },
+      });
+      mockGithub.rest.pulls.createReview.mockResolvedValue({
+        data: { id: 100, html_url: "https://github.com/owner/repo/pull/42#pullrequestreview-100" },
+      });
+      const firstIdentity = { ...first, id: 200, html_url: "https://github.com/owner/repo/pull/42#discussion_r200" };
+      const secondIdentity = { ...second, id: 201, html_url: "https://github.com/owner/repo/pull/42#discussion_r201" };
+      const data = lookup(firstIdentity, secondIdentity);
+      mockGithub.rest.pulls.listCommentsForReview.mockResolvedValue({ data });
+      const messages = [
+        { type: "create_pull_request_review_comment", output_id: "so_000000000001" },
+        { type: "create_pull_request_review_comment", output_id: "so_000000000002" },
+        { type: "submit_pull_request_review", "depends-on": ["so_000000000001", "so_000000000002"] },
+      ];
+      const plan = buildSafeOutputDependencyPlan(messages);
+      const records = [first, second].map((comment, messageIndex) => ({
+        type: "create_pull_request_review_comment",
+        messageIndex,
+        success: true,
+        result: { repo: "owner/repo", pull_request_number: 42, buffered: true, deferred_manifest: true, metadata: { path: comment.path, line: comment.line, start_line: comment.start_line, side: comment.side } },
+      }));
+      expect(checkSafeOutputDependencies(plan, 2, records, true)).toEqual({ state: "waiting" });
+
+      const review = await buffer.submitReview();
+      finalizeBufferedReviewOutcomes(records, "owner/repo", 42, review);
+
+      expect(mockGithub.rest.pulls.createReview).toHaveBeenCalledOnce();
+      expect(review.review_comments).toHaveLength(2);
+      expect(review.review_comments.map(comment => comment.metadata)).toEqual([
+        expect.objectContaining({ path: first.path, line: 10, side: "RIGHT" }),
+        expect.objectContaining({ path: second.path, line: 20, start_line: 18, side: "RIGHT" }),
+      ]);
+      expect(records.every(record => !record.skipped && !record.result.buffered && !record.result.deferred_manifest)).toBe(true);
+      expect(checkSafeOutputDependencies(plan, 2, records, false)).toEqual({ state: "ready" });
+      expect(review.review_comments.map(comment => comment.id)).toEqual(expectedIds);
     });
 
     it("should continue when before-state capture is rate-limited", async () => {

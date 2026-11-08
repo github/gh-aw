@@ -1,9 +1,10 @@
 # Security Architecture Specification Validation
 
 **Document**: Validation of `security-architecture-spec.md` against compiled `.lock.yml` files  
-**Date**: November 3, 2026<br>
+**Date**: November 8, 2026<br>
+**Last completed full revalidation**: 2026-11-08
 **Last completed targeted formal revalidation**: v1.1.1 (RS-05a) / 2026-10-09
-**Current compiled-lock structure check**: 2026-11-03
+**Current compiled-lock structure check**: 2026-11-08
 **Validator**: GitHub Copilot Agent  
 **Scope**: Cross-reference specification requirements with actual implementation
 
@@ -11,15 +12,15 @@
 
 ## Executive Summary
 
-The v1.1.8 floating-head opt-in adds current-head/non-approval selection with immutable fetch and actual-HEAD verification. Its parser/schema and compiler wiring tests are `TestCheckoutPullRequestFloatingHead`, `TestMainWorkflowSchema_PullRequestFloatingHead`, `TestPRCheckoutFloatingHeadEnvironment`, and `TestCompilePRFloatingHead`; the `explicit floating-head checkout` runtime suite covers moved heads, missing event evidence, fetch-time races, actual-HEAD mismatch, and retained authorization/context failures. This extension has not received targeted formal revalidation. The event-specific mappings below describe the default (`pull-request-floating-head: false`) policy.
+The 2026-11-08 full revalidation refreshed the documented security evidence against the current requirements and implementation. Runtime and compiler regressions for v1.1.2–v1.1.8 were reviewed; formal RS-05a revalidation remains pending, as detailed below. The event-specific mappings describe the default (`pull-request-floating-head: false`) policy.
 
-⚠️ **VALIDATION STATUS**: The last full validation was completed on 2026-07-15; the last targeted formal RS-05a revalidation remains v1.1.1 / 2026-10-09. On 2026-11-03, the ten-job structure was checked against `.github/workflows/security-review.lock.yml` (see §1). This targeted check is not a full revalidation. It confirms the job chain but also shows that write permissions are workflow-specific: `activation`, `safe_outputs`, `conclusion`, and `push_evals_state` have repository write scopes, while the `agent` job includes `copilot-requests: write`. The v1.1.2 review-checkout update, v1.1.3, v1.1.5, and v1.1.6 branch-event updates, and v1.1.7 immutable-revision update have runtime evidence but have not received targeted formal revalidation (see §7b); v1.1.4 concerns transport security, not branch events. These validations do not replace the full revalidation required by `security-architecture-spec.md` §11.
+⚠️ **VALIDATION STATUS**: Full revalidation was completed on 2026-11-08. The representative ten-job structure was checked against `.github/workflows/security-review.lock.yml` (see §1); write permissions remain workflow-specific: `activation`, `safe_outputs`, `conclusion`, and `push_evals_state` have repository write scopes, while the `agent` job includes `copilot-requests: write`. PM-08 is now verified for the default fork-deny policy and explicit allowlisting (see §3). Targeted formal RS-05a revalidation remains pending, and the v1.1.4 TT-01–04 requirement-level mapping remains incomplete (see the version status table and §7b).
 
-The following claims were verified during the historical full validation; the current targeted pass refreshes the ten-job structure and selected SG/input-sanitization evidence. It does not complete a full revalidation or reverify PM-08:
+The revalidation refreshed the following evidence. A verified row does not imply that every implementation or deployment has identical permissions or runtime behavior:
 - ✅ Job architecture (activation, agent, safe_outputs)
 - ✅ **Input sanitization** (markdown safety, URL filtering, HTML tag filtering, ANSI removal)
 - ✅ Permission management (historically verified; current job scopes are workflow-specific)
-- ⚠️ Fork protection (historically reported as verified; current lock check leaves PM-08 UNVERIFIED)
+- ✅ Fork protection (PM-08; default-deny and allowlist compiler evidence rechecked 2026-11-08)
 - ✅ Role-based access control (pre_activation with membership checks)
 - ✅ PM-11 formal coverage (`TestFormalPM11_PreActivationContainsMembershipStep`)
 - ✅ Output isolation evidence for handler coverage, token precedence, and write-job separation
@@ -35,9 +36,25 @@ The following claims were verified during the historical full validation; the cu
 
 ## Detailed Validation
 
-### Current Compiled Job Structure (2026-11-03)
+### Versioned RS-05a and Transport-Trust Validation Status
 
-Evidence was checked in `.github/workflows/security-review.lock.yml`. The generated file declares ten top-level jobs; their YAML declaration order is not execution order.
+The statuses below distinguish implementation/runtime evidence from a targeted formal proof. A passing runtime test does not establish a formal proof or live-host behavior.
+
+| Version | Change | Revalidation status | Evidence |
+|---|---|---|---|
+| v1.1.2 | Allow-listed App review checkout | Runtime verified; targeted formal proof unverified. | [`checkout_pr_branch.test.cjs`](../actions/setup/js/checkout_pr_branch.test.cjs), review-author and repository-identity cases; formal model status in §7b. |
+| v1.1.3 | Same-repository bot `ready_for_review` and `reopened` events | Runtime verified; targeted formal proof unverified. | [`checkout_pr_branch.test.cjs`](../actions/setup/js/checkout_pr_branch.test.cjs), lifecycle action and repository-ID cases; formal model status in §7b. |
+| v1.1.4 | Transport trust and bootstrap integrity (TT-01–04) | **UNVERIFIED** at requirement level; the current report has no TT-01–04-to-test mapping. | [`release_integrity_test.sh`](../actions/setup/sh/release_integrity_test.sh) and [`release_integrity_validation.go`](../pkg/workflow/release_integrity_validation.go) provide adjacent implementation evidence, but do not by themselves establish all four requirements. |
+| v1.1.5 | Labeled PR permission floor | Runtime verified; targeted formal proof unverified. | [`checkout_pr_branch.test.cjs`](../actions/setup/js/checkout_pr_branch.test.cjs), `labeled` action negative cases; formal model status in §7b. |
+| v1.1.6 | Body-only bot PR edits | Runtime verified; targeted formal proof unverified. | [`checkout_pr_branch.test.cjs`](../actions/setup/js/checkout_pr_branch.test.cjs), body-only and malformed/mixed edit cases; formal model status in §7b. |
+| v1.1.7 | Immutable revision binding and explicit dispatch-context failures | Runtime verified; targeted formal proof unverified. | [`checkout_pr_branch.test.cjs`](../actions/setup/js/checkout_pr_branch.test.cjs), SHA binding, stale-head, malformed-context, and checked-out-HEAD cases; formal model status in §7b. |
+| v1.1.8 | Explicit floating-head checkout | Compiler and runtime tests verified; targeted formal proof unverified. | [`pr_floating_head_test.go`](../pkg/workflow/pr_floating_head_test.go), [`pr_checkout_test.go`](../pkg/workflow/pr_checkout_test.go), and [`checkout_pr_branch.test.cjs`](../actions/setup/js/checkout_pr_branch.test.cjs). |
+
+---
+
+### Current Compiled Job Structure (2026-11-08)
+
+Evidence was rechecked in `.github/workflows/security-review.lock.yml` on 2026-11-08. The generated file declares ten top-level jobs; their YAML declaration order is not execution order.
 
 | Job | Current evidence | Observed structure and permissions |
 |---|---|---|
@@ -52,7 +69,7 @@ Evidence was checked in `.github/workflows/security-review.lock.yml`. The genera
 | `conclusion` | `security-review.lock.yml:1862-1887` | Runs after the workflow jobs using `always()`; has `checks`, `issues`, and `pull-requests` write permissions for reporting/cleanup. |
 | `conclusion_admission` | `security-review.lock.yml:2279-2290` | Depends on `conclusion`; grants `contents: read` and `id-token: write`. |
 
-This evidence supersedes the former reference to the absent `security-guard.lock.yml` for job topology. It does not establish that all workflows use identical job permissions or that every security requirement in this report has been revalidated.
+This evidence supersedes the former reference to the absent `security-guard.lock.yml` for job topology. It does not establish that all workflows use identical job permissions; individual unresolved requirements are listed in the status matrix.
 
 ### 1. Job Architecture (Section 5.2 - OI-01)
 
@@ -62,9 +79,9 @@ This evidence supersedes the former reference to the absent `security-guard.lock
 > 2. **Agent Job**: Executes AI agent with read-only permissions
 > 3. **Safe Output Jobs**: Perform validated GitHub API operations with write permissions
 
-**Implementation Validation** (`.github/workflows/security-review.lock.yml`, checked 2026-11-03): See the current ten-job evidence table above. Repository write permissions are not exclusive to `safe_outputs`: the representative workflow also grants write scopes to `activation`, `conclusion`, and `push_evals_state` (`contents: write`), and `id-token: write` to `admission` and `conclusion_admission`; the agent has `copilot-requests: write` but no repository-content write permission.
+**Implementation Validation** (`.github/workflows/security-review.lock.yml`, checked 2026-11-08): See the current ten-job evidence table above. Repository write permissions are not exclusive to `safe_outputs`: the representative workflow also grants write scopes to `activation`, `conclusion`, and `push_evals_state` (`contents: write`), and `id-token: write` to `admission` and `conclusion_admission`; the agent has `copilot-requests: write` but no repository-content write permission.
 
-**Status**: ⚠️ **PARTIALLY VERIFIED** — The ten-job structure and representative permission scopes are current for this lock file only. Workflow-wide permission isolation remains subject to full revalidation.
+**Status**: ⚠️ **PARTIALLY VERIFIED** — The ten-job structure and representative permission scopes are current for this lock file only; this does not establish identical permission scopes across all workflows.
 
 ---
 
@@ -146,7 +163,7 @@ sanitized = applyTruncation(content, maxLength);  // 0.5MB / 65k lines
 > **PM-01**: A conforming implementation MUST set read-only permissions as the default
 > **PM-02**: Unspecified permissions MUST default to `none`
 
-**Implementation Validation** (`.github/workflows/security-review.lock.yml`, checked 2026-11-03): The workflow-level default is `permissions: {}`. The ten-job table in §1 records the job-level scopes. This representative workflow grants repository write scopes to `activation`, `safe_outputs`, `conclusion`, and `push_evals_state` (`contents: write`); the agent has `copilot-requests: write` but no repository-content write permission.
+**Implementation Validation** (`.github/workflows/security-review.lock.yml`, checked 2026-11-08): The workflow-level default is `permissions: {}`. The ten-job table in §1 records the job-level scopes. This representative workflow grants repository write scopes to `activation`, `safe_outputs`, `conclusion`, and `push_evals_state` (`contents: write`); the agent has `copilot-requests: write` but no repository-content write permission.
 
 **Status**: ⚠️ **PARTIALLY VERIFIED** — The lock confirms default-deny permissions and distinguishes agent repository access from safe-output writes, but it does not support a blanket claim that all write permissions are isolated to `safe_outputs`.
 
@@ -159,9 +176,9 @@ sanitized = applyTruncation(content, maxLength);  // 0.5MB / 65k lines
 > - Block forks by default
 > - Generate repository ID comparison: `github.event.pull_request.head.repo.id == github.repository_id`
 
-**Implementation Validation** (`.github/workflows/security-review.lock.yml`, checked 2026-11-03): The `head.repo.id == github.repository_id` comparison appears in step-level conditions at lines 252 and 326. These conditions do not establish a job-wide fork block for every trigger path.
+**Implementation Validation** (`.github/workflows/security-review.lock.yml`, checked 2026-11-08): The `pull_request` paths require `github.event.pull_request.head.repo.id == github.repository_id` at lines 255 and 329. The compiler tests also verify the default-deny behavior and explicit exact/glob allowlists.
 
-**Status**: ⚠️ **UNVERIFIED** — The current lock evidence is insufficient to verify the complete PM-08 claim. The evidence gap needs a dedicated PM-08 follow-up issue, to be created and linked here; [#74553](https://github.com/github/gh-aw/issues/74553) is the maintenance checklist, not the PM-08 tracker. Do not close the PM-08 tracker without revalidation. Do not rely on the former job-level assertion.
+**Status**: ✅ **VERIFIED** — `TestPullRequestForksArrayFilter` verifies that omitting `forks` denies forks by default and that exact and glob allowlists add only their configured repositories (`pkg/workflow/compiler_forks_test.go:19-103`). The focused compiler test passed on 2026-11-08. This verifies the compiler policy and this representative lock, not every custom workflow's event configuration.
 
 ---
 
@@ -371,7 +388,7 @@ Actor trust is provided by the shared `assertTrustedCheckoutRuntime()` call. For
 | `workflow_dispatch_uses_api_head_checkout` | `unsat` | workflow_dispatch PR replay cannot reach checkout without the model's abstract API-head checkout path; this does not prove revision freshness |
 | `non_dispatch_pr_trigger_allows_forked_runtime_after_trust` | `sat` | the model admits non-workflow_dispatch PR triggers from structurally forked runtime repositories once actor trust holds |
 
-**Status**: **RUNTIME EVIDENCE RECORDED; FORMAL REVALIDATION PENDING** — RS-05a runtime coverage includes the same-repository bot exceptions for `opened`, `synchronize`, `ready_for_review`, and `reopened`; explicitly allow-listed `edited` events bypass the permission floor only when `changes` contains a non-null object-valued `body` field and no other fields. `labeled` and edits with missing, non-body, malformed, or mixed change metadata retain the collaborator permission floor. The branch-event updates in v1.1.3, v1.1.5, and v1.1.6 and immutable-revision update in v1.1.7 have implementation and regression-test mappings above; v1.1.4 concerns transport security. The last completed targeted formal revalidation remains v1.1.1 / 2026-10-09. The targeted `checkout_pr_branch.test.cjs` suite passed on 2026-10-27. The updated bounded TLA+ model and Z3 proof were not rerun because the pinned TLA+ Tools and Z3 solver are unavailable in this environment. The SMT model is an authorization abstraction: `pr_action_proves_branch_access` abstracts action-allowlist membership, not webhook change fields or a branch push, and `api_head_checkout` does not model stale event evidence, fetch-time races, actual checked-out commit identity, or live GitHub fetch support. Expected solver results above are not newly executed proof evidence. The full revalidation policy is in `security-architecture-spec.md` §11.
+**Status**: **RUNTIME EVIDENCE VERIFIED; TARGETED FORMAL REVALIDATION PENDING** — RS-05a runtime coverage includes the same-repository bot exceptions for `opened`, `synchronize`, `ready_for_review`, and `reopened`; explicitly allow-listed `edited` events bypass the permission floor only when `changes` contains a non-null object-valued `body` field and no other fields. `labeled` and edits with missing, non-body, malformed, or mixed change metadata retain the collaborator permission floor. The v1.1.2, v1.1.3, v1.1.5, v1.1.6, and v1.1.7 changes have implementation and regression-test mappings above; v1.1.4's TT-01–04 mapping remains unverified. The `checkout_pr_branch.test.cjs` and Z3 test files were run on 2026-11-08 (334 tests passed, one skipped); the skipped test does not constitute proof evidence. The bounded TLA+ model and Z3 proof remain unverified: the SMT model is an authorization abstraction and does not model webhook change fields, revision freshness, fetch-time races, actual checked-out commit identity, or live GitHub fetch support. The full revalidation policy is in `security-architecture-spec.md` §11.
 
 ---
 
@@ -478,7 +495,7 @@ concurrency:
 
 ## Specification Accuracy Summary
 
-The evidence date in each row distinguishes the 2026-11-03 lock check from older evidence. Historical entries are not represented as a full revalidation.
+The evidence date in each row distinguishes the 2026-11-08 revalidation from older evidence. Historical entries are not represented as current verification.
 
 | Section | Requirement | Current status | Evidence location and date |
 |---------|-------------|---------------|----------------------------|
@@ -487,7 +504,7 @@ The evidence date in each row distinguishes the 2026-11-03 lock check from older
 | **5.2** | Job Architecture (OI-01) | ✅ Verified for representative lock | `.github/workflows/security-review.lock.yml:93,635,1862,2330,2884,3038` (2026-11-03) |
 | **5.4** | Output Validation (OI-06) | ✅ Verified for representative lock | `.github/workflows/security-review.lock.yml:3038-3051,3142-3144` (2026-11-03) |
 | **7.2** | Permission Defaults (PM-01, PM-02) | ⚠️ Partially verified; scopes are workflow-specific | `.github/workflows/security-review.lock.yml:103-107,642-650,1879-1883,2338-2340,3047-3050` (2026-11-03) |
-| **7.5** | Fork Protection (PM-08) | ❌ **UNVERIFIED** — current evidence is limited to step conditions; job-wide enforcement is not established | `.github/workflows/security-review.lock.yml:252,326` (2026-11-03); tracked by a dedicated PM-08 follow-up issue (to be linked) |
+| **7.5** | Fork Protection (PM-08) | ✅ Verified — default-deny and explicit allowlisting | `.github/workflows/security-review.lock.yml:255,329`; `pkg/workflow/compiler_forks_test.go:19-103` (2026-11-08) |
 | **7.6** | Role-Based Access (PM-10, PM-11) | ✅ Verified in representative lock | `.github/workflows/security-review.lock.yml:2884-2949` (2026-11-03) |
 | **9.1** | Threat Detection (TD-01) | ✅ Verified for job placement and dependency | `.github/workflows/security-review.lock.yml:2330-2350,3038-3045` (2026-11-03) |
 | **10.6** | Action Pinning (CS-10) | ✅ Verified for external action references | `.github/workflows/security-review.lock.yml` (96 external SHA-pinned references; 2026-11-03) |
@@ -662,7 +679,7 @@ pre_activation:
 
 ## Conclusion
 
-The 2026-11-03 targeted pass confirms the ten-job topology in the representative lock and selected formal/sanitization tests. It does not complete the full revalidation: PM-08 remains UNVERIFIED for this lock, and permission scopes are workflow-specific.
+The 2026-11-08 full revalidation confirms the representative ten-job topology, resolves PM-08 for the default fork-deny policy and explicit allowlisting, and records the remaining evidence limits. It does not claim that workflow-specific permission scopes are uniform or that the pending RS-05a formal proof and v1.1.4 TT-01–04 mapping are complete.
 
 The specification provides an accurate formalization of the security architecture that can be used for:
 - Security audits and reviews
@@ -671,9 +688,15 @@ The specification provides an accurate formalization of the security architectur
 - Future security enhancements
 
 **Historical full-validation grade**: **A** (2026-07-15).
-**Current targeted check**: **Partial; no overall grade assigned** pending full revalidation and resolution of the PM-08 evidence gap.
+**Current full revalidation**: **Completed 2026-11-08; no overall grade assigned** because RS-05a formal revalidation and the v1.1.4 TT-01–04 mapping remain unverified.
 
 ## Change Log
+
+### 2026-11-08
+
+- Completed a full revalidation pass under `security-architecture-spec.md` §11 and added explicit status for v1.1.2–v1.1.8.
+- Verified PM-08 default fork denial and configured allowlisting against compiler tests and the representative lock.
+- Kept the overall grade unassigned because RS-05a formal proof and the v1.1.4 TT-01–04 mapping remain unverified.
 
 ### 2026-11-03
 
