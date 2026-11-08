@@ -23,7 +23,7 @@ const { detectForkPR, checkBranchPushable } = require("./pr_helpers.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { checkFileProtection, checkFileProtectionPostApply } = require("./manifest_file_helpers.cjs");
-const { ERR_SYSTEM, POLICY_FILE_PROTECTION_DENIED_REASON_CODE } = require("./error_codes.cjs");
+const { ERR_API, ERR_SYSTEM, POLICY_FILE_PROTECTION_DENIED_REASON_CODE } = require("./error_codes.cjs");
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
 const { buildProtectedFileBlocks, getPromptPath } = require("./messages_core.cjs");
 const { withGitHubHostToken } = require("./git_auth_helpers.cjs");
@@ -1085,24 +1085,41 @@ async function main(config = {}) {
       const issueReport = appendReportExecutionProvenance(buildIssueReport(issueTitle, issueBody), process.env.GH_AW_WORKFLOW_NAME || "Workflow", runUrl);
 
       try {
-        const { data: issue } = await withRetry(
-          () => {
-            transport.assertUnchanged();
-            return createReportIssue(
-              githubClient,
-              {
-                owner: repoParts.owner,
-                repo: repoParts.repo,
-                title: issueTitle,
-                labels: ["agentic-workflows", "pull-request-fallback"],
-              },
-              issueReport
-            );
-          },
+        const searchQuery = `repo:${repoParts.owner}/${repoParts.repo} is:issue is:open label:pull-request-fallback in:title "Protected Files"`;
+        const { data: searchResults } = await withRetry(
+          () => githubClient.rest.search.issuesAndPullRequests({ q: searchQuery, per_page: 100 }),
           RATE_LIMIT_RETRY_CONFIG,
-          `create manifest-protection review issue in ${repoParts.owner}/${repoParts.repo}`
+          `search manifest-protection review issues in ${repoParts.owner}/${repoParts.repo}`
         );
-        core.info(`Created manifest-protection review issue #${issue.number}: ${issue.html_url}`);
+        if (!Array.isArray(searchResults.items)) {
+          throw new Error(`${ERR_API}: Protected-file fallback issue search returned an invalid response`);
+        }
+        const targetPullRequestUrl = `${githubServer}/${repoParts.owner}/${repoParts.repo}/pull/${pullNumber}`;
+        const existingIssue = searchResults.items.find(item => !item.pull_request && item.body?.includes(`](${targetPullRequestUrl})`));
+        let issue = existingIssue;
+        if (issue) {
+          core.info(`Reusing protected-file-protection review issue #${issue.number}: ${issue.html_url}`);
+        } else {
+          const created = await withRetry(
+            () => {
+              transport.assertUnchanged();
+              return createReportIssue(
+                githubClient,
+                {
+                  owner: repoParts.owner,
+                  repo: repoParts.repo,
+                  title: issueTitle,
+                  labels: ["agentic-workflows", "pull-request-fallback"],
+                },
+                issueReport
+              );
+            },
+            RATE_LIMIT_RETRY_CONFIG,
+            `create manifest-protection review issue in ${repoParts.owner}/${repoParts.repo}`
+          );
+          issue = created.data;
+          core.info(`Created manifest-protection review issue #${issue.number}: ${issue.html_url}`);
+        }
         await updateActivationComment(github, context, core, issue.html_url, issue.number, "issue", { activationCommentLinks });
         return attachExecutionState(
           {

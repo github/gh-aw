@@ -217,6 +217,9 @@ describe("push_to_pull_request_branch.cjs", () => {
             },
           }),
         },
+        search: {
+          issuesAndPullRequests: vi.fn().mockResolvedValue({ data: { items: [] } }),
+        },
       },
       graphql: vi.fn(),
     };
@@ -4152,6 +4155,53 @@ ${diffs}
       expect(issueBody).toContain("gh run download");
       expect(issueBody).toContain("git am --3way");
       expect(issueBody).not.toContain("refs/bundles/");
+    });
+
+    it("should reuse an open protected-file fallback issue for the same pull request", async () => {
+      createPatchFile("should-reuse-an-open-protected-file-fallback-issue", createPatchWithFiles("package.json"));
+      mockGithub.rest.search.issuesAndPullRequests.mockResolvedValue({
+        data: {
+          items: [
+            {
+              number: 789,
+              html_url: "https://github.com/test-owner/test-repo/issues/789",
+              body: "Target Pull Request: [#123](https://github.com/test-owner/test-repo/pull/123)",
+            },
+          ],
+        },
+      });
+
+      const module = await loadModule();
+      const handler = await module.main({
+        protected_files: ["package.json"],
+        protected_files_policy: "fallback-to-issue",
+      });
+      const result = await handler({ branch: "should-reuse-an-open-protected-file-fallback-issue" }, {});
+
+      expect(result).toMatchObject({
+        success: true,
+        fallback_used: true,
+        issue_number: 789,
+        issue_url: "https://github.com/test-owner/test-repo/issues/789",
+      });
+      expect(mockGithub.rest.search.issuesAndPullRequests).toHaveBeenCalledWith(expect.objectContaining({ q: expect.stringContaining("label:pull-request-fallback") }));
+      expect(mockGithub.rest.issues.create).not.toHaveBeenCalled();
+    });
+
+    it("should not create a protected-file fallback issue when duplicate lookup fails", async () => {
+      createPatchFile("should-not-create-protected-file-fallback-issue-when-lookup-fails", createPatchWithFiles("package.json"));
+      mockGithub.rest.search.issuesAndPullRequests.mockRejectedValue(new Error("Search API unavailable"));
+
+      const module = await loadModule();
+      const handler = await module.main({
+        protected_files: ["package.json"],
+        protected_files_policy: "fallback-to-issue",
+      });
+      const result = await handler({ branch: "should-not-create-protected-file-fallback-issue-when-lookup-fails" }, {});
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Search API unavailable");
+      expect(mockGithub.rest.issues.create).not.toHaveBeenCalled();
     });
 
     it.each([
