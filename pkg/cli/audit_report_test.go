@@ -1449,6 +1449,11 @@ func TestStripGHALogTimestamps(t *testing.T) {
 			expected: "Line one\nLine two",
 		},
 		{
+			name:     "CRLF lines with timestamps",
+			input:    "2024-01-15T10:30:45.1234567Z Line one\r\n2024-01-15T10:30:46.9876543Z Line two",
+			expected: "Line one\nLine two",
+		},
+		{
 			name:     "line without timestamp unchanged",
 			input:    "This line has no timestamp",
 			expected: "This line has no timestamp",

@@ -1102,8 +1102,7 @@ func extractAgentStdioFailureExcerpt(agentStdioPath string, maxMessageLen int) s
 		return ""
 	}
 
-	lines := strings.Split(stripGHALogTimestamps(string(tail)), "\n")
-	nonEmpty, errorLike := classifyAgentStdioLines(lines)
+	nonEmpty, errorLike := classifyAgentStdioLines(stripGHALogTimestamps(string(tail)))
 
 	if len(errorLike) > 0 {
 		const maxErrorLines = 5
@@ -1120,11 +1119,11 @@ func extractAgentStdioFailureExcerpt(agentStdioPath string, maxMessageLen int) s
 	return stringutil.Truncate(strings.Join(nonEmpty[start:], "\n"), maxMessageLen)
 }
 
-func classifyAgentStdioLines(lines []string) ([]string, []string) {
-	nonEmpty := make([]string, 0, len(lines))
-	errorLike := make([]string, 0, len(lines))
+func classifyAgentStdioLines(content string) ([]string, []string) {
+	nonEmpty := make([]string, 0)
+	errorLike := make([]string, 0)
 
-	for _, line := range lines {
+	for line := range strings.SplitSeq(content, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" {
 			continue
@@ -1164,9 +1163,9 @@ func parseStepFilename(filename string) (int, string) {
 // e.g. "2024-01-01T10:00:00.1234567Z message here". This function strips those prefixes so the
 // returned string contains only the actual log content.
 func stripGHALogTimestamps(content string) string {
-	lines := strings.Split(content, "\n")
-	stripped := make([]string, 0, len(lines))
-	for _, line := range lines {
+	stripped := make([]string, 0)
+	for line := range strings.SplitSeq(content, "\n") {
+		line = strings.TrimSuffix(line, "\r")
 		// GHA timestamp format: YYYY-MM-DDTHH:MM:SS[.sss...]Z<space>
 		// The 'T' separator is always at position 10. Search for the terminating 'Z' after 'T'
 		// in a generous window (positions 11-35) to handle any fractional seconds length.

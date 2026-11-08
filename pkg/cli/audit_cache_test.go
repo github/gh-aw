@@ -80,9 +80,9 @@ func TestLoadCachedAuditDataRejectsOlderSchema(t *testing.T) {
 
 	// Earlier audits lack captured queue diagnostics, unified-session model
 	// resolution findings, engine step failure findings, evals summaries scoped
-	// to the audited attempt, and threat-detection outcomes, so must be regenerated.
-	require.Equal(t, 13, auditSchemaVersion)
-	for _, schemaVersion := range []int{0, 5, 6, 7, 8, 9, 10, 11, 12} {
+	// to the audited attempt, threat-detection outcomes, or run attempt identity.
+	require.Equal(t, 14, auditSchemaVersion)
+	for _, schemaVersion := range []int{0, 5, 6, 7, 8, 9, 10, 11, 12, 13} {
 		runDir := t.TempDir()
 		run := WorkflowRun{DatabaseID: 42, Status: "completed", Conclusion: "success"}
 		data, err := json.Marshal(AuditData{
