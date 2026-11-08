@@ -30,6 +30,8 @@ func sessionDurableFiles(engine string) []string {
 		files = append(files, path.Join(root, "home/.gemini/tmp"), path.Join(root, "home/.gemini/projects.json"))
 	case "agy":
 		files = append(files, path.Join(root, "home/.gemini/antigravity-cli/conversations"))
+	case "pi":
+		files = append(files, path.Join(root, "session.jsonl"))
 	}
 	return files
 }
@@ -39,7 +41,8 @@ func sessionDurableExecutionPlan(engine CodingAgentEngine, data *WorkflowData, l
 	if config == nil || config.Durable == nil {
 		return nil, fmt.Errorf("engine %q durable execution requires engine.durable", engine.GetID())
 	}
-	if config.Command != "" || config.Driver != "" || config.HarnessScript != "" {
+	builtinPiDriver := engine.GetID() == "pi" && (config.Driver == "pi_agent_core_driver.cjs" || config.Driver == "pi_rpc_driver.cjs")
+	if config.Command != "" || (config.Driver != "" && !builtinPiDriver) || config.HarnessScript != "" {
 		return nil, fmt.Errorf("engine %q durable execution does not support custom commands, drivers or harnesses", engine.GetID())
 	}
 	if err := validateDurableSessionArgs(engine.GetID(), config.Args); err != nil {
@@ -70,6 +73,8 @@ func validateDurableSessionArgs(engine string, args []string) error {
 		selectors = []string{"--resume", "-r", "--continue", "--session-id"}
 	case "codex":
 		selectors = []string{"resume", "fork", "--last", "--ephemeral"}
+	case "pi":
+		selectors = []string{"--session", "--session-dir", "--session-id", "--resume", "-r", "--continue", "-c", "--fork", "--no-session"}
 	}
 	for _, arg := range args {
 		flag, _, _ := strings.Cut(arg, "=")
@@ -128,6 +133,13 @@ func (e *GeminiEngine) GetDurableExecutionPlan(data *WorkflowData, logFile strin
 }
 
 func (e *AgyEngine) GetDurableExecutionPlan(data *WorkflowData, logFile string) (*DurableExecutionPlan, error) {
+	return sessionDurableExecutionPlan(e, data, logFile)
+}
+
+func (e *PiEngine) GetDurableExecutionPlan(data *WorkflowData, logFile string) (*DurableExecutionPlan, error) {
+	if piSessionSettings(data).Enabled {
+		return nil, errors.New("pi durable execution owns session selection; remove engine.config.session")
+	}
 	return sessionDurableExecutionPlan(e, data, logFile)
 }
 

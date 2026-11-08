@@ -49,7 +49,7 @@ describe("engine-declared durable files", () => {
 
   it("supports a single native checkpoint file through the same artifact contract", () => {
     const options = fixture();
-    const checkpoint = path.join(options.root, "durable/pi-durable-example.json");
+    const checkpoint = path.join(options.root, "durable/checkpoint-example.json");
     fs.mkdirSync(path.dirname(checkpoint));
     fs.writeFileSync(checkpoint, '{"native":"checkpoint"}');
     vi.stubEnv("GH_AW_DURABLE_FILES", JSON.stringify([checkpoint]));

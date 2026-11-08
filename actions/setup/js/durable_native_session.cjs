@@ -5,7 +5,33 @@ const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
 const { randomUUID } = require("node:crypto");
+const { readJsonlFile } = require("./jsonl_helpers.cjs");
 const SESSION_ID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+
+function openPiDurableSession(env = process.env) {
+  if (env.GH_AW_DURABLE_STORAGE !== "artifact" || env.GH_AW_PI_SUBAGENT_CHILD === "1") return undefined;
+  const directory = env.GH_AW_DURABLE_SESSION_DIR;
+  if (env.GH_AW_DURABLE_ENGINE !== "pi" || !directory || !path.isAbsolute(directory)) throw new Error("Missing engine-owned durable Pi session configuration");
+  const file = path.join(directory, "session.jsonl");
+  if (fs.lstatSync(directory, { throwIfNoEntry: false })?.isSymbolicLink()) throw new Error("Durable Pi session directory must not be a symlink");
+  const stat = fs.lstatSync(file, { throwIfNoEntry: false });
+  if (!stat) {
+    if (env.GH_AW_DURABLE_RESUMED === "true") throw new Error("Restored durable Pi session transcript is missing; refusing to start an unrelated conversation");
+    fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+    return { file, directory, id: undefined };
+  }
+  if (!stat.isFile()) throw new Error("Durable Pi session transcript must be a regular file");
+  let header;
+  for (const record of readJsonlFile(file, {
+    onError(error) {
+      throw error;
+    },
+  })) {
+    header ??= record;
+  }
+  if (header?.type !== "session" || header.version !== 3 || !SESSION_ID.test(header.id || "")) throw new Error("Invalid durable Pi native session header");
+  return { file, directory, id: header.id };
+}
 
 function readCopilotCaptureBaseline(directory) {
   const file = path.join(directory, "capture-offset.json");
@@ -80,4 +106,4 @@ function observeDurableSession(session, engine, line) {
   if (id !== undefined) session.save(id);
 }
 
-module.exports = { openDurableSession, observeDurableSession, readCopilotCaptureBaseline };
+module.exports = { openDurableSession, observeDurableSession, readCopilotCaptureBaseline, openPiDurableSession };

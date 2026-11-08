@@ -5,7 +5,7 @@ const { execFileSync, spawn } = require("node:child_process");
 const { resolveCopilotSDKMCPConfigPath } = require("./copilot_sdk_mcp_config_path.cjs");
 
 const GUEST_ROOT = "/workspace/.gh-aw-nvx";
-const STATE_INPUTS = ["aw-prompts", "mcp-config", "agent", "threat-detection", ".pi", "pi-agent-dir", "pi-durable-runtime", "models.json", "github-event.json", "awf-config.json", "engine-command.sh"];
+const STATE_INPUTS = ["aw-prompts", "mcp-config", "agent", "threat-detection", ".pi", "pi-agent-dir", "models.json", "github-event.json", "awf-config.json", "engine-command.sh"];
 const STATE_OUTPUT_DIRECTORIES = ["agent", "threat-detection", "sandbox/agent/logs"];
 const STATE_OUTPUT_FILES = ["pi-streaming.jsonl", "claude-debug.log", "agent-step-summary.md", "step-summary.md"];
 const SAFEOUTPUTS_OUTPUT_FILES = ["outputs.jsonl"];

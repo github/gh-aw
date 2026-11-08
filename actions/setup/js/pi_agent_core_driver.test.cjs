@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 
 const { main, jsonEvent } = await import("./pi_agent_core_driver.cjs");
+const { stageFiles, restoreFiles } = await import("./durable_files.cjs");
 let dir;
 
 beforeEach(() => {
@@ -21,6 +22,57 @@ afterEach(() => {
 });
 
 describe("Pi coding-agent SDK driver", () => {
+  it("opens the exact restored native session with current models, policy and workflow instructions", async () => {
+    const root = path.join(dir, "state");
+    const sessionDirectory = path.join(root, "durable-sessions/pi");
+    const sessionFile = path.join(sessionDirectory, "session.jsonl");
+    const id = "00000000-0000-4000-8000-000000000001";
+    vi.stubEnv("GH_AW_DURABLE_STORAGE", "artifact");
+    vi.stubEnv("GH_AW_DURABLE_ENGINE", "pi");
+    vi.stubEnv("GH_AW_DURABLE_SESSION_DIR", sessionDirectory);
+    vi.stubEnv("GH_AW_DURABLE_RESUMED", "false");
+    vi.stubEnv("GH_AW_DURABLE_FILES", JSON.stringify([sessionFile]));
+    const model = { id: "gpt-5.4" };
+    const session = {
+      sessionId: id,
+      subscribe: vi.fn(),
+      bindExtensions: vi.fn(),
+      prompt: vi.fn(async prompt => {
+        if (!fs.existsSync(sessionFile)) fs.writeFileSync(sessionFile, JSON.stringify({ type: "session", version: 3, id }) + "\n");
+        fs.appendFileSync(sessionFile, JSON.stringify({ type: "message", message: { role: "user", content: prompt } }) + "\n");
+      }),
+      dispose: vi.fn(),
+    };
+    const sdk = {
+      ModelRuntime: { create: vi.fn(async () => ({ getModel: () => model })) },
+      SettingsManager: { create: () => ({ applyOverrides: vi.fn() }) },
+      DefaultResourceLoader: vi.fn(function () {
+        return { reload: vi.fn() };
+      }),
+      createCodemodeExtension: vi.fn(),
+      createToolSearchExtension: vi.fn(),
+      createMcpExtension: vi.fn(),
+      SessionManager: { open: vi.fn(() => "persistent"), inMemory: vi.fn() },
+      createAgentSession: vi.fn(async () => ({ session })),
+    };
+    await main({ sdk, emit: vi.fn() });
+    const core = { info() {}, setOutput() {} };
+    stageFiles({ root, core });
+    fs.rmSync(sessionDirectory, { recursive: true });
+    restoreFiles({ root, core });
+    vi.stubEnv("GH_AW_DURABLE_RESUMED", "true");
+    fs.writeFileSync(path.join(dir, "prompt.txt"), "Current workflow instructions");
+    await main({ sdk, emit: vi.fn() });
+    expect(sdk.SessionManager.open).toHaveBeenNthCalledWith(2, sessionFile, sessionDirectory, process.env.GH_AW_ENGINE_CWD || process.env.GITHUB_WORKSPACE || process.cwd());
+    expect(sdk.SessionManager.inMemory).not.toHaveBeenCalled();
+    expect(sdk.createAgentSession).toHaveBeenLastCalledWith(expect.objectContaining({ model, sessionManager: "persistent" }));
+    expect(session.prompt).toHaveBeenLastCalledWith("Current workflow instructions");
+    expect(session.bindExtensions).toHaveBeenCalledTimes(2);
+    session.sessionId = "00000000-0000-4000-8000-000000000002";
+    await expect(main({ sdk, emit: vi.fn() })).rejects.toThrow("exact durable session");
+    expect(session.prompt).toHaveBeenCalledTimes(2);
+  });
+
   it("runs the full session layer with MCP, codemode, and policy extensions", async () => {
     const model = { id: "gpt-5.4", reasoning: true, input: ["text", "image"] };
     const session = { sessionId: "session-id", subscribe: vi.fn(), bindExtensions: vi.fn(), prompt: vi.fn(), dispose: vi.fn() };

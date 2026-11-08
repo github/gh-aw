@@ -93,7 +93,7 @@ func TestDurableArtifactEnvironment(t *testing.T) {
 
 func TestCompileDurableRejectsUnsupportedEngineOrDriver(t *testing.T) {
 	for _, test := range []struct{ engine, tools, want string }{
-		{"  pi:\n    durable: {}\n    driver: custom.cjs", "", "pi durable does not support custom"},
+		{"  pi:\n    durable: {}\n    driver: custom.cjs", "", "does not support custom"},
 		{"  id: copilot\n  durable: {}\n  driver: custom.cjs", "", "does not support custom"},
 	} {
 		t.Run(test.want+test.engine, func(t *testing.T) {
@@ -332,9 +332,8 @@ func TestCompilePiDurableArtifactLifecycle(t *testing.T) {
 			lock, err := os.ReadFile(filepath.Join(dir, "continuable.lock.yml"))
 			require.NoError(t, err)
 			text := string(lock)
-			require.Contains(t, text, "pi_durable_driver.cjs")
-			require.Contains(t, text, "@earendil-works/pi-durable@1.4.0")
-			require.Contains(t, text, "Verify Pi durable dependencies")
+			require.Contains(t, text, "--session-dir /tmp/gh-aw/agent/durable-sessions/pi --session /tmp/gh-aw/agent/durable-sessions/pi/session.jsonl")
+			require.NotContains(t, text, "Install Pi durable")
 			require.Equal(t, 1, strings.Count(text, "- name: Restore durable workflow state"))
 			require.Contains(t, text, "await restoreCheckpoint(")
 			require.NotContains(t, text, "Restore durable checkpoint artifact")

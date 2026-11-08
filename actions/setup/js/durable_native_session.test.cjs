@@ -5,7 +5,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 const require = createRequire(import.meta.url);
-const { openDurableSession, observeDurableSession } = require("./durable_native_session.cjs");
+const { openDurableSession, observeDurableSession, openPiDurableSession } = require("./durable_native_session.cjs");
 const { stageFiles, restoreFiles, validateFiles } = require("./durable_files.cjs");
 const { captureCopilotSessions } = require("./durable_session.cjs");
 const { createCopilotSDKModelObserver } = require("./copilot_model_selection.cjs");
@@ -68,6 +68,55 @@ function artifactRoundtrip(env, files) {
 }
 
 describe("native CLI artifact continuation", () => {
+  it("chains Pi's exact native transcript and submits each run's current prompt", () => {
+    const env = {
+      ...environment("pi"),
+      GH_AW_PI_CONFIG: "{}",
+      PI_CODING_AGENT_DIR: path.join(directory, "pi-agent"),
+      GH_AW_PI_STAGING_DIR: path.join(directory, "missing-staging"),
+      GH_AW_PI_SUBAGENT_CHILD: "",
+    };
+    const file = path.join(env.GH_AW_DURABLE_SESSION_DIR, "session.jsonl");
+    const cli = path.join(directory, "pi-cli.cjs");
+    fs.writeFileSync(
+      cli,
+      `#!${process.execPath}
+const fs = require("node:fs");
+const args = process.argv.slice(2);
+if (args.includes("--version")) { console.log("1.3.0"); process.exit(0); }
+const file = args[args.indexOf("--session") + 1];
+if (!file || args.includes("--no-session")) throw new Error("Native session persistence was not selected");
+if (!fs.existsSync(file)) fs.writeFileSync(file, JSON.stringify({ type: "session", version: 3, id: ${JSON.stringify(id)} }) + "\\n");
+fs.appendFileSync(file, JSON.stringify({ type: "message", message: { role: "user", content: args.at(-1) } }) + "\\n");
+console.log(JSON.stringify({ type: "session", version: 3, id: ${JSON.stringify(id)} }));
+console.log(JSON.stringify({ type: "message_end", message: { role: "assistant", content: args.at(-1) } }));
+`
+    );
+    fs.chmodSync(cli, 0o700);
+    env.GH_AW_PI_COMMAND = cli;
+    const runtime = require.resolve("./pi_runtime.cjs");
+    const harness = require.resolve("./shell_harness.cjs");
+    function run(prompt) {
+      const command = `${JSON.stringify(process.execPath)} ${JSON.stringify(runtime)} && ${JSON.stringify(process.execPath)} ${JSON.stringify(cli)} --session-dir ${JSON.stringify(env.GH_AW_DURABLE_SESSION_DIR)} --session ${JSON.stringify(file)} ${JSON.stringify(prompt)}`;
+      const result = spawnSync(process.execPath, [harness, "pi", command], { env, encoding: "utf8", timeout: 15000 });
+      expect(result.status, result.stderr).toBe(0);
+      return result.stdout;
+    }
+    run("First task A");
+    expect(openPiDurableSession(env).id).toBe(id);
+    artifactRoundtrip(env, [file]);
+    const output = run("Current task B");
+    expect(output).toContain("Current task B");
+    expect(output).not.toContain("First task A");
+    const records = fs
+      .readFileSync(file, "utf8")
+      .trim()
+      .split("\n")
+      .map(line => JSON.parse(line));
+    expect(records[0].id).toBe(id);
+    expect(records.slice(1).map(record => record.message.content)).toEqual(["First task A", "Current task B"]);
+  });
+
   it.each(["claude", "codex", "copilot"])("starts %s fresh, then restores its exact session and sends new workflow instructions", engine => {
     const env = environment(engine);
     const state = env.GH_AW_DURABLE_SESSION_DIR;
@@ -121,6 +170,24 @@ process.stdin.on("end", () => {
       expect(JSON.parse(fs.readFileSync(path.join(state, "capture-offset.json"), "utf8"))).toEqual(baseline);
     }
   });
+});
+
+it("refuses missing, corrupt, incompatible or redirected Pi transcripts and leaves sub-agents ephemeral", () => {
+  const env = environment("pi");
+  const session = openPiDurableSession(env);
+  expect(session.id).toBeUndefined();
+  env.GH_AW_DURABLE_RESUMED = "true";
+  expect(() => openPiDurableSession(env)).toThrow("transcript is missing");
+  for (const content of ["{", '{"type":"session","version":3,"id":"../../other"}\n', JSON.stringify({ type: "session", version: 2, id }), JSON.stringify({ type: "session", version: 3, id }) + "\n{"]) {
+    fs.writeFileSync(session.file, content);
+    expect(() => openPiDurableSession(env)).toThrow();
+  }
+  fs.writeFileSync(session.file, JSON.stringify({ type: "session", version: 3, id }) + "\n");
+  expect(openPiDurableSession(env).id).toBe(id);
+  fs.unlinkSync(session.file);
+  fs.symlinkSync(path.join(directory, "outside"), session.file);
+  expect(() => openPiDurableSession(env)).toThrow("regular file");
+  expect(openPiDurableSession({ ...env, GH_AW_PI_SUBAGENT_CHILD: "1" })).toBeUndefined();
 });
 
 it.each(["claude", "codex", "copilot"])("allows a first %s run without history but refuses incomplete or corrupt restored selectors", engine => {

@@ -5,10 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
-const { createHash } = require("node:crypto");
-const { selectCheckpoint, restoreCheckpoint, validateCheckpoint } = require("./durable_artifact.cjs");
+const { selectCheckpoint, restoreCheckpoint } = require("./durable_artifact.cjs");
 const { stageFiles } = require("./durable_files.cjs");
-const { SOURCE, VERSION } = require("./pi_durable_checkpoint.cjs");
 const directories = [];
 
 afterEach(() => {
@@ -194,7 +192,7 @@ describe("single-step durable restoration", () => {
     expect(options.core.setOutput).toHaveBeenCalledWith("parent-run-id", "100");
     expect(options.core.setOutput).toHaveBeenLastCalledWith("restored", "true");
     const prompt = fs.readFileSync(options.promptFile, "utf8");
-    if (engine === "pi" || engine === "imported-engine") expect(prompt).toBe("Current task");
+    if (engine === "imported-engine") expect(prompt).toBe("Current task");
     else {
       expect(prompt).toContain("untrusted historical data");
       expect(prompt.endsWith("Current task")).toBe(true);
@@ -225,46 +223,5 @@ describe("single-step durable restoration", () => {
     fs.unlinkSync(options.promptFile);
     await expect(restoreCheckpoint(options)).rejects.toThrow("ENOENT");
     expect(options.core.setOutput).not.toHaveBeenCalledWith("restored", "true");
-  });
-});
-
-describe("durable artifact publication", () => {
-  function checkpointFixture() {
-    vi.stubEnv("GH_AW_DURABLE_CHECKPOINT", "/tmp/gh-aw/agent/durable/pi-durable-continuable.json");
-    vi.stubEnv("GH_AW_DURABLE_ENGINE", "pi");
-    const content = '{"seq":1}\n';
-    const checkpoint = {
-      source: SOURCE,
-      packageVersion: VERSION,
-      contractVersion: 1,
-      scope: "pi-durable-continuable",
-      storage: "artifact",
-      files: { "main.jsonl": content },
-      hashes: { "main.jsonl": createHash("sha256").update(content).digest("hex") },
-    };
-    vi.spyOn(fs, "existsSync").mockReturnValue(true);
-    vi.spyOn(fs, "lstatSync").mockReturnValue({ isFile: () => true, isSymbolicLink: () => false });
-    vi.spyOn(fs, "readFileSync").mockImplementation(() => JSON.stringify(checkpoint));
-    const core = { setOutput: vi.fn(), info: vi.fn() };
-    return { checkpoint, core };
-  }
-
-  it("publishes only a valid complete checkpoint", () => {
-    const { core } = checkpointFixture();
-    validateCheckpoint({ core });
-    expect(core.setOutput).toHaveBeenCalledWith("present", "true");
-  });
-
-  it("rejects a checkpoint modified by secret redaction", () => {
-    const { checkpoint, core } = checkpointFixture();
-    checkpoint.files["main.jsonl"] = '{"seq":"***"}\n';
-    expect(() => validateCheckpoint({ core })).toThrow("damaged or redacted");
-    expect(core.setOutput).not.toHaveBeenCalled();
-  });
-
-  it("rejects symlink checkpoints", () => {
-    const { core } = checkpointFixture();
-    fs.lstatSync.mockReturnValue({ isFile: () => false, isSymbolicLink: () => true });
-    expect(() => validateCheckpoint({ core })).toThrow("regular files");
   });
 });

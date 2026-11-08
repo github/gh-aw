@@ -21,6 +21,31 @@ afterEach(() => {
 });
 
 describe("Pi RPC driver", () => {
+  it("uses the restored native session and rejects a substituted conversation before prompting", async () => {
+    const sessionDirectory = path.join(dir, "durable-sessions/pi");
+    fs.mkdirSync(sessionDirectory, { recursive: true });
+    const sessionFile = path.join(sessionDirectory, "session.jsonl");
+    const id = "00000000-0000-4000-8000-000000000001";
+    fs.writeFileSync(sessionFile, JSON.stringify({ type: "session", version: 3, id }) + "\n");
+    vi.stubEnv("GH_AW_DURABLE_STORAGE", "artifact");
+    vi.stubEnv("GH_AW_DURABLE_ENGINE", "pi");
+    vi.stubEnv("GH_AW_DURABLE_SESSION_DIR", sessionDirectory);
+    vi.stubEnv("GH_AW_DURABLE_RESUMED", "true");
+    const client = { onEvent: vi.fn(() => vi.fn()), start: vi.fn(), getState: vi.fn(async () => ({ sessionId: id })), prompt: vi.fn(async () => "handled"), waitForIdle: vi.fn(), stop: vi.fn(), getStderr: () => "" };
+    const RpcClient = vi.fn(function () {
+      return client;
+    });
+    await main({ sdk: { RpcClient }, cliPath: "/pi/dist/bundle/cli.js", emit: vi.fn() });
+    const { args } = RpcClient.mock.calls[0][0];
+    expect(args).not.toContain("--no-session");
+    expect(args[args.indexOf("--session") + 1]).toBe(sessionFile);
+    expect(client.prompt).toHaveBeenCalledWith("Complete the task");
+    client.getState.mockResolvedValue({ sessionId: "00000000-0000-4000-8000-000000000002" });
+    await expect(main({ sdk: { RpcClient }, cliPath: "/pi/dist/bundle/cli.js", emit: vi.fn() })).rejects.toThrow("exact durable session");
+    expect(client.prompt).toHaveBeenCalledTimes(1);
+    expect(client.stop).toHaveBeenCalledTimes(2);
+  });
+
   it("keeps session and policy options without overriding RPC mode", () => {
     expect(rpcArgs(["--print", "--mode", "json", "--no-session", "--thinking", "high"])).toEqual(["--no-session", "--thinking", "high"]);
   });
