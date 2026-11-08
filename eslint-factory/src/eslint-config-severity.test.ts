@@ -25,4 +25,9 @@ describe("eslint.config.cjs", () => {
   it("rejects ad hoc JSONL parsers at error severity", () => {
     expect(getRuleSeverity("gh-aw-custom/no-ad-hoc-jsonl-parser")).toBe("error");
   });
+
+  it("ignores the vendored work queue YAML parser", () => {
+    const runtimeConfig = eslintConfigs.find(config => config && typeof config === "object" && Array.isArray(config.ignores));
+    expect(runtimeConfig?.ignores).toContain("**/work_queue_yaml.cjs");
+  });
 });
