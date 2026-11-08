@@ -2472,6 +2472,9 @@ jobs:
               "update_issue": {
                 "defaultMax": 1,
                 "fields": {
+                  "artifacts": {
+                    "type": "array"
+                  },
                   "assignees": {
                     "type": "array",
                     "itemType": "string",
@@ -2519,7 +2522,7 @@ jobs:
                     "maxLength": 128
                   }
                 },
-                "customValidation": "requiresOneOf:status,title,body,labels,assignees,milestone"
+                "customValidation": "requiresOneOf:status,title,body,labels,assignees,milestone,artifacts"
               },
               "update_project": {
                 "defaultMax": 10,

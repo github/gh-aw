@@ -10996,6 +10996,20 @@
               "type": "object",
               "description": "Configuration for updating GitHub issues from agentic workflow output",
               "properties": {
+                "max-issue-artifacts": {
+                  "type": "integer",
+                  "default": 10,
+                  "description": "Maximum number of artifacts attached per updated issue (default: 10). Zero or a negative value disables issue artifacts."
+                },
+                "max-issue-artifact-size": {
+                  "type": ["integer", "string"],
+                  "minimum": 1,
+                  "maximum": 9007199254740991,
+                  "maxLength": 64,
+                  "pattern": "^\\s*[0-9]+(?:\\.[0-9]+)?\\s*(?:[bB]|[kKmMgGtT](?:[iI]?[bB])?)?\\s*$",
+                  "default": 1048576,
+                  "description": "Maximum UTF-8 size of each issue artifact body (default: 1mb = 1048576 bytes). Accepts positive integer bytes or a human-friendly size such as 512kb, 1mb, or 1.5mb. Units B, K/KB/KiB, M/MB/MiB, G/GB/GiB, and T/TB/TiB are case-insensitive and use multiples of 1024. The size must resolve to a positive whole byte count. Oversized bodies are rejected, not truncated."
+                },
                 "status": {
                   "type": "null",
                   "description": "Allow updating issue status (open/closed) - presence of key indicates field can be updated"

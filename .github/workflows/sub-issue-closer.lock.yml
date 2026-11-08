@@ -765,7 +765,7 @@ jobs:
         env:
           GH_AW_FILE_ROOT: "${{ runner.temp }}/gh-aw"
           GH_AW_FILE_CONFIG: "{\"files\":[{\"path\":\"safeoutputs/config.json\",\"content_env\":\"GH_AW_SAFE_OUTPUTS_CONFIG\"}]}"
-          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"add_comment\":{\"max\":20,\"target\":\"*\"},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{},\"update_issue\":{\"allow_body\":true,\"allow_status\":true,\"max\":20,\"target\":\"*\"}}"
+          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"add_comment\":{\"max\":20,\"target\":\"*\"},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{},\"update_issue\":{\"allow_body\":true,\"allow_status\":true,\"max\":20,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10,\"target\":\"*\"}}"
         with:
           script: |
             const path = require('path');
@@ -780,7 +780,7 @@ jobs:
             {
               "description_suffixes": {
                 "add_comment": " CONSTRAINTS: Maximum 20 comment(s) can be added. Target: *. Supports reply_to_id for discussion threading.",
-                "update_issue": " CONSTRAINTS: Maximum 20 issue(s) can be updated. Target: *."
+                "update_issue": " CONSTRAINTS: Maximum 20 issue(s) can be updated. Maximum 10 artifact(s) can be attached per issue. Maximum artifact body size: 1048576 UTF-8 bytes. Target: *."
               },
               "repo_params": {},
               "dynamic_tools": []
@@ -904,6 +904,9 @@ jobs:
               "update_issue": {
                 "defaultMax": 1,
                 "fields": {
+                  "artifacts": {
+                    "type": "array"
+                  },
                   "assignees": {
                     "type": "array",
                     "itemType": "string",
@@ -951,7 +954,7 @@ jobs:
                     "maxLength": 128
                   }
                 },
-                "customValidation": "requiresOneOf:status,title,body,labels,assignees,milestone"
+                "customValidation": "requiresOneOf:status,title,body,labels,assignees,milestone,artifacts"
               }
             }
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -2654,7 +2657,7 @@ jobs:
           GH_AW_ALLOWED_DOMAINS: "*.grafana.net,*.sentry.io,archive.ubuntu.com,azure.archive.ubuntu.com,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,json-schema.org,json.schemastore.org,keyserver.ubuntu.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,s.symcb.com,s.symcd.com,security.ubuntu.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com"
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"max\":20,\"target\":\"*\"},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{},\"update_issue\":{\"allow_body\":true,\"allow_status\":true,\"max\":20,\"target\":\"*\"}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"max\":20,\"target\":\"*\"},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{},\"update_issue\":{\"allow_body\":true,\"allow_status\":true,\"max\":20,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10,\"target\":\"*\"}}"
           GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}

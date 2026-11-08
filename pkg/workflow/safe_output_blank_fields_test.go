@@ -91,11 +91,11 @@ for (const field of ["status", "labels", "assignees", "milestone"]) {
     assert.equal(validateArgumentsAgainstSchema(normalized, updateTool.inputSchema), null);
     assert.throws(() => handlers.updateIssueHandler(normalized), {
       code: -32602,
-      message: "ERR_VALIDATION: update_issue requires at least one of: status, title, body, labels, assignees, milestone fields"
+      message: "ERR_VALIDATION: update_issue requires at least one of: status, title, body, labels, assignees, milestone, artifacts fields"
     });
     assert.deepEqual(validateItem({ type: "update_issue", ...raw }, "update_issue", 1), {
       isValid: false,
-      error: "Line 1: update_issue requires at least one of: 'status', 'title', 'body', 'labels', 'assignees', 'milestone' fields"
+      error: "Line 1: update_issue requires at least one of: 'status', 'title', 'body', 'labels', 'assignees', 'milestone', 'artifacts' fields"
     });
     assert.equal(recorded.length, 0, "blank-only updates must not be recorded");
   }

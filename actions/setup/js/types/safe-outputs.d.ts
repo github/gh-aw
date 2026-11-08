@@ -312,6 +312,8 @@ interface AddReviewerItem extends BaseSafeOutputItem {
  */
 interface UpdateIssueItem extends BaseSafeOutputItem {
   type: "update_issue";
+  /** Optional artifacts to create or update by name on the target issue. */
+  artifacts?: IssueArtifactBodyInput[];
   /** Optional new issue status */
   status?: "open" | "closed";
   /** Optional new issue title */

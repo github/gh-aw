@@ -520,8 +520,11 @@ func TestUpdateIssueValidationConfig(t *testing.T) {
 		t.Fatal("update_issue not found in ValidationConfig")
 	}
 
-	if config.CustomValidation != "requiresOneOf:status,title,body,labels,assignees,milestone" {
-		t.Errorf("update_issue customValidation = %q, want %q", config.CustomValidation, "requiresOneOf:status,title,body,labels,assignees,milestone")
+	if config.CustomValidation != "requiresOneOf:status,title,body,labels,assignees,milestone,artifacts" {
+		t.Errorf("update_issue customValidation = %q, want %q", config.CustomValidation, "requiresOneOf:status,title,body,labels,assignees,milestone,artifacts")
+	}
+	if artifacts, ok := config.Fields["artifacts"]; !ok || artifacts.Type != "array" || artifacts.Sanitize {
+		t.Errorf("update_issue artifacts must be an unsanitized array, got %+v", artifacts)
 	}
 
 	if _, ok := config.Fields["labels"]; !ok {

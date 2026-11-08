@@ -19,6 +19,8 @@ const { fetchIssueState, mergeIssueState } = require("./safe_output_execution_me
 const { MAX_LABELS, MAX_ASSIGNEES } = require("./constants.cjs");
 const { fetchAllRepoLabels } = require("./github_api_helpers.cjs");
 const { buildIssueIntentLabelUpdates, getIssueIntentLabelNames, normalizeIssueIntentLabelSpecs } = require("./issue_intents.cjs");
+const { normalizeIssueArtifacts, sanitizeIssueArtifacts, upsertIssueArtifacts } = require("./issue_artifacts.cjs");
+const { getErrorMessage } = require("./error_helpers.cjs");
 
 /**
  * Execute the issue update API call
@@ -41,7 +43,7 @@ async function executeIssueUpdate(github, context, issueNumber, updateData) {
   const useIssueIntentLabels = Boolean(labelSpecs);
 
   // Remove internal fields
-  const { _operation, _rawBody, _includeFooter, _bodyFooter, _titlePrefix, _workflowRepo, ...apiData } = updateData;
+  const { _operation, _rawBody, _includeFooter, _bodyFooter, _titlePrefix, _workflowRepo, _maxIssueArtifactSize, artifacts, ...apiData } = updateData;
   if (labelSpecs) {
     apiData.labels = getIssueIntentLabelNames(labelSpecs);
   }
@@ -53,7 +55,7 @@ async function executeIssueUpdate(github, context, issueNumber, updateData) {
   let currentIssue = null;
 
   // Fetch current issue if needed (title prefix validation or body update)
-  if (titlePrefix || rawBody !== undefined || useIssueIntentLabels) {
+  if (titlePrefix || rawBody !== undefined || useIssueIntentLabels || artifacts?.length) {
     const response = await github.rest.issues.get({
       owner: context.repo.owner,
       repo: context.repo.repo,
@@ -151,6 +153,16 @@ async function executeIssueUpdate(github, context, issueNumber, updateData) {
     };
   }
 
+  if (artifacts?.length) {
+    try {
+      const attached = await upsertIssueArtifacts(github, context.repo.owner, context.repo.repo, issueNumber, artifacts, _maxIssueArtifactSize);
+      issue = { ...issue, artifacts: attached };
+    } catch (error) {
+      // Preserve the issue result and do not retry the entire update after a partial attachment.
+      issue = { ...issue, _artifactError: getErrorMessage(error) };
+      core.error(issue._artifactError);
+    }
+  }
   return issue;
 }
 
@@ -172,6 +184,13 @@ const resolveIssueNumber = createStandardResolveNumber({
  * @returns {{success: true, data: Object} | {success: false, error: string}} Update data result
  */
 function buildIssueUpdateData(item, config) {
+  let artifacts;
+  try {
+    artifacts = sanitizeIssueArtifacts(normalizeIssueArtifacts(item.artifacts, config.max_issue_artifacts, config.max_issue_artifact_size, HANDLER_TYPE), {});
+    artifacts = normalizeIssueArtifacts(artifacts, config.max_issue_artifacts, config.max_issue_artifact_size, HANDLER_TYPE);
+  } catch (error) {
+    return { success: false, error: getErrorMessage(error) };
+  }
   // hasCommonUpdates is not needed here: the issue handler always continues to check
   // entity-specific fields (state, labels, assignees, milestone, title prefix).
   const { updateData } = buildCommonEntityUpdateData(item, config, {
@@ -196,6 +215,10 @@ function buildIssueUpdateData(item, config) {
   }
   if (item.milestone !== undefined) {
     updateData.milestone = item.milestone;
+  }
+  if (artifacts.length > 0) {
+    updateData.artifacts = artifacts;
+    updateData._maxIssueArtifactSize = config.max_issue_artifact_size;
   }
 
   // Enforce max limits on labels and assignees before API calls
@@ -241,7 +264,11 @@ const main = createUpdateHandlerFactory({
   resolveItemNumber: resolveIssueNumber,
   buildUpdateData: buildIssueUpdateData,
   executeUpdate: executeIssueUpdate,
-  formatSuccessResult: formatIssueSuccessResult,
+  formatSuccessResult: (issueNumber, issue) => ({
+    ...formatIssueSuccessResult(issueNumber, issue),
+    ...(issue.artifacts?.length ? { artifacts: issue.artifacts } : {}),
+    ...(issue._artifactError ? { success: false, error: issue._artifactError } : {}),
+  }),
   captureExecutionMetadata: {
     captureBefore: async (githubClient, effectiveContext, issueNumber) => fetchIssueState(githubClient, effectiveContext.repo, issueNumber),
     captureAfter: async (updatedIssue, beforeState) => mergeIssueState(beforeState, updatedIssue),
