@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestResolveWorkQueueWorkerTarget(t *testing.T) {
+func TestResolveWorkQueueWorkerSource(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), ".github", "workflows")
 	require.NoError(t, os.MkdirAll(dir, 0o755))
 	markdownPath := filepath.Join(dir, "dispatcher.md")
@@ -24,21 +24,21 @@ func TestResolveWorkQueueWorkerTarget(t *testing.T) {
 	}
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "generated.lock.yml"), nil, 0o600))
 
-	worker, err := resolveWorkQueueWorkerTarget("worker", markdownPath)
+	sourcePath, err := resolveWorkQueueWorkerSource("worker", markdownPath)
 	require.NoError(t, err)
-	require.True(t, worker)
+	require.Equal(t, filepath.Join(dir, "worker.md"), sourcePath)
 
-	worker, err = resolveWorkQueueWorkerTarget("ordinary", markdownPath)
+	sourcePath, err = resolveWorkQueueWorkerSource("ordinary", markdownPath)
 	require.NoError(t, err)
-	require.False(t, worker)
+	require.Equal(t, filepath.Join(dir, "ordinary.md"), sourcePath)
 
-	worker, err = resolveWorkQueueWorkerTarget("generated", markdownPath)
+	sourcePath, err = resolveWorkQueueWorkerSource("generated", markdownPath)
 	require.ErrorIs(t, err, errNotCompilerManagedWorkQueueTarget)
-	require.False(t, worker)
+	require.Empty(t, sourcePath)
 
-	worker, err = resolveWorkQueueWorkerTarget("../outside", markdownPath)
+	sourcePath, err = resolveWorkQueueWorkerSource("../outside", markdownPath)
 	require.ErrorContains(t, err, "path traversal not allowed")
-	require.False(t, worker)
+	require.Empty(t, sourcePath)
 }
 
 func TestWorkQueueTargetCallersPreserveWorkerPolicies(t *testing.T) {
@@ -55,6 +55,15 @@ func TestWorkQueueTargetCallersPreserveWorkerPolicies(t *testing.T) {
 	data := &WorkflowData{WorkQueuePolicy: &WorkQueuePolicyConfig{Policy: policy}, SafeOutputs: dispatch}
 	require.EqualError(t, populateDefaultWorkQueueProfiles(data, markdownPath),
 		"work-queue: dispatcher must approve at least one compiler-managed queue worker")
+
+	dispatch = &SafeOutputsConfig{DispatchWorkflow: &DispatchWorkflowConfig{Workflows: []string{"../outside"}}}
+	require.EqualError(t, validateApprovedWorkQueueTargets(&WorkflowData{SafeOutputs: dispatch}, markdownPath),
+		"work-queue: approved worker \"../outside\": invalid workflow name '../outside' (path traversal not allowed)")
+
+	policy = workqueue.DefaultPolicy("1", "owner/repo")
+	data = &WorkflowData{WorkQueuePolicy: &WorkQueuePolicyConfig{Policy: policy}, SafeOutputs: dispatch}
+	require.EqualError(t, populateDefaultWorkQueueProfiles(data, markdownPath),
+		"work-queue: worker profile \"../outside\": invalid workflow name '../outside' (path traversal not allowed)")
 
 	policy = workqueue.DefaultPolicy("1", "owner/repo")
 	pool := policy.Pools["default"]
