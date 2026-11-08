@@ -51,7 +51,7 @@ function installFactoryNativeAPI(fake, fixture) {
     },
   };
   Object.assign(fake.githubClient, { auth: async () => ({ type: "token", token: "fixture-token" }) });
-  const workerFiles = ESLINT_WORKERS.flatMap(profile => [`.github/workflows/${profile}.md`, `.github/workflows/${profile}.lock.yml`]);
+  const workerFiles = ESLINT_WORKERS.map(profile => `.github/workflows/${profile}.lock.yml`);
   fake.githubClient.rest.repos.getContent = async ({ path: filename, ref }) => {
     assert.ok([REF, fake.state.defaultRevision].includes(ref));
     assert.ok(workerFiles.includes(filename));

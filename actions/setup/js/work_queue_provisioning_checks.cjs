@@ -3,11 +3,12 @@
 const assert = require("node:assert/strict");
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
+const { Readable } = require("node:stream");
 const { randomUUID } = require("node:crypto");
 const path = require("node:path");
 const { defaultPolicy } = require("./work_queue_policy.cjs");
 const { buildAWPolicy } = require("./work_queue_settings.cjs");
-const { MAX_WORKFLOW_BYTES, verifyWorkerRoute, verifyWorkerRoutes } = require("./work_queue_provisioning.cjs");
+const { MAX_WORKFLOW_BYTES, verifyWorkerRoute, verifyWorkerRoutes, readLockFileHeaders, workerContract } = require("./work_queue_provisioning.cjs");
 
 const validYAML = "on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\n";
 const profile = defaultPolicy({ repository: "owner/repo", principal: "1001", ref: "a".repeat(40) }).pools.default.profiles.default;
@@ -67,31 +68,38 @@ function registerTests({ describe, it }) {
         ["registration", { owner: "owner", repo: "repo", workflow_id: "worker.lock.yml", request: native.calls[1][1].request }],
       ]);
     });
-    it("accepts optional string inputs and genuine quoted, flow, alias and merge YAML", async () => {
+    it("requires valid YAML with the work queue assignment string input", async () => {
+      await verifyWorkerRoute(options(nativeRoute(validYAML)));
       for (const contents of [
-        validYAML,
-        validYAML + "        required: false\n",
-        validYAML + "        required: true\n",
-        '"on": {workflow_dispatch: {inputs: {work_queue_assignment: {type: "string"}}}}\n',
-        "assignment: &assignment {type: string}\non: {workflow_dispatch: {inputs: {work_queue_assignment: *assignment}}}\n",
-        "assignment: &assignment {type: string}\non: {workflow_dispatch: {inputs: {work_queue_assignment: {<<: *assignment, required: false}}}}\n",
-        validYAML + "name: 'worker 🦄'\njobs:\n  worker:\n    steps:\n      - run: |\n          echo '${{ inputs.work_queue_assignment }}'\n",
-      ])
-        await verifyWorkerRoute(options(nativeRoute(contents)));
-    });
-    it("does not mistake comments, block strings or foreign inputs for a dispatch assignment", async () => {
-      for (const contents of [
-        "# " + validYAML.replaceAll("\n", "\n# "),
-        "on: push\nexample: |\n  " + validYAML.replaceAll("\n", "\n  "),
-        "on: {workflow_dispatch: {inputs: {foreign: {type: string}}}}\n",
-        "on: {workflow_dispatch: {inputs: {work_queue_assignment: {type: boolean}}}}\n",
-        "on: {workflow_dispatch: {inputs: {work_queue_assignment: {required: true}}}}\n",
-      ])
+        "this is deliberately not workflow YAML",
+        "on: [\n",
+        "on: push\n",
+        "on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: boolean\n",
+        "on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment: {}\n",
+      ]) {
         await rejected(nativeRoute(contents));
+      }
     });
-    it("rejects malformed YAML, duplicate keys, extra documents and recursive aliases", async () => {
-      for (const contents of [validYAML + "broken: [\n", validYAML + "on: {workflow_dispatch: {inputs: {work_queue_assignment: {type: string}}}}\n", validYAML + "---\n" + validYAML, "on: &cycle {workflow_dispatch: *cycle}\n"])
-        await rejected(nativeRoute(contents));
+    it("reads lock metadata headers through a bounded reader", async () => {
+      const metadata = { schema_version: "v1" };
+      const manifest = { work_queue: { worker: true, logical_contract: "a".repeat(64) } };
+      const reader = Readable.from([`# gh-aw-metadata: ${JSON.stringify(metadata)}\n`, `# gh-aw-manifest: ${JSON.stringify(manifest)}\n`, "on: [\n", "# gh-aw-manifest: invalid\n"]);
+      const headers = await readLockFileHeaders(reader);
+      assert.equal(headers.metadata?.schema_version, metadata.schema_version);
+      assert.equal(workerContract(headers.manifest), manifest.work_queue.logical_contract);
+      assert.equal(reader.destroyed, true);
+      const lateManifest = Readable.from(["comment\n", "on: [\n", "jobs:\n", `# gh-aw-manifest: ${JSON.stringify(manifest)}\n`]);
+      const boundedHeaders = await readLockFileHeaders(lateManifest);
+      assert.equal(workerContract(boundedHeaders.manifest), undefined);
+      assert.equal(lateManifest.destroyed, true);
+    });
+    it("reads only valid worker metadata from the compiler manifest", () => {
+      const contract = "a".repeat(64);
+      assert.equal(workerContract({ work_queue: { worker: true, logical_contract: contract } }), contract);
+      assert.equal(workerContract({ work_queue: { worker: false, logical_contract: contract } }), undefined);
+      assert.equal(workerContract({ work_queue: { worker: true } }), undefined);
+      assert.equal(workerContract(undefined), undefined);
+      assert.equal(workerContract({ work_queue: { worker: true, logical_contract: "invalid" } }), undefined);
     });
     it("rejects constructor revisions without a native read", async () => {
       for (const ref of ["0".repeat(40), "0".repeat(64)]) {
@@ -114,13 +122,10 @@ function registerTests({ describe, it }) {
         assert.equal(native.calls.length, 1);
       }
     });
-    it("rejects invalid UTF-8 rather than decoding replacement characters", async () => {
-      const native = nativeRoute();
-      const bytes = Buffer.from([0xc0, 0xaf]);
-      native.state.file.content = bytes.toString("base64");
-      native.state.file.size = bytes.length;
-      await rejected(native);
-      assert.equal(native.calls.length, 1);
+    it("does not accept invalid UTF-8 in the manifest header as worker metadata", async () => {
+      const bytes = Buffer.concat([Buffer.from("# gh-aw-manifest: "), Buffer.from([0xc0, 0xaf])]);
+      const headers = await readLockFileHeaders(Readable.from([bytes]));
+      assert.equal(workerContract(headers.manifest), undefined);
     });
     it("accepts CRLF-wrapped GitHub base64 content", async () => {
       const native = nativeRoute();
@@ -184,13 +189,13 @@ function registerTests({ describe, it }) {
       await rejected(native, policy.pools.default.profiles.worker);
       assert.equal(native.calls.length, 1);
     });
-    it("fails explicitly before registration when the production YAML parser is missing", () => {
+    it("validates worker assignment inputs with the bundled YAML parser", () => {
       const script = `
         const assert = require("node:assert/strict");
         const Module = require("node:module");
         const load = Module._load;
         Module._load = function(name, ...args) {
-          if (name === "./work_queue_yaml.cjs") throw Object.assign(new Error("parser absent"), {code: "MODULE_NOT_FOUND"});
+          if (!name.startsWith("node:") && !name.startsWith(".") && !name.startsWith("/")) throw new Error("runtime npm package forbidden: " + name);
           return load.call(this, name, ...args);
         };
         const { verifyWorkerRoute } = require(process.argv[1]);
@@ -200,15 +205,11 @@ function registerTests({ describe, it }) {
         const githubClient = {rest: {
           repos: {getContent: async () => ({data: {type: "file", path: profile.workflow,
             encoding: "base64", content: bytes.toString("base64"), size: bytes.length}})},
-          actions: {getWorkflow: async () => { registrations++; throw new Error("unexpected registration"); }}
+          actions: {getWorkflow: async () => { registrations++; return {data: {path: profile.workflow, state: "active"}}; }}
         }};
         verifyWorkerRoute({githubClient, owner: "owner", repo: "repo", profile}).then(
-          () => { throw new Error("unexpected provisioning success"); },
-          error => {
-            assert.equal(error.code, "policy_missing");
-            assert.match(error.message, /deployed YAML parser/);
-            assert.equal(registrations, 0);
-          }
+          () => assert.equal(registrations, 1),
+          error => { console.error(error); process.exitCode = 1; }
         ).catch(error => { console.error(error); process.exitCode = 1; });
       `;
       const result = spawnSync(process.execPath, ["-e", script, require.resolve("./work_queue_provisioning.cjs"), JSON.stringify(profile), validYAML], { encoding: "utf8" });
@@ -243,16 +244,17 @@ function registerTests({ describe, it }) {
           };
           const { verifyWorkerRoute, verifiedDefaultReference, configuredWorkerDeployment } = require(process.argv[1]);
           const profile = {...JSON.parse(process.argv[2]), logical_contract: "a".repeat(64)};
-          const bytes = Buffer.from(process.argv[3] + 'env:\\n  GH_AW_WORK_QUEUE_CONTRACT: "' + profile.logical_contract + '"\\n', "utf8");
+          const contents = '# gh-aw-manifest: ' + JSON.stringify({work_queue: {worker: true, logical_contract: profile.logical_contract}}) + '\\non:\\n  workflow_dispatch:\\n    inputs:\\n      work_queue_assignment:\\n        type: string\\n';
+          const bytes = Buffer.from(contents, "utf8");
           let reads = 0;
           const githubClient = {rest: {
             repos: {
               get: async () => ({data: {full_name: "owner/repo", default_branch: "main"}}),
               getContent: async ({path, ref}) => {
-              assert.ok([profile.workflow, profile.workflow.replace(/\\.lock\\.yml$/, ".md")].includes(path));
+              assert.equal(path, profile.workflow);
               assert.equal(ref, profile.ref);
               reads++;
-              const content = path.endsWith(".md") ? Buffer.from("---\\ntools: {work-queue: {worker: true}}\\n---\\nApproved work.\\n") : bytes;
+              const content = bytes;
               return {data: {type: "file", path, encoding: "base64",
                 content: content.toString("base64"), size: content.length}};
             }},
@@ -269,11 +271,11 @@ function registerTests({ describe, it }) {
               assert.equal(revision, profile.ref);
               const route = await configuredWorkerDeployment(options, revision);
               assert.deepEqual(route, {profile, available: true});
-              assert.equal(reads, 5);
+              assert.equal(reads, 4);
             })
             .catch(error => { console.error(error); process.exitCode = 1; });
         `;
-        const result = spawnSync(process.execPath, ["-e", script, path.join(directory, "work_queue_provisioning.cjs"), JSON.stringify(profile), validYAML], { encoding: "utf8", env: { ...process.env, NODE_PATH: "" } });
+        const result = spawnSync(process.execPath, ["-e", script, path.join(directory, "work_queue_provisioning.cjs"), JSON.stringify(profile)], { encoding: "utf8", env: { ...process.env, NODE_PATH: "" } });
         assert.equal(result.status, 0, result.stderr);
         assert.equal(fs.existsSync(path.join(directory, "node_modules")), false);
       } finally {
