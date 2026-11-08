@@ -648,7 +648,9 @@ function createReviewBuffer() {
           if (Array.isArray(data) && data.length > 0) {
             // Identity lookup is optional enrichment, not evidence that a submitted
             // anchor disappeared. GitHub can return null coordinates after publication.
-            const sameAnchor = (comment, submitted) => comment.path === submitted.path && comment.line === submitted.line && (comment.start_line ?? undefined) === submitted.start_line && comment.side === submitted.side;
+            const sideOrDefault = side => (side === undefined ? "RIGHT" : side);
+            const sameAnchor = (comment, submitted) =>
+              comment.path === submitted.path && comment.line === submitted.line && (comment.start_line ?? undefined) === submitted.start_line && sideOrDefault(comment.side) === sideOrDefault(submitted.side);
             reviewComments = reviewComments.map(submitted => {
               const matches = data.filter(comment => sameAnchor(comment, submitted.metadata));
               if (matches.length !== 1 || reviewComments.filter(candidate => sameAnchor(matches[0], candidate.metadata)).length !== 1) {

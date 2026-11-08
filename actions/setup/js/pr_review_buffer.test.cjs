@@ -361,8 +361,52 @@ describe("pr_review_buffer (factory pattern)", () => {
       });
     });
 
-    it("should capture created review comment identities", async () => {
-      buffer.addComment({ path: "src/index.js", line: 10, body: "Fix this", side: "RIGHT" });
+    it.each([
+      { submittedSide: "RIGHT", apiSide: "RIGHT", enriched: true },
+      { submittedSide: undefined, apiSide: "RIGHT", enriched: true },
+      { submittedSide: "RIGHT", apiSide: undefined, enriched: true },
+      { submittedSide: undefined, apiSide: undefined, enriched: true },
+      { submittedSide: undefined, apiSide: null, enriched: false },
+      { submittedSide: "RIGHT", apiSide: null, enriched: false },
+      { submittedSide: "LEFT", apiSide: "RIGHT", enriched: false },
+      { submittedSide: "LEFT", apiSide: "LEFT", enriched: true },
+    ])("resolves identities conservatively with submitted side $submittedSide and API side $apiSide", async ({ submittedSide, apiSide, enriched }) => {
+      buffer.addComment({ path: "src/index.js", line: 10, body: "Fix this", ...(submittedSide !== undefined ? { side: submittedSide } : {}) });
+      buffer.setReviewContext({
+        repo: "owner/repo",
+        repoParts: { owner: "owner", repo: "repo" },
+        pullRequestNumber: 42,
+        pullRequest: { head: { sha: "abc123" } },
+      });
+      mockGithub.rest.pulls.createReview.mockResolvedValue({
+        data: { id: 100, html_url: "https://github.com/owner/repo/pull/42#pullrequestreview-100" },
+      });
+      mockGithub.rest.pulls.listCommentsForReview.mockResolvedValue({
+        data: [{ id: 200, node_id: "PRRC_200", html_url: "https://github.com/owner/repo/pull/42#discussion_r200", path: "src/index.js", line: 10, ...(apiSide !== undefined ? { side: apiSide } : {}) }],
+      });
+
+      const result = await buffer.submitReview();
+
+      expect(mockGithub.rest.pulls.listCommentsForReview).toHaveBeenCalledWith({
+        owner: "owner",
+        repo: "repo",
+        pull_number: 42,
+        review_id: 100,
+        per_page: 100,
+      });
+      expect(result.review_comments).toEqual([
+        {
+          ...(enriched ? { id: 200, url: "https://github.com/owner/repo/pull/42#discussion_r200" } : {}),
+          repo: "owner/repo",
+          pull_request_number: 42,
+          metadata: { review_id: 100, ...(enriched ? { node_id: "PRRC_200" } : {}), path: "src/index.js", line: 10, side: submittedSide },
+        },
+      ]);
+    });
+
+    it("does not enrich identities shared by omitted and explicit RIGHT submitted sides", async () => {
+      buffer.addComment({ path: "src/index.js", line: 10, body: "First finding" });
+      buffer.addComment({ path: "src/index.js", line: 10, body: "Second finding", side: "RIGHT" });
       buffer.setReviewContext({
         repo: "owner/repo",
         repoParts: { owner: "owner", repo: "repo" },
@@ -378,21 +422,10 @@ describe("pr_review_buffer (factory pattern)", () => {
 
       const result = await buffer.submitReview();
 
-      expect(mockGithub.rest.pulls.listCommentsForReview).toHaveBeenCalledWith({
-        owner: "owner",
-        repo: "repo",
-        pull_number: 42,
-        review_id: 100,
-        per_page: 100,
-      });
+      expect(result.success).toBe(true);
       expect(result.review_comments).toEqual([
-        {
-          id: 200,
-          url: "https://github.com/owner/repo/pull/42#discussion_r200",
-          repo: "owner/repo",
-          pull_request_number: 42,
-          metadata: { review_id: 100, node_id: "PRRC_200", path: "src/index.js", line: 10, side: "RIGHT" },
-        },
+        { repo: "owner/repo", pull_request_number: 42, metadata: { review_id: 100, path: "src/index.js", line: 10, side: undefined } },
+        { repo: "owner/repo", pull_request_number: 42, metadata: { review_id: 100, path: "src/index.js", line: 10, side: "RIGHT" } },
       ]);
     });
 
