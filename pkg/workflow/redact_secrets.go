@@ -74,8 +74,8 @@ func CollectSecretReferences(yamlContent string) []string {
 }
 
 // CollectActionReferences extracts all external GitHub Action references from the workflow YAML.
-// It returns a sorted, deduplicated list of "uses:" values, excluding local references
-// that start with "./" (e.g., "./actions/setup" or "./.github/workflows/...").
+// It returns a sorted, deduplicated list of "uses:" values, excluding local and
+// self-repository references that start with "./" or "$/".
 // Each entry includes the inline tag comment when present (e.g., "actions/checkout@sha # v4").
 func CollectActionReferences(yamlContent string) []string {
 	secretMaskingLog.Printf("Scanning workflow YAML (%d bytes) for action references", len(yamlContent))
@@ -123,8 +123,8 @@ func CollectActionReferences(yamlContent string) []string {
 			}
 		}
 
-		// Skip local actions (e.g. "./actions/setup", "./.github/workflows/...")
-		if strings.HasPrefix(ref, "./") {
+		// Skip local and self-repository actions and reusable workflows.
+		if strings.HasPrefix(ref, "./") || strings.HasPrefix(ref, "$/") {
 			continue
 		}
 

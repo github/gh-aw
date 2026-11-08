@@ -1,5 +1,5 @@
 // Package osremoveuncheckedcleanup implements a Go analysis linter that flags
-// os.Remove and os.RemoveAll calls whose errors are discarded.
+// os.Remove and os.RemoveAll expression and go statements whose errors are discarded.
 package osremoveuncheckedcleanup
 
 import (
@@ -14,7 +14,7 @@ import (
 )
 
 // Analyzer is the os-remove-unchecked-cleanup analysis pass.
-var Analyzer = analyzerutil.New("osremoveuncheckedcleanup", "reports os.Remove and os.RemoveAll calls whose errors are discarded", run)
+var Analyzer = analyzerutil.New("osremoveuncheckedcleanup", "reports discarded os.Remove and os.RemoveAll expression and go statements", run)
 
 func run(pass *analysis.Pass) (any, error) {
 	nolintIndex, generatedFiles, err := analyzerutil.Indexes(pass)
@@ -22,7 +22,7 @@ func run(pass *analysis.Pass) (any, error) {
 		return nil, err
 	}
 
-	nodeFilter := []ast.Node{(*ast.AssignStmt)(nil), (*ast.ExprStmt)(nil), (*ast.GoStmt)(nil)}
+	nodeFilter := []ast.Node{(*ast.ExprStmt)(nil), (*ast.GoStmt)(nil)}
 	return analyzerutil.Preorder(pass, nodeFilter, func(n ast.Node) {
 		analyzeDiscardedCleanup(pass, n, generatedFiles, nolintIndex)
 	})
@@ -37,15 +37,6 @@ func analyzeDiscardedCleanup(pass *analysis.Pass, n ast.Node, generatedFiles fil
 	var call *ast.CallExpr
 	var callOK bool
 	switch stmt := stmt.(type) {
-	case *ast.AssignStmt:
-		if len(stmt.Lhs) != 1 || len(stmt.Rhs) != 1 {
-			return
-		}
-		blank, ok := stmt.Lhs[0].(*ast.Ident) //nolint:uncheckedsliceindex // len(stmt.Lhs) == 1 was checked above.
-		if !ok || blank.Name != "_" {
-			return
-		}
-		call, callOK = astutil.UnwrapParenExpr(stmt.Rhs[0]).(*ast.CallExpr) //nolint:uncheckedsliceindex // len(stmt.Rhs) == 1 was checked above.
 	case *ast.ExprStmt:
 		call, callOK = astutil.UnwrapParenExpr(stmt.X).(*ast.CallExpr)
 	case *ast.GoStmt:
