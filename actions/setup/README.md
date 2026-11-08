@@ -139,6 +139,13 @@ answer validation, so callers can collect costs even when the answer batch is
 invalid. Evals use it to save response token usage and catalog-derived AIC and
 USD costs to the accounting artifact.
 
+The CJS workflow's **Copilot Decisions API Integration** job runs
+`node --test actions/setup/js/scripts/test_decisions_client.cjs` with
+`GITHUB_TOKEN` from a job granting `copilot-requests: write`. It makes one live
+predicate request using synthetic evidence and requires a correct answer with
+probability at least 0.9. Missing credentials and API errors fail the test.
+The job excludes fork pull requests and does not use PATs or repository secrets.
+
 ### Synthetic message previews
 
 `js/testdata/messages_preview.md` contains locally rendered previews of shared
