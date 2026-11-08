@@ -209,7 +209,6 @@ describe("bounded daily and weekly discussion-report portfolio", () => {
       "daily-news",
       "daily-arxiv-researcher",
       "daily-cache-strategy-analyzer",
-      "daily-hippo-learn",
       "org-health-report",
       "portfolio-analyst",
       "archivx-agentic-workflows-analyzer",
@@ -226,6 +225,17 @@ describe("bounded daily and weekly discussion-report portfolio", () => {
     }
     expect(REPORT_PROFILES).not.toContain("agent-performance-analyzer");
     expect(source("agent-performance-analyzer")).toContain("on: daily");
+  });
+
+  it("keeps the retired Hippo schedule dispatch-only and outside the report portfolio", () => {
+    expect(REPORT_PROFILES).not.toContain("daily-hippo-learn");
+    const frontmatter = source("daily-hippo-learn").split("\n---")[0];
+    expect(frontmatter).toMatch(/^  workflow_dispatch:/m);
+    expect(frontmatter).not.toMatch(/^\s+schedule:/m);
+    const compiled = parseDocument(fs.readFileSync(new URL("../../../.github/workflows/daily-hippo-learn.lock.yml", import.meta.url), "utf8"), { version: "1.2", uniqueKeys: true });
+    expect(compiled.errors).toEqual([]);
+    expect(compiled.toJS().on).toHaveProperty("workflow_dispatch");
+    expect(compiled.toJS().on).not.toHaveProperty("schedule");
   });
 
   it("preserves DeepReport's bounded follow-ups without authorizing unscoped repository-memory writes", () => {
