@@ -1893,6 +1893,13 @@ func TestBuildAWFConfigJSON_SchemaURLIsVersionPinned(t *testing.T) {
 		assert.Contains(t, jsonStr, expectedVersion, "schema URL should contain the default firewall version")
 		assert.Contains(t, jsonStr, "releases/download/", "schema URL should use release download path")
 		assert.Contains(t, jsonStr, "awf-config.schema.json", "schema URL should reference awf-config.schema.json")
+
+		var awfConfig AWFConfigFile
+		require.NoError(t, json.Unmarshal([]byte(jsonStr), &awfConfig))
+		require.NotNil(t, awfConfig.Container)
+		imageTag, _, _ := strings.Cut(awfConfig.Container.ImageTag, ",")
+		assert.Equal(t, strings.TrimPrefix(expectedVersion, "v"), imageTag, "container images should match the default firewall release")
+		require.NoError(t, validateAWFConfigJSON(jsonStr))
 	})
 
 	t.Run("pinned version appears in schema URL", func(t *testing.T) {

@@ -37,6 +37,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/httpstatuscode"
 	"github.com/github/gh-aw/pkg/linters/ioutildeprecated"
 	"github.com/github/gh-aw/pkg/linters/jsonmarshalignoredeerror"
+	"github.com/github/gh-aw/pkg/linters/jsonunmarshalbytesconversion"
 	"github.com/github/gh-aw/pkg/linters/largefunc"
 	"github.com/github/gh-aw/pkg/linters/lenstringsplit"
 	"github.com/github/gh-aw/pkg/linters/lenstringzero"
@@ -178,6 +179,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	stringssplitfirst.Analyzer,
 	stringscountcontains.Analyzer,
 	jsonmarshalignoredeerror.Analyzer,
+	jsonunmarshalbytesconversion.Analyzer,
 	lenstringzero.Analyzer,
 	lenstringsplit.Analyzer,
 	timeafterleak.Analyzer,

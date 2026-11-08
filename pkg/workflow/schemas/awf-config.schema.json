@@ -159,7 +159,7 @@
         "maxAiCredits": {
           "type": "number",
           "exclusiveMinimum": 0,
-          "description": "Maximum cumulative AI credits allowed for a run. When reached, the API proxy rejects subsequent requests with HTTP 403 and error type 'ai_credits_limit_exceeded'. AWF also enforces a non-overridable hard cap of 10,000 AI credits; values above 10,000 are effectively clamped."
+          "description": "Maximum cumulative AI credits allowed for a run. When reached, the API proxy rejects subsequent requests with HTTP 403 and error type 'ai_credits_limit_exceeded'. AWF always enforces an operator-controlled hard cap, defaulting to 10,000 accounted AI credits. Set AWF_AI_CREDITS_HARD_CAP in the host environment or api-proxy container to a positive finite number to lower or raise it; unset, empty, invalid, nonpositive, or non-finite values retain the default. Values above the hard cap are effectively clamped, and the agent cannot raise or disable it."
         },
         "defaultAiCreditsPricing": {
           "type": "object",
