@@ -12,7 +12,7 @@ const policyOptions = { repository: options.repository, ref: "a".repeat(40), set
 
 describe("engine conformance queue portfolio", () => {
   it("selects supported engines first, recent changes next and eventually covers every engine", () => {
-    expect(ENGINES).toHaveLength(14);
+    expect(ENGINES).toHaveLength(15);
     const seen = new Set();
     for (let day = 0; day < 42; day++) {
       const date = new Date(Date.parse("2026-01-01T00:00:00Z") + day * 86400000).toISOString().slice(0, 10);
@@ -28,6 +28,7 @@ describe("engine conformance queue portfolio", () => {
     expect(changedEngines(["pkg/workflow/engine.go"]).size).toBe(ENGINES.length);
     expect([...changedEngines(["pkg/workflow/codex_config.go", ".github/workflows/shared/agy-conformance.md"])].sort()).toEqual(["agy", "codex"]);
     expect([...changedEngines(["pkg/workflow/copilot_engine.go"])]).toEqual(["copilot"]);
+    expect([...changedEngines([".github/workflows/engine-conformance-mini-swe-agent.md"])]).toEqual(["mini-swe-agent"]);
   });
 
   it("rejects invalid dates, identities and changed-path inputs", () => {
