@@ -328,9 +328,24 @@ describe("Decisions BinEval harness", () => {
   ])("passes through the configured model or resolves its alias without provider mapping (%s, %s)", async (model, provider, expected) => {
     vi.stubEnv("GH_AW_EVALS_MODEL", model);
     vi.stubEnv("GH_AW_DECISIONS_PROVIDER", provider);
+    vi.stubEnv("GH_AW_DECISIONS_BASE_URL", provider === "github-copilot" ? "https://api.githubcopilot.com/v1" : "https://api.openai.com/v1");
     await executeMain();
     expect(JSON.parse(fetch.mock.calls[0][1].body).model).toBe(expected);
     expect(fetch.mock.calls[0][1].headers["Copilot-Integration-Id"]).toBe(provider === "github-copilot" ? "agentic-workflows" : undefined);
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("sets the GitHub Copilot integration identity based on the endpoint even with another provider label", async () => {
+    vi.stubEnv("GH_AW_DECISIONS_PROVIDER", "openai");
+    await executeMain();
+    expect(fetch.mock.calls[0][0]).toBe("https://api.githubcopilot.com/v1/decisions");
+    expect(fetch.mock.calls[0][1].headers["Copilot-Integration-Id"]).toBe("agentic-workflows");
+  });
+
+  it("omits the integration identity for non-GitHub endpoints even with the Copilot provider label", async () => {
+    vi.stubEnv("GH_AW_DECISIONS_BASE_URL", "https://api.openai.com/v1");
+    await executeMain();
+    expect(fetch.mock.calls[0][0]).toBe("https://api.openai.com/v1/decisions");
+    expect(fetch.mock.calls[0][1].headers).not.toHaveProperty("Copilot-Integration-Id");
   });
 });

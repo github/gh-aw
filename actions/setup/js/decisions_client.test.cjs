@@ -48,7 +48,7 @@ describe("generic Decisions client", () => {
       expect(requests[0]).toEqual({
         method: "POST",
         url: "/v1/decisions",
-        integrationId: "agentic-workflows",
+        integrationId: undefined,
         body: { model: "decision-model", input: "Shared evidence", questions },
       });
     } finally {
@@ -70,15 +70,48 @@ describe("generic Decisions client", () => {
     expect(JSON.parse(request.body)).toEqual({ model: config.model, input: config.input, questions });
   });
 
-  it("sends the caller's Copilot integration identity without changing authentication", async () => {
+  it("omits the caller's Copilot integration identity for non-GitHub endpoints without changing authentication", async () => {
     const config = { ...options(), integrationId: "agentic-workflows" };
     await invokeDecisions(config);
     expect(config.fetchImpl.mock.calls[0][1].headers).toEqual({
       "Content-Type": "application/json",
       Authorization: ["Bearer", "test-key"].join(" "),
-      "Copilot-Integration-Id": "agentic-workflows",
     });
   });
+
+  it.each(["https://api.githubcopilot.com/v1", "https://api.enterprise.githubcopilot.com/v1", "https://githubcopilot.com/v1", "https://API.GITHUBCOPILOT.COM/v1", "https://api.githubcopilot.com./v1"])(
+    "defaults the integration identity for GitHub Copilot endpoint %s",
+    async baseURL => {
+      const config = { ...options(), baseURL };
+      await invokeDecisions(config);
+      const headers = config.fetchImpl.mock.calls[0][1].headers;
+      expect(headers["Copilot-Integration-Id"]).toBe("agentic-workflows");
+      expect(headers.Authorization).toBe(["Bearer", "test-key"].join(" "));
+    }
+  );
+
+  it.each([undefined, ""])("uses the GitHub Copilot default when integrationId is %j", async integrationId => {
+    const config = { ...options(), baseURL: "https://api.githubcopilot.com/v1", integrationId };
+    await invokeDecisions(config);
+    expect(config.fetchImpl.mock.calls[0][1].headers["Copilot-Integration-Id"]).toBe("agentic-workflows");
+  });
+
+  it("preserves an explicit integration identity for GitHub Copilot", async () => {
+    const config = { ...options(), baseURL: "https://api.githubcopilot.com/v1", integrationId: "custom-integration" };
+    await invokeDecisions(config);
+    expect(config.fetchImpl.mock.calls[0][1].headers["Copilot-Integration-Id"]).toBe("custom-integration");
+  });
+
+  it.each(["https://api.openai.com/v1", "https://githubcopilot.com.example.com/v1", "https://notgithubcopilot.com/v1", "https://example.com/githubcopilot.com"])(
+    "never sends an integration identity to non-GitHub endpoint %s",
+    async baseURL => {
+      for (const integrationId of [undefined, "agentic-workflows", "custom-integration"]) {
+        const config = { ...options(), baseURL, integrationId };
+        await invokeDecisions(config);
+        expect(config.fetchImpl.mock.calls[0][1].headers).not.toHaveProperty("Copilot-Integration-Id");
+      }
+    }
+  );
 
   it("supports credential-free proxies and named refusals", async () => {
     const config = options({ answers: answers.map(answer => ({ type: "refusal", name: answer.name })) });

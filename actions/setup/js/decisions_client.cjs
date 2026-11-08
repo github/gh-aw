@@ -110,12 +110,14 @@ async function invokeDecisions({ baseURL, apiKey, integrationId, model, input, q
     throw new Error("Decisions base URL must be an HTTP(S) URL without credentials, query, or fragment");
   }
   url.pathname = url.pathname.replace(/\/+$/, "") + "/decisions";
+  const hostname = url.hostname.replace(/\.$/, "");
+  const copilotIntegrationId = hostname === "githubcopilot.com" || hostname.endsWith(".githubcopilot.com") ? integrationId || "agentic-workflows" : undefined;
   const response = await fetchImpl(url.toString(), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
-      ...(integrationId ? { "Copilot-Integration-Id": integrationId } : {}),
+      ...(copilotIntegrationId ? { "Copilot-Integration-Id": copilotIntegrationId } : {}),
     },
     body: JSON.stringify({ model, input, questions }),
     signal: AbortSignal.timeout(timeoutMs),

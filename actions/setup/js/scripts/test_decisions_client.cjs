@@ -12,7 +12,6 @@ test("Copilot Decisions accepts the copilot-requests: write job token", { timeou
   const response = await invokeDecisions({
     baseURL: "https://api.githubcopilot.com/v1",
     apiKey,
-    integrationId: "agentic-workflows",
     model: "gpt-6-luna-decisions",
     input: "The basket contains three apples and no other fruit.",
     questions: [{ type: "choice", name: "basket_fruit", instructions: "Which fruit does the basket contain?", choices: [{ value: "apples" }, { value: "bananas" }] }],
