@@ -134,14 +134,33 @@ export const noDynamicStringReplacementRule = createRule({
       }
     }
 
-    function isDynamic(node: TSESTree.Expression): boolean {
+    function isDynamic(node: TSESTree.Expression, resolving: Set<TSESLint.Scope.Variable> = new Set()): boolean {
       const expression = unwrapExpression(node);
       if (isKnownFunction(expression)) {
         return false;
       }
       switch (expression.type) {
-        case "Identifier":
-          return expression.name !== "undefined";
+        case "Identifier": {
+          if (expression.name === "undefined") {
+            return false;
+          }
+          const variable = resolveVariable(expression);
+          if (!variable || variable.defs.length !== 1 || resolving.has(variable) || hasNonInitializingWrite(variable)) {
+            return true;
+          }
+          const definition = variable.defs[0];
+          if (definition?.type !== "Variable" || definition.parent.type !== "VariableDeclaration" || definition.parent.kind !== "const") {
+            return true;
+          }
+          const initializer = getVariableInitializer(variable);
+          if (!initializer) {
+            return true;
+          }
+          resolving.add(variable);
+          const result = isDynamic(initializer, resolving) || hasStaticReplacementToken(initializer);
+          resolving.delete(variable);
+          return result;
+        }
         case "MemberExpression":
           return true;
         case "TemplateLiteral":
@@ -149,15 +168,15 @@ export const noDynamicStringReplacementRule = createRule({
         case "CallExpression":
           return true;
         case "BinaryExpression":
-          return isDynamicOperand(expression.left) || isDynamicOperand(expression.right);
+          return isDynamicOperand(expression.left, resolving) || isDynamicOperand(expression.right, resolving);
         case "LogicalExpression":
-          return isDynamic(expression.left) || isDynamic(expression.right);
+          return isDynamic(expression.left, resolving) || isDynamic(expression.right, resolving);
         case "ConditionalExpression":
-          return isDynamic(expression.consequent) || isDynamic(expression.alternate);
+          return isDynamic(expression.consequent, resolving) || isDynamic(expression.alternate, resolving);
         case "SequenceExpression":
-          return expression.expressions.length > 0 && isDynamic(expression.expressions[expression.expressions.length - 1]);
+          return expression.expressions.length > 0 && isDynamic(expression.expressions[expression.expressions.length - 1], resolving);
         case "UnaryExpression":
-          return isDynamic(expression.argument);
+          return isDynamic(expression.argument, resolving);
         default:
           return false;
       }
@@ -216,8 +235,8 @@ export const noDynamicStringReplacementRule = createRule({
       }
     }
 
-    function isDynamicOperand(node: TSESTree.Expression | TSESTree.PrivateIdentifier): boolean {
-      return node.type !== "PrivateIdentifier" && isDynamic(node);
+    function isDynamicOperand(node: TSESTree.Expression | TSESTree.PrivateIdentifier, resolving: Set<TSESLint.Scope.Variable>): boolean {
+      return node.type !== "PrivateIdentifier" && isDynamic(node, resolving);
     }
 
     function hasStaticReplacementTokenOperand(node: TSESTree.Expression | TSESTree.PrivateIdentifier): boolean {
