@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -100,17 +101,18 @@ func TestLSPManagerGenerateInstallSteps(t *testing.T) {
 		},
 	})
 
-	// Default: --ignore-scripts + cooldown enabled + pinned versions
+	// Default: scripts disabled + cooldown enabled + pinned versions
 	steps := manager.GenerateInstallSteps(nil)
 	require.Len(t, steps, 1)
 	content := strings.Join(steps[0], "\n")
 	assert.Contains(t, content, "Install TypeScript LSP dependencies")
-	assert.Contains(t, content, "npm install -g --ignore-scripts typescript@5.8.3 typescript-language-server@4.3.3")
-	assert.Contains(t, content, "NPM_CONFIG_MIN_RELEASE_AGE")
+	assert.Contains(t, content, "npm install -g typescript@5.8.3 typescript-language-server@4.3.3")
+	assert.NotContains(t, content, "--ignore-scripts")
+	assert.Contains(t, content, fmt.Sprintf("        env:\n          NPM_CONFIG_IGNORE_SCRIPTS: 'true'\n          NPM_CONFIG_MIN_RELEASE_AGE: '%d'", npmDefaultCooldownDays))
 }
 
 func TestLSPManagerGenerateInstallSteps_RunInstallScripts(t *testing.T) {
-	// When run-install-scripts is enabled, --ignore-scripts must be omitted.
+	// When run-install-scripts is enabled, script suppression must be omitted.
 	manager := NewLSPManager(map[string]LSPServerConfig{
 		"typescript": {
 			Command: "typescript-language-server",
@@ -127,6 +129,8 @@ func TestLSPManagerGenerateInstallSteps_RunInstallScripts(t *testing.T) {
 	content := strings.Join(steps[0], "\n")
 	assert.Contains(t, content, "npm install -g typescript@5.8.3 typescript-language-server@4.3.3")
 	assert.NotContains(t, content, "--ignore-scripts")
+	assert.NotContains(t, content, "NPM_CONFIG_IGNORE_SCRIPTS")
+	assert.Contains(t, content, fmt.Sprintf("        env:\n          NPM_CONFIG_MIN_RELEASE_AGE: '%d'", npmDefaultCooldownDays))
 }
 
 func TestLSPManagerGenerateInstallSteps_CooldownDisabled(t *testing.T) {
@@ -150,8 +154,35 @@ func TestLSPManagerGenerateInstallSteps_CooldownDisabled(t *testing.T) {
 	steps := manager.GenerateInstallSteps(workflowData)
 	require.Len(t, steps, 1)
 	content := strings.Join(steps[0], "\n")
-	assert.Contains(t, content, "--ignore-scripts")
+	assert.Contains(t, content, "        env:\n          NPM_CONFIG_IGNORE_SCRIPTS: 'true'")
+	assert.NotContains(t, content, "--ignore-scripts")
 	assert.NotContains(t, content, "NPM_CONFIG_MIN_RELEASE_AGE")
+}
+
+func TestLSPManagerGenerateInstallSteps_RunInstallScriptsAndCooldownDisabled(t *testing.T) {
+	manager := NewLSPManager(map[string]LSPServerConfig{
+		"typescript": {
+			Command:        "typescript-language-server",
+			FileExtensions: map[string]string{".ts": "typescript"},
+		},
+	})
+	falseVal := false
+	workflowData := &WorkflowData{
+		RunInstallScripts: true,
+		ParsedFrontmatter: &FrontmatterConfig{
+			RuntimesTyped: &RuntimesConfig{
+				Node: &RuntimeConfig{Cooldown: &falseVal},
+			},
+		},
+	}
+	steps := manager.GenerateInstallSteps(workflowData)
+	require.Len(t, steps, 1)
+	content := strings.Join(steps[0], "\n")
+	assert.Contains(t, content, "npm install -g typescript@5.8.3 typescript-language-server@4.3.3")
+	assert.NotContains(t, content, "--ignore-scripts")
+	assert.NotContains(t, content, "NPM_CONFIG_IGNORE_SCRIPTS")
+	assert.NotContains(t, content, "NPM_CONFIG_MIN_RELEASE_AGE")
+	assert.NotContains(t, content, "        env:")
 }
 
 func TestLSPManagerGenerateInstallSteps_DefaultVersionPinning(t *testing.T) {

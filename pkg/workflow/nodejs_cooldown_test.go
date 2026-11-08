@@ -106,6 +106,11 @@ func TestNpmEngineCooldownAtInstallationTime(t *testing.T) {
 				defer registry.Close()
 
 				dir := t.TempDir()
+				if _, supported := config["allow-scripts"]; supported {
+					// npm 12 requires approval even without ignore-scripts. Approve only
+					// the fixture so suppression cases still exercise ignore-scripts.
+					require.NoError(t, os.WriteFile(filepath.Join(dir, ".npmrc"), []byte("allow-scripts=cooldown-test@1.2.3\n"), 0o600))
+				}
 				marker := filepath.Join(dir, "install-scripts.txt")
 				days := test.days
 				step := GenerateNpmInstallStepsWithScope("cooldown-test", "${{ inputs.version }}", "Install", "cooldown-test", NPMInstallOptions{
