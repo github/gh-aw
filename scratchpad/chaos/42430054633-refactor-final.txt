@@ -1,0 +1,3 @@
+persona: refactor zealot
+scenario: rename draft
+status: complete
