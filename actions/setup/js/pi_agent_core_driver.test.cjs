@@ -38,14 +38,19 @@ describe("Pi coding-agent SDK driver", () => {
       subscribe: vi.fn(),
       bindExtensions: vi.fn(),
       prompt: vi.fn(async prompt => {
-        if (!fs.existsSync(sessionFile)) fs.writeFileSync(sessionFile, JSON.stringify({ type: "session", version: 3, id }) + "\n");
-        fs.appendFileSync(sessionFile, JSON.stringify({ type: "message", message: { role: "user", content: prompt } }) + "\n");
+        const timestamp = new Date().toISOString();
+        if (!fs.existsSync(sessionFile)) fs.writeFileSync(sessionFile, JSON.stringify({ type: "session", version: 3, id, timestamp, cwd: process.cwd() }) + "\n");
+        const count = session.prompt.mock.calls.length;
+        fs.appendFileSync(
+          sessionFile,
+          JSON.stringify({ type: "message", id: `message-${count}`, parentId: count > 1 ? `message-${count - 1}` : null, timestamp, message: { role: "user", content: [{ type: "text", text: prompt }] } }) + "\n"
+        );
       }),
       dispose: vi.fn(),
     };
     const sdk = {
       ModelRuntime: { create: vi.fn(async () => ({ getModel: () => model })) },
-      SettingsManager: { create: () => ({ applyOverrides: vi.fn() }) },
+      SettingsManager: { create: () => ({ applyOverrides: vi.fn(), getDefaultThinkingLevel: () => undefined, getModelThinkingLevel: () => undefined }) },
       DefaultResourceLoader: vi.fn(function () {
         return { reload: vi.fn() };
       }),
@@ -56,21 +61,94 @@ describe("Pi coding-agent SDK driver", () => {
       createAgentSession: vi.fn(async () => ({ session })),
     };
     await main({ sdk, emit: vi.fn() });
+    expect(sdk.createAgentSession.mock.calls[0][0]).not.toHaveProperty("thinkingLevel");
     const core = { info() {}, setOutput() {} };
     stageFiles({ root, core });
     fs.rmSync(sessionDirectory, { recursive: true });
     restoreFiles({ root, core });
     vi.stubEnv("GH_AW_DURABLE_RESUMED", "true");
-    fs.writeFileSync(path.join(dir, "prompt.txt"), "Current workflow instructions");
+    fs.writeFileSync(path.join(dir, "prompt.txt"), "Raw combined prompt is not submitted");
+    const userPrompt = path.join(dir, "user.txt");
+    const systemPrompt = path.join(dir, "system.txt");
+    fs.writeFileSync(userPrompt, "Current workflow instructions");
+    fs.writeFileSync(systemPrompt, "Current system instructions");
+    vi.stubEnv("GH_AW_PI_USER_PROMPT", userPrompt);
+    vi.stubEnv("GH_AW_PI_SYSTEM_PROMPT", systemPrompt);
     await main({ sdk, emit: vi.fn() });
     expect(sdk.SessionManager.open).toHaveBeenNthCalledWith(2, sessionFile, sessionDirectory, process.env.GH_AW_ENGINE_CWD || process.env.GITHUB_WORKSPACE || process.cwd());
     expect(sdk.SessionManager.inMemory).not.toHaveBeenCalled();
-    expect(sdk.createAgentSession).toHaveBeenLastCalledWith(expect.objectContaining({ model, sessionManager: "persistent" }));
+    expect(sdk.createAgentSession).toHaveBeenLastCalledWith(expect.objectContaining({ model, sessionManager: "persistent", thinkingLevel: "medium" }));
+    expect(sdk.DefaultResourceLoader).toHaveBeenLastCalledWith(expect.objectContaining({ appendSystemPrompt: ["Current system instructions"] }));
     expect(session.prompt).toHaveBeenLastCalledWith("Current workflow instructions");
     expect(session.bindExtensions).toHaveBeenCalledTimes(2);
     session.sessionId = "00000000-0000-4000-8000-000000000002";
     await expect(main({ sdk, emit: vi.fn() })).rejects.toThrow("exact durable session");
     expect(session.prompt).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    { name: "current workflow effort off", settings: { defaultThinkingLevel: "off" }, expected: "off" },
+    { name: "current model-specific effort", settings: { defaultThinkingLevel: "high", modelThinkingLevels: { "openai/gpt-5.4": "low" } }, expected: "low" },
+    { name: "model-specific effort off", settings: { defaultThinkingLevel: "high", modelThinkingLevels: { "openai/gpt-5.4": "off" } }, expected: "off" },
+    { name: "native first-run default with no current effort", settings: {}, expected: "medium" },
+    { name: "routed effort off over fixed and model-specific effort", settings: { defaultThinkingLevel: "high", modelThinkingLevels: { "aw-gateway/gpt-5.4": "low" } }, routedEffort: "off", expected: "off" },
+    { name: "routed effort low", settings: { defaultThinkingLevel: "high" }, routedEffort: "low", expected: "low" },
+  ])("overrides saved high effort with $name on durable SDK resume", async ({ settings, routedEffort, expected }) => {
+    const sessionDirectory = path.join(dir, "state/durable-sessions/pi");
+    const sessionFile = path.join(sessionDirectory, "session.jsonl");
+    const id = "00000000-0000-4000-8000-000000000001";
+    const timestamp = new Date().toISOString();
+    fs.mkdirSync(sessionDirectory, { recursive: true });
+    fs.writeFileSync(
+      sessionFile,
+      [
+        { type: "session", version: 3, id, timestamp, cwd: process.cwd() },
+        { type: "thinking_level_change", id: "thinking", parentId: null, timestamp, thinkingLevel: "high" },
+        { type: "message", id: "message", parentId: "thinking", timestamp, message: { role: "user", content: [{ type: "text", text: "Previous task" }] } },
+      ]
+        .map(record => JSON.stringify(record))
+        .join("\n") + "\n"
+    );
+    vi.stubEnv("GH_AW_DURABLE_STORAGE", "artifact");
+    vi.stubEnv("GH_AW_DURABLE_ENGINE", "pi");
+    vi.stubEnv("GH_AW_DURABLE_SESSION_DIR", sessionDirectory);
+    vi.stubEnv("GH_AW_DURABLE_RESUMED", "true");
+    vi.stubEnv("GH_AW_PI_CONFIG", JSON.stringify({ settings }));
+    fs.mkdirSync(path.join(dir, "agent"), { recursive: true });
+    if (routedEffort) {
+      vi.stubEnv("GH_AW_MODEL_ROUTING", "1");
+      fs.writeFileSync(path.join(dir, "agent/model-routing-selection.json"), JSON.stringify({ wire_model: "gpt-5.4", mapped_effort: routedEffort }));
+    }
+    const model = { provider: routedEffort ? "aw-gateway" : "openai", id: "gpt-5.4", reasoning: true };
+    let currentSettings = {};
+    const settingsManager = {
+      applyOverrides: overrides => {
+        currentSettings = { ...currentSettings, ...overrides };
+      },
+      getDefaultThinkingLevel: () => currentSettings.defaultThinkingLevel,
+      getModelThinkingLevel: (provider, modelId) => currentSettings.modelThinkingLevels?.[`${provider}/${modelId}`],
+    };
+    const session = { sessionId: id, thinkingLevel: "high", subscribe: vi.fn(), bindExtensions: vi.fn(), prompt: vi.fn(), dispose: vi.fn() };
+    const sdk = {
+      ModelRuntime: { create: vi.fn(async () => ({ getModel: () => model })) },
+      SettingsManager: { create: () => settingsManager },
+      DefaultResourceLoader: vi.fn(function () {
+        return { reload: vi.fn() };
+      }),
+      createCodemodeExtension: vi.fn(),
+      createToolSearchExtension: vi.fn(),
+      createMcpExtension: vi.fn(),
+      SessionManager: { open: vi.fn(() => "persistent") },
+      createAgentSession: vi.fn(async options => {
+        // Pi 1.0.0 through 1.5.0 prefer saved effort when the option is omitted.
+        session.thinkingLevel = options.thinkingLevel ?? "high";
+        return { session };
+      }),
+    };
+    await main({ sdk, emit: vi.fn() });
+    expect(sdk.createAgentSession).toHaveBeenCalledWith(expect.objectContaining({ thinkingLevel: expected, model }));
+    expect(session.thinkingLevel).toBe(expected);
+    expect(session.prompt).toHaveBeenCalledWith("Complete the task");
   });
 
   it("runs the full session layer with MCP, codemode, and policy extensions", async () => {
@@ -98,6 +176,7 @@ describe("Pi coding-agent SDK driver", () => {
       })
     );
     expect(sdk.createAgentSession).toHaveBeenCalledWith(expect.objectContaining({ model, resourceLoader, sessionManager: "in-memory" }));
+    expect(sdk.createAgentSession.mock.calls[0][0]).not.toHaveProperty("thinkingLevel");
     expect(session.bindExtensions).toHaveBeenCalledOnce();
     expect(session.prompt).toHaveBeenCalledWith("Complete the task");
     expect(session.dispose).toHaveBeenCalledOnce();

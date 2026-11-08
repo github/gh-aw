@@ -165,10 +165,16 @@ describe("single-step durable restoration", () => {
     fs.unlinkSync(session);
     const promptFile = path.join(root, "prompt.txt");
     fs.writeFileSync(promptFile, "Current task");
+    const userPromptFile = path.join(root, "user.txt");
+    const systemPromptFile = path.join(root, "system.txt");
+    if (engine === "pi") {
+      fs.writeFileSync(userPromptFile, "Current task");
+      fs.writeFileSync(systemPromptFile, "Current system instructions");
+    }
     const artifactClient = {
       downloadArtifact: vi.fn(async (_id, { path: destination }) => fs.cpSync(saved, destination, { recursive: true })),
     };
-    return { ...options, root, session, promptFile, saved, artifactClient, token: "test-download-token" };
+    return { ...options, root, session, promptFile, userPromptFile, systemPromptFile, saved, artifactClient, token: "test-download-token" };
   }
 
   it("starts fresh without a download, file restore, or prompt rewrite", async () => {
@@ -191,12 +197,48 @@ describe("single-step durable restoration", () => {
     expect(fs.readFileSync(options.session, "utf8")).toBe("previous task state");
     expect(options.core.setOutput).toHaveBeenCalledWith("parent-run-id", "100");
     expect(options.core.setOutput).toHaveBeenLastCalledWith("restored", "true");
-    const prompt = fs.readFileSync(options.promptFile, "utf8");
+    const prompt = fs.readFileSync(engine === "pi" ? options.userPromptFile : options.promptFile, "utf8");
     if (engine === "imported-engine") expect(prompt).toBe("Current task");
     else {
       expect(prompt).toContain("untrusted historical data");
       expect(prompt.endsWith("Current task")).toBe(true);
     }
+    if (engine === "pi") {
+      expect(fs.readFileSync(options.promptFile, "utf8")).toBe("Current task");
+      expect(fs.readFileSync(options.systemPromptFile, "utf8")).toBe("Current system instructions");
+    }
+  });
+
+  it("uses an explicitly configured Pi user prompt without changing the raw or system prompt", async () => {
+    const options = restoreFixture("pi");
+    const userPromptFile = path.join(options.root, "custom-user.txt");
+    fs.writeFileSync(userPromptFile, "Current split workflow task");
+    vi.stubEnv("GH_AW_PI_USER_PROMPT", userPromptFile);
+    await restoreCheckpoint(options);
+    const prompt = fs.readFileSync(userPromptFile, "utf8");
+    expect(prompt).toContain("untrusted historical data");
+    expect(prompt).toContain("The harness resumes your exact native session");
+    expect(prompt.endsWith("Current split workflow task")).toBe(true);
+    expect(fs.readFileSync(options.userPromptFile, "utf8")).toBe("Current task");
+    expect(fs.readFileSync(options.promptFile, "utf8")).toBe("Current task");
+    expect(fs.readFileSync(options.systemPromptFile, "utf8")).toBe("Current system instructions");
+  });
+
+  it("does not rewrite a first-run Pi split prompt when no checkpoint exists", async () => {
+    const options = restoreFixture("pi");
+    options.github.rest.actions.listWorkflowRuns.mockResolvedValue({ data: { workflow_runs: [] } });
+    await restoreCheckpoint(options);
+    expect(fs.readFileSync(options.userPromptFile, "utf8")).toBe("Current task");
+    expect(fs.readFileSync(options.systemPromptFile, "utf8")).toBe("Current system instructions");
+    expect(options.core.setOutput).not.toHaveBeenCalledWith("restored", "true");
+  });
+
+  it("fails closed when Pi's consumed split prompt is missing, without rewriting the raw prompt", async () => {
+    const options = restoreFixture("pi");
+    fs.unlinkSync(options.userPromptFile);
+    await expect(restoreCheckpoint(options)).rejects.toThrow("ENOENT");
+    expect(fs.readFileSync(options.promptFile, "utf8")).toBe("Current task");
+    expect(options.core.setOutput).not.toHaveBeenCalledWith("restored", "true");
   });
 
   it("fails without restoring files or enabling continuation when download authorization fails", async () => {

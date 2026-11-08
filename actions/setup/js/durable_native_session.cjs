@@ -8,6 +8,43 @@ const { randomUUID } = require("node:crypto");
 const { readJsonlFile } = require("./jsonl_helpers.cjs");
 const SESSION_ID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
+/** @param {any} value */
+function isRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+/** @param {any} value */
+function isEntryId(value) {
+  return typeof value === "string" && value.length > 0;
+}
+
+/** Validate native envelopes and tree links without constraining extension-owned payloads.
+ * @param {any} entry @param {Set<string>} ids */
+function validatePiNativeEntry(entry, ids) {
+  if (
+    !isRecord(entry) ||
+    !isEntryId(entry.type) ||
+    entry.type === "session" ||
+    !isEntryId(entry.id) ||
+    ids.has(entry.id) ||
+    typeof entry.timestamp !== "string" ||
+    !Number.isFinite(Date.parse(entry.timestamp)) ||
+    (entry.parentId !== null && (!isEntryId(entry.parentId) || !ids.has(entry.parentId)))
+  ) {
+    throw new Error("Invalid durable Pi native session entry or parent reference");
+  }
+  if (entry.type === "message" && (!isRecord(entry.message) || !isEntryId(entry.message.role))) throw new Error("Invalid durable Pi native message entry");
+  if (entry.type === "compaction" && (!isEntryId(entry.firstKeptEntryId) || (entry.firstKeptEntryId !== entry.id && !ids.has(entry.firstKeptEntryId)))) {
+    throw new Error("Invalid durable Pi native compaction reference");
+  }
+  if ((entry.type === "label" || entry.type === "context_edit") && (!isEntryId(entry.targetId) || !ids.has(entry.targetId))) {
+    throw new Error("Invalid durable Pi native target reference");
+  }
+  // fromId is provenance: "root" is a sentinel, and a fork can omit the abandoned branch.
+  if (entry.type === "branch_summary" && !isEntryId(entry.fromId)) throw new Error("Invalid durable Pi native branch summary reference");
+  ids.add(entry.id);
+}
+
 function openPiDurableSession(env = process.env) {
   if (env.GH_AW_DURABLE_STORAGE !== "artifact" || env.GH_AW_PI_SUBAGENT_CHILD === "1") return undefined;
   const directory = env.GH_AW_DURABLE_SESSION_DIR;
@@ -22,14 +59,33 @@ function openPiDurableSession(env = process.env) {
   }
   if (!stat.isFile()) throw new Error("Durable Pi session transcript must be a regular file");
   let header;
+  const ids = new Set();
   for (const record of readJsonlFile(file, {
+    fatalUTF8: true,
     onError(error) {
       throw error;
     },
   })) {
-    header ??= record;
+    if (header === undefined) {
+      if (
+        !isRecord(record) ||
+        record.type !== "session" ||
+        record.version !== 3 ||
+        typeof record.id !== "string" ||
+        !SESSION_ID.test(record.id) ||
+        typeof record.timestamp !== "string" ||
+        !Number.isFinite(Date.parse(record.timestamp)) ||
+        typeof record.cwd !== "string" ||
+        (record.parentSession !== undefined && typeof record.parentSession !== "string")
+      ) {
+        throw new Error("Invalid durable Pi native session header");
+      }
+      header = record;
+    } else {
+      validatePiNativeEntry(record, ids);
+    }
   }
-  if (header?.type !== "session" || header.version !== 3 || !SESSION_ID.test(header.id || "")) throw new Error("Invalid durable Pi native session header");
+  if (!header) throw new Error("Invalid durable Pi native session header");
   return { file, directory, id: header.id };
 }
 

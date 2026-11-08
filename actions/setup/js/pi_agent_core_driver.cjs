@@ -82,6 +82,8 @@ async function main(options = {}) {
         : sessionOptions.fork
           ? sdk.SessionManager.forkFrom(sessionOptions.fork, cwd, DEFAULT_SESSION_DIR, sessionOptions.id ? { id: sessionOptions.id } : undefined)
           : sdk.SessionManager.create(cwd, DEFAULT_SESSION_DIR, sessionOptions.id ? { id: sessionOptions.id } : undefined);
+  // Native resume prefers historical effort unless the current run supplies it explicitly.
+  const thinkingLevel = durableSession?.id ? (routingSelection?.mapped_effort ?? (model ? settingsManager.getModelThinkingLevel(model.provider, model.id) : undefined) ?? settingsManager.getDefaultThinkingLevel() ?? "medium") : undefined;
   const { session, modelFallbackMessage } = await sdk.createAgentSession({
     cwd,
     agentDir,
@@ -90,6 +92,7 @@ async function main(options = {}) {
     settingsManager,
     resourceLoader,
     sessionManager,
+    ...(thinkingLevel !== undefined ? { thinkingLevel } : {}),
   });
   try {
     if (durableSession?.id && session.sessionId !== durableSession.id) throw new Error("Pi SDK did not resume the exact durable session");

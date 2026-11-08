@@ -9,7 +9,7 @@ const { restoreFiles } = require("./durable_files.cjs");
 const { preparePrompt } = require("./durable_session.cjs");
 
 /** Select and restore a checkpoint before exposing continuation to the engine. */
-async function restoreCheckpoint({ github, context, core, token, artifactClient = new DefaultArtifactClient(), root = "/tmp/gh-aw/agent", promptFile }) {
+async function restoreCheckpoint({ github, context, core, token, artifactClient = new DefaultArtifactClient(), root = "/tmp/gh-aw/agent", promptFile = "/tmp/gh-aw/aw-prompts/prompt.txt" }) {
   const outputs = new Map();
   await selectCheckpoint({
     github,
@@ -29,7 +29,9 @@ async function restoreCheckpoint({ github, context, core, token, artifactClient 
   });
   restoreFiles({ core: { ...core, setOutput() {} }, root });
   if (["copilot", "claude", "codex", "gemini", "agy", "pi"].includes(process.env.GH_AW_DURABLE_ENGINE || "")) {
-    preparePrompt({ env: { ...process.env, GH_AW_DURABLE_RESUMED: "true" }, promptFile });
+    // Pi consumes the already-split user prompt in CLI, SDK, and RPC modes.
+    const currentPrompt = process.env.GH_AW_DURABLE_ENGINE === "pi" ? process.env.GH_AW_PI_USER_PROMPT || path.join(path.dirname(promptFile), "user.txt") : promptFile;
+    preparePrompt({ env: { ...process.env, GH_AW_DURABLE_RESUMED: "true" }, promptFile: currentPrompt });
   }
   core.setOutput("restored", "true");
 }

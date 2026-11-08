@@ -26,7 +26,7 @@ describe("Pi RPC driver", () => {
     fs.mkdirSync(sessionDirectory, { recursive: true });
     const sessionFile = path.join(sessionDirectory, "session.jsonl");
     const id = "00000000-0000-4000-8000-000000000001";
-    fs.writeFileSync(sessionFile, JSON.stringify({ type: "session", version: 3, id }) + "\n");
+    fs.writeFileSync(sessionFile, JSON.stringify({ type: "session", version: 3, id, timestamp: new Date().toISOString(), cwd: dir }) + "\n");
     vi.stubEnv("GH_AW_DURABLE_STORAGE", "artifact");
     vi.stubEnv("GH_AW_DURABLE_ENGINE", "pi");
     vi.stubEnv("GH_AW_DURABLE_SESSION_DIR", sessionDirectory);

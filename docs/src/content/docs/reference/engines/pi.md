@@ -117,6 +117,16 @@ Artifacts from the former experimental Pi Durable task runtime are incompatible
 with native sessions and are not migrated. Restoration rejects those artifacts
 rather than interpreting task journals as conversation history.
 
+To reset a chain blocked by a legacy artifact, remove the configured `durable`
+block, recompile and publish the workflow, and let a new run complete successfully
+without durable mode. Then re-enable durable mode, recompile and publish on the
+same workflow and branch. With that reset run as the latest successful run, the
+next new run starts fresh because its parent has no durable checkpoint; older
+artifacts are not searched. Omit explicit `aw_context.run_id` and `parent_run_id`
+lineage for that next run, especially references to legacy history. This discards
+continuation history rather than migrating it; integrity validation remains
+unchanged for artifacts that are restored.
+
 Workflow-level concurrency serializes execution and artifact publication without
 cancelling the previous writer. Explicit concurrency, reusable workflow calls and
 work-queue workers are not supported. The compiler grants `actions: read` only
