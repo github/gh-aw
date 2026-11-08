@@ -7,7 +7,7 @@ import "strings"
 func parenthesizedExamples(name string) {
 	_ = strings.EqualFold(name, "alice") // want `use strings\.EqualFold`
 
-	_ = strings.EqualFold(name, "alice") // want `use strings\.EqualFold`
+	_ = strings.EqualFold("alice", name) // want `use strings\.EqualFold`
 
 	_ = strings.EqualFold(name, "ALICE") // want `use strings\.EqualFold`
 
@@ -18,6 +18,9 @@ func parenthesizedExamples(name string) {
 	_ = (lower) == "alice" // want `use strings\.EqualFold`
 
 	_ = "alice" == (lower) // want `use strings\.EqualFold`
+
+	(lower) = "bob"
+	_ = (lower) == "alice"
 }
 
 func parenthesizedOK(name string) {

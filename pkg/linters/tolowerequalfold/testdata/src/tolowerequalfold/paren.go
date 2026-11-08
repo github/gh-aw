@@ -11,13 +11,16 @@ func parenthesizedExamples(name string) {
 
 	_ = (strings.ToUpper)(name) == "ALICE" // want `use strings\.EqualFold`
 
-	_ = ((strings.ToLower))(name) != "alice" // want `use strings\.EqualFold`
+	_ = (strings.ToLower)(name) != "alice" // want `use strings\.EqualFold`
 
 	lower := strings.ToLower(name)
 
 	_ = (lower) == "alice" // want `use strings\.EqualFold`
 
 	_ = "alice" == (lower) // want `use strings\.EqualFold`
+
+	(lower) = "bob"
+	_ = (lower) == "alice"
 }
 
 func parenthesizedOK(name string) {
