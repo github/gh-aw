@@ -6,6 +6,7 @@ steps:
   - name: Prepare pinned TLA+ runtime
     shell: bash
     run: |
+      # runner-guard:ignore RGS-018 -- Version-pinned TLA+ runtime artifacts are SHA-256 verified before use.
       set -euo pipefail
       trusted=$(mktemp -d "$RUNNER_TEMP/tla-installer.XXXXXX")
       trap 'rm -rf "$trusted"' EXIT
