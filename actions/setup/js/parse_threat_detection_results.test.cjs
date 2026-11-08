@@ -1000,6 +1000,18 @@ describe("main", () => {
         expect(mockCore.setOutput).toHaveBeenCalledWith("conclusion", "failure");
         expect(mockCore.setOutput).toHaveBeenCalledWith("success", "false");
         expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Security threats detected: prompt injection"));
+        expect(mockCore.setOutput).toHaveBeenCalledWith("threat_kinds", "prompt_injection");
+        expect(mockCore.exportVariable).toHaveBeenCalledWith("GH_AW_DETECTION_THREAT_KINDS", "prompt_injection");
+      });
+
+      it.each(["true", "false"])("exports only boolean categories in continue-on-error=%s mode", async continueOnError => {
+        process.env.GH_AW_DETECTION_CONTINUE_ON_ERROR = continueOnError;
+        mockExistsSync.mockReturnValue(true);
+        mockReadFileSync.mockReturnValue('{"prompt_injection":true,"secret_leak":false,"malicious_patch":true,"reasons":["PRIVATE_TEXT"]}');
+        await mod.main();
+        expect(mockCore.setOutput).toHaveBeenCalledWith("threat_kinds", "prompt_injection,malicious_patch");
+        expect(mockCore.exportVariable).toHaveBeenCalledWith("GH_AW_DETECTION_THREAT_KINDS", "prompt_injection,malicious_patch");
+        expect(mockCore.setOutput.mock.calls.flat().join(" ")).not.toContain("PRIVATE_TEXT");
       });
 
       it("should fail when readFileSync throws", async () => {

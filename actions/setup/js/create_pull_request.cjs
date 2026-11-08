@@ -27,6 +27,7 @@ const { assembleMarkdownBodyParts } = require("./markdown_body_helpers.cjs");
 const { appendExecutionProvenance, appendReportExecutionProvenance, stripExecutionProvenance } = require("./execution_provenance.cjs");
 const { getBodyHeader, getDisclosureHeader } = require("./messages_header.cjs");
 const { getBodyFooterMessage } = require("./messages_footer.cjs");
+const { getDetectionReasonText } = require("./threat_detection_warning.cjs");
 const { generateHistoryUrl } = require("./generate_history_link.cjs");
 const { normalizeBranchName } = require("./normalize_branch_name.cjs");
 const { pushExtraEmptyCommit } = require("./extra_empty_commit.cjs");
@@ -2719,7 +2720,8 @@ async function main(config = {}) {
           const detectionWarningReviewTemplatePath = getPromptPath("threat_warning_request_changes_review.md");
           requestChangesSections.push(
             buildFallbackIssueBlocks(detectionWarningReviewTemplatePath, {
-              detectionReason,
+              detectionReason: ["threat_detected", "agent_failure", "parse_error"].includes(detectionReason) ? detectionReason : "unknown",
+              reasonText: getDetectionReasonText(detectionReason),
               runUrl,
             })
           );

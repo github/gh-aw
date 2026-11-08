@@ -174,6 +174,7 @@ func TestArcDindThreatDetectionUsesVerifiedBinary(t *testing.T) {
 			for _, dir := range []string{hostDir, pathDir} {
 				require.NoError(t, os.MkdirAll(dir, 0700))
 			}
+			require.NoError(t, os.MkdirAll(filepath.Join(root, "threat-detection-inputs"), 0700))
 			shadow := filepath.Join(pathDir, "threat-detect")
 			require.NoError(t, os.WriteFile(shadow, []byte("#!/bin/bash\nexit 99\n"), 0700))
 			verified := filepath.Join(root, "verified detector")
