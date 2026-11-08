@@ -8,6 +8,7 @@ on:
       - 'pkg/graders/**'
       - 'actions/setup/js/session*'
       - 'scripts/test_harbor_conformance.py'
+      - '.github/workflows/requirements-harbor.*'
       - 'go.mod'
       - 'go.sum'
       - 'Makefile'
@@ -20,6 +21,7 @@ on:
       - 'pkg/graders/**'
       - 'actions/setup/js/session*'
       - 'scripts/test_harbor_conformance.py'
+      - '.github/workflows/requirements-harbor.*'
       - 'go.mod'
       - 'go.sum'
       - 'Makefile'
@@ -52,7 +54,8 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v6
         with:
           node-version: '24'
-      - name: Install pinned Harbor
-        run: python -m pip install harbor==0.25.0
+      - name: Install hash-locked Harbor
+        run: |
+          python -m pip install --require-hashes --only-binary=:all: -r .github/workflows/requirements-harbor.txt
       - name: Validate native Harbor consumption
         run: make test-harbor-conformance

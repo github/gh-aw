@@ -16,8 +16,8 @@ import { queueFixture, REF, WORKFLOW, REPOSITORY, DISPATCHER } from "./work_queu
 
 const CONTRACT = "a".repeat(64);
 const NEW_REF = "b".repeat(40);
-const WORKER_SOURCE = "---\ntools:\n  work-queue:\n    worker: true\n---\nDo approved work.\n";
-const workerLock = (contract = CONTRACT) => `on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\nenv:\n  GH_AW_WORK_QUEUE_CONTRACT: "${contract}"\n`;
+const workerLock = (contract = CONTRACT) =>
+  `# gh-aw-manifest: ${JSON.stringify({ work_queue: { worker: true, logical_contract: contract } })}\non:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\nenv:\n  GH_AW_WORK_QUEUE_CONTRACT: "${contract}"\n`;
 function nativeFile(path, contents) {
   return { data: { type: "file", path, encoding: "base64", content: Buffer.from(contents).toString("base64") } };
 }
@@ -127,10 +127,9 @@ describe("prospective drain-free worker evolution", () => {
         const proposal = futurePolicy(f.state);
         proposal.pools.default.profiles.default.ref = NEW_REF;
         const failure = Object.assign(new Error("metadata read denied"), status === undefined ? {} : { status });
-        const workflow = `on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\nenv:\n  GH_AW_WORK_QUEUE_CONTRACT: "${CONTRACT}"\n`;
         f.githubClient.rest.repos.getContent = vi.fn(async ({ path }) => {
           if (endpoint === "content") throw failure;
-          return nativeFile(path, path.endsWith(".md") ? WORKER_SOURCE : workflow);
+          return nativeFile(path, workerLock());
         });
         f.githubClient.rest.actions.getWorkflow = vi.fn(async () => {
           throw failure;
@@ -272,11 +271,10 @@ describe("prospective drain-free worker evolution", () => {
         [...f.state.works.values()].find(work => work.execution_ref)
       ).reason
     ).toBe("worker_unavailable");
-    const workflow = `on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\nenv:\n  GH_AW_WORK_QUEUE_CONTRACT: "${CONTRACT}"\n`;
     let available = false;
     f.githubClient.rest.repos.getContent = vi.fn(async ({ path }) => {
       if (!available) throw Object.assign(new Error("temporarily unavailable"), { status: 404 });
-      return nativeFile(path, path.endsWith(".md") ? WORKER_SOURCE : workflow);
+      return nativeFile(path, workerLock());
     });
     f.githubClient.rest.actions.getWorkflow = vi.fn(async () => ({ data: { path: WORKFLOW, state: "active" } }));
     const options = {
@@ -329,8 +327,7 @@ describe("prospective drain-free worker evolution", () => {
       const proposal = futurePolicy(f.state);
       proposal.pools.default.profiles.default.ref = NEW_REF;
       f.githubClient.rest.repos.getContent = vi.fn(async ({ path }) => {
-        const workflow = `on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\nenv:\n  GH_AW_WORK_QUEUE_CONTRACT: "${CONTRACT}"\n`;
-        return nativeFile(path, path.endsWith(".md") ? WORKER_SOURCE : workflow);
+        return nativeFile(path, workerLock());
       });
       f.githubClient.rest.actions.getWorkflow = vi.fn(async ({ workflow_id }) => {
         if (workflow_id === "worker.lock.yml" && missing) throw Object.assign(new Error("unregistered worker"), { status: 404 });

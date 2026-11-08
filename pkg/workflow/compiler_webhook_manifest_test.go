@@ -129,3 +129,21 @@ func TestWebhookManifestSerializationFailure(t *testing.T) {
 	require.ErrorContains(t, err, "cannot generate gh-aw-manifest header")
 	assert.Empty(t, header.String(), "compilation must not silently omit an unserializable declaration")
 }
+
+func TestWorkQueueMetadataManifestCompilation(t *testing.T) {
+	const contract = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	data := &WorkflowData{
+		Tools: map[string]any{"work-queue": map[string]any{"worker": true}},
+		WorkQueuePolicy: &WorkQueuePolicyConfig{
+			WorkerContract: contract,
+		},
+	}
+
+	var header strings.Builder
+	require.NoError(t, NewCompiler().generateManifestHeader(&header, data, nil, nil))
+	manifest, err := ExtractGHAWManifestFromLockFile(header.String())
+	require.NoError(t, err)
+	require.NotNil(t, manifest.WorkQueue)
+	assert.True(t, manifest.WorkQueue.Worker)
+	assert.Equal(t, contract, manifest.WorkQueue.LogicalContract)
+}

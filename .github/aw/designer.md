@@ -272,6 +272,7 @@ Before final output, run this internal self-check:
 - `.github/aw/safe-outputs.md` (index → `.github/aw/safe-outputs-content.md`, `.github/aw/safe-outputs-management.md`, `.github/aw/safe-outputs-automation.md`, `.github/aw/safe-outputs-runtime.md`)
 - `.github/aw/network.md`
 - `.github/aw/patterns.md`
+- `.github/aw/index-search.md`
 - `.github/aw/subagents.md`
 - `.github/aw/token-optimization.md`
 - `.github/aw/triggers.md`

@@ -6,9 +6,8 @@ const { defaultPolicy } = require("./work_queue_policy.cjs");
 const { createWorkQueueLogger, queueControlErrorCode, queueControlErrorExplanation } = require("./work_queue_logging.cjs");
 
 const profile = defaultPolicy({ repository: "owner/repo", principal: "1001", ref: "a".repeat(40) }).pools.default.profiles.default;
-const workflow = `on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\nenv:\n  GH_AW_WORK_QUEUE_CONTRACT: "${"b".repeat(64)}"\n`;
-const source = "---\ntools:\n  work-queue:\n    worker: true\n---\n";
-const deploymentEndpoints = ["repository", "reference", "source", "contents", "registration"];
+const workflow = `# gh-aw-manifest: ${JSON.stringify({ work_queue: { worker: true, logical_contract: "b".repeat(64) } })}\non:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\nenv:\n  GH_AW_WORK_QUEUE_CONTRACT: "${"b".repeat(64)}"\n`;
+const deploymentEndpoints = ["repository", "reference", "contents", "registration"];
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -26,11 +25,11 @@ function fixture(failure, endpoint = "contents", failures = 1) {
     let target;
     let data;
     if (parsed.pathname.includes("/contents/")) {
-      target = parsed.pathname.endsWith(".md") ? "source" : "contents";
-      const path = target === "source" ? profile.workflow.replace(/\.lock\.yml$/, ".md") : profile.workflow;
+      target = "contents";
+      const path = profile.workflow;
       expect(decodeURIComponent(parsed.pathname)).toBe(`/repos/owner/repo/contents/${path}`);
       expect(parsed.searchParams.get("ref")).toBe(profile.ref);
-      data = { type: "file", path, encoding: "base64", content: Buffer.from(target === "source" ? source : workflow).toString("base64") };
+      data = { type: "file", path, encoding: "base64", content: Buffer.from(workflow).toString("base64") };
     } else if (parsed.pathname === "/repos/owner/repo") {
       target = "repository";
       data = { full_name: "owner/repo", default_branch: "main" };
