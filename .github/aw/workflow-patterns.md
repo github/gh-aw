@@ -4,6 +4,10 @@ description: Shared design patterns for command workflows, monitoring workflows,
 
 # Workflow Patterns
 
+## Least Privilege for Review-Only and Comment-Only Workflows
+
+- Remove `edit` and other write-capable tools unless changing files is required; keep GitHub access read-only and use `safe-outputs.add-comment` for comments.
+
 ## Command Workflows
 
 ### Prefer `slash_command` when
