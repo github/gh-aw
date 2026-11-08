@@ -124,8 +124,8 @@ func TestNormalizeOutput_DefaultRuntimeVersions(t *testing.T) {
 		`GH_AW_INFO_AGENT_VERSION: "` + string(constants.DefaultPiVersion) + `"`,
 		`GH_AW_INFO_VERSION: "` + string(constants.DefaultCopilotVersion) + `"`,
 		`GH_AW_INFO_AGENT_VERSION: "` + string(constants.DefaultCopilotVersion) + `"`,
-		`run: npm install --ignore-scripts -g @openai/codex@` + string(constants.DefaultCodexVersion),
-		`run: npm install --ignore-scripts -g @earendil-works/pi-coding-agent@` + string(constants.DefaultPiVersion),
+		`run: npm install -g @openai/codex@` + string(constants.DefaultCodexVersion),
+		`run: npm install -g @earendil-works/pi-coding-agent@` + string(constants.DefaultPiVersion),
 		pinnedRuntimeConfig,
 	}, "\n")
 

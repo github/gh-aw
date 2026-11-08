@@ -316,7 +316,8 @@ func TestCodexEngineStableReleaseInstallation(t *testing.T) {
 			steps := NewCodexEngine().GetInstallationSteps(data)
 			require.Len(t, steps, 2)
 			assert.Contains(t, strings.Join(steps[0], "\n"), "Setup Node.js")
-			assert.Contains(t, strings.Join(steps[1], "\n"), "npm install --ignore-scripts -g @openai/codex@"+version)
+			assert.Contains(t, strings.Join(steps[1], "\n"), "npm install -g @openai/codex@"+version)
+			assert.Contains(t, strings.Join(steps[1], "\n"), "NPM_CONFIG_IGNORE_SCRIPTS: 'true'")
 			assert.Contains(t, strings.Join(steps[1], "\n"), "NPM_CONFIG_MIN_RELEASE_AGE: '3'")
 
 			microVM := strings.Join(generateCodexMicroVMCLIInstallStep(data), "\n")

@@ -423,6 +423,11 @@ func TestExtractGHAWManifestFromLockFile(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name:    "trailing JSON returns error",
+			content: `# gh-aw-manifest: {"version":1,"secrets":[],"actions":[]} {}`,
+			wantErr: true,
+		},
+		{
 			name: "manifest embedded in multi-line header",
 			content: `# gh-aw-metadata: {"schema_version":"v3","frontmatter_hash":"abc"}
 # gh-aw-manifest: {"version":1,"secrets":["FOO"],"actions":[]}

@@ -736,13 +736,13 @@ func TestInstallCopilotCLIScriptRootlessModeUsesRealScriptWithToolcacheAndNoSudo
 	installScript := filepath.Join(projectRoot, "actions", "setup", "sh", "install_copilot_cli.sh")
 
 	testCases := []struct {
-		name                string
-		args                []string
-		autoSelect          bool
-		blockedInstall      bool
-		symlinkInstall      bool
-		blockedState        bool
-		staleCleanupFailure bool
+		name               string
+		args               []string
+		autoSelect         bool
+		blockedInstall     bool
+		symlinkInstall     bool
+		blockedState       bool
+		blockSharedCleanup bool
 	}{
 		{name: "rootless flag before version", args: []string{"--rootless", "1.2.3"}},
 		{name: "rootless flag after version", args: []string{"1.2.3", "--rootless"}},
@@ -752,7 +752,7 @@ func TestInstallCopilotCLIScriptRootlessModeUsesRealScriptWithToolcacheAndNoSudo
 		{name: "native runner with legacy root-owned state", args: []string{"1.2.3"}, autoSelect: true, blockedState: true},
 		{name: "explicit rootless with legacy root-owned state", args: []string{"--rootless", "1.2.3"}, blockedState: true},
 		{name: "native runner with inaccessible state directory", args: []string{"1.2.3"}, autoSelect: true, blockedState: true},
-		{name: "native runner with stale privileged AWF directories", args: []string{"1.2.3"}, autoSelect: true, staleCleanupFailure: true},
+		{name: "native runner must not clean shared AWF directories", args: []string{"1.2.3"}, autoSelect: true, blockSharedCleanup: true},
 	}
 
 	for _, tc := range testCases {
@@ -798,9 +798,13 @@ exit 99
 case "$1" in -u) echo 12345 ;; -g) echo 31 ;; *) exit 1 ;; esac
 `), 0o755))
 			}
-			if tc.staleCleanupFailure {
+			sharedCleanupLog := filepath.Join(tempDir, "shared-cleanup.log")
+			if tc.blockSharedCleanup {
 				require.NoError(t, os.WriteFile(filepath.Join(fakeBinDir, "find"), []byte(`#!/usr/bin/env bash
-if [ "${1:-}" = /tmp ]; then exit 1; fi
+if [ "${1:-}" = /tmp ]; then
+  echo "$*" >> "`+sharedCleanupLog+`"
+  exit 1
+fi
 exec /usr/bin/find "$@"
 `), 0o755))
 			}
@@ -842,10 +846,8 @@ exec /usr/bin/find "$@"
 				return
 			}
 			require.NoError(t, err, "install_copilot_cli.sh should succeed in rootless mode with toolcache and no sudo: %s", output)
-			if tc.staleCleanupFailure {
-				assert.Contains(t, string(output), "WARNING: Could not remove stale /tmp/awf-*-chroot-home directories")
-				assert.Contains(t, string(output), "WARNING: Could not remove stale /tmp/awf-chroot-* directories")
-				assert.Contains(t, string(output), "installation will continue")
+			if tc.blockSharedCleanup {
+				assert.NoFileExists(t, sharedCleanupLog, "installation must not traverse shared /tmp for cleanup")
 			}
 
 			assert.Contains(t, string(output), "Using cached GitHub Copilot CLI", "script should use cached copilot CLI")

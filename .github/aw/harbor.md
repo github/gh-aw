@@ -155,15 +155,22 @@ unchanged. Ungraded trials keep `verifier_result: null`.
 
 ### Run the conformance test
 
-Compatibility is pinned to the published **Harbor 0.25.0** package (Python 3.12
-or newer). Harbor is needed only for consumption and conformance testing, not
-for Go export.
+Compatibility is pinned to the published **Harbor 0.25.0** package. The conformance
+dependency lock targets Python 3.12 and includes the complete runtime dependency
+graph and artifact hashes. Installation accepts wheels only, without source
+builds. Harbor is needed only for consumption and conformance testing, not for
+Go export.
 
 ```bash
-python3 -m venv /tmp/gh-aw-harbor
-/tmp/gh-aw-harbor/bin/python -m pip install harbor==0.25.0
+python3.12 -m venv /tmp/gh-aw-harbor
+/tmp/gh-aw-harbor/bin/python -m pip install --require-hashes --only-binary=:all: -r .github/workflows/requirements-harbor.txt
 GH_AW_HARBOR_PYTHON=/tmp/gh-aw-harbor/bin/python make test-harbor-conformance
 ```
+
+To refresh the lock with `uv`, run the command recorded in its header. Review
+the version and hash changes, install in a clean Python 3.12 environment, run
+`python -m pip check`, and rerun conformance before committing the lock. CI uses
+the checked-in lock directly; it does not resolve new versions.
 
 The dedicated Harbor conformance workflow runs this test in CI. It generates an
 export from representative GH-AW session fixtures and validates the relocated

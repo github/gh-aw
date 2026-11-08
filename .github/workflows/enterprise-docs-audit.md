@@ -150,6 +150,15 @@ close, reopen, or otherwise modify prior issues: these are actionable backlog it
 
 Each issue must include:
 
+Use `###` or lower for every heading in the generated issue; reserve h1/h2 for the
+platform-rendered title. Order the body as overview/impact → key issue or metric →
+collapsible detailed evidence → proposed next action or limitation. Keep the
+question, impact, and proposed correction visible. Put long evidence, navigation
+steps, source tables, and logs in
+`<details><summary><b>...</b></summary>...</details>` blocks. Use `- [ ]` for
+follow-up actions and format applicable workflow runs as
+`[§12345](https://github.com/${{ github.repository }}/actions/runs/12345)`.
+
 ### User task and impact
 
 The question, platform (GHEC or GHES and version if verified), runner topology,
@@ -157,18 +166,29 @@ expected answer/path, actual obstacle, and concrete operational consequence.
 
 ### Reproduction and evidence
 
-Numbered home/search/sidebar path, search terms, affected published URLs/anchors,
-observed text or links, and local source paths with exact line ranges. Include
-source links pinned to the recorded checkout SHA, relevant navigation config lines,
-and the source-versus-deployment comparison. State what was verified and what was
-not; do not present an unexecuted command example as a reproduced deployment failure.
+Briefly summarize the verified evidence, then put the numbered home/search/sidebar
+path, search terms, affected published URLs/anchors, observed text or links, local
+source paths with exact line ranges, source links pinned to the recorded checkout
+SHA, relevant navigation config lines, and source-versus-deployment comparison in
+a collapsible block:
+
+<details>
+<summary><b>Reproduction steps and supporting evidence</b></summary>
+
+[Detailed steps and evidence]
+
+</details>
+
+State what was verified and what was not; do not present an unexecuted command
+example as a reproduced deployment failure.
 
 ### Proposed improvement and acceptance criteria
 
 A specific correction, prerequisite, cross-link, sidebar/search change, or
-troubleshooting step. Include testable acceptance criteria: repeat the question-led
-path and identify the now-discoverable, platform-accurate answer. Link prior related
-issues when relevant and summarize the dedup searches.
+troubleshooting step. Include testable acceptance criteria as `- [ ]` checklist
+items: repeat the question-led path and identify the now-discoverable,
+platform-accurate answer. Link prior related issues when relevant and summarize the
+dedup searches.
 
 Use `###` or lower headings in issue bodies; keep the task, impact, and fix visible.
 Put lengthy evidence in a `<details>` block. Avoid mentions and automatic closing

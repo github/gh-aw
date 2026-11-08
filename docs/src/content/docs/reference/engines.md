@@ -41,7 +41,7 @@ The engine, inference provider, and enabled tools determine where repository con
 | Per-command bash allowlist | Yes | Yes | No | Yes | Yes | No |
 | Native MCP | Yes | Yes | Yes | Yes | Yes | Production-conformance gated |
 | Agent Plugins (`plugins`) | Yes | Yes | Yes | No | No | No |
-| Artifact-backed `engine.durable` | Session (CLI/SDK) | Session | Session | Session | Native durable tasks | Session |
+| Artifact-backed `engine.durable` | Session (CLI/SDK) | Session | Session | Session | Session (CLI/SDK/RPC) | Session |
 
 Codex can disable shell execution but cannot enforce a command allowlist. Agy rejects unsupported tool restrictions rather than ignoring them. See individual references for provider-specific web access, bare-mode behavior, and dynamic workflows.
 
@@ -99,19 +99,19 @@ The compiler restores an explicit parent from `aw_context`, or the last successf
 | Codex | Native and archived rollout sessions and exact thread ID | CLI `exec resume <id>` |
 | Gemini | Native temporary session storage and project registry | Prompt points to restored session files |
 | Agy | Native conversation databases | Prompt points to restored session files |
-| Pi | Official Pi Durable task journal and checkpoint | Native task continuation; see [Pi durable runs](/gh-aw/reference/engines/pi/#durable-runs) |
+| Pi CLI, SDK and RPC | Native JSONL conversation session | CLI/RPC `--session`; SDK `SessionManager.open` |
 
-Copilot, Claude, and Codex resume the exact recorded native session with the current workflow prompt and freshly configured credentials, models, and tool policy. Gemini and Agy receive restoration metadata without a forced CLI continuation argument. Continuation guidance limits use to metadata unless historical facts are independently verified against trusted sources for the current task. It does not direct the agent to ingest restored text as prompts or instructions.
+Copilot, Claude, Codex, and Pi resume the exact recorded native session with the current workflow prompt and freshly configured credentials, models, and tool policy. Gemini and Agy receive restoration metadata without a forced CLI continuation argument. Continuation guidance limits use to metadata unless historical facts are independently verified against trusted sources for the current task. It does not direct the agent to ingest restored text as prompts or instructions.
 
 Enabling `engine.durable` opts into reusing potentially attacker-influenced history across runs. Guidance to treat restored files as untrusted factual data is advisory, not deterministic instruction/data isolation; native session resume also reintroduces prior history. Durable continuation does not eliminate cross-run prompt injection.
 
-The first run starts normally when no prior run or implicit checkpoint exists. No continuation notice or resume argument is added without history. Missing explicit-parent artifacts, corrupt restored sessions, and API authorization failures remain errors rather than silently starting unrelated conversations.
+The first run creates a new session when no prior run or implicit checkpoint exists. No continuation notice is added without history. Missing explicit-parent artifacts, corrupt restored sessions, and API authorization failures remain errors rather than silently starting unrelated conversations.
 
-This restores session files, not workspace edits, credentials, or exactly-once tool execution. Pi additionally preserves pending tasks using its native durable library. Existing unified session capture and trace propagation remain enabled; restored Copilot events are excluded from current-run capture and model verification.
+This restores session files, not workspace edits, credentials, pending task phases, or exactly-once tool execution. Existing unified session capture and trace propagation remain enabled; restored Copilot events are excluded from current-run capture and model verification.
 
 Threat detection uses a separate fresh session and does not inherit the primary agent's durable state.
 
-Built-in session-based durable mode rejects replacement commands, drivers, and harnesses because their session files may differ. Ordinary CLI arguments remain supported, but native session selectors and flags that disable persistence cannot override compiler-managed continuation. Copilot cannot override `COPILOT_HOME` because durable mode collects its standard native session directory. Pi has [additional restrictions](/gh-aw/reference/engines/pi/#durable-runs). [Imported engines](/gh-aw/reference/third-party-agent/#durable-execution) must declare their own durable files and execution behavior; unsupported definitions still fail compilation.
+Built-in session-based durable mode rejects replacement commands, custom drivers, and harnesses because their session files may differ. Pi's built-in SDK and RPC drivers remain supported. Ordinary CLI arguments remain supported, but native session selectors and flags that disable persistence cannot override compiler-managed continuation. Copilot cannot override `COPILOT_HOME` because durable mode collects its standard native session directory. Pi has [additional restrictions](/gh-aw/reference/engines/pi/#durable-runs). [Imported engines](/gh-aw/reference/third-party-agent/#durable-execution) must declare their own durable files and execution behavior; unsupported definitions still fail compilation.
 
 Checkpoint artifacts are published after secret redaction and integrity validation. Cancellation or hard runner loss can prevent publication; only the last published checkpoint can be restored.
 
