@@ -52,7 +52,7 @@ func TestAtomicSampleExecution(t *testing.T) {
 		installation.WriteString(strings.Join(step, "\n"))
 	}
 	assert.Contains(t, installation.String(), "@bastani/atomic@"+def.Version)
-	assert.Contains(t, installation.String(), "--ignore-scripts")
+	assert.Contains(t, installation.String(), "NPM_CONFIG_IGNORE_SCRIPTS: 'true'")
 	assert.Contains(t, installation.String(), "atomic --version")
 	for _, step := range engine.GetExecutionSteps(data, "/tmp/atomic.log") {
 		execution.WriteString(strings.Join(step, "\n"))
@@ -425,7 +425,8 @@ func TestAtomicSmokeContract(t *testing.T) {
 	lock, err := os.ReadFile("../../.github/workflows/smoke-atomic.lock.yml")
 	require.NoError(t, err)
 	for _, expected := range []string{
-		"npm install --ignore-scripts -g @bastani/atomic@" + loadAtomicSample(t).Version,
+		"npm install -g @bastani/atomic@" + loadAtomicSample(t).Version,
+		"NPM_CONFIG_IGNORE_SCRIPTS: 'true'",
 		"GH_AW_ENGINE_VERSION: " + loadAtomicSample(t).Version,
 		"ATOMIC_MODEL: copilot/gpt-5.3-codex",
 		"atomic_mcp_config_adapter.cjs", "--exclude-env OPENAI_API_KEY",

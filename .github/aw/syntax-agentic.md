@@ -220,7 +220,7 @@ description: Agentic workflow specific frontmatter fields for GitHub Agentic Wor
     ```
 
 - **`runtimes.node.run-install-scripts:`** - Allow npm pre/post install scripts to execute during package installation for the Node.js runtime (boolean, default: `false`)
-  - By default, `--ignore-scripts` is added to all generated npm install commands to prevent supply chain attacks via malicious install hooks
+  - By default, generated Node.js runtime and engine npm installs disable scripts using `NPM_CONFIG_IGNORE_SCRIPTS: 'true'` for global installs or `--ignore-scripts` for local installs to prevent supply chain attacks via malicious install hooks
   - Set `run-install-scripts: true` under `runtimes.node` to allow scripts for Node.js installs
   - A supply chain security warning is emitted at compile time; in strict mode this is an error
 
