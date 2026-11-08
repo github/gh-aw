@@ -28,6 +28,9 @@ imports:
     - automation
     title-prefix: "[spec-librarian] "
 - shared/go-source-analysis.md
+- uses: shared/pageindex.md
+  with:
+    patterns: "pkg/**/README.md"
 - shared/otlp.md
 safe-outputs:
   create-issue:
@@ -97,6 +100,9 @@ Run direct shell commands for each package in `has_spec` to detect stale specifi
 Run direct shell commands to validate import paths, naming conventions, and dependency graphs.
 Produce `import_issues`, `naming_issues`, and `dependency_issues`.
 Perform terminology consistency analysis (Check 3) using the spec content collected in Phase 1.
+Use the local PageIndex outlines to find related sections across package specifications,
+then read the selected nodes and verify conflicts against the source files.
+Keep the complete package inventory and exhaustive checks; index search is a navigation aid.
 
 ### Check 3: Terminology Consistency
 
