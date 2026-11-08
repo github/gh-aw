@@ -70,12 +70,14 @@ function registerTests({ describe, it }) {
     it("verifies route metadata without parsing workflow YAML", async () => {
       for (const contents of [validYAML, "this is deliberately not workflow YAML", "on: [\n"]) await verifyWorkerRoute(options(nativeRoute(contents)));
     });
-    it("extracts only one consistent literal compiler contract stamp", () => {
+    it("reads only valid worker metadata from the compiler manifest", () => {
       const contract = "a".repeat(64);
-      assert.equal(workerContract(`env:\n  GH_AW_WORK_QUEUE_CONTRACT: "${contract}"\njobs:\n  worker:\n    env:\n      GH_AW_WORK_QUEUE_CONTRACT: "${contract}"\n`), contract);
-      assert.equal(workerContract(`# GH_AW_WORK_QUEUE_CONTRACT: "${contract}"\n`), undefined);
-      assert.equal(workerContract(`env:\n  GH_AW_WORK_QUEUE_CONTRACT: "${contract}"\nenv:\n  GH_AW_WORK_QUEUE_CONTRACT: "${"b".repeat(64)}"\n`), undefined);
-      assert.equal(workerContract("env:\n  GH_AW_WORK_QUEUE_CONTRACT: ${{ inputs.contract }}\n"), undefined);
+      const metadata = JSON.stringify({ work_queue: { worker: true, logical_contract: contract } });
+      assert.equal(workerContract(`# gh-aw-manifest: ${metadata}\non: [\n`), contract);
+      assert.equal(workerContract(`# gh-aw-manifest: ${JSON.stringify({ work_queue: { worker: false, logical_contract: contract } })}`), undefined);
+      assert.equal(workerContract(`# gh-aw-manifest: ${JSON.stringify({ work_queue: { worker: true } })}`), undefined);
+      assert.equal(workerContract("# gh-aw-manifest: invalid"), undefined);
+      assert.equal(workerContract(`# gh-aw-manifest: ${metadata}\n# gh-aw-manifest: ${metadata}`), undefined);
     });
     it("rejects constructor revisions without a native read", async () => {
       for (const ref of ["0".repeat(40), "0".repeat(64)]) {
@@ -223,16 +225,16 @@ function registerTests({ describe, it }) {
           };
           const { verifyWorkerRoute, verifiedDefaultReference, configuredWorkerDeployment } = require(process.argv[1]);
           const profile = {...JSON.parse(process.argv[2]), logical_contract: "a".repeat(64)};
-          const bytes = Buffer.from(process.argv[3] + 'env:\\n  GH_AW_WORK_QUEUE_CONTRACT: "' + profile.logical_contract + '"\\n', "utf8");
+          const bytes = Buffer.from('# gh-aw-manifest: ' + JSON.stringify({work_queue: {worker: true, logical_contract: profile.logical_contract}}) + '\\n', "utf8");
           let reads = 0;
           const githubClient = {rest: {
             repos: {
               get: async () => ({data: {full_name: "owner/repo", default_branch: "main"}}),
               getContent: async ({path, ref}) => {
-              assert.ok([profile.workflow, profile.workflow.replace(/\\.lock\\.yml$/, ".md")].includes(path));
+              assert.equal(path, profile.workflow);
               assert.equal(ref, profile.ref);
               reads++;
-              const content = path.endsWith(".md") ? Buffer.from("---\\ntools:\\n  work-queue:\\n    worker: true\\n---\\nApproved work.\\n") : bytes;
+              const content = bytes;
               return {data: {type: "file", path, encoding: "base64",
                 content: content.toString("base64"), size: content.length}};
             }},
@@ -249,11 +251,11 @@ function registerTests({ describe, it }) {
               assert.equal(revision, profile.ref);
               const route = await configuredWorkerDeployment(options, revision);
               assert.deepEqual(route, {profile, available: true});
-              assert.equal(reads, 5);
+              assert.equal(reads, 4);
             })
             .catch(error => { console.error(error); process.exitCode = 1; });
         `;
-        const result = spawnSync(process.execPath, ["-e", script, path.join(directory, "work_queue_provisioning.cjs"), JSON.stringify(profile), validYAML], { encoding: "utf8", env: { ...process.env, NODE_PATH: "" } });
+        const result = spawnSync(process.execPath, ["-e", script, path.join(directory, "work_queue_provisioning.cjs"), JSON.stringify(profile)], { encoding: "utf8", env: { ...process.env, NODE_PATH: "" } });
         assert.equal(result.status, 0, result.stderr);
         assert.equal(fs.existsSync(path.join(directory, "node_modules")), false);
       } finally {

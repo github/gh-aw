@@ -66,77 +66,18 @@ async function verifyRegisteredWorker({ githubClient, owner, repo, profile, slee
 }
 
 function workerContract(contents) {
-  const contracts = [];
-  for (const line of contents.split(/\r?\n/)) {
-    const field = /^\s*GH_AW_WORK_QUEUE_CONTRACT:\s*(.*?)\s*$/.exec(line);
-    if (!field) continue;
-    const stamp = /^"([a-f0-9]{64})"$/.exec(field[1])?.[1];
-    if (!stamp) return undefined;
-    contracts.push(stamp);
+  const prefix = "# gh-aw-manifest: ";
+  const manifestLines = contents.match(/^# gh-aw-manifest: .+$/gm) ?? [];
+  if (manifestLines.length !== 1) return undefined;
+  let manifest;
+  try {
+    manifest = JSON.parse(manifestLines[0].slice(prefix.length));
+  } catch {
+    return undefined;
   }
-  return contracts.length && new Set(contracts).size === 1 ? contracts[0] : undefined;
-}
-
-function sourceIsWorker(contents) {
-  const lines = contents.split(/\r?\n/);
-  if (lines[0]?.replace(/^\uFEFF/, "").trim() !== "---") return false;
-  const end = lines.findIndex((line, index) => index > 0 && line.trim() === "---");
-  if (end < 0) return false;
-
-  let toolsIndent;
-  let toolsChildIndent;
-  let queueIndent;
-  let queueChildIndent;
-  let toolsCount = 0;
-  let queueCount = 0;
-  let workerCount = 0;
-  let worker = false;
-  for (const line of lines.slice(1, end)) {
-    if (/^\s*(?:#.*)?$/.test(line)) continue;
-    const match = /^( *)(?:"([^"]+)"|'([^']+)'|([A-Za-z0-9_-]+))\s*:(.*)$/.exec(line);
-    if (!match) continue;
-    const indent = match[1].length;
-    const key = match[2] ?? match[3] ?? match[4];
-    const value = match[5].trim();
-    if (indent === 0) {
-      if (key === "tools") {
-        toolsCount++;
-        if ((value && !value.startsWith("#")) || toolsCount > 1) return false;
-        toolsIndent = indent;
-        toolsChildIndent = undefined;
-        queueIndent = undefined;
-        queueChildIndent = undefined;
-      } else {
-        toolsIndent = undefined;
-        toolsChildIndent = undefined;
-        queueIndent = undefined;
-        queueChildIndent = undefined;
-      }
-      continue;
-    }
-    if (toolsIndent === undefined) continue;
-    if (toolsChildIndent === undefined || indent < toolsChildIndent) toolsChildIndent = indent;
-    if (key === "work-queue") {
-      queueCount++;
-      if (indent !== toolsChildIndent || (value && !value.startsWith("#")) || queueCount > 1) return false;
-      queueIndent = indent;
-      queueChildIndent = undefined;
-      continue;
-    }
-    if (queueIndent === undefined) continue;
-    if (indent <= queueIndent) {
-      queueIndent = undefined;
-      queueChildIndent = undefined;
-      continue;
-    }
-    if (queueChildIndent === undefined || indent < queueChildIndent) queueChildIndent = indent;
-    if (key === "worker") {
-      workerCount++;
-      if (indent !== queueChildIndent || !/^true(?:\s+#.*)?$/.test(value) || workerCount > 1) return false;
-      worker = true;
-    }
-  }
-  return toolsCount === 1 && queueCount === 1 && workerCount === 1 && worker;
+  if (!isRecord(manifest) || !isRecord(manifest.work_queue) || manifest.work_queue.worker !== true) return undefined;
+  const contract = manifest.work_queue.logical_contract;
+  return typeof contract === "string" && /^[a-f0-9]{64}$/.test(contract) ? contract : undefined;
 }
 
 async function verifiedDefaultReference({ githubClient, owner, repo, sleepFn = delay => new Promise(resolve => setTimeout(resolve, delay)) }) {
@@ -157,8 +98,6 @@ async function configuredWorkerDeployment(options, revision) {
   const current = options.profile;
   let profile = current;
   try {
-    const source = current.workflow.replace(/\.lock\.yml$/, ".md");
-    if (!sourceIsWorker(await readWorkerFile({ ...options, path: source, ref: revision }))) return { profile, available: false };
     const contents = await readWorkerFile({ ...options, path: current.workflow, ref: revision });
     const contract = workerContract(contents);
     if (!contract) return { profile, available: false };
