@@ -26,12 +26,6 @@ network:
 sandbox:
   agent:
     id: awf
-    config:
-      filesystem:
-        allow-write:
-          - /workspace/.github/workflows
-          - /workspace/actions/setup/js
-          - /workspace/pkg/workflow
 tools:
   cli-proxy: true
   github:
