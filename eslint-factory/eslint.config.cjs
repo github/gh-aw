@@ -3,7 +3,7 @@ const plugin = require("./dist/index.js");
 module.exports = [
   {
     files: ["*.cjs", "**/*.cjs"],
-    ignores: ["**/*.test.cjs", "**/*.test.js"],
+    ignores: ["**/*.test.cjs", "**/*.test.js", "**/work_queue_yaml.cjs"],
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "commonjs",
