@@ -209,7 +209,6 @@ describe("bounded daily and weekly discussion-report portfolio", () => {
       "daily-news",
       "daily-arxiv-researcher",
       "daily-cache-strategy-analyzer",
-      "daily-hippo-learn",
       "org-health-report",
       "portfolio-analyst",
       "archivx-agentic-workflows-analyzer",
