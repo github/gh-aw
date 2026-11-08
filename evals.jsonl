@@ -5260,3 +5260,6 @@
 {"id":"adr-check-performed","question":"Does the agent output confirm that it checked for existing ADRs before deciding on an action?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-08T17:39:35.027Z","runid":"42505627858"}
 {"id":"action-taken","question":"Did the agent add a PR comment, push a draft ADR, or call noop?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-08T17:39:35.027Z","runid":"42505627858"}
 {"id":"decision-justified","question":"Does the agent output explain why an ADR is required or why no ADR gate was triggered for this PR?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-08T17:39:35.027Z","runid":"42505627858"}
+{"id":"adr-check-performed","question":"Does the agent output confirm that it checked for existing ADRs before deciding on an action?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-08T17:39:50.079Z","runid":"42505665262"}
+{"id":"action-taken","question":"Did the agent add a PR comment, push a draft ADR, or call noop?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-08T17:39:50.079Z","runid":"42505665262"}
+{"id":"decision-justified","question":"Does the agent output explain why an ADR is required or why no ADR gate was triggered for this PR?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-08T17:39:50.079Z","runid":"42505665262"}
