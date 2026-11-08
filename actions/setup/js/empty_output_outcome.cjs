@@ -234,6 +234,7 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
     // Ignore missing CLI audit evidence for workflows using MCP directly.
   }
   let driverExitCode;
+  let lastAgentAction = "not recorded";
   let lastToolCallStatus = "not recorded";
   let lastToolExitCode;
   let failedToolCalls = 0;
@@ -256,12 +257,18 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
     /** @type {any} */
     const data = event.data;
     const context = sessionContext(event);
-    if (event.type === "assistant.refusal" && data.reason === "content_filter" && context.agentId === undefined && !context.parentToolUseId) {
-      contentFiltered = true;
-      diagnostics.add("The model response was blocked by content filtering; task completion could not be confirmed.");
+    if (event.type === "assistant.refusal" && context.agentId === undefined && !context.parentToolUseId) {
+      if (data.reason === "content_filter") {
+        contentFiltered = true;
+        diagnostics.add("The model response was blocked by content filtering; task completion could not be confirmed.");
+      }
+      lastAgentAction = "assistant refusal recorded";
+    } else if (event.type === "assistant.message" && context.agentId === undefined && !context.parentToolUseId) {
+      lastAgentAction = "assistant response recorded";
     } else if (event.type === "tool.execution_start") {
       lastToolCallStatus = "started (completion not recorded)";
       lastToolExitCode = undefined;
+      lastAgentAction = "tool call started (completion not recorded)";
     } else if (event.type === "tool.execution_complete") {
       const failed =
         data.success === false ||
@@ -275,6 +282,7 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
         (typeof data.exitCode === "number" && data.exitCode !== 0);
       lastToolCallStatus = failed ? "failed" : data.success === true || data.exitCode === 0 ? "succeeded" : "completed (outcome unknown)";
       lastToolExitCode = Number.isSafeInteger(data.exitCode) && data.exitCode >= 0 && data.exitCode <= 255 ? data.exitCode : undefined;
+      lastAgentAction = `tool call ${lastToolCallStatus}`;
       if (failed) failedToolCalls++;
     } else if (event.type === "guard.tool_denials_exceeded") {
       toolDenialLimitExceeded = true;
@@ -401,6 +409,7 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
           `Failure classification: ${failureCause}`,
           ...(driverExitCode !== undefined ? [`Driver exit code: ${driverExitCode}`] : []),
           ...(lastToolCallStatus !== "not recorded" ? [`Last tool call status: ${lastToolCallStatus}`] : []),
+          ...(lastAgentAction !== "not recorded" && !lastAgentAction.startsWith("tool call ") ? [`Last agent action: ${lastAgentAction}`] : []),
           ...(lastToolExitCode !== undefined ? [`Last tool exit code: ${lastToolExitCode}`] : []),
           ...(failedToolCalls ? [`Failed tool calls observed: ${failedToolCalls}`] : []),
           ...observedCompletionEvidence,
@@ -420,6 +429,7 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
               ]
             : []),
           `Last tool call status: ${lastToolCallStatus}`,
+          ...(lastAgentAction !== "not recorded" && !lastAgentAction.startsWith("tool call ") ? [`Last agent action: ${lastAgentAction}`] : []),
           ...(lastToolExitCode !== undefined ? [`Last tool exit code: ${lastToolExitCode}`] : []),
           `Failed tool calls observed: ${failedToolCalls}`,
           `Token budget state: ${executionCategories.includes("effective_tokens_limit_exceeded") ? "exceeded" : "unknown (no exhaustion signal recorded)"}`,

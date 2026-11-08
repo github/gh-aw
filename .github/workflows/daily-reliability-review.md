@@ -17,6 +17,9 @@ sandbox:
 tracker-id: daily-reliability-review
 engine:
   id: copilot
+  model-routing:
+    goal: cost
+    mode: economy
   copilot-sdk: true
 strict: true
 network:
