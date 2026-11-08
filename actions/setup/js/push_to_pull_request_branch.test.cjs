@@ -176,6 +176,9 @@ describe("push_to_pull_request_branch.cjs", () => {
     // Default GitHub API mock
     mockGithub = {
       rest: {
+        apps: {
+          getAuthenticated: vi.fn().mockResolvedValue({ data: { slug: "test-app" } }),
+        },
         pulls: {
           get: vi.fn().mockResolvedValue({
             data: {
@@ -217,6 +220,10 @@ describe("push_to_pull_request_branch.cjs", () => {
               html_url: "https://github.com/test-owner/test-repo/issues/456",
             },
           }),
+          createComment: vi.fn().mockResolvedValue({ data: { id: 123 } }),
+        },
+        users: {
+          getAuthenticated: vi.fn().mockResolvedValue({ data: { login: "test-user" } }),
         },
       },
       graphql: vi.fn(),
@@ -4016,6 +4023,16 @@ ${diffs}
 `;
     }
 
+    function makeFallbackIssue(overrides = {}) {
+      return {
+        number: 789,
+        html_url: "https://github.com/test-owner/test-repo/issues/789",
+        body: ["Target Pull Request: [#123](https://github.com/test-owner/test-repo/pull/123)", "<!-- gh-aw-agentic-workflow: Workflow -->", "<!-- gh-aw-execution: {} -->"].join("\n"),
+        user: { login: "test-app[bot]" },
+        ...overrides,
+      };
+    }
+
     it("should reject files outside the allowed-files allowlist", async () => {
       const patchPath = createPatchFile("should-reject-files-outside-the-allowed-files-allowlist", createPatchWithFiles("src/index.js"));
 
@@ -4157,15 +4174,7 @@ ${diffs}
 
     it("should reuse an open protected-file fallback issue for the same pull request", async () => {
       createPatchFile("should-reuse-an-open-protected-file-fallback-issue", createPatchWithFiles("package.json"));
-      mockGithub.rest.issues.listForRepo.mockResolvedValue({
-        data: [
-          {
-            number: 789,
-            html_url: "https://github.com/test-owner/test-repo/issues/789",
-            body: "Target Pull Request: [#123](https://github.com/test-owner/test-repo/pull/123)",
-          },
-        ],
-      });
+      mockGithub.rest.issues.listForRepo.mockResolvedValue({ data: [makeFallbackIssue()] });
 
       const module = await loadModule();
       const handler = await module.main({
@@ -4188,6 +4197,116 @@ ${diffs}
         })
       );
       expect(mockGithub.rest.issues.create).not.toHaveBeenCalled();
+      expect(mockGithub.rest.issues.createComment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          owner: "test-owner",
+          repo: "test-repo",
+          issue_number: 789,
+          body: expect.stringContaining("gh-aw-execution:"),
+        })
+      );
+    });
+
+    it("should identify the issue creator from a user token when app authentication is unavailable", async () => {
+      createPatchFile("should-identify-issue-creator-from-user-token", createPatchWithFiles("package.json"));
+      mockGithub.rest.apps.getAuthenticated.mockRejectedValue(new Error("Not authenticated as a GitHub App"));
+      mockGithub.rest.issues.listForRepo.mockResolvedValue({ data: [makeFallbackIssue({ user: { login: "test-user" } })] });
+
+      const module = await loadModule();
+      const handler = await module.main({
+        protected_files: ["package.json"],
+        protected_files_policy: "fallback-to-issue",
+      });
+      const result = await handler({ branch: "should-identify-issue-creator-from-user-token" }, {});
+
+      expect(result.issue_number).toBe(789);
+      expect(mockGithub.rest.users.getAuthenticated).toHaveBeenCalledOnce();
+      expect(mockGithub.rest.issues.create).not.toHaveBeenCalled();
+      expect(mockGithub.rest.issues.createComment).toHaveBeenCalledOnce();
+    });
+
+    it("should not reuse matching issues without trusted provenance and the authenticated author", async () => {
+      createPatchFile("should-not-reuse-untrusted-protected-file-fallback-issues", createPatchWithFiles("package.json"));
+      mockGithub.rest.issues.listForRepo.mockResolvedValue({
+        data: [
+          makeFallbackIssue({ body: "Target Pull Request: [#123](https://github.com/test-owner/test-repo/pull/12)" }),
+          makeFallbackIssue({ pull_request: { url: "https://api.github.com/repos/test-owner/test-repo/pulls/123" } }),
+          makeFallbackIssue({ body: "Target Pull Request: [#123](https://github.com/test-owner/test-repo/pull/123)" }),
+          makeFallbackIssue({ user: { login: "untrusted[bot]" } }),
+        ],
+      });
+
+      const module = await loadModule();
+      const handler = await module.main({
+        protected_files: ["package.json"],
+        protected_files_policy: "fallback-to-issue",
+      });
+      const result = await handler({ branch: "should-not-reuse-untrusted-protected-file-fallback-issues" }, {});
+
+      expect(result.success).toBe(true);
+      expect(mockGithub.rest.issues.listForRepo).toHaveBeenCalledTimes(1);
+      expect(mockGithub.rest.issues.create).toHaveBeenCalledTimes(1);
+      expect(mockGithub.rest.issues.createComment).not.toHaveBeenCalled();
+    });
+
+    it("should find a trusted fallback issue on the next page", async () => {
+      createPatchFile("should-find-trusted-fallback-issue-on-next-page", createPatchWithFiles("package.json"));
+      const existingIssue = makeFallbackIssue();
+      mockGithub.rest.issues.listForRepo.mockImplementation(({ page }) =>
+        Promise.resolve({
+          data: page === 1 ? Array.from({ length: 100 }, (_, index) => makeFallbackIssue({ number: index + 1, body: "Different PR" })) : [existingIssue],
+        })
+      );
+
+      const module = await loadModule();
+      const handler = await module.main({
+        protected_files: ["package.json"],
+        protected_files_policy: "fallback-to-issue",
+      });
+      const result = await handler({ branch: "should-find-trusted-fallback-issue-on-next-page" }, {});
+
+      expect(result.issue_number).toBe(789);
+      expect(mockGithub.rest.issues.listForRepo).toHaveBeenCalledTimes(2);
+      expect(mockGithub.rest.issues.listForRepo.mock.calls.map(([parameters]) => parameters.page)).toEqual([1, 2]);
+      expect(mockGithub.rest.issues.create).not.toHaveBeenCalled();
+    });
+
+    it("should fail closed when fallback issue lookup reaches the page limit", async () => {
+      createPatchFile("should-fail-closed-when-fallback-lookup-reaches-page-limit", createPatchWithFiles("package.json"));
+      mockGithub.rest.issues.listForRepo.mockResolvedValue({
+        data: Array.from({ length: 100 }, (_, index) => makeFallbackIssue({ number: index + 1, body: "Different PR" })),
+      });
+
+      const module = await loadModule();
+      const handler = await module.main({
+        protected_files: ["package.json"],
+        protected_files_policy: "fallback-to-issue",
+      });
+      const result = await handler({ branch: "should-fail-closed-when-fallback-lookup-reaches-page-limit" }, {});
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("maximum number of pages");
+      expect(mockGithub.rest.issues.listForRepo).toHaveBeenCalledTimes(5);
+      expect(mockGithub.rest.issues.create).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["non-array response", { data: {} }],
+      ["malformed issue entry", { data: [null] }],
+    ])("should fail closed when fallback issue lookup returns an invalid response: %s", async (_description, response) => {
+      createPatchFile("should-fail-closed-when-fallback-lookup-response-is-invalid", createPatchWithFiles("package.json"));
+      mockGithub.rest.issues.listForRepo.mockResolvedValue(response);
+
+      const module = await loadModule();
+      const handler = await module.main({
+        protected_files: ["package.json"],
+        protected_files_policy: "fallback-to-issue",
+      });
+      const result = await handler({ branch: "should-fail-closed-when-fallback-lookup-response-is-invalid" }, {});
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("invalid response");
+      expect(mockGithub.rest.issues.create).not.toHaveBeenCalled();
     });
 
     it("should not create a protected-file fallback issue when duplicate lookup fails", async () => {
@@ -4206,7 +4325,7 @@ ${diffs}
       expect(mockGithub.rest.issues.create).not.toHaveBeenCalled();
     });
 
-    it("should treat a rate-limited fallback issue lookup as not found", async () => {
+    it("should fail closed when fallback issue lookup is rate limited", async () => {
       createPatchFile("should-treat-rate-limited-fallback-issue-lookup-as-not-found", createPatchWithFiles("package.json"));
       const rateLimitError = new Error("API rate limit exceeded");
       rateLimitError.status = 429;
@@ -4219,9 +4338,10 @@ ${diffs}
       });
       const result = await handler({ branch: "should-treat-rate-limited-fallback-issue-lookup-as-not-found" }, {});
 
-      expect(result.success).toBe(true);
-      expect(mockGithub.rest.issues.create).toHaveBeenCalledTimes(1);
-      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("treating it as not found"));
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("API rate limit exceeded");
+      expect(mockGithub.rest.issues.create).not.toHaveBeenCalled();
+      expect(mockGithub.rest.issues.createComment).not.toHaveBeenCalled();
     });
 
     it.each([

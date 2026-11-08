@@ -16,7 +16,7 @@ const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { pushSignedCommits } = require("./push_signed_commits.cjs");
 const { updateActivationCommentWithCommit, updateActivationComment } = require("./update_activation_comment.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { withRetry, isRateLimitError, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
+const { withRetry, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
 const { normalizeBranchName } = require("./normalize_branch_name.cjs");
 const { pushExtraEmptyCommit } = require("./extra_empty_commit.cjs");
 const { detectForkPR, checkBranchPushable } = require("./pr_helpers.cjs");
@@ -48,6 +48,7 @@ const { buildManualBranchApplyCommands, buildFallbackIssueBlocks, withTransientP
 const HANDLER_TYPE = "push_to_pull_request_branch";
 const MAX_BUNDLE_PARENT_COMPARISONS = 4;
 const MAX_BUNDLE_HISTORY_COMMITS = 100;
+const MAX_FALLBACK_ISSUE_LOOKUP_PAGES = 5;
 const BUNDLE_VALIDATION_TIMEOUT_MS = 5000;
 const BUNDLE_VALIDATION_MAX_OUTPUT = 1024 * 1024;
 
@@ -1086,35 +1087,54 @@ async function main(config = {}) {
 
       try {
         const targetPullRequestUrl = `${githubServer}/${repoParts.owner}/${repoParts.repo}/pull/${pullNumber}`;
+        const appIdentity = await githubClient.rest.apps.getAuthenticated().catch(() => null);
+        const authenticatedLogin = typeof appIdentity?.data?.slug === "string" && appIdentity.data.slug ? `${appIdentity.data.slug}[bot]` : (await githubClient.rest.users.getAuthenticated()).data?.login;
+        if (typeof authenticatedLogin !== "string" || !authenticatedLogin) {
+          throw new Error(`${ERR_API}: Could not determine the authenticated issue creator`);
+        }
         let existingIssue;
-        for (let page = 1; ; page++) {
-          let response;
-          try {
-            response = await githubClient.rest.issues.listForRepo({
-              owner: repoParts.owner,
-              repo: repoParts.repo,
-              state: "open",
-              labels: "pull-request-fallback",
-              per_page: 100,
-              page,
-            });
-          } catch (lookupError) {
-            if (!isRateLimitError(lookupError)) {
-              throw lookupError;
-            }
-            core.warning(`Protected-file fallback issue lookup was rate limited; treating it as not found`);
-            break;
-          }
-          if (!Array.isArray(response?.data)) {
+        let lookupComplete = false;
+        for (let page = 1; page <= MAX_FALLBACK_ISSUE_LOOKUP_PAGES; page++) {
+          const response = await githubClient.rest.issues.listForRepo({
+            owner: repoParts.owner,
+            repo: repoParts.repo,
+            state: "open",
+            labels: "pull-request-fallback",
+            per_page: 100,
+            page,
+          });
+          if (!Array.isArray(response?.data) || response.data.some(item => !item || typeof item !== "object" || !Number.isInteger(item.number) || typeof item.html_url !== "string")) {
             throw new Error(`${ERR_API}: Protected-file fallback issue lookup returned an invalid response`);
           }
-          existingIssue = response.data.find(item => !item.pull_request && item.body?.includes(`](${targetPullRequestUrl})`));
-          if (existingIssue || response.data.length < 100) {
+          existingIssue = response.data.find(
+            item =>
+              !item?.pull_request &&
+              item?.user?.login === authenticatedLogin &&
+              typeof item.body === "string" &&
+              item.body.includes(`](${targetPullRequestUrl})`) &&
+              item.body.includes("<!-- gh-aw-agentic-workflow:") &&
+              item.body.includes("<!-- gh-aw-execution:")
+          );
+          if (existingIssue) {
+            break;
+          }
+          if (response.data.length < 100) {
+            lookupComplete = true;
             break;
           }
         }
+        if (!existingIssue && !lookupComplete) {
+          throw new Error(`${ERR_API}: Protected-file fallback issue lookup reached the maximum number of pages`);
+        }
         let issue = existingIssue;
         if (issue) {
+          transport.assertUnchanged();
+          await githubClient.rest.issues.createComment({
+            owner: repoParts.owner,
+            repo: repoParts.repo,
+            issue_number: issue.number,
+            body: renderSizedReport(issueReport).body,
+          });
           core.info(`Reusing protected-file-protection review issue #${issue.number}: ${issue.html_url}`);
         } else {
           const created = await withRetry(
