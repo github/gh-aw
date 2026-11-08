@@ -26,7 +26,7 @@ const {
   extractDeniedCommands,
   buildMissingToolPermissionIssuePayload,
   buildCodexChildEnv,
-  hasCodexAzureOIDCProxy,
+  hasCodexOIDCProxy,
   resolveSafeCodexConfigPath,
   extractPortFromURL,
   extractOpenAIProxyBaseURLFromToml,
@@ -202,6 +202,29 @@ describe("codex_harness.cjs", () => {
       expect(calls).toHaveLength(1);
     });
 
+    describe("OpenAI WIF", () => {
+      const env = { CODEX_API_KEY: "", OPENAI_API_KEY: "", GH_AW_CODEX_OIDC_AUTH: "openai", AWF_REFLECT_ENABLED: "1", GH_AW_LLM_PROVIDER: "openai" };
+      const endpoint = { provider: "openai", configured: true, auth_type: "github-oidc/openai", port: 10000, models_url: "http://api-proxy:10000/v1/models", models: ["gpt-5.4"] };
+      const config = 'model_provider = "openai-proxy"\n[model_providers.openai-proxy]\nbase_url = "http://172.30.0.30:10000"\nwire_api = "responses"\nrequires_openai_auth = false\n';
+
+      it("runs without API keys through the configured OpenAI WIF proxy", () => {
+        const { result, calls } = runHarnessFixture(
+          'const config=fs.readFileSync(process.env.CODEX_HOME+"/config.toml","utf8");if(process.env.CODEX_API_KEY||process.env.OPENAI_API_KEY||config.includes("env_key")||!config.includes("http://api-proxy:10000"))process.exitCode=1;',
+          { env, reflectData: { endpoints: [endpoint] }, config }
+        );
+        expect(result.status).toBe(0);
+        expect(calls).toHaveLength(1);
+      });
+
+      it("requires the OpenAI WIF policy and endpoint authentication", () => {
+        expect(hasCodexOIDCProxy({ endpoints: [endpoint] }, env, "openai")).toBe(true);
+        expect(hasCodexOIDCProxy({ endpoints: [{ ...endpoint, auth_type: "static-key" }] }, env, "openai")).toBe(false);
+        expect(hasCodexOIDCProxy({ endpoints: [endpoint] }, { ...env, AWF_REFLECT_ENABLED: "0" }, "openai")).toBe(false);
+        expect(hasCodexOIDCProxy({ endpoints: [endpoint] }, { ...env, GH_AW_CODEX_OIDC_AUTH: "" }, "openai")).toBe(false);
+        expect(hasCodexOIDCProxy({ endpoints: [endpoint] }, env, "azure")).toBe(false);
+      });
+    });
+
     it.each([
       ["unconfigured", { ...endpoint, configured: false }],
       ["static key", { ...endpoint, auth_type: "static-key" }],
@@ -242,10 +265,10 @@ describe("codex_harness.cjs", () => {
     });
 
     it("requires the compiler policy and firewall even with OIDC reflection", () => {
-      expect(hasCodexAzureOIDCProxy({ endpoints: [endpoint] }, env)).toBe(true);
-      expect(hasCodexAzureOIDCProxy({ endpoints: [endpoint] }, { ...env, GH_AW_CODEX_OIDC_AUTH: "" })).toBe(false);
-      expect(hasCodexAzureOIDCProxy({ endpoints: [endpoint] }, { ...env, AWF_REFLECT_ENABLED: "0" })).toBe(false);
-      expect(hasCodexAzureOIDCProxy({ endpoints: [endpoint] }, { ...env, GH_AW_LLM_PROVIDER: "github" })).toBe(false);
+      expect(hasCodexOIDCProxy({ endpoints: [endpoint] }, env, "azure")).toBe(true);
+      expect(hasCodexOIDCProxy({ endpoints: [endpoint] }, { ...env, GH_AW_CODEX_OIDC_AUTH: "" }, "azure")).toBe(false);
+      expect(hasCodexOIDCProxy({ endpoints: [endpoint] }, { ...env, AWF_REFLECT_ENABLED: "0" }, "azure")).toBe(false);
+      expect(hasCodexOIDCProxy({ endpoints: [endpoint] }, { ...env, GH_AW_LLM_PROVIDER: "github" }, "azure")).toBe(false);
     });
 
     it("checks the endpoint that will actually be selected", () => {

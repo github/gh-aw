@@ -46,7 +46,7 @@ func (c *Compiler) buildPrepareDetectionEngineConfigForExternalDetectorStep(data
 	// OpenAI (10000) or Copilot (10002) ingress can serve it.
 	codexAPIBase := NewCodexEngine().getOpenAIProxyProviderBaseURL(detectionData)
 	codexWSSBase := codexProxyWebsocketBaseURL(codexAPIBase)
-	codexConfig := buildExternalDetectorCodexConfig(codexAPIBase, codexWSSBase, isCodexAzureOIDC(detectionData))
+	codexConfig := buildExternalDetectorCodexConfig(codexAPIBase, codexWSSBase, isCodexAzureOIDC(detectionData) || isCodexOpenAIWIF(detectionData))
 	codexConfigDelimiter := GenerateHeredocDelimiterFromContent("CODEX_DETECTION_CONFIG", codexConfig)
 
 	return []string{
@@ -274,9 +274,9 @@ func (c *Compiler) buildPullAWFContainersStep(data *WorkflowData) []string {
 	}
 
 	// Split the generated YAML into individual lines so each is a separate entry
-	lines := strings.Split(b.String(), "\n")
 	var steps []string
-	for _, line := range lines {
+	for line := range strings.Lines(b.String()) {
+		line = strings.TrimSuffix(line, "\n")
 		if line != "" {
 			steps = append(steps, line+"\n")
 		}
@@ -626,8 +626,8 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 	// no longer writes any step-summary output (see
 	// github/gh-aw-threat-detection#792), so the flag is intentionally omitted here.
 	npmPathSetup := GetNpmBinPathSetup()
-	if engineID == "codex" && isCodexAzureOIDC(threatDetectionData) {
-		npmPathSetup += " && " + codexAzureOIDCReflectionGuard()
+	if engineID == "codex" && (isCodexAzureOIDC(threatDetectionData) || isCodexOpenAIWIF(threatDetectionData)) {
+		npmPathSetup += " && " + codexOIDCReflectionGuard(threatDetectionData.EngineConfig.Auth.Provider)
 	}
 	threatDetectCmd := buildThreatDetectCommand(npmPathSetup, engineID, data.SafeOutputs.ThreatDetection, isArcDindTopology(threatDetectionData))
 
@@ -724,17 +724,19 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 	return append(c.buildTokenBrokerRequestStep(threatDetectionData, detectionExecutionCondition), steps...)
 }
 
-func codexAzureOIDCReflectionGuard() string {
-	script := `fetch("http://api-proxy:10000/reflect", { signal: AbortSignal.timeout(60000) }).then(async response => {
+func codexOIDCReflectionGuard(provider string) string {
+	authType := strconv.Quote("github-oidc/" + provider)
+	errorMessage := strconv.Quote("No configured OpenAI endpoint uses github-oidc/" + provider)
+	script := fmt.Sprintf(`fetch("http://api-proxy:10000/reflect", { signal: AbortSignal.timeout(60000) }).then(async response => {
   if (!response.ok) throw new Error("AWF /reflect request failed");
   const reflectData = await response.json();
   const endpoints = Array.isArray(reflectData?.endpoints) ? reflectData.endpoints.filter(endpoint => endpoint?.configured === true) : [];
   const endpoint = endpoints.find(candidate => String(candidate?.provider || "").trim().toLowerCase() === "openai");
-  if (!endpoint || endpoint.auth_type !== "github-oidc/azure") throw new Error("No configured OpenAI endpoint uses github-oidc/azure");
+  if (!endpoint || endpoint.auth_type !== %s) throw new Error(%s);
 }).catch(error => {
-  console.error("Azure OIDC threat detection requires fresh AWF reflection:", error);
+  console.error("OpenAI OIDC threat detection requires fresh AWF reflection:", error);
   process.exitCode = 1;
-})`
+})`, authType, errorMessage)
 	return "node -e " + shellEscapeArg(script)
 }
 
