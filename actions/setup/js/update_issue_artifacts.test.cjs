@@ -79,6 +79,20 @@ describe("update_issue artifacts", () => {
     expect(client.request).toHaveBeenLastCalledWith(patch, expect.objectContaining({ artifact_number: 101 }));
   });
 
+  it("patches the lowest-numbered artifact when a name has duplicates", async () => {
+    client.request
+      .mockResolvedValueOnce({
+        data: [
+          { number: 9, name: "Plan", type: "plan" },
+          { number: 3, name: "Plan", type: "plan" },
+        ],
+      })
+      .mockResolvedValueOnce({ data: { number: 3 } });
+    const handler = await main({});
+    expect((await handler({ artifacts: [artifact] }, {})).success).toBe(true);
+    expect(client.request).toHaveBeenLastCalledWith(patch, expect.objectContaining({ artifact_number: 3 }));
+  });
+
   it("uses the same sanitized name for matching and publishing", async () => {
     const name = "Plan".repeat(32);
     client.request.mockResolvedValueOnce({ data: [{ number: 7, name, type: "plan" }] }).mockResolvedValueOnce({ data: { number: 7 } });
@@ -163,6 +177,23 @@ describe("update_issue artifacts", () => {
     expect(published).not.toContain("https://outside.example/private");
   });
 
+  it("resolves temporary issue references and reuses configured mention sanitization", async () => {
+    const handler = await main({ target: "*", "target-repo": "other/repo", allowedMentionAliases: ["copilot"] });
+    const result = await handler({ issue_number: 456, artifacts: [{ name: "Plan", type: "plan", body: "See #aw_child @copilot and @someone" }] }, { aw_child: { repo: "other/repo", number: 42 } });
+    expect(result.success).toBe(true);
+    const published = client.request.mock.calls[1][1].body;
+    expect(published).toBe("See #42 @copilot and `@someone`");
+  });
+
+  it("checks the UTF-8 limit after resolving temporary issue references", async () => {
+    const handler = await main({ target: "*", max_issue_artifact_size: 20 });
+    const result = await handler({ issue_number: 456, artifacts: [{ name: "Plan", type: "plan", body: "#aw_child" }] }, { aw_child: { repo: "a-very-long-owner/a-very-long-repository", number: 123456 } });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("max-issue-artifact-size");
+    expect(client.rest.issues.update).not.toHaveBeenCalled();
+    expect(client.request).not.toHaveBeenCalled();
+  });
+
   it("checks size after sanitization as well as before it", async () => {
     const handler = await main({ max_issue_artifact_size: 4 });
     const result = await handler({ artifacts: [{ name: "Notes", body: "@abc" }] }, {});
@@ -184,10 +215,29 @@ describe("update_issue artifacts", () => {
   it("rejects type changes before any artifact writes, including Markdown into HTML", async () => {
     client.request.mockResolvedValueOnce({ data: [{ number: 7, name: "Preview", type: "embedded_html" }] });
     const handler = await main({});
-    const result = await handler({ artifacts: [artifact, { name: "Preview", body: "`<script>alert(1)</script>`" }] }, {});
+    const result = await handler({ title: "Update", artifacts: [artifact, { name: "Preview", body: "`<script>alert(1)</script>`" }] }, {});
     expect(result.success).toBe(false);
     expect(result.error).toContain("types cannot be changed");
     expect(client.request).toHaveBeenCalledTimes(1);
+    expect(client.rest.issues.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects conflicting artifact types in one request before issue mutations", async () => {
+    const handler = await main({});
+    const result = await handler(
+      {
+        title: "Update",
+        artifacts: [
+          { name: "Plan", type: "plan", body: "Plan" },
+          { name: "Plan", type: "generic", body: "Notes" },
+        ],
+      },
+      {}
+    );
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("types cannot be changed");
+    expect(client.request).toHaveBeenCalledTimes(1);
+    expect(client.rest.issues.update).not.toHaveBeenCalled();
   });
 
   it("reports partial failures with the target issue and does not retry the entire update", async () => {
@@ -197,10 +247,34 @@ describe("update_issue artifacts", () => {
       .mockRejectedValueOnce(new Error("Forbidden"));
     const handler = await main({});
     const result = await handler({ title: "Update", artifacts: [artifact, { name: "Notes", body: "Research" }] }, {});
-    expect(result).toMatchObject({ success: false, number: 123, url: issue.html_url, repo: "test-owner/test-repo" });
+    expect(result).toMatchObject({
+      success: false,
+      partial: true,
+      retryable: false,
+      issueUpdated: true,
+      number: 123,
+      url: issue.html_url,
+      repo: "test-owner/test-repo",
+      artifacts: [{ number: 7 }],
+    });
     expect(result.error).toContain("1/2 attached");
     expect(client.rest.issues.update).toHaveBeenCalledTimes(1);
     expect(client.request).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not automatically retry a failed artifact creation", async () => {
+    vi.useFakeTimers();
+    client.request.mockImplementation(async method => {
+      if (method === route) return { data: [] };
+      throw Object.assign(new Error("Service unavailable"), { status: 503 });
+    });
+    const handler = await main({});
+    const pending = handler({ artifacts: [artifact] }, {});
+    await vi.runAllTimersAsync();
+    const result = await pending;
+    vi.useRealTimers();
+    expect(result).toMatchObject({ success: false, partial: true, retryable: false });
+    expect(client.request.mock.calls.map(([method]) => method)).toEqual([route, post]);
   });
 
   it("uses cross-repository targets for listing and writing artifacts", async () => {

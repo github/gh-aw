@@ -196,6 +196,56 @@ async function createIssueArtifacts(githubClient, owner, repo, issueNumber, arti
 }
 
 /**
+ * List matching artifacts and validate the complete batch before any issue mutations.
+ * @param {typeof github} githubClient
+ * @param {string} owner
+ * @param {string} repo
+ * @param {number} issueNumber
+ * @param {IssueArtifact[]} artifacts
+ * @param {number} [maxSizeBytes=1048576]
+ * @returns {Promise<Map<string, {number: number, type: string}>>}
+ */
+async function prepareIssueArtifactUpsert(githubClient, owner, repo, issueNumber, artifacts, maxSizeBytes = DEFAULT_MAX_ISSUE_ARTIFACT_SIZE) {
+  /** @type {Map<string, {number: number, type: string}>} */
+  const existing = new Map();
+  for (let page = 1; ; page++) {
+    const { data } = await withRetry(
+      () =>
+        githubClient.request("GET /repos/{owner}/{repo}/issues/{issue_number}/artifacts", {
+          owner,
+          repo,
+          issue_number: issueNumber,
+          per_page: 100,
+          page,
+          headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION },
+        }),
+      RATE_LIMIT_RETRY_CONFIG,
+      `list issue artifacts on ${owner}/${repo}#${issueNumber}`
+    );
+    if (!Array.isArray(data)) throw new Error(`${ERR_API}: Invalid issue artifact list response; expected an array`);
+    for (const entry of data) {
+      const metadata = normalizeCreatedIssueArtifact(entry);
+      if (typeof entry.name !== "string" || !["generic", "link", "plan", "embedded_html"].includes(entry.type)) {
+        throw new Error(`${ERR_API}: Invalid issue artifact list response; expected a name and supported type`);
+      }
+      const match = existing.get(entry.name);
+      if (!match || metadata.number < match.number) existing.set(entry.name, { number: metadata.number, type: entry.type });
+    }
+    if (data.length < 100) break;
+  }
+
+  const types = new Map([...existing].map(([name, entry]) => [name, entry.type]));
+  for (const artifact of artifacts) {
+    validateIssueArtifactBodySize(artifact.body, maxSizeBytes, `Artifact "${artifact.name}" body`);
+    if (types.has(artifact.name) && types.get(artifact.name) !== artifact.type) {
+      throw new Error(`${ERR_VALIDATION}: Artifact "${artifact.name}" already has type ${types.get(artifact.name)}; artifact types cannot be changed`);
+    }
+    types.set(artifact.name, artifact.type);
+  }
+  return existing;
+}
+
+/**
  * Upsert sanitized artifacts by their exact name. The list API has no Link header,
  * so read pages until a short page is returned.
  * @param {typeof github} githubClient
@@ -204,74 +254,41 @@ async function createIssueArtifacts(githubClient, owner, repo, issueNumber, arti
  * @param {number} issueNumber
  * @param {IssueArtifact[]} artifacts
  * @param {number} [maxSizeBytes=1048576]
+ * @param {Map<string, {number: number, type: string}>} [preparedExisting]
  * @returns {Promise<CreatedIssueArtifact[]>}
  */
-async function upsertIssueArtifacts(githubClient, owner, repo, issueNumber, artifacts, maxSizeBytes = DEFAULT_MAX_ISSUE_ARTIFACT_SIZE) {
+async function upsertIssueArtifacts(githubClient, owner, repo, issueNumber, artifacts, maxSizeBytes = DEFAULT_MAX_ISSUE_ARTIFACT_SIZE, preparedExisting) {
   if (artifacts.length === 0) return [];
-  /** @type {Map<string, {number: number, type: string}>} */
-  const existing = new Map();
   /** @type {CreatedIssueArtifact[]} */
   const attached = [];
   let artifactName = artifacts[0].name;
   try {
-    for (let page = 1; ; page++) {
-      const { data } = await withRetry(
-        () =>
-          githubClient.request("GET /repos/{owner}/{repo}/issues/{issue_number}/artifacts", {
-            owner,
-            repo,
-            issue_number: issueNumber,
-            per_page: 100,
-            page,
-            headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION },
-          }),
-        RATE_LIMIT_RETRY_CONFIG,
-        `list issue artifacts on ${owner}/${repo}#${issueNumber}`
-      );
-      if (!Array.isArray(data)) throw new Error(`${ERR_API}: Invalid issue artifact list response; expected an array`);
-      for (const entry of data) {
-        const metadata = normalizeCreatedIssueArtifact(entry);
-        if (typeof entry.name !== "string" || !["generic", "link", "plan", "embedded_html"].includes(entry.type)) {
-          throw new Error(`${ERR_API}: Invalid issue artifact list response; expected a name and supported type`);
-        }
-        if (!existing.has(entry.name)) existing.set(entry.name, { number: metadata.number, type: entry.type });
-      }
-      if (data.length < 100) break;
-    }
-    // PATCH cannot change type. Reject mismatches before writing, especially to
-    // avoid publishing Markdown-sanitized content into an existing HTML artifact.
-    const types = new Map([...existing].map(([name, entry]) => [name, entry.type]));
-    for (const artifact of artifacts) {
-      artifactName = artifact.name;
-      validateIssueArtifactBodySize(artifact.body, maxSizeBytes, `Artifact "${artifact.name}" body`);
-      if (types.has(artifact.name) && types.get(artifact.name) !== artifact.type) {
-        throw new Error(`${ERR_VALIDATION}: Artifact "${artifact.name}" already has type ${types.get(artifact.name)}; artifact types cannot be changed`);
-      }
-      types.set(artifact.name, artifact.type);
-    }
+    const existing = preparedExisting ?? (await prepareIssueArtifactUpsert(githubClient, owner, repo, issueNumber, artifacts, maxSizeBytes));
     for (const artifact of artifacts) {
       artifactName = artifact.name;
       const match = existing.get(artifact.name);
-      const { data } = await withRetry(
-        () =>
-          githubClient.request(match ? "PATCH /repos/{owner}/{repo}/issues/{issue_number}/artifacts/{artifact_number}" : "POST /repos/{owner}/{repo}/issues/{issue_number}/artifacts", {
-            owner,
-            repo,
-            issue_number: issueNumber,
-            ...(match ? { artifact_number: match.number, name: artifact.name, body: artifact.body } : artifact),
-            headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION },
-          }),
-        RATE_LIMIT_RETRY_CONFIG,
-        `upsert issue artifact on ${owner}/${repo}#${issueNumber}`
-      );
+      const parameters = {
+        owner,
+        repo,
+        issue_number: issueNumber,
+        ...(match ? { artifact_number: match.number, name: artifact.name, body: artifact.body } : artifact),
+        headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION },
+      };
+      const { data } = match
+        ? await withRetry(() => githubClient.request("PATCH /repos/{owner}/{repo}/issues/{issue_number}/artifacts/{artifact_number}", parameters), RATE_LIMIT_RETRY_CONFIG, `update issue artifact on ${owner}/${repo}#${issueNumber}`)
+        : await githubClient.request("POST /repos/{owner}/{repo}/issues/{issue_number}/artifacts", parameters);
       const metadata = normalizeCreatedIssueArtifact(data);
       attached.push(metadata);
       existing.set(artifact.name, { number: metadata.number, type: artifact.type });
     }
   } catch (error) {
-    throw new Error(`${ERR_API}: Issue ${owner}/${repo}#${issueNumber} artifact "${artifactName}" could not be attached or updated (${attached.length}/${artifacts.length} attached): ${getErrorMessage(error)}`, { cause: error });
+    const failure = Object.assign(
+      new Error(`${ERR_API}: Issue ${owner}/${repo}#${issueNumber} artifact "${artifactName}" could not be attached or updated (${attached.length}/${artifacts.length} attached): ${getErrorMessage(error)}`, { cause: error }),
+      { attached }
+    );
+    throw failure;
   }
   return attached;
 }
 
-module.exports = { normalizeIssueArtifacts, resolveIssueArtifactPaths, sanitizeIssueArtifacts, createIssueArtifacts, upsertIssueArtifacts };
+module.exports = { normalizeIssueArtifacts, resolveIssueArtifactPaths, sanitizeIssueArtifacts, createIssueArtifacts, prepareIssueArtifactUpsert, upsertIssueArtifacts };
