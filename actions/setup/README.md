@@ -117,7 +117,7 @@ values; the runner-mask policy does not reduce that redaction.
 ### Decisions client
 
 `js/decisions_client.cjs` exports
-`invokeDecisions({ baseURL, apiKey?, model, input, questions, timeoutMs?, fetchImpl?, onUsage? })`.
+`invokeDecisions({ baseURL, apiKey?, integrationId?, model, input, questions, timeoutMs?, fetchImpl?, onUsage? })`.
 It sends the whole question array in one `POST` to `<baseURL>/decisions` and
 returns the response, including its named answers, model, and token usage.
 The helper supports `predicate`, `choice`, and `score` questions, string or
@@ -129,6 +129,10 @@ timeout is 120 seconds. The client rejects invalid batches, mismatched answers,
 HTTP failures, and redirects without retrying or logging provider bodies.
 Refusals remain typed answers for the caller to handle. It requires no SDK,
 Actions globals, or agentic engine.
+
+The optional `integrationId` adds the `Copilot-Integration-Id` request header.
+Copilot evals set it to `agentic-workflows`, matching the firewall's default
+integration identity. OpenAI evals omit it.
 
 The optional `onUsage(usage, model)` callback runs after receiving JSON, before
 answer validation, so callers can collect costs even when the answer batch is

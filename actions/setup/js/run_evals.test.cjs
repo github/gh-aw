@@ -61,6 +61,7 @@ describe("Decisions BinEval harness", () => {
     expect(fetch).toHaveBeenCalledTimes(1);
     const [url, request] = fetch.mock.calls[0];
     expect(url).toBe("https://api.githubcopilot.com/v1/decisions");
+    expect(request.headers["Copilot-Integration-Id"]).toBe("agentic-workflows");
     expect(request.headers.Authorization).toBe("Bearer test-token");
     const body = JSON.parse(request.body);
     expect(body.model).toBe("gpt-6-luna-decisions");
@@ -318,6 +319,7 @@ describe("Decisions BinEval harness", () => {
     vi.stubEnv("GH_AW_DECISIONS_PROVIDER", provider);
     await executeMain();
     expect(JSON.parse(fetch.mock.calls[0][1].body).model).toBe(expected);
+    expect(fetch.mock.calls[0][1].headers["Copilot-Integration-Id"]).toBe(provider === "github-copilot" ? "agentic-workflows" : undefined);
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 });
