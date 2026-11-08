@@ -60,7 +60,6 @@ If GitHub API, `gh api`, or GitHub MCP downloads return HTTP 403 (including a to
 - `.github/aw/designer.md`
 - `.github/aw/doctor.md`
 - `.github/aw/documentation-workflows.md`
-- `.github/aw/dreaming.md`
 - `.github/aw/drive-memory.md`
 - `.github/aw/enclaves.md`
 - `.github/aw/evals.md`
