@@ -16,7 +16,7 @@ const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { pushSignedCommits } = require("./push_signed_commits.cjs");
 const { updateActivationCommentWithCommit, updateActivationComment } = require("./update_activation_comment.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { withRetry, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
+const { withRetry, isRateLimitError, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
 const { normalizeBranchName } = require("./normalize_branch_name.cjs");
 const { pushExtraEmptyCommit } = require("./extra_empty_commit.cjs");
 const { detectForkPR, checkBranchPushable } = require("./pr_helpers.cjs");
@@ -1085,17 +1085,34 @@ async function main(config = {}) {
       const issueReport = appendReportExecutionProvenance(buildIssueReport(issueTitle, issueBody), process.env.GH_AW_WORKFLOW_NAME || "Workflow", runUrl);
 
       try {
-        const searchQuery = `repo:${repoParts.owner}/${repoParts.repo} is:issue is:open label:pull-request-fallback in:title "Protected Files"`;
-        const { data: searchResults } = await withRetry(
-          () => githubClient.rest.search.issuesAndPullRequests({ q: searchQuery, per_page: 100 }),
-          RATE_LIMIT_RETRY_CONFIG,
-          `search manifest-protection review issues in ${repoParts.owner}/${repoParts.repo}`
-        );
-        if (!Array.isArray(searchResults.items)) {
-          throw new Error(`${ERR_API}: Protected-file fallback issue search returned an invalid response`);
-        }
         const targetPullRequestUrl = `${githubServer}/${repoParts.owner}/${repoParts.repo}/pull/${pullNumber}`;
-        const existingIssue = searchResults.items.find(item => !item.pull_request && item.body?.includes(`](${targetPullRequestUrl})`));
+        let existingIssue;
+        for (let page = 1; ; page++) {
+          let response;
+          try {
+            response = await githubClient.rest.issues.listForRepo({
+              owner: repoParts.owner,
+              repo: repoParts.repo,
+              state: "open",
+              labels: "pull-request-fallback",
+              per_page: 100,
+              page,
+            });
+          } catch (lookupError) {
+            if (!isRateLimitError(lookupError)) {
+              throw lookupError;
+            }
+            core.warning(`Protected-file fallback issue lookup was rate limited; treating it as not found`);
+            break;
+          }
+          if (!Array.isArray(response?.data)) {
+            throw new Error(`${ERR_API}: Protected-file fallback issue lookup returned an invalid response`);
+          }
+          existingIssue = response.data.find(item => !item.pull_request && item.body?.includes(`](${targetPullRequestUrl})`));
+          if (existingIssue || response.data.length < 100) {
+            break;
+          }
+        }
         let issue = existingIssue;
         if (issue) {
           core.info(`Reusing protected-file-protection review issue #${issue.number}: ${issue.html_url}`);

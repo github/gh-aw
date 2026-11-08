@@ -210,15 +210,13 @@ describe("push_to_pull_request_branch.cjs", () => {
           getBranch: vi.fn().mockResolvedValue({ data: { protected: false } }),
         },
         issues: {
+          listForRepo: vi.fn().mockResolvedValue({ data: [] }),
           create: vi.fn().mockResolvedValue({
             data: {
               number: 456,
               html_url: "https://github.com/test-owner/test-repo/issues/456",
             },
           }),
-        },
-        search: {
-          issuesAndPullRequests: vi.fn().mockResolvedValue({ data: { items: [] } }),
         },
       },
       graphql: vi.fn(),
@@ -4159,16 +4157,14 @@ ${diffs}
 
     it("should reuse an open protected-file fallback issue for the same pull request", async () => {
       createPatchFile("should-reuse-an-open-protected-file-fallback-issue", createPatchWithFiles("package.json"));
-      mockGithub.rest.search.issuesAndPullRequests.mockResolvedValue({
-        data: {
-          items: [
-            {
-              number: 789,
-              html_url: "https://github.com/test-owner/test-repo/issues/789",
-              body: "Target Pull Request: [#123](https://github.com/test-owner/test-repo/pull/123)",
-            },
-          ],
-        },
+      mockGithub.rest.issues.listForRepo.mockResolvedValue({
+        data: [
+          {
+            number: 789,
+            html_url: "https://github.com/test-owner/test-repo/issues/789",
+            body: "Target Pull Request: [#123](https://github.com/test-owner/test-repo/pull/123)",
+          },
+        ],
       });
 
       const module = await loadModule();
@@ -4184,13 +4180,19 @@ ${diffs}
         issue_number: 789,
         issue_url: "https://github.com/test-owner/test-repo/issues/789",
       });
-      expect(mockGithub.rest.search.issuesAndPullRequests).toHaveBeenCalledWith(expect.objectContaining({ q: expect.stringContaining("label:pull-request-fallback") }));
+      expect(mockGithub.rest.issues.listForRepo).toHaveBeenCalledWith(
+        expect.objectContaining({
+          state: "open",
+          labels: "pull-request-fallback",
+          per_page: 100,
+        })
+      );
       expect(mockGithub.rest.issues.create).not.toHaveBeenCalled();
     });
 
     it("should not create a protected-file fallback issue when duplicate lookup fails", async () => {
       createPatchFile("should-not-create-protected-file-fallback-issue-when-lookup-fails", createPatchWithFiles("package.json"));
-      mockGithub.rest.search.issuesAndPullRequests.mockRejectedValue(new Error("Search API unavailable"));
+      mockGithub.rest.issues.listForRepo.mockRejectedValue(new Error("Issue API unavailable"));
 
       const module = await loadModule();
       const handler = await module.main({
@@ -4200,8 +4202,26 @@ ${diffs}
       const result = await handler({ branch: "should-not-create-protected-file-fallback-issue-when-lookup-fails" }, {});
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain("Search API unavailable");
+      expect(result.error).toContain("Issue API unavailable");
       expect(mockGithub.rest.issues.create).not.toHaveBeenCalled();
+    });
+
+    it("should treat a rate-limited fallback issue lookup as not found", async () => {
+      createPatchFile("should-treat-rate-limited-fallback-issue-lookup-as-not-found", createPatchWithFiles("package.json"));
+      const rateLimitError = new Error("API rate limit exceeded");
+      rateLimitError.status = 429;
+      mockGithub.rest.issues.listForRepo.mockRejectedValue(rateLimitError);
+
+      const module = await loadModule();
+      const handler = await module.main({
+        protected_files: ["package.json"],
+        protected_files_policy: "fallback-to-issue",
+      });
+      const result = await handler({ branch: "should-treat-rate-limited-fallback-issue-lookup-as-not-found" }, {});
+
+      expect(result.success).toBe(true);
+      expect(mockGithub.rest.issues.create).toHaveBeenCalledTimes(1);
+      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("treating it as not found"));
     });
 
     it.each([
