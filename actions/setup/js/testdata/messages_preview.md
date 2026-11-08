@@ -21,12 +21,6 @@ This file covers message generators and every bundled Markdown body/diagnostic t
 
 ---
 
-## getDetectionFailureMessage
-
-⚠️ Security scanning failed for [Synthetic preview workflow](https://example.test/synthetic/repository/actions/runs/1000). The threat detection analysis could not be completed. Review the logs for details.
-
----
-
 ## getPullRequestCreatedMessage
 
 Pull request created: [#42](https://example.test/synthetic/repository/issues/42)

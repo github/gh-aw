@@ -15,7 +15,6 @@ const {
   getRunStartedMessage,
   getRunSuccessMessage,
   getRunFailureMessage,
-  getDetectionFailureMessage,
   getDetectionFailureBlocks,
   getDetectionWarningBlocks,
   getPullRequestCreatedMessage,
@@ -107,12 +106,7 @@ describe("messages_run_status", () => {
     });
   });
 
-  describe("getDetectionFailureMessage", () => {
-    it("returns default template with placeholders substituted", () => {
-      const msg = getDetectionFailureMessage({ workflowName: WORKFLOW, runUrl: RUN_URL });
-      expect(msg).toBe(`⚠️ Security scanning failed for [${WORKFLOW}](${RUN_URL}). The threat detection analysis could not be completed. Review the logs for details.`);
-    });
-
+  describe("detection report blocks", () => {
     it.each([getDetectionFailureBlocks, getDetectionWarningBlocks])("renders category-only details in failure and warning report trees", buildBlocks => {
       process.env.GH_AW_PROMPTS_DIR = new URL("../md/", import.meta.url).pathname;
       const children = buildBlocks({ workflowName: WORKFLOW, runUrl: RUN_URL, reason: "threat_detected", threatKinds: "prompt_injection,malicious_patch,PRIVATE_TEXT" });
@@ -123,16 +117,12 @@ describe("messages_run_status", () => {
       expect(JSON.stringify(children)).toContain('"agentTainted":false');
     });
 
-    it("supplies safe category and description placeholders in configured templates", () => {
+    it("supplies safe category and description placeholders in configured failure templates", () => {
       process.env.GH_AW_SAFE_OUTPUT_MESSAGES = JSON.stringify({ detectionFailure: "{threat_kinds}: {reason_text}" });
-      const body = getDetectionFailureMessage({ workflowName: WORKFLOW, runUrl: RUN_URL, reason: "threat_detected", threatKinds: "secret_leak PRIVATE_TEXT" });
-      expect(body).toBe("secret_leak: Potential security threats were detected in the agent output. Detected threat types: secret leak.");
-    });
-
-    it("uses custom template from config", () => {
-      process.env.GH_AW_SAFE_OUTPUT_MESSAGES = JSON.stringify({ detectionFailure: "Security alert for {workflow_name}" });
-      const msg = getDetectionFailureMessage({ workflowName: WORKFLOW, runUrl: RUN_URL });
-      expect(msg).toBe(`Security alert for ${WORKFLOW}`);
+      const blocks = getDetectionFailureBlocks({ workflowName: WORKFLOW, runUrl: RUN_URL, reason: "threat_detected", threatKinds: "secret_leak PRIVATE_TEXT" });
+      const body = renderSizedReport({ type: "report", title: "Detection", children: blocks }).body;
+      expect(body).toContain("secret\\_leak: Potential security threats were detected in the agent output. Detected threat types: secret leak.");
+      expect(body).not.toContain("PRIVATE_TEXT");
     });
   });
 

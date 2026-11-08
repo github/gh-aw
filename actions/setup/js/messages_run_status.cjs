@@ -84,15 +84,6 @@ function getRunFailureMessage(ctx) {
  * @property {string} [threatKinds] - Schema-defined threat categories
  */
 
-/**
- * Get the detection-failure message, using custom template if configured.
- * @param {DetectionFailureContext} ctx - Context for detection-failure message generation
- * @returns {string} Detection-failure message
- */
-function getDetectionFailureMessage(ctx) {
-  return renderConfiguredMessage("detectionFailure", DETECTION_FAILURE_TEMPLATE, detectionMessageContext(ctx));
-}
-
 const DETECTION_FAILURE_TEMPLATE = "⚠️ Security scanning failed for [{workflow_name}]({run_url}). {reason_text} Review the logs for details.";
 
 /**
@@ -227,7 +218,6 @@ module.exports = {
   getRunStartedMessage,
   getRunSuccessMessage,
   getRunFailureMessage,
-  getDetectionFailureMessage,
   getDetectionFailureBlocks,
   getDetectionWarningMessage,
   getDetectionWarningBlocks,

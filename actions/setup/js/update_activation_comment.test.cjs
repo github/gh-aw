@@ -31,41 +31,6 @@ const createTestableFunction = scriptContent => {
       // Mock sanitizeContent to return input as-is for testing
       return { sanitizeContent: content => content };
     }
-    if (module === "./messages_run_status.cjs") {
-      const messagesEnv = process.env.GH_AW_SAFE_OUTPUT_MESSAGES;
-      const messages = messagesEnv ? JSON.parse(messagesEnv) : null;
-      const renderTmpl = (tmpl, ctx) => tmpl.replace(/\{(\w+)\}/g, (m, k) => (ctx[k] !== undefined ? String(ctx[k]) : m));
-      const toSnake = obj => {
-        const r = {};
-        for (const [k, v] of Object.entries(obj)) {
-          r[k.replace(/([A-Z])/g, "_$1").toLowerCase()] = v;
-          r[k] = v;
-        }
-        return r;
-      };
-      return {
-        getPullRequestCreatedMessage: ctx => {
-          const tc = toSnake(ctx);
-          const def = "Pull request created: [#{item_number}]({item_url})";
-          return messages?.pullRequestCreated ? renderTmpl(messages.pullRequestCreated, tc) : renderTmpl(def, tc);
-        },
-        getIssueCreatedMessage: ctx => {
-          const tc = toSnake(ctx);
-          const def = "Issue created: [#{item_number}]({item_url})";
-          return messages?.issueCreated ? renderTmpl(messages.issueCreated, tc) : renderTmpl(def, tc);
-        },
-        getCommitPushedMessage: ctx => {
-          const tc = toSnake(ctx);
-          const def = "Commit pushed: [`{short_sha}`]({commit_url})";
-          return messages?.commitPushed ? renderTmpl(messages.commitPushed, tc) : renderTmpl(def, tc);
-        },
-        getDetectionWarningMessage: ctx => {
-          const reasonText = threatDetectionWarning.getDetectionReasonText(ctx.reason);
-          const warning = threatDetectionWarning.getThreatWarningPresentation(ctx.reason);
-          return `> [!${warning.admonition}]\n> ${warning.title}\n> ${warning.summary}\n> ${warning.marker}\n>\n> ${reasonText}`;
-        },
-      };
-    }
     if (module === "./templatable.cjs") {
       return {
         parseBoolTemplatable: (value, defaultValue = true) => {

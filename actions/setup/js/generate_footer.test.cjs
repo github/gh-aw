@@ -54,6 +54,7 @@ describe("generate_footer.cjs", () => {
     delete process.env.GITHUB_RUN_ID;
     delete process.env.GH_AW_DETECTION_CONCLUSION;
     delete process.env.GH_AW_DETECTION_REASON;
+    delete process.env.GH_AW_DETECTION_THREAT_KINDS;
 
     // Dynamic import to get fresh module state
     const module = await import("./generate_footer.cjs");
@@ -516,6 +517,7 @@ describe("generate_footer.cjs", () => {
       it("should return caution alert when detection conclusion is warning", () => {
         process.env.GH_AW_DETECTION_CONCLUSION = "warning";
         process.env.GH_AW_DETECTION_REASON = "threat_detected";
+        process.env.GH_AW_DETECTION_THREAT_KINDS = "secret_leak PRIVATE_TEXT";
 
         const result = getExpiredEntityCautionAlert("Test Workflow", "https://github.com/test/repo/actions/runs/123");
 
