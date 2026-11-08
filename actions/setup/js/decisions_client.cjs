@@ -22,6 +22,14 @@ class DecisionsModelUnavailableError extends Error {
   }
 }
 
+class DecisionsAuthUnsupportedError extends Error {
+  /** @param {number} status */
+  constructor(status) {
+    super(`Decisions endpoint does not accept personal access tokens (HTTP ${status})`);
+    this.name = "DecisionsAuthUnsupportedError";
+  }
+}
+
 /**
  * Validate a complete batch before sending any request.
  * @param {DecisionQuestion[]} questions
@@ -121,18 +129,22 @@ async function invokeDecisions({ baseURL, apiKey, integrationId, model, input, q
     signal: AbortSignal.timeout(timeoutMs),
     redirect: "error",
   });
-  // Inspect only allowlisted codes; never expose provider bodies or messages.
+  // Inspect only allowlisted codes and token rejection text; never expose provider bodies or messages.
   if (!response.ok) {
     // A 404 may come from routing infrastructure, even with a model error code.
-    if ([400, 422].includes(response.status)) {
+    if ([400, 401, 403, 422].includes(response.status)) {
+      const text = (await response.text()).slice(0, 2048);
+      if ([400, 401, 403].includes(response.status) && text.includes("Personal Access Tokens are not supported")) {
+        throw new DecisionsAuthUnsupportedError(response.status);
+      }
       let body;
       try {
-        body = await response.json();
+        body = JSON.parse(text);
       } catch (error) {
         if (!(error instanceof SyntaxError)) throw error;
       }
       const code = body?.error?.code ?? body?.code;
-      if (["model_not_supported", "model_not_found", "model_not_available", "model_unavailable", "unsupported_model"].includes(code)) {
+      if ([400, 422].includes(response.status) && ["model_not_supported", "model_not_found", "model_not_available", "model_unavailable", "unsupported_model"].includes(code)) {
         throw new DecisionsModelUnavailableError(response.status);
       }
     }
@@ -146,4 +158,4 @@ async function invokeDecisions({ baseURL, apiKey, integrationId, model, input, q
   return validateDecisionResponse(result, questions);
 }
 
-module.exports = { invokeDecisions, validateDecisionResponse, validateQuestions, MAX_DECISION_QUESTIONS, DecisionsModelUnavailableError };
+module.exports = { invokeDecisions, validateDecisionResponse, validateQuestions, MAX_DECISION_QUESTIONS, DecisionsModelUnavailableError, DecisionsAuthUnsupportedError };

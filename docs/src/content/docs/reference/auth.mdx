@@ -137,6 +137,9 @@ When this permission is present, gh-aw automatically uses the GitHub Actions tok
 
 Use `COPILOT_GITHUB_TOKEN` when you need to authenticate Copilot inference with a specific user's PAT — for example, in personal repositories or when centralized org billing is not available. When `permissions: copilot-requests: write` is set in your workflow, this secret is ignored for inference.
 
+> [!WARNING]
+> PAT authentication for the Copilot agent does not imply support for `evals:`. The separate Copilot `/v1/decisions` endpoint can reject PATs with `Personal Access Tokens are not supported`, even when agent inference succeeds. This is recorded as `not_evaluated / auth_unsupported`; changing the Copilot judge model does not fix it. See [evals authentication](/gh-aw/experimental/experiments/#evals-authentication) for credential selection and alternatives.
+
 When using this PAT-based Copilot authentication path, set a GitHub Actions secret to a fine-grained Personal Access Token (PAT) that can authenticate Copilot CLI.
 
 **Setup**:

@@ -441,6 +441,28 @@ credentials. Configure the provider's actual model ID; model names are not remap
 Per-question model overrides are not supported. Transport failures
 are recorded as `not_evaluated`, not as negative or unknown answers.
 
+#### Evals authentication
+
+Copilot judge requests send `Copilot-Integration-Id: agentic-workflows`. They use
+a configured Copilot token broker when enabled, otherwise `github.token` when the
+workflow declares `permissions: copilot-requests: write`, or `COPILOT_GITHUB_TOKEN`.
+The Actions-token path requires organization Copilot access and centralized billing;
+declaring that permission also changes the Copilot agent's inference credential.
+There is no separate evals-only permission setting.
+
+The Copilot Decisions endpoint can reject personal access tokens before validating
+the model. PAT-based agent authentication therefore does not guarantee evals support.
+Such rejections produce `not_evaluated / auth_unsupported`, with remediation in the
+step summary and an `evals_auth_unsupported` audit finding. Provider error bodies
+are not published. The evals job remains non-blocking; no answers are recorded.
+
+For a personal-account workflow without a Decisions-compatible Copilot credential,
+use an OpenAI-backed `evals.model` with `CODEX_API_KEY` or `OPENAI_API_KEY` and
+Decisions access, or remove `evals`. The judge provider is independent of the agent.
+GitHub App and OAuth tokens are not documented substitutes for the Copilot judge;
+their acceptance by this endpoint has not been verified. Compilation warns about
+the Copilot secret-based path but does not reject it, including in strict mode.
+
 ### Deterministic decisions
 
 `gh aw experiments analyze <workflow>` keeps each experiment stage distinct:

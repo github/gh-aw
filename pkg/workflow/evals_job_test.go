@@ -39,6 +39,36 @@ func TestBuildEvalsJobNeedsWithoutDetection(t *testing.T) {
 	assert.Contains(t, strings.Join(job.Steps, ""), "id: parse_evals_token_usage\n")
 }
 
+func TestBuildEvalsJobAuthWarning(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		model       string
+		permissions string
+		hasEvals    bool
+		broker      bool
+		warnings    int
+	}{
+		{name: "PAT with default judge", hasEvals: true, warnings: 1},
+		{name: "PAT with explicit Copilot judge", model: "copilot/gpt-6-luna-decisions", hasEvals: true, warnings: 1},
+		{name: "Actions token", permissions: "permissions:\n  copilot-requests: write", hasEvals: true},
+		{name: "token broker", hasEvals: true, broker: true},
+		{name: "OpenAI judge", model: "openai/gpt-6-luna", hasEvals: true},
+		{name: "no evals"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			compiler := NewCompiler()
+			compiler.SetStrictMode(true)
+			data := &WorkflowData{AI: "copilot", Permissions: tc.permissions, TokenBrokerEnabled: tc.broker, TokenBrokerCopilotRequest: tc.broker}
+			if tc.hasEvals {
+				data.Evals = &EvalsConfig{Model: tc.model, Questions: []EvalDefinition{{ID: "q1", Question: "Does it build?"}}}
+			}
+			_, err := compiler.buildEvalsJob(data)
+			require.NoError(t, err)
+			assert.Equal(t, tc.warnings, compiler.GetWarningCount())
+		})
+	}
+}
+
 func TestBuildEvalsJobNeedsWithDetection(t *testing.T) {
 	compiler := NewCompiler()
 

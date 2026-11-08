@@ -3,7 +3,9 @@ package workflow
 
 import (
 	"fmt"
+	"os"
 
+	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 )
@@ -27,6 +29,7 @@ func (c *Compiler) buildEvalsJob(data *WorkflowData) (*Job, error) {
 		return nil, nil
 	}
 	evalsJobLog.Print("Building evals job")
+	c.warnEvalsAuth(data)
 
 	steps := c.buildEvalsPreparationSteps(data)
 
@@ -101,6 +104,14 @@ func (c *Compiler) buildEvalsPreparationSteps(data *WorkflowData) []string {
 
 	// Download the current experiment variant assignments.
 	return append(steps, buildExperimentArtifactDownloadSteps(data, c.getActionPin)...)
+}
+
+func (c *Compiler) warnEvalsAuth(data *WorkflowData) {
+	evalsData := c.buildEvalsDecisionData(data)
+	if evalsData.AI == "copilot" && !hasCopilotRequestsWritePermission(evalsData) && !usesTokenBrokerInference(evalsData) {
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("evals uses the Copilot Decisions endpoint with COPILOT_GITHUB_TOKEN. This endpoint can reject personal access tokens even when the agent accepts them. Use a credential supported by Decisions, configure an OpenAI-backed evals.model, or remove evals; changing the Copilot model will not fix token rejection."))
+		c.IncrementWarningCount()
+	}
 }
 
 func (c *Compiler) buildEvalsJobPermissions(data *WorkflowData) (*WorkflowData, string) {

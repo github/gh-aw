@@ -159,6 +159,23 @@ describe("render_evals_summary.cjs", () => {
     });
   });
   describe("not-evaluated marker", () => {
+    it("shows unsupported authentication and remediation without answer tallies", async () => {
+      fs.mkdirSync(EVALS_DIR, { recursive: true });
+      fs.writeFileSync(EXECUTION_PATH, JSON.stringify({ component: "evals", state: "auth_unsupported", run_id: "123", run_attempt: "1" }));
+      vi.stubEnv("GITHUB_RUN_ID", "123");
+      vi.stubEnv("GITHUB_RUN_ATTEMPT", "1");
+      vi.stubEnv("GH_AW_EVALS_EXECUTION_OUTCOME", "success");
+      const { parseMain } = await import("./run_evals.cjs");
+      await parseMain();
+      await module.main();
+      const summary = mockCore.summary.addRaw.mock.calls[0][0];
+      expect(summary).toContain("auth_unsupported");
+      expect(summary).toContain("personal access tokens are not supported");
+      expect(summary).toContain("remove evals");
+      expect(summary).not.toContain("**YES**");
+      expect(fs.existsSync(OUTPUT_PATH)).toBe(false);
+    });
+
     /**
      * Produces the marker exactly as the parse step does for an audited run.
      * @param {string} runID

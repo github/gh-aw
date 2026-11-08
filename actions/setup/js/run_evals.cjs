@@ -3,7 +3,7 @@
 "use strict";
 
 const fs = require("fs");
-const { invokeDecisions, validateDecisionResponse, DecisionsModelUnavailableError } = require("./decisions_client.cjs");
+const { invokeDecisions, validateDecisionResponse, DecisionsModelUnavailableError, DecisionsAuthUnsupportedError } = require("./decisions_client.cjs");
 const { EVALS_OUTPUT_PATH, EVALS_STATUS_PATH, EVALS_EXECUTION_EVIDENCE_PATH } = require("./evals_constants.cjs");
 const { EVALS_NOT_EVALUATED, EVALS_REASON_CODES } = require("./evals_status.cjs");
 const { readExperimentAssignments } = require("./experiment_helpers.cjs");
@@ -126,8 +126,8 @@ async function executeMain() {
       onUsage: (usage, responseModel) => recordUsage(usage, responseModel, provider),
     });
   } catch (error) {
-    if (!(error instanceof DecisionsModelUnavailableError)) throw error;
-    evidence.state = EVALS_REASON_CODES.MODEL_UNAVAILABLE;
+    if (!(error instanceof DecisionsModelUnavailableError) && !(error instanceof DecisionsAuthUnsupportedError)) throw error;
+    evidence.state = error instanceof DecisionsAuthUnsupportedError ? EVALS_REASON_CODES.AUTH_UNSUPPORTED : EVALS_REASON_CODES.MODEL_UNAVAILABLE;
     fs.writeFileSync(EVALS_EXECUTION_EVIDENCE_PATH, JSON.stringify(evidence) + "\n");
     writeNotEvaluatedStatus({
       model,
@@ -150,6 +150,14 @@ function classifyJudgeExecution(rawOutcome, evidence) {
   const executionOutcome = ["success", "failure", "cancelled", "skipped"].includes(rawOutcome || "") ? rawOutcome || "" : "";
   const executionState = evidence?.state || "";
   const base = { executionOutcome, executionState };
+  if (executionState === EVALS_REASON_CODES.AUTH_UNSUPPORTED && ["", "success", "failure"].includes(executionOutcome)) {
+    return {
+      ...base,
+      reasonCode: EVALS_REASON_CODES.AUTH_UNSUPPORTED,
+      reason:
+        "The Decisions endpoint rejected the credential: personal access tokens are not supported. Use a credential supported by the endpoint, configure an OpenAI-backed evals.model, or remove evals from the workflow; changing the Copilot model will not fix authentication. No answers were recorded.",
+    };
+  }
   if (executionState === EVALS_REASON_CODES.MODEL_UNAVAILABLE && ["", "success", "failure"].includes(executionOutcome)) {
     return {
       ...base,
@@ -179,7 +187,13 @@ function readExecutionEvidence(runID, runAttempt) {
     core.warning(`Cannot read evals execution evidence: ${getErrorMessage(error)}`);
     return null;
   }
-  if (evidence?.component !== "evals" || String(evidence.run_id) !== runID || String(evidence.run_attempt) !== runAttempt || !["started", "not_started", EVALS_REASON_CODES.MODEL_UNAVAILABLE].includes(evidence.state)) return null;
+  if (
+    evidence?.component !== "evals" ||
+    String(evidence.run_id) !== runID ||
+    String(evidence.run_attempt) !== runAttempt ||
+    !["started", "not_started", EVALS_REASON_CODES.MODEL_UNAVAILABLE, EVALS_REASON_CODES.AUTH_UNSUPPORTED].includes(evidence.state)
+  )
+    return null;
   return { state: evidence.state };
 }
 

@@ -33,6 +33,7 @@ func generateFindings(processedRun ProcessedRun, metrics MetricsData, errors []V
 	detectionFindings := generateThreatDetectionFindings(processedRun)
 	findings = append(findings, detectionFindings...)
 	findings = append(findings, generateEngineStepFailureFindings(processedRun)...)
+	findings = append(findings, generateEvalsAuthFindings(processedRun.Run)...)
 	findings = append(findings, generatePerformanceFindings(metrics)...)
 	findings = append(findings, generateErrorVolumeFindings(errors)...)
 	findings = append(findings, generateToolingFindings(processedRun)...)

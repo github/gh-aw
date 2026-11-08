@@ -150,7 +150,7 @@ describe("Decisions BinEval harness", () => {
 
   it("does not retry failed requests or reuse a stale response", async () => {
     fs.writeFileSync(`${dir}/decisions.json`, "{}");
-    fetch.mockResolvedValue({ ok: false, status: 401 });
+    fetch.mockResolvedValue(new Response("", { status: 401 }));
     await expect(executeMain()).rejects.toThrow("HTTP 401");
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(fs.existsSync(`${dir}/decisions.json`)).toBe(false);
@@ -165,7 +165,7 @@ describe("Decisions BinEval harness", () => {
     fs.writeFileSync(output, "stale answers");
     fs.writeFileSync(status, "{}");
     fs.writeFileSync(usagePath, '{"ai_credits":42}');
-    fetch.mockResolvedValue({ ok: false, status: httpStatus, json: async () => ({ ...body, message: "sensitive provider message" }) });
+    fetch.mockResolvedValue(new Response(JSON.stringify({ ...body, message: "sensitive provider message" }), { status: httpStatus }));
     await expect(executeMain()).resolves.toBeUndefined();
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(readEvalsNotEvaluatedStatus()).toMatchObject({ status: "not_evaluated", reason_code: EVALS_REASON_CODES.MODEL_UNAVAILABLE, model: "copilot/gpt-6-luna-decisions", run_id: "123", run_attempt: "1" });
@@ -177,7 +177,7 @@ describe("Decisions BinEval harness", () => {
   });
 
   it("does not reuse unavailable-model evidence from another attempt", async () => {
-    fetch.mockResolvedValue({ ok: false, status: 400, json: async () => ({ error: { code: "model_not_supported" } }) });
+    fetch.mockResolvedValue(new Response(JSON.stringify({ error: { code: "model_not_supported" } }), { status: 400 }));
     await executeMain();
     vi.stubEnv("GITHUB_RUN_ATTEMPT", "2");
     await parseMain();
@@ -185,7 +185,7 @@ describe("Decisions BinEval harness", () => {
   });
 
   it.each(["cancelled", "skipped"])("preserves %s outcomes over unavailable-model evidence", async outcome => {
-    fetch.mockResolvedValue({ ok: false, status: 400, json: async () => ({ error: { code: "model_not_supported" } }) });
+    fetch.mockResolvedValue(new Response(JSON.stringify({ error: { code: "model_not_supported" } }), { status: 400 }));
     await executeMain();
     vi.stubEnv("GH_AW_EVALS_EXECUTION_OUTCOME", outcome);
     await parseMain();
@@ -193,7 +193,7 @@ describe("Decisions BinEval harness", () => {
   });
 
   it.each([400, 404, 422])("still fails ordinary HTTP %s errors instead of skipping evals", async httpStatus => {
-    fetch.mockResolvedValue({ ok: false, status: httpStatus, json: async () => ({ error: { code: "invalid_request_error" } }) });
+    fetch.mockResolvedValue(new Response(JSON.stringify({ error: { code: "invalid_request_error" } }), { status: httpStatus }));
     await expect(executeMain()).rejects.toThrow(`HTTP ${httpStatus}`);
     vi.stubEnv("GH_AW_EVALS_EXECUTION_OUTCOME", "failure");
     await parseMain();
@@ -230,6 +230,28 @@ describe("Decisions BinEval harness", () => {
 
   it("classifies skipped execution as not started", () => {
     expect(classifyJudgeExecution("skipped", null).reasonCode).toBe("judge_not_started");
+  });
+
+  it.each(["success", "failure", ""])("preserves unsupported-auth evidence for outcome %s", async outcome => {
+    fetch.mockResolvedValue(new Response("checking third-party user token: bad request: Personal Access Tokens are not supported for this endpoint; sensitive provider text", { status: 400, headers: { "Content-Type": "text/plain" } }));
+    await expect(executeMain()).resolves.toBeUndefined();
+    expect(fetch.mock.calls[0][1].headers["Copilot-Integration-Id"]).toBe("agentic-workflows");
+    expect(readEvalsNotEvaluatedStatus()).toMatchObject({ reason_code: EVALS_REASON_CODES.AUTH_UNSUPPORTED, execution_state: EVALS_REASON_CODES.AUTH_UNSUPPORTED });
+    vi.stubEnv("GH_AW_EVALS_EXECUTION_OUTCOME", outcome);
+    await parseMain();
+    expect(readEvalsNotEvaluatedStatus()).toMatchObject({ reason_code: EVALS_REASON_CODES.AUTH_UNSUPPORTED, model: "copilot/gpt-6-luna-decisions", run_id: "123", run_attempt: "1" });
+    expect(readEvalsNotEvaluatedStatus().execution_outcome).toBe(outcome || undefined);
+    expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("personal access tokens are not supported"));
+    expect(JSON.stringify(core.warning.mock.calls)).not.toContain("sensitive");
+    for (const file of [output, usagePath, `${dir}/decisions.json`]) expect(fs.existsSync(file)).toBe(false);
+    vi.stubEnv("GITHUB_RUN_ATTEMPT", "2");
+    vi.stubEnv("GH_AW_EVALS_EXECUTION_OUTCOME", "failure");
+    await parseMain();
+    expect(readEvalsNotEvaluatedStatus().reason_code).toBe(EVALS_REASON_CODES.JUDGE_FAILED);
+  });
+
+  it.each(["cancelled", "skipped"])("preserves %s outcomes over unsupported-auth evidence", outcome => {
+    expect(classifyJudgeExecution(outcome, { state: EVALS_REASON_CODES.AUTH_UNSUPPORTED }).reasonCode).toBe(outcome === "skipped" ? EVALS_REASON_CODES.JUDGE_NOT_STARTED : EVALS_REASON_CODES.JUDGE_FAILED);
   });
 
   it.each([0, 0.123456])("publishes response-derived credits with full precision (%s)", async credits => {

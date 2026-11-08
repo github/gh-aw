@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createRequire } from "module";
 import { createServer } from "node:http";
-const { invokeDecisions, validateQuestions, DecisionsModelUnavailableError } = createRequire(import.meta.url)("./decisions_client.cjs");
+const { invokeDecisions, validateQuestions, DecisionsModelUnavailableError, DecisionsAuthUnsupportedError } = createRequire(import.meta.url)("./decisions_client.cjs");
 
 const questions = [
   { type: "predicate", name: "relevant", instructions: "Is it relevant?" },
@@ -146,7 +146,7 @@ describe("generic Decisions client", () => {
     const text = vi.fn().mockResolvedValue("sensitive provider response");
     config.fetchImpl.mockResolvedValue({ ok: false, status, text, json: async () => ({ error: { message: "sensitive provider response", code: "invalid_request_error" } }) });
     await expect(invokeDecisions(config)).rejects.toThrow(`Decisions request failed (HTTP ${status})`);
-    expect(text).not.toHaveBeenCalled();
+    expect(text).toHaveBeenCalledTimes([400, 401, 403, 422].includes(status) ? 1 : 0);
     expect(config.fetchImpl).toHaveBeenCalledTimes(1);
   });
 
@@ -158,7 +158,7 @@ describe("generic Decisions client", () => {
     [400, { error: { code: "model_unavailable" } }],
   ])("classifies explicit model availability codes without exposing provider text (%s, %j)", async (status, body) => {
     const config = options();
-    config.fetchImpl.mockResolvedValue({ ok: false, status, json: async () => ({ ...body, message: "sensitive evidence and credentials" }) });
+    config.fetchImpl.mockResolvedValue(new Response(JSON.stringify({ ...body, message: "sensitive evidence and credentials" }), { status }));
     const request = invokeDecisions(config);
     await expect(request).rejects.toThrow(DecisionsModelUnavailableError);
     await expect(request).rejects.not.toThrow("sensitive");
@@ -168,7 +168,7 @@ describe("generic Decisions client", () => {
   it.each([401, 403, 404, 429, 500])("does not classify HTTP %s as model unavailability even with a model error code", async status => {
     const config = options();
     const json = vi.fn().mockResolvedValue({ error: { code: "model_not_supported" } });
-    config.fetchImpl.mockResolvedValue({ ok: false, status, json });
+    config.fetchImpl.mockResolvedValue({ ok: false, status, json, text: async () => JSON.stringify({ error: { code: "model_not_supported" } }) });
     await expect(invokeDecisions(config)).rejects.toThrow(`HTTP ${status}`);
     expect(json).not.toHaveBeenCalled();
   });
@@ -178,16 +178,14 @@ describe("generic Decisions client", () => {
     config.fetchImpl.mockResolvedValue({
       ok: false,
       status: 422,
-      json: async () => {
-        throw new SyntaxError("sensitive non-JSON response");
-      },
+      text: async () => "sensitive non-JSON response",
     });
     await expect(invokeDecisions(config)).rejects.toThrow("Decisions request failed (HTTP 422)");
   });
 
   it("does not treat provider messages or arbitrary codes as model availability evidence", async () => {
     const config = options();
-    config.fetchImpl.mockResolvedValue({ ok: false, status: 400, json: async () => ({ error: { code: "sensitive-model_not_found", message: "model_not_supported" } }) });
+    config.fetchImpl.mockResolvedValue(new Response(JSON.stringify({ error: { code: "sensitive-model_not_found", message: "model_not_supported" } }), { status: 400 }));
     await expect(invokeDecisions(config)).rejects.toThrow("Decisions request failed (HTTP 400)");
   });
 
@@ -196,6 +194,30 @@ describe("generic Decisions client", () => {
     config.fetchImpl.mockRejectedValue(new Error("connection failed"));
     await expect(invokeDecisions(config)).rejects.toThrow("connection failed");
     expect(config.fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([400, 401, 403])("classifies PAT rejection without exposing provider text (HTTP %s)", async status => {
+    const config = options();
+    config.fetchImpl.mockResolvedValue(
+      new Response("checking third-party user token: bad request: Personal Access Tokens are not supported for this endpoint; sensitive credentials", { status, headers: { "Content-Type": "text/plain; charset=utf-8" } })
+    );
+    const request = invokeDecisions(config);
+    await expect(request).rejects.toThrow(DecisionsAuthUnsupportedError);
+    await expect(request).rejects.toThrow(`Decisions endpoint does not accept personal access tokens (HTTP ${status})`);
+    await expect(request).rejects.not.toThrow("sensitive");
+    expect(config.fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([404, 422, 429, 500])("does not classify PAT rejection text on HTTP %s as unsupported auth", async status => {
+    const config = options();
+    config.fetchImpl.mockResolvedValue(new Response("Personal Access Tokens are not supported", { status }));
+    await expect(invokeDecisions(config)).rejects.toThrow(`Decisions request failed (HTTP ${status})`);
+  });
+
+  it("limits error classification to the first 2 KB", async () => {
+    const config = options();
+    config.fetchImpl.mockResolvedValue(new Response("x".repeat(2048) + "Personal Access Tokens are not supported", { status: 400 }));
+    await expect(invokeDecisions(config)).rejects.toThrow("Decisions request failed (HTTP 400)");
   });
 
   it("propagates invalid JSON", async () => {
