@@ -40,7 +40,6 @@ If GitHub API, `gh api`, or GitHub MCP downloads return HTTP 403 (including a to
 - `.github/aw/cli-commands.md`
 - `.github/aw/compat.md`
 - `.github/aw/configure-agentic-engine.md`
-- `.github/aw/connectors.md`
 - `.github/aw/context.md`
 - `.github/aw/create-agentic-workflow-trigger-details.md`
 - `.github/aw/create-agentic-workflow.md`
