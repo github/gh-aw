@@ -31,7 +31,11 @@ func run(pass *analysis.Pass) (any, error) {
 	nodeFilter := []ast.Node{(*ast.CallExpr)(nil)}
 	return analyzerutil.Preorder(pass, nodeFilter, func(n ast.Node) {
 		call, ok := n.(*ast.CallExpr)
-		if !ok || !isStringsSplit(pass, call) || !hasNewlineSeparator(pass, call) {
+		if !ok {
+			return
+		}
+		stringsCall, ok := astutil.AsStringsMethodCall(pass, call, "Split")
+		if !ok || len(stringsCall.Args) != 2 || !hasNewlineSeparator(pass, stringsCall) {
 			return
 		}
 
@@ -46,26 +50,12 @@ func run(pass *analysis.Pass) (any, error) {
 		pass.Report(analysis.Diagnostic{
 			Pos:     call.Pos(),
 			End:     call.End(),
-			Message: "strings.Split with a newline separator can retain carriage returns on CRLF input and produce a trailing empty element; normalize line endings or use a line scanner instead",
+			Message: "strings.Split with a newline separator can retain carriage returns on CRLF input and produce a trailing empty element; normalize line endings or trim carriage returns from each line",
 		})
 	})
 }
 
-func isStringsSplit(pass *analysis.Pass, call *ast.CallExpr) bool {
-	if len(call.Args) != 2 {
-		return false
-	}
-	sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
-	if !ok || sel.Sel.Name != "Split" {
-		return false
-	}
-	return astutil.IsPkgSelector(pass, sel, "strings")
-}
-
 func hasNewlineSeparator(pass *analysis.Pass, call *ast.CallExpr) bool {
-	if len(call.Args) != 2 {
-		return false
-	}
 	tv, ok := pass.TypesInfo.Types[call.Args[1]] //nolint:uncheckedsliceindex // call is checked for exactly two arguments above
 	return ok && tv.Value != nil && tv.Value.Kind() == constant.String && constant.StringVal(tv.Value) == "\n"
 }

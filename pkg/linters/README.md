@@ -306,8 +306,8 @@ import (
 	"github.com/github/gh-aw/pkg/linters/sortslice"
 	"github.com/github/gh-aw/pkg/linters/sprintfbool"
 	"github.com/github/gh-aw/pkg/linters/sprintfint"
-	"github.com/github/gh-aw/pkg/linters/ssljson"
 	"github.com/github/gh-aw/pkg/linters/splitlines-on-newline"
+	"github.com/github/gh-aw/pkg/linters/ssljson"
 	"github.com/github/gh-aw/pkg/linters/stringssplitfirst"
 	"github.com/github/gh-aw/pkg/linters/timesleepnocontext"
 	"github.com/github/gh-aw/pkg/linters/trimleftright"
@@ -339,8 +339,8 @@ _ = regexpdynamicpattern.Analyzer
 _ = sortslice.Analyzer
 _ = sprintfbool.Analyzer
 _ = sprintfint.Analyzer
-_ = ssljson.Analyzer
 _ = splitlinesonnewline.Analyzer
+_ = ssljson.Analyzer
 _ = stringssplitfirst.Analyzer
 _ = timesleepnocontext.Analyzer
 _ = trimleftright.Analyzer

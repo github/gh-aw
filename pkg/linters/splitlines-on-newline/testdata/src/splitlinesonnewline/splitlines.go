@@ -35,3 +35,8 @@ func (customSplitter) Split(string, string) []string {
 func goodUserDefinedSplit(input string) {
 	customSplitter{}.Split(input, "\n")
 }
+
+func goodShadowedPackageName(input string) {
+	strings := customSplitter{}
+	strings.Split(input, "\n")
+}
