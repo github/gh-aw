@@ -25,6 +25,7 @@ const HANDLER_TYPE = "replace_label";
 const { matchesSimpleGlob } = require("./glob_pattern_helpers.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
+const { hardenUnicodeText } = require("./sanitize_content_core.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { resolveSafeOutputIssueTarget } = require("./temporary_id.cjs");
@@ -57,8 +58,9 @@ const SET_LABELS_RETRY_CONFIG = {
  * @returns {{valid: true} | {valid: false, error: string}}
  */
 function validateSingleLabel(labelName, allowedPatterns, blockedPatterns, fieldName) {
+  const normalizedLabelName = hardenUnicodeText(labelName);
   if (blockedPatterns.length > 0) {
-    const isBlocked = blockedPatterns.some(pattern => matchesSimpleGlob(labelName, pattern));
+    const isBlocked = blockedPatterns.some(pattern => matchesSimpleGlob(normalizedLabelName, hardenUnicodeText(pattern)));
     if (isBlocked) {
       return { valid: false, error: `${fieldName} "${labelName}" matches a blocked pattern` };
     }

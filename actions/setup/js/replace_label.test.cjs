@@ -260,6 +260,18 @@ describe("replace_label", () => {
     expect(result.success).toBe(false);
   });
 
+  it.each([
+    ["case variation", "BlOcKeD"],
+    ["zero-width character", "block\u200Bed"],
+    ["full-width characters", "ｂｌｏｃｋｅｄ"],
+  ])("should reject blocked labels with %s", async (_variant, label) => {
+    const handler = await main({ blocked: ["blocked"] });
+    const result = await handler({ label_to_remove: "in-progress", label_to_add: label }, {});
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("blocked pattern");
+  });
+
   it("should reject label_to_add before setLabels when blocklist changes mid-flight", async () => {
     let setLabelsCalls = 0;
     let getCalls = 0;

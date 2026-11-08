@@ -138,16 +138,15 @@ func TestSanitizeRunStepExpressions(t *testing.T) {
 			expectWarnings: 1,
 		},
 		{
-			name: "expression in heredoc not extracted",
+			name: "expression in quoted heredoc left for validation",
 			step: map[string]any{
 				"name": "Heredoc step",
 				"run": `cat > /tmp/out.txt << 'EOF'
 ${{ github.event.issue.title }}
 EOF`,
 			},
-			// The run: script only has ${{ }} inside a heredoc; removeHeredocContent
-			// strips that section before scanning, so no expressions are found and
-			// nothing is extracted.
+			// Rewriting a quoted heredoc would change its literal output. The expression
+			// remains for the template-injection validator to reject.
 			expectChanged: false,
 		},
 		{
@@ -233,6 +232,32 @@ EOF`,
 			},
 			expectChanged:  true,
 			expectWarnings: 1,
+		},
+		{
+			name: "expressions in comments and expanding heredocs are extracted",
+			step: map[string]any{
+				"run": strings.Join([]string{
+					`# docs: ${{ github.event.issue.title }}`,
+					`cat <<EOF`,
+					`${{ github.event.issue.body }}`,
+					`EOF`,
+				}, "\n"),
+			},
+			expectChanged: true,
+			expectRunHas: []string{
+				"# docs: $GH_AW_GITHUB_EVENT_ISSUE_TITLE",
+				"$GH_AW_GITHUB_EVENT_ISSUE_BODY",
+			},
+			expectRunNotHas: []string{"${{"},
+			expectEnvKeys: []string{
+				"GH_AW_GITHUB_EVENT_ISSUE_TITLE",
+				"GH_AW_GITHUB_EVENT_ISSUE_BODY",
+			},
+			expectEnvVals: map[string]string{
+				"GH_AW_GITHUB_EVENT_ISSUE_TITLE": "${{ github.event.issue.title }}",
+				"GH_AW_GITHUB_EVENT_ISSUE_BODY":  "${{ github.event.issue.body }}",
+			},
+			expectWarnings: 2,
 		},
 		{
 			name: "warning omits name when step has no name",
