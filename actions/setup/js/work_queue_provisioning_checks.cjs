@@ -68,8 +68,17 @@ function registerTests({ describe, it }) {
         ["registration", { owner: "owner", repo: "repo", workflow_id: "worker.lock.yml", request: native.calls[1][1].request }],
       ]);
     });
-    it("verifies route metadata without parsing workflow YAML", async () => {
-      for (const contents of [validYAML, "this is deliberately not workflow YAML", "on: [\n"]) await verifyWorkerRoute(options(nativeRoute(contents)));
+    it("requires valid YAML with the work queue assignment string input", async () => {
+      await verifyWorkerRoute(options(nativeRoute(validYAML)));
+      for (const contents of [
+        "this is deliberately not workflow YAML",
+        "on: [\n",
+        "on: push\n",
+        "on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: boolean\n",
+        "on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment: {}\n",
+      ]) {
+        await rejected(nativeRoute(contents));
+      }
     });
     it("reads lock metadata headers through a bounded reader", async () => {
       const metadata = { schema_version: "v1" };
@@ -180,13 +189,13 @@ function registerTests({ describe, it }) {
       await rejected(native, policy.pools.default.profiles.worker);
       assert.equal(native.calls.length, 1);
     });
-    it("verifies worker routes without loading a YAML parser", () => {
+    it("validates worker assignment inputs with the bundled YAML parser", () => {
       const script = `
         const assert = require("node:assert/strict");
         const Module = require("node:module");
         const load = Module._load;
         Module._load = function(name, ...args) {
-          if (name === "./work_queue_yaml.cjs") throw new Error("work queue provisioning must not load a YAML parser");
+          if (!name.startsWith("node:") && !name.startsWith(".") && !name.startsWith("/")) throw new Error("runtime npm package forbidden: " + name);
           return load.call(this, name, ...args);
         };
         const { verifyWorkerRoute } = require(process.argv[1]);
@@ -220,7 +229,7 @@ function registerTests({ describe, it }) {
           for (const match of source.matchAll(/require\(["']\.\/([a-z_]+\.cjs)["']\)/g)) copy(match[1]);
         }
         copy("work_queue_provisioning.cjs");
-        assert.ok(!copied.has("work_queue_yaml.cjs"));
+        assert.ok(copied.has("work_queue_yaml.cjs"));
         assert.ok(copied.has("work_queue_host.cjs"));
         assert.ok(copied.has("work_queue_logging.cjs"));
         assert.ok(copied.has("mcp_logger.cjs"));
@@ -235,7 +244,8 @@ function registerTests({ describe, it }) {
           };
           const { verifyWorkerRoute, verifiedDefaultReference, configuredWorkerDeployment } = require(process.argv[1]);
           const profile = {...JSON.parse(process.argv[2]), logical_contract: "a".repeat(64)};
-          const bytes = Buffer.from('# gh-aw-manifest: ' + JSON.stringify({work_queue: {worker: true, logical_contract: profile.logical_contract}}) + '\\n', "utf8");
+          const contents = '# gh-aw-manifest: ' + JSON.stringify({work_queue: {worker: true, logical_contract: profile.logical_contract}}) + '\\non:\\n  workflow_dispatch:\\n    inputs:\\n      work_queue_assignment:\\n        type: string\\n';
+          const bytes = Buffer.from(contents, "utf8");
           let reads = 0;
           const githubClient = {rest: {
             repos: {

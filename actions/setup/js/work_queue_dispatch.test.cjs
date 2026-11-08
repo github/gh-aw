@@ -2093,7 +2093,7 @@ describe("native queue launch fencing and conservative recovery", () => {
       pool.profiles.default.ref = "c".repeat(40);
       pool.profiles.default.logical_contract = "c".repeat(64);
     }
-    const contents = `on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\nenv:\n  GH_AW_WORK_QUEUE_CONTRACT: "${"b".repeat(64)}"\n`;
+    const contents = `# gh-aw-manifest: ${JSON.stringify({ work_queue: { worker: true, logical_contract: "b".repeat(64) } })}\non:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\nenv:\n  GH_AW_WORK_QUEUE_CONTRACT: "${"b".repeat(64)}"\n`;
     fixture.githubClient.rest.repos.getContent = vi.fn(async ({ path: workflowPath }) => ({
       data: { type: "file", path: workflowPath, encoding: "base64", content: Buffer.from(contents).toString("base64") },
     }));
