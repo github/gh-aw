@@ -21,6 +21,7 @@ For workflows that **persist state across runs** — deduplication, incremental 
 | Long-lived knowledge base visible in PRs and code reviews | `repo-memory` |
 | Baselines that must survive cache expiry (e.g. security findings, dedup lists) | `repo-memory` |
 | Bounded append-only structured event history and built-in current-state projections | Experimental `tools.ledger` — see [ledger.md](ledger.md) |
+| Reusable lessons need semantic consolidation beyond deterministic cleanup | [Scheduled dreaming](#scheduled-dreaming) only when cheaper options cannot meet the need |
 | Human-readable wiki pages for knowledge accumulation | `repo-memory` with `wiki: true` |
 | Persist notes/state inline on the triggering issue or PR | `comment-memory` |
 | Private-preview GitHub Drives backend (enrolled repos only) | `drive-memory` — see [drive-memory.md](drive-memory.md) |
@@ -128,7 +129,7 @@ Supported schema keywords are `type` (including arrays of types and `null`), pri
 
 ### Branch scoping
 
-Caches are **branch-scoped** with default-branch fallback restore. A feature branch's first restore comes from `main`; subsequent saves fork a branch-local lineage. For warmed-state workflows, schedule on the default branch to reuse one lineage instead of fragmenting state.
+Caches are **branch-scoped** with default-branch fallback restore. A feature branch's first restore can come from the default branch; subsequent saves fork a branch-local lineage. Caches saved on a PR merge ref cannot be restored by a default-branch scheduled workflow. Default-branch fallback does not publish PR-local updates back to that branch. For warmed-state workflows, schedule on the default branch to reuse one lineage instead of fragmenting state.
 
 ### Deduplication example (scheduled workflow)
 
@@ -195,7 +196,7 @@ When instructing the agent for timestamped files, say: "Use `YYYY-MM-DD-HH-MM-SS
 
 ## `repo-memory` — Long-lived Repository Knowledge
 
-Uses a dedicated Git branch (default: `memory/agent-notes`) to store files that persist indefinitely until explicitly deleted. The directory lives at `/tmp/gh-aw/repo-memory/`.
+Uses a dedicated Git branch (default: `memory/agent-notes`) to store long-lived files. Omission or local deletion during a workflow does not delete backing-branch files. The directory lives at `/tmp/gh-aw/repo-memory/`.
 
 ### When to use
 
@@ -234,9 +235,73 @@ state-model types, limits, and compaction.
 |---|---|
 | Persists indefinitely (no expiry) | Produces Git commits — repository noise |
 | Auditable: Git history shows every change | Slower: requires Git clone + push |
-| Survives cache invalidation | Not available for Copilot engine (requires GitHub tools) |
+| Survives cache invalidation | Shared-file writers need explicit ownership |
 | Human-readable via GitHub branch UI | More complex setup |
 | Can target a different repository | |
+
+---
+
+## Scheduled dreaming
+
+Dreaming is a separate, scheduled workflow that turns accumulated observations
+into a small, evidence-backed knowledge view for later runs. It is not a new
+frontmatter field, ledger compaction, or permission to rewrite task state.
+Use existing `tools.repo-memory` and, when immutable lessons and corrections
+are useful, experimental `tools.ledger` with `type: notes`.
+
+Use the cheapest sufficient option, in this order:
+
+| Need | First choice |
+|---|---|
+| Exact-key deduplication, sorting, hash-based invalidation, retention of disposable state, rebuilding an index | Deterministic cleanup in the existing workflow; no model invocation |
+| Meaning-based reconciliation or synthesis that fits an existing run's budget | Bounded review by the already-running agent; no additional workflow |
+| Recurring semantic consolidation that the cheaper options cannot cover economically | A separate dreamer, only with primary evidence, a consumer, and a credible benefit |
+
+Deterministic cleanup is preferable whenever the rules reliably express the
+operation. Invalidating a changed citation by hash does not verify the new
+assertion's meaning. Never prune canonical ledger evidence or producer task
+state under the guise of retention; clean disposable state and derived views.
+Keep semantic review by the already-running producer within its budget and
+ownership; do not use it to rewrite another workflow's files.
+
+Inspect the producer workflow and its actual memory format first. Repeated
+investigations, tested strategies, environment gotchas, and recurring explicit
+corrections are good inputs. A deduplication list, backlog cursor, numeric
+baseline, one-off task, or raw transcript alone does not justify dreaming.
+Preserve successful techniques as well as failures; distinguish observed
+outcomes from hypotheses.
+
+Recommend dreaming only when a later consumer will reuse the knowledge and
+the expected reduction in repeated reasoning or stale advice justifies the
+extra workflow, model invocation, and maintenance after cheaper options are
+ruled out. Compare total cost, not just reduced online tokens; do not invent
+savings. If the benefit is uncertain, do not add the dreamer.
+Identify the observed problem, primary evidence source, later consumer, and
+why an additional workflow is worth its total cost. Keep this a quick design
+decision, not a separate investigation; defer the dreamer when these are unknown.
+A recurring schedule or a growing note count
+alone is not enough. Prefer direct recall and producer-owned corrections when
+the existing view is already small, current, and cheap to use.
+
+For `cache-memory`, scheduled and manual dreamer runs must use the repository's
+actual default branch, not a hard-coded `main`. Scheduled dreaming is eligible
+for default-branch history only, not PR-local caches. A PR merge-ref run may
+restore an eligible default-branch cache, but its updates do not flow back to the
+default branch. Keep PR-local cleanup inside the PR workflow.
+
+Separate workflows do not automatically share cache-memory: default keys are
+workflow-scoped. Verify compatible restore/save key prefixes, cache versions and
+paths, schema, and integrity/access policy. `scope: repo` broadens eligible
+restore keys, not GitHub's branch visibility; a shared key does not remove PR
+isolation. Cache eviction remains possible, so define a rebuildable cold start.
+If knowledge must outlive or cross PR boundaries, require explicitly authorized,
+evidence-validated publication to durable repo-memory or a ledger. Do not silently
+export PR content into shared memory to bypass cache isolation.
+
+Once the need, cost, and input scope justify a separate dreamer, load
+[dreaming.md](dreaming.md) for configuration, ownership, bounded consolidation,
+publication, consumer recall, and examples. Do not load implementation details
+merely because a workflow uses memory.
 
 ---
 
@@ -326,7 +391,7 @@ Multiple memory IDs in one comment are supported; each maps to a separate `*.md`
 
 ## Stateful Scanning Pattern (repo-memory)
 
-Persist a baseline JSON file between runs to alert only on *new* findings — vulnerability scans, dependency audits, licence checks. Unlike `cache-memory`, the baseline survives cache expiry, so a missed cycle won't flood the repo with duplicate issues. Store only stable identifiers (advisory IDs), cap output with `max:`, treat missing baseline as `[]`. Requires Claude or custom engine — not Copilot.
+Persist a baseline JSON file between runs to alert only on *new* findings — vulnerability scans, dependency audits, licence checks. Unlike `cache-memory`, the baseline survives cache expiry, so a missed cycle won't flood the repo with duplicate issues. Store only stable identifiers (advisory IDs), cap output with `max:`, treat missing baseline as `[]`.
 
 Keep this as a replaceable repo-memory snapshot by default. Use the experimental
 ledger only when the audit needs an append-only record of each scan or finding

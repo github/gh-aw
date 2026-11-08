@@ -68,7 +68,7 @@ jobs:
           key: auditor-collection-v1-${{ github.repository_id }}-${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
             auditor-collection-v1-${{ github.repository_id }}-${{ github.ref_name }}-
-      - name: Collect complete metadata, cached logs and bounded audits
+      - name: Collect health failures, cached logs and bounded audits
         id: collect
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
@@ -105,44 +105,51 @@ jobs:
             if (Date.parse(end) - Date.parse(state.checkpoint) > 86400000) {
               throw new Error('Collection checkpoint gap exceeds 24 hours; refusing to reset it silently');
             }
-            // Incremental all-status creation discovery, with a one-second overlap.
-            // Retention is independent: refresh recent processed backlog identities
-            // as well as unfinished/deferred IDs outside the discovery window.
-            const start = new Date(Date.parse(state.checkpoint) - (bootstrap ? 0 : 1000)).toISOString();
             const retentionStart = new Date(Date.parse(end) - 86400000).toISOString();
             let requests = 0;
             const request = async (method, params) => {
               if (++requests > 1025) throw new Error('Metadata request budget exceeded');
               return method({...context.repo, ...params});
             };
-            const observed = [];
-            let total;
-            for (let page = 1; page <= 10; page++) {
-              const response = await request(github.rest.actions.listWorkflowRunsForRepo, {
-                created: `${start}..${end}`, per_page: 100, page, exclude_pull_requests: true
-              });
-              const body = response.data;
-              if (!Number.isInteger(body.total_count) || !Array.isArray(body.workflow_runs) ||
-                  body.total_count >= 1000 || (total !== undefined && total !== body.total_count)) {
-                throw new Error('Incomplete or oversized recent run scope; checkpoint unchanged');
-              }
-              total = body.total_count;
-              observed.push(...body.workflow_runs);
-              if (observed.length >= total) break;
+            const health = JSON.parse(execFileSync('gh', ['aw', 'health',
+              '--repo', repository, '--start-date', retentionStart, '--end-date', end,
+              '--logs-dir', path.join(cache, 'health'), '--timeout', '2m', '--json'], {
+              encoding: 'utf8', timeout: 150000, maxBuffer: 16 * 1024 * 1024
+            }));
+            const discovery = health.collection;
+            if (!discovery || !Array.isArray(health.workflows) ||
+                (discovery.partial !== false &&
+                  !(discovery.partial === true && discovery.reason === 'failure_listing_limit')) ||
+                (discovery.partial === false &&
+                  (discovery.failure_listing_complete !== true || discovery.failure_pass_complete !== true)) ||
+                (discovery.potential_issues !== undefined && !Array.isArray(discovery.potential_issues))) {
+              throw new Error('Incomplete or invalid health discovery; checkpoint unchanged');
             }
-            if (observed.length !== total || new Set(observed.map(r => r.id)).size !== total) {
-              throw new Error('Recent run pagination incomplete or raced; checkpoint unchanged');
-            }
+            // Health is a bounded current-revision sample, not an all-run census.
+            // Only verified representatives can activate collection, even when
+            // the cheap failure inventory reaches its documented page limit.
+            const candidates = (discovery.potential_issues || []).filter(issue =>
+              issue.representative_status === 'revision_checked' &&
+              issue.workflow_path !== '.github/workflows/auditor.lock.yml' &&
+              health.workflows.some(w => w.workflow_path === issue.workflow_path && !w.intentional_failure));
+            const currentIDs = new Set(health.workflows.filter(w => !w.intentional_failure &&
+              w.workflow_path !== '.github/workflows/auditor.lock.yml').flatMap(w =>
+              (w.revisions || []).flatMap(revision => revision.current?.run_ids || [])));
             const pendingIDs = [...new Set([...(state.pending || []),
               ...state.backlog.filter(item => Date.parse(item.run.updated_at) >= Date.parse(retentionStart))
-                .map(item => item.run.id)])];
-            if (pendingIDs.length >= 1000 || pendingIDs.some(id => !Number.isSafeInteger(id) || id <= 0)) {
+                .map(item => item.run.id)])].filter(id => currentIDs.has(id));
+            const selectedIDs = [...new Set([...candidates.map(issue => issue.representative_run_id), ...pendingIDs])];
+            if (selectedIDs.length >= 1000 || selectedIDs.some(id => !Number.isSafeInteger(id) || id <= 0)) {
               throw new Error('Invalid or oversized tracked run scope');
             }
-            for (const id of pendingIDs) {
-              if (observed.some(r => r.id === id)) continue;
+            const observed = [];
+            for (const id of selectedIDs) {
               const response = await request(github.rest.actions.getWorkflowRun, {run_id: id});
               if (response.data.id !== id) throw new Error('Tracked run identity changed');
+              const candidate = candidates.find(issue => issue.representative_run_id === id);
+              if (candidate && (response.data.path || '').split('@')[0] !== candidate.workflow_path) {
+                throw new Error('Health representative workflow changed');
+              }
               observed.push(response.data);
             }
             if (observed.length >= 1000) throw new Error('Combined recent/tracked metadata scope exceeded');
@@ -311,12 +318,13 @@ jobs:
             // Copy ONLY this collection's compact reports and selected audit
             // evidence. Do not upload the whole historical download cache.
             const manifest = {
-              complete: true, repository, window_start: start, window_end: end,
+              complete: true, repository, window_start: retentionStart, window_end: end,
               retention_start: retentionStart, bootstrap, cli_version: cliVersion,
+              discovery,
               new_failures: newFailures,
               evidence_complete: deferred === 0, pending_runs: pending.length, deferred_failures: deferred,
               open_prs_complete: true, open_prs: openPRs, clusters: ranked,
-              limits: {recent_pages: 10, metadata_requests: 1025, metadata_runs: 999,
+              limits: {health_timeout_seconds: 120, metadata_requests: 1025, metadata_runs: 999,
                 pr_pages: 10, new_runs: 25, audits: 3, api_used_ceiling: ceiling}
             };
             for (const [index, cluster] of manifest.clusters.entries()) {
@@ -337,7 +345,7 @@ jobs:
               throw new Error('Shared API budget exceeded or reset; checkpoint unchanged');
             }
             write(path.join(data, 'manifest.json'), manifest);
-            // Complete metadata/PR scope; evidence may be a declared FIFO batch.
+            // Verified health sample and complete PR scope; evidence may be a FIFO batch.
             // Never mark deferred attempts seen. Cache save must also succeed.
             write(stateFile, {...state, checkpoint: end,
               seen: eligible.filter(r => Date.parse(r.updated_at) >= Date.parse(retentionStart))
@@ -345,7 +353,8 @@ jobs:
             core.setOutput('has_new_failures',
               manifest.new_failures > 0 && manifest.evidence_complete ? 'true' : 'false');
             await core.summary.addRaw(`Collected ${manifest.new_failures} new non-intentional failures; ` +
-              `${ranked.length} symptom clusters; ${pending.length} unfinished/deferred runs. Created window ${start} to ${end}. ` +
+              `${ranked.length} symptom clusters; ${pending.length} deferred runs. Health window ${retentionStart} to ${end}. ` +
+              `Discovery is a bounded sample (partial=${discovery.partial}). ` +
               'No new failures means no agent, not proof that the backlog is healthy.').write();
       - name: Upload compact collection
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -388,7 +397,7 @@ are tracked separately and do not block ranking completed failures.
 
 ## Evidence and selection
 
-The trusted `collect` job alone queries `gh aw logs`, caches attempt-specific
+The trusted `collect` job discovers failures with `gh aw health`, then queries `gh aw logs`, caches attempt-specific
 JSONL/artifacts, and runs up to three representative audits using native
 `gh aw logs --audit` (local audit generation from cached runs, no automatic
 previous-run baseline downloads). Read its
@@ -468,21 +477,23 @@ If no safe, novel, evidenced fix is available, call `noop` with a concise reason
 
 Runs hourly on the default branch. The compiler adds a manual dispatch trigger,
 but both collection and agent jobs require the scheduled event, so manual
-dispatch cannot activate this auditor. A cold or
-evicted cache starts with runs **created** in the preceding one hour. Each later
-invocation discovers all statuses from the successful collection checkpoint minus
-a one-second overlap through now. Checkpoint gaps over 24 hours fail closed without
-resetting or advancing the checkpoint; oversized or truncated scopes also fail closed.
-Observed unfinished or
-unprocessed run IDs persist beyond it and are refreshed individually until terminal
-and processed. Old reruns first observed outside discovery and cache loss are not
-covered: this is not an all-history completion census.
-Fail closed at 1,000 recent/combined metadata runs, 1,025 metadata requests, ten PR
-pages, incomplete CLI results, or exhausted API reserve.
+dispatch cannot activate this auditor. Each invocation uses `gh aw health --json`
+over runs created in the preceding 24 hours, selecting only revision-checked
+failure representatives from registered agentic workflows. Superseded, jobless,
+unverified, intentional and auditor failures never activate collection.
+Health is a bounded sample, not an all-history completion census or fleet failure
+rate. Its collection metadata is included as `discovery` in the manifest.
+The documented `failure_listing_limit` may leave the inventory partial; verified
+representatives remain actionable, but rankings cover only the collected sample.
+Other partial/invalid health results fail closed without advancing the checkpoint.
+Checkpoint gaps over 24 hours also fail closed. Retained pending/backlog IDs are
+refreshed only while included in health's current-revision cohorts.
+Fail closed at 1,000 selected metadata runs, 1,025 metadata requests, ten PR
+pages, incomplete evidence results, or exhausted API reserve.
 Process at most 25 new failures FIFO per hour; excess candidates are checkpointed,
 never marked seen, and proceed next hour even without newly created failures.
 Backlog retention uses a separate now-minus-24-hours boundary, regardless of discovery
-start. Rankings cover retained failures updated in that period plus this batch;
+start. Rankings cover retained sampled failures updated in that period plus this batch;
 do not activate the agent while failures remain unprocessed. Refresh retained
 processed runs outside discovery too, preserving seen identities until retention
 expires and removing superseded attempts without needlessly re-auditing identical runs.
