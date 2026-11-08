@@ -722,6 +722,8 @@ When Go is required and `runtimes.go.version` is omitted, the generated setup st
 
 Controls whether npm pre/post-install scripts are allowed during package installation. Configure this under `runtimes.node.run-install-scripts`. The default is `false`.
 
+The shared npm installer disables lifecycle scripts for global installs through step-level `NPM_CONFIG_IGNORE_SCRIPTS: 'true'`; local installs retain `--ignore-scripts`. This keeps exact-version global commands compatible with dependency-pinning scanners without changing version pins or release-age cooldowns.
+
 ```yaml wrap
 runtimes:
   node:

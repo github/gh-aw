@@ -8,6 +8,7 @@ const { execFileSync } = require("node:child_process");
 const { writeSecureOutput } = require("./convert_gateway_config_shared.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { INLINE_SKILL_MANIFEST, resolveWorkflowSkillPaths, writeWorkflowSkillArgs } = require("./pi_workflow_skills.cjs");
+const { openPiDurableSession } = require("./durable_native_session.cjs");
 
 const DEFAULT_AGENT_DIR = "/tmp/gh-aw/pi-agent-dir";
 const DEFAULT_SESSION_DIR = "/tmp/gh-aw/agent/pi-sessions";
@@ -116,6 +117,7 @@ function applyResolvedPiModel() {
 }
 
 function preparePiRuntime(config = parsePiConfig()) {
+  const durableSession = openPiDurableSession();
   const agentDir = process.env.PI_CODING_AGENT_DIR || DEFAULT_AGENT_DIR;
   const routingSelection = readPiModelRoutingSelection(agentDir);
   if (!routingSelection) applyResolvedPiModel();
@@ -129,9 +131,10 @@ function preparePiRuntime(config = parsePiConfig()) {
   const settings = {
     ...installedSettings,
     defaultTools: [...new Set([...(Array.isArray(installedSettings.defaultTools) ? installedSettings.defaultTools : []), "+codemode", "+tool_search"])],
-    sessionDir: DEFAULT_SESSION_DIR,
+    sessionDir: durableSession?.directory || DEFAULT_SESSION_DIR,
     enableInstallTelemetry: false,
     ...config.settings,
+    ...(durableSession ? { sessionDir: durableSession.directory } : {}),
     retry: {
       enabled: true,
       maxRetries: 2,
@@ -177,7 +180,7 @@ function preparePiRuntime(config = parsePiConfig()) {
   // Bare mode disables skill discovery; explicitly load only the inline skills activation staged.
   const skillPaths = process.env.GH_AW_PI_BARE === "true" ? resolveWorkflowSkillPaths(agentDir) : [];
   writeWorkflowSkillArgs(agentDir, skillPaths);
-  return { agentDir, settings, config, routingSelection, skillPaths };
+  return { agentDir, settings, config, routingSelection, skillPaths, durableSession };
 }
 
 /** @param {string} agentDir */
