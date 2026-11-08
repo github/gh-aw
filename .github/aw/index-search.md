@@ -71,7 +71,7 @@ jobs:
     outputs:
       cache-key: ${{ steps.key.outputs.value }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@<approved-ref>
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
@@ -84,14 +84,14 @@ jobs:
         run: |
           ./scripts/search-index build --output /tmp/gh-aw/search-index
           ./scripts/search-index validate --index /tmp/gh-aw/search-index
-      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+      - uses: actions/cache/save@<approved-ref>
         with:
           path: /tmp/gh-aw/search-index
           key: ${{ steps.key.outputs.value }}
   agent:
     needs: [index]
 pre-agent-steps:
-  - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+  - uses: actions/cache/restore@<approved-ref>
     with:
       path: /tmp/gh-aw/search-index
       key: ${{ needs.index.outputs.cache-key }}
@@ -139,7 +139,7 @@ checkout:
   ref: main
   pull-request: false
 pre-agent-steps:
-  - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+  - uses: actions/cache/restore@<approved-ref>
     id: search_index
     with:
       path: /tmp/gh-aw/search-index
