@@ -384,6 +384,63 @@ func TestCompilerLintAllowsOnlyWellFormedMutableActionRefs(t *testing.T) {
 	}
 }
 
+func TestCompilerLintSelfRepositoryReferences(t *testing.T) {
+	t.Parallel()
+	for _, strict := range []bool{false, true} {
+		t.Run(fmt.Sprintf("strict=%t", strict), func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			path := filepath.Join(dir, "self-repository.md")
+			source := fmt.Sprintf(`---
+on: workflow_call
+strict: %t
+permissions:
+  contents: read
+tools:
+  github: false
+steps:
+  - uses: $/some/agent-action
+jobs:
+  custom:
+    needs: activation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: $/some/custom-action
+  call:
+    needs: activation
+    uses: $/.github/workflows/called.yml
+safe-outputs:
+  jobs:
+    report:
+      description: Report results
+      runs-on: ubuntu-latest
+      permissions: {}
+      steps:
+        - uses: $/some/report-action
+---
+Use self-repository actions and workflows.
+`, strict)
+			require.NoError(t, os.WriteFile(path, []byte(source), 0o600))
+			compiler := NewCompiler(WithLint(true))
+			compiler.gitRoot = dir
+			compiler.SetReadOnly(true)
+			compiler.SetSkipValidation(true)
+			require.NoError(t, compiler.CompileWorkflow(path))
+			lock, err := os.ReadFile(filepath.Join(dir, "self-repository.lock.yml"))
+			require.NoError(t, err)
+			for _, uses := range []string{
+				"$/some/agent-action",
+				"$/some/custom-action",
+				"$/.github/workflows/called.yml",
+				"$/some/report-action",
+			} {
+				require.Contains(t, string(lock), "uses: "+uses+"\n")
+			}
+		})
+	}
+}
+
 func TestCompilerLintGeneratedActionFallback(t *testing.T) {
 	t.Parallel()
 	for _, mode := range []ActionMode{ActionModeAction, ActionModeRelease} {
