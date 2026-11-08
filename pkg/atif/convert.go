@@ -93,12 +93,14 @@ func Convert(ctx context.Context, input io.Reader) (*Trajectory, error) {
 		return nil, fmt.Errorf("read unified session for ATIF: %w", err)
 	}
 	if limited.N <= 0 {
+		convertLog.Printf("Rejecting unified session: input exceeds %d byte limit", MaxSessionBytes)
 		return nil, errors.New("unified session exceeds the 64 MiB ATIF input limit")
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	if !conversion.headerSeen {
+		convertLog.Print("Rejecting unified session: no events found before end of input")
 		return nil, errors.New("unified session is missing its leading session.format header")
 	}
 	trajectory.FinalMetrics = finalMetrics(conversion.terminal, len(trajectory.Steps))
@@ -112,17 +114,21 @@ func Convert(ctx context.Context, input io.Reader) (*Trajectory, error) {
 func (c *converter) consume(raw []byte, line int) error {
 	var ev event
 	if err := json.Unmarshal(raw, &ev); err != nil {
+		convertLog.Printf("Rejecting unified session: invalid JSONL at line %d: %v", line, err)
 		return fmt.Errorf("invalid unified session JSONL at line %d", line)
 	}
 	if !strings.Contains(ev.Type, ".") || ev.Data == nil {
+		convertLog.Printf("Rejecting unified session: malformed event at line %d (type=%q, has_data=%t)", line, ev.Type, ev.Data != nil)
 		return fmt.Errorf("invalid unified session event at line %d: expected namespaced type and object data", line)
 	}
 	header := ev.Type == "session.format" && ev.Provenance.Component == "collector"
 	if !c.headerSeen {
 		if !header {
+			convertLog.Printf("Rejecting unified session: first event at line %d is %q, not the session.format header", line, ev.Type)
 			return errors.New("unified session is missing its leading session.format header")
 		}
 		if string(ev.Data["version"]) != "1" {
+			convertLog.Printf("Rejecting unified session: unsupported format version %s", ev.Data["version"])
 			return errors.New("unsupported unified session file-format version")
 		}
 		c.trajectory.Extra = map[string]any{"unified_header": json.RawMessage(bytes.Clone(raw))}
@@ -242,6 +248,8 @@ func (c *converter) mapToolEvent(ev event, step *Step) bool {
 			step.Source = "agent"
 			step.ToolCalls = []ToolCall{{ToolCallID: id, FunctionName: name, Arguments: args}}
 			c.calls[key] = append(c.calls[key], len(c.trajectory.Steps))
+		} else {
+			convertLog.Printf("Keeping tool start as system evidence: toolCallId=%q, toolName=%q, valid_arguments=%t", id, name, ok)
 		}
 		return false
 	}
@@ -256,7 +264,7 @@ func (c *converter) mapToolEvent(ev event, step *Step) bool {
 		})
 		return true
 	}
-	convertLog.Printf("No unambiguous initiating step for tool observation: toolCallId=%s", id)
+	convertLog.Printf("No unambiguous initiating step for tool observation: toolCallId=%s, candidate_steps=%d", id, len(c.calls[key]))
 	return false
 }
 
