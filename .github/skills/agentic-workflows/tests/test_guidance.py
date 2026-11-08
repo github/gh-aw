@@ -42,6 +42,47 @@ def checklist(text):
 
 
 class GuidanceTests(unittest.TestCase):
+    def test_connector_creation_routes_to_spec_and_skill(self):
+        skill = ROOT / ".github/skills/create-connector/SKILL.md"
+        spec = ROOT / "docs/src/content/docs/specs/connector-specification.md"
+        guide = ROOT / ".github/aw/connectors.md"
+        self.assertTrue(spec.is_file())
+        text = skill.read_text()
+        self.assertIn("name: create-connector", text)
+        for boundary in (
+            "Importing alone must select nothing",
+            "secret NAMES",
+            "An agent-phase test DOES contact the provider",
+            "explicit effect scope",
+        ):
+            with self.subTest(boundary=boundary):
+                self.assertIn(boundary.lower(), text.lower())
+        self.assertIn("../skills/create-connector/SKILL.md", guide.read_text())
+        for router in (SKILL / "SKILL.md", ROOT / "pkg/cli/data/agentic_workflows_skill.md"):
+            with self.subTest(router=router):
+                self.assertIn("Create a new connector:", router.read_text())
+                self.assertIn(".github/skills/create-connector/SKILL.md", router.read_text())
+        for link in re.findall(r"\]\(([^)]+)\)", text):
+            with self.subTest(link=link):
+                path, _, anchor = link.partition("#")
+                target = skill.parent / path
+                self.assertTrue(target.is_file())
+                if anchor:
+                    headings = re.findall(r"^#{1,6} (.+)$", target.read_text(), re.MULTILINE)
+                    self.assertIn(anchor, [heading_anchor(heading) for heading in headings])
+        spec_text = spec.read_text()
+        for contract in (
+            "There is no public connector `context`",
+            "github.com/gh-aw/connectors/v1",
+            "Importing a declaration selects nothing",
+            "experimental",
+            "responseResourceInputs",
+            "operational: false",
+            "synthetic contract",
+        ):
+            with self.subTest(contract=contract):
+                self.assertIn(contract, spec_text)
+
     def test_creator_discovers_memory_reuse_before_selecting_persistence(self):
         designer = (ROOT / ".github/aw/designer.md").read_text()
         phase = designer.split("### Phase 4: Data Strategy\n", 1)[1].split("\n### Phase 5:", 1)[0]

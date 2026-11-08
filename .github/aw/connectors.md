@@ -22,6 +22,11 @@ Example declarations in this repository include `linear`, `jira`, `azure-devops`
 and `notion`. The [human reference](../../docs/src/content/docs/reference/connectors.md)
 contains credential-route details and migration limits.
 
+The [connector specification](../../docs/src/content/docs/specs/connector-specification.md)
+defines the public declaration, selection, execution, and conformance contract.
+To add a provider, use the repository's
+[create-connector skill](../skills/create-connector/SKILL.md).
+
 Every included declaration currently sets `experimental: true`. Selecting a
 capability from an experimental connector emits a compile-time warning.
 Declarations accept boolean `true` or `false`; omission defaults to `false`.
@@ -246,7 +251,9 @@ local declaration or normal-import wrapper. Never turn a conformance check into
 a provider mutation, receiver deployment, or automatic login.
 
 Use ordinary Markdown with `connectors.<id>` and an `import-schema`; no separate
-public spec, connection, or binding YAML is required. Reuse an existing provider
+definition, connection, or binding YAML file is required. The
+[creation skill](../skills/create-connector/SKILL.md) supplies the bounded
+authoring and offline-validation procedure. Reuse an existing provider
 declaration and the shared runtime before adding custom code.
 
 Declare stability and sources alongside endpoints and credentials:

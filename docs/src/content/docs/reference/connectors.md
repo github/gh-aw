@@ -10,6 +10,10 @@ file is required. Review the specimen hosts and resource IDs before use.
 
 For agent-oriented authoring instructions, use
 [`.github/aw/connectors.md`](https://github.com/github/gh-aw/blob/main/.github/aw/connectors.md).
+The [connector specification](/gh-aw/specs/connector-specification/) defines the
+normative contract. Use the
+[create-connector skill](https://github.com/github/gh-aw/blob/main/.github/skills/create-connector/SKILL.md)
+to add a provider with a narrow consumer and offline conformance evidence.
 
 Declarations are editable source files, not built into the compiler. Import a
 reviewed copy from `.github/workflows/connectors/<provider>.md`, or use the

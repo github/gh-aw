@@ -35,6 +35,7 @@ After loading the matching workflow prompt or skill, follow it directly:
 - Configure scheduled dreaming or consolidate persistent memory: `.github/aw/create-agentic-workflow.md`, then `.github/aw/memory.md#scheduled-dreaming`; load `.github/aw/dreaming.md` only when the decision and input scope justify implementation
 - Configure or add declarative engines: `.github/aw/configure-agentic-engine.md`
 - Consume, author, or document third-party connectors: `.github/aw/connectors.md`
+- Create a new connector: `.github/aw/connectors.md#author-or-extend-a-declaration`, then the repository's `.github/skills/create-connector/SKILL.md` when available
 - Update existing workflows: `.github/aw/update-agentic-workflow.md`
 - Diagnose, patch, audit, or actively debug workflows: `.github/aw/debug-agentic-workflow.md` (local-first strategy, evidence triage and live gates)
 - Analyze existing runs, logs, or recurring failures: `.github/aw/analyzing-runs.md`. General repository-wide debugging or optimization requests start here with failure clustering before selecting a workflow.
