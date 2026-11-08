@@ -8,7 +8,7 @@ import-schema:
 tools:
   bash:
     - "jq *"
-    - "sed *"
+    - "sed -n *"
     - "git rev-parse HEAD"
 
 jobs:
@@ -123,7 +123,6 @@ jobs:
               tree_path = output / f"{key}.json"
               tree_path.write_text(json.dumps({
                   "source": source,
-                  "sha256": hashlib.sha256(content.encode()).hexdigest(),
                   "structure": tree,
               }, ensure_ascii=False), encoding="utf-8")
               catalog.append({

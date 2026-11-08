@@ -1,10 +1,12 @@
 """Regression checks for the shared local PageIndex workflow."""
 
 import contextlib
+import importlib.util
 import io
 import json
 import os
 import re
+import sys
 import tempfile
 import textwrap
 import unittest
@@ -16,8 +18,20 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / ".github/workflows/shared/pageindex.md"
+PAGEINDEX_AVAILABLE = importlib.util.find_spec("pageindex") is not None
+
+if not PAGEINDEX_AVAILABLE:
+    print(
+        "Skipping PageIndex workflow tests: requires pageindex==0.5.3; "
+        "run with `make test-pageindex-workflow`.",
+        file=sys.stderr,
+    )
 
 
+@unittest.skipUnless(
+    PAGEINDEX_AVAILABLE,
+    "requires pageindex==0.5.3; run with `make test-pageindex-workflow`",
+)
 class PageIndexWorkflowTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -52,6 +66,20 @@ class PageIndexWorkflowTests(unittest.TestCase):
     def tree(self, entry):
         return json.loads(Path(entry["tree"]).read_text())
 
+    def assert_unique_node_ids(self, nodes):
+        node_ids = []
+
+        def visit(current_nodes):
+            for node in current_nodes:
+                self.assertIn("node_id", node)
+                self.assertIsInstance(node["node_id"], str)
+                self.assertTrue(node["node_id"])
+                node_ids.append(node["node_id"])
+                visit(node.get("nodes", []))
+
+        visit(nodes)
+        self.assertEqual(len(node_ids), len(set(node_ids)))
+
     def test_hierarchy_line_numbers_and_text_are_preserved_offline(self):
         self.document(
             "docs/guide.md",
@@ -72,6 +100,7 @@ class PageIndexWorkflowTests(unittest.TestCase):
         self.assertEqual(child["line_num"], 4)
         self.assertIn("Evidence", child["text"])
         self.assertEqual(len(tree[1]["nodes"]), 1)
+        self.assert_unique_node_ids(tree)
 
     def test_bold_paragraphs_do_not_detach_subsections(self):
         self.document(
@@ -93,7 +122,9 @@ class PageIndexWorkflowTests(unittest.TestCase):
         self.assertEqual(len(catalog), 3)
         self.assertEqual(len({entry["tree"] for entry in catalog}), 3)
         for entry in catalog:
-            self.assertEqual(self.tree(entry)["source"], entry["source"])
+            tree = self.tree(entry)
+            self.assertEqual(tree["source"], entry["source"])
+            self.assert_unique_node_ids(tree["structure"])
 
     def test_headingless_and_empty_documents_remain_readable(self):
         self.document("docs/plain.md", "No headings, but important evidence.")
@@ -122,8 +153,10 @@ class PageIndexWorkflowTests(unittest.TestCase):
         first = self.tree(self.index()[0])
         path.write_text("# New\nUpdated version")
         second = self.tree(self.index()[0])
-        self.assertNotEqual(first["sha256"], second["sha256"])
+        self.assertNotIn("sha256", first)
+        self.assertNotIn("sha256", second)
         self.assertEqual(second["structure"][1]["title"], "New")
+        self.assertIn("Updated version", second["structure"][1]["text"])
         path.unlink()
         self.assertEqual(self.index(), [])
 
