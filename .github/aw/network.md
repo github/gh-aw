@@ -171,6 +171,7 @@ network:
 - Setting `hosted-web` on any engine other than Claude or Codex is a compile error.
 - On import merge, allowed/blocked lists from imported files combine with the main workflow's, but only when both policies are enabled; the main workflow's scalar settings (such as `max-uses`) and an explicit `hosted-web: false` on either side win — see [syntax-tools-imports.md](syntax-tools-imports.md).
 - Copilot has no `hosted-web` policy. Its native web tools are unavailable in offline BYOK mode, so `tools.web-search` and CLI-mode `tools.web-fetch` are compile errors regardless of network restrictions. Use a web MCP server, a supported engine, or SDK mode for custom proxy-aware `web-fetch`.
+- GitHub Copilot inference (for example `model: copilot/...` or `engine.model-provider: github`) runs offline too: Claude's native `tools.web-fetch`/`tools.web-search` and Codex's `network.hosted-web` are compile errors on that provider, even for allowlisted domains. Switch to native Anthropic/OpenAI inference or use an MCP fetch/search server.
 
 ## Inferring Ecosystem From Repository Files
 
