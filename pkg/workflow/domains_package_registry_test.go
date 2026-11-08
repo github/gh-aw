@@ -143,8 +143,9 @@ type engineEcosystemDomainOverlap struct {
 
 func engineDefaultEcosystemOverlaps(ecosystems, defaults map[string][]string) []engineEcosystemDomainOverlap {
 	// These categories describe shared transport or vendor services rather than
-	// gated package ecosystems. Chrome's broad Google vendor rules also cover
-	// Gemini's inference API; do not treat those as package registry rules.
+	// gated package ecosystems. Mini-SWE-agent installs its Python package inside
+	// AWF, so its PyPI access is an explicit exception. Chrome's broad Google
+	// vendor rules also cover Gemini's inference API.
 	excludedEcosystems := []string{
 		"chrome", "codex-vendor", "copilot-vendor", "defaults", "dev-tools",
 		"fonts", "gh-aw", "github", "github-actions", "local", "threat-detection",
@@ -163,6 +164,12 @@ func engineDefaultEcosystemOverlaps(ecosystems, defaults map[string][]string) []
 					}
 					if engine == "threat-detection" && rule == "registry.npmjs.org" {
 						continue // Detection intentionally permits read-only npm lockfile validation.
+					}
+					if (engine == "mini-swe-agent" || strings.HasSuffix(engine, "mini-swe-agent.md/defaults")) &&
+						(ecosystem == "python" || ecosystem == "python-native") &&
+						((rule == "pypi.org" && domain == "pypi.org") ||
+							(rule == "files.pythonhosted.org" && (domain == "files.pythonhosted.org" || domain == "*.pythonhosted.org"))) {
+						continue
 					}
 					if awfDomainRulesOverlap(rule, domain) {
 						overlaps = append(overlaps, engineEcosystemDomainOverlap{engine, rule, ecosystem, domain})
@@ -217,7 +224,7 @@ func TestBehaviorDefinedEngineDefaultsDoNotOverlapEcosystems(t *testing.T) {
 		}
 	}
 	require.NotEmpty(t, defaults, "shared behavior-defined engines must be checked")
-	require.Equal(t, 9, checkedBehaviorDefinedEngines, "all behavior-defined engines with network policies must be checked")
+	require.Equal(t, 10, checkedBehaviorDefinedEngines, "all behavior-defined engines with network policies must be checked")
 	assert.Empty(t, engineDefaultEcosystemOverlaps(getLoadedDomainSets().Ecosystems, defaults),
 		"behavior-defined engine defaults and provider domains require the same package ecosystem opt-in as static engines")
 }
@@ -259,6 +266,7 @@ func TestEngineDefaultEcosystemOverlapGuard(t *testing.T) {
 	t.Run("exact exceptions remain allowed", func(t *testing.T) {
 		defaults := map[string][]string{
 			"copilot":          {"github.com"},
+			"mini-swe-agent":   {"pypi.org", "files.pythonhosted.org"},
 			"threat-detection": {"github.com", "registry.npmjs.org"},
 		}
 		assert.Empty(t, engineDefaultEcosystemOverlaps(getLoadedDomainSets().Ecosystems, defaults))

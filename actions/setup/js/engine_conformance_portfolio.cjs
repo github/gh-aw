@@ -3,7 +3,7 @@
 
 const { buildAWPolicy } = require("./work_queue_settings.cjs");
 
-const ENGINES = Object.freeze(["agy", "aider", "claude", "codex", "copilot", "crush", "cursor", "deepseek-harness", "gemini", "goose", "kiro", "opencode", "pi", "pydantic-ai"]);
+const ENGINES = Object.freeze(["agy", "aider", "claude", "codex", "copilot", "crush", "cursor", "deepseek-harness", "gemini", "goose", "kiro", "mini-swe-agent", "opencode", "pi", "pydantic-ai"]);
 const SUPPORTED = Object.freeze(["claude", "codex", "copilot", "pi"]);
 const POOL = "engine-conformance";
 const DAILY_LIMIT = 3;
