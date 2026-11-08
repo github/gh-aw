@@ -3,11 +3,12 @@
 const assert = require("node:assert/strict");
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
+const { Readable } = require("node:stream");
 const { randomUUID } = require("node:crypto");
 const path = require("node:path");
 const { defaultPolicy } = require("./work_queue_policy.cjs");
 const { buildAWPolicy } = require("./work_queue_settings.cjs");
-const { MAX_WORKFLOW_BYTES, verifyWorkerRoute, verifyWorkerRoutes, workerContract } = require("./work_queue_provisioning.cjs");
+const { MAX_WORKFLOW_BYTES, verifyWorkerRoute, verifyWorkerRoutes, readLockFileHeaders, workerContract } = require("./work_queue_provisioning.cjs");
 
 const validYAML = "on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\n";
 const profile = defaultPolicy({ repository: "owner/repo", principal: "1001", ref: "a".repeat(40) }).pools.default.profiles.default;
@@ -70,14 +71,26 @@ function registerTests({ describe, it }) {
     it("verifies route metadata without parsing workflow YAML", async () => {
       for (const contents of [validYAML, "this is deliberately not workflow YAML", "on: [\n"]) await verifyWorkerRoute(options(nativeRoute(contents)));
     });
+    it("reads lock metadata headers through a bounded reader", async () => {
+      const metadata = { schema_version: "v1" };
+      const manifest = { work_queue: { worker: true, logical_contract: "a".repeat(64) } };
+      const reader = Readable.from([`# gh-aw-metadata: ${JSON.stringify(metadata)}\n`, `# gh-aw-manifest: ${JSON.stringify(manifest)}\n`, "on: [\n", "# gh-aw-manifest: invalid\n"]);
+      const headers = await readLockFileHeaders(reader);
+      assert.equal(headers.metadata?.schema_version, metadata.schema_version);
+      assert.equal(workerContract(headers.manifest), manifest.work_queue.logical_contract);
+      assert.equal(reader.destroyed, true);
+      const lateManifest = Readable.from(["comment\n", "on: [\n", "jobs:\n", `# gh-aw-manifest: ${JSON.stringify(manifest)}\n`]);
+      const boundedHeaders = await readLockFileHeaders(lateManifest);
+      assert.equal(workerContract(boundedHeaders.manifest), undefined);
+      assert.equal(lateManifest.destroyed, true);
+    });
     it("reads only valid worker metadata from the compiler manifest", () => {
       const contract = "a".repeat(64);
-      const metadata = JSON.stringify({ work_queue: { worker: true, logical_contract: contract } });
-      assert.equal(workerContract(`# gh-aw-manifest: ${metadata}\non: [\n`), contract);
-      assert.equal(workerContract(`# gh-aw-manifest: ${JSON.stringify({ work_queue: { worker: false, logical_contract: contract } })}`), undefined);
-      assert.equal(workerContract(`# gh-aw-manifest: ${JSON.stringify({ work_queue: { worker: true } })}`), undefined);
-      assert.equal(workerContract("# gh-aw-manifest: invalid"), undefined);
-      assert.equal(workerContract(`# gh-aw-manifest: ${metadata}\n# gh-aw-manifest: ${metadata}`), undefined);
+      assert.equal(workerContract({ work_queue: { worker: true, logical_contract: contract } }), contract);
+      assert.equal(workerContract({ work_queue: { worker: false, logical_contract: contract } }), undefined);
+      assert.equal(workerContract({ work_queue: { worker: true } }), undefined);
+      assert.equal(workerContract(undefined), undefined);
+      assert.equal(workerContract({ work_queue: { worker: true, logical_contract: "invalid" } }), undefined);
     });
     it("rejects constructor revisions without a native read", async () => {
       for (const ref of ["0".repeat(40), "0".repeat(64)]) {
@@ -100,13 +113,10 @@ function registerTests({ describe, it }) {
         assert.equal(native.calls.length, 1);
       }
     });
-    it("rejects invalid UTF-8 rather than decoding replacement characters", async () => {
-      const native = nativeRoute();
-      const bytes = Buffer.from([0xc0, 0xaf]);
-      native.state.file.content = bytes.toString("base64");
-      native.state.file.size = bytes.length;
-      await rejected(native);
-      assert.equal(native.calls.length, 1);
+    it("does not accept invalid UTF-8 in the manifest header as worker metadata", async () => {
+      const bytes = Buffer.concat([Buffer.from("# gh-aw-manifest: "), Buffer.from([0xc0, 0xaf])]);
+      const headers = await readLockFileHeaders(Readable.from([bytes]));
+      assert.equal(workerContract(headers.manifest), undefined);
     });
     it("accepts CRLF-wrapped GitHub base64 content", async () => {
       const native = nativeRoute();

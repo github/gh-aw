@@ -1,9 +1,10 @@
 // @ts-check
 "use strict";
 
-const { TextDecoder } = require("node:util");
 const { posix } = require("node:path");
-const { queueError } = require("./work_queue_codec.cjs");
+const { createInterface } = require("node:readline");
+const { Readable } = require("node:stream");
+const { parseStrictJSON, queueError } = require("./work_queue_codec.cjs");
 const { validatePolicy, validateProfile } = require("./work_queue_policy.cjs");
 const { readQueueMetadata, metadataRequest } = require("./work_queue_read_retry.cjs");
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("provisioning");
@@ -30,17 +31,13 @@ async function readWorkerFile({ githubClient, owner, repo, path, ref, sleepFn })
     throw queueError("policy_missing", "approved worker route cannot be verified at its immutable revision");
   }
   if (!isRecord(file) || file.type !== "file" || file.path !== path || file.encoding !== "base64" || typeof file.content !== "string") throw queueError("policy_missing", "approved worker route is not an exact immutable workflow file");
-  if (file.content.length > Math.ceil(MAX_WORKFLOW_BYTES / 3) * 4 + 65536) throw queueError("policy_missing", "approved worker route content exceeds the bounded workflow limit");
-  const encoded = file.content.replace(/[\r\n]/g, "");
-  if (encoded.length > Math.ceil(MAX_WORKFLOW_BYTES / 3) * 4 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded))
-    throw queueError("policy_missing", "approved worker route requires bounded valid base64 content");
-  const bytes = Buffer.from(encoded, "base64");
-  if (bytes.length > MAX_WORKFLOW_BYTES) throw queueError("policy_missing", "approved worker route content is oversized");
-  try {
-    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-  } catch {
-    throw queueError("policy_missing", "approved worker route contains invalid UTF-8");
-  }
+  const encodedSize = file.content.length;
+  const containsLineBreaks = /[\r\n]/.test(file.content);
+  const padding = file.content.endsWith("==") ? 2 : file.content.endsWith("=") ? 1 : 0;
+  const decodedSize = containsLineBreaks ? (typeof file.size === "number" ? file.size : Number.NaN) : (encodedSize / 4) * 3 - padding;
+  if (!Number.isSafeInteger(decodedSize) || decodedSize < 0 || decodedSize > MAX_WORKFLOW_BYTES || encodedSize > Math.ceil(MAX_WORKFLOW_BYTES / 3) * 4 + 65536)
+    throw queueError("policy_missing", "approved worker route content exceeds the bounded workflow limit");
+  return readLockFileHeaders(Readable.from(decodeBase64Content(file.content)));
 }
 
 /** @param {{githubClient: RouteClient, owner: string, repo: string, profile: WorkerProfile, sleepFn?: (delay: number) => Promise<void>}} options */
@@ -65,16 +62,63 @@ async function verifyRegisteredWorker({ githubClient, owner, repo, profile, slee
   if (!isRecord(registration) || registration.path !== profile.workflow || registration.state !== "active") throw queueError("policy_missing", "approved worker route must be active at its exact registered path");
 }
 
-function workerContract(contents) {
-  const prefix = "# gh-aw-manifest: ";
-  const manifestLines = contents.match(/^# gh-aw-manifest: .+$/gm) ?? [];
-  if (manifestLines.length !== 1) return undefined;
-  let manifest;
+async function* decodeBase64Content(contents) {
+  let pending = "";
+  let padded = false;
+  for (let offset = 0; offset < contents.length; offset += 4096) {
+    const part = (pending + contents.slice(offset, offset + 4096)).replace(/[\r\n]/g, "");
+    const alignedLength = part.length - (part.length % 4);
+    const chunk = part.slice(0, alignedLength);
+    pending = part.slice(alignedLength);
+    if (!chunk) continue;
+    if (padded || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(chunk)) throw queueError("policy_missing", "approved worker route requires valid base64 content");
+    padded = chunk.endsWith("=");
+    yield Buffer.from(chunk, "base64");
+  }
+  if (pending.length) throw queueError("policy_missing", "approved worker route requires valid base64 content");
+}
+
+/**
+ * @param {import("node:stream").Readable} reader
+ * @returns {Promise<{metadata: Record<string, unknown>|undefined, manifest: Record<string, unknown>|undefined}>}
+ */
+async function readLockFileHeaders(reader) {
+  const lines = createInterface({ input: reader, crlfDelay: Infinity });
+  const headers = /** @type {{metadata: Record<string, unknown>|undefined, manifest: Record<string, unknown>|undefined}} */ { metadata: undefined, manifest: undefined };
+  const seen = new Set();
+  let lineCount = 0;
   try {
-    manifest = JSON.parse(manifestLines[0].slice(prefix.length));
+    for await (const line of lines) {
+      lineCount++;
+      for (const name of ["metadata", "manifest"]) {
+        const prefix = `# gh-aw-${name}: `;
+        if (!line.startsWith(prefix)) continue;
+        if (seen.has(name)) {
+          headers[name] = undefined;
+        } else {
+          seen.add(name);
+          headers[name] = parseHeaderJSON(line.slice(prefix.length));
+        }
+      }
+      if (lineCount >= 3 || (seen.has("metadata") && seen.has("manifest"))) break;
+    }
+  } finally {
+    lines.close();
+    reader.destroy();
+  }
+  return headers;
+}
+
+function parseHeaderJSON(value) {
+  try {
+    const parsed = parseStrictJSON(value);
+    return isRecord(parsed) ? parsed : undefined;
   } catch {
     return undefined;
   }
+}
+
+function workerContract(manifest) {
   if (!isRecord(manifest) || !isRecord(manifest.work_queue) || manifest.work_queue.worker !== true) return undefined;
   const contract = manifest.work_queue.logical_contract;
   return typeof contract === "string" && /^[a-f0-9]{64}$/.test(contract) ? contract : undefined;
@@ -98,8 +142,8 @@ async function configuredWorkerDeployment(options, revision) {
   const current = options.profile;
   let profile = current;
   try {
-    const contents = await readWorkerFile({ ...options, path: current.workflow, ref: revision });
-    const contract = workerContract(contents);
+    const headers = await readWorkerFile({ ...options, path: current.workflow, ref: revision });
+    const contract = workerContract(headers.manifest);
     if (!contract) return { profile, available: false };
     profile = { ...current, ref: revision, logical_contract: contract };
     await verifyRegisteredWorker({ ...options, profile });
@@ -125,4 +169,4 @@ async function verifyWorkerRoutes({ githubClient, owner, repo, policy }) {
     }
 }
 
-module.exports = { MAX_WORKFLOW_BYTES, verifyWorkerRoute, verifyWorkerRoutes, workerContract, verifiedDefaultReference, configuredWorkerDeployment };
+module.exports = { MAX_WORKFLOW_BYTES, verifyWorkerRoute, verifyWorkerRoutes, readLockFileHeaders, workerContract, verifiedDefaultReference, configuredWorkerDeployment };
