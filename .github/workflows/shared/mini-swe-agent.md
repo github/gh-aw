@@ -13,11 +13,6 @@ excluded-env:
   - GH_ENTERPRISE_TOKEN
   - GH_AW_GITHUB_TOKEN
   - GH_AW_AGENT_TOKEN
-pre-agent-steps:
-  - name: Install mini-swe-agent
-    run: |
-      python3 -m pip install --quiet --user --disable-pip-version-check --only-binary=:all: "mini-swe-agent==$GH_AW_ENGINE_VERSION"
-      python3 -c 'from importlib.metadata import version; import os; assert version("mini-swe-agent") == os.environ["GH_AW_ENGINE_VERSION"]'
 engine:
   id: mini-swe-agent
   detection-engine: copilot
@@ -35,6 +30,8 @@ engine:
     network:
       defaults:
         - host.docker.internal
+        - pypi.org
+        - files.pythonhosted.org
       provider-domains:
         copilot: api.githubcopilot.com
         anthropic: api.anthropic.com
@@ -48,12 +45,28 @@ engine:
       env:
         MSWEA_SILENT_STARTUP: "1"
         LITELLM_TELEMETRY: "false"
+        GH_AW_MINI_DEPS: /tmp/gh-aw/agent/mini-swe-agent-deps
         GH_AW_MINI_TRAJECTORY: /tmp/gh-aw/agent/mini-swe-agent.traj.json
       args:
+        - -I
         - -c
         - |
           import os
+          import subprocess
+          import sys
+          from importlib.metadata import version
           from pathlib import Path
+
+          dependencies = Path(os.environ["GH_AW_MINI_DEPS"])
+          subprocess.run([
+              sys.executable, "-I", "-m", "pip", "install", "--quiet",
+              "--disable-pip-version-check", "--only-binary=:all:",
+              "--target", str(dependencies),
+              f"mini-swe-agent=={os.environ['GH_AW_ENGINE_VERSION']}",
+          ], check=True)
+          sys.path.insert(0, str(dependencies))
+          assert version("mini-swe-agent") == os.environ["GH_AW_ENGINE_VERSION"]
+
           import yaml
           from minisweagent.agents.default import DefaultAgent
           from minisweagent.config import builtin_config_dir
@@ -92,7 +105,7 @@ engine:
       const { spawnSync } = require("child_process");
       const { constants } = require("os");
       const { resolve } = require("path");
-      const { fetchAWFReflect, resolveProviderEndpointFromReflect, deriveBaseUrlFromModelsURL, normalizeReflectProviderName, REFLECT_PROVIDER_ALIASES } = require("./awf_reflect.cjs");
+      const { fetchAWFReflect, deriveBaseUrlFromModelsURL, normalizeReflectProviderName, REFLECT_PROVIDER_ALIASES } = require("./awf_reflect.cjs");
 
       const log = message => process.stderr.write(`[mini-swe-agent] ${message}\n`);
       const main = async () => {
@@ -110,7 +123,7 @@ engine:
         if (!["github", "openai", "anthropic"].includes(provider)) {
           throw new Error("mini-SWE-agent supports copilot, openai/codex, or anthropic models");
         }
-        const limit = process.env.GH_AW_MAX_TURNS || "500";
+        const limit = process.env.GH_AW_MAX_TURNS || "20";
         if (!/^[1-9][0-9]*$/.test(limit) || !Number.isSafeInteger(Number(limit))) {
           throw new Error("GH_AW_MAX_TURNS must be a positive safe integer");
         }
@@ -121,17 +134,16 @@ engine:
         if (!reflected.ok || !reflected.reflectData) {
           throw new Error(`Unable to discover the mini-SWE-agent LLM endpoint: ${reflected.reason || "empty /reflect response"}`);
         }
-        const endpoint = resolveProviderEndpointFromReflect({ provider, reflectData: reflected.reflectData, logger: log });
         const aliases = REFLECT_PROVIDER_ALIASES[provider];
-        const nativeEndpoint = reflected.reflectData.endpoints?.find(entry =>
-          entry?.configured === true && aliases.has(normalizeReflectProviderName(entry.provider))
+        const endpoint = reflected.reflectData.endpoints?.find(entry =>
+          entry?.configured === true && aliases.has(normalizeReflectProviderName(entry.provider)) &&
+          typeof entry.models_url === "string"
         );
-        if (!endpoint || !nativeEndpoint || !aliases.has(normalizeReflectProviderName(endpoint.endpointProvider)) ||
-            typeof nativeEndpoint.models_url !== "string") {
+        if (!endpoint) {
           throw new Error(`No configured mini-SWE-agent /reflect models endpoint for provider ${provider}`);
         }
         const model = selected.slice(separator + 1);
-        let base = deriveBaseUrlFromModelsURL(nativeEndpoint.models_url);
+        let base = deriveBaseUrlFromModelsURL(endpoint.models_url);
         if (provider === "anthropic") base = base.replace(/\/+$/, "").replace(/\/v1$/, "");
         const env = {
           ...process.env,
@@ -158,7 +170,12 @@ engine:
 # mini-SWE-agent
 
 This unsupported experimental sample pins `mini-swe-agent==2.4.6` from PyPI
-and uses Python 3.12. Import it and select a workflow-facing `provider/model`:
+and uses Python 3.12. Dependencies are installed inside AWF at the mounted path
+`/tmp/gh-aw/agent/mini-swe-agent-deps`, not in the host user site. Isolated
+Python ignores workspace imports and Python environment search paths; only
+the explicit dependency directory is added. PyPI wheel downloads require
+`pypi.org` and `files.pythonhosted.org`, included in the engine network defaults.
+Import it and select a workflow-facing `provider/model`:
 
 ```yaml
 engine:
@@ -182,15 +199,17 @@ The pinned Python API bypasses CLI first-run setup and interactive confirmations
 It reads the workflow prompt from a file, uses the packaged `default.yaml`
 with the text-based LiteLLM model and local shell environment inside AWF, and
 fails unless the agent explicitly submits with
-`echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT`. `max-turns` limits model calls.
+`echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT`. `max-turns` limits model calls,
+defaulting to 20 when unset.
 LiteLLM's best-effort cost estimates do not enforce a dollar budget; AWF
 enforces the workflow inference budget.
 
 There is no native MCP client: configured tools and safe outputs are available
 through gh-aw's shell CLI proxies. Native shell command allowlists, disabling
 file edits, Agent Plugins, repository-specific mini configuration, and structured
-session parsing are not supported. The private native trajectory is retained at
-`/tmp/gh-aw/agent/mini-swe-agent.traj.json`; stdout is not treated as verified
+session parsing are not supported. The private native trajectory is written to
+`/tmp/gh-aw/agent/mini-swe-agent.traj.json` but is not uploaded as an artifact;
+stdout is not treated as verified
 tool or token-accounting evidence. Dependencies must have binary wheels; source
 builds are deliberately disabled.
 -->

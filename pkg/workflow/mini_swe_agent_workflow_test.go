@@ -12,19 +12,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 )
 
 func loadMiniSweAgentSample(t *testing.T) *EngineDefinition {
 	t.Helper()
-	content, err := os.ReadFile("../../.github/workflows/shared/mini-swe-agent.md")
-	require.NoError(t, err)
-	parts := strings.SplitN(string(content), "---", 3)
-	require.Len(t, parts, 3)
 	var frontmatter struct {
 		Engine EngineDefinition `yaml:"engine"`
 	}
-	require.NoError(t, yaml.Unmarshal([]byte(parts[1]), &frontmatter))
+	readConformanceFrontmatter(t, "../../.github/workflows/shared/mini-swe-agent.md", &frontmatter)
 	return &frontmatter.Engine
 }
 
@@ -122,6 +117,8 @@ func TestMiniSweAgentHarnessFailures(t *testing.T) {
 		{"reflection failure", `MINI_TEST_REFLECT={"ok":false,"reason":"unavailable"}`, "unavailable"},
 		{"wrong provider", `MINI_TEST_REFLECT={"ok":true,"reflectData":{"endpoints":[{"provider":"openai","configured":true,"models_url":"http://localhost:1234/v1/models"}]}}`, "No configured"},
 		{"unconfigured provider", `MINI_TEST_REFLECT={"ok":true,"reflectData":{"endpoints":[{"provider":"github","configured":false,"models_url":"http://localhost:1234/v1/models"}]}}`, "No configured"},
+		{"missing models URL", `MINI_TEST_REFLECT={"ok":true,"reflectData":{"endpoints":[{"provider":"github","configured":true}]}}`, "No configured"},
+		{"invalid models URL", `MINI_TEST_REFLECT={"ok":true,"reflectData":{"endpoints":[{"provider":"github","configured":true,"models_url":"not a URL"}]}}`, "Invalid models URL"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			cmd := miniSweAgentHarnessCommand(t, t.TempDir(), "node", "-e", "process.exit(0)")
@@ -157,3 +154,108 @@ func TestMiniSweAgentHarnessWorkingDirectory(t *testing.T) {
 		})
 	}
 }
+
+func TestMiniSweAgentHarnessDefaultTurnLimit(t *testing.T) {
+	cmd := miniSweAgentHarnessCommand(t, t.TempDir(), "node", "-e", `console.log(process.env.GH_AW_MINI_STEP_LIMIT)`)
+	cmd.Env = append(cmd.Env, "GH_AW_MAX_TURNS=")
+	output, err := cmd.Output()
+	require.NoError(t, err)
+	assert.Equal(t, "20\n", string(output))
+}
+
+func TestMiniSweAgentPythonExecution(t *testing.T) {
+	def := loadMiniSweAgentSample(t)
+	args := def.Behaviors.Execution.Args
+	require.Len(t, args, 3)
+	require.Equal(t, []string{"-I", "-c"}, args[:2])
+	for _, status := range []string{"Submitted", "LimitsExceeded", "unknown"} {
+		t.Run(status, func(t *testing.T) {
+			dir := t.TempDir()
+			prompt := filepath.Join(dir, "prompt with spaces.md")
+			require.NoError(t, os.WriteFile(prompt, []byte("literal task --- with file-based input"), 0o600))
+			script := filepath.Join(dir, "mini.py")
+			require.NoError(t, os.WriteFile(script, []byte(args[2]), 0o600))
+			cmd := miniSweAgentHarnessCommand(t, dir, "python3", "-I", "-c", miniSweAgentPythonStubs, script)
+			cmd.Env = append(cmd.Env, "GH_AW_ENGINE_VERSION="+def.Version,
+				"GH_AW_MINI_DEPS="+filepath.Join(dir, "dependencies"),
+				"GH_AW_MINI_TRAJECTORY="+filepath.Join(dir, "agent", "trajectory.json"),
+				"MINI_TEST_STATUS="+status)
+			output, err := cmd.CombinedOutput()
+			if status == "Submitted" {
+				require.NoError(t, err, "%s", output)
+			} else {
+				var exitError *exec.ExitError
+				require.ErrorAs(t, err, &exitError, "%s", output)
+				assert.Equal(t, 1, exitError.ExitCode())
+			}
+			assert.Contains(t, string(output), "Python wiring verified")
+			assert.Contains(t, string(output), "mini-SWE-agent exit status: "+status)
+			info, err := os.Stat(filepath.Join(dir, "agent", "trajectory.json"))
+			require.NoError(t, err)
+			assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+		})
+	}
+}
+
+const miniSweAgentPythonStubs = `
+import os
+import sys
+from pathlib import Path
+from types import ModuleType, SimpleNamespace
+from unittest.mock import Mock, patch
+
+config = {"agent": {}, "model": {}, "environment": {}}
+builtin = Path(os.environ["GITHUB_WORKSPACE"]) / "builtin"
+builtin.mkdir()
+(builtin / "default.yaml").write_text("fixture configuration")
+model = SimpleNamespace(config=SimpleNamespace(model_kwargs={}))
+model_class = Mock(return_value=model)
+environment = object()
+environment_class = Mock(return_value=environment)
+agent = Mock()
+agent.run.return_value = {"exit_status": os.environ["MINI_TEST_STATUS"]}
+agent_class = Mock(return_value=agent)
+yaml_load = Mock(return_value=config)
+
+for name, attributes in {
+    "yaml": {"safe_load": yaml_load},
+    "minisweagent.agents.default": {"DefaultAgent": agent_class},
+    "minisweagent.config": {"builtin_config_dir": builtin},
+    "minisweagent.environments.local": {"LocalEnvironment": environment_class},
+    "minisweagent.models.litellm_textbased_model": {"LitellmTextbasedModel": model_class},
+}.items():
+    module = ModuleType(name)
+    module.__dict__.update(attributes)
+    sys.modules[name] = module
+
+exit_code = 0
+with patch("subprocess.run") as install, patch("importlib.metadata.version") as version:
+    version.return_value = os.environ["GH_AW_ENGINE_VERSION"]
+    try:
+        exec(compile(Path(sys.argv[1]).read_text(), sys.argv[1], "exec"))
+    except SystemExit as error:
+        exit_code = error.code
+    install.assert_called_once_with([
+        sys.executable, "-I", "-m", "pip", "install", "--quiet",
+        "--disable-pip-version-check", "--only-binary=:all:",
+        "--target", os.environ["GH_AW_MINI_DEPS"],
+        "mini-swe-agent==" + os.environ["GH_AW_ENGINE_VERSION"],
+    ], check=True)
+    version.assert_called_once_with("mini-swe-agent")
+
+assert sys.flags.isolated
+assert sys.path[0] == os.environ["GH_AW_MINI_DEPS"]
+yaml_load.assert_called_once_with("fixture configuration")
+assert config["agent"]["step_limit"] == 20
+assert config["agent"]["cost_limit"] == 0
+assert config["agent"]["output_path"] == Path(os.environ["GH_AW_MINI_TRAJECTORY"])
+model_class.assert_called_once_with(
+    model_name="openai/test-model", cost_tracking="ignore_errors")
+assert model.config.model_kwargs == {
+    "api_base": "http://localhost:1234/v1", "api_key": "awf-proxy"}
+environment_class.assert_called_once_with(cwd=os.environ["GITHUB_WORKSPACE"])
+agent_class.assert_called_once_with(model, environment, **config["agent"])
+agent.run.assert_called_once_with("literal task --- with file-based input")
+print("Python wiring verified", flush=True)
+raise SystemExit(exit_code)
+`

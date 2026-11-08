@@ -34,7 +34,7 @@ post-steps:
   - name: Verify mini-SWE-agent smoke evidence
     if: always()
     run: |
-      python3 - <<'PY'
+      python3 -I - <<'PY'
       import json
       import re
       from pathlib import Path

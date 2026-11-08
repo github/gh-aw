@@ -10,7 +10,7 @@ strict: true
 inlined-imports: true
 timeout-minutes: 10
 max-turns: 30
-max-ai-credits: 50
+max-ai-credits: 5
 features:
   gh-aw-detection: false
 model: copilot/claude-haiku-5.5
