@@ -21,4 +21,7 @@ may change without deprecation.
 Record outcomes, sanitized errors, latency, and avoided invocations in harness
 artifacts and typed `harness.decision` unified-session events. Audit exposes
 decision history and avoided invocations separately from executed attempts.
+Show decision outcomes, latency, sanitized errors, and skipped invocation totals
+in a bounded, collapsible Actions step-summary section, including initial skips
+without an agent conversation.
 See the [audit deny example](https://github.github.com/gh-aw/reference/audit/#invocation-skip-decisions).

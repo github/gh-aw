@@ -7,6 +7,7 @@ const { collapseStreamedMessages, boundSummaryLines, escapeSummaryText, redactSe
 const { collectArtifactSecretValues, redactManifestValue } = require("./safe_output_manifest.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { normalizeUnifiedSessionEvent } = require("./unified_session_payload.cjs");
+const { normalizeHarnessDecisionData } = require("./harness_retry_record.cjs");
 const { COPILOT_WORKFLOW_EVENT_FIELDS, COPILOT_WORKFLOW_EVENT_TYPES } = require("./copilot_workflow_events.cjs");
 const { ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
 const { validateAgentExecution } = require("./agent_execution.cjs");
@@ -455,6 +456,8 @@ function renderUnifiedSession(events, { markdown, maxBytes, maxLineBytes, agentS
   const preamble = markdown ? "<details><summary>Unified session</summary>\n\n" : "";
   const tail = markdown ? "\n\n</details>" : "";
   if (!markdown) return boundSummaryLines(lines, maxBytes, maxLineBytes).join("\n").replace(/::/g, ": :");
+  const decisions = decisionSummarySection(redacted);
+  /** @type {Array<{title: string, collapsed: boolean, lines: string[], markdown?: boolean}>} */
   const sections = [
     { title: "Session overview", collapsed: true, lines: overview },
     {
@@ -467,6 +470,7 @@ function renderUnifiedSession(events, { markdown, maxBytes, maxLineBytes, agentS
     },
     { title: "Full timeline", collapsed: true, lines: traceLines },
   ];
+  if (decisions) sections.push({ ...decisions, collapsed: true, markdown: true });
   const bounded = sections.map(section => ({
     ...section,
     lines: boundSummaryLines(section.lines.length ? section.lines : ["No agent conversation recorded."], Number.MAX_SAFE_INTEGER, maxLineBytes),
@@ -476,9 +480,9 @@ function renderUnifiedSession(events, { markdown, maxBytes, maxLineBytes, agentS
   // Fenced code treats HTML as literal text; escaping here would print entities.
   for (const section of bounded) for (const line of section.lines) for (const run of line.match(/`+/g) ?? []) longest = Math.max(longest, run.length);
   const fence = "`".repeat(longest + 1);
-  /** @param {{title: string, collapsed: boolean}} section @param {string[]} content */
+  /** @param {{title: string, collapsed: boolean, markdown?: boolean}} section @param {string[]} content */
   const block = (section, content) => {
-    const transcript = `${fence}text\n${content.join("\n")}\n${fence}\n\n`;
+    const transcript = section.markdown ? `${content.join("\n")}\n\n` : `${fence}text\n${content.join("\n")}\n${fence}\n\n`;
     return section.collapsed ? `<details><summary>${section.title}</summary>\n\n${transcript}</details>\n\n` : `### ${section.title}\n\n${transcript}`;
   };
   const shellBytes = Buffer.byteLength(preamble + tail + bounded.map(section => block(section, [])).join(""), "utf8");
@@ -486,7 +490,7 @@ function renderUnifiedSession(events, { markdown, maxBytes, maxLineBytes, agentS
   const fallback = "Unified session summary omitted: remaining step-summary byte limit reached.\n";
   if (remaining < 512) return Buffer.byteLength(fallback, "utf8") <= maxBytes ? fallback : "";
   const contentBySection = new Map();
-  const priority = [bounded[1], bounded[0], bounded[2]];
+  const priority = [...(decisions ? [bounded[3]] : []), bounded[1], bounded[0], bounded[2]];
   for (const [index, section] of priority.entries()) {
     // Reserve an explicit omission notice for every later priority section.
     const reserved = priority.slice(index + 1).reduce((bytes, next) => bytes + Buffer.byteLength(next.notice, "utf8") + 1, 0);
@@ -497,7 +501,37 @@ function renderUnifiedSession(events, { markdown, maxBytes, maxLineBytes, agentS
     contentBySection.set(section, content);
   }
   const blocks = bounded.map(section => block(section, contentBySection.get(section)));
-  return preamble + blocks.join("") + tail;
+  return (decisions ? blocks[3] : "") + preamble + blocks.slice(0, 3).join("") + tail;
+}
+
+/** @param {Array<any>} events */
+function decisionSummarySection(events) {
+  const decisions = events
+    .filter(event => event.type === "harness.decision")
+    .map(event => {
+      const decision = normalizeHarnessDecisionData(event.data);
+      if (!decision) throw new Error(`${ERR_VALIDATION}: Harness decision evidence must contain bounded outcomes and latency metadata`);
+      return decision;
+    });
+  if (!decisions.length) return undefined;
+  const skipped = decisions.filter(decision => decision.avoidedInvocation).length;
+  const status = skipped ? `${skipped} invocation${skipped === 1 ? "" : "s"} skipped` : "No invocations skipped";
+  const lines = [
+    "### Invocation skip decisions",
+    "",
+    `**${status}.** ${decisions.length} decision check${decisions.length === 1 ? "" : "s"} evaluated before eligible agent invocations.`,
+    "",
+    "| Proposed attempt | Outcome | Effect | Questions (allow / deny / unknown) | Latency | Errors |",
+    "| --- | --- | --- | --- | --- | --- |",
+  ];
+  for (const decision of decisions) {
+    const counts = ["allow", "deny", "unknown"].map(outcome => decision.questions.filter(question => question.outcome === outcome).length);
+    const errors = [...(decision.error ? [`Batch: \`${decision.error}\``] : []), ...decision.questions.filter(question => question.error).map(question => `Q${question.question}: \`${question.error}\``)];
+    const attempt = `${decision.startupAttemptId ? `${decision.startupAttemptId} / ` : ""}${decision.proposedAttempt}`;
+    lines.push(`| ${attempt} | \`${decision.outcome}\` | ${decision.avoidedInvocation ? "Skipped" : "No skip recommended"} | ${counts.join(" / ")} | ${decision.latencyMs} ms | ${errors.join("<br>") || "None"} |`);
+  }
+  lines.push("", "Unknown answers preserve the harness-selected execution path. Decision requests may consume credits; a skip is not independent proof of task completion.");
+  return { title: `skip-if-decision: ${status.toLowerCase()}`, lines };
 }
 
 /** @param {string} filePath @returns {Promise<void>} */
