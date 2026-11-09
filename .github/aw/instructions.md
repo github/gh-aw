@@ -26,7 +26,7 @@ task or progress files. Prefer deterministic trigger/activation checks when
 ordinary conditions suffice; decisions cannot override retry limits, budgets,
 deadlines, or nonrecoverable errors.
 
-Nonempty lists emit a compile-time experimental warning. Configuration and
+Lists accept at most 64 questions. Nonempty lists emit a compile-time experimental warning. Configuration and
 behavior may change without deprecation.
 
 ```yaml

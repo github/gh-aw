@@ -133,6 +133,29 @@ describe("skip-if-decision", () => {
     expect(JSON.parse(request.body).questions).toHaveLength(2);
   });
 
+  it("accepts 64 questions in one decision batch", async () => {
+    const questions = Array.from({ length: 64 }, () => "Is the task complete?");
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(endpoint())
+      .mockResolvedValueOnce(decision(Array(64).fill("allow")));
+    const result = await evaluateSkipIfDecision({ env: env(questions), fetchImpl });
+    expect(result.outcome).toBe("allow");
+    expect(result.questions).toHaveLength(64);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(fetchImpl.mock.calls[1][1].body).questions).toHaveLength(64);
+  });
+
+  it("abstains for 65 questions without proxy calls or file reads", async () => {
+    const fetchImpl = vi.fn();
+    const readFile = vi.fn();
+    const questions = Array.from({ length: 65 }, () => "Is @task.md complete?");
+    const result = await evaluateSkipIfDecision({ env: env(questions), fetchImpl, readFile });
+    expect(result).toMatchObject({ outcome: "unknown", error: "invalid_configuration", questions: [] });
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(readFile).not.toHaveBeenCalled();
+  });
+
   it("matches shuffled answers by name, not position", async () => {
     const response = {
       answers: [

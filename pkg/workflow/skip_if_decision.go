@@ -13,8 +13,8 @@ func parseSkipIfDecision(frontmatter map[string]any) ([]string, error) {
 		return nil, nil
 	}
 	items, ok := raw.([]any)
-	if !ok || len(items) > 400 {
-		return nil, errors.New("skip-if-decision must be a list of at most 400 questions. Example:\nskip-if-decision:\n  - Is there no actionable work remaining in @context/task.md?")
+	if !ok || len(items) > 64 {
+		return nil, errors.New("skip-if-decision must be a list of at most 64 questions. Example:\nskip-if-decision:\n  - Is there no actionable work remaining in @context/task.md?")
 	}
 	questions := make([]string, 0, len(items))
 	for index, item := range items {

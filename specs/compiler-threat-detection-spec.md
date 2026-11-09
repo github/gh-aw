@@ -795,7 +795,7 @@ standard compiler experimental-feature warning; syntax and behavior may change
 without deprecation.
 
 For a nonempty top-level `skip-if-decision` list, the compiler MUST require the
-AWF agent sandbox and validate up to 400 nonblank string questions. Actions
+AWF agent sandbox and validate up to 64 nonblank string questions. Actions
 expressions in questions MUST be rejected. Questions MUST be transported as
 JSON environment data, not interpolated shell code or host-side decision
 steps. Nonempty lists combined with declarative `protected-session-capture`

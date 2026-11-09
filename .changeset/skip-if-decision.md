@@ -2,7 +2,7 @@
 "gh-aw": patch
 ---
 
-Add experimental top-level `skip-if-decision` questions evaluated inside AWF before eligible
+Add up to 64 experimental top-level `skip-if-decision` questions evaluated inside AWF before eligible
 agent invocations, including retries, resumes, and continuations. Questions share
 one Decisions request through the existing API proxy and resolve guarded runtime
 file references in the agent sandbox. Any deny skips; allow or all unknown

@@ -2,13 +2,14 @@
 "use strict";
 
 const path = require("node:path");
-const { invokeDecisions, MAX_DECISION_QUESTIONS } = require("./decisions_client.cjs");
+const { invokeDecisions } = require("./decisions_client.cjs");
 const { resolveIssueArtifactPath, readGuardedFile } = require("./symlink_guard.cjs");
 const { AWF_API_PROXY_REFLECT_URL, deriveBaseUrlFromModelsURL } = require("./awf_reflect.cjs");
 const { redactBuiltInPatterns, redactSecrets } = require("./redact_secrets.cjs");
 const { isSensitiveConfigKey } = require("./safe_outputs_config_redact.cjs");
 
 const DECISION_TIMEOUT_MS = 10000;
+const MAX_SKIP_IF_DECISION_QUESTIONS = 64;
 const MAX_CONTEXT_BYTES = 512 * 1024;
 const DEFAULT_MODEL = "gpt-6-luna-decisions";
 
@@ -108,7 +109,7 @@ async function evaluateSkipIfDecision({ env = process.env, fetchImpl = fetch, re
   let batchError;
   try {
     const questions = JSON.parse(env.GH_AW_SKIP_IF_DECISION);
-    if (!Array.isArray(questions) || questions.length > MAX_DECISION_QUESTIONS || questions.some(question => typeof question !== "string" || !question.trim())) throw new Error("invalid_configuration");
+    if (!Array.isArray(questions) || questions.length > MAX_SKIP_IF_DECISION_QUESTIONS || questions.some(question => typeof question !== "string" || !question.trim())) throw new Error("invalid_configuration");
     if (!questions.length) return null;
     outcomes = questions.map((_, index) => ({ question: index + 1, outcome: "unknown" }));
     if (env.AWF_REFLECT_ENABLED !== "1") throw new Error("sandbox_unavailable");

@@ -55,7 +55,7 @@ emoji: "🤖"
 > `skip-if-decision` is experimental. Nonempty lists emit a compile-time
 > warning; configuration and behavior may change without deprecation.
 
-An optional top-level `skip-if-decision` list of up to 400 questions evaluated inside AWF before each otherwise eligible agent invocation, including initial execution, retries, resumes, and continuations. The gate applies to all built-in engines and declarative engines, including command-based, custom-harness, and durable execution paths. Nonempty lists are incompatible with declarative `protected-session-capture`; compilation rejects this combination to preserve recorder isolation and verified session ingestion.
+An optional top-level `skip-if-decision` list of up to 64 questions evaluated inside AWF before each otherwise eligible agent invocation, including initial execution, retries, resumes, and continuations. The gate applies to all built-in engines and declarative engines, including command-based, custom-harness, and durable execution paths. Nonempty lists are incompatible with declarative `protected-session-capture`; compilation rejects this combination to preserve recorder isolation and verified session ingestion.
 
 Questions and referenced files are screened for known credential patterns and
 configured secret values before transmission. A match withholds that question

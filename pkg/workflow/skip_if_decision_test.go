@@ -28,7 +28,7 @@ func TestParseSkipIfDecision(t *testing.T) {
 		{"non-string", map[string]any{"skip-if-decision": []any{true}}, true},
 		{"blank", map[string]any{"skip-if-decision": []any{" \n"}}, true},
 		{"expression", map[string]any{"skip-if-decision": []any{"Is ${{ secrets.TOKEN }} complete?"}}, true},
-		{"too-many", map[string]any{"skip-if-decision": make([]any, 401)}, true},
+		{"too-many", map[string]any{"skip-if-decision": make([]any, 65)}, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := parseSkipIfDecision(tc.raw)
@@ -36,6 +36,32 @@ func TestParseSkipIfDecision(t *testing.T) {
 				t.Fatalf("parseSkipIfDecision error = %v, want failure %v", err, tc.fail)
 			}
 		})
+	}
+}
+
+func TestSkipIfDecisionQuestionLimit(t *testing.T) {
+	for _, count := range []int{64, 65} {
+		questions := make([]any, count)
+		for i := range questions {
+			questions[i] = "Is the task complete?"
+		}
+		parsed, parseErr := parseSkipIfDecision(map[string]any{"skip-if-decision": questions})
+		encoded, err := json.Marshal(questions)
+		require.NoError(t, err)
+		filename := filepath.Join(testutil.TempDir(t, "skip-decision-limit"), "decision.md")
+		source := "---\non: workflow_dispatch\nengine: copilot\nskip-if-decision: " + string(encoded) + "\n---\nDo the task.\n"
+		require.NoError(t, os.WriteFile(filename, []byte(source), 0600))
+		compileErr := NewCompiler().CompileWorkflow(filename)
+		if count == 64 {
+			require.NoError(t, parseErr)
+			require.Len(t, parsed, 64)
+			require.NoError(t, compileErr)
+		} else {
+			require.ErrorContains(t, parseErr, "at most 64 questions")
+			require.Error(t, compileErr)
+			_, lockErr := os.Stat(stringutil.MarkdownToLockFile(filename))
+			require.True(t, os.IsNotExist(lockErr))
+		}
 	}
 }
 

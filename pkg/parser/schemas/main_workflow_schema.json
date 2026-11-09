@@ -8,9 +8,9 @@
   "required": ["on"],
   "properties": {
     "skip-if-decision": {
-      "description": "Experimental. Advisory skip questions evaluated inside AWF before each eligible agent invocation. Nonempty lists emit a compile-time experimental warning; configuration and behavior may change without deprecation. Any deny skips; allow or all unknown preserves deterministic harness eligibility. Runtime @file references use sandbox filesystem restrictions. Nonempty lists cannot be combined with declarative protected-session-capture.",
+      "description": "Experimental. Up to 64 advisory skip questions evaluated inside AWF before each eligible agent invocation. Nonempty lists emit a compile-time experimental warning; configuration and behavior may change without deprecation. Any deny skips; allow or all unknown preserves deterministic harness eligibility. Runtime @file references use sandbox filesystem restrictions. Nonempty lists cannot be combined with declarative protected-session-capture.",
       "type": "array",
-      "maxItems": 400,
+      "maxItems": 64,
       "items": { "type": "string", "minLength": 1, "pattern": "\\S" }
     },
     "token-broker": {
