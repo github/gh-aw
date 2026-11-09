@@ -99,6 +99,19 @@ describe("Generated session schemas", () => {
     expect(validateSession(jsonl([header, unified({ type: "vendor.progress", data: { arbitrary: { body: false } } })]))).toBe(2);
   });
 
+  it("requires boolean output truncation in canonical and unified completions", () => {
+    for (const outputTruncated of [true, false]) {
+      const event = { type: "tool.execution_complete", data: { output: "preview\n", outputTruncated } };
+      expect(validateSession(jsonl([event]), "agent")).toBe(1);
+      expect(validateSession(jsonl([header, unified(normalizeUnifiedSessionEvent(event))]))).toBe(2);
+    }
+    for (const outputTruncated of ["false", 0, null]) {
+      const event = { type: "tool.execution_complete", data: { outputTruncated } };
+      expect(() => validateSession(jsonl([event]), "agent")).toThrow("Invalid session event");
+      expect(() => validateSession(jsonl([header, unified(event)]))).toThrow("Invalid session event");
+    }
+  });
+
   it("validates dependency job results with required IDs and native Actions outcomes", () => {
     for (const result of ["success", "failure", "cancelled", "skipped"]) {
       expect(validateSession(jsonl([header, unified({ type: "workflow.job_result", data: { jobId: "custom-job", result, durationMs: 0 } })]))).toBe(2);

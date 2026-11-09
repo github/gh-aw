@@ -857,6 +857,7 @@ export interface UnifiedSessionEventDataMap {
     | "toolName"
     | "success"
     | "output"
+    | "outputTruncated"
     | "structuredContent"
     | "result"
     | "error"
