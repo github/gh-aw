@@ -63,7 +63,10 @@ describe("model_pin_check acceptance cases", () => {
     const root = fixtureRepo({ ".github/workflows/main.md": source });
     const { prepareMarkdownFixtures } = require("../../../scripts/markdown_metadata_test_adapter.cjs");
     const metadata = prepareMarkdownFixtures(source);
-    fs.writeFileSync(path.join(root, ".github/workflows/main.lock.yml"), `# gh-aw-metadata: {}\n# gh-aw-manifest: ${JSON.stringify({ version: 1, markdown_metadata: metadata })}\n# generated\ninvalid: [yaml\n`);
+    fs.writeFileSync(
+      path.join(root, ".github/workflows/main.lock.yml"),
+      `# gh-aw-metadata: {}\n# gh-aw-manifest: ${JSON.stringify({ version: 1, ...require("./markdown_metadata.cjs").metadataManifestFields(metadata) })}\n# generated\ninvalid: [yaml\n`
+    );
     const scriptDirectory = path.join(root, "actions/setup/js");
     fs.mkdirSync(scriptDirectory, { recursive: true });
     const originalDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -141,7 +144,7 @@ describe("model_pin_check collection and rules", () => {
     const second = "engine: copilot\nmodel: sonnet";
     const imported = "models:\n  scoped-small: [gpt-5-mini]";
     const record = (source, value) => ({ sha256: crypto.createHash("sha256").update(source).digest("hex"), kind: "model-pins", value });
-    const header = records => `# gh-aw-metadata: {}\n# gh-aw-manifest: ${JSON.stringify({ markdown_metadata: { version: 2, records } })}\n# generated\ninvalid: [yaml\n`;
+    const header = records => `# gh-aw-metadata: {}\n# gh-aw-manifest: ${JSON.stringify(require("./markdown_metadata.cjs").metadataManifestFields({ version: 2, records }))}\n# generated\ninvalid: [yaml\n`;
     const root = fixtureRepo({
       ".github/workflows/first.md": `---\n${first}\n---\n`,
       ".github/workflows/second.md": `---\n${second}\n---\n`,
@@ -532,7 +535,8 @@ describe("repository-pins-reflection-regression", () => {
     if (cachedRepositoryReport) return cachedRepositoryReport;
     const bytes = fs.readFileSync(REFLECT_FILE);
     expect(crypto.createHash("sha256").update(bytes).digest("hex")).toBe(REFLECT_SHA256);
-    const collected = collectModelPins({ repoRoot: REPO_ROOT });
+    require("./markdown_metadata.cjs").installMarkdownMetadata({ version: 2, records: [] });
+    const collected = require("./model_pin_check.cjs").collectModelPins({ repoRoot: REPO_ROOT });
     cachedRepositoryReport = buildModelPinReport({ ...collected, reflectData: JSON.parse(bytes.toString("utf8")) });
     return cachedRepositoryReport;
   }

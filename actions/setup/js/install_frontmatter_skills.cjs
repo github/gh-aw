@@ -217,23 +217,6 @@ async function main(options = {}) {
       installed = true;
       const after = skillDigests(skillsDst);
       const changed = Object.entries(after).filter(([name, digest]) => digest !== before[name]);
-      if (Object.keys(after).length) {
-        const documents = Object.keys(after).map(name => fs.readFileSync(path.join(skillsDst, name, "SKILL.md"), "utf8"));
-        const { missingMarkdownMetadata, ensureCheckoutMarkdownMetadata, ensureRemoteMarkdownMetadata, persistMarkdownMetadata, CompilerMetadataUnavailableError } = require("./markdown_metadata.cjs");
-        if (missingMarkdownMetadata(documents).size) {
-          if (isLocalSkillRef(skillSpec)) {
-            ensureCheckoutMarkdownMetadata(documents, process.env.GITHUB_WORKSPACE || process.cwd());
-            if (missingMarkdownMetadata(documents).size) throw new CompilerMetadataUnavailableError();
-          } else {
-            const separator = skillSpec.lastIndexOf("@");
-            const repository = skillSpec.slice(0, separator).split("/").slice(0, 2).join("/");
-            const ref = skillSpec.slice(separator + 1);
-            const client = options.githubClient || (process.env.GH_TOKEN ? global.getOctokit?.(process.env.GH_TOKEN) : global.github);
-            await ensureRemoteMarkdownMetadata(documents, client, { repository, ref });
-          }
-          persistMarkdownMetadata();
-        }
-      }
       if (changed.length) {
         const history = fs.existsSync(SKILL_INSTALL_HISTORY_FILE) ? JSON.parse(fs.readFileSync(SKILL_INSTALL_HISTORY_FILE, "utf8")) : [];
         if (!Array.isArray(history)) throw new Error("Invalid skill installation history");

@@ -24,9 +24,7 @@
 // document (for example via an import) without swallowing unrelated content
 // that follows it, and lets the block itself contain nested "##" headings.
 //
-// Supported frontmatter fields (all others are stripped with a warning)
-// ─────────────────────────────────────────────────────────────────────
-//   description   Human-readable description of the skill's role.
+// Inline skill frontmatter is discarded without parsing; only the body is used.
 //
 // If no ## skill: markers are present the content is returned unchanged and no
 // files are written.
@@ -36,10 +34,6 @@ const path = require("path");
 const { collectInlineEndMarkers, unknownInlineEndMarkerError } = require("./inline_marker_helpers.cjs");
 const { inlineArtifactTarget } = require("./inline_artifact_target.cjs");
 const { INLINE_SKILL_MANIFEST } = require("./pi_workflow_skills.cjs");
-
-// Supported frontmatter fields for inline skills.
-// Any other field is stripped with a warning.
-const SUPPORTED_FRONTMATTER_FIELDS = ["description"];
 
 // Regex for the start marker: ## skill: `name` (lowercase identifier)
 const START_MARKER_RE = /^##[ \t]+skill:[ \t]+`([a-z][a-z0-9_-]*)`[ \t]*$/gm;
@@ -56,33 +50,20 @@ const AGENT_START_BOUNDARY_RE = /^##[ \t]+agent:[ \t]+`(?:[a-z][a-z0-9_-]*)`[ \t
 const H2_HEADING_RE = /^##[ \t]/gm;
 
 /**
- * Filters skill frontmatter to only retain supported fields.
- *
- * Only `description` is valid in a skill frontmatter block. Any other
- * top-level key is stripped and a warning is emitted.
+ * Discards inline skill frontmatter without interpreting its contents.
  *
  * When no YAML frontmatter delimiter (`---`) is found at the start of the
  * content, the content is returned unchanged.
  *
  * @param {string} content   - Raw skill block content (frontmatter + prompt).
  * @param {string} skillName - Skill name used in log messages.
- * @returns {string} Content with only supported frontmatter fields retained.
+ * @returns {string} Skill body without frontmatter.
  */
 function filterInlineSkillFrontmatter(content, skillName) {
-  const match = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*\r?(?=\n|$)/.exec(content);
-  if (!match) return content;
-  const { readMarkdownMetadata, editMarkdownMetadata } = require("./markdown_metadata.cjs");
-  const metadata = readMarkdownMetadata("agent", content).value;
-  const stripped = Object.keys(metadata).filter(key => !SUPPORTED_FRONTMATTER_FIELDS.includes(key));
-  if (stripped.length > 0) {
-    core.warning(`[extractInlineSkills] skill "${skillName}": unsupported frontmatter field(s) stripped: ${stripped.join(", ")} (only "description" is supported)`);
-  }
-
-  // If no supported fields remain, omit the frontmatter block entirely.
-  if (!Object.hasOwn(metadata, "description")) {
-    return content.slice(match[0].length).replace(/^\r?\n/, "");
-  }
-  return editMarkdownMetadata(content, value => ({ description: value.description }));
+  const { markdownMetadataBlocks } = require("./markdown_metadata.cjs");
+  const block = markdownMetadataBlocks(content, true)[0];
+  if (!block) return content;
+  return content.slice(block.end).replace(/^\r?\n/, "");
 }
 
 /**

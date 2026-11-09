@@ -14,7 +14,7 @@ global.core = {
   setFailed: () => {},
 };
 
-const { extractInlineSkills, writeInlineSkills, filterInlineSkillFrontmatter, closeUnterminatedSkillMarkers } = require("../../../scripts/markdown_metadata_test_adapter.cjs").withCompilerFixtures(require("./extract_inline_skills.cjs"));
+const { extractInlineSkills, writeInlineSkills, filterInlineSkillFrontmatter, closeUnterminatedSkillMarkers } = require("./extract_inline_skills.cjs");
 
 // Helper: returns a ## skill: `name` start marker line.
 const skillMarker = name => `## skill: \`${name}\``;
@@ -267,7 +267,7 @@ describe("writeInlineSkills", () => {
     expect(fs.existsSync(skillPath)).toBe(true);
     const written = fs.readFileSync(skillPath, "utf8");
     expect(written).toContain("You are a helper.");
-    expect(written).toContain('"description":"A helper skill"');
+    expect(written).not.toContain("description");
   });
 
   it("writes Codex skills as discoverable SKILL.md files", () => {
@@ -319,19 +319,19 @@ describe("writeInlineSkills", () => {
     writeInlineSkills(content, tmpDir);
 
     const written = fs.readFileSync(path.join(tmpDir, ".github", "skills", "a/SKILL.md"), "utf8");
-    expect(written).toContain('"description":"A helper"');
+    expect(written).not.toContain("description");
     expect(written).not.toContain("engine:");
     expect(written).not.toContain("tools:");
     expect(written).toContain("Skill prompt.");
   });
 
-  it("writes only description when mixed with unsupported fields", () => {
+  it("writes only the body when frontmatter contains descriptions and configuration", () => {
     const content = ["Main.", "", skillMarker("a"), "---", "description: A helpful skill", "engine: openai", "---", "Prompt."].join("\n");
 
     writeInlineSkills(content, tmpDir);
 
     const written = fs.readFileSync(path.join(tmpDir, ".github", "skills", "a/SKILL.md"), "utf8");
-    expect(written).toContain('"description":"A helpful skill"');
+    expect(written).toBe("Prompt.\n");
     expect(written).not.toContain("engine:");
   });
 });
@@ -346,17 +346,17 @@ describe("filterInlineSkillFrontmatter", () => {
     expect(filterInlineSkillFrontmatter(content, "skill")).toBe(content);
   });
 
-  it("keeps description field", () => {
+  it("drops description field", () => {
     const content = "---\ndescription: A planner\n---\nPrompt.";
     const result = filterInlineSkillFrontmatter(content, "skill");
-    expect(result).toContain('"description":"A planner"');
+    expect(result).not.toContain("description");
     expect(result).toContain("Prompt.");
   });
 
-  it("strips unsupported fields and keeps supported ones", () => {
+  it("strips all frontmatter fields", () => {
     const content = "---\nengine: copilot\ndescription: Helper\n---\nPrompt.";
     const result = filterInlineSkillFrontmatter(content, "skill");
-    expect(result).toContain('"description":"Helper"');
+    expect(result).toBe("Prompt.");
     expect(result).not.toContain("engine:");
   });
 
@@ -367,9 +367,9 @@ describe("filterInlineSkillFrontmatter", () => {
     expect(result).toContain("Prompt.");
   });
 
-  it("returns content unchanged when no closing delimiter found", () => {
+  it("rejects an unterminated frontmatter delimiter", () => {
     const content = "---\nengine: copilot\nPrompt without closing delimiter.";
-    expect(filterInlineSkillFrontmatter(content, "skill")).toBe(content);
+    expect(() => filterInlineSkillFrontmatter(content, "skill")).toThrow(/unterminated/);
   });
 
   it("drops frontmatter when only unsupported fields are present", () => {
@@ -381,6 +381,6 @@ describe("filterInlineSkillFrontmatter", () => {
   it("handles content with only description field", () => {
     const content = "---\ndescription: Summarizes files\n---\nYou are a summarizer.";
     const result = filterInlineSkillFrontmatter(content, "agent");
-    expect(result).toBe('---\n{"description":"Summarizes files"}\n---\nYou are a summarizer.');
+    expect(result).toBe("You are a summarizer.");
   });
 });

@@ -50,7 +50,7 @@ function parseLockFileHeaders(lines) {
       seen.add(name);
       try {
         const source = line.slice(prefix.length);
-        const value = parseStrictJSON(source, name === "manifest" ? { finiteNumbersIn: "markdown_metadata" } : {});
+        const value = parseStrictJSON(source, name === "manifest" ? { finiteNumbersIn: ["agent_metadata", "model_pins"] } : {});
         if (value !== null && typeof value === "object" && !Array.isArray(value)) headers[name] = value;
       } catch {
         headers[name] = undefined;

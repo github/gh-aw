@@ -76,7 +76,7 @@ function fingerprint(actor, kind, parameters) {
 // JSON.parse alone cannot detect duplicate (including escaped-equivalent) keys.
 /**
  * @param {string} text
- * @param {{maxBytes?: unknown, finiteNumbersIn?: string}} [options]
+ * @param {{maxBytes?: unknown, finiteNumbersIn?: string | string[]}} [options]
  */
 function parseStrictJSON(text, { maxBytes = MAX_PARSE_BYTES, finiteNumbersIn } = {}) {
   if (typeof maxBytes !== "number" || !Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > MAX_SNAPSHOT_PARSE_BYTES) throw queueError("resource_limit", "JSON parser byte limit must be a positive safe integer at most 161 MiB");
@@ -127,7 +127,7 @@ function parseStrictJSON(text, { maxBytes = MAX_PARSE_BYTES, finiteNumbersIn } =
         if (Object.hasOwn(object, key)) throw queueError("duplicate_key", "duplicate JSON object key");
         skip();
         if (text[i++] !== ":") fail();
-        object[key] = read(depth + 1, finiteNumbers || (depth === 0 && key === finiteNumbersIn));
+        object[key] = read(depth + 1, finiteNumbers || (depth === 0 && (Array.isArray(finiteNumbersIn) ? finiteNumbersIn.includes(key) : key === finiteNumbersIn)));
         skip();
         const end = text[i++];
         if (end === "}") return object;

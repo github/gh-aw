@@ -39,3 +39,32 @@ func TestModelPinMetadataProjection(t *testing.T) {
 	require.Equal(t, []any{map[string]any{"agent": map[string]any{"model": "isolated", "engine": "copilot"}}}, out["enclaves"])
 	require.Equal(t, false, out["safe-outputs"].(map[string]any)["threat-detection"].(map[string]any)["enabled"])
 }
+
+func TestModelPinMetadataImportLocations(t *testing.T) {
+	imports := []any{
+		"shared.md",
+		map[string]any{"path": "local.md", "uses": "alternate.md", "inputs": map[string]any{"model": "not a pin"}},
+		map[string]any{"uses": "owner/repo/shared.md@main", "with": map[string]any{"model": "not a pin"}},
+		map[string]any{"with": map[string]any{"unused": "not an import"}},
+	}
+	expected := []any{
+		"shared.md",
+		map[string]any{"path": "local.md", "uses": "alternate.md"},
+		map[string]any{"uses": "owner/repo/shared.md@main"},
+		map[string]any{},
+	}
+	for _, wrapped := range []bool{false, true} {
+		t.Run(map[bool]string{false: "list", true: "aw"}[wrapped], func(t *testing.T) {
+			var source any = imports
+			var want any = expected
+			if wrapped {
+				source = map[string]any{"aw": imports, "other": "not inventory"}
+				want = map[string]any{"aw": expected}
+			}
+			out := projectModelPinMetadata(map[string]any{"imports": source}).(map[string]any)
+			require.Equal(t, want, out["imports"])
+		})
+	}
+	require.Contains(t, imports[1].(map[string]any), "inputs", "projection must not mutate authored metadata")
+	require.Contains(t, imports[2].(map[string]any), "with")
+}

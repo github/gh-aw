@@ -182,20 +182,10 @@ describe("install_frontmatter_skills", () => {
     expect(history).not.toContain("owner/skills");
   });
 
-  it("loads private skill metadata with the existing per-skill credential and persists all fields", async () => {
+  it("installs private skill files unchanged without fetching metadata or caching descriptions", async () => {
     const revision = "a".repeat(40);
     const source = "description: Private reader\nmodel: small\ntools: [Read]";
-    const value = { description: "Private reader", model: "small", tools: ["Read"] };
-    const record = { kind: "artifact", sha256: require("node:crypto").createHash("sha256").update(source).digest("hex"), value };
-    const file = ".github/workflows/metadata.lock.yml";
-    const header = `# gh-aw-metadata: {}\n# gh-aw-manifest: ${JSON.stringify({ version: 1, markdown_metadata: { version: 2, records: [record] } })}\n# generated\ninvalid: [yaml\n`;
-    const client = {
-      rest: {
-        repos: {
-          getContent: vi.fn(async request => (request.path === ".github/workflows" ? { data: [{ type: "file", path: file }] } : { data: { type: "file", path: file, encoding: "base64", content: Buffer.from(header).toString("base64") } })),
-        },
-      },
-    };
+    const client = { rest: { repos: { getContent: vi.fn() } } };
     global.getOctokit = vi.fn(() => client);
     global.github = { rest: { repos: { getContent: vi.fn() } } };
     vi.stubEnv("GH_TOKEN", "private-source-token");
@@ -209,18 +199,19 @@ describe("install_frontmatter_skills", () => {
       return 0;
     });
     await script.main();
-    expect(global.getOctokit).toHaveBeenCalledWith("private-source-token");
+    expect(global.getOctokit).not.toHaveBeenCalled();
     expect(global.github.rest.repos.getContent).not.toHaveBeenCalled();
-    expect(client.rest.repos.getContent).toHaveBeenCalledTimes(2);
+    expect(client.rest.repos.getContent).not.toHaveBeenCalled();
     const info = fs.readFileSync(path.join(tempRoot, "aw_info.json"), "utf8");
     expect(JSON.parse(info).run_id).toBe(123);
-    expect(JSON.parse(info).markdown_metadata.records[0].value).toEqual(value);
+    expect(JSON.parse(info)).toEqual({ run_id: 123 });
+    expect(fs.readFileSync(path.join(tempRoot, ".claude/skills/reader/SKILL.md"), "utf8")).toBe(`---\n${source}\n---\nBody`);
     expect(info).not.toContain("private-source-token");
     await script.main();
-    expect(client.rest.repos.getContent).toHaveBeenCalledTimes(2);
+    expect(client.rest.repos.getContent).not.toHaveBeenCalled();
   });
 
-  it("fails activation without credential fallback when installed skill metadata cannot be authorized", async () => {
+  it("does not require compiler metadata for installed skill descriptions", async () => {
     const failure = Object.assign(new Error("Forbidden"), { status: 403 });
     global.getOctokit = vi.fn(() => ({ rest: { repos: { getContent: vi.fn().mockRejectedValue(failure) } } }));
     global.github = { rest: { repos: { getContent: vi.fn() } } };
@@ -233,8 +224,8 @@ describe("install_frontmatter_skills", () => {
       fs.writeFileSync(path.join(directory, "SKILL.md"), "---\ndescription: Not compiled\n---\nBody");
       return 0;
     });
-    await expect(script.main()).rejects.toBe(failure);
-    expect(global.getOctokit).toHaveBeenCalledTimes(1);
+    await script.main();
+    expect(global.getOctokit).not.toHaveBeenCalled();
     expect(global.github.rest.repos.getContent).not.toHaveBeenCalled();
   });
 

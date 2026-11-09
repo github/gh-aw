@@ -33,6 +33,9 @@ func main() {
 		records := map[string]any{}
 		for _, content := range input.Sources {
 			for _, block := range parser.ExtractMarkdownMetadataBlocks(content) {
+				if block.Skill {
+					continue
+				}
 				value, err := parser.CompileMarkdownMetadata(block.Source)
 				encoded, encodeErr := json.Marshal(value)
 				if encodeErr != nil {

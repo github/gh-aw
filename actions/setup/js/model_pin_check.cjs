@@ -241,6 +241,7 @@ function loadWorkflowFiles(workflowFile, repoRoot) {
     if (visited.has(file)) continue;
     visited.add(file);
     const rel = relativePath(file, repoRoot);
+    if (/(?:^|\/)skills\/|(?:^|\/)SKILL\.md$/i.test(rel)) continue;
     let content;
     try {
       content = fs.readFileSync(file, "utf8");

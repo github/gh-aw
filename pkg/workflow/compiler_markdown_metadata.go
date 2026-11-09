@@ -53,7 +53,7 @@ func (c *Compiler) collectMarkdownMetadata(data *WorkflowData) *GHAWMarkdownMeta
 	root := markdownMetadataRoot(c.markdownPath)
 	scanRuntimeImportMetadata(root, data, scan)
 	scanImportedDocumentMetadata(root, c.markdownPath, data, scan)
-	scanRepositoryArtifactMetadata(root, data.Skills, scan)
+	scanRepositoryArtifactMetadata(root, scan)
 	keys := make([]string, 0, len(records))
 	for key := range records {
 		keys = append(keys, key)
@@ -74,7 +74,13 @@ func addMarkdownMetadataRecord(records map[string]GHAWMarkdownMetadataRecord, so
 	if _, exists := records[key]; exists {
 		return
 	}
-	value, err := parser.CompileMarkdownMetadata(source)
+	var value any
+	var err error
+	if kind == "artifact" {
+		value, err = parser.CompileAgentMetadata(source)
+	} else {
+		value, err = parser.CompileMarkdownMetadata(source)
+	}
 	if kind == "model-pins" && err == nil {
 		value = projectModelPinMetadata(value)
 	}
@@ -91,6 +97,9 @@ func addMarkdownMetadataRecord(records map[string]GHAWMarkdownMetadataRecord, so
 func scanMarkdownMetadata(records map[string]GHAWMarkdownMetadataRecord, content, documentKind string) {
 	content = strings.ReplaceAll(content, "\r\n", "\n")
 	for _, block := range parser.ExtractMarkdownMetadataBlocks(content) {
+		if block.Skill || (block.Document && documentKind == "skill") {
+			continue
+		}
 		kind := "artifact"
 		if block.Document {
 			kind = documentKind
@@ -160,8 +169,10 @@ func scanRuntimeImportMetadata(root string, data *WorkflowData, scan func(string
 				}
 				slash := strings.TrimPrefix(filepath.ToSlash(relative), constants.GithubDir)
 				kind := "model-pins"
-				if strings.HasPrefix(slash, "agents/") || strings.HasPrefix(slash, "skills/") || strings.HasPrefix(slash, ".agents/agents/") || strings.HasPrefix(slash, ".agents/skills/") {
+				if strings.HasPrefix(slash, "agents/") || strings.Contains(slash, "/agents/") {
 					kind = "artifact"
+				} else if strings.HasPrefix(slash, "skills/") || strings.Contains(slash, "/skills/") || filepath.Base(slash) == "SKILL.md" {
+					kind = "skill"
 				}
 				scan(imported, kind)
 				scanRuntimeImports(imported)
@@ -177,8 +188,10 @@ func scanRuntimeImportMetadata(root string, data *WorkflowData, scan func(string
 func scanImportedDocumentMetadata(root, markdownPath string, data *WorkflowData, scan func(string, string)) {
 	for file, content := range data.ImportedMetadataDocuments {
 		kind := "model-pins"
-		if strings.Contains(filepath.ToSlash(file), "/agents/") || strings.HasSuffix(file, "SKILL.md") {
+		if strings.Contains(filepath.ToSlash(file), "/agents/") {
 			kind = "artifact"
+		} else if strings.Contains(filepath.ToSlash(file), "/skills/") || strings.HasSuffix(file, "SKILL.md") {
+			kind = "skill"
 		}
 		scan(content, kind)
 	}
@@ -194,8 +207,10 @@ func scanImportedDocumentMetadata(root, markdownPath string, data *WorkflowData,
 			}
 			if content, err := os.ReadFile(file); err == nil {
 				kind := "model-pins"
-				if strings.Contains(filepath.ToSlash(file), "/agents/") || strings.HasSuffix(file, "SKILL.md") {
+				if strings.Contains(filepath.ToSlash(file), "/agents/") {
 					kind = "artifact"
+				} else if strings.Contains(filepath.ToSlash(file), "/skills/") || strings.HasSuffix(file, "SKILL.md") {
+					kind = "skill"
 				}
 				scan(string(content), kind)
 				break
@@ -206,13 +221,8 @@ func scanImportedDocumentMetadata(root, markdownPath string, data *WorkflowData,
 	}
 }
 
-func scanRepositoryArtifactMetadata(root string, skills []string, scan func(string, string)) {
-	directories := []string{activationSymlinkAgentDir, activationSymlinkSkillDir, ".agents/agents", ".agents/skills", ".claude/agents", ".claude/skills", ".codex/agents", ".codex/skills", ".gemini/agents", ".gemini/skills", ".pi/agents", ".pi/skills", "skills"}
-	for _, skill := range skills {
-		if spec := parseSkillRefSpec(skill); spec.isLocal {
-			directories = append(directories, spec.trimmed)
-		}
-	}
+func scanRepositoryArtifactMetadata(root string, scan func(string, string)) {
+	directories := []string{activationSymlinkAgentDir, ".agents/agents", ".claude/agents", ".codex/agents", ".gemini/agents", ".pi/agents"}
 	for _, directory := range directories {
 		err := filepath.WalkDir(filepath.Join(root, directory), func(file string, entry fs.DirEntry, entryErr error) error {
 			if entryErr != nil {

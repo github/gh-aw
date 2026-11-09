@@ -52,7 +52,7 @@ function markdownMetadataBlocks(content, documentOnly = false) {
     const sourceEnd = /** @type {number} */ lines[closing].index;
     const source = content.slice(sourceStart, sourceEnd).replace(/\r?\n$/, "");
     const end = sourceEnd + lineText(closing).length;
-    blocks.push({ start, end, source });
+    blocks.push({ start, end, source, skill: /^##[ \t]+skill:/.test(lineText(index)) });
     index = closing;
     if (documentOnly) break;
   }
@@ -112,6 +112,55 @@ function currentMarkdownMetadata() {
   return { version: 2, records: [...records.values()] };
 }
 
+/** @param {MetadataCatalog} catalog */
+function metadataManifestFields(catalog) {
+  /** @type {Record<string, any>} */
+  const agent_metadata = {};
+  /** @type {Record<string, any>} */
+  const model_pins = {};
+  /** @type {Record<string, any>} */
+  const metadata_refs = {};
+  /** @type {Record<string, string>} */
+  const metadata_errors = {};
+  for (const record of catalog.records) {
+    const key = `${record.kind}:${record.sha256}`;
+    (record.kind === "artifact" ? agent_metadata : model_pins)[record.sha256] = record.value;
+    if ("references" in record) metadata_refs[key] = record.references;
+    if (record.error !== undefined) metadata_errors[key] = record.error;
+  }
+  return {
+    ...(Object.keys(agent_metadata).length ? { agent_metadata } : {}),
+    model_pins,
+    ...(Object.keys(metadata_refs).length ? { metadata_refs } : {}),
+    ...(Object.keys(metadata_errors).length ? { metadata_errors } : {}),
+  };
+}
+
+/** @param {Record<string, any>} manifest */
+function manifestMetadataCatalog(manifest) {
+  const groups = [
+    ["artifact", manifest.agent_metadata],
+    ["model-pins", manifest.model_pins],
+  ];
+  const references = manifest.metadata_refs ?? {};
+  const errors = manifest.metadata_errors ?? {};
+  if (![references, errors].every(value => value && typeof value === "object" && !Array.isArray(value))) throw new Error("Invalid compiler metadata manifest");
+  const keys = new Set();
+  /** @type {any[]} */
+  const catalogRecords = [];
+  for (const [kind, group] of groups) {
+    if (group === undefined) continue;
+    if (!group || typeof group !== "object" || Array.isArray(group)) throw new Error("Invalid compiler metadata manifest");
+    for (const [sha256, value] of Object.entries(group)) {
+      const key = `${kind}:${sha256}`;
+      keys.add(key);
+      catalogRecords.push({ kind, sha256, value, ...(Object.hasOwn(references, key) ? { references: references[key] } : {}), ...(Object.hasOwn(errors, key) ? { error: errors[key] } : {}) });
+    }
+  }
+  if ([...Object.keys(references), ...Object.keys(errors)].some(key => !keys.has(key))) throw new Error("Compiler metadata reference or error has no source");
+  return { version: 2, records: catalogRecords };
+}
+
 /** @param {string} pointer */
 function metadataPointer(pointer) {
   if (typeof pointer !== "string" || (pointer !== "" && !pointer.startsWith("/")) || /~(?![01])/u.test(pointer)) throw new Error("Invalid Markdown metadata reference");
@@ -135,8 +184,9 @@ function referencedMetadataValue(root, parts) {
 
 /** @param {{metadata?: Record<string, unknown>, manifest?: Record<string, unknown>}} headers */
 function resolveMarkdownMetadata(headers) {
-  const catalog = headers.manifest?.markdown_metadata;
-  if (catalog === undefined) return undefined;
+  const manifest = headers.manifest;
+  if (!manifest || (!Object.hasOwn(manifest, "agent_metadata") && !Object.hasOwn(manifest, "model_pins"))) return undefined;
+  const catalog = manifestMetadataCatalog(manifest);
   if (!catalog || typeof catalog !== "object" || !("version" in catalog) || catalog.version !== 2 || !("records" in catalog) || !Array.isArray(catalog.records)) throw new Error("Invalid compiler Markdown metadata manifest");
   return {
     version: 2,
@@ -150,7 +200,8 @@ function resolveMarkdownMetadata(headers) {
       for (const destination of destinations) {
         const parts = metadataPointer(destination);
         const source = metadataPointer(references[destination]);
-        if (source.length < 2 || !["metadata", "manifest"].includes(source[0]) || (source[0] === "manifest" && source[1] === "markdown_metadata")) throw new Error("Invalid Markdown metadata reference source");
+        if (source.length < 2 || !["metadata", "manifest"].includes(source[0]) || (source[0] === "manifest" && ["agent_metadata", "model_pins", "metadata_refs", "metadata_errors", "markdown_metadata"].includes(source[1])))
+          throw new Error("Invalid Markdown metadata reference source");
         if (destinations.some(other => other !== destination && (destination === "" || other.startsWith(destination + "/")))) throw new Error("Overlapping Markdown metadata references");
         const value = structuredClone(referencedMetadataValue(headers, source));
         if (!parts.length) {
@@ -218,21 +269,7 @@ async function loadMarkdownMetadata(workflowId, workspace, { repository, githubC
 function checkoutArtifactDocuments(workspace) {
   const documents = [];
   const realWorkspace = fs.realpathSync(workspace);
-  for (const directory of [
-    ".github/agents",
-    ".github/skills",
-    ".claude/agents",
-    ".claude/skills",
-    ".codex/agents",
-    ".codex/skills",
-    ".gemini/agents",
-    ".gemini/skills",
-    ".pi/agents",
-    ".pi/skills",
-    ".agents/agents",
-    ".agents/skills",
-    "skills",
-  ]) {
+  for (const directory of [".github/agents", ".claude/agents", ".codex/agents", ".gemini/agents", ".pi/agents", ".agents/agents"]) {
     const root = path.join(workspace, directory);
     if (!fs.existsSync(root)) continue;
     const relative = path.relative(realWorkspace, fs.realpathSync(root));
@@ -256,6 +293,7 @@ function missingMarkdownMetadata(documents) {
   const missing = new Set();
   for (const content of documents) {
     for (const block of markdownMetadataBlocks(content)) {
+      if (block.skill) continue;
       const source = block.source;
       if (!source?.trim()) continue;
       try {
@@ -325,7 +363,8 @@ function persistMarkdownMetadata() {
   if (!fs.existsSync(infoPath)) throw new Error("Compiler Markdown metadata cache is unavailable; activation must generate aw_info.json before installing skills");
   const info = JSON.parse(fs.readFileSync(infoPath, "utf8"));
   if (!info || typeof info !== "object" || Array.isArray(info)) throw new Error("Invalid compiler Markdown metadata cache");
-  info.markdown_metadata = currentMarkdownMetadata();
+  for (const key of ["markdown_metadata", "agent_metadata", "model_pins", "metadata_refs", "metadata_errors"]) delete info[key];
+  Object.assign(info, metadataManifestFields(currentMarkdownMetadata()));
   fs.writeFileSync(infoPath, JSON.stringify(info));
 }
 
@@ -334,7 +373,8 @@ function restoreCachedMetadata() {
   const infoPath = path.join(process.env.GH_AW_TMP_DIR || require("./constants.cjs").TMP_GH_AW_PATH, "aw_info.json");
   if (fs.existsSync(infoPath)) {
     const info = JSON.parse(fs.readFileSync(infoPath, "utf8"));
-    if (info.markdown_metadata) installMarkdownMetadata(info.markdown_metadata);
+    const metadata = resolveMarkdownMetadata({ manifest: info });
+    if (metadata) installMarkdownMetadata(metadata);
   }
 }
 
@@ -356,7 +396,17 @@ function readDocumentMetadata(source, { kind = "document" } = {}) {
   }
   // Model-pin records deliberately project workflow configuration; only
   // artifact metadata is also used directly by runtime engine readers.
-  if (record.kind === "artifact" && !isDeepStrictEqual(runtime, compiled)) throw new Error("Markdown JSON metadata does not match its compiler manifest");
+  if (record.kind === "artifact") {
+    const projected =
+      runtime && typeof runtime === "object" && !Array.isArray(runtime) && compiled && typeof compiled === "object" && !Array.isArray(compiled)
+        ? Object.fromEntries(
+            Object.keys(compiled)
+              .filter(key => Object.hasOwn(runtime, key))
+              .map(key => [key, runtime[key]])
+          )
+        : runtime;
+    if (!isDeepStrictEqual(projected, compiled)) throw new Error("Markdown JSON metadata does not match its compiler manifest");
+  }
   return { value: compiled };
 }
 
@@ -416,6 +466,10 @@ function transformMarkdownContent(content, transform) {
   let result = "";
   for (const block of blocks) {
     result += content.slice(cursor, block.start);
+    if (block.skill) {
+      cursor = block.end;
+      continue;
+    }
     const value = readDocumentMetadata(block.source, { kind: "artifact" }).value ?? {};
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("agent frontmatter must be a mapping");
     metadata.push(value);
@@ -463,4 +517,5 @@ module.exports = {
   parseMarkdownJSON,
   markdownMetadataBlocks,
   CompilerMetadataUnavailableError,
+  metadataManifestFields,
 };

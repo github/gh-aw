@@ -1,4 +1,11 @@
 const { installMarkdownMetadata, readMarkdownMetadata, readDocumentMetadata, transformMarkdownContent, editMarkdownMetadata, loadMarkdownMetadata, parseMarkdownJSON } = require("./markdown_metadata.cjs");
+
+it("discards inline skill descriptions without requiring metadata or interpreting YAML", () => {
+  installMarkdownMetadata({ version: 2, records: [] });
+  const content = "## skill: `reader`\n---\ndescription: [not parsed\nname: unused\n---\nRead files.\n## end skill: `reader`";
+  expect(transformMarkdownContent(content, text => text)).toBe("## skill: `reader`\n\nRead files.\n## end skill: `reader`");
+  expect(require("./markdown_metadata.cjs").missingMarkdownMetadata([content]).size).toBe(0);
+});
 const { createLiteralValues, restoreInlineMetadata } = require("./prompt_literal_values.cjs");
 const record = (source, value) => ({ sha256: require("node:crypto").createHash("sha256").update(source).digest("hex"), kind: "artifact", value });
 
@@ -185,7 +192,7 @@ describe("compiler-owned Markdown metadata", () => {
     const metadata = { version: 2, records: [record("rate: 0.25", { rate: 0.25 })] };
     try {
       fs.mkdirSync(path.dirname(file), { recursive: true });
-      fs.writeFileSync(file, `# gh-aw-metadata: {}\n# gh-aw-manifest: ${JSON.stringify({ version: 1, markdown_metadata: metadata })}\n# compiled fixture\ninvalid: [yaml\n`);
+      fs.writeFileSync(file, `# gh-aw-metadata: {}\n# gh-aw-manifest: ${JSON.stringify({ version: 1, ...require("./markdown_metadata.cjs").metadataManifestFields(metadata) })}\n# compiled fixture\ninvalid: [yaml\n`);
       expect(await loadMarkdownMetadata("owner/repo/.github/workflows/main.lock.yml@main", workspace)).toEqual(metadata);
       expect(readDocumentMetadata("rate: 0.25").value).toEqual({ rate: 0.25 });
       fs.writeFileSync(file, "# gh-aw-manifest: {}\n# gh-aw-manifest: {}\n# compiled fixture\n");

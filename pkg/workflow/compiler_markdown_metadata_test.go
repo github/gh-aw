@@ -43,11 +43,11 @@ func TestCompilerMarkdownMetadataManifest(t *testing.T) {
 		return hex.EncodeToString(value[:])
 	}
 	require.Equal(t, map[string]any{"model": "small", "description": "Reads files"}, values[hash("model: small\ndescription: >-\n  Reads files")])
-	require.Equal(t, map[string]any{"description": "Reads skill files"}, values[hash("description: Reads skill files")])
+	require.NotContains(t, values, hash("description: Reads skill files"))
 	require.Equal(t, map[string]any{"model": "large", "tools": []any{"Read"}}, values[hash("model: large\ntools: [Read]")])
-	require.Equal(t, map[string]any{"description": "__GH_AW_EXPR_TEST__"}, values[hash("description: __GH_AW_EXPR_TEST__")])
+	require.NotContains(t, values, hash("description: __GH_AW_EXPR_TEST__"))
 	require.Equal(t, map[string]any{"description": "Imported text", "tools": []any{"Read"}}, values[hash("{description: Imported text, tools: [Read]}")])
-	require.Equal(t, map[string]any{"description": "Custom directory"}, values[hash("description: Custom directory")])
+	require.NotContains(t, values, hash("description: Custom directory"))
 }
 
 func TestCompilerMarkdownMetadataDelimiterForms(t *testing.T) {

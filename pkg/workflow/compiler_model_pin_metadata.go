@@ -9,7 +9,10 @@ func projectModelPinMetadata(value any) any {
 	if !ok {
 		return value
 	}
-	result := metadataFields(root, "model", "models", "imports")
+	result := metadataFields(root, "model", "models")
+	if imports, exists := root["imports"]; exists {
+		result["imports"] = modelPinImportsMetadata(imports)
+	}
 	if models, ok := result["models"].(map[string]any); ok {
 		aliases := map[string]any{}
 		for key, value := range models {
@@ -57,6 +60,17 @@ func projectModelPinMetadata(value any) any {
 		result["enclaves"] = modelPinEnclavesMetadata(enclaves)
 	}
 	return result
+}
+
+func modelPinImportsMetadata(imports any) any {
+	if config, ok := imports.(map[string]any); ok {
+		target := metadataFields(config, "aw")
+		if list, exists := target["aw"]; exists {
+			target["aw"] = modelPinArrayMetadata(list, "path", "uses")
+		}
+		return target
+	}
+	return modelPinArrayMetadata(imports, "path", "uses")
 }
 
 func modelPinEnclavesMetadata(enclaves []any) []any {

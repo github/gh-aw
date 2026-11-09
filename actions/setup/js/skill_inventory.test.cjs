@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
 
-const { inventoryDirectory, detectSkillConflicts, main } = createRequire(import.meta.url)("../../../scripts/markdown_metadata_test_adapter.cjs").withCompilerFixtures(createRequire(import.meta.url)("./skill_inventory.cjs"));
+const { inventoryDirectory, detectSkillConflicts, main } = createRequire(import.meta.url)("./skill_inventory.cjs");
 
 describe("skill inventory", () => {
   let root;
@@ -27,28 +27,29 @@ describe("skill inventory", () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  it("records stable names, sources, scopes, digests and declared purposes without content", () => {
+  it("records stable names, sources, scopes and digests without descriptions or content", () => {
     const dir = path.join(root, "skills");
     fs.mkdirSync(path.join(dir, "review"), { recursive: true });
     fs.writeFileSync(path.join(dir, "review", "SKILL.md"), "---\ndescription: Review changes\n---\nSECRET_CONTENT\n");
     const skills = inventoryDirectory(dir, "repository", "skills");
-    expect(skills).toEqual([{ name: "review", source: "skills/review", scope: "repository", digest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/), purpose: "Review changes" }]);
+    expect(skills).toEqual([{ name: "review", source: "skills/review", scope: "repository", digest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/) }]);
+    expect(JSON.stringify(skills)).not.toContain("Review changes");
     expect(JSON.stringify(skills)).not.toContain("SECRET_CONTENT");
     expect(inventoryDirectory(dir, "repository", "skills")).toEqual(skills);
   });
 
-  it("parses YAML descriptions and ignores non-string declarations", () => {
+  it("does not interpret skill frontmatter or require compiler metadata", () => {
     const dir = path.join(root, "skills");
     fs.mkdirSync(path.join(dir, "quoted"), { recursive: true });
     fs.mkdirSync(path.join(dir, "folded"), { recursive: true });
     fs.mkdirSync(path.join(dir, "numeric"), { recursive: true });
     fs.writeFileSync(path.join(dir, "quoted", "SKILL.md"), '---\ndescription: "Review user\'s code"\n---\n');
     fs.writeFileSync(path.join(dir, "folded", "SKILL.md"), "---\ndescription: >\n  Review user's code\n  across files\n---\n");
-    fs.writeFileSync(path.join(dir, "numeric", "SKILL.md"), "---\ndescription: 42\n---\n");
+    fs.writeFileSync(path.join(dir, "numeric", "SKILL.md"), "---\ndescription: [invalid YAML\n---\n");
     expect(inventoryDirectory(dir, "repository", "skills")).toEqual([
-      { name: "folded", source: "skills/folded", scope: "repository", digest: expect.any(String), purpose: "Review user's code across files" },
+      { name: "folded", source: "skills/folded", scope: "repository", digest: expect.any(String) },
       { name: "numeric", source: "skills/numeric", scope: "repository", digest: expect.any(String) },
-      { name: "quoted", source: "skills/quoted", scope: "repository", digest: expect.any(String), purpose: "Review user's code" },
+      { name: "quoted", source: "skills/quoted", scope: "repository", digest: expect.any(String) },
     ]);
   });
 

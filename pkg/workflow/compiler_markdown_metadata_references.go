@@ -39,6 +39,9 @@ func deduplicateMarkdownMetadata(header string, manifest *GHAWManifest) error {
 		return err
 	}
 	delete(value, "markdown_metadata")
+	for _, key := range []string{"agent_metadata", "model_pins", "metadata_refs", "metadata_errors"} {
+		delete(value, key)
+	}
 	indexMarkdownMetadataValues(index, value, "/manifest")
 	for i, record := range manifest.MarkdownMetadata.Records {
 		if record.Error != "" {
@@ -56,7 +59,29 @@ func deduplicateMarkdownMetadata(header string, manifest *GHAWManifest) error {
 		}
 		manifest.MarkdownMetadata.Records[i] = record
 	}
+	populateManifestMetadata(manifest)
 	return nil
+}
+
+func populateManifestMetadata(manifest *GHAWManifest) {
+	manifest.AgentMetadata = map[string]json.RawMessage{}
+	manifest.ModelPins = map[string]json.RawMessage{}
+	manifest.MetadataRefs = map[string]map[string]string{}
+	manifest.MetadataErrors = map[string]string{}
+	for _, record := range manifest.MarkdownMetadata.Records {
+		key := record.Kind + ":" + record.SHA256
+		if record.Kind == "artifact" {
+			manifest.AgentMetadata[record.SHA256] = record.Value
+		} else {
+			manifest.ModelPins[record.SHA256] = record.Value
+		}
+		if len(record.References) > 0 {
+			manifest.MetadataRefs[key] = record.References
+		}
+		if record.Error != "" {
+			manifest.MetadataErrors[key] = record.Error
+		}
+	}
 }
 
 func metadataPointerPart(key string) string {
@@ -72,29 +97,17 @@ func indexMarkdownMetadataValues(index map[string]string, value any, pointer str
 	if err != nil {
 		return
 	}
-	// Empty containers, booleans and numbers are smaller than a reference and do
-	// not carry duplicated field information worth moving out of the catalog.
-	if text, ok := value.(string); ok && text != "" {
+	if pointer != "/metadata" && pointer != "/manifest" {
 		if _, exists := index[string(encoded)]; !exists {
 			index[string(encoded)] = pointer
 		}
 	}
 	switch item := value.(type) {
 	case map[string]any:
-		if len(item) > 0 {
-			if _, exists := index[string(encoded)]; !exists {
-				index[string(encoded)] = pointer
-			}
-		}
 		for _, key := range sortedMetadataKeys(item) {
 			indexMarkdownMetadataValues(index, item[key], appendMetadataPointer(pointer, key))
 		}
 	case []any:
-		if len(item) > 0 {
-			if _, exists := index[string(encoded)]; !exists {
-				index[string(encoded)] = pointer
-			}
-		}
 		for i, child := range item {
 			indexMarkdownMetadataValues(index, child, fmt.Sprintf("%s/%d", pointer, i))
 		}

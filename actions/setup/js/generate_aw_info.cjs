@@ -60,7 +60,7 @@ async function main(core, ctx, githubClient) {
   const model = process.env.GH_AW_INFO_MODEL || "";
   const workflowId = process.env.GH_AW_INFO_WORKFLOW_ID || "";
   if (!process.env.GH_AW_INFO_WORKFLOW_SHA) throw new Error("Executing compiler metadata requires GH_AW_INFO_WORKFLOW_SHA; recompile this workflow");
-  const { loadMarkdownMetadata } = require("./markdown_metadata.cjs");
+  const { loadMarkdownMetadata, metadataManifestFields } = require("./markdown_metadata.cjs");
   const markdownMetadata = await loadMarkdownMetadata(workflowId, process.env.GITHUB_WORKSPACE || "", {
     repository: ctx.repo ? `${ctx.repo.owner}/${ctx.repo.repo}` : undefined,
     githubClient: githubClient || global.github,
@@ -86,7 +86,7 @@ async function main(core, ctx, githubClient) {
     agent_version: process.env.GH_AW_INFO_AGENT_VERSION || "",
     workflow_name: process.env.GH_AW_INFO_WORKFLOW_NAME || "",
     workflow_id: workflowId,
-    markdown_metadata: markdownMetadata,
+    ...metadataManifestFields(markdownMetadata),
     workflow_call_id: buildWorkflowCallId(ctx.runId, process.env.GITHUB_RUN_ATTEMPT, workflowId),
     // GITHUB_WORKFLOW_REF identifies the top-level caller for reusable workflows.
     caller_workflow_ref: process.env.GITHUB_WORKFLOW_REF || "",

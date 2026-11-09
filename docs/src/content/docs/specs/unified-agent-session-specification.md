@@ -259,7 +259,7 @@ opaque because its essential fields are not defined by this specification.
 | Execution, detection, workflow | Observed outcomes, exit code, duration/start/end, detection job result/conclusion/categorical reason and verdict flags, engine ID, requested model, trigger type, workflow/repository/run ID, and available gh-aw, AWF, MCPG, and agent versions. No detector transcript or free-form reasons. |
 | Model routing | `firewall.model_routing` retains its stage, purpose, provider, labels, selection, endpoint, router, request, outcome, and deviation fields, plus AWF's ranked choices, pool counts, request endpoints, telemetry availability, HTTP status, and failure phase when supplied. `workflow.info` includes the observed `model`, `requestedModel`, and a compact `modelRouting` object. `model_routing.outcome` records the harness's status, wire model, effective and selected endpoints, effort, applied effort, and failure code. |
 | Caller context and episode lineage | `workflow.info.awContext` retains the supplied `aw_context` object from runner-owned `aw_info.json.context`, including original keys and nested work-queue data. For webhook batches, it retains unique affected items and delivery IDs but omits each delivery's raw `payload`; those bodies remain in runner-owned context files. Text and Markdown summaries display the log-safe context as compact JSON alongside the workflow metadata, subject to existing output-size limits. Registered secrets are redacted during artifact serialization and summary rendering. `workflow.info.episode` additionally projects supplied canonical lineage and parent repository, run, attempt, workflow, call identity, and event type. |
-| Skills | Activation inventory records installed skill name, relative source, scope, SHA-256 content digest, and declared purpose, without skill content. Exact-name and cross-scope collisions retain names, kinds, and source identifiers: current sources are workspace-relative paths, while overwritten frontmatter installations use ordinal identifiers such as `frontmatter-1`. Observed engine invocations retain the selected skill name, path, source, trigger, model, and turn when supplied; a declared or installed skill is not proof of invocation. |
+| Skills | Activation inventory records installed skill name, relative source, scope, and SHA-256 content digest, without skill descriptions or content. Exact-name and cross-scope collisions retain names, kinds, and source identifiers: current sources are workspace-relative paths, while overwritten frontmatter installations use ordinal identifiers such as `frontmatter-1`. Observed engine invocations retain the selected skill name, path, source, trigger, model, and turn when supplied; a declared or installed skill is not proof of invocation. |
 
 OpenTelemetry observations use `otel.span`, `otel.span_event`, and `otel.log`.
 They retain trace/span/parent IDs, names, status, attributes, links, log bodies
@@ -896,7 +896,7 @@ duration collection itself requires only read access.
 
 **T-UAS-072 — Skill evidence and conflicts.** When an activation skill inventory
 is present, the merger MUST include its deterministic installed-skill names,
-relative sources, installation scopes, content digests, and declared purposes
+relative sources, installation scopes, and content digests
 with activation provenance. It MUST report exact-name collisions and conflicting
 scopes without treating similar names as failures. It MUST NOT include skill
 contents in these observations. Engine usage MUST be attributed only to explicit

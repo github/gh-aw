@@ -16,6 +16,7 @@ import (
 type MarkdownMetadataBlock struct {
 	Source   string
 	Document bool
+	Skill    bool
 	Error    string
 }
 
@@ -54,7 +55,8 @@ func ExtractMarkdownMetadataBlocks(content string) []MarkdownMetadataBlock {
 			}
 			closing++
 		}
-		block := MarkdownMetadataBlock{Source: strings.Join(lines[opening+1:closing], "\n"), Document: document}
+		skill := !document && strings.HasSuffix(inlineMetadataHeading.FindString(lines[index]), "skill:") //nolint:uncheckedsliceindex // The loop bounds index.
+		block := MarkdownMetadataBlock{Source: strings.Join(lines[opening+1:closing], "\n"), Document: document, Skill: skill}
 		if closing == len(lines) {
 			block.Error = "unterminated frontmatter"
 		}
@@ -62,6 +64,23 @@ func ExtractMarkdownMetadataBlocks(content string) []MarkdownMetadataBlock {
 		index = closing
 	}
 	return blocks
+}
+
+func CompileAgentMetadata(source string) (any, error) {
+	value, err := CompileMarkdownMetadata(source)
+	if err != nil {
+		return nil, err
+	}
+	if fields, ok := value.(map[string]any); ok {
+		result := map[string]any{}
+		for _, key := range []string{"name", "description", "model", "tools"} {
+			if field, exists := fields[key]; exists {
+				result[key] = field
+			}
+		}
+		return result, nil
+	}
+	return value, nil
 }
 
 // CompileMarkdownMetadata produces JSON-compatible author metadata for the

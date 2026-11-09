@@ -280,7 +280,8 @@ describe("copilot_sdk_session runtime configuration", () => {
     expect(fs.readdirSync(config.skillDirectories[0]).sort()).toEqual([...names].sort());
     for (const name of names) {
       const content = fs.readFileSync(path.join(config.skillDirectories[0], name, "SKILL.md"), "utf8");
-      expect(JSON.parse(extractFrontmatterAndBody(content).frontmatterText).description).toEqual(expect.any(String));
+      expect(extractFrontmatterAndBody(content).frontmatterText).toBe("");
+      expect(content.trim()).not.toBe("");
       expect(prompt).toContain(`/tmp/gh-aw/.github/skills/${name}/SKILL.md`);
       expect(prompt).not.toContain(`Invoke skill \`${name}\``);
     }

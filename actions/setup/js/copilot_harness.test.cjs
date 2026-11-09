@@ -168,7 +168,7 @@ function spawnSync(command, args, options) {
   if (documents.length) {
     const infoPath = path.join(env.GH_AW_TMP_DIR, "aw_info.json");
     const info = fs.existsSync(infoPath) ? JSON.parse(fs.readFileSync(infoPath, "utf8")) : {};
-    info.markdown_metadata = require("../../../scripts/markdown_metadata_test_adapter.cjs").prepareMarkdownFixtures(...documents);
+    Object.assign(info, require("./markdown_metadata.cjs").metadataManifestFields(require("../../../scripts/markdown_metadata_test_adapter.cjs").prepareMarkdownFixtures(...documents)));
     fs.mkdirSync(path.dirname(infoPath), { recursive: true });
     fs.writeFileSync(infoPath, JSON.stringify(info));
   }
@@ -5436,7 +5436,7 @@ Module._load = function(request, ...args) {
   async function runHarness({ sdk = false, agents = {}, inlineAgents = {}, workspaceAgents = {}, noop = false, reflect = recordedReflect(), env: envOverrides = {} }) {
     const dir = tempDir("copilot-subagent-harness-");
     const markdownMetadata = require("../../../scripts/markdown_metadata_test_adapter.cjs").prepareMarkdownFixtures(...Object.values(agents), ...Object.values(inlineAgents), ...Object.values(workspaceAgents));
-    fs.writeFileSync(path.join(dir, "aw_info.json"), JSON.stringify({ markdown_metadata: markdownMetadata }));
+    fs.writeFileSync(path.join(dir, "aw_info.json"), JSON.stringify(require("./markdown_metadata.cjs").metadataManifestFields(markdownMetadata)));
     const workspace = path.join(dir, "workspace");
     const engineCwd = envOverrides.GH_AW_ENGINE_CWD || workspace;
     fs.mkdirSync(path.join(engineCwd, ".github/agents"), { recursive: true });
