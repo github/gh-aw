@@ -790,6 +790,10 @@ Generated-YAML regressions do not prove live App installation access, effective 
 
 ### 7.11 Advisory Invocation Decisions Inside AWF
 
+`skip-if-decision` is experimental. Nonempty agent-phase lists MUST emit the
+standard compiler experimental-feature warning; syntax and behavior may change
+without deprecation.
+
 For a nonempty top-level `skip-if-decision` list, the compiler MUST require the
 AWF agent sandbox and validate up to 400 nonblank string questions. Actions
 expressions in questions MUST be rejected. Questions MUST be transported as
@@ -822,6 +826,15 @@ to the workspace or `/tmp/gh-aw/agent`, and checked by the existing guarded
 regular-file reader. Sensitive paths, links, and oversized/changing files MUST
 be rejected; an unreadable reference makes only its question `unknown`.
 
+Before transmission, questions and file evidence MUST be screened using
+configured secret values and common credential patterns. A match MUST withhold
+the entire question and its evidence as `unknown` with
+`sensitive_content_blocked`; other safe questions retain their existing batch
+path. All-blocked batches MUST make no proxy reflection or decision request.
+File evidence MUST use JSON-escaped records with reference and byte-count
+metadata, with data-only guidance outside the record. This structuring prevents
+record-boundary injection, not semantic instruction-following by the model.
+
 Only bounded decision metadata, including question indices, outcomes,
 sanitized error codes, latency, and avoided invocations, MUST enter typed
 `harness.decision` unified-session and audit evidence. Raw file contents,
@@ -839,7 +852,9 @@ decision evidence MUST NOT authorize GitHub mutations or waive detection.
 
 File evidence and model answers remain untrusted semantic inputs: describing
 them as evidence rather than instructions does not prevent prompt injection
-or independently prove that work is complete. These regressions establish
+or independently prove that work is complete. Credential screening is heuristic
+and can miss unknown or encoded secrets or withhold benign examples; it does
+not establish that arbitrary project data is safe to transmit. These regressions establish
 compiler wiring and local/mocked behavior, not live AWF deployment, provider
 availability, or absence of semantic false skips. Linux-only guarded-file
 tests remain explicit coverage gaps on other platforms. No new `CTR-*` or

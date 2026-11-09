@@ -30,6 +30,18 @@ func TestAuditSkipIfDecision(t *testing.T) {
 	require.Contains(t, console, "skip-if-decision: evaluations=1 avoided_invocations=1")
 }
 
+func TestAuditSkipIfDecisionSensitiveContentBlocked(t *testing.T) {
+	const body = `{"proposedAttempt":1,"outcome":"unknown","questions":[{"question":1,"outcome":"unknown","error":"sensitive_content_blocked"}],"latencyMs":1,"timestamp":1,"avoidedInvocation":false}`
+	event := sessionModelRoutingEvent{Type: "harness.decision", Data: json.RawMessage(body)}
+	event.Provenance.Component, event.Provenance.Phase = "harness", "agent"
+	report := buildAuditRetrySummary([]sessionModelRoutingEvent{event})
+	require.NotNil(t, report)
+	require.Len(t, report.Decisions, 1)
+	require.Equal(t, "sensitive_content_blocked", report.Decisions[0].Questions[0].Error)
+	require.Zero(t, report.AvoidedInvocations)
+	require.Empty(t, report.Attempts)
+}
+
 func TestAuditSkipIfDecisionInvalidEvidence(t *testing.T) {
 	const valid = `{"proposedAttempt":1,"outcome":"unknown","questions":[{"question":1,"outcome":"unknown"}],"latencyMs":1,"timestamp":1,"avoidedInvocation":false}`
 	for _, body := range []string{

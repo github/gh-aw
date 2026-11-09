@@ -18,10 +18,12 @@ JSON Schema for validating agentic workflow frontmatter configuration
 
 ```yaml wrap
 ---
-# Advisory skip questions evaluated inside AWF before each eligible agent
-# invocation. Any deny skips; allow or all unknown preserves deterministic harness
-# eligibility. Runtime @file references use sandbox filesystem restrictions.
-# Nonempty lists cannot be combined with declarative protected-session-capture.
+# Experimental. Advisory skip questions evaluated inside AWF before each eligible
+# agent invocation. Nonempty lists emit a compile-time experimental warning;
+# configuration and behavior may change without deprecation. Any deny skips; allow
+# or all unknown preserves deterministic harness eligibility. Runtime @file
+# references use sandbox filesystem restrictions. Nonempty lists cannot be
+# combined with declarative protected-session-capture.
 # (optional)
 skip-if-decision: []
   # Array of strings

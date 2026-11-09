@@ -855,7 +855,10 @@
       "additionalProperties": false,
       "description": "Advisory decision preceding a proposed invocation, not authorization or an agent attempt."
     },
-    "HarnessDecisionError": { "type": "string", "enum": ["invalid_configuration", "sandbox_unavailable", "proxy_unavailable", "invalid_proxy_endpoint", "model_unavailable", "timeout", "evaluation_failed", "file_reference_failed"] },
+    "HarnessDecisionError": {
+      "type": "string",
+      "enum": ["invalid_configuration", "sandbox_unavailable", "proxy_unavailable", "invalid_proxy_endpoint", "model_unavailable", "timeout", "evaluation_failed", "file_reference_failed", "sensitive_content_blocked"]
+    },
     "HarnessDecisionOutcome": { "type": "string", "enum": ["allow", "deny", "unknown"] },
     "HarnessFailureClass": {
       "type": "string",

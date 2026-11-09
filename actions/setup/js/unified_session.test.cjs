@@ -42,12 +42,12 @@ describe("Unified conclusion session", () => {
     return target;
   }
 
-  it("publishes typed skip decisions in the agent unified session without model inputs", () => {
+  it.each(["file_reference_failed", "sensitive_content_blocked"])("publishes typed skip decisions with %s in the agent unified session without model inputs", error => {
     const decision = {
       proposedAttempt: 1,
       outcome: "deny",
       questions: [
-        { question: 1, outcome: "unknown", error: "file_reference_failed" },
+        { question: 1, outcome: "unknown", error },
         { question: 2, outcome: "deny" },
       ],
       timestamp: 1000,

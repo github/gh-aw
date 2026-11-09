@@ -170,7 +170,7 @@ function normalizeHarnessRetryRecord(value) {
 }
 
 const DECISION_OUTCOMES = new Set(["allow", "deny", "unknown"]);
-const DECISION_ERRORS = new Set(["invalid_configuration", "sandbox_unavailable", "proxy_unavailable", "invalid_proxy_endpoint", "model_unavailable", "timeout", "evaluation_failed", "file_reference_failed"]);
+const DECISION_ERRORS = new Set(["invalid_configuration", "sandbox_unavailable", "proxy_unavailable", "invalid_proxy_endpoint", "model_unavailable", "timeout", "evaluation_failed", "file_reference_failed", "sensitive_content_blocked"]);
 
 /**
  * Project only bounded metadata; never keep decision input or provider diagnostics.

@@ -47,7 +47,40 @@ func TestExperimentalWarningAccounting(t *testing.T) {
 		assert.Zero(t, compiler.GetWarningCount())
 		assert.Zero(t, compiler.GetExperimentalWarningCount())
 	}
+}
 
+func TestSkipIfDecisionExperimentalNoticeClassification(t *testing.T) {
+	t.Parallel()
+	for _, batch := range []bool{false, true} {
+		for _, data := range []*WorkflowData{
+			{},
+			{SkipIfDecision: []string{}},
+			{SkipIfDecision: []string{"Done?"}, IsDetectionRun: true},
+			{SkipIfDecision: []string{"Done?"}, IsEvalsRun: true},
+		} {
+			compiler := NewCompiler()
+			compiler.SetBatchMode(batch)
+			var output bytes.Buffer
+			compiler.emitExperimentalFeatureWarningsTo(data, &output)
+			assert.Empty(t, output.String())
+			assert.Zero(t, compiler.GetExperimentalWarningCount())
+			assert.Empty(t, compiler.GetExperimentalFeatureUsage())
+		}
+		compiler := NewCompiler()
+		compiler.SetBatchMode(batch)
+		var output bytes.Buffer
+		compiler.emitExperimentalFeatureWarningsTo(&WorkflowData{SkipIfDecision: []string{"Done?"}}, &output)
+		assert.Equal(t, 1, compiler.GetWarningCount())
+		assert.Equal(t, 1, compiler.GetExperimentalWarningCount())
+		const warning = "Using experimental feature: skip-if-decision"
+		if batch {
+			assert.Empty(t, output.String())
+			assert.Equal(t, map[string]int{warning: 1}, compiler.GetExperimentalFeatureUsage())
+		} else {
+			assert.Contains(t, output.String(), warning)
+			assert.Empty(t, compiler.GetExperimentalFeatureUsage())
+		}
+	}
 }
 
 func TestDurableExperimentalNoticeClassification(t *testing.T) {

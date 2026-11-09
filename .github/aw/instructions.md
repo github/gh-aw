@@ -21,10 +21,13 @@ These rules override conflicting upstream guidance.
 
 ## Skipping Unnecessary Agent Invocations
 
-Use top-level `skip-if-decision` when skipping requires semantic evidence from
+Use experimental top-level `skip-if-decision` when skipping requires semantic evidence from
 task or progress files. Prefer deterministic trigger/activation checks when
 ordinary conditions suffice; decisions cannot override retry limits, budgets,
 deadlines, or nonrecoverable errors.
+
+Nonempty lists emit a compile-time experimental warning. Configuration and
+behavior may change without deprecation.
 
 ```yaml
 skip-if-decision:

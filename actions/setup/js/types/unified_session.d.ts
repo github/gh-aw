@@ -568,7 +568,8 @@ export interface HarnessAttemptData extends HarnessRetryAttemptData {
 }
 
 export type HarnessDecisionOutcome = "allow" | "deny" | "unknown";
-export type HarnessDecisionError = "invalid_configuration" | "sandbox_unavailable" | "proxy_unavailable" | "invalid_proxy_endpoint" | "model_unavailable" | "timeout" | "evaluation_failed" | "file_reference_failed";
+export type HarnessDecisionError =
+  "invalid_configuration" | "sandbox_unavailable" | "proxy_unavailable" | "invalid_proxy_endpoint" | "model_unavailable" | "timeout" | "evaluation_failed" | "file_reference_failed" | "sensitive_content_blocked";
 
 /** Advisory decision preceding a proposed invocation, not authorization or an agent attempt. */
 export interface HarnessDecisionData {

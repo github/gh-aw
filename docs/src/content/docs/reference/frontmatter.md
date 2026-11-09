@@ -49,9 +49,20 @@ An optional emoji to represent the workflow visually, for example in listings an
 emoji: "🤖"
 ```
 
-### Invocation Skip Questions (`skip-if-decision:`)
+### Invocation Skip Questions
 
-An optional top-level list of up to 400 questions evaluated inside AWF before each otherwise eligible agent invocation, including initial execution, retries, resumes, and continuations. The gate applies to all built-in engines and declarative engines, including command-based, custom-harness, and durable execution paths. Nonempty lists are incompatible with declarative `protected-session-capture`; compilation rejects this combination to preserve recorder isolation and verified session ingestion.
+> [!WARNING]
+> `skip-if-decision` is experimental. Nonempty lists emit a compile-time
+> warning; configuration and behavior may change without deprecation.
+
+An optional top-level `skip-if-decision` list of up to 400 questions evaluated inside AWF before each otherwise eligible agent invocation, including initial execution, retries, resumes, and continuations. The gate applies to all built-in engines and declarative engines, including command-based, custom-harness, and durable execution paths. Nonempty lists are incompatible with declarative `protected-session-capture`; compilation rejects this combination to preserve recorder isolation and verified session ingestion.
+
+Questions and referenced files are screened for known credential patterns and
+configured secret values before transmission. A match withholds that question
+as `unknown` with `sensitive_content_blocked`. Screening is heuristic; do not
+reference confidential files merely because they are inside an allowed path.
+Structured file evidence is still model-readable untrusted data, not an
+instruction-isolation boundary.
 
 ```aw wrap
 skip-if-decision:

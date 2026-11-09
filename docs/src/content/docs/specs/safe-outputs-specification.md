@@ -3195,6 +3195,27 @@ unavailable file evidence MUST NOT independently generate `noop` or
 Previously recorded failures and normal threat-detection and publication
 policies MUST remain effective regardless of the decision recommendation.
 
+`skip-if-decision` is experimental; nonempty lists emit a compiler warning,
+and configuration and behavior may change without deprecation.
+
+Before transmitting a question or its fresh, confined, size-limited `@file`
+evidence, the evaluator MUST screen for configured secret values and common
+credential patterns, including private keys, GitHub/AWS credentials, bearer
+tokens, and sensitive key/value assignments. A match MUST withhold the entire
+question and its evidence, record `unknown` with `sensitive_content_blocked`,
+and preserve batching of other safe questions. If all questions are withheld,
+neither proxy reflection nor a Decisions request is made. Question text,
+reference names, and matched values MUST NOT appear in decision telemetry.
+
+File evidence is supplied as JSON-escaped records containing a reference name,
+byte count, and contents, preceded by a data-only directive outside the record.
+Escaping prevents file text from structurally closing the record, but model
+instructions are not a deterministic prompt-injection boundary: semantic
+injection can still influence advisory decisions. Secret screening is also
+heuristic; unknown or encoded secrets can evade detection, and benign examples
+or sensitive-looking assignments can be withheld. These controls do not prove
+that arbitrary files are safe to transmit or authorize publishing their data.
+
 Decision outcomes, sanitized errors, latency, and avoided invocations MUST be
 recorded separately as `harness.decision` unified-session evidence and audit
 decision history. A decision-generated no-op is not a publication

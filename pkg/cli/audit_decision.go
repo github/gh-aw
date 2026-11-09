@@ -30,7 +30,7 @@ type AuditDecisionQuestion struct {
 func validDecisionError(value string) bool {
 	switch value {
 	case "", "invalid_configuration", "sandbox_unavailable", "proxy_unavailable",
-		"invalid_proxy_endpoint", "model_unavailable", "timeout", "evaluation_failed", "file_reference_failed":
+		"invalid_proxy_endpoint", "model_unavailable", "timeout", "evaluation_failed", "file_reference_failed", "sensitive_content_blocked":
 		return true
 	default:
 		return false
