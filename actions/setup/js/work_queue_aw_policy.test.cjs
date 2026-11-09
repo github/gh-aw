@@ -40,7 +40,9 @@ function setupAW(settings = {}) {
       type: "file",
       path: WORKFLOW,
       encoding: "base64",
-      content: Buffer.from("on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\n").toString("base64"),
+      content: Buffer.from(`# gh-aw-manifest: ${JSON.stringify({ work_queue: { worker: true, logical_contract: "a".repeat(64) } })}\non:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\n`).toString(
+        "base64"
+      ),
     },
   });
   fixture.githubClient.rest.actions.getWorkflow = vi.fn().mockResolvedValue({ data: { path: WORKFLOW, state: "active" } });

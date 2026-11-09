@@ -93,8 +93,7 @@ class LocalGitHub {
   async initialize() {
     await fs.mkdir(this.directory, { recursive: true });
     await this.git(["init", "--bare", "--quiet", "--initial-branch=main", this.directory]);
-    const workflow =
-      "name: Local worker\non:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\n        required: true\njobs:\n  worker:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo local-only\n";
+    const workflow = `# gh-aw-manifest: ${JSON.stringify({ work_queue: { worker: true, logical_contract: "b".repeat(64) } })}\nname: Local worker\non:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\n        required: true\njobs:\n  worker:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo local-only\n`;
     const blob = (await this.git(["hash-object", "-w", "--stdin"], workflow)).toString().trim();
     const workflows = (await this.git(["mktree"], `100644 blob ${blob}\tworker.lock.yml\n100644 blob ${blob}\tpublisher.lock.yml\n`)).toString().trim();
     const github = (await this.git(["mktree"], `040000 tree ${workflows}\tworkflows\n`)).toString().trim();

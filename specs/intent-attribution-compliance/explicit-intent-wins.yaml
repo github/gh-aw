@@ -22,6 +22,7 @@ expected:
     intent_key: security
   policy:
     autonomy: bounded
-    write_scope: feature_branch
+    write_scope: any_branch
     human_approval_required: false
     auto_merge_allowed: true
+    max_attempts: 10

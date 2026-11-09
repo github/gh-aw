@@ -2294,7 +2294,7 @@ describe("native queue launch fencing and conservative recovery", () => {
     });
     const proposal = structuredClone(fixture.policy);
     proposal.pools.smoke = structuredClone(proposal.pools.default);
-    const contents = "on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\n";
+    const contents = `# gh-aw-manifest: {"work_queue":{"worker":true,"logical_contract":"${"a".repeat(64)}"}}\non:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\n`;
     fixture.githubClient.rest.repos.getContent = vi.fn(async ({ path: workflowPath }) => ({
       data: { type: "file", path: workflowPath, encoding: "base64", content: Buffer.from(contents).toString("base64") },
     }));
@@ -2375,7 +2375,7 @@ describe("native queue launch fencing and conservative recovery", () => {
     });
     const proposal = structuredClone(fixture.policy);
     proposal.pools[name] = structuredClone(proposal.pools.default);
-    const contents = "on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\n";
+    const contents = `# gh-aw-manifest: {"work_queue":{"worker":true,"logical_contract":"${"a".repeat(64)}"}}\non:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\n`;
     fixture.githubClient.rest.repos.getContent = vi.fn(async ({ path: workflowPath }) => ({
       data: { type: "file", path: workflowPath, encoding: "base64", content: Buffer.from(contents).toString("base64") },
     }));

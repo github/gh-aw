@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync, existsSync, mkdirSync, rmSync } from "fs";
+import { readFileSync, existsSync, mkdirSync, rmSync, copyFileSync } from "fs";
 import { execFileSync } from "child_process";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -32,6 +32,52 @@ describe("setup action Windows support", () => {
 });
 
 describe("setup.sh Copilot runtime files", () => {
+  it("deploys JavaScript runtime files without native metadata or npm dependencies", () => {
+    const development = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8"));
+    expect(development.dependencies).toBeUndefined();
+    expect(setupShContent).not.toContain("markdown-metadata");
+    expect(setupShContent).not.toMatch(/\bgo\s+(?:build|install)\b/);
+    expect(setupShContent).not.toContain("npm ci");
+  });
+
+  it("reads JSON metadata from an isolated JavaScript-only runtime directory", () => {
+    const directory = resolve(__dirname, `.setup-metadata-${process.pid}`);
+    mkdirSync(directory);
+    try {
+      for (const file of collectTransitiveDeps(["markdown_metadata.cjs"])) {
+        const destination = resolve(directory, file);
+        mkdirSync(dirname(destination), { recursive: true });
+        copyFileSync(resolve(__dirname, file), destination);
+      }
+      const output = execFileSync(
+        process.execPath,
+        [
+          "-e",
+          `
+            const assert = require("node:assert/strict");
+            const { createHash } = require("node:crypto");
+            const { readMarkdownMetadata, installMarkdownMetadata } = require("./markdown_metadata.cjs");
+            const value = { model: "small", description: "Read files" };
+            const source = JSON.stringify(value);
+            assert.deepEqual(readMarkdownMetadata("agent", "---\\nmodel: __uncompiled_probe__\\n---\\nBody").value, {});
+            installMarkdownMetadata({
+              version: 2,
+              records: [{ sha256: createHash("sha256").update(source).digest("hex"), kind: "artifact", value }],
+            });
+            process.stdout.write(JSON.stringify(readMarkdownMetadata("agent", "---\\n" + source + "\\n---\\nBody").value));
+          `,
+        ],
+        { cwd: directory, encoding: "utf8" }
+      );
+      expect(JSON.parse(output)).toEqual({ model: "small", description: "Read files" });
+      expect(existsSync(resolve(directory, "node_modules"))).toBe(false);
+      expect(existsSync(resolve(directory, "markdown-metadata"))).toBe(false);
+      expect(existsSync(resolve(directory, "markdown-metadata.exe"))).toBe(false);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it("copies the shared routing effort dependency alongside Copilot runtime scripts", () => {
     expect(setupShContent).toContain('for file in "${JS_SOURCE_DIR}"/*.cjs; do');
     expect(setupShContent).toContain('cp "$file" "${DESTINATION}/${filename}"');
@@ -134,7 +180,7 @@ describe("setup.sh MCP_SCRIPTS_FILES", () => {
       // Run only the real MCP deployment block, not setup's runner-wide initialization.
       const deploymentBlock = setupShContent.slice(setupShContent.indexOf("# Copy mcp-scripts files"), setupShContent.indexOf("# Copy safe-outputs files"));
       execFileSync("bash", ["-ec", `create_dir() { mkdir -p "$1"; }\ndebug_log() { :; }\n${deploymentBlock}`], {
-        env: { ...process.env, GH_AW_ROOT: runnerRoot, JS_SOURCE_DIR: __dirname },
+        env: { ...process.env, GH_AW_ROOT: runnerRoot, JS_SOURCE_DIR: __dirname, DESTINATION: __dirname },
       });
       execFileSync(
         process.execPath,
@@ -202,7 +248,7 @@ describe("setup.sh SAFE_OUTPUTS_FILES", () => {
     try {
       const deploymentBlock = setupShContent.slice(setupShContent.indexOf("# Copy safe-outputs files"), setupShContent.indexOf("# Copy configure_git_credentials.sh"));
       execFileSync("bash", ["-ec", `create_dir() { mkdir -p "$1"; }\ndebug_log() { :; }\n${deploymentBlock}`], {
-        env: { ...process.env, GH_AW_ROOT: runnerRoot, JS_SOURCE_DIR: __dirname },
+        env: { ...process.env, GH_AW_ROOT: runnerRoot, JS_SOURCE_DIR: __dirname, DESTINATION: __dirname },
       });
       execFileSync(
         process.execPath,
@@ -278,8 +324,8 @@ describe("setup.sh SAFE_OUTPUTS_FILES", () => {
 
   it("deploys Claim authority and worker route provisioning dependencies", () => {
     expect(getDirectLocalRequires("safe_outputs_handlers.cjs")).toContain("work_queue_claim_scope.cjs");
-    expect(getDirectLocalRequires("work_queue_provisioning.cjs")).toContain("work_queue_yaml.cjs");
-    for (const file of ["work_queue_claim_scope.cjs", "finish_work_queue_claim.cjs", "work_queue_resource_scope.cjs", "work_queue_effect_client.cjs", "work_queue_yaml.cjs"]) {
+    expect(readFileSync(resolve(__dirname, "work_queue_provisioning.cjs"), "utf8")).not.toContain("readDocumentMetadata");
+    for (const file of ["work_queue_claim_scope.cjs", "finish_work_queue_claim.cjs", "work_queue_resource_scope.cjs", "work_queue_effect_client.cjs"]) {
       expect(safeOutputsFiles).toContain(file);
     }
   });

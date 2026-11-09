@@ -8,11 +8,11 @@ import { parse as parseToml } from "smol-toml";
 
 const require = createRequire(import.meta.url);
 global.core = { info: () => {}, warning: () => {}, error: () => {}, setFailed: () => {} };
-const { applyClaudeSubagentModels, applyCodexSubagentModels, isDetectionPhase, replaceAgentModel } = require("./engine_subagent_models.cjs");
+const { applyClaudeSubagentModels, applyCodexSubagentModels, isDetectionPhase, replaceAgentModel } = require("../../../scripts/markdown_metadata_test_adapter.cjs").withCompilerFixtures(require("./engine_subagent_models.cjs"));
 const { extractInlineSubAgents, writeInlineSubAgents } = require("./extract_inline_sub_agents.cjs");
 const { claudeBareCapabilities, removeClaudePlugin } = require("./claude_runtime.cjs");
 const { extractFrontmatterAndBody } = require("./frontmatter_hash_pure.cjs");
-const { parseDocument } = require("./work_queue_yaml.cjs");
+const { readDocumentMetadata, prepareMarkdownFixtures } = require("../../../scripts/markdown_metadata_test_adapter.cjs");
 const { recordModelResolution } = require("./resolve_model_alias.cjs");
 const runs = require("./fixtures/claude_codex_subagent_runs.cjs");
 
@@ -22,7 +22,7 @@ afterEach(() => {
   for (const dir of tempDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 });
 
-const frontmatterOf = content => parseDocument(extractFrontmatterAndBody(content).frontmatterText).toJS() || {};
+const frontmatterOf = content => readDocumentMetadata(extractFrontmatterAndBody(content).frontmatterText).value || {};
 const sha = content => crypto.createHash("sha256").update(content).digest("hex");
 
 /**
@@ -47,6 +47,7 @@ function layout() {
 /** Stage inline agents through the activation writer and restore them into the workspace. */
 function stageInline(run, engine, agents) {
   const markdown = ["# Workflow", "", "Main prompt.", ...Object.entries(agents).flatMap(([name, content]) => ["", `## agent: \`${name}\``, content.trimEnd()])].join("\n");
+  prepareMarkdownFixtures(markdown);
   writeInlineSubAgents(markdown, run.workspaceDir, run.agentsBaseDir, engine);
   const dir = engine === "claude" ? ".claude/agents" : ".codex/agents";
   fs.mkdirSync(path.join(run.workspaceDir, dir), { recursive: true });
@@ -347,8 +348,8 @@ describe("Claude sub-agent models (Typist run 39415087125)", () => {
     expect(fs.readFileSync(path.join(run.workspaceDir, ".claude/agents/main-agent.md"), "utf8")).toBe(repositoryAgent);
   });
 
-  it("replaces only the model scalar", () => {
-    expect(replaceAgentModel('---\nname: "a"\nmodel: small\ntools: Read\n---\nBody model: small\n', "claude-haiku-5-5")).toBe('---\nname: "a"\nmodel: "claude-haiku-5-5"\ntools: Read\n---\nBody model: small\n');
+  it("replaces the model scalar and derives Claude's description without changing instructions or tools", () => {
+    expect(replaceAgentModel('---\nname: "a"\nmodel: small\ntools: Read\n---\nBody model: small\n', "claude-haiku-5-5")).toBe('---\n{"model":"claude-haiku-5-5","name":"a","tools":"Read","description":"a"}\n---\nBody model: small\n');
   });
 });
 
@@ -407,7 +408,7 @@ describe("Codex sub-agent models (daily-arxiv-researcher run 39394965127)", () =
     expect(roleFiles(run)).toEqual(["paper-screener.toml"]);
     expect(readRole(run, "paper-screener")).toEqual({
       name: "paper-screener",
-      description: frontmatterOf(agent).description,
+      description: "paper-screener",
       developer_instructions: bodyOf(agent),
       model: "gpt-5-mini-2025-08-07",
     });
@@ -432,7 +433,7 @@ describe("Codex sub-agent models (daily-arxiv-researcher run 39394965127)", () =
     ]);
     expect(roleFiles(run)).toEqual(["opportunity-extractor.toml", "paper-screener.toml", "preliminary-investigator.toml", "relevance-ranker.toml"]);
     for (const [name, content] of Object.entries(agents)) {
-      expect(readRole(run, name)).toEqual({ name, description: frontmatterOf(content).description, developer_instructions: bodyOf(content), model: outcome.resolutions.find(resolution => resolution.name === name).model });
+      expect(readRole(run, name)).toEqual({ name, description: name, developer_instructions: bodyOf(content), model: outcome.resolutions.find(resolution => resolution.name === name).model });
     }
     // Same record fields as the run's recorded main-role model.resolution.
     for (const record of run.records()) {
@@ -441,9 +442,10 @@ describe("Codex sub-agent models (daily-arxiv-researcher run 39394965127)", () =
     }
     // The staged Markdown and its workspace copy are left unchanged.
     for (const [name, content] of Object.entries(agents)) {
-      const expected = content.endsWith("\n") ? content : `${content}\n`;
-      expect(fs.readFileSync(path.join(run.agentsBaseDir, ".codex/agents", `${name}.md`), "utf8")).toBe(expected);
-      expect(fs.readFileSync(path.join(run.workspaceDir, ".codex/agents", `${name}.md`), "utf8")).toBe(expected);
+      const staged = fs.readFileSync(path.join(run.agentsBaseDir, ".codex/agents", `${name}.md`), "utf8");
+      expect(frontmatterOf(staged)).toEqual(frontmatterOf(content));
+      expect(bodyOf(staged)).toBe(bodyOf(content));
+      expect(fs.readFileSync(path.join(run.workspaceDir, ".codex/agents", `${name}.md`), "utf8")).toBe(staged);
     }
   });
 
@@ -487,7 +489,7 @@ describe("Codex sub-agent models (daily-arxiv-researcher run 39394965127)", () =
     expect(Object.keys(role).sort()).toEqual(["description", "developer_instructions", "model", "name"]);
     expect(role.developer_instructions).toBe(bodyOf(agent));
     expect(role.developer_instructions.endsWith(extra)).toBe(true);
-    expect(role).toMatchObject({ name: "relevance-ranker", description: frontmatterOf(agent).description, model: "gpt-5.4-mini" });
+    expect(role).toMatchObject({ name: "relevance-ranker", description: "relevance-ranker", model: "gpt-5.4-mini" });
   });
 
   it("round-trips quotes, backslashes, multi-line instructions and a declared effort", async () => {
@@ -537,17 +539,17 @@ describe("Codex sub-agent models (daily-arxiv-researcher run 39394965127)", () =
     expect(roleFiles(run)).toEqual([]);
   });
 
-  it("fails closed for a staged agent without a description", async () => {
+  it("derives the required role description from the name without authored description", async () => {
     const run = codexLayout();
     // Fixture mutation: the recorded paper-screener without its description.
     stageInline(run, "codex", { "paper-screener": arxivAgents()["paper-screener"].replace(/^description:.*\n/m, "") });
 
     const outcome = await apply(run);
 
-    expect(outcome.ok).toBe(false);
-    expect(run.logs).toContainEqual(expect.stringContaining("no nonblank 'description'"));
-    expect(run.records()).toEqual([]);
-    expect(roleFiles(run)).toEqual([]);
+    expect(outcome.ok).toBe(true);
+    expect(readRole(run, "paper-screener")).toMatchObject({ name: "paper-screener", description: "paper-screener", model: "gpt-5.4-mini" });
+    expect(run.records()).toEqual([expect.objectContaining({ role: "paper-screener", status: "exact" })]);
+    expect(roleFiles(run)).toEqual(["paper-screener.toml"]);
   });
 
   it("fails closed when CODEX_HOME is unknown", async () => {

@@ -17,6 +17,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { transformMarkdownContent } = require("./markdown_metadata.cjs");
 
 /**
  * Test the full pipeline: substitution -> interpolation -> template rendering
@@ -47,10 +48,12 @@ async function testTemplateSubstitution(template, substitutions, variables, { de
     const literals = createLiteralValues(readLiteralState(testFile) ?? undefined);
     const authored = readAuthorContent(testFile, testFile, literals.state).content;
     const protectedVariables = Object.fromEntries(Object.entries(variables).map(([key, value]) => [key, literals.protect(value)]));
-    const interpolated = interpolateVariables(authored, protectedVariables);
+    const interpolate = (/** @type {string} */ text) => interpolateVariables(text, protectedVariables);
+    const interpolated = metadata ? transformMarkdownContent(authored, interpolate) : interpolate(authored);
     const afterInterpolation = literals.restore(interpolated);
 
-    const opaque = renderMarkdownTemplate(interpolated, literals.restore);
+    const render = (/** @type {string} */ text) => renderMarkdownTemplate(text, literals.restore);
+    const opaque = metadata ? transformMarkdownContent(interpolated, render) : render(interpolated);
     const afterTemplate = metadata ? restoreInlineMetadata(opaque, literals.restore) : literals.restore(opaque);
     fs.writeFileSync(testFile, afterTemplate, "utf8");
     literals.state.files[literalFileKey(testFile, testFile)] = { opaque, rendered: afterTemplate, metadata };

@@ -718,7 +718,7 @@ imports:
 		if err != nil {
 			t.Fatalf("Failed to read lock file: %v", err)
 		}
-		lockContent := string(lockFileContent)
+		lockContent := compiledWorkflowBody(string(lockFileContent))
 
 		// The engine max-turns should be resolved to the default value (10000).
 		// In the compiled lock file the value appears as the GH_AW_MAX_TURNS env var.
@@ -777,7 +777,7 @@ imports:
 		if err != nil {
 			t.Fatalf("Failed to read lock file: %v", err)
 		}
-		lockContent := string(lockFileContent)
+		lockContent := compiledWorkflowBody(string(lockFileContent))
 
 		// The safe-outputs expires should be resolved to the default value ("3d" = 72 hours).
 		// In the compiled lock file the value appears as JSON in the safe-outputs config.
@@ -835,7 +835,7 @@ imports:
 		if err != nil {
 			t.Fatalf("Failed to read lock file: %v", err)
 		}
-		lockContent := string(lockFileContent)
+		lockContent := compiledWorkflowBody(string(lockFileContent))
 
 		if strings.Contains(lockContent, "github.aw.import-inputs.model") {
 			t.Error("Lock file should not contain unresolved github.aw.import-inputs.model expression")

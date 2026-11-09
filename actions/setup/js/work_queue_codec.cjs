@@ -76,9 +76,9 @@ function fingerprint(actor, kind, parameters) {
 // JSON.parse alone cannot detect duplicate (including escaped-equivalent) keys.
 /**
  * @param {string} text
- * @param {{maxBytes?: unknown}} [options]
+ * @param {{maxBytes?: unknown, finiteNumbersIn?: string | string[]}} [options]
  */
-function parseStrictJSON(text, { maxBytes = MAX_PARSE_BYTES } = {}) {
+function parseStrictJSON(text, { maxBytes = MAX_PARSE_BYTES, finiteNumbersIn } = {}) {
   if (typeof maxBytes !== "number" || !Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > MAX_SNAPSHOT_PARSE_BYTES) throw queueError("resource_limit", "JSON parser byte limit must be a positive safe integer at most 161 MiB");
   if (typeof text !== "string" || Buffer.byteLength(text, "utf8") > maxBytes) throw queueError("resource_limit", "JSON input exceeds parser limit");
   let i = 0;
@@ -107,7 +107,7 @@ function parseStrictJSON(text, { maxBytes = MAX_PARSE_BYTES } = {}) {
     }
     return fail();
   }
-  function read(depth) {
+  function read(depth, finiteNumbers = false) {
     if (depth > MAX_DEPTH) throw queueError("resource_limit", "JSON nesting exceeds 64");
     skip();
     const char = text[i];
@@ -127,7 +127,7 @@ function parseStrictJSON(text, { maxBytes = MAX_PARSE_BYTES } = {}) {
         if (Object.hasOwn(object, key)) throw queueError("duplicate_key", "duplicate JSON object key");
         skip();
         if (text[i++] !== ":") fail();
-        object[key] = read(depth + 1);
+        object[key] = read(depth + 1, finiteNumbers || (depth === 0 && (Array.isArray(finiteNumbersIn) ? finiteNumbersIn.includes(key) : key === finiteNumbersIn)));
         skip();
         const end = text[i++];
         if (end === "}") return object;
@@ -144,7 +144,7 @@ function parseStrictJSON(text, { maxBytes = MAX_PARSE_BYTES } = {}) {
       }
       for (;;) {
         if (array.length >= 16384) throw queueError("resource_limit", "JSON array exceeds 16384 members");
-        array.push(read(depth + 1));
+        array.push(read(depth + 1, finiteNumbers));
         skip();
         const end = text[i++];
         if (end === "]") return array;
@@ -155,7 +155,7 @@ function parseStrictJSON(text, { maxBytes = MAX_PARSE_BYTES } = {}) {
     if (!literal) return fail();
     i += literal[0].length;
     const value = JSON.parse(literal[0]);
-    if (typeof value === "number" && (!Number.isSafeInteger(value) || String(value) !== literal[0])) throw queueError("noncanonical_number", "use safe integer numbers or canonical decimal strings");
+    if (typeof value === "number" && (finiteNumbers ? !Number.isFinite(value) : !Number.isSafeInteger(value) || String(value) !== literal[0])) throw queueError("noncanonical_number", "use safe integer numbers or canonical decimal strings");
     return value;
   }
   const result = read(0);
