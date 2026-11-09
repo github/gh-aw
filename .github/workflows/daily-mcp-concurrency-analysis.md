@@ -554,6 +554,14 @@ Your output MUST include:
    - Clean tool confirmation if no problems found
 3. **Cache Update Confirmation**: Confirm cache was updated with results
 
+Use `###` or lower headings in the report. Start with a concise overview and
+tool-selection rationale, then summarize key results and actionable issues;
+collapse long analysis and supporting evidence in
+`<details><summary><b>...</b></summary>...</details>`, and finish with next
+actions or limitations. Keep the selected tool, result, and any required action
+visible. Format applicable run references as
+`[§12345](https://github.com/${{ github.repository }}/actions/runs/12345)`.
+
 ## Completion Requirement
 
 You MUST call at least one safe-output tool before finishing:

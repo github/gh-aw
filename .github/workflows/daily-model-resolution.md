@@ -167,6 +167,13 @@ confirm whether the mismatch is a misconfiguration or a resolution bug.
 
 After all `run-analyzer` calls complete, build the report:
 
+Use `###` or lower for every report heading. Begin with a concise overview of
+the run and mismatch counts, then summarize key metrics and findings, keep
+decision-relevant conclusions visible, collapse per-run evidence in
+`<details><summary><b>...</b></summary>...</details>`, and end with next actions
+or coverage limitations. Format applicable run references as
+`[§12345](https://github.com/${{ github.repository }}/actions/runs/12345)`.
+
 1. **Runs analyzed**: total downloaded, total with sub-agents, mismatches found.
 2. **Per-workflow table**: workflow name, sub-agent name, declared model alias,
    observed model, classification (✅ correct / ⚠️ mismatch / ❓ unknown).
@@ -180,6 +187,10 @@ After all `run-analyzer` calls complete, build the report:
 ```markdown
 ### 🔬 Sub-Agent Model Resolution Audit — {DATE}
 
+### Summary
+
+{N} runs analyzed; {K} mismatches found. State the key conclusion and any next action or coverage limitation.
+
 **Period**: last 2 days · **Runs analyzed**: {N} · **With sub-agents**: {M}
 
 ---
@@ -191,7 +202,7 @@ After all `run-analyzer` calls complete, build the report:
 | … | … | `small` | `claude-sonnet-4-5` | ⚠️ size mismatch |
 
 <details>
-<summary>Mismatch details</summary>
+<summary><b>Mismatch details</b></summary>
 
 For each mismatch: run link, agent-stdio.log snippet showing the dispatch,
 token-usage.jsonl model observed, and note on whether the workflow source
