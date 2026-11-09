@@ -231,6 +231,17 @@ func (c *Compiler) validateUvPackages(workflowData *WorkflowData) error {
 }
 
 func (c *Compiler) validateUvPackagesWithExecutable(packages []string, uvPath string) error {
+	validatedUvPath, err := fileutil.ValidateExecutablePath(uvPath)
+	if err != nil {
+		return NewOperationError(
+			"validate",
+			"uv packages",
+			"",
+			err,
+			"Install uv to enable package validation:\n\n$ curl -LsSf https://astral.sh/uv/install.sh | sh",
+		)
+	}
+
 	var errors []string
 	for _, pkg := range packages {
 		pkgName := stripUvPackageVersion(pkg)
@@ -244,10 +255,10 @@ func (c *Compiler) validateUvPackagesWithExecutable(packages []string, uvPath st
 		}
 
 		// Use uv pip show to check if package exists on PyPI
-		// #nosec G204 -- uvPath is resolved from the hardcoded executable name "uv" via
-		// fileutil.ResolveExecutablePath and validated before calling this method;
+		// #nosec G204 -- uvPath is validated above and resolved from the hardcoded
+		// executable name "uv" via fileutil.ResolveExecutablePath by the caller;
 		// pkgName is validated above by validatePipPackageName against the strict PEP 508 allowlist.
-		cmd := exec.Command(uvPath, "pip", "show", "--no-cache", "--", pkgName)
+		cmd := exec.Command(validatedUvPath, "pip", "show", "--no-cache", "--", pkgName)
 		_, err := cmd.CombinedOutput()
 
 		if err != nil {
