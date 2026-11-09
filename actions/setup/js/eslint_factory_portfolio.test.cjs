@@ -237,6 +237,12 @@ describe("ESLint factory producer and dispatcher", () => {
       const result = await processControls(controls);
       expect(result.success, JSON.stringify({ result, failures })).toBe(true);
       expect(result.receipts.map(receipt => receipt.status)).toEqual(["durable", "durable"]);
+      expect(result.status).toBe("activation_pending");
+      expect(result.receipts[1].launches).toMatchObject([
+        { state: "activation_pending", run_id: "42", dispatched: true, released: false },
+        { state: "activation_pending", run_id: "43", dispatched: true, released: false },
+        { state: "activation_pending", run_id: "44", dispatched: true, released: false },
+      ]);
       expect(posts).toHaveLength(3);
       expect(tagCreations).toHaveLength(1);
       expect(new Set(posts.map(post => post.workflow_id))).toEqual(new Set(ESLINT_WORKERS.map(profile => `${profile}.lock.yml`)));
@@ -246,16 +252,13 @@ describe("ESLint factory producer and dispatcher", () => {
       expect(state.policy).toEqual(policy);
       expect(state.works.size).toBe(3);
       expect(state.claims.size).toBe(3);
-      expect([...state.dispatches.values()].every(dispatch => dispatch.state === "bound")).toBe(true);
-      const readsBeforeReplay = [...fileReads];
-      expect((await processControls(controls)).success).toBe(true);
-      expect(fileReads).toEqual(readsBeforeReplay);
-      expect(posts).toHaveLength(3);
-      expect(tagCreations).toHaveLength(1);
-      expect(replayTransactions(fake.log()).works.size).toBe(3);
-      for (const [index, post] of posts.entries()) {
+      expect(state.dispatches.size).toBe(3);
+      for (const dispatch of state.dispatches.values()) {
+        expect(dispatch.state).toBe("started");
+        expect(dispatch.run).toBeUndefined();
+      }
+      const workers = posts.map((post, index) => {
         const assignment = JSON.parse(post.inputs.work_queue_assignment);
-        const member = assignment.claims[0];
         const runId = String(42 + index);
         const workerContext = {
           ...fixture.workerContext,
@@ -263,7 +266,7 @@ describe("ESLint factory producer and dispatcher", () => {
           payload: { repository: { id: 7 }, inputs: post.inputs },
         };
         const finishIntentPath = path.join(directory, `${assignment.worker_profile}.finish.jsonl`);
-        const worker = {
+        return {
           ...options,
           context: workerContext,
           workflowRef: `${REPOSITORY}/.github/workflows/${assignment.worker_profile}.lock.yml@${REF}`,
@@ -273,7 +276,33 @@ describe("ESLint factory producer and dispatcher", () => {
           requireAssignment: true,
           finishIntentPath,
         };
-        expect((await bindWorkerAssignment(worker)).binding.run_id).toBe(runId);
+      });
+      for (const worker of workers) {
+        const { assignment, context } = worker;
+        const runId = context.runId;
+        const activated = await bindWorkerAssignment(worker);
+        expect(activated.binding).toEqual({
+          run_id: runId,
+          run_attempt: 1,
+          repository: REPOSITORY,
+          workflow: `.github/workflows/${assignment.worker_profile}.lock.yml`,
+          ref: REF,
+          principal: "12",
+          event: "workflow_dispatch",
+        });
+        expect(replayTransactions(fake.log()).dispatches.get(assignment.dispatch_id)).toMatchObject({ state: "bound", run: activated.binding });
+      }
+      expect([...replayTransactions(fake.log()).dispatches.values()].every(dispatch => dispatch.state === "bound")).toBe(true);
+      const readsBeforeReplay = [...fileReads];
+      expect((await processControls(controls)).success).toBe(true);
+      expect(fileReads).toEqual(readsBeforeReplay);
+      expect(posts).toHaveLength(3);
+      expect(tagCreations).toHaveLength(1);
+      expect(replayTransactions(fake.log()).works.size).toBe(3);
+      for (const worker of workers) {
+        const { assignment, finishIntentPath, context } = worker;
+        const member = assignment.claims[0];
+        const runId = context.runId;
         expect(await authorizeWorkerClaim({ ...worker, claim_handle: member.handle, requireCompletion: false })).toMatchObject({ authorized: true, state: "open", work_id: member.work_id });
         expect(await authorizeWorkerClaim({ ...worker, claim_handle: member.handle })).toMatchObject({ authorized: false, state: "open" });
         fs.writeFileSync(finishIntentPath, JSON.stringify({ version: 3, kind: "finish", intent_id: `factory-finish:${assignment.worker_profile}`, claim_handle: member.handle, parameters: { outcome } }) + "\n");
