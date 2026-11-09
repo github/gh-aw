@@ -37,69 +37,31 @@ function createLiteralValues(state = { version: 1, prefix: `\x00VALUE_${randomUU
 }
 
 /**
- * Restore only YAML scalar values after parsing author-owned frontmatter.
- * Surgical scalar edits preserve untouched keys, comments, and formatting.
+ * Restore only compiler-owned JSON scalar values. Evaluated context cannot
+ * manufacture engine metadata keys or document delimiters.
  * @param {string} content
  * @param {(text: string) => string} restore
  */
 function restoreInlineMetadata(content, restore) {
-  const match = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*\r?(?=\n|$)/.exec(content);
-  if (!match) {
+  const { editMarkdownMetadata, transformValues, markdownMetadataBlocks } = require("./markdown_metadata.cjs");
+  const block = markdownMetadataBlocks(content, true)[0];
+  if (!block) {
     const rendered = restore(content);
     // A restored body must not manufacture frontmatter for the engine's reader.
-    if (!/^---[ \t]*\r?(?=\n|$)/.test(content) && /^---[ \t]*\r?(?=\n|$)/.test(rendered)) {
-      return `---\n{}\n---\n${rendered}`;
+    const startsHeader = (/** @type {string} */ text) =>
+      text
+        .replace(/^\uFEFF/, "")
+        .split(/\r?\n/, 1)[0]
+        .trim() === "---";
+    if (!startsHeader(content) && startsHeader(rendered)) {
+      return editMarkdownMetadata(`---\n\n---\n${rendered}`, () => ({}));
     }
     return rendered;
   }
-  const frontmatter = match[1];
-  // YAML disallows NUL. A same-length printable stand-in retains scalar ranges.
-  const tokens = new Map();
-  const printable = frontmatter.replace(/\x00VALUE_[0-9a-f-]+_\d+\x00/g, token => {
-    const placeholder = token.replace(/\x00/g, "_");
-    tokens.set(placeholder, token);
-    return placeholder;
-  });
-  const decode = (/** @type {string} */ value) => value.replace(/_VALUE_[0-9a-f-]+_\d+_/g, token => tokens.get(token) ?? token);
-  const { parseDocument } = require("./work_queue_yaml.cjs");
-  /** @type {any} */
-  const document = parseDocument(printable);
-  /** @type {Array<{start: number, end: number, text: string}>} */
-  const edits = [];
-  /** @param {any} node */
-  const visit = node => {
-    if (!node || typeof node !== "object") return;
-    if (Array.isArray(node.items)) {
-      for (const item of node.items) {
-        if (item?.key) {
-          if (typeof item.key.value === "string" && restore(decode(item.key.value)) !== decode(item.key.value)) {
-            throw new Error(`${ERR_VALIDATION}: Inline metadata keys must be author-owned`);
-          }
-          visit(item.value);
-        } else visit(item);
-      }
-    } else if (typeof node.value === "string" && Array.isArray(node.range)) {
-      const opaque = decode(node.value);
-      const value = restore(opaque);
-      if (value !== opaque) {
-        // Keep plain model/alias selectors compatible; quote other runtime scalars.
-        const plain = node.type === "PLAIN" && /^[A-Za-z][A-Za-z0-9._/?=&+-]*$/.test(value) && !/^(?:true|false|null)$/i.test(value);
-        const trailingNewline = frontmatter.slice(node.range[0], node.range[1]).endsWith("\n") ? "\n" : "";
-        edits.push({ start: node.range[0], end: node.range[1], text: (plain ? value : JSON.stringify(value)) + trailingNewline });
-      }
-    }
-  };
-  if ((!document || document.errors.length) && restore(frontmatter) !== frontmatter) {
-    throw new Error(`${ERR_VALIDATION}: Cannot safely restore inline metadata in invalid YAML`);
-  }
-  visit(document?.contents);
-  let rendered = frontmatter;
-  for (const edit of edits.sort((a, b) => b.start - a.start)) {
-    rendered = rendered.slice(0, edit.start) + edit.text + rendered.slice(edit.end);
-  }
-  if (restore(rendered) !== rendered) throw new Error(`${ERR_VALIDATION}: Evaluated inline metadata must be a YAML scalar value`);
-  const start = content.indexOf("\n") + 1;
-  return content.slice(0, start) + rendered + restore(content.slice(start + frontmatter.length));
+  const rendered = editMarkdownMetadata(content, metadata => transformValues(metadata, restore));
+  const renderedBlock = markdownMetadataBlocks(rendered, true)[0];
+  if (!renderedBlock || restore(renderedBlock.source.replaceAll("\\u0000", "\x00")) !== renderedBlock.source.replaceAll("\\u0000", "\x00")) throw new Error(`${ERR_VALIDATION}: Evaluated inline metadata must be a scalar value`);
+  return rendered.slice(0, renderedBlock.end) + restore(rendered.slice(renderedBlock.end));
 }
 
 /** @param {string} file */
@@ -112,7 +74,7 @@ function writeLiteralState(file, state) {
   const pattern = new RegExp(`${state.prefix}(\\d+)\x00`, "g");
   const used = new Set();
   for (const entry of Object.values(state.files)) {
-    for (const match of entry.opaque.matchAll(pattern)) used.add(Number(match[1]));
+    for (const match of entry.opaque.replaceAll("\\u0000", "\x00").matchAll(pattern)) used.add(Number(match[1]));
   }
   // Do not persist values discarded by author conditionals or metadata filtering.
   state.values = state.values.map((value, index) => (used.has(index) ? value : ""));

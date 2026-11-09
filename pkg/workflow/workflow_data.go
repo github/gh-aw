@@ -42,31 +42,32 @@ type WorkflowData struct {
 	workQueueRepoIssuesConfigured  bool
 	DryRun                         bool // Disable compiler-managed GitHub mutations while retaining local diagnostics
 	Name                           string
-	WorkflowID                     string           // workflow identifier derived from markdown filename (basename without extension)
-	CompiledVersion                string           // gh-aw compiler version emitted to generated install steps as GH_AW_COMPILED_VERSION (release tag for releases, "dev" for non-release builds) so the install script can resolve a compat.json window at runtime without churn
-	TrialMode                      bool             // whether the workflow is running in trial mode
-	TrialLogicalRepo               string           // target repository slug for trial mode (owner/repo)
-	UseSamples                     bool             // whether the agentic step should be replaced by a deterministic samples replay driver (hidden feature)
-	FrontmatterName                string           // name field from frontmatter (for code scanning alert driver default)
-	FrontmatterEmoji               string           // emoji field from frontmatter (for display in footers and UI)
-	FrontmatterYAML                string           // raw frontmatter YAML content (rendered as comment in lock file for reference)
-	FrontmatterHash                string           // SHA-256 hash of frontmatter (computed before job building, used to derive stable heredoc delimiters)
-	BodyHash                       string           // SHA-256 hash of the markdown body (computed before job building)
-	FrontmatterFieldLines          map[string]int   // absolute 1-based line numbers of top-level frontmatter keys in the source file (populated by parser)
-	RawMarkdown                    string           // raw markdown body before include expansion, used for frontmatter hash computation without re-reading the file
-	Description                    string           // optional description rendered as comment in lock file
-	Intent                         string           // optional intent (durable outcome the workflow exists to achieve) rendered as comment in lock file
-	Docs                           string           // optional human-facing documentation URL preserved in lock metadata
-	Source                         string           // optional source field (owner/repo@ref/path) rendered as comment in lock file
-	Redirect                       string           // optional redirect field describing a moved workflow location
-	TrackerID                      string           // optional tracker identifier for created assets (min 8 chars, alphanumeric + hyphens/underscores)
-	MaxDailyAICredits              *string          // optional 24-hour per-workflow AIC threshold (numeric string or GitHub Actions expression)
-	MaxDailyAICreditsExplicit      bool             // daily limit came from workflow/import configuration rather than the runtime default
-	MaxDailyAICBackend             string           // optional backend for the daily AIC guardrail ("repo-memory" for git-backed JSONL ledger)
-	MaxDailyAICreditsGitHubApp     *GitHubAppConfig // optional GitHub App for minting the token used by the daily AIC guardrail
-	MaxDailyAICContinueOnError     bool             // when true, unknown/unverifiable daily AIC accounting is a warning instead of failing closed
-	ImportedFiles                  []string         // list of files imported via imports field (rendered as comment in lock file)
-	Skills                         []string         // skill specs from frontmatter (owner/repo@sha or owner/repo/skill/path@sha)
+	WorkflowID                     string            // workflow identifier derived from markdown filename (basename without extension)
+	CompiledVersion                string            // gh-aw compiler version emitted to generated install steps as GH_AW_COMPILED_VERSION (release tag for releases, "dev" for non-release builds) so the install script can resolve a compat.json window at runtime without churn
+	TrialMode                      bool              // whether the workflow is running in trial mode
+	TrialLogicalRepo               string            // target repository slug for trial mode (owner/repo)
+	UseSamples                     bool              // whether the agentic step should be replaced by a deterministic samples replay driver (hidden feature)
+	FrontmatterName                string            // name field from frontmatter (for code scanning alert driver default)
+	FrontmatterEmoji               string            // emoji field from frontmatter (for display in footers and UI)
+	FrontmatterYAML                string            // raw frontmatter YAML content (rendered as comment in lock file for reference)
+	FrontmatterHash                string            // SHA-256 hash of frontmatter (computed before job building, used to derive stable heredoc delimiters)
+	BodyHash                       string            // SHA-256 hash of the markdown body (computed before job building)
+	FrontmatterFieldLines          map[string]int    // absolute 1-based line numbers of top-level frontmatter keys in the source file (populated by parser)
+	RawMarkdown                    string            // raw markdown body before include expansion, used for frontmatter hash computation without re-reading the file
+	Description                    string            // optional description rendered as comment in lock file
+	Intent                         string            // optional intent (durable outcome the workflow exists to achieve) rendered as comment in lock file
+	Docs                           string            // optional human-facing documentation URL preserved in lock metadata
+	Source                         string            // optional source field (owner/repo@ref/path) rendered as comment in lock file
+	Redirect                       string            // optional redirect field describing a moved workflow location
+	TrackerID                      string            // optional tracker identifier for created assets (min 8 chars, alphanumeric + hyphens/underscores)
+	MaxDailyAICredits              *string           // optional 24-hour per-workflow AIC threshold (numeric string or GitHub Actions expression)
+	MaxDailyAICreditsExplicit      bool              // daily limit came from workflow/import configuration rather than the runtime default
+	MaxDailyAICBackend             string            // optional backend for the daily AIC guardrail ("repo-memory" for git-backed JSONL ledger)
+	MaxDailyAICreditsGitHubApp     *GitHubAppConfig  // optional GitHub App for minting the token used by the daily AIC guardrail
+	MaxDailyAICContinueOnError     bool              // when true, unknown/unverifiable daily AIC accounting is a warning instead of failing closed
+	ImportedFiles                  []string          // list of files imported via imports field (rendered as comment in lock file)
+	ImportedMetadataDocuments      map[string]string // compiler-resolved raw imports for JSON metadata generation
+	Skills                         []string          // skill specs from frontmatter (owner/repo@sha or owner/repo/skill/path@sha)
 	SkillReferences                []SkillReference
 	Plugins                        []string
 	PluginReferences               []PluginReference
@@ -109,6 +110,7 @@ type WorkflowData struct {
 	ExplicitlyDisabledTools        map[string]struct{}        // tool names explicitly set to false before default resolution mutates/removes their map entries
 	BashDisabled                   bool                       // true when tools.bash was fully and explicitly refused (bash: false, or bash: []) after default-tool resolution; used by engines that can fully disable shell execution (e.g. Codex's features.shell_tool=false), see EngineCapabilities.BashDisable
 	MarkdownContent                string
+	CompiledPromptMarkdown         []string               // Actual compiler-substituted prompt templates for runtime metadata provenance
 	SubAgentModels                 []parser.SubAgentModel // models declared by inline and imported sub-agents
 	SubAgents                      []parser.InlineSubAgent
 	AI                             string        // "claude" or "codex" (for backwards compatibility)

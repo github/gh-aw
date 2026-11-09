@@ -41,7 +41,7 @@ func writeStepsSection(yaml *strings.Builder, stepsYAML string) {
 	// YAML comments are stripped during parse/marshal, so they must be re-injected here
 	// before the indentation-normalization pass below rewrites each line.
 	stepsYAML = injectZizmorUnverifiedCreatorAnnotations(stepsYAML)
-	lines := strings.Split(stepsYAML, "\n")
+	lines := strings.Split(strings.ReplaceAll(stepsYAML, "\r\n", "\n"), "\n") //nolint:splitlinesonnewline // Normalize CRLF before indentation rewriting.
 	var blockScalarState yamlBlockScalarState
 	for _, line := range lines[1:] { // skip the "pre-steps:" / "pre-agent-steps:" / "post-steps:" header line
 		// Update block-scalar state using the original source line (before the
@@ -189,6 +189,7 @@ func (c *Compiler) generateCreateAwInfo(yaml *strings.Builder, data *WorkflowDat
 	writeFormattedYAML(yaml, "          GH_AW_INFO_WORKFLOW_NAME: \"%s\"\n", data.Name)
 	// Unlike github.workflow_ref, job.workflow_ref identifies the executing reusable workflow.
 	yaml.WriteString("          GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}\n")
+	yaml.WriteString("          GH_AW_INFO_WORKFLOW_SHA: ${{ job.workflow_sha }}\n")
 	writeFormattedYAML(yaml, "          GH_AW_INFO_EXPERIMENTAL: \"%t\"\n", engine.IsExperimental())
 	writeFormattedYAML(yaml, "          GH_AW_INFO_SUPPORTS_TOOLS_ALLOWLIST: \"%t\"\n", engine.GetCapabilities().ToolsAllowlist)
 	writeFormattedYAML(yaml, "          GH_AW_INFO_STAGED: \"%s\"\n", stagedValue)

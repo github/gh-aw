@@ -1,0 +1,23 @@
+fixture_id: suggested-attribution-fail-closed
+description: A heuristic suggestion remains non-authoritative and cannot select a relaxed policy.
+spec_refs:
+  - "Attribution states"
+  - "Fail-Closed Behavior"
+input:
+  suggested_attribution:
+    source: suggestion
+    status: suggested
+    labels:
+      - security
+expected:
+  attribution:
+    source: suggestion
+    status: suggested
+    labels:
+      - security
+  policy:
+    autonomy: propose_only
+    write_scope: none
+    human_approval_required: true
+    auto_merge_allowed: false
+    max_attempts: 1

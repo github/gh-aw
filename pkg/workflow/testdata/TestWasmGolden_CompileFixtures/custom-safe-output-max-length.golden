@@ -111,6 +111,7 @@ jobs:
           GH_AW_INFO_AGENT_VERSION: "COPILOT_VERSION"
           GH_AW_INFO_WORKFLOW_NAME: "custom-safe-output-max-length-test"
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
+          GH_AW_INFO_WORKFLOW_SHA: ${{ job.workflow_sha }}
           GH_AW_INFO_EXPERIMENTAL: "false"
           GH_AW_INFO_SUPPORTS_TOOLS_ALLOWLIST: "true"
           GH_AW_INFO_STAGED: "false"

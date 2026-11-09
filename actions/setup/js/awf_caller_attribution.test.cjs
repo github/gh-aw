@@ -8,6 +8,7 @@ const require = createRequire(import.meta.url);
 const piProvider = require("./pi_provider.cjs");
 const { runPiSubagent } = require("./pi_subagent_extension.cjs");
 const { runWithCopilotSDK } = require("./copilot_sdk_session.cjs");
+const { prepareMarkdownFixtures } = require("../../../scripts/markdown_metadata_test_adapter.cjs");
 const { resolveMultiProviderFromReflect } = require("./awf_reflect.cjs");
 const { normalizeRuntimeEvent } = require("./unified_session.cjs");
 const { normalizeUnifiedSessionEvent } = require("./unified_session_payload.cjs");
@@ -234,7 +235,9 @@ process.stdin.on("end", () => {
     // so any header would also label child traffic. The SDK sends none and
     // relies on native per-agent metrics instead.
     fs.mkdirSync(path.join(dir, ".github/agents"), { recursive: true });
-    fs.writeFileSync(path.join(dir, ".github/agents/haiku-whoami.agent.md"), "---\nmodel: claude-haiku-4.5\n---\nSay which model you are.");
+    const agent = "---\nmodel: claude-haiku-4.5\n---\nSay which model you are.";
+    fs.writeFileSync(path.join(dir, ".github/agents/haiku-whoami.agent.md"), agent);
+    prepareMarkdownFixtures(agent);
     vi.stubEnv("GH_AW_SESSION_STATE_BASE_DIR", dir);
     vi.stubEnv("GH_AW_ENGINE_CWD", dir);
     vi.stubEnv("COPILOT_MODEL", "");

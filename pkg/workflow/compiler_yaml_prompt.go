@@ -17,7 +17,7 @@ func splitContentIntoChunks(content string) []string {
 	const maxChunkSize = 20900        // 21000 - 100 character buffer
 	const indentSpaces = "          " // 10 spaces added to each line
 
-	lines := strings.Split(content, "\n")
+	lines := strings.Split(strings.ReplaceAll(content, "\r\n", "\n"), "\n") //nolint:splitlinesonnewline // Normalize CRLF and preserve the trailing line for prompt chunking.
 	var chunks []string
 	var currentChunk []string
 	currentSize := 0
@@ -64,6 +64,7 @@ func (c *Compiler) generatePrompt(output *strings.Builder, data *WorkflowData, p
 	if err != nil {
 		return err
 	}
+	data.CompiledPromptMarkdown = append(data.CompiledPromptMarkdown, strings.Join(userPromptChunks, "\n"))
 	promptMarkdown := data.MarkdownContent + "\n" + data.ImportedMarkdown + "\n" + c.collectRuntimeImportMarkdownForCompilerAnalysis(data)
 	expressionMappings, data.DeferredPromptExpressions = rewriteDeferredPromptExpressions(expressionMappings, data.Jobs, beforeActivationJobs, promptMarkdown)
 	expressionMappings = filterPromptExpressionsForActivation(expressionMappings, data.Jobs, beforeActivationJobs, promptMarkdown)
@@ -477,7 +478,7 @@ func readRuntimeImportMarkdownForAnalysis(ref runtimeImportReference, workspaceR
 }
 
 func applyRuntimeImportLineRangeForAnalysis(content string, startLine, endLine int) string {
-	lines := strings.Split(content, "\n")
+	lines := strings.Split(strings.ReplaceAll(content, "\r\n", "\n"), "\n") //nolint:splitlinesonnewline // Normalize CRLF while retaining line-range coordinates.
 	start := startLine
 	if start <= 0 {
 		start = 1

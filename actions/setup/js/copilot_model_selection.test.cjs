@@ -13,7 +13,16 @@ describe("Copilot configured versus observed model", () => {
   let root, env, session, infoPath;
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(process.cwd(), ".copilot-model-selection-"));
-    env = { GH_AW_TMP_DIR: root, GH_AW_AWF_CONFIG_PATH: path.join(root, "awf-config.json"), HOME: root, COPILOT_HOME: path.join(root, ".copilot"), GH_AW_ENGINE_ID: "copilot", GH_AW_ENGINE_MODEL: "gemini-3.8-flash" };
+    env = {
+      GH_AW_TMP_DIR: root,
+      GH_AW_AWF_CONFIG_PATH: path.join(root, "awf-config.json"),
+      GITHUB_WORKSPACE: root,
+      GH_AW_ENGINE_CWD: ".",
+      HOME: root,
+      COPILOT_HOME: path.join(root, ".copilot"),
+      GH_AW_ENGINE_ID: "copilot",
+      GH_AW_ENGINE_MODEL: "gemini-3.8-flash",
+    };
     session = path.join(root, ".copilot/session-state/session/events.jsonl");
     infoPath = path.join(root, "aw_info.json");
     fs.mkdirSync(path.dirname(session), { recursive: true });
