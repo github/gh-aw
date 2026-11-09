@@ -7,9 +7,9 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.29.21<br>
+**Version**: 1.29.22<br>
 **Status**: Working Draft<br>
-**Publication Date**: 2026-11-08<br>
+**Publication Date**: 2026-11-09<br>
 **Editor**: GitHub Agentic Workflows Team<br>
 **This Version**: [safe-outputs-specification](/gh-aw/specs/safe-outputs-specification/)<br>
 **Latest Published Version**: This document
@@ -4281,6 +4281,10 @@ or review bodies to returned or persisted decision evidence.
 - Signed branch delivery MUST satisfy the shared [signed commit delivery requirements](#signed-commit-delivery-requirements).
 - Patch/bundle handling and publication MUST satisfy the shared [transport integrity requirements](#patch-and-bundle-transport-integrity-requirements).
 - Bundle inspection, recovery, and unsigned validation baselines MUST satisfy [BGO-001–008](#bundle-git-operations-and-validation-baselines).
+- The handler MUST reject an attempt to push when the resolved pull request head branch is the repository's default branch, before attempting the push.
+- The handler MUST attempt the push optimistically and MUST NOT block the push solely because a preflight branch-protection or ruleset inspection indicates that the branch may be protected.
+- After a failed push, the implementation MAY perform informational protection diagnostics. When performed, diagnostics MUST use only branch metadata and active branch-rules inspection available to the implementation and MUST NOT invoke an Administration-only classic branch-protection API.
+- Diagnostic inspection failures, unavailable inspection data, and disabled diagnostics MUST preserve the original push failure. Diagnostics MUST NOT change push retry behavior, fallback behavior, or the reported primary failure.
 
 ---
 
@@ -6845,6 +6849,14 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.29.22** (2026-11-09):
+
+- **Specified**: `push_to_pull_request_branch` attempts authorized pushes optimistically rather than blocking on preflight branch-protection inspection.
+- **Preserved**: The repository default-branch guard remains mandatory before pushing.
+- **Specified**: Optional post-failure diagnostics use branch metadata and active branch rules only; Administration-only classic protection APIs are not required.
+- **Preserved**: Inspection failures retain the original push failure and do not alter retries or fallback behavior.
+- **Updated**: Publication metadata to 1.29.22.
 
 **Version 1.29.21** (2026-11-08):
 
