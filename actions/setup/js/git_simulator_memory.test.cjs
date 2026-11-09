@@ -66,6 +66,16 @@ describe("git simulator memory isolation", () => {
     expect(validateProducer(memoryDir, review)).toBe(true);
   });
 
+  it("keeps safe-output probes local and caps reported findings to the four-cell sweep", () => {
+    const source = fs.readFileSync(path.join(process.cwd(), "../../../.github/workflows/daily-safeoutputs-git-simulator.md"), "utf8");
+    const frontmatter = source.split("\n---\n", 2)[0];
+    expect(frontmatter).not.toMatch(/^  (?:create-pull-request|push-to-pull-request-branch):/m);
+    expect(frontmatter).toMatch(/  create-issue:\n(?:[^\n]*\n)*    max: 4\n/);
+    expect(source).toContain("Use the `config-simulator` sub-agent four times in parallel");
+    expect(source).toContain("Never call a GitHub write tool or safe output.");
+    expect(source).toContain("Never create a probe PR or push to a PR branch");
+  });
+
   it("enumerates exactly 3600 unique cells in primary order", () => {
     expect(configIds).toHaveLength(3600);
     expect(new Set(configIds).size).toBe(3600);
@@ -128,19 +138,22 @@ describe("git simulator memory isolation", () => {
     expect(JSON.parse(fs.readFileSync(outputPath, "utf8")).regression_priority).toEqual([configIds[0], configIds[7]]);
   });
 
-  it("retains publisher Git metadata outside the agent's mounted memory directory", () => {
+  it("keeps publisher Git metadata outside the agent's mounted memory directory until restoration", () => {
     fs.mkdirSync(path.join(memoryDir, ".git/objects"), { recursive: true });
     fs.writeFileSync(path.join(memoryDir, ".git/objects/narrative"), "create_issue from old memory");
     const privateGitDir = path.join(root, "host-only/git");
     isolateMemory({ memoryDir, workspace, outputPath, privateGitDir });
-    expect(fs.readFileSync(path.join(memoryDir, ".git"), "utf8")).toBe(`gitdir: ${privateGitDir}\n`);
+    expect(fs.existsSync(path.join(memoryDir, ".git"))).toBe(false);
     expect(fs.readFileSync(path.join(privateGitDir, "objects/narrative"), "utf8")).toBe("create_issue from old memory");
-    expect(fs.existsSync(path.join(memoryDir, ".git/objects/narrative"))).toBe(false);
+    restoreProducerHistory({ memoryDir, workspace, privateGitDir, privateHistoryPath });
+    expect(fs.readFileSync(path.join(memoryDir, ".git"), "utf8")).toBe(`gitdir: ${privateGitDir}\n`);
   });
 
   it("keeps host-side memory staging functional without making commits", () => {
     execFileSync("git", ["init", "--quiet", memoryDir]);
-    isolateMemory({ memoryDir, workspace, outputPath, privateGitDir: path.join(root, "publisher-git") });
+    const privateGitDir = path.join(root, "publisher-git");
+    isolateMemory({ memoryDir, workspace, outputPath, privateGitDir });
+    restoreProducerHistory({ memoryDir, workspace, privateGitDir, privateHistoryPath });
     execFileSync("git", ["add", "--", "git-sim-state.json"], { cwd: memoryDir });
     expect(execFileSync("git", ["diff", "--cached", "--name-only"], { cwd: memoryDir, encoding: "utf8" })).toBe("git-sim-state.json\n");
   });
@@ -207,6 +220,8 @@ describe("git simulator memory isolation", () => {
     const args = [mockRequire, { env: { RUNNER_TEMP: path.join(root, "host-only"), GITHUB_WORKSPACE: workspace, GH_TOKEN: "" } }, {}, { repo: { owner: "github", repo: "gh-aw" } }, { exec: async () => {} }, core, {}, () => {}];
     const execute = script => new AsyncFunction("require", "process", "github", "context", "exec", "core", "io", "getOctokit", script)(...args);
     await execute(prepareScript);
+    expect(fs.existsSync(path.join(memoryDir, ".git"))).toBe(false);
+    expect(fs.existsSync(path.join(privateGitDir, "objects"))).toBe(true);
     expect(JSON.parse(fs.readFileSync(path.join(memoryDir, "git-sim-state.json"), "utf8")).strategies).toEqual([]);
     expect(fs.readFileSync(path.join(memoryDir, "git-sim-strategies.md"), "utf8")).toBe("");
     expect(fs.readFileSync(outputPath, "utf8")).not.toContain("Historical");

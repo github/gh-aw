@@ -1,7 +1,7 @@
 ---
 private: true
 emoji: "🧪"
-description: Daily synthetic tester that exhaustively explores the space of git configurations for create-pull-request and push-to-pull-request-branch safe outputs, using Z3-style constraint enumeration, repo-memory persistence, and parallel inline sub-agents to detect systematic issues related to repo size, history depth, and file count.
+description: Daily synthetic tester that exhaustively explores git configurations associated with create-pull-request and push-to-pull-request-branch safe outputs using local repositories, repo-memory persistence, and parallel inline sub-agents.
 on:
   schedule: daily
   workflow_dispatch:
@@ -82,8 +82,9 @@ pre-agent-steps:
         } finally {
           database.close();
         }
+        const memoryDir = "/tmp/gh-aw/repo-memory/default";
         isolateMemory({
-          memoryDir: "/tmp/gh-aw/repo-memory/default",
+          memoryDir,
           workspace: process.env.GITHUB_WORKSPACE, notes,
           outputPath: "/tmp/gh-aw/agent/git-simulator-signals.json",
           privateGitDir: path.join(process.env.RUNNER_TEMP, "git-simulator-private-memory-git"),
@@ -135,32 +136,10 @@ safe-outputs:
   create-issue:
     title-prefix: "[git-sim] "
     labels: ["git-simulator", "safe-outputs", "automated"]
-    max: 10
+    max: 4
     close-older-issues: false
     deduplicate-by-title: 3
   steer: true
-  create-pull-request:
-    draft: true
-    expires: 1d
-    labels: ["git-sim-probe", "automated"]
-    title-prefix: "[git-sim] "
-    allowed-files:
-      - "sim/**"
-      - "stuff.md"
-      - "history.md"
-    max-patch-size: 5120
-    max-patch-files: 200
-    if-no-changes: warn
-  push-to-pull-request-branch:
-    target: "*"
-    required-title-prefix: "[git-sim] "
-    required-labels: ["git-sim-probe", "automated"]
-    allowed-files:
-      - "sim/**"
-      - "stuff.md"
-      - "history.md"
-    if-no-changes: ignore
-    max-patch-size: 5120
 checkout:
   fetch: ["*"]
   fetch-depth: 0
@@ -171,16 +150,16 @@ models:
     output: 25.0
 evals:
   - id: git_scenarios_simulated
-    question: Did the agent simulate git configurations for create-pull-request and push-to-pull-request-branch safe outputs?
+    question: Did the agent simulate git configurations associated with create-pull-request and push-to-pull-request-branch using local repositories only?
   - id: simulator_findings_reported
-    question: Did the agent report the simulator results and any systematic safe-output issues it found?
+    question: Did the agent report the simulator results and any systematic git-state issues it found?
 features:
   gh-aw-detection: true
 ---
 
 # Daily Safe Outputs Git Simulator
 
-You are the **Safe Outputs Git Simulator** — a systematic exhaustive tester for git operations in the agentic workflow framework. Your mission is to discover systematic failures in `create-pull-request` and `push-to-pull-request-branch` safe outputs by exploring the full configuration space using Z3-style constraint enumeration.
+You are the **Safe Outputs Git Simulator** — a systematic exhaustive tester for git operations in the agentic workflow framework. Explore the full configuration space using local-only Git repositories and report measurable git-state behavior associated with `create-pull-request` and `push-to-pull-request-branch`. Never invoke either safe output: they create externally visible GitHub resources and are not probes.
 
 ## Current Context
 
@@ -322,26 +301,23 @@ Using the state loaded in Phase 0:
    | PATCH=medium | 200 KB total | |
    | PATCH=large | 1000 KB total | |
    | PATCH=xlarge | 4000 KB total | |
-   | BRANCH=clean | create-pull-request only | |
-   | BRANCH=ahead | create PR then push to it | |
-   | BRANCH=diverged | create PR, note divergence in scenario, push | |
+   | BRANCH=clean | base remains unchanged after candidate commits | |
+   | BRANCH=ahead | candidate has one extra commit and the base remains unchanged | |
+   | BRANCH=diverged | candidate and base have independent commits after their shared base | |
    | COMMIT=single | 1 commit | |
    | COMMIT=multi | 3 commits | |
    | COMMIT=merge_msg | 1 commit with "Merge branch ..." message | |
 
-## Phase 2: Run Parallel Simulations
+## Phase 2: Run Parallel Local Simulations
 
-Use the `config-simulator` sub-agent **four times in parallel** — once for each selected configuration. Pass each agent its full configuration parameters.
+Use the `config-simulator` sub-agent four times in parallel — once for each selected configuration. Pass each agent its full configuration parameters. These sub-agents only create and inspect disposable local repositories; they do not call GitHub write tools or safe outputs.
 
 For each simulation, the sub-agent will:
 1. Create a local git repo in `/tmp/gh-aw/agent/git-sim-{config_id}/`
 2. Build `stuff.md` and `history.md` according to the SIZE/HISTORY dimensions
 3. Generate patch files matching FILES/PATCH dimensions
 4. Commit according to COMMIT dimension
-5. Attempt the appropriate safe output based on BRANCH dimension:
-   - `BRANCH=clean` → `create_pull_request`
-   - `BRANCH=ahead` → `create_pull_request`, then `push_to_pull_request_branch` with an additional commit
-   - `BRANCH=diverged` → `create_pull_request`, note simulated divergence, then `push_to_pull_request_branch`
+5. Model the selected branch topology locally and verify its relationship to the base branch.
 6. Return a structured JSON result
 
 ## Phase 3: Collect and Analyze Results
@@ -352,7 +328,7 @@ After all four sub-agents complete, collect their JSON results:
 {
   "config_id": "string",
   "scenario_description": "full narrative of what was simulated",
-  "outcome": "pass | fail | error | rejected | timeout",
+  "outcome": "pass | fail | error | timeout",
   "error_message": "string or null",
   "git_cost_estimate": {
     "declared_file_count": 0,
@@ -361,18 +337,20 @@ After all four sub-agents complete, collect their JSON results:
     "actual_patch_size_kb": 0,
     "actual_commit_count": 0
   },
-  "safe_output_used": "create-pull-request | push-to-pull-request-branch | both",
+  "git_state_simulated": "clean | ahead | diverged",
   "observations": ["..."]
 }
 ```
 
-For each result with `outcome` of `fail`, `error`, or `rejected`, create a GitHub issue (Phase 4).
+For each result with `outcome` of `fail` or `error`, create a GitHub issue (Phase 4).
 
 For all results regardless of outcome, update persistent state (Phase 5).
 
 ## Phase 4: Create Issues for Failures
 
-For each failing/erroring/rejected configuration, call `create_issue` with:
+Create at most one issue per failed cell. The `create-issue` quota of four matches the four cells simulated in this run.
+
+For each failing or erroring configuration, call `create_issue` with:
 
 **Title**: `[git-sim] {config_id}: {brief failure description (max 80 chars)}`
 
@@ -382,8 +360,8 @@ For each failing/erroring/rejected configuration, call `create_issue` with:
 ### Git Simulator Finding
 
 **Scenario ID**: {config_id}
-**Safe Output Tested**: {create-pull-request | push-to-pull-request-branch | both}
-**Outcome**: {fail | error | rejected}
+**Git State Simulated**: {clean | ahead | diverged}
+**Outcome**: {fail | error}
 **Run Date**: {date}
 **Run ID**: ${{ github.run_id }}
 
@@ -433,7 +411,7 @@ For each failing/erroring/rejected configuration, call `create_issue` with:
 It was created by the daily git simulator workflow as a diagnostic report.
 ```
 
-**Do NOT create issues for passing configurations.** Only create issues for `fail`, `error`, and `rejected` outcomes.
+**Do NOT create issues for passing configurations.** Only create issues for `fail` and `error` outcomes.
 
 ## Phase 5: Update Persistent State
 
@@ -445,12 +423,12 @@ After all results are collected:
 4. Increment `tested_count`
 5. Append any new patterns to `/tmp/gh-aw/repo-memory/default/git-sim-strategies.md`:
    - Observations that suggest a boundary or threshold
-   - Patterns like "PATCH=xlarge always rejects" or "HISTORY=deep + FILES=batch → timeout"
+   - Patterns such as "PATCH=xlarge requires more local Git processing" or "HISTORY=deep + FILES=batch → timeout"
 6. Save updated `git-sim-state.json`
 
 ## Phase 6: Noop or Summary
 
-If ALL 4 configurations passed without any issues:
+If all four configurations passed without any issues:
 
 ```
 noop: "Git simulator run complete. 4 configurations tested successfully.
@@ -464,8 +442,9 @@ If any failures were found, the `create_issue` calls from Phase 4 are sufficient
 ## Important Constraints
 
 - **All git repos are local to /tmp** — never run git operations on the actual cloned repository
-- **Patches come from /tmp repos** — use `git format-patch` or `git bundle create` inside the simulated repo
-- **stuff.md and history.md are content files** — they appear in the PR branch as documentation of the simulated scenario, not as real manifests
+- **Never create a probe PR or push to a PR branch** — no safe-output call is part of a simulation
+- **Patches stay in /tmp repos** — measure local diffs; never export or submit them
+- **stuff.md and history.md are local content files** — they document synthetic repository characteristics only
 - **Do NOT provide mitigations** in issue bodies — this workflow is purely diagnostic
 - **Engine is Claude** — use bash freely to build local git repos and generate patches
 
@@ -479,11 +458,11 @@ If any failures were found, the `create_issue` calls from Phase 4 are sufficient
 
 ## agent: `config-simulator`
 ---
-description: Simulates one configuration cell from the Z3 space and attempts the corresponding safe output git operation, returning a structured JSON result
+description: Simulates one configuration cell from the Z3 space in a disposable local repository and returns a structured JSON result without GitHub writes
 model: large
 ---
 
-You simulate a single git configuration and attempt a safe output operation for the daily git simulator.
+You simulate a single git configuration for the daily git simulator. Never call a GitHub write tool or safe output.
 
 You will receive from the parent agent:
 - `config_id`: e.g. `medium-shallow-few-small-clean-single`
@@ -515,6 +494,7 @@ rm -rf "$WORKDIR"
 mkdir -p "$WORKDIR/sim"
 cd "$WORKDIR"
 git init -q
+git branch -M main
 git config user.email "sim@test.local"
 git config user.name "GitSim"
 ```
@@ -572,25 +552,25 @@ git add stuff.md history.md
 git commit -q -m "base: simulated repo (size=$SIZE_ENTRIES history=$HISTORY_ENTRIES)"
 ```
 
-### Step 5: Create probe branch and generate patch files
+### Step 5: Create candidate branch and generate synthetic patch files
 
 ```bash
 cd "$WORKDIR"
-git checkout -q -b sim-probe
+git checkout -q -b sim-candidate
 
 KB_PER_FILE=$(( TARGET_KB / FILE_COUNT + 1 ))
 LINES_PER_FILE=$(( KB_PER_FILE * 10 ))  # ~100 chars per line
 
 for i in $(seq 1 $FILE_COUNT); do
   {
-    echo "# Probe file ${i} — config: ${CONFIG_ID}"
+    echo "# Simulated file ${i} — config: ${CONFIG_ID}"
     echo ""
-    echo "This is a synthetic probe file for git simulator testing."
+    echo "This is a synthetic file for local git simulator testing."
     echo ""
     for j in $(seq 1 $LINES_PER_FILE); do
       echo "sim-line-${j}: $(printf '%0.s-' $(seq 1 $(( j % 60 + 20 )))) config=${CONFIG_ID} file=${i}"
     done
-  } > "sim/probe_${i}.md"
+  } > "sim/candidate_${i}.md"
 done
 ```
 
@@ -600,105 +580,75 @@ For `commit_mode = single`:
 ```bash
 cd "$WORKDIR"
 git add sim/
-git commit -q -m "sim: probe patch [${CONFIG_ID}] — ${FILE_COUNT} files, ${TARGET_KB}KB"
+git commit -q -m "sim: candidate patch [${CONFIG_ID}] — ${FILE_COUNT} files, ${TARGET_KB}KB"
 ```
 
 For `commit_mode = multi`:
 ```bash
 cd "$WORKDIR"
 git add sim/
-git commit -q -m "sim: probe batch 1/3 [${CONFIG_ID}]"
-git commit -q --allow-empty -m "sim: probe batch 2/3 [${CONFIG_ID}]"
-git commit -q --allow-empty -m "sim: probe batch 3/3 [${CONFIG_ID}]"
+git commit -q -m "sim: candidate batch 1/3 [${CONFIG_ID}]"
+git commit -q --allow-empty -m "sim: candidate batch 2/3 [${CONFIG_ID}]"
+git commit -q --allow-empty -m "sim: candidate batch 3/3 [${CONFIG_ID}]"
 ```
 
 For `commit_mode = merge_msg`:
 ```bash
 cd "$WORKDIR"
 git add sim/
-git commit -q -m "Merge branch 'feature/sim-probe-${CONFIG_ID}' into main
+git commit -q -m "Merge branch 'feature/sim-candidate-${CONFIG_ID}' into main
 
 Simulated merge commit for git cost estimation.
 Files: ${FILE_COUNT}, Size: ${TARGET_KB}KB, Config: ${CONFIG_ID}"
 ```
 
-### Step 7: Measure actual patch size
+### Step 7: Model the selected branch topology
+
+For `BRANCH_MODE=ahead`, add and commit one extra file on `sim-candidate` after the patch commits:
+
+```bash
+PATCH_COMMITS=$(git rev-list --count main..sim-candidate)
+echo "ahead commit" > sim/candidate_extra.md
+git add sim/candidate_extra.md
+git commit -q -m "sim: ahead commit [${CONFIG_ID}]"
+```
+
+For `BRANCH_MODE=diverged`, switch to `main`, add and commit `sim/base-only.md`, then switch back to `sim-candidate`:
+
+```bash
+git checkout -q main
+echo "base-only commit" > sim/base-only.md
+git add sim/base-only.md
+git commit -q -m "sim: base-only commit [${CONFIG_ID}]"
+git checkout -q sim-candidate
+```
+
+For `clean`, leave `main` unchanged. All branches and commits stay local.
+
+### Step 8: Measure patch size and verify topology
 
 ```bash
 cd "$WORKDIR"
-git diff --stat main..sim-probe
-ACTUAL_FILES=$(git diff --name-only main..sim-probe | wc -l | tr -d ' ')
-ACTUAL_SIZE_KB=$(git diff main..sim-probe | wc -c | awk '{printf "%d", $1/1024}')
-COMMIT_COUNT=$(git log --oneline main..sim-probe | wc -l | tr -d ' ')
-echo "actual_files=$ACTUAL_FILES actual_kb=$ACTUAL_SIZE_KB commits=$COMMIT_COUNT"
+git diff --stat main...sim-candidate
+ACTUAL_FILES=$(git diff --name-only main...sim-candidate | wc -l | tr -d ' ')
+ACTUAL_SIZE_KB=$(git diff main...sim-candidate | wc -c | awk '{printf "%d", $1/1024}')
+CANDIDATE_ONLY_COMMITS=$(git rev-list --count main..sim-candidate)
+BASE_ONLY_COMMITS=$(git rev-list --count sim-candidate..main)
+COMMON_BASE=$(git merge-base main sim-candidate)
+echo "actual_files=$ACTUAL_FILES actual_kb=$ACTUAL_SIZE_KB candidate_only_commits=$CANDIDATE_ONLY_COMMITS base_only_commits=$BASE_ONLY_COMMITS common_base=$COMMON_BASE"
 ```
 
-### Step 8: Create git bundle for safe output
+Verify the expected topology using the local commit counts: `clean` has candidate-only commits and no base-only commits; `ahead` has more candidate-only commits than `PATCH_COMMITS` and no base-only commits; `diverged` has commits unique to both branches.
 
-```bash
-cd "$WORKDIR"
-# Include both the base commit and the sim-probe branch in the bundle
-git bundle create "/tmp/gh-aw/agent/git-sim-${CONFIG_ID}.bundle" main..sim-probe 2>&1
-echo "bundle_created=$?"
-ls -la "/tmp/gh-aw/agent/git-sim-${CONFIG_ID}.bundle"
-```
+### Step 9: Return structured result
 
-### Step 9: Attempt safe output
-
-**Scenario description** to include in the PR body:
-
-```markdown
-## Simulated Scenario: {config_id}
-
-**Repo size**: {size_entries} declared files in `stuff.md` (simulates a $SIZE_MODE repository)
-**History depth**: {history_entries} entries in `history.md` (simulates $HISTORY_MODE clone depth)
-**Patch files**: {file_count} files in `sim/`
-**Target patch size**: {patch_target_kb} KB
-**Commit structure**: {commit_mode}
-**Branch state**: {branch_mode}
-
-This probe was generated by the daily git simulator to test safe output behaviour
-at this specific configuration cell. The `stuff.md` and `history.md` files declare
-the simulated characteristics but are not real file listings or git logs.
-
-**Git cost estimate**:
-- Declared files: {size_entries}
-- Declared history: {history_entries} commits
-- Actual patch files: {ACTUAL_FILES}
-- Actual patch size: ~{ACTUAL_SIZE_KB} KB
-- Actual commits in patch: {COMMIT_COUNT}
-```
-
-**For BRANCH=clean**: Call `create_pull_request` with:
-- title: `probe: {config_id} — {file_count}f/{patch_target_kb}KB/{commit_mode}`
-- body: the scenario description above
-- branch: `git-sim/{config_id}`
-
-**For BRANCH=ahead**:
-1. Call `create_pull_request` with the initial patch (same as clean)
-2. Add one more file to the sim-probe branch:
-   ```bash
-   cd "$WORKDIR"
-   echo "# Extra commit — ahead scenario" > sim/probe_extra.md
-   git add sim/probe_extra.md
-   git commit -q -m "sim: ahead commit [{config_id}]"
-   ```
-3. Call `push_to_pull_request_branch` with the new commit's patch, targeting the PR just created (use the PR number returned from step 1)
-
-**For BRANCH=diverged**:
-1. Call `create_pull_request` (same as clean)
-2. Note in observations: "Diverged scenario — push to PR branch after simulated divergence"
-3. Add a file and call `push_to_pull_request_branch` (the safe output handles any divergence internally)
-
-### Step 10: Return structured result
-
-After attempting the safe output(s), return a JSON block with this exact structure. The parent agent will parse it.
+Return a JSON block with this exact structure. The parent agent will parse it.
 
 ```json
 {
   "config_id": "{config_id}",
   "scenario_description": "Simulated a $SIZE_MODE repository ($SIZE_ENTRIES declared files) with $HISTORY_MODE history depth ($HISTORY_ENTRIES commits), $FILES_MODE files ($FILE_COUNT files), $PATCH_MODE patch ($TARGET_KB KB target), $BRANCH_MODE branch state, $COMMIT_MODE commit structure.",
-  "outcome": "pass | fail | error | rejected",
+  "outcome": "pass | fail | error | timeout",
   "error_message": null,
   "git_cost_estimate": {
     "declared_file_count": 0,
@@ -707,7 +657,7 @@ After attempting the safe output(s), return a JSON block with this exact structu
     "actual_patch_size_kb": 0,
     "actual_commit_count": 0
   },
-  "safe_output_used": "create-pull-request | push-to-pull-request-branch | both",
+  "git_state_simulated": "{BRANCH_MODE}",
   "observations": [
     "Observation 1",
     "Observation 2"
@@ -716,10 +666,10 @@ After attempting the safe output(s), return a JSON block with this exact structu
 ```
 
 Set `outcome` to:
-- `pass` — safe output completed without error
-- `fail` — safe output returned an error or the PR/push was not created
-- `error` — unexpected exception or tool failure
-- `rejected` — safe output was rejected by validation (e.g. patch too large, too many files)
+- `pass` — the local repository and expected branch topology were created and verified
+- `fail` — a local Git invariant did not match the requested configuration
+- `error` — unexpected exception or local Git tool failure
+- `timeout` — local simulation exceeded its execution limit
 
 ### Output Format
 

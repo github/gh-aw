@@ -1,5 +1,5 @@
-# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"155e3468a9a6f233e7a6c2fce67a2291848a4834b02c909126ba6323e6b95a0f","body_hash":"7f46b25185b1a521aaa36eeb33380e2c2807d0508b2c0e7a4d54583103729fc4","strict":true,"agent_id":"claude","engine_versions":{"claude":"2.1.317"}}
-# gh-aw-manifest: {"version":1,"secrets":["GH_AW_CI_TRIGGER_TOKEN","GH_AW_DEFAULT_OTLP_ENDPOINT","GH_AW_DEFAULT_OTLP_HEADERS","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GITHUB_TOKEN"],"actions":[{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"949feb2413d6458794dcd2491c4babbbce0c15c1","version":"v7.1.0"},{"repo":"actions/setup-python","sha":"6d4fd22b20465ccc0f7354476588e8df7c9ca0e0","version":"v7.1.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.29.10@sha256:06af9976ff77a783a5ec80da61cb56e407d91ae7b75fdacd074748b1740c79ed"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.10@sha256:04c350586bbda035439bb0902af1a7aae688a48a336f7c895c189bcd857eadfa"},{"image":"ghcr.io/github/gh-aw-firewall/cli-proxy:0.29.10@sha256:6887c6a77696a0b8d4c3ee596810b4416b0d88be5cf3b36e0a6230e986ced246"},{"image":"ghcr.io/github/gh-aw-firewall/router:0.29.10@sha256:cf7ba6dedba5037c51e84487fdfcdfa7c294fd295c29e083cb6ae872a9512bbd"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.29.10@sha256:df9e9a1f689fd08cc2634035faef208363d9b4a56b068b95940cae464e629653"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.5.4","digest":"sha256:801db64c2456ba2132733b23141fb52ca9d4691765181ee957ee121a21b86c09","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.5.4@sha256:801db64c2456ba2132733b23141fb52ca9d4691765181ee957ee121a21b86c09"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:2c2ea524e648b91c8333ce246e3838fcf5b19ac70e45baac1a51b9207299749f","pinned_image":"ghcr.io/github/gh-aw-node@sha256:2c2ea524e648b91c8333ce246e3838fcf5b19ac70e45baac1a51b9207299749f"},{"image":"ghcr.io/github/github-mcp-server:v2.1.0","digest":"sha256:f6056fc10bfffcc8c81a6417a2e9ca12808647e8dd6049642a4feaadee0e0f8a","pinned_image":"ghcr.io/github/github-mcp-server:v2.1.0@sha256:f6056fc10bfffcc8c81a6417a2e9ca12808647e8dd6049642a4feaadee0e0f8a"}],"memory_validation_scripts":[{"memory":"repo-memory:default","sha256":"62d7541f158ca1ce18961e89cc15ff50cd3886ce468b6c9049da0ae7123afb99"}],"mcp_servers":[{"name":"safeoutputs","tools":["create_issue","create_pull_request","noop","push_to_pull_request_branch","report_incomplete","report_missing_data","report_missing_tool"]}],"threat_detection":{"mode":"enabled"},"admission":true}
+# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"c588aba601f7f1d11bdfcffad89cb0268a26cb4e7caa086ae1fcfd6cd8f520c2","body_hash":"914e1e93d8579522e6d99f0ba9e1fcd9123dba995cba88e2fb038fc0ae53a0a1","strict":true,"agent_id":"claude","engine_versions":{"claude":"2.1.317"}}
+# gh-aw-manifest: {"version":1,"secrets":["GH_AW_DEFAULT_OTLP_ENDPOINT","GH_AW_DEFAULT_OTLP_HEADERS","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GITHUB_TOKEN"],"actions":[{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"949feb2413d6458794dcd2491c4babbbce0c15c1","version":"v7.1.0"},{"repo":"actions/setup-python","sha":"6d4fd22b20465ccc0f7354476588e8df7c9ca0e0","version":"v7.1.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.29.10@sha256:06af9976ff77a783a5ec80da61cb56e407d91ae7b75fdacd074748b1740c79ed"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.10@sha256:04c350586bbda035439bb0902af1a7aae688a48a336f7c895c189bcd857eadfa"},{"image":"ghcr.io/github/gh-aw-firewall/cli-proxy:0.29.10@sha256:6887c6a77696a0b8d4c3ee596810b4416b0d88be5cf3b36e0a6230e986ced246"},{"image":"ghcr.io/github/gh-aw-firewall/router:0.29.10@sha256:cf7ba6dedba5037c51e84487fdfcdfa7c294fd295c29e083cb6ae872a9512bbd"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.29.10@sha256:df9e9a1f689fd08cc2634035faef208363d9b4a56b068b95940cae464e629653"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.5.4","digest":"sha256:801db64c2456ba2132733b23141fb52ca9d4691765181ee957ee121a21b86c09","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.5.4@sha256:801db64c2456ba2132733b23141fb52ca9d4691765181ee957ee121a21b86c09"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:2c2ea524e648b91c8333ce246e3838fcf5b19ac70e45baac1a51b9207299749f","pinned_image":"ghcr.io/github/gh-aw-node@sha256:2c2ea524e648b91c8333ce246e3838fcf5b19ac70e45baac1a51b9207299749f"},{"image":"ghcr.io/github/github-mcp-server:v2.1.0","digest":"sha256:f6056fc10bfffcc8c81a6417a2e9ca12808647e8dd6049642a4feaadee0e0f8a","pinned_image":"ghcr.io/github/github-mcp-server:v2.1.0@sha256:f6056fc10bfffcc8c81a6417a2e9ca12808647e8dd6049642a4feaadee0e0f8a"}],"memory_validation_scripts":[{"memory":"repo-memory:default","sha256":"62d7541f158ca1ce18961e89cc15ff50cd3886ce468b6c9049da0ae7123afb99"}],"mcp_servers":[{"name":"safeoutputs","tools":["create_issue","noop","report_incomplete","report_missing_data","report_missing_tool"]}],"threat_detection":{"mode":"enabled"},"admission":true}
 # This file was automatically generated by gh-aw. DO NOT EDIT. To debug this workflow, load the skill at https://github.com/github/gh-aw/blob/main/debug.md
 #
 #    ___                   _   _
@@ -23,10 +23,9 @@
 #
 # For more information: https://github.github.com/gh-aw/introduction/overview/
 #
-# Daily synthetic tester that exhaustively explores the space of git configurations for create-pull-request and push-to-pull-request-branch safe outputs, using Z3-style constraint enumeration, repo-memory persistence, and parallel inline sub-agents to detect systematic issues related to repo size, history depth, and file count.
+# Daily synthetic tester that exhaustively explores git configurations associated with create-pull-request and push-to-pull-request-branch safe outputs using local repositories, repo-memory persistence, and parallel inline sub-agents.
 #
 # Secrets used:
-#   - GH_AW_CI_TRIGGER_TOKEN
 #   - GH_AW_DEFAULT_OTLP_ENDPOINT
 #   - GH_AW_DEFAULT_OTLP_HEADERS
 #   - GH_AW_GITHUB_MCP_SERVER_TOKEN
@@ -322,12 +321,12 @@ jobs:
           GH_AW_OTLP_LOGS_ENABLED: ""
           GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
-          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"repo_memory_prompt.md\"},{\"file\":\"safe_outputs_cli_only_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"file\":\"safe_outputs_create_pull_request.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"safe_outputs_steering_issue.md\"},{\"file\":\"safe_outputs_push_to_pr_branch.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"file\":\"cli_proxy_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"},{\"author_file\":\".github/workflows/daily-safeoutputs-git-simulator.md\"}],\"system_item_count\":17,\"author_expressions\":{\"github.repository\":\"GH_AW_GITHUB_REPOSITORY\",\"github.run_id\":\"GH_AW_GITHUB_RUN_ID\"}}"
+          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"repo_memory_prompt.md\"},{\"file\":\"safe_outputs_cli_only_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"safe_outputs_steering_issue.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"file\":\"cli_proxy_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"},{\"author_file\":\".github/workflows/daily-safeoutputs-git-simulator.md\"}],\"system_item_count\":15,\"author_expressions\":{\"github.repository\":\"GH_AW_GITHUB_REPOSITORY\",\"github.run_id\":\"GH_AW_GITHUB_RUN_ID\"}}"
           GH_AW_PROMPT_CONTENT_0000: |
             <system>
           GH_AW_PROMPT_CONTENT_0001: |
             <safe-output-tools>
-            Tools: create_issue(max:10), create_pull_request, push_to_pull_request_branch, report_missing_tool, report_missing_data, noop(max:2)
+            Tools: create_issue(max:4), report_missing_tool, report_missing_data, noop(max:2)
           GH_AW_PROMPT_CONTENT_0002: |+
             <issue-steering>
             The steering issue for this run is #__GH_AW_NEEDS_ACTIVATION_OUTPUTS_STEERING_ISSUE_NUMBER__.
@@ -624,7 +623,7 @@ jobs:
           GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
           GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
           GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
-          GH_AW_ADMISSION_WORKFLOW_HASH: "155e3468a9a6f233e7a6c2fce67a2291848a4834b02c909126ba6323e6b95a0f:7f46b25185b1a521aaa36eeb33380e2c2807d0508b2c0e7a4d54583103729fc4"
+          GH_AW_ADMISSION_WORKFLOW_HASH: "c588aba601f7f1d11bdfcffad89cb0268a26cb4e7caa086ae1fcfd6cd8f520c2:914e1e93d8579522e6d99f0ba9e1fcd9123dba995cba88e2fb038fc0ae53a0a1"
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
@@ -882,7 +881,7 @@ jobs:
         name: Isolate simulator memory and read-only ledger signals
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
-          script: "const fs = require(\"node:fs\");\nconst path = require(\"node:path\");\nconst { DatabaseSync } = require(\"node:sqlite\");\nconst actionsDir = path.join(process.env.RUNNER_TEMP, \"gh-aw\", \"actions\");\nconst { main } = require(path.join(actionsDir, \"create_ledger_projection.cjs\"));\nconst { isolateMemory } = require(path.join(process.env.GITHUB_WORKSPACE, \"actions/setup/js/git_simulator_memory_helpers.test.cjs\"));\nconst ledgerName = \"git-simulator-lessons\";\nconst ledgerWorkspace = path.join(process.env.RUNNER_TEMP, \"git-simulator-private-ledger\");\nfs.mkdirSync(ledgerWorkspace, { recursive: true });\nawait exec.exec(\"git\", [\"init\", \"--quiet\", ledgerWorkspace]);\nconst [databasePath] = await main({\n  githubClient: github, owner: context.repo.owner, repo: context.repo.repo,\n  workspaceDir: ledgerWorkspace,\n  ledgerConfigs: [{\n    name: ledgerName, type: \"notes\",\n    max_record_kb: 4, max_segment_kb: 100, max_patch_kb: 16\n  }]\n});\nconst database = new DatabaseSync(databasePath, { readOnly: true });\nlet notes;\ntry {\n  notes = database.prepare(`\n    SELECT n.id, n.subject, n.note, s.downvotes\n    FROM notes n JOIN note_state s ON n.id = s.note_id\n    ORDER BY n.id LIMIT 20\n  `).all().map(row => ({\n    ...row,\n    citations: database.prepare(`\n      SELECT path FROM note_citations WHERE note_id = ? ORDER BY ordinal LIMIT 4\n    `).all(row.id).map(citation => citation.path)\n  }));\n} finally {\n  database.close();\n}\nisolateMemory({\n  memoryDir: \"/tmp/gh-aw/repo-memory/default\",\n  workspace: process.env.GITHUB_WORKSPACE, notes,\n  outputPath: \"/tmp/gh-aw/agent/git-simulator-signals.json\",\n  privateGitDir: path.join(process.env.RUNNER_TEMP, \"git-simulator-private-memory-git\"),\n  privateHistoryPath: path.join(process.env.RUNNER_TEMP, \"git-simulator-private-producer-history.json\")\n});\n// The reader does not declare tools.ledger, so no ledger write or compaction handler exists.\nconst projectionRoot = path.dirname(path.dirname(databasePath));\nfs.chmodSync(projectionRoot, 0o700);\nfs.chmodSync(path.dirname(databasePath), 0o700);\nfs.rmSync(projectionRoot, { recursive: true });\nfs.rmSync(ledgerWorkspace, { recursive: true });"
+          script: "const fs = require(\"node:fs\");\nconst path = require(\"node:path\");\nconst { DatabaseSync } = require(\"node:sqlite\");\nconst actionsDir = path.join(process.env.RUNNER_TEMP, \"gh-aw\", \"actions\");\nconst { main } = require(path.join(actionsDir, \"create_ledger_projection.cjs\"));\nconst { isolateMemory } = require(path.join(process.env.GITHUB_WORKSPACE, \"actions/setup/js/git_simulator_memory_helpers.test.cjs\"));\nconst ledgerName = \"git-simulator-lessons\";\nconst ledgerWorkspace = path.join(process.env.RUNNER_TEMP, \"git-simulator-private-ledger\");\nfs.mkdirSync(ledgerWorkspace, { recursive: true });\nawait exec.exec(\"git\", [\"init\", \"--quiet\", ledgerWorkspace]);\nconst [databasePath] = await main({\n  githubClient: github, owner: context.repo.owner, repo: context.repo.repo,\n  workspaceDir: ledgerWorkspace,\n  ledgerConfigs: [{\n    name: ledgerName, type: \"notes\",\n    max_record_kb: 4, max_segment_kb: 100, max_patch_kb: 16\n  }]\n});\nconst database = new DatabaseSync(databasePath, { readOnly: true });\nlet notes;\ntry {\n  notes = database.prepare(`\n    SELECT n.id, n.subject, n.note, s.downvotes\n    FROM notes n JOIN note_state s ON n.id = s.note_id\n    ORDER BY n.id LIMIT 20\n  `).all().map(row => ({\n    ...row,\n    citations: database.prepare(`\n      SELECT path FROM note_citations WHERE note_id = ? ORDER BY ordinal LIMIT 4\n    `).all(row.id).map(citation => citation.path)\n  }));\n} finally {\n  database.close();\n}\nconst memoryDir = \"/tmp/gh-aw/repo-memory/default\";\nisolateMemory({\n  memoryDir,\n  workspace: process.env.GITHUB_WORKSPACE, notes,\n  outputPath: \"/tmp/gh-aw/agent/git-simulator-signals.json\",\n  privateGitDir: path.join(process.env.RUNNER_TEMP, \"git-simulator-private-memory-git\"),\n  privateHistoryPath: path.join(process.env.RUNNER_TEMP, \"git-simulator-private-producer-history.json\")\n});\n// The reader does not declare tools.ledger, so no ledger write or compaction handler exists.\nconst projectionRoot = path.dirname(path.dirname(databasePath));\nfs.chmodSync(projectionRoot, 0o700);\nfs.chmodSync(path.dirname(databasePath), 0o700);\nfs.rmSync(projectionRoot, { recursive: true });\nfs.rmSync(ledgerWorkspace, { recursive: true });"
 
       - name: Download container images
         run: bash "${RUNNER_TEMP}/gh-aw/actions/download_docker_images.sh" ghcr.io/github/gh-aw-mcpg:v0.5.4@sha256:801db64c2456ba2132733b23141fb52ca9d4691765181ee957ee121a21b86c09 ghcr.io/github/gh-aw-node@sha256:2c2ea524e648b91c8333ce246e3838fcf5b19ac70e45baac1a51b9207299749f ghcr.io/github/github-mcp-server:v2.1.0@sha256:f6056fc10bfffcc8c81a6417a2e9ca12808647e8dd6049642a4feaadee0e0f8a ghcr.io/github/gh-aw-firewall/agent:0.29.10@sha256:06af9976ff77a783a5ec80da61cb56e407d91ae7b75fdacd074748b1740c79ed ghcr.io/github/gh-aw-firewall/api-proxy:0.29.10@sha256:04c350586bbda035439bb0902af1a7aae688a48a336f7c895c189bcd857eadfa ghcr.io/github/gh-aw-firewall/cli-proxy:0.29.10@sha256:6887c6a77696a0b8d4c3ee596810b4416b0d88be5cf3b36e0a6230e986ced246 ghcr.io/github/gh-aw-firewall/router:0.29.10@sha256:cf7ba6dedba5037c51e84487fdfcdfa7c294fd295c29e083cb6ae872a9512bbd ghcr.io/github/gh-aw-firewall/squid:0.29.10@sha256:df9e9a1f689fd08cc2634035faef208363d9b4a56b068b95940cae464e629653
@@ -896,7 +895,7 @@ jobs:
         env:
           GH_AW_FILE_ROOT: "${{ runner.temp }}/gh-aw"
           GH_AW_FILE_CONFIG: "{\"files\":[{\"path\":\"safeoutputs/config.json\",\"content_env\":\"GH_AW_SAFE_OUTPUTS_CONFIG\"}]}"
-          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_issue\":{\"close_older_issues\":false,\"deduplicate_by_title\":3,\"labels\":[\"git-simulator\",\"safe-outputs\",\"automated\"],\"max\":10,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10,\"title_prefix\":\"[git-sim] \"},\"create_pull_request\":{\"allowed_files\":[\"sim/**\",\"stuff.md\",\"history.md\"],\"draft\":true,\"expires\":24,\"if_no_changes\":\"warn\",\"labels\":[\"git-sim-probe\",\"automated\"],\"max\":1,\"max_patch_files\":200,\"max_patch_size\":5120,\"protect_top_level_dot_folders\":true,\"protected_files\":[\"package.json\",\"bun.lockb\",\"bunfig.toml\",\"deno.json\",\"deno.jsonc\",\"deno.lock\",\"global.json\",\"NuGet.Config\",\"Directory.Packages.props\",\"mix.exs\",\"mix.lock\",\"go.mod\",\"go.sum\",\"stack.yaml\",\"stack.yaml.lock\",\"pom.xml\",\"build.gradle\",\"build.gradle.kts\",\"settings.gradle\",\"settings.gradle.kts\",\"gradle.properties\",\"package-lock.json\",\"yarn.lock\",\"pnpm-lock.yaml\",\"npm-shrinkwrap.json\",\"requirements.txt\",\"Pipfile\",\"Pipfile.lock\",\"pyproject.toml\",\"setup.py\",\"setup.cfg\",\"Gemfile\",\"Gemfile.lock\",\"uv.lock\",\"CODEOWNERS\",\"DESIGN.md\",\"README.md\",\"CONTRIBUTING.md\",\"SECURITY.md\",\"CODE_OF_CONDUCT.md\",\"CLAUDE.md\",\"AGENTS.md\"],\"protected_files_path_exclude\":[\".changeset/*.md\"],\"protected_files_policy\":\"request-review\",\"title_prefix\":\"[git-sim] \"},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"push_repo_memory\":{\"memories\":[{\"allowed_extensions\":[\".json\",\".md\"],\"dir\":\"/tmp/gh-aw/repo-memory/default\",\"file_glob\":\"git-sim-state.json git-sim-strategies.md\",\"id\":\"default\",\"max_file_count\":100,\"max_file_size\":204800,\"max_patch_size\":10240,\"validation\":{\"script\":\"if (memoryPhase === \\\"push\\\" && memorySourceJobResult !== \\\"success\\\") {\\n  throw new Error(\\\"Simulator memory publication requires successful final evidence preparation\\\");\\n}\\nreturn true;\\n\",\"script_required\":true,\"timeout\":60}}]},\"push_to_pull_request_branch\":{\"allowed_files\":[\"sim/**\",\"stuff.md\",\"history.md\"],\"if_no_changes\":\"ignore\",\"max_patch_size\":5120,\"protect_top_level_dot_folders\":true,\"protected_files\":[\"package.json\",\"bun.lockb\",\"bunfig.toml\",\"deno.json\",\"deno.jsonc\",\"deno.lock\",\"global.json\",\"NuGet.Config\",\"Directory.Packages.props\",\"mix.exs\",\"mix.lock\",\"go.mod\",\"go.sum\",\"stack.yaml\",\"stack.yaml.lock\",\"pom.xml\",\"build.gradle\",\"build.gradle.kts\",\"settings.gradle\",\"settings.gradle.kts\",\"gradle.properties\",\"package-lock.json\",\"yarn.lock\",\"pnpm-lock.yaml\",\"npm-shrinkwrap.json\",\"requirements.txt\",\"Pipfile\",\"Pipfile.lock\",\"pyproject.toml\",\"setup.py\",\"setup.cfg\",\"Gemfile\",\"Gemfile.lock\",\"uv.lock\",\"CODEOWNERS\",\"DESIGN.md\",\"README.md\",\"CONTRIBUTING.md\",\"SECURITY.md\",\"CODE_OF_CONDUCT.md\",\"CLAUDE.md\",\"AGENTS.md\"],\"protected_files_path_exclude\":[\".changeset/*.md\"],\"protected_files_policy\":\"request-review\",\"required_labels\":[\"git-sim-probe\",\"automated\"],\"target\":\"*\",\"title_prefix\":\"[git-sim] \"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_issue\":{\"close_older_issues\":false,\"deduplicate_by_title\":3,\"labels\":[\"git-simulator\",\"safe-outputs\",\"automated\"],\"max\":4,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10,\"title_prefix\":\"[git-sim] \"},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"push_repo_memory\":{\"memories\":[{\"allowed_extensions\":[\".json\",\".md\"],\"dir\":\"/tmp/gh-aw/repo-memory/default\",\"file_glob\":\"git-sim-state.json git-sim-strategies.md\",\"id\":\"default\",\"max_file_count\":100,\"max_file_size\":204800,\"max_patch_size\":10240,\"validation\":{\"script\":\"if (memoryPhase === \\\"push\\\" && memorySourceJobResult !== \\\"success\\\") {\\n  throw new Error(\\\"Simulator memory publication requires successful final evidence preparation\\\");\\n}\\nreturn true;\\n\",\"script_required\":true,\"timeout\":60}}]},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
         with:
           script: |
             const path = require('path');
@@ -910,9 +909,7 @@ jobs:
           GH_AW_TOOLS_META_JSON: |
             {
               "description_suffixes": {
-                "create_issue": " CONSTRAINTS: Maximum 10 issue(s) can be created. Title will be prefixed with \"[git-sim] \". Labels [\"git-simulator\" \"safe-outputs\" \"automated\"] will be automatically added. Maximum 10 artifact(s) can be attached per issue. Maximum artifact body size: 1048576 UTF-8 bytes.",
-                "create_pull_request": " CONSTRAINTS: Maximum 1 pull request(s) can be created. Title will be prefixed with \"[git-sim] \". Labels [\"git-sim-probe\" \"automated\"] will be automatically added. PRs will be created as drafts.",
-                "push_to_pull_request_branch": " CONSTRAINTS: The target pull request title must start with \"[git-sim] \"."
+                "create_issue": " CONSTRAINTS: Maximum 4 issue(s) can be created. Title will be prefixed with \"[git-sim] \". Labels [\"git-simulator\" \"safe-outputs\" \"automated\"] will be automatically added. Maximum 10 artifact(s) can be attached per issue. Maximum artifact body size: 1048576 UTF-8 bytes."
               },
               "repo_params": {},
               "dynamic_tools": []
@@ -961,65 +958,6 @@ jobs:
                 },
                 "collapseData": true
               },
-              "create_pull_request": {
-                "defaultMax": 1,
-                "fields": {
-                  "base": {
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 128
-                  },
-                  "body": {
-                    "required": true,
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 65000
-                  },
-                  "branch": {
-                    "required": true,
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 256
-                  },
-                  "dependencies": {
-                    "type": "array",
-                    "itemType": "string",
-                    "itemSanitize": true,
-                    "itemMaxLength": 256
-                  },
-                  "draft": {
-                    "type": "boolean"
-                  },
-                  "labels": {
-                    "type": "array",
-                    "itemType": "string",
-                    "itemSanitize": true,
-                    "itemMaxLength": 128
-                  },
-                  "repo": {
-                    "type": "string",
-                    "maxLength": 256
-                  },
-                  "stack_position": {
-                    "optionalPositiveInteger": true
-                  },
-                  "stack_root": {
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 256
-                  },
-                  "temporary_id": {
-                    "type": "string",
-                    "pattern": "^#?aw_[A-Za-z0-9_]{3,12}$"
-                  },
-                  "title": {
-                    "required": true,
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 128
-                  }
-                }
-              },
               "noop": {
                 "defaultMax": 2,
                 "fields": {
@@ -1038,29 +976,6 @@ jobs:
                     "type": "string",
                     "sanitize": true,
                     "maxLength": 128
-                  }
-                }
-              },
-              "push_to_pull_request_branch": {
-                "defaultMax": 1,
-                "fields": {
-                  "branch": {
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 256
-                  },
-                  "message": {
-                    "required": true,
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 65000
-                  },
-                  "pull_request_number": {
-                    "issueOrPRNumber": true
-                  },
-                  "repo": {
-                    "type": "string",
-                    "maxLength": 256
                   }
                 }
               },
@@ -1826,9 +1741,8 @@ jobs:
     permissions:
       actions: read # Read workflow runs and artifacts for workflow context.
       checks: read # Read check runs for workflow context.
-      contents: write # Create or update repository contents.
       issues: write # Create or update issues and comments.
-      pull-requests: write # Create or update pull requests and review comments.
+      pull-requests: read # Read pull requests and review comments for workflow context.
     concurrency:
       group: "gh-aw-conclusion-daily-safeoutputs-git-simulator"
       cancel-in-progress: false
@@ -2061,8 +1975,6 @@ jobs:
           GH_AW_SHELL_EXPANSION_GUARD_REJECTED: ${{ needs.agent.outputs.shell_expansion_guard_rejected }}
           GH_AW_ENGINE_API_HOSTS: "api.enterprise.githubcopilot.com,api.githubcopilot.com,api.business.githubcopilot.com,api.individual.githubcopilot.com"
           GH_AW_FAILURE_ISSUE_NUMBER: ${{ needs.activation.outputs.steering_issue_number }}
-          GH_AW_CODE_PUSH_FAILURE_ERRORS: ${{ needs.safe_outputs.outputs.code_push_failure_errors }}
-          GH_AW_CODE_PUSH_FAILURE_COUNT: ${{ needs.safe_outputs.outputs.code_push_failure_count }}
           GH_AW_LOCKDOWN_CHECK_FAILED: ${{ needs.activation.outputs.lockdown_check_failed }}
           GH_AW_OAUTH_TOKEN_CHECK_FAILED: ${{ needs.activation.outputs.oauth_token_check_failed }}
           GH_AW_STALE_LOCK_FILE_FAILED: ${{ needs.activation.outputs.stale_lock_file_failed }}
@@ -2289,7 +2201,7 @@ jobs:
           GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
           GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
           GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
-          GH_AW_ADMISSION_WORKFLOW_HASH: "155e3468a9a6f233e7a6c2fce67a2291848a4834b02c909126ba6323e6b95a0f:7f46b25185b1a521aaa36eeb33380e2c2807d0508b2c0e7a4d54583103729fc4"
+          GH_AW_ADMISSION_WORKFLOW_HASH: "c588aba601f7f1d11bdfcffad89cb0268a26cb4e7caa086ae1fcfd6cd8f520c2:914e1e93d8579522e6d99f0ba9e1fcd9123dba995cba88e2fb038fc0ae53a0a1"
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
@@ -2424,7 +2336,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           WORKFLOW_NAME: "Daily Safe Outputs Git Simulator"
-          WORKFLOW_DESCRIPTION: "Daily synthetic tester that exhaustively explores the space of git configurations for create-pull-request and push-to-pull-request-branch safe outputs, using Z3-style constraint enumeration, repo-memory persistence, and parallel inline sub-agents to detect systematic issues related to repo size, history depth, and file count."
+          WORKFLOW_DESCRIPTION: "Daily synthetic tester that exhaustively explores git configurations associated with create-pull-request and push-to-pull-request-branch safe outputs using local repositories, repo-memory persistence, and parallel inline sub-agents."
           HAS_PATCH: ${{ needs.agent.outputs.has_patch }}
           GH_AW_DETECTION_CONTINUE_ON_ERROR: "true"
           GH_AW_DETECTION_SKIP_PROMPT_SUMMARY: "true"
@@ -2502,7 +2414,7 @@ jobs:
           S2STOKENS: true
           TRACEPARENT: ${{ env.GITHUB_AW_OTEL_TRACE_ID != '' && env.GITHUB_AW_OTEL_PARENT_SPAN_ID != '' && format('00-{0}-{1}-01', env.GITHUB_AW_OTEL_TRACE_ID, env.GITHUB_AW_OTEL_PARENT_SPAN_ID) || '' }}
           WORKFLOW_NAME: "Daily Safe Outputs Git Simulator"
-          WORKFLOW_DESCRIPTION: "Daily synthetic tester that exhaustively explores the space of git configurations for create-pull-request and push-to-pull-request-branch safe outputs, using Z3-style constraint enumeration, repo-memory persistence, and parallel inline sub-agents to detect systematic issues related to repo size, history depth, and file count."
+          WORKFLOW_DESCRIPTION: "Daily synthetic tester that exhaustively explores git configurations associated with create-pull-request and push-to-pull-request-branch safe outputs using local repositories, repo-memory persistence, and parallel inline sub-agents."
           HAS_PATCH: ${{ needs.agent.outputs.has_patch }}
           GH_AW_DETECTION_CONTINUE_ON_ERROR: "true"
           GH_AW_DETECTION_INPUT_DIR: "/tmp/gh-aw/threat-detection-inputs"
@@ -2749,7 +2661,7 @@ jobs:
           GH_AW_DECISIONS_BASE_URL: https://api.githubcopilot.com/v1
           GH_AW_DECISIONS_API_KEY: ${{ github.token }}
           GH_AW_DECISIONS_PROVIDER: github-copilot
-          GH_AW_EVALS_QUESTIONS: '[{"id":"git_scenarios_simulated","question":"Did the agent simulate git configurations for create-pull-request and push-to-pull-request-branch safe outputs?"},{"id":"simulator_findings_reported","question":"Did the agent report the simulator results and any systematic safe-output issues it found?"}]'
+          GH_AW_EVALS_QUESTIONS: '[{"id":"git_scenarios_simulated","question":"Did the agent simulate git configurations associated with create-pull-request and push-to-pull-request-branch using local repositories only?"},{"id":"simulator_findings_reported","question":"Did the agent report the simulator results and any systematic git-state issues it found?"}]'
           GH_AW_EVALS_MODEL: "copilot/gpt-6-luna-decisions"
         with:
           script: |
@@ -2764,7 +2676,7 @@ jobs:
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          GH_AW_EVALS_QUESTIONS: '[{"id":"git_scenarios_simulated","question":"Did the agent simulate git configurations for create-pull-request and push-to-pull-request-branch safe outputs?"},{"id":"simulator_findings_reported","question":"Did the agent report the simulator results and any systematic safe-output issues it found?"}]'
+          GH_AW_EVALS_QUESTIONS: '[{"id":"git_scenarios_simulated","question":"Did the agent simulate git configurations associated with create-pull-request and push-to-pull-request-branch using local repositories only?"},{"id":"simulator_findings_reported","question":"Did the agent report the simulator results and any systematic git-state issues it found?"}]'
           GH_AW_EVALS_MODEL: "copilot/gpt-6-luna-decisions"
           GH_AW_EVALS_PHASE: parse
           GH_AW_EVALS_EXECUTION_OUTCOME: ${{ steps.evals_decisions_execution.outcome }}
@@ -3058,13 +2970,11 @@ jobs:
       - agent
       - detection
     if: (!cancelled()) && needs.agent.result != 'skipped' && needs.detection.result == 'success'
-    runs-on: ubuntu-latest # Safe-output code publication checks out repository files; ubuntu-slim is limited to 15 minutes.
+    runs-on: ubuntu-slim
     # Permissions for the safe_outputs job (workflow permissions default to none).
     permissions:
-      contents: write # Create or update repository contents.
       issues: write # Create or update issues and comments.
-      pull-requests: write # Create or update pull requests and review comments.
-    timeout-minutes: 45
+    timeout-minutes: 15
     env:
       GH_AW_AGENT_AIC: ${{ needs.agent.outputs.aic }}
       GH_AW_AIC: ${{ needs.agent.outputs.aic }}
@@ -3090,15 +3000,12 @@ jobs:
       GH_AW_WORKFLOW_NAME: "Daily Safe Outputs Git Simulator"
       GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-safeoutputs-git-simulator.md"
     outputs:
-      activation_comment_links: ${{ steps.process_safe_outputs.outputs.activation_comment_links }}
       code_push_failure_count: ${{ steps.process_safe_outputs.outputs.code_push_failure_count }}
       code_push_failure_errors: ${{ steps.process_safe_outputs.outputs.code_push_failure_errors }}
       create_discussion_error_count: ${{ steps.process_safe_outputs.outputs.create_discussion_error_count }}
       create_discussion_errors: ${{ steps.process_safe_outputs.outputs.create_discussion_errors }}
       created_issue_number: ${{ steps.process_safe_outputs.outputs.created_issue_number }}
       created_issue_url: ${{ steps.process_safe_outputs.outputs.created_issue_url }}
-      created_pr_number: ${{ steps.process_safe_outputs.outputs.created_pr_number }}
-      created_pr_url: ${{ steps.process_safe_outputs.outputs.created_pr_url }}
       process_safe_outputs_items_applied: ${{ steps.process_safe_outputs.outputs.items_applied }}
       process_safe_outputs_items_cancelled: ${{ steps.process_safe_outputs.outputs.items_cancelled }}
       process_safe_outputs_items_deferred: ${{ steps.process_safe_outputs.outputs.items_deferred }}
@@ -3108,8 +3015,6 @@ jobs:
       process_safe_outputs_items_warnings: ${{ steps.process_safe_outputs.outputs.items_warnings }}
       process_safe_outputs_processed_count: ${{ steps.process_safe_outputs.outputs.processed_count }}
       process_safe_outputs_status: ${{ steps.process_safe_outputs.outputs.status }}
-      push_commit_sha: ${{ steps.process_safe_outputs.outputs.push_commit_sha }}
-      push_commit_url: ${{ steps.process_safe_outputs.outputs.push_commit_url }}
     steps:
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -3154,53 +3059,6 @@ jobs:
           if [ -f "/tmp/gh-aw/agent_output.json" ]; then
             echo "GH_AW_AGENT_OUTPUT=/tmp/gh-aw/agent_output.json" >> "$GITHUB_OUTPUT"
           fi
-      - name: Download patch artifact
-        continue-on-error: true
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: agent
-          path: /tmp/gh-aw/
-      - name: Checkout repository (gh-aw default)
-        if: (!cancelled()) && needs.agent.result != 'skipped' && contains(needs.agent.outputs.output_types, 'create_pull_request') || (!cancelled()) && needs.agent.result != 'skipped' && contains(needs.agent.outputs.output_types, 'push_to_pull_request_branch')
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: true
-          fetch-depth: 0
-          token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-      - name: Fetch additional refs
-        if: (!cancelled()) && needs.agent.result != 'skipped' && contains(needs.agent.outputs.output_types, 'create_pull_request') || (!cancelled()) && needs.agent.result != 'skipped' && contains(needs.agent.outputs.output_types, 'push_to_pull_request_branch')
-        env:
-          GH_AW_FETCH_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-        run: |
-          set -o pipefail
-          header=$(printf "x-access-token:%s" "${GH_AW_FETCH_TOKEN}" | base64 -w 0)
-          refspecs=('+refs/heads/*:refs/remotes/origin/*')
-          for refspec in "${refspecs[@]}"; do
-            source_ref=${refspec%%:*}
-            source_ref=${source_ref#+}
-            if matched=$(git -c "http.extraheader=Authorization: Basic ${header}" ls-remote --exit-code origin "$source_ref" | {
-              found=0
-              while read -r _ remote_ref; do
-                # Match the configured ref glob, not a literal string.
-                # shellcheck disable=SC2254
-                case "$remote_ref" in ($source_ref) found=1 ;; esac
-              done
-              printf '%s' "$found"
-            }); then
-              if [ "$matched" -eq 0 ]; then continue; fi
-              git -c "http.extraheader=Authorization: Basic ${header}" fetch origin "$refspec"
-            else
-              status=$?
-              if [ "$status" -ne 2 ]; then exit "$status"; fi
-            fi
-          done
-      - name: Configure Git credentials
-        if: (!cancelled()) && needs.agent.result != 'skipped' && contains(needs.agent.outputs.output_types, 'create_pull_request') || (!cancelled()) && needs.agent.result != 'skipped' && contains(needs.agent.outputs.output_types, 'push_to_pull_request_branch')
-        env:
-          GH_AW_GIT_REPOSITORY: ${{ github.repository }}
-          GITHUB_SERVER_URL: ${{ github.server_url }}
-          GIT_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-        run: bash "${RUNNER_TEMP}/gh-aw/actions/configure_git_credentials.sh"
       - name: Configure GH_HOST for enterprise compatibility
         id: ghes-host-config
         shell: bash
@@ -3221,8 +3079,7 @@ jobs:
           GH_AW_ALLOWED_DOMAINS: "*.pythonhosted.org,anaconda.org,archive.ubuntu.com,azure.archive.ubuntu.com,binstar.org,bootstrap.pypa.io,conda.anaconda.org,conda.binstar.org,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,files.pythonhosted.org,json-schema.org,json.schemastore.org,keyserver.ubuntu.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,pip.pypa.io,pypi.org,pypi.python.org,repo.anaconda.com,repo.continuum.io,s.symcb.com,s.symcd.com,security.ubuntu.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com"
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"close_older_issues\":false,\"deduplicate_by_title\":3,\"labels\":[\"git-simulator\",\"safe-outputs\",\"automated\"],\"max\":10,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10,\"title_prefix\":\"[git-sim] \"},\"create_pull_request\":{\"allowed_files\":[\"sim/**\",\"stuff.md\",\"history.md\"],\"draft\":true,\"expires\":24,\"if_no_changes\":\"warn\",\"labels\":[\"git-sim-probe\",\"automated\"],\"max\":1,\"max_patch_files\":200,\"max_patch_size\":5120,\"protect_top_level_dot_folders\":true,\"protected_files\":[\"package.json\",\"bun.lockb\",\"bunfig.toml\",\"deno.json\",\"deno.jsonc\",\"deno.lock\",\"global.json\",\"NuGet.Config\",\"Directory.Packages.props\",\"mix.exs\",\"mix.lock\",\"go.mod\",\"go.sum\",\"stack.yaml\",\"stack.yaml.lock\",\"pom.xml\",\"build.gradle\",\"build.gradle.kts\",\"settings.gradle\",\"settings.gradle.kts\",\"gradle.properties\",\"package-lock.json\",\"yarn.lock\",\"pnpm-lock.yaml\",\"npm-shrinkwrap.json\",\"requirements.txt\",\"Pipfile\",\"Pipfile.lock\",\"pyproject.toml\",\"setup.py\",\"setup.cfg\",\"Gemfile\",\"Gemfile.lock\",\"uv.lock\",\"CODEOWNERS\",\"DESIGN.md\",\"README.md\",\"CONTRIBUTING.md\",\"SECURITY.md\",\"CODE_OF_CONDUCT.md\",\"CLAUDE.md\",\"AGENTS.md\"],\"protected_files_path_exclude\":[\".changeset/*.md\"],\"protected_files_policy\":\"request-review\",\"title_prefix\":\"[git-sim] \"},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"push_to_pull_request_branch\":{\"allowed_files\":[\"sim/**\",\"stuff.md\",\"history.md\"],\"if_no_changes\":\"ignore\",\"max_patch_size\":5120,\"protect_top_level_dot_folders\":true,\"protected_files\":[\"package.json\",\"bun.lockb\",\"bunfig.toml\",\"deno.json\",\"deno.jsonc\",\"deno.lock\",\"global.json\",\"NuGet.Config\",\"Directory.Packages.props\",\"mix.exs\",\"mix.lock\",\"go.mod\",\"go.sum\",\"stack.yaml\",\"stack.yaml.lock\",\"pom.xml\",\"build.gradle\",\"build.gradle.kts\",\"settings.gradle\",\"settings.gradle.kts\",\"gradle.properties\",\"package-lock.json\",\"yarn.lock\",\"pnpm-lock.yaml\",\"npm-shrinkwrap.json\",\"requirements.txt\",\"Pipfile\",\"Pipfile.lock\",\"pyproject.toml\",\"setup.py\",\"setup.cfg\",\"Gemfile\",\"Gemfile.lock\",\"uv.lock\",\"CODEOWNERS\",\"DESIGN.md\",\"README.md\",\"CONTRIBUTING.md\",\"SECURITY.md\",\"CODE_OF_CONDUCT.md\",\"CLAUDE.md\",\"AGENTS.md\"],\"protected_files_path_exclude\":[\".changeset/*.md\"],\"protected_files_policy\":\"request-review\",\"required_labels\":[\"git-sim-probe\",\"automated\"],\"target\":\"*\",\"title_prefix\":\"[git-sim] \"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
-          GH_AW_CI_TRIGGER_TOKEN: ${{ secrets.GH_AW_CI_TRIGGER_TOKEN }}
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"close_older_issues\":false,\"deduplicate_by_title\":3,\"labels\":[\"git-simulator\",\"safe-outputs\",\"automated\"],\"max\":4,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10,\"title_prefix\":\"[git-sim] \"},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
           GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
@@ -3245,14 +3102,3 @@ jobs:
             /tmp/gh-aw/safe-output-errors.json
           if-no-files-found: ignore
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
-      - name: Restore actions folder
-        if: always()
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: github/gh-aw
-          sparse-checkout: |
-            actions/setup
-          sparse-checkout-cone-mode: true
-          fetch-depth: 1
-          clean: false
-          persist-credentials: false

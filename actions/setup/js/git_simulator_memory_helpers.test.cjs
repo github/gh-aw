@@ -201,8 +201,7 @@ function isolateMemory({ memoryDir, workspace, notes = [], outputPath, privateGi
     fs.mkdirSync(path.dirname(privateGitDir), { recursive: true });
     fs.cpSync(gitDir, privateGitDir, { recursive: true, errorOnExist: true, force: false });
     fs.rmSync(gitDir, { recursive: true });
-    // The host-side memory publisher needs Git history, but the agent must not read old narrative blobs.
-    fs.writeFileSync(gitDir, `gitdir: ${privateGitDir}\n`);
+    // Keep old Git history outside the agent-visible memory directory until trusted post-agent preparation.
   }
   // No restored narrative, vote reason, citation text, or arbitrary state string reaches the model.
   for (const name of fs.readdirSync(memoryDir)) {
