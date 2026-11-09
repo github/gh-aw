@@ -219,26 +219,34 @@ func (c *Compiler) applyDefaultModelRouting(ctx *workflowBuildContext) {
 	}
 	data := ctx.workflowData
 	if reason := defaultModelRoutingIneligibility(data); reason != "" {
-		modelRoutingDefaultLog.Printf("Implicit model routing not applied: %s", reason)
+		modelRoutingDefaultLog.Printf("Implicit model routing not applied to %s: %s", filepath.Base(ctx.cleanPath), reason)
 		return
 	}
 	data.EngineConfig.ModelRouting = &CopilotModelRoutingConfig{Goal: defaultModelRoutingGoal, Mode: defaultModelRoutingMode, implicit: true}
 	if reason := defaultModelRoutingValidationFailure(c, data); reason != "" {
 		data.EngineConfig.ModelRouting = nil
-		modelRoutingDefaultLog.Printf("Implicit model routing not applied: %s", reason)
+		modelRoutingDefaultLog.Printf("Implicit model routing not applied to %s: %s", filepath.Base(ctx.cleanPath), reason)
 		return
 	}
-	modelRoutingDefaultLog.Printf("Applied implicit model routing (goal=%s, mode=%s) for engine %s", defaultModelRoutingGoal, defaultModelRoutingMode, data.EngineConfig.ID)
+	modelRoutingDefaultLog.Printf("Applied implicit model routing (goal=%s, mode=%s) to %s for engine %s", defaultModelRoutingGoal, defaultModelRoutingMode, filepath.Base(ctx.cleanPath), data.EngineConfig.ID)
 	if c.batchMode {
-		// Batch compilation summarizes per-workflow notices with the other
-		// experimental features instead of printing one line per workflow.
-		c.featureUsage["default model routing (cost/balanced; opt out with engine.model-routing: false)"]++
+		// Batch compilation prints one aggregated informational notice instead of
+		// one line per workflow.
+		c.defaultRoutingCount++
 		return
 	}
 	if c.quiet {
 		return
 	}
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(defaultModelRoutingNotice(filepath.Base(ctx.cleanPath), data.EngineConfig.ID)))
+}
+
+// DefaultModelRoutingBatchNotice is the aggregated informational notice for
+// workflows that received the implicit model-routing default in batch mode.
+func DefaultModelRoutingBatchNotice(count int) string {
+	return fmt.Sprintf("%d workflow(s) set no model or engine.model-routing, so they use model routing with goal %s and mode %s on GitHub Copilot inference. "+
+		"Set engine.model-routing: false to opt out, or choose a model. A nonempty vars.GH_AW_MODEL_AGENT_<ENGINE> or vars.GH_AW_DEFAULT_MODEL_<ENGINE> bypasses routing at run time. "+
+		"See https://github.github.com/gh-aw/reference/model-routing/", count, defaultModelRoutingGoal, defaultModelRoutingMode)
 }
 
 func defaultModelRoutingNotice(workflowFile, engineID string) string {

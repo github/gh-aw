@@ -16,6 +16,8 @@ For first-time setup, see [Using Pi](/gh-aw/engines/pi/). Shared options are in 
 
 The default Pi version is `1.3.0`. Copilot defaults to `copilot/auto` with the gateway; native execution without the gateway retains `copilot/gpt-5.4`. `auto` delegates selection to the gateway and need not appear in its concrete-model inventory. OpenAI/Codex routes use the Responses API, not Chat Completions.
 
+Without a `model`, `engine.model`, or `engine.model-routing`, Pi on GitHub Copilot inference uses [model routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model) with `goal: cost` and `mode: balanced` for its main agent. Pi has no model variables, so this default isn't bypassed at run time; set `engine.model-routing: false` to opt out, or set a model.
+
 Threat detection defaults to Copilot regardless of Pi's provider. Supply its separate Copilot credential or [configure another detection engine](/gh-aw/reference/threat-detection/).
 
 ## Capabilities and limitations

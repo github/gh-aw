@@ -64,6 +64,12 @@ func (c *Compiler) CopilotRequestsTipNeeded() bool {
 	return c.copilotTipNeeded
 }
 
+// DefaultModelRoutingWorkflowCount returns how many workflows compiled in batch
+// mode received the implicit cost/balanced model-routing default.
+func (c *Compiler) DefaultModelRoutingWorkflowCount() int {
+	return c.defaultRoutingCount
+}
+
 // SetExperimentalFeatureUsage replaces the experimental feature usage map.
 // Intended for use in tests that need to exercise aggregation output.
 func (c *Compiler) SetExperimentalFeatureUsage(usage map[string]int) {
