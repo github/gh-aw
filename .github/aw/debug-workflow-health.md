@@ -30,7 +30,10 @@ stderr. Increase the budget or narrow the scope when more evidence is needed.
 Use available health evidence when the CLI is unavailable; do not assume that
 an MCP equivalent exists without discovering its actual schema.
 
-Health inventories registered AW `failure` conclusions from run-list payloads before
+Health scans the repository's default branch before PR and other branches.
+Check `collection.default_branch` and `default_branch_pass_complete`; PR failures
+may reflect unmerged code rather than a default-branch regression. Within each
+branch pass, health inventories registered AW `failure` conclusions from run-list payloads before
 any job or revision lookups, then verifies one job-backed representative per
 branch/event. `collection.potential_issues` are approximate, list-only signals;
 they may include jobless, historical, or superseded failures. Check each
@@ -40,8 +43,9 @@ covers representative verification. Counts survive budget exhaustion even if
 verification is unfinished. The later chronological pass adds successful and
 pending evidence, prioritizing recently failing workflows. A truncated sample is
 not a fleet failure rate or proof that remaining workflows are healthy.
-The inventory keeps up to five candidates per workflow and stops when every
-registered workflow reaches that count or after ten pages. The page cap marks
+The inventory keeps up to five candidates per workflow across both passes,
+prioritizing default-branch failures, and stops when every
+registered workflow reaches that count or after ten pages shared across passes. The page cap marks
 collection partial while leaving chronological sampling available.
 It samples backward per AW toward five completed first-attempt runs, bounded by
 `--days` and API quota.
