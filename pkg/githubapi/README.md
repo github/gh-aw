@@ -8,6 +8,13 @@ The `githubapi` package produces an `api.ClientOptions` value pre-populated with
 
 ## Public API
 
+### Types
+
+| Type | Kind | Description |
+|------|------|-------------|
+| `HTTPStatusError` | struct | Non-200 public GitHub API response; exposes `StatusCode` and trimmed response `Body`. |
+| `ResponseTooLargeError` | struct | Public GitHub API response exceeding the read limit; exposes the byte `Limit`. |
+
 ### Functions
 
 | Function | Signature | Description |
@@ -36,6 +43,13 @@ Returns an `api.ClientOptions` struct suitable for passing to `api.NewRESTClient
 - MUST set `Host` to the provided `host` value.
 - MUST set `AuthToken` to the provided `authToken` value.
 - MUST set `Timeout` to `constants.DefaultHTTPClientTimeout`.
+
+### Methods
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `HTTPStatusError.Error` | `func (e *HTTPStatusError) Error() string` | Formats the status and trimmed response body as `GitHub API returned <status>: <body>`. |
+| `ResponseTooLargeError.Error` | `func (e *ResponseTooLargeError) Error() string` | Reports that the public GitHub API response exceeds the configured byte limit. |
 
 ## Usage Examples
 
