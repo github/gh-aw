@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "fs";
+import { createHash } from "node:crypto";
 
 // Mock the global objects that GitHub Actions provides
 const mockCore = {
@@ -184,6 +185,43 @@ describe("generate_aw_info.cjs", () => {
     expect(awInfo.firewall_enabled).toBe(false);
     expect(awInfo.features).toBeUndefined();
     expect(awInfo.created_at).toBeTruthy();
+  });
+
+  it("keeps compiler metadata in aw_info.json without dumping it to Actions logs", async () => {
+    const agent = { name: "private-agent", description: "confidential-agent-description", model: "private-model", tools: ["confidential-tool"] };
+    const pins = { "private-model": "confidential-model-pin" };
+    const digest = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");
+    const agentDigest = digest(agent);
+    const pinsDigest = digest(pins);
+    const errorDigest = digest("invalid-agent-source");
+    const manifest = {
+      version: 1,
+      agent_metadata: { [agentDigest]: agent, [errorDigest]: null },
+      model_pins: { [pinsDigest]: pins },
+      metadata_errors: { [`artifact:${errorDigest}`]: "confidential-compiler-error" },
+    };
+    mockGithub.rest.repos.getContent.mockImplementationOnce(async ({ path }) => ({
+      data: { type: "file", path, encoding: "base64", content: Buffer.from(`# gh-aw-metadata: {}\n# gh-aw-manifest: ${JSON.stringify(manifest)}\n# compiled fixture\n`).toString("base64") },
+    }));
+
+    await main(mockCore, mockContext);
+
+    const awInfo = JSON.parse(fs.readFileSync(awInfoPath, "utf8"));
+    expect(awInfo).toMatchObject({
+      agent_metadata: manifest.agent_metadata,
+      model_pins: manifest.model_pins,
+      metadata_errors: manifest.metadata_errors,
+      engine_id: "copilot",
+      run_id: mockContext.runId,
+    });
+    expect(mockGithub.rest.repos.getContent).toHaveBeenCalledWith(expect.objectContaining({ ref: process.env.GH_AW_INFO_WORKFLOW_SHA }));
+    expect(mockCore.setOutput).toHaveBeenCalledWith("model", "gpt-4");
+    expect(mockCore.setOutput).toHaveBeenCalledWith("engine_id", "copilot");
+    expect(mockCore.info).toHaveBeenCalledWith("Generated aw_info.json at: " + awInfoPath);
+    const logs = [mockCore.info, mockCore.debug, mockCore.warning, mockCore.error].flatMap(log => log.mock.calls.flat()).join("\n");
+    for (const value of ["agent_metadata", "model_pins", "metadata_errors", agent.name, agent.description, agent.model, ...agent.tools, ...Object.values(pins), ...Object.values(manifest.metadata_errors)]) {
+      expect(logs).not.toContain(value);
+    }
   });
 
   it("records the executing reusable workflow separately from its caller in the same run", async () => {

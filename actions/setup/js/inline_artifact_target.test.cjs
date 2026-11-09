@@ -6,6 +6,7 @@ import path from "node:path";
 const { inlineArtifactTarget } = await import("./inline_artifact_target.cjs");
 const { writeInlineSubAgents } = await import("./extract_inline_sub_agents.cjs");
 const { writeInlineSkills } = await import("./extract_inline_skills.cjs");
+const { prepareMarkdownFixtures } = await import("../../../scripts/markdown_metadata_test_adapter.cjs");
 let dir;
 
 beforeEach(() => {
@@ -20,9 +21,13 @@ afterEach(() => {
 
 describe("compiler-owned inline artifact targets", () => {
   it("stages pi agents and skills where activation uploads them", () => {
-    writeInlineSubAgents("Main.\n## agent: `reader`\n---\ndescription: Reads files\n---\nRead.", dir, dir, "pi");
+    const content = "Main.\n## agent: `reader`\n---\ndescription: Reads files\n---\nRead.";
+    prepareMarkdownFixtures(content);
+    writeInlineSubAgents(content, dir, dir, "pi");
     writeInlineSkills("Main.\n## skill: `report`\n---\ndescription: Reports facts\n---\nReport.", dir, dir, "pi");
     expect(fs.existsSync(path.join(dir, ".pi/agents/reader.md"))).toBe(true);
+    const agent = fs.readFileSync(path.join(dir, ".pi/agents/reader.md"), "utf8");
+    expect(agent).toBe("---\ndescription: Reads files\n---\nRead.\n");
     expect(fs.existsSync(path.join(dir, ".pi/skills/report/SKILL.md"))).toBe(true);
   });
 

@@ -11,7 +11,7 @@ const { writeMergedModelsJSON } = require("./merge_frontmatter_models.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_CONFIG, ERR_SYSTEM } = require("./error_codes.cjs");
 const { buildWorkflowCallId, normalizeLegacyWorkQueueContext, normalizeWorkQueueContext, resolveWorkQueueRuntime, readInboundAwContext } = require("./aw_context.cjs");
-const { normalizeWebhookContext, redactWebhookPayloads } = require("./webhook_context.cjs");
+const { normalizeWebhookContext } = require("./webhook_context.cjs");
 const { normalizeEngineHarness, parseCompiledModelConfig } = require("./routing_analytics.cjs");
 
 /**
@@ -351,7 +351,6 @@ async function main(core, ctx, githubClient) {
   }
 
   core.info("Generated aw_info.json at: " + tmpPath);
-  core.info(JSON.stringify({ ...awInfo, ...(awInfo.context ? { context: redactWebhookPayloads(awInfo.context) } : {}) }, null, 2));
 
   // Set model and engine_id as outputs for reuse in other steps/jobs
   core.setOutput("model", awInfo.model);
