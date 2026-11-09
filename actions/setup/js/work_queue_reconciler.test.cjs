@@ -33,6 +33,94 @@ function expectFenced(fixture, post) {
 }
 
 describe("native discovery with delayed attempt correlation", () => {
+  it.each([404, 500])("retains the returned run hint after a transient HTTP %s outside the discovery window", async status => {
+    const { fixture, options, post, list } = setup(policy => {
+      policy.pools.default.reconciliation.max_attempts = 2;
+    });
+    const read = vi
+      .fn()
+      .mockRejectedValueOnce(Object.assign(new Error("native read unavailable"), { status }))
+      .mockResolvedValue({ status: 200, data: fixture.nativeRun() });
+    fixture.githubClient.rest.actions.getWorkflowRunAttempt = read;
+    list.mockResolvedValue({ status: 200, data: { workflow_runs: [] } });
+    const sleepFn = vi.fn(async () => expectFenced(fixture, post));
+
+    expect(await reconcileDispatch({ ...options, returnedRunId: "42", sleepFn })).toMatchObject({ state: "bound", run_id: "42", released: false });
+    expect(sleepFn).toHaveBeenCalledExactlyOnceWith(50);
+    expect(read).toHaveBeenCalledTimes(3);
+    expect(read.mock.calls.every(([parameters]) => parameters.run_id === "42" && parameters.attempt_number === 1 && parameters.request.retries === 0)).toBe(true);
+    expect(list).toHaveBeenCalledTimes(1);
+    expect(fixture.transactions.flatMap(commit => commit.operations).filter(operation => operation.kind === "Dispatch" && operation.state === "bound")).toHaveLength(1);
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it("retains a discovered pending run hint across a subsequent transient failure", async () => {
+    const { fixture, options, post, list } = setup(policy => {
+      policy.pools.default.reconciliation.max_attempts = 3;
+    });
+    const read = vi
+      .fn()
+      .mockResolvedValueOnce({ status: 200, data: { ...fixture.nativeRun(), display_title: "worker" } })
+      .mockRejectedValueOnce(Object.assign(new Error("native read unavailable"), { status: 500 }))
+      .mockResolvedValue({ status: 200, data: fixture.nativeRun() });
+    fixture.githubClient.rest.actions.getWorkflowRunAttempt = read;
+    list.mockResolvedValueOnce({ status: 200, data: { workflow_runs: [fixture.nativeRun()] } }).mockResolvedValue({ status: 200, data: { workflow_runs: [] } });
+    const sleepFn = vi.fn(async () => expectFenced(fixture, post));
+
+    expect(await reconcileDispatch({ ...options, sleepFn })).toMatchObject({ state: "bound", run_id: "42", released: false });
+    expect(sleepFn.mock.calls).toEqual([[1000], [100]]);
+    expect(read).toHaveBeenCalledTimes(4);
+    expect(read.mock.calls.every(([parameters]) => parameters.run_id === "42" && parameters.attempt_number === 1 && parameters.request.retries === 0)).toBe(true);
+    expect(list).toHaveBeenCalledTimes(2);
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it("keeps an unhinted started launch unresolved when discovery cannot find its run", async () => {
+    const { fixture, options, post, list } = setup(policy => {
+      policy.pools.default.reconciliation.max_attempts = 2;
+    });
+    const read = vi.fn();
+    fixture.githubClient.rest.actions.getWorkflowRunAttempt = read;
+    list.mockResolvedValue({ status: 200, data: { workflow_runs: [] } });
+
+    expect(await reconcileDispatch(options)).toMatchObject({ state: "launch_unresolved", released: false, attempts: 2 });
+    expect(list).toHaveBeenCalledTimes(2);
+    expect(read).not.toHaveBeenCalled();
+    expectFenced(fixture, post);
+  });
+
+  it("keeps an exact valid hint fenced when two full discovery pages overflow", async () => {
+    const { fixture, options, post, list } = setup();
+    const read = vi.fn().mockResolvedValue({ status: 200, data: fixture.nativeRun() });
+    fixture.githubClient.rest.actions.getWorkflowRunAttempt = read;
+    list.mockImplementation(async ({ page }) => ({
+      status: 200,
+      data: { workflow_runs: Array.from({ length: 50 }, (_, index) => ({ ...fixture.nativeRun(), id: String(100 + (page - 1) * 50 + index), display_title: "unrelated dispatch" })) },
+    }));
+
+    expect(await reconcileDispatch({ ...options, returnedRunId: "42" })).toEqual({ state: "run_binding_conflict", released: false });
+    expect(read).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ run_id: "42", attempt_number: 1 }));
+    expect(list).toHaveBeenCalledTimes(2);
+    expect(list.mock.calls.map(([parameters]) => ({ page: parameters.page, per_page: parameters.per_page }))).toEqual([
+      { page: 1, per_page: 50 },
+      { page: 2, per_page: 50 },
+    ]);
+    expectFenced(fixture, post);
+  });
+
+  it.each([{ status: 404 }, { status: 500 }, { head_sha: "b".repeat(40) }, { actor: { id: "99" } }, { run_attempt: 2 }])("keeps a repeatedly unavailable or invalid hinted run fenced within the retry budget: %j", async override => {
+    const { fixture, options, post, list } = setup(policy => {
+      policy.pools.default.reconciliation.max_attempts = 2;
+    });
+    const read = override.status ? vi.fn().mockRejectedValue(Object.assign(new Error("native read unavailable"), { status: override.status })) : vi.fn().mockResolvedValue({ status: 200, data: { ...fixture.nativeRun(), ...override } });
+    fixture.githubClient.rest.actions.getWorkflowRunAttempt = read;
+
+    expect(await reconcileDispatch({ ...options, returnedRunId: "42" })).toMatchObject({ state: "launch_unresolved", released: false, attempts: 2 });
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(list).not.toHaveBeenCalled();
+    expectFenced(fixture, post);
+  });
+
   it("returns a title-pending run separately from validated candidates and conflicts", async () => {
     const { fixture, options, expected } = setup();
     const read = vi.fn().mockResolvedValue({ ...fixture.nativeRun(), display_title: "worker" });

@@ -208,9 +208,9 @@ async function reconcileDispatchImpl(options) {
       log.failure("dispatch.reconcile.attempt_failed", error);
       if (error?.code === "run_binding_conflict" || error?.message === "run_binding_conflict") return { state: "run_binding_conflict", released: false };
       correlationPending = error?.message === "run_correlation_mismatch";
-      // Missing discovery, deadlines and API failures do not establish nonlaunch.
+      // Missing discovery, deadlines and API failures do not establish nonlaunch
+      // or invalidate the exact run hint; retain it throughout this retry budget.
     }
-    if (!correlationPending) hint = null;
     if (Date.now() - started >= policy.deadline_ms) {
       log.debug("dispatch.reconcile.deadline_reached", { attempts: attempts + 1 });
       attempts++;
