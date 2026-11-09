@@ -1,6 +1,6 @@
 {
-  "run_id": "42541223254",
-  "run_date": "2026-11-09T00:40:27Z",
+  "run_id": "42573501390",
+  "run_date": "2026-11-09T06:34:18.295351Z",
   "source": "pr-triage",
   "eligible_total": 0,
   "open_copilot_prs": 1,
@@ -12,7 +12,7 @@
   "batches": [],
   "selected_candidates": [],
   "skipped_prs": [
-    75986
+    76157
   ],
-  "summary": "No eligible Copilot PRs remained after the 1-hour cooldown; the only open Copilot PR was updated within the last hour and was skipped for re-triage."
+  "summary": "No eligible Copilot PRs remained after the 1-hour cooldown; all open Copilot PRs were updated within the last hour and were skipped for re-triage."
 }
