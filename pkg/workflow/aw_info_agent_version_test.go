@@ -73,6 +73,19 @@ func TestAgentVersionInAwInfo(t *testing.T) {
 			expectedAgentVersion: string(constants.DefaultPiVersion),
 			description:          "Should use default version when not provided",
 		},
+		{
+			name:                 "Gemini with explicit version",
+			engineID:             "gemini",
+			explicitVersion:      "0.39.1",
+			expectedAgentVersion: "0.39.1",
+			description:          "Should preserve the explicitly pinned Gemini version",
+		},
+		{
+			name:                 "Gemini with default version",
+			engineID:             "gemini",
+			expectedAgentVersion: string(constants.DefaultGeminiVersion),
+			description:          "Unversioned Gemini runs should report the default installation version",
+		},
 	}
 
 	for _, tt := range tests {
@@ -177,6 +190,17 @@ func TestGetInstallationVersion(t *testing.T) {
 			engineID:        "pi",
 			explicitVersion: "",
 			expectedVersion: string(constants.DefaultPiVersion),
+		},
+		{
+			name:            "Gemini with explicit version",
+			engineID:        "gemini",
+			explicitVersion: "0.39.1",
+			expectedVersion: "0.39.1",
+		},
+		{
+			name:            "Gemini without explicit version",
+			engineID:        "gemini",
+			expectedVersion: string(constants.DefaultGeminiVersion),
 		},
 	}
 
