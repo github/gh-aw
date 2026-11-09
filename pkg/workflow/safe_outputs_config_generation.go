@@ -208,18 +208,10 @@ func addSafeJobsConfig(safeOutputsConfig map[string]any, jobs map[string]*SafeJo
 	safeOutputsConfigLog.Printf("Processing %d safe job configurations", len(jobs))
 	for jobName, jobConfig := range jobs {
 		safeOutputsConfigLog.Printf("Generating config for safe job: %s", jobName)
-		safeJobConfig := map[string]any{"supports_dependencies": false}
-		if jobConfig.Description != "" {
-			safeJobConfig["description"] = jobConfig.Description
-		}
+		safeJobConfig := buildSafeToolConfigFields(jobConfig.Description, jobConfig.Max, jobConfig.Inputs)
+		safeJobConfig["supports_dependencies"] = false
 		if jobConfig.Output != "" {
 			safeJobConfig["output"] = jobConfig.Output
-		}
-		if jobConfig.Max > 0 {
-			safeJobConfig["max"] = jobConfig.Max
-		}
-		if inputsConfig := buildSafeOutputInputsConfig(jobConfig.Inputs); inputsConfig != nil {
-			safeJobConfig["inputs"] = inputsConfig
 		}
 		safeOutputsConfig[jobName] = safeJobConfig
 	}
@@ -235,18 +227,22 @@ func addSafeScriptsConfig(safeOutputsConfig map[string]any, scripts map[string]*
 	for scriptName, scriptConfig := range scripts {
 		normalizedName := stringutil.NormalizeSafeOutputIdentifier(scriptName)
 		safeOutputsConfigLog.Printf("Generating config for safe script: %s (normalized: %s)", scriptName, normalizedName)
-		safeScriptConfigMap := map[string]any{}
-		if scriptConfig.Max > 0 {
-			safeScriptConfigMap["max"] = scriptConfig.Max
-		}
-		if scriptConfig.Description != "" {
-			safeScriptConfigMap["description"] = scriptConfig.Description
-		}
-		if inputsConfig := buildSafeOutputInputsConfig(scriptConfig.Inputs); inputsConfig != nil {
-			safeScriptConfigMap["inputs"] = inputsConfig
-		}
-		safeOutputsConfig[normalizedName] = safeScriptConfigMap
+		safeOutputsConfig[normalizedName] = buildSafeToolConfigFields(scriptConfig.Description, scriptConfig.Max, scriptConfig.Inputs)
 	}
+}
+
+func buildSafeToolConfigFields(description string, max int, inputs map[string]*InputDefinition) map[string]any {
+	config := make(map[string]any)
+	if description != "" {
+		config["description"] = description
+	}
+	if max > 0 {
+		config["max"] = max
+	}
+	if inputsConfig := buildSafeOutputInputsConfig(inputs); inputsConfig != nil {
+		config["inputs"] = inputsConfig
+	}
+	return config
 }
 
 // buildSafeOutputInputsConfig converts safe-job/safe-script input definitions into

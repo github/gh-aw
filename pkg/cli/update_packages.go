@@ -10,8 +10,11 @@ import (
 
 	"github.com/github/gh-aw/pkg/fileutil"
 	"github.com/github/gh-aw/pkg/gitutil"
+	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/workflow"
 )
+
+var updatePackagesLog = logger.New("cli:update_packages")
 
 type installedPackageUpdate struct {
 	record         packageOwnershipRecord
@@ -34,6 +37,7 @@ func resolveInstalledPackageUpdates(targets []string) ([]string, []installedPack
 			workflowTargets = append(workflowTargets, target)
 		}
 	}
+	updatePackagesLog.Printf("Resolving update targets: workflows=%d, packages=%d", len(workflowTargets), len(packageTargets))
 	if len(packageTargets) == 0 {
 		return workflowTargets, nil, nil
 	}
@@ -65,6 +69,7 @@ func resolveInstalledPackageUpdates(targets []string) ([]string, []installedPack
 			return nil, nil, err
 		}
 		workflowsDir, engineOverride := packageInstallContext(gitRoot, *record)
+		updatePackagesLog.Printf("Selected installed package %s: workflows=%d, engineOverride=%q", record.Package, len(workflows), engineOverride)
 		packages = append(packages, installedPackageUpdate{
 			record:         *record,
 			workflows:      workflows,
@@ -97,6 +102,7 @@ func findInstalledPackageRecord(records []packageOwnershipRecord, target string)
 				bestMatch = &records[i]
 			}
 		}
+		updatePackagesLog.Printf("Package URL lookup: records=%d, matched=%t", len(records), bestMatch != nil)
 		return bestMatch, true, nil
 	}
 
@@ -170,9 +176,11 @@ func packageWorkflowsFromOwnershipRecord(gitRoot string, record packageOwnership
 		source := readFullSourceFromFile(workflowPath)
 		repoSpec, ok, err := parseManifestSourceSpec(source)
 		if err != nil || !ok || repoSpec == nil {
+			updatePackagesLog.Printf("Skipping %s: no parsable package source spec", entry.Destination)
 			continue
 		}
 		if !strings.EqualFold(repositoryPackageIdentifier(repoSpec.RepoSlug, repoSpec.PackagePath), record.Package) {
+			updatePackagesLog.Printf("Skipping %s: source belongs to a different package", entry.Destination)
 			continue
 		}
 		workflows = append(workflows, &workflowWithSource{

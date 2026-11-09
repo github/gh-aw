@@ -7,7 +7,11 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+
+	"github.com/github/gh-aw/pkg/logger"
 )
+
+var orgRolloutDiscoveryLog = logger.New("cli:org_rollout_discovery")
 
 var orgRolloutAPIFn = runOrgAPI
 
@@ -110,7 +114,9 @@ func discoverEnterpriseOrgs(ctx context.Context, enterprise string) ([]string, e
 		cursor = page.PageInfo.EndCursor
 	}
 	slices.Sort(orgs)
-	return slices.Compact(orgs), nil
+	orgs = slices.Compact(orgs)
+	orgRolloutDiscoveryLog.Printf("Discovered %d enterprise organizations", len(orgs))
+	return orgs, nil
 }
 
 // Batch repository connections instead of spending one API request per repository.
@@ -162,6 +168,7 @@ func discoverRolloutPRs(ctx context.Context, repos []string, marker string) (map
 			}
 			prs := connection.PullRequests.Nodes
 			if connection.PullRequests.PageInfo.HasNextPage {
+				orgRolloutDiscoveryLog.Printf("Repository %s has more than 100 open PRs; falling back to REST pagination", repo)
 				var err error
 				prs, err = listRolloutPRs(ctx, repo)
 				if err != nil {
@@ -175,6 +182,7 @@ func discoverRolloutPRs(ctx context.Context, repos []string, marker string) (map
 			}
 		}
 	}
+	orgRolloutDiscoveryLog.Printf("Rollout PR discovery complete: repos=%d, reposWithRolloutPRs=%d", len(repos), len(found))
 	return found, nil
 }
 
@@ -224,6 +232,7 @@ func prepareOrgRolloutWorker(ctx context.Context, repo, marker string) ([]orgRol
 		}
 	}
 	if len(existing) > 0 && !opts.replace {
+		orgRolloutDiscoveryLog.Printf("Skipping %s: %d existing rollout PR(s) and replace not requested", repo, len(existing))
 		err := emitOrgRolloutResult(orgRolloutResult{Status: "skipped: existing PR", URL: existing[0].URL})
 		return existing, true, err
 	}
@@ -271,6 +280,7 @@ func listOrgRolloutRepos(ctx context.Context, org string) ([]string, error) {
 		}
 		if len(items) < 100 {
 			slices.Sort(repos)
+			orgRolloutDiscoveryLog.Printf("Listed %d active repositories in org %s", len(repos), org)
 			return repos, nil
 		}
 	}
