@@ -63,7 +63,7 @@ const SAMPLE_VALIDATION_CONFIG = {
   },
   update_issue: {
     defaultMax: 1,
-    customValidation: "requiresOneOf:status,title,body,labels,assignees,milestone",
+    customValidation: "requiresOneOf:status,title,body,labels,assignees,milestone,artifacts",
     fields: {
       status: { type: "string", enum: ["open", "closed"] },
       title: { type: "string", sanitize: true, maxLength: 128 },

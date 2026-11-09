@@ -218,8 +218,9 @@ var ValidationConfig = map[string]TypeValidationConfig{
 	},
 	"update_issue": {
 		DefaultMax:       1,
-		CustomValidation: "requiresOneOf:status,title,body,labels,assignees,milestone",
+		CustomValidation: "requiresOneOf:status,title,body,labels,assignees,milestone,artifacts",
 		Fields: map[string]FieldValidation{
+			"artifacts":    {Type: "array"},
 			"status":       {Type: "string", Enum: []string{"open", "closed"}},
 			"title":        {Type: "string", Sanitize: true, MaxLength: 128},
 			"body":         {Type: "string", Sanitize: true, MaxLength: MaxBodyLength},

@@ -9,7 +9,7 @@ This directory contains fixture stubs for the Section 11 compliance tests of the
 
 CI runs the pinned-commit comparison in `.github/workflows/ci.yml` whenever this README or the
 pinned specification changes. Update the pin in this README in the same change as any intentional
-specification update.
+specification update, and update the matching pin in `.github/workflows/ci.yml`.
 
 CI fetches the full history so the comparison uses the latest commit that changed
 `scratchpad/github-mcp-access-control-specification.md` and fails when it differs from the pin:

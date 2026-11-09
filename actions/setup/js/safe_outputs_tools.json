@@ -1137,7 +1137,7 @@
   },
   {
     "name": "update_issue",
-    "description": "Update an existing GitHub issue's title, body, labels, assignees, or milestone WITHOUT closing it. This tool is primarily for editing issue metadata and content. REQUIRED: Provide at least one of: status, title, body, labels, assignees, or milestone. While it supports changing status between 'open' and 'closed', use close_issue instead when you want to close an issue with a closing comment. Body updates support replacing, appending to, prepending content, or updating a per-run \"island\" section. IMPORTANT: The behavior of this tool depends on the workflow's `update-issue: target:` configuration. When `target: triggering` (the default), the tool always updates the issue that triggered the workflow and `issue_number` is ignored. When `target: '*'`, the `issue_number` field controls which issue is updated. The tool will fail (not skip silently) when `target: triggering` and there is no triggering issue (e.g., in scheduled or workflow_dispatch workflows).",
+    "description": "Update an existing GitHub issue's title, body, labels, assignees, milestone, or artifacts WITHOUT closing it. This tool is primarily for editing issue metadata and content. REQUIRED: Provide at least one of: status, title, body, labels, assignees, milestone, or artifacts. While it supports changing status between 'open' and 'closed', use close_issue instead when you want to close an issue with a closing comment. Body updates support replacing, appending to, prepending content, or updating a per-run \"island\" section. IMPORTANT: The behavior of this tool depends on the workflow's `update-issue: target:` configuration. When `target: triggering` (the default), the tool always updates the issue that triggered the workflow and `issue_number` is ignored. When `target: '*'`, the `issue_number` field controls which issue is updated. The tool will fail (not skip silently) when `target: triggering` and there is no triggering issue (e.g., in scheduled or workflow_dispatch workflows).",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -1154,6 +1154,40 @@
           "type": "string",
           "description": "Issue body content in Markdown. For 'replace', this becomes the entire body. For 'append'/'prepend', this content is added with a separator and an attribution footer. For 'replace-island', only the run-specific section is updated.",
           "maxLength": 65536
+        },
+        "artifacts": {
+          "type": "array",
+          "description": "Artifacts to create or update by exact sanitized name on the target issue. Matching names add a new version instead of a second artifact. Each artifact requires a name and exactly one of body or path; type defaults to generic and must match the existing artifact type. The MCP backend reads path-based UTF-8 content without requiring the agent to load it.",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "oneOf": [{ "required": ["body"] }, { "required": ["path"] }],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["generic", "link", "plan", "embedded_html"],
+                "default": "generic"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": ".*\\S.*"
+              },
+              "body": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Artifact content, limited by max-issue-artifact-size in UTF-8 bytes (default: 1048576).",
+                "pattern": ".*\\S.*"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^/",
+                "description": "Absolute literal path to a non-empty UTF-8 text file within the workspace or /tmp/gh-aw/agent (e.g., /tmp/gh-aw/agent/plan.md). Repository .git metadata, system directories, and HOME credential/config paths are denied. The MCP backend reads it into body before recording the request. Variables and globs are not expanded. Links and non-regular files are rejected; max-issue-artifact-size bounds the read (default: 1mb). Do not also provide body."
+              }
+            },
+            "additionalProperties": false
+          }
         },
         "operation": {
           "type": "string",

@@ -4,7 +4,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 const fs = require("node:fs");
 const path = require("node:path");
-const os = require("node:os");
 const { selectCheckpoint, restoreCheckpoint } = require("./durable_artifact.cjs");
 const { stageFiles } = require("./durable_files.cjs");
 const directories = [];
@@ -20,7 +19,7 @@ function fixture() {
   vi.stubEnv("GITHUB_RUN_ATTEMPT", "1");
   const current = { id: 200, workflow_id: 42, run_number: 20, head_branch: "feature", repository: { id: 1 }, head_repository: { id: 1 }, status: "in_progress", event: "workflow_dispatch" };
   const parent = { ...structuredClone(current), id: 100, run_number: 19, status: "completed", conclusion: "success" };
-  const core = { setOutput: vi.fn(), info: vi.fn() };
+  const core = { setOutput: vi.fn(), info: vi.fn(), warning: vi.fn() };
   const github = {
     rest: {
       actions: {
@@ -151,7 +150,7 @@ describe("durable artifact lineage", () => {
 describe("single-step durable restoration", () => {
   function restoreFixture(engine = "gemini") {
     const options = fixture();
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "durable-restore-test-"));
+    const root = fs.mkdtempSync(path.resolve(".durable-restore-test-"));
     directories.push(root);
     const session = path.join(root, "sessions/state.jsonl");
     fs.mkdirSync(path.dirname(session), { recursive: true });
@@ -185,6 +184,8 @@ describe("single-step durable restoration", () => {
     expect(fs.existsSync(options.session)).toBe(false);
     expect(fs.readFileSync(options.promptFile, "utf8")).toBe("Current task");
     expect(options.core.setOutput).not.toHaveBeenCalledWith("restored", "true");
+    const record = JSON.parse(fs.readFileSync(path.join(options.root, "durable-session.jsonl"), "utf8"));
+    expect(record).toMatchObject({ type: "durable.restore", data: { status: "fresh", runId: "200" } });
   });
 
   it.each(["copilot", "claude", "codex", "gemini", "agy", "pi", "imported-engine"])("downloads and validates %s state before enabling continuation", async engine => {
@@ -197,6 +198,9 @@ describe("single-step durable restoration", () => {
     expect(fs.readFileSync(options.session, "utf8")).toBe("previous task state");
     expect(options.core.setOutput).toHaveBeenCalledWith("parent-run-id", "100");
     expect(options.core.setOutput).toHaveBeenLastCalledWith("restored", "true");
+    const record = JSON.parse(fs.readFileSync(path.join(options.root, "durable-session.jsonl"), "utf8"));
+    expect(record).toMatchObject({ type: "durable.restore", data: { status: "restored", parentRunId: "100", artifactId: "999" } });
+    expect(JSON.stringify(record)).not.toContain("previous task state");
     const prompt = fs.readFileSync(engine === "pi" ? options.userPromptFile : options.promptFile, "utf8");
     if (engine === "imported-engine") expect(prompt).toBe("Current task");
     else {
@@ -245,9 +249,35 @@ describe("single-step durable restoration", () => {
     const options = restoreFixture();
     options.artifactClient.downloadArtifact.mockRejectedValue(new Error("403 forbidden"));
     await expect(restoreCheckpoint(options)).rejects.toThrow("403 forbidden");
+    expect(JSON.parse(fs.readFileSync(path.join(options.root, "durable-session.jsonl"), "utf8")).data.status).toBe("failed");
     expect(fs.existsSync(options.session)).toBe(false);
     expect(fs.readFileSync(options.promptFile, "utf8")).toBe("Current task");
     expect(options.core.setOutput).not.toHaveBeenCalledWith("restored", "true");
+  });
+
+  it.each(["fresh", "restored", "failed"])("keeps the %s restore outcome when metadata I/O fails", async status => {
+    const options = restoreFixture();
+    const target = path.join(options.root, "durable-session.jsonl");
+    fs.mkdirSync(target);
+    const error = new Error("original download error");
+    if (status === "fresh") options.github.rest.actions.listWorkflowRuns.mockResolvedValue({ data: { workflow_runs: [] } });
+    if (status === "failed") options.artifactClient.downloadArtifact.mockRejectedValue(error);
+    if (status === "failed") await expect(restoreCheckpoint(options)).rejects.toBe(error);
+    else await expect(restoreCheckpoint(options)).resolves.toBeUndefined();
+    expect(options.core.warning).toHaveBeenCalledTimes(1);
+    expect(options.core.warning).toHaveBeenCalledWith("Durable session metadata could not be recorded; continuation evidence is unavailable.");
+    expect(fs.existsSync(options.session)).toBe(status === "restored");
+    if (status === "restored") expect(options.core.setOutput).toHaveBeenCalledWith("restored", "true");
+    else expect(options.core.setOutput).not.toHaveBeenCalledWith("restored", "true");
+  });
+
+  it("does not fail a successful restore when recording metadata is invalid", async () => {
+    const options = restoreFixture("invalid/engine");
+    await expect(restoreCheckpoint(options)).resolves.toBeUndefined();
+    expect(options.core.setOutput).toHaveBeenCalledWith("restored", "true");
+    expect(fs.existsSync(options.session)).toBe(true);
+    expect(fs.existsSync(path.join(options.root, "durable-session.jsonl"))).toBe(false);
+    expect(options.core.warning).toHaveBeenCalledTimes(1);
   });
 
   it("rejects damaged downloaded state before touching the prompt or enabling continuation", async () => {

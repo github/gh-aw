@@ -40,6 +40,7 @@ func TestCompileDurableBuiltinEngines(t *testing.T) {
 				require.NotContains(t, text, "restore_durable_files")
 				require.NotContains(t, text, "Prepare durable continuation prompt")
 				require.Contains(t, text, "steps.durable_checkpoint.outputs.restored")
+				require.Contains(t, text, "/tmp/gh-aw/agent/durable-session.jsonl")
 				require.Contains(t, text, durableSessionDirectory(engine))
 				require.Contains(t, text, "durable_artifact.cjs")
 				require.NotContains(t, text, "gemini_durable_harness.cjs")

@@ -53,6 +53,8 @@ func renderAuditReport(ctx context.Context, processedRun ProcessedRun, metrics L
 	if auditData.Ledger == nil {
 		auditData.Ledger = processedRun.Ledger
 	}
+	// Reparse raw session evidence even when an older audit cache omitted it.
+	auditData.DurableSession = readDurableSessionReport(runOutputDir, processedRun.Run, hasDurableRestoreStep(processedRun.JobDetails))
 	// NoBaseline runs avoid writing audit-cache changes, including queue backfills.
 	if mergeWorkQueueReport(&auditData.WorkQueue, processedRun.WorkQueue) && !opts.NoBaseline {
 		if err := ctx.Err(); err != nil {

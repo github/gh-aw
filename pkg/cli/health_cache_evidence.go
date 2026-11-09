@@ -48,6 +48,11 @@ func recordHealthCacheEvidence(run WorkflowRun, summary *RunSummary, status stri
 	if collection.cacheSummaries == nil {
 		collection.cacheSummaries = make(map[healthRunAttempt]*RunSummary)
 	}
+	if collection.cacheSessionCompatibility == nil {
+		collection.cacheSessionCompatibility = make(map[healthRunAttempt]bool)
+	}
+	collection.cacheSessionCompatibility[healthRunAttempt{id: run.DatabaseID, attempt: run.Attempt}] =
+		status == "missing" || status == "compatible" || status == "version_mismatch_raw_jobs_only"
 	evidence := HealthCacheEvidence{Status: status, Attempt: run.Attempt, UpdatedAt: run.UpdatedAt}
 	if summary != nil {
 		evidence.ProducerVersion = summary.CLIVersion

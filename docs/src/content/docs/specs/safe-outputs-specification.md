@@ -3281,7 +3281,7 @@ None. `comment_memory` MUST NOT be exposed as an agent-callable MCP tool when fi
 
 #### Type: update_issue
 
-**Purpose**: Modify existing issue properties (title, body, state, labels, assignees, milestone).
+**Purpose**: Modify existing issue properties (title, body, state, labels, assignees, milestone) or upsert issue artifacts.
 
 **Default Max**: 1  
 **Cross-Repository Support**: Yes  
@@ -3307,7 +3307,23 @@ None. `comment_memory` MUST NOT be exposed as an agent-callable MCP tool when fi
       },
       "labels": {"type": "array", "items": {"type": "string"}, "description": "Replacement label list"},
       "assignees": {"type": "array", "items": {"type": "string"}, "description": "Replacement assignee list"},
-      "milestone": {"type": ["number", "string"], "description": "Milestone number (null to clear)"}
+      "milestone": {"type": ["number", "string"], "description": "Milestone number (null to clear)"},
+      "artifacts": {
+        "type": "array",
+        "description": "Create or update artifacts by exact sanitized name",
+        "items": {
+          "type": "object",
+          "required": ["name"],
+          "oneOf": [{"required": ["body"]}, {"required": ["path"]}],
+          "properties": {
+            "name": {"type": "string", "minLength": 1},
+            "type": {"type": "string", "enum": ["generic", "link", "plan", "embedded_html"], "default": "generic"},
+            "body": {"type": "string", "minLength": 1},
+            "path": {"type": "string", "minLength": 1, "pattern": "^/"}
+          },
+          "additionalProperties": false
+        }
+      }
     },
     "additionalProperties": false
   }
@@ -3321,6 +3337,9 @@ None. `comment_memory` MUST NOT be exposed as an agent-callable MCP tool when fi
 3. **Label Validation**: Provided labels must exist in the repository; non-existent labels cause failure.
 4. **Assignee Resolution**: Assignees must have repository access; invalid usernames cause failure.
 5. **Cross-Repository**: When `target-repo` is configured, operates on that repository (must be in `allowed-repos`).
+6. **Artifact Inputs**: `artifacts` alone MUST be sufficient for an update. Artifact shape validation, unprivileged path resolution, sanitization, and pre- and post-sanitization byte limits MUST follow the `create_issue` artifact requirements. Artifact limits apply per call, not to the total artifacts already on the issue. Invalid input MUST fail before any issue or artifact writes.
+7. **Artifact Upserts**: The processor MUST list all artifact pages on the authorized target issue, using explicit page numbers until a short page is returned because this API does not provide Link headers. It MUST match exact, case-sensitive sanitized names, PATCH the lowest-numbered matching artifact to add a version, or POST for a new name. Names created earlier in the same call MUST participate in matching. PATCH MUST send only name and body; an existing artifact's type MUST NOT be changed. Type mismatches MUST fail before any artifact writes, preventing Markdown-sanitized content from entering an existing HTML artifact.
+8. **Artifact Failures**: Failed attachment or update MUST report failure with the target issue number, URL, and completed artifact count. Earlier writes MUST NOT be rolled back or cause the whole issue update to be retried. Staged mode MUST validate inputs without invoking artifact APIs.
 
 **Configuration Parameters**:
 
@@ -3329,6 +3348,8 @@ None. `comment_memory` MUST NOT be exposed as an agent-callable MCP tool when fi
 - `target-repo`: Cross-repository target
 - `allowed-repos`: Cross-repo allowlist
 - `staged`: Staged mode override
+
+Artifact limits use the same parsing and defaults as `create-issue`: `max-issue-artifacts` is an integer (default: 10; non-positive disables artifacts), and `max-issue-artifact-size` is positive integer bytes or a human-friendly size (default: `1mb`, 1048576 UTF-8 bytes). The compiler MUST emit `max_issue_artifacts` and normalized integer `max_issue_artifact_size`.
 
 **Security Requirements**:
 
@@ -5498,8 +5519,8 @@ the same stage violate the specification.
 | `create_issue` | Title length | 256 chars | E009 |
 | `create_issue` | Input body length | 524288 chars | Schema validation |
 | `create_issue` | Body length (complete body with footer) | 65536 chars | E006 |
-| `create_issue` | Issue artifacts per issue | Configured `max-issue-artifacts`, default 10 | Handler validation |
-| `create_issue` | Each issue artifact body | Configured `max-issue-artifact-size`, default 1048576 UTF-8 bytes | Handler validation |
+| `create_issue`, `update_issue` | Issue artifacts per call | Configured `max-issue-artifacts`, default 10 | Handler validation |
+| `create_issue`, `update_issue` | Each issue artifact body | Configured `max-issue-artifact-size`, default 1048576 UTF-8 bytes | Handler validation |
 | `create_pull_request` | Title length | 256 chars | E009 |
 | `create_pull_request` | Body length (complete body with footer) | 65536 chars | E006 |
 

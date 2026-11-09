@@ -226,7 +226,7 @@ function createUpdateHandlerFactory(handlerConfig) {
       }
 
       // Build update data (handler-specific logic)
-      const updateDataResult = buildUpdateData(item, config);
+      const updateDataResult = buildUpdateData(item, config, resolvedTemporaryIds, repoResult.repo);
 
       if (!updateDataResult.success) {
         core.warning(updateDataResult.error);

@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
 const { randomUUID } = require("node:crypto");
+const { tryRecordDurableSessionEvent } = require("./durable_session_record.cjs");
 const { readJsonlFile } = require("./jsonl_helpers.cjs");
 const SESSION_ID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
@@ -45,6 +46,24 @@ function validatePiNativeEntry(entry, ids) {
   ids.add(entry.id);
 }
 
+function piDurableSessionState(file, directory, id, env) {
+  let startupRecorded = false;
+  return {
+    file,
+    directory,
+    get id() {
+      return id;
+    },
+    started(sessionId) {
+      if (typeof sessionId !== "string" || !SESSION_ID.test(sessionId) || (id && sessionId !== id)) throw new Error("Durable Pi startup must use the selected native session");
+      id = sessionId;
+      if (startupRecorded) return;
+      tryRecordDurableSessionEvent("durable.session", { status: env.GH_AW_DURABLE_RESUMED === "true" ? "resumed" : "fresh", sessionId, parentRunId: env.GH_AW_DURABLE_PARENT_RUN_ID }, { env });
+      startupRecorded = true;
+    },
+  };
+}
+
 function openPiDurableSession(env = process.env) {
   if (env.GH_AW_DURABLE_STORAGE !== "artifact" || env.GH_AW_PI_SUBAGENT_CHILD === "1") return undefined;
   const directory = env.GH_AW_DURABLE_SESSION_DIR;
@@ -55,7 +74,7 @@ function openPiDurableSession(env = process.env) {
   if (!stat) {
     if (env.GH_AW_DURABLE_RESUMED === "true") throw new Error("Restored durable Pi session transcript is missing; refusing to start an unrelated conversation");
     fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
-    return { file, directory, id: undefined };
+    return piDurableSessionState(file, directory, undefined, env);
   }
   if (!stat.isFile()) throw new Error("Durable Pi session transcript must be a regular file");
   let header;
@@ -86,7 +105,7 @@ function openPiDurableSession(env = process.env) {
     }
   }
   if (!header) throw new Error("Invalid durable Pi native session header");
-  return { file, directory, id: header.id };
+  return piDurableSessionState(file, directory, header.id, env);
 }
 
 function readCopilotCaptureBaseline(directory) {
@@ -106,6 +125,8 @@ function openDurableSession(engine, env = process.env) {
   fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
   if (fs.lstatSync(file, { throwIfNoEntry: false })?.isSymbolicLink()) throw new Error("Durable session selector must not be a symlink");
   let id = "";
+  let startupRecorded = false;
+  const resumed = env.GH_AW_DURABLE_RESUMED === "true";
   if (fs.existsSync(file)) {
     const state = JSON.parse(fs.readFileSync(file, "utf8"));
     if (state.version !== 1 || state.engine !== engine || !SESSION_ID.test(state.id || "")) throw new Error("Invalid durable session selector");
@@ -146,6 +167,20 @@ function openDurableSession(engine, env = process.env) {
     },
     save,
     copilotSession,
+    started(sessionId = id) {
+      if (!SESSION_ID.test(sessionId) || sessionId !== id) throw new Error("Durable startup must use the selected native session");
+      if (startupRecorded) return;
+      tryRecordDurableSessionEvent(
+        "durable.session",
+        {
+          status: resumed ? "resumed" : "fresh",
+          sessionId,
+          parentRunId: env.GH_AW_DURABLE_PARENT_RUN_ID,
+        },
+        { env }
+      );
+      startupRecorded = true;
+    },
   };
 }
 
@@ -158,8 +193,15 @@ function observeDurableSession(session, engine, line) {
     return; // Harness diagnostics are interleaved with structured CLI events.
   }
   if (!event || typeof event !== "object") return;
+  if (engine === "pi") {
+    if (event.type === "session" && event.version === 3) session.started(event.id);
+    return;
+  }
   const id = engine === "codex" && event.type === "thread.started" ? event.thread_id : engine === "claude" && event.type === "system" && event.subtype === "init" ? event.session_id : undefined;
-  if (id !== undefined) session.save(id);
+  if (id !== undefined) {
+    session.save(id);
+    session.started(id);
+  }
 }
 
 module.exports = { openDurableSession, observeDurableSession, readCopilotCaptureBaseline, openPiDurableSession };

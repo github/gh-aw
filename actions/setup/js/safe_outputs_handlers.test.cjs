@@ -85,6 +85,77 @@ describe("safe_outputs_handlers", () => {
     handlers = createHandlers(mockServer, mockAppendSafeOutput);
   });
 
+  describe("update_issue artifact paths", () => {
+    let restoreDescriptors;
+
+    beforeEach(() => {
+      restoreDescriptors = simulateLinuxDescriptors(vi);
+    });
+
+    afterEach(() => {
+      restoreDescriptors?.();
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    });
+
+    it("records artifact-only file requests as content on the triggering issue", () => {
+      const source = path.join(testWorkspaceDir, "plan.md");
+      fs.writeFileSync(source, "Implementation plan");
+      vi.stubGlobal("context", { ...mockContext, eventName: "issues", payload: { issue: { number: 123 } } });
+      try {
+        const input = { artifacts: [{ type: "plan", name: "Plan", path: source }] };
+        const result = handlers.updateIssueHandler(input);
+        expect(result.isError).not.toBe(true);
+        expect(mockAppendSafeOutput).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: "update_issue",
+            artifacts: [{ type: "plan", name: "Plan", body: "Implementation plan" }],
+          })
+        );
+        expect(input.artifacts[0].path).toBe(source);
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it.each([0, -1, 1])("enforces count cap %s before opening files or recording requests", max => {
+      const configured = createHandlers(mockServer, mockAppendSafeOutput, { update_issue: { target: "*", max_issue_artifacts: max } });
+      const open = vi.spyOn(fs, "openSync");
+      expect(() =>
+        configured.updateIssueHandler({
+          issue_number: 123,
+          artifacts: [
+            { name: "Plan", path: path.join(testWorkspaceDir, "missing.md") },
+            { name: "Notes", body: "Research" },
+          ],
+        })
+      ).toThrow("max-issue-artifacts");
+      expect(open).not.toHaveBeenCalled();
+      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+    });
+
+    it("enforces the configured byte limit for inline and file inputs", () => {
+      const source = path.join(testWorkspaceDir, "plan.md");
+      fs.writeFileSync(source, "é");
+      const configured = createHandlers(mockServer, mockAppendSafeOutput, { update_issue: { target: "*", max_issue_artifact_size: 2 } });
+      configured.updateIssueHandler({ issue_number: 123, artifacts: [{ name: "Plan", path: source }] });
+      expect(mockAppendSafeOutput.mock.calls[0][0].artifacts[0].body).toBe("é");
+      mockAppendSafeOutput.mockClear();
+      fs.appendFileSync(source, "a");
+      expect(() => configured.updateIssueHandler({ issue_number: 123, artifacts: [{ name: "Plan", path: source }] })).toThrow("exceeds maximum allowed size");
+      expect(() => configured.updateIssueHandler({ issue_number: 123, artifacts: [{ name: "Plan", body: "éa" }] })).toThrow("update_issue artifacts[0].body is 3 UTF-8 bytes");
+      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+    });
+
+    it("rejects unsafe paths without recording requests", () => {
+      const configured = createHandlers(mockServer, mockAppendSafeOutput, { update_issue: { target: "*" } });
+      for (const source of ["/etc/passwd", path.join(testWorkspaceDir, ".git", "config")]) {
+        expect(() => configured.updateIssueHandler({ issue_number: 123, artifacts: [{ name: "Plan", path: source }] })).toThrow();
+      }
+      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+    });
+  });
+
   describe("create_issue artifact paths", () => {
     let restoreDescriptors;
     const request = artifacts => ({ title: "Implement parser caching", body: "Cache parsed workflows and add regression coverage.", artifacts });

@@ -464,6 +464,12 @@ func addReviewerConstraints(config *AddReviewerConfig) []string {
 func updateIssueConstraints(config *UpdateIssuesConfig) []string {
 	return buildConstraints(config, func(config *UpdateIssuesConfig, constraints *[]string) {
 		appendMaxConstraint(constraints, config.Max, "Maximum %d issue(s) can be updated.")
+		if limit := config.maxIssueArtifacts(); limit > 0 {
+			*constraints = append(*constraints, fmt.Sprintf("Maximum %d artifact(s) can be attached per issue.", limit))
+			*constraints = append(*constraints, fmt.Sprintf("Maximum artifact body size: %d UTF-8 bytes.", config.maxIssueArtifactSize()))
+		} else {
+			*constraints = append(*constraints, "Issue artifacts are disabled; omit artifacts.")
+		}
 		appendTargetConstraint(constraints, config.Target)
 		titlePrefix := config.TitlePrefix
 		if config.RequiredTitlePrefix != "" {

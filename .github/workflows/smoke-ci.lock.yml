@@ -906,7 +906,7 @@ jobs:
         env:
           GH_AW_FILE_ROOT: "${{ runner.temp }}/gh-aw"
           GH_AW_FILE_CONFIG: "{\"files\":[{\"path\":\"safeoutputs/config.json\",\"content_env\":\"GH_AW_SAFE_OUTPUTS_CONFIG\"}]}"
-          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"add_comment\":{\"hide_older_comments\":true,\"max\":1},\"add_labels\":{\"allowed\":[\"ai-generated\"],\"max\":1},\"comment_memory\":{\"max\":1,\"memory_id\":\"default\"},\"create_issue\":{\"close_older_issues\":true,\"close_older_key\":\"smoke-ci-memory-safe-outputs\",\"labels\":[\"ai-generated\"],\"max\":1,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10,\"title_prefix\":\"[smoke-ci] \"},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"push_repo_memory\":{\"memories\":[{\"dir\":\"/tmp/gh-aw/repo-memory/default\",\"file_glob\":\"*.md\",\"id\":\"default\",\"max_file_count\":100,\"max_file_size\":102400,\"max_patch_size\":10240}]},\"remove_labels\":{\"allowed\":[\"ai-generated\"],\"max\":1},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{},\"update_issue\":{\"allow_body\":true,\"max\":1,\"target\":\"*\"},\"update_pull_request\":{\"allow_body\":true,\"allow_title\":true,\"max\":1,\"target\":\"*\",\"update_branch\":false,\"update_branch_stacks\":true}}"
+          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"add_comment\":{\"hide_older_comments\":true,\"max\":1},\"add_labels\":{\"allowed\":[\"ai-generated\"],\"max\":1},\"comment_memory\":{\"max\":1,\"memory_id\":\"default\"},\"create_issue\":{\"close_older_issues\":true,\"close_older_key\":\"smoke-ci-memory-safe-outputs\",\"labels\":[\"ai-generated\"],\"max\":1,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10,\"title_prefix\":\"[smoke-ci] \"},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"push_repo_memory\":{\"memories\":[{\"dir\":\"/tmp/gh-aw/repo-memory/default\",\"file_glob\":\"*.md\",\"id\":\"default\",\"max_file_count\":100,\"max_file_size\":102400,\"max_patch_size\":10240}]},\"remove_labels\":{\"allowed\":[\"ai-generated\"],\"max\":1},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{},\"update_issue\":{\"allow_body\":true,\"max\":1,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10,\"target\":\"*\"},\"update_pull_request\":{\"allow_body\":true,\"allow_title\":true,\"max\":1,\"target\":\"*\",\"update_branch\":false,\"update_branch_stacks\":true}}"
         with:
           script: |
             const path = require('path');
@@ -924,7 +924,7 @@ jobs:
                 "add_labels": " CONSTRAINTS: Maximum 1 add_labels call(s) allowed. Maximum 10 label(s) per call. Only these labels are allowed: [\"ai-generated\"].",
                 "create_issue": " CONSTRAINTS: Maximum 1 issue(s) can be created. Title will be prefixed with \"[smoke-ci] \". Labels [\"ai-generated\"] will be automatically added. Maximum 10 artifact(s) can be attached per issue. Maximum artifact body size: 1048576 UTF-8 bytes.",
                 "remove_labels": " CONSTRAINTS: Maximum 1 label(s) can be removed. Only these labels can be removed: [ai-generated].",
-                "update_issue": " CONSTRAINTS: Maximum 1 issue(s) can be updated. Target: *. Body updates are allowed.",
+                "update_issue": " CONSTRAINTS: Maximum 1 issue(s) can be updated. Maximum 10 artifact(s) can be attached per issue. Maximum artifact body size: 1048576 UTF-8 bytes. Target: *. Body updates are allowed.",
                 "update_pull_request": " CONSTRAINTS: Maximum 1 pull request(s) can be updated. Target: *."
               },
               "repo_params": {},
@@ -1158,6 +1158,9 @@ jobs:
               "update_issue": {
                 "defaultMax": 1,
                 "fields": {
+                  "artifacts": {
+                    "type": "array"
+                  },
                   "assignees": {
                     "type": "array",
                     "itemType": "string",
@@ -1205,7 +1208,7 @@ jobs:
                     "maxLength": 128
                   }
                 },
-                "customValidation": "requiresOneOf:status,title,body,labels,assignees,milestone"
+                "customValidation": "requiresOneOf:status,title,body,labels,assignees,milestone,artifacts"
               },
               "update_pull_request": {
                 "defaultMax": 1,
@@ -2059,6 +2062,7 @@ jobs:
             /tmp/gh-aw/usage/agent/model-routing.jsonl
             /tmp/gh-aw/usage/agent/execution.json
             /tmp/gh-aw/usage/agent/harness_retry.json
+            /tmp/gh-aw/usage/agent/durable-session.jsonl
             /tmp/gh-aw/usage/detection/token_usage.jsonl
             /tmp/gh-aw/usage/detection/execution.json
             /tmp/gh-aw/usage/detection/harness_retry.json
@@ -2097,6 +2101,7 @@ jobs:
             /tmp/gh-aw/usage/agent/model-routing.jsonl
             /tmp/gh-aw/usage/agent/execution.json
             /tmp/gh-aw/usage/agent/harness_retry.json
+            /tmp/gh-aw/usage/agent/durable-session.jsonl
             /tmp/gh-aw/usage/detection/token_usage.jsonl
             /tmp/gh-aw/usage/detection/execution.json
             /tmp/gh-aw/usage/detection/harness_retry.json
@@ -2436,7 +2441,7 @@ jobs:
           GH_AW_ALLOWED_DOMAINS: "*.grafana.net,*.sentry.io,archive.ubuntu.com,azure.archive.ubuntu.com,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,json-schema.org,json.schemastore.org,keyserver.ubuntu.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,s.symcb.com,s.symcd.com,security.ubuntu.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com"
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"hide_older_comments\":true,\"max\":1},\"add_labels\":{\"allowed\":[\"ai-generated\"],\"max\":1},\"comment_memory\":{\"max\":1,\"memory_id\":\"default\"},\"create_issue\":{\"close_older_issues\":true,\"close_older_key\":\"smoke-ci-memory-safe-outputs\",\"labels\":[\"ai-generated\"],\"max\":1,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10,\"title_prefix\":\"[smoke-ci] \"},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"remove_labels\":{\"allowed\":[\"ai-generated\"],\"max\":1},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{},\"update_issue\":{\"allow_body\":true,\"max\":1,\"target\":\"*\"},\"update_pull_request\":{\"allow_body\":true,\"allow_title\":true,\"max\":1,\"target\":\"*\",\"update_branch\":false,\"update_branch_stacks\":true}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"hide_older_comments\":true,\"max\":1},\"add_labels\":{\"allowed\":[\"ai-generated\"],\"max\":1},\"comment_memory\":{\"max\":1,\"memory_id\":\"default\"},\"create_issue\":{\"close_older_issues\":true,\"close_older_key\":\"smoke-ci-memory-safe-outputs\",\"labels\":[\"ai-generated\"],\"max\":1,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10,\"title_prefix\":\"[smoke-ci] \"},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"remove_labels\":{\"allowed\":[\"ai-generated\"],\"max\":1},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{},\"update_issue\":{\"allow_body\":true,\"max\":1,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10,\"target\":\"*\"},\"update_pull_request\":{\"allow_body\":true,\"allow_title\":true,\"max\":1,\"target\":\"*\",\"update_branch\":false,\"update_branch_stacks\":true}}"
           GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}

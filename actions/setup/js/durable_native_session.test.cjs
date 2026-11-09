@@ -22,6 +22,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
   fs.rmSync(directory, { recursive: true, force: true });
 });
@@ -54,6 +55,8 @@ function environment(engine) {
     GH_AW_DURABLE_ENGINE: engine,
     GH_AW_DURABLE_SESSION_DIR: state,
     GH_AW_DURABLE_RESUMED: "false",
+    GITHUB_RUN_ID: "100",
+    GITHUB_RUN_ATTEMPT: "1",
   };
 }
 
@@ -67,9 +70,43 @@ function artifactRoundtrip(env, files) {
   fs.rmSync(env.HOME, { recursive: true, force: true });
   restoreFiles({ core, root });
   env.GH_AW_DURABLE_RESUMED = "true";
+  env.GITHUB_RUN_ID = "101";
+  env.GH_AW_DURABLE_PARENT_RUN_ID = "100";
 }
 
 describe("native CLI artifact continuation", () => {
+  it("reports Pi startup once without weakening exact identity or requiring eager transcript persistence", () => {
+    const env = environment("pi");
+    const session = openPiDurableSession(env);
+    fs.mkdirSync(path.join(directory, "agent/durable-session.jsonl"));
+    const warning = vi.fn();
+    vi.stubGlobal("core", { warning });
+    observeDurableSession(session, "pi", "ordinary diagnostic output");
+    expect(() => session.started("invalid-id")).toThrow("selected native session");
+    observeDurableSession(session, "pi", JSON.stringify({ type: "session", version: 3, id }));
+    observeDurableSession(session, "pi", JSON.stringify({ type: "session", version: 3, id }));
+    expect(session.id).toBe(id);
+    expect(warning).toHaveBeenCalledTimes(1);
+    expect(warning).toHaveBeenCalledWith("Durable session metadata could not be recorded; continuation evidence is unavailable.");
+    expect(() => session.started("00000000-0000-4000-8000-000000000002")).toThrow("selected native session");
+  });
+
+  it("keeps exact native session startup when metadata recording fails", () => {
+    const env = environment("codex");
+    const session = openDurableSession("codex", env);
+    session.save(id);
+    fs.mkdirSync(path.join(directory, "agent/durable-session.jsonl"));
+    const warning = vi.fn();
+    vi.stubGlobal("core", { warning });
+    expect(() => session.started("00000000-0000-4000-8000-000000000002")).toThrow("selected native session");
+    expect(() => session.started(id)).not.toThrow();
+    expect(session.id).toBe(id);
+    expect(JSON.parse(fs.readFileSync(path.join(env.GH_AW_DURABLE_SESSION_DIR, "session.json"), "utf8")).id).toBe(id);
+    session.started(id);
+    expect(warning).toHaveBeenCalledTimes(1);
+    expect(warning).toHaveBeenCalledWith("Durable session metadata could not be recorded; continuation evidence is unavailable.");
+  });
+
   it("chains Pi's exact native transcript and submits each run's current prompt", () => {
     const env = {
       ...environment("pi"),
@@ -119,6 +156,11 @@ console.log(JSON.stringify({ type: "message_end", message: { role: "assistant", 
       .map(line => JSON.parse(line));
     expect(records[0].id).toBe(id);
     expect(records.slice(1).map(record => record.message.content)).toEqual(["First task A", "Current task B"]);
+    const evidence = fs.readFileSync(path.join(directory, "agent/durable-session.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
+    expect(evidence).toEqual([
+      expect.objectContaining({ type: "durable.session", data: expect.objectContaining({ engine: "pi", status: "fresh", sessionId: id, runId: "100" }) }),
+      expect.objectContaining({ type: "durable.session", data: expect.objectContaining({ engine: "pi", status: "resumed", sessionId: id, runId: "101", parentRunId: "100" }) }),
+    ]);
   });
 
   it.each(["claude", "codex", "copilot"])("starts %s fresh, then restores its exact session and sends new workflow instructions", engine => {
@@ -166,6 +208,11 @@ process.stdin.on("end", () => {
     const marker = engine === "copilot" ? "--session-id" : engine === "claude" ? "--resume" : "resume";
     expect(second.args[second.args.indexOf(marker) + 1]).toBe(selector.id);
     expect(second.input || second.args.join(" ")).toContain("Continue current task B");
+    const records = fs.readFileSync(path.join(directory, "agent/durable-session.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
+    expect(records).toEqual([
+      expect.objectContaining({ type: "durable.session", data: expect.objectContaining({ status: "fresh", runId: "100", sessionId: selector.id }) }),
+      expect.objectContaining({ type: "durable.session", data: expect.objectContaining({ status: "resumed", runId: "101", parentRunId: "100", sessionId: selector.id }) }),
+    ]);
     if (engine === "copilot") {
       const baseline = JSON.parse(fs.readFileSync(path.join(state, "capture-offset.json"), "utf8"));
       expect(baseline.bytes).toBeGreaterThan(0);

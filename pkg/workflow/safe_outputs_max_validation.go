@@ -278,6 +278,9 @@ func validateSafeOutputsMax(config *SafeOutputsConfig) error {
 		}
 	}
 	if config.UpdateIssues != nil {
+		if config.UpdateIssues.artifactSizeParseError != nil {
+			return config.UpdateIssues.artifactSizeParseError
+		}
 		if err := checkMaxField("update_issue", config.UpdateIssues.Max); err != nil {
 			return err
 		}
