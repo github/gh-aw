@@ -32,29 +32,35 @@ describe("setup action Windows support", () => {
 });
 
 describe("setup.sh Copilot runtime files", () => {
-  it("deploys native Markdown metadata processing without npm runtime dependencies", () => {
+  it("deploys JavaScript runtime files without native metadata or npm dependencies", () => {
     const development = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8"));
     expect(development.dependencies).toBeUndefined();
-    expect(setupShContent).toContain('bash "${SCRIPT_DIR}/../markdown-metadata/setup.sh" "${DESTINATION}"');
+    expect(setupShContent).not.toContain("markdown-metadata");
+    expect(setupShContent).not.toMatch(/\bgo\s+(?:build|install)\b/);
     expect(setupShContent).not.toContain("npm ci");
   });
 
-  it("provisions the separate metadata helper and exchanges JSON from an isolated runtime directory", () => {
+  it("reads JSON metadata from an isolated JavaScript-only runtime directory", () => {
     const directory = resolve(__dirname, `.setup-metadata-${process.pid}`);
     mkdirSync(directory);
     try {
-      execFileSync("bash", [resolve(__dirname, "../../markdown-metadata/setup.sh"), directory], { stdio: "pipe" });
-      copyFileSync(resolve(__dirname, "markdown_metadata.cjs"), resolve(directory, "markdown_metadata.cjs"));
+      for (const file of collectTransitiveDeps(["markdown_metadata.cjs"])) {
+        const destination = resolve(directory, file);
+        mkdirSync(dirname(destination), { recursive: true });
+        copyFileSync(resolve(__dirname, file), destination);
+      }
       const output = execFileSync(
         process.execPath,
         [
           "-e",
-          `const {readMarkdownMetadata} = require("./markdown_metadata.cjs"); process.stdout.write(JSON.stringify(readMarkdownMetadata("agent", "---\\n" + JSON.stringify({model: "small", description: "Read files"}) + "\\n---\\nBody").value));`,
+          `const assert = require("node:assert/strict"); const {readMarkdownMetadata} = require("./markdown_metadata.cjs"); assert.throws(() => readMarkdownMetadata("agent", "---\\nmodel: __uncompiled_probe__\\n---\\nBody")); process.stdout.write(JSON.stringify(readMarkdownMetadata("agent", "---\\n" + JSON.stringify({model: "small", description: "Read files"}) + "\\n---\\nBody").value));`,
         ],
         { cwd: directory, encoding: "utf8" }
       );
       expect(JSON.parse(output)).toEqual({ model: "small", description: "Read files" });
       expect(existsSync(resolve(directory, "node_modules"))).toBe(false);
+      expect(existsSync(resolve(directory, "markdown-metadata"))).toBe(false);
+      expect(existsSync(resolve(directory, "markdown-metadata.exe"))).toBe(false);
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }

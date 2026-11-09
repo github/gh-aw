@@ -134,8 +134,6 @@ debug_log "Created /tmp/gh-aw directory"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 JS_SOURCE_DIR="${SCRIPT_DIR}/js"
 
-bash "${SCRIPT_DIR}/../markdown-metadata/setup.sh" "${DESTINATION}"
-
 debug_log "Script directory: ${SCRIPT_DIR}"
 debug_log "Looking for JavaScript sources in: ${JS_SOURCE_DIR}"
 
@@ -326,6 +324,7 @@ MCP_SCRIPTS_FILES=(
   "work_queue_claim_adapters.cjs"
   "work_queue_claim_scope.cjs"
   "work_queue_codec.cjs"
+  "lock_file_headers.cjs"
   "work_queue_control_receipts.cjs"
   "work_queue_declared_verification.cjs"
   "work_queue_delivery.cjs"
@@ -539,6 +538,7 @@ SAFE_OUTPUTS_FILES=(
   "work_queue_claim_adapters.cjs"
   "work_queue_claim_scope.cjs"
   "work_queue_codec.cjs"
+  "lock_file_headers.cjs"
   "work_queue_control_receipts.cjs"
   "work_queue_declared_verification.cjs"
   "work_queue_delivery.cjs"

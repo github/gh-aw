@@ -238,7 +238,7 @@ function registerTests({ describe, it }) {
         function copy(name) {
           if (copied.has(name)) return;
           copied.add(name);
-          assert.match(name, /^(?:work_queue_[a-z_]+|mcp_logger|error_helpers)\.cjs$/);
+          assert.match(name, /^(?:work_queue_[a-z_]+|lock_file_headers|mcp_logger|error_helpers)\.cjs$/);
           const source = fs.readFileSync(path.join(__dirname, name), "utf8");
           fs.writeFileSync(path.join(directory, name), source);
           for (const match of source.matchAll(/require\(["']\.\/([a-z_]+\.cjs)["']\)/g)) copy(match[1]);

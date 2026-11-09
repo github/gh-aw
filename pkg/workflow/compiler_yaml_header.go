@@ -88,6 +88,7 @@ func (c *Compiler) generateManifestHeader(yaml *strings.Builder, data *WorkflowD
 	// The manifest records safe-update inventory and normalized webhook declarations
 	// for CAO discovery without interpreting generated workflow steps.
 	manifest := NewGHAWManifest(secrets, actions, data.ActionResolutionFailures, data.DockerImagePins, data.Redirect, data.Skills, data.Plugins, data.RawFrontmatter["on"])
+	manifest.MarkdownMetadata = c.collectMarkdownMetadata(data)
 	if isWorkQueueWorker(data) {
 		manifest.WorkQueue = &GHAWManifestWorkQueue{Worker: true}
 		if data.WorkQueuePolicy != nil {
@@ -112,6 +113,9 @@ func (c *Compiler) generateManifestHeader(yaml *strings.Builder, data *WorkflowD
 	if err != nil {
 		return fmt.Errorf("cannot generate gh-aw-manifest header: %w", err)
 	}
+	// Header JSON is data, not an Actions expression-bearing YAML value. Escape
+	// the dollar in authored templates without changing the decoded manifest.
+	manifestJSON = strings.ReplaceAll(manifestJSON, "${{", `\u0024{{`)
 	fmt.Fprintf(yaml, "# gh-aw-manifest: %s\n", manifestJSON) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	return nil
 }

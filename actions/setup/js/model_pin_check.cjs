@@ -103,7 +103,7 @@ function parseMarkdownFrontmatter(content) {
   const metadata = lines.slice(1, end).join("\n");
   const body = lines.slice(end + 1).join("\n");
   try {
-    const value = readMarkdownMetadata("document", metadata, { allowDuplicates: true }).value;
+    const value = readMarkdownMetadata("document", metadata).value;
     return { frontmatter: value && typeof value === "object" && !Array.isArray(value) ? value : {}, body, error: null };
   } catch (error) {
     return { frontmatter: null, body, error: error instanceof Error ? error.message : String(error) };
@@ -218,6 +218,12 @@ function relativePath(file, repoRoot) {
  * @returns {{ files: LoadedFile[], skipped: Array<{ workflow: string, import: string, reason: string }>, errors: Array<{ file: string, error: string }> }}
  */
 function loadWorkflowFiles(workflowFile, repoRoot) {
+  const lockFile = workflowFile.replace(/\.md$/, ".lock.yml");
+  if (fs.existsSync(lockFile)) {
+    const { readLocalMarkdownMetadata, installMarkdownMetadata } = require("./markdown_metadata.cjs");
+    const metadata = readLocalMarkdownMetadata(lockFile, repoRoot);
+    if (metadata) installMarkdownMetadata(metadata, true);
+  }
   /** @type {LoadedFile[]} */
   const files = [];
   /** @type {Array<{ workflow: string, import: string, reason: string }>} */

@@ -11,6 +11,8 @@ describe("install_frontmatter_skills", () => {
   let originalEnv;
   let originalCore;
   let originalExec;
+  let originalGetOctokit;
+  let originalGithub;
   let tempRoot;
 
   beforeEach(() => {
@@ -23,7 +25,11 @@ describe("install_frontmatter_skills", () => {
     };
     originalCore = global.core;
     originalExec = global.exec;
+    originalGetOctokit = global.getOctokit;
+    originalGithub = global.github;
     tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-frontmatter-skills-"));
+    vi.stubEnv("GH_AW_TMP_DIR", tempRoot);
+    require("./markdown_metadata.cjs").installMarkdownMetadata({ version: 1, records: [] });
 
     global.core = {
       info: vi.fn(),
@@ -63,10 +69,10 @@ describe("install_frontmatter_skills", () => {
     else process.env.GH_AW_SKILL_INSTALL_INDEX = originalEnv.GH_AW_SKILL_INSTALL_INDEX;
     global.core = originalCore;
     global.exec = originalExec;
+    global.getOctokit = originalGetOctokit;
+    global.github = originalGithub;
     fs.rmSync(tempRoot, { recursive: true, force: true });
-    fs.rmSync("/tmp/gh-aw/.claude", { recursive: true, force: true });
-    fs.rmSync("/tmp/gh-aw/skill_install_failures.json", { force: true });
-    fs.rmSync("/tmp/gh-aw/skill_install_history.json", { force: true });
+    vi.unstubAllEnvs();
   });
 
   it("splits repo-level and path-level skill specs into gh skill install arguments", () => {
@@ -152,9 +158,9 @@ describe("install_frontmatter_skills", () => {
 
     await script.main();
 
-    expect(global.exec.exec).toHaveBeenNthCalledWith(1, "gh", ["skill", "install", "githubnext/skills", "--all", "--pin", "abc123", "--agent", "claude-code", "--dir", "/tmp/gh-aw/.claude/skills", "--force"]);
-    expect(global.exec.exec).toHaveBeenNthCalledWith(2, "gh", ["skill", "install", "githubnext/skills", "review/security", "--pin", "def456", "--agent", "claude-code", "--dir", "/tmp/gh-aw/.claude/skills", "--force"]);
-    expect(global.exec.exec).toHaveBeenNthCalledWith(3, "gh", ["skill", "install", "${{ inputs.skill_ref }}", "--agent", "claude-code", "--dir", "/tmp/gh-aw/.claude/skills", "--force"]);
+    expect(global.exec.exec).toHaveBeenNthCalledWith(1, "gh", ["skill", "install", "githubnext/skills", "--all", "--pin", "abc123", "--agent", "claude-code", "--dir", path.join(tempRoot, ".claude/skills"), "--force"]);
+    expect(global.exec.exec).toHaveBeenNthCalledWith(2, "gh", ["skill", "install", "githubnext/skills", "review/security", "--pin", "def456", "--agent", "claude-code", "--dir", path.join(tempRoot, ".claude/skills"), "--force"]);
+    expect(global.exec.exec).toHaveBeenNthCalledWith(3, "gh", ["skill", "install", "${{ inputs.skill_ref }}", "--agent", "claude-code", "--dir", path.join(tempRoot, ".claude/skills"), "--force"]);
     expect(global.core.summary.addRaw).toHaveBeenCalledWith(expect.stringMatching(/^<details>\n<summary>Skill install details<\/summary>/));
     expect(global.core.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining('["githubnext/skills@abc123","githubnext/skills/review/security@def456","${{ inputs.skill_ref }}"]'));
   });
@@ -164,16 +170,72 @@ describe("install_frontmatter_skills", () => {
     process.env.GH_AW_SKILL_INSTALL_INDEX = "1";
     process.env.GH_AW_FRONTMATTER_SKILLS = "owner/skills/a@abc123";
     global.exec.exec = vi.fn().mockImplementation(async () => {
-      const directory = "/tmp/gh-aw/.claude/skills/a";
+      const directory = path.join(tempRoot, ".claude/skills/a");
       fs.mkdirSync(directory, { recursive: true });
       fs.writeFileSync(path.join(directory, "SKILL.md"), "PRIVATE_SKILL");
       return 0;
     });
     await script.main();
-    const history = fs.readFileSync("/tmp/gh-aw/skill_install_history.json", "utf8");
+    const history = fs.readFileSync(path.join(tempRoot, "skill_install_history.json"), "utf8");
     expect(JSON.parse(history)).toEqual([{ name: "a", digest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/), source: "frontmatter-1" }]);
     expect(history).not.toContain("PRIVATE_SKILL");
     expect(history).not.toContain("owner/skills");
+  });
+
+  it("loads private skill metadata with the existing per-skill credential and persists all fields", async () => {
+    const revision = "a".repeat(40);
+    const source = "description: Private reader\nmodel: small\ntools: [Read]";
+    const value = { description: "Private reader", model: "small", tools: ["Read"] };
+    const record = { kind: "artifact", sha256: require("node:crypto").createHash("sha256").update(source).digest("hex"), value_json: JSON.stringify(value) };
+    const file = ".github/workflows/metadata.lock.yml";
+    const header = `# gh-aw-metadata: {}\n# gh-aw-manifest: ${JSON.stringify({ version: 1, markdown_metadata: { version: 1, records: [record] } })}\n# generated\ninvalid: [yaml\n`;
+    const client = {
+      rest: {
+        repos: {
+          getContent: vi.fn(async request => (request.path === ".github/workflows" ? { data: [{ type: "file", path: file }] } : { data: { type: "file", path: file, encoding: "base64", content: Buffer.from(header).toString("base64") } })),
+        },
+      },
+    };
+    global.getOctokit = vi.fn(() => client);
+    global.github = { rest: { repos: { getContent: vi.fn() } } };
+    vi.stubEnv("GH_TOKEN", "private-source-token");
+    process.env.GH_AW_SKILL_DIR = ".claude/skills";
+    process.env.GH_AW_FRONTMATTER_SKILLS = `private/skills/reader@${revision}`;
+    fs.writeFileSync(path.join(tempRoot, "aw_info.json"), JSON.stringify({ run_id: 123 }));
+    global.exec.exec = vi.fn(async () => {
+      const directory = path.join(tempRoot, ".claude/skills/reader");
+      fs.mkdirSync(directory, { recursive: true });
+      fs.writeFileSync(path.join(directory, "SKILL.md"), `---\n${source}\n---\nBody`);
+      return 0;
+    });
+    await script.main();
+    expect(global.getOctokit).toHaveBeenCalledWith("private-source-token");
+    expect(global.github.rest.repos.getContent).not.toHaveBeenCalled();
+    expect(client.rest.repos.getContent).toHaveBeenCalledTimes(2);
+    const info = fs.readFileSync(path.join(tempRoot, "aw_info.json"), "utf8");
+    expect(JSON.parse(info).run_id).toBe(123);
+    expect(JSON.parse(JSON.parse(info).markdown_metadata.records[0].value_json)).toEqual(value);
+    expect(info).not.toContain("private-source-token");
+    await script.main();
+    expect(client.rest.repos.getContent).toHaveBeenCalledTimes(2);
+  });
+
+  it("fails activation without credential fallback when installed skill metadata cannot be authorized", async () => {
+    const failure = Object.assign(new Error("Forbidden"), { status: 403 });
+    global.getOctokit = vi.fn(() => ({ rest: { repos: { getContent: vi.fn().mockRejectedValue(failure) } } }));
+    global.github = { rest: { repos: { getContent: vi.fn() } } };
+    vi.stubEnv("GH_TOKEN", "private-source-token");
+    process.env.GH_AW_SKILL_DIR = ".claude/skills";
+    process.env.GH_AW_FRONTMATTER_SKILLS = `private/skills/reader@${"a".repeat(40)}`;
+    global.exec.exec = vi.fn(async () => {
+      const directory = path.join(tempRoot, ".claude/skills/reader");
+      fs.mkdirSync(directory, { recursive: true });
+      fs.writeFileSync(path.join(directory, "SKILL.md"), "---\ndescription: Not compiled\n---\nBody");
+      return 0;
+    });
+    await expect(script.main()).rejects.toBe(failure);
+    expect(global.getOctokit).toHaveBeenCalledTimes(1);
+    expect(global.github.rest.repos.getContent).not.toHaveBeenCalled();
   });
 
   it("omits --agent when no gh skill agent name is provided", async () => {
@@ -182,7 +244,7 @@ describe("install_frontmatter_skills", () => {
 
     await script.main();
 
-    expect(global.exec.exec).toHaveBeenCalledWith("gh", ["skill", "install", "githubnext/skills", "--all", "--pin", "abc123", "--dir", "/tmp/gh-aw/.claude/skills", "--force"]);
+    expect(global.exec.exec).toHaveBeenCalledWith("gh", ["skill", "install", "githubnext/skills", "--all", "--pin", "abc123", "--dir", path.join(tempRoot, ".claude/skills"), "--force"]);
   });
 
   it("records failures without throwing when skill install fails", async () => {
@@ -192,7 +254,7 @@ describe("install_frontmatter_skills", () => {
 
     await expect(script.main()).resolves.toBeUndefined();
 
-    const failures = JSON.parse(fs.readFileSync("/tmp/gh-aw/skill_install_failures.json", "utf8"));
+    const failures = JSON.parse(fs.readFileSync(path.join(tempRoot, "skill_install_failures.json"), "utf8"));
     expect(failures).toEqual([{ skill: "bad/repo@abc123", error: "exit code 1 HTTP 404" }]);
     expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("Failed to install skill 'bad/repo@abc123'"));
     expect(global.core.summary.addRaw).toHaveBeenCalledWith(expect.stringMatching(/^<details open>\n<summary>Skill install details<\/summary>/));
@@ -205,6 +267,6 @@ describe("install_frontmatter_skills", () => {
 
     await script.main();
 
-    expect(global.exec.exec).toHaveBeenCalledWith("gh", ["skill", "install", "skills/rig", "rig", "--from-local", "--agent", "claude-code", "--dir", "/tmp/gh-aw/.claude/skills", "--force"]);
+    expect(global.exec.exec).toHaveBeenCalledWith("gh", ["skill", "install", "skills/rig", "rig", "--from-local", "--agent", "claude-code", "--dir", path.join(tempRoot, ".claude/skills"), "--force"]);
   });
 });

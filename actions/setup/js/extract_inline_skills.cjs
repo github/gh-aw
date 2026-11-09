@@ -69,58 +69,20 @@ const H2_HEADING_RE = /^##[ \t]/gm;
  * @returns {string} Content with only supported frontmatter fields retained.
  */
 function filterInlineSkillFrontmatter(content, skillName) {
-  // A YAML frontmatter block must start immediately at the beginning of the
-  // content (after trimming performed by the caller).
-  if (!content.startsWith("---\n")) {
-    return content;
-  }
-
-  // Locate the closing delimiter.  We search for "\n---" starting after the
-  // complete opening "---\n" (offset 4) to avoid matching the opening itself.
-  const closeIdx = content.indexOf("\n---", 4);
-  if (closeIdx === -1) {
-    return content;
-  }
-
-  // Lines between the opening and closing "---".
-  const fmLines = content.slice(4, closeIdx).split("\n");
-  // Everything after the closing "\n---" (including the optional newline).
-  const body = content.slice(closeIdx + 4);
-
-  const kept = [];
-  const stripped = [];
-
-  for (const line of fmLines) {
-    // Match a simple scalar YAML key at the start of the line.
-    // YAML keys are plain identifiers (no hyphens).
-    const keyMatch = line.match(/^([a-z_][a-z0-9_]*)[ \t]*:/);
-    if (keyMatch) {
-      const key = keyMatch[1];
-      if (SUPPORTED_FRONTMATTER_FIELDS.includes(key)) {
-        kept.push(line);
-      } else {
-        stripped.push(key);
-      }
-    } else {
-      // Continuation / comment / blank line — keep only when at least one
-      // supported key has already been accepted, so multi-line values (e.g.
-      // `description: |`) are preserved correctly.
-      if (kept.length > 0) {
-        kept.push(line);
-      }
-    }
-  }
-
+  const match = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*\r?(?=\n|$)/.exec(content);
+  if (!match) return content;
+  const { readMarkdownMetadata, editMarkdownMetadata } = require("./markdown_metadata.cjs");
+  const metadata = readMarkdownMetadata("agent", content).value;
+  const stripped = Object.keys(metadata).filter(key => !SUPPORTED_FRONTMATTER_FIELDS.includes(key));
   if (stripped.length > 0) {
     core.warning(`[extractInlineSkills] skill "${skillName}": unsupported frontmatter field(s) stripped: ${stripped.join(", ")} (only "description" is supported)`);
   }
 
   // If no supported fields remain, omit the frontmatter block entirely.
-  if (kept.length === 0) {
-    return body.replace(/^\n/, "");
+  if (!Object.hasOwn(metadata, "description")) {
+    return content.slice(match[0].length).replace(/^\r?\n/, "");
   }
-
-  return `---\n${kept.join("\n")}\n---${body}`;
+  return editMarkdownMetadata(content, value => ({ description: value.description }));
 }
 
 /**

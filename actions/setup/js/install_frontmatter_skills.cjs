@@ -117,8 +117,7 @@ function countInstalledSkillFiles(skillsDst) {
 }
 
 /** Path to the shared skill install failures JSON file within the activation job's runner. */
-const SKILL_FAILURES_FILE = "/tmp/gh-aw/skill_install_failures.json";
-const SKILL_INSTALL_HISTORY_FILE = "/tmp/gh-aw/skill_install_history.json";
+const skillStatePath = name => path.join(process.env.GH_AW_TMP_DIR || "/tmp/gh-aw", name);
 
 /** @param {string} directory */
 function skillDigests(directory) {
@@ -140,6 +139,7 @@ function skillDigests(directory) {
  * @param {string} errorMessage
  */
 function appendSkillInstallFailure(skillSpec, errorMessage) {
+  const SKILL_FAILURES_FILE = skillStatePath("skill_install_failures.json");
   let failures = [];
   try {
     if (fs.existsSync(SKILL_FAILURES_FILE)) {
@@ -184,11 +184,13 @@ async function writeSkillSummary(skillDir, skills, installedSkillCount, failures
   await core.summary.write();
 }
 
-async function main() {
+/** @param {{githubClient?: any}} [options] */
+async function main(options = {}) {
   const skillDir = process.env.GH_AW_SKILL_DIR || "";
   const skillInstallAgent = process.env.GH_AW_GH_SKILL_AGENT_NAME || "";
   const skills = parseSkillSpecs(process.env.GH_AW_FRONTMATTER_SKILLS || "");
-  const skillsDst = path.join("/tmp/gh-aw", skillDir);
+  const skillsDst = path.join(process.env.GH_AW_TMP_DIR || "/tmp/gh-aw", skillDir);
+  const SKILL_INSTALL_HISTORY_FILE = skillStatePath("skill_install_history.json");
 
   try {
     fs.mkdirSync(skillsDst, { recursive: true });
@@ -209,10 +211,29 @@ async function main() {
     core.info(`Installing skill reference: ${skillSpec}`);
     const command = buildSkillInstallCommand(skillSpec, skillsDst, skillInstallAgent);
     const before = skillDigests(skillsDst);
+    let installed = false;
     try {
       await exec.exec("gh", command.args);
+      installed = true;
       const after = skillDigests(skillsDst);
       const changed = Object.entries(after).filter(([name, digest]) => digest !== before[name]);
+      if (Object.keys(after).length) {
+        const documents = Object.keys(after).map(name => fs.readFileSync(path.join(skillsDst, name, "SKILL.md"), "utf8"));
+        const { missingMarkdownMetadata, ensureCheckoutMarkdownMetadata, ensureRemoteMarkdownMetadata, persistMarkdownMetadata, CompilerMetadataUnavailableError } = require("./markdown_metadata.cjs");
+        if (missingMarkdownMetadata(documents).size) {
+          if (isLocalSkillRef(skillSpec)) {
+            ensureCheckoutMarkdownMetadata(documents, process.env.GITHUB_WORKSPACE || process.cwd());
+            if (missingMarkdownMetadata(documents).size) throw new CompilerMetadataUnavailableError();
+          } else {
+            const separator = skillSpec.lastIndexOf("@");
+            const repository = skillSpec.slice(0, separator).split("/").slice(0, 2).join("/");
+            const ref = skillSpec.slice(separator + 1);
+            const client = options.githubClient || (process.env.GH_TOKEN ? global.getOctokit?.(process.env.GH_TOKEN) : global.github);
+            await ensureRemoteMarkdownMetadata(documents, client, { repository, ref });
+          }
+          persistMarkdownMetadata();
+        }
+      }
       if (changed.length) {
         const history = fs.existsSync(SKILL_INSTALL_HISTORY_FILE) ? JSON.parse(fs.readFileSync(SKILL_INSTALL_HISTORY_FILE, "utf8")) : [];
         if (!Array.isArray(history)) throw new Error("Invalid skill installation history");
@@ -224,6 +245,7 @@ async function main() {
       core.warning(`Failed to install skill '${skillSpec}': ${errorMessage}`);
       failures.push({ skill: skillSpec, error: errorMessage });
       appendSkillInstallFailure(skillSpec, errorMessage);
+      if (installed) throw err;
     }
   }
 

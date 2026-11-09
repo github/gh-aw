@@ -40,19 +40,8 @@ all: build
 
 # Build the binary, run make deps before this
 .PHONY: build
-build: check-agent-local-settings sync-action-pins sync-action-scripts sync-compat sync-model-aliases build-markdown-metadata
+build: check-agent-local-settings sync-action-pins sync-action-scripts sync-compat sync-model-aliases
 	go build $(LDFLAGS) -o $(BINARY_NAME) ./cmd/gh-aw
-
-.PHONY: build-markdown-metadata
-build-markdown-metadata:
-	cd actions/markdown-metadata && GOWORK=off GOTOOLCHAIN=local CGO_ENABLED=0 go build -mod=readonly -trimpath -o ../setup/js/markdown-metadata .
-
-.PHONY: lint-markdown-metadata test-markdown-metadata
-lint-markdown-metadata:
-	cd actions/markdown-metadata && GOWORK=off GOTOOLCHAIN=local go vet ./...
-
-test-markdown-metadata:
-	cd actions/markdown-metadata && GOWORK=off GOTOOLCHAIN=local go test ./...
 
 # Reject persisted local command approvals even if force-added or already tracked.
 .PHONY: check-agent-local-settings test-agent-local-settings
@@ -120,7 +109,7 @@ test-race:
 
 # Test impacted Go unit tests first for faster feedback (target budget: ~30s)
 .PHONY: test-unit
-test-unit: test-markdown-metadata
+test-unit:
 	@echo "Running impacted Go unit tests first (time budget: $(TEST_UNIT_MAX_SECONDS)s)..."; \
 	$(MAKE) --no-print-directory test-impacted-go CI_COVERAGE_ENABLED=0 GO_IMPACTED_TEST_MAX_SECONDS=$(TEST_UNIT_MAX_SECONDS) GO_IMPACTED_TEST_FALLBACK_MODE=$(TEST_UNIT_IMPACTED_FALLBACK_MODE) GO_IMPACTED_TEST_SAMPLE_PER_PACKAGE=$(GO_IMPACTED_TEST_SAMPLE_PER_PACKAGE); \
 	if [ "$(TEST_UNIT_RUN_FULL)" = "1" ]; then \
@@ -350,7 +339,7 @@ test-impacted-go:
 		echo "Set BASE_REF explicitly, for example: make test-impacted-go BASE_REF=origin/main"; \
 		exit 1; \
 	fi; \
-	CHANGED_GO_FILES=$$({ git diff --name-only --diff-filter=ACDMR "$$BASE_COMMIT"; git ls-files --others --exclude-standard; } | sort -u | grep -E '\.go$$' | grep -v -E '(^|/)testdata/|^actions/markdown-metadata/' || true); \
+	CHANGED_GO_FILES=$$({ git diff --name-only --diff-filter=ACDMR "$$BASE_COMMIT"; git ls-files --others --exclude-standard; } | sort -u | grep -E '\.go$$' | grep -v -E '(^|/)testdata/' || true); \
 	if [ -z "$$CHANGED_GO_FILES" ]; then \
 		echo "No changed Go files; skipping impacted Go tests."; \
 		exit 0; \

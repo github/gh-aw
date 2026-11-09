@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { prepareMarkdownFixtures } = require("../../../scripts/markdown_metadata_test_adapter.cjs");
+const { transformMarkdownContent } = require("./markdown_metadata.cjs");
 const substitutePlaceholders = require("./substitute_placeholders.cjs");
 const { processRuntimeImports } = require("./runtime_import.cjs");
 const { writeInlineSubAgents, getEngineSubAgentTarget } = require("./extract_inline_sub_agents.cjs");
@@ -201,6 +203,7 @@ describe("substitutePlaceholders", () => {
       "{{#runtime-import release.md}}",
       "## end skill: `release`",
     ].join("\n");
+    prepareMarkdownFixtures(markdown);
     let imported;
     try {
       imported = await processRuntimeImports(markdown, tempDir);
@@ -238,8 +241,9 @@ describe("substitutePlaceholders", () => {
           { directory: skillDir, extension: skillExt },
         ],
       });
-      expect(fs.readFileSync(agentPath, "utf8")).toBe(stagedAgent.replace("__GH_AW_DEFERRED_RELEASE__", () => value));
-      expect(fs.readFileSync(skillPath, "utf8")).toBe(stagedSkill.replace("__GH_AW_DEFERRED_RELEASE__", () => value));
+      const replace = text => text.replace("__GH_AW_DEFERRED_RELEASE__", () => value);
+      expect(fs.readFileSync(agentPath, "utf8")).toBe(transformMarkdownContent(stagedAgent, replace));
+      expect(fs.readFileSync(skillPath, "utf8")).toBe(transformMarkdownContent(stagedSkill, replace));
       expect(fs.readFileSync(promptPath, "utf8")).toBe(main);
       expect(fs.readFileSync(unrelated, "utf8")).toBe("__GH_AW_DEFERRED_RELEASE__");
     }

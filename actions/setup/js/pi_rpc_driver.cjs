@@ -25,7 +25,7 @@ function rpcArgs(args) {
 async function main(options = {}) {
   const sdk = options.sdk || (await loadPiSDK());
   const emit = options.emit || (event => process.stdout.write(JSON.stringify(event) + "\n"));
-  const { agentDir, config, routingSelection, skillPaths } = preparePiRuntime();
+  const { agentDir, config, routingSelection, skillPaths, durableSession } = preparePiRuntime();
   const cwd = process.env.GH_AW_ENGINE_CWD || process.env.GITHUB_WORKSPACE || process.cwd();
   const promptPath = process.env.GH_AW_PI_USER_PROMPT || process.env.GH_AW_PROMPT;
   if (!promptPath) throw new Error("GH_AW_PROMPT is required");
@@ -39,6 +39,11 @@ async function main(options = {}) {
   const modelId = slash >= 0 ? configuredModel.slice(slash + 1) : configuredModel;
   const model = fs.existsSync(path.join(agentDir, "models.json")) ? `aw-gateway/${modelId}` : `${provider}/${modelId}`;
   const args = rpcArgs(JSON.parse(process.env.GH_AW_PI_ARGS || '["--no-session","--no-approve"]'));
+  if (durableSession) {
+    const ephemeral = args.indexOf("--no-session");
+    if (ephemeral >= 0) args.splice(ephemeral, 1);
+    if (!args.includes("--session")) args.push("--session-dir", durableSession.directory, "--session", durableSession.file);
+  }
   if (routingSelection) {
     for (let i = args.length - 1; i >= 0; i--) {
       if (args[i] === "--model") args.splice(i, 2);
@@ -62,6 +67,7 @@ async function main(options = {}) {
   try {
     await client.start();
     const state = await client.getState();
+    if (durableSession?.id && state.sessionId !== durableSession.id) throw new Error("Pi RPC did not resume the exact durable session");
     emit({ type: "session", version: 3, id: state.sessionId, cwd });
     const disposition = await client.prompt(fs.readFileSync(promptPath, "utf8"));
     if (disposition !== "handled" && !settled) {

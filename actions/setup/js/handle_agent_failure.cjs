@@ -603,7 +603,10 @@ function isReusableFailureIssue(body, options) {
     return failureMarker.failure_cause === options.failureCause;
   }
 
-  return (failureMarker.failure_categories || "") === options.failureCategories.join("|");
+  // Supplemental diagnostics can vary between incomplete runs without changing
+  // the completion failure. Preserve other categories so distinct causes stay separate.
+  const matchCategories = categories => (categories.includes("report_incomplete") ? categories.filter(category => !["missing_data", "missing_tool"].includes(category)) : [...categories]).sort().join("|");
+  return matchCategories((failureMarker.failure_categories || "").split("|")) === matchCategories(options.failureCategories);
 }
 
 /**

@@ -105,6 +105,7 @@ function parseAgentFrontmatter(content) {
  * @returns {Array<{ fileName: string, path: string, name: string | null, model?: string, invalidModel?: string }>}
  */
 function listMarkdownAgentFiles(directory, logger, options = {}) {
+  const { CompilerMetadataUnavailableError } = require("./markdown_metadata.cjs");
   const invalid = options.onInvalid || ((/** @type {string} */ filePath, /** @type {unknown} */ error) => logger(`warning: cannot read custom agent ${filePath}: ${getErrorMessage(error)}`));
   let entries;
   try {
@@ -124,6 +125,7 @@ function listMarkdownAgentFiles(directory, logger, options = {}) {
       const declared = typeof model === "string" ? { model: model.trim() } : model !== undefined && model !== null ? { invalidModel: JSON.stringify(model) } : {};
       agents.push({ fileName: entry.name, path: agentPath, name, ...declared });
     } catch (error) {
+      if (error instanceof CompilerMetadataUnavailableError) throw error;
       invalid(agentPath, error);
     }
   }
@@ -138,14 +140,12 @@ function listMarkdownAgentFiles(directory, logger, options = {}) {
  * @returns {string}
  */
 function replaceAgentModel(content, model) {
-  const { readMarkdownMetadata } = require("./markdown_metadata.cjs");
-  const scalar = readMarkdownMetadata("agent", content).scalars?.model;
-  if (!scalar) {
-    throw new Error("expected exactly one top-level string 'model:' scalar in the frontmatter");
-  }
-  const { start, end } = scalar;
-  const lineEnding = content.slice(start, end).match(/(?:\r?\n)+$/)?.[0] || "";
-  return content.slice(0, start) + JSON.stringify(model) + lineEnding + content.slice(end);
+  const { editMarkdownMetadata, readMarkdownMetadata } = require("./markdown_metadata.cjs");
+  if (typeof readMarkdownMetadata("agent", content).value.model !== "string") throw new Error("expected exactly one top-level string 'model:' scalar in the frontmatter");
+  return editMarkdownMetadata(content, metadata => {
+    if (typeof metadata.model !== "string") throw new Error("expected exactly one top-level string 'model:' scalar in the frontmatter");
+    return { ...metadata, model };
+  });
 }
 
 /**

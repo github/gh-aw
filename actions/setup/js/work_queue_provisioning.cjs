@@ -2,10 +2,10 @@
 "use strict";
 
 const { posix } = require("node:path");
-const { createInterface } = require("node:readline");
 const { Readable } = require("node:stream");
 const { TextDecoder } = require("node:util");
-const { parseStrictJSON, queueError } = require("./work_queue_codec.cjs");
+const { queueError } = require("./work_queue_codec.cjs");
+const { readLockFileHeaders } = require("./lock_file_headers.cjs");
 const { validatePolicy, validateProfile } = require("./work_queue_policy.cjs");
 const { readQueueMetadata, metadataRequest } = require("./work_queue_read_retry.cjs");
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("provisioning");
@@ -89,46 +89,6 @@ async function* decodeBase64Content(contents) {
     yield Buffer.from(chunk, "base64");
   }
   if (pending.length) throw queueError("policy_missing", "approved worker route requires valid base64 content");
-}
-
-/**
- * @param {import("node:stream").Readable} reader
- * @returns {Promise<{metadata: Record<string, unknown>|undefined, manifest: Record<string, unknown>|undefined}>}
- */
-async function readLockFileHeaders(reader) {
-  const lines = createInterface({ input: reader, crlfDelay: Infinity });
-  const headers = /** @type {{metadata: Record<string, unknown>|undefined, manifest: Record<string, unknown>|undefined}} */ { metadata: undefined, manifest: undefined };
-  const seen = new Set();
-  let lineCount = 0;
-  try {
-    for await (const line of lines) {
-      lineCount++;
-      for (const name of ["metadata", "manifest"]) {
-        const prefix = `# gh-aw-${name}: `;
-        if (!line.startsWith(prefix)) continue;
-        if (seen.has(name)) {
-          headers[name] = undefined;
-        } else {
-          seen.add(name);
-          headers[name] = parseHeaderJSON(line.slice(prefix.length));
-        }
-      }
-      if (lineCount >= 3) break;
-    }
-  } finally {
-    lines.close();
-    reader.destroy();
-  }
-  return headers;
-}
-
-function parseHeaderJSON(value) {
-  try {
-    const parsed = parseStrictJSON(value);
-    return isRecord(parsed) ? parsed : undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 function workerContract(manifest) {

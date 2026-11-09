@@ -3,6 +3,8 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { fileURLToPath } from "url";
+const { prepareMarkdownFixtures } = require("../../../scripts/markdown_metadata_test_adapter.cjs");
+const { readMarkdownMetadata } = require("./markdown_metadata.cjs");
 const { ERR_CONFIG } = require("./error_codes.cjs");
 const __filename = fileURLToPath(import.meta.url),
   __dirname = path.dirname(__filename),
@@ -625,6 +627,7 @@ describe("inline sub-agent experiment model expansion", () => {
   let tmpDir, promptPath, originalEnv;
 
   beforeEach(() => {
+    prepareMarkdownFixtures(...["${{ experiments.subagent_model }}", "__GH_AW_EXPERIMENTS_SUBAGENT_MODEL__", "claude-haiku-4.5"].map(agentBlock));
     originalEnv = { ...process.env };
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "interpolate-subagent-test-"));
     promptPath = path.join(tmpDir, "prompt.txt");
@@ -685,11 +688,11 @@ describe("inline sub-agent experiment model expansion", () => {
     ])("writes_selected_experiment_model_before_agent_file_write: %s with assignment %s", async (reference, variant) => {
       process.env.GH_AW_EXPERIMENTS_SUBAGENT_MODEL = variant;
       const written = await forms[form](reference);
-      expect(written.startsWith(`---\nmodel: ${variant}\n`)).toBe(true);
+      expect(readMarkdownMetadata("agent", written).value.model).toBe(variant);
       expect(written).not.toContain("${{");
       expect(written).not.toContain("experiments.");
       expect(written).not.toContain("__GH_AW_");
-      expect(written).toContain("description: Summarizes the content of a file in a few concise sentences");
+      expect(readMarkdownMetadata("agent", written).value.description).toBe("Summarizes the content of a file in a few concise sentences");
       expect(written).toContain("You are a file summarization assistant.");
       expect(fs.readFileSync(promptPath, "utf8")).not.toContain("file summarization assistant");
     });
@@ -700,7 +703,7 @@ describe("inline sub-agent experiment model expansion", () => {
       for (const variant of ["small", "large"]) {
         process.env.GH_AW_EXPERIMENTS_SUBAGENT_MODEL = variant;
         const written = await forms[form]("${{ experiments.subagent_model }}");
-        models.push(/^model: (.*)$/m.exec(written)?.[1] ?? "");
+        models.push(readMarkdownMetadata("agent", written).value.model);
       }
       expect(models).toEqual(["small", "large"]);
     });
@@ -708,7 +711,8 @@ describe("inline sub-agent experiment model expansion", () => {
     it("preserves_plain_subagent_model_and_frontmatter", async () => {
       process.env.GH_AW_EXPERIMENTS_SUBAGENT_MODEL = "large";
       const written = await forms[form]("claude-haiku-4.5");
-      expect(written).toBe("---\nmodel: claude-haiku-4.5\ndescription: Summarizes the content of a file in a few concise sentences\n---\nYou are a file summarization assistant.\n");
+      expect(readMarkdownMetadata("agent", written).value).toEqual({ model: "claude-haiku-4.5", description: "Summarizes the content of a file in a few concise sentences" });
+      expect(written).toContain("\nYou are a file summarization assistant.\n");
     });
 
     it("fails activation instead of writing an unresolved experiment model", async () => {
@@ -736,7 +740,7 @@ describe("inline sub-agent experiment model expansion", () => {
       if (variant) {
         process.env.GH_AW_EXPERIMENTS_SUBAGENT_MODEL = variant;
         const written = await runAndReadAgent(prompt);
-        expect(written).toContain(`---\r\nmodel: ${variant}\r\n`);
+        expect(readMarkdownMetadata("agent", written).value.model).toBe(variant);
         expect(written).not.toContain("${{");
       } else {
         delete process.env.GH_AW_EXPERIMENTS_SUBAGENT_MODEL;

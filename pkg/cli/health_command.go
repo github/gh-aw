@@ -304,10 +304,7 @@ func displayDetailedHealth(runs []WorkflowRun, config HealthConfig) error {
 	if err := renderHealthRevisions(os.Stderr, health.Revisions); err != nil {
 		return err
 	}
-	if err := renderHealthSubagentFailures(os.Stderr, health); err != nil {
-		return err
-	}
-	if err := renderHealthDetectionFailures(os.Stderr, health); err != nil {
+	if err := renderHealthSessionEvidence(os.Stderr, health); err != nil {
 		return err
 	}
 	return renderFailureReportToWriter(os.Stderr, health.FailureClusters, health.FailureInvestigation, "", config.Verbose)
@@ -383,10 +380,7 @@ func outputHealthTable(summary HealthSummary, threshold float64) error {
 		if err := renderHealthRevisions(os.Stderr, health.Revisions); err != nil {
 			return err
 		}
-		if err := renderHealthSubagentFailures(os.Stderr, health); err != nil {
-			return err
-		}
-		if err := renderHealthDetectionFailures(os.Stderr, health); err != nil {
+		if err := renderHealthSessionEvidence(os.Stderr, health); err != nil {
 			return err
 		}
 	}

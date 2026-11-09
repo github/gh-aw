@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { readDocumentMetadata } from "./markdown_metadata.cjs";
+import { readDocumentMetadata } from "../../../scripts/markdown_metadata_test_adapter.cjs";
 
 const source = readFileSync(resolve(import.meta.dirname, "../../../.github/workflows/haiku-printer.yml"), "utf8");
 const document = readDocumentMetadata(source, { version: "1.2", uniqueKeys: true });

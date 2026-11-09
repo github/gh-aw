@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
-import { readDocumentMetadata } from "./markdown_metadata.cjs";
+import { readDocumentMetadata } from "../../../scripts/markdown_metadata_test_adapter.cjs";
 
 // Latest 100 merged PRs: these workflows produced closing issues with gh-aw provenance.
 const migrated = [

@@ -25,6 +25,32 @@ const promote = script(promotion, "Validate and promote release");
 const compare = script(alignment, "Compare latest releases");
 const stable = { tag_name: "v1.2.3", draft: false, prerelease: false };
 
+function specPinValidationJob(workflow) {
+  const job = workflow.split("  validate-mcp-access-control-spec-pin:\n")[1]?.split(/\n  [A-Za-z0-9_-]+:\n/)[0];
+  assert.ok(job, "Missing MCP access-control spec-pin validation job");
+  const checkout = job.split(/\n    - /).find(step => /^      uses: actions\/checkout@/m.test(step));
+  assert.ok(checkout, "Missing specification validation checkout");
+  assert.match(checkout, /      with:\n        fetch-depth: 0\n        persist-credentials: false/);
+  return job;
+}
+
+test("MCP access-control spec validation uses full history and matching documented pins", () => {
+  const job = specPinValidationJob(ci);
+  const pin = job.match(/pinned="([a-f0-9]{40})"/)?.[1];
+  assert.ok(pin, "Missing specification commit pin");
+  const readme = fs.readFileSync(path.join(root, "specs/github-mcp-access-control-compliance/README.md"), "utf8");
+  assert.ok(readme.includes(`**Spec version pinned at commit \`${pin}\`.**`));
+  assert.ok(readme.includes(`PINNED="${pin}"`));
+});
+
+test("spec-pin checkout assertions cannot be satisfied by another step or an inserted job", () => {
+  const shallow = "  validate-mcp-access-control-spec-pin:\n    steps:\n    - name: Checkout code\n      uses: actions/checkout@sha\n      with:\n        fetch-depth: 1\n        persist-credentials: false\n";
+  const fullCheckout = "    - name: Other checkout\n      uses: actions/checkout@sha\n      with:\n        fetch-depth: 0\n        persist-credentials: false\n";
+  for (const suffix of [fullCheckout, `  inserted_job:\n    steps:\n${fullCheckout}  test-race:\n`]) {
+    assert.throws(() => specPinValidationJob(shallow + suffix), assert.AssertionError);
+  }
+});
+
 test("release checkout is credential-free while tag publishing retains git authentication", () => {
   const lock = fs.readFileSync(path.join(root, ".github/workflows/release.lock.yml"), "utf8");
   for (const source of [release, lock]) {

@@ -352,12 +352,11 @@ func buildUsageArtifactPublishSteps(prefix string, hasDetection, hasDailyAICGuar
 }
 
 func buildUsageArtifactUploadStep(prefix string, pinAction func(string) string) []string {
-	usageArtifactName := prefix + "usage"
 	var steps []string
 	usageArtifactUploadAction := pinAction("actions/upload-artifact")
 	usageArtifactUploadWithLines := []string{
 		"        with:\n",
-		fmt.Sprintf("          name: %s\n", usageArtifactName),
+		fmt.Sprintf("          name: %susage\n", prefix),
 		"          path: |\n",
 		"            /tmp/gh-aw/usage/aw_session.jsonl\n",
 		"            /tmp/gh-aw/usage/aw_info.json\n",
@@ -373,6 +372,7 @@ func buildUsageArtifactUploadStep(prefix string, pinAction func(string) string) 
 		"            /tmp/gh-aw/usage/agent/model-routing.jsonl\n",
 		"            /tmp/gh-aw/usage/agent/execution.json\n",
 		"            /tmp/gh-aw/usage/agent/harness_retry.json\n",
+		"            /tmp/gh-aw/usage/agent/durable-session.jsonl\n",
 		"            /tmp/gh-aw/usage/detection/token_usage.jsonl\n",
 		"            /tmp/gh-aw/usage/detection/execution.json\n",
 		"            /tmp/gh-aw/usage/detection/harness_retry.json\n",

@@ -1,31 +1,59 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { extname, relative, resolve } from "node:path";
+import { dirname, extname, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const setupDirectory = resolve(import.meta.dirname, "..");
-const existingGoFiles = new Set(["session_parsers.go", "session_parsers_test.go", "sh/validate_multi_secret_test.go"]);
+const actionsDirectory = resolve(setupDirectory, "..");
+const existingGoFiles = new Set(["setup/session_parsers.go", "setup/session_parsers_test.go", "setup/sh/validate_multi_secret_test.go"]);
 const parserPackages = /^(?:yaml|js-yaml|work_queue_yaml)(?:[/.]|$)/;
 
-function setupFiles(directory = setupDirectory) {
+function actionFiles(directory = actionsDirectory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
-    if (entry.name === "node_modules" || entry.name === ".git") return [];
+    if (entry.name === "node_modules" || entry.name === ".git" || entry.name.startsWith(".setup-")) return [];
     const file = resolve(directory, entry.name);
-    return entry.isDirectory() ? setupFiles(file) : entry.isFile() ? [file] : [];
+    return entry.isDirectory() ? actionFiles(file) : entry.isFile() ? [file] : [];
   });
 }
 
-describe("setup runtime metadata boundary", () => {
+describe("Actions runtime metadata boundary", () => {
   it("adds no Go implementations beyond the existing embedding and shell-test files", () => {
-    const unexpected = setupFiles()
+    const unexpected = actionFiles()
       .filter(file => extname(file) === ".go")
-      .map(file => relative(setupDirectory, file))
+      .map(file => relative(actionsDirectory, file))
       .filter(file => !existingGoFiles.has(file));
     expect(unexpected).toEqual([]);
   });
 
+  it("contains no Go modules or native metadata executables anywhere in Actions", () => {
+    expect(actionFiles().filter(file => /(?:^|\/)(?:go\.(?:mod|sum)|markdown-metadata(?:\.exe)?)$/.test(file))).toEqual([]);
+  });
+
+  it("reads metadata in JavaScript without launching an external parser", () => {
+    const source = readFileSync(resolve(setupDirectory, "js/markdown_metadata.cjs"), "utf8");
+    expect(source).not.toMatch(/["'](?:node:)?child_process["']/);
+    expect(source).not.toContain('"markdown-metadata"');
+    expect(source).not.toContain('"markdown-metadata.exe"');
+  });
+
+  it("keeps repository-local runtime dependencies inside setup", () => {
+    const violations = [];
+    for (const file of actionFiles()) {
+      if (extname(file) !== ".cjs" || /(?:\.test|_checks)\.cjs$/.test(file)) continue;
+      const source = readFileSync(file, "utf8");
+      for (const match of source.matchAll(/require\s*\(\s*["'](\.[^"']+)["']\s*\)/g)) {
+        const dependency = resolve(dirname(file), match[1]);
+        const location = relative(setupDirectory, dependency);
+        if (location === ".." || location.startsWith("../") || location.startsWith("..\\")) {
+          violations.push(`${relative(actionsDirectory, file)}: ${match[1]}`);
+        }
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
   it("contains no YAML parser modules, imports, or parser API references, including in tests", () => {
     const violations = [];
-    for (const file of setupFiles()) {
+    for (const file of actionFiles()) {
       if (![".js", ".cjs", ".mjs", ".ts"].includes(extname(file))) continue;
       const source = readFileSync(file, "utf8");
       const imports = [...source.matchAll(/(?:require(?:\.resolve)?\s*\(|import\s*\(|from\s*)["']([^"']+)["']/g)].map(match => match[1]);
@@ -34,26 +62,28 @@ describe("setup runtime metadata boundary", () => {
         /(?:^|\/)work_queue_yaml\.cjs$/.test(file) ||
         /\b(?:parseDocument|parseAllDocuments)\s*\(|\.parseFrontmatter\s*\(/.test(source)
       ) {
-        violations.push(relative(setupDirectory, file));
+        violations.push(relative(actionsDirectory, file));
       }
     }
     expect(violations).toEqual([]);
-    const manifest = JSON.parse(readFileSync(resolve(setupDirectory, "js/package.json"), "utf8"));
-    const lock = JSON.parse(readFileSync(resolve(setupDirectory, "js/package-lock.json"), "utf8"));
-    for (const dependencies of [manifest.dependencies, manifest.devDependencies, manifest.optionalDependencies]) {
-      expect(Object.keys(dependencies ?? {}).filter(name => parserPackages.test(name))).toEqual([]);
+    for (const file of actionFiles().filter(file => /(?:^|\/)package(?:-lock)?\.json$/.test(file))) {
+      const manifest = JSON.parse(readFileSync(file, "utf8"));
+      for (const dependencies of [manifest.dependencies, manifest.devDependencies, manifest.optionalDependencies]) {
+        expect(Object.keys(dependencies ?? {}).filter(name => parserPackages.test(name))).toEqual([]);
+        expect(Object.values(dependencies ?? {}).filter(version => typeof version === "string" && /^npm:(?:yaml|js-yaml)(?:@|$)/.test(version))).toEqual([]);
+      }
+      expect(Object.keys(manifest.packages ?? {}).filter(name => parserPackages.test(name.replace(/^(?:.*\/)?node_modules\//, "")))).toEqual([]);
     }
-    expect(Object.keys(lock.packages).filter(name => parserPackages.test(name.replace(/^node_modules\//, "")))).toEqual([]);
   });
 
   it("does not build or install Go code in setup runtime scripts", () => {
-    const violations = setupFiles()
+    const violations = actionFiles()
       .filter(file => [".sh", ".js", ".cjs", ".mjs"].includes(extname(file)))
       .filter(file => {
         const source = readFileSync(file, "utf8");
-        return /\bgo\s+(?:build|install)\b/.test(source) || /(?:execFileSync|spawnSync|execFile|spawn)\s*\(\s*["']go["']/.test(source);
+        return /\bgo\s+(?:build|install)\b/.test(source) || /(?:execFileSync|spawnSync|execFile|spawn)\s*\(\s*["']go["']/.test(source) || /markdown-metadata\/(?:setup\.sh|vitest_setup\.mjs)/.test(source);
       })
-      .map(file => relative(setupDirectory, file));
+      .map(file => relative(actionsDirectory, file));
     expect(violations).toEqual([]);
   });
 });

@@ -59,6 +59,13 @@ async function main(core, ctx, githubClient) {
   // Build awInfo from env vars (compile-time) + context (runtime)
   const model = process.env.GH_AW_INFO_MODEL || "";
   const workflowId = process.env.GH_AW_INFO_WORKFLOW_ID || "";
+  if (!process.env.GH_AW_INFO_WORKFLOW_SHA) throw new Error("Executing compiler metadata requires GH_AW_INFO_WORKFLOW_SHA; recompile this workflow");
+  const { loadMarkdownMetadata } = require("./markdown_metadata.cjs");
+  const markdownMetadata = await loadMarkdownMetadata(workflowId, process.env.GITHUB_WORKSPACE || "", {
+    repository: ctx.repo ? `${ctx.repo.owner}/${ctx.repo.repo}` : undefined,
+    githubClient: githubClient || global.github,
+    revision: process.env.GH_AW_INFO_WORKFLOW_SHA,
+  });
 
   // Reject model names that contain an unresolved GitHub Actions expression.
   // This can happen when a vars.* expression was used for the model in the
@@ -79,6 +86,7 @@ async function main(core, ctx, githubClient) {
     agent_version: process.env.GH_AW_INFO_AGENT_VERSION || "",
     workflow_name: process.env.GH_AW_INFO_WORKFLOW_NAME || "",
     workflow_id: workflowId,
+    markdown_metadata: markdownMetadata,
     workflow_call_id: buildWorkflowCallId(ctx.runId, process.env.GITHUB_RUN_ATTEMPT, workflowId),
     // GITHUB_WORKFLOW_REF identifies the top-level caller for reusable workflows.
     caller_workflow_ref: process.env.GITHUB_WORKFLOW_REF || "",

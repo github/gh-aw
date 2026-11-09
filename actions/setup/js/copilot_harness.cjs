@@ -689,7 +689,7 @@ async function resolveCopilotSDKMultiProvider(options) {
  * @returns {Array<{ name: string, model?: string, path: string }>}
  */
 function listCopilotAgentFiles(directory, logger = log) {
-  const { readMarkdownMetadata } = require("./markdown_metadata.cjs");
+  const { readMarkdownMetadata, CompilerMetadataUnavailableError } = require("./markdown_metadata.cjs");
   let entries;
   try {
     entries = fs.readdirSync(directory, { withFileTypes: true });
@@ -707,6 +707,7 @@ function listCopilotAgentFiles(directory, logger = log) {
       const name = typeof frontmatter.name === "string" && frontmatter.name.trim() ? frontmatter.name.trim() : entry.name.slice(0, -".agent.md".length);
       agents.push({ name, path: agentPath, ...(typeof frontmatter.model === "string" ? { model: frontmatter.model.trim() } : {}) });
     } catch (error) {
+      if (error instanceof CompilerMetadataUnavailableError) throw error;
       logger(`warning: cannot read custom agent ${agentPath}: ${getErrorMessage(error)}`);
     }
   }
@@ -735,30 +736,18 @@ function listCopilotSubagents(workingDirectory, agentsBaseDir, logger = log) {
 }
 
 /**
- * Locate the top-level YAML model scalar in a Copilot agent file.
- * @param {string} content
- * @returns {{ value: string, source: string, start: number, end: number }}
- */
-function getCopilotAgentModelScalar(content) {
-  const { readMarkdownMetadata } = require("./markdown_metadata.cjs");
-  const scalar = readMarkdownMetadata("agent", content).scalars?.model;
-  if (!scalar) {
-    throw new Error("expected exactly one top-level string 'model:' scalar in the frontmatter");
-  }
-  const { value, start, end } = scalar;
-  return { value, source: content.slice(start, end), start, end };
-}
-
-/**
- * Replace the complete YAML model scalar, including any block-scalar continuation lines.
+ * Replace a compiler-owned top-level model while retaining every other field.
  * @param {string} content
  * @param {string} model
  * @returns {string}
  */
 function replaceCopilotAgentFileModelContent(content, model) {
-  const scalar = getCopilotAgentModelScalar(content);
-  const lineEnding = scalar.source.match(/(?:\r?\n)+$/)?.[0] || "";
-  return content.slice(0, scalar.start) + JSON.stringify(model) + lineEnding + content.slice(scalar.end);
+  const { editMarkdownMetadata, readMarkdownMetadata } = require("./markdown_metadata.cjs");
+  if (typeof readMarkdownMetadata("agent", content).value.model !== "string") throw new Error("expected exactly one top-level string 'model:' scalar in the frontmatter");
+  return editMarkdownMetadata(content, metadata => {
+    if (typeof metadata.model !== "string") throw new Error("expected exactly one top-level string 'model:' scalar in the frontmatter");
+    return { ...metadata, model };
+  });
 }
 
 /**
@@ -2131,6 +2120,9 @@ async function main() {
                 event = JSON.parse(line);
               } catch {
                 return;
+              }
+              if (!copilotSDKMode && durableSession && sessionId && ["session.start", "session.resume", "assistant.message", "tool.execution_start"].includes(event?.type)) {
+                durableSession.started(sessionId);
               }
               if (["error", "session.error", "turn.failed"].includes(event?.type) && NATIVE_RATE_LIMIT_ERROR_PATTERN.test(JSON.stringify(event))) {
                 nativeTerminalRateLimitError = true;

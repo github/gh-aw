@@ -100,6 +100,7 @@ type GHAWManifest struct {
 	Admission                   bool                                 `json:"admission"`
 	WebhookSubscriptions        []WebhookSubscription                `json:"webhook_subscriptions,omitempty"`
 	WorkQueue                   *GHAWManifestWorkQueue               `json:"work_queue,omitempty"`
+	MarkdownMetadata            *GHAWMarkdownMetadata                `json:"markdown_metadata,omitempty"`
 }
 
 // NewGHAWManifest builds a GHAWManifest from the raw secret names, action reference

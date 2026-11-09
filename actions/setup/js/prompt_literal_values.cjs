@@ -37,8 +37,8 @@ function createLiteralValues(state = { version: 1, prefix: `\x00VALUE_${randomUU
 }
 
 /**
- * Restore only YAML scalar values after parsing author-owned frontmatter.
- * Surgical scalar edits preserve untouched keys, comments, and formatting.
+ * Restore only compiler-owned JSON scalar values. Evaluated context cannot
+ * manufacture engine metadata keys or document delimiters.
  * @param {string} content
  * @param {(text: string) => string} restore
  */
@@ -52,10 +52,8 @@ function restoreInlineMetadata(content, restore) {
     }
     return rendered;
   }
-  const frontmatter = match[1];
-  const { readMarkdownMetadata } = require("./markdown_metadata.cjs");
-  const replacements = Object.fromEntries([...frontmatter.matchAll(/\x00VALUE_[0-9a-f-]+_\d+\x00/g)].map(match => [match[0], restore(match[0])]));
-  const rendered = readMarkdownMetadata("restore", content, { replacements }).content;
+  const { editMarkdownMetadata, transformValues } = require("./markdown_metadata.cjs");
+  const rendered = editMarkdownMetadata(content, metadata => transformValues(metadata, restore));
   const renderedMatch = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*\r?(?=\n|$)/.exec(rendered);
   if (!renderedMatch || restore(renderedMatch[1]) !== renderedMatch[1]) throw new Error(`${ERR_VALIDATION}: Evaluated inline metadata must be a scalar value`);
   return rendered.slice(0, renderedMatch[0].length) + restore(rendered.slice(renderedMatch[0].length));
@@ -71,7 +69,7 @@ function writeLiteralState(file, state) {
   const pattern = new RegExp(`${state.prefix}(\\d+)\x00`, "g");
   const used = new Set();
   for (const entry of Object.values(state.files)) {
-    for (const match of entry.opaque.matchAll(pattern)) used.add(Number(match[1]));
+    for (const match of entry.opaque.replaceAll("\\u0000", "\x00").matchAll(pattern)) used.add(Number(match[1]));
   }
   // Do not persist values discarded by author conditionals or metadata filtering.
   state.values = state.values.map((value, index) => (used.has(index) ? value : ""));

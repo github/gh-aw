@@ -6,7 +6,7 @@ import { resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
-import { readDocumentMetadata } from "./markdown_metadata.cjs";
+import { readDocumentMetadata } from "../../../scripts/markdown_metadata_test_adapter.cjs";
 import { Readable } from "node:stream";
 import { readLockFileHeaders } from "./work_queue_provisioning.cjs";
 

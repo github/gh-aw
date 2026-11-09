@@ -5,13 +5,13 @@ import * as path from "path";
 import os from "node:os";
 
 const require = createRequire(import.meta.url);
-const { runWithCopilotSDK, resolveCopilotSDKWorkingDirectory } = require("./copilot_sdk_session.cjs");
+const { readDocumentMetadata, withCompilerFixtures } = require("../../../scripts/markdown_metadata_test_adapter.cjs");
+const { runWithCopilotSDK, resolveCopilotSDKWorkingDirectory } = withCompilerFixtures(require("./copilot_sdk_session.cjs"));
 const { normalizeCopilotSession } = require("./copilot_session.cjs");
 const { resolveMultiProviderFromReflect } = require("./awf_reflect.cjs");
-const { extractInlineSubAgents } = require("./extract_inline_sub_agents.cjs");
-const { writeInlineSkills } = require("./extract_inline_skills.cjs");
+const { extractInlineSubAgents } = withCompilerFixtures(require("./extract_inline_sub_agents.cjs"));
+const { writeInlineSkills } = withCompilerFixtures(require("./extract_inline_skills.cjs"));
 const { extractFrontmatterAndBody } = require("./frontmatter_hash_pure.cjs");
-const { readDocumentMetadata } = require("./markdown_metadata.cjs");
 const models = [
   { id: "gpt-5.4", provider: "openai" },
   { id: "claude-sonnet-4.6", provider: "anthropic" },
@@ -205,7 +205,8 @@ describe("copilot_sdk_session runtime configuration", () => {
     const names = ["opt-phase-performance", "opt-phase-pr-analysis", "opt-phase-recommendations", "opt-phase-issue-creation"];
     expect(fs.readdirSync(config.skillDirectories[0]).sort()).toEqual([...names].sort());
     for (const name of names) {
-      expect(fs.readFileSync(path.join(config.skillDirectories[0], name, "SKILL.md"), "utf8")).toContain("description:");
+      const content = fs.readFileSync(path.join(config.skillDirectories[0], name, "SKILL.md"), "utf8");
+      expect(JSON.parse(extractFrontmatterAndBody(content).frontmatterText).description).toEqual(expect.any(String));
       expect(prompt).toContain(`/tmp/gh-aw/.github/skills/${name}/SKILL.md`);
       expect(prompt).not.toContain(`Invoke skill \`${name}\``);
     }

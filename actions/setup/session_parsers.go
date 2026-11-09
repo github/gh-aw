@@ -7,6 +7,7 @@ import "embed"
 //
 //go:embed js/session_cli.cjs js/unified_session.cjs js/unified_session_payload.cjs js/unified_session_render.cjs
 //go:embed js/memory_save_results.cjs
+//go:embed js/durable_session_record.cjs
 //go:embed js/steering_helpers.cjs js/jsonl_helpers.cjs
 //go:embed js/schema-validation.cjs js/json_schema_validation.cjs js/memory_schema_contract.cjs
 //go:embed js/add_labels_schema.cjs
@@ -37,7 +38,7 @@ import "embed"
 //go:embed js/ephemerals.cjs js/project_timezone.cjs
 //go:embed js/add_mask_redaction.cjs js/json_string_scanner.cjs js/mask_value_matcher.cjs js/redact_secrets.cjs js/safe_output_redaction.cjs js/safe_outputs_tools.json js/safe_outputs_config_redact.cjs js/safe_output_manifest.cjs js/safe_output_outcomes.cjs js/safe_outputs_status.cjs
 //go:embed js/otlp_header_helpers.cjs js/otlp.cjs js/work_queue_telemetry.cjs
-//go:embed js/work_queue_claim_scope.cjs js/work_queue_codec.cjs js/work_queue_resource_scope.cjs
+//go:embed js/work_queue_claim_scope.cjs js/work_queue_codec.cjs js/lock_file_headers.cjs js/work_queue_resource_scope.cjs
 //go:embed js/work_queue_host.cjs
 //go:embed js/aw_context.cjs js/experiment_helpers.cjs js/finish_work_queue_claim.cjs
 //go:embed js/webhook_context.cjs js/provider_issue_webhook.cjs js/webhook_resource.cjs

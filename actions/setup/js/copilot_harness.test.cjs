@@ -85,7 +85,7 @@ const {
   logCopilotInferenceConfiguration,
   resolveLongRunTokenThreshold,
   computeStartupRetryEligible,
-} = require("./copilot_harness.cjs");
+} = require("../../../scripts/markdown_metadata_test_adapter.cjs").withCompilerFixtures(require("./copilot_harness.cjs"));
 
 describe("external detection artifact access", () => {
   it.each(["/tmp/gh-aw/threat-detection-inputs", "/runner temp/gh-aw/threat-detection-inputs"])("grants access only to the prepared inputs at %s", inputDir => {
@@ -5092,7 +5092,7 @@ describe("Copilot sub-agent model resolution (recorded /reflect from run 3930457
     expect(run.resolutions).toEqual([{ name: "haiku-small", configuredModel: "small", resolvedModel: "claude-haiku-5.5", model: expected }]);
 
     // The harness hands the resolved models to the SDK driver, which passes them to the session.
-    const { runWithCopilotSDK } = require("./copilot_sdk_session.cjs");
+    const { runWithCopilotSDK } = require("../../../scripts/markdown_metadata_test_adapter.cjs").withCompilerFixtures(require("./copilot_sdk_session.cjs"));
     const base = tempDir("copilot-subagent-sdk-session-");
     fs.mkdirSync(path.join(base, ".github/agents"), { recursive: true });
     fs.writeFileSync(path.join(base, ".github/agents/haiku-small.agent.md"), "---\nmodel: small\n---\nWho are you?");
@@ -5162,7 +5162,7 @@ describe("Copilot sub-agent model resolution (recorded /reflect from run 3930457
     expect(run.records).toContainEqual({ engine: "copilot", role: "planner", configured_model: "GPT-5.4 (copilot)", resolved_model: null, provider: "copilot", status: "failed", cause: "model_unavailable" });
     expect(run.resolutions.map(resolution => resolution.name)).toEqual(["haiku-small"]);
 
-    const { runWithCopilotSDK } = require("./copilot_sdk_session.cjs");
+    const { runWithCopilotSDK } = require("../../../scripts/markdown_metadata_test_adapter.cjs").withCompilerFixtures(require("./copilot_sdk_session.cjs"));
     const base = tempDir("copilot-subagent-sdk-repository-");
     fs.mkdirSync(path.join(base, ".github/agents"), { recursive: true });
     fs.writeFileSync(path.join(base, ".github/agents/planner.agent.md"), vscodePinnedAgent);
@@ -5226,8 +5226,8 @@ describe("Copilot sub-agent model resolution (recorded /reflect from run 3930457
     ]);
     const personalAgentsDir = path.join(copilotHome, "agents");
     expect(fs.readdirSync(personalAgentsDir).sort()).toEqual(["haiku-small.agent.md", "multiline.agent.md"]);
-    expect(fs.readFileSync(path.join(personalAgentsDir, "haiku-small.agent.md"), "utf8")).toBe(files["haiku-small.agent.md"].replace("model: small # alias", 'model: "claude-haiku-5.5" # alias'));
-    expect(fs.readFileSync(path.join(personalAgentsDir, "multiline.agent.md"), "utf8")).toBe('---\nname: multiline\nmodel: "claude-haiku-5.5"\ndescription: retained\n---\nPrompt retained.\n');
+    expect(fs.readFileSync(path.join(personalAgentsDir, "haiku-small.agent.md"), "utf8")).toBe('---\n{"description":"Small model","model":"claude-haiku-5.5","name":"haiku-small","tools":["read"]}\n---\nWho are you?\nmodel: small\n');
+    expect(fs.readFileSync(path.join(personalAgentsDir, "multiline.agent.md"), "utf8")).toBe('---\n{"description":"retained","model":"claude-haiku-5.5","name":"multiline"}\n---\nPrompt retained.\n');
     for (const [name, content] of Object.entries(files)) expect(fs.readFileSync(path.join(agentsDir, name), "utf8")).toBe(content);
     expect(execFileSync("git", ["status", "--porcelain"], { cwd: workspace, encoding: "utf8" })).toBe("");
   });
@@ -5314,6 +5314,8 @@ Module._load = function(request, ...args) {
    */
   async function runHarness({ sdk = false, agents = {}, inlineAgents = {}, workspaceAgents = {}, noop = false, reflect = recordedReflect(), env: envOverrides = {} }) {
     const dir = tempDir("copilot-subagent-harness-");
+    const markdownMetadata = require("../../../scripts/markdown_metadata_test_adapter.cjs").prepareMarkdownFixtures(...Object.values(agents), ...Object.values(inlineAgents), ...Object.values(workspaceAgents));
+    fs.writeFileSync(path.join(dir, "aw_info.json"), JSON.stringify({ markdown_metadata: markdownMetadata }));
     const workspace = path.join(dir, "workspace");
     const engineCwd = envOverrides.GH_AW_ENGINE_CWD || workspace;
     fs.mkdirSync(path.join(engineCwd, ".github/agents"), { recursive: true });
@@ -5504,7 +5506,7 @@ process.stdout.write("done\\n");`
     const run = await runHarness({ agents: { "haiku-small.agent.md": "---\nname: haiku-small\nmodel: small\n---\nWho are you?\n" } });
     expect(run.result.status, run.result.stderr).toBe(0);
     expect(run.started).not.toBeNull();
-    expect(run.started.personalAgents).toEqual({ "haiku-small.agent.md": '---\nname: haiku-small\nmodel: "claude-haiku-5.5"\n---\nWho are you?\n' });
+    expect(run.started.personalAgents).toEqual({ "haiku-small.agent.md": '---\n{"model":"claude-haiku-5.5","name":"haiku-small"}\n---\nWho are you?\n' });
     expect(run.started.agentFiles["haiku-small.agent.md"]).toBe("---\nname: haiku-small\nmodel: small\n---\nWho are you?\n");
     expect(run.agentFile("haiku-small.agent.md")).toBe("---\nname: haiku-small\nmodel: small\n---\nWho are you?\n");
     expect(run.gitStatus()).toBe("");
@@ -5515,7 +5517,7 @@ process.stdout.write("done\\n");`
     const inline = "---\nname: inline-large\nmodel: large\n---\nPropose.\n";
     const run = await runHarness({ inlineAgents: { "inline-large.agent.md": inline } });
     expect(run.result.status, run.result.stderr).toBe(0);
-    expect(run.started.personalAgents).toEqual({ "inline-large.agent.md": '---\nname: inline-large\nmodel: "claude-sonnet-5.5"\n---\nPropose.\n' });
+    expect(run.started.personalAgents).toEqual({ "inline-large.agent.md": '---\n{"model":"claude-sonnet-5.5","name":"inline-large"}\n---\nPropose.\n' });
     expect(run.agentFile("inline-large.agent.md")).toBe(inline);
   });
 

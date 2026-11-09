@@ -8,11 +8,11 @@ import { parse as parseToml } from "smol-toml";
 
 const require = createRequire(import.meta.url);
 global.core = { info: () => {}, warning: () => {}, error: () => {}, setFailed: () => {} };
-const { applyClaudeSubagentModels, applyCodexSubagentModels, isDetectionPhase, replaceAgentModel } = require("./engine_subagent_models.cjs");
+const { applyClaudeSubagentModels, applyCodexSubagentModels, isDetectionPhase, replaceAgentModel } = require("../../../scripts/markdown_metadata_test_adapter.cjs").withCompilerFixtures(require("./engine_subagent_models.cjs"));
 const { extractInlineSubAgents, writeInlineSubAgents } = require("./extract_inline_sub_agents.cjs");
 const { claudeBareCapabilities, removeClaudePlugin } = require("./claude_runtime.cjs");
 const { extractFrontmatterAndBody } = require("./frontmatter_hash_pure.cjs");
-const { readDocumentMetadata } = require("./markdown_metadata.cjs");
+const { readDocumentMetadata, prepareMarkdownFixtures } = require("../../../scripts/markdown_metadata_test_adapter.cjs");
 const { recordModelResolution } = require("./resolve_model_alias.cjs");
 const runs = require("./fixtures/claude_codex_subagent_runs.cjs");
 
@@ -47,6 +47,7 @@ function layout() {
 /** Stage inline agents through the activation writer and restore them into the workspace. */
 function stageInline(run, engine, agents) {
   const markdown = ["# Workflow", "", "Main prompt.", ...Object.entries(agents).flatMap(([name, content]) => ["", `## agent: \`${name}\``, content.trimEnd()])].join("\n");
+  prepareMarkdownFixtures(markdown);
   writeInlineSubAgents(markdown, run.workspaceDir, run.agentsBaseDir, engine);
   const dir = engine === "claude" ? ".claude/agents" : ".codex/agents";
   fs.mkdirSync(path.join(run.workspaceDir, dir), { recursive: true });
@@ -348,7 +349,7 @@ describe("Claude sub-agent models (Typist run 39415087125)", () => {
   });
 
   it("replaces only the model scalar", () => {
-    expect(replaceAgentModel('---\nname: "a"\nmodel: small\ntools: Read\n---\nBody model: small\n', "claude-haiku-5-5")).toBe('---\nname: "a"\nmodel: "claude-haiku-5-5"\ntools: Read\n---\nBody model: small\n');
+    expect(replaceAgentModel('---\nname: "a"\nmodel: small\ntools: Read\n---\nBody model: small\n', "claude-haiku-5-5")).toBe('---\n{"model":"claude-haiku-5-5","name":"a","tools":"Read"}\n---\nBody model: small\n');
   });
 });
 
@@ -441,9 +442,10 @@ describe("Codex sub-agent models (daily-arxiv-researcher run 39394965127)", () =
     }
     // The staged Markdown and its workspace copy are left unchanged.
     for (const [name, content] of Object.entries(agents)) {
-      const expected = content.endsWith("\n") ? content : `${content}\n`;
-      expect(fs.readFileSync(path.join(run.agentsBaseDir, ".codex/agents", `${name}.md`), "utf8")).toBe(expected);
-      expect(fs.readFileSync(path.join(run.workspaceDir, ".codex/agents", `${name}.md`), "utf8")).toBe(expected);
+      const staged = fs.readFileSync(path.join(run.agentsBaseDir, ".codex/agents", `${name}.md`), "utf8");
+      expect(frontmatterOf(staged)).toEqual(frontmatterOf(content));
+      expect(bodyOf(staged)).toBe(bodyOf(content));
+      expect(fs.readFileSync(path.join(run.workspaceDir, ".codex/agents", `${name}.md`), "utf8")).toBe(staged);
     }
   });
 

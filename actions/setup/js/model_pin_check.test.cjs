@@ -8,7 +8,8 @@ import { createRequire } from "module";
 import { fileURLToPath } from "url";
 
 const require = createRequire(import.meta.url);
-const { buildModelPinReport, collectModelPins, main, renderModelPinReport, renderModelPinSummary } = require("./model_pin_check.cjs");
+const { withCompilerFixtures } = require("../../../scripts/markdown_metadata_test_adapter.cjs");
+const { buildModelPinReport, collectModelPins, main, renderModelPinReport, renderModelPinSummary } = withCompilerFixtures(require("./model_pin_check.cjs"));
 // Recorded /reflect from Design Decision Gate run 38945917145 (40 Copilot models; no claude-opus-5).
 const { ddgReflect, incompleteDiscovery } = require("./fixtures/model_resolution_reflect.cjs");
 
@@ -109,6 +110,26 @@ describe("model_pin_check acceptance cases", () => {
 });
 
 describe("model_pin_check collection and rules", () => {
+  it("reads each workflow's own scoped JSON headers without a global configuration catalog", () => {
+    const first = "engine: copilot\nmodel: scoped-small\nimports: [../aw/nested/models.md]";
+    const second = "engine: copilot\nmodel: sonnet";
+    const imported = "models:\n  scoped-small: [gpt-5-mini]";
+    const record = (source, value) => ({ sha256: crypto.createHash("sha256").update(source).digest("hex"), kind: "model-pins", value_json: JSON.stringify(value) });
+    const header = records => `# gh-aw-metadata: {}\n# gh-aw-manifest: ${JSON.stringify({ markdown_metadata: { version: 1, records } })}\n# generated\ninvalid: [yaml\n`;
+    const root = fixtureRepo({
+      ".github/workflows/first.md": `---\n${first}\n---\n`,
+      ".github/workflows/second.md": `---\n${second}\n---\n`,
+      ".github/aw/nested/models.md": `---\n${imported}\n---\n`,
+      ".github/workflows/first.lock.yml": header([record(first, { engine: "copilot", model: "scoped-small", imports: ["../aw/nested/models.md"] }), record(imported, { models: { "scoped-small": ["gpt-5-mini"] } })]),
+      ".github/workflows/second.lock.yml": header([record(second, { engine: "copilot", model: "sonnet" })]),
+    });
+    require("./markdown_metadata.cjs").installMarkdownMetadata({ version: 1, records: [] });
+    const result = require("./model_pin_check.cjs").collectModelPins({ repoRoot: root });
+    expect(result.errors).toEqual([]);
+    expect(result.pins.filter(pin => pin.field === "model").map(pin => pin.model)).toEqual(["scoped-small", "sonnet"]);
+    expect(result.pins.find(pin => pin.field === "models.scoped-small")).toMatchObject({ aliasEntries: ["gpt-5-mini"] });
+  });
+
   it("collects engine, detection, evals, sub-agent and imported pins with file and field", () => {
     const report = check({
       ".github/workflows/full.md": [

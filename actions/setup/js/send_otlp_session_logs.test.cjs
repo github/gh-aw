@@ -53,6 +53,17 @@ describe("compact unified session OTLP logs", () => {
     expect(Object.keys(require("./send_otlp_session_logs.cjs"))).toEqual(["sendSessionLogs"]);
   });
 
+  it("exports the validated durable parent as a searchable string attribute", async () => {
+    write([
+      { type: "durable.restore", data: { engine: "copilot", storage: "artifact", runId: "200", runAttempt: "1", status: "restored", parentRunId: "100", artifactId: "99" } },
+      { type: "durable.session", data: { engine: "copilot", storage: "artifact", runId: "200", runAttempt: "1", status: "resumed", parentRunId: "100", sessionId: "native-session" } },
+      { type: "durable.restore", data: { engine: "copilot", storage: "artifact", runId: "200", runAttempt: "1", status: "fresh" } },
+    ]);
+    await sendSessionLogs({ sessionPath });
+    for (const record of records().slice(0, 2)) expect(record.attributes).toContainEqual({ key: "gh-aw.durable.parent_run_id", value: { stringValue: "100" } });
+    expect(records()[2].attributes).not.toContainEqual(expect.objectContaining({ key: "gh-aw.durable.parent_run_id" }));
+  });
+
   it.each([
     { timestamp: "2026-10-20T19:00:00.123456789Z", expected: "1792522800123456789" },
     { timestamp: "2026-10-20T21:00:00.123456789+02:00", expected: "1792522800123456789" },

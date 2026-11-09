@@ -17,6 +17,7 @@ const { normalizeCodexSession } = require("./codex_session.cjs");
 const { projectSessionResult, observedSessionModel } = require("./agent_session.cjs");
 const { resolveEffectiveModel, resolveModelRoutingSummary } = require("./model_attribution.cjs");
 const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
+const { isDurableSessionRecord } = require("./durable_session_record.cjs");
 const { readEvalsNotEvaluatedStatus } = require("./evals_status.cjs");
 const { MAX_OTLP_RESPONSE_BYTES, readOTLPResponse, inspectOTLPResponse, unavailableOTLPResponse } = require("./otlp_response.cjs");
 const { OTEL_ATTR_WORKFLOW_NAME, OTEL_ATTR_REPOSITORY, OTEL_ATTR_RUN_ID, OTEL_ATTR_GITHUB_RUN_ID, OTEL_ATTR_ENGINE_ID, canonicalAttributeName } = require("./otel_attributes_generated.cjs");
@@ -1705,6 +1706,26 @@ function readJSONLIfExists(filePath) {
   }
 }
 
+function readDurableParentRunId(runId, runAttempt) {
+  const file = getGhAwPath("agent/durable-session.jsonl");
+  try {
+    const info = fs.lstatSync(file);
+    if (!info.isFile() || info.size > 1024 * 1024 || fs.lstatSync(path.dirname(file)).isSymbolicLink()) throw new Error("Invalid durable session source");
+    let parentRunId;
+    for (const record of iterateJsonl(fs.readFileSync(file, "utf8"), { strict: true })) {
+      if (!isDurableSessionRecord(record)) throw new Error("Invalid durable session metadata");
+      if (record.data.runId !== String(runId) || record.data.runAttempt !== String(runAttempt) || record.type !== "durable.restore" || record.data.status !== "restored") continue;
+      if (parentRunId && parentRunId !== record.data.parentRunId) throw new Error("Conflicting durable session parents");
+      parentRunId = record.data.parentRunId;
+    }
+    return parentRunId;
+  } catch (error) {
+    const code = error && typeof error === "object" && "code" in error ? error.code : undefined;
+    if (code !== "ENOENT") console.warn("[otlp] Durable session parent unavailable: invalid or unreadable metadata");
+    return undefined;
+  }
+}
+
 /**
  * Path to the GitHub rate-limit JSONL log file.
  * Mirrors GITHUB_RATE_LIMITS_JSONL_PATH from constants.cjs without introducing
@@ -2378,6 +2399,10 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   }
 
   const attributes = [buildAttr(OTEL_ATTR_WORKFLOW_NAME, workflowName), buildAttr(OTEL_ATTR_RUN_ID, runId), buildAttr("gh-aw.run.attempt", runAttempt), buildAttr("gh-aw.run.actor", actor), buildAttr(OTEL_ATTR_REPOSITORY, repository)];
+  if (jobName === "agent") {
+    const durableParentRunId = readDurableParentRunId(runId, runAttempt);
+    if (durableParentRunId) attributes.push(buildAttr("gh-aw.durable.parent_run_id", durableParentRunId));
+  }
   const runUrlAttr = buildGitHubActionsRunUrlAttribute(repository, runId);
   if (runUrlAttr) {
     attributes.push(runUrlAttr);

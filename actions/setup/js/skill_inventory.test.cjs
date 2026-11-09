@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
 
-const { inventoryDirectory, detectSkillConflicts, main } = createRequire(import.meta.url)("./skill_inventory.cjs");
+const { inventoryDirectory, detectSkillConflicts, main } = createRequire(import.meta.url)("../../../scripts/markdown_metadata_test_adapter.cjs").withCompilerFixtures(createRequire(import.meta.url)("./skill_inventory.cjs"));
 
 describe("skill inventory", () => {
   let root;
