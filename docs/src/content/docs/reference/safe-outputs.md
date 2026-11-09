@@ -109,7 +109,7 @@ The tables below summarize the built-in safe output handlers. `noop`, `report-mi
 | Output | Key | Description |
 |--------|-----|-------------|
 | [Create Issue](#issue-creation-create-issue) | `create-issue` | Create GitHub issues (max: 1) |
-| [Update Issue](#issue-updates-update-issue) | `update-issue` | Update issue status, title, or body (max: 1) |
+| [Update Issue](#issue-updates-update-issue) | `update-issue` | Update issue properties or artifacts (max: 1) |
 | [Close Issue](#close-issue-close-issue) | `close-issue` | Close issues with comment (max: 1) |
 | [Link Sub-Issue](#link-sub-issue-link-sub-issue) | `link-sub-issue` | Link issues as sub-issues (max: 1) |
 | [Create Discussion](#discussion-creation-create-discussion) | `create-discussion` | Create GitHub discussions (max: 1) |
@@ -817,8 +817,26 @@ When using `target: "*"`, the agent must provide `issue_number` or `item_number`
 - `replace`: Completely replaces existing body with new content and attribution
 - `replace-island`: Updates a specific section marked with HTML comments
 
-Agent output format: `{"type": "update_issue", "issue_number": 123, "operation": "append", "body": "..."}`. The `operation` field is optional (defaults to `append`). Each call must include at least one update field: `status`, `title`, `body`, `labels`, `assignees`, or `milestone`; an issue number or operation alone is rejected. Set `milestone` to `null` to clear the issue's milestone; omitting `milestone` leaves it unchanged.
+Agent output format: `{"type": "update_issue", "issue_number": 123, "operation": "append", "body": "..."}`. The `operation` field is optional (defaults to `append`). Each call must include at least one update field: `status`, `title`, `body`, `labels`, `assignees`, `milestone`, or `artifacts`; an issue number or operation alone is rejected. Set `milestone` to `null` to clear the issue's milestone; omitting `milestone` leaves it unchanged.
 For issue field updates, use [`set_issue_field`](#set-issue-field-set-issue-field).
+
+#### Updating Issue Artifacts
+
+`update_issue` accepts the same [artifact inputs](#issue-artifacts) as `create_issue`: a `name`, exactly one of inline `body` or absolute `path`, and an optional `type` (default: `generic`). An artifact-only call leaves the issue body unchanged.
+
+```yaml wrap
+safe-outputs:
+  update-issue:
+    target: triggering
+    max-issue-artifacts: 3       # per-call limit (default: 10; <=0 disables)
+    max-issue-artifact-size: 1mb # per-artifact UTF-8 bytes (default: 1 MB)
+```
+
+Agent output: `{"type":"update_issue","artifacts":[{"name":"Plan","type":"plan","body":"Implementation plan"}]}`.
+
+Artifacts are matched by exact, case-sensitive sanitized name on the target issue. A new name creates an artifact; a matching name updates that artifact and adds a version rather than creating a duplicate. If duplicate names already exist, the lowest-numbered artifact is updated. The type must match the existing artifact because the API cannot change it.
+
+The same path guards, sanitization, and pre- and post-sanitization size checks as `create_issue` apply. Target authorization, required filters, cross-repository restrictions, and credentials also apply to artifacts. Staged mode makes no artifact API calls. Attachment failures report the target issue's number and URL and the count already attached or updated; prior issue edits and artifact writes are not rolled back, and the entire update is not retried.
 
 ### Pull Request Updates (`update-pull-request:`)
 

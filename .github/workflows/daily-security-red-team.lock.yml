@@ -845,7 +845,7 @@ jobs:
         env:
           GH_AW_FILE_ROOT: "${{ runner.temp }}/gh-aw"
           GH_AW_FILE_CONFIG: "{\"files\":[{\"path\":\"safeoutputs/config.json\",\"content_env\":\"GH_AW_SAFE_OUTPUTS_CONFIG\"}]}"
-          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_discussion\":{\"category\":\"audits\",\"close_older_discussions\":true,\"expires\":72,\"fallback_to_issue\":true,\"max\":1,\"title_prefix\":\"[security-red-team] \"},\"create_issue\":{\"deduplicate_by_labels\":[\"security\",\"red-team\"],\"deduplicate_by_title\":true,\"labels\":[\"security\",\"red-team\",\"cookie\"],\"max\":1,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10,\"title_prefix\":\"🚨 [SECURITY]\"},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{},\"update_issue\":{\"allow_body\":true,\"allow_title\":true,\"max\":1,\"target\":\"*\",\"title_prefix\":\"🚨 [SECURITY] Security Red Team Findings\"}}"
+          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_discussion\":{\"category\":\"audits\",\"close_older_discussions\":true,\"expires\":72,\"fallback_to_issue\":true,\"max\":1,\"title_prefix\":\"[security-red-team] \"},\"create_issue\":{\"deduplicate_by_labels\":[\"security\",\"red-team\"],\"deduplicate_by_title\":true,\"labels\":[\"security\",\"red-team\",\"cookie\"],\"max\":1,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10,\"title_prefix\":\"🚨 [SECURITY]\"},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{},\"update_issue\":{\"allow_body\":true,\"allow_title\":true,\"max\":1,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10,\"target\":\"*\",\"title_prefix\":\"🚨 [SECURITY] Security Red Team Findings\"}}"
         with:
           script: |
             const path = require('path');
@@ -861,7 +861,7 @@ jobs:
               "description_suffixes": {
                 "create_discussion": " CONSTRAINTS: Maximum 1 discussion(s) can be created. Title will be prefixed with \"[security-red-team] \". Discussions will be created in category \"audits\".",
                 "create_issue": " CONSTRAINTS: Maximum 1 issue(s) can be created. Title will be prefixed with \"🚨 [SECURITY]\". Labels [\"security\" \"red-team\" \"cookie\"] will be automatically added. Maximum 10 artifact(s) can be attached per issue. Maximum artifact body size: 1048576 UTF-8 bytes.",
-                "update_issue": " CONSTRAINTS: Maximum 1 issue(s) can be updated. Target: *. The target issue title must start with \"🚨 [SECURITY] Security Red Team Findings\". Body updates are allowed."
+                "update_issue": " CONSTRAINTS: Maximum 1 issue(s) can be updated. Maximum 10 artifact(s) can be attached per issue. Maximum artifact body size: 1048576 UTF-8 bytes. Target: *. The target issue title must start with \"🚨 [SECURITY] Security Red Team Findings\". Body updates are allowed."
               },
               "repo_params": {},
               "dynamic_tools": []
@@ -1017,6 +1017,9 @@ jobs:
               "update_issue": {
                 "defaultMax": 1,
                 "fields": {
+                  "artifacts": {
+                    "type": "array"
+                  },
                   "assignees": {
                     "type": "array",
                     "itemType": "string",
@@ -1064,7 +1067,7 @@ jobs:
                     "maxLength": 128
                   }
                 },
-                "customValidation": "requiresOneOf:status,title,body,labels,assignees,milestone"
+                "customValidation": "requiresOneOf:status,title,body,labels,assignees,milestone,artifacts"
               }
             }
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -3136,7 +3139,7 @@ jobs:
           GH_AW_ALLOWED_DOMAINS: "*.githubusercontent.com,*.grafana.net,*.sentry.io,api.npms.io,archive.ubuntu.com,azure.archive.ubuntu.com,bun.sh,cdn.jsdelivr.net,codeload.github.com,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,deb.nodesource.com,deno.land,docs.github.com,esm.sh,get.pnpm.io,github-cloud.githubusercontent.com,github-cloud.s3.amazonaws.com,github.blog,github.com,github.githubassets.com,googleapis.deno.dev,googlechromelabs.github.io,json-schema.org,json.schemastore.org,jsr.io,keyserver.ubuntu.com,lfs.github.com,nodejs.org,npm.pkg.github.com,npmjs.com,npmjs.org,objects.githubusercontent.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,patch-diff.githubusercontent.com,patchdiff.githubusercontent.com,raw.githubusercontent.com,registry.bower.io,registry.npmjs.com,registry.npmjs.org,registry.yarnpkg.com,repo.yarnpkg.com,s.symcb.com,s.symcd.com,security.ubuntu.com,skimdb.npmjs.com,storage.googleapis.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com,www.npmjs.com,www.npmjs.org,yarnpkg.com"
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_discussion\":{\"category\":\"audits\",\"close_older_discussions\":true,\"expires\":72,\"fallback_to_issue\":true,\"max\":1,\"title_prefix\":\"[security-red-team] \"},\"create_issue\":{\"deduplicate_by_labels\":[\"security\",\"red-team\"],\"deduplicate_by_title\":true,\"labels\":[\"security\",\"red-team\",\"cookie\"],\"max\":1,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10,\"title_prefix\":\"🚨 [SECURITY]\"},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{},\"update_issue\":{\"allow_body\":true,\"allow_title\":true,\"max\":1,\"target\":\"*\",\"title_prefix\":\"🚨 [SECURITY] Security Red Team Findings\"}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_discussion\":{\"category\":\"audits\",\"close_older_discussions\":true,\"expires\":72,\"fallback_to_issue\":true,\"max\":1,\"title_prefix\":\"[security-red-team] \"},\"create_issue\":{\"deduplicate_by_labels\":[\"security\",\"red-team\"],\"deduplicate_by_title\":true,\"labels\":[\"security\",\"red-team\",\"cookie\"],\"max\":1,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10,\"title_prefix\":\"🚨 [SECURITY]\"},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{},\"update_issue\":{\"allow_body\":true,\"allow_title\":true,\"max\":1,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10,\"target\":\"*\",\"title_prefix\":\"🚨 [SECURITY] Security Red Team Findings\"}}"
           GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
