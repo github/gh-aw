@@ -115,6 +115,7 @@ test_curl_retry_all_errors() {
   local release_version="${7:-v0.28.62}"
   local attestation_failure="${8:-}"
   local identity_version="${9:-$release_version}"
+  local curl_failure_asset="${10:-}"
   local test_dir
   local option_index
   local -a actual_options
@@ -149,6 +150,12 @@ while [ "$#" -gt 0 ]; do
   fi
   shift
 done
+case "${output:-}" in
+  */"${AWF_TEST_CURL_FAILURE_ASSET:-__never__}")
+    echo "simulated curl network failure" >&2
+    exit 7
+    ;;
+esac
 if [[ "${output}" == *checksums.txt ]]; then
   printf '%064d awf-linux-x64\n%064d awf-darwin-x64\n%064d awf-bundle.js\n' 0 0 0 > "${output}"
 elif [[ "${output}" == *release-identity.txt ]]; then
@@ -194,6 +201,7 @@ EOF
   AWF_TEST_MANIFEST_SHA256="$(release_artifact_sha256 github/gh-aw-firewall "$release_version" checksums.txt)" \
     CURL_HELP_ALL_OUTPUT="${curl_help_all}" CURL_HELP_OUTPUT="${curl_help}" CURL_HELP_ALL_FAILS="${help_all_fails}" CURL_ARGS_FILE="${test_dir}/curl-args" \
     AWF_TEST_ATTESTATION_LOG="${test_dir}/attestations" AWF_TEST_ATTESTATION_FAILURE="$attestation_failure" AWF_TEST_IDENTITY_VERSION="$identity_version" \
+    AWF_TEST_CURL_FAILURE_ASSET="$curl_failure_asset" \
     AWF_TEST_NODE_VERSION="$node_version" AWF_TEST_OS="$platform" HOME="${test_dir}/home" GITHUB_PATH="${test_dir}/github-path" \
     RUNNER_TEMP="$test_dir" PATH="${test_dir}/bin:${PATH}" bash "${SCRIPT_DIR}/install_awf_binary.sh" "$release_version" --rootless >"${test_dir}/output" 2>&1 || installer_exit=$?
   if [ -n "$attestation_failure" ] || [ "$identity_version" != "$release_version" ]; then
@@ -228,6 +236,14 @@ EOF
   curl_args_files=("${test_dir}"/curl-args.[0-9]*)
   shopt -u nullglob
   local expected_downloads=2
+  if [ -n "$curl_failure_asset" ]; then
+    expected_downloads=$((expected_downloads + 1))
+    if ! grep -qF "simulated curl network failure" "${test_dir}/output"; then
+      TEST_FAILURE_REASON="failed curl output was not included in the installer diagnostics"
+      rm -rf "$test_dir"
+      return 1
+    fi
+  fi
   if [ "$release_version" = v0.29.5 ] || [ "$release_version" = v0.29.6 ] || [ "$release_version" = v0.29.7 ]; then
     expected_downloads=3
     if [ "$(wc -l < "${test_dir}/attestations")" -ne 3 ]; then
@@ -341,6 +357,11 @@ if test_curl_retry_all_errors '--retry-all-errors' true false '--retry-all-error
   pass "attested identity for another tag prevents installation"
 else
   fail "mismatched release identity was accepted" "$TEST_FAILURE_REASON"
+fi
+if test_curl_retry_all_errors '--retry-all-errors' true false '--retry-all-errors' v24.0.0 Linux v0.28.62 '' v0.28.62 awf-bundle.js; then
+  pass "failed download output is included in installer diagnostics before fallback"
+else
+  fail "failed download output was not preserved" "$TEST_FAILURE_REASON"
 fi
 
 # Test 7: warning emitted when GITHUB_PATH is unset in rootless mode
