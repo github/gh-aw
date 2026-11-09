@@ -10,7 +10,7 @@ const { defaultPolicy } = require("./work_queue_policy.cjs");
 const { buildAWPolicy } = require("./work_queue_settings.cjs");
 const { MAX_WORKFLOW_BYTES, verifyWorkerRoute, verifyWorkerRoutes, readLockFileHeaders, workerContract } = require("./work_queue_provisioning.cjs");
 
-const validYAML = "on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\n";
+const validYAML = `# gh-aw-manifest: ${JSON.stringify({ work_queue: { worker: true, logical_contract: "a".repeat(64) } })}\non:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\n`;
 const profile = defaultPolicy({ repository: "owner/repo", principal: "1001", ref: "a".repeat(40) }).pools.default.profiles.default;
 
 /** @param {string} content @param {{contentError?: Error, registrationError?: Error}} failures */
@@ -68,8 +68,9 @@ function registerTests({ describe, it }) {
         ["registration", { owner: "owner", repo: "repo", workflow_id: "worker.lock.yml", request: native.calls[1][1].request }],
       ]);
     });
-    it("requires valid YAML with the work queue assignment string input", async () => {
+    it("requires compiler worker metadata rather than parsing the workflow body", async () => {
       await verifyWorkerRoute(options(nativeRoute(validYAML)));
+      await verifyWorkerRoute(options(nativeRoute(validYAML.split("\n")[0] + "\nnot YAML at all")));
       for (const contents of [
         "this is deliberately not workflow YAML",
         "on: [\n",
@@ -92,6 +93,10 @@ function registerTests({ describe, it }) {
       const boundedHeaders = await readLockFileHeaders(lateManifest);
       assert.equal(workerContract(boundedHeaders.manifest), undefined);
       assert.equal(lateManifest.destroyed, true);
+      const duplicateManifest = Readable.from([`# gh-aw-metadata: ${JSON.stringify(metadata)}\n# gh-aw-manifest: ${JSON.stringify(manifest)}\n# gh-aw-manifest: ${JSON.stringify(manifest)}\n`]);
+      assert.equal((await readLockFileHeaders(duplicateManifest)).manifest, undefined);
+      const duplicateMetadata = Readable.from([`# gh-aw-metadata: ${JSON.stringify(metadata)}\n# gh-aw-manifest: ${JSON.stringify(manifest)}\n# gh-aw-metadata: ${JSON.stringify(metadata)}\n`]);
+      assert.equal((await readLockFileHeaders(duplicateMetadata)).metadata, undefined);
     });
     it("reads only valid worker metadata from the compiler manifest", () => {
       const contract = "a".repeat(64);
@@ -189,16 +194,18 @@ function registerTests({ describe, it }) {
       await rejected(native, policy.pools.default.profiles.worker);
       assert.equal(native.calls.length, 1);
     });
-    it("validates worker assignment inputs with the bundled YAML parser", () => {
+    it("reads lock metadata and manifests with the JavaScript helper, without parsers or native processes", () => {
       const script = `
         const assert = require("node:assert/strict");
         const Module = require("node:module");
         const load = Module._load;
         Module._load = function(name, ...args) {
-          if (!name.startsWith("node:") && !name.startsWith(".") && !name.startsWith("/")) throw new Error("runtime npm package forbidden: " + name);
+          if (name.includes("markdown_metadata") || name === "node:child_process" || name === "child_process") throw new Error("lock headers must not use a native metadata parser");
+          if (!Module.isBuiltin(name) && !name.startsWith(".") && !name.startsWith("/")) throw new Error("unexpected runtime npm package: " + name);
           return load.call(this, name, ...args);
         };
-        const { verifyWorkerRoute } = require(process.argv[1]);
+        const { verifyWorkerRoute, readLockFileHeaders } = require(process.argv[1]);
+        const { Readable } = require("node:stream");
         const profile = JSON.parse(process.argv[2]);
         const bytes = Buffer.from(process.argv[3], "utf8");
         let registrations = 0;
@@ -207,15 +214,23 @@ function registerTests({ describe, it }) {
             encoding: "base64", content: bytes.toString("base64"), size: bytes.length}})},
           actions: {getWorkflow: async () => { registrations++; return {data: {path: profile.workflow, state: "active"}}; }}
         }};
-        verifyWorkerRoute({githubClient, owner: "owner", repo: "repo", profile}).then(
-          () => assert.equal(registrations, 1),
+        Promise.all([
+          verifyWorkerRoute({githubClient, owner: "owner", repo: "repo", profile}),
+          readLockFileHeaders(Readable.from([bytes])),
+        ]).then(
+          ([, headers]) => {
+            assert.equal(registrations, 1);
+            assert.equal(headers.metadata.schema_version, "v4");
+            assert.equal(headers.manifest.work_queue.worker, true);
+          },
           error => { console.error(error); process.exitCode = 1; }
         ).catch(error => { console.error(error); process.exitCode = 1; });
       `;
-      const result = spawnSync(process.execPath, ["-e", script, require.resolve("./work_queue_provisioning.cjs"), JSON.stringify(profile), validYAML], { encoding: "utf8" });
+      const contents = '# gh-aw-metadata: {"schema_version":"v4"}\n' + validYAML.split("\n")[0] + "\nthis body deliberately is not valid workflow syntax: [";
+      const result = spawnSync(process.execPath, ["-e", script, require.resolve("./work_queue_provisioning.cjs"), JSON.stringify(profile), contents], { encoding: "utf8" });
       assert.equal(result.status, 0, result.stderr);
     });
-    it("provisions from copied runtime scripts with all npm package imports denied", () => {
+    it("provisions from copied runtime scripts without any npm packages", () => {
       const directory = path.resolve(`.queue-route-runtime-${randomUUID()}`);
       fs.mkdirSync(directory);
       try {
@@ -223,13 +238,12 @@ function registerTests({ describe, it }) {
         function copy(name) {
           if (copied.has(name)) return;
           copied.add(name);
-          assert.match(name, /^(?:work_queue_[a-z_]+|mcp_logger|error_helpers)\.cjs$/);
+          assert.match(name, /^(?:work_queue_[a-z_]+|lock_file_headers|mcp_logger|error_helpers)\.cjs$/);
           const source = fs.readFileSync(path.join(__dirname, name), "utf8");
           fs.writeFileSync(path.join(directory, name), source);
           for (const match of source.matchAll(/require\(["']\.\/([a-z_]+\.cjs)["']\)/g)) copy(match[1]);
         }
         copy("work_queue_provisioning.cjs");
-        assert.ok(copied.has("work_queue_yaml.cjs"));
         assert.ok(copied.has("work_queue_host.cjs"));
         assert.ok(copied.has("work_queue_logging.cjs"));
         assert.ok(copied.has("mcp_logger.cjs"));
@@ -238,8 +252,8 @@ function registerTests({ describe, it }) {
           const Module = require("node:module");
           const load = Module._load;
           Module._load = function(name, ...args) {
-            if (!name.startsWith("node:") && !name.startsWith(".") && !name.startsWith("/"))
-              throw new Error("runtime npm package forbidden: " + name);
+            if (!Module.isBuiltin(name) && !name.startsWith(".") && !name.startsWith("/"))
+              throw new Error("unexpected runtime npm package: " + name);
             return load.call(this, name, ...args);
           };
           const { verifyWorkerRoute, verifiedDefaultReference, configuredWorkerDeployment } = require(process.argv[1]);
@@ -275,7 +289,10 @@ function registerTests({ describe, it }) {
             })
             .catch(error => { console.error(error); process.exitCode = 1; });
         `;
-        const result = spawnSync(process.execPath, ["-e", script, path.join(directory, "work_queue_provisioning.cjs"), JSON.stringify(profile)], { encoding: "utf8", env: { ...process.env, NODE_PATH: "" } });
+        const result = spawnSync(process.execPath, ["-e", script, path.join(directory, "work_queue_provisioning.cjs"), JSON.stringify(profile)], {
+          encoding: "utf8",
+          env: { ...process.env, NODE_PATH: "" },
+        });
         assert.equal(result.status, 0, result.stderr);
         assert.equal(fs.existsSync(path.join(directory, "node_modules")), false);
       } finally {

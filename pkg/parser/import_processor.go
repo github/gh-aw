@@ -92,6 +92,7 @@ type ImportsResult struct {
 	MergedJobDiscriminator        string                // First concurrency.job-discriminator found across all imports (first-wins)
 	MergedExcludedEnv             []string              // Union of excluded-env lists from all imports (deduplicated, used to extend the main workflow's excluded-env)
 	ImportedFiles                 []string              // List of imported file paths (for manifest)
+	MetadataDocuments             map[string]string     // Raw selected Markdown imports, keyed by compiler-resolved path
 	AgentFile                     string                // Path to custom agent file (if imported)
 	SubAgentModels                []SubAgentModel       // models declared by imported inline agents and agent files
 	SubAgents                     []InlineSubAgent      // imported inline definitions for engine-specific validation

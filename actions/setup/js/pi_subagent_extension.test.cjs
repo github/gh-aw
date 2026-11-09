@@ -9,6 +9,7 @@ const { default: extension, subagentArgs, runPiSubagent } = await import("./pi_s
 const { writeInlineSubAgents } = await import("./extract_inline_sub_agents.cjs");
 const { stagePiArtifacts } = await import("./pi_runtime.cjs");
 const { preparePiSubagents } = await import("./pi_subagent_config.cjs");
+const { prepareMarkdownFixtures } = await import("../../../scripts/markdown_metadata_test_adapter.cjs");
 let dir;
 const agent = { name: "reader", description: "Read facts", prompt: "Read only.", declaredModel: "small", modelId: "claude-haiku-4.5", model: "aw-gateway/claude-haiku-4.5", tools: ["read"] };
 
@@ -47,6 +48,15 @@ describe("Pi managed delegation", () => {
     const registerTool = vi.fn();
     extension({ registerTool });
     expect(registerTool).toHaveBeenCalledWith(expect.objectContaining({ name: "subagent", parameters: expect.objectContaining({ required: ["agent", "task"] }) }));
+  });
+
+  it("advertises agent names without including their descriptions", () => {
+    fs.writeFileSync(path.join(dir, "subagents.json"), JSON.stringify([agent, { ...agent, name: "writer", description: "Write facts" }]));
+    const registerTool = vi.fn();
+    extension({ registerTool });
+    const tool = registerTool.mock.calls[0][0];
+    expect(tool.description).toBe("Delegate a task to a declared agent in an isolated Pi session. Available agents: reader; writer");
+    expect(tool.parameters.properties.agent.enum).toEqual(["reader", "writer"]);
   });
 
   it("does not expose delegation without declarations or inside a child", () => {
@@ -280,25 +290,12 @@ process.stdin.on("end", () => {
       };
       vi.stubGlobal("core", { info: vi.fn() });
       const source = fs.readFileSync(new URL("../../../.github/workflows/smoke-pi-sub-agents.md", import.meta.url), "utf8");
+      prepareMarkdownFixtures(source);
       const parentPrompt = writeInlineSubAgents(source, dir, dir, "pi");
       expect(parentPrompt).not.toContain("## agent:");
       stagePiArtifacts(process.env.PI_CODING_AGENT_DIR);
       const expected = ["claude-haiku-4.5", "gpt-5.6-luna", "gpt-4o-mini"];
-      const sdk = {
-        parseFrontmatter: content => {
-          const [, header, body] = content.split("---");
-          const frontmatter = Object.fromEntries(
-            header
-              .trim()
-              .split("\n")
-              .map(line => {
-                const colon = line.indexOf(":");
-                return [line.slice(0, colon), line.slice(colon + 1).trim()];
-              })
-          );
-          return { frontmatter, body };
-        },
-      };
+      const sdk = {};
       const agents = preparePiSubagents({
         agentDir: process.env.PI_CODING_AGENT_DIR,
         sdk,

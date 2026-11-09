@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import { describe, test, expect } from "vitest";
+import { Readable } from "node:stream";
+import { readLockFileHeaders } from "./work_queue_provisioning.cjs";
 
 const require = createRequire(import.meta.url);
 const runs = require("./fixtures/claude_codex_subagent_runs.cjs");
@@ -148,8 +150,8 @@ describe("smoke-claude-sub-agents is read-only", () => {
     expect(lock).toContain('GH_AW_FAILURE_REPORT_AS_ISSUE: "false"');
   });
 
-  test("the agent finishes through a non-publishing noop", () => {
-    const manifest = JSON.parse(lock.split("\n")[1].replace(/^# gh-aw-manifest: /, ""));
+  test("the agent finishes through a non-publishing noop", async () => {
+    const { manifest } = await readLockFileHeaders(Readable.from([lock]));
     expect(manifest.mcp_servers.find(server => server.name === "safeoutputs").tools).toContain("noop");
     expect(lock).toContain('GH_AW_NOOP_REPORT_AS_ISSUE: "false"');
     expect(workflow).toContain("Finish by calling the `noop` safe output once");

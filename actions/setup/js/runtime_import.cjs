@@ -609,6 +609,12 @@ function evaluateExpression(expr, resolution) {
  * @throws {Error} - If unsafe expressions are found
  */
 function processExpressions(content, source, protectValue = value => value) {
+  const { transformMarkdownContent } = require("./markdown_metadata.cjs");
+  return transformMarkdownContent(content, text => processExpressionText(text, source, protectValue));
+}
+
+/** @param {string} content @param {string} source @param {(value: string, expression?: string) => string} protectValue */
+function processExpressionText(content, source, protectValue) {
   // Pattern to match GitHub Actions expressions: ${{ ... }}
   const expressionRegex = /\$\{\{([\s\S]*?)\}\}/g;
 
@@ -1041,24 +1047,31 @@ async function processRuntimeImport(filepathOrUrl, optional, workspaceDir, start
     }
   }
 
-  // Remove XML comments
-  content = removeXMLComments(content);
+  const { transformMarkdownContent, missingMarkdownMetadata, ensureCheckoutMarkdownMetadata, persistMarkdownMetadata } = require("./markdown_metadata.cjs");
+  const missing = missingMarkdownMetadata([content]);
+  if (missing.size) {
+    ensureCheckoutMarkdownMetadata([content], workspaceDir);
+    if (missingMarkdownMetadata([content]).size < missing.size) persistMarkdownMetadata();
+  }
+  // Decode compiler metadata before evaluating author expressions. Scalars are
+  // transformed separately so evaluated values cannot alter keys or structure.
+  content = transformMarkdownContent(content, text => removeXMLComments(text));
 
   // Raw placeholders are literal; only explicit author expressions select bindings.
-  content = content.replace(/\$\{GH_AW_(?:ENV|SECRETS|VARS|EXPR)_[A-Z0-9_]+\}|__GH_AW_(?:ENV|SECRETS|VARS|EXPR)_[A-Z0-9_]+__/g, value => protectValue(value));
-  content = bindAuthorExpressions(content, authorExpressions, process.env, protectValue);
+  content = transformMarkdownContent(content, text => text.replace(/\$\{GH_AW_(?:ENV|SECRETS|VARS|EXPR)_[A-Z0-9_]+\}|__GH_AW_(?:ENV|SECRETS|VARS|EXPR)_[A-Z0-9_]+__/g, value => protectValue(value)));
+  content = transformMarkdownContent(content, text => bindAuthorExpressions(text, authorExpressions, process.env, protectValue));
 
   // Wrap expressions in template conditionals
   // This handles {{#if expression}} where expression is not already wrapped in ${{ }}
-  content = wrapExpressionsInTemplateConditionals(content);
+  content = transformMarkdownContent(content, text => wrapExpressionsInTemplateConditionals(text));
 
   // Extract and replace GitHub expressions in template conditionals with placeholders
   // This transforms {{#if ${{ expression }} }} to {{#if __GH_AW_PLACEHOLDER__ }}
-  content = extractAndReplacePlaceholders(content);
+  content = transformMarkdownContent(content, text => extractAndReplacePlaceholders(text));
 
   // Process GitHub Actions expressions (validate and render safe ones)
   if (hasGitHubActionsMacros(content)) {
-    content = processExpressions(content, `File ${filepath}`, protectValue);
+    content = transformMarkdownContent(content, text => processExpressions(text, `File ${filepath}`, protectValue));
   }
 
   // Close any unterminated "## skill:"/"## agent:" block so this import

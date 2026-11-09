@@ -4,7 +4,7 @@ import * as fs from "fs";
 import * as path from "path";
 
 const require = createRequire(import.meta.url);
-const { runWithCopilotSDK, parsePermissionConfigFromServerArgs } = require("./copilot_sdk_driver.cjs");
+const { runWithCopilotSDK, parsePermissionConfigFromServerArgs } = require("../../../scripts/markdown_metadata_test_adapter.cjs").withCompilerFixtures(require("./copilot_sdk_driver.cjs"));
 const { WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE } = require("./permission_denied_helpers.cjs");
 const { normalizeCopilotSession } = require("./copilot_session.cjs");
 

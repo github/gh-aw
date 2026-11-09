@@ -185,6 +185,9 @@ done
 for file in "${JS_SOURCE_DIR}"/*.json; do
   if [ -f "$file" ]; then
     filename=$(basename "$file")
+    if [[ "${filename}" == "package.json" || "${filename}" == "package-lock.json" ]]; then
+      continue
+    fi
     cp "$file" "${DESTINATION}/${filename}"
     debug_log "Copied: ${filename}"
     FILE_COUNT=$((FILE_COUNT + 1))
@@ -328,6 +331,7 @@ MCP_SCRIPTS_FILES=(
   "work_queue_claim_adapters.cjs"
   "work_queue_claim_scope.cjs"
   "work_queue_codec.cjs"
+  "lock_file_headers.cjs"
   "work_queue_control_receipts.cjs"
   "work_queue_declared_verification.cjs"
   "work_queue_delivery.cjs"
@@ -367,7 +371,6 @@ MCP_SCRIPTS_FILES=(
   "work_queue_telemetry.cjs"
   "work_queue_summary_renderer.cjs"
   "work_queue_host.cjs"
-  "work_queue_yaml.cjs"
 )
 
 MCP_SCRIPTS_COUNT=0
@@ -551,6 +554,7 @@ SAFE_OUTPUTS_FILES=(
   "work_queue_claim_adapters.cjs"
   "work_queue_claim_scope.cjs"
   "work_queue_codec.cjs"
+  "lock_file_headers.cjs"
   "work_queue_control_receipts.cjs"
   "work_queue_declared_verification.cjs"
   "work_queue_delivery.cjs"
@@ -590,7 +594,6 @@ SAFE_OUTPUTS_FILES=(
   "work_queue_store.cjs"
   "work_queue_telemetry.cjs"
   "work_queue_summary_renderer.cjs"
-  "work_queue_yaml.cjs"
 )
 
 SAFE_OUTPUTS_COUNT=0

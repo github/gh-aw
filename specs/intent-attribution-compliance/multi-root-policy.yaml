@@ -1,0 +1,30 @@
+fixture_id: multi-root-policy
+description: Three distinct closing roots without explicit intent remain ambiguous and fail closed.
+spec_refs:
+  - "Multiple-root policy"
+  - "Fail-Closed Behavior"
+input:
+  artifact:
+    kind: pull_request
+    number: 144
+    explicit_intent: null
+    linked_closing_issues:
+      - number: 201
+        inferred_intent: security
+      - number: 202
+        inferred_intent: reliability
+      - number: 203
+        inferred_intent: documentation
+    labels:
+      - enhancement
+expected:
+  attribution:
+    source: closing_issue
+    status: ambiguous
+    intent_key: null
+  policy:
+    autonomy: propose_only
+    write_scope: none
+    human_approval_required: true
+    auto_merge_allowed: false
+    max_attempts: 1

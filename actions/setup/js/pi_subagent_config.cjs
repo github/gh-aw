@@ -7,14 +7,16 @@ const { loadBuiltinModelAliases, ModelAliasResolutionError, recordModelResolutio
 const { writeSecureOutput } = require("./convert_gateway_config_shared.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { verifyPiThinkingEffort } = require("./pi_runtime.cjs");
+const { readMarkdownMetadata } = require("./markdown_metadata.cjs");
+const { extractFrontmatterAndBody } = require("./frontmatter_hash_pure.cjs");
 
 /** @param {string} provider */
 function aliasProvider(provider) {
   return { github: "copilot", "github-copilot": "copilot", codex: "openai", gemini: "google" }[provider] || provider;
 }
 
-/** @param {string} agentDir @param {any} sdk */
-function readPiSubagents(agentDir, sdk) {
+/** @param {string} agentDir */
+function readPiSubagents(agentDir) {
   const dir = path.join(agentDir, "agents");
   if (!fs.existsSync(dir)) return [];
   const names = new Set();
@@ -23,17 +25,18 @@ function readPiSubagents(agentDir, sdk) {
       .readdirSync(dir, { withFileTypes: true })
       .filter(entry => entry.isFile() && entry.name.endsWith(".md"))
       .map(entry => {
-        const { frontmatter, body } = sdk.parseFrontmatter(fs.readFileSync(path.join(dir, entry.name), "utf8"));
+        const content = fs.readFileSync(path.join(dir, entry.name), "utf8");
+        const frontmatter = readMarkdownMetadata("agent", content).value;
+        const { markdown: body } = extractFrontmatterAndBody(content);
         const filenameName = entry.name.replace(/(?:\.agent)?\.md$/, "");
         const name = frontmatter.name ?? filenameName;
         if (typeof name !== "string" || !/^[a-z][a-z0-9_-]*$/.test(name) || names.has(name)) throw new Error(`Invalid or duplicate Pi sub-agent name in ${entry.name}`);
         if (name !== filenameName) throw new Error(`Pi sub-agent "${name}" name must match its agent filename`);
         names.add(name);
-        if (typeof frontmatter.description !== "string" || !frontmatter.description.trim()) throw new Error(`Pi sub-agent "${name}" requires a non-empty description`);
         if (frontmatter.model !== undefined && (typeof frontmatter.model !== "string" || !frontmatter.model.trim())) throw new Error(`Pi sub-agent "${name}" model must be a non-empty string`);
         const tools = typeof frontmatter.tools === "string" ? frontmatter.tools.split(",").map(tool => tool.trim()) : frontmatter.tools;
         if (tools !== undefined && (!Array.isArray(tools) || tools.some(tool => typeof tool !== "string" || !/^[a-zA-Z0-9_*-]+$/.test(tool)))) throw new Error(`Pi sub-agent "${name}" tools must be a list of tool names`);
-        return { name, description: frontmatter.description, prompt: body, declaredModel: frontmatter.model, tools };
+        return { name, prompt: body, declaredModel: frontmatter.model, tools };
       });
   } catch (error) {
     throw new Error(`Cannot read Pi sub-agent definitions: ${getErrorMessage(error)}`, { cause: error });
@@ -49,7 +52,7 @@ function readPiSubagents(agentDir, sdk) {
  * @param {{agentDir: string, sdk: any, provider: string, catalog?: string[], reflectData?: any, noCatalog?: boolean, gateway: boolean, parentModel: string, logger?: (message: string) => void, env?: NodeJS.ProcessEnv}} options
  */
 function preparePiSubagents(options) {
-  const { agentDir, sdk, provider, catalog, reflectData, noCatalog, gateway, parentModel, logger = () => {}, env = process.env } = options;
+  const { agentDir, provider, catalog, reflectData, noCatalog, gateway, parentModel, logger = () => {}, env = process.env } = options;
   let aliases;
   try {
     aliases = JSON.parse(env.GH_AW_PI_MODEL_ALIASES || "{}");
@@ -60,7 +63,7 @@ function preparePiSubagents(options) {
   // GH_AW_PI_MODEL_ALIASES carries only workflow-defined and imported aliases; built-ins ship with the setup action.
   aliases = { ...loadBuiltinModelAliases(), ...aliases };
   const scopedProvider = aliasProvider(provider);
-  const agents = readPiSubagents(agentDir, sdk).map(agent => {
+  const agents = readPiSubagents(agentDir).map(agent => {
     const requested = agent.declaredModel || parentModel;
     const { base, params } = splitModelIdentifier(requested);
     if (!base || /[\s*$[\]]/.test(base)) throw new Error(`Pi sub-agent "${agent.name}" model must be a literal model or alias`);
