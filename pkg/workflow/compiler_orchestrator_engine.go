@@ -64,7 +64,7 @@ func (c *Compiler) setupEngineAndImports(result *parser.FrontmatterResult, clean
 	if err != nil {
 		return nil, err
 	}
-	modelChoiceDeclared := declaresModelOrRoutingChoice(result.Frontmatter, model, importedEngineDefinitions, importsResult.MergedEngineModel)
+	modelChoiceDeclared := declaresModelOrRoutingChoice(result.Frontmatter, model, importedEngineDefinitions, importsResult.MergedEngineModel, importsResult.EngineModelChoiceDeclared)
 	engineConfig, model = c.applyEngineImportDefaults(engineImportDefaultsOptions{
 		engineConfig:                engineConfig,
 		model:                       model,
@@ -389,7 +389,7 @@ func mainEngineDisablesModelRouting(frontmatter map[string]any) bool {
 	if !ok {
 		return false
 	}
-	disabled, ok := engineObj["model-routing"].(bool)
+	disabled, ok := normalizedEngineObject(engineObj)["model-routing"].(bool)
 	return ok && !disabled
 }
 

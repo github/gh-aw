@@ -25,6 +25,7 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/workflow/compilerenv"
+	"github.com/goccy/go-yaml"
 )
 
 var modelRoutingDefaultLog = logger.New("workflow:model_routing_default")
@@ -36,8 +37,10 @@ const (
 	// modelRoutingDecisionStepID is the activation step that resolves whether the
 	// implicit routing default applies for this run.
 	modelRoutingDecisionStepID = "resolve-model-routing"
-	// modelRoutingDecisionOutput is the activation step and job output name.
-	modelRoutingDecisionOutput = "model_routing"
+	// modelRoutingDecisionOutput is the activation step and job output name. The
+	// hyphen keeps it outside the experiment-name namespace ([a-zA-Z_][a-zA-Z0-9_]*),
+	// so an experiment output can never overwrite the routing decision.
+	modelRoutingDecisionOutput = "model-routing"
 )
 
 // modelRoutingActiveInActivation is the expression, valid in the activation job,
@@ -173,8 +176,8 @@ func generateModelRoutingDecisionStep(data *WorkflowData) string {
 // imports choose a model or routing: a top-level or engine model (including
 // aliases, auto, expressions, and empty values), engine.model-routing (including
 // false), fallback models, or a recognized engine.env model override.
-func declaresModelOrRoutingChoice(frontmatter map[string]any, model string, engineSpecs []string, mergedEngineModel string) bool {
-	if model != "" || mergedEngineModel != "" {
+func declaresModelOrRoutingChoice(frontmatter map[string]any, model string, engineSpecs []string, mergedEngineModel string, importedModelChoice bool) bool {
+	if model != "" || mergedEngineModel != "" || importedModelChoice {
 		return true
 	}
 	if _, ok := frontmatter["model"]; ok {
@@ -195,7 +198,17 @@ func declaresModelOrRoutingChoice(frontmatter map[string]any, model string, engi
 	return false
 }
 
+// normalizedEngineObject returns the engine options of an engine object,
+// unwrapping the `engine.pi` form the same way engine extraction does.
+func normalizedEngineObject(engineObj map[string]any) map[string]any {
+	if pi, ok := engineObj["pi"].(map[string]any); ok {
+		return pi
+	}
+	return engineObj
+}
+
 func engineObjectDeclaresModelChoice(engineObj map[string]any) bool {
+	engineObj = normalizedEngineObject(engineObj)
 	for _, key := range []string{"model", "model-routing", "fallback-models"} {
 		if _, ok := engineObj[key]; ok {
 			return true
@@ -229,16 +242,24 @@ func (c *Compiler) applyDefaultModelRouting(ctx *workflowBuildContext) {
 		return
 	}
 	modelRoutingDefaultLog.Printf("Applied implicit model routing (goal=%s, mode=%s) to %s for engine %s", defaultModelRoutingGoal, defaultModelRoutingMode, filepath.Base(ctx.cleanPath), data.EngineConfig.ID)
+}
+
+// reportDefaultModelRouting emits the informational notice for a workflow that
+// received the implicit routing default. It runs once per compiled workflow from
+// the compilation path, so parse-only callers (such as dry-run baselines) stay
+// silent. Batch compilation counts workflows for one aggregated notice instead.
+func (c *Compiler) reportDefaultModelRouting(data *WorkflowData, markdownPath string) {
+	if data == nil || !isModelRoutingImplicit(data) {
+		return
+	}
 	if c.batchMode {
-		// Batch compilation prints one aggregated informational notice instead of
-		// one line per workflow.
 		c.defaultRoutingCount++
 		return
 	}
 	if c.quiet {
 		return
 	}
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(defaultModelRoutingNotice(filepath.Base(ctx.cleanPath), data.EngineConfig.ID)))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(defaultModelRoutingNotice(filepath.Base(markdownPath), data.EngineConfig.ID)))
 }
 
 // DefaultModelRoutingBatchNotice is the aggregated informational notice for
@@ -301,22 +322,24 @@ func defaultModelRoutingIneligibility(data *WorkflowData) string {
 	if argsMayChooseModel(config.Args) {
 		return "engine arguments may choose a model"
 	}
-	for key := range config.Env {
-		upperKey := strings.ToUpper(key)
-		if isModelRoutingOverrideEnvKey(key) || strings.Contains(upperKey, "BASE_URL") ||
-			strings.Contains(upperKey, "EFFORT") || strings.Contains(upperKey, "THINKING") || strings.HasPrefix(upperKey, "COPILOT_PROVIDER_") {
-			return "engine.env may choose a model or inference target"
-		}
+	if envMayChooseModel(config.Env) {
+		return "engine.env may choose a model or inference target"
 	}
 	if data.TokenBrokerCopilotRequest || data.TokenBrokerEnabled || enclavesEnabled(data) {
 		return "custom inference credentials or enclaves"
 	}
-	if isArcDindTopology(data) || isCloudHypervisorRuntime(data) || isNVXRuntime(data) {
+	if isArcDindTopology(data) || isCloudHypervisorRuntime(data) || isNVXRuntime(data) || isLegacySecurityRuntime(data) {
 		return "non-default sandbox runtime"
 	}
-	if agentConfig := getAgentConfig(data); agentConfig != nil &&
-		(agentConfig.Command != "" || len(agentConfig.Images) > 0 || len(agentConfig.Targets) > 0) {
+	agentConfig := getAgentConfig(data)
+	if agentConfig != nil && envMayChooseModel(agentConfig.Env) {
+		return "sandbox.agent.env may choose a model or inference target"
+	}
+	if agentConfig != nil && (agentConfig.Command != "" || len(agentConfig.Images) > 0 || len(agentConfig.Targets) > 0) {
 		return "custom AWF command, images, or API targets"
+	}
+	if manualApprovalEnvironmentDiffers(data) {
+		return "manual approval runs in a different environment than the agent"
 	}
 	if len(customAWFArgs(data)) > 0 {
 		return "custom AWF arguments"
@@ -324,13 +347,61 @@ func defaultModelRoutingIneligibility(data *WorkflowData) string {
 	return ""
 }
 
+// envMayChooseModel conservatively detects environment variables that may
+// select a model, reasoning effort, or inference target.
+func envMayChooseModel(env map[string]string) bool {
+	for key := range env {
+		upperKey := strings.ToUpper(key)
+		if isModelRoutingOverrideEnvKey(key) || strings.Contains(upperKey, "BASE_URL") ||
+			strings.Contains(upperKey, "EFFORT") || strings.Contains(upperKey, "THINKING") || strings.HasPrefix(upperKey, "COPILOT_PROVIDER_") {
+			return true
+		}
+	}
+	return false
+}
+
+// manualApprovalEnvironmentDiffers reports whether on.manual-approval gates the
+// activation job with an environment other than the agent job's environment.
+// Activation would then resolve model variables in a different environment from
+// the agent, so the implicit default is skipped conservatively.
+func manualApprovalEnvironmentDiffers(data *WorkflowData) bool {
+	if data.ManualApproval == "" {
+		return false
+	}
+	return jobEnvironmentName(data.Environment) != data.ManualApproval
+}
+
+// jobEnvironmentName returns the environment name from a job `environment:`
+// YAML section in either string or object form, or "" when none is set.
+func jobEnvironmentName(section string) string {
+	if strings.TrimSpace(section) == "" {
+		return ""
+	}
+	var parsed map[string]any
+	if err := yaml.Unmarshal([]byte(section), &parsed); err != nil {
+		return ""
+	}
+	switch environment := parsed["environment"].(type) {
+	case string:
+		return environment
+	case map[string]any:
+		name, _ := environment["name"].(string)
+		return name
+	}
+	return ""
+}
+
 // argsMayChooseModel conservatively detects engine arguments that may select a
-// model, reasoning effort, or provider.
+// model, reasoning effort, or provider. Arguments containing an Actions
+// expression are resolved only at run time, so they are treated as uncertain.
 func argsMayChooseModel(args []string) bool {
 	if codexArgsSelectModel(args) {
 		return true
 	}
 	for _, arg := range args {
+		if strings.Contains(arg, "${{") {
+			return true
+		}
 		lower := strings.ToLower(arg)
 		for _, marker := range []string{"model", "effort", "reasoning", "thinking", "provider"} {
 			if strings.Contains(lower, marker) {

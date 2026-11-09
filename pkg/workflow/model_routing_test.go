@@ -12,6 +12,7 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/testutil"
+	"github.com/github/gh-aw/pkg/workflow/aw"
 	"github.com/stretchr/testify/require"
 	yamlv3 "go.yaml.in/yaml/v3"
 )
@@ -1137,11 +1138,11 @@ func TestCompileDefaultModelRouting_RuntimeOverrideGuard(t *testing.T) {
 	activation := extractJobSection(compiled.lock, "activation")
 	require.Contains(t, activation, "GH_AW_MODEL_AGENT_VAR: ${{ vars.GH_AW_MODEL_AGENT_COPILOT }}")
 	require.Contains(t, activation, "GH_AW_DEFAULT_MODEL_VAR: ${{ vars.GH_AW_DEFAULT_MODEL_COPILOT }}")
-	require.Contains(t, activation, "model_routing: ${{ steps.resolve-model-routing.outputs.model_routing }}")
+	require.Contains(t, activation, "model-routing: ${{ steps.resolve-model-routing.outputs.model-routing }}")
 
 	env := agentExecutionEnv(t, compiled.lock)
-	require.Equal(t, "${{ needs.activation.outputs.model_routing != 'true' && (vars.GH_AW_MODEL_AGENT_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'auto') || '' }}", env["COPILOT_MODEL"])
-	require.Equal(t, "${{ needs.activation.outputs.model_routing == 'true' && '1' || '0' }}", env["GH_AW_MODEL_ROUTING"])
+	require.Equal(t, "${{ needs.activation.outputs.model-routing != 'true' && (vars.GH_AW_MODEL_AGENT_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'auto') || '' }}", env["COPILOT_MODEL"])
+	require.Equal(t, "${{ needs.activation.outputs.model-routing == 'true' && '1' || '0' }}", env["GH_AW_MODEL_ROUTING"])
 
 	configs := compiled.awfConfigs(t)
 	require.Len(t, configs, 2)
@@ -1196,7 +1197,7 @@ func TestCompileDefaultModelRouting_ProviderMatrix(t *testing.T) {
 			require.Equal(t, tc.guarded, strings.Contains(compiled.lock, "id: "+modelRoutingDecisionStepID))
 			if tc.guarded {
 				env := agentExecutionEnv(t, compiled.lock)
-				require.True(t, strings.HasPrefix(env[tc.modelEnv], "${{ needs.activation.outputs.model_routing != 'true' && (vars."+tc.modelEnv), env[tc.modelEnv])
+				require.True(t, strings.HasPrefix(env[tc.modelEnv], "${{ needs.activation.outputs.model-routing != 'true' && (vars."+tc.modelEnv), env[tc.modelEnv])
 			} else {
 				require.Contains(t, compiled.lock, "GH_AW_MODEL_ROUTING: 1")
 			}
@@ -1277,7 +1278,7 @@ func TestRecompileDefaultModelRouting_EligibleLocksOnly(t *testing.T) {
 		}
 		lock := string(lockContent)
 		name := filepath.Base(sourcePath)
-		explicitChoice := declaresModelOrRoutingChoice(result.Frontmatter, "", nil, "")
+		explicitChoice := declaresModelOrRoutingChoice(result.Frontmatter, "", nil, "", false)
 		guarded := strings.Contains(lock, "id: "+modelRoutingDecisionStepID)
 		if guarded {
 			implicit++
@@ -1295,4 +1296,160 @@ func TestRecompileDefaultModelRouting_EligibleLocksOnly(t *testing.T) {
 		}
 	}
 	require.Positive(t, implicit, "expected eligible repository workflows to use the implicit default")
+}
+
+// activationJobOutputs decodes the activation job outputs of a compiled lock.
+func activationJobOutputs(t *testing.T, lock string) map[string]string {
+	t.Helper()
+	var workflow struct {
+		Jobs map[string]struct {
+			Outputs map[string]string `yaml:"outputs"`
+		} `yaml:"jobs"`
+	}
+	require.NoError(t, yamlv3.Unmarshal([]byte(lock), &workflow))
+	return workflow.Jobs["activation"].Outputs
+}
+
+// TestCompileDefaultModelRouting_ExperimentNamedModelRouting ensures an
+// experiment named model_routing cannot overwrite the routing decision output.
+func TestCompileDefaultModelRouting_ExperimentNamedModelRouting(t *testing.T) {
+	compiled := compileDefaultRoutingSource(t, "---\non: workflow_dispatch\npermissions:\n  contents: read\nengine: copilot\nexperiments:\n  model_routing: [\"true\", \"false\"]\n---\nReport.\n")
+	require.NoError(t, compiled.err)
+	require.True(t, isModelRoutingImplicit(compiled.data))
+	outputs := activationJobOutputs(t, compiled.lock)
+	require.Equal(t, "${{ steps.pick-experiment.outputs.model_routing }}", outputs["model_routing"], "the experiment keeps its own output")
+	require.Equal(t, "${{ steps."+modelRoutingDecisionStepID+".outputs."+modelRoutingDecisionOutput+" }}", outputs[modelRoutingDecisionOutput], "the routing decision has a separate output")
+	require.NotEqual(t, "model_routing", modelRoutingDecisionOutput)
+	env := agentExecutionEnv(t, compiled.lock)
+	require.Equal(t, "${{ "+modelRoutingActiveDownstream+" && '1' || '0' }}", env["GH_AW_MODEL_ROUTING"])
+	require.NotContains(t, env["GH_AW_MODEL_ROUTING"], "outputs.model_routing ")
+}
+
+// TestCompileDefaultModelRouting_EntryPointParity compiles the same source
+// through the file and string/document entry points and requires the same
+// routing result.
+func TestCompileDefaultModelRouting_EntryPointParity(t *testing.T) {
+	source := "---\non: workflow_dispatch\npermissions:\n  contents: read\nengine: copilot\n---\nReport.\n"
+	fileCompiled := compileDefaultRoutingSource(t, source)
+	require.NoError(t, fileCompiled.err)
+	require.True(t, isModelRoutingImplicit(fileCompiled.data))
+
+	compileString := func(t *testing.T, parse func(*Compiler) (*WorkflowData, error)) (string, *WorkflowData) {
+		t.Helper()
+		compiler := NewCompiler()
+		var data *WorkflowData
+		var lock string
+		testutil.CaptureStderr(t, func() {
+			var err error
+			data, err = parse(compiler)
+			require.NoError(t, err)
+			lock, err = compiler.CompileToYAML(data, "main.md")
+			require.NoError(t, err)
+		})
+		return lock, data
+	}
+	for name, parse := range map[string]func(*Compiler) (*WorkflowData, error){
+		"ParseWorkflowString": func(c *Compiler) (*WorkflowData, error) { return c.ParseWorkflowString(source, "main.md") },
+		"ParseWorkflowDocument": func(c *Compiler) (*WorkflowData, error) {
+			document, err := aw.Parse(source)
+			if err != nil {
+				return nil, err
+			}
+			return c.ParseWorkflowDocument(document, "main.md")
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			lock, data := compileString(t, parse)
+			require.True(t, isModelRoutingImplicit(data))
+			require.Equal(t, fileCompiled.data.EngineConfig.ModelRouting, data.EngineConfig.ModelRouting)
+			stringCompiled := defaultRoutingCompilation{lock: lock}
+			require.Equal(t, fileCompiled.awfConfigs(t), stringCompiled.awfConfigs(t))
+			require.Equal(t, agentExecutionEnv(t, fileCompiled.lock), agentExecutionEnv(t, lock))
+			require.Equal(t, activationJobOutputs(t, fileCompiled.lock), activationJobOutputs(t, lock))
+			require.Equal(t, extractJobSection(fileCompiled.lock, "agent"), extractJobSection(lock, "agent"))
+		})
+	}
+}
+
+// TestCompileDefaultModelRouting_ImportedEmptyModelUnchanged treats an imported
+// empty model, top-level or preference-only engine.model, as an explicit choice.
+func TestCompileDefaultModelRouting_ImportedEmptyModelUnchanged(t *testing.T) {
+	base := "---\non: workflow_dispatch\npermissions:\n  contents: read\nengine: copilot\nimports:\n  - shared/model.md\n---\nReport.\n"
+	for name, shared := range map[string]string{
+		"top-level model":         "---\nmodel: \"\"\n---\n",
+		"preference engine.model": "---\nengine:\n  model: \"\"\n---\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			requireNoDefaultRouting(t, compileDefaultRoutingFiles(t, map[string]string{"main.md": base, "shared/model.md": shared}))
+		})
+	}
+}
+
+// TestCompileDefaultModelRouting_PiOptOutBeatsImportedRouting keeps the
+// engine.pi model-routing opt-out when an import supplies a routing block.
+func TestCompileDefaultModelRouting_PiOptOutBeatsImportedRouting(t *testing.T) {
+	compiled := compileDefaultRoutingFiles(t, map[string]string{
+		"main.md":           "---\non: workflow_dispatch\npermissions:\n  contents: read\n  copilot-requests: write\nengine:\n  pi:\n    model-routing: false\nimports:\n  - shared/routing.md\n---\nReport.\n",
+		"shared/routing.md": "---\nengine:\n  id: pi\n  model-routing:\n    goal: cost\n    mode: economy\n---\n",
+	})
+	requireNoDefaultRouting(t, compiled)
+	require.True(t, compiled.data.EngineConfig.ModelRoutingDisabled)
+	require.True(t, mainEngineDisablesModelRouting(map[string]any{"engine": map[string]any{"pi": map[string]any{"model-routing": false}}}))
+}
+
+// TestCompileDefaultModelRouting_NoticeOncePerCompiledWorkflow emits the notice
+// from compilation only, so parse-only callers (dry-run baselines) stay silent
+// and batch mode counts each workflow once.
+func TestCompileDefaultModelRouting_NoticeOncePerCompiledWorkflow(t *testing.T) {
+	dir := t.TempDir()
+	workflowPath := filepath.Join(dir, "main.md")
+	require.NoError(t, os.WriteFile(workflowPath, []byte("---\non: workflow_dispatch\npermissions:\n  contents: read\nengine: copilot\n---\nReport.\n"), 0o600))
+
+	compiler := NewCompiler()
+	compiler.SetNoEmit(true)
+	var data *WorkflowData
+	parseStderr := testutil.CaptureStderr(t, func() {
+		var err error
+		data, err = compiler.ParseWorkflowFile(workflowPath)
+		require.NoError(t, err)
+	})
+	require.True(t, isModelRoutingImplicit(data))
+	require.NotContains(t, parseStderr, defaultRoutingNoticeMarker, "parsing alone must not print the notice")
+	compileStderr := testutil.CaptureStderr(t, func() { require.NoError(t, compiler.CompileWorkflow(workflowPath)) })
+	require.Equal(t, 1, strings.Count(parseStderr+compileStderr, defaultRoutingNoticeMarker))
+
+	batch := NewCompiler()
+	batch.SetNoEmit(true)
+	batch.SetBatchMode(true)
+	batchStderr := testutil.CaptureStderr(t, func() {
+		_, err := batch.ParseWorkflowFile(workflowPath)
+		require.NoError(t, err)
+		require.NoError(t, batch.CompileWorkflow(workflowPath))
+	})
+	require.NotContains(t, batchStderr, defaultRoutingNoticeMarker)
+	require.Equal(t, 1, batch.DefaultModelRoutingWorkflowCount())
+}
+
+// TestCompileDefaultModelRouting_ReviewIneligibleUnchanged covers configurations
+// whose model choice is explicit or uncertain, or whose runtime is ineligible.
+func TestCompileDefaultModelRouting_ReviewIneligibleUnchanged(t *testing.T) {
+	base := "---\non: workflow_dispatch\npermissions:\n  contents: read\n"
+	for name, source := range map[string]string{
+		"sandbox.agent.env model":      "---\non: workflow_dispatch\nstrict: false\npermissions:\n  contents: read\nengine: copilot\nsandbox:\n  agent:\n    env:\n      COPILOT_MODEL: gpt-5.6-luna\n---\nReport.\n",
+		"docker-sudo-iptables runtime": base + "engine: copilot\nsandbox:\n  agent:\n    id: awf\n    runtime: docker-sudo-iptables\n---\nReport.\n",
+		"manual approval elsewhere":    "---\non:\n  workflow_dispatch:\n  manual-approval: approvals\npermissions:\n  contents: read\nenvironment: production\nengine: copilot\n---\nReport.\n",
+		"manual approval no agent env": "---\non:\n  workflow_dispatch:\n  manual-approval: approvals\npermissions:\n  contents: read\nengine: copilot\n---\nReport.\n",
+		"templated engine.args":        base + "engine:\n  id: copilot\n  args: [\"${{ vars.CLI_FLAG }}\"]\n---\nReport.\n",
+		"partly templated engine.args": base + "engine:\n  id: copilot\n  args: [\"--flag=${{ vars.CLI_FLAG }}\"]\n---\nReport.\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			requireNoDefaultRouting(t, compileDefaultRoutingSource(t, source))
+		})
+	}
+
+	t.Run("manual approval in the agent environment", func(t *testing.T) {
+		compiled := compileDefaultRoutingSource(t, "---\non:\n  workflow_dispatch:\n  manual-approval: production\npermissions:\n  contents: read\nenvironment: production\nengine: copilot\n---\nReport.\n")
+		require.NoError(t, compiled.err)
+		require.True(t, isModelRoutingImplicit(compiled.data), "the same environment resolves model variables consistently")
+	})
 }
