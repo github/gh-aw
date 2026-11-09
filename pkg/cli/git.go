@@ -429,7 +429,7 @@ func readGitAttributesFile(path string) ([]string, error) {
 		return nil, fmt.Errorf("failed to read .gitattributes: %w", err)
 	}
 
-	lines := strings.Split(string(content), "\n")
+	lines := strings.Split(strings.ReplaceAll(string(content), "\r\n", "\n"), "\n")
 	gitLog.Printf("Read existing .gitattributes with %d lines", len(lines))
 	return lines, nil
 }

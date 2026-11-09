@@ -190,6 +190,13 @@ func TestReadGitAttributesFile(t *testing.T) {
 			expected: []string{"first", "second", ""},
 		},
 		{
+			name: "normalizes CRLF line endings",
+			setup: func(t *testing.T, path string) {
+				require.NoError(t, os.WriteFile(path, []byte("first\r\nsecond\r\n"), 0o644))
+			},
+			expected: []string{"first", "second", ""},
+		},
+		{
 			name: "returns an error when file is unreadable",
 			setup: func(t *testing.T, path string) {
 				require.NoError(t, os.WriteFile(path, []byte("existing rules\n"), 0o644))
