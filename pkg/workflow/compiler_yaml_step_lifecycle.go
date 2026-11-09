@@ -205,7 +205,14 @@ func (c *Compiler) generateCreateAwInfo(yaml *strings.Builder, data *WorkflowDat
 		writeFormattedYAML(yaml, "          GH_AW_INFO_ENGINE_HARNESS: \"%s\"\n", harness)
 	}
 	if modelConfigJSON, budget := buildAwInfoModelConfig(data); modelConfigJSON != "" {
-		writeFormattedYAML(yaml, "          GH_AW_INFO_MODEL_CONFIG: '%s'\n", strings.ReplaceAll(modelConfigJSON, "'", "''"))
+		modelConfigValue := modelConfigJSON
+		if isModelRoutingRuntimeGuarded(data) {
+			// The activation job records routing only when it applies to this run.
+			plainModelConfigJSON, _ := buildAwInfoModelConfig(withoutModelRouting(data))
+			modelConfigValue = fmt.Sprintf("${{ %s && '%s' || '%s' }}", modelRoutingActiveInActivation,
+				strings.ReplaceAll(modelConfigJSON, "'", "''"), strings.ReplaceAll(plainModelConfigJSON, "'", "''"))
+		}
+		writeFormattedYAML(yaml, "          GH_AW_INFO_MODEL_CONFIG: '%s'\n", strings.ReplaceAll(modelConfigValue, "'", "''"))
 		if budget != "" {
 			if containsExpression(budget) {
 				writeFormattedYAML(yaml, "          GH_AW_INFO_MAX_AI_CREDITS: %s\n", budget)

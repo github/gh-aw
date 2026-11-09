@@ -354,7 +354,7 @@ func (e *CodexEngine) codexHarnessScriptName(workflowData *WorkflowData) string 
 
 func (e *CodexEngine) buildCodexCommand(workflowData *WorkflowData, commandName, harnessScriptName string, firewallEnabled bool, modelEnvVar, structuredOutputParam string) string {
 	modelParam := fmt.Sprintf(`${%s:+ --model "$%s"}`, modelEnvVar, modelEnvVar)
-	if isModelRoutingEnabled(workflowData) {
+	if isModelRoutingUnconditional(workflowData) {
 		modelParam = ""
 	}
 	if workflowData.EngineConfig != nil && codexArgsSelectModel(workflowData.EngineConfig.Args) {
@@ -553,7 +553,7 @@ func (e *CodexEngine) buildCodexExecutionEnv(workflowData *WorkflowData, firewal
 }
 
 func applyCodexModelEnv(env map[string]string, workflowData *WorkflowData, modelConfigured bool, modelEnvVar string) {
-	if isModelRoutingEnabled(workflowData) {
+	if isModelRoutingUnconditional(workflowData) {
 		return
 	}
 	if modelConfigured {
@@ -566,6 +566,7 @@ func applyCodexModelEnv(env map[string]string, workflowData *WorkflowData, model
 		return
 	}
 	env[modelEnvVar] = compilerenv.BuildModelOverrideExpressionEmptyFallback(modelEnvVar, compilerenv.DefaultModelCodex)
+	guardImplicitRoutingModelEnv(env, workflowData, constants.EnvVarModelAgentCodex)
 }
 
 func (e *CodexEngine) buildCodexExecutionStep(workflowData *WorkflowData, command string, env map[string]string) GitHubActionStep {

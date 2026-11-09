@@ -26,6 +26,9 @@ type engineSetupResult struct {
 	sandboxConfig      *SandboxConfig
 	importsResult      *parser.ImportsResult
 	configSteps        []map[string]any // steps returned by RenderConfig (may be nil)
+	// modelChoiceDeclared is true when the workflow or its resolved imports choose a
+	// model or routing configuration; compiler-synthesized fallback models do not count.
+	modelChoiceDeclared bool
 }
 
 // setupEngineAndImports configures the AI engine, processes imports, and validates network/sandbox settings.
@@ -61,6 +64,7 @@ func (c *Compiler) setupEngineAndImports(result *parser.FrontmatterResult, clean
 	if err != nil {
 		return nil, err
 	}
+	modelChoiceDeclared := declaresModelOrRoutingChoice(result.Frontmatter, model, importedEngineDefinitions, importsResult.MergedEngineModel)
 	engineConfig, model = c.applyEngineImportDefaults(engineImportDefaultsOptions{
 		engineConfig:                engineConfig,
 		model:                       model,
@@ -87,14 +91,15 @@ func (c *Compiler) setupEngineAndImports(result *parser.FrontmatterResult, clean
 	}
 	c.emitGeminiDeprecationNotice(agenticEngine)
 	return &engineSetupResult{
-		engineSetting:      engineSetting,
-		model:              model,
-		engineConfig:       engineConfig,
-		agenticEngine:      agenticEngine,
-		networkPermissions: networkPermissions,
-		sandboxConfig:      sandboxConfig,
-		importsResult:      importsResult,
-		configSteps:        configSteps,
+		engineSetting:       engineSetting,
+		model:               model,
+		engineConfig:        engineConfig,
+		agenticEngine:       agenticEngine,
+		networkPermissions:  networkPermissions,
+		sandboxConfig:       sandboxConfig,
+		importsResult:       importsResult,
+		configSteps:         configSteps,
+		modelChoiceDeclared: modelChoiceDeclared,
 	}, nil
 }
 
@@ -362,7 +367,7 @@ func (c *Compiler) resolveEngineFromIncludesAndImports(
 	if err != nil {
 		return "", nil, "", nil, err
 	}
-	engineConfig = c.mergeImportedModelRoutingConfigs(engineConfig, allEngines)
+	engineConfig = c.mergeImportedModelRoutingConfigs(engineConfig, allEngines, mainEngineDisablesModelRouting(result.Frontmatter))
 	if engineSetting == "" {
 		defaultEngine := c.engineRegistry.GetDefaultEngine()
 		engineSetting = defaultEngine.GetID()
@@ -377,17 +382,51 @@ func (c *Compiler) resolveEngineFromIncludesAndImports(
 	return engineSetting, engineConfig, model, allEngines, nil
 }
 
-func (c *Compiler) mergeImportedModelRoutingConfigs(engineConfig *EngineConfig, importedEngines []string) *EngineConfig {
+// mainEngineDisablesModelRouting reports whether the main workflow sets the
+// explicit `engine.model-routing: false` opt-out.
+func mainEngineDisablesModelRouting(frontmatter map[string]any) bool {
+	engineObj, ok := frontmatter["engine"].(map[string]any)
+	if !ok {
+		return false
+	}
+	disabled, ok := engineObj["model-routing"].(bool)
+	return ok && !disabled
+}
+
+// mergeImportedModelRoutingConfigs merges imported routing objects into the
+// resolved engine config. An explicit `model-routing: false` in the main workflow
+// wins over imported routing; an imported `false` applies only when no routing
+// object is configured, and is preserved as ModelRoutingDisabled rather than
+// collapsing into an absent setting.
+func (c *Compiler) mergeImportedModelRoutingConfigs(engineConfig *EngineConfig, importedEngines []string, mainDisabled bool) *EngineConfig {
 	if engineConfig == nil {
 		return nil
 	}
+	importedDisabled := false
+	defer func() {
+		switch {
+		case mainDisabled:
+			engineConfig.ModelRouting = nil
+			engineConfig.ModelRoutingDisabled = true
+		case engineConfig.ModelRouting != nil:
+			engineConfig.ModelRoutingDisabled = false
+		case importedDisabled:
+			engineConfig.ModelRoutingDisabled = true
+		}
+	}()
 	for _, engineJSON := range importedEngines {
 		importedConfig, _, err := c.extractEngineConfigFromJSON(engineJSON)
 		if err != nil {
 			continue
 		}
-		if importedConfig.ModelRouting == nil ||
-			(importedConfig.ID != "" && engineConfig.ID != "" && !strings.EqualFold(importedConfig.ID, engineConfig.ID)) {
+		if importedConfig.ID != "" && engineConfig.ID != "" && !strings.EqualFold(importedConfig.ID, engineConfig.ID) {
+			continue
+		}
+		if importedConfig.ModelRoutingDisabled {
+			importedDisabled = true
+			continue
+		}
+		if importedConfig.ModelRouting == nil || mainDisabled {
 			continue
 		}
 		if engineConfig.ModelRouting == nil {
