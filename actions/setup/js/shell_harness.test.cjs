@@ -4,7 +4,6 @@
 
 const path = require("path");
 const fs = require("node:fs");
-const os = require("node:os");
 const { spawnSync } = require("child_process");
 
 describe("shell_harness.cjs", () => {
@@ -26,7 +25,7 @@ describe("shell_harness.cjs", () => {
   });
 
   it.each(["deny", "allow", "unknown", "api-error"].flatMap(outcome => ["command", "custom-harness", "pi-durable"].map(mode => [outcome, mode])))("gates the actual %s invocation through %s", (outcome, mode) => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "shell-decision-"));
+    const root = fs.mkdtempSync(path.join(__dirname, "shell-decision-"));
     try {
       const preload = path.join(root, "fetch.cjs");
       fs.writeFileSync(
@@ -72,6 +71,7 @@ global.fetch = async url => {
         },
       });
       expect(result.status).toBe(0);
+      expect(result.stderr).toContain(`[${mode === "pi-durable" ? "pi" : "test"}-harness] decision gate: harness initialized before decision evaluation`);
       const skipped = outcome === "deny";
       expect(result.stdout.includes("AGENT_INVOKED")).toBe(!skipped);
       const telemetry = JSON.parse(fs.readFileSync(path.join(root, "harness_retry.json"), "utf8"));
@@ -90,7 +90,7 @@ global.fetch = async url => {
   });
 
   it("rejects invalid durable preflight before evaluating a skip decision", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "shell-decision-preflight-"));
+    const root = fs.mkdtempSync(path.join(__dirname, "shell-decision-preflight-"));
     try {
       const decisionMarker = path.join(root, "decision-called");
       const preload = path.join(root, "fetch.cjs");
@@ -101,8 +101,91 @@ global.fetch = async url => {
       });
       expect(result.status).toBe(1);
       expect(result.stderr).toContain("Restored durable Pi session transcript is missing");
+      expect(result.stderr).not.toContain("[pi-harness]");
       expect(result.stdout).not.toContain("AGENT_INVOKED");
       expect(fs.existsSync(decisionMarker)).toBe(false);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it.each(["allow", "unknown", "api-error", "deny"].flatMap(outcome => ["command", "custom-harness"].flatMap(mode => ["relative", "absolute"].map(cwd => [outcome, mode, cwd]))))(
+    "shares a normalized cwd before %s decisions and %s invocation with %s paths",
+    (outcome, mode, cwd) => {
+      const root = fs.mkdtempSync(path.join(__dirname, "shell-decision-cwd-"));
+      try {
+        const engineCwd = path.join(root, "packages", "app");
+        fs.mkdirSync(engineCwd, { recursive: true });
+        const decisionCwd = path.join(root, "decision-cwd.json");
+        const preload = path.join(root, "fetch.cjs");
+        fs.writeFileSync(
+          preload,
+          `global.fetch = async url => {
+  require("node:fs").writeFileSync(${JSON.stringify(decisionCwd)}, JSON.stringify(process.env.GH_AW_ENGINE_CWD));
+  if (url.endsWith("/reflect")) return new Response(JSON.stringify({ endpoints: [{ configured: true, provider: "github", models_url: "http://api-proxy:10002/v1/models" }] }));
+  if (${JSON.stringify(outcome)} === "api-error") return new Response("", { status: 503 });
+  return new Response(JSON.stringify({ answers: [{ name: "skip_1", type: "choice", choice: ${JSON.stringify(outcome)} }] }));
+};`
+        );
+        const customHarness = path.join(root, "custom_harness.cjs");
+        fs.writeFileSync(
+          customHarness,
+          `const result = require("node:child_process").spawnSync(process.execPath, ["-e", "process.stdout.write(process.cwd())"], { cwd: process.env.GH_AW_ENGINE_CWD, encoding: "utf8" });
+if (result.error) throw result.error;
+process.stdout.write(result.stdout);
+process.exitCode = result.status;`
+        );
+        const command = mode === "command" ? 'cd "$GH_AW_ENGINE_CWD" && printf "%s" "$PWD"' : `"${process.execPath}" "${customHarness}"`;
+        const result = spawnSync(process.execPath, ["--require", preload, harnessPath, "test", command], {
+          cwd: root,
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            GH_AW_ENGINE_CWD: cwd === "relative" ? "packages/app" : engineCwd,
+            GITHUB_WORKSPACE: root,
+            GH_AW_SKIP_IF_DECISION: '["Is work complete?"]',
+            AWF_REFLECT_ENABLED: "1",
+            GH_AW_PHASE: "agent",
+            GH_AW_HARNESS_TELEMETRY_DIR: root,
+            GH_AW_SAFE_OUTPUTS: path.join(root, "safeoutputs.jsonl"),
+          },
+        });
+        expect(result.status).toBe(0);
+        expect(JSON.parse(fs.readFileSync(decisionCwd, "utf8"))).toBe(engineCwd);
+        if (outcome === "deny") {
+          expect(result.stdout).toBe("");
+        } else {
+          expect(result.stdout.split("\n")).toContain(engineCwd);
+        }
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it("emits a startup marker before a decision request can terminate the sandbox", () => {
+    const root = fs.mkdtempSync(path.join(__dirname, "shell-decision-startup-"));
+    try {
+      const preload = path.join(root, "fetch.cjs");
+      fs.writeFileSync(
+        preload,
+        `global.fetch = async url => {
+  if (url.endsWith("/reflect")) return new Response(JSON.stringify({ endpoints: [{ configured: true, provider: "github", models_url: "http://api-proxy:10002/v1/models" }] }));
+  process.stderr.write("DECISION_REQUEST_STARTED\\n");
+  process.kill(process.pid, "SIGTERM");
+  await new Promise(() => {});
+};`
+      );
+      const result = spawnSync(process.execPath, ["--require", preload, harnessPath, "test", "printf AGENT_INVOKED"], {
+        encoding: "utf8",
+        env: { ...process.env, GH_AW_SKIP_IF_DECISION: '["Is work complete?"]', AWF_REFLECT_ENABLED: "1", GH_AW_PHASE: "agent", GH_AW_HARNESS_TELEMETRY_DIR: root },
+      });
+      expect(result.signal).toBe("SIGTERM");
+      expect(result.stderr).toContain("[test-harness] decision gate: harness initialized before decision evaluation");
+      expect(result.stderr).toContain("DECISION_REQUEST_STARTED");
+      expect(result.stderr.indexOf("[test-harness]")).toBeLessThan(result.stderr.indexOf("DECISION_REQUEST_STARTED"));
+      expect(result.stderr).not.toContain("spawning:");
+      expect(result.stdout).not.toContain("AGENT_INVOKED");
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

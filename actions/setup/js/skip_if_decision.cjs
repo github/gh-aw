@@ -15,7 +15,11 @@ const DEFAULT_MODEL = "gpt-6-luna-decisions";
 /** @typedef {{question: number, outcome: DecisionOutcome, error?: DecisionError}} QuestionOutcome */
 /** @typedef {{outcome: DecisionOutcome, questions: QuestionOutcome[], latencyMs: number, error?: DecisionError}} SkipDecision */
 
-/** @param {DecisionOutcome[]} outcomes @returns {DecisionOutcome} */
+/**
+ * Priority is deny > allow > unknown; an empty list abstains as unknown.
+ * @param {DecisionOutcome[]} outcomes
+ * @returns {DecisionOutcome}
+ */
 function aggregateDecisions(outcomes) {
   if (outcomes.includes("deny")) return "deny";
   return outcomes.includes("allow") ? "allow" : "unknown";
@@ -60,7 +64,7 @@ async function resolveDecisionEndpoint(fetchImpl, timeoutMs) {
     const endpoint = endpoints.find(entry => entry?.configured === true && aliases.includes(entry.provider) && typeof entry.models_url === "string");
     if (!endpoint) continue;
     const url = new URL(endpoint.models_url);
-    if (url.protocol !== "http:" || url.hostname !== "api-proxy" || !/^1000[1-9]$/.test(url.port) || url.username || url.password || url.search || url.hash) throw new Error("invalid_proxy_endpoint");
+    if (url.protocol !== "http:" || url.hostname !== "api-proxy" || !/^1000[0-9]$/.test(url.port) || url.username || url.password || url.search || url.hash) throw new Error("invalid_proxy_endpoint");
     return { baseURL: deriveBaseUrlFromModelsURL(endpoint.models_url), model: endpoint.provider === "openai" ? "gpt-6-luna" : DEFAULT_MODEL };
   }
   throw new Error("model_unavailable");

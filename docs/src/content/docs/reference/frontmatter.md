@@ -51,7 +51,7 @@ emoji: "🤖"
 
 ### Invocation Skip Questions (`skip-if-decision:`)
 
-An optional top-level list of up to 400 questions evaluated inside AWF before each otherwise eligible agent invocation, including initial execution, retries, resumes, and continuations. The gate applies to all built-in engines and declarative engines, including command-based, custom-harness, and durable execution paths.
+An optional top-level list of up to 400 questions evaluated inside AWF before each otherwise eligible agent invocation, including initial execution, retries, resumes, and continuations. The gate applies to all built-in engines and declarative engines, including command-based, custom-harness, and durable execution paths. Nonempty lists are incompatible with declarative `protected-session-capture`; compilation rejects this combination to preserve recorder isolation and verified session ingestion.
 
 ```aw wrap
 skip-if-decision:

@@ -8,7 +8,7 @@
   "required": ["on"],
   "properties": {
     "skip-if-decision": {
-      "description": "Advisory skip questions evaluated inside AWF before each eligible agent invocation. Any deny skips; allow or all unknown preserves deterministic harness eligibility. Runtime @file references use sandbox filesystem restrictions.",
+      "description": "Advisory skip questions evaluated inside AWF before each eligible agent invocation. Any deny skips; allow or all unknown preserves deterministic harness eligibility. Runtime @file references use sandbox filesystem restrictions. Nonempty lists cannot be combined with declarative protected-session-capture.",
       "type": "array",
       "maxItems": 400,
       "items": { "type": "string", "minLength": 1, "pattern": "\\S" }

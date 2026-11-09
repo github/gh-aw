@@ -79,6 +79,45 @@ describe("harness_retry_runner.cjs", () => {
     return { outcome, questions: [{ question: 1, outcome }], latencyMs: 1 };
   }
 
+  it.each(["", "[]"])("does not request decisions without nonempty configured questions: %j", async configuration => {
+    vi.stubEnv("GH_AW_SKIP_IF_DECISION", configuration);
+    vi.stubEnv("AWF_REFLECT_ENABLED", "1");
+    const fetchImpl = vi.fn();
+    vi.stubGlobal("fetch", fetchImpl);
+    try {
+      const options = telemetryOptions();
+      options.runAttempt = vi.fn(options.runAttempt);
+      expect(await runHarnessRetryLoop(options)).toMatchObject({ exitCode: 0, attempts: 1 });
+      expect(options.runAttempt).toHaveBeenCalledTimes(1);
+      expect(fetchImpl).not.toHaveBeenCalled();
+      expect(JSON.parse(fs.readFileSync(options.telemetryPath, "utf8")).decision_results).toBeUndefined();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("honors a deny through the default evaluator only after configured opt-in", async () => {
+    vi.stubEnv("GH_AW_SKIP_IF_DECISION", '["Is further work unnecessary?"]');
+    vi.stubEnv("AWF_REFLECT_ENABLED", "1");
+    vi.stubEnv("GH_AW_PHASE", "agent");
+    vi.stubEnv("GH_AW_SAFE_OUTPUTS", "");
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ endpoints: [{ configured: true, provider: "openai", models_url: "http://api-proxy:10000/v1/models" }] })))
+      .mockResolvedValueOnce(new Response('{"answers":[{"name":"skip_1","type":"choice","choice":"deny"}]}'));
+    vi.stubGlobal("fetch", fetchImpl);
+    try {
+      const options = telemetryOptions();
+      options.runAttempt = vi.fn();
+      expect(await runHarnessRetryLoop(options)).toMatchObject({ exitCode: 0, attempts: 0 });
+      expect(options.runAttempt).not.toHaveBeenCalled();
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+      expect(JSON.parse(fs.readFileSync(options.telemetryPath, "utf8")).decision_results).toMatchObject([{ outcome: "deny", avoidedInvocation: true }]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("can deny the initial invocation without counting a process attempt", async () => {
     const options = telemetryOptions();
     options.evaluateDecision = vi.fn().mockResolvedValue(gateResult("deny"));

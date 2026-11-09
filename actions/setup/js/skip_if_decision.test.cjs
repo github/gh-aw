@@ -124,18 +124,20 @@ describe("skip-if-decision", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it("rejects public provider endpoints instead of bypassing AWF", async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(new Response(JSON.stringify({ endpoints: [{ configured: true, provider: "openai", models_url: "https://api.openai.com/v1/models" }] })));
+  it.each(["https://api.openai.com/v1/models", "http://api-proxy:9999/v1/models", "http://api-proxy:10010/v1/models"])("rejects endpoints outside the AWF listener range: %s", async models_url => {
+    const fetchImpl = vi.fn().mockResolvedValue(new Response(JSON.stringify({ endpoints: [{ configured: true, provider: "openai", models_url }] })));
     expect(await evaluateSkipIfDecision({ env: env(), fetchImpl })).toMatchObject({ outcome: "unknown", error: "invalid_proxy_endpoint" });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it("uses the OpenAI Decisions model on a configured OpenAI proxy listener", async () => {
+  it.each([10000, 10001, 10009])("uses the OpenAI Decisions model on configured OpenAI proxy listener %s", async port => {
     const fetchImpl = vi
       .fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({ endpoints: [{ configured: true, provider: "openai", models_url: "http://api-proxy:10001/v1/models" }] })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ endpoints: [{ configured: true, provider: "openai", models_url: `http://api-proxy:${port}/v1/models` }] })))
       .mockResolvedValueOnce(decision(["deny"]));
     expect(await evaluateSkipIfDecision({ env: env(["Is work complete?"]), fetchImpl })).toMatchObject({ outcome: "deny" });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(fetchImpl.mock.calls[1][0]).toBe(`http://api-proxy:${port}/v1/decisions`);
     expect(JSON.parse(fetchImpl.mock.calls[1][1].body).model).toBe("gpt-6-luna");
   });
 

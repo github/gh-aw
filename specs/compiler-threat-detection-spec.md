@@ -32,7 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw | Compatibility |
 |---|---:|---|
-| `1.0.99` | Unreleased | Specifies optional `skip-if-decision` evaluation inside the AWF sandbox, data-only question transport, guarded runtime files, advisory aggregation after deterministic eligibility, and sanitized unified-session/audit evidence. Requires the matching compiler and setup runtime for configured workflows. Absent/empty lists preserve existing output; no new threat identifier or permission grant. |
+| `1.0.99` | Unreleased | Specifies optional `skip-if-decision` evaluation inside the AWF sandbox, data-only question transport, guarded runtime files, advisory aggregation after deterministic eligibility, and sanitized unified-session/audit evidence. Rejects nonempty lists with protected session capture and records harness initialization before billable decisions. Requires the matching compiler and setup runtime for configured workflows. Absent/empty lists preserve existing output; no new threat identifier or permission grant. |
 | `1.0.98` | Unreleased | Applies validated effective runner UID:GID defaults to both built-in `agenticworkflows` and `safeoutputs` backend containers, while retaining explicit user, HOME, and supplementary group settings. Requires owner-only no-follow writes for generated safeoutputs config, tools, metadata, validation, and output files, including replacements; no new threat identifier, permission grant, or lock-file schema change. |
 | `1.0.97` | Unreleased | Extends CTR-006 validation to raw `run:` content, including shell comments and quoted heredocs, while retaining Bash-aware sanitizer and codemod boundaries. Expressions preserved by `gh aw fix` in comments or quoted heredocs require manual migration; no new threat identifier, permission grant, or lock-file schema change. |
 | `1.0.96` | Unreleased | Specifies resolved global-App token persistence only for the default host PR checkout, preserving per-checkout authentication, static additional checkouts, optional-App fallback, and agent isolation. Requires work-queue reconciliation and App minting before shared PR checkout. Regenerate workflow locks; no new threat identifier, permission grant, or repository-scope expansion. |
@@ -794,17 +794,25 @@ For a nonempty top-level `skip-if-decision` list, the compiler MUST require the
 AWF agent sandbox and validate up to 400 nonblank string questions. Actions
 expressions in questions MUST be rejected. Questions MUST be transported as
 JSON environment data, not interpolated shell code or host-side decision
-steps. Absent/empty lists MUST preserve existing generated behavior.
+steps. Nonempty lists combined with declarative `protected-session-capture`
+MUST be rejected: the decision wrapper retains the capture descriptor across
+the exec-only boundary, and a skipped invocation cannot supply a verified
+protected session. Absent/empty lists MUST preserve existing generated behavior.
 
 The shared invocation harness MUST evaluate questions inside AWF before every
 otherwise eligible initial, retry, resume, or continuation invocation,
-including built-in engines, custom-harness overrides, and declarative/durable
+including built-in engines, custom-harness overrides, and supported declarative/durable
 execution. Deterministic retry, budget, deadline, and nonrecoverable-error
 safeguards MUST remain authoritative. Any `deny` MUST suppress the proposed
 invocation; otherwise any `allow` or all `unknown` MUST preserve the selected
 execution path. API/model unavailability, timeouts, malformed responses, and
 evaluation failures MUST abstain without a separate decision retry, additional
 decision-model call, or independent workflow failure.
+
+Harness initialization MUST be recorded before a potentially billable
+decision request so startup recovery cannot infer zero usage from a missing
+CLI attempt. This initialization marker MUST NOT claim that an agent CLI
+invocation occurred; nonrecoverable preflight checks MUST still run first.
 
 Decision requests MUST use the existing AWF API proxy and its model, network,
 credential, budget, and usage policies. Direct-provider fallback and separate
@@ -825,8 +833,8 @@ decision evidence MUST NOT authorize GitHub mutations or waive detection.
 
 | Boundary | Implementation | Regression Evidence |
 |---|---|---|
-| Compiler validation and sandbox-only transport | `pkg/workflow/skip_if_decision.go`, `compiler_orchestrator_workflow.go`, `engine_helpers.go`; `pkg/parser/schemas/main_workflow_schema.json` | `pkg/workflow/skip_if_decision_test.go`: malformed configuration, sandbox disablement, phase exclusions, built-in/custom/declarative/durable paths, and absent/empty compatibility. |
-| Eligible invocation gating, proxy-only requests, and guarded files | `actions/setup/js/harness_retry_runner.cjs`, `skip_if_decision.cjs`, `decisions_client.cjs`, `symlink_guard.cjs` | `skip_if_decision.test.cjs`, `harness_retry_runner.test.cjs`, and `shell_harness.test.cjs`: aggregation, failure abstention, runtime snapshots, path confinement, restart paths, and avoided invocations. |
+| Compiler validation and sandbox-only transport | `pkg/workflow/skip_if_decision.go`, `compiler_orchestrator_workflow.go`, `engine_helpers.go`; `pkg/parser/schemas/main_workflow_schema.json` | `pkg/workflow/skip_if_decision_test.go`: malformed configuration, sandbox disablement, phase exclusions, built-in/custom/declarative/durable paths, protected-capture rejection, and absent/empty compatibility. |
+| Eligible invocation gating, proxy-only requests, and guarded files | `actions/setup/js/harness_retry_runner.cjs`, `shell_harness.cjs`, `skip_if_decision.cjs`, `decisions_client.cjs`, `symlink_guard.cjs` | `skip_if_decision.test.cjs`, `harness_retry_runner.test.cjs`, and `shell_harness.test.cjs`: aggregation, failure abstention, runtime snapshots, normalized working directories, pre-request initialization markers, path confinement, restart paths, and avoided invocations. |
 | Advisory evidence and safe-output preservation | `actions/setup/js/harness_retry_record.cjs`, `unified_session.cjs`, `compact_unified_session.cjs`; `pkg/cli/audit_decision.go` | `unified_session.test.cjs`, `compact_unified_session.test.cjs`, `unified_session_render.test.cjs`, and `pkg/cli/audit_decision_test.go`: bounded metadata, separate counts, and no-op preservation. |
 
 File evidence and model answers remain untrusted semantic inputs: describing

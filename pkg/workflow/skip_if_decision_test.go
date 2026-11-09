@@ -139,6 +139,63 @@ func TestSkipIfDecisionCompileValidation(t *testing.T) {
 	}
 }
 
+func TestSkipIfDecisionProtectedCaptureCompilation(t *testing.T) {
+	for _, harness := range []bool{false, true} {
+		for _, durable := range []bool{false, true} {
+			for _, questions := range []string{"absent", "empty", "enabled"} {
+				t.Run(questions+"/"+map[bool]string{false: "command", true: "harness"}[harness]+"/"+map[bool]string{false: "fresh", true: "durable"}[durable], func(t *testing.T) {
+					dir := testutil.TempDir(t, "skip-decision-protected")
+					harnessSource := ""
+					if harness {
+						harnessSource = "    harness-script: |\n      require('node:process').execve('/usr/bin/recorder', ['/usr/bin/recorder'], process.env);\n"
+					}
+					durableSource := ""
+					engineSelection := "engine:\n  id: protected-test\n"
+					if durable {
+						durableSource = "    durable:\n      files: ['$GH_AW_DURABLE_CHECKPOINT']\n      execution:\n        command-name: recorder\n        protected-session-capture: true\n"
+						if harness {
+							durableSource += "      harness-script: |\n        require('node:process').execve('/usr/bin/recorder', ['/usr/bin/recorder'], process.env);\n"
+						}
+						engineSelection += "  durable: {}\n"
+					}
+					definition := "---\nengine:\n  id: protected-test\n  display-name: Protected test\n  behaviors:\n" + harnessSource +
+						"    log-parser: |\n      function parseLog() { return { markdown: '', logEntries: [] }; }\n" +
+						"    execution:\n      command-name: recorder\n      protected-session-capture: true\n" + durableSource + "---\nProtected engine.\n"
+					require.NoError(t, os.WriteFile(filepath.Join(dir, "engine.md"), []byte(definition), 0600))
+					config := ""
+					switch questions {
+					case "empty":
+						config = "skip-if-decision: []\n"
+					case "enabled":
+						config = "skip-if-decision: ['Done?']\n"
+					}
+					filename := filepath.Join(dir, "decision.md")
+					require.NoError(t, os.WriteFile(filename, []byte("---\non: workflow_dispatch\n"+engineSelection+"imports: [engine.md]\n"+config+"---\nDo the task.\n"), 0600))
+					err := NewCompiler().CompileWorkflow(filename)
+					if questions == "enabled" {
+						require.ErrorContains(t, err, "skip-if-decision is incompatible with protected-session-capture")
+						require.ErrorContains(t, err, "remove skip-if-decision")
+						_, lockErr := os.Stat(stringutil.MarkdownToLockFile(filename))
+						require.True(t, os.IsNotExist(lockErr), "unsafe combination must not produce a lock")
+						return
+					}
+					require.NoError(t, err)
+					lock, err := os.ReadFile(stringutil.MarkdownToLockFile(filename))
+					require.NoError(t, err)
+					require.NotContains(t, string(lock), "shell_harness.cjs")
+					require.NotContains(t, string(lock), "GH_AW_SKIP_IF_DECISION:")
+					require.Contains(t, string(lock), "--capture-command-output")
+					if harness {
+						require.Contains(t, string(lock), `exec "$GH_AW_NODE_EXEC"`)
+					} else {
+						require.Contains(t, string(lock), "exec recorder")
+					}
+				})
+			}
+		}
+	}
+}
+
 func TestSkipIfDecisionDeclarativeExecution(t *testing.T) {
 	for _, harness := range []bool{false, true} {
 		for _, durable := range []bool{false, true} {

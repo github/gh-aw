@@ -135,6 +135,7 @@ function projectEvent(event) {
     const retry = event.type === "harness.retry" ? normalizeHarnessRetryRecord(event.data) : normalizeHarnessAttemptEvent(event.data);
     if (!retry) return undefined;
     Object.assign(data, retry);
+    if (event.type === "harness.retry") delete data.decisionResults;
   }
   if (["session.result", "usage.report", "firewall.token_usage"].includes(event.type) && isRecord(event.data.usage)) data.usage = projectScalars(event.data.usage, USAGE_FIELDS);
   if (event.type === "grader.result" && isRecord(event.data.run)) data.run = projectScalars(event.data.run, GRADER_RUN_FIELDS);

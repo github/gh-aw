@@ -65,9 +65,44 @@ for `harness.attempt` records and
 [Harness Retry Policy](/gh-aw/reference/engines/#harness-retry-and-post-result-watchdog-policy)
 for execution behavior.
 
-### Searching session evidence
+### Invocation skip decisions
 
 Invocation skip decisions appear in `retries.decisions` and as searchable `harness.decision` unified-session events. Each records the proposed attempt, question outcomes, sanitized errors, latency, and whether an invocation was avoided. `retries.avoided_invocations` counts denied invocations separately from executed attempts and retries; a skip does not count as an agent retry.
+
+For example, this `--json` excerpt records a denied initial invocation. Question
+1 abstained because its referenced file could not be read, but question 2 was
+evaluated and denied, so no attempt executed:
+
+```json
+{
+  "retries": {
+    "agent_retries": 0,
+    "detection_retries": 0,
+    "attempts": [],
+    "engine_retries": 0,
+    "detection_engine_retries": 0,
+    "decisions": [
+      {
+        "proposedAttempt": 1,
+        "outcome": "deny",
+        "questions": [
+          { "question": 1, "outcome": "unknown", "error": "file_reference_failed" },
+          { "question": 2, "outcome": "deny" }
+        ],
+        "latencyMs": 20,
+        "timestamp": 1794096000000,
+        "avoidedInvocation": true,
+        "phase": "agent",
+        "path": "agent/harness_retry.json",
+        "index": 1
+      }
+    ],
+    "avoided_invocations": 1
+  }
+}
+```
+
+### Searching session evidence
 
 ```bash
 gh aw audit 1234567890 --search "api.example.com ERR_AUTH_401" --json

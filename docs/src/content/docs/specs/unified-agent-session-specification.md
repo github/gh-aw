@@ -1750,6 +1750,11 @@ It requires a definition-owned `behaviors.log-parser`; the generic format
 detection and tolerant recovery rules do not authorize fallback after protected
 recorder verification fails.
 
+Nonempty `skip-if-decision` lists are rejected for this profile. The outer
+decision harness would retain the recorder's capture descriptor across the
+exec-only boundary, and a denied invocation cannot supply a verified structured
+session. Absent or empty lists preserve protected execution and ingestion.
+
 **T-UAS-084 — Native source and collection completeness.** Protected ingestion
 MUST use AWF-native host-only command output and validate its metadata, private
 regular stream files, completion/drain state, aggregate byte counts, and command

@@ -11,6 +11,11 @@ const { fetchAWFReflect, deriveBaseUrlFromModelsURL } = require("./awf_reflect.c
 const { resolveEngineModel } = require("./resolve_model_alias.cjs");
 const [command, ...commandArgs] = process.argv.slice(2);
 const log = message => process.stderr.write(`[agy-harness] ${message}\n`);
+const reportError = error => {
+  const message = error instanceof Error ? error.message : "Agy harness failed";
+  log(message);
+  process.stdout.write(JSON.stringify({ type: "session.error", data: { error: message } }) + "\n");
+};
 const maxPendingRecordLength = 16 * 1024 * 1024; // UTF-16 code units, including the record terminator.
 const checksums = {
   "1.3.1": "0e313b309ea58c71431ce86bb820936a3700e17e44eabce7bf2264617dc822db",
@@ -141,9 +146,10 @@ const main = async () => {
     const prompt = fs.readFileSync(promptPath, "utf8");
     const args = [...commandArgs, "--input-format", "stream-json", "--output-format", "stream-json", "--print-timeout", "5m", "--model", model, "--dangerously-skip-permissions"];
     log(`verified experimental Agy ${version}`);
+    const decisionEnabled = Boolean(process.env.GH_AW_SKIP_IF_DECISION);
     const runAttempt = () =>
       new Promise(
-        /** @param {(value?: void) => void} resolve */ (resolve, reject) => {
+        /** @param {(value: import("./harness_retry_runner.cjs").HarnessAttemptResult) => void} resolve */ (resolve, reject) => {
           const child = spawn(binary, args, { cwd: env.GH_AW_ENGINE_CWD || workspace, env, detached: true, stdio: ["pipe", "pipe", "pipe"] });
           const parser = new JsonlParser({ maxPendingRecordLength });
           let outputFailure = "";
@@ -253,11 +259,19 @@ const main = async () => {
             process.removeListener("SIGINT", onInterrupt);
             process.removeListener("SIGTERM", onTerminate);
           };
+          const failAttempt = (error, code) => {
+            if (!decisionEnabled || interrupted) {
+              reject(error);
+              return;
+            }
+            reportError(error);
+            resolve({ exitCode: Number.isSafeInteger(code) && code !== 0 ? code : 1, output: "", hasOutput: true });
+          };
           child.once("error", () => {
             if (settled) return;
             settled = true;
             cleanup();
-            reject(new Error("Agy executable could not be started"));
+            failAttempt(new Error("Agy executable could not be started"), null);
           });
           const complete = (code, signal) => {
             if (settled) return;
@@ -275,15 +289,15 @@ const main = async () => {
               if (result?.status === "SUCCESS") {
                 process.stdout.write(JSON.stringify({ event: "result", result: { ...result, status: "ERROR", error: outputFailure || "Agy run was denied, interrupted, or lacked completed inference" } }) + "\n");
               }
-              reject(new Error(outputFailure || "Agy run failed, was denied, interrupted, or lacked completed inference"));
-            } else resolve();
+              failAttempt(new Error(outputFailure || "Agy run failed, was denied, interrupted, or lacked completed inference"), code);
+            } else resolve({ exitCode: 0, output: "", hasOutput: true });
           };
           child.once("exit", () => terminate("SIGTERM"));
           child.once("close", complete);
           child.stdin.end(JSON.stringify({ event: "user", message: { content: prompt } }) + "\n");
         }
-      ).then(() => ({ exitCode: 0, output: "", hasOutput: true }));
-    if (process.env.GH_AW_SKIP_IF_DECISION) {
+      );
+    if (decisionEnabled) {
       const run = await require("./harness_retry_runner.cjs").runSingleHarnessInvocation({ runAttempt, harnessName: "Agy harness", log });
       process.exitCode = run.exitCode;
     } else {
@@ -296,9 +310,7 @@ const main = async () => {
 
 if (require.main === module) {
   main().catch(error => {
-    const message = error instanceof Error ? error.message : "Agy harness failed";
-    log(message);
-    process.stdout.write(JSON.stringify({ type: "session.error", data: { error: message } }) + "\n");
+    reportError(error);
     process.exitCode = 1;
   });
 }

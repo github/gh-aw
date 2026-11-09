@@ -34,6 +34,17 @@ func isSkipIfDecisionEnabled(data *WorkflowData) bool {
 	return data != nil && !data.IsDetectionRun && !data.IsEvalsRun && len(data.SkipIfDecision) > 0
 }
 
+func validateSkipIfDecisionEngine(engine CodingAgentEngine, data *WorkflowData) error {
+	if data == nil || len(data.SkipIfDecision) == 0 {
+		return nil
+	}
+	behaviorEngine, ok := engine.(*BehaviorDefinedEngine)
+	if ok && behaviorEngine.protectedSessionCaptureEnabled() {
+		return errors.New("skip-if-decision is incompatible with protected-session-capture: the decision wrapper retains a capture descriptor and skipped invocations have no verified protected session; remove skip-if-decision or use an engine without protected-session-capture")
+	}
+	return nil
+}
+
 func wrapCustomHarnessDecisionCommand(data *WorkflowData, engineName, defaultHarness, command string) string {
 	if isSkipIfDecisionEnabled(data) && data.EngineConfig != nil &&
 		data.EngineConfig.HarnessScript != "" && data.EngineConfig.HarnessScript != defaultHarness {
