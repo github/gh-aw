@@ -1,27 +1,29 @@
 {
-  "last_run_date": "2026-11-08",
+  "last_run_date": "2026-11-09",
   "last_window": {
-    "start": "2026-11-07T07:53:01Z",
-    "end": "2026-11-08T07:53:01Z"
+    "start": "2026-11-08T07:55:50Z",
+    "end": "2026-11-09T07:55:50Z"
   },
   "observed_window": {
-    "coverage": "Partial: 343 cached run records, from 2026-11-07T20:01:34Z through 2026-11-08T07:53:01Z; 07:53:01-20:01:34 UTC missing because collection hit count limit; 8 records still in progress at snapshot",
+    "coverage": "Partial: 185 cached run records from 2026-11-09T03:21:24Z through 2026-11-09T07:52:46Z; 2026-11-08T07:55:50Z through 2026-11-09T03:20:54Z missing after count limit",
     "representative_audits": [
-      42409016328,
-      42423438587,
-      42453386098,
-      42458892731
+      42561605912,
+      42579453481,
+      42562699860,
+      42579514401
     ]
   },
   "key_themes": [
-    "PR review safe-output processing failed in 10 distinct runs across three workflows",
-    "Review feedback led to human assignments and merged corrections on PRs #75736 and #75761",
-    "Hourly Auditor failed in evidence collection 12 times while six-hour investigator succeeded"
+    "Seven Process Safe Outputs failures across three workflows",
+    "Five Install AWF binary failures across five workflows",
+    "PR #76126 review led to repair and maintainer merge",
+    "Hourly Auditor evidence collection failed five times"
   ],
   "carry_forward_questions": [
-    "Why does reviewer Process Safe Outputs fail after successful agent, detection, and eval jobs?",
+    "Did PR #76185 repair simulator sweep and memory publication after review?",
+    "What caused AWF binary installation failures across five workflows?",
+    "Did the PR #76126 queue maintenance change improve live runs?",
     "What failed inside hourly Auditor evidence collection?",
-    "Did PR #75761 resolve guarded uploader access on later runs?",
-    "What occurred in missing 2026-11-07 07:53-20:01 UTC interval?"
+    "What occurred in missing 2026-11-08 07:55:50 to 2026-11-09 03:20:54 UTC interval?"
   ]
 }
