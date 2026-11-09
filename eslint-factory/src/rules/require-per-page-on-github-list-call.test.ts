@@ -13,7 +13,9 @@ describe("require-per-page-on-github-list-call", () => {
     ruleTester.run("require-per-page-on-github-list-call", requirePerPageOnGithubListCallRule, {
       valid: [
         `async function f() { await github.rest.issues.listComments({ owner, repo, issue_number: 1, per_page: 100 }); }`,
+        `async function f() { await github.rest.issues.listComments({ owner, repo, issue_number: 1, "per_page": 100 }); }`,
         `async function f() { await github.rest.actions.listWorkflowRuns({ owner, repo, per_page: MAX }); }`,
+        `async function f() { await github.rest.repos.listLanguages({ owner, repo }); }`,
         `async function f() { await github.rest.issues.listComments({ ...base }); }`,
         `async function f() { await github.rest.issues.listComments(params); }`,
         `async function f() { await github.rest.issues.get({ owner, repo, issue_number: 1 }); }`,
@@ -27,6 +29,14 @@ describe("require-per-page-on-github-list-call", () => {
         },
         {
           code: `async function f() { await githubClient.rest.pulls.listReviews({ owner, repo, pull_number: 1 }); }`,
+          errors: [{ messageId: "missingPerPage" }],
+        },
+        {
+          code: `async function f() { await github.rest.issues.listComments({ owner, repo, issue_number: 1, per_page: undefined }); }`,
+          errors: [{ messageId: "missingPerPage" }],
+        },
+        {
+          code: `async function f() { await github.rest.issues.listComments({ owner, repo, issue_number: 1, per_page: void 0 }); }`,
           errors: [{ messageId: "missingPerPage" }],
         },
       ],

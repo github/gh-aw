@@ -2,6 +2,8 @@ import { ESLintUtils, TSESTree } from "@typescript-eslint/utils";
 
 const createRule = ESLintUtils.RuleCreator(name => `https://github.com/github/gh-aw/tree/main/eslint-factory#${name}`);
 
+const nonPaginatedRestListMethods = new Set(["repos.listLanguages"]);
+
 function isRestListCallee(callee: TSESTree.Expression): string | null {
   // Matches <client>.rest.<namespace>.list*(...)
   if (callee.type !== "MemberExpression" || callee.computed || callee.property.type !== "Identifier" || !callee.property.name.startsWith("list")) {
@@ -35,7 +37,7 @@ export const requirePerPageOnGithubListCallRule = createRule({
     return {
       CallExpression(node: TSESTree.CallExpression) {
         const method = isRestListCallee(node.callee);
-        if (!method || node.arguments.length !== 1) {
+        if (!method || nonPaginatedRestListMethods.has(method) || node.arguments.length !== 1) {
           return;
         }
         const arg = node.arguments[0];
@@ -46,8 +48,11 @@ export const requirePerPageOnGithubListCallRule = createRule({
         if (arg.properties.some(p => p.type === "SpreadElement")) {
           return;
         }
-        const hasPerPage = arg.properties.some(p => p.type === "Property" && ((!p.computed && p.key.type === "Identifier" && p.key.name === "per_page") || (p.key.type === "Literal" && p.key.value === "per_page")));
-        if (!hasPerPage) {
+        const perPageProperty = arg.properties.find(p => p.type === "Property" && ((!p.computed && p.key.type === "Identifier" && p.key.name === "per_page") || (p.key.type === "Literal" && p.key.value === "per_page")));
+        const hasUndefinedPerPage =
+          perPageProperty?.type === "Property" &&
+          ((perPageProperty.value.type === "Identifier" && perPageProperty.value.name === "undefined") || (perPageProperty.value.type === "UnaryExpression" && perPageProperty.value.operator === "void"));
+        if (!perPageProperty || hasUndefinedPerPage) {
           context.report({ node: node.callee, messageId: "missingPerPage", data: { method } });
         }
       },
