@@ -64,6 +64,7 @@ type HealthCollection struct {
 	checkedRequests           int
 	repoOverride              string
 	scanBranch                string
+	sampleIncomplete          bool
 	stopped                   bool
 	visited                   map[string]struct{}
 	jobPresence               map[healthRunAttempt]bool

@@ -286,7 +286,7 @@ func TestHealthDefaultBranchPrecedesPRRuns(t *testing.T) {
 				Status: "completed", Conclusion: "failure", Event: "push", HeadBranch: "release/stable",
 				RunAttempt: 1, HeadSHA: strings.Repeat("a", 40), CreatedAt: time.Now().Add(-2 * time.Hour)}
 			prFailure := defaultFailure
-			prFailure.ID, prFailure.Path, prFailure.HeadBranch, prFailure.Event = 2, collection.workflows[0].Path, "feature", "pull_request"
+			prFailure.ID, prFailure.Path, prFailure.HeadBranch, prFailure.Event = 2, collection.workflows[0].Path, "release/stable", "pull_request"
 			prFailure.CreatedAt = time.Now().Add(-time.Hour)
 			var successes []workflowRunAPIResponse
 			for i := range healthMinimumRuns {
