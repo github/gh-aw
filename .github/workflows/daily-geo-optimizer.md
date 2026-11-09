@@ -15,6 +15,16 @@ tracker-id: daily-geo-optimizer
 engine:
   id: copilot
   copilot-sdk: true
+skip-if-decision:
+  - >-
+    Do @/tmp/gh-aw/agent/geo-optimizer/docs-site-audit.json,
+    @/tmp/gh-aw/agent/geo-optimizer/docs-sitemap-audit.json,
+    @/tmp/gh-aw/agent/geo-optimizer/readme-audit.json,
+    @/tmp/gh-aw/agent/geo-optimizer/docs-robots-verification.json, and
+    @/tmp/gh-aw/agent/geo-optimizer/docs-ai-discovery-verification.json
+    conclusively establish that all audited scores are Excellent (90+/100)
+    and no actionable GEO recommendation remains? Abstain for failed,
+    incomplete, or inconsistent audits and unresolved discovery-file findings.
 max-tool-denials: 3
 strict: true
 timeout-minutes: 30
@@ -224,7 +234,7 @@ sandbox:
     id: awf
 evals:
   - id: geo_audit_performed
-    question: Did the agent audit the README and documentation site using the geo-optimizer skill?
+    question: Did the agent audit the README and documentation site using the geo-optimizer skill? Return UNKNOWN when the output records a skip-if-decision no-op before agent execution.
   - id: recommendations_or_pr_created
     question: Were GEO improvement recommendations produced or a PR created, or was noop used when no improvements were needed?
 ---
@@ -232,6 +242,9 @@ evals:
 {{#runtime-import? .github/shared-instructions.md}}
 
 # GEO Optimizer Daily Audit
+
+The AWF decision gate may skip analysis of conclusively Excellent audits with
+no actionable recommendations. Uncertain or failed audits still run.
 
 You are the GEO (Generative Engine Optimization) audit agent. Your task is to analyze the audit results produced by `geo-optimizer-skill` and report on the AI visibility of the `${{ github.repository }}` README and documentation site.
 

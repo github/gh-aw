@@ -15,6 +15,13 @@ permissions:
 engine:
   id: copilot
   copilot-sdk: true
+skip-if-decision:
+  - >-
+    Do @/tmp/gh-aw/agent/all-help.txt and
+    @docs/src/content/docs/setup/cli.md conclusively establish that the
+    collected CLI help has no typos, terminology or flag inconsistencies,
+    broken examples, or documentation gaps requiring an issue? Abstain if
+    help collection is incomplete or command behavior needs further inspection.
 max-tool-denials: 3
 strict: false
 network:
@@ -87,13 +94,16 @@ features:
   gh-aw-detection: true
 evals:
   - id: cli_inspected
-    question: Did the agent inspect the gh-aw CLI commands and analyze their output for inconsistencies, typos, or documentation gaps?
+    question: Did the agent inspect the gh-aw CLI commands and analyze their output for inconsistencies, typos, or documentation gaps? Return UNKNOWN when the output records a skip-if-decision no-op before agent execution.
   - id: issue_created_or_noop
     question: Was an issue created with specific CLI inconsistencies found, or was noop used when no issues were detected?
 
 ---
 
 # CLI Consistency Checker
+
+The AWF decision gate compares prepared help with the CLI documentation and may
+skip only a conclusively clean inspection. Unresolved behavior still runs.
 
 Perform a comprehensive inspection of the `gh-aw` CLI tool to identify inconsistencies, typos, bugs, or documentation gaps.
 
