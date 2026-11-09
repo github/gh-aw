@@ -64,6 +64,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/regexpdynamicpattern"
 	"github.com/github/gh-aw/pkg/linters/seenmapbool"
 	"github.com/github/gh-aw/pkg/linters/slicemakezerolength"
+	"github.com/github/gh-aw/pkg/linters/sortbasicslices"
 	"github.com/github/gh-aw/pkg/linters/sortslice"
 	"github.com/github/gh-aw/pkg/linters/splitindexzero"
 	splitlinesonnewline "github.com/github/gh-aw/pkg/linters/splitlines-on-newline"
@@ -166,6 +167,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	ssljson.Analyzer,
 	seenmapbool.Analyzer,
 	slicemakezerolength.Analyzer,
+	sortbasicslices.Analyzer,
 	sortslice.Analyzer,
 	splitindexzero.Analyzer,
 	splitlinesonnewline.Analyzer,

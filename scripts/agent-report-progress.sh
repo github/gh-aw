@@ -180,7 +180,6 @@ if [ "${#go_packages[@]}" -gt 0 ]; then
     done < <(printf '%s\n' "${go_packages[@]}" | LC_ALL=C sort -u)
     go_packages=("${sorted_go_packages[@]}")
 fi
-
 normalize_repo_path() {
     local file="$1"
     file="${file#"$PWD"/}"

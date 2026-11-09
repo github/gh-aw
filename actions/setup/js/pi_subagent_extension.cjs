@@ -204,7 +204,7 @@ function piSubagentExtension(pi) {
   pi.registerTool({
     name: "subagent",
     label: "Sub-agent",
-    description: `Delegate a task to a declared agent in an isolated Pi session. Available agents: ${agents.map(agent => `${agent.name}: ${agent.description}`).join("; ")}`,
+    description: `Delegate a task to a declared agent in an isolated Pi session. Available agents: ${agents.map(agent => agent.name).join("; ")}`,
     parameters: { type: "object", properties: { agent: { type: "string", enum: agents.map(agent => agent.name) }, task: { type: "string", minLength: 1 } }, required: ["agent", "task"], additionalProperties: false },
     async execute(_id, params, signal, _onUpdate, ctx) {
       if (!params || typeof params !== "object" || Array.isArray(params) || typeof params.agent !== "string" || typeof params.task !== "string" || !params.task.trim())

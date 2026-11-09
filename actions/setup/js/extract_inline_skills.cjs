@@ -24,9 +24,7 @@
 // document (for example via an import) without swallowing unrelated content
 // that follows it, and lets the block itself contain nested "##" headings.
 //
-// Supported frontmatter fields (all others are stripped with a warning)
-// ─────────────────────────────────────────────────────────────────────
-//   description   Human-readable description of the skill's role.
+// Inline skill frontmatter is discarded without parsing; only the body is used.
 //
 // If no ## skill: markers are present the content is returned unchanged and no
 // files are written.
@@ -36,10 +34,6 @@ const path = require("path");
 const { collectInlineEndMarkers, unknownInlineEndMarkerError } = require("./inline_marker_helpers.cjs");
 const { inlineArtifactTarget } = require("./inline_artifact_target.cjs");
 const { INLINE_SKILL_MANIFEST } = require("./pi_workflow_skills.cjs");
-
-// Supported frontmatter fields for inline skills.
-// Any other field is stripped with a warning.
-const SUPPORTED_FRONTMATTER_FIELDS = ["description"];
 
 // Regex for the start marker: ## skill: `name` (lowercase identifier)
 const START_MARKER_RE = /^##[ \t]+skill:[ \t]+`([a-z][a-z0-9_-]*)`[ \t]*$/gm;
@@ -56,71 +50,20 @@ const AGENT_START_BOUNDARY_RE = /^##[ \t]+agent:[ \t]+`(?:[a-z][a-z0-9_-]*)`[ \t
 const H2_HEADING_RE = /^##[ \t]/gm;
 
 /**
- * Filters skill frontmatter to only retain supported fields.
- *
- * Only `description` is valid in a skill frontmatter block. Any other
- * top-level key is stripped and a warning is emitted.
+ * Discards inline skill frontmatter without interpreting its contents.
  *
  * When no YAML frontmatter delimiter (`---`) is found at the start of the
  * content, the content is returned unchanged.
  *
  * @param {string} content   - Raw skill block content (frontmatter + prompt).
  * @param {string} skillName - Skill name used in log messages.
- * @returns {string} Content with only supported frontmatter fields retained.
+ * @returns {string} Skill body without frontmatter.
  */
 function filterInlineSkillFrontmatter(content, skillName) {
-  // A YAML frontmatter block must start immediately at the beginning of the
-  // content (after trimming performed by the caller).
-  if (!content.startsWith("---\n")) {
-    return content;
-  }
-
-  // Locate the closing delimiter.  We search for "\n---" starting after the
-  // complete opening "---\n" (offset 4) to avoid matching the opening itself.
-  const closeIdx = content.indexOf("\n---", 4);
-  if (closeIdx === -1) {
-    return content;
-  }
-
-  // Lines between the opening and closing "---".
-  const fmLines = content.slice(4, closeIdx).split("\n");
-  // Everything after the closing "\n---" (including the optional newline).
-  const body = content.slice(closeIdx + 4);
-
-  const kept = [];
-  const stripped = [];
-
-  for (const line of fmLines) {
-    // Match a simple scalar YAML key at the start of the line.
-    // YAML keys are plain identifiers (no hyphens).
-    const keyMatch = line.match(/^([a-z_][a-z0-9_]*)[ \t]*:/);
-    if (keyMatch) {
-      const key = keyMatch[1];
-      if (SUPPORTED_FRONTMATTER_FIELDS.includes(key)) {
-        kept.push(line);
-      } else {
-        stripped.push(key);
-      }
-    } else {
-      // Continuation / comment / blank line — keep only when at least one
-      // supported key has already been accepted, so multi-line values (e.g.
-      // `description: |`) are preserved correctly.
-      if (kept.length > 0) {
-        kept.push(line);
-      }
-    }
-  }
-
-  if (stripped.length > 0) {
-    core.warning(`[extractInlineSkills] skill "${skillName}": unsupported frontmatter field(s) stripped: ${stripped.join(", ")} (only "description" is supported)`);
-  }
-
-  // If no supported fields remain, omit the frontmatter block entirely.
-  if (kept.length === 0) {
-    return body.replace(/^\n/, "");
-  }
-
-  return `---\n${kept.join("\n")}\n---${body}`;
+  const { markdownMetadataBlocks } = require("./markdown_metadata.cjs");
+  const block = markdownMetadataBlocks(content, true)[0];
+  if (!block) return content;
+  return content.slice(block.end).replace(/^\r?\n/, "");
 }
 
 /**

@@ -582,7 +582,6 @@ class IndependentDriverTests(unittest.TestCase):
                      "actions/setup/js/work_queue_resource_scope.cjs",
                      "actions/setup/js/work_queue_store.cjs",
                      "actions/setup/js/work_queue_provisioning.cjs",
-                     "actions/setup/js/work_queue_yaml.cjs",
                      "actions/setup/js/work_queue_conformance_fixtures.json"):
             self.assertIn(path, sources)
         for path in sources:
@@ -595,7 +594,7 @@ class IndependentDriverTests(unittest.TestCase):
         original_read = Path.read_bytes
         for name in ("actions/setup/js/work_queue_claim_scope.cjs",
                      "actions/setup/js/work_queue_store.cjs", "actions/setup/js/work_queue_provisioning.cjs",
-                     "actions/setup/js/work_queue_yaml.cjs", "specs/work-queue/effect-contract.schema.json",
+                     "specs/work-queue/effect-contract.schema.json",
                      "specs/work-queue/resource-scope.schema.json"):
             with self.subTest(source=name):
                 target = verify.ROOT / name

@@ -6,6 +6,7 @@ import path from "path";
 import os from "node:os";
 
 const require = createRequire(import.meta.url);
+const { prepareMarkdownFixtures } = require("../../../scripts/markdown_metadata_test_adapter.cjs");
 const {
   resolveCodexPromptFileArgs,
   resolveCodexPromptInput,
@@ -2824,6 +2825,9 @@ describe("Codex native sub-agent roles before spawn (github/gh-aw#70939)", () =>
     fs.mkdirSync(staged, { recursive: true });
     fs.mkdirSync(codexHome, { recursive: true });
     for (const [name, content] of Object.entries(agents)) fs.writeFileSync(path.join(staged, name), content);
+    const { metadataManifestFields } = require("./markdown_metadata.cjs");
+    fs.mkdirSync(recordsDir, { recursive: true });
+    fs.writeFileSync(path.join(recordsDir, "aw_info.json"), JSON.stringify(metadataManifestFields(prepareMarkdownFixtures(...Object.values(agents)))));
     const { result, calls } = runHarnessFixture(
       `const p=require("path");const d=p.join(process.env.CODEX_HOME,"agents");fs.writeFileSync(p.join(process.env.CODEX_HOME,"roles-at-spawn.json"),JSON.stringify(fs.existsSync(d)?Object.fromEntries(fs.readdirSync(d).filter(n=>n.endsWith(".toml")).sort().map(n=>[n,fs.readFileSync(p.join(d,n),"utf8")])):null));`,
       {
@@ -2858,7 +2862,7 @@ describe("Codex native sub-agent roles before spawn (github/gh-aw#70939)", () =>
     expect(Object.keys(rolesAtSpawn)).toEqual(["paper-screener.toml"]);
     const toml = rolesAtSpawn["paper-screener.toml"];
     expect(roleField(toml, "name")).toBe("paper-screener");
-    expect(roleField(toml, "description")).toBe("Fast relevance screening of arXiv paper abstracts for GitHub Agentic Workflows");
+    expect(roleField(toml, "description")).toBe("paper-screener");
     expect(roleField(toml, "developer_instructions")).toBe(agent.slice(agent.indexOf("\n---\n") + 5).trim());
     expect(roleField(toml, "model")).toBe("gpt-5-mini-2025-08-07");
     expect(records.filter(record => record.role !== "main")).toEqual([{ engine: "codex", role: "paper-screener", configured_model: "small", resolved_model: "gpt-5-mini-2025-08-07", provider: "openai", status: "resolved", cause: null }]);

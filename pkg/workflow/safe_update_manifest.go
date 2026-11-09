@@ -100,6 +100,10 @@ type GHAWManifest struct {
 	Admission                   bool                                 `json:"admission"`
 	WebhookSubscriptions        []WebhookSubscription                `json:"webhook_subscriptions,omitempty"`
 	WorkQueue                   *GHAWManifestWorkQueue               `json:"work_queue,omitempty"`
+	MarkdownMetadata            *GHAWMarkdownMetadata                `json:"-"`
+	AgentMetadata               map[string]json.RawMessage           `json:"agent_metadata"`
+	MetadataRefs                map[string]map[string]string         `json:"metadata_refs,omitempty"`
+	MetadataErrors              map[string]string                    `json:"metadata_errors,omitempty"`
 }
 
 // NewGHAWManifest builds a GHAWManifest from the raw secret names, action reference
@@ -154,6 +158,7 @@ func NewGHAWManifest(secretNames []string, actionRefs []string, failures []GHAWM
 		Redirect:             strings.TrimSpace(redirect),
 		HasPullRequest:       hasPR,
 		HasPullRequestTarget: hasPRTarget,
+		AgentMetadata:        map[string]json.RawMessage{},
 	}
 }
 

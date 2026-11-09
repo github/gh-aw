@@ -420,13 +420,21 @@ func ensureGitAttributes() (bool, error) {
 }
 
 func readGitAttributesFile(path string) ([]string, error) {
-	if content, err := os.ReadFile(path); err == nil {
-		lines := strings.Split(string(content), "\n")
-		gitLog.Printf("Read existing .gitattributes with %d lines", len(lines))
-		return lines, nil
+	content, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		gitLog.Print("No existing .gitattributes file found")
+		return []string{}, nil
 	}
-	gitLog.Print("No existing .gitattributes file found")
-	return []string{}, nil
+	if err != nil {
+		return nil, fmt.Errorf("failed to read .gitattributes: %w", err)
+	}
+
+	lines := strings.SplitAfter(strings.ReplaceAll(string(content), "\r\n", "\n"), "\n")
+	for i := range lines {
+		lines[i] = strings.TrimSuffix(lines[i], "\n")
+	}
+	gitLog.Printf("Read existing .gitattributes with %d lines", len(lines))
+	return lines, nil
 }
 
 func ensureRequiredGitAttributesEntry(lines []string) ([]string, bool) {
