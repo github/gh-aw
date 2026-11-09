@@ -41,6 +41,8 @@ func (e *AgyEngine) buildExecutionCommand(workflowData *WorkflowData, logFile, e
 	if cliPath := GetMCPCLIPathSetup(workflowData); cliPath != "" {
 		engineCommand = fmt.Sprintf("%s && %s", cliPath, engineCommand)
 	}
+	allowedDomains := mergeDomainsWithNetworkToolsAndRuntimes(AgyDefaultDomains, workflowData.NetworkPermissions, workflowData.Tools, workflowData.Runtimes)
+	allowedDomains = mergeAPITargetDomains(allowedDomains, explicitGeminiAPITargetHost(workflowData, e.GetID()))
 	return BuildAWFCommand(AWFCommandConfig{
 		EngineName:         e.GetID(),
 		EngineCommand:      engineCommand,
@@ -48,7 +50,7 @@ func (e *AgyEngine) buildExecutionCommand(workflowData *WorkflowData, logFile, e
 		WorkflowData:       workflowData,
 		UsesTTY:            false,
 		PathSetup:          "touch " + AgentStepSummaryPath,
-		AllowedDomains:     mergeDomainsWithNetworkToolsAndRuntimes(AgyDefaultDomains, workflowData.NetworkPermissions, workflowData.Tools, workflowData.Runtimes),
+		AllowedDomains:     allowedDomains,
 		ExcludeEnvVarNames: ComputeAWFExcludeEnvVarNames(workflowData, e.GetRequiredSecretNames(workflowData)),
 	})
 }
