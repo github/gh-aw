@@ -56,6 +56,7 @@ async function discoverRuns(options, expected, readAttempt = createNativeRunAtte
   log.debug("discovery.start");
   const [owner, repo] = expected.repository.split("/");
   const candidates = new Map();
+  const correlationPending = new Set();
   let conflict = false;
   for (let page = 1; page <= 2; page++) {
     const response = await options.githubClient.rest.actions.listWorkflowRuns({
@@ -80,27 +81,28 @@ async function discoverRuns(options, expected, readAttempt = createNativeRunAtte
         runId = nativeId(run.id);
       } catch (error) {
         log.failure("discovery.identity_invalid", error);
-        return { candidates: [...candidates.values()], conflict: true };
+        return { candidates: [...candidates.values()], correlationPending: [...correlationPending], conflict: true };
       }
-      if (candidates.has(runId)) continue;
+      if (candidates.has(runId) || correlationPending.has(runId)) continue;
       const original = await readAttempt(runId, 1);
       try {
         const proof = validateNativeRun(original, { ...expected, run_id: runId });
         candidates.set(proof.run_id, proof);
       } catch (error) {
         log.failure("discovery.proof_invalid", error);
-        return { candidates: [...candidates.values()], conflict: true };
+        if (error?.message === "run_correlation_mismatch") correlationPending.add(runId);
+        else return { candidates: [...candidates.values()], correlationPending: [...correlationPending], conflict: true };
       }
-      if (candidates.size > 1) {
-        log.debug("discovery.multiple_candidates", { candidates: candidates.size });
-        return { candidates: [...candidates.values()], conflict: true };
+      if (candidates.size + correlationPending.size > 1) {
+        log.debug("discovery.multiple_candidates", { candidates: candidates.size, correlation_pending: correlationPending.size });
+        return { candidates: [...candidates.values()], correlationPending: [...correlationPending], conflict: true };
       }
     }
     if (runs.length < 50) break;
     if (page === 2) conflict = true;
   }
   log.debug("discovery.complete", { candidates: candidates.size, conflict });
-  return { candidates: [...candidates.values()], conflict };
+  return { candidates: [...candidates.values()], correlationPending: [...correlationPending], conflict };
 }
 
 function returnedRunHint(state, dispatchId) {
@@ -187,8 +189,11 @@ async function reconcileDispatchImpl(options) {
       candidates = [...new Map([...candidates, ...discovered.candidates].map(candidate => [candidate.run_id, candidate])).values()];
       conflict ||= discovered.conflict;
       log.debug("dispatch.reconcile.candidates", { candidates: candidates.length, conflict });
-      if (candidates.length > 1 || conflict) return { state: "run_binding_conflict", released: false };
-      if (candidates.length === 1) {
+      const runIds = new Set([...candidates.map(candidate => candidate.run_id), ...discovered.correlationPending]);
+      if (runIds.size > 1 || conflict) return { state: "run_binding_conflict", released: false };
+      correlationPending = discovered.correlationPending.length > 0;
+      if (correlationPending) hint = discovered.correlationPending[0];
+      if (candidates.length === 1 && !correlationPending) {
         const proof = candidates[0];
         const binding = bindingForRun(proof, expected);
         const evidence = lifecycleEvidence(assignment, profile, repository, "reconciliation", "github_api", options.now ?? Date.now(), { run_id: proof.run_id, run_attempt: 1, principal: proof.principal });

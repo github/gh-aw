@@ -841,18 +841,9 @@ describe("native queue launch fencing and conservative recovery", () => {
     expect(assignment).not.toHaveProperty("run");
   });
 
-  it.each(["not_found", "unavailable", "timeout", "nested_socket", "nested_reset", "nested_timeout", "title_pending"])("does not poll an accepted launch even when its native metadata would be %s", async failure => {
+  it("does not poll native metadata for an accepted launch", async () => {
     const { fixture, post, options } = setup({ count: 1 });
-    const get = fixture.githubClient.rest.actions.getWorkflowRunAttempt;
-    const read = vi.fn(async parameters => {
-      if (read.mock.calls.length === 1) {
-        if (failure === "title_pending") return { status: 200, data: { ...fixture.nativeRun(), display_title: "worker" } };
-        if (failure.startsWith("nested_")) throw { cause: { cause: { code: failure === "nested_socket" ? "UND_ERR_SOCKET" : failure === "nested_reset" ? "ECONNRESET" : "ETIMEDOUT" } } };
-        throw Object.assign(new Error("private response"), failure === "timeout" ? { code: "ETIMEDOUT" } : { status: failure === "not_found" ? 404 : 503 });
-      }
-      return get(parameters);
-    });
-    fixture.githubClient.rest.actions.getWorkflowRunAttempt = read;
+    const read = vi.spyOn(fixture.githubClient.rest.actions, "getWorkflowRunAttempt");
     const sleepFn = vi.fn(async () => {});
     expect(await launchAssignment({ ...options, sleepFn }, fixture.assignment)).toMatchObject({ state: "activation_pending", run_id: "42", dispatched: true });
     expect(read).not.toHaveBeenCalled();
@@ -1155,16 +1146,9 @@ describe("native queue launch fencing and conservative recovery", () => {
     expect(post).toHaveBeenCalledTimes(1);
   });
 
-  it.each(["post_response_unconfirmed"])("reports %s launch receipts as unsuccessful", async reason => {
+  it("reports post_response_unconfirmed launch receipts as unsuccessful", async () => {
     const { fixture, options, post } = setup({ granted: false, count: 1 });
-    if (reason === "post_response_unconfirmed") post.mockRejectedValue(new Error("request timed out"));
-    else {
-      const get = fixture.githubClient.rest.actions.getWorkflowRun;
-      fixture.githubClient.rest.actions.getWorkflowRun = async parameters => {
-        if (parameters.run_id === "42") throw new Error("binding read timed out");
-        return get(parameters);
-      };
-    }
+    post.mockRejectedValue(new Error("request timed out"));
     const result = await dispatchQueueIntent({
       ...options,
       assignment: null,
@@ -1172,7 +1156,7 @@ describe("native queue launch fencing and conservative recovery", () => {
       message: { type: "work_queue_dispatch_next", intent_id: "unresolved-is-failure", pool: "default", max_claims: 1, max_dispatches: 1 },
     });
     expect(result).toMatchObject({ success: false, launches: [expect.objectContaining({ state: "launch_unresolved" })] });
-    expect([...fixture.state.dispatches.values()][0]).toMatchObject({ state: "uncertain", reason, released: false });
+    expect([...fixture.state.dispatches.values()][0]).toMatchObject({ state: "uncertain", reason: "post_response_unconfirmed", released: false });
     expect(post).toHaveBeenCalledTimes(1);
   });
 
