@@ -852,7 +852,24 @@ export interface UnifiedSessionEventDataMap {
   } & UnifiedSessionContextData;
   "tool.execution_complete": Pick<
     ToolExecutionCompleteData,
-    "toolCallId" | "stepIndex" | "toolName" | "success" | "output" | "result" | "error" | "fileEdits" | "durationMs" | "exitCode" | "status" | "mcpServerName" | "isError" | "taskId" | "taskType" | "workflowName" | "workflowRunId"
+    | "toolCallId"
+    | "stepIndex"
+    | "toolName"
+    | "success"
+    | "output"
+    | "structuredContent"
+    | "result"
+    | "error"
+    | "fileEdits"
+    | "durationMs"
+    | "exitCode"
+    | "status"
+    | "mcpServerName"
+    | "isError"
+    | "taskId"
+    | "taskType"
+    | "workflowName"
+    | "workflowRunId"
   > &
     UnifiedSessionContextData;
   "dynamicWorkflows.task_started": DynamicWorkflowObservationData;

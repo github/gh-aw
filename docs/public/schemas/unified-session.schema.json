@@ -327,6 +327,7 @@
                 "toolName": { "type": "string" },
                 "success": { "type": "boolean" },
                 "output": { "$ref": "#/definitions/JsonValue" },
+                "structuredContent": { "$ref": "#/definitions/JsonValue" },
                 "result": { "$ref": "#/definitions/JsonValue" },
                 "error": { "$ref": "#/definitions/JsonValue" },
                 "fileEdits": { "$ref": "#/definitions/JsonValue" },

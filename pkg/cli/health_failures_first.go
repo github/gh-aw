@@ -27,7 +27,7 @@ type HealthPotentialIssue struct {
 func collectHealthFailures(startDate, repoOverride string, collection *HealthCollection) ([]WorkflowRun, error) {
 	inventory := newHealthFailureInventory(startDate, collection)
 	candidates, err := inventory.fill(repoOverride, collection)
-	collection.failureInventory = candidates
+	collection.failureInventory = append(collection.failureInventory, candidates...)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +36,7 @@ func collectHealthFailures(startDate, repoOverride string, collection *HealthCol
 	for index := 0; index >= 0 && index < len(collection.failureInventory); index++ {
 		run := collection.failureInventory[index]
 		scope := failureClusterKey(run.Repository, run.WorkflowPath, run.HeadBranch, run.Event)
-		if _, sampled := scopes[scope]; sampled {
+		if _, sampled := scopes[scope]; sampled || !healthRunInScan(run, collection) {
 			continue
 		}
 		hasJobs, err := healthRunHasJobs(run, collection)
@@ -96,7 +96,6 @@ type healthFailureInventory struct {
 	opts      ListWorkflowRunsOptions
 	batches   [][]workflowRunAPIResponse
 	page      int
-	pages     int
 	exhausted bool
 }
 
@@ -118,9 +117,13 @@ func newHealthFailureInventory(startDate string, collection *HealthCollection) *
 	for _, target := range collection.workflows {
 		targets[target.Path] = target
 	}
+	seen := make(map[int64]struct{})
+	for _, run := range collection.failureInventory {
+		seen[run.DatabaseID] = struct{}{}
+	}
 	return &healthFailureInventory{
-		targets: targets, seen: make(map[int64]struct{}), page: 1,
-		opts: ListWorkflowRunsOptions{StartDate: startDate, EndDate: collection.EndDate, Limit: 100},
+		targets: targets, seen: seen, page: 1,
+		opts: ListWorkflowRunsOptions{Ref: collection.scanBranch, StartDate: startDate, EndDate: collection.EndDate, Limit: 100},
 	}
 }
 
@@ -142,16 +145,16 @@ func (inventory *healthFailureInventory) fill(repoOverride string, collection *H
 			return runs, nil
 		}
 		collection.FailureListingComplete = false
-		if inventory.pages >= healthMaximumFailureListingPages {
+		if collection.failureListingPages >= healthMaximumFailureListingPages {
 			collection.Partial, collection.Reason = true, "failure_listing_limit"
-			collection.Warning = fmt.Sprintf("Health failure inventory stopped after %d pages; chronological sampling will continue", inventory.pages)
+			collection.Warning = fmt.Sprintf("Health failure inventory stopped after %d pages; chronological sampling will continue", collection.failureListingPages)
 			return runs, nil
 		}
 		batch, oldest, err := healthListFailureCandidates(inventory.opts, inventory.page, repoOverride, collection)
 		if err != nil {
 			return runs, err
 		}
-		inventory.pages++
+		collection.failureListingPages++
 		inventory.batches = append(inventory.batches, batch)
 		runs = appendHealthFailureCandidates(batch, inventory.targets, inventory.seen, candidatesByWorkflow, issues, runs, collection)
 		inventory.exhausted = len(batch) < inventory.opts.Limit
@@ -171,7 +174,7 @@ func appendHealthFailureCandidates(batch []workflowRunAPIResponse, targets map[s
 	for _, response := range batch {
 		run := response.workflowRun()
 		target, registered := targets[run.WorkflowPath]
-		if _, duplicate := seen[run.DatabaseID]; duplicate || !registered || run.Conclusion != "failure" {
+		if _, duplicate := seen[run.DatabaseID]; duplicate || !registered || run.Conclusion != "failure" || !healthRunInScan(run, collection) {
 			continue
 		}
 		if candidatesByWorkflow[run.WorkflowPath] >= healthMinimumRuns {
@@ -232,9 +235,13 @@ func healthFailureCandidatesEndpoint(opts ListWorkflowRunsOptions, page int, rep
 			base = path.Join(healthRepositoryEndpoint(repoOverride), "actions/workflows", url.PathEscape(id), "runs")
 		}
 	}
-	return fmt.Sprintf("%s?status=failure&per_page=%d&page=%d&created=%s",
+	endpoint := fmt.Sprintf("%s?status=failure&per_page=%d&page=%d&created=%s",
 		base, opts.Limit, page,
 		url.QueryEscape(buildCreatedFilter(opts.StartDate, opts.EndDate, opts.BeforeDate)))
+	if opts.Ref != "" {
+		endpoint += "&branch=" + url.QueryEscape(opts.Ref)
+	}
+	return endpoint
 }
 
 func parseHealthFailureCandidates(out []byte) ([]workflowRunAPIResponse, time.Time, error) {
