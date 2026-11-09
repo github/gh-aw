@@ -3,9 +3,9 @@ title: Unified Agent Session Specification
 description: Draft contract for canonical traces, full unified artifacts, and bounded compact unified sessions.
 sidebar:
   order: 1365
-version: "2.7.0"
+version: "2.8.0"
 status: Draft
-publication_date: "2026-10-30"
+publication_date: "2026-11-09"
 editors:
   - name: GitHub Agentic Workflows Team
     organization: GitHub
@@ -13,9 +13,9 @@ editors:
 
 # Unified Agent Session Specification
 
-**Version**: 2.7.0<br>
+**Version**: 2.8.0<br>
 **Status**: Draft<br>
-**Publication Date**: 2026-10-30<br>
+**Publication Date**: 2026-11-09<br>
 **Editors**: GitHub Agentic Workflows Team (GitHub)<br>
 **This Version**: [unified-agent-session-specification](/gh-aw/specs/unified-agent-session-specification/)<br>
 **Latest Version**: This document
@@ -30,7 +30,7 @@ This specification defines the session traces used by GitHub Agentic Workflows: 
 
 This is a **GitHub Agentic Workflows project specification**, written using W3C-inspired document conventions. It is **not an official W3C standard**, W3C publication, or W3C-endorsed recommendation.
 
-Version 2.7.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
+Version 2.8.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
 
 The specification version belongs to this document. The unified file's leading
 `session.format` record carries an independent numeric serialization-format
@@ -85,7 +85,11 @@ The agent artifact already contains native session evidence: Copilot session
 `logEntries` as `agent-session.jsonl` so conclusion can reuse canonical events
 without parsing the same native transcript again. After downloading agent, detection, safe-output, experiment,
 and eval evidence, the conclusion job merges these observations into
-`usage/aw_session.jsonl`. The agent artifact also carries the split activation
+`usage/aw_session.jsonl`. Conclusion also downloads activation's `info` artifact
+to collect runner-owned `aw_info.json` as `workflow.info`, including available
+engine, model, version, revision, and trigger metadata. Runtime model metadata,
+when captured, takes precedence over the activation snapshot.
+The agent artifact also carries the split activation
 `aw-prompts/system.txt` and `aw-prompts/user.txt` files; the merger records each
 available file as an untimed `prompt.system` or `prompt.user` event with its exact
 content and source path. These prompt events are omitted from default summaries.
@@ -243,7 +247,7 @@ opaque because its essential fields are not defined by this specification.
 | Agent messages and reasoning | Exact `content`, without duplicate text blocks or the original message envelope. |
 | Agent session errors | Observed diagnostic fields, including `errorType`, `code`, and `statusCode`; absent status codes remain absent, and unrelated native error context is omitted. |
 | Agent policy refusals | Structured `reason`, exact available `content`, `policyCategory`, `explanation`, and streaming `partial` flag; no duplicated provider envelope. |
-| Agent tool lifecycle | Correlation IDs, tool/server names, one `input` or `output` field, separately supplied `structuredContent`, command, outcome/error signals, duration, and exit code. Background tool updates retain observed `taskId` and `taskType`; progress and task notifications do not imply a tool completion. |
+| Agent tool lifecycle | Correlation IDs, including supplied `messageId`, the observed `model`, tool/server names, one `input` or `output` field, separately supplied `structuredContent`, command, outcome/error signals, duration, and exit code. Background tool updates retain observed `taskId` and `taskType`; progress and task notifications do not imply a tool completion. |
 | Agent accounting | Turns, duration, cost, observed terminal `status` and `sourceType`, normalized `usage` including reported reasoning tokens, errors, and permission denials. |
 | Agent execution diagnostics | Unique harness/compiler `categories`, native `errorCodes` and `errorTypes`, and the observed final process `exitCode`; no diagnostic messages or duplicated engine envelopes. |
 | MCP | Server, direction, RPC/call/request IDs, method, tool name, duration, sizes, status, reason, and error code/message. Failed calls reporting HTTP 429 also retain `httpStatus: 429` and the sanitized `retryHint`, including retry durations or `Retry-After` seconds/HTTP-date. No RPC arguments, response bodies, echoed queries/URLs in rate-limit diagnostics, or error context. |
@@ -369,7 +373,16 @@ timestamp values and MUST derive its ordering key using the source schema's
 units, not an epoch-magnitude heuristic. ISO timestamps MUST carry a timezone.
 Numeric Squid audit timestamps use Unix seconds; native agent timestamps and
 token-tracker audit `ts` values use milliseconds. Pi's observed
-`message.timestamp` is also a supported source timestamp. ISO fractional seconds
+`message.timestamp` is also a supported source timestamp, including its
+`data.messageMetadata.timestamp` representation in saved canonical traces.
+When the event has no source clock, the unified projection MUST retain a valid
+observed message clock as `timestamp` before omitting the archival message
+metadata. Promotion MUST use the ordering parser's timezone, calendar and
+numeric-range validation. Embedded native message clocks take precedence over
+archival message clocks only when valid; invalid archival message clocks MUST
+NOT be promoted.
+Explicit source clocks take precedence and retain their native values; ordering
+anchors are not substitutes for missing native clocks. ISO fractional seconds
 and OTLP decimal-string Unix nanoseconds MUST be compared at nanosecond precision.
 `provenance.timestampMs` is an observed millisecond projection, not the exact
 ordering key; native timestamps retain their original precision.
@@ -457,7 +470,14 @@ Grader and eval result collection MUST import only records attributed to the
 current run, not restored historical results. Runner-owned `aw_info.json`
 supplies the run ID and available attempt; the supplied collector environment
 (defaulting to the process environment) supplies them only when recorded run
-identity is absent. An explicit environment snapshot MUST NOT borrow run identity
+identity is absent. The live conclusion entry point explicitly supplies the
+current execution identity, which MUST reconcile the in-memory workflow metadata
+and derived workflow call ID before filtering durable, grader, and eval records
+or computing built-in graders. Caller context and episode parent identities
+remain unchanged.
+This prevents a reused successful activation snapshot from selecting an earlier
+attempt. Source artifacts remain unchanged; offline reconstruction retains
+recorded-identity precedence. An explicit environment snapshot MUST NOT borrow run identity
 from the ambient process. Records from other runs or
 explicitly different attempts are excluded without changing source artifacts.
 Unattributed results or an unavailable current run ID produce collection
@@ -765,6 +785,7 @@ Native `parameters` remains a reader alias for `input`. If both are present, rea
 | `toolName` | Source-dependent native name, or a name recovered from an exact matching start. |
 | `success` | Boolean when the source completion establishes an outcome; omitted when unknown. |
 | `output` | Source-dependent JSON-compatible output, not restricted to text. |
+| `outputTruncated` | Optional boolean indicating native output truncation. Absence means unknown; `false` does not certify collector completeness. |
 | `structuredContent` | Optional separately supplied JSON-compatible tool result, retained alongside `output` without flattening nested fields or replacing explicit empty or falsy values. |
 | `durationMs` | Source-dependent finite nonnegative duration in milliseconds, including zero. |
 | `error` | Optional native error string, object, or other supported error value. |
@@ -1723,6 +1744,12 @@ run metadata identifies Pi; it does not rewrite stored Actions artifacts.
 
 The adapter can discover a reported model from a finalized turn without inventing an earlier model observation. When Pi reports `responseModel`, canonical message and error observations use that served model; the canonical trace retains the requested `model` and native thinking levels as message metadata. Child request observations also preserve reported reasoning-output tokens without adding them to parent usage. Presentation aliases such as `bash` → `Bash` do not change canonical tool names. Sources lacking duration or cost do not supply zero duration or zero cost.
 
+Pi message clocks survive reconciliation of `message_end`, `turn_end` and
+`agent_end` snapshots onto streamed text, reasoning and tool calls. Supplied
+tool `messageId` and `model` survive the unified projection; the full
+`messageMetadata` envelope remains archival. These fields identify a message
+and its model, not additional inference or usage observations.
+
 ### 7.6 Custom engines
 
 **T-UAS-041 — Custom format detection.** The custom adapter MUST select a delegate from actual supported input signatures. Parseable JSON alone, any dot-containing type alone, a nonempty markdown result, or a delegate's fabricated initialization MUST NOT establish detection. Existing Claude-compatible and Codex fallback support MUST remain available for unprotected ingestion, and native canonical events MUST remain supported.
@@ -1831,10 +1858,24 @@ assistant messages. The custom adapter also recognizes this signature.
 | Native logfmt `message="server unavailable"` with a failed MCP server, or harness `opencode.mcp_failure` | Report the observed server name in `mcpFailures`; preserve harness events without interpreting arbitrary prose as failure evidence. |
 
 OpenCode envelope timestamps use milliseconds and remain unchanged, including
-when a completed tool part expands into invocation and result events. Duplicate
+when a completed tool part expands into invocation and result events. The native
+`sessionID` scopes core events through canonical `data.sessionId`. Tool metadata
+projects only the observed boolean `truncated` into `outputTruncated` (nested
+under `metadata.metadata` for v2); provider envelopes remain in the native and
+parser artifacts, not the unified projection. Duplicate
 parts are identified within their session, not globally. Cache-read and
 cache-write tokens are separate from the reported input count; reasoning tokens
 are an output subset, not an additional contribution to total tokens.
+Exported accounting revisions remain after the original observations in source
+order, even when their timestamps regress. Usage is reconciled by session and
+message identity; repeated step observations and shared source IDs are not
+additional turns or globally unique event IDs.
+When recognized native records span multiple sessions, the appended aggregate
+`session.result` sets `data.sessionId: null`, overriding session aliases from its
+last source record rather than attributing combined usage, cost, turns, or errors
+to that session. The source envelope and payload additions remain in the parser
+artifact; individual observations retain their session scope, and single-session
+results remain scoped as before.
 Synthetic coverage lives in `parse_opencode_log.test.cjs` and
 `opencode_workflow.test.cjs`; it is not evidence of a live smoke run.
 
@@ -2656,6 +2697,12 @@ Malformed logs and very large records can exhaust memory or produce misleading s
 Native IDs can collide, timestamps can be out of order, and a trace can contain ambiguous concurrent calls. Exact-ID pairing avoids attributing a failure or output to the wrong tool. Cross-session concatenation requires an external boundary policy; this specification does not invent a wrapper or fabricated session IDs to resolve such ambiguity.
 
 ## 13. Change Log (Informative)
+
+### Version 2.8.0 - Draft (2026-11-09)
+
+- Retained valid observed Pi message clocks across native and saved canonical traces, with explicit source-clock precedence and shared ordering validation (T-UAS-056).
+- Preserved tool/message/model correlation and supplied structured tool content in the essential unified projection while keeping native envelopes archival.
+- Retained serialization-format version 1.
 
 ### Version 2.7.0 - Draft (2026-10-30)
 

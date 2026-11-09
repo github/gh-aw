@@ -9,6 +9,66 @@ const header = { type: "session.format", data: { version: 1 }, provenance: { com
 const jsonl = events => [header, ...events].map(JSON.stringify).join("\n") + "\n";
 
 describe("Unified trace ordering", () => {
+  it.each([
+    [0, "milliseconds", 0n],
+    [1.25, "milliseconds", 1250000n],
+    [1.25, "seconds", 1250000000n],
+    ["1790899200123456789", "nanoseconds", 1790899200123456789n],
+    ["2026-10-02T00:00:00.123456789+00:00", "milliseconds", 1790899200123456789n],
+  ])("orders the first valid embedded or archived clock with declared units (%s, %s)", (timestamp, unit, expectedNs) => {
+    for (const invalid of [false, { value: 0 }, "yesterday", "2026-02-30T00:00:00Z", Infinity, NaN]) {
+      const saved = { id: "saved", message: { timestamp: invalid }, data: { messageMetadata: { timestamp } } };
+      expect(sessionTimestampNs(saved, unit)).toBe(expectedNs);
+      const adjacent = [...(expectedNs > 0n ? [event("before", String(expectedNs - 1n))] : []), event("after", String(expectedNs + 1n))];
+      expect(orderSessionSources([source("agent", [saved], unit), source("otel", adjacent, "nanoseconds")]).map(record => record.id)).toEqual(expectedNs === 0n ? ["saved", "after"] : ["before", "saved", "after"]);
+      expect(sessionTimestampNs({ ...saved, message: { timestamp } }, unit)).toBe(expectedNs);
+      for (const alias of ["timestamp", "ts", "time", "created_at"]) {
+        expect(sessionTimestampNs({ ...saved, [alias]: invalid }, unit)).toBeUndefined();
+      }
+    }
+  });
+
+  it("keeps a valid embedded message clock ahead of an archived clock", () => {
+    expect(sessionTimestampNs({ message: { timestamp: 0 }, data: { messageMetadata: { timestamp: 10 } } })).toBe(0n);
+  });
+
+  it.each([0, 2000, "2026-11-09T00:27:23.729Z"])("orders saved Pi message metadata clocks without publishing the native envelope (%s)", timestamp => {
+    const clock = typeof timestamp === "number" ? timestamp : Date.parse(timestamp);
+    const saved = {
+      type: "tool.execution_start",
+      data: { toolCallId: "call", messageId: "message", model: "served-model", input: { nested: [false, 0] }, messageMetadata: { timestamp, provider: "fixture", usage: { input: 10 } } },
+    };
+    const original = structuredClone(saved);
+    expect(sessionTimestamp(saved)).toBe(clock);
+    const merged = mergeSessionSources([source("agent", [saved]), source("mcp", [event("before", clock - 1), event("after", clock + 1)])]);
+    expect(merged.map(record => record.id ?? record.data.toolCallId)).toEqual(["before", "call", "after"]);
+    expect(merged[1]).toMatchObject({ timestamp, data: { messageId: "message", model: "served-model" }, provenance: { timestampMs: clock, index: 0 } });
+    expect(merged[1].data).not.toHaveProperty("messageMetadata");
+    expect(validateSession(jsonl(merged))).toBe(4);
+    expect(saved).toEqual(original);
+    expect(mergeSessionSources([source("agent", [merged[1]])])[0].timestamp).toBe(timestamp);
+  });
+
+  it("does not overwrite an explicit source clock or replace invalid clocks with message metadata", () => {
+    const saved = { type: "assistant.message", timestamp: 10, data: { content: "exact", messageMetadata: { timestamp: 20 } } };
+    expect(sessionTimestamp(saved)).toBe(10);
+    expect(mergeSessionSources([source("agent", [saved])])[0].timestamp).toBe(10);
+    expect(sessionTimestamp({ ...saved, timestamp: "invalid" })).toBeUndefined();
+    expect(sessionTimestamp({ type: "assistant.message", data: { content: "untimed" } })).toBeUndefined();
+  });
+
+  it.each(["yesterday", "2026-11-09T00:27:23.729", "2026-02-30T00:00:00Z", 8640000000000001, { value: 0 }])("keeps invalid archived clocks untimed and source ordered (%j)", timestamp => {
+    const saved = { type: "tool.execution_start", data: { toolCallId: "call", messageMetadata: { timestamp } } };
+    const original = structuredClone(saved);
+    const merged = mergeSessionSources([source("agent", [event("start", 10), saved, event("end", 20)]), source("mcp", [event("rpc", 15)])]);
+    expect(merged.map(record => record.id ?? record.data.toolCallId)).toEqual(["start", "call", "rpc", "end"]);
+    expect(merged[1]).not.toHaveProperty("timestamp");
+    expect(merged[1].provenance).not.toHaveProperty("timestampMs");
+    expect(sessionTimestampNs(merged[1])).toBeUndefined();
+    expect(validateSession(jsonl(merged))).toBe(5);
+    expect(saved).toEqual(original);
+  });
+
   it.each([[], [source("agent", [])], [source("agent", []), source("otel", [], "nanoseconds")]].map(sources => [sources]))("accepts empty source collections without inventing observations: %j", sources => {
     expect(mergeSessionSources(sources)).toEqual([]);
   });

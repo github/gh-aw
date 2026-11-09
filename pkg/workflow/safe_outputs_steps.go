@@ -244,6 +244,15 @@ func buildAgentOutputDownloadSteps(prefix string, pinAction func(string) string)
 	}, pinAction)
 }
 
+func buildWorkflowInfoDownloadSteps(prefix string, pinAction func(string) string) []string {
+	return buildArtifactDownloadSteps(ArtifactDownloadConfig{
+		ArtifactName: prefix + constants.InfoArtifactName.String(),
+		DownloadPath: constants.TmpGhAwDirSlash,
+		StepName:     "Download workflow metadata",
+		IfCondition:  "always()",
+	}, pinAction)
+}
+
 // buildDetectionArtifactDownloadSteps creates a step to download the detection artifact
 // into the threat-detection working directory so its firewall proxy/audit logs are
 // available for collect_usage_artifact_files.sh in the conclusion job (see gh-aw#54047).
