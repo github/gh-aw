@@ -292,7 +292,7 @@ func (c *Compiler) validateCoreToolConfiguration(workflowData *WorkflowData, mar
 		{logMessage: "Validating max-daily-ai-credits frontmatter", validateFn: func() error { return validateMaxDailyAICFrontmatter(workflowData) }},
 		{logMessage: "Validating private-to-public-flows string value", validateFn: func() error { return validatePrivateToPublicFlowsStringValue(workflowData) }},
 		{logMessage: "Validating private-to-public-flows server IDs", validateFn: func() error { return validatePrivateToPublicFlowsServerIDs(workflowData) }},
-		{logMessage: "Validating WIF engine auth required fields", validateFn: func() error { return validateWIFEngineAuth(workflowData) }},
+		{logMessage: "Validating WIF engine auth required fields", validateFn: func() error { return c.validateWIFEngineAuth(workflowData) }},
 		{logMessage: "Validating OTLP workload identity configuration", validateFn: func() error { return validateOTLPWorkloadIdentity(workflowData) }},
 		{logMessage: "Validating default AI credits pricing values", validateFn: func() error { return validateDefaultAiCreditsPricing(workflowData) }},
 		{logMessage: "Validating enclaves configuration", validateFn: func() error { return validateEnclavesConfig(workflowData) }},
@@ -757,20 +757,20 @@ func validateGCPWIFEngineAuth(workflowData *WorkflowData) error {
 	return nil
 }
 
-func validateWIFEngineAuth(workflowData *WorkflowData) error {
+func (c *Compiler) validateWIFEngineAuth(workflowData *WorkflowData) error {
 	if err := validateAzureWIFEngineAuth(workflowData); err != nil {
 		return err
 	}
 	if err := validateGCPWIFEngineAuth(workflowData); err != nil {
 		return err
 	}
-	if err := validateOpenAIWIFEngineAuth(workflowData); err != nil {
+	if err := validateOpenAIWIFEngineAuthAtPath(workflowData, "engine"); err != nil {
 		return err
 	}
-	return validateThreatDetectionOpenAIWIFEngineAuth(workflowData)
+	return c.validateThreatDetectionOpenAIWIFEngineAuth(workflowData)
 }
 
-func validateThreatDetectionOpenAIWIFEngineAuth(workflowData *WorkflowData) error {
+func (c *Compiler) validateThreatDetectionOpenAIWIFEngineAuth(workflowData *WorkflowData) error {
 	if workflowData == nil || workflowData.SafeOutputs == nil || workflowData.SafeOutputs.ThreatDetection == nil {
 		return nil
 	}
@@ -780,22 +780,23 @@ func validateThreatDetectionOpenAIWIFEngineAuth(workflowData *WorkflowData) erro
 		return nil
 	}
 
-	engineID := detectionConfig.ID
-	if engineID == "" {
-		engineID = ResolveEngineID(workflowData)
-	}
-	detectionData := *workflowData
-	detectionData.EngineConfig = cloneThreatDetectionEngineConfig(engineID, detectionConfig)
+	engineID := c.getThreatDetectionEngineID(workflowData)
+	detectionData := buildExternalDetectorWorkflowData(workflowData, engineID)
+	detectionData.Model = inheritedDetectionModel(workflowData, engineID)
 	if workflowData.SafeOutputs.ThreatDetection.Model != "" {
 		detectionData.Model = workflowData.SafeOutputs.ThreatDetection.Model
 	}
-	if err := validateOpenAIWIFEngineAuth(&detectionData); err != nil {
-		return fmt.Errorf("safe-outputs.threat-detection.engine.auth: %w", err)
+	if err := validateOpenAIWIFEngineAuthAtPath(detectionData, "safe-outputs.threat-detection.engine"); err != nil {
+		return err
 	}
 	return nil
 }
 
 func validateOpenAIWIFEngineAuth(workflowData *WorkflowData) error {
+	return validateOpenAIWIFEngineAuthAtPath(workflowData, "engine")
+}
+
+func validateOpenAIWIFEngineAuthAtPath(workflowData *WorkflowData, engineConfigPath string) error {
 	if workflowData == nil || workflowData.EngineConfig == nil || workflowData.EngineConfig.Auth == nil {
 		return nil
 	}
@@ -815,16 +816,16 @@ func validateOpenAIWIFEngineAuth(workflowData *WorkflowData) error {
 		missing = append(missing, "audience")
 	}
 	if len(missing) > 0 {
-		return fmt.Errorf("engine.auth with provider=openai requires the following fields: %s", strings.Join(missing, ", "))
+		return fmt.Errorf("%s.auth with provider=openai requires the following fields: %s", engineConfigPath, strings.Join(missing, ", "))
 	}
 	if workflowData.EngineConfig.ID != "codex" {
-		return errors.New("engine.auth with provider=openai requires engine.id: codex")
+		return fmt.Errorf("%s.id: auth.provider=openai requires codex", engineConfigPath)
 	}
 	if !isFirewallEnabled(workflowData) {
-		return errors.New("engine.auth with provider=openai requires the firewall to be enabled")
+		return fmt.Errorf("%s.auth with provider=openai requires the firewall to be enabled", engineConfigPath)
 	}
 	if NewCodexEngine().ResolveLLMProvider(workflowData) != LLMProviderOpenAI {
-		return errors.New("engine.auth with provider=openai requires the OpenAI inference provider")
+		return fmt.Errorf("%s.auth with provider=openai requires the OpenAI inference provider", engineConfigPath)
 	}
 	return nil
 }
