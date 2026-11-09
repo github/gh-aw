@@ -138,7 +138,7 @@ steps:
               finding_keys+=("$finding")
               finding_counts+=(1)
             else
-              finding_counts[$match_index]=$((finding_counts[$match_index] + 1))
+              finding_counts[match_index]=$((finding_counts[match_index] + 1))
             fi
           fi
         done < "$input"
