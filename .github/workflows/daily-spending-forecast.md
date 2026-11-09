@@ -29,7 +29,7 @@ steps:
       set -euo pipefail
       make build
       "$GITHUB_WORKSPACE/gh-aw" --version
-  - name: Prefetch forecast usage artifacts
+  - name: Pre-fetch forecast usage artifacts
     continue-on-error: true
     env:
       REPOSITORY: ${{ github.repository }}

@@ -40,7 +40,7 @@ imports:
   - shared/otlp.md
   - shared/reporting.md
 pre-agent-steps:
-  - name: Preload linter source and cache context
+  - name: Pre-load linter source and cache context
     run: |
       set -euo pipefail
       mkdir -p /tmp/gh-aw/agent

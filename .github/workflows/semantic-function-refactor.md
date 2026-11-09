@@ -50,7 +50,7 @@ steps:
     with:
       go-version-file: go.mod
       cache: true
-  - name: Precompute semantic refactor slice
+  - name: Pre-compute semantic refactor slice
     run: |
       set -euo pipefail
       go run ./scripts/semantic-refactor-slice \

@@ -49,7 +49,7 @@ tools:
   edit:
   cache-memory:
 pre-agent-steps:
-  - name: Precompute code scanning alert candidates
+  - name: Pre-compute code scanning alert candidates
     env:
       GH_TOKEN: ${{ github.token }}
     run: |

@@ -46,7 +46,7 @@ jobs:
     env:
       GH_AW_SAFE_OUTPUTS_STAGED: ${{ github.event_name == 'workflow_dispatch' && inputs.staged }}
     steps:
-      - name: Check out trusted cleanup code
+      - name: Checkout trusted cleanup code
         uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
@@ -98,11 +98,11 @@ safe-outputs:
           required: true
           description: Set to agent/aw-issue-clustering/plan.json after writing and validating the complete plan artifact
       steps:
-        - name: Check out trusted reconciliation code
+        - name: Checkout trusted reconciliation code
           uses: actions/checkout@v7.0.1
           with:
             persist-credentials: false
-        - name: Set up safe-output helpers
+        - name: Setup safe-output helpers
           uses: ./actions/setup
         - name: Revalidate live provenance and publish essential assignments
           uses: actions/github-script@v9.0.0
