@@ -18,6 +18,16 @@ JSON Schema for validating agentic workflow frontmatter configuration
 
 ```yaml wrap
 ---
+# Experimental. Up to 64 advisory skip questions evaluated inside AWF before each
+# eligible agent invocation. Nonempty lists emit a compile-time experimental
+# warning; configuration and behavior may change without deprecation. Any deny
+# skips; allow or all unknown preserves deterministic harness eligibility. Runtime
+# @file references use sandbox filesystem restrictions. Nonempty lists cannot be
+# combined with declarative protected-session-capture.
+# (optional)
+skip-if-decision: []
+  # Array of strings
+
 # Experimental. Select independent Copilot capabilities to authenticate through
 # the OIDC token broker. Using this field emits a compile-time warning.
 # Configuration and behavior may change without deprecation.

@@ -14,6 +14,38 @@ import (
 
 type failingMarshaler struct{}
 
+func TestSpec_PublicAPI_UnmarshalString(t *testing.T) {
+	for _, test := range []struct {
+		input    string
+		expected any
+		wantErr  bool
+	}{
+		{`{"key":"value","count":2}`, map[string]any{"key": "value", "count": float64(2)}, false},
+		{`[true,"value",null]`, []any{true, "value", nil}, false},
+		{`"value"`, "value", false},
+		{`null`, nil, false},
+		{" \r\n{\"key\":\"value\"}\r\n ", map[string]any{"key": "value"}, false},
+		{"", nil, true},
+		{" \r\n ", nil, true},
+		{`{"key":`, nil, true},
+		{`{} {}`, nil, true},
+		{`null false`, nil, true},
+		{`{} invalid`, nil, true},
+	} {
+		t.Run(test.input, func(t *testing.T) {
+			var value any
+			err := jsonutil.UnmarshalString(test.input, &value)
+			if test.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, test.expected, value)
+		})
+	}
+	require.Error(t, jsonutil.UnmarshalString("{}", nil))
+}
+
 func (failingMarshaler) MarshalJSON() ([]byte, error) {
 	return nil, assert.AnError
 }

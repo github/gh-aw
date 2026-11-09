@@ -557,6 +557,9 @@ function collectUnifiedSession({
       if (data) {
         /** @type {SessionEvent[]} */
         const retryEvents = [{ type: "harness.retry", data }];
+        for (const decision of data.decisionResults ?? []) {
+          retryEvents.push({ type: "harness.decision", data: { ...decision }, timestamp: decision.timestamp });
+        }
         /** @type {Array<["startup" | "harness", import("./types/unified_session").HarnessRetryAttemptData[]]>} */
         const layers = [
           ["startup", data.startupAttemptResults ?? []],

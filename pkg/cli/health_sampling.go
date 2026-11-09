@@ -215,12 +215,12 @@ func fetchWorkflowRuns(workflowName, startDate, repoOverride string, verbose boo
 			collection.FailureListingComplete = false
 			return allRuns, err
 		}
-		collection.DefaultBranchPassComplete = collection.FailureListingComplete && collection.FailurePassComplete
+		collection.DefaultBranchPassComplete = !collection.sampleIncomplete && collection.FailureListingComplete && collection.FailurePassComplete
 		listingComplete, passComplete := collection.FailureListingComplete, collection.FailurePassComplete
 		collection.scanBranch = ""
 		collection.failureScopes = nil
 		collection.FailureListingComplete, collection.FailurePassComplete = false, false
-		runs, err = fetchHealthRunSample(targets, startDate, repoOverride, verbose, collection)
+		runs, err = fetchHealthRunSample(targets, startDate, repoOverride, verbose, collection, allRuns)
 		collection.FailureListingComplete = listingComplete && collection.FailureListingComplete
 		collection.FailurePassComplete = passComplete && collection.FailurePassComplete
 		return mergeHealthRunSamples(runs, allRuns), err
@@ -229,13 +229,15 @@ func fetchWorkflowRuns(workflowName, startDate, repoOverride string, verbose boo
 }
 
 func healthRunInScan(run WorkflowRun, collection *HealthCollection) bool {
+	isPR := strings.HasPrefix(run.Event, "pull_request")
 	if collection.scanBranch != "" {
-		return run.HeadBranch == collection.scanBranch
+		return run.HeadBranch == collection.scanBranch && !isPR
 	}
-	return collection.DefaultBranch == "" || run.HeadBranch != collection.DefaultBranch
+	return collection.DefaultBranch == "" || run.HeadBranch != collection.DefaultBranch || isPR
 }
 
-func fetchHealthRunSample(targets []GitHubWorkflow, startDate, repoOverride string, verbose bool, collection *HealthCollection) ([]WorkflowRun, error) {
+func fetchHealthRunSample(targets []GitHubWorkflow, startDate, repoOverride string, verbose bool, collection *HealthCollection, priorSamples ...[]WorkflowRun) ([]WorkflowRun, error) {
+	collection.sampleIncomplete = false
 	var allRuns []WorkflowRun
 	if len(collection.workflows) > 0 {
 		failures, err := collectHealthFailures(startDate, repoOverride, collection)
@@ -249,7 +251,15 @@ func fetchHealthRunSample(targets []GitHubWorkflow, startDate, repoOverride stri
 		targets = prioritizeHealthFailureWorkflows(targets, failures)
 	}
 	for _, target := range targets {
-		runs, err := sampleHealthWorkflow(target, startDate, repoOverride, verbose, collection)
+		var prior []WorkflowRun
+		for _, runs := range priorSamples {
+			for _, run := range runs {
+				if run.WorkflowPath == target.Path {
+					prior = append(prior, run)
+				}
+			}
+		}
+		runs, err := sampleHealthWorkflow(target, startDate, repoOverride, verbose, collection, prior)
 		allRuns = mergeHealthRunSamples(runs, allRuns)
 		if err != nil {
 			if collection.stopped || errors.Is(err, errHealthAPIBudget) {
@@ -261,7 +271,7 @@ func fetchHealthRunSample(targets []GitHubWorkflow, startDate, repoOverride stri
 	return allRuns, nil
 }
 
-func sampleHealthWorkflow(target GitHubWorkflow, startDate, repoOverride string, verbose bool, collection *HealthCollection) ([]WorkflowRun, error) {
+func sampleHealthWorkflow(target GitHubWorkflow, startDate, repoOverride string, verbose bool, collection *HealthCollection, priorSamples ...[]WorkflowRun) ([]WorkflowRun, error) {
 	var oldest time.Time
 	workflowID := path.Base(target.Path)
 	if target.ID > 0 {
@@ -311,16 +321,26 @@ func sampleHealthWorkflow(target GitHubWorkflow, startDate, repoOverride string,
 		if collection.stopped {
 			return sample, errHealthAPIBudget
 		}
-		if total < opts.Limit || (healthWorkflowEvidenceEnough(sample, collection) && healthWorkflowFailureScopesCovered(sample, target.Path, collection)) {
+		if total < opts.Limit || healthWorkflowSampleEnough(sample, target.Path, collection, priorSamples) {
 			return sample, nil
 		}
 		if page*opts.Limit >= healthMaximumRunSearchResults {
 			if !advanceHealthRunWindow(&opts, oldest, collection) {
+				collection.sampleIncomplete = true
 				return sample, nil
 			}
 			page = 0
 		}
 	}
+}
+
+func healthWorkflowSampleEnough(sample []WorkflowRun, workflowPath string, collection *HealthCollection, priorSamples [][]WorkflowRun) bool {
+	// Reuse published evidence for stopping, without letting it cover other failure scopes.
+	evidence := sample
+	for _, prior := range priorSamples {
+		evidence = mergeHealthRunSamples(evidence, prior)
+	}
+	return healthWorkflowEvidenceEnough(evidence, collection) && healthWorkflowFailureScopesCovered(sample, workflowPath, collection)
 }
 
 func healthWorkflowFailureScopesCovered(runs []WorkflowRun, workflowPath string, collection *HealthCollection) bool {

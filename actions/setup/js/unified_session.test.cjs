@@ -42,6 +42,42 @@ describe("Unified conclusion session", () => {
     return target;
   }
 
+  it.each(["file_reference_failed", "sensitive_content_blocked"])("publishes typed skip decisions with %s in the agent unified session without model inputs", error => {
+    const decision = {
+      proposedAttempt: 1,
+      outcome: "deny",
+      questions: [
+        { question: 1, outcome: "unknown", error },
+        { question: 2, outcome: "deny" },
+      ],
+      timestamp: 1000,
+      latencyMs: 25,
+      avoidedInvocation: true,
+      privateProviderBody: "private",
+    };
+    write("agent/harness_retry.json", { attempts: 0, exit_code: 0, attempt_results: [], decision_results: [decision] });
+    const outputPath = path.join(root, "usage/aw_session.jsonl");
+    const events = writeUnifiedSession({ rootDir: root, outputPath });
+    const event = events.find(event => event.type === "harness.decision");
+    expect(event?.data).toMatchObject({ proposedAttempt: 1, outcome: "deny", latencyMs: 25, avoidedInvocation: true, questions: decision.questions });
+    expect(event?.provenance).toMatchObject({ component: "harness", phase: "agent", path: "agent/harness_retry.json" });
+    const content = fs.readFileSync(outputPath, "utf8");
+    expect(content).not.toContain("private");
+    expect(validateSession(content)).toBe(events.length);
+  });
+
+  it("rejects malformed decision telemetry rather than treating it as a skip", () => {
+    write("agent/harness_retry.json", {
+      attempts: 0,
+      exit_code: 0,
+      attempt_results: [],
+      decision_results: [{ proposedAttempt: 1, outcome: "deny", questions: [{ question: 1, outcome: "unknown" }], timestamp: 1000, latencyMs: 1, avoidedInvocation: true }],
+    });
+    const { events } = collectUnifiedSession({ rootDir: root });
+    expect(events.some(event => event.type === "harness.decision")).toBe(false);
+    expect(events.some(event => event.type === "session.collection_warning" && event.data.code === "invalid_harness_retry")).toBe(true);
+  });
+
   it("collects and exports only run-scoped durable metadata without historical top-level content", async () => {
     const metadata = { engine: "codex", storage: "artifact", runId: "123", runAttempt: "2", parentRunId: "122" };
     write("agent/durable-session.jsonl", [
