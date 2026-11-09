@@ -4,6 +4,7 @@ package workflow
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -435,7 +436,7 @@ func TestInlinedSubagentExperimentCompilerToRuntime(t *testing.T) {
 		metadataCatalog := map[string]any{
 			"version": 1,
 			"records": []map[string]any{{
-				"sha256":     fmt.Sprintf("%x", metadataDigest),
+				"sha256":     hex.EncodeToString(metadataDigest[:]),
 				"kind":       "artifact",
 				"value_json": string(metadataJSON),
 			}},

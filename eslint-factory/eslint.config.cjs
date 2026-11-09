@@ -52,6 +52,7 @@ module.exports = [
       "gh-aw-custom/require-fs-io-try-catch": "warn",
       "gh-aw-custom/require-fs-chmod-try-catch": "warn",
       "gh-aw-custom/no-single-char-string-replace": "warn",
+      "gh-aw-custom/require-per-page-on-github-list-call": "warn",
       "gh-aw-custom/no-dynamic-string-replacement": "warn",
       "gh-aw-custom/no-async-foreach-callback": "warn",
       "gh-aw-custom/no-unguarded-async-timer-callback": "warn",

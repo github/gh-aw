@@ -54,6 +54,25 @@ The built-in `tools.playwright` integration uses `playwright-cli`; omit its `mod
 
 Pi resolves [model aliases](/gh-aw/reference/engines/#model-aliases) for the main model and for sub-agents with the same rules as Copilot: `model: copilot/opus` runs on the newest live Opus. Exact ids are checked against AWF `/reflect` before Pi starts, and an unlisted id fails with `model_unavailable`, producing the same unavailable-model failure issue as Copilot. When AWF's model discovery is incomplete, exact ids pass through and aliases fail with `catalog_unavailable`; sub-agents no longer fall back to Pi's built-in model list.
 
+## Session artifacts
+
+The agent artifact contains native `pi-streaming.jsonl` evidence and the
+normalized `agent-session.jsonl`. Conclusion publishes the essential event
+projection in `usage/aw_session.jsonl`. Pi's observed message timestamps are
+retained on canonical messages, reasoning and tool calls when no source-event
+clock is present. Collection also recognizes clocks stored only in
+`data.messageMetadata.timestamp` in older canonical artifacts. Collection
+promotes only finite, in-range milliseconds or calendar-valid timezone-qualified
+ISO strings from archival message metadata. Invalid archival clocks are not
+promoted; missing clocks are not filled with collection time.
+
+Unified tool lifecycle events retain supplied `messageId` and `model` alongside
+`toolCallId`, allowing a tool call to be correlated with its originating model
+response. Full native message metadata, provider envelopes and signatures remain
+in the archival agent evidence rather than the unified projection. Child
+messages remain scoped to their invocation, and child usage is not added to
+parent session totals.
+
 ## Durable runs
 
 > [!WARNING]

@@ -110,6 +110,7 @@ negative controls and validated readable traces without live effects.
 | [`prefer-actions-exec-over-child-process`](#prefer-actions-exec-over-child-process) | Prefer `@actions/exec` over `child_process` to spawn processes that run to completion |
 | [`no-unguarded-async-timer-callback`](#no-unguarded-async-timer-callback) | Require async timer callbacks to wrap their entire body in try/catch |
 | [`require-finite-check-before-date-toisostring`](#require-finite-check-before-date-toisostring) | Validate dynamic dates before calling `toISOString()` or `toJSON()` |
+| [`require-per-page-on-github-list-call`](#require-per-page-on-github-list-call) | Require explicit `per_page` values on paginated Octokit REST list calls |
 
 ### `no-ad-hoc-jsonl-parser`
 
@@ -1317,3 +1318,18 @@ Disallow async callbacks passed to `setTimeout()`, `setInterval()`, or `setImmed
 ### `require-finite-check-before-date-toisostring`
 
 Require validation of dynamic values passed to `new Date(...)` before calling `toISOString()` or `toJSON()`, since invalid dates throw a `RangeError`. Validate the input with `Number.isFinite()` / `Number.isNaN()` or wrap the serialization in `try/catch`.
+
+### `require-per-page-on-github-list-call`
+
+Require an explicit `per_page` value on Octokit REST `list*` calls whose endpoints support pagination. `repos.listLanguages` is excluded because it returns all languages and does not accept `per_page`. Statically undefined values such as `per_page: undefined` and `per_page: void 0` are also reported; dynamic values are allowed.
+
+**Flagged form:**
+```js
+const comments = await github.rest.issues.listComments({ owner, repo, issue_number: 1 });
+```
+
+**Safe alternatives:**
+```js
+const page = await github.rest.issues.listComments({ owner, repo, issue_number: 1, per_page: 100 });
+const allComments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: 1, per_page: 100 });
+```

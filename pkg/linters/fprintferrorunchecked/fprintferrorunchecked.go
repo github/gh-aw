@@ -10,6 +10,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/github/gh-aw/pkg/linters/internal/analyzerutil"
+	"github.com/github/gh-aw/pkg/linters/internal/astutil"
 	"github.com/github/gh-aw/pkg/linters/internal/filecheck"
 	"github.com/github/gh-aw/pkg/linters/internal/nolint"
 	"github.com/github/gh-aw/pkg/logger"
@@ -51,12 +52,7 @@ func run(pass *analysis.Pass) (any, error) {
 			if filecheck.ShouldSkipFilename(position.Filename, generatedFiles) {
 				return
 			}
-			call, ok := stmt.X.(*ast.CallExpr)
-			if !ok {
-				return
-			}
-			funcName := extractFunctionName(call)
-			if isFprintFunction(funcName) && isFprintCallReturningError(pass, call) {
+			if call, funcName, ok := matchFprintCall(pass, stmt.X); ok {
 				reportUncheckedFprint(pass, call, funcName, noLintIndex)
 			}
 		}
@@ -68,56 +64,39 @@ func run(pass *analysis.Pass) (any, error) {
 func checkUncheckedFprintAssign(pass *analysis.Pass, assign *ast.AssignStmt, noLintIndex nolint.DirectiveIndex) {
 	// Only flag patterns like: _ = fmt.Fprintf(...) or _, _ = fmt.Fprintf(...)
 	// Do not flag: n, err := fmt.Fprintf(...) or similar patterns where result is used
-
-	// Pattern 1: _ = fmt.Fprintf(...)
-	if len(assign.Lhs) == 1 && len(assign.Rhs) == 1 {
-		blank, ok := assign.Lhs[0].(*ast.Ident) //nolint:uncheckedsliceindex // len(assign.Lhs) is checked above
-		if !ok || blank.Name != "_" {
-			return
-		}
-		call, ok := assign.Rhs[0].(*ast.CallExpr) //nolint:uncheckedsliceindex // len(assign.Rhs) is checked above
-		if !ok {
-			return
-		}
-		funcName := extractFunctionName(call)
-		if !isFprintFunction(funcName) {
-			return
-		}
-		if !isFprintCallReturningError(pass, call) {
-			return
-		}
-		reportUncheckedFprint(pass, call, funcName, noLintIndex)
+	if len(assign.Rhs) != 1 {
 		return
 	}
 
-	// Pattern 2: _, _ = fmt.Fprintf(...) or similar multi-return with all blanks
-	// We only flag if ALL left-hand sides are blanks (true "discard all" pattern)
-	if len(assign.Rhs) == 1 {
-		allBlanks := true
-		for _, lhs := range assign.Lhs {
-			blank, ok := lhs.(*ast.Ident)
-			if !ok || blank.Name != "_" {
-				allBlanks = false
-				break
-			}
-		}
-		if !allBlanks {
+	// Every left-hand side must be blank (true "discard all" pattern).
+	for _, lhs := range assign.Lhs {
+		blank, ok := lhs.(*ast.Ident)
+		if !ok || blank.Name != "_" {
 			return
 		}
+	}
 
-		call, ok := assign.Rhs[0].(*ast.CallExpr) //nolint:uncheckedsliceindex // len(assign.Rhs) is checked above
-		if !ok {
-			return
-		}
-		funcName := extractFunctionName(call)
-		if !isFprintFunction(funcName) {
-			return
-		}
-		if !isFprintCallReturningError(pass, call) {
-			return
-		}
+	if call, funcName, ok := matchFprintCall(pass, assign.Rhs[0]); ok { //nolint:uncheckedsliceindex // len(assign.Rhs) is checked above
 		reportUncheckedFprint(pass, call, funcName, noLintIndex)
 	}
+}
+
+// matchFprintCall reports whether expr (ignoring redundant parentheses) is a
+// call to fmt.Fprintf, fmt.Fprint, or fmt.Fprintln that returns an error, and
+// returns the call and the function name.
+func matchFprintCall(pass *analysis.Pass, expr ast.Expr) (*ast.CallExpr, string, bool) {
+	call, ok := astutil.UnwrapParenExpr(expr).(*ast.CallExpr)
+	if !ok {
+		return nil, "", false
+	}
+	// PackageCall resolves the callee through the type checker, so aliased
+	// imports (import f "fmt") and parenthesized callees ((fmt.Fprintf)(...))
+	// are recognised and a shadowing local named fmt is not.
+	pkgPath, funcName, ok := astutil.PackageCall(pass, call)
+	if !ok || pkgPath != "fmt" || !isFprintFunction(funcName) || !isFprintCallReturningError(pass, call) {
+		return nil, "", false
+	}
+	return call, funcName, true
 }
 
 func reportUncheckedFprint(pass *analysis.Pass, call *ast.CallExpr, funcName string, noLintIndex nolint.DirectiveIndex) {
@@ -135,7 +114,7 @@ func isConsoleOutput(pass *analysis.Pass, call *ast.CallExpr) bool {
 	if len(call.Args) == 0 {
 		return false
 	}
-	sel, ok := call.Args[0].(*ast.SelectorExpr) //nolint:uncheckedsliceindex // len(call.Args) is checked above
+	sel, ok := astutil.UnwrapParenExpr(call.Args[0]).(*ast.SelectorExpr) //nolint:uncheckedsliceindex // len(call.Args) is checked above
 	if !ok || (sel.Sel.Name != "Stdout" && sel.Sel.Name != "Stderr") {
 		return false
 	}
@@ -150,23 +129,6 @@ func isFprintFunction(funcName string) bool {
 		return true
 	}
 	return false
-}
-
-// extractFunctionName extracts the function name from a call expression.
-// Returns empty string if not a simple function or method call.
-func extractFunctionName(call *ast.CallExpr) string {
-	if call == nil || call.Fun == nil {
-		return ""
-	}
-
-	// Handle selector expressions (fmt.Fprintf)
-	if sel, ok := call.Fun.(*ast.SelectorExpr); ok {
-		if ident, ok := sel.X.(*ast.Ident); ok && ident.Name == "fmt" {
-			return sel.Sel.Name
-		}
-	}
-
-	return ""
 }
 
 // isFprintCallReturningError returns true when call is a fmt.Fprintf/Fprint/Fprintln
