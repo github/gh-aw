@@ -69,6 +69,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `regexpdynamicpattern` — reports regexp compile calls whose pattern is not a compile-time constant string.
 - `seenmapbool` — reports `map[string]bool` used as a set (values always `true`) that should use `map[string]struct{}` instead.
 - `slicemakezerolength` — reports zero-length slice allocations before known-size range loops that append exactly one element per iteration, where the range length provides a capacity hint.
+- `sortbasicslices` — reports `sort.Strings` / `sort.Ints` / `sort.Float64s` calls that should use `slices.Sort`.
 - `sortslice` — reports `sort.Slice` / `sort.SliceStable` calls that should use `slices.SortFunc` / `slices.SortStableFunc`.
 - `splitindexzero` — reports `strings.SplitN(s, sep, 2)[0]` calls that allocate a slice to read only the first segment; use `strings.Cut`.
 - `splitlines-on-newline` — reports `strings.Split(s, "\n")` calls that can retain carriage returns on CRLF input or produce a trailing empty element.
@@ -243,6 +244,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `regexpdynamicpattern` | Custom `go/analysis` analyzer that flags regexp compile calls with non-constant patterns |
 | `seenmapbool` | Custom `go/analysis` analyzer that flags `map[string]bool` used as a set that should use `map[string]struct{}` |
 | `slicemakezerolength` | Custom `go/analysis` analyzer that flags zero-length slice allocations before known-size range loops that append one element per iteration |
+| `sortbasicslices` | Custom `go/analysis` analyzer that flags `sort.Strings` / `sort.Ints` / `sort.Float64s` calls that should use `slices.Sort` |
 | `sortslice` | Custom `go/analysis` analyzer that flags `sort.Slice` / `sort.SliceStable` calls that should use `slices.SortFunc` / `slices.SortStableFunc` |
 | `splitindexzero` | Custom `go/analysis` analyzer that flags `strings.SplitN(s, sep, 2)[0]` calls that allocate a slice to read only the first segment |
 | `splitlines-on-newline` | Custom `go/analysis` analyzer that flags `strings.Split` calls using a newline separator |
@@ -309,6 +311,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/rawloginlib"
 	"github.com/github/gh-aw/pkg/linters/regexpcompileinfunction"
 	"github.com/github/gh-aw/pkg/linters/regexpdynamicpattern"
+	"github.com/github/gh-aw/pkg/linters/sortbasicslices"
 	"github.com/github/gh-aw/pkg/linters/sortslice"
 	"github.com/github/gh-aw/pkg/linters/sprintfbool"
 	"github.com/github/gh-aw/pkg/linters/sprintfint"
@@ -342,6 +345,7 @@ _ = panicinlibrarycode.Analyzer
 _ = rawloginlib.Analyzer
 _ = regexpcompileinfunction.Analyzer
 _ = regexpdynamicpattern.Analyzer
+_ = sortbasicslices.Analyzer
 _ = sortslice.Analyzer
 _ = sprintfbool.Analyzer
 _ = sprintfint.Analyzer
@@ -403,6 +407,7 @@ _ = typeassertionnil.Analyzer
 - `github.com/github/gh-aw/pkg/linters/regexpcompileinfunction` — regexp-compile-in-function analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/regexpdynamicpattern` — regexp-dynamic-pattern analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/seenmapbool` — seen-map-bool analyzer subpackage
+- `github.com/github/gh-aw/pkg/linters/sortbasicslices` — sort-basic-slices analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/sortslice` — sort-slice analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/sprintferrdot` — sprintf-err-dot analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/sprintferrorsnew` — sprintf-errors-new analyzer subpackage
