@@ -4,6 +4,10 @@ import os from "os";
 import path from "path";
 import { spawnSync } from "child_process";
 import { agentErrorDiagnosticText } from "./agent_execution.cjs";
+import { parseDeepSeekLog } from "./parse_deepseek_log.cjs";
+import { timedOut } from "./fixtures/deepseek_ci_logs.cjs";
+import { writeSessionArtifact } from "./session_artifact.cjs";
+import { writeUnifiedSession } from "./unified_session.cjs";
 
 // Minimal mock for @actions/core used by github-script CJS modules (renderLogFromFile).
 const mockCore = {
@@ -44,16 +48,21 @@ const {
 } = require("./detect_agent_errors.cjs");
 
 describe("detect_agent_errors.cjs", () => {
-  it("emits the DeepSeek timeout classification from attributed AWF stdout", async () => {
-    const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-deepseek-timeout-"));
+  it.each(["none", "init-only", "full"])("preserves the detected DeepSeek timeout in the unified session with %s canonical capture", async canonical => {
+    const rootDir = fs.mkdtempSync(path.join(process.cwd(), ".deepseek-detector-timeout-"));
     const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
     try {
       vi.stubEnv("GH_AW_ENGINE_ID", "deepseek-harness");
       vi.stubEnv("GH_AW_AGENTIC_EXECUTION_OUTCOME", "failure");
       vi.stubEnv("GITHUB_OUTPUT", path.join(rootDir, "github-output"));
       vi.stubEnv("GH_AW_ENGINE_INTERNAL_LOGS_DIR", "");
-      fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), "[deepseek-harness] configured provider=github model=auto\n[WARN] Agent command timed out after 15 minutes, stopping container...\n");
+      const raw = `${timedOut}[WARN] Agent command timed out after 15 minutes, stopping container...\n`;
+      fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), raw);
       fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "0");
+      if (canonical !== "none") {
+        const parsed = parseDeepSeekLog(raw).logEntries;
+        writeSessionArtifact(path.join(rootDir, "agent-session.jsonl"), canonical === "full" ? parsed : parsed.filter(event => event.type === "session.init"));
+      }
 
       await main({ rootDir });
 
@@ -63,6 +72,22 @@ describe("detect_agent_errors.cjs", () => {
       const execution = records.find(event => event.type === "agent.execution");
       expect(execution.data.categories).toContain("agentic_engine_timeout");
       expect(execution.data).not.toHaveProperty("exitCode");
+      const events = writeUnifiedSession({ rootDir, engine: "deepseek-harness", dailyAIC: {} });
+      const errors = events.filter(event => event.type === "session.error");
+      expect(errors).toHaveLength(1);
+      expect(errors[0].data.code).toBe("agentic_engine_timeout");
+      const executions = events.filter(event => event.type === "agent.execution");
+      expect(executions).toHaveLength(1);
+      expect(executions[0].data.categories).toContain("agentic_engine_timeout");
+      expect(executions[0].data).not.toHaveProperty("exitCode");
+      expect(fs.readFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "utf8")).toBe("0");
+      expect(
+        fs
+          .readFileSync(path.join(rootDir, "usage", "aw_session.jsonl"), "utf8")
+          .trimEnd()
+          .split("\n")
+          .map(JSON.parse)
+      ).toEqual(events);
       expect(stderr.mock.calls.flat().join("\n")).toContain("Detected agentic engine timeout signature");
     } finally {
       stderr.mockRestore();
