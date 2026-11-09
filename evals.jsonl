@@ -1,0 +1,2 @@
+{"id":"pi_auto_marker","question":"Does the output contain exactly one noop safe-output request with the exact message PI_AUTO_OK?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-09T00:28:07.320Z","runid":"42540113955"}
+{"id":"inference_only_scope","question":"Does the output show no repository inspection, command execution, or additional task beyond the required noop?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-09T00:28:07.320Z","runid":"42540113955"}
