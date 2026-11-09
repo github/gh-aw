@@ -1,10 +1,11 @@
 // @ts-check
 import { describe, expect, it, vi } from "vitest";
 import { canonical } from "./work_queue_codec.cjs";
-import { synchronizeDeployments } from "./work_queue_deployment_control.cjs";
-import { executionProfile, futurePolicy } from "./work_queue_deployment.cjs";
+import { synchronizeDeployments, reconcileObsoleteWork } from "./work_queue_deployment_control.cjs";
+import { executionProfile, obsoleteWork, futurePolicy } from "./work_queue_deployment.cjs";
 import { normalizeSubmitParameters } from "./work_queue_intents.cjs";
-import { queueFixture, REF, WORKFLOW, REPOSITORY } from "./work_queue_lifecycle.test_helpers.cjs";
+import { nodeId } from "./work_queue_graph.cjs";
+import { queueFixture, REF, WORKFLOW, REPOSITORY, DISPATCHER } from "./work_queue_lifecycle.test_helpers.cjs";
 
 const DEFAULT_REF = "b".repeat(40);
 const BRANCH_REF = "e".repeat(40);
@@ -13,7 +14,7 @@ const NEXT_CONTRACT = "b".repeat(64);
 const lock = (contract = CONTRACT) =>
   `# gh-aw-manifest: ${JSON.stringify({ work_queue: { worker: true, logical_contract: contract } })}\non:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\nenv:\n  GH_AW_WORK_QUEUE_CONTRACT: "${contract}"\n`;
 
-function fixture({ otherPool = false } = {}) {
+function fixture({ otherPool = false, operationLimit = 256 } = {}) {
   const f = queueFixture({
     count: 3,
     batch: 1,
@@ -21,6 +22,7 @@ function fixture({ otherPool = false } = {}) {
     configurePolicy: policy => {
       policy.authorization = "aw";
       policy.producers = {};
+      policy.limits.operations = operationLimit;
       const profile = policy.pools.default.profiles.default;
       delete profile.principal;
       profile.logical_contract = CONTRACT;
@@ -32,7 +34,7 @@ function fixture({ otherPool = false } = {}) {
       if (index === 2) work.worker_profile = "other";
     },
   });
-  f.githubClient.rest.repos.get = vi.fn(async () => ({ data: { full_name: REPOSITORY, default_branch: "release/main" } }));
+  f.githubClient.rest.repos.get = vi.fn(async () => ({ status: 200, data: { full_name: REPOSITORY, id: 7, default_branch: "release/main" } }));
   f.githubClient.rest.git = { getRef: vi.fn(async () => ({ data: { ref: "refs/heads/release/main", object: { sha: DEFAULT_REF } } })) };
   f.githubClient.rest.repos.getContent = vi.fn(async ({ path, ref }) => {
     expect([DEFAULT_REF, REF]).toContain(ref);
@@ -69,6 +71,130 @@ describe("verified default worker deployment authority", () => {
     const before = canonical(f.transactions);
     await synchronizeDeployments(options, trusted, []);
     expect(canonical(f.transactions)).toBe(before);
+  });
+
+  describe("obsolete approved worker backlog recovery", () => {
+    async function outdated() {
+      const { f, options, trusted } = fixture();
+      options.context = f.dispatcherContext;
+      options.workflowRef = `${REPOSITORY}/${DISPATCHER}@${REF}`;
+      f.githubClient.rest.repos.getContent = vi.fn(async ({ path, ref }) => ({
+        data: { type: "file", path, encoding: "base64", content: Buffer.from(lock(ref === DEFAULT_REF ? NEXT_CONTRACT : CONTRACT)).toString("base64") },
+      }));
+      await synchronizeDeployments(options, trusted);
+      return { f, options };
+    }
+
+    it("terminally cancels obsolete unpinned Work once, retaining pins, compatible Work, policy, debt and history", async () => {
+      const { f, options } = await outdated();
+      const before = f.state;
+      const [old, pinned, other] = [...before.works.values()];
+      expect(await reconcileObsoleteWork(options)).toEqual({ cancelled: 1 });
+      const after = f.state;
+      expect(after.works.get(old.work_id)).toMatchObject({ state: "cancelled", cancellation_reason: "worker_contract_obsolete" });
+      expect(after.works.get(pinned.work_id)).toEqual(pinned);
+      expect(after.works.get(other.work_id)).toEqual(other);
+      for (const key of ["policy", "policy_epoch", "claims", "dispatches", "clocks", "terminalBarriers"]) expect(after[key]).toEqual(before[key]);
+      expect(f.transactions.slice(0, before.transactions.length)).toEqual(before.transactions);
+      expect(f.transactions.at(-1).actor.role).toBe("reconciler");
+      const history = canonical(f.transactions);
+      expect(await reconcileObsoleteWork(options)).toEqual({ cancelled: 0 });
+      expect(canonical(f.transactions)).toBe(history);
+    });
+
+    it.each(["pending", "failed", "verified"])("preserves %s delivery and all owned or pinned Work", async barrier => {
+      const { f } = await outdated();
+      const state = f.state;
+      const work = [...state.works.values()][0];
+      expect(obsoleteWork(state, work)).toBe(true);
+      for (const changes of [{ barrier }, { state: "claimed" }, { claim_id: "owned" }, { execution_ref: REF }, { state: "completed" }]) {
+        expect(obsoleteWork(state, { ...work, ...changes })).toBe(false);
+      }
+    });
+
+    it("does not mistake unavailable deployments for obsolete Work or run in staged mode", async () => {
+      const { f, options } = await outdated();
+      expect(await reconcileObsoleteWork({ ...options, staged: true })).toEqual({ cancelled: 0 });
+      const worker = f.state.deployments.get("default").get("default");
+      f.append("deployment", {
+        operations: [
+          {
+            kind: "Deployment",
+            pool: "default",
+            worker_profile: "default",
+            expected_ref: worker.current_ref,
+            expected_contract: worker.current_contract,
+            profile: worker.revisions[worker.current_ref].profile,
+            available: false,
+            reason: "worker_unavailable",
+          },
+        ],
+      });
+      expect(await reconcileObsoleteWork(options)).toEqual({ cancelled: 0 });
+    });
+
+    it("rejects an entire stale cancellation batch after a concurrent compatible route update", async () => {
+      const { f, options } = await outdated();
+      options.publishWorkQueueRequest = async args => {
+        const worker = f.state.deployments.get("default").get("default");
+        f.append("deployment", {
+          operations: [
+            {
+              kind: "Deployment",
+              pool: "default",
+              worker_profile: "default",
+              expected_ref: worker.current_ref,
+              expected_contract: worker.current_contract,
+              profile: worker.revisions[REF].profile,
+              available: true,
+              reason: "compiler_deployment",
+            },
+          ],
+        });
+        return f.publishWorkQueueRequest(args);
+      };
+      await expect(reconcileObsoleteWork(options)).rejects.toMatchObject({ code: "deployment_conflict" });
+      expect([...f.state.works.values()].every(work => work.state === "available")).toBe(true);
+    });
+
+    it("fails closed on authentication or publication errors", async () => {
+      const { f, options } = await outdated();
+      const failure = new Error("denied");
+      options.publishWorkQueueRequest = vi.fn().mockRejectedValue(failure);
+      await expect(reconcileObsoleteWork(options)).rejects.toBe(failure);
+      expect([...f.state.works.values()].every(work => work.state === "available")).toBe(true);
+      options.publishWorkQueueRequest = vi.fn();
+      f.githubClient.rest.actions.getWorkflowRun = vi.fn().mockRejectedValue(failure);
+      await expect(reconcileObsoleteWork(options)).rejects.toBe(failure);
+      expect(options.publishWorkQueueRequest).not.toHaveBeenCalled();
+    });
+
+    it("retires a bounded deterministic prefix and leaves the rest for the next maintenance run", async () => {
+      const { f, options, trusted } = fixture({ operationLimit: 3 });
+      const original = f.transactions[1].operations[0];
+      f.append(
+        "submit",
+        {
+          nodes: Array.from({ length: 3 }, (_, index) => ({ ...original, graph_id: "g2", node_key: `n${index}`, work_id: nodeId("g2", `n${index}`) })),
+        },
+        { role: "producer", principal: "11", repository: REPOSITORY }
+      );
+      options.context = f.dispatcherContext;
+      options.workflowRef = `${REPOSITORY}/${DISPATCHER}@${REF}`;
+      f.githubClient.rest.repos.getContent = vi.fn(async ({ path, ref }) => ({
+        data: { type: "file", path, encoding: "base64", content: Buffer.from(lock(ref === DEFAULT_REF ? NEXT_CONTRACT : CONTRACT)).toString("base64") },
+      }));
+      await synchronizeDeployments(options, trusted);
+      const eligible = [...f.state.works.values()]
+        .filter(work => obsoleteWork(f.state, work))
+        .map(work => work.work_id)
+        .sort();
+      expect(eligible).toHaveLength(4);
+      expect(await reconcileObsoleteWork(options)).toEqual({ cancelled: 3 });
+      expect(f.transactions.at(-1).operations.map(operation => operation.work_id)).toEqual(eligible.slice(0, 3));
+      expect(await reconcileObsoleteWork(options)).toEqual({ cancelled: 1 });
+      expect(await reconcileObsoleteWork(options)).toEqual({ cancelled: 0 });
+    });
   });
 
   it.each([

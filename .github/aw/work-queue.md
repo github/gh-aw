@@ -114,7 +114,10 @@ Lost responses, dispatcher cancellation/deadlines never prove nonlaunch/terminat
 Retain reservations until exact evidence. Never rerun uncertain effects after
 Completion; bounded verification yields Result/DeliveryFailure. Compatible
 deployments preserve obligations, debt, Results, frozen assignments and explicit
-`execution_ref` pins. Unavailable/incompatible workers pause affected Work only.
+`execution_ref` pins. Unavailable workers pause affected Work only. Scheduled
+maintenance terminally cancels unclaimed, unpinned Work whose admission contract
+differs from its approved active worker contract, with reason
+`worker_contract_obsolete`. Work with delivery barriers is preserved.
 Quiesce economic Policy changes. Reject unsupported protocols/scalar assignments.
 Retries/checkpoints preserve submission identity; never delete queues to retry admission.
 

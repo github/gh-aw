@@ -118,6 +118,8 @@ The immutable Work payload declares its output contract in `effect_contract`. A 
 
 Worker conclusion performs inline reservation cleanup. Scheduled `agentics-maintenance.yml` reconciliation handles stranded reservations and pending delivery before compaction. Maintenance never cancels active runs or manufactures Result; disabling it leaves dispatcher/operator reconciliation as the fallback.
 
+Maintenance also retires obsolete backlog in checked batches of at most 256 Work (further bounded by the installed operation limit). Available, unpinned Work with no delivery barrier is terminally cancelled with reason `worker_contract_obsolete` when its admission contract differs from its approved active worker contract. Missing or unavailable deployments are not proof of obsolescence. Exact `execution_ref` pins, owned Work, delivery barriers, Results, ledger history and fairness debt are preserved. Cancellation rechecks eligibility against the publication's current ledger; a concurrent Claim or compatible route change rejects the transaction. Operators can use `cancel-work --reason worker_contract_obsolete --work-id ID` for the same checked recovery without dispatching workers.
+
 ### Claim-scoped memory
 
 `tools.work-queue.memory` generates a structured output tool and protected Git-tree publication adapter for a worker. It is not standalone `tools.repo-memory`. Configuration fields are `name` (default `persist_work_queue_memory`), `path`, `target-repo`, `base-revision`, `branch-prefix`, `schema`, and `max-bytes` (default and maximum `262144`, including the final newline).

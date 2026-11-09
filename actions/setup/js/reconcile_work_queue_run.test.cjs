@@ -286,6 +286,46 @@ describe("inline trusted worker termination", () => {
 });
 
 describe("scheduled work queue recovery", () => {
+  it("retires obsolete backlog through the scheduled maintenance entry point without dispatching", async () => {
+    const contract = "a".repeat(64);
+    const { fixture, options } = setup({
+      bound: false,
+      granted: false,
+      count: 1,
+      configurePolicy: policy => {
+        policy.authorization = "aw";
+        policy.producers = {};
+        const profile = policy.pools.default.profiles.default;
+        delete profile.principal;
+        profile.logical_contract = contract;
+      },
+    });
+    const worker = fixture.state.deployments.get("default").get("default");
+    fixture.append("deployment", {
+      operations: [
+        {
+          kind: "Deployment",
+          pool: "default",
+          worker_profile: "default",
+          expected_ref: worker.current_ref,
+          expected_contract: contract,
+          profile: { ...worker.revisions[REF].profile, ref: "b".repeat(40), logical_contract: "b".repeat(64) },
+          available: true,
+          reason: "compiler_deployment",
+        },
+      ],
+    });
+    const publisher = fixture.nativeRun(fixture.dispatcherContext);
+    options.context = { ...fixture.dispatcherContext, job: "work_queue_compaction" };
+    options.workflowRef = `${REPOSITORY}/${publisher.path}@${REF}`;
+    options.githubClient.rest.actions.getWorkflowRun.mockResolvedValue({ status: 200, data: publisher });
+    expect(await maintenance(options)).toMatchObject({ obsolete_work_cancelled: 1 });
+    expect([...fixture.state.works.values()][0]).toMatchObject({ state: "cancelled", cancellation_reason: "worker_contract_obsolete" });
+    expect(fixture.state.dispatches.size).toBe(0);
+    expect(fixture.state.claims.size).toBe(0);
+    expect(await maintenance(options)).toMatchObject({ obsolete_work_cancelled: 0 });
+  });
+
   it.each([
     { pending: false, deferIssueWarning: false },
     { pending: true, deferIssueWarning: false },

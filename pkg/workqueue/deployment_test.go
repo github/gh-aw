@@ -65,6 +65,69 @@ func deployTestWorker(t *testing.T, commits []QueueCommit, id, name, ref, contra
 	}))
 }
 
+func TestObsoleteWorkerCancellationReplayParity(t *testing.T) {
+	commits := testGenesis(t, deploymentPolicy)
+	installed, err := Replay(commits)
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := testNode(t, commits, "obsolete")
+	pinned := testNode(t, commits, "pinned")
+	pinned.ExecutionRef = installed.Policy.Pools["default"].Profiles["default"].Ref
+	commits = testSubmit(t, commits, "backlog", old, pinned)
+	commits = deployTestWorker(t, commits, "new-contract", "default", strings.Repeat("b", 40), strings.Repeat("b", 64), true)
+	before, err := Replay(commits)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !before.obsoleteWork(before.Works[old.WorkID]) || before.obsoleteWork(before.Works[pinned.WorkID]) {
+		t.Fatal("obsolete selection did not preserve the immutable pin")
+	}
+	operation := mustOp(t, map[string]any{"kind": "WorkCancellation", "work_id": old.WorkID, "reason": "worker_contract_obsolete"})
+	commits = testOperations(t, commits, testActor("reconciler"), "retire-obsolete", "cancel_work", operation)
+	after, err := Replay(commits)
+	if err != nil || after.Works[old.WorkID].State != "cancelled" || !sameJSON(before.Works[pinned.WorkID], after.Works[pinned.WorkID]) ||
+		!sameJSON(before.Policy, after.Policy) || !sameJSON(before.Clocks, after.Clocks) || !sameJSON(before.Claims, after.Claims) {
+		t.Fatalf("obsolete cancellation changed protected state: %v", err)
+	}
+	input, err := canonicalValue(commits)
+	if err != nil {
+		t.Fatal(err)
+	}
+	command := exec.Command("node", "-e", `
+const assert = require("node:assert/strict");
+const r = require("../../actions/setup/js/work_queue_replay.cjs");
+const s = r.replayTransactions(JSON.parse(require("node:fs").readFileSync(0, "utf8")));
+assert.equal([...s.works.values()].filter(w => w.state === "cancelled").length, 1);
+assert.equal([...s.works.values()].filter(w => w.execution_ref && w.state === "available").length, 1);
+`)
+	command.Stdin = bytes.NewReader(input)
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("obsolete cancellation Go/JS replay parity: %v\n%s", err, output)
+	}
+	for _, changes := range []func(*WorkState){
+		func(w *WorkState) { w.State = "claimed" },
+		func(w *WorkState) { w.ClaimID = "owned" },
+		func(w *WorkState) { w.Barrier = "pending" },
+		func(w *WorkState) { w.Barrier = "failed" },
+		func(w *WorkState) { w.Barrier = "verified" },
+	} {
+		work := *before.Works[old.WorkID]
+		changes(&work)
+		if before.obsoleteWork(&work) {
+			t.Fatal("owned or delivery-barrier Work was selected")
+		}
+	}
+	compatible := deployTestWorker(t, commits[:len(commits)-1], "compatible-again", "default", pinned.ExecutionRef, strings.Repeat("a", 64), true)
+	request, err := NewRequest("stale-retirement", "cancel_work", testActor("administrator"), OperationsParameters{Operations: []Operation{operation}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err := BuildCandidate(compatible, testActor("administrator"), request, 9000); err == nil {
+		t.Fatal("stale cancellation accepted a now-compatible contract")
+	}
+}
+
 func TestDeploymentCompatibleEvolutionPreservesFrozenRecoveryAndPins(t *testing.T) {
 	commits := testGenesis(t, deploymentPolicy)
 	root := testNode(t, commits, "root")

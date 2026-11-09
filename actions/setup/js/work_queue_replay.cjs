@@ -11,7 +11,7 @@ const { indexesFor, trackState, untrackState, updateIndexes } = require("./work_
 const { validateEffectResourceAuthority } = require("./work_queue_resource_scope.cjs");
 const { applyIssueBinding } = require("./work_queue_issue_contract.cjs");
 const { advanceExpiration, expirationView } = require("./work_queue_expiration.cjs");
-const { initializeDeployments, validateDeployment, applyDeployment, admissionProfile, serializeDeployments, restoreDeployments } = require("./work_queue_deployment.cjs");
+const { initializeDeployments, validateDeployment, applyDeployment, admissionProfile, obsoleteWork, serializeDeployments, restoreDeployments } = require("./work_queue_deployment.cjs");
 const {
   actorFromContext,
   bindingAuthority,
@@ -569,6 +569,8 @@ function applyLifecycle(state, operation, commit) {
     }
     case "WorkCancellation":
       if (!work || work.state === "completed" || work.barrier === "pending") throw queueError("work_terminal", "completed ownership cannot be reopened or cancelled");
+      if (operation.reason === "worker_contract_obsolete" && work.state !== "cancelled" && !obsoleteWork(state, work))
+        throw queueError("deployment_conflict", "obsolete cancellation requires available unpinned Work with no delivery barrier and an incompatible active worker contract");
       if (operation.claim_id) {
         const selected = state.claims.get(operation.claim_id);
         if (

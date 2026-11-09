@@ -319,9 +319,16 @@ func (state *Projection) replayCancellation(operation Operation, kind string, co
 		return nil
 	}
 
-	var value WorkDefinition
+	var value struct {
+		WorkID string `json:"work_id"`
+		Reason string `json:"reason"`
+	}
 	if err := json.Unmarshal(operation, &value); err != nil {
 		return err
+	}
+	work := state.Works[value.WorkID]
+	if value.Reason == "worker_contract_obsolete" && work != nil && work.State != "cancelled" && !state.obsoleteWork(work) {
+		return queueError("deployment_conflict", "obsolete cancellation requires available unpinned Work with no delivery barrier and an incompatible active worker contract")
 	}
 	if err := state.cancelWork(operation, commit); err != nil {
 		return err
