@@ -32,6 +32,7 @@ type WorkflowHealth struct {
 	SubagentFailures       []HealthSubagentFailure  `json:"subagent_failures,omitempty" console:"-"`
 	DetectionFailureRuns   int                      `json:"detection_failure_runs" console:"header:Detection Failure Runs"`
 	DetectionFailures      []HealthDetectionFailure `json:"detection_failures,omitempty" console:"-"`
+	DurableSessions        *HealthDurableSessions   `json:"durable_sessions,omitempty" console:"-"`
 	SuccessRate            float64                  `json:"success_rate" console:"-"`
 	DisplayRate            string                   `json:"-" console:"header:Success Rate"`
 	Trend                  string                   `json:"trend" console:"header:Trend"`
