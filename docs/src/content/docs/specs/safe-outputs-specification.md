@@ -7,9 +7,9 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.29.20<br>
+**Version**: 1.29.21<br>
 **Status**: Working Draft<br>
-**Publication Date**: 2026-11-07<br>
+**Publication Date**: 2026-11-08<br>
 **Editor**: GitHub Agentic Workflows Team<br>
 **This Version**: [safe-outputs-specification](/gh-aw/specs/safe-outputs-specification/)<br>
 **Latest Published Version**: This document
@@ -3176,6 +3176,35 @@ System types are always available in every workflow. The types `noop`, `report-m
 2. **Execution Order**: Always executes last for summary generation.
 3. **No Side Effects**: Creates no GitHub resources.
 4. **Transparency**: Provides clear indication of normal completion vs. error states.
+
+**Invocation Decision Skips**:
+
+For a top-level `skip-if-decision` aggregate of `deny`, the harness inside AWF
+MUST suppress the otherwise eligible proposed agent invocation without counting
+it as an executed attempt or retry. When safe-output recording is configured
+and no terminal output exists, it MUST attempt to append a `noop` describing
+the skipped invocation. It MUST NOT append a duplicate no-op when a terminal
+output already exists, discard earlier task outputs, or remove incomplete
+diagnostics. An append failure MUST be diagnosed without changing the advisory
+decision into an agent invocation or independently failing the workflow.
+
+An `allow`, all `unknown`, or an absent/empty question list MUST preserve the
+deterministic execution path. API errors, timeouts, malformed responses, and
+unavailable file evidence MUST NOT independently generate `noop` or
+`report_incomplete`, trigger a decision retry, or suppress invocation.
+Previously recorded failures and normal threat-detection and publication
+policies MUST remain effective regardless of the decision recommendation.
+
+Decision outcomes, sanitized errors, latency, and avoided invocations MUST be
+recorded separately as `harness.decision` unified-session evidence and audit
+decision history. A decision-generated no-op is not a publication
+authorization, independent proof of completed work, or proof of zero model
+usage; decision requests remain subject to normal proxy usage accounting.
+
+Regression evidence: `actions/setup/js/skip_if_decision.test.cjs`,
+`harness_retry_runner.test.cjs`, and `shell_harness.test.cjs` cover abstention,
+denied invocations, and no-op preservation; `unified_session.test.cjs` and
+`pkg/cli/audit_decision_test.go` cover separate decision accounting.
 
 **Configuration Parameters**:
 
@@ -6768,6 +6797,11 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.29.21** (2026-11-08):
+
+- **Specified**: AWF-resident invocation decision skips, conditional no-op recording, preservation of prior outputs and incomplete diagnostics, and failure abstention without decision retries.
+- **Clarified**: Decision evidence is separate from executed attempts and does not authorize publication, prove completed work, or imply zero model usage.
 
 **Version 1.29.20** (2026-11-07):
 
