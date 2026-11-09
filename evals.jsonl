@@ -1,0 +1,3 @@
+{"id":"redis_ping","question":"Does the output show a PONG response from the Redis service at host.docker.internal port 6379?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-09T00:40:15.647Z","runid":"42540719989"}
+{"id":"redis_roundtrip","question":"Does the output show that GET smoke_test returned the exact service-ports-ok value written by SET?","answer":"UNKNOWN","model":"gpt-6-luna","timestamp":"2026-11-09T00:40:15.647Z","runid":"42540719989"}
+{"id":"redis_info","question":"Does the output show Redis server information retrieved from the host service rather than merely claiming connectivity?","answer":"UNKNOWN","model":"gpt-6-luna","timestamp":"2026-11-09T00:40:15.647Z","runid":"42540719989"}
