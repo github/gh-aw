@@ -102,7 +102,7 @@ function buildMissingToolAlternatives(baseAlternatives, deniedCommands) {
  *   runSafeOutputsCLI?: RunSafeOutputsCLILike,
  *   logger?: (message: string) => void,
  *   deniedCommands?: string[],
- *   permissionOutput?: string
+ *   workflowToolPermissionDenied?: boolean
  * }=} options
  */
 function emitMissingToolPermissionIssue(options) {
@@ -110,14 +110,14 @@ function emitMissingToolPermissionIssue(options) {
   const runSafeOutputs = options && options.runSafeOutputsCLI ? options.runSafeOutputsCLI : runSafeOutputsCLI;
   const logger = options && options.logger ? options.logger : defaultLog;
   const deniedCommands = options && options.deniedCommands ? options.deniedCommands : [];
-  const permissionOutput = options && typeof options.permissionOutput === "string" ? options.permissionOutput : "";
+  const workflowToolPermissionDenied = options && options.workflowToolPermissionDenied === true;
 
   if (!safeOutputsPath) {
     logger("report_missing_tool skipped: GH_AW_SAFE_OUTPUTS is not set");
     return;
   }
   try {
-    const payload = JSON.parse(buildMissingToolPermissionIssuePayload(deniedCommands, permissionOutput));
+    const payload = JSON.parse(buildMissingToolPermissionIssuePayload(deniedCommands, workflowToolPermissionDenied));
     runSafeOutputs("report_missing_tool", {
       tool: payload.tool,
       reason: payload.reason,

@@ -414,8 +414,63 @@ func TestDailyFormalSpecVerifierAllowsReadOnlyFileInspection(t *testing.T) {
 	if !strings.Contains(workflow, "edit: null") {
 		t.Fatal("Expected daily-formal-spec-verifier workflow to enable built-in file inspection tools")
 	}
-	if !strings.Contains(workflow, `- "sed *"`) {
-		t.Fatal("Expected daily-formal-spec-verifier workflow to allow ranged sed reads")
+	if strings.Contains(workflow, `- "sed *"`) {
+		t.Fatal("Expected daily-formal-spec-verifier workflow to exclude unrestricted sed commands")
+	}
+	if strings.Contains(workflow, `- "bash .github/scripts/install_tla_runtime_test.sh"`) {
+		t.Fatal("Expected the installer test to run outside the agent's shell allowlist")
+	}
+	if !strings.Contains(workflow, "run: bash .github/scripts/install_tla_runtime_test.sh") {
+		t.Fatal("Expected the fixture-based installer test to run before agent execution")
+	}
+}
+
+func TestDailySquidImageScanUsesFixedLogQueries(t *testing.T) {
+	repoRoot, err := findRepoRoot()
+	if err != nil {
+		t.Fatalf("Failed to find repo root: %v", err)
+	}
+
+	workflowFile := filepath.Join(repoRoot, ".github", "workflows", "daily-squid-image-scan.md")
+	content, err := os.ReadFile(workflowFile)
+	if err != nil {
+		t.Fatalf("Failed to read workflow file: %v", err)
+	}
+
+	workflow := string(content)
+	frontmatterParts := strings.SplitN(workflow, "---\n", 3)
+	if len(frontmatterParts) != 3 {
+		t.Fatal("Expected daily-squid-image-scan workflow to contain frontmatter")
+	}
+	frontmatter := frontmatterParts[1]
+	if !strings.Contains(frontmatter, "  bash: []") {
+		t.Fatal("Expected daily-squid-image-scan workflow to disable agent bash commands")
+	}
+	if strings.Contains(workflow, "grep") {
+		t.Fatal("Expected scan-log queries to use fixed Bash builtins rather than model-invocable grep")
+	}
+
+	lockFile := filepath.Join(repoRoot, ".github", "workflows", "daily-squid-image-scan.lock.yml")
+	lockContent, err := os.ReadFile(lockFile)
+	if err != nil {
+		t.Fatalf("Failed to read compiled workflow lock: %v", err)
+	}
+	if strings.Contains(string(lockContent), "--allow-tool shell(grep)") || strings.Contains(string(lockContent), `"shell(grep)"`) {
+		t.Fatal("Expected compiled daily-squid-image-scan lock to exclude agent grep permissions")
+	}
+
+	for _, expected := range []string{
+		`marker_pattern='Running \((syft|grype|grant)\)|syft scanned'`,
+		`finding_pattern='^[^[:space:]]+:1:1: (error|warning|info): \[[A-Za-z]+\]'`,
+		`if [[ "$line" =~ $marker_pattern ]]`,
+		`if [[ "$line" =~ $finding_pattern ]]`,
+		`finding_counts[$match_index]=$((finding_counts[$match_index] + 1))`,
+		`markers="$output_dir/${scan}-markers.txt"`,
+		`counts="$output_dir/compile-finding-counts.txt"`,
+	} {
+		if !strings.Contains(workflow, expected) {
+			t.Fatalf("Expected daily-squid-image-scan workflow to contain fixed scan-log query %q", expected)
+		}
 	}
 }
 
