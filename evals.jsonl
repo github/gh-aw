@@ -38,3 +38,5 @@
 {"id":"workflow_targeted","question":"Did the agent identify and target a workflow that lacks an experiments section?","answer":"UNKNOWN","model":"openai/gpt-6.1-sol","timestamp":"2026-10-24T10:39:31.900Z","runid":"40086220770"}
 {"id":"experiment_issue_created","question":"Did the agent implement a validated A/B experiment campaign pull request for a selected workflow?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-08T10:44:54.628Z","runid":"42471395329"}
 {"id":"workflow_targeted","question":"Did the agent identify and target a workflow that lacks an experiments section?","answer":"UNKNOWN","model":"gpt-6-luna","timestamp":"2026-11-08T10:44:54.628Z","runid":"42471395329"}
+{"id":"experiment_issue_created","question":"Did the agent implement a validated A/B experiment campaign pull request for a selected workflow?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-09T23:42:16.376Z","runid":"42721724368"}
+{"id":"workflow_targeted","question":"Did the agent identify and target a workflow that lacks an experiments section?","answer":"UNKNOWN","model":"gpt-6-luna","timestamp":"2026-11-09T23:42:16.376Z","runid":"42721724368"}
