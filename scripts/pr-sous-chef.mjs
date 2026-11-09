@@ -567,7 +567,7 @@ export async function buildQueue(candidates, inspectCandidate, now = Date.now())
 }
 
 /** @returns {import("../actions/setup/js/report_ast.cjs").Report | null} */
-export function buildNudgeReport(pr, requested = false) {
+export function buildNudgeReport(pr) {
   if (pr.nudge_needed === false) return null;
   const checks = pr.failed_checks.filter(check => check.conclusion !== "ACTION_REQUIRED");
   if (!pr.unresolved_reviews.length && !checks.length && !pr.zero_diff_stalled && !["CONFLICTING", "BEHIND"].includes(pr.mergeStateStatus)) return null;
@@ -590,15 +590,9 @@ export function buildNudgeReport(pr, requested = false) {
   for (const review of pr.unresolved_reviews) {
     const location = review.path ? ` (${review.path}${review.line ? `:${review.line}` : ""})` : "";
     for (const comment of review.comments) {
-      const reviewText = comment.body
-        .split(/\n\s*\n/)[0]
-        .replace(/\s+/g, " ")
-        .replace(/@/g, "")
-        .trim();
-      const summary = reviewText.length > 600 ? `${reviewText.slice(0, 600)}...` : reviewText;
       tasks.push([
         paragraph([
-          { type: "text", value: `Review${location}: ${summary} - `, agentTainted: true },
+          { type: "text", value: `Review${location}: address unresolved feedback - `, agentTainted: true },
           { type: "link", url: comment.url, children: [text("Review comment")], agentTainted: true },
         ]),
       ]);
@@ -620,21 +614,16 @@ export function buildNudgeReport(pr, requested = false) {
     title: "PR Sous Chef",
     agentTainted: false,
     children: [
-      ...(requested ? [paragraph([{ type: "mention", login: "copilot", agentTainted: false }])] : []),
-      paragraph([text(requested ? "🍳 A little prep to help this PR along! Copilot assignment requested for the following outstanding work:" : "🍳 Apron on! Copilot is working through this prep list:")]),
+      paragraph([{ type: "mention", login: "copilot", agentTainted: false }]),
+      paragraph([text("🍳 A little prep to help this PR along! Copilot assignment requested for the following outstanding work:")]),
       { type: "list", ordered: true, items: tasks, agentTainted: false },
       paragraph([text("Keeping the changes focused; human review and CI get the final taste test. No merging or CI triggering.")]),
     ],
   };
 }
 
-export function formatNudge(pr) {
-  const report = buildNudgeReport(pr);
-  return report ? renderSizedReport(report).body : null;
-}
-
 export function formatAssignmentRequest(pr) {
-  const report = buildNudgeReport(pr, true);
+  const report = buildNudgeReport(pr);
   return report ? renderSizedReport(report).body : null;
 }
 
