@@ -6,19 +6,19 @@ import (
 )
 
 func BadSortStrings(items []string) {
-	sort.Strings(items) // want `sort\.Strings is not type-safe; use slices\.Sort instead`
+	sort.Strings(items) // want `sort\.Strings can be replaced with slices\.Sort`
 }
 
 func BadSortInts(items []int) {
-	sort.Ints(items) // want `sort\.Ints is not type-safe; use slices\.Sort instead`
+	sort.Ints(items) // want `sort\.Ints can be replaced with slices\.Sort`
 }
 
 func BadSortFloat64s(items []float64) {
-	sort.Float64s(items) // want `sort\.Float64s is not type-safe; use slices\.Sort instead`
+	sort.Float64s(items) // want `sort\.Float64s can be replaced with slices\.Sort`
 }
 
 func BadParenSortStrings(items []string) {
-	(sort.Strings)(items) // want `sort\.Strings is not type-safe`
+	(sort.Strings)(items) // want `sort\.Strings can be replaced with slices\.Sort`
 }
 
 func GoodSorts() {

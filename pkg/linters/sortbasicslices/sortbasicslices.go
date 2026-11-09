@@ -1,11 +1,9 @@
-// Package sortbasicslices implements a Go analysis linter that flags sort.Strings,
-// sort.Ints, and sort.Float64s calls that should use the type-safe slices.Sort
-// function from the standard library slices package.
+// Package sortbasicslices implements a Go analysis linter that recommends
+// replacing sort.Strings, sort.Ints, and sort.Float64s with slices.Sort.
 package sortbasicslices
 
 import (
 	"go/ast"
-	"go/types"
 
 	"golang.org/x/tools/go/analysis"
 
@@ -19,7 +17,7 @@ import (
 var pkgLog = logger.New("linters:sortbasicslices")
 
 // Analyzer is the sort-basic-slices analysis pass.
-var Analyzer = analyzerutil.New("sortbasicslices", "reports sort.Strings, sort.Ints, and sort.Float64s calls that should use slices.Sort", run)
+var Analyzer = analyzerutil.New("sortbasicslices", "reports sort.Strings, sort.Ints, and sort.Float64s calls that can be replaced with slices.Sort", run)
 
 func run(pass *analysis.Pass) (any, error) {
 	pkgLog.Printf("analyzing package %s", pass.Pkg.Path())
@@ -52,7 +50,7 @@ func run(pass *analysis.Pass) (any, error) {
 		}
 
 		pkgLog.Printf("flagging sort.%s call at %s", name, pos)
-		pass.ReportRangef(call, "sort.%s is not type-safe; use slices.Sort instead", name)
+		pass.ReportRangef(call, "sort.%s can be replaced with slices.Sort", name)
 	}
 
 	return nil, nil
@@ -62,19 +60,7 @@ func run(pass *analysis.Pass) (any, error) {
 // sort.Float64s, including calls through an aliased import.
 func matchSortCall(pass *analysis.Pass, call *ast.CallExpr) (string, bool) {
 	sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
-	if !ok {
-		return "", false
-	}
-	pkgIdent, ok := sel.X.(*ast.Ident)
-	if !ok || pass.TypesInfo == nil {
-		return "", false
-	}
-	obj := pass.TypesInfo.ObjectOf(pkgIdent)
-	if obj == nil {
-		return "", false
-	}
-	pkgName, ok := obj.(*types.PkgName)
-	if !ok || pkgName.Imported().Path() != "sort" {
+	if !ok || !astutil.IsPkgSelector(pass, sel, "sort") {
 		return "", false
 	}
 	switch sel.Sel.Name {
