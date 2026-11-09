@@ -3,6 +3,13 @@ private: true
 engine:
   id: copilot
   copilot-sdk: true
+skip-if-decision:
+  - >-
+    Do @/tmp/gh-aw/agent/code-simplifier/recent-context.json and
+    @/tmp/gh-aw/agent/code-simplifier/source-files.json conclusively establish
+    that no recently modified production code is eligible for simplification
+    under this run's scope? Abstain if either dataset is invalid, incomplete,
+    inconsistent, or contains an eligible candidate.
 emoji: "🔧"
 name: Code Simplifier
 description: Analyzes recently modified code and creates pull requests with simplifications that improve clarity, consistency, and maintainability while preserving functionality
@@ -138,13 +145,16 @@ timeout-minutes: 30
 strict: true
 evals:
   - id: code_analyzed
-    question: Did the agent analyze recently modified code for simplification opportunities?
+    question: Did the agent analyze recently modified code for simplification opportunities? Return UNKNOWN when the output records a skip-if-decision no-op before agent execution.
   - id: pr_created_or_noop
     question: Was a pull request created with simplifications, or was noop used when no improvements were needed?
 
 ---
 
 # Code Simplifier Agent
+
+The AWF decision gate checks the prepared scope before invocation and may skip
+when no production-code candidates remain. Uncertain evidence preserves execution.
 
 Preserve behavior exactly while simplifying recently changed production code for readability and maintainability.
 

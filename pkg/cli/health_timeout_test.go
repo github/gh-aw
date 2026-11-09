@@ -86,12 +86,15 @@ func TestHealthTimeBudgetReturnsPartialJSON(t *testing.T) {
 				currentStage := "sampling"
 				response := `{"workflow_runs":[]}`
 				switch {
+				case endpoint == "repos/org/repo":
+					currentStage = "repository"
+					response = `{"default_branch":"main"}`
 				case strings.Contains(endpoint, "/actions/workflows?"):
 					currentStage = "registry"
 					response = `{"workflows":[{"id":1,"name":"Example","path":".github/workflows/example.lock.yml","state":"active"}]}`
 				case strings.Contains(endpoint, "status=failure"):
 					currentStage = "failure_listing"
-					response = `{"workflow_runs":[{"id":42,"name":"Example","path":".github/workflows/example.lock.yml","status":"completed","conclusion":"failure","event":"pull_request","run_attempt":1}]}`
+					response = `{"workflow_runs":[{"id":42,"name":"Example","path":".github/workflows/example.lock.yml","status":"completed","conclusion":"failure","event":"push","head_branch":"main","run_attempt":1}]}`
 				case strings.Contains(endpoint, "/jobs?per_page=1"):
 					currentStage = "job_presence"
 					if strings.Contains(endpoint, "per_page=100") {
@@ -123,7 +126,8 @@ func TestHealthTimeBudgetReturnsPartialJSON(t *testing.T) {
 			assert.Contains(t, report.Collection.Warning, "time budget exhausted")
 			assert.InDelta(t, 0.03, report.Collection.TimeoutSeconds, 0.001)
 			assert.GreaterOrEqual(t, report.Collection.ElapsedSeconds, 0.03)
-			assert.Equal(t, stage == "sampling", report.Collection.FailurePassComplete)
+			assert.False(t, report.Collection.FailurePassComplete, "the later branch pass has not completed")
+			assert.False(t, report.Collection.DefaultBranchPassComplete)
 			if stage == "representative_jobs" || stage == "sampling" {
 				assert.Equal(t, 1, report.Collection.FailureCandidates)
 				assert.Len(t, report.Collection.PotentialIssues, 1)

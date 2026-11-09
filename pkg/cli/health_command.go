@@ -49,9 +49,14 @@ Shows health metrics for workflows including:
 - Warnings when success rate drops below threshold
 - Work-queue diagnostics when a selected published workflow uses work-queue
 
-Inventories failure signals from run-list payloads, verifies one representative
-per branch/event, then samples successful and pending runs. Reuses local Git
-objects when the checkout matches the target, with GitHub API fallback.
+Scans non-PR runs on the repository's default branch before reviewing PR and other
+branch runs, even when a PR's source branch has the default branch's name.
+Their failures may reflect unmerged code rather than a default-branch regression.
+Within each pass, inventories failure signals from run-list payloads, verifies one
+representative per branch/event, then samples successful and pending runs.
+The later pass reuses default-branch evidence for stopping, but still samples known
+other-branch failure scopes independently. Reuses local Git objects when the
+checkout matches the target, with GitHub API fallback.
 When called without a workflow name, displays summary for all workflows.
 When called with a specific workflow name, displays detailed metrics for that workflow.
 
@@ -214,7 +219,7 @@ func newHealthCollection(ctx context.Context, config HealthConfig, start, end ti
 		ProducerVersion:     GetVersion(),
 		ReportSchemaVersion: 1,
 		ObservedAt:          time.Now().UTC(),
-		Capabilities:        []string{"failure_inventory", "source_revisions", "typed_job_steps", "cache_diagnostics", "cross_version_raw_jobs", "pr_lifecycle_filtering", "approval_expiry_filtering", "work_queue", "time_budget"},
+		Capabilities:        []string{"default_branch_first", "failure_inventory", "source_revisions", "typed_job_steps", "cache_diagnostics", "cross_version_raw_jobs", "pr_lifecycle_filtering", "approval_expiry_filtering", "work_queue", "time_budget"},
 		TimeoutSeconds:      config.Timeout.Seconds(),
 		ctx:                 ctx,
 		Host:                normalizedGitHubAPIHost(logsRateLimitHost(config.RepoOverride)),

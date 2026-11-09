@@ -20,6 +20,14 @@ engine:
   model-routing:
     goal: cost
     mode: economy
+skip-if-decision:
+  - >-
+    Do @/tmp/gh-aw/agent/pr-meta.json, @/tmp/gh-aw/agent/test-diff.txt, and
+    @/tmp/gh-aw/agent/missing-build-tags.txt conclusively establish that no
+    supported Go or JavaScript behavioral test changed and no hard guideline
+    violation exists, so the act-vs-noop rubric requires no review? Abstain
+    for unavailable, stale, or truncated evidence, any hard violation, or any
+    behavioral test change; clean behavioral tests still require approval.
 cache:
   key: pr-test-prefetch-${{ github.event.pull_request.head.sha || github.event.issue.number }}
   path: /tmp/gh-aw/agent
@@ -220,11 +228,14 @@ features:
   gh-aw-detection: true
 evals:
   - id: review_decision_consistent
-    question: Did the agent either post a Test Quality Score with an APPROVE or REQUEST_CHANGES decision that matches the tests and guideline violations it flagged, or call noop with a scope reason the workflow's act-vs-noop rubric allows (pre-fetch unavailable, no changed or only unsupported-language test files, or no behavioral test change and no hard violation)?
+    question: Did the agent either post a Test Quality Score with an APPROVE or REQUEST_CHANGES decision that matches the tests and guideline violations it flagged, or call noop with a scope reason the workflow's act-vs-noop rubric allows (pre-fetch unavailable, no changed or only unsupported-language test files, or no behavioral test change and no hard violation)? Return UNKNOWN when the output records a skip-if-decision no-op before agent execution.
 
 ---
 
 # Test Quality Sentinel 🧪
+
+The AWF decision gate follows the act-vs-noop rubric before invocation.
+Behavioral changes, hard violations, and uncertain evidence preserve execution.
 
 You are the Test Quality Sentinel. Analyze new and changed tests in this PR to produce a **Test Quality Score** (0–100) and flag tests that create false comfort without genuine behavioral coverage.
 
