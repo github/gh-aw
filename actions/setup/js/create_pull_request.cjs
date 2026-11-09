@@ -2606,6 +2606,7 @@ async function main(config = {}) {
           /** @param {import("./report_ast.cjs").ReportBlock[]} children */
           const protectedFallbackFrame = children => fallbackFrame([...children, { type: "quote", agentTainted: false, children: [{ type: "expiration", expiresAt, agentTainted: false }] }], { expiresHours: 0, itemType: "issue" });
           const issueLabels = mergeFallbackIssueLabels([...effectiveFallbackLabels, "pull-request-fallback"]);
+          /** @type {Awaited<ReturnType<typeof findProtectedFallbackIssue>>} */
           let existingIssueMatch = null;
           try {
             existingIssueMatch = await findProtectedFallbackIssue(githubClient, repoParts, title, fingerprint);
