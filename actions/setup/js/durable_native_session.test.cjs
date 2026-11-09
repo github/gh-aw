@@ -43,6 +43,8 @@ function environment(engine) {
     CODEX_HOME: state,
     CLAUDE_CONFIG_DIR: state,
     RUNNER_TEMP: directory,
+    GITHUB_WORKSPACE: directory,
+    GH_AW_ENGINE_CWD: ".",
     GH_AW_TMP_DIR: directory,
     GH_AW_AWF_CONFIG_PATH: path.join(directory, "missing-config.json"),
     GH_AW_SAFE_OUTPUTS: "",

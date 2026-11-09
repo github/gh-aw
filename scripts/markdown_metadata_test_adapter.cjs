@@ -29,7 +29,7 @@ function fixtureCompilerFingerprint() {
   return hash.digest("hex");
 }
 
-function compile(input) {
+function ensureFixtureCompiler() {
   if (!built) {
     fs.mkdirSync(path.dirname(binary), { recursive: true });
     const fingerprint = fixtureCompilerFingerprint();
@@ -40,6 +40,12 @@ function compile(input) {
     }
     built = true;
   }
+}
+
+// Provision developer tooling at module load, not inside timed runtime assertions.
+ensureFixtureCompiler();
+
+function compile(input) {
   return JSON.parse(execFileSync(binary, [], { cwd: root, input: JSON.stringify(input), encoding: "utf8", maxBuffer: 16 * 1024 * 1024 }));
 }
 
