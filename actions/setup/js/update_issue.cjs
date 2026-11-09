@@ -1,4 +1,5 @@
 // @ts-check
+// @safe-outputs-exempt SEC-005: cross-repo allowlist is enforced by createUpdateHandlerFactory (update_handler_factory.cjs) via resolveAndValidateRepo before buildUpdateData/executeUpdate run; this file only receives the already-validated targetRepo slug for temporary-ID resolution.
 /// <reference types="@actions/github-script" />
 
 /**
