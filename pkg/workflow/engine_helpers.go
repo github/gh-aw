@@ -107,6 +107,7 @@ func engineEnvHasNonEmptyValue(workflowData *WorkflowData, key string) bool {
 // process_runner.cjs) and by shell-based engine command prefixes so the engine spawns in
 // the user-specified working directory rather than the default GITHUB_WORKSPACE.
 func applyEngineCwdEnv(env map[string]string, workflowData *WorkflowData) {
+	applySkipIfDecisionEnv(env, workflowData)
 	if workflowData == nil || workflowData.EngineConfig == nil || workflowData.EngineConfig.Cwd == "" {
 		return
 	}
@@ -204,7 +205,7 @@ func applyEngineAndAgentEnv(env map[string]string, workflowData *WorkflowData, l
 			log.Printf("Added %d custom env vars from agent config", len(agentConfig.Env))
 		}
 	}
-
+	applySkipIfDecisionEnv(env, workflowData)
 }
 
 func applyPlaywrightBrowserEnv(env map[string]string, workflowData *WorkflowData) {

@@ -247,7 +247,9 @@ describe("prompt provenance through the generated substitution sequence", () => 
   it("preserves literal VALUE-shaped text while safely restoring metadata scalars", () => {
     const literals = createLiteralValues();
     const payload = "\x00VALUE_00000000-0000-0000-0000-000000000000_0\x00";
-    const text = `---\n${JSON.stringify({ description: literals.protect(payload) })}\n---\nAUTHOR RULE`;
+    const authored = '---\n{"description":"TOKEN"}\n---\nAUTHOR RULE';
+    prepareMarkdownFixtures(authored);
+    const text = require("./markdown_metadata.cjs").transformMarkdownContent(authored, value => value.replace("TOKEN", literals.protect(payload)));
     const result = restoreInlineMetadata(text, literals.restore);
     expect(readDocumentMetadata(/^---\n([\s\S]*?)\n---/.exec(result)[1]).value.description).toBe(payload);
     expect(result).toContain("AUTHOR RULE");
@@ -268,7 +270,9 @@ describe("prompt provenance through the generated substitution sequence", () => 
   it("does not decode an authored printable forged marker while restoring another scalar token", () => {
     const literals = createLiteralValues();
     const forged = "_VALUE_00000000-0000-0000-0000-000000000000_0_";
-    const text = `---\n${JSON.stringify({ description: `${forged} ${literals.protect("value")}` })}\n---\nAUTHOR RULE`;
+    const authored = `---\n${JSON.stringify({ description: `${forged} TOKEN` })}\n---\nAUTHOR RULE`;
+    prepareMarkdownFixtures(authored);
+    const text = require("./markdown_metadata.cjs").transformMarkdownContent(authored, value => value.replace("TOKEN", literals.protect("value")));
     const result = restoreInlineMetadata(text, literals.restore);
     expect(readDocumentMetadata(/^---\n([\s\S]*?)\n---/.exec(result)[1]).value.description).toBe(`${forged} value`);
   });

@@ -267,7 +267,7 @@ async function main({ deferredBindings = {}, authorExpressions = {} } = {}) {
         const protectedValue = protectValue(value || "");
         const placeholder = `__${key}__`;
         if (content.includes(placeholder)) {
-          content = content.split(placeholder).join(protectedValue);
+          content = transformMarkdownContent(content, text => text.split(placeholder).join(protectedValue));
           experimentSubCount++;
           core.debug("[main] Substituted experiment placeholder");
         }
@@ -277,14 +277,16 @@ async function main({ deferredBindings = {}, authorExpressions = {} } = {}) {
         const conditionPattern = /(\{\{#?(?:if|else[-_]?if)\s+)([^}]*)(\}\})/gi;
         const operandPattern = new RegExp(`"[^"]*"|'[^']*'|\\b${exprForm.replace(".", "\\.")}\\b`, "gi");
         let substitutedCondition = false;
-        content = content.replace(conditionPattern, (_, prefix, condition, suffix) => {
-          const substituted = condition.replace(operandPattern, operand => {
-            if (operand.startsWith('"') || operand.startsWith("'")) return operand;
-            substitutedCondition = true;
-            return protectedValue;
-          });
-          return prefix + substituted + suffix;
-        });
+        content = transformMarkdownContent(content, text =>
+          text.replace(conditionPattern, (_, prefix, condition, suffix) => {
+            const substituted = condition.replace(operandPattern, operand => {
+              if (operand.startsWith('"') || operand.startsWith("'")) return operand;
+              substitutedCondition = true;
+              return protectedValue;
+            });
+            return prefix + substituted + suffix;
+          })
+        );
         if (substitutedCondition) {
           core.debug("[main] Substituted experiment condition operand");
         }

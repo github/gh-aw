@@ -59,7 +59,6 @@ tools:
     - "find . -name \"*_test.go\" -path \"*/pkg/*\" | head -20"
     - "cat pkg/workflow/*.go | head -200"
     - "cat pkg/cli/*.go"
-    - "sed *"
     - "find specs -type f -name \"*.tla\""
     - "find specs -type f -name \"*.kk\""
     - "sha256sum *"
@@ -72,6 +71,10 @@ tools:
     - "timeout --kill-after=30s * /tmp/gh-aw/agent/formal-spec-verifier/*"
     - "cat /tmp/gh-aw/agent/formal-spec-verifier/*"
     - "tee /tmp/gh-aw/agent/formal-spec-verifier/*"
+
+steps:
+    - name: Validate fixture-based TLA+ installer
+      run: bash .github/scripts/install_tla_runtime_test.sh
 
 post-steps:
   - name: Upload formal verification evidence
@@ -100,6 +103,8 @@ features:
 {{#runtime-import? .github/shared-instructions.md}}
 
 # Daily Formal Spec Verifier 🔬
+
+Use only commands listed under `tools.bash`, one standalone command per call. Pipelines are permitted only when the complete pipeline is explicitly allowlisted. Do not append commands, redirections, or subshells to an allowed command. If a required operation is blocked, stop and report it instead of probing command variants.
 
 You are a formal methods expert and Go test engineer. Your mission is to:
 

@@ -12,8 +12,52 @@ const { parseLockFileHeaders } = require("./lock_file_headers.cjs");
 /** @type {Map<string, MetadataRecord>} */
 let records = new Map();
 let initialized = false;
-const FRONTMATTER = /^---[ \t]*\r?\n(?:([\s\S]*?)\r?\n)?---[ \t]*\r?(?=\n|$)/;
-const METADATA_BLOCKS = /(^|(?:^|\n)##[ \t]+(?:agent|skill):[^\n]*\r?\n(?:[ \t]*\r?\n)*)---[ \t]*\r?\n(?:([\s\S]*?)\r?\n)?---[ \t]*\r?(?=\n|$)/g;
+/** @type {Map<string, MetadataRecord>} */
+let generatedRecords = new Map();
+
+/** @param {string} source */
+function metadataDigest(source) {
+  return createHash("sha256").update(source.replaceAll("\r\n", "\n")).digest("hex");
+}
+
+/**
+ * Find only document and inline-artifact headers, preserving original offsets.
+ * Delimiters follow the same BOM/whitespace rules as the engine body reader.
+ * @param {string} content
+ * @param {boolean} [documentOnly]
+ */
+function markdownMetadataBlocks(content, documentOnly = false) {
+  const lines = [...content.matchAll(/[^\n]*(?:\n|$)/g)].filter(line => line[0]);
+  const blocks = [];
+  const lineText = (/** @type {number} */ index) => lines[index][0].replace(/\r?\n$/, "");
+  for (let index = 0; index < lines.length; index++) {
+    let opening = index;
+    if (index !== 0 || /^##[ \t]+(?:agent|skill):/.test(lineText(index))) {
+      if (documentOnly || !/^##[ \t]+(?:agent|skill):/.test(lineText(index))) continue;
+      opening++;
+      while (opening < lines.length && !lineText(opening).trim()) opening++;
+    }
+    if (
+      opening >= lines.length ||
+      lineText(opening)
+        .replace(/^\uFEFF/, "")
+        .trim() !== "---"
+    )
+      continue;
+    let closing = opening + 1;
+    while (closing < lines.length && lineText(closing).trim() !== "---") closing++;
+    if (closing === lines.length) throw new Error("unterminated frontmatter");
+    const start = /** @type {number} */ lines[opening].index;
+    const sourceStart = start + lines[opening][0].length;
+    const sourceEnd = /** @type {number} */ lines[closing].index;
+    const source = content.slice(sourceStart, sourceEnd).replace(/\r?\n$/, "");
+    const end = sourceEnd + lineText(closing).length;
+    blocks.push({ start, end, source });
+    index = closing;
+    if (documentOnly) break;
+  }
+  return blocks;
+}
 
 class CompilerMetadataUnavailableError extends Error {
   constructor() {
@@ -23,7 +67,7 @@ class CompilerMetadataUnavailableError extends Error {
 
 /**
  * Install compiler-owned records. Source digests are exact provenance keys;
- * changed or newly-created YAML must be recompiled.
+ * changed or newly-created metadata, including JSON, must be recompiled.
  * @param {unknown} metadata
  * @param {boolean} [merge]
  */
@@ -44,6 +88,15 @@ function installMarkdownMetadata(metadata, merge = false) {
     result.set(key, record);
   }
   records = result;
+  generatedRecords = new Map();
+  // Engine copies use canonical JSON, not the original author YAML. Only
+  // compiler-approved artifact values can authorize that representation.
+  for (const record of records.values()) {
+    if (record.kind === "artifact" && !record.error) {
+      const source = JSON.stringify(parseMarkdownJSON(record.value_json));
+      generatedRecords.set(`artifact:${metadataDigest(source)}`, { ...record, sha256: metadataDigest(source), value_json: source });
+    }
+  }
   initialized = true;
 }
 
@@ -172,14 +225,14 @@ function missingMarkdownMetadata(documents) {
   restoreCachedMetadata();
   const missing = new Set();
   for (const content of documents) {
-    for (const match of content.matchAll(METADATA_BLOCKS)) {
-      const source = match[2];
+    for (const block of markdownMetadataBlocks(content)) {
+      const source = block.source;
       if (!source?.trim()) continue;
       try {
         readDocumentMetadata(source, { kind: "artifact" });
       } catch (error) {
         if (!(error instanceof CompilerMetadataUnavailableError)) throw error;
-        missing.add(createHash("sha256").update(source.replaceAll("\r\n", "\n")).digest("hex"));
+        missing.add(metadataDigest(source));
       }
     }
   }
@@ -258,18 +311,41 @@ function restoreCachedMetadata() {
 /** @param {string} source @param {{kind?: string}} [options] */
 function readDocumentMetadata(source, { kind = "document" } = {}) {
   if (!source?.trim()) return { value: {} };
-  // JSON is the sole runtime representation. Literal prompt markers contain NUL
-  // and are escaped for JSON decoding, never interpreted as syntax.
+  restoreCachedMetadata();
+  const digest = metadataDigest(source);
+  const artifact = records.get(`artifact:${digest}`) || generatedRecords.get(`artifact:${digest}`);
+  const record = kind === "artifact" ? artifact : records.get(`model-pins:${digest}`) || artifact;
+  if (!record) throw new CompilerMetadataUnavailableError();
+  if (record.error) throw new Error(record.error);
+  const compiled = parseMarkdownJSON(record.value_json);
+  let runtime;
   try {
-    return { value: parseMarkdownJSON(source.replaceAll("\x00", "\\u0000")) };
+    runtime = parseMarkdownJSON(source.replaceAll("\x00", "\\u0000"));
   } catch {
-    restoreCachedMetadata();
-    const digest = createHash("sha256").update(source.replaceAll("\r\n", "\n")).digest("hex");
-    const record = kind === "artifact" ? records.get(`artifact:${digest}`) : records.get(`model-pins:${digest}`) || records.get(`artifact:${digest}`);
-    if (!record) throw new CompilerMetadataUnavailableError();
-    if (record.error) throw new Error(record.error);
-    return { value: parseMarkdownJSON(record.value_json) };
+    return { value: compiled };
   }
+  // Model-pin records deliberately project workflow configuration; only
+  // artifact metadata is also used directly by runtime engine readers.
+  if (record.kind === "artifact" && !isDeepStrictEqual(runtime, compiled)) throw new Error("Markdown JSON metadata does not match its compiler manifest");
+  return { value: compiled };
+}
+
+/**
+ * Authorize only output of a trusted edit whose input was already validated.
+ * Persist exact derived digests for downstream engine copies in fresh processes.
+ * This is deliberately private, never a runtime-input registration API.
+ * @param {any} value
+ */
+function renderMetadata(value) {
+  const source = JSON.stringify(value);
+  parseMarkdownJSON(source);
+  const digest = metadataDigest(source);
+  const record = { kind: "artifact", sha256: digest, value_json: source };
+  generatedRecords.set(`artifact:${digest}`, record);
+  records.set(`artifact:${digest}`, record);
+  const infoPath = path.join(process.env.GH_AW_TMP_DIR || require("./constants.cjs").TMP_GH_AW_PATH, "aw_info.json");
+  if (fs.existsSync(infoPath)) persistMarkdownMetadata();
+  return source;
 }
 
 /** @param {any} value @param {(value: string) => string} transform */
@@ -289,11 +365,11 @@ function transformValues(value, transform) {
 
 /** @param {string} content @param {(value: any) => any} transform */
 function editMarkdownMetadata(content, transform) {
-  const match = FRONTMATTER.exec(content);
-  if (!match) return content;
-  const value = readDocumentMetadata(match[1], { kind: "artifact" }).value ?? {};
+  const block = markdownMetadataBlocks(content, true)[0];
+  if (!block) return content;
+  const value = readDocumentMetadata(block.source, { kind: "artifact" }).value ?? {};
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("agent frontmatter must be a mapping");
-  return `---\n${JSON.stringify(transform(value))}\n---${content.slice(match[0].length)}`;
+  return `---\n${renderMetadata(transform(value))}\n---${content.slice(block.end)}`;
 }
 
 /**
@@ -302,36 +378,35 @@ function editMarkdownMetadata(content, transform) {
  * @param {string} content @param {(text: string) => string} transform
  */
 function transformMarkdownContent(content, transform) {
-  const blocks = [...content.matchAll(METADATA_BLOCKS)];
+  const blocks = markdownMetadataBlocks(content);
   if (!blocks.length) return transform(content);
   const prefix = `\x00METADATA_${require("node:crypto").randomUUID()}_`;
   const metadata = [];
   let cursor = 0;
   let result = "";
   for (const block of blocks) {
-    const start = /** @type {number} */ block.index;
-    result += content.slice(cursor, start) + block[1];
-    const value = readDocumentMetadata(block[2], { kind: "artifact" }).value ?? {};
+    result += content.slice(cursor, block.start);
+    const value = readDocumentMetadata(block.source, { kind: "artifact" }).value ?? {};
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("agent frontmatter must be a mapping");
     metadata.push(value);
     result += `${prefix}${metadata.length - 1}\x00`;
-    cursor = start + block[0].length;
+    cursor = block.end;
   }
   result = transform(result + content.slice(cursor));
-  return result.replace(new RegExp(`${prefix}(\\d+)\x00`, "g"), (_, index) => `---\n${JSON.stringify(transformValues(metadata[Number(index)], transform))}\n---`);
+  return result.replace(new RegExp(`${prefix}(\\d+)\x00`, "g"), (_, index) => `---\n${renderMetadata(transformValues(metadata[Number(index)], transform))}\n---`);
 }
 
 /** @param {string} operation @param {string} content @param {{value?: string, replacements?: Record<string, string>}} [options] */
 function readMarkdownMetadata(operation, content, options = {}) {
   if (operation === "document") return readDocumentMetadata(content);
-  const match = FRONTMATTER.exec(content);
-  const value = match ? (readDocumentMetadata(match[1], { kind: "artifact" }).value ?? {}) : {};
+  const block = markdownMetadataBlocks(content, true)[0];
+  const value = block ? (readDocumentMetadata(block.source, { kind: "artifact" }).value ?? {}) : {};
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("agent frontmatter must be a mapping");
   if (operation === "agent") return { value, content };
   if (operation === "ensure-name") {
     if (Object.hasOwn(value, "name")) return { value, content };
     const named = { name: options.value, ...value };
-    return { value: named, content: match ? editMarkdownMetadata(content, () => named) : `---\n${JSON.stringify(named)}\n---\n${content}` };
+    return { value: named, content: block ? editMarkdownMetadata(content, () => named) : `---\n${renderMetadata(named)}\n---\n${content}` };
   }
   if (operation === "restore") {
     const replacements = options.replacements || {};
@@ -356,5 +431,6 @@ module.exports = {
   transformMarkdownContent,
   transformValues,
   parseMarkdownJSON,
+  markdownMetadataBlocks,
   CompilerMetadataUnavailableError,
 };

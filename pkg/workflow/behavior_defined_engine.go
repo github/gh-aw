@@ -1,7 +1,6 @@
 package workflow
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -11,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/jsonutil"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/setutil"
 	"github.com/goccy/go-yaml"
@@ -213,9 +213,10 @@ func (e *BehaviorDefinedEngine) GetInstallationSteps(workflowData *WorkflowData)
 	if behavior == nil {
 		return nil
 	}
+	requiresNode := behavior.HarnessScript != "" || isSkipIfDecisionEnabled(workflowData)
 	if workflowData != nil && workflowData.EngineConfig != nil && workflowData.EngineConfig.Command != "" {
 		var steps []GitHubActionStep
-		if behavior.HarnessScript != "" {
+		if requiresNode {
 			steps = append(steps, generateNodeJsSetupStep(workflowData))
 		}
 		return buildNpmEngineInstallStepsWithAWF(steps, workflowData, false)
@@ -226,7 +227,7 @@ func (e *BehaviorDefinedEngine) GetInstallationSteps(workflowData *WorkflowData)
 	// binary) must always be installed even when no package-manager based installation
 	// is declared for the engine's CLI itself.
 	if behavior.Installation == nil {
-		if behavior.HarnessScript == "" {
+		if !requiresNode {
 			// Engines that install their CLI through `pre-agent-steps`
 			// declare no installation block at all, but the agent still runs inside the
 			// firewall sandbox, so the AWF binary must be installed.
@@ -239,7 +240,11 @@ func (e *BehaviorDefinedEngine) GetInstallationSteps(workflowData *WorkflowData)
 	if install.PackageManager != "npm" {
 		// Non-npm installations are performed by the engine's own steps, but the AWF
 		// binary is still required to run the agent inside the firewall sandbox.
-		return BuildNpmEngineInstallStepsWithAWF(nil, workflowData)
+		var steps []GitHubActionStep
+		if isSkipIfDecisionEnabled(workflowData) {
+			steps = append(steps, generateNodeJsSetupStep(workflowData))
+		}
+		return BuildNpmEngineInstallStepsWithAWF(steps, workflowData)
 	}
 	version := install.Version
 	if workflowData != nil && workflowData.EngineConfig != nil && workflowData.EngineConfig.Version != "" {
@@ -555,6 +560,9 @@ func (e *BehaviorDefinedEngine) GetExecutionSteps(workflowData *WorkflowData, lo
 	}
 	firewallEnabled := e.behaviorDefinedFirewallEnabled(workflowData)
 	engineCommand := e.buildBehaviorDefinedEngineCommand(exec, workflowData)
+	if isSkipIfDecisionEnabled(workflowData) {
+		engineCommand = buildShellHarnessCommand(e.GetID(), engineCommand)
+	}
 	command := e.buildBehaviorDefinedExecutionCommand(exec, workflowData, logFile, engineCommand, firewallEnabled, backend)
 	env := e.buildBehaviorDefinedExecutionEnv(exec, workflowData, firewallEnabled, backend)
 	steps := e.buildBehaviorDefinedSetupSteps()
@@ -892,7 +900,7 @@ func parseEngineDefinitionFromJSON(engineJSON string) (*EngineDefinition, error)
 		engineDefinitionCache.Delete(engineJSON)
 	}
 	var engineData any
-	if err := json.Unmarshal([]byte(engineJSON), &engineData); err != nil {
+	if err := jsonutil.UnmarshalString(engineJSON, &engineData); err != nil {
 		return nil, fmt.Errorf("engine JSON is not recognized, expected a valid JSON object describing the engine: %w", err)
 	}
 	dataMap, ok := engineData.(map[string]any)

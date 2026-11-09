@@ -105,12 +105,12 @@ describe("safeoutputs_cli.cjs", () => {
       expect(logs.some(m => m.includes("skipped"))).toBe(true);
     });
 
-    it("preserves workflow allowlist guidance through the actual CLI emission path", () => {
+    it("uses trusted SDK denial state for workflow allowlist guidance through CLI emission", () => {
       const calls = [];
       emitMissingToolPermissionIssue({
         safeOutputsPath: "/tmp/safeoutputs.jsonl",
         deniedCommands: ["shell(node --test scripts/pr-sous-chef.test.mjs)"],
-        permissionOutput: "[sdk-driver] permission denied by workflow tool permissions: shell(node --test scripts/pr-sous-chef.test.mjs)",
+        workflowToolPermissionDenied: true,
         runSafeOutputsCLI: (toolName, args) => calls.push({ toolName, args }),
         logger: () => {},
       });
@@ -119,6 +119,19 @@ describe("safeoutputs_cli.cjs", () => {
       expect(calls[0].args.alternatives).toContain("Denied commands: shell(node --test scripts/pr-sous-chef.test.mjs)");
       expect(calls[0].args.alternatives).not.toContain("Verify token scopes");
       expect(calls[0].args.alternatives.length).toBeLessThanOrEqual(512);
+    });
+
+    it("does not infer workflow allowlist guidance from output text", () => {
+      const calls = [];
+      emitMissingToolPermissionIssue({
+        safeOutputsPath: "/tmp/safeoutputs.jsonl",
+        deniedCommands: ["shell(ls)"],
+        permissionOutput: "[sdk-driver] permission denied by workflow tool permissions: shell(ls)",
+        runSafeOutputsCLI: (toolName, args) => calls.push({ toolName, args }),
+        logger: () => {},
+      });
+      expect(calls[0].args.alternatives).not.toContain("workflow tools configuration");
+      expect(calls[0].args.alternatives).toContain("Verify token scopes");
     });
 
     it("logs error when CLI invocation fails", () => {

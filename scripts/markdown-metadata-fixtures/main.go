@@ -7,14 +7,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"os"
-	"regexp"
-	"strings"
 
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/goccy/go-yaml"
 )
-
-var metadataPattern = regexp.MustCompile(`(?m)(?:\A|^##[ \t]+(?:agent|skill):[^\n]*\n(?:[ \t]*\n)*)---[ \t]*\n([\s\S]*?)\n---[ \t]*(?:\n|$)`)
 
 func main() {
 	var input struct {
@@ -36,21 +32,21 @@ func main() {
 	} else {
 		records := map[string]any{}
 		for _, content := range input.Sources {
-			for _, match := range metadataPattern.FindAllStringSubmatch(strings.ReplaceAll(content, "\r\n", "\n"), -1) {
-				if len(match) < 2 {
-					continue
-				}
-				value, err := parser.CompileMarkdownMetadata(match[1]) //nolint:uncheckedsliceindex // The regexp capture count is checked above.
+			for _, block := range parser.ExtractMarkdownMetadataBlocks(content) {
+				value, err := parser.CompileMarkdownMetadata(block.Source)
 				encoded, encodeErr := json.Marshal(value)
 				if encodeErr != nil {
 					panic(encodeErr)
 				}
-				hash := sha256.Sum256([]byte(match[1])) //nolint:uncheckedsliceindex // The regexp capture count is checked above.
+				hash := sha256.Sum256([]byte(block.Source))
 				record := map[string]any{"sha256": hex.EncodeToString(hash[:]), "kind": "artifact", "value_json": string(encoded)}
 				if err != nil {
 					record["error"] = err.Error()
 				}
-				records[match[1]] = record //nolint:uncheckedsliceindex // The regexp capture count is checked above.
+				if block.Error != "" {
+					record["error"] = block.Error
+				}
+				records[block.Source] = record
 			}
 		}
 		result = records

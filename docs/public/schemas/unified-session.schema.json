@@ -101,6 +101,7 @@
       { "if": { "properties": { "type": { "const": "guardrail.admission" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/AdmissionDecisionData" } } } },
       { "if": { "properties": { "type": { "const": "guardrail.daily_aic" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DailyAICDecisionData" } } } },
       { "if": { "properties": { "type": { "const": "harness.attempt" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/HarnessAttemptData" } } } },
+      { "if": { "properties": { "type": { "const": "harness.decision" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/HarnessDecisionData" } } } },
       { "if": { "properties": { "type": { "const": "harness.retry" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/HarnessRetryData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.configuration" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpConfigurationData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.difc.filtered" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
@@ -825,6 +826,40 @@
       "required": ["attempt", "exitCode", "failureClasses", "layer"],
       "additionalProperties": false
     },
+    "HarnessDecisionData": {
+      "type": "object",
+      "properties": {
+        "proposedAttempt": { "type": "integer", "minimum": 1, "maximum": 101 },
+        "startupAttemptId": { "type": "string", "pattern": "^startup:[1-9][0-9]{0,2}$" },
+        "outcome": { "$ref": "#/definitions/HarnessDecisionOutcome" },
+        "questions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "question": { "type": "integer", "description": "One-based index in workflow skip-if-decision.", "minimum": 1, "maximum": 400 },
+              "outcome": { "$ref": "#/definitions/HarnessDecisionOutcome" },
+              "error": { "$ref": "#/definitions/HarnessDecisionError" }
+            },
+            "required": ["question", "outcome"],
+            "additionalProperties": false
+          },
+          "maxItems": 400
+        },
+        "latencyMs": { "$ref": "#/definitions/SessionCount" },
+        "timestamp": { "$ref": "#/definitions/SessionCount" },
+        "error": { "$ref": "#/definitions/HarnessDecisionError" },
+        "avoidedInvocation": { "type": "boolean" }
+      },
+      "required": ["proposedAttempt", "outcome", "questions", "latencyMs", "timestamp", "avoidedInvocation"],
+      "additionalProperties": false,
+      "description": "Advisory decision preceding a proposed invocation, not authorization or an agent attempt."
+    },
+    "HarnessDecisionError": {
+      "type": "string",
+      "enum": ["invalid_configuration", "sandbox_unavailable", "proxy_unavailable", "invalid_proxy_endpoint", "model_unavailable", "timeout", "evaluation_failed", "file_reference_failed", "sensitive_content_blocked"]
+    },
+    "HarnessDecisionOutcome": { "type": "string", "enum": ["allow", "deny", "unknown"] },
     "HarnessFailureClass": {
       "type": "string",
       "enum": [
@@ -897,7 +932,8 @@
         "attempts": { "type": "integer", "minimum": 0, "maximum": 101 },
         "exitCode": { "anyOf": [{ "$ref": "#/definitions/HarnessRetryExitCode" }, { "type": "null" }] },
         "attemptResults": { "type": "array", "items": { "$ref": "#/definitions/HarnessRetryAttemptData" } },
-        "startupAttemptResults": { "type": "array", "items": { "$ref": "#/definitions/HarnessRetryAttemptData" } }
+        "startupAttemptResults": { "type": "array", "items": { "$ref": "#/definitions/HarnessRetryAttemptData" } },
+        "decisionResults": { "type": "array", "items": { "$ref": "#/definitions/HarnessDecisionData" } }
       },
       "required": ["attempts", "exitCode", "attemptResults"],
       "additionalProperties": false

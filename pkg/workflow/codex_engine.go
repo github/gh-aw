@@ -384,8 +384,9 @@ func (e *CodexEngine) buildCodexCommand(workflowData *WorkflowData, commandName,
 	}
 	if harnessScriptName != "" {
 		execPrefix := fmt.Sprintf(`%s %s/%s %s`, nodeRuntimeResolutionCommand, SetupActionDestinationShell, harnessScriptName, commandName)
-		return fmt.Sprintf("%s exec%s%s%s%s%s%s --prompt-file /tmp/gh-aw/aw-prompts/prompt.txt",
+		command := fmt.Sprintf("%s exec%s%s%s%s%s%s --prompt-file /tmp/gh-aw/aw-prompts/prompt.txt",
 			execPrefix, modelParam, webSearchParam, shellToolParam, executionPolicyParam, structuredOutputParam, customArgsParam)
+		return wrapCustomHarnessDecisionCommand(workflowData, e.GetID(), e.GetHarnessScriptName(), command)
 	}
 	return getWorkspaceCommandPrefixFor(workflowData.EngineConfig) + fmt.Sprintf("%s exec%s%s%s%s%s%s -- \"$INSTRUCTION\"",
 		commandName, modelParam, webSearchParam, shellToolParam, executionPolicyParam, structuredOutputParam, customArgsParam)

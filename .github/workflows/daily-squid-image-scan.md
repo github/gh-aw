@@ -19,10 +19,11 @@ network:
     - defaults
     - go
 tools:
-  cli-proxy: true
-  bash:
-    - "cat /tmp/gh-aw/agent/image-scan/compile-output.txt"
-    - "cat /tmp/gh-aw/agent/image-scan/candidate-output.txt"
+  cli-proxy: false
+  github:
+    toolsets: [issues]
+  edit: false
+  bash: []
 safe-outputs:
   create-issue:
     title-prefix: "[container-image-scan] "
@@ -94,6 +95,58 @@ steps:
       mkdir -p "$output_dir"
       echo "" >> "$output_dir/candidate-output.txt"
       "$GITHUB_WORKSPACE/gh-aw" compile --syft --grype --grant 2>&1 | tee -a "$output_dir/candidate-output.txt" || true
+  - name: Index scan logs with fixed queries
+    run: |
+      set -euo pipefail
+      output_dir="/tmp/gh-aw/agent/image-scan"
+      marker_pattern='Running \((syft|grype|grant)\)|syft scanned'
+      finding_pattern='^[^[:space:]]+:1:1: (error|warning|info): \[[A-Za-z]+\]'
+      for scan in compile candidate; do
+        input="$output_dir/${scan}-output.txt"
+        markers="$output_dir/${scan}-markers.txt"
+        if [[ ! -f "$input" ]]; then
+          printf 'ERROR: Scan output not found: %s\n' "$input" > "$markers"
+          continue
+        fi
+        : > "$markers"
+        line_number=0
+        while IFS= read -r line || [[ -n "$line" ]]; do
+          line_number=$((line_number + 1))
+          if [[ "$line" =~ $marker_pattern ]]; then
+            printf '%s:%s\n' "$line_number" "$line" >> "$markers"
+          fi
+        done < "$input"
+      done
+      input="$output_dir/compile-output.txt"
+      counts="$output_dir/compile-finding-counts.txt"
+      if [[ ! -f "$input" ]]; then
+        printf 'ERROR: Scan output not found: %s\n' "$input" > "$counts"
+      else
+        finding_keys=()
+        finding_counts=()
+        while IFS= read -r line || [[ -n "$line" ]]; do
+          if [[ "$line" =~ $finding_pattern ]]; then
+            finding="${BASH_REMATCH[0]}"
+            match_index=-1
+            for index in "${!finding_keys[@]}"; do
+              if [[ "${finding_keys[$index]}" == "$finding" ]]; then
+                match_index="$index"
+                break
+              fi
+            done
+            if [[ "$match_index" -eq -1 ]]; then
+              finding_keys+=("$finding")
+              finding_counts+=(1)
+            else
+              finding_counts[$match_index]=$((finding_counts[$match_index] + 1))
+            fi
+          fi
+        done < "$input"
+        : > "$counts"
+        for index in "${!finding_keys[@]}"; do
+          printf '%s %s\n' "${finding_counts[$index]}" "${finding_keys[$index]}" >> "$counts"
+        done
+      fi
 post-steps:
   - name: Enforce vendored vulnerability and license gates
     if: always()
@@ -109,15 +162,26 @@ post-steps:
       # github-mcp-server, grafana) are tracked-only per the workflow's policy and
       # must not fail this daily scan; they are remediated via upstream pin refreshes.
       vendored_pattern='(^|[[:space:]])ghcr\.io/github/gh-aw-node(@|:)'
-      if grep -qE "$vendored_pattern.*: error: \[Critical\]" "$output"; then
+      critical_pattern="$vendored_pattern.*: error: \[Critical\]"
+      high_fix_pattern="$vendored_pattern.*: (error|warning): \[High\].* \(fix: [^)]+\)"
+      license_pattern="$vendored_pattern.*: error: license policy violation:"
+      critical_found=false
+      high_fix_found=false
+      license_found=false
+      while IFS= read -r line || [[ -n "$line" ]]; do
+        [[ "$line" =~ $critical_pattern ]] && critical_found=true
+        [[ "$line" =~ $high_fix_pattern ]] && high_fix_found=true
+        [[ "$line" =~ $license_pattern ]] && license_found=true
+      done < "$output"
+      if [[ "$critical_found" == true ]]; then
         echo "::error::Critical vulnerabilities detected in the vendored ghcr.io/github/gh-aw-node container image."
         exit 1
       fi
-      if grep -qE "$vendored_pattern.*: (error|warning): \[High\].* \(fix: [^)]+\)" "$output"; then
+      if [[ "$high_fix_found" == true ]]; then
         echo "::error::High vulnerabilities with available fixes detected in the vendored ghcr.io/github/gh-aw-node container image."
         exit 1
       fi
-      if grep -qE "$vendored_pattern.*: error: license policy violation:" "$output"; then
+      if [[ "$license_found" == true ]]; then
         echo "::error::License policy violations detected in the vendored ghcr.io/github/gh-aw-node container image."
         exit 1
       fi
@@ -153,22 +217,14 @@ adoption from candidate results, including a clean candidate scan.
 
 ### Read the scan with permitted tools
 
-The log can exceed 500 KB. Use native `grep` with line numbers to locate
-`Running (syft|grype|grant)` and `syft scanned`, then native `view` with
-`view_range` to read successive ranges through the end of the scan. Read every
-finding, including lower severities, license results, and scanner errors; a
-truncated tool response or a severity summary is not the complete evidence.
-Keep using the absolute log path, without changing directories.
-Read the candidate log separately with the same native tools and pagination.
-
-These shell commands are supported by the existing allowlist: the first gives
-the line count for pagination, and the second counts findings per image
-reference and severity without discarding the image tag:
-
-```bash
-wc -l /tmp/gh-aw/agent/image-scan/compile-output.txt
-grep -oE '^[^[:space:]]+:1:1: (error|warning|info): \[[A-Za-z]+\]' /tmp/gh-aw/agent/image-scan/compile-output.txt | sort | uniq -c
-```
+The pre-agent workflow step creates fixed-query indexes at
+`compile-markers.txt` and `candidate-markers.txt`, plus the committed-pin
+finding counts at `compile-finding-counts.txt`. Use native file inspection to
+read these indexes, then use `view_range` to read successive ranges from each
+original log through its end. Read every finding, including lower severities,
+license results, and scanner errors; an index or severity count is not complete
+scan evidence. Read the candidate log separately. Bash is disabled for the
+agent, so do not construct shell queries against scan logs.
 
 Do not use `cd`, `cut`, `sed`, `awk`, `python`, `python3`, `jq`, or ad hoc
 scripts for analysis; they are not permitted. If a required read is unavailable

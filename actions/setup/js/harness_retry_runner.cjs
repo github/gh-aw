@@ -212,6 +212,7 @@ function shouldStopForNoopSafeOutputs({ attempt, safeOutputsPath, hasNoopInSafeO
  *   getRetryMode?: (attempt: number) => string,
  *   sleepFn?: (ms: number) => Promise<void>,
  *   telemetryPath?: string,
+ *   evaluateDecision?: () => Promise<import("./skip_if_decision.cjs").SkipDecision | null>,
  * }} options
  * @returns {Promise<{ exitCode: number, attempts: number, lastResult: HarnessAttemptResult | null }>}
  */
@@ -233,6 +234,24 @@ async function runHarnessRetryLoop(options) {
   }
   /** @type {{ attempt: number, attempt_id: string, startup_attempt_id?: string, started_at: number, finished_at: number | null, strategy: "restart" | "resume", backoff_ms: number, outcome: string, exit_code: number | null, failure_classes: string[] }[]} */
   const attemptResults = [];
+  /** @type {import("./types/unified_session").HarnessDecisionData[]} */
+  const decisionResults = [];
+  if (options.telemetryPath && (process.env.GH_AW_SKIP_IF_DECISION || options.evaluateDecision)) {
+    try {
+      const prior = JSON.parse(fs.readFileSync(options.telemetryPath, "utf8")).decision_results;
+      const { normalizeHarnessDecisionData, MAX_HARNESS_DECISIONS } = require("./harness_retry_record.cjs");
+      if (Array.isArray(prior) && prior.length <= MAX_HARNESS_DECISIONS) {
+        for (const value of prior) {
+          const decision = normalizeHarnessDecisionData(value);
+          if (decision) decisionResults.push(decision);
+          else options.log("skip-if-decision: ignored invalid prior decision telemetry");
+        }
+      }
+    } catch (error) {
+      const missing = error && typeof error === "object" && "code" in error && error.code === "ENOENT";
+      if (!missing) options.log("skip-if-decision: could not read prior decision telemetry");
+    }
+  }
   /** @param {"start" | "finish"} event @param {(typeof attemptResults)[number]} result */
   const writeAttemptMarker = (event, result) => {
     try {
@@ -253,7 +272,16 @@ async function runHarnessRetryLoop(options) {
       } catch {
         // A standalone harness has no host startup telemetry.
       }
-      fs.writeFileSync(`${options.telemetryPath}.tmp`, JSON.stringify({ attempts, exit_code: lastExitCode, attempt_results: attemptResults, ...(Array.isArray(startupAttempts) ? { startup_attempt_results: startupAttempts } : {}) }) + "\n");
+      fs.writeFileSync(
+        `${options.telemetryPath}.tmp`,
+        JSON.stringify({
+          attempts,
+          exit_code: lastExitCode,
+          attempt_results: attemptResults,
+          ...(decisionResults.length ? { decision_results: decisionResults } : {}),
+          ...(Array.isArray(startupAttempts) ? { startup_attempt_results: startupAttempts } : {}),
+        }) + "\n"
+      );
       fs.renameSync(`${options.telemetryPath}.tmp`, options.telemetryPath);
     } catch (error) {
       try {
@@ -287,6 +315,22 @@ async function runHarnessRetryLoop(options) {
         options.log(`retry ${attempt}/${options.maxRetries}: woke up, next delay will be ${delay}ms`);
         if (options.softTimeoutGuard && Date.now() >= options.softTimeoutGuard.softDeadlineMs) {
           emitSoftTimeoutSignal(options.softTimeoutGuard, "after backoff sleep", options.harnessName, options.log);
+          lastExitCode = 1;
+          break;
+        }
+      }
+
+      const decision = await (options.evaluateDecision ?? (() => (process.env.GH_AW_SKIP_IF_DECISION ? require("./skip_if_decision.cjs").evaluateSkipIfDecision({ log: options.log }) : null)))();
+      if (decision) {
+        decisionResults.push({ ...decision, proposedAttempt: attempt + 1, ...(startupAttemptId ? { startupAttemptId } : {}), timestamp: Date.now(), avoidedInvocation: decision.outcome === "deny" });
+        writeTelemetry();
+        if (decision.outcome === "deny") {
+          require("./skip_if_decision.cjs").recordDecisionSkip(options.log);
+          lastExitCode = 0;
+          break;
+        }
+        if (options.softTimeoutGuard && Date.now() >= options.softTimeoutGuard.softDeadlineMs) {
+          emitSoftTimeoutSignal(options.softTimeoutGuard, "after decision evaluation", options.harnessName, options.log);
           lastExitCode = 1;
           break;
         }
@@ -346,18 +390,18 @@ async function runHarnessRetryLoop(options) {
         break;
       }
 
-      const decision = await options.handleFailure({ attempt, result, maxRetries: options.maxRetries });
+      const failureDecision = await options.handleFailure({ attempt, result, maxRetries: options.maxRetries });
       if (result.failureClasses?.length) {
         attemptResult.failure_classes = result.failureClasses;
       }
-      if (typeof decision.exitCode === "number") {
-        lastExitCode = decision.exitCode;
+      if (typeof failureDecision.exitCode === "number") {
+        lastExitCode = failureDecision.exitCode;
       }
-      if (typeof decision.nextDelayMs === "number") {
-        delay = decision.nextDelayMs;
+      if (typeof failureDecision.nextDelayMs === "number") {
+        delay = failureDecision.nextDelayMs;
       }
       writeTelemetry();
-      if (decision.action === "retry") {
+      if (failureDecision.action === "retry") {
         continue;
       }
       break;
@@ -369,12 +413,31 @@ async function runHarnessRetryLoop(options) {
   return { exitCode: lastExitCode, attempts, lastResult };
 }
 
+/**
+ * Sandboxed engines without a native retry loop still use the same invocation gate.
+ * @param {{runAttempt: () => Promise<HarnessAttemptResult>, harnessName: string, log: (message: string) => void}} options
+ */
+function runSingleHarnessInvocation(options) {
+  return runHarnessRetryLoop({
+    ...options,
+    maxRetries: 0,
+    initialDelayMs: 0,
+    backoffMultiplier: 1,
+    maxDelayMs: 0,
+    driverStartTime: Date.now(),
+    softTimeoutGuard: null,
+    handleFailure: () => ({ action: "stop" }),
+    telemetryPath: resolveHarnessRetryTelemetryPath(),
+  });
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     captureExecutionEvidenceConfiguration,
     resolveHarnessRetryTelemetryPath,
     recordStartupAttempt,
     runHarnessRetryLoop,
+    runSingleHarnessInvocation,
     runPreflightNoopCheck,
     shouldSkipForNoopSafeOutputs,
     shouldStopForNoopSafeOutputs,

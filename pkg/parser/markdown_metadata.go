@@ -2,12 +2,67 @@ package parser
 
 import (
 	"errors"
+	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/ast"
 	yamlparser "github.com/goccy/go-yaml/parser"
 )
+
+// MarkdownMetadataBlock is author frontmatter at a document or inline-artifact
+// boundary. Source is normalized consistently with runtime digest lookups.
+type MarkdownMetadataBlock struct {
+	Source   string
+	Document bool
+	Error    string
+}
+
+var inlineMetadataHeading = regexp.MustCompile(`^##[ \t]+(?:agent|skill):`)
+
+// ExtractMarkdownMetadataBlocks recognizes the engine reader's delimiter forms
+// and always stops at the first closing fence, including an empty header.
+func ExtractMarkdownMetadataBlocks(content string) []MarkdownMetadataBlock {
+	lines := slices.Collect(strings.SplitSeq(strings.ReplaceAll(content, "\r\n", "\n"), "\n"))
+	var blocks []MarkdownMetadataBlock
+	for index := 0; index < len(lines); index++ {
+		opening := index
+		document := index == 0 && !inlineMetadataHeading.MatchString(lines[index]) //nolint:uncheckedsliceindex // The loop bounds index.
+		if !document {
+			if !inlineMetadataHeading.MatchString(lines[index]) { //nolint:uncheckedsliceindex // The loop bounds index.
+				continue
+			}
+			opening++
+			for _, line := range lines[opening:] {
+				if strings.TrimSpace(line) != "" {
+					break
+				}
+				opening++
+			}
+		}
+		if opening < 0 || opening >= len(lines) {
+			continue
+		}
+		if strings.TrimSpace(strings.TrimPrefix(lines[opening], "\uFEFF")) != "---" {
+			continue
+		}
+		closing := opening + 1
+		for _, line := range lines[closing:] {
+			if strings.TrimSpace(line) == "---" {
+				break
+			}
+			closing++
+		}
+		block := MarkdownMetadataBlock{Source: strings.Join(lines[opening+1:closing], "\n"), Document: document}
+		if closing == len(lines) {
+			block.Error = "unterminated frontmatter"
+		}
+		blocks = append(blocks, block)
+		index = closing
+	}
+	return blocks
+}
 
 // CompileMarkdownMetadata produces JSON-compatible author metadata for the
 // JavaScript runtime. YAML syntax is interpreted only during compilation.

@@ -1,11 +1,15 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { dirname, extname, relative, resolve } from "node:path";
+import { dirname, extname, posix, relative, resolve, win32 } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const setupDirectory = resolve(import.meta.dirname, "..");
 const actionsDirectory = resolve(setupDirectory, "..");
 const existingGoFiles = new Set(["setup/session_parsers.go", "setup/session_parsers_test.go", "setup/sh/validate_multi_secret_test.go"]);
 const parserPackages = /^(?:yaml|js-yaml|work_queue_yaml)(?:[/.]|$)/;
+
+function normalizeSeparators(file) {
+  return file.replaceAll("\\", "/");
+}
 
 function actionFiles(directory = actionsDirectory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
@@ -16,16 +20,23 @@ function actionFiles(directory = actionsDirectory) {
 }
 
 describe("Actions runtime metadata boundary", () => {
+  it.each([posix, win32])("recognizes the existing Go allowlist with platform-specific paths (%#)", path => {
+    const root = path.resolve("actions");
+    const existing = [...existingGoFiles].map(file => normalizeSeparators(path.relative(root, path.resolve(root, file))));
+    expect(existing.filter(file => !existingGoFiles.has(file))).toEqual([]);
+    expect(existing).toEqual([...existingGoFiles]);
+  });
+
   it("adds no Go implementations beyond the existing embedding and shell-test files", () => {
     const unexpected = actionFiles()
       .filter(file => extname(file) === ".go")
-      .map(file => relative(actionsDirectory, file))
+      .map(file => normalizeSeparators(relative(actionsDirectory, file)))
       .filter(file => !existingGoFiles.has(file));
     expect(unexpected).toEqual([]);
   });
 
   it("contains no Go modules or native metadata executables anywhere in Actions", () => {
-    expect(actionFiles().filter(file => /(?:^|\/)(?:go\.(?:mod|sum)|markdown-metadata(?:\.exe)?)$/.test(file))).toEqual([]);
+    expect(actionFiles().filter(file => /(?:^|\/)(?:go\.(?:mod|sum)|markdown-metadata(?:\.exe)?)$/.test(normalizeSeparators(file)))).toEqual([]);
   });
 
   it("reads metadata in JavaScript without launching an external parser", () => {
@@ -59,14 +70,14 @@ describe("Actions runtime metadata boundary", () => {
       const imports = [...source.matchAll(/(?:require(?:\.resolve)?\s*\(|import\s*\(|from\s*)["']([^"']+)["']/g)].map(match => match[1]);
       if (
         imports.some(name => parserPackages.test(name) || /(?:^|\/)work_queue_yaml(?:\.cjs)?$/.test(name)) ||
-        /(?:^|\/)work_queue_yaml\.cjs$/.test(file) ||
+        /(?:^|\/)work_queue_yaml\.cjs$/.test(normalizeSeparators(file)) ||
         /\b(?:parseDocument|parseAllDocuments)\s*\(|\.parseFrontmatter\s*\(/.test(source)
       ) {
         violations.push(relative(actionsDirectory, file));
       }
     }
     expect(violations).toEqual([]);
-    for (const file of actionFiles().filter(file => /(?:^|\/)package(?:-lock)?\.json$/.test(file))) {
+    for (const file of actionFiles().filter(file => /(?:^|\/)package(?:-lock)?\.json$/.test(normalizeSeparators(file)))) {
       const manifest = JSON.parse(readFileSync(file, "utf8"));
       for (const dependencies of [manifest.dependencies, manifest.devDependencies, manifest.optionalDependencies]) {
         expect(Object.keys(dependencies ?? {}).filter(name => parserPackages.test(name))).toEqual([]);

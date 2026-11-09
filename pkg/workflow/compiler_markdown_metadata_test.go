@@ -50,6 +50,33 @@ func TestCompilerMarkdownMetadataManifest(t *testing.T) {
 	require.Equal(t, map[string]any{"description": "Custom directory"}, values[hash("description: Custom directory")])
 }
 
+func TestCompilerMarkdownMetadataDelimiterForms(t *testing.T) {
+	for _, fence := range []string{"\uFEFF---", "  ---\t", "\uFEFF \t--- "} {
+		t.Run(fence, func(t *testing.T) {
+			records := map[string]GHAWMarkdownMetadataRecord{}
+			scanMarkdownMetadata(records, fence+"\r\nmodel: small\r\ntools: [Read]\r\n \t--- \r\nBody", "artifact")
+			require.Len(t, records, 1)
+			for _, record := range records {
+				require.Empty(t, record.Error)
+				require.JSONEq(t, `{"model":"small","tools":["Read"]}`, record.ValueJSON)
+			}
+		})
+	}
+	records := map[string]GHAWMarkdownMetadataRecord{}
+	scanMarkdownMetadata(records, "---\n---\nBody\n---\nmodel: forged\n---", "artifact")
+	require.Len(t, records, 1)
+	for _, record := range records {
+		require.JSONEq(t, `{}`, record.ValueJSON)
+	}
+	records = map[string]GHAWMarkdownMetadataRecord{}
+	scanMarkdownMetadata(records, "## agent: reader\n---\nmodel: small", "model-pins")
+	require.Len(t, records, 1)
+	for _, record := range records {
+		require.Equal(t, "artifact", record.Kind)
+		require.Equal(t, "unterminated frontmatter", record.Error)
+	}
+}
+
 func TestCompilerMarkdownMetadataAcrossPromptChunks(t *testing.T) {
 	root := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(root, ".github"), 0o755))

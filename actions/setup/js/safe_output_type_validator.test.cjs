@@ -596,6 +596,18 @@ describe("safe_output_type_validator", () => {
       expect(result.normalizedItem.body.includes("Structured data:")).toBe(!collapseData);
     });
 
+    it.each([true, false])("honors trusted runtime collapseData=%s without accepting agent layout overrides", async collapseData => {
+      const { validateItem } = await import("./safe_output_type_validator.cjs");
+      const data = { state: "a".repeat(64) };
+      const item = { type: "add_comment", body: "Copilot is working through the prep list.", data, collapseData: !collapseData };
+      const result = validateItem(item, "add_comment", 1, { dataEnabled: true, collapseData });
+      expect(result.isValid).toBe(true);
+      expect(result.normalizedItem.data).toEqual(data);
+      expect(result.normalizedItem).not.toHaveProperty("collapseData");
+      expect(result.normalizedItem.body.includes("<details>")).toBe(collapseData);
+      expect(result.normalizedItem.body.includes("Structured data:")).toBe(!collapseData);
+    });
+
     it.each([{}, { status: "DEFECT_FOUND", totals: { defect: 1 }, rows: [{ number: 5 }] }])("should collapse create-issue structured data %j", async data => {
       const { validateItem } = await import("./safe_output_type_validator.cjs");
       const { sanitizeContent } = await import("./sanitize_content.cjs");

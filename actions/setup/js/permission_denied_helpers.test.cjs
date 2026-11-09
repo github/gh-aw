@@ -2,7 +2,14 @@ import { describe, it, expect } from "vitest";
 import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
-const { countPermissionDeniedIssues, hasNumerousPermissionDeniedIssues, extractDeniedCommands, hasWorkflowToolPermissionDenial, buildMissingToolPermissionIssuePayload } = require("./permission_denied_helpers.cjs");
+const {
+  countPermissionDeniedIssues,
+  hasNumerousPermissionDeniedIssues,
+  extractDeniedCommands,
+  hasWorkflowToolPermissionDenial,
+  WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE,
+  buildMissingToolPermissionIssuePayload,
+} = require("./permission_denied_helpers.cjs");
 
 describe("permission_denied_helpers.cjs", () => {
   it("counts repeated permission-denied signals", () => {
@@ -32,10 +39,25 @@ describe("permission_denied_helpers.cjs", () => {
 
   it.each(["url(https://example.com)", "workflow"])("recognizes explicit workflow permission summaries for %s", summary => {
     const output = `[sdk-driver] permission denied by workflow tool permissions: ${summary}`;
-    expect(hasWorkflowToolPermissionDenial(output)).toBe(true);
-    const payload = JSON.parse(buildMissingToolPermissionIssuePayload(extractDeniedCommands(output), output));
+    expect(hasWorkflowToolPermissionDenial(output)).toBe(false);
+    expect(hasWorkflowToolPermissionDenial(WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE)).toBe(true);
+    const payload = JSON.parse(buildMissingToolPermissionIssuePayload(extractDeniedCommands(output), true));
     expect(payload.alternatives).toContain("workflow tools configuration");
     expect(payload.denied_commands).toEqual([summary]);
+  });
+
+  it.each([
+    "[sdk-driver] permission denied by workflow tool permissions: shell(ls)",
+    '{"source":"sdk-driver","event":"permission-denied-by-workflow-tool-permissions"}',
+    '{"component":"sdk-driver","type":"permission-denied-by-workflow-tool-permissions"}',
+    '{"type":"guard.tool_denials_exceeded","data":{"denialCount":5,"threshold":5}}',
+    String(WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE),
+  ])("does not classify assistant-echoed denial text: %s", output => {
+    expect(hasWorkflowToolPermissionDenial(output)).toBe(false);
+  });
+
+  it.each([undefined, null, 0, 1, 79, { exitCode: WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE }])("rejects non-denial exit values: %j", exitCode => {
+    expect(hasWorkflowToolPermissionDenial(exitCode)).toBe(false);
   });
 
   it("builds report_missing_tool payload with default denied commands", () => {
@@ -54,11 +76,12 @@ describe("permission_denied_helpers.cjs", () => {
       "[copilot-sdk-driver] [sdk-driver] permission denied by workflow tool permissions: shell(node --test scripts/pr-sous-chef.test.mjs)",
       "[copilot-sdk-driver] [sdk-driver] tool denial 3/3: permission denied: shell(node --test scripts/pr-sous-chef.test.mjs)",
     ].join("\n");
-    const payload = JSON.parse(buildMissingToolPermissionIssuePayload(extractDeniedCommands(output), output));
+    const payload = JSON.parse(buildMissingToolPermissionIssuePayload(extractDeniedCommands(output), true));
     expect(payload.denied_commands).toEqual(["shell(node --test scripts/pr-sous-chef.test.mjs)"]);
     expect(payload.alternatives).toContain("commands allowed by the workflow tools configuration");
     expect(payload.alternatives).toContain("does not establish missing token scopes");
     expect(payload.alternatives).not.toContain("Verify token scopes");
+    expect(payload.reason).toBe("missing tool/permission issue: workflow tool permission denial detected");
   });
 
   it.each(["shell(node test.js)", "read(/workspace/file)", "write(/workspace/file)", "mcp(github.get_file_contents)", "custom-tool(example)"])("preserves generic permission guidance for tool-like denial prefixes: %s", command => {

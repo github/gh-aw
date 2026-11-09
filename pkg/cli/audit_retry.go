@@ -15,6 +15,8 @@ type AuditRetrySummary struct {
 	EngineRetries          int                 `json:"engine_retries"`
 	DetectionEngineRetries int                 `json:"detection_engine_retries"`
 	EngineRetryHistory     []AuditEngineRetry  `json:"engine_retry_history,omitempty"`
+	Decisions              []AuditDecision     `json:"decisions,omitempty"`
+	AvoidedInvocations     int                 `json:"avoided_invocations,omitempty"`
 }
 
 // AuditEngineRetry is a native retry observation, not a harness invocation.
@@ -168,6 +170,13 @@ func buildAuditRetrySummary(events []sessionModelRoutingEvent) *AuditRetrySummar
 			}
 		case "harness.retry":
 			builder.observeSummary(event)
+		case "harness.decision":
+			if decision := parseAuditDecision(event); decision != nil {
+				builder.report.Decisions = append(builder.report.Decisions, *decision)
+				if decision.AvoidedInvocation {
+					builder.report.AvoidedInvocations++
+				}
+			}
 		}
 	}
 	for _, attempt := range builder.report.Attempts {
@@ -181,7 +190,7 @@ func buildAuditRetrySummary(events []sessionModelRoutingEvent) *AuditRetrySummar
 			builder.report.DetectionRetries++
 		}
 	}
-	if len(builder.report.Attempts) == 0 && len(builder.report.EngineRetryHistory) == 0 {
+	if len(builder.report.Attempts) == 0 && len(builder.report.EngineRetryHistory) == 0 && len(builder.report.Decisions) == 0 {
 		return nil
 	}
 	return builder.report
@@ -190,5 +199,8 @@ func buildAuditRetrySummary(events []sessionModelRoutingEvent) *AuditRetrySummar
 func renderConsoleRetries(report *AuditRetrySummary) {
 	if report != nil {
 		fmt.Fprintf(os.Stderr, "  retries: agent=%d detection=%d attempts=%d engine=%d detection_engine=%d\n", report.AgentRetries, report.DetectionRetries, len(report.Attempts), report.EngineRetries, report.DetectionEngineRetries)
+		if len(report.Decisions) > 0 {
+			fmt.Fprintf(os.Stderr, "  skip-if-decision: evaluations=%d avoided_invocations=%d\n", len(report.Decisions), report.AvoidedInvocations)
+		}
 	}
 }

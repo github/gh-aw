@@ -6,6 +6,7 @@ import os from "os";
 import path from "path";
 import { createRequire } from "module";
 import { fileURLToPath } from "url";
+import { execFileSync } from "node:child_process";
 
 const require = createRequire(import.meta.url);
 const { withCompilerFixtures } = require("../../../scripts/markdown_metadata_test_adapter.cjs");
@@ -57,6 +58,31 @@ function pin(report, field) {
 }
 
 describe("model_pin_check acceptance cases", () => {
+  it("audits a clean checkout copy in a fresh process using only compiler lock JSON", () => {
+    const source = "---\nengine: copilot\nmodel: copilot/claude-opus-5\n---\nBody";
+    const root = fixtureRepo({ ".github/workflows/main.md": source });
+    const { prepareMarkdownFixtures } = require("../../../scripts/markdown_metadata_test_adapter.cjs");
+    const metadata = prepareMarkdownFixtures(source);
+    fs.writeFileSync(path.join(root, ".github/workflows/main.lock.yml"), `# gh-aw-metadata: {}\n# gh-aw-manifest: ${JSON.stringify({ version: 1, markdown_metadata: metadata })}\n# generated\ninvalid: [yaml\n`);
+    const scriptDirectory = path.join(root, "actions/setup/js");
+    fs.mkdirSync(scriptDirectory, { recursive: true });
+    const originalDirectory = path.dirname(fileURLToPath(import.meta.url));
+    for (const name of fs.readdirSync(originalDirectory)) {
+      if (name.endsWith(".cjs") && !name.endsWith(".test.cjs")) fs.copyFileSync(path.join(originalDirectory, name), path.join(scriptDirectory, name));
+    }
+    const reflect = path.join(root, "reflect.json");
+    const output = path.join(root, "model-pins");
+    fs.writeFileSync(reflect, JSON.stringify(ddgReflect()));
+    const script = path.join(scriptDirectory, "model_pin_check.cjs");
+    expect(fs.existsSync(path.join(scriptDirectory, "markdown-metadata"))).toBe(false);
+    execFileSync(process.execPath, [script, "--reflect", reflect, "--out-dir", output, "--repo", root], { cwd: root, encoding: "utf8" });
+    const report = JSON.parse(fs.readFileSync(path.join(output, "model-pins.json"), "utf8"));
+    expect(report.errors).toEqual([]);
+    expect(report.counts.unresolvable).toBe(1);
+    expect(report.pins).toHaveLength(1);
+    expect(report.pins[0].configured).toBe("copilot/claude-opus-5");
+  });
+
   it("uses a standardized code for missing CLI configuration", () => {
     expect(() => main([])).toThrow(/^ERR_MODEL_PIN_REFLECT_REQUIRED:/);
   });

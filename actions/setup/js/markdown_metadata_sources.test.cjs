@@ -137,6 +137,6 @@ describe("compiler metadata source acquisition", () => {
     expect(result).not.toContain("engine: copilot");
     const info = JSON.parse(fs.readFileSync(path.join(workspace, "aw_info.json"), "utf8"));
     expect(info.run_id).toBe(123);
-    expect(info.markdown_metadata.records).toHaveLength(1);
+    expect(info.markdown_metadata.records).toHaveLength(2);
   });
 });

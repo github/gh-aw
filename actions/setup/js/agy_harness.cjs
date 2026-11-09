@@ -11,6 +11,11 @@ const { fetchAWFReflect, deriveBaseUrlFromModelsURL } = require("./awf_reflect.c
 const { resolveEngineModel } = require("./resolve_model_alias.cjs");
 const [command, ...commandArgs] = process.argv.slice(2);
 const log = message => process.stderr.write(`[agy-harness] ${message}\n`);
+const reportError = error => {
+  const message = error instanceof Error ? error.message : "Agy harness failed";
+  log(message);
+  process.stdout.write(JSON.stringify({ type: "session.error", data: { error: message } }) + "\n");
+};
 const maxPendingRecordLength = 16 * 1024 * 1024; // UTF-16 code units, including the record terminator.
 const checksums = {
   "1.3.1": "0e313b309ea58c71431ce86bb820936a3700e17e44eabce7bf2264617dc822db",
@@ -141,147 +146,163 @@ const main = async () => {
     const prompt = fs.readFileSync(promptPath, "utf8");
     const args = [...commandArgs, "--input-format", "stream-json", "--output-format", "stream-json", "--print-timeout", "5m", "--model", model, "--dangerously-skip-permissions"];
     log(`verified experimental Agy ${version}`);
-    await new Promise(
-      /** @param {(value?: void) => void} resolve */ (resolve, reject) => {
-        const child = spawn(binary, args, { cwd: env.GH_AW_ENGINE_CWD || workspace, env, detached: true, stdio: ["pipe", "pipe", "pipe"] });
-        const parser = new JsonlParser({ maxPendingRecordLength });
-        let outputFailure = "";
-        let stderrTail = "",
-          result,
-          invalid = false,
-          denied = false,
-          interrupted = false,
-          timedOut = false,
-          settled = false,
-          escalation,
-          drain;
-        const pendingTools = new Set();
-        const signalGroup = signal => {
-          if (!child.pid) return;
-          try {
-            process.kill(-child.pid, signal);
-          } catch (error) {
-            const code = error && typeof error === "object" && "code" in error ? String(error.code) : "unknown";
-            if (code !== "ESRCH") {
+    const decisionEnabled = Boolean(process.env.GH_AW_SKIP_IF_DECISION);
+    const runAttempt = () =>
+      new Promise(
+        /** @param {(value: import("./harness_retry_runner.cjs").HarnessAttemptResult) => void} resolve */ (resolve, reject) => {
+          const child = spawn(binary, args, { cwd: env.GH_AW_ENGINE_CWD || workspace, env, detached: true, stdio: ["pipe", "pipe", "pipe"] });
+          const parser = new JsonlParser({ maxPendingRecordLength });
+          let outputFailure = "";
+          let stderrTail = "",
+            result,
+            invalid = false,
+            denied = false,
+            interrupted = false,
+            timedOut = false,
+            settled = false,
+            escalation,
+            drain;
+          const pendingTools = new Set();
+          const signalGroup = signal => {
+            if (!child.pid) return;
+            try {
+              process.kill(-child.pid, signal);
+            } catch (error) {
+              const code = error && typeof error === "object" && "code" in error ? String(error.code) : "unknown";
+              if (code !== "ESRCH") {
+                invalid = true;
+                log(`Agy process group termination failed (${code})`);
+                child.kill(signal);
+              }
+            }
+          };
+          const terminate = signal => {
+            if (settled) return;
+            signalGroup(signal);
+            escalation ??= setTimeout(() => signalGroup("SIGKILL"), 1000);
+            drain ??= setTimeout(() => {
               invalid = true;
-              log(`Agy process group termination failed (${code})`);
-              child.kill(signal);
+              child.stdin.destroy();
+              child.stdout.destroy();
+              child.stderr.destroy();
+              complete(child.exitCode, child.signalCode);
+            }, 1500);
+          };
+          const onInterrupt = () => {
+            interrupted = true;
+            terminate("SIGINT");
+          };
+          const onTerminate = () => {
+            interrupted = true;
+            terminate("SIGTERM");
+          };
+          process.once("SIGINT", onInterrupt);
+          process.once("SIGTERM", onTerminate);
+          const timer = setTimeout(() => {
+            timedOut = true;
+            terminate("SIGTERM");
+          }, 305000);
+          const consume = entry => {
+            if (entry.type === "invalid") {
+              if (entry.reason === "blank") return;
+              invalid = true;
+              terminate("SIGTERM");
+              return;
             }
-          }
-        };
-        const terminate = signal => {
-          if (settled) return;
-          signalGroup(signal);
-          escalation ??= setTimeout(() => signalGroup("SIGKILL"), 1000);
-          drain ??= setTimeout(() => {
-            invalid = true;
-            child.stdin.destroy();
-            child.stdout.destroy();
-            child.stderr.destroy();
-            complete(child.exitCode, child.signalCode);
-          }, 1500);
-        };
-        const onInterrupt = () => {
-          interrupted = true;
-          terminate("SIGINT");
-        };
-        const onTerminate = () => {
-          interrupted = true;
-          terminate("SIGTERM");
-        };
-        process.once("SIGINT", onInterrupt);
-        process.once("SIGTERM", onTerminate);
-        const timer = setTimeout(() => {
-          timedOut = true;
-          terminate("SIGTERM");
-        }, 305000);
-        const consume = entry => {
-          if (entry.type === "invalid") {
-            if (entry.reason === "blank") return;
-            invalid = true;
-            terminate("SIGTERM");
-            return;
-          }
-          const event = entry.value;
-          if (!event || typeof event !== "object" || Array.isArray(event)) {
-            invalid = true;
-            terminate("SIGTERM");
-            return;
-          }
-          if (event.event === "result") result = event.result;
-          else if (event.status === "ERROR") result = event;
-          const step = event.step_update;
-          if (step?.step_type === "tool") {
-            if (step.state === "ACTIVE") pendingTools.add(step.step_index);
-            if (step.state === "DONE") pendingTools.delete(step.step_index);
-            if (/denied|permission|rejected/i.test(step.tool_info?.error?.type || "")) denied = true;
-          }
-        };
-        const consumeEvents = events => {
-          if (outputFailure) return;
-          try {
-            for (const event of events) consume(event);
-          } catch (error) {
-            if (!(error instanceof RangeError) || error.message !== "JSONL record exceeds maxPendingRecordLength") throw error;
-            outputFailure = `Agy output exceeds the pending JSONL record limit (${maxPendingRecordLength} UTF-16 code units)`;
-            invalid = true;
-            terminate("SIGTERM");
-          }
-        };
-        child.stdout.setEncoding("utf8").on("data", chunk => {
-          if (outputFailure) return;
-          process.stdout.write(chunk);
-          consumeEvents(parser.push(chunk));
-        });
-        child.stderr.setEncoding("utf8").on("data", chunk => {
-          stderrTail = (stderrTail + chunk).slice(-4096);
-          if (/soft[- ]denied|permission[^\n]*denied|requires approval/i.test(stderrTail)) denied = true;
-          process.stderr.write(chunk);
-        });
-        child.stdin.on("error", error => {
-          if (!("code" in error) || error.code !== "EPIPE") {
-            invalid = true;
-            terminate("SIGTERM");
-          }
-        });
-        const cleanup = () => {
-          signalGroup("SIGKILL");
-          clearTimeout(timer);
-          clearTimeout(escalation);
-          clearTimeout(drain);
-          process.removeListener("SIGINT", onInterrupt);
-          process.removeListener("SIGTERM", onTerminate);
-        };
-        child.once("error", () => {
-          if (settled) return;
-          settled = true;
-          cleanup();
-          reject(new Error("Agy executable could not be started"));
-        });
-        const complete = (code, signal) => {
-          if (settled) return;
-          settled = true;
-          cleanup();
-          consumeEvents(parser.finish());
-          const inferred =
-            Number.isSafeInteger(result?.num_turns) &&
-            result.num_turns > 0 &&
-            Number.isSafeInteger(result?.usage?.input_tokens) &&
-            result.usage.input_tokens > 0 &&
-            Number.isSafeInteger(result?.usage?.output_tokens) &&
-            result.usage.output_tokens > 0;
-          if (code !== 0 || signal || invalid || denied || interrupted || timedOut || pendingTools.size || result?.status !== "SUCCESS" || !inferred) {
-            if (result?.status === "SUCCESS") {
-              process.stdout.write(JSON.stringify({ event: "result", result: { ...result, status: "ERROR", error: outputFailure || "Agy run was denied, interrupted, or lacked completed inference" } }) + "\n");
+            const event = entry.value;
+            if (!event || typeof event !== "object" || Array.isArray(event)) {
+              invalid = true;
+              terminate("SIGTERM");
+              return;
             }
-            reject(new Error(outputFailure || "Agy run failed, was denied, interrupted, or lacked completed inference"));
-          } else resolve();
-        };
-        child.once("exit", () => terminate("SIGTERM"));
-        child.once("close", complete);
-        child.stdin.end(JSON.stringify({ event: "user", message: { content: prompt } }) + "\n");
-      }
-    );
+            if (event.event === "result") result = event.result;
+            else if (event.status === "ERROR") result = event;
+            const step = event.step_update;
+            if (step?.step_type === "tool") {
+              if (step.state === "ACTIVE") pendingTools.add(step.step_index);
+              if (step.state === "DONE") pendingTools.delete(step.step_index);
+              if (/denied|permission|rejected/i.test(step.tool_info?.error?.type || "")) denied = true;
+            }
+          };
+          const consumeEvents = events => {
+            if (outputFailure) return;
+            try {
+              for (const event of events) consume(event);
+            } catch (error) {
+              if (!(error instanceof RangeError) || error.message !== "JSONL record exceeds maxPendingRecordLength") throw error;
+              outputFailure = `Agy output exceeds the pending JSONL record limit (${maxPendingRecordLength} UTF-16 code units)`;
+              invalid = true;
+              terminate("SIGTERM");
+            }
+          };
+          child.stdout.setEncoding("utf8").on("data", chunk => {
+            if (outputFailure) return;
+            process.stdout.write(chunk);
+            consumeEvents(parser.push(chunk));
+          });
+          child.stderr.setEncoding("utf8").on("data", chunk => {
+            stderrTail = (stderrTail + chunk).slice(-4096);
+            if (/soft[- ]denied|permission[^\n]*denied|requires approval/i.test(stderrTail)) denied = true;
+            process.stderr.write(chunk);
+          });
+          child.stdin.on("error", error => {
+            if (!("code" in error) || error.code !== "EPIPE") {
+              invalid = true;
+              terminate("SIGTERM");
+            }
+          });
+          const cleanup = () => {
+            signalGroup("SIGKILL");
+            clearTimeout(timer);
+            clearTimeout(escalation);
+            clearTimeout(drain);
+            process.removeListener("SIGINT", onInterrupt);
+            process.removeListener("SIGTERM", onTerminate);
+          };
+          const failAttempt = (error, code) => {
+            if (!decisionEnabled || interrupted) {
+              reject(error);
+              return;
+            }
+            reportError(error);
+            resolve({ exitCode: Number.isSafeInteger(code) && code !== 0 ? code : 1, output: "", hasOutput: true });
+          };
+          child.once("error", () => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            failAttempt(new Error("Agy executable could not be started"), null);
+          });
+          const complete = (code, signal) => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            consumeEvents(parser.finish());
+            const inferred =
+              Number.isSafeInteger(result?.num_turns) &&
+              result.num_turns > 0 &&
+              Number.isSafeInteger(result?.usage?.input_tokens) &&
+              result.usage.input_tokens > 0 &&
+              Number.isSafeInteger(result?.usage?.output_tokens) &&
+              result.usage.output_tokens > 0;
+            if (code !== 0 || signal || invalid || denied || interrupted || timedOut || pendingTools.size || result?.status !== "SUCCESS" || !inferred) {
+              if (result?.status === "SUCCESS") {
+                process.stdout.write(JSON.stringify({ event: "result", result: { ...result, status: "ERROR", error: outputFailure || "Agy run was denied, interrupted, or lacked completed inference" } }) + "\n");
+              }
+              failAttempt(new Error(outputFailure || "Agy run failed, was denied, interrupted, or lacked completed inference"), code);
+            } else resolve({ exitCode: 0, output: "", hasOutput: true });
+          };
+          child.once("exit", () => terminate("SIGTERM"));
+          child.once("close", complete);
+          child.stdin.end(JSON.stringify({ event: "user", message: { content: prompt } }) + "\n");
+        }
+      );
+    if (decisionEnabled) {
+      const run = await require("./harness_retry_runner.cjs").runSingleHarnessInvocation({ runAttempt, harnessName: "Agy harness", log });
+      process.exitCode = run.exitCode;
+    } else {
+      await runAttempt();
+    }
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -289,9 +310,7 @@ const main = async () => {
 
 if (require.main === module) {
   main().catch(error => {
-    const message = error instanceof Error ? error.message : "Agy harness failed";
-    log(message);
-    process.stdout.write(JSON.stringify({ type: "session.error", data: { error: message } }) + "\n");
+    reportError(error);
     process.exitCode = 1;
   });
 }

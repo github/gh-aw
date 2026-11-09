@@ -43,20 +43,25 @@ function createLiteralValues(state = { version: 1, prefix: `\x00VALUE_${randomUU
  * @param {(text: string) => string} restore
  */
 function restoreInlineMetadata(content, restore) {
-  const match = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*\r?(?=\n|$)/.exec(content);
-  if (!match) {
+  const { editMarkdownMetadata, transformValues, markdownMetadataBlocks } = require("./markdown_metadata.cjs");
+  const block = markdownMetadataBlocks(content, true)[0];
+  if (!block) {
     const rendered = restore(content);
     // A restored body must not manufacture frontmatter for the engine's reader.
-    if (!/^---[ \t]*\r?(?=\n|$)/.test(content) && /^---[ \t]*\r?(?=\n|$)/.test(rendered)) {
-      return `---\n{}\n---\n${rendered}`;
+    const startsHeader = (/** @type {string} */ text) =>
+      text
+        .replace(/^\uFEFF/, "")
+        .split(/\r?\n/, 1)[0]
+        .trim() === "---";
+    if (!startsHeader(content) && startsHeader(rendered)) {
+      return editMarkdownMetadata(`---\n\n---\n${rendered}`, () => ({}));
     }
     return rendered;
   }
-  const { editMarkdownMetadata, transformValues } = require("./markdown_metadata.cjs");
   const rendered = editMarkdownMetadata(content, metadata => transformValues(metadata, restore));
-  const renderedMatch = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*\r?(?=\n|$)/.exec(rendered);
-  if (!renderedMatch || restore(renderedMatch[1]) !== renderedMatch[1]) throw new Error(`${ERR_VALIDATION}: Evaluated inline metadata must be a scalar value`);
-  return rendered.slice(0, renderedMatch[0].length) + restore(rendered.slice(renderedMatch[0].length));
+  const renderedBlock = markdownMetadataBlocks(rendered, true)[0];
+  if (!renderedBlock || restore(renderedBlock.source.replaceAll("\\u0000", "\x00")) !== renderedBlock.source.replaceAll("\\u0000", "\x00")) throw new Error(`${ERR_VALIDATION}: Evaluated inline metadata must be a scalar value`);
+  return rendered.slice(0, renderedBlock.end) + restore(rendered.slice(renderedBlock.end));
 }
 
 /** @param {string} file */

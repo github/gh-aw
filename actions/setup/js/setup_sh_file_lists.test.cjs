@@ -53,7 +53,19 @@ describe("setup.sh Copilot runtime files", () => {
         process.execPath,
         [
           "-e",
-          `const assert = require("node:assert/strict"); const {readMarkdownMetadata} = require("./markdown_metadata.cjs"); assert.throws(() => readMarkdownMetadata("agent", "---\\nmodel: __uncompiled_probe__\\n---\\nBody")); process.stdout.write(JSON.stringify(readMarkdownMetadata("agent", "---\\n" + JSON.stringify({model: "small", description: "Read files"}) + "\\n---\\nBody").value));`,
+          `
+            const assert = require("node:assert/strict");
+            const { createHash } = require("node:crypto");
+            const { readMarkdownMetadata, installMarkdownMetadata } = require("./markdown_metadata.cjs");
+            const value = { model: "small", description: "Read files" };
+            const source = JSON.stringify(value);
+            assert.throws(() => readMarkdownMetadata("agent", "---\\nmodel: __uncompiled_probe__\\n---\\nBody"));
+            installMarkdownMetadata({
+              version: 1,
+              records: [{ sha256: createHash("sha256").update(source).digest("hex"), kind: "artifact", value_json: source }],
+            });
+            process.stdout.write(JSON.stringify(readMarkdownMetadata("agent", "---\\n" + source + "\\n---\\nBody").value));
+          `,
         ],
         { cwd: directory, encoding: "utf8" }
       );

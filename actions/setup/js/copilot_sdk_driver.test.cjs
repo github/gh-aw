@@ -5,6 +5,7 @@ import * as path from "path";
 
 const require = createRequire(import.meta.url);
 const { runWithCopilotSDK, parsePermissionConfigFromServerArgs } = require("./copilot_sdk_driver.cjs");
+const { WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE } = require("./permission_denied_helpers.cjs");
 const { normalizeCopilotSession } = require("./copilot_session.cjs");
 
 describe("copilot_sdk_driver.cjs", () => {
@@ -1671,7 +1672,7 @@ describe("copilot_sdk_driver.cjs", () => {
           },
         });
 
-        expect(result.exitCode).toBe(1);
+        expect(result.exitCode).toBe(WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE);
         expect(result.output).toContain("max tool denials threshold reached");
         expect(disconnect).toHaveBeenCalled();
         const parsedEvents = stderrWriteSpy.mock.calls
@@ -1802,7 +1803,7 @@ describe("copilot_sdk_driver.cjs", () => {
           },
         });
 
-        expect(result.exitCode).toBe(1);
+        expect(result.exitCode).toBe(WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE);
         expect(result.output).toContain("max tool denials threshold reached");
       } finally {
         if (oldMaxToolDenials === undefined) {
@@ -1863,7 +1864,7 @@ describe("copilot_sdk_driver.cjs", () => {
         });
         const elapsedMs = Date.now() - startedAt;
 
-        expect(result.exitCode).toBe(1);
+        expect(result.exitCode).toBe(WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE);
         expect(result.output).toContain("max tool denials threshold reached");
         // Bounded by the denial-guard force-exit timeout plus the cleanup timeout,
         // not by the (unreached) 10-minute sendAndWait default or a hosted job timeout.

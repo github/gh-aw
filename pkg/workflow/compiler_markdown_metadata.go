@@ -9,7 +9,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 
@@ -28,8 +27,6 @@ type GHAWMarkdownMetadata struct {
 	Version int                          `json:"version"`
 	Records []GHAWMarkdownMetadataRecord `json:"records"`
 }
-
-var markdownMetadataBlock = regexp.MustCompile(`(?m)(?:\A|^##[ \t]+(?:agent|skill):[^\n]*\n(?:[ \t]*\n)*)---[ \t]*\n([\s\S]*?)\n---[ \t]*(?:\n|$)`)
 
 // collectMarkdownMetadata records author syntax before expression substitution.
 // The source is an exact lookup key, so stale repository files cannot acquire
@@ -92,15 +89,19 @@ func addMarkdownMetadataRecord(records map[string]GHAWMarkdownMetadataRecord, so
 
 func scanMarkdownMetadata(records map[string]GHAWMarkdownMetadataRecord, content, documentKind string) {
 	content = strings.ReplaceAll(content, "\r\n", "\n")
-	for _, match := range markdownMetadataBlock.FindAllStringSubmatch(content, -1) {
-		if len(match) < 2 {
-			continue
-		}
+	for _, block := range parser.ExtractMarkdownMetadataBlocks(content) {
 		kind := "artifact"
-		if strings.HasPrefix(match[0], "---") { //nolint:uncheckedsliceindex // The regexp capture count is checked above.
+		if block.Document {
 			kind = documentKind
 		}
-		addMarkdownMetadataRecord(records, match[1], kind) //nolint:uncheckedsliceindex // The regexp capture count is checked above.
+		addMarkdownMetadataRecord(records, block.Source, kind)
+		if block.Error != "" {
+			hash := sha256.Sum256([]byte(block.Source))
+			key := kind + ":" + hex.EncodeToString(hash[:])
+			record := records[key]
+			record.Error = block.Error
+			records[key] = record
+		}
 	}
 }
 

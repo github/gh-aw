@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 
 const { preparePiSubagents } = await import("./pi_subagent_config.cjs");
+const { prepareMarkdownFixtures } = await import("../../../scripts/markdown_metadata_test_adapter.cjs");
 const reflectFixtures = await import("./fixtures/model_resolution_reflect.cjs");
 let dir;
 let frontmatter;
@@ -25,7 +26,9 @@ afterEach(() => {
 });
 
 const prepare = overrides => {
-  fs.writeFileSync(path.join(dir, "agents/reader.md"), `---\n${JSON.stringify(frontmatter)}\n---\nRead the requested file.`);
+  const content = `---\n${JSON.stringify(frontmatter)}\n---\nRead the requested file.`;
+  prepareMarkdownFixtures(content);
+  fs.writeFileSync(path.join(dir, "agents/reader.md"), content);
   return preparePiSubagents({ agentDir: dir, sdk: {}, provider: "github-copilot", catalog, gateway: true, parentModel: "github-copilot/gpt-5.6-luna", ...overrides });
 };
 
