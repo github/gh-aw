@@ -77,7 +77,12 @@ credential-free placeholders; neither step-level staging overrides nor
 available, but their outputs are empty and dependent jobs may be skipped.
 Reusable output bindings and self-hosted runner policy remain valid without
 retaining original executable targets or matrix-dependent runner expressions.
-Host steps (`steps`, `pre-steps`, `pre-agent-steps`, `post-steps`, `on.steps`,
+Authored `steps` and `post-steps` are accepted but their code and credentials
+are omitted from dry-run locks before job construction and token wiring.
+Separate dispatch cannot execute them; review the reduced coverage from missing
+setup and cleanup. The agent and compiler-owned steps still execute on an
+authorized live test.
+Other host steps (`pre-steps`, `pre-agent-steps`, `on.steps`,
 safe-output/threat-detection/secret-masking steps, and unsafe built-in job
 overrides), custom MCP servers, `mcp-scripts`, custom safe-output scripts/actions,
 enabled Bash graders, and authored OIDC permissions (including safe-output

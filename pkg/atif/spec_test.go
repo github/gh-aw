@@ -71,7 +71,7 @@ func TestSpec_PublicAPI_ConvertRejectsInvalidInput(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			trajectory, err := atif.Convert(context.Background(), strings.NewReader(tt.input))
-			assert.Error(t, err, "Convert should reject %s per the README error-handling contract", tt.name)
+			require.Error(t, err, "Convert should reject %s per the README error-handling contract", tt.name)
 			assert.Nil(t, trajectory, "Convert should not return a trajectory for %s", tt.name)
 		})
 	}
@@ -84,7 +84,7 @@ func TestSpec_PublicAPI_ConvertEnforcesInputLimit(t *testing.T) {
 
 	trajectory, err := atif.Convert(context.Background(), input)
 
-	assert.Error(t, err, "Convert should reject input larger than MaxSessionBytes")
+	require.Error(t, err, "Convert should reject input larger than MaxSessionBytes")
 	assert.Nil(t, trajectory, "Convert should not return a trajectory for oversized input")
 }
 

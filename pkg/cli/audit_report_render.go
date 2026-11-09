@@ -529,6 +529,9 @@ func renderConsoleWarnings(warnings []ValidationIssue) {
 }
 
 func renderConsoleOperationalSections(data AuditData) {
+	if err := renderDurableSession(os.Stderr, data.DurableSession); err != nil {
+		auditReportLog.Printf("Failed to render durable session evidence: %v", err)
+	}
 	renderConsoleWorkQueue(data.WorkQueue)
 	renderConsoleSkillActivations(data.SkillActivations)
 	renderConsoleGatewaySteeringEvents(data.GatewaySteeringEvents)

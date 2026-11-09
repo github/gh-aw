@@ -2,8 +2,9 @@
 //
 // # Run Scripts
 //
-// By default, the runtime manager adds --ignore-scripts to generated npm install
-// commands to prevent pre/post install scripts from executing. This is a supply
+// By default, generated Node.js runtime and engine npm installs disable scripts
+// using NPM_CONFIG_IGNORE_SCRIPTS for global installs or --ignore-scripts for local
+// installs to prevent pre/post install scripts from executing. This is a supply
 // chain security measure: malicious packages can use install hooks to exfiltrate
 // secrets or corrupt the runner environment.
 //
@@ -11,9 +12,10 @@
 // in their workflow frontmatter. This emits a security warning in non-strict mode and
 // is rejected as an error in strict mode.
 //
-// # Supported Flags (by package manager)
+// # Script Suppression (by package manager)
 //
-//   - npm / yarn / pnpm: --ignore-scripts
+//   - npm: NPM_CONFIG_IGNORE_SCRIPTS (global installs) / --ignore-scripts (local installs)
+//   - yarn / pnpm: --ignore-scripts
 //   - pip / uv: no pre/post install lifecycle scripts (N/A)
 //   - go / gem / bundle / dotnet / elixir / haskell / java / ruby: N/A
 //

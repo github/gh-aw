@@ -24,6 +24,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/excessivefuncparams"
 	"github.com/github/gh-aw/pkg/linters/execcommandwithoutcontext"
 	"github.com/github/gh-aw/pkg/linters/fileclosenotdeferred"
+	"github.com/github/gh-aw/pkg/linters/filepathwalkpreferwalkdir"
 	"github.com/github/gh-aw/pkg/linters/fmterrorfnoverbs"
 	"github.com/github/gh-aw/pkg/linters/formatintitoa"
 	"github.com/github/gh-aw/pkg/linters/fprintferrorunchecked"
@@ -129,6 +130,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	execcommandwithoutcontext.Analyzer,
 	excessivefuncparams.Analyzer,
 	fileclosenotdeferred.Analyzer,
+	filepathwalkpreferwalkdir.Analyzer,
 	fmterrorfnoverbs.Analyzer,
 	formatintitoa.Analyzer,
 	fprintferrorunchecked.Analyzer,

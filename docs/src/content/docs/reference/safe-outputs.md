@@ -109,7 +109,7 @@ The tables below summarize the built-in safe output handlers. `noop`, `report-mi
 | Output | Key | Description |
 |--------|-----|-------------|
 | [Create Issue](#issue-creation-create-issue) | `create-issue` | Create GitHub issues (max: 1) |
-| [Update Issue](#issue-updates-update-issue) | `update-issue` | Update issue status, title, or body (max: 1) |
+| [Update Issue](#issue-updates-update-issue) | `update-issue` | Update issue properties or artifacts (max: 1) |
 | [Close Issue](#close-issue-close-issue) | `close-issue` | Close issues with comment (max: 1) |
 | [Link Sub-Issue](#link-sub-issue-link-sub-issue) | `link-sub-issue` | Link issues as sub-issues (max: 1) |
 | [Create Discussion](#discussion-creation-create-discussion) | `create-discussion` | Create GitHub discussions (max: 1) |
@@ -817,8 +817,26 @@ When using `target: "*"`, the agent must provide `issue_number` or `item_number`
 - `replace`: Completely replaces existing body with new content and attribution
 - `replace-island`: Updates a specific section marked with HTML comments
 
-Agent output format: `{"type": "update_issue", "issue_number": 123, "operation": "append", "body": "..."}`. The `operation` field is optional (defaults to `append`). Each call must include at least one update field: `status`, `title`, `body`, `labels`, `assignees`, or `milestone`; an issue number or operation alone is rejected. Set `milestone` to `null` to clear the issue's milestone; omitting `milestone` leaves it unchanged.
+Agent output format: `{"type": "update_issue", "issue_number": 123, "operation": "append", "body": "..."}`. The `operation` field is optional (defaults to `append`). Each call must include at least one update field: `status`, `title`, `body`, `labels`, `assignees`, `milestone`, or `artifacts`; an issue number or operation alone is rejected. Set `milestone` to `null` to clear the issue's milestone; omitting `milestone` leaves it unchanged.
 For issue field updates, use [`set_issue_field`](#set-issue-field-set-issue-field).
+
+#### Updating Issue Artifacts
+
+`update_issue` accepts the same [artifact inputs](#issue-artifacts) as `create_issue`: a `name`, exactly one of inline `body` or absolute `path`, and an optional `type` (default: `generic`). An artifact-only call leaves the issue body unchanged.
+
+```yaml wrap
+safe-outputs:
+  update-issue:
+    target: triggering
+    max-issue-artifacts: 3       # per-call limit (default: 10; <=0 disables)
+    max-issue-artifact-size: 1mb # per-artifact UTF-8 bytes (default: 1 MB)
+```
+
+Agent output: `{"type":"update_issue","artifacts":[{"name":"Plan","type":"plan","body":"Implementation plan"}]}`.
+
+Artifacts are matched by exact, case-sensitive sanitized name on the target issue. A new name creates an artifact; a matching name updates that artifact and adds a version rather than creating a duplicate. If duplicate names already exist, the lowest-numbered artifact is updated. The type must match the existing artifact because the API cannot change it.
+
+The same path guards, sanitization, and pre- and post-sanitization size checks as `create_issue` apply. Target authorization, required filters, cross-repository restrictions, and credentials also apply to artifacts. Staged mode makes no artifact API calls. Attachment failures report the target issue's number and URL and the count already attached or updated; prior issue edits and artifact writes are not rolled back, and the entire update is not retried.
 
 ### Pull Request Updates (`update-pull-request:`)
 
@@ -1996,6 +2014,8 @@ When the Actions jobs API confirms that the entire run has no jobs, failure repo
 Without a more specific runtime failure, the failure classification is `missing_terminal_safe_output`, not an inferred engine outage or budget exhaustion. Incompletion descriptions contain only inferred runtime status and validated error codes: driver exit status, last tool status, failed-tool counts, token and LLM-invocation exhaustion signals, and safe-output tool registration. Registration prefers a valid setup cache, falling back to the archived gateway snapshot when the cache is missing, unreadable, or invalid; neither proves continued availability. A recorded gateway zero-tools flag overrides registration evidence as unavailable; an unreadable flag makes availability unknown. CLI attempt counts and gateway request counts are reported separately because one invocation can appear in both. Persistence reports whether the output file is missing, empty, nonempty, or unreadable, with record and malformed-record counts; it does not establish validation or publication.
 
 Explicit `report_incomplete` signals also include registration, call-count, and persistence evidence, even alongside ordinary safe outputs. They are not reclassified as missing terminal output. Failure issues, follow-up comments, and run summaries can include a bounded, secret-redacted agent-declared reason labeled unverified; summaries are also written when failure-issue reporting is disabled. A reason matching a trusted collector cause is presented only as runtime-derived classification. Agent tool names, commands, arguments, results, schemas, and diagnostic/error text remain excluded, even when they contain no recognized secrets. Reasons are omitted from summaries when secret redaction fails. Missing evidence is reported as unknown or not recorded, and malformed call logs are marked as partial evidence.
+
+Within the failure-report reuse window, incomplete runs reuse an open, unexpired issue for the same workflow and classified runtime cause. Without a classified cause, matching uses the failure categories but ignores supplemental `missing_tool` and `missing_data` categories when `report_incomplete` is present. Other failure categories remain distinct. Each follow-up retains its own reported reason and diagnostics; the full category set still applies to reporting filters.
 
 **Use case: Suppress transient infrastructure failures**
 

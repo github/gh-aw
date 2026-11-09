@@ -4,11 +4,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 const fs = require("node:fs");
 const path = require("node:path");
-const os = require("node:os");
-const { createHash } = require("node:crypto");
-const { selectCheckpoint, restoreCheckpoint, validateCheckpoint } = require("./durable_artifact.cjs");
+const { selectCheckpoint, restoreCheckpoint } = require("./durable_artifact.cjs");
 const { stageFiles } = require("./durable_files.cjs");
-const { SOURCE, VERSION } = require("./pi_durable_checkpoint.cjs");
 const directories = [];
 
 afterEach(() => {
@@ -22,7 +19,7 @@ function fixture() {
   vi.stubEnv("GITHUB_RUN_ATTEMPT", "1");
   const current = { id: 200, workflow_id: 42, run_number: 20, head_branch: "feature", repository: { id: 1 }, head_repository: { id: 1 }, status: "in_progress", event: "workflow_dispatch" };
   const parent = { ...structuredClone(current), id: 100, run_number: 19, status: "completed", conclusion: "success" };
-  const core = { setOutput: vi.fn(), info: vi.fn() };
+  const core = { setOutput: vi.fn(), info: vi.fn(), warning: vi.fn() };
   const github = {
     rest: {
       actions: {
@@ -153,7 +150,7 @@ describe("durable artifact lineage", () => {
 describe("single-step durable restoration", () => {
   function restoreFixture(engine = "gemini") {
     const options = fixture();
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "durable-restore-test-"));
+    const root = fs.mkdtempSync(path.resolve(".durable-restore-test-"));
     directories.push(root);
     const session = path.join(root, "sessions/state.jsonl");
     fs.mkdirSync(path.dirname(session), { recursive: true });
@@ -167,10 +164,16 @@ describe("single-step durable restoration", () => {
     fs.unlinkSync(session);
     const promptFile = path.join(root, "prompt.txt");
     fs.writeFileSync(promptFile, "Current task");
+    const userPromptFile = path.join(root, "user.txt");
+    const systemPromptFile = path.join(root, "system.txt");
+    if (engine === "pi") {
+      fs.writeFileSync(userPromptFile, "Current task");
+      fs.writeFileSync(systemPromptFile, "Current system instructions");
+    }
     const artifactClient = {
       downloadArtifact: vi.fn(async (_id, { path: destination }) => fs.cpSync(saved, destination, { recursive: true })),
     };
-    return { ...options, root, session, promptFile, saved, artifactClient, token: "test-download-token" };
+    return { ...options, root, session, promptFile, userPromptFile, systemPromptFile, saved, artifactClient, token: "test-download-token" };
   }
 
   it("starts fresh without a download, file restore, or prompt rewrite", async () => {
@@ -181,6 +184,8 @@ describe("single-step durable restoration", () => {
     expect(fs.existsSync(options.session)).toBe(false);
     expect(fs.readFileSync(options.promptFile, "utf8")).toBe("Current task");
     expect(options.core.setOutput).not.toHaveBeenCalledWith("restored", "true");
+    const record = JSON.parse(fs.readFileSync(path.join(options.root, "durable-session.jsonl"), "utf8"));
+    expect(record).toMatchObject({ type: "durable.restore", data: { status: "fresh", runId: "200" } });
   });
 
   it.each(["copilot", "claude", "codex", "gemini", "agy", "pi", "imported-engine"])("downloads and validates %s state before enabling continuation", async engine => {
@@ -193,21 +198,86 @@ describe("single-step durable restoration", () => {
     expect(fs.readFileSync(options.session, "utf8")).toBe("previous task state");
     expect(options.core.setOutput).toHaveBeenCalledWith("parent-run-id", "100");
     expect(options.core.setOutput).toHaveBeenLastCalledWith("restored", "true");
-    const prompt = fs.readFileSync(options.promptFile, "utf8");
-    if (engine === "pi" || engine === "imported-engine") expect(prompt).toBe("Current task");
+    const record = JSON.parse(fs.readFileSync(path.join(options.root, "durable-session.jsonl"), "utf8"));
+    expect(record).toMatchObject({ type: "durable.restore", data: { status: "restored", parentRunId: "100", artifactId: "999" } });
+    expect(JSON.stringify(record)).not.toContain("previous task state");
+    const prompt = fs.readFileSync(engine === "pi" ? options.userPromptFile : options.promptFile, "utf8");
+    if (engine === "imported-engine") expect(prompt).toBe("Current task");
     else {
       expect(prompt).toContain("untrusted historical data");
       expect(prompt.endsWith("Current task")).toBe(true);
     }
+    if (engine === "pi") {
+      expect(fs.readFileSync(options.promptFile, "utf8")).toBe("Current task");
+      expect(fs.readFileSync(options.systemPromptFile, "utf8")).toBe("Current system instructions");
+    }
+  });
+
+  it("uses an explicitly configured Pi user prompt without changing the raw or system prompt", async () => {
+    const options = restoreFixture("pi");
+    const userPromptFile = path.join(options.root, "custom-user.txt");
+    fs.writeFileSync(userPromptFile, "Current split workflow task");
+    vi.stubEnv("GH_AW_PI_USER_PROMPT", userPromptFile);
+    await restoreCheckpoint(options);
+    const prompt = fs.readFileSync(userPromptFile, "utf8");
+    expect(prompt).toContain("untrusted historical data");
+    expect(prompt).toContain("The harness resumes your exact native session");
+    expect(prompt.endsWith("Current split workflow task")).toBe(true);
+    expect(fs.readFileSync(options.userPromptFile, "utf8")).toBe("Current task");
+    expect(fs.readFileSync(options.promptFile, "utf8")).toBe("Current task");
+    expect(fs.readFileSync(options.systemPromptFile, "utf8")).toBe("Current system instructions");
+  });
+
+  it("does not rewrite a first-run Pi split prompt when no checkpoint exists", async () => {
+    const options = restoreFixture("pi");
+    options.github.rest.actions.listWorkflowRuns.mockResolvedValue({ data: { workflow_runs: [] } });
+    await restoreCheckpoint(options);
+    expect(fs.readFileSync(options.userPromptFile, "utf8")).toBe("Current task");
+    expect(fs.readFileSync(options.systemPromptFile, "utf8")).toBe("Current system instructions");
+    expect(options.core.setOutput).not.toHaveBeenCalledWith("restored", "true");
+  });
+
+  it("fails closed when Pi's consumed split prompt is missing, without rewriting the raw prompt", async () => {
+    const options = restoreFixture("pi");
+    fs.unlinkSync(options.userPromptFile);
+    await expect(restoreCheckpoint(options)).rejects.toThrow("ENOENT");
+    expect(fs.readFileSync(options.promptFile, "utf8")).toBe("Current task");
+    expect(options.core.setOutput).not.toHaveBeenCalledWith("restored", "true");
   });
 
   it("fails without restoring files or enabling continuation when download authorization fails", async () => {
     const options = restoreFixture();
     options.artifactClient.downloadArtifact.mockRejectedValue(new Error("403 forbidden"));
     await expect(restoreCheckpoint(options)).rejects.toThrow("403 forbidden");
+    expect(JSON.parse(fs.readFileSync(path.join(options.root, "durable-session.jsonl"), "utf8")).data.status).toBe("failed");
     expect(fs.existsSync(options.session)).toBe(false);
     expect(fs.readFileSync(options.promptFile, "utf8")).toBe("Current task");
     expect(options.core.setOutput).not.toHaveBeenCalledWith("restored", "true");
+  });
+
+  it.each(["fresh", "restored", "failed"])("keeps the %s restore outcome when metadata I/O fails", async status => {
+    const options = restoreFixture();
+    const target = path.join(options.root, "durable-session.jsonl");
+    fs.mkdirSync(target);
+    const error = new Error("original download error");
+    if (status === "fresh") options.github.rest.actions.listWorkflowRuns.mockResolvedValue({ data: { workflow_runs: [] } });
+    if (status === "failed") options.artifactClient.downloadArtifact.mockRejectedValue(error);
+    if (status === "failed") await expect(restoreCheckpoint(options)).rejects.toBe(error);
+    else await expect(restoreCheckpoint(options)).resolves.toBeUndefined();
+    expect(options.core.warning).toHaveBeenCalledTimes(1);
+    expect(options.core.warning).toHaveBeenCalledWith("Durable session metadata could not be recorded; continuation evidence is unavailable.");
+    expect(fs.existsSync(options.session)).toBe(status === "restored");
+    if (status === "restored") expect(options.core.setOutput).toHaveBeenCalledWith("restored", "true");
+    else expect(options.core.setOutput).not.toHaveBeenCalledWith("restored", "true");
+  });
+
+  it("does not fail a successful restore when recording metadata is invalid", async () => {
+    const options = restoreFixture("invalid/engine");
+    await expect(restoreCheckpoint(options)).resolves.toBeUndefined();
+    expect(options.core.setOutput).toHaveBeenCalledWith("restored", "true");
+    expect(fs.existsSync(options.session)).toBe(true);
+    expect(fs.existsSync(path.join(options.root, "durable-session.jsonl"))).toBe(false);
+    expect(options.core.warning).toHaveBeenCalledTimes(1);
   });
 
   it("rejects damaged downloaded state before touching the prompt or enabling continuation", async () => {
@@ -225,46 +295,5 @@ describe("single-step durable restoration", () => {
     fs.unlinkSync(options.promptFile);
     await expect(restoreCheckpoint(options)).rejects.toThrow("ENOENT");
     expect(options.core.setOutput).not.toHaveBeenCalledWith("restored", "true");
-  });
-});
-
-describe("durable artifact publication", () => {
-  function checkpointFixture() {
-    vi.stubEnv("GH_AW_DURABLE_CHECKPOINT", "/tmp/gh-aw/agent/durable/pi-durable-continuable.json");
-    vi.stubEnv("GH_AW_DURABLE_ENGINE", "pi");
-    const content = '{"seq":1}\n';
-    const checkpoint = {
-      source: SOURCE,
-      packageVersion: VERSION,
-      contractVersion: 1,
-      scope: "pi-durable-continuable",
-      storage: "artifact",
-      files: { "main.jsonl": content },
-      hashes: { "main.jsonl": createHash("sha256").update(content).digest("hex") },
-    };
-    vi.spyOn(fs, "existsSync").mockReturnValue(true);
-    vi.spyOn(fs, "lstatSync").mockReturnValue({ isFile: () => true, isSymbolicLink: () => false });
-    vi.spyOn(fs, "readFileSync").mockImplementation(() => JSON.stringify(checkpoint));
-    const core = { setOutput: vi.fn(), info: vi.fn() };
-    return { checkpoint, core };
-  }
-
-  it("publishes only a valid complete checkpoint", () => {
-    const { core } = checkpointFixture();
-    validateCheckpoint({ core });
-    expect(core.setOutput).toHaveBeenCalledWith("present", "true");
-  });
-
-  it("rejects a checkpoint modified by secret redaction", () => {
-    const { checkpoint, core } = checkpointFixture();
-    checkpoint.files["main.jsonl"] = '{"seq":"***"}\n';
-    expect(() => validateCheckpoint({ core })).toThrow("damaged or redacted");
-    expect(core.setOutput).not.toHaveBeenCalled();
-  });
-
-  it("rejects symlink checkpoints", () => {
-    const { core } = checkpointFixture();
-    fs.lstatSync.mockReturnValue({ isFile: () => false, isSymbolicLink: () => true });
-    expect(() => validateCheckpoint({ core })).toThrow("regular files");
   });
 });

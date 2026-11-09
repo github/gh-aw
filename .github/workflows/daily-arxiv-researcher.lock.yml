@@ -781,8 +781,9 @@ jobs:
           node-version: '24'
           package-manager-cache: false
       - name: Install Codex CLI
-        run: npm install --ignore-scripts -g @openai/codex@0.166.0
+        run: npm install -g @openai/codex@0.166.0
         env:
+          NPM_CONFIG_IGNORE_SCRIPTS: 'true'
           NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Install AWF binary
         env:
@@ -1465,17 +1466,12 @@ jobs:
         if: always() && steps.stage_durable_files.outcome == 'success' && steps.stage_durable_files.outputs.present == 'true' && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          GH_AW_DURABLE_CHECKPOINT: "/tmp/gh-aw/agent/durable/pi-durable-daily-arxiv-researcher.json"
           GH_AW_DURABLE_ENGINE: "codex"
           GH_AW_DURABLE_FILES: "[\"/tmp/gh-aw/agent/durable-sessions/codex/session.json\",\"/tmp/gh-aw/agent/durable-sessions/codex/sessions\",\"/tmp/gh-aw/agent/durable-sessions/codex/archived_sessions\"]"
         with:
           script: |
             const path = require('path');
             const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { validateCheckpoint } = require(path.join(actionsDir, 'durable_artifact.cjs'));
-            const { exportDurableTelemetry } = require(path.join(actionsDir, 'pi_durable_telemetry.cjs'));
-            await exportDurableTelemetry();
-            if (process.env.GH_AW_DURABLE_ENGINE === 'pi') validateCheckpoint({ core });
             const { validateFiles } = require(path.join(actionsDir, 'durable_files.cjs'));
             validateFiles({ core });
       - name: Upload durable checkpoint artifact
@@ -1648,7 +1644,7 @@ jobs:
           GH_AW_OBJECT_PACK_MAX_OBJECTS: ${{ vars.GH_AW_OBJECT_PACK_MAX_OBJECTS }}
           GH_AW_OBJECT_PACK_TIMEOUT_MS: ${{ vars.GH_AW_OBJECT_PACK_TIMEOUT_MS }}
           GH_AW_OBJECT_PACK_FETCH_DEPTHS: ${{ vars.GH_AW_OBJECT_PACK_FETCH_DEPTHS }}
-          GH_AW_RECOVERY_ADDITIONAL_ROOTS: '["/tmp/gh-aw/aw-prompts/prompt.txt","/tmp/gh-aw/agent/durable-otel.jsonl","/tmp/gh-aw/agent_execution.json","/tmp/gh-aw/agent_execution_exit_code.txt","/tmp/gh-aw/agent-session.jsonl","/tmp/gh-aw/agent-errors.jsonl","/tmp/gh-aw/aw-prompts/user.txt","/tmp/gh-aw/aw-prompts/system.txt","/tmp/gh-aw/skill_inventory.json","/tmp/gh-aw/mcp-config/logs/","/tmp/gh-aw/redacted-urls.log","/tmp/gh-aw/mcp-logs/","/tmp/gh-aw/agent_usage.json","/tmp/gh-aw/agent/model-resolution.json","/tmp/gh-aw/agent-stdio.log","/tmp/gh-aw/agent/harness_retry.json","/tmp/gh-aw/pre-agent-audit.txt","/tmp/gh-aw/github_rate_limits.jsonl","/tmp/gh-aw/otel.jsonl","/tmp/gh-aw/otlp-export-errors.jsonl","/tmp/gh-aw/safeoutputs.jsonl","/tmp/gh-aw/agent_output.json","/tmp/gh-aw","/tmp/gh-aw","/tmp/gh-aw/awf-config.json","/tmp/gh-aw/awf-resolved-config.json","/tmp/gh-aw/sandbox/firewall/logs/","/tmp/gh-aw/sandbox/firewall/audit/","/tmp/gh-aw/sandbox/firewall/awf-reflect.json"]'
+          GH_AW_RECOVERY_ADDITIONAL_ROOTS: '["/tmp/gh-aw/aw-prompts/prompt.txt","/tmp/gh-aw/agent_execution.json","/tmp/gh-aw/agent_execution_exit_code.txt","/tmp/gh-aw/agent-session.jsonl","/tmp/gh-aw/agent-errors.jsonl","/tmp/gh-aw/aw-prompts/user.txt","/tmp/gh-aw/aw-prompts/system.txt","/tmp/gh-aw/agent/durable-session.jsonl","/tmp/gh-aw/skill_inventory.json","/tmp/gh-aw/mcp-config/logs/","/tmp/gh-aw/redacted-urls.log","/tmp/gh-aw/mcp-logs/","/tmp/gh-aw/agent_usage.json","/tmp/gh-aw/agent/model-resolution.json","/tmp/gh-aw/agent-stdio.log","/tmp/gh-aw/agent/harness_retry.json","/tmp/gh-aw/pre-agent-audit.txt","/tmp/gh-aw/github_rate_limits.jsonl","/tmp/gh-aw/otel.jsonl","/tmp/gh-aw/otlp-export-errors.jsonl","/tmp/gh-aw/safeoutputs.jsonl","/tmp/gh-aw/agent_output.json","/tmp/gh-aw","/tmp/gh-aw","/tmp/gh-aw/awf-config.json","/tmp/gh-aw/awf-resolved-config.json","/tmp/gh-aw/sandbox/firewall/logs/","/tmp/gh-aw/sandbox/firewall/audit/","/tmp/gh-aw/sandbox/firewall/awf-reflect.json"]'
         with:
           script: |
             const path = require('path');
@@ -1689,13 +1685,13 @@ jobs:
           name: agent
           path: |
             /tmp/gh-aw/aw-prompts/prompt.txt
-            /tmp/gh-aw/agent/durable-otel.jsonl
             /tmp/gh-aw/agent_execution.json
             /tmp/gh-aw/agent_execution_exit_code.txt
             /tmp/gh-aw/agent-session.jsonl
             /tmp/gh-aw/agent-errors.jsonl
             /tmp/gh-aw/aw-prompts/user.txt
             /tmp/gh-aw/aw-prompts/system.txt
+            /tmp/gh-aw/agent/durable-session.jsonl
             /tmp/gh-aw/skill_inventory.json
             /tmp/gh-aw/mcp-config/logs/
             /tmp/gh-aw/redacted-urls.log
@@ -2055,6 +2051,7 @@ jobs:
             /tmp/gh-aw/usage/agent/model-routing.jsonl
             /tmp/gh-aw/usage/agent/execution.json
             /tmp/gh-aw/usage/agent/harness_retry.json
+            /tmp/gh-aw/usage/agent/durable-session.jsonl
             /tmp/gh-aw/usage/detection/token_usage.jsonl
             /tmp/gh-aw/usage/detection/execution.json
             /tmp/gh-aw/usage/detection/harness_retry.json
@@ -2093,6 +2090,7 @@ jobs:
             /tmp/gh-aw/usage/agent/model-routing.jsonl
             /tmp/gh-aw/usage/agent/execution.json
             /tmp/gh-aw/usage/agent/harness_retry.json
+            /tmp/gh-aw/usage/agent/durable-session.jsonl
             /tmp/gh-aw/usage/detection/token_usage.jsonl
             /tmp/gh-aw/usage/detection/execution.json
             /tmp/gh-aw/usage/detection/harness_retry.json
@@ -2309,8 +2307,9 @@ jobs:
           node-version: '24'
           package-manager-cache: false
       - name: Install Codex CLI
-        run: npm install --ignore-scripts -g @openai/codex@0.166.0
+        run: npm install -g @openai/codex@0.166.0
         env:
+          NPM_CONFIG_IGNORE_SCRIPTS: 'true'
           NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Prepare Codex config for threat-detect
         if: always() && steps.detection_guard.outputs.run_detection == 'true'

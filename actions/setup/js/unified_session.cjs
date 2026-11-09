@@ -17,6 +17,7 @@ const { getApiProxyEventName } = require("./steering_helpers.cjs");
 const { estimateBaseline, projectModelConfig } = require("./routing_analytics.cjs");
 const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
 const { parseHarnessAttempts, correlateHarnessAttempts } = require("./harness_retry_session.cjs");
+const { isDurableSessionRecord } = require("./durable_session_record.cjs");
 
 const SESSION_FILE_FORMAT_VERSION = 1;
 
@@ -355,6 +356,22 @@ function collectUnifiedSession({
       currentRunId = String(info.run_id);
       currentRunAttempt = info.run_attempt !== undefined && info.run_attempt !== null ? String(info.run_attempt) : undefined;
     }
+  }
+  const durableFile = choose(["agent/durable-session.jsonl", "usage/agent/durable-session.jsonl"]);
+  if (durableFile) {
+    const events = [];
+    for (const record of records(durableFile)) {
+      const timestampMs = typeof record?.timestamp === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(record.timestamp) ? sessionTimestamp({ timestamp: record.timestamp }) : undefined;
+      if (!isDurableSessionRecord(record) || (record.timestamp !== undefined && timestampMs === undefined)) {
+        report(durableFile, "invalid_durable_session", undefined);
+        continue;
+      }
+      if (currentRunId && record.data.runId !== String(currentRunId)) continue;
+      if (currentRunAttempt && record.data.runAttempt !== String(currentRunAttempt)) continue;
+      const { data } = normalizeUnifiedSessionEvent({ type: record.type, data: record.data }, "agent");
+      events.push({ type: record.type, data, ...(timestampMs !== undefined ? { timestamp: new Date(timestampMs).toISOString() } : {}) });
+    }
+    sources.push({ component: "durable", phase: "agent", path: path.relative(rootDir, durableFile), events });
   }
   const selectedPrSha = dailyAIC.GH_AW_PR_HEAD_BASE_SHA;
   const selectedPrNumberText = dailyAIC.GH_AW_PR_HEAD_BASE_PR_NUMBER;

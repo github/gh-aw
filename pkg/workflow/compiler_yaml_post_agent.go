@@ -19,6 +19,9 @@ func (c *Compiler) collectArtifactPaths(data *WorkflowData, engine CodingAgentEn
 	if len(data.Plugins) > 0 {
 		paths = append(paths, pluginInstallationsPath)
 	}
+	if data.EngineConfig != nil && data.EngineConfig.Durable != nil {
+		paths = append(paths, constants.TmpGhAwDirSlash+"agent/durable-session.jsonl")
+	}
 	if hasSkillInventory(data) {
 		paths = append(paths, constants.TmpGhAwDirSlash+"skill_inventory.json")
 	}

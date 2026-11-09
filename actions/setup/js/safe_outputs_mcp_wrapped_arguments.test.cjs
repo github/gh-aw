@@ -133,7 +133,7 @@ describe("safe_outputs_mcp wrapped tool arguments", () => {
         id: 1,
         error: {
           code: -32602,
-          message: "ERR_VALIDATION: update_issue requires at least one of: status, title, body, labels, assignees, milestone fields",
+          message: "ERR_VALIDATION: update_issue requires at least one of: status, title, body, labels, assignees, milestone, artifacts fields",
         },
       });
       expect(fs.existsSync(outputPath)).toBe(false);

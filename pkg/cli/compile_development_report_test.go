@@ -49,6 +49,7 @@ func TestDryRunCompileReport(t *testing.T) {
 			assert.Equal(t, DryRunScannerCheck{Requested: true, Status: "not_run"}, summary.DryRun.Scanners["shellcheck"])
 			assert.Equal(t, DryRunScannerCheck{Status: "not_run"}, summary.DryRun.Scanners["zizmor"])
 			assert.Contains(t, summary.DryRun.UnverifiedEffects, "custom credentials")
+			assert.Equal(t, []string{"steps", "post-steps"}, summary.DryRun.DisabledEffects)
 			output, err := formatValidationOutput(test.results)
 			require.NoError(t, err)
 			var decoded []ValidationResult
@@ -56,6 +57,14 @@ func TestDryRunCompileReport(t *testing.T) {
 			assert.Equal(t, sanitizeValidationResults(test.results), decoded)
 		})
 	}
+}
+
+func TestDryRunScopeReportsOmittedSteps(t *testing.T) {
+	t.Parallel()
+	assert.Contains(t, dryRunScopeMessage, "Authored steps and post-steps are omitted from emitted locks")
+	assert.Contains(t, dryRunScopeMessage, "separate dispatch does not execute them")
+	assert.Contains(t, dryRunScopeMessage, "Pre-steps, pre-agent-steps, on.steps")
+	assert.NotContains(t, dryRunScopeMessage, "Host scripts")
 }
 
 func TestDryRunExperimentalOptIn(t *testing.T) {

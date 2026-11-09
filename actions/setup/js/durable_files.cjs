@@ -5,7 +5,19 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { createHash } = require("node:crypto");
 const { isDeepStrictEqual } = require("node:util");
-const { assertNoSecrets } = require("./pi_durable_checkpoint.cjs");
+
+/** Refuse credentials rather than redacting and corrupting restorable session state. */
+function assertNoSecrets(value, env = process.env) {
+  const text = JSON.stringify(value);
+  for (const [name, secret] of Object.entries(env)) {
+    if (/(?:TOKEN|KEY|SECRET|PASSWORD|CREDENTIAL)/i.test(name) && secret && secret.length >= 6 && text.includes(JSON.stringify(secret).slice(1, -1))) {
+      throw new Error("Durable session contains a credential; refusing persistence");
+    }
+  }
+  if (/\b(?:gh[pousr]_|ghs_|github_pat_)[A-Za-z0-9._-]{12,}|\bsk-(?:proj-|ant-api03-)?[A-Za-z0-9_-]{20,}|Bearer\s+[A-Za-z0-9._~+/-]{8,}/i.test(text)) {
+    throw new Error("Durable session contains a credential; refusing persistence");
+  }
+}
 
 function configuration(root) {
   const files = JSON.parse(process.env.GH_AW_DURABLE_FILES || "[]");

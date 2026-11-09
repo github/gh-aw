@@ -40,15 +40,12 @@ func TestCompileDurableBuiltinEngines(t *testing.T) {
 				require.NotContains(t, text, "restore_durable_files")
 				require.NotContains(t, text, "Prepare durable continuation prompt")
 				require.Contains(t, text, "steps.durable_checkpoint.outputs.restored")
-				if engine == "pi" {
-					require.Contains(t, text, "pi_durable_driver.cjs")
-					require.Contains(t, text, "@earendil-works/pi-durable@1.4.0")
-				} else {
-					require.Contains(t, text, durableSessionDirectory(engine))
-					require.Contains(t, text, "durable_artifact.cjs")
-					require.NotContains(t, text, "gemini_durable_harness.cjs")
-					require.NotContains(t, text, "Install Pi durable")
-				}
+				require.Contains(t, text, "/tmp/gh-aw/agent/durable-session.jsonl")
+				require.Contains(t, text, durableSessionDirectory(engine))
+				require.Contains(t, text, "durable_artifact.cjs")
+				require.NotContains(t, text, "gemini_durable_harness.cjs")
+				require.NotContains(t, text, "Install Pi durable")
+				require.NotContains(t, text, "pi_durable_")
 				if engine == "copilot" {
 					require.Contains(t, text, "Collect Copilot durable session files")
 					require.Contains(t, text, "steps.capture_durable_sessions.outcome == 'success'")
@@ -66,7 +63,7 @@ func TestCompileDurableBuiltinEngines(t *testing.T) {
 
 func TestDurableBuiltinSessionDeclarations(t *testing.T) {
 	registry := NewEngineRegistry()
-	for _, id := range []string{"copilot", "claude", "codex", "gemini", "agy"} {
+	for _, id := range []string{"copilot", "claude", "codex", "gemini", "agy", "pi"} {
 		t.Run(id, func(t *testing.T) {
 			engine, err := registry.GetEngine(id)
 			require.NoError(t, err)
@@ -95,11 +92,14 @@ func TestDurableBuiltinSessionDeclarations(t *testing.T) {
 }
 
 func TestDurableSessionOwnedArguments(t *testing.T) {
-	for _, engine := range []string{"claude", "codex", "copilot"} {
+	for _, engine := range []string{"claude", "codex", "copilot", "pi"} {
 		t.Run(engine, func(t *testing.T) {
 			args := []string{"--continue", "--session-id=some-session"}
-			if engine == "codex" {
+			switch engine {
+			case "codex":
 				args = []string{"resume", "--last", "--ephemeral"}
+			case "pi":
+				args = []string{"--session=other.jsonl", "--session-dir", "--session-id", "--resume", "-r", "--continue", "-c", "--fork", "--no-session"}
 			}
 			for _, arg := range args {
 				require.ErrorContains(t, validateDurableSessionArgs(engine, []string{arg}), "remove")
@@ -110,7 +110,7 @@ func TestDurableSessionOwnedArguments(t *testing.T) {
 }
 
 func TestDurableThreatDetectionStartsFresh(t *testing.T) {
-	for _, id := range []string{"copilot", "claude", "codex"} {
+	for _, id := range []string{"copilot", "claude", "codex", "pi"} {
 		t.Run(id, func(t *testing.T) {
 			data := &WorkflowData{
 				AI: id,

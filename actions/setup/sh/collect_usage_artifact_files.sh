@@ -60,6 +60,11 @@ elif [ -f /tmp/gh-aw/detection_usage.jsonl ]; then
 fi
 if [ -f /tmp/gh-aw/agent_execution.json ]; then cp /tmp/gh-aw/agent_execution.json /tmp/gh-aw/usage/agent/execution.json || true; fi
 if [ -f /tmp/gh-aw/agent/harness_retry.json ]; then cp /tmp/gh-aw/agent/harness_retry.json /tmp/gh-aw/usage/agent/harness_retry.json || true; fi
+if [ -f /tmp/gh-aw/agent/durable-session.jsonl ]; then
+  if ! cp /tmp/gh-aw/agent/durable-session.jsonl /tmp/gh-aw/usage/agent/durable-session.jsonl 2>/dev/null; then
+    echo "::warning::Durable session metadata could not be copied; continuing usage evidence collection."
+  fi
+fi
 if [ -f /tmp/gh-aw/threat-detection/detection_harness_retry.json ]; then cp /tmp/gh-aw/threat-detection/detection_harness_retry.json /tmp/gh-aw/usage/detection/harness_retry.json || true; fi
 if [ -f /tmp/gh-aw/threat-detection/execution.json ]; then cp /tmp/gh-aw/threat-detection/execution.json /tmp/gh-aw/usage/detection/execution.json || true; fi
 # The evals artifact is rooted at /tmp/gh-aw/ in the evals job, so its execution evidence

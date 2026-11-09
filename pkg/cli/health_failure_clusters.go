@@ -60,6 +60,12 @@ func enrichHealthFailureFromCache(data *RunData, run WorkflowRun, config HealthC
 }
 
 func loadHealthRunSummary(run WorkflowRun, config HealthConfig) (*RunSummary, string) {
+	summary, dir, _ := loadHealthRunSummaryWithSessionCompatibility(run, config)
+	return summary, dir
+}
+
+// Raw-session-only caches remain usable, but rejected summaries cannot authenticate sessions.
+func loadHealthRunSummaryWithSessionCompatibility(run WorkflowRun, config HealthConfig) (*RunSummary, string, bool) {
 	root := config.LogsDir
 	if root == "" {
 		root = defaultLogsOutputDir
@@ -68,12 +74,12 @@ func loadHealthRunSummary(run WorkflowRun, config HealthConfig) (*RunSummary, st
 	key := healthRunAttempt{id: run.DatabaseID, attempt: run.Attempt}
 	if config.collection != nil {
 		if summary, checked := config.collection.cacheSummaries[key]; checked {
-			return summary, dir
+			return summary, dir, summary != nil || config.collection.cacheSessionCompatibility[key]
 		}
 		if checkHealthTimeBudget(config.collection) != nil {
 			recordHealthCacheEvidence(run, nil, config.collection.Reason, config.collection)
 			config.collection.cacheSummaries[key] = nil
-			return nil, dir
+			return nil, dir, false
 		}
 	}
 	summary, reason := readHealthCache(dir)
@@ -82,7 +88,7 @@ func loadHealthRunSummary(run WorkflowRun, config HealthConfig) (*RunSummary, st
 		if config.collection != nil {
 			config.collection.cacheSummaries[key] = nil
 		}
-		return nil, dir // Cache loader logs missing or invalid evidence.
+		return nil, dir, reason == "missing" // Cache loader logs missing or invalid evidence.
 	}
 	cached := summary.Run
 	if summary.RunID != run.DatabaseID || cached.DatabaseID != run.DatabaseID ||
@@ -94,7 +100,7 @@ func loadHealthRunSummary(run WorkflowRun, config HealthConfig) (*RunSummary, st
 		if config.collection != nil {
 			config.collection.cacheSummaries[key] = nil
 		}
-		return nil, dir
+		return nil, dir, false
 	}
 	status := "compatible"
 	producer := summary
@@ -110,5 +116,5 @@ func loadHealthRunSummary(run WorkflowRun, config HealthConfig) (*RunSummary, st
 	if config.collection != nil {
 		config.collection.cacheSummaries[key] = summary
 	}
-	return summary, dir
+	return summary, dir, true
 }

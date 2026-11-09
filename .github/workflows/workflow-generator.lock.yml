@@ -828,7 +828,7 @@ jobs:
         env:
           GH_AW_FILE_ROOT: "${{ runner.temp }}/gh-aw"
           GH_AW_FILE_CONFIG: "{\"files\":[{\"path\":\"safeoutputs/config.json\",\"content_env\":\"GH_AW_SAFE_OUTPUTS_CONFIG\"}]}"
-          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"assign_to_agent\":{\"allowed\":[\"copilot\"],\"max\":1,\"target\":\"triggering\"},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{},\"update_issue\":{\"allow_body\":true,\"allow_status\":true,\"max\":1}}"
+          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"assign_to_agent\":{\"allowed\":[\"copilot\"],\"max\":1,\"target\":\"triggering\"},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{},\"update_issue\":{\"allow_body\":true,\"allow_status\":true,\"max\":1,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10}}"
         with:
           script: |
             const path = require('path');
@@ -843,7 +843,7 @@ jobs:
             {
               "description_suffixes": {
                 "assign_to_agent": " CONSTRAINTS: Maximum 1 issue(s) can be assigned to agent.",
-                "update_issue": " CONSTRAINTS: Maximum 1 issue(s) can be updated. Body updates are allowed."
+                "update_issue": " CONSTRAINTS: Maximum 1 issue(s) can be updated. Maximum 10 artifact(s) can be attached per issue. Maximum artifact body size: 1048576 UTF-8 bytes. Body updates are allowed."
               },
               "repo_params": {},
               "dynamic_tools": []
@@ -969,6 +969,9 @@ jobs:
               "update_issue": {
                 "defaultMax": 1,
                 "fields": {
+                  "artifacts": {
+                    "type": "array"
+                  },
                   "assignees": {
                     "type": "array",
                     "itemType": "string",
@@ -1016,7 +1019,7 @@ jobs:
                     "maxLength": 128
                   }
                 },
-                "customValidation": "requiresOneOf:status,title,body,labels,assignees,milestone"
+                "customValidation": "requiresOneOf:status,title,body,labels,assignees,milestone,artifacts"
               }
             }
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -1905,6 +1908,7 @@ jobs:
             /tmp/gh-aw/usage/agent/model-routing.jsonl
             /tmp/gh-aw/usage/agent/execution.json
             /tmp/gh-aw/usage/agent/harness_retry.json
+            /tmp/gh-aw/usage/agent/durable-session.jsonl
             /tmp/gh-aw/usage/detection/token_usage.jsonl
             /tmp/gh-aw/usage/detection/execution.json
             /tmp/gh-aw/usage/detection/harness_retry.json
@@ -1943,6 +1947,7 @@ jobs:
             /tmp/gh-aw/usage/agent/model-routing.jsonl
             /tmp/gh-aw/usage/agent/execution.json
             /tmp/gh-aw/usage/agent/harness_retry.json
+            /tmp/gh-aw/usage/agent/durable-session.jsonl
             /tmp/gh-aw/usage/detection/token_usage.jsonl
             /tmp/gh-aw/usage/detection/execution.json
             /tmp/gh-aw/usage/detection/harness_retry.json
@@ -2827,7 +2832,7 @@ jobs:
           GH_AW_ALLOWED_DOMAINS: "*.grafana.net,*.sentry.io,archive.ubuntu.com,azure.archive.ubuntu.com,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,json-schema.org,json.schemastore.org,keyserver.ubuntu.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,s.symcb.com,s.symcd.com,security.ubuntu.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com"
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"assign_to_agent\":{\"allowed\":[\"copilot\"],\"max\":1,\"target\":\"triggering\"},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{},\"update_issue\":{\"allow_body\":true,\"allow_status\":true,\"max\":1}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"assign_to_agent\":{\"allowed\":[\"copilot\"],\"max\":1,\"target\":\"triggering\"},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{},\"update_issue\":{\"allow_body\":true,\"allow_status\":true,\"max\":1,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10}}"
           GH_AW_ASSIGN_TO_AGENT_TOKEN: ${{ secrets.GH_AW_AGENT_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           GH_AW_ASSIGN_TO_AGENT_TOKEN_SOURCE: ${{ secrets.GH_AW_AGENT_TOKEN != '' && 'GH_AW_AGENT_TOKEN' || secrets.GH_AW_GITHUB_TOKEN != '' && 'GH_AW_GITHUB_TOKEN' || secrets.GITHUB_TOKEN != '' && 'GITHUB_TOKEN' || 'unavailable' }}
           GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
