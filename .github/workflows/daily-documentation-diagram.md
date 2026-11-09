@@ -79,6 +79,14 @@ Create one small, useful diagram for the next eligible documentation page. Keep 
 5. Make the SVG accessible: include `role="img"`, a unique `aria-labelledby`, and first-child `<title>` and `<desc>` elements. Use concise, readable labels and preserve sufficient contrast.
 6. Add the diagram immediately after the section it explains, using the repository's existing MDX image syntax and meaningful alt text. Do not change unrelated wording or frontmatter.
 
+## PR body format
+
+Use `###` or lower headings in the generated PR body. Start with a concise
+overview, then the selected page, diagram concept, and validation result; put
+longer design or test evidence in
+`<details><summary><b>...</b></summary>...</details>`, and finish with any next
+action or limitation. Keep the page, concept, and build result visible.
+
 ## Validate and publish
 
 1. Confirm the patch contains only the selected MDX page and the new SVG. Confirm the SVG has a `viewBox`, accessibility metadata, no `<script>` element, and no external URL.

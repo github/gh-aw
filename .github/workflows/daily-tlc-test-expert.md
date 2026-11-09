@@ -198,8 +198,13 @@ Write a concise report and sanitized logs under
 `/tmp/gh-aw/agent/tlc-test-expert/evidence/`, excluding TLC state directories,
 credentials, and large generated data. Upload this directory as one artifact
 through the safe output even when checking is inconclusive or no PR is needed.
-Report the selected module, assumptions, configuration verdicts, uncompleted
-checks, coverage gaps, implementation/test mapping, and validation results.
+Use `###` or lower headings. Structure the report as a concise overview and
+verdict → key configuration results and coverage gaps → collapsible per-config
+evidence and logs → next actions or limitations. Keep the selected module,
+assumptions, verdicts, uncompleted checks, coverage gaps, implementation/test
+mapping, and validation results visible; put lengthy logs in
+`<details><summary><b>...</b></summary>...</details>`. Format applicable run
+references as `[§12345](https://github.com/${{ github.repository }}/actions/runs/12345)`.
 
 Create at most one draft PR through `create_pull_request` only for a meaningful,
 validated test change not already covered by an open PR. Commit the intended

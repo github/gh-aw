@@ -106,3 +106,13 @@ Do not force-release reservations to make a target count. Three launches are not
 a guarantee of three successfully published discussions. Report only the staged
 request; never label it as a completed report or infer
 that a stale snapshot guarantees no eligible grant.
+
+## Status report format
+
+Use `###` or lower headings for any status report. Start with a visible summary
+of the staged request, then key counts and dispatch status, collapse lengthy
+cohort details in `<details><summary><b>...</b></summary>...</details>`, and end
+with next actions or limitations. Keep staging failures and the distinction
+between staged requests and completed reports visible; never imply that a report
+was published. Format applicable run references as
+`[§12345](https://github.com/${{ github.repository }}/actions/runs/12345)`.
