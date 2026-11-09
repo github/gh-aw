@@ -444,7 +444,7 @@ safe-outputs:
     fallback-as-pull-request: true        # on non-fast-forward or workflow-permission timeout, create fallback PR (default: true)
     signed-commits: true                  # signed commits are required (default); set false to use git push directly
     ignore-missing-branch-failure: false  # treat deleted/missing branch errors as skipped instead of failed (default: false)
-    check-branch-protection: true         # set to false to skip the branch protection pre-flight check (default: true)
+    check-branch-protection: true         # diagnose branch protection after a failed push (default: true)
     protected-files: fallback-to-issue  # create review issue if protected files modified
     target-repo: "owner/repo"    # upstream repository containing the PR
     head-repo: "automation/fork" # required for supported fork-backed follow-up pushes
@@ -595,11 +595,11 @@ When `fallback-as-pull-request` is enabled (default), non-fast-forward push fail
 
 When `ignore-missing-branch-failure: true` is set, push failures caused by a deleted or missing PR branch return `skipped: true` instead of a hard failure. This is useful when the PR branch may have been deleted before the safe-output job runs (for example, on auto-merged PRs). Without this flag, a missing branch is a terminal error.
 
-When `check-branch-protection: false` is set, the branch protection pre-flight check is skipped. By default (`true`), the handler calls `GET /repos/{owner}/{repo}/branches/{branch}` and checks the `protected` flag before pushing. Branches protected by classic branch protection or restrictive rulesets are rejected, even when the proposed push would satisfy the ruleset (for example, by using a signed commit).
+The handler attempts the PR-branch push optimistically, without inspecting branch protection first. GitHub enforces permissions, branch protection, and rulesets when the push is attempted. The default branch is still rejected before pushing whenever repository metadata identifies it.
 
-The sole exception is a non-default branch whose metadata explicitly disables classic protection, whose complete list of active rules contains only `copilot_code_review`, and whose classic protection endpoint explicitly reports `Branch not protected`. Automatic Copilot review does not restrict pushes. Rules are read page by page; unknown or mixed rule types, missing metadata, an empty initial response, an incomplete rules list, or any failed rules query leave the push blocked. Branch metadata may use `contents: read`; [active branch rules](https://docs.github.com/en/rest/repos/rules#get-rules-for-a-branch) require `Metadata: read`, while [classic-protection confirmation](https://docs.github.com/en/rest/branches/branch-protection#get-branch-protection) requires `Administration: read` for fine-grained tokens. `GITHUB_TOKEN` cannot provide `Administration` permission. If these reads are unavailable, the branch remains blocked without requesting broader credentials. No classic-protection lookup is needed for an unprotected branch.
+By default (`check-branch-protection: true`), a failed push triggers optional branch-protection diagnostics. The handler uses [branch metadata](https://docs.github.com/en/rest/branches/branches#get-a-branch) (`Contents: read`) and [active branch rules](https://docs.github.com/en/rest/repos/rules#get-rules-for-a-branch) (`Metadata: read`) to provide additional failure context. The branch's `protected` flag covers classic protection and rulesets; active rules can distinguish advisory Copilot-review rules when the metadata permits it. These diagnostics do not replace the original push error or change retry and fallback behavior. Set `check-branch-protection: false` to skip them.
 
-If the initial branch API returns 403, the check logs a warning and continues (GitHub still enforces protection at push time). The default branch is rejected whenever repository metadata identifies it, regardless of `check-branch-protection`.
+An inability to inspect protection, including permission errors, rate limits, server errors, and network failures, produces an informational log only. The handler does not call the classic-protection endpoint or require `Administration: read`.
 
 ## Protected Files
 

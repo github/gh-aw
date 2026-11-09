@@ -544,7 +544,7 @@ async function main(config = {}) {
   core.info(`If no changes: ${ifNoChanges}`);
   core.info(`Ignore missing branch failure: ${ignoreMissingBranchFailure}`);
   core.info(`Fallback as pull request: ${fallbackAsPullRequest}`);
-  core.info(`Check branch protection: ${checkBranchProtection}`);
+  core.info(`Diagnose branch protection after push failure: ${checkBranchProtection}`);
   core.info(`Push signed commits: ${signedCommits}`);
   if (commitTitleSuffix) {
     core.info(`Commit title suffix: ${commitTitleSuffix}`);
@@ -1017,12 +1017,9 @@ async function main(config = {}) {
     core.info(`PR title: ${prTitle}`);
     core.info(`PR labels: ${prLabels.join(", ")}`);
 
-    // SECURITY: Block pushing to the repository's default branch or any branch with
-    // protection rules. PR head branches must never be default or protected branches.
-    // This prevents agents from pushing directly to branches that should only receive
-    // changes through reviewed pull requests.
+    // Keep the default-branch guard; GitHub enforces branch protection on push.
     {
-      const blockReason = await checkBranchPushable(pushGithubClient, pushRepoParts.owner, pushRepoParts.repo, branchName, checkBranchProtection);
+      const blockReason = await checkBranchPushable(pushGithubClient, pushRepoParts.owner, pushRepoParts.repo, branchName, false);
       if (blockReason) {
         core.error(blockReason);
         return { success: false, error: blockReason };
@@ -1772,6 +1769,14 @@ async function main(config = {}) {
           }
         } catch (diagnosisError) {
           core.warning(`Push failed and branch existence re-check errored for ${branchName}: ${getErrorMessage(diagnosisError)}`);
+        }
+
+        if (checkBranchProtection) {
+          const protectionDiagnostic = await checkBranchPushable(pushGithubClient, pushRepoParts.owner, pushRepoParts.repo, branchName, true);
+          if (protectionDiagnostic) {
+            core.info(`Branch protection diagnostic: ${protectionDiagnostic}`);
+            userMessage += ` Branch protection diagnostic: ${protectionDiagnostic}`;
+          }
         }
 
         // Fallback path for diverged branches: create a new pull request so changes

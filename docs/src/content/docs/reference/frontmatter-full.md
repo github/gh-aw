@@ -18176,10 +18176,10 @@ safe-outputs:
     # (optional)
     allow-workflows: true
 
-    # When false, skips the branch protection API pre-flight check before pushing. Set
-    # to false to avoid requiring administration: read permission. The GitHub platform
-    # will still enforce branch protection at push time. Default is true (check
-    # enabled).
+    # When true (default), inspects branch protection only after a push fails to
+    # provide additional diagnostic context. Inspection failures are informational.
+    # GitHub enforces permissions and branch protection on the optimistic push
+    # attempt. Set false to skip these diagnostics.
     # (optional)
     check-branch-protection: true
 

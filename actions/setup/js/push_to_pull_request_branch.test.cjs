@@ -975,20 +975,21 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
       expect(mockExec.exec).not.toHaveBeenCalled();
     });
 
-    it("should block push to a branch with protection rules", async () => {
-      // Branch has protection rules
+    it("attempts an optimistic push without inspecting branch protection", async () => {
       mockGithub.rest.repos.getBranch.mockResolvedValue({ data: { protected: true } });
-
-      const patchPath = createPatchFile("should-block-push-to-a-branch-with-protection-rules");
+      createPatchFile("optimistic-protected-branch-push");
+      mockExec.getExecOutput.mockResolvedValue({ exitCode: 0, stdout: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n", stderr: "" });
+      const pushSignedSpy = vi.spyOn(require("./push_signed_commits.cjs"), "pushSignedCommits").mockImplementation(async () => {
+        expect(mockGithub.rest.repos.getBranch).not.toHaveBeenCalled();
+        return "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+      });
       const module = await loadModule();
       const handler = await module.main({ target: "triggering" });
-      const result = await handler({ branch: "should-block-push-to-a-branch-with-protection-rules" }, {});
+      const result = await handler({ branch: "optimistic-protected-branch-push" }, {});
 
-      expect(result.success).toBe(false);
-      expect(result.error).toContain("protection rules");
-      expect(mockCore.error).toHaveBeenCalledWith(expect.stringContaining("protection rules"));
-      // Should not attempt any git operations
-      expect(mockExec.exec).not.toHaveBeenCalled();
+      expect(result.success).toBe(true);
+      expect(pushSignedSpy).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ branch: "feature-branch" }));
+      expect(mockGithub.rest.repos.getBranch).not.toHaveBeenCalled();
     });
 
     it("should allow push when branch is not default and has no protection rules", async () => {
@@ -1020,68 +1021,127 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
 
       expect(result.success).toBe(true);
       expect(result.branch_name).toBe("feature-branch");
-      expect(mockGithub.rest.repos.getBranchRules).toHaveBeenCalledWith({
-        owner: "test-owner",
-        repo: "test-repo",
-        branch: "feature-branch",
-        per_page: 100,
-        page: 1,
-      });
+      expect(mockGithub.rest.repos.getBranch).not.toHaveBeenCalled();
+      expect(mockGithub.rest.repos.getBranchRules).not.toHaveBeenCalled();
+      expect(mockGithub.rest.repos.getBranchProtection).not.toHaveBeenCalled();
     });
 
-    it.each([
-      [404, "Not Found"],
-      [403, "Resource not accessible by integration"],
-    ])("should not attempt git operations when classic protection cannot be confirmed absent (%s)", async (status, message) => {
+    it("diagnoses a rejected Markdown-only spec push without Administration-only APIs", async () => {
       mockGithub.rest.repos.getBranch.mockResolvedValue({ data: { protected: true, protection: { enabled: false } } });
       mockGithub.rest.repos.getBranchRules = vi.fn().mockResolvedValue({ data: [{ type: "copilot_code_review" }] });
-      mockGithub.rest.repos.getBranchProtection = vi.fn().mockRejectedValue(Object.assign(new Error(message), { status, response: { data: { message } } }));
-      createPatchFile(`copilot-review-classic-${status}-branch`);
+      mockGithub.rest.repos.getBranchProtection = vi.fn().mockRejectedValue(Object.assign(new Error("Resource not accessible by integration"), { status: 403 }));
+      const patchPath = createPatchFile("permission-compatible-spec-push");
+      fs.writeFileSync(patchPath, fs.readFileSync(patchPath, "utf8").replaceAll("test.txt", "docs/src/content/docs/specs/work-queue-specification.md"));
+      mockExec.getExecOutput.mockImplementation(async (_cmd, args) => ({
+        exitCode: 0,
+        stdout: args?.[0] === "diff" && args.includes("--name-only") ? "docs/src/content/docs/specs/work-queue-specification.md\0" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+        stderr: "",
+      }));
+      const pushSignedSpy = vi.spyOn(require("./push_signed_commits.cjs"), "pushSignedCommits").mockImplementation(async () => {
+        expect(mockGithub.rest.repos.getBranch).not.toHaveBeenCalled();
+        throw new Error("remote: Repository rule violations found");
+      });
 
       const module = await loadModule();
-      const handler = await module.main({});
-      const result = await handler({ branch: `copilot-review-classic-${status}-branch` }, {});
+      const handler = await module.main({
+        allowed_files: ["docs/src/content/docs/specs/*.md"],
+        protected_files_policy: "allowed",
+        fallback_as_pull_request: false,
+      });
+      const result = await handler({ branch: "permission-compatible-spec-push" }, {});
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain("Cannot verify branch protection rules");
-      if (status === 403) {
-        expect(result.error).toContain("Administration: read");
-        expect(result.error).toContain("GITHUB_TOKEN cannot provide");
-      }
-      expect(mockExec.exec).not.toHaveBeenCalled();
-      expect(mockExec.getExecOutput).not.toHaveBeenCalled();
+      expect(result.error_type).toBe("push_failed");
+      expect(result.error).toContain("Repository rule violations found");
+      expect(result.error).not.toContain("Administration");
+      expect(pushSignedSpy).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ owner: "test-owner", repo: "test-repo", branch: "feature-branch" }));
+      expect(mockGithub.rest.repos.getBranch).toHaveBeenCalledWith({ owner: "test-owner", repo: "test-repo", branch: "feature-branch" });
+      expect(mockGithub.rest.repos.getBranchRules).toHaveBeenCalledWith({ owner: "test-owner", repo: "test-repo", branch: "feature-branch", per_page: 100, page: 1 });
+      expect(mockGithub.rest.repos.getBranchProtection).not.toHaveBeenCalled();
+      expect(mockCore.warning).not.toHaveBeenCalledWith(expect.stringContaining("branch protection"));
+      expect(mockGithub.rest.pulls.create).not.toHaveBeenCalled();
     });
 
-    it.each(["restrictive", "unavailable"])("should not attempt git operations when Copilot rules are mixed with %s protection", async scenario => {
+    it("diagnoses restrictive protection only after GitHub rejects the push", async () => {
       mockGithub.rest.repos.getBranch.mockResolvedValue({ data: { protected: true, protection: { enabled: false } } });
-      mockGithub.rest.repos.getBranchRules =
-        scenario === "restrictive" ? vi.fn().mockResolvedValue({ data: [{ type: "copilot_code_review" }, { type: "pull_request" }] }) : vi.fn().mockRejectedValue(Object.assign(new Error("Forbidden"), { status: 403 }));
-      createPatchFile(`copilot-review-${scenario}-branch`);
+      mockGithub.rest.repos.getBranchRules = vi.fn().mockResolvedValue({ data: [{ type: "copilot_code_review" }, { type: "pull_request" }] });
+      createPatchFile("copilot-review-restrictive-branch");
+      mockExec.getExecOutput.mockResolvedValue({ exitCode: 0, stdout: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n", stderr: "" });
+      const pushSignedSpy = vi.spyOn(require("./push_signed_commits.cjs"), "pushSignedCommits").mockImplementation(async () => {
+        expect(mockGithub.rest.repos.getBranch).not.toHaveBeenCalled();
+        throw new Error("remote: Repository rule violations found");
+      });
 
       const module = await loadModule();
       const handler = await module.main({});
-      const result = await handler({ branch: `copilot-review-${scenario}-branch` }, {});
+      const result = await handler({ branch: "copilot-review-restrictive-branch" }, {});
 
       expect(result.success).toBe(false);
+      expect(result.error).toContain("Repository rule violations found");
       expect(result.error).toContain("protection rules");
-      expect(mockExec.exec).not.toHaveBeenCalled();
-      expect(mockExec.getExecOutput).not.toHaveBeenCalled();
+      expect(pushSignedSpy).toHaveBeenCalledOnce();
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Branch protection diagnostic:"));
     });
 
-    it("should not attempt git operations when repository metadata is unavailable for a protected branch", async () => {
+    it("attempts publication when the active branch rules cannot be inspected", async () => {
+      mockGithub.rest.repos.getBranch.mockResolvedValue({ data: { protected: true, protection: { enabled: false } } });
+      mockGithub.rest.repos.getBranchRules = vi.fn().mockRejectedValue(Object.assign(new Error("Forbidden"), { status: 403 }));
+      createPatchFile("copilot-review-unavailable-branch");
+      mockExec.getExecOutput.mockResolvedValue({ exitCode: 0, stdout: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n", stderr: "" });
+      const pushSignedSpy = vi.spyOn(require("./push_signed_commits.cjs"), "pushSignedCommits").mockImplementation(async () => {
+        expect(mockGithub.rest.repos.getBranchRules).not.toHaveBeenCalled();
+        throw new Error("remote: Repository rule violations found");
+      });
+
+      const module = await loadModule();
+      const handler = await module.main({});
+      const result = await handler({ branch: "copilot-review-unavailable-branch" }, {});
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Repository rule violations found");
+      expect(pushSignedSpy).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ branch: "feature-branch" }));
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Forbidden. GitHub enforces branch protection"));
+      expect(mockCore.warning).not.toHaveBeenCalledWith(expect.stringContaining("branch protection"));
+    });
+
+    it("skips branch-protection diagnostics when disabled without hiding the push failure", async () => {
+      mockGithub.rest.repos.getBranch.mockResolvedValue({ data: { protected: true, protection: { enabled: false } } });
+      mockGithub.rest.repos.getBranchRules = vi.fn().mockResolvedValue({ data: [{ type: "copilot_code_review" }] });
+      mockGithub.rest.repos.getBranchProtection = vi.fn().mockRejectedValue(Object.assign(new Error("Resource not accessible by integration"), { status: 403 }));
+      createPatchFile("inspection-unavailable-push-rejected");
+      mockExec.getExecOutput.mockResolvedValue({ exitCode: 0, stdout: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n", stderr: "" });
+      const pushSignedSpy = vi.spyOn(require("./push_signed_commits.cjs"), "pushSignedCommits").mockRejectedValue(new Error("remote: Repository rule violations found"));
+
+      const module = await loadModule();
+      const handler = await module.main({ fallback_as_pull_request: false, check_branch_protection: false });
+      const result = await handler({ branch: "inspection-unavailable-push-rejected" }, {});
+
+      expect(pushSignedSpy).toHaveBeenCalledOnce();
+      expect(result.success).toBe(false);
+      expect(result.error_type).toBe("push_failed");
+      expect(result.error).toContain("Repository rule violations found");
+      expect(mockGithub.rest.pulls.create).not.toHaveBeenCalled();
+      expect(mockGithub.rest.repos.getBranch).not.toHaveBeenCalled();
+      expect(mockGithub.rest.repos.getBranchRules).not.toHaveBeenCalled();
+      expect(mockGithub.rest.repos.getBranchProtection).not.toHaveBeenCalled();
+    });
+
+    it("attempts an optimistic push when repository metadata is unavailable", async () => {
       mockGithub.rest.repos.get.mockRejectedValue(new Error("API unavailable"));
       mockGithub.rest.repos.getBranch.mockResolvedValue({ data: { protected: true, protection: { enabled: false } } });
       mockGithub.rest.repos.getBranchRules = vi.fn().mockResolvedValue({ data: [{ type: "copilot_code_review" }] });
       createPatchFile("protected-branch-without-repository-metadata");
+      mockExec.getExecOutput.mockResolvedValue({ exitCode: 0, stdout: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n", stderr: "" });
+      const pushSignedSpy = vi.spyOn(require("./push_signed_commits.cjs"), "pushSignedCommits").mockResolvedValue("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
 
       const module = await loadModule();
       const handler = await module.main({});
       const result = await handler({ branch: "protected-branch-without-repository-metadata" }, {});
 
-      expect(result.success).toBe(false);
-      expect(result.error).toContain("protection rules");
-      expect(mockExec.exec).not.toHaveBeenCalled();
-      expect(mockExec.getExecOutput).not.toHaveBeenCalled();
+      expect(result.success).toBe(true);
+      expect(pushSignedSpy).toHaveBeenCalledOnce();
+      expect(mockGithub.rest.repos.getBranch).not.toHaveBeenCalled();
+      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Could not check repository default branch"));
     });
 
     it("should warn and continue when repos.get fails", async () => {
@@ -1099,9 +1159,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
       expect(result.success).toBe(true);
     });
 
-    it("should warn and continue when getBranch returns 403 (permission denied)", async () => {
-      // getBranch returns 403 (no permission to read the branch)
-      // Platform will still enforce protection at push time, so we warn and allow
+    it("does not inspect branch protection when the push succeeds", async () => {
       mockGithub.rest.repos.getBranch.mockRejectedValue(Object.assign(new Error("Forbidden"), { status: 403 }));
       const patchPath = createPatchFile("should-warn-and-continue-when-getbranchprotection-returns-40");
       mockExec.getExecOutput.mockResolvedValue({ exitCode: 0, stdout: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n", stderr: "" });
@@ -1110,26 +1168,29 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
       const handler = await module.main({});
       const result = await handler({ branch: "should-warn-and-continue-when-getbranchprotection-returns-40" }, {});
 
-      // Should warn but allow push since the platform still enforces protection at push time
-      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Could not check branch protection rules"));
+      expect(mockGithub.rest.repos.getBranch).not.toHaveBeenCalled();
+      expect(mockCore.warning).not.toHaveBeenCalledWith(expect.stringContaining("branch protection"));
       expect(result.success).toBe(true);
     });
 
-    it("should block push when getBranch returns an unexpected error (fail closed)", async () => {
-      // getBranch returns 500 - unexpected error, fail closed for security
+    it("logs failed branch diagnostics informationally after a push rejection", async () => {
       mockGithub.rest.repos.getBranch.mockRejectedValue(Object.assign(new Error("Internal Server Error"), { status: 500 }));
-      const patchPath = createPatchFile("should-block-push-when-getbranchprotection-returns-an-unexpe");
+      createPatchFile("branch-inspection-server-error");
+      mockExec.getExecOutput.mockResolvedValue({ exitCode: 0, stdout: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n", stderr: "" });
+      const pushSignedSpy = vi.spyOn(require("./push_signed_commits.cjs"), "pushSignedCommits").mockImplementation(async () => {
+        expect(mockGithub.rest.repos.getBranch).not.toHaveBeenCalled();
+        throw new Error("remote: Repository rule violations found");
+      });
 
       const module = await loadModule();
       const handler = await module.main({});
-      const result = await handler({ branch: "should-block-push-when-getbranchprotection-returns-an-unexpe" }, {});
+      const result = await handler({ branch: "branch-inspection-server-error" }, {});
 
-      // Should block the push when branch protection status cannot be verified
       expect(result.success).toBe(false);
-      expect(result.error).toContain("Cannot verify branch protection rules");
-      expect(mockCore.error).toHaveBeenCalledWith(expect.stringContaining("Cannot verify branch protection rules"));
-      // Should not attempt any git operations
-      expect(mockExec.exec).not.toHaveBeenCalled();
+      expect(result.error).toContain("Repository rule violations found");
+      expect(pushSignedSpy).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ branch: "feature-branch" }));
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Internal Server Error. GitHub enforces branch protection"));
+      expect(mockCore.warning).not.toHaveBeenCalledWith(expect.stringContaining("branch protection"));
     });
   });
 

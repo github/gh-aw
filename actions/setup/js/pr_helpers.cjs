@@ -129,15 +129,12 @@ async function hasOnlyCopilotReviewRules(githubClient, owner, repo, branch) {
 }
 
 /**
- * Check whether a branch is safe to push to.
+ * Check the default-branch guard and optionally diagnose branch protection.
+ * Call with `checkBranchProtection: false` before pushing, and inspect protection
+ * only after a push failure. Inspection failures are informational.
  *
- * Performs two security checks:
- * 1. Ensures the branch is not the repository's default branch.
- * 2. When `checkBranchProtection` is true, queries the branch API to
- *    verify the branch has no protection rules other than Copilot code review.
- *
- * Returns null when the push is safe to proceed, or a string error message that
- * should be surfaced as a hard failure when the push must be blocked.
+ * Returns a string describing the default-branch guard or diagnosed protection,
+ * or null when neither applies or inspection is unavailable.
  *
  * @param {any} githubClient - Octokit REST client
  * @param {string} owner - Repository owner
@@ -167,52 +164,31 @@ async function checkBranchPushable(githubClient, owner, repo, branchName, checkB
     try {
       const { data: branchData } = await githubClient.rest.repos.getBranch({ owner, repo, branch: branchName });
       isBranchProtected = branchData.protected;
-      // The protected flag includes advisory rulesets. Confirm classic protection separately.
+      // The protected flag includes advisory rulesets; use read-compatible metadata.
       if (isBranchProtected && typeof defaultBranch === "string" && defaultBranch.length > 0 && branchName !== defaultBranch && branchData.protection?.enabled === false) {
         try {
           if (await hasOnlyCopilotReviewRules(githubClient, owner, repo, branchName)) {
-            try {
-              await githubClient.rest.repos.getBranchProtection({ owner, repo, branch: branchName });
-            } catch (classicError) {
-              const classicStatus = classicError && typeof classicError === "object" && "status" in classicError ? classicError.status : undefined;
-              const classicMessage = classicError && typeof classicError === "object" ? classicError.response?.data?.message : undefined;
-              if (classicStatus === 403) {
-                throw new Error(
-                  `${getErrorMessage(classicError)}. Reading classic branch protection requires a GitHub App installation token or fine-grained PAT with Administration: read repository permission; GITHUB_TOKEN cannot provide this permission`,
-                  { cause: classicError }
-                );
-              }
-              if (classicStatus !== 404 || classicMessage !== "Branch not protected") throw classicError;
-              core.info(`Branch "${branchName}" only has Copilot code review rules and no classic protection; proceeding to push`);
-              isBranchProtected = false;
-            }
+            core.info(`Branch "${branchName}" reports only Copilot code review rules in its active rulesets`);
+            isBranchProtected = false;
           }
         } catch (rulesError) {
-          return `Cannot verify branch protection rules for "${branchName}": ${getErrorMessage(rulesError)}. Push blocked to prevent accidental writes to protected branches.`;
+          core.info(`Could not check branch protection rules for "${branchName}": ${getErrorMessage(rulesError)}. GitHub enforces branch protection and permissions when pushing.`);
+          return null;
         }
       }
     } catch (protectionError) {
       const protectionStatus = protectionError && typeof protectionError === "object" && "status" in protectionError ? protectionError.status : undefined;
       if (protectionStatus === 404) {
         // 404 means the branch does not exist – safe to proceed
-        core.info(`Branch "${branchName}" not found; proceeding to push`);
-      } else if (protectionStatus === 403) {
-        // 403 means the token lacks permission to read branch protection rules.
-        // The GitHub platform will still enforce branch protection at push time,
-        // so warn and allow the push to proceed.
-        core.warning(`Could not check branch protection rules for "${branchName}" (insufficient permissions): ${getErrorMessage(protectionError)}`);
+        core.info(`Branch "${branchName}" not found during branch-protection inspection`);
       } else {
-        // Unexpected errors (5xx, network failures, etc.) – fail closed to
-        // avoid bypassing branch protection due to transient API issues.
-        return `Cannot verify branch protection rules for "${branchName}": ${getErrorMessage(protectionError)}. Push blocked to prevent accidental writes to protected branches.`;
+        core.info(`Could not check branch protection rules for "${branchName}": ${getErrorMessage(protectionError)}. GitHub enforces branch protection and permissions when pushing.`);
       }
     }
 
     if (isBranchProtected) {
-      return `Cannot push to branch "${branchName}": this branch has protection rules. Agents must not push directly to protected branches.`;
+      return `Branch "${branchName}" has protection rules that may explain the rejected push.`;
     }
-  } else {
-    core.info(`Branch protection check skipped (check-branch-protection: false)`);
   }
 
   return null;

@@ -39,7 +39,7 @@ type PushToPullRequestBranchConfig struct {
 	AllowFullHistoryFetch          bool             `yaml:"allow-full-history-fetch,omitempty"`            // Explicit opt-in to unbounded bundle prerequisite downloads (default: false).
 	AllowMergedBaseBaseline        bool             `yaml:"allow-merged-base-baseline,omitempty"`          // Enables bounded discovery of older merged base ancestors for unsigned bundle size validation.
 	AllowWorkflows                 bool             `yaml:"allow-workflows,omitempty"`                     // When true, adds workflows: write to the GitHub App token. Requires safe-outputs.github-app to be configured.
-	CheckBranchProtection          *bool            `yaml:"check-branch-protection,omitempty"`             // When false, skips the branch protection API pre-flight check. Default is true (check enabled). Set to false to avoid needing administration: read permission.
+	CheckBranchProtection          *bool            `yaml:"check-branch-protection,omitempty"`             // Diagnose branch protection after a failed push (default: true). Inspection failures are informational.
 }
 
 // buildCheckoutRepository generates a checkout step with optional target repository and custom token
