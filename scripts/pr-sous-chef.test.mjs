@@ -1091,7 +1091,7 @@ const completedTask = {
   html_url: "https://github.com/github/gh-aw/actions/runs/17",
 };
 
-test("a completed sous-chef task gets one status-only comment for remaining CI failures", () => {
+test("a completed sous-chef task gets one Copilot-addressed comment for remaining CI failures", () => {
   const first = classify({ ...failingPr, statusCheckRollup: [...failingPr.statusCheckRollup, { name: "Lint", status: "COMPLETED", conclusion: "FAILURE" }] }, detail(), [], [], now);
   const running = { ...nudge(first.state_fingerprint), body: formatNudge(first) };
   const result = classify(failingPr, detail(), [running], [completedTask], now);
@@ -1099,11 +1099,14 @@ test("a completed sous-chef task gets one status-only comment for remaining CI f
   assert.equal(result.ci_follow_up.run_id, completedTask.id);
   assert.equal(formatAssignmentRequest(result), null);
   const body = formatCIFollowUp(result);
+  assert.match(body, /^@copilot\n\n/);
+  assert.equal((body.match(/@copilot/g) ?? []).length, 1);
   assert.match(body, /The prep is done, but CI needs another taste test/);
   assert.match(body, /`CGO` \(FAILURE\)/);
   assert.match(body, /\[Completed task\]\(https:\/\/github\.com\/github\/gh-aw\/actions\/runs\/17\)/);
   assert.doesNotMatch(body, /`Lint`/);
-  assert.doesNotMatch(body, /@copilot|make merge-main|Fix the regression/);
+  assert.match(body, /Please address the remaining CI failures on this PR's existing branch/);
+  assert.doesNotMatch(body, /make merge-main|Fix the regression/);
   assert.equal(readSousChefData(body).completed_task, 17);
   assert.equal(formatCIFollowUp(first), null);
   for (const published of [body, stripHtmlComments(body), sanitizeContent(body)]) {
@@ -1837,6 +1840,8 @@ test("workflow polls every five minutes but never starts an agent for low budget
   assert.match(workflow, /assign-to-agent:\n\s+name: copilot\n\s+allowed: \[copilot\]\n\s+target: "\*"\n\s+max: 4\n\s+github-token: \$\{\{ secrets\.AWI_MAINTENANCE_TOKEN \}\}/);
   assert.match(workflow, /post its `nudges\[0\]\.body` and `nudges\[0\]\.data` exactly via `add_comment` on\n\s+`nudges\[0\]\.pr_number`/);
   assert.match(workflow, /The comment must start with the literal `@copilot` mention/);
+  assert.match(workflow, /The follow-up must start with the\n\s+literal `@copilot` mention, not a Markdown link/);
+  assert.match(workflow, /Do not call `assign_to_agent`, retry CI, or repeat answered reviews/);
   assert.match(workflow, /If the latest is from PR Sous Chef, do not add an acknowledgement/);
   assert.match(workflow, /leading Copilot mention, replacing the opening with/);
   assert.match(workflow, /Do not quote the assignment request,\n\s+shorten its hashes, or display them outside the collapsed block/);

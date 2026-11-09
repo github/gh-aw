@@ -10,7 +10,7 @@ const { queueControlErrorCode } = require("./work_queue_logging.cjs");
 /** @type {AsyncLocalStorage<{attributes: Attributes, snapshot?: {state: object, at: number}}>} */
 const activeOperation = new AsyncLocalStorage();
 const PREFIX = "gh-aw.work_queue.";
-const OUTCOMES = new Set(["bound", "released", "rejected", "reserved", "cancellation_requested", "launch_unresolved", "run_binding_conflict", "staged_preview"]);
+const OUTCOMES = new Set(["activation_pending", "bound", "released", "rejected", "reserved", "cancellation_requested", "launch_unresolved", "run_binding_conflict", "staged_preview"]);
 const REASONS = new Set([
   "selected",
   "no_work",

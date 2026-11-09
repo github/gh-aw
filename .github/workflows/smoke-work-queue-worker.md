@@ -22,7 +22,7 @@ safe-outputs:
     report-as-issue: false
 jobs:
   verify_smoke_completion:
-    needs: [agent, safe_outputs]
+    needs: [activation, agent, safe_outputs]
     if: always()
     runs-on: ubuntu-slim
     timeout-minutes: 3
@@ -30,6 +30,7 @@ jobs:
     steps:
       - name: Require verified smoke Result
         env:
+          SMOKE_ACTIVATION_RESULT: ${{ needs.activation.result }}
           SMOKE_AGENT_RESULT: ${{ needs.agent.result }}
           SMOKE_SAFE_OUTPUTS_RESULT: ${{ needs.safe_outputs.result }}
           SMOKE_QUEUE_OUTCOME: ${{ needs.safe_outputs.outputs.work_queue_outcome }}
@@ -37,6 +38,7 @@ jobs:
           set -euo pipefail
           node <<'JS'
           const assert = require("node:assert/strict");
+          assert.equal(process.env.SMOKE_ACTIVATION_RESULT, "success", "Smoke requires trusted worker activation and binding");
           assert.equal(process.env.SMOKE_AGENT_RESULT, "success", "Smoke agent job must run and succeed");
           assert.equal(process.env.SMOKE_SAFE_OUTPUTS_RESULT, "success", "Trusted Claim processing must run and succeed");
           assert.equal(process.env.SMOKE_QUEUE_OUTCOME, "completed", "Smoke requires a verified Result, not cancellation or a staged finish");
@@ -109,8 +111,9 @@ If validation or the finish tool fails, surface the error and stop; never claim
 success. The host assertion rejects a missing, foreign, or cancelled finish.
 Trusted queue processing still owns Completion, verified Result, and reservation
 release; the agent's response or a staged intent alone proves none of them.
-The always-running downstream verifier requires successful agent and safe-output
-jobs and the trusted `work_queue_outcome: completed` output. Missing finish
+The always-running downstream verifier separately requires successful trusted
+activation (including native identity verification and binding), agent and
+safe-output jobs, and the trusted `work_queue_outcome: completed` output. Missing finish
 artifacts, cancelled Claims, and skipped jobs cannot count as smoke success.
 
 The no-resource-effects contract permits framework queue ledger commits and

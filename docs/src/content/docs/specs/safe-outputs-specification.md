@@ -7,9 +7,9 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.29.21<br>
+**Version**: 1.29.22<br>
 **Status**: Working Draft<br>
-**Publication Date**: 2026-11-08<br>
+**Publication Date**: 2026-11-09<br>
 **Editor**: GitHub Agentic Workflows Team<br>
 **This Version**: [safe-outputs-specification](/gh-aw/specs/safe-outputs-specification/)<br>
 **Latest Published Version**: This document
@@ -4204,10 +4204,14 @@ or review bodies to returned or persisted decision evidence.
 - `head-github-token`: Optional credential for `head-repo` branch writes
 - `head-github-app`: Optional GitHub App configuration to mint an ephemeral credential for `head-repo` branch writes at runtime; takes precedence over `head-github-token` when both are specified
 - `allow-full-history-fetch`: Literal boolean, default `false`, independently scoped to this handler. Permits potentially unbounded bundle prerequisite recovery; does not enable downloads for optional validation baselines.
+- `check-branch-protection`: Literal boolean, default `true`; when `false`, skips the branch-protection pre-flight check but does not bypass GitHub's enforcement during push.
 
 **Notes**:
 
 - Requires `contents: write` for git push operations
+- The handler MUST reject the repository's default branch when identified, regardless of the value of `check-branch-protection`.
+- When branch metadata marks a branch as protected, the handler MUST inspect its active rules before considering an exception. When confirming classic branch protection, implementations MUST query the branch's GraphQL `Ref.refUpdateRule`, not the REST classic-protection endpoint that requires `Administration: read`.
+- An implementation MAY allow a non-default branch that is marked protected only when its metadata explicitly disables classic protection, its complete active-rule list contains only `copilot_code_review`, and GraphQL `Ref.refUpdateRule` is explicitly `null`. A missing field, incomplete or unknown active-rule data, or failed rules/GraphQL query MUST leave the push blocked. An object returned by `refUpdateRule` MUST NOT be treated as absence of classic protection.
 - Enforces maximum patch size limit (default: 10 KB, range: 1–100 KB)
 - Validates changes don't exceed size limits before pushing
 - The handler MUST ignore agent-supplied `diff_size` values and validate patch size from the generated patch artifact.
@@ -6785,6 +6789,10 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.29.22** (2026-11-09):
+
+- **Specified**: `push_to_pull_request_branch` classic-protection confirmation through GraphQL `Ref.refUpdateRule`, requiring explicit absence and fail-closed behavior without `Administration: read`.
 
 **Version 1.29.21** (2026-11-08):
 

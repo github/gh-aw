@@ -588,6 +588,28 @@ printf "%s\n" "$@" > "$GH_AW_TEST_UV_ARGS_FILE"
 	}
 }
 
+func TestValidateUvPackagesWithExecutable_RejectsUnvalidatedExecutablePath(t *testing.T) {
+	tempDir := t.TempDir()
+	argsFile := filepath.Join(tempDir, "uv-args.txt")
+	uvPath := filepath.Join(tempDir, "uv")
+	script := `#!/bin/sh
+printf "%s\n" "$@" > "$GH_AW_TEST_UV_ARGS_FILE"
+`
+	if err := os.WriteFile(uvPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("failed to write fake uv executable: %v", err)
+	}
+	t.Setenv("GH_AW_TEST_UV_ARGS_FILE", argsFile)
+	t.Chdir(tempDir)
+
+	err := NewCompiler().validateUvPackagesWithExecutable([]string{"requests"}, "./uv")
+	if err == nil {
+		t.Fatal("expected relative executable path to be rejected")
+	}
+	if _, err := os.Stat(argsFile); !os.IsNotExist(err) {
+		t.Fatalf("expected invalid executable path to be rejected before uv execution; stat error = %v", err)
+	}
+}
+
 // TestValidateUvPackages_RejectsInvalidPackageName verifies that uv package names
 // which do not conform to the PyPI naming rules are rejected before being passed
 // as arguments to the uv CLI. This validation happens before uv/pip is resolved

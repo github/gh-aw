@@ -175,6 +175,16 @@ Do not bypass a failed check; remove unvalidated edits and use `noop` explaining
 the blocker. If no demonstrable defect remains, use `noop` with the engine,
 inspected run, and verification outcome.
 
+## PR body format
+
+Use `###` or lower for every heading in the generated PR body. Present a concise
+overview, the selected engine and decision, key evidence and validation results,
+then detailed supporting evidence in
+`<details><summary><b>...</b></summary>...</details>`, followed by the requested
+action or limitations. Keep the decision and proposed action visible; format
+applicable run references as
+`[§12345](https://github.com/${{ github.repository }}/actions/runs/12345)`.
+
 ## QCreate pull request
 
 For a validated nonempty fix, commit locally and call the configured
