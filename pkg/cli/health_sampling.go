@@ -63,6 +63,20 @@ func discoverHealthWorkflows(config *HealthConfig) error {
 }
 
 func fetchHealthWorkflows(collection *HealthCollection) ([]GitHubWorkflow, error) {
+	out, err := healthAPI(collection, healthRepositoryEndpoint(collection.repoOverride))
+	if err != nil {
+		return nil, err
+	}
+	var repository struct {
+		DefaultBranch string `json:"default_branch"`
+	}
+	if err := json.Unmarshal(out, &repository); err != nil {
+		return nil, fmt.Errorf("failed to parse health repository metadata: %w", err)
+	}
+	if repository.DefaultBranch == "" {
+		return nil, errors.New("failed to resolve health default branch: missing default_branch")
+	}
+	collection.DefaultBranch = repository.DefaultBranch
 	var registered []GitHubWorkflow
 	for page := 1; page <= MaxIterations; page++ {
 		endpoint := fmt.Sprintf("%s/actions/workflows?per_page=100&page=%d", healthRepositoryEndpoint(collection.repoOverride), page)
@@ -91,6 +105,9 @@ func listHealthWorkflowRuns(opts ListWorkflowRunsOptions, page int, collection *
 		endpoint = path.Join(healthRepositoryEndpoint(opts.RepoOverride), "actions/workflows", url.PathEscape(opts.WorkflowName), "runs")
 	}
 	endpoint += fmt.Sprintf("?per_page=%d&page=%d&created=%s", opts.Limit, page, url.QueryEscape(buildCreatedFilter(opts.StartDate, opts.EndDate, opts.BeforeDate)))
+	if opts.Ref != "" {
+		endpoint += "&branch=" + url.QueryEscape(opts.Ref)
+	}
 	out, err := healthAPI(collection, endpoint)
 	if err != nil {
 		return nil, 0, err
@@ -108,6 +125,9 @@ func listHealthWorkflowRuns(opts ListWorkflowRunsOptions, page int, collection *
 			oldest = response.CreatedAt
 		}
 		run := response.workflowRun()
+		if !healthRunInScan(run, collection) {
+			continue
+		}
 		if isIgnoredHealthRun(run) || filterHealthPRLifecycleRun(run, collection) {
 			continue
 		}
@@ -185,6 +205,38 @@ func fetchWorkflowRuns(workflowName, startDate, repoOverride string, verbose boo
 		targets = []GitHubWorkflow{{Name: workflowName, Path: workflowName}}
 	}
 	var allRuns []WorkflowRun
+	if collection.DefaultBranch != "" {
+		collection.scanBranch = collection.DefaultBranch
+		defer func() { collection.scanBranch = "" }()
+		runs, err := fetchHealthRunSample(targets, startDate, repoOverride, verbose, collection)
+		allRuns = runs
+		if err != nil || collection.stopped {
+			collection.FailurePassComplete = false
+			collection.FailureListingComplete = false
+			return allRuns, err
+		}
+		collection.DefaultBranchPassComplete = collection.FailureListingComplete && collection.FailurePassComplete
+		listingComplete, passComplete := collection.FailureListingComplete, collection.FailurePassComplete
+		collection.scanBranch = ""
+		collection.failureScopes = nil
+		collection.FailureListingComplete, collection.FailurePassComplete = false, false
+		runs, err = fetchHealthRunSample(targets, startDate, repoOverride, verbose, collection)
+		collection.FailureListingComplete = listingComplete && collection.FailureListingComplete
+		collection.FailurePassComplete = passComplete && collection.FailurePassComplete
+		return mergeHealthRunSamples(runs, allRuns), err
+	}
+	return fetchHealthRunSample(targets, startDate, repoOverride, verbose, collection)
+}
+
+func healthRunInScan(run WorkflowRun, collection *HealthCollection) bool {
+	if collection.scanBranch != "" {
+		return run.HeadBranch == collection.scanBranch
+	}
+	return collection.DefaultBranch == "" || run.HeadBranch != collection.DefaultBranch
+}
+
+func fetchHealthRunSample(targets []GitHubWorkflow, startDate, repoOverride string, verbose bool, collection *HealthCollection) ([]WorkflowRun, error) {
+	var allRuns []WorkflowRun
 	if len(collection.workflows) > 0 {
 		failures, err := collectHealthFailures(startDate, repoOverride, collection)
 		allRuns = failures
@@ -216,7 +268,7 @@ func sampleHealthWorkflow(target GitHubWorkflow, startDate, repoOverride string,
 		workflowID = strconv.FormatInt(target.ID, 10)
 	}
 	opts := ListWorkflowRunsOptions{WorkflowName: workflowID, StartDate: startDate, EndDate: collection.EndDate, Limit: healthMinimumRuns * 2,
-		RepoOverride: repoOverride, Verbose: verbose, OldestFetchedCreatedAt: &oldest}
+		Ref: collection.scanBranch, RepoOverride: repoOverride, Verbose: verbose, OldestFetchedCreatedAt: &oldest}
 	var sample []WorkflowRun
 	seen := make(map[int64]struct{})
 	sourceBoundaries := make(map[string]struct{})
