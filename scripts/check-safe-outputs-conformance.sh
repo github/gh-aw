@@ -4,8 +4,8 @@ set +o histexpand
 # Safe Outputs Specification Conformance Checker
 # This script implements automated checks for the Safe Outputs specification
 # Specification: docs/src/content/docs/specs/safe-outputs-specification.md
-# Spec Version: 1.29.14 (2026-10-31; reviewed through 2026-11-02 changes)
-# Script Version: 1.29.14 (2026-11-02)
+# Spec Version: 1.29.21 (2026-11-08)
+# Script Version: 1.29.21 (2026-11-09)
 
 set -euo pipefail
 
@@ -3222,6 +3222,249 @@ check_handler_token_global_app_exclusion() {
     fi
 }
 check_handler_token_global_app_exclusion
+
+# WTD-004: Enforceable Pull Request Merge Gate (Section 10.5 WTD4, create_pull_request item 16, T-WTD-004..006, v1.29.17)
+# Detection caution or protected-files request-review MUST leave auto-merge disabled unless
+# enforceable approval policy is verified; a failed required REQUEST_CHANGES review MUST NOT be
+# downgraded to COMMENT, and independent-review guidance MUST be emitted.
+echo "Running WTD-004: Enforceable Pull Request Merge Gate..."
+check_wtd_auto_merge_gate() {
+    local handler="actions/setup/js/create_pull_request.cjs"
+    local failed=0
+
+    if [ ! -f "$handler" ]; then
+        log_high "WTD-004: create_pull_request handler missing: $handler"
+        return
+    fi
+
+    # WTD4: independent-review requirement must gate auto-merge enablement.
+    if ! grep -qE 'requiresIndependentReview\s*=' "$handler" ||
+        ! grep -qE 'autoMerge\s*&&\s*requiresIndependentReview' "$handler"; then
+        log_high "WTD-004: Auto-merge is not withheld when detection caution or protected files require independent review (WTD4)"
+        failed=1
+    fi
+
+    # T-WTD-005: never downgrade the only blocking review to COMMENT.
+    if grep -qE 'event:\s*"COMMENT"' "$handler"; then
+        log_high "WTD-004: create_pull_request may downgrade the required REQUEST_CHANGES review to COMMENT (T-WTD-005)"
+        failed=1
+    fi
+
+    # T-WTD-005/006: independent-review guidance must be emitted.
+    if ! grep -qi 'independent reviewer' "$handler"; then
+        log_medium "WTD-004: create_pull_request does not emit independent-review guidance when auto-merge is withheld (T-WTD-005/006)"
+        failed=1
+    fi
+
+    if [ $failed -eq 0 ]; then
+        log_pass "WTD-004: Auto-merge is withheld for detection caution and independent-review requirements (WTD4)"
+    fi
+}
+check_wtd_auto_merge_gate
+
+# ART-001: Issue Artifacts (Section 7.3 create_issue artifacts, v1.29.18)
+# The unprivileged MCP backend MUST read artifacts[].path into UTF-8 content through guarded,
+# bounded reads before recording a body-only request; invalid UTF-8 and empty content MUST be
+# rejected; the privileged issue processor MUST NOT read agent-supplied paths.
+echo "Running ART-001: Issue Artifacts..."
+check_issue_artifacts() {
+    local artifacts="actions/setup/js/issue_artifacts.cjs"
+    local backend="actions/setup/js/safe_outputs_handlers.cjs"
+    local processor="actions/setup/js/create_issue.cjs"
+    local failed=0
+
+    if [ ! -f "$artifacts" ]; then
+        log_high "ART-001: Issue artifact helper missing: $artifacts"
+        return
+    fi
+
+    local resolver
+    resolver=$(sed -n '/^function resolveIssueArtifactPaths/,/^}/p' "$artifacts")
+    if [ -z "$resolver" ]; then
+        log_high "ART-001: resolveIssueArtifactPaths not found; artifacts[].path cannot be read by the MCP backend"
+        return
+    fi
+
+    # Shape/count validation before any file read, then guarded bounded reads.
+    if ! echo "$resolver" | grep -qE 'normalizeIssueArtifactInputs\(' || ! echo "$resolver" | grep -qE 'readGuardedFile\(.*maxSizeBytes'; then
+        log_high "ART-001: artifacts[].path reads are not preceded by input validation or are not guarded and size-bounded"
+        failed=1
+    fi
+
+    # UTF-8 and empty-content rejection.
+    if ! echo "$resolver" | grep -qE 'isUtf8\(' || ! echo "$resolver" | grep -qE '\.trim\(\)'; then
+        log_high "ART-001: artifacts[].path content is not validated as non-empty UTF-8"
+        failed=1
+    fi
+
+    # The unprivileged MCP backend must resolve paths before recording requests.
+    if [ ! -f "$backend" ] || ! grep -qE 'resolveIssueArtifactPaths\(' "$backend"; then
+        log_high "ART-001: Safe outputs MCP backend does not resolve artifacts[].path before recording requests"
+        failed=1
+    fi
+
+    # The privileged processor must never read agent-supplied paths.
+    if [ -f "$processor" ] && grep -qE 'resolveIssueArtifactPaths|readGuardedFile' "$processor"; then
+        log_critical "ART-001: Privileged create_issue processor reads agent-supplied artifact paths"
+        failed=1
+    fi
+
+    if [ $failed -eq 0 ]; then
+        log_pass "ART-001: Issue artifact paths are read by the MCP backend with guarded, bounded UTF-8 reads"
+    fi
+}
+check_issue_artifacts
+
+# SOF-001: Owner-Only Safeoutputs File Writes (Section 9 safeoutputs backend identity, v1.29.19)
+# Generated safeoutputs config, tools, metadata, validation, and output files MUST use mode 0600
+# on creation and replacement/append, and writes MUST reject symbolic links (O_NOFOLLOW).
+echo "Running SOF-001: Owner-Only Safeoutputs File Writes..."
+check_safeoutputs_private_writes() {
+    local writer="actions/setup/js/create_files.cjs"
+    local appender="actions/setup/js/safe_outputs_append.cjs"
+    local tools_gen="actions/setup/js/generate_safe_outputs_tools.cjs"
+    local failed=0
+
+    local file
+    for file in "$writer" "$appender"; do
+        if [ ! -f "$file" ]; then
+            log_high "SOF-001: Safeoutputs writer missing: $file"
+            failed=1
+            continue
+        fi
+        if ! grep -q 'O_NOFOLLOW' "$file"; then
+            log_high "SOF-001: $file does not reject symbolic links with O_NOFOLLOW"
+            failed=1
+        fi
+        # 0600 on creation and fchmod to 0600 when replacing or appending to existing files.
+        if ! grep -qE 'openSync\(.*0o600' "$file" || ! grep -qE 'fchmodSync\(.*0o600' "$file"; then
+            log_high "SOF-001: $file does not enforce mode 0600 on both creation and replacement"
+            failed=1
+        fi
+    done
+
+    # tools.json, tools_meta.json and validation.json must go through the guarded writer.
+    if [ -f "$tools_gen" ]; then
+        if ! grep -qE 'require\("\./create_files\.cjs"\)' "$tools_gen" || grep -qE 'fs\.writeFileSync\(' "$tools_gen"; then
+            log_high "SOF-001: generate_safe_outputs_tools.cjs bypasses the owner-only no-follow writer"
+            failed=1
+        fi
+    fi
+
+    if [ $failed -eq 0 ]; then
+        log_pass "SOF-001: Safeoutputs files are written owner-only (0600) with no-follow semantics"
+    fi
+}
+check_safeoutputs_private_writes
+
+# TID-001: Escaped Temporary-ID References (Section 7.3 create_issue Temporary ID Resolution, v1.29.20)
+# Ordinary, Markdown-escaped, and partially escaped references (#aw_x, \#aw_x, #aw\_x) MUST be
+# recognized; only backslashes immediately preceding # or _ are removed for lookup; unresolved
+# references stay unchanged; a valid prefix of a longer identifier MUST NOT be replaced.
+echo "Running TID-001: Escaped Temporary-ID References..."
+check_escaped_temporary_ids() {
+    local tid="actions/setup/js/temporary_id.cjs"
+    local failed=0
+
+    if [ ! -f "$tid" ]; then
+        log_high "TID-001: Temporary ID helper missing: $tid"
+        return
+    fi
+
+    local pattern
+    pattern=$(grep -E '^const TEMPORARY_ID_PATTERN\s*=' "$tid" || true)
+    if [ -z "$pattern" ]; then
+        log_high "TID-001: TEMPORARY_ID_PATTERN not defined in $tid"
+        return
+    fi
+
+    # Escaped hash and underscore forms must be matched.
+    if ! echo "$pattern" | grep -qF '\\?#' || ! echo "$pattern" | grep -qF 'aw\\?_'; then
+        log_high "TID-001: TEMPORARY_ID_PATTERN does not recognize Markdown-escaped '#' or '_' forms"
+        failed=1
+    fi
+
+    # Complete-identifier requirement: a negative lookahead must prevent prefix matches.
+    if ! echo "$pattern" | grep -qF '(?!'; then
+        log_high "TID-001: TEMPORARY_ID_PATTERN lacks a boundary lookahead and may replace valid prefixes"
+        failed=1
+    fi
+
+    # Normalization removes only escapes immediately preceding # or _.
+    if ! sed -n '/^function normalizeTemporaryId/,/^}/p' "$tid" | grep -qF '.replace(/\\([#_])/g'; then
+        log_high "TID-001: normalizeTemporaryId does not limit unescaping to backslashes before '#' or '_'"
+        failed=1
+    fi
+
+    if [ $failed -eq 0 ]; then
+        log_pass "TID-001: Temporary-ID resolution recognizes escaped forms and requires complete identifiers"
+    fi
+}
+check_escaped_temporary_ids
+
+# DEC-001: Invocation Decision Skips (Section 7 noop Invocation Decision Skips, v1.29.21)
+# A deny aggregate MUST suppress the invocation without counting an attempt, append a noop only
+# when no terminal output exists, and diagnose append failures without failing. Requests MUST be
+# bounded to 400,000 UTF-8 bytes; secret matches MUST withhold questions with
+# sensitive_content_blocked; outcomes MUST be recorded as harness.decision evidence.
+echo "Running DEC-001: Invocation Decision Skips..."
+check_invocation_decision_skips() {
+    local decision="actions/setup/js/skip_if_decision.cjs"
+    local runner="actions/setup/js/harness_retry_runner.cjs"
+    local session="actions/setup/js/unified_session.cjs"
+    local failed=0
+
+    if [ ! -f "$decision" ]; then
+        log_high "DEC-001: skip-if-decision evaluator missing: $decision"
+        return
+    fi
+
+    # Conditional noop: only when no terminal output exists; failures diagnosed, not thrown.
+    local skip
+    skip=$(sed -n '/^function recordDecisionSkip/,/^}/p' "$decision")
+    if ! echo "$skip" | grep -qE 'if \(!hasTerminalSafeOutput\(' || ! echo "$skip" | grep -qE 'type: "noop"'; then
+        log_high "DEC-001: Decision skips do not append a noop conditionally on the absence of terminal outputs"
+        failed=1
+    fi
+    if ! echo "$skip" | grep -qE 'catch'; then
+        log_high "DEC-001: noop append failures are not diagnosed without failing the workflow"
+        failed=1
+    fi
+
+    # Request budget: 400,000 UTF-8 bytes (100,000 tokens x 4 bytes).
+    if ! grep -qE 'MAX_DECISION_INPUT_BYTES\s*=\s*(400000|400_000|100000 \* 4|100_000 \* 4)' "$decision"; then
+        log_high "DEC-001: Decision request budget is not bounded to 400,000 UTF-8 bytes"
+        failed=1
+    fi
+
+    # Secret screening withholds questions with sensitive_content_blocked.
+    if ! grep -q 'containsSensitiveContent' "$decision" || ! grep -q 'sensitive_content_blocked' "$decision"; then
+        log_high "DEC-001: Questions and file evidence are not screened for secrets before transmission"
+        failed=1
+    fi
+
+    # A deny suppresses the invocation before the attempt counter advances.
+    if [ -f "$runner" ]; then
+        if ! awk '/decision\.outcome === "deny"/{d=NR} /attempts = attempt \+ 1/{if(!a)a=NR} END{exit !(d && a && d < a)}' "$runner"; then
+            log_high "DEC-001: Denied invocations may be counted as executed attempts"
+            failed=1
+        fi
+    else
+        log_high "DEC-001: Harness retry runner missing: $runner"
+        failed=1
+    fi
+
+    # Decision evidence is recorded separately as harness.decision.
+    if [ ! -f "$session" ] || ! grep -q '"harness.decision"' "$session"; then
+        log_medium "DEC-001: Decision outcomes are not recorded as separate harness.decision unified-session evidence"
+        failed=1
+    fi
+
+    if [ $failed -eq 0 ]; then
+        log_pass "DEC-001: Invocation decision skips are bounded, screened, conditional, and separately recorded"
+    fi
+}
+check_invocation_decision_skips
 
 # Summary
 echo ""
