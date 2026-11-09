@@ -579,7 +579,7 @@ safe-outputs:
 
 Posts comments on issues, PRs, or discussions. Defaults to triggering item; use `target: "*"` for any, or number for specific items. When combined with `create-issue`, `create-discussion`, or `create-pull-request`, includes "Related Items" section.
 
-For machine-readable state such as an incremental review's baseline commit, use [`safe-outputs.data`](#structured-data-data). HTML comments in the agent-provided body are stripped; structured data is published as visible fenced JSON.
+For machine-readable state such as an incremental review's baseline commit, use [`safe-outputs.data`](#structured-data-data). HTML comments in the agent-provided body are stripped; structured data is published as fenced JSON. Set `collapse-data: true` to collapse the JSON without changing its values.
 The `add_comment` tool rejects obvious placeholder bodies such as `test` and `test body` before recording the output or consuming the comment budget. Intent checks also recognize `test ` followed by the corresponding field name, such as `test title` for issue or pull request titles. Matching ignores case and repeated whitespace, but preserves substantive content such as `Test coverage improved`. Rejected calls return a validation error so the agent can submit the real comment.
 
 Use `required-labels` to only comment on issues/PRs that have **all** of the specified labels. Use `required-title-prefix` to only comment on issues/PRs whose title starts with the given prefix. These filters apply to issues and PRs only (not discussions).
@@ -591,6 +591,7 @@ safe-outputs:
   add-comment:
     max: 3                       # max comments (default: 1)
     max-links: 100                # max URL occurrences in agent content (default: 50)
+    collapse-data: true            # collapse structured data (default: false)
     target: "*"                  # "triggering" (default), "*", or number
     allows-comment-ids: ${{ needs.prepare.outputs.comment_ids }} # comment IDs the agent may update when target is "*"
     discussions: true            # request discussions:write permission (default: false)
@@ -2208,7 +2209,7 @@ safe-outputs:
 
 Inline object schemas are validated at compile-time (Go) and runtime (JavaScript). Expression-based schemas are resolved and validated at runtime in JavaScript.
 
-For safe outputs that support `body`, the validator preserves output `data` and appends it to the body as fenced JSON. For `create-issue`, the JSON is enclosed in a collapsed `<details>` element with a "Structured data" summary. For `add-comment`, the JSON is visible under a "Structured data:" label, not hidden metadata.
+For safe outputs that support `body`, the validator preserves output `data` and appends it to the body as fenced JSON. For `create-issue`, the JSON is enclosed in a collapsed `<details>` element with a "Structured data" summary. For `add-comment`, the default is visible JSON under a "Structured data:" label. Set `add-comment.collapse-data: true` to use the collapsed section instead. The option does not enable `data` or change its schema.
 
 For example, an incremental review can declare a baseline SHA:
 
@@ -2231,7 +2232,7 @@ The agent supplies the baseline in the output item's `data` field, not as an HTM
 }
 ```
 
-On a later run, including an `issue_comment`-triggered run, read the PR's comment history and parse the fenced JSON following "Structured data:" in the latest matching review comment. Filter by the expected comment author and [workflow marker](#searching-for-workflow-created-items). Validate the recovered SHA against the target PR before using it as a baseline. The state persists in the posted comment; `data` does not automatically restore it or provide a separate cross-run store. Do not put secrets in `data`.
+On a later run, including an `issue_comment`-triggered run, read the PR's comment history and parse the fenced JSON following "Structured data:" or inside the collapsed "Structured data" section in the latest matching review comment. Filter by the expected comment author and [workflow marker](#searching-for-workflow-created-items). Validate the recovered SHA against the target PR before using it as a baseline. The state persists in the posted comment; `data` does not automatically restore it or provide a separate cross-run store. Do not put secrets in `data`.
 
 #### Sanitization Options
 

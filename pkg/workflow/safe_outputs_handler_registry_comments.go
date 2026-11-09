@@ -10,6 +10,7 @@ var commentHandlerRegistry = map[string]handlerBuilder{
 		return newHandlerConfigBuilder().
 			AddTemplatableInt("max", c.Max).
 			AddIfPositive("max_links", c.MaxLinks).
+			AddBoolPtr("collapse_data", c.CollapseData).
 			AddIfNotEmpty("target", c.Target).
 			AddTemplatableBool("hide_older_comments", c.HideOlderComments).
 			AddTemplatableBool("replace_older_comments", c.ReplaceOlderComments).
