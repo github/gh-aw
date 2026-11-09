@@ -40,7 +40,7 @@ function isMetric(value) {
  */
 function sessionContext(event) {
   const data = event?.data ?? {};
-  const sessionId = data.sessionId !== undefined ? data.sessionId : event?.sessionId !== undefined ? event.sessionId : event?.session_id !== undefined ? event.session_id : data.session_id;
+  const sessionId = data.sessionId !== undefined ? data.sessionId : event?.sessionId !== undefined ? event.sessionId : event?.session_id !== undefined ? event.session_id : data.session_id !== undefined ? data.session_id : event?.sessionID;
   const parentToolUseId =
     data.parentToolUseId !== undefined ? data.parentToolUseId : event?.parentToolUseId !== undefined ? event.parentToolUseId : event?.parent_tool_use_id !== undefined ? event.parent_tool_use_id : data.parent_tool_use_id;
   const agentId = data.agentId ?? (typeof event?.type === "string" && event.type.startsWith("subagent.") ? undefined : event?.agentId);

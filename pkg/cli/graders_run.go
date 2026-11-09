@@ -17,9 +17,12 @@ import (
 
 	"github.com/github/gh-aw/actions/setup"
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/workflow"
 )
+
+var gradersRunLog = logger.New("cli:graders_run")
 
 const (
 	maxGraderPayloadBytes = 50 * 1024 * 1024
@@ -56,6 +59,7 @@ type graderRunDefinition struct {
 }
 
 func runGrader(ctx context.Context, config graderRunConfig) error {
+	gradersRunLog.Printf("Running grader %q from workflow %q (runID=%d)", config.GraderID, config.Workflow, config.RunID)
 	grader, err := loadGraderRunDefinition(config.Workflow, config.GraderID)
 	if err != nil {
 		return err
@@ -103,6 +107,7 @@ func loadGraderRunDefinitionMode(workflowArg, graderID string, collection bool) 
 			return graderRunDefinition{}, err
 		}
 	}
+	gradersRunLog.Printf("Loaded grader %q: source=%s, collection=%t", graderID, source, collection)
 	return graderRunDefinition{
 		Workflow: workflowPath, Selector: workflowPath + ":" + graderID,
 		ID: graderID, Name: definition.Name, Description: definition.Description, Source: source, Unit: definition.Unit,
@@ -113,8 +118,10 @@ func loadGraderRunDefinitionMode(workflowArg, graderID string, collection bool) 
 
 func loadGraderRunPayload(ctx context.Context, config graderRunConfig) (payload json.RawMessage, err error) {
 	if config.RunID == 0 {
+		gradersRunLog.Print("Reading grader payload from standard input")
 		return readGraderPayload(config.Input, "standard input")
 	}
+	gradersRunLog.Printf("Downloading usage artifact for run %d", config.RunID)
 	tempDir, err := os.MkdirTemp("", "gh-aw-grader-run-*")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create grader run directory: %w", err)
@@ -233,6 +240,7 @@ func runSessionGrader(ctx context.Context, grader graderRunDefinition, payload j
 	if grader.Source == "operational-value" {
 		timeout = 125 * time.Second
 	}
+	gradersRunLog.Printf("Executing grader %q via node: source=%s, timeout=%s, payloadBytes=%d", grader.ID, grader.Source, timeout, len(payload))
 	commandCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	args := []string{permissionFlag, "--allow-fs-read=" + directory}

@@ -13,9 +13,12 @@ import (
 	"time"
 
 	"github.com/github/gh-aw/pkg/gitutil"
+	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/syncutil"
 	"github.com/github/gh-aw/pkg/workflow"
 )
+
+var updateActionsDepsLog = logger.New("cli:update_actions_deps")
 
 // isCoreAction returns true if the repo is a GitHub-maintained core action (actions/* org).
 // Core actions are always updated to the latest major version without requiring --major.
@@ -59,6 +62,7 @@ func newCachedActionUpdateDeps(base actionUpdateDeps) actionUpdateDeps {
 		repo = gitutil.ExtractBaseRepo(repo)
 		key := fmt.Sprintf("%s|%s|%t", repo, currentVersion, allowMajor)
 		result, err := loadActionUpdateResult(&mu, latestReleases, key, func() (cachedLatestRelease, error) {
+			updateActionsDepsLog.Printf("Cache miss: fetching latest release for %s (current=%s, allowMajor=%t)", repo, currentVersion, allowMajor)
 			var version, sha string
 			var err error
 			if base.getLatestRelease != nil {
@@ -72,6 +76,7 @@ func newCachedActionUpdateDeps(base actionUpdateDeps) actionUpdateDeps {
 	}
 	cached.runGHReleasesAPI = func(ctx context.Context, repo string) ([]byte, error) {
 		return loadActionUpdateResult(&mu, releaseLists, repo, func() ([]byte, error) {
+			updateActionsDepsLog.Printf("Cache miss: fetching release list for %s", repo)
 			return base.runGHReleasesAPI(ctx, repo)
 		})
 	}
@@ -79,12 +84,14 @@ func newCachedActionUpdateDeps(base actionUpdateDeps) actionUpdateDeps {
 		repo = gitutil.ExtractBaseRepo(repo)
 		key := repo + "|" + tag
 		return loadActionUpdateResult(&mu, shas, key, func() (string, error) {
+			updateActionsDepsLog.Printf("Cache miss: resolving SHA for %s@%s", repo, tag)
 			return base.getActionSHAForTag(ctx, repo, tag)
 		})
 	}
 	cached.checkCoolDown = func(ctx context.Context, repo, tag string, coolDown time.Duration) coolDownCheckResult {
 		key := fmt.Sprintf("%s|%s|%s", repo, tag, coolDown)
 		result, _ := loadActionUpdateResult(&mu, cooldowns, key, func() (coolDownCheckResult, error) {
+			updateActionsDepsLog.Printf("Cache miss: checking cooldown for %s@%s (window=%s)", repo, tag, coolDown)
 			return base.checkCoolDown(ctx, repo, tag, coolDown), nil
 		})
 		return result

@@ -395,6 +395,46 @@ func TestYamlStringValue(t *testing.T) {
 			expected: "${{ secrets.TOKEN }}",
 		},
 		{
+			name:     "uppercase boolean keyword is quoted",
+			input:    "True",
+			expected: `"True"`,
+		},
+		{
+			name:     "uppercase boolean synonym is quoted",
+			input:    "TRUE",
+			expected: `"TRUE"`,
+		},
+		{
+			name:     "boolean synonym is quoted",
+			input:    "yes",
+			expected: `"yes"`,
+		},
+		{
+			name:     "boolean synonym with mixed case is quoted",
+			input:    "Off",
+			expected: `"Off"`,
+		},
+		{
+			name:     "null keyword is quoted",
+			input:    "null",
+			expected: `"null"`,
+		},
+		{
+			name:     "null synonym is quoted",
+			input:    "~",
+			expected: `"~"`,
+		},
+		{
+			name:     "canonical true remains unquoted",
+			input:    "true",
+			expected: "true",
+		},
+		{
+			name:     "canonical false remains unquoted",
+			input:    "false",
+			expected: "false",
+		},
+		{
 			name:     "json object gets single-quoted",
 			input:    `{"key":"value"}`,
 			expected: `'{"key":"value"}'`,
@@ -447,6 +487,19 @@ func TestFormatStepWithCommandAndEnvYAMLSafe(t *testing.T) {
 		// GitHub Actions expressions should not be wrapped in extra quotes
 		if !strings.Contains(output, "MY_TOKEN: ${{ secrets.TOKEN }}") {
 			t.Errorf("Expected unquoted github expression in env, got:\n%s", output)
+		}
+	})
+
+	t.Run("ambiguous scalar env var is quoted", func(t *testing.T) {
+		stepLines := []string{"      - name: Test step"}
+		env := map[string]string{
+			"LITELLM_LOCAL_MODEL_COST_MAP": "True",
+		}
+		result := FormatStepWithCommandAndEnv(stepLines, "echo test", env)
+		output := strings.Join(result, "\n")
+
+		if !strings.Contains(output, `LITELLM_LOCAL_MODEL_COST_MAP: "True"`) {
+			t.Errorf("Expected quoted ambiguous scalar in env, got:\n%s", output)
 		}
 	})
 
