@@ -14,3 +14,6 @@
 
 # Workflow Health — 2026-11-08T04:30Z
 - Compile clean; 362 workflows. Failing list is low-sample (1-run); no new delta; no dashboard.
+
+# Workflow Health — 2026-11-09T04:30Z
+- Compile clean; 365 workflows. Failing list low-sample (1-3 runs); no new delta; no dashboard.
