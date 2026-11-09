@@ -41,6 +41,18 @@ describe("compiler-owned Markdown metadata", () => {
     expect(transformMarkdownContent(content, text => renderMarkdownTemplate(text))).toBe("Visible");
   });
 
+  it("does not interpret ordinary Markdown separators as document metadata", () => {
+    const content = "Introduction\n---\nExample prose, not YAML\n---\nConclusion";
+    expect(transformMarkdownContent(content, text => text.replace("Example", "Rendered"))).toBe("Introduction\n---\nRendered prose, not YAML\n---\nConclusion");
+  });
+
+  it.each(["", "Introduction\n", "Introduction\r\n"])("recognizes an inline artifact at a heading boundary after %j", prefix => {
+    const source = "model: small";
+    installMarkdownMetadata({ version: 1, records: [record(source, { model: "small" })] });
+    const content = `${prefix}## agent: reader\n---\n${source}\n---\nBody`;
+    expect(transformMarkdownContent(content, text => text.replace("small", "resolved"))).toBe(`${prefix}## agent: reader\n---\n{"model":"resolved"}\n---\nBody`);
+  });
+
   it("fails closed rather than silently unregistering agents without compiler metadata", () => {
     const fs = require("node:fs");
     const path = require("node:path");

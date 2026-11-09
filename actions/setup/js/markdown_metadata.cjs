@@ -13,7 +13,7 @@ const { parseLockFileHeaders } = require("./lock_file_headers.cjs");
 let records = new Map();
 let initialized = false;
 const FRONTMATTER = /^---[ \t]*\r?\n(?:([\s\S]*?)\r?\n)?---[ \t]*\r?(?=\n|$)/;
-const METADATA_BLOCKS = /(^|^##[ \t]+(?:agent|skill):[^\n]*\r?\n(?:[ \t]*\r?\n)*)---[ \t]*\r?\n(?:([\s\S]*?)\r?\n)?---[ \t]*\r?(?=\n|$)/gm;
+const METADATA_BLOCKS = /(^|(?:^|\n)##[ \t]+(?:agent|skill):[^\n]*\r?\n(?:[ \t]*\r?\n)*)---[ \t]*\r?\n(?:([\s\S]*?)\r?\n)?---[ \t]*\r?(?=\n|$)/g;
 
 class CompilerMetadataUnavailableError extends Error {
   constructor() {
