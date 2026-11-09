@@ -41,16 +41,15 @@ func run(pass *analysis.Pass) (any, error) {
 		if strings.HasSuffix(pkgPath, ".test") || filecheck.ShouldSkipFilename(pass.Fset.Position(call.Pos()).Filename, generatedFiles) {
 			return
 		}
-		sel, ok := call.Fun.(*ast.SelectorExpr)
-		if !ok {
+		// CalledOSFunc sees through parentheses such as (os.Exit)(1) and
+		// resolves dot-imported calls, which a bare SelectorExpr check misses.
+		if _, ok := astutil.CalledOSFunc(pass, call, "Exit"); !ok {
 			return
 		}
-		if astutil.IsPkgSelector(pass, sel, "os") && sel.Sel.Name == "Exit" {
-			position := pass.Fset.PositionFor(call.Pos(), false)
-			if nolint.HasDirectiveForLinter(position, noLintIndex, "osexitinlibrary") {
-				return
-			}
-			pass.ReportRangef(call, "os.Exit called in library package %s; move process termination to a cmd/ entry-point", pkgPath)
+		position := pass.Fset.PositionFor(call.Pos(), false)
+		if nolint.HasDirectiveForLinter(position, noLintIndex, "osexitinlibrary") {
+			return
 		}
+		pass.ReportRangef(call, "os.Exit called in library package %s; move process termination to a cmd/ entry-point", pkgPath)
 	})
 }
