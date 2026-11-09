@@ -1021,6 +1021,21 @@ request MUST recover its original request and fingerprint, not publish a checked
 replacement. All existing authorization, ownership and native-reservation
 requirements still apply to both forms.
 
+Native `work cancel-work --obsolete` MUST use the maintenance eligibility predicate,
+current-time expiration, UTF-8 byte ordering, and a single batch bounded by 256
+and the installed operation limit. An optional smaller `--limit` only narrows
+that bound. Publication uses the existing native administrator authority, not
+an impersonated workflow reconciler. `--dry-run` MUST remain read-only and MUST
+NOT assert authenticated publication authority. Retrying an accepted request
+MUST recover its original targets and fingerprint rather than reselect a batch
+from newly obsolete Work. No eligible targets MUST NOT record a request.
+Publication MUST retain the selection or recovery ledger snapshot and reject
+replacement ledgers, including hard-clear/readmission of identical Work IDs,
+while allowing verified same-ledger appends and checkpoints. Accepted receipt
+recovery MUST NOT be blocked by a later lower Policy operation limit; only the
+caller's limit bounds its size, and an insufficient limit MUST report the
+required numeric minimum. Fresh selection remains Policy-bounded.
+
 `WorkPriority` is published through an administrator `control` request in this
 same transaction log. Replay stores `effective_priority` separately from the
 immutable Work definition; native Go and JavaScript selection and historical
