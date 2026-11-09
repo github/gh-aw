@@ -245,7 +245,7 @@ const input = [init, user, assistant, start, complete, result].map(JSON.stringif
 const events = parseLog("2026.10.14-941492e\n[INFO] infrastructure\n" + input).logEntries;
 assert.deepEqual(events.map(event => event.type), [
   "session.init", "user.message", "assistant.message", "tool.execution_start",
-  "tool.execution_complete", "session.result", "cursor.diagnostic",
+  "tool.execution_complete", "session.result", "assistant.message", "cursor.diagnostic",
 ]);
 assert.equal(events[0].data.model, "Auto");
 assert.equal(events[0].data.sessionId, "session-1");
@@ -364,6 +364,59 @@ for (const diagnostic of [
   assert.deepEqual(parseLog([init, quoted, {...result, result: diagnostic}].map(JSON.stringify).join("\n")).mcpFailures, []);
 }
 assert.deepEqual(parseLog(JSON.stringify(init) + "\nMCP server github connected").mcpFailures, []);
+const liveTimestamp = 1793526675866;
+const liveText = "Quoted \"text\", backslash \\, newline\nand Unicode \u2603";
+const liveStart = {...start, timestamp_ms: liveTimestamp, model_call_id: "model-call-1",
+  tool_call: {...start.tool_call, hookAdditionalContexts: [], toolCallId: "read-1", startedAtMs: String(liveTimestamp)}};
+const liveComplete = {...complete, timestamp_ms: liveTimestamp + 1, model_call_id: "model-call-1",
+  tool_call: {...complete.tool_call, hookAdditionalContexts: [{context: "metadata, not a tool"}],
+    toolCallId: "read-1", startedAtMs: String(liveTimestamp), completedAtMs: String(liveTimestamp + 1)}};
+const liveResult = {...result, result: liveText, usage: {inputTokens: 16565, outputTokens: 1129, cacheReadTokens: 95360, cacheWriteTokens: 0}};
+const live = parseLog([
+  init,
+  {type: "thinking", subtype: "delta", text: liveText, session_id: "session-1", timestamp_ms: liveTimestamp - 2},
+  {type: "thinking", subtype: "completed", session_id: "session-1", timestamp_ms: liveTimestamp - 1},
+  {...assistant, timestamp_ms: liveTimestamp, model_call_id: "model-call-1"},
+  liveStart, liveComplete, liveResult,
+].map(JSON.stringify).join("\n")).logEntries;
+assert.deepEqual(live.map(event => event.type), [
+  "session.init", "assistant.reasoning", "assistant.reasoning", "assistant.message",
+  "tool.execution_start", "tool.execution_complete", "session.result", "assistant.message",
+]);
+assert.equal(live[1].data.content, liveText);
+assert.equal(live[1].data.delta, true);
+assert.equal(live[2].data.delta, false);
+assert.equal(Object.hasOwn(live[2].data, "content"), false);
+assert.equal(live[4].data.messageId, "model-call-1");
+assert.equal(live[5].data.messageId, "model-call-1");
+assert.equal(live[6].data.status, "success");
+const {normalizeUnifiedSessionEvent} = require("./unified_session_payload.cjs");
+const unifiedLive = live.map(event => normalizeUnifiedSessionEvent(event, "agent"));
+assert.equal(unifiedLive[1].data.content, liveText);
+assert.equal(unifiedLive[1].timestamp, liveTimestamp - 2);
+assert.equal(unifiedLive[3].timestamp, liveTimestamp);
+assert.equal(unifiedLive[3].data.apiCallId, "model-call-1");
+assert.equal(unifiedLive[4].timestamp, liveTimestamp);
+assert.equal(unifiedLive[5].timestamp, liveTimestamp + 1);
+assert.deepEqual(unifiedLive[4].data.input, liveStart.tool_call.readToolCall.args);
+assert.deepEqual(unifiedLive[5].data.output, liveComplete.tool_call.readToolCall.result);
+assert.equal(unifiedLive[6].data.usage.cacheReadInputTokens, 95360);
+assert.equal(unifiedLive[6].data.usage.cacheCreationInputTokens, 0);
+assert.equal(unifiedLive[7].data.content, liveText);
+assert.equal(unifiedLive[7].data.apiCallId, "request-1");
+assert.deepEqual(JSON.parse(JSON.stringify(unifiedLive)), unifiedLive);
+const duplicate = parseLog([init, {...assistant, message: {content: [{type: "text", text: liveText}]}}, liveResult].map(JSON.stringify).join("\n")).logEntries;
+assert.equal(duplicate.filter(event => event.type === "assistant.message").length, 1);
+for (const timestamp_ms of [-1, "1793526675866", Number.MAX_SAFE_INTEGER + 1]) {
+  const invalidTimestamp = parseLog(JSON.stringify({...assistant, timestamp_ms})).logEntries[0];
+  assert.equal(Object.hasOwn(invalidTimestamp, "timestamp"), false);
+}
+const metadataOnly = parseLog(JSON.stringify({type: "tool_call", subtype: "started", tool_call: {
+  hookAdditionalContexts: [], metadata: {context: "not a call"},
+}})).logEntries;
+assert.equal(metadataOnly.some(event => event.type.startsWith("tool.execution")), false);
+assert.equal(metadataOnly[0].type, "cursor.tool_call");
+assert.equal(parseLog(JSON.stringify({...result, subtype: "error", is_error: true})).logEntries[0].data.status, "error");
 process.stdout.write(JSON.stringify(parserEvents));
 `
 

@@ -325,6 +325,32 @@ describe("Unified Agent Session 1.0.0 conformance", () => {
     expect(normalizeSessionUsage({ input_tokens: 10, overflowed_tokens: ["input_tokens"], overflowedTokens: [] })).toMatchObject({ overflowed_tokens: ["input_tokens"] });
   });
 
+  it.each([
+    ["cache_read_input_tokens", "cacheReadTokens", "cacheReadInputTokens"],
+    ["cache_creation_input_tokens", "cacheWriteTokens", "cacheCreationInputTokens"],
+    ["cache_read_input_tokens", "cache_read_tokens", "cacheReadInputTokens"],
+    ["cache_creation_input_tokens", "cache_write_tokens", "cacheCreationInputTokens"],
+  ])("normalizes native cache alias %s / %s without overriding canonical evidence", (key, alias, primaryAlias) => {
+    expect(normalizeSessionUsage({ [alias]: 0 })[key]).toBe(0);
+    expect(normalizeSessionUsage({ [alias]: 95360 })[key]).toBe(95360);
+    expect(normalizeSessionUsage({ [key]: 0, [alias]: 42 })[key]).toBe(0);
+    expect(normalizeSessionUsage({ [primaryAlias]: 3, [alias]: 42 })[key]).toBe(3);
+    const invalid = normalizeSessionUsage({ [key]: -1, [alias]: 42 });
+    expect(invalid[key]).toBeUndefined();
+    expect(invalid[alias]).toBeUndefined();
+    expect(normalizeSessionUsage({ [alias]: "42" })[key]).toBeUndefined();
+    const overflow = normalizeSessionUsage({ [alias]: 42, overflowed_tokens: [alias] });
+    expect(overflow.overflowed_tokens).toEqual([key]);
+    expect(overflow[key]).toBeUndefined();
+    expect(overflow[alias]).toBeUndefined();
+    const usage = {};
+    accumulateSessionUsage(usage, { [alias]: Number.MAX_SAFE_INTEGER });
+    accumulateSessionUsage(usage, { [alias]: 1 });
+    accumulateSessionUsage(usage, { [alias]: 1 });
+    expect(normalizeSessionUsage(usage)[key]).toBeUndefined();
+    expect(usage.overflowed_tokens).toEqual([key]);
+  });
+
   it("T-UAS-032/033: sum contributions but select snapshots field by field", () => {
     const usage = {};
     accumulateSessionUsage(usage, { input_tokens: 5, outputTokens: 2 });

@@ -158,7 +158,12 @@ engine:
         const logEntries = [];
         const AWF_INFRA_RE = /^\[(INFO|WARN|SUCCESS|ERROR|entrypoint|health-check|cursor-harness)\]|^ (?:Container|Network|Volume) |^Process exiting with code:/;
         const plaintext = [];
-        const emit = (type, data) => logEntries.push({ type, data });
+        const append = event => {
+          const timestamp = event.data.timestamp_ms;
+          if (event.timestamp === undefined && Number.isSafeInteger(timestamp) && timestamp >= 0) event.timestamp = timestamp;
+          logEntries.push(event);
+        };
+        const emit = (type, data) => append({ type, data });
         const mcpFailures = new Set();
         let parseErrors = 0;
         let fence;
@@ -216,11 +221,12 @@ engine:
           const context = { ...record, sourceEngine: "cursor" };
           if (typeof record.session_id === "string") context.sessionId = record.session_id;
           if (record.type === "tool_call") {
-            const calls = record.tool_call && typeof record.tool_call === "object" ? Object.entries(record.tool_call) : [];
+            const calls = record.tool_call && typeof record.tool_call === "object" ? Object.entries(record.tool_call).filter(([name, call]) =>
+              (name === "function" || name.endsWith("ToolCall")) && call && typeof call === "object" && !Array.isArray(call)) : [];
             for (const [name, call] of calls) {
-              if (!call || typeof call !== "object") continue;
               const data = { ...context, toolName: name === "function" ? call.name : name };
               if (typeof record.call_id === "string") data.toolCallId = record.call_id;
+              if (typeof record.model_call_id === "string") data.messageId = record.model_call_id;
               if (Object.hasOwn(call, "args")) data.input = call.args;
               else if (Object.hasOwn(call, "arguments")) data.input = call.arguments;
               if (record.subtype === "started") {
@@ -237,13 +243,25 @@ engine:
               }
             }
             if (calls.length === 0) emit("cursor.tool_call", context);
+          } else if (record.type === "thinking" && (record.subtype === "delta" || record.subtype === "completed")) {
+            const data = { ...context, delta: record.subtype === "delta" };
+            if (typeof record.text === "string") data.content = record.text;
+            emit("assistant.reasoning", data);
           } else {
             const normalized = normalizeAgentSession([record], { sourceEngine: "cursor" });
             if (normalized.length === 0) emit("cursor.event", context);
             for (const event of normalized) {
               const data = { ...context, ...event.data };
+              if (event.type === "assistant.message" && typeof record.model_call_id === "string") data.apiCallId = record.model_call_id;
+              if (event.type === "session.result" && typeof record.is_error === "boolean") data.status = record.is_error ? "error" : "success";
               for (const key of Object.keys(data)) if (data[key] === undefined) delete data[key];
-              logEntries.push({ ...event, data });
+              append({ ...event, data });
+            }
+            if (record.type === "result" && typeof record.result === "string" &&
+                !logEntries.some(event => event.type === "assistant.message" && event.data.sessionId === context.sessionId && event.data.content === record.result)) {
+              const data = { ...context, content: record.result };
+              if (typeof record.request_id === "string") data.apiCallId = record.request_id;
+              emit("assistant.message", data);
             }
           }
         }
@@ -288,13 +306,18 @@ Plugins are loaded from `~/.cursor/plugins/local`.
 The CLI emits [stream-json](https://cursor.com/docs/cli/reference/output-format)
 without partial text deltas. The parser preserves observed session, message,
 tool-call IDs, arguments, results, and terminal metadata as unified session
-events. It does not invent turn counts, token usage, or tool success when
+events. Hook contexts and tool envelope metadata are not tool calls. Native
+reasoning deltas and completion markers use `assistant.reasoning`; observed
+millisecond timestamps, model-call correlations, cache counters, and distinct
+terminal answer text are retained in their canonical fields. It does not invent
+turn counts, token usage, or tool success when
 these are absent. Legacy text is retained as final-answer prose, never parsed
 as tool calls, including JSON examples in Markdown fences. Native framing
 requires an initialization record outside a fence or an all-JSONL log.
 Rejected native records emit payload-free collection warnings with 1-based
 line numbers. MCP connection failures are recognized only in non-JSON native
 diagnostics, not in legacy answers or JSON-encoded assistant messages.
-Fixture coverage follows the published format; authenticated
-latest-build event output remains unverified until a permitted live smoke.
+Sanitized regressions cover the native shapes observed in an existing
+2026.10.14-941492e conformance run. Failed-tool results and subagent events
+remain fixture-only or unverified where absent from live evidence.
 -->

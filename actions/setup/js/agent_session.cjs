@@ -7,12 +7,12 @@
 const { getMessageRefusal, getProviderRefusals, normalizeOpenAIChatUsage } = require("./provider_refusal.cjs");
 
 const USAGE_ALIASES = {
-  input_tokens: "inputTokens",
-  output_tokens: "outputTokens",
-  reasoning_output_tokens: "reasoningOutputTokens",
-  total_tokens: "totalTokens",
-  cache_creation_input_tokens: "cacheCreationInputTokens",
-  cache_read_input_tokens: "cacheReadInputTokens",
+  input_tokens: ["inputTokens"],
+  output_tokens: ["outputTokens"],
+  reasoning_output_tokens: ["reasoningOutputTokens"],
+  total_tokens: ["totalTokens"],
+  cache_creation_input_tokens: ["cacheCreationInputTokens", "cacheWriteTokens", "cache_write_tokens"],
+  cache_read_input_tokens: ["cacheReadInputTokens", "cacheReadTokens", "cache_read_tokens"],
 };
 const USAGE_BOOLEAN_ALIASES = {
   input_tokens_include_cache: "inputTokensIncludeCache",
@@ -74,13 +74,14 @@ function normalizeSessionUsage(usage) {
   if (!usage || typeof usage !== "object" || Array.isArray(usage)) return undefined;
   const result = { ...usage };
   delete result.overflowedTokens;
-  for (const [key, alias] of Object.entries(USAGE_ALIASES)) {
+  for (const [key, aliases] of Object.entries(USAGE_ALIASES)) {
     const hasCanonical = Object.hasOwn(usage, key);
-    const value = hasCanonical ? usage[key] : usage[alias];
+    const alias = aliases.find(name => Object.hasOwn(usage, name));
+    const value = hasCanonical ? usage[key] : alias === undefined ? undefined : usage[alias];
     if (isTokenCount(value)) result[key] = value;
     else {
       delete result[key];
-      if (hasCanonical) delete result[alias];
+      if (hasCanonical) for (const name of aliases) delete result[name];
     }
   }
   for (const [key, alias] of Object.entries(USAGE_BOOLEAN_ALIASES)) {
@@ -94,10 +95,10 @@ function normalizeSessionUsage(usage) {
   }
   const overflowed = Object.hasOwn(usage, "overflowed_tokens") ? usage.overflowed_tokens : usage.overflowedTokens;
   if (Array.isArray(overflowed)) {
-    result.overflowed_tokens = [...new Set(overflowed.map(key => Object.entries(USAGE_ALIASES).find(([name, alias]) => key === name || key === alias)?.[0]).filter(Boolean))];
+    result.overflowed_tokens = [...new Set(overflowed.map(key => Object.entries(USAGE_ALIASES).find(([name, aliases]) => key === name || aliases.includes(key))?.[0]).filter(Boolean))];
     for (const key of result.overflowed_tokens) {
       delete result[key];
-      delete result[USAGE_ALIASES[key]];
+      for (const alias of USAGE_ALIASES[key]) delete result[alias];
     }
   } else delete result.overflowed_tokens;
   return result;
@@ -120,7 +121,7 @@ function reconcileSessionUsage(previous, snapshot) {
   for (const key of normalized.overflowed_tokens ?? []) {
     overflowed.add(key);
     delete result[key];
-    delete result[USAGE_ALIASES[key]];
+    for (const alias of USAGE_ALIASES[key]) delete result[alias];
   }
   if (overflowed.size) result.overflowed_tokens = [...overflowed];
   else delete result.overflowed_tokens;
@@ -142,7 +143,7 @@ function accumulateSessionUsage(target, usage) {
     target.overflowed_tokens = [...overflowed];
     for (const key of overflowed) {
       delete target[key];
-      delete target[USAGE_ALIASES[key]];
+      for (const alias of USAGE_ALIASES[key]) delete target[alias];
     }
   }
 }
