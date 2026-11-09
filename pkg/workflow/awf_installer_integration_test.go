@@ -68,16 +68,44 @@ Inspect the repository.
 				t.Fatal(err)
 			}
 			lockText := string(lock)
-			installStepStart := strings.Index(lockText, "      - name: Install AWF binary\n")
+			const installStepMarker = "      - name: Install AWF binary\n"
+			installStepStart := strings.Index(lockText, installStepMarker)
 			if installStepStart < 0 {
 				t.Fatalf("generated %s lock file lacks the AWF install step:\n%s", runner, lock)
 			}
-			installStepEnd := strings.Index(lockText[installStepStart+1:], "\n      - ")
 			installStep := lockText[installStepStart:]
-			if installStepEnd >= 0 {
-				installStep = lockText[installStepStart : installStepStart+1+installStepEnd]
+			stepLines := strings.Split(installStep, "\n")
+			boundary := -1
+			for i, line := range stepLines[1:] {
+				if strings.HasPrefix(line, "      - ") {
+					boundary = i + 1
+					break
+				}
+				if strings.TrimSpace(line) == "" {
+					continue
+				}
+				if len(line)-len(strings.TrimLeft(line, " ")) <= 4 {
+					boundary = i + 1
+					break
+				}
 			}
-			if !strings.Contains(installStep, `install_awf_binary.sh" v0.28.62 --checksums-sha256 `+checksum) {
+			if boundary < 0 {
+				if !strings.HasSuffix(installStep, "\n") {
+					t.Fatalf("generated %s lock file lacks a boundary after the AWF install step:\n%s", runner, installStep)
+				}
+				// The AWF step is the final step in the lock file.
+				boundary = len(stepLines) - 1
+			}
+			installStep = strings.Join(stepLines[:boundary], "\n")
+			expectedCommand := `        run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.28.62 --checksums-sha256 ` + checksum + ` --rootless`
+			commandFound := false
+			for line := range strings.SplitSeq(installStep, "\n") {
+				if strings.HasPrefix(line, "        run:") && line == expectedCommand {
+					commandFound = true
+					break
+				}
+			}
+			if !commandFound {
 				t.Errorf("generated %s lock file lacks the pinned installer command:\n%s", runner, installStep)
 			}
 			if runner == "windows-latest" {
