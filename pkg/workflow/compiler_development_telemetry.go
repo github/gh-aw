@@ -28,6 +28,9 @@ func (c *Compiler) prepareDryRunWorkflowData(data *WorkflowData) (*WorkflowData,
 		before.ParsedFrontmatter = &frontmatter
 	}
 	defer logDryRunWorkflowChanges(&before, result)
+	// Remove authored code and credentials before job construction and token wiring.
+	result.CustomSteps = ""
+	result.PostSteps = ""
 	if err := prepareDryRunWorkflowDispatch(result); err != nil {
 		return nil, err
 	}
