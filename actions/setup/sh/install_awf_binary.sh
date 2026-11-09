@@ -14,6 +14,8 @@ set +o histexpand
 # Install strategy:
 #   1. If Node.js >= 20 is available, download the lightweight awf-bundle.js (~357KB)
 #   2. Otherwise, fall back to platform-specific pkg binary (~50MB)
+#   Exhausted release-download HTTP 5xx errors use the release-assets API when jq
+#   is available; both download paths require the same integrity verification.
 #
 # Platform support (fallback binary):
 #   - Linux (x64, arm64): Downloads pre-built binary
@@ -162,6 +164,36 @@ create_awf_runtime_tmp
 # Create a private staging directory on the runner's job-owned filesystem.
 create_release_staging awf
 
+download_release_asset_from_api() {
+  local asset="$1" asset_id
+  local -a options=(--proto '=https' --proto-redir '=https' --retry 2 --retry-max-time 30 --connect-timeout 15)
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "ERROR: Release-assets API fallback requires jq." >&2
+    return 1
+  fi
+  # Public release metadata needs no token, including on enterprise runners.
+  if ! curl -fsSL "${options[@]}" --max-time 30 -H 'Accept: application/vnd.github+json' \
+    -o "${TEMP_DIR}/release.json" "https://api.github.com/repos/${AWF_REPO}/releases/tags/${AWF_VERSION}"; then
+    echo "ERROR: Failed to fetch release metadata for ${AWF_REPO} ${AWF_VERSION}." >&2
+    return 1
+  fi
+  if ! asset_id=$(jq -er --arg asset "$asset" --arg version "$AWF_VERSION" \
+    'select(.tag_name == $version) | .assets[] | select(.name == $asset) | .id' "${TEMP_DIR}/release.json") ||
+    [[ ! "$asset_id" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: Release metadata must identify exactly one numeric asset ID for ${asset}." >&2
+    return 1
+  fi
+  case "$asset" in
+    awf-linux-*|awf-darwin-*) options+=(--speed-limit 1 --speed-time 60) ;;
+    *) options+=(--max-time 60) ;;
+  esac
+  if ! curl -fsSL "${options[@]}" -H 'Accept: application/octet-stream' \
+    -o "${TEMP_DIR}/${asset}" "https://api.github.com/repos/${AWF_REPO}/releases/assets/${asset_id}"; then
+    echo "ERROR: Release-assets API download failed for ${asset}." >&2
+    return 1
+  fi
+}
+
 download_release_asset() {
   local asset="$1"
   local http_status="" curl_exit=0
@@ -179,6 +211,12 @@ download_release_asset() {
     return 0
   else
     curl_exit=$?
+  fi
+  if [ "$curl_exit" -eq 22 ] && [[ "$http_status" =~ ^5[0-9]{2}$ ]]; then
+    echo "WARNING: Download of ${asset} returned HTTP ${http_status} after retries; trying the release-assets API." >&2
+    if download_release_asset_from_api "$asset"; then
+      return 0
+    fi
   fi
   echo "ERROR: Failed to download ${asset} from ${AWF_REPO} ${AWF_VERSION} (HTTP ${http_status:-000}, curl exit ${curl_exit})." >&2
   if [ "$curl_exit" -eq 23 ]; then

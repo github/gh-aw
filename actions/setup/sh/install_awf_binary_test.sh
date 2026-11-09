@@ -117,6 +117,8 @@ test_curl_retry_all_errors() {
   local identity_version="${9:-$release_version}"
   local curl_failure_asset="${10:-}"
   local expect_download_failure="${11:-false}"
+  local api_mode="${12:-}"
+  local curl_failure_http="${13:-000}"
   local test_dir
   local option_index
   local -a actual_options
@@ -144,6 +146,7 @@ count=$(cat "${count_file}" 2>/dev/null || echo 0)
 count=$((count + 1))
 printf '%s\n' "${count}" > "${count_file}"
 printf '%s\n' "$@" > "${CURL_ARGS_FILE}.${count}"
+for argument in "$@"; do url="$argument"; done
 while [ "$#" -gt 0 ]; do
   if [ "$1" = "-o" ]; then
     output="$2"
@@ -151,12 +154,38 @@ while [ "$#" -gt 0 ]; do
   fi
   shift
 done
+if [[ "$url" == https://api.github.com/*/releases/tags/* ]]; then
+  if [ "$AWF_TEST_API_MODE" = metadata-failure ]; then
+    echo "simulated API metadata failure" >&2
+    exit 22
+  fi
+  case "$AWF_TEST_API_MODE" in
+    missing-asset) printf '{"tag_name":"%s","assets":[]}\n' "$AWF_TEST_RELEASE_VERSION" > "$output" ;;
+    invalid-id) printf '{"tag_name":"%s","assets":[{"name":"%s","id":"../../other"}]}\n' "$AWF_TEST_RELEASE_VERSION" "$AWF_TEST_CURL_FAILURE_ASSET" > "$output" ;;
+    duplicate-asset) printf '{"tag_name":"%s","assets":[{"name":"%s","id":123},{"name":"%s","id":456}]}\n' "$AWF_TEST_RELEASE_VERSION" "$AWF_TEST_CURL_FAILURE_ASSET" "$AWF_TEST_CURL_FAILURE_ASSET" > "$output" ;;
+    wrong-tag) printf '{"tag_name":"v9.9.9","assets":[{"name":"%s","id":123}]}\n' "$AWF_TEST_CURL_FAILURE_ASSET" > "$output" ;;
+    *) printf '{"tag_name":"%s","assets":[{"name":"%s","id":123}]}\n' "$AWF_TEST_RELEASE_VERSION" "$AWF_TEST_CURL_FAILURE_ASSET" > "$output" ;;
+  esac
+  exit 0
+fi
+if [[ "$url" == https://api.github.com/*/releases/assets/* ]]; then
+  if [ "$AWF_TEST_API_MODE" = asset-failure ]; then
+    echo partial > "$output"
+    echo "simulated API asset failure" >&2
+    exit 22
+  fi
+else
 case "${output:-}" in
   */"${AWF_TEST_CURL_FAILURE_ASSET:-__never__}")
     echo "simulated curl network failure" >&2
+    if [ "$AWF_TEST_CURL_FAILURE_HTTP" != 000 ]; then
+      printf '%s' "$AWF_TEST_CURL_FAILURE_HTTP"
+      exit 22
+    fi
     exit 7
     ;;
 esac
+fi
 if [[ "${output}" == *checksums.txt ]]; then
   printf '%064d awf-linux-x64\n%064d awf-darwin-x64\n%064d awf-bundle.js\n' 0 0 0 > "${output}"
 elif [[ "${output}" == *release-identity.txt ]]; then
@@ -183,7 +212,11 @@ EOF
   cat > "${test_dir}/bin/sha256sum" <<'EOF'
 #!/usr/bin/env bash
 if [[ "$1" == *checksums.txt ]]; then
-  printf '%s %s\n' "$AWF_TEST_MANIFEST_SHA256" "$1"
+  if [ "$AWF_TEST_API_MODE" = corrupt-manifest ]; then
+    printf '%064d %s\n' 0 "$1"
+  else
+    printf '%s %s\n' "$AWF_TEST_MANIFEST_SHA256" "$1"
+  fi
 else
   printf '%064d %s\n' 0 "$1"
 fi
@@ -202,20 +235,72 @@ EOF
   AWF_TEST_MANIFEST_SHA256="$(release_artifact_sha256 github/gh-aw-firewall "$release_version" checksums.txt)" \
     CURL_HELP_ALL_OUTPUT="${curl_help_all}" CURL_HELP_OUTPUT="${curl_help}" CURL_HELP_ALL_FAILS="${help_all_fails}" CURL_ARGS_FILE="${test_dir}/curl-args" \
     AWF_TEST_ATTESTATION_LOG="${test_dir}/attestations" AWF_TEST_ATTESTATION_FAILURE="$attestation_failure" AWF_TEST_IDENTITY_VERSION="$identity_version" \
-    AWF_TEST_CURL_FAILURE_ASSET="$curl_failure_asset" \
+    AWF_TEST_CURL_FAILURE_ASSET="$curl_failure_asset" AWF_TEST_CURL_FAILURE_HTTP="$curl_failure_http" \
+    AWF_TEST_API_MODE="$api_mode" AWF_TEST_RELEASE_VERSION="$release_version" \
     AWF_TEST_NODE_VERSION="$node_version" AWF_TEST_OS="$platform" HOME="${test_dir}/home" GITHUB_PATH="${test_dir}/github-path" \
+    GITHUB_ENV="" GH_AW_RUNTIME_TMP_DIR="" GH_AW_RUNTIME_TMP_ID="" TMPDIR="$test_dir" \
     RUNNER_TEMP="$test_dir" PATH="${test_dir}/bin:${PATH}" bash "${SCRIPT_DIR}/install_awf_binary.sh" "$release_version" --rootless >"${test_dir}/output" 2>&1 || installer_exit=$?
+  local expected_api_calls=0
+  if [[ "$curl_failure_http" =~ ^5[0-9]{2}$ ]]; then
+    expected_api_calls=2
+    case "$api_mode" in
+      metadata-failure|missing-asset|invalid-id|duplicate-asset|wrong-tag) expected_api_calls=1 ;;
+    esac
+  fi
+  local api_calls=0
+  local recorded_call request_url
+  for recorded_call in "${test_dir}"/curl-args.[0-9]*; do
+    request_url="$(tail -n 1 "$recorded_call")"
+    if [[ "$request_url" == https://api.github.com/* ]]; then
+      api_calls=$((api_calls + 1))
+      if grep -qi authorization "$recorded_call" ||
+        ! grep -qx -- '--retry-max-time' "$recorded_call" ||
+        ! grep -qx -- '--proto-redir' "$recorded_call"; then
+        TEST_FAILURE_REASON="API fallback must remain bounded, HTTPS-only, and unauthenticated"
+        rm -rf "$test_dir"
+        return 1
+      fi
+      case "$request_url" in
+        "https://api.github.com/repos/github/gh-aw-firewall/releases/tags/$release_version") ;;
+        https://api.github.com/repos/github/gh-aw-firewall/releases/assets/123) ;;
+        *)
+          TEST_FAILURE_REASON="API fallback used an unexpected host, repository, version, or asset ID"
+          rm -rf "$test_dir"
+          return 1
+          ;;
+      esac
+    fi
+  done
+  if [ "$api_calls" -ne "$expected_api_calls" ]; then
+    TEST_FAILURE_REASON="expected $expected_api_calls API calls, got $api_calls"
+    cat "${test_dir}/output"
+    rm -rf "$test_dir"
+    return 1
+  fi
+  local expected_curl_exit=7
+  if [ "$curl_failure_http" != 000 ]; then expected_curl_exit=22; fi
   if [ "$expect_download_failure" = true ]; then
-    if [ "$installer_exit" -eq 0 ]; then
+    if [ "$installer_exit" -eq 0 ] || [ -e "${test_dir}/home/.local/bin/awf" ]; then
       TEST_FAILURE_REASON="installer succeeded after a required download failed"
       rm -rf "$test_dir"
       return 1
     fi
     if ! grep -qF "simulated curl network failure" "${test_dir}/output" ||
       ! grep -qF "ERROR: Failed to download ${curl_failure_asset}" "${test_dir}/output" ||
-      ! grep -qF "(HTTP 000, curl exit 7)." "${test_dir}/output"; then
+      ! grep -qF "(HTTP $curl_failure_http, curl exit $expected_curl_exit)." "${test_dir}/output"; then
       TEST_FAILURE_REASON="required download failure diagnostics did not include the curl error, asset, HTTP status, and exit code"
       cat "${test_dir}/output"
+      rm -rf "$test_dir"
+      return 1
+    fi
+    rm -rf "$test_dir"
+    return 0
+  fi
+  if [ "$api_mode" = corrupt-manifest ]; then
+    if [ "$installer_exit" -eq 0 ] || [ -e "${test_dir}/home/.local/bin/awf" ] ||
+      ! grep -q 'Trusted SHA256 verification failed' "${test_dir}/output" ||
+      grep -qE '/awf-(bundle|linux|darwin)' "${test_dir}"/curl-args.[0-9]*; then
+      TEST_FAILURE_REASON="corrupt fallback manifest did not stop installation before payload download"
       rm -rf "$test_dir"
       return 1
     fi
@@ -253,12 +338,17 @@ EOF
   shopt -s nullglob
   curl_args_files=("${test_dir}"/curl-args.[0-9]*)
   shopt -u nullglob
-  local expected_downloads=2
+  local expected_downloads=2 expected_diagnostic
   if [ -n "$curl_failure_asset" ]; then
-    expected_downloads=$((expected_downloads + 1))
+    if [ "$expected_api_calls" -gt 0 ]; then
+      expected_downloads=$((expected_downloads + expected_api_calls))
+      expected_diagnostic="trying the release-assets API"
+    else
+      expected_downloads=$((expected_downloads + 1))
+      expected_diagnostic="(HTTP $curl_failure_http, curl exit $expected_curl_exit)."
+    fi
     if ! grep -qF "simulated curl network failure" "${test_dir}/output" ||
-      ! grep -qF "ERROR: Failed to download ${curl_failure_asset}" "${test_dir}/output" ||
-      ! grep -qF "(HTTP 000, curl exit 7)." "${test_dir}/output"; then
+      ! grep -qF "$expected_diagnostic" "${test_dir}/output"; then
       TEST_FAILURE_REASON="failed curl output was not included in the installer diagnostics"
       rm -rf "$test_dir"
       return 1
@@ -285,13 +375,27 @@ EOF
   fi
   for curl_args in "${curl_args_files[@]}"; do
     mapfile -t actual_options < "${curl_args}"
-    expected_options=("${common_options[@]}")
-    case "${actual_options[${#actual_options[@]}-1]}" in
-      */awf-linux-*|*/awf-darwin-*) expected_options+=(--speed-limit 1 --speed-time 60) ;;
-      *) expected_options+=(--max-time 60) ;;
-    esac
-    if [ "$expected" = true ] && [[ "${actual_options[${#actual_options[@]}-1]}" != */awf-bundle.js ]]; then
-      expected_options+=(--retry-all-errors)
+    if [[ "${actual_options[${#actual_options[@]}-1]}" == https://api.github.com/* ]]; then
+      expected_options=(-fsSL --proto '=https' --proto-redir '=https' --retry 2 --retry-max-time 30 --connect-timeout 15)
+      case "${actual_options[${#actual_options[@]}-1]}" in
+        */releases/tags/*) expected_options+=(--max-time 30 -H 'Accept: application/vnd.github+json') ;;
+        *)
+          case "$curl_failure_asset" in
+            awf-linux-*|awf-darwin-*) expected_options+=(--speed-limit 1 --speed-time 60) ;;
+            *) expected_options+=(--max-time 60) ;;
+          esac
+          expected_options+=(-H 'Accept: application/octet-stream')
+          ;;
+      esac
+    else
+      expected_options=("${common_options[@]}")
+      case "${actual_options[${#actual_options[@]}-1]}" in
+        */awf-linux-*|*/awf-darwin-*) expected_options+=(--speed-limit 1 --speed-time 60) ;;
+        *) expected_options+=(--max-time 60) ;;
+      esac
+      if [ "$expected" = true ] && [[ "${actual_options[${#actual_options[@]}-1]}" != */awf-bundle.js ]]; then
+        expected_options+=(--retry-all-errors)
+      fi
     fi
     for option_index in "${!expected_options[@]}"; do
       if [ "${actual_options[option_index]:-}" != "${expected_options[option_index]}" ]; then
@@ -307,8 +411,9 @@ EOF
       rm -rf "${test_dir}"
       return 1
     fi
-    if [ "${actual_options[${#expected_options[@]}+2]:-}" != "--write-out" ] ||
-      [ "${actual_options[${#expected_options[@]}+3]:-}" != '%{http_code}' ]; then
+    if [[ "${actual_options[${#actual_options[@]}-1]}" != https://api.github.com/* ]] &&
+      { [ "${actual_options[${#expected_options[@]}+2]:-}" != "--write-out" ] ||
+      [ "${actual_options[${#expected_options[@]}+3]:-}" != '%{http_code}' ]; }; then
       TEST_FAILURE_REASON="download did not capture the final HTTP status"
       rm -rf "${test_dir}"
       return 1
@@ -388,6 +493,40 @@ if test_curl_retry_all_errors '--retry-all-errors' true false '--retry-all-error
 else
   fail "required download failure diagnostics were incomplete" "$TEST_FAILURE_REASON"
 fi
+
+for asset in checksums.txt release-identity.txt awf-bundle.js awf-linux-x64; do
+  node_version=v24.0.0
+  if [ "$asset" = awf-linux-x64 ]; then node_version=v18.0.0; fi
+  if test_curl_retry_all_errors '--retry-all-errors' true false '--retry-all-errors' "$node_version" Linux v0.29.5 '' v0.29.5 "$asset" false success 504; then
+    pass "HTTP 504 for $asset recovers through the API with integrity checks"
+  else
+    fail "HTTP 504 API recovery failed for $asset" "$TEST_FAILURE_REASON"
+  fi
+done
+for api_mode in metadata-failure asset-failure missing-asset invalid-id duplicate-asset wrong-tag; do
+  if test_curl_retry_all_errors '--retry-all-errors' true false '--retry-all-errors' v24.0.0 Linux v0.29.5 '' v0.29.5 checksums.txt true "$api_mode" 504; then
+    pass "API $api_mode fails closed and retains original HTTP 504 diagnostics"
+  else
+    fail "API $api_mode did not fail closed" "$TEST_FAILURE_REASON"
+  fi
+done
+if test_curl_retry_all_errors '--retry-all-errors' true false '--retry-all-errors' v24.0.0 Linux v0.29.5 '' v0.29.5 checksums.txt false corrupt-manifest 504; then
+  pass "API-retrieved manifest still requires the trusted digest"
+else
+  fail "corrupt API manifest was accepted" "$TEST_FAILURE_REASON"
+fi
+if test_curl_retry_all_errors '--retry-all-errors' true false '--retry-all-errors' v24.0.0 Linux v0.29.5 awf-bundle.js v0.29.5 awf-bundle.js false success 504; then
+  pass "API-retrieved bundle still requires attestation and cannot bypass it through binary fallback"
+else
+  fail "unattested API bundle was accepted" "$TEST_FAILURE_REASON"
+fi
+for http_status in 401 403 404; do
+  if test_curl_retry_all_errors '--retry-all-errors' true false '--retry-all-errors' v24.0.0 Linux v0.29.5 '' v0.29.5 checksums.txt true success "$http_status"; then
+    pass "HTTP $http_status does not trigger API fallback"
+  else
+    fail "HTTP $http_status incorrectly triggered API fallback" "$TEST_FAILURE_REASON"
+  fi
+done
 
 # Test 7: warning emitted when GITHUB_PATH is unset in rootless mode
 echo "Test 7: warning emitted when GITHUB_PATH is unset in rootless mode..."
