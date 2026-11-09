@@ -8,6 +8,15 @@ See [jobs.md](jobs.md) for the full compiler-generated job graph and which job e
 
 The `report-incomplete` safe-output is enabled by default and is distinct from `noop`. Use it when required tools or data are unavailable and the task cannot be meaningfully performed (e.g., MCP server crash, missing authentication, inaccessible repository). When an agent emits `report_incomplete`, gh-aw activates failure handling even when the agent process exits 0 — preventing empty outputs from being classified as successful, so every unrecoverable failure is tracked.
 
+When top-level `skip-if-decision` denies an otherwise eligible invocation, the
+AWF harness attempts to record `noop` only if no terminal safe output exists.
+Existing task outputs, no-ops, and incomplete diagnostics are preserved; the
+decision does not authorize their publication or override failure/detection
+policy. Decision evaluation errors abstain and do not independently emit
+`noop` or `report_incomplete`. Use `harness.decision` unified-session events and
+audit decision history to distinguish an avoided invocation from agent work.
+Decision-model usage remains part of normal proxy accounting.
+
 **Per-handler modifiers** — most handlers accept `max`, `github-token`, `github-app`, and `staged` to override the global equivalents for that one output type. Two extras:
 
 - `issue-intent:` (boolean) on `close-issue`, `set-issue-type`, `set-issue-field`, `assign-to-user`, and `assign-to-agent` — enables issue-intent metadata (rationale/confidence/suggest) fields and their schema requirements on that tool's payload.

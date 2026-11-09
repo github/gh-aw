@@ -1,6 +1,7 @@
 // @ts-check
 
 const MAX_HARNESS_ATTEMPTS = 101;
+const MAX_HARNESS_DECISIONS = 1024;
 const MAX_HARNESS_FAILURE_CLASSES = 16;
 const FAILURE_CLASS_PATTERN = /^[a-z][a-z0-9_]{0,63}$/;
 const HARNESS_FAILURE_CLASSES = new Set([
@@ -154,7 +155,63 @@ function normalizeHarnessRetryRecord(value) {
     }
     record.startupAttemptResults = startupAttemptResults;
   }
+  if (Object.hasOwn(value, "decision_results") || Object.hasOwn(value, "decisionResults")) {
+    const rawDecisions = readField(value, "decision_results", "decisionResults");
+    if (!Array.isArray(rawDecisions) || rawDecisions.length > MAX_HARNESS_DECISIONS) return undefined;
+    const decisions = [];
+    for (const raw of rawDecisions) {
+      const decision = normalizeHarnessDecisionData(raw);
+      if (!decision) return undefined;
+      decisions.push(decision);
+    }
+    record.decisionResults = decisions;
+  }
   return record;
 }
 
-module.exports = { normalizeHarnessRetryRecord, normalizeHarnessAttemptData, normalizeHarnessAttemptEvent, MAX_HARNESS_ATTEMPTS, MAX_HARNESS_FAILURE_CLASSES };
+const DECISION_OUTCOMES = new Set(["allow", "deny", "unknown"]);
+const DECISION_ERRORS = new Set(["invalid_configuration", "sandbox_unavailable", "proxy_unavailable", "invalid_proxy_endpoint", "model_unavailable", "timeout", "evaluation_failed", "file_reference_failed", "sensitive_content_blocked"]);
+
+/**
+ * Project only bounded metadata; never keep decision input or provider diagnostics.
+ * @param {unknown} value
+ * @returns {import("./types/unified_session").HarnessDecisionData | undefined}
+ */
+function normalizeHarnessDecisionData(value) {
+  if (
+    !isRecord(value) ||
+    !Number.isSafeInteger(value.proposedAttempt) ||
+    value.proposedAttempt < 1 ||
+    value.proposedAttempt > MAX_HARNESS_ATTEMPTS ||
+    !DECISION_OUTCOMES.has(value.outcome) ||
+    !Number.isSafeInteger(value.latencyMs) ||
+    value.latencyMs < 0 ||
+    !Number.isSafeInteger(value.timestamp) ||
+    value.timestamp < 0 ||
+    value.avoidedInvocation !== (value.outcome === "deny") ||
+    !Array.isArray(value.questions) ||
+    value.questions.length > 400 ||
+    (value.error !== undefined && !DECISION_ERRORS.has(value.error))
+  )
+    return undefined;
+  if (value.startupAttemptId !== undefined && !(typeof value.startupAttemptId === "string" && /^startup:[1-9][0-9]{0,2}$/.test(value.startupAttemptId) && Number(value.startupAttemptId.slice(8)) <= MAX_HARNESS_ATTEMPTS)) return undefined;
+  const questions = [];
+  for (const [index, item] of value.questions.entries()) {
+    if (!isRecord(item) || item.question !== index + 1 || !DECISION_OUTCOMES.has(item.outcome) || (item.error !== undefined && !DECISION_ERRORS.has(item.error))) return undefined;
+    questions.push({ question: item.question, outcome: item.outcome, ...(item.error ? { error: item.error } : {}) });
+  }
+  const aggregate = questions.some(question => question.outcome === "deny") ? "deny" : questions.some(question => question.outcome === "allow") ? "allow" : "unknown";
+  if (value.outcome !== aggregate) return undefined;
+  return {
+    proposedAttempt: value.proposedAttempt,
+    outcome: value.outcome,
+    questions,
+    latencyMs: value.latencyMs,
+    timestamp: value.timestamp,
+    avoidedInvocation: value.avoidedInvocation,
+    ...(value.error ? { error: value.error } : {}),
+    ...(value.startupAttemptId ? { startupAttemptId: value.startupAttemptId } : {}),
+  };
+}
+
+module.exports = { normalizeHarnessRetryRecord, normalizeHarnessAttemptData, normalizeHarnessAttemptEvent, normalizeHarnessDecisionData, MAX_HARNESS_ATTEMPTS, MAX_HARNESS_DECISIONS, MAX_HARNESS_FAILURE_CLASSES };

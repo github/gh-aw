@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.98
+**Version**: 1.0.99
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,6 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw | Compatibility |
 |---|---:|---|
+| `1.0.99` | Unreleased | Specifies optional `skip-if-decision` evaluation inside the AWF sandbox, data-only question transport, guarded runtime files, advisory aggregation after deterministic eligibility, and sanitized unified-session/audit evidence. Rejects nonempty lists with protected session capture and records harness initialization before billable decisions. Requires the matching compiler and setup runtime for configured workflows. Absent/empty lists preserve existing output; no new threat identifier or permission grant. |
 | `1.0.98` | Unreleased | Applies validated effective runner UID:GID defaults to both built-in `agenticworkflows` and `safeoutputs` backend containers, while retaining explicit user, HOME, and supplementary group settings. Requires owner-only no-follow writes for generated safeoutputs config, tools, metadata, validation, and output files, including replacements; no new threat identifier, permission grant, or lock-file schema change. |
 | `1.0.97` | Unreleased | Extends CTR-006 validation to raw `run:` content, including shell comments and quoted heredocs, while retaining Bash-aware sanitizer and codemod boundaries. Expressions preserved by `gh aw fix` in comments or quoted heredocs require manual migration; no new threat identifier, permission grant, or lock-file schema change. |
 | `1.0.96` | Unreleased | Specifies resolved global-App token persistence only for the default host PR checkout, preserving per-checkout authentication, static additional checkouts, optional-App fallback, and agent isolation. Requires work-queue reconciliation and App minting before shared PR checkout. Regenerate workflow locks; no new threat identifier, permission grant, or repository-scope expansion. |
@@ -126,6 +127,15 @@ The following implementation snapshot complements the detailed mapping in Sectio
 ## 3. Threat Model Overview
 
 Generated workflows run with elevated permissions and consume untrusted content (issues, PRs, comments, external tool output). The catalog in Section 5 groups the threats a conforming compiler MUST detect into five classes: unauthorized privilege or scope expansion, unsafe or bypassed sandboxing, injection (template, shell, or subprocess argument), unsafe output and supply-chain routes (including forged execution attribution), and compile-time drift between manifests, mappings, and the rules that reference them. Each class maps to one or more `CTR-*` rules with a stable trigger and compiler action.
+
+Invocation decision models for `skip-if-decision` run inside the AWF agent
+sandbox, not on the Actions host or in activation, detection, evals, or
+conclusion. The compiler transports questions as data; the shared harness
+resolves runtime files and calls the existing AWF API proxy only after
+deterministic eligibility checks. Model recommendations are not authorization
+or a replacement for sandbox, credential, retry, budget, or publication
+controls. Section 7.11 specifies this compiler/runtime boundary and its
+residual semantic-evidence risks.
 
 An adversary may also intercept network traffic while possessing a formerly trusted intermediate CA private key, as in the [October 2026 eMudhra compromise](https://emudhra.we-have-a-problem.com). Such an adversary can impersonate an allowlisted HTTPS service to an unpatched client and replace both an executable and an unsigned checksum served beside it. CTR-011 authorizes destinations; it does not authenticate their operators or attest client distrust updates. CTR-002 action pins and CTR-016 manifest checks likewise do not establish remote TLS identity.
 
@@ -777,6 +787,85 @@ These are generated-configuration requirements, not new authored-source lint dia
 | Runtime checkout credential isolation | `pkg/workflow/compiler_safe_outputs_steps.go`; `github_token.go`: `resolvePRCheckoutToken`, `resolveStaticCheckoutToken` | `TestSafeOutputDynamicCheckoutTokenPriority`, `TestSafeOutputDynamicCheckoutKeepsHostingAndStaticAuth`, `TestSafeOutputDynamicCheckoutDoesNotInheritAnotherEntryApp`. |
 
 Generated-YAML regressions do not prove live App installation access, effective repository permissions, push identity, or downstream workflow execution. Existing locks MUST be recompiled to adopt this compiler change; no new `CTR-*` identifier or lock-file schema is introduced.
+
+### 7.11 Advisory Invocation Decisions Inside AWF
+
+`skip-if-decision` is experimental. Nonempty agent-phase lists MUST emit the
+standard compiler experimental-feature warning; syntax and behavior may change
+without deprecation.
+
+For a nonempty top-level `skip-if-decision` list, the compiler MUST require the
+AWF agent sandbox and validate up to 64 nonblank string questions. Actions
+expressions in questions MUST be rejected. Questions MUST be transported as
+JSON environment data, not interpolated shell code or host-side decision
+steps. Nonempty lists combined with declarative `protected-session-capture`
+MUST be rejected: the decision wrapper retains the capture descriptor across
+the exec-only boundary, and a skipped invocation cannot supply a verified
+protected session. Absent/empty lists MUST preserve existing generated behavior.
+
+The shared invocation harness MUST evaluate questions inside AWF before every
+otherwise eligible initial, retry, resume, or continuation invocation,
+including built-in engines, custom-harness overrides, and supported declarative/durable
+execution. Deterministic retry, budget, deadline, and nonrecoverable-error
+safeguards MUST remain authoritative. Any `deny` MUST suppress the proposed
+invocation; otherwise any `allow` or all `unknown` MUST preserve the selected
+execution path. API/model unavailability, timeouts, malformed responses, and
+evaluation failures MUST abstain without a separate decision retry, additional
+decision-model call, or independent workflow failure.
+
+Harness initialization MUST be recorded before a potentially billable
+decision request so startup recovery cannot infer zero usage from a missing
+CLI attempt. This initialization marker MUST NOT claim that an agent CLI
+invocation occurred; nonrecoverable preflight checks MUST still run first.
+
+Decision requests MUST use the existing AWF API proxy and its model, network,
+credential, budget, and usage policies. Direct-provider fallback and separate
+credential discovery MUST NOT be introduced. Runtime `@file` evidence MUST be
+read afresh relative to the engine working directory or workspace, confined
+to the workspace or `/tmp/gh-aw/agent`, and checked by the existing guarded
+regular-file reader. Sensitive paths, links, and oversized/changing files MUST
+be rejected; an unreadable reference makes only its question `unknown`.
+Imports MUST use the remaining per-question byte budget and account for
+question text, evidence metadata, and JSON escaping within a 512 KiB ceiling.
+The complete serialized Decisions request MUST be limited to 400,000 UTF-8
+bytes, including input, question definitions, choices, escaped evidence, and
+model/request framing. This approximates 100,000 tokens at four bytes per token;
+it is not tokenizer-exact. A question exceeding the remaining request budget
+MUST abstain without transmission; smaller questions MAY still join the batch.
+
+Before transmission, questions and file evidence MUST be screened using
+configured secret values and common credential patterns. A match MUST withhold
+the entire question and its evidence as `unknown` with
+`sensitive_content_blocked`; other safe questions retain their existing batch
+path. All-blocked batches MUST make no proxy reflection or decision request.
+File evidence MUST use JSON-escaped records with reference and byte-count
+metadata, with data-only guidance outside the record. This structuring prevents
+record-boundary injection, not semantic instruction-following by the model.
+
+Only bounded decision metadata, including question indices, outcomes,
+sanitized error codes, latency, and avoided invocations, MUST enter typed
+`harness.decision` unified-session and audit evidence. Raw file contents,
+question text, provider diagnostics, and credentials MUST NOT enter this
+metadata. A denied invocation MUST NOT increment process attempts or retries.
+Conditional no-op recording MUST follow the Safe Outputs specification's
+invocation-decision skip contract and preserve earlier outputs and failures;
+decision evidence MUST NOT authorize GitHub mutations or waive detection.
+
+| Boundary | Implementation | Regression Evidence |
+|---|---|---|
+| Compiler validation and sandbox-only transport | `pkg/workflow/skip_if_decision.go`, `compiler_orchestrator_workflow.go`, `engine_helpers.go`; `pkg/parser/schemas/main_workflow_schema.json` | `pkg/workflow/skip_if_decision_test.go`: malformed configuration, sandbox disablement, phase exclusions, built-in/custom/declarative/durable paths, protected-capture rejection, and absent/empty compatibility. |
+| Eligible invocation gating, proxy-only requests, and guarded files | `actions/setup/js/harness_retry_runner.cjs`, `shell_harness.cjs`, `skip_if_decision.cjs`, `decisions_client.cjs`, `symlink_guard.cjs` | `skip_if_decision.test.cjs`, `harness_retry_runner.test.cjs`, and `shell_harness.test.cjs`: aggregation, failure abstention, runtime snapshots, normalized working directories, pre-request initialization markers, path confinement, restart paths, and avoided invocations. |
+| Advisory evidence and safe-output preservation | `actions/setup/js/harness_retry_record.cjs`, `unified_session.cjs`, `compact_unified_session.cjs`; `pkg/cli/audit_decision.go` | `unified_session.test.cjs`, `compact_unified_session.test.cjs`, `unified_session_render.test.cjs`, and `pkg/cli/audit_decision_test.go`: bounded metadata, separate counts, and no-op preservation. |
+
+File evidence and model answers remain untrusted semantic inputs: describing
+them as evidence rather than instructions does not prevent prompt injection
+or independently prove that work is complete. Credential screening is heuristic
+and can miss unknown or encoded secrets or withhold benign examples; it does
+not establish that arbitrary project data is safe to transmit. These regressions establish
+compiler wiring and local/mocked behavior, not live AWF deployment, provider
+availability, or absence of semantic false skips. Linux-only guarded-file
+tests remain explicit coverage gaps on other platforms. No new `CTR-*` or
+compiler compliance-test identifier is introduced.
 
 ## 8. Compliance Testing
 

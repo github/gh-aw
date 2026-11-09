@@ -56,6 +56,113 @@ const trace = [
 ];
 
 describe("unified session publication views", () => {
+  it("renders skip decisions with outcomes, errors, latency, and avoided invocations", () => {
+    const events = [
+      header,
+      event(
+        "harness.decision",
+        {
+          proposedAttempt: 2,
+          outcome: "deny",
+          questions: [
+            { question: 1, outcome: "unknown", error: "timeout" },
+            { question: 2, outcome: "deny" },
+          ],
+          latencyMs: 25,
+          timestamp: 1000,
+          avoidedInvocation: true,
+          providerBody: "PRIVATE_PROVIDER_BODY",
+        },
+        "harness",
+        0
+      ),
+    ];
+    for (const output of [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events), generateConversationMarkdown(events, { formatToolCallback: formatToolUse, formatInitCallback: formatInitializationSummary }).markdown]) {
+      expect(output).toContain("harness.decision");
+      expect(output).toContain("outcome=deny");
+      expect(output).toContain("latencyMs=25");
+      expect(output).toContain("avoidedInvocation=true");
+      expect(output).toContain("error=timeout");
+      expect(output).not.toContain("PRIVATE_PROVIDER_BODY");
+    }
+    const markdown = generateCopilotCliStyleSummary(events);
+    expect(markdown.startsWith("<details><summary>skip-if-decision: 1 invocation skipped</summary>")).toBe(true);
+    expect(markdown).toContain("### Invocation skip decisions");
+    expect(markdown).toContain("| 2 | `deny` | Skipped | 0 / 1 / 1 | 25 ms | Q1: `timeout` |");
+    expect(markdown).toContain("Decision requests may consume credits");
+  });
+
+  it.each(["allow", "unknown"])("renders a collapsed %s outcome without claiming an agent executed", outcome => {
+    const decision = {
+      proposedAttempt: 1,
+      outcome,
+      questions: [{ question: 1, outcome, ...(outcome === "unknown" ? { error: "proxy_unavailable" } : {}) }],
+      latencyMs: 10,
+      timestamp: 1000,
+      avoidedInvocation: false,
+      ...(outcome === "unknown" ? { error: "proxy_unavailable" } : {}),
+    };
+    const markdown = generateCopilotCliStyleSummary([header, event("harness.decision", decision, "harness", 0)]);
+    const section = markdown.slice(0, markdown.indexOf("<details><summary>Unified session"));
+    expect(section).toContain("<summary>skip-if-decision: no invocations skipped</summary>");
+    expect(section).toContain(`| 1 | \`${outcome}\` | No skip recommended |`);
+    expect(section).toContain("Unknown answers preserve the harness-selected execution path");
+    expect(section).not.toContain("Executed");
+    if (outcome === "unknown") expect(section).toContain("Batch: `proxy_unavailable`<br>Q1: `proxy_unavailable`");
+  });
+
+  it("summarizes restart history from individual events without double-counting retry history", () => {
+    const decisions = ["allow", "unknown", "deny"].map((outcome, index) => ({
+      proposedAttempt: index === 0 ? 1 : 2,
+      startupAttemptId: `startup:${index + 1}`,
+      outcome,
+      questions: [{ question: 1, outcome }],
+      latencyMs: 5,
+      timestamp: 1000 + index,
+      avoidedInvocation: outcome === "deny",
+      questionText: "PRIVATE_QUESTION",
+      fileContents: "</summary><script>PRIVATE_FILE</script>",
+    }));
+    const events = [
+      header,
+      ...decisions.map((decision, index) => event("harness.decision", decision, "harness", index)),
+      event("harness.retry", { attempts: 2, exitCode: 0, attemptResults: [1, 2].map(attempt => ({ attempt, exitCode: 0, failureClasses: [] })), decisionResults: decisions }, "harness", 3),
+    ];
+    const markdown = generateCopilotCliStyleSummary(events);
+    const section = markdown.slice(0, markdown.indexOf("<details><summary>Unified session"));
+    expect(section).toContain("**1 invocation skipped.** 3 decision checks");
+    expect(section).toContain("| startup:3 / 2 | `deny` | Skipped |");
+    expect(section.match(/<\/?details>/g)).toHaveLength(2);
+    expect(section.match(/<\/?summary>/g)).toHaveLength(2);
+    expect(markdown).not.toContain("PRIVATE_QUESTION");
+    expect(markdown).not.toContain("PRIVATE_FILE");
+  });
+
+  it("omits the decision section when the workflow has no decision evidence", () => {
+    expect(generateCopilotCliStyleSummary([header])).not.toContain("<summary>skip-if-decision:");
+  });
+
+  it("renders empty question results as an unknown recommendation", () => {
+    const markdown = generateCopilotCliStyleSummary([
+      header,
+      event("harness.decision", { proposedAttempt: 1, outcome: "unknown", questions: [], error: "invalid_configuration", latencyMs: 0, timestamp: 1000, avoidedInvocation: false }, "harness", 0),
+    ]);
+    expect(markdown).toContain("| 1 | `unknown` | No skip recommended | 0 / 0 / 0 | 0 ms | Batch: `invalid_configuration` |");
+  });
+
+  it("keeps decision outcomes ahead of a large conversation within the step-summary budget", () => {
+    const decision = event("harness.decision", { proposedAttempt: 1, outcome: "deny", questions: [{ question: 1, outcome: "deny" }], latencyMs: 1, timestamp: 1000, avoidedInvocation: true }, "harness", 0);
+    const events = [header, decision, ...Array.from({ length: 100 }, (_, index) => event("assistant.message", { content: "x".repeat(1000) }, "agent", index, index))];
+    const markdown = generateCopilotCliStyleSummary(events, { maxBytes: 4096 });
+    expect(Buffer.byteLength(markdown)).toBeLessThanOrEqual(4096);
+    expect(markdown).toContain("<summary>skip-if-decision: 1 invocation skipped</summary>");
+    expect(markdown).toContain("| 1 | `deny` | Skipped |");
+    expect(markdown.match(/<details>/g).length).toBe(markdown.match(/<\/details>/g).length);
+    for (const maxBytes of [0, 1, 32, 511, 900, 1024]) {
+      expect(Buffer.byteLength(generateCopilotCliStyleSummary(events, { maxBytes }))).toBeLessThanOrEqual(maxBytes);
+    }
+  });
+
   it("renders safe-output execution status alongside its canonical resource URI", () => {
     const events = [header, event("safe_output.result", { type: "publish", status: "success", url: "https://github.com/owner/repo/issues/42" }, "safe_output", 0)];
     for (const output of [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events), generateConversationMarkdown(events, { formatToolCallback: formatToolUse, formatInitCallback: formatInitializationSummary }).markdown]) {
@@ -940,6 +1047,30 @@ describe("unified session publication views", () => {
     expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("firewall.http_access"));
     expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("byte limit"));
     expect(fs.readFileSync(summary, "utf8")).toBe(existing);
+  });
+
+  it("publishes decision-only no-op evidence even when no agent conversation exists", async () => {
+    global.core.summary = { addDetails: vi.fn(), write: vi.fn() };
+    const summary = path.join(directory, "summary.md");
+    fs.writeFileSync(summary, "Earlier summary\n");
+    process.env.GITHUB_STEP_SUMMARY = summary;
+    fs.mkdirSync(path.join(directory, "agent"));
+    fs.writeFileSync(
+      path.join(directory, "agent", "harness_retry.json"),
+      JSON.stringify({
+        attempts: 0,
+        exit_code: 0,
+        attempt_results: [],
+        decision_results: [{ proposedAttempt: 1, outcome: "deny", questions: [{ question: 1, outcome: "deny" }], latencyMs: 12, timestamp: 1000, avoidedInvocation: true }],
+      })
+    );
+    await main({ rootDir: directory, jobDurations: {} });
+    const output = fs.readFileSync(summary, "utf8");
+    expect(output.startsWith("Earlier summary\n")).toBe(true);
+    expect(output).toContain("<summary>skip-if-decision: 1 invocation skipped</summary>");
+    expect(output).toContain("| 1 | `deny` | Skipped | 0 / 1 / 0 | 12 ms | None |");
+    expect(output.match(/<summary>skip-if-decision:/g)).toHaveLength(1);
+    expect(output).toContain("No agent conversation recorded");
   });
 
   it("does not publish a stale or incomplete session when assembly fails before the atomic write completes", async () => {

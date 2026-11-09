@@ -1,10 +1,12 @@
 # jsonutil Package
 
-> Compact JSON marshaling utilities that avoid HTML escaping for safe expression handling.
+> Compact JSON serialization utilities for safe expression handling and complete-document decoding.
 
 ## Overview
 
 The `jsonutil` package provides a thin wrapper around Go's standard `encoding/json` encoder to produce compact JSON output without HTML escaping. This is essential for serializing GitHub Actions expressions (e.g. `${{ env.X && env.Y }}`) that contain characters such as `&`, `<`, and `>` which the standard `json.Marshal` would otherwise encode as `\u0026`, `\u003c`, and `\u003e`.
+
+It also decodes JSON strings without copying the input into a byte slice. Decoding rejects malformed input and additional trailing values while allowing trailing whitespace.
 
 ## Public API
 
@@ -13,6 +15,7 @@ The `jsonutil` package provides a thin wrapper around Go's standard `encoding/js
 | Function | Signature | Description |
 |----------|-----------|-------------|
 | `MarshalCompactNoHTMLEscape` | `func(v any) (string, error)` | Marshals `v` to compact JSON without HTML escaping, trimming the trailing newline emitted by `json.Encoder` |
+| `UnmarshalString` | `func(input string, target any) error` | Decodes one complete JSON value without copying the string; rejects malformed input and trailing values |
 
 ## Usage Examples
 
