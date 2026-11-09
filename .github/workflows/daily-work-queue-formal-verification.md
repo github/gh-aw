@@ -59,7 +59,7 @@ jobs:
         uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
-      - name: Set up Java 21
+      - name: Setup Java 21
         uses: actions/setup-java@v6.2.0
         with:
           distribution: temurin

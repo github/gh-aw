@@ -142,6 +142,39 @@ class ModelRunnerTests(unittest.TestCase):
                 rejected = self.run_model(config, "Invariant TypeOK is violated", 12, model=model)
                 self.assertNotEqual(rejected.returncode, 0)
 
+    def test_retirement_configs_require_exact_verdicts(self):
+        model = "ObsoleteWorkRetirement"
+        for config in ("Retirement", "RetirementSingle"):
+            accepted = self.run_model(config, "Model checking completed. No error", model=model)
+            self.assertEqual(accepted.returncode, 0, accepted.stderr)
+        for config, invariant in (
+            ("BrokenRetirementExpiry", "SelectionExpiration"),
+            ("BrokenRetirementPublication", "CancellationAuthority"),
+            ("BrokenRetirementPin", "CancellationAuthority"),
+            ("BrokenRetirementOwnership", "CancellationAuthority"),
+            ("BrokenRetirementBarrier", "CancellationAuthority"),
+            ("BrokenRetirementAvailability", "CancellationAuthority"),
+            ("BrokenRetirementLegacy", "LegacyReplayCompatibility"),
+            ("BrokenRetirementCheckpoint", "CheckpointMetadata"),
+            ("BrokenRetirementTerminal", "TerminalMetadata"),
+            ("BrokenRetirementDebt", "ProtectedState"),
+            ("BrokenRetirementReservation", "ProtectedState"),
+            ("BrokenRetirementResult", "ProtectedState"),
+            ("BrokenRetirementMaintenance", "RecoveryIsolation"),
+            ("RetirementCheckedWitness", "NoCheckedRetirement"),
+            ("RetirementLegacyWitness", "NoLegacyCheckpoint"),
+            ("RetirementRecoveryWitness", "NoRetirementRecovery"),
+            ("RetirementExpirationWitness", "NoElapsedPrefix"),
+        ):
+            with self.subTest(config=config):
+                accepted = self.run_model(config, f"Invariant {invariant} is violated", 12, model=model)
+                self.assertEqual(accepted.returncode, 0, accepted.stderr)
+                for output, status in ((f"Invariant {invariant} is violated", 0),
+                                       ("Invariant TypeOK is violated", 12),
+                                       ("Parsing failed", 151)):
+                    rejected = self.run_model(config, output, status, model=model)
+                    self.assertNotEqual(rejected.returncode, 0)
+
     def test_delivery_recovery_configs_require_exact_verdicts(self):
         model = "ClaimDeliveryRecovery"
         for config in ("DeliveryRecovery", "DeliveryRecoveryProgress"):
@@ -199,6 +232,7 @@ class ModelRunnerTests(unittest.TestCase):
     def test_all_new_configs_are_registered_with_real_invariants(self):
         runner = (SPEC / "check.sh").read_text()
         for model, pattern in (("ClaimDeliveryHealth", r"(?:Delivery|BrokenDelivery).*\.cfg"),
+                               ("ObsoleteWorkRetirement", r"(?:Retirement.*|BrokenRetirement.*)\.cfg"),
                                ("WorkExpiration", r"(?:WorkExpiration|BrokenExpiration.*|Expiration.*Witness)\.cfg"),
                                ("ClaimDeliveryRecovery", r"(?:DeliveryRecovery.*|BrokenRecovery.*|Recovery(?:Released|Enriched|Retained|Unavailable)Witness)\.cfg"),
                                ("QueueLifecycle", r"LifecycleReleasedPendingWitness\.cfg"),

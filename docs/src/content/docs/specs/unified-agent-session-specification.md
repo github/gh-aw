@@ -85,7 +85,11 @@ The agent artifact already contains native session evidence: Copilot session
 `logEntries` as `agent-session.jsonl` so conclusion can reuse canonical events
 without parsing the same native transcript again. After downloading agent, detection, safe-output, experiment,
 and eval evidence, the conclusion job merges these observations into
-`usage/aw_session.jsonl`. The agent artifact also carries the split activation
+`usage/aw_session.jsonl`. Conclusion also downloads activation's `info` artifact
+to collect runner-owned `aw_info.json` as `workflow.info`, including available
+engine, model, version, revision, and trigger metadata. Runtime model metadata,
+when captured, takes precedence over the activation snapshot.
+The agent artifact also carries the split activation
 `aw-prompts/system.txt` and `aw-prompts/user.txt` files; the merger records each
 available file as an untimed `prompt.system` or `prompt.user` event with its exact
 content and source path. These prompt events are omitted from default summaries.
@@ -466,7 +470,14 @@ Grader and eval result collection MUST import only records attributed to the
 current run, not restored historical results. Runner-owned `aw_info.json`
 supplies the run ID and available attempt; the supplied collector environment
 (defaulting to the process environment) supplies them only when recorded run
-identity is absent. An explicit environment snapshot MUST NOT borrow run identity
+identity is absent. The live conclusion entry point explicitly supplies the
+current execution identity, which MUST reconcile the in-memory workflow metadata
+and derived workflow call ID before filtering durable, grader, and eval records
+or computing built-in graders. Caller context and episode parent identities
+remain unchanged.
+This prevents a reused successful activation snapshot from selecting an earlier
+attempt. Source artifacts remain unchanged; offline reconstruction retains
+recorded-identity precedence. An explicit environment snapshot MUST NOT borrow run identity
 from the ambient process. Records from other runs or
 explicitly different attempts are excluded without changing source artifacts.
 Unattributed results or an unavailable current run ID produce collection

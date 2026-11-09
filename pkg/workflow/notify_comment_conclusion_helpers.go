@@ -65,6 +65,7 @@ func (c *Compiler) buildConclusionSetupSteps(data *WorkflowData) []string {
 	// Add artifact download steps once (shared by noop and conclusion steps).
 	// In workflow_call context, use the per-invocation prefix to avoid artifact name clashes.
 	steps = append(steps, buildAgentOutputDownloadSteps(artifactPrefixExprForDownstreamJob(data), c.getActionPin)...)
+	steps = append(steps, buildWorkflowInfoDownloadSteps(artifactPrefixExprForDownstreamJob(data), c.getActionPin)...)
 	if isModelRoutingEnabled(data) || data.EngineConfig != nil && data.EngineConfig.ID == string(constants.CopilotEngine) {
 		steps = append(steps,
 			"      - name: Restore runtime model metadata\n",

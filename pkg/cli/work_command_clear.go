@@ -229,6 +229,7 @@ func workRecoverClearIntent(accepted workqueue.QueueCommit, reason string) (work
 	for _, operation := range accepted.Operations {
 		var fields struct {
 			Kind    string `json:"kind"`
+			Version *int   `json:"version,omitempty"`
 			WorkID  string `json:"work_id"`
 			ClaimID string `json:"claim_id,omitempty"`
 			Reason  string `json:"reason"`
