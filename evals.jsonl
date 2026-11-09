@@ -1,0 +1,2 @@
+{"id":"strategy-split","question":"Does the report describe the required equal split between cached strategy reuse and new exploration?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-09T03:53:04.363Z","runid":"42557907411"}
+{"id":"validated-fixes","question":"When fix pull requests are proposed, does the agent output provide validation results for the actual changes? Return UNKNOWN when no fix pull requests are proposed.","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-09T03:53:04.363Z","runid":"42557907411"}
