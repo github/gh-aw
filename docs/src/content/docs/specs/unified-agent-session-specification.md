@@ -3,9 +3,9 @@ title: Unified Agent Session Specification
 description: Draft contract for canonical traces, full unified artifacts, and bounded compact unified sessions.
 sidebar:
   order: 1365
-version: "2.7.0"
+version: "2.8.0"
 status: Draft
-publication_date: "2026-10-30"
+publication_date: "2026-11-09"
 editors:
   - name: GitHub Agentic Workflows Team
     organization: GitHub
@@ -13,9 +13,9 @@ editors:
 
 # Unified Agent Session Specification
 
-**Version**: 2.7.0<br>
+**Version**: 2.8.0<br>
 **Status**: Draft<br>
-**Publication Date**: 2026-10-30<br>
+**Publication Date**: 2026-11-09<br>
 **Editors**: GitHub Agentic Workflows Team (GitHub)<br>
 **This Version**: [unified-agent-session-specification](/gh-aw/specs/unified-agent-session-specification/)<br>
 **Latest Version**: This document
@@ -30,7 +30,7 @@ This specification defines the session traces used by GitHub Agentic Workflows: 
 
 This is a **GitHub Agentic Workflows project specification**, written using W3C-inspired document conventions. It is **not an official W3C standard**, W3C publication, or W3C-endorsed recommendation.
 
-Version 2.7.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
+Version 2.8.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
 
 The specification version belongs to this document. The unified file's leading
 `session.format` record carries an independent numeric serialization-format
@@ -371,10 +371,12 @@ Numeric Squid audit timestamps use Unix seconds; native agent timestamps and
 token-tracker audit `ts` values use milliseconds. Pi's observed
 `message.timestamp` is also a supported source timestamp, including its
 `data.messageMetadata.timestamp` representation in saved canonical traces.
-When the event has no source clock, the adapter or merger MUST retain that
+When the event has no source clock, the unified projection MUST retain a valid
 observed message clock as `timestamp` before omitting the archival message
-metadata. Explicit source clocks take precedence; ordering anchors are not
-substitutes for missing native clocks. ISO fractional seconds
+metadata. Promotion MUST use the ordering parser's timezone, calendar and
+numeric-range validation; invalid archival message clocks MUST NOT be promoted.
+Explicit source clocks take precedence and retain their native values; ordering
+anchors are not substitutes for missing native clocks. ISO fractional seconds
 and OTLP decimal-string Unix nanoseconds MUST be compared at nanosecond precision.
 `provenance.timestampMs` is an observed millisecond projection, not the exact
 ordering key; native timestamps retain their original precision.
@@ -2667,6 +2669,12 @@ Malformed logs and very large records can exhaust memory or produce misleading s
 Native IDs can collide, timestamps can be out of order, and a trace can contain ambiguous concurrent calls. Exact-ID pairing avoids attributing a failure or output to the wrong tool. Cross-session concatenation requires an external boundary policy; this specification does not invent a wrapper or fabricated session IDs to resolve such ambiguity.
 
 ## 13. Change Log (Informative)
+
+### Version 2.8.0 - Draft (2026-11-09)
+
+- Retained valid observed Pi message clocks across native and saved canonical traces, with explicit source-clock precedence and shared ordering validation (T-UAS-056).
+- Preserved tool/message/model correlation and supplied structured tool content in the essential unified projection while keeping native envelopes archival.
+- Retained serialization-format version 1.
 
 ### Version 2.7.0 - Draft (2026-10-30)
 

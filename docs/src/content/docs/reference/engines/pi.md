@@ -61,9 +61,10 @@ normalized `agent-session.jsonl`. Conclusion publishes the essential event
 projection in `usage/aw_session.jsonl`. Pi's observed message timestamps are
 retained on canonical messages, reasoning and tool calls when no source-event
 clock is present. Collection also recognizes clocks stored only in
-`data.messageMetadata.timestamp` in older canonical artifacts. These clocks
-use milliseconds or timezone-qualified ISO strings; missing clocks are not
-filled with collection time.
+`data.messageMetadata.timestamp` in older canonical artifacts. Collection
+promotes only finite, in-range milliseconds or calendar-valid timezone-qualified
+ISO strings from archival message metadata. Invalid archival clocks are not
+promoted; missing clocks are not filled with collection time.
 
 Unified tool lifecycle events retain supplied `messageId` and `model` alongside
 `toolCallId`, allowing a tool call to be correlated with its originating model

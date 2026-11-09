@@ -34,6 +34,18 @@ describe("Unified trace ordering", () => {
     expect(sessionTimestamp({ type: "assistant.message", data: { content: "untimed" } })).toBeUndefined();
   });
 
+  it.each(["yesterday", "2026-11-09T00:27:23.729", "2026-02-30T00:00:00Z", 8640000000000001, { value: 0 }])("keeps invalid archived clocks untimed and source ordered (%j)", timestamp => {
+    const saved = { type: "tool.execution_start", data: { toolCallId: "call", messageMetadata: { timestamp } } };
+    const original = structuredClone(saved);
+    const merged = mergeSessionSources([source("agent", [event("start", 10), saved, event("end", 20)]), source("mcp", [event("rpc", 15)])]);
+    expect(merged.map(record => record.id ?? record.data.toolCallId)).toEqual(["start", "call", "rpc", "end"]);
+    expect(merged[1]).not.toHaveProperty("timestamp");
+    expect(merged[1].provenance).not.toHaveProperty("timestampMs");
+    expect(sessionTimestampNs(merged[1])).toBeUndefined();
+    expect(validateSession(jsonl(merged))).toBe(5);
+    expect(saved).toEqual(original);
+  });
+
   it.each([[], [source("agent", [])], [source("agent", []), source("otel", [], "nanoseconds")]].map(sources => [sources]))("accepts empty source collections without inventing observations: %j", sources => {
     expect(mergeSessionSources(sources)).toEqual([]);
   });

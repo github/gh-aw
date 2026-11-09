@@ -19,8 +19,28 @@ import { dynamicWorkflow } from "./fixtures/claude_dynamic_workflow.cjs";
 import { DYNAMIC_WORKFLOW_EVENT_TYPES } from "./dynamic_workflow_session.cjs";
 import { failure as claudeFailures } from "./fixtures/claude_ci_sessions.cjs";
 import { createSessionLookups } from "./grader_session.cjs";
+import { sessionTimestampNs } from "./unified_session_order.cjs";
 
 describe("essential unified session payloads", () => {
+  it.each(["yesterday", "2026-11-09T00:27:23.729", "2026-02-30T00:00:00Z", 8640000000000001, Infinity, { value: 0 }])("does not promote invalid native or archived message clocks %j", timestamp => {
+    for (const original of [
+      { type: "tool.execution_start", data: { toolCallId: "call", messageMetadata: { timestamp } } },
+      { type: "assistant.message", data: { content: "untimed" }, message: { role: "assistant", content: "untimed", timestamp } },
+    ]) {
+      const snapshot = structuredClone(original);
+      const projected = normalizeUnifiedSessionEvent(original);
+      expect(sessionTimestampNs(original)).toBeUndefined();
+      expect(projected).not.toHaveProperty("timestamp");
+      expect(sessionTimestampNs(projected)).toBeUndefined();
+      expect(normalizeUnifiedSessionEvent(projected)).toEqual(projected);
+      const [unified] = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-session.jsonl", events: [original] }]);
+      expect(unified).not.toHaveProperty("timestamp");
+      expect(unified.provenance).not.toHaveProperty("timestampMs");
+      expect(createSessionValidator("unified").event(unified)).toBe(true);
+      expect(original).toEqual(snapshot);
+    }
+  });
+
   it.each(["tool.execution_start", "tool.execution_update", "tool.execution_complete"])("retains tool/message correlation without publishing native envelopes (%s)", type => {
     const original = {
       type,
