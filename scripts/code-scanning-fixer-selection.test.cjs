@@ -25,12 +25,13 @@ function select(records, alerts = [alert]) {
   return JSON.parse(execFileSync("jq", ["-n", "--argjson", "now", JSON.stringify(now), "--argjson", "cached", JSON.stringify([records]), "--argjson", "alerts", JSON.stringify([alerts]), selector[1]], { encoding: "utf8" }));
 }
 
-function checkpoint(startedAt = "2026-11-06T21:00:00Z") {
+function checkpoint(startedAt = "2026-11-06T21:00:00Z", lastSuccessfulStep = "alert_selected") {
   return {
     alert_number: 42,
     fingerprint,
     outcome: "in_progress",
     started_at: startedAt,
+    last_successful_step: lastSuccessfulStep,
   };
 }
 
@@ -72,6 +73,28 @@ test("A later retry checkpoint still distinguishes a real hang from an active at
   assert.equal(stalled.stalled_alert_number, "42");
   assert.equal(stalled.stalled_record.fingerprint, fingerprint);
   assert.deepEqual(stalled.candidates, []);
+});
+
+test("A stalled attempt reports its cause and last successful step, then releases the alert for retry", () => {
+  const stalled = select([checkpoint("2026-11-06T21:00:00Z", "vulnerability_analyzed")]);
+  assert.equal(stalled.stalled_record.last_successful_step, "vulnerability_analyzed");
+  assert.match(stalled.stalled_record.stall_reason, /No completion outcome was recorded within 30 minutes/);
+  assert.deepEqual(stalled.candidates, []);
+
+  const legacyStall = select([{ ...checkpoint(), last_successful_step: undefined }]);
+  assert.equal(legacyStall.stalled_record.last_successful_step, "alert_selected");
+
+  const diagnostic = workflow.split("### 1. Select an Unfixed Alert")[1].split("### 2.")[0];
+  assert.match(diagnostic, /`stall_reason`/);
+  assert.match(diagnostic, /`last_successful_step`/);
+  assert.match(diagnostic, /releases the alert for selection on the next run/);
+
+  const released = select([checkpoint(), { ...checkpoint(), outcome: "stalled_reported", recorded_at: "2026-11-07T03:00:00Z" }]);
+  assert.equal(released.stalled_alert_number, null);
+  assert.deepEqual(
+    released.candidates.map(({ number }) => number),
+    [42]
+  );
 });
 
 test("Existing fixed and oversized-patch exclusions remain intact", () => {
