@@ -36,6 +36,7 @@ Visible approved instruction.
 		name           string
 		inline, legacy bool
 		agent          bool
+		standalone     bool
 		payload        string
 	}{
 		{name: "runtime"},
@@ -47,6 +48,11 @@ Visible approved instruction.
 		{name: "input-code-fence", payload: "```\n-->ESCAPED_FENCE_PAYLOAD<!--\n```"},
 		{name: "input-legacy", legacy: true, payload: "-->ESCAPED_LEGACY_PAYLOAD<!--"},
 		{name: "agent-input", agent: true, payload: "-->ESCAPED_AGENT_PAYLOAD<!--"},
+	}
+	for _, mode := range modes {
+		mode.name = "standalone-" + mode.name
+		mode.standalone = true
+		modes = append(modes, mode)
 	}
 	runtimePath, err := filepath.Abs("../../actions/setup/js/runtime_import.cjs")
 	require.NoError(t, err)
@@ -60,9 +66,14 @@ Visible approved instruction.
 					workflows := filepath.Join(root, ".github", "workflows")
 					require.NoError(t, os.MkdirAll(workflows, 0700))
 					content := declaration
+					start, end := "<!--", "-->"
+					if mode.standalone {
+						content = strings.ReplaceAll(strings.ReplaceAll(content, "<!--\n", ""), "-->\n", "")
+						start, end = "<connector-documentation", "</connector-documentation>"
+					}
 					if fenced {
-						content = strings.Replace(content, "<!--", "```markdown\n<!--", 1)
-						content = strings.Replace(content, "-->", "-->\n```", 1)
+						content = strings.Replace(content, start, "```markdown\n"+start, 1)
+						content = strings.Replace(content, end, end+"\n```", 1)
 					}
 					spec := ".github/workflows/connectors/tracker.md"
 					if mode.agent {

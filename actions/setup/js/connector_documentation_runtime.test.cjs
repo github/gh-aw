@@ -4,11 +4,11 @@ import fs from "fs";
 const { processRuntimeImports, removeConnectorDocumentation } = require("./runtime_import.cjs");
 const { renderMarkdownTemplate } = require("./render_template.cjs");
 
-describe("connector documentation runtime prompt boundary", () => {
+describe.each(["legacy-comment", "standalone"])("connector documentation runtime prompt boundary (%s)", format => {
   const workspace = "/workspace";
   const file = "/workspace/.github/workflows/connectors/tracker.md";
   const url = "https://raw.githubusercontent.com/owner/repo/1111111111111111111111111111111111111111/.github/workflows/connectors/tracker.md";
-  const source = `---
+  const legacySource = `---
 connectors:
   tracker:
     endpoints: {api: https://example.test}
@@ -27,6 +27,7 @@ Visible approved instruction.
 \`\`\`
 Visible ending.
 `;
+  const source = format === "standalone" ? legacySource.replace("<!--\n<connector-documentation", "<connector-documentation").replace("</connector-documentation>\n-->", "</connector-documentation>") : legacySource;
   let fetch;
 
   beforeEach(() => {

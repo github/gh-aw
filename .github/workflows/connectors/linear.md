@@ -1655,7 +1655,6 @@ import-schema:
     description: Separate Actions secret containing a raw GraphQL personal API key for selected writes; default LINEAR_WRITE_API_KEY.
 ---
 
-<!--
 <connector-documentation id="linear" version="1">
   <stability>experimental: true. This connector's contract may change.</stability>
   <gateway-routing receiver-installed="false">
@@ -2255,7 +2254,6 @@ safe-outputs:
     <source url="https://raw.githubusercontent.com/linear/linear/253713fef2916ab744defdd71c62acccc8e929a2/packages/sdk/src/schema.graphql">Pinned reader SDL evidence, SHA256 73fac69ae08c0cf8329bbc85a3728a9e24e6e66116ac2f5d6aebbef922b30daf, reviewed 2026-11-02.</source>
   </sources>
 </connector-documentation>
--->
 
 Import `.github/workflows/connectors/linear.md` and explicitly select read tools and
 hyphen-prefixed safe outputs. Supply exact resource allowlists through `with`;

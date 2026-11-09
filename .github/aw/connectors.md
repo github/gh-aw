@@ -12,8 +12,8 @@ integration in GitHub Agentic Workflows. Use `gh aw` to compile workflows;
 
 Read the selected provider's Markdown declaration under
 [workflow connector declarations](../workflows/connectors/) and its
-`connector-documentation` XML comment.
-That comment describes credential provisioning, exact import inputs, resource
+standalone `connector-documentation` XML block.
+That block describes credential provisioning, exact import inputs, resource
 grants, capabilities, privacy limits, and complete consumer examples. Read only
 the relevant provider, not every integration.
 
@@ -382,7 +382,6 @@ Put exactly one matching XML documentation block in the declaration's Markdown
 body. Keep the public declaration and its documentation synchronized:
 
 ```xml
-<!--
 <connector-documentation id="provider" version="1">
   <purpose>Describe the bounded integration.</purpose>
   <credentials>Explain acquisition, scopes, secret storage, and routes.</credentials>
@@ -393,14 +392,16 @@ body. Keep the public declaration and its documentation synchronized:
     <body><![CDATA[The complete consumer prompt goes here.]]></body>
   </example>
 </connector-documentation>
--->
 ```
 
 Use the real connector ID and complete content, not the placeholders above.
-Do not put a double-hyphen sequence inside the outer comment, even in CDATA.
+Do not hide the block in an HTML comment or include double-hyphen sequences.
 These blocks are authoring documentation, not runtime instructions: matching
 blocks are omitted before import input substitution and from rendered prompts,
-including partial runtime imports. Other imported content remains untrusted.
+including partial runtime imports. The full source remains security-scanned;
+legacy comment wrappers do not exempt suspicious hidden content.
+Setup displays decoded guidance as fenced, untrusted reference data.
+Other imported content remains untrusted.
 Describe Markdown frontmatter delimiters rather than embedding them there.
 Reconstruct each sample as an opening delimiter, YAML, closing delimiter, and
 prompt. Keep secrets out of all components. Existing providers may use

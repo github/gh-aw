@@ -186,7 +186,6 @@ import-schema:
     description: Separate Actions secret containing an approved partner OAuth token with incident_write.
 ---
 
-<!--
 <connector-documentation id="datadog" version="1">
   <stability>experimental: true. This connector's contract may change.</stability>
   <runtime-policies>
@@ -416,4 +415,3 @@ or monitor configuration. Never claim a staged request changed Datadog.
     <source url="https://docs.datadoghq.com/api/latest/authentication/">Separate API and application key mode</source>
   </sources>
 </connector-documentation>
--->

@@ -49,19 +49,8 @@ func serviceNowImportCompiler(t *testing.T, with, selection string) (*Compiler, 
 func TestServiceNowMarkdownDocumentation(t *testing.T) {
 	source, err := os.ReadFile("../../.github/workflows/connectors/servicenow.md")
 	require.NoError(t, err)
-	parts := strings.SplitN(string(source), "---\n", 3)
-	require.Len(t, parts, 3)
-	body := strings.TrimSpace(parts[2])
-	require.True(t, strings.HasPrefix(body, "<!--\n<connector-documentation "))
-	require.Equal(t, 1, strings.Count(body, "<!--"))
-	require.Equal(t, 1, strings.Count(body, "-->"))
-	comment, _, found := strings.Cut(strings.TrimPrefix(body, "<!--\n"), "\n-->")
-	require.True(t, found)
-	assert.NotContains(t, comment, "--", "HTML comments cannot contain internal double hyphens, even in CDATA")
+	comment := standaloneConnectorDocumentation(t, string(source))
 	assert.NotContains(t, comment, "connector_10_", "document the direct provider tool names")
-	assert.Empty(t, scanImportedMarkdownSecurity(string(source)),
-		"the self-contained XML comment must be accepted by the actual local-import scanner")
-
 	var doc struct {
 		XMLName        xml.Name `xml:"connector-documentation"`
 		ID             string   `xml:"id,attr"`

@@ -156,7 +156,6 @@ import-schema:
     default: ZENDESK_WRITE_OAUTH_TOKEN
     description: Separate Actions secret containing a raw OAuth access token with tickets:write.
 ---
-<!--
 <connector-documentation id="zendesk" version="1">
   <stability>experimental: true. This connector's contract may change.</stability>
   <runtime-policies>
@@ -386,4 +385,3 @@ triage information. Do not claim a staged proposal was delivered to Zendesk.
     <source url="https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_audits/" />
   </sources>
 </connector-documentation>
--->

@@ -135,9 +135,7 @@ func TestGitLabConnectorEmptyGrantsAndDocumentedExamples(t *testing.T) {
 	}
 	source, err := os.ReadFile("../../.github/workflows/connectors/gitlab.md")
 	require.NoError(t, err)
-	_, body, ok := strings.Cut(string(source), "<!--\n")
-	require.True(t, ok)
-	body = strings.TrimSuffix(strings.TrimSpace(body), "-->")
+	body := standaloneConnectorDocumentation(t, string(source))
 	var documentation struct {
 		Examples []struct {
 			ID     string `xml:"id,attr"`

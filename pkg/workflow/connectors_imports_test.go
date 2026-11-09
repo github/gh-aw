@@ -321,6 +321,9 @@ func TestConnectorDocumentationMatchesDeclarations(t *testing.T) {
 			_, section, found := strings.Cut(string(doc), "Declaration: `.github/workflows/connectors/"+provider+".md`.")
 			section, _, _ = strings.Cut(section, "\n## ")
 			machineDocumentation := false
+			if strings.HasPrefix(frontmatter.Markdown, "<connector-documentation ") {
+				section, machineDocumentation = standaloneConnectorDocumentation(t, string(data)), true
+			}
 			for _, match := range htmlCommentPattern.FindAllStringSubmatch(string(data), -1) {
 				if !strings.Contains(parser.RemoveConnectorDocumentation(string(data)), match[0]) {
 					section, machineDocumentation = match[1], true
@@ -328,7 +331,7 @@ func TestConnectorDocumentationMatchesDeclarations(t *testing.T) {
 				}
 			}
 			if !machineDocumentation {
-				require.True(t, found, "document the provider in its XML comment or consolidated reference")
+				require.True(t, found, "document the provider in its XML block or consolidated reference")
 				for _, surface := range []string{"### Secrets", "| Triggers |", "| MCPs/read tools |", "| Safe outputs |", "| Context |"} {
 					assert.Contains(t, section, surface)
 				}

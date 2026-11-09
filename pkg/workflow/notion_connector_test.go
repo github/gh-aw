@@ -29,16 +29,7 @@ func notionConsumerExample(t *testing.T) string {
 	t.Helper()
 	source, err := os.ReadFile("../../.github/workflows/connectors/notion.md")
 	require.NoError(t, err)
-	parts := strings.SplitN(string(source), "---", 3)
-	require.Len(t, parts, 3)
-	body := parts[2]
-	require.Equal(t, 1, strings.Count(body, "<!--"))
-	require.Equal(t, 1, strings.Count(body, "-->"))
-	_, comment, found := strings.Cut(body, "<!--\n")
-	require.True(t, found)
-	comment, _, found = strings.Cut(comment, "\n-->")
-	require.True(t, found)
-	require.NotContains(t, comment, "--", "XML comments cannot contain double hyphens, including in CDATA")
+	comment := standaloneConnectorDocumentation(t, string(source))
 	var documentation notionDocumentation
 	require.NoError(t, xml.Unmarshal([]byte(comment), &documentation))
 	require.Equal(t, "notion", documentation.ID)

@@ -12,13 +12,9 @@ func scanImportedMarkdownSecurity(content string) []SecurityFinding {
 	if promptContent == content {
 		return findings
 	}
-	// Omitted documentation is never prompt input, but retain the other source
-	// checks (including Unicode, HTML abuse and hidden spans) within it as well.
+	// Omitted documentation is never prompt input, but retain all source
+	// security checks within it as well.
 	for _, finding := range ScanMarkdownSecurity(content) {
-		if finding.Category == CategoryHiddenContent &&
-			finding.Description == "HTML comment contains suspicious content (code, URLs, or executable instructions)" {
-			continue
-		}
 		if !slices.Contains(findings, finding) {
 			findings = append(findings, finding)
 		}

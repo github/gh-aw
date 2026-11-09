@@ -1913,7 +1913,6 @@ import-schema:
     description: Exact approved same-organization/project work-item REST URLs for the singleton work-item source and each approved link type.
 ---
 
-<!--
 <connector-documentation id="azure-devops" version="1">
   <stability>experimental: true. This connector's contract may change.</stability>
   <gateway-routing receiver-installed="false">
@@ -2768,4 +2767,3 @@ authorizes a same-run follow-up.
     <source href="https://learn.microsoft.com/en-us/azure/devops/service-hooks/services/webhooks?view=azure-devops"/>
   </sources>
 </connector-documentation>
--->

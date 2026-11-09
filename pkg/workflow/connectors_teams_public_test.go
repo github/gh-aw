@@ -26,15 +26,11 @@ func teamsPublicDocumentation(t *testing.T) (string, string) {
 	require.NoError(t, err)
 	doc, err := parser.ExtractFrontmatterFromContent(string(content))
 	require.NoError(t, err)
-	require.Len(t, strings.Split(string(content), "<!--"), 2)
-	require.Len(t, strings.Split(string(content), "-->"), 2)
-	frontmatter, comment, found := strings.Cut(string(content), "<!--\n")
+	comment := standaloneConnectorDocumentation(t, string(content))
+	frontmatter, _, found := strings.Cut(string(content), comment)
 	require.True(t, found)
 	require.Contains(t, frontmatter, "\n---\n", "documentation must follow the closing frontmatter separator")
 	require.NotContains(t, frontmatter, "<connector-documentation")
-	comment, _, found = strings.Cut(comment, "\n-->")
-	require.True(t, found)
-	require.NotContains(t, comment, "--", "XML CDATA does not exempt an HTML comment from this restriction")
 	var document struct {
 		XMLName xml.Name `xml:"connector-documentation"`
 		ID      string   `xml:"id,attr"`

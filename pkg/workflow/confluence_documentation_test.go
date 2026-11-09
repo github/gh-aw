@@ -18,7 +18,6 @@ import (
 	"testing"
 
 	"github.com/github/gh-aw/pkg/connectors"
-	"github.com/github/gh-aw/pkg/parser"
 	"github.com/stretchr/testify/require"
 	"go.yaml.in/yaml/v3"
 )
@@ -52,15 +51,7 @@ func confluenceDocumentationSource(t *testing.T) (string, confluenceDocumentatio
 	t.Helper()
 	source, err := os.ReadFile("../../.github/workflows/connectors/confluence.md")
 	require.NoError(t, err)
-	document, err := parser.ExtractFrontmatterFromContent(string(source))
-	require.NoError(t, err)
-	body := strings.TrimSpace(document.Markdown)
-	require.True(t, strings.HasPrefix(body, "<!--\n<connector-documentation "))
-	require.Equal(t, 1, strings.Count(body, "<connector-documentation "))
-	require.Equal(t, 1, strings.Count(body, "</connector-documentation>"))
-	comment, _, found := strings.Cut(strings.TrimPrefix(body, "<!--\n"), "\n-->")
-	require.True(t, found)
-	require.NotContains(t, comment, "--", "XML comments cannot contain double hyphens, even in CDATA")
+	comment := standaloneConnectorDocumentation(t, string(source))
 	var documentation confluenceDocumentation
 	require.NoError(t, xml.Unmarshal([]byte(comment), &documentation))
 	require.Equal(t, "confluence", documentation.ID)

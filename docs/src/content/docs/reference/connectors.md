@@ -154,14 +154,15 @@ on insufficient evidence and avoids pretending metadata is a document or
 conversation body. No example installs a receiver, expands grants from returned
 IDs or claims a staged effect was delivered.
 
-Every included declaration contains one self-contained
-`connector-documentation` XML comment in its Markdown body, including credential
+Every included declaration contains one self-contained standalone
+`connector-documentation` XML block in its Markdown body, including credential
 provisioning, resource inputs, capability limits, and complete consumer examples.
 The YAML and prompt elements form a workflow when wrapped in normal Markdown
-frontmatter delimiters. These comments are documentation, not executable setup
+frontmatter delimiters. These blocks are documentation, not executable setup
 or authenticated event enrollment. Matching, well-formed documentation blocks are
-omitted before import input substitution and security scanning, independent of
-the source or cache path. They are also omitted from inlined and runtime prompts,
+omitted before import input substitution and prompt rendering, independent of
+the source or cache path. The full source, including documentation, remains
+security-scanned. These blocks are also omitted from inlined and runtime prompts,
 including partial runtime imports; malformed documentation and unrelated content
 do not receive a scanner exemption. This does not make other imported content
 trusted.

@@ -281,7 +281,6 @@ import-schema:
     description: Exact approved root Graph message IDs for reader paths and reply constraints.
 ---
 
-<!--
 <connector-documentation id="teams" version="1">
   <stability>experimental: true. This connector's contract may change.</stability>
   <gateway-routing receiver-installed="false">
@@ -600,7 +599,6 @@ Writes are staged; do not call provider write APIs directly.
     <reference path="docs/src/content/docs/reference/connectors.md"/>
   </sources>
 </connector-documentation>
--->
 
 Import `.github/workflows/connectors/teams.md` and supply exact resource grants through
 `with`; defaults grant nothing. Select Graph reads and Bot Connector safe outputs

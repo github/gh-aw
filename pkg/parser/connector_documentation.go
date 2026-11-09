@@ -8,15 +8,16 @@ import (
 	"strings"
 )
 
-var connectorDocumentationCommentPattern = regexp.MustCompile(`(?s)<!--(.*?)-->`)
+var connectorDocumentationPattern = regexp.MustCompile(`(?s)<!--.*?(?:-->|$)|<connector-documentation(?:\s[^>]*)?>.*?</connector-documentation>`)
 
 // RemoveConnectorDocumentation omits well-formed authoring documentation that
 // matches a declared connector. Call before input substitution, not afterwards:
 // an input must not be able to close a documentation comment or its CDATA.
 // Newlines are retained so source positions and line selections stay stable.
-// Invalid documentation and unrelated comments remain subject to security scans.
+// Standalone XML and legacy comments are supported. Invalid documentation and
+// unrelated comments remain subject to security scans.
 func RemoveConnectorDocumentation(content string) string {
-	if !strings.Contains(content, "<!--") || !strings.Contains(content, "connector-documentation") {
+	if !strings.Contains(content, "connector-documentation") {
 		return content
 	}
 	document, err := ExtractFrontmatterFromContent(content)
@@ -32,11 +33,18 @@ func RemoveConnectorDocumentation(content string) string {
 	if err != nil {
 		return content
 	}
-	body := connectorDocumentationCommentPattern.ReplaceAllStringFunc(content[markdownStart:], func(comment string) string {
-		if !validConnectorDocumentation(comment[4:len(comment)-3], declarations) {
-			return comment
+	body := connectorDocumentationPattern.ReplaceAllStringFunc(content[markdownStart:], func(fragment string) string {
+		document := fragment
+		if strings.HasPrefix(fragment, "<!--") {
+			if !strings.HasSuffix(fragment, "-->") {
+				return fragment
+			}
+			document = fragment[4 : len(fragment)-3]
 		}
-		return strings.Repeat("\n", strings.Count(comment, "\n"))
+		if !validConnectorDocumentation(document, declarations) {
+			return fragment
+		}
+		return strings.Repeat("\n", strings.Count(fragment, "\n"))
 	})
 	return content[:markdownStart] + body
 }

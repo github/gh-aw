@@ -56,15 +56,8 @@ func sentryPublicSource(selection string) string {
 func TestSentryPublicDocumentationConsumer(t *testing.T) {
 	source, err := os.ReadFile("../../.github/workflows/connectors/sentry.md")
 	require.NoError(t, err)
-	parts := strings.SplitN(string(source), "\n---\n", 2)
-	require.Len(t, parts, 2)
-	body := parts[1]
-	require.Equal(t, 1, strings.Count(body, "<!--"))
-	require.Equal(t, 1, strings.Count(body, "-->"))
-	require.Equal(t, 1, strings.Count(body, `<connector-documentation id="sentry" version="1">`))
-	comment, _, found := strings.Cut(strings.TrimPrefix(strings.TrimSpace(body), "<!--\n"), "\n-->")
-	require.True(t, found)
-	require.NotContains(t, comment, "--", "the Markdown comment must not close inside CDATA")
+	comment := standaloneConnectorDocumentation(t, string(source))
+	require.Equal(t, 1, strings.Count(comment, `<connector-documentation id="sentry" version="1">`))
 	type section struct {
 		Text string `xml:",innerxml"`
 	}

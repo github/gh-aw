@@ -167,15 +167,7 @@ func TestDatadogConnectorSitesAndSecretNames(t *testing.T) {
 func TestDatadogConnectorXMLDocumentation(t *testing.T) {
 	data, err := os.ReadFile("../../.github/workflows/connectors/datadog.md")
 	require.NoError(t, err)
-	body := strings.SplitN(string(data), "\n---\n", 2)
-	require.Len(t, body, 2)
-	require.Equal(t, 1, strings.Count(body[1], "<!--"))
-	require.Equal(t, 1, strings.Count(body[1], "-->"))
-	comment := strings.TrimSpace(body[1])
-	require.True(t, strings.HasPrefix(comment, "<!--\n"))
-	require.True(t, strings.HasSuffix(comment, "\n-->"))
-	document := strings.TrimSuffix(strings.TrimPrefix(comment, "<!--\n"), "\n-->")
-	require.NotContains(t, document, "--", "XML comments cannot contain internal double hyphens")
+	document := standaloneConnectorDocumentation(t, string(data))
 	var parsed struct {
 		XMLName  xml.Name `xml:"connector-documentation"`
 		ID       string   `xml:"id,attr"`

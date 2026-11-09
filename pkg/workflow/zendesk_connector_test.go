@@ -106,13 +106,7 @@ func zendeskNoteArgs() map[string]any {
 func TestZendeskConnectorDocumentation(t *testing.T) {
 	source, err := os.ReadFile("../../.github/workflows/connectors/zendesk.md")
 	require.NoError(t, err)
-	_, body, found := strings.Cut(strings.TrimPrefix(string(source), "---\n"), "\n---\n")
-	require.True(t, found)
-	require.Equal(t, 1, strings.Count(body, "<!--"))
-	require.Equal(t, 1, strings.Count(body, "-->"))
-	require.True(t, strings.HasPrefix(body, "<!--\n<connector-documentation "))
-	document := strings.TrimSuffix(strings.TrimPrefix(body, "<!--\n"), "-->\n")
-	require.NotContains(t, document, "--", "XML comments cannot contain internal double hyphens")
+	document := standaloneConnectorDocumentation(t, string(source))
 	var documentation struct {
 		XMLName        xml.Name `xml:"connector-documentation"`
 		ID             string   `xml:"id,attr"`
@@ -151,7 +145,7 @@ func TestZendeskConnectorDocumentation(t *testing.T) {
 	require.Contains(t, documentation.Compatibility, "Basic")
 	require.Contains(t, documentation.Limitations, "index zero")
 	require.Contains(t, documentation.Limitations, "global read")
-	require.Contains(t, body, "<![CDATA[")
+	require.Contains(t, document, "<![CDATA[")
 	sample := "---\n" + strings.TrimSpace(documentation.Sample.YAML) + "\n---\n" + documentation.Sample.Prompt
 	compiler, data, path, err := parseZendeskWorkflow(t, sample)
 	require.NoError(t, err)

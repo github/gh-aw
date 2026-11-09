@@ -58,22 +58,54 @@ func TestRemoveConnectorDocumentation(t *testing.T) {
 }
 
 func TestConnectorDocumentationRemovedBeforeInputSubstitution(t *testing.T) {
-	for _, payload := range []string{
-		"-->ESCAPED_COMMENT_PAYLOAD<!--",
-		"]]></example></connector-documentation>-->ESCAPED_CDATA_PAYLOAD<!--",
-		"```\n-->ESCAPED_FENCE_PAYLOAD<!--\n```",
+	for format, content := range map[string]string{
+		"legacy-comment": connectorDocumentationFixture,
+		"standalone":     strings.ReplaceAll(strings.ReplaceAll(connectorDocumentationFixture, "<!--\n", ""), "-->\n", ""),
 	} {
-		t.Run(payload, func(t *testing.T) {
-			acc := newImportAccumulator()
-			_, _, err := acc.prepareFrontmatter([]byte(connectorDocumentationFixture), importQueueItem{
-				fullPath: ".github/workflows/connectors/tracker.md",
-				inputs:   map[string]any{"payload": payload},
-			}, map[string]struct{}{})
-			require.NoError(t, err)
-			require.NotContains(t, acc.markdownBuilder.String(), "ESCAPED")
-			require.NotContains(t, acc.markdownBuilder.String(), "hidden instructions")
-			require.Empty(t, acc.markdownBuilder.String(), "documentation-only inputs must not cause compile-time inlining")
-			require.Len(t, acc.importPaths, 1)
+		for _, payload := range []string{
+			"-->ESCAPED_COMMENT_PAYLOAD<!--",
+			"]]></example></connector-documentation>-->ESCAPED_CDATA_PAYLOAD<!--",
+			"```\n-->ESCAPED_FENCE_PAYLOAD<!--\n```",
+		} {
+			t.Run(format+"/"+payload, func(t *testing.T) {
+				acc := newImportAccumulator()
+				_, _, err := acc.prepareFrontmatter([]byte(content), importQueueItem{
+					fullPath: ".github/workflows/connectors/tracker.md",
+					inputs:   map[string]any{"payload": payload},
+				}, map[string]struct{}{})
+				require.NoError(t, err)
+				require.NotContains(t, acc.markdownBuilder.String(), "ESCAPED")
+				require.NotContains(t, acc.markdownBuilder.String(), "hidden instructions")
+				require.Empty(t, acc.markdownBuilder.String(), "documentation-only inputs must not cause compile-time inlining")
+				require.Len(t, acc.importPaths, 1)
+			})
+		}
+	}
+}
+
+func TestRemoveStandaloneConnectorDocumentation(t *testing.T) {
+	content := strings.ReplaceAll(strings.ReplaceAll(connectorDocumentationFixture, "<!--\n", ""), "-->\n", "")
+	got := RemoveConnectorDocumentation(content)
+	require.NotContains(t, got, "hidden instructions")
+	require.NotContains(t, got, "connector-documentation")
+	require.Contains(t, got, "Visible instructions.")
+	require.Contains(t, got, "Visible ending.")
+	require.Equal(t, strings.Count(content, "\n"), strings.Count(got, "\n"))
+	require.Equal(t, got, RemoveConnectorDocumentation(got))
+	require.Equal(t, strings.SplitN(content, "---\n", 3)[:2], strings.SplitN(got, "---\n", 3)[:2], "frontmatter is unchanged")
+
+	for name, invalid := range map[string]string{
+		"wrong connector":   strings.Replace(content, `id="tracker"`, `id="other"`, 1),
+		"wrong version":     strings.Replace(content, `version="1"`, `version="2"`, 1),
+		"mismatched XML":    strings.Replace(content, "</usage>", "</broken>", 1),
+		"directive":         strings.Replace(content, "<usage>", "<!DOCTYPE x><usage>", 1),
+		"no declaration":    strings.Replace(content, "connectors:", "not-connectors:", 1),
+		"unclosed document": strings.Replace(content, "</connector-documentation>", "", 1),
+		"unrelated comment": strings.Replace(content, "<connector-documentation", "<!-- Unrelated comment\n<connector-documentation", 1) + "-->",
+		"unclosed comment":  strings.Replace(content, "<connector-documentation", "<!--\n<connector-documentation", 1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, invalid, RemoveConnectorDocumentation(invalid), "invalid and unrelated source remains subject to security scans")
 		})
 	}
 }

@@ -237,7 +237,6 @@ import-schema:
     description: Exact approved numeric Confluence space IDs as strings.
 ---
 
-<!--
 <connector-documentation id="confluence" version="1">
   <stability>experimental: true. This connector's contract may change.</stability>
   <gateway-routing receiver-installed="false">
@@ -535,6 +534,5 @@ Do not call write APIs directly, invent dynamic content inputs, or expand grants
     <source path="docs/src/content/docs/reference/connectors.md"/>
   </sources>
 </connector-documentation>
--->
 
 Use ordinary AW imports and explicitly selected read tools and hyphen-prefixed safe outputs. Event envelopes contain references, not resource content; retrieve approved content through scoped read APIs. Native ingress is not operational.

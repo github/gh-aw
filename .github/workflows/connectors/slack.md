@@ -179,7 +179,6 @@ import-schema:
     description: Separate Actions secret containing the bearer token with chat:write for the fixed thread.
 ---
 
-<!--
 <connector-documentation id="slack" version="1">
   <stability>experimental: true. This connector's contract may change.</stability>
   <gateway-routing receiver-installed="false">
@@ -473,6 +472,5 @@ Writes are staged; never call a write API directly or change the targets.
     <reference href="docs/src/content/docs/reference/connectors.md">Shared AW connector reference</reference>
   </references>
 </connector-documentation>
--->
 
 Use ordinary AW imports and explicitly selected read tools and hyphen-prefixed safe outputs. Event envelopes contain references, not resource content; retrieve approved content through scoped read APIs. Native ingress is not operational.

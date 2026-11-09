@@ -194,16 +194,7 @@ func TestPagerDutyConnectorSelectionRejections(t *testing.T) {
 func TestPagerDutyConnectorXMLDocumentation(t *testing.T) {
 	data, err := os.ReadFile("../../.github/workflows/connectors/pagerduty.md")
 	require.NoError(t, err)
-	parts := strings.SplitN(string(data), "---", 3)
-	require.Len(t, parts, 3)
-	body := parts[2]
-	require.Equal(t, 1, strings.Count(body, "<!--"))
-	require.Equal(t, 1, strings.Count(body, "-->"))
-	_, comment, found := strings.Cut(body, "<!--\n")
-	require.True(t, found)
-	comment, _, found = strings.Cut(comment, "\n-->")
-	require.True(t, found)
-	require.NotContains(t, comment, "--", "XML comments cannot contain internal double hyphens")
+	comment := standaloneConnectorDocumentation(t, string(data))
 	var documentation struct {
 		XMLName xml.Name `xml:"connector-documentation"`
 		ID      string   `xml:"id,attr"`

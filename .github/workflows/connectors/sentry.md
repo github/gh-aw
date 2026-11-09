@@ -206,7 +206,6 @@ import-schema:
     description: Separate Actions secret containing the REST bearer token with event:write for the fixed approved issue.
 ---
 
-<!--
 <connector-documentation id="sentry" version="1">
   <stability>experimental: true. This connector's contract may change.</stability>
   <gateway-routing receiver-installed="false">
@@ -444,6 +443,5 @@ Writes are staged: never claim that a staged request resolved the issue.
     <source url="https://github.com/getsentry/sentry-mcp/blob/main/packages/mcp-core/src/tools/catalog/get-issue-details.ts" />
   </sources>
 </connector-documentation>
--->
 
 Use ordinary AW imports and explicitly selected read tools and hyphen-prefixed safe outputs. Event envelopes contain references, not resource content; retrieve approved content through scoped read APIs. Native ingress is not operational.

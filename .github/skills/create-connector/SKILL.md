@@ -69,10 +69,10 @@ only when the task explicitly includes that implementation.
 
 ## Supply a complete consumer and documentation
 
-Add one matching XML comment with purpose, acquisition/renewal instructions,
+Add one matching standalone XML block with purpose, acquisition/renewal instructions,
 phase credential names/scopes, input/grant contracts, evidence/privacy limits,
 and complete consumer YAML/prompt elements. Never include secret values or
-double-hyphen sequences in the outer comment. Do not embed Markdown
+double-hyphen sequences or an outer HTML comment. Do not embed Markdown
 frontmatter delimiters inside it. Documentation is stripped from prompts,
 not executed as setup.
 

@@ -80,10 +80,12 @@ function shouldPreserveFrontMatter(filepath) {
  * @returns {string}
  */
 function removeConnectorDocumentation(content) {
-  if (!content.includes("<!--") || !content.includes("connector-documentation")) {
+  if (!content.includes("connector-documentation")) {
     return content;
   }
-  return content.replace(/<!--\s*<connector-documentation(?:\s|>)[\s\S]*?<\/connector-documentation>\s*-->/g, comment => comment.replace(/[^\r\n]/g, ""));
+  return content
+    .replace(/<!--\s*<connector-documentation(?:\s|>)[\s\S]*?<\/connector-documentation>\s*-->/g, comment => comment.replace(/[^\r\n]/g, ""))
+    .replace(/<!--[\s\S]*?(?:-->|$)|<connector-documentation(?:\s|>)[\s\S]*?<\/connector-documentation>/g, fragment => (fragment.startsWith("<!--") ? fragment : fragment.replace(/[^\r\n]/g, "")));
 }
 
 /**

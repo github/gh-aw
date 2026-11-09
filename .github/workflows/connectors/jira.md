@@ -694,7 +694,6 @@ import-schema:
     description: Separate Actions secret containing base64(account-email:unscoped-api-token) for direct-site REST writes, without the Basic prefix.
 ---
 
-<!--
 <connector-documentation id="jira" version="1">
   <stability>experimental: true. This connector's contract may change.</stability>
   <gateway-routing receiver-installed="false">
@@ -1122,7 +1121,6 @@ Report these as staged intents, never as completed Jira mutations.
     <reference href="https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-user-search/">Account lookup query semantics, limits and privacy.</reference>
   </references>
 </connector-documentation>
--->
 
 Import this connector and explicitly select read profiles and `jira-` safe outputs.
 Event envelopes contain references, not resource content. Native ingress is not operational.
