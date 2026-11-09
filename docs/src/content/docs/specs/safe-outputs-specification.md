@@ -4282,9 +4282,11 @@ or review bodies to returned or persisted decision evidence.
 - Patch/bundle handling and publication MUST satisfy the shared [transport integrity requirements](#patch-and-bundle-transport-integrity-requirements).
 - Bundle inspection, recovery, and unsigned validation baselines MUST satisfy [BGO-001–008](#bundle-git-operations-and-validation-baselines).
 - The handler MUST reject an attempt to push when the resolved pull request head branch is the repository's default branch, before attempting the push.
-- The handler MUST attempt the push optimistically and MUST NOT block the push solely because a preflight branch-protection or ruleset inspection indicates that the branch may be protected.
-- After a failed push, the implementation MAY perform informational protection diagnostics. When performed, diagnostics MUST use only branch metadata and active branch-rules inspection available to the implementation and MUST NOT invoke an Administration-only classic branch-protection API.
-- Diagnostic inspection failures, unavailable inspection data, and disabled diagnostics MUST preserve the original push failure. Diagnostics MUST NOT change push retry behavior, fallback behavior, or the reported primary failure.
+- When `check-branch-protection` is enabled or omitted, the handler MUST inspect protection before attempting publication and MUST block the push on detected restrictive protection, inspection failures, or missing or malformed required metadata.
+- Protection inspection MUST use only branch metadata and active branch-rules APIs available with read-compatible permissions and MUST NOT invoke an Administration-only classic branch-protection API.
+- An advisory-only Copilot-review ruleset MUST NOT block publication when branch metadata explicitly disables classic protection and the complete active rules list contains only `copilot_code_review`.
+- When `check-branch-protection: false` is configured, the handler MUST skip protection inspection and attempt otherwise-authorized pushes optimistically, leaving protection enforcement to GitHub. Disabling this gate MUST NOT disable the default-branch guard, file protections, or target-repository authorization.
+- For pushes that pass or skip the gate, the implementation MUST preserve the actual push failure, push retry behavior, and fallback behavior.
 
 ---
 
@@ -6852,10 +6854,10 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 
 **Version 1.29.22** (2026-11-09):
 
-- **Specified**: `push_to_pull_request_branch` attempts authorized pushes optimistically rather than blocking on preflight branch-protection inspection.
+- **Specified**: `push_to_pull_request_branch` gates restrictive branch protection and inspection failures before publication by default; `check-branch-protection: false` skips inspection and attempts otherwise-authorized pushes optimistically.
 - **Preserved**: The repository default-branch guard remains mandatory before pushing.
-- **Specified**: Optional post-failure diagnostics use branch metadata and active branch rules only; Administration-only classic protection APIs are not required.
-- **Preserved**: Inspection failures retain the original push failure and do not alter retries or fallback behavior.
+- **Specified**: Protection inspection uses branch metadata and active branch rules only, without Administration-only classic protection APIs; metadata-confirmed advisory-only Copilot-review rules do not block publication.
+- **Preserved**: Default-branch, file, and target-repository controls remain mandatory; actual push failures, retries, and fallback behavior remain unchanged for pushes that pass or skip the gate.
 - **Updated**: Publication metadata to 1.29.22.
 
 **Version 1.29.21** (2026-11-08):
