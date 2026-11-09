@@ -76,9 +76,10 @@ const { detectErrors, buildOutputLines, isStepTimeout, sanitizeModelName } = err
 const { parseUnknownModelAICreditsAndModelFromAuditLog, parseMaxCacheMissesExceededFromEventLog } = require("./ai_credits_context.cjs");
 const { renderLogFromFile } = require("./render_detection_log.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { collectAgentExecution, agentErrorDiagnosticText, parseAgentExitCode } = require("./agent_execution.cjs");
+const { collectAgentExecution, agentErrorDiagnosticText, parseAgentExitCode, isAgentExecutionEvent } = require("./agent_execution.cjs");
 const { writeSessionArtifact } = require("./session_artifact.cjs");
 const { collectAddMaskedValues } = require("./add_mask_redaction.cjs");
+const { parseDeepSeekLog, reconcileDeepSeekExecution } = require("./parse_deepseek_log.cjs");
 
 // File written by the engine execution step with the epoch milliseconds at which the
 // engine CLI was started. Used to measure how long the engine ran before it was killed.
@@ -229,15 +230,30 @@ async function renderInternalEngineLogOnFailure() {
  */
 function persistAgentExecution(logContent, results, rootDir = process.env.GH_AW_TMP_DIR || "/tmp/gh-aw") {
   const exitPath = path.join(rootDir, "agent_execution_exit_code.txt");
-  const execution = collectAgentExecution({
+  const deepSeek = process.env.GH_AW_ENGINE_ID === "deepseek-harness";
+  const events = deepSeek ? parseDeepSeekLog(logContent).logEntries : [];
+  /** @type {import("./types/agent_session").SessionEvent[]} */
+  const supplementalErrors = [];
+  if (deepSeek && !events.some(event => event.type === "session.error")) {
+    if (results.agenticEngineTimeout) {
+      supplementalErrors.push({ type: "session.error", data: { message: "DeepSeek Harness execution timed out", code: "agentic_engine_timeout", errorType: "TimeoutError" } });
+    } else if (process.env.GH_AW_AGENTIC_EXECUTION_OUTCOME === "failure") {
+      supplementalErrors.push({ type: "session.error", data: { message: "DeepSeek Harness execution failed", code: "agentic_engine_execution_failed" } });
+    }
+  }
+  const diagnostics = [...events, ...supplementalErrors];
+  let execution = collectAgentExecution({
     content: logContent,
     ...(process.env.GH_AW_ENGINE_ID === "aider" ? { rawSourceEngine: "aider" } : {}),
+    events: diagnostics,
+    observations: events.filter(isAgentExecutionEvent).map(event => event.data),
     categories: buildOutputLines(results)
       .filter(line => line.endsWith("=true"))
       .map(line => line.slice(0, -5)),
     ...(fs.existsSync(exitPath) ? { exitCode: parseAgentExitCode(fs.readFileSync(exitPath, "utf8")) } : {}),
   });
-  writeSessionArtifact(path.join(rootDir, "agent-errors.jsonl"), execution ? [execution] : [], collectAddMaskedValues(logContent));
+  if (deepSeek) execution = reconcileDeepSeekExecution(execution, diagnostics);
+  writeSessionArtifact(path.join(rootDir, "agent-errors.jsonl"), [...supplementalErrors, ...(execution ? [execution] : [])], collectAddMaskedValues(logContent));
 }
 
 async function main({ rootDir = process.env.GH_AW_TMP_DIR || "/tmp/gh-aw" } = {}) {
@@ -255,6 +271,9 @@ async function main({ rootDir = process.env.GH_AW_TMP_DIR || "/tmp/gh-aw" } = {}
   }
 
   const stdioResults = detectErrors(agentErrorDiagnosticText(logContent, process.env.GH_AW_ENGINE_ID === "aider" ? "aider" : undefined));
+  if (process.env.GH_AW_ENGINE_ID === "deepseek-harness" && parseDeepSeekLog(logContent).logEntries.some(event => event.type === "session.error" && event.data.code === "agentic_engine_timeout")) {
+    stdioResults.agenticEngineTimeout = true;
+  }
 
   // Also check the AWF firewall structured JSONL logs for the `unknown_model_ai_credits`
   // event — the API proxy event log is preferred and the audit log is used as a fallback.

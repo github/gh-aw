@@ -64,6 +64,8 @@ These definitions are examples for integration authors, **not supported gh-aw en
 
 Read the pinned definition for its exact install and provider contract. Native events and accounting are retained only when observed; process exit zero alone does not prove task completion.
 
+DeepSeek Harness captures attributed startup errors, matching failed wrapper exits, and the observed AWF timeout diagnostic as `session.error` events. Live step failure or timeout metadata also supplies an error when stdout has no diagnostic. These failures survive unified-session collection even if a wrapper records exit zero: an observed nonzero code is retained, otherwise `agent.execution.exitCode` is omitted rather than fabricated. A timeout does not imply native reasoning, tool, usage, or final-answer coverage.
+
 ## Defining an engine
 
 A definition contains `engine.id`, metadata, and `engine.behaviors`. Its behaviors install the CLI, configure inference and MCP, invoke it headlessly, and expose logs for session reconstruction. Keep secrets outside the agent sandbox and fail explicitly when required credentials, endpoints, or restrictions cannot be honored.

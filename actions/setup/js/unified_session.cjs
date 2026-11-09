@@ -18,6 +18,7 @@ const { estimateBaseline, projectModelConfig } = require("./routing_analytics.cj
 const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
 const { parseHarnessAttempts, correlateHarnessAttempts } = require("./harness_retry_session.cjs");
 const { isDurableSessionRecord } = require("./durable_session_record.cjs");
+const { reconcileDeepSeekExecution } = require("./parse_deepseek_log.cjs");
 
 const SESSION_FILE_FORMAT_VERSION = 1;
 
@@ -727,13 +728,18 @@ function collectUnifiedSession({
     )
     .find(Boolean)?.data;
   const exitCode = observedExit ?? nativeExit?.exitCode ?? nativeExit?.exit_code;
-  const execution = collectAgentExecution({
+  let execution = collectAgentExecution({
     content: stdioContent,
     ...(engine === "aider" ? { rawSourceEngine: "aider" } : {}),
     events: executionAgentSources.flatMap(source => source.events),
     observations: executionObservations,
     ...(exists(exitFile) ? { exitCode: parseAgentExitCode(read(exitFile)) } : exitCode !== undefined ? { exitCode: validateAgentExitCode(exitCode) } : {}),
   });
+  if (engine === "deepseek-harness")
+    execution = reconcileDeepSeekExecution(
+      execution,
+      executionAgentSources.flatMap(source => source.events)
+    );
   for (const source of agentSources) source.events = source.events.filter(event => event.type !== "agent.execution");
   if (execution) {
     const primary = executionObservations.length

@@ -44,6 +44,31 @@ const {
 } = require("./detect_agent_errors.cjs");
 
 describe("detect_agent_errors.cjs", () => {
+  it("emits the DeepSeek timeout classification from attributed AWF stdout", async () => {
+    const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-deepseek-timeout-"));
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    try {
+      vi.stubEnv("GH_AW_ENGINE_ID", "deepseek-harness");
+      vi.stubEnv("GH_AW_AGENTIC_EXECUTION_OUTCOME", "failure");
+      vi.stubEnv("GITHUB_OUTPUT", path.join(rootDir, "github-output"));
+      vi.stubEnv("GH_AW_ENGINE_INTERNAL_LOGS_DIR", "");
+      fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), "[deepseek-harness] configured provider=github model=auto\n[WARN] Agent command timed out after 15 minutes, stopping container...\n");
+      fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "0");
+
+      await main({ rootDir });
+
+      expect(fs.readFileSync(path.join(rootDir, "github-output"), "utf8")).toContain("agentic_engine_timeout=true");
+      const execution = JSON.parse(fs.readFileSync(path.join(rootDir, "agent-errors.jsonl"), "utf8").trim());
+      expect(execution.data.categories).toContain("agentic_engine_timeout");
+      expect(execution.data).not.toHaveProperty("exitCode");
+      expect(stderr.mock.calls.flat().join("\n")).toContain("Detected agentic engine timeout signature");
+    } finally {
+      stderr.mockRestore();
+      vi.unstubAllEnvs();
+      fs.rmSync(rootDir, { recursive: true, force: true });
+    }
+  });
+
   it.each([
     { log: "", outcome: "success", linked: false },
     { log: "Assistant: Access denied by policy settings", outcome: "success", linked: false },

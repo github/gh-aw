@@ -8,6 +8,7 @@ const { stripVTControlCharacters } = require("node:util");
 
 const main = createEngineLogParser({ parserName: "DeepSeek Harness", parseFunction: parseDeepSeekLog, supportsDirectories: false });
 const HARNESS_FAILURE = /^\[deepseek-harness\] DeepSeek Harness execution failed with exit code ([1-9]\d*)(?: \(signal=[A-Z0-9]+\))?$/;
+const AWF_TIMEOUT = /^\[WARN\] Agent command timed out after [1-9]\d* minutes, stopping container\.\.\.$/;
 const TOKEN_CLEANUP = /^\[entrypoint\] Unset [A-Z][A-Z0-9_]* from \/proc\/1\/environ$/;
 const PERMISSION_CLEANUP = /^\[entrypoint\] Relaxed \S+ group permissions for host-side post-processing$/;
 
@@ -69,8 +70,25 @@ function extractHeadlessErrors(lines, configuration) {
   const shutdown = lines.findIndex((line, index) => index > configuration.index && line === "[INFO] Stopping containers...");
   const body = lines.slice(configuration.index + 1, shutdown < 0 ? undefined : shutdown);
   if (body.some(line => /^[ \t]*(?:(?:user|system)\s*(?:prompt|message)?\s*:|prompt\s*:)/i.test(line))) return [];
+  const start = body.findIndex(line => line.trim() !== "" && line !== "[entrypoint] Unsetting sensitive tokens from parent shell environment..." && !TOKEN_CLEANUP.test(line));
+  if (shutdown < 0 && start >= 0 && AWF_TIMEOUT.test(body[start]) && body.slice(start + 1).every(line => line.trim() === "" || PERMISSION_CLEANUP.test(line))) {
+    const error = createSessionEvent({}, "session.error", { message: body[start].slice("[WARN] ".length), code: "agentic_engine_timeout", errorType: "TimeoutError" });
+    const execution = collectAgentExecution({ events: [error], categories: ["agentic_engine_timeout"] });
+    return execution ? [error, execution] : [error];
+  }
   const failureIndex = body.findIndex(line => HARNESS_FAILURE.test(line));
-  if (failureIndex < 0) return [];
+  if (failureIndex < 0) {
+    if (shutdown < 0) return [];
+    const terminal = lines.slice(shutdown + 1);
+    const failure = terminal.find(line => /^\[WARN\] Command completed with exit code: [1-9]\d*$/.test(line));
+    const exit = terminal.find(line => /^Process exiting with code:/.test(line));
+    if (!failure || terminal.includes("[SUCCESS] Command completed successfully")) return [];
+    const exitCode = Number(failure.slice("[WARN] Command completed with exit code: ".length));
+    if (exitCode > 255 || exit !== `Process exiting with code: ${exitCode}`) return [];
+    const error = createSessionEvent({}, "session.error", { message: `DeepSeek Harness execution exited with code ${exitCode}`, exitCode });
+    const execution = collectAgentExecution({ events: [error], exitCode });
+    return execution ? [error, execution] : [error];
+  }
   const exitCode = Number(body[failureIndex].match(HARNESS_FAILURE)?.[1]);
   if (shutdown >= 0) {
     const terminal = lines.slice(shutdown + 1);
@@ -78,7 +96,6 @@ function extractHeadlessErrors(lines, configuration) {
     if (terminal.includes("[SUCCESS] Command completed successfully") || (exit !== undefined && exit !== `Process exiting with code: ${exitCode}`)) return [];
   }
   if (!body.slice(failureIndex + 1).every(line => line.trim() === "" || PERMISSION_CLEANUP.test(line))) return [];
-  const start = body.findIndex(line => line.trim() !== "" && line !== "[entrypoint] Unsetting sensitive tokens from parent shell environment..." && !TOKEN_CLEANUP.test(line));
   const stackStart = body.findIndex(line => /^file:\/\/\/\S+:\d+(?::\d+)?$/.test(line));
   const nodeVersion = body.findIndex((line, index) => index > stackStart && /^Node\.js v\d+\.\d+\.\d+$/.test(line));
   const hasNodeStack = stackStart === start && stackStart >= 0 && nodeVersion > stackStart && nodeVersion < failureIndex && body.slice(nodeVersion + 1, failureIndex).every(line => line.trim() === "");
@@ -99,6 +116,23 @@ function extractHeadlessErrors(lines, configuration) {
   const execution = collectAgentExecution({ events: entries, ...(exitCode <= 255 ? { exitCode } : {}) });
   if (execution) entries.push(execution);
   return entries;
+}
+
+/**
+ * A wrapper's zero status cannot establish success against an attributed failure.
+ * Preserve an observed native failure code; a timeout alone has no known code.
+ * @param {import("./types/agent_session").AgentExecutionEvent | undefined} execution
+ * @param {import("./types/agent_session").SessionEvent[]} events
+ * @returns {import("./types/agent_session").AgentExecutionEvent | undefined}
+ */
+function reconcileDeepSeekExecution(execution, events) {
+  const errors = events.filter(event => event.type === "session.error");
+  if (!execution || execution.data.exitCode !== 0 || !errors.length) return execution;
+  const reconciled = structuredClone(execution);
+  const nativeExit = errors.map(event => event.data.exitCode).find(value => typeof value === "number" && Number.isSafeInteger(value) && value > 0 && value <= 255);
+  if (typeof nativeExit === "number") reconciled.data.exitCode = nativeExit;
+  else delete reconciled.data.exitCode;
+  return reconciled;
 }
 
 /** @param {string} content @returns {boolean} */
@@ -138,4 +172,4 @@ function parseDeepSeekLog(content) {
   };
 }
 
-module.exports = { main, parseDeepSeekLog, isDeepSeekLog };
+module.exports = { main, parseDeepSeekLog, isDeepSeekLog, reconcileDeepSeekExecution };
