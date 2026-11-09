@@ -2862,7 +2862,7 @@ describe("Codex native sub-agent roles before spawn (github/gh-aw#70939)", () =>
     expect(Object.keys(rolesAtSpawn)).toEqual(["paper-screener.toml"]);
     const toml = rolesAtSpawn["paper-screener.toml"];
     expect(roleField(toml, "name")).toBe("paper-screener");
-    expect(roleField(toml, "description")).toBe("Fast relevance screening of arXiv paper abstracts for GitHub Agentic Workflows");
+    expect(roleField(toml, "description")).toBe("paper-screener");
     expect(roleField(toml, "developer_instructions")).toBe(agent.slice(agent.indexOf("\n---\n") + 5).trim());
     expect(roleField(toml, "model")).toBe("gpt-5-mini-2025-08-07");
     expect(records.filter(record => record.role !== "main")).toEqual([{ engine: "codex", role: "paper-screener", configured_model: "small", resolved_model: "gpt-5-mini-2025-08-07", provider: "openai", status: "resolved", cause: null }]);

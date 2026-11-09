@@ -25,8 +25,8 @@
 // document (for example via an import) without swallowing unrelated content
 // that follows it, and lets the block itself contain nested "##" headings.
 //
-// Sub-agent frontmatter keys and their order are preserved without filtering;
-// boundary whitespace is trimmed.
+// Extraction preserves source frontmatter; engine edits use compiler-approved
+// fields. Boundary whitespace is trimmed.
 //
 // If no ## agent: markers are present the content is returned unchanged and no
 // files are written.
@@ -144,12 +144,13 @@ function resolveSubAgentExperimentReferences(agentName, content, env = process.e
  *
  * @param {string} agentName - Declared sub-agent name from the `## agent:` marker.
  * @param {string} content - Agent block content (frontmatter + prompt).
- * @returns {string} Content with a top-level `name:` in its frontmatter.
+ * @returns {string} Content with Claude's required name and name-derived description.
  */
 function ensureClaudeSubAgentName(agentName, content) {
-  const { readMarkdownMetadata } = require("./markdown_metadata.cjs");
+  const { editMarkdownMetadata, readMarkdownMetadata } = require("./markdown_metadata.cjs");
   const replacements = Object.fromEntries([...content.matchAll(/\x00VALUE_[0-9a-f-]+_\d+\x00/g)].map(match => [match[0], match[0]]));
-  return readMarkdownMetadata("ensure-name", content, { value: agentName, replacements }).content;
+  const named = readMarkdownMetadata("ensure-name", content, { value: agentName, replacements }).content;
+  return editMarkdownMetadata(named, metadata => ({ ...metadata, description: metadata.name }));
 }
 
 /**

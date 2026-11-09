@@ -692,7 +692,7 @@ describe("inline sub-agent experiment model expansion", () => {
       expect(written).not.toContain("${{");
       expect(written).not.toContain("experiments.");
       expect(written).not.toContain("__GH_AW_");
-      expect(readMarkdownMetadata("agent", written).value.description).toBe("Summarizes the content of a file in a few concise sentences");
+      expect(readMarkdownMetadata("agent", written).value).not.toHaveProperty("description");
       expect(written).toContain("You are a file summarization assistant.");
       expect(fs.readFileSync(promptPath, "utf8")).not.toContain("file summarization assistant");
     });
@@ -708,10 +708,10 @@ describe("inline sub-agent experiment model expansion", () => {
       expect(models).toEqual(["small", "large"]);
     });
 
-    it("preserves_plain_subagent_model_and_frontmatter", async () => {
+    it("preserves_plain_subagent_model_without_authored_description", async () => {
       process.env.GH_AW_EXPERIMENTS_SUBAGENT_MODEL = "large";
       const written = await forms[form]("claude-haiku-4.5");
-      expect(readMarkdownMetadata("agent", written).value).toEqual({ model: "claude-haiku-4.5", description: "Summarizes the content of a file in a few concise sentences" });
+      expect(readMarkdownMetadata("agent", written).value).toEqual({ model: "claude-haiku-4.5" });
       expect(written).toContain("\nYou are a file summarization assistant.\n");
     });
 

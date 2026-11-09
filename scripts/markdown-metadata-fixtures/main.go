@@ -36,7 +36,11 @@ func main() {
 				if block.Skill {
 					continue
 				}
-				value, err := parser.CompileMarkdownMetadata(block.Source)
+				compile := parser.CompileMarkdownMetadata
+				if !block.Document {
+					compile = parser.CompileAgentMetadata
+				}
+				value, err := compile(block.Source)
 				encoded, encodeErr := json.Marshal(value)
 				if encodeErr != nil {
 					panic(encodeErr)

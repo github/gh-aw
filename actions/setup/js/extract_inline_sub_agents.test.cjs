@@ -473,16 +473,16 @@ describe("Claude staged sub-agent identity", () => {
     const written = fs.readFileSync(path.join(tmpDir, ".claude", "agents", "duplicate-type-finder.md"), "utf8");
     const frontmatter = parseFrontmatter(written);
     expect(frontmatter.name).toBe(typistAgentToolUse.input.subagent_type);
-    expect(frontmatter.description).toBe(parseFrontmatter(recorded).description);
+    expect(frontmatter.description).toBe(frontmatter.name);
     expect(frontmatter.model).toBe("small");
     expect(written.slice(written.indexOf("\n---") + 4)).toBe(recorded.slice(recorded.indexOf("\n---") + 4));
     expect(fs.readFileSync(fixturePath, "utf8")).toBe(recorded);
   });
 
-  it("keeps an authored name and leaves other engines' copies unchanged", () => {
-    expect(ensureClaudeSubAgentName("persona-evaluator", "---\nname: persona-evaluator\nmodel: inherit\n---\nBody\n")).toBe("---\nname: persona-evaluator\nmodel: inherit\n---\nBody\n");
-    expect(ensureClaudeSubAgentName("helper", "Body only\n")).toBe('---\n{"name":"helper"}\n---\nBody only\n');
-    expect(ensureClaudeSubAgentName("helper", "---\n---\nBody\n")).toBe('---\n{"name":"helper"}\n---\nBody\n');
+  it("keeps an authored name, derives its description and leaves other engines' copies unchanged", () => {
+    expect(ensureClaudeSubAgentName("persona-evaluator", "---\nname: persona-evaluator\nmodel: inherit\n---\nBody\n")).toBe('---\n{"model":"inherit","name":"persona-evaluator","description":"persona-evaluator"}\n---\nBody\n');
+    expect(ensureClaudeSubAgentName("helper", "Body only\n")).toBe('---\n{"name":"helper","description":"helper"}\n---\nBody only\n');
+    expect(ensureClaudeSubAgentName("helper", "---\n---\nBody\n")).toBe('---\n{"name":"helper","description":"helper"}\n---\nBody\n');
 
     const workflow = `Main.\n\n${agentMarker("helper")}\n---\nmodel: small\n---\nHelp.`;
     writeInlineSubAgents(workflow, tmpDir, tmpDir, "codex");
@@ -496,8 +496,8 @@ describe("Claude staged sub-agent identity", () => {
     writeInlineSubAgents(workflow, tmpDir, tmpDir, "claude");
 
     const written = fs.readFileSync(path.join(tmpDir, ".claude", "agents", "reviewer.md"), "utf8");
-    expect(written).toBe('---\n"name": reviewer\nmodel: small\n---\nReview.\n');
-    expect(parseFrontmatter(written)).toEqual({ name: "reviewer", model: "small" });
+    expect(written).toBe('---\n{"model":"small","name":"reviewer","description":"reviewer"}\n---\nReview.\n');
+    expect(parseFrontmatter(written)).toEqual({ name: "reviewer", model: "small", description: "reviewer" });
   });
 
   it("inserts the name inside flow-mapping frontmatter without mixing mapping styles", () => {
@@ -505,10 +505,10 @@ describe("Claude staged sub-agent identity", () => {
     writeInlineSubAgents(workflow, tmpDir, tmpDir, "claude");
 
     const written = fs.readFileSync(path.join(tmpDir, ".claude", "agents", "marker-worker.md"), "utf8");
-    expect(written).toBe('---\n{"name":"marker-worker","description":"Returns a marker","model":"small"}\n---\nMarker.\n');
-    expect(parseFrontmatter(written)).toEqual({ name: "marker-worker", description: "Returns a marker", model: "small" });
+    expect(written).toBe('---\n{"name":"marker-worker","model":"small","description":"marker-worker"}\n---\nMarker.\n');
+    expect(parseFrontmatter(written)).toEqual({ name: "marker-worker", description: "marker-worker", model: "small" });
     const empty = fs.readFileSync(path.join(tmpDir, ".claude", "agents", "empty-flow.md"), "utf8");
-    expect(parseFrontmatter(empty)).toEqual({ name: "empty-flow" });
+    expect(parseFrontmatter(empty)).toEqual({ name: "empty-flow", description: "empty-flow" });
   });
 
   it("injects the name for any engine id that stages into .claude/agents", () => {
@@ -518,7 +518,7 @@ describe("Claude staged sub-agent identity", () => {
     for (const engineId of ["Claude", " CLAUDE "]) {
       const dir = fs.mkdtempSync(path.join(tmpDir, "engine-"));
       writeInlineSubAgents(workflow, dir, dir, engineId);
-      expect(fs.readFileSync(path.join(dir, ".claude", "agents", "helper.md"), "utf8")).toBe('---\n{"name":"helper","model":"small"}\n---\nHelp.\n');
+      expect(fs.readFileSync(path.join(dir, ".claude", "agents", "helper.md"), "utf8")).toBe('---\n{"name":"helper","model":"small","description":"helper"}\n---\nHelp.\n');
     }
   });
 });

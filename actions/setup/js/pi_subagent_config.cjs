@@ -33,11 +33,10 @@ function readPiSubagents(agentDir) {
         if (typeof name !== "string" || !/^[a-z][a-z0-9_-]*$/.test(name) || names.has(name)) throw new Error(`Invalid or duplicate Pi sub-agent name in ${entry.name}`);
         if (name !== filenameName) throw new Error(`Pi sub-agent "${name}" name must match its agent filename`);
         names.add(name);
-        if (typeof frontmatter.description !== "string" || !frontmatter.description.trim()) throw new Error(`Pi sub-agent "${name}" requires a non-empty description`);
         if (frontmatter.model !== undefined && (typeof frontmatter.model !== "string" || !frontmatter.model.trim())) throw new Error(`Pi sub-agent "${name}" model must be a non-empty string`);
         const tools = typeof frontmatter.tools === "string" ? frontmatter.tools.split(",").map(tool => tool.trim()) : frontmatter.tools;
         if (tools !== undefined && (!Array.isArray(tools) || tools.some(tool => typeof tool !== "string" || !/^[a-zA-Z0-9_*-]+$/.test(tool)))) throw new Error(`Pi sub-agent "${name}" tools must be a list of tool names`);
-        return { name, description: frontmatter.description, prompt: body, declaredModel: frontmatter.model, tools };
+        return { name, prompt: body, declaredModel: frontmatter.model, tools };
       });
   } catch (error) {
     throw new Error(`Cannot read Pi sub-agent definitions: ${getErrorMessage(error)}`, { cause: error });

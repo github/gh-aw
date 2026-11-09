@@ -108,7 +108,7 @@ Please implement the following changes:
 5. **Follow Guidelines**:
    - Use console formatting from `pkg/console` for CLI output
    - Follow error message style guide
-   - Run `make agent-finish` before completing
+   - Run `make agent-report-progress` once before the final push
 ```
 
 ### Step 3: Discuss and Refine with the Team
@@ -126,7 +126,7 @@ A core team member will:
 - Take your agentic plan and use a coding agent (Copilot or local) to implement it
 - Read relevant documentation and specifications
 - Make code changes following established patterns
-- Run `make agent-finish` to validate changes
+- Run `make agent-report-progress` once to validate changes before the final push
 - Create a PR and handle review feedback and adjustments
 
 **You don't create or own the PR** — the core team member does, using agents as their implementation tool.
@@ -156,7 +156,7 @@ When a core team member implements your plan, the coding agent they use will:
 - **Implement validation** following the architecture in [scratchpad/validation-architecture.md](scratchpad/validation-architecture.md)
 - **Use console formatting** from `pkg/console` for CLI output
 - **Write error messages** following the [Error Message Style Guide](.github/skills/error-messages/SKILL.md) and [docs guide](docs/src/content/docs/troubleshooting/error-messages.md)
-- **Run all quality checks**: `make agent-finish` (build, test, recompile, format, lint)
+- **Run the final quality gate**: `make agent-report-progress` (build, impacted tests, workflow drift, formatting, lint)
 - **Update documentation** for new features
 - **Create tests** for new functionality
 
@@ -349,7 +349,7 @@ All community-sourced pull requests are created and managed by core team members
    - They run the plan through a coding agent (Copilot or local)
    - The agent reads specifications and guidelines
    - The agent makes changes following established patterns
-   - The agent runs `make agent-finish` automatically
+   - The agent runs `make agent-report-progress` once before the final push
 
 4. **Automated quality checks:**
    - CI runs on all PRs
@@ -397,8 +397,16 @@ Every agent-created PR automatically runs:
 - `make test` - Runs all unit and integration tests
 - `make lint` - Checks code quality and style
 - `make recompile` - Recompiles all workflows to ensure compatibility. If you edit `.github/workflows/*.md`, run this before committing so the paired `.lock.yml` files stay in sync with CI.
-- `make fmt` - Formats Go code
+- `make fmt` - Formats changed Go, JavaScript, TypeScript, and JSON files; use `make fmt-all` for full-repository formatting
 - `make lint-errors` - Validates error message quality
+
+For local iteration, run `make fmt` and one focused test command. Before an
+intermediate agent save, `make agent-report-progress-no-test` formats changes
+and compiles/vets affected Go packages without running test bodies, package-wide
+Go linters, or full workflow recompilation. Run `make agent-report-progress`
+once before the final push to retain the build, lint, impacted-test, and workflow
+drift checks. Cold Go compilation and final validation can take longer than the
+warm inner loop.
 
 ## 🏗️ Project Structure
 
@@ -541,9 +549,10 @@ Dependabot prioritizes security patches:
 For comprehensive testing guidelines including assert vs require usage, table-driven test patterns, and best practices, see **[scratchpad/testing.md](scratchpad/testing.md)**.
 
 Quick reference:
-- `make test-unit` - Fast unit tests (~25s)
-- `make test` - Full test suite (~30s)
-- `make agent-finish` - Complete validation before committing
+- `make test-unit` - Impacted Go tests (30-second selected-runtime budget; compilation is additional)
+- `make test-unit-all` - Full Go unit test suite
+- `make agent-report-progress` - Final branch-scoped validation before pushing
+- `make agent-finish` - Explicit repository-wide maintenance sweep; not an inner-loop command
 
 ### Compiling against a different actions repository
 

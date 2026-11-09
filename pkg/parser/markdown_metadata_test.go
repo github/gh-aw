@@ -26,7 +26,7 @@ func TestCompileMarkdownMetadata(t *testing.T) {
 func TestCompileAgentMetadataRuntimeFields(t *testing.T) {
 	value, err := CompileAgentMetadata("name: reader\ndescription: Reads files\nmodel: small\ntools: [Read]\napplyTo: '**'\ninputs: [unused]\noutputs: [unused]\nmetadata: {version: '1.0'}")
 	require.NoError(t, err)
-	require.Equal(t, map[string]any{"name": "reader", "description": "Reads files", "model": "small", "tools": []any{"Read"}}, value)
+	require.Equal(t, map[string]any{"name": "reader", "model": "small", "tools": []any{"Read"}}, value)
 	_, err = CompileAgentMetadata("model: a\nmodel: b")
 	require.Error(t, err)
 }

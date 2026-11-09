@@ -16,7 +16,7 @@ package.
 
 The lock manifest stores compact top-level `agent_metadata` and `model_pins`
 maps, keyed by normalized frontmatter SHA-256. Agent values contain only
-`name`, `description`, `model`, and `tools`; model-audit values contain only the
+`name`, `model`, and `tools`; model-audit values contain only the
 configuration used by the auditor. There is no `markdown_metadata` wrapper or
 per-entry `sha256`, `kind`, or `value` envelope, and no JSON-encoded strings.
 Information already present in `gh-aw-metadata` or the rest of `gh-aw-manifest`
@@ -35,6 +35,8 @@ discarded without parsing, and inventory records only directory-derived names,
 sources, scopes, and content digests. The existing `skills` field remains the
 safe-update inventory of explicitly declared installation references.
 Model audits skip skill imports rather than requiring their frontmatter.
+Authored agent descriptions are not stored in these maps. Pi advertises agent
+names only; Codex and Claude use the agent name for required native descriptions.
 
 The compiler interprets authored frontmatter;
 the runtime matches the normalized source SHA-256 digest to the catalog and

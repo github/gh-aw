@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/parser"
 	"github.com/stretchr/testify/require"
 )
 
@@ -42,11 +43,11 @@ func TestCompilerMarkdownMetadataManifest(t *testing.T) {
 		value := sha256.Sum256([]byte(source))
 		return hex.EncodeToString(value[:])
 	}
-	require.Equal(t, map[string]any{"model": "small", "description": "Reads files"}, values[hash("model: small\ndescription: >-\n  Reads files")])
+	require.Equal(t, map[string]any{"model": "small"}, values[hash("model: small\ndescription: >-\n  Reads files")])
 	require.NotContains(t, values, hash("description: Reads skill files"))
 	require.Equal(t, map[string]any{"model": "large", "tools": []any{"Read"}}, values[hash("model: large\ntools: [Read]")])
 	require.NotContains(t, values, hash("description: __GH_AW_EXPR_TEST__"))
-	require.Equal(t, map[string]any{"description": "Imported text", "tools": []any{"Read"}}, values[hash("{description: Imported text, tools: [Read]}")])
+	require.Equal(t, map[string]any{"tools": []any{"Read"}}, values[hash("{description: Imported text, tools: [Read]}")])
 	require.NotContains(t, values, hash("description: Custom directory"))
 }
 
@@ -92,16 +93,20 @@ func TestCompilerMarkdownMetadataAcrossPromptChunks(t *testing.T) {
 	require.NoError(t, c.generatePrompt(&output, data, false, nil))
 	require.Len(t, data.CompiledPromptMarkdown, 1)
 	require.Greater(t, len(data.CompiledPromptMarkdown[0]), 21000)
+	blocks := parser.ExtractMarkdownMetadataBlocks(data.CompiledPromptMarkdown[0])
+	require.Len(t, blocks, 1)
+	require.Contains(t, blocks[0].Source, "__GH_AW_")
+	digest := sha256.Sum256([]byte(blocks[0].Source))
 	found := false
 	for _, record := range c.collectMarkdownMetadata(data).Records {
 		var value map[string]any
 		if record.Kind != "artifact" || json.Unmarshal(record.Value, &value) != nil || value["model"] != "small" {
 			continue
 		}
-		description, _ := value["description"].(string)
-		if strings.Contains(description, "__GH_AW_") {
+		if record.SHA256 == hex.EncodeToString(digest[:]) {
 			require.Empty(t, record.Error)
 			require.Equal(t, []any{"Read"}, value["tools"])
+			require.NotContains(t, value, "description")
 			found = true
 		}
 	}
@@ -133,7 +138,7 @@ func TestCompilerMarkdownMetadataScopesWorkflowConfiguration(t *testing.T) {
 		require.NotContains(t, string(record.Value), "unrelated")
 		if record.Kind == "artifact" {
 			artifacts++
-			require.JSONEq(t, `{"description":"Reads files","model":"small"}`, string(record.Value))
+			require.JSONEq(t, `{"model":"small"}`, string(record.Value))
 		}
 	}
 	require.Equal(t, 1, artifacts, "workflow frontmatter and unrelated workflows must not become artifact records")

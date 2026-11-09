@@ -36,6 +36,12 @@ describe("Pi sub-agent model resolution", () => {
   it("derives name from the marker filename and qualifies bare models through the gateway", () => {
     expect(prepare()).toEqual([expect.objectContaining({ name: "reader", requested: "claude-haiku-4.5", model: "aw-gateway/claude-haiku-4.5", tools: ["read"] })]);
     expect(JSON.parse(fs.readFileSync(path.join(dir, "subagents.json"), "utf8"))[0].declaredModel).toBe("claude-haiku-4.5");
+    expect(JSON.parse(fs.readFileSync(path.join(dir, "subagents.json"), "utf8"))[0]).not.toHaveProperty("description");
+  });
+
+  it("accepts agents without an authored description", () => {
+    delete frontmatter.description;
+    expect(prepare()[0]).toMatchObject({ name: "reader", prompt: "Read the requested file.", tools: ["read"] });
   });
 
   it.each(["small", "recursive"])("resolves alias %s only on the parent's provider", model => {
@@ -135,7 +141,7 @@ describe("Pi sub-agent model resolution", () => {
     expect(() => prepare()).toThrow("different provider");
   });
 
-  it.each([{ model: 123 }, { tools: { read: true } }, { description: "" }])("rejects malformed frontmatter %j", invalid => {
+  it.each([{ model: 123 }, { tools: { read: true } }])("rejects malformed frontmatter %j", invalid => {
     Object.assign(frontmatter, invalid);
     expect(() => prepare()).toThrow();
   });

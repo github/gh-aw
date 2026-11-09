@@ -73,7 +73,7 @@ func CompileAgentMetadata(source string) (any, error) {
 	}
 	if fields, ok := value.(map[string]any); ok {
 		result := map[string]any{}
-		for _, key := range []string{"name", "description", "model", "tools"} {
+		for _, key := range []string{"name", "model", "tools"} {
 			if field, exists := fields[key]; exists {
 				result[key] = field
 			}
