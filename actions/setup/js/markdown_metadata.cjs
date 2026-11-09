@@ -20,6 +20,47 @@ function metadataDigest(source) {
   return createHash("sha256").update(source.replaceAll("\r\n", "\n")).digest("hex");
 }
 
+const metadataHashPrefixLength = 20;
+
+/** @param {any} value */
+function emptyMetadataValue(value) {
+  return value === null || (value && typeof value === "object" && !Array.isArray(value) && !Object.keys(value).length);
+}
+
+/** @param {MetadataRecord[]} input */
+function coalesceMetadataRecords(input) {
+  /** @type {MetadataRecord[]} */
+  const result = [];
+  for (const record of input) {
+    const index = result.findIndex(existing => existing.kind === record.kind && (existing.sha256.startsWith(record.sha256) || record.sha256.startsWith(existing.sha256)));
+    if (index < 0) {
+      result.push(record);
+      continue;
+    }
+    const existing = result[index];
+    if (
+      existing.error !== record.error ||
+      (!isDeepStrictEqual(existing.value, record.value) && !(emptyMetadataValue(existing.value) && emptyMetadataValue(record.value))) ||
+      !isDeepStrictEqual("references" in existing ? existing.references : undefined, "references" in record ? record.references : undefined)
+    )
+      throw new Error("Conflicting compiler Markdown metadata for overlapping source hashes");
+    if (record.sha256.length > existing.sha256.length) result[index] = record;
+  }
+  return result;
+}
+
+/** @param {string} kind @param {string} digest */
+function findMetadataRecord(kind, digest) {
+  let found = records.get(`${kind}:${digest}`) || generatedRecords.get(`${kind}:${digest}`);
+  for (let length = metadataHashPrefixLength; length < digest.length; length++) {
+    const candidate = records.get(`${kind}:${digest.slice(0, length)}`);
+    if (!candidate) continue;
+    if (found && (found.error !== candidate.error || !isDeepStrictEqual(found.value, candidate.value))) throw new Error("Ambiguous compiler Markdown metadata source hash");
+    found ??= candidate;
+  }
+  return found;
+}
+
 /**
  * Find only document and inline-artifact headers, preserving original offsets.
  * Delimiters follow the same BOM/whitespace rules as the engine body reader.
@@ -78,7 +119,7 @@ function installMarkdownMetadata(metadata, merge = false) {
     const key = `${record?.kind}:${record?.sha256}`;
     if (
       !record ||
-      !/^[a-f0-9]{64}$/.test(record.sha256) ||
+      !/^[a-f0-9]{20,64}$/.test(record.sha256) ||
       !["artifact", "model-pins"].includes(record.kind) ||
       !Object.hasOwn(record, "value") ||
       Object.hasOwn(record, "value_json") ||
@@ -89,13 +130,8 @@ function installMarkdownMetadata(metadata, merge = false) {
       throw new Error("Invalid or duplicate compiler Markdown metadata record");
     next.set(key, { ...record, value: parseMarkdownJSON(JSON.stringify(record.value)) });
   }
-  const result = merge ? new Map(records) : new Map();
-  for (const [key, record] of next) {
-    const previous = result.get(key);
-    if (previous && (previous.error !== record.error || !isDeepStrictEqual(previous.value, record.value))) throw new Error("Conflicting compiler Markdown metadata for the same author source");
-    result.set(key, record);
-  }
-  records = result;
+  const result = coalesceMetadataRecords([...(merge ? records.values() : []), ...next.values()]);
+  records = new Map(result.map(record => [`${record.kind}:${record.sha256}`, record]));
   generatedRecords = new Map();
   // Engine copies use canonical JSON, not the original author YAML. Only
   // compiler-approved artifact values can authorize that representation.
@@ -122,10 +158,19 @@ function metadataManifestFields(catalog) {
   const metadata_refs = {};
   /** @type {Record<string, string>} */
   const metadata_errors = {};
-  for (const record of catalog.records) {
-    const key = `${record.kind}:${record.sha256}`;
-    (record.kind === "artifact" ? agent_metadata : model_pins)[record.sha256] = record.value;
-    if ("references" in record) metadata_refs[key] = record.references;
+  const input = coalesceMetadataRecords(catalog.records);
+  const hashes = [...new Set(input.map(record => record.sha256))];
+  for (const record of input) {
+    if (!/^[a-f0-9]{20,64}$/.test(record.sha256) || !["artifact", "model-pins"].includes(record.kind)) throw new Error("Invalid compiler Markdown metadata source hash");
+    let length = metadataHashPrefixLength;
+    while (length < record.sha256.length && hashes.some(other => other !== record.sha256 && other.startsWith(record.sha256.slice(0, length)))) length++;
+    const hash = record.sha256.slice(0, length);
+    const key = `${record.kind}:${hash}`;
+    const empty = emptyMetadataValue(record.value);
+    const references = "references" in record ? record.references : undefined;
+    const hasReferences = references !== undefined && (!references || typeof references !== "object" || Array.isArray(references) || Object.keys(references).length > 0);
+    if (!empty || (!hasReferences && record.error === undefined)) (record.kind === "artifact" ? agent_metadata : model_pins)[hash] = empty ? { empty: true } : record.value;
+    if (hasReferences) metadata_refs[key] = references;
     if (record.error !== undefined) metadata_errors[key] = record.error;
   }
   return {
@@ -145,20 +190,28 @@ function manifestMetadataCatalog(manifest) {
   const references = manifest.metadata_refs ?? {};
   const errors = manifest.metadata_errors ?? {};
   if (![references, errors].every(value => value && typeof value === "object" && !Array.isArray(value))) throw new Error("Invalid compiler metadata manifest");
-  const keys = new Set();
-  /** @type {any[]} */
-  const catalogRecords = [];
+  /** @type {Map<string, any>} */
+  const catalogRecords = new Map();
   for (const [kind, group] of groups) {
-    if (group === undefined) continue;
-    if (!group || typeof group !== "object" || Array.isArray(group)) throw new Error("Invalid compiler metadata manifest");
-    for (const [sha256, value] of Object.entries(group)) {
+    if (group !== undefined && (!group || typeof group !== "object" || Array.isArray(group))) throw new Error("Invalid compiler metadata manifest");
+    for (const [sha256, value] of Object.entries(group ?? {})) {
+      if (!/^[a-f0-9]{20,64}$/.test(sha256)) throw new Error("Invalid compiler Markdown metadata source hash");
       const key = `${kind}:${sha256}`;
-      keys.add(key);
-      catalogRecords.push({ kind, sha256, value, ...(Object.hasOwn(references, key) ? { references: references[key] } : {}), ...(Object.hasOwn(errors, key) ? { error: errors[key] } : {}) });
+      const empty = value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === 1 && value.empty === true;
+      if (empty && (Object.hasOwn(references, key) || Object.hasOwn(errors, key))) throw new Error("Conflicting empty compiler metadata");
+      catalogRecords.set(key, { kind, sha256, value: empty ? {} : value });
     }
   }
-  if ([...Object.keys(references), ...Object.keys(errors)].some(key => !keys.has(key))) throw new Error("Compiler metadata reference or error has no source");
-  return { version: 2, records: catalogRecords };
+  for (const key of new Set([...Object.keys(references), ...Object.keys(errors)])) {
+    const match = /^(artifact|model-pins):([a-f0-9]{20,64})$/.exec(key);
+    if (!match) throw new Error("Invalid compiler Markdown metadata source hash");
+    if (Object.hasOwn(references, key) && (!references[key] || typeof references[key] !== "object" || Array.isArray(references[key]) || !Object.keys(references[key]).length)) throw new Error("Compiler metadata reference has no source");
+    const record = catalogRecords.get(key) ?? { kind: match[1], sha256: match[2], value: Object.hasOwn(errors, key) || Object.hasOwn(references[key] ?? {}, "") ? null : {} };
+    if (Object.hasOwn(references, key)) record.references = references[key];
+    if (Object.hasOwn(errors, key)) record.error = errors[key];
+    catalogRecords.set(key, record);
+  }
+  return { version: 2, records: [...catalogRecords.values()] };
 }
 
 /** @param {string} pointer */
@@ -185,41 +238,39 @@ function referencedMetadataValue(root, parts) {
 /** @param {{metadata?: Record<string, unknown>, manifest?: Record<string, unknown>}} headers */
 function resolveMarkdownMetadata(headers) {
   const manifest = headers.manifest;
-  if (!manifest || (!Object.hasOwn(manifest, "agent_metadata") && !Object.hasOwn(manifest, "model_pins"))) return undefined;
+  if (!manifest || (!Object.hasOwn(manifest, "agent_metadata") && !Object.hasOwn(manifest, "model_pins") && !Object.hasOwn(manifest, "metadata_refs") && !Object.hasOwn(manifest, "metadata_errors"))) return undefined;
   const catalog = manifestMetadataCatalog(manifest);
   if (!catalog || typeof catalog !== "object" || !("version" in catalog) || catalog.version !== 2 || !("records" in catalog) || !Array.isArray(catalog.records)) throw new Error("Invalid compiler Markdown metadata manifest");
-  return {
-    version: 2,
-    records: catalog.records.map(record => {
-      if (!record || typeof record !== "object" || Array.isArray(record) || !Object.hasOwn(record, "value")) throw new Error("Invalid compiler Markdown metadata record");
-      const { references, ...resolved } = record;
-      resolved.value = structuredClone(record.value);
-      if (references === undefined) return resolved;
-      if (!references || typeof references !== "object" || Array.isArray(references)) throw new Error("Invalid Markdown metadata references");
-      const destinations = Object.keys(references);
-      for (const destination of destinations) {
-        const parts = metadataPointer(destination);
-        const source = metadataPointer(references[destination]);
-        if (source.length < 2 || !["metadata", "manifest"].includes(source[0]) || (source[0] === "manifest" && ["agent_metadata", "model_pins", "metadata_refs", "metadata_errors", "markdown_metadata"].includes(source[1])))
-          throw new Error("Invalid Markdown metadata reference source");
-        if (destinations.some(other => other !== destination && (destination === "" || other.startsWith(destination + "/")))) throw new Error("Overlapping Markdown metadata references");
-        const value = structuredClone(referencedMetadataValue(headers, source));
-        if (!parts.length) {
-          if (resolved.value !== null) throw new Error("Markdown metadata reference duplicates an inline value");
-          resolved.value = value;
-          continue;
-        }
-        const key = parts.pop();
-        const parent = referencedMetadataValue(resolved.value, parts);
-        if (!parent || typeof parent !== "object" || key === undefined) throw new Error("Invalid Markdown metadata reference destination");
-        if (Array.isArray(parent)) {
-          if (!/^(?:0|[1-9]\d*)$/.test(key) || !Object.hasOwn(parent, key) || parent[Number(key)] !== null) throw new Error("Invalid Markdown metadata array reference");
-        } else if (Object.hasOwn(parent, key)) throw new Error("Markdown metadata reference duplicates an inline value");
-        Object.defineProperty(parent, key, { value, enumerable: true, writable: true, configurable: true });
+  const resolved = catalog.records.map(record => {
+    if (!record || typeof record !== "object" || Array.isArray(record) || !Object.hasOwn(record, "value")) throw new Error("Invalid compiler Markdown metadata record");
+    const { references, ...resolved } = record;
+    resolved.value = structuredClone(record.value);
+    if (references === undefined) return resolved;
+    if (!references || typeof references !== "object" || Array.isArray(references)) throw new Error("Invalid Markdown metadata references");
+    const destinations = Object.keys(references);
+    for (const destination of destinations) {
+      const parts = metadataPointer(destination);
+      const source = metadataPointer(references[destination]);
+      if (source.length < 2 || !["metadata", "manifest"].includes(source[0]) || (source[0] === "manifest" && ["agent_metadata", "model_pins", "metadata_refs", "metadata_errors", "metadata_empty", "markdown_metadata"].includes(source[1])))
+        throw new Error("Invalid Markdown metadata reference source");
+      if (destinations.some(other => other !== destination && (destination === "" || other.startsWith(destination + "/")))) throw new Error("Overlapping Markdown metadata references");
+      const value = structuredClone(referencedMetadataValue(headers, source));
+      if (!parts.length) {
+        if (resolved.value !== null) throw new Error("Markdown metadata reference duplicates an inline value");
+        resolved.value = value;
+        continue;
       }
-      return resolved;
-    }),
-  };
+      const key = parts.pop();
+      const parent = referencedMetadataValue(resolved.value, parts);
+      if (!parent || typeof parent !== "object" || key === undefined) throw new Error("Invalid Markdown metadata reference destination");
+      if (Array.isArray(parent)) {
+        if (!/^(?:0|[1-9]\d*)$/.test(key) || !Object.hasOwn(parent, key) || parent[Number(key)] !== null) throw new Error("Invalid Markdown metadata array reference");
+      } else if (Object.hasOwn(parent, key)) throw new Error("Markdown metadata reference duplicates an inline value");
+      Object.defineProperty(parent, key, { value, enumerable: true, writable: true, configurable: true });
+    }
+    return resolved;
+  });
+  return { version: 2, records: coalesceMetadataRecords(resolved) };
 }
 
 /** @param {string} file @param {string} workspace */
@@ -316,7 +367,10 @@ function mergeMatchingMarkdownMetadata(metadata, missing) {
       version: metadata.version,
       records: metadata.records.filter(record => {
         if (!record || typeof record.kind !== "string" || typeof record.sha256 !== "string") throw new Error("Invalid compiler Markdown metadata record");
-        return record.kind === "artifact" && missing.has(record.sha256);
+        if (record.kind !== "artifact") return false;
+        const matches = [...missing].filter(digest => digest.startsWith(record.sha256));
+        if (matches.length > 1) throw new Error("Ambiguous compiler Markdown metadata source hash");
+        return matches.length === 1;
       }),
     },
     true
@@ -363,7 +417,7 @@ function persistMarkdownMetadata() {
   if (!fs.existsSync(infoPath)) throw new Error("Compiler Markdown metadata cache is unavailable; activation must generate aw_info.json before installing skills");
   const info = JSON.parse(fs.readFileSync(infoPath, "utf8"));
   if (!info || typeof info !== "object" || Array.isArray(info)) throw new Error("Invalid compiler Markdown metadata cache");
-  for (const key of ["markdown_metadata", "agent_metadata", "model_pins", "metadata_refs", "metadata_errors"]) delete info[key];
+  for (const key of ["markdown_metadata", "agent_metadata", "model_pins", "metadata_refs", "metadata_errors", "metadata_empty"]) delete info[key];
   Object.assign(info, metadataManifestFields(currentMarkdownMetadata()));
   fs.writeFileSync(infoPath, JSON.stringify(info));
 }
@@ -383,8 +437,8 @@ function readDocumentMetadata(source, { kind = "document" } = {}) {
   if (!source?.trim()) return { value: {} };
   restoreCachedMetadata();
   const digest = metadataDigest(source);
-  const artifact = records.get(`artifact:${digest}`) || generatedRecords.get(`artifact:${digest}`);
-  const record = kind === "artifact" ? artifact : records.get(`model-pins:${digest}`) || artifact;
+  const artifact = findMetadataRecord("artifact", digest);
+  const record = kind === "artifact" ? artifact : findMetadataRecord("model-pins", digest) || artifact;
   if (!record) throw new CompilerMetadataUnavailableError();
   if (record.error) throw new Error(record.error);
   const compiled = structuredClone(record.value);

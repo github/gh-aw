@@ -427,7 +427,7 @@ func TestInlinedSubagentExperimentCompilerToRuntime(t *testing.T) {
 		manifest := &GHAWManifest{
 			MarkdownMetadata: compiler.collectMarkdownMetadata(&WorkflowData{CompiledPromptMarkdown: []string{prompt}}),
 		}
-		populateManifestMetadata(manifest)
+		require.NoError(t, populateManifestMetadata(manifest))
 		require.Len(t, manifest.AgentMetadata, 1)
 		metadataDir := filepath.Join(workspace, "runtime")
 		require.NoError(t, os.MkdirAll(metadataDir, 0700))

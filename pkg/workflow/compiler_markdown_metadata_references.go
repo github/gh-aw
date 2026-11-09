@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -59,21 +60,40 @@ func deduplicateMarkdownMetadata(header string, manifest *GHAWManifest) error {
 		}
 		manifest.MarkdownMetadata.Records[i] = record
 	}
-	populateManifestMetadata(manifest)
-	return nil
+	return populateManifestMetadata(manifest)
 }
 
-func populateManifestMetadata(manifest *GHAWManifest) {
+func populateManifestMetadata(manifest *GHAWManifest) error {
+	hashes, err := abbreviatedMetadataHashes(manifest.MarkdownMetadata.Records)
+	if err != nil {
+		return err
+	}
 	manifest.AgentMetadata = map[string]json.RawMessage{}
 	manifest.ModelPins = map[string]json.RawMessage{}
 	manifest.MetadataRefs = map[string]map[string]string{}
 	manifest.MetadataErrors = map[string]string{}
 	for _, record := range manifest.MarkdownMetadata.Records {
-		key := record.Kind + ":" + record.SHA256
-		if record.Kind == "artifact" {
-			manifest.AgentMetadata[record.SHA256] = record.Value
-		} else {
-			manifest.ModelPins[record.SHA256] = record.Value
+		if record.Kind != "artifact" && record.Kind != "model-pins" {
+			return fmt.Errorf("invalid Markdown metadata kind: %q", record.Kind)
+		}
+		hash := hashes[record.SHA256]
+		key := record.Kind + ":" + hash
+		var value any
+		if err := json.Unmarshal(record.Value, &value); err != nil {
+			return err
+		}
+		object, mapping := value.(map[string]any)
+		empty := value == nil || (mapping && len(object) == 0)
+		if !empty || (record.Error == "" && len(record.References) == 0) {
+			encoded := record.Value
+			if empty {
+				encoded = json.RawMessage(`{"empty":true}`)
+			}
+			if record.Kind == "artifact" {
+				manifest.AgentMetadata[hash] = encoded
+			} else {
+				manifest.ModelPins[hash] = encoded
+			}
 		}
 		if len(record.References) > 0 {
 			manifest.MetadataRefs[key] = record.References
@@ -82,6 +102,37 @@ func populateManifestMetadata(manifest *GHAWManifest) {
 			manifest.MetadataErrors[key] = record.Error
 		}
 	}
+	return nil
+}
+
+const metadataHashPrefixLength = 20
+
+func abbreviatedMetadataHashes(records []GHAWMarkdownMetadataRecord) (map[string]string, error) {
+	hashes := map[string]string{}
+	for _, record := range records {
+		digest, err := hex.DecodeString(record.SHA256)
+		if err != nil || len(digest) != 32 || hex.EncodeToString(digest) != record.SHA256 {
+			return nil, fmt.Errorf("invalid Markdown metadata SHA256: %q", record.SHA256)
+		}
+		hashes[record.SHA256] = ""
+	}
+	for hash := range hashes {
+		for length := metadataHashPrefixLength; length <= len(hash); length++ {
+			prefix := hash[:length]
+			collision := false
+			for other := range hashes {
+				if other != hash && strings.HasPrefix(other, prefix) {
+					collision = true
+					break
+				}
+			}
+			if !collision {
+				hashes[hash] = prefix
+				break
+			}
+		}
+	}
+	return hashes, nil
 }
 
 func metadataPointerPart(key string) string {

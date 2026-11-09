@@ -2,12 +2,14 @@ const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const os = require("node:os");
+const { execFileSync } = require("node:child_process");
 const metadata = require("./markdown_metadata.cjs");
 const revision = "a".repeat(40);
 const source = "description: Private reader\nmodel: small\ntools: [Read]";
 const document = `---\n${source}\n---\nRead files.`;
 const record = value => ({ sha256: crypto.createHash("sha256").update(source).digest("hex"), kind: "artifact", value });
 const catalog = records => ({ version: 2, records });
+const decodedCatalog = records => catalog(records.map(record => ({ ...record, sha256: record.sha256.slice(0, 20) })));
 const fields = records => metadata.metadataManifestFields(catalog(records));
 const headers = records => `# gh-aw-metadata: {}\n# gh-aw-manifest: ${JSON.stringify({ version: 1, ...fields(records) })}\n# generated\ninvalid: [yaml\n`;
 const remoteFile = (file, records) => ({ data: { type: "file", path: file, encoding: "base64", content: Buffer.from(headers(records)).toString("base64") } });
@@ -37,8 +39,8 @@ describe("compiler metadata source acquisition", () => {
     const file = path.join(workspace, ".github/workflows/main.lock.yml");
     const compiled = { ...record({}), references: { "/model": "/metadata/agent_model" } };
     const manifest = fields([compiled]);
-    expect(manifest.agent_metadata).toEqual({ [compiled.sha256]: {} });
-    expect(manifest.metadata_refs).toEqual({ [`artifact:${compiled.sha256}`]: compiled.references });
+    expect(manifest).not.toHaveProperty("agent_metadata");
+    expect(manifest.metadata_refs).toEqual({ [`artifact:${compiled.sha256.slice(0, 20)}`]: compiled.references });
     expect(manifest).not.toHaveProperty("markdown_metadata");
     expect(JSON.stringify(manifest)).not.toContain('"kind":');
     fs.writeFileSync(file, `# gh-aw-metadata: {"agent_model":"small"}\n# gh-aw-manifest: ${JSON.stringify(manifest)}\n# generated\n`);
@@ -49,10 +51,101 @@ describe("compiler metadata source acquisition", () => {
     expect(() => metadata.readMarkdownMetadata("agent", document)).toThrow("invalid authored metadata");
   });
 
-  it.each(["metadata_refs", "metadata_errors"])("rejects orphan %s entries", field => {
+  it.each(["metadata_refs", "metadata_errors"])("rejects invalid %s source keys", field => {
     const file = path.join(workspace, ".github/workflows/main.lock.yml");
-    fs.writeFileSync(file, `# gh-aw-metadata: {}\n# gh-aw-manifest: ${JSON.stringify({ model_pins: {}, [field]: { [`artifact:${"a".repeat(64)}`]: field === "metadata_refs" ? {} : "invalid" } })}\n# generated\n`);
-    expect(() => metadata.readLocalMarkdownMetadata(file, workspace)).toThrow(/has no source/);
+    fs.writeFileSync(file, `# gh-aw-metadata: {}\n# gh-aw-manifest: ${JSON.stringify({ model_pins: {}, [field]: { "artifact:invalid": field === "metadata_refs" ? {} : "invalid" } })}\n# generated\n`);
+    expect(() => metadata.readLocalMarkdownMetadata(file, workspace)).toThrow(/source hash/);
+  });
+
+  it("omits empty hash/value pairs while preserving exact source approval and fresh-process caching", () => {
+    const emptySource = "description: Private reader";
+    const emptyDocument = `---\n${emptySource}\n---\nRead files.`;
+    const sha256 = crypto.createHash("sha256").update(emptySource).digest("hex");
+    const records = [
+      { kind: "artifact", sha256, value: {} },
+      { kind: "model-pins", sha256: "b".repeat(64), value: {} },
+    ];
+    const manifest = fields(records);
+    expect(manifest.agent_metadata).toEqual({ [sha256.slice(0, 20)]: { empty: true } });
+    expect(manifest.model_pins).toEqual({ ["b".repeat(20)]: { empty: true } });
+    expect(manifest).not.toHaveProperty("metadata_empty");
+    expect(JSON.stringify(manifest)).not.toContain(sha256);
+    const file = path.join(workspace, ".github/workflows/main.lock.yml");
+    fs.writeFileSync(file, headers(records));
+    metadata.installMarkdownMetadata(metadata.readLocalMarkdownMetadata(file, workspace));
+    expect(metadata.readMarkdownMetadata("agent", emptyDocument).value).toEqual({});
+    expect(() => metadata.readMarkdownMetadata("agent", emptyDocument.replace("Private", "Unknown"))).toThrow(/compiler manifest/);
+    fs.writeFileSync(path.join(workspace, "aw_info.json"), JSON.stringify({ run_id: 123 }));
+    metadata.persistMarkdownMetadata();
+    const restored = execFileSync(
+      process.execPath,
+      ["-e", 'const metadata = require(process.argv[1]); process.stdout.write(JSON.stringify(metadata.readMarkdownMetadata("agent", process.argv[2]).value));', require.resolve("./markdown_metadata.cjs"), emptyDocument],
+      { env: { ...process.env, GH_AW_TMP_DIR: workspace }, encoding: "utf8" }
+    );
+    expect(JSON.parse(restored)).toEqual({});
+    metadata.installMarkdownMetadata(catalog([record({ model: "small" })]));
+    metadata.persistMarkdownMetadata();
+    expect(JSON.parse(fs.readFileSync(path.join(workspace, "aw_info.json"), "utf8"))).not.toHaveProperty("metadata_empty");
+  });
+
+  it.each(["invalid", "A".repeat(20), "a".repeat(19), "a".repeat(65)])("rejects invalid source hash keys: %s", hash => {
+    const file = path.join(workspace, ".github/workflows/main.lock.yml");
+    fs.writeFileSync(file, `# gh-aw-metadata: {}\n# gh-aw-manifest: ${JSON.stringify({ agent_metadata: { [hash]: { empty: true } } })}\n# generated\n`);
+    expect(() => metadata.readLocalMarkdownMetadata(file, workspace)).toThrow(/source hash/);
+  });
+
+  it.each(["reference", "error"])("rejects conflicting empty source approval with %s", scenario => {
+    const compiled = record({});
+    const hash = compiled.sha256.slice(0, 20);
+    const key = `artifact:${hash}`;
+    const manifest = { model_pins: {}, agent_metadata: { [hash]: { empty: true } } };
+    if (scenario === "reference") manifest.metadata_refs = { [key]: { "/model": "/metadata/agent_model" } };
+    if (scenario === "error") manifest.metadata_errors = { [key]: "invalid source" };
+    const file = path.join(workspace, ".github/workflows/main.lock.yml");
+    fs.writeFileSync(file, `# gh-aw-metadata: {"agent_model":"small"}\n# gh-aw-manifest: ${JSON.stringify(manifest)}\n# generated\n`);
+    expect(() => metadata.readLocalMarkdownMetadata(file, workspace)).toThrow("Conflicting empty compiler metadata");
+  });
+
+  it.each(["full", "short"])("matches computed full source digests against %s manifest keys", form => {
+    const compiled = record({ model: "small" });
+    const sha256 = form === "full" ? compiled.sha256 : compiled.sha256.slice(0, 20);
+    metadata.installMarkdownMetadata(catalog([{ ...compiled, sha256 }]));
+    expect(metadata.readMarkdownMetadata("agent", document).value).toEqual({ model: "small" });
+    expect(() => metadata.readMarkdownMetadata("agent", document.replace("small", "forged"))).toThrow(/compiler manifest/);
+  });
+
+  it("extends colliding source prefixes and coalesces consistent full/short aliases", () => {
+    const prefix = "a".repeat(20);
+    const first = prefix + "b" + "c".repeat(43),
+      second = prefix + "c" + "b".repeat(43);
+    expect(
+      Object.keys(
+        fields([
+          { kind: "artifact", sha256: first, value: { model: "a" } },
+          { kind: "artifact", sha256: second, value: { model: "b" } },
+        ]).agent_metadata
+      )
+    ).toEqual([first.slice(0, 21), second.slice(0, 21)]);
+    const compiled = record({ model: "small" });
+    metadata.installMarkdownMetadata(catalog([compiled]));
+    metadata.installMarkdownMetadata(catalog([{ ...compiled, sha256: compiled.sha256.slice(0, 20) }]), true);
+    expect(metadata.currentMarkdownMetadata().records).toEqual([compiled]);
+    expect(() => metadata.installMarkdownMetadata(catalog([{ ...compiled, sha256: compiled.sha256.slice(0, 20), value: { model: "forged" } }]), true)).toThrow(/Conflicting/);
+    expect(metadata.readMarkdownMetadata("agent", document).value.model).toBe("small");
+  });
+
+  it("prunes null value entries while preserving root references and compiler errors", () => {
+    const file = path.join(workspace, ".github/workflows/main.lock.yml");
+    const compiled = { ...record(null), references: { "": "/metadata/template" } };
+    const rejected = { ...record(null), sha256: "b".repeat(64), error: "invalid authored metadata" };
+    const empty = { kind: "model-pins", sha256: "c".repeat(64), value: null };
+    const manifest = fields([compiled, rejected, empty]);
+    expect(manifest).not.toHaveProperty("agent_metadata");
+    expect(JSON.stringify(manifest)).not.toContain(":null");
+    fs.writeFileSync(file, `# gh-aw-metadata: {"template":{"model":"small"}}\n# gh-aw-manifest: ${JSON.stringify(manifest)}\n# generated\n`);
+    metadata.installMarkdownMetadata(metadata.readLocalMarkdownMetadata(file, workspace));
+    expect(metadata.readMarkdownMetadata("agent", document).value).toEqual({ model: "small" });
+    expect(metadata.currentMarkdownMetadata().records).toContainEqual({ ...rejected, sha256: rejected.sha256.slice(0, 20) });
   });
 
   it("reads the immutable executing revision rather than a replaced checkout lock", async () => {
@@ -103,7 +196,7 @@ describe("compiler metadata source acquisition", () => {
     const header = `# gh-aw-metadata: ${JSON.stringify({ agent_model: "small" })}\n# gh-aw-manifest: ${JSON.stringify({ version: 1, declared_tools: ["Read"], ...fields([compiled]) })}\n# generated\n`;
     fs.writeFileSync(path.join(workspace, file), header);
     const result = await metadata.loadMarkdownMetadata(`owner/repo/${file}@main`, workspace);
-    expect(result).toEqual(catalog([record(value)]));
+    expect(result).toEqual(decodedCatalog([record(value)]));
     expect(metadata.readMarkdownMetadata("agent", document).value).toEqual(value);
     expect(header.match(/"small"/g)).toHaveLength(1);
     expect(header.match(/"Read"/g)).toHaveLength(1);
@@ -146,7 +239,7 @@ describe("compiler metadata source acquisition", () => {
     const compiled = { ...record({}), references };
     fs.writeFileSync(path.join(workspace, file), `# gh-aw-metadata: ${JSON.stringify(value)}\n# gh-aw-manifest: ${JSON.stringify({ version: 1, ...fields([compiled]) })}\n# generated\n`);
     const result = await metadata.loadMarkdownMetadata(`owner/repo/${file}@main`, workspace);
-    expect(result).toEqual(catalog([record(value)]));
+    expect(result).toEqual(decodedCatalog([record(value)]));
     expect(metadata.readMarkdownMetadata("agent", document).value).toEqual(value);
     fs.writeFileSync(path.join(workspace, "aw_info.json"), '{"run_id":123}');
     metadata.persistMarkdownMetadata();

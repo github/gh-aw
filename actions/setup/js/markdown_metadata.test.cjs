@@ -193,7 +193,7 @@ describe("compiler-owned Markdown metadata", () => {
     try {
       fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.writeFileSync(file, `# gh-aw-metadata: {}\n# gh-aw-manifest: ${JSON.stringify({ version: 1, ...require("./markdown_metadata.cjs").metadataManifestFields(metadata) })}\n# compiled fixture\ninvalid: [yaml\n`);
-      expect(await loadMarkdownMetadata("owner/repo/.github/workflows/main.lock.yml@main", workspace)).toEqual(metadata);
+      expect(await loadMarkdownMetadata("owner/repo/.github/workflows/main.lock.yml@main", workspace)).toEqual({ version: 2, records: metadata.records.map(record => ({ ...record, sha256: record.sha256.slice(0, 20) })) });
       expect(readDocumentMetadata("rate: 0.25").value).toEqual({ rate: 0.25 });
       fs.writeFileSync(file, "# gh-aw-manifest: {}\n# gh-aw-manifest: {}\n# compiled fixture\n");
       await expect(loadMarkdownMetadata("owner/repo/.github/workflows/main.lock.yml@main", workspace)).rejects.toThrow(/lacks compiler Markdown metadata/);

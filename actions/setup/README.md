@@ -15,7 +15,9 @@ or install Go code, provision a native metadata helper, or install a parser
 package.
 
 The lock manifest stores compact top-level `agent_metadata` and `model_pins`
-maps, keyed by normalized frontmatter SHA-256. Agent values contain only
+maps, keyed by unique normalized frontmatter SHA-256 prefixes. Prefixes start at
+20 hexadecimal characters and extend as needed to avoid collisions; lookup
+supports full digests and abbreviated keys. Agent values contain only
 `name`, `model`, and `tools`; model-audit values contain only the
 configuration used by the auditor. There is no `markdown_metadata` wrapper or
 per-entry `sha256`, `kind`, or `value` envelope, and no JSON-encoded strings.
@@ -23,6 +25,10 @@ Information already present in `gh-aw-metadata` or the rest of `gh-aw-manifest`
 is omitted and reused through `metadata_refs`, keyed by `artifact:<sha256>` or
 `model-pins:<sha256>` and mapping destination JSON pointers to existing header
 pointers. Compiler rejections are stored separately in `metadata_errors`.
+Empty projections use a readable `{"empty":true}` source-approval marker rather
+than `{}` or `null` values. Reference-only and rejected sources need no value
+entry: their reference/error maps carry the source key. There is no
+`metadata_empty` field or opaque hash encoding, and unknown sources still fail.
 The runtime resolves these references from the same immutable lock before
 installing records; missing, recursive, overlapping, or conflicting references
 are rejected. The existing header fields remain the source of truth.

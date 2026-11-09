@@ -208,9 +208,9 @@ describe("generate_aw_info.cjs", () => {
 
     const awInfo = JSON.parse(fs.readFileSync(awInfoPath, "utf8"));
     expect(awInfo).toMatchObject({
-      agent_metadata: manifest.agent_metadata,
-      model_pins: manifest.model_pins,
-      metadata_errors: manifest.metadata_errors,
+      agent_metadata: { [agentDigest.slice(0, 20)]: agent },
+      model_pins: { [pinsDigest.slice(0, 20)]: pins },
+      metadata_errors: { [`artifact:${errorDigest.slice(0, 20)}`]: "confidential-compiler-error" },
       engine_id: "copilot",
       run_id: mockContext.runId,
     });
