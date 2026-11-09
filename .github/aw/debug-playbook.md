@@ -58,7 +58,7 @@ Prose isn't native error.
 
 | Codes | Check | Remedy |
 | --- | --- | --- |
-| `inference_access_error`, `inference_access_denied`, `authentication_failed` | Native 401/403, credential names, permissions/policy, proxy guards. | Fix access/config; budget/policy denial doesn't warrant credential rotation. |
+| `inference_access_error`, `inference_access_denied`, `authentication_failed` | Native 401/403, credential names, permissions/policy, proxy guards. | Fix access/config; budget/policy denial != credential rotation. |
 | `mcp_policy_error` | Blocked MCP server; organization policy. | Use approved tool/authorized policy correction; no bypass. |
 | `model_not_supported_error`, `model_endpoint_mismatch_error`, `model_endpoint_mismatch` | Model, API, tool protocol, same-run inventory/routes. | Follow [model/engine guide](debug-model-engine-misconfiguration.md); endpoint change != availability. |
 | `http_400_response_error` | Provider diagnostic, endpoint, feature/schema. | Fix unsupported request; 400 alone != model removal. |
@@ -69,7 +69,7 @@ Prose isn't native error.
 | `max_ai_credits_exceeded`, `ai_credits_rate_limit_error`, `ai_credits_limit_exceeded` | Used/max credits; cap. | Stop; reduce work or authorize future budget. |
 | `max_cache_misses_exceeded` | Miss counters; prompt/cache changes. | Stabilize context/cache; no exhausted-guard retry. |
 | `effective_tokens_limit_exceeded` | Effective tokens; prompt/turn growth. | Reduce context/iterations; retain guard. |
-| `permission_denied_limit_exceeded` | Denied calls; allowed tools. | Stop denied calls; use allowed tools, not larger denial budget. |
+| `permission_denied_limit_exceeded` | Denied calls; allowed tools. | Stop denied calls; use allowed tools; no larger budget. |
 | `model_policy_violation`, `content_filter` | Provider/proxy reason; endpoint mismatch separately. | Correct request within policy; no credential swap/bypass. |
 | `awf_api_proxy_blocking_requests` | Specific budget/policy/filter guard. | Address guard; blocking alone != authentication failure. |
 | `capi_quota_exceeded_error` | Native 429; exhausted retries. | Respect quota/reset; no retry storm. |
@@ -252,7 +252,7 @@ or profile/effect-scope bypass.
 | `result_invalid`, `completion_conflict`, `cancellation_conflict`, `ownership_terminal`, `work_terminal`, `work_missing` | Work/ownership state; finish/result intent. | Respect terminal transitions; reconcile duplicate/conflicting completion/cancellation. |
 | `retry_invalid`, `retry_exhausted`, `release_invalid`, `release_open_claims`, `remediation_invalid` | Retry/release policy, attempts, open claims. | Stop exhausted retries; reconcile claims; authorized recovery only. |
 | `ERR_WORK_QUEUE_RECONCILIATION`, `observation_invalid`, `observation_conflict`, `reconciliation_invalid`, `reconciliation_pending`, `inspection_invalid`, `resource_unverified` | Reason, run/Claim binding, provenance/freshness. | Bounded trusted reconciliation; unverified stays blocked; never force release. |
-| `resource_invalid`, `resource_limit`, `assignment_limit`, `evidence_limit`, `graph_limit`, `work_queue_graph_limit`, `ledger_limit`, `observation_limit`, `operation_limit`, `payload_limit`, `pending_limit`, `projection_limit`, `reconciliation_limit` | Named limit; actual count. | Bound/batch/compact through supported operations; retain limits. |
+| `resource_invalid`, `resource_limit`, `assignment_limit`, `evidence_limit`, `graph_limit`, `work_queue_graph_limit`, `ledger_limit`, `observation_limit`, `obsolete_limit`, `operation_limit`, `payload_limit`, `pending_limit`, `projection_limit`, `reconciliation_limit` | Named limit; actual count. | Bound/batch/compact through supported operations; retain limits. |
 | `issue_binding_invalid`, `issue_binding_conflict` | Queue-issue binding; ownership. | Correct authorized binding; never adopt another work item's issue. |
 | `projection_invalid`, `projection_journal_invalid`, `projection_journal_conflict`, `projection_scope_changed`, `projection_write_ambiguous` | Journal, native acknowledgement, target, CAS. | Reconcile receipts; never duplicate uncertain writes, drop uncertain locks or rewrite history. |
 | `projection_target_unavailable`, `projection_unavailable` | Actual failure; safe status/request ID. | Diagnose cause; preserve mirrors and locks. |
