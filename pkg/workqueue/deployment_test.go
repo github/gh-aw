@@ -83,28 +83,14 @@ func TestObsoleteWorkerCancellationReplayParity(t *testing.T) {
 	if !before.obsoleteWork(before.Works[old.WorkID]) || before.obsoleteWork(before.Works[pinned.WorkID]) {
 		t.Fatal("obsolete selection did not preserve the immutable pin")
 	}
-	operation := mustOp(t, map[string]any{"kind": "WorkCancellation", "work_id": old.WorkID, "reason": "worker_contract_obsolete"})
+	operation := mustOp(t, map[string]any{"kind": "WorkCancellation", "version": 1, "work_id": old.WorkID, "reason": "worker_contract_obsolete"})
 	commits = testOperations(t, commits, testActor("reconciler"), "retire-obsolete", "cancel_work", operation)
 	after, err := Replay(commits)
 	if err != nil || after.Works[old.WorkID].State != "cancelled" || !sameJSON(before.Works[pinned.WorkID], after.Works[pinned.WorkID]) ||
 		!sameJSON(before.Policy, after.Policy) || !sameJSON(before.Clocks, after.Clocks) || !sameJSON(before.Claims, after.Claims) {
 		t.Fatalf("obsolete cancellation changed protected state: %v", err)
 	}
-	input, err := canonicalValue(commits)
-	if err != nil {
-		t.Fatal(err)
-	}
-	command := exec.Command("node", "-e", `
-const assert = require("node:assert/strict");
-const r = require("../../actions/setup/js/work_queue_replay.cjs");
-const s = r.replayTransactions(JSON.parse(require("node:fs").readFileSync(0, "utf8")));
-assert.equal([...s.works.values()].filter(w => w.state === "cancelled").length, 1);
-assert.equal([...s.works.values()].filter(w => w.execution_ref && w.state === "available").length, 1);
-`)
-	command.Stdin = bytes.NewReader(input)
-	if output, err := command.CombinedOutput(); err != nil {
-		t.Fatalf("obsolete cancellation Go/JS replay parity: %v\n%s", err, output)
-	}
+	assertOperatorJSProjection(t, commits)
 	for _, changes := range []func(*WorkState){
 		func(w *WorkState) { w.State = "claimed" },
 		func(w *WorkState) { w.ClaimID = "owned" },

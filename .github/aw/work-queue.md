@@ -101,7 +101,7 @@ Unassigned dispatchers cannot emit `noop` or `report_incomplete`.
   ([reference](safe-outputs-runtime.md)); each adapter binds one effect-type to
   an independently verified result, never job success alone.
 
-`<mcp-clis>` takes one JSON argument. `uninitialized` plus null SHA is empty.
+`<mcp-clis>` takes one JSON argument. `uninitialized` + null SHA is empty.
 Policyless ledgers fail; workers require Policy; `status: "staged"` grants nothing.
 
 ## Dependencies and recovery
@@ -114,27 +114,25 @@ Retain reservations until exact evidence; never rerun uncertain effects after
 Completion. Bounded verification yields Result/DeliveryFailure. Compatible
 deployments preserve obligations, debt, Results, frozen assignments and explicit
 `execution_ref` pins. Unavailable workers pause affected Work only. Scheduled
-maintenance terminally cancels unclaimed, unpinned Work when its admission
-contract differs from the approved active worker contract
-(`worker_contract_obsolete`). Preserve Work with delivery barriers.
+maintenance terminally cancels unclaimed, unpinned Work on admission/approved-
+active-worker-contract mismatch (`WorkCancellation`, `version: 1`, reason
+`worker_contract_obsolete`). Exclude elapsed Work by current time; publication
+rechecks eligibility. Preserve delivery barriers. Legacy V3 cancellations
+without operation versions replay reason-only, even when compatible/pinned.
 Quiesce economic Policy changes; reject unsupported protocols/scalar assignments.
 Retries/checkpoints preserve submission identity; never delete queues to retry admission.
 
-## Details
-
-- Operator commands, TUI, diagnostics:
-  [queue reference](../../docs/src/content/docs/reference/work-queue.md).
-  Cancellation terminates Work, not workers; reconcile separately.
+- Commands: [queue reference](../../docs/src/content/docs/reference/work-queue.md).
+  Cancellation ends Work, not workers; reconcile.
   `gh aw work-queue --repo OWNER/REPO stats --json`. `dispatch-next` grants
   reservations, never launches; use authorized dispatcher.
 - Destructive: `gh aw work-queue clear --reason CODE [--dry-run | --hard]`
-  requires repo maintain/admin, forbids CI, and requires interactive confirmation
-  of the exact snapshot preview; no bypass. `--hard` replaces the ledger,
-  forgetting Work/Claim identities, retry history and fairness debt. Admission/grants
-  must already be paused, without open Claims/pending deliveries.
+  requires repo maintain/admin and interactive confirmation of the exact snapshot
+  preview; forbids CI, no bypass. `--hard` replaces the ledger,
+  forgetting Work/Claim IDs, retry history and fairness debt. Pause admission/grants;
+  no open Claims or pending deliveries.
   See [hard reset](../../docs/src/content/docs/reference/work-queue.md#hard-reset).
-- Daily report rotation/Claims:
-  [portfolio example](../../docs/src/content/docs/gallery/daily-report-portfolio.md)
-  and [shared worker instructions](../workflows/shared/daily-report-worker.md).
+- Daily-report/Claims: [portfolio](../../docs/src/content/docs/gallery/daily-report-portfolio.md)
+  and [worker](../workflows/shared/daily-report-worker.md).
 - Contracts: [specification](../../docs/src/content/docs/specs/work-queue-specification.md#91-implementation-coverage-and-remaining-requirements).
-- Models/fixtures: [formal reference](../../specs/work-queue/README.md).
+- [Formal reference](../../specs/work-queue/README.md).

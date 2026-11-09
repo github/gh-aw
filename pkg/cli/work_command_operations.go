@@ -143,6 +143,9 @@ func workOperatorIntent(state workqueue.Projection, targets []workOperatorTarget
 		}
 		previous = target.WorkID
 		fields := map[string]any{"kind": "WorkCancellation", "work_id": target.WorkID, "reason": reason}
+		if reason == "worker_contract_obsolete" && priority == 0 {
+			fields["version"] = 1
+		}
 		if target.ClaimID != "" {
 			fields["claim_id"] = target.ClaimID
 		}
@@ -167,7 +170,19 @@ func recoverWorkOperatorIntent(state workqueue.Projection, wanted workqueue.Oper
 		return wanted, nil
 	}
 	var old workqueue.OperationsParameters
-	if err := json.Unmarshal(accepted.Request.Parameters, &old); err != nil {
+	var err error
+	if kind == "cancel_work" && len(wanted.Operations) > 0 {
+		var desired struct {
+			Reason string `json:"reason"`
+		}
+		if err := json.Unmarshal(wanted.Operations[0], &desired); err != nil {
+			return wanted, err
+		}
+		old, err = workRecoverClearIntent(accepted, desired.Reason)
+	} else {
+		err = json.Unmarshal(accepted.Request.Parameters, &old)
+	}
+	if err != nil {
 		return wanted, err
 	}
 	if accepted.Request.Kind != kind || len(old.Operations) != len(wanted.Operations) {
@@ -181,7 +196,7 @@ func recoverWorkOperatorIntent(state workqueue.Projection, wanted workqueue.Oper
 		if err != nil {
 			return wanted, err
 		}
-		right, err := workOperatorComparison(wanted.Operations[index])
+		right, err := workOperatorRetryComparison(operation, wanted.Operations[index])
 		if err != nil {
 			return wanted, err
 		}
@@ -199,4 +214,22 @@ func workOperatorComparison(operation workqueue.Operation) ([]byte, error) {
 	}
 	delete(fields, "expected_priority")
 	return json.Marshal(fields)
+}
+
+func workOperatorRetryComparison(original, wanted workqueue.Operation) ([]byte, error) {
+	var old, next map[string]json.RawMessage
+	if err := json.Unmarshal(original, &old); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(wanted, &next); err != nil {
+		return nil, err
+	}
+	// Acknowledging an accepted legacy request must recover its original bytes,
+	// not turn its reason-only cancellation into a new checked publication.
+	if old["version"] == nil && string(old["kind"]) == `"WorkCancellation"` &&
+		string(old["reason"]) == `"worker_contract_obsolete"` && string(next["version"]) == "1" {
+		delete(next, "version")
+	}
+	delete(next, "expected_priority")
+	return json.Marshal(next)
 }
