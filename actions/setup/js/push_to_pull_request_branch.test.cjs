@@ -1010,7 +1010,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
         data: { protected: true, protection: { enabled: false, required_status_checks: { enforcement_level: "off", contexts: [], checks: [] } } },
       });
       mockGithub.rest.repos.getBranchRules = vi.fn().mockResolvedValue({ data: [{ type: "copilot_code_review", parameters: { review_draft_pull_requests: false, review_on_push: false } }] });
-      mockGithub.rest.repos.getBranchProtection = vi.fn().mockRejectedValue(Object.assign(new Error("Not Found"), { status: 404, response: { data: { message: "Branch not protected" } } }));
+      mockGithub.graphql.mockResolvedValueOnce({ repository: { ref: { refUpdateRule: null } } });
       createPatchFile("copilot-review-only-branch");
       mockExec.getExecOutput.mockResolvedValue({ exitCode: 0, stdout: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n", stderr: "" });
 
@@ -1035,7 +1035,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
     ])("should not attempt git operations when classic protection cannot be confirmed absent (%s)", async (status, message) => {
       mockGithub.rest.repos.getBranch.mockResolvedValue({ data: { protected: true, protection: { enabled: false } } });
       mockGithub.rest.repos.getBranchRules = vi.fn().mockResolvedValue({ data: [{ type: "copilot_code_review" }] });
-      mockGithub.rest.repos.getBranchProtection = vi.fn().mockRejectedValue(Object.assign(new Error(message), { status, response: { data: { message } } }));
+      mockGithub.graphql.mockRejectedValueOnce(Object.assign(new Error(message), { status }));
       createPatchFile(`copilot-review-classic-${status}-branch`);
 
       const module = await loadModule();
@@ -1044,10 +1044,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
 
       expect(result.success).toBe(false);
       expect(result.error).toContain("Cannot verify branch protection rules");
-      if (status === 403) {
-        expect(result.error).toContain("Administration: read");
-        expect(result.error).toContain("GITHUB_TOKEN cannot provide");
-      }
+      expect(result.error).toContain(message);
       expect(mockExec.exec).not.toHaveBeenCalled();
       expect(mockExec.getExecOutput).not.toHaveBeenCalled();
     });
