@@ -1,15 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
+import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 
 const { inlineArtifactTarget } = await import("./inline_artifact_target.cjs");
 const { writeInlineSubAgents } = await import("./extract_inline_sub_agents.cjs");
 const { writeInlineSkills } = await import("./extract_inline_skills.cjs");
+const { installMarkdownMetadata } = require("./markdown_metadata.cjs");
 let dir;
 
 beforeEach(() => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), "inline-target-"));
+  installMarkdownMetadata({ version: 2, records: [] });
   vi.stubGlobal("core", { info: vi.fn(), warning: vi.fn() });
 });
 afterEach(() => {
@@ -20,6 +23,16 @@ afterEach(() => {
 
 describe("compiler-owned inline artifact targets", () => {
   it("stages pi agents and skills where activation uploads them", () => {
+    installMarkdownMetadata({
+      version: 2,
+      records: [
+        {
+          kind: "artifact",
+          sha256: crypto.createHash("sha256").update("description: Reads files").digest("hex"),
+          value: { description: "Reads files" },
+        },
+      ],
+    });
     writeInlineSubAgents("Main.\n## agent: `reader`\n---\ndescription: Reads files\n---\nRead.", dir, dir, "pi");
     writeInlineSkills("Main.\n## skill: `report`\n---\ndescription: Reports facts\n---\nReport.", dir, dir, "pi");
     expect(fs.existsSync(path.join(dir, ".pi/agents/reader.md"))).toBe(true);
