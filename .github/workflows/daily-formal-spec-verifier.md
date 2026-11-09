@@ -59,7 +59,6 @@ tools:
     - "find . -name \"*_test.go\" -path \"*/pkg/*\" | head -20"
     - "cat pkg/workflow/*.go | head -200"
     - "cat pkg/cli/*.go"
-    - "sed *"
     - "find specs -type f -name \"*.tla\""
     - "find specs -type f -name \"*.kk\""
     - "sha256sum *"
@@ -67,12 +66,15 @@ tools:
     - "/tmp/gh-aw/agent/koka/bin/koka --version"
     - "/tmp/gh-aw/agent/tla-tools/jre/bin/java -version"
     - "timeout --kill-after=30s * /tmp/gh-aw/agent/tla-tools/jre/bin/java *"
-    - "bash .github/scripts/install_tla_runtime_test.sh"
     - "cd specs/*"
     - "timeout --kill-after=30s * /tmp/gh-aw/agent/koka/bin/koka *"
     - "timeout --kill-after=30s * /tmp/gh-aw/agent/formal-spec-verifier/*"
     - "cat /tmp/gh-aw/agent/formal-spec-verifier/*"
     - "tee /tmp/gh-aw/agent/formal-spec-verifier/*"
+
+steps:
+    - name: Validate fixture-based TLA+ installer
+      run: bash .github/scripts/install_tla_runtime_test.sh
 
 post-steps:
   - name: Upload formal verification evidence

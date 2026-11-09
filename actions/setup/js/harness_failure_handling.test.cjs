@@ -29,8 +29,8 @@ afterEach(() => {
   fs.rmSync(directory, { recursive: true, force: true });
 });
 
-function stop(output, deniedCommands = extractDeniedCommands(output)) {
-  return stopForPermissionDenied({ attempt: 1, output, safeOutputsPath, log, deniedCommands });
+function stop(output, deniedCommands = extractDeniedCommands(output), workflowToolPermissionDenied = false) {
+  return stopForPermissionDenied({ attempt: 1, output, safeOutputsPath, log, deniedCommands, workflowToolPermissionDenied });
 }
 
 describe("stopForPermissionDenied", () => {
@@ -69,10 +69,17 @@ describe("stopForPermissionDenied", () => {
   });
 
   it("preserves workflow-boundary guidance without advising credential escalation", () => {
-    stop("[sdk-driver] permission denied by workflow tool permissions: read");
+    stop("[sdk-driver] permission denied by workflow tool permissions: read", undefined, true);
     const args = execFile.mock.calls[0][1].join(" ");
     expect(args).toContain("workflow tools configuration");
     expect(args).not.toContain("Verify token scopes");
+  });
+
+  it("does not derive workflow-boundary guidance from an assistant-echoed marker", () => {
+    stop("[sdk-driver] permission denied by workflow tool permissions: shell(ls)");
+    const args = execFile.mock.calls[0][1].join(" ");
+    expect(args).not.toContain("workflow tools configuration");
+    expect(args).toContain("Verify token scopes");
   });
 
   it("keeps the failure terminal when diagnostic emission fails", () => {

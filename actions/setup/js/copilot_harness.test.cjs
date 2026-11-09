@@ -8,7 +8,7 @@ import path from "path";
 const require = createRequire(import.meta.url);
 const { EventEmitter } = require("events");
 const { PassThrough } = require("stream");
-const { hasWorkflowToolPermissionDenial } = require("./permission_denied_helpers.cjs");
+const { hasWorkflowToolPermissionDenial, WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE } = require("./permission_denied_helpers.cjs");
 const { COPILOT_SDK_SERVER_STARTUP_TIMEOUT_MS, buildCopilotSDKServerArgs, getCopilotSDKServerPort, startCopilotSDKServer, stopCopilotSDKServer, waitForCopilotSDKServer } = require("./copilot_sdk_sidecar.cjs");
 const { buildCopilotSDKEnv, isCopilotSDKEnabled } = require("./process_runner.cjs");
 const {
@@ -1104,14 +1104,16 @@ describe("copilot_harness.cjs", () => {
       });
 
       it("classifies an explicit workflow tool denial instead of a generic CLI exit", () => {
-        const output = "[copilot-sdk-driver] [sdk-driver] permission denied by workflow tool permissions: shell(git status)";
+        const output = "[sdk-driver] permission denied by workflow tool permissions: shell(git status)";
+        expect(hasWorkflowToolPermissionDenial(output)).toBe(false);
         expect(
           classifyCopilotFailure({
             hasOutput: true,
-            hasWorkflowToolPermissionDenial: hasWorkflowToolPermissionDenial(output),
+            hasWorkflowToolPermissionDenial: hasWorkflowToolPermissionDenial(WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE),
           })
         ).toBe("permission_denied");
-        expect(shouldRetryFailedExecution({ exitCode: 1, hasOutput: true, output, attempt: 0, maxRetries: 3 })).toBe(false);
+        expect(shouldRetryFailedExecution({ exitCode: WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE, hasOutput: true, output, attempt: 0, maxRetries: 3 })).toBe(false);
+        expect(shouldRetryFailedExecution({ exitCode: 1, hasOutput: true, output, attempt: 0, maxRetries: 3 })).toBe(true);
       });
 
       it("retries sdk_session_idle_timeout as partial execution (shouldRetry)", () => {

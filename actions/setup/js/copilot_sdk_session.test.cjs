@@ -103,6 +103,38 @@ describe("copilot_sdk_session runtime configuration", () => {
     expect(stop).toHaveBeenCalledTimes(1);
   });
 
+  it("returns a dedicated exit code for SDK workflow tool permission denials", async () => {
+    let sessionConfig;
+    class FakeCopilotClient {
+      start = async () => {};
+      stop = async () => {};
+      createSession = async config => {
+        sessionConfig = config;
+        return {
+          sessionId: "workflow-tool-denial",
+          on: () => {},
+          sendAndWait: async () => {
+            await sessionConfig.onPermissionRequest({ kind: "shell", fullCommandText: "echo blocked" });
+            throw new Error("session failed after permission denial");
+          },
+          disconnect: async () => {},
+        };
+      };
+    }
+
+    const result = await runWithCopilotSDK({
+      sdkUri: "http://127.0.0.1:3002",
+      prompt: "test",
+      logger: () => {},
+      workingDirectory: base,
+      agentsBaseDir: base,
+      permissionConfig: { allowedTools: ["read"] },
+      sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forUri: () => ({}) }, approveAll: () => "allow" },
+    });
+
+    expect(result.exitCode).toBe(79);
+  });
+
   it.each([{}, { rte: false }, { rte: true, parentToolCallId: "child" }])("does not fail ordinary quoted text or a nested filtered response %j", context => {
     const message = { ...filteredMessage, data: { content: filteredMessage.data.content, ...context } };
     let handler;

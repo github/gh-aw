@@ -4,6 +4,7 @@
 
 const PERMISSION_DENIED_PATTERN = /\b(?:permission denied|permissions denied|EACCES|EPERM)\b/gi;
 const NUMEROUS_PERMISSION_DENIED_THRESHOLD = 3;
+const WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE = 79;
 
 /**
  * Count permission-denied indicators in process output.
@@ -70,27 +71,27 @@ function extractDeniedCommands(output) {
 }
 
 /**
- * Detect explicit workflow tool-permission denial summaries.
- * @param {string | undefined} output
+ * Detect the SDK driver's trusted workflow tool-permission denial exit code.
+ * @param {unknown} exitCode
  * @returns {boolean}
  */
-function hasWorkflowToolPermissionDenial(output) {
-  return typeof output === "string" && /(?:^|\r?\n)[ \t]*(?:\[copilot-sdk-driver\][ \t]*)?\[sdk-driver\][ \t]+permission denied by workflow tool permissions\s*:/i.test(output);
+function hasWorkflowToolPermissionDenial(exitCode) {
+  return exitCode === WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE;
 }
 
 /**
- * Build a structured report_missing_tool payload for repeated permission-denied failures.
+ * Build a structured report_missing_tool payload for permission-denied failures.
  * @param {string[]} [deniedCommands] - Commands that were denied (may be empty)
- * @param {string} [permissionOutput] - Original output containing permission-denial summaries
+ * @param {boolean} [workflowToolDenial] - Trusted SDK-driver workflow-tool denial signal
  * @returns {string}
  */
-function buildMissingToolPermissionIssuePayload(deniedCommands, permissionOutput) {
-  const workflowToolDenial = hasWorkflowToolPermissionDenial(permissionOutput);
+function buildMissingToolPermissionIssuePayload(deniedCommands, workflowToolDenial = false) {
+  const isWorkflowToolDenial = workflowToolDenial === true;
   return JSON.stringify({
     type: "report_missing_tool",
     tool: "tool/permission",
-    reason: workflowToolDenial ? "missing tool/permission issue: workflow tool permission denial detected" : "missing tool/permission issue: numerous permission denied errors detected",
-    alternatives: workflowToolDenial
+    reason: isWorkflowToolDenial ? "missing tool/permission issue: workflow tool permission denial detected" : "missing tool/permission issue: numerous permission denied errors detected",
+    alternatives: isWorkflowToolDenial
       ? "Use only commands allowed by the workflow tools configuration; stop unsupported probes before the denial budget is exhausted. A workflow tool denial does not establish missing token scopes or invalid credentials."
       : "Verify token scopes, repository permissions, and MCP/tool access configuration.",
     denied_commands: deniedCommands && deniedCommands.length > 0 ? deniedCommands : [],
@@ -102,5 +103,6 @@ module.exports = {
   hasNumerousPermissionDeniedIssues,
   extractDeniedCommands,
   hasWorkflowToolPermissionDenial,
+  WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE,
   buildMissingToolPermissionIssuePayload,
 };

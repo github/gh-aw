@@ -39,6 +39,7 @@ const { copilotSessionContext, getCopilotMessageRefusal } = require("./copilot_s
 const { loadCopilotSDKCustomAgents } = require("./extract_inline_sub_agents.cjs");
 const { qualifyModelForMultiProvider, parseMultiProviderJson } = require("./copilot_sdk_multi_provider.cjs");
 const { COPILOT_MODEL_VERIFICATION_EXIT_CODE, createCopilotSDKModelObserver, copilotSessionStateDirectories } = require("./copilot_model_selection.cjs");
+const { WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE } = require("./permission_denied_helpers.cjs");
 
 const CAPTURED_EPHEMERAL_EVENTS = new Set([...COPILOT_WORKFLOW_EVENT_TYPES, "assistant.usage", "assistant.message_delta", "assistant.reasoning_delta", "model.call_failure", "model.call_final_result", "model.call_finished"]);
 
@@ -264,6 +265,7 @@ async function runCopilotSDKSession({
   let eventsStream = null;
   let clientStarted = false;
   let toolDenialCount = 0;
+  let workflowToolPermissionDenied = false;
   let assistantTurnCount = 0;
   let contentFiltered = false;
   /** @type {any} */
@@ -342,6 +344,7 @@ async function runCopilotSDKSession({
    * @param {string} reason
    */
   function recordToolDenial(reason) {
+    workflowToolPermissionDenied = true;
     toolDenialCount += 1;
     log(`tool denial ${toolDenialCount}/${maxToolDenialsLimit}: ${reason}`);
     if (catastrophicToolDenialsTriggered || toolDenialCount < maxToolDenialsLimit) {
@@ -664,7 +667,7 @@ async function runCopilotSDKSession({
     // Preserve any output collected before the error so the harness can use it
     // for retry decisions and diagnostics.
     return {
-      exitCode: 1,
+      exitCode: workflowToolPermissionDenied ? WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE : 1,
       output: hasOutput ? output : failure.message,
       hasOutput,
       durationMs,

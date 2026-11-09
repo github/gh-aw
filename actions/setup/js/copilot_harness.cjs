@@ -1308,7 +1308,7 @@ function shouldRetryFailedExecution(params) {
   if (params.exitCode === 0) return false;
   if (isCopilotContentFilterError(params.output)) return false;
   if (params.isModelRoutingFailure) return false;
-  if (hasNumerousPermissionDeniedIssues(params.output) || hasWorkflowToolPermissionDenial(params.output)) return false;
+  if (hasNumerousPermissionDeniedIssues(params.output) || hasWorkflowToolPermissionDenial(params.exitCode)) return false;
   if (isCAPIQuotaExceededError(params.output)) return false;
   const nonRetryableGuard = detectNonRetryableHarnessGuard(params.output);
   if (nonRetryableGuard.modelEndpointMismatch) return false;
@@ -2218,7 +2218,7 @@ async function main() {
           const isConnectionRefused = isConnectionRefusedError(result.output);
           const permissionDeniedCount = countPermissionDeniedIssues(result.output);
           const hasNumerousPermissionDenied = hasNumerousPermissionDeniedIssues(result.output);
-          const isWorkflowToolPermissionDenied = hasWorkflowToolPermissionDenial(result.output);
+          const isWorkflowToolPermissionDenied = hasWorkflowToolPermissionDenial(result.exitCode);
           const nonRetryableGuard = detectNonRetryableHarnessGuard(result.output);
           const isContentFiltered = isCopilotContentFilterError(result.output);
           let isInvocationCapExceeded = nonRetryableGuard.maxRunsExceeded;
@@ -2436,7 +2436,7 @@ async function main() {
           }
 
           if (hasNumerousPermissionDenied || isWorkflowToolPermissionDenied) {
-            return stopForPermissionDenied({ attempt, output: result.output, safeOutputsPath, log, deniedCommands: extractDeniedCommands(result.output) });
+            return stopForPermissionDenied({ attempt, output: result.output, safeOutputsPath, log, deniedCommands: extractDeniedCommands(result.output), workflowToolPermissionDenied: isWorkflowToolPermissionDenied });
           }
 
           if (isMCPPolicy) {
