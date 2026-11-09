@@ -218,7 +218,7 @@ func (c *Compiler) buildDetectionJob(data *WorkflowData) (*Job, error) { //nolin
 	if brokeredInference {
 		perms.Set(PermissionIdToken, PermissionWrite)
 	}
-	if data.EngineConfig != nil && data.EngineConfig.Auth != nil && data.EngineConfig.Auth.Type == "github-oidc" {
+	if detectionAuthData.EngineConfig != nil && detectionAuthData.EngineConfig.Auth != nil && detectionAuthData.EngineConfig.Auth.Type == "github-oidc" {
 		perms.Set(PermissionIdToken, PermissionWrite)
 	}
 	if hasOTLPGitHubOIDCAuth(data.ParsedFrontmatter, data.RawFrontmatter) {

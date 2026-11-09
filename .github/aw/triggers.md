@@ -67,6 +67,19 @@ on:
   workflow_dispatch:    # Manual trigger
 ```
 
+### Issue Template Routing
+
+The `issues` event cannot filter by issue template. A workflow triggered by `issues` receives matching issue events regardless of which template created the issue.
+
+To activate only for a particular template, configure that issue form to apply a dedicated label and use a `label_command` trigger restricted to `issues`. Otherwise, use an `issues` trigger and instruct the agent to check a template-specific marker or required fields before acting: `noop` for a known different template, and explicitly choose whether missing or ambiguous template evidence should `noop` or use a generic fallback.
+
+```yaml
+on:
+  label_command:
+    name: bug-report
+    events: [issues]
+```
+
 ### `workflow_run` Failure-Triage Pattern
 
 Use this when reacting to failures from another workflow in the same repository:
@@ -153,6 +166,12 @@ on:
 ```
 
 `pull_request_target` supports the same `forks:` field and defaults to same-repository PRs only (omitting `forks:` is equivalent to `forks: []`). List exact `owner/repo` or `owner/*` entries to admit specific forks. Strict mode rejects `"*"` unless the main workflow's top-level `features.dangerously-allow-pull-request-target-forks-all: true` is set; an imported feature does not count as this opt-in. Non-strict mode allows `"*"` with a warning, and the warning remains when strict mode is opted in. `acknowledge-risk: true` and disabled/trusted checkout do not suppress this warning — prefer `pull_request` and avoid `pull_request_target` fork admission unless base-repository context is required.
+
+#### Policy Checks on Fork PRs
+
+The default `pull_request` policy-check trigger skips fork PRs. If a check must review fork contributions directly, explicitly allow the required forks with `forks:` (prefer a narrow allowlist) and keep the workflow read-only; treat PR content as untrusted input.
+
+Use `workflow_run` instead when the check depends on another workflow's completed result or artifact and must wait for that workflow, rather than racing it on `pull_request`. Scope it to the named workflow and completion type, gate on its conclusion, and read the result through GitHub APIs or artifacts. Do not use `workflow_run` to check out or execute the PR's head code or as a way to bypass fork safeguards.
 
 ### Command Triggers (/mentions)
 

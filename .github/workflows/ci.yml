@@ -224,7 +224,14 @@ jobs:
         go-version-file: go.mod
         cache: true
 
+    - name: Set up Python 3.12 for mini-SWE-agent lock tests
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+      with:
+        python-version: "3.12"
+
     - name: Run race detector
+      env:
+        GH_AW_REQUIRE_MINI_PY312: "1"
       run: make test-race
   shellcheck-setup-sh:
     name: ShellCheck actions/setup/sh
