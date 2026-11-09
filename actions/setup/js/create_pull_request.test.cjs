@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createRequire } from "module";
 import { fileURLToPath } from "url";
+import { createHash } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -2106,12 +2107,18 @@ describe("create_pull_request - allowed-files strict allowlist", () => {
         repos: {
           get: vi.fn().mockResolvedValue({ data: { default_branch: "main" } }),
         },
+        issues: {
+          listForRepo: vi.fn().mockResolvedValue({ data: [] }),
+        },
       },
+      paginate: vi.fn().mockResolvedValue([]),
       graphql: vi.fn(),
     };
     global.context = {
       eventName: "workflow_dispatch",
       repo: { owner: "test-owner", repo: "test-repo" },
+      runId: 123,
+      serverUrl: "https://github.com",
       payload: {},
     };
     global.exec = {
@@ -2343,6 +2350,93 @@ ${diffs}
     expect(global.github.graphql).not.toHaveBeenCalledWith(expect.stringContaining("enablePullRequestAutoMerge"), expect.anything());
     expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("Review permission denied"));
     expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("independent reviewer"));
+  });
+
+  it("should update an existing issue and link the run for an identical protected-file proposal", async () => {
+    const patchContent = createPatchWithFiles(".github/aw/instructions.md");
+    writePatch("feature/protected-identical", patchContent);
+    const promptsDir = path.join(tempDir, "prompts");
+    fs.mkdirSync(promptsDir, { recursive: true });
+    copyPromptTemplate(promptsDir, "manifest_protection_create_pr_fallback.md");
+    copyPromptTemplate(promptsDir, "safe_outputs_disclosure_header.md");
+    process.env.GH_AW_PROMPTS_DIR = promptsDir;
+
+    const fingerprint = createHash("sha256")
+      .update(JSON.stringify(["Test PR", patchContent]))
+      .digest("hex");
+    const existingIssue = {
+      number: 76,
+      title: "Test PR",
+      body: `<!-- gh-aw-protected-file-fallback:${fingerprint} -->`,
+      html_url: "https://github.com/test-owner/test-repo/issues/76",
+      state: "closed",
+    };
+    global.github.rest.issues = {
+      create: vi.fn(),
+      update: vi.fn().mockResolvedValue({ data: { number: 76, html_url: existingIssue.html_url } }),
+      listForRepo: vi.fn(),
+    };
+    global.github.paginate.mockResolvedValue([existingIssue]);
+
+    const { main } = require("./create_pull_request.cjs");
+    const handler = await main({
+      protected_path_prefixes: [".github/"],
+      protected_files_policy: "fallback-to-issue",
+    });
+    const result = await handler({ title: "Test PR", body: "Test body", branch: "feature/protected-identical" }, {});
+
+    expect(result.issue_number).toBe(76);
+    expect(global.github.rest.issues.create).not.toHaveBeenCalled();
+    expect(global.github.paginate).toHaveBeenCalledWith(global.github.rest.issues.listForRepo, expect.objectContaining({ owner: "test-owner", repo: "test-repo", state: "all", labels: "pull-request-fallback" }));
+    const updateCall = global.github.rest.issues.update.mock.calls[0][0];
+    expect(updateCall).toMatchObject({ issue_number: 76, title: "Test PR", labels: expect.arrayContaining(["pull-request-fallback"]), state: "open" });
+    expect(updateCall.body).toContain("https://github.com/test-owner/test-repo/actions/runs/123");
+    expect(updateCall.body).toContain(`<!-- gh-aw-protected-file-fallback:${fingerprint} -->`);
+  });
+
+  it("should create a new issue when the protected-file proposal changes", async () => {
+    const originalPatch = createPatchWithFiles(".github/aw/old-instructions.md");
+    const changedPatch = createPatchWithFiles(".github/aw/new-instructions.md");
+    writePatch("feature/protected-changed", changedPatch);
+    const promptsDir = path.join(tempDir, "prompts");
+    fs.mkdirSync(promptsDir, { recursive: true });
+    copyPromptTemplate(promptsDir, "manifest_protection_create_pr_fallback.md");
+    copyPromptTemplate(promptsDir, "safe_outputs_disclosure_header.md");
+    process.env.GH_AW_PROMPTS_DIR = promptsDir;
+
+    const oldFingerprint = createHash("sha256")
+      .update(JSON.stringify(["Test PR", originalPatch]))
+      .digest("hex");
+    global.github.rest.issues = {
+      create: vi.fn().mockResolvedValue({ data: { number: 77, html_url: "https://github.com/test-owner/test-repo/issues/77" } }),
+      update: vi.fn().mockResolvedValue({ data: {} }),
+      listForRepo: vi.fn(),
+    };
+    global.github.paginate.mockResolvedValue([
+      {
+        number: 76,
+        title: "Test PR",
+        body: `<!-- gh-aw-protected-file-fallback:${oldFingerprint} -->`,
+        html_url: "https://github.com/test-owner/test-repo/issues/76",
+      },
+    ]);
+
+    const { main } = require("./create_pull_request.cjs");
+    const handler = await main({
+      protected_path_prefixes: [".github/"],
+      protected_files_policy: "fallback-to-issue",
+    });
+    const result = await handler({ title: "Test PR", body: "Test body", branch: "feature/protected-changed" }, {});
+
+    expect(result.issue_number).toBe(77);
+    expect(global.github.rest.issues.create).toHaveBeenCalledTimes(1);
+    const createCall = global.github.rest.issues.create.mock.calls[0][0];
+    const newFingerprint = createHash("sha256")
+      .update(JSON.stringify(["Test PR", changedPatch]))
+      .digest("hex");
+    expect(newFingerprint).not.toBe(oldFingerprint);
+    expect(createCall.body).toContain(`<!-- gh-aw-protected-file-fallback:${newFingerprint} -->`);
+    expect(createCall.body).toContain("https://github.com/test-owner/test-repo/actions/runs/123");
   });
 
   it.each([
