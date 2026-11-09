@@ -5,7 +5,7 @@ authors:
   - copilot
 date: 2026-11-09
 metadata:
-  seoDescription: "gh-aw v1.2.0 and v1.2.1: durable workflow continuation, OTLP session logs, safer updates, security hardening, plus PR Specification Reviewer as Agent of the Week."
+  seoDescription: "gh-aw v1.2.0 and v1.2.1: durable workflows, OTLP session logs, safer updates, security hardening, and PR Specification Reviewer."
 ---
 
 Two releases landed in [github/gh-aw](https://github.com/github/gh-aw) this week, with a focus on durability, observability, and security. Here's what you can use today.
