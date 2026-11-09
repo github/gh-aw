@@ -599,8 +599,9 @@ printf "%s\n" "$@" > "$GH_AW_TEST_UV_ARGS_FILE"
 		t.Fatalf("failed to write fake uv executable: %v", err)
 	}
 	t.Setenv("GH_AW_TEST_UV_ARGS_FILE", argsFile)
+	t.Chdir(tempDir)
 
-	err := NewCompiler().validateUvPackagesWithExecutable([]string{"requests"}, "uv")
+	err := NewCompiler().validateUvPackagesWithExecutable([]string{"requests"}, "./uv")
 	if err == nil {
 		t.Fatal("expected relative executable path to be rejected")
 	}
