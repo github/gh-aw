@@ -9,45 +9,24 @@ connectors:
       - https://learn.microsoft.com/en-us/azure/bot-service/rest-api/bot-framework-rest-connector-authentication?view=azure-bot-service-4.0
       - https://learn.microsoft.com/en-us/microsoftteams/platform/bots/how-to/conversations/send-proactive-messages
       - https://learn.microsoft.com/en-us/graph/teams-changenotifications-chatmessage
+    endpoints:
+      bot: https://smba.trafficmanager.net
+      graph: https://graph.microsoft.com
     credentials:
       bot-writer:
-        header: Authorization
         phase: safe-output
+        header: Authorization
         scheme: bearer
         scopes:
           - https://api.botframework.com/.default
         secret: ${{ github.aw.import-inputs.bot-writer-secret }}
       reader:
-        header: Authorization
         phase: agent
+        header: Authorization
         scheme: bearer
         scopes:
           - ChannelMessage.Read.Group
         secret: ${{ github.aw.import-inputs.reader-secret }}
-    endpoints:
-      bot: https://smba.trafficmanager.net
-      graph: https://graph.microsoft.com
-    triggers:
-      channel-message-created:
-        resourceOrigins:
-          - https://graph.microsoft.com
-          - https://teams.microsoft.com
-        match:
-          /changeType: created
-          /resourceData/@odata.type: '#Microsoft.Graph.chatMessage'
-        nativeEvents:
-          - created
-        normalize:
-          resource: /resource
-          subject: /resourceData/id
-          subscription: /subscriptionId
-          tenant: /tenantId
-        resources:
-          /resource: notification-resources
-          /resourceData/id: threads
-          /subscriptionId: subscriptions
-          /tenantId: tenants
-        verificationProfile: microsoft.com/graph-basic-channel-notification
     resources:
       activities: ${{ github.aw.import-inputs.activities }}
       channels: ${{ github.aw.import-inputs.channels }}
@@ -57,29 +36,137 @@ connectors:
       teams: ${{ github.aw.import-inputs.teams }}
       tenants: ${{ github.aw.import-inputs.tenants }}
       threads: ${{ github.aw.import-inputs.threads }}
+    triggers:
+      channel-message-created:
+        verificationProfile: microsoft.com/graph-basic-channel-notification
+        nativeEvents:
+          - created
+        resourceOrigins:
+          - https://graph.microsoft.com
+          - https://teams.microsoft.com
+        match:
+          /changeType: created
+          /resourceData/@odata.type: '#Microsoft.Graph.chatMessage'
+        resources:
+          /resource: notification-resources
+          /resourceData/id: threads
+          /subscriptionId: subscriptions
+          /tenantId: tenants
+        normalize:
+          resource: /resource
+          subject: /resourceData/id
+          subscription: /subscriptionId
+          tenant: /tenantId
+    tools:
+      get-channel-message:
+        tool: get-channel-message
+        credential: reader
+        inputs:
+          channel: &teams-input-channel
+            type: string
+            required: true
+            maxLength: 256
+          team: &teams-input-team
+            type: string
+            required: true
+            maxLength: 36
+          thread: &teams-input-thread
+            type: string
+            required: true
+            maxLength: 128
+        resources:
+          channel: channels
+          team: teams
+          thread: threads
+        request:
+          endpoint: graph
+          method: GET
+          path: /v1.0/teams/{team}/channels/{channel}/messages/{thread}
+          pathInputs:
+            channel: channel
+            team: team
+            thread: thread
+        maxResponseBytes: 65536
+        responseChecks:
+          /messageType: message
+          /replyToId: null
+        responseRequired:
+          - /id
+          - /from/user/id
+          - /body/content
+        responseTypes:
+          /body/content: string
+          /body/contentType: string
+          /from/user/id: string
+          /id: string
+        responseInputs:
+          /channelIdentity/channelId: channel
+          /channelIdentity/teamId: team
+          /id: thread
+        responseResources:
+          /channelIdentity/channelId: channels
+          /channelIdentity/teamId: teams
+          /id: threads
+        project:
+          author: /from/user/id
+          channel: /channelIdentity/channelId
+          content-type: /body/contentType
+          id: /id
+          team: /channelIdentity/teamId
+          text: /body/content
+      list-channel-replies:
+        tool: list-channel-replies
+        credential: reader
+        inputs:
+          channel: *teams-input-channel
+          team: *teams-input-team
+          thread: *teams-input-thread
+        resources:
+          channel: channels
+          team: teams
+          thread: threads
+        request:
+          endpoint: graph
+          method: GET
+          path: /v1.0/teams/{team}/channels/{channel}/messages/{thread}/replies
+          pathInputs:
+            channel: channel
+            team: team
+            thread: thread
+          query:
+            $top:
+              literal: 20
+        maxResponseBytes: 65536
+        responseRequired:
+          - /value
+        project:
+          replies: /value
     safe-outputs:
       reply-to-activity:
         credential: bot-writer
         inputs:
-          activity:
-            maxLength: 128
-            required: true
+          activity: *teams-input-thread
+          conversation: &teams-input-conversation
             type: string
-          conversation:
+            required: true
             maxLength: 512
-            required: true
+          text: &teams-input-text
             type: string
-          text:
-            sanitize: body
+            required: true
             minLength: 1
             maxLength: 4000
             pattern: \S
-            required: true
-            type: string
-        maxResponseBytes: 16384
-        project:
-          id: /id
+            sanitize: body
+        resources:
+          activity: activities
+          conversation: conversations
         request:
+          endpoint: bot
+          method: POST
+          path: /teams/v3/conversations/{conversation}/activities/{activity}
+          pathInputs:
+            activity: activity
+            conversation: conversation
           body:
             replyToId:
               input: activity
@@ -87,41 +174,29 @@ connectors:
               input: text
             type:
               literal: message
+        maxResponseBytes: 16384
+        responseRequired:
+          - /id
+        responseTypes:
+          /id: string
+        project:
+          id: /id
+      reply-with-review-card:
+        credential: bot-writer
+        inputs:
+          activity: *teams-input-thread
+          conversation: *teams-input-conversation
+          text: *teams-input-text
+        resources:
+          activity: activities
+          conversation: conversations
+        request:
           endpoint: bot
           method: POST
           path: /teams/v3/conversations/{conversation}/activities/{activity}
           pathInputs:
             activity: activity
             conversation: conversation
-        resources:
-          activity: activities
-          conversation: conversations
-        responseRequired:
-          - /id
-        responseTypes:
-          /id: string
-      reply-with-review-card:
-        credential: bot-writer
-        inputs:
-          activity:
-            maxLength: 128
-            required: true
-            type: string
-          conversation:
-            maxLength: 512
-            required: true
-            type: string
-          text:
-            sanitize: body
-            minLength: 1
-            maxLength: 4000
-            pattern: \S
-            required: true
-            type: string
-        maxResponseBytes: 16384
-        project:
-          id: /id
-        request:
           body:
             attachments:
               literal:
@@ -140,159 +215,70 @@ connectors:
               input: text
             type:
               literal: message
-          endpoint: bot
-          method: POST
-          path: /teams/v3/conversations/{conversation}/activities/{activity}
-          pathInputs:
-            activity: activity
-            conversation: conversation
-        resources:
-          activity: activities
-          conversation: conversations
+        maxResponseBytes: 16384
         responseRequired:
           - /id
         responseTypes:
           /id: string
-    tools:
-      get-channel-message:
-        credential: reader
-        inputs:
-          channel:
-            maxLength: 256
-            required: true
-            type: string
-          team:
-            maxLength: 36
-            required: true
-            type: string
-          thread:
-            maxLength: 128
-            required: true
-            type: string
-        maxResponseBytes: 65536
         project:
-          author: /from/user/id
-          channel: /channelIdentity/channelId
-          content-type: /body/contentType
           id: /id
-          team: /channelIdentity/teamId
-          text: /body/content
-        request:
-          endpoint: graph
-          method: GET
-          path: /v1.0/teams/{team}/channels/{channel}/messages/{thread}
-          pathInputs:
-            channel: channel
-            team: team
-            thread: thread
-        resources:
-          channel: channels
-          team: teams
-          thread: threads
-        responseChecks:
-          /messageType: message
-          /replyToId: null
-        responseInputs:
-          /channelIdentity/channelId: channel
-          /channelIdentity/teamId: team
-          /id: thread
-        responseRequired:
-          - /id
-          - /from/user/id
-          - /body/content
-        responseResources:
-          /channelIdentity/channelId: channels
-          /channelIdentity/teamId: teams
-          /id: threads
-        responseTypes:
-          /body/content: string
-          /body/contentType: string
-          /from/user/id: string
-          /id: string
-        tool: get-channel-message
-      list-channel-replies:
-        credential: reader
-        inputs:
-          channel:
-            maxLength: 256
-            required: true
-            type: string
-          team:
-            maxLength: 36
-            required: true
-            type: string
-          thread:
-            maxLength: 128
-            required: true
-            type: string
-        maxResponseBytes: 65536
-        project:
-          replies: /value
-        request:
-          endpoint: graph
-          method: GET
-          path: /v1.0/teams/{team}/channels/{channel}/messages/{thread}/replies
-          pathInputs:
-            channel: channel
-            team: team
-            thread: thread
-          query:
-            $top:
-              literal: 20
-        resources:
-          channel: channels
-          team: teams
-          thread: threads
-        responseRequired:
-          - /value
-        tool: list-channel-replies
 import-schema:
   activities:
     type: array
     items:
       type: string
     default: []
+    description: Exact approved Bot Connector activity IDs; Graph message IDs do not establish activity references.
   bot-writer-secret:
-    default: TEAMS_BOT_ACCESS_TOKEN
     type: string
+    default: TEAMS_BOT_ACCESS_TOKEN
+    description: Separate Actions secret containing the Bot Connector access token for the approved conversation reference.
   channels:
     type: array
     items:
       type: string
     default: []
+    description: Exact approved Graph channel IDs for the Teams reader.
   conversations:
     type: array
     items:
       type: string
     default: []
+    description: Exact approved Bot Connector conversation IDs, independently granted from Graph channels.
   notification-resources:
     type: array
     items:
       type: string
     default: []
+    description: Exact approved Graph notification resource strings for trigger evidence.
   reader-secret:
-    default: TEAMS_GRAPH_READ_ACCESS_TOKEN
     type: string
+    default: TEAMS_GRAPH_READ_ACCESS_TOKEN
+    description: Actions secret containing the Graph token with installed and consented ChannelMessage.Read.Group RSC permission.
   subscriptions:
     type: array
     items:
       type: string
     default: []
+    description: Exact approved Graph subscription IDs for trigger evidence; importing does not create subscriptions.
   teams:
     type: array
     items:
       type: string
     default: []
+    description: Exact approved Graph team UUIDs.
   tenants:
     type: array
     items:
       type: string
     default: []
+    description: Exact approved tenant UUIDs for credential and event scope.
   threads:
     type: array
     items:
       type: string
     default: []
+    description: Exact approved root Graph message IDs for reader paths and reply constraints.
 ---
 
 <!--

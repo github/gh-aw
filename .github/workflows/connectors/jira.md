@@ -14,215 +14,40 @@ connectors:
       - https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-remote-links/
       - https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-projects/
       - https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-user-search/
+    endpoints:
+      site: ${{ github.aw.import-inputs.site }}
     credentials:
       rest-reader:
-        header: Authorization
         phase: agent
+        header: Authorization
         scheme: basic
         scopes:
           - read:jira-work
           - read:jira-user
         secret: ${{ github.aw.import-inputs.rest-reader-secret }}
       mcp-personal:
-        header: Authorization
         phase: agent
+        header: Authorization
         scheme: basic
         scopes:
           - read:jira:agent-interface
           - search:jira:agent-interface
         secret: ${{ github.aw.import-inputs.mcp-personal-secret }}
       mcp-service-account:
-        header: Authorization
         phase: agent
+        header: Authorization
         scheme: bearer
         scopes:
           - read:jira:agent-interface
           - search:jira:agent-interface
         secret: ${{ github.aw.import-inputs.mcp-service-account-secret }}
       rest-writer:
-        header: Authorization
         phase: safe-output
+        header: Authorization
         scheme: basic
         scopes:
           - write:jira-work
         secret: ${{ github.aw.import-inputs.rest-writer-secret }}
-    endpoints:
-      site: ${{ github.aw.import-inputs.site }}
-    mcp-servers:
-      personal:
-        credential: mcp-personal
-        maxResponseBytes: 65536
-        readOnly: true
-        tools: &jira-mcp-tools
-          getJiraIssue:
-            inputs:
-              cloudId:
-                maxLength: 80
-                required: true
-                type: string
-              issueIdOrKey:
-                maxLength: 80
-                pattern: ^[A-Z][A-Z0-9_]*-[1-9][0-9]*$
-                required: true
-                type: string
-            resources:
-              cloudId: cloud-ids
-              issueIdOrKey: issues
-          searchJiraIssuesUsingJql:
-            inputs:
-              cloudId:
-                maxLength: 80
-                required: true
-                type: string
-              jql:
-                maxLength: 1000
-                required: true
-                type: string
-              maxResults:
-                maximum: 25
-                minimum: 1
-                required: true
-                type: integer
-            resources:
-              cloudId: cloud-ids
-              jql: queries
-        url: https://mcp.atlassian.com/v2/mcp
-      service-account:
-        credential: mcp-service-account
-        maxResponseBytes: 65536
-        readOnly: true
-        tools: *jira-mcp-tools
-        url: https://mcp.atlassian.com/v2/mcp
-    triggers:
-      issue-created:
-        urlIdentity: /issue/id
-        urlPathPrefix: /rest/api/3/issue/
-        filters: &jira-event-filters
-          issue-id: {path: /issue/id, type: string}
-          issue-key: {path: /issue/key, type: string}
-          project: {path: /issue/fields/project/key, type: string}
-          labels: {path: "/issue/fields/labels/*", type: string}
-          status: {path: /issue/fields/status/name, type: string}
-          resolution: {path: /issue/fields/resolution/id, type: string}
-          sender: {path: /user/accountId, type: string}
-        resourceOrigins:
-          - ${{ github.aw.import-inputs.site }}
-        match:
-          /webhookEvent: jira:issue_created
-        nativeEvents:
-          - jira:issue_created
-        normalize:
-          issue-id: /issue/id
-          issue-key: /issue/key
-          project: /issue/fields/project/key
-          url: /issue/self
-        resources:
-          /issue/fields/project/key: projects
-          /issue/id: issue-ids
-        types:
-          /issue/fields/project/key: string
-          /issue/id: string
-          /issue/key: string
-          /issue/self: string
-          /webhookEvent: string
-        verificationProfile: atlassian.com/jira-admin-hmac-sha256
-      issue-deleted:
-        urlIdentity: /issue/id
-        urlPathPrefix: /rest/api/3/issue/
-        filters: *jira-event-filters
-        resourceOrigins:
-          - ${{ github.aw.import-inputs.site }}
-        match:
-          /webhookEvent: jira:issue_deleted
-        nativeEvents:
-          - jira:issue_deleted
-        normalize:
-          issue-id: /issue/id
-          issue-key: /issue/key
-          project: /issue/fields/project/key
-          url: /issue/self
-        resources:
-          /issue/fields/project/key: projects
-          /issue/id: issue-ids
-        types:
-          /issue/fields/project/key: string
-          /issue/id: string
-          /issue/key: string
-          /issue/self: string
-          /webhookEvent: string
-        verificationProfile: atlassian.com/jira-admin-hmac-sha256
-      issue-updated: &jira-issue-updated
-        urlIdentity: /issue/id
-        urlPathPrefix: /rest/api/3/issue/
-        filters: *jira-event-filters
-        resourceOrigins:
-          - ${{ github.aw.import-inputs.site }}
-        match:
-          /webhookEvent: jira:issue_updated
-        nativeEvents:
-          - jira:issue_updated
-        normalize:
-          issue-id: /issue/id
-          issue-key: /issue/key
-          project: /issue/fields/project/key
-          url: /issue/self
-        resources:
-          /issue/fields/project/key: projects
-          /issue/id: issue-ids
-        types:
-          /issue/fields/project/key: string
-          /issue/id: string
-          /issue/key: string
-          /issue/self: string
-          /webhookEvent: string
-        verificationProfile: atlassian.com/jira-admin-hmac-sha256
-      issue-closed:
-        <<: *jira-issue-updated
-        when:
-          path: /changelog/items
-          op: any-item
-          items:
-            all:
-              - {path: /fieldtype, op: equals, value: jira}
-              - {path: /field, op: equals, value: resolution}
-              - {path: /from, op: "null"}
-              - {path: /to, op: text}
-      issue-reopened:
-        <<: *jira-issue-updated
-        when:
-          path: /changelog/items
-          op: any-item
-          items:
-            all:
-              - {path: /fieldtype, op: equals, value: jira}
-              - {path: /field, op: equals, value: resolution}
-              - {path: /from, op: text}
-              - {path: /to, op: "null"}
-      issue-labeled:
-        <<: *jira-issue-updated
-        when:
-          path: /changelog/items
-          op: any-item
-          items:
-            all:
-              - {path: /fieldtype, op: equals, value: jira}
-              - {path: /field, op: equals, value: labels}
-              - {path: /fromString, op: "null"}
-              - {path: /toString, op: text}
-              - {path: /toString, op: equals, other: /issue/fields/labels/0}
-              - {path: /issue/fields/labels, root: true, op: length, value: 1}
-      issue-unlabeled:
-        <<: *jira-issue-updated
-        when:
-          path: /changelog/items
-          op: any-item
-          items:
-            all:
-              - {path: /fieldtype, op: equals, value: jira}
-              - {path: /field, op: equals, value: labels}
-              - {path: /fromString, op: text}
-              - {path: /toString, op: "null"}
-              - {path: /issue/fields/labels, root: true, op: length, value: 0}
     resources:
       account-queries: ${{ github.aw.import-inputs.account-queries }}
       cloud-ids: ${{ github.aw.import-inputs.cloud-ids }}
@@ -233,30 +58,160 @@ connectors:
       issue-types: ${{ github.aw.import-inputs.issue-types }}
       projects: ${{ github.aw.import-inputs.projects }}
       queries: ${{ github.aw.import-inputs.queries }}
+    triggers:
+      issue-created:
+        verificationProfile: atlassian.com/jira-admin-hmac-sha256
+        nativeEvents:
+          - jira:issue_created
+        resourceOrigins:
+          - ${{ github.aw.import-inputs.site }}
+        match:
+          /webhookEvent: jira:issue_created
+        types:
+          /issue/fields/project/key: string
+          /issue/id: string
+          /issue/key: string
+          /issue/self: string
+          /webhookEvent: string
+        resources:
+          /issue/fields/project/key: projects
+          /issue/id: issue-ids
+        normalize:
+          issue-id: /issue/id
+          issue-key: /issue/key
+          project: /issue/fields/project/key
+          url: /issue/self
+        filters: &jira-event-filters
+          issue-id: { path: /issue/id, type: string }
+          issue-key: { path: /issue/key, type: string }
+          project: { path: /issue/fields/project/key, type: string }
+          labels: { path: "/issue/fields/labels/*", type: string }
+          status: { path: /issue/fields/status/name, type: string }
+          resolution: { path: /issue/fields/resolution/id, type: string }
+          sender: { path: /user/accountId, type: string }
+        urlIdentity: /issue/id
+        urlPathPrefix: /rest/api/3/issue/
+      issue-deleted:
+        verificationProfile: atlassian.com/jira-admin-hmac-sha256
+        nativeEvents:
+          - jira:issue_deleted
+        resourceOrigins:
+          - ${{ github.aw.import-inputs.site }}
+        match:
+          /webhookEvent: jira:issue_deleted
+        types:
+          /issue/fields/project/key: string
+          /issue/id: string
+          /issue/key: string
+          /issue/self: string
+          /webhookEvent: string
+        resources:
+          /issue/fields/project/key: projects
+          /issue/id: issue-ids
+        normalize:
+          issue-id: /issue/id
+          issue-key: /issue/key
+          project: /issue/fields/project/key
+          url: /issue/self
+        filters: *jira-event-filters
+        urlIdentity: /issue/id
+        urlPathPrefix: /rest/api/3/issue/
+      issue-updated: &jira-issue-updated
+        verificationProfile: atlassian.com/jira-admin-hmac-sha256
+        nativeEvents:
+          - jira:issue_updated
+        resourceOrigins:
+          - ${{ github.aw.import-inputs.site }}
+        match:
+          /webhookEvent: jira:issue_updated
+        types:
+          /issue/fields/project/key: string
+          /issue/id: string
+          /issue/key: string
+          /issue/self: string
+          /webhookEvent: string
+        resources:
+          /issue/fields/project/key: projects
+          /issue/id: issue-ids
+        normalize:
+          issue-id: /issue/id
+          issue-key: /issue/key
+          project: /issue/fields/project/key
+          url: /issue/self
+        filters: *jira-event-filters
+        urlIdentity: /issue/id
+        urlPathPrefix: /rest/api/3/issue/
+      issue-closed:
+        <<: *jira-issue-updated
+        when:
+          path: /changelog/items
+          op: any-item
+          items:
+            all:
+              - { path: /fieldtype, op: equals, value: jira }
+              - { path: /field, op: equals, value: resolution }
+              - { path: /from, op: "null" }
+              - { path: /to, op: text }
+      issue-reopened:
+        <<: *jira-issue-updated
+        when:
+          path: /changelog/items
+          op: any-item
+          items:
+            all:
+              - { path: /fieldtype, op: equals, value: jira }
+              - { path: /field, op: equals, value: resolution }
+              - { path: /from, op: text }
+              - { path: /to, op: "null" }
+      issue-labeled:
+        <<: *jira-issue-updated
+        when:
+          path: /changelog/items
+          op: any-item
+          items:
+            all:
+              - { path: /fieldtype, op: equals, value: jira }
+              - { path: /field, op: equals, value: labels }
+              - { path: /fromString, op: "null" }
+              - { path: /toString, op: text }
+              - { path: /toString, op: equals, other: /issue/fields/labels/0 }
+              - { path: /issue/fields/labels, root: true, op: length, value: 1 }
+      issue-unlabeled:
+        <<: *jira-issue-updated
+        when:
+          path: /changelog/items
+          op: any-item
+          items:
+            all:
+              - { path: /fieldtype, op: equals, value: jira }
+              - { path: /field, op: equals, value: labels }
+              - { path: /fromString, op: text }
+              - { path: /toString, op: "null" }
+              - { path: /issue/fields/labels, root: true, op: length, value: 0 }
     tools:
       get-issue-remote-links:
-        credential: rest-reader
         tool: get-issue-remote-links
+        credential: rest-reader
         inputs:
-          issue:
+          issue: &jira-issue-key
             type: string
             required: true
             maxLength: 80
             pattern: ^[A-Z][A-Z0-9_]*-[1-9][0-9]*$
         resources:
           issue: issues
-        maxResponseBytes: 65536
         request:
           endpoint: site
           method: GET
           path: /rest/api/3/issue/{issue}/remotelink
           pathInputs:
             issue: issue
+        maxResponseBytes: 65536
         responseLimits:
           "": 25
       lookup-account-id:
-        credential: rest-reader
         tool: lookup-account-id
+        credential: rest-reader
         inputs:
           query:
             type: string
@@ -275,49 +230,44 @@ connectors:
             maximum: 25
         resources:
           query: account-queries
-        maxResponseBytes: 65536
         request:
           endpoint: site
           method: GET
           path: /rest/api/3/user/search
           query:
-            query: {input: query}
-            startAt: {input: start-at}
-            maxResults: {input: max-results}
+            query: { input: query }
+            startAt: { input: start-at }
+            maxResults: { input: max-results }
+        maxResponseBytes: 65536
         responseLimits:
           "": 25
       get-issue-link-types:
-        credential: rest-reader
         tool: get-issue-link-types
+        credential: rest-reader
         inputs:
           scope:
             type: string
             required: true
-            enum: [site-metadata]
             maxLength: 13
+            enum: [ site-metadata ]
         resources:
           scope: discovery-scopes
-        maxResponseBytes: 65536
         request:
           endpoint: site
           method: GET
           path: /rest/api/3/issueLinkType
+        maxResponseBytes: 65536
         responseLimits:
           /issueLinkTypes: 25
         project:
           link-types: /issueLinkTypes
       get-transitions-for-issue:
-        credential: rest-reader
         tool: get-transitions-for-issue
+        credential: rest-reader
         inputs:
-          issue:
-            type: string
-            required: true
-            maxLength: 80
-            pattern: ^[A-Z][A-Z0-9_]*-[1-9][0-9]*$
+          issue: *jira-issue-key
         resources:
           issue: issues
-        maxResponseBytes: 65536
         request:
           endpoint: site
           method: GET
@@ -325,15 +275,16 @@ connectors:
           pathInputs:
             issue: issue
           query:
-            includeUnavailableTransitions: {literal: false}
-            skipRemoteOnlyCondition: {literal: false}
+            includeUnavailableTransitions: { literal: false }
+            skipRemoteOnlyCondition: { literal: false }
+        maxResponseBytes: 65536
         responseLimits:
           /transitions: 25
         project:
           transitions: /transitions
       get-project-issue-types:
-        credential: rest-reader
         tool: get-project-issue-types
+        credential: rest-reader
         inputs: &jira-project-page-inputs
           project: &jira-read-project
             type: string
@@ -352,7 +303,6 @@ connectors:
             maximum: 25
         resources:
           project: projects
-        maxResponseBytes: 65536
         request:
           endpoint: site
           method: GET
@@ -360,8 +310,9 @@ connectors:
           pathInputs:
             project: project
           query: &jira-read-page-query
-            startAt: {input: start-at}
-            maxResults: {input: max-results}
+            startAt: { input: start-at }
+            maxResults: { input: max-results }
+        maxResponseBytes: 65536
         responseInputs:
           /startAt: start-at
         responseLimits:
@@ -371,8 +322,8 @@ connectors:
           start-at: /startAt
           total: /total
       get-issue-type-fields:
-        credential: rest-reader
         tool: get-issue-type-fields
+        credential: rest-reader
         inputs:
           <<: *jira-project-page-inputs
           issue-type-id:
@@ -383,7 +334,6 @@ connectors:
         resources:
           project: projects
           issue-type-id: issue-type-ids
-        maxResponseBytes: 131072
         request:
           endpoint: site
           method: GET
@@ -392,6 +342,7 @@ connectors:
             project: project
             type: issue-type-id
           query: *jira-read-page-query
+        maxResponseBytes: 131072
         responseInputs:
           /startAt: start-at
         responseLimits:
@@ -401,21 +352,21 @@ connectors:
           start-at: /startAt
           total: /total
       get-visible-projects:
-        credential: rest-reader
         tool: get-visible-projects
+        credential: rest-reader
         inputs: *jira-project-page-inputs
         resources:
           project: projects
-        maxResponseBytes: 65536
         request:
           endpoint: site
           method: GET
           path: /rest/api/3/project/search
           query:
             <<: *jira-read-page-query
-            keys: {input: project}
-            action: {literal: browse}
-            orderBy: {literal: key}
+            keys: { input: project }
+            action: { literal: browse }
+            orderBy: { literal: key }
+        maxResponseBytes: 65536
         responseInputs:
           /startAt: start-at
           /values/*/key: project
@@ -425,60 +376,103 @@ connectors:
           projects: /values
           start-at: /startAt
           total: /total
+    mcp-servers:
+      personal:
+        url: https://mcp.atlassian.com/v2/mcp
+        credential: mcp-personal
+        readOnly: true
+        tools: &jira-mcp-tools
+          getJiraIssue:
+            inputs:
+              cloudId:
+                type: string
+                required: true
+                maxLength: 80
+              issueIdOrKey:
+                type: string
+                required: true
+                maxLength: 80
+                pattern: ^[A-Z][A-Z0-9_]*-[1-9][0-9]*$
+            resources:
+              cloudId: cloud-ids
+              issueIdOrKey: issues
+          searchJiraIssuesUsingJql:
+            inputs:
+              cloudId:
+                type: string
+                required: true
+                maxLength: 80
+              jql:
+                type: string
+                required: true
+                maxLength: 1000
+              maxResults:
+                type: integer
+                required: true
+                minimum: 1
+                maximum: 25
+            resources:
+              cloudId: cloud-ids
+              jql: queries
+        maxResponseBytes: 65536
+      service-account:
+        url: https://mcp.atlassian.com/v2/mcp
+        credential: mcp-service-account
+        readOnly: true
+        tools: *jira-mcp-tools
+        maxResponseBytes: 65536
     safe-outputs:
       add-comment:
-        createdResources:
-          issue: create-issue
         credential: rest-writer
         inputs:
-          issue:
-            maxLength: 80
-            pattern: ^[A-Z][A-Z0-9_]*-[1-9][0-9]*$
-            required: true
+          issue: *jira-issue-key
+          text: &jira-description
             type: string
-          text:
-            sanitize: body
+            required: true
             minLength: 1
             maxLength: 32767
             pattern: \S
-            required: true
-            type: string
-        maxResponseBytes: 16384
-        project:
-          comment-id: /id
+            sanitize: body
+        resources:
+          issue: issues
+        createdResources:
+          issue: create-issue
         request:
-          body:
-            body:
-              encoding: jira-adf
-              input: text
           endpoint: site
           method: POST
           path: /rest/api/3/issue/{issue}/comment
           pathInputs:
             issue: issue
-        resources:
-          issue: issues
+          body:
+            body:
+              encoding: jira-adf
+              input: text
+        maxResponseBytes: 16384
         responseRequired:
           - /id
         responseTypes:
           /id: string
+        project:
+          comment-id: /id
       add-label:
-        createdResources:
-          issue: create-issue
         credential: rest-writer
         inputs:
-          issue:
-            maxLength: 80
-            pattern: ^[A-Z][A-Z0-9_]*-[1-9][0-9]*$
-            required: true
-            type: string
+          issue: *jira-issue-key
           label:
+            type: string
+            required: true
             maxLength: 255
             pattern: ^[A-Za-z0-9_.-]+$
-            required: true
-            type: string
-        maxResponseBytes: 16384
+        resources:
+          issue: issues
+        createdResources:
+          issue: create-issue
         request:
+          endpoint: site
+          method: PUT
+          path: /rest/api/3/issue/{issue}
+          pathInputs:
+            issue: issue
           body:
             update:
               object:
@@ -487,55 +481,50 @@ connectors:
                     - object:
                         add:
                           input: label
-          endpoint: site
-          method: PUT
-          path: /rest/api/3/issue/{issue}
-          pathInputs:
-            issue: issue
-        resources:
-          issue: issues
+        maxResponseBytes: 16384
       create-issue:
+        credential: rest-writer
+        inputs:
+          temporary_id:
+            type: string
+            maxLength: 80
+            pattern: ^#?aw_[A-Za-z0-9_]{3,12}$
+          description:
+            type: string
+            minLength: 1
+            maxLength: 32767
+            pattern: \S
+            sanitize: body
+          issue-type:
+            type: string
+            required: true
+            minLength: 1
+            maxLength: 80
+            pattern: \S
+          project:
+            type: string
+            required: true
+            maxLength: 80
+          summary: &jira-summary
+            type: string
+            required: true
+            minLength: 20
+            maxLength: 255
+            pattern: \S
+            sanitize: title
+        resources:
+          project: projects
+          issue-type: issue-types
         creates:
           resource: issues
           value: /issue-key
           scope: project
           scopePrefix: "-"
           temporaryId: temporary_id
-        credential: rest-writer
-        inputs:
-          temporary_id:
-            maxLength: 80
-            pattern: ^#?aw_[A-Za-z0-9_]{3,12}$
-            type: string
-          description:
-            sanitize: body
-            minLength: 1
-            maxLength: 32767
-            pattern: \S
-            type: string
-          issue-type:
-            maxLength: 80
-            minLength: 1
-            pattern: \S
-            required: true
-            type: string
-          project:
-            maxLength: 80
-            required: true
-            type: string
-          summary:
-            sanitize: title
-            minLength: 20
-            maxLength: 255
-            pattern: \S
-            required: true
-            type: string
-        maxResponseBytes: 16384
-        project:
-          issue-id: /id
-          issue-key: /key
-          url: /self
         request:
+          endpoint: site
+          method: POST
+          path: /rest/api/3/issue
           body:
             fields:
               object:
@@ -552,12 +541,7 @@ connectors:
                       input: project
                 summary:
                   input: summary
-          endpoint: site
-          method: POST
-          path: /rest/api/3/issue
-        resources:
-          project: projects
-          issue-type: issue-types
+        maxResponseBytes: 16384
         responseRequired:
           - /id
           - /key
@@ -566,32 +550,26 @@ connectors:
           /id: string
           /key: string
           /self: string
+        project:
+          issue-id: /id
+          issue-key: /key
+          url: /self
       update-issue:
-        createdResources: &jira-created-issue
-          issue: create-issue
         credential: rest-writer
         inputs:
-          description: &jira-description
-            sanitize: body
-            minLength: 1
-            maxLength: 32767
-            pattern: \S
-            required: true
-            type: string
-          issue: &jira-issue-key
-            maxLength: 80
-            pattern: ^[A-Z][A-Z0-9_]*-[1-9][0-9]*$
-            required: true
-            type: string
-          summary: &jira-summary
-            sanitize: title
-            minLength: 20
-            maxLength: 255
-            pattern: \S
-            required: true
-            type: string
-        maxResponseBytes: 16384
+          description: *jira-description
+          issue: *jira-issue-key
+          summary: *jira-summary
+        resources:
+          issue: issues
+        createdResources: &jira-created-issue
+          issue: create-issue
         request:
+          endpoint: site
+          method: PUT
+          path: /rest/api/3/issue/{issue}
+          pathInputs:
+            issue: issue
           body:
             fields:
               object:
@@ -600,102 +578,120 @@ connectors:
                   input: description
                 summary:
                   input: summary
-          endpoint: site
-          method: PUT
-          path: /rest/api/3/issue/{issue}
-          pathInputs:
-            issue: issue
-        resources:
-          issue: issues
+        maxResponseBytes: 16384
       update-issue-summary:
-        createdResources: *jira-created-issue
         credential: rest-writer
         inputs:
           issue: *jira-issue-key
           summary: *jira-summary
-        maxResponseBytes: 16384
+        resources:
+          issue: issues
+        createdResources: *jira-created-issue
         request:
-          body:
-            fields:
-              object:
-                summary:
-                  input: summary
           endpoint: site
           method: PUT
           path: /rest/api/3/issue/{issue}
           pathInputs:
             issue: issue
-        resources:
-          issue: issues
+          body:
+            fields:
+              object:
+                summary:
+                  input: summary
+        maxResponseBytes: 16384
       update-issue-description:
-        createdResources: *jira-created-issue
         credential: rest-writer
         inputs:
           issue: *jira-issue-key
           description: *jira-description
-        maxResponseBytes: 16384
+        resources:
+          issue: issues
+        createdResources: *jira-created-issue
         request:
+          endpoint: site
+          method: PUT
+          path: /rest/api/3/issue/{issue}
+          pathInputs:
+            issue: issue
           body:
             fields:
               object:
                 description:
                   encoding: jira-adf
                   input: description
-          endpoint: site
-          method: PUT
-          path: /rest/api/3/issue/{issue}
-          pathInputs:
-            issue: issue
-        resources:
-          issue: issues
+        maxResponseBytes: 16384
 import-schema:
   account-queries:
     type: array
-    items: {type: string}
+    items: { type: string }
     default: []
+    description: Exact approved account-search display-name or email prefixes, independently granted from issue JQL.
   discovery-scopes:
     type: array
-    items: {type: string}
+    items: { type: string }
     default: []
+    description: Exact site-metadata grants for the bounded issue-link-type catalog; not OAuth scopes.
   issue-type-ids:
     type: array
-    items: {type: string}
+    items: { type: string }
     default: []
+    description: Exact numeric-string issue-type IDs for read-only field discovery, distinct from write type names.
   rest-reader-secret:
     type: string
     default: JIRA_REST_READ_BASIC_AUTH
+    description: Actions secret containing base64(account-email:unscoped-api-token) for the direct-site REST reader, without the Basic prefix.
   site:
-    default: https://example.atlassian.net
     type: string
+    default: https://example.atlassian.net
+    description: Exact approved Jira Cloud HTTPS site origin; replace the specimen before live use.
   cloud-ids:
-    default: []
     type: array
+    default: []
+    description: Exact approved cloudId strings for hosted Jira MCP methods.
+    items:
+      type: string
   issue-ids:
-    default: []
     type: array
+    default: []
+    description: Exact numeric-string issue IDs for event constraints, not read-tool issue keys.
+    items:
+      type: string
   issues:
-    default: []
     type: array
+    default: []
+    description: Exact approved Jira issue keys for issue retrieval and existing-issue writes.
+    items:
+      type: string
   issue-types:
-    default: [Task]
     type: array
     items:
       type: string
+    default: [ Task ]
+    description: Exact approved issue-type names for creation; Task is a specimen default, not project/type membership.
   projects:
-    default: []
     type: array
+    default: []
+    description: Exact approved project keys for creation, metadata reads and event constraints.
+    items:
+      type: string
   queries:
-    default: []
     type: array
+    default: []
+    description: Exact approved JQL strings; search results are not filtered by the independent issues grant.
+    items:
+      type: string
   mcp-personal-secret:
+    type: string
     default: JIRA_MCP_PERSONAL_BASIC_AUTH
-    type: string
+    description: Actions secret containing the prepared Basic credential for hosted personal MCP; provider policy and tool scopes must permit access.
   mcp-service-account-secret:
+    type: string
     default: JIRA_MCP_SERVICE_ACCOUNT_KEY
-    type: string
+    description: Actions secret containing the hosted MCP service-account bearer credential; not a direct-site REST token.
   rest-writer-secret:
-    default: JIRA_REST_BASIC_AUTH
     type: string
+    default: JIRA_REST_BASIC_AUTH
+    description: Separate Actions secret containing base64(account-email:unscoped-api-token) for direct-site REST writes, without the Basic prefix.
 ---
 
 <!--

@@ -36,12 +36,18 @@ func TestLinearConventionalSecretDefaultsAndOverrides(t *testing.T) {
 	imports = strings.ReplaceAll(imports, "      writer-secret: LINEAR_WRITE_API_KEY\n", "")
 	_, data, _, err := parseLinearConnectorWorkflow(t, imports, "tools:\n  linear: [get-issue]\nsafe-outputs:\n  staged: true\n  linear-add-comment:\n")
 	require.NoError(t, err)
-	require.Equal(t, []string{"LINEAR_API_KEY"}, data.Connectors["linear"].Agent.Secrets())
-	require.Equal(t, []string{"LINEAR_API_KEY"}, data.Connectors["linear"].SafeOutputs.Secrets())
+	require.Equal(t, []string{"LINEAR_READ_API_KEY"}, data.Connectors["linear"].Agent.Secrets())
+	require.Equal(t, []string{"LINEAR_WRITE_API_KEY"}, data.Connectors["linear"].SafeOutputs.Secrets())
 	_, overridden, _, err := parseLinearConnectorWorkflow(t, linearConnectorImport, "tools:\n  linear: [get-issue]\nsafe-outputs:\n  linear-add-comment:\n")
 	require.NoError(t, err)
 	require.Equal(t, []string{"LINEAR_READ_API_KEY"}, overridden.Connectors["linear"].Agent.Secrets())
 	require.Equal(t, []string{"LINEAR_WRITE_API_KEY"}, overridden.Connectors["linear"].SafeOutputs.Secrets())
+	shared := strings.ReplaceAll(linearConnectorImport, "LINEAR_READ_API_KEY", "LINEAR_API_KEY")
+	shared = strings.ReplaceAll(shared, "LINEAR_WRITE_API_KEY", "LINEAR_API_KEY")
+	_, compatible, _, err := parseLinearConnectorWorkflow(t, shared, "tools:\n  linear: [get-issue]\nsafe-outputs:\n  linear-add-comment:\n")
+	require.NoError(t, err)
+	require.Equal(t, []string{"LINEAR_API_KEY"}, compatible.Connectors["linear"].Agent.Secrets())
+	require.Equal(t, []string{"LINEAR_API_KEY"}, compatible.Connectors["linear"].SafeOutputs.Secrets())
 }
 
 func parseLinearConnectorWorkflow(t *testing.T, imports, selection string) (*Compiler, *WorkflowData, string, error) {

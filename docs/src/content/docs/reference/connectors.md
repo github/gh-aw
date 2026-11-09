@@ -99,6 +99,19 @@ and other mutations remain opt-in, not additional advertised tools for these
 selections. Missing or unsupported provider functionality is preferable to a
 generic arbitrary-call proxy.
 
+Reader selectors and callable tool names are separate fields:
+
+| Read selection | Callable reader |
+| --- | --- |
+| `tools.notion: [get-page]` | `get_page` |
+| `tools.jira: [get-issue-remote-links]` | `get-issue-remote-links` |
+| `tools.gitlab: [get-merge-request]` | `gitlab_get_merge_request` |
+
+New REST/GraphQL wrappers use unprefixed snake_case tool names; existing
+hyphenated and provider-prefixed readers remain compatible. Hosted MCP
+methods retain exact native names such as `getJiraIssue`; no automatic name
+conversion is performed.
+
 ### Golden workflows
 
 Each integration includes a manually triggered common-scenario fixture under
@@ -410,7 +423,8 @@ Secrets bootstrap checks engine/system prerequisites only. Its success does
 not mean provider credentials were provisioned or provider access was approved;
 token acquisition, consent, renewal and provider ACLs remain external.
 
-Declared secret names have defaults. Linear GraphQL uses `LINEAR_API_KEY`;
+Declared secret names have defaults. Linear GraphQL reads use
+`LINEAR_READ_API_KEY`, and writes use `LINEAR_WRITE_API_KEY`;
 `with` in workflows and `--input` in these commands override names, never values.
 Supply the selected read credential through the environment for local tests;
 Actions secrets are not automatically available to local processes. Missing
@@ -476,9 +490,11 @@ Declaration: `.github/workflows/connectors/linear.md`.
 
 Create separate personal API keys in Linear **Settings > Security & access**,
 restricted to the required read or write permissions and teams. Store the raw
-key as `LINEAR_API_KEY`, the default secret name for both GraphQL routes.
-Override `reader-secret` and `writer-secret` through `with` to use distinct
-keys such as `LINEAR_READ_API_KEY` and `LINEAR_WRITE_API_KEY`. GraphQL personal keys
+keys as `LINEAR_READ_API_KEY` and `LINEAR_WRITE_API_KEY`, the separate defaults
+for the GraphQL routes. Existing consumers that intentionally share one
+`LINEAR_API_KEY` can preserve that configuration by explicitly binding both
+`reader-secret` and `writer-secret` to `LINEAR_API_KEY` through `with`.
+There is no automatic shared-key fallback. GraphQL personal keys
 use raw Authorization rather than a bearer prefix. For hosted MCP, separately provision
 an authorized bearer token through Linear's supported OAuth or direct-key route and store it as
 `LINEAR_READ_MCP_TOKEN`. Personal-key GraphQL access does not prove hosted MCP

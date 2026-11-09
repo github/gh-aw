@@ -111,7 +111,7 @@ func TestLinearWriteParityProjectlessCreation(t *testing.T) {
 	require.NoError(t, err)
 	calls := 0
 	response := `{"data":{"issueCreate":{"success":true,"issue":{"id":"` + linearParityIssue + `","identifier":"ENG-123","team":{"id":"` + linearParityTeam + `"}}}}}`
-	runtime := parityProviderRuntime(t, "https://api.linear.app", "LINEAR_API_KEY", func(request *http.Request) string {
+	runtime := parityProviderRuntime(t, "https://api.linear.app", "LINEAR_WRITE_API_KEY", func(request *http.Request) string {
 		calls++
 		var document struct {
 			Query     string         `json:"query"`

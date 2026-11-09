@@ -21,207 +21,42 @@ connectors:
       - https://learn.microsoft.com/en-us/rest/api/azure/devops/build/builds/list?view=azure-devops-rest-7.1
       - https://learn.microsoft.com/en-us/rest/api/azure/devops/build/builds/get?view=azure-devops-rest-7.1
       - https://learn.microsoft.com/en-us/azure/devops/service-hooks/events?view=azure-devops
+    endpoints:
+      api: https://dev.azure.com
     credentials:
       agent-reader:
-        header: Authorization
         phase: agent
+        header: Authorization
         scheme: bearer
         scopes:
           - vso.project
         secret: ${{ github.aw.import-inputs.agent-reader-secret }}
       rest-reader:
-        header: Authorization
         phase: agent
+        header: Authorization
         scheme: bearer
         scopes:
           - vso.work
         secret: ${{ github.aw.import-inputs.rest-reader-secret }}
       code-reader:
-        header: Authorization
         phase: agent
+        header: Authorization
         scheme: bearer
-        scopes: [vso.code]
+        scopes: [ vso.code ]
         secret: ${{ github.aw.import-inputs.code-reader-secret }}
       build-reader:
-        header: Authorization
         phase: agent
+        header: Authorization
         scheme: bearer
-        scopes: [vso.build]
+        scopes: [ vso.build ]
         secret: ${{ github.aw.import-inputs.build-reader-secret }}
       writer:
-        header: Authorization
         phase: safe-output
+        header: Authorization
         scheme: bearer
         scopes:
           - vso.work_write
         secret: ${{ github.aw.import-inputs.writer-secret }}
-    endpoints:
-      api: https://dev.azure.com
-    mcp-servers:
-      azure-devops:
-        credential: agent-reader
-        headers:
-          X-MCP-Readonly: "true"
-          X-MCP-Tools: core_list_projects
-        maxResponseBytes: 65536
-        readOnly: true
-        tools:
-          core_list_projects:
-            inputs: {}
-        url: https://mcp.dev.azure.com/${{ github.aw.import-inputs.organization }}
-    triggers:
-      work-item-created:
-        filters: &azure-event-filters
-          collection-id: {path: /resourceContainers/collection/id, type: string}
-          project-id: {path: /resourceContainers/project/id, type: string}
-          state-from: {path: /resource/fields/System.State/oldValue, type: string}
-          state-to: {path: /resource/fields/System.State/newValue, type: string}
-          tags-from: {path: /resource/fields/System.Tags/oldValue, type: string}
-          tags-to: {path: /resource/fields/System.Tags/newValue, type: string}
-        resourceOrigins:
-          - https://dev.azure.com
-          - https://${{ github.aw.import-inputs.organization }}.visualstudio.com
-        match:
-          /eventType: workitem.created
-          /resourceContainers/collection/id: ${{ github.aw.import-inputs.collection }}
-          /resourceContainers/project/id: ${{ github.aw.import-inputs.project }}
-        nativeEvents:
-          - workitem.created
-        types:
-          /resource/id: integer
-        normalize:
-          collection: /resourceContainers/collection/id
-          project: /resourceContainers/project/id
-          subject: /resource/id
-        resources:
-          /resource/id: work-items
-          /resourceContainers/collection/id: collections
-          /resourceContainers/project/id: projects
-        verificationProfile: dev.azure.com/configured-https-auth
-      work-item-deleted:
-        filters: *azure-event-filters
-        resourceOrigins:
-          - https://dev.azure.com
-          - https://${{ github.aw.import-inputs.organization }}.visualstudio.com
-        match:
-          /eventType: workitem.deleted
-          /resourceContainers/collection/id: ${{ github.aw.import-inputs.collection }}
-          /resourceContainers/project/id: ${{ github.aw.import-inputs.project }}
-        nativeEvents:
-          - workitem.deleted
-        types:
-          /resource/id: integer
-        normalize:
-          collection: /resourceContainers/collection/id
-          project: /resourceContainers/project/id
-          subject: /resource/id
-        resources:
-          /resource/id: work-items
-          /resourceContainers/collection/id: collections
-          /resourceContainers/project/id: projects
-        verificationProfile: dev.azure.com/configured-https-auth
-      work-item-restored:
-        filters: *azure-event-filters
-        resourceOrigins:
-          - https://dev.azure.com
-          - https://${{ github.aw.import-inputs.organization }}.visualstudio.com
-        match:
-          /eventType: workitem.restored
-          /resourceContainers/collection/id: ${{ github.aw.import-inputs.collection }}
-          /resourceContainers/project/id: ${{ github.aw.import-inputs.project }}
-        nativeEvents:
-          - workitem.restored
-        types:
-          /resource/id: integer
-        normalize:
-          collection: /resourceContainers/collection/id
-          project: /resourceContainers/project/id
-          subject: /resource/id
-        resources:
-          /resource/id: work-items
-          /resourceContainers/collection/id: collections
-          /resourceContainers/project/id: projects
-        verificationProfile: dev.azure.com/configured-https-auth
-      work-item-updated: &azure-work-item-updated
-        filters: *azure-event-filters
-        resourceOrigins:
-          - https://dev.azure.com
-          - https://${{ github.aw.import-inputs.organization }}.visualstudio.com
-        match:
-          /eventType: workitem.updated
-          /resourceContainers/collection/id: ${{ github.aw.import-inputs.collection }}
-          /resourceContainers/project/id: ${{ github.aw.import-inputs.project }}
-        nativeEvents:
-          - workitem.updated
-        types:
-          /resource/workItemId: integer
-        normalize:
-          collection: /resourceContainers/collection/id
-          project: /resourceContainers/project/id
-          subject: /resource/workItemId
-        resources:
-          /resource/workItemId: work-items
-          /resourceContainers/collection/id: collections
-          /resourceContainers/project/id: projects
-        verificationProfile: dev.azure.com/configured-https-auth
-        variants:
-          - when:
-              all:
-                - {path: /resource/workItemId, op: present}
-                - any:
-                    - {path: /resourceVersion, op: absent}
-                    - {path: /resourceVersion, op: equals, value: "1.0"}
-            normalize:
-              collection: /resourceContainers/collection/id
-              project: /resourceContainers/project/id
-              subject: /resource/workItemId
-            resources:
-              /resource/workItemId: work-items
-              /resourceContainers/collection/id: collections
-              /resourceContainers/project/id: projects
-            types: {/resource/workItemId: integer}
-          - when:
-              all:
-                - {path: /resourceVersion, op: equals, value: "1.0"}
-                - {path: /resource/workItemId, op: absent}
-                - {path: /resource/revision, op: absent}
-            normalize:
-              collection: /resourceContainers/collection/id
-              project: /resourceContainers/project/id
-              subject: /resource/id
-            resources:
-              /resource/id: work-items
-              /resourceContainers/collection/id: collections
-              /resourceContainers/project/id: projects
-            types: {/resource/id: integer}
-      work-item-closed:
-        <<: *azure-work-item-updated
-        when:
-          path: /resource/fields/System.State/newValue
-          other: /resource/fields/System.State/oldValue
-          op: enters
-          values: ${{ github.aw.import-inputs.closed-states }}
-      work-item-reopened:
-        <<: *azure-work-item-updated
-        when:
-          path: /resource/fields/System.State/newValue
-          other: /resource/fields/System.State/oldValue
-          op: leaves
-          values: ${{ github.aw.import-inputs.closed-states }}
-      work-item-labeled:
-        <<: *azure-work-item-updated
-        when:
-          path: /resource/fields/System.Tags/newValue
-          other: /resource/fields/System.Tags/oldValue
-          op: set-added
-          separator: ";"
-      work-item-unlabeled:
-        <<: *azure-work-item-updated
-        when:
-          path: /resource/fields/System.Tags/newValue
-          other: /resource/fields/System.Tags/oldValue
-          op: set-removed
-          separator: ";"
     resources:
       attachments: ${{ github.aw.import-inputs.attachment-ids }}
       assignees:
@@ -257,25 +92,179 @@ connectors:
       read-pull-requests: ${{ github.aw.import-inputs.read-pull-request-ids }}
       read-pipelines: ${{ github.aw.import-inputs.read-pipeline-ids }}
       read-runs: ${{ github.aw.import-inputs.read-run-ids }}
+    triggers:
+      work-item-created:
+        verificationProfile: dev.azure.com/configured-https-auth
+        nativeEvents:
+          - workitem.created
+        resourceOrigins:
+          - https://dev.azure.com
+          - https://${{ github.aw.import-inputs.organization }}.visualstudio.com
+        match:
+          /eventType: workitem.created
+          /resourceContainers/collection/id: ${{ github.aw.import-inputs.collection }}
+          /resourceContainers/project/id: ${{ github.aw.import-inputs.project }}
+        types:
+          /resource/id: integer
+        resources:
+          /resource/id: work-items
+          /resourceContainers/collection/id: collections
+          /resourceContainers/project/id: projects
+        normalize:
+          collection: /resourceContainers/collection/id
+          project: /resourceContainers/project/id
+          subject: /resource/id
+        filters: &azure-event-filters
+          collection-id: { path: /resourceContainers/collection/id, type: string }
+          project-id: { path: /resourceContainers/project/id, type: string }
+          state-from: { path: /resource/fields/System.State/oldValue, type: string }
+          state-to: { path: /resource/fields/System.State/newValue, type: string }
+          tags-from: { path: /resource/fields/System.Tags/oldValue, type: string }
+          tags-to: { path: /resource/fields/System.Tags/newValue, type: string }
+      work-item-deleted:
+        verificationProfile: dev.azure.com/configured-https-auth
+        nativeEvents:
+          - workitem.deleted
+        resourceOrigins:
+          - https://dev.azure.com
+          - https://${{ github.aw.import-inputs.organization }}.visualstudio.com
+        match:
+          /eventType: workitem.deleted
+          /resourceContainers/collection/id: ${{ github.aw.import-inputs.collection }}
+          /resourceContainers/project/id: ${{ github.aw.import-inputs.project }}
+        types:
+          /resource/id: integer
+        resources:
+          /resource/id: work-items
+          /resourceContainers/collection/id: collections
+          /resourceContainers/project/id: projects
+        normalize:
+          collection: /resourceContainers/collection/id
+          project: /resourceContainers/project/id
+          subject: /resource/id
+        filters: *azure-event-filters
+      work-item-restored:
+        verificationProfile: dev.azure.com/configured-https-auth
+        nativeEvents:
+          - workitem.restored
+        resourceOrigins:
+          - https://dev.azure.com
+          - https://${{ github.aw.import-inputs.organization }}.visualstudio.com
+        match:
+          /eventType: workitem.restored
+          /resourceContainers/collection/id: ${{ github.aw.import-inputs.collection }}
+          /resourceContainers/project/id: ${{ github.aw.import-inputs.project }}
+        types:
+          /resource/id: integer
+        resources:
+          /resource/id: work-items
+          /resourceContainers/collection/id: collections
+          /resourceContainers/project/id: projects
+        normalize:
+          collection: /resourceContainers/collection/id
+          project: /resourceContainers/project/id
+          subject: /resource/id
+        filters: *azure-event-filters
+      work-item-updated: &azure-work-item-updated
+        verificationProfile: dev.azure.com/configured-https-auth
+        nativeEvents:
+          - workitem.updated
+        resourceOrigins:
+          - https://dev.azure.com
+          - https://${{ github.aw.import-inputs.organization }}.visualstudio.com
+        match:
+          /eventType: workitem.updated
+          /resourceContainers/collection/id: ${{ github.aw.import-inputs.collection }}
+          /resourceContainers/project/id: ${{ github.aw.import-inputs.project }}
+        types:
+          /resource/workItemId: integer
+        resources:
+          /resource/workItemId: work-items
+          /resourceContainers/collection/id: collections
+          /resourceContainers/project/id: projects
+        normalize:
+          collection: /resourceContainers/collection/id
+          project: /resourceContainers/project/id
+          subject: /resource/workItemId
+        filters: *azure-event-filters
+        variants:
+          - when:
+              all:
+                - { path: /resource/workItemId, op: present }
+                - any:
+                    - { path: /resourceVersion, op: absent }
+                    - { path: /resourceVersion, op: equals, value: "1.0" }
+            normalize:
+              collection: /resourceContainers/collection/id
+              project: /resourceContainers/project/id
+              subject: /resource/workItemId
+            resources:
+              /resource/workItemId: work-items
+              /resourceContainers/collection/id: collections
+              /resourceContainers/project/id: projects
+            types: { /resource/workItemId: integer }
+          - when:
+              all:
+                - { path: /resourceVersion, op: equals, value: "1.0" }
+                - { path: /resource/workItemId, op: absent }
+                - { path: /resource/revision, op: absent }
+            normalize:
+              collection: /resourceContainers/collection/id
+              project: /resourceContainers/project/id
+              subject: /resource/id
+            resources:
+              /resource/id: work-items
+              /resourceContainers/collection/id: collections
+              /resourceContainers/project/id: projects
+            types: { /resource/id: integer }
+      work-item-closed:
+        <<: *azure-work-item-updated
+        when:
+          path: /resource/fields/System.State/newValue
+          other: /resource/fields/System.State/oldValue
+          op: enters
+          values: ${{ github.aw.import-inputs.closed-states }}
+      work-item-reopened:
+        <<: *azure-work-item-updated
+        when:
+          path: /resource/fields/System.State/newValue
+          other: /resource/fields/System.State/oldValue
+          op: leaves
+          values: ${{ github.aw.import-inputs.closed-states }}
+      work-item-labeled:
+        <<: *azure-work-item-updated
+        when:
+          path: /resource/fields/System.Tags/newValue
+          other: /resource/fields/System.Tags/oldValue
+          op: set-added
+          separator: ";"
+      work-item-unlabeled:
+        <<: *azure-work-item-updated
+        when:
+          path: /resource/fields/System.Tags/newValue
+          other: /resource/fields/System.Tags/oldValue
+          op: set-removed
+          separator: ";"
     tools:
       get-work-item-description:
+        tool: get_work_item_description
         credential: rest-reader
         inputs:
           organization: &azure-rich-organization
+            type: string
+            required: true
             maxLength: 64
             pattern: ^[A-Za-z0-9][A-Za-z0-9-]*$
-            required: true
-            type: string
           project: &azure-rich-project
+            type: string
+            required: true
             maxLength: 36
             pattern: ^[0-9a-f-]{36}$
-            required: true
-            type: string
           work-item: &azure-rich-item
+            type: string
+            required: true
             maxLength: 16
             pattern: ^[1-9][0-9]{0,9}$
-            required: true
-            type: string
         resources: &azure-rich-item-resources
           organization: organizations
           project: projects
@@ -297,23 +286,23 @@ connectors:
         responseRequired: &azure-rich-item-evidence
           - /id
           - /fields/System.TeamProject
-        responseResourceInputs: &azure-rich-item-correlation
-          /id: work-item
-        responseResources: &azure-rich-item-response-resources
-          /id: work-items
-          /fields/System.TeamProject: project-names
         responseTypes:
           /id: integer
           /fields/System.Title: string
           /fields/System.State: string
           /fields/System.Description: string
+        responseResourceInputs: &azure-rich-item-correlation
+          /id: work-item
+        responseResources: &azure-rich-item-response-resources
+          /id: work-items
+          /fields/System.TeamProject: project-names
         project:
           work-item: /id
           title: /fields/System.Title
           state: /fields/System.State
           body: /fields/System.Description
-        tool: get_work_item_description
       get-bug-repro-steps:
+        tool: get_bug_repro_steps
         credential: rest-reader
         inputs:
           organization: *azure-rich-organization
@@ -332,20 +321,20 @@ connectors:
               literal: System.TeamProject,System.Title,System.State,Microsoft.VSTS.TCM.ReproSteps
         maxResponseBytes: 131072
         responseRequired: *azure-rich-item-evidence
-        responseResourceInputs: *azure-rich-item-correlation
-        responseResources: *azure-rich-item-response-resources
         responseTypes:
           /id: integer
           /fields/System.Title: string
           /fields/System.State: string
           /fields/Microsoft.VSTS.TCM.ReproSteps: string
+        responseResourceInputs: *azure-rich-item-correlation
+        responseResources: *azure-rich-item-response-resources
         project:
           work-item: /id
           title: /fields/System.Title
           state: /fields/System.State
           body: /fields/Microsoft.VSTS.TCM.ReproSteps
-        tool: get_bug_repro_steps
       get-work-item:
+        tool: get_work_item
         credential: rest-reader
         inputs:
           organization: *azure-rich-organization
@@ -361,31 +350,27 @@ connectors:
           path: /{organization}/{project}/_apis/wit/workitems/{work-item}
           pathInputs: *azure-rich-item-path-inputs
           query:
-            api-version: {literal: "7.1"}
+            api-version: { literal: "7.1" }
             fields:
               literal: System.TeamProject,System.Title,System.State,System.WorkItemType,System.AssignedTo,System.AreaPath,System.IterationPath,System.Tags,System.Description,Microsoft.VSTS.TCM.ReproSteps
         maxResponseBytes: 262144
         responseRequired: *azure-rich-item-evidence
+        responseTypes: { /id: integer, /rev: integer }
         responseResourceInputs: *azure-rich-item-correlation
         responseResources:
           /id: read-work-items
           /fields/System.TeamProject: project-names
-        responseTypes: {/id: integer, /rev: integer}
         project:
           work-item: /id
           revision: /rev
           fields: /fields
-        tool: get_work_item
       run-work-item-query:
+        tool: run_work_item_query
         credential: rest-reader
         inputs:
           organization: *azure-rich-organization
           project: *azure-rich-project
-          query-id: &azure-reader-uuid
-            type: string
-            required: true
-            maxLength: 36
-            pattern: ^[0-9a-f-]{36}$
+          query-id: *azure-rich-project
           first: &azure-reader-first
             type: integer
             required: true
@@ -404,22 +389,22 @@ connectors:
             project: project
             query-id: query-id
           query:
-            api-version: {literal: "7.1"}
-            $top: {input: first}
+            api-version: { literal: "7.1" }
+            $top: { input: first }
         maxResponseBytes: 131072
-        responseChecks: {/queryType: flat}
-        responseLimits: {/workItems: 100, /columns: 32}
-        responseResources: {/workItems/*/id: read-work-items}
+        responseChecks: { /queryType: flat }
+        responseResources: { /workItems/*/id: read-work-items }
+        responseLimits: { /workItems: 100, /columns: 32 }
         project:
           work-items: /workItems
           as-of: /asOf
-        tool: run_work_item_query
       get-repository:
+        tool: get_repository
         credential: code-reader
         inputs: &azure-reader-repository-inputs
           organization: *azure-rich-organization
           project: *azure-rich-project
-          repository-id: *azure-reader-uuid
+          repository-id: *azure-rich-project
         resources: &azure-reader-repository-resources
           organization: organizations
           project: projects
@@ -433,29 +418,29 @@ connectors:
             project: project
             repository-id: repository-id
           query:
-            api-version: {literal: "7.1"}
+            api-version: { literal: "7.1" }
         maxResponseBytes: 65536
+        responseTypes: { /id: string, /name: string }
         responseInputs:
           /id: repository-id
           /project/id: project
         responseResources:
           /id: read-repositories
           /project/id: projects
-        responseTypes: {/id: string, /name: string}
         project:
           repository-id: /id
           project-id: /project/id
           name: /name
-        tool: get_repository
       get-repository-file:
+        tool: get_repository_file
         credential: code-reader
         inputs:
           <<: *azure-reader-repository-inputs
           path:
             type: string
             required: true
-            maxLength: 1024
             minLength: 2
+            maxLength: 1024
             pattern: ^/[^\\\r\n]+$
           commit:
             type: string
@@ -472,30 +457,30 @@ connectors:
           path: /{organization}/{project}/_apis/git/repositories/{repository-id}/items
           pathInputs: *azure-reader-repository-path
           query:
-            api-version: {literal: "7.1"}
-            path: {input: path}
-            versionDescriptor.version: {input: commit}
-            versionDescriptor.versionType: {literal: commit}
-            versionDescriptor.versionOptions: {literal: none}
-            includeContent: {literal: true}
-            includeContentMetadata: {literal: true}
-            resolveLfs: {literal: false}
-            download: {literal: false}
-            $format: {literal: json}
+            api-version: { literal: "7.1" }
+            path: { input: path }
+            versionDescriptor.version: { input: commit }
+            versionDescriptor.versionType: { literal: commit }
+            versionDescriptor.versionOptions: { literal: none }
+            includeContent: { literal: true }
+            includeContentMetadata: { literal: true }
+            resolveLfs: { literal: false }
+            download: { literal: false }
+            $format: { literal: json }
         maxResponseBytes: 262144
+        responseChecks: { /gitObjectType: blob, /contentMetadata/isBinary: false }
+        responseTypes: { /content: string, /objectId: string }
         responseInputs:
           /path: path
           /commitId: commit
-        responseChecks: {/gitObjectType: blob, /contentMetadata/isBinary: false}
-        responseTypes: {/content: string, /objectId: string}
         project:
           path: /path
           commit: /commitId
           object-id: /objectId
           content: /content
           content-metadata: /contentMetadata
-        tool: get_repository_file
       list-pull-requests:
+        tool: list_pull_requests
         credential: code-reader
         inputs:
           <<: *azure-reader-repository-inputs
@@ -508,7 +493,7 @@ connectors:
             type: string
             required: true
             maxLength: 16
-            enum: [active, completed, abandoned, all]
+            enum: [ active, completed, abandoned, all ]
           first: *azure-reader-first
           skip:
             type: integer
@@ -524,22 +509,22 @@ connectors:
           path: /{organization}/{project}/_apis/git/repositories/{repository-id}/pullrequests
           pathInputs: *azure-reader-repository-path
           query:
-            api-version: {literal: "7.1"}
-            searchCriteria.targetRefName: {input: target-ref}
-            searchCriteria.status: {input: status}
-            $top: {input: first}
-            $skip: {input: skip}
+            api-version: { literal: "7.1" }
+            searchCriteria.targetRefName: { input: target-ref }
+            searchCriteria.status: { input: status }
+            $top: { input: first }
+            $skip: { input: skip }
         maxResponseBytes: 262144
-        responseLimits: {/value: 100}
         responseInputs:
           /value/*/repository/id: repository-id
           /value/*/repository/project/id: project
           /value/*/targetRefName: target-ref
         responseResources:
           /value/*/pullRequestId: read-pull-requests
-        project: {pull-requests: /value}
-        tool: list_pull_requests
+        responseLimits: { /value: 100 }
+        project: { pull-requests: /value }
       get-pull-request:
+        tool: get_pull_request
         credential: code-reader
         inputs:
           <<: *azure-reader-repository-inputs
@@ -557,18 +542,18 @@ connectors:
             <<: *azure-reader-repository-path
             pull-request-id: pull-request-id
           query:
-            api-version: {literal: "7.1"}
-            includeCommits: {literal: false}
-            includeWorkItemRefs: {literal: false}
+            api-version: { literal: "7.1" }
+            includeCommits: { literal: false }
+            includeWorkItemRefs: { literal: false }
         maxResponseBytes: 262144
-        responseResourceInputs: {/pullRequestId: pull-request-id}
+        responseTypes: { /pullRequestId: integer, /title: string, /status: string }
         responseInputs:
           /repository/id: repository-id
           /repository/project/id: project
           /targetRefName: target-ref
-        responseTypes: {/pullRequestId: integer, /title: string, /status: string}
-        tool: get_pull_request
+        responseResourceInputs: { /pullRequestId: pull-request-id }
       list-pipeline-definitions:
+        tool: list_pipeline_definitions
         credential: build-reader
         inputs:
           organization: *azure-rich-organization
@@ -576,8 +561,8 @@ connectors:
           first: *azure-reader-first
           continuation-token: &azure-reader-continuation-token
             type: string
-            maxLength: 512
             minLength: 1
+            maxLength: 512
         resources:
           organization: organizations
           project: projects
@@ -589,18 +574,18 @@ connectors:
             organization: organization
             project: project
           query:
-            api-version: {literal: "7.1"}
-            $top: {input: first}
-            continuationToken: {input: continuation-token}
-            includeAllProperties: {literal: false}
-            includeLatestBuilds: {literal: false}
+            api-version: { literal: "7.1" }
+            $top: { input: first }
+            continuationToken: { input: continuation-token }
+            includeAllProperties: { literal: false }
+            includeLatestBuilds: { literal: false }
         maxResponseBytes: 262144
-        responseLimits: {/value: 100}
-        responseInputs: {/value/*/project/id: project}
-        responseResources: {/value/*/id: read-pipelines}
-        project: {pipelines: /value}
-        tool: list_pipeline_definitions
+        responseInputs: { /value/*/project/id: project }
+        responseResources: { /value/*/id: read-pipelines }
+        responseLimits: { /value: 100 }
+        project: { pipelines: /value }
       get-pipeline-definition:
+        tool: get_pipeline_definition
         credential: build-reader
         inputs:
           <<: *azure-reader-repository-inputs
@@ -616,14 +601,14 @@ connectors:
             <<: *azure-reader-project-path
             pipeline-id: pipeline-id
           query:
-            api-version: {literal: "7.1"}
-            includeLatestBuilds: {literal: false}
+            api-version: { literal: "7.1" }
+            includeLatestBuilds: { literal: false }
         maxResponseBytes: 262144
-        responseResourceInputs: {/id: pipeline-id}
+        responseTypes: { /id: integer, /name: string }
         responseInputs:
           /project/id: project
           /repository/id: repository-id
-        responseTypes: {/id: integer, /name: string}
+        responseResourceInputs: { /id: pipeline-id }
         project:
           pipeline-id: /id
           name: /name
@@ -631,8 +616,8 @@ connectors:
           path: /path
           repository: /repository
           process: /process
-        tool: get_pipeline_definition
       list-pipeline-runs:
+        tool: list_pipeline_runs
         credential: build-reader
         inputs:
           <<: *azure-reader-repository-inputs
@@ -648,14 +633,13 @@ connectors:
           path: /{organization}/{project}/_apis/build/builds
           pathInputs: *azure-reader-project-path
           query:
-            api-version: {literal: "7.1"}
-            repositoryId: {input: repository-id}
-            repositoryType: {literal: TfsGit}
-            branchName: {input: source-ref}
-            $top: {input: first}
-            continuationToken: {input: continuation-token}
+            api-version: { literal: "7.1" }
+            repositoryId: { input: repository-id }
+            repositoryType: { literal: TfsGit }
+            branchName: { input: source-ref }
+            $top: { input: first }
+            continuationToken: { input: continuation-token }
         maxResponseBytes: 262144
-        responseLimits: {/value: 100}
         responseInputs:
           /value/*/project/id: project
           /value/*/repository/id: repository-id
@@ -663,9 +647,10 @@ connectors:
         responseResources:
           /value/*/id: read-runs
           /value/*/definition/id: read-pipelines
-        project: {runs: /value}
-        tool: list_pipeline_runs
+        responseLimits: { /value: 100 }
+        project: { runs: /value }
       get-pipeline-run:
+        tool: get_pipeline_run
         credential: build-reader
         inputs:
           <<: *azure-reader-repository-inputs
@@ -685,54 +670,57 @@ connectors:
             <<: *azure-reader-project-path
             run-id: run-id
           query:
-            api-version: {literal: "7.1"}
+            api-version: { literal: "7.1" }
         maxResponseBytes: 262144
-        responseResourceInputs:
-          /id: run-id
-          /definition/id: pipeline-id
+        responseTypes: { /id: integer, /status: string }
         responseInputs:
           /project/id: project
           /repository/id: repository-id
           /sourceBranch: source-ref
-        responseTypes: {/id: integer, /status: string}
-        tool: get_pipeline_run
+        responseResourceInputs:
+          /id: run-id
+          /definition/id: pipeline-id
+    mcp-servers:
+      azure-devops:
+        url: https://mcp.dev.azure.com/${{ github.aw.import-inputs.organization }}
+        credential: agent-reader
+        readOnly: true
+        headers:
+          X-MCP-Readonly: "true"
+          X-MCP-Tools: core_list_projects
+        tools:
+          core_list_projects:
+            inputs: {}
+        maxResponseBytes: 65536
     safe-outputs:
       upload-attachment:
         credential: writer
-        creates:
-          resource: attachments
-          value: /attachment-id
-          scope: project
-          temporaryId: temporary_id
         inputs:
-          organization: &azure-attachment-organization
-            type: string
-            required: true
-            maxLength: 64
-            pattern: ^[A-Za-z0-9][A-Za-z0-9-]*$
-          project: &azure-attachment-project
-            type: string
-            required: true
-            maxLength: 36
-            pattern: ^[0-9a-f-]{36}$
+          organization: *azure-rich-organization
+          project: *azure-rich-project
           file:
             type: string
             required: true
-            maxLength: 1024
             minLength: 1
+            maxLength: 1024
           file-name:
             type: string
             required: true
-            maxLength: 255
             minLength: 1
+            maxLength: 255
             pattern: ^[^/\\\r\n\t]+$
-          temporary_id:
+          temporary_id: &azure-work-item-temporary-id
             type: string
             maxLength: 80
             pattern: ^#?aw_[A-Za-z0-9_]{3,12}$
         resources:
           organization: organizations
           project: projects
+        creates:
+          resource: attachments
+          value: /attachment-id
+          scope: project
+          temporaryId: temporary_id
         request:
           endpoint: api
           method: POST
@@ -741,39 +729,36 @@ connectors:
             organization: organization
             project: project
           query:
-            api-version: {literal: "7.1"}
-            fileName: {input: file-name}
+            api-version: { literal: "7.1" }
+            fileName: { input: file-name }
           binary:
             input: file
             maxBytes: ${{ github.aw.import-inputs.attachment-max-bytes }}
             extensions: ${{ github.aw.import-inputs.attachment-extensions }}
-            rejectContains: ["##vso["]
+            rejectContains: [ "##vso[" ]
         maxResponseBytes: 16384
-        responseRequired: [/id, /url]
-        responseTypes: {/id: string, /url: string}
+        responseRequired: [ /id, /url ]
+        responseTypes: { /id: string, /url: string }
         responseWhen:
           any:
             - path: /url
               other: /id
               op: url-id
               value: https://dev.azure.com/${{ github.aw.import-inputs.organization }}/_apis/wit/attachments/
-              values: [fileName]
+              values: [ fileName ]
             - path: /url
               other: /id
               op: url-id
               value: https://dev.azure.com/${{ github.aw.import-inputs.organization }}/${{ github.aw.import-inputs.project }}/_apis/wit/attachments/
-              values: [fileName]
+              values: [ fileName ]
         project:
           attachment-id: /id
           attachment-url: /url
       attach-file-to-work-item:
         credential: writer
-        createdResources:
-          work-item: ${{ github.aw.import-inputs.work-item-creator }}
-          attachment-id: upload-attachment
         inputs:
-          organization: *azure-attachment-organization
-          project: *azure-attachment-project
+          organization: *azure-rich-organization
+          project: *azure-rich-project
           work-item: *azure-rich-item
           attachment-id:
             type: string
@@ -783,15 +768,18 @@ connectors:
           comment:
             type: string
             required: true
-            sanitize: body
             minLength: 1
             maxLength: 1024
+            sanitize: body
         resources:
           organization: organizations
           project: projects
           work-item: work-items
           attachment-id: attachments
         checks: ${{ github.aw.import-inputs.write-checks }}
+        createdResources:
+          work-item: ${{ github.aw.import-inputs.work-item-creator }}
+          attachment-id: upload-attachment
         request:
           endpoint: api
           method: PATCH
@@ -801,60 +789,47 @@ connectors:
             project: project
             work-item: work-item
           query:
-            api-version: {literal: "7.1"}
+            api-version: { literal: "7.1" }
           patch:
             - op: add
               path: /relations/-
               value:
                 object:
-                  rel: {literal: AttachedFile}
+                  rel: { literal: AttachedFile }
                   url:
                     input: attachment-id
                     prefix: https://dev.azure.com/${{ github.aw.import-inputs.organization }}/_apis/wit/attachments/
                   attributes:
                     object:
-                      comment: {input: comment}
+                      comment: { input: comment }
         maxResponseBytes: 65536
-        responseRequired: [/id, /fields/System.TeamProject]
-        responseTypes: {/id: integer}
-        responseResourceInputs: {/id: work-item}
+        responseRequired: [ /id, /fields/System.TeamProject ]
+        responseTypes: { /id: integer }
+        responseResourceInputs: { /id: work-item }
         responseResources:
           /id: work-items
           /fields/System.TeamProject: project-names
       assign-work-item:
         credential: writer
+        inputs:
+          assignee:
+            type: string
+            required: true
+            maxLength: 256
+          organization: *azure-rich-organization
+          project: *azure-rich-project
+          work-item: *azure-rich-item
+        resources:
+          assignee: assignees
+          organization: organizations
+          project: projects
+          work-item: work-items
         checks: ${{ github.aw.import-inputs.write-checks }}
         createdResources: &azure-work-item-created-resources
           work-item: ${{ github.aw.import-inputs.work-item-creator }}
-        inputs:
-          assignee:
-            maxLength: 256
-            required: true
-            type: string
-          organization:
-            maxLength: 64
-            pattern: ^[A-Za-z0-9][A-Za-z0-9-]*$
-            required: true
-            type: string
-          project:
-            maxLength: 36
-            pattern: ^[0-9a-f-]{36}$
-            required: true
-            type: string
-          work-item:
-            maxLength: 16
-            pattern: ^[1-9][0-9]{0,9}$
-            required: true
-            type: string
-        maxResponseBytes: 65536
         request:
           endpoint: api
           method: PATCH
-          patch:
-            - op: add
-              path: /fields/System.AssignedTo
-              value:
-                input: assignee
           path: /{organization}/{project}/_apis/wit/workitems/{work-item}
           pathInputs:
             organization: organization
@@ -863,54 +838,41 @@ connectors:
           query:
             api-version:
               literal: "7.1"
-        resources:
-          assignee: assignees
-          organization: organizations
-          project: projects
-          work-item: work-items
+          patch:
+            - op: add
+              path: /fields/System.AssignedTo
+              value:
+                input: assignee
+        maxResponseBytes: 65536
         responseRequired:
           - /id
           - /fields/System.TeamProject
+        responseTypes:
+          /id: integer
         responseResourceInputs:
           /id: work-item
         responseResources:
           /id: work-items
           /fields/System.TeamProject: project-names
-        responseTypes:
-          /id: integer
       comment-on-work-item:
         credential: writer
-        checks: ${{ github.aw.import-inputs.write-checks }}
-        createdResources: *azure-work-item-created-resources
         inputs:
-          organization:
-            maxLength: 64
-            pattern: ^[A-Za-z0-9][A-Za-z0-9-]*$
-            required: true
+          organization: *azure-rich-organization
+          project: *azure-rich-project
+          text: &azure-devops-input-text
             type: string
-          project:
-            maxLength: 36
-            pattern: ^[0-9a-f-]{36}$
             required: true
-            type: string
-          text:
-            sanitize: body
             minLength: 1
             maxLength: 4000
-            required: true
-            type: string
-          work-item:
-            maxLength: 16
-            pattern: ^[1-9][0-9]{0,9}$
-            required: true
-            type: string
-        maxResponseBytes: 65536
-        project:
-          work-item: /workItemId
+            sanitize: body
+          work-item: *azure-rich-item
+        resources:
+          organization: organizations
+          project: projects
+          work-item: work-items
+        checks: ${{ github.aw.import-inputs.write-checks }}
+        createdResources: *azure-work-item-created-resources
         request:
-          body:
-            text:
-              input: text
           endpoint: api
           method: POST
           path: /{organization}/{project}/_apis/wit/workItems/{work-item}/comments
@@ -923,59 +885,44 @@ connectors:
               literal: 7.1-preview.4
             format:
               literal: markdown
-        resources:
-          organization: organizations
-          project: projects
-          work-item: work-items
+          body:
+            text:
+              input: text
+        maxResponseBytes: 65536
         responseRequired:
           - /workItemId
+        responseTypes:
+          /workItemId: integer
         responseResourceInputs:
           /workItemId: work-item
         responseResources:
           /workItemId: work-items
-        responseTypes:
-          /workItemId: integer
+        project:
+          work-item: /workItemId
       create-work-item:
         credential: writer
+        inputs:
+          temporary_id: *azure-work-item-temporary-id
+          organization: *azure-rich-organization
+          project: *azure-rich-project
+          title: &azure-rich-title
+            type: string
+            required: true
+            minLength: 20
+            maxLength: 256
+            sanitize: title
+        resources:
+          organization: organizations
+          project: projects
         creates: &azure-work-item-creates
           resource: work-items
           value: /work-item
           scope: project
           temporaryId: temporary_id
           valueType: integer
-        inputs:
-          temporary_id: &azure-work-item-temporary-id
-            type: string
-            maxLength: 80
-            pattern: ^#?aw_[A-Za-z0-9_]{3,12}$
-          organization:
-            maxLength: 64
-            pattern: ^[A-Za-z0-9][A-Za-z0-9-]*$
-            required: true
-            type: string
-          project:
-            maxLength: 36
-            pattern: ^[0-9a-f-]{36}$
-            required: true
-            type: string
-          title:
-            sanitize: title
-            minLength: 20
-            maxLength: 256
-            required: true
-            type: string
-        maxResponseBytes: 65536
-        project:
-          work-item: /id
         request:
           endpoint: api
           method: POST
-          additionalPatch: ${{ github.aw.import-inputs.create-additional-patch }}
-          patch:
-            - op: add
-              path: /fields/System.Title
-              value:
-                input: title
           path: /{organization}/{project}/_apis/wit/workitems/$Task
           pathInputs:
             organization: organization
@@ -983,42 +930,59 @@ connectors:
           query:
             api-version:
               literal: "7.1"
-        resources:
-          organization: organizations
-          project: projects
+          patch:
+            - op: add
+              path: /fields/System.Title
+              value:
+                input: title
+          additionalPatch: ${{ github.aw.import-inputs.create-additional-patch }}
+        maxResponseBytes: 65536
         responseRequired:
           - /id
           - /fields/System.TeamProject
-        responseResources:
-          /fields/System.TeamProject: project-names
         responseTypes:
           /id: integer
+        responseResources:
+          /fields/System.TeamProject: project-names
+        project:
+          work-item: /id
       link-work-items:
         credential: writer
         inputs:
           organization:
+            type: string
+            required: true
+            maxLength: 64
             enum:
               - ${{ github.aw.import-inputs.organization }}
-            maxLength: 64
-            required: true
-            type: string
           project:
+            type: string
+            required: true
+            maxLength: 36
             enum:
               - ${{ github.aw.import-inputs.project }}
-            maxLength: 36
-            required: true
-            type: string
           work-item:
+            type: string
+            required: true
+            maxLength: 10
             enum:
               - "${{ github.aw.import-inputs.work-item }}"
-            maxLength: 10
             pattern: ^[1-9][0-9]{0,9}$
-            required: true
-            type: string
-        maxResponseBytes: 65536
+        resources:
+          organization: organizations
+          project: projects
+          work-item: work-items
         request:
           endpoint: api
           method: PATCH
+          path: /{organization}/{project}/_apis/wit/workitems/{work-item}
+          pathInputs:
+            organization: organization
+            project: project
+            work-item: work-item
+          query:
+            api-version:
+              literal: "7.1"
           patch:
             - op: add
               path: /relations/-
@@ -1026,6 +990,33 @@ connectors:
                 literal:
                   rel: System.LinkTypes.Related
                   url: https://dev.azure.com/${{ github.aw.import-inputs.organization }}/${{ github.aw.import-inputs.project }}/_apis/wit/workItems/${{ github.aw.import-inputs.related-work-item }}
+        maxResponseBytes: 65536
+        responseRequired:
+          - /id
+          - /fields/System.TeamProject
+        responseTypes:
+          /id: integer
+        responseResourceInputs:
+          /id: work-item
+        responseResources:
+          /id: work-items
+          /fields/System.TeamProject: project-names
+      update-work-item:
+        credential: writer
+        inputs:
+          organization: *azure-rich-organization
+          project: *azure-rich-project
+          title: *azure-rich-title
+          work-item: *azure-rich-item
+        resources:
+          organization: organizations
+          project: projects
+          work-item: work-items
+        checks: ${{ github.aw.import-inputs.write-checks }}
+        createdResources: *azure-work-item-created-resources
+        request:
+          endpoint: api
+          method: PATCH
           path: /{organization}/{project}/_apis/wit/workitems/{work-item}
           pathInputs:
             organization: organization
@@ -1034,112 +1025,51 @@ connectors:
           query:
             api-version:
               literal: "7.1"
-        resources:
-          organization: organizations
-          project: projects
-          work-item: work-items
-        responseRequired:
-          - /id
-          - /fields/System.TeamProject
-        responseResourceInputs:
-          /id: work-item
-        responseResources:
-          /id: work-items
-          /fields/System.TeamProject: project-names
-        responseTypes:
-          /id: integer
-      update-work-item:
-        credential: writer
-        checks: ${{ github.aw.import-inputs.write-checks }}
-        createdResources: *azure-work-item-created-resources
-        inputs:
-          organization:
-            maxLength: 64
-            pattern: ^[A-Za-z0-9][A-Za-z0-9-]*$
-            required: true
-            type: string
-          project:
-            maxLength: 36
-            pattern: ^[0-9a-f-]{36}$
-            required: true
-            type: string
-          title:
-            sanitize: title
-            minLength: 20
-            maxLength: 256
-            required: true
-            type: string
-          work-item:
-            maxLength: 16
-            pattern: ^[1-9][0-9]{0,9}$
-            required: true
-            type: string
-        maxResponseBytes: 65536
-        request:
-          endpoint: api
-          method: PATCH
           patch:
             - op: add
               path: /fields/System.Title
               value:
                 input: title
-          path: /{organization}/{project}/_apis/wit/workitems/{work-item}
-          pathInputs:
-            organization: organization
-            project: project
-            work-item: work-item
-          query:
-            api-version:
-              literal: "7.1"
-        resources:
-          organization: organizations
-          project: projects
-          work-item: work-items
+        maxResponseBytes: 65536
         responseRequired:
           - /id
           - /fields/System.TeamProject
+        responseTypes:
+          /id: integer
         responseResourceInputs:
           /id: work-item
         responseResources:
           /id: work-items
           /fields/System.TeamProject: project-names
-        responseTypes:
-          /id: integer
       create-work-item-with-description:
         credential: writer
-        creates: *azure-work-item-creates
         inputs:
           temporary_id: *azure-work-item-temporary-id
           organization: *azure-rich-organization
           project: *azure-rich-project
           work-item-type:
+            type: string
+            required: true
+            maxLength: 64
             enum:
               - ${{ github.aw.import-inputs.work-item-type }}
-            maxLength: 64
             pattern: ^[A-Za-z][A-Za-z0-9 -]*$
-            required: true
-            type: string
-          title: &azure-rich-title
-            sanitize: title
-            minLength: 20
-            maxLength: 256
-            required: true
-            type: string
+          title: *azure-rich-title
           body: &azure-rich-body
-            sanitize: body
+            type: string
+            required: true
             minLength: 1
             maxLength: 65000
             pattern: \S
-            required: true
-            type: string
+            sanitize: body
         resources:
           organization: organizations
           project: projects
           work-item-type: work-item-types
+        creates: *azure-work-item-creates
         request:
           endpoint: api
           method: POST
-          additionalPatch: ${{ github.aw.import-inputs.create-additional-patch }}
           path: /{organization}/{project}/_apis/wit/workitems/$${{ github.aw.import-inputs.work-item-type }}
           pathInputs:
             organization: organization
@@ -1160,38 +1090,38 @@ connectors:
               path: /multilineFieldsFormat/System.Description
               value:
                 literal: Markdown
+          additionalPatch: ${{ github.aw.import-inputs.create-additional-patch }}
         maxResponseBytes: 131072
         responseRequired: *azure-rich-item-evidence
-        responseResources:
-          /fields/System.TeamProject: project-names
-        responseInputs:
-          /fields/System.WorkItemType: work-item-type
         responseTypes:
           /id: integer
+        responseInputs:
+          /fields/System.WorkItemType: work-item-type
+        responseResources:
+          /fields/System.TeamProject: project-names
         project:
           work-item: /id
       create-bug-with-repro-steps:
         credential: writer
-        creates: *azure-work-item-creates
         inputs:
           temporary_id: *azure-work-item-temporary-id
           organization: *azure-rich-organization
           project: *azure-rich-project
           work-item-type:
-            enum: [Bug]
-            maxLength: 64
-            required: true
             type: string
+            required: true
+            maxLength: 64
+            enum: [ Bug ]
           title: *azure-rich-title
           body: *azure-rich-body
         resources:
           organization: organizations
           project: projects
           work-item-type: work-item-types
+        creates: *azure-work-item-creates
         request:
           endpoint: api
           method: POST
-          additionalPatch: ${{ github.aw.import-inputs.create-additional-patch }}
           path: /{organization}/{project}/_apis/wit/workitems/$Bug
           pathInputs:
             organization: organization
@@ -1210,26 +1140,27 @@ connectors:
               path: /multilineFieldsFormat/Microsoft.VSTS.TCM.ReproSteps
               value:
                 literal: Markdown
+          additionalPatch: ${{ github.aw.import-inputs.create-additional-patch }}
         maxResponseBytes: 131072
         responseRequired: *azure-rich-item-evidence
-        responseResources:
-          /fields/System.TeamProject: project-names
-        responseInputs:
-          /fields/System.WorkItemType: work-item-type
         responseTypes:
           /id: integer
+        responseInputs:
+          /fields/System.WorkItemType: work-item-type
+        responseResources:
+          /fields/System.TeamProject: project-names
         project:
           work-item: /id
       set-work-item-description:
         credential: writer
-        checks: ${{ github.aw.import-inputs.write-checks }}
-        createdResources: *azure-work-item-created-resources
         inputs:
           organization: *azure-rich-organization
           project: *azure-rich-project
           work-item: *azure-rich-item
           body: *azure-rich-body
         resources: *azure-rich-item-resources
+        checks: ${{ github.aw.import-inputs.write-checks }}
+        createdResources: *azure-work-item-created-resources
         request:
           endpoint: api
           method: PATCH
@@ -1247,22 +1178,22 @@ connectors:
                 literal: Markdown
         maxResponseBytes: 131072
         responseRequired: *azure-rich-item-evidence
-        responseResourceInputs: *azure-rich-item-correlation
-        responseResources: *azure-rich-item-response-resources
         responseTypes: &azure-rich-item-response-types
           /id: integer
+        responseResourceInputs: *azure-rich-item-correlation
+        responseResources: *azure-rich-item-response-resources
         project: &azure-rich-item-projection
           work-item: /id
       set-work-item-repro-steps:
         credential: writer
-        checks: ${{ github.aw.import-inputs.write-checks }}
-        createdResources: *azure-work-item-created-resources
         inputs:
           organization: *azure-rich-organization
           project: *azure-rich-project
           work-item: *azure-rich-item
           body: *azure-rich-body
         resources: *azure-rich-item-resources
+        checks: ${{ github.aw.import-inputs.write-checks }}
+        createdResources: *azure-work-item-created-resources
         request:
           endpoint: api
           method: PATCH
@@ -1280,28 +1211,28 @@ connectors:
                 literal: Markdown
         maxResponseBytes: 131072
         responseRequired: *azure-rich-item-evidence
+        responseTypes: *azure-rich-item-response-types
         responseResourceInputs: *azure-rich-item-correlation
         responseResources: *azure-rich-item-response-resources
-        responseTypes: *azure-rich-item-response-types
         project: *azure-rich-item-projection
       set-work-item-state:
         credential: writer
-        checks: ${{ github.aw.import-inputs.write-checks }}
-        createdResources: *azure-work-item-created-resources
         inputs:
           organization: *azure-rich-organization
           project: *azure-rich-project
           work-item: *azure-rich-item
           state:
+            type: string
+            required: true
             maxLength: 64
             pattern: ^[A-Za-z][A-Za-z0-9 -]*$
-            required: true
-            type: string
         resources:
           organization: organizations
           project: projects
           work-item: work-items
           state: states
+        checks: ${{ github.aw.import-inputs.write-checks }}
+        createdResources: *azure-work-item-created-resources
         request:
           endpoint: api
           method: PATCH
@@ -1315,28 +1246,28 @@ connectors:
                 input: state
         maxResponseBytes: 131072
         responseRequired: *azure-rich-item-evidence
+        responseTypes: *azure-rich-item-response-types
         responseResourceInputs: *azure-rich-item-correlation
         responseResources: *azure-rich-item-response-resources
-        responseTypes: *azure-rich-item-response-types
         project: *azure-rich-item-projection
       replace-work-item-tags:
         credential: writer
-        checks: ${{ github.aw.import-inputs.write-checks }}
-        createdResources: *azure-work-item-created-resources
         inputs:
           organization: *azure-rich-organization
           project: *azure-rich-project
           work-item: *azure-rich-item
           tags:
+            type: string
+            required: true
             maxLength: 1024
             pattern: ^[A-Za-z0-9][A-Za-z0-9 _.-]{0,63}(; [A-Za-z0-9][A-Za-z0-9 _.-]{0,63}){0,15}$
-            required: true
-            type: string
         resources:
           organization: organizations
           project: projects
           work-item: work-items
           tags: tag-sets
+        checks: ${{ github.aw.import-inputs.write-checks }}
+        createdResources: *azure-work-item-created-resources
         request:
           endpoint: api
           method: PATCH
@@ -1350,29 +1281,29 @@ connectors:
                 input: tags
         maxResponseBytes: 131072
         responseRequired: *azure-rich-item-evidence
+        responseTypes: *azure-rich-item-response-types
         responseResourceInputs: *azure-rich-item-correlation
         responseResources: *azure-rich-item-response-resources
-        responseTypes: *azure-rich-item-response-types
         project: *azure-rich-item-projection
       set-work-item-area-path:
         credential: writer
-        checks: ${{ github.aw.import-inputs.write-checks }}
-        createdResources: *azure-work-item-created-resources
         inputs:
           organization: *azure-rich-organization
           project: *azure-rich-project
           work-item: *azure-rich-item
           area-path: &azure-rich-classification-path
+            type: string
+            required: true
             minLength: 1
             maxLength: 256
             pattern: ^[A-Za-z0-9][A-Za-z0-9 _.\\-]*$
-            required: true
-            type: string
         resources:
           organization: organizations
           project: projects
           work-item: work-items
           area-path: area-paths
+        checks: ${{ github.aw.import-inputs.write-checks }}
+        createdResources: *azure-work-item-created-resources
         request:
           endpoint: api
           method: PATCH
@@ -1386,14 +1317,12 @@ connectors:
                 input: area-path
         maxResponseBytes: 131072
         responseRequired: *azure-rich-item-evidence
+        responseTypes: *azure-rich-item-response-types
         responseResourceInputs: *azure-rich-item-correlation
         responseResources: *azure-rich-item-response-resources
-        responseTypes: *azure-rich-item-response-types
         project: *azure-rich-item-projection
       set-work-item-iteration-path:
         credential: writer
-        checks: ${{ github.aw.import-inputs.write-checks }}
-        createdResources: *azure-work-item-created-resources
         inputs:
           organization: *azure-rich-organization
           project: *azure-rich-project
@@ -1404,6 +1333,8 @@ connectors:
           project: projects
           work-item: work-items
           iteration-path: iteration-paths
+        checks: ${{ github.aw.import-inputs.write-checks }}
+        createdResources: *azure-work-item-created-resources
         request:
           endpoint: api
           method: PATCH
@@ -1417,9 +1348,9 @@ connectors:
                 input: iteration-path
         maxResponseBytes: 131072
         responseRequired: *azure-rich-item-evidence
+        responseTypes: *azure-rich-item-response-types
         responseResourceInputs: *azure-rich-item-correlation
         responseResources: *azure-rich-item-response-resources
-        responseTypes: *azure-rich-item-response-types
         project: *azure-rich-item-projection
       link-approved-work-items:
         credential: writer
@@ -1427,18 +1358,21 @@ connectors:
           organization: *azure-rich-organization
           project: *azure-rich-project
           work-item:
+            type: string
+            required: true
+            maxLength: 10
             enum:
               - "${{ github.aw.import-inputs.work-item }}"
-            maxLength: 10
             pattern: ^[1-9][0-9]*$
-            required: true
-            type: string
           target-url:
+            type: string
+            required: true
             maxLength: 256
             pattern: ^https://dev[.]azure[.]com/${{ github.aw.import-inputs.organization }}/${{ github.aw.import-inputs.project }}/_apis/wit/workItems/[1-9][0-9]{0,9}$
-            required: true
-            type: string
           link-type:
+            type: string
+            required: true
+            maxLength: 64
             enum:
               - System.LinkTypes.Related
               - System.LinkTypes.Hierarchy-Reverse
@@ -1447,9 +1381,6 @@ connectors:
               - System.LinkTypes.Dependency-Forward
               - System.LinkTypes.Duplicate-Forward
               - System.LinkTypes.Duplicate-Reverse
-            maxLength: 64
-            required: true
-            type: string
         resources:
           organization: organizations
           project: projects
@@ -1473,19 +1404,19 @@ connectors:
                     input: target-url
         maxResponseBytes: 131072
         responseRequired: *azure-rich-item-evidence
+        responseTypes: *azure-rich-item-response-types
         responseResourceInputs: *azure-rich-item-correlation
         responseResources: *azure-rich-item-response-resources
-        responseTypes: *azure-rich-item-response-types
         project: *azure-rich-item-projection
       link-created-work-item:
         credential: writer
-        checks: ${{ github.aw.import-inputs.write-checks }}
-        createdResources: *azure-work-item-created-resources
         inputs:
           organization: *azure-rich-organization
           project: *azure-rich-project
           work-item: *azure-rich-item
         resources: *azure-rich-item-resources
+        checks: ${{ github.aw.import-inputs.write-checks }}
+        createdResources: *azure-work-item-created-resources
         request:
           endpoint: api
           method: PATCH
@@ -1501,31 +1432,31 @@ connectors:
                   url: https://dev.azure.com/${{ github.aw.import-inputs.organization }}/${{ github.aw.import-inputs.project }}/_apis/wit/workItems/${{ github.aw.import-inputs.related-work-item }}
         maxResponseBytes: 131072
         responseRequired: *azure-rich-item-evidence
+        responseTypes: *azure-rich-item-response-types
         responseResourceInputs: *azure-rich-item-correlation
         responseResources: *azure-rich-item-response-resources
-        responseTypes: *azure-rich-item-response-types
         project: *azure-rich-item-projection
       clear-work-item-description:
         credential: writer
-        checks: ${{ github.aw.import-inputs.write-checks }}
-        createdResources: *azure-work-item-created-resources
         inputs: &azure-clear-inputs
           organization:
+            type: string
+            required: true
             maxLength: 64
             pattern: ^[A-Za-z0-9][A-Za-z0-9-]*$
-            required: true
-            type: string
           project:
+            type: string
+            required: true
             maxLength: 36
             pattern: ^[0-9a-f-]{36}$
-            required: true
-            type: string
           work-item:
+            type: string
+            required: true
             maxLength: 16
             pattern: ^[1-9][0-9]{0,9}$
-            required: true
-            type: string
         resources: *azure-rich-item-resources
+        checks: ${{ github.aw.import-inputs.write-checks }}
+        createdResources: *azure-work-item-created-resources
         request:
           endpoint: api
           method: PATCH
@@ -1535,19 +1466,19 @@ connectors:
           patch:
             - op: add
               path: /fields/System.Description
-              value: {literal: ""}
+              value: { literal: "" }
         maxResponseBytes: 131072
         responseRequired: *azure-rich-item-evidence
+        responseTypes: *azure-rich-item-response-types
         responseResourceInputs: *azure-rich-item-correlation
         responseResources: *azure-rich-item-response-resources
-        responseTypes: *azure-rich-item-response-types
         project: *azure-rich-item-projection
       clear-work-item-repro-steps:
         credential: writer
-        checks: ${{ github.aw.import-inputs.write-checks }}
-        createdResources: *azure-work-item-created-resources
         inputs: *azure-clear-inputs
         resources: *azure-rich-item-resources
+        checks: ${{ github.aw.import-inputs.write-checks }}
+        createdResources: *azure-work-item-created-resources
         request:
           endpoint: api
           method: PATCH
@@ -1557,19 +1488,19 @@ connectors:
           patch:
             - op: add
               path: /fields/Microsoft.VSTS.TCM.ReproSteps
-              value: {literal: ""}
+              value: { literal: "" }
         maxResponseBytes: 131072
         responseRequired: *azure-rich-item-evidence
+        responseTypes: *azure-rich-item-response-types
         responseResourceInputs: *azure-rich-item-correlation
         responseResources: *azure-rich-item-response-resources
-        responseTypes: *azure-rich-item-response-types
         project: *azure-rich-item-projection
       clear-work-item-tags:
         credential: writer
-        checks: ${{ github.aw.import-inputs.write-checks }}
-        createdResources: *azure-work-item-created-resources
         inputs: *azure-clear-inputs
         resources: *azure-rich-item-resources
+        checks: ${{ github.aw.import-inputs.write-checks }}
+        createdResources: *azure-work-item-created-resources
         request:
           endpoint: api
           method: PATCH
@@ -1579,24 +1510,24 @@ connectors:
           patch:
             - op: replace
               path: /fields/System.Tags
-              value: {literal: ""}
+              value: { literal: "" }
         maxResponseBytes: 131072
         responseRequired: *azure-rich-item-evidence
+        responseTypes: *azure-rich-item-response-types
         responseResourceInputs: *azure-rich-item-correlation
         responseResources: *azure-rich-item-response-resources
-        responseTypes: *azure-rich-item-response-types
         project: *azure-rich-item-projection
       link-work-item-by-id: &azure-numeric-link
         credential: writer
-        createdResources:
-          work-item: ${{ github.aw.import-inputs.work-item-creator }}
-          target-work-item: ${{ github.aw.import-inputs.work-item-creator }}
         inputs: &azure-numeric-link-inputs
           organization: *azure-rich-organization
           project: *azure-rich-project
           work-item: *azure-rich-item
           target-work-item: *azure-rich-item
           link-type: &azure-numeric-link-type
+            type: string
+            required: true
+            maxLength: 64
             enum:
               - System.LinkTypes.Related
               - System.LinkTypes.Hierarchy-Reverse
@@ -1605,9 +1536,6 @@ connectors:
               - System.LinkTypes.Dependency-Forward
               - System.LinkTypes.Duplicate-Forward
               - System.LinkTypes.Duplicate-Reverse
-            maxLength: 64
-            required: true
-            type: string
         resources:
           organization: organizations
           project: projects
@@ -1624,13 +1552,13 @@ connectors:
               path: /{organization}/{project}/_apis/wit/workitems/{work-item}
               pathInputs: *azure-rich-item-path-inputs
               query:
-                api-version: {literal: "7.1"}
-                fields: {literal: System.TeamProject}
+                api-version: { literal: "7.1" }
+                fields: { literal: System.TeamProject }
             maxResponseBytes: 131072
             responseRequired: *azure-rich-item-evidence
+            responseTypes: *azure-rich-item-response-types
             responseResourceInputs: *azure-rich-item-correlation
             responseResources: *azure-rich-item-response-resources
-            responseTypes: *azure-rich-item-response-types
           - inputs:
               organization: *azure-rich-organization
               project: *azure-rich-project
@@ -1648,14 +1576,17 @@ connectors:
                 project: project
                 target-work-item: target-work-item
               query:
-                api-version: {literal: "7.1"}
-                fields: {literal: System.TeamProject}
+                api-version: { literal: "7.1" }
+                fields: { literal: System.TeamProject }
             maxResponseBytes: 131072
             responseRequired: *azure-rich-item-evidence
+            responseTypes: *azure-rich-item-response-types
             responseResourceInputs:
               /id: target-work-item
             responseResources: *azure-rich-item-response-resources
-            responseTypes: *azure-rich-item-response-types
+        createdResources:
+          work-item: ${{ github.aw.import-inputs.work-item-creator }}
+          target-work-item: ${{ github.aw.import-inputs.work-item-creator }}
         request: &azure-numeric-link-request
           endpoint: api
           method: PATCH
@@ -1667,26 +1598,21 @@ connectors:
               path: /relations/-
               value:
                 object: &azure-numeric-link-value
-                  rel: {input: link-type}
+                  rel: { input: link-type }
                   url:
                     input: target-work-item
                     prefix: https://dev.azure.com/${{ github.aw.import-inputs.organization }}/${{ github.aw.import-inputs.project }}/_apis/wit/workItems/
         maxResponseBytes: 131072
         responseRequired: *azure-rich-item-evidence
+        responseTypes: *azure-rich-item-response-types
         responseResourceInputs: *azure-rich-item-correlation
         responseResources: *azure-rich-item-response-resources
-        responseTypes: *azure-rich-item-response-types
         project: *azure-rich-item-projection
       link-work-item-by-id-with-comment:
         <<: *azure-numeric-link
         inputs:
           <<: *azure-numeric-link-inputs
-          comment:
-            sanitize: body
-            minLength: 1
-            maxLength: 4000
-            required: true
-            type: string
+          comment: *azure-devops-input-text
         request:
           <<: *azure-numeric-link-request
           patch:
@@ -1697,24 +1623,23 @@ connectors:
                   <<: *azure-numeric-link-value
                   attributes:
                     object:
-                      comment: {input: comment}
+                      comment: { input: comment }
       link-work-item-to-branch:
         credential: writer
-        createdResources: *azure-work-item-created-resources
         inputs:
           <<: *azure-clear-inputs
           repository-id: &azure-artifact-repository-input
-            enum: ["${{ github.aw.import-inputs.repository-id }}"]
+            type: string
+            required: true
             maxLength: 36
+            enum: [ "${{ github.aw.import-inputs.repository-id }}" ]
             pattern: ^[0-9a-f-]{36}$
-            required: true
-            type: string
           branch: &azure-artifact-branch-input
-            enum: ["${{ github.aw.import-inputs.branch }}"]
-            maxLength: 200
-            pattern: ^[A-Za-z0-9][A-Za-z0-9_/-]*$
-            required: true
             type: string
+            required: true
+            maxLength: 200
+            enum: [ "${{ github.aw.import-inputs.branch }}" ]
+            pattern: ^[A-Za-z0-9][A-Za-z0-9_/-]*$
         resources:
           <<: *azure-rich-item-resources
           repository-id: repositories
@@ -1739,7 +1664,7 @@ connectors:
                 repository-id: repository-id
               query: *azure-rich-api-version
             maxResponseBytes: 131072
-            responseRequired: [/id, /project/id]
+            responseRequired: [ /id, /project/id ]
             responseInputs:
               /id: repository-id
               /project/id: project
@@ -1765,19 +1690,20 @@ connectors:
                 project: project
                 repository-id: repository-id
               query:
-                api-version: {literal: "7.1"}
+                api-version: { literal: "7.1" }
                 filter:
                   input: branch
                   prefix: heads/
-                "$top": {literal: "2"}
+                "$top": { literal: "2" }
             maxResponseBytes: 131072
-            responseRequired: [/count, /value/0/name]
             responseChecks:
               /count: 1
               /value/0/name: refs/heads/${{ github.aw.import-inputs.branch }}
+            responseRequired: [ /count, /value/0/name ]
             responseTypes:
               /count: integer
               /value/0/name: string
+        createdResources: *azure-work-item-created-resources
         request:
           endpoint: api
           method: PATCH
@@ -1795,9 +1721,9 @@ connectors:
                     name: Branch
         maxResponseBytes: 131072
         responseRequired: *azure-rich-item-evidence
+        responseTypes: *azure-rich-item-response-types
         responseResourceInputs: *azure-rich-item-correlation
         responseResources: *azure-rich-item-response-resources
-        responseTypes: *azure-rich-item-response-types
         project: *azure-rich-item-projection
 import-schema:
   attachment-max-bytes:
@@ -1843,145 +1769,147 @@ import-schema:
     default: []
     description: Explicit approved terminal state names required for closed/reopened trigger selections.
   organization:
-    default: fabrikam
     type: string
+    default: fabrikam
     description: Approved Azure DevOps organization name, not a URL.
   collection:
-    default: 11111111-1111-4111-8111-111111111111
     type: string
+    default: 11111111-1111-4111-8111-111111111111
     description: Approved collection ID for nonoperational trigger declarations.
   project:
-    default: 22222222-2222-4222-8222-222222222222
     type: string
+    default: 22222222-2222-4222-8222-222222222222
     description: Approved project UUID for write targets.
   project-name:
-    default: Fabrikam
     type: string
+    default: Fabrikam
     description: Exact project name required in write responses.
   work-item:
-    default: "123"
     type: string
+    default: "123"
     description: Exact approved existing work item ID as a canonical positive decimal string of at most ten digits; no whitespace, wildcard, leading zero or temporary ID.
   related-work-item:
-    default: "124"
     type: string
+    default: "124"
     description: Exact approved target ID for the fixed Related link.
   assignee:
-    default: reviewer@example.invalid
     type: string
+    default: reviewer@example.invalid
     description: Exact approved assignee identity.
   agent-reader-secret:
+    type: string
     default: AZURE_DEVOPS_MCP_ENTRA_TOKEN
-    type: string
+    description: Actions secret containing the audience-bound Entra access token for the hosted Azure DevOps MCP reader.
   writer-secret:
+    type: string
     default: AZURE_DEVOPS_WRITE_TOKEN
-    type: string
+    description: Separate Actions secret containing the Entra bearer access token with vso.work_write for approved safe-output operations.
   rest-reader-secret:
-    default: AZURE_DEVOPS_READ_TOKEN
     type: string
+    default: AZURE_DEVOPS_READ_TOKEN
     description: Separate REST-resource Entra reader token secret name, not the hosted MCP token.
   code-reader-secret:
-    default: AZURE_DEVOPS_CODE_READ_TOKEN
     type: string
+    default: AZURE_DEVOPS_CODE_READ_TOKEN
     description: Separate REST-resource read-only source-code identity secret name; never a hosted MCP or writer token.
   build-reader-secret:
-    default: AZURE_DEVOPS_BUILD_READ_TOKEN
     type: string
+    default: AZURE_DEVOPS_BUILD_READ_TOKEN
     description: Separate REST-resource read-only build identity secret name; never a hosted MCP or writer token.
   read-work-item-ids:
-    default: []
     type: array
-    items: {type: string}
+    items: { type: string }
+    default: []
     description: Exact positive decimal work-item IDs for get-work-item and flat saved-query results; independent of writer grants.
   read-query-ids:
-    default: []
     type: array
-    items: {type: string}
+    items: { type: string }
+    default: []
     description: Exact reviewed saved flat WIQL query UUIDs; no agent-authored WIQL, query text or query discovery.
   read-repository-ids:
-    default: []
     type: array
-    items: {type: string}
+    items: { type: string }
+    default: []
     description: Exact Git repository UUIDs approved for REST reads; independent of the branch-link writer repository.
   read-file-paths:
-    default: []
     type: array
-    items: {type: string}
+    items: { type: string }
+    default: []
     description: Exact repository file paths including leading slash; no directory, prefix or recursive grants.
   read-commits:
-    default: []
     type: array
-    items: {type: string}
+    items: { type: string }
+    default: []
     description: Exact lowercase 40-hex commit SHAs for file content; no mutable branch resolution or implicit default ref.
   read-target-refs:
-    default: []
     type: array
-    items: {type: string}
+    items: { type: string }
+    default: []
     description: Exact refs/heads/ branch names for pull-request targets and build source branches.
   read-pull-request-ids:
-    default: []
     type: array
-    items: {type: string}
+    items: { type: string }
+    default: []
     description: Exact positive decimal pull-request IDs, enforced for both single and every listed result.
   read-pipeline-ids:
-    default: []
     type: array
-    items: {type: string}
+    items: { type: string }
+    default: []
     description: Exact positive decimal Build definition IDs, enforced for single definitions, listed definitions and single-run parents.
   read-run-ids:
-    default: []
     type: array
-    items: {type: string}
+    items: { type: string }
+    default: []
     description: Exact positive decimal Build run IDs, enforced for both single and every listed result.
   work-item-types:
-    default: []
     type: array
     items:
       type: string
+    default: []
     description: Exact approved type names for rich creation; include Bug explicitly for ReproSteps creation.
   work-item-type:
-    default: Task
     type: string
+    default: Task
     description: Author-fixed type for create-work-item-with-description, independently approved by work-item-types.
   work-item-creator:
-    default: create-work-item
     type: string
+    default: create-work-item
     description: Exact selected receipt producer for followups; create-work-item, create-work-item-with-description, or create-bug-with-repro-steps.
   states:
-    default: []
     type: array
     items:
       type: string
+    default: []
     description: Exact approved destination states for sparse state changes.
   tag-sets:
-    default: []
     type: array
     items:
       type: string
+    default: []
     description: Exact complete semicolon-space-separated tag strings approved for replacement, not individual tag grants.
   area-paths:
-    default: []
     type: array
     items:
       type: string
+    default: []
     description: Exact approved area paths, not prefixes.
   iteration-paths:
-    default: []
     type: array
     items:
       type: string
+    default: []
     description: Exact approved iteration paths, not prefixes.
   link-types:
-    default: []
     type: array
     items:
       type: string
+    default: []
     description: Exact approved System.LinkTypes values from the seven declared relations.
   link-target-urls:
-    default: []
     type: array
     items:
       type: string
+    default: []
     description: Exact approved same-organization/project work-item REST URLs for the singleton work-item source and each approved link type.
 ---
 

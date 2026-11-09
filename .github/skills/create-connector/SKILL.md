@@ -40,11 +40,22 @@ real provider or live-test target.
 Set `experimental: true` for a new unproven contract. Add literal official
 HTTPS `docs` URLs actually consulted. Expose resource arrays and secret NAMES
 through `import-schema`; tokens never belong in `with`, source, or prompts.
+Describe every import binding and give resource arrays explicit string item
+types. Put declaration metadata, endpoints, credentials, resources, triggers,
+readers, hosted MCP registrations, and safe outputs in that order. Put input
+type/required before its constraints. Reuse provider-local anchors for identical
+primitive schemas without combining independent grants or credential phases.
+Preserve quoted import substitutions and define anchors before their aliases.
+Keep merge keys before explicit overrides and verify nested aliases with the
+actual compiler and bundled runtime, not only a generic YAML parser.
 Use `token`, scoped `github-app`, or audience-bound `github-oidc` only when that
 route is valid for the actual provider. Neither GitHub route exchanges tokens.
 
 Bound every string and response. Request placeholders take safe individual
-segments; query/body values use `input`, `literal`, `object`, or `array`.
+segments. New local readers use kebab-case selectors and unprefixed snake_case
+`tool` names; preserve existing advertised names and exact hosted native MCP
+names rather than renaming them for style. Query/body values use
+`input`, `literal`, `object`, or `array`.
 Resource inputs are required strings checked against exact grants before secrets.
 Correlate the returned ID with the requested ID, not merely some allowed ID.
 Reject partial pages when completeness matters. Project only needed evidence.

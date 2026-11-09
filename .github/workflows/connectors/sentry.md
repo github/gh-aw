@@ -9,108 +9,30 @@ connectors:
       - https://docs.sentry.io/api/events/update-an-issue/
       - https://docs.sentry.io/integrations/integration-platform/webhooks/
       - https://mcp.sentry.dev/
+    endpoints:
+      api: https://sentry.io
     credentials:
       hosted-reader:
-        header: Authorization
         phase: agent
+        header: Authorization
         scheme: bearer
         scopes:
           - event:read
         secret: ${{ github.aw.import-inputs.hosted-reader-secret }}
       reader:
-        header: Authorization
         phase: agent
+        header: Authorization
         scheme: bearer
         scopes:
           - event:read
         secret: ${{ github.aw.import-inputs.reader-secret }}
       writer:
-        header: Authorization
         phase: safe-output
+        header: Authorization
         scheme: bearer
         scopes:
           - event:write
         secret: ${{ github.aw.import-inputs.writer-secret }}
-    endpoints:
-      api: https://sentry.io
-    mcp-servers:
-      sentry:
-        credential: hosted-reader
-        maxResponseBytes: 65536
-        readOnly: true
-        tools:
-          get_issue_details:
-            inputs:
-              issueId:
-                maxLength: 32
-                pattern: ^[0-9]+$
-                required: true
-                type: string
-              organizationSlug:
-                enum:
-                  - example-org
-                maxLength: 100
-                required: true
-                type: string
-            resources:
-              issueId: issues
-              organizationSlug: organizations
-        url: https://mcp.sentry.dev/mcp/example-org/example-project
-    triggers:
-      error-created:
-        resourceOrigins:
-          - https://sentry.io
-        match:
-          /action: created
-          /data/issue/issueCategory: error
-        nativeEvents:
-          - issue.created
-        normalize:
-          installation: /installation/uuid
-          project: /data/issue/project/id
-          subject: /data/issue/id
-        resources:
-          /data/issue/id: issues
-          /data/issue/project/id: projects
-          /installation/uuid: installations
-        verificationProfile: sentry.io/issue-hmac-sha256
-      error-regressed:
-        resourceOrigins:
-          - https://sentry.io
-        match:
-          /action: unresolved
-          /data/issue/issueCategory: error
-          /data/issue/substatus: regressed
-        nativeEvents:
-          - issue.unresolved
-        normalize:
-          installation: /installation/uuid
-          project: /data/issue/project/id
-          subject: /data/issue/id
-        resources:
-          /data/issue/id: issues
-          /data/issue/project/id: projects
-          /installation/uuid: installations
-        verificationProfile: sentry.io/issue-hmac-sha256
-      issue-alert-triggered:
-        resourceOrigins:
-          - https://sentry.io
-        match:
-          /action: triggered
-          /data/event/type: error
-        nativeEvents:
-          - event_alert.triggered
-        normalize:
-          event: /data/event/event_id
-          installation: /installation/uuid
-          project: /data/event/project
-          subject: /data/event/issue_id
-        resources:
-          /data/event/event_id: events
-          /data/event/issue_id: issues
-          /data/event/project: projects
-          /installation/uuid: installations
-        verificationProfile: sentry.io/event-alert-hmac-sha256
     resources:
       events:
         - 0123456789abcdef0123456789abcdef
@@ -122,66 +44,79 @@ connectors:
         - example-org
       projects:
         - "4500000000000001"
-    safe-outputs:
-      resolve-issue:
-        credential: writer
+    triggers:
+      error-created:
+        verificationProfile: sentry.io/issue-hmac-sha256
+        nativeEvents:
+          - issue.created
+        resourceOrigins:
+          - https://sentry.io
+        match:
+          /action: created
+          /data/issue/issueCategory: error
+        resources:
+          /data/issue/id: issues
+          /data/issue/project/id: projects
+          /installation/uuid: installations
+        normalize:
+          installation: /installation/uuid
+          project: /data/issue/project/id
+          subject: /data/issue/id
+      error-regressed:
+        verificationProfile: sentry.io/issue-hmac-sha256
+        nativeEvents:
+          - issue.unresolved
+        resourceOrigins:
+          - https://sentry.io
+        match:
+          /action: unresolved
+          /data/issue/issueCategory: error
+          /data/issue/substatus: regressed
+        resources:
+          /data/issue/id: issues
+          /data/issue/project/id: projects
+          /installation/uuid: installations
+        normalize:
+          installation: /installation/uuid
+          project: /data/issue/project/id
+          subject: /data/issue/id
+      issue-alert-triggered:
+        verificationProfile: sentry.io/event-alert-hmac-sha256
+        nativeEvents:
+          - event_alert.triggered
+        resourceOrigins:
+          - https://sentry.io
+        match:
+          /action: triggered
+          /data/event/type: error
+        resources:
+          /data/event/event_id: events
+          /data/event/issue_id: issues
+          /data/event/project: projects
+          /installation/uuid: installations
+        normalize:
+          event: /data/event/event_id
+          installation: /installation/uuid
+          project: /data/event/project
+          subject: /data/event/issue_id
+    tools:
+      get-issue:
+        tool: get_issue_details
+        credential: reader
         inputs:
-          issue:
+          issue: &sentry-input-issue
+            type: string
+            required: true
             maxLength: 32
             pattern: ^[0-9]+$
-            required: true
+          organization: &sentry-input-organization
             type: string
-          organization:
+            required: true
             maxLength: 100
             pattern: ^[a-z0-9][a-z0-9-]*$
-            required: true
-            type: string
-        maxResponseBytes: 65536
-        project:
-          issue: /id
-          project: /project/id
-          status: /status
-        request:
-          body:
-            status:
-              literal: resolved
-          endpoint: api
-          method: PUT
-          path: /api/0/organizations/{organization}/issues/{issue}/
-          pathInputs:
-            issue: issue
-            organization: organization
         resources:
           issue: issues
           organization: organizations
-        responseChecks:
-          /issueCategory: error
-          /status: resolved
-        responseRequired:
-          - /id
-          - /project/id
-        responseResources:
-          /id: issues
-          /project/id: projects
-    tools:
-      get-issue:
-        credential: reader
-        inputs:
-          issue:
-            maxLength: 32
-            pattern: ^[0-9]+$
-            required: true
-            type: string
-          organization:
-            maxLength: 100
-            pattern: ^[a-z0-9][a-z0-9-]*$
-            required: true
-            type: string
-        maxResponseBytes: 65536
-        project:
-          issue: /id
-          project: /project/id
-          status: /status
         request:
           endpoint: api
           method: GET
@@ -189,9 +124,7 @@ connectors:
           pathInputs:
             issue: issue
             organization: organization
-        resources:
-          issue: issues
-          organization: organizations
+        maxResponseBytes: 65536
         responseChecks:
           /issueCategory: error
           /status: unresolved
@@ -202,17 +135,75 @@ connectors:
         responseResources:
           /id: issues
           /project/id: projects
-        tool: get_issue_details
+        project:
+          issue: /id
+          project: /project/id
+          status: /status
+    mcp-servers:
+      sentry:
+        url: https://mcp.sentry.dev/mcp/example-org/example-project
+        credential: hosted-reader
+        readOnly: true
+        tools:
+          get_issue_details:
+            inputs:
+              issueId: *sentry-input-issue
+              organizationSlug:
+                type: string
+                required: true
+                maxLength: 100
+                enum:
+                  - example-org
+            resources:
+              issueId: issues
+              organizationSlug: organizations
+        maxResponseBytes: 65536
+    safe-outputs:
+      resolve-issue:
+        credential: writer
+        inputs:
+          issue: *sentry-input-issue
+          organization: *sentry-input-organization
+        resources:
+          issue: issues
+          organization: organizations
+        request:
+          endpoint: api
+          method: PUT
+          path: /api/0/organizations/{organization}/issues/{issue}/
+          pathInputs:
+            issue: issue
+            organization: organization
+          body:
+            status:
+              literal: resolved
+        maxResponseBytes: 65536
+        responseChecks:
+          /issueCategory: error
+          /status: resolved
+        responseRequired:
+          - /id
+          - /project/id
+        responseResources:
+          /id: issues
+          /project/id: projects
+        project:
+          issue: /id
+          project: /project/id
+          status: /status
 import-schema:
   hosted-reader-secret:
+    type: string
     default: SENTRY_MCP_OAUTH_TOKEN
-    type: string
+    description: Actions secret containing the separately authorized hosted Sentry MCP OAuth bearer token.
   reader-secret:
+    type: string
     default: SENTRY_READ_TOKEN
-    type: string
+    description: Actions secret containing the REST bearer token with event:read; not hosted MCP authorization.
   writer-secret:
-    default: SENTRY_STATUS_TOKEN
     type: string
+    default: SENTRY_STATUS_TOKEN
+    description: Separate Actions secret containing the REST bearer token with event:write for the fixed approved issue.
 ---
 
 <!--

@@ -9,51 +9,23 @@ connectors:
       - https://docs.slack.dev/authentication/installing-with-oauth/
       - https://docs.slack.dev/authentication/verifying-requests-from-slack/
       - https://docs.slack.dev/ai/slack-mcp-server/
+    endpoints:
+      api: https://slack.com
     credentials:
       reader:
-        header: Authorization
         phase: agent
+        header: Authorization
         scheme: bearer
         scopes:
           - channels:history
         secret: ${{ github.aw.import-inputs.reader-secret }}
       writer:
-        header: Authorization
         phase: safe-output
+        header: Authorization
         scheme: bearer
         scopes:
           - chat:write
         secret: ${{ github.aw.import-inputs.writer-secret }}
-    endpoints:
-      api: https://slack.com
-    triggers:
-      threaded-app-mention:
-        resourceOrigins:
-          - https://app.slack.com
-        match:
-          /api_app_id: A123ABC456
-          /event/channel: C123ABC456
-          /event/type: app_mention
-          /team_id: T123ABC456
-          /type: event_callback
-        nativeEvents:
-          - app_mention
-        normalize:
-          author-id: /event/user
-          channel-id: /event/channel
-          delivery-id: /event_id
-          message-id: /event/ts
-          thread-id: /event/thread_ts
-          workspace-id: /team_id
-        resources:
-          /api_app_id: apps
-          /event/channel: channels
-          /event/thread_ts: threads
-          /team_id: workspaces
-        types:
-          /event/thread_ts: string
-          /event/ts: string
-        verificationProfile: slack.com/events-v0
     resources:
       apps:
         - A123ABC456
@@ -63,33 +35,101 @@ connectors:
         - "1515449522.000016"
       workspaces:
         - T123ABC456
+    triggers:
+      threaded-app-mention:
+        verificationProfile: slack.com/events-v0
+        nativeEvents:
+          - app_mention
+        resourceOrigins:
+          - https://app.slack.com
+        match:
+          /api_app_id: A123ABC456
+          /event/channel: C123ABC456
+          /event/type: app_mention
+          /team_id: T123ABC456
+          /type: event_callback
+        types:
+          /event/thread_ts: string
+          /event/ts: string
+        resources:
+          /api_app_id: apps
+          /event/channel: channels
+          /event/thread_ts: threads
+          /team_id: workspaces
+        normalize:
+          author-id: /event/user
+          channel-id: /event/channel
+          delivery-id: /event_id
+          message-id: /event/ts
+          thread-id: /event/thread_ts
+          workspace-id: /team_id
+    tools:
+      read-thread:
+        tool: read-thread
+        credential: reader
+        inputs:
+          channel: &slack-input-channel
+            type: string
+            required: true
+            maxLength: 80
+            enum:
+              - C123ABC456
+          thread: &slack-input-thread
+            type: string
+            required: true
+            maxLength: 40
+            pattern: ^[0-9]{10,20}\.[0-9]{6}$
+        resources:
+          channel: channels
+          thread: threads
+        request:
+          endpoint: api
+          method: GET
+          path: /api/conversations.replies
+          query:
+            channel:
+              input: channel
+            limit:
+              literal: 15
+            ts:
+              input: thread
+        maxResponseBytes: 65536
+        responseChecks:
+          /has_more: false
+          /ok: true
+        responseRequired:
+          - /messages/0/ts
+        responseTypes:
+          /has_more: boolean
+          /messages/0/ts: string
+        responseInputs:
+          /messages/0/ts: thread
+        responseResources:
+          /messages/0/ts: threads
+        responseOptionalEmpty:
+          - /response_metadata/next_cursor
+        project:
+          has-more: /has_more
+          messages: /messages
     safe-outputs:
       reply-in-thread:
         credential: writer
         inputs:
-          channel:
-            enum:
-              - C123ABC456
-            maxLength: 80
-            required: true
-            type: string
+          channel: *slack-input-channel
           text:
-            sanitize: body
+            type: string
+            required: true
             minLength: 1
             maxLength: 4000
-            required: true
-            type: string
-          thread:
-            maxLength: 40
-            pattern: ^[0-9]{10,20}\.[0-9]{6}$
-            required: true
-            type: string
-        maxResponseBytes: 65536
-        project:
-          channel: /channel
-          message-id: /ts
-          thread-id: /message/thread_ts
+            sanitize: body
+          thread: *slack-input-thread
+        resources:
+          channel: channels
+          thread: threads
         request:
+          endpoint: api
+          method: POST
+          path: /api/chat.postMessage
           body:
             channel:
               input: channel
@@ -107,83 +147,36 @@ connectors:
               literal: false
             unfurl_media:
               literal: false
-          endpoint: api
-          method: POST
-          path: /api/chat.postMessage
-        resources:
-          channel: channels
-          thread: threads
+        maxResponseBytes: 65536
         responseChecks:
           /ok: true
-        responseInputs:
-          /channel: channel
-          /message/thread_ts: thread
         responseRequired:
           - /channel
           - /ts
           - /message/thread_ts
-        responseResources:
-          /channel: channels
-          /message/thread_ts: threads
         responseTypes:
           /channel: string
           /message/thread_ts: string
           /ts: string
-    tools:
-      read-thread:
-        credential: reader
-        inputs:
-          channel:
-            enum:
-              - C123ABC456
-            maxLength: 80
-            required: true
-            type: string
-          thread:
-            maxLength: 40
-            pattern: ^[0-9]{10,20}\.[0-9]{6}$
-            required: true
-            type: string
-        maxResponseBytes: 65536
-        project:
-          has-more: /has_more
-          messages: /messages
-        request:
-          endpoint: api
-          method: GET
-          path: /api/conversations.replies
-          query:
-            channel:
-              input: channel
-            limit:
-              literal: 15
-            ts:
-              input: thread
-        resources:
-          channel: channels
-          thread: threads
-        responseChecks:
-          /has_more: false
-          /ok: true
         responseInputs:
-          /messages/0/ts: thread
-        responseOptionalEmpty:
-          - /response_metadata/next_cursor
-        responseRequired:
-          - /messages/0/ts
+          /channel: channel
+          /message/thread_ts: thread
         responseResources:
-          /messages/0/ts: threads
-        responseTypes:
-          /has_more: boolean
-          /messages/0/ts: string
-        tool: read-thread
+          /channel: channels
+          /message/thread_ts: threads
+        project:
+          channel: /channel
+          message-id: /ts
+          thread-id: /message/thread_ts
 import-schema:
   reader-secret:
+    type: string
     default: SLACK_READ_TOKEN
-    type: string
+    description: Actions secret containing the bearer token with channels:history for the declaration's fixed channel/thread.
   writer-secret:
-    default: SLACK_WRITE_TOKEN
     type: string
+    default: SLACK_WRITE_TOKEN
+    description: Separate Actions secret containing the bearer token with chat:write for the fixed thread.
 ---
 
 <!--

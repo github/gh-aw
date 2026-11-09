@@ -239,7 +239,10 @@ For local development, use `gh aw connector <id> setup` for phase-specific
 secret-name and provisioning guidance, then `gh aw connector <id> test` with
 an explicit phase, capability, typed arguments, and approved import bindings.
 Default secret names come from `import-schema`; Linear GraphQL defaults to
-`LINEAR_API_KEY`. Override names through workflow `with` or CLI `--input`.
+`LINEAR_READ_API_KEY`; its writer defaults to `LINEAR_WRITE_API_KEY`.
+Override names through workflow `with` or CLI `--input`. Existing shared-key
+consumers must explicitly bind both names to `LINEAR_API_KEY`; no token fallback
+is performed.
 Setup never reads or writes values. Reads use environment credentials and fail
 with actionable missing-variable instructions; Actions secrets are not local
 environment variables automatically.
@@ -255,6 +258,23 @@ definition, connection, or binding YAML file is required. The
 [creation skill](../skills/create-connector/SKILL.md) supplies the bounded
 authoring and offline-validation procedure. Reuse an existing provider
 declaration and the shared runtime before adding custom code.
+
+Order declaration fields as `experimental`, `docs`, `endpoints`, `credentials`,
+`resources`, `triggers`, `tools`, `mcp-servers`, then `safe-outputs`, omitting
+unused fields. Put input `type` and `required` before its bounds, `enum`,
+`pattern`, and `sanitize`. These are readability conventions, not semantic
+ordering rules. Preserve array order, scalar quoting, and anchor dependencies.
+Keep merge keys before explicit overrides for compiler compatibility.
+Reuse provider-local anchors only for identical primitive schemas; independent
+grants, credentials, request shapes, and response checks remain explicit.
+Avoid extra alias nesting inside already-aliased containers unless the actual
+Go/Node contract comparison passes; a generic YAML parse alone is insufficient.
+
+For new REST/GraphQL readers, use a kebab-case selector and an unprefixed
+snake_case `tool` name. Existing readers retain their advertised names,
+including hyphenated and provider-prefixed names. The selector is not
+automatically converted into the callable read-tool name. Hosted MCP native
+names keep their exact provider spelling and case; never rename them for style.
 
 Declare stability and sources alongside endpoints and credentials:
 

@@ -9,94 +9,41 @@ connectors:
       - https://docs.pagerduty.com/developer/api/reference/rest/incidents/create-incident-note
       - https://raw.githubusercontent.com/PagerDuty/api-schema/main/reference/REST/openapiv3.json
       - https://docs.pagerduty.com/developer/verifying-webhook-signatures
+    endpoints:
+      api: https://api.pagerduty.com
     credentials:
       reader:
-        header: Authorization
         phase: agent
+        header: Authorization
         scheme: raw
         scopes:
           - incidents.read
         token:
           secret: ${{ github.aw.import-inputs.reader-secret }}
       writer:
-        header: Authorization
         phase: safe-output
+        header: Authorization
         scheme: raw
         scopes:
           - incidents.write
         token:
           secret: ${{ github.aw.import-inputs.writer-secret }}
-    endpoints:
-      api: https://api.pagerduty.com
     resources:
       incidents: ${{ github.aw.import-inputs.incidents }}
       services: ${{ github.aw.import-inputs.services }}
       teams: ${{ github.aw.import-inputs.teams }}
-    safe-outputs:
-      add-note:
-        credential: writer
-        inputs:
-          incident-id:
-            type: string
-            required: true
-            maxLength: 32
-            pattern: ^[A-Z][A-Z0-9]{6,31}$
-          content:
-            sanitize: body
-            minLength: 1
-            type: string
-            required: true
-            maxLength: 2000
-            pattern: \S
-        resources:
-          incident-id: incidents
-        request:
-          endpoint: api
-          method: POST
-          path: /incidents/{incident}/notes
-          pathInputs:
-            incident: incident-id
-          headers:
-            Accept: application/vnd.pagerduty+json;version=2
-            From: ${{ github.aw.import-inputs.from-email }}
-          body:
-            note:
-              object:
-                content:
-                  input: content
-        maxResponseBytes: 16384
-        responseRequired:
-          - /note/id
-          - /note/created_at
-        responseTypes:
-          /note/id: string
-          /note/content: string
-          /note/created_at: string
-        responseInputs:
-          /note/content: content
-        project:
-          note-id: /note/id
-          created-at: /note/created_at
     tools:
       get-incident:
         tool: pagerduty_get_incident
         credential: reader
         inputs:
-          incident-id:
+          incident-id: &pagerduty-input-incident-id
             type: string
             required: true
             maxLength: 32
             pattern: ^[A-Z][A-Z0-9]{6,31}$
-          service-id:
-            type: string
-            required: true
-            maxLength: 32
-            pattern: ^[A-Z][A-Z0-9]{6,31}$
-          team-id:
-            type: string
-            required: true
-            maxLength: 32
-            pattern: ^[A-Z][A-Z0-9]{6,31}$
+          service-id: *pagerduty-input-incident-id
+          team-id: *pagerduty-input-incident-id
         resources:
           incident-id: incidents
           service-id: services
@@ -104,11 +51,11 @@ connectors:
         request:
           endpoint: api
           method: GET
+          headers:
+            Accept: application/vnd.pagerduty+json;version=2
           path: /incidents/{incident}
           pathInputs:
             incident: incident-id
-          headers:
-            Accept: application/vnd.pagerduty+json;version=2
         maxResponseBytes: 65536
         responseChecks:
           /incident/type: incident
@@ -128,42 +75,89 @@ connectors:
         responseInputs:
           /incident/id: incident-id
           /incident/service/id: service-id
-        responseContains:
-          /incident/teams/*/id: team-id
         responseResources:
           /incident/id: incidents
           /incident/service/id: services
+        responseContains:
+          /incident/teams/*/id: team-id
         project:
           incident-id: /incident/id
           service-id: /incident/service/id
           title: /incident/title
           status: /incident/status
           urgency: /incident/urgency
+    safe-outputs:
+      add-note:
+        credential: writer
+        inputs:
+          incident-id: *pagerduty-input-incident-id
+          content:
+            type: string
+            required: true
+            minLength: 1
+            maxLength: 2000
+            pattern: \S
+            sanitize: body
+        resources:
+          incident-id: incidents
+        request:
+          endpoint: api
+          method: POST
+          headers:
+            Accept: application/vnd.pagerduty+json;version=2
+            From: ${{ github.aw.import-inputs.from-email }}
+          path: /incidents/{incident}/notes
+          pathInputs:
+            incident: incident-id
+          body:
+            note:
+              object:
+                content:
+                  input: content
+        maxResponseBytes: 16384
+        responseRequired:
+          - /note/id
+          - /note/created_at
+        responseTypes:
+          /note/id: string
+          /note/content: string
+          /note/created_at: string
+        responseInputs:
+          /note/content: content
+        project:
+          note-id: /note/id
+          created-at: /note/created_at
 import-schema:
   incidents:
     type: array
     items:
       type: string
     default: []
+    description: Exact approved incident IDs; service and team grants do not establish incident association.
   services:
     type: array
     items:
       type: string
     default: []
+    description: Exact approved service IDs for response evidence checks.
   teams:
     type: array
     items:
       type: string
     default: []
+    description: Exact approved team IDs for response evidence checks.
   from-email:
     type: string
     default: incident-automation@example.invalid
+    description: Author-approved From identity authorized to add notes; replace the specimen email.
   reader-secret:
     type: string
     default: PAGERDUTY_READ_AUTHORIZATION
+    description: Actions secret containing the full REST Authorization header value, not only a raw token.
   writer-secret:
     type: string
     default: PAGERDUTY_WRITE_AUTHORIZATION
+    description: Separate Actions secret containing the full REST Authorization value for approved note writes.
 ---
 
 <!--

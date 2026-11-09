@@ -9,30 +9,30 @@ connectors:
       - https://docs.datadoghq.com/api/latest/incidents/get-the-details-of-an-incident/
       - https://docs.datadoghq.com/api/latest/incidents/update-an-existing-incident/
       - https://docs.datadoghq.com/api/latest/scopes/
+    endpoints:
+      api: ${{ github.aw.import-inputs.api-origin }}
     credentials:
       monitor-reader:
-        header: Authorization
         phase: agent
+        header: Authorization
         scheme: bearer
-        scopes: [monitors_read]
+        scopes: [ monitors_read ]
         token:
           secret: ${{ github.aw.import-inputs.monitor-reader-secret }}
       incident-reader:
-        header: Authorization
         phase: agent
+        header: Authorization
         scheme: bearer
-        scopes: [incident_read]
+        scopes: [ incident_read ]
         token:
           secret: ${{ github.aw.import-inputs.incident-reader-secret }}
       incident-writer:
-        header: Authorization
         phase: safe-output
+        header: Authorization
         scheme: bearer
-        scopes: [incident_write]
+        scopes: [ incident_write ]
         token:
           secret: ${{ github.aw.import-inputs.incident-writer-secret }}
-    endpoints:
-      api: ${{ github.aw.import-inputs.api-origin }}
     resources:
       monitors: ${{ github.aw.import-inputs.monitors }}
       incidents: ${{ github.aw.import-inputs.incidents }}
@@ -55,16 +55,16 @@ connectors:
           pathInputs:
             monitor: monitor-id
         maxResponseBytes: 65536
-        responseRequired: [/id, /name, /type, /overall_state]
-        responseResources:
-          /id: monitors
-        responseResourceInputs:
-          /id: monitor-id
+        responseRequired: [ /id, /name, /type, /overall_state ]
         responseTypes:
           /id: integer
           /name: string
           /type: string
           /overall_state: string
+        responseResourceInputs:
+          /id: monitor-id
+        responseResources:
+          /id: monitors
         project:
           monitor-id: /id
           name: /name
@@ -74,7 +74,7 @@ connectors:
         tool: datadog_get_incident
         credential: incident-reader
         inputs:
-          incident-id:
+          incident-id: &datadog-input-incident-id
             type: string
             required: true
             maxLength: 36
@@ -90,14 +90,14 @@ connectors:
         maxResponseBytes: 65536
         responseChecks:
           /data/type: incidents
-        responseRequired: [/data/id, /data/attributes/title]
-        responseResources:
-          /data/id: incidents
-        responseInputs:
-          /data/id: incident-id
+        responseRequired: [ /data/id, /data/attributes/title ]
         responseTypes:
           /data/id: string
           /data/attributes/title: string
+        responseInputs:
+          /data/id: incident-id
+        responseResources:
+          /data/id: incidents
         project:
           incident-id: /data/id
           title: /data/attributes/title
@@ -105,18 +105,14 @@ connectors:
       rename-incident:
         credential: incident-writer
         inputs:
-          incident-id:
-            type: string
-            required: true
-            maxLength: 36
-            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          incident-id: *datadog-input-incident-id
           title:
-            sanitize: title
-            minLength: 20
             type: string
             required: true
+            minLength: 20
             maxLength: 128
             pattern: \S
+            sanitize: title
         resources:
           incident-id: incidents
         request:
@@ -139,22 +135,21 @@ connectors:
         maxResponseBytes: 65536
         responseChecks:
           /data/type: incidents
-        responseRequired: [/data/id, /data/attributes/title]
-        responseResources:
-          /data/id: incidents
-        responseInputs:
-          /data/id: incident-id
-          /data/attributes/title: title
+        responseRequired: [ /data/id, /data/attributes/title ]
         responseTypes:
           /data/id: string
           /data/attributes/title: string
+        responseInputs:
+          /data/id: incident-id
+          /data/attributes/title: title
+        responseResources:
+          /data/id: incidents
         project:
           incident-id: /data/id
           title: /data/attributes/title
 import-schema:
   api-origin:
     type: choice
-    default: https://api.datadoghq.com
     options:
       - https://api.datadoghq.com
       - https://api.us3.datadoghq.com
@@ -163,25 +158,32 @@ import-schema:
       - https://api.ap1.datadoghq.com
       - https://api.ap2.datadoghq.com
       - https://api.uk1.datadoghq.com
+    default: https://api.datadoghq.com
+    description: Approved Datadog regional API origin; select the region used by the OAuth connection.
   monitors:
     type: array
     items:
       type: string
     default: []
+    description: Exact approved monitor IDs as decimal strings; not names or search expressions.
   incidents:
     type: array
     items:
       type: string
     default: []
+    description: Exact approved incident UUID strings; monitor grants do not establish incident membership.
   monitor-reader-secret:
     type: string
     default: DATADOG_MONITOR_READ_OAUTH_TOKEN
+    description: Actions secret containing an approved partner OAuth token with monitors_read; not an API/application-key pair.
   incident-reader-secret:
     type: string
     default: DATADOG_INCIDENT_READ_OAUTH_TOKEN
+    description: Actions secret containing an approved partner OAuth token with incident_read.
   incident-writer-secret:
     type: string
     default: DATADOG_INCIDENT_WRITE_OAUTH_TOKEN
+    description: Separate Actions secret containing an approved partner OAuth token with incident_write.
 ---
 
 <!--

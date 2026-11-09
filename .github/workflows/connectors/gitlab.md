@@ -17,14 +17,14 @@ connectors:
         phase: agent
         header: PRIVATE-TOKEN
         scheme: raw
-        scopes: [read_api]
+        scopes: [ read_api ]
         token:
           secret: ${{ github.aw.import-inputs.reader-secret }}
       writer:
         phase: safe-output
         header: PRIVATE-TOKEN
         scheme: raw
-        scopes: [api]
+        scopes: [ api ]
         token:
           secret: ${{ github.aw.import-inputs.writer-secret }}
     resources:
@@ -33,56 +33,52 @@ connectors:
       pipelines: ${{ github.aw.import-inputs.pipelines }}
     triggers:
       merge-request-opened:
+        verificationProfile: gitlab.com/standard-webhooks-hmac-sha256
+        nativeEvents: [ Merge Request Hook ]
         resourceOrigins:
           - ${{ github.aw.import-inputs.api-origin }}
-        verificationProfile: gitlab.com/standard-webhooks-hmac-sha256
-        nativeEvents: [Merge Request Hook]
         match:
           /object_kind: merge_request
           /object_attributes/action: open
-        normalize:
-          project: /project/id
-          subject: /object_attributes/iid
-        resources:
-          /project/id: projects
-          /object_attributes/target_project_id: projects
-          /object_attributes/iid: merge-requests
         types:
           /project/id: integer
           /object_attributes/target_project_id: integer
           /object_attributes/iid: integer
+        resources:
+          /project/id: projects
+          /object_attributes/target_project_id: projects
+          /object_attributes/iid: merge-requests
+        normalize:
+          project: /project/id
+          subject: /object_attributes/iid
       pipeline-updated:
+        verificationProfile: gitlab.com/standard-webhooks-hmac-sha256
+        nativeEvents: [ Pipeline Hook ]
         resourceOrigins:
           - ${{ github.aw.import-inputs.api-origin }}
-        verificationProfile: gitlab.com/standard-webhooks-hmac-sha256
-        nativeEvents: [Pipeline Hook]
         match:
           /object_kind: pipeline
+        types:
+          /project/id: integer
+          /object_attributes/id: integer
+        resources:
+          /project/id: projects
+          /object_attributes/id: pipelines
         normalize:
           project: /project/id
           subject: /object_attributes/id
           status: /object_attributes/status
-        resources:
-          /project/id: projects
-          /object_attributes/id: pipelines
-        types:
-          /project/id: integer
-          /object_attributes/id: integer
     tools:
       get-merge-request:
         tool: gitlab_get_merge_request
         credential: reader
         inputs:
-          project:
+          project: &gitlab-input-project
             type: string
             required: true
             maxLength: 15
             pattern: ^[1-9][0-9]{0,14}$
-          merge-request:
-            type: string
-            required: true
-            maxLength: 15
-            pattern: ^[1-9][0-9]{0,14}$
+          merge-request: *gitlab-input-project
         resources:
           project: projects
           merge-request: merge-requests
@@ -94,7 +90,7 @@ connectors:
             project: project
             merge-request: merge-request
         maxResponseBytes: 65536
-        responseRequired: [/id, /project_id, /iid, /title, /state, /draft]
+        responseRequired: [ /id, /project_id, /iid, /title, /state, /draft ]
         responseTypes:
           /id: integer
           /project_id: integer
@@ -102,12 +98,12 @@ connectors:
           /title: string
           /state: string
           /draft: boolean
-        responseResources:
-          /project_id: projects
-          /iid: merge-requests
         responseResourceInputs:
           /project_id: project
           /iid: merge-request
+        responseResources:
+          /project_id: projects
+          /iid: merge-requests
         project:
           id: /id
           project: /project_id
@@ -119,16 +115,8 @@ connectors:
         tool: gitlab_get_pipeline
         credential: reader
         inputs:
-          project:
-            type: string
-            required: true
-            maxLength: 15
-            pattern: ^[1-9][0-9]{0,14}$
-          pipeline:
-            type: string
-            required: true
-            maxLength: 15
-            pattern: ^[1-9][0-9]{0,14}$
+          project: *gitlab-input-project
+          pipeline: *gitlab-input-project
         resources:
           project: projects
           pipeline: pipelines
@@ -140,7 +128,7 @@ connectors:
             project: project
             pipeline: pipeline
         maxResponseBytes: 65536
-        responseRequired: [/id, /project_id, /status, /sha, /ref, /source]
+        responseRequired: [ /id, /project_id, /status, /sha, /ref, /source ]
         responseTypes:
           /id: integer
           /project_id: integer
@@ -148,12 +136,12 @@ connectors:
           /sha: string
           /ref: string
           /source: string
-        responseResources:
-          /project_id: projects
-          /id: pipelines
         responseResourceInputs:
           /project_id: project
           /id: pipeline
+        responseResources:
+          /project_id: projects
+          /id: pipelines
         project:
           pipeline: /id
           project: /project_id
@@ -165,23 +153,15 @@ connectors:
       add-merge-request-note:
         credential: writer
         inputs:
-          project:
-            type: string
-            required: true
-            maxLength: 15
-            pattern: ^[1-9][0-9]{0,14}$
-          merge-request:
-            type: string
-            required: true
-            maxLength: 15
-            pattern: ^[1-9][0-9]{0,14}$
+          project: *gitlab-input-project
+          merge-request: *gitlab-input-project
           body:
-            sanitize: body
-            minLength: 1
             type: string
             required: true
+            minLength: 1
             maxLength: 2000
             pattern: ^[A-Za-z0-9][^\r\n]*(?:\r?\n[ \t]*(?:[^/ \t\r\n][^\r\n]*)?)*$
+            sanitize: body
         resources:
           project: projects
           merge-request: merge-requests
@@ -199,17 +179,17 @@ connectors:
         responseChecks:
           /noteable_type: MergeRequest
           /system: false
-        responseRequired: [/id, /project_id, /noteable_iid]
+        responseRequired: [ /id, /project_id, /noteable_iid ]
         responseTypes:
           /id: integer
           /project_id: integer
           /noteable_iid: integer
-        responseResources:
-          /project_id: projects
-          /noteable_iid: merge-requests
         responseResourceInputs:
           /project_id: project
           /noteable_iid: merge-request
+        responseResources:
+          /project_id: projects
+          /noteable_iid: merge-requests
         project:
           note: /id
           project: /project_id
@@ -218,27 +198,33 @@ import-schema:
   api-origin:
     type: string
     default: https://gitlab.com
+    description: Exact approved GitLab HTTPS origin, including a reviewed self-managed host; not an API path.
   projects:
     type: array
     items:
       type: string
     default: []
+    description: Exact approved numeric project IDs as strings.
   merge-requests:
     type: array
     items:
       type: string
     default: []
+    description: Exact approved project-local merge-request IID strings, not global merge-request IDs.
   pipelines:
     type: array
     items:
       type: string
     default: []
+    description: Exact approved pipeline ID strings, not pipeline IIDs.
   reader-secret:
     type: string
     default: GITLAB_READ_TOKEN
+    description: Actions secret containing a raw project-scoped token with read_api for the PRIVATE-TOKEN header.
   writer-secret:
     type: string
     default: GITLAB_NOTE_TOKEN
+    description: Separate Actions secret containing a raw project-scoped token with api for approved note writes.
 ---
 <!--
 <connector-documentation id="gitlab" version="1">

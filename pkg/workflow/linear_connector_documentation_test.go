@@ -106,8 +106,8 @@ func checkLinearDocumentedCredentials(t *testing.T, frontmatter map[string]any, 
 func TestLinearConnectorDocumentationContract(t *testing.T) {
 	documentation := loadLinearDocumentation(t)
 	require.Equal(t, []linearDocumentedCredential{
-		{ID: "reader", Secret: "LINEAR_API_KEY", Phase: "agent", Scheme: "raw"},
-		{ID: "writer", Secret: "LINEAR_API_KEY", Phase: "safe-output", Scheme: "raw"},
+		{ID: "reader", Secret: "LINEAR_READ_API_KEY", Phase: "agent", Scheme: "raw"},
+		{ID: "writer", Secret: "LINEAR_WRITE_API_KEY", Phase: "safe-output", Scheme: "raw"},
 		{ID: "mcp-reader", Secret: "LINEAR_READ_MCP_TOKEN", Phase: "agent", Scheme: "bearer"},
 	}, documentation.Credentials)
 	require.Len(t, documentation.Tools, 3)

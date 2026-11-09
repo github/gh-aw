@@ -8,86 +8,163 @@ connectors:
       - https://www.servicenow.com/docs/r/platform-security/authentication/client-credentials-grant-workflow.html
       - https://www.servicenow.com/docs/r/platform-security/authentication/configure-rest-api-auth-scope.html
       - https://www.servicenow.com/docs/r/yokohama/platform-administration/c_JournalFields.html
+    endpoints:
+      instance: ${{ github.aw.import-inputs.instance }}
     credentials:
       reader:
-        header: Authorization
         phase: agent
+        header: Authorization
         scheme: bearer
         scopes:
           - ${{ github.aw.import-inputs.reader-scope }}
         secret: ${{ github.aw.import-inputs.reader-secret }}
       writer:
-        header: Authorization
         phase: safe-output
+        header: Authorization
         scheme: bearer
         scopes:
           - ${{ github.aw.import-inputs.writer-scope }}
         secret: ${{ github.aw.import-inputs.writer-secret }}
-    endpoints:
-      instance: ${{ github.aw.import-inputs.instance }}
+    resources:
+      incidents: ${{ github.aw.import-inputs.incidents }}
+      requested-items: ${{ github.aw.import-inputs.requested-items }}
     triggers:
       incident-updated:
+        verificationProfile: gh-aw.local/servicenow-admin-ingress
+        nativeEvents:
+          - record.updated
         resourceOrigins:
           - ${{ github.aw.import-inputs.instance }}
         match:
           /event: record.updated
           /instance: ${{ github.aw.import-inputs.instance }}
           /table: incident
-        nativeEvents:
-          - record.updated
-        normalize:
-          delivery-id: /delivery_id
-          subject: /sys_id
-        resources:
-          /sys_id: incidents
         types:
           /delivery_id: string
           /sys_id: string
-        verificationProfile: gh-aw.local/servicenow-admin-ingress
+        resources:
+          /sys_id: incidents
+        normalize:
+          delivery-id: /delivery_id
+          subject: /sys_id
       requested-item-updated:
+        verificationProfile: gh-aw.local/servicenow-admin-ingress
+        nativeEvents:
+          - record.updated
         resourceOrigins:
           - ${{ github.aw.import-inputs.instance }}
         match:
           /event: record.updated
           /instance: ${{ github.aw.import-inputs.instance }}
           /table: sc_req_item
-        nativeEvents:
-          - record.updated
-        normalize:
-          delivery-id: /delivery_id
-          subject: /sys_id
-        resources:
-          /sys_id: requested-items
         types:
           /delivery_id: string
           /sys_id: string
-        verificationProfile: gh-aw.local/servicenow-admin-ingress
-    resources:
-      incidents: ${{ github.aw.import-inputs.incidents }}
-      requested-items: ${{ github.aw.import-inputs.requested-items }}
+        resources:
+          /sys_id: requested-items
+        normalize:
+          delivery-id: /delivery_id
+          subject: /sys_id
+    tools:
+      get-incident:
+        tool: get-incident
+        credential: reader
+        inputs:
+          record: &servicenow-input-record
+            type: string
+            required: true
+            maxLength: 32
+            pattern: ^[0-9a-f]{32}$
+        resources:
+          record: incidents
+        request:
+          endpoint: instance
+          method: GET
+          path: /api/now/table/incident/{record}
+          pathInputs:
+            record: record
+          query:
+            sysparm_display_value:
+              literal: "false"
+            sysparm_exclude_reference_link:
+              literal: "true"
+            sysparm_fields:
+              literal: sys_id,number,state,sys_mod_count
+        maxResponseBytes: 8192
+        responseRequired:
+          - /result/sys_id
+          - /result/number
+          - /result/state
+          - /result/sys_mod_count
+        responseTypes:
+          /result/number: string
+          /result/state: string
+          /result/sys_id: string
+          /result/sys_mod_count: string
+        responseInputs:
+          /result/sys_id: record
+        responseResources:
+          /result/sys_id: incidents
+        project:
+          number: /result/number
+          revision: /result/sys_mod_count
+          state: /result/state
+          sys-id: /result/sys_id
+      get-requested-item:
+        tool: get-requested-item
+        credential: reader
+        inputs:
+          record: *servicenow-input-record
+        resources:
+          record: requested-items
+        request:
+          endpoint: instance
+          method: GET
+          path: /api/now/table/sc_req_item/{record}
+          pathInputs:
+            record: record
+          query:
+            sysparm_display_value:
+              literal: "false"
+            sysparm_exclude_reference_link:
+              literal: "true"
+            sysparm_fields:
+              literal: sys_id,number,state,sys_mod_count
+        maxResponseBytes: 8192
+        responseRequired:
+          - /result/sys_id
+          - /result/number
+          - /result/state
+          - /result/sys_mod_count
+        responseTypes:
+          /result/number: string
+          /result/state: string
+          /result/sys_id: string
+          /result/sys_mod_count: string
+        responseInputs:
+          /result/sys_id: record
+        responseResources:
+          /result/sys_id: requested-items
+        project:
+          number: /result/number
+          revision: /result/sys_mod_count
+          state: /result/state
+          sys-id: /result/sys_id
     safe-outputs:
       append-incident-work-note:
         credential: writer
         inputs:
-          note:
-            sanitize: body
+          note: &servicenow-input-note
+            type: string
+            required: true
             minLength: 1
             maxLength: 4000
             pattern: (?s)^.*\S.*$
-            required: true
-            type: string
-          record:
-            maxLength: 32
-            pattern: ^[0-9a-f]{32}$
-            required: true
-            type: string
-        maxResponseBytes: 1024
-        project:
-          sys-id: /result/sys_id
+            sanitize: body
+          record: *servicenow-input-record
+        resources:
+          record: incidents
         request:
-          body:
-            work_notes:
-              input: note
           endpoint: instance
           method: PATCH
           path: /api/now/table/incident/{record}
@@ -100,38 +177,28 @@ connectors:
               literal: "true"
             sysparm_fields:
               literal: sys_id
-        resources:
-          record: incidents
-        responseInputs:
-          /result/sys_id: record
+          body:
+            work_notes:
+              input: note
+        maxResponseBytes: 1024
         responseRequired:
           - /result/sys_id
-        responseResources:
-          /result/sys_id: incidents
         responseTypes:
           /result/sys_id: string
+        responseInputs:
+          /result/sys_id: record
+        responseResources:
+          /result/sys_id: incidents
+        project:
+          sys-id: /result/sys_id
       append-requested-item-work-note:
         credential: writer
         inputs:
-          note:
-            sanitize: body
-            minLength: 1
-            maxLength: 4000
-            pattern: (?s)^.*\S.*$
-            required: true
-            type: string
-          record:
-            maxLength: 32
-            pattern: ^[0-9a-f]{32}$
-            required: true
-            type: string
-        maxResponseBytes: 1024
-        project:
-          sys-id: /result/sys_id
+          note: *servicenow-input-note
+          record: *servicenow-input-record
+        resources:
+          record: requested-items
         request:
-          body:
-            work_notes:
-              input: note
           endpoint: instance
           method: PATCH
           path: /api/now/table/sc_req_item/{record}
@@ -144,131 +211,53 @@ connectors:
               literal: "true"
             sysparm_fields:
               literal: sys_id
-        resources:
-          record: requested-items
-        responseInputs:
-          /result/sys_id: record
+          body:
+            work_notes:
+              input: note
+        maxResponseBytes: 1024
         responseRequired:
           - /result/sys_id
+        responseTypes:
+          /result/sys_id: string
+        responseInputs:
+          /result/sys_id: record
         responseResources:
           /result/sys_id: requested-items
-        responseTypes:
-          /result/sys_id: string
-    tools:
-      get-incident:
-        credential: reader
-        inputs:
-          record:
-            maxLength: 32
-            pattern: ^[0-9a-f]{32}$
-            required: true
-            type: string
-        maxResponseBytes: 8192
         project:
-          number: /result/number
-          revision: /result/sys_mod_count
-          state: /result/state
           sys-id: /result/sys_id
-        request:
-          endpoint: instance
-          method: GET
-          path: /api/now/table/incident/{record}
-          pathInputs:
-            record: record
-          query:
-            sysparm_display_value:
-              literal: "false"
-            sysparm_exclude_reference_link:
-              literal: "true"
-            sysparm_fields:
-              literal: sys_id,number,state,sys_mod_count
-        resources:
-          record: incidents
-        responseInputs:
-          /result/sys_id: record
-        responseRequired:
-          - /result/sys_id
-          - /result/number
-          - /result/state
-          - /result/sys_mod_count
-        responseResources:
-          /result/sys_id: incidents
-        responseTypes:
-          /result/number: string
-          /result/state: string
-          /result/sys_id: string
-          /result/sys_mod_count: string
-        tool: get-incident
-      get-requested-item:
-        credential: reader
-        inputs:
-          record:
-            maxLength: 32
-            pattern: ^[0-9a-f]{32}$
-            required: true
-            type: string
-        maxResponseBytes: 8192
-        project:
-          number: /result/number
-          revision: /result/sys_mod_count
-          state: /result/state
-          sys-id: /result/sys_id
-        request:
-          endpoint: instance
-          method: GET
-          path: /api/now/table/sc_req_item/{record}
-          pathInputs:
-            record: record
-          query:
-            sysparm_display_value:
-              literal: "false"
-            sysparm_exclude_reference_link:
-              literal: "true"
-            sysparm_fields:
-              literal: sys_id,number,state,sys_mod_count
-        resources:
-          record: requested-items
-        responseInputs:
-          /result/sys_id: record
-        responseRequired:
-          - /result/sys_id
-          - /result/number
-          - /result/state
-          - /result/sys_mod_count
-        responseResources:
-          /result/sys_id: requested-items
-        responseTypes:
-          /result/number: string
-          /result/state: string
-          /result/sys_id: string
-          /result/sys_mod_count: string
-        tool: get-requested-item
 import-schema:
   incidents:
-    default: []
+    type: array
     items:
       type: string
-    type: array
+    default: []
+    description: Exact approved lowercase 32-character incident sys_id strings.
   instance:
+    type: string
     default: https://example.service-now.com
-    type: string
+    description: Exact approved ServiceNow HTTPS instance origin; replace the specimen and retain reviewed ACLs.
   reader-scope:
+    type: string
     default: x_gh_aw.records.read
-    type: string
+    description: Instance-defined read OAuth scope documented by the operator; this string does not grant permissions.
   reader-secret:
-    default: SERVICENOW_READ_TOKEN
     type: string
+    default: SERVICENOW_READ_TOKEN
+    description: Actions secret containing the instance OAuth access token for approved record reads.
   requested-items:
-    default: []
+    type: array
     items:
       type: string
-    type: array
+    default: []
+    description: Exact approved lowercase 32-character requested-item sys_id strings.
   writer-scope:
+    type: string
     default: x_gh_aw.records.work-notes
-    type: string
+    description: Instance-defined work-note OAuth scope documented by the operator; not an ACL or permission grant.
   writer-secret:
-    default: SERVICENOW_WRITE_TOKEN
     type: string
+    default: SERVICENOW_WRITE_TOKEN
+    description: Separate Actions secret containing the instance OAuth access token for approved work-note writes.
 ---
 
 <!--

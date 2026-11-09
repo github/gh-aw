@@ -73,6 +73,19 @@ Unknown declaration fields MUST fail. There is no public connector `context`
 configuration. Content is obtained through selected readers; the compiler MUST
 NOT hydrate event references or run automatic context fetches.
 
+For authoring consistency, declarations SHOULD order fields as `experimental`,
+`docs`, `endpoints`, `credentials`, `resources`, `triggers`, `tools`,
+`mcp-servers`, and `safe-outputs`. Primitive inputs SHOULD put `type` and
+`required` before bounds, `enum`, `pattern`, and `sanitize`. Import bindings
+SHOULD include concise descriptions and explicit array item types. These are
+source-format conventions, not semantic map-order requirements. Authors MAY
+reuse provider-local anchors for identical primitive schemas but MUST preserve
+scalar quoting, alias dependencies, array order, and independent resource,
+credential, and response-evidence contracts.
+Merge keys SHOULD precede explicit overrides for compiler compatibility.
+Additional nesting in already-aliased containers requires actual Go/Node
+conformance evidence, not only a structural YAML parse.
+
 ### 2.2 Internal versioned documents
 
 The compiler lowers a declaration into frozen internal documents with
@@ -99,6 +112,11 @@ REST read-tool names come from `tool`; HTTP MCP names are derived from the
 registration and native method. Effect selectors use hyphens; generated effect
 MCP tool names use underscores, for example `example_add_note`. Authors MUST
 inspect generated schemas rather than invent a tool prefix.
+
+New local REST/GraphQL reader `tool` names SHOULD use unprefixed snake_case.
+Existing hyphenated and provider-prefixed reader names remain supported; a
+selector MUST NOT be silently converted into a callable reader name. Hosted
+HTTP MCP methods MUST retain their exact native names and case.
 
 The compiler MUST remove unselected capabilities and unused endpoints, grants,
 and credential references from each delivered phase plan. Writer credentials

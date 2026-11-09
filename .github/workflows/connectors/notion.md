@@ -10,30 +10,31 @@ connectors:
       - https://developers.notion.com/reference/create-a-comment
       - https://developers.notion.com/reference/comment-object
       - https://developers.notion.com/reference/request-limits
+    endpoints:
+      api: https://api.notion.com
     credentials:
       reader:
-        header: Authorization
         phase: agent
+        header: Authorization
         scheme: bearer
         scopes:
           - Read content
         secret: ${{ github.aw.import-inputs.reader-secret }}
       writer:
-        header: Authorization
         phase: safe-output
+        header: Authorization
         scheme: bearer
         scopes:
           - Insert comments
         secret: ${{ github.aw.import-inputs.writer-secret }}
-    endpoints:
-      api: https://api.notion.com
     resources:
       pages: ${{ github.aw.import-inputs.pages }}
     tools:
       get-page:
+        tool: get_page
         credential: reader
         inputs:
-          page-id:
+          page-id: &notion-input-page-id
             type: string
             required: true
             maxLength: 36
@@ -56,10 +57,6 @@ connectors:
         responseChecks:
           /object: page
           /in_trash: false
-        responseInputs:
-          /id: page-id
-        responseResources:
-          /id: pages
         responseRequired:
           - /url
           - /last_edited_time
@@ -68,27 +65,26 @@ connectors:
           /url: string
           /last_edited_time: string
           /in_trash: boolean
+        responseInputs:
+          /id: page-id
+        responseResources:
+          /id: pages
         project:
           page-id: /id
           url: /url
           last-edited-time: /last_edited_time
-        tool: get_page
     safe-outputs:
       add-comment:
         credential: writer
         inputs:
-          page-id:
-            type: string
-            required: true
-            maxLength: 36
-            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          page-id: *notion-input-page-id
           text:
-            sanitize: body
-            minLength: 1
             type: string
             required: true
+            minLength: 1
             maxLength: 2000
             pattern: '[^\x09-\x0d\x20]'
+            sanitize: body
         resources:
           page-id: pages
         request:
@@ -116,11 +112,6 @@ connectors:
         responseChecks:
           /object: comment
           /parent/type: page_id
-        responseInputs:
-          /parent/page_id: page-id
-          /rich_text/0/text/content: text
-        responseResources:
-          /parent/page_id: pages
         responseRequired:
           - /id
           - /discussion_id
@@ -131,6 +122,11 @@ connectors:
           /created_time: string
           /parent/page_id: string
           /rich_text/0/text/content: string
+        responseInputs:
+          /parent/page_id: page-id
+          /rich_text/0/text/content: text
+        responseResources:
+          /parent/page_id: pages
         project:
           comment-id: /id
           discussion-id: /discussion_id
@@ -142,12 +138,15 @@ import-schema:
     items:
       type: string
     default: []
+    description: Exact approved lowercase hyphenated page UUIDs; connection capabilities and page sharing are also required.
   reader-secret:
     type: string
     default: NOTION_READ_TOKEN
+    description: Actions secret containing the internal connection token with Read content for approved pages.
   writer-secret:
     type: string
     default: NOTION_COMMENT_WRITE_TOKEN
+    description: Separate Actions secret containing the internal connection token with Insert comments for approved pages.
 ---
 
 <!--

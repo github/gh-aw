@@ -8,25 +8,25 @@ connectors:
       - https://developer.zendesk.com/api-reference/ticketing/tickets/tickets/
       - https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_comments/
       - https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_audits/
+    endpoints:
+      support: https://${{ github.aw.import-inputs.subdomain }}.zendesk.com
     credentials:
       reader:
-        header: Authorization
         phase: agent
+        header: Authorization
         scheme: bearer
         scopes:
           - tickets:read
         token:
           secret: ${{ github.aw.import-inputs.reader-secret }}
       writer:
-        header: Authorization
         phase: safe-output
+        header: Authorization
         scheme: bearer
         scopes:
           - tickets:write
         token:
           secret: ${{ github.aw.import-inputs.writer-secret }}
-    endpoints:
-      support: https://${{ github.aw.import-inputs.subdomain }}.zendesk.com
     resources:
       subdomains:
         - "${{ github.aw.import-inputs.subdomain }}"
@@ -36,14 +36,15 @@ connectors:
         - https://${{ github.aw.import-inputs.subdomain }}.zendesk.com/api/v2/tickets/${{ github.aw.import-inputs.ticket }}
     tools:
       get-ticket:
+        tool: get_ticket
         credential: reader
         inputs:
-          subdomain:
+          subdomain: &zendesk-input-subdomain
             type: string
             required: true
             maxLength: 63
             pattern: ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$
-          ticket:
+          ticket: &zendesk-input-ticket
             type: string
             required: true
             maxLength: 15
@@ -78,28 +79,19 @@ connectors:
           status: /ticket/status
           subject: /ticket/subject
           updated-at: /ticket/updated_at
-        tool: get_ticket
     safe-outputs:
       add-internal-note:
         credential: writer
         inputs:
-          subdomain:
-            type: string
-            required: true
-            maxLength: 63
-            pattern: ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$
-          ticket:
-            type: string
-            required: true
-            maxLength: 15
-            pattern: ^[1-9][0-9]{0,14}$
+          subdomain: *zendesk-input-subdomain
+          ticket: *zendesk-input-ticket
           text:
-            sanitize: body
-            minLength: 1
             type: string
             required: true
+            minLength: 1
             maxLength: 4000
             pattern: ^[^{}]*[^{} \t\r\n\f\x0B][^{}]*$
+            sanitize: body
         resources:
           subdomain: subdomains
           ticket: tickets
@@ -119,6 +111,9 @@ connectors:
                     public:
                       literal: false
         maxResponseBytes: 65536
+        responseChecks:
+          /audit/events/0/type: Comment
+          /audit/events/0/public: false
         responseRequired:
           - /ticket/id
           - /audit/id
@@ -133,14 +128,11 @@ connectors:
           /audit/created_at: string
           /audit/events/0/id: integer
           /audit/events/0/body: string
+        responseInputs:
+          /audit/events/0/body: text
         responseResources:
           /ticket/id: tickets
           /audit/ticket_id: tickets
-        responseChecks:
-          /audit/events/0/type: Comment
-          /audit/events/0/public: false
-        responseInputs:
-          /audit/events/0/body: text
         project:
           ticket-id: /ticket/id
           audit-id: /audit/id
