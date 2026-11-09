@@ -903,6 +903,19 @@ test("structured bookkeeping validates its version, kind, hashes, work tokens, a
   assert.equal(readSousChefData("```json\n" + JSON.stringify(followUp) + "\n```"), null);
 });
 
+test("comment parser limits are diagnosed without swallowing unexpected errors", t => {
+  const warnings = [];
+  t.mock.method(global.core, "warning", message => warnings.push(message));
+  const data = formatSousChefData(classify(failingPr, detail(), [], [], now), "running");
+  const nested = depth => "<details>\n<summary>Nested</summary>\n\n".repeat(depth) + "```json\n" + JSON.stringify(data) + "\n```\n" + "\n</details>\n".repeat(depth);
+  assert.deepEqual(readSousChefData(nested(16)), data);
+  assert.equal(readSousChefData(nested(17)), null);
+  assert.deepEqual(warnings, ["Ignoring unreadable PR Sous Chef comment data: Report details nesting exceeds the maximum depth"]);
+  assert.equal(readSousChefData('<img alt="&' + "amp;".repeat(80) + '#34;">\n"pr-sous-chef"'), null);
+  assert.equal(warnings[1], "Ignoring unreadable PR Sous Chef comment data: Publication text contains excessively nested encodings");
+  assert.throws(() => readSousChefData({ includes: () => true }), TypeError);
+});
+
 test("new structured readers retain active and pending legacy marker compatibility", () => {
   const first = classify(failingPr, detail(), [], [], now);
   const data = formatSousChefData(first, "running");
@@ -1073,6 +1086,7 @@ const completedTask = {
   conclusion: "success",
   head_branch: pr.headRefName,
   pull_requests: [{ number: pr.number }],
+  created_at: "2026-10-03T16:35:00Z",
   updated_at: "2026-10-03T17:00:00Z",
   html_url: "https://github.com/github/gh-aw/actions/runs/17",
 };
@@ -1106,6 +1120,9 @@ test("completion follow-ups require a successful, idle, PR-scoped Copilot task a
   for (const changes of [
     { status: "in_progress" },
     { conclusion: "failure" },
+    { event: "workflow_dispatch" },
+    { created_at: undefined },
+    { created_at: recent },
     { head_branch: "other-branch" },
     { pull_requests: [{ number: 99 }] },
     { name: "Code scanning", path: "dynamic/agents/github-advanced-security" },
@@ -1122,6 +1139,26 @@ test("completion follow-ups require a successful, idle, PR-scoped Copilot task a
   const approval = { ...failingPr, statusCheckRollup: [{ name: "CGO", status: "COMPLETED", conclusion: "ACTION_REQUIRED" }] };
   assert.ok(!classify(approval, detail(), [running], [completedTask], now).ci_follow_up);
   assert.equal(classify(failingPr, detail(), [running], [completedTask, { ...completedTask, id: 18, status: "in_progress" }], now).skip_reason, "agent_active");
+  const requested = { ...running, body: formatAssignmentRequest(first) };
+  const acknowledged = { ...running, created_at: "2026-10-03T16:40:00Z" };
+  assert.ok(classify(failingPr, detail(), [requested, acknowledged], [completedTask], now).ci_follow_up);
+  assert.ok(!classify(failingPr, detail(), [acknowledged], [completedTask], now).ci_follow_up);
+});
+
+test("legacy completion follow-ups remain deduplicated after structured publication", () => {
+  const first = classify(failingPr, detail(), [], [], now);
+  const data = formatSousChefData(first, "running");
+  const running = {
+    ...nudge(first.state_fingerprint),
+    body: `Sous-chef head: ${data.head}\nSous-chef work: ${data.work.join(" ")}\nSous-chef state: ${data.state}`,
+  };
+  const result = classify(failingPr, detail(), [running], [completedTask], now);
+  assert.equal(result.ci_follow_up.run_id, completedTask.id);
+  const legacy = { ...nudge(first.state_fingerprint, "2026-10-03T17:15:00Z"), body: `CI remains failing\nSous-chef ci-follow-up: ${completedTask.id}` };
+  assert.equal(classify(failingPr, detail(), [running, legacy], [completedTask], now).skip_reason, "unchanged");
+  const updatedHead = { ...failingPr, headRefOid: "completed-head" };
+  assert.equal(classify(updatedHead, detail(), [running, response(), legacy], [completedTask], now).skip_reason, "unchanged");
+  assert.equal(classify(updatedHead, detail(), [running, response(), { ...legacy, user: { login: "outsider" } }], [completedTask], now).ci_follow_up.run_id, 17);
 });
 
 const budgets = {
@@ -1156,6 +1193,142 @@ function queueAPI({ listed = [pr], candidate = graphPr, head = headCommit, check
     },
   };
 }
+
+test("scheduled and targeted refreshes ignore oversized outsider comments and diagnose trusted parser limits", async t => {
+  const warnings = [];
+  t.mock.method(global.core, "warning", message => warnings.push(message));
+  const malformed = "<details>\n<summary>Nested</summary>\n\n".repeat(17) + '"pr-sous-chef"\n' + "\n</details>\n".repeat(17);
+  for (const number of [undefined, "42"]) {
+    for (const user of ["outsider", "gh-aw-bot"]) {
+      warnings.length = 0;
+      const { api } = queueAPI({
+        listed: [pr, { ...pr, number: 43 }],
+        candidate: { ...graphPr, mergeStateStatus: "BLOCKED" },
+        checks: [{ name: "CGO", status: "completed", conclusion: "failure" }],
+        comments: [{ id: 9, user: { login: user }, body: malformed, created_at: recent }],
+      });
+      const queue = await fetchQueue(
+        "github/gh-aw",
+        number,
+        args => {
+          const result = structuredClone(api(args));
+          if (args[1] === "graphql") result.data.repository.pullRequest.number = Number(args.at(-1).split("=")[1]);
+          return result;
+        },
+        now
+      );
+      assert.deepEqual(
+        queue.prs.map(item => item.number),
+        number ? [42] : [42, 43]
+      );
+      assert.ok(queue.prs.every(item => item.nudge_needed));
+      assert.equal(warnings.length, user === "outsider" ? 0 : number ? 1 : 2);
+    }
+  }
+});
+
+test("completed assignments cover unchanged work across a refreshed head, not new blockers or unproven tasks", async () => {
+  const first = classify(failingPr, detail([thread()]), [], [], now);
+  const running = { ...nudge(first.state_fingerprint), body: formatNudge(first) };
+  for (const number of [undefined, "42"]) {
+    for (const kind of ["running", "requested", "legacy"]) {
+      const assignment = {
+        ...running,
+        body:
+          kind === "running"
+            ? running.body
+            : kind === "requested"
+              ? formatAssignmentRequest(first)
+              : `Sous-chef head: ${first.headRefOid}\nSous-chef work: ${formatSousChefData(first, "running").work.join(" ")}\nSous-chef state: ${first.state_fingerprint}`,
+      };
+      for (const changes of [
+        {},
+        { completedRuns: [] },
+        { completedRuns: [{ ...completedTask, conclusion: "failure" }] },
+        { completedRuns: [{ ...completedTask, pull_requests: [{ number: 99 }] }] },
+        { completedRuns: [{ ...completedTask, updated_at: recent }] },
+        { completedRuns: [{ ...completedTask, created_at: recent }] },
+        {
+          comments: [
+            assignment,
+            { ...nudge(first.state_fingerprint, "2026-10-03T16:32:00Z"), body: formatNudge(classify({ ...failingPr, statusCheckRollup: [{ name: "Different CI", status: "COMPLETED", conclusion: "FAILURE" }] }, detail(), [], [], now)) },
+            response(),
+          ],
+        },
+        { checks: [{ name: "New CI", status: "completed", conclusion: "failure" }] },
+        { checks: [{ name: "CGO", status: "completed", conclusion: "error" }] },
+        { data: detail([thread({ id: "new-review" })]) },
+        { candidate: { ...graphPr, headRefOid: "updated-head", mergeStateStatus: "DIRTY" } },
+        { candidate: { ...graphPr, headRefOid: "updated-head", mergeStateStatus: "BEHIND" } },
+        { head: { sha: "updated-head", commit: { committer: { date: "2026-10-03T17:15:00Z" } } } },
+      ]) {
+        const { api, calls } = queueAPI({
+          candidate: { ...graphPr, headRefOid: "updated-head", mergeStateStatus: "BLOCKED" },
+          head: { ...headCommit, sha: "updated-head" },
+          checks: [{ name: "CGO", status: "completed", conclusion: "failure" }],
+          comments: [assignment, response()],
+          completedRuns: [completedTask],
+          ...changes,
+        });
+        const queue = await fetchQueue("github/gh-aw", number, api, now);
+        assert.equal(queue.prs.length, 1, `${kind}: ${JSON.stringify(changes)}`);
+        const result = queue.prs[0];
+        assert.equal(result.nudge_needed, Object.keys(changes).length > 0, `${kind}: ${JSON.stringify(changes)}`);
+        assert.equal(Boolean(result.ci_follow_up), Object.keys(changes).length === 0);
+        assert.equal(calls.filter(args => args[1].includes("status=completed&event=dynamic")).length, 1);
+        if (!result.ci_follow_up) continue;
+        assert.equal(formatAssignmentRequest(result), null);
+        const followUp = { ...nudge(result.state_fingerprint, "2026-10-03T17:15:00Z"), body: formatCIFollowUp(result) };
+        assert.equal(classify({ ...failingPr, headRefOid: "updated-head" }, detail(), [assignment, response(), followUp], [completedTask], now).skip_reason, "unchanged");
+      }
+    }
+  }
+});
+
+test("unsafe CI and review destinations render as text while valid HTTPS links remain clickable", async () => {
+  const unsafeURLs = [
+    undefined,
+    "",
+    "http://ci.example.com/run/1",
+    "javascript:alert(1)",
+    "not a URL",
+    "https://",
+    "https://user:secret@github.com/run/1",
+    "https://user@github.com/run/1",
+    "https://github.com/white space",
+    "https://github.com\\run\\1",
+    "https://github.com/run?x=1&amp;y=2",
+  ];
+  const safeURL = "https://github.com/github/gh-aw/actions/runs/2";
+  const first = classify({ ...failingPr, statusCheckRollup: [...failingPr.statusCheckRollup, { name: "external-ci", status: "COMPLETED", conclusion: "FAILURE" }] }, detail(), [], [], now);
+  for (const url of [...unsafeURLs, safeURL]) {
+    for (const completed of [false, true]) {
+      const feedback = thread();
+      feedback.comments.nodes[0].url = url;
+      const { api } = queueAPI({
+        candidate: { ...graphPr, mergeStateStatus: "BLOCKED" },
+        statuses: [
+          { context: "external-ci", state: "failure", target_url: url },
+          { context: "CGO", state: "failure", target_url: safeURL },
+        ],
+        data: completed ? detail() : detail([feedback]),
+        comments: completed ? [{ ...nudge(first.state_fingerprint), body: formatNudge(first) }] : [],
+        completedRuns: completed ? [{ ...completedTask, html_url: url }] : [],
+      });
+      const result = (await fetchQueue("github/gh-aw", "42", api, now)).prs[0];
+      const body = completed ? formatCIFollowUpBody(result) : formatAssignmentBody(result);
+      assert.ok(body);
+      assert.match(body, /\[Check run\]\(https:\/\/github\.com\/github\/gh-aw\/actions\/runs\/2\)/);
+      if (url === safeURL) {
+        assert.match(body, completed ? /\[Completed task\]\(https:/ : /\[Review comment\]\(https:/);
+      } else {
+        assert.doesNotMatch(body, /\[Completed task\]|\[Review comment\]/);
+        if (!completed || url) assert.match(body, /see the PR checks/);
+        if (url && !safeURL.includes(url)) assert.ok(!body.includes(url), url);
+      }
+    }
+  }
+});
 
 test("scheduled and targeted queues refresh completed tasks only for previously assigned failing PRs", async () => {
   const first = classify(failingPr, detail(), [], [], now);

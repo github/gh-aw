@@ -256,11 +256,18 @@ Active agents block action regardless of how long they have been running.
 After an assigned Copilot coding task completes successfully and has been idle
 for ten minutes, remaining CI failures may receive one status-only follow-up per
 completed task. This includes unchanged failures and a last conversation comment
-from PR Sous Chef. It does not start another assignment for the same work.
+from PR Sous Chef. A successful task can cover its recorded work across the head
+it pushed, even after a normal completion comment; new review/check tokens,
+later commits, and branch conflicts or behind status remain actionable.
+Completion evidence must not predate the matching request (or running
+acknowledgement when no request is recorded). It does not start another assignment
+for the same work.
 The prefilter checks up to 100 recent completed dynamic runs on that PR branch
 only when prior assignment data and concrete CI failures warrant a follow-up.
 Already-reported completions, unrelated agents, failed tasks, and approval-only
 checks do not qualify. Missing older completion evidence is not assumed.
+Legacy `Sous-chef ci-follow-up: <run-id>` comments still deduplicate completions;
+new follow-ups publish the structured envelope instead.
 Short-running pending CI also blocks action.
 PRs that only need human approval or a maintainer CI re-trigger need no agent nudge.
 

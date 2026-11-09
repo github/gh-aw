@@ -9,6 +9,7 @@ import "../actions/setup/js/shim.cjs";
 import { withRetry, isTransientError } from "../actions/setup/js/error_recovery.cjs";
 import { renderSizedReport } from "../actions/setup/js/report_size.cjs";
 import { parseReportMarkdown } from "../actions/setup/js/report_markdown.cjs";
+import { normalizeReportURL } from "../actions/setup/js/report_ast.cjs";
 import { validateValueAgainstSchema } from "../actions/setup/js/schema-validation.cjs";
 
 const execFile = promisify(execFileCallback);
@@ -24,6 +25,14 @@ const idleMs = 10 * 60 * 1000;
 const staleMs = 14 * 24 * 60 * 60 * 1000;
 const approvalWorkflows = new Set([".github/workflows/cjs.yml", ".github/workflows/cgo.yml", ".github/workflows/CWI.yml"]);
 const commentDataCache = new WeakMap();
+const unreadableReportErrors = new Set([
+  "Report template nesting exceeds the maximum depth",
+  "Report summary nesting exceeds the maximum depth",
+  "Report inline nesting exceeds the maximum depth",
+  "Report details nesting exceeds the maximum depth",
+  "Report text contains excessively nested encodings",
+  "Publication text contains excessively nested encodings",
+]);
 
 export const sousChefDataSchema = {
   type: "object",
@@ -59,11 +68,20 @@ export function readSousChefData(body) {
       }
     }
   }
-  visit(parseReportMarkdown(body, { agentTainted: true }));
+  let nodes;
+  try {
+    nodes = parseReportMarkdown(body, { agentTainted: true });
+  } catch (error) {
+    if (!(error instanceof TypeError) || !unreadableReportErrors.has(error.message)) throw error;
+    core.warning(`Ignoring unreadable PR Sous Chef comment data: ${error.message}`);
+    return null;
+  }
+  visit(nodes);
   return matches.length === 1 ? matches[0] : null;
 }
 
 function commentData(comment) {
+  if (!trustedSousChefAuthor(comment)) return null;
   const body = comment.body ?? "";
   const cached = commentDataCache.get(comment);
   if (cached?.body === body) return cached.data;
@@ -78,8 +96,9 @@ function recordedState(comment) {
 }
 
 function isAssignment(comment) {
+  if (!isSousChefComment(comment)) return false;
   const data = commentData(comment);
-  return isSousChefComment(comment) && (data ? ["requested", "running"].includes(data.kind) : /^Sous-chef (?:requested-)?state: [a-f0-9]{64}$/m.test(comment.body ?? ""));
+  return data ? ["requested", "running"].includes(data.kind) : /^Sous-chef (?:requested-)?state: [a-f0-9]{64}$/m.test(comment.body ?? "");
 }
 
 function epoch(value) {
@@ -117,11 +136,14 @@ function trustedReviewer(comment) {
   return trusted(comment) || ["copilot", "github-copilot", "copilot-pull-request-reviewer", "github-advanced-security"].includes(normalizedLogin(comment));
 }
 
+function trustedSousChefAuthor(comment) {
+  return trusted(comment) || ["copilot", "github-copilot", "copilot-swe-agent"].includes(normalizedLogin(comment));
+}
+
 function isSousChefComment(comment) {
   const body = comment.body ?? "";
-  const trustedAuthor = trusted(comment) || ["copilot", "github-copilot", "copilot-swe-agent"].includes(normalizedLogin(comment));
   return (
-    trustedAuthor &&
+    trustedSousChefAuthor(comment) &&
     (Boolean(commentData(comment)) ||
       body.includes(marker) ||
       statePattern.test(body) ||
@@ -133,12 +155,13 @@ function isSousChefComment(comment) {
 }
 
 function isNudge(comment) {
+  if (!isSousChefComment(comment)) return false;
   const body = comment.body ?? "";
   if (/The code changes were not applied\.|a fallback review issue was created instead due to protected file changes:|Direct push to the original pull request branch was not possible/.test(body)) return false;
   const data = commentData(comment);
-  if (data) return isSousChefComment(comment) && data.kind === "running";
+  if (data) return data.kind === "running";
   if (/^Sous-chef requested-state: [a-f0-9]{64}$/m.test(body) && !statePattern.test(body)) return false;
-  return isSousChefComment(comment) && (body.includes("@copilot") || statePattern.test(body));
+  return body.includes("@copilot") || statePattern.test(body);
 }
 
 function workTokens(pr) {
@@ -296,22 +319,11 @@ export function classify(pr, detail, comments, runs, now = Date.now()) {
     return previous === previousState;
   });
   const work = workTokens({ unresolved_reviews: feedback, failed_checks: failedChecks, zero_diff_stalled: zeroDiff });
-  const coveredWork = new Set(
-    nudges
-      .filter(comment => (commentData(comment)?.head ?? /^Sous-chef head: (\S+)$/m.exec(comment.body)?.[1]) === pr.headRefOid)
-      .flatMap(comment => {
-        const data = commentData(comment);
-        if (data?.kind === "running") return data.work;
-        const recorded = /^Sous-chef work: ([a-f0-9 ]+)$/m.exec(comment.body)?.[1];
-        return recorded?.split(" ") ?? [];
-      })
-  );
-  let nudgeSkip;
-  if (!branchAction && (alreadyNudged || (work.length && work.every(token => coveredWork.has(token))))) nudgeSkip = "unchanged";
-  else if (!branchAction && latest && !recordedState(latest) && activity <= epoch(latest.created_at)) nudgeSkip = "unchanged_legacy";
-  else if (!branchAction && !work.length) nudgeSkip = failedChecks.length ? "approval_required" : "nothing_actionable";
-  if (!nudgeSkip && lastComment && isSousChefComment(lastComment)) nudgeSkip = "last_comment_sous_chef";
-  const assignment = [...comments].filter(isAssignment).sort((a, b) => epoch(b.createdAt ?? b.created_at) - epoch(a.createdAt ?? a.created_at))[0];
+  const assignments = [...comments].filter(isAssignment).sort((a, b) => epoch(b.createdAt ?? b.created_at) - epoch(a.createdAt ?? a.created_at));
+  const assignment = assignments[0];
+  const assignmentState = comment => commentData(comment)?.state ?? /^Sous-chef (?:requested-)?state: ([a-f0-9]{64})$/m.exec(comment.body ?? "")?.[1];
+  const request = assignment && assignments.find(comment => assignmentState(comment) === assignmentState(assignment) && (commentData(comment)?.kind === "requested" || /^Sous-chef requested-state:/m.test(comment.body ?? "")));
+  const assignedAt = assignment ? epoch((request ?? assignment).createdAt ?? (request ?? assignment).created_at) : 0;
   const completedTask =
     assignment && failedChecks.some(check => check.conclusion !== "ACTION_REQUIRED")
       ? runs
@@ -323,14 +335,40 @@ export function classify(pr, detail, comments, runs, now = Date.now()) {
               run.id > 0 &&
               run.head_branch === pr.headRefName &&
               (run.pull_requests?.length ? run.pull_requests.every(item => item.number === pr.number) : true) &&
+              run.event === "dynamic" &&
               /^dynamic\/copilot-swe-agent(?:\/|$)/.test(run.path ?? "") &&
+              epoch(run.created_at ?? run.run_started_at) >= assignedAt &&
               epoch(run.updated_at) > epoch(assignment.createdAt ?? assignment.created_at) &&
               now - epoch(run.updated_at) >= idleMs
           )
           .sort((a, b) => epoch(b.updated_at) - epoch(a.updated_at))[0]
       : null;
+  const coveredWork = new Set(
+    nudges
+      .filter(comment => (commentData(comment)?.head ?? /^Sous-chef head: (\S+)$/m.exec(comment.body)?.[1]) === pr.headRefOid)
+      .flatMap(comment => {
+        const data = commentData(comment);
+        if (data?.kind === "running") return data.work;
+        const recorded = /^Sous-chef work: ([a-f0-9 ]+)$/m.exec(comment.body)?.[1];
+        return recorded?.split(" ") ?? [];
+      })
+  );
+  // Only the successfully completed assignment can cover work across its head update.
+  if (completedTask && epoch(pr.headCommittedAt) <= epoch(completedTask.updated_at)) {
+    const data = commentData(assignment);
+    const recorded = /^Sous-chef (?:requested-)?work: ([a-f0-9 ]+)$/m.exec(assignment.body ?? "")?.[1];
+    for (const token of data?.work ?? recorded?.split(" ") ?? []) coveredWork.add(token);
+  }
+  const unchangedWork = alreadyNudged || (work.length > 0 && work.every(token => coveredWork.has(token)));
+  let nudgeSkip;
+  if (!branchAction && unchangedWork) nudgeSkip = "unchanged";
+  else if (!branchAction && latest && !recordedState(latest) && activity <= epoch(latest.created_at)) nudgeSkip = "unchanged_legacy";
+  else if (!branchAction && !work.length) nudgeSkip = failedChecks.length ? "approval_required" : "nothing_actionable";
+  if (!nudgeSkip && lastComment && isSousChefComment(lastComment)) nudgeSkip = "last_comment_sous_chef";
   const ciFollowUp =
     nudgeSkip &&
+    !branchAction &&
+    unchangedWork &&
     completedTask &&
     !comments.some(
       comment =>
@@ -459,7 +497,7 @@ async function inspect(repo, pr, runs, api = gh, now = Date.now()) {
   const comments = (await api(["api", `repos/${repo}/issues/${pr.number}/comments?per_page=100`, "--paginate", "--slurp"])).flat();
   const result = classify(pr, detail, comments, runs, now);
   if (
-    (result.skip_reason === "unchanged" || result.skip_reason === "unchanged_legacy" || result.skip_reason === "last_comment_sous_chef" || result.nudge_needed === false) &&
+    (!result.skip_reason || ["unchanged", "unchanged_legacy", "last_comment_sous_chef"].includes(result.skip_reason)) &&
     !activeAgent(pr, runs) &&
     pr.statusCheckRollup?.some(check => failureStates.has(check.conclusion ?? check.state) && (check.conclusion ?? check.state) !== "ACTION_REQUIRED") &&
     comments.some(isAssignment)
@@ -566,6 +604,18 @@ export async function buildQueue(candidates, inspectCandidate, now = Date.now())
   };
 }
 
+/** @returns {import("../actions/setup/js/report_ast.cjs").ReportInline} */
+function reportLink(url, label, fallback, agentTainted = true) {
+  if (url) {
+    try {
+      return { type: "link", url: normalizeReportURL(url), children: [{ type: "text", value: label, agentTainted: false }], agentTainted };
+    } catch (error) {
+      if (!(error instanceof TypeError)) throw error;
+    }
+  }
+  return { type: "text", value: fallback, agentTainted: false };
+}
+
 /** @returns {import("../actions/setup/js/report_ast.cjs").Report | null} */
 export function buildNudgeReport(pr) {
   if (pr.nudge_needed === false) return null;
@@ -590,24 +640,11 @@ export function buildNudgeReport(pr) {
   for (const review of pr.unresolved_reviews) {
     const location = review.path ? ` (${review.path}${review.line ? `:${review.line}` : ""})` : "";
     for (const comment of review.comments) {
-      tasks.push([
-        paragraph([
-          { type: "text", value: `Review${location}: address unresolved feedback - `, agentTainted: true },
-          { type: "link", url: comment.url, children: [text("Review comment")], agentTainted: true },
-        ]),
-      ]);
+      tasks.push([paragraph([{ type: "text", value: `Review${location}: address unresolved feedback - `, agentTainted: true }, reportLink(comment.url, "Review comment", "see the PR review comments")])]);
     }
   }
   for (const check of checks)
-    tasks.push([
-      paragraph([
-        text("Fix failing check "),
-        { type: "code", value: check.name, agentTainted: true },
-        text(` (${check.conclusion}): `),
-        check.url ? { type: "link", url: check.url, children: [text("Check run")], agentTainted: true } : text("see the PR checks"),
-        text("."),
-      ]),
-    ]);
+    tasks.push([paragraph([text("Fix failing check "), { type: "code", value: check.name, agentTainted: true }, text(` (${check.conclusion}): `), reportLink(check.url, "Check run", "see the PR checks"), text(".")])]);
   if (pr.zero_diff_stalled) tasks.push([paragraph([text("Implement the requested change, or close this zero-diff PR with a reason.")])]);
   return {
     type: "report",
@@ -652,12 +689,7 @@ export function formatCIFollowUp(pr) {
         agentTainted: false,
         children: [
           { type: "text", value: "🍳 The prep is done, but CI needs another taste test. Copilot's assigned task has finished; these checks are still failing:", agentTainted: false },
-          ...(pr.ci_follow_up.url
-            ? [
-                { type: "text", value: " ", agentTainted: false },
-                { type: "link", url: pr.ci_follow_up.url, children: [{ type: "text", value: "Completed task", agentTainted: false }], agentTainted: false },
-              ]
-            : []),
+          ...(pr.ci_follow_up.url ? [{ type: "text", value: " ", agentTainted: false }, reportLink(pr.ci_follow_up.url, "Completed task", "see the completed Copilot task", false)] : []),
         ],
       },
       {
@@ -673,12 +705,7 @@ export function formatCIFollowUp(pr) {
               children: [
                 { type: "code", value: check.name, agentTainted: true },
                 { type: "text", value: ` (${check.conclusion})`, agentTainted: false },
-                ...(check.url
-                  ? [
-                      { type: "text", value: " — ", agentTainted: false },
-                      { type: "link", url: check.url, children: [{ type: "text", value: "Check run", agentTainted: false }], agentTainted: true },
-                    ]
-                  : []),
+                ...(check.url ? [{ type: "text", value: " — ", agentTainted: false }, reportLink(check.url, "Check run", "see the PR checks")] : []),
               ],
             },
           ]),
