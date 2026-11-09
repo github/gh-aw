@@ -2,10 +2,10 @@
 "use strict";
 
 const { posix } = require("node:path");
-const { createInterface } = require("node:readline");
 const { Readable } = require("node:stream");
 const { TextDecoder } = require("node:util");
-const { parseStrictJSON, queueError } = require("./work_queue_codec.cjs");
+const { queueError } = require("./work_queue_codec.cjs");
+const { readLockFileHeaders } = require("./lock_file_headers.cjs");
 const { validatePolicy, validateProfile } = require("./work_queue_policy.cjs");
 const { readQueueMetadata, metadataRequest } = require("./work_queue_read_retry.cjs");
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("provisioning");
@@ -48,9 +48,7 @@ async function readWorkerFile({ githubClient, owner, repo, path, ref, sleepFn })
   } catch {
     throw queueError("policy_missing", "approved worker route contains invalid UTF-8");
   }
-  const headers = await readLockFileHeaders(Readable.from([contents]));
-  const workflow = parsedWorkflow(contents);
-  return { ...headers, assignmentInputType: assignmentInputType(workflow) };
+  return readLockFileHeaders(Readable.from([contents]));
 }
 
 /** @param {{githubClient: RouteClient, owner: string, repo: string, profile: WorkerProfile, sleepFn?: (delay: number) => Promise<void>}} options */
@@ -59,7 +57,7 @@ async function verifyWorkerRoute(options) {
   validateProfile(profile);
   if (/^(?:0{40}|0{64})$/.test(profile.ref)) throw queueError("policy_missing", "constructor placeholder revisions cannot provision a worker route");
   const worker = await readWorkerFile({ ...options, path: profile.workflow, ref: profile.ref });
-  if (worker.assignmentInputType !== "string") throw queueError("policy_missing", "approved worker route must accept the work_queue_assignment string input");
+  if (!workerContract(worker.manifest)) throw queueError("policy_missing", "approved worker route requires a compiler worker manifest with a logical contract");
   if (profile.logical_contract && workerContract(worker.manifest) !== profile.logical_contract) throw queueError("policy_missing", "worker route does not carry its compiler-derived logical contract");
   await verifyRegisteredWorker(options);
 }
@@ -93,72 +91,6 @@ async function* decodeBase64Content(contents) {
   if (pending.length) throw queueError("policy_missing", "approved worker route requires valid base64 content");
 }
 
-/**
- * @param {import("node:stream").Readable} reader
- * @returns {Promise<{metadata: Record<string, unknown>|undefined, manifest: Record<string, unknown>|undefined}>}
- */
-async function readLockFileHeaders(reader) {
-  const lines = createInterface({ input: reader, crlfDelay: Infinity });
-  const headers = /** @type {{metadata: Record<string, unknown>|undefined, manifest: Record<string, unknown>|undefined}} */ { metadata: undefined, manifest: undefined };
-  const seen = new Set();
-  let lineCount = 0;
-  try {
-    for await (const line of lines) {
-      lineCount++;
-      for (const name of ["metadata", "manifest"]) {
-        const prefix = `# gh-aw-${name}: `;
-        if (!line.startsWith(prefix)) continue;
-        if (seen.has(name)) {
-          headers[name] = undefined;
-        } else {
-          seen.add(name);
-          headers[name] = parseHeaderJSON(line.slice(prefix.length));
-        }
-      }
-      if (lineCount >= 3 || (seen.has("metadata") && seen.has("manifest"))) break;
-    }
-  } finally {
-    lines.close();
-    reader.destroy();
-  }
-  return headers;
-}
-
-function parseHeaderJSON(value) {
-  try {
-    const parsed = parseStrictJSON(value);
-    return isRecord(parsed) ? parsed : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/** @param {string} contents */
-function parsedWorkflow(contents) {
-  let parseDocument;
-  try {
-    ({ parseDocument } = require("./work_queue_yaml.cjs"));
-  } catch {
-    throw queueError("policy_missing", "worker route provisioning requires the deployed YAML parser");
-  }
-  try {
-    const document = parseDocument(contents, { uniqueKeys: true, merge: true });
-    if (!document || document.errors.length || document.warnings.length) throw new Error("invalid workflow YAML");
-    return document.toJS({ mapAsMap: true, maxAliasCount: 100 });
-  } catch {
-    throw queueError("policy_missing", "approved worker route has invalid or unbounded workflow YAML");
-  }
-}
-
-function assignmentInputType(contents) {
-  let value = contents;
-  for (const key of ["on", "workflow_dispatch", "inputs", "work_queue_assignment", "type"]) {
-    if (!(value instanceof Map)) return undefined;
-    value = value.get(key);
-  }
-  return value;
-}
-
 function workerContract(manifest) {
   if (!isRecord(manifest) || !isRecord(manifest.work_queue) || manifest.work_queue.worker !== true) return undefined;
   const contract = manifest.work_queue.logical_contract;
@@ -184,7 +116,6 @@ async function configuredWorkerDeployment(options, revision) {
   let profile = current;
   try {
     const headers = await readWorkerFile({ ...options, path: current.workflow, ref: revision });
-    if (headers.assignmentInputType !== "string") return { profile, available: false };
     const contract = workerContract(headers.manifest);
     if (!contract) return { profile, available: false };
     profile = { ...current, ref: revision, logical_contract: contract };

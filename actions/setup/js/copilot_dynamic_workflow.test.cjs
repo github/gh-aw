@@ -9,6 +9,10 @@ import { generatePlainTextSummary, generateCopilotCliStyleSummary } from "./log_
 import { runWithCopilotSDK } from "./copilot_sdk_session.cjs";
 import { projectSessionResult } from "./agent_session.cjs";
 import { createSessionValidator } from "./scripts/validate_session.cjs";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+const { runWithCopilotSDK: runWithCompilerFixtures } = require("../../../scripts/markdown_metadata_test_adapter.cjs").withCompilerFixtures({ runWithCopilotSDK });
 
 const runId = "dynamic-smoke-run";
 const nativePath = "sandbox/agent/logs/copilot-session-state/root/events.jsonl";
@@ -180,6 +184,8 @@ describe("Copilot dynamic workflow sessions", () => {
 
   it("serializes ephemeral SDK workflow signals, child metadata and observed message deltas", async () => {
     const root = temporaryRoot();
+    fs.mkdirSync(path.join(root, ".github/agents"), { recursive: true });
+    fs.writeFileSync(path.join(root, ".github/agents/smoke-marker.agent.md"), "---\nname: smoke-marker\ntools: [read]\n---\nRun the smoke workflow.\n");
     vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     vi.stubEnv("GH_AW_SDK_IDLE_MS", "1234");
     const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
@@ -199,13 +205,18 @@ describe("Copilot dynamic workflow sessions", () => {
     };
     class FakeClient {
       start = async () => {};
-      createSession = async () => session;
+      createSession = async config => {
+        expect(config.customAgents).toEqual([{ name: "smoke-marker", displayName: "smoke-marker", prompt: "Run the smoke workflow.", tools: ["read"] }]);
+        return session;
+      };
       stop = async () => {};
     }
-    const result = await runWithCopilotSDK({
+    const result = await runWithCompilerFixtures({
       sdkUri: "http://127.0.0.1:3002",
       prompt: "Run the smoke workflow",
       logger: () => {},
+      workingDirectory: root,
+      agentsBaseDir: root,
       sessionStateBaseDir: root,
       sdkModule: { CopilotClient: FakeClient, RuntimeConnection: { forUri: () => ({}) }, approveAll: () => "allow" },
     });

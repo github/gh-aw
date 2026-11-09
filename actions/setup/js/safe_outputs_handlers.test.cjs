@@ -106,6 +106,7 @@ describe("safe_outputs_handlers", () => {
     afterEach(() => {
       restoreDescriptors?.();
       vi.restoreAllMocks();
+      vi.unstubAllGlobals();
     });
 
     it("records artifact-only file requests as content on the triggering issue", () => {

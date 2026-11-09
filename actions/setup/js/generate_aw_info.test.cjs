@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "fs";
+import { createHash } from "node:crypto";
 
 // Mock the global objects that GitHub Actions provides
 const mockCore = {
@@ -30,6 +31,11 @@ const mockContext = {
 
 const mockGithub = {
   rest: {
+    repos: {
+      getContent: vi.fn(async ({ path }) => ({
+        data: { type: "file", path, encoding: "base64", content: Buffer.from('# gh-aw-metadata: {}\n# gh-aw-manifest: {"version":1,"agent_metadata":{}}\n# compiled fixture\n').toString("base64") },
+      })),
+    },
     actions: {
       getWorkflowRun: vi.fn(),
     },
@@ -50,6 +56,7 @@ const queueAssignment = {
 describe("generate_aw_info.cjs", () => {
   let main;
   let awInfoPath;
+  let originalGithub;
 
   it("persists declared sub-agent models without configured skills", async () => {
     const models = [{ name: "reader", model: "small", patterns: ["github-copilot/*haiku*"] }];
@@ -77,14 +84,23 @@ describe("generate_aw_info.cjs", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    originalGithub = global.github;
     // Keep compiler-fixed runner paths in memory; never write to the host's /tmp.
     const files = new Map();
     const realRead = fs.readFileSync.bind(fs);
     const realExists = fs.existsSync.bind(fs);
+    const realStat = fs.lstatSync.bind(fs);
+    const realPath = fs.realpathSync.bind(fs);
     vi.spyOn(fs, "mkdirSync").mockImplementation(() => undefined);
     vi.spyOn(fs, "writeFileSync").mockImplementation((filename, content) => files.set(String(filename), String(content)));
     vi.spyOn(fs, "existsSync").mockImplementation(filename => (String(filename).startsWith("/tmp/gh-aw") ? files.has(String(filename)) : realExists(filename)));
+    vi.spyOn(fs, "lstatSync").mockImplementation(filename => (String(filename).endsWith(".lock.yml") ? { isFile: () => true, size: 128 } : realStat(filename)));
+    vi.spyOn(fs, "realpathSync").mockImplementation(filename => (String(filename).endsWith(".lock.yml") ? String(filename) : realPath(filename)));
     vi.spyOn(fs, "readFileSync").mockImplementation((filename, ...args) => {
+      if (String(filename).endsWith(".lock.yml")) {
+        const header = '# gh-aw-metadata: {}\n# gh-aw-manifest: {"version":1,"agent_metadata":{}}\n# compiled fixture\n';
+        return args[0] === "utf8" ? header : Buffer.from(header);
+      }
       if (files.has(String(filename))) return files.get(String(filename));
       if (String(filename).startsWith("/tmp/gh-aw")) throw Object.assign(new Error("missing fixture"), { code: "ENOENT" });
       return realRead(filename, ...args);
@@ -103,6 +119,8 @@ describe("generate_aw_info.cjs", () => {
     process.env.GH_AW_INFO_CLI_VERSION = "";
     process.env.GH_AW_INFO_WORKFLOW_NAME = "my-workflow";
     process.env.GH_AW_INFO_WORKFLOW_ID = "github/my-repo/.github/workflows/my-workflow.lock.yml@refs/heads/main";
+    process.env.GH_AW_INFO_WORKFLOW_SHA = "a".repeat(40);
+    global.github = mockGithub;
     process.env.GH_AW_INFO_EXPERIMENTAL = "false";
     process.env.GH_AW_INFO_SUPPORTS_TOOLS_ALLOWLIST = "true";
     delete process.env.GH_AW_INFO_CACHE_MEMORY;
@@ -137,6 +155,7 @@ describe("generate_aw_info.cjs", () => {
     }
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
+    global.github = originalGithub;
   });
 
   it("should write aw_info.json with values from env vars and context", async () => {
@@ -168,6 +187,39 @@ describe("generate_aw_info.cjs", () => {
     expect(awInfo.created_at).toBeTruthy();
   });
 
+  it("keeps compiler metadata in aw_info.json without dumping it to Actions logs", async () => {
+    const agent = { name: "private-agent", description: "confidential-agent-description", model: "private-model", tools: ["confidential-tool"] };
+    const digest = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");
+    const agentDigest = digest(agent);
+    const errorDigest = digest("invalid-agent-source");
+    const manifest = {
+      version: 1,
+      agent_metadata: { [agentDigest]: agent, [errorDigest]: null },
+      metadata_errors: { [`artifact:${errorDigest}`]: "confidential-compiler-error" },
+    };
+    mockGithub.rest.repos.getContent.mockImplementationOnce(async ({ path }) => ({
+      data: { type: "file", path, encoding: "base64", content: Buffer.from(`# gh-aw-metadata: {}\n# gh-aw-manifest: ${JSON.stringify(manifest)}\n# compiled fixture\n`).toString("base64") },
+    }));
+
+    await main(mockCore, mockContext);
+
+    const awInfo = JSON.parse(fs.readFileSync(awInfoPath, "utf8"));
+    expect(awInfo).toMatchObject({
+      agent_metadata: { [agentDigest.slice(0, 20)]: agent },
+      metadata_errors: { [`artifact:${errorDigest.slice(0, 20)}`]: "confidential-compiler-error" },
+      engine_id: "copilot",
+      run_id: mockContext.runId,
+    });
+    expect(mockGithub.rest.repos.getContent).toHaveBeenCalledWith(expect.objectContaining({ ref: process.env.GH_AW_INFO_WORKFLOW_SHA }));
+    expect(mockCore.setOutput).toHaveBeenCalledWith("model", "gpt-4");
+    expect(mockCore.setOutput).toHaveBeenCalledWith("engine_id", "copilot");
+    expect(mockCore.info).toHaveBeenCalledWith("Generated aw_info.json at: " + awInfoPath);
+    const logs = [mockCore.info, mockCore.debug, mockCore.warning, mockCore.error].flatMap(log => log.mock.calls.flat()).join("\n");
+    for (const value of ["agent_metadata", "model_pins", "metadata_errors", agent.name, agent.description, agent.model, ...agent.tools, ...Object.values(manifest.metadata_errors)]) {
+      expect(logs).not.toContain(value);
+    }
+  });
+
   it("records the executing reusable workflow separately from its caller in the same run", async () => {
     const callerRef = "github/my-repo/.github/workflows/caller.yml@refs/heads/main";
     const executingRef = "org/platform/.github/workflows/worker.lock.yml@refs/tags/v1";
@@ -175,7 +227,7 @@ describe("generate_aw_info.cjs", () => {
     vi.stubEnv("GITHUB_WORKFLOW_REF", callerRef);
     vi.stubEnv("GITHUB_RUN_ATTEMPT", "2");
     const caller = { repo: "github/my-repo", run_id: "12345", run_attempt: "2", workflow_id: callerRef, workflow_call_id: `12345-2:${callerRef}` };
-    await main(mockCore, { ...mockContext, payload: { inputs: { aw_context: JSON.stringify(caller) } } });
+    await main(mockCore, { ...mockContext, payload: { inputs: { aw_context: JSON.stringify(caller) } } }, mockGithub);
     const info = JSON.parse(fs.readFileSync(awInfoPath, "utf8"));
     expect(info).toMatchObject({
       workflow_id: executingRef,
@@ -195,11 +247,8 @@ describe("generate_aw_info.cjs", () => {
     delete process.env.GH_AW_INFO_WORKFLOW_ID;
     vi.stubEnv("GITHUB_RUN_ATTEMPT", "2");
     vi.stubEnv("GITHUB_WORKFLOW_REF", "github/my-repo/.github/workflows/caller.yml@refs/heads/main");
-    await main(mockCore, mockContext);
-    const info = JSON.parse(fs.readFileSync(awInfoPath, "utf8"));
-    expect(info.workflow_id).toBe("");
-    expect(info.workflow_call_id).toBe("12345-2");
-    expect(info.caller_workflow_ref).toBe("github/my-repo/.github/workflows/caller.yml@refs/heads/main");
+    await expect(main(mockCore, mockContext)).rejects.toThrow("executing workflow identity");
+    expect(fs.existsSync(awInfoPath)).toBe(false);
   });
 
   it("defaults the workflow call ID to the first attempt when the runner omits it", async () => {

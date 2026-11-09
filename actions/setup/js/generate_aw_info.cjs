@@ -11,7 +11,7 @@ const { writeMergedModelsJSON } = require("./merge_frontmatter_models.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_CONFIG, ERR_SYSTEM } = require("./error_codes.cjs");
 const { buildWorkflowCallId, normalizeLegacyWorkQueueContext, normalizeWorkQueueContext, resolveWorkQueueRuntime, readInboundAwContext } = require("./aw_context.cjs");
-const { normalizeWebhookContext, redactWebhookPayloads } = require("./webhook_context.cjs");
+const { normalizeWebhookContext } = require("./webhook_context.cjs");
 const { normalizeEngineHarness, parseCompiledModelConfig } = require("./routing_analytics.cjs");
 
 /**
@@ -59,6 +59,13 @@ async function main(core, ctx, githubClient) {
   // Build awInfo from env vars (compile-time) + context (runtime)
   const model = process.env.GH_AW_INFO_MODEL || "";
   const workflowId = process.env.GH_AW_INFO_WORKFLOW_ID || "";
+  if (!process.env.GH_AW_INFO_WORKFLOW_SHA) throw new Error("Executing compiler metadata requires GH_AW_INFO_WORKFLOW_SHA; recompile this workflow");
+  const { loadMarkdownMetadata, metadataManifestFields } = require("./markdown_metadata.cjs");
+  const markdownMetadata = await loadMarkdownMetadata(workflowId, process.env.GITHUB_WORKSPACE || "", {
+    repository: ctx.repo ? `${ctx.repo.owner}/${ctx.repo.repo}` : undefined,
+    githubClient: githubClient || global.github,
+    revision: process.env.GH_AW_INFO_WORKFLOW_SHA,
+  });
 
   // Reject model names that contain an unresolved GitHub Actions expression.
   // This can happen when a vars.* expression was used for the model in the
@@ -79,6 +86,7 @@ async function main(core, ctx, githubClient) {
     agent_version: process.env.GH_AW_INFO_AGENT_VERSION || "",
     workflow_name: process.env.GH_AW_INFO_WORKFLOW_NAME || "",
     workflow_id: workflowId,
+    ...metadataManifestFields(markdownMetadata),
     workflow_call_id: buildWorkflowCallId(ctx.runId, process.env.GITHUB_RUN_ATTEMPT, workflowId),
     // GITHUB_WORKFLOW_REF identifies the top-level caller for reusable workflows.
     caller_workflow_ref: process.env.GITHUB_WORKFLOW_REF || "",
@@ -343,7 +351,6 @@ async function main(core, ctx, githubClient) {
   }
 
   core.info("Generated aw_info.json at: " + tmpPath);
-  core.info(JSON.stringify({ ...awInfo, ...(awInfo.context ? { context: redactWebhookPayloads(awInfo.context) } : {}) }, null, 2));
 
   // Set model and engine_id as outputs for reuse in other steps/jobs
   core.setOutput("model", awInfo.model);

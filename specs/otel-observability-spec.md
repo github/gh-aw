@@ -4,7 +4,7 @@ description: Formal W3C-style specification for observability contract for GitHu
 version: 0.6.0
 status: Working Draft
 date: 2026-06-18
-last_updated: 2026-11-05
+last_updated: 2026-11-09
 editors:
   - GitHub gh-aw Team
 ---
@@ -844,6 +844,8 @@ Hashes, lengths, counts, content types, and classification labels MAY be capture
 
 A Level 3 implementation MUST provide a redaction stage before remote export and artifact upload. Redaction MUST cover known secret formats, authorization headers, bearer tokens, GitHub tokens, private keys, passwords, connection strings, and configured repository-specific patterns.
 
+Direct personal identifiers and other PII MUST NOT be captured by default, except for operational identifiers expressly permitted by §15.4. The current exporter includes actor and actor-ID values in remote span payloads; §15.4 permits these when operationally necessary and authorized and does not require their redaction. Redacting those permitted identifiers is a proposed follow-up tracked by **T-OT-013**, not a current guarantee.
+
 ### 15.3 Attribute Limits
 
 The implementation MUST define and enforce limits for attribute count per record, attribute value length, event count per span, link count per span, log-body size, captured content size, and local mirror size.
@@ -867,6 +869,8 @@ Untrusted values MAY be recorded only after validation, redaction, and bounded-l
 Once valid configuration has been established, telemetry export failure SHOULD NOT change a successful functional workflow into a failed workflow.
 
 `if-missing: error` applies to missing mandatory setup values, not transient delivery failure.
+
+Section 16.6 specifies the required handling for exporter, mirror, and bounded-shutdown-flush failures. **T-OT-012** tracks remaining conformance-test coverage and does not claim that every failure case is currently tested.
 
 ### 16.2 Retry and Queueing
 
@@ -921,6 +925,21 @@ The following requirements apply to every runtime span emitter that consumes `GH
 Endpoint resolution and credential filtering MUST complete before fan-out. Eligible endpoint requests MAY run concurrently; retries remain bounded per endpoint. The ordered export/fan-out/finalization contract is in §6.4 and §16.5.
 
 The CLI outcome evaluator currently emits JSON/JSONL and has no OTLP exporter. OTLP unavailability therefore MUST NOT change its classification or suppress its output; any downstream exporter is responsible for preserving those records on export failure. See the [Safe Output Outcome Evaluation Specification](safe-output-outcome-evaluation.md#otlp-backend-unavailability).
+
+---
+
+### Tracked Follow-ups (Non-normative)
+
+The following items track coverage and possible future requirements; they do not add current implementation guarantees. Section 16.6 remains the normative exporter-failure contract.
+
+| Safeguard | Follow-up | Status |
+|---|---|---|
+| **OTEL-SG-01 — Exporter failure tests** | Complete coverage for bounded-shutdown-flush failures in addition to the existing non-2xx, exhausted-retry, and mirror-write failure tests. | Partial; tracked by [T-OT-012](#1712-concrete-span-attribute-contract-cases). |
+| **OTEL-SG-02 — Identifier redaction** | If redaction of authorized §15.4 identifiers is adopted, add payload and mirror tests before claiming the guarantee. | Proposed; tracked by [T-OT-013](#1712-concrete-span-attribute-contract-cases). |
+
+### Sync Notes
+
+Sections 15.2 and 16.1/16.6 define the privacy and delivery contracts; §17.1.A maps existing implementation tests, while §17.1.2 distinguishes current coverage from tracked follow-ups. Changes to content capture, redaction, mirrors, exporter retries, fan-out, or shutdown behavior MUST update the corresponding test mapping. Revalidate the shipped compatibility contract with `make validate-otel-contract`.
 
 ---
 
@@ -994,6 +1013,8 @@ attribute-level checks mapped directly to Section 10 requirements:
 | **T-OT-009** | §10.3 `gen_ai.system` on built-in agent spans | A known engine emits a non-empty normalized provider/system value | Run a workflow with a built-in agent span, decode exported spans, and assert `gen_ai.system` is present whenever the engine mapping is known |
 | **T-OT-010** | §13.3 `gh-aw.outcome.type` on optional downstream outcome-evaluation spans | Exported outcome spans preserve the safe-output type being evaluated | Feed `.outcomes[].items[]` from `gh aw logs --outcomes --json` to the downstream exporter under test and assert `gh-aw.outcome.type` matches the evaluated manifest item type; not a built-in CLI export |
 | **T-OT-011** | §17 Backward-compatibility: v0.3.0 fields present in v0.4.0 export | All span attribute keys that were present in v0.3.0 (`gh-aw.*`, `github.*`, `gen_ai.system`, `gen_ai.usage.total_tokens`, `OTEL_EXPORTER_OTLP_ENDPOINT`, built-in setup/conclusion span names) **MUST** also be present in a v0.4.0 export at the same semantic positions | Produce a v0.4.0 compliant export from the current implementation; compare the set of attribute keys against the v0.3.0 attribute inventory (defined in Version 0.3.0 change-log entry in Section 19); assert no v0.3.0 attribute has been removed or renamed; assert no built-in span name has changed |
+| **T-OT-012** | §16.6 Exporter-failure test coverage | Non-2xx responses, exhausted network retries, mirror-write failures, and bounded-shutdown-flush failures preserve the completed workflow result and do not report failed delivery as successful | Existing tests cover non-2xx responses, exhausted retries, and mirror-write failures; add a bounded-shutdown-flush failure case to complete coverage |
+| **T-OT-013** | Proposed stricter §15.2 identifier redaction | If the contract changes to redact authorized §15.4 identifiers, those values are absent from remote payloads, mirrors, artifacts, and diagnostics; metric-dimension restrictions remain | Proposed only; current payload tests expect authorized actor identifiers, and mirror redaction is not guaranteed. Add payload and mirror tests before adopting this requirement |
 
 
 ### 17.2 Optional Extension Tests
@@ -1058,6 +1079,7 @@ context is added to outcome spans or links.
 ### Unreleased
 
 - **Added**: A normative requirement (§10.8) that completed BinEval records MUST produce `eval.result` events on `gh-aw.evals.conclusion`; when a not-evaluated status marker is present it takes precedence and answers are not emitted.
+- **Added**: Non-normative follow-ups for PII redaction and exporter-failure test coverage, with tracked IDs T-OT-012 and T-OT-013.
 
 ### Version 0.6.0 (Working Draft, November 5, 2026)
 

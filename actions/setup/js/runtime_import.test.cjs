@@ -19,7 +19,7 @@ const {
   wrapExpressionsInTemplateConditionals,
   extractAndReplacePlaceholders,
   generatePlaceholderName,
-} = require("./runtime_import.cjs");
+} = require("../../../scripts/markdown_metadata_test_adapter.cjs").withCompilerFixtures(require("./runtime_import.cjs"));
 const { extractInlineSkills } = require("./extract_inline_skills.cjs");
 describe("runtime_import", () => {
   let tempDir;
@@ -586,7 +586,7 @@ describe("runtime_import", () => {
 
           const result = await processRuntimeImport(filepath, !1, tempDir);
 
-          expect(result).toContain("model: gpt-5-mini");
+          expect(result).toContain('"model":"gpt-5-mini"');
           expect(result).toContain("# Planner");
           expect(core.debug).toHaveBeenCalledWith("File agents/planner.md contains front matter which will be preserved for agent runtime import");
         }),
@@ -599,7 +599,7 @@ describe("runtime_import", () => {
 
           const result = await processRuntimeImport(filepath, !1, tempDir);
 
-          expect(result).toContain("model: gpt-5-mini");
+          expect(result).toContain('"model":"gpt-5-mini"');
           expect(result).toContain("Router body.");
           expect(core.debug).toHaveBeenCalledWith("File .agents/agents/router.md contains front matter which will be preserved for agent runtime import");
         }),
@@ -612,7 +612,7 @@ describe("runtime_import", () => {
 
           const result = await processRuntimeImport(filepath, !1, tempDir);
 
-          expect(result).toContain("model: gpt-5-mini");
+          expect(result).toContain('"model":"gpt-5-mini"');
           expect(result).toContain("Skill body.");
           expect(core.debug).toHaveBeenCalledWith("File skills/planner-skill/SKILL.md contains front matter which will be preserved for agent runtime import");
         }),
@@ -625,7 +625,7 @@ describe("runtime_import", () => {
 
           const result = await processRuntimeImport(filepath, !1, tempDir);
 
-          expect(result).toContain("model: gpt-5-mini");
+          expect(result).toContain('"model":"gpt-5-mini"');
           expect(result).toContain("Router skill body.");
           expect(core.debug).toHaveBeenCalledWith("File .agents/skills/router-skill/instructions.md contains front matter which will be preserved for agent runtime import");
         }),

@@ -80,6 +80,22 @@ const {
 const { isStackedEnabled, parseStackMetadata, hasCircularStackDependency, buildStackMetadataLines, stackedDisabledError, circularStackError, verifyStackBaseBranchExists, createStackTracker } = require("./stacked_pull_requests.cjs");
 
 const MAX_GITHUB_BODY_LENGTH = 65536;
+const PROTECTED_FALLBACK_ISSUE_MARKER = "gh-aw-protected-file-fallback";
+
+/**
+ * Fingerprint a protected-file proposal without per-commit format-patch metadata.
+ * @param {string} title
+ * @param {string} patchContent
+ * @returns {string}
+ */
+function getProtectedFallbackIssueFingerprint(title, patchContent) {
+  const diffHeaderIndex = patchContent.search(/^diff --git /m);
+  const canonicalPatchContent = diffHeaderIndex === -1 ? patchContent : patchContent.slice(diffHeaderIndex);
+  return crypto
+    .createHash("sha256")
+    .update(JSON.stringify([title, canonicalPatchContent]))
+    .digest("hex");
+}
 
 /**
  * @typedef {import('./types/handler-factory').HandlerFactoryFunction} HandlerFactoryFunction
@@ -461,6 +477,44 @@ async function createFallbackIssue(githubClient, repoParts, title, body, labels,
   };
 
   return withRetry(innerCreate, RATE_LIMIT_RETRY_CONFIG, `create fallback issue in ${repoParts.owner}/${repoParts.repo}`);
+}
+
+/**
+ * Find a previously created protected-file fallback issue for the same proposal.
+ * @param {any} githubClient
+ * @param {{owner: string, repo: string}} repoParts
+ * @param {string} title
+ * @param {string} fingerprint
+ * @returns {Promise<any | null>}
+ */
+async function findProtectedFallbackIssue(githubClient, repoParts, title, fingerprint) {
+  const marker = `<!-- ${PROTECTED_FALLBACK_ISSUE_MARKER}:${fingerprint} -->`;
+  const workflowRepoSlug = process.env.GITHUB_REPOSITORY || "";
+  const [workflowOwner, workflowRepo] = workflowRepoSlug.split("/");
+  /** @type {{owner: string, repo: string}[]} */
+  const alternateRepos = [resolveFailureIssueRepo(workflowRepoSlug, message => core.warning(message)), workflowOwner && workflowRepo ? { owner: workflowOwner, repo: workflowRepo } : null].filter(candidate => candidate !== null);
+  const candidateRepos = [repoParts, ...alternateRepos].filter(
+    (candidate, index, repos) => repos.findIndex(repo => repo.owner.toLowerCase() === candidate.owner.toLowerCase() && repo.repo.toLowerCase() === candidate.repo.toLowerCase()) === index
+  );
+
+  for (const candidate of candidateRepos) {
+    let issues;
+    try {
+      issues = await githubClient.paginate(githubClient.rest.issues.listForRepo, {
+        ...candidate,
+        state: "all",
+        labels: "pull-request-fallback",
+        per_page: 100,
+      });
+    } catch (error) {
+      const status = typeof error === "object" && error !== null && "status" in error ? error.status : undefined;
+      if (status === 410) continue;
+      throw error;
+    }
+    const issue = issues.find(item => !item.pull_request && item.title === title && typeof item.body === "string" && item.body.includes(marker));
+    if (issue) return { issue, issueRepoParts: candidate };
+  }
+  return null;
 }
 
 /**
@@ -2527,22 +2581,71 @@ async function main(config = {}) {
           });
         }
 
+        const fingerprint = getProtectedFallbackIssueFingerprint(title, patchContent);
+        /**
+         * @param {import("./report_ast.cjs").ReportBlock[]} children
+         * @returns {import("./report_ast.cjs").ReportBlock[]}
+         */
+        const withProposalMetadata = children => [
+          ...children,
+          {
+            type: "paragraph",
+            agentTainted: false,
+            children: [
+              { type: "text", value: "Proposed in ", agentTainted: false },
+              { type: "link", url: runUrl, children: [{ type: "text", value: "this workflow run", agentTainted: false }], agentTainted: false },
+              { type: "text", value: ".", agentTainted: false },
+            ],
+          },
+          { type: "xml_marker", name: PROTECTED_FALLBACK_ISSUE_MARKER, value: fingerprint, compact: true, agentTainted: false },
+        ];
+
         try {
           transport.assertUnchanged();
           const expiresAt = new Date(Date.now() + (expiresHours > 0 ? expiresHours : 7 * 24) * 60 * 60 * 1000).toISOString();
           /** @param {import("./report_ast.cjs").ReportBlock[]} children */
           const protectedFallbackFrame = children => fallbackFrame([...children, { type: "quote", agentTainted: false, children: [{ type: "expiration", expiresAt, agentTainted: false }] }], { expiresHours: 0, itemType: "issue" });
-          const { data: issue, issueRepoParts } = await createFallbackIssue(
-            githubClient,
-            repoParts,
-            title,
-            protectedFallbackFrame(fallbackBody),
-            mergeFallbackIssueLabels([...effectiveFallbackLabels, "pull-request-fallback"]),
-            configAssignees,
-            transport.assertUnchanged
-          );
-
-          core.info(`Created protected-file-protection review issue #${issue.number}: ${issue.html_url}`);
+          const issueLabels = mergeFallbackIssueLabels([...effectiveFallbackLabels, "pull-request-fallback"]);
+          /** @type {Awaited<ReturnType<typeof findProtectedFallbackIssue>>} */
+          let existingIssueMatch = null;
+          try {
+            existingIssueMatch = await findProtectedFallbackIssue(githubClient, repoParts, title, fingerprint);
+          } catch (lookupError) {
+            core.warning(`Failed to look up an existing protected-file fallback issue; creating a new issue: ${getErrorMessage(lookupError)}`);
+          }
+          const existingIssue = existingIssueMatch?.issue;
+          let issue;
+          let issueRepoParts;
+          if (existingIssue) {
+            issueRepoParts = existingIssueMatch.issueRepoParts;
+            const existingIssueBody = appendReportExecutionProvenance(protectedFallbackFrame(withProposalMetadata(fallbackBody)), process.env.GH_AW_WORKFLOW_NAME || "Workflow", "");
+            const existingIssueLabels = Array.isArray(existingIssue.labels) ? existingIssue.labels.map(label => (typeof label === "string" ? label : label?.name)).filter(label => typeof label === "string") : [];
+            const response = await withRetry(
+              async () => {
+                transport.assertUnchanged();
+                const result = await githubClient.rest.issues.update({
+                  owner: issueRepoParts.owner,
+                  repo: issueRepoParts.repo,
+                  issue_number: existingIssue.number,
+                  title,
+                  body: renderSizedReport(existingIssueBody).body,
+                  labels: mergeFallbackIssueLabels([...existingIssueLabels, ...issueLabels]),
+                  state: "open",
+                });
+                transport.assertUnchanged();
+                return result;
+              },
+              RATE_LIMIT_RETRY_CONFIG,
+              `update protected-file-protection fallback issue #${existingIssue.number}`
+            );
+            issue = { ...existingIssue, ...response.data };
+            core.info(`Updated protected-file-protection review issue #${issue.number}: ${issue.html_url}`);
+          } else {
+            const result = await createFallbackIssue(githubClient, repoParts, title, protectedFallbackFrame(withProposalMetadata(fallbackBody)), issueLabels, configAssignees, transport.assertUnchanged);
+            issue = result.data;
+            issueRepoParts = result.issueRepoParts;
+            core.info(`Created protected-file-protection review issue #${issue.number}: ${issue.html_url}`);
+          }
 
           if (!manifestProtectionPushFailedError) {
             try {
@@ -2560,7 +2663,7 @@ async function main(config = {}) {
                     owner: issueRepoParts.owner,
                     repo: issueRepoParts.repo,
                     issue_number: issue.number,
-                    body: renderSizedReport(protectedFallbackFrame(fallbackBodyWithCloseKeyword)).body,
+                    body: renderSizedReport(protectedFallbackFrame(withProposalMetadata(fallbackBodyWithCloseKeyword))).body,
                   }),
                 RATE_LIMIT_RETRY_CONFIG,
                 `update protected-file-protection fallback issue #${issue.number} with auto-close link`
@@ -3038,6 +3141,7 @@ async function main(config = {}) {
 
 module.exports = {
   main,
+  getProtectedFallbackIssueFingerprint,
   enforcePullRequestLimits,
   countUniquePatchFiles,
   parseDiffGitHeader,

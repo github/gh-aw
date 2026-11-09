@@ -84,6 +84,7 @@ function compiledInfoEnv(workflow, info) {
     const raw = match[2].trim();
     let value;
     if (raw === "${{ job.workflow_ref }}") value = info.workflow_id;
+    else if (raw === "${{ job.workflow_sha }}") value = info.sha;
     else if (raw.startsWith("${{")) value = /'([^']*)' }}$/.exec(raw)?.[1] ?? "";
     else if (raw.startsWith("'")) value = raw.slice(1, -1).replace(/''/g, "'");
     else if (raw.startsWith('"')) value = JSON.parse(raw);

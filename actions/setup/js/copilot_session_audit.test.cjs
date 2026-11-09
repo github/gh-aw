@@ -361,6 +361,8 @@ describe("Copilot SDK evidence capture (synthetic)", () => {
         prompt: "synthetic prompt",
         logger: () => {},
         sessionStateBaseDir: directory,
+        workingDirectory: directory,
+        agentsBaseDir: directory,
         sdkModule: { CopilotClient: Client, RuntimeConnection: { forUri: () => ({}) }, approveAll: () => "allow" },
       });
       const saved = fs
