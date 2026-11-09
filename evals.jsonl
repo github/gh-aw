@@ -1,0 +1,2 @@
+{"id":"worker_selection","question":"Does the agent request the smoke-workflow-call worker through its smoke_workflow_call safe-output tool rather than substituting noop?","answer":"UNKNOWN","model":"gpt-6-luna","timestamp":"2026-11-09T00:06:33.068Z","runid":"42537936768"}
+{"id":"worker_input","question":"Does the worker request pass the exact task-description value smoke test checkout validation?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-09T00:06:33.068Z","runid":"42537936768"}
