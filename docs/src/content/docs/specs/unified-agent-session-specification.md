@@ -85,7 +85,11 @@ The agent artifact already contains native session evidence: Copilot session
 `logEntries` as `agent-session.jsonl` so conclusion can reuse canonical events
 without parsing the same native transcript again. After downloading agent, detection, safe-output, experiment,
 and eval evidence, the conclusion job merges these observations into
-`usage/aw_session.jsonl`. The agent artifact also carries the split activation
+`usage/aw_session.jsonl`. Conclusion also downloads activation's `info` artifact
+to collect runner-owned `aw_info.json` as `workflow.info`, including available
+engine, model, version, revision, and trigger metadata. Runtime model metadata,
+when captured, takes precedence over the activation snapshot.
+The agent artifact also carries the split activation
 `aw-prompts/system.txt` and `aw-prompts/user.txt` files; the merger records each
 available file as an untimed `prompt.system` or `prompt.user` event with its exact
 content and source path. These prompt events are omitted from default summaries.

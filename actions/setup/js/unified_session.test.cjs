@@ -1386,6 +1386,43 @@ describe("Unified conclusion session", () => {
     expect(events.find(event => event.type === "workflow.info").data).not.toHaveProperty("secret");
   });
 
+  it("publishes downloaded Kiro activation metadata without expanding session.init", () => {
+    // Synthetic transport regression, not native Kiro structured-stream evidence.
+    write("aw_info.json", {
+      engine_id: "kiro",
+      agent_version: "2.31.1",
+      model: "kiro/auto",
+      event_name: "schedule",
+      sha: "a".repeat(40),
+      run_id: 123,
+      run_attempt: 2,
+      workflow_id: "example/repo/.github/workflows/smoke-kiro.lock.yml@refs/heads/main",
+    });
+    write("agent-session.jsonl", [{ type: "session.init", data: { sourceEngine: "kiro", agentVersion: "2.31.1" } }]);
+
+    const events = writeUnifiedSession({ rootDir: root });
+    const metadata = events.filter(event => event.type === "workflow.info");
+    expect(metadata).toHaveLength(1);
+    expect(metadata[0]).toMatchObject({
+      data: {
+        engineId: "kiro",
+        agentVersion: "2.31.1",
+        model: "kiro/auto",
+        requestedModel: "kiro/auto",
+        triggerType: "schedule",
+        sha: "a".repeat(40),
+        runId: 123,
+        runAttempt: 2,
+        workflowId: "example/repo/.github/workflows/smoke-kiro.lock.yml@refs/heads/main",
+      },
+      provenance: { component: "workflow", phase: "activation", path: "aw_info.json", index: 0 },
+    });
+    expect(events.find(event => event.type === "session.init").data).toEqual({ sourceEngine: "kiro" });
+    const persisted = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8");
+    expect(persisted.trim().split("\n").map(JSON.parse)).toEqual(events);
+    expect(validateSession(persisted)).toBe(events.length);
+  });
+
   it("prefers runner routing metadata over agent metadata and preserves the harness outcome", () => {
     write("aw_info.json", {
       engine_id: "claude",
