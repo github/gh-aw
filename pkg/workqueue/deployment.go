@@ -144,6 +144,31 @@ func (state Projection) obsoleteWork(work *WorkState) bool {
 	return reason == "worker_incompatible"
 }
 
+// ObsoleteWorkIDs selects the same bounded, byte-ordered retirement batch as
+// JavaScript maintenance. Publication must still validate each checked operation.
+func ObsoleteWorkIDs(state Projection, at int64, limit int) ([]string, error) {
+	ids := []string{}
+	if at < 0 || at > MaxTimestamp {
+		return nil, queueError("timestamp_invalid", "invalid obsolete selection timestamp")
+	}
+	if limit < 1 || limit > 256 {
+		return nil, queueError("obsolete_limit", "obsolete cancellation limit must be 1..256")
+	}
+	if state.Policy == nil {
+		return nil, queueError("queue_missing", "obsolete cancellation requires an installed queue")
+	}
+	if state.Policy.Authorization != "aw" {
+		return ids, nil
+	}
+	for id, work := range state.Works {
+		if state.obsoleteWork(work) && !workExpired(work, max(at, state.timeWatermark)) {
+			ids = append(ids, id)
+		}
+	}
+	slices.Sort(ids)
+	return ids[:min(len(ids), limit, state.Policy.Limits.Operations)], nil
+}
+
 // FuturePolicy exposes current routes for trusted admission builders only.
 // It does not replace the installed policy or affect existing assignments.
 func FuturePolicy(state Projection) Policy {
