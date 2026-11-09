@@ -12,6 +12,11 @@ on:
       - 'Makefile'
       - '.github/workflows/ci.yml'
       - '.github/workflows/cjs.yml'
+      - 'pkg/workflow/nvx_copilot_musl_integration_test.go'
+      - 'pkg/constants/version_constants.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'scripts/workflow-tool-contracts.test.cjs'
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
@@ -23,6 +28,11 @@ on:
       - 'Makefile'
       - '.github/workflows/ci.yml'
       - '.github/workflows/cjs.yml'
+      - 'pkg/workflow/nvx_copilot_musl_integration_test.go'
+      - 'pkg/constants/version_constants.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'scripts/workflow-tool-contracts.test.cjs'
   workflow_dispatch:
 
 jobs:
@@ -31,6 +41,9 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      pull-requests: read
+    outputs:
+      nvx-musl: ${{ steps.nvx-paths.outputs.run }}
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -39,6 +52,43 @@ jobs:
           persist-credentials: false
       - name: Verify CGO/CJS workflow purity
         run: bash scripts/check-cgo-cjs-workflow-purity.sh
+      - name: Select NVX musl integration
+        id: nvx-paths
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            // Pushes and manual runs retain integration coverage.
+            if (context.eventName !== "pull_request") {
+              core.setOutput("run", "true");
+              return;
+            }
+            const relevantPaths = new Set([
+              "actions/setup/js/nvx_assets.cjs",
+              "actions/setup/js/nvx_assets.test.cjs",
+              "actions/setup/js/copilot_sdk_mcp_config_path.cjs",
+              "actions/setup/js/copilot_sdk_mcp_config_path.test.cjs",
+              "pkg/workflow/nvx_copilot_musl_integration_test.go",
+              "pkg/constants/version_constants.go",
+              "go.mod",
+              "go.sum",
+              ".github/workflows/cjs.yml",
+              "scripts/workflow-tool-contracts.test.cjs",
+            ]);
+            try {
+              // Compare the whole PR, not just the latest synchronization commit.
+              const files = await github.paginate(github.rest.pulls.listFiles, {
+                ...context.repo,
+                pull_number: context.payload.pull_request.number,
+                per_page: 100,
+              });
+              // The API caps results at 3,000 files; never skip on incomplete data.
+              const run = files.length >= 3000 || files.some(file =>
+                relevantPaths.has(file.filename) || relevantPaths.has(file.previous_filename));
+              core.setOutput("run", String(run));
+            } catch (error) {
+              core.warning(`Unable to select NVX paths; running integration: ${error instanceof Error ? error.message : String(error)}`);
+              core.setOutput("run", "true");
+            }
       - name: Cache repository checkout
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -355,6 +405,7 @@ jobs:
   nvx-musl-integration:
     name: NVX musl inference integration
     needs: [checkout-cache]
+    if: github.event_name != 'pull_request' || needs.checkout-cache.outputs.nvx-musl == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
