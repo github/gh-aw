@@ -520,6 +520,7 @@ process.stdout.write(JSON.stringify(interpretedTestTypes.map(type => ({
   type,
   data:{
     ...(type === "mcp.configuration" ? {servers:[]} : type === "model.inventory" ? {endpoints:[]} : {}),
+    ...(type === "harness.decision" ? {proposedAttempt:1, outcome:"unknown", questions:[], latencyMs:0, timestamp:0, avoidedInvocation:false} : {}),
     engineId:"aider", status:"under_budget", exceeded:false, total:0, threshold:999,
     content:"INJECTED", reason:"INJECTED", errorType:"INJECTED", errorCode:"INJECTED",
     categories:["authentication_failed"], errorCodes:["INJECTED"], errorTypes:["INJECTED"],
