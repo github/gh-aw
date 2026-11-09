@@ -7,9 +7,9 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.29.20<br>
+**Version**: 1.29.21<br>
 **Status**: Working Draft<br>
-**Publication Date**: 2026-11-07<br>
+**Publication Date**: 2026-11-08<br>
 **Editor**: GitHub Agentic Workflows Team<br>
 **This Version**: [safe-outputs-specification](/gh-aw/specs/safe-outputs-specification/)<br>
 **Latest Published Version**: This document
@@ -3176,6 +3176,62 @@ System types are always available in every workflow. The types `noop`, `report-m
 2. **Execution Order**: Always executes last for summary generation.
 3. **No Side Effects**: Creates no GitHub resources.
 4. **Transparency**: Provides clear indication of normal completion vs. error states.
+
+**Invocation Decision Skips**:
+
+For a top-level `skip-if-decision` aggregate of `deny`, the harness inside AWF
+MUST suppress the otherwise eligible proposed agent invocation without counting
+it as an executed attempt or retry. When safe-output recording is configured
+and no terminal output exists, it MUST attempt to append a `noop` describing
+the skipped invocation. It MUST NOT append a duplicate no-op when a terminal
+output already exists, discard earlier task outputs, or remove incomplete
+diagnostics. An append failure MUST be diagnosed without changing the advisory
+decision into an agent invocation or independently failing the workflow.
+
+An `allow`, all `unknown`, or an absent/empty question list MUST preserve the
+deterministic execution path. API errors, timeouts, malformed responses, and
+unavailable file evidence MUST NOT independently generate `noop` or
+`report_incomplete`, trigger a decision retry, or suppress invocation.
+Previously recorded failures and normal threat-detection and publication
+policies MUST remain effective regardless of the decision recommendation.
+
+`skip-if-decision` is experimental; nonempty lists emit a compiler warning,
+and configuration and behavior may change without deprecation.
+
+File imports MUST remain confined to the workspace or `/tmp/gh-aw/agent` and
+use remaining byte budgets that include evidence metadata and escaping.
+The complete serialized Decisions request MUST NOT exceed 400,000 UTF-8 bytes,
+approximately 100,000 tokens at four bytes per token, not an exact token count.
+Questions that exceed the remaining budget MUST abstain without transmission.
+
+Before transmitting a question or its fresh, confined, size-limited `@file`
+evidence, the evaluator MUST screen for configured secret values and common
+credential patterns, including private keys, GitHub/AWS credentials, bearer
+tokens, and sensitive key/value assignments. A match MUST withhold the entire
+question and its evidence, record `unknown` with `sensitive_content_blocked`,
+and preserve batching of other safe questions. If all questions are withheld,
+neither proxy reflection nor a Decisions request is made. Question text,
+reference names, and matched values MUST NOT appear in decision telemetry.
+
+File evidence is supplied as JSON-escaped records containing a reference name,
+byte count, and contents, preceded by a data-only directive outside the record.
+Escaping prevents file text from structurally closing the record, but model
+instructions are not a deterministic prompt-injection boundary: semantic
+injection can still influence advisory decisions. Secret screening is also
+heuristic; unknown or encoded secrets can evade detection, and benign examples
+or sensitive-looking assignments can be withheld. These controls do not prove
+that arbitrary files are safe to transmit or authorize publishing their data.
+
+Decision outcomes, sanitized errors, latency, and avoided invocations MUST be
+recorded separately as `harness.decision` unified-session evidence and audit
+decision history. A decision-generated no-op is not a publication
+authorization, independent proof of completed work, or proof of zero model
+usage; decision requests remain subject to normal proxy usage accounting.
+
+Regression evidence: `actions/setup/js/skip_if_decision.test.cjs`,
+`harness_retry_runner.test.cjs`, and `shell_harness.test.cjs` cover abstention,
+denied invocations, and no-op preservation; `unified_session.test.cjs` and
+`pkg/cli/audit_decision_test.go` cover separate decision accounting.
 
 **Configuration Parameters**:
 
@@ -6729,6 +6785,11 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.29.21** (2026-11-08):
+
+- **Specified**: AWF-resident invocation decision skips, conditional no-op recording, preservation of prior outputs and incomplete diagnostics, and failure abstention without decision retries.
+- **Clarified**: Decision evidence is separate from executed attempts and does not authorize publication, prove completed work, or imply zero model usage.
 
 **Version 1.29.20** (2026-11-07):
 

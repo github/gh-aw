@@ -19,6 +19,50 @@ These rules override conflicting upstream guidance.
 - Before inventing workflow/shared-component/tool/safe-output patterns, inspect
   `https://github.com/gm3dmo/the-power` through GitHub APIs or `gh` for prior art.
 
+## Skipping Unnecessary Agent Invocations
+
+Use experimental top-level `skip-if-decision` when skipping requires semantic evidence from
+task or progress files. Prefer deterministic trigger/activation checks when
+ordinary conditions suffice; decisions cannot override retry limits, budgets,
+deadlines, or nonrecoverable errors.
+
+Lists accept at most 64 questions. Nonempty lists emit a compile-time experimental warning. Configuration and
+behavior may change without deprecation.
+
+```yaml
+skip-if-decision:
+  - Is there no actionable work remaining in @context/task.md?
+  - Has @reports/progress.md established that further execution is unnecessary?
+```
+
+Write each question as a skip condition, not a request to execute the agent.
+Populate referenced files through checkout, restored memory, or pre-agent setup
+before the first invocation, and keep them current for subsequent invocations.
+Runtime `@file` references resolve relative to `engine.cwd` or the workspace;
+only workspace and `/tmp/gh-aw/agent` files are eligible. Sensitive paths,
+symlinks, hardlinks, oversized context, and Actions expressions are unsupported.
+Each read is bounded by the remaining import budget, including JSON escaping
+and evidence metadata. Per-question context has a 512 KiB ceiling; the complete
+serialized Decisions request is limited to 400,000 UTF-8 bytes (approximately
+100,000 tokens at four bytes per token, not tokenizer-exact). A question that
+does not fit abstains, while smaller remaining questions may still run.
+
+The shared harness evaluates questions inside AWF before every otherwise
+eligible initial, retry, resume, or continuation invocation, including
+declarative engines. Any `deny` skips; otherwise `allow` or all `unknown`
+preserves the existing execution path. Missing files, API/model unavailability,
+timeouts, and malformed responses abstain without decision retries or workflow
+failure. An absent or empty list preserves existing behavior.
+
+Questions are batched through the existing AWF proxy, using
+`gpt-6-luna-decisions` on Copilot or `gpt-6-luna` on OpenAI. Do not add direct
+provider calls, extra credentials, host-side decision steps, or decision code
+to detection, evals, or conclusion. Decision requests retain normal proxy
+budget and usage accounting; a skipped agent is not zero total model usage.
+Inspect typed `harness.decision` unified-session events or `gh aw audit --json`
+under `retries.decisions` and `retries.avoided_invocations` for outcomes,
+sanitized errors, latency, and avoided invocations.
+
 ## Indexing and Search
 
 Follow [index-search.md](index-search.md) when integrating existing indexes or

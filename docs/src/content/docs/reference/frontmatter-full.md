@@ -25,6 +25,16 @@ JSON Schema for validating agentic workflow frontmatter configuration
 connectors:
   {}
 
+# Experimental. Up to 64 advisory skip questions evaluated inside AWF before each
+# eligible agent invocation. Nonempty lists emit a compile-time experimental
+# warning; configuration and behavior may change without deprecation. Any deny
+# skips; allow or all unknown preserves deterministic harness eligibility. Runtime
+# @file references use sandbox filesystem restrictions. Nonempty lists cannot be
+# combined with declarative protected-session-capture.
+# (optional)
+skip-if-decision: []
+  # Array of strings
+
 # Experimental. Select independent Copilot capabilities to authenticate through
 # the OIDC token broker. Using this field emits a compile-time warning.
 # Configuration and behavior may change without deprecation.
@@ -3587,9 +3597,9 @@ engine:
 
   # Experimental. Persist engine-declared session files in GitHub Actions artifacts.
   # Using this field emits a compile-time warning. Configuration and behavior may
-  # change without deprecation. Copilot, Claude, and Codex resume the exact native
-  # session; other session-based engines receive a continuation prompt. Pi uses its
-  # native durable task runtime. Starts fresh when no prior history exists. No
+  # change without deprecation. Copilot, Claude, Codex, and Pi resume the exact
+  # native session with the current workflow prompt; other session-based engines
+  # receive a continuation prompt. Starts fresh when no prior history exists. No
   # memory tool is required.
   # (optional)
   durable:
@@ -3738,9 +3748,9 @@ engine:
 
   # Experimental. Persist engine-declared session files in GitHub Actions artifacts.
   # Using this field emits a compile-time warning. Configuration and behavior may
-  # change without deprecation. Copilot, Claude, and Codex resume the exact native
-  # session; other session-based engines receive a continuation prompt. Pi uses its
-  # native durable task runtime. Starts fresh when no prior history exists. No
+  # change without deprecation. Copilot, Claude, Codex, and Pi resume the exact
+  # native session with the current workflow prompt; other session-based engines
+  # receive a continuation prompt. Starts fresh when no prior history exists. No
   # memory tool is required.
   # (optional)
   durable:
@@ -4168,9 +4178,9 @@ engine:
   pi:
     # Experimental. Persist engine-declared session files in GitHub Actions artifacts.
     # Using this field emits a compile-time warning. Configuration and behavior may
-    # change without deprecation. Copilot, Claude, and Codex resume the exact native
-    # session; other session-based engines receive a continuation prompt. Pi uses its
-    # native durable task runtime. Starts fresh when no prior history exists. No
+    # change without deprecation. Copilot, Claude, Codex, and Pi resume the exact
+    # native session with the current workflow prompt; other session-based engines
+    # receive a continuation prompt. Starts fresh when no prior history exists. No
     # memory tool is required.
     # (optional)
     durable:
@@ -5915,6 +5925,19 @@ safe-outputs:
     # (optional)
     allowed-fields: []
       # Array of strings
+
+    # Maximum number of artifacts attached per created issue (default: 10). Zero or a
+    # negative value disables issue artifacts.
+    # (optional)
+    max-issue-artifacts: 1
+
+    # Maximum UTF-8 size of each issue artifact body (default: 1mb = 1048576 bytes).
+    # Accepts positive integer bytes or a human-friendly size such as 512kb, 1mb, or
+    # 1.5mb. Units B, K/KB/KiB, M/MB/MiB, G/GB/GiB, and T/TB/TiB are case-insensitive
+    # and use multiples of 1024. The size must resolve to a positive whole byte count.
+    # Oversized bodies are rejected, not truncated.
+    # (optional)
+    max-issue-artifact-size: null
 
     # GitHub usernames to assign the created issue to. Can be a single username string
     # or array of usernames. Use 'copilot' to assign to GitHub Copilot.
@@ -9834,6 +9857,12 @@ safe-outputs:
   # Format 1: Configuration for automatically creating GitHub issue or pull request
   # comments from AI workflow output. The main job does not need write permissions.
   add-comment:
+    # Render safe-output data in a collapsed Structured data details block. Default:
+    # false (visible fenced JSON). Requires safe-outputs.data to accept structured
+    # data.
+    # (optional)
+    collapse-data: true
+
     # Maximum number of http/https URL occurrences in agent-provided comment content
     # (default: 50). Generated footer and metadata links are excluded.
     # (optional)
@@ -16123,6 +16152,19 @@ safe-outputs:
 
   # Format 1: Configuration for updating GitHub issues from agentic workflow output
   update-issue:
+    # Maximum number of artifacts attached per updated issue (default: 10). Zero or a
+    # negative value disables issue artifacts.
+    # (optional)
+    max-issue-artifacts: 1
+
+    # Maximum UTF-8 size of each issue artifact body (default: 1mb = 1048576 bytes).
+    # Accepts positive integer bytes or a human-friendly size such as 512kb, 1mb, or
+    # 1.5mb. Units B, K/KB/KiB, M/MB/MiB, G/GB/GiB, and T/TB/TiB are case-insensitive
+    # and use multiples of 1024. The size must resolve to a positive whole byte count.
+    # Oversized bodies are rejected, not truncated.
+    # (optional)
+    max-issue-artifact-size: null
+
     # Allow updating issue status (open/closed) - presence of key indicates field can
     # be updated
     # (optional)
@@ -21758,9 +21800,9 @@ safe-outputs:
         azure-cloud: "example-value"
 
         # Optional WIF provider discriminator. Recognized values are 'azure', 'anthropic',
-        # and 'gcp'.
+        # 'gcp', and 'openai'.
         # (optional)
-        provider: "example-value"
+        provider: "azure"
 
         # Anthropic WIF federation rule ID (e.g., fdrl_...).
         # (optional)
@@ -21770,7 +21812,8 @@ safe-outputs:
         # (optional)
         organization-id: "example-value"
 
-        # Anthropic WIF service account ID (e.g., svac_...).
+        # Provider service account ID (Anthropic e.g., svac_...; OpenAI as configured in
+        # the OpenAI admin console).
         # (optional)
         service-account-id: "example-value"
 
@@ -21796,6 +21839,10 @@ safe-outputs:
         # us-central1 when omitted.
         # (optional)
         location: "example-value"
+
+        # OpenAI Workload Identity Provider ID configured in the OpenAI admin console.
+        # (optional)
+        identity-provider-id: "example-value"
 
       # Additional engine configuration text. Codex accepts TOML structurally merged
       # into config.toml. Pi accepts a JSON object with settings, model metadata
@@ -21892,9 +21939,9 @@ safe-outputs:
 
       # Experimental. Persist engine-declared session files in GitHub Actions artifacts.
       # Using this field emits a compile-time warning. Configuration and behavior may
-      # change without deprecation. Copilot, Claude, and Codex resume the exact native
-      # session; other session-based engines receive a continuation prompt. Pi uses its
-      # native durable task runtime. Starts fresh when no prior history exists. No
+      # change without deprecation. Copilot, Claude, Codex, and Pi resume the exact
+      # native session with the current workflow prompt; other session-based engines
+      # receive a continuation prompt. Starts fresh when no prior history exists. No
       # memory tool is required.
       # (optional)
       durable:
@@ -22043,9 +22090,9 @@ safe-outputs:
 
       # Experimental. Persist engine-declared session files in GitHub Actions artifacts.
       # Using this field emits a compile-time warning. Configuration and behavior may
-      # change without deprecation. Copilot, Claude, and Codex resume the exact native
-      # session; other session-based engines receive a continuation prompt. Pi uses its
-      # native durable task runtime. Starts fresh when no prior history exists. No
+      # change without deprecation. Copilot, Claude, Codex, and Pi resume the exact
+      # native session with the current workflow prompt; other session-based engines
+      # receive a continuation prompt. Starts fresh when no prior history exists. No
       # memory tool is required.
       # (optional)
       durable:
@@ -22473,9 +22520,9 @@ safe-outputs:
       pi:
         # Experimental. Persist engine-declared session files in GitHub Actions artifacts.
         # Using this field emits a compile-time warning. Configuration and behavior may
-        # change without deprecation. Copilot, Claude, and Codex resume the exact native
-        # session; other session-based engines receive a continuation prompt. Pi uses its
-        # native durable task runtime. Starts fresh when no prior history exists. No
+        # change without deprecation. Copilot, Claude, Codex, and Pi resume the exact
+        # native session with the current workflow prompt; other session-based engines
+        # receive a continuation prompt. Starts fresh when no prior history exists. No
         # memory tool is required.
         # (optional)
         durable:

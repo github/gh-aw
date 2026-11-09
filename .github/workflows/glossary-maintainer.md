@@ -19,6 +19,14 @@ engine:
   id: copilot
   agent: technical-doc-writer
 
+skip-if-decision:
+  - >-
+    Do @/tmp/gh-aw/agent/recent-commits.txt and
+    @/tmp/gh-aw/agent/doc-changes.txt conclusively establish that this scan has
+    no new, changed, or removed user-facing terminology requiring updates to
+    @docs/src/content/docs/reference/glossary.md? Abstain if the summaries are
+    insufficient or any glossary work remains.
+
 network:
   allowed:
     - defaults
@@ -91,7 +99,7 @@ steps:
 
 evals:
   - id: glossary_reviewed
-    question: Did the agent review the glossary and identify gaps or stale entries relative to recent codebase changes?
+    question: When the agent ran, did it review the glossary and identify gaps or stale entries relative to recent codebase changes? Return UNKNOWN when the output records a skip-if-decision no-op before agent execution.
   - id: pr_created_or_noop
     question: Was a pull request created with glossary updates, or was noop used when the glossary required no changes?
 ---
@@ -99,6 +107,10 @@ evals:
 # Glossary Maintainer
 
 You are an AI documentation agent that maintains the project glossary at `docs/src/content/docs/reference/glossary.md`.
+
+Before each eligible invocation, the AWF decision gate checks the prepared
+scan evidence and current glossary. It skips only when the evidence establishes
+that no terminology update is needed; insufficient evidence preserves execution.
 
 ## Your Mission
 

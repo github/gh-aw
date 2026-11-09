@@ -244,6 +244,7 @@ type WorkflowData struct {
 	ContainerPinMappings           map[string]string               // container-pin redirect table from aw.json container_pins: maps source image → replacement image
 	GHES                           bool                            // select action versions compatible with GitHub Enterprise Server
 	Evals                          *EvalsConfig                    // BinEval evaluation configuration parsed from frontmatter evals field
+	SkipIfDecision                 []string                        // Advisory skip questions evaluated before eligible sandboxed agent invocations
 	Graders                        *GradersConfig                  // Deterministic graders configuration parsed from frontmatter graders field
 	ExcludedEnv                    []string                        // additional env var names to exclude from agent container via AWF --exclude-env (from frontmatter excluded-env field)
 }

@@ -580,6 +580,7 @@ func (c *Compiler) emitExperimentalFeatureWarningsTo(workflowData *WorkflowData,
 	}{
 		{enabled: ResolveEngineID(workflowData) == string(constants.CopilotEngine) && workflowData.EngineConfig.DynamicWorkflowsEnabled(), message: "Using experimental feature: copilot.dynamic-workflows"},
 		{enabled: workflowData.RateLimit != nil, message: "Using experimental feature: rate limiting"},
+		{enabled: isSkipIfDecisionEnabled(workflowData), message: "Using experimental feature: skip-if-decision"},
 		{enabled: workflowData.TokenBrokerEnabled, message: "Using experimental feature: token-broker"},
 		{enabled: workflowData.EngineConfig != nil && workflowData.EngineConfig.Durable != nil, message: "Using experimental feature: engine.durable"},
 		{enabled: len(workflowData.WebhookSubscriptions) > 0, message: "Using experimental feature: on.gateway-dispatch (approved webhook bridge required)"},

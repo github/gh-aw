@@ -3,13 +3,16 @@
 package workflow
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/stringutil"
+	"github.com/goccy/go-yaml"
 )
 
 // ============================================================================
@@ -414,8 +417,184 @@ func TestDailyFormalSpecVerifierAllowsReadOnlyFileInspection(t *testing.T) {
 	if !strings.Contains(workflow, "edit: null") {
 		t.Fatal("Expected daily-formal-spec-verifier workflow to enable built-in file inspection tools")
 	}
-	if !strings.Contains(workflow, `- "sed *"`) {
-		t.Fatal("Expected daily-formal-spec-verifier workflow to allow ranged sed reads")
+	if strings.Contains(workflow, `- "sed *"`) {
+		t.Fatal("Expected daily-formal-spec-verifier workflow to exclude unrestricted sed commands")
+	}
+	if strings.Contains(workflow, `- "bash .github/scripts/install_tla_runtime_test.sh"`) {
+		t.Fatal("Expected the installer test to run outside the agent's shell allowlist")
+	}
+	if !strings.Contains(workflow, "run: bash .github/scripts/install_tla_runtime_test.sh") {
+		t.Fatal("Expected the fixture-based installer test to run before agent execution")
+	}
+
+	lockContent, err := os.ReadFile(strings.TrimSuffix(workflowFile, ".md") + ".lock.yml")
+	if err != nil {
+		t.Fatalf("Failed to read compiled workflow lock: %v", err)
+	}
+	var compiled struct {
+		Jobs map[string]struct {
+			Steps []struct {
+				Name string
+				Run  string
+				Env  map[string]string
+				With map[string]any
+			}
+		}
+	}
+	if err := yaml.Unmarshal(lockContent, &compiled); err != nil {
+		t.Fatalf("Failed to parse compiled workflow lock: %v", err)
+	}
+	positions := map[string]int{}
+	for index, step := range compiled.Jobs["agent"].Steps {
+		positions[step.Name] = index
+		if step.Name == "Checkout repository (gh-aw default)" && step.With["persist-credentials"] != false {
+			t.Fatal("Expected the pre-agent installer checkout not to persist credentials")
+		}
+		if step.Name == "Validate fixture-based TLA+ installer" {
+			if step.Run != "bash .github/scripts/install_tla_runtime_test.sh" || len(step.Env) != 0 {
+				t.Fatal("Expected the pre-agent fixture test to run the fixed script without credential environment bindings")
+			}
+		}
+	}
+	installerIndex, ok := positions["Validate fixture-based TLA+ installer"]
+	if !ok {
+		t.Fatal("Expected fixture-based installer validation in the compiled agent job")
+	}
+	checkoutIndex, ok := positions["Checkout repository (gh-aw default)"]
+	if !ok || checkoutIndex >= installerIndex {
+		t.Fatal("Expected the fixture test to use the initial credential-free checkout")
+	}
+	for _, name := range []string{"Configure Git credentials", "Checkout PR branch", "Execute GitHub Copilot CLI"} {
+		index, ok := positions[name]
+		if !ok || index <= installerIndex {
+			t.Fatalf("Expected fixture validation before %q so agent edits cannot change the executed test", name)
+		}
+	}
+}
+
+func TestDailySquidImageScanUsesFixedLogQueries(t *testing.T) {
+	repoRoot, err := findRepoRoot()
+	if err != nil {
+		t.Fatalf("Failed to find repo root: %v", err)
+	}
+
+	workflowFile := filepath.Join(repoRoot, ".github", "workflows", "daily-squid-image-scan.md")
+	content, err := os.ReadFile(workflowFile)
+	if err != nil {
+		t.Fatalf("Failed to read workflow file: %v", err)
+	}
+
+	workflow := string(content)
+	frontmatterParts := strings.SplitN(workflow, "---\n", 3)
+	if len(frontmatterParts) != 3 {
+		t.Fatal("Expected daily-squid-image-scan workflow to contain frontmatter")
+	}
+	frontmatter := frontmatterParts[1]
+	if !strings.Contains(frontmatter, "  bash: []") {
+		t.Fatal("Expected daily-squid-image-scan workflow to disable agent bash commands")
+	}
+	if !strings.Contains(frontmatter, "  edit: false") {
+		t.Fatal("Expected daily-squid-image-scan workflow to explicitly disable agent file editing")
+	}
+	if strings.Contains(workflow, "grep") {
+		t.Fatal("Expected scan-log queries to use fixed Bash builtins rather than model-invocable grep")
+	}
+
+	lockFile := filepath.Join(repoRoot, ".github", "workflows", "daily-squid-image-scan.lock.yml")
+	lockContent, err := os.ReadFile(lockFile)
+	if err != nil {
+		t.Fatalf("Failed to read compiled workflow lock: %v", err)
+	}
+	if strings.Contains(string(lockContent), "--allow-tool shell(grep)") || strings.Contains(string(lockContent), `"shell(grep)"`) {
+		t.Fatal("Expected compiled daily-squid-image-scan lock to exclude agent grep permissions")
+	}
+	var compiled struct {
+		Jobs map[string]struct {
+			Steps []struct {
+				Name string
+				Env  map[string]string
+			}
+		}
+	}
+	if err := yaml.Unmarshal(lockContent, &compiled); err != nil {
+		t.Fatalf("Failed to parse compiled workflow lock: %v", err)
+	}
+	summaryIndex, executionIndex := -1, -1
+	for index, step := range compiled.Jobs["agent"].Steps {
+		if step.Name == "Index scan logs with fixed queries" {
+			summaryIndex = index
+		}
+		if step.Name != "Execute GitHub Copilot CLI" {
+			continue
+		}
+		executionIndex = index
+		var serverArgs []string
+		if err := json.Unmarshal([]byte(step.Env["GH_AW_COPILOT_SDK_SERVER_ARGS"]), &serverArgs); err != nil {
+			t.Fatalf("Failed to parse compiled SDK server arguments: %v", err)
+		}
+		var serverAllowedTools []string
+		for index, arg := range serverArgs {
+			if arg == "--allow-all-tools" || arg == "--allow-all" {
+				t.Fatalf("Expected compiled SDK server to exclude unrestricted tool permissions, got %q", arg)
+			}
+			if arg == "--allow-tool" && index+1 < len(serverArgs) {
+				tool := serverArgs[index+1]
+				if tool == "write" || tool == "*" {
+					t.Fatalf("Expected compiled SDK server to exclude agent write permissions, got %q", tool)
+				}
+				serverAllowedTools = append(serverAllowedTools, tool)
+			}
+		}
+		for _, tool := range []string{"github", "safeoutputs"} {
+			if !slices.Contains(serverAllowedTools, tool) {
+				t.Fatalf("Expected compiled SDK server to preserve %q permissions", tool)
+			}
+		}
+		var toolConfig struct {
+			Capabilities            map[string]bool `json:"capabilities"`
+			ExplicitlyDisabledTools []string        `json:"explicitlyDisabledTools"`
+			Permissions             struct {
+				AllowedTools []string `json:"allowedTools"`
+			} `json:"permissions"`
+		}
+		if err := json.Unmarshal([]byte(step.Env["GH_AW_COPILOT_SDK_TOOL_CONFIG"]), &toolConfig); err != nil {
+			t.Fatalf("Failed to parse compiled SDK tool permissions: %v", err)
+		}
+		bashEnabled, configured := toolConfig.Capabilities["bash"]
+		if !configured || bashEnabled || !slices.Contains(toolConfig.ExplicitlyDisabledTools, "bash") {
+			t.Fatal("Expected compiled SDK permissions to explicitly disable agent bash")
+		}
+		editEnabled, configured := toolConfig.Capabilities["edit"]
+		if !configured || editEnabled || !slices.Contains(toolConfig.ExplicitlyDisabledTools, "edit") {
+			t.Fatal("Expected compiled SDK permissions to explicitly disable agent file editing")
+		}
+		for _, tool := range toolConfig.Permissions.AllowedTools {
+			if tool == "*" || tool == "bash" || tool == "write" || strings.HasPrefix(tool, "shell") {
+				t.Fatalf("Expected no shell or write permissions that could alter scan evidence, got %q", tool)
+			}
+		}
+		for _, tool := range []string{"github", "read", "safeoutputs"} {
+			if !slices.Contains(toolConfig.Permissions.AllowedTools, tool) {
+				t.Fatalf("Expected compiled SDK permissions to preserve %q access", tool)
+			}
+		}
+	}
+	if summaryIndex < 0 || executionIndex <= summaryIndex {
+		t.Fatal("Expected fixed log summaries to run before agent execution")
+	}
+
+	for _, expected := range []string{
+		`marker_pattern='Running \((syft|grype|grant)\)|syft scanned'`,
+		`finding_pattern='^[^[:space:]]+:1:1: (error|warning|info): \[[A-Za-z]+\]'`,
+		`if [[ "$line" =~ $marker_pattern ]]`,
+		`if [[ "$line" =~ $finding_pattern ]]`,
+		`finding_counts[$match_index]=$((finding_counts[$match_index] + 1))`,
+		`markers="$output_dir/${scan}-markers.txt"`,
+		`counts="$output_dir/compile-finding-counts.txt"`,
+	} {
+		if !strings.Contains(workflow, expected) {
+			t.Fatalf("Expected daily-squid-image-scan workflow to contain fixed scan-log query %q", expected)
+		}
 	}
 }
 

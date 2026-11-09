@@ -36,6 +36,12 @@
         "else": { "$ref": "#/$defs/connectorRegistration" }
       }
     },
+    "skip-if-decision": {
+      "description": "Experimental. Up to 64 advisory skip questions evaluated inside AWF before each eligible agent invocation. Nonempty lists emit a compile-time experimental warning; configuration and behavior may change without deprecation. Any deny skips; allow or all unknown preserves deterministic harness eligibility. Runtime @file references use sandbox filesystem restrictions. Nonempty lists cannot be combined with declarative protected-session-capture.",
+      "type": "array",
+      "maxItems": 64,
+      "items": { "type": "string", "minLength": 1, "pattern": "\\S" }
+    },
     "token-broker": {
       "description": "Experimental. Select independent Copilot capabilities to authenticate through the OIDC token broker. Using this field emits a compile-time warning. Configuration and behavior may change without deprecation.",
       "type": "object",
@@ -8342,6 +8348,10 @@
               "type": "object",
               "description": "Configuration for automatically creating GitHub issue or pull request comments from AI workflow output. The main job does not need write permissions.",
               "properties": {
+                "collapse-data": {
+                  "type": "boolean",
+                  "description": "Render safe-output data in a collapsed Structured data details block. Default: false (visible fenced JSON). Requires safe-outputs.data to accept structured data."
+                },
                 "max-links": {
                   "type": "integer",
                   "minimum": 1,

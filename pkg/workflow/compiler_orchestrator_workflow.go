@@ -1,11 +1,11 @@
 package workflow
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/jsonutil"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/setutil"
@@ -289,6 +289,9 @@ func (c *Compiler) populateWorkflowBuildContext(ctx *workflowBuildContext) error
 	if err := c.extractAdditionalConfigurations(ctx.frontmatter.Frontmatter, ctx.toolsResult.tools, ctx.markdownDir, ctx.workflowData, ctx.engineSetup.importsResult, ctx.toolsResult.rawMainMarkdown, ctx.toolsResult.safeOutputs); err != nil {
 		return err
 	}
+	if err := validateSkipIfDecisionEngine(ctx.engineSetup.agenticEngine, ctx.workflowData); err != nil {
+		return formatCompilerError(ctx.cleanPath, "error", err.Error(), err)
+	}
 	if err := c.mergeImportedOnFields(ctx.frontmatter.Frontmatter, ctx.workflowData, ctx.engineSetup.importsResult); err != nil {
 		return err
 	}
@@ -334,7 +337,7 @@ func hasExplicitConcurrencyGroup(frontmatter map[string]any) bool {
 func (c *Compiler) mergeImportedWorkflowConfiguration(ctx *workflowBuildContext) error {
 	if ctx.engineSetup.importsResult.MergedConcurrency != "" && !hasExplicitConcurrencyGroup(ctx.frontmatter.Frontmatter) {
 		var importedConcurrency any
-		if err := json.Unmarshal([]byte(ctx.engineSetup.importsResult.MergedConcurrency), &importedConcurrency); err == nil {
+		if err := jsonutil.UnmarshalString(ctx.engineSetup.importsResult.MergedConcurrency, &importedConcurrency); err == nil {
 			ctx.workflowData.Concurrency = c.extractTopLevelYAMLSection(map[string]any{"concurrency": importedConcurrency}, "concurrency")
 		} else {
 			orchestratorWorkflowLog.Printf("Skipping imported concurrency merge: invalid JSON: %v", err)
@@ -368,7 +371,7 @@ func (c *Compiler) mergeImportedObservability(workflowData *WorkflowData, merged
 		return
 	}
 	var importedObs map[string]any
-	if err := json.Unmarshal([]byte(mergedObservability), &importedObs); err != nil {
+	if err := jsonutil.UnmarshalString(mergedObservability, &importedObs); err != nil {
 		orchestratorWorkflowLog.Printf("Skipping imported observability merge: invalid JSON: %v", err)
 		return
 	}
@@ -723,6 +726,13 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 		return fmt.Errorf("invalid evals configuration: %w", err)
 	}
 	workflowData.Evals = evalsConfig
+	workflowData.SkipIfDecision, err = parseSkipIfDecision(frontmatter)
+	if err != nil {
+		return err
+	}
+	if len(workflowData.SkipIfDecision) > 0 && !isFirewallEnabled(workflowData) {
+		return errors.New("skip-if-decision requires the AWF agent sandbox: enable sandbox.agent or remove skip-if-decision")
+	}
 
 	// Extract deterministic graders configuration, including graders contributed by imports.
 	gradersFrontmatter, err := mergeImportedGradersFrontmatter(frontmatter, importsResult.MergedGraders)
@@ -769,7 +779,7 @@ func (c *Compiler) mergeImportedOnFields(frontmatter map[string]any, workflowDat
 
 	if _, exists := onMap["skip-if-match"]; !exists && importsResult.MergedSkipIfMatch != "" {
 		var value any
-		if err := json.Unmarshal([]byte(importsResult.MergedSkipIfMatch), &value); err != nil {
+		if err := jsonutil.UnmarshalString(importsResult.MergedSkipIfMatch, &value); err != nil {
 			return fmt.Errorf("failed to parse imported on.skip-if-match value: %w", err)
 		}
 		onMap["skip-if-match"] = value
@@ -783,7 +793,7 @@ func (c *Compiler) mergeImportedOnFields(frontmatter map[string]any, workflowDat
 
 	if _, exists := onMap["skip-if-no-match"]; !exists && importsResult.MergedSkipIfNoMatch != "" {
 		var value any
-		if err := json.Unmarshal([]byte(importsResult.MergedSkipIfNoMatch), &value); err != nil {
+		if err := jsonutil.UnmarshalString(importsResult.MergedSkipIfNoMatch, &value); err != nil {
 			return fmt.Errorf("failed to parse imported on.skip-if-no-match value: %w", err)
 		}
 		onMap["skip-if-no-match"] = value

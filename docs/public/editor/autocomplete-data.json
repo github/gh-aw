@@ -4,6 +4,11 @@
       "type": "object",
       "desc": "Experimental."
     },
+    "skip-if-decision": {
+      "type": "array",
+      "desc": "Experimental.",
+      "array": true
+    },
     "token-broker": {
       "type": "object",
       "desc": "Experimental.",
@@ -748,12 +753,18 @@
     },
     "runner": {
       "type": "object",
-      "desc": "Runner topology configuration.",
+      "desc": "Runner configuration.",
       "children": {
         "topology": {
           "type": "string",
           "desc": "Runner execution topology.",
           "enum": ["arc-dind"],
+          "leaf": true
+        },
+        "installation": {
+          "type": "string",
+          "desc": "Installation privilege for Copilot CLI and threat-detect in the agent and detection jobs.",
+          "enum": ["rootless", "privileged"],
           "leaf": true
         }
       }

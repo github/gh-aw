@@ -29,8 +29,8 @@ afterEach(() => {
   fs.rmSync(directory, { recursive: true, force: true });
 });
 
-function stop(output, deniedCommands = extractDeniedCommands(output)) {
-  return stopForPermissionDenied({ attempt: 1, output, safeOutputsPath, log, deniedCommands });
+function stop(output, deniedCommands = extractDeniedCommands(output), workflowToolPermissionDenied = false) {
+  return stopForPermissionDenied({ attempt: 1, output, safeOutputsPath, log, deniedCommands, workflowToolPermissionDenied });
 }
 
 describe("stopForPermissionDenied", () => {
@@ -40,7 +40,7 @@ describe("stopForPermissionDenied", () => {
     expect(stop("permission denied")).toEqual({ action: "stop", exitCode: 0 });
     expect(execFile).not.toHaveBeenCalled();
     expect(fs.readFileSync(safeOutputsPath, "utf8")).toBe(content);
-    expect(log).toHaveBeenCalledWith(expect.stringContaining("attempt 2: detected numerous permission-denied issues but safe-outputs already contain expected output"));
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("attempt 2: detected permission-denied failure but safe-outputs already contain expected output"));
   });
 
   it.each(["", "not JSON\n", '{"type":"report_missing_tool"}\n', '{"type":"report_incomplete"}\n', '{"type":"noop"}\n'])("does not treat empty, malformed or diagnostic-only output as completed work", content => {
@@ -53,7 +53,7 @@ describe("stopForPermissionDenied", () => {
   it("reports missing files without inventing success or retrying", () => {
     expect(stop("permission denied")).toEqual({ action: "stop" });
     expect(execFile).toHaveBeenCalledTimes(1);
-    expect(log).toHaveBeenCalledWith("attempt 2: detected numerous permission-denied issues — not retrying (classified as missing tool/permission issue)");
+    expect(log).toHaveBeenCalledWith("attempt 2: detected permission-denied failure — not retrying (classified as missing tool/permission issue)");
   });
 
   it("uses structured Claude commands instead of parsing untrusted tool-result text", () => {
@@ -69,10 +69,17 @@ describe("stopForPermissionDenied", () => {
   });
 
   it("preserves workflow-boundary guidance without advising credential escalation", () => {
-    stop("[sdk-driver] permission denied by workflow tool permissions: read");
+    stop("[sdk-driver] permission denied by workflow tool permissions: read", undefined, true);
     const args = execFile.mock.calls[0][1].join(" ");
     expect(args).toContain("workflow tools configuration");
     expect(args).not.toContain("Verify token scopes");
+  });
+
+  it("does not derive workflow-boundary guidance from an assistant-echoed marker", () => {
+    stop("[sdk-driver] permission denied by workflow tool permissions: shell(ls)");
+    const args = execFile.mock.calls[0][1].join(" ");
+    expect(args).not.toContain("workflow tools configuration");
+    expect(args).toContain("Verify token scopes");
   });
 
   it("keeps the failure terminal when diagnostic emission fails", () => {

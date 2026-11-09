@@ -102,7 +102,7 @@ function buildMissingToolAlternatives(baseAlternatives, deniedCommands) {
  *   runSafeOutputsCLI?: RunSafeOutputsCLILike,
  *   logger?: (message: string) => void,
  *   deniedCommands?: string[],
- *   permissionOutput?: string
+ *   workflowToolPermissionDenied?: boolean
  * }=} options
  */
 function emitMissingToolPermissionIssue(options) {
@@ -110,14 +110,14 @@ function emitMissingToolPermissionIssue(options) {
   const runSafeOutputs = options && options.runSafeOutputsCLI ? options.runSafeOutputsCLI : runSafeOutputsCLI;
   const logger = options && options.logger ? options.logger : defaultLog;
   const deniedCommands = options && options.deniedCommands ? options.deniedCommands : [];
-  const permissionOutput = options && typeof options.permissionOutput === "string" ? options.permissionOutput : "";
+  const workflowToolPermissionDenied = options && options.workflowToolPermissionDenied === true;
 
   if (!safeOutputsPath) {
     logger("report_missing_tool skipped: GH_AW_SAFE_OUTPUTS is not set");
     return;
   }
   try {
-    const payload = JSON.parse(buildMissingToolPermissionIssuePayload(deniedCommands, permissionOutput));
+    const payload = JSON.parse(buildMissingToolPermissionIssuePayload(deniedCommands, workflowToolPermissionDenied));
     runSafeOutputs("report_missing_tool", {
       tool: payload.tool,
       reason: payload.reason,
@@ -180,7 +180,7 @@ const NON_TERMINAL_SAFE_OUTPUT_TYPES = new Set(["report_missing_tool", "report_m
  * Read the safe-outputs JSONL file and check whether it contains at least one
  * non-diagnostic entry (i.e. an output that represents real, task-level work).
  * Returns true when such an entry exists; false otherwise.
- * Used by harnesses to suppress the terminal "numerous permission-denied" verdict
+ * Used by harnesses to suppress the terminal permission-denied verdict
  * when the agent already produced the expected output — preventing false-red runs.
  * @param {string} safeOutputsPath - Path to the safe-outputs JSONL file
  * @param {{

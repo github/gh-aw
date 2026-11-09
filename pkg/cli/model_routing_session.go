@@ -186,7 +186,7 @@ func decodeSessionModelRoutingEvent(line []byte, lineNumber int, attribution *se
 		return fmt.Errorf("invalid session event on line %d: %w", lineNumber, err)
 	}
 	switch {
-	case (event.Type == "harness.attempt" || event.Type == "harness.retry") && event.Provenance.Component == "harness":
+	case (event.Type == "harness.attempt" || event.Type == "harness.retry" || event.Type == "harness.decision") && event.Provenance.Component == "harness":
 		attribution.RetryEvents = append(attribution.RetryEvents, event)
 	case event.Type == "engine.retry" && event.Provenance.Component == "agent":
 		attribution.RetryEvents = append(attribution.RetryEvents, event)

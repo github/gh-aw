@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const fs = require("node:fs");
-const os = require("node:os");
 const path = require("node:path");
+const { collectUnifiedSession } = require("./unified_session.cjs");
 const {
   compactUnifiedSession,
   readCompactUnifiedSession,
@@ -17,6 +17,22 @@ const event = (type, data) => ({ type, data, timestamp: "2026-10-20T19:00:00Z", 
 const parse = result => (result.session.trim() ? result.session.trim().split("\n").map(JSON.parse) : []);
 
 describe("compact unified session projection", () => {
+  it("preserves invocation decision evidence without retaining question content", () => {
+    const data = {
+      proposedAttempt: 1,
+      outcome: "deny",
+      questions: [{ question: 1, outcome: "deny", instructions: "private contents" }],
+      latencyMs: 1,
+      timestamp: 1000,
+      avoidedInvocation: true,
+      providerBody: "private body",
+    };
+    const result = compactUnifiedSession([event("harness.decision", data)]);
+    expect(parse(result)[0].data).toMatchObject({ proposedAttempt: 1, outcome: "deny", latencyMs: 1, avoidedInvocation: true, questions: [{ question: 1, outcome: "deny" }] });
+    expect(result.session).not.toContain("private");
+    expect(sessionEventPriority(event("harness.decision", data))).toBe(4);
+  });
+
   it("preserves durable lineage but excludes historical content", () => {
     const events = [
       event("durable.restore", { engine: "codex", storage: "artifact", status: "restored", runId: "200", runAttempt: "1", parentRunId: "100", artifactId: "999", transcript: "private history" }),
@@ -28,6 +44,7 @@ describe("compact unified session projection", () => {
     expect(result.session).not.toContain("private history");
     expect(sessionEventPriority(events[0])).toBe(2);
   });
+
   it("retains bounded accounting and outcome metadata without mutating the source", () => {
     const events = [
       event("session.format", { version: 1 }),
@@ -353,12 +370,61 @@ describe("bounded compact session file reader", () => {
   let directory;
   let file;
   beforeEach(() => {
-    directory = fs.mkdtempSync(path.join(os.tmpdir(), "compact-session-"));
+    directory = fs.mkdtempSync(path.resolve(".gh-aw-compact-session-"));
     file = path.join(directory, "aw_session.jsonl");
   });
   afterEach(() => {
     vi.restoreAllMocks();
     fs.rmSync(directory, { recursive: true, force: true });
+  });
+
+  it("preserves retry and final execution metadata with three evaluations of 100 errored questions", () => {
+    const decisions = Array.from({ length: 3 }, (_, index) => ({
+      proposedAttempt: index + 1,
+      outcome: "unknown",
+      questions: Array.from({ length: 100 }, (_, question) => ({ question: question + 1, outcome: "unknown", error: "evaluation_failed" })),
+      latencyMs: 25,
+      timestamp: 1000 + index * 100,
+      avoidedInvocation: false,
+    }));
+    const attempts = Array.from({ length: 3 }, (_, index) => ({
+      attempt: index + 1,
+      exitCode: index === 2 ? 0 : 1,
+      failureClasses: index === 2 ? [] : ["rate_limit_error"],
+      outcome: index === 2 ? "success" : "failure",
+    }));
+    const record = { attempts: 3, exitCode: 0, attemptResults: attempts, decisionResults: decisions };
+    fs.mkdirSync(path.join(directory, "agent"));
+    fs.writeFileSync(path.join(directory, "agent/harness_retry.json"), JSON.stringify(record));
+    fs.writeFileSync(path.join(directory, "agent_execution.json"), JSON.stringify({ outcome: "success", exitCode: 0 }));
+    const { events } = collectUnifiedSession({ rootDir: directory });
+    const original = JSON.stringify(events);
+    const fullRetry = events.find(item => item.type === "harness.retry");
+    const fullDecisions = events.filter(item => item.type === "harness.decision");
+    expect(fullRetry.data).toEqual(record);
+    expect(Buffer.byteLength(JSON.stringify(fullRetry))).toBeGreaterThan(MAX_SOURCE_LINE_BYTES);
+    expect(fullDecisions.map(item => item.data)).toEqual(decisions);
+    for (const decision of fullDecisions) {
+      expect(Buffer.byteLength(JSON.stringify(decision))).toBeLessThan(MAX_SOURCE_LINE_BYTES);
+      const projected = compactUnifiedSession([decision]);
+      expect(parse(projected)[0].data).toEqual(decision.data);
+      expect(Buffer.byteLength(projected.session)).toBeLessThan(MAX_SOURCE_LINE_BYTES);
+      expect(projected.truncated).toBe(false);
+    }
+    const result = compactUnifiedSession(events);
+    const projected = parse(result);
+    expect(projected.find(item => item.type === "harness.retry").data).toEqual({ attempts: 3, exitCode: 0, attemptResults: attempts });
+    expect(projected.filter(item => item.type === "harness.attempt").map(item => item.data)).toEqual(attempts.map(attempt => ({ ...attempt, attemptId: `harness:${attempt.attempt}`, layer: "harness" })));
+    expect(projected.find(item => item.type === "execution.result").data).toEqual({ outcome: "success", exitCode: 0 });
+    expect(projected.filter(item => item.type === "harness.decision").length).toBeGreaterThan(0);
+    expect(result.session).not.toContain("decisionResults");
+    expect(Buffer.byteLength(result.session)).toBeLessThanOrEqual(MAX_COMPACT_SESSION_BYTES);
+    expect(JSON.stringify(events)).toBe(original);
+    fs.writeFileSync(file, result.session);
+    const reread = readCompactUnifiedSession(file);
+    expect(reread.oversizedLines).toBe(0);
+    expect(parse(reread)).toEqual(projected);
+    expect(JSON.parse(fs.readFileSync(path.join(directory, "agent/harness_retry.json"), "utf8"))).toEqual(record);
   });
 
   it("skips multi-chunk oversized agent messages and retains subsequent accounting", () => {

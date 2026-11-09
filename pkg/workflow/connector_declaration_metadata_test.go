@@ -115,3 +115,24 @@ func TestAWConnectorGlobalStagedOutputs(t *testing.T) {
 		})
 	}
 }
+
+func TestAWConnectorWithSkipIfDecision(t *testing.T) {
+	c, root := awConnectorCompiler(t)
+	source := awConnectorHeader + awConnectorSource(t) +
+		"skip-if-decision:\n  - Is there no actionable work remaining?\n" +
+		"tools:\n  tracker: [get-issue]\n" +
+		"safe-outputs:\n  staged: true\n  tracker-add-comment:\n---\nRead approved evidence.\n"
+	path := filepath.Join(root, "connector-decision.md")
+	data, err := c.ParseWorkflowString(source, path)
+	require.NoError(t, err)
+	require.Equal(t, []string{"Is there no actionable work remaining?"}, data.SkipIfDecision)
+	connector := data.Connectors["tracker"]
+	require.NotNil(t, connector)
+	require.NotNil(t, connector.Agent)
+	require.NotNil(t, connector.SafeOutputs)
+	require.Nil(t, connector.Context)
+	output, err := c.CompileToYAML(data, path)
+	require.NoError(t, err)
+	require.Contains(t, output, "GH_AW_SKIP_IF_DECISION")
+	require.NotContains(t, output, "secrets.EXAMPLE_WRITE_TOKEN")
+}

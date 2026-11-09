@@ -370,6 +370,8 @@ evals:
 
 # Daily Community Attribution Updater
 
+Use only commands listed under `tools.bash`, one standalone command per call. Do not combine commands with shell operators unless the complete command is explicitly allowlisted. If a required operation is blocked, stop and report it instead of probing command variants.
+
 Maintain an up-to-date **🌍 Community Contributions** section in `README.md`
 and an all-time **Community Contributors** wiki page by attributing all
 resolved community-labeled issues using the five-tier attribution strategy.
