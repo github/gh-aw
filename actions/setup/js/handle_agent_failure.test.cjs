@@ -6505,7 +6505,7 @@ describe("handle_agent_failure", () => {
         const outcome = buildEmptyOutputOutcome([], rootDir);
         const result = buildReportIncompleteContext([outcome], { collectorEmptyOutputCause: outcome.reason, rootDir });
         expect(result).toContain("Completion Signal Missing");
-        expect(result).toContain("not evidence that the requested work was incomplete");
+        expect(result).toContain("whether the requested work finished is unknown");
         expect(result).not.toContain("Task Could Not Be Completed");
         expect(result).toContain("missing_terminal_safe_output");
         expect(result).toContain("Failure classification: missing_terminal_safe_output");

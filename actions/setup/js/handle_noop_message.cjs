@@ -19,9 +19,10 @@ const { buildNoopConclusionSummary } = require("./conclusion_summary.cjs");
  * A noop is an agent-reported outcome, not independent completion evidence.
  * @param {string} agentConclusion
  * @param {boolean} [hasIncompleteReport]
+ * @param {boolean} [hasNonNoopOutput]
  * @returns {{category: string, description: string}}
  */
-function classifyNoopOutcome(agentConclusion, hasIncompleteReport = false) {
+function classifyNoopOutcome(agentConclusion, hasIncompleteReport = false, hasNonNoopOutput = false) {
   if (hasIncompleteReport) {
     return {
       category: "incomplete",
@@ -35,6 +36,12 @@ function classifyNoopOutcome(agentConclusion, hasIncompleteReport = false) {
     };
   }
   if (agentConclusion === "success") {
+    if (hasNonNoopOutput) {
+      return {
+        category: "reported_action",
+        description: "The agent completed and reported one or more actions. The no-op output is a completion signal, not a claim that no action was taken.",
+      };
+    }
     return {
       category: "reported_no_action",
       description: "The agent completed and reported no action. A no-op output alone does not verify that all required work was completed or that publication was possible.",
@@ -198,10 +205,11 @@ function buildHistoryLink() {
  * @param {string} agentConclusion
  * @param {string} runUrl
  * @param {boolean} hasIncompleteReport
+ * @param {boolean} hasNonNoopOutput
  * @returns {string}
  */
-function buildNoopCommentBody(workflowName, agentConclusion, runUrl, hasIncompleteReport) {
-  const outcome = classifyNoopOutcome(agentConclusion, hasIncompleteReport);
+function buildNoopCommentBody(workflowName, agentConclusion, runUrl, hasIncompleteReport, hasNonNoopOutput) {
+  const outcome = classifyNoopOutcome(agentConclusion, hasIncompleteReport, hasNonNoopOutput);
   const commentTemplatePath = getPromptPath("noop_comment.md");
   const children = parseReportMarkdown(fs.readFileSync(commentTemplatePath, "utf8"), {
     context: {
@@ -246,6 +254,7 @@ async function main() {
     const limitedMaxCount = maxCount;
     const allNoopItems = (result.items || []).filter(/** @param {any} item */ item => item.type === "noop");
     const noopItems = limitedMaxCount > 0 ? allNoopItems.slice(0, limitedMaxCount) : allNoopItems;
+    const nonNoopItems = result.items.filter(/** @param {any} item */ ({ type }) => type !== "noop");
 
     if (noopItems.length === 0) {
       core.info("No noop items found in agent output");
@@ -282,12 +291,13 @@ async function main() {
     const runUrl = process.env.GH_AW_RUN_URL || "";
     const agentConclusion = process.env.GH_AW_AGENT_CONCLUSION || "";
     const hasIncompleteReport = result.items.some(/** @param {any} item */ item => item.type === "report_incomplete") && !shouldIgnoreTaskCompleteRegistrationReports(result.items);
+    const hasNonNoopOutput = nonNoopItems.length > 0;
     const reportAsIssue = process.env.GH_AW_NOOP_REPORT_AS_ISSUE !== "false"; // Default to true
 
     // Reuse this privacy-safe body in the run's completion status comment.
     let commentBody = "";
     try {
-      commentBody = buildNoopCommentBody(workflowName, agentConclusion, runUrl, hasIncompleteReport);
+      commentBody = buildNoopCommentBody(workflowName, agentConclusion, runUrl, hasIncompleteReport, hasNonNoopOutput);
       core.setOutput("noop_comment_body", commentBody);
     } catch (error) {
       core.warning(`Could not render no-op comment body: ${getErrorMessage(error)}`);
@@ -295,7 +305,7 @@ async function main() {
 
     core.info(`Workflow name: ${workflowName}`);
     core.info(`Run URL: ${runUrl}`);
-    core.info(`No-op outcome: ${classifyNoopOutcome(agentConclusion, hasIncompleteReport).category}`);
+    core.info(`No-op outcome: ${classifyNoopOutcome(agentConclusion, hasIncompleteReport, hasNonNoopOutput).category}`);
     core.info(`Report as issue: ${reportAsIssue}`);
 
     if (!reportAsIssue) {
@@ -314,7 +324,6 @@ async function main() {
     }
 
     // Skip posting when there are non-noop outputs (agent did real work)
-    const nonNoopItems = result.items.filter(/** @param {any} item */ ({ type }) => type !== "noop");
     if (nonNoopItems.length > 0) {
       core.info(`Found ${nonNoopItems.length} non-noop output(s), skipping no-op message posting`);
       return;

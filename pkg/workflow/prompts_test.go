@@ -588,7 +588,7 @@ func TestDailySquidImageScanUsesFixedLogQueries(t *testing.T) {
 		`finding_pattern='^[^[:space:]]+:1:1: (error|warning|info): \[[A-Za-z]+\]'`,
 		`if [[ "$line" =~ $marker_pattern ]]`,
 		`if [[ "$line" =~ $finding_pattern ]]`,
-		`finding_counts[$match_index]=$((finding_counts[$match_index] + 1))`,
+		`finding_counts[match_index]=$((finding_counts[match_index] + 1))`,
 		`markers="$output_dir/${scan}-markers.txt"`,
 		`counts="$output_dir/compile-finding-counts.txt"`,
 	} {
