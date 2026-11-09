@@ -764,7 +764,35 @@ func validateWIFEngineAuth(workflowData *WorkflowData) error {
 	if err := validateGCPWIFEngineAuth(workflowData); err != nil {
 		return err
 	}
-	return validateOpenAIWIFEngineAuth(workflowData)
+	if err := validateOpenAIWIFEngineAuth(workflowData); err != nil {
+		return err
+	}
+	return validateThreatDetectionOpenAIWIFEngineAuth(workflowData)
+}
+
+func validateThreatDetectionOpenAIWIFEngineAuth(workflowData *WorkflowData) error {
+	if workflowData == nil || workflowData.SafeOutputs == nil || workflowData.SafeOutputs.ThreatDetection == nil {
+		return nil
+	}
+	detectionConfig := workflowData.SafeOutputs.ThreatDetection.EngineConfig
+	if detectionConfig == nil || detectionConfig.Auth == nil ||
+		detectionConfig.Auth.Type != "github-oidc" || detectionConfig.Auth.Provider != "openai" {
+		return nil
+	}
+
+	engineID := detectionConfig.ID
+	if engineID == "" {
+		engineID = ResolveEngineID(workflowData)
+	}
+	detectionData := *workflowData
+	detectionData.EngineConfig = cloneThreatDetectionEngineConfig(engineID, detectionConfig)
+	if workflowData.SafeOutputs.ThreatDetection.Model != "" {
+		detectionData.Model = workflowData.SafeOutputs.ThreatDetection.Model
+	}
+	if err := validateOpenAIWIFEngineAuth(&detectionData); err != nil {
+		return fmt.Errorf("safe-outputs.threat-detection.engine.auth: %w", err)
+	}
+	return nil
 }
 
 func validateOpenAIWIFEngineAuth(workflowData *WorkflowData) error {

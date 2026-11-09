@@ -461,6 +461,9 @@ func (e *CodexEngine) codexAllowedDomains(workflowData *WorkflowData) string {
 	if workflowData.EngineConfig != nil && workflowData.EngineConfig.APITarget != "" {
 		allowedDomains = mergeAPITargetDomains(allowedDomains, workflowData.EngineConfig.APITarget)
 	}
+	if isCodexOpenAIWIF(workflowData) {
+		allowedDomains = mergeAllowedDomainList(allowedDomains, "auth.openai.com")
+	}
 	return allowedDomains
 }
 
