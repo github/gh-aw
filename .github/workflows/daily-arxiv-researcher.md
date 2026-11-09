@@ -68,10 +68,6 @@ network:
     - defaults
     - arxiv.org
     - export.arxiv.org
-  hosted-web:
-    allowed:
-      - arxiv.org
-      - export.arxiv.org
 
 imports:
   - shared/mcp/kreuzberg.md
