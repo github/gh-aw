@@ -79,7 +79,8 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { collectAgentExecution, agentErrorDiagnosticText, parseAgentExitCode, isAgentExecutionEvent } = require("./agent_execution.cjs");
 const { writeSessionArtifact } = require("./session_artifact.cjs");
 const { collectAddMaskedValues } = require("./add_mask_redaction.cjs");
-const { parseDeepSeekLog, reconcileDeepSeekExecution } = require("./parse_deepseek_log.cjs");
+const { parseDeepSeekLog } = require("./parse_deepseek_log.cjs");
+const { reconcileDeepSeekExecution } = require("./deepseek_execution.cjs");
 
 // File written by the engine execution step with the epoch milliseconds at which the
 // engine CLI was started. Used to measure how long the engine ran before it was killed.
@@ -234,10 +235,12 @@ function persistAgentExecution(logContent, results, rootDir = process.env.GH_AW_
   const events = deepSeek ? parseDeepSeekLog(logContent).logEntries : [];
   /** @type {import("./types/agent_session").SessionEvent[]} */
   const supplementalErrors = [];
-  if (deepSeek && !events.some(event => event.type === "session.error")) {
-    if (results.agenticEngineTimeout) {
+  if (deepSeek) {
+    const hasSessionError = events.some(event => event.type === "session.error");
+    const hasTimeoutError = events.some(event => event.type === "session.error" && event.data.code === "agentic_engine_timeout");
+    if (results.agenticEngineTimeout && !hasTimeoutError) {
       supplementalErrors.push({ type: "session.error", data: { message: "DeepSeek Harness execution timed out", code: "agentic_engine_timeout", errorType: "TimeoutError" } });
-    } else if (process.env.GH_AW_AGENTIC_EXECUTION_OUTCOME === "failure") {
+    } else if (!hasSessionError && process.env.GH_AW_AGENTIC_EXECUTION_OUTCOME === "failure") {
       supplementalErrors.push({ type: "session.error", data: { message: "DeepSeek Harness execution failed", code: "agentic_engine_execution_failed" } });
     }
   }

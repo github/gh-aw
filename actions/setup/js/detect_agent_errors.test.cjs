@@ -5,9 +5,10 @@ import path from "path";
 import { spawnSync } from "child_process";
 import { agentErrorDiagnosticText } from "./agent_execution.cjs";
 import { parseDeepSeekLog } from "./parse_deepseek_log.cjs";
-import { timedOut } from "./fixtures/deepseek_ci_logs.cjs";
+import { startupFailure, timedOut } from "./fixtures/deepseek_ci_logs.cjs";
 import { writeSessionArtifact } from "./session_artifact.cjs";
 import { writeUnifiedSession } from "./unified_session.cjs";
+import { validateSession } from "./scripts/validate_session.cjs";
 
 // Minimal mock for @actions/core used by github-script CJS modules (renderLogFromFile).
 const mockCore = {
@@ -80,17 +81,33 @@ describe("detect_agent_errors.cjs", () => {
       expect(executions).toHaveLength(1);
       expect(executions[0].data.categories).toContain("agentic_engine_timeout");
       expect(executions[0].data).not.toHaveProperty("exitCode");
+      expect(events.some(event => event.type === "assistant.message" || event.type === "assistant.reasoning" || event.type === "session.result" || event.type.startsWith("tool."))).toBe(false);
+      const jsonl = fs.readFileSync(path.join(rootDir, "usage", "aw_session.jsonl"), "utf8");
       expect(fs.readFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "utf8")).toBe("0");
-      expect(
-        fs
-          .readFileSync(path.join(rootDir, "usage", "aw_session.jsonl"), "utf8")
-          .trimEnd()
-          .split("\n")
-          .map(JSON.parse)
-      ).toEqual(events);
+      expect(jsonl.trimEnd().split("\n").map(JSON.parse)).toEqual(events);
+      expect(validateSession(jsonl)).toBe(events.length);
       expect(stderr.mock.calls.flat().join("\n")).toContain("Detected agentic engine timeout signature");
     } finally {
       stderr.mockRestore();
+      vi.unstubAllEnvs();
+      fs.rmSync(rootDir, { recursive: true, force: true });
+    }
+  });
+
+  it("preserves a detected DeepSeek timeout alongside a parsed wrapper failure", () => {
+    const rootDir = fs.mkdtempSync(path.join(process.cwd(), ".deepseek-wrapper-timeout-"));
+    try {
+      vi.stubEnv("GH_AW_ENGINE_ID", "deepseek-harness");
+      vi.stubEnv("GH_AW_AGENTIC_EXECUTION_OUTCOME", "failure");
+      const results = { ...detectErrors(startupFailure), agenticEngineTimeout: true };
+
+      persistAgentExecution(startupFailure, results, rootDir);
+
+      const records = fs.readFileSync(path.join(rootDir, "agent-errors.jsonl"), "utf8").trimEnd().split("\n").map(JSON.parse);
+      const errors = records.filter(event => event.type === "session.error");
+      expect(errors.map(event => event.data.code)).toContain("agentic_engine_timeout");
+      expect(errors.some(event => event.data.message.includes("exit code 1"))).toBe(true);
+    } finally {
       vi.unstubAllEnvs();
       fs.rmSync(rootDir, { recursive: true, force: true });
     }

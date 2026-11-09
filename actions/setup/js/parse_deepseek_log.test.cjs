@@ -209,37 +209,6 @@ describe("parseDeepSeekLog", () => {
     expect(parseDeepSeekLog(raw).logEntries.some(event => event.type === "session.error")).toBe(false);
   });
 
-  it.each(["none", "init-only", "full"])("normalizes observed AWF timeout evidence with a zero exit artifact and $0 canonical capture", canonical => {
-    const raw = `${timedOut}[WARN] Agent command timed out after 15 minutes, stopping container...\n`;
-    const root = fs.mkdtempSync(path.join(process.cwd(), ".deepseek-timeout-capture-"));
-    try {
-      vi.stubEnv("GH_AW_ENGINE_ID", "deepseek-harness");
-      vi.stubEnv("GH_AW_AGENTIC_EXECUTION_OUTCOME", "failure");
-      const parsed = parseDeepSeekLog(raw).logEntries;
-      fs.writeFileSync(path.join(root, "agent-stdio.log"), raw);
-      fs.writeFileSync(path.join(root, "agent_execution_exit_code.txt"), "0");
-      if (canonical !== "none") writeSessionArtifact(path.join(root, "agent-session.jsonl"), canonical === "full" ? parsed : parsed.filter(event => event.type === "session.init"));
-      persistAgentExecution(raw, detectErrors(raw), root);
-      const detected = fs.readFileSync(path.join(root, "agent-errors.jsonl"), "utf8").trimEnd().split("\n").map(JSON.parse);
-      expect(detected).toEqual(parsed.filter(event => event.type === "session.error" || event.type === "agent.execution"));
-      const events = writeUnifiedSession({ rootDir: root, engine: "deepseek-harness", dailyAIC: {} });
-      const errors = events.filter(event => event.type === "session.error");
-      expect(errors).toHaveLength(1);
-      expect(errors[0].data.code).toBe("agentic_engine_timeout");
-      const execution = events.filter(event => event.type === "agent.execution");
-      expect(execution).toHaveLength(1);
-      expect(execution[0].data.categories).toContain("agentic_engine_timeout");
-      expect(execution[0].data).not.toHaveProperty("exitCode");
-      expect(events.some(event => event.type === "assistant.message" || event.type === "assistant.reasoning" || event.type === "session.result" || event.type.startsWith("tool."))).toBe(false);
-      const jsonl = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8");
-      expect(jsonl.trimEnd().split("\n").map(JSON.parse)).toEqual(events);
-      expect(validateSession(jsonl)).toBe(events.length);
-    } finally {
-      vi.unstubAllEnvs();
-      fs.rmSync(root, { recursive: true, force: true });
-    }
-  });
-
   it.each([
     { raw: startupFailure, recordedExit: 0, expectedExit: 1 },
     { raw: startupFailure, recordedExit: 7, expectedExit: 7 },

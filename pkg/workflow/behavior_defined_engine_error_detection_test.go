@@ -116,7 +116,7 @@ func TestDetectAgentErrorsStepEngineID(t *testing.T) {
 	for _, engine := range []CodingAgentEngine{NewCopilotEngine(), NewClaudeEngine(), NewCodexEngine(), NewPiEngine()} {
 		t.Run(engine.GetID(), func(t *testing.T) {
 			var generated strings.Builder
-			NewCompiler().generateDetectAgentErrorsStep(&generated, &WorkflowData{}, engine)
+			NewCompiler().generateDetectAgentErrorsStep(&generated, &WorkflowData{EngineConfig: &EngineConfig{ID: engine.GetID()}}, engine)
 			assert.Contains(t, generated.String(), fmt.Sprintf("GH_AW_ENGINE_ID: %q", engine.GetID()))
 		})
 	}

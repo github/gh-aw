@@ -19,7 +19,7 @@ const { estimateBaseline, projectModelConfig } = require("./routing_analytics.cj
 const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
 const { parseHarnessAttempts, correlateHarnessAttempts } = require("./harness_retry_session.cjs");
 const { isDurableSessionRecord } = require("./durable_session_record.cjs");
-const { reconcileDeepSeekExecution } = require("./parse_deepseek_log.cjs");
+const { reconcileDeepSeekExecution } = require("./deepseek_execution.cjs");
 const { buildWorkflowCallId } = require("./aw_context.cjs");
 
 const SESSION_FILE_FORMAT_VERSION = 1;
