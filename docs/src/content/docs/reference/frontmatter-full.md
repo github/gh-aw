@@ -18176,10 +18176,10 @@ safe-outputs:
     # (optional)
     allow-workflows: true
 
-    # When false, skips the branch protection API pre-flight check before pushing. Set
-    # to false to avoid requiring administration: read permission. The GitHub platform
-    # will still enforce branch protection at push time. Default is true (check
-    # enabled).
+    # When false, skips the branch protection API pre-flight check before pushing. The
+    # default check uses branch metadata, active rules, and GraphQL confirmation for
+    # classic protection; it does not require administration: read permission. GitHub
+    # still enforces branch protection at push time. Default is true (check enabled).
     # (optional)
     check-branch-protection: true
 

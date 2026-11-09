@@ -450,6 +450,17 @@ describe("checkBranchPushable", () => {
     expect(mockCore.info).toHaveBeenCalledWith('Branch "feature" only has Copilot code review rules and no classic protection; proceeding to push');
   });
 
+  it("retries transient GraphQL errors before deciding classic protection", async () => {
+    const client = makeClient("main", null, true);
+    client.rest.repos.getBranch.mockResolvedValue({
+      data: { protected: true, protection: { enabled: false, required_status_checks: { enforcement_level: "off", contexts: [], checks: [] } } },
+    });
+    client.graphql.mockRejectedValueOnce(Object.assign(new Error("Service unavailable"), { status: 503, response: { status: 503, headers: { "retry-after": "1" } } })).mockResolvedValueOnce({ repository: { ref: { refUpdateRule: null } } });
+
+    expect(await checkBranchPushable(client, "owner", "repo", "feature", true)).toBeNull();
+    expect(client.graphql).toHaveBeenCalledTimes(2);
+  });
+
   it.each([undefined, null, {}, { enabled: true }])("blocks protected branches without explicit absence of classic protection: %j", async protection => {
     const client = makeClient("main", null, true);
     client.rest.repos.getBranch.mockResolvedValue({ data: { protected: true, protection } });
@@ -535,7 +546,18 @@ describe("checkBranchPushable", () => {
     client.rest.repos.getBranch.mockResolvedValue({ data: { protected: true, protection: { enabled: false } } });
     client.graphql.mockRejectedValue(Object.assign(new Error("Classic protection unavailable"), { status }));
 
-    expect(await checkBranchPushable(client, "owner", "repo", "feature", true)).toContain("Cannot verify branch protection rules");
+    if (status === 500) {
+      vi.useFakeTimers();
+      try {
+        const result = checkBranchPushable(client, "owner", "repo", "feature", true);
+        await vi.runAllTimersAsync();
+        expect(await result).toContain("Cannot verify branch protection rules");
+      } finally {
+        vi.useRealTimers();
+      }
+    } else {
+      expect(await checkBranchPushable(client, "owner", "repo", "feature", true)).toContain("Cannot verify branch protection rules");
+    }
   });
 
   it("fails closed on a classic protection 404", async () => {

@@ -1,6 +1,7 @@
 // @ts-check
 
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { withRetry, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
 
 const MAX_BRANCH_RULE_PAGES = 50;
 
@@ -172,15 +173,20 @@ async function checkBranchPushable(githubClient, owner, repo, branchName, checkB
         try {
           if (await hasOnlyCopilotReviewRules(githubClient, owner, repo, branchName)) {
             // refUpdateRule exposes classic protection to non-admins.
-            const result = await githubClient.graphql(
-              `query($owner: String!, $repo: String!, $ref: String!) {
-                repository(owner: $owner, name: $repo) {
-                  ref(qualifiedName: $ref) {
-                    refUpdateRule { pattern }
+            const result = await withRetry(
+              () =>
+                githubClient.graphql(
+                  `query($owner: String!, $repo: String!, $ref: String!) {
+                  repository(owner: $owner, name: $repo) {
+                    ref(qualifiedName: $ref) {
+                      refUpdateRule { pattern }
+                    }
                   }
-                }
-              }`,
-              { owner, repo, ref: `refs/heads/${branchName}` }
+                }`,
+                  { owner, repo, ref: `refs/heads/${branchName}` }
+                ),
+              RATE_LIMIT_RETRY_CONFIG,
+              `check classic branch protection for ${owner}/${repo}:${branchName}`
             );
             const classicRule = result?.repository?.ref?.refUpdateRule;
             if (classicRule === undefined) {
