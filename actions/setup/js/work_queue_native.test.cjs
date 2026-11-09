@@ -9,7 +9,6 @@ import {
   dispatchResponse,
   fetchNativeRunAttempt,
   createNativeRunAttemptReader,
-  isTransientVerificationError,
   correlationRetryDelay,
   postQueueDispatch,
   validateNativeRun,
@@ -264,38 +263,6 @@ describe("authenticated native queue runs", () => {
     expect(getWorkflowRunAttempt).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({ run_id: run.id, attempt_number: 1, headers: { "X-GitHub-Api-Version": API_VERSION }, request: { retries: 0, retryCount: 0, timeout: 15000, signal: expect.any(AbortSignal) } })
     );
-  });
-
-  it("classifies only the retryable native verification failures as transient", () => {
-    for (const status of [404, 500, 502, 599]) {
-      expect(isTransientVerificationError({ status })).toBe(true);
-      expect(isTransientVerificationError({ response: { status } })).toBe(true);
-    }
-    for (const code of ["ETIMEDOUT", "ECONNRESET", "UND_ERR_SOCKET", "UND_ERR_CONNECT_TIMEOUT", "UND_ERR_HEADERS_TIMEOUT", "UND_ERR_BODY_TIMEOUT"]) {
-      expect(isTransientVerificationError({ code })).toBe(true);
-      expect(isTransientVerificationError({ cause: { cause: { code } } })).toBe(true);
-    }
-    expect(isTransientVerificationError(new Error("run_correlation_mismatch"))).toBe(true);
-    for (const error of [
-      undefined,
-      null,
-      new Error("rerun_not_authorized"),
-      new Error("run_binding_conflict"),
-      new Error("run_repository_mismatch"),
-      new Error("run_repository_identity_mismatch"),
-      new Error("run_event_mismatch"),
-      new Error("run_ref_mismatch"),
-      new Error("run_workflow_mismatch"),
-      new Error("run_principal_mismatch"),
-      { code: "EACCES" },
-      { status: 503, cause: { code: "ERR_TRANSPORT_INTEGRITY" } },
-      { status: 503, response: { headers: { "retry-after": "1" } } },
-      { code: "ECONNRESET", cause: { status: 403 } },
-      { status: 403, response: { status: 503 } },
-      ...[200, 400, 401, 403, 422, 429, 499, 600].map(status => ({ status })),
-      ...[403, 429, 600].map(status => ({ response: { status } })),
-    ])
-      expect(isTransientVerificationError(error)).toBe(false);
   });
 
   it("recovers a protected original intent origin through its exact native attempt without changing request identity", async () => {

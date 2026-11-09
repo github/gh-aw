@@ -6,7 +6,7 @@ const { posix } = require("node:path");
 const { canonical, closed, parseStrictJSON } = require("./work_queue_codec.cjs");
 const { actorFromContext } = require("./work_queue_policy.cjs");
 const { dispatchWorkflow } = require("./dispatch_workflow_transport.cjs");
-const { isTransientQueueReadError, readQueueMetadata, metadataRequest } = require("./work_queue_read_retry.cjs");
+const { readQueueMetadata, metadataRequest } = require("./work_queue_read_retry.cjs");
 
 const API_VERSION = "2026-03-10";
 
@@ -127,11 +127,6 @@ function createNativeRunAttemptReader(githubClient, repository, readOptions = {}
 
 async function fetchNativeRunAttempt(githubClient, repository, runId, attempt = 1, readOptions = {}) {
   return createNativeRunAttemptReader(githubClient, repository, readOptions)(runId, attempt);
-}
-
-function isTransientVerificationError(error) {
-  const status = error?.status ?? error?.response?.status;
-  return status === 404 || isTransientQueueReadError(error) || error?.message === "run_correlation_mismatch";
 }
 
 function correlationRetryDelay(attempt, remaining) {
@@ -315,7 +310,6 @@ module.exports = {
   fetchNativeRun,
   fetchNativeRunAttempt,
   createNativeRunAttemptReader,
-  isTransientVerificationError,
   correlationRetryDelay,
   validateNativeRun,
   dispatchTag,
