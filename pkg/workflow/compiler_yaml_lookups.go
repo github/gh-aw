@@ -110,6 +110,8 @@ func getInstallationVersion(data *WorkflowData, engine CodingAgentEngine, regist
 		return string(constants.DefaultClaudeCodeVersion)
 	case string(constants.CodexEngine):
 		return string(constants.DefaultCodexVersion)
+	case string(constants.GeminiEngine):
+		return string(constants.DefaultGeminiVersion)
 	case string(constants.PiEngine):
 		return string(constants.DefaultPiVersion)
 	case string(constants.AgyEngine):
