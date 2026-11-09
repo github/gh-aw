@@ -307,7 +307,7 @@ function runProcess({
             const tail = redactAndBoundDiagnostics(redacted.trimEnd().split(/\r?\n/).slice(-20).join("\n").slice(-4000), { maskedValues, maxLength: 4000 });
             log(`attempt ${attempt + 1}: driver stderr tail: ${JSON.stringify({ exitCode, tail })}`);
           } catch {
-            log(`attempt ${attempt + 1}: driver stderr tail unavailable (redaction failed)`);
+            log(`attempt ${attempt + 1}: driver stderr tail: ${JSON.stringify({ exitCode, tail: "" })}`);
           }
         }
       }

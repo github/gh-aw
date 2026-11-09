@@ -377,20 +377,24 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
   }
   const engineErrorType = engineSummary.match(/\(([a-z][a-z0-9_]*)\)/)?.[1] || "";
   const errorCodes = executionErrorCodes.filter(code => Number.isSafeInteger(code) && code >= 400 && code <= 599);
+  const workflowInfo = events.find(event => event.type === "workflow.info" && event.provenance.component === "workflow");
+  const engineId = process.env.GH_AW_ENGINE_ID ?? workflowInfo?.data.engineId ?? workflowInfo?.data.engine_id;
+  const workflowToolPermissionDenied = engineId === "copilot" && hasWorkflowToolPermissionDenial(driverExitCode);
   const driverExitMeaning =
+    (workflowToolPermissionDenied ? "Workflow tool permission denied (Copilot SDK driver)" : "") ||
     {
       1: "General failure",
       2: "Invalid usage (conventional; engine-specific)",
-      78: "Configuration error (EX_CONFIG convention; AWF model routing failure)",
-      80: "Workflow tool permission denied (Copilot SDK driver)",
+      78: "Configuration error (EX_CONFIG convention; engine-specific, including AWF model routing)",
       124: "Command timed out (timeout utility convention)",
       126: "Command is not executable",
       127: "Command not found",
-    }[driverExitCode] || (driverExitSignal ? `Terminated by ${driverExitSignal} (128 + signal number)` : "Unknown (engine-specific exit code)");
+    }[driverExitCode] ||
+    (driverExitSignal ? `Terminated by ${driverExitSignal} (128 + signal number)` : "Unknown (engine-specific exit code)");
   const isPromptExhaustion = executionCategories.some(category => PROMPT_EXHAUSTION_ERROR_CATEGORIES.has(category));
   const isRequestRejection =
     driverExitCode === 78 ||
-    hasWorkflowToolPermissionDenial(driverExitCode) ||
+    workflowToolPermissionDenied ||
     contentFiltered ||
     ["invalid_safe_outputs", "safeoutputs_cli_error"].includes(reason) ||
     executionCategories.some(category => REQUEST_REJECTION_ERROR_CATEGORIES.has(category)) ||

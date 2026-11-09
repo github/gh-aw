@@ -6480,26 +6480,30 @@ describe("handle_agent_failure", () => {
       [1, [], [], "driver_crash"],
       [78, [], [], "request_rejection"],
       [80, [], [], "request_rejection"],
+      [80, [], [], "driver_crash", "claude"],
       [146, [], [], "driver_crash"],
       [137, [], [], "driver_crash"],
       [139, [], [], "driver_crash"],
       [1, ["capi_server_error"], [502], "engine_outage"],
-    ])("renders a driver failure classification supported by runtime evidence for exit %s", (exitCode, categories, errorCodes, failureCause) => {
+    ])("renders a driver failure classification supported by runtime evidence for exit %s", (exitCode, categories, errorCodes, failureCause, engineId = "copilot") => {
       const { buildEmptyOutputOutcome } = require("./empty_output_outcome.cjs");
       const { tmpdir } = require("os");
       const rootDir = mkdtempSync(join(tmpdir(), "failure-driver-details-"));
       try {
+        vi.stubEnv("GH_AW_ENGINE_ID", engineId);
         writeFileSync(join(rootDir, "agent-session.jsonl"), JSON.stringify({ type: "agent.execution", data: { categories, errorCodes, errorTypes: [], exitCode } }));
         const outcome = buildEmptyOutputOutcome([], rootDir);
         const result = buildReportIncompleteContext([outcome], { collectorEmptyOutputCause: outcome.reason, rootDir });
         expect(result).toContain(`Failure classification: ${failureCause}`);
         expect(result).toContain(`Driver exit code: ${exitCode}`);
-        if (exitCode === 78) expect(result).toContain("Configuration error (EX_CONFIG convention; AWF model routing failure)");
-        if (exitCode === 80) expect(result).toContain("Workflow tool permission denied (Copilot SDK driver)");
+        if (exitCode === 78) expect(result).toContain("Configuration error (EX_CONFIG convention; engine-specific, including AWF model routing)");
+        if (exitCode === 80 && engineId === "copilot") expect(result).toContain("Workflow tool permission denied (Copilot SDK driver)");
+        if (exitCode === 80 && engineId !== "copilot") expect(result).toContain("Unknown (engine-specific exit code)");
         if (exitCode === 146) expect(result).toContain("Unknown (engine-specific exit code)");
         if (failureCause === "request_rejection") expect(result).not.toContain("Failure classification: driver_crash");
         if (failureCause === "unknown") expect(result).not.toContain("engine_outage");
       } finally {
+        vi.unstubAllEnvs();
         rmSync(rootDir, { recursive: true, force: true });
       }
     });
