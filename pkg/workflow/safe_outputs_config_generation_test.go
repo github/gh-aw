@@ -28,6 +28,75 @@ func TestBuildSafeOutputInputsConfigIncludesMaxLength(t *testing.T) {
 	assert.NotContains(t, result["legacy"].(map[string]any), "maxLength")
 }
 
+func TestGenerateSafeOutputsConfigSafeJobsAndScripts(t *testing.T) {
+	maxLength := 120
+	inputs := map[string]*InputDefinition{
+		"message": {
+			Type:        "string",
+			Description: "Finding message",
+			Required:    true,
+			Default:     "example",
+			MaxLength:   &maxLength,
+		},
+	}
+	data := &WorkflowData{
+		SafeOutputs: &SafeOutputsConfig{
+			Jobs: map[string]*SafeJobConfig{
+				"publish-report": {
+					Description: "Publish a report",
+					Output:      "report",
+					Max:         3,
+					Inputs:      inputs,
+				},
+			},
+			Scripts: map[string]*SafeScriptConfig{
+				"custom-script": {
+					Description: "Run a custom script",
+					Max:         4,
+					Inputs:      inputs,
+				},
+			},
+		},
+	}
+
+	result, err := generateSafeOutputsConfig(data)
+	require.NoError(t, err)
+
+	var parsed map[string]any
+	require.NoError(t, json.Unmarshal([]byte(result), &parsed))
+	require.Equal(t, map[string]any{
+		"description":           "Publish a report",
+		"max":                   float64(3),
+		"output":                "report",
+		"supports_dependencies": false,
+		"inputs": map[string]any{
+			"message": map[string]any{
+				"type":        "string",
+				"description": "Finding message",
+				"required":    true,
+				"default":     "example",
+				"maxLength":   float64(120),
+			},
+		},
+	}, parsed["publish-report"])
+
+	require.Equal(t, map[string]any{
+		"description": "Run a custom script",
+		"max":         float64(4),
+		"inputs": map[string]any{
+			"message": map[string]any{
+				"type":        "string",
+				"description": "Finding message",
+				"required":    true,
+				"default":     "example",
+				"maxLength":   float64(120),
+			},
+		},
+	}, parsed["custom_script"])
+	assert.NotContains(t, parsed["custom_script"].(map[string]any), "supports_dependencies")
+	assert.NotContains(t, parsed["custom_script"].(map[string]any), "output")
+}
+
 // TestGenerateSafeOutputsConfigDispatchWorkflow tests that generateSafeOutputsConfig correctly
 // includes dispatch_workflow configuration with workflow_files mapping.
 func TestGenerateSafeOutputsConfigDispatchWorkflow(t *testing.T) {

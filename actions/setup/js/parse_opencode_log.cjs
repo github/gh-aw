@@ -287,11 +287,13 @@ function parseOpenCodeLog(content) {
         const start = state.time?.start;
         const end = state.time?.end;
         const exitCode = isV2Part(part) ? state.metadata?.metadata?.exit : state.metadata?.exit;
+        const outputTruncated = isV2Part(part) ? state.metadata?.metadata?.truncated : state.metadata?.truncated;
         const completion = {
           toolCallId: callID,
           toolName: part.tool,
           status: state.status,
           ...(Object.hasOwn(state, "output") ? { output: state.output } : {}),
+          ...(typeof outputTruncated === "boolean" ? { outputTruncated } : {}),
           ...(Object.hasOwn(state, "result") ? { result: state.result } : {}),
           ...(state.metadata !== undefined ? { metadata: state.metadata } : {}),
           ...(Number.isSafeInteger(exitCode) ? { exitCode } : {}),
@@ -300,6 +302,7 @@ function parseOpenCodeLog(content) {
         };
         const success = previous?.event.data.success === false ? false : (sessionToolSuccess({ ...raw.data, ...state, ...completion }) ?? state.status === "completed");
         const previousData = { ...previous?.event.data };
+        if (previous && typeof outputTruncated !== "boolean") delete previousData.outputTruncated;
         if (previous && state.error === undefined) delete previousData.error;
         if (previous && state.metadata === undefined) {
           delete previousData.metadata;
@@ -379,6 +382,8 @@ function parseOpenCodeLog(content) {
     if (Object.keys(usage).length) usage.input_tokens_include_cache = false;
     logEntries.push(
       createSessionEvent(sourceMetadata(resultSource), "session.result", {
+        // Null suppresses native session aliases without discarding the source.
+        ...(sessions.size > 1 ? { sessionId: null } : {}),
         ...(stepReports.size > 0 ? { numTurns: stepReports.size } : {}),
         ...(Object.keys(usage).length ? { usage } : {}),
         ...(totalCostUsd !== undefined ? { totalCostUsd } : {}),

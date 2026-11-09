@@ -1612,7 +1612,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN || github.token }}
           GITHUB_COPILOT_BASE_URL: http://api-proxy:10002
           GITHUB_WORKSPACE: ${{ github.workspace }}
-          LITELLM_LOCAL_MODEL_COST_MAP: True
+          LITELLM_LOCAL_MODEL_COST_MAP: "True"
           LITELLM_TELEMETRY: false
           MSWEA_SILENT_STARTUP: 1
           NO_PROXY: localhost,127.0.0.1,host.docker.internal,host.docker.internal:10000,host.docker.internal:10001,host.docker.internal:10002,host.docker.internal:10003,172.30.0.30,172.30.0.30:10000,172.30.0.30:10001,172.30.0.30:10002,172.30.0.30:10003

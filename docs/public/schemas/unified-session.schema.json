@@ -327,6 +327,7 @@
                 "toolName": { "type": "string" },
                 "success": { "type": "boolean" },
                 "output": { "$ref": "#/definitions/JsonValue" },
+                "outputTruncated": { "type": "boolean", "description": "Native output truncation, not a collector completeness guarantee." },
                 "structuredContent": { "$ref": "#/definitions/JsonValue" },
                 "result": { "$ref": "#/definitions/JsonValue" },
                 "error": { "$ref": "#/definitions/JsonValue" },
