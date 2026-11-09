@@ -185,6 +185,8 @@ evals:
     question: Did the agent avoid nudging PRs classified as unchanged, stale, dependency_bot, opted_out, agent_active, not_idle, approval_required, nothing_actionable, or last_comment_sous_chef, and entries with nudge_needed false, repeating unchanged work only for behind or conflicting branches after an intervening non-sous-chef comment?
   - id: progress-or-noop
     question: Did the agent either perform a specific forward-progress action on an eligible PR or stop with an explicit no-op when none remained?
+  - id: ci-follow-up-targeted
+    question: Did every completed-task CI follow-up begin with the literal "@copilot" mention (not a Markdown link), list only remaining CI failures, preserve its ci-follow-up structured data envelope, and avoid another assign_to_agent call?
 graders:
   execution-duration: {}
 ---
@@ -254,7 +256,7 @@ to repeat the remaining requests on the same head.
 Dependency-bot PRs and PRs with no substantive activity for 14 days are excluded.
 Active agents block action regardless of how long they have been running.
 After an assigned Copilot coding task completes successfully and has been idle
-for ten minutes, remaining CI failures may receive one status-only follow-up per
+for ten minutes, remaining CI failures may receive one Copilot-addressed follow-up per
 completed task. This includes unchanged failures and a last conversation comment
 from PR Sous Chef. A successful task can cover its recorded work across the head
 it pushed, even after a normal completion comment; new review/check tokens,
@@ -363,9 +365,11 @@ may receive progress actions.
    present, run `node scripts/pr-sous-chef.mjs <N> --simulate` for a final refresh.
    Post `ci_follow_ups[0].body` and `ci_follow_ups[0].data` exactly via
    `add_comment` on its `pr_number`, passing data as its separate field.
-   An empty `ci_follow_ups` means do nothing. This is a status comment only:
-   do not mention Copilot, call `assign_to_agent`, retry CI, or repeat answered
-   reviews. Preserve `kind: "ci-follow-up"` and `completed_task` for deduplication. This
+   An empty `ci_follow_ups` means do nothing. The follow-up must start with the
+   literal `@copilot` mention, not a Markdown link, with no preceding text or marker.
+   Ask Copilot to address the remaining CI failures on the existing PR branch.
+   Do not call `assign_to_agent`, retry CI, or repeat answered reviews.
+   Preserve `kind: "ci-follow-up"` and `completed_task` for deduplication. This
    guarded follow-up is the only exception to the last-sous-chef-comment rule;
    it does not relax the guards on implementation assignments.
 

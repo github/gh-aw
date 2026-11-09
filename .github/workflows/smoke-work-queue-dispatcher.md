@@ -33,7 +33,7 @@ jobs:
     timeout-minutes: 3
     permissions: {}
     steps:
-      - name: Require verified smoke dispatch
+      - name: Require accepted smoke dispatch
         env:
           SMOKE_AGENT_RESULT: ${{ needs.agent.result }}
           SMOKE_SAFE_OUTPUTS_RESULT: ${{ needs.safe_outputs.result }}
@@ -43,7 +43,7 @@ jobs:
           node <<'JS'
           const assert = require("node:assert/strict");
           assert.equal(process.env.SMOKE_AGENT_RESULT, "success", "Smoke agent job must run and succeed");
-          assert.equal(process.env.SMOKE_SAFE_OUTPUTS_RESULT, "success", "Trusted smoke launch verification must succeed");
+          assert.equal(process.env.SMOKE_SAFE_OUTPUTS_RESULT, "success", "Trusted smoke dispatch processing must succeed");
           const result = JSON.parse(process.env.SMOKE_DISPATCH_RECEIPT);
           assert.equal(result.version, 3);
           assert.equal(result.success, true, "Trusted queue controls must succeed");
@@ -55,7 +55,7 @@ jobs:
           assert.equal(receipt.dispatches, 1, "Smoke requires exactly one worker dispatch");
           assert.equal(receipt.launches.length, 1);
           const launch = receipt.launches[0];
-          assert.equal(launch.state, "bound", "Smoke requires a verified native worker launch");
+          assert.ok(["activation_pending", "bound"].includes(launch.state), "Smoke requires an accepted dispatch; trusted worker activation verifies binding separately");
           assert.equal(launch.dispatched, true);
           assert.match(String(launch.run_id), /^[1-9][0-9]*$/);
           JS
@@ -120,9 +120,11 @@ and worker run when diagnosing failures; do not wait for workers in this run.
 
 Publish both smoke workflows and their lock files together with `aw.json`.
 The dedicated pool has concurrency one and still shares repository-wide limits.
-Trusted launch verification rejects `no_grant`, missing receipts, and unbound
+Trusted dispatch verification rejects `no_grant`, missing receipts, and unresolved
 launches; an always-running downstream check also rejects skipped or failed jobs.
-It does not wait for worker completion.
+An accepted dispatch may still be `activation_pending`: the worker separately
+requires trusted activation and a verified Result. The dispatcher does not wait
+for worker binding or completion.
 
 `effect_contract: {kind: "none"}` forbids Claim resource effects, not framework
 queue bookkeeping. Queue ledger commits, tracking Issues, labels, and Claim

@@ -171,18 +171,22 @@ async function checkBranchPushable(githubClient, owner, repo, branchName, checkB
       if (isBranchProtected && typeof defaultBranch === "string" && defaultBranch.length > 0 && branchName !== defaultBranch && branchData.protection?.enabled === false) {
         try {
           if (await hasOnlyCopilotReviewRules(githubClient, owner, repo, branchName)) {
-            try {
-              await githubClient.rest.repos.getBranchProtection({ owner, repo, branch: branchName });
-            } catch (classicError) {
-              const classicStatus = classicError && typeof classicError === "object" && "status" in classicError ? classicError.status : undefined;
-              const classicMessage = classicError && typeof classicError === "object" ? classicError.response?.data?.message : undefined;
-              if (classicStatus === 403) {
-                throw new Error(
-                  `${getErrorMessage(classicError)}. Reading classic branch protection requires a GitHub App installation token or fine-grained PAT with Administration: read repository permission; GITHUB_TOKEN cannot provide this permission`,
-                  { cause: classicError }
-                );
-              }
-              if (classicStatus !== 404 || classicMessage !== "Branch not protected") throw classicError;
+            // refUpdateRule exposes classic protection to non-admins.
+            const result = await githubClient.graphql(
+              `query($owner: String!, $repo: String!, $ref: String!) {
+                repository(owner: $owner, name: $repo) {
+                  ref(qualifiedName: $ref) {
+                    refUpdateRule { pattern }
+                  }
+                }
+              }`,
+              { owner, repo, ref: `refs/heads/${branchName}` }
+            );
+            const classicRule = result?.repository?.ref?.refUpdateRule;
+            if (classicRule === undefined) {
+              throw new Error("Classic branch protection query did not return a ref update rule");
+            }
+            if (classicRule === null) {
               core.info(`Branch "${branchName}" only has Copilot code review rules and no classic protection; proceeding to push`);
               isBranchProtected = false;
             }

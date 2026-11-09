@@ -339,13 +339,15 @@ maintenance forever without preparing a failure; the fixed model excludes that
 behavior under the stated fairness assumptions. Without fairness, even a
 prepared sibling failure can remain unpublished forever.
 
-The related regression run also exhausted both `ClaimDeliveryHealth` positives
+The related historical regression run also exhausted both `ClaimDeliveryHealth` positives
 (73 and 6 states), both `QueueLifecycle` positives (496 and 207,612 states), and
 `FairKeepOpen` (83,865 states); every registered control/witness in those first
 two modules returned its exact expected verdict. The runner's 11 unit tests
 check verdict handling, not protocol correctness. The existing 16-case
 Go/JavaScript deadline-parity test separately confirms real replay checks for
 deadline/attempt exhaustion and unknown/none/partial evidence dispositions.
+Those lifecycle counts predate the accepted-receipt model described below;
+they are not current-model verification evidence.
 
 This is bounded safety and conditional temporal evidence, not an unbounded
 proof or runtime refinement. It omits actual Git CAS, arbitrary wire records,
@@ -1448,29 +1450,46 @@ these exhausted counts.
 fairness arithmetic. Its independent FIFO packing oracle uses profile order
 X/Y/X: one available dispatch admits the first X only; two dispatches permit
 X/X and Y without skipping the middle winner. Immutable assignments, one
-selected sender, activation recovery, conflicting bindings, attempt-1 effects,
+selected sender, accepted-but-unbound observations, normal trusted activation,
+conflicting bindings, attempt-1 effects,
 Controls, logical/native release, delivery outcomes and replacement admission
 are checked together.
 
+`ObserveReceipt` records only volatile controls-output knowledge; the derived
+`LaunchStatus` becomes `activation_pending` while the durable launch is unbound.
+It may arrive before or after trusted activation. `LoseReceipt` changes no
+binding, Claim or reservation. `Exhaust` abstracts an unavailable bounded scan,
+overflow or exhausted polling budget: it retains unbound capacity as
+unresolved/conflicted, and only later checked evidence can recover authority.
+The model does not promise that activation or sufficient recovery evidence
+eventually occurs.
+
 | Configuration | Expected result | Exhausted evidence |
 |---|---|---|
-| `LifecycleRecurring` | Safety across two fully drained epochs | 496 states, depth 20 |
-| `LifecyclePacked` | Safety for the bounded packed assignment | 207,612 states, depth 33 |
+| `LifecycleRecurring` | Safety across two fully drained epochs | 1,032 states, depth 21 |
+| `LifecyclePacked` | Safety for the bounded packed assignment | 875,532 states, depth 35 |
 
-Eleven negative controls require the exact named violations for fair-prefix
+Twelve negative controls require the exact named violations for fair-prefix
 packing, one sender, binding authority, unauthenticated activation, reruns,
 premature release, conflict release, pause/preemption confusion, delivery
-exclusivity, replacement safety and delivery-verification budgets. Three guarded
-witnesses reach mixed DAG outcomes, recovered activation and retained capacity
-after conflicting activation. Witness violations are expected reachability
+exclusivity, replacement safety, delivery-verification budgets and receipt-only
+binding. Seven guarded witnesses reach mixed DAG outcomes, recovered activation,
+retained capacity after conflicting activation, released pending delivery,
+accepted-but-unbound status, accepted/bound status and unresolved retained capacity.
+Witness violations are expected reachability
 diagnostics, not failures of the guarded safety properties.
 
 ```mermaid
 flowchart LR
     Prefix["Independent X/Y/X packing oracle"] --> Assignment["Immutable group membership"]
     Assignment --> Marker["One sender marker"]
-    Marker --> Unknown["Launch uncertain: retain native slot"]
-    Unknown --> Activation["Checked activation recovers binding"]
+    Marker --> Unknown["Launch unbound: retain native slot"]
+    Unknown --> Accepted["Receipt observed: activation pending"]
+    Accepted --> Activation["Checked activation establishes binding"]
+    Unknown --> Activation
+    Accepted --> Unresolved["Bounded recovery exhausted: retain native slot"]
+    Unknown --> Unresolved
+    Unresolved --> Activation
     Activation --> Members["Independent Claim closures and delivery barriers"]
     Activation --> Conflict["Conflicting run: retain reservation"]
     Members --> Terminal["Exact terminal evidence releases shared slot"]
@@ -1478,10 +1497,14 @@ flowchart LR
 ```
 
 Reproduce these checks with `TLC_MODEL_FILTER=QueueLifecycle`. The positive
-total is **208,108 exhausted states**, not an unbounded proof or runtime test.
+total is **876,564 exhausted states**, checked with the pinned TLC 2.19 and
+Java 21 on 2026-11-09, not an unbounded proof or runtime test.
+All 21 lifecycle configurations returned their exact expected verdicts.
 Terminal, activation and receipt predicates abstract independently checked
 evidence; they do not verify real GitHub responses, credentials, artifact
-authenticity or resource targets. The model does not cover actual Git CAS,
+authenticity or resource targets. Exact run hints, transient HTTP failures,
+dispatcher metadata-GET counts and the concrete two-page/50-run scan are
+runtime regression obligations, not modeled API behavior. The model does not cover actual Git CAS,
 wire codecs, arbitrary graphs, the native scheduler, all handler types or a
 liveness theorem. These checks do not complete the two interrupted large
 searches or the supported-host integration gate.

@@ -6,6 +6,8 @@ const path = require("node:path");
 const { temporaryDirectory } = require("./work_queue_effect_test_helpers.cjs");
 const { createCompilerDependencyResolver, credentialBindings, dependencyStateForIntents, main } = require("./work_queue_control_adapter.cjs");
 const { queueFixture, WORKFLOW, DISPATCHER, REF, REPOSITORY } = require("./work_queue_lifecycle.test_helpers.cjs");
+const { bindWorkerAssignment } = require("./work_queue_binding.cjs");
+const { assignmentOnly } = require("./work_queue_scheduler.cjs");
 const { main: captureIntentOrigin } = require("./capture_work_queue_intent_origin.cjs");
 const { canonical } = require("./work_queue_codec.cjs");
 const { createDispatchCredentialValidator, resolveDispatchCredentialPrincipal, isDispatchCredentialProof } = require("./work_queue_dispatch_credential.cjs");
@@ -21,6 +23,20 @@ function resolverOptions(overrides = {}) {
     state: { credential_generation: "generation", policy: { pools: { default: { allowed_repositories: [repository, foreign] } } } },
     ...overrides,
   };
+}
+
+function activateDispatch(fixture, dispatch, githubClient, context = fixture.workerContext) {
+  const assignment = assignmentOnly(dispatch);
+  return bindWorkerAssignment({
+    assignment,
+    githubClient,
+    context: { ...context, payload: { ...context.payload, inputs: { work_queue_assignment: JSON.stringify(assignment) } } },
+    workflowRef: `${REPOSITORY}/${WORKFLOW}@${REF}`,
+    logicalContract: dispatch.profile.logical_contract,
+    readWorkQueueLog: fixture.readWorkQueueLog,
+    publishWorkQueueRequest: fixture.publishWorkQueueRequest,
+    now: fixture.at,
+  });
 }
 
 function registerTests({ describe, it }) {
@@ -150,15 +166,11 @@ function registerTests({ describe, it }) {
                 assert.equal(parameters.ref, `refs/tags/gh-aw/work-queue/${REF}`);
                 return { status: 200, data: { workflow_run_id: "42", run_url: "https://api.github.com/repos/owner/repo/actions/runs/42", html_url: "https://github.com/owner/repo/actions/runs/42" } };
               },
-              getWorkflowRun: async () => {
-                throw new Error("Launch verification must read immutable attempt 1, not the latest run");
-              },
-              getWorkflowRunAttempt: async parameters => {
+              getWorkflowRun: async parameters => {
                 workerReads++;
                 assert.equal(parameters.owner, "owner");
                 assert.equal(parameters.repo, "repo");
                 assert.equal(parameters.run_id, "42");
-                assert.equal(parameters.attempt_number, 1);
                 const dispatch = [...fixture.state.dispatches.values()][0];
                 return { status: 200, data: { ...fixture.nativeRun(), display_title: `gh-aw work-queue ${dispatch.dispatch_id}` } };
               },
@@ -207,15 +219,22 @@ function registerTests({ describe, it }) {
             core: { setOutput: () => {}, info: () => {} },
           });
           assert.equal(result.receipts[0].status, "durable", JSON.stringify(result));
+          assert.equal(result.status, "activation_pending");
+          assert.equal(result.success, true);
+          assert.equal(result.receipts[0].launches[0].state, "activation_pending");
           assert.equal(posts, 1);
-          assert.equal(workerReads, 1);
+          assert.equal(workerReads, 0, "accepted dispatch must not poll worker metadata");
           assert.equal(identityReads, 1);
           assert.ok(queueReads > 0);
           assert.ok(queueWrites > 0);
           const dispatch = [...fixture.state.dispatches.values()][0];
-          assert.equal(dispatch.state, "bound");
-          assert.equal(dispatch.run.principal, entry.principal);
-          assert.equal(dispatch.run.run_attempt, 1);
+          assert.equal(dispatch.state, "started");
+          assert.equal(dispatch.run, undefined);
+          const activated = await activateDispatch(fixture, dispatch, dispatchClient);
+          assert.equal(workerReads, 1);
+          assert.equal(activated.projection.dispatches.get(dispatch.dispatch_id).state, "bound");
+          assert.equal(activated.binding.principal, entry.principal);
+          assert.equal(activated.binding.run_attempt, 1);
           assert.equal(dispatch.sender.run_attempt, 2);
           const grant = fixture.transactions.find(commit => commit.request.kind === "dispatch_next");
           assert.equal(grant.actor.run_attempt, 1, "immutable logical requester is not current START sender");
@@ -561,6 +580,11 @@ function registerTests({ describe, it }) {
         assert.equal(first.receipts[0].status, "durable", JSON.stringify(first));
         assert.equal(fixture.state.claims.size, 1);
         assert.equal(posts, 1);
+        assert.equal(first.status, "activation_pending");
+        const firstDispatch = [...fixture.state.dispatches.values()][0];
+        assert.equal(firstDispatch.state, "started");
+        assert.equal(firstDispatch.run, undefined);
+        await activateDispatch(fixture, firstDispatch, fixture.githubClient);
         fixture.dispatcherContext.runAttempt = 2;
         const before = JSON.stringify(fixture.transactions);
         const recovered = await main(options);
@@ -605,9 +629,13 @@ function registerTests({ describe, it }) {
         assert.ok(freshDispatch);
         assert.equal(freshDispatch.sender.principal, "11");
         assert.equal(freshDispatch.sender.run_attempt, 2);
-        assert.equal(freshDispatch.run.principal, "22");
-        assert.equal(freshDispatch.run.run_id, "43");
-        assert.equal(freshDispatch.run.run_attempt, 1);
+        assert.equal(fresh.status, "activation_pending");
+        assert.equal(freshDispatch.state, "started");
+        assert.equal(freshDispatch.run, undefined);
+        const activated = await activateDispatch(fixture, freshDispatch, fixture.githubClient, { ...fixture.workerContext, runId: "43" });
+        assert.equal(activated.binding.principal, "22");
+        assert.equal(activated.binding.run_id, "43");
+        assert.equal(activated.binding.run_attempt, 1);
       } finally {
         for (const key of keys) {
           if (previous[key] === undefined) delete process.env[key];
@@ -802,6 +830,7 @@ async function verifyCompiledDispatchIdentity(input) {
           },
         },
         actions: {
+          getWorkflowRun: parameters => dispatchClient.rest.actions.getWorkflowRunAttempt({ ...parameters, attempt_number: 1 }),
           createWorkflowDispatch: async parameters => {
             posts++;
             assert.equal(identityReads, 1);
@@ -910,10 +939,11 @@ async function verifyCompiledDispatchIdentity(input) {
       await new AsyncFunction("require", "core", "github", "context", "exec", "io", "getOctokit", input.script)(localRequire, core, fixture.githubClient, fixture.dispatcherContext, {}, {}, getOctokit);
       assert.equal(canonical(fixture.state.policy), canonical(input.policy));
       assert.ok(result, "compiled runtime must return its dispatch receipt");
-      assert.equal(controlFailures.length, mode === "verified" ? 0 : 1, JSON.stringify(result));
-      assert.equal(result.status, mode === "verified" ? "ok" : "recovery_required");
-      assert.equal(result.success, mode === "verified");
-      if (mode !== "verified") assert.match(controlFailures[0], /Work queue controls require recovery/);
+      const launchBlocked = ["wrong-publisher", "wrong-credential", "wrong-dispatch-tag"].includes(mode);
+      assert.equal(controlFailures.length, launchBlocked ? 1 : 0, JSON.stringify(result));
+      assert.equal(result.status, launchBlocked ? "recovery_required" : "activation_pending");
+      assert.equal(result.success, !launchBlocked);
+      if (launchBlocked) assert.match(controlFailures[0], /Work queue controls require recovery/);
       if (mode === "wrong-publisher") {
         assert.equal(identityReads, 0);
         assert.equal(tagReads, 0);
@@ -930,9 +960,13 @@ async function verifyCompiledDispatchIdentity(input) {
       if (mode === "verified") {
         assert.equal(result.receipts[0].status, "durable", JSON.stringify(result));
         assert.equal(posts, 1);
-        assert.equal(dispatch.state, "bound");
-        assert.equal(dispatch.run.principal, input.principal);
-        assert.equal(dispatch.run.run_attempt, 1);
+        assert.equal(result.receipts[0].launches[0].state, "activation_pending");
+        assert.equal(dispatch.state, "started");
+        assert.equal(dispatch.run, undefined);
+        const activated = await activateDispatch(fixture, dispatch, dispatchClient);
+        assert.equal(activated.projection.dispatches.get(dispatch.dispatch_id).state, "bound");
+        assert.equal(activated.binding.principal, input.principal);
+        assert.equal(activated.binding.run_attempt, 1);
         assert.equal(dispatch.sender.principal, "11");
         assert.equal(dispatch.sender.run_attempt, 2);
       } else if (mode === "wrong-credential" || mode === "wrong-dispatch-tag") {
@@ -952,7 +986,10 @@ async function verifyCompiledDispatchIdentity(input) {
         );
       } else {
         assert.equal(posts, 1);
-        assert.notEqual(dispatch.state, "bound", JSON.stringify(result));
+        assert.equal(result.receipts[0].launches[0].state, "activation_pending");
+        assert.equal(dispatch.state, "started");
+        await assert.rejects(activateDispatch(fixture, dispatch, dispatchClient));
+        assert.equal(fixture.state.dispatches.get(dispatch.dispatch_id).state, "started");
         assert.equal(dispatch.run, undefined);
       }
     } finally {

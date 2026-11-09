@@ -8,7 +8,8 @@ import {
   hasDispatchToken,
   dispatchResponse,
   fetchNativeRunAttempt,
-  isTransientVerificationError,
+  createNativeRunAttemptReader,
+  correlationRetryDelay,
   postQueueDispatch,
   validateNativeRun,
   authenticatePublisher,
@@ -37,6 +38,58 @@ describe("authenticated native queue runs", () => {
   const nativeClient = (actions, repository = run.repository) => ({
     rest: { repos: { get: vi.fn().mockResolvedValue({ status: 200, data: repository }) }, actions },
   });
+  it("spaces pending title reads exponentially while respecting the delay cap and remaining deadline", () => {
+    expect(Array.from({ length: 7 }, (_, index) => correlationRetryDelay(index + 1, 300000))).toEqual([1000, 2000, 4000, 8000, 16000, 30000, 30000]);
+    expect(correlationRetryDelay(64, 300000)).toBe(30000);
+    expect(correlationRetryDelay(5, 250)).toBe(250);
+    expect(correlationRetryDelay(5, 0)).toBe(0);
+  });
+
+  it("authenticates repository identity once per polling operation and still reads each exact native attempt", async () => {
+    const getAttempt = vi.fn().mockResolvedValue({ status: 200, data: run });
+    const githubClient = nativeClient({ getWorkflowRunAttempt: getAttempt });
+    const read = createNativeRunAttemptReader(githubClient, expected.repository, { retryMetadata: false });
+    for (let poll = 0; poll < 5; poll++) expect(validateNativeRun(await read(run.id, 1), expected)).toMatchObject({ run_id: run.id, run_attempt: 1 });
+    expect(githubClient.rest.repos.get).toHaveBeenCalledTimes(1);
+    expect(getAttempt).toHaveBeenCalledTimes(5);
+    expect(getAttempt.mock.calls.every(([parameters]) => parameters.run_id === run.id && parameters.attempt_number === 1 && parameters.request.retries === 0)).toBe(true);
+    await createNativeRunAttemptReader(githubClient, expected.repository)(run.id, 1);
+    await fetchNativeRunAttempt(githubClient, expected.repository, run.id);
+    expect(githubClient.rest.repos.get).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not reuse repository identity across selected clients or after failed authentication", async () => {
+    const getAttempt = vi.fn().mockResolvedValue({ status: 200, data: run });
+    const githubClient = nativeClient({ getWorkflowRunAttempt: getAttempt });
+    const read = createNativeRunAttemptReader(githubClient, expected.repository, { retryMetadata: false });
+    githubClient.rest.repos.get.mockRejectedValueOnce({ status: 503 });
+    await expect(read(run.id)).rejects.toMatchObject({ status: 503 });
+    expect(getAttempt).not.toHaveBeenCalled();
+    await expect(read(run.id)).resolves.toMatchObject({ id: run.id });
+    await read(run.id);
+    expect(githubClient.rest.repos.get).toHaveBeenCalledTimes(2);
+    const foreignClient = nativeClient({ getWorkflowRunAttempt: getAttempt }, { full_name: expected.repository, id: 8 });
+    await expect(createNativeRunAttemptReader(foreignClient, expected.repository)(run.id)).rejects.toThrow("run_repository_identity_mismatch");
+    expect(foreignClient.rest.repos.get).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    { full_name: "foreign/repo", id: 7 },
+    { full_name: expected.repository, id: 8 },
+    { full_name: expected.repository, id: Number.MAX_SAFE_INTEGER + 1 },
+  ])("rejects changed repository identity on a later polling response: %j", async repository => {
+    const getAttempt = vi
+      .fn()
+      .mockResolvedValueOnce({ status: 200, data: run })
+      .mockResolvedValue({ status: 200, data: { ...run, repository } });
+    const githubClient = nativeClient({ getWorkflowRunAttempt: getAttempt });
+    const read = createNativeRunAttemptReader(githubClient, expected.repository, { retryMetadata: false });
+    await read(run.id);
+    await expect(read(run.id)).rejects.toThrow();
+    expect(githubClient.rest.repos.get).toHaveBeenCalledTimes(1);
+    expect(getAttempt).toHaveBeenCalledTimes(2);
+  });
+
   it("matches the 256-digit positive canonical ID boundary without numeric coercion", () => {
     const id = "9".repeat(256);
     expect(nativeId(id)).toBe(id);
@@ -210,38 +263,6 @@ describe("authenticated native queue runs", () => {
     expect(getWorkflowRunAttempt).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({ run_id: run.id, attempt_number: 1, headers: { "X-GitHub-Api-Version": API_VERSION }, request: { retries: 0, retryCount: 0, timeout: 15000, signal: expect.any(AbortSignal) } })
     );
-  });
-
-  it("classifies only the retryable native verification failures as transient", () => {
-    for (const status of [404, 500, 502, 599]) {
-      expect(isTransientVerificationError({ status })).toBe(true);
-      expect(isTransientVerificationError({ response: { status } })).toBe(true);
-    }
-    for (const code of ["ETIMEDOUT", "ECONNRESET", "UND_ERR_SOCKET", "UND_ERR_CONNECT_TIMEOUT", "UND_ERR_HEADERS_TIMEOUT", "UND_ERR_BODY_TIMEOUT"]) {
-      expect(isTransientVerificationError({ code })).toBe(true);
-      expect(isTransientVerificationError({ cause: { cause: { code } } })).toBe(true);
-    }
-    expect(isTransientVerificationError(new Error("run_correlation_mismatch"))).toBe(true);
-    for (const error of [
-      undefined,
-      null,
-      new Error("rerun_not_authorized"),
-      new Error("run_binding_conflict"),
-      new Error("run_repository_mismatch"),
-      new Error("run_repository_identity_mismatch"),
-      new Error("run_event_mismatch"),
-      new Error("run_ref_mismatch"),
-      new Error("run_workflow_mismatch"),
-      new Error("run_principal_mismatch"),
-      { code: "EACCES" },
-      { status: 503, cause: { code: "ERR_TRANSPORT_INTEGRITY" } },
-      { status: 503, response: { headers: { "retry-after": "1" } } },
-      { code: "ECONNRESET", cause: { status: 403 } },
-      { status: 403, response: { status: 503 } },
-      ...[200, 400, 401, 403, 422, 429, 499, 600].map(status => ({ status })),
-      ...[403, 429, 600].map(status => ({ response: { status } })),
-    ])
-      expect(isTransientVerificationError(error)).toBe(false);
   });
 
   it("recovers a protected original intent origin through its exact native attempt without changing request identity", async () => {

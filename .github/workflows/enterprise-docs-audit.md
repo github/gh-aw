@@ -151,8 +151,8 @@ close, reopen, or otherwise modify prior issues: these are actionable backlog it
 Each issue must include:
 
 Use `###` or lower for every heading in the generated issue; reserve h1/h2 for the
-platform-rendered title. Order the body as overview/impact → key issue or metric →
-collapsible detailed evidence → proposed next action or limitation. Keep the
+platform-rendered title. Order the body as overview/impact → key metrics/issues →
+detailed findings and evidence → next actions or limitations. Keep the
 question, impact, and proposed correction visible. Put long evidence, navigation
 steps, source tables, and logs in
 `<details><summary><b>...</b></summary>...</details>` blocks. Use `- [ ]` for
