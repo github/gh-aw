@@ -187,7 +187,7 @@ Consumer workflow.
 	if err != nil {
 		t.Fatalf("Failed to read lock file: %v", err)
 	}
-	lockContent := string(lockFileContent)
+	lockContent := compiledWorkflowBody(string(lockFileContent))
 
 	// The leaf workflow's tools (bash) should be merged.
 	// "git *" normalizes to the canonical stem form shell(git:*) at compile time.

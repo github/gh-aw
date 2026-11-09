@@ -6,25 +6,33 @@ import { resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
-import { parseDocument } from "./work_queue_yaml.cjs";
+import { readDocumentMetadata } from "../../../scripts/markdown_metadata_test_adapter.cjs";
+import { Readable } from "node:stream";
+import { readLockFileHeaders } from "./work_queue_provisioning.cjs";
 
 const require = createRequire(import.meta.url);
 const { buildCopilotSDKPermissionHandler } = require("./copilot_sdk_permissions.cjs");
 const { parseToolArgs } = require("./mcp_cli_bridge.cjs");
 const root = resolve(import.meta.dirname, "../../..");
 const names = ["draft-pr-cleanup", "instructions-janitor", "daily-mcp-concurrency-analysis"];
+const manifests = new Map(
+  await Promise.all(
+    [...names, "daily-file-diet", "daily-caveman-optimizer"].map(async name => {
+      const { manifest } = await readLockFileHeaders(Readable.from([readFileSync(resolve(root, `.github/workflows/${name}.lock.yml`), "utf8")]));
+      return [name, manifest];
+    })
+  )
+);
 const readWorkflow = name => {
   const source = readFileSync(resolve(root, `.github/workflows/${name}.md`), "utf8");
   const [, frontmatter, prompt] = source.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
-  const document = parseDocument(frontmatter, { version: "1.2", uniqueKeys: true });
-  if (document.errors.length) throw new AggregateError(document.errors, `Invalid ${name} source`);
+  const document = readDocumentMetadata(frontmatter, { version: "1.2", uniqueKeys: true });
   const lock = readFileSync(resolve(root, `.github/workflows/${name}.lock.yml`), "utf8");
-  const compiled = parseDocument(lock, { version: "1.2", uniqueKeys: true });
-  if (compiled.errors.length) throw new AggregateError(compiled.errors, `Invalid ${name} lock`);
-  const manifest = JSON.parse(lock.match(/^# gh-aw-manifest: (.+)$/m)[1]);
-  const steps = compiled.toJS().jobs.agent.steps;
+  const compiled = readDocumentMetadata(lock, { version: "1.2", uniqueKeys: true });
+  const manifest = manifests.get(name);
+  const steps = compiled.value.jobs.agent.steps;
   const sdkConfig = steps.find(step => step.env?.GH_AW_COPILOT_SDK_TOOL_CONFIG)?.env.GH_AW_COPILOT_SDK_TOOL_CONFIG;
-  return { workflow: document.toJS(), prompt, lock, manifest, steps, sdkConfig: sdkConfig && JSON.parse(sdkConfig) };
+  return { workflow: document.value, prompt, lock, manifest, steps, sdkConfig: sdkConfig && JSON.parse(sdkConfig) };
 };
 
 describe("workflow native MCP permission alignment", () => {

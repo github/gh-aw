@@ -424,6 +424,17 @@ func TestInlinedSubagentExperimentCompilerToRuntime(t *testing.T) {
 		require.Len(t, mappings, 1)
 		assert.Equal(t, "GH_AW_EXPERIMENTS_SUBAGENT_MODEL", mappings[0].EnvVar)
 		assert.Equal(t, "steps.pick-experiment.outputs.subagent_model", mappings[0].Content)
+		manifest := &GHAWManifest{
+			MarkdownMetadata: compiler.collectMarkdownMetadata(&WorkflowData{CompiledPromptMarkdown: []string{prompt}}),
+		}
+		require.NoError(t, populateManifestMetadata(manifest))
+		require.Len(t, manifest.AgentMetadata, 1)
+		metadataDir := filepath.Join(workspace, "runtime")
+		require.NoError(t, os.MkdirAll(metadataDir, 0700))
+		awInfo, err := json.Marshal(manifest)
+		require.NoError(t, err)
+		require.NotContains(t, string(awInfo), `"markdown_metadata"`)
+		require.NoError(t, os.WriteFile(filepath.Join(metadataDir, "aw_info.json"), awInfo, 0600))
 
 		for _, variant := range []string{"small", "large", "gpt-5.4?effort=low"} {
 			t.Run(fmt.Sprintf("ordered=%t/%s", ordered, variant), func(t *testing.T) {
@@ -444,10 +455,16 @@ require(process.argv[1]).main().then(() => {
 }).catch(error => { console.error(error); process.exitCode = 1; });
 `, runtime)
 				cmd.Dir = workspace
-				cmd.Env = append(os.Environ(), "GH_AW_PROMPT="+promptPath, "GITHUB_WORKSPACE="+workspace, "GH_AW_ENGINE_ID=copilot", "GH_AW_EXPERIMENTS_SUBAGENT_MODEL="+variant)
+				cmd.Env = append(os.Environ(), "GH_AW_PROMPT="+promptPath, "GITHUB_WORKSPACE="+workspace, "GH_AW_TMP_DIR="+metadataDir, "GH_AW_ENGINE_ID=copilot", "GH_AW_EXPERIMENTS_SUBAGENT_MODEL="+variant)
 				output, err := cmd.CombinedOutput()
 				require.NoError(t, err, "%s", output)
-				assert.Contains(t, string(output), "model: "+variant+"\n")
+				lines := strings.SplitN(string(output), "\n", 4)
+				require.Len(t, lines, 4)
+				require.Equal(t, "---", lines[0])
+				require.Equal(t, "---", lines[2])
+				var agentMetadata map[string]any
+				require.NoError(t, json.Unmarshal([]byte(lines[1]), &agentMetadata))
+				assert.Equal(t, variant, agentMetadata["model"])
 				assert.NotContains(t, string(output), "__GH_AW_")
 				assert.NotContains(t, string(output), "${{")
 			})

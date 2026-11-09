@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createRequire } from "module";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -534,6 +534,19 @@ describe("workflow permission scope", () => {
 });
 
 describe("runWithCopilotSDK compiler-owned catalog", () => {
+  let workspace;
+  beforeEach(() => {
+    workspace = mkdtempSync(join(process.cwd(), ".sdk-tool-catalog-"));
+    vi.stubEnv("GITHUB_WORKSPACE", workspace);
+    vi.stubEnv("GH_AW_ENGINE_CWD", "");
+    vi.stubEnv("TMPDIR", workspace);
+    vi.stubEnv("GH_AW_SESSION_STATE_BASE_DIR", join(workspace, "session-state"));
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    rmSync(workspace, { recursive: true, force: true });
+  });
+
   it.each([true, false])("wires workflow visibility and approvals into the session when enabled=%s", async enabled => {
     const createSession = vi.fn().mockResolvedValue({
       sessionId: `session-workflow-contract-${enabled}`,

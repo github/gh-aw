@@ -4,10 +4,10 @@ import os from "node:os";
 import path from "node:path";
 
 const { preparePiSubagents } = await import("./pi_subagent_config.cjs");
+const { prepareMarkdownFixtures } = await import("../../../scripts/markdown_metadata_test_adapter.cjs");
 const reflectFixtures = await import("./fixtures/model_resolution_reflect.cjs");
 let dir;
 let frontmatter;
-const sdk = { parseFrontmatter: () => ({ frontmatter, body: "Read the requested file." }) };
 const catalog = ["github-copilot/claude-haiku-4.5", "github-copilot/gpt-5.6-luna", "anthropic/claude-haiku-4-5"];
 
 beforeEach(() => {
@@ -25,12 +25,23 @@ afterEach(() => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-const prepare = overrides => preparePiSubagents({ agentDir: dir, sdk, provider: "github-copilot", catalog, gateway: true, parentModel: "github-copilot/gpt-5.6-luna", ...overrides });
+const prepare = overrides => {
+  const content = `---\n${JSON.stringify(frontmatter)}\n---\nRead the requested file.`;
+  prepareMarkdownFixtures(content);
+  fs.writeFileSync(path.join(dir, "agents/reader.md"), content);
+  return preparePiSubagents({ agentDir: dir, sdk: {}, provider: "github-copilot", catalog, gateway: true, parentModel: "github-copilot/gpt-5.6-luna", ...overrides });
+};
 
 describe("Pi sub-agent model resolution", () => {
   it("derives name from the marker filename and qualifies bare models through the gateway", () => {
     expect(prepare()).toEqual([expect.objectContaining({ name: "reader", requested: "claude-haiku-4.5", model: "aw-gateway/claude-haiku-4.5", tools: ["read"] })]);
     expect(JSON.parse(fs.readFileSync(path.join(dir, "subagents.json"), "utf8"))[0].declaredModel).toBe("claude-haiku-4.5");
+    expect(JSON.parse(fs.readFileSync(path.join(dir, "subagents.json"), "utf8"))[0]).not.toHaveProperty("description");
+  });
+
+  it("accepts agents without an authored description", () => {
+    delete frontmatter.description;
+    expect(prepare()[0]).toMatchObject({ name: "reader", prompt: "Read the requested file.", tools: ["read"] });
   });
 
   it.each(["small", "recursive"])("resolves alias %s only on the parent's provider", model => {
@@ -130,7 +141,7 @@ describe("Pi sub-agent model resolution", () => {
     expect(() => prepare()).toThrow("different provider");
   });
 
-  it.each([{ model: 123 }, { tools: { read: true } }, { description: "" }])("rejects malformed frontmatter %j", invalid => {
+  it.each([{ model: 123 }, { tools: { read: true } }])("rejects malformed frontmatter %j", invalid => {
     Object.assign(frontmatter, invalid);
     expect(() => prepare()).toThrow();
   });

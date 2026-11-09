@@ -30,6 +30,8 @@ func ParseStaleCheckMode(frontmatter map[string]any) (disabled, full bool) {
 }
 
 // buildInitialWorkflowData creates the initial WorkflowData struct with basic fields populated.
+//
+//nolint:largefunc // Keep the existing workflow-data assembly together when adding metadata inputs.
 func (c *Compiler) buildInitialWorkflowData(
 	result *parser.FrontmatterResult,
 	toolsResult *toolsProcessingResult,
@@ -75,6 +77,7 @@ func (c *Compiler) buildInitialWorkflowData(
 		MaxDailyAICreditsGitHubApp: extractMaxDailyAICGitHubApp(result.Frontmatter),
 		MaxDailyAICContinueOnError: resolveMaxDailyAICContinueOnError(result.Frontmatter, importsResult.MergedMaxDailyAICredits),
 		ImportedFiles:              importsResult.ImportedFiles,
+		ImportedMetadataDocuments:  importsResult.MetadataDocuments,
 		Skills:                     extractFrontmatterSkills(toolsResult.parsedFrontmatter, result.Frontmatter),
 		SkillReferences:            extractFrontmatterSkillReferences(toolsResult.parsedFrontmatter, result.Frontmatter),
 		Plugins:                    mergeFrontmatterPlugins(toolsResult.parsedFrontmatter, result.Frontmatter, importsResult.MergedPlugins, importsResult.MergedPluginObjects),
@@ -125,6 +128,7 @@ func (c *Compiler) buildInitialWorkflowData(
 	}
 	if importsResult.MergedConcurrency != "" && !hasExplicitConcurrencyGroup(result.Frontmatter) {
 		var importedConcurrency any
+		//nolint:jsonunmarshalbytesconversion // Reject trailing data instead of decoding only the first JSON value.
 		if err := json.Unmarshal([]byte(importsResult.MergedConcurrency), &importedConcurrency); err == nil {
 			workflowData.Concurrency = c.extractTopLevelYAMLSection(map[string]any{"concurrency": importedConcurrency}, "concurrency")
 		} else {
@@ -171,6 +175,7 @@ func (c *Compiler) buildInitialWorkflowData(
 				continue
 			}
 			var raw any
+			//nolint:jsonunmarshalbytesconversion // Each imported checkout line must be one complete JSON value.
 			if err := json.Unmarshal([]byte(line), &raw); err != nil {
 				return nil, fmt.Errorf("invalid imported checkout JSON: %w", err)
 			}

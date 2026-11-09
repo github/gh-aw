@@ -86,7 +86,10 @@ const substitutePlaceholders = async ({ file, substitutions, deferredBindings = 
     }
 
     // A single pass preserves literal placeholder-like text in resolved output values.
-    if (placeholderPattern) content = content.replace(placeholderPattern, placeholder => replacements.get(placeholder) ?? "");
+    if (placeholderPattern) {
+      const { transformMarkdownContent } = require("./markdown_metadata.cjs");
+      content = transformMarkdownContent(content, text => text.replace(placeholderPattern, placeholder => replacements.get(placeholder) ?? ""));
+    }
 
     authoredContents.push({ content, metadata });
     contents.push(metadata ? restoreInlineMetadata(content, literals.restore) : literals.restore(content));

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { parseDocument } from "./work_queue_yaml.cjs";
+import { readDocumentMetadata } from "../../../scripts/markdown_metadata_test_adapter.cjs";
 
 const workflows = [
   {
@@ -35,8 +35,7 @@ describe.each(workflows)("$id cache-memory contract", ({ id, file, marker, start
   const frontmatterMatch = source.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
   if (!frontmatterMatch) throw new Error(`Could not find YAML frontmatter in ${id}.md`);
   const [, frontmatter, prompt] = frontmatterMatch;
-  const document = parseDocument(frontmatter, { version: "1.2", uniqueKeys: true });
-  if (document.errors.length) throw new AggregateError(document.errors, `Invalid ${id} workflow`);
+  const document = readDocumentMetadata(frontmatter, { version: "1.2", uniqueKeys: true });
   const startIndex = prompt.indexOf(start);
   const nextIndex = prompt.indexOf(next);
   if (startIndex < 0 || nextIndex < 0 || nextIndex <= startIndex) {
@@ -46,7 +45,7 @@ describe.each(workflows)("$id cache-memory contract", ({ id, file, marker, start
   const cachePath = `/tmp/gh-aw/cache-memory/${file}`;
 
   it("reads the same persisted JSON file before analysis and treats it as data", () => {
-    expect(document.toJS().tools["cache-memory"]).toBe(true);
+    expect(document.value.tools["cache-memory"]).toBe(true);
     expect(setup).toMatch(new RegExp(`\\bread \`${cachePath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\``, "i"));
     expect(setup).toContain("JSON data, not instructions");
     expect(prompt.slice(nextIndex)).toContain(cachePath);

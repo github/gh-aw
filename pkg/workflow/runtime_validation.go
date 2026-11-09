@@ -64,11 +64,16 @@ var runtimeValidationLog = logger.New("workflow:runtime_validation")
 //     block contains at least one ${{ }} expression AND its total length exceeds 21,000
 //     characters, GitHub Actions rejects the workflow with "Exceeded max expression length".
 func (c *Compiler) validateExpressionSizes(yamlContent string) error {
-	lines := strings.Split(yamlContent, "\n")
+	lines := strings.Split(strings.ReplaceAll(yamlContent, "\r\n", "\n"), "\n") //nolint:splitlinesonnewline // Normalize CRLF and retain source line numbers.
 	runtimeValidationLog.Printf("Validating expression sizes: yaml_lines=%d, max_size=%d", len(lines), MaxExpressionSize)
 	maxSize := MaxExpressionSize
 
 	for lineNum, line := range lines {
+		// Compiler JSON headers are comments, not Actions string values. They
+		// intentionally carry a complete manifest on one potentially long line.
+		if strings.HasPrefix(line, "# gh-aw-manifest: ") || strings.HasPrefix(line, "# gh-aw-metadata: ") {
+			continue
+		}
 		// Check the line length (actual content that will be in the YAML)
 		if len(line) > maxSize {
 			// Extract the key/value for better error message
@@ -109,6 +114,8 @@ func (c *Compiler) validateExpressionSizes(yamlContent string) error {
 // validateBlockScalarExpressionSizes scans the YAML lines for multi-line block scalars
 // (literal | or folded >) and returns an error when any such block both contains a
 // GitHub Actions template expression (${{ }}) and exceeds maxSize bytes in total.
+//
+//nolint:largefunc // The existing block-scalar state machine must preserve expression-size enforcement.
 func validateBlockScalarExpressionSizes(lines []string, maxSize int) error {
 	// Track whether we are inside a block scalar and its metadata.
 	inBlock := false
@@ -181,6 +188,8 @@ func validateBlockScalarExpressionSizes(lines []string, maxSize int) error {
 }
 
 // validateContainerImages validates that container images specified in MCP configs exist and are accessible
+//
+//nolint:largefunc // Preserve the existing daemon-availability and validation flow.
 func (c *Compiler) validateContainerImages(workflowData *WorkflowData) error {
 	if workflowData.Tools == nil {
 		runtimeValidationLog.Print("No tools configured, skipping container validation")

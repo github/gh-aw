@@ -3,25 +3,9 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-/** @type {(source: string, options: { version: string; uniqueKeys: boolean }) => { errors: unknown[]; toJS: () => Record<string, unknown> | null } | null} */
-const parseDocument = require("./work_queue_yaml.cjs").parseDocument;
 
 const INVENTORY_PATH = "/tmp/gh-aw/skill_inventory.json";
 const INSTALL_HISTORY_PATH = "/tmp/gh-aw/skill_install_history.json";
-
-function declaredPurpose(text) {
-  const frontmatter = text.match(/^---[ \t]*\r?\n([\s\S]*?)^---[ \t]*(?:\r?\n|$)/m)?.[1];
-  if (frontmatter === undefined) return undefined;
-  try {
-    const document = parseDocument(frontmatter, { version: "1.2", uniqueKeys: true });
-    if (!document || document.errors.length) return undefined;
-    const metadata = document.toJS();
-    if (!metadata || typeof metadata !== "object" || Array.isArray(metadata) || typeof metadata.description !== "string") return undefined;
-    return metadata.description.trim() || undefined;
-  } catch {
-    return undefined;
-  }
-}
 
 /**
  * Inventory only regular skill files in the staged engine directory and the
@@ -38,8 +22,7 @@ function inventoryDirectory(directory, scope, source) {
     const file = path.join(directory, entry.name, "SKILL.md");
     if (!fs.existsSync(file) || !fs.lstatSync(file).isFile()) continue;
     const content = fs.readFileSync(file);
-    const purpose = declaredPurpose(content.toString("utf8"));
-    skills.push({ name: entry.name, source: `${source}/${entry.name}`, scope, digest: `sha256:${crypto.createHash("sha256").update(content).digest("hex")}`, ...(purpose ? { purpose } : {}) });
+    skills.push({ name: entry.name, source: `${source}/${entry.name}`, scope, digest: `sha256:${crypto.createHash("sha256").update(content).digest("hex")}` });
   }
   return skills;
 }
@@ -86,4 +69,4 @@ function main({ stagedRoot = "/tmp/gh-aw", inventoryPath = INVENTORY_PATH, histo
   core.info(`Inventoried ${skills.length} skills; ${conflicts.length} conflict(s)`);
 }
 
-module.exports = { main, inventoryDirectory, detectSkillConflicts, declaredPurpose };
+module.exports = { main, inventoryDirectory, detectSkillConflicts };

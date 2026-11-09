@@ -117,8 +117,7 @@ function countInstalledSkillFiles(skillsDst) {
 }
 
 /** Path to the shared skill install failures JSON file within the activation job's runner. */
-const SKILL_FAILURES_FILE = "/tmp/gh-aw/skill_install_failures.json";
-const SKILL_INSTALL_HISTORY_FILE = "/tmp/gh-aw/skill_install_history.json";
+const skillStatePath = name => path.join(process.env.GH_AW_TMP_DIR || "/tmp/gh-aw", name);
 
 /** @param {string} directory */
 function skillDigests(directory) {
@@ -140,6 +139,7 @@ function skillDigests(directory) {
  * @param {string} errorMessage
  */
 function appendSkillInstallFailure(skillSpec, errorMessage) {
+  const SKILL_FAILURES_FILE = skillStatePath("skill_install_failures.json");
   let failures = [];
   try {
     if (fs.existsSync(SKILL_FAILURES_FILE)) {
@@ -184,11 +184,13 @@ async function writeSkillSummary(skillDir, skills, installedSkillCount, failures
   await core.summary.write();
 }
 
-async function main() {
+/** @param {{githubClient?: any}} [options] */
+async function main(options = {}) {
   const skillDir = process.env.GH_AW_SKILL_DIR || "";
   const skillInstallAgent = process.env.GH_AW_GH_SKILL_AGENT_NAME || "";
   const skills = parseSkillSpecs(process.env.GH_AW_FRONTMATTER_SKILLS || "");
-  const skillsDst = path.join("/tmp/gh-aw", skillDir);
+  const skillsDst = path.join(process.env.GH_AW_TMP_DIR || "/tmp/gh-aw", skillDir);
+  const SKILL_INSTALL_HISTORY_FILE = skillStatePath("skill_install_history.json");
 
   try {
     fs.mkdirSync(skillsDst, { recursive: true });
@@ -209,8 +211,10 @@ async function main() {
     core.info(`Installing skill reference: ${skillSpec}`);
     const command = buildSkillInstallCommand(skillSpec, skillsDst, skillInstallAgent);
     const before = skillDigests(skillsDst);
+    let installed = false;
     try {
       await exec.exec("gh", command.args);
+      installed = true;
       const after = skillDigests(skillsDst);
       const changed = Object.entries(after).filter(([name, digest]) => digest !== before[name]);
       if (changed.length) {
@@ -224,6 +228,7 @@ async function main() {
       core.warning(`Failed to install skill '${skillSpec}': ${errorMessage}`);
       failures.push({ skill: skillSpec, error: errorMessage });
       appendSkillInstallFailure(skillSpec, errorMessage);
+      if (installed) throw err;
     }
   }
 

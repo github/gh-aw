@@ -435,8 +435,8 @@ describe("verified default worker deployment authority", () => {
     ["string approval", lock().replace('"worker":true', '"worker":"true"')],
     ["malformed manifest", lock().replace(/^# gh-aw-manifest:.*\n/, "# gh-aw-manifest: {\n")],
     ["mutable contract", lock("${{ github.sha }}")],
-    ["malformed lock", lock() + "broken: [\n"],
-    ["missing assignment", lock().replace("work_queue_assignment:", "foreign:")],
+    ["non-object manifest", lock().replace(/^# gh-aw-manifest:.*\n/, "# gh-aw-manifest: []\n")],
+    ["missing worker approval", lock().replace('"worker":true,', "")],
   ])("handles %s locally without installing unknown code or pausing unrelated workers", async (_, content) => {
     const { f, options, trusted } = fixture();
     options.config = { work_queue_workflows: ["worker", "other"], aw_context_workflows: ["worker", "other"] };
@@ -455,6 +455,20 @@ describe("verified default worker deployment authority", () => {
     expect(worker.revisions[DEFAULT_REF]).toBeUndefined();
     expect(f.state.deployments.get("default").get("other").revisions[DEFAULT_REF].available).toBe(true);
     expect(f.state.stats.claims).toBe(0);
+  });
+
+  it.each([
+    ["malformed YAML", lock() + "broken: [\n"],
+    ["missing YAML assignment", lock().replace("work_queue_assignment:", "foreign:")],
+  ])("uses compiler worker approval without parsing %s", async (_, content) => {
+    const { f, options, trusted } = fixture();
+    f.githubClient.rest.repos.getContent = vi.fn(async ({ path }) => ({
+      data: { type: "file", path, encoding: "base64", content: Buffer.from(content).toString("base64") },
+    }));
+    await synchronizeDeployments(options, trusted);
+    const worker = f.state.deployments.get("default").get("default");
+    expect(worker.current_ref).toBe(DEFAULT_REF);
+    expect(worker.revisions[DEFAULT_REF]).toMatchObject({ available: true, profile: { logical_contract: CONTRACT } });
   });
 
   it("does not promote or reinterpret historical pins when their exact source or contract becomes unavailable", async () => {
