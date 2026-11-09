@@ -1310,6 +1310,9 @@
         "reason": {
           "$ref": "#/$defs/ReasonCode"
         },
+        "version": {
+          "const": 1
+        },
         "work_id": {
           "$ref": "#/$defs/Identity"
         }

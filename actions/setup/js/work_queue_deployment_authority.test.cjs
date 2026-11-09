@@ -212,6 +212,32 @@ describe("verified default worker deployment authority", () => {
       expect(options.publishWorkQueueRequest.mock.calls[0][0].request.parameters.operations.map(operation => operation.work_id)).toEqual(["Work-B", "work-B", "work-a"]);
       expect(canonical(f.transactions)).toBe(history);
     });
+
+    it.each(["wall clock", "explicit time"])("excludes elapsed deadlines using %s without mutating the read projection or ledger", async clock => {
+      const { f, options } = await outdated();
+      const projection = structuredClone(f.state);
+      const work = [...projection.works.values()].find(candidate => obsoleteWork(projection, candidate));
+      const now = f.at + 100;
+      projection.works = new Map(
+        [{ work_id: "work_a", expires_at: now - 1 }, { work_id: "work_b", expires_at: now }, { work_id: "work_c", expires_at: now + 1 }, { work_id: "work_d" }].map(deadline => [deadline.work_id, { ...work, ...deadline }])
+      );
+      options.readWorkQueueLog = async () => ({ ...(await f.readWorkQueueLog()), state: projection });
+      if (clock === "explicit time") options.now = now;
+      const failure = new Error("stop before ledger publication");
+      options.publishWorkQueueRequest = vi.fn().mockRejectedValue(failure);
+      const before = structuredClone(projection);
+      const history = canonical(f.transactions);
+      const time = vi.spyOn(Date, "now").mockReturnValue(clock === "explicit time" ? now + 100 : now);
+      try {
+        await expect(reconcileObsoleteWork(options)).rejects.toBe(failure);
+        expect(options.publishWorkQueueRequest).toHaveBeenCalledOnce();
+        expect(options.publishWorkQueueRequest.mock.calls[0][0].request.parameters.operations.map(operation => operation.work_id)).toEqual(["work_c", "work_d"]);
+        expect(projection).toEqual(before);
+        expect(canonical(f.transactions)).toBe(history);
+      } finally {
+        time.mockRestore();
+      }
+    });
   });
 
   it.each([

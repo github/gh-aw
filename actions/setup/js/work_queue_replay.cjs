@@ -62,7 +62,10 @@ const OP_FIELDS = {
     ["source_updated_at", "state_reason", "resource_state", "merged", "merge_commit"],
   ],
   ClaimCancellation: [["kind", "work_id", "claim_id", "reason", "retry_not_before"], []],
-  WorkCancellation: [["kind", "work_id", "reason"], ["claim_id"]],
+  WorkCancellation: [
+    ["kind", "work_id", "reason"],
+    ["claim_id", "version"],
+  ],
   WorkPriority: [["kind", "work_id", "priority", "expected_priority", "reason"], []],
   Dispatch: [
     ["kind", "dispatch_id", "state"],
@@ -182,6 +185,7 @@ function validateOperation(operation) {
   for (const field of ["work_id", "claim_id", "dispatch_id", "handle", "claim_handle", "completion_id", "epoch", "observation_id", "credential_generation", "read_status"])
     if (Object.hasOwn(operation, field)) identity(operation[field], field);
   if (Object.hasOwn(operation, "reason")) validateReason(operation.reason);
+  if (operation.kind === "WorkCancellation" && Object.hasOwn(operation, "version") && operation.version !== 1) throw queueError("unsupported_protocol", "checked WorkCancellation requires version 1");
   if (Object.hasOwn(operation, "evidence")) validateEvidence(operation.evidence);
   if (Object.hasOwn(operation, "run")) validateRunBinding(operation.run);
   if (Object.hasOwn(operation, "sender")) validateActor(operation.sender);
@@ -569,7 +573,7 @@ function applyLifecycle(state, operation, commit) {
     }
     case "WorkCancellation":
       if (!work || work.state === "completed" || work.barrier === "pending") throw queueError("work_terminal", "completed ownership cannot be reopened or cancelled");
-      if (operation.reason === "worker_contract_obsolete" && work.state !== "cancelled" && !obsoleteWork(state, work))
+      if (operation.version === 1 && operation.reason === "worker_contract_obsolete" && work.state !== "cancelled" && !obsoleteWork(state, work))
         throw queueError("deployment_conflict", "obsolete cancellation requires available unpinned Work with no delivery barrier and an incompatible active worker contract");
       if (operation.claim_id) {
         const selected = state.claims.get(operation.claim_id);
@@ -802,6 +806,7 @@ function checkpointSnapshot(state, lastAt, retainPolicyHistory = true) {
         if (operation.kind === "Deployment" || (retainPolicyHistory && ["Policy", "PoolInstall"].includes(operation.kind))) return structuredClone(operation);
         const fields = [
           "kind",
+          "version",
           "work_id",
           "logical_contract",
           "execution_ref",

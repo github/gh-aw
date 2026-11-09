@@ -5,6 +5,7 @@ const { canonical, digest, utf8Compare } = require("./work_queue_codec.cjs");
 const { policyProposalFor, loadQueue, publishOperations } = require("./work_queue_binding.cjs");
 const { verifiedDefaultReference, configuredWorkerDeployment } = require("./work_queue_provisioning.cjs");
 const { obsoleteWork } = require("./work_queue_deployment.cjs");
+const { expirationView } = require("./work_queue_expiration.cjs");
 const { authenticatePublisher } = require("./work_queue_native.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 
@@ -12,11 +13,12 @@ async function reconcileObsoleteWork(options) {
   if (isStagedMode(options) || isStagedMode(options.config)) return { cancelled: 0 };
   const latest = await loadQueue({ ...options, policyProposal: undefined });
   if (latest.projection.policy?.authorization !== "aw") return { cancelled: 0 };
-  const operations = [...latest.projection.works.values()]
-    .filter(work => obsoleteWork(latest.projection, work))
+  const projection = expirationView(latest.projection, options.now ?? Date.now());
+  const operations = [...projection.works.values()]
+    .filter(work => obsoleteWork(projection, work))
     .sort((a, b) => utf8Compare(a.work_id, b.work_id))
     .slice(0, Math.min(256, latest.projection.policy.limits.operations))
-    .map(work => ({ kind: "WorkCancellation", work_id: work.work_id, reason: "worker_contract_obsolete" }));
+    .map(work => ({ kind: "WorkCancellation", version: 1, work_id: work.work_id, reason: "worker_contract_obsolete" }));
   if (!operations.length) return { cancelled: 0 };
   const context = await authenticatePublisher({ ...options, role: "reconciler" });
   await publishOperations(options, context, ["obsolete-work", latest.projection.tip, operations], "cancel_work", operations);

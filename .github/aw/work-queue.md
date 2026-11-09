@@ -116,8 +116,11 @@ Completion; bounded verification yields Result/DeliveryFailure. Compatible
 deployments preserve obligations, debt, Results, frozen assignments and explicit
 `execution_ref` pins. Unavailable workers pause affected Work only. Scheduled
 maintenance terminally cancels unclaimed, unpinned Work whose admission contract
-differs from its approved active worker contract, with reason
-`worker_contract_obsolete`. Work with delivery barriers is preserved.
+differs from its approved active worker contract, using `WorkCancellation` with
+operation `version: 1` and reason `worker_contract_obsolete`. Current-time
+expiration excludes elapsed Work; publication rechecks eligibility. Work with
+delivery barriers is preserved. Version-3 history without an operation version
+retains reason-only semantics, including compatible/pinned cancellations.
 Quiesce economic Policy changes. Reject unsupported protocols/scalar assignments.
 Retries/checkpoints preserve submission identity; never delete queues to retry admission.
 
