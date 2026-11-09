@@ -16,3 +16,5 @@
 {"id":"pull_request_created","question":"Was a pull request created with the generated SVG diagram committed?","answer":"UNKNOWN","model":"evals","timestamp":"2026-10-12T09:35:34.153Z","runid":"38226353014"}
 {"id":"animated_diagram_generated","question":"Did the agent generate an SVG diagram using glowmotion?","answer":"YES","model":"evals","timestamp":"2026-10-19T09:00:24.722Z","runid":"39224671858"}
 {"id":"pull_request_created","question":"Was a pull request created with the generated SVG diagram committed?","answer":"YES","model":"evals","timestamp":"2026-10-19T09:00:24.722Z","runid":"39224671858"}
+{"id":"animated_diagram_generated","question":"Did the agent generate an SVG diagram using glowmotion?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-09T08:50:54.342Z","runid":"42585948958"}
+{"id":"pull_request_created","question":"Was a pull request created with the generated SVG diagram committed?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-09T08:50:54.342Z","runid":"42585948958"}
