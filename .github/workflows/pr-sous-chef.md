@@ -33,10 +33,12 @@ checkout:
     .github/scripts
 network:
   allowed: ["defaults"]
-model: copilot/claude-haiku-4.5
 engine:
   id: pi
   model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
 strict: true
 imports:
   - shared/mcp-pagination.md
