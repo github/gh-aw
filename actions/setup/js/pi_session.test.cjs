@@ -11,6 +11,114 @@ const parse = records => parsePiLog(records.map(record => JSON.stringify(record)
 const byType = (events, type) => events.filter(event => event.type === type);
 
 describe("Pi CI stream regressions", () => {
+  // Synthetic content in the shape of Smoke Pi 42539928028 and
+  // Smoke Pi Sub Agents 39516073462; no captured payloads are published.
+  it.each([0, 1794184043729, "2026-11-09T00:27:23.729Z"])("retains the observed message clock %s through streaming reconciliation and publication", timestamp => {
+    const message = {
+      role: "assistant",
+      responseId: "sanitized-response",
+      model: "requested-model",
+      responseModel: "served-model",
+      timestamp,
+      content: [
+        { type: "thinking", thinking: "Sanitized reasoning." },
+        { type: "toolCall", id: "sanitized-tool", name: "lookup", arguments: { nested: [false, 0, null, "line\n\u00e9"] } },
+        { type: "text", text: "Sanitized answer.\n" },
+      ],
+      usage: { input: 10, output: 3 },
+    };
+    const records = [
+      { type: "turn_start" },
+      { type: "message_update", assistantMessageEvent: { type: "thinking_delta", contentIndex: 0, delta: "Sanitized reasoning." } },
+      { type: "message_update", assistantMessageEvent: { type: "toolcall_start", contentIndex: 1, id: "sanitized-tool", toolName: "lookup" } },
+      { type: "message_update", assistantMessageEvent: { type: "text_delta", contentIndex: 2, delta: "Sanitized answer.\n" } },
+      { type: "message_end", message },
+      { type: "turn_end", message },
+      { type: "agent_end", messages: [message] },
+    ];
+    const original = structuredClone(records);
+    const events = parse(records).logEntries;
+    const messages = events.filter(event => event.data.messageId === message.responseId);
+    expect(messages.map(event => event.type)).toEqual(["assistant.reasoning", "tool.execution_start", "assistant.message"]);
+    expect(messages.every(event => event.timestamp === timestamp)).toBe(true);
+    const unified = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-session.jsonl", events }]);
+    for (const event of unified.filter(event => event.type !== "session.result")) {
+      expect(event.timestamp).toBe(timestamp);
+      expect(event.provenance.timestampMs).toBe(typeof timestamp === "number" ? timestamp : Date.parse(timestamp));
+      expect(event.data).toMatchObject({ messageId: message.responseId, model: "served-model" });
+      expect(event.data).not.toHaveProperty("messageMetadata");
+      expect(event).not.toHaveProperty("assistantMessageEvent");
+    }
+    expect(unified.find(event => event.type === "tool.execution_start").data.input).toEqual(message.content[1].arguments);
+    expect(selectSessionResult(events).usage).toMatchObject({ input_tokens: 10, output_tokens: 3 });
+    expect(records).toEqual(original);
+  });
+
+  it.each(["timestamp", "ts", "time", "created_at"])("preserves the source %s clock over embedded message clocks and never invents a missing clock", clock => {
+    const message = { role: "assistant", timestamp: 10, content: [{ type: "text", text: "Sanitized answer" }] };
+    const events = transformPiV3Entries([
+      { type: "message_update", [clock]: 5, assistantMessageEvent: { type: "text_delta", delta: "Sanitized answer" } },
+      { type: "message_end", timestamp: 20, message },
+    ]);
+    expect(events).toHaveLength(1);
+    expect(events[0][clock]).toBe(5);
+    if (clock !== "timestamp") expect(events[0]).not.toHaveProperty("timestamp");
+    expect(events[0].data.messageMetadata.timestamp).toBe(10);
+    const unified = mergeSessionSources([
+      { component: "agent", phase: "agent", path: "pi-streaming.jsonl", events },
+      { component: "other", phase: "agent", path: "other.jsonl", events: [{ type: "session.info", timestamp: 7, data: { content: "later" } }] },
+    ]);
+    expect(unified[0]).toMatchObject({ type: "assistant.message", provenance: { timestampMs: 5 } });
+    const [untimed] = transformPiV3Entries([{ type: "message_end", message: { ...message, timestamp: undefined } }]);
+    expect(untimed).not.toHaveProperty("timestamp");
+  });
+
+  it("recovers the sampled tool-result clock onto its single observed execution completion", () => {
+    const original = structuredClone(success);
+    const events = parse(success).logEntries;
+    expect(byType(events, "tool.execution_complete")).toMatchObject([{ timestamp: 3 }]);
+    expect(byType(events, "tool.execution_complete")).toHaveLength(1);
+    const unified = mergeSessionSources([{ component: "agent", phase: "agent", path: "pi-streaming.jsonl", events }]);
+    expect(byType(unified, "tool.execution_complete")).toMatchObject([{ timestamp: 3, provenance: { timestampMs: 3 } }]);
+    expect(success).toEqual(original);
+  });
+
+  it.each([false, true])("reconciles repeated tool-result clocks when the execution end arrives first=%s", endFirst => {
+    const end = { type: "tool_execution_end", toolCallId: "call", result: { content: "observed execution" }, isError: false };
+    const result = { type: "message_end", message: { role: "toolResult", toolCallId: "call", timestamp: 3, content: "snapshot" } };
+    const records = endFirst ? [end, result, result] : [result, result, end];
+    const [event] = transformPiV3Entries(records);
+    expect(transformPiV3Entries(records)).toHaveLength(1);
+    expect(event).toMatchObject({ timestamp: 3, data: { output: end.result, success: true } });
+  });
+
+  it.each(["timestamp", "ts", "time", "created_at"])("does not replace an execution completion's explicit %s clock with its result clock", clock => {
+    const events = transformPiV3Entries([
+      { type: "tool_execution_end", [clock]: 0, toolCallId: "call", result: { content: "observed execution" } },
+      { type: "message_end", message: { role: "toolResult", toolCallId: "call", timestamp: 3, content: "snapshot" } },
+    ]);
+    expect(events).toHaveLength(1);
+    expect(events[0][clock]).toBe(0);
+    if (clock !== "timestamp") expect(events[0]).not.toHaveProperty("timestamp");
+  });
+
+  it("retains child, tool-result and provider-error clocks without duplicating snapshots or parent usage", () => {
+    const child = { role: "assistant", responseId: "child-response", model: "fixture-model", timestamp: 3, content: [{ type: "text", text: "Child answer" }], usage: { input: 5, output: 2 } };
+    const records = [
+      { type: "gh_aw_subagent_dispatch", agent: "reader", invocation_id: "child", timestamp: 1 },
+      { type: "gh_aw_subagent_event", agent: "reader", invocation_id: "child", timestamp: 4, event: { type: "message_end", message: child } },
+      { type: "gh_aw_subagent_event", agent: "reader", invocation_id: "child", timestamp: 5, event: { type: "turn_end", message: child } },
+      { type: "message_end", message: { role: "toolResult", toolCallId: "tool", timestamp: 6, content: [{ type: "text", text: "result" }], isError: false } },
+      { type: "message_end", message: { role: "assistant", timestamp: 7, content: [], errorMessage: "Sanitized provider failure", usage: { input: 0, output: 0 } } },
+    ];
+    const events = parse(records).logEntries;
+    expect(byType(events, "assistant.message")).toMatchObject([{ agentId: "child", timestamp: 3 }]);
+    expect(byType(events, "tool.execution_complete")).toMatchObject([{ timestamp: 6 }]);
+    expect(byType(events, "session.error")).toMatchObject([{ timestamp: 7 }]);
+    expect(byType(events, "subagent.request")).toHaveLength(1);
+    expect(selectSessionResult(events).usage).toMatchObject({ input_tokens: 0, output_tokens: 0 });
+  });
+
   it("retains sampled child text and reasoning in their evidenced dispatch scope through unified projection", () => {
     const original = structuredClone(childObservations);
     const records = [...success, ...childObservations];

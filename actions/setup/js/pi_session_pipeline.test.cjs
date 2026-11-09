@@ -7,7 +7,7 @@ import { parsePiLog } from "./parse_pi_log.cjs";
 import { runLogParser } from "./log_parser_bootstrap.cjs";
 import { writeUnifiedSession } from "./unified_session.cjs";
 import { normalizeUnifiedSessionEvent } from "./unified_session_payload.cjs";
-import { createSessionValidator } from "./scripts/validate_session.cjs";
+import { createSessionValidator, validateSession } from "./scripts/validate_session.cjs";
 
 describe("Pi native-to-unified artifact pipeline", () => {
   let root;
@@ -38,6 +38,35 @@ describe("Pi native-to-unified artifact pipeline", () => {
     process.env = originalEnv;
     global.core = originalCore;
     fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it.each([false, true])("publishes message clocks and tool correlation from saved canonical events (metadata-only clocks=%s)", legacy => {
+    const records = [...success, ...childObservations];
+    const events = JSON.parse(JSON.stringify(parsePiLog(records.map(JSON.stringify).join("\n")).logEntries));
+    if (legacy) {
+      for (const event of events) if (event.data.messageMetadata?.timestamp !== undefined) delete event.timestamp;
+    }
+    const original = structuredClone(events);
+    fs.writeFileSync(path.join(root, "agent-session.jsonl"), events.map(JSON.stringify).join("\n") + "\n");
+    const unified = writeUnifiedSession({ rootDir: root, engine: "pi", warn: vi.fn() });
+    const agent = unified.filter(event => event.provenance.path === "agent-session.jsonl");
+    const messages = agent.filter(event => event.type === "assistant.message" || event.type === "assistant.reasoning" || event.type === "tool.execution_start");
+    expect(messages).toHaveLength(4);
+    for (const event of messages) {
+      const native = events[event.provenance.index];
+      expect(event.timestamp).toBe(native.data.messageMetadata.timestamp);
+      expect(event.provenance.timestampMs).toBe(native.data.messageMetadata.timestamp);
+      expect(event.data.messageId).toBe(native.data.messageId);
+      expect(event.data.model).toBe(native.data.model);
+      expect(event.data).not.toHaveProperty("messageMetadata");
+    }
+    expect(messages.find(event => event.type === "tool.execution_start").data.input).toEqual({ command: "printf sanitized" });
+    expect(messages.find(event => event.agentId)?.agentId).toBe("legacy:pi:sanitized-reader:1");
+    const bytes = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8");
+    expect(validateSession(bytes)).toBe(unified.length);
+    expect(readEvents(path.join(root, "agent-session.jsonl"))).toEqual(original);
+    writeUnifiedSession({ rootDir: root, engine: "pi", warn: vi.fn() });
+    expect(fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8")).toBe(bytes);
   });
 
   // Sanitized excerpts from separate runs, combined locally to exercise the

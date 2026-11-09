@@ -20,6 +20,26 @@ const byType = (events, type) => events.filter(event => event.type === type);
 const parse = events => parsePiLog(events.map(JSON.stringify).join("\n")).logEntries;
 
 describe("historical Pi observations", () => {
+  it("reconciles the published legacy request when the mapper clones events, preserving mixed native clocks", () => {
+    const child = { role: "assistant", id: "child-answer", model: "fixture", usage: { input: 1, output: 0 } };
+    const wrap = message => ({ type: "pi.subagent_event", data: { agent: "reader", invocation_id: "child", event: { message } } });
+    const records = [
+      wrap(child),
+      wrap({ ...child, usage: { input: 1, output: 2 } }),
+      { type: "message_end", message: { role: "toolResult", toolCallId: "call", timestamp: 3, content: "result" } },
+      { type: "message_end", message: { role: "system", timestamp: 4, content: "system" } },
+      { type: "message_end", message: { role: "assistant", timestamp: 5, content: [], errorMessage: "failure" } },
+    ];
+    const original = structuredClone(records);
+    const events = normalizePiObservations(records, event => ({ ...structuredClone(event), mapped: true }));
+    expect(byType(events, "subagent.request")).toHaveLength(1);
+    expect(byType(events, "subagent.request")[0]).toMatchObject({ mapped: true, data: { inputTokens: 1, outputTokens: 2 } });
+    expect(byType(events, "tool.execution_complete")).toMatchObject([{ timestamp: 3 }]);
+    expect(byType(events, "session.info").find(event => event.data.sourceType === "message_snapshot")).toMatchObject({ timestamp: 4 });
+    expect(byType(events, "session.error")).toMatchObject([{ timestamp: 5 }]);
+    expect(records).toEqual(original);
+  });
+
   it.each(["assistant", "toolResult"])("maps a %s snapshot as metadata, not another message or usage report", role => {
     const usage = { input: 0, output: 2, cacheRead: 0, cost: { total: 0 } };
     const snapshot = {
