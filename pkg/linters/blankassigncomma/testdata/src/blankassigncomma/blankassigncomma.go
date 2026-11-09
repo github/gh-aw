@@ -56,6 +56,17 @@ func badOtherWriteString(w io.Writer) {
 	_, _ = io.WriteString(w, "content") // want `assignment with 2 blank identifiers`
 }
 
+// Parenthesized forms of the hash.Hash exemption are still exempt.
+func goodHashWriteStringParenthesized(h hash.Hash) {
+	_, _ = (io.WriteString(h, "content"))
+	_, _ = (io.WriteString)(h, "content")
+	_, _ = ((io.WriteString))(h, "content")
+}
+
+func badOtherWriteStringParenthesized(w io.Writer) {
+	_, _ = (io.WriteString)(w, "content") // want `assignment with 2 blank identifiers`
+}
+
 func someFunction() interface{} {
 	return nil
 }

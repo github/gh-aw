@@ -87,11 +87,11 @@ func isHashWriteString(pass *analysis.Pass, assign *ast.AssignStmt) bool {
 	if len(assign.Rhs) != 1 {
 		return false
 	}
-	call, ok := assign.Rhs[0].(*ast.CallExpr) //nolint:uncheckedsliceindex // len(assign.Rhs) is checked above
+	call, ok := astutil.UnwrapParenExpr(assign.Rhs[0]).(*ast.CallExpr) //nolint:uncheckedsliceindex // len(assign.Rhs) is checked above
 	if !ok || len(call.Args) != 2 {
 		return false
 	}
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok || sel.Sel.Name != "WriteString" || !astutil.IsPkgSelector(pass, sel, "io") {
 		return false
 	}
