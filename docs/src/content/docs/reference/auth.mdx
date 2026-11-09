@@ -413,6 +413,7 @@ network:
   allowed:
     - defaults
     - api.openai.com
+    - auth.openai.com
 ```
 
 `identity-provider-id`, `service-account-id`, and `audience` are required for
@@ -420,9 +421,11 @@ network:
 provider, and an enabled firewall; `sandbox.agent: false` is not supported.
 The compiler maps these values to `AWF_AUTH_OPENAI_*` and
 `AWF_AUTH_OIDC_AUDIENCE` for the AWF API proxy. This requires an AWF release
-that supports OpenAI WIF; confirm that support is available in the selected
-firewall version before using this configuration. Codex startup verifies that
-fresh AWF reflection reports the configured OpenAI WIF endpoint before launching.
+that supports OpenAI WIF; `auth.openai.com` is the token-exchange host and must
+be reachable through the firewall. The current default pin, AWF `v0.29.10`, does
+not support OpenAI WIF, so do not use this configuration until a supporting
+release is available. Codex startup verifies that fresh AWF reflection reports
+the configured OpenAI WIF endpoint before launching.
 
 ---
 

@@ -251,12 +251,89 @@ Inspect the repository and report findings.
 	assert.Contains(t, lock, "AWF_AUTH_OPENAI_SERVICE_ACCOUNT_ID: ${{ vars.OPENAI_SERVICE_ACCOUNT_ID }}")
 	assert.Contains(t, lock, "AWF_AUTH_OIDC_AUDIENCE: https://api.openai.com/v1")
 	assert.Contains(t, lock, "GH_AW_CODEX_OIDC_AUTH: openai")
+	agentSection := extractJobSection(lock, "agent")
+	assert.Contains(t, agentSection, "auth.openai.com")
 	detectionSection := extractJobSection(lock, "detection")
 	assert.NotEmpty(t, detectionSection)
 	assert.Contains(t, detectionSection, "http://api-proxy:10000/reflect")
+	assert.Contains(t, detectionSection, "auth.openai.com")
 	assert.Contains(t, detectionSection, "github-oidc/openai")
 	assert.Contains(t, detectionSection, "No configured OpenAI endpoint uses github-oidc/openai")
 	assert.NotContains(t, detectionSection, `env_key = "CODEX_API_KEY"`)
+}
+
+func TestCodexOpenAIWIFDetectionValidationAndPermissions(t *testing.T) {
+	tests := []struct {
+		name        string
+		authFields  string
+		wantErr     string
+		wantIdToken bool
+	}{
+		{
+			name:       "missing identity provider ID",
+			authFields: "service-account-id: service-account\naudience: https://api.openai.com/v1",
+			wantErr:    "safe-outputs.threat-detection.engine.auth with provider=openai requires the following fields: identity-provider-id",
+		},
+		{
+			name:       "missing service account ID",
+			authFields: "identity-provider-id: idp\naudience: https://api.openai.com/v1",
+			wantErr:    "service-account-id",
+		},
+		{
+			name:       "missing audience",
+			authFields: "identity-provider-id: idp\nservice-account-id: service-account",
+			wantErr:    "audience",
+		},
+		{
+			name:        "valid detection-only OpenAI WIF grants token permission",
+			authFields:  "identity-provider-id: idp\nservice-account-id: service-account\naudience: https://api.openai.com/v1",
+			wantIdToken: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := testutil.TempDir(t, "codex-openai-wif-detection-*")
+			file := filepath.Join(dir, "workflow.md")
+			source := `---
+on: workflow_dispatch
+engine:
+  id: codex
+  model: gpt-5.4
+network:
+  allowed: [defaults]
+safe-outputs:
+  add-comment:
+  threat-detection:
+    engine:
+      id: codex
+      auth:
+        type: github-oidc
+        provider: openai
+        AUTH_FIELDS
+---
+Inspect the repository.
+`
+			authFields := strings.ReplaceAll(tt.authFields, "\n", "\n        ")
+			source = strings.ReplaceAll(source, "AUTH_FIELDS", authFields)
+			require.NoError(t, os.WriteFile(file, []byte(source), 0o644))
+			err := NewCompiler().CompileWorkflow(file)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			content, err := os.ReadFile(filepath.Join(dir, "workflow.lock.yml"))
+			require.NoError(t, err)
+			detectionSection := extractJobSection(string(content), "detection")
+			assert.NotEmpty(t, detectionSection)
+			assert.Contains(t, detectionSection, "auth.openai.com")
+			if tt.wantIdToken {
+				assert.Contains(t, detectionSection, "id-token: write")
+			}
+		})
+	}
 }
 
 func TestCodexOpenAIWIFUnsupportedConfigurations(t *testing.T) {
@@ -267,7 +344,7 @@ func TestCodexOpenAIWIFUnsupportedConfigurations(t *testing.T) {
 		wantErr string
 	}{
 		{name: "Codex", engine: "codex"},
-		{name: "Claude", engine: "claude", wantErr: "requires engine.id: codex"},
+		{name: "Claude", engine: "claude", wantErr: "engine.id: auth.provider=openai requires codex"},
 		{name: "firewall disabled", engine: "codex", network: "strict: false\nfeatures:\n  dangerously-disable-sandbox-agent: true\nsandbox:\n  agent: false\n", wantErr: "requires the firewall to be enabled"},
 		{name: "GitHub inference", engine: "codex\n  model-provider: github", wantErr: "requires the OpenAI inference provider"},
 	} {
@@ -301,6 +378,91 @@ Inspect the repository.
 			}
 		})
 	}
+}
+
+func TestCodexOpenAIWIFDetectionUsesEffectiveDetectorConfig(t *testing.T) {
+	tests := []struct {
+		name        string
+		mainConfig  string
+		detectModel string
+	}{
+		{
+			name: "detector-only configuration without main engine",
+		},
+		{
+			name:       "cross-engine detection inherits main model",
+			mainConfig: "engine:\n  id: copilot\n  model: copilot/gpt-5\n",
+		},
+		{
+			name:        "explicit detector model overrides main model",
+			mainConfig:  "engine:\n  id: copilot\n  model: copilot/gpt-5\n",
+			detectModel: "    model: gpt-5.4\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := testutil.TempDir(t, "openai-wif-effective-detection-*")
+			file := filepath.Join(dir, "workflow.md")
+			source := `---
+on: workflow_dispatch
+permissions:
+  contents: read
+MAIN_CONFIGnetwork:
+  allowed: [defaults]
+safe-outputs:
+  add-comment:
+  threat-detection:
+DETECTION_MODEL    engine:
+      id: codex
+      auth:
+        type: github-oidc
+        provider: openai
+        identity-provider-id: idp
+        service-account-id: service-account
+        audience: https://api.openai.com/v1
+---
+Inspect the repository.
+`
+			source = strings.ReplaceAll(source, "MAIN_CONFIG", tt.mainConfig)
+			source = strings.ReplaceAll(source, "DETECTION_MODEL", tt.detectModel)
+			require.NoError(t, os.WriteFile(file, []byte(source), 0o644))
+			require.NoError(t, NewCompiler().CompileWorkflow(file))
+
+			content, err := os.ReadFile(filepath.Join(dir, "workflow.lock.yml"))
+			require.NoError(t, err)
+			detectionSection := extractJobSection(string(content), "detection")
+			assert.Contains(t, detectionSection, "auth.openai.com")
+			assert.Contains(t, detectionSection, "id-token: write")
+		})
+	}
+}
+
+func TestCodexOpenAIWIFDetectionValidationReportsDetectorEnginePath(t *testing.T) {
+	dir := testutil.TempDir(t, "openai-wif-invalid-detector-engine-*")
+	file := filepath.Join(dir, "workflow.md")
+	require.NoError(t, os.WriteFile(file, []byte(`---
+on: workflow_dispatch
+engine:
+  id: codex
+network:
+  allowed: [defaults]
+safe-outputs:
+  threat-detection:
+    engine:
+      id: claude
+      auth:
+        type: github-oidc
+        provider: openai
+        identity-provider-id: idp
+        service-account-id: service-account
+        audience: https://api.openai.com/v1
+---
+Inspect the repository.
+`), 0o644))
+
+	err := NewCompiler().CompileWorkflow(file)
+	require.ErrorContains(t, err, "safe-outputs.threat-detection.engine.id: auth.provider=openai requires codex")
 }
 
 func TestCodexOpenAIWIFFallbackKeepsKeylessProvider(t *testing.T) {

@@ -75,7 +75,7 @@ func isThreatDetectionExplicitlyDisabledInConfigs(configs []string) bool {
 }
 
 func getThreatDetectionAdditionalAllowedDomains(data *WorkflowData, engineID string) []string {
-	if data == nil || data.NetworkPermissions == nil {
+	if data == nil {
 		return []string{}
 	}
 
@@ -91,8 +91,16 @@ func getThreatDetectionAdditionalAllowedDomains(data *WorkflowData, engineID str
 		effectiveEnv["ANTHROPIC_BASE_URL"] != "" ||
 		effectiveEnv[constants.CopilotProviderBaseURL] != ""
 
-	additional := make([]string, 0, len(data.NetworkPermissions.Allowed))
+	additional := make([]string, 0)
 	seen := make(map[string]struct{})
+	if detectionEngineConfig := resolveExternalDetectorEngineConfig(data, engineID); engineID == string(constants.CodexEngine) &&
+		detectionEngineConfig.Auth != nil && detectionEngineConfig.Auth.Type == "github-oidc" && detectionEngineConfig.Auth.Provider == "openai" {
+		seen["auth.openai.com"] = struct{}{}
+		additional = append(additional, "auth.openai.com")
+	}
+	if data.NetworkPermissions == nil {
+		return additional
+	}
 	for _, entry := range data.NetworkPermissions.Allowed {
 		if entry == "" || strings.Contains(entry, "${{") {
 			continue

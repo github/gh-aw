@@ -227,7 +227,7 @@ type WorkflowData struct {
 	ExperimentsStorage             ExperimentStorageMode           // "cache" or "repo" (default "repo"); controls how experiment state is persisted across runs
 	CachedConcurrencyGroupExprSet  bool                            // true once CachedConcurrencyGroupExprErr has been populated; distinguishes "valid (nil)" from "not yet computed"
 	CachedParsedToolsets           []string                        // cached result of ParseGitHubToolsets for the GitHub tool (for performance optimization); populated by applyDefaults
-	CachedAllowedDomainsStr        string                          // cached allowed-domains string for sanitization (for performance optimization); computed once and reused across multiple compilation steps
+	CachedAllowedDomainsStr        string                          // cached agent firewall policy; sanitization-only domains must not be stored here
 	CachedAllowedDomainsComputed   bool                            // true once CachedAllowedDomainsStr has been set; distinguishes "computed empty" from "not yet computed"
 	CachedRuntimeRequirements      []RuntimeRequirement            // cached runtime requirements derived from DetectRuntimeRequirements; reused by validation and YAML generation within one compilation
 	CachedRuntimeRequirementsSet   bool                            // true once CachedRuntimeRequirements is populated; distinguishes "computed empty" from "not yet computed"
