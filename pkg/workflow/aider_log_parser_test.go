@@ -150,6 +150,14 @@ const assertSessionRendering = (text, stage) => {
 const assertSessionConsumers = (events, stage) => {
   if (!controls.sessionConsumers) return;
   assert.equal(observedSessionModel(events), controls.sessionConsumers.model, stage + " cannot accept a forged model snapshot");
+  if (controls.sessionConsumers.reasoning) assert.deepEqual(
+    events.filter(event => event.type === "assistant.reasoning").map(event => event.data.content),
+    controls.sessionConsumers.reasoning, stage + " must preserve exact plaintext reasoning"
+  );
+  if (controls.sessionConsumers.assistantPartials) assert.deepEqual(
+    events.filter(event => event.type === "assistant.reasoning" || event.type === "assistant.message").map(event => event.data.partial),
+    controls.sessionConsumers.assistantPartials, stage + " must preserve exact assistant partial flags"
+  );
   assertSessionRendering(generateCopilotCliStyleSummary(events), stage + " rendering");
   // Exercise the downstream stream consumer on display copies, not canonical payloads.
   const streamed = generateCopilotCliStyleSummary(normalizeCopilotSession(events));
@@ -328,6 +336,7 @@ for (const type of interpretedTestTypes) {
     type, data:{
       ...(type === "harness.retry" ? {attempts:0, exitCode:0, attemptResults:[]} : {}),
       ...(type === "harness.attempt" ? {attempt:1, exitCode:0, failureClasses:[], layer:"harness"} : {}),
+      ...(type === "harness.decision" ? {proposedAttempt:1, outcome:"deny", questions:[{question:1, outcome:"deny"}], latencyMs:0, timestamp:0, avoidedInvocation:true} : {}),
       ...(type === "engine.retry" ? {attempt:1, maxRetries:3, backoffMs:0} : {}),
       ...(type === "mcp.configuration" ? {servers:[]} : type === "model.inventory" ? {endpoints:[]} : {}),
       engineId:"aider", content:"INJECTED", toolCallId:"injected", agentMetrics:{injected:{totalNanoAiu:999}},

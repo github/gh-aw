@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { collectUnifiedSession, mergeSessionSources, normalizeRuntimeEvent, parseEngineSession, sessionTimestamp, writeUnifiedSession } from "./unified_session.cjs";
+import { collectUnifiedSession, main, mergeSessionSources, normalizeRuntimeEvent, parseEngineSession, sessionTimestamp, writeUnifiedSession } from "./unified_session.cjs";
 import { serializeSessionArtifact, writeSessionArtifact } from "./session_artifact.cjs";
 import { normalizeUnifiedSessionEvent } from "./unified_session_payload.cjs";
 import { validateSession } from "./scripts/validate_session.cjs";
@@ -864,6 +864,89 @@ describe("Unified conclusion session", () => {
     expect(events.filter(event => event.type === "grader.result")).toHaveLength(1);
   });
 
+  it.each(["aw_info.json", "activation/aw_info.json", "runtime/aw_info.json"])("reconciles reused successful activation from %s at the live conclusion boundary, not offline replay", async metadataPath => {
+    const workflowId = "org/repo/.github/workflows/worker.lock.yml@refs/heads/main";
+    const callerWorkflowRef = "org/parent/.github/workflows/caller.yml@refs/heads/main";
+    const snapshot = {
+      run_id: "123",
+      run_attempt: 1,
+      workflow_id: workflowId,
+      workflow_call_id: `123-1:${workflowId}`,
+      caller_workflow_ref: callerWorkflowRef,
+      engine_id: "codex",
+      model: "fixture-model",
+      context: {
+        episode_id: "100-1:root",
+        hop_id: "122-1:caller",
+        parent_hop_id: "100-1:root",
+        root_run_id: "100",
+        repo: "org/parent",
+        run_id: "122",
+        run_attempt: "1",
+        workflow_id: callerWorkflowRef,
+        workflow_call_id: `122-1:${callerWorkflowRef}`,
+      },
+    };
+    const metadataFile = write(metadataPath, snapshot);
+    const durable = ["1", "2"].flatMap(runAttempt => {
+      const identity = { engine: "codex", storage: "artifact", runId: "123", runAttempt, parentRunId: "122" };
+      return [
+        { type: "durable.restore", data: { ...identity, status: "restored", artifactId: runAttempt } },
+        { type: "durable.session", data: { ...identity, status: "resumed", sessionId: `session-${runAttempt}` } },
+      ];
+    });
+    const durableFile = write("agent/durable-session.jsonl", durable);
+    write(
+      "evals.jsonl",
+      ["1", "2"].map(runAttempt => ({ id: `attempt-${runAttempt}`, runid: "123", runAttempt, answer: "YES" }))
+    );
+    write(
+      "agent/graders/grader_results.json",
+      [1, 2].map(attempt => ({ run: { id: "123", attempt }, results: [{ id: `attempt-${attempt}` }] }))
+    );
+    const recorded = collectUnifiedSession({ rootDir: root, dailyAIC: { GITHUB_RUN_ID: "456", GITHUB_RUN_ATTEMPT: "3" } }).events;
+    expect(recorded.filter(event => event.type.startsWith("durable.")).map(event => event.data.runAttempt)).toEqual(["1", "1"]);
+    const recordedInfo = recorded.find(event => event.type === "workflow.info").data;
+    expect(recordedInfo).toMatchObject({ runId: "123", runAttempt: 1, workflowId, workflowCallId: `123-1:${workflowId}` });
+    expect(recorded.find(event => event.type === "grader.result").data.run).toMatchObject({ id: "123", attempt: 1 });
+
+    global.core.summary = { addDetails: vi.fn(), write: vi.fn().mockResolvedValue(undefined) };
+    process.env.GITHUB_STEP_SUMMARY = path.join(root, "step-summary.md");
+    await main({ rootDir: root, jobDurations: {} });
+
+    const content = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8");
+    const events = content.trim().split("\n").map(JSON.parse);
+    expect(validateSession(content)).toBe(events.length);
+    expect(events.find(event => event.type === "workflow.info")).toMatchObject({
+      data: {
+        runId: "123",
+        runAttempt: 2,
+        workflowId,
+        workflowCallId: `123-2:${workflowId}`,
+        callerWorkflowRef,
+        engineId: "codex",
+        model: "fixture-model",
+        awContext: recordedInfo.awContext,
+        episode: recordedInfo.episode,
+      },
+      provenance: { component: "workflow", phase: metadataPath.startsWith("runtime/") ? "agent" : "activation", path: metadataPath },
+    });
+    expect(events.filter(event => event.type.startsWith("durable."))).toMatchObject([
+      { type: "durable.restore", data: { runId: "123", runAttempt: "2", parentRunId: "122", artifactId: "2" } },
+      { type: "durable.session", data: { runId: "123", runAttempt: "2", parentRunId: "122", sessionId: "session-2" } },
+    ]);
+    expect(events.filter(event => event.type.startsWith("durable."))).toHaveLength(2);
+    expect(events.filter(event => event.type === "eval.result").map(event => event.data.id)).toEqual(["attempt-2"]);
+    expect(events.find(event => event.type === "grader.result").data.run).toMatchObject({ id: "123", attempt: 2, graderCount: 10 });
+    const graderOutput = JSON.parse(fs.readFileSync(path.join(root, "usage/graders/grader_results.json"), "utf8"));
+    expect(graderOutput.run).toMatchObject({ id: "123", attempt: 2 });
+    expect(fs.readFileSync(metadataFile, "utf8")).toBe(JSON.stringify(snapshot));
+    expect(fs.readFileSync(durableFile, "utf8")).toBe(durable.map(record => JSON.stringify(record)).join("\n") + "\n");
+    const replay = collectUnifiedSession({ rootDir: root, dailyAIC: {} }).events;
+    expect(replay.filter(event => event.type.startsWith("durable.")).map(event => event.data.runAttempt)).toEqual(["1", "1"]);
+    expect(replay.find(event => event.type === "workflow.info").data).toEqual(recordedInfo);
+  });
+
   it("warns and omits results when the current run cannot be identified", () => {
     delete process.env.GITHUB_RUN_ID;
     delete process.env.GITHUB_RUN_ATTEMPT;
@@ -1384,6 +1467,43 @@ describe("Unified conclusion session", () => {
       provenance: { path: "aw_info.json", component: "workflow" },
     });
     expect(events.find(event => event.type === "workflow.info").data).not.toHaveProperty("secret");
+  });
+
+  it("publishes downloaded Kiro activation metadata without expanding session.init", () => {
+    // Synthetic transport regression, not native Kiro structured-stream evidence.
+    write("aw_info.json", {
+      engine_id: "kiro",
+      agent_version: "2.31.1",
+      model: "kiro/auto",
+      event_name: "schedule",
+      sha: "a".repeat(40),
+      run_id: 123,
+      run_attempt: 2,
+      workflow_id: "example/repo/.github/workflows/smoke-kiro.lock.yml@refs/heads/main",
+    });
+    write("agent-session.jsonl", [{ type: "session.init", data: { sourceEngine: "kiro", agentVersion: "2.31.1" } }]);
+
+    const events = writeUnifiedSession({ rootDir: root });
+    const metadata = events.filter(event => event.type === "workflow.info");
+    expect(metadata).toHaveLength(1);
+    expect(metadata[0]).toMatchObject({
+      data: {
+        engineId: "kiro",
+        agentVersion: "2.31.1",
+        model: "kiro/auto",
+        requestedModel: "kiro/auto",
+        triggerType: "schedule",
+        sha: "a".repeat(40),
+        runId: 123,
+        runAttempt: 2,
+        workflowId: "example/repo/.github/workflows/smoke-kiro.lock.yml@refs/heads/main",
+      },
+      provenance: { component: "workflow", phase: "activation", path: "aw_info.json", index: 0 },
+    });
+    expect(events.find(event => event.type === "session.init").data).toEqual({ sourceEngine: "kiro" });
+    const persisted = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8");
+    expect(persisted.trim().split("\n").map(JSON.parse)).toEqual(events);
+    expect(validateSession(persisted)).toBe(events.length);
   });
 
   it("prefers runner routing metadata over agent metadata and preserves the harness outcome", () => {
