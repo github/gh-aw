@@ -8,13 +8,14 @@
  *
  * @param {string} owner - Repository owner
  * @param {string} repo - Repository name
+ * @param {{ runId?: number, serverUrl?: string }} [ctx] - GitHub Actions context (defaults to the global `context`)
  * @returns {{workflowName: string, workflowId: string, runId: number, runUrl: string}} Workflow metadata
  */
-function getWorkflowMetadata(owner, repo) {
+function getWorkflowMetadata(owner, repo, ctx = context) {
   const workflowName = process.env.GH_AW_WORKFLOW_NAME || "Workflow";
   const workflowId = process.env.GH_AW_WORKFLOW_ID || "";
-  const runId = context.runId ?? 0;
-  const runUrl = buildWorkflowRunUrl({ runId, serverUrl: context.serverUrl }, { owner, repo });
+  const runId = ctx.runId ?? 0;
+  const runUrl = buildWorkflowRunUrl({ runId, serverUrl: ctx.serverUrl }, { owner, repo });
 
   return { workflowName, workflowId, runId, runUrl };
 }

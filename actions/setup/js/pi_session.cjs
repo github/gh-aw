@@ -106,6 +106,11 @@ function messageIdentity(message) {
   return undefined;
 }
 
+/** @param {SessionEvent} event @param {any} message */
+function retainMessageTimestamp(event, message) {
+  if (["timestamp", "ts", "time", "created_at"].every(key => event[key] === undefined) && (typeof message?.timestamp === "string" || typeof message?.timestamp === "number")) event.timestamp = message.timestamp;
+}
+
 /** @returns {MessageState} */
 function newMessageState() {
   return { text: new Map(), thinking: new Map(), calls: new Map(), blocks: new Map(), errors: [], finalized: false };
@@ -144,7 +149,9 @@ function transformPiV3Entries(records, mapLegacyEvent = event => event) {
   const executionEnds = new Set(records.filter(r => r.type === "tool_execution_end" && r.toolCallId !== undefined).map(r => r.toolCallId));
   const calls = new Map();
   const executionStarts = new Set();
-  const completions = new Set();
+  /** @type {Map<string, SessionEvent>} */
+  const completions = new Map();
+  const completionMessages = new Map();
   /** @type {Map<string, MessageState>} */
   const messageStates = new Map();
   /** @type {Array<{message: any, state: MessageState}>} */
@@ -162,8 +169,9 @@ function transformPiV3Entries(records, mapLegacyEvent = event => event) {
   const emit = (raw, type, data, metadata = {}) => {
     const event = createSessionEvent(raw, type, data);
     Object.assign(event, metadata);
-    events.push(legacyObservation ? mapLegacyEvent(event) : event);
-    return event;
+    const mappedEvent = legacyObservation ? mapLegacyEvent(event) : event;
+    events.push(mappedEvent);
+    return mappedEvent;
   };
   const invocationIdentity = (raw, dispatch) => {
     const agentName = raw.agent ?? raw.agentName ?? "unknown";
@@ -296,15 +304,26 @@ function transformPiV3Entries(records, mapLegacyEvent = event => event) {
 
   const emitCompletion = (raw, message) => {
     const id = message.toolCallId;
-    if (id !== undefined && (executionEnds.has(id) || completions.has(id))) return;
-    if (id !== undefined) completions.add(id);
-    emit(raw, "tool.execution_complete", {
+    if (id !== undefined) {
+      const previous = completions.get(id);
+      if (previous) {
+        retainMessageTimestamp(previous, message);
+        return;
+      }
+      if (executionEnds.has(id)) {
+        if (typeof completionMessages.get(id)?.timestamp !== "string" && typeof completionMessages.get(id)?.timestamp !== "number") completionMessages.set(id, message);
+        return;
+      }
+    }
+    const event = emit(raw, "tool.execution_complete", {
       ...message,
       toolCallId: id,
       toolName: message.toolName,
       output: message.content,
       success: message.isError === true || isPiResultError(message) ? false : message.isError === false ? true : undefined,
     });
+    retainMessageTimestamp(event, message);
+    if (id !== undefined) completions.set(id, event);
   };
 
   const emitMessage = (raw, message, fallback) => {
@@ -312,7 +331,7 @@ function transformPiV3Entries(records, mapLegacyEvent = event => event) {
     if (!["assistant", "user", "toolResult"].includes(message.role)) {
       if (!snapshots.some(snapshot => isDeepStrictEqual(snapshot.message, message))) {
         snapshots.push({ message: structuredClone(message), state: fallback });
-        emit(raw, "session.info", { sourceType: "message_snapshot", role: message.role, content: message });
+        retainMessageTimestamp(emit(raw, "session.info", { sourceType: "message_snapshot", role: message.role, content: message }), message);
       }
       return;
     }
@@ -363,15 +382,20 @@ function transformPiV3Entries(records, mapLegacyEvent = event => event) {
       ...((message.id ?? message.responseId) !== undefined ? { messageId: message.id ?? message.responseId } : {}),
     };
     for (const segments of [...state.text.values(), ...state.thinking.values()]) {
-      for (const event of segments.segments) Object.assign(event.data, structuredClone(metadata));
+      for (const event of segments.segments) {
+        Object.assign(event.data, structuredClone(metadata));
+        retainMessageTimestamp(event, message);
+      }
     }
-    for (const event of state.calls.values()) Object.assign(event.data, structuredClone(metadata));
-    for (const event of state.blocks.values()) Object.assign(event.data, structuredClone(metadata));
+    for (const event of [...state.calls.values(), ...state.blocks.values()]) {
+      Object.assign(event.data, structuredClone(metadata));
+      retainMessageTimestamp(event, message);
+    }
     if (!snapshots.some(snapshot => snapshot.state === state && isDeepStrictEqual(snapshot.message, message))) snapshots.push({ message: structuredClone(message), state });
     if (raw.type === "message_end" || raw.type === "turn_end") state.finalized = true;
     if (message.errorMessage !== undefined && !state.errors.some(error => isDeepStrictEqual(error, message.errorMessage))) {
       state.errors.push(structuredClone(message.errorMessage));
-      emit(raw, "session.error", { error: message.errorMessage, model: message.responseModel ?? message.model });
+      retainMessageTimestamp(emit(raw, "session.error", { error: message.errorMessage, model: message.responseModel ?? message.model }), message);
     }
   };
 
@@ -485,8 +509,7 @@ function transformPiV3Entries(records, mapLegacyEvent = event => event) {
       );
     } else if (raw.type === "tool_execution_end") {
       if (raw.toolCallId !== undefined && completions.has(raw.toolCallId)) continue;
-      if (raw.toolCallId !== undefined) completions.add(raw.toolCallId);
-      emit(raw, "tool.execution_complete", {
+      const event = emit(raw, "tool.execution_complete", {
         toolCallId: raw.toolCallId,
         toolName: raw.toolName,
         parentToolCallId: raw.parentToolCallId,
@@ -496,6 +519,10 @@ function transformPiV3Entries(records, mapLegacyEvent = event => event) {
         success: raw.isError === true || raw.error != null || isPiResultError(raw.result) ? false : raw.isError === false ? true : undefined,
         durationMs: isMetric(raw.durationMs) ? raw.durationMs : undefined,
       });
+      if (raw.toolCallId !== undefined) {
+        completions.set(raw.toolCallId, event);
+        retainMessageTimestamp(event, completionMessages.get(raw.toolCallId));
+      }
     } else if (raw.type === "tool_execution_update")
       emit(raw, "tool.execution_update", { toolCallId: raw.toolCallId, toolName: raw.toolName, parentToolCallId: raw.parentToolCallId, input: raw.args, output: raw.partialResult, partial: true });
     else if (Object.hasOwn(PI_SESSION_EVENT_TYPES, raw.type)) {

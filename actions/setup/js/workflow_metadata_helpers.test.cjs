@@ -125,6 +125,20 @@ describe("getWorkflowMetadata", () => {
     expect(metadata.runId).toBe(0);
     expect(metadata.runUrl).toBe("https://github.com/owner/repo/actions/runs/0");
   });
+
+  it("should prefer an explicitly passed context over the global context", () => {
+    const metadata = getWorkflowMetadata("owner", "repo", { runId: 777, serverUrl: "https://ghe.example.com" });
+
+    expect(metadata.runId).toBe(777);
+    expect(metadata.runUrl).toBe("https://ghe.example.com/owner/repo/actions/runs/777");
+  });
+
+  it("should fall back to runId 0 when the explicit context has no runId", () => {
+    const metadata = getWorkflowMetadata("owner", "repo", {});
+
+    expect(metadata.runId).toBe(0);
+    expect(metadata.runUrl).toMatch(/\/owner\/repo\/actions\/runs\/0$/);
+  });
 });
 
 describe("buildWorkflowRunUrl", () => {
