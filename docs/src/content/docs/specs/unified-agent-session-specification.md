@@ -243,7 +243,7 @@ opaque because its essential fields are not defined by this specification.
 | Agent messages and reasoning | Exact `content`, without duplicate text blocks or the original message envelope. |
 | Agent session errors | Observed diagnostic fields, including `errorType`, `code`, and `statusCode`; absent status codes remain absent, and unrelated native error context is omitted. |
 | Agent policy refusals | Structured `reason`, exact available `content`, `policyCategory`, `explanation`, and streaming `partial` flag; no duplicated provider envelope. |
-| Agent tool lifecycle | Correlation IDs, tool/server names, one `input` or `output` field, command, outcome/error signals, duration, and exit code. Background tool updates retain observed `taskId` and `taskType`; progress and task notifications do not imply a tool completion. |
+| Agent tool lifecycle | Correlation IDs, including supplied `messageId`, the observed `model`, tool/server names, one `input` or `output` field, command, outcome/error signals, duration, and exit code. Background tool updates retain observed `taskId` and `taskType`; progress and task notifications do not imply a tool completion. |
 | Agent accounting | Turns, duration, cost, observed terminal `status` and `sourceType`, normalized `usage` including reported reasoning tokens, errors, and permission denials. |
 | Agent execution diagnostics | Unique harness/compiler `categories`, native `errorCodes` and `errorTypes`, and the observed final process `exitCode`; no diagnostic messages or duplicated engine envelopes. |
 | MCP | Server, direction, RPC/call/request IDs, method, tool name, duration, sizes, status, reason, and error code/message. Failed calls reporting HTTP 429 also retain `httpStatus: 429` and the sanitized `retryHint`, including retry durations or `Retry-After` seconds/HTTP-date. No RPC arguments, response bodies, echoed queries/URLs in rate-limit diagnostics, or error context. |
@@ -369,7 +369,12 @@ timestamp values and MUST derive its ordering key using the source schema's
 units, not an epoch-magnitude heuristic. ISO timestamps MUST carry a timezone.
 Numeric Squid audit timestamps use Unix seconds; native agent timestamps and
 token-tracker audit `ts` values use milliseconds. Pi's observed
-`message.timestamp` is also a supported source timestamp. ISO fractional seconds
+`message.timestamp` is also a supported source timestamp, including its
+`data.messageMetadata.timestamp` representation in saved canonical traces.
+When the event has no source clock, the adapter or merger MUST retain that
+observed message clock as `timestamp` before omitting the archival message
+metadata. Explicit source clocks take precedence; ordering anchors are not
+substitutes for missing native clocks. ISO fractional seconds
 and OTLP decimal-string Unix nanoseconds MUST be compared at nanosecond precision.
 `provenance.timestampMs` is an observed millisecond projection, not the exact
 ordering key; native timestamps retain their original precision.
@@ -1716,6 +1721,12 @@ download command applies this normalization to published JSONL only when trusted
 run metadata identifies Pi; it does not rewrite stored Actions artifacts.
 
 The adapter can discover a reported model from a finalized turn without inventing an earlier model observation. When Pi reports `responseModel`, canonical message and error observations use that served model; the canonical trace retains the requested `model` and native thinking levels as message metadata. Child request observations also preserve reported reasoning-output tokens without adding them to parent usage. Presentation aliases such as `bash` → `Bash` do not change canonical tool names. Sources lacking duration or cost do not supply zero duration or zero cost.
+
+Pi message clocks survive reconciliation of `message_end`, `turn_end` and
+`agent_end` snapshots onto streamed text, reasoning and tool calls. Supplied
+tool `messageId` and `model` survive the unified projection; the full
+`messageMetadata` envelope remains archival. These fields identify a message
+and its model, not additional inference or usage observations.
 
 ### 7.6 Custom engines
 

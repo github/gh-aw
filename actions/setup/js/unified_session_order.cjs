@@ -10,7 +10,7 @@
  * @returns {bigint | undefined}
  */
 function sessionTimestampNs(record, unit = "milliseconds") {
-  const value = record.timestamp ?? record.ts ?? record.time ?? record.created_at ?? record.message?.timestamp;
+  const value = record.timestamp ?? record.ts ?? record.time ?? record.created_at ?? record.message?.timestamp ?? record.data?.messageMetadata?.timestamp;
   if (unit === "nanoseconds") {
     if (typeof value !== "string" || !/^\d{1,22}$/.test(value)) return undefined;
     const ns = BigInt(value);

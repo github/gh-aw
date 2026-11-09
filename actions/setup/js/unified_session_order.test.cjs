@@ -9,6 +9,31 @@ const header = { type: "session.format", data: { version: 1 }, provenance: { com
 const jsonl = events => [header, ...events].map(JSON.stringify).join("\n") + "\n";
 
 describe("Unified trace ordering", () => {
+  it.each([0, 2000, "2026-11-09T00:27:23.729Z"])("orders saved Pi message metadata clocks without publishing the native envelope (%s)", timestamp => {
+    const clock = typeof timestamp === "number" ? timestamp : Date.parse(timestamp);
+    const saved = {
+      type: "tool.execution_start",
+      data: { toolCallId: "call", messageId: "message", model: "served-model", input: { nested: [false, 0] }, messageMetadata: { timestamp, provider: "fixture", usage: { input: 10 } } },
+    };
+    const original = structuredClone(saved);
+    expect(sessionTimestamp(saved)).toBe(clock);
+    const merged = mergeSessionSources([source("agent", [saved]), source("mcp", [event("before", clock - 1), event("after", clock + 1)])]);
+    expect(merged.map(record => record.id ?? record.data.toolCallId)).toEqual(["before", "call", "after"]);
+    expect(merged[1]).toMatchObject({ timestamp, data: { messageId: "message", model: "served-model" }, provenance: { timestampMs: clock, index: 0 } });
+    expect(merged[1].data).not.toHaveProperty("messageMetadata");
+    expect(validateSession(jsonl(merged))).toBe(4);
+    expect(saved).toEqual(original);
+    expect(mergeSessionSources([source("agent", [merged[1]])])[0].timestamp).toBe(timestamp);
+  });
+
+  it("does not overwrite an explicit source clock or replace invalid clocks with message metadata", () => {
+    const saved = { type: "assistant.message", timestamp: 10, data: { content: "exact", messageMetadata: { timestamp: 20 } } };
+    expect(sessionTimestamp(saved)).toBe(10);
+    expect(mergeSessionSources([source("agent", [saved])])[0].timestamp).toBe(10);
+    expect(sessionTimestamp({ ...saved, timestamp: "invalid" })).toBeUndefined();
+    expect(sessionTimestamp({ type: "assistant.message", data: { content: "untimed" } })).toBeUndefined();
+  });
+
   it.each([[], [source("agent", [])], [source("agent", []), source("otel", [], "nanoseconds")]].map(sources => [sources]))("accepts empty source collections without inventing observations: %j", sources => {
     expect(mergeSessionSources(sources)).toEqual([]);
   });

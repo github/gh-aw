@@ -21,6 +21,25 @@ import { failure as claudeFailures } from "./fixtures/claude_ci_sessions.cjs";
 import { createSessionLookups } from "./grader_session.cjs";
 
 describe("essential unified session payloads", () => {
+  it.each(["tool.execution_start", "tool.execution_update", "tool.execution_complete"])("retains tool/message correlation without publishing native envelopes (%s)", type => {
+    const original = {
+      type,
+      data: {
+        toolCallId: "call",
+        message_id: "message",
+        model: "served-model",
+        messageMetadata: { timestamp: 0, api: "fixture-api", usage: { input: 10 }, private: "OMITTED_NATIVE_CONTEXT" },
+      },
+    };
+    const projected = normalizeUnifiedSessionEvent(original);
+    expect(projected).toEqual({ type, timestamp: 0, data: { toolCallId: "call", messageId: "message", model: "served-model" } });
+    expect(normalizeUnifiedSessionEvent(projected)).toEqual(projected);
+    const [unified] = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-session.jsonl", events: [original] }]);
+    expect(createSessionValidator("unified").event(unified)).toBe(true);
+    expect(JSON.stringify(unified)).not.toContain("OMITTED_NATIVE_CONTEXT");
+    expect(original.data.messageMetadata.usage).toEqual({ input: 10 });
+  });
+
   it("preserves observed Codex reconnect progress separately from harness attempts", () => {
     const native = parseEngineSession("Reconnecting... 2/5 (connection interrupted)\n", "codex").find(event => event.type === "session.result");
     expect(native).toMatchObject({ reconnectAttempt: 2, maxReconnects: 5 });

@@ -55,6 +55,8 @@ const AIC_RESOLVABLE_PHASES = new Set(["detection", "evals"]);
 const TOOL_FIELDS = {
   toolCallId: ["toolCallId", "tool_call_id", "tool_use_id"],
   toolName: ["toolName", "tool_name"],
+  messageId: ["messageId", "message_id"],
+  model: ["model"],
   mcpServerName: ["mcpServerName"],
   parentToolCallId: ["parentToolCallId"],
   stepIndex: ["stepIndex", "step_index"],
@@ -862,9 +864,9 @@ function normalizeUnifiedSessionEvent(event, phase) {
     if (Array.isArray(errors)) data.errors = errors.filter(error => error && typeof error === "object" && !Array.isArray(error)).map(projectSafeOutputData);
   }
   const metadata = selectFields(event, { id: ["id"], parentId: ["parentId"], timestamp: ["timestamp", "ts", "time", "created_at"], agentId: ["agentId"], ephemeral: ["ephemeral"] });
-  /** @type {any} */
   const nativeMessage = event.message;
-  if (!Object.hasOwn(metadata, "timestamp") && nativeMessage?.timestamp !== undefined) metadata.timestamp = structuredClone(nativeMessage.timestamp);
+  const nativeTimestamp = (nativeMessage && typeof nativeMessage === "object" && "timestamp" in nativeMessage ? nativeMessage.timestamp : undefined) ?? source.messageMetadata?.timestamp;
+  if (!Object.hasOwn(metadata, "timestamp") && (typeof nativeTimestamp === "string" || typeof nativeTimestamp === "number")) metadata.timestamp = nativeTimestamp;
   return {
     type: event.type,
     ...metadata,
