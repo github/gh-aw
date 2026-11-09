@@ -7,10 +7,12 @@ const { inlineArtifactTarget } = await import("./inline_artifact_target.cjs");
 const { writeInlineSubAgents } = await import("./extract_inline_sub_agents.cjs");
 const { writeInlineSkills } = await import("./extract_inline_skills.cjs");
 const { prepareMarkdownFixtures } = await import("../../../scripts/markdown_metadata_test_adapter.cjs");
+const { installMarkdownMetadata } = require("./markdown_metadata.cjs");
 let dir;
 
 beforeEach(() => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), "inline-target-"));
+  installMarkdownMetadata({ version: 2, records: [] });
   vi.stubGlobal("core", { info: vi.fn(), warning: vi.fn() });
 });
 afterEach(() => {

@@ -50,6 +50,15 @@ describe("Pi managed delegation", () => {
     expect(registerTool).toHaveBeenCalledWith(expect.objectContaining({ name: "subagent", parameters: expect.objectContaining({ required: ["agent", "task"] }) }));
   });
 
+  it("advertises agent names without including their descriptions", () => {
+    fs.writeFileSync(path.join(dir, "subagents.json"), JSON.stringify([agent, { ...agent, name: "writer", description: "Write facts" }]));
+    const registerTool = vi.fn();
+    extension({ registerTool });
+    const tool = registerTool.mock.calls[0][0];
+    expect(tool.description).toBe("Delegate a task to a declared agent in an isolated Pi session. Available agents: reader; writer");
+    expect(tool.parameters.properties.agent.enum).toEqual(["reader", "writer"]);
+  });
+
   it("does not expose delegation without declarations or inside a child", () => {
     const registerTool = vi.fn();
     extension({ registerTool });
