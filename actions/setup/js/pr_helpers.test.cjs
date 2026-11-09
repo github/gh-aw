@@ -397,12 +397,13 @@ describe("checkBranchPushable", () => {
   });
 
   const makeClient = (defaultBranch, protectionStatus, isProtected = false) => ({
+    graphql: vi.fn().mockResolvedValue({ repository: { ref: { refUpdateRule: null } } }),
     rest: {
       repos: {
         get: vi.fn().mockResolvedValue({ data: { default_branch: defaultBranch } }),
         getBranch: protectionStatus === null ? vi.fn().mockResolvedValue({ data: { protected: isProtected } }) : vi.fn().mockRejectedValue(Object.assign(new Error("error"), { status: protectionStatus })),
         getBranchRules: vi.fn().mockResolvedValue({ data: [{ type: "copilot_code_review" }] }),
-        getBranchProtection: vi.fn().mockRejectedValue(Object.assign(new Error("Not Found"), { status: 404, response: { data: { message: "Branch not protected" } } })),
+        getBranchProtection: vi.fn().mockRejectedValue(new Error("Administration permission must not be required")),
       },
     },
   });
@@ -444,7 +445,8 @@ describe("checkBranchPushable", () => {
 
     expect(result).toBeNull();
     expect(client.rest.repos.getBranchRules).toHaveBeenCalledWith({ owner: "owner", repo: "repo", branch: "feature", per_page: 100, page: 1 });
-    expect(client.rest.repos.getBranchProtection).toHaveBeenCalledWith({ owner: "owner", repo: "repo", branch: "feature" });
+    expect(client.graphql).toHaveBeenCalledWith(expect.stringContaining("refUpdateRule { pattern }"), { owner: "owner", repo: "repo", ref: "refs/heads/feature" });
+    expect(client.rest.repos.getBranchProtection).not.toHaveBeenCalled();
     expect(mockCore.info).toHaveBeenCalledWith('Branch "feature" only has Copilot code review rules and no classic protection; proceeding to push');
   });
 
@@ -523,7 +525,7 @@ describe("checkBranchPushable", () => {
   it("blocks classic protection even if branch metadata says enabled:false", async () => {
     const client = makeClient("main", null, true);
     client.rest.repos.getBranch.mockResolvedValue({ data: { protected: true, protection: { enabled: false } } });
-    client.rest.repos.getBranchProtection.mockResolvedValue({ data: { required_signatures: { enabled: true } } });
+    client.graphql.mockResolvedValue({ repository: { ref: { refUpdateRule: { pattern: "feature*" } } } });
 
     expect(await checkBranchPushable(client, "owner", "repo", "feature", true)).toContain("protection rules");
   });
@@ -531,34 +533,27 @@ describe("checkBranchPushable", () => {
   it.each([403, 409, 500, undefined])("fails closed when classic protection cannot be confirmed absent: %s", async status => {
     const client = makeClient("main", null, true);
     client.rest.repos.getBranch.mockResolvedValue({ data: { protected: true, protection: { enabled: false } } });
-    client.rest.repos.getBranchProtection.mockRejectedValue(Object.assign(new Error("Classic protection unavailable"), { status }));
+    client.graphql.mockRejectedValue(Object.assign(new Error("Classic protection unavailable"), { status }));
 
     expect(await checkBranchPushable(client, "owner", "repo", "feature", true)).toContain("Cannot verify branch protection rules");
   });
 
-  it.each([
-    ["generic API response", Object.assign(new Error("Branch not protected"), { status: 404, response: { data: { message: "Not Found" } } })],
-    ["missing API response", Object.assign(new Error("Branch not protected"), { status: 404 })],
-    ["missing API message", Object.assign(new Error("Branch not protected"), { status: 404, response: { data: {} } })],
-  ])("fails closed on a classic protection 404 with %s", async (_scenario, error) => {
+  it("fails closed on a classic protection 404", async () => {
     const client = makeClient("main", null, true);
     client.rest.repos.getBranch.mockResolvedValue({ data: { protected: true, protection: { enabled: false } } });
-    client.rest.repos.getBranchProtection.mockRejectedValue(error);
+    client.graphql.mockRejectedValue(Object.assign(new Error("Not Found"), { status: 404 }));
 
     expect(await checkBranchPushable(client, "owner", "repo", "feature", true)).toContain("Cannot verify branch protection rules");
   });
 
-  it("explains the token permission needed when classic protection returns 403", async () => {
+  it.each([undefined, null, {}, { repository: null }, { repository: {} }, { repository: { ref: null } }, { repository: { ref: {} } }])("fails closed on an incomplete classic protection response: %j", async response => {
     const client = makeClient("main", null, true);
     client.rest.repos.getBranch.mockResolvedValue({ data: { protected: true, protection: { enabled: false } } });
-    client.rest.repos.getBranchProtection.mockRejectedValue(Object.assign(new Error("Resource not accessible by integration"), { status: 403 }));
+    client.graphql.mockResolvedValue(response);
 
     const result = await checkBranchPushable(client, "owner", "repo", "feature", true);
 
     expect(result).toContain("Cannot verify branch protection rules");
-    expect(result).toContain("Resource not accessible by integration");
-    expect(result).toContain("Administration: read");
-    expect(result).toContain("GITHUB_TOKEN cannot provide");
     expect(result).toContain("Push blocked");
   });
 

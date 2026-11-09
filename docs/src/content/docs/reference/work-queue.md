@@ -241,6 +241,7 @@ Repository selection is `--repo`, then `GH_REPO`, then local `origin`, then `gh 
 | `deploy --from-config` | Refresh compatible worker routes; optional `--pool`, `--worker-profile`. |
 | `policy --from-config --epoch EPOCH` | Update existing, quiescent Policy; `--file` is the mutually exclusive alternative. |
 | `control`, `cancel-work` | Apply authorized pause, cutover, or Work cancellation. |
+| `cancel-work --obsolete [--limit N] [--dry-run]` | Select one checked obsolete-contract batch. |
 | `cancel-claim --claim-id ID[,ID...] --reason CODE` | Cancel exact current Claims and their Work, not native runs. |
 | `reprioritize --work-id ID[,ID...] --priority 1..5 --reason CODE` | Administrator-only priority override for future grants of available Work. |
 | `clear --reason CODE [--dry-run] [--hard]` | Interactive local cancellation or settled-queue reset; see below. |
@@ -264,6 +265,21 @@ All timestamps are Unix milliseconds. Inspection reads do not refresh external d
 | `explain --json` | Scheduler `decision` and compact `prediction`. |
 
 Metadata diagnostics exclude payloads, Result descriptors, request parameters, and receipt bodies. Retired pools remain visible with `policy_installed: false`; unknown admission ages are counted rather than inferred from client timestamps.
+
+### Cancel obsolete worker-contract Work
+
+```bash
+gh aw work --repo OWNER/REPO cancel-work --obsolete \
+  --limit 256 --request-id obsolete-batch-1 --dry-run --json
+```
+
+`cancel-work --obsolete` uses the JavaScript maintenance selection: only available, unclaimed, unpinned Work with barrier `none` and an admission contract incompatible with an available approved active Deployment is eligible. Expired Work, compatible Work, explicit execution pins, and missing/unavailable deployments are excluded. IDs are sorted in UTF-8 byte order; one batch contains at most `--limit` Work (default and maximum 256), further bounded by the installed Policy operation limit. It does not refresh routes or restore missing deployments.
+
+`--dry-run` reads and validates the ledger and reports the selection without checking administrator publication authority, recording a request, synchronizing Issues, or causing queue effects. Remove it to publish an administrator-authorized atomic `cancel_work` request with fixed reason `worker_contract_obsolete` and operation `version: 1`. Fresh publication checks reject the whole batch if a selected Work becomes owned, expired, compatible, or otherwise ineligible. Claims, Results, delivery barriers, reservations, policy/epoch/limits, fairness debt, history, and unselected Work are preserved; no native runs are stopped.
+
+`--work-id` and `--reason` cannot be combined with `--obsolete`; `--limit` and `--dry-run` require it. Use the same stable `--request-id` after an uncertain publication. An accepted request recovers only its original cancellation targets and fingerprint, including historical legacy receipts; it never sweeps newly obsolete Work. A caller limit that cannot hold the original receipt is rejected with the required numeric minimum. A subsequently lowered Policy operation limit does not block accepted receipt recovery, since it creates no new operations. Publication retains the original ledger snapshot and rejects replacement ledgers, including hard-clear/readmission of the same Work IDs; verified same-ledger appends and checkpoints remain supported. To select another batch, use a new request ID. No eligible Work returns `no_work` without recording a request.
+
+JSON output includes `status`, `request_id`, `snapshot_tip`, and metadata-only `work_ids`; authenticated publication additionally includes `publication`. Status is `dry_run`, `no_work`, `cancelled`, or `already_committed`. A preview does not guarantee later publication authority or eligibility. Inspect `explain --request-id ID` after an uncertain failure before retrying that same ID; a committed cancellation with pending Issue synchronization requires `sync-issues --request-id ID`, not another cancellation.
 
 ### Clear unfinished Work
 
@@ -362,7 +378,11 @@ Events go to stderr with elapsed timing and sanitized counts, flags, statuses, a
 
 Git ledger reads reuse one bounded local object stream instead of starting Git for every historical object. Issue projection shares the originating client's ledger and verified ancestry; repository access is still refreshed before cached history is reused. Cold reads still validate every checkpoint boundary.
 
-Native launch diagnostics preserve fixed identity failure codes such as `run_correlation_mismatch`, `run_ref_mismatch`, and `run_principal_mismatch` without printing the run metadata. A correlation mismatch can reflect a pending run title; other identity failures remain non-retryable. Neither permits a second dispatch POST or release of an uncertain reservation.
+After GitHub accepts a dispatch with the required HTTP 200 native run receipt, the dispatcher reports `activation_pending` and does not poll worker metadata or publish a binding. The durable start marker fences every resend; the returned run ID and URL are preserved in the Actions `work_queue_requests` controls output, not as new durable ledger evidence. This status means dispatch acceptance, not Claim/effect authority or worker completion. Trusted worker activation still verifies the actual run ID, attempt one, repository, workflow, immutable SHA, initiating/triggering principal and original dispatch token, then publishes and rechecks a durable binding before allowing worker execution. An uncertain POST response still requires recovery and is never retried.
+
+Stranded-launch recovery is bounded. Without an explicit run hint or an existing ledger evidence hint, scheduled or explicit reconciliation discovers at most two pages of 50 runs filtered by the worker workflow, `workflow_dispatch` event and immutable SHA, within the installed attempt/deadline limits. A full second page is an overflow conflict, not proof of a unique run. Even a successfully verified exact run hint must pass this bounded conflict scan and does not bypass the overflow fence or guarantee recovery outside the listing window. If a worker never activates and its run falls outside this window, automatic reconciliation cannot recover its binding from the controls output: the reservation remains fenced and unbound (`launch_unresolved` or `run_binding_conflict`). Preserve the controls receipt for operator investigation; losing it does not authorize another dispatch, release or effect replay. Recovery requires authenticated run evidence and all normal binding checks; reconciliation does not widen its scan.
+
+Native activation/reconciliation diagnostics preserve fixed identity failure codes such as `run_correlation_mismatch`, `run_ref_mismatch`, and `run_principal_mismatch` without printing run metadata. A correlation mismatch can reflect a pending run title; neither a mismatch nor missing discovery permits release or another POST. Unbound reconciliation authenticates repository identity once per operation and checks every subsequent attempt response against that identity, with no cross-operation or cross-client cache. Failed authentication is not cached. Reconciliation retains an exact run hint throughout its retry budget, including after transient API errors or a 404; these failures do not establish nonlaunch. For pending titles, it spaces reads with exponential delays of 1, 2, 4, 8 seconds and so on, capped at 30 seconds and the remaining installed deadline. Attempt limits and all identity checks remain unchanged; permanently mismatched runs remain fenced without binding/effect authority.
 
 Routing diagnostics distinguish installed Policy gaps from compiler approval failures:
 
@@ -392,7 +412,7 @@ Claim audit exports contain operations, temporary-ID references, and structured 
 
 The `safe_outputs` job exposes `work_queue_outcome`. Unverified Claims retain delivery state, effects disposition, and reconciliation reason in scoped `claim-delivery-errors.json`.
 
-When trusted queue controls are configured, `safe_outputs.outputs.work_queue_requests` contains their version-3 JSON receipt. A successful controls job can report `no_grant` with no launches; only a launch with `state: "bound"` identifies a verified native worker run. This receipt proves launch, not worker completion or Result.
+When trusted queue controls are configured, `safe_outputs.outputs.work_queue_requests` contains their version-3 JSON receipt. A successful controls job can report `no_grant` with no launches or `activation_pending` when GitHub accepted a launch but this observation has not verified its binding. A launch with `state: "activation_pending"` includes the accepted run ID and link, not binding authority; only `state: "bound"` identifies a verified native worker run. Pending activation alone does not fail controls, but it never masks a failed or uncertain sibling launch. The receipt is not automatically consumed by reconciliation and proves neither worker completion nor Result.
 
 Claim files live under `/tmp/gh-aw/claims/<original-identity-hash>/` with directory/file modes `0700`/`0600`:
 

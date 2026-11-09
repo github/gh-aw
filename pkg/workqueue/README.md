@@ -33,6 +33,7 @@ For the full queue behavior and operator configuration, see the [work-queue refe
 | `Settings` | struct | Parsed repository scheduling preferences; it does not grant authorization or routes. |
 | `Branch` | struct | Git-backed queue ledger transport. |
 | `NativeDeliveryHost` | struct | Native host for verifying and publishing queue delivery outputs. |
+| `LedgerSession` | struct | Scoped set of ledger operations sharing one isolated Git object store. |
 
 Other exported types represent typed operation parameters, dependencies and external resources, policies and worker profiles, queue limits, explanations, statistics, delivery verification, and settings overrides.
 
@@ -55,7 +56,6 @@ Other exported types represent typed operation parameters, dependencies and exte
 | `NewRequest` | `func NewRequest(id, kind string, actor Actor, parameters any) (Request, error)` | Constructs a request with its canonical fingerprint. |
 | `AuthorizeEffect` | `func AuthorizeEffect(state Projection, actor Actor, target EffectResource) error` | Checks whether a completed worker Claim authorizes the requested effect. |
 | `CanonicalValue` | `func CanonicalValue(value any) ([]byte, error)` | Encodes typed JSON without repairing strings or losing numeric values. |
-| `Compact` | `func Compact(commits []QueueCommit) ([]QueueCommit, error)` | Validates and returns commits in causal order. |
 | `CompactCheckpoint` | `func CompactCheckpoint(commits []QueueCommit, priorGitSHA string, actor Actor, at int64) ([]QueueCommit, error)` | Builds a minimal state checkpoint from validated history, bound to the Git commit containing the prior ledger. |
 | `DefaultPolicy` | `func DefaultPolicy(principal, repository string) Policy` | Creates the default weighted-priority policy for a principal and repository. |
 | `DispatchPrincipal` | `func DispatchPrincipal(dispatch *DispatchState) string` | Returns the principal frozen at dispatch launch from the selected AW credential. |
@@ -82,6 +82,41 @@ Other exported types represent typed operation parameters, dependencies and exte
 | `TraceQueue` | `func TraceQueue(commits []QueueCommit, options TraceOptions, at int64) (TracePage, error)` | Returns bounded ledger provenance without payloads, descriptors, receipts, or request parameters. |
 | `ValidReason` | `func ValidReason(reason string) bool` | Reports whether a reason is a bounded, sanitized queue reason code. |
 | `ValidateAssignment` | `func ValidateAssignment(state Projection, assignment Assignment) error` | Verifies that an assignment matches the dispatch recorded in the projection. |
+
+### Methods
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `Assignment.ToReceipt` | `func (assignment Assignment) ToReceipt() AssignmentReceipt` | Projects assignment identity without work payloads or result references; callers populate lifecycle facts separately from a validated projection. |
+| `AssignmentClaim.ToReceipt` | `func (claim AssignmentClaim) ToReceipt() ClaimReceipt` | Projects Claim identity without work payloads or result references. |
+| `Branch.Authenticate` | `func (b Branch) Authenticate(ctx context.Context, role string) (Actor, error)` | Derives operator identity from credentials rather than caller-supplied actor fields or flags. |
+| `Branch.AuthenticateClear` | `func (b Branch) AuthenticateClear(ctx context.Context) (Actor, error)` | Authorizes repository maintainers and administrators for clear operations. |
+| `Branch.CancelReserved` | `func (b Branch) CancelReserved(ctx context.Context, dispatchID, requestID string) (Reconciliation, error)` | Cancels a reservation before launch; a competing start marker wins the compare-and-swap. |
+| `Branch.Compact` | `func (b Branch) Compact(ctx context.Context) (Compaction, error)` | Replaces validated ledger history with a canonical checkpoint bound to the prior Git commit. |
+| `Branch.DeploymentOperationsFromConfig` | `func (b Branch) DeploymentOperationsFromConfig(ctx context.Context, state Projection, poolName, workerName string) ([]Operation, error)` | Proposes route-only changes for existing AW workers; unavailable registrations pause only affected targets. |
+| `Branch.DispatcherFromConfig` | `func (b Branch) DispatcherFromConfig(ctx context.Context, name string) (DispatcherRoute, error)` | Resolves a dispatcher at the verified default revision without granting or launching Claims. |
+| `Branch.HardClear` | `func (b Branch) HardClear(ctx context.Context, requestID, reason string, dryRun bool) (HardClearResult, error)` | Previews or resets only a settled, paused queue while retaining the prior ledger in Git history. |
+| `Branch.HardClearFromSnapshot` | `func (b Branch) HardClearFromSnapshot(ctx context.Context, requestID, reason, priorGitSHA string) (HardClearResult, error)` | Resets only the exact Git snapshot previewed by the operator. |
+| `Branch.InspectEvidence` | `func (b Branch) InspectEvidence(ctx context.Context, dispatchID string) (Reconciliation, error)` | Reads evidence for the specified dispatch and returns its reconciliation state. |
+| `Branch.OpenLedgerSession` | `func (b Branch) OpenLedgerSession(ctx context.Context) (*LedgerSession, error)` | Opens a scoped session with an isolated Git object store. |
+| `Branch.PolicyFromConfig` | `func (b Branch) PolicyFromConfig(ctx context.Context) (Policy, error)` | Resolves scheduling policy and worker approval from the target repository's verified immutable default ref. |
+| `Branch.PrepareDispatcherActivation` | `func (b Branch) PrepareDispatcherActivation(ctx context.Context, route DispatcherRoute) (string, error)` | Binds a verified dispatcher route to a named snapshot ref without moving or deleting tags. |
+| `Branch.Publish` | `func (b Branch) Publish(ctx context.Context, actor Actor, request Request) (Publication, error)` | Publishes authenticated intent, rebuilding selections and charges after compare-and-swap retries. |
+| `Branch.PublishFromSnapshot` | `func (b Branch) PublishFromSnapshot(ctx context.Context, actor Actor, request Request, selected []QueueCommit) (Publication, error)` | Publishes intent selected from a snapshot while rejecting replacement ledgers. |
+| `Branch.Read` | `func (b Branch) Read(ctx context.Context) ([]QueueCommit, error)` | Refreshes the queue head and reads its validated ledger. |
+| `Branch.Reconcile` | `func (b Branch) Reconcile(ctx context.Context, dispatchID, requestID string) (Reconciliation, error)` | Inspects the bound native attempt; missing or unbound runs retain reservations. |
+| `Branch.RecoverDelivery` | `func (b Branch) RecoverDelivery(ctx context.Context, workID, requestID string) (DeliveryRecovery, error)` | Recovers a delivery barrier independently of native capacity; missing proof remains unknown. |
+| `Branch.SynchronizeIssueTransition` | `func (b Branch) SynchronizeIssueTransition(ctx context.Context, requestID string) (result IssueSynchronization, err error)` | Synchronizes one checked terminal request as an explicit maintain/admin action. |
+| `Branch.SynchronizePublishedIssueTransition` | `func (b Branch) SynchronizePublishedIssueTransition(ctx context.Context, publication *Publication) (IssueSynchronization, error)` | Synchronizes the exact checked publication using its publisher's existing writer authority. |
+| `DispatchParameters.MarshalJSON` | `func (parameters DispatchParameters) MarshalJSON() ([]byte, error)` | Serializes dispatch bounds while preserving an explicitly empty worker-profile list. |
+| `LedgerSession.Close` | `func (s *LedgerSession) Close()` | Closes the session and removes its temporary Git object store. |
+| `LedgerSession.Compact` | `func (s *LedgerSession) Compact(ctx context.Context) (Compaction, error)` | Compacts the current queue using the session's object store. |
+| `LedgerSession.Publish` | `func (s *LedgerSession) Publish(ctx context.Context, actor Actor, request Request) (Publication, error)` | Publishes a checked request using the session's object store. |
+| `LedgerSession.Read` | `func (s *LedgerSession) Read(ctx context.Context) ([]QueueCommit, error)` | Refreshes the queue head and reads its validated ledger. |
+| `NativeDeliveryHost.Verifier` | `func (host *NativeDeliveryHost) Verifier(branch Branch) DeliveryVerifier` | Returns the native verifier used for recovery and fresh ledger prefixes. |
+| `ProtocolError.Error` | `func (e *ProtocolError) Error() string` | Formats the stable error code and rejection message as `<code>: <message>`. |
+| `Settings.Apply` | `func (settings Settings) Apply(policy Policy) (Policy, error)` | Applies scheduling preferences to host-approved policy routes without adding profile authority. |
+| `WorkState.SchedulingPriority` | `func (work *WorkState) SchedulingPriority() int` | Computes scheduling priority without changing the admitted definition or historical Claims. |
 
 ### Constants
 

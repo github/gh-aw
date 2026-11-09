@@ -244,6 +244,13 @@ describe("work queue OpenTelemetry", () => {
     expect(attributes(mirrors[0])[`${PREFIX}outcome`]).toBe(state);
   });
 
+  it("reports accepted launches as activation pending rather than bound or unhealthy", async () => {
+    const result = { state: "activation_pending", released: false, dispatched: true };
+    await telemetry.observeQueueOperation("dispatch", queueOptions, async () => result);
+    expect(span(mirrors[0]).status.code).not.toBe(2);
+    expect(attributes(mirrors[0])[`${PREFIX}outcome`]).toBe("activation_pending");
+  });
+
   it("reports reconciliation failures even when the batch returns normally", async () => {
     const result = { results: [{ state: "bound" }, { state: "launch_unresolved" }] };
     await telemetry.observeQueueOperation("reconcile", queueOptions, async () => result);
