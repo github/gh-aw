@@ -101,13 +101,14 @@ describe("AW-owned authorization with queue-owned scheduling and delivery", () =
     const intentPath = writeIntents([submit, { kind: "dispatch_next", intent_id: "own-dispatch", parameters: { pool: "default", max_claims: 1, max_dispatches: 1 } }]);
     const result = await processWorkQueueIntents({ ...options, intentPath, maxDispatches: 1 });
     expect(result.receipts.map(receipt => receipt.status)).toEqual(["durable", "durable"]);
-    expect(result.receipts[1].launches).toEqual([expect.objectContaining({ state: "bound", run_id: "42" })]);
+    expect(result.receipts[1].launches).toEqual([expect.objectContaining({ state: "activation_pending", run_id: "42" })]);
     const work = [...fixture.state.works.values()].find(work => work.payload.task === "own approved worker");
     expect(work.worker_profile).toBe("workerB");
     expect(fixture.state.policy.pools.default.default_profile).toBe("artifacts-summary");
     expect(post).toHaveBeenCalledOnce();
     expect(post.mock.calls[0][0]).toMatchObject({ workflow_id: "worker.lock.yml", ref: `refs/tags/gh-aw/work-queue/${REF}` });
-    expect([...fixture.state.dispatches.values()][0].run.principal).toBe("22");
+    expect([...fixture.state.dispatches.values()][0].credential_principal).toBe("22");
+    expect([...fixture.state.dispatches.values()][0].run).toBeUndefined();
     fs.writeFileSync(intentPath, canonical({ version: 3, ...submit }) + "\n");
     const before = canonical(fixture.transactions);
     expect((await processWorkQueueIntents({ ...options, config: {}, intentPath })).receipts[0].status).toBe("durable");
@@ -144,7 +145,8 @@ describe("AW-owned authorization with queue-owned scheduling and delivery", () =
         policy.pools.default.default_profile = "daily";
       },
     });
-    expect(await launchAssignment(options, fixture.assignment)).toMatchObject({ state: "bound" });
+    expect(await launchAssignment(options, fixture.assignment)).toMatchObject({ state: "activation_pending" });
+    await bindWorkerAssignment({ ...options, context: fixture.workerContext, workflowRef: `${REPOSITORY}/${WORKFLOW}@${REF}` });
     const member = fixture.assignment.claims[0];
     const origin = { ...fixture.workerActor, dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle };
     fixture.append("finish", { dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle, outcome: "completed" }, origin);
@@ -193,7 +195,8 @@ describe("AW-owned authorization with queue-owned scheduling and delivery", () =
   it("binds a no-principal profile to the selected credential, not the dispatcher or actor hint, and retains it across checkpoints", async () => {
     const { fixture, options, post } = setupAW();
     const frozen = canonical(fixture.state.dispatches.get(fixture.assignment.dispatch_id).profile);
-    expect(await launchAssignment(options, fixture.assignment)).toMatchObject({ state: "bound", run_id: "42" });
+    expect(await launchAssignment(options, fixture.assignment)).toMatchObject({ state: "activation_pending", run_id: "42" });
+    await bindWorkerAssignment({ ...options, context: fixture.workerContext, workflowRef: `${REPOSITORY}/${WORKFLOW}@${REF}` });
     expect(post).toHaveBeenCalledOnce();
     const dispatch = fixture.state.dispatches.get(fixture.assignment.dispatch_id);
     expect(dispatch.credential_principal).toBe("22");
@@ -248,7 +251,8 @@ describe("AW-owned authorization with queue-owned scheduling and delivery", () =
       status: 200,
       data: run_id === "42" ? { ...fixture.nativeRun(), actor: { id: "33" }, triggering_actor: { id: "33" } } : fixture.nativeRun(fixture.dispatcherContext),
     });
-    expect(await launchAssignment(options, fixture.assignment)).toMatchObject({ state: "launch_unresolved" });
+    expect(await launchAssignment(options, fixture.assignment)).toMatchObject({ state: "activation_pending" });
+    await expect(bindWorkerAssignment({ ...options, context: fixture.workerContext, workflowRef: `${REPOSITORY}/${WORKFLOW}@${REF}` })).rejects.toThrow(/principal/);
     expect(post).toHaveBeenCalledOnce();
     expect(fixture.state.dispatches.get(fixture.assignment.dispatch_id).credential_principal).toBe("22");
     fixture.githubClient.rest.actions.listWorkflowRuns = async () => ({ status: 200, data: { workflow_runs: [fixture.nativeRun()] } });
@@ -345,7 +349,7 @@ describe("AW-owned authorization with queue-owned scheduling and delivery", () =
       status: 200,
       data: { full_name: REPOSITORY, id: 7, permissions: { push: false } },
     });
-    expect(await launchAssignment(options, fixture.assignment)).toMatchObject({ state: "bound" });
+    expect(await launchAssignment(options, fixture.assignment)).toMatchObject({ state: "activation_pending" });
     expect(fixture.transactions.flatMap(commit => commit.operations).some(operation => operation.kind === "Dispatch" && operation.state === "started")).toBe(true);
     expect(post).toHaveBeenCalledOnce();
   });
@@ -398,7 +402,7 @@ describe("AW-owned authorization with queue-owned scheduling and delivery", () =
       return { status: 201, data: verified.data };
     });
     fixture.githubClient.rest.git = { getRef: vi.fn().mockRejectedValueOnce({ status: 404 }).mockResolvedValue(verified), createRef };
-    expect(await launchAssignment(options, fixture.assignment)).toMatchObject({ state: "bound" });
+    expect(await launchAssignment(options, fixture.assignment)).toMatchObject({ state: "activation_pending" });
     expect(createRef).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ ref: tag, sha: REF }));
     expect(fixture.githubClient.rest.git.getRef.mock.invocationCallOrder[1]).toBeLessThan(post.mock.invocationCallOrder[0]);
     expect(post).toHaveBeenCalledOnce();
@@ -504,7 +508,8 @@ describe("AW-owned authorization with queue-owned scheduling and delivery", () =
       })
     ).toMatchObject({ dispatches: 1 });
     expect(post).toHaveBeenCalledOnce();
-    expect([...fixture.state.dispatches.values()][0].run.principal).toBe("22");
+    expect([...fixture.state.dispatches.values()][0].credential_principal).toBe("22");
+    expect([...fixture.state.dispatches.values()][0].run).toBeUndefined();
     const root = workDefinition([...fixture.state.works.values()][0]);
     fixture.append(
       "submit",
