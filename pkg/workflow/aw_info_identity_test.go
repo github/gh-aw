@@ -55,6 +55,7 @@ Call the worker.
 				if step.ID == "generate_aw_info" {
 					assert.Equal(t, "${{ job.workflow_ref }}", step.Env["GH_AW_INFO_WORKFLOW_ID"],
 						"run metadata must use the executing job's workflow, not github.workflow_ref (the caller)")
+					assert.Equal(t, "${{ job.workflow_sha }}", step.Env["GH_AW_INFO_WORKFLOW_SHA"])
 					return
 				}
 			}

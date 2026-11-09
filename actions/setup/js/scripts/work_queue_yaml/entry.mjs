@@ -1,1 +1,0 @@
-export { parseDocument } from "yaml";

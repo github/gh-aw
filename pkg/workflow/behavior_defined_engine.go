@@ -789,13 +789,20 @@ func (e *BehaviorDefinedEngine) allowedDomains(workflowData *WorkflowData) strin
 	engineName := constants.EngineName(e.GetID())
 	behavior := e.behavior()
 	if behavior != nil && behavior.Network != nil {
-		model := ""
-		if workflowData != nil && workflowData.EngineConfig != nil {
-			model = workflowData.Model
-		}
-		defaults, err := resolveEngineNetworkDomains(behavior.Network, model)
-		if err != nil {
-			panic(fmt.Sprintf("BUG: invalid model %q reached domain computation (should have been caught by validation): %v", model, err))
+		var defaults []string
+		if e.usesUniversalLLMConsumer() || (behavior.Execution != nil && behavior.Execution.ProviderEnvMode == behaviorProviderEnvModeUniversalLLMConsumer) {
+			// AWF-proxied inference uses its gateway target, not direct agent egress.
+			defaults = behavior.Network.Defaults
+		} else {
+			model := ""
+			if workflowData != nil && workflowData.EngineConfig != nil {
+				model = workflowData.Model
+			}
+			var err error
+			defaults, err = resolveEngineNetworkDomains(behavior.Network, model)
+			if err != nil {
+				panic(fmt.Sprintf("BUG: invalid model %q reached domain computation (should have been caught by validation): %v", model, err))
+			}
 		}
 		return mergeDomainsWithNetworkToolsAndRuntimes(defaults, workflowData.NetworkPermissions, workflowData.Tools, workflowData.Runtimes)
 	}

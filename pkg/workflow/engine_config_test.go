@@ -1048,7 +1048,7 @@ Write a haiku and say Done.
 	lock := string(lockFile)
 
 	// The literal (invalid) "experiments" context must never appear in the compiled workflow.
-	assert.NotContains(t, lock, "experiments.model }}", "the raw experiments.model expression must be rewritten")
+	assert.False(t, containsInNonCommentLines(lock, "experiments.model }}"), "the raw experiments.model expression must be rewritten")
 
 	// Within the activation job (same job as the pick-experiment step), the info step must
 	// read the step output directly since a job cannot reference its own outputs via needs.
@@ -1101,7 +1101,7 @@ Write a haiku and say Done.
 	}
 	lock := string(lockFile)
 
-	assert.NotContains(t, lock, "experiments.model }}", "the raw experiments.model expression must be rewritten")
+	assert.False(t, containsInNonCommentLines(lock, "experiments.model }}"), "the raw experiments.model expression must be rewritten")
 	assert.Contains(t, lock, `GH_AW_INFO_MODEL: "${{ steps.pick-experiment.outputs.model }}"`)
 	assert.Contains(t, lock, "ANTHROPIC_MODEL: ${{ needs.activation.outputs.model }}")
 	assert.Contains(t, lock, `GH_AW_ENGINE_MODEL: "${{ needs.activation.outputs.model }}"`)

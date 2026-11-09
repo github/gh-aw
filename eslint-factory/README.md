@@ -44,6 +44,7 @@ negative controls and validated readable traces without live effects.
 | [`no-core-exportvariable-non-string`](#no-core-exportvariable-non-string) | Require explicit string values for `core.exportVariable` calls |
 | [`no-core-setoutput-non-string`](#no-core-setoutput-non-string) | Require explicit string values for `core.setOutput` calls |
 | [`no-deprecated-string-substr`](#no-deprecated-string-substr) | Disallow deprecated `String.prototype.substr()` calls |
+| [`no-dynamic-string-replacement`](#no-dynamic-string-replacement) | Disallow dynamic replacement values passed to `String.prototype.replace()` or `replaceAll()` |
 | [`no-empty-catch-block`](#no-empty-catch-block) | Disallow undocumented empty `catch` blocks |
 | [`no-duplicate-constant-values`](#no-duplicate-constant-values) | Report constants with duplicate static primitive values in the same file |
 | [`no-child-process-interpolated-command`](#no-child-process-interpolated-command) | Disallow interpolated command strings in shell-evaluated `child_process` calls |

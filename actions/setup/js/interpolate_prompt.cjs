@@ -18,6 +18,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_API, ERR_CONFIG, ERR_VALIDATION } = require("./error_codes.cjs");
 const { renderMarkdownTemplate } = require("./render_template.cjs");
 const { createLiteralValues, readLiteralState, restoreInlineMetadata, writeLiteralState, literalFileKey } = require("./prompt_literal_values.cjs");
+const { transformMarkdownContent } = require("./markdown_metadata.cjs");
 
 /**
  * @typedef {Object} ImportTreeNode
@@ -136,6 +137,7 @@ async function main({ deferredBindings = {}, authorExpressions = {} } = {}) {
       content = system + splitMarker + user;
     }
 
+    content = transformMarkdownContent(content, text => text);
     // Step 1: Process local file runtime imports without network access
     core.info("\n========================================");
     core.info("[main] STEP 1: Runtime Imports");
@@ -244,7 +246,7 @@ async function main({ deferredBindings = {}, authorExpressions = {} } = {}) {
       core.info(`Found ${varCount} expression variable(s) to interpolate`);
 
       const beforeInterpolation = content.length;
-      content = interpolateVariables(content, variables);
+      content = transformMarkdownContent(content, text => interpolateVariables(text, variables));
       const afterInterpolation = content.length;
 
       core.info(`Successfully interpolated ${varCount} variable(s) in prompt`);
@@ -265,7 +267,7 @@ async function main({ deferredBindings = {}, authorExpressions = {} } = {}) {
         const protectedValue = protectValue(value || "");
         const placeholder = `__${key}__`;
         if (content.includes(placeholder)) {
-          content = content.split(placeholder).join(protectedValue);
+          content = transformMarkdownContent(content, text => text.split(placeholder).join(protectedValue));
           experimentSubCount++;
           core.debug("[main] Substituted experiment placeholder");
         }
@@ -275,14 +277,16 @@ async function main({ deferredBindings = {}, authorExpressions = {} } = {}) {
         const conditionPattern = /(\{\{#?(?:if|else[-_]?if)\s+)([^}]*)(\}\})/gi;
         const operandPattern = new RegExp(`"[^"]*"|'[^']*'|\\b${exprForm.replace(".", "\\.")}\\b`, "gi");
         let substitutedCondition = false;
-        content = content.replace(conditionPattern, (_, prefix, condition, suffix) => {
-          const substituted = condition.replace(operandPattern, operand => {
-            if (operand.startsWith('"') || operand.startsWith("'")) return operand;
-            substitutedCondition = true;
-            return protectedValue;
-          });
-          return prefix + substituted + suffix;
-        });
+        content = transformMarkdownContent(content, text =>
+          text.replace(conditionPattern, (_, prefix, condition, suffix) => {
+            const substituted = condition.replace(operandPattern, operand => {
+              if (operand.startsWith('"') || operand.startsWith("'")) return operand;
+              substitutedCondition = true;
+              return protectedValue;
+            });
+            return prefix + substituted + suffix;
+          })
+        );
         if (substitutedCondition) {
           core.debug("[main] Substituted experiment condition operand");
         }
@@ -306,7 +310,7 @@ async function main({ deferredBindings = {}, authorExpressions = {} } = {}) {
       const beforeRendering = content.length;
       const resolveCondition = (/** @type {string} */ condition) =>
         restoreValues(condition.replace(/__(GH_AW_[A-Z0-9_]+)__/g, (placeholder, key) => (Object.prototype.hasOwnProperty.call(process.env, key) ? protectValue(process.env[key] || "") : placeholder)));
-      content = renderMarkdownTemplate(content, resolveCondition);
+      content = transformMarkdownContent(content, text => renderMarkdownTemplate(text, resolveCondition));
       const afterRendering = content.length;
 
       core.info(`Template rendered successfully`);

@@ -62,7 +62,14 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 		displayOrder = append(displayOrder, state.importPaths[fullPath])
 	}
 	parserLog.Printf("Sorted imports in topological order: %v", displayOrder)
-	return state.acc.toImportsResult(displayOrder), nil
+	result := state.acc.toImportsResult(displayOrder)
+	result.MetadataDocuments = make(map[string]string)
+	for _, fullPath := range topologicalOrder {
+		if item := state.processedItems[fullPath]; len(item.content) > 0 {
+			result.MetadataDocuments[fullPath] = string(item.content)
+		}
+	}
+	return result, nil
 }
 
 type nestedImportEntry struct {
@@ -272,6 +279,8 @@ func handleAgentImportItem(item importQueueItem, state *importBFSState) (bool, e
 	if err != nil {
 		return true, fmt.Errorf("reading imported agent %q: %w", item.importPath, err)
 	}
+	item.content = content
+	state.processedItems[item.fullPath] = item
 	if original, err := ExtractFrontmatterFromContent(string(content)); err == nil {
 		rawContent, _ := state.acc.applyImportDefaultsToContent(string(content), original.Frontmatter, item.inputs)
 		if parsed, err := ExtractFrontmatterFromContent(rawContent); err == nil {
@@ -345,6 +354,7 @@ func appendYAMLImportServices(acc *importAccumulator, importPath, servicesJSON s
 		return
 	}
 	var services map[string]any
+	//nolint:jsonunmarshalbytesconversion // Unmarshal enforces whole-document validation, including trailing data.
 	if err := json.Unmarshal([]byte(servicesJSON), &services); err != nil {
 		return
 	}

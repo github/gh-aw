@@ -79,8 +79,7 @@ func TestCompiledWorkflowGatesPackageRegistries(t *testing.T) {
 			name:              "aider without imported python runtime",
 			engine:            "aider",
 			networkBlock:      "network:\n  allowed: []",
-			expectContains:    []string{"api.openai.com"},
-			expectNotContains: registries,
+			expectNotContains: append(registries, "api.openai.com"),
 		},
 		{
 			name:              "aider explicit python opt-in",
@@ -100,16 +99,16 @@ func TestCompiledWorkflowGatesPackageRegistries(t *testing.T) {
 			name:              "mini-SWE full shared import opts into python runtime",
 			engine:            "mini-swe-agent",
 			networkBlock:      "network:\n  allowed: []",
-			expectContains:    []string{"api.githubcopilot.com", "host.docker.internal", "pypi.org", "files.pythonhosted.org"},
-			expectNotContains: []string{"registry.npmjs.org"},
+			expectContains:    []string{"host.docker.internal", "pypi.org", "files.pythonhosted.org"},
+			expectNotContains: []string{"registry.npmjs.org", "api.githubcopilot.com"},
 		},
 		{
 			name:              "mini-SWE shared import without runtime excludes registries",
 			engine:            "mini-swe-agent",
 			removeRuntime:     true,
 			networkBlock:      "network:\n  allowed: []",
-			expectContains:    []string{"api.githubcopilot.com", "host.docker.internal"},
-			expectNotContains: registries,
+			expectContains:    []string{"host.docker.internal"},
+			expectNotContains: append(registries, "api.githubcopilot.com"),
 		},
 		{
 			name:              "mini-SWE explicit python network opt-in",
@@ -204,6 +203,7 @@ func TestCompiledWorkflowGatesPackageRegistries(t *testing.T) {
 				t.Fatalf("failed to read lock file: %v", err)
 			}
 			lock := string(lockContent)
+			allowedDomains := strings.Join(extractCompiledAWFAllowedDomains(lock), "\n")
 			if tt.engine == "mini-swe-agent" {
 				var compiled struct {
 					Jobs map[string]struct {
@@ -268,15 +268,28 @@ func TestCompiledWorkflowGatesPackageRegistries(t *testing.T) {
 			}
 
 			for _, expected := range tt.expectContains {
-				if !strings.Contains(lock, expected) {
+				if !strings.Contains(allowedDomains, expected) {
 					t.Errorf("expected compiled workflow to allow %q", expected)
 				}
 			}
 			for _, unexpected := range tt.expectNotContains {
-				if strings.Contains(lock, unexpected) {
+				if strings.Contains(allowedDomains, unexpected) {
 					t.Errorf("compiled workflow must not allow %q without explicit ecosystem opt-in", unexpected)
 				}
 			}
 		})
 	}
+}
+
+func extractCompiledAWFAllowedDomains(lock string) []string {
+	lock = strings.ReplaceAll(lock, `\"`, `"`)
+	matches := regexp.MustCompile(`"allowDomains"\s*:\s*(\[[^\]]*\])`).FindAllStringSubmatch(lock, -1)
+	var domains []string
+	for _, match := range matches {
+		var current []string
+		if err := json.Unmarshal([]byte(match[1]), &current); err == nil {
+			domains = append(domains, current...)
+		}
+	}
+	return domains
 }

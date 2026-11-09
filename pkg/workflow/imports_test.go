@@ -15,6 +15,14 @@ import (
 	"github.com/github/gh-aw/pkg/workflow"
 )
 
+func compiledWorkflowBody(lock string) string {
+	lines := strings.SplitN(lock, "\n", 3)
+	if len(lines) == 3 && strings.HasPrefix(lines[0], "# gh-aw-metadata: ") && strings.HasPrefix(lines[1], "# gh-aw-manifest: ") {
+		return lines[2]
+	}
+	return lock
+}
+
 func TestCompileWorkflowWithImports(t *testing.T) {
 	// Create a temporary directory for test files
 	tempDir := testutil.TempDir(t, "test-*")
@@ -575,7 +583,7 @@ This workflow overrides the shared workflow's model with its own model: field.
 	if err != nil {
 		t.Fatalf("Failed to read lock file: %v", err)
 	}
-	lockStr := string(lockFileContent)
+	lockStr := compiledWorkflowBody(string(lockFileContent))
 
 	// Main workflow's model must win.
 	if !strings.Contains(lockStr, `GH_AW_INFO_MODEL: "openai/gpt-5.4"`) {

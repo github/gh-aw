@@ -33,10 +33,11 @@ func TestAiderNetworkRequiresPackageEcosystemOptIn(t *testing.T) {
 	engine, err := NewBehaviorDefinedEngine(loadAiderSample(t))
 	require.NoError(t, err)
 	for _, test := range []struct {
-		name     string
-		allowed  []string
-		runtimes map[string]any
-		wantPyPI bool
+		name       string
+		allowed    []string
+		runtimes   map[string]any
+		wantPyPI   bool
+		wantOpenAI bool
 	}{
 		{name: "no opt-in", allowed: []string{}},
 		{name: "explicit network opt-in", allowed: []string{"python"}, wantPyPI: true},
@@ -44,6 +45,7 @@ func TestAiderNetworkRequiresPackageEcosystemOptIn(t *testing.T) {
 			name: "explicit runtime opt-in", allowed: []string{},
 			runtimes: map[string]any{"python": map[string]any{"version": "3.12"}}, wantPyPI: true,
 		},
+		{name: "explicit provider domain opt-in", allowed: []string{"api.openai.com"}, wantOpenAI: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			domains := domainSet(t, engine.allowedDomains(&WorkflowData{
@@ -51,7 +53,11 @@ func TestAiderNetworkRequiresPackageEcosystemOptIn(t *testing.T) {
 				NetworkPermissions: &NetworkPermissions{Allowed: test.allowed},
 				Runtimes:           test.runtimes,
 			}))
-			assert.Contains(t, domains, "api.openai.com")
+			if test.wantOpenAI {
+				assert.Contains(t, domains, "api.openai.com")
+			} else {
+				assert.NotContains(t, domains, "api.openai.com")
+			}
 			for _, registry := range packageRegistryDomains {
 				allowed := false
 				for rule := range domains {
