@@ -4,6 +4,7 @@ package workflow
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -37,7 +38,7 @@ func miniSweAgentLockHash(t *testing.T) string {
 
 func miniSweAgentLockHashFor(contents []byte) string {
 	hash := sha256.Sum256(contents)
-	return fmt.Sprintf("%x", hash)
+	return hex.EncodeToString(hash[:])
 }
 
 func miniSweAgentBootstrapScript(t *testing.T) string {
