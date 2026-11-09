@@ -35,7 +35,8 @@ func requiredPromptTools(content string, tools map[string]any) []promptToolRequi
 }
 
 func hasPromptToolAlternative(line string, known map[string]promptToolRequirement) bool {
-	for _, match := range promptToolAlternative.FindAllStringIndex(line, -1) {
+	for _, indices := range promptToolAlternative.FindAllStringIndex(line, -1) {
+		match := [2]int(indices)
 		target := strings.TrimPrefix(line[match[1]:], "`")
 		if len(promptInvocationRequirements("use", target, known)) > 0 {
 			return true

@@ -1402,7 +1402,12 @@ async function main() {
   // Convert gateway output to agent-specific format
   // -----------------------------------------------------------------------
   if (process.env.GH_AW_REQUIRED_MCP_TOOLS) {
-    const required = JSON.parse(process.env.GH_AW_REQUIRED_MCP_TOOLS);
+    let required;
+    try {
+      required = JSON.parse(process.env.GH_AW_REQUIRED_MCP_TOOLS);
+    } catch {
+      throw codedError("Required-tool preflight configuration is invalid JSON", ERR_CONFIG);
+    }
     await preflightRequiredTools(gatewayOutput, required, gatewayPort || "", agentId || "", core);
   }
   core.info("Converting gateway configuration to agent format...");

@@ -271,7 +271,8 @@ func promptBareRequirements(target string, knownTools map[string]promptToolRequi
 		if len(bare) < 2 {
 			break
 		}
-		name := bare[1]
+		captures := [2]string(bare)
+		name := captures[1]
 		requirement, known := knownTools[name]
 		if !known {
 			break
