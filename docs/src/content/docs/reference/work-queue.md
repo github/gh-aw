@@ -412,7 +412,7 @@ Claim audit exports contain operations, temporary-ID references, and structured 
 
 The `safe_outputs` job exposes `work_queue_outcome`. Unverified Claims retain delivery state, effects disposition, and reconciliation reason in scoped `claim-delivery-errors.json`.
 
-When trusted queue controls are configured, `safe_outputs.outputs.work_queue_requests` contains their version-3 JSON receipt. A successful controls job can report `no_grant` with no launches; only a launch with `state: "bound"` identifies a verified native worker run. This receipt proves launch, not worker completion or Result.
+When trusted queue controls are configured, `safe_outputs.outputs.work_queue_requests` contains their version-3 JSON receipt. A successful controls job can report `no_grant` with no launches or `activation_pending` when GitHub accepted a launch but this observation has not verified its binding. A launch with `state: "activation_pending"` includes the accepted run ID and link, not binding authority; only `state: "bound"` identifies a verified native worker run. Pending activation alone does not fail controls, but it never masks a failed or uncertain sibling launch. The receipt is not automatically consumed by reconciliation and proves neither worker completion nor Result.
 
 Claim files live under `/tmp/gh-aw/claims/<original-identity-hash>/` with directory/file modes `0700`/`0600`:
 
