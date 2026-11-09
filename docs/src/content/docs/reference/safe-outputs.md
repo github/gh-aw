@@ -1469,7 +1469,7 @@ safe-outputs:
 
 Agent output: `{"noop": {"message": "No action needed: analysis complete - no issues found"}}`. Messages appear in the workflow step summary; public completion comments show the categorized outcome instead.
 
-When [`skip-if-decision`](frontmatter.md#invocation-skip-questions-skip-if-decision)
+When [`skip-if-decision`](/gh-aw/reference/frontmatter/#invocation-skip-questions-skip-if-decision)
 denies an otherwise eligible agent invocation, the harness inside AWF attempts
 to record a `noop` only when no terminal safe output exists. It preserves
 previously recorded task outputs and incomplete diagnostics; normal failure,
