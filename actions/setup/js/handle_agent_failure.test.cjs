@@ -6494,7 +6494,7 @@ describe("handle_agent_failure", () => {
       }
     });
 
-    it("explains collector-generated incompletion without assuming a prompt or infrastructure failure", () => {
+    it("distinguishes a missing terminal signal from incomplete work", () => {
       const { buildEmptyOutputOutcome } = require("./empty_output_outcome.cjs");
       const { mkdtempSync, rmSync, writeFileSync } = require("fs");
       const { tmpdir } = require("os");
@@ -6504,8 +6504,9 @@ describe("handle_agent_failure", () => {
         writeFileSync(join(rootDir, "agent-session.jsonl"), JSON.stringify({ type: "tool.execution_start", data: { toolName: "read", toolCallId: "last", input: { path: "private-path" } } }));
         const outcome = buildEmptyOutputOutcome([], rootDir);
         const result = buildReportIncompleteContext([outcome], { collectorEmptyOutputCause: outcome.reason, rootDir });
-        expect(result).toContain("The workflow recorded a `report_incomplete` signal");
-        expect(result).toContain("completion could not be confirmed");
+        expect(result).toContain("Completion Signal Missing");
+        expect(result).toContain("not evidence that the requested work was incomplete");
+        expect(result).not.toContain("Task Could Not Be Completed");
         expect(result).toContain("missing_terminal_safe_output");
         expect(result).toContain("Failure classification: missing_terminal_safe_output");
         expect(result).not.toContain("Reported reason (agent-declared, unverified)");
