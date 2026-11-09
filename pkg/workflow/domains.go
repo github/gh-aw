@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"net/url"
 	"sort"
 	"strings"
 	"sync"
@@ -880,7 +881,7 @@ func (c *Compiler) computeAllowedDomainsForFirewall(data *WorkflowData) (string,
 		}
 	}
 
-	_, err := validateDomainEngineModel(data)
+	engineID, err := validateDomainEngineModel(data)
 	if err != nil {
 		return "", err
 	}
@@ -898,7 +899,7 @@ func (c *Compiler) computeAllowedDomainsForFirewall(data *WorkflowData) (string,
 
 	// Preserve explicit custom-target egress, but never infer agent access from
 	// the default Gemini proxy upstream.
-	if geminiAPITarget := extractAPITargetHost(data, "GEMINI_API_BASE_URL"); geminiAPITarget != "" {
+	if geminiAPITarget := explicitGeminiAPITargetHost(data, engineID); geminiAPITarget != "" {
 		base = mergeAPITargetDomains(base, geminiAPITarget)
 	}
 
@@ -917,6 +918,33 @@ func (c *Compiler) computeAllowedDomainsForFirewall(data *WorkflowData) (string,
 	}
 
 	return base, nil
+}
+
+func explicitGeminiAPITargetHost(data *WorkflowData, engineID string) string {
+	if data == nil || data.EngineConfig == nil || data.EngineConfig.Env == nil {
+		return ""
+	}
+
+	envVars := []string{"GEMINI_API_BASE_URL"}
+	if engineID == string(constants.AgyEngine) {
+		envVars = append([]string{"GOOGLE_GEMINI_BASE_URL"}, envVars...)
+	}
+
+	for _, envVar := range envVars {
+		baseURL := data.EngineConfig.Env[envVar]
+		if baseURL == "" {
+			continue
+		}
+		if !strings.Contains(baseURL, "://") {
+			baseURL = "//" + baseURL
+		}
+		parsedURL, err := url.Parse(baseURL)
+		if err == nil && parsedURL.Hostname() != "" {
+			return parsedURL.Hostname()
+		}
+	}
+
+	return ""
 }
 
 func validateDomainEngineModel(data *WorkflowData) (string, error) {

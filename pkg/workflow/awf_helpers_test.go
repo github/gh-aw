@@ -1396,3 +1396,32 @@ func TestGeminiProxyTargetDoesNotGrantAgentEgress(t *testing.T) {
 		})
 	}
 }
+
+func TestAgyCustomGeminiTargetIsAllowedWithoutDefaultUpstream(t *testing.T) {
+	const customTarget = "gemini-proxy.example.com"
+	compiler := NewCompiler()
+	data := &WorkflowData{
+		AI: "agy",
+		EngineConfig: &EngineConfig{
+			ID: "agy",
+			Env: map[string]string{
+				"GOOGLE_GEMINI_BASE_URL": "https://" + customTarget + "/api",
+			},
+		},
+		NetworkPermissions: &NetworkPermissions{
+			Firewall: &FirewallConfig{Enabled: true},
+		},
+	}
+
+	sanitizationDomains, err := compiler.computeAllowedDomainsForSanitization(data)
+	require.NoError(t, err)
+	assert.Contains(t, splitDomainList(sanitizationDomains), customTarget)
+	assert.Contains(t, splitDomainList(data.CachedAllowedDomainsStr), customTarget)
+	assert.NotContains(t, splitDomainList(data.CachedAllowedDomainsStr), DefaultGeminiAPITarget)
+
+	steps := NewAgyEngine().GetExecutionSteps(data, "test.log")
+	require.Len(t, steps, 1)
+	stepContent := strings.Join(steps[0], "\n")
+	assert.Contains(t, stepContent, customTarget)
+	assert.NotContains(t, stepContent, DefaultGeminiAPITarget)
+}
