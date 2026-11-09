@@ -27,6 +27,85 @@ func loadMiniSweAgentSample(t *testing.T) *EngineDefinition {
 	return &frontmatter.Engine
 }
 
+func miniSweAgentBootstrapScript(t *testing.T) string {
+	t.Helper()
+	var frontmatter struct {
+		Steps []struct {
+			Run string `yaml:"run"`
+		} `yaml:"pre-agent-steps"`
+	}
+	readConformanceFrontmatter(t, "../../.github/workflows/shared/mini-swe-agent.md", &frontmatter)
+	require.Len(t, frontmatter.Steps, 1)
+	run := frontmatter.Steps[0].Run
+	require.True(t, strings.HasPrefix(run, "python3 -I - <<'PY'\n"))
+	require.True(t, strings.HasSuffix(run, "\nPY\n"))
+	return strings.TrimSuffix(strings.TrimPrefix(run, "python3 -I - <<'PY'\n"), "\nPY\n")
+}
+
+func miniSweAgentBootstrapCommand(t *testing.T, dir string) *exec.Cmd {
+	t.Helper()
+	script := filepath.Join(dir, "bootstrap.py")
+	require.NoError(t, os.WriteFile(script, []byte(miniSweAgentBootstrapScript(t)), 0o600))
+	cmd := exec.Command("python3", "-I", "-c", miniSweAgentBootstrapStubs, script)
+	cmd.Env = append(os.Environ(), "GH_AW_ENGINE_VERSION="+loadMiniSweAgentSample(t).Version,
+		"GH_AW_MINI_DEPS="+filepath.Join(dir, "dependencies"))
+	return cmd
+}
+
+func stageMiniSweAgentTestLock(t *testing.T, dir string) {
+	t.Helper()
+	output, err := miniSweAgentBootstrapCommand(t, dir).CombinedOutput()
+	require.NoError(t, err, "%s", output)
+	assert.Contains(t, string(output), "Hash-locked wheel staging verified")
+}
+
+func TestMiniSweAgentBootstrap(t *testing.T) {
+	stageMiniSweAgentTestLock(t, t.TempDir())
+	for _, test := range []struct{ name, env, message string }{
+		{"unlocked version", "GH_AW_ENGINE_VERSION=0.0.0", "version must match the dependency lock"},
+		{"wrong Python", "MINI_TEST_PYTHON=3.11", "requires Linux x86-64 and Python 3.12"},
+		{"wrong platform", "MINI_TEST_PLATFORM=darwin", "requires Linux x86-64 and Python 3.12"},
+		{"wrong architecture", "MINI_TEST_ARCH=aarch64", "requires Linux x86-64 and Python 3.12"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cmd := miniSweAgentBootstrapCommand(t, t.TempDir())
+			cmd.Env = append(cmd.Env, test.env)
+			output, err := cmd.CombinedOutput()
+			require.Error(t, err)
+			assert.Contains(t, string(output), test.message)
+		})
+	}
+}
+
+const miniSweAgentBootstrapStubs = `
+import os
+import sys
+from pathlib import Path
+from unittest.mock import patch
+
+with (
+    patch("subprocess.run") as download,
+    patch("sys.version_info", tuple(map(int, os.environ.get("MINI_TEST_PYTHON", "3.12").split(".")))),
+    patch("sys.platform", os.environ.get("MINI_TEST_PLATFORM", "linux")),
+    patch("platform.machine", return_value=os.environ.get("MINI_TEST_ARCH", "x86_64")),
+):
+    exec(compile(Path(sys.argv[1]).read_text(), sys.argv[1], "exec"))
+    dependencies = Path(os.environ["GH_AW_MINI_DEPS"])
+    lock = dependencies / "requirements.lock"
+    download.assert_called_once_with([
+        sys.executable, "-I", "-m", "pip", "download", "--quiet",
+        "--isolated", "--disable-pip-version-check", "--only-binary=:all:",
+        "--require-hashes", "--dest", str(dependencies / "wheels"),
+        "--requirement", str(lock),
+    ], check=True)
+    requirements = lock.read_text().strip().splitlines()
+    assert len(requirements) > 80
+    assert all("==" in line and " --hash=sha256:" in line for line in requirements)
+    assert not list(dependencies.glob("*.dist-info"))
+    assert sys.flags.isolated
+    print("Hash-locked wheel staging verified")
+`
+
 func TestMiniSweAgentSampleExecution(t *testing.T) {
 	def := loadMiniSweAgentSample(t)
 	engine, err := NewBehaviorDefinedEngine(def)
@@ -179,6 +258,7 @@ func TestMiniSweAgentPythonExecution(t *testing.T) {
 	for _, status := range []string{"Submitted", "LimitsExceeded", "unknown"} {
 		t.Run(status, func(t *testing.T) {
 			dir := t.TempDir()
+			stageMiniSweAgentTestLock(t, dir)
 			prompt := filepath.Join(dir, "prompt with spaces.md")
 			require.NoError(t, os.WriteFile(prompt, []byte("literal task --- with file-based input"), 0o600))
 			script := filepath.Join(dir, "mini.py")
@@ -252,7 +332,7 @@ with (
     install.assert_called_once_with([
         sys.executable, "-I", "-m", "pip", "install", "--quiet",
         "--isolated", "--disable-pip-version-check", "--only-binary=:all:",
-        "--require-hashes",
+        "--require-hashes", "--no-index", "--find-links", str(Path(os.environ["GH_AW_MINI_DEPS"]) / "wheels"),
         "--target", os.environ["GH_AW_MINI_DEPS"],
         "--requirement", str(Path(os.environ["GH_AW_MINI_DEPS"]) / "requirements.lock"),
     ], check=True)
@@ -323,11 +403,59 @@ func TestMiniSweAgentHarnessEnvironment(t *testing.T) {
 
 func TestMiniSweAgentPythonRejectsUnlockedVersion(t *testing.T) {
 	def := loadMiniSweAgentSample(t)
-	cmd := miniSweAgentHarnessCommand(t, t.TempDir(), append([]string{"python3"}, def.Behaviors.Execution.Args...)...)
-	cmd.Env = append(cmd.Env, "GH_AW_ENGINE_VERSION=0.0.0")
+	dir := t.TempDir()
+	stageMiniSweAgentTestLock(t, dir)
+	cmd := miniSweAgentHarnessCommand(t, dir, append([]string{"python3"}, def.Behaviors.Execution.Args...)...)
+	cmd.Env = append(cmd.Env, "GH_AW_ENGINE_VERSION=0.0.0", "GH_AW_MINI_DEPS="+filepath.Join(dir, "dependencies"))
 	output, err := cmd.CombinedOutput()
 	require.Error(t, err)
 	assert.Contains(t, string(output), "version must match the dependency lock")
+}
+
+func TestMiniSweAgentPythonRequiresStagedLock(t *testing.T) {
+	def := loadMiniSweAgentSample(t)
+	dir := t.TempDir()
+	cmd := miniSweAgentHarnessCommand(t, dir, append([]string{"python3"}, def.Behaviors.Execution.Args...)...)
+	cmd.Env = append(cmd.Env, "GH_AW_ENGINE_VERSION="+def.Version, "GH_AW_MINI_DEPS="+filepath.Join(dir, "dependencies"))
+	output, err := cmd.CombinedOutput()
+	require.Error(t, err)
+	assert.Contains(t, string(output), "requirements.lock")
+	assert.NotContains(t, string(output), "mini-SWE-agent exit status")
+}
+
+func TestMiniSweAgentPythonRejectsTamperedWheel(t *testing.T) {
+	if err := exec.Command("python3", "-I", "-c",
+		`import platform, sys; sys.exit(0 if sys.version_info[:2] == (3, 12) and sys.platform == "linux" and platform.machine() == "x86_64" else 1)`).Run(); err != nil {
+		t.Skip("Linux x86-64 and Python 3.12 are required for the offline hash-verification test")
+	}
+	if err := exec.Command("python3", "-I", "-m", "pip", "--version").Run(); err != nil {
+		t.Skip("isolated pip is required for the offline hash-verification test")
+	}
+	def := loadMiniSweAgentSample(t)
+	dir := t.TempDir()
+	stageMiniSweAgentTestLock(t, dir)
+	dependencies := filepath.Join(dir, "dependencies")
+	lock := filepath.Join(dependencies, "requirements.lock")
+	requirements, err := os.ReadFile(lock)
+	require.NoError(t, err)
+	var miniRequirement string
+	for line := range strings.SplitSeq(string(requirements), "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "mini-swe-agent==") {
+			miniRequirement = strings.TrimSpace(line)
+		}
+	}
+	require.NotEmpty(t, miniRequirement)
+	require.NoError(t, os.WriteFile(lock, []byte(miniRequirement+"\n"), 0o600))
+	wheels := filepath.Join(dependencies, "wheels")
+	require.NoError(t, os.MkdirAll(wheels, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(wheels, "mini_swe_agent-"+def.Version+"-py3-none-any.whl"),
+		[]byte("tampered wheel"), 0o600))
+	cmd := miniSweAgentHarnessCommand(t, dir, append([]string{"python3"}, def.Behaviors.Execution.Args...)...)
+	cmd.Env = append(cmd.Env, "GH_AW_ENGINE_VERSION="+def.Version, "GH_AW_MINI_DEPS="+dependencies)
+	output, err := cmd.CombinedOutput()
+	require.Error(t, err)
+	assert.Contains(t, string(output), "DO NOT MATCH THE HASHES")
+	assert.NotContains(t, string(output), "mini-SWE-agent exit status")
 }
 
 func TestMiniSweAgentPinnedPackageSmoke(t *testing.T) {
@@ -336,6 +464,11 @@ func TestMiniSweAgentPinnedPackageSmoke(t *testing.T) {
 	}
 	dir := t.TempDir()
 	def := loadMiniSweAgentSample(t)
+	bootstrap := exec.Command("python3", "-I", "-c", miniSweAgentBootstrapScript(t))
+	bootstrap.Env = append(os.Environ(), "GH_AW_ENGINE_VERSION="+def.Version,
+		"GH_AW_MINI_DEPS="+filepath.Join(dir, "dependencies"))
+	bootstrapOutput, bootstrapErr := bootstrap.CombinedOutput()
+	require.NoError(t, bootstrapErr, "%s", bootstrapOutput)
 	prompt := "Local mini-SWE-agent smoke: print MINI_LOCAL_SMOKE and submit."
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "prompt with spaces.md"), []byte(prompt), 0o600))
 	var mu sync.Mutex
