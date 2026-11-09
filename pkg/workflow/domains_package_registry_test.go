@@ -143,9 +143,8 @@ type engineEcosystemDomainOverlap struct {
 
 func engineDefaultEcosystemOverlaps(ecosystems, defaults map[string][]string) []engineEcosystemDomainOverlap {
 	// These categories describe shared transport or vendor services rather than
-	// gated package ecosystems. Mini-SWE-agent installs its Python package inside
-	// AWF, so its PyPI access is an explicit exception. Chrome's broad Google
-	// vendor rules also cover Gemini's inference API.
+	// gated package ecosystems. Chrome's broad Google vendor rules also cover
+	// Gemini's inference API.
 	excludedEcosystems := []string{
 		"chrome", "codex-vendor", "copilot-vendor", "defaults", "dev-tools",
 		"fonts", "gh-aw", "github", "github-actions", "local", "threat-detection",
@@ -164,12 +163,6 @@ func engineDefaultEcosystemOverlaps(ecosystems, defaults map[string][]string) []
 					}
 					if engine == "threat-detection" && rule == "registry.npmjs.org" {
 						continue // Detection intentionally permits read-only npm lockfile validation.
-					}
-					if (engine == "mini-swe-agent" || strings.HasSuffix(engine, "mini-swe-agent.md/defaults")) &&
-						(ecosystem == "python" || ecosystem == "python-native") &&
-						((rule == "pypi.org" && domain == "pypi.org") ||
-							(rule == "files.pythonhosted.org" && (domain == "files.pythonhosted.org" || domain == "*.pythonhosted.org"))) {
-						continue
 					}
 					if awfDomainRulesOverlap(rule, domain) {
 						overlaps = append(overlaps, engineEcosystemDomainOverlap{engine, rule, ecosystem, domain})
@@ -244,6 +237,10 @@ func TestEngineDefaultEcosystemOverlapGuard(t *testing.T) {
 		{"copilot", "registry.npmjs.org", "node", "registry.npmjs.org"},
 		{"copilot", "*.github.com", "node", "npm.pkg.github.com"},
 		{"threat-detection", "*.github.com", "node", "npm.pkg.github.com"},
+		{"mini-swe-agent", "pypi.org", "python", "pypi.org"},
+		{"mini-swe-agent", "files.pythonhosted.org", "python", "files.pythonhosted.org"},
+		{"shared/mini-swe-agent.md/defaults", "pypi.org", "python-native", "pypi.org"},
+		{"shared/mini-swe-agent.md/defaults", "files.pythonhosted.org", "python-native", "*.pythonhosted.org"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.engine+"/"+tt.rule, func(t *testing.T) {
@@ -266,7 +263,6 @@ func TestEngineDefaultEcosystemOverlapGuard(t *testing.T) {
 	t.Run("exact exceptions remain allowed", func(t *testing.T) {
 		defaults := map[string][]string{
 			"copilot":          {"github.com"},
-			"mini-swe-agent":   {"pypi.org", "files.pythonhosted.org"},
 			"threat-detection": {"github.com", "registry.npmjs.org"},
 		}
 		assert.Empty(t, engineDefaultEcosystemOverlaps(getLoadedDomainSets().Ecosystems, defaults))

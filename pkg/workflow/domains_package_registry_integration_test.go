@@ -3,8 +3,10 @@
 package workflow_test
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -24,6 +26,7 @@ func TestCompiledWorkflowGatesPackageRegistries(t *testing.T) {
 	tests := []struct {
 		name              string
 		engine            string
+		removeRuntime     bool
 		networkBlock      string
 		expectContains    []string
 		expectNotContains []string
@@ -93,6 +96,37 @@ func TestCompiledWorkflowGatesPackageRegistries(t *testing.T) {
 			expectContains:    []string{"pypi.org", "files.pythonhosted.org"},
 			expectNotContains: []string{"registry.npmjs.org"},
 		},
+		{
+			name:              "mini-SWE full shared import opts into python runtime",
+			engine:            "mini-swe-agent",
+			networkBlock:      "network:\n  allowed: []",
+			expectContains:    []string{"api.githubcopilot.com", "host.docker.internal", "pypi.org", "files.pythonhosted.org"},
+			expectNotContains: []string{"registry.npmjs.org"},
+		},
+		{
+			name:              "mini-SWE shared import without runtime excludes registries",
+			engine:            "mini-swe-agent",
+			removeRuntime:     true,
+			networkBlock:      "network:\n  allowed: []",
+			expectContains:    []string{"api.githubcopilot.com", "host.docker.internal"},
+			expectNotContains: registries,
+		},
+		{
+			name:              "mini-SWE explicit python network opt-in",
+			engine:            "mini-swe-agent",
+			removeRuntime:     true,
+			networkBlock:      "network:\n  allowed:\n    - python",
+			expectContains:    []string{"pypi.org", "files.pythonhosted.org"},
+			expectNotContains: []string{"registry.npmjs.org"},
+		},
+		{
+			name:              "mini-SWE caller python runtime opt-in",
+			engine:            "mini-swe-agent",
+			removeRuntime:     true,
+			networkBlock:      "network:\n  allowed: []\nruntimes:\n  python:\n    version: \"3.12\"",
+			expectContains:    []string{"pypi.org", "files.pythonhosted.org"},
+			expectNotContains: []string{"registry.npmjs.org"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -126,6 +160,34 @@ func TestCompiledWorkflowGatesPackageRegistries(t *testing.T) {
 				}
 				engineBlock = "engine:\n  id: aider\nmodel: openai/gpt-5\nimports:\n  - engine.md\n"
 			}
+			if tt.engine == "mini-swe-agent" {
+				source, err := os.ReadFile("../../.github/workflows/shared/mini-swe-agent.md")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if tt.removeRuntime {
+					parts := strings.SplitN(string(source), "---", 3)
+					if len(parts) != 3 {
+						t.Fatal("shared mini-SWE workflow has invalid frontmatter")
+					}
+					var frontmatter map[string]any
+					if err := yaml.Unmarshal([]byte(parts[1]), &frontmatter); err != nil {
+						t.Fatal(err)
+					}
+					// Preserve bootstrap steps and environment exclusions; only remove
+					// the imported runtime's explicit network capability.
+					delete(frontmatter, "runtimes")
+					frontmatterYAML, err := yaml.Marshal(frontmatter)
+					if err != nil {
+						t.Fatal(err)
+					}
+					source = []byte("---\n" + string(frontmatterYAML) + "---\n" + parts[2])
+				}
+				if err := os.WriteFile(filepath.Join(tempDir, "engine.md"), source, 0600); err != nil {
+					t.Fatal(err)
+				}
+				engineBlock = "engine:\n  id: mini-swe-agent\nmodel: copilot/claude-haiku-5.5\nimports:\n  - engine.md\n"
+			}
 			content := "---\non: issues\npermissions:\n  contents: read\n" + engineBlock +
 				"strict: false\n" + tt.networkBlock + "\n---\n\n# Registry Gate Test\n\nDo nothing.\n"
 			if err := os.WriteFile(workflowPath, []byte(content), 0644); err != nil {
@@ -142,6 +204,68 @@ func TestCompiledWorkflowGatesPackageRegistries(t *testing.T) {
 				t.Fatalf("failed to read lock file: %v", err)
 			}
 			lock := string(lockContent)
+			if tt.engine == "mini-swe-agent" {
+				var compiled struct {
+					Jobs map[string]struct {
+						Env   map[string]string `yaml:"env"`
+						Steps []struct {
+							Name string `yaml:"name"`
+							Run  string `yaml:"run"`
+						} `yaml:"steps"`
+					} `yaml:"jobs"`
+				}
+				if err := yaml.Unmarshal(lockContent, &compiled); err != nil {
+					t.Fatal(err)
+				}
+				var agentRun, bootstrapRun string
+				bootstrapIndex, executionIndex := -1, -1
+				for _, job := range compiled.Jobs {
+					for index, step := range job.Steps {
+						switch step.Name {
+						case "Stage hash-locked mini-SWE-agent wheels":
+							bootstrapRun, bootstrapIndex = step.Run, index
+							if job.Env["GH_AW_ENGINE_VERSION"] != "2.4.6" {
+								t.Errorf("bootstrap must receive the pinned engine version, got %q", job.Env["GH_AW_ENGINE_VERSION"])
+							}
+						case "Execute mini-SWE-agent":
+							agentRun, executionIndex = step.Run, index
+						}
+					}
+				}
+				if bootstrapIndex < 0 || executionIndex <= bootstrapIndex {
+					t.Fatal("trusted wheel staging must precede AWF agent execution")
+				}
+				if strings.Contains(bootstrapRun, "awf ") || !strings.Contains(bootstrapRun, `"pip", "download"`) {
+					t.Fatal("wheel downloads must run in the trusted bootstrap, outside AWF")
+				}
+				if !strings.Contains(agentRun, "--no-index") || !strings.Contains(agentRun, "--require-hashes") {
+					t.Fatal("agent dependency installation must be offline and hash verified")
+				}
+				// Assert emitted AWF rules, not incidental mentions in scripts/docs.
+				agentRun = strings.ReplaceAll(agentRun, `\"`, `"`)
+				matches := regexp.MustCompile(`"allowDomains":(\[[^]]*\])`).FindAllStringSubmatch(agentRun, -1)
+				if len(matches) != 1 {
+					t.Fatalf("expected one agent AWF allow-list, got %d", len(matches))
+				}
+				var rules []string
+				if err := json.Unmarshal([]byte(matches[0][1]), &rules); err != nil {
+					t.Fatal(err)
+				}
+				for _, expected := range tt.expectContains {
+					if !strings.Contains(","+strings.Join(rules, ",")+",", ","+expected+",") {
+						t.Errorf("expected AWF allow-list to contain %q: %v", expected, rules)
+					}
+				}
+				for _, unexpected := range tt.expectNotContains {
+					for _, rule := range rules {
+						suffix := strings.TrimPrefix(rule, "*.")
+						if unexpected == suffix || strings.HasSuffix(unexpected, "."+suffix) {
+							t.Errorf("AWF rule %q must not allow registry %q", rule, unexpected)
+						}
+					}
+				}
+				return
+			}
 
 			for _, expected := range tt.expectContains {
 				if !strings.Contains(lock, expected) {

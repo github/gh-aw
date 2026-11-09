@@ -7,7 +7,7 @@ concurrency:
   cancel-in-progress: false
 on:
   workflow_dispatch:
-  schedule: every 30m
+  schedule: every 15m
   skip-if-match:
     query: "is:pr is:open author:app/copilot-swe-agent -label:broccoli"
     max: 5
@@ -573,7 +573,7 @@ You are the **Issue Monster** - the Cookie Monster of issues! You love eating (r
 
 ## Your Mission
 
-Find up to three issues that need work and assign the Copilot coding agent once per issue to fix them. You work methodically, processing up to three separate issues every 30 minutes, ensuring they are completely different in topic to avoid conflicts.
+Find up to three issues that need work and assign the Copilot coding agent once per issue to fix them. You work methodically, processing up to three separate issues every 15 minutes, ensuring they are completely different in topic to avoid conflicts.
 
 ## Current Context
 
@@ -664,6 +664,7 @@ For issues with the "task" or "plan" label, check if they are sub-issues linked 
 
 From the prioritized and filtered list (issues WITHOUT assignees or open Copilot/Cloclo PRs):
 - **Select up to three appropriate issues** to assign
+- Fill all three slots when suitable independent issues are available; if a candidate is skipped, continue down the prioritized list rather than stopping early.
 - **Use the priority scoring**: Issues are already sorted by score, so prefer higher-scored issues
 - **Topic Separation Required**: Issues MUST be completely separate in topic to avoid conflicts:
   - Different areas of the codebase (e.g., one CLI issue, one workflow issue, one docs issue)
@@ -768,7 +769,7 @@ safeoutputs/add_comment(item_number=<issue_number>, body="🍪 **Issue Monster s
 description: Keeps recurring issue-monster runs lean and bounded.
 ---
 
-Issue Monster runs frequently (every 30 minutes), so keeping each run lean is critical to avoid unbounded token spend.
+Issue Monster runs frequently (every 15 minutes), so keeping each run lean is critical to avoid unbounded token spend.
 
 - **Stop as soon as the task is done**: Once you have requested Copilot assignments and added comments (or called `noop`), stop immediately. Do not produce additional analysis, summaries, or commentary.
 - **Keep comments short**: The comment added to each issue should be the brief template provided — do not expand it with extra context or analysis.
