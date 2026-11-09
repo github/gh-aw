@@ -48,21 +48,17 @@ func run(pass *analysis.Pass) (any, error) {
 		if filecheck.ShouldSkipFilename(pass.Fset.Position(call.Pos()).Filename, generatedFiles) {
 			return
 		}
-		sel, ok := call.Fun.(*ast.SelectorExpr)
-		if !ok {
-			return
-		}
-		if !astutil.IsPkgSelector(pass, sel, "log") {
-			return
-		}
-		if !rawLogFuncs[sel.Sel.Name] {
+		// PackageCall sees through parentheses such as (log.Printf)("x") and
+		// resolves dot-imported calls, which a bare SelectorExpr check misses.
+		callPkg, funcName, ok := astutil.PackageCall(pass, call)
+		if !ok || callPkg != "log" || !rawLogFuncs[funcName] {
 			return
 		}
 		position := pass.Fset.PositionFor(call.Pos(), false)
 		if nolint.HasDirectiveForLinter(position, noLintIndex, "rawloginlib") {
 			return
 		}
-		pkgLog.Printf("flagging log.%s call at %s", sel.Sel.Name, position)
-		pass.ReportRangef(call, "log.%s called in library package %s; use pkg/logger instead", sel.Sel.Name, pkgPath)
+		pkgLog.Printf("flagging log.%s call at %s", funcName, position)
+		pass.ReportRangef(call, "log.%s called in library package %s; use pkg/logger instead", funcName, pkgPath)
 	})
 }

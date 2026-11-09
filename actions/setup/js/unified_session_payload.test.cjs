@@ -19,8 +19,154 @@ import { dynamicWorkflow } from "./fixtures/claude_dynamic_workflow.cjs";
 import { DYNAMIC_WORKFLOW_EVENT_TYPES } from "./dynamic_workflow_session.cjs";
 import { failure as claudeFailures } from "./fixtures/claude_ci_sessions.cjs";
 import { createSessionLookups } from "./grader_session.cjs";
+import { sessionTimestampNs } from "./unified_session_order.cjs";
 
 describe("essential unified session payloads", () => {
+  it.each([false, { value: 0 }, "yesterday", "2026-02-30T00:00:00Z", Infinity, NaN])("falls back from an invalid native clock to a valid archived message clock %j", timestamp => {
+    for (const archivedTimestamp of [0, 1.25, "2026-11-09T00:27:23.729123456Z"]) {
+      const original = {
+        type: "tool.execution_complete",
+        message: { timestamp },
+        data: {
+          toolCallId: "call",
+          messageId: "message",
+          model: "served-model",
+          structuredContent: { nested: [false, 0, null] },
+          messageMetadata: { timestamp: archivedTimestamp, private: "OMITTED_NATIVE_CONTEXT" },
+        },
+      };
+      const snapshot = structuredClone(original);
+      const projected = normalizeUnifiedSessionEvent(original);
+      expect(projected.timestamp).toBe(archivedTimestamp);
+      expect(sessionTimestampNs(projected)).toBe(sessionTimestampNs({ timestamp: archivedTimestamp }));
+      expect(normalizeUnifiedSessionEvent(projected)).toEqual(projected);
+      const [unified] = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-session.jsonl", events: [original] }]);
+      const published = JSON.parse(serializeSessionArtifact([unified]).trim());
+      expect(published).toMatchObject({ timestamp: archivedTimestamp, data: { toolCallId: "call", messageId: "message", model: "served-model", structuredContent: original.data.structuredContent } });
+      expect(JSON.stringify(published)).not.toContain("OMITTED_NATIVE_CONTEXT");
+      expect(createSessionValidator("unified").event(published)).toBe(true);
+      expect(original).toEqual(snapshot);
+    }
+  });
+
+  it.each(["yesterday", "2026-11-09T00:27:23.729", "2026-02-30T00:00:00Z", 8640000000000001, Infinity, { value: 0 }])("does not promote invalid native or archived message clocks %j", timestamp => {
+    for (const original of [
+      { type: "tool.execution_start", data: { toolCallId: "call", messageMetadata: { timestamp } } },
+      { type: "assistant.message", data: { content: "untimed" }, message: { role: "assistant", content: "untimed", timestamp } },
+    ]) {
+      const snapshot = structuredClone(original);
+      const projected = normalizeUnifiedSessionEvent(original);
+      expect(sessionTimestampNs(original)).toBeUndefined();
+      expect(projected).not.toHaveProperty("timestamp");
+      expect(sessionTimestampNs(projected)).toBeUndefined();
+      expect(normalizeUnifiedSessionEvent(projected)).toEqual(projected);
+      const [unified] = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-session.jsonl", events: [original] }]);
+      expect(unified).not.toHaveProperty("timestamp");
+      expect(unified.provenance).not.toHaveProperty("timestampMs");
+      expect(createSessionValidator("unified").event(unified)).toBe(true);
+      expect(original).toEqual(snapshot);
+    }
+  });
+
+  it.each(["tool.execution_start", "tool.execution_update", "tool.execution_complete"])("retains tool/message correlation without publishing native envelopes (%s)", type => {
+    const original = {
+      type,
+      data: {
+        toolCallId: "call",
+        message_id: "message",
+        model: "served-model",
+        messageMetadata: { timestamp: 0, api: "fixture-api", usage: { input: 10 }, private: "OMITTED_NATIVE_CONTEXT" },
+      },
+    };
+    const projected = normalizeUnifiedSessionEvent(original);
+    expect(projected).toEqual({ type, timestamp: 0, data: { toolCallId: "call", messageId: "message", model: "served-model" } });
+    expect(normalizeUnifiedSessionEvent(projected)).toEqual(projected);
+    const [unified] = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-session.jsonl", events: [original] }]);
+    expect(createSessionValidator("unified").event(unified)).toBe(true);
+    expect(JSON.stringify(unified)).not.toContain("OMITTED_NATIVE_CONTEXT");
+    expect(original.data.messageMetadata.usage).toEqual({ input: 10 });
+  });
+
+  it("retains structured content together with tool correlation and the archived Pi message clock", () => {
+    const structuredContent = { stdout: 'line\n"quoted"\\path \u2603', nested: [false, 0, null, ""] };
+    const original = {
+      type: "tool.execution_complete",
+      data: {
+        toolCallId: "call",
+        messageId: "response",
+        model: "served-model",
+        output: [],
+        structuredContent,
+        messageMetadata: { timestamp: 1794184043729, private: "OMITTED_NATIVE_CONTEXT" },
+      },
+    };
+    const snapshot = structuredClone(original);
+    const [unified] = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-session.jsonl", events: [original] }]);
+    const published = JSON.parse(serializeSessionArtifact([unified]).trim());
+    expect(published).toMatchObject({
+      timestamp: 1794184043729,
+      provenance: { timestampMs: 1794184043729 },
+      data: { toolCallId: "call", messageId: "response", model: "served-model", output: [], structuredContent },
+    });
+    expect(published.data).not.toHaveProperty("messageMetadata");
+    expect(normalizeUnifiedSessionEvent(unified)).toEqual(normalizeUnifiedSessionEvent(published));
+    expect(createSessionValidator("unified").event(published)).toBe(true);
+    expect(original).toEqual(snapshot);
+  });
+
+  it.each([null, false, 0, "", [], {}, { stdout: 'line\n"quoted"\\path \u2603', stderr: "", exit_code: 0, nested: [false, 0, null, ""] }])(
+    "retains explicitly supplied structured tool content %j without restoring provider envelopes",
+    structuredContent => {
+      const event = {
+        type: "tool.execution_complete",
+        id: "completion",
+        data: {
+          toolCallId: "shell",
+          success: false,
+          output: [],
+          structuredContent,
+          nativeEnvelope: { omitted: true },
+        },
+      };
+      const original = structuredClone(event);
+      const projected = normalizeUnifiedSessionEvent(event);
+      expect(projected).toEqual({ type: event.type, id: event.id, data: { toolCallId: "shell", success: false, output: [], structuredContent } });
+      expect(normalizeUnifiedSessionEvent(projected)).toEqual(projected);
+      expect(event).toEqual(original);
+      const [unified] = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-session.jsonl", events: [event] }]);
+      const published = JSON.parse(serializeSessionArtifact([unified]).trim());
+      expect(published.data.structuredContent).toEqual(structuredContent);
+      const validate = createSessionValidator("unified").event;
+      expect(validate(published), JSON.stringify(validate.errors)).toBe(true);
+    }
+  );
+
+  it("does not invent structured tool content or retain it in compact RPC observations", () => {
+    expect(normalizeUnifiedSessionEvent({ type: "tool.execution_complete", data: { output: [] } }).data).toEqual({ output: [] });
+    const rpc = normalizeUnifiedSessionEvent({
+      type: "mcp.rpc.response",
+      data: { id: 1, result: { structuredContent: { omitted: true }, content: [{ type: "text", text: "omitted" }] } },
+    });
+    expect(JSON.stringify(rpc)).not.toContain("structuredContent");
+    expect(JSON.stringify(rpc)).not.toContain("omitted");
+  });
+
+  it("redacts structured tool payload values and keys without rejecting them as structural metadata", () => {
+    const event = {
+      type: "tool.execution_complete",
+      data: {
+        toolCallId: "shell",
+        structuredContent: { stdout: "SANITIZED_MASK\n", stderr: "", exit_code: 0, nested: { SANITIZED_MASK: "SANITIZED_MASK" } },
+      },
+    };
+    for (const events of [[event], mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-session.jsonl", events: [event] }])]) {
+      const serialized = serializeSessionArtifact(events, ["SANITIZED_MASK"], { rejectStructuralRedaction: true });
+      expect(serialized).not.toContain("SANITIZED_MASK");
+      expect(JSON.parse(serialized.trim()).data.structuredContent).toEqual({ stdout: "***\n", stderr: "", exit_code: 0, nested: { "***": "***" } });
+    }
+    expect(() => serializeSessionArtifact([{ ...event, id: "SANITIZED_MASK" }], ["SANITIZED_MASK"], { rejectStructuralRedaction: true })).toThrow("Session redaction changed structural fields");
+  });
+
   it("preserves observed Codex reconnect progress separately from harness attempts", () => {
     const native = parseEngineSession("Reconnecting... 2/5 (connection interrupted)\n", "codex").find(event => event.type === "session.result");
     expect(native).toMatchObject({ reconnectAttempt: 2, maxReconnects: 5 });

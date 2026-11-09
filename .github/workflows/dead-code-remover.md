@@ -14,6 +14,14 @@ engine:
   id: copilot
   copilot-sdk: true
   bare: true
+skip-if-decision:
+  - >-
+    Do @/tmp/gh-aw/agent/dead-code-analysis-status.json,
+    @/tmp/gh-aw/agent/dead-code-analysis.txt, and
+    @/tmp/gh-aw/agent/dead-code-analysis-errors.txt conclusively establish
+    that successful analysis of both ./cmd/... and ./internal/tools/... found
+    no unreachable functions eligible for removal? Abstain if analysis failed,
+    coverage is incomplete, or any candidate still needs caller or WASM checks.
 max-tool-denials: 3
 imports:
   - uses: shared/skip-if-issue-open.md
@@ -47,10 +55,27 @@ timeout-minutes: 30
 steps:
   - name: Install deadcode analyzer
     run: go install golang.org/x/tools/cmd/deadcode@latest
+  - name: Prepare dead code analysis
+    run: |
+      set -euo pipefail
+      mkdir -p /tmp/gh-aw/agent
+      status=0
+      deadcode ./cmd/... ./internal/tools/... \
+        > /tmp/gh-aw/agent/dead-code-analysis.txt \
+        2> /tmp/gh-aw/agent/dead-code-analysis-errors.txt || status=$?
+      printf '{"exit_code":%s,"targets":["./cmd/...","./internal/tools/..."]}\n' \
+        "$status" > /tmp/gh-aw/agent/dead-code-analysis-status.json
+      if [ "$status" -ne 0 ]; then
+        echo "::warning::Dead code analysis failed with exit code $status; agent inspection is required."
+        cat /tmp/gh-aw/agent/dead-code-analysis-errors.txt
+      fi
 
 ---
 
 # Dead Code Removal Agent
+
+The AWF decision gate may skip when successful prepared analysis finds no removal
+work. Failed or incomplete analysis and candidates needing safety checks still run.
 
 You are the Dead Code Removal Agent — a Go code maintenance expert that identifies and safely removes unreachable functions to keep the codebase clean and lean.
 
@@ -81,7 +106,11 @@ After it runs, parse its stdout JSON and use `skip` / `candidates` as inputs for
 ## agent: discover-candidates
 model: gpt-6-luna
 task: |
-  Run: deadcode ./cmd/... ./internal/tools/...
+  Read: /tmp/gh-aw/agent/dead-code-analysis-status.json,
+    /tmp/gh-aw/agent/dead-code-analysis.txt, and
+    /tmp/gh-aw/agent/dead-code-analysis-errors.txt.
+  Reuse successful prepared results; run deadcode ./cmd/... ./internal/tools/...
+    only if prepared analysis is missing or failed.
   Read: /tmp/gh-aw/cache-memory/dead-code-processed.jsonl (if present)
   Exclude functions whose "file:FuncName" key appears in the cache.
   Always skip:
