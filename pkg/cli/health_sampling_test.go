@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -266,6 +267,152 @@ func TestHealthLowQuotaAndSecondaryLimitProducePartialJSON(t *testing.T) {
 	}
 }
 
+func TestHealthDefaultBranchPrecedesPRRuns(t *testing.T) {
+	for _, stopAt := range []string{"", "default_jobs", "default_sample", "pr_listing"} {
+		t.Run("stop_at="+stopAt, func(t *testing.T) {
+			original := healthRunGH
+			t.Cleanup(func() { healthRunGH = original })
+			collection := &HealthCollection{
+				Host: "github.example.com", repoOverride: "github.example.com/org/repo",
+				APIRateLimit: &GitHubAPIRateLimitState{Remaining: 4000}, localGitChecked: true,
+				revisions: make(map[string]*workflow.LockMetadata), headRevisions: make(map[string]*workflow.LockMetadata),
+				sourceRevisions: make(map[string]string),
+				workflows: []GitHubWorkflow{
+					{ID: 1, Name: "Alpha", Path: ".github/workflows/alpha.lock.yml"},
+					{ID: 2, Name: "Zulu", Path: ".github/workflows/zulu.lock.yml"},
+				},
+			}
+			defaultFailure := workflowRunAPIResponse{ID: 1, Path: collection.workflows[1].Path,
+				Status: "completed", Conclusion: "failure", Event: "push", HeadBranch: "release/stable",
+				RunAttempt: 1, HeadSHA: strings.Repeat("a", 40), CreatedAt: time.Now().Add(-2 * time.Hour)}
+			prFailure := defaultFailure
+			prFailure.ID, prFailure.Path, prFailure.HeadBranch, prFailure.Event = 2, collection.workflows[0].Path, "release/stable", "pull_request"
+			prFailure.CreatedAt = time.Now().Add(-time.Hour)
+			var successes []workflowRunAPIResponse
+			for i := range healthMinimumRuns {
+				run := defaultFailure
+				run.ID, run.Conclusion, run.CreatedAt = int64(10+i), "success", time.Now().Add(-time.Duration(i)*time.Minute)
+				successes = append(successes, run)
+			}
+			for _, response := range append(successes, defaultFailure, prFailure) {
+				run := response.workflowRun()
+				metadata := &workflow.LockMetadata{FrontmatterHash: "settings", BodyHash: "prompt"}
+				collection.revisions[healthRevisionLookupKey(run)] = metadata
+				collection.headRevisions[healthHeadRevisionKey(run)] = metadata
+				collection.sourceRevisions[healthSourceRevisionKey(run, run.HeadSha)] = strings.Repeat("b", 40)
+				collection.sourceRevisions[healthSourceRevisionKey(run, run.HeadBranch)] = strings.Repeat("b", 40)
+			}
+			var order []string
+			healthRunGH = func(_ context.Context, _ string, args ...string) ([]byte, error) {
+				assert.Equal(t, collection.Host, args[2])
+				endpoint, err := url.Parse(args[3])
+				require.NoError(t, err)
+				query := endpoint.Query()
+				var batch []workflowRunAPIResponse
+				switch {
+				case endpoint.Path == "repos/org/repo":
+					return []byte(`{"default_branch":"release/stable"}`), nil
+				case strings.HasSuffix(endpoint.Path, "/actions/workflows"):
+					return json.Marshal(map[string]any{"workflows": collection.workflows})
+				case strings.Contains(endpoint.Path, "/jobs"):
+					stage := "pr_jobs"
+					if strings.Contains(endpoint.Path, "/runs/1/") {
+						stage = "default_jobs"
+					} else {
+						require.True(t, collection.DefaultBranchPassComplete, "PR jobs must wait for all default-branch workflows")
+					}
+					order = append(order, stage)
+					if stopAt == stage {
+						collection.APIRequests = healthMaximumAPIRequests
+					}
+					return []byte(`{"total_count":1,"jobs":[{"id":42,"name":"agent","conclusion":"failure"}]}`), nil
+				case query.Get("status") == "failure":
+					if query.Get("branch") == collection.DefaultBranch {
+						order = append(order, "default_listing")
+						batch = []workflowRunAPIResponse{defaultFailure}
+					} else {
+						require.True(t, collection.DefaultBranchPassComplete)
+						order = append(order, "pr_listing")
+						// Newer PR code must not displace the default-branch failure.
+						batch = []workflowRunAPIResponse{prFailure, defaultFailure}
+						if stopAt == "pr_listing" {
+							collection.APIRequests = healthMaximumAPIRequests
+						}
+					}
+				case strings.Contains(endpoint.Path, "/runs"):
+					stage := "pr_sample"
+					if query.Get("branch") == collection.DefaultBranch {
+						stage = "default_sample"
+					} else {
+						require.True(t, collection.DefaultBranchPassComplete)
+					}
+					order = append(order, stage+":"+endpoint.Path)
+					if strings.Contains(endpoint.Path, "/workflows/2/") {
+						batch = successes
+					} else if stage == "pr_sample" {
+						batch = []workflowRunAPIResponse{prFailure}
+					}
+					if stopAt == stage {
+						collection.APIRequests = healthMaximumAPIRequests
+					}
+				default:
+					t.Fatalf("unexpected health request: %s", endpoint)
+				}
+				if batch == nil {
+					batch = []workflowRunAPIResponse{}
+				}
+				return json.Marshal(map[string]any{"workflow_runs": batch})
+			}
+			registered, err := fetchHealthWorkflows(collection)
+			require.NoError(t, err)
+			require.Len(t, registered, 2)
+			assert.Equal(t, "release/stable", collection.DefaultBranch)
+			runs, err := fetchWorkflowRuns("", "2026-10-01", collection.repoOverride, false, collection)
+			require.NoError(t, err)
+			require.NotEmpty(t, runs)
+			assert.Equal(t, "default_listing", order[0])
+			assert.Equal(t, "default_jobs", order[1])
+			assert.True(t, slices.ContainsFunc(runs, func(run WorkflowRun) bool { return run.DatabaseID == 1 }))
+			if stopAt == "" {
+				assert.False(t, collection.Partial)
+				assert.True(t, collection.FailurePassComplete)
+				assert.True(t, collection.DefaultBranchPassComplete)
+				assert.Equal(t, 2, collection.FailureCandidates, "default failures must not be inventoried twice")
+				assert.Len(t, runs, healthMinimumRuns+2, "default runs must not be collected twice")
+				assert.Equal(t, "default_sample:repos/org/repo/actions/workflows/2/runs", order[3], "default failures prioritize their workflow")
+				assert.Equal(t, "default_sample:repos/org/repo/actions/workflows/1/runs", order[4])
+				assert.Equal(t, "pr_listing", order[5])
+			} else {
+				assert.True(t, collection.Partial)
+				assert.Equal(t, "request_budget", collection.Reason)
+				assert.False(t, collection.FailurePassComplete)
+				assert.Equal(t, stopAt == "pr_listing", collection.DefaultBranchPassComplete)
+				assert.False(t, slices.ContainsFunc(runs, func(run WorkflowRun) bool { return run.DatabaseID == 2 }))
+			}
+		})
+	}
+}
+
+func TestHealthDefaultBranchResolutionErrors(t *testing.T) {
+	original := healthRunGH
+	t.Cleanup(func() { healthRunGH = original })
+	for _, response := range []string{`{}`, `{"default_branch":42}`, `not-json`, "HTTP 403"} {
+		t.Run(response, func(t *testing.T) {
+			collection := &HealthCollection{Host: "github.com", APIRateLimit: &GitHubAPIRateLimitState{Remaining: 4000}}
+			healthRunGH = func(_ context.Context, _ string, args ...string) ([]byte, error) {
+				assert.Equal(t, "repos/{owner}/{repo}", args[3])
+				if response == "HTTP 403" {
+					return nil, errors.New("HTTP 403")
+				}
+				return []byte(response), nil
+			}
+			_, err := fetchHealthWorkflows(collection)
+			require.Error(t, err, "unknown default branches must not silently scan PRs first")
+			assert.Empty(t, collection.DefaultBranch)
+			assert.Equal(t, 1, collection.APIRequests)
+		})
+	}
+}
 func TestHealthCurrentSnapshotFromGitHubMetadata(t *testing.T) {
 	for _, unexecuted := range []bool{false, true} {
 		t.Run(map[bool]string{false: "recovered", true: "pushed-without-runs"}[unexecuted], func(t *testing.T) {
@@ -311,6 +458,9 @@ func TestHealthCurrentSnapshotFromGitHubMetadata(t *testing.T) {
 				case strings.Contains(endpoint, "/actions/runs?status=failure"):
 					return []byte(`{"workflow_runs":[]}`), nil
 				case strings.Contains(endpoint, "/actions/workflows/11/runs?"):
+					if !strings.Contains(endpoint, "branch=main") {
+						return []byte(`{"workflow_runs":[]}`), nil
+					}
 					if strings.Contains(endpoint, "status=failure") {
 						var failures []workflowRunAPIResponse
 						for _, response := range responses {

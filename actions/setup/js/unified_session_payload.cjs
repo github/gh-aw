@@ -255,6 +255,7 @@ const EVENT_FIELDS = {
     ...TOOL_FIELDS,
     success: ["success"],
     output: ["output"],
+    structuredContent: ["structuredContent"],
     result: ["result"],
     error: ["error"],
     fileEdits: ["fileEdits"],
