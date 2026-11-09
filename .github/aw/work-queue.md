@@ -11,12 +11,12 @@ For issue-backed WorkQueueOps: [deployment](../../docs/src/content/docs/patterns
 ## Select the role
 
 - **Observer:** explain only; never submit, dispatch or finish Work.
-- **Producer/dispatcher:** submit trusted plans/request bounded pool work;
+- **Producer/dispatcher:** submit trusted, bounded plans/request pool work;
   no arbitrary resource writes.
 - **Worker:** require compiler-supplied version-3 `claims`; never override
   reserved `work_queue_assignment` or caller context.
 
-Trust roles, not snapshots: AW authenticates run/workflow/revision;
+AW authenticates run/workflow/revision;
 reruns cannot inherit attempt 1. Absent branches are empty;
 reject malformed/unsupported logs.
 
@@ -72,14 +72,14 @@ events; disabling removes it.
   Submit bounded, secret-free plans within scheduling limits.
 - Request prefixes: `work_queue_dispatch_next` (`pool`, `max_claims`,
   `max_dispatches`). Never choose winners/targets or use scalar dispatch.
-- Trusted processing refreshes the ledger and commits a compatible fair prefix.
+- Trusted processing refreshes the ledger and commits a fair compatible prefix.
   CAS losers discard tentative choices/charges and recompute.
 
 ESLint/daily-report/conformance agents only explain staged plans.
 Trusted controls validate batches; empty dispatcher intents fail.
 Unassigned dispatchers cannot emit `noop` or `report_incomplete`.
 
-## Execute original Claims
+## Execute Claims
 
 - Process only assigned original Claims/stored plans. Scope every safe output
   and finish intent to one original Claim.
@@ -101,17 +101,17 @@ Unassigned dispatchers cannot emit `noop` or `report_incomplete`.
   ([reference](safe-outputs-runtime.md)); each adapter binds one effect-type to
   independently verified results, never job success alone.
 
-`<mcp-clis>` takes one JSON argument. `uninitialized` plus null SHA is empty.
-Policyless ledgers fail; workers require Policy; `status: "staged"` is no grant.
+`<mcp-clis>` takes one JSON argument. `uninitialized` + null SHA is empty.
+Policyless ledgers fail; workers require Policy; `status: "staged"` grants nothing.
 
 ## Dependencies and recovery
 
 Require fresh Issue completed-state/PR merge evidence. Predecessors consume no
 Claims; successors await predecessor Results.
 
-Lost responses, dispatcher cancellation/deadlines never prove nonlaunch/termination.
-Retain reservations until exact evidence. Never rerun uncertain effects after
-Completion; bounded verification yields Result/DeliveryFailure. Compatible
+Lost responses, cancellation or deadlines never prove nonlaunch/termination.
+Retain reservations until exact evidence; never rerun uncertain effects after
+Completion. Bounded verification yields Result/DeliveryFailure. Compatible
 deployments preserve obligations, debt, Results, frozen assignments and explicit
 `execution_ref` pins. Unavailable workers pause affected Work only. Scheduled
 maintenance terminally cancels unclaimed, unpinned Work with admission/approved-active-worker
@@ -140,4 +140,4 @@ Retries/checkpoints preserve submission identity; never delete queues to retry a
   [portfolio example](../../docs/src/content/docs/gallery/daily-report-portfolio.md)
   and [worker instructions](../workflows/shared/daily-report-worker.md).
 - Contracts: [specification](../../docs/src/content/docs/specs/work-queue-specification.md#91-implementation-coverage-and-remaining-requirements).
-- Models/fixtures/bounded verification: [formal reference](../../specs/work-queue/README.md).
+- [Formal reference](../../specs/work-queue/README.md).
