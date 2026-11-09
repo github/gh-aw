@@ -19,6 +19,11 @@ const alert = {
     message: { text: "Test alert" },
   },
 };
+const lowerPriorityAlert = {
+  ...alert,
+  number: 43,
+  rule: { id: "lower-priority-rule", security_severity_level: "medium" },
+};
 const fingerprint = JSON.stringify(["test-rule", "example.go", 10, "Test alert"]);
 
 function select(records, alerts = [alert]) {
@@ -83,11 +88,12 @@ test("A stalled attempt reports its cause and last successful step, then release
 
   const legacyStall = select([{ ...checkpoint(), last_successful_step: undefined }]);
   assert.equal(legacyStall.stalled_record.last_successful_step, "alert_selected");
+  assert.equal(legacyStall.stalled_record.last_successful_step_invalid, false);
 
   const diagnostic = workflow.split("### 1. Select an Unfixed Alert")[1].split("### 2.")[0];
   assert.match(diagnostic, /`stall_reason`/);
   assert.match(diagnostic, /`last_successful_step`/);
-  assert.match(diagnostic, /releases the alert for selection on the next run/);
+  assert.match(diagnostic, /releases the fingerprint for one retry/);
 
   const released = select([checkpoint(), { ...checkpoint(), outcome: "stalled_reported", recorded_at: "2026-11-07T03:00:00Z" }]);
   assert.equal(released.stalled_alert_number, null);
@@ -95,6 +101,72 @@ test("A stalled attempt reports its cause and last successful step, then release
     released.candidates.map(({ number }) => number),
     [42]
   );
+});
+
+test("Unknown and non-string milestones are reported as unknown", () => {
+  for (const lastSuccessfulStep of [{ x: 1 }, "unexpected-step", 7, null]) {
+    const selection = select([checkpoint("2026-11-06T21:00:00Z", lastSuccessfulStep)]);
+    assert.equal(selection.stalled_record.last_successful_step, "unknown");
+    assert.equal(selection.stalled_record.last_successful_step_invalid, true);
+  }
+});
+
+test("Missing or malformed checkpoint timestamps have an invalid-timestamp reason", () => {
+  const missingTimestamp = checkpoint();
+  delete missingTimestamp.started_at;
+
+  for (const record of [missingTimestamp, checkpoint("not-a-timestamp")]) {
+    const selection = select([record]);
+    assert.equal(selection.stalled_record.timestamp_invalid, true);
+    assert.match(selection.stalled_record.stall_reason, /missing or invalid started_at timestamp/);
+    assert.doesNotMatch(selection.stalled_record.stall_reason, /within 30 minutes/);
+  }
+});
+
+test("Repeated stalls are bounded by fingerprint and do not starve lower-priority alerts", () => {
+  const firstStall = { ...checkpoint(), outcome: "stalled_reported" };
+  const secondStall = { ...firstStall, recorded_at: "2026-11-07T03:00:00Z" };
+
+  const oneStall = select([firstStall], [alert, lowerPriorityAlert]);
+  assert.deepEqual(
+    oneStall.candidates.map(({ number }) => number),
+    [42]
+  );
+
+  const repeatedStall = select([firstStall, secondStall], [alert, lowerPriorityAlert]);
+  assert.deepEqual(
+    repeatedStall.candidates.map(({ number }) => number),
+    [43]
+  );
+
+  const changedFingerprint = {
+    ...alert,
+    most_recent_instance: {
+      ...alert.most_recent_instance,
+      message: { text: "Changed alert" },
+    },
+  };
+  const changedAlert = select([firstStall, secondStall], [changedFingerprint, lowerPriorityAlert]);
+  assert.deepEqual(
+    changedAlert.candidates.map(({ number }) => number),
+    [42]
+  );
+
+  const selectionInstructions = workflow.split("### 1. Select an Unfixed Alert")[1].split("### 2.")[0];
+  assert.match(selectionInstructions, /Do not claim all alerts are addressed/);
+});
+
+test("Every milestone checkpoint preserves alert identity and original start time", () => {
+  for (const [heading, milestone] of [
+    ["3. Get Alert Details", "alert_details_retrieved"],
+    ["4. Analyze the Vulnerability", "vulnerability_analyzed"],
+    ["5. Generate the Fix", "fix_generated_and_reviewed"],
+    ["6. Create Pull Request", "patch_preflight_passed"],
+  ]) {
+    const section = workflow.split(`### ${heading}`)[1].split("\n### ")[0];
+    const checkpointPattern = new RegExp(`\\{"alert_number": \\[alert-number\\], "fingerprint": \\[candidate fingerprint\\], "outcome": "in_progress", "started_at": "\\[original started_at\\]", "last_successful_step": "${milestone}"\\}`);
+    assert.match(section, checkpointPattern);
+  }
 });
 
 test("Existing fixed and oversized-patch exclusions remain intact", () => {
