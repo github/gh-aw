@@ -37,7 +37,7 @@ imports:
       expires: 1d
   - shared/otlp.md
 pre-agent-steps:
-  - name: Precompute schema analysis data
+  - name: Pre-compute schema analysis data
     run: |
       set -e
       mkdir -p /tmp/gh-aw/agent

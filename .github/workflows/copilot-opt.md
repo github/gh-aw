@@ -58,7 +58,7 @@ evals:
   - id: three_issues_created
     question: Were three optimization issues created with evidence-backed recommendations?
 steps:
-  - name: Token budget guard
+  - name: Estimate first-turn token budget
     run: |
       PROMPT_FILE="/tmp/gh-aw/aw-prompts/prompt.txt"
       if [ -f "$PROMPT_FILE" ]; then
