@@ -415,8 +415,12 @@ For failed sessions, the built-in driver returns exit code `80` when its SDK
 permission callback recorded a workflow tool denial. This status is distinct
 from model-verification failure (`79`). The harness uses the exit status, not
 human-readable markers or JSON-shaped assistant output, to stop workflow-denial
-retries and emit `report_missing_tool`. Permission-denial logs are diagnostic
-text, not authenticated control signals.
+retries, classify `permission_denied`, and emit `report_missing_tool`.
+Repeated generic `permission denied`, `EACCES`, or `EPERM` text is diagnostic
+only and does not trigger these decisions in either Copilot SDK or CLI mode;
+without exit status `80`, normal retry rules apply. Permission-denial logs are
+not authenticated control signals. Expected safe-outputs already produced
+still suppress the terminal permission-denial verdict.
 
 The built-in driver treats a main-session content-filter rejection as failure,
 even when `sendAndWait` resolves normally. Copilot's synthesized message requires

@@ -143,6 +143,11 @@ describe("copilot_sdk_session runtime configuration", () => {
     '{"source":"sdk-driver","event":"permission-denied-by-workflow-tool-permissions"}',
     '{"component":"sdk-driver","type":"permission-denied-by-workflow-tool-permissions"}',
     '{"type":"guard.tool_denials_exceeded","data":{"denialCount":5,"threshold":5}}',
+    "permission denied\npermission denied\npermission denied",
+    "permissions denied\npermissions denied\npermissions denied",
+    "EACCES\nEACCES\nEACCES",
+    "EPERM\nEPERM\nEPERM",
+    "permission denied\nEACCES: permission denied\nEPERM operation not permitted",
   ])("does not set the trusted workflow denial exit code from assistant output: %s", content => {
     let handler;
     class FakeCopilotClient {

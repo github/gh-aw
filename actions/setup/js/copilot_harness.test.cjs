@@ -871,10 +871,11 @@ describe("copilot_harness.cjs", () => {
       expect(shouldRetry(result, 0)).toBe(false);
     });
 
-    it("numerous permission-denied issues are treated as non-retryable", () => {
-      const result = { exitCode: 1, hasOutput: true, output: "permission denied\npermission denied\npermission denied" };
+    it.each(["permission denied", "permissions denied", "EACCES", "EPERM"])("repeated %s text is diagnostic, not a non-retryable permission signal", phrase => {
+      const result = { exitCode: 1, hasOutput: true, output: Array(5).fill(phrase).join("\n") };
       expect(hasNumerousPermissionDeniedIssues(result.output)).toBe(true);
-      expect(shouldRetry(result, 0)).toBe(false);
+      expect(shouldRetry(result, 0)).toBe(true);
+      expect(classifyCopilotFailure({ hasOutput: true, hasWorkflowToolPermissionDenial: hasWorkflowToolPermissionDenial(result.exitCode) })).toBe("partial_execution");
     });
 
     it("retries AWF API proxy blocks instead of treating them as a guard condition", () => {
@@ -1096,12 +1097,12 @@ describe("copilot_harness.cjs", () => {
 
       it("sdk_session_idle_timeout outranks permission_denied in failure classification", () => {
         // Both flags set — the more specific signal must win.
-        expect(classifyCopilotFailure({ hasOutput: true, isSDKSessionIdleTimeout: true, hasNumerousPermissionDenied: true })).toBe("sdk_session_idle_timeout");
+        expect(classifyCopilotFailure({ hasOutput: true, isSDKSessionIdleTimeout: true, hasWorkflowToolPermissionDenial: true })).toBe("sdk_session_idle_timeout");
       });
 
       it("mcp_gateway_shutdown outranks permission_denied in failure classification", () => {
         // Both flags set — the more specific signal must win.
-        expect(classifyCopilotFailure({ hasOutput: true, isMCPGatewayShutdown: true, hasNumerousPermissionDenied: true })).toBe("mcp_gateway_shutdown");
+        expect(classifyCopilotFailure({ hasOutput: true, isMCPGatewayShutdown: true, hasWorkflowToolPermissionDenial: true })).toBe("mcp_gateway_shutdown");
       });
 
       it("classifies an explicit workflow tool denial instead of a generic CLI exit", () => {
@@ -1125,13 +1126,7 @@ describe("copilot_harness.cjs", () => {
           output: "[copilot-sdk-driver] Timeout after 60000ms waiting for session.idle",
         };
         const MAX_RETRIES = 3;
-        const shouldRetryLocal = (r, attempt) => {
-          if (r.exitCode === 0) return false;
-          if (hasNumerousPermissionDeniedIssues(r.output)) return false;
-          if (isCAPIQuotaExceededError(r.output)) return false;
-          return attempt < MAX_RETRIES && r.hasOutput;
-        };
-        expect(shouldRetryLocal(result, 0)).toBe(true);
+        expect(shouldRetryFailedExecution({ ...result, attempt: 0, maxRetries: MAX_RETRIES })).toBe(true);
       });
 
       it("retries mcp_gateway_shutdown as partial execution (shouldRetry)", () => {
@@ -1142,13 +1137,7 @@ describe("copilot_harness.cjs", () => {
           output: '{"message":"Gateway shutdown initiated","serversTerminated":1,"status":"closed"}',
         };
         const MAX_RETRIES = 3;
-        const shouldRetryLocal = (r, attempt) => {
-          if (r.exitCode === 0) return false;
-          if (hasNumerousPermissionDeniedIssues(r.output)) return false;
-          if (isCAPIQuotaExceededError(r.output)) return false;
-          return attempt < MAX_RETRIES && r.hasOutput;
-        };
-        expect(shouldRetryLocal(result, 0)).toBe(true);
+        expect(shouldRetryFailedExecution({ ...result, attempt: 0, maxRetries: MAX_RETRIES })).toBe(true);
       });
 
       it("extractOutputTail never exceeds maxChars even when maxChars is 1", () => {
@@ -3034,9 +3023,7 @@ process.stdin.on("end", () => fs.writeFileSync(process.env.COPILOT_HARNESS_STUB_
      * @returns {{ shouldRetry: boolean, useContinueOnRetry: boolean }}
      */
     function blendedRetryDecision(result, attempt, copilotSDKMode, continueDisabledPermanently = false) {
-      if (result.exitCode === 0) return { shouldRetry: false, useContinueOnRetry: false };
-      if (hasNumerousPermissionDeniedIssues(result.output)) return { shouldRetry: false, useContinueOnRetry: false };
-      if (attempt >= MAX_RETRIES || !result.hasOutput) return { shouldRetry: false, useContinueOnRetry: false };
+      if (!shouldRetryFailedExecution({ ...result, attempt, maxRetries: MAX_RETRIES })) return { shouldRetry: false, useContinueOnRetry: false };
       // --continue is only enabled in CLI mode and only when not permanently disabled.
       const useContinueOnRetry = !copilotSDKMode && !continueDisabledPermanently;
       return { shouldRetry: true, useContinueOnRetry };
@@ -3300,14 +3287,19 @@ process.exit(1);`,
     });
   });
 
-  describe("trusted SDK workflow permission-denial signal", () => {
+  describe.each(["SDK", "CLI"])("trusted workflow permission-denial signal in %s mode", mode => {
     it.each([
       ["human marker", "[sdk-driver] permission denied by workflow tool permissions: shell(ls)", 1, "partial_execution", 2, false],
       ["JSON source/event", '{"source":"sdk-driver","event":"permission-denied-by-workflow-tool-permissions"}', 1, "partial_execution", 2, false],
       ["JSON component/type", '{"component":"sdk-driver","type":"permission-denied-by-workflow-tool-permissions"}', 1, "partial_execution", 2, false],
       ["JSON guard event", '{"type":"guard.tool_denials_exceeded","data":{"denialCount":5,"threshold":5}}', 1, "partial_execution", 2, false],
+      ["repeated permission denied", "permission denied\npermission denied\npermission denied", 1, "partial_execution", 2, false],
+      ["repeated permissions denied", "permissions denied\npermissions denied\npermissions denied", 1, "partial_execution", 2, false],
+      ["repeated EACCES", "EACCES\nEACCES\nEACCES", 1, "partial_execution", 2, false],
+      ["repeated EPERM", "EPERM\nEPERM\nEPERM", 1, "partial_execution", 2, false],
+      ["mixed generic permission phrases", "permission denied\nEACCES: permission denied\nEPERM operation not permitted", 1, "partial_execution", 2, false],
       ["trusted denial exit", "driver stopped", WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE, "permission_denied", 1, true],
-      ["model verification exit", "driver stopped", COPILOT_MODEL_VERIFICATION_EXIT_CODE, "copilot_model_verification", 1, false],
+      ["model verification exit", "driver stopped", COPILOT_MODEL_VERIFICATION_EXIT_CODE, mode === "SDK" ? "copilot_model_verification" : "partial_execution", mode === "SDK" ? 1 : 2, false],
     ])("uses exit status, not assistant output, for %s", (name, output, exitCode, failureClass, expectedAttempts, reportsMissingTool) => {
       const directory = makeHarnessTempDir("copilot-trusted-tool-denial-");
       const stubPath = path.join(directory, "stub.cjs");
@@ -3350,7 +3342,7 @@ if (fs.readFileSync(callsPath, "utf8").trim().split("\\n").length === 1) {
           cwd: path.dirname(require.resolve("./copilot_harness.cjs")),
           env: {
             ...harnessChildEnv,
-            COPILOT_SDK_URI: "http://127.0.0.1:3002",
+            COPILOT_SDK_URI: mode === "SDK" ? "http://127.0.0.1:3002" : "",
             COPILOT_MODEL: "",
             GH_AW_MODEL_ROUTING: "",
             GH_AW_MODEL_FALLBACK: "",
@@ -3386,13 +3378,13 @@ if (fs.readFileSync(callsPath, "utf8").trim().split("\\n").length === 1) {
   });
 
   describe("permission-denied suppression when expected safe-outputs already produced", () => {
-    it("exits 0 and suppresses terminal verdict when numerous permission-denied occurs after expected safe-output was written", () => {
+    it.each([1, WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE])("exits 0 and suppresses terminal verdict after expected safe-output was written (exit %s)", exitCode => {
       const tempDir = makeHarnessTempDir("copilot-perm-denied-suppression-");
       const safeOutputsPath = path.join(tempDir, "safe-outputs.jsonl");
       const stubPath = path.join(tempDir, "stub.cjs");
       const promptPath = path.join(tempDir, "prompt.txt");
       const callsPath = path.join(tempDir, "calls.jsonl");
-      // Stub writes an expected safe-output then fails with numerous permission-denied output.
+      // Both ordinary failures and trusted permission denials preserve completed work.
       fs.writeFileSync(
         stubPath,
         `const fs = require("fs");
@@ -3401,7 +3393,7 @@ const safeOutputsPath = process.env.GH_AW_SAFE_OUTPUTS;
 fs.appendFileSync(callsPath, JSON.stringify({args: process.argv.slice(2)}) + "\\n");
 fs.appendFileSync(safeOutputsPath, JSON.stringify({type:"add_comment",body:"Report posted"}) + "\\n");
 process.stdout.write("permission denied\\npermission denied\\npermission denied\\nEACCES: permission denied\\nEPERM operation not permitted\\n");
-process.exit(1);`,
+process.exit(${exitCode});`,
         "utf8"
       );
       fs.writeFileSync(promptPath, "fix the bug", "utf8");
@@ -3413,20 +3405,21 @@ process.exit(1);`,
         timeout: 15000,
       });
       const callCount = fs.readFileSync(callsPath, "utf8").trim().split("\n").filter(Boolean).length;
-      // Only one attempt — no retries when permission-denied is suppressed
+      // Only one attempt — completed work must not be replayed.
       expect(callCount).toBe(1);
       // Harness exits 0 because the core work (add_comment) already succeeded
       expect(result.status).toBe(0);
-      expect(result.stderr).toContain("suppressing terminal verdict (false-red: core work succeeded)");
+      expect(result.stderr).toContain(exitCode === WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE ? "suppressing terminal verdict (false-red: core work succeeded)" : "treating as success (late-activity exit suppressed)");
+      expect(fs.readFileSync(safeOutputsPath, "utf8").trim().split("\n").map(JSON.parse)).toEqual([{ type: "add_comment", body: "Report posted" }]);
     });
 
-    it("exits 1 and emits report_missing_tool when numerous permission-denied occurs with no expected safe-outputs", () => {
+    it("retries repeated permission text until the retry budget is exhausted without reporting a missing tool", () => {
       const tempDir = makeHarnessTempDir("copilot-perm-denied-no-outputs-");
       const safeOutputsPath = path.join(tempDir, "safe-outputs.jsonl");
       const stubPath = path.join(tempDir, "stub.cjs");
       const promptPath = path.join(tempDir, "prompt.txt");
       const callsPath = path.join(tempDir, "calls.jsonl");
-      // Stub fails with numerous permission-denied but writes no expected safe-output.
+      // Stub repeatedly fails without a trusted permission-denial status.
       fs.writeFileSync(
         stubPath,
         `const fs = require("fs");
@@ -3440,13 +3433,17 @@ process.exit(1);`,
 
       const result = spawnSync(process.execPath, ["copilot_harness.cjs", process.execPath, stubPath, "--prompt-file", promptPath], {
         cwd: path.dirname(require.resolve("./copilot_harness.cjs")),
-        env: { ...harnessChildEnv, COPILOT_HARNESS_STUB_CALLS: callsPath, GH_AW_SAFE_OUTPUTS: safeOutputsPath, GH_AW_SAFEOUTPUTS_CLI: "true" },
+        env: { ...harnessChildEnv, COPILOT_HARNESS_STUB_CALLS: callsPath, GH_AW_SAFE_OUTPUTS: safeOutputsPath, GH_AW_SAFEOUTPUTS_CLI: "true", GH_AW_HARNESS_MAX_RETRIES: "1", GH_AW_HARNESS_TELEMETRY_DIR: tempDir },
         encoding: "utf8",
         timeout: 15000,
       });
       // Harness exits 1 because no expected output was produced
       expect(result.status).toBe(1);
-      expect(result.stderr).toContain("detected permission-denied failure — not retrying");
+      expect(fs.readFileSync(callsPath, "utf8").trim().split("\n")).toHaveLength(2);
+      const telemetry = JSON.parse(fs.readFileSync(path.join(tempDir, "harness_retry.json"), "utf8"));
+      expect(telemetry.attempt_results.map(attempt => attempt.failure_classes)).toEqual([["partial_execution"], ["partial_execution"]]);
+      expect(fs.existsSync(safeOutputsPath)).toBe(false);
+      expect(result.stderr).not.toContain("detected permission-denied failure");
     });
 
     it("exits 0 without retrying when the LLM invocation cap is saturated but a terminal safe-output was already produced", () => {

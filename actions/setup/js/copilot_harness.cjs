@@ -1264,7 +1264,6 @@ function isCopilotContentFilterError(output) {
  *   isModelRoutingFailure?: boolean,
  *   isModelEndpointMismatch?: boolean,
  *   hasWorkflowToolPermissionDenial?: boolean,
- *   hasNumerousPermissionDenied?: boolean,
  *   tokenCount?: number,
  * }} detection
  * @returns {string}
@@ -1291,7 +1290,7 @@ function classifyCopilotFailure(detection) {
   if (detection.isAuthenticationFailed) return "authentication_failed";
   if (detection.isSDKSessionIdleTimeout) return "sdk_session_idle_timeout";
   if (detection.isMCPGatewayShutdown) return "mcp_gateway_shutdown";
-  if (detection.hasWorkflowToolPermissionDenial || detection.hasNumerousPermissionDenied) return "permission_denied";
+  if (detection.hasWorkflowToolPermissionDenial) return "permission_denied";
   if (detection.isTransientCAPIError) return "capi_error_400";
   if (detection.hasOutput && (detection.tokenCount ?? 0) > LONG_RUN_TOKEN_THRESHOLD) return "long_run_exit";
   return detection.hasOutput ? "partial_execution" : "no_output";
@@ -1308,7 +1307,7 @@ function shouldRetryFailedExecution(params) {
   if (params.exitCode === 0) return false;
   if (isCopilotContentFilterError(params.output)) return false;
   if (params.isModelRoutingFailure) return false;
-  if (hasNumerousPermissionDeniedIssues(params.output) || hasWorkflowToolPermissionDenial(params.exitCode)) return false;
+  if (hasWorkflowToolPermissionDenial(params.exitCode)) return false;
   if (isCAPIQuotaExceededError(params.output)) return false;
   const nonRetryableGuard = detectNonRetryableHarnessGuard(params.output);
   if (nonRetryableGuard.modelEndpointMismatch) return false;
@@ -2216,6 +2215,7 @@ async function main() {
           const isSDKSessionIdleTimeout = isSDKSessionIdleTimeoutError(result.output);
           const isMCPGatewayShutdown = isMCPGatewayShutdownError(result.output);
           const isConnectionRefused = isConnectionRefusedError(result.output);
+          // Combined output includes untrusted assistant text; counts are diagnostic only.
           const permissionDeniedCount = countPermissionDeniedIssues(result.output);
           const hasNumerousPermissionDenied = hasNumerousPermissionDeniedIssues(result.output);
           const isWorkflowToolPermissionDenied = hasWorkflowToolPermissionDenial(result.exitCode);
@@ -2268,7 +2268,6 @@ async function main() {
             isTrustedAICreditsBudgetExhausted,
             isSDKSessionIdleTimeout,
             hasWorkflowToolPermissionDenial: isWorkflowToolPermissionDenied,
-            hasNumerousPermissionDenied,
             tokenCount,
           });
           const outputTail = extractOutputTail(result.output);
@@ -2435,7 +2434,7 @@ async function main() {
             return { action: "stop" };
           }
 
-          if (hasNumerousPermissionDenied || isWorkflowToolPermissionDenied) {
+          if (isWorkflowToolPermissionDenied) {
             return stopForPermissionDenied({ attempt, output: result.output, safeOutputsPath, log, deniedCommands: extractDeniedCommands(result.output), workflowToolPermissionDenied: isWorkflowToolPermissionDenied });
           }
 
