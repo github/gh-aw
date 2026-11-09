@@ -55,21 +55,17 @@ func run(pass *analysis.Pass) (any, error) {
 		if strings.HasSuffix(pkgPath, ".test") || filecheck.ShouldSkipFilename(pass.Fset.Position(call.Pos()).Filename, generatedFiles) {
 			return
 		}
-		sel, ok := call.Fun.(*ast.SelectorExpr)
-		if !ok {
-			return
-		}
-		if !fatalFuncs[sel.Sel.Name] {
-			return
-		}
-		if !astutil.IsPkgSelector(pass, sel, "log") {
+		// PackageCall sees through parentheses such as (log.Fatal)("x") and
+		// resolves dot-imported calls, which a bare SelectorExpr check misses.
+		callPkg, funcName, ok := astutil.PackageCall(pass, call)
+		if !ok || callPkg != "log" || !fatalFuncs[funcName] {
 			return
 		}
 		position := pass.Fset.PositionFor(call.Pos(), false)
 		if nolint.HasDirectiveForLinter(position, noLintIndex, "logfatallibrary") {
 			return
 		}
-		pkgLog.Printf("flagging log.%s call at %s", sel.Sel.Name, position)
-		pass.ReportRangef(call, "log.%s called in library package %s; use error returns instead to avoid implicit os.Exit", sel.Sel.Name, pkgPath)
+		pkgLog.Printf("flagging log.%s call at %s", funcName, position)
+		pass.ReportRangef(call, "log.%s called in library package %s; use error returns instead to avoid implicit os.Exit", funcName, pkgPath)
 	})
 }
