@@ -461,7 +461,14 @@ Grader and eval result collection MUST import only records attributed to the
 current run, not restored historical results. Runner-owned `aw_info.json`
 supplies the run ID and available attempt; the supplied collector environment
 (defaulting to the process environment) supplies them only when recorded run
-identity is absent. An explicit environment snapshot MUST NOT borrow run identity
+identity is absent. The live conclusion entry point explicitly supplies the
+current execution identity, which MUST reconcile the in-memory workflow metadata
+and derived workflow call ID before filtering durable, grader, and eval records
+or computing built-in graders. Caller context and episode parent identities
+remain unchanged.
+This prevents a reused successful activation snapshot from selecting an earlier
+attempt. Source artifacts remain unchanged; offline reconstruction retains
+recorded-identity precedence. An explicit environment snapshot MUST NOT borrow run identity
 from the ambient process. Records from other runs or
 explicitly different attempts are excluded without changing source artifacts.
 Unattributed results or an unavailable current run ID produce collection
