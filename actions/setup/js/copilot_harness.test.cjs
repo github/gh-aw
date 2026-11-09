@@ -1,5 +1,5 @@
 import { afterEach, describe, it, expect, vi } from "vitest";
-import { spawnSync } from "child_process";
+import { spawnSync as spawnProcessSync } from "child_process";
 import { createRequire } from "module";
 import fs from "fs";
 import os from "os";
@@ -150,6 +150,29 @@ const harnessChildEnv = {
   GH_AW_HARNESS_MAX_DELAY_MS: "1",
   GH_AW_SKIP_REFLECT: "true",
 };
+
+// Child processes restore compiler provenance from aw_info.json, not this worker's in-memory fixture records.
+function spawnSync(command, args, options) {
+  const env = { ...(options.env || process.env) };
+  const workspace = path.resolve(env.GITHUB_WORKSPACE || options.cwd || process.cwd(), env.GH_AW_ENGINE_CWD || ".");
+  const agentsBaseDir = path.join(env.TMPDIR || os.tmpdir(), "gh-aw");
+  env.GH_AW_TMP_DIR ||= agentsBaseDir;
+  const documents = [];
+  for (const directory of new Set([path.join(workspace, ".github/agents"), path.join(agentsBaseDir, ".github/agents")])) {
+    if (!fs.existsSync(directory)) continue;
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      if (entry.isFile() && entry.name.endsWith(".agent.md")) documents.push(fs.readFileSync(path.join(directory, entry.name), "utf8"));
+    }
+  }
+  if (documents.length) {
+    const infoPath = path.join(env.GH_AW_TMP_DIR, "aw_info.json");
+    const info = fs.existsSync(infoPath) ? JSON.parse(fs.readFileSync(infoPath, "utf8")) : {};
+    info.markdown_metadata = require("../../../scripts/markdown_metadata_test_adapter.cjs").prepareMarkdownFixtures(...documents);
+    fs.mkdirSync(path.dirname(infoPath), { recursive: true });
+    fs.writeFileSync(infoPath, JSON.stringify(info));
+  }
+  return spawnProcessSync(command, args, { ...options, env });
+}
 
 function makeHarnessTempDir(name) {
   fs.mkdirSync(agentTempDir, { recursive: true });
