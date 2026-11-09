@@ -84,6 +84,7 @@ export interface ToolExecutionCompleteData {
   workflowRunId?: string;
   success?: boolean;
   output?: JsonValue;
+  structuredContent?: JsonValue;
   result?: JsonValue;
   error?: JsonValue;
   fileEdits?: JsonValue;

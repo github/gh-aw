@@ -131,6 +131,7 @@ describe("Goose unified session parser", () => {
         success: !native.isError,
         isError: native.isError,
         output: native.content,
+        structuredContent: native.structuredContent,
         exitCode: native.structuredContent.exit_code,
       });
       expect(parsed.logEntries.at(-1).data.status).toBe("completed");
@@ -345,6 +346,11 @@ describe("Goose unified session parser", () => {
       expect(validateSession(serializeSessionArtifact(collected.events), "unified")).toBe(collected.events.length);
       const unified = collected.events.filter(event => event.type === "tool.execution_complete");
       expect(unified.map(event => event.data)).toEqual(parsed.filter(event => event.type === "tool.execution_complete").map(event => normalizeUnifiedSessionEvent(event).data));
+      for (const event of unified) {
+        const nativeResult = fixture.flatMap(record => record.message?.content ?? []).find(item => item.type === "toolResponse" && item.id === event.data.toolCallId).toolResult.value;
+        if (Object.hasOwn(nativeResult, "structuredContent")) expect(event.data.structuredContent).toEqual(nativeResult.structuredContent);
+        else expect(event.data).not.toHaveProperty("structuredContent");
+      }
       const nativeText = fixture
         .flatMap(event => event.message?.content ?? [])
         .filter(item => item.type === "text")
