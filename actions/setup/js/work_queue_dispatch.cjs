@@ -295,13 +295,32 @@ async function launchAssignmentImpl(options, supplied) {
       await publishOperations(options, trustedContext, ["reject", assignment.dispatch_id, rejection], "dispatch", [{ kind: "Dispatch", dispatch_id: assignment.dispatch_id, state: "rejected", reason: rejection, evidence }]);
       return { ...(await releaseAssignment(options, assignment, evidence)), state: "rejected", dispatched: false };
     }
+    let uncertainMarkerPersisted = false;
     try {
       await publishOperations(options, trustedContext, ["uncertain", assignment.dispatch_id], "dispatch", [{ kind: "Dispatch", dispatch_id: assignment.dispatch_id, state: "uncertain", reason: "post_response_unconfirmed" }]);
+      uncertainMarkerPersisted = true;
     } catch (error) {
-      log.failure("launch.uncertain_marker.failed", error);
+      log.failure("launch.uncertain_marker.failed", error, true);
       // A durable start marker alone already fences every possible resend.
     }
-    log.debug("launch.unresolved");
+    const recoveryStarted = Date.now();
+    log.diagnostic("launch.recovery.start", { uncertain_marker_persisted: uncertainMarkerPersisted, resend_allowed: false });
+    try {
+      const recovered = await reconcileDispatch({ ...options, assignment, requestCancellation: false });
+      log.diagnostic("launch.recovery.complete", {
+        elapsed_ms: Math.max(0, Date.now() - recoveryStarted),
+        recovered: recovered.state === "bound" || recovered.released,
+        bound: recovered.state === "bound",
+        released: recovered.released,
+        conflict: recovered.state === "run_binding_conflict",
+        attempts: recovered.attempts,
+        resend_allowed: false,
+      });
+      return { ...recovered, dispatched: true };
+    } catch (error) {
+      log.failure("launch.recovery.failed", error, true);
+    }
+    log.diagnostic("launch.unresolved", { reservation_retained: true, resend_allowed: false });
     return { state: "launch_unresolved", released: false, dispatched: true };
   }
   // Acceptance is not binding authority. Trusted worker activation verifies the
