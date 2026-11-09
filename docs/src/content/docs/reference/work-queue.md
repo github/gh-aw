@@ -241,7 +241,7 @@ Repository selection is `--repo`, then `GH_REPO`, then local `origin`, then `gh 
 | `deploy --from-config` | Refresh compatible worker routes; optional `--pool`, `--worker-profile`. |
 | `policy --from-config --epoch EPOCH` | Update existing, quiescent Policy; `--file` is the mutually exclusive alternative. |
 | `control`, `cancel-work` | Apply authorized pause, cutover, or Work cancellation. |
-| `cancel --obsolete [--limit N] [--dry-run]` | Select one checked obsolete-contract batch; `cancel` is an alias of `cancel-work`. |
+| `cancel-work --obsolete [--limit N] [--dry-run]` | Select one checked obsolete-contract batch. |
 | `cancel-claim --claim-id ID[,ID...] --reason CODE` | Cancel exact current Claims and their Work, not native runs. |
 | `reprioritize --work-id ID[,ID...] --priority 1..5 --reason CODE` | Administrator-only priority override for future grants of available Work. |
 | `clear --reason CODE [--dry-run] [--hard]` | Interactive local cancellation or settled-queue reset; see below. |
@@ -269,11 +269,11 @@ Metadata diagnostics exclude payloads, Result descriptors, request parameters, a
 ### Cancel obsolete worker-contract Work
 
 ```bash
-gh aw work --repo OWNER/REPO cancel --obsolete \
+gh aw work --repo OWNER/REPO cancel-work --obsolete \
   --limit 256 --request-id obsolete-batch-1 --dry-run --json
 ```
 
-`cancel` aliases `cancel-work`. `--obsolete` uses the JavaScript maintenance selection: only available, unclaimed, unpinned Work with barrier `none` and an admission contract incompatible with an available approved active Deployment is eligible. Expired Work, compatible Work, explicit execution pins, and missing/unavailable deployments are excluded. IDs are sorted in UTF-8 byte order; one batch contains at most `--limit` Work (default and maximum 256), further bounded by the installed Policy operation limit. It does not refresh routes or restore missing deployments.
+`cancel-work --obsolete` uses the JavaScript maintenance selection: only available, unclaimed, unpinned Work with barrier `none` and an admission contract incompatible with an available approved active Deployment is eligible. Expired Work, compatible Work, explicit execution pins, and missing/unavailable deployments are excluded. IDs are sorted in UTF-8 byte order; one batch contains at most `--limit` Work (default and maximum 256), further bounded by the installed Policy operation limit. It does not refresh routes or restore missing deployments.
 
 `--dry-run` reads and validates the ledger and reports the selection without checking administrator publication authority, recording a request, synchronizing Issues, or causing queue effects. Remove it to publish an administrator-authorized atomic `cancel_work` request with fixed reason `worker_contract_obsolete` and operation `version: 1`. Fresh publication checks reject the whole batch if a selected Work becomes owned, expired, compatible, or otherwise ineligible. Claims, Results, delivery barriers, reservations, policy/epoch/limits, fairness debt, history, and unselected Work are preserved; no native runs are stopped.
 

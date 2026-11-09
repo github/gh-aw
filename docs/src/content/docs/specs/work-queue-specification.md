@@ -1021,7 +1021,7 @@ request MUST recover its original request and fingerprint, not publish a checked
 replacement. All existing authorization, ownership and native-reservation
 requirements still apply to both forms.
 
-Native `work cancel --obsolete` MUST use the maintenance eligibility predicate,
+Native `work cancel-work --obsolete` MUST use the maintenance eligibility predicate,
 current-time expiration, UTF-8 byte ordering, and a single batch bounded by 256
 and the installed operation limit. An optional smaller `--limit` only narrows
 that bound. Publication uses the existing native administrator authority, not

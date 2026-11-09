@@ -71,7 +71,7 @@ func workObsoleteExecute(t *testing.T, extra ...string) (workObsoleteResult, err
 	var output bytes.Buffer
 	parent.SetOut(&output)
 	parent.SetErr(io.Discard)
-	parent.SetArgs(append([]string{"work", "--repo", "owner/repo", "--json", "cancel", "--obsolete", "--request-id", "obsolete-batch"}, extra...))
+	parent.SetArgs(append([]string{"work", "--repo", "owner/repo", "--json", "cancel-work", "--obsolete", "--request-id", "obsolete-batch"}, extra...))
 	err := parent.Execute()
 	var result workObsoleteResult
 	if err == nil {
@@ -236,7 +236,7 @@ func TestWorkCancelObsoleteNoWorkAndClosedFlags(t *testing.T) {
 			t.Fatalf("unsafe obsolete flags accepted: %v", extra)
 		}
 	}
-	for _, args := range [][]string{{"cancel", "--dry-run"}, {"cancel", "--limit", "1"}} {
+	for _, args := range [][]string{{"cancel-work", "--dry-run"}, {"cancel-work", "--limit", "1"}, {"cancel", "--obsolete"}} {
 		cmd := NewWorkCommand()
 		cmd.SetOut(io.Discard)
 		cmd.SetErr(io.Discard)
@@ -244,6 +244,10 @@ func TestWorkCancelObsoleteNoWorkAndClosedFlags(t *testing.T) {
 		if err := cmd.Execute(); err == nil {
 			t.Fatalf("obsolete-only flag silently ignored: %v", args)
 		}
+	}
+	cmd := workCancelCommand()
+	if len(cmd.Aliases) != 0 {
+		t.Fatalf("cancel-work must not introduce aliases: %v", cmd.Aliases)
 	}
 	if _, _, err := workObsoleteIntent(state, 10000, 256, "submit"); err == nil {
 		t.Fatal("obsolete request reused a noncancellation identity")

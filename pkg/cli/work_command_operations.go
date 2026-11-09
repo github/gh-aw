@@ -16,7 +16,6 @@ type workOperatorTarget struct{ WorkID, ClaimID string }
 
 func workCancelCommand() *cobra.Command {
 	cmd := workOperatorCommand("cancel-work", false, false)
-	cmd.Aliases = []string{"cancel"}
 	cmd.Long = "Terminally cancel exact Work IDs with --work-id and --reason, or use\n" +
 		"--obsolete to retire one bounded batch using the JavaScript maintenance semantics.\n\n" +
 		"--obsolete selects available, unclaimed, unpinned Work without delivery barriers\n" +
