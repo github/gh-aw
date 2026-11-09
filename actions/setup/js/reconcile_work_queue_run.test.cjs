@@ -286,6 +286,121 @@ describe("inline trusted worker termination", () => {
 });
 
 describe("scheduled work queue recovery", () => {
+  it("retires obsolete backlog through the scheduled maintenance entry point without dispatching", async () => {
+    const contract = "a".repeat(64);
+    const { fixture, options } = setup({
+      bound: false,
+      granted: false,
+      count: 1,
+      configurePolicy: policy => {
+        policy.authorization = "aw";
+        policy.producers = {};
+        const profile = policy.pools.default.profiles.default;
+        delete profile.principal;
+        profile.logical_contract = contract;
+      },
+    });
+    const worker = fixture.state.deployments.get("default").get("default");
+    fixture.append("deployment", {
+      operations: [
+        {
+          kind: "Deployment",
+          pool: "default",
+          worker_profile: "default",
+          expected_ref: worker.current_ref,
+          expected_contract: contract,
+          profile: { ...worker.revisions[REF].profile, ref: "b".repeat(40), logical_contract: "b".repeat(64) },
+          available: true,
+          reason: "compiler_deployment",
+        },
+      ],
+    });
+    const publisher = fixture.nativeRun(fixture.dispatcherContext);
+    options.context = { ...fixture.dispatcherContext, job: "work_queue_compaction" };
+    options.workflowRef = `${REPOSITORY}/${publisher.path}@${REF}`;
+    options.githubClient.rest.actions.getWorkflowRun.mockResolvedValue({ status: 200, data: publisher });
+    expect(await maintenance(options)).toMatchObject({ obsolete_work_cancelled: 1, obsolete_work_reconciliation_failed: false });
+    expect([...fixture.state.works.values()][0]).toMatchObject({ state: "cancelled", cancellation_reason: "worker_contract_obsolete" });
+    expect(fixture.state.dispatches.size).toBe(0);
+    expect(fixture.state.claims.size).toBe(0);
+    expect(await maintenance(options)).toMatchObject({ obsolete_work_cancelled: 0 });
+  });
+
+  it.each([
+    ["deployment race", { code: "deployment_conflict" }],
+    ["authentication", { status: 401 }],
+    ["read", { status: 503 }],
+    ["publication", { status: 403 }],
+    ["durability", { code: "work_queue_obsolete_cancellation_not_durable" }],
+  ])("recovers a held reservation and expired pending delivery despite an obsolete sweep %s failure", async (_kind, failure) => {
+    const { fixture, options, nativeRun } = setup({ count: 1 });
+    const member = fixture.assignment.claims[0];
+    fixture.append("finish", { dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle, outcome: "completed" }, { ...fixture.workerActor, dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle });
+    expect(fixture.state.dispatches.get(fixture.assignment.dispatch_id).released).toBe(false);
+    expect(fixture.state.works.get(member.work_id).barrier).toBe("pending");
+    options.context = { ...fixture.dispatcherContext, job: "work_queue_compaction" };
+    const publisher = fixture.nativeRun(fixture.dispatcherContext);
+    options.workflowRef = `${REPOSITORY}/${publisher.path}@${REF}`;
+    options.githubClient.rest.actions.getWorkflowRun.mockResolvedValue({ status: 200, data: publisher });
+    options.now = fixture.at + fixture.policy.pools.default.reconciliation.deadline_ms;
+    options.publishWorkQueueRequest = vi.fn(async args => fixture.append(args.request.kind, args.request.parameters, args.actor, args.request.id, options.now));
+    nativeRun.status = "completed";
+    nativeRun.conclusion = "failure";
+    const canary = "private-obsolete-provider-message-token-and-stack";
+    const error = Object.assign(new Error(canary, { cause: new Error(canary) }), failure, { response: { data: { message: canary }, headers: { authorization: canary } } });
+    const sweep = vi.spyOn(require("./work_queue_deployment_control.cjs"), "reconcileObsoleteWork").mockRejectedValue(error);
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    try {
+      const result = await maintenance(options);
+      expect(sweep).toHaveBeenCalledOnce();
+      expect(result).toMatchObject({
+        obsolete_work_cancelled: null,
+        obsolete_work_reconciliation_failed: true,
+        reconciled: 1,
+        results: [{ released: true, delivery: { claims: { h1: { state: "delivery_failed", effects: "unknown" } } } }],
+      });
+      expect(fixture.state.dispatches.get(fixture.assignment.dispatch_id).released).toBe(true);
+      expect(fixture.state.works.get(member.work_id)).toMatchObject({ barrier: "failed", disposition: "unknown" });
+      const operations = fixture.transactions.flatMap(commit => commit.operations);
+      expect(operations.filter(operation => operation.kind === "Release")).toHaveLength(1);
+      expect(operations.filter(operation => operation.kind === "DeliveryFailure")).toHaveLength(1);
+      expect(operations.some(operation => operation.kind === "Result")).toBe(false);
+      expect(options.core.warning).toHaveBeenCalledExactlyOnceWith(expect.stringContaining("obsolete-work reconciliation failed; core recovery will continue"));
+      const diagnostics = stderr.mock.calls.map(call => call[0]).join("");
+      expect(diagnostics).toContain("maintenance.obsolete.failed failed=true");
+      expect(diagnostics).not.toContain(canary);
+      expect(JSON.stringify(result)).not.toContain(canary);
+      expect(JSON.stringify(options.core.warning.mock.calls)).not.toContain(canary);
+    } finally {
+      sweep.mockRestore();
+      stderr.mockRestore();
+    }
+  });
+
+  it("keeps independent delivery verification failures fatal after an obsolete sweep failure", async () => {
+    const { fixture, options, nativeRun } = setup({ count: 1 });
+    const member = fixture.assignment.claims[0];
+    fixture.append("finish", { dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle, outcome: "completed" }, { ...fixture.workerActor, dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle });
+    options.context = { ...fixture.dispatcherContext, job: "work_queue_compaction" };
+    const publisher = fixture.nativeRun(fixture.dispatcherContext);
+    options.workflowRef = `${REPOSITORY}/${publisher.path}@${REF}`;
+    options.githubClient.rest.actions.getWorkflowRun.mockResolvedValue({ status: 200, data: publisher });
+    nativeRun.status = "completed";
+    nativeRun.conclusion = "failure";
+    const sweep = vi.spyOn(require("./work_queue_deployment_control.cjs"), "reconcileObsoleteWork").mockRejectedValue(new Error("private-sweep-error"));
+    const finalize = vi.spyOn(require("./finish_work_queue_claim.cjs"), "finalizeWorkerResults").mockRejectedValue(new Error("private-delivery-error"));
+    try {
+      await expect(maintenance(options)).rejects.toThrow("work_queue_maintenance_reconciliation_unresolved");
+      expect(finalize).toHaveBeenCalledOnce();
+      expect(fixture.state.dispatches.get(fixture.assignment.dispatch_id).released).toBe(true);
+      expect(fixture.state.works.get(member.work_id).barrier).toBe("pending");
+      expect(options.core.warning).toHaveBeenCalledExactlyOnceWith(expect.stringContaining("obsolete-work reconciliation failed"));
+    } finally {
+      sweep.mockRestore();
+      finalize.mockRestore();
+    }
+  });
+
   it.each([
     { pending: false, deferIssueWarning: false },
     { pending: true, deferIssueWarning: false },

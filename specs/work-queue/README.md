@@ -26,6 +26,8 @@ from the existing launch and worker models.
 verified Claim results and native reservation release.
 `ClaimDeliveryRecovery` refines released pending-delivery recovery, private
 receipt loss, authenticated cleanup and conditional maintenance progress.
+`ObsoleteWorkRetirement` isolates checked backlog retirement, legacy
+cancellation receipts, expiration-sensitive selection and failure isolation.
 
 The original `WorkQueue.tla` is retained as historical model evidence for
 [issue #64852](https://github.com/github/gh-aw/issues/64852). Its best-effort
@@ -40,6 +42,7 @@ The design rationale and trade-offs are recorded in [ADR-64955](../../docs/adr/6
 |---|---|---|
 | [Current operator interface](#current-operator-interface) | Point operators to the supported commands and deployment guidance. | Historical model details could be mistaken for current operator guidance. |
 | [Unclaimed Work expiration model](#unclaimed-work-expiration-model) | Check immutable deadlines without changing Claim authority. | Bounded deadline checks do not prove wall-clock scheduling or eventual service. |
+| [Obsolete Work retirement model](#obsolete-work-retirement-model) | Check fresh retirement eligibility and preserve legacy receipts and core recovery. | Approved routes and deterministic byte ordering are premises, not authentication or codec proofs. |
 | [Retained Claim completion model](#retained-claim-completion-model) | Check retained completion, delivery barriers, and subsequent re-claim. | Abstract receipts do not prove external effects or runtime refinement. |
 | [Claim delivery health and native capacity](#claim-delivery-health-and-native-capacity) | Separate aggregate delivery reporting from per-Claim results and capacity release. | Trusted receipt and terminal evidence are model premises, not verified implementations. |
 | [Released Claim delivery recovery](#released-claim-delivery-recovery) | Check recovery of released Claims whose delivery remains pending. | Fair recovery depends on stable terminal evidence, writable storage, and successful retries. |
@@ -108,6 +111,57 @@ The model abstracts retry counts, DAG structure, publication contention and
 physical pruning. The native conformance tests cover those runtime boundaries
 separately. No liveness property promises service before a finite expiration;
 the existing `QueueService` result remains conditional on continuous eligibility.
+
+## Obsolete Work retirement model
+
+`ObsoleteWorkRetirement.tla` supplements the existing deployment and expiration
+models without changing their configurations. Six Work nodes distinguish
+expired, incompatible, pinned, claimed, delivery-barrier and compatible-profile
+cases. The approved active route can change once; selection and publication can
+observe different routes, ownership, delivery barriers or timestamps.
+
+Selection uses a disposable current-time expiration view and a deterministic
+prefix bounded to one or two operations. Publication checks the fresh prefix
+atomically. A route, Claim, barrier or expiration race rejects the whole batch;
+publication/authentication failure likewise commits no retirement. Both outcomes
+still permit the existing recovery and compaction phases to be attempted.
+Recovery success and independently fatal core errors remain runtime concerns.
+
+The checked cancellation form represents operation `version: 1`. Historical
+reason-only cancellations remain accepted for compatible or pinned Work.
+Terminal metadata cannot change between the two forms, and an abstract checkpoint
+preserves the marker. Expiration is derived `work_expired` metadata, not a
+synthetic cancellation operation. Retirement preserves existing Claims, fairness
+charges, reservations and historical Results; it does not authorize effect replay.
+
+| Configuration | Required verdict |
+|---|---|
+| `Retirement.cfg`, `RetirementSingle.cfg` | Exhaust bounded `Safety` for two- and one-operation prefixes. |
+| `BrokenRetirementExpiry.cfg` | Reject selection from a stale, unexpired projection. |
+| `BrokenRetirementPublication.cfg` | Reject publication that skips fresh eligibility checks. |
+| `BrokenRetirementPin.cfg`, `BrokenRetirementOwnership.cfg`, `BrokenRetirementBarrier.cfg`, `BrokenRetirementAvailability.cfg` | Reject cancellation of protected or unavailable Work. |
+| `BrokenRetirementLegacy.cfg`, `BrokenRetirementCheckpoint.cfg`, `BrokenRetirementTerminal.cfg` | Reject retroactive legacy checks, checkpoint marker changes or terminal receipt rewrites. |
+| `BrokenRetirementDebt.cfg`, `BrokenRetirementReservation.cfg`, `BrokenRetirementResult.cfg` | Reject loss of charges, reservations or historical Results. |
+| `BrokenRetirementMaintenance.cfg` | Reject retirement failures that skip core recovery. |
+| `RetirementCheckedWitness.cfg`, `RetirementLegacyWitness.cfg`, `RetirementRecoveryWitness.cfg`, `RetirementExpirationWitness.cfg` | Reach checked retirement, legacy checkpoint preservation, recovery after failure and an elapsed-deadline prefix under `Safety`. |
+
+Official TLC 2.19 (pinned jar SHA below) with Java 21 exhausted **9,411 distinct
+states at depth 11** for `Retirement.cfg` and **9,195 at depth 11** for
+`RetirementSingle.cfg`. All thirteen mutation controls and four safety-guarded
+witnesses produced their exact named counterexamples and expected exit statuses.
+
+```bash
+TLA2TOOLS_JAR=/path/to/tla2tools.jar JAVA_BIN=/path/to/java \
+  TLC_MODEL_FILTER=ObsoleteWorkRetirement bash specs/work-queue/check.sh
+```
+
+The runner requires exact named counterexamples and exit statuses for all
+mutation controls and safety-guarded witnesses. These are bounded reachability
+checks, not liveness or a Go/JavaScript refinement proof. Approved deployment
+identity, immutable pins/contracts, deterministic UTF-8 ordering and trusted
+timestamps are premises. The checkpoint is an abstract record copy, not a JSON
+codec or Git history proof. The model does not establish actual API availability,
+authentication, global scheduling fairness or successful recovery effects.
 
 ## Retained Claim completion model
 

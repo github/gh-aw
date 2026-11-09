@@ -995,7 +995,7 @@ Use a small operation union:
 | `DeliveryFailure` | Close a completed node's unresolved delivery barrier after terminal-run evidence and bounded reconciliation; never authorize effects or release successors |
 | `Observation` | Record normalized trusted GitHub Issue/PR condition evidence, including identity and observation time |
 | `ClaimCancellation` | Remove this Claim's authority; optionally record trusted retry-not-before metadata |
-| `WorkCancellation` | Terminal cancellation; optional `claim_id` fences the selected current owner; does not pretend the worker has stopped using capacity |
+| `WorkCancellation` | Terminal cancellation; optional `claim_id` fences the selected current owner; operation `version: 1` checks `worker_contract_obsolete` eligibility; absent version retains historical reason-only semantics; does not pretend the worker has stopped using capacity |
 | `WorkPriority` | Administrator-only prospective override for available Work, with `expected_priority` compare-and-set; admitted priority, FIFO position, retry boundary and all charged clocks remain unchanged |
 | `Dispatch` | Record launch started, bound run, definitive rejection, or uncertainty for a `dispatch_id` and its immutable Claim array |
 | `Release` | Release the group's native reservation once with trusted termination/nonlaunch evidence; logical Claim slots close independently |
@@ -1003,6 +1003,23 @@ Use a small operation union:
 Do not repeat the entire Claim array in each dispatch lifecycle operation.
 Immutable membership is derived from the admission commit; lifecycle operations
 reference `dispatch_id`, its binding/evidence, and stable request identity.
+
+The QueueCommit protocol remains version 3. `WorkCancellation` without an
+operation `version` MUST retain legacy reason-only semantics, including
+`worker_contract_obsolete` cancellations of compatible or explicitly pinned Work.
+Operation `version: 1` adds a checked obsolescence transition for that reason;
+other explicit versions MUST be rejected. New maintenance and operator retirement
+producers MUST emit this checked form. Replay MUST require available, unclaimed,
+unpinned Work without any delivery barrier and an incompatible, available,
+approved active worker contract at the operation's committed time. Missing or
+unavailable deployments MUST NOT establish obsolescence. Selection MUST exclude
+Work expired at the current time, and publication MUST recheck against its own
+current prefix. Historical receipts and checkpoint state MUST NOT be rewritten
+to add or remove an operation version; only exact repeats of terminal
+cancellation metadata are idempotent. A retry of an accepted legacy operator
+request MUST recover its original request and fingerprint, not publish a checked
+replacement. All existing authorization, ownership and native-reservation
+requirements still apply to both forms.
 
 `WorkPriority` is published through an administrator `control` request in this
 same transaction log. Replay stores `effective_priority` separately from the
@@ -3342,6 +3359,7 @@ unexecuted formal, supported-host, performance, or deployment-security gate.
 | Protected launch credentials, immutable effect targets and native delivery verification | Implemented with exact selected-client/profile proofs, immutable Work/profile/ancestor target intersection and private native readback. Both public and compiler control entry points reject missing/invalid protected launch metadata before client construction or queue publication, while previews and submit-only controls remain credential-independent. Local positive and refusal regressions pass; writer deployment automation is separate |
 | Trusted AW settings and first-submit bootstrap | Compiler, JavaScript and native Go share optional global scheduling/Issue settings and default-only atomic Policy-and-Work bootstrap. AW authorizes participants and approved targets; no producer enrollment, worker-principal settings or administrator seeding is required. Installed economic Policy stays authoritative. Local tests cover defaults, overrides, malformed/conflicting settings, multiple participants, concurrent bootstrap, selective route validation and duplicate-free replay. Hosted Git publication and immutable-SHA dispatch remain unverified live gates |
 | Worker-evolution bounded model | Trusted-AW bootstrap and prospective worker-evolution models cover contract compatibility, explicit pins, local readiness, CAS races, frozen completion/credentials and preservation of debt, Results, reservations and scheduling economics. Focused positive, exact negative and guarded witness configurations are registered in the [formal reference](https://github.com/github/gh-aw/blob/main/specs/work-queue/README.md). These bounded models are not a proof of arbitrary Go/JavaScript or hosted API refinement; earlier captures are not rewritten |
+| Obsolete retirement and historical cancellation compatibility | Native Go/JavaScript and operator regressions cover checked operation versions, legacy reason-only history, immutable terminal metadata, checkpoint/retry identity, expiration-sensitive selection and independent maintenance recovery. `ObsoleteWorkRetirement` adds two bounded safety configurations, thirteen exact mutation controls and four safety-guarded reachability witnesses. Approved routes, byte ordering and timestamps remain premises; the abstract checkpoint is not a codec proof, and recovery attempts do not establish live delivery or liveness. See the [retirement model](https://github.com/github/gh-aw/blob/main/specs/work-queue/README.md#obsolete-work-retirement-model) |
 | Worker-evolution runtime and compiler integration | Go/JavaScript implement durable deployment CAS, frozen admission contracts, immutable execution pins, caller-local approval and readiness, historical availability updates, checkpoint replay and frozen completion/delivery/reconciliation. Compiler stamps use complete worker authority frontmatter and imports; chunked proposals reconstruct exactly below Actions' per-value limit. Actual compiled ESLint bootstrap admits three Work items and launches three mocked native workers without duplicate replay. Full native queue/setup, scoped CLI/compiler, 1,053 JavaScript tests, typecheck and 334-workflow drift checks pass. Hosted execution remains unverified; the aggregate publication gate retains independently baseline-confirmed custom Go lint findings |
 
 Authenticated ingestion, actual run/attempt binding, Claim/resource checks and

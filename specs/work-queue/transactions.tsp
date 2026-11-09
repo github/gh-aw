@@ -354,6 +354,8 @@ model WorkCancellationOperation {
   kind: "WorkCancellation";
   work_id: Identity;
   reason: ReasonCode;
+  // Absent preserves legacy reason-only replay; version 1 checks obsolescence.
+  version?: 1;
   // Optional compare-and-cancel fence for an operator selecting a Claim.
   claim_id?: Identity;
 }
