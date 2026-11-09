@@ -68,6 +68,19 @@ function sessionScopeKey(event) {
   return JSON.stringify([sessionId, parentToolUseId, agentId]);
 }
 
+/** @param {any} value @returns {string[]} */
+function normalizeOverflowedTokens(value) {
+  if (!Array.isArray(value)) return [];
+  return [
+    ...new Set(
+      value.flatMap(key => {
+        const match = Object.entries(USAGE_ALIASES).find(([name, aliases]) => key === name || aliases.includes(key));
+        return match ? [match[0]] : [];
+      })
+    ),
+  ];
+}
+
 /** @param {any} usage @returns {Record<string, any>|undefined} */
 function normalizeSessionUsage(usage) {
   // Usage is a named-field object; arrays cannot represent its token fields.
@@ -81,7 +94,7 @@ function normalizeSessionUsage(usage) {
     if (isTokenCount(value)) result[key] = value;
     else {
       delete result[key];
-      if (hasCanonical) for (const name of aliases) delete result[name];
+      for (const name of aliases) delete result[name];
     }
   }
   for (const [key, alias] of Object.entries(USAGE_BOOLEAN_ALIASES)) {
@@ -95,7 +108,7 @@ function normalizeSessionUsage(usage) {
   }
   const overflowed = Object.hasOwn(usage, "overflowed_tokens") ? usage.overflowed_tokens : usage.overflowedTokens;
   if (Array.isArray(overflowed)) {
-    result.overflowed_tokens = [...new Set(overflowed.map(key => Object.entries(USAGE_ALIASES).find(([name, aliases]) => key === name || aliases.includes(key))?.[0]).filter(Boolean))];
+    result.overflowed_tokens = normalizeOverflowedTokens(overflowed);
     for (const key of result.overflowed_tokens) {
       delete result[key];
       for (const alias of USAGE_ALIASES[key]) delete result[alias];
@@ -114,7 +127,7 @@ function reconcileSessionUsage(previous, snapshot) {
   const normalized = normalizeSessionUsage(snapshot);
   if (!normalized) return previous;
   const result = { ...previous, ...normalized };
-  const overflowed = new Set(Array.isArray(previous?.overflowed_tokens) ? previous.overflowed_tokens : []);
+  const overflowed = new Set(normalizeOverflowedTokens(previous?.overflowed_tokens));
   for (const key of Object.keys(USAGE_ALIASES)) {
     if (isTokenCount(normalized[key])) overflowed.delete(key);
   }
@@ -132,7 +145,7 @@ function reconcileSessionUsage(previous, snapshot) {
 function accumulateSessionUsage(target, usage) {
   const normalized = normalizeSessionUsage(usage);
   if (!normalized) return;
-  const overflowed = new Set([...(Array.isArray(target.overflowed_tokens) ? target.overflowed_tokens : []), ...(normalized.overflowed_tokens ?? [])]);
+  const overflowed = new Set([...normalizeOverflowedTokens(target.overflowed_tokens), ...(normalized.overflowed_tokens ?? [])]);
   for (const key of Object.keys(USAGE_ALIASES)) {
     if (overflowed.has(key) || !isTokenCount(normalized[key])) continue;
     const sum = (target[key] ?? 0) + normalized[key];
@@ -145,7 +158,7 @@ function accumulateSessionUsage(target, usage) {
       delete target[key];
       for (const alias of USAGE_ALIASES[key]) delete target[alias];
     }
-  }
+  } else delete target.overflowed_tokens;
 }
 
 /**

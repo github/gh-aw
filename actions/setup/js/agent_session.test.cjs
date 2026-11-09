@@ -6,6 +6,7 @@ import {
   projectSessionResult,
   normalizeSessionUsage,
   accumulateSessionUsage,
+  reconcileSessionUsage,
   sessionOutputText,
   sessionToolSuccess,
   sessionTokenTotal,
@@ -16,6 +17,7 @@ import {
   observedSessionModel,
 } from "./agent_session.cjs";
 import { scopedAgentSessions } from "./unified_session_render.cjs";
+import { normalizeUnifiedSessionEvent } from "./unified_session_payload.cjs";
 import {
   convertLegacyLogEntriesToCopilotEvents,
   convertCopilotEventsToLegacyLogEntries,
@@ -349,6 +351,65 @@ describe("Unified Agent Session 1.0.0 conformance", () => {
     accumulateSessionUsage(usage, { [alias]: 1 });
     expect(normalizeSessionUsage(usage)[key]).toBeUndefined();
     expect(usage.overflowed_tokens).toEqual([key]);
+  });
+
+  it.each([
+    ["cache_read_input_tokens", "cacheReadInputTokens", "cacheReadTokens", "cache_read_tokens"],
+    ["cache_creation_input_tokens", "cacheCreationInputTokens", "cacheWriteTokens", "cache_write_tokens"],
+  ])("never resurrects rejected %s aliases through unified projection or totals", (key, primaryAlias, secondaryAlias, nativeAlias) => {
+    for (const rejected of [
+      { [key]: -1, [primaryAlias]: 42, [secondaryAlias]: 42, [nativeAlias]: 42 },
+      { [primaryAlias]: "x", [secondaryAlias]: 42, [nativeAlias]: 42 },
+      { [secondaryAlias]: -1, [nativeAlias]: 42 },
+    ]) {
+      const source = freeze({ inputTokens: 10, outputTokens: 2, inputTokensIncludeCache: false, ...rejected });
+      const normalized = normalizeSessionUsage(source);
+      for (const name of [key, primaryAlias, secondaryAlias, nativeAlias]) expect(Object.hasOwn(normalized, name)).toBe(false);
+      expect(normalizeSessionUsage(normalized)).toEqual(normalized);
+      const event = normalizeUnifiedSessionEvent({ type: "session.result", data: { usage: normalized } });
+      for (const name of [key, primaryAlias, secondaryAlias, nativeAlias]) expect(Object.hasOwn(event.data.usage, name)).toBe(false);
+      expect(sessionTokenTotal(event.data.usage)).toBe(12);
+      expect(sessionTokenTotal(projectSessionResult([event]).usage)).toBe(12);
+      const accumulated = {};
+      accumulateSessionUsage(accumulated, source);
+      expect(sessionTokenTotal(accumulated)).toBe(12);
+    }
+    for (const selected of [key, primaryAlias, secondaryAlias]) {
+      const normalized = normalizeSessionUsage({ [selected]: 0, [nativeAlias]: 42 });
+      expect(normalized[key]).toBe(0);
+      expect(normalizeUnifiedSessionEvent({ type: "session.result", data: { usage: normalized } }).data.usage[primaryAlias]).toBe(0);
+    }
+    const overflow = normalizeSessionUsage({ [secondaryAlias]: 42, [nativeAlias]: 42, overflowed_tokens: [secondaryAlias] });
+    expect(overflow.overflowed_tokens).toEqual([key]);
+    const projected = normalizeUnifiedSessionEvent({ type: "session.result", data: { usage: overflow } });
+    expect(projected.data.usage[primaryAlias]).toBeUndefined();
+    expect(sessionTokenTotal(projected.data.usage)).toBeUndefined();
+  });
+
+  it.each(["bogus", "__proto__", "constructor", "prototype", "toString", "hasOwnProperty", "valueOf"])("ignores hostile overflow key %s in normalization, reconciliation and accumulation", key => {
+    const source = freeze({ input_tokens: 4, [key]: { kept: true }, overflowed_tokens: [key, null, 17, ["input_tokens"], {}] });
+    const normalized = normalizeSessionUsage(source);
+    expect(normalized).toMatchObject({ input_tokens: 4, overflowed_tokens: [] });
+    expect(Object.hasOwn(normalized, key)).toBe(true);
+    expect(normalized[key]).toEqual({ kept: true });
+    const reconciled = reconcileSessionUsage(source, { output_tokens: 2, overflowed_tokens: [key] });
+    expect(reconciled).toMatchObject({ input_tokens: 4, output_tokens: 2 });
+    expect(reconciled.overflowed_tokens).toBeUndefined();
+    expect(reconciled[key]).toEqual({ kept: true });
+    const accumulated = { ...source };
+    accumulateSessionUsage(accumulated, { inputTokens: 3, outputTokens: 0, overflowed_tokens: [key] });
+    expect(accumulated).toMatchObject({ input_tokens: 7, output_tokens: 0 });
+    expect(accumulated.overflowed_tokens).toBeUndefined();
+    expect(accumulated[key]).toEqual({ kept: true });
+  });
+
+  it("retains recognized overflow evidence while discarding hostile prior markers", () => {
+    const previous = { output_tokens: 2, overflowed_tokens: ["inputTokens", "constructor", "__proto__"] };
+    expect(reconcileSessionUsage(previous, { outputTokens: 0 })).toMatchObject({ output_tokens: 0, overflowed_tokens: ["input_tokens"] });
+    expect(reconcileSessionUsage(previous, { inputTokens: 0 }).overflowed_tokens).toBeUndefined();
+    const accumulated = { ...previous };
+    accumulateSessionUsage(accumulated, { inputTokens: 42, outputTokens: 0 });
+    expect(accumulated).toEqual({ output_tokens: 2, overflowed_tokens: ["input_tokens"] });
   });
 
   it("T-UAS-032/033: sum contributions but select snapshots field by field", () => {

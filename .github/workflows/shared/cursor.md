@@ -154,7 +154,20 @@ engine:
       }
     log-parser: |
       function parseLog(logContent) {
-        const { normalizeAgentSession, isSessionEvent } = require("./agent_session.cjs");
+        const { normalizeAgentSession, isSessionEvent, isTokenCount } = require("./agent_session.cjs");
+        const normalizeCursorRecord = record => {
+          const events = normalizeAgentSession([record], { sourceEngine: "cursor" });
+          for (const event of events) {
+            const usage = event.data.usage;
+            if (record.type === "result" && event.type === "session.result" && usage &&
+                !Object.hasOwn(record.usage, "input_tokens_include_cache") &&
+                !Object.hasOwn(record.usage, "inputTokensIncludeCache") &&
+                [usage.cache_read_input_tokens, usage.cache_creation_input_tokens].some(isTokenCount)) {
+              usage.input_tokens_include_cache = false;
+            }
+          }
+          return events;
+        };
         const logEntries = [];
         const AWF_INFRA_RE = /^\[(INFO|WARN|SUCCESS|ERROR|entrypoint|health-check|cursor-harness)\]|^ (?:Container|Network|Volume) |^Process exiting with code:/;
         const plaintext = [];
@@ -167,6 +180,7 @@ engine:
         const mcpFailures = new Set();
         let parseErrors = 0;
         let fence;
+        let lastAssistant;
         const lines = logContent.split("\n").map((line, index) => {
           const marker = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
           const fenced = Boolean(fence || marker);
@@ -188,10 +202,12 @@ engine:
         const trailer = lines.findLast(entry => entry.line.trim());
 
         for (const { line, index, fenced, record } of lines) {
+          const previousAssistant = lastAssistant;
+          lastAssistant = undefined;
           if (!structured) {
             if (!fenced && record?.type === "result" && record.subtype === undefined && record.session_id === undefined &&
                 trailer?.index === index) {
-              logEntries.push(...normalizeAgentSession([record], { sourceEngine: "cursor" }));
+              logEntries.push(...normalizeCursorRecord(record));
             } else plaintext.push(line);
             continue;
           }
@@ -216,6 +232,7 @@ engine:
           }
           if (isSessionEvent(record)) {
             logEntries.push(record);
+            if (record.type === "assistant.message") lastAssistant = record;
             continue;
           }
           const context = { ...record, sourceEngine: "cursor" };
@@ -248,20 +265,33 @@ engine:
             if (typeof record.text === "string") data.content = record.text;
             emit("assistant.reasoning", data);
           } else {
-            const normalized = normalizeAgentSession([record], { sourceEngine: "cursor" });
+            const normalized = normalizeCursorRecord(record);
             if (normalized.length === 0) emit("cursor.event", context);
             for (const event of normalized) {
               const data = { ...context, ...event.data };
               if (event.type === "assistant.message" && typeof record.model_call_id === "string") data.apiCallId = record.model_call_id;
               if (event.type === "session.result" && typeof record.is_error === "boolean") data.status = record.is_error ? "error" : "success";
               for (const key of Object.keys(data)) if (data[key] === undefined) delete data[key];
-              append({ ...event, data });
+              const appended = { ...event, data };
+              append(appended);
+              lastAssistant = record.type === "assistant" && event.type === "assistant.message" ? appended : undefined;
             }
-            if (record.type === "result" && typeof record.result === "string" &&
-                !logEntries.some(event => event.type === "assistant.message" && event.data.sessionId === context.sessionId && event.data.content === record.result)) {
-              const data = { ...context, content: record.result };
-              if (typeof record.request_id === "string") data.apiCallId = record.request_id;
-              emit("assistant.message", data);
+            if (record.type === "result" && typeof record.result === "string") {
+              const previous = previousAssistant?.data;
+              const sameSession = typeof context.sessionId === "string" && context.sessionId.length > 0 && previous?.sessionId === context.sessionId;
+              const sameRequest = typeof record.request_id === "string" && record.request_id.length > 0 && previous?.apiCallId === record.request_id;
+              const conflictingSession = typeof previous?.sessionId === "string" && typeof context.sessionId === "string" && previous.sessionId !== context.sessionId;
+              const conflictingRequest = typeof previous?.apiCallId === "string" && typeof record.request_id === "string" && previous.apiCallId !== record.request_id;
+              if (previous?.content === record.result && (sameSession || sameRequest) && !conflictingSession && !conflictingRequest) {
+                if (typeof record.request_id === "string") {
+                  previous.request_id = record.request_id;
+                  previous.apiCallId = record.request_id;
+                }
+              } else {
+                const data = { ...context, content: record.result };
+                if (typeof record.request_id === "string") data.apiCallId = record.request_id;
+                emit("assistant.message", data);
+              }
             }
           }
         }
@@ -309,7 +339,10 @@ tool-call IDs, arguments, results, and terminal metadata as unified session
 events. Hook contexts and tool envelope metadata are not tool calls. Native
 reasoning deltas and completion markers use `assistant.reasoning`; observed
 millisecond timestamps, model-call correlations, cache counters, and distinct
-terminal answer text are retained in their canonical fields. It does not invent
+terminal answer text are retained in their canonical fields. Observed separate
+cache counters are excluded from input tokens unless an inclusion flag is
+explicitly supplied. Terminal-answer deduplication requires an immediately
+preceding matching answer and compatible session or request identity. It does not invent
 turn counts, token usage, or tool success when
 these are absent. Legacy text is retained as final-answer prose, never parsed
 as tool calls, including JSON examples in Markdown fences. Native framing
