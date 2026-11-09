@@ -314,6 +314,14 @@ steps:
 
 Do not put a private key in this file. Missing or unreadable files fail startup; malformed PEM or files without valid CA certificates are rejected by the gateway without printing certificate contents. `ca-cert-file` is not supported for stdio servers or plain HTTP URLs. Local `gh aw mcp inspect` reports this gateway-only setting as unsupported rather than ignoring it. This setting does not replace the separate model-provider `sandbox.agent.ca-cert` configuration.
 
+### Required Tool Preflight
+
+Explicit prompt instructions such as `Use issue_read.`, `Call github(issue_read).`, or `Call inventory(lookup).` are checked against the effective tool configuration during compilation. An unavailable required MCP tool fails compilation with configuration guidance. Before agent execution, the gateway also checks these requirements against the live `tools/list` responses, including paginated results.
+
+The scanner checks direct `Use`, `Call`, and `Run` instructions in the prompt and locally available imports. Examples, quoted text, negated instructions, and alternatives such as `Call github(issue_read) or github(list_issues).` are not mandatory requirements. Shell instructions remain advisory. This is not semantic analysis of arbitrary prose or dynamically fetched content.
+
+Preflight never enables tools or expands permissions. Align the prompt with the configured interface, or explicitly configure the needed server, toolset, allowlist, or safe output. A prompt that requires a tool from an optional server still fails preflight if that tool is unavailable.
+
 ### Required Field
 
 MCP servers must pass a startup connectivity check before the agent starts. By default every server is startup-critical: if it cannot be reached, the workflow fails. Set `required: false` to mark a server as best-effort, so an unreachable server logs a warning and the workflow continues without it:

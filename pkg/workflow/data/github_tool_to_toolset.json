@@ -22,6 +22,7 @@
   "issue_dependency_write": "issues",
   "find_duplicate": "issues",
   "issue_read": "issues",
+  "list_issue_fields": "issues",
   "list_issues": "issues",
   "create_issue": "issues",
   "update_issue": "issues",

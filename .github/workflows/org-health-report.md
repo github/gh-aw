@@ -19,7 +19,7 @@ max-tool-denials: 3
 tools:
   cli-proxy: true
   github:
-    mode: gh-proxy
+    mode: local
     min-integrity: approved
     toolsets:
       - repos

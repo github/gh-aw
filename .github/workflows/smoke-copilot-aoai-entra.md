@@ -86,6 +86,7 @@ safe-outputs:
       retention-days: 1
       skip-archive: true
     add-comment:
+      discussions: true
       allowed-repos: ["github/gh-aw"]
       hide-older-comments: true
       max: 2

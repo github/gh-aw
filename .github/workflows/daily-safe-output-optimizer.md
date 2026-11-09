@@ -117,7 +117,7 @@ Implement focused tool-description fixes when the workflow prompt is correct but
 - These reads are optional historical context: a missing or invalid file is a normal cold start. Do not call `report_missing_data` for these cache misses.
 - DO NOT ATTEMPT TO USE GH AW DIRECTLY, it is not authenticated. Use the MCP server instead.
 - Do not attempt to download the `gh aw` extension or build it. If the MCP fails, give up.
-- Run the `status` tool of `gh-aw` MCP server to verify configuration.
+- Run `agenticworkflows status` through the configured CLI wrapper to verify configuration.
 
 ### Phase 1: Collect Workflow Logs with Safe Output Errors
 

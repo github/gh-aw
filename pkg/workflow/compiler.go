@@ -143,6 +143,9 @@ func (c *Compiler) validateWorkflowData(workflowData *WorkflowData, markdownPath
 		return err
 	}
 	c.validatePromptTools(workflowData, markdownPath)
+	if err := c.validateRequiredPromptTools(workflowData); err != nil {
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
+	}
 
 	if err := c.validateFeatureConfig(workflowData, markdownPath); err != nil {
 		return err

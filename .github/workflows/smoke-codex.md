@@ -51,7 +51,8 @@ tools:
   web-search:
   github:
     mode: local
-    toolsets: [repos, pull_requests]
+    toolsets: [repos, pull_requests, issues]
+    allowed: [list_pull_requests, pull_request_read, list_issue_fields]
   playwright:
   edit:
   bash:
@@ -140,7 +141,7 @@ post-steps:
 10. **Set Issue Field Testing**:
     - After creating the smoke-test issue, use `set_issue_field` exactly once on that new issue
     - Reference the created issue using the `temporary_id` declared on the `create_issue` output: set `issue_number: '#aw_smoke_issue'` in the `set_issue_field` message
-    - Discover available issue fields and choose one compatible field/value pair:
+    - Use `list_issue_fields` to discover available issue fields and choose one compatible field/value pair:
       - text field → short text value
       - number field → numeric value
       - date field → `YYYY-MM-DD`

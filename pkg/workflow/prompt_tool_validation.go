@@ -37,11 +37,7 @@ func (c *Compiler) validatePromptTools(data *WorkflowData, markdownPath string) 
 	if data == nil {
 		return
 	}
-	contents := []string{data.MarkdownContent, data.MainWorkflowMarkdown, data.ImportedMarkdown}
-	for _, entry := range data.PromptImports {
-		contents = append(contents, entry.Markdown)
-	}
-	contents = append(contents, c.collectRuntimeImportMarkdownForCompilerAnalysis(data))
+	contents := c.promptToolContents(data)
 	var capabilities EngineCapabilities
 	if engine, err := c.getAgenticEngine(ResolveEngineID(data)); err == nil {
 		capabilities = engine.GetCapabilities()
@@ -63,6 +59,15 @@ func (c *Compiler) validatePromptTools(data *WorkflowData, markdownPath string) 
 	}
 }
 
+func (c *Compiler) promptToolContents(data *WorkflowData) []string {
+	contents := []string{data.MarkdownContent, data.MainWorkflowMarkdown, data.ImportedMarkdown}
+	for _, entry := range data.PromptImports {
+		contents = append(contents, entry.Markdown)
+	}
+	contents = append(contents, c.collectRuntimeImportMarkdownForCompilerAnalysis(data))
+	return contents
+}
+
 func promptToolWarning(data *WorkflowData, requirement promptToolRequirement) string {
 	name := requirement.server + "(" + requirement.tool + ")"
 	advice := fmt.Sprintf("allow this specific tool in tools.%s.allowed and enable its server/toolset when needed", requirement.server)
@@ -74,6 +79,16 @@ func promptToolWarning(data *WorkflowData, requirement promptToolRequirement) st
 		advice = "enable tools.bash only for the specific commands the prompt needs"
 	} else if requirement.server == "mcpscripts" {
 		advice = "define the specific tool in mcp-scripts before requiring it"
+	} else if requirement.server == "agenticworkflows" {
+		advice = "enable tools.agentic-workflows and its required permissions"
+	} else if requirement.server == "safeoutputs" {
+		advice = "configure the corresponding safe-outputs entry before requiring this write tool"
+		for _, handler := range safeOutputHandlers {
+			if handler.ToolName == requirement.tool {
+				advice = fmt.Sprintf("configure safe-outputs.%s before requiring this tool", handler.Key)
+				break
+			}
+		}
 	} else if requirement.server == "native-read" {
 		name = "Read (native reads are unavailable for GitHub-backed Codex)"
 		advice = "replace the native read instruction with an available, explicitly configured MCP tool"
@@ -81,6 +96,9 @@ func promptToolWarning(data *WorkflowData, requirement promptToolRequirement) st
 	if promptToolTransportUnavailable(data, requirement) {
 		advice = fmt.Sprintf("use the %s CLI instead, or disable tools.cli-proxy to retain native MCP access", requirement.server)
 		name = "mcp__" + requirement.server + "__" + requirement.tool + " (native MCP access is excluded by tools.cli-proxy)"
+	}
+	if _, proxy := IsGitHubCLIProxyMode(data.Tools); requirement.server == "github" && proxy {
+		advice = "use the configured gh CLI for GitHub reads, or set tools.github.mode: local to expose GitHub MCP tools"
 	}
 	return fmt.Sprintf("Prompt explicitly requires %s, but the effective tool configuration does not allow it. Align the prompt with the permitted tools, or, if intended, %s. Permissions have not been expanded.", name, advice)
 }
@@ -241,15 +259,32 @@ func promptInvocationRequirements(verb, target string, knownTools map[string]pro
 		return promptShellRequirements(strings.TrimSuffix(target, "."))
 	}
 	if strings.EqualFold(verb, "use") || strings.EqualFold(verb, "call") {
-		if bare := promptBareTool.FindStringSubmatch(target); len(bare) >= 2 {
-			for _, name := range bare[1:] {
-				if requirement, known := knownTools[name]; known {
-					return []promptToolRequirement{requirement}
-				}
-			}
-		}
+		return promptBareRequirements(target, knownTools)
 	}
 	return nil
+}
+
+func promptBareRequirements(target string, knownTools map[string]promptToolRequirement) []promptToolRequirement {
+	var requirements []promptToolRequirement
+	for {
+		bare := promptBareTool.FindStringSubmatch(target)
+		if len(bare) < 2 {
+			break
+		}
+		name := bare[1]
+		requirement, known := knownTools[name]
+		if !known {
+			break
+		}
+		requirements = append(requirements, requirement)
+		target = target[len(name):]
+		separator := promptToolListSeparator.FindString(target)
+		if separator == "" {
+			break
+		}
+		target = strings.TrimPrefix(target[len(separator):], "`")
+	}
+	return requirements
 }
 
 func promptQualifiedRequirements(target string) ([]promptToolRequirement, bool) {
@@ -412,7 +447,8 @@ func promptToolAvailable(data *WorkflowData, requirement promptToolRequirement, 
 		tool, present := data.MCPScripts.Tools[requirement.tool]
 		return present && tool != nil
 	case "agenticworkflows":
-		return true // Availability depends on engine runtime features, not tools.allowed.
+		value, present := data.Tools["agentic-workflows"]
+		return present && !isToolExplicitlyFalse(value)
 	}
 	value, present := data.Tools[requirement.server]
 	if !present || isToolExplicitlyFalse(value) {
@@ -432,6 +468,9 @@ func promptToolAvailable(data *WorkflowData, requirement promptToolRequirement, 
 		}
 	}
 	if requirement.server == "github" {
+		if _, proxy := IsGitHubCLIProxyMode(data.Tools); proxy {
+			return false
+		}
 		toolToToolset, _ := getGitHubToolToToolsetMap()
 		if toolset, known := toolToToolset[requirement.tool]; known {
 			return slices.Contains(ParseGitHubToolsets(getGitHubToolsets(config)), toolset)

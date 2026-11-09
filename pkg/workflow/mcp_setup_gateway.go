@@ -63,6 +63,13 @@ func generateMCPGatewaySetup(yaml *strings.Builder, tools map[string]any, mcpToo
 	}
 	stepEnvVars := maps.Clone(mcpEnvVars)
 	stepEnvVars["DEBUG"] = mcpDebugEnv
+	if len(workflowData.RequiredMCPTools) > 0 {
+		requiredTools, err := json.Marshal(workflowData.RequiredMCPTools)
+		if err != nil {
+			return fmt.Errorf("marshal required MCP tools: %w", err)
+		}
+		stepEnvVars["GH_AW_REQUIRED_MCP_TOOLS"] = strconv.Quote(string(requiredTools))
+	}
 	maps.Copy(stepEnvVars, jiraAPIAuthStepEnv(tools))
 	customGatewayEnvNames := sanitizedGatewayEnvNames(gatewayConfig.Env)
 	writeMCPGatewayStepEnvWithCustomGatewayEnvNames(yaml, stepEnvVars, safeOutputsInputEnvVars, gatewayConfig.Env, customGatewayEnvNames, gatewayConfig.AgentID)

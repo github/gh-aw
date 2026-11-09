@@ -30,7 +30,7 @@ tools:
   cli-proxy: true
   agentic-workflows:
   github:
-    mode: gh-proxy
+    mode: local
     min-integrity: none
     toolsets:
       - default
@@ -127,7 +127,7 @@ This workflow was triggered from a comment on discussion #${{ github.event.discu
 
 **DO NOT ATTEMPT TO USE GH AW DIRECTLY** - it is not authenticated. Use the MCP server instead.
 
-1. **Verify MCP Server**: Run the `status` tool of `gh-aw` MCP server to verify configuration
+1. **Verify MCP Server**: Run `agenticworkflows status` through the configured CLI wrapper to verify configuration
 2. **Analyze Trigger Context**: Parse the triggering content to understand what needs improvement:
    - Is a specific workflow mentioned?
    - Are there error messages or issues described?

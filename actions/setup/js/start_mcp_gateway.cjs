@@ -47,6 +47,7 @@ const { PROXY_ENV_NAMES, STEP_NAME_START_MCP_GATEWAY } = require("./constants.cj
 const { redactCliProxyDiagnostics } = require("./redact_cli_proxy_diagnostics.cjs");
 const { prepareMCPServerCAs } = require("./mcp_server_ca.cjs");
 const { ERR_CONFIG, ERR_SYSTEM } = require("./error_codes.cjs");
+const { preflightRequiredTools } = require("./required_tools_preflight.cjs");
 
 function codedError(message, code = ERR_SYSTEM, options) {
   return new Error(`${code}: ${message}`, options);
@@ -1400,6 +1401,10 @@ async function main() {
   // -----------------------------------------------------------------------
   // Convert gateway output to agent-specific format
   // -----------------------------------------------------------------------
+  if (process.env.GH_AW_REQUIRED_MCP_TOOLS) {
+    const required = JSON.parse(process.env.GH_AW_REQUIRED_MCP_TOOLS);
+    await preflightRequiredTools(gatewayOutput, required, gatewayPort || "", agentId || "", core);
+  }
   core.info("Converting gateway configuration to agent format...");
   const configConvertStart = nowMs();
   process.env.MCP_GATEWAY_OUTPUT = outputPath;

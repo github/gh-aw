@@ -388,6 +388,7 @@ function safeMCPTransportCode(err) {
  * @param {string} agentId - Bearer token for gateway authentication
  * @param {typeof import("@actions/core")} core - GitHub Actions core
  * @param {number} [timeoutMs=DEFAULT_HTTP_TIMEOUT_MS]
+ * @param {string[]} [requiredTools] - Follow pagination until these tools are found.
  * `emptyWasSuccessful` marks a valid tools/list response (including non-empty lists).
  * `retryable` marks transient failures only; successful responses set it to false.
  * `failure` contains only the handshake phase, HTTP status, and whitelisted
@@ -395,7 +396,7 @@ function safeMCPTransportCode(err) {
  *
  * @returns {Promise<{tools: Array<{name: string, description?: string, inputSchema?: unknown}>, emptyWasSuccessful: boolean, retryable: boolean, failure?: {phase: "initialize" | "notifications/initialized" | "tools/list", statusCode?: number, code?: string}}>}
  */
-async function fetchMCPToolsResult(serverUrl, agentId, core, timeoutMs = DEFAULT_HTTP_TIMEOUT_MS) {
+async function fetchMCPToolsResult(serverUrl, agentId, core, timeoutMs = DEFAULT_HTTP_TIMEOUT_MS, requiredTools = []) {
   const authHeaders = { Authorization: agentId };
 
   // Step 1: initialize – establish the session and capture Mcp-Session-Id if present
@@ -448,19 +449,33 @@ async function fetchMCPToolsResult(serverUrl, agentId, core, timeoutMs = DEFAULT
 
   // Step 3: tools/list – get the available tool definitions
   try {
-    const listResp = await httpPostJSON(serverUrl, { ...authHeaders, ...sessionHeader }, { jsonrpc: "2.0", id: 2, method: "tools/list" }, timeoutMs);
-    const respBody = parseMCPResponseBody(listResp.body);
-    if (listResp.statusCode === 200 && hasMCPResult(respBody)) {
-      const result = respBody.result;
-      if ("tools" in result && Array.isArray(result.tools)) {
+    /** @type {Array<{name: string, description?: string, inputSchema?: unknown}>} */
+    const tools = [];
+    const cursors = new Set();
+    let cursor;
+    const deadline = Date.now() + timeoutMs;
+    for (let page = 0; page < 100; page++) {
+      const remainingMs = deadline - Date.now();
+      if (remainingMs <= 0) break;
+      const listResp = await httpPostJSON(serverUrl, { ...authHeaders, ...sessionHeader }, { jsonrpc: "2.0", id: 2 + page, method: "tools/list", ...(cursor ? { params: { cursor } } : {}) }, remainingMs);
+      const respBody = parseMCPResponseBody(listResp.body);
+      const result = hasMCPResult(respBody) ? respBody.result : undefined;
+      if (listResp.statusCode !== 200 || !result || !Array.isArray(result.tools)) {
+        return { tools: [], emptyWasSuccessful: false, retryable: isRetryableMCPFailure(listResp.statusCode, respBody), failure: { phase: "tools/list", statusCode: listResp.statusCode } };
+      }
+      tools.push(...result.tools);
+      if (!("nextCursor" in result) || !result.nextCursor || requiredTools.every(name => tools.some(tool => tool.name === name))) {
         return {
-          tools: /** @type {Array<{name: string, description?: string, inputSchema?: unknown}>} */ result.tools,
+          tools,
           emptyWasSuccessful: true,
           retryable: false,
         };
       }
+      if (typeof result.nextCursor !== "string" || cursors.has(result.nextCursor)) break;
+      cursor = result.nextCursor;
+      cursors.add(cursor);
     }
-    return { tools: [], emptyWasSuccessful: false, retryable: isRetryableMCPFailure(listResp.statusCode, respBody), failure: { phase: "tools/list", statusCode: listResp.statusCode } };
+    return { tools: [], emptyWasSuccessful: false, retryable: false, failure: { phase: "tools/list" } };
   } catch (err) {
     core.warning("  tools/list failed due to a transport error");
     return { tools: [], emptyWasSuccessful: false, retryable: true, failure: { phase: "tools/list", code: safeMCPTransportCode(err) } };

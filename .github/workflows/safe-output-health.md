@@ -64,7 +64,7 @@ Daily audit all agentic workflow runs from the last 24 hours to identify issues,
 
 - DO NOT ATTEMPT TO USE GH AW DIRECTLY, it is not authenticated. Use the MCP server instead.
 - Do not attempt to download the `gh aw` extension or build it. If the MCP fails, give up.
-- Run the `status` tool of `gh-aw` MCP server to verify configuration.
+- Run `agenticworkflows status` through the configured CLI wrapper to verify configuration.
 
 ### Phase 0.1: Check Monitoring Cadence
 

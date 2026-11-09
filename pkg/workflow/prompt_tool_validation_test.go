@@ -59,6 +59,7 @@ func TestPromptToolRequirements(t *testing.T) {
 		{"custom server", "Call inventory(lookup).", []promptToolRequirement{{server: "inventory", tool: "lookup", nativeMCP: true}}},
 		{"hyphenated script", "Call mcp__mcpscripts__read-outcomes.", []promptToolRequirement{{server: "mcpscripts", tool: "read-outcomes", nativeMCP: true}}},
 		{"bare github", "Use `issue_read` to inspect the issue.", []promptToolRequirement{{server: "github", tool: "issue_read"}}},
+		{"bare tool list", "Use `issue_read`, `list_issues`, and `list_discussions`.", []promptToolRequirement{{server: "github", tool: "issue_read"}, {server: "github", tool: "list_issues"}, {server: "github", tool: "list_discussions"}}},
 		{"bare unknown", "Use lookup to inspect the issue.", nil},
 		{"file plural prose", "- Use the `edit` tool to modify the affected file(s)", nil},
 		{"workflow plural prose", "- Use the issue/PR/discussion details and triggering content to determine the target workflow(s)", nil},
@@ -348,7 +349,16 @@ func TestPromptToolCompilerIntegration(t *testing.T) {
 			compiler := NewCompiler()
 			var err error
 			output := testutil.CaptureStderr(t, func() { err = compiler.CompileWorkflow(path) })
-			require.NoError(t, err)
+			switch tt.name {
+			case "github disabled", "github restricted", "github empty", "github toolset",
+				"CLI native mismatch", "named MCP status tool", "named MCP status tool-first",
+				"named GitHub restricted", "named GitHub toolset", "named GitHub CLI excluded",
+				"named custom casing mismatch", "safeoutput native mismatch", "safeoutput tool not enabled",
+				"bare safeoutput tool not enabled", "script missing":
+				require.ErrorContains(t, err, "required-tool preflight")
+			default:
+				require.NoError(t, err)
+			}
 			require.Equal(t, tt.want, strings.Count(output, "Prompt explicitly requires"), output)
 			if tt.name == "uppercase qualified allowed first denied second" {
 				require.Contains(t, output, "Prompt explicitly requires github(issue_read)")
@@ -374,8 +384,13 @@ func TestPromptToolCompilerIntegration(t *testing.T) {
 				require.Contains(t, output, "explicitly configured MCP tool")
 			}
 			require.GreaterOrEqual(t, compiler.GetWarningCount(), tt.want)
-			_, err = os.Stat(strings.TrimSuffix(path, ".md") + ".lock.yml")
-			require.NoError(t, err)
+			if err == nil {
+				_, err = os.Stat(strings.TrimSuffix(path, ".md") + ".lock.yml")
+				require.NoError(t, err)
+			} else {
+				_, statErr := os.Stat(strings.TrimSuffix(path, ".md") + ".lock.yml")
+				require.ErrorIs(t, statErr, os.ErrNotExist)
+			}
 		})
 	}
 

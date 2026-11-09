@@ -37,6 +37,7 @@ network:
 tools:
   cache-memory: true
   github:
+    mode: local
     toolsets: [repos, pull_requests]
   edit:
   bash:

@@ -420,6 +420,50 @@ describe("fetchMCPToolsResult handshake and failure classification", () => {
     res.end(body === undefined ? "" : JSON.stringify(body));
   }
 
+  it("follows tools/list pagination for required tools using the same session", async () => {
+    const cursors = [];
+    const url = await serve((req, res, request) => {
+      if (request.method === "initialize") {
+        return reply(res, { result: {} }, 200, { "mcp-session-id": "preflight-session" });
+      }
+      expect(req.headers["mcp-session-id"]).toBe("preflight-session");
+      if (request.method !== "tools/list") return reply(res, undefined, 202);
+      cursors.push(request.params?.cursor);
+      reply(res, {
+        result: request.params?.cursor ? { tools: [{ name: "issue_read" }] } : { tools: [{ name: "list_issues" }], nextCursor: "page-2" },
+      });
+    });
+    expect(await fetchMCPToolsResult(url, "test-auth", { warning: () => {} }, 1000, ["issue_read"])).toEqual({
+      tools: [{ name: "list_issues" }, { name: "issue_read" }],
+      emptyWasSuccessful: true,
+      retryable: false,
+    });
+    expect(cursors).toEqual([undefined, "page-2"]);
+  });
+
+  it("fails closed on repeated tools/list cursors", async () => {
+    const url = await serve((_req, res, request) => {
+      reply(res, { result: request.method === "tools/list" ? { tools: [], nextCursor: "repeated" } : {} });
+    });
+    expect(await fetchMCPToolsResult(url, "test-auth", { warning: () => {} }, 1000, ["issue_read"])).toEqual({
+      tools: [],
+      emptyWasSuccessful: false,
+      retryable: false,
+      failure: { phase: "tools/list" },
+    });
+  });
+
+  it("finishes pagination when a required tool is absent", async () => {
+    const url = await serve((_req, res, request) => {
+      reply(res, { result: request.method === "tools/list" ? (request.params?.cursor ? { tools: [] } : { tools: [], nextCursor: "last" }) : {} });
+    });
+    expect(await fetchMCPToolsResult(url, "test-auth", { warning: () => {} }, 1000, ["issue_read"])).toEqual({
+      tools: [],
+      emptyWasSuccessful: true,
+      retryable: false,
+    });
+  });
+
   it.each([{}, { result: null }, { result: [] }, { result: "invalid" }, []])("rejects malformed initialization %j without requesting tools", async body => {
     const methods = [];
     const url = await serve((_req, res, request) => {

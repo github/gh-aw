@@ -17,7 +17,7 @@ model: copilot/gpt-6-luna
 imports:
   - uses: shared/meta-analysis-base.md
     with:
-      toolsets: [default]
+      toolsets: [default, actions, discussions]
   - shared/otlp.md
   - shared/reporting.md
 tools:
@@ -283,7 +283,8 @@ cannot determine outcome status, set those items to `"pending"` rather than omit
 
 **Workflow Runs Fallback (GitHub API)**:
 
-When the logs-based path is truncated or unavailable, paginate `list_workflow_runs` across the full
+When the logs-based path is truncated or unavailable, paginate `actions_list` with
+`method: list_workflow_runs` across the full
 collection window and classify each run by its `conclusion`. Count `success` as `successful`;
 `failure`, `cancelled`, and `timed_out` as `failed`; and count `skipped` and `action_required`
 separately. Set `executed` to `successful + failed` and calculate `success_rate` as
