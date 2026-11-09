@@ -1,0 +1,3 @@
+{"id":"haiku_file_readback","question":"Does the output show readback of the run-specific file containing exactly three lines of a software-testing haiku?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-09T00:35:47.286Z","runid":"42540452060"}
+{"id":"bash_calculation","question":"Does the output show a bash calculation of 6 times 7 returning 42?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-09T00:35:47.286Z","runid":"42540452060"}
+{"id":"browser_title_comparison","question":"Does the output show that the JavaScript-rendered page title obtained with Playwright was compared for exact equality with the expected fixture title?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-09T00:35:47.286Z","runid":"42540452060"}
