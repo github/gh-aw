@@ -11,10 +11,12 @@ permissions:
   issues: read
   pull-requests: read
 tracker-id: daily-awf-spec-compiler-surfacing
-model: copilot/gpt-6-sol
 engine:
   id: codex
   model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
 sandbox:
   agent:
     id: awf
