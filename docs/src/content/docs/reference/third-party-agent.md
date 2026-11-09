@@ -64,6 +64,19 @@ These definitions are examples for integration authors, **not supported gh-aw en
 
 Read the pinned definition for its exact install and provider contract. Native events and accounting are retained only when observed; process exit zero alone does not prove task completion.
 
+### mini-SWE-agent package access
+
+The mini-SWE sample downloads hash-locked binary wheels in trusted `pre-agent-steps`,
+before AWF starts. Agent-time installation is isolated and offline; pip verifies
+the same hashes again. No dependencies are installed into the host user site.
+
+The shared import also declares `runtimes.python`, which explicitly grants the
+agent Python ecosystem access, including `pypi.org` and `files.pythonhosted.org`.
+Engine defaults do not grant this access. For registry-free execution, vendor
+the definition without `runtimes`, retain its bootstrap steps, and provide Python
+3.12 on a Linux x86-64 runner independently. Callers can opt back in with
+`network.allowed: [python]` or `runtimes.python`.
+
 ## Defining an engine
 
 A definition contains `engine.id`, metadata, and `engine.behaviors`. Its behaviors install the CLI, configure inference and MCP, invoke it headlessly, and expose logs for session reconstruction. Keep secrets outside the agent sandbox and fail explicitly when required credentials, endpoints, or restrictions cannot be honored.
