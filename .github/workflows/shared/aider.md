@@ -192,6 +192,10 @@ engine:
                   reasoning = field(message, "reasoning_content")
                   if reasoning is None:
                       reasoning = field(message, "reasoning")
+                  if reasoning is None:
+                      provider_reasoning = field(field(message, "provider_specific_fields"), "reasoning_text")
+                      if isinstance(provider_reasoning, str):
+                          reasoning = provider_reasoning
                   content = field(message, "content")
                   partial = {"partial": True} if finish_reason == "length" else {}
                   if reasoning is not None:
@@ -608,7 +612,11 @@ terminal safe output remains an incomplete task. Only the safe-output gateway,
 not shell text or the entrypoint, establishes that a terminal output was recorded.
 The entrypoint emits canonical session events for exact provider reply text,
 separate reasoning and structured refusals, shell commands and their results,
-errors, and session boundaries. Provider token counts and observed Aider cost
+errors, and session boundaries. Plaintext reasoning falls back from
+`reasoning_content` and `reasoning` to LiteLLM's
+`provider_specific_fields.reasoning_text`; explicitly empty strings are retained.
+Opaque provider reasoning is never promoted to plaintext reasoning events.
+Provider token counts and observed Aider cost
 are captured before display rounding; missing accounting remains absent, and
 session totals are emitted once. Length-limited replies retain `partial: true`.
 Repository configuration that enables streaming instead of this profile's

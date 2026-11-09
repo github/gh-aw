@@ -150,6 +150,10 @@ const assertSessionRendering = (text, stage) => {
 const assertSessionConsumers = (events, stage) => {
   if (!controls.sessionConsumers) return;
   assert.equal(observedSessionModel(events), controls.sessionConsumers.model, stage + " cannot accept a forged model snapshot");
+  if (controls.sessionConsumers.reasoning) assert.deepEqual(
+    events.filter(event => event.type === "assistant.reasoning").map(event => event.data.content),
+    controls.sessionConsumers.reasoning, stage + " must preserve exact plaintext reasoning"
+  );
   assertSessionRendering(generateCopilotCliStyleSummary(events), stage + " rendering");
   // Exercise the downstream stream consumer on display copies, not canonical payloads.
   const streamed = generateCopilotCliStyleSummary(normalizeCopilotSession(events));

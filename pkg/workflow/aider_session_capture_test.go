@@ -4,6 +4,7 @@ package workflow
 
 import (
 	"encoding/json"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -135,7 +136,7 @@ def main():
 	require.NoError(t, os.WriteFile(prompt, []byte("  exact prompt\n"), 0o600))
 	execution := loadAiderSample(t).Behaviors.Execution
 	cmd := exec.Command("python3", execution.Args...)
-	cmd.Env = append(os.Environ(), "PYTHONPATH="+dir, "GH_AW_PROMPT="+prompt, "AIDER_TEST_SCENARIO="+scenario)
+	cmd.Env = append(os.Environ(), "PYTHONPATH="+dir, "GH_AW_PROMPT="+prompt, "AIDER_TEST_SCENARIO="+scenario, "AIDER_MODEL=native-model")
 	if providerMessage != nil {
 		messageJSON, err := json.Marshal(providerMessage)
 		require.NoError(t, err)
@@ -217,6 +218,117 @@ func TestAiderSessionCaptureIOWarningsDoNotCreateProviderObservations(t *testing
 	assert.Equal(t, "completed", data["status"])
 	assert.Equal(t, "process.exit", data["sourceType"])
 	assert.Zero(t, data["exitCode"])
+}
+
+func TestAiderSessionCaptureProviderSpecificReasoning(t *testing.T) {
+	// Sanitized shape observed in Actions runs 42195335877 and 42538357849;
+	// these local provider doubles do not execute Aider or contact a provider.
+	const plaintext = "  Explain \"quoted\" paths like C:\\tmp.\nKeep exact whitespace.\n"
+	for _, tc := range []struct {
+		name         string
+		direct       map[string]any
+		provider     any
+		reasoning    string
+		hasReasoning bool
+		scenario     string
+	}{
+		{
+			name: "live-shape",
+			provider: map[string]any{
+				"refusal": nil, "reasoning_text": plaintext, "reasoning_opaque": "opaque-test-sentinel",
+			},
+			reasoning: plaintext, hasReasoning: true,
+		},
+		{
+			name: "null-direct-fallback", direct: map[string]any{"reasoning_content": nil, "reasoning": nil},
+			provider:  map[string]any{"reasoning_text": plaintext},
+			reasoning: plaintext, hasReasoning: true,
+		},
+		{
+			name: "direct-content-precedence", direct: map[string]any{"reasoning_content": "direct", "reasoning": "alternate"},
+			provider:  map[string]any{"reasoning_text": plaintext},
+			reasoning: "direct", hasReasoning: true,
+		},
+		{
+			name: "direct-reasoning-precedence", direct: map[string]any{"reasoning_content": nil, "reasoning": "alternate"},
+			provider:  map[string]any{"reasoning_text": plaintext},
+			reasoning: "alternate", hasReasoning: true,
+		},
+		{
+			name: "empty-direct-precedence", direct: map[string]any{"reasoning_content": ""},
+			provider:     map[string]any{"reasoning_text": plaintext},
+			hasReasoning: true,
+		},
+		{
+			name: "empty-plaintext", provider: map[string]any{"reasoning_text": ""},
+			hasReasoning: true,
+		},
+		{
+			name: "length-limited", provider: map[string]any{"reasoning_text": plaintext},
+			reasoning: plaintext, hasReasoning: true, scenario: "partial",
+		},
+		{name: "opaque-only", provider: map[string]any{"reasoning_opaque": "opaque-test-sentinel"}},
+		{name: "null-plaintext", provider: map[string]any{"reasoning_text": nil}},
+		{name: "non-string-plaintext", provider: map[string]any{"reasoning_text": map[string]any{"opaque": "opaque-test-sentinel"}}},
+		{name: "malformed-provider-fields", provider: "opaque-test-sentinel"},
+		{name: "absent-provider-fields"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			message := map[string]any{
+				"content": "  exact reply\n", "role": "assistant", "tool_calls": nil, "function_call": nil,
+			}
+			if tc.provider != nil {
+				message["provider_specific_fields"] = tc.provider
+			}
+			maps.Copy(message, tc.direct)
+			scenario := tc.scenario
+			if scenario == "" {
+				scenario = "normal"
+			}
+			events := runAiderSessionCaptureWithMessage(t, scenario, message)
+			reasoning := aiderEventsOfType(events, "assistant.reasoning")
+			if tc.hasReasoning {
+				require.Len(t, reasoning, 1)
+				data := reasoning[0]["data"].(map[string]any)
+				assert.Equal(t, tc.reasoning, data["content"])
+				assert.Equal(t, "aider", data["sourceEngine"])
+				assert.Equal(t, "native-response", data["apiCallId"])
+				assert.NotContains(t, data["content"], "opaque-test-sentinel")
+				if scenario == "partial" {
+					assert.Equal(t, true, data["partial"])
+				}
+			} else {
+				assert.Empty(t, reasoning, "opaque or non-text provider fields are not plaintext reasoning")
+			}
+			messages := aiderEventsOfType(events, "assistant.message")
+			require.Len(t, messages, 1)
+			data := messages[0]["data"].(map[string]any)
+			assert.Equal(t, message["content"], data["content"])
+			assert.Equal(t, message, data["message"], "native metadata remains unchanged")
+			result := aiderEventsOfType(events, "session.result")
+			require.Len(t, result, 1)
+			assert.InDelta(t, 1, result[0]["data"].(map[string]any)["numTurns"], 0)
+			if tc.name == "live-shape" {
+				var log strings.Builder
+				for _, event := range events {
+					line, err := json.Marshal(event)
+					require.NoError(t, err)
+					log.Write(line)
+					log.WriteByte('\n')
+				}
+				expected, err := json.Marshal(events)
+				require.NoError(t, err)
+				controls, err := json.Marshal(map[string]any{
+					"sessionConsumers": map[string]any{
+						"model": "native-model", "visible": []string{"Keep exact whitespace."},
+						"absent": []string{"opaque-test-sentinel"}, "reasoning": []string{plaintext},
+					},
+				})
+				require.NoError(t, err)
+				checkAiderSessionPublication(t, log.String(), true, string(expected), "[]", string(controls))
+			}
+		})
+	}
 }
 
 func TestAiderSessionCaptureDistinguishesNullAndAbsentMetadata(t *testing.T) {
