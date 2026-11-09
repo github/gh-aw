@@ -9,6 +9,7 @@ const { default: extension, subagentArgs, runPiSubagent } = await import("./pi_s
 const { writeInlineSubAgents } = await import("./extract_inline_sub_agents.cjs");
 const { stagePiArtifacts } = await import("./pi_runtime.cjs");
 const { preparePiSubagents } = await import("./pi_subagent_config.cjs");
+const { prepareMarkdownFixtures } = await import("../../../scripts/markdown_metadata_test_adapter.cjs");
 let dir;
 const agent = { name: "reader", description: "Read facts", prompt: "Read only.", declaredModel: "small", modelId: "claude-haiku-4.5", model: "aw-gateway/claude-haiku-4.5", tools: ["read"] };
 
@@ -280,6 +281,7 @@ process.stdin.on("end", () => {
       };
       vi.stubGlobal("core", { info: vi.fn() });
       const source = fs.readFileSync(new URL("../../../.github/workflows/smoke-pi-sub-agents.md", import.meta.url), "utf8");
+      prepareMarkdownFixtures(source);
       const parentPrompt = writeInlineSubAgents(source, dir, dir, "pi");
       expect(parentPrompt).not.toContain("## agent:");
       stagePiArtifacts(process.env.PI_CODING_AGENT_DIR);

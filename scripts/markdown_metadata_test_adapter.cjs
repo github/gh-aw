@@ -2,16 +2,42 @@
 "use strict";
 const fs = require("node:fs");
 const path = require("node:path");
+const { createHash } = require("node:crypto");
 const { execFileSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..");
 const binary = path.join(process.env.GH_AW_TEST_METADATA_TOOL_DIR || path.join(root, "build", "test-tools"), "markdown-metadata-fixtures");
 let built = false;
 const records = new Map();
 
+function fixtureCompilerFingerprint() {
+  const parserDirectory = path.join(root, "pkg", "parser");
+  const sources = [
+    "go.mod",
+    "go.sum",
+    "scripts/markdown-metadata-fixtures/main.go",
+    ...fs
+      .readdirSync(parserDirectory)
+      .filter(name => name.endsWith(".go") && !name.endsWith("_test.go"))
+      .sort()
+      .map(name => `pkg/parser/${name}`),
+  ];
+  const hash = createHash("sha256");
+  for (const source of sources) {
+    hash.update(source);
+    hash.update(fs.readFileSync(path.join(root, source)));
+  }
+  return hash.digest("hex");
+}
+
 function compile(input) {
   if (!built) {
     fs.mkdirSync(path.dirname(binary), { recursive: true });
-    execFileSync("go", ["build", "-o", binary, "./scripts/markdown-metadata-fixtures"], { cwd: root, stdio: "pipe" });
+    const fingerprint = fixtureCompilerFingerprint();
+    const fingerprintFile = `${binary}.sha256`;
+    if (!fs.existsSync(binary) || !fs.existsSync(fingerprintFile) || fs.readFileSync(fingerprintFile, "utf8") !== fingerprint) {
+      execFileSync("go", ["build", "-o", binary, "./scripts/markdown-metadata-fixtures"], { cwd: root, stdio: "pipe" });
+      fs.writeFileSync(fingerprintFile, fingerprint);
+    }
     built = true;
   }
   return JSON.parse(execFileSync(binary, [], { cwd: root, input: JSON.stringify(input), encoding: "utf8", maxBuffer: 16 * 1024 * 1024 }));

@@ -863,7 +863,7 @@ describe("pi_models_json.cjs", () => {
     it("incomplete discovery fails sub-agent aliases instead of using Pi's static model list", async () => {
       configure("copilot/claude-opus-5.5");
       fs.mkdirSync(path.join(process.env.GH_AW_PI_STAGING_DIR, "agents"), { recursive: true });
-      fs.writeFileSync(path.join(process.env.GH_AW_PI_STAGING_DIR, "agents/reader.md"), "---\ndescription: Read files\nmodel: haiku\n---\nRead only.");
+      fs.writeFileSync(path.join(process.env.GH_AW_PI_STAGING_DIR, "agents/reader.md"), `---\n${JSON.stringify({ description: "Read files", model: "haiku" })}\n---\nRead only.`);
       const staticCatalog = [{ provider: "github-copilot", id: "claude-haiku-4.5" }];
       const sdk = {
         ModelRuntime: { create: async () => ({ getModels: () => staticCatalog, getModel: () => undefined }) },
@@ -894,7 +894,7 @@ describe("pi_models_json.cjs", () => {
       process.env.AWF_REFLECT_ENABLED = "1";
       delete process.env.GH_AW_PI_MODELS_JSON_PATH;
       fs.mkdirSync(path.join(process.env.GH_AW_PI_STAGING_DIR, "agents"), { recursive: true });
-      fs.writeFileSync(path.join(process.env.GH_AW_PI_STAGING_DIR, "agents/reader.md"), "---\ndescription: Read files\nmodel: small\n---\nRead only.");
+      fs.writeFileSync(path.join(process.env.GH_AW_PI_STAGING_DIR, "agents/reader.md"), `---\n${JSON.stringify({ description: "Read files", model: "small" })}\n---\nRead only.`);
       const catalog = [
         { provider: "github-copilot", id: "gpt-5.6-luna", api: "openai-responses", reasoning: true, input: ["text"], contextWindow: 128000, maxTokens: 32000 },
         { provider: "github-copilot", id: "claude-haiku-4.5", api: "openai-completions", reasoning: false, input: ["text"], contextWindow: 200000, maxTokens: 8192 },
