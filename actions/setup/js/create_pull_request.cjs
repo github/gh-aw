@@ -83,6 +83,21 @@ const MAX_GITHUB_BODY_LENGTH = 65536;
 const PROTECTED_FALLBACK_ISSUE_MARKER = "gh-aw-protected-file-fallback";
 
 /**
+ * Fingerprint a protected-file proposal without per-commit format-patch metadata.
+ * @param {string} title
+ * @param {string} patchContent
+ * @returns {string}
+ */
+function getProtectedFallbackIssueFingerprint(title, patchContent) {
+  const diffHeaderIndex = patchContent.search(/^diff --git /m);
+  const canonicalPatchContent = diffHeaderIndex === -1 ? patchContent : patchContent.slice(diffHeaderIndex);
+  return crypto
+    .createHash("sha256")
+    .update(JSON.stringify([title, canonicalPatchContent]))
+    .digest("hex");
+}
+
+/**
  * @typedef {import('./types/handler-factory').HandlerFactoryFunction} HandlerFactoryFunction
  */
 
@@ -2566,11 +2581,7 @@ async function main(config = {}) {
           });
         }
 
-        const fingerprint = crypto
-          .createHash("sha256")
-          .update(JSON.stringify([title, patchContent]))
-          .digest("hex");
-        const runUrl = buildWorkflowRunUrl(context, context.repo);
+        const fingerprint = getProtectedFallbackIssueFingerprint(title, patchContent);
         /**
          * @param {import("./report_ast.cjs").ReportBlock[]} children
          * @returns {import("./report_ast.cjs").ReportBlock[]}
@@ -2595,13 +2606,19 @@ async function main(config = {}) {
           /** @param {import("./report_ast.cjs").ReportBlock[]} children */
           const protectedFallbackFrame = children => fallbackFrame([...children, { type: "quote", agentTainted: false, children: [{ type: "expiration", expiresAt, agentTainted: false }] }], { expiresHours: 0, itemType: "issue" });
           const issueLabels = mergeFallbackIssueLabels([...effectiveFallbackLabels, "pull-request-fallback"]);
-          const existingIssueMatch = await findProtectedFallbackIssue(githubClient, repoParts, title, fingerprint);
+          let existingIssueMatch = null;
+          try {
+            existingIssueMatch = await findProtectedFallbackIssue(githubClient, repoParts, title, fingerprint);
+          } catch (lookupError) {
+            core.warning(`Failed to look up an existing protected-file fallback issue; creating a new issue: ${getErrorMessage(lookupError)}`);
+          }
           const existingIssue = existingIssueMatch?.issue;
           let issue;
           let issueRepoParts;
           if (existingIssue) {
             issueRepoParts = existingIssueMatch.issueRepoParts;
             const existingIssueBody = appendReportExecutionProvenance(protectedFallbackFrame(withProposalMetadata(fallbackBody)), process.env.GH_AW_WORKFLOW_NAME || "Workflow", "");
+            const existingIssueLabels = Array.isArray(existingIssue.labels) ? existingIssue.labels.map(label => (typeof label === "string" ? label : label?.name)).filter(label => typeof label === "string") : [];
             const response = await withRetry(
               async () => {
                 transport.assertUnchanged();
@@ -2611,7 +2628,7 @@ async function main(config = {}) {
                   issue_number: existingIssue.number,
                   title,
                   body: renderSizedReport(existingIssueBody).body,
-                  labels: issueLabels,
+                  labels: mergeFallbackIssueLabels([...existingIssueLabels, ...issueLabels]),
                   state: "open",
                 });
                 transport.assertUnchanged();
@@ -3123,6 +3140,7 @@ async function main(config = {}) {
 
 module.exports = {
   main,
+  getProtectedFallbackIssueFingerprint,
   enforcePullRequestLimits,
   countUniquePatchFiles,
   parseDiffGitHeader,

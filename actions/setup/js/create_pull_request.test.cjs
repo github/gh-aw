@@ -2,7 +2,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createRequire } from "module";
 import { fileURLToPath } from "url";
-import { createHash } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -2361,19 +2360,22 @@ ${diffs}
     copyPromptTemplate(promptsDir, "safe_outputs_disclosure_header.md");
     process.env.GH_AW_PROMPTS_DIR = promptsDir;
 
-    const fingerprint = createHash("sha256")
-      .update(JSON.stringify(["Test PR", patchContent]))
-      .digest("hex");
+    const { getProtectedFallbackIssueFingerprint } = require("./create_pull_request.cjs");
+    const fingerprint = getProtectedFallbackIssueFingerprint("Test PR", patchContent);
     const existingIssue = {
       number: 76,
       title: "Test PR",
       body: `<!-- gh-aw-protected-file-fallback:${fingerprint} -->`,
       html_url: "https://github.com/test-owner/test-repo/issues/76",
       state: "closed",
+      labels: [{ name: "priority" }, { name: "pull-request-fallback" }],
     };
     global.github.rest.issues = {
       create: vi.fn(),
-      update: vi.fn().mockResolvedValue({ data: { number: 76, html_url: existingIssue.html_url } }),
+      update: vi
+        .fn()
+        .mockResolvedValueOnce({ data: { number: 76, html_url: existingIssue.html_url } })
+        .mockRejectedValueOnce(new Error("auto-close update failed")),
       listForRepo: vi.fn(),
     };
     global.github.paginate.mockResolvedValue([existingIssue]);
@@ -2389,9 +2391,48 @@ ${diffs}
     expect(global.github.rest.issues.create).not.toHaveBeenCalled();
     expect(global.github.paginate).toHaveBeenCalledWith(global.github.rest.issues.listForRepo, expect.objectContaining({ owner: "test-owner", repo: "test-repo", state: "all", labels: "pull-request-fallback" }));
     const updateCall = global.github.rest.issues.update.mock.calls[0][0];
-    expect(updateCall).toMatchObject({ issue_number: 76, title: "Test PR", labels: expect.arrayContaining(["pull-request-fallback"]), state: "open" });
+    expect(updateCall).toMatchObject({ issue_number: 76, title: "Test PR", labels: expect.arrayContaining(["priority", "pull-request-fallback"]), state: "open" });
     expect(updateCall.body).toContain("https://github.com/test-owner/test-repo/actions/runs/123");
     expect(updateCall.body).toContain(`<!-- gh-aw-protected-file-fallback:${fingerprint} -->`);
+    expect(global.github.rest.issues.update.mock.calls[1][0].body).toContain(`<!-- gh-aw-protected-file-fallback:${fingerprint} -->`);
+    expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("Failed to update protected-file-protection fallback issue #76 with auto-close link"));
+  });
+
+  it("should fingerprint identical diffs despite regenerated format-patch headers", () => {
+    const { getProtectedFallbackIssueFingerprint } = require("./create_pull_request.cjs");
+    const diff = "diff --git a/.github/aw/instructions.md b/.github/aw/instructions.md\nindex 1234567..abcdef0 100644\n";
+    const firstPatch = `From 1111111111111111111111111111111111111111 Mon Sep 17 00:00:00 2001\nDate: Mon, 1 Jan 2024 12:00:00 +0000\nX-GH-AW-Base-Commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\n${diff}`;
+    const regeneratedPatch = `From 2222222222222222222222222222222222222222 Mon Sep 17 00:00:00 2001\nDate: Tue, 2 Jan 2024 13:00:00 +0000\nX-GH-AW-Base-Commit: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n\n${diff}`;
+
+    expect(getProtectedFallbackIssueFingerprint("Test PR", firstPatch)).toBe(getProtectedFallbackIssueFingerprint("Test PR", regeneratedPatch));
+  });
+
+  it("should create a new issue if protected-file fallback lookup fails", async () => {
+    const patchContent = createPatchWithFiles(".github/aw/instructions.md");
+    writePatch("feature/protected-lookup-failure", patchContent);
+    const promptsDir = path.join(tempDir, "prompts");
+    fs.mkdirSync(promptsDir, { recursive: true });
+    copyPromptTemplate(promptsDir, "manifest_protection_create_pr_fallback.md");
+    copyPromptTemplate(promptsDir, "safe_outputs_disclosure_header.md");
+    process.env.GH_AW_PROMPTS_DIR = promptsDir;
+
+    global.github.rest.issues = {
+      create: vi.fn().mockResolvedValue({ data: { number: 77, html_url: "https://github.com/test-owner/test-repo/issues/77" } }),
+      update: vi.fn().mockResolvedValue({ data: {} }),
+      listForRepo: vi.fn(),
+    };
+    global.github.paginate.mockRejectedValue(Object.assign(new Error("Service unavailable"), { status: 503 }));
+
+    const { main } = require("./create_pull_request.cjs");
+    const handler = await main({
+      protected_path_prefixes: [".github/"],
+      protected_files_policy: "fallback-to-issue",
+    });
+    const result = await handler({ title: "Test PR", body: "Test body", branch: "feature/protected-lookup-failure" }, {});
+
+    expect(result.issue_number).toBe(77);
+    expect(global.github.rest.issues.create).toHaveBeenCalledTimes(1);
+    expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("Failed to look up an existing protected-file fallback issue; creating a new issue"));
   });
 
   it("should create a new issue when the protected-file proposal changes", async () => {
@@ -2404,9 +2445,8 @@ ${diffs}
     copyPromptTemplate(promptsDir, "safe_outputs_disclosure_header.md");
     process.env.GH_AW_PROMPTS_DIR = promptsDir;
 
-    const oldFingerprint = createHash("sha256")
-      .update(JSON.stringify(["Test PR", originalPatch]))
-      .digest("hex");
+    const { getProtectedFallbackIssueFingerprint } = require("./create_pull_request.cjs");
+    const oldFingerprint = getProtectedFallbackIssueFingerprint("Test PR", originalPatch);
     global.github.rest.issues = {
       create: vi.fn().mockResolvedValue({ data: { number: 77, html_url: "https://github.com/test-owner/test-repo/issues/77" } }),
       update: vi.fn().mockResolvedValue({ data: {} }),
@@ -2431,9 +2471,7 @@ ${diffs}
     expect(result.issue_number).toBe(77);
     expect(global.github.rest.issues.create).toHaveBeenCalledTimes(1);
     const createCall = global.github.rest.issues.create.mock.calls[0][0];
-    const newFingerprint = createHash("sha256")
-      .update(JSON.stringify(["Test PR", changedPatch]))
-      .digest("hex");
+    const newFingerprint = getProtectedFallbackIssueFingerprint("Test PR", changedPatch);
     expect(newFingerprint).not.toBe(oldFingerprint);
     expect(createCall.body).toContain(`<!-- gh-aw-protected-file-fallback:${newFingerprint} -->`);
     expect(createCall.body).toContain("https://github.com/test-owner/test-repo/actions/runs/123");
