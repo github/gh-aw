@@ -29,7 +29,7 @@ describe("install_frontmatter_skills", () => {
     originalGithub = global.github;
     tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-frontmatter-skills-"));
     vi.stubEnv("GH_AW_TMP_DIR", tempRoot);
-    require("./markdown_metadata.cjs").installMarkdownMetadata({ version: 1, records: [] });
+    require("./markdown_metadata.cjs").installMarkdownMetadata({ version: 2, records: [] });
 
     global.core = {
       info: vi.fn(),
@@ -186,9 +186,9 @@ describe("install_frontmatter_skills", () => {
     const revision = "a".repeat(40);
     const source = "description: Private reader\nmodel: small\ntools: [Read]";
     const value = { description: "Private reader", model: "small", tools: ["Read"] };
-    const record = { kind: "artifact", sha256: require("node:crypto").createHash("sha256").update(source).digest("hex"), value_json: JSON.stringify(value) };
+    const record = { kind: "artifact", sha256: require("node:crypto").createHash("sha256").update(source).digest("hex"), value };
     const file = ".github/workflows/metadata.lock.yml";
-    const header = `# gh-aw-metadata: {}\n# gh-aw-manifest: ${JSON.stringify({ version: 1, markdown_metadata: { version: 1, records: [record] } })}\n# generated\ninvalid: [yaml\n`;
+    const header = `# gh-aw-metadata: {}\n# gh-aw-manifest: ${JSON.stringify({ version: 1, markdown_metadata: { version: 2, records: [record] } })}\n# generated\ninvalid: [yaml\n`;
     const client = {
       rest: {
         repos: {
@@ -214,7 +214,7 @@ describe("install_frontmatter_skills", () => {
     expect(client.rest.repos.getContent).toHaveBeenCalledTimes(2);
     const info = fs.readFileSync(path.join(tempRoot, "aw_info.json"), "utf8");
     expect(JSON.parse(info).run_id).toBe(123);
-    expect(JSON.parse(JSON.parse(info).markdown_metadata.records[0].value_json)).toEqual(value);
+    expect(JSON.parse(info).markdown_metadata.records[0].value).toEqual(value);
     expect(info).not.toContain("private-source-token");
     await script.main();
     expect(client.rest.repos.getContent).toHaveBeenCalledTimes(2);

@@ -13,4 +13,13 @@ describe("shared JSON lock headers", () => {
     expect(parseLockFileHeaders(["# first", "# second", "# third", '# gh-aw-manifest: {"version":1}']).manifest).toBeUndefined();
     expect(parseLockFileHeaders(['# gh-aw-manifest: {"rate":0.25}']).manifest).toBeUndefined();
   });
+  it("accepts finite fractional catalog values without weakening inventory or queue numbers", () => {
+    const manifest = { version: 1, markdown_metadata: { version: 2, records: [{ value: { rate: 0.25 } }] } };
+    expect(parseLockFileHeaders([`# gh-aw-manifest: ${JSON.stringify(manifest)}`]).manifest).toEqual(manifest);
+    expect(parseLockFileHeaders(['# gh-aw-manifest: {"markdown_metadata":{"value":{"rate":1e999}}}']).manifest).toBeUndefined();
+    expect(parseLockFileHeaders(['# gh-aw-manifest: {"markdown_metadata":{"value":{"rate":0.25,"rate":0.5}}}']).manifest).toBeUndefined();
+    expect(() => require("./work_queue_codec.cjs").parseStrictJSON('{"rate":0.25}')).toThrow();
+    expect(parseLockFileHeaders(['# gh-aw-manifest: {"version":1e0,"markdown_metadata":{"rate":0.25}}']).manifest).toBeUndefined();
+    expect(parseLockFileHeaders(['# gh-aw-manifest: {"version":1,"inventory":{"markdown_metadata":{"rate":0.25}}}']).manifest).toBeUndefined();
+  });
 });

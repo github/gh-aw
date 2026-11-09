@@ -30,12 +30,12 @@ func TestCompilerMarkdownMetadataManifest(t *testing.T) {
 	}
 
 	manifest := c.collectMarkdownMetadata(data)
-	require.Equal(t, 1, manifest.Version)
+	require.Equal(t, 2, manifest.Version)
 	values := map[string]any{}
 	for _, record := range manifest.Records {
 		require.Empty(t, record.Error)
 		var value any
-		require.NoError(t, json.Unmarshal([]byte(record.ValueJSON), &value))
+		require.NoError(t, json.Unmarshal(record.Value, &value))
 		values[record.SHA256] = value
 	}
 	hash := func(source string) string {
@@ -58,7 +58,7 @@ func TestCompilerMarkdownMetadataDelimiterForms(t *testing.T) {
 			require.Len(t, records, 1)
 			for _, record := range records {
 				require.Empty(t, record.Error)
-				require.JSONEq(t, `{"model":"small","tools":["Read"]}`, record.ValueJSON)
+				require.JSONEq(t, `{"model":"small","tools":["Read"]}`, string(record.Value))
 			}
 		})
 	}
@@ -66,7 +66,7 @@ func TestCompilerMarkdownMetadataDelimiterForms(t *testing.T) {
 	scanMarkdownMetadata(records, "---\n---\nBody\n---\nmodel: forged\n---", "artifact")
 	require.Len(t, records, 1)
 	for _, record := range records {
-		require.JSONEq(t, `{}`, record.ValueJSON)
+		require.JSONEq(t, `{}`, string(record.Value))
 	}
 	records = map[string]GHAWMarkdownMetadataRecord{}
 	scanMarkdownMetadata(records, "## agent: reader\n---\nmodel: small", "model-pins")
@@ -95,7 +95,7 @@ func TestCompilerMarkdownMetadataAcrossPromptChunks(t *testing.T) {
 	found := false
 	for _, record := range c.collectMarkdownMetadata(data).Records {
 		var value map[string]any
-		if record.Kind != "artifact" || json.Unmarshal([]byte(record.ValueJSON), &value) != nil || value["model"] != "small" {
+		if record.Kind != "artifact" || json.Unmarshal(record.Value, &value) != nil || value["model"] != "small" {
 			continue
 		}
 		description, _ := value["description"].(string)
@@ -129,11 +129,11 @@ func TestCompilerMarkdownMetadataScopesWorkflowConfiguration(t *testing.T) {
 	artifacts := 0
 	for _, record := range result.Records {
 		require.Empty(t, record.Error)
-		require.NotContains(t, record.ValueJSON, "irrelevant")
-		require.NotContains(t, record.ValueJSON, "unrelated")
+		require.NotContains(t, string(record.Value), "irrelevant")
+		require.NotContains(t, string(record.Value), "unrelated")
 		if record.Kind == "artifact" {
 			artifacts++
-			require.JSONEq(t, `{"description":"Reads files","model":"small"}`, record.ValueJSON)
+			require.JSONEq(t, `{"description":"Reads files","model":"small"}`, string(record.Value))
 		}
 	}
 	require.Equal(t, 1, artifacts, "workflow frontmatter and unrelated workflows must not become artifact records")
@@ -158,7 +158,7 @@ func TestCompilerMarkdownMetadataRepresentativeWorkflowScope(t *testing.T) {
 			foundWorkflow = true
 		}
 		if record.Kind == "artifact" {
-			require.NotContains(t, record.ValueJSON, "Prepare recent-change dataset", "full workflow configurations must not be duplicated as artifacts")
+			require.NotContains(t, string(record.Value), "Prepare recent-change dataset", "full workflow configurations must not be duplicated as artifacts")
 		}
 	}
 	require.True(t, foundWorkflow, "the workflow's own model metadata must be present when RawMarkdown contains only its body")

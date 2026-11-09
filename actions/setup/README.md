@@ -14,13 +14,22 @@ this action and consumes compiler-produced JSON metadata. Setup does not compile
 or install Go code, provision a native metadata helper, or install a parser
 package.
 
-The lock manifest includes a versioned `markdown_metadata` catalog for agent,
-skill, and model-audit metadata. The compiler interprets authored frontmatter;
+The lock manifest includes a version-2 `markdown_metadata` catalog for agent,
+skill, and model-audit metadata. Records store native JSON `value` objects, not
+JSON-encoded strings. Information already present in `gh-aw-metadata` or the
+rest of `gh-aw-manifest` is omitted from the record and reused through
+`references`, mapping destination JSON pointers to existing header pointers.
+The runtime resolves these references from the same immutable lock before
+installing records; missing, recursive, overlapping, or conflicting references
+are rejected. The existing header fields remain the source of truth.
+
+The compiler interprets authored frontmatter;
 the runtime matches the normalized source SHA-256 digest to the catalog and
 reads JSON. JSON frontmatter also requires catalog provenance; valid JSON alone
 is not trusted. Run `gh aw compile` after changing repository or imported
-frontmatter. Missing or stale compiler records and compiler rejections fail
-explicitly rather than falling back to runtime parsing.
+frontmatter to regenerate the version-2 catalog. Missing or stale compiler
+records and compiler rejections fail explicitly rather than falling back to
+runtime parsing.
 
 Engine copies use canonical JSON authorized by compiler artifact values.
 Trusted scalar, name, and model edits retain exact derived digests in the

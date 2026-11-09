@@ -39,7 +39,7 @@ func main() {
 					panic(encodeErr)
 				}
 				hash := sha256.Sum256([]byte(block.Source))
-				record := map[string]any{"sha256": hex.EncodeToString(hash[:]), "kind": "artifact", "value_json": string(encoded)}
+				record := map[string]any{"sha256": hex.EncodeToString(hash[:]), "kind": "artifact", "value": json.RawMessage(encoded)}
 				if err != nil {
 					record["error"] = err.Error()
 				}

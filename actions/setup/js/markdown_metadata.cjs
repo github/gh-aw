@@ -5,9 +5,9 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { createHash } = require("node:crypto");
 const { isDeepStrictEqual } = require("node:util");
-const { parseLockFileHeaders } = require("./lock_file_headers.cjs");
+const { parseLockFileHeaders, parseMarkdownJSON } = require("./lock_file_headers.cjs");
 
-/** @typedef {{sha256: string, kind: string, value_json: string, error?: string}} MetadataRecord */
+/** @typedef {{sha256: string, kind: string, value: any, error?: string}} MetadataRecord */
 /** @typedef {{version: number, records: MetadataRecord[]}} MetadataCatalog */
 /** @type {Map<string, MetadataRecord>} */
 let records = new Map();
@@ -72,19 +72,27 @@ class CompilerMetadataUnavailableError extends Error {
  * @param {boolean} [merge]
  */
 function installMarkdownMetadata(metadata, merge = false) {
-  if (!metadata || typeof metadata !== "object" || !("version" in metadata) || metadata.version !== 1 || !("records" in metadata) || !Array.isArray(metadata.records)) throw new Error("Invalid compiler Markdown metadata manifest");
+  if (!metadata || typeof metadata !== "object" || !("version" in metadata) || metadata.version !== 2 || !("records" in metadata) || !Array.isArray(metadata.records)) throw new Error("Invalid compiler Markdown metadata manifest");
   const next = new Map();
   for (const record of metadata.records) {
     const key = `${record?.kind}:${record?.sha256}`;
-    if (!record || !/^[a-f0-9]{64}$/.test(record.sha256) || !["artifact", "model-pins"].includes(record.kind) || typeof record.value_json !== "string" || (record.error !== undefined && typeof record.error !== "string") || next.has(key))
+    if (
+      !record ||
+      !/^[a-f0-9]{64}$/.test(record.sha256) ||
+      !["artifact", "model-pins"].includes(record.kind) ||
+      !Object.hasOwn(record, "value") ||
+      Object.hasOwn(record, "value_json") ||
+      Object.hasOwn(record, "references") ||
+      (record.error !== undefined && typeof record.error !== "string") ||
+      next.has(key)
+    )
       throw new Error("Invalid or duplicate compiler Markdown metadata record");
-    parseMarkdownJSON(record.value_json);
-    next.set(key, record);
+    next.set(key, { ...record, value: parseMarkdownJSON(JSON.stringify(record.value)) });
   }
   const result = merge ? new Map(records) : new Map();
   for (const [key, record] of next) {
     const previous = result.get(key);
-    if (previous && (previous.error !== record.error || !isDeepStrictEqual(parseMarkdownJSON(previous.value_json), parseMarkdownJSON(record.value_json)))) throw new Error("Conflicting compiler Markdown metadata for the same author source");
+    if (previous && (previous.error !== record.error || !isDeepStrictEqual(previous.value, record.value))) throw new Error("Conflicting compiler Markdown metadata for the same author source");
     result.set(key, record);
   }
   records = result;
@@ -93,50 +101,74 @@ function installMarkdownMetadata(metadata, merge = false) {
   // compiler-approved artifact values can authorize that representation.
   for (const record of records.values()) {
     if (record.kind === "artifact" && !record.error) {
-      const source = JSON.stringify(parseMarkdownJSON(record.value_json));
-      generatedRecords.set(`artifact:${metadataDigest(source)}`, { ...record, sha256: metadataDigest(source), value_json: source });
+      const source = JSON.stringify(record.value);
+      generatedRecords.set(`artifact:${metadataDigest(source)}`, { ...record, sha256: metadataDigest(source) });
     }
   }
   initialized = true;
 }
 
 function currentMarkdownMetadata() {
-  return { version: 1, records: [...records.values()] };
+  return { version: 2, records: [...records.values()] };
 }
 
-/**
- * JSON-only validation, including escaped-equivalent duplicate keys. Metadata
- * numbers are ordinary finite JSON numbers, not the queue codec's integers.
- * @param {string} source
- */
-function parseMarkdownJSON(source) {
-  if (Buffer.byteLength(source, "utf8") > 4 * 1024 * 1024) throw new Error("Markdown metadata exceeds the bounded input limit");
-  const value = JSON.parse(source);
-  /** @type {Array<{keys: Set<string>|null, key: boolean}>} */
-  const stack = [];
-  let nodes = 0;
-  for (const token of source.matchAll(/"(?:\\.|[^"\\])*"|[{}\[\]:,]/g)) {
-    if (++nodes > 10000) throw new Error("Markdown JSON metadata exceeds structural limits");
-    const text = token[0];
-    const frame = stack.at(-1);
-    if (text === "{" || text === "[") {
-      stack.push({ keys: text === "{" ? new Set() : null, key: text === "{" });
-      if (stack.length > 100) throw new Error("Markdown JSON metadata exceeds structural limits");
-    } else if (text === "}" || text === "]") stack.pop();
-    else if (text === "," && frame?.keys) frame.key = true;
-    else if (text.startsWith('"') && frame?.keys && frame.key) {
-      const key = JSON.parse(text);
-      if (frame.keys.has(key)) throw new Error("Duplicate Markdown JSON metadata key");
-      frame.keys.add(key);
-      frame.key = false;
-    }
+/** @param {string} pointer */
+function metadataPointer(pointer) {
+  if (typeof pointer !== "string" || (pointer !== "" && !pointer.startsWith("/")) || /~(?![01])/u.test(pointer)) throw new Error("Invalid Markdown metadata reference");
+  return pointer === ""
+    ? []
+    : pointer
+        .slice(1)
+        .split("/")
+        .map(part => part.replaceAll("~1", "/").replaceAll("~0", "~"));
+}
+
+/** @param {any} root @param {string[]} parts */
+function referencedMetadataValue(root, parts) {
+  let value = root;
+  for (const part of parts) {
+    if (!value || typeof value !== "object" || !Object.hasOwn(value, part) || (Array.isArray(value) && !/^(?:0|[1-9]\d*)$/.test(part))) throw new Error("Missing Markdown metadata reference");
+    value = value[part];
   }
-  const checkNumbers = (/** @type {any} */ item) => {
-    if (typeof item === "number" && !Number.isFinite(item)) throw new Error("Markdown JSON metadata numbers must be finite");
-    if (item && typeof item === "object") for (const child of Object.values(item)) checkNumbers(child);
-  };
-  checkNumbers(value);
   return value;
+}
+
+/** @param {{metadata?: Record<string, unknown>, manifest?: Record<string, unknown>}} headers */
+function resolveMarkdownMetadata(headers) {
+  const catalog = headers.manifest?.markdown_metadata;
+  if (catalog === undefined) return undefined;
+  if (!catalog || typeof catalog !== "object" || !("version" in catalog) || catalog.version !== 2 || !("records" in catalog) || !Array.isArray(catalog.records)) throw new Error("Invalid compiler Markdown metadata manifest");
+  return {
+    version: 2,
+    records: catalog.records.map(record => {
+      if (!record || typeof record !== "object" || Array.isArray(record) || !Object.hasOwn(record, "value")) throw new Error("Invalid compiler Markdown metadata record");
+      const { references, ...resolved } = record;
+      resolved.value = structuredClone(record.value);
+      if (references === undefined) return resolved;
+      if (!references || typeof references !== "object" || Array.isArray(references)) throw new Error("Invalid Markdown metadata references");
+      const destinations = Object.keys(references);
+      for (const destination of destinations) {
+        const parts = metadataPointer(destination);
+        const source = metadataPointer(references[destination]);
+        if (source.length < 2 || !["metadata", "manifest"].includes(source[0]) || (source[0] === "manifest" && source[1] === "markdown_metadata")) throw new Error("Invalid Markdown metadata reference source");
+        if (destinations.some(other => other !== destination && (destination === "" || other.startsWith(destination + "/")))) throw new Error("Overlapping Markdown metadata references");
+        const value = structuredClone(referencedMetadataValue(headers, source));
+        if (!parts.length) {
+          if (resolved.value !== null) throw new Error("Markdown metadata reference duplicates an inline value");
+          resolved.value = value;
+          continue;
+        }
+        const key = parts.pop();
+        const parent = referencedMetadataValue(resolved.value, parts);
+        if (!parent || typeof parent !== "object" || key === undefined) throw new Error("Invalid Markdown metadata reference destination");
+        if (Array.isArray(parent)) {
+          if (!/^(?:0|[1-9]\d*)$/.test(key) || !Object.hasOwn(parent, key) || parent[Number(key)] !== null) throw new Error("Invalid Markdown metadata array reference");
+        } else if (Object.hasOwn(parent, key)) throw new Error("Markdown metadata reference duplicates an inline value");
+        Object.defineProperty(parent, key, { value, enumerable: true, writable: true, configurable: true });
+      }
+      return resolved;
+    }),
+  };
 }
 
 /** @param {string} file @param {string} workspace */
@@ -149,8 +181,7 @@ function readLocalMarkdownMetadata(file, workspace) {
   const realRelative = path.relative(fs.realpathSync(root), fs.realpathSync(absolute));
   if (!info.isFile() || info.size > 4 * 1024 * 1024 || realRelative.startsWith("..") || path.isAbsolute(realRelative)) throw new Error("Executing workflow lock manifest must be a bounded regular workspace file");
   const content = new TextDecoder("utf8", { fatal: true }).decode(fs.readFileSync(absolute));
-  const { manifest } = parseLockFileHeaders(content.split(/\r?\n/, 3));
-  return manifest?.markdown_metadata;
+  return resolveMarkdownMetadata(parseLockFileHeaders(content.split(/\r?\n/, 3)));
 }
 
 /** @param {any} githubClient @param {{owner: string, repo: string, path: string, ref: string}} identity */
@@ -163,8 +194,7 @@ async function readRemoteMarkdownMetadata(githubClient, identity) {
   const bytes = Buffer.from(encoded, "base64");
   if (bytes.length > 4 * 1024 * 1024 || bytes.toString("base64") !== encoded) throw new Error("Executing workflow lock manifest requires bounded canonical base64");
   const content = new TextDecoder("utf8", { fatal: true }).decode(bytes);
-  const { manifest } = parseLockFileHeaders(content.split(/\r?\n/, 3));
-  return manifest?.markdown_metadata;
+  return resolveMarkdownMetadata(parseLockFileHeaders(content.split(/\r?\n/, 3)));
 }
 
 /** @param {string} workflowId @param {string} workspace @param {{repository?: string, githubClient?: any, revision?: string}} [options] */
@@ -242,7 +272,7 @@ function missingMarkdownMetadata(documents) {
 /** @param {unknown} metadata @param {Set<string>} missing */
 function mergeMatchingMarkdownMetadata(metadata, missing) {
   if (!metadata) return;
-  if (typeof metadata !== "object" || !("version" in metadata) || metadata.version !== 1 || !("records" in metadata) || !Array.isArray(metadata.records)) throw new Error("Invalid compiler Markdown metadata manifest");
+  if (typeof metadata !== "object" || !("version" in metadata) || metadata.version !== 2 || !("records" in metadata) || !Array.isArray(metadata.records)) throw new Error("Invalid compiler Markdown metadata manifest");
   installMarkdownMetadata(
     {
       version: metadata.version,
@@ -317,7 +347,7 @@ function readDocumentMetadata(source, { kind = "document" } = {}) {
   const record = kind === "artifact" ? artifact : records.get(`model-pins:${digest}`) || artifact;
   if (!record) throw new CompilerMetadataUnavailableError();
   if (record.error) throw new Error(record.error);
-  const compiled = parseMarkdownJSON(record.value_json);
+  const compiled = structuredClone(record.value);
   let runtime;
   try {
     runtime = parseMarkdownJSON(source.replaceAll("\x00", "\\u0000"));
@@ -340,7 +370,7 @@ function renderMetadata(value) {
   const source = JSON.stringify(value);
   parseMarkdownJSON(source);
   const digest = metadataDigest(source);
-  const record = { kind: "artifact", sha256: digest, value_json: source };
+  const record = { kind: "artifact", sha256: digest, value: parseMarkdownJSON(source) };
   generatedRecords.set(`artifact:${digest}`, record);
   records.set(`artifact:${digest}`, record);
   const infoPath = path.join(process.env.GH_AW_TMP_DIR || require("./constants.cjs").TMP_GH_AW_PATH, "aw_info.json");

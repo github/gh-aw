@@ -17,10 +17,11 @@ import (
 )
 
 type GHAWMarkdownMetadataRecord struct {
-	SHA256    string `json:"sha256"`
-	Kind      string `json:"kind"`
-	ValueJSON string `json:"value_json"`
-	Error     string `json:"error,omitempty"`
+	SHA256     string            `json:"sha256"`
+	Kind       string            `json:"kind"`
+	Value      json.RawMessage   `json:"value"`
+	References map[string]string `json:"references,omitempty"`
+	Error      string            `json:"error,omitempty"`
 }
 
 type GHAWMarkdownMetadata struct {
@@ -58,7 +59,7 @@ func (c *Compiler) collectMarkdownMetadata(data *WorkflowData) *GHAWMarkdownMeta
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-	result := &GHAWMarkdownMetadata{Version: 1, Records: make([]GHAWMarkdownMetadataRecord, 0, len(keys))}
+	result := &GHAWMarkdownMetadata{Version: 2, Records: make([]GHAWMarkdownMetadataRecord, 0, len(keys))}
 	for _, key := range keys {
 		result.Records = append(result.Records, records[key])
 	}
@@ -78,7 +79,7 @@ func addMarkdownMetadataRecord(records map[string]GHAWMarkdownMetadataRecord, so
 		value = projectModelPinMetadata(value)
 	}
 	encoded, encodeErr := json.Marshal(value)
-	record := GHAWMarkdownMetadataRecord{SHA256: digest, Kind: kind, ValueJSON: string(encoded)}
+	record := GHAWMarkdownMetadataRecord{SHA256: digest, Kind: kind, Value: encoded}
 	if err != nil {
 		record.Error = err.Error()
 	} else if encodeErr != nil {

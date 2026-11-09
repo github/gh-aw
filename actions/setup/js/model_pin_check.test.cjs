@@ -140,8 +140,8 @@ describe("model_pin_check collection and rules", () => {
     const first = "engine: copilot\nmodel: scoped-small\nimports: [../aw/nested/models.md]";
     const second = "engine: copilot\nmodel: sonnet";
     const imported = "models:\n  scoped-small: [gpt-5-mini]";
-    const record = (source, value) => ({ sha256: crypto.createHash("sha256").update(source).digest("hex"), kind: "model-pins", value_json: JSON.stringify(value) });
-    const header = records => `# gh-aw-metadata: {}\n# gh-aw-manifest: ${JSON.stringify({ markdown_metadata: { version: 1, records } })}\n# generated\ninvalid: [yaml\n`;
+    const record = (source, value) => ({ sha256: crypto.createHash("sha256").update(source).digest("hex"), kind: "model-pins", value });
+    const header = records => `# gh-aw-metadata: {}\n# gh-aw-manifest: ${JSON.stringify({ markdown_metadata: { version: 2, records } })}\n# generated\ninvalid: [yaml\n`;
     const root = fixtureRepo({
       ".github/workflows/first.md": `---\n${first}\n---\n`,
       ".github/workflows/second.md": `---\n${second}\n---\n`,
@@ -149,7 +149,7 @@ describe("model_pin_check collection and rules", () => {
       ".github/workflows/first.lock.yml": header([record(first, { engine: "copilot", model: "scoped-small", imports: ["../aw/nested/models.md"] }), record(imported, { models: { "scoped-small": ["gpt-5-mini"] } })]),
       ".github/workflows/second.lock.yml": header([record(second, { engine: "copilot", model: "sonnet" })]),
     });
-    require("./markdown_metadata.cjs").installMarkdownMetadata({ version: 1, records: [] });
+    require("./markdown_metadata.cjs").installMarkdownMetadata({ version: 2, records: [] });
     const result = require("./model_pin_check.cjs").collectModelPins({ repoRoot: root });
     expect(result.errors).toEqual([]);
     expect(result.pins.filter(pin => pin.field === "model").map(pin => pin.model)).toEqual(["scoped-small", "sonnet"]);

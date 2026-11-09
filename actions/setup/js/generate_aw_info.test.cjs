@@ -32,7 +32,7 @@ const mockGithub = {
   rest: {
     repos: {
       getContent: vi.fn(async ({ path }) => ({
-        data: { type: "file", path, encoding: "base64", content: Buffer.from('# gh-aw-metadata: {}\n# gh-aw-manifest: {"version":1,"markdown_metadata":{"version":1,"records":[]}}\n# compiled fixture\n').toString("base64") },
+        data: { type: "file", path, encoding: "base64", content: Buffer.from('# gh-aw-metadata: {}\n# gh-aw-manifest: {"version":1,"markdown_metadata":{"version":2,"records":[]}}\n# compiled fixture\n').toString("base64") },
       })),
     },
     actions: {
@@ -97,7 +97,7 @@ describe("generate_aw_info.cjs", () => {
     vi.spyOn(fs, "realpathSync").mockImplementation(filename => (String(filename).endsWith(".lock.yml") ? String(filename) : realPath(filename)));
     vi.spyOn(fs, "readFileSync").mockImplementation((filename, ...args) => {
       if (String(filename).endsWith(".lock.yml")) {
-        const header = '# gh-aw-metadata: {}\n# gh-aw-manifest: {"version":1,"markdown_metadata":{"version":1,"records":[]}}\n# compiled fixture\n';
+        const header = '# gh-aw-metadata: {}\n# gh-aw-manifest: {"version":1,"markdown_metadata":{"version":2,"records":[]}}\n# compiled fixture\n';
         return args[0] === "utf8" ? header : Buffer.from(header);
       }
       if (files.has(String(filename))) return files.get(String(filename));

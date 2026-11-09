@@ -6,8 +6,8 @@ const metadata = require("./markdown_metadata.cjs");
 const revision = "a".repeat(40);
 const source = "description: Private reader\nmodel: small\ntools: [Read]";
 const document = `---\n${source}\n---\nRead files.`;
-const record = value => ({ sha256: crypto.createHash("sha256").update(source).digest("hex"), kind: "artifact", value_json: JSON.stringify(value) });
-const catalog = records => ({ version: 1, records });
+const record = value => ({ sha256: crypto.createHash("sha256").update(source).digest("hex"), kind: "artifact", value });
+const catalog = records => ({ version: 2, records });
 const headers = records => `# gh-aw-metadata: {}\n# gh-aw-manifest: ${JSON.stringify({ version: 1, markdown_metadata: catalog(records) })}\n# generated\ninvalid: [yaml\n`;
 const remoteFile = (file, records) => ({ data: { type: "file", path: file, encoding: "base64", content: Buffer.from(headers(records)).toString("base64") } });
 
@@ -71,6 +71,49 @@ describe("compiler metadata source acquisition", () => {
     metadata.installMarkdownMetadata(catalog([record({ tools: ["Read"], model: "small" })]), true);
     expect(() => metadata.installMarkdownMetadata(catalog([record({ model: "forged" })]), true)).toThrow(/Conflicting/);
     expect(metadata.readMarkdownMetadata("agent", document).value.model).toBe("small");
+  });
+
+  it("restores native catalog values from both existing headers before checking provenance", async () => {
+    const file = ".github/workflows/main.lock.yml";
+    const value = { model: "small", tools: ["Read"], description: "Private reader", rate: 0.25 };
+    const compiled = { ...record({ description: "Private reader", rate: 0.25 }), references: { "/model": "/metadata/agent_model", "/tools": "/manifest/declared_tools" } };
+    const header = `# gh-aw-metadata: ${JSON.stringify({ agent_model: "small" })}\n# gh-aw-manifest: ${JSON.stringify({ version: 1, declared_tools: ["Read"], markdown_metadata: catalog([compiled]) })}\n# generated\n`;
+    fs.writeFileSync(path.join(workspace, file), header);
+    const result = await metadata.loadMarkdownMetadata(`owner/repo/${file}@main`, workspace);
+    expect(result).toEqual(catalog([record(value)]));
+    expect(metadata.readMarkdownMetadata("agent", document).value).toEqual(value);
+    expect(header.match(/"small"/g)).toHaveLength(1);
+    expect(header.match(/"Read"/g)).toHaveLength(1);
+    expect(header).not.toContain("value_json");
+    expect(() => metadata.readMarkdownMetadata("agent", document.replace("small", "forged"))).toThrow(/compiler manifest/);
+    fs.writeFileSync(path.join(workspace, "aw_info.json"), '{"run_id":123}');
+    metadata.persistMarkdownMetadata();
+    expect(JSON.parse(fs.readFileSync(path.join(workspace, "aw_info.json"), "utf8")).markdown_metadata).toEqual(result);
+  });
+
+  it.each([
+    { "/model": "/metadata/missing" },
+    { "/model": "/manifest/markdown_metadata/version" },
+    { "/model": "/metadata/agent_model", "/model/nested": "/metadata/agent_model" },
+    { "/model": "/metadata/agent~2model" },
+    { "/description": "/metadata/agent_model" },
+    { "/model/nested": "/metadata/agent_model" },
+  ])("rejects missing, recursive, overlapping, malformed, and conflicting references (%j)", references => {
+    const file = path.join(workspace, ".github/workflows/main.lock.yml");
+    const compiled = { ...record({ description: "Private reader" }), references };
+    fs.writeFileSync(file, `# gh-aw-metadata: {"agent_model":"small"}\n# gh-aw-manifest: ${JSON.stringify({ markdown_metadata: catalog([compiled]) })}\n# generated\n`);
+    expect(() => metadata.readLocalMarkdownMetadata(file, workspace)).toThrow(/metadata.*reference/);
+  });
+
+  it("resolves escaped object names, array slots, and whole values without adding parser dependencies", () => {
+    const file = path.join(workspace, ".github/workflows/main.lock.yml");
+    const compiled = [
+      { ...record({ "x/y~z": [null, "unique"] }), references: { "/x~1y~0z/0": "/manifest/a~1b~0c/0" } },
+      { ...record(null), sha256: "b".repeat(64), references: { "": "/manifest/a~1b~0c" } },
+    ];
+    fs.writeFileSync(file, `# gh-aw-metadata: {}\n# gh-aw-manifest: ${JSON.stringify({ "a/b~c": ["model"], markdown_metadata: catalog(compiled) })}\n# generated\n`);
+    expect(metadata.readLocalMarkdownMetadata(file, workspace).records.map(record => record.value)).toEqual([{ "x/y~z": ["model", "unique"] }, ["model"]]);
+    expect(() => metadata.installMarkdownMetadata(catalog(compiled))).toThrow(/metadata record/);
   });
 
   it("acquires only matching skill records from compiler headers using the supplied source client", async () => {

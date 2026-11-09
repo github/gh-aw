@@ -434,11 +434,11 @@ func TestInlinedSubagentExperimentCompilerToRuntime(t *testing.T) {
 		require.NoError(t, err)
 		metadataDigest := sha256.Sum256([]byte(metadataBlocks[0].Source))
 		metadataCatalog := map[string]any{
-			"version": 1,
+			"version": 2,
 			"records": []map[string]any{{
-				"sha256":     hex.EncodeToString(metadataDigest[:]),
-				"kind":       "artifact",
-				"value_json": string(metadataJSON),
+				"sha256": hex.EncodeToString(metadataDigest[:]),
+				"kind":   "artifact",
+				"value":  json.RawMessage(metadataJSON),
 			}},
 		}
 		metadataDir := filepath.Join(workspace, "runtime")

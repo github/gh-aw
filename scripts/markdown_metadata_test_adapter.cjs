@@ -58,8 +58,8 @@ function readDocumentMetadata(content) {
 function prepareMarkdownFixtures(...sources) {
   const compiled = compile({ sources });
   for (const [source, record] of Object.entries(compiled)) records.set(source, record);
-  require("../actions/setup/js/markdown_metadata.cjs").installMarkdownMetadata({ version: 1, records: [...records.values()] });
-  return { version: 1, records: [...records.values()] };
+  require("../actions/setup/js/markdown_metadata.cjs").installMarkdownMetadata({ version: 2, records: [...records.values()] });
+  return { version: 2, records: [...records.values()] };
 }
 
 // Explicitly compile authored test inputs before calling the real runtime.

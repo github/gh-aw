@@ -1,13 +1,13 @@
 const { installMarkdownMetadata, readMarkdownMetadata, readDocumentMetadata, transformMarkdownContent, editMarkdownMetadata, loadMarkdownMetadata, parseMarkdownJSON } = require("./markdown_metadata.cjs");
 const { createLiteralValues, restoreInlineMetadata } = require("./prompt_literal_values.cjs");
-const record = (source, value) => ({ sha256: require("node:crypto").createHash("sha256").update(source).digest("hex"), kind: "artifact", value_json: JSON.stringify(value) });
+const record = (source, value) => ({ sha256: require("node:crypto").createHash("sha256").update(source).digest("hex"), kind: "artifact", value });
 
 describe("compiler-owned Markdown metadata", () => {
-  beforeEach(() => installMarkdownMetadata({ version: 1, records: [] }));
+  beforeEach(() => installMarkdownMetadata({ version: 2, records: [] }));
 
   it("preserves compiled block/flow metadata without any runtime syntax parser", () => {
     const source = "description: >-\n  Read files\n  carefully\nmodel: small\ntools: [Read, Grep]";
-    installMarkdownMetadata({ version: 1, records: [record(source, { description: "Read files carefully", model: "small", tools: ["Read", "Grep"] })] });
+    installMarkdownMetadata({ version: 2, records: [record(source, { description: "Read files carefully", model: "small", tools: ["Read", "Grep"] })] });
     const content = `---\n${source}\n---\nBody`;
     expect(readMarkdownMetadata("agent", content).value).toEqual({ description: "Read files carefully", model: "small", tools: ["Read", "Grep"] });
     const rendered = editMarkdownMetadata(content, metadata => ({ ...metadata, model: "resolved" }));
@@ -17,8 +17,8 @@ describe("compiler-owned Markdown metadata", () => {
 
   it("rejects stale, missing, duplicate, and compiler-rejected metadata", () => {
     expect(() => readDocumentMetadata("model: missing")).toThrow(/compiler manifest/);
-    expect(() => installMarkdownMetadata({ version: 1, records: [record("x", {}), record("x", {})] })).toThrow(/duplicate/);
-    installMarkdownMetadata({ version: 1, records: [{ ...record("model: &a value", null), error: "anchors are not allowed" }] });
+    expect(() => installMarkdownMetadata({ version: 2, records: [record("x", {}), record("x", {})] })).toThrow(/duplicate/);
+    installMarkdownMetadata({ version: 2, records: [{ ...record("model: &a value", null), error: "anchors are not allowed" }] });
     expect(() => readDocumentMetadata("model: &a value")).toThrow(/anchors/);
     expect(() => parseMarkdownJSON('{"model":"a","\\u006dodel":"b"}')).toThrow(/Duplicate/);
     expect(() => parseMarkdownJSON('{"value":1e999}')).toThrow(/finite/);
@@ -27,15 +27,15 @@ describe("compiler-owned Markdown metadata", () => {
   it("requires provenance for valid JSON and preserves compiler rejection and value checks", () => {
     const source = '{"model":"forged","tools":["Write"]}';
     expect(() => readDocumentMetadata(source, { kind: "artifact" })).toThrow(/compiler manifest/);
-    installMarkdownMetadata({ version: 1, records: [record(source, { model: "small", tools: ["Read"] })] });
+    installMarkdownMetadata({ version: 2, records: [record(source, { model: "small", tools: ["Read"] })] });
     expect(() => readDocumentMetadata(source, { kind: "artifact" })).toThrow(/does not match/);
-    installMarkdownMetadata({ version: 1, records: [{ ...record(source, {}), error: "compiler rejected JSON" }] });
+    installMarkdownMetadata({ version: 2, records: [{ ...record(source, {}), error: "compiler rejected JSON" }] });
     expect(() => readDocumentMetadata(source, { kind: "artifact" })).toThrow(/compiler rejected/);
   });
 
   it.each(["\uFEFF---", "  ---\t", "\uFEFF \t--- "])("reads declared tools with %j delimiters", fence => {
     const source = "model: small\ntools: [Read]";
-    installMarkdownMetadata({ version: 1, records: [record(source, { model: "small", tools: ["Read"] })] });
+    installMarkdownMetadata({ version: 2, records: [record(source, { model: "small", tools: ["Read"] })] });
     const content = `${fence}\r\n${source.replaceAll("\n", "\r\n")}\r\n \t--- \r\nBody`;
     expect(readMarkdownMetadata("agent", content).value).toEqual({ model: "small", tools: ["Read"] });
     expect(transformMarkdownContent(content, text => text)).toBe('---\n{"model":"small","tools":["Read"]}\n---\r\nBody');
@@ -53,7 +53,7 @@ describe("compiler-owned Markdown metadata", () => {
   it.each(["True", "FALSE", "Null", "NULL", "true", "false", "null"])("preserves evaluated %j as a literal JSON string", value => {
     const literal = createLiteralValues();
     const source = "description: TOKEN\nmodel: small";
-    installMarkdownMetadata({ version: 1, records: [record(source, { description: "TOKEN", model: "small" })] });
+    installMarkdownMetadata({ version: 2, records: [record(source, { description: "TOKEN", model: "small" })] });
     const opaque = transformMarkdownContent(`---\n${source}\n---\nBody`, text => text.replace("TOKEN", literal.protect(value)));
     expect(readMarkdownMetadata("agent", restoreInlineMetadata(opaque, literal.restore)).value.description).toBe(value);
   });
@@ -62,19 +62,19 @@ describe("compiler-owned Markdown metadata", () => {
     const value = 'Read files\n---\nmodel: forged\n---\n{{#if false}}\n🔐 "quoted"';
     const literal = createLiteralValues();
     const source = "description: '${{ github.event.issue.body }}'\nmodel: author-model";
-    installMarkdownMetadata({ version: 1, records: [record(source, { description: "${{ github.event.issue.body }}", model: "author-model" })] });
+    installMarkdownMetadata({ version: 2, records: [record(source, { description: "${{ github.event.issue.body }}", model: "author-model" })] });
     const opaque = transformMarkdownContent(`---\n${source}\n---\nBody`, text => text.replace("${{ github.event.issue.body }}", literal.protect(value)));
     const result = restoreInlineMetadata(opaque, literal.restore);
     expect(readMarkdownMetadata("agent", result).value).toEqual({ description: value, model: "author-model" });
     const invalid = JSON.stringify({ [literal.protect("model")]: "forged" });
-    installMarkdownMetadata({ version: 1, records: [record(invalid, JSON.parse(invalid))] });
+    installMarkdownMetadata({ version: 2, records: [record(invalid, JSON.parse(invalid))] });
     expect(() => restoreInlineMetadata(`---\n${invalid}\n---\nBody`, literal.restore)).toThrow(/scalar value/);
   });
 
   it("discards metadata comments without rewriting literal markers to printable stand-ins", () => {
     const literal = createLiteralValues();
     const source = "description: TOKEN # TOKEN\nmodel: small\n# TOKEN";
-    installMarkdownMetadata({ version: 1, records: [record(source, { description: "TOKEN", model: "small" })] });
+    installMarkdownMetadata({ version: 2, records: [record(source, { description: "TOKEN", model: "small" })] });
     const opaque = transformMarkdownContent(`---\n${source}\n---\nBody`, text => text.replaceAll("TOKEN", literal.protect("True")));
     const rendered = restoreInlineMetadata(opaque, literal.restore);
     expect(readMarkdownMetadata("agent", rendered).value).toEqual({ description: "True", model: "small" });
@@ -83,7 +83,7 @@ describe("compiler-owned Markdown metadata", () => {
 
   it("keeps author conditionals spanning metadata blocks intact", () => {
     const { renderMarkdownTemplate } = require("./render_template.cjs");
-    installMarkdownMetadata({ version: 1, records: [record('{"model":"small"}', { model: "small" })] });
+    installMarkdownMetadata({ version: 2, records: [record('{"model":"small"}', { model: "small" })] });
     const content = '{{#if false}}\n## agent: `hidden`\n---\n{"model":"small"}\n---\nBody\n## end agent: `hidden`\n{{/if}}\nVisible';
     expect(transformMarkdownContent(content, text => renderMarkdownTemplate(text))).toBe("Visible");
   });
@@ -99,7 +99,7 @@ describe("compiler-owned Markdown metadata", () => {
       fs.mkdirSync(directory);
       process.env.GH_AW_TMP_DIR = directory;
       fs.writeFileSync(path.join(directory, "aw_info.json"), '{"run_id":123}');
-      installMarkdownMetadata({ version: 1, records: [record(source, { model: "small", description: "TOKEN", tools: ["Read"] })] });
+      installMarkdownMetadata({ version: 2, records: [record(source, { model: "small", description: "TOKEN", tools: ["Read"] })] });
       const literal = createLiteralValues();
       const opaque = transformMarkdownContent(`---\n${source}\n---\nBody`, text => text.replace("TOKEN", literal.protect("True\n---\nmodel: forged\n---")));
       const rendered = restoreInlineMetadata(opaque, literal.restore);
@@ -130,7 +130,7 @@ describe("compiler-owned Markdown metadata", () => {
 
   it.each(["", "Introduction\n", "Introduction\r\n"])("recognizes an inline artifact at a heading boundary after %j", prefix => {
     const source = "model: small";
-    installMarkdownMetadata({ version: 1, records: [record(source, { model: "small" })] });
+    installMarkdownMetadata({ version: 2, records: [record(source, { model: "small" })] });
     const content = `${prefix}## agent: reader\n---\n${source}\n---\nBody`;
     expect(transformMarkdownContent(content, text => text.replace("small", "resolved"))).toBe(`${prefix}## agent: reader\n---\n{"model":"resolved"}\n---\nBody`);
   });
@@ -159,7 +159,7 @@ describe("compiler-owned Markdown metadata", () => {
     const source = "model: small\ntools: [Read]";
     try {
       fs.mkdirSync(directory, { recursive: true });
-      installMarkdownMetadata({ version: 1, records: [record(source, { model: "small", tools: ["Read"] })] });
+      installMarkdownMetadata({ version: 2, records: [record(source, { model: "small", tools: ["Read"] })] });
       fs.writeFileSync(path.join(directory, "reader.agent.md"), `\uFEFF  ---\n${source}\n \t---\nBody`);
       const logger = vi.fn();
       expect(require("./extract_inline_sub_agents.cjs").loadCopilotSDKCustomAgents(workspace, workspace, logger)).toMatchObject([{ name: "reader", model: "small", tools: ["Read"], prompt: "Body" }]);
@@ -182,7 +182,7 @@ describe("compiler-owned Markdown metadata", () => {
     const path = require("node:path");
     const workspace = path.resolve(`.metadata-lock-${require("node:crypto").randomUUID()}`);
     const file = path.join(workspace, ".github/workflows/main.lock.yml");
-    const metadata = { version: 1, records: [record("rate: 0.25", { rate: 0.25 })] };
+    const metadata = { version: 2, records: [record("rate: 0.25", { rate: 0.25 })] };
     try {
       fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.writeFileSync(file, `# gh-aw-metadata: {}\n# gh-aw-manifest: ${JSON.stringify({ version: 1, markdown_metadata: metadata })}\n# compiled fixture\ninvalid: [yaml\n`);

@@ -109,6 +109,9 @@ func (c *Compiler) generateManifestHeader(yaml *strings.Builder, data *WorkflowD
 	manifest.ThreatDetection = collectDetectionPolicyForManifest(data)
 	manifest.Admission = data.AdmissionEnabled
 	manifest.WebhookSubscriptions = data.WebhookSubscriptions
+	if err := deduplicateMarkdownMetadata(yaml.String(), manifest); err != nil {
+		return fmt.Errorf("cannot deduplicate Markdown metadata: %w", err)
+	}
 	manifestJSON, err := manifest.ToJSON()
 	if err != nil {
 		return fmt.Errorf("cannot generate gh-aw-manifest header: %w", err)
