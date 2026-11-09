@@ -30,6 +30,12 @@ model: gpt-5
 engine:
   id: copilot
   copilot-sdk: true
+skip-if-decision:
+  - >-
+    Does @/tmp/gh-aw/agent/dependabot-burner/context.json conclusively establish
+    that the selected remediation batch is empty and the objective requires
+    no source-workflow dependency updates? Abstain if selection is incomplete
+    or inconsistent, or a slash-command trigger still needs an explanation.
 strict: true
 network:
   allowed:
@@ -283,7 +289,7 @@ steps:
         console.log(JSON.stringify(payload, null, 2));
 evals:
   - id: dependabot_batch_analyzed
-    question: Did the agent analyze the selected grouped Dependabot remediation batch?
+    question: Did the agent analyze the selected grouped Dependabot remediation batch? Return UNKNOWN when the output records a skip-if-decision no-op before agent execution.
   - id: remediation_reported
     question: Did the agent create a remediation pull request or clearly report why no remediation was needed?
 features:
@@ -291,6 +297,9 @@ features:
 ---
 
 # Dependabot Burner
+
+The AWF decision gate may skip an empty, non-actionable remediation wave.
+Slash-command explanations and uncertain selection still require execution.
 
 You are the grouped Dependabot remediation orchestrator.
 

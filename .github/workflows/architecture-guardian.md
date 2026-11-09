@@ -13,6 +13,12 @@ permissions:
 engine:
   id: copilot
   copilot-sdk: true
+skip-if-decision:
+  - >-
+    Does @/tmp/gh-aw/agent/arch-metrics.json conclusively establish that there
+    are no architecture violations under its configured file, function, export,
+    and import-cycle thresholds? Abstain if any violation remains or the
+    metrics do not fully establish function sizes, including JavaScript sizes.
 max-tool-denials: 3
 tracker-id: architecture-guardian
 imports:
@@ -135,13 +141,16 @@ features:
   gh-aw-detection: true
 evals:
   - id: violations-analyzed
-    question: Did the workflow analyze changed Go or JavaScript files from the last 24 hours for architecture violations, or correctly conclude there were none?
+    question: Did the workflow analyze changed Go or JavaScript files from the last 24 hours for architecture violations, or correctly conclude there were none? Return UNKNOWN when the output records a skip-if-decision no-op before agent execution.
   - id: issue-created-or-noop
     question: Was an architecture report issue created when violations were found, or was noop or skip behavior used appropriately when there was nothing actionable?
 
 ---
 
 # Architecture Guardian
+
+The AWF decision gate may skip a scan only when the prepared metrics establish
+that no violations remain. Incomplete metrics preserve agent execution.
 
 You are the Architecture Guardian, a code quality agent that enforces structural discipline in the codebase. Your mission is to prevent "spaghetti code" by detecting structural violations in commits landed in the last 24 hours before they accumulate.
 
