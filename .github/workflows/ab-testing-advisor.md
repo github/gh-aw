@@ -33,10 +33,12 @@ safe-outputs:
     title-prefix: "[ab-advisor] "
 description: Daily A/B testing advisor that selects a workflow without experiments and implements a validated experiment campaign pull request
 emoji: 🧪
-model: openai/gpt-6.1-sol
 engine:
   id: codex
-  model-provider: openai
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: balanced
 strict: true
 timeout-minutes: 30
 tools:

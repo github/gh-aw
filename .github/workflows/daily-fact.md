@@ -13,11 +13,14 @@ permissions:
   pull-requests: read
   actions: read
   discussions: read
+  copilot-requests: write
 tracker-id: daily-fact-thread
-model: openai/gpt-5.6-terra
 engine:
   id: codex
-  model-provider: openai
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
 strict: true
 experiments:
   reasoning_depth:

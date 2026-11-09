@@ -12,9 +12,12 @@ permissions:
 
 engine:
   id: codex
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
   durable:
     retention-days: 7
-model: openai/gpt-5.6-sol
 
 timeout-minutes: 20
 max-ai-credits: 300
