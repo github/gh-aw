@@ -776,8 +776,9 @@ jobs:
         env:
           NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Install TypeScript LSP dependencies
-        run: npm install -g --ignore-scripts typescript@5.8.3 typescript-language-server@4.3.3
+        run: npm install -g typescript@5.8.3 typescript-language-server@4.3.3
         env:
+          NPM_CONFIG_IGNORE_SCRIPTS: 'true'
           NPM_CONFIG_MIN_RELEASE_AGE: '3'
         timeout-minutes: 10
       - name: Determine automatic lockdown mode for GitHub MCP Server
@@ -1920,6 +1921,7 @@ jobs:
             /tmp/gh-aw/usage/agent/model-routing.jsonl
             /tmp/gh-aw/usage/agent/execution.json
             /tmp/gh-aw/usage/agent/harness_retry.json
+            /tmp/gh-aw/usage/agent/durable-session.jsonl
             /tmp/gh-aw/usage/detection/token_usage.jsonl
             /tmp/gh-aw/usage/detection/execution.json
             /tmp/gh-aw/usage/detection/harness_retry.json
@@ -1958,6 +1960,7 @@ jobs:
             /tmp/gh-aw/usage/agent/model-routing.jsonl
             /tmp/gh-aw/usage/agent/execution.json
             /tmp/gh-aw/usage/agent/harness_retry.json
+            /tmp/gh-aw/usage/agent/durable-session.jsonl
             /tmp/gh-aw/usage/detection/token_usage.jsonl
             /tmp/gh-aw/usage/detection/execution.json
             /tmp/gh-aw/usage/detection/harness_retry.json

@@ -727,9 +727,6 @@ func (c *Compiler) generateAgentRunSteps(yaml *strings.Builder, data *WorkflowDa
 	// Collect artifact paths for unified upload at the end
 	var artifactPaths []string
 	artifactPaths = append(artifactPaths, constants.AwPromptsFile)
-	if data.EngineConfig != nil && data.EngineConfig.Durable != nil {
-		artifactPaths = append(artifactPaths, durableOTelJournal)
-	}
 
 	logFileFull := constants.AgentStdioLogPath
 	c.generateDurableArtifactRestore(yaml, data)

@@ -34,7 +34,15 @@ safe-outputs:
   create-issue:
     title-prefix: "🚨 [SECURITY]"
     labels: ["security", "red-team", "cookie"]
-    max: 5
+    deduplicate-by-title: true
+    deduplicate-by-labels: [security, red-team]
+    max: 1
+  update-issue:
+    target: "*"
+    title-prefix: "🚨 [SECURITY] Security Red Team Findings"
+    title:
+    body: true
+    max: 1
 experiments:
   reasoning_depth:
     variants: [single_pass, iterative]
@@ -69,6 +77,10 @@ evals:
     question: Did the agent perform a deep red teaming security scan of actions/setup/js and actions/setup/sh directories?
   - id: findings_reported_or_noop
     question: Were security findings (backdoors, secret leaks, malicious code) reported, or was noop used when no issues were detected?
+  - id: test_files_excluded
+    question: Were test, fixture, and vendored dependency files excluded before heuristic scanning, with no SECRET_EXFIL or OBFUSCATION findings sourced only from those files?
+  - id: repeated_findings_update_tracker
+    question: When findings match prior scan signatures, did the agent update the existing stable security-red-team issue instead of creating a new daily issue?
 features:
   gh-aw-detection: true
 ---
@@ -164,6 +176,7 @@ TIMESTAMP=$(date +%Y-%m-%d-%H-%M-%S)
 SCAN_HISTORY="$CACHE_DIR/scan-history.json"
 TECHNIQUE_TRACKER="$CACHE_DIR/technique-tracker.json"
 CURRENT_SCAN="$CACHE_DIR/current-scan-${TIMESTAMP}.json"
+FINDINGS_LOG="$CACHE_DIR/findings-log.json"
 
 # Initialize scan history if not exists
 if [ ! -f "$SCAN_HISTORY" ]; then
@@ -176,6 +189,11 @@ if [ ! -f "$SCAN_HISTORY" ]; then
   "scans": []
 }
 EOF
+fi
+
+# Initialize the finding-signature log if not exists
+if [ ! -f "$FINDINGS_LOG" ]; then
+  printf '{"findings":[]}\n' > "$FINDINGS_LOG"
 fi
 
 # Initialize technique tracker if not exists
@@ -284,8 +302,16 @@ else
   fi
 fi
 
-# Exclude test files and test directories from the security scan.
-awk '!/(^|\/)(test|tests|__tests__)\// && !/\.test\.cjs$/' /tmp/gh-aw/agent/files-to-scan.txt > /tmp/gh-aw/agent/files-to-scan.filtered.txt
+# Exclude test/fixture files, test directories, and vendored dependencies before any technique scans these paths.
+awk '
+  {
+    path = $0
+    basename = path
+    sub(/^.*\//, "", basename)
+  }
+  path !~ /(^|\/)(test|tests|__tests__|fixtures|__fixtures__|testdata|node_modules|vendor)\// &&
+  basename !~ /(^|[._-])(test|spec|fixture|fixtures|testdata)([._-]|$)/
+' /tmp/gh-aw/agent/files-to-scan.txt > /tmp/gh-aw/agent/files-to-scan.filtered.txt
 mv /tmp/gh-aw/agent/files-to-scan.filtered.txt /tmp/gh-aw/agent/files-to-scan.txt
 
 FILE_COUNT=$(wc -l < /tmp/gh-aw/agent/files-to-scan.txt)
@@ -329,9 +355,9 @@ while IFS= read -r file; do
     FINDINGS+=("DYNAMIC_EXEC:$file:$(head -1 /tmp/gh-aw/agent/pattern.txt | cut -d: -f1)")
   fi
   
-  # Pattern 3: Obfuscated strings
-  if grep -nE '(atob|btoa|Buffer\.from.*base64|String\.fromCharCode|\\x[0-9a-f]{2}.*\\x[0-9a-f]{2}.*\\x[0-9a-f]{2})' "$file" > /tmp/gh-aw/agent/pattern.txt; then
-    echo "⚠️  Obfuscated content in $file"
+  # Pattern 3: Encoded content connected to dynamic execution
+  if grep -nE '((atob|btoa|Buffer\.from.*base64|String\.fromCharCode|\\x[0-9a-f]{2}.*\\x[0-9a-f]{2}.*\\x[0-9a-f]{2}).*(eval|Function|exec)|(eval|Function|exec).*(atob|btoa|Buffer\.from.*base64|String\.fromCharCode|\\x[0-9a-f]{2}.*\\x[0-9a-f]{2}.*\\x[0-9a-f]{2}))' "$file" > /tmp/gh-aw/agent/pattern.txt; then
+    echo "🔎 Reviewing encoded-content execution candidate in $file"
     FINDINGS+=("OBFUSCATION:$file:$(head -1 /tmp/gh-aw/agent/pattern.txt | cut -d: -f1)")
   fi
   
@@ -599,7 +625,8 @@ Before Phase 5, validate every candidate in `FINDINGS[]`, including in the `sing
 2. Treat regex matches, suspicious keywords, entropy scores, and long encoded strings as leads only. A heuristic match does not establish malicious behavior.
 3. For any `SECRET_EXFIL_CANDIDATE`, identify the sensitive value source and the outbound network sink, then trace the same value from source to sink. Cite the exact source and sink lines and explain the data flow. An environment-variable read, a network call, or high entropy on its own is insufficient. Promote the candidate to `SECRET_EXFIL` only when this path is verified; otherwise remove it from `FINDINGS[]` and record the reason in `$CACHE_DIR/dismissed-findings-${TIMESTAMP}.json`.
 4. Apply the same evidence standard to other finding types: retain only findings supported by the cited code and its behavior. If a candidate cannot be verified, do not report it as a confirmed issue.
-5. Ensure all remaining entries in `FINDINGS[]` are confirmed, correctly cited findings before running forensics or generating remediation tasks. If none remain, use the no-findings path in Phase 8.
+5. Do not retain `OBFUSCATION` from `atob`, `btoa`, `Buffer.from(..., "base64")`, or `String.fromCharCode` alone. These are ordinary encoding/decoding operations in data-format, OTLP/protobuf, header, session-redaction, serialization, and codec code; require evidence that decoded content is executed or used to conceal a suspicious destination. Inspect multi-line data flow when needed, but do not flag the encoding API alone. Treat vendored/generated implementation details as out of scope for heuristic findings.
+6. Ensure all remaining entries in `FINDINGS[]` are confirmed, correctly cited findings before running forensics or generating remediation tasks. If none remain, use the no-findings path in Phase 8.
 
 #### Phase 5: Compile and Report Findings
 
@@ -608,11 +635,23 @@ Before Phase 5, validate every candidate in `FINDINGS[]`, including in the `sing
 
 echo "📊 Analyzing findings..."
 
-# Save findings to current scan
-FINDINGS_JSON=$(printf '%s\n' "${FINDINGS[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+# Deduplicate this scan and compare confirmed finding signatures with prior scans.
+FINDINGS_JSON=$(printf '%s\n' "${FINDINGS[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0)) | unique')
+mapfile -t FINDINGS < <(jq -r '.[]' <<< "$FINDINGS_JSON")
+PREVIOUS_FINDINGS_JSON=$(jq -c '.findings // []' "$FINDINGS_LOG")
+NEW_FINDINGS_JSON=$(jq -cn --argjson current "$FINDINGS_JSON" --argjson previous "$PREVIOUS_FINDINGS_JSON" '$current | map(select(. as $finding | ($previous | index($finding)) == null))')
+REPEATED_FINDINGS_JSON=$(jq -cn --argjson current "$FINDINGS_JSON" --argjson previous "$PREVIOUS_FINDINGS_JSON" '$current | map(select(. as $finding | ($previous | index($finding)) != null))')
+SEEN_FINDINGS_JSON=$(jq -cn --argjson current "$FINDINGS_JSON" --argjson previous "$PREVIOUS_FINDINGS_JSON" '($previous + $current) | unique')
 
-jq ".findings = $FINDINGS_JSON | .status = \"complete\"" "$CURRENT_SCAN" > "${CURRENT_SCAN}.tmp"
+jq --argjson findings "$FINDINGS_JSON" --argjson new_findings "$NEW_FINDINGS_JSON" --argjson repeated_findings "$REPEATED_FINDINGS_JSON" \
+  '.findings = $findings | .new_findings = $new_findings | .repeated_findings = $repeated_findings | .status = "complete"' \
+  "$CURRENT_SCAN" > "${CURRENT_SCAN}.tmp"
 mv "${CURRENT_SCAN}.tmp" "$CURRENT_SCAN"
+
+# Persist signatures so later scans can identify unchanged findings.
+jq -cn --argjson findings "$SEEN_FINDINGS_JSON" --arg updated_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  '{findings: $findings, updated_at: $updated_at}' > "${FINDINGS_LOG}.tmp"
+mv "${FINDINGS_LOG}.tmp" "$FINDINGS_LOG"
 
 # Update scan history
 TOTAL_SCANS=$(jq -r '.total_scans' "$SCAN_HISTORY")
@@ -633,6 +672,8 @@ mv "${SCAN_HISTORY}.tmp" "$SCAN_HISTORY"
 echo "✅ Scan history updated"
 echo "📊 Total scans: $NEW_TOTAL_SCANS"
 echo "📊 Findings this scan: ${#FINDINGS[@]}"
+echo "🆕 New findings: $(jq 'length' <<< "$NEW_FINDINGS_JSON")"
+echo "🔁 Previously seen findings: $(jq 'length' <<< "$REPEATED_FINDINGS_JSON")"
 echo "📊 Total findings all time: $NEW_TOTAL_FINDINGS"
 ```
 
@@ -650,25 +691,27 @@ Create actionable remediation tasks for each finding:
 Pipe the FORENSICS_DATA JSON lines (from Phase 6) to stdin of the `fix-task-generator` agent.
 Use its markdown stdout output as FIX_TASKS in Phase 8.
 
-#### Phase 8: Create Security Issues with Actionable Tasks
+#### Phase 8: Update the Security Tracker with Actionable Tasks
 
-If findings are detected, create detailed security issues with forensics and fix tasks:
+If findings are detected, update the security tracker with forensics and fix tasks:
 
 ```bash
 #!/bin/bash
 
 if [ ${#FINDINGS[@]} -gt 0 ]; then
   echo "🚨 SECURITY FINDINGS DETECTED!"
-  echo "Creating security issue with actionable tasks..."
+  echo "Updating the security tracker or creating it if it does not exist..."
   
-  # Create issue using safe-outputs
+  # Prepare the stable tracker body using safe-outputs
   cat > /tmp/gh-aw/agent/security-issue.md <<EOF
 ### 🚨 Security Red Team Findings - $(date +%Y-%m-%d)
 
-**Scan Mode**: $SCAN_MODE  
-**Technique**: $TECHNIQUE  
-**Files Analyzed**: $FILE_COUNT  
-**Findings**: ${#FINDINGS[@]}
+- **Scan Mode**: $SCAN_MODE
+- **Technique**: $TECHNIQUE
+- **Files Analyzed**: $FILE_COUNT
+- **Findings**: ${#FINDINGS[@]}
+- **New Findings**: $(jq 'length' <<< "$NEW_FINDINGS_JSON")
+- **Previously Seen**: $(jq 'length' <<< "$REPEATED_FINDINGS_JSON")
 
 ### 📋 Executive Summary
 
@@ -713,8 +756,8 @@ $FIX_TASKS
 *📅 Scan completed at $(date -u +"%Y-%m-%d %H:%M:%S UTC")*
 EOF
 
-  # Use create-issue safe output
-  echo "Creating issue via safe-outputs..."
+  # Use update-issue for an existing tracker; create-issue only when none exists.
+  echo "Publishing the tracker update via safe-outputs..."
   
 else
   echo "✅ No security findings detected"
@@ -729,10 +772,10 @@ Your workflow MUST produce a safe output:
 1. **If security findings detected**:
    - **PERFORM** forensics analysis using `git blame` to identify when code was introduced
    - **GENERATE** actionable remediation tasks for each finding
-   - **CALL** the `create_issue` tool with:
-     - Title: "Security Red Team Findings - [DATE]"
-     - Body: Detailed findings with forensics data, fix tasks, and @pelikhan mention
-     - Labels: ["security", "red-team"]
+   - Search open issues for the security-red-team tracker by title prefix `🚨 [SECURITY] Security Red Team Findings` and labels `security` and `red-team`.
+   - If one exists, prefer the issue with the stable title `🚨 [SECURITY] Security Red Team Findings`; otherwise use the most recently updated matching issue. Replace its body and normalize its title to the stable title using `update_issue` with `operation: "replace"`.
+   - If no matching tracker exists, call `create_issue` with title `Security Red Team Findings`, the current findings and scan date in the body, and labels `security` and `red-team`.
+   - Never create a date-specific issue title. On repeat scans, update the existing tracker even when every finding is previously seen; use the new/repeated counts to distinguish changes without appending duplicate entries.
 
 2. **If no findings detected**:
    - **CALL** the `noop` tool with completion message:

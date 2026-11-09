@@ -354,7 +354,10 @@ func (e *PiEngine) buildPiArgs(workflowData *WorkflowData) []string {
 	piArgs := []string{"--print", "--mode", "json"}
 	modelRouting := isModelRoutingEnabled(workflowData)
 	session := piSessionSettings(workflowData)
-	if session.Enabled {
+	if workflowData.EngineConfig != nil && workflowData.EngineConfig.Durable != nil {
+		root := durableSessionDirectory("pi")
+		piArgs = append(piArgs, "--session-dir", root, "--session", path.Join(root, "session.jsonl"))
+	} else if session.Enabled {
 		piArgs = append(piArgs, "--session-dir", PiSessionDirectory)
 		switch {
 		case session.Resume != "":

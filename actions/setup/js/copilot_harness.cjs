@@ -2132,6 +2132,9 @@ async function main() {
               } catch {
                 return;
               }
+              if (!copilotSDKMode && durableSession && sessionId && ["session.start", "session.resume", "assistant.message", "tool.execution_start"].includes(event?.type)) {
+                durableSession.started(sessionId);
+              }
               if (["error", "session.error", "turn.failed"].includes(event?.type) && NATIVE_RATE_LIMIT_ERROR_PATTERN.test(JSON.stringify(event))) {
                 nativeTerminalRateLimitError = true;
               }

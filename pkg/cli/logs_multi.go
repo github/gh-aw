@@ -309,32 +309,19 @@ func DownloadWorkflowLogsForTargets( //nolint:largefunc // Keeps shared collecti
 	if err != nil {
 		return err
 	}
-	return renderLogsOutput(processedRuns, renderLogsOutputOptions{
-		outputDir:         opts.OutputDir,
-		summaryFile:       opts.SummaryFile,
-		format:            opts.Format,
-		reportFile:        opts.ReportFile,
-		jsonOutput:        opts.JSONOutput,
-		episodes:          opts.Episodes,
-		toolGraph:         opts.ToolGraph,
-		train:             opts.Train,
-		drain3Weights:     opts.Drain3Weights,
-		audit:             opts.Audit,
-		verbose:           opts.Verbose,
-		artifactFilter:    artifactFilter,
-		includeWorkQueue:  workQueueEvidenceRequested(opts.ArtifactSets),
-		startDate:         opts.StartDate,
-		endDate:           opts.EndDate,
-		checkStaleness:    true,
-		countLimitReached: countLimitReached,
-		countLimitTargets: logsCountLimitedTargets(results),
-		suppressRender:    opts.SuppressRender,
-		continuations:     continuations,
-		apiRateLimit:      apiRateLimit,
-		apiRateLimits:     apiRateLimits,
-		cachedJSONLWriter: opts.cachedJSONLWriter,
-		outcomeReports:    outcomeReports,
-	})
+	renderOpts := newRenderLogsOutputOptions(opts, artifactFilter)
+	renderOpts.startDate = opts.StartDate
+	renderOpts.endDate = opts.EndDate
+	renderOpts.checkStaleness = true
+	renderOpts.countLimitReached = countLimitReached
+	renderOpts.countLimitTargets = logsCountLimitedTargets(results)
+	renderOpts.suppressRender = opts.SuppressRender
+	renderOpts.continuations = continuations
+	renderOpts.apiRateLimit = apiRateLimit
+	renderOpts.apiRateLimits = apiRateLimits
+	renderOpts.cachedJSONLWriter = opts.cachedJSONLWriter
+	renderOpts.outcomeReports = outcomeReports
+	return renderLogsOutput(processedRuns, renderOpts)
 }
 
 func logLogsMultiTargetDownloadStart(opts LogsDownloadOptions, targetCount int) {

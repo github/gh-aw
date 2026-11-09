@@ -18,8 +18,6 @@ type DurableConfig struct {
 
 const durableStateDirectory = "/tmp/gh-aw/agent/durable"
 const defaultDurableRetentionDays = 7
-const durableOTelJournal = constants.TmpGhAwAgentDir + "durable-otel.jsonl"
-const piDurablePackageRoot = "/tmp/gh-aw/pi-durable-runtime/node_modules"
 
 type DurableExecutionPlan struct {
 	Files             []string
@@ -69,6 +67,7 @@ func durableWorkflowID(data *WorkflowData) string {
 }
 
 func durableCheckpointName(data *WorkflowData) string {
+	// Preserve the checkpoint path contract used by imported native engines.
 	return "pi-durable-" + durableWorkflowID(data) + ".json"
 }
 
@@ -148,10 +147,4 @@ func applyDurableExecutionEnv(env map[string]string, data *WorkflowData) {
 	}
 	maps.Copy(env, durableEnv)
 	applyDurableSessionEnv(env, data)
-	if data.EngineConfig.ID == string(constants.PiEngine) {
-		env["GH_AW_PI_DURABLE_STORAGE"] = durableEnv["GH_AW_DURABLE_STORAGE"]
-		env["GH_AW_PI_DURABLE_DIR"] = durableEnv["GH_AW_DURABLE_DIR"]
-		env["GH_AW_PI_DURABLE_CHECKPOINT"] = durableEnv["GH_AW_DURABLE_CHECKPOINT"]
-		env["GH_AW_PI_DURABLE_PACKAGE_ROOT"] = piDurablePackageRoot
-	}
 }

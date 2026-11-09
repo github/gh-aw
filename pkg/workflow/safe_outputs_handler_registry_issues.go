@@ -63,6 +63,8 @@ var issueHandlerRegistry = map[string]handlerBuilder{
 		c := cfg.UpdateIssues
 		builder := newHandlerConfigBuilder().
 			AddTemplatableInt("max", c.Max).
+			AddDefault("max_issue_artifacts", c.maxIssueArtifacts()).
+			AddDefault("max_issue_artifact_size", c.maxIssueArtifactSize()).
 			AddIfNotEmpty("target", c.Target).
 			AddIfNotEmpty("title_prefix", c.TitlePrefix).
 			AddStringSlice("required_labels", c.RequiredLabels).
