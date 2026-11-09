@@ -20,16 +20,17 @@ function verification(name) {
   return { job, step, run: env => runInNewContext(script, { require: () => assert, process: { env } }) };
 }
 
-const successfulJobs = { SMOKE_AGENT_RESULT: "success", SMOKE_SAFE_OUTPUTS_RESULT: "success" };
+const successfulJobs = { SMOKE_ACTIVATION_RESULT: "success", SMOKE_AGENT_RESULT: "success", SMOKE_SAFE_OUTPUTS_RESULT: "success" };
 const boundLaunch = { dispatch_id: "dispatch:smoke", state: "bound", released: false, dispatched: true, run_id: "42", html_url: "https://github.com/owner/repo/actions/runs/42" };
+const pendingLaunch = { ...boundLaunch, state: "activation_pending" };
 // Shapes emitted by dispatchQueueIntent and work_queue_dispatch.main, not agent intents.
 const dispatchReceipt = (overrides = {}) => ({
   version: 3,
-  status: "ok",
+  status: "activation_pending",
   success: true,
   receipts: [
     { status: "durable", request_id: "request:submit" },
-    { status: "durable", success: true, request_id: "request:dispatch", dispatches: 1, launches: [boundLaunch], ...overrides },
+    { status: "durable", success: true, request_id: "request:dispatch", dispatches: 1, launches: [pendingLaunch], ...overrides },
   ],
   remaining_dispatches: 0,
 });
@@ -39,21 +40,22 @@ describe("native work queue smoke verification", () => {
   it.each(["dispatcher", "worker"])("%s always checks completed upstream jobs, including skipped agents", name => {
     const { job, step, run } = verification(name);
     expect(job.if).toBe("always()");
-    expect(job.needs).toEqual(["agent", "safe_outputs"]);
+    expect(job.needs).toEqual(name === "worker" ? ["activation", "agent", "safe_outputs"] : ["agent", "safe_outputs"]);
     expect(step.env.SMOKE_AGENT_RESULT).toBe("${{ needs.agent.result }}");
     expect(step.env.SMOKE_SAFE_OUTPUTS_RESULT).toBe("${{ needs.safe_outputs.result }}");
     const env = name === "worker" ? { ...successfulJobs, SMOKE_QUEUE_OUTCOME: "completed" } : dispatchEnv(dispatchReceipt());
-    for (const variable of ["SMOKE_AGENT_RESULT", "SMOKE_SAFE_OUTPUTS_RESULT"]) {
+    for (const variable of [...(name === "worker" ? ["SMOKE_ACTIVATION_RESULT"] : []), "SMOKE_AGENT_RESULT", "SMOKE_SAFE_OUTPUTS_RESULT"]) {
       for (const result of ["skipped", "failure", "cancelled", ""]) {
         expect(() => run({ ...env, [variable]: result })).toThrow();
       }
     }
   });
 
-  it("requires the trusted controls receipt and a verified native worker launch", () => {
+  it("requires a trusted accepted dispatch receipt without waiting for worker activation", () => {
     const { step, run } = verification("dispatcher");
     expect(step.env.SMOKE_DISPATCH_RECEIPT).toBe("${{ needs.safe_outputs.outputs.work_queue_requests }}");
     expect(() => run(dispatchEnv(dispatchReceipt()))).not.toThrow();
+    expect(() => run(dispatchEnv({ ...dispatchReceipt({ launches: [boundLaunch] }), status: "ok" }))).not.toThrow();
     for (const invalid of [
       dispatchReceipt({ status: "no_grant", dispatches: 0, launches: [] }),
       dispatchReceipt({ status: "staged_preview", dispatches: 0, launches: [] }),
@@ -62,6 +64,8 @@ describe("native work queue smoke verification", () => {
       dispatchReceipt({ launches: [{ ...boundLaunch, state: "launch_unresolved" }] }),
       dispatchReceipt({ launches: [{ ...boundLaunch, state: "released", released: true, dispatched: false }] }),
       dispatchReceipt({ launches: [{ ...boundLaunch, state: "rejected" }] }),
+      dispatchReceipt({ launches: [{ ...pendingLaunch, dispatched: false }] }),
+      dispatchReceipt({ success: false }),
       dispatchReceipt({ launches: [{ ...boundLaunch, run_id: undefined }] }),
       dispatchReceipt({ acknowledgement_only: true, launches: [] }),
       { ...dispatchReceipt(), success: false },
@@ -84,6 +88,13 @@ describe("native work queue smoke verification", () => {
     expect(() => run(successfulJobs)).toThrow();
   });
 
+  it("requires trusted worker activation separately from a completed Result", () => {
+    const { step, run } = verification("worker");
+    expect(step.env.SMOKE_ACTIVATION_RESULT).toBe("${{ needs.activation.result }}");
+    const { SMOKE_ACTIVATION_RESULT, ...withoutActivation } = successfulJobs;
+    expect(() => run({ ...withoutActivation, SMOKE_QUEUE_OUTCOME: "completed" })).toThrow();
+  });
+
   it("compiles always-running verifiers and exports only trusted receipt and outcome sources", () => {
     for (const name of ["dispatcher", "worker"]) {
       const compiled = readWorkflow(name, true);
@@ -97,6 +108,9 @@ describe("native work queue smoke verification", () => {
       expect(controls.with.script).toContain("work_queue_control_adapter.cjs");
       expect(controls.with.script).toContain("await main({ core, github, context");
       if (name === "worker") {
+        expect(compiled.jobs[id].needs).toContain("activation");
+        const activation = compiled.jobs.activation.steps.find(step => step.id === "work_queue_snapshot");
+        expect(activation.with.script).toContain("write_work_queue_snapshot.cjs");
         expect(compiled.jobs.safe_outputs.outputs.work_queue_outcome).toBe("${{ steps.process_safe_outputs.outputs.work_queue_outcome }}");
       }
     }

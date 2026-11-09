@@ -466,11 +466,17 @@ explain any required maintainer recompilation of source workflow changes in the
 PR. Do not bypass the exclusion or commit a generated lock under another name.
 
 Create at most one draft PR via `create_pull_request` only after validation and
-fresh dedup pass. Use `### Summary`, `### Root cause`, `### Validation`, and
-`### Coverage and limitations`. Include the stable fingerprint/tuple, source
-cluster IDs, unique affected count, collection window, remaining clusters,
-up to three linked run references, and actual test results. Separate observed
-evidence from inference and local validation from unperformed live checks.
+fresh dedup pass. Use `###` or lower headings, with `### Summary`, `### Root
+cause`, `### Validation`, and `### Coverage and limitations`. Keep the overview,
+root cause, key impact, and next actions visible; follow the sequence overview →
+findings and metrics → collapsible detailed evidence → next actions or
+limitations. Put lengthy logs and per-run evidence in
+`<details><summary><b>...</b></summary>...</details>`. Include the stable
+fingerprint/tuple, source cluster IDs, unique affected count, collection window,
+remaining clusters, up to three linked run references, and actual test results.
+Format run references as `[§12345](https://github.com/${{ github.repository }}/actions/runs/12345)`.
+Separate observed evidence from inference and local validation from unperformed
+live checks.
 If no safe, novel, evidenced fix is available, call `noop` with a concise reason.
 
 ## Usage and collection limits

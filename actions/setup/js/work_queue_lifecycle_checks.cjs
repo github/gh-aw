@@ -48,7 +48,7 @@ async function run() {
       const assignment = JSON.parse(parameters.inputs.work_queue_assignment);
       check(fixture.state.dispatches.get(assignment.dispatch_id).state === "started");
       check(parameters.headers["X-GitHub-Api-Version"] === "2026-03-10" && parameters.request.retries === 0);
-      check(parameters.ref === REF);
+      check(parameters.ref === `refs/tags/gh-aw/work-queue/${REF}`);
       if (response instanceof Error || response?.response) throw response;
       return response || { status: 200, data: { workflow_run_id: "42", run_url: "https://api.github.com/repos/owner/repo/actions/runs/42", html_url: "https://github.com/owner/repo/actions/runs/42" } };
     };
@@ -223,12 +223,15 @@ async function run() {
     const launch = assignedFixture();
     const posts = prepareLaunch(launch);
     const launchOptions = optionsFor(launch, false);
-    check((await launchAssignment(launchOptions, launch.assignment)).state === "bound");
+    check((await launchAssignment(launchOptions, launch.assignment)).state === "activation_pending");
+    check(launch.state.dispatches.get(launch.assignment.dispatch_id).state === "started" && !launch.state.dispatches.get(launch.assignment.dispatch_id).run);
+    await activate({ ...optionsFor(launch), snapshotPath: path.join(directory, "launch-activation.json"), core: { info: () => {} }, requireAssignment: true });
     await launchAssignment(launchOptions, launch.assignment);
     check(posts() === 1 && launch.state.dispatches.get(launch.assignment.dispatch_id).run.run_id === "42");
     const concurrent = assignedFixture();
     const concurrentPosts = prepareLaunch(concurrent);
     await Promise.all([launchAssignment(optionsFor(concurrent, false), concurrent.assignment), launchAssignment(optionsFor(concurrent, false), concurrent.assignment)]);
+    await activate({ ...optionsFor(concurrent), snapshotPath: path.join(directory, "concurrent-activation.json"), core: { info: () => {} }, requireAssignment: true });
     check(concurrentPosts() === 1 && concurrent.state.dispatches.get(concurrent.assignment.dispatch_id).run.run_id === "42");
     for (const destination of [{ repository: "foreign/repo" }, { workflow: ".github/workflows/other.yml" }, { ref: "b".repeat(40) }]) {
       const invalidDestination = assignedFixture();
