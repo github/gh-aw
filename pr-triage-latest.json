@@ -1,18 +1,100 @@
 {
-  "run_id": "42573501390",
-  "run_date": "2026-11-09T06:34:18.295351Z",
+  "run_id": "2026-11-09T12:29:59Z",
+  "run_date": "2026-11-09T12:29:59Z",
   "source": "pr-triage",
-  "eligible_total": 0,
-  "open_copilot_prs": 1,
-  "cooldown_skipped": 1,
-  "category_counts": {},
-  "risk_counts": {},
-  "priority_counts": {},
-  "action_counts": {},
-  "batches": [],
-  "selected_candidates": [],
-  "skipped_prs": [
-    76157
+  "eligible_total": 7,
+  "open_copilot_prs": 7,
+  "cooldown_skipped": 0,
+  "category_counts": {
+    "bug": 5,
+    "feature": 2
+  },
+  "risk_counts": {
+    "medium": 7
+  },
+  "priority_counts": {
+    "high": 1,
+    "medium": 6
+  },
+  "action_counts": {
+    "auto_merge": 1,
+    "batch_review": 6
+  },
+  "batches": [
+    {
+      "id": "agent-runtime",
+      "count": 7,
+      "pr_numbers": [
+        76157,
+        76183,
+        76184,
+        76185,
+        76192,
+        76193,
+        76194
+      ],
+      "category": "mixed",
+      "risk": "medium"
+    }
   ],
-  "summary": "No eligible Copilot PRs remained after the 1-hour cooldown; all open Copilot PRs were updated within the last hour and were skipped for re-triage."
+  "selected_candidates": [
+    {
+      "number": 76157,
+      "category": "bug",
+      "risk": "medium",
+      "priority": "high",
+      "action": "batch_review",
+      "score": 70
+    },
+    {
+      "number": 76183,
+      "category": "feature",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 65
+    },
+    {
+      "number": 76184,
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 53
+    },
+    {
+      "number": 76185,
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 57
+    },
+    {
+      "number": 76192,
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "auto_merge",
+      "score": 57
+    },
+    {
+      "number": 76193,
+      "category": "feature",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 54
+    },
+    {
+      "number": 76194,
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 54
+    }
+  ],
+  "skipped_prs": [],
+  "summary": "Seven eligible Copilot PRs remain after the 1-hour cooldown; the cluster is dominated by medium-risk reliability and workflow-runtime fixes with one auto-merge candidate."
 }
