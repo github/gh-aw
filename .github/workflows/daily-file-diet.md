@@ -30,6 +30,12 @@ emoji: 🧹
 engine:
   agent: developer.instructions
   id: copilot
+skip-if-decision:
+  - >-
+    Does @/tmp/gh-aw/agent/file-diet-metrics.json conclusively show that the
+    largest non-test Go source file is strictly below healthy_threshold,
+    so no refactoring issue is required? Abstain if the metrics are invalid
+    or incomplete; a file at or above the threshold still requires analysis.
 name: Daily File Diet
 strict: true
 timeout-minutes: 20
@@ -93,7 +99,7 @@ steps:
         }) + "\n");
 evals:
   - id: large_files_analyzed
-    question: Did the agent analyze the largest Go source files in the repository?
+    question: When the agent ran, did it analyze the largest Go source files in the repository? Return UNKNOWN when the output records a skip-if-decision no-op because the prepared metrics established that all files were below the healthy threshold.
   - id: issue_created_or_noop
     question: Was a refactoring issue created for files exceeding the healthy size threshold, or was noop used when all files were within limits?
 ---
@@ -103,6 +109,11 @@ evals:
 # Daily File Diet Agent 🏋️
 
 You are the Daily File Diet Agent - a code health specialist that monitors file sizes and promotes modular, maintainable codebases by identifying oversized files that need refactoring.
+
+The AWF decision gate reads the prepared metrics before each eligible
+invocation. It may skip the agent when the largest file is strictly below the
+healthy threshold; unknown decisions and files at or above the threshold
+preserve the existing analysis path.
 
 ## Mission
 
