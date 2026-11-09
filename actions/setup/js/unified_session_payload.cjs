@@ -13,7 +13,7 @@ const { redactWebhookPayloads } = require("./webhook_context.cjs");
 const { isErrorIdentifier, normalizeEngineHarness } = require("./routing_analytics.cjs");
 const { projectSafeOutputData } = require("./safe_output_outcomes.cjs");
 const { normalizeHarnessRetryRecord, normalizeHarnessAttemptEvent, normalizeHarnessDecisionData } = require("./harness_retry_record.cjs");
-const { sessionTimestampNs } = require("./unified_session_order.cjs");
+const { sessionMessageTimestamp } = require("./unified_session_order.cjs");
 
 /** AWF failed-request origins: provider response versus AWF-originated rejection. */
 const ERROR_SOURCES = new Set(["upstream", "awf"]);
@@ -866,9 +866,8 @@ function normalizeUnifiedSessionEvent(event, phase) {
     if (Array.isArray(errors)) data.errors = errors.filter(error => error && typeof error === "object" && !Array.isArray(error)).map(projectSafeOutputData);
   }
   const metadata = selectFields(event, { id: ["id"], parentId: ["parentId"], timestamp: ["timestamp", "ts", "time", "created_at"], agentId: ["agentId"], ephemeral: ["ephemeral"] });
-  const nativeMessage = event.message;
-  const nativeTimestamp = (nativeMessage && typeof nativeMessage === "object" && "timestamp" in nativeMessage ? nativeMessage.timestamp : undefined) ?? source.messageMetadata?.timestamp;
-  if (!Object.hasOwn(metadata, "timestamp") && sessionTimestampNs({ timestamp: nativeTimestamp }) !== undefined) metadata.timestamp = nativeTimestamp;
+  const nativeTimestamp = sessionMessageTimestamp(event);
+  if (!Object.hasOwn(metadata, "timestamp") && nativeTimestamp !== undefined) metadata.timestamp = nativeTimestamp;
   return {
     type: event.type,
     ...metadata,

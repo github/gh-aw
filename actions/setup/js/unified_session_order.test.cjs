@@ -9,6 +9,29 @@ const header = { type: "session.format", data: { version: 1 }, provenance: { com
 const jsonl = events => [header, ...events].map(JSON.stringify).join("\n") + "\n";
 
 describe("Unified trace ordering", () => {
+  it.each([
+    [0, "milliseconds", 0n],
+    [1.25, "milliseconds", 1250000n],
+    [1.25, "seconds", 1250000000n],
+    ["1790899200123456789", "nanoseconds", 1790899200123456789n],
+    ["2026-10-02T00:00:00.123456789+00:00", "milliseconds", 1790899200123456789n],
+  ])("orders the first valid embedded or archived clock with declared units (%s, %s)", (timestamp, unit, expectedNs) => {
+    for (const invalid of [false, { value: 0 }, "yesterday", "2026-02-30T00:00:00Z", Infinity, NaN]) {
+      const saved = { id: "saved", message: { timestamp: invalid }, data: { messageMetadata: { timestamp } } };
+      expect(sessionTimestampNs(saved, unit)).toBe(expectedNs);
+      const adjacent = [...(expectedNs > 0n ? [event("before", String(expectedNs - 1n))] : []), event("after", String(expectedNs + 1n))];
+      expect(orderSessionSources([source("agent", [saved], unit), source("otel", adjacent, "nanoseconds")]).map(record => record.id)).toEqual(expectedNs === 0n ? ["saved", "after"] : ["before", "saved", "after"]);
+      expect(sessionTimestampNs({ ...saved, message: { timestamp } }, unit)).toBe(expectedNs);
+      for (const alias of ["timestamp", "ts", "time", "created_at"]) {
+        expect(sessionTimestampNs({ ...saved, [alias]: invalid }, unit)).toBeUndefined();
+      }
+    }
+  });
+
+  it("keeps a valid embedded message clock ahead of an archived clock", () => {
+    expect(sessionTimestampNs({ message: { timestamp: 0 }, data: { messageMetadata: { timestamp: 10 } } })).toBe(0n);
+  });
+
   it.each([0, 2000, "2026-11-09T00:27:23.729Z"])("orders saved Pi message metadata clocks without publishing the native envelope (%s)", timestamp => {
     const clock = typeof timestamp === "number" ? timestamp : Date.parse(timestamp);
     const saved = {

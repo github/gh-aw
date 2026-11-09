@@ -374,7 +374,9 @@ token-tracker audit `ts` values use milliseconds. Pi's observed
 When the event has no source clock, the unified projection MUST retain a valid
 observed message clock as `timestamp` before omitting the archival message
 metadata. Promotion MUST use the ordering parser's timezone, calendar and
-numeric-range validation; invalid archival message clocks MUST NOT be promoted.
+numeric-range validation. Embedded native message clocks take precedence over
+archival message clocks only when valid; invalid archival message clocks MUST
+NOT be promoted.
 Explicit source clocks take precedence and retain their native values; ordering
 anchors are not substitutes for missing native clocks. ISO fractional seconds
 and OTLP decimal-string Unix nanoseconds MUST be compared at nanosecond precision.
