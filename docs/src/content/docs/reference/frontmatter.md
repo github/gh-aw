@@ -74,7 +74,15 @@ Each question returns `deny` when its skip condition is established, `allow` whe
 
 Questions share one Decisions request through the existing AWF API proxy, using `gpt-6-luna-decisions` on a configured Copilot provider, or `gpt-6-luna` when only OpenAI is configured. No direct-provider fallback or additional credentials are used. Unavailable models or APIs, timeouts, malformed responses, and file-read failures abstain without decision retries. Decision requests remain subject to the proxy's model and budget policies and its existing usage accounting.
 
-Runtime `@file` references resolve relative to `engine.cwd`, or the workspace when unset. They are read afresh before each invocation using the existing guarded regular-file reader: only workspace and `/tmp/gh-aw/agent` paths are eligible; symlinks, hardlinks, sensitive paths, and oversized context are rejected. Each question's referenced content is bounded to 512 KiB. Unreadable context makes that question `unknown`, without preventing other questions from being evaluated. Paths use letters, digits, `_`, `.`, `/`, and `-`; Actions expressions are not supported in questions.
+Runtime `@file` references resolve relative to `engine.cwd`, or the workspace when unset. They are read afresh before each invocation using the existing guarded regular-file reader: only workspace and `/tmp/gh-aw/agent` paths are eligible; symlinks, hardlinks, sensitive paths, and oversized context are rejected. Each question's imports have a 512 KiB ceiling including question text, evidence metadata, and JSON escaping; each read receives the remaining budget.
+
+The entire serialized Decisions request is capped at 400,000 UTF-8 bytes,
+approximately 100,000 tokens at four bytes per token. This is a byte-based
+estimate, not tokenizer-exact accounting, and includes request framing,
+questions, choices, and escaped evidence. Questions that would exceed the
+remaining budget become `unknown`; smaller questions can still be evaluated.
+Unreadable context also makes only its question `unknown`. Paths use letters,
+digits, `_`, `.`, `/`, and `-`; Actions expressions are not supported in questions.
 
 Decision metadata is retained in the existing harness retry artifact and as typed `harness.decision` events in the agent's unified session. Events contain one-based question indices, outcomes, sanitized error codes, latency, the proposed attempt, and `avoidedInvocation`; they never retain file contents or raw provider diagnostics. `gh aw audit --json` exposes this history under `retries.decisions` and counts avoided invocations separately from retries. A denied invocation records a noop if no terminal safe-output exists. The gate does not apply to threat detection or evals.
 

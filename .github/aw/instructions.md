@@ -41,6 +41,11 @@ before the first invocation, and keep them current for subsequent invocations.
 Runtime `@file` references resolve relative to `engine.cwd` or the workspace;
 only workspace and `/tmp/gh-aw/agent` files are eligible. Sensitive paths,
 symlinks, hardlinks, oversized context, and Actions expressions are unsupported.
+Each read is bounded by the remaining import budget, including JSON escaping
+and evidence metadata. Per-question context has a 512 KiB ceiling; the complete
+serialized Decisions request is limited to 400,000 UTF-8 bytes (approximately
+100,000 tokens at four bytes per token, not tokenizer-exact). A question that
+does not fit abstains, while smaller remaining questions may still run.
 
 The shared harness evaluates questions inside AWF before every otherwise
 eligible initial, retry, resume, or continuation invocation, including

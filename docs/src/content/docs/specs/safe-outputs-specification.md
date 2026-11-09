@@ -3198,6 +3198,12 @@ policies MUST remain effective regardless of the decision recommendation.
 `skip-if-decision` is experimental; nonempty lists emit a compiler warning,
 and configuration and behavior may change without deprecation.
 
+File imports MUST remain confined to the workspace or `/tmp/gh-aw/agent` and
+use remaining byte budgets that include evidence metadata and escaping.
+The complete serialized Decisions request MUST NOT exceed 400,000 UTF-8 bytes,
+approximately 100,000 tokens at four bytes per token, not an exact token count.
+Questions that exceed the remaining budget MUST abstain without transmission.
+
 Before transmitting a question or its fresh, confined, size-limited `@file`
 evidence, the evaluator MUST screen for configured secret values and common
 credential patterns, including private keys, GitHub/AWS credentials, bearer

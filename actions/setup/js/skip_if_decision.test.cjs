@@ -116,6 +116,46 @@ describe("skip-if-decision", () => {
     expect(() => resolveQuestionContext("Is @task.md complete?", () => Buffer.from("\n".repeat(300 * 1024)))).toThrow("context_limit");
   });
 
+  it("accepts exactly 512 KiB including the question and evidence metadata, but rejects one more byte", () => {
+    const question = "Is @task.md complete?";
+    const limit = 512 * 1024;
+    const empty = resolveQuestionContext(question, () => Buffer.alloc(0));
+    const overhead = empty.reduce((bytes, part) => bytes + Buffer.byteLength(part.text), 0);
+    const length = limit - overhead - (String(limit - overhead).length - 1);
+    const parts = resolveQuestionContext(question, () => Buffer.alloc(length, "a"));
+    expect(parts.reduce((bytes, part) => bytes + Buffer.byteLength(part.text), 0)).toBe(limit);
+    expect(() => resolveQuestionContext(question, () => Buffer.alloc(length + 1, "a"))).toThrow("context_limit");
+  });
+
+  it("counts escaped evidence and metadata against subsequent reads and stops at the import limit", () => {
+    const question = "Is @first.md @second.md @third.md complete?";
+    const content = Buffer.from("\n".repeat(130 * 1024));
+    const firstEvidence = resolveQuestionContext("Is @first.md complete?", () => content)[1].text;
+    const initialBudget = 512 * 1024 - Buffer.byteLength(question);
+    const readFile = vi.fn(() => content);
+    expect(() => resolveQuestionContext(question, readFile)).toThrow("context_limit");
+    expect(readFile).toHaveBeenCalledTimes(2);
+    expect(readFile.mock.calls[0][1]).toBe(initialBudget);
+    expect(readFile.mock.calls[1][1]).toBe(initialBudget - Buffer.byteLength(firstEvidence));
+  });
+
+  it("deduplicates repeated file references within a question", () => {
+    const readFile = vi.fn(() => Buffer.from("work complete"));
+    const parts = resolveQuestionContext("Is @task.md complete according to @task.md?", readFile);
+    expect(parts).toHaveLength(2);
+    expect(readFile).toHaveBeenCalledTimes(1);
+  });
+
+  it("abstains on oversized imports without transmitting them or failing other questions", async () => {
+    const readFile = vi.fn(() => Buffer.alloc(512 * 1024, "a"));
+    const fetchImpl = vi.fn().mockResolvedValueOnce(endpoint()).mockResolvedValueOnce(new Response('{"answers":[{"name":"skip_2","type":"choice","choice":"allow"}]}'));
+    const result = await evaluateSkipIfDecision({ env: env(["Is @task.md complete?", "Is the task complete?"]), readFile, fetchImpl });
+    expect(result).toMatchObject({ outcome: "allow", questions: [{ outcome: "unknown", error: "file_reference_failed" }, { outcome: "allow" }] });
+    const request = JSON.parse(fetchImpl.mock.calls[1][1].body);
+    expect(request.questions.map(question => question.name)).toEqual(["skip_2"]);
+    expect(JSON.stringify(request)).not.toContain("task.md");
+  });
+
   it.each([
     [["unknown", "unknown"], "unknown"],
     [["allow", "unknown"], "allow"],
@@ -154,6 +194,46 @@ describe("skip-if-decision", () => {
     expect(result).toMatchObject({ outcome: "unknown", error: "invalid_configuration", questions: [] });
     expect(fetchImpl).not.toHaveBeenCalled();
     expect(readFile).not.toHaveBeenCalled();
+  });
+
+  it("accepts a 400000-byte serialized request and abstains at one byte over", async () => {
+    const calibration = vi
+      .fn()
+      .mockResolvedValueOnce(endpoint())
+      .mockResolvedValueOnce(decision(["allow"]));
+    await evaluateSkipIfDecision({ env: env(["x"]), fetchImpl: calibration });
+    const overhead = Buffer.byteLength(calibration.mock.calls[1][1].body) - 1;
+    const question = "x".repeat(400000 - overhead);
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(endpoint())
+      .mockResolvedValueOnce(decision(["allow"]));
+    expect(await evaluateSkipIfDecision({ env: env([question]), fetchImpl })).toMatchObject({ outcome: "allow" });
+    expect(Buffer.byteLength(fetchImpl.mock.calls[1][1].body)).toBe(400000);
+    const rejectedFetch = vi.fn();
+    expect(await evaluateSkipIfDecision({ env: env([question + "x"]), fetchImpl: rejectedFetch })).toMatchObject({ outcome: "unknown", questions: [{ error: "file_reference_failed" }] });
+    expect(rejectedFetch).not.toHaveBeenCalled();
+  });
+
+  it("shares the serialized request budget across file imports while retaining smaller safe questions", async () => {
+    const readFile = vi.fn(() => Buffer.alloc(220000, "a"));
+    const fetchImpl = vi.fn().mockResolvedValueOnce(endpoint()).mockResolvedValueOnce(new Response('{"answers":[{"name":"skip_1","type":"choice","choice":"unknown"},{"name":"skip_3","type":"choice","choice":"allow"}]}'));
+    const result = await evaluateSkipIfDecision({ env: env(["Is @first.md complete?", "Is @second.md complete?", "Is the task complete?"]), readFile, fetchImpl });
+    expect(result).toMatchObject({ outcome: "allow", questions: [{ outcome: "unknown" }, { outcome: "unknown", error: "file_reference_failed" }, { outcome: "allow" }] });
+    expect(readFile).toHaveBeenCalledTimes(2);
+    expect(readFile.mock.calls[1][1]).toBeLessThan(readFile.mock.calls[0][1] - 220000);
+    const body = fetchImpl.mock.calls[1][1].body;
+    expect(Buffer.byteLength(body)).toBeLessThanOrEqual(400000);
+    expect(JSON.parse(body).questions.map(question => question.name)).toEqual(["skip_1", "skip_3"]);
+    expect(body).not.toContain("second.md");
+  });
+
+  it("includes JSON escaping in the shared request-size limit", async () => {
+    const readFile = vi.fn(() => Buffer.from("\n".repeat(150000)));
+    const fetchImpl = vi.fn();
+    const result = await evaluateSkipIfDecision({ env: env(["Is @task.md complete?"]), readFile, fetchImpl });
+    expect(result).toMatchObject({ outcome: "unknown", questions: [{ error: "file_reference_failed" }] });
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it("matches shuffled answers by name, not position", async () => {
@@ -294,6 +374,38 @@ describe("skip-if-decision", () => {
     expect(readFile).not.toHaveBeenCalled();
   });
 
+  it.each(["/tmp/task.md", "/tmp/gh-aw/agent-sibling/task.md", "/tmp/gh-aw/agent/../task.md", "/proc/self/environ", "/dev/null", "/usr/lib/task.md"])("rejects disallowed @%s before any read", filename => {
+    const readFile = vi.fn();
+    expect(() => resolveQuestionContext(`Is @${filename} complete?`, readFile)).toThrow();
+    expect(readFile).not.toHaveBeenCalled();
+  });
+
+  it("rejects workspace prefix siblings and traversal through engine.cwd", () => {
+    const readFile = vi.fn();
+    expect(() => resolveQuestionContext(`Is @${root}-sibling/task.md complete?`, readFile)).toThrow();
+    vi.stubEnv("GH_AW_ENGINE_CWD", path.join(root, "packages/app"));
+    expect(() => resolveQuestionContext("Is @../../../outside.md complete?", readFile)).toThrow();
+    expect(readFile).not.toHaveBeenCalled();
+  });
+
+  it("allows workspace-relative and absolute references, including the confined agent temporary root", () => {
+    vi.stubEnv("GH_AW_ENGINE_CWD", path.join(root, "packages/app"));
+    const readFile = vi.fn(() => Buffer.from("work complete"));
+    resolveQuestionContext("Is @task.md complete?", readFile);
+    resolveQuestionContext(`Is @${root}/context/task.md complete?`, readFile);
+    resolveQuestionContext("Is @/tmp/gh-aw/agent/task.md complete?", readFile);
+    expect(readFile.mock.calls.map(call => call[0])).toEqual([path.join(root, "packages/app/task.md"), path.join(root, "context/task.md"), path.join(fs.realpathSync("/tmp"), "gh-aw/agent/task.md")]);
+  });
+
+  it("makes forbidden references unknown without calling the proxy", async () => {
+    const readFile = vi.fn();
+    const fetchImpl = vi.fn();
+    const result = await evaluateSkipIfDecision({ env: env(["Is @/tmp/task.md complete?"]), readFile, fetchImpl });
+    expect(result).toMatchObject({ outcome: "unknown", questions: [{ error: "file_reference_failed" }] });
+    expect(readFile).not.toHaveBeenCalled();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it.runIf(process.platform === "linux")("uses the real guarded reader (Linux /proc/self/fd only; skipped on macOS) and rejects symlinks and hardlinks", () => {
     const filename = path.join(root, "task.md");
     fs.writeFileSync(filename, "work complete");
@@ -304,6 +416,12 @@ describe("skip-if-decision", () => {
     fs.linkSync(filename, path.join(root, "hardlink.md"));
     expect(() => resolveQuestionContext("Is @link.md complete?")).toThrow();
     expect(() => resolveQuestionContext("Is @hardlink.md complete?")).toThrow();
+    fs.mkdirSync(path.join(root, "directory"));
+    fs.symlinkSync(path.join(root, "directory"), path.join(root, "parent-link"));
+    expect(() => resolveQuestionContext("Is @directory complete?")).toThrow();
+    expect(() => resolveQuestionContext("Is @parent-link/task.md complete?")).toThrow();
+    fs.writeFileSync(path.join(root, "oversized.md"), Buffer.alloc(512 * 1024, "a"));
+    expect(() => resolveQuestionContext("Is @oversized.md complete?")).toThrow();
   });
 
   it("records an intentional noop without overwriting existing output", () => {

@@ -10,6 +10,11 @@ preserves the deterministic execution path. Evaluation failures abstain without
 additional retries. All built-in and declarative engines share the gate, including
 command-based, custom-harness, and durable execution paths.
 
+Confine runtime files to the workspace or `/tmp/gh-aw/agent`, with incremental
+import bounds including metadata and escaping. Limit each serialized request
+to 400,000 UTF-8 bytes, approximately 100,000 tokens; questions exceeding the
+remaining budget abstain.
+
 Nonempty lists emit an experimental feature warning; configuration and behavior
 may change without deprecation.
 

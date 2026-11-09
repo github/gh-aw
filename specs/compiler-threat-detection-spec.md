@@ -825,6 +825,13 @@ read afresh relative to the engine working directory or workspace, confined
 to the workspace or `/tmp/gh-aw/agent`, and checked by the existing guarded
 regular-file reader. Sensitive paths, links, and oversized/changing files MUST
 be rejected; an unreadable reference makes only its question `unknown`.
+Imports MUST use the remaining per-question byte budget and account for
+question text, evidence metadata, and JSON escaping within a 512 KiB ceiling.
+The complete serialized Decisions request MUST be limited to 400,000 UTF-8
+bytes, including input, question definitions, choices, escaped evidence, and
+model/request framing. This approximates 100,000 tokens at four bytes per token;
+it is not tokenizer-exact. A question exceeding the remaining request budget
+MUST abstain without transmission; smaller questions MAY still join the batch.
 
 Before transmission, questions and file evidence MUST be screened using
 configured secret values and common credential patterns. A match MUST withhold
