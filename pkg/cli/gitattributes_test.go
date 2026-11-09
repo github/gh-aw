@@ -35,6 +35,8 @@ func TestEnsureGitAttributes(t *testing.T) {
 		expectedContent string
 		expectUpdated   bool
 		makeDirectory   bool
+		unreadable      bool
+		unwritableFile  bool
 		wantErr         string
 	}{
 		{
@@ -71,9 +73,23 @@ func TestEnsureGitAttributes(t *testing.T) {
 			expectUpdated:   true,
 		},
 		{
-			name:          "fails to write when gitattributes is a directory",
+			name:          "fails to read when gitattributes is a directory",
 			makeDirectory: true,
-			wantErr:       "failed to write .gitattributes",
+			wantErr:       "failed to read .gitattributes",
+		},
+		{
+			name:            "fails to read an unreadable gitattributes file",
+			existingContent: "*.generated linguist-generated=true\n",
+			expectedContent: "*.generated linguist-generated=true\n",
+			unreadable:      true,
+			wantErr:         "failed to read .gitattributes",
+		},
+		{
+			name:            "fails to write when the file is read-only",
+			existingContent: "*.generated linguist-generated=true\n",
+			expectedContent: "*.generated linguist-generated=true\n",
+			unwritableFile:  true,
+			wantErr:         "failed to write .gitattributes",
 		},
 	}
 
@@ -88,9 +104,36 @@ func TestEnsureGitAttributes(t *testing.T) {
 				require.NoError(t, os.WriteFile(gitAttributesPath, []byte(tt.existingContent), 0o644))
 			}
 
+			if tt.unreadable {
+				require.NoError(t, os.Chmod(gitAttributesPath, 0o200))
+				if _, err := os.ReadFile(gitAttributesPath); err == nil {
+					t.Skip("permission bits do not prevent reads for this user")
+				}
+				defer func() {
+					require.NoError(t, os.Chmod(gitAttributesPath, 0o644))
+				}()
+			}
+			if tt.unwritableFile {
+				require.NoError(t, os.Chmod(gitAttributesPath, 0o444))
+				defer func() {
+					require.NoError(t, os.Chmod(gitAttributesPath, 0o644))
+				}()
+				if err := os.WriteFile(gitAttributesPath, []byte("probe"), 0o644); err == nil {
+					t.Skip("file permissions do not prevent writes for this user")
+				}
+			}
+
 			updated, err := ensureGitAttributes()
 			if tt.wantErr != "" {
 				require.ErrorContains(t, err, tt.wantErr)
+				if tt.expectedContent != "" {
+					if tt.unreadable {
+						require.NoError(t, os.Chmod(gitAttributesPath, 0o644))
+					}
+					content, readErr := os.ReadFile(gitAttributesPath)
+					require.NoError(t, readErr)
+					assert.Equal(t, tt.expectedContent, string(content))
+				}
 				return
 			}
 			require.NoError(t, err)
@@ -130,9 +173,10 @@ func TestEnsureGitAttributes_NotInGitRepo(t *testing.T) {
 
 func TestReadGitAttributesFile(t *testing.T) {
 	tests := []struct {
-		name     string
-		setup    func(t *testing.T, path string)
-		expected []string
+		name       string
+		setup      func(t *testing.T, path string)
+		expected   []string
+		unreadable bool
 	}{
 		{
 			name:     "missing file",
@@ -145,6 +189,14 @@ func TestReadGitAttributesFile(t *testing.T) {
 			},
 			expected: []string{"first", "second", ""},
 		},
+		{
+			name: "returns an error when file is unreadable",
+			setup: func(t *testing.T, path string) {
+				require.NoError(t, os.WriteFile(path, []byte("existing rules\n"), 0o644))
+				require.NoError(t, os.Chmod(path, 0o200))
+			},
+			unreadable: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -154,7 +206,20 @@ func TestReadGitAttributesFile(t *testing.T) {
 				tt.setup(t, path)
 			}
 
+			if tt.unreadable {
+				if _, err := os.ReadFile(path); err == nil {
+					t.Skip("permission bits do not prevent reads for this user")
+				}
+				defer func() {
+					require.NoError(t, os.Chmod(path, 0o644))
+				}()
+			}
+
 			lines, err := readGitAttributesFile(path)
+			if tt.unreadable {
+				require.ErrorContains(t, err, "failed to read .gitattributes")
+				return
+			}
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, lines)
 		})
@@ -208,13 +273,54 @@ func TestEnsureRequiredGitAttributesEntry(t *testing.T) {
 	}
 }
 
-func TestStageGitAttributesIfChanged(t *testing.T) {
-	setupGitRepo(t)
-	require.NoError(t, os.WriteFile(".gitattributes", []byte(constants.WorkflowsLockYmlGitAttributesEntry), 0o644))
+func TestStageGitAttributesIfChangedFromFreshRepo(t *testing.T) {
+	tests := []struct {
+		name                string
+		createFile          bool
+		commitExistingFile  bool
+		expectedStagedFiles string
+		wantErr             bool
+	}{
+		{
+			name:                "stages gitattributes",
+			createFile:          true,
+			expectedStagedFiles: ".gitattributes",
+		},
+		{
+			name:               "unchanged gitattributes is a no-op",
+			createFile:         true,
+			commitExistingFile: true,
+		},
+		{
+			name:    "missing gitattributes returns an error",
+			wantErr: true,
+		},
+	}
 
-	require.NoError(t, stageGitAttributesIfChanged())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setupGitRepo(t)
+			if tt.createFile {
+				require.NoError(t, os.WriteFile(".gitattributes", []byte(constants.WorkflowsLockYmlGitAttributesEntry), 0o644))
+			}
+			if tt.commitExistingFile {
+				for _, setting := range [][2]string{{"user.name", "Test User"}, {"user.email", "test@example.com"}} {
+					require.NoError(t, exec.Command("git", "config", setting[0], setting[1]).Run())
+				}
+				require.NoError(t, exec.Command("git", "add", ".gitattributes").Run())
+				require.NoError(t, exec.Command("git", "commit", "-m", "add gitattributes").Run())
+			}
 
-	output, err := exec.Command("git", "diff", "--cached", "--name-only").Output()
-	require.NoError(t, err)
-	assert.Equal(t, ".gitattributes", strings.TrimSpace(string(output)))
+			err := stageGitAttributesIfChanged()
+			if tt.wantErr {
+				require.ErrorContains(t, err, "exit status")
+				return
+			}
+			require.NoError(t, err)
+
+			output, err := exec.Command("git", "diff", "--cached", "--name-only").Output()
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedStagedFiles, strings.TrimSpace(string(output)))
+		})
+	}
 }
