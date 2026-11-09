@@ -16,6 +16,9 @@ artifacts directly and executes them against the real `pkg/intent.Resolver` and
 | Explicit intent wins over linked issues | Attribution uses explicit metadata as the sole source | §RFC 2119 Norms → Attribution-Resolution Order |
 | Ambiguous root issue set | Attribution is `status: "ambiguous"` with `source: "closing_issue"` | §RFC 2119 Norms → Ambiguous-Root Handling |
 | Unlinked pull request fails closed | Governance resolves to the safest policy (`propose_only`, no writes, approval required) | §RFC 2119 Norms → Fail-Closed Behavior |
+| Multiple roots cannot select a relaxed policy | Three closing roots remain ambiguous and compile to the safest policy | §Multiple-root policy; §RFC 2119 Norms → Fail-Closed Behavior |
+| Suggested attribution is non-authoritative | A suggestion cannot select an intent-specific policy | §Attribution states → `suggested`; §RFC 2119 Norms → Fail-Closed Behavior |
+| Unmapped labels fail closed | A linked root with no configured label match compiles to the safest policy | §Attribution states → `unmapped`; §RFC 2119 Norms → Fail-Closed Behavior |
 
 ## Fixture guidance
 
@@ -30,6 +33,9 @@ The minimum fixture set for conformance claims is:
 1. `explicit-intent-wins.yaml`
 2. `ambiguous-root-closing-issues.yaml`
 3. `unlinked-pr-fail-closed.yaml`
+4. `multi-root-policy.yaml`
+5. `suggested-attribution-fail-closed.yaml`
+6. `unmapped-labels-fail-closed.yaml`
 
 ## Formal Model
 
@@ -70,7 +76,7 @@ F3_UnlinkedFailsClosed(a) ≜ Explicit(a) = null ∧ |Closing(a)| = 0 ∧ |Label
   Resolve(a).status = unlinked ∧ Resolve(a).source = none
 
 F4_SafestPolicyOnIndeterminate(a) ≜
-  Resolve(a).status ∈ {ambiguous, unlinked} ⇒
+  Resolve(a).status ∈ {ambiguous, unlinked, unmapped, suggested} ⇒
   Compile(Resolve(a)) =
     (propose_only, none, approval_required=true, auto_merge=false, max_attempts=1)
 
@@ -83,6 +89,12 @@ F6_PolicyDeterminism(a) ≜
 F7_SingleSourcePerRecord(a) ≜
   Resolve(a).source ∈ {explicit_metadata, closing_issue, none, artifact_labels} ∧
   Resolve(a) is attributed to exactly one source
+
+F8_SuggestionIsNonAuthoritative(a) ≜
+  Resolve(a).status = suggested ⇒ Compile(Resolve(a)) = safest_policy
+
+F9_UnmappedAttributionFailsClosed(a) ≜
+  Resolve(a).status = unmapped ⇒ Compile(Resolve(a)) = safest_policy
 ```
 
 ### Structure
@@ -111,6 +123,9 @@ context that was supplied to policy compilation.
 | Edge case: order independence | `TestFormalFixture_AmbiguousOrderIndependence` | Reordering the two closing issues does not change the ambiguous outcome |
 | Edge case: empty labels do not mask unlinked | `TestFormalFixture_UnlinkedWithEmptyLabelsSlice` | An explicitly empty labels slice on the unlinked fixture still resolves to unlinked |
 | Edge case: explicit intent overrides even when closing issues would otherwise be unambiguous | `TestFormalFixture_ExplicitIntentOverridesSingleClosingIssue` | Explicit metadata wins even when only one closing issue is present |
+| Multi-root policy | `TestFormalFixture_MultiRootPolicyFailsClosed` | Three closing roots remain ambiguous and cannot select a relaxed policy |
+| `F8_SuggestionIsNonAuthoritative` | `TestFormalFixture_SuggestedAttributionDoesNotSelectPolicy` | A supplied heuristic suggestion cannot select a relaxed policy |
+| `F9_UnmappedAttributionFailsClosed` | `TestFormalFixture_UnmappedLabelsFailClosed` | A linked root whose labels do not match configured intent receives the safest policy |
 
 ## Usage
 
@@ -130,7 +145,7 @@ The formal compliance suite is implemented in:
 
 The suite:
 
-- loads the three required YAML fixtures from this directory
+- loads the six required YAML fixtures from this directory
 - adapts each fixture into real `intent.PullRequestData` inputs
-- verifies attribution precedence and ambiguous/unlinked handling
-- verifies that fail-closed policy compilation applies only to indeterminate attribution states
+- verifies attribution precedence and mapped, unmapped, ambiguous, and unlinked handling
+- verifies that suggestions and other indeterminate attribution states cannot select a relaxed policy

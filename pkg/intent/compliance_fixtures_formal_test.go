@@ -20,7 +20,8 @@ import (
 type complianceFixture struct {
 	FixtureID string `yaml:"fixture_id"`
 	Input     struct {
-		Artifact fixtureArtifact `yaml:"artifact"`
+		Artifact             fixtureArtifact             `yaml:"artifact"`
+		SuggestedAttribution *fixtureExpectedAttribution `yaml:"suggested_attribution"`
 	} `yaml:"input"`
 	Expected fixtureExpected `yaml:"expected"`
 }
@@ -49,9 +50,10 @@ type fixtureExpected struct {
 }
 
 type fixtureExpectedAttribution struct {
-	Source    string  `yaml:"source"`
-	Status    string  `yaml:"status"`
-	IntentKey *string `yaml:"intent_key"`
+	Source    string   `yaml:"source"`
+	Status    string   `yaml:"status"`
+	IntentKey *string  `yaml:"intent_key"`
+	Labels    []string `yaml:"labels"`
 }
 
 type fixtureExpectedPolicy struct {
@@ -66,7 +68,7 @@ func TestFormalFixture_ExplicitIntentWinsOverLinkedIssues(t *testing.T) {
 	t.Parallel()
 	fixture := loadIntentComplianceFixture(t, "explicit-intent-wins.yaml")
 
-	rec := matchingResolver().ResolvePullRequest(buildFixturePullRequest(fixture))
+	rec := fixtureResolver(fixture).ResolvePullRequest(buildFixturePullRequest(fixture))
 
 	assertFixtureAttribution(t, fixture.Expected.Attribution, rec)
 }
@@ -75,7 +77,7 @@ func TestFormalFixture_AmbiguousRootIssueSet(t *testing.T) {
 	t.Parallel()
 	fixture := loadIntentComplianceFixture(t, "ambiguous-root-closing-issues.yaml")
 
-	rec := matchingResolver().ResolvePullRequest(buildFixturePullRequest(fixture))
+	rec := fixtureResolver(fixture).ResolvePullRequest(buildFixturePullRequest(fixture))
 
 	assertFixtureAttribution(t, fixture.Expected.Attribution, rec)
 }
@@ -84,7 +86,7 @@ func TestFormalFixture_UnlinkedPullRequestFailsClosed(t *testing.T) {
 	t.Parallel()
 	fixture := loadIntentComplianceFixture(t, "unlinked-pr-fail-closed.yaml")
 
-	rec := matchingResolver().ResolvePullRequest(buildFixturePullRequest(fixture))
+	rec := fixtureResolver(fixture).ResolvePullRequest(buildFixturePullRequest(fixture))
 
 	assertFixtureAttribution(t, fixture.Expected.Attribution, rec)
 }
@@ -93,7 +95,7 @@ func TestFormalFixture_AmbiguousResolvesToSafestPolicy(t *testing.T) {
 	t.Parallel()
 	fixture := loadIntentComplianceFixture(t, "ambiguous-root-closing-issues.yaml")
 
-	rec := matchingResolver().ResolvePullRequest(buildFixturePullRequest(fixture))
+	rec := fixtureResolver(fixture).ResolvePullRequest(buildFixturePullRequest(fixture))
 	policy := fixturePolicyCompiler(t).Compile(rec, intent.RepositoryContext{})
 
 	assertFixturePolicy(t, fixture.Expected.Policy, policy)
@@ -103,7 +105,7 @@ func TestFormalFixture_UnlinkedResolvesToSafestPolicy(t *testing.T) {
 	t.Parallel()
 	fixture := loadIntentComplianceFixture(t, "unlinked-pr-fail-closed.yaml")
 
-	rec := matchingResolver().ResolvePullRequest(buildFixturePullRequest(fixture))
+	rec := fixtureResolver(fixture).ResolvePullRequest(buildFixturePullRequest(fixture))
 	policy := fixturePolicyCompiler(t).Compile(rec, intent.RepositoryContext{})
 
 	assertFixturePolicy(t, fixture.Expected.Policy, policy)
@@ -145,10 +147,12 @@ func TestFormalFixture_SingleSourcePerRecordAcrossAllFixtures(t *testing.T) {
 		"explicit-intent-wins.yaml",
 		"ambiguous-root-closing-issues.yaml",
 		"unlinked-pr-fail-closed.yaml",
+		"multi-root-policy.yaml",
+		"unmapped-labels-fail-closed.yaml",
 	} {
 		t.Run(fixtureName, func(t *testing.T) {
 			fixture := loadIntentComplianceFixture(t, fixtureName)
-			rec := matchingResolver().ResolvePullRequest(buildFixturePullRequest(fixture))
+			rec := fixtureResolver(fixture).ResolvePullRequest(buildFixturePullRequest(fixture))
 
 			assert.NotEmpty(t, string(rec.Source), "every fixture must resolve to exactly one attribution source")
 			assert.Equal(t, fixture.Expected.Attribution.Source, string(rec.Source))
@@ -181,7 +185,7 @@ func TestFormalFixture_UnlinkedWithEmptyLabelsSlice(t *testing.T) {
 	pr := buildFixturePullRequest(fixture)
 	pr.Labels = []string{}
 
-	rec := matchingResolver().ResolvePullRequest(pr)
+	rec := fixtureResolver(fixture).ResolvePullRequest(pr)
 
 	assertFixtureAttribution(t, fixture.Expected.Attribution, rec)
 }
@@ -192,9 +196,43 @@ func TestFormalFixture_ExplicitIntentOverridesSingleClosingIssue(t *testing.T) {
 	pr := buildFixturePullRequest(fixture)
 	pr.ClosingIssues = pr.ClosingIssues[:1]
 
-	rec := matchingResolver().ResolvePullRequest(pr)
+	rec := fixtureResolver(fixture).ResolvePullRequest(pr)
 
 	assertFixtureAttribution(t, fixture.Expected.Attribution, rec)
+}
+
+func TestFormalFixture_MultiRootPolicyFailsClosed(t *testing.T) {
+	t.Parallel()
+	fixture := loadIntentComplianceFixture(t, "multi-root-policy.yaml")
+
+	rec := fixtureResolver(fixture).ResolvePullRequest(buildFixturePullRequest(fixture))
+	assertFixtureAttribution(t, fixture.Expected.Attribution, rec)
+	assertFixturePolicy(t, fixture.Expected.Policy, fixturePolicyCompiler(t).Compile(rec, intent.RepositoryContext{}))
+}
+
+func TestFormalFixture_SuggestedAttributionDoesNotSelectPolicy(t *testing.T) {
+	t.Parallel()
+	fixture := loadIntentComplianceFixture(t, "suggested-attribution-fail-closed.yaml")
+	suggestion := fixture.Input.SuggestedAttribution
+	require.NotNil(t, suggestion)
+
+	rec := intent.IntentRecord{
+		Status: intent.AttributionStatus(suggestion.Status),
+		Source: intent.AttributionSource(suggestion.Source),
+		Labels: suggestion.Labels,
+	}
+
+	assertFixtureAttribution(t, fixture.Expected.Attribution, rec)
+	assertFixturePolicy(t, fixture.Expected.Policy, fixturePolicyCompiler(t).Compile(rec, intent.RepositoryContext{}))
+}
+
+func TestFormalFixture_UnmappedLabelsFailClosed(t *testing.T) {
+	t.Parallel()
+	fixture := loadIntentComplianceFixture(t, "unmapped-labels-fail-closed.yaml")
+
+	rec := fixtureResolver(fixture).ResolvePullRequest(buildFixturePullRequest(fixture))
+	assertFixtureAttribution(t, fixture.Expected.Attribution, rec)
+	assertFixturePolicy(t, fixture.Expected.Policy, fixturePolicyCompiler(t).Compile(rec, intent.RepositoryContext{}))
 }
 
 func loadIntentComplianceFixture(t *testing.T, fixtureName string) complianceFixture {
@@ -206,6 +244,13 @@ func loadIntentComplianceFixture(t *testing.T, fixtureName string) complianceFix
 	var fixture complianceFixture
 	require.NoError(t, yamlv3.Unmarshal(data, &fixture))
 	return fixture
+}
+
+func fixtureResolver(fixture complianceFixture) intent.Resolver {
+	if fixture.Expected.Attribution.Status == string(intent.AttributionUnmapped) {
+		return intent.Resolver{ResolverVersion: "formal-v1"}
+	}
+	return matchingResolver()
 }
 
 func intentComplianceFixtureDir(t *testing.T) string {
@@ -286,8 +331,8 @@ func assertFixtureAttribution(t *testing.T, expected fixtureExpectedAttribution,
 
 	assert.Equal(t, expected.Status, string(rec.Status))
 	assert.Equal(t, expected.Source, string(rec.Source))
-	if expected.IntentKey == nil {
-		assert.Empty(t, rec.Labels, "fixtures that omit intent_key must not resolve through blended label attribution")
+	if expected.Labels != nil {
+		assert.Equal(t, expected.Labels, rec.Labels)
 	}
 }
 

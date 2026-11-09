@@ -1,0 +1,27 @@
+fixture_id: unmapped-labels-fail-closed
+description: A linked root whose labels do not match configured intent remains unmapped and fails closed.
+spec_refs:
+  - "Attribution states"
+  - "Fail-Closed Behavior"
+input:
+  artifact:
+    kind: pull_request
+    number: 145
+    explicit_intent: null
+    linked_closing_issues:
+      - number: 204
+        inferred_intent: unregistered-topic
+    labels: []
+expected:
+  attribution:
+    source: closing_issue
+    status: unmapped
+    intent_key: null
+    labels:
+      - unregistered-topic
+  policy:
+    autonomy: propose_only
+    write_scope: none
+    human_approval_required: true
+    auto_merge_allowed: false
+    max_attempts: 1

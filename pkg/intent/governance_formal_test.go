@@ -70,7 +70,7 @@ func TestAuthorizeTool_EmptyAllowedToolsDeniesAll(t *testing.T) {
 }
 
 // TestSafestDefaultPolicy_FailClosedForIndeterminateStatus (P13 — SafestDefaultFailClosed)
-// Invariant: unlinked/ambiguous status forces the safest policy regardless of
+// Invariant: indeterminate attribution forces the safest policy regardless of
 // configured rules.
 func TestSafestDefaultPolicy_FailClosedForIndeterminateStatus(t *testing.T) {
 	t.Parallel()
@@ -88,7 +88,12 @@ func TestSafestDefaultPolicy_FailClosedForIndeterminateStatus(t *testing.T) {
 	compiler := intent.PolicyCompiler{Rules: []intent.PolicyRule{permissive}}
 	repo := intent.RepositoryContext{Owner: "owner", Name: "repo"}
 
-	for _, status := range []intent.AttributionStatus{intent.AttributionUnlinked, intent.AttributionAmbiguous} {
+	for _, status := range []intent.AttributionStatus{
+		intent.AttributionUnlinked,
+		intent.AttributionAmbiguous,
+		intent.AttributionUnmapped,
+		intent.AttributionSuggested,
+	} {
 		t.Run(string(status), func(t *testing.T) {
 			rec := intent.IntentRecord{Status: status}
 			policy := compiler.Compile(rec, repo)

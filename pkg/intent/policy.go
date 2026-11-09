@@ -98,18 +98,19 @@ type PolicyCompiler struct {
 }
 
 // Compile applies the compiler's rules to rec and repo and returns the resulting
-// ExecutionPolicy. Unlinked and ambiguous records always receive the safest
-// policy regardless of configured rules (fail-closed). For all other statuses
-// the first matching rule seeds the accumulator directly; subsequent matching
-// rules are merged with stricter-wins semantics. Autonomy and WriteScope values
-// that are not recognized by the rank tables are replaced with the safest default
-// for that field when seeding. If no rules match, the safest default policy is
-// returned.
+// ExecutionPolicy. Indeterminate records always receive the safest policy
+// regardless of configured rules (fail-closed). For other statuses the first
+// matching rule seeds the accumulator directly; subsequent matching rules are
+// merged with stricter-wins semantics. Autonomy and WriteScope values that are
+// not recognized by the rank tables are replaced with the safest default for
+// that field when seeding. If no rules match, the safest default policy is returned.
 func (c PolicyCompiler) Compile(rec IntentRecord, repo RepositoryContext) ExecutionPolicy {
 	policyLog.Printf("Compiling policy: status=%s rules=%d", rec.Status, len(c.Rules))
-	// Fail-closed for indeterminate statuses: unlinked and ambiguous records
-	// must never receive a relaxed policy from a matching wildcard rule.
-	if rec.Status == AttributionUnlinked || rec.Status == AttributionAmbiguous {
+	// Indeterminate attribution must never receive a relaxed policy from a matching
+	// wildcard rule. Suggested attribution is non-authoritative, and unmapped labels
+	// do not identify a configured intent.
+	switch rec.Status {
+	case AttributionUnlinked, AttributionAmbiguous, AttributionUnmapped, AttributionSuggested:
 		policyLog.Printf("Fail-closed for indeterminate status=%s, returning safest default policy", rec.Status)
 		return safestDefaultPolicy()
 	}
