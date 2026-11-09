@@ -14,6 +14,69 @@ const record = (type, part, extra = {}) => ({ type, timestamp, sessionID, part: 
 const jsonl = records => records.map(value => JSON.stringify(value)).join("\n");
 
 describe("OpenCode JSON session parser", () => {
+  it.each([true, false, undefined, "true"])("publishes observed v2 truncation and session context without provider metadata: %s", truncated => {
+    const tool = record("tool_use", {
+      partID: "prt_live_shape",
+      id: "call_live_shape",
+      tool: "grep",
+      state: {
+        status: "completed",
+        input: { pattern: '"quoted"\\path', include: "*.cjs" },
+        output: "first match\nsecond match\n",
+        metadata: {
+          metadata: { truncated },
+          content: [{ type: "text", text: "first match\nsecond match\n" }],
+          providerCall: { executed: false },
+          providerResult: { executed: false },
+          rawInput: '{"pattern":"private-provider-input"}',
+        },
+        time: { start: timestamp, end: timestamp + 10 },
+      },
+    });
+    const events = parseOpenCodeLog(jsonl([tool, record("text", { text: "  done\n" }), record("step_finish", { reason: "stop", tokens: { input: 10, output: 2 } })])).logEntries;
+    const completion = events.find(event => event.type === "tool.execution_complete");
+    if (typeof truncated === "boolean") expect(completion.data.outputTruncated).toBe(truncated);
+    else expect(completion.data).not.toHaveProperty("outputTruncated");
+    expect(completion.data.metadata).toEqual(tool.part.state.metadata);
+    const unified = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-session.jsonl", events }]);
+    expect(unified.every(event => event.data.sessionId === sessionID)).toBe(true);
+    const published = unified.find(event => event.type === "tool.execution_complete");
+    expect(published.data).toMatchObject({ toolCallId: "call_live_shape", output: tool.part.state.output, success: true });
+    if (typeof truncated === "boolean") expect(published.data.outputTruncated).toBe(truncated);
+    else expect(published.data).not.toHaveProperty("outputTruncated");
+    expect(published.data).not.toHaveProperty("metadata");
+    expect(JSON.stringify(unified)).not.toContain("private-provider-input");
+    expect(JSON.parse(JSON.stringify(unified))).toEqual(unified);
+  });
+
+  it("retains v1 truncation and clears stale flags on reconciled tool snapshots", () => {
+    const first = record("tool_use", { callID: "call_v1", tool: "grep", state: { status: "completed", input: {}, output: "preview\n", metadata: { truncated: true } } });
+    const events = parseOpenCodeLog(jsonl([first])).logEntries;
+    expect(events.find(event => event.type === "tool.execution_complete").data.outputTruncated).toBe(true);
+    for (const metadata of [{ truncated: false }, {}, { truncated: "false" }]) {
+      const replay = { ...first, timestamp: timestamp + 1, part: { ...first.part, state: { ...first.part.state, metadata, output: "latest\n" } } };
+      const completions = parseOpenCodeLog(jsonl([first, replay])).logEntries.filter(event => event.type === "tool.execution_complete");
+      expect(completions).toHaveLength(1);
+      expect(completions[0].data.output).toBe("latest\n");
+      if (metadata.truncated === false) expect(completions[0].data.outputTruncated).toBe(false);
+      else expect(completions[0].data).not.toHaveProperty("outputTruncated");
+    }
+  });
+
+  it("keeps live-shaped accounting reconciliation in source order without double-counting turns", () => {
+    const first = record("step_finish", { messageID: "msg_first", tokens: { input: 10, output: 2 }, reason: "tool-calls" });
+    const text = record("text", { messageID: "msg_second", text: "done\n" }, { timestamp: timestamp + 100 });
+    const reconciled = { ...first, part: { ...first.part, tokens: { input: 20, output: 3 } } };
+    const final = record("step_finish", { id: "gh_aw_export_msg_second", messageID: "msg_second", tokens: { input: 30, output: 4 }, reason: "stop" }, { timestamp: timestamp + 100 });
+    const events = parseOpenCodeLog(jsonl([first, text, reconciled, final])).logEntries;
+    const unified = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-session.jsonl", timestampUnit: "milliseconds", events }]);
+    expect(unified.map(event => event.type)).toEqual(events.map(event => event.type));
+    expect(unified.map(event => event.timestamp)).toEqual(events.map(event => event.timestamp));
+    expect(unified.map(event => event.provenance.index)).toEqual(events.map((_, index) => index));
+    expect(unified.filter(event => event.type === "opencode.step_finish")).toHaveLength(3);
+    expect(unified.at(-1).data).toMatchObject({ numTurns: 2, usage: { inputTokens: 50, outputTokens: 7 }, sessionId: sessionID });
+  });
+
   it("recovers only completed assistant-step metadata from v2 exports", () => {
     const steps = getOpenCodeSessionSteps(
       {

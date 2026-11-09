@@ -84,6 +84,8 @@ export interface ToolExecutionCompleteData {
   workflowRunId?: string;
   success?: boolean;
   output?: JsonValue;
+  /** Native output truncation, not a collector completeness guarantee. */
+  outputTruncated?: boolean;
   result?: JsonValue;
   error?: JsonValue;
   fileEdits?: JsonValue;

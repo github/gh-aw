@@ -66,6 +66,16 @@ const canonical = freeze([
 ]);
 
 describe("Unified Agent Session 1.0.0 conformance", () => {
+  it("recognizes native OpenCode sessionID without overriding existing context precedence", () => {
+    const native = { type: "tool.execution_complete", sessionID: "opencode-session", data: {} };
+    expect(sessionContext(native)).toEqual({ sessionId: "opencode-session" });
+    expect(sessionContext({ ...native, data: { sessionId: null } })).toEqual({ sessionId: null });
+    expect(sessionContext({ ...native, sessionId: "canonical" })).toEqual({ sessionId: "canonical" });
+    expect(sessionContext({ ...native, session_id: "legacy" })).toEqual({ sessionId: "legacy" });
+    expect(sessionContext({ ...native, data: { session_id: "legacy-data" } })).toEqual({ sessionId: "legacy-data" });
+    expect(sessionContext({ ...native, sessionID: 123 })).toEqual({});
+  });
+
   it("retains observed assistant reasoning alongside provider refusals", () => {
     const source = freeze({
       object: "chat.completion",
