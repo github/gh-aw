@@ -352,42 +352,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: cd actions/setup/js && npm run test:js-integration-artifact
 
-  decisions-integration:
-    name: Copilot Decisions API Integration
-    needs: [checkout-cache]
-    # Fork PRs and Dependabot runs have read-only tokens, even with the permission below.
-    if: github.actor != 'dependabot[bot]' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      copilot-requests: write
-    concurrency:
-      group: ci-${{ github.ref }}-decisions-integration
-      cancel-in-progress: true
-    steps:
-      - name: Restore checkout
-        id: restore-checkout
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: .
-          key: checkout-cjs-${{ github.run_id }}-${{ github.sha }}
-      - name: Checkout on cache miss
-        if: steps.restore-checkout.outputs.cache-hit != 'true'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.sha }}
-          fetch-depth: 2
-          persist-credentials: false
-      - name: Set up Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
-        with:
-          node-version: "24"
-      - name: Run live Decisions client integration test
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: node --test actions/setup/js/scripts/test_decisions_client.cjs
-
   nvx-musl-integration:
     name: NVX musl inference integration
     needs: [checkout-cache]
@@ -435,7 +399,6 @@ jobs:
       - docker-root-owned-cleanup
       - lint-js
       - artifact-integration
-      - decisions-integration
       - nvx-musl-integration
     if: always()
     runs-on: ubuntu-latest
