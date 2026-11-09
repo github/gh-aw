@@ -191,17 +191,14 @@ Focus areas by skill:
 
 ### Step 5: Post Inline Review Comments
 
-For each issue found, create a review comment using `create-pull-request-review-comment`. Apply **progressive disclosure**: lead with a brief visible statement, then collapse verbose analysis and code examples in a `<details>` block:
+For each issue found, create a review comment using the `safeoutputs` CLI from bash; do not call it as a native tool. Include `pull_request_number` in the JSON payload and send it on stdin:
 
-```json
-{
-  "path": "path/to/file.ts",
-  "line": 42,
-  "body": "**[/tdd]** Missing edge case: `value` is `null` — add a test to prevent this regression.\n\n<details>\n<summary>💡 Suggested test</summary>\n\n```ts\nit('returns default when value is null', () => {\n  expect(fn(null)).toBe(defaultValue);\n});\n```\n\nMissing edge case tests are a common source of regressions.\n\n</details>\n\n@copilot please address this."
-}
+```bash
+printf '%s' '{"path":"path/to/file.ts","line":42,"pull_request_number":123,"body":"**[/tdd]** Missing edge case: `value` is `null` — add a test to prevent this regression.\n\n<details>\n<summary>💡 Suggested test</summary>\n\n```ts\nit(\u0027returns default when value is null\u0027, () => {\n  expect(fn(null)).toBe(defaultValue);\n});\n```\n\nMissing edge case tests are a common source of regressions.\n\n</details>\n\n@copilot please address this."}' | safeoutputs create_pull_request_review_comment .
 ```
 
 Guidelines:
+- Encode every apostrophe in JSON string values as `\u0027` before wrapping the JSON in shell single quotes. Use only valid JSON escapes, never shell double quotes, and encode control characters (for example, newlines as `\n`) instead of including them raw.
 - Prefix each comment with the skill name in brackets: `**[/diagnosing-bugs]**`, `**[/tdd]**`, etc.
 - Keep the **immediately visible text brief** (1–2 sentences): state the issue and its impact
 - Wrap code examples, detailed explanations, and multi-step suggestions in `<details><summary>💡 …</summary>` blocks
@@ -211,7 +208,13 @@ Guidelines:
 
 ### Step 6: Submit the Overall Review
 
-Submit a review using `submit_pull_request_review` with an overall summary:
+Submit an overall review using the `safeoutputs` CLI from bash (do not call it as a native tool). Include `pull_request_number` and send the JSON payload on stdin:
+
+```bash
+printf '%s' '{"pull_request_number":123,"event":"COMMENT","body":"Review summary"}' | safeoutputs submit_pull_request_review .
+```
+
+Follow the same JSON/shell encoding rules as Step 5: encode apostrophes as `\u0027`, use only valid JSON escapes, never shell double quotes, and do not include raw control characters.
 
 - **`APPROVE`** — Changes are solid; only minor suggestions
 - **`REQUEST_CHANGES`** — There are important issues that should be addressed
