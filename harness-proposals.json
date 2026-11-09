@@ -52,5 +52,14 @@
     "experiment_name": "deterministic_precondition_v1",
     "pr_or_issue": "issue",
     "decision": null
+  },
+  {
+    "date": "2026-11-09",
+    "workflow_id": "pr-sous-chef",
+    "primary_dimension": "tool interaction",
+    "subtype": "remove_unnecessary_tool",
+    "experiment_name": "remove_unnecessary_tool_v1",
+    "pr_or_issue": "issue",
+    "decision": null
   }
 ]
