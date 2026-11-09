@@ -198,6 +198,14 @@ func TestComposedPromptSafeOutputsGuidanceStaysTransportNeutral(t *testing.T) {
 		"final composed prompt should not require safeoutputs CLI usage unconditionally")
 	assert.Contains(t, finalPrompt, "if a separate `<mcp-clis>` section says `safeoutputs` is available on `PATH`, you may use that CLI form instead",
 		"final composed prompt should keep safeoutputs CLI guidance optional when safe-output tools are available")
+	assert.Contains(t, finalPrompt, "a terminal safe-output tool as your final tool call before finishing",
+		"final composed prompt should require a terminal safe-output call")
+	assert.Contains(t, finalPrompt, "do not use `noop` to mask incomplete work",
+		"final composed prompt should preserve genuine incomplete outcomes")
+	assert.Contains(t, finalPrompt, "call `report_incomplete` with the blocker instead",
+		"final composed prompt should report blocked work as incomplete")
+	assert.Contains(t, finalPrompt, "Earlier safe-output calls do not satisfy this final-step requirement",
+		"final composed prompt should not treat an earlier output as the terminal signal")
 }
 
 // TestComposedPromptForNonMCPEngineStatesCLIIsOnlyTransport verifies that engines

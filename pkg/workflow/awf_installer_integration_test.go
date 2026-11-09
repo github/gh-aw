@@ -39,6 +39,86 @@ func TestAWFInstallerAuthenticationIsStepLocal(t *testing.T) {
 	}
 }
 
+func TestAWFInstallerLockUsesBashOnLinuxAndWindows(t *testing.T) {
+	t.Parallel()
+	for _, runner := range []string{"ubuntu-latest", "windows-latest"} {
+		t.Run(runner, func(t *testing.T) {
+			t.Parallel()
+			checksum := strings.Repeat("b", 64)
+			path := filepath.Join(t.TempDir(), "awf-install.md")
+			content := fmt.Sprintf(`---
+on: workflow_dispatch
+strict: false
+runs-on: %s
+sandbox:
+  agent:
+    version: v0.28.62
+    checksums-sha256: "%s"
+---
+Inspect the repository.
+`, runner, checksum)
+			if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := NewCompiler(WithSkipValidation(true)).CompileWorkflow(path); err != nil {
+				t.Fatal(err)
+			}
+			lock, err := os.ReadFile(strings.TrimSuffix(path, ".md") + ".lock.yml")
+			if err != nil {
+				t.Fatal(err)
+			}
+			lockText := string(lock)
+			const installStepMarker = "      - name: Install AWF binary\n"
+			installStepStart := strings.Index(lockText, installStepMarker)
+			if installStepStart < 0 {
+				t.Fatalf("generated %s lock file lacks the AWF install step:\n%s", runner, lock)
+			}
+			installStep := lockText[installStepStart:]
+			stepLines := strings.Split(installStep, "\n")
+			boundary := -1
+			for i, line := range stepLines[1:] {
+				if strings.HasPrefix(line, "      - ") {
+					boundary = i + 1
+					break
+				}
+				if strings.TrimSpace(line) == "" {
+					continue
+				}
+				if len(line)-len(strings.TrimLeft(line, " ")) <= 4 {
+					boundary = i + 1
+					break
+				}
+			}
+			if boundary < 0 {
+				if !strings.HasSuffix(installStep, "\n") {
+					t.Fatalf("generated %s lock file lacks a boundary after the AWF install step:\n%s", runner, installStep)
+				}
+				// The AWF step is the final step in the lock file.
+				boundary = len(stepLines) - 1
+			}
+			installStep = strings.Join(stepLines[:boundary], "\n")
+			expectedCommand := `        run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.28.62 --checksums-sha256 ` + checksum + ` --rootless`
+			commandFound := false
+			for line := range strings.SplitSeq(installStep, "\n") {
+				if strings.HasPrefix(line, "        run:") && line == expectedCommand {
+					commandFound = true
+					break
+				}
+			}
+			if !commandFound {
+				t.Errorf("generated %s lock file lacks the pinned installer command:\n%s", runner, installStep)
+			}
+			if runner == "windows-latest" {
+				if !strings.Contains(installStep, "shell: bash") {
+					t.Errorf("generated Windows install step does not use Bash:\n%s", installStep)
+				}
+			} else if strings.Contains(installStep, "shell: bash") {
+				t.Errorf("generated Linux install step unexpectedly overrides its default shell:\n%s", installStep)
+			}
+		})
+	}
+}
+
 func TestDockerEnclaveHelperInstallerContract(t *testing.T) {
 	t.Parallel()
 	for _, version := range []string{"", "v0.29.5", "0.29.5", "v0.29.6", "0.29.6", "v0.29.7", "0.29.7"} {

@@ -106,13 +106,16 @@ Use UTC date and set target file:
 - `docs/src/content/docs/blog/YYYY-MM-DD-agent-of-the-day.md`
 - If file exists, append `-2`, `-3`, etc.
 
-### 2) Collect live workflow evidence
+### 2) Rotate through active workflows and collect evidence
 
-Use `agentic-workflows` MCP tools:
+Keep the daily spotlight varied by cycling through **all active agentic workflows**, not just workflows with runs today.
 
-1. `list` to identify active workflows.
-2. `logs` for recent runs (last 3 days, up to 5 runs) of top candidates.
-3. `audit` for structured evidence when available.
+1. Use `agentic-workflows` `list` to discover agentic workflow IDs, then verify their GitHub Actions state using the read-only Actions API. Paginate both inventories completely. Include scheduled, event-driven, and manually triggered workflows whose state is `active`; exclude disabled/deleted workflows and non-agentic Actions workflows. Use the workflow filename without `.md` or `.lock.yml` as its stable ID, not its display name.
+2. Read **all** existing `docs/src/content/docs/blog/*-agent-of-the-day*.md` posts, not just recent posts. Map each spotlight to its workflow ID using the `agent-of-the-day-workflow` source comment or, for older posts, the featured workflow's source link and heading. Count only the spotlight, not other workflows mentioned as supporting evidence. Record each active workflow's most recent published post date.
+3. Rank never-featured active workflows first, then previously featured workflows by oldest last-featured date; break ties by workflow ID. Select in that order. This least-recently-featured rotation must cover every active workflow before repeating one. Newly active workflows enter the never-featured group; disabled/deleted workflows do not block rotation.
+4. Preserve the existing `skip-if-match` gate, which pauses publication while an Agent of the Day PR is open. If a pending PR appears after activation, treat its workflow as reserved: do not duplicate it or count it as published. Closed, unmerged PRs do not advance rotation. Repository memory may cache workflow IDs, dates, post paths, and persona/style history, but reconcile it with published posts and open PRs every run; missing or stale memory must not reset rotation. If history or active-state discovery is incomplete or ambiguous, emit `report_incomplete` rather than guessing.
+5. Use `logs` for the selected workflow's recent runs (last 3 days, up to 5 runs), then `audit` for structured evidence when available. If there are no recent runs, look up its latest completed run outside that window and state the actual run date in the post. Do not exclude a workflow merely because it runs infrequently, produced no issue/PR, or has no successful run today.
+6. If the selected workflow has no trustworthy evidence or is reserved by an open PR, try the next workflow with the **same rotation priority** (also never featured, or the same oldest last-featured date). Do not bypass unfeatured or older workflows to repeat a more recently featured workflow. If that priority group is exhausted, emit `noop` explaining which workflows are awaiting evidence or publication. Tooling/API failures require `report_incomplete`, not a fallback to a recent favorite.
 
 From evidence, extract:
 
@@ -120,7 +123,7 @@ From evidence, extract:
 - Real links to created/updated issues and PRs.
 - Any chart/image links or artifact links.
 
-If no useful data appears for the selected workflow, pick another active workflow.
+Include the selected workflow ID and its previous feature date (or "never featured") in the PR's selection rationale. Do not advance published history merely because a draft or PR was created; the merged blog post is the durable rotation record.
 
 ### 3) Gather optional chart image
 
@@ -163,6 +166,7 @@ metadata:
 
 Body requirements:
 
+- Add `<!-- agent-of-the-day-workflow: <selected workflow ID> -->` immediately after the frontmatter so future runs can identify the spotlight reliably.
 - Start with a concise opening paragraph.
 - Include an **Agent of the Day** section with authentic narrative grounded in live logs/audit data.
 - Include explicit links to referenced issue(s) and PR(s).
@@ -190,7 +194,7 @@ PR body must include:
 
 ### 7) No-action rule
 
-If no trustworthy live evidence can be gathered after checking multiple workflows, call `noop` with a short explanation.
+If no workflow in the current rotation priority group has trustworthy live evidence and no pending reservation, call `noop` with a short explanation. Do not relax the rotation rule to produce a post.
 
 ### 8) Mandatory safe-output completion
 

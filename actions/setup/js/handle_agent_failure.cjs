@@ -1921,7 +1921,10 @@ function buildReportIncompleteContext(items, { collectorEmptyOutputCause, rootDi
     core.info(`Found ${messages.length} report_incomplete signal(s)`);
   }
 
-  const context = nodes.warning("Task Could Not Be Completed", [nodes.text("The workflow recorded a "), nodes.code("report_incomplete"), nodes.text(" signal: the task was not completed or completion could not be confirmed.")]);
+  const missingTerminalSignal = trustedCollectorCause === "missing_terminal_safe_output" && messages.length === 0;
+  const context = missingTerminalSignal
+    ? nodes.warning("Completion Signal Missing", [nodes.text("No terminal safe output was recorded, so completion is unconfirmed; whether the requested work finished is unknown.")])
+    : nodes.warning("Task Could Not Be Completed", [nodes.text("The workflow recorded a "), nodes.code("report_incomplete"), nodes.text(" signal: the task was not completed or completion could not be confirmed.")]);
   if (messages.length > 0) {
     context.push(
       nodes.list(messages.map(message => [nodes.paragraph([nodes.strong([nodes.text("Reported reason (agent-declared, unverified):")]), nodes.text(" "), nodes.code(redactAndBoundDiagnostics(message.reason, { maxLength: 1000 }))])]))
