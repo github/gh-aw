@@ -493,6 +493,9 @@ func TestDailySquidImageScanUsesFixedLogQueries(t *testing.T) {
 	if !strings.Contains(frontmatter, "  bash: []") {
 		t.Fatal("Expected daily-squid-image-scan workflow to disable agent bash commands")
 	}
+	if !strings.Contains(frontmatter, "  edit: false") {
+		t.Fatal("Expected daily-squid-image-scan workflow to explicitly disable agent file editing")
+	}
 	if strings.Contains(workflow, "grep") {
 		t.Fatal("Expected scan-log queries to use fixed Bash builtins rather than model-invocable grep")
 	}
@@ -525,6 +528,28 @@ func TestDailySquidImageScanUsesFixedLogQueries(t *testing.T) {
 			continue
 		}
 		executionIndex = index
+		var serverArgs []string
+		if err := json.Unmarshal([]byte(step.Env["GH_AW_COPILOT_SDK_SERVER_ARGS"]), &serverArgs); err != nil {
+			t.Fatalf("Failed to parse compiled SDK server arguments: %v", err)
+		}
+		var serverAllowedTools []string
+		for index, arg := range serverArgs {
+			if arg == "--allow-all-tools" || arg == "--allow-all" {
+				t.Fatalf("Expected compiled SDK server to exclude unrestricted tool permissions, got %q", arg)
+			}
+			if arg == "--allow-tool" && index+1 < len(serverArgs) {
+				tool := serverArgs[index+1]
+				if tool == "write" || tool == "*" {
+					t.Fatalf("Expected compiled SDK server to exclude agent write permissions, got %q", tool)
+				}
+				serverAllowedTools = append(serverAllowedTools, tool)
+			}
+		}
+		for _, tool := range []string{"github", "safeoutputs"} {
+			if !slices.Contains(serverAllowedTools, tool) {
+				t.Fatalf("Expected compiled SDK server to preserve %q permissions", tool)
+			}
+		}
 		var toolConfig struct {
 			Capabilities            map[string]bool `json:"capabilities"`
 			ExplicitlyDisabledTools []string        `json:"explicitlyDisabledTools"`
@@ -539,9 +564,18 @@ func TestDailySquidImageScanUsesFixedLogQueries(t *testing.T) {
 		if !configured || bashEnabled || !slices.Contains(toolConfig.ExplicitlyDisabledTools, "bash") {
 			t.Fatal("Expected compiled SDK permissions to explicitly disable agent bash")
 		}
+		editEnabled, configured := toolConfig.Capabilities["edit"]
+		if !configured || editEnabled || !slices.Contains(toolConfig.ExplicitlyDisabledTools, "edit") {
+			t.Fatal("Expected compiled SDK permissions to explicitly disable agent file editing")
+		}
 		for _, tool := range toolConfig.Permissions.AllowedTools {
-			if tool == "*" || tool == "bash" || strings.HasPrefix(tool, "shell") {
-				t.Fatalf("Expected no shell permissions that could permit extended scan pipelines, got %q", tool)
+			if tool == "*" || tool == "bash" || tool == "write" || strings.HasPrefix(tool, "shell") {
+				t.Fatalf("Expected no shell or write permissions that could alter scan evidence, got %q", tool)
+			}
+		}
+		for _, tool := range []string{"github", "read", "safeoutputs"} {
+			if !slices.Contains(toolConfig.Permissions.AllowedTools, tool) {
+				t.Fatalf("Expected compiled SDK permissions to preserve %q access", tool)
 			}
 		}
 	}

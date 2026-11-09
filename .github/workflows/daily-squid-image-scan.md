@@ -22,7 +22,7 @@ tools:
   cli-proxy: false
   github:
     toolsets: [issues]
-  edit: null
+  edit: false
   bash: []
 safe-outputs:
   create-issue:
