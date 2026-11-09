@@ -38,7 +38,7 @@ runtimes:
   node:
     version: "24"
 steps:
-  - name: Set up Go for implementation tests
+  - name: Setup Go for implementation tests
     uses: actions/setup-go@v7.0.0
     with:
       go-version-file: go.mod

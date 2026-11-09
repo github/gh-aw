@@ -38,7 +38,7 @@ jobs:
       issue_title: ${{ steps.precompute.outputs.issue_title }}
       issue_body: ${{ steps.precompute.outputs.issue_body }}
     steps:
-      - name: Precompute deterministic findings
+      - name: Pre-compute deterministic findings
         id: precompute
         uses: actions/github-script@v9.0.0
         with:

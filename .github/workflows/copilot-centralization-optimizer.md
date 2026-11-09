@@ -199,7 +199,7 @@ steps:
       # Convert JSONL to JSON array for downstream analysis steps
       jq -s '.' /tmp/gh-aw/data/task-summaries.jsonl > /tmp/gh-aw/data/task-summaries.json
 
-  - name: Precompute optimization datasets
+  - name: Pre-compute optimization datasets
     env:
       EXPR_GITHUB_REPOSITORY: ${{ github.repository }}
       EXPR_GITHUB_RUN_ID: ${{ github.run_id }}

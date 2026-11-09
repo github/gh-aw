@@ -3,7 +3,7 @@ runtimes:
   python:
     version: "3.12"
 pre-agent-steps:
-  - name: Preinstall Aider CLI
+  - name: Pre-install Aider CLI
     run: |
       # fastuuid only ships manylinux wheels for CPython; installing it explicitly first
       # ensures pip resolves the prebuilt wheel instead of falling back to a source build

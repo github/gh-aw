@@ -47,7 +47,7 @@ steps:
   - name: Prepare analysis workspace
     run: |
       mkdir -p /tmp/gh-aw/ambient-context
-  - name: Closed PR deduplication guard
+  - name: Exclude files from recently closed PRs
     uses: actions/github-script@v9.0.0
     with:
       github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -108,7 +108,7 @@ steps:
 
         core.info(`Deduplication guard: ${closedOptimizerPrs.length} closed optimizer PRs, ${blockedFiles.length} blocked files`);
         for (const bf of blockedFiles) core.info(`  BLOCKED: ${bf}`);
-  - name: PR close-rate metric
+  - name: Calculate PR close rate
     uses: actions/github-script@v9.0.0
     with:
       github-token: ${{ secrets.GITHUB_TOKEN }}
