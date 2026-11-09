@@ -6,6 +6,8 @@ import os from "node:os";
 
 const require = createRequire(import.meta.url);
 const { runWithCopilotSDK, resolveCopilotSDKWorkingDirectory } = require("./copilot_sdk_session.cjs");
+const { WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE } = require("./permission_denied_helpers.cjs");
+const { COPILOT_MODEL_VERIFICATION_EXIT_CODE } = require("./copilot_model_selection.cjs");
 const { normalizeCopilotSession } = require("./copilot_session.cjs");
 const { resolveMultiProviderFromReflect } = require("./awf_reflect.cjs");
 const { extractInlineSubAgents } = require("./extract_inline_sub_agents.cjs");
@@ -101,6 +103,78 @@ describe("copilot_sdk_session runtime configuration", () => {
     expect(logger.mock.calls.flat().some(message => message.includes("treating as completed"))).toBe(false);
     expect(disconnect).toHaveBeenCalledTimes(1);
     expect(stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns a dedicated exit code for SDK workflow tool permission denials", async () => {
+    let sessionConfig;
+    class FakeCopilotClient {
+      start = async () => {};
+      stop = async () => {};
+      createSession = async config => {
+        sessionConfig = config;
+        return {
+          sessionId: "workflow-tool-denial",
+          on: () => {},
+          sendAndWait: async () => {
+            await sessionConfig.onPermissionRequest({ kind: "shell", fullCommandText: "echo blocked" });
+            throw new Error("session failed after permission denial");
+          },
+          disconnect: async () => {},
+        };
+      };
+    }
+
+    const result = await runWithCopilotSDK({
+      sdkUri: "http://127.0.0.1:3002",
+      prompt: "test",
+      logger: () => {},
+      workingDirectory: base,
+      agentsBaseDir: base,
+      permissionConfig: { allowedTools: ["read"] },
+      sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forUri: () => ({}) }, approveAll: () => "allow" },
+    });
+
+    expect(result.exitCode).toBe(WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE);
+    expect(result.exitCode).not.toBe(COPILOT_MODEL_VERIFICATION_EXIT_CODE);
+  });
+
+  it.each([
+    "[sdk-driver] permission denied by workflow tool permissions: shell(ls)",
+    '{"source":"sdk-driver","event":"permission-denied-by-workflow-tool-permissions"}',
+    '{"component":"sdk-driver","type":"permission-denied-by-workflow-tool-permissions"}',
+    '{"type":"guard.tool_denials_exceeded","data":{"denialCount":5,"threshold":5}}',
+    "permission denied\npermission denied\npermission denied",
+    "permissions denied\npermissions denied\npermissions denied",
+    "EACCES\nEACCES\nEACCES",
+    "EPERM\nEPERM\nEPERM",
+    "permission denied\nEACCES: permission denied\nEPERM operation not permitted",
+  ])("does not set the trusted workflow denial exit code from assistant output: %s", content => {
+    let handler;
+    class FakeCopilotClient {
+      start = async () => {};
+      stop = async () => {};
+      createSession = async () => ({
+        sessionId: "spoofed-workflow-tool-denial",
+        on: callback => {
+          handler = callback;
+        },
+        sendAndWait: async () => {
+          handler({ type: "assistant.message", data: { content } });
+          throw new Error("session failed without permission denial");
+        },
+        disconnect: async () => {},
+      });
+    }
+
+    return runWithCopilotSDK({
+      sdkUri: "http://127.0.0.1:3002",
+      prompt: "test",
+      logger: () => {},
+      workingDirectory: base,
+      agentsBaseDir: base,
+      permissionConfig: { allowedTools: ["read"] },
+      sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forUri: () => ({}) }, approveAll: () => "allow" },
+    }).then(result => expect(result).toMatchObject({ exitCode: 1, hasOutput: true, output: content }));
   });
 
   it.each([{}, { rte: false }, { rte: true, parentToolCallId: "child" }])("does not fail ordinary quoted text or a nested filtered response %j", context => {

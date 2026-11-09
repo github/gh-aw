@@ -104,6 +104,8 @@ evals:
 
 # PR Specification Reviewer
 
+Use only commands listed under `tools.bash`, one standalone command per call. Do not combine commands with shell operators unless the complete command is explicitly allowlisted. If a required operation is blocked, stop and report it instead of probing command variants.
+
 Review the triggering PR against the formal contracts it affects. Enforce
 existing requirements, or synchronize specifications for evidenced intentional
 changes; both outcomes may be necessary in one PR. Edit only directly affected
