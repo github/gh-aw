@@ -11,6 +11,7 @@ engine:
     name: github
   behaviors:
     secret-strategy: universal-llm-consumer
+    error-detection: true
     manifest:
       files:
         - AGENTS.md

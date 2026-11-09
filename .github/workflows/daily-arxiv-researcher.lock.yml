@@ -1386,6 +1386,7 @@ jobs:
         id: detect-agent-errors
         continue-on-error: true
         env:
+          GH_AW_ENGINE_ID: "codex"
           GH_AW_AGENTIC_EXECUTION_OUTCOME: ${{ steps.agentic_execution.outcome }}
           GH_AW_ENGINE_STEP_TIMEOUT_MINUTES: 20
           GH_AW_ENGINE_INTERNAL_LOGS_DIR: /tmp/gh-aw/mcp-config/logs

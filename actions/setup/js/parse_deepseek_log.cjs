@@ -60,6 +60,24 @@ function extractHeadlessAnswer(lines, configuration) {
 }
 
 /**
+ * @param {string[]} lines
+ * @param {number} shutdown
+ * @returns {import("./types/agent_session").SessionEvent[]}
+ */
+function extractWrapperErrors(lines, shutdown) {
+  if (shutdown < 0) return [];
+  const terminal = lines.slice(shutdown + 1);
+  const failures = terminal.filter(line => /^\[WARN\] Command completed with exit code: [1-9]\d*$/.test(line));
+  const exits = terminal.filter(line => /^Process exiting with code:/.test(line));
+  if (failures.length !== 1 || exits.length !== 1 || terminal.includes("[SUCCESS] Command completed successfully")) return [];
+  const exitCode = Number(failures[0].slice("[WARN] Command completed with exit code: ".length));
+  if (exitCode > 255 || exits[0] !== `Process exiting with code: ${exitCode}`) return [];
+  const error = createSessionEvent({}, "session.error", { message: `DeepSeek Harness execution exited with code ${exitCode}`, exitCode });
+  const execution = collectAgentExecution({ events: [error], exitCode });
+  return execution ? [error, execution] : [error];
+}
+
+/**
  * Node startup stacks require both the runtime framing and an attributed harness
  * failure. An error quoted in the assistant answer is not engine evidence.
  * @param {string[]} lines
@@ -77,29 +95,18 @@ function extractHeadlessErrors(lines, configuration) {
     return execution ? [error, execution] : [error];
   }
   const failureIndex = body.findIndex(line => HARNESS_FAILURE.test(line));
-  if (failureIndex < 0) {
-    if (shutdown < 0) return [];
-    const terminal = lines.slice(shutdown + 1);
-    const failure = terminal.find(line => /^\[WARN\] Command completed with exit code: [1-9]\d*$/.test(line));
-    const exit = terminal.find(line => /^Process exiting with code:/.test(line));
-    if (!failure || terminal.includes("[SUCCESS] Command completed successfully")) return [];
-    const exitCode = Number(failure.slice("[WARN] Command completed with exit code: ".length));
-    if (exitCode > 255 || exit !== `Process exiting with code: ${exitCode}`) return [];
-    const error = createSessionEvent({}, "session.error", { message: `DeepSeek Harness execution exited with code ${exitCode}`, exitCode });
-    const execution = collectAgentExecution({ events: [error], exitCode });
-    return execution ? [error, execution] : [error];
-  }
+  if (failureIndex < 0) return extractWrapperErrors(lines, shutdown);
   const exitCode = Number(body[failureIndex].match(HARNESS_FAILURE)?.[1]);
   if (shutdown >= 0) {
     const terminal = lines.slice(shutdown + 1);
     const exit = terminal.find(line => /^Process exiting with code:/.test(line));
     if (terminal.includes("[SUCCESS] Command completed successfully") || (exit !== undefined && exit !== `Process exiting with code: ${exitCode}`)) return [];
   }
-  if (!body.slice(failureIndex + 1).every(line => line.trim() === "" || PERMISSION_CLEANUP.test(line))) return [];
+  if (!body.slice(failureIndex + 1).every(line => line.trim() === "" || PERMISSION_CLEANUP.test(line))) return extractWrapperErrors(lines, shutdown);
   const stackStart = body.findIndex(line => /^file:\/\/\/\S+:\d+(?::\d+)?$/.test(line));
   const nodeVersion = body.findIndex((line, index) => index > stackStart && /^Node\.js v\d+\.\d+\.\d+$/.test(line));
   const hasNodeStack = stackStart === start && stackStart >= 0 && nodeVersion > stackStart && nodeVersion < failureIndex && body.slice(nodeVersion + 1, failureIndex).every(line => line.trim() === "");
-  if (failureIndex !== start && !hasNodeStack) return [];
+  if (failureIndex !== start && !hasNodeStack) return extractWrapperErrors(lines, shutdown);
   const entries = [];
   if (hasNodeStack) {
     for (let index = stackStart + 1; index < nodeVersion; index++) {

@@ -274,6 +274,8 @@ type EngineBehaviorDefinition struct {
 	// OutputFiles are untrusted diagnostic files retained by the redaction-gated
 	// agent artifact upload; they do not enable structured session parsing.
 	OutputFiles []string `yaml:"output-files,omitempty"`
+	// ErrorDetection enables the shared host-runner detector and its job outputs.
+	ErrorDetection bool `yaml:"error-detection,omitempty"`
 	// HarnessScript is the JavaScript source of a Node.js harness that spawns the
 	// engine CLI.  When non-empty the script is written to
 	// ${RUNNER_TEMP}/gh-aw/actions/<engine-id>_harness.cjs before execution and the

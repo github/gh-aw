@@ -253,7 +253,7 @@ function persistAgentExecution(logContent, results, rootDir = process.env.GH_AW_
     ...(fs.existsSync(exitPath) ? { exitCode: parseAgentExitCode(fs.readFileSync(exitPath, "utf8")) } : {}),
   });
   if (deepSeek) execution = reconcileDeepSeekExecution(execution, diagnostics);
-  writeSessionArtifact(path.join(rootDir, "agent-errors.jsonl"), [...supplementalErrors, ...(execution ? [execution] : [])], collectAddMaskedValues(logContent));
+  writeSessionArtifact(path.join(rootDir, "agent-errors.jsonl"), [...diagnostics.filter(event => event.type === "session.error"), ...(execution ? [execution] : [])], collectAddMaskedValues(logContent));
 }
 
 async function main({ rootDir = process.env.GH_AW_TMP_DIR || "/tmp/gh-aw" } = {}) {

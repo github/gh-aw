@@ -497,6 +497,7 @@ func (c *Compiler) generateDetectAgentErrorsStep(yaml *strings.Builder, data *Wo
 	// recognize a GitHub Actions step-level timeout ("The action '...' has timed out after N
 	// minutes."), which kills the engine without leaving a timeout signature in the agent log.
 	yaml.WriteString("        env:\n")
+	fmt.Fprintf(yaml, "          GH_AW_ENGINE_ID: %q\n", engine.GetID()) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	yaml.WriteString("          GH_AW_AGENTIC_EXECUTION_OUTCOME: ${{ steps.agentic_execution.outcome }}\n")
 	fmt.Fprintf(yaml, "          GH_AW_ENGINE_STEP_TIMEOUT_MINUTES: %s\n", resolveStepTimeoutValue(data)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	// Engines that write their own internal tracing/diagnostic logs to files (rather than

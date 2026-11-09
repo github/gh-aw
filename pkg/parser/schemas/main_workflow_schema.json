@@ -16843,6 +16843,11 @@
                   },
                   "additionalProperties": false
                 },
+                "error-detection": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Run the shared host-runner agent error detector after execution and expose its error outputs to the conclusion job."
+                },
                 "harness-script": {
                   "type": "string",
                   "description": "JavaScript source of a Node.js harness that spawns the engine CLI. When set, the script is written to ${RUNNER_TEMP}/gh-aw/actions/<engine-id>_harness.cjs before execution and the engine is launched as: node <harness-path> <command-name> [args...]. The harness reads process.env.GH_AW_PROMPT for the prompt-file path and, when the AWF firewall is active, process.env.AWF_REFLECT_ENABLED is set to '1' so the harness can read /reflect data to dynamically configure the engine CLI."

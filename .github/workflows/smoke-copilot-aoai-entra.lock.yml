@@ -2723,6 +2723,7 @@ jobs:
         id: detect-agent-errors
         continue-on-error: true
         env:
+          GH_AW_ENGINE_ID: "copilot"
           GH_AW_AGENTIC_EXECUTION_OUTCOME: ${{ steps.agentic_execution.outcome }}
           GH_AW_ENGINE_STEP_TIMEOUT_MINUTES: 15
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0

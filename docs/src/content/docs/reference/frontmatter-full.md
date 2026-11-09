@@ -3825,6 +3825,19 @@ engine:
     # (optional)
     java: "example-value"
 
+  # Experimental. Persist engine-declared session files in GitHub Actions artifacts.
+  # Using this field emits a compile-time warning. Configuration and behavior may
+  # change without deprecation. Copilot, Claude, Codex, and Pi resume the exact
+  # native session with the current workflow prompt; other session-based engines
+  # receive a continuation prompt. Starts fresh when no prior history exists. No
+  # memory tool is required.
+  # (optional)
+  durable:
+    # Number of days to retain durable checkpoint artifacts, subject to repository and
+    # organization artifact retention policy.
+    # (optional)
+    retention-days: 1
+
   # Engine-specific plugin names to install before launching the engine. Currently
   # used by the Pi engine: each entry is passed to `pi install <extension>`.
   # (optional)
@@ -3963,6 +3976,19 @@ engine:
   # (optional)
   mcp: true
 
+  # Experimental. Persist engine-declared session files in GitHub Actions artifacts.
+  # Using this field emits a compile-time warning. Configuration and behavior may
+  # change without deprecation. Copilot, Claude, Codex, and Pi resume the exact
+  # native session with the current workflow prompt; other session-based engines
+  # receive a continuation prompt. Starts fresh when no prior history exists. No
+  # memory tool is required.
+  # (optional)
+  durable:
+    # Number of days to retain durable checkpoint artifacts, subject to repository and
+    # organization artifact retention policy.
+    # (optional)
+    retention-days: 1
+
   # Runtime adapter identifier. Maps to the CodingAgentEngine registered in the
   # engine registry. Defaults to id when omitted.
   # (optional)
@@ -4060,6 +4086,69 @@ engine:
   # engine from frontmatter.
   # (optional)
   behaviors:
+    # Experimental native durability or session-file continuation. Declares persisted
+    # files and the continuation invocation; pinned dependency installation is
+    # optional. Enabling engine.durable emits a compile-time warning. The harness
+    # receives GH_AW_DURABLE_RESUMED and GH_AW_DURABLE_PARENT_RUN_ID.
+    # (optional)
+    durable:
+      # Explicit files or directories under /tmp/gh-aw/agent/ to persist.
+      # $GH_AW_DURABLE_CHECKPOINT refers to the compiler-managed native checkpoint file.
+      # Globs and overlapping paths are unsupported.
+      files: []
+        # Array of strings
+
+      # (optional)
+      installation: []
+
+      execution:
+        # (optional)
+        command-name: "example-value"
+
+        # (optional)
+        args: []
+          # Array of strings
+
+        # (optional)
+        step-name: "example-value"
+
+        # (optional)
+        model-env-var: "example-value"
+
+        # (optional)
+        model-env-provider-prefix: "example-value"
+
+        # (optional)
+        model-flag: "example-value"
+
+        # (optional)
+        mcp-config-env-var: "example-value"
+
+        # (optional)
+        mcp-config-flag: "example-value"
+
+        # (optional)
+        write-timestamp: true
+
+        # (optional)
+        provider-env-mode: "example-value"
+
+        # Parse only the final stderr attempt from native AWF protected command output
+        # (v0.28.67+, non-TTY Docker only). Requires an isolated recorder and verifying
+        # log parser; raw streams remain private and incomplete capture or structural
+        # redaction collisions fail publication.
+        # (optional)
+        protected-session-capture: true
+
+        # Additional static environment variables injected into the execution step. Values
+        # are rendered verbatim and must not contain secrets.
+        # (optional)
+        env:
+          {}
+
+      # (optional)
+      harness-script: "example-value"
+
     # Secret resolution mode for the engine (for example 'universal-llm-consumer').
     # (optional)
     secret-strategy: "example-value"
@@ -4260,6 +4349,11 @@ engine:
       # (optional)
       config-adapter: "example-value"
 
+    # Run the shared host-runner agent error detector after execution and expose its
+    # error outputs to the conclusion job.
+    # (optional)
+    error-detection: true
+
     # JavaScript source of a Node.js harness that spawns the engine CLI. When set, the
     # script is written to ${RUNNER_TEMP}/gh-aw/actions/<engine-id>_harness.cjs before
     # execution and the engine is launched as: node <harness-path> <command-name>
@@ -4313,6 +4407,174 @@ engine:
   # the default engine when engine.id is not specified. Overrides the top-level
   # 'model' field.
   model: "example-value"
+
+# Format 7: Pi engine options, including optional durable execution.
+engine:
+  pi:
+    # Experimental. Persist engine-declared session files in GitHub Actions artifacts.
+    # Using this field emits a compile-time warning. Configuration and behavior may
+    # change without deprecation. Copilot, Claude, Codex, and Pi resume the exact
+    # native session with the current workflow prompt; other session-based engines
+    # receive a continuation prompt. Starts fresh when no prior history exists. No
+    # memory tool is required.
+    # (optional)
+    durable:
+      # Number of days to retain durable checkpoint artifacts, subject to repository and
+      # organization artifact retention policy.
+      # (optional)
+      retention-days: 1
+
+    # Model for this engine, overriding the top-level model. Has sensible defaults and
+    # can typically be omitted. Supports full model IDs (e.g.,
+    # 'claude-3-5-sonnet-20241022', 'gpt-4'), which is useful when a nested engine
+    # (e.g. safe-outputs.threat-detection.engine) needs a different model than the
+    # main agent engine.
+    # (optional)
+    model: "example-value"
+
+    # Optional version of the AI engine action (e.g., 'beta', 'stable', 20). Has
+    # sensible defaults and can typically be omitted. Numeric values are automatically
+    # converted to strings at runtime. GitHub Actions expressions (e.g., '${{
+    # inputs.engine-version }}') are accepted and compiled with injection-safe env var
+    # handling.
+    # (optional)
+    version: null
+
+    # Additional engine configuration text. Codex accepts TOML structurally merged
+    # into config.toml. Pi accepts a JSON object with settings, model metadata
+    # overrides, MCP exposure settings, and session persistence options.
+    # (optional)
+    config: "example-value"
+
+    # Custom environment variables to pass to the AI engine, including secret
+    # overrides (e.g., OPENAI_API_KEY: ${{ secrets.CUSTOM_KEY }})
+    # (optional)
+    env:
+      {}
+
+    # Optional array of command-line arguments to pass to the AI engine CLI. These
+    # arguments are injected after all other args but before the prompt.
+    # (optional)
+    args: []
+      # Array of strings
+
+    # Engine-level MCP gateway configuration. Settings here apply to the MCP gateway
+    # used by this engine.
+    # (optional)
+    mcp:
+      # Session timeout for MCP gateway sessions as a Go duration string (e.g. "30m",
+      # "4h", "24h"). Must be at least 5m (no upper bound). Omitted or empty uses the
+      # effective gateway default (precedence: this field > MCP_GATEWAY_SESSION_TIMEOUT
+      # env var > built-in default 6h). Longer timeouts benefit multi-hour workflows
+      # such as large-scale migrations; shorter values free gateway resources sooner.
+      # (optional)
+      session-timeout: "example-value"
+
+      # Timeout for individual MCP tool calls as a Go duration string (e.g. "30s", "2m",
+      # "10m"). Must be between 10s and 600s inclusive. Omitted or empty uses the
+      # gateway built-in default (60s). Use a higher value for slow MCP backends such as
+      # full-text search over large indexes.
+      # (optional)
+      tool-timeout: "example-value"
+
+    # Custom driver script, command, or inline source for the engine. String values
+    # accept a workspace-relative path or bare name. Inline object values are
+    # supported for the Copilot engine and materialize runtime files before execution.
+    # Supported inline runtimes are node, python, go, and java.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: Workspace-relative driver path or bare command name. The copilot
+    # engine accepts .js, .cjs, .mjs, .py, .ts, .mts, and .rb drivers; other engines
+    # accept .js, .cjs, and .mjs. Bare names without an extension are treated as
+    # built-in drivers or executables in PATH.
+    driver: "example-value"
+
+    # Format 2: Inline Copilot SDK driver source. Provide exactly one runtime key.
+    driver:
+      # Inline Node.js driver source written to a generated .cjs file.
+      # (optional)
+      node: "example-value"
+
+      # Inline Python driver source written to a generated .py file.
+      # (optional)
+      python: "example-value"
+
+      # Inline Go driver source written to a generated .go file.
+      # (optional)
+      go: "example-value"
+
+      # Inline Java driver source written to a generated .java file.
+      # (optional)
+      java: "example-value"
+
+    # Engine-specific plugin names to install before launching the engine. Currently
+    # used by the Pi engine: each entry is passed to `pi install <extension>`.
+    # (optional)
+    extensions: []
+      # Array of strings
+
+    # Custom executable path for the AI engine CLI. When specified, the workflow will
+    # skip the standard installation steps and use this command instead. The command
+    # should be the full path to the executable or a command available in PATH.
+    # (optional)
+    command: "example-value"
+
+    # When true, disables automatic loading of context and custom instructions where
+    # supported. Copilot uses --no-custom-instructions, Claude uses --bare, and Pi
+    # disables context-file, skill, prompt-template, extension, and theme discovery
+    # while retaining explicit workflow infrastructure extensions. Codex and Gemini do
+    # not support this option and emit a warning. Defaults to false.
+    # (optional)
+    bare: true
+
+    # Minimum release age in days for compiler-managed engine installs. Zero disables
+    # the cooldown only outside strict mode.
+    # (optional)
+    cooldown: 1
+
+    # Override the working directory for the engine's spawned process. Accepts a
+    # literal path or a GitHub Actions expression (e.g. `${{ github.workspace
+    # }}/subdir`). When set, passed as GH_AW_ENGINE_CWD to the engine execution
+    # environment.
+    # (optional)
+    cwd: "example-value"
+
+    # Experimental per-run model and reasoning-effort selection from the task text for
+    # Copilot, Claude, Codex, and pi engines, on GitHub Copilot or, for Claude and
+    # Codex, natively on Anthropic or OpenAI; requires the AWF firewall and ignores
+    # fixed model and effort settings. See
+    # https://github.github.com/gh-aw/reference/model-routing/.
+    # (optional)
+    model-routing:
+      # Routing objective: cost prefers the cheapest model and effort that meet the
+      # mode's target; cost-speed prefers the fastest model and effort that meet it.
+      goal: "cost"
+
+      # Routing quality profile: economy, balanced, and robust set increasing quality
+      # bars, generally with increasing cost; auto lets the classifier recommend one of
+      # these profiles per task.
+      mode: "economy"
+
+      # Optional exact model names of the routing provider or gh-aw model aliases (such
+      # as small or sonnet) that narrow the router's choice for the main agent only.
+      # Aliases expand to their model patterns for the routing provider (GitHub Copilot,
+      # or Anthropic or OpenAI for native Claude and Codex routing), limited to the
+      # engine's model family for Claude and Codex. This is not a request policy; put
+      # patterns such as gpt-* in models.allowed or models.blocked. When omitted, the
+      # router chooses from the models that policy allows (Claude and Codex only from
+      # their own model family). Among workflows that enable routing for the same
+      # engine, if any omits allowed-models, the router has no shortlist; otherwise,
+      # their lists are combined. GitHub Actions expressions are allowed only when
+      # neither models.allowed nor models.blocked is set.
+      # (optional)
+      allowed-models: []
+        # Array of strings
+
+    # Optional inference provider override for this engine. Defaults to the engine's
+    # native provider (copilot: github, claude: anthropic, codex: openai, pi: github).
+    # (optional)
+    model-provider: "github"
 
 # AWF turn cap (`max_turns`) applied consistently across all agentic engines.
 # Supports GitHub Actions expressions (e.g. '${{ inputs.max-turns }}') for
@@ -5617,6 +5879,110 @@ tools:
 
   # Format 3: Repo-memory configuration object
   repo-memory:
+    # GitHub App credentials for repo-memory. Push tokens request only contents:
+    # write; cross-repository clone tokens request only contents: read.
+    # (optional)
+    github-app:
+      # GitHub App client ID (e.g., '${{ vars.APP_ID }}'). Required to mint a GitHub App
+      # token.
+      # (optional)
+      client-id: "example-value"
+
+      # Deprecated alias for client-id. GitHub App ID/client ID (e.g., '${{ vars.APP_ID
+      # }}').
+      # (optional)
+      app-id: "example-value"
+
+      # GitHub App private key (e.g., '${{ secrets.APP_PRIVATE_KEY }}'). Required to
+      # mint a GitHub App token.
+      # (optional)
+      private-key: "example-value"
+
+      # Optional owner of the GitHub App installation (defaults to current repository
+      # owner if not specified)
+      # (optional)
+      owner: "example-value"
+
+      # Optional list of repositories to grant access to (defaults to current repository
+      # if not specified)
+      # (optional)
+      repositories: []
+        # Array of strings
+
+      # If true, skip token minting when client-id/private-key resolve to empty strings
+      # at runtime. Defaults to false.
+      # (optional)
+      ignore-if-missing: true
+
+    # GitHub App for memory restores and daily-credit ledger clones. Overrides
+    # github-app for reads only.
+    # (optional)
+    github-app-read:
+      # GitHub App client ID (e.g., '${{ vars.APP_ID }}'). Required to mint a GitHub App
+      # token.
+      # (optional)
+      client-id: "example-value"
+
+      # Deprecated alias for client-id. GitHub App ID/client ID (e.g., '${{ vars.APP_ID
+      # }}').
+      # (optional)
+      app-id: "example-value"
+
+      # GitHub App private key (e.g., '${{ secrets.APP_PRIVATE_KEY }}'). Required to
+      # mint a GitHub App token.
+      # (optional)
+      private-key: "example-value"
+
+      # Optional owner of the GitHub App installation (defaults to current repository
+      # owner if not specified)
+      # (optional)
+      owner: "example-value"
+
+      # Optional list of repositories to grant access to (defaults to current repository
+      # if not specified)
+      # (optional)
+      repositories: []
+        # Array of strings
+
+      # If true, skip token minting when client-id/private-key resolve to empty strings
+      # at runtime. Defaults to false.
+      # (optional)
+      ignore-if-missing: true
+
+    # GitHub App for memory pushes. Overrides github-app for writes only.
+    # (optional)
+    github-app-write:
+      # GitHub App client ID (e.g., '${{ vars.APP_ID }}'). Required to mint a GitHub App
+      # token.
+      # (optional)
+      client-id: "example-value"
+
+      # Deprecated alias for client-id. GitHub App ID/client ID (e.g., '${{ vars.APP_ID
+      # }}').
+      # (optional)
+      app-id: "example-value"
+
+      # GitHub App private key (e.g., '${{ secrets.APP_PRIVATE_KEY }}'). Required to
+      # mint a GitHub App token.
+      # (optional)
+      private-key: "example-value"
+
+      # Optional owner of the GitHub App installation (defaults to current repository
+      # owner if not specified)
+      # (optional)
+      owner: "example-value"
+
+      # Optional list of repositories to grant access to (defaults to current repository
+      # if not specified)
+      # (optional)
+      repositories: []
+        # Array of strings
+
+      # If true, skip token minting when client-id/private-key resolve to empty strings
+      # at runtime. Defaults to false.
+      # (optional)
+      ignore-if-missing: true
+
     # Branch prefix for memory storage (default: 'memory'). Must be 4-32 characters,
     # alphanumeric with hyphens/underscores, and cannot be 'copilot'. Branch will be
     # named {branch-prefix}/{id}
@@ -5875,6 +6241,19 @@ safe-outputs:
     allowed-fields: []
       # Array of strings
 
+    # Maximum number of artifacts attached per created issue (default: 10). Zero or a
+    # negative value disables issue artifacts.
+    # (optional)
+    max-issue-artifacts: 1
+
+    # Maximum UTF-8 size of each issue artifact body (default: 1mb = 1048576 bytes).
+    # Accepts positive integer bytes or a human-friendly size such as 512kb, 1mb, or
+    # 1.5mb. Units B, K/KB/KiB, M/MB/MiB, G/GB/GiB, and T/TB/TiB are case-insensitive
+    # and use multiples of 1024. The size must resolve to a positive whole byte count.
+    # Oversized bodies are rejected, not truncated.
+    # (optional)
+    max-issue-artifact-size: null
+
     # GitHub usernames to assign the created issue to. Can be a single username string
     # or array of usernames. Use 'copilot' to assign to GitHub Copilot.
     # (optional)
@@ -5910,10 +6289,11 @@ safe-outputs:
     # (optional)
     deduplicate-by-title: null
 
-    # Deduplicate against issues with all listed labels. With deduplicate-by-title,
-    # both the title and all labels must match (AND). Applies within-run and against
-    # open/recently-closed repository issues. Omitted or empty lists disable label
-    # filtering. Literal strings only; does not change labels applied at creation.
+    # Deduplicate against issues with all listed labels. When deduplicate-by-title is
+    # also enabled, both the title and all labels must match (AND). Applies within-run
+    # and against open/recently-closed repository issues. Omitted or empty lists
+    # disable label filtering. Labels must be literal strings, not GitHub Actions
+    # expressions. Does not change labels applied at creation.
     # (optional)
     deduplicate-by-labels: []
       # Array of strings
@@ -10038,6 +10418,12 @@ safe-outputs:
   # Format 1: Configuration for automatically creating GitHub issue or pull request
   # comments from AI workflow output. The main job does not need write permissions.
   add-comment:
+    # Render safe-output data in a collapsed Structured data details block. Default:
+    # false (visible fenced JSON). Requires safe-outputs.data to accept structured
+    # data.
+    # (optional)
+    collapse-data: true
+
     # Maximum number of http/https URL occurrences in agent-provided comment content
     # (default: 50). Generated footer and metadata links are excluded.
     # (optional)
@@ -16767,6 +17153,19 @@ safe-outputs:
 
   # Format 1: Configuration for updating GitHub issues from agentic workflow output
   update-issue:
+    # Maximum number of artifacts attached per updated issue (default: 10). Zero or a
+    # negative value disables issue artifacts.
+    # (optional)
+    max-issue-artifacts: 1
+
+    # Maximum UTF-8 size of each issue artifact body (default: 1mb = 1048576 bytes).
+    # Accepts positive integer bytes or a human-friendly size such as 512kb, 1mb, or
+    # 1.5mb. Units B, K/KB/KiB, M/MB/MiB, G/GB/GiB, and T/TB/TiB are case-insensitive
+    # and use multiples of 1024. The size must resolve to a positive whole byte count.
+    # Oversized bodies are rejected, not truncated.
+    # (optional)
+    max-issue-artifact-size: null
+
     # Allow updating issue status (open/closed) - presence of key indicates field can
     # be updated
     # (optional)
@@ -22406,9 +22805,9 @@ safe-outputs:
         azure-cloud: "example-value"
 
         # Optional WIF provider discriminator. Recognized values are 'azure', 'anthropic',
-        # and 'gcp'.
+        # 'gcp', and 'openai'.
         # (optional)
-        provider: "example-value"
+        provider: "azure"
 
         # Anthropic WIF federation rule ID (e.g., fdrl_...).
         # (optional)
@@ -22418,7 +22817,8 @@ safe-outputs:
         # (optional)
         organization-id: "example-value"
 
-        # Anthropic WIF service account ID (e.g., svac_...).
+        # Provider service account ID (Anthropic e.g., svac_...; OpenAI as configured in
+        # the OpenAI admin console).
         # (optional)
         service-account-id: "example-value"
 
@@ -22444,6 +22844,10 @@ safe-outputs:
         # us-central1 when omitted.
         # (optional)
         location: "example-value"
+
+        # OpenAI Workload Identity Provider ID configured in the OpenAI admin console.
+        # (optional)
+        identity-provider-id: "example-value"
 
       # Additional engine configuration text. Codex accepts TOML structurally merged
       # into config.toml. Pi accepts a JSON object with settings, model metadata
@@ -22537,6 +22941,19 @@ safe-outputs:
         # Inline Java driver source written to a generated .java file.
         # (optional)
         java: "example-value"
+
+      # Experimental. Persist engine-declared session files in GitHub Actions artifacts.
+      # Using this field emits a compile-time warning. Configuration and behavior may
+      # change without deprecation. Copilot, Claude, Codex, and Pi resume the exact
+      # native session with the current workflow prompt; other session-based engines
+      # receive a continuation prompt. Starts fresh when no prior history exists. No
+      # memory tool is required.
+      # (optional)
+      durable:
+        # Number of days to retain durable checkpoint artifacts, subject to repository and
+        # organization artifact retention policy.
+        # (optional)
+        retention-days: 1
 
       # Engine-specific plugin names to install before launching the engine. Currently
       # used by the Pi engine: each entry is passed to `pi install <extension>`.
@@ -22676,6 +23093,19 @@ safe-outputs:
       # (optional)
       mcp: true
 
+      # Experimental. Persist engine-declared session files in GitHub Actions artifacts.
+      # Using this field emits a compile-time warning. Configuration and behavior may
+      # change without deprecation. Copilot, Claude, Codex, and Pi resume the exact
+      # native session with the current workflow prompt; other session-based engines
+      # receive a continuation prompt. Starts fresh when no prior history exists. No
+      # memory tool is required.
+      # (optional)
+      durable:
+        # Number of days to retain durable checkpoint artifacts, subject to repository and
+        # organization artifact retention policy.
+        # (optional)
+        retention-days: 1
+
       # Runtime adapter identifier. Maps to the CodingAgentEngine registered in the
       # engine registry. Defaults to id when omitted.
       # (optional)
@@ -22773,6 +23203,69 @@ safe-outputs:
       # engine from frontmatter.
       # (optional)
       behaviors:
+        # Experimental native durability or session-file continuation. Declares persisted
+        # files and the continuation invocation; pinned dependency installation is
+        # optional. Enabling engine.durable emits a compile-time warning. The harness
+        # receives GH_AW_DURABLE_RESUMED and GH_AW_DURABLE_PARENT_RUN_ID.
+        # (optional)
+        durable:
+          # Explicit files or directories under /tmp/gh-aw/agent/ to persist.
+          # $GH_AW_DURABLE_CHECKPOINT refers to the compiler-managed native checkpoint file.
+          # Globs and overlapping paths are unsupported.
+          files: []
+            # Array of strings
+
+          # (optional)
+          installation: []
+
+          execution:
+            # (optional)
+            command-name: "example-value"
+
+            # (optional)
+            args: []
+              # Array of strings
+
+            # (optional)
+            step-name: "example-value"
+
+            # (optional)
+            model-env-var: "example-value"
+
+            # (optional)
+            model-env-provider-prefix: "example-value"
+
+            # (optional)
+            model-flag: "example-value"
+
+            # (optional)
+            mcp-config-env-var: "example-value"
+
+            # (optional)
+            mcp-config-flag: "example-value"
+
+            # (optional)
+            write-timestamp: true
+
+            # (optional)
+            provider-env-mode: "example-value"
+
+            # Parse only the final stderr attempt from native AWF protected command output
+            # (v0.28.67+, non-TTY Docker only). Requires an isolated recorder and verifying
+            # log parser; raw streams remain private and incomplete capture or structural
+            # redaction collisions fail publication.
+            # (optional)
+            protected-session-capture: true
+
+            # Additional static environment variables injected into the execution step. Values
+            # are rendered verbatim and must not contain secrets.
+            # (optional)
+            env:
+              {}
+
+          # (optional)
+          harness-script: "example-value"
+
         # Secret resolution mode for the engine (for example 'universal-llm-consumer').
         # (optional)
         secret-strategy: "example-value"
@@ -22973,6 +23466,11 @@ safe-outputs:
           # (optional)
           config-adapter: "example-value"
 
+        # Run the shared host-runner agent error detector after execution and expose its
+        # error outputs to the conclusion job.
+        # (optional)
+        error-detection: true
+
         # JavaScript source of a Node.js harness that spawns the engine CLI. When set, the
         # script is written to ${RUNNER_TEMP}/gh-aw/actions/<engine-id>_harness.cjs before
         # execution and the engine is launched as: node <harness-path> <command-name>
@@ -23026,6 +23524,174 @@ safe-outputs:
       # the default engine when engine.id is not specified. Overrides the top-level
       # 'model' field.
       model: "example-value"
+
+    # Format 7: Pi engine options, including optional durable execution.
+    engine-config:
+      pi:
+        # Experimental. Persist engine-declared session files in GitHub Actions artifacts.
+        # Using this field emits a compile-time warning. Configuration and behavior may
+        # change without deprecation. Copilot, Claude, Codex, and Pi resume the exact
+        # native session with the current workflow prompt; other session-based engines
+        # receive a continuation prompt. Starts fresh when no prior history exists. No
+        # memory tool is required.
+        # (optional)
+        durable:
+          # Number of days to retain durable checkpoint artifacts, subject to repository and
+          # organization artifact retention policy.
+          # (optional)
+          retention-days: 1
+
+        # Model for this engine, overriding the top-level model. Has sensible defaults and
+        # can typically be omitted. Supports full model IDs (e.g.,
+        # 'claude-3-5-sonnet-20241022', 'gpt-4'), which is useful when a nested engine
+        # (e.g. safe-outputs.threat-detection.engine) needs a different model than the
+        # main agent engine.
+        # (optional)
+        model: "example-value"
+
+        # Optional version of the AI engine action (e.g., 'beta', 'stable', 20). Has
+        # sensible defaults and can typically be omitted. Numeric values are automatically
+        # converted to strings at runtime. GitHub Actions expressions (e.g., '${{
+        # inputs.engine-version }}') are accepted and compiled with injection-safe env var
+        # handling.
+        # (optional)
+        version: null
+
+        # Additional engine configuration text. Codex accepts TOML structurally merged
+        # into config.toml. Pi accepts a JSON object with settings, model metadata
+        # overrides, MCP exposure settings, and session persistence options.
+        # (optional)
+        config: "example-value"
+
+        # Custom environment variables to pass to the AI engine, including secret
+        # overrides (e.g., OPENAI_API_KEY: ${{ secrets.CUSTOM_KEY }})
+        # (optional)
+        env:
+          {}
+
+        # Optional array of command-line arguments to pass to the AI engine CLI. These
+        # arguments are injected after all other args but before the prompt.
+        # (optional)
+        args: []
+          # Array of strings
+
+        # Engine-level MCP gateway configuration. Settings here apply to the MCP gateway
+        # used by this engine.
+        # (optional)
+        mcp:
+          # Session timeout for MCP gateway sessions as a Go duration string (e.g. "30m",
+          # "4h", "24h"). Must be at least 5m (no upper bound). Omitted or empty uses the
+          # effective gateway default (precedence: this field > MCP_GATEWAY_SESSION_TIMEOUT
+          # env var > built-in default 6h). Longer timeouts benefit multi-hour workflows
+          # such as large-scale migrations; shorter values free gateway resources sooner.
+          # (optional)
+          session-timeout: "example-value"
+
+          # Timeout for individual MCP tool calls as a Go duration string (e.g. "30s", "2m",
+          # "10m"). Must be between 10s and 600s inclusive. Omitted or empty uses the
+          # gateway built-in default (60s). Use a higher value for slow MCP backends such as
+          # full-text search over large indexes.
+          # (optional)
+          tool-timeout: "example-value"
+
+        # Custom driver script, command, or inline source for the engine. String values
+        # accept a workspace-relative path or bare name. Inline object values are
+        # supported for the Copilot engine and materialize runtime files before execution.
+        # Supported inline runtimes are node, python, go, and java.
+        # (optional)
+        # Accepted formats:
+
+        # Format 1: Workspace-relative driver path or bare command name. The copilot
+        # engine accepts .js, .cjs, .mjs, .py, .ts, .mts, and .rb drivers; other engines
+        # accept .js, .cjs, and .mjs. Bare names without an extension are treated as
+        # built-in drivers or executables in PATH.
+        driver: "example-value"
+
+        # Format 2: Inline Copilot SDK driver source. Provide exactly one runtime key.
+        driver:
+          # Inline Node.js driver source written to a generated .cjs file.
+          # (optional)
+          node: "example-value"
+
+          # Inline Python driver source written to a generated .py file.
+          # (optional)
+          python: "example-value"
+
+          # Inline Go driver source written to a generated .go file.
+          # (optional)
+          go: "example-value"
+
+          # Inline Java driver source written to a generated .java file.
+          # (optional)
+          java: "example-value"
+
+        # Engine-specific plugin names to install before launching the engine. Currently
+        # used by the Pi engine: each entry is passed to `pi install <extension>`.
+        # (optional)
+        extensions: []
+          # Array of strings
+
+        # Custom executable path for the AI engine CLI. When specified, the workflow will
+        # skip the standard installation steps and use this command instead. The command
+        # should be the full path to the executable or a command available in PATH.
+        # (optional)
+        command: "example-value"
+
+        # When true, disables automatic loading of context and custom instructions where
+        # supported. Copilot uses --no-custom-instructions, Claude uses --bare, and Pi
+        # disables context-file, skill, prompt-template, extension, and theme discovery
+        # while retaining explicit workflow infrastructure extensions. Codex and Gemini do
+        # not support this option and emit a warning. Defaults to false.
+        # (optional)
+        bare: true
+
+        # Minimum release age in days for compiler-managed engine installs. Zero disables
+        # the cooldown only outside strict mode.
+        # (optional)
+        cooldown: 1
+
+        # Override the working directory for the engine's spawned process. Accepts a
+        # literal path or a GitHub Actions expression (e.g. `${{ github.workspace
+        # }}/subdir`). When set, passed as GH_AW_ENGINE_CWD to the engine execution
+        # environment.
+        # (optional)
+        cwd: "example-value"
+
+        # Experimental per-run model and reasoning-effort selection from the task text for
+        # Copilot, Claude, Codex, and pi engines, on GitHub Copilot or, for Claude and
+        # Codex, natively on Anthropic or OpenAI; requires the AWF firewall and ignores
+        # fixed model and effort settings. See
+        # https://github.github.com/gh-aw/reference/model-routing/.
+        # (optional)
+        model-routing:
+          # Routing objective: cost prefers the cheapest model and effort that meet the
+          # mode's target; cost-speed prefers the fastest model and effort that meet it.
+          goal: "cost"
+
+          # Routing quality profile: economy, balanced, and robust set increasing quality
+          # bars, generally with increasing cost; auto lets the classifier recommend one of
+          # these profiles per task.
+          mode: "economy"
+
+          # Optional exact model names of the routing provider or gh-aw model aliases (such
+          # as small or sonnet) that narrow the router's choice for the main agent only.
+          # Aliases expand to their model patterns for the routing provider (GitHub Copilot,
+          # or Anthropic or OpenAI for native Claude and Codex routing), limited to the
+          # engine's model family for Claude and Codex. This is not a request policy; put
+          # patterns such as gpt-* in models.allowed or models.blocked. When omitted, the
+          # router chooses from the models that policy allows (Claude and Codex only from
+          # their own model family). Among workflows that enable routing for the same
+          # engine, if any omits allowed-models, the router has no shortlist; otherwise,
+          # their lists are combined. GitHub Actions expressions are allowed only when
+          # neither models.allowed nor models.blocked is set.
+          # (optional)
+          allowed-models: []
+            # Array of strings
+
+        # Optional inference provider override for this engine. Defaults to the engine's
+        # native provider (copilot: github, claude: anthropic, codex: openai, pi: github).
+        # (optional)
+        model-provider: "github"
 
     # Model override for threat detection engine execution.
     # (optional)

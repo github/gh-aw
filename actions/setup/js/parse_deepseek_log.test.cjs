@@ -2,9 +2,7 @@
 
 import { describe, it, expect, vi } from "vitest";
 import fs, { readFileSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
 import { parseDeepSeekLog, isDeepSeekLog } from "./parse_deepseek_log.cjs";
 import { startupFailure, timedOut } from "./fixtures/deepseek_ci_logs.cjs";
 import { projectSessionResult } from "./agent_session.cjs";
@@ -13,6 +11,7 @@ import { collectUnifiedSession, parseEngineSession, writeUnifiedSession } from "
 import { parseCustomLog } from "./parse_custom_log.cjs";
 import { persistAgentExecution, detectErrors } from "./detect_agent_errors.cjs";
 import { validateSession } from "./scripts/validate_session.cjs";
+import { normalizeUnifiedSessionEvent } from "./unified_session_payload.cjs";
 
 // Verified against agent artifact 9781648195 from existing successful Actions
 // run https://github.com/github/gh-aw/actions/runs/33456355349.
@@ -172,6 +171,36 @@ describe("parseDeepSeekLog", () => {
     expect(JSON.stringify(result)).not.toContain(answer);
   });
 
+  it.each(["Partial assistant output", "Ordinary diagnostic\nError: unframed child failure"])("retains a verified wrapper failure after output and a harness failure: %s", text => {
+    const raw = startupFailure.replace(/file:\/\/\/fixture[\s\S]*?Node\.js v24\.21\.0/, text);
+    const result = parseDeepSeekLog(raw);
+
+    expect(result.logEntries.map(event => event.type)).toEqual(["session.init", "session.error", "agent.execution"]);
+    expect(result.logEntries[1].data).toEqual({ message: "DeepSeek Harness execution exited with code 1", exitCode: 1 });
+    expect(result.logEntries[2].data.exitCode).toBe(1);
+    expect(JSON.stringify(result)).not.toContain(text);
+    expect(projectSessionResult(result.logEntries)).toBeUndefined();
+  });
+
+  it("falls back to wrapper evidence when output follows the harness failure", () => {
+    const raw = startupFailure.replace("file:///fixture", "Partial output\nfile:///fixture").replace("[entrypoint] Relaxed", "More unattributed output\n[entrypoint] Relaxed");
+    const result = parseDeepSeekLog(raw);
+
+    expect(result.logEntries.map(event => event.type)).toEqual(["session.init", "session.error", "agent.execution"]);
+    expect(result.logEntries[1].data).toEqual({ message: "DeepSeek Harness execution exited with code 1", exitCode: 1 });
+    expect(JSON.stringify(result)).not.toContain("unattributed output");
+  });
+
+  it.each([
+    startupFailure.replace(/file:\/\/\/fixture[\s\S]*?Node\.js v24\.21\.0/, "User prompt: private-input"),
+    startupFailure.replace(/file:\/\/\/fixture[\s\S]*?Node\.js v24\.21\.0/, "Partial output").replace("Process exiting with code: 1", "Process exiting with code: 0"),
+    startupFailure.replace(/file:\/\/\/fixture[\s\S]*?Node\.js v24\.21\.0/, "Partial output").replace("[WARN] Command completed with exit code: 1", "[SUCCESS] Command completed successfully"),
+    fixture.replace(answer, "Partial output\n[deepseek-harness] DeepSeek Harness execution failed with exit code 1"),
+    `${timedOut}Partial output\n[deepseek-harness] DeepSeek Harness execution failed with exit code 1\n`,
+  ])("retains quote and contradiction guards when startup extraction rejects the body", raw => {
+    expect(parseDeepSeekLog(raw).logEntries.some(event => event.type === "session.error")).toBe(false);
+  });
+
   it.each([
     fixture.replace("[SUCCESS] Command completed successfully", "[WARN] Command completed with exit code: 7"),
     `${fixture}[WARN] Command completed with exit code: 7\nProcess exiting with code: 7\n`,
@@ -180,50 +209,31 @@ describe("parseDeepSeekLog", () => {
     expect(parseDeepSeekLog(raw).logEntries.some(event => event.type === "session.error")).toBe(false);
   });
 
-  it("normalizes a real local timeout even when its wrapper returns zero", () => {
-    const result = spawnSync(
-      process.execPath,
-      [
-        "-e",
-        [
-          'const { spawnSync } = require("node:child_process");',
-          'console.log("[deepseek-harness] configured provider=github model=auto");',
-          'const child = spawnSync(process.execPath, ["-e", "setTimeout(() => {}, 60000)"], { timeout: 50 });',
-          'if (child.error?.code !== "ETIMEDOUT") process.exit(1);',
-          'console.log("[WARN] Agent command timed out after 15 minutes, stopping container...");',
-        ].join("\n"),
-      ],
-      { encoding: "utf8", timeout: 5000 }
-    );
-    expect(result.error).toBeUndefined();
-    expect(result.status).toBe(0);
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "deepseek-timeout-capture-"));
+  it.each(["none", "init-only", "full"])("normalizes observed AWF timeout evidence with a zero exit artifact and $0 canonical capture", canonical => {
+    const raw = `${timedOut}[WARN] Agent command timed out after 15 minutes, stopping container...\n`;
+    const root = fs.mkdtempSync(path.join(process.cwd(), ".deepseek-timeout-capture-"));
     try {
       vi.stubEnv("GH_AW_ENGINE_ID", "deepseek-harness");
       vi.stubEnv("GH_AW_AGENTIC_EXECUTION_OUTCOME", "failure");
-      fs.writeFileSync(path.join(root, "agent-stdio.log"), result.stdout);
-      fs.writeFileSync(path.join(root, "agent_execution_exit_code.txt"), String(result.status));
-      persistAgentExecution(result.stdout, detectErrors(result.stdout), root);
+      const parsed = parseDeepSeekLog(raw).logEntries;
+      fs.writeFileSync(path.join(root, "agent-stdio.log"), raw);
+      fs.writeFileSync(path.join(root, "agent_execution_exit_code.txt"), "0");
+      if (canonical !== "none") writeSessionArtifact(path.join(root, "agent-session.jsonl"), canonical === "full" ? parsed : parsed.filter(event => event.type === "session.init"));
+      persistAgentExecution(raw, detectErrors(raw), root);
       const detected = fs.readFileSync(path.join(root, "agent-errors.jsonl"), "utf8").trimEnd().split("\n").map(JSON.parse);
-      expect(detected).toHaveLength(1);
-      expect(detected[0].data.categories).toContain("agentic_engine_timeout");
-      expect(detected[0].data).not.toHaveProperty("exitCode");
-
-      for (const canonical of [false, true]) {
-        if (canonical) writeSessionArtifact(path.join(root, "agent-session.jsonl"), parseDeepSeekLog(result.stdout).logEntries);
-        const events = writeUnifiedSession({ rootDir: root, engine: "deepseek-harness", dailyAIC: {} });
-        const errors = events.filter(event => event.type === "session.error");
-        expect(errors).toHaveLength(1);
-        expect(errors[0].data.code).toBe("agentic_engine_timeout");
-        const execution = events.filter(event => event.type === "agent.execution");
-        expect(execution).toHaveLength(1);
-        expect(execution[0].data.categories).toContain("agentic_engine_timeout");
-        expect(execution[0].data).not.toHaveProperty("exitCode");
-        expect(events.some(event => event.type === "assistant.message" || event.type === "session.result" || event.type.startsWith("tool."))).toBe(false);
-        const jsonl = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8");
-        expect(jsonl.trimEnd().split("\n").map(JSON.parse)).toEqual(events);
-        expect(validateSession(jsonl)).toBe(events.length);
-      }
+      expect(detected).toEqual(parsed.filter(event => event.type === "session.error" || event.type === "agent.execution"));
+      const events = writeUnifiedSession({ rootDir: root, engine: "deepseek-harness", dailyAIC: {} });
+      const errors = events.filter(event => event.type === "session.error");
+      expect(errors).toHaveLength(1);
+      expect(errors[0].data.code).toBe("agentic_engine_timeout");
+      const execution = events.filter(event => event.type === "agent.execution");
+      expect(execution).toHaveLength(1);
+      expect(execution[0].data.categories).toContain("agentic_engine_timeout");
+      expect(execution[0].data).not.toHaveProperty("exitCode");
+      expect(events.some(event => event.type === "assistant.message" || event.type === "assistant.reasoning" || event.type === "session.result" || event.type.startsWith("tool."))).toBe(false);
+      const jsonl = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8");
+      expect(jsonl.trimEnd().split("\n").map(JSON.parse)).toEqual(events);
+      expect(validateSession(jsonl)).toBe(events.length);
     } finally {
       vi.unstubAllEnvs();
       fs.rmSync(root, { recursive: true, force: true });
@@ -236,7 +246,7 @@ describe("parseDeepSeekLog", () => {
     { raw: `${timedOut}[WARN] Agent command timed out after 15 minutes, stopping container...\n`, recordedExit: 124, expectedExit: 124 },
     { raw: fixture, recordedExit: 0, expectedExit: 0 },
   ])("reconciles recorded exit $recordedExit with attributed DeepSeek observations", ({ raw, recordedExit, expectedExit }) => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "deepseek-exit-capture-"));
+    const root = fs.mkdtempSync(path.join(process.cwd(), ".deepseek-exit-capture-"));
     try {
       vi.stubEnv("GH_AW_ENGINE_ID", "deepseek-harness");
       vi.stubEnv("GH_AW_AGENTIC_EXECUTION_OUTCOME", "");
@@ -245,10 +255,79 @@ describe("parseDeepSeekLog", () => {
       const fallback = collectUnifiedSession({ rootDir: root, engine: "deepseek-harness", dailyAIC: {} }).events;
       expect(fallback.find(event => event.type === "agent.execution").data.exitCode).toBe(expectedExit);
       persistAgentExecution(raw, detectErrors(""), root);
-      const detected = JSON.parse(fs.readFileSync(path.join(root, "agent-errors.jsonl"), "utf8").trim());
+      const detected = fs
+        .readFileSync(path.join(root, "agent-errors.jsonl"), "utf8")
+        .trimEnd()
+        .split("\n")
+        .map(JSON.parse)
+        .find(event => event.type === "agent.execution");
       expect(detected.data.exitCode).toBe(expectedExit);
       const persisted = collectUnifiedSession({ rootDir: root, engine: "deepseek-harness", dailyAIC: {} }).events;
       expect(persisted.find(event => event.type === "agent.execution").data.exitCode).toBe(expectedExit);
+    } finally {
+      vi.unstubAllEnvs();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it.each(["none", "init-only", "partial", "full"])("preserves parsed startup errors without duplicating $0 canonical capture", canonical => {
+    const root = fs.mkdtempSync(path.join(process.cwd(), ".deepseek-error-capture-"));
+    try {
+      vi.stubEnv("GH_AW_ENGINE_ID", "deepseek-harness");
+      vi.stubEnv("GH_AW_AGENTIC_EXECUTION_OUTCOME", "failure");
+      const parsed = parseDeepSeekLog(startupFailure).logEntries;
+      const parsedErrors = parsed.filter(event => event.type === "session.error");
+      fs.writeFileSync(path.join(root, "agent-stdio.log"), startupFailure);
+      fs.writeFileSync(path.join(root, "agent_execution_exit_code.txt"), "0");
+      if (canonical !== "none") {
+        const captured = canonical === "full" ? parsed : canonical === "partial" ? parsed.slice(0, 2) : parsed.slice(0, 1);
+        writeSessionArtifact(
+          path.join(root, "agent-session.jsonl"),
+          captured.map((event, index) => ({
+            ...event,
+            id: `canonical-${index}`,
+            timestamp: "2026-11-08T00:00:00Z",
+            data: Object.fromEntries(Object.entries(event.data).reverse()),
+          }))
+        );
+      }
+      persistAgentExecution(startupFailure, detectErrors(""), root);
+      const events = writeUnifiedSession({ rootDir: root, engine: "deepseek-harness", dailyAIC: {} });
+      const errors = events.filter(event => event.type === "session.error");
+      expect(errors).toHaveLength(parsedErrors.length);
+      expect(errors.map(event => event.data)).toEqual(parsedErrors.map(event => normalizeUnifiedSessionEvent(event).data));
+      if (canonical === "full" || canonical === "partial") {
+        expect(errors[0].id).toBe("canonical-1");
+        expect(errors[0].provenance.path).toBe("agent-session.jsonl");
+      }
+      const execution = events.filter(event => event.type === "agent.execution");
+      expect(execution).toHaveLength(1);
+      expect(execution[0].data.exitCode).toBe(1);
+      expect(execution[0].data.errorTypes).toEqual(["Error"]);
+      expect(events.some(event => event.type === "assistant.message" || event.type === "assistant.reasoning" || event.type === "session.result" || event.type.startsWith("tool."))).toBe(false);
+      expect(validateSession(fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8"))).toBe(events.length);
+    } finally {
+      vi.unstubAllEnvs();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("preserves distinct canonical errors and repeated error occurrences while removing detector copies", () => {
+    const root = fs.mkdtempSync(path.join(process.cwd(), ".deepseek-distinct-errors-"));
+    try {
+      vi.stubEnv("GH_AW_ENGINE_ID", "deepseek-harness");
+      vi.stubEnv("GH_AW_AGENTIC_EXECUTION_OUTCOME", "failure");
+      const parsed = parseDeepSeekLog(startupFailure).logEntries;
+      const error = parsed.find(event => event.type === "session.error");
+      const distinctError = { ...error, data: { ...error.data, code: "distinct_failure" } };
+      fs.writeFileSync(path.join(root, "agent-stdio.log"), startupFailure);
+      fs.writeFileSync(path.join(root, "agent_execution_exit_code.txt"), "0");
+      writeSessionArtifact(path.join(root, "agent-session.jsonl"), [...parsed, error, distinctError]);
+      persistAgentExecution(startupFailure, detectErrors(""), root);
+      const events = collectUnifiedSession({ rootDir: root, engine: "deepseek-harness", dailyAIC: {} }).events;
+      expect(events.filter(event => event.type === "session.error")).toHaveLength(4);
+      expect(events.filter(event => event.type === "session.error" && event.data.code === "distinct_failure")).toHaveLength(1);
+      expect(events.filter(event => event.type === "agent.execution")).toHaveLength(1);
     } finally {
       vi.unstubAllEnvs();
       fs.rmSync(root, { recursive: true, force: true });
@@ -259,7 +338,7 @@ describe("parseDeepSeekLog", () => {
     { outcome: "failure", timeout: false, code: "agentic_engine_execution_failed" },
     { outcome: "failure", timeout: true, code: "agentic_engine_timeout" },
   ])("retains failed step metadata when no native terminal diagnostics exist: $code", ({ outcome, timeout, code }) => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "deepseek-step-failure-"));
+    const root = fs.mkdtempSync(path.join(process.cwd(), ".deepseek-step-failure-"));
     try {
       vi.stubEnv("GH_AW_ENGINE_ID", "deepseek-harness");
       vi.stubEnv("GH_AW_AGENTIC_EXECUTION_OUTCOME", outcome);
@@ -387,7 +466,7 @@ describe("parseDeepSeekLog", () => {
   });
 
   it.each([fixture, startupFailure, timedOut])("persists the observed headless trace through canonical and unified artifacts", raw => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "deepseek-session-audit-"));
+    const root = fs.mkdtempSync(path.join(process.cwd(), ".deepseek-session-audit-"));
     try {
       const parsed = parseDeepSeekLog(raw).logEntries;
       fs.writeFileSync(path.join(root, "agent-stdio.log"), raw);

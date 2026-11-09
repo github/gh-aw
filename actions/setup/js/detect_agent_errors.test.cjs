@@ -58,7 +58,9 @@ describe("detect_agent_errors.cjs", () => {
       await main({ rootDir });
 
       expect(fs.readFileSync(path.join(rootDir, "github-output"), "utf8")).toContain("agentic_engine_timeout=true");
-      const execution = JSON.parse(fs.readFileSync(path.join(rootDir, "agent-errors.jsonl"), "utf8").trim());
+      const records = fs.readFileSync(path.join(rootDir, "agent-errors.jsonl"), "utf8").trimEnd().split("\n").map(JSON.parse);
+      expect(records.filter(event => event.type === "session.error")).toHaveLength(1);
+      const execution = records.find(event => event.type === "agent.execution");
       expect(execution.data.categories).toContain("agentic_engine_timeout");
       expect(execution.data).not.toHaveProperty("exitCode");
       expect(stderr.mock.calls.flat().join("\n")).toContain("Detected agentic engine timeout signature");

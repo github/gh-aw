@@ -3,6 +3,7 @@ const { iterateJsonlEvents } = require("./jsonl_helpers.cjs");
 
 const fs = require("fs");
 const path = require("path");
+const { isDeepStrictEqual } = require("node:util");
 const { isSessionEvent } = require("./agent_session.cjs");
 const { hasCopilotConversation, deduplicateCopilotFallback, normalizeCopilotSession } = require("./copilot_session.cjs");
 const { collectAddMaskedValues, serializeSessionArtifact, writeSessionArtifact, removeFailedSessionArtifacts } = require("./session_artifact.cjs");
@@ -711,6 +712,19 @@ function collectUnifiedSession({
   const executionFile = path.join(rootDir, "agent-errors.jsonl");
   if (!protectedSessionCapture) add(executionFile, "agent", "agent", undefined);
   const agentSources = sources.filter(source => source.component === "agent");
+  if (engine === "deepseek-harness") {
+    const representedErrors = agentSources.filter(source => source.path !== "agent-errors.jsonl").flatMap(source => source.events.filter(event => event.type === "session.error"));
+    const detectedSource = agentSources.find(source => source.path === "agent-errors.jsonl");
+    if (detectedSource) {
+      detectedSource.events = detectedSource.events.filter(event => {
+        if (event.type !== "session.error") return true;
+        const index = representedErrors.findIndex(canonical => isDeepStrictEqual(canonical.data, event.data));
+        if (index < 0) return true;
+        representedErrors.splice(index, 1);
+        return false;
+      });
+    }
+  }
   const finalCopilotSource = agentSources.filter(source => copilotSources.has(source)).at(-1);
   const executionAgentSources = finalCopilotSource ? agentSources.filter(source => !copilotSources.has(source) || source === finalCopilotSource) : agentSources;
   const diagnosticSources = [...executionAgentSources.filter(source => source.path === "agent-errors.jsonl"), ...executionAgentSources.filter(source => source.path !== "agent-errors.jsonl")];
