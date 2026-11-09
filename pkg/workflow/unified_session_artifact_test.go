@@ -63,9 +63,48 @@ func TestRuntimeModelMetadataConclusionTransport(t *testing.T) {
 					require.GreaterOrEqual(t, download, 0)
 					assert.Contains(t, steps[download:strings.Index(steps, "Restore runtime model metadata")], "path: /tmp/gh-aw/")
 					assert.Less(t, download, strings.Index(steps, "Restore runtime model metadata"))
+					assert.Less(t, strings.Index(steps, "Download workflow metadata"), strings.Index(steps, "Restore runtime model metadata"))
 				} else {
 					assert.NotContains(t, paths, "/tmp/gh-aw/runtime/aw_info.json")
 					assert.NotContains(t, steps, "Restore runtime model metadata")
+				}
+			})
+		}
+	}
+}
+
+func TestWorkflowMetadataConclusionTransport(t *testing.T) {
+	for _, id := range []string{"copilot", "claude", "codex", "gemini", "pi", "kiro"} {
+		for _, reusable := range []bool{false, true} {
+			t.Run(id+"/"+strconv.FormatBool(reusable), func(t *testing.T) {
+				for _, ghes := range []bool{false, true} {
+					t.Run("ghes/"+strconv.FormatBool(ghes), func(t *testing.T) {
+						compiler := NewCompiler()
+						compiler.SetGHESCompat(ghes)
+						compiler.configureGHESCompatibility()
+						data := &WorkflowData{
+							AI: id, EngineConfig: &EngineConfig{ID: id},
+							SafeOutputs: &SafeOutputsConfig{},
+							On:          "workflow_dispatch:",
+						}
+						if reusable {
+							data.On = "workflow_call:"
+						}
+						artifactName := "info"
+						if reusable {
+							artifactName = "${{ needs.activation.outputs.artifact_prefix }}info"
+						}
+						steps := strings.Join(compiler.buildConclusionSetupSteps(data), "")
+						download := extractWorkflowStepByName(t, steps, "Download workflow metadata")
+						assert.Contains(t, download, "if: always()")
+						assert.Contains(t, download, "continue-on-error: true")
+						assert.Contains(t, download, "name: "+artifactName+"\n")
+						assert.Contains(t, download, "path: /tmp/gh-aw/")
+						assert.NotContains(t, download, "pattern:")
+						assert.NotContains(t, download, "activation\n")
+						assert.Contains(t, download, "uses: "+compiler.getActionPin("actions/download-artifact"))
+						assert.Less(t, strings.Index(steps, "Download agent output artifact"), strings.Index(steps, "Download workflow metadata"))
+					})
 				}
 			})
 		}
