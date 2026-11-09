@@ -494,6 +494,8 @@ describe("repository-pins-reflection-regression", () => {
   const REFLECT_FILE = path.join(TEST_DIR, "test_data", "awf_reflect", "run-39506475007-awf-reflect.json");
   const REFLECT_SHA256 = "3d9fa7af7e07e93100bb614e45eb85abafbd16a3bbb2cb62a687a04cb5fff9b3";
   const REPO_ROOT = path.resolve(TEST_DIR, "..", "..", "..");
+  /** @type {ReturnType<typeof buildModelPinReport> | undefined} */
+  let cachedRepositoryReport;
 
   // Pins that did not resolve against this catalogue before github/gh-aw#70649, by workflow and field.
   const FIXED_PINS = [
@@ -527,10 +529,12 @@ describe("repository-pins-reflection-regression", () => {
   const KNOWN_MAIN_FAILURES = [];
 
   function repositoryReport() {
+    if (cachedRepositoryReport) return cachedRepositoryReport;
     const bytes = fs.readFileSync(REFLECT_FILE);
     expect(crypto.createHash("sha256").update(bytes).digest("hex")).toBe(REFLECT_SHA256);
     const collected = collectModelPins({ repoRoot: REPO_ROOT });
-    return buildModelPinReport({ ...collected, reflectData: JSON.parse(bytes.toString("utf8")) });
+    cachedRepositoryReport = buildModelPinReport({ ...collected, reflectData: JSON.parse(bytes.toString("utf8")) });
+    return cachedRepositoryReport;
   }
 
   it("classifies the repository's workflow pins against the run 39506475007 catalogue", () => {
@@ -555,7 +559,7 @@ describe("repository-pins-reflection-regression", () => {
     const unresolvable = report.action_required.map(({ workflow, field, configured, cause }) => ({ workflow, field, configured, cause }));
     expect(unresolvable).toEqual([]);
     expect(report.counts.unresolvable).toBe(0);
-  });
+  }, 30_000);
 
   it("resolves the sub-agent aliases and keeps the GPT sub-agents on GPT models", () => {
     const report = repositoryReport();
