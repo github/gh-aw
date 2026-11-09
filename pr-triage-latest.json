@@ -1,157 +1,18 @@
 {
-  "run_id": "42509022113",
-  "run_date": "2026-11-08T18:17:19Z",
+  "run_id": "42541223254",
+  "run_date": "2026-11-09T00:40:27Z",
   "source": "pr-triage",
-  "eligible_total": 5,
-  "open_copilot_prs": 15,
-  "cooldown_skipped": 10,
-  "category_counts": {
-    "chore": 1,
-    "test": 1,
-    "refactor": 1,
-    "bug": 2
-  },
-  "risk_counts": {
-    "low": 2,
-    "medium": 3
-  },
-  "priority_counts": {
-    "low": 2,
-    "medium": 3
-  },
-  "action_counts": {
-    "auto_merge": 2,
-    "batch_review": 2,
-    "defer": 1
-  },
-  "batches": [
-    {
-      "id": "pr-batch:quality-copilot",
-      "prs": [75821, 75807, 75806, 75793]
-    }
-  ],
-  "selected_candidates": [
-    {
-      "number": 75843,
-      "title": "Bump gh-aw-firewall to v0.29.10",
-      "category": "chore",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 59,
-      "score_breakdown": {
-        "impact": 32,
-        "urgency": 15,
-        "quality": 12
-      },
-      "labels": [
-        "pr-type:chore",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:batch_review",
-        "pr-agent:copilot"
-      ]
-    },
-    {
-      "number": 75821,
-      "title": "Improve safe-output helper test coverage",
-      "category": "test",
-      "risk": "low",
-      "priority": "low",
-      "action": "auto_merge",
-      "score": 35,
-      "score_breakdown": {
-        "impact": 14,
-        "urgency": 6,
-        "quality": 15
-      },
-      "labels": [
-        "pr-type:test",
-        "pr-risk:low",
-        "pr-priority:low",
-        "pr-action:auto_merge",
-        "pr-agent:copilot",
-        "pr-batch:quality-copilot"
-      ]
-    },
-    {
-      "number": 75807,
-      "title": "Extract shared work-queue worker target resolution",
-      "category": "refactor",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 47,
-      "score_breakdown": {
-        "impact": 26,
-        "urgency": 10,
-        "quality": 11
-      },
-      "labels": [
-        "pr-type:refactor",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:batch_review",
-        "pr-agent:copilot",
-        "pr-batch:quality-copilot"
-      ]
-    },
-    {
-      "number": 75806,
-      "title": "Exclude vendored YAML from ESLint custom rules",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "defer",
-      "score": 48,
-      "score_breakdown": {
-        "impact": 22,
-        "urgency": 18,
-        "quality": 8
-      },
-      "labels": [
-        "pr-type:bug",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:defer",
-        "pr-agent:copilot",
-        "pr-batch:quality-copilot"
-      ]
-    },
-    {
-      "number": 75793,
-      "title": "Normalize blocked labels and cover run-step sanitization",
-      "category": "bug",
-      "risk": "low",
-      "priority": "low",
-      "action": "auto_merge",
-      "score": 42,
-      "score_breakdown": {
-        "impact": 20,
-        "urgency": 8,
-        "quality": 14
-      },
-      "labels": [
-        "pr-type:bug",
-        "pr-risk:low",
-        "pr-priority:low",
-        "pr-action:auto_merge",
-        "pr-agent:copilot",
-        "pr-batch:quality-copilot"
-      ]
-    }
-  ],
+  "eligible_total": 0,
+  "open_copilot_prs": 1,
+  "cooldown_skipped": 1,
+  "category_counts": {},
+  "risk_counts": {},
+  "priority_counts": {},
+  "action_counts": {},
+  "batches": [],
+  "selected_candidates": [],
   "skipped_prs": [
-    75890,
-    75875,
-    75868,
-    75865,
-    75862,
-    75841,
-    75838,
-    75775,
-    75773,
-    74077
+    75986
   ],
-  "summary": "Five Copilot PRs were eligible after the 1-hour cooldown. The batch of four quality-focused PRs is healthy and ready for a grouped pass, with one draft CI-failing PR deferred and one medium-risk infrastructure bump queued for batched review."
+  "summary": "No eligible Copilot PRs remained after the 1-hour cooldown; the only open Copilot PR was updated within the last hour and was skipped for re-triage."
 }
