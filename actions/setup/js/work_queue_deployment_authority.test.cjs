@@ -1,6 +1,6 @@
 // @ts-check
 import { describe, expect, it, vi } from "vitest";
-import { canonical } from "./work_queue_codec.cjs";
+import { canonical, utf8Compare } from "./work_queue_codec.cjs";
 import { synchronizeDeployments, reconcileObsoleteWork } from "./work_queue_deployment_control.cjs";
 import { executionProfile, obsoleteWork, futurePolicy } from "./work_queue_deployment.cjs";
 import { normalizeSubmitParameters } from "./work_queue_intents.cjs";
@@ -188,12 +188,29 @@ describe("verified default worker deployment authority", () => {
       const eligible = [...f.state.works.values()]
         .filter(work => obsoleteWork(f.state, work))
         .map(work => work.work_id)
-        .sort();
+        .sort(utf8Compare);
       expect(eligible).toHaveLength(4);
       expect(await reconcileObsoleteWork(options)).toEqual({ cancelled: 3 });
       expect(f.transactions.at(-1).operations.map(operation => operation.work_id)).toEqual(eligible.slice(0, 3));
       expect(await reconcileObsoleteWork(options)).toEqual({ cancelled: 1 });
       expect(await reconcileObsoleteWork(options)).toEqual({ cancelled: 0 });
+    });
+
+    it("orders a controlled read projection independently of locale before selecting a bounded prefix", async () => {
+      const { f, options } = await outdated();
+      const projection = structuredClone(f.state);
+      const work = [...projection.works.values()].find(candidate => obsoleteWork(projection, candidate));
+      projection.policy.limits.operations = 3;
+      // Synthetic IDs distinguish collation order without entering the replayed ledger.
+      projection.works = new Map(["work_a", "work-a", "Work-B", "work-B"].map(work_id => [work_id, { ...work, work_id }]));
+      options.readWorkQueueLog = async () => ({ ...(await f.readWorkQueueLog()), state: projection });
+      const failure = new Error("stop before ledger publication");
+      options.publishWorkQueueRequest = vi.fn().mockRejectedValue(failure);
+      const history = canonical(f.transactions);
+      await expect(reconcileObsoleteWork(options)).rejects.toBe(failure);
+      expect(options.publishWorkQueueRequest).toHaveBeenCalledOnce();
+      expect(options.publishWorkQueueRequest.mock.calls[0][0].request.parameters.operations.map(operation => operation.work_id)).toEqual(["Work-B", "work-B", "work-a"]);
+      expect(canonical(f.transactions)).toBe(history);
     });
   });
 

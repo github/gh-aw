@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 
-const { canonical, digest } = require("./work_queue_codec.cjs");
+const { canonical, digest, utf8Compare } = require("./work_queue_codec.cjs");
 const { policyProposalFor, loadQueue, publishOperations } = require("./work_queue_binding.cjs");
 const { verifiedDefaultReference, configuredWorkerDeployment } = require("./work_queue_provisioning.cjs");
 const { obsoleteWork } = require("./work_queue_deployment.cjs");
@@ -14,7 +14,7 @@ async function reconcileObsoleteWork(options) {
   if (latest.projection.policy?.authorization !== "aw") return { cancelled: 0 };
   const operations = [...latest.projection.works.values()]
     .filter(work => obsoleteWork(latest.projection, work))
-    .sort((a, b) => a.work_id.localeCompare(b.work_id))
+    .sort((a, b) => utf8Compare(a.work_id, b.work_id))
     .slice(0, Math.min(256, latest.projection.policy.limits.operations))
     .map(work => ({ kind: "WorkCancellation", work_id: work.work_id, reason: "worker_contract_obsolete" }));
   if (!operations.length) return { cancelled: 0 };

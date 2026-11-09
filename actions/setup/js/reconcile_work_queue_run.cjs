@@ -12,7 +12,7 @@ const { lifecycleEvidence, releaseAssignment, reconcileQueue } = require("./work
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { readQueueMetadata } = require("./work_queue_read_retry.cjs");
 const { ERR_WORK_QUEUE_RECONCILIATION } = require("./error_codes.cjs");
-const { reconcileObsoleteWork } = require("./work_queue_deployment_control.cjs");
+const deploymentControl = require("./work_queue_deployment_control.cjs");
 
 const reconciliationError = message => {
   const error = new Error(`${ERR_VALIDATION}: ${message}`);
@@ -114,8 +114,16 @@ async function main(options = {}) {
 
 async function maintenance(options = {}) {
   const configured = { ...options, context: options.context || global.context, githubClient: options.githubClient || global.github, core: options.core || global.core };
-  const obsolete = await reconcileObsoleteWork(configured);
-  log.diagnostic("maintenance.obsolete.complete", { cancelled: obsolete.cancelled });
+  let obsolete;
+  let obsoleteFailed = false;
+  try {
+    obsolete = await deploymentControl.reconcileObsoleteWork(configured);
+    log.diagnostic("maintenance.obsolete.complete", { cancelled: obsolete.cancelled });
+  } catch (error) {
+    obsoleteFailed = true;
+    log.failure("maintenance.obsolete.failed", error, true);
+    configured.core?.warning("Work queue obsolete-work reconciliation failed; core recovery will continue. Inspect safe API diagnostics and the checked ledger before retrying maintenance.");
+  }
   const result = await reconcileQueue({ ...configured, requestCancellation: false, expireUnverified: true });
   const released = result.results.filter(entry => entry.released).length;
   const unresolved = result.results.filter(entry => ["launch_unresolved", "run_binding_conflict"].includes(entry.state) || Object.values(entry.delivery?.claims || {}).some(claim => claim.reason === "verification_unresolved")).length;
@@ -138,7 +146,7 @@ async function maintenance(options = {}) {
   log.diagnostic("maintenance.projection.complete", { pending: pending.length });
   if (unresolved) throw reconciliationError("work_queue_maintenance_reconciliation_unresolved");
   if (pending.length && !options.deferIssueWarning) configured.core?.warning("Work queue transitions are committed; Issue synchronization remains pending. Recover the exact terminal requests with work-queue sync-issues --request-id.");
-  return { ...result, obsolete_work_cancelled: obsolete.cancelled, issue_sync_pending: pending };
+  return { ...result, obsolete_work_cancelled: obsolete?.cancelled ?? null, obsolete_work_reconciliation_failed: obsoleteFailed, issue_sync_pending: pending };
 }
 
 module.exports = { main, maintenance };
