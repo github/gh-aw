@@ -171,11 +171,16 @@ download_release_asset_from_api() {
     echo "ERROR: Release-assets API fallback requires jq." >&2
     return 1
   fi
-  # Public release metadata needs no token, including on enterprise runners.
-  if ! curl -fsSL "${options[@]}" --max-time 30 -H 'Accept: application/vnd.github+json' \
-    -o "${TEMP_DIR}/release.json" "https://api.github.com/repos/${AWF_REPO}/releases/tags/${AWF_VERSION}"; then
-    echo "ERROR: Failed to fetch release metadata for ${AWF_REPO} ${AWF_VERSION}." >&2
-    return 1
+  # Cache public metadata once per install without needing a token on enterprise
+  # runners. Unauthenticated requests share a 60/hour/IP limit; HTTP 403 can mean
+  # rate limiting, so this fallback cannot guarantee recovery on shared runners.
+  if [ ! -f "${TEMP_DIR}/release.json" ]; then
+    if ! curl -fsSL "${options[@]}" --max-time 30 -H 'Accept: application/vnd.github+json' \
+      -o "${TEMP_DIR}/release.json" "https://api.github.com/repos/${AWF_REPO}/releases/tags/${AWF_VERSION}"; then
+      rm -f "${TEMP_DIR}/release.json"
+      echo "ERROR: Failed to fetch release metadata for ${AWF_REPO} ${AWF_VERSION}. Unauthenticated API requests may be rate-limited (HTTP 403; 60 requests/hour per IP)." >&2
+      return 1
+    fi
   fi
   if ! asset_id=$(jq -er --arg asset "$asset" --arg version "$AWF_VERSION" \
     'select(.tag_name == $version) | .assets[] | select(.name == $asset) | .id' "${TEMP_DIR}/release.json") ||
@@ -189,6 +194,7 @@ download_release_asset_from_api() {
   esac
   if ! curl -fsSL "${options[@]}" -H 'Accept: application/octet-stream' \
     -o "${TEMP_DIR}/${asset}" "https://api.github.com/repos/${AWF_REPO}/releases/assets/${asset_id}"; then
+    rm -f "${TEMP_DIR}/${asset}"
     echo "ERROR: Release-assets API download failed for ${asset}." >&2
     return 1
   fi

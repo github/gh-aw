@@ -164,7 +164,7 @@ if [[ "$url" == https://api.github.com/*/releases/tags/* ]]; then
     invalid-id) printf '{"tag_name":"%s","assets":[{"name":"%s","id":"../../other"}]}\n' "$AWF_TEST_RELEASE_VERSION" "$AWF_TEST_CURL_FAILURE_ASSET" > "$output" ;;
     duplicate-asset) printf '{"tag_name":"%s","assets":[{"name":"%s","id":123},{"name":"%s","id":456}]}\n' "$AWF_TEST_RELEASE_VERSION" "$AWF_TEST_CURL_FAILURE_ASSET" "$AWF_TEST_CURL_FAILURE_ASSET" > "$output" ;;
     wrong-tag) printf '{"tag_name":"v9.9.9","assets":[{"name":"%s","id":123}]}\n' "$AWF_TEST_CURL_FAILURE_ASSET" > "$output" ;;
-    *) printf '{"tag_name":"%s","assets":[{"name":"%s","id":123}]}\n' "$AWF_TEST_RELEASE_VERSION" "$AWF_TEST_CURL_FAILURE_ASSET" > "$output" ;;
+    *) printf '{"tag_name":"%s","assets":[{"name":"checksums.txt","id":123},{"name":"release-identity.txt","id":124},{"name":"awf-bundle.js","id":125},{"name":"awf-linux-x64","id":126}]}\n' "$AWF_TEST_RELEASE_VERSION" > "$output" ;;
   esac
   exit 0
 fi
@@ -175,16 +175,15 @@ if [[ "$url" == https://api.github.com/*/releases/assets/* ]]; then
     exit 22
   fi
 else
-case "${output:-}" in
-  */"${AWF_TEST_CURL_FAILURE_ASSET:-__never__}")
+  if [ "$AWF_TEST_CURL_FAILURE_ASSET" = all ] ||
+    [ "${output##*/}" = "${AWF_TEST_CURL_FAILURE_ASSET:-__never__}" ]; then
     echo "simulated curl network failure" >&2
     if [ "$AWF_TEST_CURL_FAILURE_HTTP" != 000 ]; then
       printf '%s' "$AWF_TEST_CURL_FAILURE_HTTP"
       exit 22
     fi
     exit 7
-    ;;
-esac
+  fi
 fi
 if [[ "${output}" == *checksums.txt ]]; then
   printf '%064d awf-linux-x64\n%064d awf-darwin-x64\n%064d awf-bundle.js\n' 0 0 0 > "${output}"
@@ -230,7 +229,24 @@ esac
 EOF
   printf '#!/usr/bin/env bash\nexit 0\n' >"${test_dir}/bin/sudo"
   printf '#!/usr/bin/env bash\nexit 0\n' >"${test_dir}/bin/find"
+  if [ "$api_mode" = asset-failure ]; then
+    cat > "${test_dir}/bin/rm" <<'EOF'
+#!/usr/bin/env bash
+/bin/rm "$@" || exit $?
+if [ "$1" = -f ] && [[ "$2" == */checksums.txt ]] && [ ! -e "$2" ]; then
+  echo removed > "${CURL_ARGS_FILE}.partial-removed"
+fi
+EOF
+  fi
   chmod +x "${test_dir}/bin/"*
+  local installer_path="${test_dir}/bin:${PATH}"
+  if [ "$api_mode" = missing-jq ]; then
+    local tool
+    for tool in bash dirname mkdir grep awk mktemp stat cat rm; do
+      ln -s "$(command -v "$tool")" "${test_dir}/bin/$tool"
+    done
+    installer_path="${test_dir}/bin"
+  fi
   local installer_exit=0
   AWF_TEST_MANIFEST_SHA256="$(release_artifact_sha256 github/gh-aw-firewall "$release_version" checksums.txt)" \
     CURL_HELP_ALL_OUTPUT="${curl_help_all}" CURL_HELP_OUTPUT="${curl_help}" CURL_HELP_ALL_FAILS="${help_all_fails}" CURL_ARGS_FILE="${test_dir}/curl-args" \
@@ -239,15 +255,17 @@ EOF
     AWF_TEST_API_MODE="$api_mode" AWF_TEST_RELEASE_VERSION="$release_version" \
     AWF_TEST_NODE_VERSION="$node_version" AWF_TEST_OS="$platform" HOME="${test_dir}/home" GITHUB_PATH="${test_dir}/github-path" \
     GITHUB_ENV="" GH_AW_RUNTIME_TMP_DIR="" GH_AW_RUNTIME_TMP_ID="" TMPDIR="$test_dir" \
-    RUNNER_TEMP="$test_dir" PATH="${test_dir}/bin:${PATH}" bash "${SCRIPT_DIR}/install_awf_binary.sh" "$release_version" --rootless >"${test_dir}/output" 2>&1 || installer_exit=$?
+    RUNNER_TEMP="$test_dir" PATH="$installer_path" bash "${SCRIPT_DIR}/install_awf_binary.sh" "$release_version" --rootless >"${test_dir}/output" 2>&1 || installer_exit=$?
   local expected_api_calls=0
   if [[ "$curl_failure_http" =~ ^5[0-9]{2}$ ]]; then
     expected_api_calls=2
     case "$api_mode" in
       metadata-failure|missing-asset|invalid-id|duplicate-asset|wrong-tag) expected_api_calls=1 ;;
+      missing-jq) expected_api_calls=0 ;;
     esac
+    if [ "$curl_failure_asset" = all ]; then expected_api_calls=4; fi
   fi
-  local api_calls=0
+  local api_calls=0 metadata_calls=0
   local recorded_call request_url
   for recorded_call in "${test_dir}"/curl-args.[0-9]*; do
     request_url="$(tail -n 1 "$recorded_call")"
@@ -261,8 +279,8 @@ EOF
         return 1
       fi
       case "$request_url" in
-        "https://api.github.com/repos/github/gh-aw-firewall/releases/tags/$release_version") ;;
-        https://api.github.com/repos/github/gh-aw-firewall/releases/assets/123) ;;
+        "https://api.github.com/repos/github/gh-aw-firewall/releases/tags/$release_version") metadata_calls=$((metadata_calls + 1)) ;;
+        https://api.github.com/repos/github/gh-aw-firewall/releases/assets/12[3-6]) ;;
         *)
           TEST_FAILURE_REASON="API fallback used an unexpected host, repository, version, or asset ID"
           rm -rf "$test_dir"
@@ -274,6 +292,30 @@ EOF
   if [ "$api_calls" -ne "$expected_api_calls" ]; then
     TEST_FAILURE_REASON="expected $expected_api_calls API calls, got $api_calls"
     cat "${test_dir}/output"
+    rm -rf "$test_dir"
+    return 1
+  fi
+  if [ "$expected_api_calls" -gt 0 ] && [ "$metadata_calls" -ne 1 ]; then
+    TEST_FAILURE_REASON="release metadata must be fetched only once per install"
+    rm -rf "$test_dir"
+    return 1
+  fi
+  if [ "$api_mode" = asset-failure ] && [ ! -e "${test_dir}/curl-args.partial-removed" ]; then
+    TEST_FAILURE_REASON="partial API asset was not removed before staging cleanup"
+    rm -rf "$test_dir"
+    return 1
+  fi
+  if [ "$api_mode" = missing-jq ] &&
+    { ! grep -qF 'WARNING: Download of checksums.txt returned HTTP 504' "${test_dir}/output" ||
+      ! grep -qF 'Release-assets API fallback requires jq' "${test_dir}/output"; }; then
+    TEST_FAILURE_REASON="missing jq did not report the fallback warning and prerequisite error"
+    cat "${test_dir}/output"
+    rm -rf "$test_dir"
+    return 1
+  fi
+  if [ "$api_mode" = metadata-failure ] &&
+    ! grep -qF 'rate-limited (HTTP 403; 60 requests/hour per IP)' "${test_dir}/output"; then
+    TEST_FAILURE_REASON="metadata failure did not explain unauthenticated API rate limits"
     rm -rf "$test_dir"
     return 1
   fi
@@ -380,8 +422,8 @@ EOF
       case "${actual_options[${#actual_options[@]}-1]}" in
         */releases/tags/*) expected_options+=(--max-time 30 -H 'Accept: application/vnd.github+json') ;;
         *)
-          case "$curl_failure_asset" in
-            awf-linux-*|awf-darwin-*) expected_options+=(--speed-limit 1 --speed-time 60) ;;
+          case "${actual_options[${#actual_options[@]}-1]}" in
+            */assets/126) expected_options+=(--speed-limit 1 --speed-time 60) ;;
             *) expected_options+=(--max-time 60) ;;
           esac
           expected_options+=(-H 'Accept: application/octet-stream')
@@ -503,7 +545,14 @@ for asset in checksums.txt release-identity.txt awf-bundle.js awf-linux-x64; do
     fail "HTTP 504 API recovery failed for $asset" "$TEST_FAILURE_REASON"
   fi
 done
-for api_mode in metadata-failure asset-failure missing-asset invalid-id duplicate-asset wrong-tag; do
+for node_version in v24.0.0 v18.0.0; do
+  if test_curl_retry_all_errors '--retry-all-errors' true false '--retry-all-errors' "$node_version" Linux v0.29.5 '' v0.29.5 all false success 504; then
+    pass "multiple HTTP 504 downloads reuse release metadata with $node_version"
+  else
+    fail "release metadata was not reused" "$TEST_FAILURE_REASON"
+  fi
+done
+for api_mode in metadata-failure asset-failure missing-asset invalid-id duplicate-asset wrong-tag missing-jq; do
   if test_curl_retry_all_errors '--retry-all-errors' true false '--retry-all-errors' v24.0.0 Linux v0.29.5 '' v0.29.5 checksums.txt true "$api_mode" 504; then
     pass "API $api_mode fails closed and retains original HTTP 504 diagnostics"
   else

@@ -67,6 +67,8 @@ if [ "${AWF_TEST_FAIL_ASSET:-}" = "${url##*/}" ]; then
   exit "${AWF_TEST_CURL_EXIT:-22}"
 fi
 case "$url" in
+  https://api.github.com/repos/github/gh-aw-firewall/releases/tags/v0.28.62)
+    echo "simulated release metadata API rate limit (HTTP 403)" >&2; exit 22 ;;
   */compat.json) cp "$TEST_ROOT/compat.json" "$out" ;;
   */checksums.txt) cp "$TEST_ROOT/checksums.txt" "$out" ;;
   */release-identity.txt)
@@ -115,7 +117,8 @@ chmod +x "$TEMP_DIR/bin/"*
 
 run_awf() {
   env TEST_ROOT="$TEMP_DIR" EXECUTION_LOG="$TEMP_DIR/executions" HOME="$TEMP_DIR/home" \
-    GITHUB_PATH="$TEMP_DIR/github-path" PATH="$TEMP_DIR/bin:$PATH" \
+    GITHUB_PATH="$TEMP_DIR/github-path" GITHUB_ENV="" GH_AW_RUNTIME_TMP_DIR="" GH_AW_RUNTIME_TMP_ID="" \
+    RUNNER_TEMP="$TEMP_DIR/runner" PATH="$TEMP_DIR/bin:$PATH" \
     bash "$TEMP_DIR/scripts/install_awf_binary.sh" "$@" >"$TEMP_DIR/output" 2>&1
 }
 run_copilot() {
@@ -148,7 +151,13 @@ for failure in '504 22' '404 22' '000 28' '200 23'; do
   fi
   test ! -e "$TEMP_DIR/executions"
   test ! -e "$TEMP_DIR/home/.local/bin/awf"
-  test "$(wc -l <"$TEMP_DIR/curl.log" | tr -d ' ')" = 1
+  expected_calls=1
+  if [ "$http_status" = 504 ] && command -v jq >/dev/null 2>&1; then
+    expected_calls=2
+    grep -qF 'simulated release metadata API rate limit (HTTP 403)' "$TEMP_DIR/output"
+    grep -qF 'rate-limited (HTTP 403; 60 requests/hour per IP)' "$TEMP_DIR/output"
+  fi
+  test "$(wc -l <"$TEMP_DIR/curl.log" | tr -d ' ')" = "$expected_calls"
 done
 echo "PASS: failed checksum downloads preserve HTTP/curl diagnostics and never install or execute partial files"
 
@@ -158,7 +167,9 @@ for http_status in 404 504; do
   grep -qF "HTTP $http_status, curl exit 22" "$TEMP_DIR/output"
   grep -q '/awf-linux-x64' "$TEMP_DIR/curl.log"
   grep -q EXECUTED "$TEMP_DIR/executions"
-  test "$(wc -l <"$TEMP_DIR/curl.log" | tr -d ' ')" = 3
+  expected_calls=3
+  if [ "$http_status" = 504 ] && command -v jq >/dev/null 2>&1; then expected_calls=4; fi
+  test "$(wc -l <"$TEMP_DIR/curl.log" | tr -d ' ')" = "$expected_calls"
   if grep '/awf-bundle.js' "$TEMP_DIR/curl.log" | grep -q -- '--retry-all-errors'; then
     echo "FAIL: optional bundle retries permanent HTTP failures" >&2; exit 1
   fi
@@ -173,7 +184,9 @@ test "$installer_exit" = 22
 grep -qF 'Failed to download awf-linux-x64 from github/gh-aw-firewall v0.28.62 (HTTP 504, curl exit 22)' "$TEMP_DIR/output"
 test ! -e "$TEMP_DIR/executions"
 test ! -e "$TEMP_DIR/home/.local/bin/awf"
-test "$(wc -l <"$TEMP_DIR/curl.log" | tr -d ' ')" = 2
+expected_calls=2
+if command -v jq >/dev/null 2>&1; then expected_calls=3; fi
+test "$(wc -l <"$TEMP_DIR/curl.log" | tr -d ' ')" = "$expected_calls"
 echo "PASS: failed platform-binary downloads cannot install or execute partial files"
 
 run_copilot --rootless
