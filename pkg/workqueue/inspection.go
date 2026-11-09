@@ -225,6 +225,7 @@ type TraceEvent struct {
 	At                  int64           `json:"at"`
 	Actor               Actor           `json:"actor"`
 	Kind                string          `json:"kind"`
+	Version             *int            `json:"version,omitempty"`
 	Pool                string          `json:"pool,omitempty"`
 	WorkerProfile       string          `json:"worker_profile,omitempty"`
 	Profile             *WorkerProfile  `json:"profile,omitempty"`
@@ -291,8 +292,10 @@ func traceEventForOperation(operation Operation) (TraceEvent, error) {
 	if err := json.Unmarshal(operation, &fields); err != nil {
 		return TraceEvent{}, err
 	}
-	if state := fields["state"]; len(state) > 0 && (state[0] == '{' || state[0] == '[') {
-		delete(fields, "state")
+	if state := fields["state"]; len(state) > 0 {
+		if state[0] == '{' || state[0] == '[' {
+			delete(fields, "state")
+		}
 	}
 	sanitized, err := json.Marshal(fields)
 	if err != nil {
@@ -338,51 +341,18 @@ func TraceQueue(commits []QueueCommit, options TraceOptions, at int64) (TracePag
 		}
 		result.TotalEvents++
 	}
-	if len(ordered) > 0 && isCheckpoint(ordered[0]) {
-		for receiptIndex, receipt := range state.CheckpointReceipts {
-			commit := QueueCommit{
-				ID: receipt.ID, Previous: receipt.Previous,
-				Request: Request{ID: receipt.RequestID, Kind: receipt.Kind},
-				Actor:   receipt.Actor, PolicyEpoch: receipt.PolicyEpoch, At: receipt.At,
+	ordinalOffset := 0
+	if len(ordered) > 0 {
+		if isCheckpoint(ordered[0]) {
+			if err := appendCheckpointTraceEvents(state, scope, options, appendEvent); err != nil {
+				return TracePage{}, err
 			}
-			for index, operation := range receipt.Events {
-				event, err := traceEventForOperation(operation)
-				if err != nil {
-					return TracePage{}, err
-				}
-				annotateTraceEvent(&event, state, commit, Position{Commit: receiptIndex, Operation: index})
-				if scope.matches(event, commit, options) {
-					appendEvent(event)
-				}
-			}
+			ordered = ordered[1:]
+			ordinalOffset = len(state.CheckpointReceipts) + 1
 		}
-		for ordinal, commit := range ordered[1:] {
-			for index, operation := range commit.Operations {
-				event, err := traceEventForOperation(operation)
-				if err != nil {
-					return TracePage{}, err
-				}
-				if !scope.matches(event, commit, options) {
-					continue
-				}
-				annotateTraceEvent(&event, state, commit, Position{Commit: len(state.CheckpointReceipts) + 1 + ordinal, Operation: index})
-				appendEvent(event)
-			}
-		}
-	} else {
-		for ordinal, commit := range ordered {
-			for index, operation := range commit.Operations {
-				event, err := traceEventForOperation(operation)
-				if err != nil {
-					return TracePage{}, err
-				}
-				if !scope.matches(event, commit, options) {
-					continue
-				}
-				annotateTraceEvent(&event, state, commit, Position{Commit: ordinal, Operation: index})
-				appendEvent(event)
-			}
-		}
+	}
+	if err := appendLiveTraceEvents(state, ordered, scope, options, ordinalOffset, appendEvent); err != nil {
+		return TracePage{}, err
 	}
 	if options.Offset > result.TotalEvents {
 		return TracePage{}, queueError("inspection_invalid", "trace offset exceeds matching events")
@@ -393,6 +363,44 @@ func TraceQueue(commits []QueueCommit, options TraceOptions, at int64) (TracePag
 	}
 	result.Events = slices.Clip(result.Events)
 	return result, nil
+}
+
+func appendCheckpointTraceEvents(state Projection, scope traceScope, options TraceOptions, appendEvent func(TraceEvent)) error {
+	for receiptIndex, receipt := range state.CheckpointReceipts {
+		commit := QueueCommit{
+			ID: receipt.ID, Previous: receipt.Previous,
+			Request: Request{ID: receipt.RequestID, Kind: receipt.Kind},
+			Actor:   receipt.Actor, PolicyEpoch: receipt.PolicyEpoch, At: receipt.At,
+		}
+		for index, operation := range receipt.Events {
+			event, err := traceEventForOperation(operation)
+			if err != nil {
+				return err
+			}
+			annotateTraceEvent(&event, state, commit, Position{Commit: receiptIndex, Operation: index})
+			if scope.matches(event, commit, options) {
+				appendEvent(event)
+			}
+		}
+	}
+	return nil
+}
+
+func appendLiveTraceEvents(state Projection, ordered []QueueCommit, scope traceScope, options TraceOptions, ordinalOffset int, appendEvent func(TraceEvent)) error {
+	for ordinal, commit := range ordered {
+		for index, operation := range commit.Operations {
+			event, err := traceEventForOperation(operation)
+			if err != nil {
+				return err
+			}
+			if !scope.matches(event, commit, options) {
+				continue
+			}
+			annotateTraceEvent(&event, state, commit, Position{Commit: ordinalOffset + ordinal, Operation: index})
+			appendEvent(event)
+		}
+	}
+	return nil
 }
 
 type traceScope struct {

@@ -10,9 +10,9 @@ fi
 
 SPEC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 case "${TLC_MODEL_FILTER:-}" in
-    ""|WorkQueue|FairWorkQueue|ClaimScopedWorker|ClaimDeliveryHealth|ClaimDeliveryRecovery|QueueService|QueueLifecycle|DispatchReservationRecovery|IssueProjection|IssueClosureCancellation|QueueBootstrap|QueuePoolInstall|WorkerEvolution|WorkerDeploymentBoundary|WorkExpiration) ;;
+    ""|WorkQueue|FairWorkQueue|ClaimScopedWorker|ClaimDeliveryHealth|ClaimDeliveryRecovery|QueueService|QueueLifecycle|DispatchReservationRecovery|IssueProjection|IssueClosureCancellation|QueueBootstrap|QueuePoolInstall|WorkerEvolution|WorkerDeploymentBoundary|WorkExpiration|ObsoleteWorkRetirement) ;;
     *)
-        echo "TLC_MODEL_FILTER must be WorkQueue, FairWorkQueue, ClaimScopedWorker, ClaimDeliveryHealth, ClaimDeliveryRecovery, QueueService, QueueLifecycle, DispatchReservationRecovery, IssueProjection, IssueClosureCancellation, QueueBootstrap, QueuePoolInstall, WorkerEvolution, WorkerDeploymentBoundary, or WorkExpiration when set." >&2
+        echo "TLC_MODEL_FILTER must be WorkQueue, FairWorkQueue, ClaimScopedWorker, ClaimDeliveryHealth, ClaimDeliveryRecovery, QueueService, QueueLifecycle, DispatchReservationRecovery, IssueProjection, IssueClosureCancellation, QueueBootstrap, QueuePoolInstall, WorkerEvolution, WorkerDeploymentBoundary, WorkExpiration, or ObsoleteWorkRetirement when set." >&2
         exit 1
         ;;
 esac
@@ -64,6 +64,25 @@ run_model BrokenExpirationWatermark CommittedTimeMonotonicity Invariant 12 WorkE
 run_model BrokenExpirationCheckpoint ProjectionSoundness Invariant 12 WorkExpiration
 run_model ExpirationRunningWitness NoRunningPastExpiry Invariant 12 WorkExpiration
 run_model ExpirationCheckpointWitness NoCheckpointExpiry Invariant 12 WorkExpiration
+run_model Retirement "" Invariant 0 ObsoleteWorkRetirement
+run_model RetirementSingle "" Invariant 0 ObsoleteWorkRetirement
+run_model BrokenRetirementExpiry SelectionExpiration Invariant 12 ObsoleteWorkRetirement
+run_model BrokenRetirementPublication CancellationAuthority Invariant 12 ObsoleteWorkRetirement
+run_model BrokenRetirementPin CancellationAuthority Invariant 12 ObsoleteWorkRetirement
+run_model BrokenRetirementOwnership CancellationAuthority Invariant 12 ObsoleteWorkRetirement
+run_model BrokenRetirementBarrier CancellationAuthority Invariant 12 ObsoleteWorkRetirement
+run_model BrokenRetirementAvailability CancellationAuthority Invariant 12 ObsoleteWorkRetirement
+run_model BrokenRetirementLegacy LegacyReplayCompatibility Invariant 12 ObsoleteWorkRetirement
+run_model BrokenRetirementCheckpoint CheckpointMetadata Invariant 12 ObsoleteWorkRetirement
+run_model BrokenRetirementTerminal TerminalMetadata Invariant 12 ObsoleteWorkRetirement
+run_model BrokenRetirementDebt ProtectedState Invariant 12 ObsoleteWorkRetirement
+run_model BrokenRetirementReservation ProtectedState Invariant 12 ObsoleteWorkRetirement
+run_model BrokenRetirementResult ProtectedState Invariant 12 ObsoleteWorkRetirement
+run_model BrokenRetirementMaintenance RecoveryIsolation Invariant 12 ObsoleteWorkRetirement
+run_model RetirementCheckedWitness NoCheckedRetirement Invariant 12 ObsoleteWorkRetirement
+run_model RetirementLegacyWitness NoLegacyCheckpoint Invariant 12 ObsoleteWorkRetirement
+run_model RetirementRecoveryWitness NoRetirementRecovery Invariant 12 ObsoleteWorkRetirement
+run_model RetirementExpirationWitness NoElapsedPrefix Invariant 12 ObsoleteWorkRetirement
 run_model Recovery
 run_model QueueOrdering
 run_model BrokenCAS TerminalPersistence

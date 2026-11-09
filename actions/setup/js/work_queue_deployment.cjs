@@ -74,6 +74,10 @@ function executionProfile(state, work) {
   return { profile: revision.profile, reason: "ready" };
 }
 
+function obsoleteWork(state, work) {
+  return work?.state === "available" && !work.execution_ref && !work.claim_id && work.barrier === "none" && executionProfile(state, work).reason === "worker_incompatible";
+}
+
 function futurePolicy(state) {
   const policy = structuredClone(state.policy);
   for (const [pool, workers] of state.deployments ?? []) for (const [name, worker] of workers) policy.pools[pool].profiles[name] = structuredClone(worker.revisions[worker.current_ref].profile);
@@ -102,4 +106,4 @@ function restoreDeployments(state, value) {
     }
 }
 
-module.exports = { initializeDeployments, validateDeployment, applyDeployment, admissionProfile, executionProfile, futurePolicy, serializeDeployments, restoreDeployments };
+module.exports = { initializeDeployments, validateDeployment, applyDeployment, admissionProfile, executionProfile, obsoleteWork, futurePolicy, serializeDeployments, restoreDeployments };
