@@ -69,10 +69,9 @@ func TestAuthorizeTool_EmptyAllowedToolsDeniesAll(t *testing.T) {
 		"P12: non-nil empty AllowedTools must return ErrToolNotAllowed")
 }
 
-// TestSafestDefaultPolicy_FailClosedForIndeterminateStatus (P13 — SafestDefaultFailClosed)
-// Invariant: indeterminate attribution forces the safest policy regardless of
-// configured rules.
-func TestSafestDefaultPolicy_FailClosedForIndeterminateStatus(t *testing.T) {
+// TestSafestDefaultPolicy_FailClosedForNonMappedStatus (P13 — SafestDefaultFailClosed)
+// Invariant: only mapped attribution may select a configured rule.
+func TestSafestDefaultPolicy_FailClosedForNonMappedStatus(t *testing.T) {
 	t.Parallel()
 	autoMerge := true
 	permissive := intent.PolicyRule{
@@ -88,22 +87,27 @@ func TestSafestDefaultPolicy_FailClosedForIndeterminateStatus(t *testing.T) {
 	compiler := intent.PolicyCompiler{Rules: []intent.PolicyRule{permissive}}
 	repo := intent.RepositoryContext{Owner: "owner", Name: "repo"}
 
-	for _, status := range []intent.AttributionStatus{
-		intent.AttributionUnlinked,
-		intent.AttributionAmbiguous,
-		intent.AttributionUnmapped,
-		intent.AttributionSuggested,
+	for _, testCase := range []struct {
+		name   string
+		status intent.AttributionStatus
+	}{
+		{name: "unlinked", status: intent.AttributionUnlinked},
+		{name: "ambiguous", status: intent.AttributionAmbiguous},
+		{name: "unmapped", status: intent.AttributionUnmapped},
+		{name: "suggested", status: intent.AttributionSuggested},
+		{name: "empty", status: ""},
+		{name: "unknown", status: "future-status"},
 	} {
-		t.Run(string(status), func(t *testing.T) {
-			rec := intent.IntentRecord{Status: status}
+		t.Run(testCase.name, func(t *testing.T) {
+			rec := intent.IntentRecord{Status: testCase.status}
 			policy := compiler.Compile(rec, repo)
 
-			assert.Equal(t, "propose_only", policy.Autonomy, "P13: indeterminate status must force propose_only")
-			assert.Equal(t, "none", policy.WriteScope, "P13: indeterminate status must force no write scope")
-			assert.True(t, policy.HumanApprovalRequired, "P13: indeterminate status must force human approval")
+			assert.Equal(t, "propose_only", policy.Autonomy, "P13: non-mapped status must force propose_only")
+			assert.Equal(t, "none", policy.WriteScope, "P13: non-mapped status must force no write scope")
+			assert.True(t, policy.HumanApprovalRequired, "P13: non-mapped status must force human approval")
 			require.NotNil(t, policy.AutoMergeAllowed)
-			assert.False(t, *policy.AutoMergeAllowed, "P13: indeterminate status must force auto-merge denial")
-			assert.Equal(t, 1, policy.MaxAttempts, "P13: indeterminate status must force a single attempt")
+			assert.False(t, *policy.AutoMergeAllowed, "P13: non-mapped status must force auto-merge denial")
+			assert.Equal(t, 1, policy.MaxAttempts, "P13: non-mapped status must force a single attempt")
 		})
 	}
 }

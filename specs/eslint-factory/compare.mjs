@@ -298,7 +298,7 @@ export async function analyze(artifacts) {
     runtimeRules: Object.keys(plugin.rules).sort(),
     configRules: configuredRules.map(([name]) => name.replace("gh-aw-custom/", "")).sort(),
     httpSeverity: Object.fromEntries(configuredRules)["gh-aw-custom/require-http-response-error-listener"],
-    otherSeverities: [...new Set(configuredRules.filter(([name]) => !name.endsWith("/require-http-response-error-listener")).map(([, severity]) => severity))],
+    otherSeverities: [...new Set(configuredRules.filter(([name]) => !name.endsWith("/require-http-response-error-listener") && !name.endsWith("/no-ad-hoc-jsonl-parser")).map(([, severity]) => severity))],
     packageScripts: manifest.scripts,
     dispatchWorkers: [...workflows["factory-dispatcher"].frontmatter["safe-outputs"]["dispatch-workflow"].workflows].sort(),
     dispatchMax: workflows["factory-dispatcher"].frontmatter["safe-outputs"]["dispatch-workflow"].max,
@@ -331,7 +331,10 @@ export async function analyze(artifacts) {
   ];
   const documentationFindings = [
     { category: "coverage", observation: "README goals and miner mission mention JS/TS; actual configured rules apply to non-test CJS. This is a scope distinction, not proof that all JS/TS is scanned." },
-    { category: "warning-short-circuit", observation: "Monster's clean branch discards diagnostics for successful lint, including warning-only findings. Most configured rules warn; require-http-response-error-listener is error." },
+    {
+      category: "warning-short-circuit",
+      observation: "Monster's clean branch discards diagnostics for successful lint, including warning-only findings. Most configured rules warn; no-ad-hoc-jsonl-parser and require-http-response-error-listener are errors.",
+    },
     { category: "prompt-ambiguity", observation: "Miner says independently process every Claim, then exactly one last create_pull_request/noop. The model does not turn that final-action prose into a global runtime output limit." },
     { category: "delegation", observation: "assign-to-agent delivery means the declared assignment was independently verified, not that a downstream Copilot remediation build/test succeeded." },
     {

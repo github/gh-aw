@@ -24,7 +24,7 @@ test("README rule-table additions link existing sections and detect omitted or b
   const text = fs.readFileSync(path.join(root, "eslint-factory/README.md"), "utf8");
   const table = readmeTable(text);
   assert.deepEqual(table.brokenTargets, []);
-  for (const rule of ["no-async-foreach-callback", "no-single-char-string-replace", "no-string-fallback-for-non-string-message", "require-http-response-error-listener"]) {
+  for (const rule of ["no-async-foreach-callback", "no-dynamic-string-replacement", "no-single-char-string-replace", "no-string-fallback-for-non-string-message", "require-http-response-error-listener"]) {
     assert.equal(table.rules.filter(name => name === rule).length, 1);
     assert.ok(text.includes(`[\`${rule}\`](#${rule})`));
     const broken = text.replace(`[\`${rule}\`](#${rule})`, `[\`${rule}\`](#nonexistent-rule-section)`);

@@ -76,7 +76,7 @@ Build and scan fixtures reuse existing source/dependencies via symlinks as build
 
 `comparison.json` separates fact mismatches from documentation observations and assumptions. The README's rule-link table is compared with registered IDs as table coverage only, not a semantic audit of all rule descriptions. No installed policy/profile artifact is present in this comparison; actual deployed permissions and contracts remain outside its evidence.
 
-The four previously omitted rule-table entries now link their existing sections: `no-async-foreach-callback`, `no-single-char-string-replace`, `no-string-fallback-for-non-string-message` and `require-http-response-error-listener`. The comparison requires linked-table coverage to match registered rules and checks that section targets exist. Tests deliberately remove these rows or break their targets; this checks reference coverage, not all rule-description semantics.
+The rule-link table now covers the registered `no-dynamic-string-replacement` rule and the previously omitted entries `no-async-foreach-callback`, `no-single-char-string-replace`, `no-string-fallback-for-non-string-message` and `require-http-response-error-listener`. The comparison requires linked-table coverage to match registered rules and checks that section targets exist. Tests deliberately remove these rows or break their targets; this checks reference coverage, not all rule-description semantics.
 
 The collector probe runs its unchanged CJS entrypoint with fixture-supplied original assignment context and an artifact output root. Its legacy patch-directory existence probe is stubbed as absent without touching that directory. The probe exercises actual count partitioning, but does not authenticate a live assignment or deliver an issue.
 
@@ -95,7 +95,16 @@ These are agent, deployment, or operational obligations outside the bounded mode
 
 ## Sync Notes
 
-The README rule-link table must cover exactly the registered rule IDs and point to existing sections. Revalidate it with `node specs/eslint-factory/check.mjs`; `node --test specs/eslint-factory/compare.test.mjs` verifies that missing rows and broken targets are detected. Run both after adding, removing, or renaming a registered rule, editing the rule-link table, or changing the comparison logic. This checks link coverage, not rule-description semantics.
+The checks use dependencies from two existing package directories. From the repository root, install them first:
+
+```bash
+npm ci --prefix eslint-factory
+npm ci --prefix actions/setup/js
+```
+
+`eslint-factory` provides TypeScript, ESLint, and Vitest; `actions/setup/js` provides the YAML parser used by the comparison. Then run `node specs/eslint-factory/check.mjs` and `node --test specs/eslint-factory/compare.test.mjs`. The test verifies that missing rows and broken targets are detected. Run both after adding, removing, or renaming a registered rule, editing the rule-link table, or changing the comparison logic. This checks link coverage, not rule-description semantics.
+
+The model checker also requires Java and the existing official TLC jar; see the environment setup under [Reproduce](#reproduce).
 
 ## Reproduce
 

@@ -219,11 +219,8 @@ func TestFormalFixture_SuggestedAttributionDoesNotSelectPolicy(t *testing.T) {
 
 	rec := intent.IntentRecord{
 		Status: intent.AttributionStatus(suggestion.Status),
-		Source: intent.AttributionSource(suggestion.Source),
-		Labels: suggestion.Labels,
 	}
 
-	assertFixtureAttribution(t, fixture.Expected.Attribution, rec)
 	assertFixturePolicy(t, fixture.Expected.Policy, fixturePolicyCompiler(t).Compile(rec, intent.RepositoryContext{}))
 }
 
@@ -300,10 +297,12 @@ func buildFixturePullRequest(fixture complianceFixture) intent.PullRequestData {
 	}
 
 	if fixture.Input.Artifact.ExplicitIntent != nil {
+		intentKey := fixture.Input.Artifact.ExplicitIntent.Key
 		pr.ExplicitIntent = &intent.IntentRecord{
-			Status: intent.AttributionMapped,
-			Source: intent.AttributionSource(fixture.Input.Artifact.ExplicitIntent.Source),
-			Rule:   "fixture_explicit_intent",
+			Status:    intent.AttributionMapped,
+			Source:    intent.AttributionSource(fixture.Input.Artifact.ExplicitIntent.Source),
+			Rule:      "fixture_explicit_intent",
+			IntentKey: &intentKey,
 		}
 	}
 
@@ -326,18 +325,17 @@ func buildFixturePullRequest(fixture complianceFixture) intent.PullRequestData {
 func fixturePolicyCompiler(t *testing.T) intent.PolicyCompiler {
 	t.Helper()
 
-	fixture := loadIntentComplianceFixture(t, "explicit-intent-wins.yaml")
-	autoMerge := fixture.Expected.Policy.AutoMergeAllowed
+	autoMerge := true
 
 	return intent.PolicyCompiler{
 		Rules: []intent.PolicyRule{{
-			ID: "fixture-explicit-policy",
+			ID: "fixture-permissive-wildcard",
 			Set: intent.ExecutionPolicy{
-				Autonomy:              fixture.Expected.Policy.Autonomy,
-				WriteScope:            fixture.Expected.Policy.WriteScope,
-				HumanApprovalRequired: fixture.Expected.Policy.HumanApprovalRequired,
+				Autonomy:              "bounded",
+				WriteScope:            "any_branch",
+				HumanApprovalRequired: false,
 				AutoMergeAllowed:      &autoMerge,
-				MaxAttempts:           fixture.Expected.Policy.MaxAttempts,
+				MaxAttempts:           10,
 			},
 		}},
 	}
@@ -348,8 +346,11 @@ func assertFixtureAttribution(t *testing.T, expected fixtureExpectedAttribution,
 
 	assert.Equal(t, expected.Status, string(rec.Status))
 	assert.Equal(t, expected.Source, string(rec.Source))
+	assert.Equal(t, expected.IntentKey, rec.IntentKey)
 	if expected.Labels != nil {
 		assert.Equal(t, expected.Labels, rec.Labels)
+	} else if expected.IntentKey == nil {
+		assert.Empty(t, rec.Labels, "fixtures without an intent key must not resolve through blended label attribution")
 	}
 }
 

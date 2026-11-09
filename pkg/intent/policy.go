@@ -106,12 +106,10 @@ type PolicyCompiler struct {
 // that field when seeding. If no rules match, the safest default policy is returned.
 func (c PolicyCompiler) Compile(rec IntentRecord, repo RepositoryContext) ExecutionPolicy {
 	policyLog.Printf("Compiling policy: status=%s rules=%d", rec.Status, len(c.Rules))
-	// Indeterminate attribution must never receive a relaxed policy from a matching
-	// wildcard rule. Suggested attribution is non-authoritative, and unmapped labels
-	// do not identify a configured intent.
-	switch rec.Status {
-	case AttributionUnlinked, AttributionAmbiguous, AttributionUnmapped, AttributionSuggested:
-		policyLog.Printf("Fail-closed for indeterminate status=%s, returning safest default policy", rec.Status)
+	// Only authoritative mapped attribution may select a rule. Unknown statuses,
+	// including empty values, must not receive a relaxed policy from a wildcard rule.
+	if rec.Status != AttributionMapped {
+		policyLog.Printf("Fail-closed for non-mapped status=%s, returning safest default policy", rec.Status)
 		return safestDefaultPolicy()
 	}
 

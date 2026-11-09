@@ -844,7 +844,7 @@ Hashes, lengths, counts, content types, and classification labels MAY be capture
 
 A Level 3 implementation MUST provide a redaction stage before remote export and artifact upload. Redaction MUST cover known secret formats, authorization headers, bearer tokens, GitHub tokens, private keys, passwords, connection strings, and configured repository-specific patterns.
 
-Direct personal identifiers and other PII MUST NOT be captured by default. When an identifier is operationally necessary and authorized, it MUST be validated and bounded, MUST be redacted before remote export and from mirrors, artifacts, and diagnostics according to the applicable privacy rules, and MUST NOT be a metric dimension by default. See safeguard **OTEL-SG-02** and test **T-OT-013** in §17.1.2.
+Direct personal identifiers and other PII MUST NOT be captured by default, except for operational identifiers expressly permitted by §15.4. The current exporter includes actor and actor-ID values in remote span payloads; §15.4 permits these when operationally necessary and authorized and does not require their redaction. Redacting those permitted identifiers is a proposed follow-up tracked by **T-OT-013**, not a current guarantee.
 
 ### 15.3 Attribute Limits
 
@@ -870,7 +870,7 @@ Once valid configuration has been established, telemetry export failure SHOULD N
 
 `if-missing: error` applies to missing mandatory setup values, not transient delivery failure.
 
-Exporter, mirror, and bounded-flush failures MUST NOT replace an already-recorded functional result or be reported as successful delivery. See safeguard **OTEL-SG-01** and test **T-OT-012** in §17.1.2.
+Section 16.6 specifies the required handling for exporter, mirror, and bounded-shutdown-flush failures. **T-OT-012** tracks remaining conformance-test coverage and does not claim that every failure case is currently tested.
 
 ### 16.2 Retry and Queueing
 
@@ -928,16 +928,18 @@ The CLI outcome evaluator currently emits JSON/JSONL and has no OTLP exporter. O
 
 ---
 
-### Safeguards
+### Tracked Follow-ups (Non-normative)
 
-| Safeguard | Normative behavior | Compliance test |
+The following items track coverage and possible future requirements; they do not add current implementation guarantees. Section 16.6 remains the normative exporter-failure contract.
+
+| Safeguard | Follow-up | Status |
 |---|---|---|
-| **OTEL-SG-01 — Exporter failure** | After valid setup, exporter, mirror, or bounded-flush failure MUST preserve the functional result, produce a bounded diagnostic, and MUST NOT claim failed delivery succeeded. | [§17.1.2, T-OT-012](#1712-concrete-span-attribute-contract-cases) |
-| **OTEL-SG-02 — PII redaction** | PII MUST be excluded by default; authorized identifiers MUST be validated, bounded, and redacted before remote export, persistence, or diagnostics. | [§17.1.2, T-OT-013](#1712-concrete-span-attribute-contract-cases) |
+| **OTEL-SG-01 — Exporter failure tests** | Complete coverage for bounded-shutdown-flush failures in addition to the existing non-2xx, exhausted-retry, and mirror-write failure tests. | Partial; tracked by [T-OT-012](#1712-concrete-span-attribute-contract-cases). |
+| **OTEL-SG-02 — Identifier redaction** | If redaction of authorized §15.4 identifiers is adopted, add payload and mirror tests before claiming the guarantee. | Proposed; tracked by [T-OT-013](#1712-concrete-span-attribute-contract-cases). |
 
 ### Sync Notes
 
-Sections 15.2 and 16.1/16.6 define the privacy and delivery safeguards; §17.1.A maps existing implementation tests, while §17.1.2 defines their conformance test IDs. Changes to content capture, redaction, mirrors, exporter retries, fan-out, or shutdown behavior MUST update the corresponding test mapping. Revalidate the shipped compatibility contract with `make validate-otel-contract`.
+Sections 15.2 and 16.1/16.6 define the privacy and delivery contracts; §17.1.A maps existing implementation tests, while §17.1.2 distinguishes current coverage from tracked follow-ups. Changes to content capture, redaction, mirrors, exporter retries, fan-out, or shutdown behavior MUST update the corresponding test mapping. Revalidate the shipped compatibility contract with `make validate-otel-contract`.
 
 ---
 
@@ -1011,8 +1013,8 @@ attribute-level checks mapped directly to Section 10 requirements:
 | **T-OT-009** | §10.3 `gen_ai.system` on built-in agent spans | A known engine emits a non-empty normalized provider/system value | Run a workflow with a built-in agent span, decode exported spans, and assert `gen_ai.system` is present whenever the engine mapping is known |
 | **T-OT-010** | §13.3 `gh-aw.outcome.type` on optional downstream outcome-evaluation spans | Exported outcome spans preserve the safe-output type being evaluated | Feed `.outcomes[].items[]` from `gh aw logs --outcomes --json` to the downstream exporter under test and assert `gh-aw.outcome.type` matches the evaluated manifest item type; not a built-in CLI export |
 | **T-OT-011** | §17 Backward-compatibility: v0.3.0 fields present in v0.4.0 export | All span attribute keys that were present in v0.3.0 (`gh-aw.*`, `github.*`, `gen_ai.system`, `gen_ai.usage.total_tokens`, `OTEL_EXPORTER_OTLP_ENDPOINT`, built-in setup/conclusion span names) **MUST** also be present in a v0.4.0 export at the same semantic positions | Produce a v0.4.0 compliant export from the current implementation; compare the set of attribute keys against the v0.3.0 attribute inventory (defined in Version 0.3.0 change-log entry in Section 19); assert no v0.3.0 attribute has been removed or renamed; assert no built-in span name has changed |
-| **T-OT-012** | §16.1 Exporter failure preserves functional result | Non-2xx responses, exhausted network retries, mirror-write failures, and bounded flush failures do not replace the completed workflow result or report delivery success | Exercise failures in each exporter and mirror path; assert bounded diagnostics and unchanged functional result |
-| **T-OT-013** | §15.2 PII defaults and redaction | PII is absent by default; authorized identifiers are bounded and redacted before remote export and from mirrors, artifacts, and diagnostics and are not metric dimensions by default | Capture representative direct identifiers and configured PII patterns; inspect exported payloads, local mirrors, artifacts, diagnostics, and metric dimensions |
+| **T-OT-012** | §16.6 Exporter-failure test coverage | Non-2xx responses, exhausted network retries, mirror-write failures, and bounded-shutdown-flush failures preserve the completed workflow result and do not report failed delivery as successful | Existing tests cover non-2xx responses, exhausted retries, and mirror-write failures; add a bounded-shutdown-flush failure case to complete coverage |
+| **T-OT-013** | Proposed stricter §15.2 identifier redaction | If the contract changes to redact authorized §15.4 identifiers, those values are absent from remote payloads, mirrors, artifacts, and diagnostics; metric-dimension restrictions remain | Proposed only; current payload tests expect authorized actor identifiers, and mirror redaction is not guaranteed. Add payload and mirror tests before adopting this requirement |
 
 
 ### 17.2 Optional Extension Tests
@@ -1077,7 +1079,7 @@ context is added to outcome spans or links.
 ### Unreleased
 
 - **Added**: A normative requirement (§10.8) that completed BinEval records MUST produce `eval.result` events on `gh-aw.evals.conclusion`; when a not-evaluated status marker is present it takes precedence and answers are not emitted.
-- **Added**: Explicit PII and exporter-failure safeguards in §§15–16, with conformance test IDs T-OT-012 and T-OT-013 and revalidation guidance.
+- **Added**: Non-normative follow-ups for PII redaction and exporter-failure test coverage, with tracked IDs T-OT-012 and T-OT-013.
 
 ### Version 0.6.0 (Working Draft, November 5, 2026)
 

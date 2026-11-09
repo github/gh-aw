@@ -63,7 +63,7 @@ An ambiguous attribution MUST NOT be treated as equivalent to a mapped attributi
 
 #### Fail-Closed Behavior
 
-An implementation MUST apply the safest available execution policy when the intent is `unlinked`, `ambiguous`, or otherwise indeterminate.
+An implementation MUST apply the safest available execution policy unless attribution status is authoritatively `mapped`. This includes `unlinked`, `ambiguous`, `unmapped`, `suggested`, empty, and unknown statuses.
 
 The safest available policy MUST be: autonomy `propose_only`, write scope `none`, `human_approval_required: true`, `auto_merge_allowed: false`, `max_attempts: 1`.
 
