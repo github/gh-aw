@@ -67,6 +67,7 @@ import { requireFsChmodTryCatchRule } from "./rules/require-fs-chmod-try-catch";
 
 import { noDynamicStringReplacementRule } from "./rules/no-dynamic-string-replacement";
 import { noSingleCharStringReplaceRule } from "./rules/no-single-char-string-replace";
+import { requirePerPageOnGithubListCallRule } from "./rules/require-per-page-on-github-list-call";
 import { noAsyncForEachCallbackRule } from "./rules/no-async-foreach-callback";
 import { noUnguardedAsyncTimerCallbackRule } from "./rules/no-unguarded-async-timer-callback";
 import { requireFiniteCheckBeforeDateToIsoStringRule } from "./rules/require-finite-check-before-date-toisostring";
@@ -145,6 +146,7 @@ const plugin = {
     "no-misplaced-error-code-definition": noMisplacedErrorCodeDefinitionRule,
     "require-fs-chmod-try-catch": requireFsChmodTryCatchRule,
     "no-single-char-string-replace": noSingleCharStringReplaceRule,
+    "require-per-page-on-github-list-call": requirePerPageOnGithubListCallRule,
     "no-dynamic-string-replacement": noDynamicStringReplacementRule,
     "no-unguarded-async-timer-callback": noUnguardedAsyncTimerCallbackRule,
     "no-async-foreach-callback": noAsyncForEachCallbackRule,

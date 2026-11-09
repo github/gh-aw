@@ -117,3 +117,15 @@ const invalidUnifiedInit: UnifiedSessionEventDataMap["session.init"] = {
   tools: [],
 };
 void invalidUnifiedInit;
+
+const correlatedUnifiedTools: UnifiedSessionEventDataMap["tool.execution_start" | "tool.execution_update" | "tool.execution_complete"][] = [
+  { toolCallId: "call", messageId: "response", model: "served-model", input: false },
+  { toolCallId: "call", messageId: "response", model: "served-model", output: null },
+  { toolCallId: "call", messageId: "response", model: "served-model", success: false },
+];
+void correlatedUnifiedTools;
+const invalidUnifiedToolEnvelope: UnifiedSessionEventDataMap["tool.execution_start"] = {
+  // @ts-expect-error The native envelope remains archival, not part of the unified payload.
+  messageMetadata: { timestamp: 0 },
+};
+void invalidUnifiedToolEnvelope;

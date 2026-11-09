@@ -834,22 +834,23 @@ export interface UnifiedSessionEventDataMap {
     /** Observed native usage, not an additive accounting contribution. */
     usageSnapshot?: JsonValue;
   };
-  "tool.execution_start": Pick<ToolExecutionStartData, "toolCallId" | "stepIndex" | "toolName" | "input" | "inputTruncated" | "command" | "mcpServerName"> & UnifiedSessionContextData;
-  "tool.execution_update": Pick<ToolExecutionStartData, "toolCallId" | "stepIndex" | "toolName" | "input" | "mcpServerName"> & {
-    output?: JsonValue;
-    partial?: JsonValue;
-    delta?: JsonValue;
-    contentIndex?: JsonValue;
-    sourceType?: JsonValue;
-    /** Repeated observed metadata, never additive inference usage. */
-    usageSnapshot?: JsonValue;
-    durationMs?: JsonValue;
-    status?: JsonValue;
-    command?: JsonValue;
-    taskId?: string;
-    taskType?: string;
-    error?: JsonValue;
-  } & UnifiedSessionContextData;
+  "tool.execution_start": Pick<ToolExecutionStartData, "toolCallId" | "stepIndex" | "toolName" | "input" | "inputTruncated" | "command" | "mcpServerName"> & Pick<UnifiedMessageData, "messageId" | "model"> & UnifiedSessionContextData;
+  "tool.execution_update": Pick<ToolExecutionStartData, "toolCallId" | "stepIndex" | "toolName" | "input" | "mcpServerName"> &
+    Pick<UnifiedMessageData, "messageId" | "model"> & {
+      output?: JsonValue;
+      partial?: JsonValue;
+      delta?: JsonValue;
+      contentIndex?: JsonValue;
+      sourceType?: JsonValue;
+      /** Repeated observed metadata, never additive inference usage. */
+      usageSnapshot?: JsonValue;
+      durationMs?: JsonValue;
+      status?: JsonValue;
+      command?: JsonValue;
+      taskId?: string;
+      taskType?: string;
+      error?: JsonValue;
+    } & UnifiedSessionContextData;
   "tool.execution_complete": Pick<
     ToolExecutionCompleteData,
     | "toolCallId"
@@ -857,6 +858,7 @@ export interface UnifiedSessionEventDataMap {
     | "toolName"
     | "success"
     | "output"
+    | "outputTruncated"
     | "structuredContent"
     | "result"
     | "error"
@@ -871,6 +873,7 @@ export interface UnifiedSessionEventDataMap {
     | "workflowName"
     | "workflowRunId"
   > &
+    Pick<UnifiedMessageData, "messageId" | "model"> &
     UnifiedSessionContextData;
   "dynamicWorkflows.task_started": DynamicWorkflowObservationData;
   "dynamicWorkflows.task_progress": DynamicWorkflowObservationData;
