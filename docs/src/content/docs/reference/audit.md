@@ -35,6 +35,14 @@ Top-level fields in `--json` output are stable; nested sub-fields may be extende
 
 By default a single-run audit renders a Comparison section against an earlier run of the same workflow. Use `--no-baseline` when that baseline is unrepresentative or to avoid the extra downloads. A `--no-baseline` result is never written to the audit cache, so it cannot suppress the Comparison section of a later default audit.
 
+### Durable session continuation
+
+For durable workflows, `durable_session` separates checkpoint restoration from observed native startup. It reports `status`, `started`, engine, storage, available parent-run, artifact and native session IDs, and the unified-session evidence path. `resumed` requires matching restoration and native-start records from the audited run and attempt. `restored` without `started` confirms only restoration; `restore_failed` records a restoration error. Missing events, unsupported or invalid session files, and mismatched lineage report `unavailable` with a reason, never a successful continuation.
+
+The `info,usage` artifact selection contains the required evidence. Cached audits re-read it, and `health --logs-dir` reuses the same raw session evidence for its current-revision sample. These records do not establish restored workspace edits, exactly-once effects, or agent task completion.
+
+Health exposes `durable_sessions` with `resumed_runs`, `fresh_runs`, `restored_runs`, `restore_failed_runs`, `unavailable_runs`, and per-run `session` reports. Fresh runs count only observed native starts; restoration without a start is reported separately. Missing or budget-skipped cached evidence stays unavailable, including when every known-durable sample is unavailable. This is a cached evidence inventory, not a continuation rate, and does not change workflow health classifications or download artifacts.
+
 ### Retry history
 
 When unified-session retry evidence is available, `--json` includes a `retries`

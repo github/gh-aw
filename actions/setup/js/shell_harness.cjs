@@ -4,6 +4,7 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { runProcess } = require("./process_runner.cjs");
+const { openPiDurableSession, observeDurableSession } = require("./durable_native_session.cjs");
 
 async function main() {
   const [engineName, command] = process.argv.slice(2);
@@ -13,6 +14,7 @@ async function main() {
     return;
   }
 
+  const durableSession = engineName === "pi" ? openPiDurableSession() : undefined;
   const runAttempt = () =>
     runProcess({
       command: "bash",
@@ -20,6 +22,7 @@ async function main() {
       logArgs: [engineName],
       attempt: 0,
       log: message => process.stderr.write(`[${engineName}-harness] ${message}\n`),
+      onStdoutLine: line => observeDurableSession(durableSession, engineName, line),
     });
   const result = process.env.GH_AW_SKIP_IF_DECISION
     ? await require("./harness_retry_runner.cjs").runSingleHarnessInvocation({ runAttempt, harnessName: `${engineName} harness`, log: message => process.stderr.write(`[${engineName}-harness] ${message}\n`) })

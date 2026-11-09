@@ -1931,6 +1931,7 @@ jobs:
             /tmp/gh-aw/usage/agent/model-routing.jsonl
             /tmp/gh-aw/usage/agent/execution.json
             /tmp/gh-aw/usage/agent/harness_retry.json
+            /tmp/gh-aw/usage/agent/durable-session.jsonl
             /tmp/gh-aw/usage/detection/token_usage.jsonl
             /tmp/gh-aw/usage/detection/execution.json
             /tmp/gh-aw/usage/detection/harness_retry.json
@@ -1969,6 +1970,7 @@ jobs:
             /tmp/gh-aw/usage/agent/model-routing.jsonl
             /tmp/gh-aw/usage/agent/execution.json
             /tmp/gh-aw/usage/agent/harness_retry.json
+            /tmp/gh-aw/usage/agent/durable-session.jsonl
             /tmp/gh-aw/usage/detection/token_usage.jsonl
             /tmp/gh-aw/usage/detection/execution.json
             /tmp/gh-aw/usage/detection/harness_retry.json

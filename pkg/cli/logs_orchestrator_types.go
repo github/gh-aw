@@ -215,3 +215,25 @@ type renderLogsOutputOptions struct {
 	cachedJSONLWriter *cachedLogsJSONLWriter
 	outcomeReports    []OutcomesData
 }
+
+// newRenderLogsOutputOptions returns renderLogsOutputOptions populated with the
+// fields shared by the discovery-mode logs rendering paths (single-target and
+// multi-target). Callers set the path-specific fields (continuations, rate limits,
+// date range, etc.) on the returned value.
+func newRenderLogsOutputOptions(opts LogsDownloadOptions, artifactFilter []string) renderLogsOutputOptions {
+	return renderLogsOutputOptions{
+		outputDir:        opts.OutputDir,
+		summaryFile:      opts.SummaryFile,
+		format:           opts.Format,
+		reportFile:       opts.ReportFile,
+		jsonOutput:       opts.JSONOutput,
+		episodes:         opts.Episodes,
+		toolGraph:        opts.ToolGraph,
+		train:            opts.Train,
+		drain3Weights:    opts.Drain3Weights,
+		audit:            opts.Audit,
+		verbose:          opts.Verbose,
+		artifactFilter:   artifactFilter,
+		includeWorkQueue: workQueueEvidenceRequested(opts.ArtifactSets),
+	}
+}

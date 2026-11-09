@@ -11,6 +11,7 @@ const (
 	OTelAttrGhAwSessionOmittedEvents                   = "gh-aw.session.omitted_events"
 	OTelAttrGhAwSessionTruncated                       = "gh-aw.session.truncated"
 	OTelAttrGhAwSessionUntimedEvents                   = "gh-aw.session.untimed_events"
+	OTelAttrGhAwDurableParentRunID                     = "gh-aw.durable.parent_run_id"
 	OTelAttrGhAwWorkingSetCumulativeInputTokens        = "gh-aw.working_set.cumulative_input_tokens"
 	OTelAttrGhAwWorkingSetInvocations                  = "gh-aw.working_set.invocations"
 	OTelAttrGhAwWorkingSetPeakInputTokens              = "gh-aw.working_set.peak_input_tokens"
@@ -213,6 +214,7 @@ var otelAttributeNamesByValue = map[string]string{
 	"gh-aw.session.omitted_events":                      "gh-aw.session.omitted_events",
 	"gh-aw.session.truncated":                           "gh-aw.session.truncated",
 	"gh-aw.session.untimed_events":                      "gh-aw.session.untimed_events",
+	"gh-aw.durable.parent_run_id":                       "gh-aw.durable.parent_run_id",
 	"gh-aw.working_set.cumulative_input_tokens":         "gh-aw.working_set.cumulative_input_tokens",
 	"gh-aw.working_set.invocations":                     "gh-aw.working_set.invocations",
 	"gh-aw.working_set.peak_input_tokens":               "gh-aw.working_set.peak_input_tokens",

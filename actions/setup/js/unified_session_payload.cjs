@@ -193,6 +193,8 @@ const TASK_FIELDS = {
 
 /** @type {Record<string, Fields>} */
 const EVENT_FIELDS = {
+  "durable.restore": { engine: ["engine"], storage: ["storage"], runId: ["runId"], runAttempt: ["runAttempt"], status: ["status"], parentRunId: ["parentRunId"], artifactId: ["artifactId"] },
+  "durable.session": { engine: ["engine"], storage: ["storage"], runId: ["runId"], runAttempt: ["runAttempt"], status: ["status"], parentRunId: ["parentRunId"], sessionId: ["sessionId"] },
   "model.inventory": {},
   "plugin.installation": {
     plugin: ["plugin"],

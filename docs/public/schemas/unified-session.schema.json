@@ -77,6 +77,8 @@
         }
       },
       { "if": { "properties": { "type": { "const": "detection.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DetectionResultData" } } } },
+      { "if": { "properties": { "type": { "const": "durable.restore" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DurableRestoreData" } } } },
+      { "if": { "properties": { "type": { "const": "durable.session" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DurableStartupData" } } } },
       { "if": { "properties": { "type": { "const": "dynamicWorkflows.background_tasks_changed" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DynamicWorkflowObservationData" } } } },
       { "if": { "properties": { "type": { "const": "dynamicWorkflows.task_notification" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DynamicWorkflowObservationData" } } } },
       { "if": { "properties": { "type": { "const": "dynamicWorkflows.task_progress" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DynamicWorkflowObservationData" } } } },
@@ -494,6 +496,34 @@
         "maliciousPatch": { "type": "boolean" }
       },
       "additionalProperties": {}
+    },
+    "DurableRestoreData": {
+      "type": "object",
+      "properties": {
+        "engine": { "type": "string" },
+        "storage": { "type": "string", "const": "artifact" },
+        "runId": { "type": "string" },
+        "runAttempt": { "type": "string" },
+        "parentRunId": { "type": "string" },
+        "status": { "type": "string", "enum": ["restored", "fresh", "failed"] },
+        "artifactId": { "type": "string" }
+      },
+      "required": ["engine", "runAttempt", "runId", "status", "storage"],
+      "additionalProperties": false
+    },
+    "DurableStartupData": {
+      "type": "object",
+      "properties": {
+        "engine": { "type": "string" },
+        "storage": { "type": "string", "const": "artifact" },
+        "runId": { "type": "string" },
+        "runAttempt": { "type": "string" },
+        "parentRunId": { "type": "string" },
+        "status": { "type": "string", "enum": ["resumed", "fresh"] },
+        "sessionId": { "type": "string" }
+      },
+      "required": ["engine", "runAttempt", "runId", "sessionId", "status", "storage"],
+      "additionalProperties": false
     },
     "DynamicWorkflowObservationData": {
       "type": "object",

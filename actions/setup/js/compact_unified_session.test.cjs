@@ -33,6 +33,18 @@ describe("compact unified session projection", () => {
     expect(sessionEventPriority(event("harness.decision", data))).toBe(4);
   });
 
+  it("preserves durable lineage but excludes historical content", () => {
+    const events = [
+      event("durable.restore", { engine: "codex", storage: "artifact", status: "restored", runId: "200", runAttempt: "1", parentRunId: "100", artifactId: "999", transcript: "private history" }),
+      event("durable.session", { engine: "codex", storage: "artifact", status: "resumed", runId: "200", runAttempt: "1", parentRunId: "100", sessionId: "native-id" }),
+    ];
+    const result = compactUnifiedSession(events);
+    expect(parse(result)).toHaveLength(2);
+    expect(parse(result)[1].data).toMatchObject({ status: "resumed", sessionId: "native-id" });
+    expect(result.session).not.toContain("private history");
+    expect(sessionEventPriority(events[0])).toBe(2);
+  });
+
   it("retains bounded accounting and outcome metadata without mutating the source", () => {
     const events = [
       event("session.format", { version: 1 }),

@@ -116,6 +116,25 @@ export interface PluginInstallationData {
   status: "installed";
 }
 
+/** Runner-observed durable state; restoration is distinct from native startup. */
+export interface DurableSessionMetadata {
+  engine: string;
+  storage: "artifact";
+  runId: string;
+  runAttempt: string;
+  parentRunId?: string;
+}
+
+export interface DurableRestoreData extends DurableSessionMetadata {
+  status: "restored" | "fresh" | "failed";
+  artifactId?: string;
+}
+
+export interface DurableStartupData extends DurableSessionMetadata {
+  status: "resumed" | "fresh";
+  sessionId: string;
+}
+
 /** AWF API proxy steering event-log observation. */
 export interface FirewallSteeringData extends RuntimeObservationData {
   threshold?: JsonValue;
@@ -741,6 +760,8 @@ export interface CollectionData {
 
 /** Known essential payloads. Unknown native extensions remain open. */
 export interface UnifiedSessionEventDataMap {
+  "durable.restore": DurableRestoreData;
+  "durable.session": DurableStartupData;
   "workflow.job_result": WorkflowJobResultData;
   "memory.push": MemorySaveResultData;
   "model.inventory": ModelInventoryData;
