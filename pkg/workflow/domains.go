@@ -840,8 +840,21 @@ func mergeAllowedDomainList(domainsStr string, extraDomains ...string) string {
 	return strings.Join(sliceutil.SortedKeys(domainMap), ",")
 }
 
-// computeAllowedDomainsForSanitization computes the allowed domains for sanitization
-// based on the network configuration, matching what's provided to the firewall.
+// computeAllowedDomainsForSanitization also permits proxy upstream links in agent output,
+// without adding those upstreams to the cached agent firewall policy.
+func (c *Compiler) computeAllowedDomainsForSanitization(data *WorkflowData) (string, error) {
+	base, err := c.computeAllowedDomainsForFirewall(data)
+	if err != nil {
+		return "", err
+	}
+	engineID, err := validateDomainEngineModel(data)
+	if err != nil {
+		return "", err
+	}
+	return mergeAPITargetDomains(base, GetGeminiAPITarget(data, engineID)), nil
+}
+
+// computeAllowedDomainsForFirewall computes the agent egress policy.
 // The result is cached in data.CachedAllowedDomainsStr after the first call so that
 // repeated calls (e.g. from the activation job, safe-outputs steps, and agent run step)
 // do not recompute the same domain list.
@@ -849,7 +862,7 @@ func mergeAllowedDomainList(domainsStr string, extraDomains ...string) string {
 // current FrontmatterHash so repeated compilations of an unchanged workflow skip the
 // full domain computation without unbounded hash-key growth in watch mode.
 // Returns an error if the engine's model is malformed (e.g. a leading slash).
-func (c *Compiler) computeAllowedDomainsForSanitization(data *WorkflowData) (string, error) {
+func (c *Compiler) computeAllowedDomainsForFirewall(data *WorkflowData) (string, error) {
 	// Return cached result if available (engine/network/tools/runtimes do not change during compilation).
 	// CachedAllowedDomainsComputed is used as the sentinel so that a legitimately empty domain
 	// list is not confused with "not yet computed".
@@ -867,7 +880,7 @@ func (c *Compiler) computeAllowedDomainsForSanitization(data *WorkflowData) (str
 		}
 	}
 
-	engineID, err := validateDomainEngineModel(data)
+	_, err := validateDomainEngineModel(data)
 	if err != nil {
 		return "", err
 	}
@@ -883,9 +896,9 @@ func (c *Compiler) computeAllowedDomainsForSanitization(data *WorkflowData) (str
 		base = mergeAPITargetDomains(base, copilotTarget)
 	}
 
-	// Add Gemini API target domains.
-	// Resolved from GEMINI_API_BASE_URL in engine.env or default generativelanguage.googleapis.com.
-	if geminiAPITarget := GetGeminiAPITarget(data, engineID); geminiAPITarget != "" {
+	// Preserve explicit custom-target egress, but never infer agent access from
+	// the default Gemini proxy upstream.
+	if geminiAPITarget := extractAPITargetHost(data, "GEMINI_API_BASE_URL"); geminiAPITarget != "" {
 		base = mergeAPITargetDomains(base, geminiAPITarget)
 	}
 
