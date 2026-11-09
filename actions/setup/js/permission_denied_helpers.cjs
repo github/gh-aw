@@ -4,7 +4,8 @@
 
 const PERMISSION_DENIED_PATTERN = /\b(?:permission denied|permissions denied|EACCES|EPERM)\b/gi;
 const NUMEROUS_PERMISSION_DENIED_THRESHOLD = 3;
-const WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE = 79;
+// Keep distinct from the SDK model-verification exit code (79).
+const WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE = 80;
 
 /**
  * Count permission-denied indicators in process output.

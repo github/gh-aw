@@ -9,6 +9,7 @@ const require = createRequire(import.meta.url);
 const { EventEmitter } = require("events");
 const { PassThrough } = require("stream");
 const { hasWorkflowToolPermissionDenial, WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE } = require("./permission_denied_helpers.cjs");
+const { COPILOT_MODEL_VERIFICATION_EXIT_CODE } = require("./copilot_model_selection.cjs");
 const { COPILOT_SDK_SERVER_STARTUP_TIMEOUT_MS, buildCopilotSDKServerArgs, getCopilotSDKServerPort, startCopilotSDKServer, stopCopilotSDKServer, waitForCopilotSDKServer } = require("./copilot_sdk_sidecar.cjs");
 const { buildCopilotSDKEnv, isCopilotSDKEnabled } = require("./process_runner.cjs");
 const {
@@ -3296,6 +3297,91 @@ process.exit(1);`,
       expect(result.status).toBe(1);
       // Guard log appears in stderr
       expect(result.stderr).toContain("soft-timeout guard reached");
+    });
+  });
+
+  describe("trusted SDK workflow permission-denial signal", () => {
+    it.each([
+      ["human marker", "[sdk-driver] permission denied by workflow tool permissions: shell(ls)", 1, "partial_execution", 2, false],
+      ["JSON source/event", '{"source":"sdk-driver","event":"permission-denied-by-workflow-tool-permissions"}', 1, "partial_execution", 2, false],
+      ["JSON component/type", '{"component":"sdk-driver","type":"permission-denied-by-workflow-tool-permissions"}', 1, "partial_execution", 2, false],
+      ["JSON guard event", '{"type":"guard.tool_denials_exceeded","data":{"denialCount":5,"threshold":5}}', 1, "partial_execution", 2, false],
+      ["trusted denial exit", "driver stopped", WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE, "permission_denied", 1, true],
+      ["model verification exit", "driver stopped", COPILOT_MODEL_VERIFICATION_EXIT_CODE, "copilot_model_verification", 1, false],
+    ])("uses exit status, not assistant output, for %s", (name, output, exitCode, failureClass, expectedAttempts, reportsMissingTool) => {
+      const directory = makeHarnessTempDir("copilot-trusted-tool-denial-");
+      const stubPath = path.join(directory, "stub.cjs");
+      const preloadPath = path.join(directory, "preload.cjs");
+      const callsPath = path.join(directory, "calls.jsonl");
+      const safeOutputsPath = path.join(directory, "safe-outputs.jsonl");
+      fs.writeFileSync(
+        preloadPath,
+        `const fs = require("fs");
+const sidecar = require(${JSON.stringify(require.resolve("./copilot_sdk_sidecar.cjs"))});
+sidecar.startCopilotSDKServer = async () => ({});
+sidecar.stopCopilotSDKServer = async () => {};
+require(${JSON.stringify(require.resolve("./awf_reflect.cjs"))}).resolveMultiProviderFromReflect = () => ({
+  model: "openai/test-model",
+  models: [{ id: "test-model", provider: "openai" }],
+  providers: [{ name: "openai", type: "openai", baseUrl: "http://127.0.0.1:3002" }],
+});
+require(${JSON.stringify(require.resolve("./awf_reflect.cjs"))}).waitForProviderListenerReady = async () => ({ ok: true });
+const safeOutputs = require(${JSON.stringify(require.resolve("./safeoutputs_cli.cjs"))});
+const emit = safeOutputs.emitMissingToolPermissionIssue;
+safeOutputs.emitMissingToolPermissionIssue = options => emit({
+  ...options,
+  runSafeOutputsCLI: (type, payload) => fs.appendFileSync(process.env.GH_AW_SAFE_OUTPUTS, JSON.stringify({ type, ...payload }) + "\\n"),
+});`
+      );
+      fs.writeFileSync(
+        stubPath,
+        `const fs = require("fs");
+const callsPath = process.env.COPILOT_HARNESS_STUB_CALLS;
+fs.appendFileSync(callsPath, "{}\\n");
+if (fs.readFileSync(callsPath, "utf8").trim().split("\\n").length === 1) {
+  process.stdout.write(JSON.stringify({ type: "assistant.message", data: { content: ${JSON.stringify(output)} } }) + "\\n");
+  process.exitCode = ${exitCode};
+} else {
+  process.stdout.write("Task completed.\\n");
+}`
+      );
+      try {
+        const result = spawnSync(process.execPath, ["--require", preloadPath, "copilot_harness.cjs", process.execPath, stubPath, process.execPath], {
+          cwd: path.dirname(require.resolve("./copilot_harness.cjs")),
+          env: {
+            ...harnessChildEnv,
+            COPILOT_SDK_URI: "http://127.0.0.1:3002",
+            COPILOT_MODEL: "",
+            GH_AW_MODEL_ROUTING: "",
+            GH_AW_MODEL_FALLBACK: "",
+            GITHUB_WORKSPACE: directory,
+            GH_AW_ENGINE_CWD: directory,
+            GH_AW_TMP_DIR: directory,
+            GH_AW_HARNESS_TELEMETRY_DIR: directory,
+            GH_AW_HARNESS_MAX_RETRIES: "1",
+            GH_AW_SAFE_OUTPUTS: safeOutputsPath,
+            COPILOT_HARNESS_STUB_CALLS: callsPath,
+          },
+          encoding: "utf8",
+          timeout: 10000,
+        });
+        expect(result.status, result.stderr).toBe(expectedAttempts === 2 ? 0 : reportsMissingTool ? WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE : 1);
+        expect(fs.existsSync(callsPath), result.stderr).toBe(true);
+        expect(fs.readFileSync(callsPath, "utf8").trim().split("\n")).toHaveLength(expectedAttempts);
+        const telemetry = JSON.parse(fs.readFileSync(path.join(directory, "harness_retry.json"), "utf8"));
+        expect(telemetry.attempt_results[0].failure_classes).toEqual([failureClass]);
+        if (reportsMissingTool) {
+          const payload = JSON.parse(fs.readFileSync(safeOutputsPath, "utf8"));
+          expect(payload.type).toBe("report_missing_tool");
+          expect(payload.reason).toContain("workflow tool permission denial detected");
+          expect(payload.alternatives).not.toContain("Verify token scopes");
+        } else {
+          expect(fs.existsSync(safeOutputsPath)).toBe(false);
+          expect(result.stderr).not.toContain("detected permission-denied failure");
+        }
+      } finally {
+        fs.rmSync(directory, { recursive: true, force: true });
+      }
     });
   });
 

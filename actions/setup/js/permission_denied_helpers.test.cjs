@@ -46,9 +46,18 @@ describe("permission_denied_helpers.cjs", () => {
     expect(payload.denied_commands).toEqual([summary]);
   });
 
-  it("does not classify an assistant-echoed line-start workflow permission-denial marker", () => {
-    const output = "[sdk-driver] permission denied by workflow tool permissions: shell(ls)";
+  it.each([
+    "[sdk-driver] permission denied by workflow tool permissions: shell(ls)",
+    '{"source":"sdk-driver","event":"permission-denied-by-workflow-tool-permissions"}',
+    '{"component":"sdk-driver","type":"permission-denied-by-workflow-tool-permissions"}',
+    '{"type":"guard.tool_denials_exceeded","data":{"denialCount":5,"threshold":5}}',
+    String(WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE),
+  ])("does not classify assistant-echoed denial text: %s", output => {
     expect(hasWorkflowToolPermissionDenial(output)).toBe(false);
+  });
+
+  it.each([undefined, null, 0, 1, 79, { exitCode: WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE }])("rejects non-denial exit values: %j", exitCode => {
+    expect(hasWorkflowToolPermissionDenial(exitCode)).toBe(false);
   });
 
   it("builds report_missing_tool payload with default denied commands", () => {

@@ -3,13 +3,16 @@
 package workflow
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/stringutil"
+	"github.com/goccy/go-yaml"
 )
 
 // ============================================================================
@@ -423,6 +426,50 @@ func TestDailyFormalSpecVerifierAllowsReadOnlyFileInspection(t *testing.T) {
 	if !strings.Contains(workflow, "run: bash .github/scripts/install_tla_runtime_test.sh") {
 		t.Fatal("Expected the fixture-based installer test to run before agent execution")
 	}
+
+	lockContent, err := os.ReadFile(strings.TrimSuffix(workflowFile, ".md") + ".lock.yml")
+	if err != nil {
+		t.Fatalf("Failed to read compiled workflow lock: %v", err)
+	}
+	var compiled struct {
+		Jobs map[string]struct {
+			Steps []struct {
+				Name string
+				Run  string
+				Env  map[string]string
+				With map[string]any
+			}
+		}
+	}
+	if err := yaml.Unmarshal(lockContent, &compiled); err != nil {
+		t.Fatalf("Failed to parse compiled workflow lock: %v", err)
+	}
+	positions := map[string]int{}
+	for index, step := range compiled.Jobs["agent"].Steps {
+		positions[step.Name] = index
+		if step.Name == "Checkout repository (gh-aw default)" && step.With["persist-credentials"] != false {
+			t.Fatal("Expected the pre-agent installer checkout not to persist credentials")
+		}
+		if step.Name == "Validate fixture-based TLA+ installer" {
+			if step.Run != "bash .github/scripts/install_tla_runtime_test.sh" || len(step.Env) != 0 {
+				t.Fatal("Expected the pre-agent fixture test to run the fixed script without credential environment bindings")
+			}
+		}
+	}
+	installerIndex, ok := positions["Validate fixture-based TLA+ installer"]
+	if !ok {
+		t.Fatal("Expected fixture-based installer validation in the compiled agent job")
+	}
+	checkoutIndex, ok := positions["Checkout repository (gh-aw default)"]
+	if !ok || checkoutIndex >= installerIndex {
+		t.Fatal("Expected the fixture test to use the initial credential-free checkout")
+	}
+	for _, name := range []string{"Configure Git credentials", "Checkout PR branch", "Execute GitHub Copilot CLI"} {
+		index, ok := positions[name]
+		if !ok || index <= installerIndex {
+			t.Fatalf("Expected fixture validation before %q so agent edits cannot change the executed test", name)
+		}
+	}
 }
 
 func TestDailySquidImageScanUsesFixedLogQueries(t *testing.T) {
@@ -457,6 +504,49 @@ func TestDailySquidImageScanUsesFixedLogQueries(t *testing.T) {
 	}
 	if strings.Contains(string(lockContent), "--allow-tool shell(grep)") || strings.Contains(string(lockContent), `"shell(grep)"`) {
 		t.Fatal("Expected compiled daily-squid-image-scan lock to exclude agent grep permissions")
+	}
+	var compiled struct {
+		Jobs map[string]struct {
+			Steps []struct {
+				Name string
+				Env  map[string]string
+			}
+		}
+	}
+	if err := yaml.Unmarshal(lockContent, &compiled); err != nil {
+		t.Fatalf("Failed to parse compiled workflow lock: %v", err)
+	}
+	summaryIndex, executionIndex := -1, -1
+	for index, step := range compiled.Jobs["agent"].Steps {
+		if step.Name == "Index scan logs with fixed queries" {
+			summaryIndex = index
+		}
+		if step.Name != "Execute GitHub Copilot CLI" {
+			continue
+		}
+		executionIndex = index
+		var toolConfig struct {
+			Capabilities            map[string]bool `json:"capabilities"`
+			ExplicitlyDisabledTools []string        `json:"explicitlyDisabledTools"`
+			Permissions             struct {
+				AllowedTools []string `json:"allowedTools"`
+			} `json:"permissions"`
+		}
+		if err := json.Unmarshal([]byte(step.Env["GH_AW_COPILOT_SDK_TOOL_CONFIG"]), &toolConfig); err != nil {
+			t.Fatalf("Failed to parse compiled SDK tool permissions: %v", err)
+		}
+		bashEnabled, configured := toolConfig.Capabilities["bash"]
+		if !configured || bashEnabled || !slices.Contains(toolConfig.ExplicitlyDisabledTools, "bash") {
+			t.Fatal("Expected compiled SDK permissions to explicitly disable agent bash")
+		}
+		for _, tool := range toolConfig.Permissions.AllowedTools {
+			if tool == "*" || tool == "bash" || strings.HasPrefix(tool, "shell") {
+				t.Fatalf("Expected no shell permissions that could permit extended scan pipelines, got %q", tool)
+			}
+		}
+	}
+	if summaryIndex < 0 || executionIndex <= summaryIndex {
+		t.Fatal("Expected fixed log summaries to run before agent execution")
 	}
 
 	for _, expected := range []string{

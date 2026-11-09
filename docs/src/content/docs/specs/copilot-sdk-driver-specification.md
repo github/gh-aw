@@ -411,6 +411,13 @@ The session result object SHOULD include:
 - Output-presence indicator
 - Duration in milliseconds
 
+For failed sessions, the built-in driver returns exit code `80` when its SDK
+permission callback recorded a workflow tool denial. This status is distinct
+from model-verification failure (`79`). The harness uses the exit status, not
+human-readable markers or JSON-shaped assistant output, to stop workflow-denial
+retries and emit `report_missing_tool`. Permission-denial logs are diagnostic
+text, not authenticated control signals.
+
 The built-in driver treats a main-session content-filter rejection as failure,
 even when `sendAndWait` resolves normally. Copilot's synthesized message requires
 both `rte: true` and the exact runtime content-filter text; quoted text alone is
