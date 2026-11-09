@@ -163,7 +163,7 @@ func TestWorkCancelObsoleteAuthorityAndFreshPublication(t *testing.T) {
 				role = "maintain"
 			}
 			workClearRoleEnvironment(t, role)
-			commits, _ := workObsoleteFixture(t)
+			commits, ids := workObsoleteFixture(t)
 			data, _ := workqueue.Serialize(commits)
 			queue := newWorkQueueGitRemote(t, string(data))
 			transport := http.DefaultTransport
@@ -173,16 +173,9 @@ func TestWorkCancelObsoleteAuthorityAndFreshPublication(t *testing.T) {
 					changed = true
 					state, _ := workqueue.Replay(commits)
 					actor := state.Requests["deployment"].Actor
-					if scenario == "claimed" {
-						worker := workqueue.FuturePolicy(state)
-						node, err := workqueue.NewWork([]byte(`{}`), "new", "root", "default", worker, 4000)
-						if err != nil {
-							t.Fatal(err)
-						}
-						commits = workClearAppend(t, commits, actor, "new", "submit", workqueue.SubmitParameters{Nodes: []workqueue.WorkDefinition{node}}, 4000)
-					}
 					deployment := state.Deployments["default"]["default"]
 					profile := deployment.Revisions[deployment.CurrentRef].Profile
+					incompatible := profile
 					available := scenario != "unavailable"
 					if scenario != "unavailable" {
 						profile = deployment.Revisions[strings.Repeat("a", 40)].Profile
@@ -196,8 +189,28 @@ func TestWorkCancelObsoleteAuthorityAndFreshPublication(t *testing.T) {
 					}, 5000)
 					if scenario == "claimed" {
 						commits = workClearAppend(t, commits, actor, "grant-race", "dispatch_next", workqueue.DispatchParameters{
-							Pool: "default", MaxClaims: 1, MaxDispatches: 1, MaxBytes: 48 << 10,
+							Pool: "default", MaxClaims: 256, MaxDispatches: 256, MaxBytes: 48 << 10,
 						}, 6000)
+						op.ExpectedRef, op.ExpectedContract = profile.Ref, profile.LogicalContract
+						op.Profile = incompatible
+						commits = workClearAppend(t, commits, actor, "restore-incompatible-route", "deployment", workqueue.OperationsParameters{
+							Operations: []workqueue.Operation{mustWorkQueueOperation(t, op)},
+						}, 7000)
+						latest, err := workqueue.Replay(commits)
+						if err != nil {
+							t.Fatal(err)
+						}
+						route := latest.Deployments["default"]["default"]
+						revision := route.Revisions[route.CurrentRef]
+						for _, id := range ids[:2] {
+							work := latest.Works[id]
+							claim := latest.Claims[work.ClaimID]
+							if work.State != "claimed" || claim == nil || claim.State != "open" || claim.WorkID != id ||
+								work.ExecutionRef != "" || work.Barrier != "none" || !revision.Available ||
+								route.CurrentRef != strings.Repeat("b", 40) || revision.Profile.LogicalContract == work.AdmissionContract {
+								t.Fatalf("claimed race did not isolate ownership from route compatibility: %+v", work)
+							}
+						}
 					}
 					data, _ := workqueue.Serialize(commits)
 					queue.write(t, string(data))
@@ -214,6 +227,12 @@ func TestWorkCancelObsoleteAuthorityAndFreshPublication(t *testing.T) {
 			}
 			if !strings.Contains(err.Error(), code) {
 				t.Fatalf("expected actionable %s, got %v", code, err)
+			}
+			if scenario == "claimed" {
+				expected, err := workqueue.Serialize(commits)
+				if err != nil || queue.read(t) != string(expected) || workClearRead(t, queue).Stats.Cancelled != 0 {
+					t.Fatal("ownership rejection changed the raced ledger")
+				}
 			}
 		})
 	}

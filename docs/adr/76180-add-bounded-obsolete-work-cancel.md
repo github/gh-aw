@@ -33,15 +33,19 @@ operator surface rather than another command spelling.
 
 Publish an atomic `cancel_work` request containing `WorkCancellation` operations
 with fixed reason `worker_contract_obsolete` and operation `version: 1`; the
-ledger remains version 3. Reuse
-[`workPublishOperator`](../../pkg/cli/work_command_operations.go), which
-authenticates repository administrator authority. This operator authority is
+ledger remains version 3. Authenticate explicitly with
+[`Branch.Authenticate`](../../pkg/workqueue/branch.go) as an administrator, then
+pass the original selection or recovery commits to `Branch.PublishFromSnapshot`.
+This operator authority is
 distinct from the JavaScript maintenance publisher's authenticated `reconciler`
 role; matching selection semantics does not grant the CLI maintenance authority.
 The existing publication path rereads the current ledger prefix and validates
 the checked operations at committed time. A concurrent Claim, execution pin,
 delivery barrier, expiration, or compatible/unavailable deployment rejects the
-entire batch rather than cancelling a stale selection.
+entire batch rather than cancelling a stale selection. Snapshot publication
+also rejects a replacement ledger after hard clearing and readmission, even
+when the replacement uses the same Work IDs. Verified same-ledger appends and
+checkpoints remain eligible.
 
 Keep `--dry-run` a read-only ledger selection preview. It does not authenticate
 administrator publication authority, reserve a request ID, publish a receipt,
@@ -50,8 +54,10 @@ empty selection returns `no_work` without recording a request.
 
 Use stable request identity for recovery: an accepted request restores its
 original operation bytes, targets and fingerprint, never a newly selected batch.
-Reject a retry limit too small for the original receipt and incompatible request
-reuse. Preserve accepted legacy reason-only cancellations without retrofitting
+Reject a caller limit too small for the original receipt with the required
+numeric limit, and reject incompatible request reuse. A later reduction of the
+Policy operation limit does not block receipt recovery, which adds no operations;
+the Policy cap still bounds fresh selection. Preserve accepted legacy reason-only cancellations without retrofitting
 version 1 checks or rewriting terminal metadata. After publication, synchronize
 existing Issue mirrors separately; a synchronization failure reports the
 committed cancellation and directs recovery through `sync-issues --request-id`.
