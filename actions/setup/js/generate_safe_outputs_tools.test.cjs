@@ -263,7 +263,7 @@ describe("generate_safe_outputs_tools", () => {
     for (const keyword of ["anyOf", "oneOf", "allOf"]) {
       expect(tool.inputSchema).not.toHaveProperty(keyword);
     }
-    expect(tool.description).toContain("REQUIRED: Provide at least one of: status, title, body, labels, assignees, or milestone.");
+    expect(tool.description).toContain("REQUIRED: Provide at least one of: status, title, body, labels, assignees, milestone, or artifacts.");
     expect(tool.inputSchema.properties.milestone.type).toEqual(["number", "string", "null"]);
     expect(tool.inputSchema.properties.milestone.description).toContain("Use null to clear.");
   });
