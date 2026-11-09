@@ -1844,6 +1844,12 @@ Exported accounting revisions remain after the original observations in source
 order, even when their timestamps regress. Usage is reconciled by session and
 message identity; repeated step observations and shared source IDs are not
 additional turns or globally unique event IDs.
+When recognized native records span multiple sessions, the appended aggregate
+`session.result` sets `data.sessionId: null`, overriding session aliases from its
+last source record rather than attributing combined usage, cost, turns, or errors
+to that session. The source envelope and payload additions remain in the parser
+artifact; individual observations retain their session scope, and single-session
+results remain scoped as before.
 Synthetic coverage lives in `parse_opencode_log.test.cjs` and
 `opencode_workflow.test.cjs`; it is not evidence of a live smoke run.
 

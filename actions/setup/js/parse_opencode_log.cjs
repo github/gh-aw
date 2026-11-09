@@ -382,6 +382,8 @@ function parseOpenCodeLog(content) {
     if (Object.keys(usage).length) usage.input_tokens_include_cache = false;
     logEntries.push(
       createSessionEvent(sourceMetadata(resultSource), "session.result", {
+        // Null suppresses native session aliases without discarding the source.
+        ...(sessions.size > 1 ? { sessionId: null } : {}),
         ...(stepReports.size > 0 ? { numTurns: stepReports.size } : {}),
         ...(Object.keys(usage).length ? { usage } : {}),
         ...(totalCostUsd !== undefined ? { totalCostUsd } : {}),

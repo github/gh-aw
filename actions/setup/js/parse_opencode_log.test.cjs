@@ -77,6 +77,36 @@ describe("OpenCode JSON session parser", () => {
     expect(unified.at(-1).data).toMatchObject({ numTurns: 2, usage: { inputTokens: 50, outputTokens: 7 }, sessionId: sessionID });
   });
 
+  it.each([sessionID, "ses_other"].flatMap(secondSessionID => [undefined, { sessionId: secondSessionID, nativeDetail: "retained" }].map(data => ({ secondSessionID, data }))))(
+    "projects aggregate accounting with explicit scope for %j",
+    ({ secondSessionID, data }) => {
+      const first = record("step_finish", { tokens: { input: 5, output: 2 }, cost: 0.1 });
+      const reconciled = { ...first, part: { ...first.part, tokens: { input: 10, output: 3 } } };
+      const text = record("text", { sessionID: secondSessionID, messageID: "msg_second", text: "done\n" }, { sessionID: secondSessionID, timestamp: timestamp + 100 });
+      const final = record("step_finish", { sessionID: secondSessionID, messageID: "msg_second", tokens: { input: 20, output: 4 }, cost: 0.2 }, { sessionID: secondSessionID, timestamp: timestamp + 100, ...(data ? { data } : {}) });
+      const records = [first, text, reconciled, final];
+      const original = structuredClone(records);
+      const events = parseOpenCodeLog(jsonl(records)).logEntries;
+      const resultSessionId = secondSessionID === sessionID ? sessionID : null;
+      expect(events.at(-1)).toMatchObject({
+        sessionID: secondSessionID,
+        part: final.part,
+        data: { ...data, ...(resultSessionId === null ? { sessionId: null } : {}), numTurns: 2, usage: { input_tokens: 30, output_tokens: 7 } },
+      });
+      expect(events.at(-1).data.totalCostUsd).toBeCloseTo(0.3);
+      expect(records).toEqual(original);
+      const unified = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-session.jsonl", timestampUnit: "milliseconds", events }]);
+      expect(unified.map(event => event.type)).toEqual(events.map(event => event.type));
+      expect(unified.map(event => event.timestamp)).toEqual(events.map(event => event.timestamp));
+      expect(unified.map(event => event.provenance.index)).toEqual(events.map((_, index) => index));
+      expect(unified.find(event => event.type === "assistant.message").data).toMatchObject({ sessionId: secondSessionID, content: "done\n" });
+      expect(unified.filter(event => event.type === "opencode.step_finish").map(event => event.data.sessionId)).toEqual([sessionID, sessionID, secondSessionID]);
+      expect(unified.at(-1).data).toMatchObject({ sessionId: resultSessionId, numTurns: 2, usage: { inputTokens: 30, outputTokens: 7 } });
+      expect(unified.at(-1).data.totalCostUsd).toBeCloseTo(0.3);
+      if (data) expect(events.at(-1).data.nativeDetail).toBe("retained");
+    }
+  );
+
   it("recovers only completed assistant-step metadata from v2 exports", () => {
     const steps = getOpenCodeSessionSteps(
       {
@@ -189,7 +219,9 @@ describe("OpenCode JSON session parser", () => {
     expect(events.at(-1).data).toEqual({ totalCostUsd: 0.2, usage: { input_tokens: 110, output_tokens: 5, reasoning_output_tokens: 3, input_tokens_include_cache: false } });
     expect(parseOpenCodeLog(jsonl(events)).logEntries).toEqual(events);
     const otherSession = parseOpenCodeLog(jsonl([compaction, { ...compaction, sessionID: "other_session" }])).logEntries;
-    expect(otherSession.at(-1).data).toEqual({ totalCostUsd: 0.2, usage: { input_tokens: 200, output_tokens: 10, reasoning_output_tokens: 6, input_tokens_include_cache: false } });
+    expect(otherSession.at(-1).data).toEqual({ sessionId: null, totalCostUsd: 0.2, usage: { input_tokens: 200, output_tokens: 10, reasoning_output_tokens: 6, input_tokens_include_cache: false } });
+    const unified = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-session.jsonl", events: otherSession }]);
+    expect(unified.at(-1).data).toMatchObject({ sessionId: null, usage: { inputTokens: 200, outputTokens: 10, reasoningOutputTokens: 6 } });
   });
 
   it.each(["id", "partID"])("reconciles assistant usage by message across fresh %s projections and export recovery", idField => {
