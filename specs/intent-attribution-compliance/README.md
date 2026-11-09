@@ -6,8 +6,13 @@ This directory defines the minimum compliance scenarios for the
 The fixture files in this directory are the normative ground truth for the
 minimum attribution-resolution and fail-closed governance behaviors. The formal
 test suite in `pkg/intent/compliance_fixtures_formal_test.go` loads these YAML
-artifacts directly and executes them against the real `pkg/intent.Resolver` and
-`pkg/intent.PolicyCompiler` implementations.
+artifacts directly, testing resolver-produced records against `pkg/intent.Resolver`
+and `pkg/intent.PolicyCompiler`. The suggested-attribution fixture seeds a
+pre-resolved candidate directly into the compiler because the current resolver
+does not generate suggestions.
+
+Implementation status and the runtime enforcement map are documented in the
+[governance implementation companion](../intent-attribution-agent-governance-implementation.md).
 
 ## Required scenarios
 
@@ -76,7 +81,7 @@ F3_UnlinkedFailsClosed(a) ≜ Explicit(a) = null ∧ |Closing(a)| = 0 ∧ |Label
   Resolve(a).status = unlinked ∧ Resolve(a).source = none
 
 F4_SafestPolicyOnIndeterminate(a) ≜
-  Resolve(a).status ∈ {ambiguous, unlinked, unmapped, suggested} ⇒
+  Resolve(a).status ∈ {ambiguous, unlinked} ⇒
   Compile(Resolve(a)) =
     (propose_only, none, approval_required=true, auto_merge=false, max_attempts=1)
 
@@ -90,8 +95,8 @@ F7_SingleSourcePerRecord(a) ≜
   Resolve(a).source ∈ {explicit_metadata, closing_issue, none, artifact_labels} ∧
   Resolve(a) is attributed to exactly one source
 
-F8_SuggestionIsNonAuthoritative(a) ≜
-  Resolve(a).status = suggested ⇒ Compile(Resolve(a)) = safest_policy
+F8_SuggestionIsNonAuthoritative(c) ≜
+  c.status = suggested ⇒ Compile(c) = safest_policy
 
 F9_UnmappedAttributionFailsClosed(a) ≜
   Resolve(a).status = unmapped ⇒ Compile(Resolve(a)) = safest_policy
@@ -119,7 +124,7 @@ context that was supplied to policy compilation.
 | `F4_SafestPolicyOnIndeterminate` (unlinked branch) | `TestFormalFixture_UnlinkedResolvesToSafestPolicy` | Unlinked attribution compiles to the same safest execution policy tuple |
 | `F5_MappedStatusPermitsRelaxedPolicy` | `TestFormalFixture_MappedExplicitStatusIsNotFailClosed` | Explicitly mapped status is not forced into fail-closed policy when a permissive rule applies |
 | `F6_PolicyDeterminism` | `TestFormalFixture_PolicyDeterminismAcrossRepeatedResolution` | Resolving the same fixture input twice yields byte-identical attribution and policy |
-| `F7_SingleSourcePerRecord` | `TestFormalFixture_SingleSourcePerRecordAcrossAllFixtures` | Each required fixture resolves to exactly one attribution source, never a blend |
+| `F7_SingleSourcePerRecord` | `TestFormalFixture_SingleSourcePerRecordAcrossResolverFixtures` | Each resolver-backed fixture resolves to exactly one attribution source, never a blend |
 | Edge case: order independence | `TestFormalFixture_AmbiguousOrderIndependence` | Reordering the two closing issues does not change the ambiguous outcome |
 | Edge case: empty labels do not mask unlinked | `TestFormalFixture_UnlinkedWithEmptyLabelsSlice` | An explicitly empty labels slice on the unlinked fixture still resolves to unlinked |
 | Edge case: explicit intent overrides even when closing issues would otherwise be unambiguous | `TestFormalFixture_ExplicitIntentOverridesSingleClosingIssue` | Explicit metadata wins even when only one closing issue is present |
@@ -146,6 +151,6 @@ The formal compliance suite is implemented in:
 The suite:
 
 - loads the six required YAML fixtures from this directory
-- adapts each fixture into real `intent.PullRequestData` inputs
+- adapts artifact fixtures into real `intent.PullRequestData` inputs and seeds the suggested candidate directly into the policy compiler
 - verifies attribution precedence and mapped, unmapped, ambiguous, and unlinked handling
 - verifies that suggestions and other indeterminate attribution states cannot select a relaxed policy

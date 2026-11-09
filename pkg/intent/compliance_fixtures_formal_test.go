@@ -22,6 +22,7 @@ type complianceFixture struct {
 	Input     struct {
 		Artifact             fixtureArtifact             `yaml:"artifact"`
 		SuggestedAttribution *fixtureExpectedAttribution `yaml:"suggested_attribution"`
+		UnmatchedLabels      []string                    `yaml:"unmatched_labels"`
 	} `yaml:"input"`
 	Expected fixtureExpected `yaml:"expected"`
 }
@@ -140,7 +141,7 @@ func TestFormalFixture_PolicyDeterminismAcrossRepeatedResolution(t *testing.T) {
 	assertJSONEqual(t, policy1, policy2, "policy must be byte-identical across repeated compilation")
 }
 
-func TestFormalFixture_SingleSourcePerRecordAcrossAllFixtures(t *testing.T) {
+func TestFormalFixture_SingleSourcePerRecordAcrossResolverFixtures(t *testing.T) {
 	t.Parallel()
 
 	for _, fixtureName := range []string{
@@ -247,10 +248,26 @@ func loadIntentComplianceFixture(t *testing.T, fixtureName string) complianceFix
 }
 
 func fixtureResolver(fixture complianceFixture) intent.Resolver {
-	if fixture.Expected.Attribution.Status == string(intent.AttributionUnmapped) {
-		return intent.Resolver{ResolverVersion: "formal-v1"}
+	if len(fixture.Input.UnmatchedLabels) == 0 {
+		return matchingResolver()
 	}
-	return matchingResolver()
+
+	unmatched := make(map[string]struct{}, len(fixture.Input.UnmatchedLabels))
+	for _, label := range fixture.Input.UnmatchedLabels {
+		unmatched[label] = struct{}{}
+	}
+	return intent.Resolver{
+		ResolverVersion: "formal-v1",
+		MatchLabels: func(labels []string) []string {
+			matched := make([]string, 0, len(labels))
+			for _, label := range labels {
+				if _, isUnmatched := unmatched[label]; !isUnmatched {
+					matched = append(matched, label)
+				}
+			}
+			return matched
+		},
+	}
 }
 
 func intentComplianceFixtureDir(t *testing.T) string {

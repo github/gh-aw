@@ -74,13 +74,28 @@ Build and scan fixtures reuse existing source/dependencies via symlinks as build
 | Warning-only lint exits zero | Actual library scan and precheck flag probes; `require-http-response-error-listener` is an error, other configured rules warn |
 | Refiner memory is declarative, lowering to a protected git-tree adapter | Parsed `tools.work-queue.memory` is compared with the actual compiled preparation job's adapter and immutable target. The real collector preserves structured objects and checks the compiled one-per-Claim maximum independently for two Claims; no remote memory verification is exercised |
 
-`comparison.json` separates fact mismatches from documentation observations and assumptions. The README's rule-link table is compared with registered IDs as table coverage only, not a semantic audit of all rule descriptions. Prompts' final-action wording, nonduplicate issues, three total monster assignments, build/tests, quality bars and downstream remediation success are not claimed to be enforced. No installed policy/profile artifact is present in this comparison; actual deployed permissions and contracts remain outside its evidence.
+`comparison.json` separates fact mismatches from documentation observations and assumptions. The README's rule-link table is compared with registered IDs as table coverage only, not a semantic audit of all rule descriptions. No installed policy/profile artifact is present in this comparison; actual deployed permissions and contracts remain outside its evidence.
 
 The four previously omitted rule-table entries now link their existing sections: `no-async-foreach-callback`, `no-single-char-string-replace`, `no-string-fallback-for-non-string-message` and `require-http-response-error-listener`. The comparison requires linked-table coverage to match registered rules and checks that section targets exist. Tests deliberately remove these rows or break their targets; this checks reference coverage, not all rule-description semantics.
 
 The collector probe runs its unchanged CJS entrypoint with fixture-supplied original assignment context and an artifact output root. Its legacy patch-directory existence probe is stubbed as absent without touching that directory. The probe exercises actual count partitioning, but does not authenticate a live assignment or deliver an issue.
 
 Tests alter extracted facts, add misleading comments/body examples, rename an actual registration, and downgrade the hard HTTP rule in an executable fixture. That fixture changes the observed ESLint exit status and must fail the comparison. Trace tests also reject altered transitions and check recorded model/config/log hashes.
+
+## Non-goals
+
+The model and checker do not enforce or prove:
+
+- Prompt wording, nonduplicate issue creation, or the monster's three-assignment limit.
+- Agent obligations to run builds and tests or meet quality and false-positive thresholds.
+- Successful downstream remediation.
+- Production refinement, deployed policy/profile permissions, scheduler fairness, or unbounded liveness.
+
+These are agent, deployment, or operational obligations outside the bounded model.
+
+## Sync Notes
+
+The README rule-link table must cover exactly the registered rule IDs and point to existing sections. Revalidate it with `node specs/eslint-factory/check.mjs`; `node --test specs/eslint-factory/compare.test.mjs` verifies that missing rows and broken targets are detected. Run both after adding, removing, or renaming a registered rule, editing the rule-link table, or changing the comparison logic. This checks link coverage, not rule-description semantics.
 
 ## Reproduce
 

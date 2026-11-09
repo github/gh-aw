@@ -4,6 +4,8 @@ spec_refs:
   - "Attribution states"
   - "Fail-Closed Behavior"
 input:
+  unmatched_labels:
+    - unregistered-topic
   artifact:
     kind: pull_request
     number: 145

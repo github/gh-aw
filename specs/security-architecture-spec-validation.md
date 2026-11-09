@@ -1,9 +1,9 @@
 # Security Architecture Specification Validation
 
 **Document**: Validation of `security-architecture-spec.md` against compiled `.lock.yml` files  
-**Date**: November 8, 2026<br>
+**Date**: November 9, 2026<br>
 **Last completed full revalidation**: 2026-11-08
-**Last completed targeted formal revalidation**: v1.1.1 (RS-05a) / 2026-10-09
+**Last completed targeted formal revalidation**: RS-05a authorization model / 2026-11-09
 **Current compiled-lock structure check**: 2026-11-08
 **Validator**: GitHub Copilot Agent  
 **Scope**: Cross-reference specification requirements with actual implementation
@@ -12,9 +12,9 @@
 
 ## Executive Summary
 
-The 2026-11-08 full revalidation refreshed the documented security evidence against the current requirements and implementation. Runtime and compiler regressions for v1.1.2–v1.1.8 were reviewed; formal RS-05a revalidation remains pending, as detailed below. The event-specific mappings describe the default (`pull-request-floating-head: false`) policy.
+The 2026-11-08 full revalidation refreshed the documented security evidence against the current requirements and implementation. A targeted RS-05a authorization-model revalidation passed on 2026-11-09; its scope and remaining limits are detailed in §7b. The event-specific mappings describe the default (`pull-request-floating-head: false`) policy.
 
-⚠️ **VALIDATION STATUS**: Full revalidation was completed on 2026-11-08. The representative ten-job structure was checked against `.github/workflows/security-review.lock.yml` (see §1); write permissions remain workflow-specific: `activation`, `safe_outputs`, `conclusion`, and `push_evals_state` have repository write scopes, while the `agent` job includes `copilot-requests: write`. PM-08 is now verified for the default fork-deny policy and explicit allowlisting (see §3). Targeted formal RS-05a revalidation remains pending, and the v1.1.4 TT-01–04 requirement-level mapping remains incomplete (see the version status table and §7b).
+⚠️ **VALIDATION STATUS**: Full revalidation was completed on 2026-11-08. The representative ten-job structure was checked against `.github/workflows/security-review.lock.yml` (see §1); write permissions remain workflow-specific: `activation`, `safe_outputs`, `conclusion`, and `push_evals_state` have repository write scopes, while the `agent` job includes `copilot-requests: write`. PM-08 is verified for the default fork-deny policy and explicit allowlisting (see §3). The bounded RS-05a authorization model passed targeted formal revalidation on 2026-11-09; the v1.1.4 TT-01–04 requirement-level mapping remains incomplete (see the version status table and §7b).
 
 The revalidation refreshed the following evidence. A verified row does not imply that every implementation or deployment has identical permissions or runtime behavior:
 - ✅ Job architecture (activation, agent, safe_outputs)
@@ -38,7 +38,7 @@ The revalidation refreshed the following evidence. A verified row does not imply
 
 ### Versioned RS-05a and Transport-Trust Validation Status
 
-The statuses below distinguish implementation/runtime evidence from a targeted formal proof. A passing runtime test does not establish a formal proof or live-host behavior.
+The statuses below distinguish implementation/runtime evidence from a targeted formal proof. A passing runtime test does not establish a formal proof or live-host behavior. The current bounded authorization model is checked as one property set; version-specific rows remain unverified where a change is outside that abstraction.
 
 | Version | Change | Revalidation status | Evidence |
 |---|---|---|---|
@@ -388,7 +388,7 @@ Actor trust is provided by the shared `assertTrustedCheckoutRuntime()` call. For
 | `workflow_dispatch_uses_api_head_checkout` | `unsat` | workflow_dispatch PR replay cannot reach checkout without the model's abstract API-head checkout path; this does not prove revision freshness |
 | `non_dispatch_pr_trigger_allows_forked_runtime_after_trust` | `sat` | the model admits non-workflow_dispatch PR triggers from structurally forked runtime repositories once actor trust holds |
 
-**Status**: **RUNTIME EVIDENCE VERIFIED; TARGETED FORMAL REVALIDATION PENDING** — RS-05a runtime coverage includes the same-repository bot exceptions for `opened`, `synchronize`, `ready_for_review`, and `reopened`; explicitly allow-listed `edited` events bypass the permission floor only when `changes` contains a non-null object-valued `body` field and no other fields. `labeled` and edits with missing, non-body, malformed, or mixed change metadata retain the collaborator permission floor. The v1.1.2, v1.1.3, v1.1.5, v1.1.6, and v1.1.7 changes have implementation and regression-test mappings above; v1.1.4's TT-01–04 mapping remains unverified. The `checkout_pr_branch.test.cjs` and Z3 test files were run on 2026-11-08 (334 tests passed, one skipped); the skipped test does not constitute proof evidence. The bounded TLA+ model and Z3 proof remain unverified: the SMT model is an authorization abstraction and does not model webhook change fields, revision freshness, fetch-time races, actual checked-out commit identity, or live GitHub fetch support. The full revalidation policy is in `security-architecture-spec.md` §11.
+**Status**: **RUNTIME EVIDENCE VERIFIED; TARGETED FORMAL AUTHORIZATION REVALIDATION PASSED (2026-11-09)** — `checkout_pr_branch_z3.test.cjs` passed with Z3 4.8.12: all 14 expected query results matched (11 `unsat` safety queries and 3 `sat` witnesses). The targeted `checkout_pr_branch.test.cjs` suite passed 335 tests, and `go test ./pkg/workflow -run '^TestFormalRS05a' -count=1` passed. This is a bounded authorization abstraction, not a proof of webhook change fields, revision freshness, fetch-time races, actual checked-out commit identity, or live GitHub SHA-fetch support. The runtime suite covers the same-repository bot exceptions for `opened`, `synchronize`, `ready_for_review`, and `reopened`; allow-listed `edited` events bypass the permission floor only for a body-only change, while `labeled` and malformed or mixed edits retain the collaborator permission floor. Version-specific formal coverage remains unverified where a change is outside the abstraction, and v1.1.4's TT-01–04 mapping remains incomplete.
 
 ---
 
@@ -510,7 +510,7 @@ The evidence date in each row distinguishes the 2026-11-08 revalidation from old
 | **10.6** | Action Pinning (CS-10) | ✅ Verified for external action references | `.github/workflows/security-review.lock.yml` (96 external SHA-pinned references; 2026-11-03) |
 | **11.1** | Timestamp Validation (RS-01, RS-02) | ✅ Verified in representative lock | `.github/workflows/security-review.lock.yml:298-310` (2026-11-03) |
 | **11.3** | workflow_run Repository Validation (RS-05) | Historical formal evidence | `pkg/workflow/role_checks.go`, `pkg/workflow/*test.go`; historical full validation 2026-07-15 |
-| **11.3** | PR Checkout Authorization and Revision Isolation (RS-05a) | Runtime evidence; formal revalidation pending | `actions/setup/js/checkout_pr_branch.cjs`, `checkout_pr_branch.test.cjs`, `aw_context.test.cjs` (runtime suite 2026-10-27); §7b |
+| **11.3** | PR Checkout Authorization and Revision Isolation (RS-05a) | Runtime evidence and bounded authorization model verified; unmodeled revision properties remain runtime-only | `actions/setup/js/checkout_pr_branch.cjs`, `checkout_pr_branch.test.cjs`, `checkout_pr_branch_z3.test.cjs`, `pkg/workflow/security_architecture_rs05a_formal_test.go`; §7b |
 | **11.8** | Concurrency Control (RS-16 to RS-22) | ✅ Verified in representative lock | `.github/workflows/security-review.lock.yml:78-80` (2026-11-03) |
 
 ---
@@ -688,15 +688,20 @@ The specification provides an accurate formalization of the security architectur
 - Future security enhancements
 
 **Historical full-validation grade**: **A** (2026-07-15).
-**Current full revalidation**: **Completed 2026-11-08; no overall grade assigned** because RS-05a formal revalidation and the v1.1.4 TT-01–04 mapping remain unverified.
+**Current full revalidation**: **Completed 2026-11-08; no overall grade assigned** because the v1.1.4 TT-01–04 requirement-level mapping remains unverified. The bounded RS-05a authorization model passed targeted formal revalidation on 2026-11-09.
 
 ## Change Log
+
+### 2026-11-09
+
+- Completed targeted RS-05a authorization-model revalidation; all 14 Z3 query results matched expectations.
+- Recorded the passing runtime and Go formal test IDs in §7b and retained the model's revision-isolation limitations.
 
 ### 2026-11-08
 
 - Completed a full revalidation pass under `security-architecture-spec.md` §11 and added explicit status for v1.1.2–v1.1.8.
 - Verified PM-08 default fork denial and configured allowlisting against compiler tests and the representative lock.
-- Kept the overall grade unassigned because RS-05a formal proof and the v1.1.4 TT-01–04 mapping remain unverified.
+- Kept the overall grade unassigned because the v1.1.4 TT-01–04 requirement-level mapping remains unverified.
 
 ### 2026-11-03
 
