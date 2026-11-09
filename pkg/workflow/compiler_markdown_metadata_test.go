@@ -70,7 +70,7 @@ func TestCompilerMarkdownMetadataDelimiterForms(t *testing.T) {
 		require.JSONEq(t, `{}`, string(record.Value))
 	}
 	records = map[string]GHAWMarkdownMetadataRecord{}
-	scanMarkdownMetadata(records, "## agent: reader\n---\nmodel: small", "model-pins")
+	scanMarkdownMetadata(records, "## agent: reader\n---\nmodel: small", "workflow")
 	require.Len(t, records, 1)
 	for _, record := range records {
 		require.Equal(t, "artifact", record.Kind)
@@ -130,7 +130,7 @@ func TestCompilerMarkdownMetadataScopesWorkflowConfiguration(t *testing.T) {
 		ImportedMetadataDocuments: map[string]string{filepath.Join(root, ".github", "aw", "nested", "models.md"): imported},
 	}
 	result := c.collectMarkdownMetadata(data)
-	require.Len(t, result.Records, 3)
+	require.Len(t, result.Records, 1)
 	artifacts := 0
 	for _, record := range result.Records {
 		require.Empty(t, record.Error)
@@ -157,25 +157,18 @@ func TestCompilerMarkdownMetadataRepresentativeWorkflowScope(t *testing.T) {
 	encoded, err := json.Marshal(result)
 	require.NoError(t, err)
 	digest := sha256.Sum256([]byte(strings.ReplaceAll(data.FrontmatterYAML, "\r\n", "\n")))
-	foundWorkflow := false
 	for _, record := range result.Records {
-		if record.Kind == "model-pins" && record.SHA256 == hex.EncodeToString(digest[:]) {
-			foundWorkflow = true
-		}
+		require.NotEqual(t, hex.EncodeToString(digest[:]), record.SHA256, "workflow configuration must not be embedded in the lock")
 		if record.Kind == "artifact" {
 			require.NotContains(t, string(record.Value), "Prepare recent-change dataset", "full workflow configurations must not be duplicated as artifacts")
 		}
 	}
-	require.True(t, foundWorkflow, "the workflow's own model metadata must be present when RawMarkdown contains only its body")
 	lock, err := os.ReadFile(strings.TrimSuffix(file, ".md") + ".lock.yml")
 	require.NoError(t, err)
 	for _, line := range strings.SplitN(string(lock), "\n", 4)[:3] {
 		if strings.HasPrefix(line, "# gh-aw-manifest: ") {
-			var manifest struct {
-				Metadata json.RawMessage `json:"markdown_metadata"`
-			}
-			require.NoError(t, json.Unmarshal([]byte(strings.TrimPrefix(line, "# gh-aw-manifest: ")), &manifest))
-			t.Logf("code-simplifier metadata: %d records, %d bytes (existing catalog %d); metadata-only estimated lock size %d bytes (existing %d)", len(result.Records), len(encoded), len(manifest.Metadata), len(lock)-len(manifest.Metadata)+len(encoded), len(lock))
+			require.NotContains(t, line, `"model_pins"`)
+			t.Logf("code-simplifier metadata: %d records, %d bytes", len(result.Records), len(encoded))
 			break
 		}
 	}

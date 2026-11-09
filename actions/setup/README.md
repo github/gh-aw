@@ -14,35 +14,33 @@ this action and consumes compiler-produced JSON metadata. Setup does not compile
 or install Go code, provision a native metadata helper, or install a parser
 package.
 
-The lock manifest stores compact top-level `agent_metadata` and `model_pins`
-maps, keyed by unique normalized frontmatter SHA-256 prefixes. Prefixes start at
-20 hexadecimal characters and extend as needed to avoid collisions; lookup
-supports full digests and abbreviated keys. Agent values contain only
-`name`, `model`, and `tools`; model-audit values contain only the
-configuration used by the auditor. There is no `markdown_metadata` wrapper or
-per-entry `sha256`, `kind`, or `value` envelope, and no JSON-encoded strings.
-Information already present in `gh-aw-metadata` or the rest of `gh-aw-manifest`
-is omitted and reused through `metadata_refs`, keyed by `artifact:<sha256>` or
-`model-pins:<sha256>` and mapping destination JSON pointers to existing header
-pointers. Compiler rejections are stored separately in `metadata_errors`.
-Empty projections are omitted; no `{}`, `null`, or `{"empty":true}` entries are
-stored. Missing source metadata is treated as an empty object, without parsing
-the uncompiled source or adopting any of its declared fields.
+The lock manifest stores a compact top-level `agent_metadata` map, keyed by
+unique normalized frontmatter SHA-256 prefixes. Prefixes start at 20 hexadecimal
+characters and extend as needed to avoid collisions; lookup supports full
+digests and abbreviated keys. Agent values contain only `name`, `model`, and
+`tools`. There is no `markdown_metadata` wrapper or per-entry `sha256`, `kind`,
+or `value` envelope, and no JSON-encoded strings. Information already present in
+`gh-aw-metadata` or the rest of `gh-aw-manifest` is omitted and reused through
+`metadata_refs`, mapping destination JSON pointers to existing header pointers.
+Compiler rejections are stored separately in `metadata_errors`.
+Empty per-source projections are omitted; `agent_metadata: {}` marks a compiled
+manifest with no agent records. No per-source `{}`, `null`, or
+`{"empty":true}` entries are stored. Missing source metadata is treated as an
+empty object, without parsing the uncompiled source or adopting any of its
+declared fields.
 Reference-only and rejected sources need no value entry: their reference/error
-maps carry the source key. There is no
-`metadata_empty` field or opaque hash encoding.
+maps carry the source key. There is no `metadata_empty` field or opaque hash
+encoding.
 The runtime resolves these references from the same immutable lock before
 installing records; missing, recursive, overlapping, or conflicting references
 are rejected. The existing header fields remain the source of truth.
 Matching values are referenced regardless of JSON type, including booleans,
-numbers, and empty containers. Model-audit import records retain only import
-locations (`path` or `uses`, including `imports.aw`), not unused `with` or
-`inputs` arguments. Skill descriptions and IDs are not added to these maps:
+numbers, and empty containers. Skill descriptions and IDs are not added to
+these maps:
 repository skill files are installed unchanged, inline skill frontmatter is
 discarded without parsing, and inventory records only directory-derived names,
 sources, scopes, and content digests. The existing `skills` field remains the
 safe-update inventory of explicitly declared installation references.
-Model audits skip skill imports rather than requiring their frontmatter.
 Authored agent descriptions are not stored in these maps. Pi advertises agent
 names only; Codex and Claude use the agent name for required native descriptions.
 
@@ -50,7 +48,7 @@ The compiler interprets authored frontmatter;
 the runtime matches the normalized source SHA-256 digest to the catalog and
 reads JSON. JSON frontmatter also requires catalog provenance; valid JSON alone
 is not trusted. Run `gh aw compile` after changing repository or imported
-agent or model frontmatter to regenerate these maps. Missing or stale source
+agent frontmatter to regenerate these maps. Missing or stale source
 records yield no declared configuration; explicit compiler rejections still
 fail rather than falling back to runtime parsing.
 
@@ -58,8 +56,9 @@ Engine copies use canonical JSON authorized by compiler artifact values.
 Trusted scalar, name, and model edits retain exact derived digests in the
 existing `aw_info.json` metadata cache for downstream processes. Arbitrary
 generated JSON without provenance contributes no metadata. Author source files
-are not rewritten. Model audits consume the compiler's scoped model-pin projection,
-not a runtime-parsed workflow configuration.
+are not rewritten. Model inventory workflows inspect workflow source files on demand through
+agentic-workflows MCP tooling; model configuration is not copied into lock
+manifests.
 
 Header delimiters accept BOM prefixes and surrounding whitespace, stop at the
 first closing fence, and reject unterminated headers.

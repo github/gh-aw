@@ -39,7 +39,7 @@ describe("compiler metadata source acquisition", () => {
     const file = path.join(workspace, ".github/workflows/main.lock.yml");
     const compiled = { ...record({}), references: { "/model": "/metadata/agent_model" } };
     const manifest = fields([compiled]);
-    expect(manifest).not.toHaveProperty("agent_metadata");
+    expect(manifest.agent_metadata).toEqual({});
     expect(manifest.metadata_refs).toEqual({ [`artifact:${compiled.sha256.slice(0, 20)}`]: compiled.references });
     expect(manifest).not.toHaveProperty("markdown_metadata");
     expect(JSON.stringify(manifest)).not.toContain('"kind":');
@@ -51,9 +51,15 @@ describe("compiler metadata source acquisition", () => {
     expect(() => metadata.readMarkdownMetadata("agent", document)).toThrow("invalid authored metadata");
   });
 
+  it("rejects retired model-pin projection records", () => {
+    const retired = { kind: "model-pins", sha256: "b".repeat(64), value: { model: "small" } };
+    expect(() => metadata.installMarkdownMetadata(catalog([retired]))).toThrow(/Invalid or duplicate/);
+    expect(() => metadata.metadataManifestFields(catalog([retired]))).toThrow(/Invalid compiler Markdown metadata source hash/);
+  });
+
   it.each(["metadata_refs", "metadata_errors"])("rejects invalid %s source keys", field => {
     const file = path.join(workspace, ".github/workflows/main.lock.yml");
-    fs.writeFileSync(file, `# gh-aw-metadata: {}\n# gh-aw-manifest: ${JSON.stringify({ model_pins: {}, [field]: { "artifact:invalid": field === "metadata_refs" ? {} : "invalid" } })}\n# generated\n`);
+    fs.writeFileSync(file, `# gh-aw-metadata: {}\n# gh-aw-manifest: ${JSON.stringify({ [field]: { "artifact:invalid": field === "metadata_refs" ? {} : "invalid" } })}\n# generated\n`);
     expect(() => metadata.readLocalMarkdownMetadata(file, workspace)).toThrow(/source hash/);
   });
 
@@ -61,13 +67,10 @@ describe("compiler metadata source acquisition", () => {
     const emptySource = "description: Private reader";
     const emptyDocument = `---\n${emptySource}\n---\nRead files.`;
     const sha256 = crypto.createHash("sha256").update(emptySource).digest("hex");
-    const records = [
-      { kind: "artifact", sha256, value: {} },
-      { kind: "model-pins", sha256: "b".repeat(64), value: {} },
-    ];
+    const records = [{ kind: "artifact", sha256, value: {} }];
     const manifest = fields(records);
-    expect(manifest).not.toHaveProperty("agent_metadata");
-    expect(manifest.model_pins).toEqual({});
+    expect(manifest.agent_metadata).toEqual({});
+    expect(manifest).not.toHaveProperty("model_pins");
     expect(manifest).not.toHaveProperty("metadata_empty");
     expect(JSON.stringify(manifest)).not.toContain(sha256);
     const file = path.join(workspace, ".github/workflows/main.lock.yml");
@@ -98,7 +101,7 @@ describe("compiler metadata source acquisition", () => {
     const compiled = record({});
     const hash = compiled.sha256.slice(0, 20);
     const key = `artifact:${hash}`;
-    const manifest = { model_pins: {}, agent_metadata: { [hash]: { empty: true } } };
+    const manifest = { agent_metadata: { [hash]: { empty: true } } };
     if (scenario === "reference") manifest.metadata_refs = { [key]: { "/model": "/metadata/agent_model" } };
     if (scenario === "error") manifest.metadata_errors = { [key]: "invalid source" };
     const file = path.join(workspace, ".github/workflows/main.lock.yml");
@@ -138,9 +141,8 @@ describe("compiler metadata source acquisition", () => {
     const file = path.join(workspace, ".github/workflows/main.lock.yml");
     const compiled = { ...record(null), references: { "": "/metadata/template" } };
     const rejected = { ...record(null), sha256: "b".repeat(64), error: "invalid authored metadata" };
-    const empty = { kind: "model-pins", sha256: "c".repeat(64), value: null };
-    const manifest = fields([compiled, rejected, empty]);
-    expect(manifest).not.toHaveProperty("agent_metadata");
+    const manifest = fields([compiled, rejected]);
+    expect(manifest.agent_metadata).toEqual({});
     expect(JSON.stringify(manifest)).not.toContain(":null");
     fs.writeFileSync(file, `# gh-aw-metadata: {"template":{"model":"small"}}\n# gh-aw-manifest: ${JSON.stringify(manifest)}\n# generated\n`);
     metadata.installMarkdownMetadata(metadata.readLocalMarkdownMetadata(file, workspace));
@@ -295,7 +297,7 @@ describe("compiler metadata source acquisition", () => {
 
   it("rejects malformed caller catalogs and missing cache transport explicitly", () => {
     const file = path.join(workspace, ".github/workflows/main.lock.yml");
-    fs.writeFileSync(file, '# gh-aw-metadata: {}\n# gh-aw-manifest: {"agent_metadata":[],"model_pins":{}}\n# generated\n');
+    fs.writeFileSync(file, '# gh-aw-metadata: {}\n# gh-aw-manifest: {"agent_metadata":[]}\n# generated\n');
     expect(() => metadata.ensureCheckoutMarkdownMetadata([document], workspace)).toThrow(/Invalid compiler metadata manifest/);
     expect(() => metadata.persistMarkdownMetadata()).toThrow(/cache is unavailable/);
   });

@@ -120,7 +120,7 @@ function installMarkdownMetadata(metadata, merge = false) {
     if (
       !record ||
       !/^[a-f0-9]{20,64}$/.test(record.sha256) ||
-      !["artifact", "model-pins"].includes(record.kind) ||
+      record.kind !== "artifact" ||
       !Object.hasOwn(record, "value") ||
       Object.hasOwn(record, "value_json") ||
       Object.hasOwn(record, "references") ||
@@ -153,15 +153,13 @@ function metadataManifestFields(catalog) {
   /** @type {Record<string, any>} */
   const agent_metadata = {};
   /** @type {Record<string, any>} */
-  const model_pins = {};
-  /** @type {Record<string, any>} */
   const metadata_refs = {};
   /** @type {Record<string, string>} */
   const metadata_errors = {};
   const input = coalesceMetadataRecords(catalog.records);
   const hashes = [...new Set(input.map(record => record.sha256))];
   for (const record of input) {
-    if (!/^[a-f0-9]{20,64}$/.test(record.sha256) || !["artifact", "model-pins"].includes(record.kind)) throw new Error("Invalid compiler Markdown metadata source hash");
+    if (!/^[a-f0-9]{20,64}$/.test(record.sha256) || record.kind !== "artifact") throw new Error("Invalid compiler Markdown metadata source hash");
     let length = metadataHashPrefixLength;
     while (length < record.sha256.length && hashes.some(other => other !== record.sha256 && other.startsWith(record.sha256.slice(0, length)))) length++;
     const hash = record.sha256.slice(0, length);
@@ -169,13 +167,12 @@ function metadataManifestFields(catalog) {
     const empty = emptyMetadataValue(record.value);
     const references = "references" in record ? record.references : undefined;
     const hasReferences = references !== undefined && (!references || typeof references !== "object" || Array.isArray(references) || Object.keys(references).length > 0);
-    if (!empty) (record.kind === "artifact" ? agent_metadata : model_pins)[hash] = record.value;
+    if (!empty) agent_metadata[hash] = record.value;
     if (hasReferences) metadata_refs[key] = references;
     if (record.error !== undefined) metadata_errors[key] = record.error;
   }
   return {
-    ...(Object.keys(agent_metadata).length ? { agent_metadata } : {}),
-    model_pins,
+    agent_metadata,
     ...(Object.keys(metadata_refs).length ? { metadata_refs } : {}),
     ...(Object.keys(metadata_errors).length ? { metadata_errors } : {}),
   };
@@ -183,10 +180,7 @@ function metadataManifestFields(catalog) {
 
 /** @param {Record<string, any>} manifest */
 function manifestMetadataCatalog(manifest) {
-  const groups = [
-    ["artifact", manifest.agent_metadata],
-    ["model-pins", manifest.model_pins],
-  ];
+  const groups = [["artifact", manifest.agent_metadata]];
   const references = manifest.metadata_refs ?? {};
   const errors = manifest.metadata_errors ?? {};
   if (![references, errors].every(value => value && typeof value === "object" && !Array.isArray(value))) throw new Error("Invalid compiler metadata manifest");
@@ -203,10 +197,10 @@ function manifestMetadataCatalog(manifest) {
     }
   }
   for (const key of new Set([...Object.keys(references), ...Object.keys(errors)])) {
-    const match = /^(artifact|model-pins):([a-f0-9]{20,64})$/.exec(key);
+    const match = /^artifact:([a-f0-9]{20,64})$/.exec(key);
     if (!match) throw new Error("Invalid compiler Markdown metadata source hash");
     if (Object.hasOwn(references, key) && (!references[key] || typeof references[key] !== "object" || Array.isArray(references[key]) || !Object.keys(references[key]).length)) throw new Error("Compiler metadata reference has no source");
-    const record = catalogRecords.get(key) ?? { kind: match[1], sha256: match[2], value: Object.hasOwn(errors, key) || Object.hasOwn(references[key] ?? {}, "") ? null : {} };
+    const record = catalogRecords.get(key) ?? { kind: "artifact", sha256: match[1], value: Object.hasOwn(errors, key) || Object.hasOwn(references[key] ?? {}, "") ? null : {} };
     if (Object.hasOwn(references, key)) record.references = references[key];
     if (Object.hasOwn(errors, key)) record.error = errors[key];
     catalogRecords.set(key, record);
@@ -238,7 +232,7 @@ function referencedMetadataValue(root, parts) {
 /** @param {{metadata?: Record<string, unknown>, manifest?: Record<string, unknown>}} headers */
 function resolveMarkdownMetadata(headers) {
   const manifest = headers.manifest;
-  if (!manifest || (!Object.hasOwn(manifest, "agent_metadata") && !Object.hasOwn(manifest, "model_pins") && !Object.hasOwn(manifest, "metadata_refs") && !Object.hasOwn(manifest, "metadata_errors"))) return undefined;
+  if (!manifest || (!Object.hasOwn(manifest, "agent_metadata") && !Object.hasOwn(manifest, "metadata_refs") && !Object.hasOwn(manifest, "metadata_errors"))) return undefined;
   const catalog = manifestMetadataCatalog(manifest);
   if (!catalog || typeof catalog !== "object" || !("version" in catalog) || catalog.version !== 2 || !("records" in catalog) || !Array.isArray(catalog.records)) throw new Error("Invalid compiler Markdown metadata manifest");
   const resolved = catalog.records.map(record => {
@@ -251,7 +245,7 @@ function resolveMarkdownMetadata(headers) {
     for (const destination of destinations) {
       const parts = metadataPointer(destination);
       const source = metadataPointer(references[destination]);
-      if (source.length < 2 || !["metadata", "manifest"].includes(source[0]) || (source[0] === "manifest" && ["agent_metadata", "model_pins", "metadata_refs", "metadata_errors", "metadata_empty", "markdown_metadata"].includes(source[1])))
+      if (source.length < 2 || !["metadata", "manifest"].includes(source[0]) || (source[0] === "manifest" && ["agent_metadata", "metadata_refs", "metadata_errors", "metadata_empty", "markdown_metadata"].includes(source[1])))
         throw new Error("Invalid Markdown metadata reference source");
       if (destinations.some(other => other !== destination && (destination === "" || other.startsWith(destination + "/")))) throw new Error("Overlapping Markdown metadata references");
       const value = structuredClone(referencedMetadataValue(headers, source));
@@ -349,7 +343,7 @@ function missingMarkdownMetadata(documents) {
       if (!source?.trim()) continue;
       const digest = metadataDigest(source);
       if (!findMetadataRecord("artifact", digest)) missing.add(digest);
-      else readDocumentMetadata(source, { kind: "artifact" });
+      else readDocumentMetadata(source);
     }
   }
   return missing;
@@ -413,7 +407,7 @@ function persistMarkdownMetadata() {
   if (!fs.existsSync(infoPath)) throw new Error("Compiler Markdown metadata cache is unavailable; activation must generate aw_info.json before installing skills");
   const info = JSON.parse(fs.readFileSync(infoPath, "utf8"));
   if (!info || typeof info !== "object" || Array.isArray(info)) throw new Error("Invalid compiler Markdown metadata cache");
-  for (const key of ["markdown_metadata", "agent_metadata", "model_pins", "metadata_refs", "metadata_errors", "metadata_empty"]) delete info[key];
+  for (const key of ["markdown_metadata", "agent_metadata", "metadata_refs", "metadata_errors", "metadata_empty"]) delete info[key];
   Object.assign(info, metadataManifestFields(currentMarkdownMetadata()));
   fs.writeFileSync(infoPath, JSON.stringify(info));
 }
@@ -428,13 +422,13 @@ function restoreCachedMetadata() {
   }
 }
 
-/** @param {string} source @param {{kind?: string}} [options] */
-function readDocumentMetadata(source, { kind = "document" } = {}) {
+/** @param {string} source */
+function readDocumentMetadata(source) {
   if (!source?.trim()) return { value: {} };
   restoreCachedMetadata();
   const digest = metadataDigest(source);
   const artifact = findMetadataRecord("artifact", digest);
-  const record = kind === "artifact" ? artifact : findMetadataRecord("model-pins", digest) || artifact;
+  const record = artifact;
   if (!record) return { value: {} };
   if (record.error) throw new Error(record.error);
   const compiled = structuredClone(record.value);
@@ -444,8 +438,6 @@ function readDocumentMetadata(source, { kind = "document" } = {}) {
   } catch {
     return { value: compiled };
   }
-  // Model-pin records deliberately project workflow configuration; only
-  // artifact metadata is also used directly by runtime engine readers.
   if (record.kind === "artifact") {
     const projected =
       runtime && typeof runtime === "object" && !Array.isArray(runtime) && compiled && typeof compiled === "object" && !Array.isArray(compiled)
@@ -497,7 +489,7 @@ function transformValues(value, transform) {
 function editMarkdownMetadata(content, transform) {
   const block = markdownMetadataBlocks(content, true)[0];
   if (!block) return content;
-  const value = readDocumentMetadata(block.source, { kind: "artifact" }).value ?? {};
+  const value = readDocumentMetadata(block.source).value ?? {};
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("agent frontmatter must be a mapping");
   return `---\n${renderMetadata(transform(value))}\n---${content.slice(block.end)}`;
 }
@@ -520,7 +512,7 @@ function transformMarkdownContent(content, transform) {
       cursor = block.end;
       continue;
     }
-    const value = readDocumentMetadata(block.source, { kind: "artifact" }).value ?? {};
+    const value = readDocumentMetadata(block.source).value ?? {};
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("agent frontmatter must be a mapping");
     metadata.push(value);
     result += `${prefix}${metadata.length - 1}\x00`;
@@ -534,7 +526,7 @@ function transformMarkdownContent(content, transform) {
 function readMarkdownMetadata(operation, content, options = {}) {
   if (operation === "document") return readDocumentMetadata(content);
   const block = markdownMetadataBlocks(content, true)[0];
-  const value = block ? (readDocumentMetadata(block.source, { kind: "artifact" }).value ?? {}) : {};
+  const value = block ? (readDocumentMetadata(block.source).value ?? {}) : {};
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("agent frontmatter must be a mapping");
   if (operation === "agent") return { value, content };
   if (operation === "ensure-name") {

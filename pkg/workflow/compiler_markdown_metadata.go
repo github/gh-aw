@@ -37,10 +37,7 @@ func (c *Compiler) collectMarkdownMetadata(data *WorkflowData) *GHAWMarkdownMeta
 	scan := func(content, documentKind string) {
 		scanMarkdownMetadata(records, content, documentKind)
 	}
-	if data.FrontmatterYAML != "" {
-		addMarkdownMetadataRecord(records, data.FrontmatterYAML, "model-pins")
-	}
-	scan(data.RawMarkdown, "model-pins")
+	scan(data.RawMarkdown, "workflow")
 	for _, content := range []string{data.MarkdownContent, data.MainWorkflowMarkdown, data.ImportedMarkdown} {
 		scan(content, "artifact")
 	}
@@ -81,9 +78,6 @@ func addMarkdownMetadataRecord(records map[string]GHAWMarkdownMetadataRecord, so
 	} else {
 		value, err = parser.CompileMarkdownMetadata(source)
 	}
-	if kind == "model-pins" && err == nil {
-		value = projectModelPinMetadata(value)
-	}
 	encoded, encodeErr := json.Marshal(value)
 	record := GHAWMarkdownMetadataRecord{SHA256: digest, Kind: kind, Value: encoded}
 	if err != nil {
@@ -98,6 +92,9 @@ func scanMarkdownMetadata(records map[string]GHAWMarkdownMetadataRecord, content
 	content = strings.ReplaceAll(content, "\r\n", "\n")
 	for _, block := range parser.ExtractMarkdownMetadataBlocks(content) {
 		if block.Skill || (block.Document && documentKind == "skill") {
+			continue
+		}
+		if block.Document && documentKind == "workflow" {
 			continue
 		}
 		kind := "artifact"
@@ -168,7 +165,7 @@ func scanRuntimeImportMetadata(root string, data *WorkflowData, scan func(string
 					continue
 				}
 				slash := strings.TrimPrefix(filepath.ToSlash(relative), constants.GithubDir)
-				kind := "model-pins"
+				kind := "workflow"
 				if strings.HasPrefix(slash, "agents/") || strings.Contains(slash, "/agents/") {
 					kind = "artifact"
 				} else if strings.HasPrefix(slash, "skills/") || strings.Contains(slash, "/skills/") || filepath.Base(slash) == "SKILL.md" {
@@ -187,7 +184,7 @@ func scanRuntimeImportMetadata(root string, data *WorkflowData, scan func(string
 
 func scanImportedDocumentMetadata(root, markdownPath string, data *WorkflowData, scan func(string, string)) {
 	for file, content := range data.ImportedMetadataDocuments {
-		kind := "model-pins"
+		kind := "workflow"
 		if strings.Contains(filepath.ToSlash(file), "/agents/") {
 			kind = "artifact"
 		} else if strings.Contains(filepath.ToSlash(file), "/skills/") || strings.HasSuffix(file, "SKILL.md") {
@@ -206,7 +203,7 @@ func scanImportedDocumentMetadata(root, markdownPath string, data *WorkflowData,
 				continue
 			}
 			if content, err := os.ReadFile(file); err == nil {
-				kind := "model-pins"
+				kind := "workflow"
 				if strings.Contains(filepath.ToSlash(file), "/agents/") {
 					kind = "artifact"
 				} else if strings.Contains(filepath.ToSlash(file), "/skills/") || strings.HasSuffix(file, "SKILL.md") {

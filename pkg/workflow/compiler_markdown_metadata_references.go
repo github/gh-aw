@@ -40,7 +40,7 @@ func deduplicateMarkdownMetadata(header string, manifest *GHAWManifest) error {
 		return err
 	}
 	delete(value, "markdown_metadata")
-	for _, key := range []string{"agent_metadata", "model_pins", "metadata_refs", "metadata_errors"} {
+	for _, key := range []string{"agent_metadata", "metadata_refs", "metadata_errors"} {
 		delete(value, key)
 	}
 	indexMarkdownMetadataValues(index, value, "/manifest")
@@ -69,11 +69,10 @@ func populateManifestMetadata(manifest *GHAWManifest) error {
 		return err
 	}
 	manifest.AgentMetadata = map[string]json.RawMessage{}
-	manifest.ModelPins = map[string]json.RawMessage{}
 	manifest.MetadataRefs = map[string]map[string]string{}
 	manifest.MetadataErrors = map[string]string{}
 	for _, record := range manifest.MarkdownMetadata.Records {
-		if record.Kind != "artifact" && record.Kind != "model-pins" {
+		if record.Kind != "artifact" {
 			return fmt.Errorf("invalid Markdown metadata kind: %q", record.Kind)
 		}
 		hash := hashes[record.SHA256]
@@ -85,11 +84,7 @@ func populateManifestMetadata(manifest *GHAWManifest) error {
 		object, mapping := value.(map[string]any)
 		empty := value == nil || (mapping && len(object) == 0)
 		if !empty {
-			if record.Kind == "artifact" {
-				manifest.AgentMetadata[hash] = record.Value
-			} else {
-				manifest.ModelPins[hash] = record.Value
-			}
+			manifest.AgentMetadata[hash] = record.Value
 		}
 		if len(record.References) > 0 {
 			manifest.MetadataRefs[key] = record.References

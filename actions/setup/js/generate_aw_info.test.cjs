@@ -33,7 +33,7 @@ const mockGithub = {
   rest: {
     repos: {
       getContent: vi.fn(async ({ path }) => ({
-        data: { type: "file", path, encoding: "base64", content: Buffer.from('# gh-aw-metadata: {}\n# gh-aw-manifest: {"version":1,"model_pins":{}}\n# compiled fixture\n').toString("base64") },
+        data: { type: "file", path, encoding: "base64", content: Buffer.from('# gh-aw-metadata: {}\n# gh-aw-manifest: {"version":1,"agent_metadata":{}}\n# compiled fixture\n').toString("base64") },
       })),
     },
     actions: {
@@ -98,7 +98,7 @@ describe("generate_aw_info.cjs", () => {
     vi.spyOn(fs, "realpathSync").mockImplementation(filename => (String(filename).endsWith(".lock.yml") ? String(filename) : realPath(filename)));
     vi.spyOn(fs, "readFileSync").mockImplementation((filename, ...args) => {
       if (String(filename).endsWith(".lock.yml")) {
-        const header = '# gh-aw-metadata: {}\n# gh-aw-manifest: {"version":1,"model_pins":{}}\n# compiled fixture\n';
+        const header = '# gh-aw-metadata: {}\n# gh-aw-manifest: {"version":1,"agent_metadata":{}}\n# compiled fixture\n';
         return args[0] === "utf8" ? header : Buffer.from(header);
       }
       if (files.has(String(filename))) return files.get(String(filename));
@@ -189,15 +189,12 @@ describe("generate_aw_info.cjs", () => {
 
   it("keeps compiler metadata in aw_info.json without dumping it to Actions logs", async () => {
     const agent = { name: "private-agent", description: "confidential-agent-description", model: "private-model", tools: ["confidential-tool"] };
-    const pins = { "private-model": "confidential-model-pin" };
     const digest = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");
     const agentDigest = digest(agent);
-    const pinsDigest = digest(pins);
     const errorDigest = digest("invalid-agent-source");
     const manifest = {
       version: 1,
       agent_metadata: { [agentDigest]: agent, [errorDigest]: null },
-      model_pins: { [pinsDigest]: pins },
       metadata_errors: { [`artifact:${errorDigest}`]: "confidential-compiler-error" },
     };
     mockGithub.rest.repos.getContent.mockImplementationOnce(async ({ path }) => ({
@@ -209,7 +206,6 @@ describe("generate_aw_info.cjs", () => {
     const awInfo = JSON.parse(fs.readFileSync(awInfoPath, "utf8"));
     expect(awInfo).toMatchObject({
       agent_metadata: { [agentDigest.slice(0, 20)]: agent },
-      model_pins: { [pinsDigest.slice(0, 20)]: pins },
       metadata_errors: { [`artifact:${errorDigest.slice(0, 20)}`]: "confidential-compiler-error" },
       engine_id: "copilot",
       run_id: mockContext.runId,
@@ -219,7 +215,7 @@ describe("generate_aw_info.cjs", () => {
     expect(mockCore.setOutput).toHaveBeenCalledWith("engine_id", "copilot");
     expect(mockCore.info).toHaveBeenCalledWith("Generated aw_info.json at: " + awInfoPath);
     const logs = [mockCore.info, mockCore.debug, mockCore.warning, mockCore.error].flatMap(log => log.mock.calls.flat()).join("\n");
-    for (const value of ["agent_metadata", "model_pins", "metadata_errors", agent.name, agent.description, agent.model, ...agent.tools, ...Object.values(pins), ...Object.values(manifest.metadata_errors)]) {
+    for (const value of ["agent_metadata", "model_pins", "metadata_errors", agent.name, agent.description, agent.model, ...agent.tools, ...Object.values(manifest.metadata_errors)]) {
       expect(logs).not.toContain(value);
     }
   });

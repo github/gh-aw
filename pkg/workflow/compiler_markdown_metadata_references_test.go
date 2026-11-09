@@ -9,22 +9,19 @@ import (
 )
 
 func TestCompilerMarkdownMetadataOmitsEmptyProjections(t *testing.T) {
-	agentSHA, modelSHA := strings.Repeat("a", 64), strings.Repeat("b", 64)
+	agentSHA := strings.Repeat("a", 64)
 	referenceSHA, errorSHA := strings.Repeat("c", 64), strings.Repeat("d", 64)
 	manifest := &GHAWManifest{MarkdownMetadata: &GHAWMarkdownMetadata{
 		Version: 2,
 		Records: []GHAWMarkdownMetadataRecord{
 			{Kind: "artifact", SHA256: agentSHA, Value: json.RawMessage(`{}`)},
-			{Kind: "model-pins", SHA256: modelSHA, Value: json.RawMessage(`{ }`)},
 			{Kind: "artifact", SHA256: referenceSHA, Value: json.RawMessage(`null`), References: map[string]string{"": "/metadata/agent"}},
 			{Kind: "artifact", SHA256: errorSHA, Value: json.RawMessage(`null`), Error: "invalid source"},
 		},
 	}}
 	require.NoError(t, populateManifestMetadata(manifest))
 	require.Empty(t, manifest.AgentMetadata)
-	require.Empty(t, manifest.ModelPins)
 	require.NotContains(t, manifest.AgentMetadata, agentSHA)
-	require.NotContains(t, manifest.ModelPins, modelSHA)
 	require.NotContains(t, manifest.AgentMetadata, referenceSHA[:20])
 	require.NotContains(t, manifest.AgentMetadata, errorSHA[:20])
 	require.Equal(t, map[string]string{"": "/metadata/agent"}, manifest.MetadataRefs["artifact:"+referenceSHA[:20]])
@@ -32,12 +29,12 @@ func TestCompilerMarkdownMetadataOmitsEmptyProjections(t *testing.T) {
 	encoded, err := manifest.ToJSON()
 	require.NoError(t, err)
 	require.NotContains(t, encoded, agentSHA)
-	require.NotContains(t, encoded, modelSHA)
+	require.NotContains(t, encoded, `"model_pins"`)
 	require.NotContains(t, encoded, `"metadata_empty"`)
 	require.NotContains(t, encoded, `"empty":true`)
 	require.NotContains(t, encoded, `"`+referenceSHA[:20]+`":null`)
 	require.NotContains(t, encoded, `"`+errorSHA[:20]+`":null`)
-	require.Len(t, manifest.MarkdownMetadata.Records, 4)
+	require.Len(t, manifest.MarkdownMetadata.Records, 3)
 }
 
 func TestCompilerMarkdownMetadataRejectsInvalidEmptyApprovals(t *testing.T) {
@@ -69,7 +66,7 @@ func TestCompilerMarkdownMetadataReusesHeaderFields(t *testing.T) {
 	manifest.MarkdownMetadata = &GHAWMarkdownMetadata{
 		Version: 2,
 		Records: []GHAWMarkdownMetadataRecord{{
-			SHA256: strings.Repeat("a", 64), Kind: "model-pins",
+			SHA256: strings.Repeat("a", 64), Kind: "artifact",
 			Value: json.RawMessage(`{"engine":{"id":"copilot","model":"primary"},"skills":["local/reader"],"rate":0.25,"description":"Unique description"}`),
 		}},
 	}
@@ -85,7 +82,7 @@ func TestCompilerMarkdownMetadataReusesHeaderFields(t *testing.T) {
 	encoded, err := manifest.ToJSON()
 	require.NoError(t, err)
 	require.NotContains(t, encoded, "value_json")
-	require.Contains(t, encoded, `"model_pins":{"`+strings.Repeat("a", 20)+`":{`)
+	require.Contains(t, encoded, `"agent_metadata":{"`+strings.Repeat("a", 20)+`":{`)
 	require.NotContains(t, encoded, `"markdown_metadata"`)
 	require.NotContains(t, encoded, `"sha256"`)
 	require.NotContains(t, encoded, `"kind"`)

@@ -42,7 +42,6 @@ describe("compiler-owned Markdown metadata", () => {
 
   it.each(["model: [invalid", '{"model":"forged","tools":["Write"]}', "model: &a [*a]", "description: unused"])("defaults absent source metadata to empty without interpreting %s", source => {
     expect(readDocumentMetadata(source, { kind: "artifact" }).value).toEqual({});
-    expect(readDocumentMetadata(source, { kind: "model-pins" }).value).toEqual({});
     const content = `---\n${source}\n---\nBody`;
     expect(transformMarkdownContent(content, text => text)).toBe("---\n{}\n---\nBody");
   });
