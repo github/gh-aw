@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -27,15 +28,29 @@ func loadMiniSweAgentSample(t *testing.T) *EngineDefinition {
 	return &frontmatter.Engine
 }
 
+func miniSweAgentLockHash(t *testing.T) string {
+	t.Helper()
+	hash := loadMiniSweAgentSample(t).Behaviors.Execution.Env["GH_AW_MINI_DEPS_LOCK_SHA256"]
+	require.Len(t, hash, 64)
+	return hash
+}
+
+func miniSweAgentLockHashFor(contents []byte) string {
+	hash := sha256.Sum256(contents)
+	return fmt.Sprintf("%x", hash)
+}
+
 func miniSweAgentBootstrapScript(t *testing.T) string {
 	t.Helper()
 	var frontmatter struct {
 		Steps []struct {
-			Run string `yaml:"run"`
+			Run string            `yaml:"run"`
+			Env map[string]string `yaml:"env"`
 		} `yaml:"pre-agent-steps"`
 	}
 	readConformanceFrontmatter(t, "../../.github/workflows/shared/mini-swe-agent.md", &frontmatter)
 	require.Len(t, frontmatter.Steps, 1)
+	require.Equal(t, miniSweAgentLockHash(t), frontmatter.Steps[0].Env["GH_AW_MINI_DEPS_LOCK_SHA256"])
 	run := frontmatter.Steps[0].Run
 	require.True(t, strings.HasPrefix(run, "python3 -I - <<'PY'\n"))
 	require.True(t, strings.HasSuffix(run, "\nPY\n"))
@@ -48,7 +63,8 @@ func miniSweAgentBootstrapCommand(t *testing.T, dir string) *exec.Cmd {
 	require.NoError(t, os.WriteFile(script, []byte(miniSweAgentBootstrapScript(t)), 0o600))
 	cmd := exec.Command("python3", "-I", "-c", miniSweAgentBootstrapStubs, script)
 	cmd.Env = append(os.Environ(), "GH_AW_ENGINE_VERSION="+loadMiniSweAgentSample(t).Version,
-		"GH_AW_MINI_DEPS="+filepath.Join(dir, "dependencies"))
+		"GH_AW_MINI_DEPS="+filepath.Join(dir, "dependencies"),
+		"GH_AW_MINI_DEPS_LOCK_SHA256="+miniSweAgentLockHash(t))
 	return cmd
 }
 
@@ -267,6 +283,7 @@ func TestMiniSweAgentPythonExecution(t *testing.T) {
 			cmd.Args = append(cmd.Args, status)
 			cmd.Env = append(cmd.Env, "GH_AW_ENGINE_VERSION="+def.Version,
 				"GH_AW_MINI_DEPS="+filepath.Join(dir, "dependencies"),
+				"GH_AW_MINI_DEPS_LOCK_SHA256="+miniSweAgentLockHash(t),
 				"GH_AW_MINI_TRAJECTORY="+filepath.Join(dir, "agent", "trajectory.json"))
 			output, err := cmd.CombinedOutput()
 			if status == "Submitted" {
@@ -406,7 +423,10 @@ func TestMiniSweAgentPythonRejectsUnlockedVersion(t *testing.T) {
 	dir := t.TempDir()
 	stageMiniSweAgentTestLock(t, dir)
 	cmd := miniSweAgentHarnessCommand(t, dir, append([]string{"python3"}, def.Behaviors.Execution.Args...)...)
-	cmd.Env = append(cmd.Env, "GH_AW_ENGINE_VERSION=0.0.0", "GH_AW_MINI_DEPS="+filepath.Join(dir, "dependencies"))
+	cmd.Env = append(cmd.Env,
+		"GH_AW_ENGINE_VERSION=0.0.0",
+		"GH_AW_MINI_DEPS="+filepath.Join(dir, "dependencies"),
+		"GH_AW_MINI_DEPS_LOCK_SHA256="+miniSweAgentLockHash(t))
 	output, err := cmd.CombinedOutput()
 	require.Error(t, err)
 	assert.Contains(t, string(output), "version must match the dependency lock")
@@ -416,19 +436,48 @@ func TestMiniSweAgentPythonRequiresStagedLock(t *testing.T) {
 	def := loadMiniSweAgentSample(t)
 	dir := t.TempDir()
 	cmd := miniSweAgentHarnessCommand(t, dir, append([]string{"python3"}, def.Behaviors.Execution.Args...)...)
-	cmd.Env = append(cmd.Env, "GH_AW_ENGINE_VERSION="+def.Version, "GH_AW_MINI_DEPS="+filepath.Join(dir, "dependencies"))
+	cmd.Env = append(cmd.Env,
+		"GH_AW_ENGINE_VERSION="+def.Version,
+		"GH_AW_MINI_DEPS="+filepath.Join(dir, "dependencies"),
+		"GH_AW_MINI_DEPS_LOCK_SHA256="+miniSweAgentLockHash(t))
 	output, err := cmd.CombinedOutput()
 	require.Error(t, err)
 	assert.Contains(t, string(output), "requirements.lock")
 	assert.NotContains(t, string(output), "mini-SWE-agent exit status")
 }
 
+func TestMiniSweAgentPythonRejectsTamperedLock(t *testing.T) {
+	def := loadMiniSweAgentSample(t)
+	dir := t.TempDir()
+	stageMiniSweAgentTestLock(t, dir)
+	dependencies := filepath.Join(dir, "dependencies")
+	lock := filepath.Join(dependencies, "requirements.lock")
+	requirements, err := os.ReadFile(lock)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(lock, append(requirements, []byte("# modified\n")...), 0o600))
+	cmd := miniSweAgentHarnessCommand(t, dir, append([]string{"python3"}, def.Behaviors.Execution.Args...)...)
+	cmd.Env = append(cmd.Env,
+		"GH_AW_ENGINE_VERSION="+def.Version,
+		"GH_AW_MINI_DEPS="+dependencies,
+		"GH_AW_MINI_DEPS_LOCK_SHA256="+miniSweAgentLockHash(t))
+	output, err := cmd.CombinedOutput()
+	require.Error(t, err)
+	assert.Contains(t, string(output), "does not match the trusted bootstrap lock")
+	assert.NotContains(t, string(output), "mini-SWE-agent exit status")
+}
+
 func TestMiniSweAgentPythonRejectsTamperedWheel(t *testing.T) {
 	if err := exec.Command("python3", "-I", "-c",
 		`import platform, sys; sys.exit(0 if sys.version_info[:2] == (3, 12) and sys.platform == "linux" and platform.machine() == "x86_64" else 1)`).Run(); err != nil {
+		if os.Getenv("GH_AW_REQUIRE_MINI_PY312") == "1" {
+			t.Fatalf("Linux x86-64 and Python 3.12 are required for the offline hash-verification test: %v", err)
+		}
 		t.Skip("Linux x86-64 and Python 3.12 are required for the offline hash-verification test")
 	}
 	if err := exec.Command("python3", "-I", "-m", "pip", "--version").Run(); err != nil {
+		if os.Getenv("GH_AW_REQUIRE_MINI_PY312") == "1" {
+			t.Fatalf("isolated pip is required for the offline hash-verification test: %v", err)
+		}
 		t.Skip("isolated pip is required for the offline hash-verification test")
 	}
 	def := loadMiniSweAgentSample(t)
@@ -445,13 +494,17 @@ func TestMiniSweAgentPythonRejectsTamperedWheel(t *testing.T) {
 		}
 	}
 	require.NotEmpty(t, miniRequirement)
-	require.NoError(t, os.WriteFile(lock, []byte(miniRequirement+"\n"), 0o600))
+	requirements = []byte(miniRequirement + "\n")
+	require.NoError(t, os.WriteFile(lock, requirements, 0o600))
 	wheels := filepath.Join(dependencies, "wheels")
 	require.NoError(t, os.MkdirAll(wheels, 0o700))
 	require.NoError(t, os.WriteFile(filepath.Join(wheels, "mini_swe_agent-"+def.Version+"-py3-none-any.whl"),
 		[]byte("tampered wheel"), 0o600))
 	cmd := miniSweAgentHarnessCommand(t, dir, append([]string{"python3"}, def.Behaviors.Execution.Args...)...)
-	cmd.Env = append(cmd.Env, "GH_AW_ENGINE_VERSION="+def.Version, "GH_AW_MINI_DEPS="+dependencies)
+	cmd.Env = append(cmd.Env,
+		"GH_AW_ENGINE_VERSION="+def.Version,
+		"GH_AW_MINI_DEPS="+dependencies,
+		"GH_AW_MINI_DEPS_LOCK_SHA256="+miniSweAgentLockHashFor(requirements))
 	output, err := cmd.CombinedOutput()
 	require.Error(t, err)
 	assert.Contains(t, string(output), "DO NOT MATCH THE HASHES")
@@ -466,7 +519,8 @@ func TestMiniSweAgentPinnedPackageSmoke(t *testing.T) {
 	def := loadMiniSweAgentSample(t)
 	bootstrap := exec.Command("python3", "-I", "-c", miniSweAgentBootstrapScript(t))
 	bootstrap.Env = append(os.Environ(), "GH_AW_ENGINE_VERSION="+def.Version,
-		"GH_AW_MINI_DEPS="+filepath.Join(dir, "dependencies"))
+		"GH_AW_MINI_DEPS="+filepath.Join(dir, "dependencies"),
+		"GH_AW_MINI_DEPS_LOCK_SHA256="+miniSweAgentLockHash(t))
 	bootstrapOutput, bootstrapErr := bootstrap.CombinedOutput()
 	require.NoError(t, bootstrapErr, "%s", bootstrapOutput)
 	prompt := "Local mini-SWE-agent smoke: print MINI_LOCAL_SMOKE and submit."
@@ -513,6 +567,7 @@ func TestMiniSweAgentPinnedPackageSmoke(t *testing.T) {
 	cmd.Env = append(cmd.Env,
 		"GH_AW_ENGINE_VERSION="+def.Version,
 		"GH_AW_MINI_DEPS="+filepath.Join(dir, "dependencies"),
+		"GH_AW_MINI_DEPS_LOCK_SHA256="+miniSweAgentLockHash(t),
 		"GH_AW_MINI_TRAJECTORY="+filepath.Join(dir, "trajectory.json"),
 		fmt.Sprintf(`MINI_TEST_REFLECT={"ok":true,"reflectData":{"endpoints":[{"provider":"github","configured":true,"models_url":"%s/v1/models"}]}}`, server.URL))
 	output, err := cmd.CombinedOutput()

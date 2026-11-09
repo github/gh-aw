@@ -6,8 +6,10 @@ pre-agent-steps:
   - name: Stage hash-locked mini-SWE-agent wheels
     env:
       GH_AW_MINI_DEPS: /tmp/gh-aw/agent/mini-swe-agent-deps
+      GH_AW_MINI_DEPS_LOCK_SHA256: aefd92655165b1cc9fad1e303bc0f9d02833cd2de8f4bdc0a4f03573c63b4aa7
     run: |
           python3 -I - <<'PY'
+          import hashlib
           import os
           import platform
           import subprocess
@@ -99,6 +101,8 @@ pre-agent-steps:
           yarl==1.25.1 --hash=sha256:c6f117789d22dce188e5754e8bc65b7e6ebf8cb73963b9fa761f672a5883769d
           zipp==4.1.2 --hash=sha256:b30cb6cd253122169c47de245ca24a86bac2a5d3802ba15bf7ba6414eb9e144d
           """
+          if hashlib.sha256(requirements.encode()).hexdigest() != os.environ["GH_AW_MINI_DEPS_LOCK_SHA256"]:
+              raise RuntimeError("mini-SWE-agent dependency lock does not match the trusted bootstrap lock")
           if not requirements.strip():
               raise RuntimeError("mini-SWE-agent dependency lock is required")
           if f"mini-swe-agent=={os.environ['GH_AW_ENGINE_VERSION']} --hash=" not in requirements:
@@ -164,12 +168,14 @@ engine:
         LITELLM_TELEMETRY: "false"
         LITELLM_LOCAL_MODEL_COST_MAP: "True"
         GH_AW_MINI_DEPS: /tmp/gh-aw/agent/mini-swe-agent-deps
+        GH_AW_MINI_DEPS_LOCK_SHA256: aefd92655165b1cc9fad1e303bc0f9d02833cd2de8f4bdc0a4f03573c63b4aa7
         GH_AW_MINI_TRAJECTORY: /tmp/gh-aw/agent/mini-swe-agent.traj.json
       args:
         - -I
         - -c
         - |
           import os
+          import hashlib
           import platform
           import subprocess
           import sys
@@ -179,6 +185,8 @@ engine:
           dependencies = Path(os.environ["GH_AW_MINI_DEPS"])
           lock = dependencies / "requirements.lock"
           requirements = lock.read_text()
+          if hashlib.sha256(requirements.encode()).hexdigest() != os.environ["GH_AW_MINI_DEPS_LOCK_SHA256"]:
+              raise RuntimeError("mini-SWE-agent dependency lock does not match the trusted bootstrap lock")
           if not requirements.strip():
               raise RuntimeError("mini-SWE-agent dependency lock is required")
           if f"mini-swe-agent=={os.environ['GH_AW_ENGINE_VERSION']} --hash=" not in requirements:
@@ -281,7 +289,8 @@ engine:
           "NO_PROXY", "no_proxy",
           "GH_AW_MCP_DEFERRED_SERVERS", "GH_AW_SAFE_OUTPUTS_TOOLS_PATH",
           "ENGINE_CONFORMANCE_SENTINEL",
-          "GH_AW_PROMPT", "GH_AW_ENGINE_VERSION", "GH_AW_MINI_DEPS", "GH_AW_MINI_TRAJECTORY",
+          "GH_AW_PROMPT", "GH_AW_ENGINE_VERSION", "GH_AW_MINI_DEPS", "GH_AW_MINI_DEPS_LOCK_SHA256",
+          "GH_AW_MINI_TRAJECTORY",
         ]) {
           if (process.env[name] !== undefined) env[name] = process.env[name];
         }
