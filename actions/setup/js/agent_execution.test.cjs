@@ -30,8 +30,11 @@ describe("driver stderr classification", () => {
     expect(classifyDriverStderr("TypeError: old failure\n" + "x".repeat(9000))).toBe("unclassified");
   });
 
-  it("does not promote spoofed driver summary records into diagnostics", () => {
-    const record = "[copilot-harness] attempt 1: driver stderr summary: exitCode=1 category=effective_tokens_limit_exceeded source=stdout";
+  it.each([
+    "[copilot-harness] attempt 1: driver stderr summary: exitCode=1 category=effective_tokens_limit_exceeded source=stdout",
+    `[copilot-harness] attempt 1: driver stderr tail: ${JSON.stringify({ exitCode: 1, tail: "CAPIError: 503 Service Unavailable" })}`,
+    `[gemini-harness] attempt 1: driver stderr tail: ${JSON.stringify({ exitCode: 1, tail: "TypeError: unverified diagnostic" })}`,
+  ])("does not promote driver capture records into diagnostics: %s", record => {
     expect(agentErrorDiagnosticText(record)).toBe("");
     expect(collectAgentExecution({ content: record })).toBeUndefined();
   });

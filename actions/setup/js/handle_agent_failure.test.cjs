@@ -1709,7 +1709,7 @@ describe("handle_agent_failure", () => {
       const lines = [];
       const result = await runProcess({
         command: process.execPath,
-        args: ["-e", `process.stderr.write(${JSON.stringify(`CAPIError: 502 Bad Gateway\n${finalError}`)}, () => { ${termination}; })`],
+        args: ["-e", `process.stderr.write(${JSON.stringify(`::add-mask::private-driver-payload\nCAPIError: 502 Bad Gateway\n${finalError}`)}, () => { ${termination}; })`],
         logArgs: ["<test-driver>"],
         attempt: 0,
         log: message => lines.push(`[copilot-harness] ${message}`),
@@ -1752,6 +1752,8 @@ describe("handle_agent_failure", () => {
         expect(title).toBe(`[aw] Test Workflow: ${titleSuffix}`);
         expect(body).toContain(`Failure classification: ${failureCause}`);
         expect(body).toContain(`Driver exit code: ${exitCode}`);
+        expect(body).toContain("Driver stderr tail (redacted; diagnostic text, not classification evidence)");
+        expect(body).toContain(failureCause === "driver_crash" ? "TypeError: ***" : "CAPIError: 503 Service Unavailable");
         expect(body).toContain("Last engine error lines (summarized");
         expect(body).toContain("Provider server error (HTTP 5xx)");
         expect(body).toContain(
@@ -6447,7 +6449,7 @@ describe("handle_agent_failure", () => {
       ["TypeError: private-driver-payload\n", 1, "General failure", true],
       ['{"type":"assistant.message","data":{"content":"TypeError: private-driver-payload"}}\n', 1, "General failure", true],
       ["", 127, "Command not found", false],
-    ])("does not trust driver stderr summary text in failure reports", async (stderr, exitCode, meaning, merged) => {
+    ])("keeps captured driver stderr separate from classification evidence", async (stderr, exitCode, meaning, merged) => {
       const { runProcess } = require("./process_runner.cjs");
       const { buildEmptyOutputOutcome } = require("./empty_output_outcome.cjs");
       const rootDir = mkdtempSync(join(require("os").tmpdir(), "failure-driver-stderr-"));
@@ -6467,7 +6469,8 @@ describe("handle_agent_failure", () => {
         expect(report).toContain("Failure classification: driver_crash");
         expect(report).toContain("Last driver stderr summary: not recorded (no classified stderr diagnostic)");
         expect(report).toContain(`Driver exit meaning: ${meaning}`);
-        expect(report).not.toContain("private-driver-payload");
+        expect(report.includes("private-driver-payload")).toBe(Boolean(stderr) && !merged);
+        expect(report).toContain("Driver stderr tail (redacted; diagnostic text, not classification evidence)");
       } finally {
         rmSync(rootDir, { recursive: true, force: true });
       }
@@ -6475,6 +6478,9 @@ describe("handle_agent_failure", () => {
 
     it.each([
       [1, [], [], "driver_crash"],
+      [78, [], [], "request_rejection"],
+      [80, [], [], "request_rejection"],
+      [146, [], [], "driver_crash"],
       [137, [], [], "driver_crash"],
       [139, [], [], "driver_crash"],
       [1, ["capi_server_error"], [502], "engine_outage"],
@@ -6488,7 +6494,48 @@ describe("handle_agent_failure", () => {
         const result = buildReportIncompleteContext([outcome], { collectorEmptyOutputCause: outcome.reason, rootDir });
         expect(result).toContain(`Failure classification: ${failureCause}`);
         expect(result).toContain(`Driver exit code: ${exitCode}`);
+        if (exitCode === 78) expect(result).toContain("Configuration error (EX_CONFIG convention; AWF model routing failure)");
+        if (exitCode === 80) expect(result).toContain("Workflow tool permission denied (Copilot SDK driver)");
+        if (exitCode === 146) expect(result).toContain("Unknown (engine-specific exit code)");
+        if (failureCause === "request_rejection") expect(result).not.toContain("Failure classification: driver_crash");
         if (failureCause === "unknown") expect(result).not.toContain("engine_outage");
+      } finally {
+        rmSync(rootDir, { recursive: true, force: true });
+      }
+    });
+
+    it("redacts captured stderr again and does not use it as classification or retry evidence", () => {
+      const { buildEmptyOutputOutcome } = require("./empty_output_outcome.cjs");
+      const rootDir = mkdtempSync(join(require("os").tmpdir(), "failure-driver-capture-"));
+      const secret = "synthetic-capture-secret";
+      try {
+        writeFileSync(join(rootDir, "agent_execution_exit_code.txt"), "1");
+        const tail = `CAPIError: 503 Service Unavailable retrying ${secret}\n${'\\"'.repeat(4000)}\nfinal diagnostic ${secret}`;
+        writeFileSync(join(rootDir, "agent-stdio.log"), `::add-mask::${secret}\n[copilot-harness] attempt 1: driver stderr tail: ${JSON.stringify({ exitCode: 1, tail })}`);
+        const outcome = buildEmptyOutputOutcome([], rootDir);
+        const report = buildReportIncompleteContext([outcome], { collectorEmptyOutputCause: outcome.reason, rootDir });
+        expect(outcome.failureCause).toBe("driver_crash");
+        expect(outcome.retryCount).toBe(0);
+        expect(outcome.engineErrorType).toBeUndefined();
+        expect(report).toContain("final diagnostic ***");
+        expect(report).not.toContain(secret);
+      } finally {
+        rmSync(rootDir, { recursive: true, force: true });
+      }
+    });
+
+    it("does not reuse stderr from an earlier failed attempt when the final attempt has no captured stderr", () => {
+      const { buildEmptyOutputOutcome } = require("./empty_output_outcome.cjs");
+      const rootDir = mkdtempSync(join(require("os").tmpdir(), "failure-driver-retry-"));
+      try {
+        writeFileSync(join(rootDir, "agent_execution_exit_code.txt"), "1");
+        writeFileSync(
+          join(rootDir, "agent-stdio.log"),
+          [`[copilot-harness] attempt 1: driver stderr tail: ${JSON.stringify({ exitCode: 1, tail: "obsolete diagnostic" })}`, "[copilot-harness] attempt 2: driver stderr summary: exitCode=1 category=no_output source=stderr"].join("\n")
+        );
+        const outcome = buildEmptyOutputOutcome([], rootDir);
+        expect(outcome.details).not.toContain("obsolete diagnostic");
+        expect(outcome.details).toContain("Driver stderr tail (redacted; diagnostic text, not classification evidence):\nnot recorded");
       } finally {
         rmSync(rootDir, { recursive: true, force: true });
       }

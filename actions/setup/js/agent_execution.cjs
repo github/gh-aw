@@ -72,6 +72,7 @@ function isAgentDiagnosticLine(line) {
   if (/^(?:(?:Syntax|Type|Reference|Range|URI|Eval)Error:|Error \[(?:ERR_MODULE_NOT_FOUND|MODULE_NOT_FOUND|ERR_INVALID_TYPESCRIPT_SYNTAX)\]:|Error: Cannot find (?:module|package)\b|FATAL ERROR:.*(?:heap|Allocation failed))/.test(line))
     return true;
   if (/^(?:[^\s:]+:\s+.*(?:command not found|Permission denied)|Error: spawn \S+ (?:ENOENT|EACCES)\b)/i.test(line)) return true;
+  if (/^\[[a-z][a-z0-9-]*-harness\].*\bdriver stderr tail:/.test(line)) return false;
   if (/^\[(?:copilot|claude|codex)-harness\]/.test(line)) return !/\b(?:outputTail=|spawning:|resolved --prompt-file:|driver stderr summary:)/.test(line);
   if (/^\[(?:copilot-sdk-driver|sdk-driver)\]\s+(?:\[sdk-driver\]\s+)?(?:error|unhandled error):/i.test(line)) return true;
   if (/^\[gh-aw\/pi-provider\]\s+\S+\s+provider_error\b/.test(line)) return true;

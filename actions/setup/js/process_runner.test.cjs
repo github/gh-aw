@@ -340,6 +340,57 @@ describe("process_runner.cjs", () => {
       expect(logs).toContain("attempt 1: driver stderr summary: exitCode=1 category=unclassified source=stderr");
     });
 
+    it.each([1, 78, 80, 146])("captures a bounded redacted stderr tail for exit %s, without stdout", async exitCode => {
+      const logs = [];
+      const masked = "synthetic-mask-value";
+      const token = "ghp_" + "a".repeat(36);
+      const result = await runProcess({
+        command: process.execPath,
+        args: [
+          "-e",
+          `process.stdout.write('::add-mask::${masked}\\nstdout-only\\n');process.stderr.write('old diagnostic\\n'+'progress\\n'.repeat(30)+'x'.repeat(5000)+'\\nfinal diagnostic ${masked} ${token}\\n');process.exit(${exitCode});`,
+        ],
+        logArgs: ["<test-driver>"],
+        attempt: 0,
+        log: message => logs.push(message),
+      });
+      expect(result.exitCode).toBe(exitCode);
+      const record = JSON.parse(logs.find(line => line.startsWith("attempt 1: driver stderr tail: ")).split("driver stderr tail: ")[1]);
+      expect(record.exitCode).toBe(exitCode);
+      expect(record.tail).toContain("final diagnostic");
+      expect(record.tail).not.toContain(masked);
+      expect(record.tail).not.toContain(token);
+      expect(record.tail).not.toContain("stdout-only");
+      expect(record.tail).not.toContain("old diagnostic");
+      expect(record.tail.length).toBeLessThanOrEqual(4000);
+      expect(record.tail.split("\n").length).toBeLessThanOrEqual(20);
+    });
+
+    it.each([0, 1])("omits captured stderr tails for protected capture (exit %s)", async exitCode => {
+      const logs = [];
+      await runProcess({
+        command: process.execPath,
+        args: ["-e", `process.stderr.write('protected diagnostic');process.exit(${exitCode});`],
+        logArgs: ["<test-driver>"],
+        env: { ...process.env, GH_AW_PROTECTED_SESSION_CAPTURE: "1" },
+        attempt: 0,
+        log: message => logs.push(message),
+      });
+      expect(logs.some(line => line.includes("driver stderr tail:"))).toBe(false);
+    });
+
+    it("omits captured stderr tails after success", async () => {
+      const logs = [];
+      await runProcess({
+        command: process.execPath,
+        args: ["-e", "process.stderr.write('successful diagnostic')"],
+        logArgs: ["<test-driver>"],
+        attempt: 0,
+        log: message => logs.push(message),
+      });
+      expect(logs.some(line => line.includes("driver stderr tail:"))).toBe(false);
+    });
+
     it("sets hasOutput false when no output is produced", async () => {
       const logs = [];
       const result = await runProcess({

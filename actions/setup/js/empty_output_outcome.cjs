@@ -11,6 +11,7 @@ const { collectArtifactSecretValues } = require("./safe_output_manifest.cjs");
 const { collectAddMaskedValues } = require("./add_mask_redaction.cjs");
 const { redactDiagnosticText, redactAndBoundDiagnostics } = require("./diagnostic_sanitization.cjs");
 const { lstatGuard } = require("./symlink_guard.cjs");
+const { hasWorkflowToolPermissionDenial } = require("./permission_denied_helpers.cjs");
 
 // Keep cause titles and the category allow-list in sync; schema and docs list these causes too.
 const EMPTY_OUTPUT_CAUSES = Object.freeze({
@@ -322,6 +323,7 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
   if (agentNotStarted) reason = "agent_startup_failure";
   const redactedLines = [];
   for (const event of iterateJsonlEvents(stdio)) {
+    if (/^\[[a-z][a-z0-9-]*-harness\].*\bdriver stderr tail:/.test(event.rawLine)) continue;
     const ending = event.rawLine.endsWith("\r\n") ? "\r\n" : event.rawLine.endsWith("\n") ? "\n" : "";
     redactedLines.push(event.type === "json" ? redactJson(event.value) + ending : redact(event.rawLine));
   }
@@ -330,6 +332,22 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
   const engineSummary = agentNotStarted ? "" : agentErrorSummaryText(safeStdio, events, rawSourceEngine);
   if (engineSummary) diagnostics.add(engineSummary);
   const driverExitSignal = crashSignalNameForExitCode(driverExitCode) ?? ({ 130: "SIGINT", 137: "SIGKILL", 143: "SIGTERM" }[driverExitCode] || undefined);
+  let driverStderrTail = "";
+  if (!protectedCapture && !agentNotStarted && driverExitCode > 0) {
+    for (const line of stdio.split(/\r?\n/)) {
+      if (/^\[[a-z][a-z0-9-]*-harness\].*\bdriver stderr summary:/.test(line)) driverStderrTail = "";
+      const record = line.match(/^\[[a-z][a-z0-9-]*-harness\] (?:\d{4}-\d{2}-\d{2}T\S+Z )?attempt \d+: driver stderr tail: (.+)$/);
+      if (!record) continue;
+      try {
+        const value = JSON.parse(record[1]);
+        if (value.exitCode === driverExitCode && typeof value.tail === "string") {
+          driverStderrTail = redactAndBoundDiagnostics(redact(value.tail).trimEnd().split(/\r?\n/).slice(-20).join("\n").slice(-4000), { secrets, maskedValues, maxLength: 4000 });
+        }
+      } catch {
+        // Ignore malformed capture records without treating stderr payloads as classification evidence.
+      }
+    }
+  }
   let driverStderrSummary = "";
   const lastEngineErrors = [];
   let unhandledDriverError = false;
@@ -360,11 +378,23 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
   const engineErrorType = engineSummary.match(/\(([a-z][a-z0-9_]*)\)/)?.[1] || "";
   const errorCodes = executionErrorCodes.filter(code => Number.isSafeInteger(code) && code >= 400 && code <= 599);
   const driverExitMeaning =
-    { 1: "General failure", 2: "Invalid usage (conventional; engine-specific)", 124: "Command timed out (timeout utility convention)", 126: "Command is not executable", 127: "Command not found" }[driverExitCode] ||
-    (driverExitSignal ? `Terminated by ${driverExitSignal} (128 + signal number)` : "Unknown (engine-specific exit code)");
+    {
+      1: "General failure",
+      2: "Invalid usage (conventional; engine-specific)",
+      78: "Configuration error (EX_CONFIG convention; AWF model routing failure)",
+      80: "Workflow tool permission denied (Copilot SDK driver)",
+      124: "Command timed out (timeout utility convention)",
+      126: "Command is not executable",
+      127: "Command not found",
+    }[driverExitCode] || (driverExitSignal ? `Terminated by ${driverExitSignal} (128 + signal number)` : "Unknown (engine-specific exit code)");
   const isPromptExhaustion = executionCategories.some(category => PROMPT_EXHAUSTION_ERROR_CATEGORIES.has(category));
   const isRequestRejection =
-    contentFiltered || ["invalid_safe_outputs", "safeoutputs_cli_error"].includes(reason) || executionCategories.some(category => REQUEST_REJECTION_ERROR_CATEGORIES.has(category)) || errorCodes.some(code => code >= 400 && code < 500);
+    driverExitCode === 78 ||
+    hasWorkflowToolPermissionDenial(driverExitCode) ||
+    contentFiltered ||
+    ["invalid_safe_outputs", "safeoutputs_cli_error"].includes(reason) ||
+    executionCategories.some(category => REQUEST_REJECTION_ERROR_CATEGORIES.has(category)) ||
+    errorCodes.some(code => code >= 400 && code < 500);
   // Crash categories can be inferred from exit codes alone; they do not establish an outage.
   const isEngineOutage = executionCategories.some(category => ["agentic_engine_timeout", "capi_server_error"].includes(category));
   // Missing completion and nonzero driver exits are observed outcomes, not evidence of budget exhaustion or an outage.
@@ -384,7 +414,7 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
                 ? "driver_crash"
                 : "unknown";
   const retryEvents = events.filter(event => event.type === "claude.api_retry" || (event.type === "system" && event.data.subtype === "api_retry"));
-  const harnessRetryLines = stdio.split(/\r?\n/).filter(line => /^\[(?:copilot|claude|codex)-harness\].*\bretrying\b/i.test(line));
+  const harnessRetryLines = safeStdio.split(/\r?\n/).filter(line => /^\[(?:copilot|claude|codex)-harness\].*\bretrying\b/i.test(line));
   const harnessRetryCount = harnessRetryLines.length;
   const retryCount = Math.max(retryEvents.length, harnessRetryCount);
   const retryStatusCodes = [
@@ -425,6 +455,7 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
             ? [
                 `Driver exit meaning: ${driverExitMeaning}`,
                 `Last driver stderr summary: ${driverStderrSummary || (stdioRead ? (stdio.trim() ? "not recorded (no classified stderr diagnostic)" : "no output captured") : "not recorded (diagnostic log unavailable)")}`,
+                `Driver stderr tail (redacted; diagnostic text, not classification evidence):\n${driverStderrTail || "not recorded"}`,
                 ...(lastEngineErrors.length ? [`Last engine error lines (summarized, oldest first; full text in agent-stdio.log):\n${lastEngineErrors.join("\n")}`] : []),
               ]
             : []),

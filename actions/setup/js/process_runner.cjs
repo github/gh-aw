@@ -19,6 +19,8 @@ const { classifyDriverStderr, agentErrorDiagnosticText } = require("./agent_exec
 const { spawn } = require("child_process");
 const os = require("os");
 const { StringDecoder } = require("string_decoder");
+const { collectAddMaskedValues } = require("./add_mask_redaction.cjs");
+const { redactDiagnosticText, redactAndBoundDiagnostics } = require("./diagnostic_sanitization.cjs");
 
 /**
  * Convert a Node.js child-process termination signal (e.g. "SIGSYS") into the
@@ -297,6 +299,17 @@ function runProcess({
           category = "unclassified";
         }
         log(`attempt ${attempt + 1}: driver stderr summary: exitCode=${exitCode} category=${category} source=${source}`);
+        if (process.env.GH_AW_PROTECTED_SESSION_CAPTURE !== "1" && env?.GH_AW_PROTECTED_SESSION_CAPTURE !== "1") {
+          try {
+            // Redact before taking the tail so truncation cannot expose part of a secret.
+            const maskedValues = collectAddMaskedValues(stdout + "\n" + stderr);
+            const redacted = redactDiagnosticText(stderr, { maskedValues });
+            const tail = redactAndBoundDiagnostics(redacted.trimEnd().split(/\r?\n/).slice(-20).join("\n").slice(-4000), { maskedValues, maxLength: 4000 });
+            log(`attempt ${attempt + 1}: driver stderr tail: ${JSON.stringify({ exitCode, tail })}`);
+          } catch {
+            log(`attempt ${attempt + 1}: driver stderr tail unavailable (redaction failed)`);
+          }
+        }
       }
       settle({
         exitCode,
