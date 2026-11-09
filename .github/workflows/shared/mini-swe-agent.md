@@ -2,65 +2,18 @@
 runtimes:
   python:
     version: "3.12"
-excluded-env:
-  - COPILOT_GITHUB_TOKEN
-  - OPENAI_API_KEY
-  - CODEX_API_KEY
-  - ANTHROPIC_API_KEY
-  - GITHUB_TOKEN
-  - GH_TOKEN
-  - GITHUB_ENTERPRISE_TOKEN
-  - GH_ENTERPRISE_TOKEN
-  - GH_AW_GITHUB_TOKEN
-  - GH_AW_AGENT_TOKEN
-  - GH_AW_GITHUB_MCP_SERVER_TOKEN
-  - GITHUB_MCP_SERVER_TOKEN
-engine:
-  id: mini-swe-agent
-  detection-engine: copilot
-  version: "2.4.6"
-  display-name: mini-SWE-agent
-  description: mini-SWE-agent with non-interactive shell execution and AWF-proxied inference
-  experimental: true
-  mcp: false
-  provider:
-    name: github
-  behaviors:
-    secret-strategy: universal-llm-consumer
-    capabilities:
-      max-turns: true
-    output-files:
-      - /tmp/gh-aw/agent/mini-swe-agent.traj.json
-    network:
-      defaults:
-        - host.docker.internal
-        - pypi.org
-        - files.pythonhosted.org
-      provider-domains:
-        copilot: api.githubcopilot.com
-        anthropic: api.anthropic.com
-        openai: api.openai.com
-    execution:
-      command-name: python3
-      step-name: Execute mini-SWE-agent
-      model-env-var: GH_AW_MINI_MODEL
-      provider-env-mode: universal-llm-consumer
-      write-timestamp: true
-      env:
-        MSWEA_SILENT_STARTUP: "1"
-        LITELLM_TELEMETRY: "false"
-        LITELLM_LOCAL_MODEL_COST_MAP: "True"
-        GH_AW_MINI_DEPS: /tmp/gh-aw/agent/mini-swe-agent-deps
-        GH_AW_MINI_TRAJECTORY: /tmp/gh-aw/agent/mini-swe-agent.traj.json
-      args:
-        - -I
-        - -c
-        - |
+pre-agent-steps:
+  - name: Stage hash-locked mini-SWE-agent wheels
+    env:
+      GH_AW_MINI_DEPS: /tmp/gh-aw/agent/mini-swe-agent-deps
+      GH_AW_MINI_DEPS_LOCK_SHA256: aefd92655165b1cc9fad1e303bc0f9d02833cd2de8f4bdc0a4f03573c63b4aa7
+    run: |
+          python3 -I - <<'PY'
+          import hashlib
           import os
           import platform
           import subprocess
           import sys
-          from importlib.metadata import version
           from pathlib import Path
 
           # Self-contained Linux x86-64 / CPython 3.12 wheel lock.
@@ -148,6 +101,8 @@ engine:
           yarl==1.25.1 --hash=sha256:c6f117789d22dce188e5754e8bc65b7e6ebf8cb73963b9fa761f672a5883769d
           zipp==4.1.2 --hash=sha256:b30cb6cd253122169c47de245ca24a86bac2a5d3802ba15bf7ba6414eb9e144d
           """
+          if hashlib.sha256(requirements.encode()).hexdigest() != os.environ["GH_AW_MINI_DEPS_LOCK_SHA256"]:
+              raise RuntimeError("mini-SWE-agent dependency lock does not match the trusted bootstrap lock")
           if not requirements.strip():
               raise RuntimeError("mini-SWE-agent dependency lock is required")
           if f"mini-swe-agent=={os.environ['GH_AW_ENGINE_VERSION']} --hash=" not in requirements:
@@ -159,9 +114,89 @@ engine:
           lock = dependencies / "requirements.lock"
           lock.write_text(requirements)
           subprocess.run([
-              sys.executable, "-I", "-m", "pip", "install", "--quiet",
+              sys.executable, "-I", "-m", "pip", "download", "--quiet",
               "--isolated", "--disable-pip-version-check", "--only-binary=:all:",
               "--require-hashes",
+              "--dest", str(dependencies / "wheels"),
+              "--requirement", str(lock),
+          ], check=True)
+          PY
+excluded-env:
+  - COPILOT_GITHUB_TOKEN
+  - OPENAI_API_KEY
+  - CODEX_API_KEY
+  - ANTHROPIC_API_KEY
+  - GITHUB_TOKEN
+  - GH_TOKEN
+  - GITHUB_ENTERPRISE_TOKEN
+  - GH_ENTERPRISE_TOKEN
+  - GH_AW_GITHUB_TOKEN
+  - GH_AW_AGENT_TOKEN
+  - GH_AW_GITHUB_MCP_SERVER_TOKEN
+  - GITHUB_MCP_SERVER_TOKEN
+engine:
+  id: mini-swe-agent
+  detection-engine: copilot
+  version: "2.4.6"
+  display-name: mini-SWE-agent
+  description: mini-SWE-agent with non-interactive shell execution and AWF-proxied inference
+  experimental: true
+  mcp: false
+  provider:
+    name: github
+  behaviors:
+    secret-strategy: universal-llm-consumer
+    capabilities:
+      max-turns: true
+    output-files:
+      - /tmp/gh-aw/agent/mini-swe-agent.traj.json
+    network:
+      defaults:
+        - host.docker.internal
+      provider-domains:
+        copilot: api.githubcopilot.com
+        anthropic: api.anthropic.com
+        openai: api.openai.com
+    execution:
+      command-name: python3
+      step-name: Execute mini-SWE-agent
+      model-env-var: GH_AW_MINI_MODEL
+      provider-env-mode: universal-llm-consumer
+      write-timestamp: true
+      env:
+        MSWEA_SILENT_STARTUP: "1"
+        LITELLM_TELEMETRY: "false"
+        LITELLM_LOCAL_MODEL_COST_MAP: "True"
+        GH_AW_MINI_DEPS: /tmp/gh-aw/agent/mini-swe-agent-deps
+        GH_AW_MINI_DEPS_LOCK_SHA256: aefd92655165b1cc9fad1e303bc0f9d02833cd2de8f4bdc0a4f03573c63b4aa7
+        GH_AW_MINI_TRAJECTORY: /tmp/gh-aw/agent/mini-swe-agent.traj.json
+      args:
+        - -I
+        - -c
+        - |
+          import os
+          import hashlib
+          import platform
+          import subprocess
+          import sys
+          from importlib.metadata import version
+          from pathlib import Path
+
+          dependencies = Path(os.environ["GH_AW_MINI_DEPS"])
+          lock = dependencies / "requirements.lock"
+          requirements = lock.read_text()
+          if hashlib.sha256(requirements.encode()).hexdigest() != os.environ["GH_AW_MINI_DEPS_LOCK_SHA256"]:
+              raise RuntimeError("mini-SWE-agent dependency lock does not match the trusted bootstrap lock")
+          if not requirements.strip():
+              raise RuntimeError("mini-SWE-agent dependency lock is required")
+          if f"mini-swe-agent=={os.environ['GH_AW_ENGINE_VERSION']} --hash=" not in requirements:
+              raise RuntimeError("mini-SWE-agent version must match the dependency lock")
+          if sys.version_info[:2] != (3, 12) or sys.platform != "linux" or platform.machine() != "x86_64":
+              raise RuntimeError("mini-SWE-agent wheel lock requires Linux x86-64 and Python 3.12")
+          subprocess.run([
+              sys.executable, "-I", "-m", "pip", "install", "--quiet",
+              "--isolated", "--disable-pip-version-check", "--only-binary=:all:",
+              "--require-hashes", "--no-index", "--find-links", str(dependencies / "wheels"),
               "--target", str(dependencies),
               "--requirement", str(lock),
           ], check=True)
@@ -254,7 +289,8 @@ engine:
           "NO_PROXY", "no_proxy",
           "GH_AW_MCP_DEFERRED_SERVERS", "GH_AW_SAFE_OUTPUTS_TOOLS_PATH",
           "ENGINE_CONFORMANCE_SENTINEL",
-          "GH_AW_PROMPT", "GH_AW_ENGINE_VERSION", "GH_AW_MINI_DEPS", "GH_AW_MINI_TRAJECTORY",
+          "GH_AW_PROMPT", "GH_AW_ENGINE_VERSION", "GH_AW_MINI_DEPS", "GH_AW_MINI_DEPS_LOCK_SHA256",
+          "GH_AW_MINI_TRAJECTORY",
         ]) {
           if (process.env[name] !== undefined) env[name] = process.env[name];
         }
@@ -298,11 +334,20 @@ This unsupported experimental sample pins `mini-swe-agent==2.4.6` from PyPI
 and uses Python 3.12 on Linux x86-64. The imported definition embeds the complete
 version-and-SHA256 wheel requirements lock; pip requires hashes and refuses
 unlocked dependencies or version overrides that do not match the lock.
-Dependencies are installed inside AWF at the mounted path
+Trusted `pre-agent-steps` download only hash-verified binary wheels before AWF
+starts. Inside AWF, pip re-verifies the lock and installs offline with
+`--no-index --find-links` at the mounted path
 `/tmp/gh-aw/agent/mini-swe-agent-deps`, not in the host user site. Isolated
 Python ignores workspace imports and Python environment search paths; only
-the explicit dependency directory is added. PyPI wheel downloads require
-`pypi.org` and `files.pythonhosted.org`, included in the engine network defaults.
+the explicit dependency directory is added. Bootstrap downloads do not grant
+the agent access to PyPI; the engine defaults contain only inference transport.
+The shared import's `runtimes.python` declaration explicitly opts into the Python
+ecosystem, including `pypi.org` and `files.pythonhosted.org`, for agent execution.
+For a registry-free agent, publish a copy of this import without `runtimes` and
+provide Linux x86-64 / Python 3.12 on the runner independently. Keep its
+`pre-agent-steps`: they are required even without the runtime declaration.
+To deliberately restore agent package access, use `network.allowed: [python]`
+or declare `runtimes.python` in the caller.
 Import it and select a workflow-facing `provider/model`:
 
 ```yaml
