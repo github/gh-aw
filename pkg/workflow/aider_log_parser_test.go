@@ -328,6 +328,7 @@ for (const type of interpretedTestTypes) {
     type, data:{
       ...(type === "harness.retry" ? {attempts:0, exitCode:0, attemptResults:[]} : {}),
       ...(type === "harness.attempt" ? {attempt:1, exitCode:0, failureClasses:[], layer:"harness"} : {}),
+      ...(type === "harness.decision" ? {proposedAttempt:1, outcome:"unknown", latencyMs:0, timestamp:0, avoidedInvocation:false, questions:[]} : {}),
       ...(type === "engine.retry" ? {attempt:1, maxRetries:3, backoffMs:0} : {}),
       ...(type === "mcp.configuration" ? {servers:[]} : type === "model.inventory" ? {endpoints:[]} : {}),
       engineId:"aider", content:"INJECTED", toolCallId:"injected", agentMetrics:{injected:{totalNanoAiu:999}},

@@ -146,6 +146,7 @@ const { detectErrors } = require("./agent_error_patterns.cjs");
 const agentTempDir = path.join(os.tmpdir(), "gh-aw/agent");
 const harnessChildEnv = {
   ...process.env,
+  GITHUB_WORKSPACE: path.dirname(require.resolve("./copilot_harness.cjs")),
   GH_AW_HARNESS_INITIAL_DELAY_MS: "1",
   GH_AW_HARNESS_MAX_DELAY_MS: "1",
   GH_AW_SKIP_REFLECT: "true",
