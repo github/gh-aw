@@ -2,15 +2,25 @@
 
 /** @typedef {"seconds" | "milliseconds" | "nanoseconds"} TimestampUnit */
 
+/** @param {any} record @param {TimestampUnit} [unit] @returns {string | number | undefined} */
+function sessionMessageTimestamp(record, unit = "milliseconds") {
+  return [record.message?.timestamp, record.data?.messageMetadata?.timestamp].find(value => timestampValueNs(value, unit) !== undefined);
+}
+
+/** @param {any} record @param {TimestampUnit} [unit] @returns {bigint | undefined} */
+function sessionTimestampNs(record, unit = "milliseconds") {
+  const value = record.timestamp ?? record.ts ?? record.time ?? record.created_at ?? sessionMessageTimestamp(record, unit);
+  return timestampValueNs(value, unit);
+}
+
 /**
  * Source schemas, not timestamp magnitude, determine numeric units.
  * Keep nanoseconds as integers until producing the display-only millisecond key.
- * @param {any} record
+ * @param {any} value
  * @param {TimestampUnit} [unit]
  * @returns {bigint | undefined}
  */
-function sessionTimestampNs(record, unit = "milliseconds") {
-  const value = record.timestamp ?? record.ts ?? record.time ?? record.created_at ?? record.message?.timestamp;
+function timestampValueNs(value, unit = "milliseconds") {
   if (unit === "nanoseconds") {
     if (typeof value !== "string" || !/^\d{1,22}$/.test(value)) return undefined;
     const ns = BigInt(value);
@@ -82,4 +92,4 @@ function orderSessionSources(sources) {
   return entries.map(entry => entry.event);
 }
 
-module.exports = { sessionTimestamp, sessionTimestampNs, sessionOrderingEntries, orderSessionSources };
+module.exports = { sessionTimestamp, sessionTimestampNs, sessionMessageTimestamp, sessionOrderingEntries, orderSessionSources };
