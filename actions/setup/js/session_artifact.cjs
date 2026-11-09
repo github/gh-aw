@@ -63,7 +63,7 @@ const sessionPayloadFields = new Map([
   ["assistant.reasoning", ["content"]],
   ["assistant.refusal", ["content", "explanation"]],
   ["tool.execution_start", ["input", "parameters", "command"]],
-  ["tool.execution_complete", ["output", "result", "error", "fileEdits"]],
+  ["tool.execution_complete", ["output", "structuredContent", "result", "error", "fileEdits"]],
 ]);
 
 /** @param {unknown} original @param {unknown} redacted @param {string[]} maskedValues @param {string} eventType @param {string[]} [fields] */
