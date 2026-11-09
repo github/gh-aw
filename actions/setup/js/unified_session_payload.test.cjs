@@ -21,6 +21,59 @@ import { failure as claudeFailures } from "./fixtures/claude_ci_sessions.cjs";
 import { createSessionLookups } from "./grader_session.cjs";
 
 describe("essential unified session payloads", () => {
+  it.each([null, false, 0, "", [], {}, { stdout: 'line\n"quoted"\\path \u2603', stderr: "", exit_code: 0, nested: [false, 0, null, ""] }])(
+    "retains explicitly supplied structured tool content %j without restoring provider envelopes",
+    structuredContent => {
+      const event = {
+        type: "tool.execution_complete",
+        id: "completion",
+        data: {
+          toolCallId: "shell",
+          success: false,
+          output: [],
+          structuredContent,
+          nativeEnvelope: { omitted: true },
+        },
+      };
+      const original = structuredClone(event);
+      const projected = normalizeUnifiedSessionEvent(event);
+      expect(projected).toEqual({ type: event.type, id: event.id, data: { toolCallId: "shell", success: false, output: [], structuredContent } });
+      expect(normalizeUnifiedSessionEvent(projected)).toEqual(projected);
+      expect(event).toEqual(original);
+      const [unified] = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-session.jsonl", events: [event] }]);
+      const published = JSON.parse(serializeSessionArtifact([unified]).trim());
+      expect(published.data.structuredContent).toEqual(structuredContent);
+      const validate = createSessionValidator("unified").event;
+      expect(validate(published), JSON.stringify(validate.errors)).toBe(true);
+    }
+  );
+
+  it("does not invent structured tool content or retain it in compact RPC observations", () => {
+    expect(normalizeUnifiedSessionEvent({ type: "tool.execution_complete", data: { output: [] } }).data).toEqual({ output: [] });
+    const rpc = normalizeUnifiedSessionEvent({
+      type: "mcp.rpc.response",
+      data: { id: 1, result: { structuredContent: { omitted: true }, content: [{ type: "text", text: "omitted" }] } },
+    });
+    expect(JSON.stringify(rpc)).not.toContain("structuredContent");
+    expect(JSON.stringify(rpc)).not.toContain("omitted");
+  });
+
+  it("redacts structured tool payload values and keys without rejecting them as structural metadata", () => {
+    const event = {
+      type: "tool.execution_complete",
+      data: {
+        toolCallId: "shell",
+        structuredContent: { stdout: "SANITIZED_MASK\n", stderr: "", exit_code: 0, nested: { SANITIZED_MASK: "SANITIZED_MASK" } },
+      },
+    };
+    for (const events of [[event], mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-session.jsonl", events: [event] }])]) {
+      const serialized = serializeSessionArtifact(events, ["SANITIZED_MASK"], { rejectStructuralRedaction: true });
+      expect(serialized).not.toContain("SANITIZED_MASK");
+      expect(JSON.parse(serialized.trim()).data.structuredContent).toEqual({ stdout: "***\n", stderr: "", exit_code: 0, nested: { "***": "***" } });
+    }
+    expect(() => serializeSessionArtifact([{ ...event, id: "SANITIZED_MASK" }], ["SANITIZED_MASK"], { rejectStructuralRedaction: true })).toThrow("Session redaction changed structural fields");
+  });
+
   it("preserves observed Codex reconnect progress separately from harness attempts", () => {
     const native = parseEngineSession("Reconnecting... 2/5 (connection interrupted)\n", "codex").find(event => event.type === "session.result");
     expect(native).toMatchObject({ reconnectAttempt: 2, maxReconnects: 5 });

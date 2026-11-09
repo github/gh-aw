@@ -25,8 +25,23 @@ permissions:
 engine:
   id: copilot
   copilot-sdk: true
+skip-if-decision:
+  - >-
+    Do @.github/workflows/shared/graders/README.md and
+    @/tmp/gh-aw/agent/trajectory-grader-files.txt conclusively establish that
+    all 25 catalog graders are Implemented and every catalog ID already has
+    its shared fragment, leaving no net-new grader to implement? Abstain if
+    catalog statuses and files disagree or any eligible Not started entry remains.
 strict: true
 timeout-minutes: 25
+
+steps:
+  - name: Collect existing grader fragment inventory
+    run: |
+      set -euo pipefail
+      mkdir -p /tmp/gh-aw/agent
+      find .github/workflows/shared/graders -maxdepth 1 -type f -name "*.md" \
+        | sort > /tmp/gh-aw/agent/trajectory-grader-files.txt
 
 tools:
   bash:
@@ -58,6 +73,9 @@ evals:
 ---
 
 # Daily Trajectory Grader Implementer
+
+The AWF decision gate checks the catalog against the prepared fragment inventory
+and may skip when all 25 graders are implemented. Inconsistent evidence still runs.
 
 You are a deterministic-grader engineer. Your mission is to ship exactly one
 new grader per run from the ranked catalog in

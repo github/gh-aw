@@ -28,6 +28,8 @@ type HealthCollection struct {
 	Reason                    string                              `json:"reason,omitempty"`
 	Warning                   string                              `json:"warning,omitempty"`
 	Host                      string                              `json:"host"`
+	DefaultBranch             string                              `json:"default_branch,omitempty"`
+	DefaultBranchPassComplete bool                                `json:"default_branch_pass_complete"`
 	APIRateLimit              *GitHubAPIRateLimitState            `json:"api_rate_limit,omitempty"`
 	RevisionLookups           int                                 `json:"revision_lookups"`
 	APIRequests               int                                 `json:"api_requests"`
@@ -61,6 +63,8 @@ type HealthCollection struct {
 	LocalRevisionReads        int `json:"local_revision_reads"`
 	checkedRequests           int
 	repoOverride              string
+	scanBranch                string
+	sampleIncomplete          bool
 	stopped                   bool
 	visited                   map[string]struct{}
 	jobPresence               map[healthRunAttempt]bool
@@ -68,6 +72,7 @@ type HealthCollection struct {
 	cacheSummaries            map[healthRunAttempt]*RunSummary
 	cacheSessionCompatibility map[healthRunAttempt]bool
 	failureScopes             map[string]map[string]struct{}
+	failureListingPages       int
 }
 
 const healthMinimumRuns = 5
@@ -206,6 +211,12 @@ func renderHealthCollection(w io.Writer, collection *HealthCollection) error {
 		collection.ProducerVersion, collection.ReportSchemaVersion, collection.ObservedAt.Format(time.RFC3339),
 		collection.APIRequests, collection.JobRequests); err != nil {
 		return err
+	}
+	if collection.DefaultBranch != "" {
+		if _, err := fmt.Fprintf(w, "[health_run_priority] default_branch=%q default_branch_pass_complete=%t; PR and other branch failures may reflect unmerged code, not a default-branch regression\n",
+			collection.DefaultBranch, collection.DefaultBranchPassComplete); err != nil {
+			return err
+		}
 	}
 	if err := renderHealthCacheEvidence(w, collection.CacheEvidence); err != nil {
 		return err
