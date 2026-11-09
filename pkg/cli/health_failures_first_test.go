@@ -371,3 +371,35 @@ func TestHealthMergedSamplesPreferChronologicalRuns(t *testing.T) {
 	require.Len(t, merged, 1)
 	assert.Equal(t, "success", merged[0].Conclusion)
 }
+
+func TestHealthBranchPassesShareFailureListingBudget(t *testing.T) {
+	originalFailures, originalRuns := healthListFailureCandidates, healthListWorkflowRuns
+	t.Cleanup(func() {
+		healthListFailureCandidates, healthListWorkflowRuns = originalFailures, originalRuns
+	})
+	collection := &HealthCollection{
+		DefaultBranch: "trunk",
+		workflows:     []GitHubWorkflow{{ID: 1, Path: ".github/workflows/example.lock.yml"}},
+	}
+	listings := 0
+	healthListFailureCandidates = func(opts ListWorkflowRunsOptions, _ int, _ string, _ *HealthCollection) ([]workflowRunAPIResponse, time.Time, error) {
+		listings++
+		assert.Equal(t, "trunk", opts.Ref, "the default branch consumes the shared listing budget first")
+		return make([]workflowRunAPIResponse, opts.Limit), time.Now(), nil
+	}
+	var branches []string
+	healthListWorkflowRuns = func(opts ListWorkflowRunsOptions, _ int, _ *HealthCollection) ([]WorkflowRun, int, error) {
+		branches = append(branches, opts.Ref)
+		return nil, 0, nil
+	}
+	runs, err := fetchWorkflowRuns("", "", "org/repo", false, collection)
+	require.NoError(t, err)
+	assert.Empty(t, runs)
+	assert.Equal(t, healthMaximumFailureListingPages, listings, "the PR pass must not get another ten listing pages")
+	assert.Equal(t, []string{"trunk", ""}, branches, "chronological sampling continues after the listing limit")
+	assert.True(t, collection.Partial)
+	assert.Equal(t, "failure_listing_limit", collection.Reason)
+	assert.False(t, collection.FailureListingComplete)
+	assert.False(t, collection.FailurePassComplete)
+	assert.False(t, collection.DefaultBranchPassComplete)
+}

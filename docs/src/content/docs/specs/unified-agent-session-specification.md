@@ -243,7 +243,7 @@ opaque because its essential fields are not defined by this specification.
 | Agent messages and reasoning | Exact `content`, without duplicate text blocks or the original message envelope. |
 | Agent session errors | Observed diagnostic fields, including `errorType`, `code`, and `statusCode`; absent status codes remain absent, and unrelated native error context is omitted. |
 | Agent policy refusals | Structured `reason`, exact available `content`, `policyCategory`, `explanation`, and streaming `partial` flag; no duplicated provider envelope. |
-| Agent tool lifecycle | Correlation IDs, tool/server names, one `input` or `output` field, command, outcome/error signals, duration, and exit code. Background tool updates retain observed `taskId` and `taskType`; progress and task notifications do not imply a tool completion. |
+| Agent tool lifecycle | Correlation IDs, tool/server names, one `input` or `output` field, separately supplied `structuredContent`, command, outcome/error signals, duration, and exit code. Background tool updates retain observed `taskId` and `taskType`; progress and task notifications do not imply a tool completion. |
 | Agent accounting | Turns, duration, cost, observed terminal `status` and `sourceType`, normalized `usage` including reported reasoning tokens, errors, and permission denials. |
 | Agent execution diagnostics | Unique harness/compiler `categories`, native `errorCodes` and `errorTypes`, and the observed final process `exitCode`; no diagnostic messages or duplicated engine envelopes. |
 | MCP | Server, direction, RPC/call/request IDs, method, tool name, duration, sizes, status, reason, and error code/message. Failed calls reporting HTTP 429 also retain `httpStatus: 429` and the sanitized `retryHint`, including retry durations or `Retry-After` seconds/HTTP-date. No RPC arguments, response bodies, echoed queries/URLs in rate-limit diagnostics, or error context. |
@@ -766,11 +766,17 @@ Native `parameters` remains a reader alias for `input`. If both are present, rea
 | `success` | Boolean when the source completion establishes an outcome; omitted when unknown. |
 | `output` | Source-dependent JSON-compatible output, not restricted to text. |
 | `outputTruncated` | Optional boolean indicating native output truncation. Absence means unknown; `false` does not certify collector completeness. |
+| `structuredContent` | Optional separately supplied JSON-compatible tool result, retained alongside `output` without flattening nested fields or replacing explicit empty or falsy values. |
 | `durationMs` | Source-dependent finite nonnegative duration in milliseconds, including zero. |
 | `error` | Optional native error string, object, or other supported error value. |
 | `result` | Optional native result value, including Copilot `result.content` arrays or JSON content blocks. |
 
 `output` and `result` can coexist. A reader uses an explicitly present `output` for the primary output view, otherwise the native `result`; neither is destroyed. Source-specific result envelopes remain available to readers.
+
+The full unified artifact retains `structuredContent` independently of the primary
+output view, including shell `stdout`, `stderr`, and `exit_code` fields. It uses
+the same registered-secret redaction as other tool payloads. This does not retain
+duplicated provider envelopes or change the compact MCP RPC projection.
 
 **T-UAS-014 — Explicit failures.** A mapping MUST represent an explicit failed status, error outcome, `is_error: true`, `isError: true`, or nonzero command exit code as a failure. Absence of an error is not, by itself, evidence of completion or success. A source protocol's documented successful completion or default non-error tool-result semantics MAY establish `success: true`; a start alone MUST NOT. If preserved native signals conflict, readers MUST treat an explicit failure as controlling and retain the contradictory source evidence.
 

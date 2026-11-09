@@ -86,6 +86,7 @@ export interface ToolExecutionCompleteData {
   output?: JsonValue;
   /** Native output truncation, not a collector completeness guarantee. */
   outputTruncated?: boolean;
+  structuredContent?: JsonValue;
   result?: JsonValue;
   error?: JsonValue;
   fileEdits?: JsonValue;
