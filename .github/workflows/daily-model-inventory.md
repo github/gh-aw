@@ -19,6 +19,15 @@ engine:
   id: copilot
   copilot-sdk: true
   driver: .github/drivers/copilot_sdk_driver_sample_node.cjs
+skip-if-decision:
+  - >-
+    Do @/tmp/gh-aw/agent/model-inventory/inventory.json,
+    @/tmp/gh-aw/agent/model-inventory/reflect.json,
+    @/tmp/gh-aw/agent/model-inventory/model-pins/model-pins.json, and
+    @pkg/workflow/data/model_aliases.json conclusively establish that no
+    built-in alias update or workflow model-pin correction remains? Abstain
+    until this run's live Copilot reflect and deterministic pin check are
+    complete, or if provider evidence is unavailable, stale, or incomplete.
 max-tool-denials: 3
 strict: true
 timeout-minutes: 30
@@ -393,12 +402,15 @@ features:
   gh-aw-detection: true
 evals:
   - id: model_lists_queried
-    question: Did the agent query model inventories from OpenAI, Anthropic, Google, and Copilot APIs?
+    question: Did the agent query model inventories from OpenAI, Anthropic, Google, and Copilot APIs? Return UNKNOWN when the output records a skip-if-decision no-op before agent execution.
   - id: updates_proposed_or_noop
     question: Were updates to the builtin model alias mapping proposed, or was noop used when no changes were needed?
 ---
 
 # Daily Model Inventory Checker
+
+The AWF decision gate abstains until the agent has collected live Copilot reflect
+and pin-check evidence. Later invocations may skip only when no correction remains.
 
 You are an AI model catalog analyst for `${{ github.repository }}`.
 

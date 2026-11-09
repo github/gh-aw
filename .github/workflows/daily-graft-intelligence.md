@@ -15,6 +15,13 @@ permissions:
 engine:
   id: copilot
   copilot-sdk: true
+skip-if-decision:
+  - >-
+    Do @/tmp/gh-aw/agent/graft-recent-activity.txt and
+    @/tmp/gh-aw/agent/graft-changed-files.txt conclusively establish that the
+    last 24 hours contain only trivial housekeeping with no meaningful
+    architectural or operational signal to report? Abstain if change summaries
+    are insufficient or any change requires Graft analysis to assess its impact.
 strict: true
 tracker-id: daily-graft-intelligence
 timeout-minutes: 20
@@ -53,12 +60,15 @@ features:
   gh-aw-detection: true
 evals:
   - id: graph_built_and_checked
-    question: Did the workflow build a fresh Graft graph and verify it before analysis?
+    question: Did the workflow build a fresh Graft graph and verify it before analysis? Return UNKNOWN when the output records a skip-if-decision no-op before agent execution.
   - id: report_or_noop_produced
     question: Was a daily intelligence issue created when there were meaningful repository changes, or was noop used appropriately when there was nothing to report?
 ---
 
 # Daily Graft Intelligence
+
+The AWF decision gate may skip clearly report-free housekeeping before invoking
+the analyst. Ambiguous changes still receive the full Graft analysis.
 
 You are a repository intelligence analyst. Produce a concise daily report for the last 24 full hours ending at workflow start (UTC) using the pre-built Graft graph as your primary context source.
 
