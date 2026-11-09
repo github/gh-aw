@@ -23,10 +23,8 @@ func (c *Compiler) validateDryRunEffects(data *WorkflowData) error {
 	for _, section := range []struct {
 		name, content string
 	}{
-		{"steps", data.CustomSteps},
 		{"pre-steps", data.PreSteps},
 		{"pre-agent-steps", data.PreAgentSteps},
-		{"post-steps", data.PostSteps},
 	} {
 		if strings.TrimSpace(section.content) != "" {
 			unsupported = append(unsupported, section.name)

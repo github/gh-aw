@@ -485,8 +485,14 @@ Staging overrides in custom publishing steps cannot reactivate these jobs.
 Reusable output contracts and required self-hosted runner policies are preserved
 without retaining the original executable target or matrix-dependent runner.
 
-Dry-run rejects authored host steps (`steps`, `pre-steps`, `pre-agent-steps`,
-`post-steps`, `on.steps`, safe-output and threat-detection steps, secret-masking
+Authored `steps` and `post-steps` are accepted but their code and credentials are
+omitted from dry-run locks before job construction and token wiring. They cannot
+execute on separate dispatch; omitted setup and cleanup reduce live-test coverage.
+Agent and compiler-owned steps still execute when the lock is dispatched under
+separate authorization.
+
+Dry-run rejects other authored host steps (`pre-steps`, `pre-agent-steps`,
+`on.steps`, safe-output and threat-detection steps, secret-masking
 steps, and unsafe built-in job overrides), custom MCP servers, `mcp-scripts`,
 custom safe-output scripts/actions, enabled Bash graders, and authored
 `id-token: write` permissions, including safe-output and imported declarations.
@@ -509,6 +515,7 @@ be treated as approved artifacts.
 Compilation prints its limited effect scope before checks and a scanner-coverage
 summary afterward. With `--json`, the existing result array gains a batch-scoped
 `workflow: "dry-run"` entry containing `dry_run.gate`, forced `required_flags`,
+`disabled_effects` identifying omitted `steps` and `post-steps`,
 and a `scanners` map. Each scanner has `requested` and `status` fields:
 
 | Status | Meaning |

@@ -106,7 +106,7 @@ func compileDiagnosticChild(scenario string) execCmdFunc {
 	}
 }
 
-func TestCompileToolAgentJobHealthStrictDryRunRejectsHostSteps(t *testing.T) {
+func TestCompileToolAgentJobHealthStrictDryRunRejectsPreActivationSteps(t *testing.T) {
 	t.Parallel()
 	if _, err := exec.LookPath("shellcheck"); err != nil {
 		t.Skip("shellcheck is required for strict dry-run compilation")
@@ -122,6 +122,14 @@ func TestCompileToolAgentJobHealthStrictDryRunRejectsHostSteps(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, os.WriteFile(filepath.Join(workflowsDir, name), content, 0o600))
 	}
+	sourcePath := filepath.Join(workflowsDir, "agent-job-health.md")
+	source, err := os.ReadFile(sourcePath)
+	require.NoError(t, err)
+	content := string(source)
+	frontmatterEnd := strings.Index(content, "\n---\n")
+	require.NotEqual(t, -1, frontmatterEnd)
+	content = content[:frontmatterEnd] + "\npre-steps:\n  - name: Unsafe pre-activation step\n    run: echo unsafe\n" + content[frontmatterEnd:]
+	require.NoError(t, os.WriteFile(sourcePath, []byte(content), 0o600))
 	require.NoError(t, os.CopyFS(filepath.Join(workflowsDir, "shared"), os.DirFS(filepath.Join(root, ".github", "workflows", "shared"))))
 	require.NoError(t, os.CopyFS(filepath.Join(dir, ".github", "skills", "jqschema"), os.DirFS(filepath.Join(root, ".github", "skills", "jqschema"))))
 	execCmd := func(ctx context.Context, args ...string) *exec.Cmd {
@@ -160,7 +168,7 @@ func TestCompileToolAgentJobHealthStrictDryRunRejectsHostSteps(t *testing.T) {
 				report = validation.DryRun
 			} else {
 				require.NotEmpty(t, validation.Errors, output)
-				assert.Contains(t, validation.Errors[0].Message, "--dry-run cannot safely execute steps")
+				assert.Contains(t, validation.Errors[0].Message, "--dry-run cannot safely execute pre-steps")
 				rejected = true
 			}
 			for _, warning := range validation.Warnings {
