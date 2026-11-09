@@ -390,11 +390,12 @@ describe("prospective drain-free worker evolution", () => {
       return response;
     };
     const launch = await launchAssignment({ ...options, config: {}, dispatchClient: f.githubClient, validateDispatchCredential: f.validateDispatchCredential, now: f.at, sleepFn: async () => {} }, assignment);
-    expect(launch.state).toBe("bound");
+    expect(launch.state).toBe("activation_pending");
     expect(post.mock.calls[0][0].ref).toBe(`refs/tags/gh-aw/work-queue/${REF}`);
     expect(getContent).toHaveBeenCalledTimes(1);
     expect(f.state.deployments.get("default").get("default").current_ref).toBe(REF);
     expect(f.state.deployments.get("default").get("default").revisions[REF].available).toBe(false);
-    expect(f.state.dispatches.get(assignment.dispatch_id).run.principal).toBe("22");
+    expect(f.state.dispatches.get(assignment.dispatch_id).credential_principal).toBe("22");
+    expect(f.state.dispatches.get(assignment.dispatch_id).run).toBeUndefined();
   });
 });

@@ -116,6 +116,14 @@ describe("dispatch_workflow handler factory", () => {
           identities++;
           return { status: 200, data: { id: mode === "wrong-principal" ? "11" : "22", login, type: kind === "authenticated" ? "User" : "Bot" } };
         };
+        const getWorkflowRun = vi.fn(async () => {
+          throw new Error("Dispatch acceptance must not fetch worker-run metadata");
+        });
+        const getWorkflowRunAttempt = vi.fn(async parameters => {
+          expect(parameters).toMatchObject({ owner: "owner", repo: "repo", run_id: "42", attempt_number: 1 });
+          const dispatch = [...replayTransactions(native.log()).dispatches.values()][0];
+          return { status: 200, data: { ...fixture.nativeRun(), display_title: `gh-aw work-queue ${dispatch.dispatch_id}` } };
+        });
         const dispatchClient = {
           auth: async () => ({ type: "token", token: mode === "wrong-client" ? "different-token" : "protected-selected-token" }),
           rest: {
@@ -135,14 +143,8 @@ describe("dispatch_workflow handler factory", () => {
                 if (mode === "rejected") throw { status: 422, response: { status: 422, headers: { "x-github-request-id": "provider-rejection" } } };
                 return { status: 200, data: { workflow_run_id: "42", run_url: "https://api.github.com/repos/owner/repo/actions/runs/42", html_url: "https://github.com/owner/repo/actions/runs/42" } };
               },
-              getWorkflowRun: async () => {
-                throw new Error("Launch verification must read immutable attempt 1, not the latest run");
-              },
-              getWorkflowRunAttempt: async parameters => {
-                expect(parameters).toMatchObject({ owner: "owner", repo: "repo", run_id: "42", attempt_number: 1 });
-                const dispatch = [...replayTransactions(native.log()).dispatches.values()][0];
-                return { status: 200, data: { ...fixture.nativeRun(), display_title: `gh-aw work-queue ${dispatch.dispatch_id}` } };
-              },
+              getWorkflowRun,
+              getWorkflowRunAttempt,
             },
           },
         };
@@ -186,8 +188,11 @@ describe("dispatch_workflow handler factory", () => {
             expect(result.success, JSON.stringify(result)).toBe(true);
             expect(posts).toBe(1);
             const dispatch = [...replayTransactions(native.log()).dispatches.values()][0];
-            expect(dispatch.state).toBe("bound");
-            expect(dispatch.run.principal).toBe("22");
+            expect(result.launches).toMatchObject([{ state: "activation_pending", run_id: "42" }]);
+            expect(dispatch).toMatchObject({ state: "started", released: false });
+            expect(dispatch).not.toHaveProperty("run");
+            expect(getWorkflowRun).not.toHaveBeenCalled();
+            expect(getWorkflowRunAttempt).not.toHaveBeenCalled();
             const retry = await main(config);
             await retry(message, {});
             expect(posts).toBe(1);

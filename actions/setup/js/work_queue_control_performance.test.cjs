@@ -12,6 +12,7 @@ import { prepareCheckpoint, replayTransactions } from "./work_queue_replay.cjs";
 import { fakeGitHub } from "./work_queue_store_checks.cjs";
 import { queueFixture, DISPATCHER, REF, REPOSITORY } from "./work_queue_lifecycle.test_helpers.cjs";
 import { main as processControls } from "./work_queue_control_adapter.cjs";
+import { bindWorkerAssignment } from "./work_queue_binding.cjs";
 import { readWorkQueuePolicyConfig } from "./work_queue_policy_config.cjs";
 
 const require = createRequire(import.meta.url);
@@ -108,7 +109,7 @@ async function fixture({ depth = 32, profiles = 3, works = 15, retained = 100, a
   for (const [namespace, client] of Object.entries(fake.githubClient.rest)) {
     for (const [method, implementation] of Object.entries(client)) {
       client[method] = parameters => {
-        calls.push({ method: `${namespace}.${method}`, write: /^(?:create|update|delete)/.test(method), history: namespace === "git" && method === "getCommit" && history.has(parameters.commit_sha) });
+        calls.push({ method: `${namespace}.${method}`, runId: parameters.run_id, write: /^(?:create|update|delete)/.test(method), history: namespace === "git" && method === "getCommit" && history.has(parameters.commit_sha) });
         return implementation(parameters);
       };
     }
@@ -166,11 +167,26 @@ async function fixture({ depth = 32, profiles = 3, works = 15, retained = 100, a
     calls.length = 0;
     sleepMs = 0;
     const start = performance.now();
+    const firstDispatch = native.posts.length === 0;
     const result = await processControls(options);
     const cpuMs = performance.now() - start;
     expect(result.success, JSON.stringify({ result, failures })).toBe(true);
     expect(result.receipts.map(receipt => receipt.status)).toEqual(["durable", "durable"]);
     expect(failures).toEqual([]);
+    if (firstDispatch) {
+      expect(calls.filter(call => /^actions\.getWorkflowRun(?:Attempt)?$/.test(call.method) && native.runs.has(String(call.runId)))).toEqual([]);
+      expect(result.status).toBe("activation_pending");
+      expect(result.receipts[1].launches).toEqual(
+        [...native.runs.keys()].map((runId, index) => ({
+          dispatch_id: JSON.parse(native.posts[index].inputs.work_queue_assignment).dispatch_id,
+          state: "activation_pending",
+          run_id: runId,
+          html_url: `https://github.com/${REPOSITORY}/actions/runs/${runId}`,
+          dispatched: true,
+          released: false,
+        }))
+      );
+    }
     const writes = calls.filter(call => call.write).length;
     const metrics = {
       benchmark: "trusted-work-queue-controls",
@@ -198,10 +214,38 @@ async function fixture({ depth = 32, profiles = 3, works = 15, retained = 100, a
     console.info(JSON.stringify(metrics));
     return metrics;
   };
-  return { fake, native, run, works, profiles, depth, workers };
+  const activate = async () => {
+    // Worker activation is outside the dispatcher-only performance measurement.
+    for (const [index, post] of native.posts.entries()) {
+      const assignment = JSON.parse(post.inputs.work_queue_assignment);
+      const runId = String(42 + index);
+      const ref = native.runs.get(runId).head_sha;
+      const activated = await bindWorkerAssignment({
+        ...options,
+        githubClient: client,
+        context: { ...queue.workerContext, runId, sha: ref, payload: { repository: { id: 7 }, inputs: post.inputs } },
+        workflowRef: `${REPOSITORY}/.github/workflows/${assignment.worker_profile}.lock.yml@${ref}`,
+        assignment,
+        logicalContract: policy.pools.default.profiles[assignment.worker_profile].logical_contract,
+        role: "worker",
+        requireAssignment: true,
+      });
+      expect(activated.binding).toEqual({
+        run_id: runId,
+        run_attempt: 1,
+        repository: REPOSITORY,
+        workflow: `.github/workflows/${assignment.worker_profile}.lock.yml`,
+        ref,
+        principal: "12",
+        event: "workflow_dispatch",
+      });
+      expect(replayTransactions(fake.log()).dispatches.get(assignment.dispatch_id)).toMatchObject({ state: "bound", run: activated.binding });
+    }
+  };
+  return { fake, native, run, activate, works, profiles, depth, workers };
 }
 
-function assertBoundClaims(fixture) {
+function assertClaims(fixture) {
   const state = replayTransactions(fixture.fake.log());
   expect(state.works.size).toBe(fixture.works + fixture.profiles);
   expect(state.claims.size).toBe(fixture.profiles);
@@ -209,6 +253,19 @@ function assertBoundClaims(fixture) {
   expect(state.dispatches.size).toBe(fixture.profiles);
   expect(fixture.native.posts).toHaveLength(fixture.profiles);
   expect(fixture.native.tagCreations).toHaveLength(1);
+  return state;
+}
+
+function assertPendingClaims(fixture) {
+  const state = assertClaims(fixture);
+  for (const dispatch of state.dispatches.values()) {
+    expect(dispatch.state).toBe("started");
+    expect(dispatch.run).toBeUndefined();
+  }
+}
+
+function assertBoundClaims(fixture) {
+  const state = assertClaims(fixture);
   expect([...state.dispatches.values()].every(dispatch => dispatch.state === "bound")).toBe(true);
   expect(new Set([...state.dispatches.values()].map(dispatch => dispatch.run.run_id))).toEqual(new Set(fixture.native.runs.keys()));
 }
@@ -226,9 +283,11 @@ describe("trusted work queue control step performance", () => {
     async parameters => {
       const scenario = await fixture(parameters);
       const cold = await scenario.run("cold");
-      assertBoundClaims(scenario);
+      assertPendingClaims(scenario);
       expect(cold.history_reads).toBe(2 * scenario.depth + 1);
       expect(cold.api_calls).toBeLessThanOrEqual(4 * scenario.depth + 40 * scenario.profiles + 48);
+      await scenario.activate();
+      assertBoundClaims(scenario);
       const head = scenario.fake.refs.get("work-queue");
       const warm = await scenario.run("idempotent");
       assertBoundClaims(scenario);
@@ -246,7 +305,7 @@ describe("trusted work queue control step performance", () => {
     async transport => {
       const scenario = await fixture({ deploymentsChanged: true, transport });
       const metrics = await scenario.run("deployment-refresh");
-      assertBoundClaims(scenario);
+      assertPendingClaims(scenario);
       const deployments = scenario.fake
         .log()
         .flatMap(commit => commit.operations)
@@ -256,6 +315,8 @@ describe("trusted work queue control step performance", () => {
       expect([...scenario.native.runs.values()].every(run => run.head_sha === "b".repeat(40))).toBe(true);
       expect(metrics.history_reads).toBe(2 * scenario.depth + 1);
       expect(metrics.api_calls).toBeLessThanOrEqual(4 * scenario.depth + 60 * scenario.profiles + 64);
+      await scenario.activate();
+      assertBoundClaims(scenario);
     },
     30000
   );
@@ -265,9 +326,11 @@ describe("trusted work queue control step performance", () => {
     async transport => {
       const scenario = await fixture({ auth: "injected", publisherToken: true, deploymentsChanged: true, transport });
       const metrics = await scenario.run("compiled-publisher-token");
-      assertBoundClaims(scenario);
+      assertPendingClaims(scenario);
       expect(metrics.history_reads).toBe(2 * scenario.depth + 1);
       expect(metrics.api_calls).toBeLessThanOrEqual(4 * scenario.depth + 60 * scenario.profiles + 64);
+      await scenario.activate();
+      assertBoundClaims(scenario);
       const head = scenario.fake.refs.get("work-queue");
       const retry = await scenario.run("compiled-publisher-retry");
       assertBoundClaims(scenario);
@@ -283,12 +346,14 @@ describe("trusted work queue control step performance", () => {
     async auth => {
       const scenario = await fixture({ auth, deploymentsChanged: true, depth: 8 });
       const metrics = await scenario.run("uncached-auth-negative-control");
-      assertBoundClaims(scenario);
+      assertPendingClaims(scenario);
       // Negative controls must fail the same one-traversal budget as the cached
       // cases when no explicit publisher token is supplied.
       expect(metrics.within_single_traversal_budget).toBe(false);
       expect(metrics.history_reads).toBeGreaterThan(5 * (scenario.depth + 1));
       expect(metrics.simulated_network_ms).toBeGreaterThan(120000);
+      await scenario.activate();
+      assertBoundClaims(scenario);
     },
     // Uncached negative controls deliberately replay thousands of API reads.
     120000
