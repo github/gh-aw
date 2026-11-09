@@ -308,7 +308,7 @@ func TestAiderSessionCaptureProviderSpecificReasoning(t *testing.T) {
 			result := aiderEventsOfType(events, "session.result")
 			require.Len(t, result, 1)
 			assert.InDelta(t, 1, result[0]["data"].(map[string]any)["numTurns"], 0)
-			if tc.name == "live-shape" {
+			if tc.name == "live-shape" || tc.name == "null-direct-fallback" || tc.name == "length-limited" {
 				var log strings.Builder
 				for _, event := range events {
 					line, err := json.Marshal(event)
@@ -318,14 +318,20 @@ func TestAiderSessionCaptureProviderSpecificReasoning(t *testing.T) {
 				}
 				expected, err := json.Marshal(events)
 				require.NoError(t, err)
+				sessionConsumers := map[string]any{
+					"model": "native-model", "visible": []string{"Keep exact whitespace."},
+					"absent": []string{"opaque-test-sentinel"}, "reasoning": []string{tc.reasoning},
+				}
+				expectedExecution := "[]"
+				if scenario == "partial" {
+					sessionConsumers["assistantPartials"] = []bool{true, true}
+					expectedExecution = `[{"categories":[],"errorCodes":[],"errorTypes":[]}]`
+				}
 				controls, err := json.Marshal(map[string]any{
-					"sessionConsumers": map[string]any{
-						"model": "native-model", "visible": []string{"Keep exact whitespace."},
-						"absent": []string{"opaque-test-sentinel"}, "reasoning": []string{plaintext},
-					},
+					"sessionConsumers": sessionConsumers,
 				})
 				require.NoError(t, err)
-				checkAiderSessionPublication(t, log.String(), true, string(expected), "[]", string(controls))
+				checkAiderSessionPublication(t, log.String(), true, string(expected), expectedExecution, string(controls))
 			}
 		})
 	}

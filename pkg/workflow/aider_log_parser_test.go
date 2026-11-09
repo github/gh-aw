@@ -154,6 +154,10 @@ const assertSessionConsumers = (events, stage) => {
     events.filter(event => event.type === "assistant.reasoning").map(event => event.data.content),
     controls.sessionConsumers.reasoning, stage + " must preserve exact plaintext reasoning"
   );
+  if (controls.sessionConsumers.assistantPartials) assert.deepEqual(
+    events.filter(event => event.type === "assistant.reasoning" || event.type === "assistant.message").map(event => event.data.partial),
+    controls.sessionConsumers.assistantPartials, stage + " must preserve exact assistant partial flags"
+  );
   assertSessionRendering(generateCopilotCliStyleSummary(events), stage + " rendering");
   // Exercise the downstream stream consumer on display copies, not canonical payloads.
   const streamed = generateCopilotCliStyleSummary(normalizeCopilotSession(events));
