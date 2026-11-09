@@ -407,11 +407,11 @@ describe("checkBranchPushable", () => {
     },
   });
 
-  it("returns null when branch does not exist (404)", async () => {
+  it("blocks when branch inspection returns 404", async () => {
     const client = makeClient("main", 404);
     const result = await checkBranchPushable(client, "owner", "repo", "feature", true);
-    expect(result).toBeNull();
-    expect(mockCore.info).toHaveBeenCalledWith('Branch "feature" not found during branch-protection inspection');
+    expect(result).toContain("Cannot verify branch protection rules");
+    expect(result).toContain("check-branch-protection is enabled");
   });
 
   it("blocks push when branch is the default branch", async () => {
@@ -495,13 +495,12 @@ describe("checkBranchPushable", () => {
     expect(client.rest.repos.getBranchProtection).not.toHaveBeenCalled();
   });
 
-  it("logs an informational message and permits a push when a later rules page fails", async () => {
+  it("blocks when a later rules page fails", async () => {
     const client = makeClient("main", null, true);
     client.rest.repos.getBranch.mockResolvedValue({ data: { protected: true, protection: { enabled: false } } });
     client.rest.repos.getBranchRules.mockResolvedValueOnce({ data: Array.from({ length: 100 }, () => ({ type: "copilot_code_review" })) }).mockRejectedValueOnce(Object.assign(new Error("Conflict"), { status: 409 }));
 
-    expect(await checkBranchPushable(client, "owner", "repo", "feature", true)).toBeNull();
-    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Conflict. GitHub enforces branch protection"));
+    expect(await checkBranchPushable(client, "owner", "repo", "feature", true)).toContain("Conflict. Push blocked");
     expect(mockCore.warning).not.toHaveBeenCalled();
     expect(client.rest.repos.getBranchProtection).not.toHaveBeenCalled();
   });
@@ -514,13 +513,12 @@ describe("checkBranchPushable", () => {
     expect(await checkBranchPushable(client, "owner", "repo", "feature", true)).toContain("protection rules");
   });
 
-  it.each([403, 404, 409, 500, undefined])("permits a push when the rules query fails with status %s", async status => {
+  it.each([403, 404, 409, 429, 500, undefined])("blocks when the rules query fails with status %s", async status => {
     const client = makeClient("main", null, true);
     client.rest.repos.getBranch.mockResolvedValue({ data: { protected: true, protection: { enabled: false } } });
     client.rest.repos.getBranchRules.mockRejectedValue(Object.assign(new Error("Rules unavailable"), { status }));
 
-    expect(await checkBranchPushable(client, "owner", "repo", "feature", true)).toBeNull();
-    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Rules unavailable. GitHub enforces branch protection"));
+    expect(await checkBranchPushable(client, "owner", "repo", "feature", true)).toContain("Rules unavailable. Push blocked");
     expect(mockCore.warning).not.toHaveBeenCalled();
   });
 
@@ -576,12 +574,27 @@ describe("checkBranchPushable", () => {
     expect(client.rest.repos.getBranch).not.toHaveBeenCalled();
   });
 
-  it.each([403, 409, 429, 500, undefined])("logs an informational message and permits a push on branch inspection failure: %s", async status => {
+  it.each([403, 409, 429, 500, undefined])("blocks on branch inspection failure: %s", async status => {
     const client = makeClient("main", status);
     const result = await checkBranchPushable(client, "owner", "repo", "feature", true);
-    expect(result).toBeNull();
-    expect(mockCore.info).toHaveBeenCalledWith('Could not check branch protection rules for "feature": error. GitHub enforces branch protection and permissions when pushing.');
+    expect(result).toContain('Cannot verify branch protection rules for "feature": error.');
+    expect(result).toContain("Push blocked because check-branch-protection is enabled");
     expect(mockCore.warning).not.toHaveBeenCalled();
     expect(mockCore.error).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, null, "false", 0])("blocks malformed branch protection status: %j", async protectedStatus => {
+    const client = makeClient("main", null);
+    client.rest.repos.getBranch.mockResolvedValue({ data: { protected: protectedStatus } });
+
+    expect(await checkBranchPushable(client, "owner", "repo", "feature", true)).toContain("branch metadata did not report a valid protection status");
+  });
+
+  it("blocks when repository metadata cannot be read with the gate enabled", async () => {
+    const client = makeClient("main", null);
+    client.rest.repos.get.mockRejectedValue(new Error("Repository unavailable"));
+
+    expect(await checkBranchPushable(client, "owner", "repo", "feature", true)).toContain("failed to read repository metadata: Repository unavailable");
+    expect(client.rest.repos.getBranch).not.toHaveBeenCalled();
   });
 });

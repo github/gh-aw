@@ -18176,10 +18176,11 @@ safe-outputs:
     # (optional)
     allow-workflows: true
 
-    # When true (default), inspects branch protection only after a push fails to
-    # provide additional diagnostic context. Inspection failures are informational.
-    # GitHub enforces permissions and branch protection on the optimistic push
-    # attempt. Set false to skip these diagnostics.
+    # When true (default), checks branch protection before pushing and blocks
+    # detected restrictive protection or inspection failures. Uses branch metadata
+    # and active rules without Administration permission. Set false to skip this
+    # gate and let GitHub enforce protection on the push attempt. The default-branch
+    # guard is always retained.
     # (optional)
     check-branch-protection: true
 

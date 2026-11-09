@@ -129,12 +129,11 @@ async function hasOnlyCopilotReviewRules(githubClient, owner, repo, branch) {
 }
 
 /**
- * Check the default-branch guard and optionally diagnose branch protection.
- * Call with `checkBranchProtection: false` before pushing, and inspect protection
- * only after a push failure. Inspection failures are informational.
+ * Check the default-branch guard and optionally gate on branch protection.
+ * Protection inspection uses read-compatible APIs and fails closed when enabled.
  *
- * Returns a string describing the default-branch guard or diagnosed protection,
- * or null when neither applies or inspection is unavailable.
+ * Returns a string describing the default-branch guard or detected protection,
+ * or null when the enabled checks pass.
  *
  * @param {any} githubClient - Octokit REST client
  * @param {string} owner - Repository owner
@@ -151,7 +150,14 @@ async function checkBranchPushable(githubClient, owner, repo, branchName, checkB
     const { data: repoData } = await githubClient.rest.repos.get({ owner, repo });
     defaultBranch = repoData.default_branch;
   } catch (repoError) {
+    if (checkBranchProtection) {
+      return `Cannot verify branch protection rules for "${branchName}": failed to read repository metadata: ${getErrorMessage(repoError)}. Push blocked because check-branch-protection is enabled.`;
+    }
     core.warning(`Could not check repository default branch: ${getErrorMessage(repoError)}`);
+  }
+
+  if (checkBranchProtection && (typeof defaultBranch !== "string" || !defaultBranch)) {
+    return `Cannot verify branch protection rules for "${branchName}": repository metadata did not identify a default branch. Push blocked because check-branch-protection is enabled.`;
   }
 
   if (defaultBranch && branchName === defaultBranch) {
@@ -163,6 +169,9 @@ async function checkBranchPushable(githubClient, owner, repo, branchName, checkB
     let isBranchProtected = false;
     try {
       const { data: branchData } = await githubClient.rest.repos.getBranch({ owner, repo, branch: branchName });
+      if (typeof branchData.protected !== "boolean") {
+        return `Cannot verify branch protection rules for "${branchName}": branch metadata did not report a valid protection status. Push blocked because check-branch-protection is enabled.`;
+      }
       isBranchProtected = branchData.protected;
       // The protected flag includes advisory rulesets; use read-compatible metadata.
       if (isBranchProtected && typeof defaultBranch === "string" && defaultBranch.length > 0 && branchName !== defaultBranch && branchData.protection?.enabled === false) {
@@ -172,22 +181,15 @@ async function checkBranchPushable(githubClient, owner, repo, branchName, checkB
             isBranchProtected = false;
           }
         } catch (rulesError) {
-          core.info(`Could not check branch protection rules for "${branchName}": ${getErrorMessage(rulesError)}. GitHub enforces branch protection and permissions when pushing.`);
-          return null;
+          return `Cannot verify branch protection rules for "${branchName}": ${getErrorMessage(rulesError)}. Push blocked because check-branch-protection is enabled.`;
         }
       }
     } catch (protectionError) {
-      const protectionStatus = protectionError && typeof protectionError === "object" && "status" in protectionError ? protectionError.status : undefined;
-      if (protectionStatus === 404) {
-        // 404 means the branch does not exist – safe to proceed
-        core.info(`Branch "${branchName}" not found during branch-protection inspection`);
-      } else {
-        core.info(`Could not check branch protection rules for "${branchName}": ${getErrorMessage(protectionError)}. GitHub enforces branch protection and permissions when pushing.`);
-      }
+      return `Cannot verify branch protection rules for "${branchName}": ${getErrorMessage(protectionError)}. Push blocked because check-branch-protection is enabled.`;
     }
 
     if (isBranchProtected) {
-      return `Branch "${branchName}" has protection rules that may explain the rejected push.`;
+      return `Cannot push to branch "${branchName}": this branch has protection rules.`;
     }
   }
 

@@ -292,7 +292,7 @@ description: Safe-output reference for update, label, milestone, project, releas
       patch-format: "bundle"          # Optional: "bundle" (default, supports merge commits) or "am"; auto-falls back to "bundle" when the incremental range contains a merge commit
       signed-commits: true            # Optional: when true (default), push via createCommitOnBranch GraphQL so GitHub signs commits; set false to push merge commits via plain git push
       allow-workflows: false          # Optional: add workflows:write permission for .github/workflows/ paths (requires github-app)
-      check-branch-protection: true   # Optional: when true (default), diagnose branch protection after a failed push; inspection failures are informational
+      check-branch-protection: true   # Optional: gate protected branches before pushing (default: true); inspection failures block the push
       allowed-files:                  # Recommended: always restrict to specific paths or extensions to limit agent scope
         - "src/**"
       excluded-files:                 # Optional: glob patterns to strip from the patch entirely

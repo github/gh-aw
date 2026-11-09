@@ -444,7 +444,7 @@ safe-outputs:
     fallback-as-pull-request: true        # on non-fast-forward or workflow-permission timeout, create fallback PR (default: true)
     signed-commits: true                  # signed commits are required (default); set false to use git push directly
     ignore-missing-branch-failure: false  # treat deleted/missing branch errors as skipped instead of failed (default: false)
-    check-branch-protection: true         # diagnose branch protection after a failed push (default: true)
+    check-branch-protection: true         # gate protected branches before pushing (default: true)
     protected-files: fallback-to-issue  # create review issue if protected files modified
     target-repo: "owner/repo"    # upstream repository containing the PR
     head-repo: "automation/fork" # required for supported fork-backed follow-up pushes
@@ -595,11 +595,11 @@ When `fallback-as-pull-request` is enabled (default), non-fast-forward push fail
 
 When `ignore-missing-branch-failure: true` is set, push failures caused by a deleted or missing PR branch return `skipped: true` instead of a hard failure. This is useful when the PR branch may have been deleted before the safe-output job runs (for example, on auto-merged PRs). Without this flag, a missing branch is a terminal error.
 
-The handler attempts the PR-branch push optimistically, without inspecting branch protection first. GitHub enforces permissions, branch protection, and rulesets when the push is attempted. The default branch is still rejected before pushing whenever repository metadata identifies it.
+By default (`check-branch-protection: true`), branch protection is checked before pushing and detected restrictive protection blocks publication. Set `check-branch-protection: false` to skip this gate and attempt the push optimistically, letting GitHub enforce permissions, branch protection, and rulesets. The default branch is rejected whenever repository metadata identifies it, regardless of this setting.
 
-By default (`check-branch-protection: true`), a failed push triggers optional branch-protection diagnostics. The handler uses [branch metadata](https://docs.github.com/en/rest/branches/branches#get-a-branch) (`Contents: read`) and [active branch rules](https://docs.github.com/en/rest/repos/rules#get-rules-for-a-branch) (`Metadata: read`) to provide additional failure context. The branch's `protected` flag covers classic protection and rulesets; active rules can distinguish advisory Copilot-review rules when the metadata permits it. These diagnostics do not replace the original push error or change retry and fallback behavior. Set `check-branch-protection: false` to skip them.
+The check uses [branch metadata](https://docs.github.com/en/rest/branches/branches#get-a-branch) (`Contents: read`) and [active branch rules](https://docs.github.com/en/rest/repos/rules#get-rules-for-a-branch) (`Metadata: read`). The branch's `protected` flag covers classic protection and rulesets; an advisory-only Copilot-review ruleset does not block the push when metadata explicitly disables classic protection and the complete active rules list contains only `copilot_code_review`.
 
-An inability to inspect protection, including permission errors, rate limits, server errors, and network failures, produces an informational log only. The handler does not call the classic-protection endpoint or require `Administration: read`.
+When the gate is enabled, inspection failures, including permission errors, missing or malformed metadata, rate limits, server errors, and network failures, block the push. The handler does not call the classic-protection endpoint or require `Administration: read`. The PR Specification Reviewer explicitly disables this gate while retaining its specification-only Markdown allowlist.
 
 ## Protected Files
 

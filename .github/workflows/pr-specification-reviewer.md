@@ -69,6 +69,7 @@ safe-outputs:
   push-to-pull-request-branch:
     target: triggering
     max: 1
+    check-branch-protection: false
     allowed-files:
       - 'specs/*.md'
       - 'docs/src/content/docs/specs/*.md'
