@@ -7,8 +7,11 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/workflow/compilerenv"
 )
+
+var compilerAdmissionLog = logger.New("workflow:compiler_admission")
 
 const admissionJobResultCondition = "(needs.admission.result == 'success' || needs.admission.result == 'skipped')"
 
@@ -25,7 +28,9 @@ func (c *Compiler) isAdmissionEnabled(frontmatter map[string]any) bool {
 		}
 	}
 	repoConfig, err := c.loadRepoConfig()
-	return err == nil && repoConfig != nil && repoConfig.Admission
+	enabled := err == nil && repoConfig != nil && repoConfig.Admission
+	compilerAdmissionLog.Printf("Admission from repo config: enabled=%t, configLoaded=%t", enabled, err == nil)
+	return enabled
 }
 
 func (c *Compiler) buildConclusionAdmissionStep(data *WorkflowData) []string {
@@ -189,6 +194,7 @@ func (c *Compiler) connectActivationAdmission(activation *Job) {
 	}
 	activation.If = c.combineJobIfConditions(strings.Join(conditions, " && "), activation.If)
 	activation.Needs = append(activation.Needs, string(constants.AdmissionJobName))
+	compilerAdmissionLog.Printf("Connected activation job to admission job: needs=%d", len(activation.Needs))
 }
 
 // GitHub's implicit success check includes skipped ancestors, not just direct needs.
@@ -220,6 +226,7 @@ func (c *Compiler) ensureAdmissionSkipSafeConditions() {
 		if name == string(constants.AdmissionJobName) || !downstream || bare == "false" || ifExpressionContainsStatusFunc(bare) {
 			continue
 		}
+		compilerAdmissionLog.Printf("Adding admission skip-safe condition to job %s", name)
 		conditions := []string{"(!cancelled())"}
 		for _, need := range job.Needs {
 			guard := fmt.Sprintf("needs.%s.result == 'success'", need)
@@ -238,6 +245,7 @@ func (c *Compiler) buildActivationAndAdmissionJobs(data *WorkflowData, preActiva
 		return fmt.Errorf("activation job could not be built: %w. Check the workflow triggers and activation-related frontmatter fields", err)
 	}
 	if data.AdmissionEnabled {
+		compilerAdmissionLog.Print("Building admission job")
 		admission, err := c.buildAdmissionJob(data, activation)
 		if err != nil {
 			return fmt.Errorf("admission job could not be built: %w", err)

@@ -765,6 +765,7 @@ Native `parameters` remains a reader alias for `input`. If both are present, rea
 | `toolName` | Source-dependent native name, or a name recovered from an exact matching start. |
 | `success` | Boolean when the source completion establishes an outcome; omitted when unknown. |
 | `output` | Source-dependent JSON-compatible output, not restricted to text. |
+| `outputTruncated` | Optional boolean indicating native output truncation. Absence means unknown; `false` does not certify collector completeness. |
 | `structuredContent` | Optional separately supplied JSON-compatible tool result, retained alongside `output` without flattening nested fields or replacing explicit empty or falsy values. |
 | `durationMs` | Source-dependent finite nonnegative duration in milliseconds, including zero. |
 | `error` | Optional native error string, object, or other supported error value. |
@@ -1831,10 +1832,24 @@ assistant messages. The custom adapter also recognizes this signature.
 | Native logfmt `message="server unavailable"` with a failed MCP server, or harness `opencode.mcp_failure` | Report the observed server name in `mcpFailures`; preserve harness events without interpreting arbitrary prose as failure evidence. |
 
 OpenCode envelope timestamps use milliseconds and remain unchanged, including
-when a completed tool part expands into invocation and result events. Duplicate
+when a completed tool part expands into invocation and result events. The native
+`sessionID` scopes core events through canonical `data.sessionId`. Tool metadata
+projects only the observed boolean `truncated` into `outputTruncated` (nested
+under `metadata.metadata` for v2); provider envelopes remain in the native and
+parser artifacts, not the unified projection. Duplicate
 parts are identified within their session, not globally. Cache-read and
 cache-write tokens are separate from the reported input count; reasoning tokens
 are an output subset, not an additional contribution to total tokens.
+Exported accounting revisions remain after the original observations in source
+order, even when their timestamps regress. Usage is reconciled by session and
+message identity; repeated step observations and shared source IDs are not
+additional turns or globally unique event IDs.
+When recognized native records span multiple sessions, the appended aggregate
+`session.result` sets `data.sessionId: null`, overriding session aliases from its
+last source record rather than attributing combined usage, cost, turns, or errors
+to that session. The source envelope and payload additions remain in the parser
+artifact; individual observations retain their session scope, and single-session
+results remain scoped as before.
 Synthetic coverage lives in `parse_opencode_log.test.cjs` and
 `opencode_workflow.test.cjs`; it is not evidence of a live smoke run.
 
