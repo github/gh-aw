@@ -18,6 +18,13 @@ JSON Schema for validating agentic workflow frontmatter configuration
 
 ```yaml wrap
 ---
+# Advisory skip questions evaluated inside AWF before each eligible agent
+# invocation. Any deny skips; allow or all unknown preserves deterministic harness
+# eligibility. Runtime @file references use sandbox filesystem restrictions.
+# (optional)
+skip-if-decision: []
+  # Array of strings
+
 # Experimental. Select independent Copilot capabilities to authenticate through
 # the OIDC token broker. Using this field emits a compile-time warning.
 # Configuration and behavior may change without deprecation.

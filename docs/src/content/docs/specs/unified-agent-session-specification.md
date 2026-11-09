@@ -568,6 +568,7 @@ preserve encounter order and retain only these event kinds and `data` keys:
 | `execution.result` | `outcome`, `conclusion`, `exitCode`, `durationMs`, `startedAt`, `finishedAt` |
 | `harness.retry` | `attempts`, `exitCode`; validated bounded attempt lists from Section 6.4 |
 | `harness.attempt` | Validated bounded attempt fields from Section 6.4 |
+| `harness.decision` | Validated invocation skip outcomes, question indices, error codes, latency, proposed attempt, timestamp, and avoided-invocation flag from Section 6.4 |
 | `engine.retry` | `sourceEngine`, `sourceType`, `sessionId`, `agentId`, and validated `attempt`, `maxRetries`, `backoffMs` from Section 6.4 |
 | `grader.result` | `id`, `status`, `value`, `score`, `unit`, `passed`, `direction`, `threshold`, `enabled`, `min`, `max`, `version` |
 
@@ -1339,6 +1340,21 @@ In particular, Gemini `stats.tool_calls` is not a turn count. Codex completed tu
 **T-UAS-035 — Diagnostic separation.** Source session/provider errors, including empty-content error turns and supported terminal error records, MUST remain separately available in `session.result.data.errors` rather than being hidden, downgraded to assistant answers, or merged into tool output. Full unified sessions retain observed engine-native retry diagnostics in `engine.retry.data.errors` instead (Section 6.4). Distinct error observations MUST remain distinguishable. Deduplication MAY remove a repeated observation with the same supplied source identity, but MUST NOT silently remove separate retries merely because their error text matches.
 
 ### 6.4 Retry attempts
+
+`skip-if-decision` evaluations are collected as `harness.decision` events with
+`provenance.component: harness` and `provenance.phase: agent`. They retain
+`proposedAttempt`, optional `startupAttemptId`, `outcome`, one-based question
+indices and their outcomes/errors, `latencyMs`, `timestamp`, and
+`avoidedInvocation`. Outcomes are `allow`, `deny`, or `unknown`; any `deny`
+dominates the aggregate, otherwise any `allow` dominates `unknown`. Errors are
+bounded identifiers, never provider messages or file contents. The harness
+retry artifact also retains `decisionResults`; summary copies and individual
+events describe the same evaluations and must not be counted twice.
+
+A denied proposed invocation does not produce a `harness.attempt` and does not
+increment process attempts or retries. Decision failures abstain without a
+decision retry. Proxy usage remains authoritative, including decision requests;
+a skipped agent process is not evidence of zero total model usage.
 
 **T-UAS-087 — Observed attempts.** Collection MUST emit one `harness.attempt`
 observation for each validated entry in `harness_retry.json`, including an entry

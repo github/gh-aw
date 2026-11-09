@@ -7,6 +7,12 @@
   "type": "object",
   "required": ["on"],
   "properties": {
+    "skip-if-decision": {
+      "description": "Advisory skip questions evaluated inside AWF before each eligible agent invocation. Any deny skips; allow or all unknown preserves deterministic harness eligibility. Runtime @file references use sandbox filesystem restrictions.",
+      "type": "array",
+      "maxItems": 400,
+      "items": { "type": "string", "minLength": 1, "pattern": "\\S" }
+    },
     "token-broker": {
       "description": "Experimental. Select independent Copilot capabilities to authenticate through the OIDC token broker. Using this field emits a compile-time warning. Configuration and behavior may change without deprecation.",
       "type": "object",

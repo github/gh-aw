@@ -548,12 +548,36 @@ export interface HarnessAttemptData extends HarnessRetryAttemptData {
   layer: "harness" | "startup";
 }
 
+export type HarnessDecisionOutcome = "allow" | "deny" | "unknown";
+export type HarnessDecisionError = "invalid_configuration" | "sandbox_unavailable" | "proxy_unavailable" | "invalid_proxy_endpoint" | "model_unavailable" | "timeout" | "evaluation_failed" | "file_reference_failed";
+
+/** Advisory decision preceding a proposed invocation, not authorization or an agent attempt. */
+export interface HarnessDecisionData {
+  /** @asType integer @minimum 1 @maximum 101 */
+  proposedAttempt: number;
+  /** @pattern ^startup:[1-9][0-9]{0,2}$ */
+  startupAttemptId?: string;
+  outcome: HarnessDecisionOutcome;
+  /** @maxItems 400 */
+  questions: {
+    /** One-based index in workflow skip-if-decision. @asType integer @minimum 1 @maximum 400 */
+    question: number;
+    outcome: HarnessDecisionOutcome;
+    error?: HarnessDecisionError;
+  }[];
+  latencyMs: SessionCount;
+  timestamp: SessionCount;
+  error?: HarnessDecisionError;
+  avoidedInvocation: boolean;
+}
+
 export interface HarnessRetryData {
   /** @asType integer @minimum 0 @maximum 101 */
   attempts: number;
   exitCode: HarnessRetryExitCode | null;
   attemptResults: HarnessRetryAttemptData[];
   startupAttemptResults?: HarnessRetryAttemptData[];
+  decisionResults?: HarnessDecisionData[];
 }
 
 /** Conclusion's dependency snapshot, not the still-running conclusion job. */
@@ -845,6 +869,7 @@ export interface UnifiedSessionEventDataMap {
   "execution.result": ExecutionResultData;
   "harness.retry": HarnessRetryData;
   "harness.attempt": HarnessAttemptData;
+  "harness.decision": HarnessDecisionData;
   "detection.result": DetectionResultData;
   "guardrail.admission": AdmissionDecisionData;
   "guardrail.daily_aic": DailyAICDecisionData;

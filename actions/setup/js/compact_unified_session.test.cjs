@@ -17,6 +17,22 @@ const event = (type, data) => ({ type, data, timestamp: "2026-10-20T19:00:00Z", 
 const parse = result => (result.session.trim() ? result.session.trim().split("\n").map(JSON.parse) : []);
 
 describe("compact unified session projection", () => {
+  it("preserves invocation decision evidence without retaining question content", () => {
+    const data = {
+      proposedAttempt: 1,
+      outcome: "deny",
+      questions: [{ question: 1, outcome: "deny", instructions: "private contents" }],
+      latencyMs: 1,
+      timestamp: 1000,
+      avoidedInvocation: true,
+      providerBody: "private body",
+    };
+    const result = compactUnifiedSession([event("harness.decision", data)]);
+    expect(parse(result)[0].data).toMatchObject({ proposedAttempt: 1, outcome: "deny", latencyMs: 1, avoidedInvocation: true, questions: [{ question: 1, outcome: "deny" }] });
+    expect(result.session).not.toContain("private");
+    expect(sessionEventPriority(event("harness.decision", data))).toBe(4);
+  });
+
   it("retains bounded accounting and outcome metadata without mutating the source", () => {
     const events = [
       event("session.format", { version: 1 }),

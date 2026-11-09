@@ -12,7 +12,7 @@ const { getMcpRateLimitHint, getRpcRateLimitHint } = require("./mcp_rate_limit.c
 const { redactWebhookPayloads } = require("./webhook_context.cjs");
 const { isErrorIdentifier, normalizeEngineHarness } = require("./routing_analytics.cjs");
 const { projectSafeOutputData } = require("./safe_output_outcomes.cjs");
-const { normalizeHarnessRetryRecord, normalizeHarnessAttemptEvent } = require("./harness_retry_record.cjs");
+const { normalizeHarnessRetryRecord, normalizeHarnessAttemptEvent, normalizeHarnessDecisionData } = require("./harness_retry_record.cjs");
 
 /** AWF failed-request origins: provider response versus AWF-originated rejection. */
 const ERROR_SOURCES = new Set(["upstream", "awf"]);
@@ -208,6 +208,7 @@ const EVENT_FIELDS = {
   "agent.execution": { categories: ["categories"], errorCodes: ["errorCodes"], errorTypes: ["errorTypes"], exitCode: ["exitCode", "exit_code"] },
   "harness.retry": {},
   "harness.attempt": {},
+  "harness.decision": {},
   "engine.retry": { sourceEngine: ["sourceEngine"], sourceType: ["sourceType"], errors: ["errors"] },
   "skill.invoked": { name: ["name"], path: ["path"], source: ["source"], trigger: ["trigger"], model: ["model"], invokedAtTurn: ["invokedAtTurn"] },
   "skill.context_delivered_ref": { interactionId: ["interactionId"], source: ["source"], contentId: ["contentId"] },
@@ -669,6 +670,11 @@ function normalizeUnifiedSessionEvent(event, phase) {
   }
   const known = Object.hasOwn(EVENT_FIELDS, event.type);
   const data = event.type === "mcp.configuration" ? normalizeMcpConfigurationData(source) : known ? selectFields(source, EVENT_FIELDS[event.type]) : structuredClone(source);
+  if (event.type === "harness.decision") {
+    const decision = normalizeHarnessDecisionData(source);
+    if (!decision) throw new Error(`${ERR_VALIDATION}: Harness decision evidence must contain bounded outcomes and latency metadata`);
+    Object.assign(data, decision);
+  }
   if (event.type === "harness.retry" || event.type === "harness.attempt") {
     const retry = event.type === "harness.retry" ? normalizeHarnessRetryRecord(source) : normalizeHarnessAttemptEvent(source);
     if (!retry) throw new Error(`${ERR_VALIDATION}: Harness retry evidence must contain valid bounded attempt metadata`);

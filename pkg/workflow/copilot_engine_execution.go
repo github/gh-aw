@@ -423,6 +423,7 @@ func (e *CopilotEngine) buildCopilotSDKExecPrefix(workflowData *WorkflowData, co
 
 func (e *CopilotEngine) buildCopilotCommand(workflowData *WorkflowData, copilotArgs []string, execPrefix, customCommandScriptSetup, logFile, mkdirCommands string, isBYOKMode bool) (string, string) {
 	copilotCommand, copilotSDKServerArgsJSON := e.buildCopilotBaseCommand(workflowData, copilotArgs, execPrefix)
+	copilotCommand = wrapCustomHarnessDecisionCommand(workflowData, e.GetID(), e.GetHarnessScriptName(), copilotCommand)
 	if isFirewallEnabled(workflowData) {
 		return e.buildCopilotFirewallCommand(workflowData, copilotCommand, customCommandScriptSetup, isBYOKMode, logFile), copilotSDKServerArgsJSON
 	}
@@ -738,8 +739,9 @@ func (e *CopilotEngine) buildCopilotExecutionStep(workflowData *WorkflowData, co
 	// Add tool arguments comment before the run section
 	toolArgsComment := e.generateCopilotToolArgumentsComment(workflowData.Tools, workflowData.SafeOutputs, workflowData.MCPScripts, workflowData, "        ")
 	if toolArgsComment != "" {
-		commentLines := strings.Split(strings.TrimSuffix(toolArgsComment, "\n"), "\n")
-		stepLines = append(stepLines, commentLines...)
+		for line := range strings.SplitSeq(strings.TrimSuffix(toolArgsComment, "\n"), "\n") {
+			stepLines = append(stepLines, strings.TrimSuffix(line, "\r"))
+		}
 	}
 	stepLines = append(stepLines, "        timeout-minutes: "+timeoutValue)
 	// Filter environment variables to only include allowed secrets

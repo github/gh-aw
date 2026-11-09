@@ -13,13 +13,17 @@ async function main() {
     return;
   }
 
-  const result = await runProcess({
-    command: "bash",
-    args: ["-o", "pipefail", "-c", command],
-    logArgs: [engineName],
-    attempt: 0,
-    log: message => process.stderr.write(`[${engineName}-harness] ${message}\n`),
-  });
+  const runAttempt = () =>
+    runProcess({
+      command: "bash",
+      args: ["-o", "pipefail", "-c", command],
+      logArgs: [engineName],
+      attempt: 0,
+      log: message => process.stderr.write(`[${engineName}-harness] ${message}\n`),
+    });
+  const result = process.env.GH_AW_SKIP_IF_DECISION
+    ? await require("./harness_retry_runner.cjs").runSingleHarnessInvocation({ runAttempt, harnessName: `${engineName} harness`, log: message => process.stderr.write(`[${engineName}-harness] ${message}\n`) })
+    : await runAttempt();
   process.exitCode = result.exitCode;
 }
 

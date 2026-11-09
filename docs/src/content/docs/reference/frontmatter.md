@@ -49,6 +49,24 @@ An optional emoji to represent the workflow visually, for example in listings an
 emoji: "🤖"
 ```
 
+### Invocation Skip Questions (`skip-if-decision:`)
+
+An optional top-level list of up to 400 questions evaluated inside AWF before each otherwise eligible agent invocation, including initial execution, retries, resumes, and continuations. The gate applies to all built-in engines and declarative engines, including command-based, custom-harness, and durable execution paths.
+
+```aw wrap
+skip-if-decision:
+  - Is there no actionable work remaining in @context/task.md?
+  - Has @reports/progress.md established that further execution is unnecessary?
+```
+
+Each question returns `deny` when its skip condition is established, `allow` when execution is recommended, or `unknown` when it abstains. Any `deny` skips the invocation; otherwise, any `allow` or all `unknown` preserves the execution path selected by the deterministic harness. An absent or empty list preserves existing behavior. Decisions cannot override retry limits, budgets, deadlines, or nonrecoverable failures.
+
+Questions share one Decisions request through the existing AWF API proxy, using `gpt-6-luna-decisions` on a configured Copilot provider, or `gpt-6-luna` when only OpenAI is configured. No direct-provider fallback or additional credentials are used. Unavailable models or APIs, timeouts, malformed responses, and file-read failures abstain without decision retries. Decision requests remain subject to the proxy's model and budget policies and its existing usage accounting.
+
+Runtime `@file` references resolve relative to `engine.cwd`, or the workspace when unset. They are read afresh before each invocation using the existing guarded regular-file reader: only workspace and `/tmp/gh-aw/agent` paths are eligible; symlinks, hardlinks, sensitive paths, and oversized context are rejected. Each question's referenced content is bounded to 512 KiB. Unreadable context makes that question `unknown`, without preventing other questions from being evaluated. Paths use letters, digits, `_`, `.`, `/`, and `-`; Actions expressions are not supported in questions.
+
+Decision metadata is retained in the existing harness retry artifact and as typed `harness.decision` events in the agent's unified session. Events contain one-based question indices, outcomes, sanitized error codes, latency, the proposed attempt, and `avoidedInvocation`; they never retain file contents or raw provider diagnostics. `gh aw audit --json` exposes this history under `retries.decisions` and counts avoided invocations separately from retries. A denied invocation records a noop if no terminal safe-output exists. The gate does not apply to threat detection or evals.
+
 ### Labels (`labels:`)
 
 Optional array of strings for categorizing workflows by purpose, team, or functionality. Labels appear in `gh aw status` output as `[automation ci diagnostics]` (or a JSON array in `--json` mode) and can be filtered with `gh aw status --label automation`.

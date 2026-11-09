@@ -75,6 +75,100 @@ describe("harness_retry_runner.cjs", () => {
     };
   }
 
+  function gateResult(outcome) {
+    return { outcome, questions: [{ question: 1, outcome }], latencyMs: 1 };
+  }
+
+  it("can deny the initial invocation without counting a process attempt", async () => {
+    const options = telemetryOptions();
+    options.evaluateDecision = vi.fn().mockResolvedValue(gateResult("deny"));
+    options.runAttempt = vi.fn();
+    options.handleFailure = vi.fn();
+    expect(await runHarnessRetryLoop(options)).toMatchObject({ exitCode: 0, attempts: 0, lastResult: null });
+    expect(options.runAttempt).not.toHaveBeenCalled();
+    expect(options.handleFailure).not.toHaveBeenCalled();
+    expect(JSON.parse(fs.readFileSync(options.telemetryPath, "utf8"))).toMatchObject({
+      attempts: 0,
+      exit_code: 0,
+      attempt_results: [],
+      decision_results: [{ proposedAttempt: 1, outcome: "deny", avoidedInvocation: true }],
+    });
+  });
+
+  it.each(["fresh restart", "--continue", "resume native session"])("evaluates the %s retry path once and can avoid its next invocation", async mode => {
+    const options = telemetryOptions([1, 0]);
+    options.getRetryMode = () => mode;
+    options.evaluateDecision = vi.fn().mockResolvedValueOnce(gateResult("unknown")).mockResolvedValueOnce(gateResult("deny"));
+    options.runAttempt = vi.fn(options.runAttempt);
+    options.sleepFn = vi.fn(options.sleepFn);
+    expect(await runHarnessRetryLoop(options)).toMatchObject({ exitCode: 0, attempts: 1 });
+    expect(options.runAttempt).toHaveBeenCalledTimes(1);
+    expect(options.evaluateDecision).toHaveBeenCalledTimes(2);
+    expect(options.sleepFn).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fs.readFileSync(options.telemetryPath, "utf8")).decision_results).toMatchObject([
+      { proposedAttempt: 1, outcome: "unknown", avoidedInvocation: false },
+      { proposedAttempt: 2, outcome: "deny", avoidedInvocation: true },
+    ]);
+  });
+
+  it.each(["allow", "unknown"])("preserves existing retry counts, backoff and failure handling for %s", async outcome => {
+    const options = telemetryOptions([1, 1, 0]);
+    options.evaluateDecision = vi.fn().mockResolvedValue(gateResult(outcome));
+    options.runAttempt = vi.fn(options.runAttempt);
+    options.handleFailure = vi.fn(options.handleFailure);
+    options.sleepFn = vi.fn(options.sleepFn);
+    expect(await runHarnessRetryLoop(options)).toMatchObject({ exitCode: 0, attempts: 3 });
+    expect(options.evaluateDecision).toHaveBeenCalledTimes(3);
+    expect(options.runAttempt).toHaveBeenCalledTimes(3);
+    expect(options.handleFailure).toHaveBeenCalledTimes(2);
+    expect(options.sleepFn.mock.calls).toEqual([[1], [2]]);
+  });
+
+  it("does not consult decisions after a nonrecoverable failure", async () => {
+    const options = telemetryOptions([1]);
+    options.evaluateDecision = vi.fn().mockResolvedValue(gateResult("allow"));
+    options.handleFailure = () => ({ action: "stop" });
+    expect(await runHarnessRetryLoop(options)).toMatchObject({ exitCode: 1, attempts: 1 });
+    expect(options.evaluateDecision).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not consult decisions for retries outside the deterministic retry budget", async () => {
+    const options = telemetryOptions([1]);
+    options.maxRetries = 0;
+    options.evaluateDecision = vi.fn().mockResolvedValue(gateResult("unknown"));
+    expect(await runHarnessRetryLoop(options)).toMatchObject({ exitCode: 1, attempts: 1 });
+    expect(options.evaluateDecision).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not consult the decision model once the deterministic deadline is exhausted", async () => {
+    const options = telemetryOptions();
+    options.softTimeoutGuard = { timeoutMinutes: 1, softDeadlineMs: Date.now() - 1 };
+    options.evaluateDecision = vi.fn().mockResolvedValue(gateResult("allow"));
+    expect(await runHarnessRetryLoop(options)).toMatchObject({ exitCode: 1, attempts: 0 });
+    expect(options.evaluateDecision).not.toHaveBeenCalled();
+  });
+
+  it("cannot let allow or unknown bypass a deadline consumed by evaluation", async () => {
+    const options = telemetryOptions();
+    options.softTimeoutGuard = { timeoutMinutes: 1, softDeadlineMs: Date.now() + 1000 };
+    options.evaluateDecision = async () => {
+      options.softTimeoutGuard.softDeadlineMs = Date.now() - 1;
+      return gateResult("unknown");
+    };
+    options.runAttempt = vi.fn();
+    expect(await runHarnessRetryLoop(options)).toMatchObject({ exitCode: 1, attempts: 0 });
+    expect(options.runAttempt).not.toHaveBeenCalled();
+  });
+
+  it("retains decisions across outer startup/recovery loops", async () => {
+    const options = telemetryOptions();
+    options.evaluateDecision = vi.fn().mockResolvedValueOnce(gateResult("unknown")).mockResolvedValueOnce(gateResult("deny"));
+    await runHarnessRetryLoop(options);
+    await runHarnessRetryLoop(options);
+    expect(options.evaluateDecision).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(fs.readFileSync(options.telemetryPath, "utf8")).decision_results.map(decision => decision.outcome)).toEqual(["unknown", "deny"]);
+  });
+
   it.each([
     [{}, "/tmp/gh-aw/agent/harness_retry.json"],
     [{ GH_AW_PHASE: "detection" }, "/tmp/gh-aw/threat-detection/detection_harness_retry.json"],

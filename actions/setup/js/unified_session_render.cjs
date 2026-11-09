@@ -46,6 +46,7 @@ const RUNTIME_TYPES = new Set([
   "eval.result",
   "usage.report",
   "execution.result",
+  "harness.decision",
   "detection.result",
   "workflow.info",
   "workflow.job_result",
@@ -97,6 +98,9 @@ function scalarFields(value, keys) {
 function eventDetail(event) {
   /** @type {Record<string, any>} */
   const data = normalizeUnifiedSessionEvent({ ...event, data: event.data ?? {} }).data;
+  if (event.type === "harness.decision") {
+    return fields(data, ["proposedAttempt", "outcome", "latencyMs", "avoidedInvocation", "error"]) + ` questions=[${data.questions.map(question => fields(question, ["question", "outcome", "error"])).join("; ")}]`;
+  }
   if (COPILOT_WORKFLOW_EVENT_TYPES.has(event.type)) {
     return fields({ ...data, agentId: event.agentId }, ["agentId", ...Object.keys(COPILOT_WORKFLOW_EVENT_FIELDS[event.type])]);
   }

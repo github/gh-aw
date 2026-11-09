@@ -56,6 +56,37 @@ const trace = [
 ];
 
 describe("unified session publication views", () => {
+  it("renders skip decisions with outcomes, errors, latency, and avoided invocations", () => {
+    const events = [
+      header,
+      event(
+        "harness.decision",
+        {
+          proposedAttempt: 2,
+          outcome: "deny",
+          questions: [
+            { question: 1, outcome: "unknown", error: "timeout" },
+            { question: 2, outcome: "deny" },
+          ],
+          latencyMs: 25,
+          timestamp: 1000,
+          avoidedInvocation: true,
+          providerBody: "PRIVATE_PROVIDER_BODY",
+        },
+        "harness",
+        0
+      ),
+    ];
+    for (const output of [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events), generateConversationMarkdown(events, { formatToolCallback: formatToolUse, formatInitCallback: formatInitializationSummary }).markdown]) {
+      expect(output).toContain("harness.decision");
+      expect(output).toContain("outcome=deny");
+      expect(output).toContain("latencyMs=25");
+      expect(output).toContain("avoidedInvocation=true");
+      expect(output).toContain("error=timeout");
+      expect(output).not.toContain("PRIVATE_PROVIDER_BODY");
+    }
+  });
+
   it("renders safe-output execution status alongside its canonical resource URI", () => {
     const events = [header, event("safe_output.result", { type: "publish", status: "success", url: "https://github.com/owner/repo/issues/42" }, "safe_output", 0)];
     for (const output of [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events), generateConversationMarkdown(events, { formatToolCallback: formatToolUse, formatInitCallback: formatInitializationSummary }).markdown]) {

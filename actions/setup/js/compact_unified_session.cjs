@@ -3,7 +3,7 @@
 
 const fs = require("node:fs");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
-const { normalizeHarnessRetryRecord, normalizeHarnessAttemptEvent, MAX_HARNESS_ATTEMPTS } = require("./harness_retry_record.cjs");
+const { normalizeHarnessRetryRecord, normalizeHarnessAttemptEvent, normalizeHarnessDecisionData, MAX_HARNESS_ATTEMPTS } = require("./harness_retry_record.cjs");
 
 const COMPACT_UNIFIED_SESSION_VERSION = 1;
 const MAX_COMPACT_SESSION_BYTES = 16 * 1024;
@@ -25,6 +25,7 @@ const EVENT_FIELDS = {
   "execution.result": ["outcome", "conclusion", "exitCode", "durationMs", "startedAt", "finishedAt"],
   "harness.retry": ["attempts", "exitCode"],
   "harness.attempt": [],
+  "harness.decision": ["proposedAttempt", "outcome", "latencyMs", "avoidedInvocation", "error"],
   "engine.retry": ["sourceEngine", "sourceType", "sessionId", "agentId"],
   "grader.result": ["id", "status", "value", "score", "unit", "passed", "direction", "threshold", "enabled", "min", "max", "version"],
 };
@@ -44,6 +45,7 @@ const SESSION_EVENT_PRIORITIES = {
   "grader.result": 3,
   "harness.retry": 4,
   "harness.attempt": 4,
+  "harness.decision": 4,
   "engine.retry": 4,
   "usage.report": 5,
   "firewall.token_usage": 5,
@@ -111,6 +113,11 @@ function projectEvent(event) {
   if (!isRecord(event) || typeof event.type !== "string" || !Object.hasOwn(EVENT_FIELDS, event.type) || !isRecord(event.data)) return undefined;
   /** @type {Record<string, unknown>} */
   const data = projectScalars(event.data, EVENT_FIELDS[event.type]);
+  if (event.type === "harness.decision") {
+    const decision = normalizeHarnessDecisionData(event.data);
+    if (!decision) return undefined;
+    Object.assign(data, decision);
+  }
   if (event.type === "engine.retry") {
     const retry = event.data;
     if (typeof retry.attempt !== "number" || !Number.isSafeInteger(retry.attempt) || retry.attempt < 1) return undefined;

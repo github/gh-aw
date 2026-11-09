@@ -59,6 +59,8 @@ for execution behavior.
 
 ### Searching session evidence
 
+Invocation skip decisions appear in `retries.decisions` and as searchable `harness.decision` unified-session events. Each records the proposed attempt, question outcomes, sanitized errors, latency, and whether an invocation was avoided. `retries.avoided_invocations` counts denied invocations separately from executed attempts and retries; a skip does not count as an agent retry.
+
 ```bash
 gh aw audit 1234567890 --search "api.example.com ERR_AUTH_401" --json
 gh aw audit 1234567890 --search "github.issue_read timeout" --search-limit 3
