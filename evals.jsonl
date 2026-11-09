@@ -76,3 +76,5 @@
 {"id":"unified_report_created","question":"Was a unified security observability report created combining both data sources?","answer":"UNKNOWN","model":"evals","timestamp":"2026-11-01T16:12:42.156Z","runid":"41323453880"}
 {"id":"security_data_analyzed","question":"Did the agent analyze firewall traffic and DIFC integrity-filtered events for the reporting period?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-08T16:12:15.118Z","runid":"42497067383"}
 {"id":"unified_report_created","question":"Was a unified security observability report created combining both data sources?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-08T16:12:15.118Z","runid":"42497067383"}
+{"id":"security_data_analyzed","question":"Did the agent analyze firewall traffic and DIFC integrity-filtered events for the reporting period?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-09T16:10:03.151Z","runid":"42649180614"}
+{"id":"unified_report_created","question":"Was a unified security observability report created combining both data sources?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-09T16:10:03.151Z","runid":"42649180614"}
