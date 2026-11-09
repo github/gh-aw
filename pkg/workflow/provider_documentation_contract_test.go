@@ -47,16 +47,7 @@ func TestProviderDocumentationXMLConsumers(t *testing.T) {
 			for _, reference := range declaration.Connectors[provider].Docs {
 				require.Contains(t, string(source), `"`+reference+`"`, "each docs reference must also occur in the self-contained XML sources")
 			}
-			_, body, found := strings.Cut(strings.TrimPrefix(string(source), "---\n"), "\n---\n")
-			require.True(t, found)
-			body = strings.TrimSpace(body)
-			require.True(t, strings.HasPrefix(body, "<!--\n"))
-			require.Equal(t, 1, strings.Count(body, "<!--"))
-			require.Equal(t, 1, strings.Count(body, "-->"))
-			require.Equal(t, 1, strings.Count(body, "<connector-documentation "))
-			document, _, found := strings.Cut(strings.TrimPrefix(body, "<!--\n"), "\n-->")
-			require.True(t, found)
-			require.NotContains(t, document, "--")
+			document := standaloneConnectorDocumentation(t, string(source))
 			var root providerDocumentationElement
 			decoder := xml.NewDecoder(strings.NewReader(document))
 			require.NoError(t, decoder.Decode(&root))

@@ -28,12 +28,10 @@ func TestGitLabProviderDeclarationAndDocumentation(t *testing.T) {
 	}
 
 	body := strings.TrimSpace(parts[2])
-	require.Equal(t, 1, strings.Count(body, "<!--"))
-	require.Equal(t, 1, strings.Count(body, "-->"))
-	require.True(t, strings.HasPrefix(body, "<!--\n"))
-	require.True(t, strings.HasSuffix(body, "\n-->"))
-	xmlSource := strings.TrimSuffix(strings.TrimPrefix(body, "<!--\n"), "\n-->")
-	require.NotContains(t, xmlSource, "--", "XML comments forbid internal double hyphens, including in CDATA")
+	require.NotContains(t, body, "<!--", "documentation must not be hidden in an HTML comment")
+	require.NotContains(t, body, "-->")
+	require.True(t, strings.HasPrefix(body, "<connector-documentation "))
+	require.True(t, strings.HasSuffix(body, "</connector-documentation>"))
 	var documentation struct {
 		XMLName  xml.Name `xml:"connector-documentation"`
 		ID       string   `xml:"id,attr"`
@@ -44,11 +42,11 @@ func TestGitLabProviderDeclarationAndDocumentation(t *testing.T) {
 			Prompt string `xml:"body"`
 		} `xml:"examples>example"`
 	}
-	require.NoError(t, xml.Unmarshal([]byte(xmlSource), &documentation))
+	require.NoError(t, xml.Unmarshal([]byte(body), &documentation))
 	require.Equal(t, "gitlab", documentation.ID)
 	require.Equal(t, "1", documentation.Version)
 	for _, section := range []string{"purpose", "authentication", "configuration", "operations", "triggers", "privacy", "limitations", "examples", "sources"} {
-		require.Contains(t, xmlSource, "<"+section)
+		require.Contains(t, body, "<"+section)
 	}
 	require.Len(t, documentation.Examples, 2)
 	for _, example := range documentation.Examples {

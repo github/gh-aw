@@ -561,7 +561,7 @@ test-scripts: build test-workflow-tool-contracts test-agent-local-settings test-
 	node --test scripts/auditor-workflow.test.cjs
 	bash scripts/extract-workflow-frontmatter-keys_test.sh
 	bash scripts/check-stale-lock-files_test.sh
-	bash scripts/agent-report-progress_test.sh
+	$(MAKE) --no-print-directory test-agent-dev-loop
 	bash scripts/check-skill-file-paths_test.sh
 	bash scripts/check-safe-outputs-conformance_test.sh
 	bash scripts/resolve-base-commit_test.sh
@@ -588,6 +588,11 @@ test-scripts: build test-workflow-tool-contracts test-agent-local-settings test-
 	bash .github/scripts/install_tla_runtime_test.sh
 	bash actions/setup/sh/runtime_trust_inventory_test.sh
 	@echo "✓ All script tests passed"
+
+.PHONY: test-agent-dev-loop
+test-agent-dev-loop:
+	bash scripts/format-changed_test.sh
+	bash scripts/agent-report-progress_test.sh
 
 # Test all code and guidance (Go, JavaScript, wasm golden, shell scripts, and guidance contracts)
 .PHONY: test-all
@@ -1062,9 +1067,14 @@ check-stale-schema-binary:
 		bash scripts/check-stale-schema-binary.sh --binary "./$(BINARY_NAME)"; \
 	fi
 
-# Format code
+# Format only branch changes, including staged, unstaged, and untracked files.
 .PHONY: fmt
-fmt: fmt-go fmt-cjs fmt-json
+fmt:
+	@BASE_REF="$(BASE_REF)" bash scripts/format-changed.sh
+
+# Explicit full-repository formatting (not part of the inner development loop).
+.PHONY: fmt-all
+fmt-all: fmt-go fmt-cjs fmt-json
 	@echo "✓ Code formatted successfully"
 
 .PHONY: fmt-go
@@ -1503,13 +1513,13 @@ sbom:
 	syft packages . -o cyclonedx-json=sbom.cdx.json
 	@echo "✓ SBOM files generated: sbom.spdx.json, sbom.cdx.json"
 
-# Agent should run this task before finishing its turns
+# Explicit repository-wide maintenance sweep, not an inner-loop gate.
 .PHONY: agent-finish
-agent-finish: deps-dev fmt lint build build-wasm test-all validate-otel-contract fix recompile dependabot generate-schema-docs generate-agent-factory generate-llms-txt security-scan
+agent-finish: deps-dev fmt-all lint build build-wasm test-all validate-otel-contract fix recompile dependabot generate-schema-docs generate-agent-factory generate-llms-txt security-scan
 	@echo "Agent finished tasks successfully."
 
-# Change-scoped pre-PR gate — run before every intermediate report_progress call.
-# The driver runs independent lint checks in parallel after formatting and build.
+# Fast intermediate gate: scoped formatting and compilation/vet, no test bodies.
+# Package-wide Go linters and workflow recompilation run only in the final gate.
 .PHONY: agent-report-progress-no-test
 agent-report-progress-no-test:
 	@bash scripts/agent-report-progress.sh
@@ -1578,7 +1588,8 @@ help:
 	@echo "  golint           - Run golangci-lint (full repository scan)"
 	@echo "  golint-incremental - Run golangci-lint incrementally (only changed files, requires BASE_REF)"
 	@echo "  lint             - Run linter"
-	@echo "  fmt              - Format code"
+	@echo "  fmt              - Format branch changes (Go-only changes need no npm)"
+	@echo "  fmt-all          - Format the entire repository"
 	@echo "  fmt-cjs          - Format JavaScript/TypeScript/JSON files in actions/setup/js and eslint-factory"
 	@echo "  fmt-json         - Format JSON files in pkg directory (excluding actions/setup/js)"
 	@echo "  fmt-check        - Check code formatting"
@@ -1632,7 +1643,7 @@ help:
 	@echo "  clean-docs       - Clean documentation artifacts (dist, node_modules, .astro)"
 
 	@echo "  agent-finish                - Complete validation sequence (build, test, fix, recompile, fmt, lint, security-scan)"
-	@echo "  agent-report-progress-no-test - Fast change-scoped pre-PR gate without tests"
+	@echo "  agent-report-progress-no-test - Fast scoped formatting and compile/vet gate; full Go lint and workflow drift deferred"
 	@echo "  agent-report-progress       - Change-scoped pre-PR gate with impacted Go tests"
 	@echo "  agent-report-progress-lint  - Full pre-PR gate + gh aw lint lock-file check"
 	@echo "  sbom             - Generate SBOM in SPDX and CycloneDX formats (requires syft)"
