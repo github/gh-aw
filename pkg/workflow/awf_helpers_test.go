@@ -4,6 +4,7 @@ package workflow
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 
@@ -1291,4 +1292,136 @@ func TestGeminiEngineIncludesGeminiAPITarget(t *testing.T) {
 	assert.Contains(t, stepContent, `\"gemini\"`, "Should include gemini target in config JSON")
 	assert.Contains(t, stepContent, "generativelanguage.googleapis.com", "Should include default Gemini API hostname")
 	assert.NotContains(t, stepContent, "--gemini-api-target", "Should not emit --gemini-api-target as CLI flag")
+}
+
+func TestGeminiProxyTargetDoesNotGrantAgentEgress(t *testing.T) {
+	tests := []struct {
+		name       string
+		allowed    []string
+		customURL  string
+		apiTarget  string
+		wantTarget string
+		wantDirect bool
+	}{
+		{name: "empty network", allowed: []string{}, wantTarget: DefaultGeminiAPITarget},
+		{name: "github only", allowed: []string{"github"}, wantTarget: DefaultGeminiAPITarget},
+		{name: "defaults and github", allowed: []string{"defaults", "github"}, wantTarget: DefaultGeminiAPITarget},
+		{name: "gemini opt-in", allowed: []string{"gemini"}, wantTarget: DefaultGeminiAPITarget, wantDirect: true},
+		{name: "explicit hostname", allowed: []string{DefaultGeminiAPITarget}, wantTarget: DefaultGeminiAPITarget, wantDirect: true},
+		{name: "custom target", allowed: []string{"github"}, customURL: "https://gemini-proxy.example.com/v1", wantTarget: "gemini-proxy.example.com", wantDirect: true},
+		{name: "explicit default target", customURL: "https://" + DefaultGeminiAPITarget, wantTarget: DefaultGeminiAPITarget, wantDirect: true},
+		{name: "explicit API target", apiTarget: "api.example.com", wantTarget: DefaultGeminiAPITarget},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			compiler := NewCompiler()
+			compiler.markdownPath = "/tmp/gemini-egress.md"
+			for _, cache := range []string{"cold", "workflow", "compiler"} {
+				t.Run(cache, func(t *testing.T) {
+					data := &WorkflowData{
+						Name:            "test-workflow",
+						FrontmatterHash: tt.name,
+						EngineConfig: &EngineConfig{
+							ID:        "gemini",
+							APITarget: tt.apiTarget,
+							Env:       map[string]string{},
+						},
+						NetworkPermissions: &NetworkPermissions{
+							Allowed:  tt.allowed,
+							Firewall: &FirewallConfig{Enabled: true},
+						},
+					}
+					if tt.customURL != "" {
+						data.EngineConfig.Env["GEMINI_API_BASE_URL"] = tt.customURL
+					}
+					if cache != "cold" {
+						sanitizerDomains, err := compiler.computeAllowedDomainsForSanitization(data)
+						require.NoError(t, err)
+						assert.Contains(t, splitDomainList(sanitizerDomains), tt.wantTarget)
+						assert.Equal(t, tt.wantDirect, slices.Contains(splitDomainList(data.CachedAllowedDomainsStr), tt.wantTarget))
+						repeated, err := compiler.computeAllowedDomainsForSanitization(data)
+						require.NoError(t, err)
+						assert.Equal(t, sanitizerDomains, repeated)
+					}
+
+					steps := NewGeminiEngine().GetExecutionSteps(data, "test.log")
+					require.Len(t, steps, 2)
+					stepContent := strings.Join(steps[1], "\n")
+
+					domains, err := compiler.computeAllowedDomainsForFirewall(data)
+					require.NoError(t, err)
+					if tt.apiTarget != "" {
+						domains = mergeAPITargetDomains(domains, tt.apiTarget)
+					}
+					configJSON, err := BuildAWFConfigJSON(AWFCommandConfig{
+						EngineName:     "gemini",
+						WorkflowData:   data,
+						AllowedDomains: domains,
+					})
+					require.NoError(t, err)
+					var config AWFConfigFile
+					require.NoError(t, json.Unmarshal([]byte(configJSON), &config))
+					require.NotNil(t, config.APIProxy)
+					require.NotNil(t, config.APIProxy.Targets["gemini"])
+					assert.Equal(t, tt.wantTarget, config.APIProxy.Targets["gemini"].Host)
+
+					var allowDomains []string
+					if config.Network != nil {
+						allowDomains = config.Network.AllowDomains
+					}
+					assert.Equal(t, tt.wantDirect, slices.Contains(allowDomains, tt.wantTarget))
+					if tt.customURL != "" && tt.wantTarget != DefaultGeminiAPITarget {
+						assert.NotContains(t, allowDomains, DefaultGeminiAPITarget)
+					}
+					if tt.apiTarget != "" {
+						assert.Contains(t, allowDomains, tt.apiTarget)
+						assert.Contains(t, allowDomains, "example.com")
+					}
+					if len(allowDomains) == 0 {
+						assert.NotContains(t, stepContent, `\"allowDomains\"`)
+					} else {
+						encoded, err := json.Marshal(allowDomains)
+						require.NoError(t, err)
+						assert.Contains(t, stepContent, `\"allowDomains\":`+strings.ReplaceAll(string(encoded), `"`, `\"`))
+					}
+					assert.Contains(t, stepContent, `\"gemini\":{\"host\":\"`+tt.wantTarget+`\"}`)
+					wantBaseURL := llmGatewayBaseURL(constants.GeminiLLMGatewayPort, data)
+					if tt.customURL != "" {
+						wantBaseURL = tt.customURL
+					}
+					assert.Contains(t, stepContent, "GEMINI_API_BASE_URL: "+wantBaseURL)
+				})
+			}
+		})
+	}
+}
+
+func TestAgyCustomGeminiTargetIsAllowedWithoutDefaultUpstream(t *testing.T) {
+	const customTarget = "gemini-proxy.example.com"
+	compiler := NewCompiler()
+	data := &WorkflowData{
+		AI: "agy",
+		EngineConfig: &EngineConfig{
+			ID: "agy",
+			Env: map[string]string{
+				"GOOGLE_GEMINI_BASE_URL": "https://" + customTarget + "/api",
+			},
+		},
+		NetworkPermissions: &NetworkPermissions{
+			Firewall: &FirewallConfig{Enabled: true},
+		},
+	}
+
+	sanitizationDomains, err := compiler.computeAllowedDomainsForSanitization(data)
+	require.NoError(t, err)
+	assert.Contains(t, splitDomainList(sanitizationDomains), customTarget)
+	assert.Contains(t, splitDomainList(data.CachedAllowedDomainsStr), customTarget)
+	assert.NotContains(t, splitDomainList(data.CachedAllowedDomainsStr), DefaultGeminiAPITarget)
+
+	steps := NewAgyEngine().GetExecutionSteps(data, "test.log")
+	require.Len(t, steps, 1)
+	stepContent := strings.Join(steps[0], "\n")
+	assert.Contains(t, stepContent, customTarget)
+	assert.NotContains(t, stepContent, DefaultGeminiAPITarget)
 }
