@@ -136,6 +136,14 @@ func (state Projection) executionProfile(work *WorkState) (WorkerProfile, string
 	return revision.Profile, "ready"
 }
 
+func (state Projection) obsoleteWork(work *WorkState) bool {
+	if work == nil || work.State != "available" || work.ExecutionRef != "" || work.ClaimID != "" || work.Barrier != "none" {
+		return false
+	}
+	_, reason := state.executionProfile(work)
+	return reason == "worker_incompatible"
+}
+
 // FuturePolicy exposes current routes for trusted admission builders only.
 // It does not replace the installed policy or affect existing assignments.
 func FuturePolicy(state Projection) Policy {
