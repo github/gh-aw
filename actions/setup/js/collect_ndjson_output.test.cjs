@@ -195,6 +195,19 @@ describe("collect_ndjson_output.cjs", () => {
       delete process.env.GH_AW_VALIDATION_CONFIG_PATH;
       delete process.env.GH_AW_SAFE_OUTPUTS_CONFIG_PATH;
     }),
+    it.each([true, false])("publishes comment data using handler collapse_data=%s", async collapseData => {
+      const outputFile = "/tmp/gh-aw/test-ndjson-output.txt";
+      const data = { state: "a".repeat(64) };
+      process.env.GH_AW_SAFE_OUTPUTS = outputFile;
+      fs.writeFileSync(outputFile, JSON.stringify({ type: "add_comment", body: "Copilot is working through the prep list.", data }));
+      fs.writeFileSync(process.env.GH_AW_SAFE_OUTPUTS_CONFIG_PATH, JSON.stringify({ add_comment: { max: 1, data_enabled: true, collapse_data: collapseData } }));
+      await eval(`(async () => { ${collectScript}; await main(); })()`);
+      const output = JSON.parse(mockCore.setOutput.mock.calls.find(call => call[0] === "output")[1]);
+      expect(output.errors).toEqual([]);
+      expect(output.items[0].data).toEqual(data);
+      expect(output.items[0].body.includes("<details>")).toBe(collapseData);
+      expect(output.items[0].body.includes("Structured data:")).toBe(!collapseData);
+    }),
     it("should handle missing GH_AW_SAFE_OUTPUTS environment variable", async () => {
       (delete process.env.GH_AW_SAFE_OUTPUTS,
         await eval(`(async () => { ${collectScript}; await main(); })()`),

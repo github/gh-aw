@@ -8,6 +8,8 @@ import { ensureSecureDirectory, writeFileSecure } from "../.github/scripts/secur
 import "../actions/setup/js/shim.cjs";
 import { withRetry, isTransientError } from "../actions/setup/js/error_recovery.cjs";
 import { renderSizedReport } from "../actions/setup/js/report_size.cjs";
+import { parseReportMarkdown } from "../actions/setup/js/report_markdown.cjs";
+import { validateValueAgainstSchema } from "../actions/setup/js/schema-validation.cjs";
 
 const execFile = promisify(execFileCallback);
 
@@ -21,6 +23,64 @@ const failureStates = new Set(["FAILURE", "ERROR", "TIMED_OUT", "ACTION_REQUIRED
 const idleMs = 10 * 60 * 1000;
 const staleMs = 14 * 24 * 60 * 60 * 1000;
 const approvalWorkflows = new Set([".github/workflows/cjs.yml", ".github/workflows/cgo.yml", ".github/workflows/CWI.yml"]);
+const commentDataCache = new WeakMap();
+
+export const sousChefDataSchema = {
+  type: "object",
+  properties: {
+    workflow: { type: "string", enum: ["pr-sous-chef"] },
+    schema_version: { type: "string", enum: ["1"] },
+    kind: { type: "string", enum: ["requested", "running", "ci-follow-up"] },
+    head: { type: "string", minLength: 1 },
+    work: { type: "array", items: { type: "string", pattern: "^[a-f0-9]{64}$" } },
+    state: { type: "string", pattern: "^[a-f0-9]{64}$" },
+    completed_task: { type: "integer", minimum: 0 },
+  },
+  required: ["workflow", "schema_version", "kind", "head", "work", "state", "completed_task"],
+  additionalProperties: false,
+};
+
+export function readSousChefData(body) {
+  if (!body?.includes('"pr-sous-chef"')) return null;
+  const matches = [];
+  function visit(nodes) {
+    for (const node of nodes) {
+      if (node.type === "details") visit(node.children);
+      else if (node.type === "structured_data" && !validateValueAgainstSchema(node.data, sousChefDataSchema)) {
+        const data = node.data;
+        if (
+          /^\S+$/.test(data.head) &&
+          /^[a-f0-9]{64}$/.test(data.state) &&
+          data.work.every(token => /^[a-f0-9]{64}$/.test(token)) &&
+          Number.isSafeInteger(data.completed_task) &&
+          (data.kind === "ci-follow-up" ? data.completed_task > 0 : data.completed_task === 0)
+        )
+          matches.push(data);
+      }
+    }
+  }
+  visit(parseReportMarkdown(body, { agentTainted: true }));
+  return matches.length === 1 ? matches[0] : null;
+}
+
+function commentData(comment) {
+  const body = comment.body ?? "";
+  const cached = commentDataCache.get(comment);
+  if (cached?.body === body) return cached.data;
+  const data = readSousChefData(body);
+  commentDataCache.set(comment, { body, data });
+  return data;
+}
+
+function recordedState(comment) {
+  const data = commentData(comment);
+  return data?.kind === "running" ? data.state : statePattern.exec(comment.body ?? "")?.[1];
+}
+
+function isAssignment(comment) {
+  const data = commentData(comment);
+  return isSousChefComment(comment) && (data ? ["requested", "running"].includes(data.kind) : /^Sous-chef (?:requested-)?state: [a-f0-9]{64}$/m.test(comment.body ?? ""));
+}
 
 function epoch(value) {
   if (!value) return 0;
@@ -62,7 +122,8 @@ function isSousChefComment(comment) {
   const trustedAuthor = trusted(comment) || ["copilot", "github-copilot", "copilot-swe-agent"].includes(normalizedLogin(comment));
   return (
     trustedAuthor &&
-    (body.includes(marker) ||
+    (Boolean(commentData(comment)) ||
+      body.includes(marker) ||
       statePattern.test(body) ||
       /^Sous-chef requested-state: [a-f0-9]{64}$/m.test(body) ||
       /^Sous-chef ci-follow-up: [1-9]\d*$/m.test(body) ||
@@ -74,6 +135,8 @@ function isSousChefComment(comment) {
 function isNudge(comment) {
   const body = comment.body ?? "";
   if (/The code changes were not applied\.|a fallback review issue was created instead due to protected file changes:|Direct push to the original pull request branch was not possible/.test(body)) return false;
+  const data = commentData(comment);
+  if (data) return isSousChefComment(comment) && data.kind === "running";
   if (/^Sous-chef requested-state: [a-f0-9]{64}$/m.test(body) && !statePattern.test(body)) return false;
   return isSousChefComment(comment) && (body.includes("@copilot") || statePattern.test(body));
 }
@@ -216,7 +279,7 @@ export function classify(pr, detail, comments, runs, now = Date.now()) {
     .digest("hex");
   // Recognize fingerprints emitted before replied-feedback filtering was introduced.
   const alreadyNudged = nudges.some(comment => {
-    const previous = statePattern.exec(comment.body)?.[1];
+    const previous = recordedState(comment);
     if (previous === state) return true;
     const previousState = createHash("sha256")
       .update(
@@ -235,21 +298,20 @@ export function classify(pr, detail, comments, runs, now = Date.now()) {
   const work = workTokens({ unresolved_reviews: feedback, failed_checks: failedChecks, zero_diff_stalled: zeroDiff });
   const coveredWork = new Set(
     nudges
-      .filter(comment => /^Sous-chef head: (\S+)$/m.exec(comment.body)?.[1] === pr.headRefOid)
+      .filter(comment => (commentData(comment)?.head ?? /^Sous-chef head: (\S+)$/m.exec(comment.body)?.[1]) === pr.headRefOid)
       .flatMap(comment => {
+        const data = commentData(comment);
+        if (data?.kind === "running") return data.work;
         const recorded = /^Sous-chef work: ([a-f0-9 ]+)$/m.exec(comment.body)?.[1];
         return recorded?.split(" ") ?? [];
       })
   );
   let nudgeSkip;
   if (!branchAction && (alreadyNudged || (work.length && work.every(token => coveredWork.has(token))))) nudgeSkip = "unchanged";
-  else if (!branchAction && latest && !statePattern.test(latest.body) && activity <= epoch(latest.created_at)) nudgeSkip = "unchanged_legacy";
+  else if (!branchAction && latest && !recordedState(latest) && activity <= epoch(latest.created_at)) nudgeSkip = "unchanged_legacy";
   else if (!branchAction && !work.length) nudgeSkip = failedChecks.length ? "approval_required" : "nothing_actionable";
   if (!nudgeSkip && lastComment && isSousChefComment(lastComment)) nudgeSkip = "last_comment_sous_chef";
-  const assignment = [...comments]
-    .filter(isSousChefComment)
-    .filter(comment => /^Sous-chef (?:requested-)?state: [a-f0-9]{64}$/m.test(comment.body ?? ""))
-    .sort((a, b) => epoch(b.createdAt ?? b.created_at) - epoch(a.createdAt ?? a.created_at))[0];
+  const assignment = [...comments].filter(isAssignment).sort((a, b) => epoch(b.createdAt ?? b.created_at) - epoch(a.createdAt ?? a.created_at))[0];
   const completedTask =
     assignment && failedChecks.some(check => check.conclusion !== "ACTION_REQUIRED")
       ? runs
@@ -268,7 +330,12 @@ export function classify(pr, detail, comments, runs, now = Date.now()) {
           .sort((a, b) => epoch(b.updated_at) - epoch(a.updated_at))[0]
       : null;
   const ciFollowUp =
-    nudgeSkip && completedTask && !comments.some(comment => isSousChefComment(comment) && (comment.body ?? "").split("\n").includes(`Sous-chef ci-follow-up: ${completedTask.id}`))
+    nudgeSkip &&
+    completedTask &&
+    !comments.some(
+      comment =>
+        isSousChefComment(comment) && (commentData(comment)?.kind === "ci-follow-up" ? commentData(comment).completed_task === completedTask.id : (comment.body ?? "").split("\n").includes(`Sous-chef ci-follow-up: ${completedTask.id}`))
+    )
       ? { run_id: completedTask.id, url: completedTask.html_url }
       : null;
   if (nudgeSkip && !dismissReviews.length && !approveRuns.length && !ciFollowUp) {
@@ -395,7 +462,7 @@ async function inspect(repo, pr, runs, api = gh, now = Date.now()) {
     (result.skip_reason === "unchanged" || result.skip_reason === "unchanged_legacy" || result.skip_reason === "last_comment_sous_chef" || result.nudge_needed === false) &&
     !activeAgent(pr, runs) &&
     pr.statusCheckRollup?.some(check => failureStates.has(check.conclusion ?? check.state) && (check.conclusion ?? check.state) !== "ACTION_REQUIRED") &&
-    comments.some(comment => isSousChefComment(comment) && /^Sous-chef (?:requested-)?state: [a-f0-9]{64}$/m.test(comment.body ?? ""))
+    comments.some(isAssignment)
   ) {
     const completed = await api(["api", `repos/${repo}/actions/runs?status=completed&event=dynamic&branch=${encodeURIComponent(pr.headRefName)}&per_page=100`]);
     if (!Array.isArray(completed?.workflow_runs)) throw new Error(`PR #${pr.number}: could not refresh completed coding tasks`);
@@ -548,36 +615,15 @@ export function buildNudgeReport(pr, requested = false) {
       ]),
     ]);
   if (pr.zero_diff_stalled) tasks.push([paragraph([text("Implement the requested change, or close this zero-diff PR with a reason.")])]);
-  const label = requested ? "requested-" : "";
   return {
     type: "report",
     title: "PR Sous Chef",
     agentTainted: false,
     children: [
       ...(requested ? [paragraph([{ type: "mention", login: "copilot", agentTainted: false }])] : []),
-      { type: "xml_marker", name: "gh-aw-pr-sous-chef-nudge", compact: true, agentTainted: false },
       paragraph([text(requested ? "🍳 A little prep to help this PR along! Copilot assignment requested for the following outstanding work:" : "🍳 Apron on! Copilot is working through this prep list:")]),
       { type: "list", ordered: true, items: tasks, agentTainted: false },
       paragraph([text("Keeping the changes focused; human review and CI get the final taste test. No merging or CI triggering.")]),
-      {
-        type: "details",
-        summary: "Kitchen notes (automation bookkeeping)",
-        agentTainted: false,
-        children: [
-          paragraph([
-            text(
-              'Once you start work, post this work summary as a PR comment without the leading Copilot mention. Use the opening "🍳 Apron on! Copilot is working through this prep list:" and keep these kitchen notes collapsed, including the Sous-chef head, work, and state lines below, to record that the assignment is running. Apply the necessary fixes on this PR\'s existing branch, reply to each listed review thread and resolve it when addressed. Ignore feedback already answered or resolved; stop when only human review or CI remains. Do not merge or trigger CI.'
-            ),
-          ]),
-          {
-            type: "code_block",
-            language: "text",
-            value: `Sous-chef ${label}head: ${pr.headRefOid}\nSous-chef ${label}work: ${workTokens(pr).join(" ")}\nSous-chef ${label}state: ${pr.state_fingerprint}`,
-            agentTainted: false,
-            sizeProtected: true,
-          },
-        ],
-      },
     ],
   };
 }
@@ -592,6 +638,18 @@ export function formatAssignmentRequest(pr) {
   return report ? renderSizedReport(report).body : null;
 }
 
+export function formatSousChefData(pr, kind) {
+  return {
+    workflow: "pr-sous-chef",
+    schema_version: "1",
+    kind,
+    head: pr.headRefOid,
+    work: workTokens(pr),
+    state: pr.state_fingerprint,
+    completed_task: kind === "ci-follow-up" ? pr.ci_follow_up.run_id : 0,
+  };
+}
+
 export function formatCIFollowUp(pr) {
   if (!pr.ci_follow_up) return null;
   /** @type {import("../actions/setup/js/report_ast.cjs").Report} */
@@ -600,7 +658,6 @@ export function formatCIFollowUp(pr) {
     title: "PR Sous Chef CI follow-up",
     agentTainted: false,
     children: [
-      { type: "xml_marker", name: "gh-aw-pr-sous-chef-nudge", compact: true, agentTainted: false },
       {
         type: "paragraph",
         agentTainted: false,
@@ -641,20 +698,6 @@ export function formatCIFollowUp(pr) {
         type: "paragraph",
         agentTainted: false,
         children: [{ type: "text", value: "Flagging the remaining blockers for maintainer investigation, not starting another copy of the same task.", agentTainted: false }],
-      },
-      {
-        type: "details",
-        summary: "Kitchen notes (automation bookkeeping)",
-        agentTainted: false,
-        children: [
-          {
-            type: "code_block",
-            language: "text",
-            value: `Sous-chef ci-follow-up: ${pr.ci_follow_up.run_id}`,
-            agentTainted: false,
-            sizeProtected: true,
-          },
-        ],
       },
     ],
   };
@@ -722,11 +765,11 @@ async function main() {
   if (simulate) {
     output.nudges = output.prs.flatMap(pr => {
       const body = formatAssignmentRequest(pr);
-      return body ? [{ pr_number: pr.number, body }] : [];
+      return body ? [{ pr_number: pr.number, body, data: formatSousChefData(pr, "requested") }] : [];
     });
     output.ci_follow_ups = output.prs.flatMap(pr => {
       const body = formatCIFollowUp(pr);
-      return body ? [{ pr_number: pr.number, body }] : [];
+      return body ? [{ pr_number: pr.number, body, data: formatSousChefData(pr, "ci-follow-up") }] : [];
     });
   }
   if (checkNumber || simulate) {

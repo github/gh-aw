@@ -337,6 +337,7 @@ async function main() {
             normalizeIssueClosingKeywords,
             dataEnabled: typeConfig !== null && typeof typeConfig === "object" && typeConfig.data_enabled === true,
             dataSchema: typeConfig !== null && typeof typeConfig === "object" ? typeConfig.data_schema : undefined,
+            collapseData: typeConfig !== null && typeof typeConfig === "object" ? typeConfig.collapse_data : undefined,
           });
           if (!validationResult.isValid) {
             rejectItem(validationResult.error || `Line ${i + 1}: Invalid ${itemType} output`);

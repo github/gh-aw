@@ -13,12 +13,53 @@ import {
   fetchActiveRuns,
   fetchCandidate,
   fetchQueue,
-  formatAssignmentRequest,
-  formatCIFollowUp,
-  formatNudge,
+  formatAssignmentRequest as formatAssignmentBody,
+  formatCIFollowUp as formatCIFollowUpBody,
+  formatNudge as formatNudgeBody,
+  formatSousChefData,
   formatSummary,
   gh,
+  readSousChefData,
+  sousChefDataSchema,
 } from "./pr-sous-chef.mjs";
+import { validateItem, resetValidationConfigCache } from "../actions/setup/js/safe_output_type_validator.cjs";
+
+function publishedBody(body, data, collapseData = true) {
+  const previous = process.env.GH_AW_VALIDATION_CONFIG;
+  process.env.GH_AW_VALIDATION_CONFIG = JSON.stringify({
+    add_comment: {
+      fields: { body: { type: "string", required: true, sanitize: true } },
+      dataEnabled: true,
+      dataSchema: sousChefDataSchema,
+    },
+  });
+  resetValidationConfigCache();
+  try {
+    const result = validateItem({ type: "add_comment", body, data }, "add_comment", 1, { collapseData, allowedAliases: ["copilot"] });
+    assert.ok(result.isValid, result.error);
+    assert.deepEqual(result.normalizedItem.data, data);
+    return result.normalizedItem.body;
+  } finally {
+    if (previous === undefined) delete process.env.GH_AW_VALIDATION_CONFIG;
+    else process.env.GH_AW_VALIDATION_CONFIG = previous;
+    resetValidationConfigCache();
+  }
+}
+
+function formatNudge(pr) {
+  const body = formatNudgeBody(pr);
+  return body ? publishedBody(body, formatSousChefData(pr, "running")) : null;
+}
+
+function formatAssignmentRequest(pr) {
+  const body = formatAssignmentBody(pr);
+  return body ? publishedBody(body, formatSousChefData(pr, "requested")) : null;
+}
+
+function formatCIFollowUp(pr) {
+  const body = formatCIFollowUpBody(pr);
+  return body ? publishedBody(body, formatSousChefData(pr, "ci-follow-up")) : null;
+}
 
 const now = Date.parse("2026-10-03T18:00:00Z");
 const recent = "2026-10-03T16:00:00Z";
@@ -202,9 +243,7 @@ test("pending assignment comments suppress consecutive requests without recordin
   assert.doesNotMatch(request, /\[@copilot\]\(/);
   assert.ok(sanitizeContent(request, { allowedAliases: ["copilot"] }).startsWith("@copilot\n\n"));
   const body = stripHtmlComments(request);
-  assert.match(body, /Sous-chef requested-head: abc/);
-  assert.match(body, /Sous-chef requested-work: [a-f0-9]{64}/);
-  assert.match(body, new RegExp(`^Sous-chef requested-state: ${first.state_fingerprint}$`, "m"));
+  assert.deepEqual(readSousChefData(body), formatSousChefData(first, "requested"));
   assert.doesNotMatch(body, /Sous-chef (head|work|state):/);
   const pending = { ...nudge(first.state_fingerprint), body };
   assert.equal(classify(failingPr, detail(), [pending], [], now).skip_reason, "last_comment_sous_chef");
@@ -213,7 +252,7 @@ test("pending assignment comments suppress consecutive requests without recordin
   const acknowledged = {
     ...pending,
     user: { login: "copilot-swe-agent[bot]" },
-    body: body.replace("@copilot\n\n", "").replace(/^Sous-chef requested-(head|work|state):/gm, "Sous-chef $1:"),
+    body: body.replace("@copilot\n\n", "").replace('"kind": "requested"', '"kind": "running"'),
   };
   assert.doesNotMatch(acknowledged.body, /@copilot/);
   assert.equal(classify(failingPr, detail(), [pending, acknowledged], [], now).skip_reason, "unchanged");
@@ -769,24 +808,17 @@ test("a precise nudge lists only unanswered feedback and always requests a branc
   assert.doesNotMatch(body, /Fix the regression/);
   assert.doesNotMatch(body, /@copilot/);
   assert.doesNotMatch(body, /pr-finisher/);
-  assert.match(body, /Once you start work, post this work summary as a PR comment/);
-  assert.match(body, /including the Sous-chef head, work, and state lines/);
-  assert.match(body, /this PR's existing branch/);
-  assert.match(body, /Do not merge or trigger CI/);
-  assert.match(body, new RegExp(`^Sous-chef state: ${result.state_fingerprint}$`, "m"));
+  assert.match(body, /No merging or CI triggering/);
+  assert.equal(readSousChefData(body).state, result.state_fingerprint);
 });
 
-test("assignment and running comments keep full fingerprints only in collapsed kitchen notes", () => {
+test("assignment and running comments publish full fingerprints only through collapsed structured data", () => {
   const candidate = { ...failingPr, headRefOid: "a".repeat(40) };
   const result = classify(candidate, detail([thread()]), [], [], now);
   for (const requested of [false, true]) {
     const report = buildNudgeReport(result, requested);
-    const notes = report.children.at(-1);
-    assert.equal(notes.type, "details");
-    assert.equal(notes.open, undefined);
-    assert.equal(notes.summary, "Kitchen notes (automation bookkeeping)");
-    assert.equal(notes.children.at(-1).type, "code_block");
-    assert.equal(notes.children.at(-1).sizeProtected, true);
+    assert.ok(!report.children.some(node => node.type === "details" || node.type === "code_block" || node.type === "structured_data"));
+    assert.doesNotMatch(requested ? formatAssignmentBody(result) : formatNudgeBody(result), /[a-f0-9]{40,64}|Sous-chef (?:requested-)?(?:head|work|state):/);
     const body = requested ? formatAssignmentRequest(result) : formatNudge(result);
     const sanitized = sanitizeContent(body, { allowedAliases: ["copilot"] });
     for (const published of [body, sanitized, stripHtmlComments(sanitized)]) {
@@ -796,11 +828,62 @@ test("assignment and running comments keep full fingerprints only in collapsed k
       assert.match(visible, /\[Review comment\]\(https:\/\/github\.com\//);
       assert.match(visible, /\[Check run\]|see the PR checks/);
       assert.doesNotMatch(published, /<details open/);
-      assert.match(published, new RegExp(`^Sous-chef ${requested ? "requested-" : ""}head: ${candidate.headRefOid}$`, "m"));
+      assert.deepEqual(readSousChefData(published), formatSousChefData(result, requested ? "requested" : "running"));
       const comment = { ...nudge(result.state_fingerprint), body: published };
       assert.equal(classify(candidate, detail([thread()]), [comment], [], now).skip_reason, requested ? "last_comment_sous_chef" : "unchanged");
     }
   }
+});
+
+test("structured state is recovered from flat and collapsed data but not quoted or ambiguous examples", () => {
+  const first = classify(failingPr, detail(), [], [], now);
+  const data = formatSousChefData(first, "running");
+  for (const collapsed of [true, false]) {
+    const body = publishedBody(formatNudgeBody(first), data, collapsed);
+    assert.deepEqual(readSousChefData(body), data);
+    assert.equal(classify(failingPr, detail(), [{ ...nudge(first.state_fingerprint), body }], [], now).skip_reason, "unchanged");
+    const quoted = body
+      .split("\n")
+      .map(line => `> ${line}`)
+      .join("\n");
+    assert.equal(readSousChefData(quoted), null);
+    assert.equal(readSousChefData(`${body}\n\n${body}`), null);
+  }
+});
+
+test("structured bookkeeping validates its version, kind, hashes, work tokens, and task identifiers", () => {
+  const first = classify(failingPr, detail(), [], [], now);
+  const data = formatSousChefData(first, "running");
+  for (const changes of [
+    { workflow: "other-workflow" },
+    { schema_version: "2" },
+    { kind: "finished" },
+    { head: "" },
+    { state: first.state_fingerprint.slice(0, 8) },
+    { work: ["short-hash"] },
+    { work: "not-an-array" },
+    { completed_task: 17 },
+    { completed_task: -1 },
+    { extra: "unexpected" },
+  ]) {
+    const body = "```json\n" + JSON.stringify({ ...data, ...changes }) + "\n```";
+    assert.equal(readSousChefData(body), null, JSON.stringify(changes));
+  }
+  assert.equal(readSousChefData('```json\n{"workflow":"pr-sous-chef"\n```'), null);
+  const incomplete = { ...data };
+  delete incomplete.state;
+  assert.equal(readSousChefData("```json\n" + JSON.stringify(incomplete) + "\n```"), null);
+  const followUp = { ...data, kind: "ci-follow-up", completed_task: Number.MAX_SAFE_INTEGER + 1 };
+  assert.equal(readSousChefData("```json\n" + JSON.stringify(followUp) + "\n```"), null);
+});
+
+test("new structured readers retain active and pending legacy marker compatibility", () => {
+  const first = classify(failingPr, detail(), [], [], now);
+  const data = formatSousChefData(first, "running");
+  const body = `Assignment running\nSous-chef head: ${data.head}\nSous-chef work: ${data.work.join(" ")}\nSous-chef state: ${data.state}`;
+  assert.equal(classify(failingPr, detail(), [{ ...nudge(first.state_fingerprint), body }], [], now).skip_reason, "unchanged");
+  const request = body.replace(/^Sous-chef (head|work|state):/gm, "Sous-chef requested-$1:");
+  assert.equal(classify(failingPr, detail(), [{ ...nudge(first.state_fingerprint), body: request }], [], now).skip_reason, "last_comment_sous_chef");
 });
 
 test("review Markdown cannot escape the prep list or swallow kitchen notes", () => {
@@ -813,7 +896,7 @@ test("review Markdown cannot escape the prep list or swallow kitchen notes", () 
   const body = formatAssignmentRequest(result);
   assert.equal((body.match(/<details>/g) ?? []).length, 1);
   assert.equal((body.match(/<\/details>/g) ?? []).length, 1);
-  assert.match(body, new RegExp(`^Sous-chef requested-state: ${result.state_fingerprint}$`, "m"));
+  assert.equal(readSousChefData(body).state, result.state_fingerprint);
   assert.ok(body.endsWith("</details>"));
 });
 
@@ -962,7 +1045,7 @@ test("a completed sous-chef task gets one status-only comment for remaining CI f
   assert.match(body, /\[Completed task\]\(https:\/\/github\.com\/github\/gh-aw\/actions\/runs\/17\)/);
   assert.doesNotMatch(body, /`Lint`/);
   assert.doesNotMatch(body, /@copilot|make merge-main|Fix the regression/);
-  assert.match(body, /^Sous-chef ci-follow-up: 17$/m);
+  assert.equal(readSousChefData(body).completed_task, 17);
   assert.equal(formatCIFollowUp(first), null);
   for (const published of [body, stripHtmlComments(body), sanitizeContent(body)]) {
     const followUp = { ...nudge(first.state_fingerprint, "2026-10-03T17:15:00Z"), body: published };
@@ -1121,7 +1204,7 @@ test("refresh isolates filtered reviews from thread connections and head commit 
   );
   const body = formatNudge(queue.prs[0]);
   assert.match(body, /Fix the regression/);
-  assert.match(body, /Sous-chef state: [a-f0-9]{64}/);
+  assert.match(readSousChefData(body).state, /^[a-f0-9]{64}$/);
   const queries = calls.filter(args => args[1] === "graphql").map(args => args[3]);
   assert.equal(queries.length, 3);
   assert.ok(queries.every(query => !query.includes("commits(")));
@@ -1533,14 +1616,16 @@ test("workflow polls every five minutes but never starts an agent for low budget
   assert.match(workflow, /^if: needs\.prefilter\.outputs\.rate_limit_low == 'false' && \(needs\.prefilter\.outputs\.eligible_count > 0 \|\| needs\.activation\.outputs\.slash_command == 'souschef'\)$/m);
   assert.match(workflow, /sparse-checkout: \|\n\s+scripts\n\s+actions\/setup\/js\n\s+\.github\/scripts/);
   assert.match(workflow, /assign-to-agent:\n\s+name: copilot\n\s+allowed: \[copilot\]\n\s+target: "\*"\n\s+max: 4\n\s+github-token: \$\{\{ secrets\.AWI_MAINTENANCE_TOKEN \}\}/);
-  assert.match(workflow, /post its `nudges\[0\]\.body` exactly via `add_comment` on `nudges\[0\]\.pr_number`/);
+  assert.match(workflow, /post its `nudges\[0\]\.body` and `nudges\[0\]\.data` exactly via `add_comment` on\n\s+`nudges\[0\]\.pr_number`/);
   assert.match(workflow, /The comment must start with the literal `@copilot` mention/);
   assert.match(workflow, /If the latest is from PR Sous Chef, do not add an acknowledgement/);
   assert.match(workflow, /leading Copilot mention, replacing the opening with/);
-  assert.match(workflow, /Do not\n\s+quote the assignment request or display the SHA entries outside that block/);
+  assert.match(workflow, /Do not quote the assignment request,\n\s+shorten its hashes, or display them outside the collapsed block/);
   assert.match(workflow, /as `pull_number` and `copilot` as `agent`/);
   assert.match(workflow, /custom-instructions: \|\n\s+Work on this PR's existing branch/);
-  assert.match(workflow, /"Sous-chef requested-state:" with "Sous-chef head:", "Sous-chef work:", and\n\s+"Sous-chef state:"/);
+  assert.match(workflow, /changing only kind from "requested" to "running"/);
+  assert.match(workflow, /^  data:\n    type: object$/m);
+  assert.match(workflow, /^    collapse-data: true$/m);
   assert.match(workflow, /min-integrity: approved/);
   assert.match(workflow, /^  mentions:\n    allowed: \["@copilot"\]$/m);
   assert.doesNotMatch(workflow, /^\s+dispatch-workflow:/m);

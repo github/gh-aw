@@ -42,7 +42,8 @@ const ISSUE_INTENT_RATIONALE_MAX_LENGTH = 280;
  *   deferMentions?: boolean,
  *   normalizeIssueClosingKeywords?: boolean,
  *   dataEnabled?: boolean,
- *   dataSchema?: any
+ *   dataSchema?: any,
+ *   collapseData?: boolean
  * }} ValidateOptions
  */
 
@@ -907,7 +908,7 @@ function validateItem(item, itemType, lineNum, options) {
       const children = parseReportMarkdown(normalizedItem.body || "", { minimumHeadingLevel: 2, allowMetadata: false, allowedMentions: options?.allowedAliases || [], deferMentions: options?.deferMentions, agentTainted: true });
       /** @type {import("./report_ast.cjs").ReportBlock} */
       const dataBlock = { type: "structured_data", data: JSON.parse(dataJSON), agentTainted: true };
-      if (typeConfig.collapseData === true) children.push({ type: "details", summary: "Structured data", agentTainted: false, children: [dataBlock] });
+      if ((options?.collapseData ?? typeConfig.collapseData) === true) children.push({ type: "details", summary: "Structured data", agentTainted: false, children: [dataBlock] });
       else children.push({ type: "paragraph", agentTainted: false, children: [{ type: "text", value: STRUCTURED_DATA_LABEL, agentTainted: false }] }, dataBlock);
       normalizedItem.body = renderReport({ type: "report", title: "Safe output", children }).body.trimEnd();
     }

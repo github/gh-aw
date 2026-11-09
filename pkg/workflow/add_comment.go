@@ -16,6 +16,7 @@ type AddCommentsConfig struct {
 	BaseSafeOutputConfig   `yaml:",inline"`
 	SafeOutputFilterConfig `yaml:",inline"`
 	MaxLinks               int      `yaml:"max-links,omitempty"`                 // Maximum URLs in agent content (default: 50); generated metadata is excluded
+	CollapseData           *bool    `yaml:"collapse-data,omitempty"`             // Render structured data in a collapsed details block instead of visible JSON
 	Target                 string   `yaml:"target,omitempty"`                    // Target for comments: "triggering" (default), "*" (any issue), or explicit issue number
 	TargetRepoSlug         string   `yaml:"target-repo,omitempty"`               // Target repository in format "owner/repo" for cross-repository comments
 	AllowedRepos           []string `yaml:"allowed-repos,omitempty"`             // List of additional repositories that comments can be added to (additionally to the target-repo)
@@ -31,7 +32,6 @@ type AddCommentsConfig struct {
 
 // parseCommentsConfig handles add-comment configuration
 func (c *Compiler) parseCommentsConfig(outputMap map[string]any) *AddCommentsConfig {
-	// Check if the key exists
 	if _, exists := outputMap["add-comment"]; !exists {
 		return nil
 	}
@@ -80,7 +80,7 @@ func (c *Compiler) parseCommentsConfig(outputMap map[string]any) *AddCommentsCon
 	// Pre-process target field if numeric
 	preprocessTargetFieldAsString(configData, addCommentLog)
 
-	config := parseConfigScaffoldWithPostProcess(outputMap, "add-comment", addCommentLog,
+	return parseConfigScaffoldWithPostProcess(outputMap, "add-comment", addCommentLog,
 		func(err error) *AddCommentsConfig {
 			addCommentLog.Printf("Failed to unmarshal config: %v", err)
 			// For backward compatibility, handle nil/empty config
@@ -92,8 +92,6 @@ func (c *Compiler) parseCommentsConfig(outputMap map[string]any) *AddCommentsCon
 				config.Max = defaultIntStr(1)
 			}
 		})
-
-	return config
 }
 
 func preprocessHideOlderCommentsConfig(configData map[string]any, debugLog *logger.Logger) error {

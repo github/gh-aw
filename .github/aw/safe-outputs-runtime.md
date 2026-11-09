@@ -126,6 +126,7 @@ The `report-incomplete` safe-output is enabled by default and is distinct from `
   - `true` - accept any object as the `data` field alongside `body`
   - Inline schema object - enforce shape; supports full JSON Schema keywords (`type`, `properties`, `required`, `items`, `enum`, etc.) or shorthand (`{ verdict: string, score: number }`)
   - `${{ ... }}` expression - resolves to one of the above at runtime
+  - `add-comment.collapse-data: true` renders comment data in a collapsed "Structured data" section; the default remains visible fenced JSON.
   - Example:
 
     ```yaml
