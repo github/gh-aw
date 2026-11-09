@@ -59,7 +59,7 @@ describe("setup.sh Copilot runtime files", () => {
             const { readMarkdownMetadata, installMarkdownMetadata } = require("./markdown_metadata.cjs");
             const value = { model: "small", description: "Read files" };
             const source = JSON.stringify(value);
-            assert.throws(() => readMarkdownMetadata("agent", "---\\nmodel: __uncompiled_probe__\\n---\\nBody"));
+            assert.deepEqual(readMarkdownMetadata("agent", "---\\nmodel: __uncompiled_probe__\\n---\\nBody").value, {});
             installMarkdownMetadata({
               version: 2,
               records: [{ sha256: createHash("sha256").update(source).digest("hex"), kind: "artifact", value }],

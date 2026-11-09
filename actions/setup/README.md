@@ -25,10 +25,12 @@ Information already present in `gh-aw-metadata` or the rest of `gh-aw-manifest`
 is omitted and reused through `metadata_refs`, keyed by `artifact:<sha256>` or
 `model-pins:<sha256>` and mapping destination JSON pointers to existing header
 pointers. Compiler rejections are stored separately in `metadata_errors`.
-Empty projections use a readable `{"empty":true}` source-approval marker rather
-than `{}` or `null` values. Reference-only and rejected sources need no value
-entry: their reference/error maps carry the source key. There is no
-`metadata_empty` field or opaque hash encoding, and unknown sources still fail.
+Empty projections are omitted; no `{}`, `null`, or `{"empty":true}` entries are
+stored. Missing source metadata is treated as an empty object, without parsing
+the uncompiled source or adopting any of its declared fields.
+Reference-only and rejected sources need no value entry: their reference/error
+maps carry the source key. There is no
+`metadata_empty` field or opaque hash encoding.
 The runtime resolves these references from the same immutable lock before
 installing records; missing, recursive, overlapping, or conflicting references
 are rejected. The existing header fields remain the source of truth.
@@ -48,15 +50,15 @@ The compiler interprets authored frontmatter;
 the runtime matches the normalized source SHA-256 digest to the catalog and
 reads JSON. JSON frontmatter also requires catalog provenance; valid JSON alone
 is not trusted. Run `gh aw compile` after changing repository or imported
-agent or model frontmatter to regenerate these maps. Missing or stale compiler
-records and compiler rejections fail explicitly rather than falling back to
-runtime parsing.
+agent or model frontmatter to regenerate these maps. Missing or stale source
+records yield no declared configuration; explicit compiler rejections still
+fail rather than falling back to runtime parsing.
 
 Engine copies use canonical JSON authorized by compiler artifact values.
 Trusted scalar, name, and model edits retain exact derived digests in the
 existing `aw_info.json` metadata cache for downstream processes. Arbitrary
-generated JSON without provenance is rejected. Author source files are not
-rewritten. Model audits consume the compiler's scoped model-pin projection,
+generated JSON without provenance contributes no metadata. Author source files
+are not rewritten. Model audits consume the compiler's scoped model-pin projection,
 not a runtime-parsed workflow configuration.
 
 Header delimiters accept BOM prefixes and surrounding whitespace, stop at the

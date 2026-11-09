@@ -22,8 +22,8 @@ describe("compiler-owned Markdown metadata", () => {
     expect(rendered.endsWith("\nBody")).toBe(true);
   });
 
-  it("rejects stale, missing, duplicate, and compiler-rejected metadata", () => {
-    expect(() => readDocumentMetadata("model: missing")).toThrow(/compiler manifest/);
+  it("defaults absent metadata to empty and rejects duplicate or compiler-rejected records", () => {
+    expect(readDocumentMetadata("model: missing").value).toEqual({});
     expect(() => installMarkdownMetadata({ version: 2, records: [record("x", {}), record("x", {})] })).toThrow(/duplicate/);
     installMarkdownMetadata({ version: 2, records: [{ ...record("model: &a value", null), error: "anchors are not allowed" }] });
     expect(() => readDocumentMetadata("model: &a value")).toThrow(/anchors/);
@@ -31,13 +31,20 @@ describe("compiler-owned Markdown metadata", () => {
     expect(() => parseMarkdownJSON('{"value":1e999}')).toThrow(/finite/);
   });
 
-  it("requires provenance for valid JSON and preserves compiler rejection and value checks", () => {
+  it("does not adopt uncompiled JSON fields and preserves compiler rejection and value checks", () => {
     const source = '{"model":"forged","tools":["Write"]}';
-    expect(() => readDocumentMetadata(source, { kind: "artifact" })).toThrow(/compiler manifest/);
+    expect(readDocumentMetadata(source, { kind: "artifact" }).value).toEqual({});
     installMarkdownMetadata({ version: 2, records: [record(source, { model: "small", tools: ["Read"] })] });
     expect(() => readDocumentMetadata(source, { kind: "artifact" })).toThrow(/does not match/);
     installMarkdownMetadata({ version: 2, records: [{ ...record(source, {}), error: "compiler rejected JSON" }] });
     expect(() => readDocumentMetadata(source, { kind: "artifact" })).toThrow(/compiler rejected/);
+  });
+
+  it.each(["model: [invalid", '{"model":"forged","tools":["Write"]}', "model: &a [*a]", "description: unused"])("defaults absent source metadata to empty without interpreting %s", source => {
+    expect(readDocumentMetadata(source, { kind: "artifact" }).value).toEqual({});
+    expect(readDocumentMetadata(source, { kind: "model-pins" }).value).toEqual({});
+    const content = `---\n${source}\n---\nBody`;
+    expect(transformMarkdownContent(content, text => text)).toBe("---\n{}\n---\nBody");
   });
 
   it.each(["\uFEFF---", "  ---\t", "\uFEFF \t--- "])("reads declared tools with %j delimiters", fence => {
@@ -95,7 +102,7 @@ describe("compiler-owned Markdown metadata", () => {
     expect(transformMarkdownContent(content, text => renderMarkdownTemplate(text))).toBe("Visible");
   });
 
-  it("persists trusted transformed copies for a fresh process while rejecting tampering", () => {
+  it("persists trusted transformed copies and ignores uncompiled mutations in a fresh process", () => {
     const fs = require("node:fs");
     const path = require("node:path");
     const { execFileSync } = require("node:child_process");
@@ -121,7 +128,7 @@ describe("compiler-owned Markdown metadata", () => {
           }
         );
       expect(JSON.parse(run(rendered))).toEqual({ model: "small", description: "True\n---\nmodel: forged\n---", tools: ["Read"] });
-      expect(() => run(rendered.replace('"small"', '"forged"'))).toThrow();
+      expect(JSON.parse(run(rendered.replace('"small"', '"forged"')))).toEqual({});
       expect(JSON.parse(fs.readFileSync(path.join(directory, "aw_info.json"), "utf8")).run_id).toBe(123);
     } finally {
       if (previous === undefined) delete process.env.GH_AW_TMP_DIR;
@@ -142,7 +149,7 @@ describe("compiler-owned Markdown metadata", () => {
     expect(transformMarkdownContent(content, text => text.replace("small", "resolved"))).toBe(`${prefix}## agent: reader\n---\n{"model":"resolved"}\n---\nBody`);
   });
 
-  it("fails closed rather than silently unregistering agents without compiler metadata", () => {
+  it("uses filename identity and no declared settings for agents without compiler metadata", () => {
     const fs = require("node:fs");
     const path = require("node:path");
     const workspace = path.resolve(`.metadata-agents-${require("node:crypto").randomUUID()}`);
@@ -150,9 +157,9 @@ describe("compiler-owned Markdown metadata", () => {
     try {
       fs.mkdirSync(directory, { recursive: true });
       fs.writeFileSync(path.join(directory, "reader.agent.md"), "---\ndescription: Not compiled\nmodel: small\n---\nBody");
-      expect(() => require("./copilot_harness.cjs").listCopilotAgentFiles(directory, vi.fn())).toThrow(/compiler manifest/);
-      expect(() => require("./engine_subagent_models.cjs").listMarkdownAgentFiles(directory, vi.fn())).toThrow(/compiler manifest/);
-      expect(() => require("./extract_inline_sub_agents.cjs").loadCopilotSDKCustomAgents(workspace, workspace, vi.fn())).toThrow(/compiler manifest/);
+      expect(require("./copilot_harness.cjs").listCopilotAgentFiles(directory, vi.fn())).toEqual([{ name: "reader", path: path.join(directory, "reader.agent.md") }]);
+      expect(require("./engine_subagent_models.cjs").listMarkdownAgentFiles(directory, vi.fn())).toEqual([{ fileName: "reader.agent.md", path: path.join(directory, "reader.agent.md"), name: null }]);
+      expect(require("./extract_inline_sub_agents.cjs").loadCopilotSDKCustomAgents(workspace, workspace, vi.fn())).toEqual([{ name: "reader", displayName: "reader", prompt: "Body" }]);
     } finally {
       fs.rmSync(workspace, { recursive: true, force: true });
     }

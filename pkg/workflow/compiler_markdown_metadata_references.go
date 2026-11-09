@@ -84,15 +84,11 @@ func populateManifestMetadata(manifest *GHAWManifest) error {
 		}
 		object, mapping := value.(map[string]any)
 		empty := value == nil || (mapping && len(object) == 0)
-		if !empty || (record.Error == "" && len(record.References) == 0) {
-			encoded := record.Value
-			if empty {
-				encoded = json.RawMessage(`{"empty":true}`)
-			}
+		if !empty {
 			if record.Kind == "artifact" {
-				manifest.AgentMetadata[hash] = encoded
+				manifest.AgentMetadata[hash] = record.Value
 			} else {
-				manifest.ModelPins[hash] = encoded
+				manifest.ModelPins[hash] = record.Value
 			}
 		}
 		if len(record.References) > 0 {

@@ -1028,11 +1028,11 @@ async function processRuntimeImport(filepathOrUrl, optional, workspaceDir, start
     }
   }
 
-  const { transformMarkdownContent, missingMarkdownMetadata, ensureCheckoutMarkdownMetadata, persistMarkdownMetadata, CompilerMetadataUnavailableError } = require("./markdown_metadata.cjs");
-  if (missingMarkdownMetadata([content]).size) {
+  const { transformMarkdownContent, missingMarkdownMetadata, ensureCheckoutMarkdownMetadata, persistMarkdownMetadata } = require("./markdown_metadata.cjs");
+  const missing = missingMarkdownMetadata([content]);
+  if (missing.size) {
     ensureCheckoutMarkdownMetadata([content], workspaceDir);
-    if (missingMarkdownMetadata([content]).size) throw new CompilerMetadataUnavailableError();
-    persistMarkdownMetadata();
+    if (missingMarkdownMetadata([content]).size < missing.size) persistMarkdownMetadata();
   }
   // Decode compiler metadata before evaluating author expressions. Scalars are
   // transformed separately so evaluated values cannot alter keys or structure.

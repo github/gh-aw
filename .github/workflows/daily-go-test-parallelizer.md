@@ -102,6 +102,13 @@ After editing the selected batch:
 
 Always create `/tmp/gh-aw/cache-memory/go-test-parallelizer/` and write the last path from the selected batch to `state.json`, even when no edit is safe, so the next daily run advances round-robin.
 
+Use `###` or lower headings in any PR description or final report. Present a
+concise overview, selected files and results, collapsible detailed test evidence,
+then next actions or limitations. Keep the outcome visible and put long logs or
+per-file breakdowns in
+`<details><summary><b>...</b></summary>...</details>`. Format applicable run
+references as `[§12345](https://github.com/${{ github.repository }}/actions/runs/12345)`.
+
 Before stopping, call exactly one terminal safe-output tool: create one draft pull request when validation succeeds with a change, otherwise use `noop` with the selected path and a short reason.
 
 Do not parallelize tests that use or may conflict through:

@@ -8,7 +8,7 @@ const { canonical, digest, integer } = require("./work_queue_codec.cjs");
 const { dispatchPrincipal } = require("./work_queue_policy.cjs");
 const { assignmentForDispatch } = require("./work_queue_replay.cjs");
 const { loadQueue, publishOperations, validateStoredAssignment, expectedWorkerRun, bindingForRun } = require("./work_queue_binding.cjs");
-const { API_VERSION, nativeId, nativeAttempt, hasDispatchToken, authenticatePublisher, fetchNativeRunAttempt, validateNativeRun } = require("./work_queue_native.cjs");
+const { API_VERSION, nativeId, nativeAttempt, hasDispatchToken, authenticatePublisher, fetchNativeRunAttempt, createNativeRunAttemptReader, validateNativeRun, correlationRetryDelay } = require("./work_queue_native.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 
 function lifecycleEvidence(assignment, profile, repository, kind, source, checkedAt, details = {}) {
@@ -52,10 +52,11 @@ async function releaseAssignment(options, assignment, evidence) {
   return { state: "released", released: true };
 }
 
-async function discoverRuns(options, expected) {
+async function discoverRuns(options, expected, readAttempt = createNativeRunAttemptReader(options.githubClient, expected.repository, { retryMetadata: false })) {
   log.debug("discovery.start");
   const [owner, repo] = expected.repository.split("/");
   const candidates = new Map();
+  const correlationPending = new Set();
   let conflict = false;
   for (let page = 1; page <= 2; page++) {
     const response = await options.githubClient.rest.actions.listWorkflowRuns({
@@ -80,27 +81,28 @@ async function discoverRuns(options, expected) {
         runId = nativeId(run.id);
       } catch (error) {
         log.failure("discovery.identity_invalid", error);
-        return { candidates: [...candidates.values()], conflict: true };
+        return { candidates: [...candidates.values()], correlationPending: [...correlationPending], conflict: true };
       }
-      if (candidates.has(runId)) continue;
-      const original = await fetchNativeRunAttempt(options.githubClient, expected.repository, runId, 1, { retryMetadata: false });
+      if (candidates.has(runId) || correlationPending.has(runId)) continue;
+      const original = await readAttempt(runId, 1);
       try {
         const proof = validateNativeRun(original, { ...expected, run_id: runId });
         candidates.set(proof.run_id, proof);
       } catch (error) {
         log.failure("discovery.proof_invalid", error);
-        return { candidates: [...candidates.values()], conflict: true };
+        if (error?.message === "run_correlation_mismatch") correlationPending.add(runId);
+        else return { candidates: [...candidates.values()], correlationPending: [...correlationPending], conflict: true };
       }
-      if (candidates.size > 1) {
-        log.debug("discovery.multiple_candidates", { candidates: candidates.size });
-        return { candidates: [...candidates.values()], conflict: true };
+      if (candidates.size + correlationPending.size > 1) {
+        log.debug("discovery.multiple_candidates", { candidates: candidates.size, correlation_pending: correlationPending.size });
+        return { candidates: [...candidates.values()], correlationPending: [...correlationPending], conflict: true };
       }
     }
     if (runs.length < 50) break;
     if (page === 2) conflict = true;
   }
   log.debug("discovery.complete", { candidates: candidates.size, conflict });
-  return { candidates: [...candidates.values()], conflict };
+  return { candidates: [...candidates.values()], correlationPending: [...correlationPending], conflict };
 }
 
 function returnedRunHint(state, dispatchId) {
@@ -166,27 +168,32 @@ async function reconcileDispatchImpl(options) {
   }
   const policy = initial.projection.policy.pools[assignment.pool].reconciliation;
   const started = Date.now();
+  const readAttempt = createNativeRunAttemptReader(options.githubClient, repository, { retryMetadata: false });
   let attempts = 0;
   let hint = options.returnedRunId || returnedRunHint(initial.projection, assignment.dispatch_id);
   let conflict = false;
   for (; attempts < policy.max_attempts; attempts++) {
     if (attempts > 0 && Date.now() - started >= policy.deadline_ms) break;
     log.debug("dispatch.reconcile.attempt", { attempt: attempts + 1, run_hint: !!hint });
+    let correlationPending = false;
     try {
       const current = await loadQueue(options);
       const observed = current.projection.dispatches.get(assignment.dispatch_id);
       if (observed?.released || observed?.run) return reconcileDispatch({ ...options, assignment });
       let candidates = [];
       if (hint) {
-        const proof = validateNativeRun(await fetchNativeRunAttempt(options.githubClient, repository, hint, 1, { retryMetadata: false }), { ...expected, run_id: hint });
+        const proof = validateNativeRun(await readAttempt(hint, 1), { ...expected, run_id: hint });
         candidates.push(proof);
       }
-      const discovered = await discoverRuns(options, expected);
+      const discovered = await discoverRuns(options, expected, readAttempt);
       candidates = [...new Map([...candidates, ...discovered.candidates].map(candidate => [candidate.run_id, candidate])).values()];
       conflict ||= discovered.conflict;
       log.debug("dispatch.reconcile.candidates", { candidates: candidates.length, conflict });
-      if (candidates.length > 1 || conflict) return { state: "run_binding_conflict", released: false };
-      if (candidates.length === 1) {
+      const runIds = new Set([...candidates.map(candidate => candidate.run_id), ...discovered.correlationPending]);
+      if (runIds.size > 1 || conflict) return { state: "run_binding_conflict", released: false };
+      correlationPending = discovered.correlationPending.length > 0;
+      if (correlationPending) hint = discovered.correlationPending[0];
+      if (candidates.length === 1 && !correlationPending) {
         const proof = candidates[0];
         const binding = bindingForRun(proof, expected);
         const evidence = lifecycleEvidence(assignment, profile, repository, "reconciliation", "github_api", options.now ?? Date.now(), { run_id: proof.run_id, run_attempt: 1, principal: proof.principal });
@@ -200,15 +207,20 @@ async function reconcileDispatchImpl(options) {
     } catch (error) {
       log.failure("dispatch.reconcile.attempt_failed", error);
       if (error?.code === "run_binding_conflict" || error?.message === "run_binding_conflict") return { state: "run_binding_conflict", released: false };
-      // Missing discovery, deadlines and API failures do not establish nonlaunch.
+      correlationPending = error?.message === "run_correlation_mismatch";
+      // Missing discovery, deadlines and API failures do not establish nonlaunch
+      // or invalidate the exact run hint; retain it throughout this retry budget.
     }
-    hint = null;
     if (Date.now() - started >= policy.deadline_ms) {
       log.debug("dispatch.reconcile.deadline_reached", { attempts: attempts + 1 });
       attempts++;
       break;
     }
-    if (attempts + 1 < policy.max_attempts) await (options.sleepFn || (delay => new Promise(resolve => setTimeout(resolve, delay))))(Math.min(1000, 50 * 2 ** attempts, policy.deadline_ms - (Date.now() - started)));
+    if (attempts + 1 < policy.max_attempts) {
+      const remaining = policy.deadline_ms - (Date.now() - started);
+      const delay = correlationPending ? correlationRetryDelay(attempts + 1, remaining) : Math.min(1000, 50 * 2 ** attempts, remaining);
+      await (options.sleepFn || (delay => new Promise(resolve => setTimeout(resolve, delay))))(delay);
+    }
   }
   if (attempts >= policy.max_attempts) {
     const evidence = lifecycleEvidence(assignment, profile, repository, "reconciliation", "github_api", options.now ?? Date.now(), { attempts, principal: dispatchPrincipal(dispatch) });

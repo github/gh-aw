@@ -289,8 +289,32 @@ safe-outputs:
     expect(mockCore.setOutput).toHaveBeenCalledWith("noop_message", "Nothing to do");
   });
 
+  it("reports an action when a terminal noop follows real outputs", async () => {
+    process.env.GH_AW_AGENT_CONCLUSION = "success";
+    const outputFile = path.join(tempDir, "agent_output.json");
+    fs.writeFileSync(
+      outputFile,
+      JSON.stringify({
+        items: [
+          { type: "create_issue", title: "Some issue" },
+          { type: "read", path: "README.md" },
+          { type: "noop", message: "Work complete" },
+        ],
+      })
+    );
+    process.env.GH_AW_AGENT_OUTPUT = outputFile;
+
+    const { main } = await import("./handle_noop_message.cjs?t=" + Date.now());
+    await main();
+
+    const body = mockCore.setOutput.mock.calls.find(call => call[0] === "noop_comment_body")[1];
+    expect(body).toContain("**Outcome:** `reported_action`");
+    expect(body).not.toContain("reported_no_action");
+    expect(mockGithub.rest.issues.createComment).not.toHaveBeenCalled();
+  });
+
   it.each([
-    { taskOutput: true, completed: true, genuineReport: false, category: "reported_no_action" },
+    { taskOutput: true, completed: true, genuineReport: false, category: "reported_action" },
     { taskOutput: false, completed: true, genuineReport: false, category: "incomplete" },
     { taskOutput: true, completed: false, genuineReport: false, category: "incomplete" },
     { taskOutput: true, completed: true, genuineReport: true, category: "incomplete" },

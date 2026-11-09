@@ -272,4 +272,8 @@ You have successfully completed this task when:
 
 ### Output Format
 
-Structure reports as: overview → key metrics/issues → collapsible detail → next actions.
+Use `###` or lower for every heading in the generated PR body; reserve h1/h2 for
+the platform-rendered title. Structure reports as: overview → key metrics/issues
+→ collapsible detail → next actions. Keep the conclusion, important results, and
+requested action visible; put lengthy test output and supporting evidence in
+`<details><summary><b>...</b></summary>...</details>`.

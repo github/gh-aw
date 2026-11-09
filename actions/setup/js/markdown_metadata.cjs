@@ -169,7 +169,7 @@ function metadataManifestFields(catalog) {
     const empty = emptyMetadataValue(record.value);
     const references = "references" in record ? record.references : undefined;
     const hasReferences = references !== undefined && (!references || typeof references !== "object" || Array.isArray(references) || Object.keys(references).length > 0);
-    if (!empty || (!hasReferences && record.error === undefined)) (record.kind === "artifact" ? agent_metadata : model_pins)[hash] = empty ? { empty: true } : record.value;
+    if (!empty) (record.kind === "artifact" ? agent_metadata : model_pins)[hash] = record.value;
     if (hasReferences) metadata_refs[key] = references;
     if (record.error !== undefined) metadata_errors[key] = record.error;
   }
@@ -347,12 +347,9 @@ function missingMarkdownMetadata(documents) {
       if (block.skill) continue;
       const source = block.source;
       if (!source?.trim()) continue;
-      try {
-        readDocumentMetadata(source, { kind: "artifact" });
-      } catch (error) {
-        if (!(error instanceof CompilerMetadataUnavailableError)) throw error;
-        missing.add(metadataDigest(source));
-      }
+      const digest = metadataDigest(source);
+      if (!findMetadataRecord("artifact", digest)) missing.add(digest);
+      else readDocumentMetadata(source, { kind: "artifact" });
     }
   }
   return missing;
@@ -409,7 +406,6 @@ async function ensureRemoteMarkdownMetadata(documents, githubClient, { repositor
     missing = missingMarkdownMetadata(documents);
     if (!missing.size) return;
   }
-  throw new CompilerMetadataUnavailableError();
 }
 
 function persistMarkdownMetadata() {
@@ -439,7 +435,7 @@ function readDocumentMetadata(source, { kind = "document" } = {}) {
   const digest = metadataDigest(source);
   const artifact = findMetadataRecord("artifact", digest);
   const record = kind === "artifact" ? artifact : findMetadataRecord("model-pins", digest) || artifact;
-  if (!record) throw new CompilerMetadataUnavailableError();
+  if (!record) return { value: {} };
   if (record.error) throw new Error(record.error);
   const compiled = structuredClone(record.value);
   let runtime;

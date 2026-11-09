@@ -687,6 +687,11 @@ export function formatCIFollowUp(pr) {
       {
         type: "paragraph",
         agentTainted: false,
+        children: [{ type: "mention", login: "copilot", agentTainted: false }],
+      },
+      {
+        type: "paragraph",
+        agentTainted: false,
         children: [
           { type: "text", value: "🍳 The prep is done, but CI needs another taste test. Copilot's assigned task has finished; these checks are still failing:", agentTainted: false },
           ...(pr.ci_follow_up.url ? [{ type: "text", value: " ", agentTainted: false }, reportLink(pr.ci_follow_up.url, "Completed task", "see the completed Copilot task", false)] : []),
@@ -713,7 +718,7 @@ export function formatCIFollowUp(pr) {
       {
         type: "paragraph",
         agentTainted: false,
-        children: [{ type: "text", value: "Flagging the remaining blockers for maintainer investigation, not starting another copy of the same task.", agentTainted: false }],
+        children: [{ type: "text", value: "Please address the remaining CI failures on this PR's existing branch. No merging or CI triggering.", agentTainted: false }],
       },
     ],
   };

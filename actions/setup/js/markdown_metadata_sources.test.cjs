@@ -57,7 +57,7 @@ describe("compiler metadata source acquisition", () => {
     expect(() => metadata.readLocalMarkdownMetadata(file, workspace)).toThrow(/source hash/);
   });
 
-  it("omits empty hash/value pairs while preserving exact source approval and fresh-process caching", () => {
+  it("omits empty records and defaults absent source metadata to empty across fresh processes", () => {
     const emptySource = "description: Private reader";
     const emptyDocument = `---\n${emptySource}\n---\nRead files.`;
     const sha256 = crypto.createHash("sha256").update(emptySource).digest("hex");
@@ -66,15 +66,15 @@ describe("compiler metadata source acquisition", () => {
       { kind: "model-pins", sha256: "b".repeat(64), value: {} },
     ];
     const manifest = fields(records);
-    expect(manifest.agent_metadata).toEqual({ [sha256.slice(0, 20)]: { empty: true } });
-    expect(manifest.model_pins).toEqual({ ["b".repeat(20)]: { empty: true } });
+    expect(manifest).not.toHaveProperty("agent_metadata");
+    expect(manifest.model_pins).toEqual({});
     expect(manifest).not.toHaveProperty("metadata_empty");
     expect(JSON.stringify(manifest)).not.toContain(sha256);
     const file = path.join(workspace, ".github/workflows/main.lock.yml");
     fs.writeFileSync(file, headers(records));
     metadata.installMarkdownMetadata(metadata.readLocalMarkdownMetadata(file, workspace));
     expect(metadata.readMarkdownMetadata("agent", emptyDocument).value).toEqual({});
-    expect(() => metadata.readMarkdownMetadata("agent", emptyDocument.replace("Private", "Unknown"))).toThrow(/compiler manifest/);
+    expect(metadata.readMarkdownMetadata("agent", emptyDocument.replace("Private", "Unknown")).value).toEqual({});
     fs.writeFileSync(path.join(workspace, "aw_info.json"), JSON.stringify({ run_id: 123 }));
     metadata.persistMarkdownMetadata();
     const restored = execFileSync(
@@ -111,7 +111,7 @@ describe("compiler metadata source acquisition", () => {
     const sha256 = form === "full" ? compiled.sha256 : compiled.sha256.slice(0, 20);
     metadata.installMarkdownMetadata(catalog([{ ...compiled, sha256 }]));
     expect(metadata.readMarkdownMetadata("agent", document).value).toEqual({ model: "small" });
-    expect(() => metadata.readMarkdownMetadata("agent", document.replace("small", "forged"))).toThrow(/compiler manifest/);
+    expect(metadata.readMarkdownMetadata("agent", document.replace("small", "forged")).value).toEqual({});
   });
 
   it("extends colliding source prefixes and coalesces consistent full/short aliases", () => {
@@ -164,7 +164,7 @@ describe("compiler metadata source acquisition", () => {
     const githubClient = { rest: { repos: { getContent: vi.fn().mockRejectedValue(failure) } } };
     await expect(metadata.loadMarkdownMetadata(`owner/repo/${file}@main`, workspace, { revision, githubClient })).rejects.toBe(failure);
     expect(githubClient.rest.repos.getContent).toHaveBeenCalledTimes(1);
-    expect(() => metadata.readMarkdownMetadata("agent", document)).toThrow(/compiler manifest/);
+    expect(metadata.readMarkdownMetadata("agent", document).value).toEqual({});
   });
 
   it("merges matching caller checkout records for reusable workflows and preserves cache transport", async () => {
@@ -201,7 +201,7 @@ describe("compiler metadata source acquisition", () => {
     expect(header.match(/"small"/g)).toHaveLength(1);
     expect(header.match(/"Read"/g)).toHaveLength(1);
     expect(header).not.toContain("value_json");
-    expect(() => metadata.readMarkdownMetadata("agent", document.replace("small", "forged"))).toThrow(/compiler manifest/);
+    expect(metadata.readMarkdownMetadata("agent", document.replace("small", "forged")).value).toEqual({});
     fs.writeFileSync(path.join(workspace, "aw_info.json"), '{"run_id":123}');
     metadata.persistMarkdownMetadata();
     expect(JSON.parse(fs.readFileSync(path.join(workspace, "aw_info.json"), "utf8"))).toEqual({ run_id: 123, ...metadata.metadataManifestFields(result) });
@@ -272,10 +272,11 @@ describe("compiler metadata source acquisition", () => {
     for (const [request] of githubClient.rest.repos.getContent.mock.calls) expect(request.ref).toBe(revision);
   });
 
-  it("fails explicitly when a source provides no matching compiler manifest", async () => {
+  it("leaves unavailable source metadata empty after searching compiler manifests", async () => {
     const githubClient = { rest: { repos: { getContent: vi.fn(async () => ({ data: [] })) } } };
-    await expect(metadata.ensureRemoteMarkdownMetadata([document], githubClient, { repository: "owner/skills", ref: revision })).rejects.toThrow(/compiler manifest/);
-    expect(() => metadata.readMarkdownMetadata("agent", document)).toThrow(/compiler manifest/);
+    await expect(metadata.ensureRemoteMarkdownMetadata([document], githubClient, { repository: "owner/skills", ref: revision })).resolves.toBeUndefined();
+    expect(metadata.readMarkdownMetadata("agent", document).value).toEqual({});
+    expect(metadata.currentMarkdownMetadata().records).toEqual([]);
   });
 
   it("does not discover author files through a parent-directory symlink outside the checkout", async () => {
@@ -312,5 +313,15 @@ describe("compiler metadata source acquisition", () => {
     expect(info.run_id).toBe(123);
     expect(Object.keys(info.agent_metadata)).toHaveLength(2);
     expect(info).not.toHaveProperty("markdown_metadata");
+  });
+
+  it("imports uncompiled inline agents with empty settings without requiring a metadata cache", async () => {
+    const body = '---\nengine: copilot\n---\n## agent: reader\n---\n{"model":"uncompiled-model","tools":["Write"]}\n---\nBody\n## end agent: reader\n';
+    fs.writeFileSync(path.join(workspace, ".github/workflows/uncompiled.md"), body);
+    const result = await require("./runtime_import.cjs").processRuntimeImport(".github/workflows/uncompiled.md", false, workspace);
+    expect(result).toContain("## agent: reader\n---\n{}\n---\nBody");
+    expect(result).not.toContain("uncompiled-model");
+    expect(result).not.toContain("Write");
+    expect(fs.existsSync(path.join(workspace, "aw_info.json"))).toBe(false);
   });
 });

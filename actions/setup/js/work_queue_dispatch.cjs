@@ -16,7 +16,7 @@ const store = require("./work_queue_store.cjs");
 const { normalizeAssignment, normalizeClaimScope, readClaimScopeContext } = require("./work_queue_claim_scope.cjs");
 const { readStagedIntentBatch, requestIdForIntent, requestForIntent, normalizeDispatchParameters, normalizeSubmitParameters, validatePreparedPlanIntentBatch } = require("./work_queue_intents.cjs");
 const { assertPolicyProposal, loadQueue, policyProposalFor, publishOperations, validateStoredAssignment, expectedWorkerRun, bindingForRun } = require("./work_queue_binding.cjs");
-const { authenticatePublisher, authenticateIntentPublisher, immutableRef, fetchNativeRunAttempt, isTransientVerificationError, postQueueDispatch, validateNativeRun } = require("./work_queue_native.cjs");
+const { authenticatePublisher, authenticateIntentPublisher, immutableRef, postQueueDispatch, validateNativeRun } = require("./work_queue_native.cjs");
 const { dependencyKey, allowedScope, resolveDependencies, resolveExternalEdges } = require("./work_queue_dependency_resolver.cjs");
 const { lifecycleEvidence, reconcileDispatch, reconcileQueue, releaseAssignment } = require("./work_queue_reconciler.cjs");
 const { DEFAULT_INTENT_PATH } = require("./work_queue_mcp_server.cjs");
@@ -229,22 +229,6 @@ function rejectedEvidence(latest, dispatch, assignment, profile, options) {
   return lifecycleEvidence(assignment, profile, senderRepository, "nonlaunch", "github_api", options.now ?? Date.now(), { receipt, principal: dispatchPrincipal(dispatch) });
 }
 
-async function verifyLaunchedRun(options, expected, policy) {
-  const started = Date.now();
-  for (let attempt = 1; ; attempt++) {
-    try {
-      return validateNativeRun(await fetchNativeRunAttempt(options.dispatchClient || options.githubClient, expected.repository, expected.run_id, 1, { retryMetadata: false }), expected);
-    } catch (error) {
-      log.failure("launch.verification.failed", error, true);
-      const remaining = policy.deadline_ms - (Date.now() - started);
-      if (!isTransientVerificationError(error) || attempt >= policy.max_attempts || remaining <= 0) throw error;
-      // Poll at a fixed 1s cadence, never exceeding the remaining reconciliation deadline.
-      await (options.sleepFn || (delay => new Promise(resolve => setTimeout(resolve, delay))))(Math.min(1000, remaining));
-      if (Date.now() - started >= policy.deadline_ms) throw error;
-    }
-  }
-}
-
 async function launchAssignment(options, supplied) {
   return observeQueueOperation("dispatch", options, () => launchAssignmentImpl(options, supplied));
 }
@@ -320,30 +304,10 @@ async function launchAssignmentImpl(options, supplied) {
     log.debug("launch.unresolved");
     return { state: "launch_unresolved", released: false, dispatched: true };
   }
-  let verifiedEvidence;
-  try {
-    const expected = expectedWorkerRun(assignment, profile, options.context, sender.repository, credential.principal);
-    const proof = await verifyLaunchedRun(options, { ...expected, run_id: returned.run_id }, latest.projection.policy.pools[assignment.pool].reconciliation);
-    const binding = bindingForRun(proof, expected);
-    const evidence = lifecycleEvidence(assignment, profile, sender.repository, "reconciliation", "github_api", options.now ?? Date.now(), { run_id: proof.run_id, run_attempt: 1, principal: proof.principal });
-    verifiedEvidence = evidence;
-    await publishOperations(options, trustedContext, ["bind", assignment.dispatch_id, proof.run_id], "dispatch", [{ kind: "Dispatch", dispatch_id: assignment.dispatch_id, state: "bound", run: binding, evidence }]);
-    latest = await loadQueue(options);
-    if (canonical(latest.projection.dispatches.get(assignment.dispatch_id)?.run) !== canonical(binding)) throw new Error("run_binding_conflict");
-    log.debug("launch.binding.persisted");
-    return { state: "bound", released: false, dispatched: true, run_id: returned.run_id, html_url: returned.html_url };
-  } catch (error) {
-    log.failure("launch.binding.failed", error, true);
-    try {
-      await publishOperations(options, trustedContext, ["uncertain", assignment.dispatch_id, returned.run_id], "dispatch", [
-        { kind: "Dispatch", dispatch_id: assignment.dispatch_id, state: "uncertain", reason: "binding_unconfirmed", ...(verifiedEvidence ? { evidence: verifiedEvidence } : {}) },
-      ]);
-    } catch (error) {
-      log.failure("launch.binding_uncertain_marker.failed", error);
-      // Authenticated activation can recover binding publication without POST.
-    }
-    return { state: "launch_unresolved", released: false, dispatched: true, run_id: returned.run_id };
-  }
+  // Acceptance is not binding authority. Trusted worker activation verifies the
+  // actual native run before publishing its binding; the start marker fences resends.
+  log.debug("launch.activation_pending");
+  return { state: "activation_pending", released: false, dispatched: true, run_id: returned.run_id, html_url: returned.html_url };
 }
 
 async function intentContext(options, intent, { recoverAccepted = false, preview = false } = {}) {
@@ -545,7 +509,7 @@ async function dispatchQueueIntent(options) {
   }
   log.debug("intent.dispatch.complete", { assignments: groups.length, launches: launches.length });
   return {
-    success: launches.every(launch => ["bound", "released", "staged_preview"].includes(launch.state)),
+    success: launches.every(launch => ["activation_pending", "bound", "released", "staged_preview"].includes(launch.state)),
     status: groups.length ? "durable" : "no_grant",
     request_id: request.id,
     commit_id: published.commit?.id,
@@ -701,18 +665,20 @@ async function main(options = {}) {
   // Launch-processing failures belong to unresolved outcomes, not blocked control intents.
   const blocked = result.receipts.filter(receipt => receipt.status === "blocked").length;
   const rejected = result.receipts.reduce((count, receipt) => count + (receipt.launches || []).filter(launch => launch.state === "rejected").length, 0);
-  const unresolved = result.receipts.reduce((count, receipt) => count + (receipt.launches || []).filter(launch => !["bound", "released", "rejected", "staged_preview"].includes(launch.state)).length, 0);
+  const pending = result.receipts.reduce((count, receipt) => count + (receipt.launches || []).filter(launch => launch.state === "activation_pending").length, 0);
+  const unresolved = result.receipts.reduce((count, receipt) => count + (receipt.launches || []).filter(launch => !["activation_pending", "bound", "released", "rejected", "staged_preview"].includes(launch.state)).length, 0);
   const recoveryRequired = blocked > 0 || unresolved > 0 || rejected > 0;
   log.diagnostic("controls.complete", { durable, blocked, rejected, unresolved, recovery_required: recoveryRequired });
-  const status = recoveryRequired ? "recovery_required" : "ok";
+  const status = recoveryRequired ? "recovery_required" : pending > 0 ? "activation_pending" : "ok";
   const summary = [
     "## Work queue controls",
     "",
-    `Status: **${recoveryRequired ? "Recovery required" : "Complete"}**`,
+    `Status: **${recoveryRequired ? "Recovery required" : pending > 0 ? "Dispatch accepted; worker activation pending" : "Complete"}**`,
     "",
     `- Durable requests: ${durable}`,
     `- Blocked intents: ${blocked}`,
     `- Rejected launches: ${rejected}`,
+    `- Accepted launches awaiting activation: ${pending}`,
     `- Unresolved launches: ${unresolved}`,
     ...result.receipts.filter(receipt => receipt.status === "blocked").map(receipt => `- Control blocked: ${receipt.explanation || queueControlErrorExplanation(receipt.reason)}`),
     ...result.receipts.flatMap(receipt => (receipt.launches || []).filter(launch => launch.state === "blocked").map(launch => `- Launch processing blocked: ${launch.explanation} (\`${launch.reason}\`)`)),
@@ -720,7 +686,7 @@ async function main(options = {}) {
   result = { ...result, status, success: !recoveryRequired, summary };
   coreApi.setOutput("work_queue_requests", JSON.stringify(result));
   coreApi.setOutput("work_queue_controls_status", status);
-  coreApi.info(`Work queue controls: ${durable} durable requests; ${blocked} blocked intents; ${rejected} rejected launches; ${unresolved} unresolved launches`);
+  coreApi.info(`Work queue controls: ${durable} durable requests; ${blocked} blocked intents; ${rejected} rejected launches; ${pending} accepted launches awaiting activation; ${unresolved} unresolved launches`);
   if (coreApi.summary?.addRaw && coreApi.summary?.write) {
     coreApi.summary.addRaw(summary);
     await coreApi.summary.write();
@@ -736,7 +702,7 @@ async function main(options = {}) {
                 ? launch.explanation
                 : launch.state === "rejected"
                   ? "GitHub rejected a worker launch. Inspect the launch diagnostics and correct the published worker route, trigger, inputs, or credential permissions."
-                  : !["bound", "released", "staged_preview"].includes(launch.state)
+                  : !["activation_pending", "bound", "released", "staged_preview"].includes(launch.state)
                     ? "A worker may have launched, but its run has not been verified. Reconcile the original reservation; do not dispatch the same assignment again."
                     : null
             )

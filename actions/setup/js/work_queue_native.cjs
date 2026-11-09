@@ -6,7 +6,7 @@ const { posix } = require("node:path");
 const { canonical, closed, parseStrictJSON } = require("./work_queue_codec.cjs");
 const { actorFromContext } = require("./work_queue_policy.cjs");
 const { dispatchWorkflow } = require("./dispatch_workflow_transport.cjs");
-const { isTransientQueueReadError, readQueueMetadata, metadataRequest } = require("./work_queue_read_retry.cjs");
+const { readQueueMetadata, metadataRequest } = require("./work_queue_read_retry.cjs");
 
 const API_VERSION = "2026-03-10";
 
@@ -95,33 +95,42 @@ async function fetchNativeRun(githubClient, repository, runId, sleepFn = undefin
   return run;
 }
 
-async function fetchNativeRunAttempt(githubClient, repository, runId, attempt = 1, readOptions = {}) {
-  log.debug("run_attempt.fetch.start");
-  const attemptNumber = nativeAttempt(attempt);
-  const verified = await fetchNativeRepository(githubClient, repository, readOptions);
-  const [owner, repo] = verified.repository.split("/");
-  const response = await readNativeMetadata(
-    request =>
-      githubClient.rest.actions.getWorkflowRunAttempt({
-        owner,
-        repo,
-        run_id: nativeId(runId),
-        attempt_number: attemptNumber,
-        headers: { "X-GitHub-Api-Version": API_VERSION },
-        request,
-      }),
-    "run_attempt.read",
-    readOptions
-  );
-  if (response.status !== undefined && response.status !== 200) throw new Error("native run attempt API read was not successful");
-  const run = canonicalNativeRepository(response.data, verified);
-  log.debug("run_attempt.fetch.verified");
-  return run;
+function createNativeRunAttemptReader(githubClient, repository, readOptions = {}) {
+  /** @type {{repository: string, repository_id: string} | undefined} */
+  let verified;
+  return async (runId, attempt = 1) => {
+    log.debug("run_attempt.fetch.start");
+    const attemptNumber = nativeAttempt(attempt);
+    const id = nativeId(runId);
+    // Reuse only this operation's authenticated repository identity; every run response must still match it.
+    verified ??= await fetchNativeRepository(githubClient, repository, readOptions);
+    const [owner, repo] = verified.repository.split("/");
+    const response = await readNativeMetadata(
+      request =>
+        githubClient.rest.actions.getWorkflowRunAttempt({
+          owner,
+          repo,
+          run_id: id,
+          attempt_number: attemptNumber,
+          headers: { "X-GitHub-Api-Version": API_VERSION },
+          request,
+        }),
+      "run_attempt.read",
+      readOptions
+    );
+    if (response.status !== undefined && response.status !== 200) throw new Error("native run attempt API read was not successful");
+    const run = canonicalNativeRepository(response.data, verified);
+    log.debug("run_attempt.fetch.verified");
+    return run;
+  };
 }
 
-function isTransientVerificationError(error) {
-  const status = error?.status ?? error?.response?.status;
-  return status === 404 || isTransientQueueReadError(error) || error?.message === "run_correlation_mismatch";
+async function fetchNativeRunAttempt(githubClient, repository, runId, attempt = 1, readOptions = {}) {
+  return createNativeRunAttemptReader(githubClient, repository, readOptions)(runId, attempt);
+}
+
+function correlationRetryDelay(attempt, remaining) {
+  return Math.min(1000 * 2 ** Math.min(attempt - 1, 5), 30000, remaining);
 }
 
 function validateNativeRun(run, expected) {
@@ -300,7 +309,8 @@ module.exports = {
   dispatchResponse,
   fetchNativeRun,
   fetchNativeRunAttempt,
-  isTransientVerificationError,
+  createNativeRunAttemptReader,
+  correlationRetryDelay,
   validateNativeRun,
   dispatchTag,
   postQueueDispatch,

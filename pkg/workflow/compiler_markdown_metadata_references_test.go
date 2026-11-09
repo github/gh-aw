@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCompilerMarkdownMetadataCompactsEmptyApprovals(t *testing.T) {
+func TestCompilerMarkdownMetadataOmitsEmptyProjections(t *testing.T) {
 	agentSHA, modelSHA := strings.Repeat("a", 64), strings.Repeat("b", 64)
 	referenceSHA, errorSHA := strings.Repeat("c", 64), strings.Repeat("d", 64)
 	manifest := &GHAWManifest{MarkdownMetadata: &GHAWMarkdownMetadata{
@@ -21,8 +21,8 @@ func TestCompilerMarkdownMetadataCompactsEmptyApprovals(t *testing.T) {
 		},
 	}}
 	require.NoError(t, populateManifestMetadata(manifest))
-	require.JSONEq(t, `{"empty":true}`, string(manifest.AgentMetadata[strings.Repeat("a", 20)]))
-	require.JSONEq(t, `{"empty":true}`, string(manifest.ModelPins[strings.Repeat("b", 20)]))
+	require.Empty(t, manifest.AgentMetadata)
+	require.Empty(t, manifest.ModelPins)
 	require.NotContains(t, manifest.AgentMetadata, agentSHA)
 	require.NotContains(t, manifest.ModelPins, modelSHA)
 	require.NotContains(t, manifest.AgentMetadata, referenceSHA[:20])
@@ -34,6 +34,7 @@ func TestCompilerMarkdownMetadataCompactsEmptyApprovals(t *testing.T) {
 	require.NotContains(t, encoded, agentSHA)
 	require.NotContains(t, encoded, modelSHA)
 	require.NotContains(t, encoded, `"metadata_empty"`)
+	require.NotContains(t, encoded, `"empty":true`)
 	require.NotContains(t, encoded, `"`+referenceSHA[:20]+`":null`)
 	require.NotContains(t, encoded, `"`+errorSHA[:20]+`":null`)
 	require.Len(t, manifest.MarkdownMetadata.Records, 4)

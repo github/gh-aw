@@ -123,6 +123,23 @@ class ModelRunnerTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("TLC_MODEL_FILTER must be", result.stderr)
 
+    def test_activation_receipt_configs_require_exact_verdicts(self):
+        for config, invariant in (
+            ("BrokenLifecycleReceipt", "AcceptanceNotAuthority"),
+            ("LifecyclePendingWitness", "NoAcceptedPendingWitness"),
+            ("LifecycleAcceptedBindingWitness", "NoAcceptedBindingWitness"),
+            ("LifecycleUnresolvedWitness", "NoUnresolvedReservationWitness"),
+        ):
+            with self.subTest(config=config):
+                result = self.run_model(config, f"Invariant {invariant} is violated", 12,
+                                        model="QueueLifecycle")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                for output, status in (("Invariant BindingAuthority is violated", 12),
+                                       (f"Invariant {invariant} is violated", 0),
+                                       ("Parsing failed", 151)):
+                    rejected = self.run_model(config, output, status, model="QueueLifecycle")
+                    self.assertNotEqual(rejected.returncode, 0)
+
     def test_expiration_configs_require_exact_verdicts(self):
         model = "WorkExpiration"
         accepted = self.run_model("WorkExpiration", "Model checking completed. No error", model=model)
@@ -235,7 +252,7 @@ class ModelRunnerTests(unittest.TestCase):
                                ("ObsoleteWorkRetirement", r"(?:Retirement.*|BrokenRetirement.*)\.cfg"),
                                ("WorkExpiration", r"(?:WorkExpiration|BrokenExpiration.*|Expiration.*Witness)\.cfg"),
                                ("ClaimDeliveryRecovery", r"(?:DeliveryRecovery.*|BrokenRecovery.*|Recovery(?:Released|Enriched|Retained|Unavailable)Witness)\.cfg"),
-                               ("QueueLifecycle", r"LifecycleReleasedPendingWitness\.cfg"),
+                               ("QueueLifecycle", r"(?:Lifecycle.*|BrokenLifecycle.*)\.cfg"),
                                ("DispatchReservationRecovery", r"(?:Reservation|BrokenReservation).*\.cfg"),
                                ("WorkerEvolution", r"(?:WorkerEvolution|BrokenEvolution|Evolution).*\.cfg"),
                                ("WorkerDeploymentBoundary", r"(?:WorkerDeploymentBoundary|BrokenBoundary|Boundary).*\.cfg"),
