@@ -8,14 +8,17 @@ on:
     - 'cmd/**'
     - 'pkg/**'
     - 'scripts/**'
+    - 'internal/**'
     - 'go.mod'
     - 'go.sum'
     - 'Makefile'
-    - 'actions/setup/sh/**'
-    - '.github/workflows/ci.yml'
-    - '.github/workflows/cgo.yml'
-    - '.github/workflows/CWI.yml'
-    - '.github/workflows/license-check.yml'
+    - 'actions/**'
+    - '.golangci.yml'
+    - 'Dockerfile'
+    - '.dockerignore'
+    - '.github/aw/actions-lock.json'
+    - '.github/workflows/**'
+    - '.github/skills/agentic-workflows/**'
     - '.github/aw/releases.json'
     - '.github/aw/releases.schema.json'
     - '.github/aw/compat.json'
@@ -28,14 +31,17 @@ on:
     - 'cmd/**'
     - 'pkg/**'
     - 'scripts/**'
+    - 'internal/**'
     - 'go.mod'
     - 'go.sum'
     - 'Makefile'
-    - 'actions/setup/sh/**'
-    - '.github/workflows/ci.yml'
-    - '.github/workflows/cgo.yml'
-    - '.github/workflows/CWI.yml'
-    - '.github/workflows/license-check.yml'
+    - 'actions/**'
+    - '.golangci.yml'
+    - 'Dockerfile'
+    - '.dockerignore'
+    - '.github/aw/actions-lock.json'
+    - '.github/workflows/**'
+    - '.github/skills/agentic-workflows/**'
     - '.github/aw/releases.json'
     - '.github/aw/releases.schema.json'
     - '.github/aw/compat.json'
@@ -49,7 +55,20 @@ jobs:
     permissions:
       contents: read
     outputs:
-      dependencies-changed: ${{ steps.dependencies.outputs.changed }}
+      go: ${{ steps.changes.outputs.go }}
+      full-go-tests: ${{ steps.changes.outputs.full-go-tests }}
+      build: ${{ steps.changes.outputs.build }}
+      wasm: ${{ steps.changes.outputs.wasm }}
+      native-js: ${{ steps.changes.outputs.native-js }}
+      go-format: ${{ steps.changes.outputs.go-format }}
+      go-lint: ${{ steps.changes.outputs.go-lint }}
+      go-custom: ${{ steps.changes.outputs.go-custom }}
+      go-vuln: ${{ steps.changes.outputs.go-vuln }}
+      actions: ${{ steps.changes.outputs.actions }}
+      validate: ${{ steps.changes.outputs.validate }}
+      conformance: ${{ steps.changes.outputs.conformance }}
+      shell: ${{ steps.changes.outputs.shell }}
+      alpine: ${{ steps.changes.outputs.alpine }}
     steps:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
@@ -57,19 +76,17 @@ jobs:
         # Keep the PR merge commit and its base parent for incremental linting.
         fetch-depth: 2
         persist-credentials: false
-    - name: Check Go dependency changes
-      id: dependencies
-      shell: bash
-      run: |
-        if git diff --quiet HEAD^ HEAD -- go.mod go.sum; then
-          echo "changed=false" >> "$GITHUB_OUTPUT"
-        else
-          echo "changed=true" >> "$GITHUB_OUTPUT"
-        fi
+    - name: Set up Node.js
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
+      with:
+        node-version: "24"
+    - name: Select jobs for changed inputs
+      id: changes
+      run: node scripts/ci-job-filters.cjs cgo
     - name: Verify CGO/CJS workflow purity
       run: bash scripts/check-cgo-cjs-workflow-purity.sh
     - name: Test workflow timing summaries
-      run: node --test scripts/workflow-timing.test.cjs
+      run: node --test scripts/workflow-timing.test.cjs scripts/ci-job-filters.test.cjs
     - name: Cache repository checkout
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9   # v6.1.0
       with:
@@ -78,6 +95,7 @@ jobs:
         key: checkout-cgo-${{ github.run_id }}-${{ github.sha }}
 
   verify-integration-build:
+    if: needs.checkout-cache.outputs.go == 'true'
     needs: [checkout-cache]
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -165,7 +183,7 @@ jobs:
 
   test:
     name: Unit tests (${{ matrix.name }})
-    if: github.event_name != 'pull_request' || needs.checkout-cache.outputs.dependencies-changed == 'true'
+    if: needs.checkout-cache.outputs.full-go-tests == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs:
@@ -423,6 +441,7 @@ jobs:
         retention-days: 7
 
   impacted-go-tests:
+    if: needs.checkout-cache.outputs.go == 'true' && needs.checkout-cache.outputs.full-go-tests != 'true'
     needs: [checkout-cache]
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -458,6 +477,7 @@ jobs:
       run: make test-impacted-go BASE_REF=HEAD^ CI_COVERAGE_SOURCE_BRANCH=main
 
   native-javascript-tests:
+    if: needs.checkout-cache.outputs.native-js == 'true'
     name: Native JavaScript and Actions parser tests
     needs: [checkout-cache]
     runs-on: ubuntu-latest
@@ -506,6 +526,7 @@ jobs:
       run: make test-actions-parser-conformance
 
   build:
+    if: needs.checkout-cache.outputs.build == 'true'
     needs: [checkout-cache]
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -607,6 +628,7 @@ jobs:
 
 
   build-wasm:
+    if: needs.checkout-cache.outputs.wasm == 'true'
     needs: [checkout-cache]
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -714,6 +736,7 @@ jobs:
       run: node scripts/test-wasm-golden.mjs
 
   validate-yaml:
+    if: needs.checkout-cache.outputs.validate == 'true'
     needs: [checkout-cache]
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -1353,6 +1376,7 @@ jobs:
         retention-days: 14
 
   check-validator-sizes:
+    if: needs.checkout-cache.outputs.go-format == 'true'
     name: Check validator file sizes
     needs: [checkout-cache]
     runs-on: ubuntu-latest
@@ -1398,6 +1422,7 @@ jobs:
         exit "$EXIT_CODE"
 
   lint-go-format:
+    if: needs.checkout-cache.outputs.go-format == 'true'
     needs: [checkout-cache]
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -1455,6 +1480,7 @@ jobs:
         echo "✅ Go formatting check passed" >> $GITHUB_STEP_SUMMARY
 
   lint-go-golangci:
+    if: needs.checkout-cache.outputs.go-lint == 'true'
     needs: [checkout-cache]
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -1575,6 +1601,7 @@ jobs:
         fi
 
   lint-go-govulncheck:
+    if: needs.checkout-cache.outputs.go-vuln == 'true'
     needs: [checkout-cache]
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -1629,6 +1656,7 @@ jobs:
       run: make security-govulncheck
 
   lint-go-custom:
+    if: needs.checkout-cache.outputs.go-custom == 'true'
     needs: [checkout-cache]
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -1703,11 +1731,8 @@ jobs:
     - name: Check console stderr formatting (wasm)
       run: GOOS=js GOARCH=wasm make golint-custom LINTER_FLAGS="-consolestderr -test=false" LINTER_PACKAGES="./pkg/console ./pkg/parser ./pkg/styles ./pkg/tty ./pkg/workflow"
 
-      # Ensure no action shell scripts invoke python or python3
-    - name: Lint action shell scripts
-      run: make lint-action-sh
-
   lint-error-messages:
+    if: needs.checkout-cache.outputs.go-custom == 'true'
     needs: [checkout-cache]
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -1743,6 +1768,7 @@ jobs:
       run: make lint-errors
 
   actions-build:
+    if: needs.checkout-cache.outputs.actions == 'true'
     needs: [checkout-cache]
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -1997,6 +2023,7 @@ jobs:
         retention-days: 7
 
   security:
+    if: needs.checkout-cache.outputs.go == 'true'
     needs: [checkout-cache, build]
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -2116,6 +2143,7 @@ jobs:
       run: ./gh-aw compile poem-bot ${{ matrix.tool.flag }} --verbose
 
   mcp-server-compile-test:
+    if: needs.checkout-cache.outputs.build == 'true'
     needs: [checkout-cache]
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -2299,6 +2327,7 @@ jobs:
         echo "✅ Test completed successfully" >> $GITHUB_STEP_SUMMARY
 
   cross-platform-build:
+    if: needs.checkout-cache.outputs.build == 'true'
     needs: [checkout-cache, build]
     name: Build & Test on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -2693,6 +2722,7 @@ jobs:
         rm -f .github/workflows/test-cross-platform.lock.yml
 
   alpine-container-test:
+    if: needs.checkout-cache.outputs.alpine == 'true'
     name: Alpine Container Test
     needs: [checkout-cache]
     runs-on: ubuntu-latest
@@ -2842,6 +2872,7 @@ jobs:
         rm -rf test-workspace
 
   safe-outputs-conformance:
+    if: needs.checkout-cache.outputs.conformance == 'true'
     needs: [checkout-cache]
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -2905,6 +2936,21 @@ jobs:
         path: conformance-output.txt
         retention-days: 7
 
+  lint-action-sh:
+    if: needs.checkout-cache.outputs.shell == 'true'
+    needs: [checkout-cache]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - name: Lint action shell scripts
+      run: make lint-action-sh
+
   summarize-timing:
     name: Summarize workflow timing
     needs:
@@ -2932,6 +2978,7 @@ jobs:
     - cross-platform-build
     - alpine-container-test
     - safe-outputs-conformance
+    - lint-action-sh
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

@@ -33,9 +33,15 @@ If the check fails, use `git rm --cached -- <path>` to untrack each reported fil
 GitHub Agentic Workflows is developed by a core team using agentic development — primarily GitHub Copilot coding agent and local coding agents. This means:
 
 - ✅ **Core team uses agents to create and manage pull requests** - via Copilot coding agent or local agents
-- ✅ **Automated quality assurance** - CI runs all checks on all PRs
+- ✅ **Automated quality assurance** - CI runs checks targeted to each PR's changed inputs
 - ✅ **Community contributes through agentic plans** - you craft the plan, the core team executes it
 - ❌ **Traditional pull requests from non-core members are not enabled** - contribute through issues instead
+
+### Targeted PR checks
+
+CGO and CJS select PR jobs using `scripts/ci-job-filters.cjs` and the complete merge-commit diff against its base parent. Go package resources and fixtures trigger full unit coverage; ordinary Go edits use impacted tests. Runtime JavaScript edits retain all eight test shards, while artifact, OTLP, Docker cleanup, and NVX integration checks run only for their inputs. ESLint factory tests run separately rather than repeating runtime tests. Main-branch and manually dispatched runs retain full coverage.
+
+When changing CI inputs, update both the workflow trigger paths and job filters. Run `node --test scripts/ci-job-filters.test.cjs` to check selection, including dependencies, deleted files, and renamed files.
 
 ### Why This Approach?
 
