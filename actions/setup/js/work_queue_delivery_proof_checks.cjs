@@ -15,6 +15,13 @@ const { canonical } = require("./work_queue_codec.cjs");
 
 /** @typedef {{messages: Record<string, unknown>[], results: {messageIndex: number, success: boolean, claim_handle: string, result: Record<string, unknown>}[], effects: Record<string, unknown>[], effectChannel: ReturnType<typeof closeClaimEffectChannel>}} DeliveryProofRecord */
 
+function assertPendingRecheck(proof, event) {
+  assert.deepEqual(
+    { verified: proof.verified, effects: proof.effects, reason: proof.reason, event: proof.diagnostics?.event },
+    { verified: false, effects: "unknown", reason: event === "delivery.verify.binding_invalid" ? "recheck_binding_invalid" : "recheck_receipt_rejected", event }
+  );
+}
+
 function deliveryResourceScope(existingIssue = false) {
   return {
     version: 1,
@@ -663,7 +670,7 @@ function registerTests({ describe, it }) {
       const verifier = createClaimDeliveryVerifier({ assignment: f.assignment, recheck: f.inspect });
       assert.equal((await verifier(member, f.verification(member))).verified, true);
       const senderRun = { ...f.verification(member), run: { ...f.queue.binding, principal: "11" } };
-      assert.deepEqual(await verifier(member, senderRun), { verified: false, effects: "unknown" });
+      assertPendingRecheck(await verifier(member, senderRun), "delivery.verify.receipt_rejected");
     });
 
     it("does not replace an explicitly invalid authority target with rich receipt metadata", async () => {
@@ -692,11 +699,11 @@ function registerTests({ describe, it }) {
       assert.deepEqual(await verifyClaimDelivery(member, f.verification(member)), { verified: false, effects: "unknown" });
       for (const untrusted of [JSON.parse(JSON.stringify(delivery)), { verification: "verified", jobSuccess: true, contractVerified: true, descriptor: delivery.descriptor }]) {
         const verifier = createClaimDeliveryVerifier({ assignment: f.queue.assignment, recheck: async () => untrusted });
-        assert.deepEqual(await verifier(member, f.verification(member)), { verified: false, effects: "unknown" });
+        assertPendingRecheck(await verifier(member, f.verification(member)), "delivery.verify.receipt_rejected");
       }
       for (const effectChannel of [undefined, {}]) {
         const verifier = createClaimDeliveryVerifier({ assignment: f.queue.assignment, recheck: candidate => f.inspect(candidate, { effectChannel }) });
-        assert.deepEqual(await verifier(member, f.verification(member)), { verified: false, effects: "unknown" });
+        assertPendingRecheck(await verifier(member, f.verification(member)), "delivery.verify.receipt_rejected");
       }
     });
 
@@ -740,17 +747,17 @@ function registerTests({ describe, it }) {
       const member = f.assignment.claims[0];
       const verifier = createClaimDeliveryVerifier({ assignment: f.queue.assignment, recheck: f.inspect });
       const good = f.verification(member);
-      for (const verification of [
-        { ...good, attempt: 0 },
-        { ...good, contract: { kind: "unproved" } },
-        { ...good, assignment: { ...good.assignment, dispatch_id: "foreign" } },
-        { ...good, run: { ...good.run, run_id: "99" } },
-        { ...good, run: { ...good.run, run_attempt: 2 } },
-        { ...good, run: { ...good.run, principal: "99" } },
-        { ...good, run: { ...good.run, ref: "b".repeat(40) } },
+      for (const [verification, event] of [
+        [{ ...good, attempt: 0 }, "delivery.verify.binding_invalid"],
+        [{ ...good, contract: { kind: "unproved" } }, "delivery.verify.binding_invalid"],
+        [{ ...good, assignment: { ...good.assignment, dispatch_id: "foreign" } }, "delivery.verify.binding_invalid"],
+        [{ ...good, run: { ...good.run, run_id: "99" } }, "delivery.verify.receipt_rejected"],
+        [{ ...good, run: { ...good.run, run_attempt: 2 } }, "delivery.verify.binding_invalid"],
+        [{ ...good, run: { ...good.run, principal: "99" } }, "delivery.verify.receipt_rejected"],
+        [{ ...good, run: { ...good.run, ref: "b".repeat(40) } }, "delivery.verify.receipt_rejected"],
       ])
-        assert.deepEqual(await verifier(member, verification), { verified: false, effects: "unknown" });
-      assert.deepEqual(await verifier({ ...member, work_id: "foreign" }, good), { verified: false, effects: "unknown" });
+        assertPendingRecheck(await verifier(member, verification), event);
+      assertPendingRecheck(await verifier({ ...member, work_id: "foreign" }, good), "delivery.verify.binding_invalid");
     });
 
     it("never turns missing contracts, delegated, skipped, unresolved or failed outcomes into verified no effects", async () => {
@@ -761,16 +768,16 @@ function registerTests({ describe, it }) {
           assignment: f.queue.assignment,
           recheck: candidate => f.inspect(candidate, { messages: [{ type: "create_issue", claim_handle: candidate.handle }], results: [{ messageIndex: 0, ...outcome }] }),
         });
-        assert.deepEqual(await verifier(member, f.verification(member)), { verified: false, effects: "unknown" });
+        assertPendingRecheck(await verifier(member, f.verification(member)), "delivery.verify.receipt_rejected");
       }
       const absent = fixture({ workDefaults: { payload: { plan: "no declared contract" } } });
       const member = absent.assignment.claims[0];
       const verifier = createClaimDeliveryVerifier({ assignment: absent.queue.assignment, recheck: absent.inspect });
-      assert.deepEqual(await verifier(member, absent.verification(member)), { verified: false, effects: "unknown" });
+      assertPendingRecheck(await verifier(member, absent.verification(member)), "delivery.verify.binding_invalid");
       const optional = fixture({ workDefaults: { payload: { effect_contract: { version: 1, outputs: [{ type: "create_issue", min: 0, max: 1 }] } } } });
       const optionalMember = optional.assignment.claims[0];
       const optionalVerifier = createClaimDeliveryVerifier({ assignment: optional.queue.assignment, recheck: optional.inspect });
-      assert.deepEqual(await optionalVerifier(optionalMember, optional.verification(optionalMember)), { verified: false, effects: "unknown" });
+      assertPendingRecheck(await optionalVerifier(optionalMember, optional.verification(optionalMember)), "delivery.verify.receipt_rejected");
     });
 
     it("proves actual declared resource identity and destination without executing or replaying effects", async () => {

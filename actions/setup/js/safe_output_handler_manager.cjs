@@ -65,7 +65,8 @@ const {
 } = require("./work_queue_claim_scope.cjs");
 const { withClaimEffectClients, wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
 const { readClaimControlMessages } = require("./work_queue_control_delivery.cjs");
-const { readDeliveryControlInventory, inspectClaimDelivery, createClaimDeliveryVerifier, verifyBuiltinDeliveryOutput } = require("./work_queue_delivery.cjs");
+const { readDeliveryControlInventory, inspectClaimDelivery, createClaimDeliveryVerifier, verifyBuiltinDeliveryOutput, validateDeliveryContract, NO_WRITE_TYPES } = require("./work_queue_delivery.cjs");
+const { normalizeSafeOutputName } = require("./safe_output_names.cjs");
 const { createClaimAdapterHandler, verifyClaimAdapterOutput, preparedAdapterPath, createDeclaredAdapterVerifier, wrapDeclaredBuiltinHandler } = require("./work_queue_claim_adapters.cjs");
 const GITHUB_TOKEN_CONFIG_KEY = "github-token";
 
@@ -2133,6 +2134,19 @@ async function main(options = {}) {
             );
           },
         };
+        try {
+          const contract = validateDeliveryContract(scope.assignment.claims.find(claim => claim.handle === handle).work.effect_contract);
+          const known = new Set(contract.outputs.map(output => normalizeSafeOutputName(output.type)));
+          const undeclared = [...new Set(scopedMessages.map(message => normalizeSafeOutputName(message.type)).filter(type => !known.has(type) && !(contract.no_writes === true && NO_WRITE_TYPES.has(type))))];
+          if (undeclared.length > 0 && !isStagedMode()) {
+            core.warning(`Claim ${handle}: refusing ${scopedMessages.length} scoped output(s); undeclared type(s): ${undeclared.join(", ")}`);
+            const delivery = await withClaimExecution({ ...scope, claim_handle: handle, authorize, effects }, () => settleClaimDelivery(scope, scopedMessages, [], claimOptions));
+            settlements.push({ claim_handle: handle, success: false, error: `Undeclared output type(s) in immutable effect_contract: ${undeclared.join(", ")}`, delivery });
+            continue;
+          }
+        } catch {
+          // Delivery settlement reports invalid immutable contracts.
+        }
         const settlement = await withClaimExecution({ ...scope, claim_handle: handle, authorize, effects }, () =>
           withClaimEffectClients({ claim_handle: handle, authorize, authorizeGithub: unscopedGithub, context }, async () => {
             try {
@@ -2187,6 +2201,8 @@ async function main(options = {}) {
     if (!isStagedMode()) {
       for (const settlement of settlements) {
         const result = finalized?.claims?.[settlement.claim_handle];
+        const delivery = settlement.delivery;
+        const attestationRefused = delivery?.verification === "verified" && delivery.attestation?.recorded === false;
         if (["result", "cancelled"].includes(result?.state)) continue;
         await withClaimExecution({ ...scope, claim_handle: settlement.claim_handle, authorize: options.authorize }, () =>
           recordSafeOutputFailure(
@@ -2197,7 +2213,16 @@ async function main(options = {}) {
                 {
                   type: "claim_delivery",
                   errorCode: result?.reason || (result?.state === "delivery_failed" ? "delivery_failed" : "verification_unresolved"),
-                  error: settlement.delivery?.reason || settlement.error || "Independent delivery verification is unavailable",
+                  error:
+                    delivery?.reason ||
+                    settlement.error ||
+                    (attestationRefused
+                      ? "Verified settlement receipt was not attested"
+                      : delivery?.verification === "verified"
+                        ? "Verified settlement was not re-verified by the trusted finalizer"
+                        : "Independent delivery verification is unavailable"),
+                  ...(delivery?.diagnostics ? { diagnostics: delivery.diagnostics } : attestationRefused ? { diagnostics: { event: "delivery.receipt.not_recorded", ...delivery.attestation } } : {}),
+                  ...(result?.verifier ? { verifier: result.verifier } : {}),
                 },
               ],
             },

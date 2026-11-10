@@ -28,6 +28,7 @@ const { createRestEffectHandler } = require("./work_queue_rest_adapter.cjs");
 const { createGraphqlEffectHandler } = require("./work_queue_graphql_adapter.cjs");
 const { validateStoredAssignment } = require("./work_queue_binding.cjs");
 const { queueFixture } = require("./work_queue_lifecycle.test_helpers.cjs");
+const { readDeliveryControlInventory } = require("./work_queue_delivery.cjs");
 const { serializeTransactionLog } = require("./work_queue_replay.cjs");
 
 const processorConfig = { itemType: "noop", configKey: "noop", displayName: "Noop", itemTypeName: "noop", supportsIssue: true, envVars: {} };
@@ -428,6 +429,42 @@ describe("real immutable Claim routing", () => {
     expect(global.getOctokit).not.toHaveBeenCalled();
   });
 
+  it("refuses an undeclared output type before loading or running its handler", async () => {
+    process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = JSON.stringify({ create_issue: {} });
+    const createIssue = require("./create_issue.cjs");
+    const createIssueHandler = vi.fn();
+    const createIssueFactory = vi.spyOn(createIssue, "main").mockResolvedValue(createIssueHandler);
+    const fixture = activate(1, () => [{ type: "create_issue", title: "Undeclared", body: "Must not be created" }], { configureWork: work => (work.payload.effect_contract = { version: 1, outputs: [{ type: "noop", min: 0, max: 1 }] }) });
+    const member = fixture.assignment.claims[0];
+    fixture.append("finish", { dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle, outcome: "completed" }, { ...fixture.workerActor, dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle });
+    global.github = fixture.githubClient;
+    const options = managerOptions({
+      queueClient: fixture.githubClient,
+      readControlInventory: () =>
+        readDeliveryControlInventory({
+          assignment: fixture.assignment,
+          claim_handle: "h1",
+          githubClient: fixture.githubClient,
+          queueClient: fixture.githubClient,
+          context: fixture.workerContext,
+          core: global.core,
+          workflowRef: `owner/repo/.github/workflows/worker.lock.yml@${"a".repeat(40)}`,
+          readWorkQueueLog: fixture.readWorkQueueLog,
+        }),
+      finalizeResults: vi.fn(async () => ({ claims: { h1: { state: "pending", reason: "terminal_evidence_required" } } })),
+    });
+
+    const result = await manager.main(options);
+
+    expect(createIssueFactory).not.toHaveBeenCalled();
+    expect(createIssueHandler).not.toHaveBeenCalled();
+    expect(result.settlements[0]).toMatchObject({ success: false, error: expect.stringMatching(/Undeclared output type\(s\).*create_issue/) });
+    const worker = scope.readClaimScopeContext().assignment;
+    const directory = scope.claimArtifactPath(root, "h1", worker);
+    const report = JSON.parse(fs.readFileSync(path.join(directory, manifest.CLAIM_DELIVERY_ERRORS_FILE_NAME), "utf8"));
+    expect(report.failures[0].error).toBe("Undeclared output type in immutable effect_contract");
+    expect(global.core.setOutput).toHaveBeenCalledWith("work_queue_outcome", "delivery_pending");
+  });
   it.each(["pending", "delivery_failed"])("fails an otherwise successful output pass with a %s delivery without suppressing its verified sibling", async state => {
     const fixture = activate(2, members => members.map(member => ({ type: "noop", message: member.handle, claim_handle: member.handle })));
     await scope.withClaimExecution({ assignment: fixture.assignment, claim_handle: "h1", authorize }, () => manifest.writeSafeOutputErrorReport({ message: "Original handler failure" }));
@@ -450,6 +487,19 @@ describe("real immutable Claim routing", () => {
     });
     expect(fs.statSync(path.join(directory, manifest.CLAIM_DELIVERY_ERRORS_FILE_NAME)).mode & 0o777).toBe(0o600);
     expect(JSON.parse(fs.readFileSync(path.join(directory, "safe-output-errors.json"), "utf8")).message).toBe("Original handler failure");
+  });
+
+  it("preserves the trusted finalizer's verifier reason in Claim diagnostics", async () => {
+    activate(1, () => [{ type: "noop", message: "h1" }]);
+    await manager.main(
+      managerOptions({
+        finalizeResults: vi.fn(async () => ({ claims: { h1: { state: "pending", reason: "terminal_evidence_required", verifier: "recheck_receipt_rejected" } } })),
+      })
+    );
+    const worker = scope.readClaimScopeContext().assignment;
+    const directory = scope.claimArtifactPath(root, "h1", worker);
+    const report = JSON.parse(fs.readFileSync(path.join(directory, manifest.CLAIM_DELIVERY_ERRORS_FILE_NAME), "utf8"));
+    expect(report.failures[0]).toMatchObject({ errorCode: "terminal_evidence_required", verifier: "recheck_receipt_rejected" });
   });
 
   it.each(["result", "cancelled"])("does not fail independently settled %s Claims", async state => {

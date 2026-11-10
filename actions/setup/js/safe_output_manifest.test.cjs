@@ -850,6 +850,17 @@ describe("safe_output_manifest", () => {
       expect(typeof parsed.timestamp).toBe("string");
     });
 
+    it("preserves only bounded flat delivery diagnostics", () => {
+      const valid = { event: "x.y", ok: true, n: 2, types: ["a"] };
+      writeSafeOutputErrorReport({ failures: [{ type: "claim_delivery", verifier: "recheck_receipt_rejected", diagnostics: valid }] }, testErrorsFile);
+      expect(JSON.parse(fs.readFileSync(testErrorsFile, "utf8")).failures[0]).toMatchObject({ verifier: "recheck_receipt_rejected", diagnostics: valid });
+
+      for (const diagnostics of [{ event: "x".repeat(65) }, { event: "x.y", nested: { ok: true } }]) {
+        writeSafeOutputErrorReport({ failures: [{ type: "claim_delivery", diagnostics }] }, testErrorsFile);
+        expect(JSON.parse(fs.readFileSync(testErrorsFile, "utf8")).failures[0]).not.toHaveProperty("diagnostics");
+      }
+    });
+
     it("should default failures to an empty array and create parent directories", () => {
       writeSafeOutputErrorReport({ errorCode: "ERR_VALIDATION", message: "Handler manager failed" }, testErrorsFile);
 

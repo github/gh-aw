@@ -424,6 +424,22 @@ describe("native creation Claim delivery", () => {
     }
   });
 
+  it("returns field-level pull request mismatch diagnostics", async () => {
+    const labels = fixture("create_pull_request");
+    await labels.execute(async () => {
+      await labels.capture();
+      labels.pull.labels = [{ name: "changed" }];
+      expect((await labels.settle()).diagnostics).toMatchObject({ event: "pull_request.readback.mismatch", labels_matches: false, title_matches: true });
+    });
+
+    const base = fixture("create_pull_request");
+    await base.execute(async () => {
+      await base.capture();
+      base.pull.base.sha = "f".repeat(40);
+      expect((await base.settle()).diagnostics).toMatchObject({ event: "pull_request.readback.mismatch", base_matches: false });
+    });
+  });
+
   describe.each([
     ["create_discussion", "labels", "labels_matches"],
     ["create_pull_request", "labels", "labels_matches"],
