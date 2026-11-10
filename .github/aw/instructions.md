@@ -4,7 +4,8 @@ description: Repository overrides for workflow authoring, validation, and invest
 
 # Repository Instructions
 
-Apply to workflow creation, editing, review, diagnosis, debugging, and upgrades.
+Apply to workflow creation, editing, review, diagnosis, debugging, upgrades, and
+local SDLC issue preparation.
 These rules override conflicting upstream guidance.
 
 ## Repository Rules
@@ -109,3 +110,7 @@ configure Drain3. Grouping never changes ranking and keeps structured outcomes
 separate. These optional run-local groups are distinct from
 fleet failure clusters and `audit --group` finding codes; relevance/anomaly scores
 never replace full-stream findings or establish threat absence.
+
+## Local SDLC with Squad
+
+For local SDLC issues, follow [squad.md](squad.md).
