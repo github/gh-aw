@@ -848,7 +848,7 @@ engine: copilot
       expect(mockCore.setFailed).not.toHaveBeenCalled();
     });
 
-    it.each([404, 200])("should preserve missing-import and edited-import behavior (HTTP %s)", async status => {
+    it.each([404, 200])("should fail on a listed-import HTTP 404 and detect edited imports (HTTP %s)", async status => {
       const { computeFrontmatterHash } = require("./frontmatter_hash_pure.cjs");
       const content = "---\nengine: copilot\nimports:\n  - shared/test.md\n---\n# Test";
       fs.writeFileSync(path.join(workflowsDir, "test.md"), content);

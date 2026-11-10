@@ -255,7 +255,7 @@ async function processImportsTextBased(frontmatterText, baseDir, visited = new S
       importedFiles.push(...nestedResult.importedFiles);
       importedFrontmatterTexts.push(...nestedResult.importedFrontmatterTexts);
     } catch (err) {
-      if (!isFileNotFound(err) || isHttpNotFound(err)) throw err;
+      if (!isFileNotFound(err) || (isHttpNotFound(err) && !isWorkflowSpecImport(importPath))) throw err;
       onMissingImport?.(fullPath, /** @type {Error} */ err);
       continue;
     }
@@ -695,12 +695,22 @@ async function collectImportedBodies(frontmatterText, baseDir, visited = new Set
       const nestedBodies = await collectImportedBodies(importFrontmatterText, importBaseDir, visited, fileReader, rootDir);
       importedBodyTexts.push(...nestedBodies);
     } catch (err) {
-      if (!isFileNotFound(err) || isHttpNotFound(err)) throw err;
+      if (!isFileNotFound(err) || (isHttpNotFound(err) && !isWorkflowSpecImport(importPath))) throw err;
       continue;
     }
   }
 
   return importedBodyTexts;
+}
+
+function isWorkflowSpecImport(importPath) {
+  let cleanPath = importPath.split("#", 1)[0];
+  cleanPath = cleanPath.split("@", 1)[0];
+  const parts = cleanPath.split("/");
+  if (parts.length < 3) return false;
+  if (cleanPath.includes("://")) return true;
+  if (cleanPath.startsWith(".") || cleanPath.startsWith("shared/") || cleanPath.startsWith("/")) return false;
+  return parts[0] !== "" && parts[1] !== "";
 }
 
 /**
