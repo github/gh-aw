@@ -41,9 +41,12 @@ describe("code-producing issue workflow migration", () => {
     expect(lock).toContain('\\"exclude_lock_yml\\":true');
   });
 
-  it.each(["daily-formal-spec-verifier", "sergo"])("%s explicitly allows Go formatting and focused tests", id => {
+  it.each([
+    ["daily-formal-spec-verifier", ["gofmt -w:*", "go test:*"]],
+    ["sergo", ["gofmt -w *", "go test *"]],
+  ])("%s explicitly allows Go formatting and focused tests", (id, commands) => {
     const { config } = readWorkflow(id);
-    expect(config.tools.bash).toEqual(expect.arrayContaining(["gofmt -w *", "go test *"]));
+    expect(config.tools.bash).toEqual(expect.arrayContaining(commands));
     expect(config.tools.bash).not.toContain("*");
   });
 
