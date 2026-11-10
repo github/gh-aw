@@ -1323,6 +1323,34 @@ function registerTests({ describe, it }) {
       assert.equal(state.claims.size, 2);
       assert.equal(state.requests.get("local-grant").request.fingerprint, request.fingerprint);
     });
+    it("keeps retrying stale fast-forward CAS conflicts within the default budget and bounds explicit budgets at 128", async () => {
+      const initial = [genesis()];
+      initial.push(submission(initial, ["a", "b"]));
+      const fake = fakeGitHub(initial);
+      const request = newRequest("default-retry-budget", "dispatch_next", dispatcher, { pool: "default", max_claims: 1, max_dispatches: 1, max_bytes: 49152 });
+      const delays = [];
+      let conflicts = 0;
+      const compete = async ({ log, install }) => {
+        install([...log, operationCommit(log, `concurrent-control-${conflicts}`, "control", [{ kind: "Control", control: "grants_paused", value: false, reason: "concurrent_control" }], administrator, 100)]);
+        if (++conflicts < 20) fake.state.beforeUpdate = compete;
+      };
+      fake.state.beforeUpdate = compete;
+      const result = await publishWorkQueueRequest(
+        options(fake, request, dispatcher, {
+          sleepFn: async delay => delays.push(delay),
+        })
+      );
+      assert.equal(result.publishedNow, true);
+      assert.equal(conflicts, 20);
+      assert.equal(fake.state.updates, 21);
+      assert.deepEqual(delays, [50, 100, 200, 400, 800, ...Array(15).fill(1000)]);
+      assert.equal(replayTransactions(fake.log()).claims.size, 1);
+
+      const fake2 = fakeGitHub(initial);
+      const request2 = newRequest("explicit-retry-bound", "dispatch_next", dispatcher, { pool: "default", max_claims: 1, max_dispatches: 1, max_bytes: 49152 });
+      await assert.rejects(publishWorkQueueRequest(options(fake2, request2, dispatcher, { maxRetries: 129 })), /publication retries/);
+      await publishWorkQueueRequest(options(fake2, request2, dispatcher, { maxRetries: 128 }));
+    });
     it("rejects uninstalled dispatch pools before dependency probing or candidate generation", async () => {
       const fake = fakeGitHub([genesis()]);
       const before = serializeTransactionLog(fake.log());

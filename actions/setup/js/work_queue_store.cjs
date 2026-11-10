@@ -38,7 +38,8 @@ const WORK_QUEUE_BRANCH = "work-queue";
 const WORK_QUEUE_LOG_PATH = "work-queue.jsonl";
 const LEGACY_BRANCHES = ["dispatch-coordinator", "gh-aw-work-queue"];
 const LEGACY_LOGS = ["dispatch-work-coordinator.jsonl"];
-const DEFAULT_MAX_RETRIES = 5;
+// Contended ledgers routinely need 10+ fast-forward attempts; exponential backoff caps at 1 s, so 33 attempts bound a publication to ~30 s of sleep.
+const DEFAULT_MAX_RETRIES = 32;
 /** @type {WeakMap<object, {scope: object, proofs: Set<string>}>} */
 const verifiedCheckpointHistory = new WeakMap();
 /** @type {WeakMap<object, {scope: object, repository: string, sha: string, treeSha: string, contents: string}>} */
@@ -698,7 +699,7 @@ async function publishWorkQueueRequestImpl({
 }) {
   log.debug("request.publish.start", { max_retries: maxRetries, initialize_only: initializeOnly });
   validateBranch(branch);
-  integer(maxRetries, 0, 10, "publication retries");
+  integer(maxRetries, 0, 128, "publication retries");
   validateTrustedContext(context, actor);
   if (actor.repository.toLowerCase() !== `${owner}/${repo}`.toLowerCase()) throw queueError("actor_unauthorized", "authenticated context belongs to another repository");
   validateRequest(request, actor);

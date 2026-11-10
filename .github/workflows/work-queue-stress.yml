@@ -16,6 +16,16 @@ on:
       - 'actions/setup/js/**/*work_queue*.cjs'
       - 'actions/setup/js/**/*work_queue*.js'
       - 'specs/work-queue/**'
+  workflow_dispatch:
+    inputs:
+      history_items:
+        description: Retained Work plus Claim entities for the history profile
+        type: string
+        default: '100000'
+      lifecycle_items:
+        description: Work items for the concurrent lifecycle profile
+        type: string
+        default: '1024'
 
 permissions:
   contents: read
@@ -34,8 +44,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      HISTORY_ITEMS: ${{ github.event_name == 'pull_request' && '256' || '100000' }}
-      LIFECYCLE_ITEMS: ${{ github.event_name == 'pull_request' && '16' || '1024' }}
+      HISTORY_ITEMS: ${{ github.event_name == 'workflow_dispatch' && inputs.history_items || github.event_name == 'pull_request' && '256' || '100000' }}
+      LIFECYCLE_ITEMS: ${{ github.event_name == 'workflow_dispatch' && inputs.lifecycle_items || github.event_name == 'pull_request' && '128' || '1024' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
