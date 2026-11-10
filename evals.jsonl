@@ -1,0 +1,2 @@
+{"id":"output-produced","question":"Did the agent create a pull request or post a comment?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-10T17:18:16.041Z","runid":"42861951457"}
+{"id":"summary-comment-added","question":"Does the agent output confirm that a summary comment was added to the original conversation thread?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-10T17:18:16.041Z","runid":"42861951457"}
