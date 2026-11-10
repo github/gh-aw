@@ -627,5 +627,36 @@
    "base-commit law"
   ],
   "blogged": true
+ },
+ "elastic/oblt-aw": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-11-10",
+  "score": 8,
+  "summary": "Fleet framework: auto-distributed thin gh-aw clients, issue-checkbox control plane gating, pinned release train with rollback.",
+  "highlights": [
+   "docs/workflows/aw-prelude.md: shared fail-closed gate + CI validator for shared-proceed",
+   "docs/operations/release-model.md: dev @main canaries vs prod @v0, promote/rollback via release-pointers.json",
+   "docs/architecture/multi-org-agentic-workflows.md: org-scoped config and compound ids"
+  ],
+  "blogged": true
+ },
+ "elastic/docs-actions": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-11-10",
+  "score": 6,
+  "summary": "Elastic docs reusable actions plus agentic docs-review/triage workflows with example.yml callers and safe-output table.",
+  "highlights": [
+   "README.md: workflow table with triggers and safe outputs",
+   "agentic-workflows/DEVELOPING.md: inlined-imports for cross-repo workflow_call"
+  ],
+  "blogged": false
+ },
+ "githubnext/gh-cao": {
+  "kind": "extension",
+  "reviewed": "2026-11-10",
+  "score": 0,
+  "summary": "Appears to be the CAO extension already covered under githubnext/gh-aw-cao (9, blogged); not re-scored.",
+  "highlights": [],
+  "blogged": false
  }
 }
