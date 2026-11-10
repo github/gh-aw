@@ -92,6 +92,9 @@ Guardrail test workflow`
 	if !strings.Contains(lockStr, "needs.activation.outputs.daily_ai_credits_exceeded != 'true'") {
 		t.Fatal("expected the agent job to be skipped when the daily AI Credits guardrail is exceeded")
 	}
+	if !strings.Contains(lockStr, "needs.activation.outputs.daily_ai_credits_guardrail_status != 'quota_blocked'") {
+		t.Fatal("expected a handled GitHub API quota stop to skip the agent job instead of failing activation")
+	}
 	if !strings.Contains(lockStr, "GH_AW_DAILY_AI_CREDITS_EXCEEDED: ${{ needs.activation.outputs.daily_ai_credits_exceeded }}") {
 		t.Fatal("expected the conclusion job to receive the daily AI Credits guardrail output")
 	}

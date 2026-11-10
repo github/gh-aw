@@ -27,7 +27,7 @@ func TestBuildActivationJobCreatesSteeringIssue(t *testing.T) {
 
 	steps := strings.Join(job.Steps, "")
 	assert.Contains(t, steps, "id: create-steering-issue")
-	assert.Contains(t, steps, "if: steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_exceeded != 'true'")
+	assert.Contains(t, steps, "if: steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_exceeded != 'true' && steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_guardrail_status != 'quota_blocked'")
 	assert.Contains(t, steps, "create_steering_issue.cjs")
 	assert.Contains(t, job.Permissions, "issues: write")
 	assert.NotContains(t, job.Permissions, "contents: write")
