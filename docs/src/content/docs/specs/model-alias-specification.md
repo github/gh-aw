@@ -386,6 +386,7 @@ models:
 - The same alias name MUST NOT appear more than once as a key within the same alias map layer. Duplicate keys are a compile-time error.
 - Circular alias references (direct or transitive) are PROHIBITED and MUST be detected and reported as compile-time errors.
 - An alias list MUST contain at least one entry.
+- The alias name `router` is reserved (§9.4) and MUST NOT be defined. Alias entries MUST NOT be router values.
 
 ---
 
@@ -588,6 +589,27 @@ Meta-aliases reference other aliases and are resolved recursively. They allow wo
 ### 9.3 Absence of Default Policy
 
 The builtin alias set does NOT define a `""` entry. If a workflow does not define a `""` entry either, the engine's own default model is used.
+
+### 9.4 Reserved Router Values
+
+`router` and every identifier in the `router/` namespace (case-insensitive, with or without parameters) are reserved. They are not aliases and are never resolved through the alias map. The router values are:
+
+| Value | Meaning |
+|---|---|
+| `router` | Model routing with `goal: cost` and `mode: auto` |
+| `router/economy` | Model routing with `goal: cost` and `mode: economy` |
+| `router/balanced` | Model routing with `goal: cost` and `mode: balanced` |
+| `router/robust` | Model routing with `goal: cost` and `mode: robust` |
+
+A router value is accepted only as the main agent's model (top-level `model`, `engine.model`, or an imported workflow's model). The compiler MUST normalize it into the equivalent `engine.model-routing` configuration and MUST NOT pass it to the engine as a model identifier. Implementations MUST reject:
+
+- any other identifier in the reserved namespace (for example `router/fast` or `router/Economy`), listing the valid router values;
+- router values with parameters, such as `router/economy?effort=high`;
+- a `models:` alias named `router`, and router values in alias entries, `models.allowed`, `models.blocked`, or `engine.fallback-models`;
+- router values for sub-agents, threat detection, evals, or other jobs;
+- a router value combined with `engine.model-routing` or `engine.fallback-models`.
+
+A main-agent model that is an expression or variable and resolves to a router value at run time MUST stop the run before the agent starts. See [Model Routing](/gh-aw/reference/model-routing/).
 
 ---
 
@@ -1001,6 +1023,7 @@ Model parameters are compile-time configuration values and are not derived from 
 
 ### Version 1.3.0 (Draft)
 
+- **Added**: §9.4 reserves `router` and the `router/` namespace for router values (`router`, `router/economy`, `router/balanced`, `router/robust`), which select model routing and are not aliases.
 - **Added**: §8.8 runtime resolution: every alias-capable engine harness runs one shared step, provider-prefixed aliases (`copilot/opus`) are scoped to that provider, exact ids are never rewritten (a live exact id wins over an alias with the same name), and failures use `model_unavailable` / `catalog_unavailable`.
 - **Added**: Reserved `models:` keys (§7.1); workflow-defined aliases in the main workflow are merged last (§10.1).
 - **Fixed**: §14 mapping for V-MAF-020, which named `claude_engine.go` and a non-existent `codex_tools.go`.

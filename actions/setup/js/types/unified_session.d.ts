@@ -221,6 +221,8 @@ export interface ModelConfigData {
     enabled: boolean;
     goal?: string;
     mode?: string;
+    /** Router value the workflow set as its model (for example `router/economy`); absent when routing comes from `engine.model-routing` or the implicit default. */
+    requested?: "router" | "router/economy" | "router/balanced" | "router/robust";
     /** Native routing provider (`anthropic` or `openai`) sent to AWF as `apiProxy.routing.provider`; absent for GitHub Copilot routing. */
     provider?: "anthropic" | "openai";
     /** Configured routing candidates as authored (exact ids or gh-aw aliases) without provider prefix; absent means the router default or unknown. */

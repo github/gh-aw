@@ -10383,6 +10383,39 @@
                   ],
                   "additionalProperties": false
                 },
+                "model_config": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "routing": {
+                      "type": [
+                        "null",
+                        "object"
+                      ],
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "goal": {
+                          "type": "string"
+                        },
+                        "mode": {
+                          "type": "string"
+                        },
+                        "requested": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "enabled"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                },
                 "version": {
                   "type": "string"
                 },

@@ -12,7 +12,21 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_CONFIG, ERR_SYSTEM } = require("./error_codes.cjs");
 const { buildWorkflowCallId, normalizeLegacyWorkQueueContext, normalizeWorkQueueContext, resolveWorkQueueRuntime, readInboundAwContext } = require("./aw_context.cjs");
 const { normalizeWebhookContext } = require("./webhook_context.cjs");
-const { normalizeEngineHarness, parseCompiledModelConfig } = require("./routing_analytics.cjs");
+const { isRouterModelValue, normalizeEngineHarness, parseCompiledModelConfig, ROUTER_MODEL_VALUES } = require("./routing_analytics.cjs");
+
+/**
+ * Whether the compiled model configuration routes the main agent for this run.
+ * @param {string | undefined} rawConfig GH_AW_INFO_MODEL_CONFIG
+ * @returns {boolean}
+ */
+function compiledRoutingEnabled(rawConfig) {
+  if (!rawConfig) return false;
+  try {
+    return JSON.parse(rawConfig)?.routing?.enabled === true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Generate aw_info.json with workflow run metadata.
@@ -73,6 +87,20 @@ async function main(core, ctx, githubClient) {
   // causing GitHub Actions to pass the literal expression string at runtime.
   if (/\$\{\{/.test(model)) {
     const message = `${ERR_CONFIG}: GH_AW_INFO_MODEL contains an unresolved GitHub Actions expression: ${JSON.stringify(model)}`;
+    core.setFailed(message);
+    throw new Error(message);
+  }
+
+  // A router value (router, router/economy, ...) chooses model routing; it is not a
+  // model name. Router values are accepted only when written in the workflow, where
+  // the compiler turns them into routing. When the main agent's model is not routed
+  // for this run and a variable or expression resolves to a router value, stop before
+  // the agent starts instead of passing it to the engine as a model.
+  if (isRouterModelValue(model) && !compiledRoutingEnabled(process.env.GH_AW_INFO_MODEL_CONFIG)) {
+    const message =
+      `${ERR_CONFIG}: the main agent's model resolved to the router value ${JSON.stringify(model)} at run time. ` +
+      `Router values (${[...ROUTER_MODEL_VALUES].join(", ")}) must be written in the workflow's model or engine.model and are not accepted from expressions or variables such as vars.GH_AW_MODEL_AGENT_<ENGINE> or vars.GH_AW_DEFAULT_MODEL_<ENGINE>. ` +
+      "Set a model name in the variable or expression, or write the router value in the workflow and recompile. See https://github.github.com/gh-aw/reference/model-routing/";
     core.setFailed(message);
     throw new Error(message);
   }
