@@ -5,9 +5,11 @@ package workflow
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/parser"
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -40,16 +42,25 @@ engine: copilot
 }
 
 func TestInlinedImports_PreservesInlineAgentsAndSkillsInPrompt(t *testing.T) {
-	tmpDir := t.TempDir()
-	workflowPath := filepath.Join(tmpDir, "inline-agent-repro.md")
-	workflowContent := `---
+	for _, mode := range []string{"inlined-imports", "inline-prompt"} {
+		for _, message := range []string{"hello", "${{ inputs.message }}"} {
+			t.Run(mode+"/"+message, func(t *testing.T) {
+				tmpDir := t.TempDir()
+				workflowPath := filepath.Join(tmpDir, "inline-agent-repro.md")
+				workflowContent := `---
 name: inline-agent-repro
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+    inputs:
+      message:
+        type: string
 engine: copilot
 strict: false
 permissions:
   contents: read
-inlined-imports: true
+tools:
+  github: false
+inlined-imports: ` + map[bool]string{true: "true", false: "false"}[mode == "inlined-imports"] + `
 ---
 # Main Workflow
 
@@ -60,6 +71,8 @@ Delegate to the greeter agent.
 description: Greets the user
 ---
 Say hello from greeter.
+Say ` + message + `.
+Use github(get_issue).
 ## end agent: ` + "`greeter`" + `
 
 ## skill: ` + "`greeting`" + `
@@ -67,25 +80,100 @@ Say hello from greeter.
 description: Greets users
 ---
 Use the greeting skill.
+Skill says ` + message + `.
 ## end skill: ` + "`greeting`" + `
 `
-	require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0600))
+				require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0600))
 
-	compiler := NewCompiler()
-	compiler.SetQuiet(true)
-	require.NoError(t, compiler.CompileWorkflow(workflowPath))
+				compiler := NewCompiler()
+				compiler.SetQuiet(true)
+				compiler.inlinePrompt = mode == "inline-prompt"
+				data, err := compiler.ParseWorkflowFile(workflowPath)
+				require.NoError(t, err)
+				assert.NotContains(t, data.MarkdownContent, "Say hello from greeter.")
+				assert.NotContains(t, data.MainWorkflowMarkdown, "Say hello from greeter.")
+				assert.Contains(t, data.PromptMarkdown, "Say hello from greeter.")
+				warnings := compiler.GetWarningCount()
+				compiler.validatePromptTools(data, workflowPath)
+				assert.Equal(t, warnings, compiler.GetWarningCount(), "inline definitions must not affect main-prompt tool validation")
+				require.NoError(t, compiler.CompileWorkflow(workflowPath))
 
-	lockContent, err := os.ReadFile(filepath.Join(tmpDir, "inline-agent-repro.lock.yml"))
-	require.NoError(t, err)
-	for _, expected := range []string{
-		"## agent: `greeter`",
-		"Say hello from greeter.",
-		"## end agent: `greeter`",
-		"## skill: `greeting`",
-		"Use the greeting skill.",
-		"## end skill: `greeting`",
-	} {
-		assert.Contains(t, string(lockContent), expected)
+				lockContent, err := os.ReadFile(filepath.Join(tmpDir, "inline-agent-repro.lock.yml"))
+				require.NoError(t, err)
+				var workflow struct {
+					Jobs map[string]struct {
+						Steps []struct {
+							Name string            `yaml:"name"`
+							Env  map[string]string `yaml:"env"`
+						} `yaml:"steps"`
+					} `yaml:"jobs"`
+				}
+				require.NoError(t, yaml.Unmarshal(lockContent, &workflow))
+				var promptContent strings.Builder
+				var creationSteps, interpolationSteps int
+				for _, step := range workflow.Jobs["activation"].Steps {
+					switch step.Name {
+					case "Create prompt with built-in context":
+						creationSteps++
+						for key, value := range step.Env {
+							if strings.HasPrefix(key, "GH_AW_PROMPT_CONTENT_") {
+								promptContent.WriteString(value)
+							}
+						}
+					case "Interpolate variables and render templates":
+						interpolationSteps++
+						if strings.Contains(message, "${{") {
+							assert.Equal(t, "${{ inputs.message }}", step.Env["GH_AW_INPUTS_MESSAGE"])
+						}
+					}
+				}
+				require.Equal(t, 1, creationSteps)
+				assert.Equal(t, 1, interpolationSteps, "definitions alone must trigger extraction")
+				if strings.Contains(message, "${{") {
+					assert.Contains(t, promptContent.String(), "Say __GH_AW_INPUTS_MESSAGE__.")
+					assert.Contains(t, promptContent.String(), "Skill says __GH_AW_INPUTS_MESSAGE__.")
+				}
+				for _, expected := range []string{
+					"## agent: `greeter`",
+					"Say hello from greeter.",
+					"## end agent: `greeter`",
+					"## skill: `greeting`",
+					"Use the greeting skill.",
+					"## end skill: `greeting`",
+				} {
+					assert.Equal(t, 1, strings.Count(promptContent.String(), expected), "prompt must contain exactly one %q", expected)
+				}
+			})
+		}
+	}
+}
+
+func TestInlinedImports_ValidatesPreservedDefinitions(t *testing.T) {
+	for _, kind := range []string{"agent", "skill"} {
+		for _, expression := range []string{"${{ toJSON(github) }}", "${{ toJSON(secrets) }}"} {
+			for _, included := range []bool{false, true} {
+				t.Run(kind+"/"+expression+map[bool]string{true: "/include", false: "/body"}[included], func(t *testing.T) {
+					tmpDir := t.TempDir()
+					body := expression
+					if included {
+						require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "definition.md"), []byte("## end "+kind+": `helper`\n"+expression), 0600))
+						body = "@include definition.md"
+					}
+					workflowPath := filepath.Join(tmpDir, "workflow.md")
+					source := "---\non: workflow_dispatch\nengine: copilot\ninlined-imports: true\n---\n# Main\n\n## " + kind + ": `helper`\n" + body + "\n"
+					require.NoError(t, os.WriteFile(workflowPath, []byte(source), 0600))
+					compiler := NewCompiler()
+					compiler.SetQuiet(true)
+					err := compiler.CompileWorkflow(workflowPath)
+					require.Error(t, err)
+					if strings.Contains(expression, "secrets") {
+						assert.Contains(t, err.Error(), "secrets serialization")
+					} else {
+						assert.Contains(t, err.Error(), "toJSON(github)")
+					}
+				})
+			}
+		}
 	}
 }
 

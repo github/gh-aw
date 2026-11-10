@@ -147,9 +147,13 @@ func (c *Compiler) enrichExpressionMappings(data *WorkflowData, expressionMappin
 func (c *Compiler) buildMainWorkflowPromptChunks(data *WorkflowData, userPromptChunks []string, expressionMappings []*ExpressionMapping) ([]string, []*ExpressionMapping, error) {
 	data.MainWorkflowPromptPath = ""
 	if c.inlinePrompt || data.InlinedImports {
-		if data.MainWorkflowMarkdown != "" {
-			compilerYamlPromptLog.Printf("Inlining main workflow markdown (%d bytes)", len(data.MainWorkflowMarkdown))
-			inlinedMarkdown := removeXMLComments(data.MainWorkflowMarkdown)
+		promptMarkdown := data.PromptMarkdown
+		if promptMarkdown == "" {
+			promptMarkdown = data.MainWorkflowMarkdown
+		}
+		if promptMarkdown != "" {
+			compilerYamlPromptLog.Printf("Inlining main workflow markdown (%d bytes)", len(promptMarkdown))
+			inlinedMarkdown := removeXMLComments(promptMarkdown)
 			inlinedMarkdown = wrapExpressionsInTemplateConditionals(inlinedMarkdown)
 			inlineExtractor := NewExpressionExtractor()
 			inlineExprMappings, err := inlineExtractor.ExtractExpressions(inlinedMarkdown)
