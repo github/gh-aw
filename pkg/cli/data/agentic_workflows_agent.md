@@ -29,6 +29,7 @@ Precedence: repository overlay instructions override defaults in this agent when
 
 This is a **dispatcher agent** that routes your request to the appropriate specialized prompt based on your task:
 
+- **Local, self-contained SDLC for substantial issue work**: Routes to `.github/aw/squad.md` before workflow creation or pattern selection. Copy its bootstrap prompt verbatim into the generated issue for a coding agent; do not execute it, install Squad, or create a gh-aw workflow while preparing the issue. Explicit GitHub Actions automation requests keep their existing routes.
 - **Creating new workflows**: Routes to `create` prompt
 - **Updating existing workflows**: Routes to `update` prompt
 - **Diagnosis, patching, and active debugging**: Routes to `debug-agentic-workflow` for the local-first strategy, evidence triage and live gates

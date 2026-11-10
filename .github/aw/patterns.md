@@ -9,6 +9,12 @@ Use this router when a user asks for a workflow architecture, strategy, operatin
 
 ## Routing Rules
 
+For substantial issue work requiring a local, self-contained software development
+lifecycle (SDLC), route to [squad.md](squad.md) before selecting a GitHub Actions
+pattern. Include the bootstrap prompt verbatim in the generated issue for a coding agent;
+do not install Squad or create a gh-aw workflow while preparing the issue.
+Explicit GitHub Actions automation requests continue through the pattern index.
+
 1. Identify the user's primary goal and constraints.
 2. Match the request to the closest pattern in the index below.
 3. Load and follow the matched pattern document.

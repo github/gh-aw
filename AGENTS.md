@@ -58,6 +58,7 @@ When the relevant skill is not obvious, first discover candidates locally and th
 
 ### Use these skills by intent
 
+- Local, self-contained SDLC for substantial issue work → `.github/aw/squad.md`; copy its bootstrap prompt verbatim into the generated issue, not a new gh-aw workflow.
 - Workflow create/update/debug/upgrade tasks → `.github/skills/agentic-workflows/SKILL.md`
 - Core engineering conventions, validation flow, and command playbooks → `.github/skills/developer/SKILL.md`
 - Code organization, file structure, WASM stubs, string patterns → `.github/skills/developer-code-organization/SKILL.md`

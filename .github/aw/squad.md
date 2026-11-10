@@ -1,9 +1,15 @@
 # Bootstrap Squad from an issue
 
-When a user creates an issue with substantial work and wants to leverage a
+When a user creates an issue with substantial work and wants to leverage a local,
 self-contained software development lifecycle (SDLC), prime the generated issue
-for the Copilot coding agent (CCA) by including the Squad bootstrap prompt below
+for a coding agent by including the Squad bootstrap prompt below
 in the issue body.
+
+Substantial work or a mention of Squad alone is not enough. Keep explicit GitHub
+Actions automation requests on the workflow routes. If the execution model is
+unspecified, establish local SDLC intent before including setup authorization.
+If Squad is already initialized, use the existing team; do not include this
+bootstrap prompt unless the user explicitly requests reinitialization.
 
 Copy the entire `<details>` section from the code block verbatim, without the
 code fences. Preserve every word, punctuation mark, and line break; do not

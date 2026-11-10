@@ -42,6 +42,53 @@ def checklist(text):
 
 
 class GuidanceTests(unittest.TestCase):
+    def test_local_sdlc_routes_to_squad_before_workflow_creation(self):
+        for path, workflow_route in (
+            (".github/skills/agentic-workflows/SKILL.md", "- Design workflows from scratch"),
+            ("pkg/cli/data/agentic_workflows_skill.md", "- Design workflows from scratch"),
+            (".github/agents/agentic-workflows.md", "- **Creating new workflows**"),
+            ("pkg/cli/data/agentic_workflows_agent.md", "- **Creating new workflows**"),
+        ):
+            content = (ROOT / path).read_text()
+            route = next(line for line in content.splitlines() if line.startswith("- ") and "Local, self-contained SDLC" in line)
+            with self.subTest(router=path):
+                self.assertIn(".github/aw/squad.md", route)
+                self.assertIn("verbatim", route)
+                self.assertIn("for a coding agent", route)
+                self.assertIn("do not execute it, install Squad, or create a gh-aw workflow", route)
+                self.assertIn("Explicit GitHub Actions automation requests keep their existing routes", route)
+                self.assertLess(content.index(route), content.index(workflow_route))
+
+    def test_squad_is_discoverable_from_instructions_and_pattern_router(self):
+        for path in (
+            "AGENTS.md",
+            "SKILL.md",
+            ".github/aw/instructions.md",
+            ".github/aw/github-agentic-workflows.md",
+            ".github/aw/patterns.md",
+        ):
+            content = normalized((ROOT / path).read_text())
+            with self.subTest(instructions=path):
+                self.assertIn("squad.md", content)
+                self.assertIn("local", content.lower())
+                self.assertIn("verbatim", content)
+        fallback = json.loads((ROOT / "pkg/cli/data/agentic_workflows_fallback_aw_files.json").read_text())
+        self.assertIn("squad.md", fallback)
+        skill = (SKILL / "SKILL.md").read_text()
+        self.assertIn("- `.github/aw/squad.md`", skill)
+
+    def test_squad_bootstrap_requires_local_intent_and_preserves_existing_teams(self):
+        guide = normalized((ROOT / ".github/aw/squad.md").read_text().split("```text", 1)[0])
+        for required in (
+            "Substantial work or a mention of Squad alone is not enough",
+            "Keep explicit GitHub Actions automation requests on the workflow routes",
+            "establish local SDLC intent before including setup authorization",
+            "If Squad is already initialized, use the existing team",
+            "unless the user explicitly requests reinitialization",
+        ):
+            with self.subTest(guard=required):
+                self.assertIn(required, guide)
+
     def test_creator_discovers_memory_reuse_before_selecting_persistence(self):
         designer = (ROOT / ".github/aw/designer.md").read_text()
         phase = designer.split("### Phase 4: Data Strategy\n", 1)[1].split("\n### Phase 5:", 1)[0]
