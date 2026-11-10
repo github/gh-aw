@@ -106,7 +106,7 @@ func TestPiDurableSubagentsRemainEphemeral(t *testing.T) {
 func TestPiCompiledDisabledBash(t *testing.T) {
 	dir := t.TempDir()
 	source := filepath.Join(dir, "workflow.md")
-	content := "---\non: workflow_dispatch\nstrict: false\npermissions:\n  contents: read\nengine: pi\ntools:\n  bash: false\n  cli-proxy: false\n  edit: false\n---\n# Work\nReturn a short answer.\n"
+	content := "---\non: workflow_dispatch\nstrict: false\npermissions:\n  contents: read\nengine:\n  id: pi\n  model-routing: false\ntools:\n  bash: false\n  cli-proxy: false\n  edit: false\n---\n# Work\nReturn a short answer.\n"
 	require.NoError(t, os.WriteFile(source, []byte(content), 0600))
 	compiler := NewCompiler()
 	data, err := compiler.ParseWorkflowFile(source)

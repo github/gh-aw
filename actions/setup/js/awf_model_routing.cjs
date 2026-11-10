@@ -88,8 +88,8 @@ function mapAWFRoutingEffort(engine, effort) {
   if (engine === "copilot") return { effort, error: null };
   const supported = {
     claude: new Set(["low", "medium", "high", "xhigh", "max"]),
-    // Reviewed for the pinned Codex 0.166.0 (DefaultCodexVersion): its ReasoningEffort preserves all
-    // seven AWF routing-contract values unchanged (openai/codex rust-v0.166.0
+    // Reviewed for the pinned Codex 0.167.0 (DefaultCodexVersion): its ReasoningEffort preserves all
+    // seven AWF routing-contract values unchanged (openai/codex rust-v0.167.0
     // codex-rs/protocol/src/openai_models.rs). Although Codex also parses ultra, persistent, and
     // arbitrary non-empty values, they remain outside this routing contract.
     // Per-model eligibility is AWF's candidate catalogue, not this client-capability list.

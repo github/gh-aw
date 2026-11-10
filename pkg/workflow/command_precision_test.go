@@ -230,6 +230,10 @@ on:
   slash_command:
     name: test-bot
     events: [issue_comment]
+# The routing conversation step uses JavaScript trim(); keep this lock non-routed.
+engine:
+  id: copilot
+  model-routing: false
 tools:
   github:
     allowed: [list_issues]

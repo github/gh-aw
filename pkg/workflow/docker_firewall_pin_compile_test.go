@@ -18,7 +18,9 @@ func TestCompileWorkflow_FirewallImagesPinnedForAWF0270(t *testing.T) {
 
 	frontmatter := `---
 on: workflow_dispatch
-engine: copilot
+engine:
+  id: copilot
+  model-routing: false
 sandbox:
   agent:
     id: awf
