@@ -90,6 +90,15 @@ Do not use background sub-agents for this workflow. Run checks directly with she
 Run direct shell commands to compute `total_packages`, `packages_with_specs`,
 `coverage_pct`, `all_pkgs`, `has_spec`, and `missing_specs`. Use these values for all subsequent phases.
 
+Apply the repository's package-documentation policy when classifying packages:
+
+- Every production Go package under `pkg/` requires a package-root `README.md`, except the centralized linter packages below.
+- `pkg/linters/<analyzer>` packages are documented in the `Subpackages` table and rule catalog in `pkg/linters/README.md`. Count an analyzer as documented only when its package directory name and analyzer behavior are represented there; do not report the lack of a repeated leaf README as a missing specification.
+- Packages under `pkg/linters/internal/` are implementation helpers and are documented collectively in `pkg/linters/internal/README.md`. Verify that the table covers every production helper package; do not require a separate README for each helper.
+- Exclude `testdata` and generated fixture directories from the production package inventory.
+
+Keep `all_pkgs` as the complete production package inventory. Count the centralized linter packages as documented only after checking their parent specification; include them in `has_spec` and exclude them from `missing_specs`. Do not inflate README coverage by counting an incomplete parent table as a complete child specification.
+
 ## Phase 2: Staleness Detection
 
 Run direct shell commands for each package in `has_spec` to detect stale specifications with

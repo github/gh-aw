@@ -33,6 +33,7 @@ The package is intentionally large (~520 source files) because it encodes all Gi
 |--------|-----------|-------------|
 | `CompileWorkflow` | `func(*Compiler) CompileWorkflow(markdownPath string) error` | Compiles a markdown file and writes the `.lock.yml` |
 | `CompileWorkflowData` | `func(*Compiler) CompileWorkflowData(workflowData *WorkflowData, markdownPath string) error` | Compiles pre-parsed `WorkflowData` |
+| `ParseWorkflowDocument` | `func(*Compiler) ParseWorkflowDocument(document *aw.Document, virtualPath string) (*WorkflowData, error)` | Parses an authored AW document into workflow data for compilation |
 
 #### Compiler Options
 
@@ -631,10 +632,12 @@ Detects dangerous patterns in externally-sourced markdown files (e.g., from `gh 
 | Function | Signature | Description |
 |----------|-----------|-------------|
 | `ComputeGitHubAppManifestWebhookPermissions` | `func(onValue any) map[string]string` | Derives the GitHub App permissions required to receive the selected workflow webhook events. |
+| `DefaultModelRoutingBatchNotice` | `func(count int) string` | Formats the informational notice for workflows using the implicit model-routing default in batch compilation. |
 | `GenerateWorkQueueEventWorkflow` | `func(ctx context.Context, workflowDataList []*WorkflowData, workflowDir string, repoConfig *RepoConfig, noLogo ...bool) error` | Generates trusted Issue lifecycle handlers for work queue events. |
 | `GitHubCLIHost` | `func() string` | Returns the host used by `gh` helpers; an empty result allows `go-gh` to resolve the host. |
 | `InferGitHubAppTokenPermissionsFromShellScripts` | `func(scripts []string) (map[string]string, bool)` | Infers GitHub App token permissions for scripts containing only GitHub CLI read operations. |
 | `ParseWebhookSubscriptions` | `func(on any, workflowID string) ([]WebhookSubscription, error)` | Validates and normalizes webhook triggers without fetching or hydrating payload fields. |
+| `ParseExperimentMetricOutcomeReference` | `func(metric string) (string, bool)` | Returns the recognized outcome kind for an `outcome:` metric; reports a prefix match with an empty kind for an unknown outcome. |
 | `TransformExecutableShellContent` | `func(content string, transform func(string) string) (string, error)` | Applies a transformation to executable shell content while preserving recognized heredoc and comment boundaries. |
 | `ValidatePostStepsSafeOutputs` | `func(steps []any) error` | Checks user-provided post-steps for disallowed safe-output access. |
 | `WebhookCatalog` | `func() (map[string]WebhookEvent, error)` | Returns an independent copy of the embedded webhook event catalog. |
@@ -1672,6 +1675,10 @@ The following exported types were verified against source (`pkg/workflow/*.go`) 
 | `ParseStaleCheckMode` | `func ParseStaleCheckMode(frontmatter map[string]any) (disabled, full bool)` | Reads the `on` stale-check mode from frontmatter |
 | `ScanResourceSecurity` | `func ScanResourceSecurity(content []byte) []SecurityFinding` | Scans non-Markdown resources for Unicode obfuscation; returns nil for invalid UTF-8 |
 | `ValidateEnvironmentOverride` | `func ValidateEnvironmentOverride(name string) error` | Validates a literal Actions environment name; empty means no override |
+
+## Workflow Subpackages
+
+Subpackages have separate specifications for their package-level contracts: [`actions`](actions/README.md), [`actionslanguageservice`](actionslanguageservice/README.md), [`aw`](aw/README.md), [`cachepolicy`](cachepolicy/README.md), [`checkoutpolicy`](checkoutpolicy/README.md), [`codemod`](codemod/README.md), [`compilerenv`](compilerenv/README.md), [`gradershell`](gradershell/README.md), [`lint`](lint/README.md), [`shellpattern`](shellpattern/README.md), and [`taint`](taint/README.md).
 
 ## Source Synchronization
 
