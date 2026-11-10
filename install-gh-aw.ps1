@@ -125,6 +125,8 @@ $GitHubHeaders = @{
 if ($env:GH_TOKEN) {
     $GitHubHeaders.Authorization = ("Bearer " + $env:GH_TOKEN)
 }
+$AnonymousHeaders = $GitHubHeaders.Clone()
+$AnonymousHeaders.Remove("Authorization")
 
 function Compare-SemVerTags {
     param(
@@ -266,6 +268,16 @@ function Invoke-DownloadWithRetry {
             Write-WarningMessage "Download attempt $attempt failed. Retrying in ${delay}s..."
             Start-Sleep -Seconds $delay
             $delay *= 2
+        }
+    }
+
+    if ($env:GH_TOKEN) {
+        Write-WarningMessage "GitHub token was rejected; retrying binary download without authentication."
+        try {
+            Invoke-WebRequest -Uri $Url -Headers $AnonymousHeaders -OutFile $DestinationPath -TimeoutSec 120 | Out-Null
+            Write-Success "Binary downloaded successfully"
+            return $true
+        } catch {
         }
     }
 
@@ -421,6 +433,16 @@ if (-not $SkipChecksum) {
                 Write-WarningMessage "Checksum download attempt $attempt failed. Retrying in 2s..."
                 Start-Sleep -Seconds 2
             }
+        }
+    }
+
+    if (-not $checksumsDownloaded -and $env:GH_TOKEN) {
+        Write-WarningMessage "GitHub token was rejected; retrying checksums download without authentication."
+        try {
+            Invoke-WebRequest -Uri $ChecksumsURL -Headers $AnonymousHeaders -OutFile $ChecksumsPath -TimeoutSec 60 | Out-Null
+            $checksumsDownloaded = $true
+            Write-Success "Checksums file downloaded successfully"
+        } catch {
         }
     }
 
