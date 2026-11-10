@@ -68,7 +68,7 @@ describe("Pi managed delegation", () => {
     expect(registerTool).not.toHaveBeenCalled();
   });
 
-  it.each([null, [], { agent: "unknown", task: "Read." }, { agent: "reader", task: "   " }])("rejects malformed or undeclared invocation parameters: %j", async params => {
+  it.each([null, [], { agent: "unknown", task: "Read." }, { agent: "reader", task: "   " }, { agent: "reader", task: "Read.", command: "/tmp/attacker" }])("rejects malformed or undeclared invocation parameters: %j", async params => {
     fs.writeFileSync(path.join(dir, "subagents.json"), JSON.stringify([agent]));
     const registerTool = vi.fn();
     extension({ registerTool });
