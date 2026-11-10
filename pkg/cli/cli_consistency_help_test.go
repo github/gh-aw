@@ -120,6 +120,68 @@ func TestCLIDocsDocumentTimeoutFlagFormats(t *testing.T) {
 	assert.Equal(t, 2, strings.Count(text, "`--repos`, `--interactive/-i`, `--dry-run`"))
 }
 
+func TestCLIDocsDocumentCommandSideEffectsAndDefaults(t *testing.T) {
+	t.Parallel()
+	_, currentFile, _, ok := runtime.Caller(0)
+	require.True(t, ok, "should resolve current test file path")
+
+	docsPath := filepath.Join(filepath.Dir(currentFile), "..", "..", "docs", "src", "content", "docs", "setup", "cli.md")
+	content, err := os.ReadFile(docsPath)
+	require.NoError(t, err, "should read CLI setup docs")
+	text := string(content)
+
+	section := func(name, next string) string {
+		start := strings.Index(text, "#### `"+name+"`")
+		require.NotEqual(t, -1, start, "CLI setup docs should contain the %s section", name)
+		end := strings.Index(text[start:], "#### `"+next+"`")
+		require.NotEqual(t, -1, end, "CLI setup docs should contain the section after %s", name)
+		return strings.Join(strings.Fields(text[start:start+end]), " ")
+	}
+
+	fixDocs := section("fix", "format")
+	fixHelp := NewFixCommand().Long
+	assert.Contains(t, fixHelp, "deprecated .github/aw/schemas/agentic-workflow.json")
+	assert.Contains(t, fixHelp, "old template files")
+	assert.Contains(t, fixHelp, "old workflow-specific .agent.md files from .github/agents/")
+	assert.Contains(t, fixHelp, ".github/skills/agentic-workflows/SKILL.md")
+	assert.Contains(t, fixHelp, ".github/agents/agentic-workflows.md")
+	for _, path := range []string{
+		".github/aw/schemas/agentic-workflow.json",
+		"pkg/cli/templates/",
+		".github/agents/",
+		".github/skills/agentic-workflows/SKILL.md",
+		".github/agents/agentic-workflows.md",
+	} {
+		assert.Contains(t, fixDocs, path, "fix docs should describe --write changes to %s", path)
+	}
+	assert.Contains(t, fixDocs, "Without `--write`, no files are modified.")
+
+	trialDocs := section("trial", "run")
+	trialHelp := NewTrialCommand(func(string) error { return nil })
+	assert.Contains(t, trialHelp.Long, "retained by default")
+	assert.Contains(t, trialHelp.Flags().Lookup("delete-host-repo-after").Usage, "retained by default")
+	assert.Contains(t, trialDocs, "a newly created private host repository is retained after the trial")
+	assert.Contains(t, trialDocs, "`--delete-host-repo-after` to opt into deleting it")
+
+	listDocs := section("list", "status")
+	listHelp := NewListCommand()
+	assert.Contains(t, listHelp.Flags().Lookup("stale").Usage, "(local only)")
+	assert.Contains(t, listHelp.Flags().Lookup("path").Usage, "remote repository")
+	assert.Contains(t, listDocs, "Without `--repo`")
+	assert.Contains(t, listDocs, "without GitHub API queries")
+	assert.Contains(t, listDocs, "With `--repo`")
+	assert.Contains(t, listDocs, "remote workflows directory (default: `.github/workflows`)")
+	assert.Contains(t, listDocs, "The `--stale` filter is local-only")
+	assert.NotContains(t, listDocs, "`list` enumerates workflows locally without GitHub API queries.")
+
+	logsDocs := section("logs", "audit")
+	logsHelp := NewLogsCommand().Long
+	assert.Contains(t, logsHelp, "only the compact usage artifact is downloaded")
+	assert.Contains(t, logsDocs, "By default, only the compact usage")
+	assert.Contains(t, logsDocs, "`--artifacts agent`")
+	assert.Contains(t, logsDocs, "`--artifacts firewall`")
+}
+
 func TestSubcommandListingsUseHyphenBullets(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

@@ -369,6 +369,13 @@ gh aw fix --list-codemods              # List available codemods
 
 **Options:** `--dir/-d`, `--disable-codemod`, `--list-codemods`, `--write`
 
+Without `--write`, no files are modified. With `--write`, `fix` writes the updated
+workflow files, deletes the deprecated `.github/aw/schemas/agentic-workflow.json` and
+obsolete template files under `pkg/cli/templates/` when present, and removes old
+workflow-specific `.agent.md` files from `.github/agents/`. It also refreshes
+`.github/skills/agentic-workflows/SKILL.md` and `.github/agents/agentic-workflows.md`
+when they differ from the bundled templates.
+
 Use `--disable-codemod` (repeatable) to skip specific codemod IDs by name. Unlike the `--no-X` flags used elsewhere in the CLI (which toggle boolean options), `--disable-codemod` takes a codemod ID as its value and can be specified multiple times, so the `--no-codemod` pattern does not apply here.
 
 Available codemods include:
@@ -541,7 +548,7 @@ See [Workflow Linters](/gh-aw/reference/workflow-linters/) for the rule catalog 
 
 #### `trial`
 
-Test workflows in temporary private repositories (default) or run directly in specified repository (`--host-repo`). Results saved to `trials/`.
+Test workflows in private repositories or run directly in a specified repository (`--host-repo`). Results are saved to `trials/`.
 
 ```bash wrap
 gh aw trial githubnext/agentics/ci-doctor          # Test remote workflow
@@ -555,6 +562,9 @@ gh aw trial ./workflow.md --dry-run                # Preview without executing
 Unlike `run --repo/-r`, `trial` has no `--repo/-r`: `--logical-repo/-l` sets the simulated `github.repository` context, while `--host-repo` selects where the trial actually runs. `--json/-j` is available for trial output.
 
 `--timeout` sets the execution timeout in integer minutes (default: `30`; `0` disables the timeout). For example, use `--timeout 10`, not `--timeout 10m`.
+
+By default, a newly created private host repository is retained after the trial. Specify
+`--delete-host-repo-after` to opt into deleting it when the trial completes.
 
 **Secret Handling:** API keys required for the selected engine are automatically checked. If missing from the target repository, they are prompted for interactively and uploaded.
 
@@ -643,7 +653,10 @@ gh aw list --repo owner/repo --path .github/workflows  # List from a remote repo
 
 `--dir` (`-d`) overrides the local workflow directory and applies only when `--repo` is not set. `--path` specifies the workflow directory in a remote repository and is used with `--repo`.
 
-`list` enumerates workflows locally without GitHub API queries. For enabled/disabled state and run information, use `status` instead.
+Without `--repo`, `list` enumerates workflows from the local checkout without GitHub API
+queries. With `--repo`, it lists workflows from that remote repository; `--path` selects
+the remote workflows directory (default: `.github/workflows`). The `--stale` filter is
+local-only. For enabled/disabled state and run information, use `status` instead.
 
 For local workflows, `compiled` is `Yes` when the source frontmatter matches the generated `.lock.yml`, `No` when the hashes differ, and `N/A` when the lock file is missing. JSON output is a top-level array with one object per workflow and the same values in each object's `compiled` field. Use `--stale` to inspect only stale or missing lock files:
 
@@ -674,10 +687,15 @@ gh aw status --repo owner/other-repo        # Check different repository
 
 #### `logs`
 
-Download and analyze logs with tool usage, network patterns, errors, warnings. Results cached for 10-100x speedup on subsequent runs.
+Download and analyze workflow logs and artifacts. By default, only the compact usage
+artifact (token usage and run metadata) is downloaded. Use `--artifacts agent` for
+detailed agent data or `--artifacts firewall` for firewall and network data. Results are
+cached for 10-100x speedup on subsequent runs.
 
 ```bash wrap
 gh aw logs workflow                        # Download logs for workflow
+gh aw logs workflow --artifacts agent     # Include detailed agent data
+gh aw logs workflow --artifacts firewall  # Include firewall and network data
 gh aw logs -c 10 --start-date -1w         # Filter by count and date
 gh aw logs --ref main --parse --json      # With markdown/JSON output for branch
 ```
