@@ -13,14 +13,11 @@ permissions:
   pull-requests: read
   actions: read
   discussions: read
-  copilot-requests: write
 tracker-id: daily-fact-thread
+model: openai/gpt-5.6-terra
 engine:
   id: codex
-  model-provider: github
-  model-routing:
-    goal: cost
-    mode: economy
+  model-provider: openai
 strict: true
 experiments:
   reasoning_depth:
@@ -51,7 +48,7 @@ network:
 sandbox:
   agent:
     id: awf
-    runtime: docker
+    runtime: cloud-hypervisor
 tools:
   cli-proxy: true
   github:
