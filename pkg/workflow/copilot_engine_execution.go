@@ -626,9 +626,7 @@ func (e *CopilotEngine) addCopilotWorkflowStepEnv(env map[string]string, workflo
 	}
 	// Always add GH_AW_PROMPT for agentic workflows
 	env["GH_AW_PROMPT"] = constants.AwPromptsFile
-	if workflowData.EngineConfig != nil && workflowData.EngineConfig.ModelRouting != nil {
-		env["GH_AW_MODEL_ROUTING"] = "1"
-	}
+	applyModelRoutingEnv(env, workflowData)
 	applyModelAliasesEnv(env, workflowData)
 	// Tag the step as a GitHub AW agentic execution for discoverability by agents
 	env["GITHUB_AW"] = "true"
@@ -674,7 +672,7 @@ func (e *CopilotEngine) addCopilotGitHubToolEnv(env map[string]string, workflowD
 }
 
 func (e *CopilotEngine) addCopilotModelEnv(env map[string]string, workflowData *WorkflowData, modelConfigured bool, modelEnvVar string) {
-	if workflowData.EngineConfig != nil && workflowData.EngineConfig.ModelRouting != nil {
+	if isModelRoutingUnconditional(workflowData) {
 		return
 	}
 	// Set the model environment variable.
@@ -689,6 +687,7 @@ func (e *CopilotEngine) addCopilotModelEnv(env map[string]string, workflowData *
 		return
 	}
 	env[constants.CopilotCLIModelEnvVar] = compilerenv.BuildModelOverrideExpression(modelEnvVar, compilerenv.DefaultModelCopilot, constants.CopilotBYOKDefaultModel)
+	guardImplicitRoutingModelEnv(env, workflowData, constants.CopilotCLIModelEnvVar)
 }
 
 func (e *CopilotEngine) addCopilotFinalStepEnv(env map[string]string, workflowData *WorkflowData) {

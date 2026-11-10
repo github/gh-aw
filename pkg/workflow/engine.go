@@ -94,8 +94,11 @@ type EngineConfig struct {
 	Durable      *DurableConfig
 	durableError error
 
-	ModelRouting   *CopilotModelRoutingConfig
-	FallbackModels []string
+	ModelRouting *CopilotModelRoutingConfig
+	// ModelRoutingDisabled records an explicit `engine.model-routing: false`,
+	// which opts out of the implicit cost/balanced routing default.
+	ModelRoutingDisabled bool
+	FallbackModels       []string
 
 	// CopilotSDK enables the GitHub Copilot SDK integration.
 	// When true the compiler enables a harness-managed Copilot CLI headless sidecar
@@ -495,6 +498,11 @@ func applyReferencedEngineFields(config *EngineConfig, engineObj map[string]any,
 }
 
 func applyEngineModelRoutingField(config *EngineConfig, engineObj map[string]any) {
+	if disabled, ok := engineObj["model-routing"].(bool); ok && !disabled {
+		config.ModelRouting = nil
+		config.ModelRoutingDisabled = true
+		return
+	}
 	routing, ok := engineObj["model-routing"].(map[string]any)
 	if !ok {
 		return

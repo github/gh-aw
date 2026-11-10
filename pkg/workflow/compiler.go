@@ -661,6 +661,7 @@ func (c *Compiler) CompileWorkflowData(workflowData *WorkflowData, markdownPath 
 		}
 		return formatCompilerError(markdownPath, "error", "YAML generation: "+err.Error(), err)
 	}
+	c.reportDefaultModelRouting(workflowData, markdownPath)
 
 	// Enforce safe update mode: emit a warning prompt (not a hard error) when unapproved
 	// secrets or action changes are detected.  body* vars contain data collected from the

@@ -3,11 +3,19 @@
 package workflow
 
 import (
+	"encoding/json"
+	"maps"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 	"github.com/github/gh-aw/pkg/workflow/compilerenv"
+	"github.com/goccy/go-yaml"
+	"github.com/stretchr/testify/require"
 )
 
 // TestModelEnvVarInjectionForAgentJob tests that agent jobs get the correct model environment variable
@@ -742,5 +750,173 @@ func TestCodexModelFlagPositionAfterExec(t *testing.T) {
 		t.Errorf("'codex exec' must appear before the model flag '%s' in the generated command.\n"+
 			"This indicates the model flag is placed before 'exec', causing Codex to ignore it.\n"+
 			"Got:\n%s", modelPattern, stepsContent)
+	}
+}
+
+// evaluateTestExpression evaluates the subset of Actions expressions the model
+// routing guards use: string literals, context references, groups, ==, !=, &&, ||.
+func evaluateTestExpression(t *testing.T, expr *actionslanguageservice.Expression, contexts map[string]string) string {
+	t.Helper()
+	switch expr.Kind {
+	case "literal":
+		value, _ := expr.Token.Value.(string)
+		return value
+	case "group":
+		return evaluateTestExpression(t, expr.Child(0), contexts)
+	case "context", "index":
+		path, ok := actionslanguageservice.Reference(expr)
+		require.True(t, ok, "unsupported reference")
+		return contexts[strings.Join(path, ".")]
+	case "binary":
+		left := evaluateTestExpression(t, expr.Child(0), contexts)
+		right := evaluateTestExpression(t, expr.Child(1), contexts)
+		equal := strings.EqualFold(left, right)
+		if expr.Token.Kind == "!=" {
+			equal = !equal
+		}
+		if equal {
+			return "true"
+		}
+		return ""
+	case "logical":
+		var value string
+		for _, child := range expr.Children {
+			value = evaluateTestExpression(t, child, contexts)
+			if (expr.Token.Kind == "&&") == (value == "") {
+				return value
+			}
+		}
+		return value
+	}
+	t.Fatalf("unsupported expression kind %q", expr.Kind)
+	return ""
+}
+
+// evaluateTestTemplate substitutes every ${{ }} interpolation in value.
+func evaluateTestTemplate(t *testing.T, value string, contexts map[string]string) string {
+	t.Helper()
+	for {
+		start := strings.Index(value, "${{")
+		if start < 0 {
+			return value
+		}
+		end := strings.Index(value[start:], "}}")
+		require.Positive(t, end)
+		expr, err := actionslanguageservice.ParseSyntax(strings.TrimSpace(value[start+3 : start+end]))
+		require.NoError(t, err)
+		value = value[:start] + evaluateTestExpression(t, expr, contexts) + value[start+end+2:]
+	}
+}
+
+// TestDefaultModelRoutingActivationHonorsModelVariables runs the generated
+// activation decision step with stubbed Actions variables and evaluates the
+// downstream guarded model env, routing flag, conversation-step condition, and
+// AWF config branch, proving the runtime precedence is resolved before AWF starts.
+func TestDefaultModelRoutingActivationHonorsModelVariables(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash is required")
+	}
+	compiled := compileDefaultRoutingSource(t, "---\non: workflow_dispatch\npermissions:\n  contents: read\nengine: copilot\n---\nReport.\n")
+	require.NoError(t, compiled.err)
+
+	type step struct {
+		Name string            `yaml:"name"`
+		ID   string            `yaml:"id"`
+		If   string            `yaml:"if"`
+		Run  string            `yaml:"run"`
+		Env  map[string]string `yaml:"env"`
+	}
+	var lock struct {
+		Jobs map[string]struct {
+			Outputs map[string]string `yaml:"outputs"`
+			Steps   []step            `yaml:"steps"`
+		} `yaml:"jobs"`
+	}
+	require.NoError(t, yaml.Unmarshal([]byte(compiled.lock), &lock))
+	var decision, info, conversation, execution *step
+	for i, s := range lock.Jobs["activation"].Steps {
+		switch {
+		case s.ID == modelRoutingDecisionStepID:
+			decision = &lock.Jobs["activation"].Steps[i]
+		case s.Env["GH_AW_INFO_MODEL_CONFIG"] != "":
+			info = &lock.Jobs["activation"].Steps[i]
+		}
+	}
+	for i, s := range lock.Jobs["agent"].Steps {
+		switch {
+		case s.Name == "Prepare model-routing conversation":
+			conversation = &lock.Jobs["agent"].Steps[i]
+		case strings.Contains(s.Run, `awf --config "${RUNNER_TEMP}/gh-aw/awf-config.json"`):
+			execution = &lock.Jobs["agent"].Steps[i]
+		}
+	}
+	require.NotNil(t, decision, "activation decision step")
+	require.NotNil(t, info, "aw_info step")
+	require.NotNil(t, conversation, "conversation step")
+	require.NotNil(t, execution, "AWF execution step")
+	require.Equal(t, "${{ steps."+modelRoutingDecisionStepID+".outputs."+modelRoutingDecisionOutput+" }}", lock.Jobs["activation"].Outputs[modelRoutingDecisionOutput])
+
+	configStart := strings.Index(execution.Run, `if [ "${GH_AW_MODEL_ROUTING:-}" = "1" ]; then`)
+	require.GreaterOrEqual(t, configStart, 0)
+	configEnd := strings.Index(execution.Run[configStart:], "\nfi\n")
+	require.Positive(t, configEnd)
+	configScript := execution.Run[configStart : configStart+configEnd+4]
+
+	for _, tc := range []struct {
+		name, agentVar, defaultVar string
+		wantRouting                bool
+		wantModel                  string
+	}{
+		{name: "neither variable", wantRouting: true},
+		{name: "agent variable", agentVar: "gpt-5.6-luna", wantModel: "gpt-5.6-luna"},
+		{name: "default variable", defaultVar: "claude-sonnet-5.5", wantModel: "claude-sonnet-5.5"},
+		{name: "both variables, agent wins", agentVar: "gpt-5.6-luna", defaultVar: "claude-sonnet-5.5", wantModel: "gpt-5.6-luna"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			vars := map[string]string{
+				"vars." + constants.EnvVarModelAgentCopilot: tc.agentVar,
+				"vars." + compilerenv.DefaultModelCopilot:   tc.defaultVar,
+			}
+			dir := t.TempDir()
+			outputFile := filepath.Join(dir, "output")
+			cmd := exec.Command("bash", "-e", "-c", decision.Run)
+			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "GITHUB_OUTPUT=" + outputFile}
+			for key, value := range decision.Env {
+				cmd.Env = append(cmd.Env, key+"="+evaluateTestTemplate(t, value, vars))
+			}
+			out, err := cmd.CombinedOutput()
+			require.NoError(t, err, string(out))
+			outputs, err := os.ReadFile(outputFile)
+			require.NoError(t, err)
+			decisionValue := strings.TrimPrefix(strings.TrimSpace(string(outputs)), modelRoutingDecisionOutput+"=")
+			require.Equal(t, map[bool]string{true: "true", false: "false"}[tc.wantRouting], decisionValue)
+
+			activationContexts := map[string]string{"steps." + modelRoutingDecisionStepID + ".outputs." + modelRoutingDecisionOutput: decisionValue}
+			var modelConfig map[string]any
+			require.NoError(t, json.Unmarshal([]byte(evaluateTestTemplate(t, info.Env["GH_AW_INFO_MODEL_CONFIG"], activationContexts)), &modelConfig))
+			require.Equal(t, tc.wantRouting, modelConfig["routing"].(map[string]any)["enabled"])
+
+			downstream := map[string]string{"needs.activation.outputs." + modelRoutingDecisionOutput: decisionValue}
+			maps.Copy(downstream, vars)
+			require.Equal(t, tc.wantRouting, evaluateTestTemplate(t, "${{ "+conversation.If+" }}", downstream) != "", "conversation step runs only when routed")
+			require.Equal(t, tc.wantModel, evaluateTestTemplate(t, execution.Env["COPILOT_MODEL"], downstream))
+			routingFlag := evaluateTestTemplate(t, execution.Env["GH_AW_MODEL_ROUTING"], downstream)
+			require.Equal(t, tc.wantRouting, routingFlag == "1")
+
+			runnerTemp := filepath.Join(dir, "runner")
+			require.NoError(t, os.MkdirAll(filepath.Join(runnerTemp, "gh-aw"), 0o755))
+			cmd = exec.Command("bash", "-e", "-c", configScript)
+			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "RUNNER_TEMP=" + runnerTemp, "GH_AW_MODEL_ROUTING=" + routingFlag, "GH_AW_MAX_AI_CREDITS=0"}
+			out, err = cmd.CombinedOutput()
+			require.NoError(t, err, string(out))
+			configJSON, err := os.ReadFile(filepath.Join(runnerTemp, "gh-aw", "awf-config.json"))
+			require.NoError(t, err)
+			var awfConfig map[string]any
+			require.NoError(t, json.Unmarshal(configJSON, &awfConfig))
+			_, routed := awfConfig["apiProxy"].(map[string]any)["routing"]
+			require.Equal(t, tc.wantRouting, routed, "AWF config routing must follow the activation decision")
+			_, experimental := awfConfig["experimental"]
+			require.Equal(t, tc.wantRouting, experimental)
+		})
 	}
 }

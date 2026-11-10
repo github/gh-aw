@@ -56,6 +56,9 @@ func BuildAWFCommand(config AWFCommandConfig) string {
 		awfHelpersLog.Printf("Warning: failed to build AWF config JSON: %v", err)
 	} else {
 		configFileSetup = buildAWFConfigFileSetup(config, awfConfigJSON)
+		if isModelRoutingRuntimeGuarded(config.WorkflowData) {
+			configFileSetup = buildGuardedAWFConfigFileSetup(config, awfConfigJSON)
+		}
 		expandableArgs = fmt.Sprintf("--config %q ", awfConfigRuntimePathExpr) + expandableArgs
 		awfHelpersLog.Print("Using AWF config file (--config flag)")
 	}
@@ -263,7 +266,34 @@ func appendArcDindMountSettings(expandableArgs, arcDindDockerHostProbe string, i
 func buildAWFConfigFileSetup(config AWFCommandConfig, awfConfigJSON string) string {
 	maxAICreditsExportLine, updatedAWFConfigJSON := buildMaxAICreditsExport(config, awfConfigJSON)
 	printfArg := buildAWFConfigPrintfArg(updatedAWFConfigJSON, maxAICreditsExportLine != "")
-	configFileSetup := buildConfigFilePrintfLine(printfArg)
+	return finishAWFConfigFileSetup(config, maxAICreditsExportLine, buildConfigFilePrintfLine(printfArg))
+}
+
+// buildGuardedAWFConfigFileSetup writes the routed AWF config when the activation
+// job selected the implicit routing default (GH_AW_MODEL_ROUTING=1), and otherwise
+// the non-routed config, so AWF never starts the router for a bypassed run.
+func buildGuardedAWFConfigFileSetup(config AWFCommandConfig, routedJSON string) string {
+	plainConfig := config
+	plainConfig.WorkflowData = withoutModelRouting(config.WorkflowData)
+	plainJSON, err := BuildAWFConfigJSON(plainConfig)
+	if err != nil {
+		awfHelpersLog.Printf("Warning: failed to build non-routed AWF config JSON: %v", err)
+		return buildAWFConfigFileSetup(config, routedJSON)
+	}
+	maxAICreditsExportLine, updatedRoutedJSON := buildMaxAICreditsExport(config, routedJSON)
+	_, updatedPlainJSON := buildMaxAICreditsExport(plainConfig, plainJSON)
+	hasExport := maxAICreditsExportLine != ""
+	printfLines := strings.Join([]string{
+		`if [ "${GH_AW_MODEL_ROUTING:-}" = "1" ]; then`,
+		buildConfigFilePrintfLine(buildAWFConfigPrintfArg(updatedRoutedJSON, hasExport)),
+		"else",
+		buildConfigFilePrintfLine(buildAWFConfigPrintfArg(updatedPlainJSON, hasExport)),
+		"fi",
+	}, "\n")
+	return finishAWFConfigFileSetup(config, maxAICreditsExportLine, printfLines)
+}
+
+func finishAWFConfigFileSetup(config AWFCommandConfig, maxAICreditsExportLine, configFileSetup string) string {
 	if maxAICreditsExportLine != "" {
 		configFileSetup = maxAICreditsExportLine + "\n" + configFileSetup
 	}

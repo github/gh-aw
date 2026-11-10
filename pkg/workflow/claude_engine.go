@@ -383,7 +383,7 @@ func (e *ClaudeEngine) buildClaudeCommandString(workflowData *WorkflowData, clau
 	// via shell expansion so users can set a default via GitHub Actions variables.
 	// When model IS configured, ANTHROPIC_MODEL is set in the env block and the Claude CLI
 	// reads it natively — no --model flag in the shell command needed.
-	if !modelConfigured && !isModelRoutingEnabled(workflowData) {
+	if !modelConfigured && !isModelRoutingUnconditional(workflowData) {
 		isDetectionJob := isDetectionRun(workflowData)
 		var modelEnvVar string
 		if workflowRunPhase(workflowData) == runPhaseEvals {
@@ -519,8 +519,9 @@ func (e *ClaudeEngine) buildClaudeCommandEnv(workflowData *WorkflowData) map[str
 	applyOptionalEngineToolTimeouts(env, workflowData)
 	applyEngineMaxTurnsEnv(env, workflowData)
 	applyEngineHarnessRetryEnv(env, workflowData)
-	if !isModelRoutingEnabled(workflowData) {
+	if !isModelRoutingUnconditional(workflowData) {
 		applyClaudeModelEnvVars(env, workflowData)
+		guardImplicitRoutingModelEnv(env, workflowData, constants.EnvVarModelAgentClaude)
 	}
 	applyEngineCwdEnv(env, workflowData)
 	applyEngineAndAgentEnv(env, workflowData, claudeLog)
