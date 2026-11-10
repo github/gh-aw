@@ -216,6 +216,7 @@ bench:
 # Uses time-based -benchtime (not a fixed low iteration count) so that results are
 # averaged over many iterations and are far less sensitive to shared CI runner noise.
 .PHONY: bench-performance
+bench-performance: SHELL := /bin/bash -eu -o pipefail
 bench-performance:
 	@echo "Running critical performance benchmarks..."
 	@echo "This includes: CompileSimpleWorkflow, CompileComplexWorkflow, CompileMCPWorkflow,"
