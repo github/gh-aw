@@ -78,7 +78,7 @@ const DefaultGitHubMCPServerVersion Version = "v2.1.0"
 //
 // The first recompile regenerates all lock files using the new version; the second recompile
 // refreshes the container SHA pins that were resolved during the first pass.
-const DefaultFirewallVersion Version = "v0.29.10"
+const DefaultFirewallVersion Version = "v0.29.11"
 
 // AWFDockerEnclaveSetupMinVersion includes the sealed Copilot native runtime and
 // the maintained public Docker enclave diagnostic collector.
@@ -270,7 +270,7 @@ const CopilotNoAskUserMinVersion Version = "1.0.19"
 //
 // The first recompile regenerates all lock files using the new version; the second recompile
 // refreshes the container SHA pins that were resolved during the first pass.
-const DefaultMCPGatewayVersion Version = "v0.5.4"
+const DefaultMCPGatewayVersion Version = "v0.5.6"
 
 // MCPGIntegrityReactionsMinVersion is the minimum MCPG version that supports
 // endorsement-reactions and disapproval-reactions in the allow-only policy.
