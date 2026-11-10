@@ -4,6 +4,20 @@ description: Hourly, budgeted collection of newly completed agentic failures and
 intent: Reduce recurring agentic workflow failures without duplicating work already under review.
 on:
   schedule: hourly
+  workflow_dispatch:
+    inputs:
+      recovery_cache_key:
+        description: Exact restored auditor-collection cache key from the failed collection log
+        type: string
+        default: ""
+      recovery_checkpoint:
+        description: Exact checkpoint timestamp from that cache's checkpoint.json
+        type: string
+        default: ""
+      acknowledge_gap:
+        description: Accept uncollected history from that checkpoint until this recovery starts (no backfill)
+        type: boolean
+        default: false
 permissions:
   contents: read
   actions: read
@@ -43,7 +57,7 @@ if: github.event_name == 'schedule' && needs.collect.outputs.has_new_failures ==
 jobs:
   collect:
     name: Collect failure evidence
-    if: github.event_name == 'schedule'
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.ref_name == github.event.repository.default_branch && inputs.acknowledge_gap == true)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -62,6 +76,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Restore collection checkpoint and query cache
+        id: restore_checkpoint
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/auditor-cache
@@ -75,6 +90,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CACHE_DIR: ${{ runner.temp }}/auditor-cache
           DATA_DIR: ${{ runner.temp }}/auditor-data
+          RECOVERY_REQUESTED: ${{ github.event_name == 'workflow_dispatch' }}
+          ACKNOWLEDGE_GAP: ${{ inputs.acknowledge_gap }}
+          RECOVERY_CHECKPOINT: ${{ inputs.recovery_checkpoint }}
+          RECOVERY_CACHE_KEY: ${{ inputs.recovery_cache_key }}
+          RESTORED_CACHE_KEY: ${{ steps.restore_checkpoint.outputs.cache-matched-key }}
         with:
           retries: 0
           script: |
@@ -102,8 +122,52 @@ jobs:
               throw new Error('Invalid collection checkpoint; refusing to reset it silently');
             }
             core.setOutput('has_new_failures', 'false');
+            if (process.env.RECOVERY_REQUESTED === 'true') {
+              const matchedKey = process.env.RESTORED_CACHE_KEY;
+              if (bootstrap || process.env.ACKNOWLEDGE_GAP !== 'true' ||
+                  !matchedKey || process.env.RECOVERY_CACHE_KEY !== matchedKey ||
+                  process.env.RECOVERY_CHECKPOINT !== state.checkpoint ||
+                  Date.parse(end) - Date.parse(state.checkpoint) <= 86400000) {
+                throw new Error('Recovery requires explicit gap acceptance matching the restored cache key and stale checkpoint; checkpoint unchanged');
+              }
+              // Keep a reconstructable, immutable snapshot before ordinary retention
+              // can remove old identities or overwrite versioned query reports.
+              const recoveryID = crypto.createHash('sha256')
+                .update(JSON.stringify([matchedKey, state.checkpoint, end])).digest('hex');
+              const archive = path.join(cache, 'recoveries', recoveryID);
+              fs.mkdirSync(archive, {recursive: true});
+              for (const item of state.backlog) {
+                const relative = item.report_file;
+                if (typeof relative !== 'string' || !relative.startsWith('queries/') ||
+                    path.relative(cache, path.resolve(cache, relative)) !== relative ||
+                    path.dirname(relative) === 'queries') {
+                  throw new Error('Invalid recovery evidence path; checkpoint unchanged');
+                }
+                const directory = path.dirname(relative);
+                if (!fs.statSync(path.join(cache, relative)).isFile()) {
+                  throw new Error('Missing recovery evidence; checkpoint unchanged');
+                }
+                fs.cpSync(path.join(cache, directory), path.join(archive, directory), {recursive: true});
+              }
+              fs.copyFileSync(stateFile, path.join(archive, 'checkpoint.json'));
+              const recovery = {
+                kind: 'acknowledged_gap', restored_cache_key: matchedKey,
+                gap_start: state.checkpoint, gap_end: end,
+                acknowledged_by: context.actor, run_id: context.runId,
+                archive: path.relative(cache, archive), historical_coverage: false
+              };
+              write(path.join(archive, 'recovery.json'), recovery);
+              write(path.join(data, 'recovery.json'), recovery);
+              await core.summary.addRaw(`Explicitly acknowledged an uncollected historical gap from ` +
+                `${state.checkpoint} to ${end}. Original state and referenced query evidence archived in ` +
+                `${recovery.archive}. No health discovery, backfill, or agent activation performed. ` +
+                'Recovery is durable only if the cache save succeeds.').write();
+              write(stateFile, {...state, checkpoint: end,
+                recoveries: [...(state.recoveries || []), recovery]});
+              return;
+            }
             if (Date.parse(end) - Date.parse(state.checkpoint) > 86400000) {
-              throw new Error('Collection checkpoint gap exceeds 24 hours; refusing to reset it silently');
+              throw new Error('Collection checkpoint gap exceeds 24 hours; refusing to reset it silently. Explicit operator recovery is documented in auditor.md');
             }
             const retentionStart = new Date(Date.parse(end) - 86400000).toISOString();
             let requests = 0;
@@ -123,7 +187,11 @@ jobs:
                 (discovery.partial === false &&
                   (discovery.failure_listing_complete !== true || discovery.failure_pass_complete !== true)) ||
                 (discovery.potential_issues !== undefined && !Array.isArray(discovery.potential_issues))) {
-              throw new Error('Incomplete or invalid health discovery; checkpoint unchanged');
+              throw new Error(`Incomplete or invalid health discovery; checkpoint unchanged ` +
+                `(partial=${discovery?.partial}, reason=${discovery?.reason}, ` +
+                `failure_listing_complete=${discovery?.failure_listing_complete}, ` +
+                `failure_pass_complete=${discovery?.failure_pass_complete}, ` +
+                `workflows_array=${Array.isArray(health.workflows)})`);
             }
             // Health is a bounded current-revision sample, not an all-run census.
             // Only verified representatives can activate collection, even when
@@ -481,9 +549,8 @@ If no safe, novel, evidenced fix is available, call `noop` with a concise reason
 
 ## Usage and collection limits
 
-Runs hourly on the default branch. The compiler adds a manual dispatch trigger,
-but both collection and agent jobs require the scheduled event, so manual
-dispatch cannot activate this auditor. Each invocation uses `gh aw health --json`
+Runs hourly on the default branch. Manual dispatch is recovery-only on the
+default branch and cannot activate the agent. Each scheduled invocation uses `gh aw health --json`
 over runs created in the preceding 24 hours, selecting only revision-checked
 failure representatives from registered agentic workflows. Superseded, jobless,
 unverified, intentional and auditor failures never activate collection.
@@ -498,6 +565,39 @@ Fail closed at 1,000 selected metadata runs, 1,025 metadata requests, ten PR
 pages, incomplete evidence results, or exhausted API reserve.
 Process at most 25 new failures FIFO per hour; excess candidates are checkpointed,
 never marked seen, and proceed next hour even without newly created failures.
+
+### Explicit stale-checkpoint recovery
+
+Do not delete the cache, change its namespace, or reset the checkpoint to make a
+failed collection green. If historical backfill is required, stop: this recovery
+path does **not** implement it. Health's current-revision sample cannot establish
+historical coverage.
+
+An operator who explicitly accepts the missing history may manually dispatch
+the default-branch workflow with `acknowledge_gap: true`, `recovery_cache_key`
+equal to the exact restored key shown in the failed collection log, and
+`recovery_checkpoint` equal to the exact timestamp in that cache's
+`checkpoint.json`. Acceptance covers that checkpoint through recovery startup;
+the receipt records both timestamps, actor, run ID and source cache key. Missing,
+mismatched, already-recovered, or non-stale checkpoints are rejected. The default
+unchecked input does nothing; scheduled runs never acknowledge gaps.
+
+Recovery performs no health/log/audit queries and always leaves
+`has_new_failures` false. Before advancing, it copies the original checkpoint
+byte-for-byte and every backlog-referenced query directory (including cached
+JSONL and downloaded evidence) under `recoveries/<receipt-id>/` in the same cache.
+The active state's `seen`, `backlog`, and `pending` remain unchanged; its
+`recoveries` receipts and their archives survive subsequent ordinary pruning.
+Archive report paths are relative to the archived checkpoint's directory; any
+absolute paths embedded in reports are historical runner paths. The compact
+artifact contains only the recovery receipt, not the historical evidence.
+
+Only a successful cache save persists recovery. Verify that save before treating
+it as durable; GitHub cache expiry/eviction still applies to all cached evidence.
+The next hourly collection resumes the existing bounded 24-hour health sample,
+not a census or validation of the accepted gap. Health errors still fail closed;
+the error now reports completeness flags and the partial reason to distinguish
+schema incompatibility from time/API budgets without accepting partial failures.
 Backlog retention uses a separate now-minus-24-hours boundary, regardless of discovery
 start. Rankings cover retained sampled failures updated in that period plus this batch;
 do not activate the agent while failures remain unprocessed. Refresh retained

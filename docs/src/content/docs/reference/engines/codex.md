@@ -7,9 +7,21 @@ For first-time setup, see [Using OpenAI Codex](/gh-aw/engines/codex/). Shared op
 
 ## Selection and authentication
 
-Use `engine: codex` with `CODEX_API_KEY` or `OPENAI_API_KEY`. ChatGPT subscription login is unsupported. The default CLI pin is `0.167.0`; override it with `engine.version`.
+Use `engine: codex` with `CODEX_API_KEY`, `OPENAI_API_KEY`, or [OpenAI Workload Identity Federation](#openai-workload-identity-federation). [GitHub Copilot inference](#github-copilot-inference) uses separate GitHub authentication. ChatGPT subscription login is unsupported. The default CLI pin is `0.167.0`; override it with `engine.version`.
 
 Codex has no default model. Set `model` explicitly or configure the repository's model-selection variables; see [model selection](/gh-aw/reference/model-tables/).
+
+## OpenAI Workload Identity Federation
+
+With `engine.auth.type: github-oidc` and `engine.auth.provider: openai`, the AWF API proxy exchanges a GitHub Actions OIDC token for an OpenAI service-account access token. Codex inference does not require `CODEX_API_KEY` or `OPENAI_API_KEY`; the OIDC and OpenAI credentials remain outside the agent container.
+
+This mode requires the OpenAI inference provider, `permissions.id-token: write`, and an enabled AWF sandbox at `v0.29.11` or newer. `sandbox.agent: false` is unsupported. Explicit AWF versions and API-proxy image tags must use a full semantic version at or above that minimum; tags such as `latest` or `stable` do not establish WIF support. `engine.version` selects the Codex CLI, not AWF.
+
+The proxy reaches `auth.openai.com` through its dedicated egress path. Neither that host nor the `codex-vendor` network opt-in is required in `network.allowed` for WIF. Startup refuses to launch Codex unless fresh AWF reflection confirms the configured OpenAI WIF endpoint.
+
+Codex threat detection inherits the main Codex engine's authentication when no detector-specific auth is set, including when a same-engine detector override is present. The generated detection job receives `id-token: write`. The separate [evals job](/gh-aw/experimental/experiments/#analyze-an-eval-backed-metric) does not inherit WIF and still requires `CODEX_API_KEY` or `OPENAI_API_KEY` for OpenAI models.
+
+See [Codex OpenAI Workload Identity Federation](/gh-aw/reference/auth/#codex-openai-workload-identity-federation) for provider setup, required fields, and a workflow example.
 
 ## GitHub Copilot inference
 
