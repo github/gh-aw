@@ -78,17 +78,20 @@ $pwsh = (Get-Command pwsh).Source
 $ordinary = Invoke-CliProcess -FilePath $pwsh -ArgumentList @("-NoProfile", "-Command", "Write-Output 'ordinary-exit-marker'; [Console]::Error.WriteLine('ordinary-stderr-marker')") -PostExitDrainTimeoutMs 1000
 if ($ordinary.ExitCode -ne 0 -or $ordinary.Output -notmatch "ordinary-exit-marker" -or $ordinary.Output -notmatch "ordinary-stderr-marker") { throw "Ordinary process exit lost output or exit status" }
 
+$large = Invoke-CliProcess -FilePath $pwsh -ArgumentList @("-NoProfile", "-Command", "[Console]::Out.Write(('o' * 8MB)); [Console]::Error.Write(('e' * 8MB))") -TimeoutMs 15000
+if ($large.ExitCode -ne 0 -or $large.Output -cne (('o' * 8MB) + "`n" + ('e' * 8MB))) { throw "Large process output was truncated or corrupted" }
+
 $watch = [System.Diagnostics.Stopwatch]::StartNew()
 $processTimeoutRejected = $false
 try {
-  Invoke-CliProcess -FilePath $pwsh -ArgumentList @("-NoProfile", "-Command", "Write-Output 'process-timeout-marker'; Start-Sleep -Seconds 30") -TimeoutMs 500 | Out-Null
+  Invoke-CliProcess -FilePath $pwsh -ArgumentList @("-NoProfile", "-Command", "Write-Output 'process-timeout-marker'; Start-Sleep -Seconds 30") -TimeoutMs 10000 | Out-Null
 } catch {
   $message = $_.Exception.ToString()
-  if ($message -notmatch "TIMEOUT:.*$([regex]::Escape($pwsh))" -or $message -notmatch "elapsed \d+ms" -or $message -notmatch "process-timeout-marker") { throw }
+  if ($message -notmatch "TIMEOUT:.*$([regex]::Escape($pwsh))" -or $message -notmatch "elapsed \d+ms" -or $message -notmatch "Captured output:\r?\nprocess-timeout-marker") { throw }
   $processTimeoutRejected = $true
 }
 if (-not $processTimeoutRejected) { throw "CLI process timeout was swallowed" }
-if ($watch.ElapsedMilliseconds -gt 5000) { throw "CLI process timeout cleanup exceeded its budget" }
+if ($watch.ElapsedMilliseconds -gt 15000) { throw "CLI process timeout cleanup exceeded its budget" }
 
 $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "gh-aw-cli-drain-$([guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Path $tempDir | Out-Null
@@ -122,7 +125,7 @@ try {
 }
 if (-not $drainTimeoutRejected) { throw "Post-exit output drain timeout was swallowed" }
 if ($watch.ElapsedMilliseconds -gt 5000) { throw "Post-exit output drain cleanup exceeded its budget" }
-Write-Output "CLI subprocess regression checks passed: ordinary exit, bounded process timeout, and bounded post-exit drain with partial output"
+Write-Output "CLI subprocess regression checks passed: ordinary exit, large output, bounded process timeout, and bounded post-exit drain with partial output"
 
 $dllInitFailurePattern = '(?i)(-1073741502|0xC0000142|STATUS_DLL_INIT_FAILED)'
 if (-not $workflow.Contains($dllInitFailurePattern)) { throw "ConPTY DLL-init handling differs from the hosted smoke probe" }

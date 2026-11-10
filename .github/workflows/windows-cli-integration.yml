@@ -159,7 +159,8 @@ jobs:
               $processCleanupWatch = $null
               $drainWatch = $null
               while ($true) {
-                if (-not $stdoutDone -and $stdoutRead.IsCompleted) {
+                # Bound each batch so busy streams cannot starve timeout checks or each other.
+                for ($reads = 0; $reads -lt 64 -and -not $stdoutDone -and $stdoutRead.IsCompleted; $reads++) {
                   $readCount = $stdoutRead.GetAwaiter().GetResult()
                   if ($readCount -eq 0) {
                     $stdoutDone = $true
@@ -168,7 +169,7 @@ jobs:
                     $stdoutRead = $proc.StandardOutput.ReadAsync($stdoutChars, 0, $stdoutChars.Length)
                   }
                 }
-                if (-not $stderrDone -and $stderrRead.IsCompleted) {
+                for ($reads = 0; $reads -lt 64 -and -not $stderrDone -and $stderrRead.IsCompleted; $reads++) {
                   $readCount = $stderrRead.GetAwaiter().GetResult()
                   if ($readCount -eq 0) {
                     $stderrDone = $true
@@ -196,7 +197,9 @@ jobs:
                 if ($processExited -and $stdoutDone -and $stderrDone) { break }
                 if ($processExited -and $drainWatch.ElapsedMilliseconds -ge $PostExitDrainTimeoutMs) { break }
                 if ($processTimedOut -and -not $processExited -and $processCleanupWatch.ElapsedMilliseconds -ge 1000) { break }
-                Start-Sleep -Milliseconds 10
+                if (-not ((-not $stdoutDone -and $stdoutRead.IsCompleted) -or (-not $stderrDone -and $stderrRead.IsCompleted))) {
+                  Start-Sleep -Milliseconds 10
+                }
               }
 
               $stdout = $stdoutBuffer.ToString()
