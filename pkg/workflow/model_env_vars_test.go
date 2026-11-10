@@ -4,6 +4,7 @@ package workflow
 
 import (
 	"encoding/json"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -896,9 +897,7 @@ func TestDefaultModelRoutingActivationHonorsModelVariables(t *testing.T) {
 			require.Equal(t, tc.wantRouting, modelConfig["routing"].(map[string]any)["enabled"])
 
 			downstream := map[string]string{"needs.activation.outputs." + modelRoutingDecisionOutput: decisionValue}
-			for key, value := range vars {
-				downstream[key] = value
-			}
+			maps.Copy(downstream, vars)
 			require.Equal(t, tc.wantRouting, evaluateTestTemplate(t, "${{ "+conversation.If+" }}", downstream) != "", "conversation step runs only when routed")
 			require.Equal(t, tc.wantModel, evaluateTestTemplate(t, execution.Env["COPILOT_MODEL"], downstream))
 			routingFlag := evaluateTestTemplate(t, execution.Env["GH_AW_MODEL_ROUTING"], downstream)
