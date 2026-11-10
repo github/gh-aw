@@ -9,7 +9,7 @@
     "@actions/io": "^3.0.2",
     "@github/copilot-sdk": "^1.0.28",
     "@types/node": "26.6.6",
-    "@vitest/coverage-v8": "^5.0.5",
+    "@vitest/coverage-v8": "^5.1.0",
     "@vitest/ui": "^5.0.5",
     "ajv": "^8.17.1",
     "commonmark": "0.31.2",
