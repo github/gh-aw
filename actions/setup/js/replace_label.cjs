@@ -216,12 +216,12 @@ const main = createCountGatedHandler({
       if (requiredLabels.length > 0) {
         const itemLabels = (item.labels || []).map(/** @param {any} l */ l => (typeof l === "string" ? l : l.name || ""));
         if (!requiredLabels.every(r => itemLabels.includes(r))) {
-          core.info(`Skipping replace_label for ${contextType} #${itemNumber}: does not match required-labels filter (${requiredLabels.join(", ")})`);
+          core.warning(`Skipping replace_label for ${contextType} #${itemNumber}: does not match required-labels filter (${requiredLabels.join(", ")})`);
           return { success: false, skipped: true, error: "Item does not match required-labels filter" };
         }
       }
       if (requiredTitlePrefix && !item.title?.startsWith(requiredTitlePrefix)) {
-        core.info(`Skipping replace_label for ${contextType} #${itemNumber}: title does not start with required prefix "${requiredTitlePrefix}"`);
+        core.warning(`Skipping replace_label for ${contextType} #${itemNumber}: title does not start with required prefix "${requiredTitlePrefix}"`);
         return { success: false, skipped: true, error: "Item title does not start with required prefix" };
       }
 

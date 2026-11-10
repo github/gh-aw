@@ -125,6 +125,46 @@ func TestDetectionJobPermissionsIndentation(t *testing.T) {
 			wantNotContains: []string{},
 		},
 		{
+			name: "complete OpenAI OIDC environment adds id-token permission",
+			data: &WorkflowData{
+				Name: "test-workflow",
+				AI:   "codex",
+				EngineConfig: &EngineConfig{
+					ID: "codex",
+					Env: map[string]string{
+						"AWF_AUTH_TYPE":                        "github-oidc",
+						"AWF_AUTH_PROVIDER":                    "openai",
+						"AWF_AUTH_OPENAI_IDENTITY_PROVIDER_ID": "idp",
+						"AWF_AUTH_OPENAI_SERVICE_ACCOUNT_ID":   "service-account",
+						"AWF_AUTH_OIDC_AUDIENCE":               "https://api.openai.com/v1",
+					},
+				},
+				NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}},
+				SafeOutputs: &SafeOutputsConfig{
+					ThreatDetection: &ThreatDetectionConfig{},
+				},
+			},
+			wantContains: []string{"      id-token: write"},
+		},
+		{
+			name: "unvalidated OIDC environment does not grant id-token permission",
+			data: &WorkflowData{
+				Name: "test-workflow",
+				AI:   "codex",
+				EngineConfig: &EngineConfig{
+					ID: "codex",
+					Env: map[string]string{
+						"AWF_AUTH_TYPE":     "github-oidc",
+						"AWF_AUTH_PROVIDER": "openai",
+					},
+				},
+				SafeOutputs: &SafeOutputsConfig{
+					ThreatDetection: &ThreatDetectionConfig{},
+				},
+			},
+			wantNotContains: []string{"id-token: write"},
+		},
+		{
 			name: "observability.otlp.github-app auth adds id-token: write to detection job",
 			data: &WorkflowData{
 				Name: "test-workflow",

@@ -98,7 +98,7 @@ jobs:
             echo "Model routing disabled: vars.GH_AW_DEFAULT_MODEL_COPILOT selects the model"
             echo "model-routing=false" >> "$GITHUB_OUTPUT"
           else
-            echo "Model routing enabled: goal cost, mode balanced"
+            echo "Model routing enabled: goal cost, mode auto"
             echo "model-routing=true" >> "$GITHUB_OUTPUT"
           fi
       - name: Generate agentic run info
@@ -122,7 +122,7 @@ jobs:
           GH_AW_INFO_FIREWALL_TYPE: "squid"
           GH_AW_INFO_AGENT_RUNTIME: ""
           GH_AW_INFO_ENGINE_HARNESS: "copilot-cli"
-          GH_AW_INFO_MODEL_CONFIG: '${{ steps.resolve-model-routing.outputs.model-routing == ''true'' && ''{"routing":{"enabled":true,"goal":"cost","mode":"balanced"},"models":{"allowed":[],"blocked":[]},"max_ai_credits_source":"default"}'' || ''{"routing":{"enabled":false},"models":{"allowed":[],"blocked":[]},"max_ai_credits_source":"default"}'' }}'
+          GH_AW_INFO_MODEL_CONFIG: '${{ steps.resolve-model-routing.outputs.model-routing == ''true'' && ''{"routing":{"enabled":true,"goal":"cost","mode":"auto"},"models":{"allowed":[],"blocked":[]},"max_ai_credits_source":"default"}'' || ''{"routing":{"enabled":false},"models":{"allowed":[],"blocked":[]},"max_ai_credits_source":"default"}'' }}'
           GH_AW_INFO_MAX_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_AI_CREDITS || '1000' }}
           GH_AW_COMPILED_STRICT: "true"
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -265,7 +265,7 @@ jobs:
             <system>
           GH_AW_PROMPT_CONTENT_0001: |
             <safe-output-tools>
-            Tools: report_missing_tool, report_missing_data, noop(max:2), publish_report
+            Tools: report_missing_tool, report_missing_data, report_incomplete, noop(max:2), publish_report
           GH_AW_PROMPT_CONTENT_0002: |
             </safe-output-tools>
           GH_AW_PROMPT_CONTENT_0003: |+

@@ -16,6 +16,7 @@ permissions:
 network:
   allowed:
   - defaults
+  - go
 imports:
 - shared/lock-safe-pull-request.md
 - shared/otlp.md
@@ -33,10 +34,18 @@ safe-outputs:
     title-prefix: "[ab-advisor] "
 description: Daily A/B testing advisor that selects a workflow without experiments and implements a validated experiment campaign pull request
 emoji: 🧪
-model: openai/gpt-6.1-sol
 engine:
   id: codex
-  model-provider: openai
+  env:
+    GOCACHE: /tmp/gh-aw/agent/go-build-cache
+    GOMODCACHE: /tmp/gh-aw/agent/go-mod-cache
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: balanced
+steps:
+  - name: Provision disposable Go validation caches
+    run: mkdir -p /tmp/gh-aw/agent/go-build-cache /tmp/gh-aw/agent/go-mod-cache
 strict: true
 timeout-minutes: 30
 tools:
@@ -73,6 +82,14 @@ You are an **ultimate expert in A/B testing for software systems** with extensiv
 - Instrumentation, observability, and audit trail requirements for reproducible experiments
 
 Your mission today has two parts: **Primary quest** and **Side quest**.
+
+## Prepare the Compiler
+
+Use the disposable Go build and module caches provisioned by this workflow through `GOCACHE` and `GOMODCACHE`; do not read pre-existing caches or inspect the process environment.
+
+Before discovery, run `make build` in the workspace to build the checked-out compiler, then run `./gh-aw version`. Use `./gh-aw compile` for workflow validation rather than assuming a `gh aw` extension is installed. The provisioned caches are also available for the required `make recompile` and final `make agent-report-progress` validation gates.
+
+If the build or validation fails, call `report_incomplete` with the concrete failure; do not install an alternative compiler, bypass validation, or publish an unvalidated campaign.
 
 ## Primary Quest: Design an Experiment Campaign
 

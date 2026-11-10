@@ -376,38 +376,95 @@ def run_case(java, jar, results, name, fault="none", profile="sparse",
 
 
 def check_sources(compiler, results):
-    command = [str(compiler.resolve()), "compile",
-               str(ROOT / "fixtures" / "cross-repo.md"),
-               str(results / "agent-write" / "source.md"),
-               "--no-emit", "--approve", "--json"]
-    try:
-        result = subprocess.run(command, capture_output=True, text=True, timeout=120)
-    except subprocess.TimeoutExpired as error:
-        raise RuntimeError("Source compilation exceeded 120 seconds") from error
-    (results / "source-compilation.log").write_text(result.stdout + result.stderr)
-    try:
-        reports = json.loads(result.stdout)
-        if not isinstance(reports, list) or len(reports) != 2:
-            raise RuntimeError("Expected two compiler reports")
-        by_name = {report["workflow"]: report for report in reports}
-        rejected = by_name["source.md"]
-        messages = " ".join(error["message"] for error in rejected["errors"])
-        if (result.returncode != 1 or not by_name["cross-repo.md"]["valid"]
-                or rejected["valid"]
-                or "strict mode: write permission 'contents: write' is not allowed" not in messages):
-            raise RuntimeError("Source seed must compile; strict write-grant mutation must be rejected")
-    except (ValueError, KeyError, TypeError) as error:
-        raise RuntimeError("Malformed compiler JSON; see source-compilation.log") from error
-    version = subprocess.run([str(compiler.resolve()), "version"],
-                             capture_output=True, text=True, timeout=30, check=True)
-    (results / "source-compilation.json").write_text(json.dumps(
-        {"command": command, "compiler_version": version.stdout.strip(),
-         "compiler_sha256": hashlib.sha256(compiler.read_bytes()).hexdigest(),
-         "seed_sha256": hashlib.sha256((ROOT / "fixtures" / "cross-repo.md").read_bytes()).hexdigest(),
-         "mutation_sha256": hashlib.sha256((results / "agent-write" / "source.md").read_bytes()).hexdigest(),
-         "reports": reports}, indent=2
-    ) + "\n")
-    print("Source seed compiled; concrete agent-write source rejected by strict compiler.")
+    seed_path = ROOT / "fixtures" / "cross-repo.md"
+    seed = seed_path.read_text()
+    compilations = []
+    with tempfile.TemporaryDirectory(prefix=".check-cross-repo-", dir=ROOT) as temp_dir:
+        compile_source = Path(temp_dir) / "cross-repo.md"
+        compile_source.write_text(seed)
+        mutation_source = Path(temp_dir) / "source.md"
+        mutation_source.write_text((results / "agent-write" / "source.md").read_text())
+
+        command = [str(compiler.resolve()), "compile", str(compile_source), str(mutation_source),
+                   "--no-emit", "--approve", "--json", "--no-check-update"]
+        try:
+            result = subprocess.run(command, capture_output=True, text=True, timeout=120)
+        except subprocess.TimeoutExpired as error:
+            raise RuntimeError("Source compilation exceeded 120 seconds") from error
+        (results / "source-compilation.log").write_text(result.stdout + result.stderr)
+        compilations.append({"command": command, "returncode": result.returncode})
+        try:
+            reports = json.loads(result.stdout)
+            if not isinstance(reports, list) or len(reports) != 2:
+                raise RuntimeError("Expected two compiler reports")
+            by_name = {report["workflow"]: report for report in reports}
+            rejected = by_name["source.md"]
+            messages = " ".join(error["message"] for error in rejected["errors"])
+            if (result.returncode != 1 or not by_name["cross-repo.md"]["valid"]
+                    or rejected["valid"]
+                    or "strict mode: write permission 'contents: write' is not allowed" not in messages):
+                raise RuntimeError("Source seed must compile; strict write-grant mutation must be rejected")
+        except (ValueError, KeyError, TypeError) as error:
+            raise RuntimeError("Malformed compiler JSON; see source-compilation.log") from error
+
+        lock_command = [str(compiler.resolve()), "compile", str(compile_source),
+                        "--action-mode", "dev", "--approve", "--no-check-update"]
+        compile_result = subprocess.run(
+            lock_command,
+            capture_output=True, text=True, timeout=120
+        )
+        (results / "source-compilation-lock.log").write_text(
+            compile_result.stdout + compile_result.stderr
+        )
+        compilations.append({"command": lock_command, "returncode": compile_result.returncode})
+        version = subprocess.run([str(compiler.resolve()), "version"],
+                                 capture_output=True, text=True, timeout=30, check=True)
+        (results / "source-compilation.json").write_text(json.dumps(
+            {"compilations": compilations, "compiler_version": version.stdout.strip(),
+             "compiler_sha256": hashlib.sha256(compiler.read_bytes()).hexdigest(),
+             "seed_sha256": hashlib.sha256(seed_path.read_bytes()).hexdigest(),
+             "mutation_sha256": hashlib.sha256(
+                 (results / "agent-write" / "source.md").read_bytes()
+             ).hexdigest(),
+             "reports": reports}, indent=2
+        ) + "\n")
+        lock_path = compile_source.with_suffix(".lock.yml")
+        if compile_result.returncode != 0 or not lock_path.is_file():
+            raise RuntimeError(
+                "Cross-repo fixture did not emit a compile-only lock; "
+                f"see compiler output: {compile_result.stdout}{compile_result.stderr}"
+            )
+        lock_contents = lock_path.read_text()
+        expected_lock_properties = [
+            'GH_AW_CHECKOUT_MANIFEST_COUNT: "2"',
+            'GH_AW_CHECKOUT_REPO_0: "github/gh-aw"',
+            'GH_AW_CHECKOUT_REPO_1: "example/private-dependency"',
+            "GH_AW_CHECKOUT_TOKEN_1: ${{ secrets.MODEL_DEPENDENCY_READ_TOKEN }}",
+            "client-id: ${{ vars.MODEL_APP_ID }}",
+            "private-key: ${{ secrets.MODEL_APP_PRIVATE_KEY }}",
+            "repositories: gh-aw",
+            "create_issue",
+        ]
+        if any(property_text not in lock_contents for property_text in expected_lock_properties):
+            raise RuntimeError("Cross-repo lock does not match the expected checkout/app properties")
+        app_token_count = len(re.findall(
+            r"(?m)^[ \t]+uses: actions/create-github-app-token@", lock_contents
+        ))
+        if app_token_count != 2:
+            raise RuntimeError(
+                f"Cross-repo lock has {app_token_count} GitHub App token steps; expected 2"
+            )
+        for property_text in [
+            "client-id: ${{ vars.MODEL_APP_ID }}",
+            "private-key: ${{ secrets.MODEL_APP_PRIVATE_KEY }}",
+        ]:
+            if lock_contents.count(property_text) != app_token_count:
+                raise RuntimeError(
+                    f"Cross-repo lock does not wire {property_text} to every App token step"
+                )
+
+    print("Source seed compiled; emitted lock has two checkouts and two GitHub App token steps; "
+          "strict agent-write mutation rejected.")
 
 
 def check_mcp_compile(java, jar, results):

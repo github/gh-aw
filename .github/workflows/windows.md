@@ -28,7 +28,7 @@ concurrency:
 
 runs-on: windows-latest
 
-model: copilot/gpt-5.6-terra
+model: copilot/gpt-6-luna
 engine:
   id: codex
   model-provider: github

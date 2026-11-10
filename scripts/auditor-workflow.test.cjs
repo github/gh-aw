@@ -625,11 +625,12 @@ test("health removes previously collected superseded failures from the backlog",
   assert.equal(f.outputs.has_new_failures, "false");
 });
 
-test("native exclusion and no-dispatch policy are explicit", () => {
+test("native exclusion and recovery-only dispatch policy are explicit", () => {
   assert.match(workflow, /excluded-files:\n\s+- "\*\*\/\*\.lock\.yml"/);
-  assert.doesNotMatch(workflow, /ignore-files:|workflow_dispatch:/);
+  assert.doesNotMatch(workflow, /ignore-files:/);
+  assert.match(workflow, /workflow_dispatch:\n\s+inputs:/);
   assert.match(workflow, /if: github\.event_name == 'schedule' && needs\.collect\.outputs\.has_new_failures == 'true'/);
   assert.match(workflow, /github-token-for-extra-empty-commit: none/);
-  assert.match(workflow, /name: Collect failure evidence\n\s+if: github\.event_name == 'schedule'/);
+  assert.match(workflow, /name: Collect failure evidence\n\s+if: github\.event_name == 'schedule' \|\| \(github\.event_name == 'workflow_dispatch'.*inputs\.acknowledge_gap == true\)/);
   assert.match(workflow, /tools:\n\s+bash: \["\*"\]\n\s+edit:/);
 });

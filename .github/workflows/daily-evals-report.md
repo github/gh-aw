@@ -10,9 +10,12 @@ permissions:
   issues: read
   pull-requests: read
 max-daily-ai-credits: 3000
-model: copilot/gpt-5.6-sol
 engine:
   id: codex
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
 tracker-id: daily-evals-report
 sandbox:
   agent:

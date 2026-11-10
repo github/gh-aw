@@ -80,7 +80,7 @@ func TestCompilerLintRetainedMultiRepoCheckouts(t *testing.T) {
 	require.Contains(t, block, "token: ${{ secrets.ONE_TOKEN }}")
 	require.Contains(t, block, "token: ${{ secrets.TWO_TOKEN }}")
 	require.NotContains(t, block, "persist-credentials: false")
-	block, err := finalizeRunnerTempSafety(renderStepForRunner(block, compiler.formatFrameworkJobRunsOn(data)))
+	block, err := finalizeRunnerTempSafety(renderStepForRunner(block, compiler.formatFrameworkJobRunsOn(data), "safe_outputs"))
 	require.NoError(t, err)
 	graph, err := actions.Parse([]byte("jobs:\n  safe_outputs:\n    runs-on: ubuntu-latest\n    steps:\n" + block))
 	require.NoError(t, err)

@@ -7,9 +7,21 @@ For first-time setup, see [Using OpenAI Codex](/gh-aw/engines/codex/). Shared op
 
 ## Selection and authentication
 
-Use `engine: codex` with `CODEX_API_KEY` or `OPENAI_API_KEY`. ChatGPT subscription login is unsupported. The default CLI pin is `0.167.0`; override it with `engine.version`.
+Use `engine: codex` with `CODEX_API_KEY`, `OPENAI_API_KEY`, or [OpenAI Workload Identity Federation](#openai-workload-identity-federation). [GitHub Copilot inference](#github-copilot-inference) uses separate GitHub authentication. ChatGPT subscription login is unsupported. The default CLI pin is `0.167.0`; override it with `engine.version`.
 
 Codex has no default model. Set `model` explicitly or configure the repository's model-selection variables; see [model selection](/gh-aw/reference/model-tables/).
+
+## OpenAI Workload Identity Federation
+
+With `engine.auth.type: github-oidc` and `engine.auth.provider: openai`, the AWF API proxy exchanges a GitHub Actions OIDC token for an OpenAI service-account access token. Codex inference does not require `CODEX_API_KEY` or `OPENAI_API_KEY`; the OIDC and OpenAI credentials remain outside the agent container.
+
+This mode requires the OpenAI inference provider, `permissions.id-token: write`, and an enabled AWF sandbox at `v0.29.11` or newer. `sandbox.agent: false` is unsupported. Explicit AWF versions and API-proxy image tags must use a full semantic version at or above that minimum; tags such as `latest` or `stable` do not establish WIF support. `engine.version` selects the Codex CLI, not AWF.
+
+The proxy reaches `auth.openai.com` through its dedicated egress path. Neither that host nor the `codex-vendor` network opt-in is required in `network.allowed` for WIF. Startup refuses to launch Codex unless fresh AWF reflection confirms the configured OpenAI WIF endpoint.
+
+Codex threat detection inherits the main Codex engine's authentication when no detector-specific auth is set, including when a same-engine detector override is present. The generated detection job receives `id-token: write`. The separate [evals job](/gh-aw/experimental/experiments/#analyze-an-eval-backed-metric) does not inherit WIF and still requires `CODEX_API_KEY` or `OPENAI_API_KEY` for OpenAI models.
+
+See [Codex OpenAI Workload Identity Federation](/gh-aw/reference/auth/#codex-openai-workload-identity-federation) for provider setup, required fields, and a workflow example.
 
 ## GitHub Copilot inference
 
@@ -31,7 +43,7 @@ To authenticate:
 
 GitHub inference requires the AWF sandbox. Do not set `sandbox.agent: false` for this provider. For a model supplied through an expression or repository variable, set `engine.model-provider: github` explicitly; runtime model prefixes do not change the selected credentials.
 
-With `engine.model-provider: github` and no `model`, `engine.model`, or `engine.model-routing`, the main agent uses [model routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model) with `goal: cost` and `mode: balanced`, limited to GPT models. A nonempty `GH_AW_MODEL_AGENT_CODEX` or `GH_AW_DEFAULT_MODEL_CODEX` variable bypasses routing at run time; `engine.model-routing: false` opts out. The native OpenAI route isn't routed by default.
+With `engine.model-provider: github` and no `model`, `engine.model`, or `engine.model-routing`, the main agent uses [model routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model) with `goal: cost` and `mode: auto`, limited to GPT models. A nonempty `GH_AW_MODEL_AGENT_CODEX` or `GH_AW_DEFAULT_MODEL_CODEX` variable bypasses routing at run time; `engine.model-routing: false` opts out. The native OpenAI route isn't routed by default.
 
 GitHub inference uses direct function-backed `exec_command` for native shell execution unless `tools.bash: false`. JavaScript code mode is disabled because the compatibility adapter does not support its custom `exec` tool. gh-aw generates a direct-tool catalog from the installed binary's bundled metadata; MCP and `apply_patch` remain available. The binary must support `debug models --bundled`. `engine.config` cannot re-enable code mode or replace the managed catalog. OpenAI inference is unchanged.
 

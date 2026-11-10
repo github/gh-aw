@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -112,7 +112,7 @@ func (jm *JobManager) AddJob(job *Job) error {
 	jm.jobs[job.Name] = job
 	jm.jobOrder = append(jm.jobOrder, job.Name)
 	// Keep jobOrder sorted alphabetically after each addition
-	sort.Strings(jm.jobOrder)
+	slices.Sort(jm.jobOrder)
 	return nil
 }
 
@@ -218,7 +218,7 @@ func (jm *JobManager) WriteJobsYAML(b *strings.Builder) {
 		if strings.TrimSpace(strings.TrimPrefix(job.RunsOn, "runs-on:")) == "windows-latest" {
 			var jobYAML strings.Builder
 			jm.renderJobTo(&jobYAML, job)
-			b.WriteString(renderStepForRunner(jobYAML.String(), job.RunsOn))
+			b.WriteString(renderStepForRunner(jobYAML.String(), job.RunsOn, job.Name))
 			continue
 		}
 		jm.renderJobTo(b, job)
@@ -247,7 +247,7 @@ func (jm *JobManager) renderJobTo(b *strings.Builder, job *Job) {
 			// Sort needs for consistent output
 			sortedNeeds := make([]string, len(job.Needs))
 			copy(sortedNeeds, job.Needs)
-			sort.Strings(sortedNeeds)
+			slices.Sort(sortedNeeds)
 			for _, dep := range sortedNeeds {
 				fmt.Fprintf(b, "      - %s\n", dep) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 			}
