@@ -1156,8 +1156,107 @@ describe("native queue launch fencing and conservative recovery", () => {
       message: { type: "work_queue_dispatch_next", intent_id: "unresolved-is-failure", pool: "default", max_claims: 1, max_dispatches: 1 },
     });
     expect(result).toMatchObject({ success: false, launches: [expect.objectContaining({ state: "launch_unresolved" })] });
-    expect([...fixture.state.dispatches.values()][0]).toMatchObject({ state: "uncertain", reason: "post_response_unconfirmed", released: false });
+    expect([...fixture.state.dispatches.values()][0]).toMatchObject({ state: "unresolved", reason: "launch_unresolved", released: false });
     expect(post).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([true, false])("recovers a launched worker after an ambiguous POST with server response=%s without resending or cancelling", async responsePresent => {
+    const { fixture, options, post } = setup({ count: 1 });
+    const failure = Object.assign(new Error("private-provider-body"), {
+      status: 500,
+      request: { method: "POST", headers: { authorization: "private-token" } },
+      ...(responsePresent ? { response: { status: 500, headers: { "x-github-request-id": "1740:C9190:43FAC07:E0FA988:6AF1935A" } } } : {}),
+    });
+    post.mockRejectedValue(failure);
+    fixture.githubClient.rest.actions.listWorkflowRuns.mockResolvedValue({ status: 200, data: { workflow_runs: [fixture.nativeRun()] } });
+    fixture.githubClient.rest.actions.cancelWorkflowRun = vi.fn();
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    try {
+      expect(await launchAssignment({ ...options, requestCancellation: true }, fixture.assignment)).toMatchObject({ state: "bound", run_id: "42", released: false, dispatched: true });
+      expect(fixture.state.dispatches.get(fixture.assignment.dispatch_id)).toMatchObject({ run: fixture.binding, released: false });
+      expect([...fixture.state.claims.values()][0].state).toBe("open");
+      expect(await launchAssignment(options, fixture.assignment)).toMatchObject({ state: "bound", dispatched: false });
+      expect(post).toHaveBeenCalledTimes(1);
+      expect(fixture.githubClient.rest.actions.cancelWorkflowRun).not.toHaveBeenCalled();
+      const output = stderr.mock.calls.map(([text]) => text).join("");
+      expect(output).toContain(responsePresent ? "queue_control_github_api_unavailable=true" : "queue_control_github_transport_failed=true");
+      expect(output).toContain("launch.recovery.start uncertain_marker_persisted=true resend_allowed=false");
+      expect(output).toMatch(/launch.recovery.complete elapsed_ms=\d+ recovered=true bound=true released=false conflict=false resend_allowed=false/);
+      expect(output).not.toMatch(/private-provider-body|private-token|stored task/);
+      expect(output).not.toContain(fixture.assignment.dispatch_id);
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
+  it.each(["missing", "unavailable", "conflicting"])("keeps an ambiguous POST fenced when recovery evidence is %s", async evidence => {
+    const { fixture, options, post } = setup({ count: 1, configurePolicy: policy => (policy.pools.default.reconciliation.max_attempts = 2) });
+    post.mockRejectedValue({ status: 500, response: { status: 500, headers: {} } });
+    const discovery = fixture.githubClient.rest.actions.listWorkflowRuns;
+    if (evidence === "unavailable") discovery.mockRejectedValue(new Error("private-discovery-failure"));
+    if (evidence === "conflicting") discovery.mockResolvedValue({ status: 200, data: { workflow_runs: [fixture.nativeRun(), { ...fixture.nativeRun(), id: "43" }] } });
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    try {
+      const result = await launchAssignment(options, fixture.assignment);
+      expect(result).toMatchObject({ state: evidence === "conflicting" ? "run_binding_conflict" : "launch_unresolved", released: false, dispatched: true });
+      expect(discovery).toHaveBeenCalledTimes(evidence === "conflicting" ? 1 : 2);
+      expect(fixture.state.dispatches.get(fixture.assignment.dispatch_id)).toMatchObject({ released: false });
+      expect(fixture.state.dispatches.get(fixture.assignment.dispatch_id).run).toBeUndefined();
+      expect([...fixture.state.claims.values()][0].state).toBe("open");
+      await launchAssignment(options, fixture.assignment);
+      expect(post).toHaveBeenCalledTimes(1);
+      const output = stderr.mock.calls.map(([text]) => text).join("");
+      expect(output).toMatch(/launch.recovery.complete elapsed_ms=\d+ recovered=false bound=false released=false/);
+      expect(output).not.toContain("private-discovery-failure");
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
+  it("recovers a concurrent worker binding even when the uncertain marker cannot be published", async () => {
+    const { fixture, options, post } = setup({ count: 1 });
+    post.mockImplementationOnce(async () => {
+      await activate(fixture, options);
+      throw { status: 500, response: { status: 500, headers: {} } };
+    });
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    try {
+      expect(await launchAssignment(options, fixture.assignment)).toMatchObject({ state: "bound", run_id: "42", released: false, dispatched: true });
+      expect(fixture.state.dispatches.get(fixture.assignment.dispatch_id)).toMatchObject({ state: "bound", run: fixture.binding, released: false });
+      expect(fixture.githubClient.rest.actions.listWorkflowRuns).not.toHaveBeenCalled();
+      expect(post).toHaveBeenCalledTimes(1);
+      const output = stderr.mock.calls.map(([text]) => text).join("");
+      expect(output).toContain("launch.uncertain_marker.failed");
+      expect(output).toContain("launch.recovery.start uncertain_marker_persisted=false resend_allowed=false");
+      expect(output).toMatch(/launch.recovery.complete .*recovered=true bound=true/);
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
+  it("reports failed recovery reads and retains the durable start fence", async () => {
+    const { fixture, options, post } = setup({ count: 1 });
+    post.mockImplementationOnce(async () => {
+      const unavailable = async () => {
+        throw new Error("private-ledger-failure");
+      };
+      options.readWorkQueueLog = unavailable;
+      options.publishWorkQueueRequest = unavailable;
+      throw { status: 500, response: { status: 500, headers: {} } };
+    });
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    try {
+      expect(await launchAssignment(options, fixture.assignment)).toMatchObject({ state: "launch_unresolved", released: false, dispatched: true });
+      expect(fixture.state.dispatches.get(fixture.assignment.dispatch_id)).toMatchObject({ state: "started", released: false });
+      expect(post).toHaveBeenCalledTimes(1);
+      const output = stderr.mock.calls.map(([text]) => text).join("");
+      expect(output).toContain("launch.uncertain_marker.failed");
+      expect(output).toContain("launch.recovery.failed");
+      expect(output).toContain("launch.unresolved reservation_retained=true resend_allowed=false");
+      expect(output).not.toContain("private-ledger-failure");
+    } finally {
+      stderr.mockRestore();
+    }
   });
 
   it("separates a later-attempt dispatcher origin from the approved native launch principal", async () => {
