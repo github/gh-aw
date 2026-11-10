@@ -186,6 +186,7 @@ For the full dependency-license/compliance review pattern (paths scoping, licens
 | Experiments and A/B testing | [experiments.md](experiments.md) |
 | Charts and Python data visualization | [charts.md](charts.md) |
 | LLM API endpoint discovery | [llms.md](llms.md) |
+| Local SDLC issue bootstrap | [squad.md](squad.md) |
 
 ## Compile Commands
 
