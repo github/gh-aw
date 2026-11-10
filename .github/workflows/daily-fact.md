@@ -51,7 +51,7 @@ network:
 sandbox:
   agent:
     id: awf
-    runtime: cloud-hypervisor
+    runtime: docker
 tools:
   cli-proxy: true
   github:
