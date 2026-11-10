@@ -814,6 +814,40 @@ engine: copilot
       }
     });
 
+    it("should use the local fallback when a listed import API read transiently returns HTTP 404", async () => {
+      const { computeFrontmatterHash } = require("./frontmatter_hash_pure.cjs");
+      const content = "---\nengine: copilot\nimports:\n  - shared/test.md\n---\n# Test";
+      const importContent = "---\ntools:\n  bash: true\n---\nImported body";
+      fs.mkdirSync(path.join(workflowsDir, "shared"));
+      fs.writeFileSync(path.join(workflowsDir, "test.md"), content);
+      fs.writeFileSync(path.join(workflowsDir, "shared", "test.md"), importContent);
+      const sourcePath = path.join(workflowsDir, "test.md");
+      const hash = await computeFrontmatterHash(sourcePath);
+      const lockContent = `# frontmatter-hash: ${hash}\n`;
+      fs.writeFileSync(path.join(workflowsDir, "test.lock.yml"), lockContent);
+      process.env.GITHUB_WORKSPACE = tmpDir;
+      let importReads = 0;
+      mockGithub.rest.repos.getContent.mockImplementation(async ({ path: filePath }) => {
+        if (filePath.endsWith(".lock.yml")) return { data: { type: "file", content: Buffer.from(lockContent).toString("base64"), encoding: "base64" } };
+        if (filePath === ".github/workflows/test.md") return { data: { content: Buffer.from(content).toString("base64"), encoding: "base64" } };
+        if (filePath === ".github/workflows/shared/test.md") {
+          importReads++;
+          if (importReads === 1) throw Object.assign(new Error("Not Found"), { status: 404 });
+          return { data: { content: Buffer.from(importContent).toString("base64"), encoding: "base64" } };
+        }
+        throw Object.assign(new Error("Not Found"), { status: 404 });
+      });
+
+      await main();
+
+      expect(importReads).toBe(1);
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("(HTTP 404)"));
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Frontmatter hash comparison (local filesystem fallback):"));
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("✅ Lock file is up to date"));
+      expect(mockCore.info).not.toHaveBeenCalledWith(expect.stringContaining("Hashes differ"));
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+
     it.each([404, 200])("should preserve missing-import and edited-import behavior (HTTP %s)", async status => {
       const { computeFrontmatterHash } = require("./frontmatter_hash_pure.cjs");
       const content = "---\nengine: copilot\nimports:\n  - shared/test.md\n---\n# Test";
@@ -827,12 +861,13 @@ engine: copilot
         else throw Object.assign(new Error("Not Found"), { status: 404 });
         return { data: { type: "file", content: Buffer.from(text).toString("base64"), encoding: "base64" } };
       });
+      process.env.GITHUB_WORKSPACE = tmpDir;
 
       await main();
 
       if (status === 404) {
-        expect(mockCore.setFailed).not.toHaveBeenCalled();
-        expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("✅ Lock file is up to date"));
+        expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("HTTP 404"));
+        expect(mockCore.info).not.toHaveBeenCalledWith(expect.stringContaining("Hashes differ"));
       } else {
         expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("frontmatter hash mismatch"));
         expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Hashes differ"));

@@ -42,6 +42,13 @@ function isFileNotFound(error) {
   return error.cause ? isFileNotFound(error.cause) : false;
 }
 
+function isHttpNotFound(error) {
+  if (!error) return false;
+  const status = error.status || error.response?.status;
+  if (status !== undefined) return status === HTTP_STATUS_NOT_FOUND;
+  return error.cause ? isHttpNotFound(error.cause) : false;
+}
+
 /**
  * Parses a boolean flag from frontmatter text using simple text scanning.
  * Matches lines of the form "key: true" or "key: false" at the top level.
@@ -248,7 +255,7 @@ async function processImportsTextBased(frontmatterText, baseDir, visited = new S
       importedFiles.push(...nestedResult.importedFiles);
       importedFrontmatterTexts.push(...nestedResult.importedFrontmatterTexts);
     } catch (err) {
-      if (!isFileNotFound(err)) throw err;
+      if (!isFileNotFound(err) || isHttpNotFound(err)) throw err;
       onMissingImport?.(fullPath, /** @type {Error} */ err);
       continue;
     }
@@ -688,7 +695,7 @@ async function collectImportedBodies(frontmatterText, baseDir, visited = new Set
       const nestedBodies = await collectImportedBodies(importFrontmatterText, importBaseDir, visited, fileReader, rootDir);
       importedBodyTexts.push(...nestedBodies);
     } catch (err) {
-      if (!isFileNotFound(err)) throw err;
+      if (!isFileNotFound(err) || isHttpNotFound(err)) throw err;
       continue;
     }
   }

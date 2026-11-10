@@ -94,7 +94,7 @@ describe("frontmatter_hash_pure (text-based)", () => {
       { name: "runtime imports", computeHash: computeFrontmatterHash, content: "---\nengine: copilot\n---\n{{#runtime-import shared/test.md}}" },
     ];
 
-    describe.each(cases)("$name", ({ computeHash, content }) => {
+    describe.each(cases)("$name", ({ name, computeHash, content }) => {
       function readerWithError(error) {
         return createGitHubFileReader(
           {
@@ -117,19 +117,21 @@ describe("frontmatter_hash_pure (text-based)", () => {
         await expect(computeHash(workflowPath, { fileReader: readerWithError(error), readerMode: "github-api" })).rejects.toThrow(error.message);
       });
 
-      it("should skip genuinely absent API imports", async () => {
-        const hash = await computeHash(workflowPath, {
-          fileReader: readerWithError({ status: 404, message: "Not Found" }),
-          readerMode: "github-api",
-        });
-        const expected = await computeHash(workflowPath, {
-          fileReader: async filePath => {
-            if (filePath === workflowPath) return content;
-            throw Object.assign(new Error("not found"), { code: "ENOENT" });
-          },
-          readerMode: "github-api",
-        });
-        expect(hash).toBe(expected);
+      it("should propagate API 404s for listed imports but skip optional runtime-import candidates", async () => {
+        const fileReader = readerWithError({ status: 404, message: "Not Found" });
+        if (name === "runtime imports") {
+          const hash = await computeHash(workflowPath, { fileReader, readerMode: "github-api" });
+          const expected = await computeHash(workflowPath, {
+            fileReader: async filePath => {
+              if (filePath === workflowPath) return content;
+              throw Object.assign(new Error("not found"), { code: "ENOENT" });
+            },
+            readerMode: "github-api",
+          });
+          expect(hash).toBe(expected);
+        } else {
+          await expect(computeHash(workflowPath, { fileReader, readerMode: "github-api" })).rejects.toThrow("(HTTP 404)");
+        }
       });
 
       it("should skip genuinely absent local imports", async () => {
