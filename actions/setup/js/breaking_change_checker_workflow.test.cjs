@@ -15,6 +15,22 @@ const lock = readDocumentMetadata(readFileSync(resolve(root, ".github/workflows/
 const preparation = workflow.steps.find(step => step.name === "Prepare breaking review context");
 const sha = "4d73748ff2d044cc0fd9cb05ed13b51bb475cc72";
 
+function expectReadOnlyAgent(steps) {
+  const gateway = steps.find(step => step.id === "start-mcp-gateway");
+  const heredoc = gateway.run.match(/cat << (GH_AW_MCP_CONFIG_\w+_EOF)[^\n]*\n([\s\S]*?)^\1$/m);
+  expect(heredoc).not.toBeNull();
+  // Decode shell-escaped dollars and substitute only unquoted shell JSON values.
+  const mcpConfig = JSON.parse(heredoc[2].replace(/\\\$/g, "$").replace(/:\s*\$(?:\{[^}]+\}|[A-Z_][A-Z_0-9]*)/g, ": null"));
+  expect(mcpConfig.mcpServers.github.env.GITHUB_READ_ONLY).toBe("1");
+  const execution = steps.find(step => step.name === "Execute GitHub Copilot CLI");
+  const config = JSON.parse(execution.env.GH_AW_COPILOT_SDK_TOOL_CONFIG);
+  expect(config.capabilities.edit).toBe(false);
+  expect(config.permissions.allowedTools).not.toContain("write");
+  expect(config.permissions.allowedTools.some(tool => /^shell\(git(?:[ :)]|$)/.test(tool))).toBe(false);
+  expect(config.permissions.allowedTools).not.toContain("shell");
+  expect(config.permissions.allowedTools.filter(tool => tool.startsWith("github(")).sort()).toEqual(["github(get_commit)", "github(get_file_contents)", "github(list_commits)", "github(pull_request_read)", "github(search_pull_requests)"]);
+}
+
 async function prepare({ createdAt = "2026-11-10T14:53:28Z", headSha = sha, contextSha = sha, branch = "main", failure } = {}) {
   const writes = [];
   const calls = [];
@@ -85,39 +101,41 @@ describe("Breaking Change Checker coverage contract", () => {
       "min-integrity": "approved",
       allowed: ["list_commits", "get_commit", "get_file_contents", "search_pull_requests", "pull_request_read"],
     });
-    expect(workflow.tools.bash).toEqual(["cat:*", "jq:*"]);
+    expect(workflow.tools.bash).toEqual(["cat:*", "jq:*", "date +%s"]);
     expect(workflow.tools.edit).toBe(false);
     const steps = lock.jobs.agent.steps;
     expect(steps.findIndex(step => step.name === preparation.name)).toBeLessThan(steps.findIndex(step => step.name === "Execute GitHub Copilot CLI"));
     expect(steps.find(step => step.name === preparation.name).uses).toMatch(/^actions\/github-script@[0-9a-f]{40}$/);
     expect(steps.find(step => step.name === preparation.name).with.script.trim()).toBe(preparation.with.script.trim());
-    const config = JSON.parse(steps.find(step => step.env?.GH_AW_COPILOT_SDK_TOOL_CONFIG).env.GH_AW_COPILOT_SDK_TOOL_CONFIG);
-    expect(config.capabilities.edit).toBe(false);
-    expect(config.permissions.allowedTools).not.toContain("write");
-    expect(config.permissions.allowedTools.some(tool => /^shell\(git(?:[ :)]|$)/.test(tool))).toBe(false);
-    expect(config.permissions.allowedTools).not.toContain("shell");
-    expect(steps.some(step => step.env?.GITHUB_READ_ONLY === "1") || JSON.stringify(steps).includes('\\"GITHUB_READ_ONLY\\": \\"1\\"')).toBe(true);
+    expectReadOnlyAgent(steps);
   });
 
-  it("requires complete manifests, bounded recovery and honest partial-report semantics", () => {
-    for (const requirement of [
-      "sha` from context",
-      "Follow every page until exhausted",
-      "committer",
-      "search_pull_requests",
-      "merged_at",
-      "split the time interval",
-      "20,480-byte",
-      "native `view` bounded line ranges",
-      "immutable parent/head SHAs",
-      "stats-only response is not a",
-      "call `report_incomplete` as well",
-      "no finding is confirmed, call `report_incomplete`",
-      "Only after the ledger establishes complete",
-    ]) {
-      expect(prompt).toContain(requirement);
-    }
+  it.each([
+    ["disabled read-only mode", '"GITHUB_READ_ONLY": "0"'],
+    ["missing read-only mode", '"UNRELATED_READ_ONLY": "1"'],
+    ["read-only flag moved outside env", '"UNRELATED": { "GITHUB_READ_ONLY": "1" }'],
+  ])("rejects %s even with an unrelated read-only flag", (_name, replacement) => {
+    const steps = structuredClone(lock.jobs.agent.steps);
+    const gateway = steps.find(step => step.id === "start-mcp-gateway");
+    gateway.run = gateway.run.replace('"GITHUB_READ_ONLY": "1"', replacement);
+    steps.push({ env: { GITHUB_READ_ONLY: "1" }, run: '"GITHUB_READ_ONLY": "1"' });
+    expect(() => expectReadOnlyAgent(steps)).toThrow(expect.objectContaining({ name: "AssertionError" }));
+  });
+
+  it.each(["edit", "github(create_issue)", "shell(git)", "shell", "write"])("rejects compiled tool grant regression: %s", grant => {
+    const steps = structuredClone(lock.jobs.agent.steps);
+    const execution = steps.find(step => step.name === "Execute GitHub Copilot CLI");
+    const config = JSON.parse(execution.env.GH_AW_COPILOT_SDK_TOOL_CONFIG);
+    if (grant === "edit") config.capabilities.edit = true;
+    else config.permissions.allowedTools.push(grant);
+    execution.env.GH_AW_COPILOT_SDK_TOOL_CONFIG = JSON.stringify(config);
+    expect(() => expectReadOnlyAgent(steps)).toThrow(expect.objectContaining({ name: "AssertionError" }));
+  });
+
+  it("retains documentation guards for evidence and partial outcomes, not proof of agent compliance", () => {
+    for (const term of ["list_commits", "search_pull_requests", "get_file_contents", "report_incomplete", "noop"]) expect(prompt).toContain(term);
+    expect(prompt).toMatch(/coverage ledger/i);
     expect(workflow["safe-outputs"].messages["run-success"]).not.toContain("has reviewed all changes");
-    expect(workflow.evals.find(item => item.id === "analysis-completed").question).toContain("Answer NO when coverage is partial");
+    expect(workflow.evals.find(item => item.id === "analysis-completed").question).toMatch(/coverage.*partial|partial.*coverage/i);
   });
 });
