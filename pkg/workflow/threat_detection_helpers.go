@@ -176,6 +176,11 @@ func buildExternalDetectorWorkflowData(data *WorkflowData, engineID string) *Wor
 		"bash": []any{"*"},
 	}
 	d.EngineConfig = resolveExternalDetectorEngineConfig(data, engineID)
+	if d.EngineConfig.Auth == nil && data.EngineConfig != nil &&
+		ResolveEngineID(data) == engineID && data.EngineConfig.Auth != nil {
+		auth := *data.EngineConfig.Auth
+		d.EngineConfig.Auth = &auth
+	}
 	// threat-detect currently resolves the selected engine by its standard
 	// executable name and has no custom-command option. Keep the standard
 	// Copilot CLI installed for external detection rather than propagating a

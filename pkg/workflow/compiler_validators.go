@@ -855,7 +855,7 @@ func validateOpenAIWIFVersionSupport(workflowData *WorkflowData, engineConfigPat
 		effectiveVersion = string(constants.DefaultFirewallVersion)
 	}
 	minVersion := string(constants.AWFOpenAIWIFMinVersion)
-	if !versionAtLeast(configuredVersion, string(constants.DefaultFirewallVersion), minVersion) {
+	if !isFullSemanticVersion(effectiveVersion) || semverutil.Compare(effectiveVersion, minVersion) < 0 {
 		return NewValidationError(
 			engineConfigPath+".auth",
 			effectiveVersion,
@@ -864,28 +864,39 @@ func validateOpenAIWIFVersionSupport(workflowData *WorkflowData, engineConfigPat
 		)
 	}
 
-	if image, ok := getSandboxAgentImages(workflowData)[awfImageRoleAPIProxy]; ok {
-		imageTag := awfImageTag(image)
-		if !semverutil.IsValid(imageTag) || semverutil.Compare(imageTag, minVersion) < 0 {
-			return NewValidationError(
-				"sandbox.agent.images.api-proxy",
-				image,
-				fmt.Sprintf("OpenAI WIF requires an API proxy image tagged %s or newer", minVersion),
-				fmt.Sprintf("The API proxy image tag %q does not establish support for OpenAI WIF. Use a digest-pinned image with a semantic version tag of %s or newer.", imageTag, minVersion),
-			)
+	if agentConfig := getAgentConfig(workflowData); agentConfig != nil {
+		if image, ok := agentConfig.Images[awfImageRoleAPIProxy]; ok {
+			imageTag, found := imageReferenceTag(image)
+			if !found || !isFullSemanticVersion(imageTag) || semverutil.Compare(imageTag, minVersion) < 0 {
+				return NewValidationError(
+					"sandbox.agent.images.api-proxy",
+					image,
+					fmt.Sprintf("OpenAI WIF requires an API proxy image tagged %s or newer", minVersion),
+					fmt.Sprintf("The API proxy image tag %q does not establish support for OpenAI WIF. Use a digest-pinned image with a semantic version tag of %s or newer.", imageTag, minVersion),
+				)
+			}
 		}
 	}
 	return nil
 }
 
-func awfImageTag(image string) string {
-	image = strings.SplitN(image, "@", 2)[0]
-	lastSlash := strings.LastIndex(image, "/")
-	lastColon := strings.LastIndex(image, ":")
-	if lastColon <= lastSlash {
-		return ""
+func isFullSemanticVersion(version string) bool {
+	version = strings.TrimPrefix(version, "v")
+	parts := strings.Split(version, ".")
+	if len(parts) != 3 {
+		return false
 	}
-	return image[lastColon+1:]
+	for _, part := range parts {
+		if part == "" {
+			return false
+		}
+		for _, digit := range part {
+			if digit < '0' || digit > '9' {
+				return false
+			}
+		}
+	}
+	return semverutil.IsValid(version)
 }
 
 func validateAzureWIFEngineAuth(workflowData *WorkflowData) error {
