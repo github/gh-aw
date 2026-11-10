@@ -1,6 +1,18 @@
 {
-  "last_updated": "2026-09-16",
+  "last_updated": "2026-11-10",
   "pending_tasks": [
+    {
+      "file": "docs/src/content/docs/gallery/multi-repo/feature-sync.md",
+      "created": "2026-11-10",
+      "status": "pending",
+      "issue": "Bidirectional heading/body mismatch (lines 141, 175); invalid on: weekly on monday schedule (line 183)"
+    },
+    {
+      "file": ".github/workflows/smoke-test-tools.md",
+      "created": "2026-11-10",
+      "status": "pending",
+      "issue": "run-failure message (line 60) uses {status} for missing-tool wording; status holds run outcome text only"
+    },
     {
       "file": "docs/src/content/docs/reference/mcp-gateway.md",
       "created": "2026-09-10",
