@@ -38,7 +38,7 @@
     "yaml": "^2.9.1"
   },
   "devDependencies": {
-    "@playwright/test": "^1.64.1",
+    "@playwright/test": "^1.65.0",
     "@types/primer__octicons": "^19.21.0",
     "http-server": "^14.1.1",
     "postcss": "8.5.32",
