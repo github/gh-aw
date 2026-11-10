@@ -14,7 +14,7 @@ function evidence() {
   const agents = [
     ["haiku-whoami", "copilot-completions/claude-haiku-4.5", "/chat/completions", "claude-haiku-4.5", "exact"],
     ["gpt5-whoami", "copilot-responses/gpt-5.6-luna", "/responses", "gpt-5", "resolved"],
-    ["terra-whoami", "copilot-responses/gpt-5.6-terra", "/responses", "gpt-5.6-terra", "exact"],
+    ["luna-whoami", "copilot-responses/gpt-6-luna", "/responses", "gpt-6-luna", "exact"],
   ];
   return {
     events: [
@@ -91,18 +91,18 @@ describe("Copilot sub-agent smoke evidence", () => {
 
   test("rejects a failed sub-agent model resolution", async () => {
     const data = evidence();
-    Object.assign(data.events.find(event => event.type === "model.resolution" && event.data.role === "terra-whoami").data, { resolved_model: null, status: "failed", cause: "model_unavailable" });
-    await expect(assertEvidence(data)).rejects.toThrow("terra-whoami model.resolution status is failed, expected exact");
+    Object.assign(data.events.find(event => event.type === "model.resolution" && event.data.role === "luna-whoami").data, { resolved_model: null, status: "failed", cause: "model_unavailable" });
+    await expect(assertEvidence(data)).rejects.toThrow("luna-whoami model.resolution status is failed, expected exact");
   });
 
   test("expects the alias sub-agent to serve the model the harness resolved", async () => {
     const data = evidence();
-    data.events.find(event => event.type === "model.resolution" && event.data.role === "gpt5-whoami").data.resolved_model = "gpt-6-luna";
-    await expect(assertEvidence(data)).rejects.toThrow("gpt5-whoami changed or fell back from gpt-6-luna");
+    data.events.find(event => event.type === "model.resolution" && event.data.role === "gpt5-whoami").data.resolved_model = "gpt-6.1-sol";
+    await expect(assertEvidence(data)).rejects.toThrow("gpt5-whoami changed or fell back from gpt-6.1-sol");
   });
 
   test("rejects a missing proxy request for only one GPT sub-agent", async () => {
-    for (const model of ["gpt-5.6-luna", "gpt-5.6-terra"]) {
+    for (const model of ["gpt-5.6-luna", "gpt-6-luna"]) {
       const data = evidence();
       data.requests = data.requests.filter(request => request.model !== model);
       await expect(assertEvidence(data)).rejects.toThrow(`has no successful ${model} request on /responses`);
@@ -111,10 +111,10 @@ describe("Copilot sub-agent smoke evidence", () => {
 
   test("rejects GPT sub-agents that resolve to the same served model", async () => {
     const data = evidence();
-    data.events.find(event => event.type === "model.resolution" && event.data.role === "gpt5-whoami").data.resolved_model = "gpt-5.6-terra";
-    for (const event of data.events.filter(event => event.data.invocationId === "gpt5-whoami")) event.data.model = "copilot-responses/gpt-5.6-terra";
+    data.events.find(event => event.type === "model.resolution" && event.data.role === "gpt5-whoami").data.resolved_model = "gpt-6-luna";
+    for (const event of data.events.filter(event => event.data.invocationId === "gpt5-whoami")) event.data.model = "copilot-responses/gpt-6-luna";
     data.requests = data.requests.filter(request => request.model !== "gpt-5.6-luna");
-    await expect(assertEvidence(data)).rejects.toThrow("terra-whoami resolved to gpt-5.6-terra, which another sub-agent also uses");
+    await expect(assertEvidence(data)).rejects.toThrow("luna-whoami resolved to gpt-6-luna, which another sub-agent also uses");
   });
 
   test("rejects a sub-agent that falls back to the main model", async () => {
@@ -151,8 +151,8 @@ describe("Copilot sub-agent smoke evidence", () => {
   test("reports a changed dead child pin's model.resolution cause before the pin mismatch", async () => {
     const data = evidence();
     data.events = data.events.filter(event => event.type === "model.resolution");
-    Object.assign(data.events.find(event => event.data.role === "terra-whoami").data, { configured_model: "dead-child-pin", resolved_model: null, status: "failed", cause: "model_unavailable" });
-    await expect(assertEvidence({ events: data.events, requests: [] }, "failure")).rejects.toThrow("terra-whoami model.resolution status is failed, expected exact (cause: model_unavailable)");
+    Object.assign(data.events.find(event => event.data.role === "luna-whoami").data, { configured_model: "dead-child-pin", resolved_model: null, status: "failed", cause: "model_unavailable" });
+    await expect(assertEvidence({ events: data.events, requests: [] }, "failure")).rejects.toThrow("luna-whoami model.resolution status is failed, expected exact (cause: model_unavailable)");
   });
 
   test("still rejects a changed child pin that resolves", async () => {
