@@ -51,7 +51,7 @@ Create a change and open a pull request.
 	assert.Contains(t, activation, "id: create-steering-issue")
 	assert.Contains(t, activation, `GH_AW_WORKFLOW_ID: "steering"`)
 	assert.Contains(t, activation, "GH_AW_ENGINE_ID: ${{ steps.generate_aw_info.outputs.engine_id }}")
-	assert.Contains(t, activation, "GH_AW_ENGINE_MODEL: ${{ steps.generate_aw_info.outputs.model }}")
+	assert.Contains(t, activation, "GH_AW_ENGINE_MODEL: ${{ "+modelRoutingInactiveInActivation+" && steps.generate_aw_info.outputs.model || '' }}")
 	assert.Contains(t, activation, "issues: write")
 	assert.NotContains(t, activation, "contents: write")
 	assert.NotContains(t, activation, "pull-requests: write")

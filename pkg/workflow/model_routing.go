@@ -182,13 +182,6 @@ func modelRoutingCompileWarnings(data *WorkflowData) []string {
 	return append(warnings, subAgentModelPolicyWarnings(data, allowed, blocked)...)
 }
 
-func (c *Compiler) warnRoutedModelOverrides(data *WorkflowData) {
-	if warning := modelRoutingOverrideWarning(data); warning != "" {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(warning))
-		c.IncrementWarningCount()
-	}
-}
-
 func modelRoutingOverrideWarning(data *WorkflowData) string {
 	if !isModelRoutingEnabled(data) {
 		return ""

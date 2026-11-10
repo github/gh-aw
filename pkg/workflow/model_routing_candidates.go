@@ -209,12 +209,6 @@ func plausibleConcreteModelID(model string) bool {
 	return routingModelNamePattern.MatchString(model) && strings.ContainsAny(model, "0123456789-")
 }
 
-// expandModelRoutingAlias returns the github-copilot/ patterns of alias for GitHub
-// Copilot routing.
-func expandModelRoutingAlias(alias string, aliases map[string][]string, engineName string) ([]string, error) {
-	return expandModelRoutingAliasInNamespace(alias, aliases, engineName, copilotRoutingNamespace)
-}
-
 // expandModelRoutingAliasInNamespace returns the patterns of alias in the routing
 // namespace (github-copilot, anthropic or openai). Routing never crosses providers, so
 // other providers' patterns are dropped. For Claude and Codex, only patterns in the
