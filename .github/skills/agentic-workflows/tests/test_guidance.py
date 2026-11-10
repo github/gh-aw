@@ -42,7 +42,7 @@ def checklist(text):
 
 
 class GuidanceTests(unittest.TestCase):
-    def test_local_sdlc_routes_to_squad_before_workflow_creation(self):
+    def test_local_sdlc_routes_to_squad_alongside_workflow_creation(self):
         for path, workflow_route in (
             (".github/skills/agentic-workflows/SKILL.md", "- Design workflows from scratch"),
             ("pkg/cli/data/agentic_workflows_skill.md", "- Design workflows from scratch"),
@@ -57,7 +57,16 @@ class GuidanceTests(unittest.TestCase):
                 self.assertIn("for a coding agent", route)
                 self.assertIn("do not execute it, install Squad, or create a gh-aw workflow", route)
                 self.assertIn("Explicit GitHub Actions automation requests keep their existing routes", route)
-                self.assertLess(content.index(route), content.index(workflow_route))
+                self.assertIn(workflow_route, content)
+
+    def test_agent_lists_squad_after_workflow_routes(self):
+        for path in (".github/agents/agentic-workflows.md", "pkg/cli/data/agentic_workflows_agent.md"):
+            content = (ROOT / path).read_text()
+            section = content.split("## What This Agent Does\n", 1)[1].split("\nWorkflows may optionally include:", 1)[0]
+            routes = [line for line in section.splitlines() if line.startswith("- ")]
+            with self.subTest(agent=path):
+                self.assertTrue(routes[0].startswith("- **Creating new workflows**"))
+                self.assertTrue(routes[-1].startswith("- **Local, self-contained SDLC"))
 
     def test_squad_is_discoverable_from_instructions_and_pattern_router(self):
         for path in (
