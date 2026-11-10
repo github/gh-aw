@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 
+const { buildCopilotSDKPermissionHandler } = require("./copilot_sdk_permissions.cjs");
+
 const workflow = fs.readFileSync(path.resolve(__dirname, "../../../.github/workflows/visual-regression-checker.md"), "utf8");
+const compiledWorkflow = fs.readFileSync(path.resolve(__dirname, "../../../.github/workflows/visual-regression-checker.lock.yml"), "utf8");
 
 describe("visual regression workflow contract", () => {
   it("serves provisioned build artifacts on sandbox loopback instead of the runner host", () => {
@@ -12,10 +15,39 @@ describe("visual regression workflow contract", () => {
     expect(workflow).toContain("`docs/dist`");
     expect(workflow).toContain("npm --prefix docs run preview -- --host 127.0.0.1 --port 4321");
     expect(workflow).toContain("background/async mode");
-    expect(workflow).toContain("Poll `curl http://localhost:4321/gh-aw/` with a bounded wait");
+    expect(workflow).toContain("Poll `curl http://localhost:4321/gh-aw/ --fail --silent --show-error --connect-timeout 2 --max-time 5` for at most 30 seconds");
     expect(workflow).not.toContain("host.docker.internal");
     expect(workflow).not.toContain("nohup");
     expect(workflow).toContain("verify it stopped");
+  });
+
+  it("grants the exact readiness URL with options following the URL", () => {
+    expect(workflow).toContain('- "curl http://localhost:4321/gh-aw/:*"');
+    expect(compiledWorkflow).toContain('"shell(curl http://localhost:4321/gh-aw/:*)"');
+    for (const source of [workflow, compiledWorkflow]) {
+      expect(source).not.toContain("curl http://localhost:*");
+    }
+  });
+
+  it("allows the readiness command through the SDK matcher only with the corrected grant", () => {
+    const probe = workflow.match(/Poll `([^`]+)`/)[1];
+    const config = JSON.parse(compiledWorkflow.match(/GH_AW_COPILOT_SDK_TOOL_CONFIG: '([^'\n]+)'/)[1]);
+    const approveAll = () => ({ kind: "approve-once" });
+    const correctedHandler = buildCopilotSDKPermissionHandler(config.permissions, approveAll);
+    const oldHandler = buildCopilotSDKPermissionHandler({ allowedTools: ["shell(curl http://localhost:*)"] }, approveAll);
+
+    for (const identifiers of [[], ["curl"], [probe]]) {
+      const request = {
+        kind: "shell",
+        fullCommandText: probe,
+        commands: identifiers.map(identifier => ({ identifier })),
+      };
+      expect(correctedHandler(request)).toEqual({ kind: "approve-once" });
+      expect(oldHandler(request)).toEqual({
+        kind: "reject",
+        feedback: "Tool invocation is not allowed by workflow tool permissions.",
+      });
+    }
   });
 
   it("uses the provisioned CLI commands and all three viewports", () => {

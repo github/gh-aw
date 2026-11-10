@@ -1,7 +1,19 @@
 import { describe, it, expect } from "vitest";
-import { getErrorMessage, isHtmlContent, isLockedError, isRateLimitError, isConnectTimeoutError } from "./error_helpers.cjs";
+import { getErrorMessage, getErrorStatus, isHtmlContent, isLockedError, isRateLimitError, isConnectTimeoutError } from "./error_helpers.cjs";
 
 describe("error_helpers", () => {
+  describe("getErrorStatus", () => {
+    it.each([
+      [{ status: 500, response: { status: 404 } }, 500],
+      [{ response: { status: 403 } }, 403],
+      [{ message: "HTTP 404", response: { headers: { "x-github-request-id": "C401:C403:C404" } } }, undefined],
+      [{ status: "404" }, undefined],
+      [null, undefined],
+    ])("extracts only structured HTTP status from %j", (error, expected) => {
+      expect(getErrorStatus(error)).toBe(expected);
+    });
+  });
+
   describe("isConnectTimeoutError", () => {
     it.each([Object.assign(new Error("Connection failed"), { code: "UND_ERR_CONNECT_TIMEOUT" }), new Error("Connect Timeout Error"), { message: "Connect Timeout Error" }])("recognizes connection timeout %j", error => {
       expect(isConnectTimeoutError(error)).toBe(true);

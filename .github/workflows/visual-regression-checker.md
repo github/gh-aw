@@ -28,7 +28,7 @@ tools:
     - "npm *"
     - "npx *"
     - "node *"
-    - "curl http://localhost:*"
+    - "curl http://localhost:4321/gh-aw/:*"
 network:
   allowed:
     - defaults
@@ -92,7 +92,7 @@ You are a visual quality agent. Setup installed `docs/node_modules` and built `d
 
 ## Steps
 
-1. **Start the sandbox-local preview** — Run `npm --prefix docs run preview -- --host 127.0.0.1 --port 4321` with the Bash tool's background/async mode. Keep its process handle for cleanup. Do not start a runner-host server, bind to `0.0.0.0`, install packages, or change proxy configuration. Poll `curl http://localhost:4321/gh-aw/` with a bounded wait until it returns successfully; stop and report a setup failure if it does not become ready. Loopback preview traffic uses the sandbox's existing local bypass; do not inspect environment variables to discover proxy settings.
+1. **Start the sandbox-local preview** — Run `npm --prefix docs run preview -- --host 127.0.0.1 --port 4321` with the Bash tool's background/async mode. Keep its process handle for cleanup. Do not start a runner-host server, bind to `0.0.0.0`, install packages, or change proxy configuration. Poll `curl http://localhost:4321/gh-aw/ --fail --silent --show-error --connect-timeout 2 --max-time 5` for at most 30 seconds until it returns successfully; stop and report a setup failure if it does not become ready. Loopback preview traffic uses the sandbox's existing local bypass; do not inspect environment variables to discover proxy settings.
 2. **Capture screenshots** — Open `playwright-cli open http://localhost:4321/gh-aw/`, then use the pinned CLI's commands (not MCP `browser_*` tool names):
    - **Mobile**: `playwright-cli resize 375 812`, then `playwright-cli screenshot --filename=/tmp/gh-aw/agent/screenshot-mobile.png --full-page`
    - **Tablet**: resize to 768 × 1024, navigate, screenshot
