@@ -273,7 +273,7 @@ func canMergeModelRoutingEngineSpecifications(mainEngineSetting string, engineSp
 		if err := json.Unmarshal([]byte(engineJSON), &engine); err != nil {
 			return false
 		}
-		if _, ok := engine["model-routing"].(map[string]any); !ok {
+		if !isModelRoutingSetting(engine["model-routing"]) {
 			return false
 		}
 		id, ok := engine["id"].(string)
@@ -287,6 +287,19 @@ func canMergeModelRoutingEngineSpecifications(mainEngineSetting string, engineSp
 		}
 	}
 	return engineID != ""
+}
+
+// isModelRoutingSetting reports whether value is a routing object or the
+// explicit `false` opt-out accepted at engine.model-routing.
+func isModelRoutingSetting(value any) bool {
+	switch typed := value.(type) {
+	case map[string]any:
+		return true
+	case bool:
+		return !typed
+	default:
+		return false
+	}
 }
 
 // EngineHasValidateSecretStep checks if the engine provides a validate-secret step.

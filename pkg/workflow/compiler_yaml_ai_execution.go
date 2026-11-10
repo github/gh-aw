@@ -440,7 +440,11 @@ func (c *Compiler) generateTokenUsageSummary(yaml *strings.Builder, data *Workfl
 		yaml.WriteString("          GH_AW_TMP_DIR: ${{ runner.temp }}/gh-aw\n")
 	}
 	if isModelRoutingEnabled(data) {
-		yaml.WriteString("          GH_AW_MODEL_ROUTING_ENABLED: \"true\"\n")
+		if isModelRoutingRuntimeGuarded(data) {
+			yaml.WriteString("          GH_AW_MODEL_ROUTING_ENABLED: ${{ " + modelRoutingActiveDownstream + " && 'true' || 'false' }}\n")
+		} else {
+			yaml.WriteString("          GH_AW_MODEL_ROUTING_ENABLED: \"true\"\n")
+		}
 		if data.EngineConfig != nil {
 			fmt.Fprintf(yaml, "          GH_AW_ENGINE_ID: %q\n", data.EngineConfig.ID) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 		}

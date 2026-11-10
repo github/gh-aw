@@ -246,6 +246,10 @@ Gemini and declarative engines pass model names through unchanged and warn about
 
 Resolution produces `model.resolution` evidence in `usage/aw_session.jsonl`. See [Model Aliases](/gh-aw/reference/model-tables/) for the catalog and [Model Routing](/gh-aw/reference/model-routing/) for experimental per-run model/effort selection on Copilot-backed Copilot, Claude, Codex, and Pi.
 
+### Default model routing
+
+When a `copilot`, `claude`, `codex`, or `pi` workflow on GitHub Copilot inference chooses no model and no routing settings, the compiler routes its main agent with `goal: cost` and `mode: balanced`. For Claude and Codex, that requires `model-provider: github`. Any explicit `model`, `engine.model`, `engine.model-routing`, `engine.fallback-models`, or `engine.env` model variable, including from imports, keeps today's behavior, as do unsupported or uncertain configurations. A nonempty `GH_AW_MODEL_AGENT_<ENGINE>` or `GH_AW_DEFAULT_MODEL_<ENGINE>` variable bypasses the default at run time for Copilot, Claude, and Codex. Opt out with `engine.model-routing: false`. See [Default routing for workflows without a model](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model).
+
 ### Ordered model fallback (`fallback-models`)
 
 ```yaml
