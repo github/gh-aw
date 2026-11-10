@@ -1,5 +1,6 @@
 """Documentation contract regressions, not an LLM or live workflow evaluation."""
 
+import hashlib
 import json
 from pathlib import Path
 import posixpath
@@ -79,6 +80,14 @@ class GuidanceTests(unittest.TestCase):
         self.assertIn("squad.md", fallback)
         skill = (SKILL / "SKILL.md").read_text()
         self.assertIn("- `.github/aw/squad.md`", skill)
+
+    def test_squad_bootstrap_prompt_is_verbatim(self):
+        guide = (ROOT / ".github/aw/squad.md").read_bytes()
+        block = guide.split(b"```text\n", 1)[1].split(b"\n```", 1)[0]
+        self.assertEqual(
+            hashlib.sha256(block).hexdigest(),
+            "3a59b74939616d97b41ebb161fe302a2f329de031efd9422aabc829374407f11",
+        )
 
     def test_squad_bootstrap_requires_local_intent_and_preserves_existing_teams(self):
         guide = normalized((ROOT / ".github/aw/squad.md").read_text().split("```text", 1)[0])
