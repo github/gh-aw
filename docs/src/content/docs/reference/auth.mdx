@@ -403,6 +403,7 @@ permissions:
   id-token: write
 engine:
   id: codex
+  model: openai/gpt-6.1-sol
   auth:
     type: github-oidc
     provider: openai
@@ -420,13 +421,24 @@ network:
 provider, and an enabled firewall; `sandbox.agent: false` is not supported.
 The compiler maps these values to `AWF_AUTH_OPENAI_*` and
 `AWF_AUTH_OIDC_AUDIENCE` for the AWF API proxy. OpenAI WIF requires AWF
-`v0.29.11` or newer; this is also the current default pin. If
+`v0.29.11` or newer; this is also the current default pin. An explicit
+`sandbox.agent.version` or `network.firewall.version` must use a full semantic
+version at or above that minimum, not a moving tag such as `latest`. If
 `sandbox.agent.images.api-proxy` overrides the proxy image, its semantic-version
-tag must also be `v0.29.11` or newer. The proxy uses its dedicated egress path
+tag must also be `v0.29.11` or newer; digest-only references and non-version tags
+such as `stable` are rejected. The version gate also applies when WIF is
+configured through `engine.env.AWF_AUTH_*` instead of `engine.auth`.
+The proxy uses its dedicated egress path
 for the `auth.openai.com` token exchange, so do not add that host to
 `network.allowed`; the optional `codex-vendor` network opt-in is not required
 for WIF. Codex startup verifies that fresh AWF reflection reports the
 configured OpenAI WIF endpoint before launching.
+
+Codex threat detection inherits the main Codex engine's auth unless its engine
+configuration supplies its own auth, including with a same-engine detector
+override. The generated detection job receives `id-token: write`. This does not
+apply to [evals](/gh-aw/experimental/experiments/#analyze-an-eval-backed-metric), which call Decisions
+directly and still require `CODEX_API_KEY` or `OPENAI_API_KEY` for OpenAI models.
 
 ---
 
