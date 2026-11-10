@@ -1,130 +1,261 @@
 package workflow
 
-import "strings"
+import (
+	"encoding/base64"
+	"fmt"
+	"strings"
 
-func renderStepForRunner(step, runsOn string) string {
-	if strings.TrimSpace(strings.TrimPrefix(runsOn, "runs-on:")) != "windows-latest" || !containsRunField(step) {
-		return step
+	"go.yaml.in/yaml/v3"
+)
+
+const windowsWSLBootstrapStep = `      - name: Initialize WSL runtime
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $wsl = Get-Command wsl.exe -ErrorAction SilentlyContinue
+          if (-not $wsl) { throw 'WSL is required for Windows agentic workflows, but wsl.exe was not found.' }
+          & $wsl.Source --status *> $null
+          if ($LASTEXITCODE -ne 0) { throw 'WSL is unavailable. Enable WSL2 and install a Linux distribution on this runner.' }
+          $env:WSLENV = 'GITHUB_WORKSPACE/p:RUNNER_TEMP/p:RUNNER_TOOL_CACHE/p'
+          & $wsl.Source --exec bash -lc 'set -e; test -d "$GITHUB_WORKSPACE"; test -d "$RUNNER_TEMP"; mkdir -p "$RUNNER_TEMP/gh-aw"; if [ -L /tmp/gh-aw ]; then [ "$(readlink -f /tmp/gh-aw)" = "$(readlink -f "$RUNNER_TEMP/gh-aw")" ]; elif [ -e /tmp/gh-aw ]; then echo "WSL bootstrap cannot map /tmp/gh-aw: the path already exists."; exit 1; else ln -s "$RUNNER_TEMP/gh-aw" /tmp/gh-aw; fi'
+          if ($LASTEXITCODE -ne 0) { throw 'WSL bootstrap failed to map the workspace, runner temp, or /tmp/gh-aw paths.' }
+`
+
+func renderStepForRunner(jobYAML, runsOn string) string {
+	if strings.TrimSpace(strings.TrimPrefix(runsOn, "runs-on:")) != "windows-latest" {
+		return jobYAML
 	}
 
-	return setBashShell(prefixShellScriptWithBash(step))
-}
-
-func containsRunField(step string) bool {
-	for line := range strings.SplitSeq(step, "\n") {
-		if strings.HasPrefix(strings.TrimSpace(line), "run:") {
-			return true
-		}
+	stepsHeader := "    steps:\n"
+	headerIndex := strings.Index(jobYAML, stepsHeader)
+	if headerIndex < 0 {
+		return jobYAML
 	}
-	return false
-}
 
-func prefixShellScriptWithBash(step string) string {
-	lines := strings.SplitAfter(step, "\n")
-	runBlock := false
-	runIndent := 0
-	heredoc := ""
-	for i, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if heredoc != "" {
-			if strings.TrimSpace(strings.TrimSuffix(line, "\n")) == heredoc {
-				heredoc = ""
-			}
-			continue
-		}
-
-		indent := len(line) - len(strings.TrimLeft(line, " "))
-		var commandLine string
-		if run, ok := strings.CutPrefix(trimmed, "run:"); ok {
-			commandLine = strings.TrimSpace(run)
-			if commandLine == "|" || commandLine == ">" || commandLine == "|-" || commandLine == ">-" {
-				runBlock = true
-				runIndent = indent
-				continue
-			}
-		} else if runBlock && trimmed != "" && indent > runIndent {
-			commandLine = trimmed
-		} else {
-			runBlock = false
-			continue
-		}
-
-		if delimiter := shellHereDocDelimiter(commandLine); delimiter != "" {
-			heredoc = delimiter
-		}
-		command := firstShellWord(commandLine)
-		if strings.HasSuffix(command, ".sh") {
-			lines[i] = strings.Replace(line, commandLine, "bash "+commandLine, 1)
-		}
-	}
-	return strings.Join(lines, "")
-}
-
-func firstShellWord(commandLine string) string {
-	for {
-		commandLine = strings.TrimSpace(commandLine)
-		if commandLine == "" {
-			return ""
-		}
-		word := commandLine
-		if word[0] == '\'' || word[0] == '"' {
-			quote := word[0]
-			if end := strings.IndexByte(word[1:], quote); end >= 0 {
-				word = word[:end+2]
-				commandLine = commandLine[len(word):]
-			} else {
-				return ""
-			}
-		} else if end := strings.IndexAny(word, " \t"); end >= 0 {
-			word = word[:end]
-			commandLine = commandLine[len(word):]
-		} else {
-			commandLine = ""
-		}
-		if !strings.Contains(word, "=") || strings.HasPrefix(word, "./") {
-			return strings.Trim(word, "'\"")
-		}
-	}
-}
-
-func shellHereDocDelimiter(commandLine string) string {
-	_, delimiter, ok := strings.Cut(commandLine, "<<")
-	if !ok {
-		return ""
-	}
-	delimiter = strings.TrimSpace(delimiter)
-	delimiter = strings.TrimPrefix(delimiter, "-")
-	fields := strings.Fields(delimiter)
-	if len(fields) == 0 {
-		return ""
-	}
-	delimiter = fields[0]
-	return strings.Trim(delimiter, "'\"")
-}
-
-func setBashShell(step string) string {
-	lines := strings.SplitAfter(step, "\n")
-	var result strings.Builder
-	result.Grow(len(step))
+	headerEnd := headerIndex + len(stepsHeader)
+	var steps []string
 	var currentStep strings.Builder
-
-	for _, line := range lines {
-		if strings.HasPrefix(line, "      - ") {
-			result.WriteString(setBashShellForStep(currentStep.String()))
+	for _, line := range strings.SplitAfter(jobYAML[headerEnd:], "\n") {
+		if strings.HasPrefix(line, "      - ") && currentStep.Len() > 0 {
+			steps = append(steps, currentStep.String())
 			currentStep.Reset()
 		}
 		currentStep.WriteString(line)
 	}
-	result.WriteString(setBashShellForStep(currentStep.String()))
-	return result.String()
+	if currentStep.Len() > 0 {
+		steps = append(steps, currentStep.String())
+	}
+
+	hasWSLRun := false
+	for _, step := range steps {
+		if isWindowsPOSIXRunStep(step) {
+			hasWSLRun = true
+			break
+		}
+	}
+	if !hasWSLRun {
+		return jobYAML
+	}
+
+	var renderedSteps strings.Builder
+	renderedSteps.WriteString(windowsWSLBootstrapStep)
+	for _, step := range steps {
+		step = rewriteWindowsActionTempPath(step)
+		renderedSteps.WriteString(renderWindowsPOSIXRunStep(step))
+	}
+	return jobYAML[:headerEnd] + renderedSteps.String()
 }
 
-func setBashShellForStep(step string) string {
-	if !strings.Contains(step, "\n        run:") {
+func isWindowsPOSIXRunStep(step string) bool {
+	fields, ok := parseWindowsStep(step)
+	if !ok {
+		return false
+	}
+	if _, ok := fields["run"].(string); !ok {
+		return false
+	}
+	shell, _ := fields["shell"].(string)
+	return isWindowsPOSIXShell(shell)
+}
+
+func isWindowsPOSIXShell(shell string) bool {
+	shell = strings.ToLower(strings.TrimSpace(shell))
+	return shell == "" || shell == "bash" || strings.HasPrefix(shell, "bash ") || shell == "sh" || strings.HasPrefix(shell, "sh ")
+}
+
+func parseWindowsStep(step string) (map[string]any, bool) {
+	var yamlStep strings.Builder
+	yamlStep.WriteString("steps:\n")
+	for _, line := range strings.SplitAfter(step, "\n") {
+		yamlStep.WriteString("  ")
+		yamlStep.WriteString(strings.TrimPrefix(line, "    "))
+	}
+
+	var parsed struct {
+		Steps []map[string]any `yaml:"steps"`
+	}
+	if err := yaml.Unmarshal([]byte(yamlStep.String()), &parsed); err != nil || len(parsed.Steps) != 1 {
+		return nil, false
+	}
+	return parsed.Steps[0], true
+}
+
+func rewriteWindowsActionTempPath(step string) string {
+	fields, ok := parseWindowsStep(step)
+	if !ok {
 		return step
 	}
-	if strings.Contains(step, "\n        shell:") {
+	if _, ok := fields["uses"].(string); !ok {
 		return step
 	}
-	return strings.Replace(step, "\n        run:", "\n        shell: bash\n        run:", 1)
+	with, ok := fields["with"].(map[string]any)
+	if !ok {
+		return step
+	}
+	path, ok := with["path"].(string)
+	if !ok || !strings.HasPrefix(path, "/tmp/gh-aw") {
+		return step
+	}
+
+	lines := strings.SplitAfter(step, "\n")
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "path:") {
+			continue
+		}
+		value := strings.TrimSpace(strings.TrimPrefix(trimmed, "path:"))
+		if strings.HasPrefix(value, "|") || strings.HasPrefix(value, ">") {
+			pathIndent := len(line) - len(strings.TrimLeft(line, " "))
+			for j := i + 1; j < len(lines); j++ {
+				lineWithoutNewline := strings.TrimSuffix(lines[j], "\n")
+				if strings.TrimSpace(lineWithoutNewline) != "" &&
+					len(lineWithoutNewline)-len(strings.TrimLeft(lineWithoutNewline, " ")) <= pathIndent {
+					break
+				}
+				lines[j] = rewriteWindowsArtifactPathLine(lines[j])
+			}
+			break
+		}
+		newline := ""
+		if strings.HasSuffix(line, "\n") {
+			newline = "\n"
+			line = strings.TrimSuffix(line, "\n")
+		}
+		indent := line[:len(line)-len(strings.TrimLeft(line, " "))]
+		replacement := "${{ runner.temp }}/gh-aw" + strings.TrimPrefix(strings.Trim(value, `"'`), "/tmp/gh-aw")
+		lines[i] = indent + "path: " + replacement + newline
+		break
+	}
+	return strings.Join(lines, "")
+}
+
+func rewriteWindowsArtifactPathLine(line string) string {
+	newline := ""
+	if strings.HasSuffix(line, "\n") {
+		newline = "\n"
+		line = strings.TrimSuffix(line, "\n")
+	}
+	indent := line[:len(line)-len(strings.TrimLeft(line, " "))]
+	path := strings.TrimSpace(line)
+	if !strings.HasPrefix(path, "/tmp/gh-aw") {
+		return line + newline
+	}
+	return indent + "${{ runner.temp }}/gh-aw" + strings.TrimPrefix(path, "/tmp/gh-aw") + newline
+}
+
+func renderWindowsPOSIXRunStep(step string) string {
+	fields, ok := parseWindowsStep(step)
+	if !ok {
+		return step
+	}
+	script, ok := fields["run"].(string)
+	if !ok {
+		return step
+	}
+	shell, _ := fields["shell"].(string)
+	if !isWindowsPOSIXShell(shell) {
+		return step
+	}
+
+	lines := strings.SplitAfter(step, "\n")
+	runLine := -1
+	shellLine := -1
+	runIndent := 0
+	blockRun := false
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if _, value, ok := strings.Cut(trimmed, "run:"); ok && strings.HasPrefix(trimmed, "run:") {
+			runLine = i
+			runIndent = len(line) - len(strings.TrimLeft(line, " "))
+			value = strings.TrimSpace(value)
+			blockRun = strings.HasPrefix(value, "|") || strings.HasPrefix(value, ">")
+		}
+		if _, _, ok := strings.Cut(trimmed, "shell:"); ok && strings.HasPrefix(trimmed, "shell:") {
+			shellLine = i
+		}
+	}
+	if runLine < 0 {
+		return step
+	}
+
+	runEnd := runLine + 1
+	if blockRun {
+		for runEnd < len(lines) {
+			line := strings.TrimSuffix(lines[runEnd], "\n")
+			if strings.TrimSpace(line) != "" && len(line)-len(strings.TrimLeft(line, " ")) <= runIndent {
+				break
+			}
+			runEnd++
+		}
+	}
+
+	wrapper := windowsWSLRunWrapper(script)
+	var rendered strings.Builder
+	for i := 0; i < len(lines); i++ {
+		switch {
+		case i == shellLine:
+			indent := lines[i][:len(lines[i])-len(strings.TrimLeft(lines[i], " "))]
+			rendered.WriteString(indent + "shell: pwsh\n")
+		case i == runLine:
+			if shellLine < 0 {
+				rendered.WriteString(strings.Repeat(" ", runIndent) + "shell: pwsh\n")
+			}
+			rendered.WriteString(strings.Repeat(" ", runIndent) + "run: |\n")
+			for _, wrapperLine := range wrapper {
+				rendered.WriteString(strings.Repeat(" ", runIndent+2) + wrapperLine + "\n")
+			}
+			i = runEnd - 1
+		default:
+			rendered.WriteString(lines[i])
+		}
+	}
+	return rendered.String()
+}
+
+func windowsWSLRunWrapper(script string) []string {
+	encodedScript := base64.StdEncoding.EncodeToString([]byte(script))
+	return []string{
+		"$ErrorActionPreference = 'Stop'",
+		"$pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'HOME', 'TEMP', 'TMP', 'TMPDIR')",
+		"$pathVariableSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)",
+		"foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }",
+		"$environmentNames = [System.Environment]::GetEnvironmentVariables('Process').Keys | Where-Object { $_ -notin @('PATH', 'WSLENV') }",
+		"$env:WSLENV = (($environmentNames | ForEach-Object { if ($pathVariableSet.Contains($_)) { \"$_/p\" } else { $_ } }) -join ':')",
+		fmt.Sprintf("$scriptContent = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('%s'))", encodedScript),
+		`$scriptContent = 'cd "$GITHUB_WORKSPACE"' + [System.Environment]::NewLine + $scriptContent`,
+		"$scriptDirectory = Join-Path $env:RUNNER_TEMP 'gh-aw'",
+		"New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null",
+		"$hostScriptPath = Join-Path $scriptDirectory ('wsl-' + [guid]::NewGuid().ToString('N') + '.sh')",
+		"[System.IO.File]::WriteAllText($hostScriptPath, $scriptContent, [System.Text.UTF8Encoding]::new($false))",
+		"$wslScriptPath = (& wsl.exe --exec wslpath -u $hostScriptPath).Trim()",
+		"if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the generated script path.' }",
+		"$exitCode = 0",
+		"try {",
+		"  & wsl.exe --exec bash --noprofile --norc -e -o pipefail $wslScriptPath",
+		"  $exitCode = $LASTEXITCODE",
+		"} finally {",
+		"  Remove-Item -LiteralPath $hostScriptPath -Force -ErrorAction SilentlyContinue",
+		"}",
+		"if ($exitCode -ne 0) { exit $exitCode }",
+	}
 }

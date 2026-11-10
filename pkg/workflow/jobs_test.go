@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"encoding/base64"
 	"os"
 	"path/filepath"
 	"strings"
@@ -274,43 +275,95 @@ func TestJobManager_WriteJobsYAML(t *testing.T) {
 }
 
 func TestRenderStepForRunner(t *testing.T) {
-	windowsStep := "      - name: Run script\n        run: \"${RUNNER_TEMP}/gh-aw/actions/setup.sh\" --verbose\n"
+	windowsStep := "    steps:\n      - name: Run script\n        run: echo \"${RUNNER_TEMP}/gh-aw/actions/setup.sh\" --verbose\n"
 	got := renderStepForRunner(windowsStep, "runs-on: windows-latest")
-	if !strings.Contains(got, "        run: bash \"${RUNNER_TEMP}/gh-aw/actions/setup.sh\" --verbose\n") {
-		t.Fatalf("Windows step did not invoke the shell script with Bash:\n%s", got)
+	if !strings.Contains(got, "        run: |\n") || !strings.Contains(got, "wsl.exe --exec bash --noprofile --norc -e -o pipefail") {
+		t.Fatalf("Windows step did not invoke the POSIX script through WSL:\n%s", got)
 	}
-	if !strings.Contains(got, "        shell: bash\n") {
-		t.Fatalf("Windows step did not explicitly select Bash:\n%s", got)
-	}
-
-	quotedPath := "      - name: Run script\n        run: './my script.sh' --verbose\n"
-	got = renderStepForRunner(quotedPath, "windows-latest")
-	if !strings.Contains(got, "        run: bash './my script.sh' --verbose\n") {
-		t.Fatalf("Windows step did not invoke a quoted shell script with Bash:\n%s", got)
-	}
-
-	multiline := "      - name: Run script\n        run: |\n          SCRIPT=helper.sh\n          ./helper.sh\n          cat <<'EOF'\n          helper.sh\n          EOF\n"
-	got = renderStepForRunner(multiline, "windows-latest")
-	if strings.Contains(got, "bash SCRIPT=helper.sh") || strings.Contains(got, "bash helper.sh\n          EOF") {
-		t.Fatalf("Windows step rewrote an assignment or heredoc:\n%s", got)
-	}
-	if !strings.Contains(got, "          bash ./helper.sh\n") {
-		t.Fatalf("Windows step did not invoke the actual shell script with Bash:\n%s", got)
-	}
-
-	withShell := "      - name: Run script\n        run: ./script.sh\n        shell: pwsh\n"
-	got = renderStepForRunner(withShell, "runs-on: windows-latest")
 	if !strings.Contains(got, "        shell: pwsh\n") {
+		t.Fatalf("Windows step did not use PowerShell to launch WSL:\n%s", got)
+	}
+	for _, pathVariable := range []string{
+		"'GITHUB_WORKSPACE'",
+		"'RUNNER_TEMP'",
+		"'RUNNER_TOOL_CACHE'",
+		"'GITHUB_OUTPUT'",
+	} {
+		if !strings.Contains(got, pathVariable) {
+			t.Errorf("Windows step did not map %s into WSL:\n%s", pathVariable, got)
+		}
+	}
+	if !strings.Contains(got, "if ($pathVariableSet.Contains($_)) { \"$_/p\" }") {
+		t.Fatalf("Windows step did not mark host paths for WSL conversion:\n%s", got)
+	}
+	if !strings.Contains(got, "& $wsl.Source --status") || !strings.Contains(got, "WSL is unavailable") {
+		t.Fatalf("Windows job did not include a fail-fast WSL availability check:\n%s", got)
+	}
+	if script := decodeWindowsWSLRunScript(t, got); script != "echo \"${RUNNER_TEMP}/gh-aw/actions/setup.sh\" --verbose" {
+		t.Fatalf("WSL adapter changed the POSIX script: %q", script)
+	}
+
+	multiline := "    steps:\n      - name: Run script\n        run: |\n          SCRIPT=helper.sh\n          ./helper.sh\n          cat <<'EOF'\n          helper.sh\n          EOF\n"
+	got = renderStepForRunner(multiline, "windows-latest")
+	if script := decodeWindowsWSLRunScript(t, got); script != "SCRIPT=helper.sh\n./helper.sh\ncat <<'EOF'\nhelper.sh\nEOF\n" {
+		t.Fatalf("WSL adapter changed the multiline POSIX script: %q", script)
+	}
+
+	withShell := "    steps:\n      - name: Run script\n        run: ./script.ps1\n        shell: pwsh\n"
+	got = renderStepForRunner(withShell, "runs-on: windows-latest")
+	if got != withShell {
 		t.Fatalf("Windows step changed its explicit shell:\n%s", got)
 	}
 
-	ubuntuStep := "      - name: Run script\n        run: ./script.sh\n"
+	ubuntuStep := "    steps:\n      - name: Run script\n        run: ./script.sh\n"
 	if got = renderStepForRunner(ubuntuStep, "runs-on: ubuntu-latest"); got != ubuntuStep {
 		t.Fatalf("Non-Windows step changed:\n%s", got)
 	}
 }
 
-func TestCompileWindowsRunnerUsesPosixArtifactPaths(t *testing.T) {
+func decodeWindowsWSLRunScript(t *testing.T, rendered string) string {
+	t.Helper()
+	const start = "FromBase64String('"
+	index := strings.Index(rendered, start)
+	if index < 0 {
+		t.Fatalf("WSL run wrapper does not contain its encoded script:\n%s", rendered)
+	}
+	encoded := rendered[index+len(start):]
+	end := strings.IndexByte(encoded, '\'')
+	if end < 0 {
+		t.Fatalf("WSL run wrapper has an unterminated encoded script:\n%s", rendered)
+	}
+	decoded, err := base64.StdEncoding.DecodeString(encoded[:end])
+	if err != nil {
+		t.Fatalf("decode WSL run script: %v", err)
+	}
+	return string(decoded)
+}
+
+func TestRenderStepForRunnerMapsArtifactTempPaths(t *testing.T) {
+	job := `    steps:
+      - name: Upload generated data
+        uses: actions/upload-artifact@v4
+        with:
+          path: /tmp/gh-aw/agent_output.json
+      - name: Run framework
+        shell: bash
+        run: |
+          mkdir -p /tmp/gh-aw
+`
+	got := renderStepForRunner(job, "runs-on: windows-latest")
+	if !strings.Contains(got, "path: ${{ runner.temp }}/gh-aw/agent_output.json") {
+		t.Fatalf("Windows artifact path was not mapped to runner temp:\n%s", got)
+	}
+	if !strings.Contains(got, `ln -s "$RUNNER_TEMP/gh-aw" /tmp/gh-aw`) {
+		t.Fatalf("WSL bootstrap did not map /tmp/gh-aw to runner temp:\n%s", got)
+	}
+	if !strings.Contains(got, "uses: actions/upload-artifact@v4") {
+		t.Fatalf("Windows artifact action was not preserved:\n%s", got)
+	}
+}
+
+func TestCompileWindowsRunnerUsesWslArtifactPaths(t *testing.T) {
 	tmpDir := t.TempDir()
 	workflowFile := filepath.Join(tmpDir, "windows-artifacts.md")
 	workflowContent := `---
@@ -352,12 +405,12 @@ Compile this workflow on a Windows runner.
 	}
 	fallbackStep := extractWorkflowStepByName(t, string(lockBytes), "Upload agent output fallback artifact")
 
-	wantPath := "/tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl"
+	wantPath := "${{ runner.temp }}/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl"
 	if !strings.Contains(fallbackStep, wantPath) {
-		t.Fatalf("compiled Windows artifact fallback did not include POSIX token usage path %q:\n%s", wantPath, fallbackStep)
+		t.Fatalf("compiled Windows artifact fallback did not map the token usage path %q:\n%s", wantPath, fallbackStep)
 	}
-	if strings.Contains(fallbackStep, `\tmp\gh-aw\`) {
-		t.Fatalf("compiled Windows artifact fallback used Windows separators:\n%s", fallbackStep)
+	if strings.Contains(fallbackStep, "/tmp/gh-aw/") {
+		t.Fatalf("compiled Windows artifact fallback retained a host-incompatible POSIX path:\n%s", fallbackStep)
 	}
 }
 
