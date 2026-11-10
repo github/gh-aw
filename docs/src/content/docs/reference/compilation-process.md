@@ -326,7 +326,7 @@ Pre-activation runs gating checks sequentially before any AI execution. Any fail
 
 The optional `--actionlint`, `--zizmor`, and `--poutine` scanners prefer local
 binaries on `PATH` when their versions meet the pinned Docker image versions
-(actionlint ≥ 1.7.12, zizmor ≥ 1.31.1, poutine ≥ 1.1.6). Missing, older, or
+(actionlint ≥ 1.7.12, zizmor ≥ 1.32.0, poutine ≥ 1.1.6). Missing, older, or
 unrecognized versions fall back to Docker. Local actionlint uses shellcheck and
 pyflakes from `PATH` when those integrations are enabled; it does not install them.
 

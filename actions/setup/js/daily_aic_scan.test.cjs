@@ -1056,6 +1056,8 @@ describe("trusted artifact fallback without writable Actions cache", () => {
     expect(listWorkflowRunsForRepo).toHaveBeenCalledTimes(2);
     expect(listWorkflowRunArtifacts).not.toHaveBeenCalled();
     expect(global.core.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("restore stopped at repository_history after 1 attempt(s)"));
+    expect(global.core.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("API responses observed by this restore: 4"));
+    expect(global.core.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("a cache miss has not been established"));
     expect(fs.existsSync(cachePath)).toBe(false);
   });
 
@@ -1074,6 +1076,12 @@ describe("trusted artifact fallback without writable Actions cache", () => {
     expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("quota_exhausted"));
     expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("reset=2026-10-14T10:06:00.000Z"));
     expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("Accounting remains unverified; agent startup is blocked"));
+    expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("Activation stage: Restore daily AIC scan observations"));
+    expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("API responses observed by this restore: 1; shared quota used is not this step's request count"));
+    expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("Snapshot discovery has not started in the failed restore phase attempt; earlier attempts may have queried history or artifacts"));
+    expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("Blocked until at least 2026-10-14T10:06:00.000Z"));
+    expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("Check existing scheduled runs after the deadline before retrying"));
+    expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("github-token reference"));
     expect(JSON.stringify([global.core.info.mock.calls, summary.addRaw.mock.calls])).not.toContain("secret-test-value");
     expect(fs.existsSync(cachePath)).toBe(false);
   });
@@ -1102,7 +1110,36 @@ describe("trusted artifact fallback without writable Actions cache", () => {
     expect(getWorkflowRun).toHaveBeenCalledOnce();
     expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("quota_exhausted"));
     expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("retry_not_before=2026-10-14T10:06:00.000Z"));
+    expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("Blocked until at least 2026-10-14T10:06:00.000Z"));
+    expect(global.core.info).toHaveBeenCalledWith("[daily-aic-cache] No further API requests before 2026-10-14T10:06:00.000Z");
     expect(JSON.stringify([global.core.info.mock.calls, summary.addRaw.mock.calls])).not.toContain("private payload");
+  });
+
+  it.each([
+    [{ "x-ratelimit-remaining": "0", "x-ratelimit-reset": "1791972360", "retry-after": "120" }, "2026-10-14T10:06:13.000Z"],
+    [{ "x-ratelimit-remaining": "4000", "x-ratelimit-reset": "1791972900", "retry-after": "120" }, "2026-10-14T10:06:13.000Z"],
+    [{ "x-ratelimit-remaining": "100", "x-ratelimit-reset": "1791972900", "retry-after": "120" }, "2026-10-14T10:15:00.000Z"],
+    [{ "x-ratelimit-remaining": "4000", "x-ratelimit-reset": "1791972900", "retry-after": "invalid" }, null],
+    [{ "retry-after": "120" }, "2026-10-14T10:06:13.000Z"],
+    [{ "x-ratelimit-remaining": "0" }, null],
+    [{ "x-ratelimit-remaining": "0", "x-ratelimit-reset": "9999999999999999", "retry-after": "private-header-value" }, null],
+    [{ "x-ratelimit-remaining": "0", "x-ratelimit-reset": "1" }, null],
+  ])("reports a safe recovery deadline without retrying restricted reads: %j", async (headers, deadline) => {
+    vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-14T10:04:13Z"));
+    const failure = apiError(403, headers, "private API payload");
+    const getWorkflowRun = vi.fn().mockRejectedValue(failure);
+    const listWorkflowRuns = vi.fn();
+    global.context = { repo: { owner: "example", repo: "project" }, runId: 99, payload: {} };
+    global.github = { rest: { actions: { getWorkflowRun, listWorkflowRuns } } };
+    const summary = { addRaw: vi.fn().mockReturnThis(), write: vi.fn().mockResolvedValue(undefined) };
+    global.core.summary = summary;
+    await expect(restore(cachePath)).rejects.toMatchObject({ code: "DAILY_AIC_QUOTA_STOP" });
+    expect(getWorkflowRun).toHaveBeenCalledOnce();
+    expect(listWorkflowRuns).not.toHaveBeenCalled();
+    expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining(deadline ? `Blocked until at least ${deadline}` : "Blocked until: unknown"));
+    expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("A reset does not verify accounting or authorize agent startup"));
+    expect(JSON.stringify([global.core.info.mock.calls, summary.addRaw.mock.calls])).not.toMatch(/private API payload|private-header-value/);
+    expect(fs.existsSync(cachePath)).toBe(false);
   });
 
   it.each([

@@ -212,6 +212,7 @@ emit_release() {
 test_version_resolution() (
     local case_name=$1
     local case_root home fixture_bin install_dir binary_path asset checksums output requested_version expected_tag gh_log
+    local gh_token="" auth_mode=none reject_auth=false
     case_root=$(mktemp -d)
     trap 'rm -rf -- "$case_root"' EXIT
     home="$case_root/home"
@@ -269,6 +270,31 @@ test_version_resolution() (
             requested_version="v0.37.18"
             expected_tag="$requested_version"
             ;;
+        auth-pinned)
+            requested_version="v0.37.18"
+            expected_tag="$requested_version"
+            gh_token="test-token"
+            auth_mode=required
+            ;;
+        no-auth-pinned)
+            requested_version="v0.37.18"
+            expected_tag="$requested_version"
+            auth_mode=absent
+            ;;
+        auth-401-fallback)
+            requested_version="v0.37.18"
+            expected_tag="$requested_version"
+            gh_token="test-token"
+            auth_mode=fallback
+            reject_auth=true
+            ;;
+        auth-latest)
+            requested_version="latest"
+            expected_tag="v1.2.3"
+            gh_token="test-token"
+            auth_mode=required
+            printf '{"tag_name":"%s"}\n' "$expected_tag" > "$case_root/latest.json"
+            ;;
         gh-install-metadata-tag)
             requested_version="v0.37.18+build.1"
             expected_tag="$requested_version"
@@ -293,19 +319,47 @@ test_version_resolution() (
 #!/bin/bash
 set -e
 url="${!#}"
-if [[ "$url" == https://api.github.com/repos/github/gh-aw/releases\?* ]]; then
-    has_header() {
-        local expected_header=$1
-        shift
-        while [ "$#" -gt 0 ]; do
-            if [ "$1" = "-H" ] || [ "$1" = "--header" ]; then
-                shift
-                [ "$1" = "$expected_header" ] && return 0
-            fi
+has_header() {
+    local expected_header=$1
+    shift
+    while [ "$#" -gt 0 ]; do
+        if [ "$1" = "-H" ] || [ "$1" = "--header" ]; then
             shift
-        done
-        return 1
-    }
+            [[ "${1:-}" == $expected_header ]] && return 0
+        fi
+        shift
+    done
+    return 1
+}
+if [ "$FIXTURE_CHECK_AUTH" = true ]; then
+    case "$url" in
+        https://github.com/*|https://api.github.com/*)
+            for arg in "$@"; do
+                [ "$arg" != "--location-trusted" ] || { echo "unexpected --location-trusted" >&2; exit 1; }
+            done
+            expected_authorization="Authorization: Bearer "
+            expected_authorization+="$GH_TOKEN"
+            if has_header "$expected_authorization" "$@"; then
+                auth_status=authenticated
+            else
+                auth_status=anonymous
+            fi
+            printf '%s\t%s\n' "$url" "$auth_status" >> "$FIXTURE_REQUEST_LOG"
+            case "$FIXTURE_AUTH_MODE" in
+                required)
+                    [ "$auth_status" = authenticated ] || { echo "missing GH_TOKEN authorization header for $url" >&2; exit 1; }
+                    ;;
+                absent)
+                    [ "$auth_status" = anonymous ] || { echo "unexpected Authorization header for $url" >&2; exit 1; }
+                    ;;
+            esac
+            if [ "$FIXTURE_REJECT_AUTH" = true ] && [ "$auth_status" = authenticated ]; then
+                exit 22
+            fi
+            ;;
+    esac
+fi
+if [[ "$url" == https://api.github.com/repos/github/gh-aw/releases\?* ]]; then
     has_header "Accept: application/vnd.github+json" "$@" || { echo "missing GitHub API Accept header" >&2; exit 1; }
     has_header "User-Agent: gh-aw-install-gh-aw.sh" "$@" || { echo "missing GitHub API User-Agent header" >&2; exit 1; }
     has_header "X-GitHub-Api-Version: 2022-11-28" "$@" || { echo "missing GitHub API version header" >&2; exit 1; }
@@ -316,6 +370,7 @@ if [[ "$url" == https://api.github.com/repos/github/gh-aw/releases\?* ]]; then
     fi
 fi
 case "$url" in
+    https://api.github.com/repos/github/gh-aw/releases/latest) source_file="$FIXTURE_LATEST" ;;
     https://api.github.com/repos/github/gh-aw/releases\?per_page=100\&page=*)
         page="${url##*page=}"
         source_file="$FIXTURE_RELEASES_DIR/page-$page.json"
@@ -326,12 +381,14 @@ case "$url" in
         [ "$tag" = "$FIXTURE_TAG" ] || { echo "unexpected release tag: $tag" >&2; exit 1; }
         source_file="$FIXTURE_BINARY"
         ;;
+    https://github.com/github/gh-aw/releases/latest/download/"$PLATFORM") source_file="$FIXTURE_BINARY" ;;
     https://github.com/github/gh-aw/releases/download/*/checksums.txt)
         tag="${url#https://github.com/github/gh-aw/releases/download/}"
         tag="${tag%/checksums.txt}"
         [ "$tag" = "$FIXTURE_TAG" ] || { echo "unexpected checksum tag: $tag" >&2; exit 1; }
         source_file="$FIXTURE_CHECKSUMS"
         ;;
+    https://github.com/github/gh-aw/releases/latest/download/checksums.txt) source_file="$FIXTURE_CHECKSUMS" ;;
     *) echo "unexpected curl URL: $url" >&2; exit 1 ;;
 esac
 args=("$@")
@@ -372,7 +429,12 @@ EOF
         FIXTURE_CHECKSUMS="$checksums" \
         FIXTURE_RELEASES_DIR="$case_root/releases" \
         FIXTURE_EXPECT_GH_TOKEN="$([ "$case_name" = channel-page-and-semver ] && echo true || echo false)" \
-        GH_TOKEN="$([ "$case_name" = channel-page-and-semver ] && echo test-token || echo '')" \
+        FIXTURE_CHECK_AUTH="$([ "$auth_mode" = none ] && echo false || echo true)" \
+        FIXTURE_AUTH_MODE="$auth_mode" \
+        FIXTURE_REJECT_AUTH="$reject_auth" \
+        FIXTURE_REQUEST_LOG="$case_root/requests" \
+        FIXTURE_LATEST="$case_root/latest.json" \
+        GH_TOKEN="$([ "$case_name" = channel-page-and-semver ] && echo test-token || echo "$gh_token")" \
         FIXTURE_GH_INSTALL_SUCCESS="$([ "$case_name" = gh-install-metadata-tag ] && echo true || echo false)" \
         FIXTURE_INSTALLED_VERSION="v0.37.18" \
         GH_ARGUMENT_LOG="$gh_log" \
@@ -394,11 +456,44 @@ EOF
         grep -q "Successfully installed gh-aw using gh extension install" "$output" ||
             fail "gh extension install rejected a matching version with build metadata"
         grep -q -- "--pin $expected_tag" "$gh_log" || fail "gh extension install did not use the metadata-bearing tag"
+    elif [ "$case_name" = auth-latest ]; then
+        [ "$("$binary_path" version)" = "gh aw version $expected_tag" ] ||
+            fail "latest download did not install the resolved version"
     else
         grep -q -- "--pin $expected_tag" "$gh_log" || fail "gh extension install did not use resolved/exact tag"
         [ "$("$binary_path" version)" = "gh aw version $expected_tag" ] ||
             fail "download did not install the resolved/exact tag"
     fi
+    case "$case_name" in
+        auth-pinned)
+            [ "$(wc -l < "$case_root/requests" | tr -d ' ')" -eq 2 ] || fail "pinned install did not make exactly two GitHub requests"
+            awk -F '\t' '$2 != "authenticated" { exit 1 }' "$case_root/requests" || fail "pinned binary or checksums request lacked Authorization"
+            ;;
+        no-auth-pinned)
+            [ "$(wc -l < "$case_root/requests" | tr -d ' ')" -eq 2 ] || fail "pinned install did not make exactly two GitHub requests"
+            awk -F '\t' '$2 != "anonymous" { exit 1 }' "$case_root/requests" || fail "request carried Authorization without GH_TOKEN"
+            ;;
+        auth-401-fallback)
+            [ "$(awk -F '\t' '$1 ~ /\/download\/v0[.]37[.]18\/linux-amd64$/ && $2 == "authenticated" { count++ } END { print count+0 }' "$case_root/requests")" -eq 3 ] ||
+                fail "binary did not exhaust authenticated retries"
+            [ "$(awk -F '\t' '$1 ~ /\/download\/v0[.]37[.]18\/linux-amd64$/ && $2 == "anonymous" { count++ } END { print count+0 }' "$case_root/requests")" -eq 1 ] ||
+                fail "binary did not retry anonymously once"
+            [ "$(awk -F '\t' '$1 ~ /\/download\/v0[.]37[.]18\/checksums.txt$/ && $2 == "authenticated" { count++ } END { print count+0 }' "$case_root/requests")" -eq 3 ] ||
+                fail "checksums did not exhaust authenticated retries"
+            [ "$(awk -F '\t' '$1 ~ /\/download\/v0[.]37[.]18\/checksums.txt$/ && $2 == "anonymous" { count++ } END { print count+0 }' "$case_root/requests")" -eq 1 ] ||
+                fail "checksums did not retry anonymously once"
+            [ "$(grep -c 'Authenticated download failed' "$output")" -eq 2 ] || fail "authenticated download failures did not warn before anonymous fallback"
+            ;;
+        auth-latest)
+            [ "$(wc -l < "$case_root/requests" | tr -d ' ')" -eq 3 ] || {
+                cat "$case_root/requests" >&2
+                fail "latest install did not make exactly three GitHub requests"
+            }
+            awk -F '\t' '$2 != "authenticated" { exit 1 }' "$case_root/requests" || fail "latest API, binary, or checksum request lacked Authorization"
+            awk -F '\t' '$1 == "https://api.github.com/repos/github/gh-aw/releases/latest" && $2 == "authenticated" { found=1 } END { exit !found }' "$case_root/requests" ||
+                fail "latest release lookup did not include Authorization"
+            ;;
+    esac
     assert_no_staging_leftovers "$install_dir"
     echo "  PASS"
 )
@@ -693,7 +788,7 @@ fi
 for case_name in dangling-symlink live-symlink partial-download checksum-mismatch invalid-binary directory-conflict; do
     test_manual_binary_replacement "$case_name"
 done
-for case_name in channel-page-and-semver channel-no-v1-release exact-tag gh-install-metadata-tag; do
+for case_name in channel-page-and-semver channel-no-v1-release exact-tag auth-pinned no-auth-pinned auth-401-fallback auth-latest gh-install-metadata-tag; do
     test_version_resolution "$case_name"
 done
 
