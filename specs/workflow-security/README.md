@@ -889,15 +889,17 @@ assumptions until real behavior disappears:
 
 | Boundary not fully modeled | Evidence / required refinement |
 |---|---|
-| Pre-activation actor authorization, bots, replay | A:608–660,966–1012; CTR-027/029; model trusted event identity and separate membership/checkout gates. |
-| Compiler expressions and freshness | CTR-010/016/018; model expression classification, manifest approvals, frontmatter/body hashes, legacy fallbacks, and status-function augmentation. |
-| Detection warning handling | WTD1–3; disabled/conditional modes are modeled, but warning-mode annotated publication, push-to-PR conversion, and abort-only operations still need operation-specific refinement. |
-| Authorized custom steps/tools and augmented app grants | CTR-017; agent-job host secrets and explicit tool grants are legitimate. Do not assume all job secrets or permission augmentation are forbidden. |
-| Redaction coverage and exceptions | Ordering checks do not guarantee successful redaction of every artifact. Binary/unscanned exceptions and fallback `always()` uploads need explicit coverage/lifecycle states. |
-| Cache integrity and publication | CTR-019; model policy/integrity namespaces, restoration, detection-gated publication, and detection-disabled post-action saving. |
-| Checkout merging, primary target, and directory identity | Entry identity is `(repository,path,wiki)`; `current` does not change cwd. Model token/app alternatives, unioned fetch/sparse patterns, and deepest history selection. |
-| Safe-output token precedence | Runtime entry precedence, representative missing-key fallbacks, and independence from neighboring scoped Apps are modeled. Static/shared checkout target selection, installation grants, and handler/head-token variants still require separate refinement. |
-| Filesystem and platform enforcement | Artifact service origin, immutable event metadata, AWF/gateway isolation, labels, action pin integrity, post-job cleanup, and revocation are environmental assumptions at this layer. |
+| Boundary not fully modeled | Priority | Owner / tracking | Target TLA+ module | Evidence / required refinement |
+|---|---|---|---|---|
+| Pre-activation actor authorization, bots, replay | P1 | gh-aw maintainers · [#76553](https://github.com/github/gh-aw/issues/76553) | `CommentTriggeredPRCheckout.tla` | A:608–660,966–1012; CTR-027/029; model trusted event identity and separate membership/checkout gates. |
+| Compiler expressions and freshness | P1 | gh-aw maintainers · [#76553](https://github.com/github/gh-aw/issues/76553) | `CompiledWorkflow.tla` | CTR-010/016/018; model expression classification, manifest approvals, frontmatter/body hashes, legacy fallbacks, and status-function augmentation. |
+| Detection warning handling | P2 | gh-aw maintainers · [#76553](https://github.com/github/gh-aw/issues/76553) | `CompiledWorkflow.tla` | WTD1–3; disabled/conditional modes are modeled, but warning-mode annotated publication, push-to-PR conversion, and abort-only operations still need operation-specific refinement. |
+| Authorized custom steps/tools and augmented app grants | P1 | gh-aw maintainers · [#76553](https://github.com/github/gh-aw/issues/76553) | `CompiledWorkflow.tla` | CTR-017; agent-job host secrets and explicit tool grants are legitimate. Do not assume all job secrets or permission augmentation are forbidden. |
+| Redaction coverage and exceptions | P1 | gh-aw maintainers · [#76553](https://github.com/github/gh-aw/issues/76553) | `SafeOutputTransport.tla` | Ordering checks do not guarantee successful redaction of every artifact. Binary/unscanned exceptions and fallback `always()` uploads need explicit coverage/lifecycle states. |
+| Cache integrity and publication | P2 | gh-aw maintainers · [#76553](https://github.com/github/gh-aw/issues/76553) | `CompiledWorkflow.tla` | CTR-019; model policy/integrity namespaces, restoration, detection-gated publication, and detection-disabled post-action saving. |
+| Checkout merging, primary target, and directory identity | P1 | gh-aw maintainers · [#76553](https://github.com/github/gh-aw/issues/76553) | `RuntimeRepositoryCheckout.tla` | Entry identity is `(repository,path,wiki)`; `current` does not change cwd. Model token/app alternatives, unioned fetch/sparse patterns, and deepest history selection. |
+| Safe-output token precedence | P1 | gh-aw maintainers · [#76553](https://github.com/github/gh-aw/issues/76553) | `SafeOutputGeneration.tla` | Runtime entry precedence, representative missing-key fallbacks, and independence from neighboring scoped Apps are modeled. Static/shared checkout target selection, installation grants, and handler/head-token variants still require separate refinement. |
+| Filesystem and platform enforcement | P2 | gh-aw maintainers · [#76553](https://github.com/github/gh-aw/issues/76553) | `SafeOutputTransport.tla` | Artifact service origin, immutable event metadata, AWF/gateway isolation, labels, action pin integrity, post-job cleanup, and revocation are environmental assumptions at this layer. |
 
 ## Daily investigation
 

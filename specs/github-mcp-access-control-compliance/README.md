@@ -65,6 +65,15 @@ Where:
 
 The denial code is selected by the first failing guard in the evaluation order above.
 
+## Local implementation status
+
+The local `pkg/workflow/` compiler has no `tools.github.roles` or
+`private-repos` fields. These controls remain normative in the specification but
+are deferred locally, so the abstract `P3_RoleAllow` and `P4_PrivateRepoAllow`
+fixtures test the specification model only and do not establish local Complete
+Conformance. The status was verified on 2026-11-10 in Section 4.8 of the
+[specification](../../scratchpad/github-mcp-access-control-specification.md).
+
 ## Behavioral Coverage Map
 
 | Predicate / Invariant | Test Function | Description |

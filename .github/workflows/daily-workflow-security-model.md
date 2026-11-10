@@ -113,8 +113,12 @@ Compare that boundary against the current security architecture and compiler
 threat specification cited by the README, plus the corresponding compiler and
 runtime code. State precisely which behavior is enforced, merely documented,
 assumed, configurable, or not modeled. Trace every new predicate to source paths
-and symbols. Include failure/cancellation paths and explicitly authorized tool
-credentials; do not assume every token is forbidden in the agent.
+and symbols. Use the prioritized refinement backlog in
+`specs/workflow-security/README.md` as the source of truth for unresolved
+boundaries, keeping the tracking owner and target module aligned with any
+proposed refinement. A backlog item is not by itself a confirmed defect.
+Include failure/cancellation paths and explicitly authorized tool credentials;
+do not assume every token is forbidden in the agent.
 
 Refine one bounded aspect of the model when warranted. Preserve all existing
 secure runs, negative controls, and witness traces. Add a targeted mutation or
