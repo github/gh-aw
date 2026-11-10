@@ -140,7 +140,7 @@ func TestRoutingAllowedModelsScopesAliasesAcrossEngines(t *testing.T) {
 	for _, engine := range []string{"copilot", "claude", "codex", "pi"} {
 		for _, alias := range aliases {
 			t.Run(engine+"/"+alias, func(t *testing.T) {
-				patterns, err := expandModelRoutingAlias(alias, BuiltinModelAliases(), engine)
+				patterns, err := expandModelRoutingAliasInNamespace(alias, BuiltinModelAliases(), engine, copilotRoutingNamespace)
 				if engine == "codex" && (alias == "sonnet" || alias == "haiku" || alias == "opus") {
 					require.ErrorContains(t, err, "Responses API", "Codex must not route to Claude models")
 					return
@@ -417,17 +417,17 @@ process.stdout.write(JSON.stringify(status));`)
 
 func TestRoutingAllowedModelsNoInventedFamilyPatterns(t *testing.T) {
 	for _, alias := range []string{"grok", "computer-use"} {
-		_, err := expandModelRoutingAlias(alias, BuiltinModelAliases(), "codex")
+		_, err := expandModelRoutingAliasInNamespace(alias, BuiltinModelAliases(), "codex", copilotRoutingNamespace)
 		require.ErrorContains(t, err, "no models compatible with Codex's Responses API", alias)
 	}
-	patterns, err := expandModelRoutingAlias("sonnet", BuiltinModelAliases(), "claude")
+	patterns, err := expandModelRoutingAliasInNamespace("sonnet", BuiltinModelAliases(), "claude", copilotRoutingNamespace)
 	require.NoError(t, err)
 	require.Equal(t, []string{"github-copilot/claude-*sonnet*"}, patterns)
 }
 
 func TestRoutingAllowedModelsIntersectsLeadingWildcardWithFamily(t *testing.T) {
 	aliases := map[string][]string{"my-claude": {"copilot/*claude-sonnet*", "anthropic/*sonnet*"}}
-	patterns, err := expandModelRoutingAlias("my-claude", aliases, "claude")
+	patterns, err := expandModelRoutingAliasInNamespace("my-claude", aliases, "claude", copilotRoutingNamespace)
 	require.NoError(t, err)
 	require.Equal(t, []string{"github-copilot/claude-sonnet*"}, patterns)
 	matched, _ := path.Match(strings.TrimPrefix(patterns[0], "github-copilot/"), "claude-sonnet-5")
