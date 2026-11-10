@@ -38,6 +38,17 @@ func TestSmokeAndCoverageFailureContracts(t *testing.T) {
 			},
 		},
 		{
+			name: "spec-enforcer",
+			required: []string{
+				`> "$GITHUB_WORKSPACE/coverage/spec-enforcer-cobertura.xml"`,
+				`file: "coverage/spec-enforcer-cobertura.xml"`,
+			},
+			rejected: []string{
+				`> "$RUNNER_TEMP/gh-aw/safeoutputs/upload-code-coverage/`,
+				`file: "cobertura.xml"`,
+			},
+		},
+		{
 			name: "smoke-pi",
 			required: []string{
 				"Wait for each tool result",

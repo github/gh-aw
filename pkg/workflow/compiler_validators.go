@@ -28,14 +28,16 @@ func (c *Compiler) validateExpressions(workflowData *WorkflowData, markdownPath 
 	// to provide a specific, actionable error/warning message.
 	// In strict mode this returns an error that stops further validation.
 	// In non-strict mode it emits a warning and continues.
-	if err := c.validateSecretsSerializationExpressions(workflowData); err != nil {
+	expressionData := *workflowData
+	expressionData.MarkdownContent += "\n" + workflowData.PromptMarkdown
+	if err := c.validateSecretsSerializationExpressions(&expressionData); err != nil {
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
 
 	// Validate expression safety - check that all GitHub Actions expressions are in the allowed list.
 	// In non-strict mode, ${{ toJSON(secrets) }} occurrences were already warned about above;
 	// neutralize them so the allowlist does not re-surface them as errors.
-	markdownForAllowlist := removeXMLComments(workflowData.MarkdownContent)
+	markdownForAllowlist := removeXMLComments(expressionData.MarkdownContent)
 	if !c.effectiveStrictMode(workflowData.RawFrontmatter) {
 		markdownForAllowlist = neutralizeSecretsSerializationExpressions(markdownForAllowlist)
 	}
@@ -61,7 +63,7 @@ func (c *Compiler) validateExpressions(workflowData *WorkflowData, markdownPath 
 		}
 	}
 
-	if err := validatePromptSecretBindings(workflowData, c.collectRuntimeImportMarkdownForCompilerAnalysis(workflowData)); err != nil {
+	if err := validatePromptSecretBindings(workflowData, c.collectRuntimeImportMarkdownForPromptExpressions(workflowData)); err != nil {
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
 	// Warn when the prompt explicitly references /tmp/ or /tmp/gh-aw/ directly instead
@@ -85,6 +87,10 @@ func runtimeImportValidationMarkdown(workflowData *WorkflowData) string {
 
 	var seed strings.Builder
 	seed.WriteString(workflowData.MarkdownContent)
+	if workflowData.PromptMarkdown != "" {
+		seed.WriteByte('\n')
+		seed.WriteString(workflowData.PromptMarkdown)
+	}
 	if workflowData.MainWorkflowMarkdown != "" {
 		seed.WriteByte('\n')
 		seed.WriteString(workflowData.MainWorkflowMarkdown)
