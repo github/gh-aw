@@ -50,13 +50,10 @@ class GuidanceTests(unittest.TestCase):
             ("pkg/cli/data/agentic_workflows_agent.md", "- **Creating new workflows**"),
         ):
             content = (ROOT / path).read_text()
-            route = next(line for line in content.splitlines() if line.startswith("- ") and "Local, self-contained SDLC" in line)
+            route = next(line for line in content.splitlines() if line.startswith("- ") and "Local SDLC issue bootstrap" in line)
             with self.subTest(router=path):
                 self.assertIn(".github/aw/squad.md", route)
-                self.assertIn("verbatim", route)
-                self.assertIn("for a coding agent", route)
-                self.assertIn("do not execute it, install Squad, or create a gh-aw workflow", route)
-                self.assertIn("Explicit GitHub Actions automation requests keep their existing routes", route)
+                self.assertLessEqual(len(route.split()), 12)
                 self.assertIn(workflow_route, content)
 
     def test_agent_lists_squad_after_workflow_routes(self):
@@ -66,11 +63,10 @@ class GuidanceTests(unittest.TestCase):
             routes = [line for line in section.splitlines() if line.startswith("- ")]
             with self.subTest(agent=path):
                 self.assertTrue(routes[0].startswith("- **Creating new workflows**"))
-                self.assertTrue(routes[-1].startswith("- **Local, self-contained SDLC"))
+                self.assertTrue(routes[-1].startswith("- **Local SDLC issue bootstrap"))
 
     def test_squad_is_discoverable_from_instructions_and_pattern_router(self):
         for path in (
-            "AGENTS.md",
             ".github/aw/instructions.md",
             ".github/aw/github-agentic-workflows.md",
             ".github/aw/patterns.md",
@@ -79,7 +75,6 @@ class GuidanceTests(unittest.TestCase):
             with self.subTest(instructions=path):
                 self.assertIn("squad.md", content)
                 self.assertIn("local", content.lower())
-                self.assertIn("verbatim", content)
         fallback = json.loads((ROOT / "pkg/cli/data/agentic_workflows_fallback_aw_files.json").read_text())
         self.assertIn("squad.md", fallback)
         skill = (SKILL / "SKILL.md").read_text()
@@ -93,6 +88,9 @@ class GuidanceTests(unittest.TestCase):
             "establish local SDLC intent before including setup authorization",
             "If Squad is already initialized, use the existing team",
             "unless the user explicitly requests reinitialization",
+            "for a coding agent",
+            "Copy the entire `<details>` section from the code block verbatim",
+            "do not paraphrase, customize, or execute the prompt while preparing the issue",
         ):
             with self.subTest(guard=required):
                 self.assertIn(required, guide)

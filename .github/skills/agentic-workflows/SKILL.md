@@ -126,7 +126,6 @@ If GitHub API, `gh api`, or GitHub MCP downloads return HTTP 403 (including a to
 - `.github/aw/workflow-patterns.md`
 
 After loading the matching workflow prompt or skill, follow it directly:
-- Local, self-contained SDLC for substantial issue work: `.github/aw/squad.md` before workflow creation or pattern selection. Copy its bootstrap prompt verbatim into the generated issue for a coding agent; do not execute it, install Squad, or create a gh-aw workflow while preparing the issue. Explicit GitHub Actions automation requests keep their existing routes.
 - Design workflows from scratch via interview: `.github/aw/designer.md`
 - Create new workflows: `.github/aw/create-agentic-workflow.md`
 - Configure scheduled dreaming or consolidate persistent memory: `.github/aw/create-agentic-workflow.md`, then `.github/aw/memory.md#scheduled-dreaming`; load `.github/aw/dreaming.md` only when the decision and input scope justify implementation
@@ -148,6 +147,7 @@ After loading the matching workflow prompt or skill, follow it directly:
 - Advanced cost controls without native settings (custom AIC allowances by server size or shared organization budget policies): read `docs/src/content/docs/reference/cost-management.md#configure-advanced-cost-controls-with-admission` ([published guidance](https://github.github.com/gh-aw/reference/cost-management/#configure-advanced-cost-controls-with-admission)). Explain the external authority requirement and cooperative limits; do not invent frontmatter fields or promise hard caps, reservations, or mid-run cancellation.
 - Design long-running multi-agent research workflows: `.github/aw/multi-agent-research.md`
 - Add skills or agent plugins requested by the user (`skills:` / `plugins:` frontmatter, never on-the-fly installs): `.github/aw/skills.md`
+- Local SDLC issue bootstrap: `.github/aw/squad.md`
 
 When the task involves OTEL, OTLP, traces, observability backends, or telemetry-driven analysis, also read and follow `skills/otel-queries/SKILL.md` after loading the matching workflow prompt or skill.
 

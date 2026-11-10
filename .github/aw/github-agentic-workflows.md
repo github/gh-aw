@@ -5,15 +5,6 @@ applyTo: ".github/workflows/*.md,.github/workflows/**/*.md"
 
 # GitHub Agentic Workflows
 
-## Local SDLC with Squad
-
-For substantial issue work where the user wants a local, self-contained software
-development lifecycle (SDLC), follow [squad.md](squad.md) before selecting a
-workflow pattern. Copy its bootstrap `<details>` section verbatim into the
-generated issue body for a coding agent; do not execute the prompt while preparing the issue.
-This is not a request to create a gh-aw workflow. Explicit GitHub Actions
-automation requests continue through the workflow guidance below.
-
 ## Persona-to-Pattern Quick Matrix
 
 Persona-lens view of the same facts as the canonical [Decision Matrix](triggers.md#decision-matrix) in triggers.md; update both when a trigger/tool/output mapping changes.
@@ -195,6 +186,7 @@ For the full dependency-license/compliance review pattern (paths scoping, licens
 | Experiments and A/B testing | [experiments.md](experiments.md) |
 | Charts and Python data visualization | [charts.md](charts.md) |
 | LLM API endpoint discovery | [llms.md](llms.md) |
+| Local SDLC issue bootstrap | [squad.md](squad.md) |
 
 ## Compile Commands
 

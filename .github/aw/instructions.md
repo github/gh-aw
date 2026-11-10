@@ -113,5 +113,4 @@ never replace full-stream findings or establish threat absence.
 
 ## Local SDLC with Squad
 
-For substantial local, self-contained SDLC issues, follow [squad.md](squad.md)
-and copy its bootstrap prompt verbatim into the issue; do not execute it.
+For local SDLC issues, follow [squad.md](squad.md).
