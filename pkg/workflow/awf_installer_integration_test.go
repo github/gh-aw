@@ -98,22 +98,29 @@ Inspect the repository.
 			}
 			installStep = strings.Join(stepLines[:boundary], "\n")
 			expectedCommand := `        run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.28.62 --checksums-sha256 ` + checksum + ` --rootless`
-			commandFound := false
-			for line := range strings.SplitSeq(installStep, "\n") {
-				if strings.HasPrefix(line, "        run:") && line == expectedCommand {
-					commandFound = true
-					break
-				}
-			}
-			if !commandFound {
-				t.Errorf("generated %s lock file lacks the pinned installer command:\n%s", runner, installStep)
-			}
 			if runner == "windows-latest" {
-				if !strings.Contains(installStep, "shell: bash") {
-					t.Errorf("generated Windows install step does not use Bash:\n%s", installStep)
+				if !strings.Contains(installStep, "shell: pwsh") ||
+					!strings.Contains(installStep, "wsl.exe --distribution Ubuntu --user root --exec bash --noprofile --norc -e -o pipefail") {
+					t.Errorf("generated Windows install step does not launch Bash in WSL:\n%s", installStep)
 				}
-			} else if strings.Contains(installStep, "shell: bash") {
-				t.Errorf("generated Linux install step unexpectedly overrides its default shell:\n%s", installStep)
+				windowsCommand := strings.ReplaceAll(expectedCommand, "/gh-aw/actions/", "/gh-aw-setup/actions/")
+				if script := decodeWindowsWSLRunScript(t, installStep); !strings.Contains(script, strings.TrimPrefix(windowsCommand, "        run: ")) {
+					t.Errorf("generated Windows WSL payload lacks the pinned installer command:\n%s", script)
+				}
+			} else {
+				commandFound := false
+				for line := range strings.SplitSeq(installStep, "\n") {
+					if strings.HasPrefix(line, "        run:") && line == expectedCommand {
+						commandFound = true
+						break
+					}
+				}
+				if !commandFound {
+					t.Errorf("generated %s lock file lacks the pinned installer command:\n%s", runner, installStep)
+				}
+				if strings.Contains(installStep, "shell: bash") {
+					t.Errorf("generated Linux install step unexpectedly overrides its default shell:\n%s", installStep)
+				}
 			}
 		})
 	}
