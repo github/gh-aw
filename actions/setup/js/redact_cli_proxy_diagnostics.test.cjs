@@ -22,6 +22,45 @@ describe("CLI proxy console diagnostic sanitizer", () => {
     });
   }
 
+  function capture(content, env = {}) {
+    return spawnSync(process.execPath, [script, "--capture"], {
+      input: content,
+      encoding: "utf8",
+      env: { PATH: process.env.PATH, ...env },
+    });
+  }
+
+  it("retains final lines and masks from both sides of an overflowing capture", () => {
+    const result = capture(`::add-mask::early-secret\n${"x".repeat(2 * MAX_DIAGNOSTIC_BYTES)}\nearly-secret late-secret\n::add-mask::late-secret\nfinal line\n`);
+    expect(result.status).toBe(2);
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toContain("*** ***");
+    expect(result.stdout).toContain("final line");
+    for (const secret of ["early-secret", "late-secret", "::add-mask::"]) expect(result.stdout).not.toContain(secret);
+    expect(Buffer.byteLength(result.stdout)).toBeLessThanOrEqual(MAX_DIAGNOSTIC_BYTES);
+  });
+
+  it("drops a partial first line rather than publishing a split credential", () => {
+    const secret = "synthetic-credential";
+    const result = capture(`${"x".repeat(MAX_DIAGNOSTIC_BYTES)}${secret}\n${"y".repeat(MAX_DIAGNOSTIC_BYTES - secret.length)}\n`, { GH_TOKEN: secret });
+    expect(result.status).toBe(2);
+    expect(result.stdout).not.toContain("credential");
+    expect(result.stdout).toBe("y".repeat(MAX_DIAGNOSTIC_BYTES - secret.length));
+  });
+
+  it("does not publish a giant unterminated partial line", () => {
+    const result = capture("x".repeat(2 * MAX_DIAGNOSTIC_BYTES));
+    expect(result.status).toBe(2);
+    expect(result.stdout).toBe("");
+  });
+
+  it("fails closed when mask metadata exceeds the capture budget", () => {
+    const result = capture(`::add-mask::${"x".repeat(MAX_DIAGNOSTIC_BYTES + 1)}\nfinal line\n`);
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toBe("");
+  });
+
   it("normalizes NUL bytes before matching environment credentials and collecting masks", () => {
     const secret = "synthetic-proxy-credential";
     const output = redactCliProxyDiagnostics(`synthetic-proxy-\0credential\n::add-\0mask::runtime-\0credential\nruntime-credential\nruntime-\0credential`, { GH_TOKEN: secret });

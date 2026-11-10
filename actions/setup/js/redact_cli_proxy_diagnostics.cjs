@@ -11,7 +11,7 @@ const MAX_DIAGNOSTIC_BYTES = 1024 * 1024;
  * @param {NodeJS.ProcessEnv} env
  * @returns {string}
  */
-function redactCliProxyDiagnostics(content, env, credentialPatterns = []) {
+function redactCliProxyDiagnostics(content, env, credentialPatterns = [], maskedValues = []) {
   // Bash command substitution removes NUL bytes; normalize before matching.
   content = content.replaceAll("\0", "");
   const names = new Set(["GH_TOKEN", "GITHUB_TOKEN", ...PROXY_ENV_NAMES, ...Object.keys(env).filter(name => name.startsWith("SECRET_"))]);
@@ -22,7 +22,7 @@ function redactCliProxyDiagnostics(content, env, credentialPatterns = []) {
     names.add(name);
     names.add(`SECRET_${name}`);
   }
-  const values = collectAddMaskedValues(content);
+  const values = [...maskedValues, ...collectAddMaskedValues(content)];
   for (const name of names) {
     const value = env[name];
     if (!value) continue;
@@ -54,6 +54,51 @@ function redactCliProxyDiagnostics(content, env, credentialPatterns = []) {
 }
 
 /**
+ * Drain startup output while retaining a bounded tail and masks from all lines.
+ * @param {NodeJS.ReadableStream} input
+ * @returns {Promise<{content: string, truncated: boolean, masks: string[]}>}
+ */
+async function captureCliProxyDiagnostics(input) {
+  let tail = Buffer.alloc(0);
+  let truncated = false;
+  let pending = "";
+  let maskBytes = 0;
+  const masks = new Set();
+  input.setEncoding("utf8");
+  for await (const chunk of input) {
+    const text = chunk.toString().replaceAll("\0", "");
+    const bytes = Buffer.from(text);
+    truncated ||= tail.length + bytes.length > MAX_DIAGNOSTIC_BYTES;
+    tail = Buffer.concat([tail, bytes]).subarray(-MAX_DIAGNOSTIC_BYTES);
+    const lines = (pending + text).split("\n");
+    pending = lines.pop() || "";
+    for (const line of lines) {
+      for (const value of collectAddMaskedValues(line)) {
+        if (masks.has(value)) continue;
+        maskBytes += Buffer.byteLength(value);
+        if (maskBytes > MAX_DIAGNOSTIC_BYTES) throw new Error("CLI proxy mask limit exceeded");
+        masks.add(value);
+      }
+    }
+    // Keep scanning giant lines for commands without retaining their full prefix.
+    const command = pending.indexOf("::add-mask::");
+    if (command !== -1) pending = pending.slice(command);
+    if (Buffer.byteLength(pending) > MAX_DIAGNOSTIC_BYTES) {
+      if (command !== -1) throw new Error("CLI proxy mask limit exceeded");
+      pending = pending.slice(-MAX_DIAGNOSTIC_BYTES);
+    }
+  }
+  for (const value of collectAddMaskedValues(pending)) {
+    maskBytes += Buffer.byteLength(value);
+    if (maskBytes > MAX_DIAGNOSTIC_BYTES) throw new Error("CLI proxy mask limit exceeded");
+    masks.add(value);
+  }
+  // Never publish the first partial line: truncation could split a credential.
+  const content = truncated ? tail.subarray(tail.indexOf(10) + 1).toString("utf8") : tail.toString("utf8");
+  return { content: truncated && !tail.includes(10) ? "" : content, truncated, masks: [...masks] };
+}
+
+/**
  * @param {string} filePath
  * @returns {string}
  */
@@ -69,15 +114,29 @@ function readCliProxyDiagnostics(filePath) {
   }
 }
 
-if (require.main === module) {
+async function main() {
   try {
-    const content = readCliProxyDiagnostics(process.argv[2]);
-    const redacted = redactCliProxyDiagnostics(content, process.env);
-    process.stdout.write(redacted.trimEnd().split("\n").slice(-20).join("\n"));
+    const captured = process.argv[2] === "--capture" ? await captureCliProxyDiagnostics(process.stdin) : null;
+    const content = captured ? captured.content : readCliProxyDiagnostics(process.argv[2]);
+    const redacted = redactCliProxyDiagnostics(content, process.env, [], captured?.masks);
+    let output = redacted.trimEnd().split("\n").slice(-20).join("\n");
+    // Escaping during redaction can expand the retained text beyond its byte cap.
+    if (captured && Buffer.byteLength(output) > MAX_DIAGNOSTIC_BYTES) {
+      const tail = Buffer.from(output).subarray(-MAX_DIAGNOSTIC_BYTES);
+      output = tail.includes(10) ? tail.subarray(tail.indexOf(10) + 1).toString("utf8") : "";
+      captured.truncated = true;
+    }
+    process.stdout.write(output);
+    if (captured?.truncated) process.exitCode = 2;
   } catch {
     // The caller withholds both streams and emits a fixed, payload-free error.
     process.exitCode = 1;
   }
 }
+
+if (require.main === module)
+  main().catch(() => {
+    process.exitCode = 1;
+  });
 
 module.exports = { MAX_DIAGNOSTIC_BYTES, readCliProxyDiagnostics, redactCliProxyDiagnostics };
