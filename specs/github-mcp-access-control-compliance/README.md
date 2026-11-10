@@ -3,7 +3,7 @@
 This directory contains fixture stubs for the Section 11 compliance tests of the
 [GitHub MCP Access Control Specification](../../scratchpad/github-mcp-access-control-specification.md).
 
-**Spec version pinned at commit `34f03fba65c7bf34c1c03654b3c03900b7597a39`.**
+**Spec version pinned at commit `acc6a88801ea84b853bc7432f00f1343ae4b7fe3`.**
 
 ## Sync Guard: pinned spec drift check
 
@@ -15,7 +15,7 @@ CI fetches the full history so the comparison uses the latest commit that change
 `scratchpad/github-mcp-access-control-specification.md` and fails when it differs from the pin:
 
 ```bash
-PINNED="34f03fba65c7bf34c1c03654b3c03900b7597a39"
+PINNED="acc6a88801ea84b853bc7432f00f1343ae4b7fe3"
 CURRENT="$(git log -n1 --format=%H -- scratchpad/github-mcp-access-control-specification.md)"
 
 test "$CURRENT" = "$PINNED" || {
