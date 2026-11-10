@@ -7,7 +7,8 @@ const { createHash } = require("node:crypto");
 const { isDeepStrictEqual } = require("node:util");
 const { parseLockFileHeaders, parseMarkdownJSON } = require("./lock_file_headers.cjs");
 const { withRetry, RATE_LIMIT_RETRY_CONFIG, isRateLimitError } = require("./error_recovery.cjs");
-const MARKDOWN_METADATA_RETRY_CONFIG = { ...RATE_LIMIT_RETRY_CONFIG, shouldRetry: isRateLimitError };
+// Metadata reads block activation, so cap rate-limit retries at about 90 seconds plus jitter.
+const MARKDOWN_METADATA_RETRY_CONFIG = { ...RATE_LIMIT_RETRY_CONFIG, maxRetries: 2, maxDelayMs: 60000, shouldRetry: isRateLimitError };
 
 /** @typedef {{sha256: string, kind: string, value: any, error?: string}} MetadataRecord */
 /** @typedef {{version: number, records: MetadataRecord[]}} MetadataCatalog */
@@ -285,7 +286,14 @@ function readLocalMarkdownMetadata(file, workspace) {
 /** @param {any} githubClient @param {{owner: string, repo: string, path: string, ref: string}} identity */
 async function readRemoteMarkdownMetadata(githubClient, identity) {
   if (!githubClient?.rest?.repos?.getContent) throw new Error("Compiler Markdown metadata requires the source repository's GitHub client");
-  const { data } = await withRetry(() => githubClient.rest.repos.getContent(identity), MARKDOWN_METADATA_RETRY_CONFIG, `read compiler Markdown metadata for ${identity.owner}/${identity.repo}`);
+  let response;
+  try {
+    response = await withRetry(() => githubClient.rest.repos.getContent(identity), MARKDOWN_METADATA_RETRY_CONFIG, `read compiler Markdown metadata for ${identity.owner}/${identity.repo}`);
+  } catch (error) {
+    if (error?.originalError) throw error.originalError;
+    throw error;
+  }
+  const { data } = response;
   if (!data || data.type !== "file" || data.path !== identity.path || data.encoding !== "base64" || typeof data.content !== "string") throw new Error("Executing workflow lock manifest is not a regular source file");
   if (data.content.length > Math.ceil((4 * 1024 * 1024) / 3) * 4 + 65536) throw new Error("Executing workflow lock manifest exceeds the bounded input limit");
   const encoded = data.content.replace(/[\r\n]/g, "");

@@ -162,9 +162,9 @@ describe("compiler metadata source acquisition", () => {
   it("never falls back to checkout metadata after a source authorization failure", async () => {
     const file = ".github/workflows/main.lock.yml";
     fs.writeFileSync(path.join(workspace, file), headers([record({ model: "forged" })]));
-    const failure = Object.assign(new Error("Forbidden"), { status: 403 });
+    const failure = Object.assign(new Error("Forbidden"), { status: 403, response: { status: 403, headers: {} } });
     const githubClient = { rest: { repos: { getContent: vi.fn().mockRejectedValue(failure) } } };
-    await expect(metadata.loadMarkdownMetadata(`owner/repo/${file}@main`, workspace, { revision, githubClient })).rejects.toMatchObject({ originalError: failure });
+    await expect(metadata.loadMarkdownMetadata(`owner/repo/${file}@main`, workspace, { revision, githubClient })).rejects.toBe(failure);
     expect(githubClient.rest.repos.getContent).toHaveBeenCalledTimes(1);
     expect(metadata.readMarkdownMetadata("agent", document).value).toEqual({});
   });
