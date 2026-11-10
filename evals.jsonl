@@ -864,3 +864,5 @@
 {"id":"pr_created_or_skipped","question":"Was a PR created with CI fixes, or was the run correctly skipped because CI was already passing?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-10T21:35:21.632Z","runid":"42905183435"}
 {"id":"ci_state_assessed","question":"Did the agent assess the current CI state and determine if intervention was needed?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-10T22:35:36.541Z","runid":"42914656415"}
 {"id":"pr_created_or_skipped","question":"Was a PR created with CI fixes, or was the run correctly skipped because CI was already passing?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-10T22:35:36.541Z","runid":"42914656415"}
+{"id":"ci_state_assessed","question":"Did the agent assess the current CI state and determine if intervention was needed?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-10T23:35:36.603Z","runid":"42923453752"}
+{"id":"pr_created_or_skipped","question":"Was a PR created with CI fixes, or was the run correctly skipped because CI was already passing?","answer":"UNKNOWN","model":"gpt-6-luna","timestamp":"2026-11-10T23:35:36.603Z","runid":"42923453752"}
