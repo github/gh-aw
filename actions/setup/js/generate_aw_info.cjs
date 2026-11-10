@@ -59,13 +59,18 @@ async function main(core, ctx, githubClient) {
   // Build awInfo from env vars (compile-time) + context (runtime)
   const model = process.env.GH_AW_INFO_MODEL || "";
   const workflowId = process.env.GH_AW_INFO_WORKFLOW_ID || "";
-  if (!process.env.GH_AW_INFO_WORKFLOW_SHA) throw new Error("Executing compiler metadata requires GH_AW_INFO_WORKFLOW_SHA; recompile this workflow");
   const { loadMarkdownMetadata, metadataManifestFields } = require("./markdown_metadata.cjs");
-  const markdownMetadata = await loadMarkdownMetadata(workflowId, process.env.GITHUB_WORKSPACE || "", {
-    repository: ctx.repo ? `${ctx.repo.owner}/${ctx.repo.repo}` : undefined,
-    githubClient: githubClient || global.github,
-    revision: process.env.GH_AW_INFO_WORKFLOW_SHA,
-  });
+  let markdownMetadata;
+  if (!process.env.GH_AW_INFO_WORKFLOW_SHA) {
+    core.warning("GH_AW_INFO_WORKFLOW_SHA is not set; skipping revision-bound compiler Markdown metadata. Recompile this workflow to restore metadata.");
+    markdownMetadata = { records: [] };
+  } else {
+    markdownMetadata = await loadMarkdownMetadata(workflowId, process.env.GITHUB_WORKSPACE || "", {
+      repository: ctx.repo ? `${ctx.repo.owner}/${ctx.repo.repo}` : undefined,
+      githubClient: githubClient || global.github,
+      revision: process.env.GH_AW_INFO_WORKFLOW_SHA,
+    });
+  }
 
   // Reject model names that contain an unresolved GitHub Actions expression.
   // This can happen when a vars.* expression was used for the model in the

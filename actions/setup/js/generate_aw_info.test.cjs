@@ -187,6 +187,18 @@ describe("generate_aw_info.cjs", () => {
     expect(awInfo.created_at).toBeTruthy();
   });
 
+  it("should continue writing aw_info.json when workflow SHA is missing", async () => {
+    delete process.env.GH_AW_INFO_WORKFLOW_SHA;
+
+    await main(mockCore, mockContext);
+
+    expect(mockCore.warning).toHaveBeenCalledWith("GH_AW_INFO_WORKFLOW_SHA is not set; skipping revision-bound compiler Markdown metadata. Recompile this workflow to restore metadata.");
+    expect(fs.existsSync(awInfoPath)).toBe(true);
+    const awInfo = JSON.parse(fs.readFileSync(awInfoPath, "utf8"));
+    expect(awInfo.agent_metadata).toEqual({});
+    expect(mockGithub.rest.repos.getContent).not.toHaveBeenCalled();
+  });
+
   it("keeps compiler metadata in aw_info.json without dumping it to Actions logs", async () => {
     const agent = { name: "private-agent", description: "confidential-agent-description", model: "private-model", tools: ["confidential-tool"] };
     const digest = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");
