@@ -1,29 +1,27 @@
 {
-  "last_run_date": "2026-11-09",
+  "last_run_date": "2026-11-10",
   "last_window": {
-    "start": "2026-11-08T07:55:50Z",
-    "end": "2026-11-09T07:55:50Z"
+    "start": "2026-11-09T07:55:41Z",
+    "end": "2026-11-10T07:55:41Z"
   },
   "observed_window": {
-    "coverage": "Partial: 185 cached run records from 2026-11-09T03:21:24Z through 2026-11-09T07:52:46Z; 2026-11-08T07:55:50Z through 2026-11-09T03:20:54Z missing after count limit",
+    "coverage": "Partial: 286 cached run records from 2026-11-09T20:27:39Z through 2026-11-10T07:52:54Z; 2026-11-09T07:55:41Z through 2026-11-09T20:27:06Z missing after count limit",
     "representative_audits": [
-      42561605912,
-      42579453481,
-      42562699860,
-      42579514401
+      42751663439,
+      42775479108,
+      42755401610
     ]
   },
   "key_themes": [
-    "Seven Process Safe Outputs failures across three workflows",
-    "Five Install AWF binary failures across five workflows",
-    "PR #76126 review led to repair and maintainer merge",
-    "Hourly Auditor evidence collection failed five times"
+    "49 activation metadata failures across 35 workflows, followed by lock regeneration",
+    "Auditor evidence collection failed in 10 runs; two further Auditor runs failed activation",
+    "Simulator memory validation failure followed by merged compatibility fix",
+    "Human reviewer directed bounded retry on separate metadata read PR"
   ],
   "carry_forward_questions": [
-    "Did PR #76185 repair simulator sweep and memory publication after review?",
-    "What caused AWF binary installation failures across five workflows?",
-    "Did the PR #76126 queue maintenance change improve live runs?",
-    "What failed inside hourly Auditor evidence collection?",
-    "What occurred in missing 2026-11-08 07:55:50 to 2026-11-09 03:20:54 UTC interval?"
+    "Does activation remain healthy beyond the cached post-merge slice?",
+    "What exact error keeps Auditor evidence collection from running?",
+    "Did PR #76401 restore the next simulator run?",
+    "What occurred in the missing 2026-11-09 07:55:41 to 20:27:06 UTC interval?"
   ]
 }
