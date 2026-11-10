@@ -1834,8 +1834,14 @@ test("workflow polls every five minutes but never starts an agent for low budget
   const workflow = readFileSync(new URL("../.github/workflows/pr-sous-chef.md", import.meta.url), "utf8");
   assert.match(workflow, /^  schedule: every 5m$/m);
   assert.match(workflow, /^max-daily-ai-credits: -1$/m);
+  assert.match(workflow, /^  slash_command:\n    strategy: centralized\n    name: \[souschef, cook\]\n    events: \[pull_request_comment\]$/m);
   assert.match(workflow, /^  skip-if-no-match: .* -label:broccoli"$/m);
-  assert.match(workflow, /^if: needs\.prefilter\.outputs\.rate_limit_low == 'false' && \(needs\.prefilter\.outputs\.eligible_count > 0 \|\| needs\.activation\.outputs\.slash_command == 'souschef'\)$/m);
+  assert.match(
+    workflow,
+    /^if: needs\.prefilter\.outputs\.rate_limit_low == 'false' && \(needs\.prefilter\.outputs\.eligible_count > 0 \|\| needs\.activation\.outputs\.slash_command == 'souschef' \|\| needs\.activation\.outputs\.slash_command == 'cook'\)$/m
+  );
+  assert.match(workflow, /Explicit `\/souschef` or `\/cook` invocations may start the agent for acknowledgement only/);
+  assert.match(workflow, /If invoked by `\/souschef` or `\/cook`, acknowledge the triggering PR exactly once via/);
   assert.match(workflow, /sparse-checkout: \|\n\s+scripts\n\s+actions\/setup\/js\n\s+\.github\/scripts/);
   assert.match(workflow, /assign-to-agent:\n\s+name: copilot\n\s+allowed: \[copilot\]\n\s+target: "\*"\n\s+max: 4\n\s+github-token: \$\{\{ secrets\.AWI_MAINTENANCE_TOKEN \}\}/);
   assert.match(workflow, /post its `nudges\[0\]\.body` and `nudges\[0\]\.data` exactly via `add_comment` on\n\s+`nudges\[0\]\.pr_number`/);
