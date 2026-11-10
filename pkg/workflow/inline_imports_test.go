@@ -39,6 +39,56 @@ engine: copilot
 	assert.Equal(t, hash1, hash2, "same content should produce the same hash")
 }
 
+func TestInlinedImports_PreservesInlineAgentsAndSkillsInPrompt(t *testing.T) {
+	tmpDir := t.TempDir()
+	workflowPath := filepath.Join(tmpDir, "inline-agent-repro.md")
+	workflowContent := `---
+name: inline-agent-repro
+on: workflow_dispatch
+engine: copilot
+strict: false
+permissions:
+  contents: read
+inlined-imports: true
+---
+# Main Workflow
+
+Delegate to the greeter agent.
+
+## agent: ` + "`greeter`" + `
+---
+description: Greets the user
+---
+Say hello from greeter.
+## end agent: ` + "`greeter`" + `
+
+## skill: ` + "`greeting`" + `
+---
+description: Greets users
+---
+Use the greeting skill.
+## end skill: ` + "`greeting`" + `
+`
+	require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0600))
+
+	compiler := NewCompiler()
+	compiler.SetQuiet(true)
+	require.NoError(t, compiler.CompileWorkflow(workflowPath))
+
+	lockContent, err := os.ReadFile(filepath.Join(tmpDir, "inline-agent-repro.lock.yml"))
+	require.NoError(t, err)
+	for _, expected := range []string{
+		"## agent: `greeter`",
+		"Say hello from greeter.",
+		"## end agent: `greeter`",
+		"## skill: `greeting`",
+		"Use the greeting skill.",
+		"## end skill: `greeting`",
+	} {
+		assert.Contains(t, string(lockContent), expected)
+	}
+}
+
 // TestInlinedImports_AgentFileError verifies that when inlined-imports: true and a custom agent
 // file is imported, ParseWorkflowFile returns a compilation error.
 // Agent files require runtime access and will not be resolved without sources.

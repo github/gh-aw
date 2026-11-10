@@ -480,6 +480,14 @@ func (c *Compiler) resolveMarkdownArtifacts(
 		return nil, fmt.Errorf("failed to expand includes in markdown: %w", err)
 	}
 	mainWorkflowMarkdown := markdownContent
+	if c.inlinePrompt || resolveInlinedImports(result.Frontmatter) {
+		var promptIncludedFiles []string
+		mainWorkflowMarkdown, promptIncludedFiles, err = parser.ExpandIncludesWithManifest(result.Markdown, markdownDir, false, c.getSharedImportCache())
+		if err != nil {
+			return nil, fmt.Errorf("failed to expand includes in main workflow prompt: %w", err)
+		}
+		includedMarkdownFiles = append(includedMarkdownFiles, promptIncludedFiles...)
+	}
 	orchestratorToolsLog.Printf("Main workflow markdown: %d bytes", len(mainWorkflowMarkdown))
 	importPaths := append([]string{}, importsResult.ImportPaths...)
 	promptImports := append([]parser.PromptImportEntry(nil), importsResult.PromptImports...)
