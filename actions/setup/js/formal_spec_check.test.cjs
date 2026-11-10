@@ -1,7 +1,6 @@
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const require = createRequire(import.meta.url);
@@ -13,7 +12,7 @@ let options;
 let calls;
 
 beforeEach(() => {
-  directory = mkdtempSync(join(realpathSync(tmpdir()), "gh-aw-formal-check-"));
+  directory = mkdtempSync(resolve(".gh-aw-formal-check-"));
   workspace = join(directory, "workspace");
   models = join(workspace, "specs/formal/nested-selected");
   mkdirSync(models, { recursive: true });
@@ -38,6 +37,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
   rmSync(directory, { recursive: true, force: true });
 });
@@ -64,7 +64,67 @@ describe("bounded formal-spec check helper", () => {
     expect(evidence.sources.map(source => source.path)).toEqual(["specs/nested/selected.md", "specs/formal/nested-selected/Model.tla", ...(action === "tlc" ? ["specs/formal/nested-selected/Model.cfg"] : [])]);
     expect(evidence.sources.every(source => /^[a-f0-9]{64}$/.test(source.sha256))).toBe(true);
     expect(evidence.records.map(record => record.status)).toEqual([0, 0]);
-    expect(readFileSync(join(result.results, `${action}.stdout.log`), "utf8")).toBe("");
+    expect(evidence.records.every(record => record.stdout === "" && record.stderr === "")).toBe(true);
+    expect(readdirSync(result.results).some(file => file.endsWith(".log"))).toBe(false);
+  });
+
+  it("rejects colliding spec slugs before using a shared model directory", () => {
+    writeFileSync(join(workspace, "specs/nested-selected.md"), "# Another specification\n");
+    for (const spec of ["specs/nested/selected.md", "specs/nested-selected.md"]) {
+      expect(() => runFormalCheck(["sany", spec, "Model.tla"], options)).toThrow(/slug.*collision/i);
+    }
+    expect(calls).toHaveLength(0);
+  });
+
+  it("isolates every child environment, including compiled models, from agent credentials and runtime hooks", () => {
+    vi.stubEnv("GH_TOKEN", "fake-agent-token");
+    vi.stubEnv("NODE_OPTIONS", "--require=/agent/hook.cjs");
+    vi.stubEnv("JAVA_TOOL_OPTIONS", "-javaagent:/agent/hook.jar");
+    vi.stubEnv("LD_PRELOAD", "/agent/hook.so");
+    vi.stubEnv("PATH", "/agent/bin");
+    vi.stubEnv("HOME", "/agent/home");
+    vi.stubEnv("TMPDIR", "/agent/tmp");
+    const result = runFormalCheck(["koka", "specs/nested/selected.md", "main.kk"], options);
+    expect(calls).toHaveLength(3);
+    for (const { settings } of calls) {
+      expect(settings.env).toEqual({
+        PATH: "/usr/local/bin:/usr/bin:/bin",
+        HOME: join(result.results, "home"),
+        TMPDIR: join(result.results, "tmp"),
+        LANG: "C.UTF-8",
+        LC_ALL: "C.UTF-8",
+        TZ: "UTC",
+      });
+      expect(readdirSync(settings.env.HOME)).toEqual([]);
+      expect(readdirSync(settings.env.TMPDIR)).toEqual([]);
+      expect(settings.stdio).toEqual(["ignore", "pipe", "pipe"]);
+      expect(settings.maxBuffer).toBe(65536);
+    }
+  });
+
+  it("persists only bounded redacted output previews and sanitizes process errors", () => {
+    const secret = "fake-sensitive-agent-token";
+    vi.stubEnv("GH_TOKEN", secret);
+    const message = `runtime unavailable: ${secret}`;
+    options.spawnSync.mockReturnValue({
+      status: null,
+      signal: null,
+      stdout: Buffer.from(`${secret}${"x".repeat(100000)}`),
+      stderr: Buffer.from(`diagnostic ${secret}`),
+      error: new Error(message),
+    });
+    expect(() => runFormalCheck(["sany", "specs/nested/selected.md", "Model.tla"], options)).toThrow("runtime unavailable: [REDACTED]");
+    const results = join(options.resultsRoot, "nested-selected", readdirSync(join(options.resultsRoot, "nested-selected"))[0]);
+    const evidenceText = readFileSync(join(results, "evidence.json"), "utf8");
+    const record = JSON.parse(evidenceText).records[0];
+    expect(evidenceText).not.toContain(secret);
+    expect(record.stdout).toContain("[REDACTED]");
+    expect(Buffer.byteLength(record.stdout)).toBeLessThanOrEqual(8192);
+    expect(record.stdout_truncated).toBe(true);
+    expect(record.stderr).toBe("diagnostic [REDACTED]");
+    expect(record.stderr_truncated).toBe(false);
+    expect(record.error).toBe("runtime unavailable: [REDACTED]");
+    expect(readdirSync(results).some(file => file.endsWith(".log"))).toBe(false);
   });
 
   it("compiles and runs Koka only in a fresh confined output directory", () => {
@@ -132,7 +192,10 @@ describe("bounded formal-spec check helper", () => {
   it("serializes checks and caps the remaining shared budget", () => {
     mkdirSync(options.resultsRoot);
     writeFileSync(join(options.resultsRoot, "budget.lock"), "another check");
-    expect(() => runFormalCheck(["sany", "specs/nested/selected.md", "Model.tla"], options)).toThrow(/EEXIST/);
+    expect(() => runFormalCheck(["sany", "specs/nested/selected.md", "Model.tla"], options)).toThrow(
+      `Formal-check budget lock already exists: ${join(options.resultsRoot, "budget.lock")}. Another check may still be running; remove this lock only after confirming no formal check is active.`
+    );
+    expect(readFileSync(join(options.resultsRoot, "budget.lock"), "utf8")).toBe("another check");
     expect(calls).toHaveLength(0);
     rmSync(join(options.resultsRoot, "budget.lock"));
     writeFileSync(join(options.resultsRoot, "budget.json"), JSON.stringify({ elapsed_ms: 470000 }));

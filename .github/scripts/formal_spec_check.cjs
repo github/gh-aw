@@ -10,6 +10,31 @@ const JAVA = "/tmp/gh-aw/agent/tla-tools/jre/bin/java";
 const JAR = "/tmp/gh-aw/agent/tla-tools/tla2tools.jar";
 const KOKA = "/tmp/gh-aw/agent/koka/bin/koka";
 const BUDGET_MS = 8 * 60 * 1000;
+const OUTPUT_LIMIT = 8192;
+
+function specSlug(relative) {
+  return relative.slice(0, -".md".length).replaceAll("/", "-");
+}
+
+function rejectSlugCollision(root, selected, slug, prefix = "") {
+  for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+    const relative = prefix + entry.name;
+    if (entry.isDirectory()) {
+      rejectSlugCollision(path.join(root, entry.name), selected, slug, `${relative}/`);
+    } else if (entry.isFile() && relative.endsWith(".md") && relative !== selected && specSlug(relative) === slug) {
+      throw new Error(`Formal-check spec slug collision: specs/${selected} and specs/${relative} both map to ${slug}`);
+    }
+  }
+}
+
+function outputPreview(value, secrets) {
+  let text = value == null ? "" : value.toString();
+  for (const secret of secrets) text = text.replaceAll(secret, "[REDACTED]");
+  const buffer = Buffer.from(text);
+  text = buffer.subarray(0, OUTPUT_LIMIT).toString("utf8");
+  if (Buffer.byteLength(text) > OUTPUT_LIMIT) text = text.slice(0, -1);
+  return { text, truncated: buffer.length > OUTPUT_LIMIT };
+}
 
 function confinedPath(root, relative, directory = false) {
   const parts = relative.split("/");
@@ -49,7 +74,9 @@ function runFormalCheck(args, options = {}) {
   if (!spec.startsWith("specs/") || !spec.endsWith(".md")) throw new Error("Select one Markdown specification under specs/");
   const workspace = fs.realpathSync(options.workspace || path.resolve(__dirname, "../.."));
   const specPath = confinedPath(workspace, spec);
-  const slug = spec.slice("specs/".length, -".md".length).replaceAll("/", "-");
+  const relativeSpec = spec.slice("specs/".length);
+  const slug = specSlug(relativeSpec);
+  rejectSlugCollision(path.join(workspace, "specs"), relativeSpec, slug);
   const modelDirectory = confinedPath(workspace, `specs/formal/${slug}`, true);
   const extension = action === "koka" ? "kk" : "tla";
   if (!new RegExp(`^[A-Za-z][A-Za-z0-9_-]*\\.${extension}$`).test(model)) throw new Error(`Expected a ${extension} model basename`);
@@ -62,7 +89,15 @@ function runFormalCheck(args, options = {}) {
   const resultsRoot = options.resultsRoot || path.join(fs.realpathSync("/tmp"), path.relative("/tmp", RESULTS_ROOT));
   createDirectory(resultsRoot);
   const lockPath = path.join(resultsRoot, "budget.lock");
-  const lock = fs.openSync(lockPath, "wx");
+  let lock;
+  try {
+    lock = fs.openSync(lockPath, "wx");
+  } catch (error) {
+    if (error.code === "EEXIST") {
+      throw new Error(`Formal-check budget lock already exists: ${lockPath}. Another check may still be running; remove this lock only after confirming no formal check is active.`);
+    }
+    throw error;
+  }
   try {
     return runChecks();
   } finally {
@@ -81,6 +116,22 @@ function runFormalCheck(args, options = {}) {
     const slugDirectory = path.join(resultsRoot, slug);
     createDirectory(slugDirectory);
     const results = fs.mkdtempSync(path.join(slugDirectory, `${action}-`));
+    const home = path.join(results, "home");
+    const tmp = path.join(results, "tmp");
+    createDirectory(home);
+    createDirectory(tmp);
+    const env = {
+      PATH: "/usr/local/bin:/usr/bin:/bin",
+      HOME: home,
+      TMPDIR: tmp,
+      LANG: "C.UTF-8",
+      LC_ALL: "C.UTF-8",
+      TZ: "UTC",
+    };
+    const secrets = Object.entries(process.env)
+      .filter(([name, value]) => /TOKEN|SECRET|PASSWORD|CREDENTIAL|AUTH|API[_-]?KEY|PRIVATE[_-]?KEY|ACCESS[_-]?KEY/i.test(name) && value)
+      .map(([, value]) => value)
+      .sort((a, b) => b.length - a.length);
     const records = [];
     const execute = options.spawnSync || spawnSync;
     const java = options.java || JAVA;
@@ -94,25 +145,39 @@ function runFormalCheck(args, options = {}) {
       const remaining = BUDGET_MS - spent;
       if (remaining < 1000) throw new Error("The shared eight-minute formal-check budget is exhausted");
       const seconds = Math.min(Math.floor(remaining / 1000), maxMs / 1000);
-      const stdout = fs.openSync(path.join(results, `${name}.stdout.log`), "wx");
-      const stderr = fs.openSync(path.join(results, `${name}.stderr.log`), "wx");
       const start = Date.now();
       let result;
       try {
         result = execute("timeout", ["--kill-after=30s", `${seconds}s`, executable, ...argv], {
           cwd: modelDirectory,
-          stdio: ["ignore", stdout, stderr],
+          env,
+          stdio: ["ignore", "pipe", "pipe"],
+          maxBuffer: 65536,
           timeout: (seconds + 35) * 1000,
         });
+      } catch (error) {
+        result = { status: null, signal: null, error };
       } finally {
-        fs.closeSync(stdout);
-        fs.closeSync(stderr);
         spent += Date.now() - start;
         fs.writeFileSync(budgetPath, JSON.stringify({ elapsed_ms: spent }) + "\n");
       }
-      records.push({ name, command: [executable, ...argv], timeout_seconds: seconds, status: result.status, signal: result.signal, error: result.error?.message });
+      const stdout = outputPreview(result.stdout, secrets);
+      const stderr = outputPreview(result.stderr, secrets);
+      const error = result.error ? outputPreview(result.error.message, secrets).text : undefined;
+      records.push({
+        name,
+        command: [executable, ...argv],
+        timeout_seconds: seconds,
+        status: result.status,
+        signal: result.signal,
+        error,
+        stdout: stdout.text,
+        stdout_truncated: stdout.truncated,
+        stderr: stderr.text,
+        stderr_truncated: stderr.truncated,
+      });
       fs.writeFileSync(path.join(results, "evidence.json"), JSON.stringify({ action, sources, records }, null, 2) + "\n");
-      if (result.error) throw result.error;
+      if (result.error) throw new Error(error);
       if (result.status === null) throw new Error(`${name} terminated by ${result.signal || "unknown signal"}`);
       return result.status;
     }
@@ -139,7 +204,7 @@ module.exports = { runFormalCheck };
 if (require.main === module) {
   try {
     const result = runFormalCheck(process.argv.slice(2));
-    console.log(`Formal-check exit ${result.status}; evidence: ${result.results}`);
+    console.log(`Formal-check exit ${result.status}; evidence: ${path.join(result.results, "evidence.json")}`);
     process.exitCode = result.status;
   } catch (error) {
     console.error(`Formal-check error: ${error.message}`);

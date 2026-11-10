@@ -51,12 +51,27 @@ pre-agent-steps:
   run: |
     set -euo pipefail
     mkdir -p /tmp/gh-aw/agent
+    sample_files() {
+      local count="$1" output="$2" status
+      shift 2
+      # Materialize candidates to avoid SIGPIPE and preserve producer errors.
+      if "$@" > "${output}.candidates"; then
+        :
+      else
+        status=$?
+        # grep returns 1 for an empty match set, not an I/O failure.
+        if [[ "$1" != grep || "$status" -ne 1 ]]; then
+          return "$status"
+        fi
+      fi
+      shuf -n "$count" "${output}.candidates" > "$output"
+    }
     # Sample documentation files (eliminates agent exploratory find turns)
-    find docs/src/content/docs \( -name '*.md' -o -name '*.mdx' \) | shuf -n 2 > /tmp/gh-aw/agent/doc-samples.txt
+    sample_files 2 /tmp/gh-aw/agent/doc-samples.txt find docs/src/content/docs \( -name '*.md' -o -name '*.mdx' \)
     # Sample workflows with messages (pre-compute instead of agent grep)
-    grep -rl "messages:" .github/workflows/ --include="*.md" | shuf -n 2 > /tmp/gh-aw/agent/workflow-samples.txt
+    sample_files 2 /tmp/gh-aw/agent/workflow-samples.txt grep -rl "messages:" .github/workflows/ --include="*.md"
     # Sample validation files
-    find pkg -name '*validation*.go' | shuf -n 1 > /tmp/gh-aw/agent/validation-sample.txt || echo "No validation files found" > /tmp/gh-aw/agent/validation-sample.txt
+    sample_files 1 /tmp/gh-aw/agent/validation-sample.txt find pkg -name '*validation*.go'
     # Load historical memory (eliminates agent memory-read turns)
     if [[ -f /tmp/gh-aw/repo-memory/default/previous-findings.json ]]; then
       cat /tmp/gh-aw/repo-memory/default/previous-findings.json > /tmp/gh-aw/agent/previous-findings.json
@@ -71,9 +86,11 @@ pre-agent-steps:
       printf '[]\n' > /tmp/gh-aw/agent/improvement-themes.json
     fi
     # Pre-read file contents (eliminates view/read tool denials)
-    xargs -a /tmp/gh-aw/agent/doc-samples.txt cat > /tmp/gh-aw/agent/doc-samples-content.txt 2>/dev/null || echo "(no doc samples found)" > /tmp/gh-aw/agent/doc-samples-content.txt
-    xargs -a /tmp/gh-aw/agent/workflow-samples.txt cat > /tmp/gh-aw/agent/workflow-samples-content.txt 2>/dev/null || echo "(no workflow samples found)" > /tmp/gh-aw/agent/workflow-samples-content.txt
-    xargs -a /tmp/gh-aw/agent/validation-sample.txt cat > /tmp/gh-aw/agent/validation-sample-content.txt 2>/dev/null || echo "(no validation sample found)" > /tmp/gh-aw/agent/validation-sample-content.txt
+    for sample in doc-samples workflow-samples validation-sample; do
+      while IFS= read -r file; do
+        cat "$file"
+      done < "/tmp/gh-aw/agent/$sample.txt" > "/tmp/gh-aw/agent/$sample-content.txt"
+    done
 strict: true
 timeout-minutes: 30
 tools:

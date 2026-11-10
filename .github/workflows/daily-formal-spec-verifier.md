@@ -63,7 +63,6 @@ tools:
     - "find specs -type f -name \"*.kk\""
     - "sha256sum *"
     - "node .github/scripts/formal_spec_check.cjs:*"
-    - "cat /tmp/gh-aw/agent/formal-spec-verifier/*"
 
 steps:
     - name: Validate fixture-based TLA+ installer
@@ -113,6 +112,7 @@ alternative, call `report_incomplete` before exhausting the three-denial budget.
 | Format the generated test | `gofmt -w pkg/workflow/example_formal_test.go` (use the actual test path) |
 | Run focused tests | `go test ./pkg/workflow -run '^TestSelectedSpec' -count=1` (use the actual package and selector) |
 | Run a bounded formal check | `node .github/scripts/formal_spec_check.cjs sany specs/example.md Model.tla` (see the model contract below) |
+| Inspect formal-check evidence | Built-in file inspection on the exact `evidence.json` path printed by the helper |
 
 You are a formal methods expert and Go test engineer. Your mission is to:
 
@@ -234,7 +234,9 @@ and report the incompatibility. Never run the whole corpus or download another t
 
 If no suitable model exists and modeling adds value, add a small model under
 `specs/formal/<spec-slug>/`, where the slug derives from the complete selected
-spec path relative to `specs/` (replace `/` with `-` and remove `.md`). Commit
+spec path relative to `specs/` (replace `/` with `-` and remove `.md`). The helper
+rejects colliding slugs (for example `a/b.md` and `a-b.md`); report those as
+incompatible rather than sharing a model directory. Commit
 the `.tla`/`.cfg` or `.kk` sources with the Go tests. Do not add markdown files
 there that would enter the spec rotation, port production code to Koka, or
 introduce a Koka dependency into the Go application's build.
@@ -257,11 +259,22 @@ ungranted `cd`, `timeout`, interpreter, or wrapper.
 The helper uses only the pinned tool paths from shared setup. It runs from the
 model directory, creates fresh evidence/build directories under
 `/tmp/gh-aw/agent/formal-spec-verifier/<spec-slug>/`, and captures tool versions,
-source hashes, exact arguments, statuses, and complete stdout/stderr. It enforces
+source hashes, exact arguments, statuses, and bounded, redacted stdout/stderr
+previews in each run's `evidence.json`. Use built-in file inspection on the exact
+`evidence.json` path printed by the helper, not a shell glob over slug directories.
+Each child gets a fixed system toolchain `PATH`, locale, and timezone, plus fresh
+`HOME` and `TMPDIR` directories; no agent credentials or runtime hooks are inherited.
+Child output capture uses a 64 KiB `maxBuffer`; excessive output fails the check.
+Persisted previews are limited to 8 KiB per stream with truncation flags, and known
+sensitive inherited values are redacted from previews and process errors. Raw logs
+are not persisted. This environment cleanup is not filesystem isolation; do not
+read credentials or other agent files from models. The helper enforces
 `timeout --kill-after=30s`, at most 2 minutes per compilation or TLC invocation,
 30 seconds per Koka executable, and a shared **8-minute total** formal-check
 budget. TLC uses 2 workers and a 2 GiB Java heap. Leave at least 10 minutes for Go
 tests and delivery; narrow the model before starting if these limits cannot fit.
+If the helper reports an existing `budget.lock`, stop and report the full path;
+never remove a lock while another formal check may still be active.
 
 For TLA+, run SANY and the documented TLC configuration, retaining exhaustion
 status, checked invariants/temporal properties, state counts, and counterexamples.
@@ -274,7 +287,9 @@ Simulate external effects with deterministic handlers; do not use live GitHub
 mutations, services, or credentials as model fixtures.
 
 Record source/config hashes, tool versions, exact commands, exit statuses,
-bounds, verdicts, and complete sanitized logs in that results directory. Link
+bounds, verdicts, and the helper's bounded, redacted output previews in that results directory.
+Do not treat a truncated preview as complete evidence; narrow the model or report
+the evidence limitation. Link
 the `formal-spec-verifier-<run_id>-<run_attempt>` artifact and summarize evidence
 in the PR's Formal Model and Usage sections. Distinguish expected negative
 controls from genuine violations, timeouts, parse errors, and tooling failures.

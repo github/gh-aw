@@ -20,9 +20,16 @@ const readWorkflow = name => {
 
 describe("restricted workflow operation contracts", () => {
   it("allows focused Formal validation without granting arbitrary Go or Git commands", () => {
-    const { workflow, permission } = readWorkflow("daily-formal-spec-verifier");
+    const { workflow, prompt, config, permission } = readWorkflow("daily-formal-spec-verifier");
     expect(workflow.tools.bash).toContain("go test:*");
     expect(workflow.tools.bash).toContain("gofmt -w:*");
+    expect(config.permissions.allowedTools).toContain("read");
+    const handler = buildCopilotSDKPermissionHandler(config.permissions, () => ({ kind: "approve-once" }));
+    expect(handler({ kind: "read", path: "/tmp/gh-aw/agent/formal-spec-verifier/replace-label-spec/sany-example/evidence.json" }).kind).toBe("approve-once");
+    expect(workflow.tools.bash).not.toContain("cat /tmp/gh-aw/agent/formal-spec-verifier/*");
+    expect(prompt).toContain("Built-in file inspection on the exact `evidence.json` path printed by the helper");
+    expect(prompt).toContain("not a shell glob over slug directories");
+    expect(prompt).toMatch(/Raw logs\s+are not persisted/);
     for (const command of [
       "go test ./pkg/workflow -run '^TestReplaceLabel' -count=1",
       "gofmt -w pkg/workflow/replace_label_formal_test.go",
