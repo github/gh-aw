@@ -83,11 +83,12 @@ Prereleases are not selected by `latest` or a major-version channel. A channel w
 
 ### `github-token` (optional)
 
-GitHub token for authentication. Used for both `gh` CLI operations and GitHub API calls.
+GitHub token for authentication. Used for `gh` CLI operations, GitHub API calls, and release asset downloads (binaries and checksums). If the token is expired or belongs to a different GitHub instance, the installer retries failed downloads anonymously.
 
 - **Default**: `${{ github.token }}` (automatically provided by GitHub Actions)
 - **Required**: No (uses the default GITHUB_TOKEN automatically)
 - **When to override**: Only needed in special cases like using a PAT with additional permissions
+- **GHES / GHE.com**: The default token belongs to that GitHub instance and is not valid for github.com downloads. Provide a github.com token to authenticate those downloads; otherwise, the installer falls back to anonymous access.
 
 ## Outputs
 
@@ -193,7 +194,7 @@ jobs:
     github-token: ${{ secrets.MY_CUSTOM_TOKEN }}
 ```
 
-**Note**: In most cases, you don't need to specify the `github-token` input. The action automatically uses `${{ github.token }}` which is provided by GitHub Actions.
+**Note**: In most cases, you don't need to specify the `github-token` input. The action automatically uses `${{ github.token }}` which is provided by GitHub Actions. On GHES or GHE.com, provide a github.com token to authenticate github.com release downloads; an instance token is not accepted there and downloads fall back to anonymous access.
 
 ## Troubleshooting
 

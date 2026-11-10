@@ -146,7 +146,7 @@ Workflow and run positional parameters must not start with `-`; use the tool's n
 The read-only `health` tool is available without `--allow-write-tools` or actor validation. It uses the server's GitHub credentials to read a bounded current-revision sample. `days` accepts 7, 30, or 90 (default 7) and is mutually exclusive with `start_date`. Date parameters accept UTC dates, RFC3339 timestamps, or relative times such as `-24h`. `threshold` defaults to 80 percent. Failure clusters and sub-agent failures use the existing `logs_dir` cache only; the tool does not download artifacts or modify cached logs.
 
 > [!NOTE]
-> The `actionlint`, `zizmor`, and `poutine` scanners used by `compile` prefer compatible local binaries on `PATH` (actionlint ≥ 1.7.12, zizmor ≥ 1.31.1, poutine ≥ 1.1.6), falling back to Docker otherwise. Docker-based scanners, including `grant`, pull images on first use. If you see a "Docker images are being downloaded" message, wait 15–30 seconds and retry.
+> The `actionlint`, `zizmor`, and `poutine` scanners used by `compile` prefer compatible local binaries on `PATH` (actionlint ≥ 1.7.12, zizmor ≥ 1.32.0, poutine ≥ 1.1.6), falling back to Docker otherwise. Docker-based scanners, including `grant`, pull images on first use. If you see a "Docker images are being downloaded" message, wait 15–30 seconds and retry.
 
 For `audit`, each run identifier may be a numeric run ID, a run URL, a job URL, or a job URL with a step anchor such as `https://github.com/owner/repo/actions/runs/123/job/456#step:7:1`.
 
