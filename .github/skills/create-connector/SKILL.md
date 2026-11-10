@@ -69,12 +69,16 @@ only when the task explicitly includes that implementation.
 
 ## Supply a complete consumer and documentation
 
-Add one matching standalone XML block with purpose, acquisition/renewal instructions,
+Enclose the entire Markdown body in one XML/HTML comment containing a matching
+`connector-documentation` XML block with purpose, acquisition/renewal instructions,
 phase credential names/scopes, input/grant contracts, evidence/privacy limits,
 and complete consumer YAML/prompt elements. Never include secret values or
-double-hyphen sequences or an outer HTML comment. Do not embed Markdown
-frontmatter delimiters inside it. Documentation is stripped from prompts,
-not executed as setup.
+double-hyphen sequences or nested comments. Do not embed Markdown frontmatter
+delimiters inside it or leave usage instructions outside the comment: the body
+is otherwise a system prompt. Full-source security scans still apply; do not
+add exemptions for documentation. Keep credential-format details in import input
+metadata and reference the inputs from the comment. Documentation is stripped
+from prompts, not executed as setup.
 
 Create a minimal consumer with normal `uses`/`with`, `workflow_dispatch`,
 explicit network approval, one reader and one `staged: true`, `max: 1` effect.

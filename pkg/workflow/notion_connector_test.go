@@ -29,7 +29,7 @@ func notionConsumerExample(t *testing.T) string {
 	t.Helper()
 	source, err := os.ReadFile("../../.github/workflows/connectors/notion.md")
 	require.NoError(t, err)
-	comment := standaloneConnectorDocumentation(t, string(source))
+	comment := commentedConnectorDocumentation(t, string(source))
 	var documentation notionDocumentation
 	require.NoError(t, xml.Unmarshal([]byte(comment), &documentation))
 	require.Equal(t, "notion", documentation.ID)

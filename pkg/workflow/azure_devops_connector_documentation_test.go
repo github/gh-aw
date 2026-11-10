@@ -75,7 +75,7 @@ func loadAzureDevOpsDocumentation(t *testing.T) (azureDevOpsDocumentation, map[s
 	require.NoError(t, err)
 	parts := strings.SplitN(string(content), "---", 3)
 	require.Len(t, parts, 3)
-	document := standaloneConnectorDocumentation(t, string(content))
+	document := commentedConnectorDocumentation(t, string(content))
 	var docs azureDevOpsDocumentation
 	decoder := xml.NewDecoder(strings.NewReader(document))
 	require.NoError(t, decoder.Decode(&docs), "documentation must be well-formed XML")

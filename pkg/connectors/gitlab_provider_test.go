@@ -28,8 +28,11 @@ func TestGitLabProviderDeclarationAndDocumentation(t *testing.T) {
 	}
 
 	body := strings.TrimSpace(parts[2])
-	require.NotContains(t, body, "<!--", "documentation must not be hidden in an HTML comment")
-	require.NotContains(t, body, "-->")
+	require.True(t, strings.HasPrefix(body, "<!--\n"), "documentation must not become system-prompt instructions")
+	require.True(t, strings.HasSuffix(body, "\n-->"))
+	require.Equal(t, 1, strings.Count(body, "<!--"))
+	require.Equal(t, 1, strings.Count(body, "-->"))
+	body = strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(body, "<!--\n"), "\n-->"))
 	require.True(t, strings.HasPrefix(body, "<connector-documentation "))
 	require.True(t, strings.HasSuffix(body, "</connector-documentation>"))
 	var documentation struct {

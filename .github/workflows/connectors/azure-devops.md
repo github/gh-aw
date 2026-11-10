@@ -1913,6 +1913,7 @@ import-schema:
     description: Exact approved same-organization/project work-item REST URLs for the singleton work-item source and each approved link type.
 ---
 
+<!--
 <connector-documentation id="azure-devops" version="1">
   <stability>experimental: true. This connector's contract may change.</stability>
   <gateway-routing receiver-installed="false">
@@ -2349,8 +2350,8 @@ import-schema:
     </effect>
     <effect id="azure-devops-clear-work-item-repro-steps" tool="azure_devops_clear_work_item_repro_steps" inputs="organization, project, work-item">
       Adds the literal empty string at /fields/Microsoft.VSTS.TCM.ReproSteps.
-      Uses the same sparse, footer-free and receipt-aware contract as description
-      clearing; no fallback to another field.
+      Uses the same sparse, footer-free and receipt-aware description-clearing
+      contract; no fallback to another field.
     </effect>
     <effect id="azure-devops-clear-work-item-tags" tool="azure_devops_clear_work_item_tags" inputs="organization, project, work-item">
       Replaces /fields/System.Tags with the literal empty string, never append
@@ -2767,3 +2768,4 @@ authorizes a same-run follow-up.
     <source href="https://learn.microsoft.com/en-us/azure/devops/service-hooks/services/webhooks?view=azure-devops"/>
   </sources>
 </connector-documentation>
+-->

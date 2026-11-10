@@ -26,7 +26,7 @@ func teamsPublicDocumentation(t *testing.T) (string, string) {
 	require.NoError(t, err)
 	doc, err := parser.ExtractFrontmatterFromContent(string(content))
 	require.NoError(t, err)
-	comment := standaloneConnectorDocumentation(t, string(content))
+	comment := commentedConnectorDocumentation(t, string(content))
 	frontmatter, _, found := strings.Cut(string(content), comment)
 	require.True(t, found)
 	require.Contains(t, frontmatter, "\n---\n", "documentation must follow the closing frontmatter separator")

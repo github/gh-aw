@@ -1655,6 +1655,7 @@ import-schema:
     description: Separate Actions secret containing a raw GraphQL personal API key for selected writes; default LINEAR_WRITE_API_KEY.
 ---
 
+<!--
 <connector-documentation id="linear" version="1">
   <stability>experimental: true. This connector's contract may change.</stability>
   <gateway-routing receiver-installed="false">
@@ -1832,7 +1833,7 @@ import-schema:
       Linear signs the raw request body with HMAC-SHA256 in Linear-Signature.
       A trusted receiver would need a separate webhook signing secret, constant
       time signature comparison, and freshness validation of the signed
-      webhookTimestamp in milliseconds; Linear recommends a one-minute window.
+      webhookTimestamp in milliseconds; Linear recommends a one-minute freshness interval.
       The declaration matches /type and /action, checks /organizationId and
       /data/teamId grants, and projects issue-id, organization-id, team-id, url.
     </verification>
@@ -1971,8 +1972,8 @@ import-schema:
       projectUpdates and Initiative.documents/initiativeUpdates also accept
       first: Int and after: String. Query.user/issue/workflowState/project/
       projectMilestone/document/initiative take id: String!, not ID!.
-      Document.content, Project.content, Initiative.content and Comment.body/
-      ProjectUpdate.body/InitiativeUpdate.body are documented content fields.
+      The content fields on Document, Project and Initiative and the body fields
+      on Comment, ProjectUpdate and InitiativeUpdate are documented in the schema.
       The exact pinned public source is listed below; local tests never
       contact a provider or introspect a hosted MCP server.
     </schema-evidence>
@@ -2253,10 +2254,12 @@ safe-outputs:
     <source url="https://raw.githubusercontent.com/linear/linear/master/packages/sdk/src/schema.graphql">Published GraphQL fields, filters, argument and mutation input types.</source>
     <source url="https://raw.githubusercontent.com/linear/linear/253713fef2916ab744defdd71c62acccc8e929a2/packages/sdk/src/schema.graphql">Pinned reader SDL evidence, SHA256 73fac69ae08c0cf8329bbc85a3728a9e24e6e66116ac2f5d6aebbef922b30daf, reviewed 2026-11-02.</source>
   </sources>
+  <usage>
+    Import `.github/workflows/connectors/linear.md` and explicitly select read tools and
+    hyphen-prefixed safe outputs. Supply exact resource allowlists through `with`;
+    the defaults grant no resources. Personal API keys use raw Authorization;
+    hosted MCP requires a separate bearer credential. Event envelopes contain
+    references, not resource content. Native ingress is not operational.
+  </usage>
 </connector-documentation>
-
-Import `.github/workflows/connectors/linear.md` and explicitly select read tools and
-hyphen-prefixed safe outputs. Supply exact resource allowlists through `with`;
-the defaults grant no resources. Personal API keys use raw Authorization;
-hosted MCP requires a separate bearer credential. Event envelopes contain
-references, not resource content. Native ingress is not operational.
+-->

@@ -56,7 +56,7 @@ func sentryPublicSource(selection string) string {
 func TestSentryPublicDocumentationConsumer(t *testing.T) {
 	source, err := os.ReadFile("../../.github/workflows/connectors/sentry.md")
 	require.NoError(t, err)
-	comment := standaloneConnectorDocumentation(t, string(source))
+	comment := commentedConnectorDocumentation(t, string(source))
 	require.Equal(t, 1, strings.Count(comment, `<connector-documentation id="sentry" version="1">`))
 	type section struct {
 		Text string `xml:",innerxml"`

@@ -55,7 +55,7 @@ func loadLinearDocumentation(t *testing.T) linearDocumentation {
 	require.NoError(t, err)
 	parsed, err := parser.ExtractFrontmatterFromContent(string(source))
 	require.NoError(t, err)
-	comment := standaloneConnectorDocumentation(t, string(source))
+	comment := commentedConnectorDocumentation(t, string(source))
 	var documentation linearDocumentation
 	require.NoError(t, xml.Unmarshal([]byte(comment), &documentation))
 	require.Equal(t, "linear", documentation.ID)

@@ -60,7 +60,7 @@ func slackDocumentationSource(t *testing.T) (string, slackDocumentation) {
 	t.Helper()
 	source, err := os.ReadFile("../../.github/workflows/connectors/slack.md")
 	require.NoError(t, err)
-	comment := standaloneConnectorDocumentation(t, string(source))
+	comment := commentedConnectorDocumentation(t, string(source))
 	var documentation slackDocumentation
 	decoder := xml.NewDecoder(strings.NewReader(comment))
 	require.NoError(t, decoder.Decode(&documentation))

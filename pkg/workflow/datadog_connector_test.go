@@ -167,7 +167,7 @@ func TestDatadogConnectorSitesAndSecretNames(t *testing.T) {
 func TestDatadogConnectorXMLDocumentation(t *testing.T) {
 	data, err := os.ReadFile("../../.github/workflows/connectors/datadog.md")
 	require.NoError(t, err)
-	document := standaloneConnectorDocumentation(t, string(data))
+	document := commentedConnectorDocumentation(t, string(data))
 	var parsed struct {
 		XMLName  xml.Name `xml:"connector-documentation"`
 		ID       string   `xml:"id,attr"`

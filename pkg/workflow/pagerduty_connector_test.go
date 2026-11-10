@@ -194,7 +194,7 @@ func TestPagerDutyConnectorSelectionRejections(t *testing.T) {
 func TestPagerDutyConnectorXMLDocumentation(t *testing.T) {
 	data, err := os.ReadFile("../../.github/workflows/connectors/pagerduty.md")
 	require.NoError(t, err)
-	comment := standaloneConnectorDocumentation(t, string(data))
+	comment := commentedConnectorDocumentation(t, string(data))
 	var documentation struct {
 		XMLName xml.Name `xml:"connector-documentation"`
 		ID      string   `xml:"id,attr"`

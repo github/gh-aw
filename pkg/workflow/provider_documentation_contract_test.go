@@ -47,7 +47,7 @@ func TestProviderDocumentationXMLConsumers(t *testing.T) {
 			for _, reference := range declaration.Connectors[provider].Docs {
 				require.Contains(t, string(source), `"`+reference+`"`, "each docs reference must also occur in the self-contained XML sources")
 			}
-			document := standaloneConnectorDocumentation(t, string(source))
+			document := commentedConnectorDocumentation(t, string(source))
 			var root providerDocumentationElement
 			decoder := xml.NewDecoder(strings.NewReader(document))
 			require.NoError(t, decoder.Decode(&root))

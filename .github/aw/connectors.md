@@ -12,7 +12,7 @@ integration in GitHub Agentic Workflows. Use `gh aw` to compile workflows;
 
 Read the selected provider's Markdown declaration under
 [workflow connector declarations](../workflows/connectors/) and its
-standalone `connector-documentation` XML block.
+`connector-documentation` XML comment.
 That block describes credential provisioning, exact import inputs, resource
 grants, capabilities, privacy limits, and complete consumer examples. Read only
 the relevant provider, not every integration.
@@ -378,10 +378,13 @@ YAML fixtures are compatibility tests, not the public authoring interface.
 
 ## Write self-contained agent documentation
 
-Put exactly one matching XML documentation block in the declaration's Markdown
-body. Keep the public declaration and its documentation synchronized:
+Put exactly one matching XML documentation block inside an XML/HTML comment in
+the declaration's Markdown body. Leave no prose outside the comment: the body
+otherwise becomes an imported system prompt. Keep the declaration and its
+documentation synchronized:
 
 ```xml
+<!--
 <connector-documentation id="provider" version="1">
   <purpose>Describe the bounded integration.</purpose>
   <credentials>Explain acquisition, scopes, secret storage, and routes.</credentials>
@@ -392,14 +395,17 @@ body. Keep the public declaration and its documentation synchronized:
     <body><![CDATA[The complete consumer prompt goes here.]]></body>
   </example>
 </connector-documentation>
+-->
 ```
 
 Use the real connector ID and complete content, not the placeholders above.
-Do not hide the block in an HTML comment or include double-hyphen sequences.
+Do not include double-hyphen sequences or nested comments inside the wrapper.
 These blocks are authoring documentation, not runtime instructions: matching
 blocks are omitted before import input substitution and from rendered prompts,
 including partial runtime imports. The full source remains security-scanned;
-legacy comment wrappers do not exempt suspicious hidden content.
+comment wrappers do not exempt suspicious hidden content. Keep executable
+snippets out of comments; describe credential formats in import input metadata
+and reference those inputs from the documentation.
 Setup displays decoded guidance as fenced, untrusted reference data.
 Other imported content remains untrusted.
 Describe Markdown frontmatter delimiters rather than embedding them there.

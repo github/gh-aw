@@ -13,23 +13,26 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func standaloneConnectorDocumentation(t *testing.T, content string) string {
+func commentedConnectorDocumentation(t *testing.T, content string) string {
 	t.Helper()
 	parsed, err := parser.ExtractFrontmatterFromContent(content)
 	require.NoError(t, err)
-	document, visible, found := strings.Cut(strings.TrimSpace(parsed.Markdown), "</connector-documentation>")
-	require.True(t, found)
-	document += "</connector-documentation>"
+	body := strings.TrimSpace(parsed.Markdown)
+	require.True(t, strings.HasPrefix(body, "<!--\n"), "connector bodies must contain only commented documentation")
+	require.True(t, strings.HasSuffix(body, "\n-->"))
+	require.Equal(t, 1, strings.Count(body, "<!--"))
+	require.Equal(t, 1, strings.Count(body, "-->"))
+	document := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(body, "<!--\n"), "\n-->"))
 	require.True(t, strings.HasPrefix(document, "<connector-documentation "))
+	require.True(t, strings.HasSuffix(document, "</connector-documentation>"))
 	require.Equal(t, 1, strings.Count(parsed.Markdown, "<connector-documentation "))
 	require.Equal(t, 1, strings.Count(parsed.Markdown, "</connector-documentation>"))
-	require.NotContains(t, parsed.Markdown, "<!--", "documentation must not be hidden in an HTML comment")
-	require.NotContains(t, parsed.Markdown, "-->")
-	require.Empty(t, ScanMarkdownSecurity(content), "standalone documentation passes every source security check")
+	require.Empty(t, strings.TrimSpace(removeXMLComments(parsed.Markdown)), "ordinary comment removal must leave no system prompt")
+	require.Empty(t, ScanMarkdownSecurity(content), "commented documentation passes every source security check without exemptions")
 	require.Empty(t, scanImportedMarkdownSecurity(content))
 	prompt, err := parser.ExtractFrontmatterFromContent(parser.RemoveConnectorDocumentation(content))
 	require.NoError(t, err)
-	require.Equal(t, strings.TrimSpace(visible), strings.TrimSpace(prompt.Markdown), "omission must preserve ordinary visible instructions")
+	require.Empty(t, strings.TrimSpace(prompt.Markdown), "connector documentation must not contribute instructions")
 	require.Equal(t, parsed.FrontmatterLines, prompt.FrontmatterLines, "omission must preserve the declaration")
 	return document
 }
@@ -46,17 +49,21 @@ func TestConnectorDocumentationDeclarations(t *testing.T) {
 		t.Run(filepath.Base(path), func(t *testing.T) {
 			content, err := os.ReadFile(path)
 			require.NoError(t, err)
-			standaloneConnectorDocumentation(t, string(content))
-			_, visible, found := strings.Cut(string(content), "</connector-documentation>")
-			require.True(t, found)
+			commentedConnectorDocumentation(t, string(content))
 			command := exec.Command("node", "-e", `
 global.core = {info() {}, warning() {}, debug() {}};
 global.fetch = () => { throw new Error("Network access is forbidden"); };
 const fs = require("fs");
 fs.writeFileSync = fs.mkdirSync = () => { throw new Error("Runtime writes are forbidden"); };
 const {processRuntimeImport} = require(process.env.AW_TEST_RUNTIME);
-processRuntimeImport(process.env.AW_TEST_FILE, false, process.env.AW_TEST_WORKSPACE)
-  .then(content => process.stdout.write(content.trim()))
+(async () => {
+  const content = fs.readFileSync(process.env.AW_TEST_WORKSPACE + "/" + process.env.AW_TEST_FILE, "utf8");
+  const documentationLine = content.slice(0, content.indexOf("<connector-documentation")).split("\n").length;
+  for (const range of [[], [documentationLine, documentationLine + 12]]) {
+    const prompt = await processRuntimeImport(process.env.AW_TEST_FILE, false, process.env.AW_TEST_WORKSPACE, ...range);
+    require("node:assert/strict").equal(prompt.trim(), "", "full and partial connector imports must not contribute instructions");
+  }
+})()
   .catch(error => { console.error(error); process.exitCode = 1; });
 `)
 			command.Env = []string{
@@ -65,7 +72,7 @@ processRuntimeImport(process.env.AW_TEST_FILE, false, process.env.AW_TEST_WORKSP
 			}
 			output, err := command.CombinedOutput()
 			require.NoError(t, err, "%s", output)
-			require.Equal(t, strings.TrimSpace(visible), string(output), "runtime omission must preserve only ordinary visible instructions")
+			require.Empty(t, string(output), "runtime imports must not contribute documentation or usage instructions")
 		})
 	}
 }

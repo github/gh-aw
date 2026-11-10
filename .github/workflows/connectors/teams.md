@@ -281,6 +281,7 @@ import-schema:
     description: Exact approved root Graph message IDs for reader paths and reply constraints.
 ---
 
+<!--
 <connector-documentation id="teams" version="1">
   <stability>experimental: true. This connector's contract may change.</stability>
   <gateway-routing receiver-installed="false">
@@ -598,10 +599,11 @@ Writes are staged; do not call provider write APIs directly.
     <source href="https://learn.microsoft.com/en-us/graph/api/channel-post-messages?view=graph-rest-1.0"/>
     <reference path="docs/src/content/docs/reference/connectors.md"/>
   </sources>
+  <usage>
+    Import `.github/workflows/connectors/teams.md` and supply exact resource grants through
+    `with`; defaults grant nothing. Select Graph reads and Bot Connector safe outputs
+    independently. Keep their credentials and identifiers separate. Native ingress
+    is unavailable; use manual dispatch.
+  </usage>
 </connector-documentation>
-
-Import `.github/workflows/connectors/teams.md` and supply exact resource grants through
-`with`; defaults grant nothing. Select Graph reads and Bot Connector safe outputs
-independently. Keep their credentials and identifiers separate. Native ingress
-is unavailable; use manual dispatch. The XML comment above is the self-contained
-agent reference.
+-->

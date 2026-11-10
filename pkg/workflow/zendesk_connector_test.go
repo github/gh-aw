@@ -106,7 +106,7 @@ func zendeskNoteArgs() map[string]any {
 func TestZendeskConnectorDocumentation(t *testing.T) {
 	source, err := os.ReadFile("../../.github/workflows/connectors/zendesk.md")
 	require.NoError(t, err)
-	document := standaloneConnectorDocumentation(t, string(source))
+	document := commentedConnectorDocumentation(t, string(source))
 	var documentation struct {
 		XMLName        xml.Name `xml:"connector-documentation"`
 		ID             string   `xml:"id,attr"`

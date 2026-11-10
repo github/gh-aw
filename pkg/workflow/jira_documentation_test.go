@@ -27,7 +27,7 @@ func jiraDocumentationExamples(t *testing.T) []jiraDocumentationExample {
 	t.Helper()
 	source, err := os.ReadFile("../../.github/workflows/connectors/jira.md")
 	require.NoError(t, err)
-	document := standaloneConnectorDocumentation(t, string(source))
+	document := commentedConnectorDocumentation(t, string(source))
 	require.Contains(t, document, "<frontmatter><![CDATA[", "consumer YAML must be preserved as literal CDATA")
 	require.Contains(t, document, "<body><![CDATA[", "consumer prompt must be preserved as literal CDATA")
 	var parsed struct {

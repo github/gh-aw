@@ -427,6 +427,7 @@ import-schema:
   writer-secret: {type: string, default: EXAMPLE_WRITE_TOKEN}
 ---
 
+<!--
 <connector-documentation id="example" version="1">
   <purpose>Synthetic record status and note contracts; not a live provider.</purpose>
   <credentials>Reader and writer are separate stored bearer token names.
@@ -436,6 +437,7 @@ import-schema:
   <limitations>No record body, pagination, context hydration or trigger ingress.
     Staging sends no request and creates no authenticated resource receipt.</limitations>
 </connector-documentation>
+-->
 ```
 
 ```aw title=".github/workflows/example-handoff.md"
@@ -466,15 +468,16 @@ If the read succeeds, stage example_add_note for the same record-id with text
 
 ## 10. Author documentation and conformance evidence
 
-A distributable declaration SHOULD contain one matching, well-formed standalone
-`connector-documentation` XML block with provisioning, exact bindings,
+A distributable declaration SHOULD contain one matching, well-formed
+`connector-documentation` XML block inside an XML/HTML comment with provisioning, exact bindings,
 capabilities, evidence limits, and complete consumer examples. Examples use
 YAML/prompt elements or frontmatter/body CDATA; outer Markdown frontmatter
-delimiters MUST NOT be embedded inside the XML block. Documentation remains
-visible in the declaration source, but is stripped before import-input
-substitution, prompt rendering, and partial runtime-import line selection.
-Legacy XML comment wrappers are recognized for omission, but suspicious hidden
-HTML comments still fail the full-source security scan; malformed or unrelated
+delimiters MUST NOT be embedded inside the XML block. The entire Markdown body,
+including usage notes, MUST be commented out so it does not become an imported
+system prompt. Documentation remains readable in the source and setup output,
+but is stripped before import-input substitution, prompt rendering, and partial
+runtime-import line selection. Suspicious HTML comments still fail the
+full-source security scan; malformed or unrelated
 content MUST NOT gain a scanner exemption. Double-hyphen sequences are not
 supported in documentation blocks. Setup displays decoded documentation as
 fenced, untrusted reference data, not instructions. Other imported text remains

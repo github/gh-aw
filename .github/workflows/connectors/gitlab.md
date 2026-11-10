@@ -226,6 +226,7 @@ import-schema:
     default: GITLAB_NOTE_TOKEN
     description: Separate Actions secret containing a raw project-scoped token with api for approved note writes.
 ---
+<!--
 <connector-documentation id="gitlab" version="1">
   <stability>experimental: true. This connector's contract may change.</stability>
   <gateway-routing receiver-installed="false">
@@ -481,3 +482,4 @@ Do not execute a live write. Do not claim a pipeline result was verified.
     <source url="https://docs.gitlab.com/user/project/integrations/webhooks/#signing-tokens">Signing tokens and future verification requirements.</source>
   </sources>
 </connector-documentation>
+-->

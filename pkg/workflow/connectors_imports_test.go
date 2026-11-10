@@ -321,8 +321,8 @@ func TestConnectorDocumentationMatchesDeclarations(t *testing.T) {
 			_, section, found := strings.Cut(string(doc), "Declaration: `.github/workflows/connectors/"+provider+".md`.")
 			section, _, _ = strings.Cut(section, "\n## ")
 			machineDocumentation := false
-			if strings.HasPrefix(frontmatter.Markdown, "<connector-documentation ") {
-				section, machineDocumentation = standaloneConnectorDocumentation(t, string(data)), true
+			if strings.HasPrefix(strings.TrimSpace(frontmatter.Markdown), "<!--\n<connector-documentation ") {
+				section, machineDocumentation = commentedConnectorDocumentation(t, string(data)), true
 			}
 			for _, match := range htmlCommentPattern.FindAllStringSubmatch(string(data), -1) {
 				if !strings.Contains(parser.RemoveConnectorDocumentation(string(data)), match[0]) {

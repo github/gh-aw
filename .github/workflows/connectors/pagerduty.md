@@ -160,6 +160,7 @@ import-schema:
     description: Separate Actions secret containing the full REST Authorization value for approved note writes.
 ---
 
+<!--
 <connector-documentation id="pagerduty" version="1">
   <stability>experimental: true. This connector's contract may change.</stability>
   <runtime-policies>
@@ -395,3 +396,4 @@ write APIs directly.
     <source url="https://docs.pagerduty.com/developer/verifying-webhook-signatures"/>
   </sources>
 </connector-documentation>
+-->

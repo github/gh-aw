@@ -156,6 +156,7 @@ import-schema:
     default: ZENDESK_WRITE_OAUTH_TOKEN
     description: Separate Actions secret containing a raw OAuth access token with tickets:write.
 ---
+<!--
 <connector-documentation id="zendesk" version="1">
   <stability>experimental: true. This connector's contract may change.</stability>
   <runtime-policies>
@@ -227,7 +228,7 @@ import-schema:
     <compatibility>
       Both phases send Authorization: Bearer followed by the raw OAuth access
       token over HTTPS. API tokens are a different, deprecated authentication
-      mode: email/token:API_TOKEN is base64-encoded and sent as Basic, not Bearer.
+      mode using email/token:API_TOKEN with HTTP Basic authentication, not Bearer.
       This declaration intentionally does not support email/token Basic mode,
       passwords, GitHub App credentials, GitHub OIDC exchange, or automatic
       fallback. Supplying an API token as an OAuth secret is not compatible.
@@ -385,3 +386,4 @@ triage information. Do not claim a staged proposal was delivered to Zendesk.
     <source url="https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_audits/" />
   </sources>
 </connector-documentation>
+-->

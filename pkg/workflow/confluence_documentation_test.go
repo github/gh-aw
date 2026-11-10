@@ -51,7 +51,7 @@ func confluenceDocumentationSource(t *testing.T) (string, confluenceDocumentatio
 	t.Helper()
 	source, err := os.ReadFile("../../.github/workflows/connectors/confluence.md")
 	require.NoError(t, err)
-	comment := standaloneConnectorDocumentation(t, string(source))
+	comment := commentedConnectorDocumentation(t, string(source))
 	var documentation confluenceDocumentation
 	require.NoError(t, xml.Unmarshal([]byte(comment), &documentation))
 	require.Equal(t, "confluence", documentation.ID)

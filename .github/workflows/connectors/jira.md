@@ -683,7 +683,7 @@ import-schema:
   mcp-personal-secret:
     type: string
     default: JIRA_MCP_PERSONAL_BASIC_AUTH
-    description: Actions secret containing the prepared Basic credential for hosted personal MCP; provider policy and tool scopes must permit access.
+    description: Actions secret containing base64(account-email:api-token) for hosted personal MCP, without the Basic prefix or newline; provider policy and tool scopes must permit access.
   mcp-service-account-secret:
     type: string
     default: JIRA_MCP_SERVICE_ACCOUNT_KEY
@@ -694,6 +694,7 @@ import-schema:
     description: Separate Actions secret containing base64(account-email:unscoped-api-token) for direct-site REST writes, without the Basic prefix.
 ---
 
+<!--
 <connector-documentation id="jira" version="1">
   <stability>experimental: true. This connector's contract may change.</stability>
   <gateway-routing receiver-installed="false">
@@ -735,14 +736,16 @@ import-schema:
       variables, Actions. Import inputs override secret names, never secret values. Provision
       separate read and write identities, restrict their Jira project permissions, rotate and
       revoke tokens in Atlassian account administration, and replace the corresponding Actions
-      secret before expiry. Base64 is encoding, not encryption. Never store account passwords.
+      secret before expiry. HTTP Basic credential encoding is not encryption. Never store account passwords.
       The host adds the Authorization scheme: stored Basic values omit "Basic "; stored bearer
       values omit "Bearer ". Never print credentials or place them in workflow Markdown.
     </storage>
     <credential id="mcp-personal" phase="agent" scheme="basic" secret-input="mcp-personal-secret" default-secret="JIRA_MCP_PERSONAL_BASIC_AUTH">
       Create a personal scoped API token at https://id.atlassian.com/manage-profile/security/api-tokens
       for the Atlassian MCP app. Select read:jira:agent-interface and search:jira:agent-interface.
-      Store base64(account-email:api-token), without a newline, as the named Actions secret.
+      Prepare the account-email:api-token pair in HTTP Basic credential format
+      (RFC 7617), without its scheme prefix or a newline, as the named Actions secret.
+      The mcp-personal-secret input description specifies the exact stored format.
       An organization administrator must enable MCP API-token authentication and the read_jira
       and search_jira permission groups. Jira account permissions and IP allowlists still apply.
     </credential>
@@ -753,8 +756,10 @@ import-schema:
       permission groups must allow these operations; a REST API token is not automatically an MCP key.
     </credential>
     <credential id="rest-writer" phase="safe-output" scheme="basic" secret-input="rest-writer-secret" default-secret="JIRA_REST_BASIC_AUTH">
-      Create a separate unscoped account API token for the direct Jira site REST route. Store
-      base64(account-email:api-token), without a newline. Grant Browse projects plus Create issues
+      Create a separate unscoped account API token for the direct Jira site REST route.
+      Prepare its account-email:api-token pair in HTTP Basic credential format
+      (RFC 7617), without its scheme prefix or a newline, as specified by rest-writer-secret.
+      Grant Browse projects plus Create issues
       for creation, Edit issues for update and label addition, and Add comments for commenting;
       issue security and editable field screens also apply. The declaration records write:jira-work,
       the REST operations' classic OAuth scope, as metadata; it neither grants permissions nor
@@ -854,8 +859,9 @@ import-schema:
   <reads>
     <rest credential="rest-reader" secret-input="rest-reader-secret" default-secret="JIRA_REST_READ_BASIC_AUTH">
       These independent tools use direct site REST v3, not guessed hosted MCP
-      schemas. Provision a separate unscoped account API token and store
-      base64(account-email:api-token), without the Basic prefix or newline.
+      schemas. Provision a separate unscoped account API token and prepare its
+      account-email:api-token pair in HTTP Basic credential format (RFC 7617),
+      without its scheme prefix or a newline, as specified by rest-reader-secret.
       Browse projects and issue-level security apply. Account lookup also
       requires Browse users and groups; declared classic OAuth scopes
       read:jira-work and read:jira-user are metadata, not permission grants.
@@ -1120,7 +1126,9 @@ Report these as staged intents, never as completed Jira mutations.
     <reference href="https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-projects/">Project search, exact keys filter, browse permission and pagination.</reference>
     <reference href="https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-user-search/">Account lookup query semantics, limits and privacy.</reference>
   </references>
+  <usage>
+    Import this connector and explicitly select read profiles and `jira-` safe outputs.
+    Event envelopes contain references, not resource content. Native ingress is not operational.
+  </usage>
 </connector-documentation>
-
-Import this connector and explicitly select read profiles and `jira-` safe outputs.
-Event envelopes contain references, not resource content. Native ingress is not operational.
+-->

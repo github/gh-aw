@@ -49,7 +49,7 @@ func serviceNowImportCompiler(t *testing.T, with, selection string) (*Compiler, 
 func TestServiceNowMarkdownDocumentation(t *testing.T) {
 	source, err := os.ReadFile("../../.github/workflows/connectors/servicenow.md")
 	require.NoError(t, err)
-	comment := standaloneConnectorDocumentation(t, string(source))
+	comment := commentedConnectorDocumentation(t, string(source))
 	assert.NotContains(t, comment, "connector_10_", "document the direct provider tool names")
 	var doc struct {
 		XMLName        xml.Name `xml:"connector-documentation"`
