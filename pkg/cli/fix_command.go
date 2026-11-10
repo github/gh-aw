@@ -59,9 +59,13 @@ all steps and additionally:
   4. Writes updated files back to disk.
   5. Delete deprecated .github/aw/schemas/agentic-workflow.json file if it exists.
   6. Delete old template files from previous versions if present.
-  7. Delete old workflow-specific .agent.md files from .github/agents/ if present.
+  7. Delete legacy files under .github/agents/ (including .agent.md and .md files)
+     and .github/aw/upgrade-agentic-workflow.md if present.
   8. Refresh the dispatcher skill and agent at .github/skills/agentic-workflows/SKILL.md
      and .github/agents/agentic-workflows.md when they differ from the bundled templates.
+
+Legacy agent-file cleanup and dispatcher skill/agent refresh are skipped when
+instruction-file updates are disabled.
 
 ` + WorkflowIDExplanation,
 		Example: `  ` + string(constants.CLIExtensionPrefix) + ` fix                     # Check all workflows (dry-run)
