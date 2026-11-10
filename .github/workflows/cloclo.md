@@ -30,6 +30,9 @@ max-turns: 100
 engine:
   id: codex
   model-provider: github
+  model-routing:
+    goal: cost
+    mode: balanced
 imports:
   - ../skills/jqschema/SKILL.md
   - shared/mcp/serena-go.md
@@ -69,8 +72,6 @@ evals:
     question: Did the agent create a pull request or post a comment?
   - id: summary-comment-added
     question: Does the agent output confirm that a summary comment was added to the original conversation thread?
-
-model: copilot/gpt-5.6-terra
 ---
 
 # /cloclo

@@ -898,6 +898,70 @@ func TestDailyGoTestParallelizerProvisionsDisposableGoCaches(t *testing.T) {
 	t.Fatal("Expected both configured Go caches to be provisioned before the agent runs")
 }
 
+func TestABTestingAdvisorProvisionsCompilerResources(t *testing.T) {
+	repoRoot, err := findRepoRoot()
+	if err != nil {
+		t.Fatalf("Failed to find repo root: %v", err)
+	}
+	content, err := os.ReadFile(filepath.Join(repoRoot, ".github", "workflows", "ab-testing-advisor.md"))
+	if err != nil {
+		t.Fatalf("Failed to read workflow file: %v", err)
+	}
+	workflow := string(content)
+	parsed, err := parser.ExtractFrontmatterFromContent(workflow)
+	if err != nil {
+		t.Fatalf("Failed to parse workflow frontmatter: %v", err)
+	}
+	engine, ok := parsed.Frontmatter["engine"].(map[string]any)
+	if !ok {
+		t.Fatal("Expected an engine configuration")
+	}
+	env, ok := engine["env"].(map[string]any)
+	if !ok {
+		t.Fatal("Expected explicit Go cache environment variables")
+	}
+	for name, want := range map[string]string{
+		"GOCACHE":    "/tmp/gh-aw/agent/go-build-cache",
+		"GOMODCACHE": "/tmp/gh-aw/agent/go-mod-cache",
+	} {
+		if got := env[name]; got != want {
+			t.Errorf("Expected %s=%q, got %v", name, want, got)
+		}
+	}
+	steps, ok := parsed.Frontmatter["steps"].([]any)
+	if !ok {
+		t.Fatal("Expected a step to provision disposable Go caches")
+	}
+	provisioned := false
+	for _, step := range steps {
+		if step, ok := step.(map[string]any); ok && step["run"] == "mkdir -p /tmp/gh-aw/agent/go-build-cache /tmp/gh-aw/agent/go-mod-cache" {
+			provisioned = true
+		}
+	}
+	if !provisioned {
+		t.Error("Expected both configured Go caches to be provisioned before the agent runs")
+	}
+	network, ok := parsed.Frontmatter["network"].(map[string]any)
+	if !ok {
+		t.Fatal("Expected a network configuration")
+	}
+	allowed, ok := network["allowed"].([]any)
+	if !ok || !slices.Contains(allowed, any("go")) {
+		t.Error("Expected Go module downloads to be allowed through the firewall")
+	}
+	for _, required := range []string{
+		"Before discovery, run `make build`",
+		"`./gh-aw version`",
+		"`./gh-aw compile`",
+		"do not read pre-existing caches or inspect the process environment",
+		"do not install an alternative compiler, bypass validation, or publish an unvalidated campaign",
+	} {
+		if !strings.Contains(workflow, required) {
+			t.Errorf("Expected compiler bootstrap guidance %q", required)
+		}
+	}
+}
+
 func TestDailyCLIPerformanceUsesCodexCompatibleModel(t *testing.T) {
 	repoRoot, err := findRepoRoot()
 	if err != nil {

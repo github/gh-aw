@@ -608,6 +608,9 @@ Error-category fixture: `specs/replace-label-compliance/rl-004-error-categories.
 
 #### 9.2.7 REST setLabels Tests
 
+- **T-RL-037**: Verify that transient `setLabels` failures exhaust the retry policy and return a hard error.
+- **T-RL-046a**: Verify that an HTTP 404 response is rejected without retrying and logs a hard error.
+- **T-RL-046b**: Verify that HTTP 5xx and transport failures are retried and may succeed.
 - **T-RL-050**: Verify that `setLabels` is called with the correct `owner`, `repo`, `issue_number`, and `labels` array.
 - **T-RL-051**: Verify that the updated label list returned by `setLabels` is logged.
 - **T-RL-052**: Verify that a `setLabels` failure produces a hard error result with `success: false`.
@@ -676,7 +679,7 @@ records the implementation test or remaining gap.
 
 | Requirement | Test ID(s) or documented gap |
 |---|---|
-| §5 ordered processing pipeline | **Gap:** no end-to-end test asserts that every stage stops subsequent stages after failure. |
+| §5 ordered processing pipeline | `replace_label.test.cjs`: “executes the label pipeline in order and stops before writes on a gate skip.” |
 | RL-008 | T-RL-001–006; `TestFormalSchemaRequiredFields` |
 | RL-009 | `TestFormalReplaceLabelP3_ValidationConfigFields`; **gap:** common-pipeline invocation is not directly tested. |
 | RL-010 | T-RL-010–011; `TestFormalCountGate` |
@@ -693,7 +696,7 @@ records the implementation test or remaining gap.
 | RL-020a | T-RL-014–019; `TestFormalReplaceLabelP15_TargetModeEnforcement` |
 | RL-021 | T-RL-023–024; `TestFormalBlocklistOrdering`, `TestFormalBlocklistSymmetry` |
 | RL-022 | T-RL-020–023; `TestFormalBlocklistOrdering`, `TestFormalBlocklistSymmetry` |
-| RL-023 | **Gap:** workflow warning-only behavior is not directly asserted by a handler integration test. |
+| RL-023 | `replace_label.test.cjs`: warning-only assertions for target resolution, repository rejection, label validation, and count/gate skips. |
 | RL-024 | T-RL-030–031; `TestFormalRequiredLabelsGate` |
 | RL-025 | T-RL-032–033; `TestFormalTitlePrefixGate` |
 | RL-026 | T-RL-030–033; handler tests for skipped gate results |
@@ -703,18 +706,18 @@ records the implementation test or remaining gap.
 | RL-033 | T-RL-045; `replace_label.test.cjs` uses a mocked current REST response. |
 | RL-034 | T-RL-044; `TestFormalReplaceLabelP11_IdempotentMissingRemove` |
 | RL-036 | T-RL-050; `TestFormalSingleRESTCall` |
-| RL-037 | T-RL-054 covers 403/429; **gap:** handler-level 5xx, timeout, and transport retry cases are not covered. |
-| RL-038 | T-RL-051; **gap:** required success-log fields are not asserted directly. |
-| RL-039 | **Gap:** no test asserts the complete success-result field set. |
-| RL-040 | **Gap:** `attachExecutionState` before/after metadata is not asserted for this handler. |
+| RL-037 | T-RL-054 covers 403/429; `replace_label.test.cjs` retries 5xx and transport timeout, and verifies hard failure after exhaustion. |
+| RL-038 | T-RL-051; `replace_label.test.cjs`: “asserts success logs, complete result fields, and execution-state metadata.” |
+| RL-039 | `replace_label.test.cjs`: “asserts success logs, complete result fields, and execution-state metadata” checks the exact success-result fields. |
+| RL-040 | `replace_label.test.cjs`: “asserts success logs, complete result fields, and execution-state metadata” checks before/after metadata. |
 | RL-041 | T-RL-040, T-RL-050; `TestFormalLabelSetComputation` |
 | RL-042 | T-RL-053; `TestFormalAddDeduplication` |
 | RL-043 | T-RL-050; **gap:** GitHub's server-side atomicity guarantee is not locally testable. |
-| RL-044 | **Gap:** workflow-level warning-only behavior for every soft-skip category is not directly tested. |
-| RL-045 | **Gap:** `core.error()` logging for all hard-error categories is not directly asserted. |
+| RL-044 | `replace_label.test.cjs` asserts warning output and no `core.error()` for missing fields, count, target/repository rejection, label validation, and gate skips. |
+| RL-045 | `replace_label.test.cjs` asserts `core.error()` for REST failure, 404, retry exhaustion, and failed postconditions. |
 | RL-046 | T-RL-052; `TestFormalHardErrorOnRESTFail` |
-| RL-046a | **Gap:** HTTP 404 rejection has no focused handler test. |
-| RL-046b | **Gap:** handler-level 5xx, timeout, and transport retries and exhaustion are not directly tested. |
+| RL-046a | `replace_label.test.cjs`: “T-RL-046a rejects an HTTP 404 without retrying and logs a hard error.” |
+| RL-046b | `replace_label.test.cjs`: “T-RL-046b retries” and “T-RL-037 returns a hard error after transient retries are exhausted.” |
 | RL-048 | T-RL-054; handler test covers 403 and 429 retries. |
 | RL-057 | `TestFormalPostSetLabelsAddPresent`, `TestFormalPostSetLabelsRemoveAbsent` |
 | RL-058 | `TestFormalPartialSuccessRejected` |
