@@ -1,6 +1,8 @@
 package workflow
 
 import (
+	"bytes"
+	"compress/flate"
 	"encoding/base64"
 	"fmt"
 	"strings"
@@ -21,21 +23,36 @@ const windowsWSLBootstrapStep = `      - name: Initialize WSL runtime
           if ($LASTEXITCODE -ne 0) { throw 'WSL bootstrap failed to map the workspace, runner temp, or /tmp/gh-aw paths.' }
 `
 
-func renderStepForRunner(jobYAML, runsOn string) string {
+func renderStepForRunner(jobYAML, runsOn, jobName string) string {
 	if strings.TrimSpace(strings.TrimPrefix(runsOn, "runs-on:")) != "windows-latest" {
+		return jobYAML
+	}
+	if _, isFrameworkJob := runtimeFeaturesBuiltInJobNames[jobName]; !isFrameworkJob {
 		return jobYAML
 	}
 
 	stepsHeader := "    steps:\n"
 	headerIndex := strings.Index(jobYAML, stepsHeader)
 	if headerIndex < 0 {
-		return jobYAML
+		renderedSteps, hasWSLRun := renderWindowsSteps(jobYAML)
+		if !hasWSLRun {
+			return jobYAML
+		}
+		return renderedSteps
 	}
 
 	headerEnd := headerIndex + len(stepsHeader)
+	renderedSteps, hasWSLRun := renderWindowsSteps(jobYAML[headerEnd:])
+	if !hasWSLRun {
+		return jobYAML
+	}
+	return jobYAML[:headerEnd] + windowsWSLBootstrapStep + renderedSteps
+}
+
+func renderWindowsSteps(stepsYAML string) (string, bool) {
 	var steps []string
 	var currentStep strings.Builder
-	for _, line := range strings.SplitAfter(jobYAML[headerEnd:], "\n") {
+	for _, line := range strings.SplitAfter(stepsYAML, "\n") {
 		if strings.HasPrefix(line, "      - ") && currentStep.Len() > 0 {
 			steps = append(steps, currentStep.String())
 			currentStep.Reset()
@@ -54,16 +71,15 @@ func renderStepForRunner(jobYAML, runsOn string) string {
 		}
 	}
 	if !hasWSLRun {
-		return jobYAML
+		return stepsYAML, false
 	}
 
 	var renderedSteps strings.Builder
-	renderedSteps.WriteString(windowsWSLBootstrapStep)
 	for _, step := range steps {
 		step = rewriteWindowsActionTempPath(step)
 		renderedSteps.WriteString(renderWindowsPOSIXRunStep(step))
 	}
-	return jobYAML[:headerEnd] + renderedSteps.String()
+	return renderedSteps.String(), true
 }
 
 func isWindowsPOSIXRunStep(step string) bool {
@@ -233,7 +249,11 @@ func renderWindowsPOSIXRunStep(step string) string {
 }
 
 func windowsWSLRunWrapper(script string) []string {
-	encodedScript := base64.StdEncoding.EncodeToString([]byte(script))
+	var compressedScript bytes.Buffer
+	compressor, _ := flate.NewWriter(&compressedScript, flate.BestCompression)
+	_, _ = compressor.Write([]byte(script))
+	_ = compressor.Close()
+	encodedScript := base64.StdEncoding.EncodeToString(compressedScript.Bytes())
 	return []string{
 		"$ErrorActionPreference = 'Stop'",
 		"$pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'HOME', 'TEMP', 'TMP', 'TMPDIR')",
@@ -241,7 +261,11 @@ func windowsWSLRunWrapper(script string) []string {
 		"foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }",
 		"$environmentNames = [System.Environment]::GetEnvironmentVariables('Process').Keys | Where-Object { $_ -notin @('PATH', 'WSLENV') }",
 		"$env:WSLENV = (($environmentNames | ForEach-Object { if ($pathVariableSet.Contains($_)) { \"$_/p\" } else { $_ } }) -join ':')",
-		fmt.Sprintf("$scriptContent = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('%s'))", encodedScript),
+		fmt.Sprintf("$compressedScript = [System.Convert]::FromBase64String('%s')", encodedScript),
+		"$compressedStream = [System.IO.MemoryStream]::new($compressedScript)",
+		"$decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)",
+		"$reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)",
+		"try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }",
 		`$scriptContent = 'cd "$GITHUB_WORKSPACE"' + [System.Environment]::NewLine + $scriptContent`,
 		"$scriptDirectory = Join-Path $env:RUNNER_TEMP 'gh-aw'",
 		"New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null",

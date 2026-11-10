@@ -3,7 +3,10 @@
 package workflow
 
 import (
+	"bytes"
+	"compress/flate"
 	"encoding/base64"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -276,7 +279,7 @@ func TestJobManager_WriteJobsYAML(t *testing.T) {
 
 func TestRenderStepForRunner(t *testing.T) {
 	windowsStep := "    steps:\n      - name: Run script\n        run: echo \"${RUNNER_TEMP}/gh-aw/actions/setup.sh\" --verbose\n"
-	got := renderStepForRunner(windowsStep, "runs-on: windows-latest")
+	got := renderStepForRunner(windowsStep, "runs-on: windows-latest", "agent")
 	if !strings.Contains(got, "        run: |\n") || !strings.Contains(got, "wsl.exe --exec bash --noprofile --norc -e -o pipefail") {
 		t.Fatalf("Windows step did not invoke the POSIX script through WSL:\n%s", got)
 	}
@@ -304,20 +307,24 @@ func TestRenderStepForRunner(t *testing.T) {
 	}
 
 	multiline := "    steps:\n      - name: Run script\n        run: |\n          SCRIPT=helper.sh\n          ./helper.sh\n          cat <<'EOF'\n          helper.sh\n          EOF\n"
-	got = renderStepForRunner(multiline, "windows-latest")
+	got = renderStepForRunner(multiline, "windows-latest", "agent")
 	if script := decodeWindowsWSLRunScript(t, got); script != "SCRIPT=helper.sh\n./helper.sh\ncat <<'EOF'\nhelper.sh\nEOF\n" {
 		t.Fatalf("WSL adapter changed the multiline POSIX script: %q", script)
 	}
 
 	withShell := "    steps:\n      - name: Run script\n        run: ./script.ps1\n        shell: pwsh\n"
-	got = renderStepForRunner(withShell, "runs-on: windows-latest")
+	got = renderStepForRunner(withShell, "runs-on: windows-latest", "agent")
 	if got != withShell {
 		t.Fatalf("Windows step changed its explicit shell:\n%s", got)
 	}
 
 	ubuntuStep := "    steps:\n      - name: Run script\n        run: ./script.sh\n"
-	if got = renderStepForRunner(ubuntuStep, "runs-on: ubuntu-latest"); got != ubuntuStep {
+	if got = renderStepForRunner(ubuntuStep, "runs-on: ubuntu-latest", "agent"); got != ubuntuStep {
 		t.Fatalf("Non-Windows step changed:\n%s", got)
+	}
+
+	if got = renderStepForRunner(windowsStep, "runs-on: windows-latest", "release"); got != windowsStep {
+		t.Fatalf("Unrelated Windows job changed:\n%s", got)
 	}
 }
 
@@ -333,11 +340,17 @@ func decodeWindowsWSLRunScript(t *testing.T, rendered string) string {
 	if end < 0 {
 		t.Fatalf("WSL run wrapper has an unterminated encoded script:\n%s", rendered)
 	}
-	decoded, err := base64.StdEncoding.DecodeString(encoded[:end])
+	compressed, err := base64.StdEncoding.DecodeString(encoded[:end])
 	if err != nil {
-		t.Fatalf("decode WSL run script: %v", err)
+		t.Fatalf("decode compressed WSL run script: %v", err)
 	}
-	return string(decoded)
+	reader := flate.NewReader(bytes.NewReader(compressed))
+	defer reader.Close()
+	script, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("decompress WSL run script: %v", err)
+	}
+	return string(script)
 }
 
 func TestRenderStepForRunnerMapsArtifactTempPaths(t *testing.T) {
@@ -351,7 +364,7 @@ func TestRenderStepForRunnerMapsArtifactTempPaths(t *testing.T) {
         run: |
           mkdir -p /tmp/gh-aw
 `
-	got := renderStepForRunner(job, "runs-on: windows-latest")
+	got := renderStepForRunner(job, "runs-on: windows-latest", "agent")
 	if !strings.Contains(got, "path: ${{ runner.temp }}/gh-aw/agent_output.json") {
 		t.Fatalf("Windows artifact path was not mapped to runner temp:\n%s", got)
 	}

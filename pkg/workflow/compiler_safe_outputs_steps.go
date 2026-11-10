@@ -48,7 +48,7 @@ func (c *Compiler) buildSharedPRCheckoutSteps(data *WorkflowData) []string {
 }
 
 func preparePRCheckoutLintBlock(steps []string, runsOn string) string {
-	block := renderStepForRunner(strings.Join(steps, ""), runsOn)
+	block := renderStepForRunner(strings.Join(steps, ""), runsOn, string(constants.SafeOutputsJobName))
 	finalized, err := finalizeRunnerTempSafety(block)
 	if err != nil {
 		return ""

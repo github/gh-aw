@@ -218,7 +218,7 @@ func (jm *JobManager) WriteJobsYAML(b *strings.Builder) {
 		if strings.TrimSpace(strings.TrimPrefix(job.RunsOn, "runs-on:")) == "windows-latest" {
 			var jobYAML strings.Builder
 			jm.renderJobTo(&jobYAML, job)
-			b.WriteString(renderStepForRunner(jobYAML.String(), job.RunsOn))
+			b.WriteString(renderStepForRunner(jobYAML.String(), job.RunsOn, job.Name))
 			continue
 		}
 		jm.renderJobTo(b, job)
