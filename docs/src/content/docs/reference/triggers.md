@@ -17,13 +17,11 @@ on:
 
 GitHub Agentic Workflows supports all standard GitHub Actions triggers plus additional enhancements for reactions, cost control, and advanced filtering.
 
-`on.admission: true` opts a workflow into the compiler-owned `admission` and `conclusion_admission` jobs. These jobs are omitted by default unless `.github/workflows/aw.json` sets `"admission": true` for the repository. Either opt-in enables both jobs; a workflow-level `false` does not override a repository-level `true`. This setting is not a GitHub Actions event. Recompile after changing it. See [Centralized Activation Admission](/gh-aw/reference/enterprise-configuration/#centralized-activation-admission) for the required runtime variables.
+`on.admission: true` opts a workflow into the compiler-owned `admission` and `conclusion_admission` jobs, which are omitted by default. Either this opt-in or `"admission": true` in `.github/workflows/aw.json` enables both jobs; a workflow-level `false` does not override a repository-level `true`. This is not a GitHub Actions event. Recompile after changing it. See [Centralized Activation Admission](/gh-aw/reference/enterprise-configuration/#centralized-activation-admission) for required runtime variables.
 
-**Experimental hosted CAO triggers:** `on.gateway-dispatch` and all its nested triggers are experimental. GitHub issue, pull-request, discussion, comment, and review/thread notifications are filtered by the server. `projects-items` requires `project_id`; paired `status-transitions` adds delivered Status predicates. Separate `code-scanning-alert` and `dependabot-alerts` triggers select their own events with independent `types`, `severity`, and `filters`; there is no bundled security event. Shared `repos` and wildcard `orgs` restrict independently approved GitHub sources without granting access; non-GitHub families ignore them. Named secret scanning is unsupported. Compilation requires `{"gateway-dispatch":true}` in `.github/workflows/aw.json` and generates a mandatory `gateway_provenance` job for approved CAO App identity, not generic repository-write authority. Configure central Actions secrets `GH_AW_GATEWAY_APP_ID` and `GH_AW_GATEWAY_APP_BOT_ID` (existing variables remain a fallback); every other job requires successful provenance. Integrations must remain nonactivating until the receiver token flow and approved destination revision enforce the [App-token contract](/gh-aw/specs/webhook-gateway-specification/#github-app-token-provenance). No other trigger may coexist with `gateway-dispatch`. Supported non-trigger settings such as `roles` and `bots` remain outside its mapping, and the compiler emits only its workflow-specific restricted `repository_dispatch` route. See [Webhook Triggers](/gh-aw/reference/webhook-triggers/) for syntax, payload filters, and integration requirements.
+**Experimental gateway triggers:** `on.gateway-dispatch` (hosted CAO) and its `jira-issue`, `linear-issue`, and `azure-devops-issue` variants are experimental. They require `{"gateway-dispatch":true}` in `.github/workflows/aw.json`, a mandatory `gateway_provenance` job, and no other trigger in the same `on:` block. Keep integrations nonactivating until the [App-token contract](/gh-aw/specs/webhook-gateway-specification/#github-app-token-provenance) is enforced. Provider variants also need a separately approved provider bridge and credentials. See [Webhook Triggers](/gh-aw/reference/webhook-triggers/) and [Provider Issue Triggers](/gh-aw/reference/provider-issue-triggers/) for syntax, selectors, secrets, and receiver requirements.
 
-**Experimental external issue triggers:** `on.gateway-dispatch.jira-issue`, `on.gateway-dispatch.linear-issue`, and `on.gateway-dispatch.azure-devops-issue` use GitHub-style activity names derived from native provider events and delivered transition evidence. Jira requires `project`, Linear requires `organization-id` and accepts optional `team-id`, and Azure DevOps requires `project_id`, all beside `types` without a `filters` wrapper. They share the repository opt-in, write-minimum role policy, and required App-token provenance contract above, but require a separately approved provider bridge and provider-specific credentials. Azure closure requires explicit `closed-states`; Jira label normalization is limited to unambiguous single-label changes. See [Provider Issue Triggers](/gh-aw/reference/provider-issue-triggers/) for supported activities, selectors, and receiver requirements.
-
-All gateway families forward only canonical resource URLs, event type arrays, and declared matching filter literals, never native resource bodies or unselected values. Workflows resolve any additional data with provider-authenticated clients so the provider enforces access. See the [Webhook Gateway Specification](/gh-aw/specs/webhook-gateway-specification/) for the closed payload contract.
+Gateway families forward only canonical resource URLs, event type arrays, and declared filter literals, never native bodies or unselected values. Fetch any additional data with provider-authenticated clients so the provider enforces access. See the [Webhook Gateway Specification](/gh-aw/specs/webhook-gateway-specification/) for the closed payload contract.
 
 ### Dispatch Triggers (`workflow_dispatch:`)
 
@@ -110,22 +108,17 @@ on:
 | **Daily (Fuzzy)** | `daily` | `43 5 * * *` | Compiler assigns scattered time |
 | | `daily around 14:00` | `20 14 * * *` | Scattered within ±1 hour (13:00-15:00) |
 | | `daily between 9:00 and 17:00` | `37 13 * * *` | Scattered within range (9:00-17:00) |
-| | `daily between 9am and 5pm utc-5` | `12 18 * * *` | With UTC offset (9am-5pm EST → 2pm-10pm UTC) |
-| | `daily around 3pm utc-5` | `33 19 * * *` | With UTC offset (3 PM EST → 8 PM UTC) |
 | **Weekly (Fuzzy)** | `weekly` or `weekly on monday` | `43 5 * * 1` | Compiler assigns scattered time |
 | | `weekly on friday around 5pm` | `18 16 * * 5` | Scattered within ±1 hour |
 | **Intervals** | `every 10 minutes` | `*/10 * * * *` | Minimum 5 minutes |
-| | `every 2h` | `53 */2 * * *` | Fuzzy: scattered minute offset |
 | | `0 */2 * * *` | `0 */2 * * *` | Cron syntax for fixed times |
 
 **Time formats:** `HH:MM` (24-hour), `midnight`, `noon`, `1pm`-`12pm`, `1am`-`12am`
 **UTC offsets:** Add `utc+N` or `utc-N` to any time (e.g., `daily around 14:00 utc-5`)
 
-Human-friendly formats are automatically converted to standard cron expressions, with the original format preserved as a comment in the generated workflow file.
-
 ### Cooldown (`cooldown:`)
 
-Set `on.cooldown` to skip agent execution until a duration has elapsed since the latest completed run that started the `agent` job. This is useful when a workflow runs more frequently than you want the agent to act, such as checking hourly but allowing an agent run every four hours:
+Set `on.cooldown` to skip agent execution until a duration has passed since the latest completed run that started the `agent` job. For example, check hourly but act at most every four hours:
 
 ```aw wrap
 on:
@@ -186,11 +179,9 @@ on:
     types: [opened, ready_for_review]
 ```
 
-`pull_request_target.types` accepts the same activity names as `pull_request`, including `ready_for_review`.
+Strict mode rejects `pull_request_target` when `on.roles` includes `all` or `read`, even within a role list. Non-strict mode warns, because untrusted contributors could then trigger an agent job with access to secrets, including engine credentials and custom secrets. This restriction applies even with `checkout: false`, trusted checkouts, or `on.pull_request_target.acknowledge-risk: true`. To suppress only the non-strict warning, set `features.dangerously-allow-roles-read-and-pull-request-target: true`. Prefer `pull_request`, or keep the default trusted roles `[admin, maintainer, write]`.
 
-Strict mode rejects `pull_request_target` when `on.roles` contains `all` or `read`, including in a role list. Non-strict mode warns about this dangerous combination: untrusted contributors can trigger an agent job with access to secrets, including engine credentials and custom secrets. This restriction applies even with `checkout: false`, trusted checkouts, or `on.pull_request_target.acknowledge-risk: true`. To suppress only the non-strict warning, set `features.dangerously-allow-roles-read-and-pull-request-target: true`. Prefer `pull_request`, or retain the default trusted roles `[admin, maintainer, write]`.
-
-GitHub's fork-contributor workflow approval setting does not protect `pull_request_target`. The [default public-repository event policy](https://docs.github.com/en/actions/reference/security/securely-using-pull_request_target#default-policy-for-pull_request_target) has evaluate and enforce modes: evaluate mode reports affected runs without blocking them; enforcement blocks covered runs. Check GitHub's current rollout and enforcement guidance and the effective repository/organization policy rather than assuming either mode applies. That default does not cover private/internal repositories, replace an applicable explicitly configured event policy, or provide a blanket block on `workflow_run`.
+The fork-contributor approval setting does not protect `pull_request_target`. GitHub's [default public-repository event policy](https://docs.github.com/en/actions/reference/security/securely-using-pull_request_target#default-policy-for-pull_request_target) has an evaluate mode (reports affected runs without blocking them) and an enforce mode (blocks covered runs). Check the effective repository or organization policy rather than assuming either mode applies. The default does not cover private or internal repositories, replace an explicitly configured event policy, or block `workflow_run`.
 
 `acknowledge-risk: true` acknowledges the trigger warning; it does not bypass separate checkout or role restrictions. The `actions/checkout` input `allow-unsafe-pr-checkout: true` is a different opt-out that permits otherwise refused fork checkout. Neither input makes fork code trusted, and custom Git commands or third-party actions do not inherit `actions/checkout` protections.
 
@@ -205,30 +196,23 @@ on:
     forks: ["trusted-org/*"]  # Allow forks from trusted-org
 ```
 
-Use `["owner/repo"]` for a specific repository, `["owner/*"]` for an entire org/user, or `["*"]` to allow all forks (use with caution). Omit `forks:` for the default behavior (same-repository PRs only). The compiler uses repository ID comparison so fork detection is unaffected by repository renames.
+Use `["owner/repo"]` for one repository, `["owner/*"]` for an entire org or user, or `["*"]` for all forks (use with caution). Omit `forks:` to allow same-repository PRs only. Fork detection compares repository IDs, so renames do not affect it.
 
 Alternatively, use `forks: {author-association: [OWNER, MEMBER, COLLABORATOR]}` to allow fork PRs by the author's relationship to the base repository rather than the fork owner. Same-repository PRs remain allowed, and no association is implicitly included. See [author associations](/gh-aw/reference/fork-support/#author-associations) for trust and secret-availability considerations.
 
-`pull_request_target` also defaults to same-repository PRs only: omitting `forks:` is equivalent to `forks: []` in both strict and non-strict mode. To admit specific forks, list exact `owner/repo` entries or deliberately trusted `owner/*` patterns. Same-repository PRs remain allowed. `"*"` anywhere in a list permits all forks; strict mode rejects this unless `features.dangerously-allow-pull-request-target-forks-all: true` is set, and non-strict mode warns. Even with that opt-in, the wildcard warning remains visible. `acknowledge-risk: true`, disabled checkout, and trusted checkouts do not suppress the diagnostic. Actor authorization and checkout restrictions remain enforced independently; strict mode still rejects expressions and unsupported pattern forms.
+`pull_request_target` also defaults to same-repository PRs only; omitting `forks:` is equivalent to `forks: []` in strict and non-strict mode. List exact `owner/repo` entries or deliberately trusted `owner/*` patterns to admit specific forks. `"*"` permits all forks: strict mode rejects it unless `features.dangerously-allow-pull-request-target-forks-all: true` is set, and non-strict mode warns. Even with that opt-in, the wildcard warning stays visible. `acknowledge-risk: true`, disabled checkout, and trusted checkouts do not suppress it. Actor authorization and checkout restrictions still apply, and strict mode rejects expressions and unsupported pattern forms.
 
 Fork filters and `pull_request.names` compile into job conditions, not GitHub Actions trigger properties. Bounded fork admission is defense in depth, not proof of safe PR content: a trusted actor can label an attacker-controlled PR, and disabling checkout does not prevent an agent from reading malicious content with privileged capabilities.
 
 #### Stacked PR Filtering (`max-stack:`)
 
-When using stacked pull requests (a chain of PRs each targeting the previous one), every PR in the stack normally triggers workflows. This multiplies CI cost for identical changes being reviewed at multiple layers. The `max-stack:` field lets you limit which stack layers run the workflow.
+When stacked pull requests (each PR targets the previous one) are used, every layer normally triggers the workflow, multiplying CI cost for identical changes. `max-stack:` limits which layers run it. It applies to `pull_request` and `pull_request_review` triggers; non-stacked PRs and other events are unaffected.
 
-By default (`max-stack: 1`), workflows run only on the **top-most PR** in the stack — the one currently under review. Lower-stack PRs are skipped automatically.
-
-This is supported for both `pull_request` and `pull_request_review` triggers.
-
-```yaml wrap
-on:
-  pull_request:
-    types: [opened, synchronize]
-    max-stack: 1   # default: run only on the top/latest PR in a stack
-```
-
-To run on the **top N** layers (for example, if you review multiple interdependent PRs at once):
+| Value | Runs on |
+|-------|---------|
+| `1` (default) | Only the top-most PR, the one under review |
+| `N` | The top N PRs in the stack |
+| `-1` | Every PR, with stack protection disabled |
 
 ```yaml wrap
 on:
@@ -237,25 +221,7 @@ on:
     max-stack: 2   # run on the top 2 PRs in a stack
 ```
 
-To **disable** stack protection and run on every PR in a stack:
-
-```yaml wrap
-on:
-  pull_request:
-    types: [opened, synchronize]
-    max-stack: -1  # run on all pull requests regardless of stack position
-```
-
-You can also apply the same filter to review events:
-
-```yaml wrap
-on:
-  pull_request_review:
-    types: [submitted]
-    max-stack: 2   # run only for reviews on the top 2 PRs in a stack
-```
-
-Non-stacked PRs and non-`pull_request`/`pull_request_review` events are unaffected by this setting.
+The same field works on review events, for example `pull_request_review` with `types: [submitted]` and `max-stack: 2`.
 
 ### Comment Triggers
 
@@ -285,7 +251,7 @@ on:
     lock-for-agent: true
 ```
 
-This prevents concurrent modifications to the issue while processing the comment. The locking behavior is identical to the `issues:` trigger (see [Issue Locking](#issue-locking-lock-for-agent) above for full details).
+This prevents concurrent modifications to the issue while the comment is processed. Behavior matches the `issues:` trigger (see [Issue Locking](#issue-locking-lock-for-agent)).
 
 **Note:** Pull request comments are silently skipped as pull requests cannot be locked via the issues API.
 
@@ -313,7 +279,7 @@ on:
   bots: ["dependabot[bot]"]
 ```
 
-Workflows with `workflow_run` triggers include automatic security protections: `workflows` must list at least one non-empty entry (empty or missing values are rejected at compile time, since GitHub silently disables such triggers); the compiler injects repository ID and fork checks; and `branches` is recommended to limit triggering branches (the compiler warns when omitted, or errors in strict mode). Repository identity and a successful producer run do not prove that the producer executed only trusted code. Treat downloaded outputs as [untrusted artifact data](/gh-aw/reference/artifacts/#cross-run-artifact-trust), not scripts to execute in a privileged consumer.
+The compiler protects `workflow_run` triggers. It rejects empty or missing `workflows` (GitHub would silently disable such triggers), injects repository ID and fork checks, and warns when `branches` is omitted (an error in strict mode). Repository identity and a successful producer run do not prove the producer ran only trusted code. Treat downloaded outputs as [untrusted artifact data](/gh-aw/reference/artifacts/#cross-run-artifact-trust), not scripts to run in a privileged consumer.
 
 #### Conclusion Filtering (`conclusion:`)
 
@@ -340,7 +306,7 @@ on:
 
 #### State Filtering (`state:`)
 
-Use `state:` to restrict the trigger to specific deployment states (single value or list). The compiler emits a guarded `if:` condition so other combined triggers (such as `workflow_dispatch`) pass through unaffected.
+Use `state:` (single value or list) to restrict deployment states. The compiler emits a guarded `if:` so combined triggers such as `workflow_dispatch` still pass through.
 
 ```yaml wrap
 on:
@@ -361,7 +327,7 @@ permissions:
 
 ### Repository Dispatch Trigger (`repository_dispatch:`)
 
-Trigger a workflow from outside GitHub using a single authenticated API call. Any external system that can make an HTTP `POST` request—Jira, PagerDuty, Slack, or a custom API—can start an agentic workflow this way. [Full event reference](https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#repository_dispatch).
+Trigger a workflow from outside GitHub with one authenticated API call. Any system that can send an HTTP `POST`, such as Jira, PagerDuty, Slack, or a custom API, can start an agentic workflow this way. [Full event reference](https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#repository_dispatch).
 
 ```yaml wrap
 on:
@@ -439,13 +405,13 @@ on: "label-command deploy"
 
 The compiler generates `issues`, `pull_request`, and/or `discussion` events with `types: [labeled]`, adds a `workflow_dispatch` trigger with `item_number` for manual testing, and injects a label removal step in the activation job. The matched label name is exposed as `needs.activation.outputs.label_command`.
 
-The `remove_label` field (boolean, default `true`) controls whether the label is automatically removed after activation. Set to `false` to keep the label on the item — useful when the label represents persistent state rather than a one-shot command. When `remove_label: false`, the workflow does not need `issues: write` or `pull-requests: write` permissions for label removal.
+`remove_label` (default `true`) controls whether the label is removed after activation. Set it to `false` when the label records persistent state; the workflow then needs no `issues: write` or `pull-requests: write` permission for removal.
 
 `label_command` can be combined with `slash_command:` — the workflow activates when either condition is met. See [LabelOps](/gh-aw/patterns/label-ops/) for patterns and examples.
 
 ## Trigger Filtering
 
-Triggers can be filtered by label names, and more. These filters compile into guarded `if:` conditions that ensure the workflow only runs when the specified criteria are met, while allowing other events to pass through unaffected.
+Filters compile into guarded `if:` conditions, so the workflow runs only when its criteria match and other events pass through unaffected.
 
 ### Filtering with Labels (`names:`)
 
@@ -508,11 +474,11 @@ Available roles: `admin`, `maintainer`/`maintain`, `write`, `triage`, `read`, `a
 
 #### Custom organization repository roles
 
-GitHub organizations can define [custom repository roles](https://docs.github.com/en/organizations/managing-user-access-to-your-organizations-repositories/managing-repository-roles/about-custom-repository-roles) with an inherited standard role (for example `write` or `maintain`). Actors whose access comes from a custom role (e.g. `Security Champions`) are authorized against that **inherited standard role** — the custom role name itself cannot appear in `on.roles:`. For example, a user with the custom role `Security Champions` (inherited role: `write`) will be authorized when the required roles include `write`, while a custom role inherited from `maintain` will still be rejected by `roles: [write]`.
+Organizations can define [custom repository roles](https://docs.github.com/en/organizations/managing-user-access-to-your-organizations-repositories/managing-repository-roles/about-custom-repository-roles) that inherit a standard role such as `write` or `maintain`. Such actors are authorized against the **inherited standard role**; the custom role name cannot appear in `on.roles:`. For example, `Security Champions` (inherits `write`) passes `roles: [write]`, but a role inheriting `maintain` is still rejected by it.
 
 ### Filtering by Bot (`on.bots:`, `on.skip-bots:`)
 
-Configure which GitHub bot accounts can trigger workflows — useful for allowing specific automation bots while maintaining security controls. Use `skip-bots:` for the inverse:
+Allow specific GitHub bot accounts to trigger workflows. Use `skip-bots:` for the inverse:
 
 ```yaml wrap
 on:
@@ -524,13 +490,13 @@ on:
 
 The `[bot]` suffix is optional — `github-actions` matches `github-actions[bot]` automatically.
 
-Allowlisted bots must be installed on the repository, which is verified through the repository collaborator API. The built-in Copilot coding agent identities (`Copilot` and `copilot-swe-agent`, including `copilot-swe-agent[bot]`) are an exception: when explicitly allowlisted, they do not require a collaborator lookup. Other GitHub App identities are not collaborators, so that lookup finds nothing for them. On `repository_dispatch` the check is therefore relaxed: the lookup is still performed, and an allowlisted App is authorized when it conclusively reports that the actor is not a collaborator, because sending the event already requires `contents: write` access to the repository. A lookup that fails (for example during an API outage or when rate limited) is still denied. This is how an App-triggered `repository_dispatch` is admitted — `on.roles:` is matched against repository collaborator roles and never matches an App sender.
+Allowlisted bots must be installed on the repository, verified through the collaborator API. The built-in Copilot coding agent identities (`Copilot` and `copilot-swe-agent`, including `copilot-swe-agent[bot]`) skip that lookup when explicitly allowlisted. Other GitHub Apps are not collaborators, so the lookup finds nothing for them. On `repository_dispatch`, an allowlisted App is admitted when the lookup conclusively reports a non-collaborator; sending the event already requires `contents: write`. A failed lookup, such as during an outage or rate limiting, is still denied. `on.roles:` never matches an App sender.
 
 For PR branch checkout after an `issue_comment`, `pull_request_review_comment`, or `pull_request_review`, an allowlisted Bot sender may bypass the collaborator check only when it authored the comment or review and the PR head and base are both in the workflow repository. Fork PRs and other actors still require write-or-higher collaborator permission.
 
 ### Filtering by Author Associations (`on.skip-author-associations`)
 
-You can skip workflow execution when a specific event is triggered by an author with a matching event payload `author_association` field (for example `github.event.comment.author_association`, `github.event.issue.author_association`, or `github.event.pull_request.author_association`).
+Skip execution when the event's `author_association` matches, for example `github.event.comment.author_association` or `github.event.issue.author_association`.
 
 ```yaml wrap
 on:
@@ -543,13 +509,9 @@ on:
     pull_request_review_comment: [first_time_contributor, none]
 ```
 
-### Filtering by Custom Steps (`on.steps:`)
-
-Inject deterministic filtering steps directly into the pre-activation job — see [Pre-Activation Steps](#pre-activation-steps-onsteps) for full syntax and examples. This is the recommended approach for lightweight filtering since it saves one workflow job versus the multi-job pattern below.
-
 ### Filtering by Custom Jobs (`jobs:`)
 
-For complex custom trigger filtering you can use a separate `jobs:` entry when filtering requires heavy tooling (checkout, compiled tools, multiple runners):
+Use a separate `jobs:` entry only when filtering needs heavy tooling (checkout, compiled tools, multiple runners). For lightweight checks, use [Pre-Activation Steps](#pre-activation-steps-onsteps) instead, which add no extra job:
 
 ```yaml wrap title=".github/workflows/smart-responder.md"
 ---
@@ -588,7 +550,7 @@ The compiler automatically adds the filter job as a dependency of the activation
 
 ## Additional Trigger Options
 
-Trigger support additional options for reactions, status comments, authentication tokens, and more. These options are configured in the same `on:` block as the trigger and apply to all triggers defined within that block.
+These options share the trigger's `on:` block and apply to all triggers in it: reactions, status comments, and authentication tokens.
 
 ### Reactions (`reaction:`)
 
@@ -650,7 +612,7 @@ on:
 
 ### Activation Token (`on.github-token:`, `on.github-app:`)
 
-Configure a custom GitHub token or GitHub App for the activation job **and all skip-if search checks** — reaction, status comment, and search steps share the same token (default: workflow's `GITHUB_TOKEN`). Use `github-token:` for a PAT or `github-app:` to mint a short-lived installation token:
+Set a custom token for the activation job **and all skip-if searches** (default: `GITHUB_TOKEN`). Use `github-token:` for a PAT or `github-app:` for a short-lived installation token:
 
 ```yaml wrap
 on:
@@ -670,7 +632,7 @@ on:
     private-key: ${{ secrets.APP_KEY }}
 ```
 
-The `github-app` object accepts `client-id`, `private-key`, and optionally `owner` and `repositories` — the same fields used elsewhere in the framework (`app-id` is a deprecated alias for `client-id`). The token is minted once in the pre-activation job.
+The `github-app` object accepts `client-id`, `private-key`, and optionally `owner` and `repositories`; `app-id` is a deprecated alias for `client-id`. The token is minted once in the pre-activation job.
 
 Both fields can be defined in a **shared agentic workflow** and are inherited by importers (first-wins). A `CentralRepoOps` shared workflow can define the app config once and all importers benefit:
 
@@ -719,7 +681,7 @@ on:
   manual-approval: production
 ```
 
-Sets the `environment` on the activation job for human-in-the-loop approval before execution. The value must match a configured environment in repository Settings → Environments (approval rules, required reviewers, wait timers). See [GitHub's environment documentation](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment) for configuration details.
+Sets the `environment` on the activation job for human approval before execution. The value must match an environment in repository Settings → Environments. See [GitHub's environment documentation](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment) for configuration details.
 
 This setting takes precedence over the top-level [`environment:`](/gh-aw/reference/frontmatter/#environment-protection-environment) for the activation job. Without `manual-approval`, activation inherits the top-level environment and its protection rules.
 
@@ -745,7 +707,7 @@ on: weekly on monday
 
 A pre-activation check runs the query against the current repository. If matches reach or exceed the threshold (default `max: 1`), the workflow is skipped. All standard GitHub search qualifiers are supported (`is:`, `label:`, `in:title`, `author:`, etc.).
 
-Use `scope: none` to remove the automatic repo qualifier and search org-wide. For cross-repo or org-wide searches that need elevated permissions, configure `github-token` or `github-app` at the top-level `on:` section — the same token is shared across all skip-if checks and the activation job:
+For org-wide searches that need elevated permissions, set `scope: none` and configure `github-token` or `github-app` at the top-level `on:` section. That token is shared by all skip-if checks and the activation job:
 
 ```yaml wrap
 on:
@@ -788,7 +750,7 @@ If matches are below the threshold (default `min: 1`), the workflow is skipped. 
 
 ### Pre-Activation Steps (`on.steps:`)
 
-Inject custom deterministic steps directly into the pre-activation job. Steps run after all built-in checks (membership, stop-time, skip-if, etc.) and **before** agent execution. This saves one workflow job compared to the multi-job pattern and keeps filtering logic co-located with the trigger configuration.
+Inject deterministic steps into the pre-activation job. They run after the built-in checks (membership, stop-time, skip-if, etc.) and **before** agent execution, so no separate filter job is needed.
 
 ```yaml wrap
 on:
@@ -883,7 +845,7 @@ Supported permission scopes: `actions`, `checks`, `contents`, `deployments`, `di
 
 ## Trigger Shorthands
 
-Instead of writing full YAML trigger configurations, you can use natural-language shorthand strings with `on:`. The compiler expands these into standard GitHub Actions trigger syntax and automatically includes `workflow_dispatch` so the workflow can also be run manually.
+Natural-language shorthand strings in `on:` expand to standard GitHub Actions trigger syntax and automatically include `workflow_dispatch`, so the workflow can also be run manually.
 
 For label-based shorthands (`on: issue labeled bug`, `on: pull_request labeled needs-review`), see [Label Filtering](#filtering-with-labels-names) above. For the label-command pattern, see [Label Command Trigger](#label-command-trigger-label_command) above.
 
@@ -932,8 +894,6 @@ on: "deployment failed or error"    # deployment_status with state == 'failure' 
 ## Learn More
 
 - [Schedule Syntax](/gh-aw/reference/schedule-syntax/) - Complete schedule format reference
-- [Command Triggers](/gh-aw/reference/command-triggers/) - Special @mention triggers and context text
 - [Frontmatter](/gh-aw/reference/frontmatter/) - Complete frontmatter configuration
 - [DeterministicOps](/gh-aw/patterns/deterministic-ops/) - Combining deterministic steps with AI reasoning
-- [LabelOps](/gh-aw/patterns/label-ops/) - Label-based automation workflows
 - [Workflow Structure](/gh-aw/reference/workflow-structure/) - Directory layout and organization
