@@ -3,6 +3,8 @@ import fs from "fs";
 
 const { processRuntimeImports, removeConnectorDocumentation } = require("./runtime_import.cjs");
 const { renderMarkdownTemplate } = require("./render_template.cjs");
+require("./constants.cjs");
+require("./markdown_metadata.cjs");
 
 describe.each(["legacy-comment", "standalone"])("connector documentation runtime prompt boundary (%s)", format => {
   const workspace = "/workspace";
@@ -36,7 +38,7 @@ Visible ending.
       throw new Error("Network access is forbidden");
     });
     vi.stubGlobal("fetch", fetch);
-    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.spyOn(fs, "existsSync").mockImplementation(value => value === file || /url-[a-f0-9]+\.cache$/.test(String(value)));
     vi.spyOn(fs, "realpathSync").mockImplementation(value => value);
     vi.spyOn(fs, "statSync").mockReturnValue({ mtimeMs: Date.now() });
     vi.spyOn(fs, "readFileSync").mockImplementation(value => {
