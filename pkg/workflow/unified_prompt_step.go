@@ -29,15 +29,11 @@ type PromptSection struct {
 
 // removeConsecutiveEmptyLines removes consecutive empty lines, keeping only one
 func removeConsecutiveEmptyLines(content string) string {
-	lines := strings.Split(content, "\n")
-	if len(lines) == 0 {
-		return content
-	}
-
+	content = strings.ReplaceAll(content, "\r\n", "\n")
 	var result []string
 	lastWasEmpty := false
 
-	for _, line := range lines {
+	for line := range strings.SplitSeq(content, "\n") {
 		isEmpty := strings.TrimSpace(line) == ""
 
 		if isEmpty {

@@ -119,10 +119,14 @@ func TestPRCodeQualityReviewerWorkflowSafeOutputConsistency(t *testing.T) {
 
 	_, publication, ok := strings.Cut(string(source), "## skill: `review-publication`")
 	require.True(t, ok)
-	invocations := regexp.MustCompile("(?:safeoutputs[ \\t]+|(?:emit|call)[ \\t]+`)([a-z][a-z0-9_]*)").FindAllStringSubmatch(publication, -1)
+	invocationPattern := regexp.MustCompile("(?:safeoutputs[ \\t]+|(?:emit|call)[ \\t]+`)([a-z][a-z0-9_-]*)")
+	invocations := invocationPattern.FindAllStringSubmatch(publication, -1)
 	require.NotEmpty(t, invocations)
-	for _, invocation := range invocations {
-		assert.Contains(t, promptTools, invocation[1], "Reviewer instruction references an ungranted safe-output tool")
+	hyphenatedInvocation := invocationPattern.FindStringSubmatch("safeoutputs create-pull-request-review-comment")
+	require.Len(t, hyphenatedInvocation, 2)
+	for _, invocation := range append(invocations, hyphenatedInvocation) {
+		name := strings.ReplaceAll(invocation[1], "-", "_")
+		assert.Contains(t, promptTools, name, "Reviewer instruction references an ungranted safe-output tool")
 	}
 }
 
