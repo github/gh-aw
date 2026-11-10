@@ -11,6 +11,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/semverutil"
 	"github.com/goccy/go-yaml"
 )
 
@@ -28,14 +29,16 @@ func (c *Compiler) validateExpressions(workflowData *WorkflowData, markdownPath 
 	// to provide a specific, actionable error/warning message.
 	// In strict mode this returns an error that stops further validation.
 	// In non-strict mode it emits a warning and continues.
-	if err := c.validateSecretsSerializationExpressions(workflowData); err != nil {
+	expressionData := *workflowData
+	expressionData.MarkdownContent += "\n" + workflowData.PromptMarkdown
+	if err := c.validateSecretsSerializationExpressions(&expressionData); err != nil {
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
 
 	// Validate expression safety - check that all GitHub Actions expressions are in the allowed list.
 	// In non-strict mode, ${{ toJSON(secrets) }} occurrences were already warned about above;
 	// neutralize them so the allowlist does not re-surface them as errors.
-	markdownForAllowlist := removeXMLComments(workflowData.MarkdownContent)
+	markdownForAllowlist := removeXMLComments(expressionData.MarkdownContent)
 	if !c.effectiveStrictMode(workflowData.RawFrontmatter) {
 		markdownForAllowlist = neutralizeSecretsSerializationExpressions(markdownForAllowlist)
 	}
@@ -61,7 +64,7 @@ func (c *Compiler) validateExpressions(workflowData *WorkflowData, markdownPath 
 		}
 	}
 
-	if err := validatePromptSecretBindings(workflowData, c.collectRuntimeImportMarkdownForCompilerAnalysis(workflowData)); err != nil {
+	if err := validatePromptSecretBindings(workflowData, c.collectRuntimeImportMarkdownForPromptExpressions(workflowData)); err != nil {
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
 	// Warn when the prompt explicitly references /tmp/ or /tmp/gh-aw/ directly instead
@@ -85,6 +88,10 @@ func runtimeImportValidationMarkdown(workflowData *WorkflowData) string {
 
 	var seed strings.Builder
 	seed.WriteString(workflowData.MarkdownContent)
+	if workflowData.PromptMarkdown != "" {
+		seed.WriteByte('\n')
+		seed.WriteString(workflowData.PromptMarkdown)
+	}
 	if workflowData.MainWorkflowMarkdown != "" {
 		seed.WriteByte('\n')
 		seed.WriteString(workflowData.MainWorkflowMarkdown)
@@ -771,15 +778,10 @@ func (c *Compiler) validateWIFEngineAuth(workflowData *WorkflowData) error {
 }
 
 func (c *Compiler) validateThreatDetectionOpenAIWIFEngineAuth(workflowData *WorkflowData) error {
-	if workflowData == nil || workflowData.SafeOutputs == nil || workflowData.SafeOutputs.ThreatDetection == nil {
+	if workflowData == nil || workflowData.SafeOutputs == nil || workflowData.SafeOutputs.ThreatDetection == nil ||
+		workflowData.SafeOutputs.ThreatDetection.EngineDisabled {
 		return nil
 	}
-	detectionConfig := workflowData.SafeOutputs.ThreatDetection.EngineConfig
-	if detectionConfig == nil || detectionConfig.Auth == nil ||
-		detectionConfig.Auth.Type != "github-oidc" || detectionConfig.Auth.Provider != "openai" {
-		return nil
-	}
-
 	engineID := c.getThreatDetectionEngineID(workflowData)
 	detectionData := buildExternalDetectorWorkflowData(workflowData, engineID)
 	detectionData.Model = inheritedDetectionModel(workflowData, engineID)
@@ -793,11 +795,11 @@ func (c *Compiler) validateThreatDetectionOpenAIWIFEngineAuth(workflowData *Work
 }
 
 func validateOpenAIWIFEngineAuthAtPath(workflowData *WorkflowData, engineConfigPath string) error {
-	if workflowData == nil || workflowData.EngineConfig == nil || workflowData.EngineConfig.Auth == nil {
+	if workflowData == nil || workflowData.EngineConfig == nil {
 		return nil
 	}
-	auth := workflowData.EngineConfig.Auth
-	if auth.Type != "github-oidc" || auth.Provider != "openai" {
+	auth := resolveOpenAIWIFAuth(workflowData.EngineConfig)
+	if auth == nil {
 		return nil
 	}
 
@@ -823,7 +825,65 @@ func validateOpenAIWIFEngineAuthAtPath(workflowData *WorkflowData, engineConfigP
 	if NewCodexEngine().ResolveLLMProvider(workflowData) != LLMProviderOpenAI {
 		return fmt.Errorf("%s.auth with provider=openai requires the OpenAI inference provider", engineConfigPath)
 	}
+	if err := validateOpenAIWIFVersionSupport(workflowData, engineConfigPath); err != nil {
+		return err
+	}
 	return nil
+}
+
+func validateOpenAIWIFVersionSupport(workflowData *WorkflowData, engineConfigPath string) error {
+	firewallConfig := getFirewallConfig(workflowData)
+	configuredVersion := ""
+	if firewallConfig != nil {
+		configuredVersion = firewallConfig.Version
+	}
+	effectiveVersion := configuredVersion
+	if effectiveVersion == "" {
+		effectiveVersion = string(constants.DefaultFirewallVersion)
+	}
+	minVersion := string(constants.AWFOpenAIWIFMinVersion)
+	if !isFullSemanticVersion(effectiveVersion) || semverutil.Compare(effectiveVersion, minVersion) < 0 {
+		return NewValidationError(
+			engineConfigPath+".auth",
+			effectiveVersion,
+			fmt.Sprintf("OpenAI WIF requires AWF %s or newer", minVersion),
+			fmt.Sprintf("The effective AWF version is %s. Set sandbox.agent.version or network.firewall.version to %s or newer.", effectiveVersion, minVersion),
+		)
+	}
+
+	if agentConfig := getAgentConfig(workflowData); agentConfig != nil {
+		if image, ok := agentConfig.Images[awfImageRoleAPIProxy]; ok {
+			imageTag, found := imageReferenceTag(image)
+			if !found || !isFullSemanticVersion(imageTag) || semverutil.Compare(imageTag, minVersion) < 0 {
+				return NewValidationError(
+					"sandbox.agent.images.api-proxy",
+					image,
+					fmt.Sprintf("OpenAI WIF requires an API proxy image tagged %s or newer", minVersion),
+					fmt.Sprintf("The API proxy image tag %q does not establish support for OpenAI WIF. Use a digest-pinned image with a semantic version tag of %s or newer.", imageTag, minVersion),
+				)
+			}
+		}
+	}
+	return nil
+}
+
+func isFullSemanticVersion(version string) bool {
+	version = strings.TrimPrefix(version, "v")
+	parts := strings.Split(version, ".")
+	if len(parts) != 3 {
+		return false
+	}
+	for _, part := range parts {
+		if part == "" {
+			return false
+		}
+		for _, digit := range part {
+			if digit < '0' || digit > '9' {
+				return false
+			}
+		}
+	}
+	return semverutil.IsValid(version)
 }
 
 func validateAzureWIFEngineAuth(workflowData *WorkflowData) error {

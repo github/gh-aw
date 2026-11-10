@@ -3,11 +3,13 @@ title: Using OpenAI Codex with GitHub Agentic Workflows
 description: Authenticate OpenAI Codex and run your first GitHub Agentic Workflow.
 ---
 
-Run Codex on GitHub events using an OpenAI API key or GitHub Copilot inference. ChatGPT subscription login is not supported.
+Run Codex on GitHub events using an OpenAI API key, OpenAI Workload Identity Federation (WIF), or GitHub Copilot inference. ChatGPT subscription login is not supported.
 
 ## Connect your account
 
 Set `engine: codex`, choose an OpenAI model, and add a [`CODEX_API_KEY` or `OPENAI_API_KEY`](/gh-aw/reference/auth/#openai_api_key) repository secret.
+
+For keyless OpenAI inference, configure an OpenAI identity provider and service account, grant `id-token: write`, and set [`engine.auth` for OpenAI WIF](/gh-aw/reference/auth/#codex-openai-workload-identity-federation). This replaces the API key for Codex inference and requires the AWF sandbox at `v0.29.11` or newer.
 
 To use Copilot inference instead, select a Codex-compatible `copilot/` model and grant [`copilot-requests: write`](/gh-aw/reference/auth/#copilot-requests-write-permission). This requires no OpenAI key. See [provider configuration](/gh-aw/reference/engines/codex/#github-copilot-inference) for details.
 

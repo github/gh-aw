@@ -143,10 +143,17 @@ A **Complete Conforming Implementation** MUST satisfy Basic Conformance and:
 - Parse and validate `trusted-users` configuration field
 - Elevate content items from users in `trusted-users` to "approved" integrity regardless of author_association
 - Parse and validate `approval-labels` configuration field
+
 - Promote content items bearing a label in `approval-labels` to "approved" integrity level
 - Validate configuration at compilation time with actionable error messages
 - Enforce all access controls at runtime through gateway middleware
 - Support all configuration fields in combination
+
+These are normative target requirements, not a claim that the local `gh-aw`
+compiler implements every field. As verified on 2026-11-10, `roles` and
+`private-repos` remain normative but are deferred in the local compiler; the
+local implementation therefore does not claim Complete Conformance for those
+controls. Section 4.8 records each status explicitly.
 
 ### 2.2 Requirements Notation
 
@@ -1084,8 +1091,8 @@ The index covers every top-level field named in Sections 4.1–4.4. Go entities 
 | `github-app` | `GitHubToolConfig.GitHubApp` (`GitHubAppConfig`) |
 | `allowed-repos` | `GitHubToolConfig.AllowedRepos` (`GitHubReposScope`) |
 | `repos` (deprecated alias) | `GitHubToolConfig.Repos` (`GitHubReposScope`); `parseGitHubTool()` normalizes it into `AllowedRepos` |
-| `roles` | No `tools.github.roles` field in `GitHubToolConfig`; `WorkflowData.Roles` represents top-level workflow trigger roles and is not equivalent to this field |
-| `private-repos` | No corresponding field in `GitHubToolConfig` or `pkg/workflow/` gateway model |
+| `roles` | No `tools.github.roles` field in `GitHubToolConfig`; `WorkflowData.Roles` represents top-level workflow trigger roles and is not equivalent to this field. Normative; deferred in the local compiler. |
+| `private-repos` | No corresponding field in `GitHubToolConfig` or `pkg/workflow/` gateway model. Normative; deferred in the local compiler. |
 | `min-integrity` | `GitHubToolConfig.MinIntegrity` (`GitHubIntegrityLevel`) |
 | `blocked-users` | `GitHubToolConfig.BlockedUsers` (`[]string`); expression input is tracked separately in `BlockedUsersExpr` |
 | `trusted-users` | `GitHubToolConfig.TrustedUsers` (`[]string`); expression input is tracked separately in `TrustedUsersExpr` |
@@ -2772,7 +2779,7 @@ function queryWithBackoff(request):
 
 This section records the current mapping of Section 4 configuration fields to the compiler model, including fields for which no corresponding local Go entity exists.
 
-**Last verified**: 2026-11-04
+**Last verified**: 2026-11-10
 
 | Field | Current implementation mapping | Status |
 |---|---|---|
@@ -2780,14 +2787,15 @@ This section records the current mapping of Section 4 configuration fields to th
 | `tools` | Compiler field is `GitHubToolConfig.Allowed` (`allowed`), not `tools` | Naming difference; see Section 4.8 |
 | `allowed-repos`, `repos` | `GitHubToolConfig.AllowedRepos` / `Repos`; parsing and validation in `tools_parser.go` and `tools_validation_github.go` | Present; `repos` is deprecated |
 | `min-integrity`, `blocked-users`, `trusted-users`, `approval-labels` | Corresponding `GitHubToolConfig` fields, parsed in `tools_parser.go` and validated in `tools_validation_github.go` | Present |
-| `roles`, `private-repos` | No matching GitHub MCP fields in the current `pkg/workflow/` model | Specification-to-implementation gap; do not equate top-level `WorkflowData.Roles` with `tools.github.roles` |
+| `roles` | No `tools.github.roles` field in the current `pkg/workflow/` model | Normative; deferred locally. `WorkflowData.Roles` is not equivalent to `tools.github.roles`. |
+| `private-repos` | No matching field in the current `pkg/workflow/` model | Normative; deferred locally. |
 
 Sync procedure:
 1. Update this index and the §4 field definitions when any listed parser, model, or validation path changes.
 2. Resolve the `tools`, `roles`, and `private-repos` mismatches before claiming those keys are supported by the local compiler.
 3. Update the §11 compliance references and run `go test ./pkg/workflow/ -run 'TestValidateGitHub|TestFormal' -count=1`.
 
-### Historical Divergence Audit (2026-06-21; superseded by the 2026-11-04 index)
+### Historical Divergence Audit (2026-06-21; superseded by the 2026-11-10 index)
 
 Cross-reference of `scratchpad/github-mcp-access-control-specification.md` and `scratchpad/guard-policies-specification.md` against `pkg/workflow/tools_validation_github.go` and `pkg/workflow/mcp_github_config.go`:
 
@@ -2807,14 +2815,14 @@ Cross-reference of `scratchpad/github-mcp-access-control-specification.md` and `
 
 This section lists the files that **MUST** be reviewed and updated whenever a normative section of this specification changes, especially §8.5 (combined evaluation order), §4.4 (field definitions), and §11 (compliance tests).
 
-The 2026-11-04 review closed stale local follow-ups. Changes to §8.5 still require external gateway confirmation because the production evaluator is not in this repository; changes to §4.4 retain the forward-looking update procedure below.
+The 2026-11-10 review reconciled local field status and closed stale follow-ups. Changes to §8.5 still require external gateway confirmation because the production evaluator is not in this repository; changes to §4.4 retain the forward-looking update procedure below.
 
-### Follow-up Status (2026-11-04)
+### Follow-up Status (2026-11-10)
 
 | Follow-up | Status |
 |---|---|
 | §8.5 evaluation order | Local model and fixture rechecked; carry forward external production-gateway confirmation for any future order change. |
-| §4.4 field changes | No current local edit pending; retain the listed schema, type, parser, validation, and compliance updates for future changes. |
+| §4.4 field changes | `roles` and `private-repos` remain normative but deferred locally; retain schema, type, parser, validation, and compliance updates for any implementation work. |
 
 ### After Changing §8.5 Combined Evaluation Order
 

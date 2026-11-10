@@ -26,7 +26,7 @@ func promptValueUsesCredentials(value string) bool {
 
 func validatePromptSecretBindings(data *WorkflowData, localImports string) error {
 	env := parseEnvYAMLSection(data.Env)
-	prompt := removeXMLComments(data.MarkdownContent + "\n" + data.MainWorkflowMarkdown + "\n" + data.ImportedMarkdown + "\n" + localImports)
+	prompt := removeXMLComments(data.MarkdownContent + "\n" + data.MainWorkflowMarkdown + "\n" + data.PromptMarkdown + "\n" + data.ImportedMarkdown + "\n" + localImports)
 	for _, ref := range interpolationReferences(wrapExpressionsInTemplateConditionals(prompt)) {
 		if len(ref) < 2 || !strings.EqualFold(ref[0], "env") { //nolint:uncheckedsliceindex // Short-circuiting checks the context bounds.
 			continue
