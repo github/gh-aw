@@ -13,10 +13,16 @@ permissions:
   pull-requests: read
 engine:
   id: codex
+  env:
+    GOCACHE: /tmp/gh-aw/agent/go-build-cache
+    GOMODCACHE: /tmp/gh-aw/agent/go-mod-cache
   model-provider: github
   model-routing:
     goal: cost
     mode: economy
+steps:
+  - name: Provision disposable Go validation caches
+    run: mkdir -p /tmp/gh-aw/agent/go-build-cache /tmp/gh-aw/agent/go-mod-cache
 strict: true
 timeout-minutes: 30
 network:
@@ -90,6 +96,8 @@ Apply the safety exclusions below before assessing eligibility.
 Do not change assertions, test behavior, production code, dependencies, generated files, or vendored files. When safety is uncertain, make no change.
 
 ## Validate
+
+Use the disposable Go build and module caches provisioned by this workflow through `GOCACHE` and `GOMODCACHE`; do not read pre-existing caches or inspect the process environment.
 
 After editing the selected batch:
 

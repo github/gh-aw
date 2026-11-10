@@ -912,6 +912,10 @@ func displayBatchCompilationNotices(compiler *workflow.Compiler, config CompileC
 		}
 	}
 
+	if count := compiler.DefaultModelRoutingWorkflowCount(); count > 0 {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(workflow.DefaultModelRoutingBatchNotice(count)))
+	}
+
 	if compiler.CopilotRequestsTipNeeded() {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(
 			"Copilot token-based inference may be available: add permissions.copilot-requests: write. "+

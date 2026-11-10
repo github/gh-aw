@@ -178,7 +178,7 @@ func TestModelRoutingCandidateExpressionsAndImportedCandidates(t *testing.T) {
 	compiler := &Compiler{}
 	data.EngineConfig = compiler.mergeImportedModelRoutingConfigs(data.EngineConfig, []string{
 		`{"id":"copilot","model-routing":{"goal":"cost-speed","mode":"economy","allowed-models":["claude-haiku-4.5","${{ inputs.extra-model }}"]}}`,
-	})
+	}, false)
 	setRoutingCandidateModelsProxyImage(data, "0.28.33")
 
 	configJSON, err := BuildAWFConfigJSON(AWFCommandConfig{

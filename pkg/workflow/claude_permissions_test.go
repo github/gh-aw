@@ -28,7 +28,7 @@ func TestClaudeScopedMemoryPermissions(t *testing.T) {
 		CacheMemoryConfig: &CacheMemoryConfig{Caches: []CacheMemoryEntry{{ID: ""}}},
 	}
 
-	allowed := NewClaudeEngine().computeAllowedClaudeToolsString(data.Tools, nil, data.CacheMemoryConfig, nil, nil, nil)
+	allowed := NewClaudeEngine().computeAllowedClaudeToolsStringWithDynamicWorkflows(data.Tools, nil, data.CacheMemoryConfig, nil, nil, nil, false)
 	assert.Contains(t, allowed, "Edit(//tmp/gh-aw/cache-memory/**)")
 	assert.NotContains(t, allowed, "Write(")
 	assert.NotContains(t, allowed, "MultiEdit(")

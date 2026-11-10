@@ -4,7 +4,7 @@
 
 ## Overview
 
-The `envutil` package centralizes the pattern of reading environment variables, validating typed values where needed, and falling back to a default value when the variable is absent or invalid. It emits warning messages to stderr when an invalid typed value is encountered, following the console formatting conventions of the rest of the codebase.
+The `envutil` package centralizes the pattern of reading environment variables, validating typed values where needed, and falling back to a default value when the variable is absent or invalid. Warnings for invalid typed values are formatted to stderr when no logger is supplied; when a logger is supplied, they are routed through that logger.
 
 The package exposes helpers for integer, boolean, and string values so callers can avoid scattered `os.Getenv` checks while preserving consistent defaulting and debug logging behavior.
 
@@ -39,8 +39,8 @@ Reads `envVar` from the process environment, parses it as an integer, validates 
 - MUST return `defaultValue` and emit a warning when the value cannot be parsed as an integer.
 - MUST return `defaultValue` and emit a warning when the value is outside `[minValue, maxValue]` (bounds are inclusive).
 - MUST log the accepted value via `debugLog` when `debugLog` is non-nil.
-- SHOULD emit warnings formatted via `console.FormatWarningMessage` to `os.Stderr` when `debugLog` is `nil`.
-- MAY route warnings through `debugLog.Printf` when `debugLog` is non-nil instead of writing directly to stderr.
+- MUST emit warnings formatted via `console.FormatWarningMessage` to `os.Stderr` when `debugLog` is `nil`.
+- MUST route warnings through `debugLog.Printf` when `debugLog` is non-nil; the logger controls whether and how the message is emitted.
 
 #### `GetBoolFromEnv`
 
@@ -60,8 +60,8 @@ Reads `envVar` from the process environment, parses it as a boolean using Go's s
 - MUST return `defaultValue` when the environment variable is not set (empty string).
 - MUST return `defaultValue` and emit a warning when the value cannot be parsed as a boolean.
 - MUST log the accepted value via `debugLog` when `debugLog` is non-nil.
-- SHOULD emit warnings formatted via `console.FormatWarningMessage` to `os.Stderr` when `debugLog` is `nil`.
-- MAY route warnings through `debugLog.Printf` when `debugLog` is non-nil instead of writing directly to stderr.
+- MUST emit warnings formatted via `console.FormatWarningMessage` to `os.Stderr` when `debugLog` is `nil`.
+- MUST route warnings through `debugLog.Printf` when `debugLog` is non-nil; the logger controls whether and how the message is emitted.
 
 #### `GetStringFromEnv`
 
@@ -112,7 +112,7 @@ timeout := envutil.GetIntFromEnv("GH_AW_TIMEOUT", 60, 1, 3600, nil)
 ## Design Decisions
 
 - Warning messages use `console.FormatWarningMessage` so they render consistently in terminals.
-- All warnings go to `os.Stderr` to avoid polluting structured stdout output.
+- Warnings go directly to `os.Stderr` only when no logger is supplied; otherwise they are passed to the logger, which controls their output.
 - Typed helpers use Go standard library parsing rules (`strconv.Atoi`, `strconv.ParseBool`) for predictable behavior.
 - `GetStringFromEnv` logs a message of the form `Using ENV_VAR from environment` when a value is found, never the value itself, so secret-like values can be read without echoing their contents.
 - When `debugLog` is non-nil, warnings are routed through the logger rather than written directly to stderr, allowing callers to control output formatting.

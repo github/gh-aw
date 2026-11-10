@@ -169,6 +169,25 @@ function readRequiredProducerFile(file, limit = producerFileLimit) {
   return text;
 }
 
+function normalizeRestoredState(original) {
+  if (!object(original) || !object(original.tested) || !Array.isArray(original.strategies)) return original;
+  const state = { ...original, tested: {} };
+  const metadata = {};
+  for (const key of ["halted", "note", "escalation_issue"]) {
+    if (!Object.hasOwn(state, key)) continue;
+    metadata[key] = state[key];
+    delete state[key];
+  }
+  for (const [id, result] of Object.entries(original.tested)) {
+    const configId = /^(0|[1-9][0-9]{0,3})$/.test(id) ? configIds[Number(id)] : id;
+    if (!configIds.includes(configId) || Object.hasOwn(state.tested, configId)) throw new TypeError("Invalid required git simulator tested cell");
+    state.tested[configId] = configId !== id && object(result) && result.issue_url === "filed" ? { ...result, issue_url: null } : result;
+  }
+  // Keep legacy narrative as producer history, never in the agent-visible state.
+  if (Object.keys(metadata).length) state.strategies = [...original.strategies, { legacy_metadata: metadata }];
+  return state;
+}
+
 function isolateMemory({ memoryDir, workspace, notes = [], outputPath, privateGitDir, privateHistoryPath }) {
   const statePath = path.join(memoryDir, "git-sim-state.json");
   let state = freshState();
@@ -176,7 +195,7 @@ function isolateMemory({ memoryDir, workspace, notes = [], outputPath, privateGi
   const stat = fs.lstatSync(statePath, { throwIfNoEntry: false });
   if (stat) {
     if (!stat.isFile() || stat.size > 204800) throw new TypeError("Invalid required git simulator state file");
-    const original = JSON.parse(readRequiredProducerFile(statePath));
+    const original = normalizeRestoredState(JSON.parse(readRequiredProducerFile(statePath)));
     state = sanitizeState(original);
     originalStrategies = original.strategies;
   }

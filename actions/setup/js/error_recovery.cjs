@@ -568,6 +568,7 @@ module.exports = {
   withRetry,
   sleep,
   isTransientError,
+  isRateLimitError,
   isWorkflowsScopeTimeoutError,
   getRetryAfterMs,
   enhanceError,

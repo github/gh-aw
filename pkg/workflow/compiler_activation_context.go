@@ -228,6 +228,10 @@ func addActivationExperimentOutputs(ctx *activationJobBuildContext) {
 func (c *Compiler) addActivationEngineOutputs(ctx *activationJobBuildContext, engine CodingAgentEngine) {
 	ctx.engine = engine
 	compilerActivationJobLog.Print("Generating aw_info step in activation job")
+	if decisionStep := generateModelRoutingDecisionStep(ctx.data); decisionStep != "" {
+		ctx.steps = append(ctx.steps, decisionStep)
+		ctx.outputs[modelRoutingDecisionOutput] = "${{ steps." + modelRoutingDecisionStepID + ".outputs." + modelRoutingDecisionOutput + " }}"
+	}
 	var awInfoYAML strings.Builder
 	c.generateCreateAwInfo(&awInfoYAML, ctx.data, engine)
 	ctx.steps = append(ctx.steps, awInfoYAML.String())

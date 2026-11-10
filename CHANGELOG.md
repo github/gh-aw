@@ -13,6 +13,14 @@ and mixed edits continue to require write-or-higher repository permission.
 
 ### Breaking changes
 
+Eligible workflows that select neither a model nor routing now default to
+`goal: cost`, `mode: balanced` model routing on GitHub Copilot inference.
+After recompilation, the selected model, output, and cost may differ. To retain
+the previous non-routed model selection, set `engine.model-routing: false` and
+recompile; to keep a stable model, configure it explicitly. Explicit routing
+configurations are unchanged. Review generated locks and audit model and cost
+changes after recompilation.
+
 `pull_request_target` workflows now default to same-repository PRs only in both
 strict and non-strict mode. Omitting `forks` is equivalent to `forks: []`; no
 explicit empty list is required. To admit forks, configure exact `owner/repo`

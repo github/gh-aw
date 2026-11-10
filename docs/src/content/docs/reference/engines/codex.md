@@ -7,7 +7,7 @@ For first-time setup, see [Using OpenAI Codex](/gh-aw/engines/codex/). Shared op
 
 ## Selection and authentication
 
-Use `engine: codex` with `CODEX_API_KEY` or `OPENAI_API_KEY`. ChatGPT subscription login is unsupported. The default CLI pin is `0.166.0`; override it with `engine.version`.
+Use `engine: codex` with `CODEX_API_KEY` or `OPENAI_API_KEY`. ChatGPT subscription login is unsupported. The default CLI pin is `0.167.0`; override it with `engine.version`.
 
 Codex has no default model. Set `model` explicitly or configure the repository's model-selection variables; see [model selection](/gh-aw/reference/model-tables/).
 
@@ -30,6 +30,8 @@ To authenticate:
 - Otherwise, provide a [`COPILOT_GITHUB_TOKEN`](/gh-aw/reference/auth/#copilot_github_token) secret containing a fine-grained PAT with Copilot Requests access.
 
 GitHub inference requires the AWF sandbox. Do not set `sandbox.agent: false` for this provider. For a model supplied through an expression or repository variable, set `engine.model-provider: github` explicitly; runtime model prefixes do not change the selected credentials.
+
+With `engine.model-provider: github` and no `model`, `engine.model`, or `engine.model-routing`, the main agent uses [model routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model) with `goal: cost` and `mode: balanced`, limited to GPT models. A nonempty `GH_AW_MODEL_AGENT_CODEX` or `GH_AW_DEFAULT_MODEL_CODEX` variable bypasses routing at run time; `engine.model-routing: false` opts out. The native OpenAI route isn't routed by default.
 
 GitHub inference uses direct function-backed `exec_command` for native shell execution unless `tools.bash: false`. JavaScript code mode is disabled because the compatibility adapter does not support its custom `exec` tool. gh-aw generates a direct-tool catalog from the installed binary's bundled metadata; MCP and `apply_patch` remain available. The binary must support `debug models --bundled`. `engine.config` cannot re-enable code mode or replace the managed catalog. OpenAI inference is unchanged.
 

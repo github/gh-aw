@@ -75,7 +75,9 @@ func (c *Compiler) addActivationSteeringIssueStep(ctx *activationJobBuildContext
 		fmt.Sprintf("          GH_AW_WORKFLOW_ID: %q\n", ctx.data.WorkflowID),
 		"          GH_AW_ENGINE_ID: ${{ steps.generate_aw_info.outputs.engine_id }}\n",
 	)
-	if ctx.data.EngineConfig == nil || ctx.data.EngineConfig.ModelRouting == nil {
+	if isModelRoutingRuntimeGuarded(ctx.data) {
+		ctx.steps = append(ctx.steps, "          GH_AW_ENGINE_MODEL: ${{ "+modelRoutingInactiveInActivation+" && steps.generate_aw_info.outputs.model || '' }}\n")
+	} else if ctx.data.EngineConfig == nil || ctx.data.EngineConfig.ModelRouting == nil {
 		ctx.steps = append(ctx.steps, "          GH_AW_ENGINE_MODEL: ${{ steps.generate_aw_info.outputs.model }}\n")
 	}
 	if ctx.data.EngineConfig != nil && ctx.data.EngineConfig.Version != "" {

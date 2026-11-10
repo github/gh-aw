@@ -1,6 +1,12 @@
 """Regression checks for the Super Linter GO_MODULES directory selection."""
 
+import json
+import os
 import re
+import shlex
+import subprocess
+import tempfile
+import textwrap
 import unittest
 from pathlib import Path
 
@@ -10,6 +16,7 @@ from summarize_super_linter import summarize_log
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / ".github/workflows/super-linter.md"
 LOCK = ROOT / ".github/workflows/super-linter.lock.yml"
+RUNNER = ROOT / "scripts/run_super_linter.sh"
 
 
 class SuperLinterScopeTests(unittest.TestCase):
@@ -78,15 +85,139 @@ class SuperLinterScopeTests(unittest.TestCase):
         self.assertIn("twenty examples total", self.source)
         self.assertIn("does not establish an exploitable vulnerability", self.source)
         self.assertNotIn("[Include the full linter output here]", self.source)
-        self.assertIn("golangci-lint@v2.15.0", self.source)
-        self.assertIn("GOTOOLCHAIN=\"$(go env GOVERSION)\"", self.source)
-        self.assertIn("exec /action/lib/linter.sh", self.source)
+        runner = RUNNER.read_text()
+        self.assertIn("golangci-lint@v2.15.0", runner)
+        self.assertIn("GOTOOLCHAIN=\"$(go env GOVERSION)\"", runner)
+        self.assertIn("exec /action/lib/linter.sh", runner)
         self.assertIn("super-linter:v9.0.0@sha256:", self.source)
         self.assertIn("max-retries: 1", self.source)
         self.assertIn("COPILOT_MODEL: mai-code-1.1-flash", lock)
         for text in (self.source, lock):
             self.assertIn("/tmp/super-linter-summary.json", text)
         self.assertIn("analysis incomplete", self.source)
+
+
+class SuperLinterStartupTests(unittest.TestCase):
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.root = Path(temp.name)
+        self.workspace = self.root / "workspace with spaces"
+        self.workspace.mkdir()
+        self.artifacts = self.root / "artifacts"
+        self.artifacts.mkdir()
+        self.source = SOURCE.read_text()
+        mock = self.root / "mock.bash"
+        mock.write_text(textwrap.dedent("""\
+            go() {
+              if [ "$*" = "env GOVERSION" ]; then
+                echo go1.27.0
+                return "${MOCK_GO_ENV_EXIT:-0}"
+              fi
+              [ "$*" = "install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0" ] || exit 99
+              [ "$GOTOOLCHAIN" = go1.27.0 ] && [ "$CGO_ENABLED" = 0 ] || exit 98
+              echo "analyzer installation" >&2
+              return "${MOCK_INSTALL_EXIT:-0}"
+            }
+            exec() {
+              [ "$*" = /action/lib/linter.sh ] || exit 97
+              [ "$PWD" = "$GITHUB_WORKSPACE" ] || exit 96
+              [ "$CREATE_LOG_FILE" = true ] || exit 95
+              [ "${PATH%%:*}" = "$GOBIN" ] || exit 94
+              echo "original linter output" >&2
+              if [ "${MOCK_WRITE_LOG:-true}" = true ]; then
+                printf '%s' "$MOCK_LOG" > "$GITHUB_WORKSPACE/$LOG_FILE"
+              fi
+              exit "${MOCK_LINTER_EXIT:-0}"
+            }
+        """))
+        self.env = {
+            "PATH": os.defpath,
+            "BASH_ENV": str(mock),
+            "GITHUB_WORKSPACE": str(self.workspace),
+            "CREATE_LOG_FILE": "true",
+            "LOG_FILE": re.search(r"^\s+LOG_FILE: (\S+)", self.source, re.MULTILINE).group(1),
+            "MOCK_LOG": "[INFO] All files linted successfully\n",
+        }
+
+    def run_linter(self, **env):
+        return subprocess.run(
+            ["bash", str(RUNNER)], cwd=self.root, env={**self.env, **env},
+            text=True, capture_output=True, timeout=10,
+        )
+
+    def summarize(self, outcome):
+        script = re.search(
+            r"      - name: Check for linting issues\n.*?        run: \|\n(.*?)\n      - name:",
+            self.source, re.DOTALL,
+        ).group(1)
+        script = textwrap.dedent(script)
+        script = script.replace("/tmp/super-linter", str(self.artifacts / "super-linter"))
+        script = script.replace(
+            "scripts/summarize_super_linter.py",
+            shlex.quote(str(ROOT / "scripts/summarize_super_linter.py")),
+        )
+        return subprocess.run(
+            ["bash", "-e", "-c", script], cwd=self.workspace,
+            env={"PATH": os.defpath, "LINTER_OUTCOME": outcome},
+            text=True, capture_output=True, timeout=10,
+        )
+
+    def test_action_passes_a_script_without_shell_quote_parsing(self):
+        for text in (self.source, LOCK.read_text()):
+            self.assertIn("args: /github/workspace/scripts/run_super_linter.sh", text)
+            self.assertIn("entrypoint: /bin/bash", text)
+            self.assertIn("/tmp/super-linter-startup.log", text)
+            self.assertIn("for log in super-linter.log super-linter-output/super-linter-startup.log", text)
+        self.assertIn("-e GITHUB_WORKSPACE=/tmp/gh-aw/agent", self.source)
+        self.assertIn("/tmp/gh-aw/agent/scripts/run_super_linter.sh", self.source)
+
+    def test_nonempty_workspace_log_reaches_deterministic_summary(self):
+        result = self.run_linter()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual((self.workspace / self.env["LOG_FILE"]).read_text(), self.env["MOCK_LOG"])
+        summary_result = self.summarize("success")
+        self.assertEqual(summary_result.returncode, 0, summary_result.stdout + summary_result.stderr)
+        summary = json.loads((self.artifacts / "super-linter-summary.json").read_text())
+        self.assertTrue(summary["coverage_complete"])
+
+    def test_linter_failure_preserves_exit_output_and_incomplete_coverage(self):
+        result = self.run_linter(
+            MOCK_LINTER_EXIT="42",
+            MOCK_LOG="pkg/example/example.go:5:2: unsafe conversion (gosec)\n",
+        )
+        self.assertEqual(result.returncode, 42)
+        startup = self.workspace / "super-linter-output/super-linter-startup.log"
+        self.assertIn("original linter output", startup.read_text())
+        self.assertIn("original linter output", result.stdout)
+        summary_result = self.summarize("failure")
+        self.assertEqual(summary_result.returncode, 0, summary_result.stdout + summary_result.stderr)
+        summary = json.loads((self.artifacts / "super-linter-summary.json").read_text())
+        self.assertFalse(summary["coverage_complete"])
+        self.assertEqual(summary["counts"]["source"], 1)
+
+    def test_setup_failure_is_retained_but_not_used_as_lint_coverage(self):
+        result = self.run_linter(MOCK_INSTALL_EXIT="23")
+        self.assertEqual(result.returncode, 23)
+        startup = self.workspace / "super-linter-output/super-linter-startup.log"
+        self.assertIn("analyzer installation", startup.read_text())
+        self.assertNotIn("original linter output", startup.read_text())
+        self.assertFalse((self.workspace / self.env["LOG_FILE"]).exists())
+        summary = self.summarize("failure")
+        self.assertNotEqual(summary.returncode, 0)
+        self.assertIn("analysis is unavailable", summary.stdout)
+
+    def test_toolchain_lookup_failure_stops_before_installation(self):
+        result = self.run_linter(MOCK_GO_ENV_EXIT="24")
+        self.assertEqual(result.returncode, 24)
+        self.assertNotIn("analyzer installation", result.stdout)
+
+    def test_missing_and_empty_logs_remain_unavailable(self):
+        for env in ({"MOCK_WRITE_LOG": "false"}, {"MOCK_LOG": ""}):
+            with self.subTest(env=env):
+                self.assertEqual(self.run_linter(**env).returncode, 0)
+                self.assertNotEqual(self.summarize("success").returncode, 0)
+                self.assertFalse((self.artifacts / "super-linter-summary.json").exists())
 
 
 class SuperLinterSummaryTests(unittest.TestCase):
